@@ -697,7 +697,7 @@
     "ingredientsLabel": "Zutaten",
     "addToMeals": "In Essensplan übernehmen",
     "openLink": "Rezept-Link öffnen",
-    "deleteConfirm": "Rezept „{{title}}" löschen?",
+    "deleteConfirm": "Rezept \"{{title}}\" löschen?",
     "created": "Rezept gespeichert.",
     "updated": "Rezept aktualisiert.",
     "deleted": "Rezept gelöscht.",
