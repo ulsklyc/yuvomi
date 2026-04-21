@@ -22,9 +22,10 @@
     "test:modal-utils": "node --loader ./test-browser-loader.mjs test-modal-utils.js",
     "test:reminders": "node --experimental-sqlite test-reminders.js",
     "test:api": "node test-api.js",
+    "test:setup": "node test-setup.js",
     "test:ics-parser": "node test-ics-parser.js",
     "test:ics-sub": "node --experimental-sqlite test-ics-subscription.js",
-    "test": "node --experimental-sqlite test-db.js && node --experimental-sqlite test-dashboard.js && node --experimental-sqlite test-tasks.js && node --experimental-sqlite test-shopping.js && node --experimental-sqlite test-meals.js && node --experimental-sqlite test-calendar.js && node --experimental-sqlite test-notes-contacts-budget.js && npm run test:ux-utils && npm run test:modal-utils && npm run test:reminders && npm run test:api && npm run test:ics-parser && npm run test:ics-sub"
+    "test": "node --experimental-sqlite test-db.js && node --experimental-sqlite test-dashboard.js && node --experimental-sqlite test-tasks.js && node --experimental-sqlite test-shopping.js && node --experimental-sqlite test-meals.js && node --experimental-sqlite test-calendar.js && node --experimental-sqlite test-notes-contacts-budget.js && npm run test:ux-utils && npm run test:modal-utils && npm run test:reminders && npm run test:api && npm run test:ics-parser && npm run test:ics-sub && npm run test:setup"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

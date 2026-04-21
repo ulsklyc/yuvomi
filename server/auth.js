@@ -234,6 +234,55 @@ router.post('/logout', requireAuth, csrfMiddleware, (req, res) => {
 });
 
 /**
+ * POST /api/v1/auth/setup
+ * First-run bootstrap: creates the first admin when no users exist.
+ * Returns 403 if any user already exists.
+ * Body: { username: string, display_name: string, password: string }
+ * Response: { user: { id, username, display_name, avatar_color, role } }
+ */
+router.post('/setup', loginLimiter, async (req, res) => {
+  try {
+    const { count } = db.get().prepare('SELECT COUNT(*) as count FROM users').get();
+    if (count > 0) {
+      return res.status(403).json({ error: 'Setup already completed.', code: 403 });
+    }
+
+    const { username, display_name, password } = req.body;
+
+    if (!username || !display_name || !password) {
+      return res.status(400).json({ error: 'username, display_name and password are required.', code: 400 });
+    }
+    if (!/^[a-zA-Z0-9._-]{3,64}$/.test(username)) {
+      return res.status(400).json({ error: 'Username must be 3-64 chars (letters, numbers, . - _).', code: 400 });
+    }
+    if (display_name.length > 128) {
+      return res.status(400).json({ error: 'display_name must not exceed 128 characters.', code: 400 });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters.', code: 400 });
+    }
+
+    const avatarColors = ['#007AFF', '#34C759', '#FF9500', '#FF3B30', '#AF52DE', '#FF2D55'];
+    const avatarColor = avatarColors[Math.floor(Math.random() * avatarColors.length)];
+    const hash = await bcrypt.hash(password, 12);
+
+    const result = db.get()
+      .prepare('INSERT INTO users (username, display_name, password_hash, avatar_color, role) VALUES (?, ?, ?, ?, ?)')
+      .run(username, display_name, hash, avatarColor, 'admin');
+
+    res.status(201).json({
+      user: { id: result.lastInsertRowid, username, display_name, avatar_color: avatarColor, role: 'admin' },
+    });
+  } catch (err) {
+    if (err.message?.includes('UNIQUE constraint')) {
+      return res.status(409).json({ error: 'Username already taken.', code: 409 });
+    }
+    log.error('Setup error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
  * GET /api/v1/auth/me
  * Response: { user: { id, username, display_name, avatar_color, role } }
  */
