@@ -42,7 +42,8 @@
     "settings": "सेटिंग्स",
     "main": "मुख्य नेविगेशन",
     "navigation": "नेविगेशन",
-    "quickActions": "त्वरित क्रियाएं"
+    "quickActions": "त्वरित क्रियाएं",
+    "recipes": "Recipes"
   },
   "dashboard": {
     "title": "डैशबोर्ड",
@@ -242,7 +243,11 @@
     "loadingIndicator": "लोड हो रहा है…",
     "recipeUrlLabel": "रेसिपी लिंक (वैकल्पिक)",
     "recipeUrlPlaceholder": "https://…",
-    "openRecipe": "रेसिपी खोलें"
+    "openRecipe": "रेसिपी खोलें",
+    "savedRecipeLabel": "Saved recipe",
+    "savedRecipePlaceholder": "Select recipe",
+    "saveAsRecipe": "Save as recipe",
+    "recipeScaleLabel": "Scale ingredients"
   },
   "calendar": {
     "title": "कैलेंडर",
@@ -604,5 +609,29 @@
     "unitWeeks": "सप्ताह",
     "unitMonth": "माह",
     "unitMonths": "माह"
+  },
+  "recipes": {
+    "title": "Recipes",
+    "addRecipe": "Add recipe",
+    "editRecipe": "Edit recipe",
+    "emptyTitle": "No recipes yet",
+    "emptyDescription": "Save your favorite recipes and reuse them in meal planning.",
+    "titleLabel": "Title *",
+    "titlePlaceholder": "e.g. Pasta Carbonara",
+    "notesLabel": "Notes",
+    "notesPlaceholder": "Optional...",
+    "urlLabel": "Recipe link",
+    "urlPlaceholder": "https://...",
+    "ingredientsLabel": "Ingredients",
+    "addToMeals": "Add to meal plan",
+    "openLink": "Open recipe link",
+    "deleteConfirm": "Delete recipe \"{{title}}\"?",
+    "created": "Recipe saved.",
+    "updated": "Recipe updated.",
+    "deleted": "Recipe deleted.",
+    "titleRequired": "Title is required",
+    "duplicate": "Duplicate",
+    "duplicated": "Recipe duplicated.",
+    "copySuffix": "copy"
   }
 }

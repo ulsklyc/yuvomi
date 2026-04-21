@@ -42,7 +42,8 @@
     "settings": "設定",
     "main": "メインナビゲーション",
     "navigation": "ナビゲーション",
-    "quickActions": "クイックアクション"
+    "quickActions": "クイックアクション",
+    "recipes": "Recipes"
   },
   "dashboard": {
     "title": "ダッシュボード",
@@ -242,7 +243,11 @@
     "loadingIndicator": "読み込み中…",
     "recipeUrlLabel": "レシピリンク（任意）",
     "recipeUrlPlaceholder": "https://…",
-    "openRecipe": "レシピを開く"
+    "openRecipe": "レシピを開く",
+    "savedRecipeLabel": "Saved recipe",
+    "savedRecipePlaceholder": "Select recipe",
+    "saveAsRecipe": "Save as recipe",
+    "recipeScaleLabel": "Scale ingredients"
   },
   "calendar": {
     "title": "カレンダー",
@@ -604,5 +609,29 @@
     "unitWeeks": "週",
     "unitMonth": "ヶ月",
     "unitMonths": "ヶ月"
+  },
+  "recipes": {
+    "title": "Recipes",
+    "addRecipe": "Add recipe",
+    "editRecipe": "Edit recipe",
+    "emptyTitle": "No recipes yet",
+    "emptyDescription": "Save your favorite recipes and reuse them in meal planning.",
+    "titleLabel": "Title *",
+    "titlePlaceholder": "e.g. Pasta Carbonara",
+    "notesLabel": "Notes",
+    "notesPlaceholder": "Optional...",
+    "urlLabel": "Recipe link",
+    "urlPlaceholder": "https://...",
+    "ingredientsLabel": "Ingredients",
+    "addToMeals": "Add to meal plan",
+    "openLink": "Open recipe link",
+    "deleteConfirm": "Delete recipe \"{{title}}\"?",
+    "created": "Recipe saved.",
+    "updated": "Recipe updated.",
+    "deleted": "Recipe deleted.",
+    "titleRequired": "Title is required",
+    "duplicate": "Duplicate",
+    "duplicated": "Recipe duplicated.",
+    "copySuffix": "copy"
   }
 }

@@ -42,7 +42,8 @@
     "settings": "Impostazioni",
     "main": "Navigazione principale",
     "navigation": "Navigazione",
-    "quickActions": "Azioni rapide"
+    "quickActions": "Azioni rapide",
+    "recipes": "Recipes"
   },
   "dashboard": {
     "title": "Panoramica",
@@ -242,7 +243,11 @@
     "loadingIndicator": "Caricamento…",
     "recipeUrlLabel": "Link ricetta (opzionale)",
     "recipeUrlPlaceholder": "https://…",
-    "openRecipe": "Apri ricetta"
+    "openRecipe": "Apri ricetta",
+    "savedRecipeLabel": "Saved recipe",
+    "savedRecipePlaceholder": "Select recipe",
+    "saveAsRecipe": "Save as recipe",
+    "recipeScaleLabel": "Scale ingredients"
   },
   "calendar": {
     "title": "Calendario",
@@ -604,5 +609,29 @@
     "unitWeeks": "settimane",
     "unitMonth": "mese",
     "unitMonths": "mesi"
+  },
+  "recipes": {
+    "title": "Recipes",
+    "addRecipe": "Add recipe",
+    "editRecipe": "Edit recipe",
+    "emptyTitle": "No recipes yet",
+    "emptyDescription": "Save your favorite recipes and reuse them in meal planning.",
+    "titleLabel": "Title *",
+    "titlePlaceholder": "e.g. Pasta Carbonara",
+    "notesLabel": "Notes",
+    "notesPlaceholder": "Optional...",
+    "urlLabel": "Recipe link",
+    "urlPlaceholder": "https://...",
+    "ingredientsLabel": "Ingredients",
+    "addToMeals": "Add to meal plan",
+    "openLink": "Open recipe link",
+    "deleteConfirm": "Delete recipe \"{{title}}\"?",
+    "created": "Recipe saved.",
+    "updated": "Recipe updated.",
+    "deleted": "Recipe deleted.",
+    "titleRequired": "Title is required",
+    "duplicate": "Duplicate",
+    "duplicated": "Recipe duplicated.",
+    "copySuffix": "copy"
   }
 }

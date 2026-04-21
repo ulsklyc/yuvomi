@@ -154,6 +154,8 @@
   --module-calendar:   var(--_module-calendar);    /* Violett - Termine, Zeit */
   --_module-meals:     #C2410C;
   --module-meals:      var(--_module-meals);       /* Orange-700 - Essen, Wärme */
+  --_module-recipes:   #0D9488;
+  --module-recipes:    var(--_module-recipes);     /* Teal-600 - Rezepte */
   --_module-shopping:  #DB2777;
   --module-shopping:   var(--_module-shopping);    /* Pink-600 - Einkaufen (trennt von Meals) */
   --_module-notes:     #A16207;

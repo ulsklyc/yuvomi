@@ -42,7 +42,8 @@
     "settings": "设置",
     "main": "主导航",
     "navigation": "导航",
-    "quickActions": "快捷操作"
+    "quickActions": "快捷操作",
+    "recipes": "Recipes"
   },
   "dashboard": {
     "title": "概览",
@@ -242,7 +243,11 @@
     "loadingIndicator": "加载中…",
     "recipeUrlLabel": "食谱链接（可选）",
     "recipeUrlPlaceholder": "https://…",
-    "openRecipe": "打开食谱"
+    "openRecipe": "打开食谱",
+    "savedRecipeLabel": "Saved recipe",
+    "savedRecipePlaceholder": "Select recipe",
+    "saveAsRecipe": "Save as recipe",
+    "recipeScaleLabel": "Scale ingredients"
   },
   "calendar": {
     "title": "日历",
@@ -604,5 +609,29 @@
     "unitWeeks": "周",
     "unitMonth": "个月",
     "unitMonths": "个月"
+  },
+  "recipes": {
+    "title": "Recipes",
+    "addRecipe": "Add recipe",
+    "editRecipe": "Edit recipe",
+    "emptyTitle": "No recipes yet",
+    "emptyDescription": "Save your favorite recipes and reuse them in meal planning.",
+    "titleLabel": "Title *",
+    "titlePlaceholder": "e.g. Pasta Carbonara",
+    "notesLabel": "Notes",
+    "notesPlaceholder": "Optional...",
+    "urlLabel": "Recipe link",
+    "urlPlaceholder": "https://...",
+    "ingredientsLabel": "Ingredients",
+    "addToMeals": "Add to meal plan",
+    "openLink": "Open recipe link",
+    "deleteConfirm": "Delete recipe \"{{title}}\"?",
+    "created": "Recipe saved.",
+    "updated": "Recipe updated.",
+    "deleted": "Recipe deleted.",
+    "titleRequired": "Title is required",
+    "duplicate": "Duplicate",
+    "duplicated": "Recipe duplicated.",
+    "copySuffix": "copy"
   }
 }

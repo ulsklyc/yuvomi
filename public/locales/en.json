@@ -42,7 +42,8 @@
     "settings": "Settings",
     "main": "Main navigation",
     "navigation": "Navigation",
-    "quickActions": "Quick actions"
+    "quickActions": "Quick actions",
+    "recipes": "Recipes"
   },
   "dashboard": {
     "title": "Overview",
@@ -242,7 +243,11 @@
     "loadingIndicator": "Loading…",
     "recipeUrlLabel": "Recipe link (optional)",
     "recipeUrlPlaceholder": "https://…",
-    "openRecipe": "Open recipe"
+    "openRecipe": "Open recipe",
+    "savedRecipeLabel": "Saved recipe",
+    "savedRecipePlaceholder": "Select recipe",
+    "saveAsRecipe": "Save as recipe",
+    "recipeScaleLabel": "Scale ingredients"
   },
   "calendar": {
     "title": "Calendar",
@@ -625,5 +630,29 @@
     "notificationHint": "Receive notifications while the app is open.",
     "pendingBadgeTitle": "{{count}} reminder due",
     "pendingBadgeTitlePlural": "{{count}} reminders due"
+  },
+  "recipes": {
+    "title": "Recipes",
+    "addRecipe": "Add recipe",
+    "editRecipe": "Edit recipe",
+    "emptyTitle": "No recipes yet",
+    "emptyDescription": "Save your favorite recipes and reuse them in meal planning.",
+    "titleLabel": "Title *",
+    "titlePlaceholder": "e.g. Pasta Carbonara",
+    "notesLabel": "Notes",
+    "notesPlaceholder": "Optional...",
+    "urlLabel": "Recipe link",
+    "urlPlaceholder": "https://...",
+    "ingredientsLabel": "Ingredients",
+    "addToMeals": "Add to meal plan",
+    "openLink": "Open recipe link",
+    "deleteConfirm": "Delete recipe \"{{title}}\"?",
+    "created": "Recipe saved.",
+    "updated": "Recipe updated.",
+    "deleted": "Recipe deleted.",
+    "titleRequired": "Title is required",
+    "duplicate": "Duplicate",
+    "duplicated": "Recipe duplicated.",
+    "copySuffix": "copy"
   }
 }

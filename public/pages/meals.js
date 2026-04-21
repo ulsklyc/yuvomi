@@ -36,6 +36,7 @@ const EXCLUDED_MEAL_CATEGORY_NAMES = new Set(['Haushalt', 'Drogerie']);
 let state = {
   currentWeek:      null,   // YYYY-MM-DD (Montag)
   meals:            [],
+  recipes:          [],
   lists:            [],     // Einkaufslisten für Transfer-Dropdown
   categories:       [],     // Einkaufskategorien für Zutaten
   modal:            null,
@@ -115,6 +116,15 @@ async function loadCategories() {
   }
 }
 
+async function loadRecipes() {
+  try {
+    const res = await api.get('/recipes');
+    state.recipes = res.data;
+  } catch {
+    state.recipes = [];
+  }
+}
+
 async function loadPreferences() {
   try {
     const res = await api.get('/preferences');
@@ -157,9 +167,18 @@ export async function render(container, { user }) {
   const today  = new Date().toISOString().slice(0, 10);
   const monday = getMondayOf(today);
 
-  await Promise.all([loadWeek(monday), loadLists(), loadPreferences(), loadCategories()]);
+  await Promise.all([loadWeek(monday), loadLists(), loadPreferences(), loadCategories(), loadRecipes()]);
   renderWeekGrid();
   wireNav();
+
+  const selectedRecipeId = Number(new URLSearchParams(window.location.search).get('recipe'));
+  if (selectedRecipeId) {
+    const selectedRecipe = state.recipes.find((r) => r.id === selectedRecipeId);
+    if (selectedRecipe) {
+      const firstType = state.visibleMealTypes[0] ?? 'lunch';
+      openMealModal({ mode: 'create', date: today, mealType: firstType, presetRecipeId: selectedRecipe.id });
+    }
+  }
 
   container.querySelector('#fab-new-meal').addEventListener('click', () => {
     const firstType = state.visibleMealTypes[0] ?? 'lunch';
@@ -473,7 +492,7 @@ async function moveMeal(mealId, sourceDate, sourceType, targetDate, targetType, 
 
 function openMealModal(opts) {
   state.modal = opts;
-  const { mode, date, mealType, meal } = opts;
+  const { mode, date, mealType, meal, presetRecipeId = null } = opts;
   const isEdit = mode === 'edit';
 
   const content = buildModalContent(opts);
@@ -523,6 +542,144 @@ function openMealModal(opts) {
       // Zutaten
       const ingList   = panel.querySelector('#ingredient-list');
       const addIngBtn = panel.querySelector('#add-ingredient-btn');
+      const recipeSelect = panel.querySelector('#modal-recipe-id');
+      const recipeScaleInput = panel.querySelector('#modal-recipe-scale');
+      const saveAsRecipeBtn = panel.querySelector('#modal-save-as-recipe');
+      let currentAppliedRecipe = null;
+
+      const scaleQuantityText = (quantity, factor) => {
+        if (!quantity || factor === 1) return quantity;
+
+        const formatNumber = (num, useComma = false) => {
+          const rounded = Math.round(num * 100) / 100;
+          if (Number.isInteger(rounded)) return String(rounded);
+          const text = String(rounded);
+          return useComma ? text.replace('.', ',') : text;
+        };
+
+        const mixed = quantity.match(/^(\d+)\s+(\d+)\/(\d+)(.*)$/);
+        if (mixed) {
+          const whole = Number(mixed[1]);
+          const num = Number(mixed[2]);
+          const den = Number(mixed[3]);
+          if (den > 0) {
+            const value = (whole + (num / den)) * factor;
+            return `${formatNumber(value)}${mixed[4]}`;
+          }
+        }
+
+        const frac = quantity.match(/^(\d+)\/(\d+)(.*)$/);
+        if (frac) {
+          const num = Number(frac[1]);
+          const den = Number(frac[2]);
+          if (den > 0) {
+            const value = (num / den) * factor;
+            return `${formatNumber(value)}${frac[3]}`;
+          }
+        }
+
+        const dec = quantity.match(/^(\d+(?:[.,]\d+)?)(.*)$/);
+        if (dec) {
+          const useComma = dec[1].includes(',');
+          const base = Number(dec[1].replace(',', '.'));
+          if (Number.isFinite(base)) {
+            return `${formatNumber(base * factor, useComma)}${dec[2]}`;
+          }
+        }
+
+        return quantity;
+      };
+
+      const applyRecipe = (recipeId) => {
+        const id = Number(recipeId);
+        const factor = Math.max(Number(recipeScaleInput?.value || 1), 0.1);
+        if (!id) {
+          currentAppliedRecipe = null;
+          return;
+        }
+        const recipe = state.recipes.find((r) => r.id === id);
+        if (!recipe) return;
+
+        currentAppliedRecipe = recipe;
+
+        panel.querySelector('#modal-title').value = recipe.title || '';
+        panel.querySelector('#modal-notes').value = recipe.notes || '';
+        panel.querySelector('#modal-recipe-url').value = recipe.recipe_url || '';
+
+        ingList.innerHTML = (recipe.ingredients || [])
+          .map((ing) => {
+            const scaledQty = scaleQuantityText(ing.quantity ?? '', factor);
+            return ingredientRowHTML(ing.name, scaledQty, null, ing.category ?? DEFAULT_CATEGORY_NAME);
+          })
+          .join('');
+
+        if (window.lucide) lucide.createIcons();
+      };
+
+      recipeSelect?.addEventListener('change', () => {
+        if (recipeScaleInput) recipeScaleInput.value = '1';
+        applyRecipe(recipeSelect.value);
+      });
+
+      recipeScaleInput?.addEventListener('input', () => {
+        const currentRecipeId = Number(recipeSelect?.value || 0);
+        if (!currentRecipeId || !currentAppliedRecipe) return;
+
+        const factor = Number(recipeScaleInput.value || 1);
+        if (!Number.isFinite(factor) || factor <= 0) return;
+
+        ingList.innerHTML = (currentAppliedRecipe.ingredients || [])
+          .map((ing) => ingredientRowHTML(
+            ing.name,
+            scaleQuantityText(ing.quantity ?? '', Math.max(factor, 0.1)),
+            null,
+            ing.category ?? DEFAULT_CATEGORY_NAME
+          ))
+          .join('');
+
+        if (window.lucide) lucide.createIcons();
+      });
+
+      saveAsRecipeBtn?.addEventListener('click', async () => {
+        const title = panel.querySelector('#modal-title').value.trim();
+        if (!title) {
+          window.oikos?.showToast(t('meals.titleRequired'), 'error');
+          return;
+        }
+
+        const notes = panel.querySelector('#modal-notes').value.trim() || null;
+        const recipe_url = panel.querySelector('#modal-recipe-url').value.trim() || null;
+        const ingredients = collectModalIngredients(panel).map((ing) => ({
+          name: ing.name,
+          quantity: ing.quantity,
+          category: ing.category,
+        }));
+
+        saveAsRecipeBtn.disabled = true;
+        try {
+          const created = await api.post('/recipes', { title, notes, recipe_url, ingredients });
+          state.recipes.push(created.data);
+
+          if (recipeSelect) {
+            const option = document.createElement('option');
+            option.value = String(created.data.id);
+            option.textContent = created.data.title;
+            recipeSelect.appendChild(option);
+            recipeSelect.value = String(created.data.id);
+          }
+
+          window.oikos?.showToast(t('recipes.created'), 'success');
+        } catch (err) {
+          window.oikos?.showToast(err.data?.error ?? t('common.errorGeneric'), 'error');
+        } finally {
+          saveAsRecipeBtn.disabled = false;
+        }
+      });
+
+      if (presetRecipeId && recipeSelect) {
+        recipeSelect.value = String(presetRecipeId);
+        applyRecipe(presetRecipeId);
+      }
 
       addIngBtn.addEventListener('click', () => {
         const tmp  = document.createElement('div');
@@ -584,6 +741,11 @@ function buildModalContent({ mode, date, mealType, meal }) {
 
   const hasIngOpen = isEdit && meal.ingredients?.some((i) => !i.on_shopping_list);
 
+  const recipeOptions = [
+    `<option value="">${t('meals.savedRecipePlaceholder')}</option>`,
+    ...state.recipes.map((r) => `<option value="${r.id}" ${isEdit && meal.recipe_id === r.id ? 'selected' : ''}>${esc(r.title)}</option>`),
+  ].join('');
+
   return `
     <div class="modal-grid modal-grid--2">
       <div class="form-group">
@@ -603,6 +765,21 @@ function buildModalContent({ mode, date, mealType, meal }) {
              value="${esc(isEdit ? meal.title : '')}"
              autocomplete="off">
       <div id="modal-autocomplete" class="meal-modal__autocomplete" hidden></div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="modal-recipe-id">${t('meals.savedRecipeLabel')}</label>
+      <select class="form-input" id="modal-recipe-id">${recipeOptions}</select>
+    </div>
+
+    <div class="modal-grid modal-grid--2">
+      <div class="form-group">
+        <label class="form-label" for="modal-recipe-scale">${t('meals.recipeScaleLabel')}</label>
+        <input type="number" class="form-input" id="modal-recipe-scale" min="0.1" step="0.1" value="1">
+      </div>
+      <div class="form-group" style="display:flex;align-items:flex-end;">
+        <button class="btn btn--secondary" id="modal-save-as-recipe" type="button">${t('meals.saveAsRecipe')}</button>
+      </div>
     </div>
 
     <div class="form-group">
@@ -678,19 +855,14 @@ async function saveModal(overlay) {
   const title     = overlay.querySelector('#modal-title').value.trim();
   const notes     = overlay.querySelector('#modal-notes').value.trim() || null;
   const recipe_url = overlay.querySelector('#modal-recipe-url').value.trim() || null;
+  const recipe_id = overlay.querySelector('#modal-recipe-id')?.value || null;
 
   if (!title) {
     window.oikos?.showToast(t('meals.titleRequired'), 'error');
     return;
   }
 
-  const ingredients = [];
-  overlay.querySelectorAll('.ingredient-row').forEach((row) => {
-    const name     = row.querySelector('.ingredient-row__name').value.trim();
-    const qty      = row.querySelector('.ingredient-row__qty').value.trim() || null;
-    const category = row.querySelector('.ingredient-row__cat')?.value || DEFAULT_CATEGORY_NAME;
-    if (name) ingredients.push({ name, quantity: qty, category, id: row.dataset.ingId || null });
-  });
+  const ingredients = collectModalIngredients(overlay);
 
   saveBtn.disabled    = true;
   saveBtn.textContent = '…';
@@ -699,11 +871,11 @@ async function saveModal(overlay) {
     const { mode, meal } = state.modal;
 
     if (mode === 'create') {
-      const res     = await api.post('/meals', { date, meal_type, title, notes, recipe_url, ingredients });
+      const res     = await api.post('/meals', { date, meal_type, title, notes, recipe_url, recipe_id, ingredients });
       state.meals.push(res.data);
     } else {
       // Update meal meta
-      await api.put(`/meals/${meal.id}`, { date, meal_type, title, notes, recipe_url });
+      await api.put(`/meals/${meal.id}`, { date, meal_type, title, notes, recipe_url, recipe_id });
 
       // Sync ingredients
       const existingIds = new Set((meal.ingredients ?? []).map((i) => i.id));
@@ -730,6 +902,17 @@ async function saveModal(overlay) {
     saveBtn.disabled    = false;
     saveBtn.textContent = state.modal?.mode === 'edit' ? t('common.save') : t('common.add');
   }
+}
+
+function collectModalIngredients(overlay) {
+  const ingredients = [];
+  overlay.querySelectorAll('.ingredient-row').forEach((row) => {
+    const name = row.querySelector('.ingredient-row__name').value.trim();
+    const qty = row.querySelector('.ingredient-row__qty').value.trim() || null;
+    const category = row.querySelector('.ingredient-row__cat')?.value || DEFAULT_CATEGORY_NAME;
+    if (name) ingredients.push({ name, quantity: qty, category, id: row.dataset.ingId || null });
+  });
+  return ingredients;
 }
 
 // --------------------------------------------------------

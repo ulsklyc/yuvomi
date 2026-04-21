@@ -42,7 +42,8 @@
     "settings": "Ρυθμίσεις",
     "main": "Κύρια πλοήγηση",
     "navigation": "Πλοήγηση",
-    "quickActions": "Γρήγορες ενέργειες"
+    "quickActions": "Γρήγορες ενέργειες",
+    "recipes": "Recipes"
   },
   "dashboard": {
     "title": "Επισκόπηση",
@@ -242,7 +243,11 @@
     "loadingIndicator": "Φόρτωση…",
     "recipeUrlLabel": "Σύνδεσμος συνταγής (προαιρετικό)",
     "recipeUrlPlaceholder": "https://…",
-    "openRecipe": "Άνοιγμα συνταγής"
+    "openRecipe": "Άνοιγμα συνταγής",
+    "savedRecipeLabel": "Saved recipe",
+    "savedRecipePlaceholder": "Select recipe",
+    "saveAsRecipe": "Save as recipe",
+    "recipeScaleLabel": "Scale ingredients"
   },
   "calendar": {
     "title": "Ημερολόγιο",
@@ -604,5 +609,29 @@
     "unitWeeks": "εβδομάδες",
     "unitMonth": "μήνα",
     "unitMonths": "μήνες"
+  },
+  "recipes": {
+    "title": "Recipes",
+    "addRecipe": "Add recipe",
+    "editRecipe": "Edit recipe",
+    "emptyTitle": "No recipes yet",
+    "emptyDescription": "Save your favorite recipes and reuse them in meal planning.",
+    "titleLabel": "Title *",
+    "titlePlaceholder": "e.g. Pasta Carbonara",
+    "notesLabel": "Notes",
+    "notesPlaceholder": "Optional...",
+    "urlLabel": "Recipe link",
+    "urlPlaceholder": "https://...",
+    "ingredientsLabel": "Ingredients",
+    "addToMeals": "Add to meal plan",
+    "openLink": "Open recipe link",
+    "deleteConfirm": "Delete recipe \"{{title}}\"?",
+    "created": "Recipe saved.",
+    "updated": "Recipe updated.",
+    "deleted": "Recipe deleted.",
+    "titleRequired": "Title is required",
+    "duplicate": "Duplicate",
+    "duplicated": "Recipe duplicated.",
+    "copySuffix": "copy"
   }
 }

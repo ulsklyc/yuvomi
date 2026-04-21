@@ -20,6 +20,7 @@ const ROUTES = [
   { path: '/meals',    page: '/pages/meals.js',     requiresAuth: true, module: 'meals'     },
   { path: '/calendar', page: '/pages/calendar.js',  requiresAuth: true, module: 'calendar'  },
   { path: '/notes',    page: '/pages/notes.js',     requiresAuth: true, module: 'notes'     },
+  { path: '/recipes',  page: '/pages/recipes.js',   requiresAuth: true, module: 'recipes'   },
   { path: '/contacts', page: '/pages/contacts.js',  requiresAuth: true, module: 'contacts'  },
   { path: '/budget',   page: '/pages/budget.js',    requiresAuth: true, module: 'budget'    },
   { path: '/settings', page: '/pages/settings.js',  requiresAuth: true, module: 'settings'  },
@@ -123,7 +124,7 @@ let _pendingLoginRedirect = false;
 // Router
 // --------------------------------------------------------
 
-const ROUTE_ORDER = ['/', '/tasks', '/calendar', '/meals', '/shopping',
+const ROUTE_ORDER = ['/', '/tasks', '/calendar', '/meals', '/recipes', '/shopping',
                      '/notes', '/contacts', '/budget', '/settings'];
 
 const PRIMARY_NAV = 4;
@@ -581,6 +582,7 @@ function navItems() {
     { path: '/tasks',    label: t('nav.tasks'),     icon: 'check-square'     },
     { path: '/calendar', label: t('nav.calendar'),  icon: 'calendar'         },
     { path: '/meals',    label: t('nav.meals'),     icon: 'utensils'         },
+    { path: '/recipes',  label: t('nav.recipes'),   icon: 'book-open-text'   },
     { path: '/shopping', label: t('nav.shopping'),  icon: 'shopping-cart'    },
     { path: '/notes',    label: t('nav.notes'),     icon: 'sticky-note'      },
     { path: '/contacts', label: t('nav.contacts'),  icon: 'book-user'        },

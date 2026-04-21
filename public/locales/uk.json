@@ -42,7 +42,8 @@
     "settings": "Налаштування",
     "main": "Головна навігація",
     "navigation": "Навігація",
-    "quickActions": "Швидкі дії"
+    "quickActions": "Швидкі дії",
+    "recipes": "Recipes"
   },
   "dashboard": {
     "title": "Огляд",
@@ -242,7 +243,11 @@
     "loadingIndicator": "Завантаження…",
     "recipeUrlLabel": "Посилання на рецепт (необов'язково)",
     "recipeUrlPlaceholder": "https://…",
-    "openRecipe": "Відкрити рецепт"
+    "openRecipe": "Відкрити рецепт",
+    "savedRecipeLabel": "Saved recipe",
+    "savedRecipePlaceholder": "Select recipe",
+    "saveAsRecipe": "Save as recipe",
+    "recipeScaleLabel": "Scale ingredients"
   },
   "calendar": {
     "title": "Календар",
@@ -625,5 +630,29 @@
     "notificationHint": "Отримуйте сповіщення, поки додаток відкрито.",
     "pendingBadgeTitle": "{{count}} нагадування",
     "pendingBadgeTitlePlural": "{{count}} нагадувань"
+  },
+  "recipes": {
+    "title": "Recipes",
+    "addRecipe": "Add recipe",
+    "editRecipe": "Edit recipe",
+    "emptyTitle": "No recipes yet",
+    "emptyDescription": "Save your favorite recipes and reuse them in meal planning.",
+    "titleLabel": "Title *",
+    "titlePlaceholder": "e.g. Pasta Carbonara",
+    "notesLabel": "Notes",
+    "notesPlaceholder": "Optional...",
+    "urlLabel": "Recipe link",
+    "urlPlaceholder": "https://...",
+    "ingredientsLabel": "Ingredients",
+    "addToMeals": "Add to meal plan",
+    "openLink": "Open recipe link",
+    "deleteConfirm": "Delete recipe \"{{title}}\"?",
+    "created": "Recipe saved.",
+    "updated": "Recipe updated.",
+    "deleted": "Recipe deleted.",
+    "titleRequired": "Title is required",
+    "duplicate": "Duplicate",
+    "duplicated": "Recipe duplicated.",
+    "copySuffix": "copy"
   }
 }

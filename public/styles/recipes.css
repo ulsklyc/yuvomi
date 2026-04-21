@@ -1,0 +1,119 @@
+/**
+ * Modul: Rezepte (Recipes)
+ * Zweck: Styles fuer gespeicherte Rezepte und Aktionskarten
+ */
+
+.recipes-page {
+  --module-accent: var(--module-recipes);
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--safe-area-inset-top) - var(--nav-bottom-height) - var(--safe-area-inset-bottom));
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+@media (min-width: 1024px) {
+  .recipes-page {
+    height: 100dvh;
+  }
+}
+
+.recipes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-top: 3px solid var(--module-accent);
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
+.recipes-header__title {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+.recipes-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+}
+
+.recipe-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.recipe-card__title {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+}
+
+.recipe-card__notes {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+}
+
+.recipe-card__ingredients {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.recipe-card__ingredient {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.recipe-card__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.recipe-ingredient-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.recipe-ingredient-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.recipe-ingredient-row__name {
+  flex: 2;
+}
+
+.recipe-ingredient-row__qty,
+.recipe-ingredient-row__cat {
+  flex: 1;
+  min-width: 0;
+}
+
+.recipe-ingredient-row__remove {
+  border: none;
+  background: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.recipe-add-ingredient {
+  align-self: flex-start;
+}

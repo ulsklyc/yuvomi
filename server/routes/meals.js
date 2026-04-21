@@ -7,7 +7,7 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
-import { str, oneOf, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT, DATE_RE } from '../middleware/validate.js';
+import { str, oneOf, date, num, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT, DATE_RE } from '../middleware/validate.js';
 
 const log = createLogger('Meals');
 
@@ -156,15 +156,21 @@ router.post('/', (req, res) => {
     const vTitle      = str(req.body.title, 'Titel', { max: MAX_TITLE });
     const vNotes      = str(req.body.notes, 'Notizen', { max: MAX_TEXT, required: false });
     const vRecipeUrl  = str(req.body.recipe_url, 'Rezept-URL', { max: MAX_TEXT, required: false });
-    const errors = collectErrors([vDate, vType, vTitle, vNotes, vRecipeUrl]);
+    const vRecipeId   = num(req.body.recipe_id, 'Rezept-ID', { required: false });
+    const errors = collectErrors([vDate, vType, vTitle, vNotes, vRecipeUrl, vRecipeId]);
     if (!req.body.meal_type) errors.push('Mahlzeit-Typ ist erforderlich.');
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
+    if (vRecipeId.value !== null) {
+      const recipeExists = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(vRecipeId.value);
+      if (!recipeExists) return res.status(400).json({ error: 'Rezept nicht gefunden.', code: 400 });
+    }
+
     const meal = db.transaction(() => {
       const result = db.get().prepare(`
-        INSERT INTO meals (date, meal_type, title, notes, recipe_url, created_by)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(vDate.value, vType.value, vTitle.value, vNotes.value, vRecipeUrl.value, req.session.userId);
+        INSERT INTO meals (date, meal_type, title, notes, recipe_url, recipe_id, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(vDate.value, vType.value, vTitle.value, vNotes.value, vRecipeUrl.value, vRecipeId.value, req.session.userId);
 
       const mealId = result.lastInsertRowid;
 
@@ -217,8 +223,14 @@ router.put('/:id', (req, res) => {
     if (req.body.title      !== undefined) checks.push(str(req.body.title, 'Titel', { max: MAX_TITLE, required: false }));
     if (req.body.notes      !== undefined) checks.push(str(req.body.notes, 'Notizen', { max: MAX_TEXT, required: false }));
     if (req.body.recipe_url !== undefined) checks.push(str(req.body.recipe_url, 'Rezept-URL', { max: MAX_TEXT, required: false }));
+    if (req.body.recipe_id  !== undefined) checks.push(num(req.body.recipe_id, 'Rezept-ID', { required: false }));
     const errors = collectErrors(checks);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+
+    if (req.body.recipe_id !== undefined && req.body.recipe_id !== null && req.body.recipe_id !== '') {
+      const recipeExists = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(req.body.recipe_id);
+      if (!recipeExists) return res.status(400).json({ error: 'Rezept nicht gefunden.', code: 400 });
+    }
 
     db.get().prepare(`
       UPDATE meals
@@ -226,7 +238,8 @@ router.put('/:id', (req, res) => {
           meal_type  = COALESCE(?, meal_type),
           title      = COALESCE(?, title),
           notes      = ?,
-          recipe_url = ?
+          recipe_url = ?,
+          recipe_id  = ?
       WHERE id = ?
     `).run(
       req.body.date      ?? null,
@@ -234,6 +247,7 @@ router.put('/:id', (req, res) => {
       req.body.title?.trim() ?? null,
       req.body.notes       !== undefined ? (req.body.notes || null)       : meal.notes,
       req.body.recipe_url  !== undefined ? (req.body.recipe_url || null)  : meal.recipe_url,
+      req.body.recipe_id   !== undefined ? (req.body.recipe_id || null)   : meal.recipe_id,
       id
     );
 
