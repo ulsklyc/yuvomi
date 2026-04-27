@@ -268,9 +268,7 @@ router.get('/google/callback', async (req, res) => {
     delete req.session.googleOAuthState;
 
     await googleCalendar.handleCallback(code);
-
-    // Initialen Sync im Hintergrund starten (kein await - Redirect soll sofort erfolgen)
-    googleCalendar.sync().catch((e) => log.error('Initial sync failed:', e.message));
+    await googleCalendar.sync();
 
     res.redirect('/settings?sync_ok=google');
   } catch (err) {

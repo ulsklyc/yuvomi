@@ -303,10 +303,11 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR) {
   });
 
   for (const item of items) {
+    if (!item) continue;
     try {
       insertOrUpdate(item);
     } catch (err) {
-      log.error(`Upsert error for event ${item.id}:`, err.message);
+      log.error(`Upsert error for event ${item?.id}:`, err.message);
     }
   }
 }
