@@ -579,7 +579,7 @@ export async function render(container, { user }) {
               </div>
               <div class="form-group">
                 <label class="form-label" for="new-member-birth-date">${t('settings.memberBirthDateLabel')}</label>
-                <input class="form-input js-date-input" type="text" id="new-member-birth-date" placeholder="${dateInputPlaceholder()}" inputmode="numeric" />
+                <input class="form-input" type="date" id="new-member-birth-date" />
                 <p class="form-hint">${t('settings.memberContactBirthdayHint')}</p>
               </div>
               <label class="toggle-row">
@@ -677,7 +677,7 @@ export async function render(container, { user }) {
               </div>
               <div class="form-group">
                 <label class="form-label" for="profile-birth-date">${t('settings.memberBirthDateLabel')}</label>
-                <input class="form-input js-date-input" type="text" id="profile-birth-date" value="${esc(formatDateInput(user?.birth_date))}" placeholder="${dateInputPlaceholder()}" inputmode="numeric" />
+                <input class="form-input" type="date" id="profile-birth-date" value="${esc(user?.birth_date || '')}" />
                 <p class="form-hint">${t('settings.memberContactBirthdayHint')}</p>
               </div>
               <div id="profile-error" class="form-error" hidden></div>
@@ -1212,7 +1212,7 @@ function openEditMemberModal(member, currentUser, users, container) {
         </div>
         <div class="form-group">
           <label class="form-label" for="edit-member-birth-date">${t('settings.memberBirthDateLabel')}</label>
-          <input class="form-input js-date-input" type="text" id="edit-member-birth-date" value="${esc(formatDateInput(member.birth_date))}" placeholder="${dateInputPlaceholder()}" inputmode="numeric" />
+          <input class="form-input" type="date" id="edit-member-birth-date" value="${esc(member.birth_date || '')}" />
           <p class="form-hint">${t('settings.memberContactBirthdayHint')}</p>
         </div>
         <label class="toggle-row">

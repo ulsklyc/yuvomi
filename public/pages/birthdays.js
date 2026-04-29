@@ -282,7 +282,7 @@ function openBirthdayModal({ mode, birthday = null }) {
         </div>
         <div class="form-group">
           <label class="form-label" for="bd-birth-date">${t('birthdays.birthDateLabel')}</label>
-          <input class="form-input js-date-input" id="bd-birth-date" type="text" value="${esc(formatDateInput(birthday?.birth_date))}" placeholder="${dateInputPlaceholder()}" inputmode="numeric">
+          <input class="form-input" id="bd-birth-date" type="date" value="${esc(birthday?.birth_date || '')}">
         </div>
         <div class="form-group">
           <label class="form-label" for="bd-photo">${t('birthdays.photoLabel')}</label>
