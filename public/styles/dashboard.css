@@ -1941,7 +1941,6 @@
  * -------------------------------------------------------- */
 .dashboard {
   max-width: min(1680px, 100%);
-  overflow: visible;
 }
 
 .dashboard::before,
