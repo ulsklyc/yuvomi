@@ -1006,8 +1006,6 @@ const MIGRATIONS = [
         // Update external_calendars source
         db.prepare(`UPDATE external_calendars SET source='caldav' WHERE source='apple'`).run();
 
-        // Update calendar_events external_source
-        db.prepare(`UPDATE calendar_events SET external_source='caldav' WHERE external_source='apple'`).run();
       }
 
       // Add caldav to external_source CHECK constraint by recreating table
@@ -1050,8 +1048,9 @@ const MIGRATIONS = [
            attachment_name, attachment_mime, attachment_size, attachment_data,
            created_at, updated_at)
         SELECT id, title, description, start_datetime, end_datetime, all_day, location, color,
-               assigned_to, created_by, external_calendar_id, external_source, recurrence_rule,
-               subscription_id, user_modified, calendar_ref_id, icon,
+               assigned_to, created_by, external_calendar_id,
+               CASE WHEN external_source = 'apple' THEN 'caldav' ELSE external_source END,
+               recurrence_rule, subscription_id, user_modified, calendar_ref_id, icon,
                attachment_name, attachment_mime, attachment_size, attachment_data,
                created_at, updated_at
         FROM calendar_events

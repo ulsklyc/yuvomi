@@ -153,4 +153,40 @@ describe('CalDAV Multi-Account Sync', () => {
     assert.strictEqual(enabled.length, 1, 'Should have 1 enabled calendar');
     assert.strictEqual(enabled[0].calendar_name, 'Private');
   });
+
+  it('should migrate apple calendar events to caldav without violating CHECK', () => {
+    const db2 = new DatabaseSync(':memory:');
+    db2.exec(`
+      CREATE TABLE calendar_events (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        title           TEXT NOT NULL,
+        external_source TEXT NOT NULL DEFAULT 'local'
+                        CHECK(external_source IN ('local', 'google', 'apple', 'ics'))
+      );
+    `);
+
+    db2.prepare(`
+      INSERT INTO calendar_events (title, external_source)
+      VALUES ('Migrated', 'apple')
+    `).run();
+
+    db2.exec(`
+      CREATE TABLE calendar_events_new (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        title           TEXT NOT NULL,
+        external_source TEXT NOT NULL DEFAULT 'local'
+                        CHECK(external_source IN ('local', 'google', 'apple', 'ics', 'caldav'))
+      );
+    `);
+
+    db2.exec(`
+      INSERT INTO calendar_events_new (id, title, external_source)
+      SELECT id, title,
+             CASE WHEN external_source = 'apple' THEN 'caldav' ELSE external_source END
+      FROM calendar_events
+    `);
+
+    const migrated = db2.prepare(`SELECT external_source FROM calendar_events_new WHERE title = 'Migrated'`).get();
+    assert.strictEqual(migrated.external_source, 'caldav');
+  });
 });
