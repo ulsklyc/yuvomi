@@ -36,7 +36,7 @@
     "better-sqlite3": "^12.9.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "express-rate-limit": "^8.4.1",
+    "express-rate-limit": "^8.5.0",
     "express-session": "^1.19.0",
     "helmet": "^8.1.0",
     "node-cron": "^4.2.1",
@@ -44,7 +44,7 @@
   },
   "optionalDependencies": {
     "googleapis": "^171.4.0",
-    "tsdav": "^2.1.8"
+    "tsdav": "^2.2.0"
   },
   "license": "MIT",
   "devDependencies": {
