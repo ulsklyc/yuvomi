@@ -11,94 +11,72 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&family=DM+Serif+Display&display=swap" rel="stylesheet">
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --font-display: 'Fraunces', 'Georgia', serif;
-      --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      --ff-display: 'DM Serif Display', Georgia, serif;
+      --ff-body: 'DM Sans', system-ui, -apple-system, sans-serif;
       --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
 
-      --bg: #FAFAF8;
-      --bg-alt: #F5F4F1;
+      --bg: #FAFAFB;
+      --bg-alt: #F2F1F6;
       --surface: #FFFFFF;
-      --surface-border: #E8E7E2;
-      --text-primary: #1C1C1A;
-      --text-secondary: #6C6B67;
-      --text-tertiary: #8E8D89;
-      --accent: #2563EB;
-      --accent-hover: #1D4ED8;
-      --accent-light: #EFF6FF;
-      --accent-subtle: #DBEAFE;
+      --border: #E5E4EA;
+      --text-1: #181620;
+      --text-2: #5E5C6B;
+      --text-3: #8F8D9A;
+      --accent: #6C3AED;
+      --accent-hover: #5B21B6;
+      --accent-soft: #EDE9FE;
+      --accent-glow: rgba(108, 58, 237, 0.12);
       --success: #15803D;
       --success-bg: #F0FDF4;
       --warning: #B45309;
       --warning-bg: #FFFBEB;
-      --code-bg: #1C1C1A;
-      --code-text: #E2E1DC;
-      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 1px 4px rgba(0,0,0,0.03);
-      --shadow-md: 0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-      --shadow-lg: 0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.04);
-      --radius: 12px;
-      --radius-lg: 16px;
-      --radius-xl: 24px;
+      --code-bg: #1C1B22;
+      --code-text: #E2E1EC;
+      --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.08);
+      --radius: 16px;
     }
 
-    :root[data-theme="dark"] {
+    [data-theme="dark"] {
       --bg: #1A1A18;
-      --bg-alt: #222220;
-      --surface: #2A2A28;
-      --surface-border: #3D3D3A;
-      --text-primary: #F5F4F1;
-      --text-secondary: #AEADB0;
-      --text-tertiary: #8E8D89;
-      --accent: #60A5FA;
-      --accent-hover: #3B82F6;
-      --accent-light: #1E3A5F;
-      --accent-subtle: #1E3050;
-      --success: #4ADE80;
-      --success-bg: #052e16;
-      --warning: #F59E0B;
-      --warning-bg: #1c1400;
-      --code-bg: #121211;
-      --code-text: #C8C7C3;
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.25);
-      --shadow-md: 0 4px 12px rgba(0,0,0,0.35);
+      --bg-alt: #141413;
+      --surface: #222220;
+      --border: #2A2A28;
+      --text-1: #F5F4F1;
+      --text-2: #AEADB0;
+      --text-3: #8E8D89;
+      --accent: #818CF8;
+      --accent-hover: #6366F1;
+      --accent-soft: #2E2D5B;
+      --accent-glow: rgba(129, 140, 248, 0.15);
+      --code-bg: #141413;
+      --code-text: #E2E1DC;
+      --shadow-card: 0 1px 3px rgba(0,0,0,0.25);
       --shadow-lg: 0 8px 24px rgba(0,0,0,0.45);
     }
 
     @media (prefers-color-scheme: dark) {
       :root:not([data-theme="light"]) {
-        --bg: #1A1A18;
-        --bg-alt: #222220;
-        --surface: #2A2A28;
-        --surface-border: #3D3D3A;
-        --text-primary: #F5F4F1;
-        --text-secondary: #AEADB0;
-        --text-tertiary: #8E8D89;
-        --accent: #60A5FA;
-        --accent-hover: #3B82F6;
-        --accent-light: #1E3A5F;
-        --accent-subtle: #1E3050;
-        --success: #4ADE80;
-        --success-bg: #052e16;
-        --warning: #F59E0B;
-        --warning-bg: #1c1400;
-        --code-bg: #121211;
-        --code-text: #C8C7C3;
-        --shadow-sm: 0 1px 3px rgba(0,0,0,0.25);
-        --shadow-md: 0 4px 12px rgba(0,0,0,0.35);
-        --shadow-lg: 0 8px 24px rgba(0,0,0,0.45);
+        --bg: #1A1A18; --bg-alt: #141413; --surface: #222220; --border: #2A2A28;
+        --text-1: #F5F4F1; --text-2: #AEADB0; --text-3: #8E8D89;
+        --accent: #818CF8; --accent-hover: #6366F1; --accent-soft: #2E2D5B;
+        --accent-glow: rgba(129, 140, 248, 0.15);
+        --code-bg: #141413; --code-text: #E2E1DC;
+        --shadow-card: 0 1px 3px rgba(0,0,0,0.25); --shadow-lg: 0 8px 24px rgba(0,0,0,0.45);
       }
     }
 
     html { scroll-behavior: smooth; }
     body {
-      font-family: var(--font-body);
+      font-family: var(--ff-body);
       background: var(--bg);
-      color: var(--text-primary);
+      color: var(--text-1);
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
@@ -117,36 +95,36 @@
       background: color-mix(in srgb, var(--bg) 85%, transparent);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--surface-border);
+      border-bottom: 1px solid var(--border);
       height: 56px;
     }
     .nav .container-wide { display: flex; align-items: center; justify-content: space-between; height: 100%; }
     .nav-logo {
       display: flex; align-items: center; gap: 10px;
-      font-family: var(--font-display); font-weight: 700; font-size: 1.25rem;
-      color: var(--text-primary); text-decoration: none;
+      font-family: var(--ff-display); font-weight: 700; font-size: 1.25rem;
+      color: var(--text-1); text-decoration: none;
     }
     .nav-logo:hover { text-decoration: none; }
     .nav-logo svg { width: 28px; height: 28px; }
     .nav-back {
       display: flex; align-items: center; gap: 6px;
-      font-size: 0.8125rem; color: var(--text-secondary);
+      font-size: 0.8125rem; color: var(--text-2);
       text-decoration: none;
       padding: 4px 8px; border-radius: 6px;
       transition: color 0.15s ease, background 0.15s ease;
     }
-    .nav-back:hover { color: var(--text-primary); background: var(--surface); text-decoration: none; }
+    .nav-back:hover { color: var(--text-1); background: var(--surface); text-decoration: none; }
     .nav-back svg { width: 14px; height: 14px; }
     .nav-controls { display: flex; align-items: center; gap: 6px; }
     .nav-btn {
-      background: none; border: 1px solid var(--surface-border);
-      color: var(--text-secondary); cursor: pointer;
+      background: none; border: 1px solid var(--border);
+      color: var(--text-2); cursor: pointer;
       padding: 6px 10px; border-radius: 8px;
-      font-size: 0.8125rem; font-family: var(--font-body);
+      font-size: 0.8125rem; font-family: var(--ff-body);
       display: flex; align-items: center; gap: 4px;
       transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
     }
-    .nav-btn:hover { background: var(--surface); color: var(--text-primary); border-color: var(--text-tertiary); }
+    .nav-btn:hover { background: var(--surface); color: var(--text-1); border-color: var(--text-3); }
     .nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .nav-btn svg { width: 16px; height: 16px; }
 
@@ -170,13 +148,13 @@
     }
     .hero-eyebrow svg { width: 13px; height: 13px; }
     .hero h1 {
-      font-family: var(--font-display);
+      font-family: var(--ff-display);
       font-size: clamp(2rem, 5vw, 3rem);
       font-weight: 800; line-height: 1.1;
       letter-spacing: -0.02em; margin-bottom: 14px;
     }
     .hero-desc {
-      font-size: 1.0625rem; color: var(--text-secondary);
+      font-size: 1.0625rem; color: var(--text-2);
       max-width: 540px; line-height: 1.7; margin-bottom: 28px;
     }
     .time-badge {
@@ -195,33 +173,33 @@
       text-transform: uppercase; color: var(--accent); margin-bottom: 8px;
     }
     .section-title {
-      font-family: var(--font-display);
+      font-family: var(--ff-display);
       font-size: clamp(1.5rem, 3vw, 2rem);
       font-weight: 700; line-height: 1.2;
       letter-spacing: -0.015em; margin-bottom: 10px;
     }
-    .section-desc { font-size: 1rem; color: var(--text-secondary); line-height: 1.7; margin-bottom: 32px; }
+    .section-desc { font-size: 1rem; color: var(--text-2); line-height: 1.7; margin-bottom: 32px; }
 
     /* Prerequisites */
     .prereq-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
     .prereq-card {
-      background: var(--surface); border: 1px solid var(--surface-border);
+      background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 20px;
       transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    .prereq-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .prereq-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-card); }
     .prereq-icon {
       width: 40px; height: 40px; border-radius: 10px;
-      background: var(--accent-light); color: var(--accent);
+      background: var(--accent-soft); color: var(--accent);
       display: flex; align-items: center; justify-content: center;
       font-size: 1.25rem; margin-bottom: 12px;
     }
-    .prereq-card h3 { font-family: var(--font-display); font-size: 1rem; font-weight: 600; margin-bottom: 4px; }
-    .prereq-card p { font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 8px; }
+    .prereq-card h3 { font-family: var(--ff-display); font-size: 1rem; font-weight: 600; margin-bottom: 4px; }
+    .prereq-card p { font-size: 0.8125rem; color: var(--text-2); line-height: 1.5; margin-bottom: 8px; }
     .prereq-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
     .prereq-link {
       font-size: 0.75rem; font-weight: 500; color: var(--accent);
-      background: var(--accent-subtle); border-radius: 6px;
+      background: var(--accent-soft); border-radius: 6px;
       padding: 3px 8px; text-decoration: none;
     }
     .prereq-link:hover { text-decoration: underline; }
@@ -230,17 +208,17 @@
     .steps-section { background: var(--bg-alt); }
     .tab-bar {
       display: flex; gap: 4px; margin-bottom: 32px;
-      background: var(--surface); border: 1px solid var(--surface-border);
+      background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 4px; width: fit-content;
     }
     .tab-btn {
       background: none; border: none; cursor: pointer;
-      font-family: var(--font-body); font-size: 0.875rem; font-weight: 500;
-      color: var(--text-secondary); padding: 8px 18px; border-radius: 8px;
+      font-family: var(--ff-body); font-size: 0.875rem; font-weight: 500;
+      color: var(--text-2); padding: 8px 18px; border-radius: 8px;
       transition: background 0.15s ease, color 0.15s ease;
     }
     .tab-btn.active { background: var(--accent); color: #fff; }
-    .tab-btn:hover:not(.active) { background: var(--bg-alt); color: var(--text-primary); }
+    .tab-btn:hover:not(.active) { background: var(--bg-alt); color: var(--text-1); }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
 
@@ -261,25 +239,25 @@
     .step:not(:last-child)::before {
       content: ''; position: absolute;
       left: 23px; top: 48px; bottom: -4px; width: 2px;
-      background: var(--surface-border);
+      background: var(--border);
     }
     .step-num {
       width: 48px; height: 48px; border-radius: 50%;
       background: var(--accent); color: #fff;
       display: flex; align-items: center; justify-content: center;
-      font-family: var(--font-display); font-size: 1.125rem; font-weight: 700;
+      font-family: var(--ff-display); font-size: 1.125rem; font-weight: 700;
       flex-shrink: 0; position: relative; z-index: 1;
-      box-shadow: var(--shadow-sm);
+      box-shadow: var(--shadow-card);
     }
     .step-content { padding-top: 10px; }
     .step-title {
-      font-family: var(--font-display); font-size: 1.125rem; font-weight: 600;
+      font-family: var(--ff-display); font-size: 1.125rem; font-weight: 600;
       margin-bottom: 8px;
     }
-    .step-desc { font-size: 0.9375rem; color: var(--text-secondary); line-height: 1.65; margin-bottom: 12px; }
+    .step-desc { font-size: 0.9375rem; color: var(--text-2); line-height: 1.65; margin-bottom: 12px; }
     .step-desc code {
       font-family: var(--font-mono); font-size: 0.8125rem;
-      background: var(--accent-subtle); color: var(--accent);
+      background: var(--accent-soft); color: var(--accent);
       border-radius: 4px; padding: 1px 5px;
     }
 
@@ -299,7 +277,7 @@
       background: color-mix(in srgb, #fff 10%, transparent);
       border: 1px solid color-mix(in srgb, #fff 15%, transparent);
       color: #A8A8A6; cursor: pointer; border-radius: 6px;
-      padding: 4px 10px; font-size: 0.75rem; font-family: var(--font-body);
+      padding: 4px 10px; font-size: 0.75rem; font-family: var(--ff-body);
       transition: background 0.15s ease, color 0.15s ease;
       display: flex; align-items: center; gap: 5px;
     }
@@ -320,7 +298,7 @@
       color: var(--warning);
     }
     .callout-info {
-      background: var(--accent-light);
+      background: var(--accent-soft);
       border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
       color: var(--accent);
     }
@@ -335,7 +313,7 @@
     .env-section { }
     .env-grid { display: grid; gap: 12px; }
     .env-card {
-      background: var(--surface); border: 1px solid var(--surface-border);
+      background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 18px 20px;
       display: grid; grid-template-columns: auto 1fr; gap: 0 16px;
     }
@@ -349,7 +327,7 @@
       padding-top: 2px;
     }
     .env-label { font-size: 0.875rem; font-weight: 600; margin-bottom: 2px; }
-    .env-desc { font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5; }
+    .env-desc { font-size: 0.8125rem; color: var(--text-2); line-height: 1.5; }
     .env-req-badge {
       display: inline-flex; font-size: 0.6875rem; font-weight: 700;
       letter-spacing: 0.04em; text-transform: uppercase;
@@ -360,17 +338,17 @@
     .optional-section { background: var(--bg-alt); }
     .optional-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
     .optional-card {
-      background: var(--surface); border: 1px solid var(--surface-border);
+      background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 20px;
     }
-    .optional-card h3 { font-family: var(--font-display); font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
-    .optional-card p { font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.55; }
+    .optional-card h3 { font-family: var(--ff-display); font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
+    .optional-card p { font-size: 0.8125rem; color: var(--text-2); line-height: 1.55; }
     .optional-card a { font-weight: 500; }
 
     /* Troubleshooting */
     .trouble-list { display: grid; gap: 8px; }
     details {
-      background: var(--surface); border: 1px solid var(--surface-border);
+      background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); overflow: hidden;
     }
     summary {
@@ -391,13 +369,13 @@
     details[open] summary::after { transform: rotate(180deg); }
     .details-body {
       padding: 0 20px 18px;
-      font-size: 0.875rem; color: var(--text-secondary); line-height: 1.65;
-      border-top: 1px solid var(--surface-border);
+      font-size: 0.875rem; color: var(--text-2); line-height: 1.65;
+      border-top: 1px solid var(--border);
       padding-top: 14px;
     }
     .details-body code {
       font-family: var(--font-mono); font-size: 0.8125rem;
-      background: var(--accent-subtle); color: var(--accent);
+      background: var(--accent-soft); color: var(--accent);
       border-radius: 4px; padding: 1px 5px;
     }
     .details-body .code-block { margin: 10px 0; }
@@ -407,8 +385,8 @@
       background: var(--bg-alt);
     }
     .success-box {
-      background: var(--surface); border: 1px solid var(--surface-border);
-      border-radius: var(--radius-lg); padding: 32px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 32px;
       text-align: center;
     }
     .success-icon {
@@ -418,10 +396,10 @@
       margin: 0 auto 16px; font-size: 1.75rem;
     }
     .success-box h2 {
-      font-family: var(--font-display); font-size: 1.5rem; font-weight: 700;
+      font-family: var(--ff-display); font-size: 1.5rem; font-weight: 700;
       margin-bottom: 8px;
     }
-    .success-box p { color: var(--text-secondary); font-size: 0.9375rem; margin-bottom: 20px; }
+    .success-box p { color: var(--text-2); font-size: 0.9375rem; margin-bottom: 20px; }
     .success-url {
       display: inline-flex; align-items: center; gap: 8px;
       background: var(--code-bg); color: var(--code-text);
@@ -440,26 +418,26 @@
     .btn-primary:hover { background: var(--accent-hover); text-decoration: none; }
     .btn-secondary {
       display: inline-flex; align-items: center; gap: 6px;
-      background: var(--surface); color: var(--text-primary);
-      border: 1px solid var(--surface-border);
+      background: var(--surface); color: var(--text-1);
+      border: 1px solid var(--border);
       padding: 10px 20px; border-radius: 10px;
       font-weight: 500; font-size: 0.9375rem; text-decoration: none;
       transition: background 0.2s ease, border-color 0.2s ease;
     }
-    .btn-secondary:hover { background: var(--bg-alt); border-color: var(--text-tertiary); text-decoration: none; }
+    .btn-secondary:hover { background: var(--bg-alt); border-color: var(--text-3); text-decoration: none; }
 
     /* Footer */
     .footer {
-      border-top: 1px solid var(--surface-border);
+      border-top: 1px solid var(--border);
       padding: 40px 0; text-align: center;
     }
-    .footer-heart { font-size: 0.9375rem; color: var(--text-secondary); margin-bottom: 12px; }
+    .footer-heart { font-size: 0.9375rem; color: var(--text-2); margin-bottom: 12px; }
     .footer-links { display: flex; justify-content: center; gap: 24px; font-size: 0.8125rem; }
-    .footer-links a { color: var(--text-tertiary); }
+    .footer-links a { color: var(--text-3); }
     .footer-links a:hover { color: var(--accent); }
 
     /* Divider */
-    .divider { border: none; border-top: 1px solid var(--surface-border); margin: 40px 0; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
 
     /* Reveal */
     .reveal { opacity: 1; transform: none; }
@@ -486,7 +464,7 @@
     <div class="container-wide">
       <a href="index.html" class="nav-logo" aria-label="Oikos Home">
         <svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <defs><linearGradient id="navbg" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#0A84FF"/><stop offset="100%" stop-color="#006AE0"/></linearGradient></defs>
+          <defs><linearGradient id="navbg" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#8B5CF6"/><stop offset="100%" stop-color="#6C3AED"/></linearGradient></defs>
           <rect width="160" height="160" rx="36" fill="url(#navbg)"/>
           <path d="M80 36L36 72V120C36 122.2 37.8 124 40 124H68V96H92V124H120C122.2 124 124 122.2 124 120V72L80 36Z" fill="white"/>
           <rect x="100" y="46" width="12" height="22" rx="2" fill="white"/>
@@ -515,14 +493,14 @@
     <div class="container">
       <p class="hero-eyebrow reveal">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-        <span data-i18n="hero_eyebrow">Installation</span>
+        <span data-t="hero_eyebrow">Installation</span>
       </p>
-      <h1 class="reveal" data-i18n="hero_title">Install Oikos</h1>
-      <p class="hero-desc reveal" data-i18n="hero_desc">Get your self-hosted family planner running in a few minutes. No programming experience required — just Docker.</p>
+      <h1 class="reveal" data-t="hero_title">Install Oikos</h1>
+      <p class="hero-desc reveal" data-t="hero_desc">Get your self-hosted family planner running in a few minutes. No programming experience required — just Docker.</p>
       <div class="reveal">
         <span class="time-badge">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <span data-i18n="hero_time">~10 minutes</span>
+          <span data-t="hero_time">~10 minutes</span>
         </span>
       </div>
     </div>
@@ -531,14 +509,14 @@
   <!-- Prerequisites -->
   <section id="prerequisites">
     <div class="container">
-      <p class="section-label reveal" data-i18n="prereq_label">Before you start</p>
-      <h2 class="section-title reveal" data-i18n="prereq_title">What you need</h2>
-      <p class="section-desc reveal" data-i18n="prereq_desc">Oikos runs as a Docker container — you don't need to install Node.js or any other runtime. Just Docker, and you're good to go.</p>
+      <p class="section-label reveal" data-t="prereq_label">Before you start</p>
+      <h2 class="section-title reveal" data-t="prereq_title">What you need</h2>
+      <p class="section-desc reveal" data-t="prereq_desc">Oikos runs as a Docker container — you don't need to install Node.js or any other runtime. Just Docker, and you're good to go.</p>
       <div class="prereq-grid">
         <div class="prereq-card reveal">
           <div class="prereq-icon" aria-hidden="true">🐳</div>
           <h3>Docker</h3>
-          <p data-i18n="prereq_docker_desc">Packages the app so you don't need to install anything else. Free for personal use.</p>
+          <p data-t="prereq_docker_desc">Packages the app so you don't need to install anything else. Free for personal use.</p>
           <div class="prereq-links">
             <a href="https://docs.docker.com/desktop/install/mac-install/" target="_blank" rel="noopener" class="prereq-link">macOS</a>
             <a href="https://docs.docker.com/desktop/install/windows-install/" target="_blank" rel="noopener" class="prereq-link">Windows</a>
@@ -547,18 +525,18 @@
         </div>
         <div class="prereq-card reveal reveal-delay-1">
           <div class="prereq-icon" aria-hidden="true">💻</div>
-          <h3 data-i18n="prereq_terminal_title">Terminal</h3>
-          <p data-i18n="prereq_terminal_desc">A command-line interface to type a few commands. Built into every OS — no extra install needed.</p>
+          <h3 data-t="prereq_terminal_title">Terminal</h3>
+          <p data-t="prereq_terminal_desc">A command-line interface to type a few commands. Built into every OS — no extra install needed.</p>
           <div class="prereq-links">
-            <span style="font-size:0.75rem;color:var(--text-tertiary)" data-i18n="prereq_terminal_hint">macOS: Terminal · Windows: PowerShell · Linux: bash</span>
+            <span style="font-size:0.75rem;color:var(--text-3)" data-t="prereq_terminal_hint">macOS: Terminal · Windows: PowerShell · Linux: bash</span>
           </div>
         </div>
         <div class="prereq-card reveal reveal-delay-2">
           <div class="prereq-icon" aria-hidden="true">⚙️</div>
-          <h3 data-i18n="prereq_sys_title">System</h3>
-          <p data-i18n="prereq_sys_desc">256 MB RAM minimum. Runs on a Raspberry Pi, NAS, home server, or any desktop machine.</p>
+          <h3 data-t="prereq_sys_title">System</h3>
+          <p data-t="prereq_sys_desc">256 MB RAM minimum. Runs on a Raspberry Pi, NAS, home server, or any desktop machine.</p>
           <div class="prereq-links">
-            <span style="font-size:0.75rem;color:var(--text-tertiary)" data-i18n="prereq_sys_hint">~500 MB disk for Docker image</span>
+            <span style="font-size:0.75rem;color:var(--text-3)" data-t="prereq_sys_hint">~500 MB disk for Docker image</span>
           </div>
         </div>
       </div>
@@ -568,17 +546,17 @@
   <!-- Steps -->
   <section class="steps-section" id="install">
     <div class="container">
-      <p class="section-label reveal" data-i18n="steps_label">Step by step</p>
-      <h2 class="section-title reveal" data-i18n="steps_title">Installation</h2>
+      <p class="section-label reveal" data-t="steps_label">Step by step</p>
+      <h2 class="section-title reveal" data-t="steps_title">Installation</h2>
 
       <div class="tab-bar reveal" role="tablist" aria-label="Installation options">
-        <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="panel-installer" id="tab-installer" data-i18n="tab_installer">
+        <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="panel-installer" id="tab-installer" data-t="tab_installer">
           Option A — Web Installer
         </button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-a" id="tab-a" data-i18n="tab_a">
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-a" id="tab-a" data-t="tab_a">
           Option B — Pre-built Image
         </button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-b" id="tab-b" data-i18n="tab_b">
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-b" id="tab-b" data-t="tab_b">
           Option C — Build from Source
         </button>
       </div>
@@ -587,20 +565,20 @@
       <div class="tab-panel active" id="panel-installer" role="tabpanel" aria-labelledby="tab-installer">
         <div class="callout callout-success reveal">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-          <span data-i18n="option_installer_info">Recommended for most users. A browser-based wizard configures your .env, starts Docker, and creates your admin account — no manual steps. Requires Node.js 18+ on the host.</span>
+          <span data-t="option_installer_info">Recommended for most users. A browser-based wizard configures your .env, starts Docker, and creates your admin account — no manual steps. Requires Node.js 18+ on the host.</span>
         </div>
 
         <div class="step reveal">
           <div class="step-num" aria-hidden="true">1</div>
           <div class="step-content">
-            <h3 class="step-title" data-i18n="step_inst1_title">Clone the repository</h3>
-            <p class="step-desc" data-i18n="step_inst1_desc">Open your terminal and clone Oikos to a folder of your choice.</p>
+            <h3 class="step-title" data-t="step_inst1_title">Clone the repository</h3>
+            <p class="step-desc" data-t="step_inst1_desc">Open your terminal and clone Oikos to a folder of your choice.</p>
             <div class="code-wrap">
               <div class="code-block" role="region" aria-label="Clone repo">git clone https://github.com/ulsklyc/oikos.git
 cd oikos</div>
               <button class="copy-btn" data-copy="git clone https://github.com/ulsklyc/oikos.git&#10;cd oikos" aria-label="Copy commands">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span data-i18n="copy">Copy</span>
+                <span data-t="copy">Copy</span>
               </button>
             </div>
           </div>
@@ -609,13 +587,13 @@ cd oikos</div>
         <div class="step reveal">
           <div class="step-num" aria-hidden="true">2</div>
           <div class="step-content">
-            <h3 class="step-title" data-i18n="step_inst2_title">Start the installer</h3>
-            <p class="step-desc" data-i18n="step_inst2_desc">Run this command from the repository root. The installer server starts on port 8090.</p>
+            <h3 class="step-title" data-t="step_inst2_title">Start the installer</h3>
+            <p class="step-desc" data-t="step_inst2_desc">Run this command from the repository root. The installer server starts on port 8090.</p>
             <div class="code-wrap">
               <div class="code-block" role="region" aria-label="Start installer"><span class="cmd">node tools/installer/install-server.js</span></div>
               <button class="copy-btn" data-copy="node tools/installer/install-server.js" aria-label="Copy command">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span data-i18n="copy">Copy</span>
+                <span data-t="copy">Copy</span>
               </button>
             </div>
           </div>
@@ -624,18 +602,18 @@ cd oikos</div>
         <div class="step reveal">
           <div class="step-num" aria-hidden="true">3</div>
           <div class="step-content">
-            <h3 class="step-title" data-i18n="step_inst3_title">Open the wizard in your browser</h3>
-            <p class="step-desc" data-i18n="step_inst3_desc">Navigate to the following address. The wizard will guide you through configuration, Docker startup, and admin account creation.</p>
+            <h3 class="step-title" data-t="step_inst3_title">Open the wizard in your browser</h3>
+            <p class="step-desc" data-t="step_inst3_desc">Navigate to the following address. The wizard will guide you through configuration, Docker startup, and admin account creation.</p>
             <div class="code-wrap">
               <div class="code-block" role="region" aria-label="Installer URL"><span class="val">http://localhost:8090</span></div>
               <button class="copy-btn" data-copy="http://localhost:8090" aria-label="Copy URL">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span data-i18n="copy">Copy</span>
+                <span data-t="copy">Copy</span>
               </button>
             </div>
             <div class="callout callout-info">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              <span data-i18n="step_inst3_info">The installer shuts down automatically after setup completes. Your Oikos instance keeps running via Docker.</span>
+              <span data-t="step_inst3_info">The installer shuts down automatically after setup completes. Your Oikos instance keeps running via Docker.</span>
             </div>
           </div>
         </div>
@@ -645,20 +623,20 @@ cd oikos</div>
       <div class="tab-panel" id="panel-a" role="tabpanel" aria-labelledby="tab-a">
         <div class="callout callout-info reveal">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span data-i18n="option_a_info">No Git, no build step — just two files and a single command. Requires only Docker.</span>
+          <span data-t="option_a_info">No Git, no build step — just two files and a single command. Requires only Docker.</span>
         </div>
 
         <div class="step reveal">
           <div class="step-num" aria-hidden="true">1</div>
           <div class="step-content">
-            <h3 class="step-title" data-i18n="step_a1_title">Download the configuration files</h3>
-            <p class="step-desc" data-i18n="step_a1_desc">Open your terminal and run these two commands. They download the Docker configuration and the template for your settings.</p>
+            <h3 class="step-title" data-t="step_a1_title">Download the configuration files</h3>
+            <p class="step-desc" data-t="step_a1_desc">Open your terminal and run these two commands. They download the Docker configuration and the template for your settings.</p>
             <div class="code-wrap">
               <div class="code-block" role="region" aria-label="Download commands">curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/docker-compose.yml
 curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example</div>
               <button class="copy-btn" data-copy="curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/docker-compose.yml&#10;curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example" aria-label="Copy commands">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span data-i18n="copy">Copy</span>
+                <span data-t="copy">Copy</span>
               </button>
             </div>
           </div>
@@ -667,26 +645,26 @@ curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example</div>
         <div class="step reveal">
           <div class="step-num" aria-hidden="true">2</div>
           <div class="step-content">
-            <h3 class="step-title" data-i18n="step_a2_title">Create your configuration</h3>
-            <p class="step-desc" data-i18n="step_a2_desc">Copy the template to create your own settings file. Then open <code>.env</code> in a text editor and set the two required secrets.</p>
+            <h3 class="step-title" data-t="step_a2_title">Create your configuration</h3>
+            <p class="step-desc" data-t="step_a2_desc">Copy the template to create your own settings file. Then open <code>.env</code> in a text editor and set the two required secrets.</p>
             <div class="code-wrap">
               <div class="code-block" role="region" aria-label="Setup env">cp .env.example .env</div>
               <button class="copy-btn" data-copy="cp .env.example .env" aria-label="Copy command">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span data-i18n="copy">Copy</span>
+                <span data-t="copy">Copy</span>
               </button>
             </div>
-            <p class="step-desc" data-i18n="step_a2_gen">Generate a secure value for each secret by running this command twice — paste one result as <code>SESSION_SECRET</code> and one as <code>DB_ENCRYPTION_KEY</code>:</p>
+            <p class="step-desc" data-t="step_a2_gen">Generate a secure value for each secret by running this command twice — paste one result as <code>SESSION_SECRET</code> and one as <code>DB_ENCRYPTION_KEY</code>:</p>
             <div class="code-wrap">
               <div class="code-block" role="region" aria-label="Generate secret">openssl rand -hex 32</div>
               <button class="copy-btn" data-copy="openssl rand -hex 32" aria-label="Copy command">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span data-i18n="copy">Copy</span>
+                <span data-t="copy">Copy</span>
               </button>
             </div>
             <div class="callout callout-warning">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              <span data-i18n="step_a2_warning">Keep a backup of your <code>.env</code> file somewhere safe. If you lose the <code>DB_ENCRYPTION_KEY</code>, your data cannot be recovered.</span>
+              <span data-t="step_a2_warning">Keep a backup of your <code>.env</code> file somewhere safe. If you lose the <code>DB_ENCRYPTION_KEY</code>, your data cannot be recovered.</span>
             </div>
           </div>
         </div>
@@ -694,26 +672,26 @@ curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example</div>
         <div class="step reveal">
           <div class="step-num" aria-hidden="true">3</div>
           <div class="step-content">
-            <h3 class="step-title" data-i18n="step_a3_title">Start the container</h3>
-            <p class="step-desc" data-i18n="step_a3_desc">Docker will automatically download the Oikos image and start it in the background. The first download takes a minute.</p>
+            <h3 class="step-title" data-t="step_a3_title">Start the container</h3>
+            <p class="step-desc" data-t="step_a3_desc">Docker will automatically download the Oikos image and start it in the background. The first download takes a minute.</p>
             <div class="code-wrap">
               <div class="code-block" role="region" aria-label="Start container"><span class="cmd">docker compose up -d</span></div>
               <button class="copy-btn" data-copy="docker compose up -d" aria-label="Copy command">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span data-i18n="copy">Copy</span>
+                <span data-t="copy">Copy</span>
               </button>
             </div>
-            <p class="step-desc" data-i18n="step_a3_verify">You can verify it's running by checking the logs:</p>
+            <p class="step-desc" data-t="step_a3_verify">You can verify it's running by checking the logs:</p>
             <div class="code-wrap">
               <div class="code-block" role="region" aria-label="Check logs">docker compose logs -f</div>
               <button class="copy-btn" data-copy="docker compose logs -f" aria-label="Copy command">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span data-i18n="copy">Copy</span>
+                <span data-t="copy">Copy</span>
               </button>
             </div>
             <div class="callout callout-success">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-              <span data-i18n="step_a3_success">You should see: <code>Server läuft auf Port 3000</code>. Press Ctrl+C to stop following logs — the container keeps running.</span>
+              <span data-t="step_a3_success">You should see: <code>Server läuft auf Port 3000</code>. Press Ctrl+C to stop following logs — the container keeps running.</span>
             </div>
           </div>
         </div>
@@ -721,13 +699,13 @@ curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example</div>
         <div class="step reveal">
           <div class="step-num" aria-hidden="true">4</div>
           <div class="step-content">
-            <h3 class="step-title" data-i18n="step_setup_title">Create your admin account</h3>
-            <p class="step-desc" data-i18n="step_setup_desc">Run the interactive setup wizard to create the first user account. You'll be asked for a username, display name, and password.</p>
+            <h3 class="step-title" data-t="step_setup_title">Create your admin account</h3>
+            <p class="step-desc" data-t="step_setup_desc">Run the interactive setup wizard to create the first user account. You'll be asked for a username, display name, and password.</p>
             <div class="code-wrap">
               <div class="code-block" role="region" aria-label="Run setup"><span class="cmd">docker compose exec oikos node setup.js</span></div>
               <button class="copy-btn" data-copy="docker compose exec oikos node setup.js" aria-label="Copy command">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span data-i18n="copy">Copy</span>
+                <span data-t="copy">Copy</span>
               </button>
             </div>
           </div>
@@ -738,19 +716,19 @@ curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example</div>
       <div class="tab-panel" id="panel-b" role="tabpanel" aria-labelledby="tab-b">
         <div class="callout callout-info reveal">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span data-i18n="option_b_info">For contributors or those who want to run a custom version. Requires Git. The first build takes a few minutes.</span>
+          <span data-t="option_b_info">For contributors or those who want to run a custom version. Requires Git. The first build takes a few minutes.</span>
         </div>
 
         <div class="step reveal">
           <div class="step-num" aria-hidden="true">1</div>
           <div class="step-content">
-            <h3 class="step-title" data-i18n="step_b1_title">Clone the repository</h3>
+            <h3 class="step-title" data-t="step_b1_title">Clone the repository</h3>
             <div class="code-wrap">
               <div class="code-block" role="region" aria-label="Clone repo">git clone https://github.com/ulsklyc/oikos.git
 cd oikos</div>
               <button class="copy-btn" data-copy="git clone https://github.com/ulsklyc/oikos.git&#10;cd oikos" aria-label="Copy commands">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span data-i18n="copy">Copy</span>
+                <span data-t="copy">Copy</span>
               </button>
             </div>
           </div>
@@ -759,21 +737,21 @@ cd oikos</div>
         <div class="step reveal">
           <div class="step-num" aria-hidden="true">2</div>
           <div class="step-content">
-            <h3 class="step-title" data-i18n="step_a2_title">Create your configuration</h3>
-            <p class="step-desc" data-i18n="step_a2_desc">Copy the template to create your own settings file. Then open <code>.env</code> in a text editor and set the two required secrets.</p>
+            <h3 class="step-title" data-t="step_a2_title">Create your configuration</h3>
+            <p class="step-desc" data-t="step_a2_desc">Copy the template to create your own settings file. Then open <code>.env</code> in a text editor and set the two required secrets.</p>
             <div class="code-wrap">
               <div class="code-block" role="region" aria-label="Setup env">cp .env.example .env</div>
               <button class="copy-btn" data-copy="cp .env.example .env" aria-label="Copy command">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span data-i18n="copy">Copy</span>
+                <span data-t="copy">Copy</span>
               </button>
             </div>
-            <p class="step-desc" data-i18n="step_a2_gen">Generate a secure value for each secret — run this twice:</p>
+            <p class="step-desc" data-t="step_a2_gen">Generate a secure value for each secret — run this twice:</p>
             <div class="code-wrap">
               <div class="code-block" role="region" aria-label="Generate secret">openssl rand -hex 32</div>
               <button class="copy-btn" data-copy="openssl rand -hex 32" aria-label="Copy command">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span data-i18n="copy">Copy</span>
+                <span data-t="copy">Copy</span>
               </button>
             </div>
           </div>
@@ -782,13 +760,13 @@ cd oikos</div>
         <div class="step reveal">
           <div class="step-num" aria-hidden="true">3</div>
           <div class="step-content">
-            <h3 class="step-title" data-i18n="step_b3_title">Build and start</h3>
-            <p class="step-desc" data-i18n="step_b3_desc">The <code>--build</code> flag compiles the Docker image locally. This takes a few minutes the first time.</p>
+            <h3 class="step-title" data-t="step_b3_title">Build and start</h3>
+            <p class="step-desc" data-t="step_b3_desc">The <code>--build</code> flag compiles the Docker image locally. This takes a few minutes the first time.</p>
             <div class="code-wrap">
               <div class="code-block" role="region" aria-label="Build and start"><span class="cmd">docker compose up -d --build</span></div>
               <button class="copy-btn" data-copy="docker compose up -d --build" aria-label="Copy command">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span data-i18n="copy">Copy</span>
+                <span data-t="copy">Copy</span>
               </button>
             </div>
           </div>
@@ -797,13 +775,13 @@ cd oikos</div>
         <div class="step reveal">
           <div class="step-num" aria-hidden="true">4</div>
           <div class="step-content">
-            <h3 class="step-title" data-i18n="step_setup_title">Create your admin account</h3>
-            <p class="step-desc" data-i18n="step_setup_desc">Run the interactive setup wizard to create the first user account. You'll be asked for a username, display name, and password.</p>
+            <h3 class="step-title" data-t="step_setup_title">Create your admin account</h3>
+            <p class="step-desc" data-t="step_setup_desc">Run the interactive setup wizard to create the first user account. You'll be asked for a username, display name, and password.</p>
             <div class="code-wrap">
               <div class="code-block" role="region" aria-label="Run setup"><span class="cmd">docker compose exec oikos node setup.js</span></div>
               <button class="copy-btn" data-copy="docker compose exec oikos node setup.js" aria-label="Copy command">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span data-i18n="copy">Copy</span>
+                <span data-t="copy">Copy</span>
               </button>
             </div>
           </div>
@@ -817,16 +795,16 @@ cd oikos</div>
     <div class="container">
       <div class="success-box reveal">
         <div class="success-icon" aria-hidden="true">🎉</div>
-        <h2 data-i18n="success_title">You're all set!</h2>
-        <p data-i18n="success_desc">Open your browser and navigate to:</p>
+        <h2 data-t="success_title">You're all set!</h2>
+        <p data-t="success_desc">Open your browser and navigate to:</p>
         <div class="success-url" aria-label="App URL">http://localhost:3000</div>
-        <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:20px" data-i18n="success_hint">Log in with the admin credentials you just created. You can add more family members from the Settings page.</p>
+        <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:20px" data-t="success_hint">Log in with the admin credentials you just created. You can add more family members from the Settings page.</p>
         <div class="success-links">
           <a href="https://github.com/ulsklyc/oikos" target="_blank" rel="noopener" class="btn-primary">
             <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
             GitHub
           </a>
-          <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md" target="_blank" rel="noopener" class="btn-secondary" data-i18n="success_full_guide">Full Technical Guide</a>
+          <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md" target="_blank" rel="noopener" class="btn-secondary" data-t="success_full_guide">Full Technical Guide</a>
         </div>
       </div>
     </div>
@@ -835,19 +813,19 @@ cd oikos</div>
   <!-- Key env vars -->
   <section class="env-section" id="env">
     <div class="container">
-      <p class="section-label reveal" data-i18n="env_label">Configuration</p>
-      <h2 class="section-title reveal" data-i18n="env_title">Required settings</h2>
-      <p class="section-desc reveal" data-i18n="env_desc">These two variables in your <code style="font-family:var(--font-mono);font-size:0.875rem;background:var(--accent-subtle);color:var(--accent);border-radius:4px;padding:1px 5px">.env</code> file are mandatory. Everything else is optional.</p>
+      <p class="section-label reveal" data-t="env_label">Configuration</p>
+      <h2 class="section-title reveal" data-t="env_title">Required settings</h2>
+      <p class="section-desc reveal" data-t="env_desc">These two variables in your <code style="font-family:var(--font-mono);font-size:0.875rem;background:var(--accent-soft);color:var(--accent);border-radius:4px;padding:1px 5px">.env</code> file are mandatory. Everything else is optional.</p>
       <div class="env-grid">
         <div class="env-card env-required reveal">
           <div class="env-name">SESSION_SECRET</div>
-          <div class="env-label" data-i18n="env_session_label">Session Secret <span class="env-req-badge">Required</span></div>
-          <div class="env-desc" data-i18n="env_session_desc">Signs and verifies login cookies. Use <code>openssl rand -hex 32</code> to generate a secure value.</div>
+          <div class="env-label" data-t="env_session_label">Session Secret <span class="env-req-badge">Required</span></div>
+          <div class="env-desc" data-t="env_session_desc">Signs and verifies login cookies. Use <code>openssl rand -hex 32</code> to generate a secure value.</div>
         </div>
         <div class="env-card env-required reveal reveal-delay-1">
           <div class="env-name">DB_ENCRYPTION_KEY</div>
-          <div class="env-label" data-i18n="env_db_label">Database Key <span class="env-req-badge">Required</span></div>
-          <div class="env-desc" data-i18n="env_db_desc">Encrypts your entire database with AES-256. Generate with <code>openssl rand -hex 32</code>. Back this up — without it, data is unrecoverable.</div>
+          <div class="env-label" data-t="env_db_label">Database Key <span class="env-req-badge">Required</span></div>
+          <div class="env-desc" data-t="env_db_desc">Encrypts your entire database with AES-256. Generate with <code>openssl rand -hex 32</code>. Back this up — without it, data is unrecoverable.</div>
         </div>
       </div>
     </div>
@@ -856,29 +834,29 @@ cd oikos</div>
   <!-- Optional -->
   <section class="optional-section" id="optional">
     <div class="container">
-      <p class="section-label reveal" data-i18n="optional_label">Optional</p>
-      <h2 class="section-title reveal" data-i18n="optional_title">Go further</h2>
-      <p class="section-desc reveal" data-i18n="optional_desc">Once Oikos is running, you can set up these extras. All are configured in your <code style="font-family:var(--font-mono);font-size:0.875rem;background:var(--accent-subtle);color:var(--accent);border-radius:4px;padding:1px 5px">.env</code> file.</p>
+      <p class="section-label reveal" data-t="optional_label">Optional</p>
+      <h2 class="section-title reveal" data-t="optional_title">Go further</h2>
+      <p class="section-desc reveal" data-t="optional_desc">Once Oikos is running, you can set up these extras. All are configured in your <code style="font-family:var(--font-mono);font-size:0.875rem;background:var(--accent-soft);color:var(--accent);border-radius:4px;padding:1px 5px">.env</code> file.</p>
       <div class="optional-grid">
         <div class="optional-card reveal">
-          <h3 data-i18n="opt_https_title">HTTPS &amp; Network Access</h3>
-          <p data-i18n="opt_https_desc">Want to reach Oikos from other devices or the internet? Set up Nginx as a reverse proxy with a free Let's Encrypt SSL certificate. <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md#https--reverse-proxy-nginx" target="_blank" rel="noopener" data-i18n="opt_guide">Guide →</a></p>
+          <h3 data-t="opt_https_title">HTTPS &amp; Network Access</h3>
+          <p data-t="opt_https_desc">Want to reach Oikos from other devices or the internet? Set up Nginx as a reverse proxy with a free Let's Encrypt SSL certificate. <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md#https--reverse-proxy-nginx" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></p>
         </div>
         <div class="optional-card reveal reveal-delay-1">
-          <h3 data-i18n="opt_weather_title">Weather Widget</h3>
-          <p data-i18n="opt_weather_desc">Show the local weather on the dashboard. Set <code>OPENWEATHER_API_KEY</code> and <code>OPENWEATHER_CITY</code> — free API key from <a href="https://openweathermap.org/api" target="_blank" rel="noopener">openweathermap.org</a>.</p>
+          <h3 data-t="opt_weather_title">Weather Widget</h3>
+          <p data-t="opt_weather_desc">Show the local weather on the dashboard. Set <code>OPENWEATHER_API_KEY</code> and <code>OPENWEATHER_CITY</code> — free API key from <a href="https://openweathermap.org/api" target="_blank" rel="noopener">openweathermap.org</a>.</p>
         </div>
         <div class="optional-card reveal reveal-delay-2">
-          <h3 data-i18n="opt_cal_title">Calendar Sync</h3>
-          <p data-i18n="opt_cal_desc">Two-way sync with Google Calendar (OAuth) and Apple iCloud (CalDAV). Set the relevant <code>GOOGLE_*</code> or <code>APPLE_*</code> variables. <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md#environment-variables" target="_blank" rel="noopener" data-i18n="opt_guide">Guide →</a></p>
+          <h3 data-t="opt_cal_title">Calendar Sync</h3>
+          <p data-t="opt_cal_desc">Two-way sync with Google Calendar (OAuth) and Apple iCloud (CalDAV). Set the relevant <code>GOOGLE_*</code> or <code>APPLE_*</code> variables. <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md#environment-variables" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></p>
         </div>
         <div class="optional-card reveal reveal-delay-1">
-          <h3 data-i18n="opt_backup_title">Automated Backups</h3>
-          <p data-i18n="opt_backup_desc">Add a daily cron job to back up your database. All data lives in the <code>oikos_data</code> Docker volume. <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md#backup--restore" target="_blank" rel="noopener" data-i18n="opt_guide">Guide →</a></p>
+          <h3 data-t="opt_backup_title">Automated Backups</h3>
+          <p data-t="opt_backup_desc">Add a daily cron job to back up your database. All data lives in the <code>oikos_data</code> Docker volume. <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md#backup--restore" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></p>
         </div>
         <div class="optional-card reveal reveal-delay-2">
-          <h3 data-i18n="opt_update_title">Updates</h3>
-          <p data-i18n="opt_update_desc">Pull the latest image and restart: <code>docker compose pull &amp;&amp; docker compose up -d</code>. Your data persists across updates.</p>
+          <h3 data-t="opt_update_title">Updates</h3>
+          <p data-t="opt_update_desc">Pull the latest image and restart: <code>docker compose pull &amp;&amp; docker compose up -d</code>. Your data persists across updates.</p>
         </div>
       </div>
     </div>
@@ -887,64 +865,64 @@ cd oikos</div>
   <!-- Troubleshooting -->
   <section id="troubleshooting">
     <div class="container">
-      <p class="section-label reveal" data-i18n="trouble_label">Troubleshooting</p>
-      <h2 class="section-title reveal" data-i18n="trouble_title">Something not working?</h2>
-      <p class="section-desc reveal" data-i18n="trouble_desc">Most issues have a simple fix. Check below — if you're still stuck, open an issue on GitHub.</p>
+      <p class="section-label reveal" data-t="trouble_label">Troubleshooting</p>
+      <h2 class="section-title reveal" data-t="trouble_title">Something not working?</h2>
+      <p class="section-desc reveal" data-t="trouble_desc">Most issues have a simple fix. Check below — if you're still stuck, open an issue on GitHub.</p>
       <div class="trouble-list reveal">
         <details>
-          <summary data-i18n="trouble_port_title">Port 3000 is already in use</summary>
+          <summary data-t="trouble_port_title">Port 3000 is already in use</summary>
           <div class="details-body">
-            <p data-i18n="trouble_port_desc">Another application is using port 3000. Either stop the conflicting process, or change the port in <code>docker-compose.yml</code>:</p>
+            <p data-t="trouble_port_desc">Another application is using port 3000. Either stop the conflicting process, or change the port in <code>docker-compose.yml</code>:</p>
             <div class="code-wrap">
               <div class="code-block">lsof -i :3000   <span class="comment"># find what's using the port</span></div>
             </div>
-            <p data-i18n="trouble_port_change">Or edit <code>docker-compose.yml</code> and change <code>3000:3000</code> to e.g. <code>8080:3000</code>.</p>
+            <p data-t="trouble_port_change">Or edit <code>docker-compose.yml</code> and change <code>3000:3000</code> to e.g. <code>8080:3000</code>.</p>
           </div>
         </details>
         <details>
-          <summary data-i18n="trouble_perm_title">Docker: Permission denied</summary>
+          <summary data-t="trouble_perm_title">Docker: Permission denied</summary>
           <div class="details-body">
-            <p data-i18n="trouble_perm_desc">Add your user to the Docker group, then log out and back in:</p>
+            <p data-t="trouble_perm_desc">Add your user to the Docker group, then log out and back in:</p>
             <div class="code-wrap">
               <div class="code-block">sudo usermod -aG docker $USER</div>
             </div>
           </div>
         </details>
         <details>
-          <summary data-i18n="trouble_reach_title">Container starts but the page is not reachable</summary>
+          <summary data-t="trouble_reach_title">Container starts but the page is not reachable</summary>
           <div class="details-body">
-            <p data-i18n="trouble_reach_desc">Check the container status and logs:</p>
+            <p data-t="trouble_reach_desc">Check the container status and logs:</p>
             <div class="code-wrap">
               <div class="code-block">docker compose ps        <span class="comment"># should show "Up" and "healthy"</span>
 docker compose logs      <span class="comment"># look for error messages</span>
 docker port oikos        <span class="comment"># verify port mapping</span></div>
             </div>
-            <p data-i18n="trouble_reach_firewall">Accessing from another device? Check your firewall rules.</p>
+            <p data-t="trouble_reach_firewall">Accessing from another device? Check your firewall rules.</p>
           </div>
         </details>
         <details>
-          <summary data-i18n="trouble_db_title">Database encryption error</summary>
+          <summary data-t="trouble_db_title">Database encryption error</summary>
           <div class="details-body">
-            <p data-i18n="trouble_db_desc">The <code>DB_ENCRYPTION_KEY</code> in your <code>.env</code> is missing or doesn't match the key used when the database was created. If this is a fresh install, you can reset:</p>
+            <p data-t="trouble_db_desc">The <code>DB_ENCRYPTION_KEY</code> in your <code>.env</code> is missing or doesn't match the key used when the database was created. If this is a fresh install, you can reset:</p>
             <div class="code-wrap">
               <div class="code-block">docker compose down -v
 <span class="cmd">docker compose up -d</span></div>
             </div>
             <div class="callout callout-warning" style="margin-top:10px">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              <span data-i18n="trouble_db_warning"><code>docker compose down -v</code> deletes all data. Only use this on a fresh install with no data.</span>
+              <span data-t="trouble_db_warning"><code>docker compose down -v</code> deletes all data. Only use this on a fresh install with no data.</span>
             </div>
           </div>
         </details>
         <details>
-          <summary data-i18n="trouble_nginx_title">Nginx shows 502 Bad Gateway</summary>
+          <summary data-t="trouble_nginx_title">Nginx shows 502 Bad Gateway</summary>
           <div class="details-body">
-            <p data-i18n="trouble_nginx_desc">Nginx can't reach the container. Check that it's running and the port matches:</p>
+            <p data-t="trouble_nginx_desc">Nginx can't reach the container. Check that it's running and the port matches:</p>
             <div class="code-wrap">
               <div class="code-block">docker compose ps
 docker compose logs | grep "Server läuft"</div>
             </div>
-            <p data-i18n="trouble_nginx_port">Ensure the <code>proxy_pass</code> port in your Nginx config matches the host port in <code>docker-compose.yml</code> (default: 3000).</p>
+            <p data-t="trouble_nginx_port">Ensure the <code>proxy_pass</code> port in your Nginx config matches the host port in <code>docker-compose.yml</code> (default: 3000).</p>
           </div>
         </details>
       </div>
@@ -953,12 +931,12 @@ docker compose logs | grep "Server läuft"</div>
 
   <footer class="footer">
     <div class="container">
-      <p class="footer-heart" data-i18n="footer_heart">Built with care for families who value privacy and simplicity.</p>
+      <p class="footer-heart" data-t="footer_heart">Built with care for families who value privacy and simplicity.</p>
       <div class="footer-links">
-        <a href="index.html" data-i18n="footer_home">Home</a>
+        <a href="index.html" data-t="footer_home">Home</a>
         <a href="https://github.com/ulsklyc/oikos" target="_blank" rel="noopener">GitHub</a>
         <a href="https://github.com/ulsklyc/oikos/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
-        <a href="https://github.com/ulsklyc/oikos/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-i18n="footer_contrib">Contributing</a>
+        <a href="https://github.com/ulsklyc/oikos/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-t="footer_contrib">Contributing</a>
       </div>
     </div>
   </footer>
@@ -1190,8 +1168,8 @@ docker compose logs | grep "Server läuft"</div>
       function applyLang() {
         document.documentElement.lang = currentLang;
         var strings = i18n[currentLang];
-        document.querySelectorAll('[data-i18n]').forEach(function(el) {
-          var key = el.getAttribute('data-i18n');
+        document.querySelectorAll('[data-t]').forEach(function(el) {
+          var key = el.getAttribute('data-t');
           if (strings[key] !== undefined) el.textContent = strings[key];
         });
         document.getElementById('langLabel').textContent = currentLang === 'en' ? 'DE' : 'EN';
