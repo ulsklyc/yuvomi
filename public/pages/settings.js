@@ -1545,36 +1545,46 @@ function bindEvents(container, user, users, categories, icsSubscriptions, apiTok
               <small class="form-hint">${t('settings.caldavPasswordHint')}</small>
             </div>
             <div id="caldav-add-error" class="form-error" hidden></div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn--ghost" id="caldav-add-cancel">${t('common.cancel')}</button>
+              <button type="submit" class="btn btn--primary">${t('common.save')}</button>
+            </div>
           </form>
         `,
-        onSave: async (panel) => {
+        onSave: (panel) => {
           const form = panel.querySelector('#caldav-add-form');
           const errorEl = panel.querySelector('#caldav-add-error');
-          errorEl.hidden = true;
 
-          const name = panel.querySelector('#caldav-name').value.trim();
-          const caldavUrl = panel.querySelector('#caldav-url').value.trim();
-          const username = panel.querySelector('#caldav-username').value.trim();
-          const password = panel.querySelector('#caldav-password').value;
+          panel.querySelector('#caldav-add-cancel')?.addEventListener('click', () => closeModal({ force: true }));
 
-          if (!name || !caldavUrl || !username || !password) {
-            showError(errorEl, t('common.requiredFields'));
-            return;
-          }
+          form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorEl.hidden = true;
 
-          try {
-            await api.post('/calendar/caldav/accounts', {
-              name,
-              caldavUrl,
-              username,
-              password,
-            });
-            closeModal({ force: true });
-            window.oikos?.showToast(t('settings.caldavAccountAdded'), 'success');
-            await loadCalDAVAccounts(container, user);
-          } catch (err) {
-            showError(errorEl, err.message);
-          }
+            const name = panel.querySelector('#caldav-name').value.trim();
+            const caldavUrl = panel.querySelector('#caldav-url').value.trim();
+            const username = panel.querySelector('#caldav-username').value.trim();
+            const password = panel.querySelector('#caldav-password').value;
+
+            if (!name || !caldavUrl || !username || !password) {
+              showError(errorEl, t('common.requiredFields'));
+              return;
+            }
+
+            try {
+              await api.post('/calendar/caldav/accounts', {
+                name,
+                caldavUrl,
+                username,
+                password,
+              });
+              closeModal({ force: true });
+              window.oikos?.showToast(t('settings.caldavAccountAdded'), 'success');
+              await loadCalDAVAccounts(container, user);
+            } catch (err) {
+              showError(errorEl, err.message);
+            }
+          });
         },
       });
     });
@@ -1610,35 +1620,46 @@ function bindEvents(container, user, users, categories, icsSubscriptions, apiTok
               <small class="form-hint">${t('settings.cardavPasswordHint')}</small>
             </div>
             <div id="cardav-add-error" class="form-error" hidden></div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn--ghost" id="cardav-add-cancel">${t('common.cancel')}</button>
+              <button type="submit" class="btn btn--primary">${t('common.save')}</button>
+            </div>
           </form>
         `,
-        onSave: async (panel) => {
+        onSave: (panel) => {
+          const form = panel.querySelector('#cardav-add-form');
           const errorEl = panel.querySelector('#cardav-add-error');
-          errorEl.hidden = true;
 
-          const name = panel.querySelector('#cardav-name').value.trim();
-          const cardavUrl = panel.querySelector('#cardav-url').value.trim();
-          const username = panel.querySelector('#cardav-username').value.trim();
-          const password = panel.querySelector('#cardav-password').value;
+          panel.querySelector('#cardav-add-cancel')?.addEventListener('click', () => closeModal({ force: true }));
 
-          if (!name || !cardavUrl || !username || !password) {
-            showError(errorEl, t('common.allFieldsRequired'));
-            return;
-          }
+          form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorEl.hidden = true;
 
-          try {
-            await api.post('/contacts/cardav/accounts', {
-              name,
-              cardavUrl,
-              username,
-              password,
-            });
-            closeModal({ force: true });
-            window.oikos?.showToast(t('settings.cardavAccountAdded'), 'success');
-            await loadCardDAVAccounts(container, user);
-          } catch (err) {
-            showError(errorEl, err.message);
-          }
+            const name = panel.querySelector('#cardav-name').value.trim();
+            const cardavUrl = panel.querySelector('#cardav-url').value.trim();
+            const username = panel.querySelector('#cardav-username').value.trim();
+            const password = panel.querySelector('#cardav-password').value;
+
+            if (!name || !cardavUrl || !username || !password) {
+              showError(errorEl, t('common.allFieldsRequired'));
+              return;
+            }
+
+            try {
+              await api.post('/contacts/cardav/accounts', {
+                name,
+                cardavUrl,
+                username,
+                password,
+              });
+              closeModal({ force: true });
+              window.oikos?.showToast(t('settings.cardavAccountAdded'), 'success');
+              await loadCardDAVAccounts(container, user);
+            } catch (err) {
+              showError(errorEl, err.message);
+            }
+          });
         },
       });
     });
