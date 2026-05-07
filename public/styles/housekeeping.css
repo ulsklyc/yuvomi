@@ -117,7 +117,8 @@
 }
 
 .housekeeping-worker-strip {
-  display: flex;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3);
@@ -492,6 +493,15 @@
   .housekeeping-avatar--lg {
     width: 84px;
     height: 84px;
+  }
+
+  .housekeeping-worker-strip {
+    grid-template-columns: 48px 1fr;
+  }
+
+  .housekeeping-worker-strip .housekeeping-check-small {
+    grid-column: 1 / -1;
+    justify-content: center;
   }
 }
 

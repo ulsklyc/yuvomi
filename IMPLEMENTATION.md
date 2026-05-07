@@ -27,6 +27,12 @@ Migration `34` adds:
 - `housekeeping_workers`
 - `housekeeping_work_sessions.paid_at`
 
+Migration `35` adds per-staff visit tracking:
+
+- `housekeeping_workers.calendar_color`
+- `housekeeping_work_sessions.worker_id`
+- `housekeeping_work_sessions.calendar_event_id`
+
 Each staff profile links to `users.id`. These users are hidden from the normal family list by filtering rows associated with `housekeeping_workers`, while contact and birthday sync remains shared with the existing family-member artifact flow.
 
 The quick supply endpoint uses a SQLite transaction:
@@ -45,6 +51,9 @@ The SPA route `/housekeeping` is registered in `public/router.js` and loads:
 - `public/styles/housekeeping.css`
 
 The page uses the existing API wrapper in `public/api.js`, so CSRF tokens and auth expiry behavior remain centralized. The UI now follows the standard Oikos module layout: sticky toolbar, horizontal tab chips, and regular cards.
+Check-in/check-out actions live beside each staff member on the Dashboard and are disabled until at least one staff member exists.
+
+Calendar integration creates a local calendar event at check-in, assigns it to the staff user, uses the staff calendar color, and updates the end time on check-out. Calendar event icon selection now opens a dedicated icon picker dialog instead of expanding inline inside the event modal.
 
 The UI intentionally avoids `innerHTML`; rendering uses `replaceChildren()` and `insertAdjacentHTML()` with escaped dynamic values.
 
@@ -72,7 +81,7 @@ Backend validation covers:
 ## Manual Use
 
 1. Navigate to `/housekeeping`.
-2. Use the toolbar check-in/check-out button for visits.
+2. Use the check-in/check-out button next to the staff member on the Dashboard.
 3. Review the Dashboard metrics and payment chart.
 4. On **Tasks**, choose suggested chores or create a custom recurring chore.
 5. On **Reports**, take/upload a photo and submit a maintenance description.

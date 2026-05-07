@@ -480,7 +480,8 @@
     "colorPurple": "Viola",
     "colorRed": "Rosso",
     "colorSkyBlue": "Azzurro",
-    "colorYellow": "Giallo"
+    "colorYellow": "Giallo",
+    "iconCleaning": "Pulizie"
   },
   "notes": {
     "title": "Bacheca",
@@ -1294,6 +1295,7 @@
     "editWorker": "Modifica persona",
     "noWorkers": "Nessuna persona registrata.",
     "moreWorkers": "+{{count}} altre",
-    "checkInDisabled": "Aggiungi una persona prima dell’entrata."
+    "checkInDisabled": "Aggiungi una persona prima dell’entrata.",
+    "calendarColor": "Colore calendario"
   }
 }

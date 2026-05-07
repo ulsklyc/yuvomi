@@ -51,7 +51,7 @@ const VALID_EVENT_ICONS = new Set([
   'ticket', 'gamepad-2', 'camera', 'party-popper', 'users', 'baby', 'dog',
   'cat', 'paw-print', 'wrench', 'hammer', 'paintbrush', 'lightbulb', 'sofa',
   'bed', 'bath', 'washing-machine', 'refrigerator', 'star', 'flag', 'target',
-  'flame', 'leaf', 'tree-pine', 'flower', 'sun', 'moon', 'cloud-sun',
+  'flame', 'sparkles', 'leaf', 'tree-pine', 'flower', 'sun', 'moon', 'cloud-sun',
 ]);
 
 function getUserId(req) {

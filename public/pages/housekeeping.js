@@ -71,17 +71,15 @@ function renderTabButton(tab, icon, label) {
 }
 
 function renderShell(container) {
-  const isCheckedIn = !!state.dashboard?.current_session;
   const hasWorker = state.workers.length > 0;
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <section class="housekeeping-page" aria-labelledby="housekeeping-title">
       <header class="housekeeping-toolbar">
         <div class="housekeeping-toolbar__title" id="housekeeping-title">${esc(t('housekeeping.title'))}</div>
-        <button class="btn btn--primary housekeeping-check-small" type="button" id="housekeeping-check-btn"
-                ${hasWorker ? '' : 'disabled'} title="${esc(hasWorker ? '' : t('housekeeping.checkInDisabled'))}">
-          <i data-lucide="${isCheckedIn ? 'log-out' : 'log-in'}" aria-hidden="true"></i>
-          <span>${esc(isCheckedIn ? t('housekeeping.checkOut') : t('housekeeping.checkIn'))}</span>
+        <button class="btn btn--secondary housekeeping-check-small" type="button" disabled ${hasWorker ? 'hidden' : ''}>
+          <i data-lucide="log-in" aria-hidden="true"></i>
+          <span>${esc(t('housekeeping.checkIn'))}</span>
         </button>
       </header>
       <nav class="housekeeping-tabs" aria-label="${esc(t('housekeeping.bottomNav'))}">
@@ -94,7 +92,6 @@ function renderShell(container) {
     </section>
   `);
 
-  container.querySelector('#housekeeping-check-btn')?.addEventListener('click', () => toggleSession(container));
   container.querySelectorAll('[data-housekeeping-tab]').forEach((btn) => {
     btn.addEventListener('click', () => {
       state.tab = btn.dataset.housekeepingTab;
@@ -119,19 +116,22 @@ function renderCurrentTab(container) {
   if (window.lucide) window.lucide.createIcons({ el: container });
 }
 
-async function toggleSession(container) {
-  const current = state.dashboard?.current_session;
+async function toggleSession(container, workerId) {
+  const worker = state.workers.find((item) => String(item.id) === String(workerId));
+  const current = worker?.current_session;
   if (!state.workers.length) {
     window.oikos?.showToast(t('housekeeping.checkInDisabled'), 'warning');
     return;
   }
+  if (!worker) return;
   try {
     if (current) {
-      await api.post('/housekeeping/work-sessions/check-out', { extras: current.extras || 0 });
+      await api.post('/housekeeping/work-sessions/check-out', { worker_id: worker.id, extras: current.extras || 0 });
       window.oikos?.showToast(t('housekeeping.checkedOutToast'), 'success');
     } else {
       await api.post('/housekeeping/work-sessions/check-in', {
-        daily_rate: state.worker?.daily_rate || 0,
+        worker_id: worker.id,
+        daily_rate: worker.daily_rate || 0,
         extras: 0,
       });
       window.oikos?.showToast(t('housekeeping.checkedInToast'), 'success');
@@ -152,24 +152,35 @@ function renderWorkerSummary() {
           <h2>${esc(t('housekeeping.noWorkerTitle'))}</h2>
           <p>${esc(t('housekeeping.noWorkerHint'))}</p>
         </div>
+        <button class="btn btn--secondary housekeeping-check-small" type="button" disabled>
+          <i data-lucide="log-in" aria-hidden="true"></i>
+          <span>${esc(t('housekeeping.checkIn'))}</span>
+        </button>
       </section>
     `;
   }
-  const rows = state.workers.slice(0, 3).map((worker) => `
+  const rows = state.workers.map((worker) => {
+    const checkedIn = !!worker.current_session;
+    return `
     <section class="housekeeping-worker-strip">
       <div class="housekeeping-avatar" style="background:${esc(worker.avatar_color || '#7C3AED')}">
         ${worker.avatar_data ? `<img src="${esc(worker.avatar_data)}" alt="${esc(worker.display_name)}">` : esc(initials(worker.display_name))}
       </div>
       <div>
         <strong>${esc(worker.display_name)}</strong>
-        <span>${esc(money(worker.daily_rate))} · ${esc(scheduleLabel(worker.payment_schedule))}</span>
+        <span>${esc(checkedIn ? `${t('housekeeping.checkedInAt')} ${formatTime(worker.current_session.check_in)}` : `${money(worker.daily_rate)} · ${scheduleLabel(worker.payment_schedule)}`)}</span>
       </div>
+      <button class="btn ${checkedIn ? 'btn--danger-outline' : 'btn--primary'} housekeeping-check-small" type="button"
+              data-worker-check="${worker.id}">
+        <i data-lucide="${checkedIn ? 'log-out' : 'log-in'}" aria-hidden="true"></i>
+        <span>${esc(checkedIn ? t('housekeeping.checkOut') : t('housekeeping.checkIn'))}</span>
+      </button>
     </section>
-  `).join('');
+  `;
+  }).join('');
   return `
     <div class="housekeeping-worker-stack">
       ${rows}
-      ${state.workers.length > 3 ? `<p class="housekeeping-muted">${esc(t('housekeeping.moreWorkers', { count: state.workers.length - 3 }))}</p>` : ''}
     </div>
   `;
 }
@@ -219,6 +230,9 @@ function renderDashboard(content) {
       </div>
     </section>
   `);
+  content.querySelectorAll('[data-worker-check]').forEach((btn) => {
+    btn.addEventListener('click', () => toggleSession(document.querySelector('.page-transition') || document.body, btn.dataset.workerCheck));
+  });
 }
 
 async function createTask(payload, content) {
@@ -463,6 +477,10 @@ function renderStaff(content) {
             <span>${esc(t('housekeeping.dailyRate'))}</span>
             <input name="daily_rate" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(worker.daily_rate ?? 0)}">
           </label>
+          <label class="housekeeping-field housekeeping-field--color">
+            <span>${esc(t('housekeeping.calendarColor'))}</span>
+            <input name="calendar_color" type="color" value="${esc(worker.calendar_color || '#7C3AED')}">
+          </label>
           <label class="housekeeping-field">
             <span>${esc(t('housekeeping.paymentSchedule'))}</span>
             <select name="payment_schedule">
@@ -527,6 +545,7 @@ function renderStaff(content) {
         birth_date: fields.birth_date.value || null,
         daily_rate: Number(fields.daily_rate.value || 0),
         payment_schedule: fields.payment_schedule.value,
+        calendar_color: fields.calendar_color.value,
         avatar_color: fields.avatar_color.value,
         avatar_data: state.workerAvatar,
         notes: fields.notes.value.trim() || null,

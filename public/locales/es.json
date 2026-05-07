@@ -480,7 +480,8 @@
     "colorPurple": "Morado",
     "colorRed": "Rojo",
     "colorSkyBlue": "Azul cielo",
-    "colorYellow": "Amarillo"
+    "colorYellow": "Amarillo",
+    "iconCleaning": "Limpieza"
   },
   "notes": {
     "title": "Notas",
@@ -1294,6 +1295,7 @@
     "editWorker": "Editar persona",
     "noWorkers": "No hay personal de limpieza registrado.",
     "moreWorkers": "+{{count}} más",
-    "checkInDisabled": "Agrega una persona antes de registrar entrada."
+    "checkInDisabled": "Agrega una persona antes de registrar entrada.",
+    "calendarColor": "Color de calendario"
   }
 }

@@ -500,7 +500,8 @@
     "attachmentHint": "Lokales Bild, PDF oder Dokument anhängen. Bilder werden im Ereignis-Popup angezeigt.",
     "attachmentFallback": "Anhang",
     "attachmentReadError": "Der Anhang konnte nicht gelesen werden.",
-    "attachmentTooLarge": "Der Anhang darf höchstens 5 MB groß sein."
+    "attachmentTooLarge": "Der Anhang darf höchstens 5 MB groß sein.",
+    "iconCleaning": "Reinigung"
   },
   "notes": {
     "title": "Notizen",
@@ -1372,6 +1373,7 @@
     "editWorker": "Hauspflege bearbeiten",
     "noWorkers": "Noch keine Hauspflege-Person registriert.",
     "moreWorkers": "+{{count}} weitere",
-    "checkInDisabled": "Lege zuerst eine Hauspflege-Person an."
+    "checkInDisabled": "Lege zuerst eine Hauspflege-Person an.",
+    "calendarColor": "Kalenderfarbe"
   }
 }

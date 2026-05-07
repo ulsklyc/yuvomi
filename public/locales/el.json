@@ -480,7 +480,8 @@
     "colorPurple": "Μοβ",
     "colorRed": "Κόκκινο",
     "colorSkyBlue": "Γαλάζιο",
-    "colorYellow": "Κίτρινο"
+    "colorYellow": "Κίτρινο",
+    "iconCleaning": "Cleaning"
   },
   "notes": {
     "title": "Σημειώσεις",
@@ -1294,6 +1295,7 @@
     "editWorker": "Edit housekeeper",
     "noWorkers": "No housekeepers registered yet.",
     "moreWorkers": "+{{count}} more",
-    "checkInDisabled": "Add a housekeeper before checking in."
+    "checkInDisabled": "Add a housekeeper before checking in.",
+    "calendarColor": "Calendar color"
   }
 }

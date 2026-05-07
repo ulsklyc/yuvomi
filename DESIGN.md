@@ -8,7 +8,7 @@ Housekeeping adds a simplified mobile/PWA module for the cleaner workflow in Oik
 
 The `/housekeeping` route is a focused module that follows the same toolbar, tab, card, and chip patterns used by the rest of Oikos:
 
-- **Dashboard**: visits this month, last visit, pending/finished chores, pending payments, and a compact monthly payment chart.
+- **Dashboard**: staff-specific check-in/check-out actions, visits this month, last visit, pending/finished chores, pending payments, and a compact monthly payment chart.
 - **Tasks**: suggested chore templates, custom chore creation, urgency-sorted recurring tasks, and one-tap completion.
 - **Reports**: camera upload plus text description for maintenance occurrences.
 - **Staff**: one or more housekeeper people, contact data, profile pictures, daily rates, and payment schedules.
@@ -28,15 +28,18 @@ Accessibility constraints:
 Stores point/finance records:
 
 - `id`
+- `worker_id`
 - `check_in`
 - `check_out`
 - `daily_rate`
 - `extras`
+- `calendar_event_id`
 - `created_by`
 - `created_at`
 - `updated_at`
 
 Monthly amount is calculated as `SUM(daily_rate + extras)` for sessions whose `check_in` belongs to the requested month.
+Each check-in creates a linked local calendar event for the selected staff member. Check-out updates that event end time.
 
 ### `housekeeping_decay_tasks`
 
@@ -99,12 +102,14 @@ Stores housekeeper-specific employment/payment settings while keeping the person
 - `user_id`
 - `daily_rate`
 - `payment_schedule`
+- `calendar_color`
 - `notes`
 - `created_at`
 - `updated_at`
 
 The linked `users` row is excluded from normal Family Management and Family APIs through the `housekeeping_workers` association, but remains synchronized with contacts and birthdays.
 Multiple housekeepers can be registered; each has its own linked `users` row.
+`calendar_color` controls the default color used for housekeeping visit events. Visit events use the cleaning icon (`sparkles`).
 
 ## REST API
 

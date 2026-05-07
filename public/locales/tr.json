@@ -480,7 +480,8 @@
     "colorPurple": "Mor",
     "colorRed": "Kırmızı",
     "colorSkyBlue": "Gökyüzü mavisi",
-    "colorYellow": "Sarı"
+    "colorYellow": "Sarı",
+    "iconCleaning": "Cleaning"
   },
   "notes": {
     "title": "Notlar",
@@ -1294,6 +1295,7 @@
     "editWorker": "Edit housekeeper",
     "noWorkers": "No housekeepers registered yet.",
     "moreWorkers": "+{{count}} more",
-    "checkInDisabled": "Add a housekeeper before checking in."
+    "checkInDisabled": "Add a housekeeper before checking in.",
+    "calendarColor": "Calendar color"
   }
 }

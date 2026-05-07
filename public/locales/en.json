@@ -494,7 +494,8 @@
     "colorPurple": "Purple",
     "colorRed": "Red",
     "colorSkyBlue": "Sky Blue",
-    "colorYellow": "Yellow"
+    "colorYellow": "Yellow",
+    "iconCleaning": "Cleaning"
   },
   "notes": {
     "title": "Board",
@@ -1349,6 +1350,7 @@
     "editWorker": "Edit housekeeper",
     "noWorkers": "No housekeepers registered yet.",
     "moreWorkers": "+{{count}} more",
-    "checkInDisabled": "Add a housekeeper before checking in."
+    "checkInDisabled": "Add a housekeeper before checking in.",
+    "calendarColor": "Calendar color"
   }
 }

@@ -10,7 +10,7 @@ import crypto from 'node:crypto';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { normalizeAvatarData, syncFamilyMemberArtifacts } from '../auth.js';
-import { collectErrors, date, datetime, month, num, oneOf, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { collectErrors, color, date, datetime, month, num, oneOf, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 
 const log = createLogger('Housekeeping');
 const router = express.Router();
@@ -18,6 +18,8 @@ const router = express.Router();
 const MAX_PHOTO_DATA_LENGTH = 6 * 1024 * 1024;
 const IMAGE_DATA_RE = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i;
 const PAYMENT_SCHEDULES = ['daily', 'twice_monthly', 'monthly'];
+const DEFAULT_CALENDAR_COLOR = '#7C3AED';
+const HOUSEKEEPING_EVENT_ICON = 'sparkles';
 
 const TASK_TEMPLATES = [
   { name: 'Clean bathrooms', area: 'Bathrooms', frequency_days: 7 },
@@ -46,6 +48,8 @@ function publicSession(row) {
   if (!row) return null;
   return {
     id: row.id,
+    worker_id: row.worker_id ?? null,
+    calendar_event_id: row.calendar_event_id ?? null,
     check_in: row.check_in,
     check_out: row.check_out,
     daily_rate: Number(row.daily_rate || 0),
@@ -58,6 +62,7 @@ function publicSession(row) {
 
 function publicWorker(row) {
   if (!row) return null;
+  const openSession = loadOpenSession(row.id);
   return {
     id: row.id,
     user_id: row.user_id,
@@ -70,6 +75,8 @@ function publicWorker(row) {
     birth_date: row.birth_date ?? null,
     daily_rate: Number(row.daily_rate || 0),
     payment_schedule: row.payment_schedule,
+    calendar_color: row.calendar_color || DEFAULT_CALENDAR_COLOR,
+    current_session: publicSession(openSession),
     notes: row.notes ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -123,7 +130,15 @@ function validatePhotoUrl(value) {
   return { value: trimmed, error: null };
 }
 
-function loadOpenSession() {
+function loadOpenSession(workerId = null) {
+  if (workerId) {
+    return db.get().prepare(`
+      SELECT * FROM housekeeping_work_sessions
+      WHERE check_out IS NULL AND worker_id = ?
+      ORDER BY check_in DESC
+      LIMIT 1
+    `).get(workerId);
+  }
   return db.get().prepare(`
     SELECT * FROM housekeeping_work_sessions
     WHERE check_out IS NULL
@@ -163,6 +178,29 @@ function loadWorkers() {
     LEFT JOIN birthdays b ON b.family_user_id = u.id
     ORDER BY u.display_name COLLATE NOCASE ASC
   `).all();
+}
+
+function createVisitCalendarEvent(database, worker, checkIn, actorId) {
+  const result = database.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, color, icon, assigned_to, created_by, external_source)
+    VALUES (?, ?, NULL, 0, ?, ?, ?, ?, 'local')
+  `).run(
+    `Housekeeping: ${worker.display_name}`,
+    checkIn,
+    worker.calendar_color || DEFAULT_CALENDAR_COLOR,
+    HOUSEKEEPING_EVENT_ICON,
+    worker.user_id,
+    actorId,
+  );
+  database.prepare('INSERT OR IGNORE INTO event_assignments (event_id, user_id) VALUES (?, ?)')
+    .run(result.lastInsertRowid, worker.user_id);
+  return result.lastInsertRowid;
+}
+
+function updateVisitCalendarEvent(database, eventId, checkOut) {
+  if (!eventId) return;
+  database.prepare('UPDATE calendar_events SET end_datetime = ? WHERE id = ?').run(checkOut, eventId);
 }
 
 function loadWorkerById(workerId) {
@@ -346,8 +384,9 @@ router.post('/worker', async (req, res) => {
     const vBirthDate = date(req.body.birth_date, 'birth_date');
     const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: true });
     const vSchedule = oneOf(req.body.payment_schedule || 'monthly', PAYMENT_SCHEDULES, 'payment_schedule');
+    const vCalendarColor = color(req.body.calendar_color || DEFAULT_CALENDAR_COLOR, 'calendar_color');
     const vNotes = str(req.body.notes, 'notes', { max: MAX_TEXT, required: false });
-    const errors = collectErrors([vDisplayName, vUsername, vPhone, vEmail, vBirthDate, vDailyRate, vSchedule, vNotes]);
+    const errors = collectErrors([vDisplayName, vUsername, vPhone, vEmail, vBirthDate, vDailyRate, vSchedule, vCalendarColor, vNotes]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     if (vUsername.value && !/^[a-zA-Z0-9._-]{3,64}$/.test(vUsername.value)) {
       return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400 });
@@ -385,13 +424,14 @@ router.post('/worker', async (req, res) => {
         targetUserId,
       );
       db.get().prepare(`
-        INSERT INTO housekeeping_workers (user_id, daily_rate, payment_schedule, notes)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO housekeeping_workers (user_id, daily_rate, payment_schedule, calendar_color, notes)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET
           daily_rate = excluded.daily_rate,
           payment_schedule = excluded.payment_schedule,
+          calendar_color = excluded.calendar_color,
           notes = excluded.notes
-      `).run(targetUserId, vDailyRate.value, vSchedule.value, vNotes.value);
+      `).run(targetUserId, vDailyRate.value, vSchedule.value, vCalendarColor.value, vNotes.value);
       syncFamilyMemberArtifacts(db.get(), targetUserId, {
         displayName: vDisplayName.value,
         phone: vPhone.value,
@@ -451,7 +491,11 @@ router.post('/work-sessions/check-in', (req, res) => {
     if (loadWorkers().length === 0) {
       return res.status(400).json({ error: 'Add a housekeeper before checking in.', code: 400 });
     }
-    if (loadOpenSession()) return res.status(409).json({ error: 'A work session is already open.', code: 409 });
+    const vWorkerId = validateId(req.body.worker_id, 'worker_id');
+    if (vWorkerId.error) return res.status(400).json({ error: vWorkerId.error, code: 400 });
+    const worker = loadWorkerById(vWorkerId.value);
+    if (!worker) return res.status(404).json({ error: 'Housekeeper not found.', code: 404 });
+    if (loadOpenSession(worker.id)) return res.status(409).json({ error: 'A work session is already open for this housekeeper.', code: 409 });
 
     const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: true });
     const vExtras = num(req.body.extras, 'extras');
@@ -461,10 +505,15 @@ router.post('/work-sessions/check-in', (req, res) => {
       return res.status(400).json({ error: 'Amounts must be greater than or equal to zero.', code: 400 });
     }
 
-    const result = db.get().prepare(`
-      INSERT INTO housekeeping_work_sessions (check_in, daily_rate, extras, created_by)
-      VALUES (?, ?, ?, ?)
-    `).run(nowIso(), vDailyRate.value, vExtras.value ?? 0, userId(req));
+    const actorId = userId(req);
+    const checkIn = nowIso();
+    const result = db.get().transaction(() => {
+      const eventId = createVisitCalendarEvent(db.get(), worker, checkIn, actorId);
+      return db.get().prepare(`
+        INSERT INTO housekeeping_work_sessions (worker_id, check_in, daily_rate, extras, calendar_event_id, created_by)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(worker.id, checkIn, vDailyRate.value, vExtras.value ?? 0, eventId, actorId);
+    })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json({ data: publicSession(row), summary: monthlySummary() });
   } catch (err) {
@@ -475,7 +524,9 @@ router.post('/work-sessions/check-in', (req, res) => {
 
 router.post('/work-sessions/check-out', (req, res) => {
   try {
-    const session = loadOpenSession();
+    const vWorkerId = validateId(req.body.worker_id, 'worker_id');
+    if (vWorkerId.error) return res.status(400).json({ error: vWorkerId.error, code: 400 });
+    const session = loadOpenSession(vWorkerId.value);
     if (!session) return res.status(404).json({ error: 'No open work session found.', code: 404 });
 
     const vExtras = num(req.body.extras, 'extras');
@@ -484,11 +535,15 @@ router.post('/work-sessions/check-out', (req, res) => {
       return res.status(400).json({ error: 'Extras must be greater than or equal to zero.', code: 400 });
     }
 
-    db.get().prepare(`
-      UPDATE housekeeping_work_sessions
-      SET check_out = ?, extras = ?
-      WHERE id = ?
-    `).run(nowIso(), vExtras.value ?? session.extras, session.id);
+    const checkOut = nowIso();
+    db.get().transaction(() => {
+      db.get().prepare(`
+        UPDATE housekeeping_work_sessions
+        SET check_out = ?, extras = ?
+        WHERE id = ?
+      `).run(checkOut, vExtras.value ?? session.extras, session.id);
+      updateVisitCalendarEvent(db.get(), session.calendar_event_id, checkOut);
+    })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(session.id);
     res.json({ data: publicSession(row), summary: monthlySummary(row.check_in.slice(0, 7)) });
   } catch (err) {

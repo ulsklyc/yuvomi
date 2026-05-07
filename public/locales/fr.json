@@ -480,7 +480,8 @@
     "colorPurple": "Violet",
     "colorRed": "Rouge",
     "colorSkyBlue": "Bleu ciel",
-    "colorYellow": "Jaune"
+    "colorYellow": "Jaune",
+    "iconCleaning": "Ménage"
   },
   "notes": {
     "title": "Notes",
@@ -1294,6 +1295,7 @@
     "editWorker": "Modifier la personne",
     "noWorkers": "Aucune personne de ménage enregistrée.",
     "moreWorkers": "+{{count}} de plus",
-    "checkInDisabled": "Ajoutez une personne avant de pointer."
+    "checkInDisabled": "Ajoutez une personne avant de pointer.",
+    "calendarColor": "Couleur du calendrier"
   }
 }

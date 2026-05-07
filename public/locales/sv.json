@@ -480,7 +480,8 @@
     "colorSkyBlue": "Himmelsblå",
     "colorYellow": "Gul",
     "colorGray": "Grå",
-    "colorCyan": "Cyan"
+    "colorCyan": "Cyan",
+    "iconCleaning": "Städning"
   },
   "notes": {
     "title": "Anteckningar",
@@ -1294,6 +1295,7 @@
     "editWorker": "Redigera person",
     "noWorkers": "Ingen städpersonal registrerad.",
     "moreWorkers": "+{{count}} fler",
-    "checkInDisabled": "Lägg till personal innan incheckning."
+    "checkInDisabled": "Lägg till personal innan incheckning.",
+    "calendarColor": "Kalenderfärg"
   }
 }

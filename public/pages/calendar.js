@@ -181,6 +181,7 @@ const EVENT_ICON_CATEGORIES = () => [
       { value: 'building', label: t('calendar.iconBuilding') },
       { value: 'wrench', label: t('calendar.iconRepair') },
       { value: 'hammer', label: t('calendar.iconMaintenance') },
+      { value: 'sparkles', label: t('calendar.iconCleaning') },
       { value: 'paintbrush', label: t('calendar.iconDecoration') },
       { value: 'sofa', label: t('calendar.iconFurniture') },
       { value: 'washing-machine', label: t('calendar.iconLaundry') },
@@ -209,6 +210,98 @@ const ATTACHMENT_IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 
 const CALENDAR_VIEW_STORAGE_KEY = 'oikos-calendar-view';
 
 const HOUR_HEIGHT = 56; // px pro Stunde in Wochen-/Tagesansicht
+
+function renderIconPickerResults(selectedIcon, query = '') {
+  const q = query.trim().toLowerCase();
+  if (q) {
+    const filtered = EVENT_ICON_CATEGORIES()
+      .flatMap((c) => c.icons)
+      .filter((icon) => icon.label.toLowerCase().includes(q) || icon.value.includes(q));
+    if (filtered.length === 0) {
+      return `<div class="event-icon-picker__no-results">${esc(t('calendar.iconSearchEmpty'))}</div>`;
+    }
+    return `
+      <div class="event-icon-picker__category-icons">
+        ${filtered.map((icon) => iconPickerOptionHtml(icon, selectedIcon)).join('')}
+      </div>`;
+  }
+  return EVENT_ICON_CATEGORIES().map((cat) => `
+    <div class="event-icon-picker__category">
+      <div class="event-icon-picker__category-label">${esc(cat.label)}</div>
+      <div class="event-icon-picker__category-icons">
+        ${cat.icons.map((icon) => iconPickerOptionHtml(icon, selectedIcon)).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function iconPickerOptionHtml(icon, selectedIcon) {
+  return `
+    <button type="button"
+            class="event-icon-picker__option ${selectedIcon === icon.value ? 'event-icon-picker__option--active' : ''}"
+            data-icon="${icon.value}"
+            role="radio"
+            aria-checked="${selectedIcon === icon.value ? 'true' : 'false'}"
+            aria-label="${esc(icon.label)}"
+            title="${esc(icon.label)}">
+      ${eventIconHtml(icon.value, 'event-icon-picker__option-icon')}
+    </button>`;
+}
+
+function openIconPickerDialog(selectedIcon, onSelect, onClose = () => {}) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay event-icon-dialog';
+  overlay.setAttribute('aria-modal', 'true');
+
+  const panel = document.createElement('div');
+  panel.className = 'modal-panel modal-panel--md event-icon-dialog__panel';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-label', t('calendar.iconLabel'));
+  panel.insertAdjacentHTML('beforeend', `
+    <div class="modal-panel__header">
+      <span class="modal-panel__title">${esc(t('calendar.iconLabel'))}</span>
+      <button class="modal-panel__close btn--ghost" type="button" aria-label="${esc(t('common.close'))}">
+        <i data-lucide="x" style="width:16px;height:16px;" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="modal-panel__body event-icon-dialog__body">
+      <input type="search" class="form-input event-icon-picker__search" id="event-icon-dialog-search"
+             placeholder="${esc(t('calendar.iconSearchPlaceholder'))}" autocomplete="off" aria-label="${esc(t('calendar.iconSearchPlaceholder'))}">
+      <div class="event-icon-dialog__results" id="event-icon-dialog-results" role="radiogroup" aria-label="${esc(t('calendar.iconLabel'))}">
+        ${renderIconPickerResults(selectedIcon)}
+      </div>
+    </div>
+  `);
+
+  function close() {
+    overlay.remove();
+    document.removeEventListener('keydown', onKeydown);
+    onClose();
+  }
+  function onKeydown(e) {
+    if (e.key === 'Escape') close();
+  }
+
+  panel.querySelector('.modal-panel__close')?.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  panel.querySelector('#event-icon-dialog-search')?.addEventListener('input', (e) => {
+    const results = panel.querySelector('#event-icon-dialog-results');
+    results?.replaceChildren();
+    results?.insertAdjacentHTML('beforeend', renderIconPickerResults(selectedIcon, e.target.value));
+    if (window.lucide) lucide.createIcons({ el: results });
+  });
+  panel.addEventListener('click', (e) => {
+    const btn = e.target.closest('.event-icon-picker__option');
+    if (!btn) return;
+    onSelect(btn.dataset.icon);
+    close();
+  });
+
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+  document.addEventListener('keydown', onKeydown);
+  panel.querySelector('#event-icon-dialog-search')?.focus();
+  if (window.lucide) lucide.createIcons({ el: panel });
+}
 
 /**
  * Gibt eine lesbare Textfarbe für eine Hintergrundfarbe zurück.
@@ -1373,7 +1466,6 @@ function openEventModal({ mode, event = null, date = null, reminder = null }) {
 
       const iconInput = panel.querySelector('#modal-icon');
       const iconTrigger = panel.querySelector('#modal-icon-trigger');
-      const iconGrid = panel.querySelector('#modal-icon-grid');
       const selectIcon = (icon) => {
         const nextIcon = eventIconName(icon);
         if (iconInput) iconInput.value = nextIcon;
@@ -1381,79 +1473,19 @@ function openEventModal({ mode, event = null, date = null, reminder = null }) {
           iconTrigger.dataset.icon = nextIcon;
           iconTrigger.replaceChildren(eventIconElement(nextIcon, 'event-icon-picker__trigger-icon'));
         }
-        iconGrid?.querySelectorAll('.event-icon-picker__option').forEach((btn) => {
-          const active = btn.dataset.icon === nextIcon;
-          btn.classList.toggle('event-icon-picker__option--active', active);
-          btn.setAttribute('aria-checked', active ? 'true' : 'false');
-        });
         if (window.lucide) lucide.createIcons();
       };
 
       iconTrigger?.addEventListener('click', () => {
-        if (!iconGrid) return;
-        iconGrid.hidden = !iconGrid.hidden;
-        iconTrigger.setAttribute('aria-expanded', iconGrid.hidden ? 'false' : 'true');
-      });
-      iconGrid?.addEventListener('click', (e) => {
-        const btn = e.target.closest('.event-icon-picker__option');
-        if (!btn) return;
-        selectIcon(btn.dataset.icon);
-        iconGrid.hidden = true;
-        iconTrigger?.setAttribute('aria-expanded', 'false');
-        iconTrigger?.focus();
-      });
-
-      const iconSearch = iconGrid?.querySelector('#modal-icon-search');
-      iconSearch?.addEventListener('input', () => {
-        const q = iconSearch.value.trim().toLowerCase();
-        const resultsEl = iconGrid?.querySelector('#modal-icon-results');
-        if (!resultsEl) return;
-        if (!q) {
-          resultsEl.replaceChildren();
-          resultsEl.insertAdjacentHTML('afterbegin', EVENT_ICON_CATEGORIES().map((cat) => `
-            <div class="event-icon-picker__category">
-              <div class="event-icon-picker__category-label">${esc(cat.label)}</div>
-              <div class="event-icon-picker__category-icons">
-                ${cat.icons.map((icon) => `
-                  <button type="button" class="event-icon-picker__option ${iconInput?.value === icon.value ? 'event-icon-picker__option--active' : ''}"
-                          data-icon="${icon.value}" role="radio"
-                          aria-checked="${iconInput?.value === icon.value ? 'true' : 'false'}"
-                          aria-label="${esc(icon.label)}" title="${esc(icon.label)}">
-                    ${eventIconHtml(icon.value, 'event-icon-picker__option-icon')}
-                  </button>`).join('')}
-              </div>
-            </div>`).join(''));
-          if (window.lucide) lucide.createIcons({ el: resultsEl });
-          return;
-        }
-        const allIcons = EVENT_ICON_CATEGORIES().flatMap((c) => c.icons);
-        const filtered = allIcons.filter((i) => i.label.toLowerCase().includes(q) || i.value.includes(q));
-        resultsEl.replaceChildren();
-        if (filtered.length === 0) {
-          resultsEl.insertAdjacentHTML('afterbegin', `<div class="event-icon-picker__no-results">${esc(t('calendar.iconSearchEmpty'))}</div>`);
-          return;
-        }
-        resultsEl.insertAdjacentHTML('afterbegin', `
-          <div class="event-icon-picker__category-icons">
-            ${filtered.map((icon) => `
-              <button type="button" class="event-icon-picker__option ${iconInput?.value === icon.value ? 'event-icon-picker__option--active' : ''}"
-                      data-icon="${icon.value}" role="radio"
-                      aria-checked="${iconInput?.value === icon.value ? 'true' : 'false'}"
-                      aria-label="${esc(icon.label)}" title="${esc(icon.label)}">
-                ${eventIconHtml(icon.value, 'event-icon-picker__option-icon')}
-              </button>`).join('')}
-          </div>`);
-        if (window.lucide) lucide.createIcons({ el: resultsEl });
-      });
-
-      document.addEventListener('click', function closeIconPicker(e) {
-        if (!panel.isConnected) {
-          document.removeEventListener('click', closeIconPicker);
-          return;
-        }
-        if (iconGrid?.hidden || iconGrid?.contains(e.target) || iconTrigger?.contains(e.target)) return;
-        iconGrid.hidden = true;
-        iconTrigger?.setAttribute('aria-expanded', 'false');
+        iconTrigger.setAttribute('aria-expanded', 'true');
+        openIconPickerDialog(iconInput?.value || 'calendar', (icon) => {
+          selectIcon(icon);
+          iconTrigger?.setAttribute('aria-expanded', 'false');
+          iconTrigger?.focus();
+        }, () => {
+          iconTrigger?.setAttribute('aria-expanded', 'false');
+          iconTrigger?.focus();
+        });
       });
 
       const reminderOffset = panel.querySelector('#modal-reminder-offset');
@@ -1550,23 +1582,6 @@ function buildEventModalContent({ mode, event, date, reminder = null }) {
   const endTime   = isEdit && event.end_datetime && event.end_datetime.length > 10
     ? localTime(event.end_datetime) : '10:00';
   const selectedIcon = eventIconName(isEdit ? event.icon : 'calendar');
-  const iconCats = EVENT_ICON_CATEGORIES();
-  const iconCategoryButtons = iconCats.map((cat) => `
-    <div class="event-icon-picker__category">
-      <div class="event-icon-picker__category-label">${esc(cat.label)}</div>
-      <div class="event-icon-picker__category-icons">
-        ${cat.icons.map((icon) => `
-          <button type="button"
-                  class="event-icon-picker__option ${selectedIcon === icon.value ? 'event-icon-picker__option--active' : ''}"
-                  data-icon="${icon.value}"
-                  role="radio"
-                  aria-checked="${selectedIcon === icon.value ? 'true' : 'false'}"
-                  aria-label="${esc(icon.label)}"
-                  title="${esc(icon.label)}">
-            ${eventIconHtml(icon.value, 'event-icon-picker__option-icon')}
-          </button>`).join('')}
-      </div>
-    </div>`).join('');
 
   const selectedUserIds = isEdit
     ? (event.assigned_users?.map((u) => u.id) ?? (event.assigned_to ? [event.assigned_to] : []))
@@ -1593,14 +1608,6 @@ function buildEventModalContent({ mode, event, date, reminder = null }) {
                placeholder="${t('calendar.titlePlaceholder')}" value="${esc(isEdit ? event.title : '')}">
       </div>
     </div>
-    <div class="event-icon-picker__grid" id="modal-icon-grid" role="radiogroup" aria-label="${t('calendar.iconLabel')}" hidden>
-      <input type="search" class="form-input event-icon-picker__search" id="modal-icon-search"
-             placeholder="${t('calendar.iconSearchPlaceholder')}" autocomplete="off" aria-label="${t('calendar.iconSearchPlaceholder')}">
-      <div id="modal-icon-results">
-        ${iconCategoryButtons}
-      </div>
-    </div>
-
     <div class="form-group">
       <label class="toggle">
         <input type="checkbox" id="modal-allday" ${isEdit && event.all_day ? 'checked' : ''}>

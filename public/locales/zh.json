@@ -480,7 +480,8 @@
     "colorPurple": "紫色",
     "colorRed": "红色",
     "colorSkyBlue": "天蓝色",
-    "colorYellow": "黄色"
+    "colorYellow": "黄色",
+    "iconCleaning": "Cleaning"
   },
   "notes": {
     "title": "便签板",
@@ -1294,6 +1295,7 @@
     "editWorker": "Edit housekeeper",
     "noWorkers": "No housekeepers registered yet.",
     "moreWorkers": "+{{count}} more",
-    "checkInDisabled": "Add a housekeeper before checking in."
+    "checkInDisabled": "Add a housekeeper before checking in.",
+    "calendarColor": "Calendar color"
   }
 }

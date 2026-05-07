@@ -480,7 +480,8 @@
     "colorPurple": "Roxo",
     "colorRed": "Vermelho",
     "colorSkyBlue": "Azul céu",
-    "colorYellow": "Amarelo"
+    "colorYellow": "Amarelo",
+    "iconCleaning": "Faxina"
   },
   "notes": {
     "title": "Quadro de notas",
@@ -1294,6 +1295,7 @@
     "editWorker": "Editar faxineira",
     "noWorkers": "Nenhuma faxineira cadastrada.",
     "moreWorkers": "+{{count}} a mais",
-    "checkInDisabled": "Cadastre uma faxineira antes de fazer check-in."
+    "checkInDisabled": "Cadastre uma faxineira antes de fazer check-in.",
+    "calendarColor": "Cor no calendário"
   }
 }
