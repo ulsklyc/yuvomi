@@ -1,6 +1,6 @@
 /**
  * Modul: Housekeeping
- * Zweck: Dashboard, chore management, reports, and worker profile
+ * Zweck: Dashboard, chore management, reports, and housekeeping staff
  * Abhängigkeiten: /api.js, /i18n.js, /utils/html.js
  */
 
@@ -15,8 +15,10 @@ let state = {
   reports: [],
   templates: [],
   worker: null,
+  workers: [],
   photoUrl: null,
   workerAvatar: undefined,
+  editingWorker: null,
 };
 
 function money(value) {
@@ -43,18 +45,19 @@ function scheduleLabel(value) {
 }
 
 async function loadData() {
-  const [dashboard, tasks, reports, templates, worker] = await Promise.all([
+  const [dashboard, tasks, reports, templates, workers] = await Promise.all([
     api.get('/housekeeping/dashboard'),
     api.get('/housekeeping/decay-tasks'),
     api.get('/housekeeping/maintenance-log'),
     api.get('/housekeeping/task-templates'),
-    api.get('/housekeeping/worker'),
+    api.get('/housekeeping/workers'),
   ]);
   state.dashboard = dashboard.data;
   state.tasks = tasks.data || [];
   state.reports = reports.data || [];
   state.templates = templates.data || [];
-  state.worker = worker.data;
+  state.workers = workers.data || [];
+  state.worker = state.workers[0] || null;
 }
 
 function renderTabButton(tab, icon, label) {
@@ -69,12 +72,14 @@ function renderTabButton(tab, icon, label) {
 
 function renderShell(container) {
   const isCheckedIn = !!state.dashboard?.current_session;
+  const hasWorker = state.workers.length > 0;
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <section class="housekeeping-page" aria-labelledby="housekeeping-title">
       <header class="housekeeping-toolbar">
         <div class="housekeeping-toolbar__title" id="housekeeping-title">${esc(t('housekeeping.title'))}</div>
-        <button class="btn btn--primary housekeeping-check-small" type="button" id="housekeeping-check-btn">
+        <button class="btn btn--primary housekeeping-check-small" type="button" id="housekeeping-check-btn"
+                ${hasWorker ? '' : 'disabled'} title="${esc(hasWorker ? '' : t('housekeeping.checkInDisabled'))}">
           <i data-lucide="${isCheckedIn ? 'log-out' : 'log-in'}" aria-hidden="true"></i>
           <span>${esc(isCheckedIn ? t('housekeeping.checkOut') : t('housekeeping.checkIn'))}</span>
         </button>
@@ -83,7 +88,7 @@ function renderShell(container) {
         ${renderTabButton('dashboard', 'layout-dashboard', t('housekeeping.dashboard'))}
         ${renderTabButton('tasks', 'list-checks', t('housekeeping.tasks'))}
         ${renderTabButton('reports', 'message-square-warning', t('housekeeping.reports'))}
-        ${renderTabButton('profile', 'user-round', t('housekeeping.profile'))}
+        ${renderTabButton('staff', 'users-round', t('housekeeping.staff'))}
       </nav>
       <div class="housekeeping-content" id="housekeeping-content"></div>
     </section>
@@ -109,13 +114,17 @@ function renderCurrentTab(container) {
   });
   if (state.tab === 'tasks') renderTasks(content);
   else if (state.tab === 'reports') renderReports(content);
-  else if (state.tab === 'profile') renderProfile(content);
+  else if (state.tab === 'staff') renderStaff(content);
   else renderDashboard(content);
   if (window.lucide) window.lucide.createIcons({ el: container });
 }
 
 async function toggleSession(container) {
   const current = state.dashboard?.current_session;
+  if (!state.workers.length) {
+    window.oikos?.showToast(t('housekeeping.checkInDisabled'), 'warning');
+    return;
+  }
   try {
     if (current) {
       await api.post('/housekeeping/work-sessions/check-out', { extras: current.extras || 0 });
@@ -135,8 +144,7 @@ async function toggleSession(container) {
 }
 
 function renderWorkerSummary() {
-  const worker = state.worker;
-  if (!worker) {
+  if (!state.workers.length) {
     return `
       <section class="housekeeping-card housekeeping-worker-empty">
         <i data-lucide="user-plus" aria-hidden="true"></i>
@@ -147,7 +155,7 @@ function renderWorkerSummary() {
       </section>
     `;
   }
-  return `
+  const rows = state.workers.slice(0, 3).map((worker) => `
     <section class="housekeeping-worker-strip">
       <div class="housekeeping-avatar" style="background:${esc(worker.avatar_color || '#7C3AED')}">
         ${worker.avatar_data ? `<img src="${esc(worker.avatar_data)}" alt="${esc(worker.display_name)}">` : esc(initials(worker.display_name))}
@@ -157,10 +165,17 @@ function renderWorkerSummary() {
         <span>${esc(money(worker.daily_rate))} · ${esc(scheduleLabel(worker.payment_schedule))}</span>
       </div>
     </section>
+  `).join('');
+  return `
+    <div class="housekeeping-worker-stack">
+      ${rows}
+      ${state.workers.length > 3 ? `<p class="housekeeping-muted">${esc(t('housekeeping.moreWorkers', { count: state.workers.length - 3 }))}</p>` : ''}
+    </div>
   `;
 }
 
 function renderDashboard(content) {
+  content.replaceChildren();
   const data = state.dashboard || {};
   const lastVisit = data.last_visit?.check_in ? `${formatDate(data.last_visit.check_in)} · ${formatTime(data.last_visit.check_in)}` : t('housekeeping.noVisits');
   const maxPayment = Math.max(1, ...(data.monthly_payments || []).map((row) => row.total));
@@ -218,6 +233,7 @@ async function createTask(payload, content) {
 }
 
 function renderTasks(content) {
+  content.replaceChildren();
   const templateButtons = state.templates.map((template, index) => `
     <button class="housekeeping-template" type="button" data-template-index="${index}">
       <span>${esc(template.name)}</span>
@@ -309,6 +325,7 @@ function renderTasks(content) {
 }
 
 function renderReports(content) {
+  content.replaceChildren();
   const latest = state.reports.map((report) => `
     <article class="housekeeping-report-item">
       ${report.photo_url ? `<img src="${esc(report.photo_url)}" alt="">` : '<i data-lucide="wrench" aria-hidden="true"></i>'}
@@ -377,13 +394,41 @@ function renderReports(content) {
   });
 }
 
-function renderProfile(content) {
-  const worker = state.worker || {};
+function renderStaff(content) {
+  content.replaceChildren();
+  const worker = state.editingWorker || {};
   state.workerAvatar = worker.avatar_data ?? null;
+  const workerRows = state.workers.map((item) => `
+    <article class="housekeeping-staff-row">
+      <div class="housekeeping-avatar" style="background:${esc(item.avatar_color || '#7C3AED')}">
+        ${item.avatar_data ? `<img src="${esc(item.avatar_data)}" alt="${esc(item.display_name)}">` : esc(initials(item.display_name))}
+      </div>
+      <div>
+        <strong>${esc(item.display_name)}</strong>
+        <span>${esc(item.phone || item.email || '')}</span>
+      </div>
+      <button class="btn btn--secondary btn--icon" type="button" data-edit-worker="${item.id}" aria-label="${esc(t('common.edit'))}">
+        <i data-lucide="edit-2" aria-hidden="true"></i>
+      </button>
+    </article>
+  `).join('');
   content.insertAdjacentHTML('beforeend', `
     <section class="housekeeping-card">
-      <h2>${esc(t('housekeeping.profileTitle'))}</h2>
+      <div class="housekeeping-section-heading">
+        <h2>${esc(t('housekeeping.staffTitle'))}</h2>
+        <button class="btn btn--secondary" type="button" id="housekeeping-new-worker">
+          <i data-lucide="plus" aria-hidden="true"></i>
+          <span>${esc(t('housekeeping.addWorker'))}</span>
+        </button>
+      </div>
+      <div class="housekeeping-staff-list">
+        ${workerRows || `<p class="housekeeping-muted">${esc(t('housekeeping.noWorkers'))}</p>`}
+      </div>
+    </section>
+    <section class="housekeeping-card">
+      <h2>${esc(worker.id ? t('housekeeping.editWorker') : t('housekeeping.addWorker'))}</h2>
       <form id="housekeeping-worker-form" class="housekeeping-worker-form">
+        <input type="hidden" name="id" value="${esc(worker.id || '')}">
         <div class="housekeeping-profile-editor">
           <button class="housekeeping-avatar housekeeping-avatar--lg" type="button" id="housekeeping-avatar-btn"
                   style="background:${esc(worker.avatar_color || '#7C3AED')}" aria-label="${esc(t('housekeeping.profilePicture'))}">
@@ -443,6 +488,17 @@ function renderProfile(content) {
     </section>
   `);
 
+  content.querySelector('#housekeeping-new-worker')?.addEventListener('click', () => {
+    state.editingWorker = null;
+    renderStaff(content);
+  });
+  content.querySelectorAll('[data-edit-worker]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.editingWorker = state.workers.find((item) => String(item.id) === btn.dataset.editWorker) || null;
+      renderStaff(content);
+    });
+  });
+
   const avatarFile = content.querySelector('#housekeeping-avatar-file');
   const avatarButton = content.querySelector('#housekeeping-avatar-btn');
   avatarButton?.addEventListener('click', () => avatarFile?.click());
@@ -463,6 +519,7 @@ function renderProfile(content) {
     const fields = form.elements;
     try {
       await api.post('/housekeeping/worker', {
+        id: fields.id.value || null,
         display_name: fields.display_name.value.trim(),
         username: fields.username.value.trim() || null,
         phone: fields.phone.value.trim() || null,
@@ -476,7 +533,8 @@ function renderProfile(content) {
       });
       window.oikos?.showToast(t('housekeeping.workerSavedToast'), 'success');
       await loadData();
-      renderProfile(content);
+      state.editingWorker = null;
+      renderStaff(content);
     } catch (err) {
       window.oikos?.showToast(err.message, 'danger');
     }

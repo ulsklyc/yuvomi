@@ -11,7 +11,7 @@ The `/housekeeping` route is a focused module that follows the same toolbar, tab
 - **Dashboard**: visits this month, last visit, pending/finished chores, pending payments, and a compact monthly payment chart.
 - **Tasks**: suggested chore templates, custom chore creation, urgency-sorted recurring tasks, and one-tap completion.
 - **Reports**: camera upload plus text description for maintenance occurrences.
-- **Profile**: the housekeeper person, contact data, profile picture, daily rate, and payment schedule.
+- **Staff**: one or more housekeeper people, contact data, profile pictures, daily rates, and payment schedules.
 
 Accessibility constraints:
 
@@ -104,6 +104,7 @@ Stores housekeeper-specific employment/payment settings while keeping the person
 - `updated_at`
 
 The linked `users` row is excluded from normal Family Management and Family APIs through the `housekeeping_workers` association, but remains synchronized with contacts and birthdays.
+Multiple housekeepers can be registered; each has its own linked `users` row.
 
 ## REST API
 
@@ -113,6 +114,7 @@ All endpoints are mounted under `/api/v1/housekeeping` and inherit the existing 
 - `GET /dashboard`
 - `GET /task-templates`
 - `GET /worker`
+- `GET /workers`
 - `POST /worker`
 - `GET /work-sessions?month=YYYY-MM`
 - `POST /work-sessions/check-in`

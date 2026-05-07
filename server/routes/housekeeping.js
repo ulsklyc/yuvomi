@@ -144,6 +144,10 @@ function defaultDailyRate() {
 }
 
 function loadWorker() {
+  return loadWorkers()[0] ?? null;
+}
+
+function loadWorkers() {
   return db.get().prepare(`
     SELECT hw.*,
            u.username,
@@ -157,9 +161,26 @@ function loadWorker() {
     JOIN users u ON u.id = hw.user_id
     LEFT JOIN contacts c ON c.family_user_id = u.id
     LEFT JOIN birthdays b ON b.family_user_id = u.id
-    ORDER BY hw.created_at DESC
-    LIMIT 1
-  `).get();
+    ORDER BY u.display_name COLLATE NOCASE ASC
+  `).all();
+}
+
+function loadWorkerById(workerId) {
+  return db.get().prepare(`
+    SELECT hw.*,
+           u.username,
+           u.display_name,
+           u.avatar_color,
+           u.avatar_data,
+           c.phone,
+           c.email,
+           b.birth_date
+    FROM housekeeping_workers hw
+    JOIN users u ON u.id = hw.user_id
+    LEFT JOIN contacts c ON c.family_user_id = u.id
+    LEFT JOIN birthdays b ON b.family_user_id = u.id
+    WHERE hw.id = ?
+  `).get(workerId);
 }
 
 function monthlySummary(monthValue = currentMonth()) {
@@ -184,7 +205,8 @@ function monthlySummary(monthValue = currentMonth()) {
 
 function housekeepingDashboard() {
   const monthValue = currentMonth();
-  const worker = publicWorker(loadWorker());
+  const workers = loadWorkers().map(publicWorker);
+  const worker = workers[0] ?? null;
   const openSession = publicSession(loadOpenSession());
   const summary = monthlySummary(monthValue);
   const lastVisit = db.get().prepare(`
@@ -217,6 +239,7 @@ function housekeepingDashboard() {
 
   return {
     worker,
+    workers,
     current_session: openSession,
     visits_this_month: summary.session_count,
     last_visit: publicSession(lastVisit),
@@ -297,10 +320,25 @@ router.get('/worker', (_req, res) => {
   }
 });
 
+router.get('/workers', (_req, res) => {
+  try {
+    res.json({ data: loadWorkers().map(publicWorker) });
+  } catch (err) {
+    log.error('GET /workers error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
 router.post('/worker', async (req, res) => {
   if (!assertAdmin(req, res)) return;
   try {
-    const existing = loadWorker();
+    const vWorkerId = req.body.id !== undefined && req.body.id !== null && req.body.id !== ''
+      ? validateId(req.body.id, 'id')
+      : { value: null, error: null };
+    if (vWorkerId.error) return res.status(400).json({ error: vWorkerId.error, code: 400 });
+    const existing = vWorkerId.value ? loadWorkerById(vWorkerId.value) : null;
+    if (vWorkerId.value && !existing) return res.status(404).json({ error: 'Housekeeper not found.', code: 404 });
+
     const vDisplayName = str(req.body.display_name, 'display_name', { max: 128 });
     const vUsername = str(req.body.username, 'username', { max: 64, required: false });
     const vPhone = str(req.body.phone, 'phone', { max: MAX_SHORT, required: false });
@@ -326,7 +364,7 @@ router.post('/worker', async (req, res) => {
     }
 
     const actorId = userId(req);
-    const createdUserId = existing ? existing.user_id : await createWorkerUser({
+    const targetUserId = existing ? existing.user_id : await createWorkerUser({
       username: vUsername.value,
       displayName: vDisplayName.value,
       avatarColor,
@@ -340,11 +378,11 @@ router.post('/worker', async (req, res) => {
         SET username = ?, display_name = ?, avatar_color = ?, avatar_data = ?
         WHERE id = ?
       `).run(
-        vUsername.value || existing?.username || `housekeeper_${createdUserId}`,
+        vUsername.value || existing?.username || `housekeeper_${targetUserId}`,
         vDisplayName.value,
         avatarColor || '#7C3AED',
         avatarData ?? null,
-        createdUserId,
+        targetUserId,
       );
       db.get().prepare(`
         INSERT INTO housekeeping_workers (user_id, daily_rate, payment_schedule, notes)
@@ -353,8 +391,8 @@ router.post('/worker', async (req, res) => {
           daily_rate = excluded.daily_rate,
           payment_schedule = excluded.payment_schedule,
           notes = excluded.notes
-      `).run(createdUserId, vDailyRate.value, vSchedule.value, vNotes.value);
-      syncFamilyMemberArtifacts(db.get(), createdUserId, {
+      `).run(targetUserId, vDailyRate.value, vSchedule.value, vNotes.value);
+      syncFamilyMemberArtifacts(db.get(), targetUserId, {
         displayName: vDisplayName.value,
         phone: vPhone.value,
         email: vEmail.value,
@@ -364,7 +402,8 @@ router.post('/worker', async (req, res) => {
       });
     })();
 
-    res.status(existing ? 200 : 201).json({ data: publicWorker(loadWorker()) });
+    const saved = existing ? loadWorkerById(existing.id) : loadWorkers().find((worker) => worker.user_id === targetUserId);
+    res.status(existing ? 200 : 201).json({ data: publicWorker(saved) });
   } catch (err) {
     if (err.message?.includes('UNIQUE constraint')) {
       return res.status(409).json({ error: 'Username is already taken.', code: 409 });
@@ -409,6 +448,9 @@ router.get('/work-sessions', (req, res) => {
 
 router.post('/work-sessions/check-in', (req, res) => {
   try {
+    if (loadWorkers().length === 0) {
+      return res.status(400).json({ error: 'Add a housekeeper before checking in.', code: 400 });
+    }
     if (loadOpenSession()) return res.status(409).json({ error: 'A work session is already open.', code: 409 });
 
     const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: true });

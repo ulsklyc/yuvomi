@@ -1260,7 +1260,6 @@
     "taskCreatedToast": "Tarea de limpieza creada.",
     "dashboard": "Panel",
     "reports": "Reportes",
-    "profile": "Perfil",
     "visitsThisMonth": "Visitas del mes",
     "lastVisit": "Última visita",
     "pendingChores": "Tareas pendientes",
@@ -1288,6 +1287,13 @@
     "scheduleMonthly": "Mensual",
     "profileColor": "Color de perfil",
     "workerNotes": "Notas",
-    "workerSavedToast": "Perfil guardado."
+    "workerSavedToast": "Perfil guardado.",
+    "staff": "Personal",
+    "staffTitle": "Personal de limpieza",
+    "addWorker": "Agregar persona",
+    "editWorker": "Editar persona",
+    "noWorkers": "No hay personal de limpieza registrado.",
+    "moreWorkers": "+{{count}} más",
+    "checkInDisabled": "Agrega una persona antes de registrar entrada."
   }
 }

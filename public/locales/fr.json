@@ -1260,7 +1260,6 @@
     "taskCreatedToast": "Tâche de ménage créée.",
     "dashboard": "Tableau",
     "reports": "Signalements",
-    "profile": "Profil",
     "visitsThisMonth": "Visites du mois",
     "lastVisit": "Dernière visite",
     "pendingChores": "Tâches en attente",
@@ -1288,6 +1287,13 @@
     "scheduleMonthly": "Mensuel",
     "profileColor": "Couleur du profil",
     "workerNotes": "Notes",
-    "workerSavedToast": "Profil enregistré."
+    "workerSavedToast": "Profil enregistré.",
+    "staff": "Équipe",
+    "staffTitle": "Équipe de ménage",
+    "addWorker": "Ajouter une personne",
+    "editWorker": "Modifier la personne",
+    "noWorkers": "Aucune personne de ménage enregistrée.",
+    "moreWorkers": "+{{count}} de plus",
+    "checkInDisabled": "Ajoutez une personne avant de pointer."
   }
 }

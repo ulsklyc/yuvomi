@@ -38,6 +38,13 @@
   white-space: nowrap;
 }
 
+.housekeeping-check-small:disabled {
+  background: var(--color-surface-3);
+  color: var(--color-text-disabled);
+  border-color: var(--color-border);
+  cursor: not-allowed;
+}
+
 .housekeeping-tabs {
   display: flex;
   gap: var(--space-2);
@@ -114,6 +121,13 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3);
+}
+
+.housekeeping-worker-stack,
+.housekeeping-staff-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .housekeeping-worker-strip div:last-child {
@@ -429,6 +443,28 @@
 }
 
 .housekeeping-report-item span {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.housekeeping-staff-row {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.housekeeping-staff-row div:nth-child(2) {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.housekeeping-staff-row span {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
 }

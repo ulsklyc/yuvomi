@@ -1338,7 +1338,6 @@
     "taskCreatedToast": "Hauspflege-Aufgabe erstellt.",
     "dashboard": "Dashboard",
     "reports": "Meldungen",
-    "profile": "Profil",
     "visitsThisMonth": "Besuche im Monat",
     "lastVisit": "Letzter Besuch",
     "pendingChores": "Offene Aufgaben",
@@ -1366,6 +1365,13 @@
     "scheduleMonthly": "Monatlich",
     "profileColor": "Profilfarbe",
     "workerNotes": "Notizen",
-    "workerSavedToast": "Hauspflege-Profil gespeichert."
+    "workerSavedToast": "Hauspflege-Profil gespeichert.",
+    "staff": "Personal",
+    "staffTitle": "Hauspflege-Personal",
+    "addWorker": "Hauspflege hinzufügen",
+    "editWorker": "Hauspflege bearbeiten",
+    "noWorkers": "Noch keine Hauspflege-Person registriert.",
+    "moreWorkers": "+{{count}} weitere",
+    "checkInDisabled": "Lege zuerst eine Hauspflege-Person an."
   }
 }

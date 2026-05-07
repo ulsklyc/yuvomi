@@ -27,7 +27,7 @@ Migration `34` adds:
 - `housekeeping_workers`
 - `housekeeping_work_sessions.paid_at`
 
-The worker profile links to `users.id`. The user is hidden from the normal family list by filtering rows associated with `housekeeping_workers`, while the contact and birthday sync remains shared with the existing family-member artifact flow.
+Each staff profile links to `users.id`. These users are hidden from the normal family list by filtering rows associated with `housekeeping_workers`, while contact and birthday sync remains shared with the existing family-member artifact flow.
 
 The quick supply endpoint uses a SQLite transaction:
 
@@ -76,4 +76,4 @@ Backend validation covers:
 3. Review the Dashboard metrics and payment chart.
 4. On **Tasks**, choose suggested chores or create a custom recurring chore.
 5. On **Reports**, take/upload a photo and submit a maintenance description.
-6. On **Profile**, create or update the housekeeper person, contacts, birthday, rate, and payment schedule.
+6. On **Staff**, create or update one or more housekeepers, contacts, birthdays, rates, and payment schedules.

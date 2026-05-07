@@ -1260,7 +1260,6 @@
     "taskCreatedToast": "Städuppgift skapad.",
     "dashboard": "Översikt",
     "reports": "Rapporter",
-    "profile": "Profil",
     "visitsThisMonth": "Besök denna månad",
     "lastVisit": "Senaste besök",
     "pendingChores": "Väntande uppgifter",
@@ -1288,6 +1287,13 @@
     "scheduleMonthly": "Månadsvis",
     "profileColor": "Profilfärg",
     "workerNotes": "Anteckningar",
-    "workerSavedToast": "Städprofil sparad."
+    "workerSavedToast": "Städprofil sparad.",
+    "staff": "Personal",
+    "staffTitle": "Städpersonal",
+    "addWorker": "Lägg till person",
+    "editWorker": "Redigera person",
+    "noWorkers": "Ingen städpersonal registrerad.",
+    "moreWorkers": "+{{count}} fler",
+    "checkInDisabled": "Lägg till personal innan incheckning."
   }
 }

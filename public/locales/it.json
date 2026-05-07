@@ -1260,7 +1260,6 @@
     "taskCreatedToast": "Attività di pulizia creata.",
     "dashboard": "Dashboard",
     "reports": "Segnalazioni",
-    "profile": "Profilo",
     "visitsThisMonth": "Visite del mese",
     "lastVisit": "Ultima visita",
     "pendingChores": "Attività aperte",
@@ -1288,6 +1287,13 @@
     "scheduleMonthly": "Mensile",
     "profileColor": "Colore profilo",
     "workerNotes": "Note",
-    "workerSavedToast": "Profilo salvato."
+    "workerSavedToast": "Profilo salvato.",
+    "staff": "Staff",
+    "staffTitle": "Staff pulizie",
+    "addWorker": "Aggiungi persona",
+    "editWorker": "Modifica persona",
+    "noWorkers": "Nessuna persona registrata.",
+    "moreWorkers": "+{{count}} altre",
+    "checkInDisabled": "Aggiungi una persona prima dell’entrata."
   }
 }

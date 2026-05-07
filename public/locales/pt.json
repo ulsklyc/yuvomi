@@ -1260,7 +1260,6 @@
     "taskCreatedToast": "Tarefa de faxina criada.",
     "dashboard": "Painel",
     "reports": "Ocorrências",
-    "profile": "Perfil",
     "visitsThisMonth": "Visitas no mês",
     "lastVisit": "Última visita",
     "pendingChores": "Tarefas pendentes",
@@ -1288,6 +1287,13 @@
     "scheduleMonthly": "Mensal",
     "profileColor": "Cor do perfil",
     "workerNotes": "Observações",
-    "workerSavedToast": "Perfil da faxineira salvo."
+    "workerSavedToast": "Perfil da faxineira salvo.",
+    "staff": "Equipe",
+    "staffTitle": "Equipe de faxina",
+    "addWorker": "Adicionar faxineira",
+    "editWorker": "Editar faxineira",
+    "noWorkers": "Nenhuma faxineira cadastrada.",
+    "moreWorkers": "+{{count}} a mais",
+    "checkInDisabled": "Cadastre uma faxineira antes de fazer check-in."
   }
 }
