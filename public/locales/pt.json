@@ -54,7 +54,8 @@
     "more": "Mais",
     "documents": "Documentos",
     "kitchen": "Cozinha",
-    "search": "Pesquisar"
+    "search": "Pesquisar",
+    "housekeeping": "Faxina"
   },
   "dashboard": {
     "title": "Painel",
@@ -1215,5 +1216,39 @@
     "help": "Atalhos de teclado",
     "new": "Criar nova entrada",
     "search": "Abrir pesquisa"
+  },
+  "housekeeping": {
+    "title": "Área da faxineira",
+    "bottomNav": "Navegação da faxina",
+    "home": "Início",
+    "tasks": "Tarefas",
+    "report": "Reportar",
+    "notCheckedIn": "Ponto não iniciado",
+    "checkedInAt": "Entrada às",
+    "monthTotal": "Mês atual · {{count}} diárias",
+    "dailyRate": "Valor da diária",
+    "extras": "Extras",
+    "checkIn": "Entrar",
+    "checkOut": "Sair",
+    "quickSupply": "Faltou produto",
+    "supplyName": "Nome do produto",
+    "supplyPlaceholder": "O que faltou?",
+    "checkedInToast": "Entrada registrada.",
+    "checkedOutToast": "Saída registrada.",
+    "supplyAddedToast": "Adicionado à lista de compras.",
+    "overdue": "Atrasada",
+    "dueToday": "Hoje",
+    "ok": "Em dia",
+    "noTasks": "Nenhuma tarefa de faxina cadastrada.",
+    "everyDays": "A cada {{days}} dias",
+    "completeTask": "Concluir {{name}}",
+    "taskDoneToast": "Tarefa concluída.",
+    "reportTitle": "Reportar problema",
+    "problemDescription": "Descrição do problema",
+    "problemPlaceholder": "Ex: lâmpada queimada",
+    "addPhoto": "Adicionar foto",
+    "sendReport": "Enviar ocorrência",
+    "reportSentToast": "Problema reportado.",
+    "recentReports": "Ocorrências recentes"
   }
 }

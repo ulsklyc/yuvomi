@@ -54,7 +54,8 @@
     "more": "Більше",
     "documents": "Документи",
     "kitchen": "Кухня",
-    "search": "Пошук"
+    "search": "Пошук",
+    "housekeeping": "Housekeeping"
   },
   "dashboard": {
     "title": "Огляд",
@@ -1215,5 +1216,39 @@
     "help": "Гарячі клавіші",
     "new": "Створити новий запис",
     "search": "Відкрити пошук"
+  },
+  "housekeeping": {
+    "title": "Cleaner workspace",
+    "bottomNav": "Housekeeping navigation",
+    "home": "Home",
+    "tasks": "Tasks",
+    "report": "Report",
+    "notCheckedIn": "Not checked in",
+    "checkedInAt": "Checked in at",
+    "monthTotal": "Current month · {{count}} sessions",
+    "dailyRate": "Daily rate",
+    "extras": "Extras",
+    "checkIn": "Check in",
+    "checkOut": "Check out",
+    "quickSupply": "Missing product",
+    "supplyName": "Product name",
+    "supplyPlaceholder": "What is missing?",
+    "checkedInToast": "Check-in recorded.",
+    "checkedOutToast": "Check-out recorded.",
+    "supplyAddedToast": "Added to the shopping list.",
+    "overdue": "Overdue",
+    "dueToday": "Due today",
+    "ok": "OK",
+    "noTasks": "No housekeeping tasks yet.",
+    "everyDays": "Every {{days}} days",
+    "completeTask": "Complete {{name}}",
+    "taskDoneToast": "Task completed.",
+    "reportTitle": "Report a problem",
+    "problemDescription": "Problem description",
+    "problemPlaceholder": "Example: burnt-out light bulb",
+    "addPhoto": "Add photo",
+    "sendReport": "Send report",
+    "reportSentToast": "Problem reported.",
+    "recentReports": "Recent reports"
   }
 }

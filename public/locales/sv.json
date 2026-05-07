@@ -54,7 +54,8 @@
     "more": "Mer",
     "documents": "Dokument",
     "kitchen": "Kök",
-    "search": "Sök"
+    "search": "Sök",
+    "housekeeping": "Städning"
   },
   "dashboard": {
     "title": "Översikt",
@@ -1215,5 +1216,39 @@
     "goCal": "Kalender",
     "goShop": "Inköpslista",
     "goNotes": "Anteckningar"
+  },
+  "housekeeping": {
+    "title": "Städyta",
+    "bottomNav": "Städnavigation",
+    "home": "Hem",
+    "tasks": "Uppgifter",
+    "report": "Rapportera",
+    "notCheckedIn": "Inte incheckad",
+    "checkedInAt": "Incheckad kl.",
+    "monthTotal": "Aktuell månad · {{count}} pass",
+    "dailyRate": "Dagspris",
+    "extras": "Extra",
+    "checkIn": "Checka in",
+    "checkOut": "Checka ut",
+    "quickSupply": "Produkt saknas",
+    "supplyName": "Produkt",
+    "supplyPlaceholder": "Vad saknas?",
+    "checkedInToast": "Incheckning sparad.",
+    "checkedOutToast": "Utcheckning sparad.",
+    "supplyAddedToast": "Tillagd i inköpslistan.",
+    "overdue": "Försenad",
+    "dueToday": "Idag",
+    "ok": "OK",
+    "noTasks": "Inga städuppgifter ännu.",
+    "everyDays": "Var {{days}} dag",
+    "completeTask": "Slutför {{name}}",
+    "taskDoneToast": "Uppgift slutförd.",
+    "reportTitle": "Rapportera problem",
+    "problemDescription": "Problembeskrivning",
+    "problemPlaceholder": "Exempel: trasig lampa",
+    "addPhoto": "Lägg till foto",
+    "sendReport": "Skicka",
+    "reportSentToast": "Problem rapporterat.",
+    "recentReports": "Senaste rapporter"
   }
 }

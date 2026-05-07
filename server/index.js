@@ -36,6 +36,7 @@ import remindersRouter from './routes/reminders.js';
 import searchRouter from './routes/search.js';
 import familyRouter from './routes/family.js';
 import backupRouter from './routes/backup.js';
+import housekeepingRouter from './routes/housekeeping.js';
 
 const log     = createLogger('Server');
 const logSync = createLogger('Sync');
@@ -206,6 +207,7 @@ app.use('/api/v1/reminders', remindersRouter);
 app.use('/api/v1/search', searchRouter);
 app.use('/api/v1/family', familyRouter);
 app.use('/api/v1/backup', backupRouter);
+app.use('/api/v1/housekeeping', housekeepingRouter);
 
 // --------------------------------------------------------
 // Health-Check (für Docker)

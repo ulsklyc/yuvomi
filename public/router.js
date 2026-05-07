@@ -27,6 +27,7 @@ const ROUTES = [
   { path: '/contacts', page: '/pages/contacts.js',  requiresAuth: true, module: 'contacts'  },
   { path: '/budget',   page: '/pages/budget.js',    requiresAuth: true, module: 'budget'    },
   { path: '/documents', page: '/pages/documents.js', requiresAuth: true, module: 'documents' },
+  { path: '/housekeeping', page: '/pages/housekeeping.js', requiresAuth: true, module: 'housekeeping' },
   { path: '/settings', page: '/pages/settings.js',  requiresAuth: true, module: 'settings'  },
 ];
 
@@ -131,7 +132,7 @@ let _pendingLoginRedirect = false;
 // --------------------------------------------------------
 
 const ROUTE_ORDER = ['/', '/calendar', '/tasks', '/meals', '/recipes', '/shopping',
-                     '/birthdays', '/notes', '/contacts', '/budget', '/documents', '/settings'];
+                     '/birthdays', '/notes', '/contacts', '/budget', '/documents', '/housekeeping', '/settings'];
 
 const PRIMARY_NAV = 3;
 
@@ -185,6 +186,7 @@ function routeTitle(path) {
     '/contacts': t('nav.contacts'),
     '/budget': t('nav.budget'),
     '/documents': t('nav.documents'),
+    '/housekeeping': t('nav.housekeeping'),
     '/settings': t('nav.settings'),
   };
   return map[path] || getAppName();
@@ -1003,6 +1005,7 @@ function navItems() {
     { path: '/contacts',  label: t('nav.contacts'),  icon: 'book-user',        module: 'contacts'  },
     { path: '/budget',    label: t('nav.budget'),    icon: 'wallet',           module: 'budget'    },
     { path: '/documents', label: t('nav.documents'), icon: 'folder-lock',      module: 'documents' },
+    { path: '/housekeeping', label: t('nav.housekeeping'), icon: 'sparkles',   module: 'housekeeping' },
     { path: '/settings',  label: t('nav.settings'),  icon: 'settings',         module: 'settings'  },
     // Kitchen-Gruppe: via Küche-Nav-Button (Bottom-Nav + Sidebar) + kitchen-tabs-bar erreichbar
     { path: '/meals',     label: t('nav.meals'),     icon: 'utensils',      module: 'meals',    kitchenGroup: true },

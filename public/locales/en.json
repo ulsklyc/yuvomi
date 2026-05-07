@@ -54,7 +54,8 @@
     "more": "More",
     "documents": "Documents",
     "kitchen": "Kitchen",
-    "search": "Search"
+    "search": "Search",
+    "housekeeping": "Housekeeping"
   },
   "dashboard": {
     "title": "Overview",
@@ -994,8 +995,6 @@
     "caldavEmptyState": "No CalDAV accounts connected yet. Add your first account to get started.",
     "caldavNameLabel": "Account Name",
     "caldavNamePlaceholder": "e.g. My Radicale, iCloud, Nextcloud",
-    "caldavUrlLabel": "CalDAV Server URL",
-    "caldavUrlPlaceholder": "https://caldav.icloud.com",
     "caldavUrlHint": "The base URL of your CalDAV server",
     "caldavUsernameLabel": "Username",
     "caldavPasswordLabel": "Password",
@@ -1272,5 +1271,39 @@
     "dropzoneTitle": "Drop file here or click to choose",
     "dropzoneHint": "Drag a file into this area, or use the file picker.",
     "selectedFileLabel": "Selected: {{name}}"
+  },
+  "housekeeping": {
+    "title": "Cleaner workspace",
+    "bottomNav": "Housekeeping navigation",
+    "home": "Home",
+    "tasks": "Tasks",
+    "report": "Report",
+    "notCheckedIn": "Not checked in",
+    "checkedInAt": "Checked in at",
+    "monthTotal": "Current month · {{count}} sessions",
+    "dailyRate": "Daily rate",
+    "extras": "Extras",
+    "checkIn": "Check in",
+    "checkOut": "Check out",
+    "quickSupply": "Missing product",
+    "supplyName": "Product name",
+    "supplyPlaceholder": "What is missing?",
+    "checkedInToast": "Check-in recorded.",
+    "checkedOutToast": "Check-out recorded.",
+    "supplyAddedToast": "Added to the shopping list.",
+    "overdue": "Overdue",
+    "dueToday": "Due today",
+    "ok": "OK",
+    "noTasks": "No housekeeping tasks yet.",
+    "everyDays": "Every {{days}} days",
+    "completeTask": "Complete {{name}}",
+    "taskDoneToast": "Task completed.",
+    "reportTitle": "Report a problem",
+    "problemDescription": "Problem description",
+    "problemPlaceholder": "Example: burnt-out light bulb",
+    "addPhoto": "Add photo",
+    "sendReport": "Send report",
+    "reportSentToast": "Problem reported.",
+    "recentReports": "Recent reports"
   }
 }

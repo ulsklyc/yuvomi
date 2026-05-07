@@ -54,7 +54,8 @@
     "more": "もっと見る",
     "documents": "書類",
     "kitchen": "キッチン",
-    "search": "検索"
+    "search": "検索",
+    "housekeeping": "Housekeeping"
   },
   "dashboard": {
     "title": "ダッシュボード",
@@ -1215,5 +1216,39 @@
     "help": "キーボードショートカット",
     "new": "新規エントリを作成",
     "search": "検索を開く"
+  },
+  "housekeeping": {
+    "title": "Cleaner workspace",
+    "bottomNav": "Housekeeping navigation",
+    "home": "Home",
+    "tasks": "Tasks",
+    "report": "Report",
+    "notCheckedIn": "Not checked in",
+    "checkedInAt": "Checked in at",
+    "monthTotal": "Current month · {{count}} sessions",
+    "dailyRate": "Daily rate",
+    "extras": "Extras",
+    "checkIn": "Check in",
+    "checkOut": "Check out",
+    "quickSupply": "Missing product",
+    "supplyName": "Product name",
+    "supplyPlaceholder": "What is missing?",
+    "checkedInToast": "Check-in recorded.",
+    "checkedOutToast": "Check-out recorded.",
+    "supplyAddedToast": "Added to the shopping list.",
+    "overdue": "Overdue",
+    "dueToday": "Due today",
+    "ok": "OK",
+    "noTasks": "No housekeeping tasks yet.",
+    "everyDays": "Every {{days}} days",
+    "completeTask": "Complete {{name}}",
+    "taskDoneToast": "Task completed.",
+    "reportTitle": "Report a problem",
+    "problemDescription": "Problem description",
+    "problemPlaceholder": "Example: burnt-out light bulb",
+    "addPhoto": "Add photo",
+    "sendReport": "Send report",
+    "reportSentToast": "Problem reported.",
+    "recentReports": "Recent reports"
   }
 }

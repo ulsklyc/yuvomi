@@ -54,7 +54,8 @@
     "more": "Plus",
     "documents": "Documents",
     "kitchen": "Cuisine",
-    "search": "Recherche"
+    "search": "Recherche",
+    "housekeeping": "Ménage"
   },
   "dashboard": {
     "title": "Accueil",
@@ -1215,5 +1216,39 @@
     "help": "Raccourcis clavier",
     "new": "Créer une nouvelle entrée",
     "search": "Ouvrir la recherche"
+  },
+  "housekeeping": {
+    "title": "Espace ménage",
+    "bottomNav": "Navigation ménage",
+    "home": "Accueil",
+    "tasks": "Tâches",
+    "report": "Signaler",
+    "notCheckedIn": "Pas pointé",
+    "checkedInAt": "Pointé à",
+    "monthTotal": "Mois en cours · {{count}} sessions",
+    "dailyRate": "Tarif journalier",
+    "extras": "Extras",
+    "checkIn": "Arrivée",
+    "checkOut": "Départ",
+    "quickSupply": "Produit manquant",
+    "supplyName": "Produit",
+    "supplyPlaceholder": "Que manque-t-il ?",
+    "checkedInToast": "Arrivée enregistrée.",
+    "checkedOutToast": "Départ enregistré.",
+    "supplyAddedToast": "Ajouté à la liste de courses.",
+    "overdue": "En retard",
+    "dueToday": "Aujourd’hui",
+    "ok": "OK",
+    "noTasks": "Aucune tâche de ménage.",
+    "everyDays": "Tous les {{days}} jours",
+    "completeTask": "Terminer {{name}}",
+    "taskDoneToast": "Tâche terminée.",
+    "reportTitle": "Signaler un problème",
+    "problemDescription": "Description du problème",
+    "problemPlaceholder": "Exemple : ampoule grillée",
+    "addPhoto": "Ajouter une photo",
+    "sendReport": "Envoyer",
+    "reportSentToast": "Problème signalé.",
+    "recentReports": "Signalements récents"
   }
 }

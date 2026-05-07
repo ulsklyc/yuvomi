@@ -193,6 +193,8 @@
   --module-budget:     var(--_module-budget);      /* Teal-700 - Finanzen, Stabilität */
   --_module-documents: #1D4ED8;
   --module-documents:  var(--_module-documents);    /* Blue - secure family documents */
+  --_module-housekeeping: #7C3AED;
+  --module-housekeeping:  var(--_module-housekeeping); /* Violet - focused service workflow */
   --_module-settings:   #6E7781;
   --module-settings:    var(--_module-settings);   /* Grau - Konfiguration */
   --_module-reminders:  #0E7490;
@@ -554,6 +556,7 @@
     --_module-contacts:  #60A5FA;
     --_module-birthdays: #FB7185;
     --_module-budget:      #2DD4BF;
+    --_module-housekeeping: #C4B5FD;
     --_module-settings:    #94A3B8;
     --_module-reminders:   #22D3EE;   /* Cyan-400 */
 
@@ -659,6 +662,7 @@
     --_module-contacts:  #60A5FA;
     --_module-birthdays: #FB7185;
     --_module-budget:      #2DD4BF;   /* Teal-400 */
+    --_module-housekeeping: #C4B5FD;
     --_module-settings:    #94A3B8;
     --_module-reminders:   #22D3EE;   /* Cyan-400 */
 

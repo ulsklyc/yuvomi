@@ -54,7 +54,8 @@
     "more": "Altro",
     "documents": "Documenti",
     "kitchen": "Cucina",
-    "search": "Cerca"
+    "search": "Cerca",
+    "housekeeping": "Pulizie"
   },
   "dashboard": {
     "title": "Panoramica",
@@ -1215,5 +1216,39 @@
     "help": "Scorciatoie da tastiera",
     "new": "Crea nuova voce",
     "search": "Apri ricerca"
+  },
+  "housekeeping": {
+    "title": "Area pulizie",
+    "bottomNav": "Navigazione pulizie",
+    "home": "Home",
+    "tasks": "Attività",
+    "report": "Segnala",
+    "notCheckedIn": "Non registrata",
+    "checkedInAt": "Entrata alle",
+    "monthTotal": "Mese corrente · {{count}} sessioni",
+    "dailyRate": "Tariffa giornaliera",
+    "extras": "Extra",
+    "checkIn": "Entrata",
+    "checkOut": "Uscita",
+    "quickSupply": "Prodotto mancante",
+    "supplyName": "Prodotto",
+    "supplyPlaceholder": "Cosa manca?",
+    "checkedInToast": "Entrata registrata.",
+    "checkedOutToast": "Uscita registrata.",
+    "supplyAddedToast": "Aggiunto alla lista della spesa.",
+    "overdue": "In ritardo",
+    "dueToday": "Oggi",
+    "ok": "OK",
+    "noTasks": "Nessuna attività di pulizia.",
+    "everyDays": "Ogni {{days}} giorni",
+    "completeTask": "Completa {{name}}",
+    "taskDoneToast": "Attività completata.",
+    "reportTitle": "Segnala problema",
+    "problemDescription": "Descrizione del problema",
+    "problemPlaceholder": "Esempio: lampadina bruciata",
+    "addPhoto": "Aggiungi foto",
+    "sendReport": "Invia",
+    "reportSentToast": "Problema segnalato.",
+    "recentReports": "Segnalazioni recenti"
   }
 }

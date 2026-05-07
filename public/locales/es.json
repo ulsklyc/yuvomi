@@ -54,7 +54,8 @@
     "more": "Más",
     "documents": "Documentos",
     "kitchen": "Cocina",
-    "search": "Buscar"
+    "search": "Buscar",
+    "housekeeping": "Limpieza"
   },
   "dashboard": {
     "title": "Inicio",
@@ -1215,5 +1216,39 @@
     "help": "Atajos de teclado",
     "new": "Crear nueva entrada",
     "search": "Abrir búsqueda"
+  },
+  "housekeeping": {
+    "title": "Área de limpieza",
+    "bottomNav": "Navegación de limpieza",
+    "home": "Inicio",
+    "tasks": "Tareas",
+    "report": "Reportar",
+    "notCheckedIn": "Sin entrada",
+    "checkedInAt": "Entrada a las",
+    "monthTotal": "Mes actual · {{count}} jornadas",
+    "dailyRate": "Tarifa diaria",
+    "extras": "Extras",
+    "checkIn": "Entrada",
+    "checkOut": "Salida",
+    "quickSupply": "Falta producto",
+    "supplyName": "Producto",
+    "supplyPlaceholder": "¿Qué falta?",
+    "checkedInToast": "Entrada registrada.",
+    "checkedOutToast": "Salida registrada.",
+    "supplyAddedToast": "Añadido a la lista de compras.",
+    "overdue": "Atrasada",
+    "dueToday": "Hoy",
+    "ok": "OK",
+    "noTasks": "No hay tareas de limpieza.",
+    "everyDays": "Cada {{days}} días",
+    "completeTask": "Completar {{name}}",
+    "taskDoneToast": "Tarea completada.",
+    "reportTitle": "Reportar problema",
+    "problemDescription": "Descripción del problema",
+    "problemPlaceholder": "Ejemplo: bombilla fundida",
+    "addPhoto": "Agregar foto",
+    "sendReport": "Enviar reporte",
+    "reportSentToast": "Problema reportado.",
+    "recentReports": "Reportes recientes"
   }
 }
