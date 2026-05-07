@@ -1304,6 +1304,14 @@
     "addPhoto": "Add photo",
     "sendReport": "Send report",
     "reportSentToast": "Problem reported.",
-    "recentReports": "Recent reports"
+    "recentReports": "Recent reports",
+    "addTask": "Add task",
+    "taskName": "Task",
+    "taskNamePlaceholder": "Example: Clean bathrooms",
+    "taskArea": "Area",
+    "taskAreaPlaceholder": "Example: Bathroom",
+    "taskFrequency": "Frequency",
+    "createTask": "Create task",
+    "taskCreatedToast": "Housekeeping task created."
   }
 }

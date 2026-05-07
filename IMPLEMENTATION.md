@@ -67,5 +67,6 @@ Backend validation covers:
 1. Navigate to `/housekeeping`.
 2. On **Home**, set the daily rate and press the large check-in button.
 3. Use **Faltou Produto** to append missing supplies to the shopping list.
-4. On **Tarefas**, tap the large check icon to update `last_completed`.
-5. On **Reportar**, take/upload a photo and submit a maintenance description.
+4. On **Tarefas**, create recurring cleaning tasks with name, area, and frequency in days.
+5. Tap the large check icon on a task to update `last_completed`.
+6. On **Reportar**, take/upload a photo and submit a maintenance description.

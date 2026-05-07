@@ -46,19 +46,18 @@ function renderShell(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <section class="housekeeping-page" aria-labelledby="housekeeping-title">
-      <header class="housekeeping-header">
-        <div>
-          <p class="housekeeping-header__eyebrow">${esc(t('nav.housekeeping'))}</p>
-          <h1 id="housekeeping-title">${esc(t('housekeeping.title'))}</h1>
+      <header class="housekeeping-toolbar">
+        <div class="housekeeping-toolbar__title" id="housekeeping-title">${esc(t('housekeeping.title'))}</div>
+        <div class="housekeeping-toolbar__actions">
+          <i data-lucide="sparkles" class="housekeeping-toolbar__icon" aria-hidden="true"></i>
         </div>
-        <i data-lucide="sparkles" class="housekeeping-header__icon" aria-hidden="true"></i>
       </header>
-      <div class="housekeeping-content" id="housekeeping-content"></div>
       <nav class="housekeeping-tabs" aria-label="${esc(t('housekeeping.bottomNav'))}">
         ${renderTabButton('home', 'home', t('housekeeping.home'))}
         ${renderTabButton('tasks', 'list-checks', t('housekeeping.tasks'))}
         ${renderTabButton('report', 'camera', t('housekeeping.report'))}
       </nav>
+      <div class="housekeeping-content" id="housekeeping-content"></div>
     </section>
   `);
   container.querySelectorAll('[data-housekeeping-tab]').forEach((btn) => {
@@ -103,7 +102,7 @@ function renderHome(content) {
   const sessionCount = summary?.summary?.session_count || 0;
 
   content.insertAdjacentHTML('beforeend', `
-    <section class="housekeeping-panel housekeeping-panel--focus">
+    <section class="housekeeping-card housekeeping-card--focus">
       <div class="housekeeping-status">
         <span>${esc(sessionLabel(currentSession))}</span>
         <strong>${esc(money(total))}</strong>
@@ -123,7 +122,7 @@ function renderHome(content) {
       </button>
     </section>
 
-    <section class="housekeeping-panel">
+    <section class="housekeeping-card">
       <h2>${esc(t('housekeeping.quickSupply'))}</h2>
       <form id="housekeeping-supply-form" class="housekeeping-inline-form">
         <label class="sr-only" for="housekeeping-supply-name">${esc(t('housekeeping.supplyName'))}</label>
@@ -172,9 +171,60 @@ function renderHome(content) {
 
 function renderTasks(content) {
   content.replaceChildren();
+  content.insertAdjacentHTML('beforeend', `
+    <section class="housekeeping-card">
+      <h2>${esc(t('housekeeping.addTask'))}</h2>
+      <form id="housekeeping-task-form" class="housekeeping-task-form">
+        <label class="housekeeping-field">
+          <span>${esc(t('housekeeping.taskName'))}</span>
+          <input name="name" required maxlength="200" autocomplete="off"
+                 placeholder="${esc(t('housekeeping.taskNamePlaceholder'))}">
+        </label>
+        <div class="housekeeping-form-grid">
+          <label class="housekeeping-field">
+            <span>${esc(t('housekeeping.taskArea'))}</span>
+            <input name="area" required maxlength="100" autocomplete="off"
+                   placeholder="${esc(t('housekeeping.taskAreaPlaceholder'))}">
+          </label>
+          <label class="housekeeping-field">
+            <span>${esc(t('housekeeping.taskFrequency'))}</span>
+            <input name="frequency_days" required inputmode="numeric" type="number" min="1" step="1" value="7">
+          </label>
+        </div>
+        <button class="btn btn--primary housekeeping-form-submit" type="submit">
+          <i data-lucide="plus" aria-hidden="true"></i>
+          <span>${esc(t('housekeeping.createTask'))}</span>
+        </button>
+      </form>
+    </section>
+  `);
+
+  content.querySelector('#housekeeping-task-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const name = form.name.value.trim();
+    const area = form.area.value.trim();
+    const frequencyDays = Number(form.frequency_days.value);
+    if (!name || !area || !Number.isInteger(frequencyDays) || frequencyDays < 1) return;
+    try {
+      await api.post('/housekeeping/decay-tasks', {
+        name,
+        area,
+        frequency_days: frequencyDays,
+      });
+      form.reset();
+      form.frequency_days.value = '7';
+      window.oikos?.showToast(t('housekeeping.taskCreatedToast'), 'success');
+      await loadData();
+      renderTasks(content);
+    } catch (err) {
+      window.oikos?.showToast(err.message, 'danger');
+    }
+  });
+
   if (!state.tasks.length) {
     content.insertAdjacentHTML('beforeend', `
-      <section class="housekeeping-panel housekeeping-empty">
+      <section class="housekeeping-card housekeeping-empty">
         <i data-lucide="list-checks" aria-hidden="true"></i>
         <h2>${esc(t('housekeeping.noTasks'))}</h2>
       </section>
@@ -224,7 +274,7 @@ function renderReport(content) {
   `).join('');
 
   content.insertAdjacentHTML('beforeend', `
-    <section class="housekeeping-panel">
+    <section class="housekeeping-card">
       <h2>${esc(t('housekeeping.reportTitle'))}</h2>
       <form id="housekeeping-report-form" class="housekeeping-report-form">
         <label class="housekeeping-field">

@@ -1327,6 +1327,14 @@
     "addPhoto": "Foto hinzufügen",
     "sendReport": "Meldung senden",
     "reportSentToast": "Problem gemeldet.",
-    "recentReports": "Letzte Meldungen"
+    "recentReports": "Letzte Meldungen",
+    "addTask": "Aufgabe hinzufügen",
+    "taskName": "Aufgabe",
+    "taskNamePlaceholder": "Beispiel: Badezimmer reinigen",
+    "taskArea": "Bereich",
+    "taskAreaPlaceholder": "Beispiel: Bad",
+    "taskFrequency": "Häufigkeit",
+    "createTask": "Aufgabe erstellen",
+    "taskCreatedToast": "Hauspflege-Aufgabe erstellt."
   }
 }

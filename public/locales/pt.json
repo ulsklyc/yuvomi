@@ -1249,6 +1249,14 @@
     "addPhoto": "Adicionar foto",
     "sendReport": "Enviar ocorrência",
     "reportSentToast": "Problema reportado.",
-    "recentReports": "Ocorrências recentes"
+    "recentReports": "Ocorrências recentes",
+    "addTask": "Adicionar tarefa",
+    "taskName": "Tarefa",
+    "taskNamePlaceholder": "Ex: Limpar banheiros",
+    "taskArea": "Área",
+    "taskAreaPlaceholder": "Ex: Banheiro",
+    "taskFrequency": "Frequência",
+    "createTask": "Criar tarefa",
+    "taskCreatedToast": "Tarefa de faxina criada."
   }
 }

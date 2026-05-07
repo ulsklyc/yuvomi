@@ -1249,6 +1249,14 @@
     "addPhoto": "Aggiungi foto",
     "sendReport": "Invia",
     "reportSentToast": "Problema segnalato.",
-    "recentReports": "Segnalazioni recenti"
+    "recentReports": "Segnalazioni recenti",
+    "addTask": "Aggiungi attività",
+    "taskName": "Attività",
+    "taskNamePlaceholder": "Esempio: pulire i bagni",
+    "taskArea": "Area",
+    "taskAreaPlaceholder": "Esempio: bagno",
+    "taskFrequency": "Frequenza",
+    "createTask": "Crea attività",
+    "taskCreatedToast": "Attività di pulizia creata."
   }
 }

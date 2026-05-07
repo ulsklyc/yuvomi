@@ -9,7 +9,7 @@ Housekeeping adds a simplified mobile/PWA module for the cleaner workflow in Oik
 The `/housekeeping` route is a focused, mobile-first screen with large touch targets and an internal bottom navigation bar:
 
 - **Home**: giant check-in/check-out action, daily rate/extras inputs, current-month amount, and quick "missing product" input.
-- **Tarefas**: urgency-sorted recurring cleaning tasks with one-tap completion.
+- **Tarefas**: quick task creation, urgency-sorted recurring cleaning tasks, and one-tap completion.
 - **Reportar**: camera upload plus text description for maintenance occurrences.
 
 Accessibility constraints:

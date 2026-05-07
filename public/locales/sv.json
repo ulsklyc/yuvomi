@@ -1249,6 +1249,14 @@
     "addPhoto": "Lägg till foto",
     "sendReport": "Skicka",
     "reportSentToast": "Problem rapporterat.",
-    "recentReports": "Senaste rapporter"
+    "recentReports": "Senaste rapporter",
+    "addTask": "Lägg till uppgift",
+    "taskName": "Uppgift",
+    "taskNamePlaceholder": "Exempel: städa badrum",
+    "taskArea": "Område",
+    "taskAreaPlaceholder": "Exempel: badrum",
+    "taskFrequency": "Frekvens",
+    "createTask": "Skapa uppgift",
+    "taskCreatedToast": "Städuppgift skapad."
   }
 }

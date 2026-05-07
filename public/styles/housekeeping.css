@@ -1,63 +1,71 @@
 .housekeeping-page {
   --module-accent: var(--module-housekeeping);
+  max-width: var(--content-max-width);
   min-height: 100%;
-  padding: var(--space-5) var(--space-4) calc(112px + env(safe-area-inset-bottom));
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
 }
 
-.housekeeping-header {
+.housekeeping-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 3px solid var(--module-accent);
+  border-bottom: 1px solid var(--color-border);
+  background-color: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  backdrop-filter: var(--blur-sm);
+  -webkit-backdrop-filter: var(--blur-sm);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
 }
 
-.housekeeping-header h1 {
-  margin: 0;
-  font-size: 1.75rem;
-  line-height: 1.1;
-  letter-spacing: 0;
+.housekeeping-toolbar__title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-bold);
+  flex: 1;
+  white-space: nowrap;
 }
 
-.housekeeping-header__eyebrow {
-  margin: 0 0 var(--space-1);
+.housekeeping-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.housekeeping-toolbar__icon {
+  width: 24px;
+  height: 24px;
   color: var(--module-accent);
-  font-weight: 800;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-}
-
-.housekeeping-header__icon {
-  width: 44px;
-  height: 44px;
-  color: var(--module-accent);
-  flex: 0 0 auto;
 }
 
 .housekeeping-content {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-}
-
-.housekeeping-panel {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-top: 3px solid var(--module-accent);
-  border-radius: var(--radius-lg);
   padding: var(--space-4);
-  box-shadow: var(--shadow-sm);
+  padding-bottom: calc(112px + var(--nav-bottom-height) + env(safe-area-inset-bottom));
 }
 
-.housekeeping-panel h2 {
+.housekeeping-card {
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-top: 3px solid var(--module-accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.housekeeping-card h2 {
   margin: 0 0 var(--space-3);
-  font-size: 1.05rem;
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-bold);
   letter-spacing: 0;
 }
 
-.housekeeping-panel--focus {
+.housekeeping-card--focus {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -74,7 +82,7 @@
 }
 
 .housekeeping-status strong {
-  font-size: 2rem;
+  font-size: var(--text-3xl);
   line-height: 1.1;
   letter-spacing: 0;
 }
@@ -89,13 +97,13 @@
 .housekeeping-field textarea,
 .housekeeping-inline-form input {
   width: 100%;
-  min-height: 56px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  min-height: var(--target-lg);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text-primary);
   font: inherit;
-  font-size: 1rem;
+  font-size: var(--text-base);
   padding: 0 var(--space-3);
 }
 
@@ -109,7 +117,7 @@
 .housekeeping-submit-btn {
   min-height: 104px;
   border: 0;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--color-success);
   color: var(--toast-success-text);
   font: inherit;
@@ -140,8 +148,29 @@
 }
 
 .housekeeping-inline-form .btn {
-  min-height: 56px;
+  min-height: var(--target-lg);
   padding-inline: var(--space-4);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.housekeeping-task-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.housekeeping-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.housekeeping-form-submit {
+  min-height: var(--target-lg);
+  align-self: flex-start;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -161,10 +190,9 @@
   min-height: 92px;
   padding: var(--space-3);
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 1.5px solid var(--color-border);
   border-left: 7px solid var(--color-success);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-md);
 }
 
 .housekeeping-task--today {
@@ -211,39 +239,39 @@
 }
 
 .housekeeping-tabs {
-  position: fixed;
-  left: var(--space-3);
-  right: var(--space-3);
-  bottom: calc(76px + env(safe-area-inset-bottom));
+  position: sticky;
+  top: 51px;
   z-index: var(--z-sticky);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
-  padding: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .housekeeping-tab {
-  min-height: 64px;
-  border: 0;
-  border-radius: var(--radius-lg);
+  min-height: var(--target-lg);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-full);
   background: transparent;
   color: var(--color-text-secondary);
   font: inherit;
-  font-weight: 800;
-  display: flex;
-  flex-direction: column;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  white-space: nowrap;
 }
 
 .housekeeping-tab svg {
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
 }
 
 .housekeeping-tab[aria-current="page"] {
@@ -260,7 +288,7 @@
 .housekeeping-photo {
   min-height: 76px;
   border: 1.5px dashed color-mix(in srgb, var(--module-accent) 55%, var(--color-border));
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   color: var(--module-accent);
   display: flex;
   align-items: center;
@@ -280,7 +308,7 @@
   width: 100%;
   max-height: 260px;
   object-fit: cover;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
 }
 
@@ -297,8 +325,8 @@
   align-items: center;
   padding: var(--space-3);
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
 }
 
 .housekeeping-report-item img,
@@ -338,19 +366,16 @@
 
 @media (min-width: 768px) {
   .housekeeping-page {
-    max-width: 720px;
-    margin: 0 auto;
-    padding-bottom: var(--space-8);
-  }
-
-  .housekeeping-tabs {
-    position: sticky;
-    bottom: var(--space-4);
+    min-height: 100%;
   }
 }
 
 @media (max-width: 420px) {
   .housekeeping-inline-form {
+    grid-template-columns: 1fr;
+  }
+
+  .housekeeping-form-grid {
     grid-template-columns: 1fr;
   }
 
