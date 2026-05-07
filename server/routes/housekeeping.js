@@ -5,15 +5,30 @@
  */
 
 import express from 'express';
+import bcrypt from 'bcrypt';
+import crypto from 'node:crypto';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
-import { collectErrors, datetime, month, num, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { normalizeAvatarData, syncFamilyMemberArtifacts } from '../auth.js';
+import { collectErrors, date, datetime, month, num, oneOf, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 
 const log = createLogger('Housekeeping');
 const router = express.Router();
 
 const MAX_PHOTO_DATA_LENGTH = 6 * 1024 * 1024;
 const IMAGE_DATA_RE = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i;
+const PAYMENT_SCHEDULES = ['daily', 'twice_monthly', 'monthly'];
+
+const TASK_TEMPLATES = [
+  { name: 'Clean bathrooms', area: 'Bathrooms', frequency_days: 7 },
+  { name: 'Mop kitchen floor', area: 'Kitchen', frequency_days: 7 },
+  { name: 'Dust living room', area: 'Living room', frequency_days: 14 },
+  { name: 'Change bed linens', area: 'Bedrooms', frequency_days: 14 },
+  { name: 'Clean refrigerator', area: 'Kitchen', frequency_days: 30 },
+  { name: 'Clean windows', area: 'Whole house', frequency_days: 30 },
+  { name: 'Deep clean oven', area: 'Kitchen', frequency_days: 60 },
+  { name: 'Wash balcony/patio', area: 'Outdoor', frequency_days: 30 },
+];
 
 function userId(req) {
   return req.authUserId || req.session.userId;
@@ -35,6 +50,27 @@ function publicSession(row) {
     check_out: row.check_out,
     daily_rate: Number(row.daily_rate || 0),
     extras: Number(row.extras || 0),
+    paid_at: row.paid_at ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function publicWorker(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    username: row.username,
+    display_name: row.display_name,
+    avatar_color: row.avatar_color,
+    avatar_data: row.avatar_data ?? null,
+    phone: row.phone ?? null,
+    email: row.email ?? null,
+    birth_date: row.birth_date ?? null,
+    daily_rate: Number(row.daily_rate || 0),
+    payment_schedule: row.payment_schedule,
+    notes: row.notes ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -97,12 +133,33 @@ function loadOpenSession() {
 }
 
 function defaultDailyRate() {
+  const worker = loadWorker();
+  if (worker) return Number(worker.daily_rate || 0);
   const row = db.get().prepare(`
     SELECT daily_rate FROM housekeeping_work_sessions
     ORDER BY check_in DESC
     LIMIT 1
   `).get();
   return Number(row?.daily_rate || 0);
+}
+
+function loadWorker() {
+  return db.get().prepare(`
+    SELECT hw.*,
+           u.username,
+           u.display_name,
+           u.avatar_color,
+           u.avatar_data,
+           c.phone,
+           c.email,
+           b.birth_date
+    FROM housekeeping_workers hw
+    JOIN users u ON u.id = hw.user_id
+    LEFT JOIN contacts c ON c.family_user_id = u.id
+    LEFT JOIN birthdays b ON b.family_user_id = u.id
+    ORDER BY hw.created_at DESC
+    LIMIT 1
+  `).get();
 }
 
 function monthlySummary(monthValue = currentMonth()) {
@@ -123,6 +180,74 @@ function monthlySummary(monthValue = currentMonth()) {
     extras_total: Number(row.extras_total || 0),
     total_amount: Number(row.total_amount || 0),
   };
+}
+
+function housekeepingDashboard() {
+  const monthValue = currentMonth();
+  const worker = publicWorker(loadWorker());
+  const openSession = publicSession(loadOpenSession());
+  const summary = monthlySummary(monthValue);
+  const lastVisit = db.get().prepare(`
+    SELECT * FROM housekeeping_work_sessions
+    ORDER BY check_in DESC
+    LIMIT 1
+  `).get();
+  const payment = db.get().prepare(`
+    SELECT
+      COALESCE(SUM(CASE WHEN paid_at IS NULL AND check_out IS NOT NULL THEN daily_rate + extras ELSE 0 END), 0) AS pending,
+      COALESCE(SUM(CASE WHEN paid_at IS NOT NULL THEN daily_rate + extras ELSE 0 END), 0) AS paid
+    FROM housekeeping_work_sessions
+    WHERE substr(check_in, 1, 7) = ?
+  `).get(monthValue);
+  const taskRows = db.get().prepare('SELECT * FROM housekeeping_decay_tasks').all();
+  const tasks = taskRows.map(publicDecayTask);
+  const chart = db.get().prepare(`
+    SELECT substr(check_in, 1, 7) AS month,
+           COALESCE(SUM(daily_rate + extras), 0) AS total,
+           COALESCE(SUM(CASE WHEN paid_at IS NULL AND check_out IS NOT NULL THEN daily_rate + extras ELSE 0 END), 0) AS pending
+    FROM housekeeping_work_sessions
+    WHERE check_in >= strftime('%Y-%m-01T00:00:00Z', 'now', '-5 months')
+    GROUP BY substr(check_in, 1, 7)
+    ORDER BY month ASC
+  `).all().map((row) => ({
+    month: row.month,
+    total: Number(row.total || 0),
+    pending: Number(row.pending || 0),
+  }));
+
+  return {
+    worker,
+    current_session: openSession,
+    visits_this_month: summary.session_count,
+    last_visit: publicSession(lastVisit),
+    pending_tasks: tasks.filter((task) => task.urgency_status !== 'ok').length,
+    finished_tasks_this_month: taskRows.filter((task) => task.last_completed?.slice(0, 7) === monthValue).length,
+    pending_payments: Number(payment.pending || 0),
+    paid_this_month: Number(payment.paid || 0),
+    monthly_payments: chart,
+  };
+}
+
+function assertAdmin(req, res) {
+  if (req.authRole === 'admin') return true;
+  res.status(403).json({ error: 'Permission denied.', code: 403 });
+  return false;
+}
+
+async function createWorkerUser({ username, displayName, avatarColor, avatarData, actorUserId }) {
+  const finalUsername = username || `housekeeper_${Date.now()}`;
+  const password = crypto.randomBytes(24).toString('base64url');
+  const hash = await bcrypt.hash(password, 12);
+  const result = db.get().prepare(`
+    INSERT INTO users (username, display_name, password_hash, avatar_color, avatar_data, role, family_role)
+    VALUES (?, ?, ?, ?, ?, 'member', 'other')
+  `).run(finalUsername, displayName, hash, avatarColor || '#7C3AED', avatarData ?? null);
+  syncFamilyMemberArtifacts(db.get(), result.lastInsertRowid, {
+    displayName,
+    avatarData: avatarData ?? null,
+    actorUserId,
+  });
+  return result.lastInsertRowid;
 }
 
 function defaultShoppingCategory() {
@@ -149,6 +274,105 @@ function defaultShoppingList(actorId) {
     .run('Housekeeping', actorId);
   return result.lastInsertRowid;
 }
+
+router.get('/dashboard', (_req, res) => {
+  try {
+    res.json({ data: housekeepingDashboard() });
+  } catch (err) {
+    log.error('GET /dashboard error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+router.get('/task-templates', (_req, res) => {
+  res.json({ data: TASK_TEMPLATES });
+});
+
+router.get('/worker', (_req, res) => {
+  try {
+    res.json({ data: publicWorker(loadWorker()) });
+  } catch (err) {
+    log.error('GET /worker error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+router.post('/worker', async (req, res) => {
+  if (!assertAdmin(req, res)) return;
+  try {
+    const existing = loadWorker();
+    const vDisplayName = str(req.body.display_name, 'display_name', { max: 128 });
+    const vUsername = str(req.body.username, 'username', { max: 64, required: false });
+    const vPhone = str(req.body.phone, 'phone', { max: MAX_SHORT, required: false });
+    const vEmail = str(req.body.email, 'email', { max: MAX_TITLE, required: false });
+    const vBirthDate = date(req.body.birth_date, 'birth_date');
+    const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: true });
+    const vSchedule = oneOf(req.body.payment_schedule || 'monthly', PAYMENT_SCHEDULES, 'payment_schedule');
+    const vNotes = str(req.body.notes, 'notes', { max: MAX_TEXT, required: false });
+    const errors = collectErrors([vDisplayName, vUsername, vPhone, vEmail, vBirthDate, vDailyRate, vSchedule, vNotes]);
+    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    if (vUsername.value && !/^[a-zA-Z0-9._-]{3,64}$/.test(vUsername.value)) {
+      return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400 });
+    }
+    if (vDailyRate.value < 0) {
+      return res.status(400).json({ error: 'daily_rate must be greater than or equal to zero.', code: 400 });
+    }
+    const avatarColor = String(req.body.avatar_color || '#7C3AED').trim();
+    const avatarData = req.body.avatar_data !== undefined
+      ? normalizeAvatarData(req.body.avatar_data)
+      : existing?.avatar_data ?? null;
+    if (avatarData?.error) {
+      return res.status(400).json({ error: avatarData.error, code: 400 });
+    }
+
+    const actorId = userId(req);
+    const createdUserId = existing ? existing.user_id : await createWorkerUser({
+      username: vUsername.value,
+      displayName: vDisplayName.value,
+      avatarColor,
+      avatarData,
+      actorUserId: actorId,
+    });
+
+    db.get().transaction(() => {
+      db.get().prepare(`
+        UPDATE users
+        SET username = ?, display_name = ?, avatar_color = ?, avatar_data = ?
+        WHERE id = ?
+      `).run(
+        vUsername.value || existing?.username || `housekeeper_${createdUserId}`,
+        vDisplayName.value,
+        avatarColor || '#7C3AED',
+        avatarData ?? null,
+        createdUserId,
+      );
+      db.get().prepare(`
+        INSERT INTO housekeeping_workers (user_id, daily_rate, payment_schedule, notes)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+          daily_rate = excluded.daily_rate,
+          payment_schedule = excluded.payment_schedule,
+          notes = excluded.notes
+      `).run(createdUserId, vDailyRate.value, vSchedule.value, vNotes.value);
+      syncFamilyMemberArtifacts(db.get(), createdUserId, {
+        displayName: vDisplayName.value,
+        phone: vPhone.value,
+        email: vEmail.value,
+        birthDate: vBirthDate.value,
+        avatarData: avatarData ?? null,
+        actorUserId: actorId,
+      });
+    })();
+
+    res.status(existing ? 200 : 201).json({ data: publicWorker(loadWorker()) });
+  } catch (err) {
+    if (err.message?.includes('UNIQUE constraint')) {
+      return res.status(409).json({ error: 'Username is already taken.', code: 409 });
+    }
+    log.error('POST /worker error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
 
 router.get('/summary', (req, res) => {
   try {

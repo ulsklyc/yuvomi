@@ -22,6 +22,13 @@ Database schema is migration `33` in `server/db.js`. The migration creates:
 - `housekeeping_supply_requests`
 - `housekeeping_maintenance_log`
 
+Migration `34` adds:
+
+- `housekeeping_workers`
+- `housekeeping_work_sessions.paid_at`
+
+The worker profile links to `users.id`. The user is hidden from the normal family list by filtering rows associated with `housekeeping_workers`, while the contact and birthday sync remains shared with the existing family-member artifact flow.
+
 The quick supply endpoint uses a SQLite transaction:
 
 1. Resolve the first existing shopping list, or create `Housekeeping`.
@@ -37,7 +44,7 @@ The SPA route `/housekeeping` is registered in `public/router.js` and loads:
 - `public/pages/housekeeping.js`
 - `public/styles/housekeeping.css`
 
-The page uses the existing API wrapper in `public/api.js`, so CSRF tokens and auth expiry behavior remain centralized.
+The page uses the existing API wrapper in `public/api.js`, so CSRF tokens and auth expiry behavior remain centralized. The UI now follows the standard Oikos module layout: sticky toolbar, horizontal tab chips, and regular cards.
 
 The UI intentionally avoids `innerHTML`; rendering uses `replaceChildren()` and `insertAdjacentHTML()` with escaped dynamic values.
 
@@ -65,8 +72,8 @@ Backend validation covers:
 ## Manual Use
 
 1. Navigate to `/housekeeping`.
-2. On **Home**, set the daily rate and press the large check-in button.
-3. Use **Faltou Produto** to append missing supplies to the shopping list.
-4. On **Tarefas**, create recurring cleaning tasks with name, area, and frequency in days.
-5. Tap the large check icon on a task to update `last_completed`.
-6. On **Reportar**, take/upload a photo and submit a maintenance description.
+2. Use the toolbar check-in/check-out button for visits.
+3. Review the Dashboard metrics and payment chart.
+4. On **Tasks**, choose suggested chores or create a custom recurring chore.
+5. On **Reports**, take/upload a photo and submit a maintenance description.
+6. On **Profile**, create or update the housekeeper person, contacts, birthday, rate, and payment schedule.

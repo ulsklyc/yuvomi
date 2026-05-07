@@ -6,15 +6,17 @@ Housekeeping adds a simplified mobile/PWA module for the cleaner workflow in Oik
 
 ## User Experience
 
-The `/housekeeping` route is a focused, mobile-first screen with large touch targets and an internal bottom navigation bar:
+The `/housekeeping` route is a focused module that follows the same toolbar, tab, card, and chip patterns used by the rest of Oikos:
 
-- **Home**: giant check-in/check-out action, daily rate/extras inputs, current-month amount, and quick "missing product" input.
-- **Tarefas**: quick task creation, urgency-sorted recurring cleaning tasks, and one-tap completion.
-- **Reportar**: camera upload plus text description for maintenance occurrences.
+- **Dashboard**: visits this month, last visit, pending/finished chores, pending payments, and a compact monthly payment chart.
+- **Tasks**: suggested chore templates, custom chore creation, urgency-sorted recurring tasks, and one-tap completion.
+- **Reports**: camera upload plus text description for maintenance occurrences.
+- **Profile**: the housekeeper person, contact data, profile picture, daily rate, and payment schedule.
 
 Accessibility constraints:
 
-- Primary actions are at least 56px high; check-in/out is 104px high.
+- Primary actions are at least 44px high.
+- Check-in/out is a compact top-toolbar action, matching the small action pattern used elsewhere in the app.
 - Status is communicated by text and color, not color alone.
 - Inputs and buttons have explicit labels or accessible names.
 - Icons use the locally bundled Lucide runtime; no external CDN is introduced.
@@ -89,11 +91,29 @@ Stores maintenance occurrences:
 
 `photo_url` accepts self-contained `data:image/png|jpeg|webp;base64,...` values only, keeping uploaded camera photos inside the authenticated Oikos database boundary.
 
+### `housekeeping_workers`
+
+Stores housekeeper-specific employment/payment settings while keeping the person unified with Oikos user/contact/birthday data:
+
+- `id`
+- `user_id`
+- `daily_rate`
+- `payment_schedule`
+- `notes`
+- `created_at`
+- `updated_at`
+
+The linked `users` row is excluded from normal Family Management and Family APIs through the `housekeeping_workers` association, but remains synchronized with contacts and birthdays.
+
 ## REST API
 
 All endpoints are mounted under `/api/v1/housekeeping` and inherit the existing `requireAuth` and CSRF middleware.
 
 - `GET /summary?month=YYYY-MM`
+- `GET /dashboard`
+- `GET /task-templates`
+- `GET /worker`
+- `POST /worker`
 - `GET /work-sessions?month=YYYY-MM`
 - `POST /work-sessions/check-in`
 - `POST /work-sessions/check-out`
