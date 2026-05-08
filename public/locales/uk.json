@@ -495,7 +495,9 @@
     "iconCleaning": "Cleaning",
     "caldavTargetHint": "Choose a CalDAV calendar to sync this event.",
     "caldavTargetLabel": "Sync to CalDAV",
-    "caldavTargetLocal": "Store locally only"
+    "caldavTargetLocal": "Store locally only",
+    "attachmentDocumentName": "{{title}} - {{name}}",
+    "attachmentDocumentDescription": "Вкладення завантажено для події календаря «{{title}}»."
   },
   "notes": {
     "title": "Нотатки",
@@ -1292,7 +1294,9 @@
     "newFolderTitle": "New folder",
     "folderNameLabel": "Folder name",
     "createFolderAction": "Create folder",
-    "folderCreatedToast": "Folder created."
+    "folderCreatedToast": "Folder created.",
+    "housekeepingFolder": "Прибирання",
+    "calendarItemsFolder": "Елементи календаря"
   },
   "shortcuts": {
     "goKitchen": "Кухня",
@@ -1414,7 +1418,41 @@
     "receiptUploadTitle": "Upload payment receipt",
     "receiptUploadHint": "Attach a payment receipt. It will appear in Documents.",
     "receiptDocumentName": "Receipt - {{name}} - {{date}}",
-    "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}."
+    "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}.",
+    "taskTemplateData": {
+      "cleanBathrooms": {
+        "name": "Прибрати ванні кімнати",
+        "area": "Ванні кімнати"
+      },
+      "mopKitchenFloor": {
+        "name": "Помити підлогу на кухні",
+        "area": "Кухня"
+      },
+      "dustLivingRoom": {
+        "name": "Витерти пил у вітальні",
+        "area": "Вітальня"
+      },
+      "changeBedLinens": {
+        "name": "Змінити постільну білизну",
+        "area": "Спальні"
+      },
+      "cleanRefrigerator": {
+        "name": "Почистити холодильник",
+        "area": "Кухня"
+      },
+      "cleanWindows": {
+        "name": "Помити вікна",
+        "area": "Увесь дім"
+      },
+      "deepCleanOven": {
+        "name": "Глибоко очистити духовку",
+        "area": "Кухня"
+      },
+      "washOutdoor": {
+        "name": "Помити балкон/патіо",
+        "area": "Надворі"
+      }
+    }
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

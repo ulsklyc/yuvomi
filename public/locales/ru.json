@@ -495,7 +495,9 @@
     "iconCleaning": "Cleaning",
     "caldavTargetHint": "Choose a CalDAV calendar to sync this event.",
     "caldavTargetLabel": "Sync to CalDAV",
-    "caldavTargetLocal": "Store locally only"
+    "caldavTargetLocal": "Store locally only",
+    "attachmentDocumentName": "{{title}} - {{name}}",
+    "attachmentDocumentDescription": "Вложение загружено для события календаря «{{title}}»."
   },
   "notes": {
     "title": "Заметки",
@@ -1292,7 +1294,9 @@
     "newFolderTitle": "New folder",
     "folderNameLabel": "Folder name",
     "createFolderAction": "Create folder",
-    "folderCreatedToast": "Folder created."
+    "folderCreatedToast": "Folder created.",
+    "housekeepingFolder": "Уборка",
+    "calendarItemsFolder": "Элементы календаря"
   },
   "shortcuts": {
     "goKitchen": "Кухня",
@@ -1414,7 +1418,41 @@
     "receiptUploadTitle": "Upload payment receipt",
     "receiptUploadHint": "Attach a payment receipt. It will appear in Documents.",
     "receiptDocumentName": "Receipt - {{name}} - {{date}}",
-    "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}."
+    "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}.",
+    "taskTemplateData": {
+      "cleanBathrooms": {
+        "name": "Убрать ванные комнаты",
+        "area": "Ванные комнаты"
+      },
+      "mopKitchenFloor": {
+        "name": "Вымыть пол на кухне",
+        "area": "Кухня"
+      },
+      "dustLivingRoom": {
+        "name": "Вытереть пыль в гостиной",
+        "area": "Гостиная"
+      },
+      "changeBedLinens": {
+        "name": "Сменить постельное белье",
+        "area": "Спальни"
+      },
+      "cleanRefrigerator": {
+        "name": "Почистить холодильник",
+        "area": "Кухня"
+      },
+      "cleanWindows": {
+        "name": "Помыть окна",
+        "area": "Весь дом"
+      },
+      "deepCleanOven": {
+        "name": "Глубоко очистить духовку",
+        "area": "Кухня"
+      },
+      "washOutdoor": {
+        "name": "Помыть балкон/патио",
+        "area": "Улица"
+      }
+    }
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

@@ -495,7 +495,9 @@
     "iconCleaning": "Cleaning",
     "caldavTargetHint": "Choose a CalDAV calendar to sync this event.",
     "caldavTargetLabel": "Sync to CalDAV",
-    "caldavTargetLocal": "Store locally only"
+    "caldavTargetLocal": "Store locally only",
+    "attachmentDocumentName": "{{title}} - {{name}}",
+    "attachmentDocumentDescription": "कैलेंडर इवेंट \"{{title}}\" के लिए अपलोड किया गया अटैचमेंट।"
   },
   "notes": {
     "title": "नोट बोर्ड",
@@ -1292,7 +1294,9 @@
     "newFolderTitle": "New folder",
     "folderNameLabel": "Folder name",
     "createFolderAction": "Create folder",
-    "folderCreatedToast": "Folder created."
+    "folderCreatedToast": "Folder created.",
+    "housekeepingFolder": "हाउसकीपिंग",
+    "calendarItemsFolder": "कैलेंडर आइटम"
   },
   "shortcuts": {
     "goKitchen": "रसोई",
@@ -1414,7 +1418,41 @@
     "receiptUploadTitle": "Upload payment receipt",
     "receiptUploadHint": "Attach a payment receipt. It will appear in Documents.",
     "receiptDocumentName": "Receipt - {{name}} - {{date}}",
-    "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}."
+    "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}.",
+    "taskTemplateData": {
+      "cleanBathrooms": {
+        "name": "बाथरूम साफ करें",
+        "area": "बाथरूम"
+      },
+      "mopKitchenFloor": {
+        "name": "रसोई का फर्श पोंछें",
+        "area": "रसोई"
+      },
+      "dustLivingRoom": {
+        "name": "लिविंग रूम की धूल साफ करें",
+        "area": "लिविंग रूम"
+      },
+      "changeBedLinens": {
+        "name": "बिस्तर की चादरें बदलें",
+        "area": "बेडरूम"
+      },
+      "cleanRefrigerator": {
+        "name": "फ्रिज साफ करें",
+        "area": "रसोई"
+      },
+      "cleanWindows": {
+        "name": "खिड़कियाँ साफ करें",
+        "area": "पूरा घर"
+      },
+      "deepCleanOven": {
+        "name": "ओवन की गहरी सफाई करें",
+        "area": "रसोई"
+      },
+      "washOutdoor": {
+        "name": "बालकनी/आँगन धोएँ",
+        "area": "बाहरी क्षेत्र"
+      }
+    }
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

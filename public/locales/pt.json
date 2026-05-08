@@ -495,7 +495,9 @@
     "iconCleaning": "Faxina",
     "caldavTargetHint": "Choose a CalDAV calendar to sync this event.",
     "caldavTargetLabel": "Sync to CalDAV",
-    "caldavTargetLocal": "Store locally only"
+    "caldavTargetLocal": "Store locally only",
+    "attachmentDocumentName": "{{title}} - {{name}}",
+    "attachmentDocumentDescription": "Anexo enviado para o evento \"{{title}}\" do calendário."
   },
   "notes": {
     "title": "Quadro de notas",
@@ -1292,7 +1294,9 @@
     "newFolderTitle": "Nova pasta",
     "folderNameLabel": "Nome da pasta",
     "createFolderAction": "Criar pasta",
-    "folderCreatedToast": "Pasta criada."
+    "folderCreatedToast": "Pasta criada.",
+    "housekeepingFolder": "Faxina",
+    "calendarItemsFolder": "Itens do calendário"
   },
   "shortcuts": {
     "goKitchen": "Cozinha",
@@ -1414,7 +1418,41 @@
     "receiptUploadTitle": "Enviar comprovante de pagamento",
     "receiptUploadHint": "Anexe um comprovante de pagamento. Ele aparecerá em Documentos.",
     "receiptDocumentName": "Comprovante - {{name}} - {{date}}",
-    "receiptDocumentDescription": "Comprovante de pagamento da visita de faxina de {{name}} em {{date}}."
+    "receiptDocumentDescription": "Comprovante de pagamento da visita de faxina de {{name}} em {{date}}.",
+    "taskTemplateData": {
+      "cleanBathrooms": {
+        "name": "Limpar banheiros",
+        "area": "Banheiros"
+      },
+      "mopKitchenFloor": {
+        "name": "Passar pano no piso da cozinha",
+        "area": "Cozinha"
+      },
+      "dustLivingRoom": {
+        "name": "Tirar pó da sala",
+        "area": "Sala"
+      },
+      "changeBedLinens": {
+        "name": "Trocar roupa de cama",
+        "area": "Quartos"
+      },
+      "cleanRefrigerator": {
+        "name": "Limpar geladeira",
+        "area": "Cozinha"
+      },
+      "cleanWindows": {
+        "name": "Limpar janelas",
+        "area": "Casa toda"
+      },
+      "deepCleanOven": {
+        "name": "Limpeza profunda do forno",
+        "area": "Cozinha"
+      },
+      "washOutdoor": {
+        "name": "Lavar varanda/pátio",
+        "area": "Área externa"
+      }
+    }
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

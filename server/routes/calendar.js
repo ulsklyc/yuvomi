@@ -22,6 +22,7 @@ const router         = express.Router();
 
 const VALID_SOURCES  = ['local', 'google', 'apple', 'ics'];
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const DEFAULT_ATTACHMENT_FOLDER = 'Calendar items';
 const ATTACHMENT_MIME = new Set([
   'image/png',
   'image/jpeg',
@@ -85,6 +86,36 @@ function parseAttachment(dataUrl) {
   if (!buffer.length) throw new Error('attachment_data: Datei ist leer.');
   if (buffer.length > MAX_ATTACHMENT_BYTES) throw new Error('attachment_data: Datei darf höchstens 5 MB groß sein.');
   return { name: null, mime, size: buffer.length, data: base64 };
+}
+
+function ensureDocumentFolder(database, name, actorId) {
+  const folderName = typeof name === 'string' ? name.trim() : '';
+  if (!folderName) return null;
+  const existing = database.prepare('SELECT id FROM family_document_folders WHERE name = ? COLLATE NOCASE').get(folderName);
+  if (existing) return existing.id;
+  const result = database.prepare('INSERT INTO family_document_folders (name, created_by) VALUES (?, ?)').run(folderName, actorId);
+  return result.lastInsertRowid;
+}
+
+function createAttachmentDocument(database, attachment, body, actorId) {
+  if (!attachment?.data) return null;
+  const originalName = String(body.attachment_name || 'Attachment').trim() || 'Attachment';
+  const folderId = ensureDocumentFolder(database, body.document_folder_name || DEFAULT_ATTACHMENT_FOLDER, actorId);
+  const result = database.prepare(`
+    INSERT INTO family_documents
+      (name, description, category, visibility, folder_id, original_name, mime_type, file_size, content_data, created_by)
+    VALUES (?, ?, 'other', 'family', ?, ?, ?, ?, ?, ?)
+  `).run(
+    body.document_name || originalName.replace(/\.[^.]+$/, ''),
+    body.document_description || null,
+    folderId,
+    originalName,
+    attachment.mime,
+    attachment.size,
+    attachment.data,
+    actorId,
+  );
+  return result.lastInsertRowid;
 }
 
 function attachmentDataUrl(event) {
@@ -661,12 +692,13 @@ router.post('/', (req, res) => {
     const attachment = req.body.attachment_data ? parseAttachment(req.body.attachment_data) : { mime: null, size: null, data: null };
 
     const eventId = db.get().transaction(() => {
+      const documentId = createAttachmentDocument(db.get(), attachment, req.body, userId);
       const result = db.get().prepare(`
         INSERT INTO calendar_events
           (title, description, start_datetime, end_datetime, all_day,
            location, color, icon, assigned_to, created_by, recurrence_rule,
-           attachment_name, attachment_mime, attachment_size, attachment_data)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           attachment_name, attachment_mime, attachment_size, attachment_data, attachment_document_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         vTitle.value, vDesc.value,
         vStart.value, vEnd.value,
@@ -676,7 +708,8 @@ router.post('/', (req, res) => {
         req.body.attachment_name || null,
         attachment.mime,
         attachment.size,
-        attachment.data
+        attachment.data,
+        documentId
       );
       setEventAssignments(db.get(), result.lastInsertRowid, userIds);
       return result.lastInsertRowid;
@@ -747,6 +780,9 @@ router.put('/:id', (req, res) => {
     const userModified = event.external_source !== 'local' ? 1 : event.user_modified;
 
     db.get().transaction(() => {
+      const documentId = req.body.attachment_data
+        ? createAttachmentDocument(db.get(), attachment, req.body, event.created_by)
+        : event.attachment_document_id;
       db.get().prepare(`
         UPDATE calendar_events
         SET title           = COALESCE(?, title),
@@ -763,6 +799,7 @@ router.put('/:id', (req, res) => {
             attachment_mime  = ?,
             attachment_size  = ?,
             attachment_data  = ?,
+            attachment_document_id = ?,
             user_modified   = ?
         WHERE id = ?
       `).run(
@@ -780,6 +817,7 @@ router.put('/:id', (req, res) => {
         attachment.mime,
         attachment.size,
         attachment.data,
+        documentId,
         userModified,
         id
       );

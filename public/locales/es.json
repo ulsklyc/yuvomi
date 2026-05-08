@@ -495,7 +495,9 @@
     "iconCleaning": "Limpieza",
     "caldavTargetHint": "Choose a CalDAV calendar to sync this event.",
     "caldavTargetLabel": "Sync to CalDAV",
-    "caldavTargetLocal": "Store locally only"
+    "caldavTargetLocal": "Store locally only",
+    "attachmentDocumentName": "{{title}} - {{name}}",
+    "attachmentDocumentDescription": "Archivo adjunto subido para el evento de calendario \"{{title}}\"."
   },
   "notes": {
     "title": "Notas",
@@ -1292,7 +1294,9 @@
     "newFolderTitle": "New folder",
     "folderNameLabel": "Folder name",
     "createFolderAction": "Create folder",
-    "folderCreatedToast": "Folder created."
+    "folderCreatedToast": "Folder created.",
+    "housekeepingFolder": "Limpieza",
+    "calendarItemsFolder": "Elementos del calendario"
   },
   "shortcuts": {
     "goKitchen": "Cocina",
@@ -1414,7 +1418,41 @@
     "receiptUploadTitle": "Upload payment receipt",
     "receiptUploadHint": "Attach a payment receipt. It will appear in Documents.",
     "receiptDocumentName": "Receipt - {{name}} - {{date}}",
-    "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}."
+    "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}.",
+    "taskTemplateData": {
+      "cleanBathrooms": {
+        "name": "Limpiar baños",
+        "area": "Baños"
+      },
+      "mopKitchenFloor": {
+        "name": "Fregar el suelo de la cocina",
+        "area": "Cocina"
+      },
+      "dustLivingRoom": {
+        "name": "Quitar el polvo de la sala",
+        "area": "Sala"
+      },
+      "changeBedLinens": {
+        "name": "Cambiar la ropa de cama",
+        "area": "Dormitorios"
+      },
+      "cleanRefrigerator": {
+        "name": "Limpiar el refrigerador",
+        "area": "Cocina"
+      },
+      "cleanWindows": {
+        "name": "Limpiar ventanas",
+        "area": "Toda la casa"
+      },
+      "deepCleanOven": {
+        "name": "Limpieza profunda del horno",
+        "area": "Cocina"
+      },
+      "washOutdoor": {
+        "name": "Lavar balcón/patio",
+        "area": "Exterior"
+      }
+    }
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

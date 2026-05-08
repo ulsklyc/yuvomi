@@ -107,6 +107,15 @@ function replaceAccess(documentId, memberIds) {
   for (const memberId of memberIds) insert.run(documentId, memberId);
 }
 
+function ensureFolder(name, actorId) {
+  const folderName = typeof name === 'string' ? name.trim() : '';
+  if (!folderName) return null;
+  const existing = db.get().prepare('SELECT id FROM family_document_folders WHERE name = ? COLLATE NOCASE').get(folderName);
+  if (existing) return existing.id;
+  const result = db.get().prepare('INSERT INTO family_document_folders (name, created_by) VALUES (?, ?)').run(folderName, actorId);
+  return result.lastInsertRowid;
+}
+
 router.get('/meta/options', (_req, res) => {
   res.json({
     data: {
@@ -181,7 +190,8 @@ router.post('/', (req, res) => {
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
     const vDescription = str(req.body.description, 'Description', { max: MAX_TEXT, required: false });
     const vOriginalName = str(req.body.original_name, 'Original filename', { max: MAX_TITLE });
-    const errors = collectErrors([vName, vDescription, vOriginalName]);
+    const vFolderName = str(req.body.folder_name, 'Folder name', { max: MAX_TITLE, required: false });
+    const errors = collectErrors([vName, vDescription, vOriginalName, vFolderName]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const category = CATEGORIES.includes(req.body.category) ? req.body.category : 'other';
@@ -194,12 +204,13 @@ router.post('/', (req, res) => {
     if (parsed.error) return res.status(400).json({ error: parsed.error, code: 400 });
 
     const allowedIds = visibility === 'restricted' ? parseMemberIds(req.body.allowed_member_ids) : [];
+    const folderId = vFolderId.value ?? ensureFolder(vFolderName.value, userId(req));
     const database = db.get();
     const result = database.prepare(`
       INSERT INTO family_documents
         (name, description, category, visibility, folder_id, original_name, mime_type, file_size, content_data, created_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(vName.value, vDescription.value, category, visibility, vFolderId.value, vOriginalName.value, parsed.mime, parsed.size, parsed.base64, userId(req));
+    `).run(vName.value, vDescription.value, category, visibility, folderId, vOriginalName.value, parsed.mime, parsed.size, parsed.base64, userId(req));
     if (visibility === 'restricted') replaceAccess(result.lastInsertRowid, allowedIds);
 
     const row = database.prepare(`

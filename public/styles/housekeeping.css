@@ -8,7 +8,8 @@
 }
 
 .housekeeping-toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
@@ -26,7 +27,6 @@
 .housekeeping-toolbar__title {
   font-size: var(--text-lg);
   font-weight: var(--font-weight-bold);
-  flex: 1;
   min-width: 0;
 }
 
@@ -46,11 +46,12 @@
 }
 
 .housekeeping-tabs {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  padding: 0;
+  background: transparent;
+  border-bottom: 0;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -72,7 +73,6 @@
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   white-space: nowrap;
-  flex: 0 0 auto;
 }
 
 .housekeeping-tab svg {
@@ -642,6 +642,11 @@
 }
 
 @media (max-width: 720px) {
+  .housekeeping-toolbar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
   .housekeeping-metrics,
   .housekeeping-metrics--compact,
   .housekeeping-form-grid,

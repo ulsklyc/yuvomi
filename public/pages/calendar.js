@@ -1818,6 +1818,13 @@ async function saveEvent(overlay, mode, eventId, existingReminder = null, attach
       attachment_mime: attachmentPayload.mime,
       attachment_size: attachmentPayload.size,
       attachment_data: attachmentPayload.data,
+      document_folder_name: t('documents.calendarItemsFolder'),
+      document_name: attachmentPayload.name
+        ? t('calendar.attachmentDocumentName', { title, name: attachmentPayload.name })
+        : null,
+      document_description: attachmentPayload.name
+        ? t('calendar.attachmentDocumentDescription', { title })
+        : null,
       target_caldav_account_id,
       target_caldav_calendar_url,
     };

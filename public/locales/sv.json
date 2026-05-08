@@ -495,7 +495,9 @@
     "iconCleaning": "Städning",
     "caldavTargetHint": "Choose a CalDAV calendar to sync this event.",
     "caldavTargetLabel": "Sync to CalDAV",
-    "caldavTargetLocal": "Store locally only"
+    "caldavTargetLocal": "Store locally only",
+    "attachmentDocumentName": "{{title}} - {{name}}",
+    "attachmentDocumentDescription": "Bilaga uppladdad för kalenderhändelsen \"{{title}}\"."
   },
   "notes": {
     "title": "Anteckningar",
@@ -1292,7 +1294,9 @@
     "newFolderTitle": "New folder",
     "folderNameLabel": "Folder name",
     "createFolderAction": "Create folder",
-    "folderCreatedToast": "Folder created."
+    "folderCreatedToast": "Folder created.",
+    "housekeepingFolder": "Städning",
+    "calendarItemsFolder": "Kalenderobjekt"
   },
   "shortcuts": {
     "goKitchen": "Kök",
@@ -1414,7 +1418,41 @@
     "receiptUploadTitle": "Upload payment receipt",
     "receiptUploadHint": "Attach a payment receipt. It will appear in Documents.",
     "receiptDocumentName": "Receipt - {{name}} - {{date}}",
-    "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}."
+    "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}.",
+    "taskTemplateData": {
+      "cleanBathrooms": {
+        "name": "Städa badrum",
+        "area": "Badrum"
+      },
+      "mopKitchenFloor": {
+        "name": "Moppa köksgolvet",
+        "area": "Kök"
+      },
+      "dustLivingRoom": {
+        "name": "Damma vardagsrummet",
+        "area": "Vardagsrum"
+      },
+      "changeBedLinens": {
+        "name": "Byt sängkläder",
+        "area": "Sovrum"
+      },
+      "cleanRefrigerator": {
+        "name": "Rengör kylskåpet",
+        "area": "Kök"
+      },
+      "cleanWindows": {
+        "name": "Putsa fönster",
+        "area": "Hela huset"
+      },
+      "deepCleanOven": {
+        "name": "Djuprengör ugnen",
+        "area": "Kök"
+      },
+      "washOutdoor": {
+        "name": "Tvätta balkong/uteplats",
+        "area": "Utomhus"
+      }
+    }
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

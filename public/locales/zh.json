@@ -495,7 +495,9 @@
     "iconCleaning": "Cleaning",
     "caldavTargetHint": "Choose a CalDAV calendar to sync this event.",
     "caldavTargetLabel": "Sync to CalDAV",
-    "caldavTargetLocal": "Store locally only"
+    "caldavTargetLocal": "Store locally only",
+    "attachmentDocumentName": "{{title}} - {{name}}",
+    "attachmentDocumentDescription": "为日历事件“{{title}}”上传的附件。"
   },
   "notes": {
     "title": "便签板",
@@ -1292,7 +1294,9 @@
     "newFolderTitle": "New folder",
     "folderNameLabel": "Folder name",
     "createFolderAction": "Create folder",
-    "folderCreatedToast": "Folder created."
+    "folderCreatedToast": "Folder created.",
+    "housekeepingFolder": "家政清洁",
+    "calendarItemsFolder": "日历项目"
   },
   "shortcuts": {
     "goKitchen": "厨房",
@@ -1414,7 +1418,41 @@
     "receiptUploadTitle": "Upload payment receipt",
     "receiptUploadHint": "Attach a payment receipt. It will appear in Documents.",
     "receiptDocumentName": "Receipt - {{name}} - {{date}}",
-    "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}."
+    "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}.",
+    "taskTemplateData": {
+      "cleanBathrooms": {
+        "name": "清洁浴室",
+        "area": "浴室"
+      },
+      "mopKitchenFloor": {
+        "name": "拖厨房地板",
+        "area": "厨房"
+      },
+      "dustLivingRoom": {
+        "name": "客厅除尘",
+        "area": "客厅"
+      },
+      "changeBedLinens": {
+        "name": "更换床上用品",
+        "area": "卧室"
+      },
+      "cleanRefrigerator": {
+        "name": "清洁冰箱",
+        "area": "厨房"
+      },
+      "cleanWindows": {
+        "name": "擦窗户",
+        "area": "全屋"
+      },
+      "deepCleanOven": {
+        "name": "深度清洁烤箱",
+        "area": "厨房"
+      },
+      "washOutdoor": {
+        "name": "清洗阳台/露台",
+        "area": "户外"
+      }
+    }
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

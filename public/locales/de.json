@@ -501,7 +501,9 @@
     "attachmentFallback": "Anhang",
     "attachmentReadError": "Der Anhang konnte nicht gelesen werden.",
     "attachmentTooLarge": "Der Anhang darf höchstens 5 MB groß sein.",
-    "iconCleaning": "Reinigung"
+    "iconCleaning": "Reinigung",
+    "attachmentDocumentName": "{{title}} - {{name}}",
+    "attachmentDocumentDescription": "Anhang für Kalendereintrag \"{{title}}\" hochgeladen."
   },
   "notes": {
     "title": "Notizen",
@@ -1303,7 +1305,9 @@
     "newFolderTitle": "New folder",
     "folderNameLabel": "Folder name",
     "createFolderAction": "Create folder",
-    "folderCreatedToast": "Folder created."
+    "folderCreatedToast": "Folder created.",
+    "housekeepingFolder": "Hausreinigung",
+    "calendarItemsFolder": "Kalendereinträge"
   },
   "userMultiSelect": {
     "nobody": "- Niemand -",
@@ -1418,6 +1422,40 @@
     "receiptUploadTitle": "Upload payment receipt",
     "receiptUploadHint": "Attach a payment receipt. It will appear in Documents.",
     "receiptDocumentName": "Receipt - {{name}} - {{date}}",
-    "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}."
+    "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}.",
+    "taskTemplateData": {
+      "cleanBathrooms": {
+        "name": "Bäder reinigen",
+        "area": "Bäder"
+      },
+      "mopKitchenFloor": {
+        "name": "Küchenboden wischen",
+        "area": "Küche"
+      },
+      "dustLivingRoom": {
+        "name": "Wohnzimmer abstauben",
+        "area": "Wohnzimmer"
+      },
+      "changeBedLinens": {
+        "name": "Bettwäsche wechseln",
+        "area": "Schlafzimmer"
+      },
+      "cleanRefrigerator": {
+        "name": "Kühlschrank reinigen",
+        "area": "Küche"
+      },
+      "cleanWindows": {
+        "name": "Fenster putzen",
+        "area": "Ganzes Haus"
+      },
+      "deepCleanOven": {
+        "name": "Backofen gründlich reinigen",
+        "area": "Küche"
+      },
+      "washOutdoor": {
+        "name": "Balkon/Terrasse waschen",
+        "area": "Außenbereich"
+      }
+    }
   }
 }

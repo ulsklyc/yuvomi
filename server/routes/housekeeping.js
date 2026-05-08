@@ -23,14 +23,14 @@ const HOUSEKEEPING_EVENT_ICON = 'paintbrush';
 const PAYMENT_TASKS_PREF = 'housekeeping_payment_tasks';
 
 const TASK_TEMPLATES = [
-  { name: 'Clean bathrooms', area: 'Bathrooms', frequency_days: 7 },
-  { name: 'Mop kitchen floor', area: 'Kitchen', frequency_days: 7 },
-  { name: 'Dust living room', area: 'Living room', frequency_days: 14 },
-  { name: 'Change bed linens', area: 'Bedrooms', frequency_days: 14 },
-  { name: 'Clean refrigerator', area: 'Kitchen', frequency_days: 30 },
-  { name: 'Clean windows', area: 'Whole house', frequency_days: 30 },
-  { name: 'Deep clean oven', area: 'Kitchen', frequency_days: 60 },
-  { name: 'Wash balcony/patio', area: 'Outdoor', frequency_days: 30 },
+  { key: 'cleanBathrooms', name: 'Clean bathrooms', area: 'Bathrooms', frequency_days: 7 },
+  { key: 'mopKitchenFloor', name: 'Mop kitchen floor', area: 'Kitchen', frequency_days: 7 },
+  { key: 'dustLivingRoom', name: 'Dust living room', area: 'Living room', frequency_days: 14 },
+  { key: 'changeBedLinens', name: 'Change bed linens', area: 'Bedrooms', frequency_days: 14 },
+  { key: 'cleanRefrigerator', name: 'Clean refrigerator', area: 'Kitchen', frequency_days: 30 },
+  { key: 'cleanWindows', name: 'Clean windows', area: 'Whole house', frequency_days: 30 },
+  { key: 'deepCleanOven', name: 'Deep clean oven', area: 'Kitchen', frequency_days: 60 },
+  { key: 'washOutdoor', name: 'Wash balcony/patio', area: 'Outdoor', frequency_days: 30 },
 ];
 
 function userId(req) {

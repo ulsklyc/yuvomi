@@ -495,7 +495,9 @@
     "colorRed": "Red",
     "colorSkyBlue": "Sky Blue",
     "colorYellow": "Yellow",
-    "iconCleaning": "Cleaning"
+    "iconCleaning": "Cleaning",
+    "attachmentDocumentName": "{{title}} - {{name}}",
+    "attachmentDocumentDescription": "Attachment uploaded for calendar event \"{{title}}\"."
   },
   "notes": {
     "title": "Board",
@@ -1303,7 +1305,9 @@
     "newFolderTitle": "New folder",
     "folderNameLabel": "Folder name",
     "createFolderAction": "Create folder",
-    "folderCreatedToast": "Folder created."
+    "folderCreatedToast": "Folder created.",
+    "housekeepingFolder": "HouseKeeping",
+    "calendarItemsFolder": "Calendar items"
   },
   "housekeeping": {
     "title": "Cleaner workspace",
@@ -1414,7 +1418,41 @@
     "receiptUploadTitle": "Upload payment receipt",
     "receiptUploadHint": "Attach a payment receipt. It will appear in Documents.",
     "receiptDocumentName": "Receipt - {{name}} - {{date}}",
-    "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}."
+    "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}.",
+    "taskTemplateData": {
+      "cleanBathrooms": {
+        "name": "Clean bathrooms",
+        "area": "Bathrooms"
+      },
+      "mopKitchenFloor": {
+        "name": "Mop kitchen floor",
+        "area": "Kitchen"
+      },
+      "dustLivingRoom": {
+        "name": "Dust living room",
+        "area": "Living room"
+      },
+      "changeBedLinens": {
+        "name": "Change bed linens",
+        "area": "Bedrooms"
+      },
+      "cleanRefrigerator": {
+        "name": "Clean refrigerator",
+        "area": "Kitchen"
+      },
+      "cleanWindows": {
+        "name": "Clean windows",
+        "area": "Whole house"
+      },
+      "deepCleanOven": {
+        "name": "Deep clean oven",
+        "area": "Kitchen"
+      },
+      "washOutdoor": {
+        "name": "Wash balcony/patio",
+        "area": "Outdoor"
+      }
+    }
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

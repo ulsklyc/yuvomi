@@ -49,6 +49,13 @@ function scheduleLabel(value) {
   return map[value] || map.monthly;
 }
 
+function templateLabel(template, field) {
+  if (!template?.key) return template?.[field] || '';
+  const key = `housekeeping.taskTemplateData.${template.key}.${field}`;
+  const translated = t(key);
+  return translated === key ? template[field] : translated;
+}
+
 function visitTextPayload(worker, dateValue, dailyRate, extras) {
   const visitDate = dateValue || new Date().toISOString().slice(0, 10);
   const total = Number(dailyRate || 0) + Number(extras || 0);
@@ -109,23 +116,18 @@ function renderTabButton(tab, icon, label) {
 }
 
 function renderShell(container) {
-  const hasWorker = state.workers.length > 0;
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <section class="housekeeping-page" aria-labelledby="housekeeping-title">
       <header class="housekeeping-toolbar">
         <div class="housekeeping-toolbar__title" id="housekeeping-title">${esc(t('housekeeping.title'))}</div>
-        <button class="btn btn--secondary housekeeping-check-small" type="button" disabled ${hasWorker ? 'hidden' : ''}>
-          <i data-lucide="log-in" aria-hidden="true"></i>
-          <span>${esc(t('housekeeping.checkIn'))}</span>
-        </button>
+        <nav class="housekeeping-tabs" aria-label="${esc(t('housekeeping.bottomNav'))}">
+          ${renderTabButton('dashboard', 'layout-dashboard', t('housekeeping.dashboard'))}
+          ${renderTabButton('tasks', 'list-checks', t('housekeeping.tasks'))}
+          ${renderTabButton('reports', 'file-text', t('housekeeping.reports'))}
+          ${renderTabButton('staff', 'users-round', t('housekeeping.staff'))}
+        </nav>
       </header>
-      <nav class="housekeeping-tabs" aria-label="${esc(t('housekeeping.bottomNav'))}">
-        ${renderTabButton('dashboard', 'layout-dashboard', t('housekeeping.dashboard'))}
-        ${renderTabButton('tasks', 'list-checks', t('housekeeping.tasks'))}
-        ${renderTabButton('reports', 'file-text', t('housekeeping.reports'))}
-        ${renderTabButton('staff', 'users-round', t('housekeeping.staff'))}
-      </nav>
       <div class="housekeeping-content" id="housekeeping-content"></div>
     </section>
   `);
@@ -287,8 +289,8 @@ function renderTasks(content) {
   content.replaceChildren();
   const templateButtons = state.templates.map((template, index) => `
     <button class="housekeeping-template" type="button" data-template-index="${index}">
-      <span>${esc(template.name)}</span>
-      <small>${esc(template.area)} · ${esc(t('housekeeping.everyDays', { days: template.frequency_days }))}</small>
+      <span>${esc(templateLabel(template, 'name'))}</span>
+      <small>${esc(templateLabel(template, 'area'))} · ${esc(t('housekeeping.everyDays', { days: template.frequency_days }))}</small>
     </button>
   `).join('');
   const taskRows = state.tasks.map((task) => `
@@ -346,7 +348,13 @@ function renderTasks(content) {
   content.querySelectorAll('[data-template-index]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const template = state.templates[Number(btn.dataset.templateIndex)];
-      if (template) createTask(template, content);
+      if (template) {
+        createTask({
+          name: templateLabel(template, 'name'),
+          area: templateLabel(template, 'area'),
+          frequency_days: template.frequency_days,
+        }, content);
+      }
     });
   });
   content.querySelector('#housekeeping-task-form')?.addEventListener('submit', (event) => {
@@ -687,6 +695,7 @@ function openVisitEditModal(visit, content) {
               allowed_member_ids: [],
               original_name: file.name,
               content_data: await readFileAsDataUrl(file),
+              folder_name: t('documents.housekeepingFolder'),
             });
             receiptDocumentId = receipt.data?.id || receiptDocumentId;
           }
