@@ -5,11 +5,15 @@
  */
 
 import { api } from '/api.js';
-import { t, formatDate, formatTime } from '/i18n.js';
+import { t, formatDate, formatTime, getLocale } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { openModal, closeModal, confirmModal } from '/components/modal.js';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+function localDate(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 let state = {
   tab: 'dashboard',
@@ -22,12 +26,13 @@ let state = {
   workers: [],
   workerAvatar: undefined,
   selectedStaffId: null,
-  staffLogMonth: new Date().toISOString().slice(0, 7),
+  staffLogMonth: localDate().slice(0, 7),
   staffVisits: [],
+  currency: 'EUR',
 };
 
 function money(value) {
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
+  return new Intl.NumberFormat(getLocale(), { style: 'currency', currency: state.currency }).format(Number(value || 0));
 }
 
 function initials(name = '') {
@@ -57,7 +62,7 @@ function templateLabel(template, field) {
 }
 
 function visitTextPayload(worker, dateValue, dailyRate, extras) {
-  const visitDate = dateValue || new Date().toISOString().slice(0, 10);
+  const visitDate = dateValue || localDate();
   const total = Number(dailyRate || 0) + Number(extras || 0);
   const name = worker?.display_name || t('housekeeping.staff');
   return {
@@ -89,12 +94,13 @@ async function loadStaffVisits(workerId = state.selectedStaffId, monthValue = st
 }
 
 async function loadData() {
-  const [dashboard, tasks, reports, templates, workers] = await Promise.all([
+  const [dashboard, tasks, reports, templates, workers, prefs] = await Promise.all([
     api.get('/housekeeping/dashboard'),
     api.get('/housekeeping/decay-tasks'),
     api.get('/housekeeping/visits'),
     api.get('/housekeeping/task-templates'),
     api.get('/housekeeping/workers'),
+    api.get('/preferences'),
   ]);
   state.dashboard = dashboard.data;
   state.tasks = tasks.data || [];
@@ -103,6 +109,7 @@ async function loadData() {
   state.templates = templates.data || [];
   state.workers = workers.data || [];
   state.worker = state.workers[0] || null;
+  state.currency = prefs.data?.currency ?? 'EUR';
 }
 
 function renderTabButton(tab, icon, label) {
@@ -166,16 +173,19 @@ async function toggleSession(container, workerId) {
     return;
   }
   if (!worker) return;
-  if (current) return;
   try {
-    const dateValue = new Date().toISOString().slice(0, 10);
-    await api.post('/housekeeping/work-sessions/check-in', {
-      worker_id: worker.id,
-      daily_rate: worker.daily_rate || 0,
-      extras: 0,
-      ...visitTextPayload(worker, dateValue, worker.daily_rate || 0, 0),
-    });
-    window.oikos?.showToast(t('housekeeping.checkedInToast'), 'success');
+    if (current) {
+      await api.post('/housekeeping/work-sessions/check-out', { worker_id: worker.id });
+      window.oikos?.showToast(t('housekeeping.checkedOutToast'), 'success');
+    } else {
+      await api.post('/housekeeping/work-sessions/check-in', {
+        worker_id: worker.id,
+        daily_rate: worker.daily_rate || 0,
+        extras: 0,
+        ...visitTextPayload(worker, localDate(), worker.daily_rate || 0, 0),
+      });
+      window.oikos?.showToast(t('housekeeping.checkedInToast'), 'success');
+    }
     await loadData();
     renderShell(container);
   } catch (err) {
@@ -204,7 +214,7 @@ function renderWorkerSummary() {
     const session = worker.today_session || worker.current_session;
     return `
     <section class="housekeeping-worker-strip">
-      <div class="housekeeping-avatar" style="background:${esc(worker.avatar_color || '#7C3AED')}">
+      <div class="housekeeping-avatar" style="background:${esc(worker.avatar_color) || 'var(--module-housekeeping)'}">
         ${worker.avatar_data ? `<img src="${esc(worker.avatar_data)}" alt="${esc(worker.display_name)}">` : esc(initials(worker.display_name))}
       </div>
       <div>
@@ -393,7 +403,7 @@ function renderReports(content) {
     const paid = !!visit.paid_at;
     return `
     <article class="housekeeping-report-item housekeeping-report-item--visit">
-      <div class="housekeeping-avatar" style="background:${esc(visit.worker_avatar_color || '#7C3AED')}">
+      <div class="housekeeping-avatar" style="background:${esc(visit.worker_avatar_color) || 'var(--module-housekeeping)'}">
         ${visit.worker_avatar_data ? `<img src="${esc(visit.worker_avatar_data)}" alt="${esc(visit.worker_name || '')}">` : esc(initials(visit.worker_name || 'HK'))}
       </div>
       <div>
@@ -449,7 +459,7 @@ function openVisitReportModal(visit) {
     content: `
       <div class="housekeeping-report-modal">
         <div class="housekeeping-staff-row">
-          <div class="housekeeping-avatar" style="background:${esc(visit.worker_avatar_color || '#7C3AED')}">
+          <div class="housekeeping-avatar" style="background:${esc(visit.worker_avatar_color) || 'var(--module-housekeeping)'}">
             ${visit.worker_avatar_data ? `<img src="${esc(visit.worker_avatar_data)}" alt="${esc(visit.worker_name || '')}">` : esc(initials(visit.worker_name || 'HK'))}
           </div>
           <div>
@@ -476,7 +486,7 @@ function renderStaff(content) {
   const workerRows = state.workers.map((item) => `
     <article class="housekeeping-staff-row ${String(state.selectedStaffId || '') === String(item.id) ? 'housekeeping-staff-row--active' : ''}"
              data-select-worker="${item.id}" role="button" tabindex="0">
-      <div class="housekeeping-avatar" style="background:${esc(item.avatar_color || '#7C3AED')}">
+      <div class="housekeeping-avatar" style="background:${esc(item.avatar_color) || 'var(--module-housekeeping)'}">
         ${item.avatar_data ? `<img src="${esc(item.avatar_data)}" alt="${esc(item.display_name)}">` : esc(initials(item.display_name))}
       </div>
       <div>
@@ -535,7 +545,7 @@ function renderStaff(content) {
     });
   });
   content.querySelector('#housekeeping-staff-month')?.addEventListener('change', async (event) => {
-    state.staffLogMonth = event.currentTarget.value || new Date().toISOString().slice(0, 7);
+    state.staffLogMonth = event.currentTarget.value || localDate().slice(0, 7);
     try {
       await loadStaffVisits();
       renderStaff(content);
@@ -745,7 +755,7 @@ function openStaffModal(worker, content) {
         <input type="hidden" name="id" value="${esc(item.id || '')}">
         <div class="housekeeping-profile-editor">
           <button class="housekeeping-avatar housekeeping-avatar--lg" type="button" id="housekeeping-avatar-btn"
-                  style="background:${esc(item.avatar_color || '#7C3AED')}" aria-label="${esc(t('housekeeping.profilePicture'))}">
+                  style="background:${esc(item.avatar_color) || 'var(--module-housekeeping)'}" aria-label="${esc(t('housekeeping.profilePicture'))}">
             ${item.avatar_data ? `<img src="${esc(item.avatar_data)}" alt="${esc(item.display_name || '')}">` : esc(initials(item.display_name || 'HK'))}
           </button>
           <input class="sr-only" type="file" id="housekeeping-avatar-file" accept="image/png,image/jpeg,image/webp">

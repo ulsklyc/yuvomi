@@ -430,7 +430,12 @@ router.get('/dashboard', (_req, res) => {
 });
 
 router.get('/task-templates', (_req, res) => {
-  res.json({ data: TASK_TEMPLATES });
+  try {
+    res.json({ data: TASK_TEMPLATES });
+  } catch (err) {
+    log.error('GET /task-templates error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
 });
 
 router.get('/worker', (_req, res) => {
@@ -656,7 +661,7 @@ router.post('/work-sessions/check-in', (req, res) => {
       return db.get().prepare(`
         INSERT INTO housekeeping_work_sessions (worker_id, check_in, check_out, daily_rate, extras, calendar_event_id, payment_task_id, created_by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(worker.id, checkIn, checkIn, vDailyRate.value, vExtras.value ?? 0, eventId, taskId, actorId);
+      `).run(worker.id, checkIn, null, vDailyRate.value, vExtras.value ?? 0, eventId, taskId, actorId);
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json({ data: publicSession(row), summary: monthlySummary() });
@@ -755,7 +760,7 @@ router.delete('/visits/:id', (req, res) => {
       deleteVisitLinks(db.get(), existing);
       db.get().prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(existing.id);
     })();
-    res.json({ ok: true, summary: monthlySummary() });
+    res.json({ data: { summary: monthlySummary() } });
   } catch (err) {
     log.error('DELETE /visits/:id error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -885,7 +890,7 @@ router.delete('/decay-tasks/:taskId', (req, res) => {
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const result = db.get().prepare('DELETE FROM housekeeping_decay_tasks WHERE id = ?').run(vId.value);
     if (result.changes === 0) return res.status(404).json({ error: 'Task not found.', code: 404 });
-    res.json({ ok: true });
+    res.json({ data: null });
   } catch (err) {
     log.error('DELETE /decay-tasks/:taskId error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

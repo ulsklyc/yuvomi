@@ -57,7 +57,8 @@ function getOffsetMinutes(birthday) {
 
 function birthdayReminderAt(birthDate, offsetMin = 0, from = new Date()) {
   const next = nextBirthdayDate(birthDate, from);
-  return `${next}T12:00:00Z`;
+  const baseTime = new Date(`${next}T12:00:00Z`).getTime();
+  return new Date(baseTime - (offsetMin || 0) * 60000).toISOString();
 }
 
 function eventTitle(name) {

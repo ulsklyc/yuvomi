@@ -575,9 +575,6 @@ router.get('/users', requireAuth, requireAdmin, (req, res) => {
       .prepare(`
         SELECT ${USER_PUBLIC_COLUMNS}
         FROM users
-        WHERE NOT EXISTS (
-          SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = users.id
-        )
         ORDER BY display_name
       `)
       .all();

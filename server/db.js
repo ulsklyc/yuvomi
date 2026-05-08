@@ -1076,15 +1076,6 @@ const MIGRATIONS = [
   },
   {
     version: 30,
-    description: 'Advanced reminder options for birthdays',
-    up: `
-      ALTER TABLE birthdays ADD COLUMN reminder_offset TEXT;
-      ALTER TABLE birthdays ADD COLUMN reminder_custom_amount INTEGER;
-      ALTER TABLE birthdays ADD COLUMN reminder_custom_unit TEXT;
-    `,
-  },
-  {
-    version: 31,
     description: 'CardDAV multi-account contacts sync',
     up: `
       -- ========================================
