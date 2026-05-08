@@ -1203,7 +1203,7 @@
     "noResults": "No results found."
   },
   "onboarding": {
-    "step1Title": "Welcome to Oikos",
+    "step1Title": "Welcome to {{name}}",
     "step1Body": "Your personal family planner. Tasks, calendar, shopping and more – all in one place.",
     "step2Title": "Navigation & Modules",
     "step2Body": "At the bottom you can directly access Dashboard and Calendar. The ··· button opens additional modules like Kitchen, Notes and Contacts.",

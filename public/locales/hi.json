@@ -1203,7 +1203,7 @@
     "customWeeks": "Weeks"
   },
   "onboarding": {
-    "step1Title": "Welcome to Oikos",
+    "step1Title": "{{name}} में आपका स्वागत है",
     "step1Body": "Your personal family planner. Tasks, calendar, shopping and more – all in one place.",
     "step2Title": "नेविगेशन और मॉड्यूल",
     "step2Body": "नीचे से डैशबोर्ड और कैलेंडर तक सीधी पहुँच। ··· बटन से किचन, नोट्स और संपर्क जैसे अन्य मॉड्यूल खोलें।",

@@ -1203,7 +1203,7 @@
     "photoOptional": "Необов'язково: можна зберегти без фото профілю."
   },
   "onboarding": {
-    "step1Title": "Welcome to Oikos",
+    "step1Title": "Ласкаво просимо до {{name}}",
     "step1Body": "Your personal family planner. Tasks, calendar, shopping and more – all in one place.",
     "step2Title": "Навігація та модулі",
     "step2Body": "Унизу ви маєте прямий доступ до Панелі керування та Календаря. Кнопка ··· відкриває додаткові модулі: Кухня, Нотатки та Контакти.",

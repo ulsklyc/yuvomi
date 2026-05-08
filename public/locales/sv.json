@@ -1203,7 +1203,7 @@
     "customWeeks": "Veckor"
   },
   "onboarding": {
-    "step1Title": "Välkommen till Oikos",
+    "step1Title": "Välkommen till {{name}}",
     "step1Body": "Din personliga familjeplanerare. Uppgifter, kalender, shopping och mer – allt på ett ställe.",
     "step2Title": "Navigering och moduler",
     "step2Body": "Nere på skärmen når du direkt Översikt och Kalender. Med ···-knappen öppnar du fler moduler som Kök, Anteckningar och Kontakter.",

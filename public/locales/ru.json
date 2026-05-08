@@ -1203,7 +1203,7 @@
     "customWeeks": "Weeks"
   },
   "onboarding": {
-    "step1Title": "Welcome to Oikos",
+    "step1Title": "Добро пожаловать в {{name}}",
     "step1Body": "Your personal family planner. Tasks, calendar, shopping and more – all in one place.",
     "step2Title": "Навигация и модули",
     "step2Body": "Внизу доступны Панель управления и Календарь напрямую. Кнопка ··· открывает дополнительные модули: Кухня, Заметки и Контакты.",

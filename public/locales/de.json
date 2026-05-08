@@ -1203,7 +1203,7 @@
     "copySuffix": "Kopie"
   },
   "onboarding": {
-    "step1Title": "Willkommen bei Oikos",
+    "step1Title": "Willkommen bei {{name}}",
     "step1Body": "Dein persönlicher Familienplaner. Aufgaben, Kalender, Einkauf und mehr – alles an einem Ort.",
     "step2Title": "Navigation & Module",
     "step2Body": "Unten erreichst du Dashboard und Kalender direkt. Mit dem ···-Button öffnest du weitere Module wie Küche, Notizen und Kontakte.",

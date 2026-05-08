@@ -1203,7 +1203,7 @@
     "customWeeks": "Semanas"
   },
   "onboarding": {
-    "step1Title": "Welcome to Oikos",
+    "step1Title": "Bem-vindo ao {{name}}",
     "step1Body": "Your personal family planner. Tasks, calendar, shopping and more – all in one place.",
     "step2Title": "Navegação e módulos",
     "step2Body": "Na parte inferior acessa diretamente o Painel e o Calendário. Com o botão ··· abre módulos adicionais como Cozinha, Notas e Contactos.",

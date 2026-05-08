@@ -15,10 +15,16 @@ let _fabController = null;
 // ── Onboarding ──────────────────────────────────────────────────────────────
 
 const ONBOARDING_KEY = 'oikos-onboarded';
+const APP_NAME_STORAGE_KEY = 'oikos-app-name';
+
+function getAppName() {
+  return localStorage.getItem(APP_NAME_STORAGE_KEY) || 'Oikos';
+}
 
 function getOnboardingSteps() {
+  const appName = getAppName();
   return [
-    { icon: 'home',         title: t('onboarding.step1Title'), body: t('onboarding.step1Body') },
+    { icon: 'home',         title: t('onboarding.step1Title', { name: appName }), body: t('onboarding.step1Body') },
     { icon: 'navigation',   title: t('onboarding.step2Title'), body: t('onboarding.step2Body') },
     { icon: 'plus-circle',  title: t('onboarding.step3Title'), body: t('onboarding.step3Body') },
   ];

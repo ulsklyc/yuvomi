@@ -1203,7 +1203,7 @@
     "customWeeks": "Weeks"
   },
   "onboarding": {
-    "step1Title": "Welcome to Oikos",
+    "step1Title": "{{name}} uygulamasına hoş geldiniz",
     "step1Body": "Your personal family planner. Tasks, calendar, shopping and more – all in one place.",
     "step2Title": "Gezinme ve Modüller",
     "step2Body": "Aşağıda Gösterge Paneli ve Takvim'e doğrudan erişebilirsiniz. ···-düğmesiyle Mutfak, Notlar ve Kişiler gibi ek modülleri açabilirsiniz.",

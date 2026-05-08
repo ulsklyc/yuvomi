@@ -1203,7 +1203,7 @@
     "customWeeks": "Weeks"
   },
   "onboarding": {
-    "step1Title": "Welcome to Oikos",
+    "step1Title": "欢迎使用{{name}}",
     "step1Body": "Your personal family planner. Tasks, calendar, shopping and more – all in one place.",
     "step2Title": "导航与模块",
     "step2Body": "底部可直接访问仪表板和日历。点击···按钮可打开厨房、笔记和联系人等更多模块。",

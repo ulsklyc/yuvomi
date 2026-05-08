@@ -1203,7 +1203,7 @@
     "customWeeks": "Weeks"
   },
   "onboarding": {
-    "step1Title": "Welcome to Oikos",
+    "step1Title": "{{name}}へようこそ",
     "step1Body": "Your personal family planner. Tasks, calendar, shopping and more – all in one place.",
     "step2Title": "ナビゲーションとモジュール",
     "step2Body": "画面下部からダッシュボードとカレンダーに直接アクセスできます。···ボタンでキッチン、メモ、連絡先などの追加モジュールを開きます。",
