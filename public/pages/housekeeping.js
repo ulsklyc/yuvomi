@@ -107,9 +107,8 @@ async function loadData() {
 
 function renderTabButton(tab, icon, label) {
   const current = state.tab === tab ? ' aria-current="page"' : '';
-  const active = state.tab === tab ? ' sub-tab--active' : '';
   return `
-    <button class="housekeeping-tab sub-tab${active}" type="button" data-housekeeping-tab="${esc(tab)}"${current}>
+    <button class="housekeeping-tab sub-tab" type="button" data-housekeeping-tab="${esc(tab)}"${current}>
       <i class="sub-tab__icon" data-lucide="${esc(icon)}" aria-hidden="true"></i>
       <span class="sub-tab__label">${esc(label)}</span>
     </button>
@@ -147,7 +146,9 @@ function renderCurrentTab(container) {
   if (!content) return;
   content.replaceChildren();
   container.querySelectorAll('[data-housekeeping-tab]').forEach((btn) => {
-    if (btn.dataset.housekeepingTab === state.tab) btn.setAttribute('aria-current', 'page');
+    const active = btn.dataset.housekeepingTab === state.tab;
+    btn.classList.toggle('sub-tab--active', active);
+    if (active) btn.setAttribute('aria-current', 'page');
     else btn.removeAttribute('aria-current');
   });
   if (state.tab === 'tasks') renderTasks(content);
