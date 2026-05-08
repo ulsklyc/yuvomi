@@ -1296,7 +1296,8 @@
     "createFolderAction": "Create folder",
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "Прибирання",
-    "calendarItemsFolder": "Елементи календаря"
+    "calendarItemsFolder": "Елементи календаря",
+    "folderBrowserTitle": "Перегляд папок"
   },
   "shortcuts": {
     "goKitchen": "Кухня",

@@ -1296,7 +1296,8 @@
     "createFolderAction": "Create folder",
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "Καθαριότητα",
-    "calendarItemsFolder": "Στοιχεία ημερολογίου"
+    "calendarItemsFolder": "Στοιχεία ημερολογίου",
+    "folderBrowserTitle": "Περιήγηση φακέλων"
   },
   "shortcuts": {
     "goKitchen": "Κουζίνα",

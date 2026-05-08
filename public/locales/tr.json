@@ -1296,7 +1296,8 @@
     "createFolderAction": "Create folder",
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "Ev temizliği",
-    "calendarItemsFolder": "Takvim öğeleri"
+    "calendarItemsFolder": "Takvim öğeleri",
+    "folderBrowserTitle": "Klasörlere göz at"
   },
   "shortcuts": {
     "goKitchen": "Mutfak",

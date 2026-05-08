@@ -1296,7 +1296,8 @@
     "createFolderAction": "Create folder",
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "ハウスキーピング",
-    "calendarItemsFolder": "カレンダー項目"
+    "calendarItemsFolder": "カレンダー項目",
+    "folderBrowserTitle": "フォルダーを参照"
   },
   "shortcuts": {
     "goKitchen": "キッチン",

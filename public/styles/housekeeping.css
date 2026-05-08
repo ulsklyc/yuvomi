@@ -46,9 +46,11 @@
 }
 
 .housekeeping-tabs {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  height: var(--kitchen-tabs-height, var(--sub-tabs-height));
   padding: 0;
   background: transparent;
   border-bottom: 0;
@@ -59,31 +61,13 @@
 .housekeeping-tabs::-webkit-scrollbar { display: none; }
 
 .housekeeping-tab {
-  min-height: var(--target-lg);
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-text-secondary);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  white-space: nowrap;
-}
-
-.housekeeping-tab svg {
-  width: 18px;
-  height: 18px;
+  --active-module-accent: var(--module-accent);
+  flex-shrink: 0;
 }
 
 .housekeeping-tab[aria-current="page"] {
-  background: var(--module-accent);
-  border-color: var(--module-accent);
-  color: var(--color-text-on-accent);
+  background-color: color-mix(in srgb, var(--module-accent) 14%, transparent);
+  color: var(--module-accent);
 }
 
 .housekeeping-content {
@@ -645,6 +629,10 @@
   .housekeeping-toolbar {
     grid-template-columns: 1fr;
     align-items: stretch;
+  }
+
+  .housekeeping-tabs {
+    justify-content: flex-start;
   }
 
   .housekeeping-metrics,

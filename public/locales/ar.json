@@ -1296,7 +1296,8 @@
     "createFolderAction": "Create folder",
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "التنظيف المنزلي",
-    "calendarItemsFolder": "عناصر التقويم"
+    "calendarItemsFolder": "عناصر التقويم",
+    "folderBrowserTitle": "تصفح المجلدات"
   },
   "shortcuts": {
     "goKitchen": "المطبخ",

@@ -35,6 +35,7 @@ function categoryLabels() {
 }
 
 let state = {
+  allDocuments: [],
   documents: [],
   folders: [],
   members: [],
@@ -85,9 +86,16 @@ export async function render(container) {
         </select>
         <select class="input documents-filter-select" id="documents-folder">
           <option value="">${t('documents.allFolders')}</option>
+          <option value="__none">${t('documents.noFolder')}</option>
         </select>
       </div>
-      <div id="documents-list" class="documents-list documents-list--${state.view}"></div>
+      <div class="documents-browser-layout">
+        <aside class="documents-folder-browser" aria-label="${t('documents.folderBrowserTitle')}">
+          <div class="documents-folder-browser__title">${t('documents.folderBrowserTitle')}</div>
+          <div class="documents-folder-browser__list" id="documents-folder-browser"></div>
+        </aside>
+        <div id="documents-list" class="documents-list documents-list--${state.view}"></div>
+      </div>
       <button class="page-fab" id="fab-new-document" aria-label="${t('documents.addButton')}">
         <i data-lucide="upload" class="icon-2xl" aria-hidden="true"></i>
       </button>
@@ -100,6 +108,7 @@ export async function render(container) {
   await loadDocuments();
   bindPageEvents();
   renderFolderOptions();
+  renderFolderBrowser();
   renderDocuments();
 }
 
@@ -112,9 +121,9 @@ async function loadDocuments() {
   const params = new URLSearchParams();
   params.set('status', state.status);
   if (state.category) params.set('category', state.category);
-  if (state.folderId) params.set('folder_id', state.folderId);
   const res = await api.get(`/documents?${params.toString()}`);
-  state.documents = res.data || [];
+  state.allDocuments = res.data || [];
+  syncFolderDocuments();
 }
 
 async function loadFolders() {
@@ -127,9 +136,20 @@ function renderFolderOptions() {
   if (!select) return;
   select.replaceChildren();
   select.insertAdjacentHTML('beforeend', `<option value="">${t('documents.allFolders')}</option>`);
+  select.insertAdjacentHTML('beforeend', `<option value="__none" ${state.folderId === '__none' ? 'selected' : ''}>${t('documents.noFolder')}</option>`);
   state.folders.forEach((folder) => {
     select.insertAdjacentHTML('beforeend', `<option value="${folder.id}" ${String(folder.id) === String(state.folderId) ? 'selected' : ''}>${esc(folder.name)}</option>`);
   });
+}
+
+function syncFolderDocuments() {
+  if (state.folderId === '__none') {
+    state.documents = state.allDocuments.filter((doc) => !doc.folder_id);
+    return;
+  }
+  state.documents = state.folderId
+    ? state.allDocuments.filter((doc) => String(doc.folder_id || '') === String(state.folderId))
+    : state.allDocuments;
 }
 
 function bindPageEvents() {
@@ -143,16 +163,19 @@ function bindPageEvents() {
   _container.querySelector('#documents-status')?.addEventListener('change', async (e) => {
     state.status = e.target.value;
     await loadDocuments();
+    renderFolderBrowser();
     renderDocuments();
   });
   _container.querySelector('#documents-category')?.addEventListener('change', async (e) => {
     state.category = e.target.value;
     await loadDocuments();
+    renderFolderBrowser();
     renderDocuments();
   });
   _container.querySelector('#documents-folder')?.addEventListener('change', async (e) => {
     state.folderId = e.target.value;
-    await loadDocuments();
+    syncFolderDocuments();
+    renderFolderBrowser();
     renderDocuments();
   });
   _container.querySelector('.documents-view-toggle')?.addEventListener('click', (e) => {
@@ -166,6 +189,15 @@ function bindPageEvents() {
     renderDocuments();
   });
   _container.querySelector('#documents-list')?.addEventListener('click', handleDocumentAction);
+  _container.querySelector('#documents-folder-browser')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-folder-id]');
+    if (!btn) return;
+    state.folderId = btn.dataset.folderId;
+    syncFolderDocuments();
+    renderFolderOptions();
+    renderFolderBrowser();
+    renderDocuments();
+  });
 }
 
 function filteredDocuments() {
@@ -198,6 +230,39 @@ function renderDocuments() {
   list.insertAdjacentHTML('beforeend', docs.map((doc) => state.view === 'list' ? renderListItem(doc) : renderGridCard(doc)).join(''));
   if (window.lucide) lucide.createIcons();
   stagger(list.querySelectorAll('.document-card, .document-row'));
+}
+
+function folderCounts() {
+  const counts = new Map();
+  counts.set('', state.allDocuments.length);
+  counts.set('__none', state.allDocuments.filter((doc) => !doc.folder_id).length);
+  state.folders.forEach((folder) => counts.set(String(folder.id), 0));
+  state.allDocuments.forEach((doc) => {
+    if (!doc.folder_id) return;
+    const key = String(doc.folder_id);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+  return counts;
+}
+
+function renderFolderBrowser() {
+  const browser = _container.querySelector('#documents-folder-browser');
+  if (!browser) return;
+  const counts = folderCounts();
+  const items = [
+    { id: '', name: t('documents.allFolders'), icon: 'folders' },
+    { id: '__none', name: t('documents.noFolder'), icon: 'folder-x' },
+    ...state.folders.map((folder) => ({ id: String(folder.id), name: folder.name, icon: 'folder' })),
+  ];
+  browser.replaceChildren();
+  browser.insertAdjacentHTML('beforeend', items.map((item) => `
+    <button class="documents-folder-item ${String(state.folderId) === item.id ? 'documents-folder-item--active' : ''}" type="button" data-folder-id="${esc(item.id)}" aria-current="${String(state.folderId) === item.id ? 'true' : 'false'}">
+      <span class="documents-folder-item__icon"><i data-lucide="${esc(item.icon)}" aria-hidden="true"></i></span>
+      <span class="documents-folder-item__name">${esc(item.name)}</span>
+      <span class="documents-folder-item__count">${counts.get(item.id) || 0}</span>
+    </button>
+  `).join(''));
+  if (window.lucide) lucide.createIcons();
 }
 
 function renderMeta(doc) {
@@ -267,6 +332,7 @@ async function handleDocumentAction(e) {
     await api.patch(`/documents/${doc.id}/archive`, { archived: doc.status !== 'archived' });
     window.oikos?.showToast(doc.status === 'archived' ? t('documents.restoredToast') : t('documents.archivedToast'), 'success');
     await loadDocuments();
+    renderFolderBrowser();
     renderDocuments();
   }
   if (btn.dataset.action === 'delete') {
@@ -274,6 +340,7 @@ async function handleDocumentAction(e) {
     await api.delete(`/documents/${doc.id}`);
     window.oikos?.showToast(t('documents.deletedToast'), 'success');
     await loadDocuments();
+    renderFolderBrowser();
     renderDocuments();
   }
 }
@@ -441,6 +508,7 @@ async function saveDocument(event, doc) {
     window.oikos?.showToast(doc ? t('documents.savedToast') : t('documents.uploadedToast'), 'success');
     closeModal({ force: true });
     await loadDocuments();
+    renderFolderBrowser();
     renderDocuments();
   } catch (err) {
     error.textContent = err.message;
@@ -480,6 +548,7 @@ function openFolderModal() {
           await loadDocuments();
           closeModal({ force: true });
           renderFolderOptions();
+          renderFolderBrowser();
           renderDocuments();
         } catch (err) {
           error.textContent = err.message;

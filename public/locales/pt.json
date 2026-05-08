@@ -1296,7 +1296,8 @@
     "createFolderAction": "Criar pasta",
     "folderCreatedToast": "Pasta criada.",
     "housekeepingFolder": "Faxina",
-    "calendarItemsFolder": "Itens do calendário"
+    "calendarItemsFolder": "Itens do calendário",
+    "folderBrowserTitle": "Navegar por pastas"
   },
   "shortcuts": {
     "goKitchen": "Cozinha",

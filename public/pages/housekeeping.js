@@ -107,10 +107,11 @@ async function loadData() {
 
 function renderTabButton(tab, icon, label) {
   const current = state.tab === tab ? ' aria-current="page"' : '';
+  const active = state.tab === tab ? ' sub-tab--active' : '';
   return `
-    <button class="housekeeping-tab" type="button" data-housekeeping-tab="${esc(tab)}"${current}>
-      <i data-lucide="${esc(icon)}" aria-hidden="true"></i>
-      <span>${esc(label)}</span>
+    <button class="housekeeping-tab sub-tab${active}" type="button" data-housekeeping-tab="${esc(tab)}"${current}>
+      <i class="sub-tab__icon" data-lucide="${esc(icon)}" aria-hidden="true"></i>
+      <span class="sub-tab__label">${esc(label)}</span>
     </button>
   `;
 }

@@ -1296,7 +1296,8 @@
     "createFolderAction": "Create folder",
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "Städning",
-    "calendarItemsFolder": "Kalenderobjekt"
+    "calendarItemsFolder": "Kalenderobjekt",
+    "folderBrowserTitle": "Bläddra bland mappar"
   },
   "shortcuts": {
     "goKitchen": "Kök",

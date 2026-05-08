@@ -1296,7 +1296,8 @@
     "createFolderAction": "Create folder",
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "Limpieza",
-    "calendarItemsFolder": "Elementos del calendario"
+    "calendarItemsFolder": "Elementos del calendario",
+    "folderBrowserTitle": "Explorar carpetas"
   },
   "shortcuts": {
     "goKitchen": "Cocina",

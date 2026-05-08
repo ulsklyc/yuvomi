@@ -1307,7 +1307,8 @@
     "createFolderAction": "Create folder",
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "Hausreinigung",
-    "calendarItemsFolder": "Kalendereinträge"
+    "calendarItemsFolder": "Kalendereinträge",
+    "folderBrowserTitle": "Ordner durchsuchen"
   },
   "userMultiSelect": {
     "nobody": "- Niemand -",

@@ -1296,7 +1296,8 @@
     "createFolderAction": "Create folder",
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "家政清洁",
-    "calendarItemsFolder": "日历项目"
+    "calendarItemsFolder": "日历项目",
+    "folderBrowserTitle": "浏览文件夹"
   },
   "shortcuts": {
     "goKitchen": "厨房",

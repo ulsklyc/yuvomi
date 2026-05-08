@@ -1296,7 +1296,8 @@
     "createFolderAction": "Create folder",
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "हाउसकीपिंग",
-    "calendarItemsFolder": "कैलेंडर आइटम"
+    "calendarItemsFolder": "कैलेंडर आइटम",
+    "folderBrowserTitle": "फ़ोल्डर ब्राउज़ करें"
   },
   "shortcuts": {
     "goKitchen": "रसोई",

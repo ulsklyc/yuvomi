@@ -1307,7 +1307,8 @@
     "createFolderAction": "Create folder",
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "HouseKeeping",
-    "calendarItemsFolder": "Calendar items"
+    "calendarItemsFolder": "Calendar items",
+    "folderBrowserTitle": "Browse folders"
   },
   "housekeeping": {
     "title": "Cleaner workspace",
