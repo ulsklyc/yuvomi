@@ -1039,7 +1039,26 @@
     "housekeepingPaymentsTitle": "Payment tasks",
     "housekeepingPaymentTasksLabel": "Create a payment task on each housekeeper check-in",
     "housekeepingPaymentTasksHint": "When enabled, each check-in creates a task for paying the staff member. Completing that task marks the visit payment as paid.",
-    "housekeepingPaymentTasksSaved": "Housekeeping payment setting saved."
+    "housekeepingPaymentTasksSaved": "Housekeeping payment setting saved.",
+    "breadcrumbLabel": "Pfad",
+    "emptyStateAddFirst": "Füge dein erstes Konto hinzu",
+    "emptyStateNoAccounts": "Noch keine Konten verbunden",
+    "helpTooltipCalDAV": "CalDAV ermöglicht die Synchronisation von Kalendern mit iCloud, Nextcloud und anderen CalDAV-Servern.",
+    "helpTooltipCardDAV": "CardDAV ermöglicht die Synchronisation von Kontakten mit iCloud, Nextcloud und anderen CardDAV-Servern.",
+    "navigationLabel": "Einstellungsnavigation",
+    "sectionAdmin": "Administration",
+    "sectionCloudServices": "Cloud-Dienste",
+    "sectionModulesNav": "Module",
+    "sectionOpenStandards": "CalDAV & CardDAV",
+    "sectionPersonal": "Persönlich",
+    "sectionSync": "Synchronisation",
+    "statusError": "Fehler",
+    "statusNeverSynced": "Noch nie synchronisiert",
+    "statusSynced": "Synchronisiert",
+    "statusSyncing": "Synchronisiert…",
+    "syncedAgo": "vor {{time}}",
+    "tabSyncCalendar": "Kalender",
+    "tabSyncContacts": "Kontakte"
   },
   "login": {
     "tagline": "Family planning. Secure. Privacy-friendly. Open source.",
@@ -1369,6 +1388,22 @@
     "paymentStatus": "Payment status",
     "paymentTask": "Payment task",
     "calendarEvent": "Calendar event",
-    "notAvailable": "Not available"
+    "notAvailable": "Not available",
+    "calendarVisitTitle": "Housekeeping: {{name}}",
+    "paymentTaskTitle": "Pay {{name}} for housekeeping",
+    "paymentTaskDescription": "Housekeeping visit on {{date}}. Amount due: {{amount}}.",
+    "staffLogTitle": "{{name}} visits",
+    "staffLogHint": "Edit visit dates, amounts, and linked records.",
+    "filterMonth": "Month",
+    "editVisit": "Edit visit",
+    "deleteVisit": "Delete visit",
+    "deleteVisitConfirm": "Delete this visit? The linked calendar event and payment task will also be removed.",
+    "visitDeletedToast": "Visit deleted.",
+    "visitSavedToast": "Visit updated.",
+    "visitDate": "Visit date"
+  },
+  "userMultiSelect": {
+    "moreUsers": "weitere",
+    "nobody": "- Niemand -"
   }
 }

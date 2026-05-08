@@ -278,6 +278,10 @@
   resize: vertical;
 }
 
+.housekeeping-field--inline {
+  min-width: 180px;
+}
+
 .housekeeping-field--color input {
   padding: var(--space-1);
 }
@@ -506,6 +510,17 @@
   background: var(--color-surface);
 }
 
+.housekeeping-staff-row[role="button"] {
+  cursor: pointer;
+}
+
+.housekeeping-staff-row[role="button"]:hover,
+.housekeeping-staff-row[role="button"]:focus-visible,
+.housekeeping-staff-row--active {
+  border-color: var(--module-accent);
+  background: color-mix(in srgb, var(--module-accent) 8%, var(--color-surface));
+}
+
 .housekeeping-staff-row div:nth-child(2) {
   display: grid;
   gap: 2px;
@@ -529,6 +544,42 @@
   gap: var(--space-3);
 }
 
+.housekeeping-staff-log {
+  margin-top: var(--space-3);
+}
+
+.housekeeping-staff-log-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.housekeeping-staff-log-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.housekeeping-staff-log-row > div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.housekeeping-staff-log-row span {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.housekeeping-staff-log-row__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
 @media (max-width: 720px) {
   .housekeeping-metrics,
   .housekeeping-metrics--compact,
@@ -550,6 +601,19 @@
   .housekeeping-worker-strip .housekeeping-check-small {
     grid-column: 1 / -1;
     justify-content: center;
+  }
+
+  .housekeeping-section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .housekeeping-staff-log-row {
+    grid-template-columns: 1fr;
+  }
+
+  .housekeeping-staff-log-row__actions {
+    justify-content: flex-end;
   }
 }
 

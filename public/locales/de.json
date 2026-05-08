@@ -1392,6 +1392,18 @@
     "paymentStatus": "Payment status",
     "paymentTask": "Payment task",
     "calendarEvent": "Calendar event",
-    "notAvailable": "Not available"
+    "notAvailable": "Not available",
+    "calendarVisitTitle": "Housekeeping: {{name}}",
+    "paymentTaskTitle": "Pay {{name}} for housekeeping",
+    "paymentTaskDescription": "Housekeeping visit on {{date}}. Amount due: {{amount}}.",
+    "staffLogTitle": "{{name}} visits",
+    "staffLogHint": "Edit visit dates, amounts, and linked records.",
+    "filterMonth": "Month",
+    "editVisit": "Edit visit",
+    "deleteVisit": "Delete visit",
+    "deleteVisitConfirm": "Delete this visit? The linked calendar event and payment task will also be removed.",
+    "visitDeletedToast": "Visit deleted.",
+    "visitSavedToast": "Visit updated.",
+    "visitDate": "Visit date"
   }
 }

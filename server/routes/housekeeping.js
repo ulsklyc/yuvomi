@@ -197,14 +197,14 @@ function loadWorkers() {
   `).all();
 }
 
-function createVisitCalendarEvent(database, worker, checkIn, actorId) {
+function createVisitCalendarEvent(database, worker, checkIn, actorId, title = null) {
   const visitDate = checkIn.slice(0, 10);
   const result = database.prepare(`
     INSERT INTO calendar_events
       (title, start_datetime, end_datetime, all_day, color, icon, assigned_to, created_by, external_source)
     VALUES (?, ?, NULL, 1, ?, ?, ?, ?, 'local')
   `).run(
-    `Housekeeping: ${worker.display_name}`,
+    title || `Housekeeping: ${worker.display_name}`,
     visitDate,
     worker.calendar_color || DEFAULT_CALENDAR_COLOR,
     HOUSEKEEPING_EVENT_ICON,
@@ -216,15 +216,60 @@ function createVisitCalendarEvent(database, worker, checkIn, actorId) {
   return result.lastInsertRowid;
 }
 
-function createPaymentTask(database, worker, checkIn, amount, actorId) {
+function createPaymentTask(database, worker, checkIn, amount, actorId, title = null, description = null) {
   const visitDate = checkIn.slice(0, 10);
-  const title = `Pay ${worker.display_name} for housekeeping`;
-  const description = `Housekeeping visit on ${visitDate}. Amount due: ${amount.toFixed(2)}.`;
   const result = database.prepare(`
     INSERT INTO tasks (title, description, due_date, priority, category, status, created_by)
     VALUES (?, ?, ?, 'medium', 'household', 'open', ?)
-  `).run(title, description, visitDate, actorId);
+  `).run(
+    title || `Pay ${worker.display_name} for housekeeping`,
+    description || `Housekeeping visit on ${visitDate}. Amount due: ${amount.toFixed(2)}.`,
+    visitDate,
+    actorId,
+  );
   return result.lastInsertRowid;
+}
+
+function updateVisitLinks(database, session, worker, checkIn, dailyRate, extras, eventTitle = null, paymentTitle = null, paymentDescription = null) {
+  const visitDate = checkIn.slice(0, 10);
+  if (session.calendar_event_id) {
+    database.prepare(`
+      UPDATE calendar_events
+      SET title = COALESCE(?, title),
+          start_datetime = ?,
+          end_datetime = NULL,
+          all_day = 1,
+          color = ?,
+          icon = ?
+      WHERE id = ?
+    `).run(
+      eventTitle,
+      visitDate,
+      worker?.calendar_color || DEFAULT_CALENDAR_COLOR,
+      HOUSEKEEPING_EVENT_ICON,
+      session.calendar_event_id,
+    );
+  }
+  if (session.payment_task_id) {
+    const totalAmount = Number(dailyRate || 0) + Number(extras || 0);
+    database.prepare(`
+      UPDATE tasks
+      SET title = COALESCE(?, title),
+          description = COALESCE(?, description),
+          due_date = ?
+      WHERE id = ?
+    `).run(
+      paymentTitle,
+      paymentDescription || `Housekeeping visit on ${visitDate}. Amount due: ${totalAmount.toFixed(2)}.`,
+      visitDate,
+      session.payment_task_id,
+    );
+  }
+}
+
+function deleteVisitLinks(database, session) {
+  if (session.calendar_event_id) database.prepare('DELETE FROM calendar_events WHERE id = ?').run(session.calendar_event_id);
+  if (session.payment_task_id) database.prepare('DELETE FROM tasks WHERE id = ?').run(session.payment_task_id);
 }
 
 function reconcilePaymentTasks(database = db.get()) {
@@ -530,6 +575,10 @@ router.get('/visits', (req, res) => {
     reconcilePaymentTasks();
     const vMonth = month(req.query.month, 'month');
     if (vMonth.error) return res.status(400).json({ error: vMonth.error, code: 400 });
+    const vWorkerId = req.query.worker_id !== undefined && req.query.worker_id !== ''
+      ? validateId(req.query.worker_id, 'worker_id')
+      : { value: null, error: null };
+    if (vWorkerId.error) return res.status(400).json({ error: vWorkerId.error, code: 400 });
     const selectedMonth = vMonth.value || currentMonth();
     const rows = db.get().prepare(`
       SELECT hws.*,
@@ -544,8 +593,9 @@ router.get('/visits', (req, res) => {
       LEFT JOIN users u ON u.id = hw.user_id
       LEFT JOIN tasks t ON t.id = hws.payment_task_id
       WHERE substr(hws.check_in, 1, 7) = ?
+        AND (? IS NULL OR hws.worker_id = ?)
       ORDER BY hws.check_in DESC
-    `).all(selectedMonth);
+    `).all(selectedMonth, vWorkerId.value, vWorkerId.value);
     const visits = rows.map((row) => ({
       ...publicSession(row),
       worker_name: row.worker_name ?? null,
@@ -582,7 +632,10 @@ router.post('/work-sessions/check-in', (req, res) => {
 
     const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: true });
     const vExtras = num(req.body.extras, 'extras');
-    const errors = collectErrors([vDailyRate, vExtras]);
+    const vEventTitle = str(req.body.event_title, 'event_title', { max: MAX_TITLE, required: false });
+    const vPaymentTitle = str(req.body.payment_title, 'payment_title', { max: MAX_TITLE, required: false });
+    const vPaymentDescription = str(req.body.payment_description, 'payment_description', { max: MAX_TEXT, required: false });
+    const errors = collectErrors([vDailyRate, vExtras, vEventTitle, vPaymentTitle, vPaymentDescription]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     if (vDailyRate.value < 0 || (vExtras.value ?? 0) < 0) {
       return res.status(400).json({ error: 'Amounts must be greater than or equal to zero.', code: 400 });
@@ -591,10 +644,10 @@ router.post('/work-sessions/check-in', (req, res) => {
     const actorId = userId(req);
     const checkIn = nowIso();
     const result = db.get().transaction(() => {
-      const eventId = createVisitCalendarEvent(db.get(), worker, checkIn, actorId);
+      const eventId = createVisitCalendarEvent(db.get(), worker, checkIn, actorId, vEventTitle.value);
       const totalAmount = Number(vDailyRate.value || 0) + Number(vExtras.value || 0);
       const taskId = housekeepingPaymentTasksEnabled(db.get())
-        ? createPaymentTask(db.get(), worker, checkIn, totalAmount, actorId)
+        ? createPaymentTask(db.get(), worker, checkIn, totalAmount, actorId, vPaymentTitle.value, vPaymentDescription.value)
         : null;
       return db.get().prepare(`
         INSERT INTO housekeeping_work_sessions (worker_id, check_in, check_out, daily_rate, extras, calendar_event_id, payment_task_id, created_by)
@@ -605,6 +658,71 @@ router.post('/work-sessions/check-in', (req, res) => {
     res.status(201).json({ data: publicSession(row), summary: monthlySummary() });
   } catch (err) {
     log.error('POST /work-sessions/check-in error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+router.put('/visits/:id', (req, res) => {
+  try {
+    const vId = validateId(req.params.id, 'id');
+    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+    const existing = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(vId.value);
+    if (!existing) return res.status(404).json({ error: 'Visit not found.', code: 404 });
+
+    const vDate = date(req.body.date, 'date', true);
+    const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: true });
+    const vExtras = num(req.body.extras, 'extras');
+    const vEventTitle = str(req.body.event_title, 'event_title', { max: MAX_TITLE, required: false });
+    const vPaymentTitle = str(req.body.payment_title, 'payment_title', { max: MAX_TITLE, required: false });
+    const vPaymentDescription = str(req.body.payment_description, 'payment_description', { max: MAX_TEXT, required: false });
+    const errors = collectErrors([vDate, vDailyRate, vExtras, vEventTitle, vPaymentTitle, vPaymentDescription]);
+    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    if (vDailyRate.value < 0 || (vExtras.value ?? 0) < 0) {
+      return res.status(400).json({ error: 'Amounts must be greater than or equal to zero.', code: 400 });
+    }
+
+    const originalTime = existing.check_in?.slice(11) || '09:00:00.000Z';
+    const checkIn = `${vDate.value}T${originalTime}`;
+    const worker = existing.worker_id ? loadWorkerById(existing.worker_id) : null;
+    db.get().transaction(() => {
+      db.get().prepare(`
+        UPDATE housekeeping_work_sessions
+        SET check_in = ?, check_out = ?, daily_rate = ?, extras = ?
+        WHERE id = ?
+      `).run(checkIn, checkIn, vDailyRate.value, vExtras.value ?? 0, existing.id);
+      updateVisitLinks(
+        db.get(),
+        existing,
+        worker,
+        checkIn,
+        vDailyRate.value,
+        vExtras.value ?? 0,
+        vEventTitle.value,
+        vPaymentTitle.value,
+        vPaymentDescription.value,
+      );
+    })();
+    const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
+    res.json({ data: publicSession(row), summary: monthlySummary(row.check_in.slice(0, 7)) });
+  } catch (err) {
+    log.error('PUT /visits/:id error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+router.delete('/visits/:id', (req, res) => {
+  try {
+    const vId = validateId(req.params.id, 'id');
+    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+    const existing = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(vId.value);
+    if (!existing) return res.status(404).json({ error: 'Visit not found.', code: 404 });
+    db.get().transaction(() => {
+      deleteVisitLinks(db.get(), existing);
+      db.get().prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(existing.id);
+    })();
+    res.json({ ok: true, summary: monthlySummary() });
+  } catch (err) {
+    log.error('DELETE /visits/:id error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

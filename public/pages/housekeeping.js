@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { t, formatDate, formatTime } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { openModal, closeModal } from '/components/modal.js';
+import { openModal, closeModal, confirmModal } from '/components/modal.js';
 
 let state = {
   tab: 'dashboard',
@@ -19,6 +19,9 @@ let state = {
   worker: null,
   workers: [],
   workerAvatar: undefined,
+  selectedStaffId: null,
+  staffLogMonth: new Date().toISOString().slice(0, 7),
+  staffVisits: [],
 };
 
 function money(value) {
@@ -42,6 +45,29 @@ function scheduleLabel(value) {
     monthly: t('housekeeping.scheduleMonthly'),
   };
   return map[value] || map.monthly;
+}
+
+function visitTextPayload(worker, dateValue, dailyRate, extras) {
+  const visitDate = dateValue || new Date().toISOString().slice(0, 10);
+  const total = Number(dailyRate || 0) + Number(extras || 0);
+  const name = worker?.display_name || t('housekeeping.staff');
+  return {
+    event_title: t('housekeeping.calendarVisitTitle', { name }),
+    payment_title: t('housekeeping.paymentTaskTitle', { name }),
+    payment_description: t('housekeeping.paymentTaskDescription', {
+      date: formatDate(visitDate),
+      amount: money(total),
+    }),
+  };
+}
+
+async function loadStaffVisits(workerId = state.selectedStaffId, monthValue = state.staffLogMonth) {
+  if (!workerId) {
+    state.staffVisits = [];
+    return;
+  }
+  const res = await api.get(`/housekeeping/visits?month=${encodeURIComponent(monthValue)}&worker_id=${encodeURIComponent(workerId)}`);
+  state.staffVisits = res.data?.visits || [];
 }
 
 async function loadData() {
@@ -127,10 +153,12 @@ async function toggleSession(container, workerId) {
   if (!worker) return;
   if (current) return;
   try {
+    const dateValue = new Date().toISOString().slice(0, 10);
     await api.post('/housekeeping/work-sessions/check-in', {
       worker_id: worker.id,
       daily_rate: worker.daily_rate || 0,
       extras: 0,
+      ...visitTextPayload(worker, dateValue, worker.daily_rate || 0, 0),
     });
     window.oikos?.showToast(t('housekeeping.checkedInToast'), 'success');
     await loadData();
@@ -425,7 +453,8 @@ function openVisitReportModal(visit) {
 function renderStaff(content) {
   content.replaceChildren();
   const workerRows = state.workers.map((item) => `
-    <article class="housekeeping-staff-row">
+    <article class="housekeeping-staff-row ${String(state.selectedStaffId || '') === String(item.id) ? 'housekeeping-staff-row--active' : ''}"
+             data-select-worker="${item.id}" role="button" tabindex="0">
       <div class="housekeeping-avatar" style="background:${esc(item.avatar_color || '#7C3AED')}">
         ${item.avatar_data ? `<img src="${esc(item.avatar_data)}" alt="${esc(item.display_name)}">` : esc(initials(item.display_name))}
       </div>
@@ -451,16 +480,166 @@ function renderStaff(content) {
         ${workerRows || `<p class="housekeeping-muted">${esc(t('housekeeping.noWorkers'))}</p>`}
       </div>
     </section>
+    ${state.selectedStaffId ? renderStaffVisitLog() : ''}
   `);
 
   content.querySelector('#housekeeping-new-worker')?.addEventListener('click', () => {
     openStaffModal(null, content);
   });
+  content.querySelectorAll('[data-select-worker]').forEach((row) => {
+    const select = async () => {
+      state.selectedStaffId = row.dataset.selectWorker;
+      try {
+        await loadStaffVisits();
+        renderStaff(content);
+      } catch (err) {
+        window.oikos?.showToast(err.message, 'danger');
+      }
+    };
+    row.addEventListener('click', (event) => {
+      if (event.target.closest('[data-edit-worker]')) return;
+      select();
+    });
+    row.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      select();
+    });
+  });
   content.querySelectorAll('[data-edit-worker]').forEach((btn) => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
       const worker = state.workers.find((item) => String(item.id) === btn.dataset.editWorker) || null;
       openStaffModal(worker, content);
     });
+  });
+  content.querySelector('#housekeeping-staff-month')?.addEventListener('change', async (event) => {
+    state.staffLogMonth = event.currentTarget.value || new Date().toISOString().slice(0, 7);
+    try {
+      await loadStaffVisits();
+      renderStaff(content);
+    } catch (err) {
+      window.oikos?.showToast(err.message, 'danger');
+    }
+  });
+  content.querySelectorAll('[data-edit-visit]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const visit = state.staffVisits.find((item) => String(item.id) === btn.dataset.editVisit);
+      if (visit) openVisitEditModal(visit, content);
+    });
+  });
+  content.querySelectorAll('[data-delete-visit]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const visit = state.staffVisits.find((item) => String(item.id) === btn.dataset.deleteVisit);
+      if (!visit) return;
+      if (!await confirmModal(t('housekeeping.deleteVisitConfirm'), { danger: true, confirmLabel: t('common.delete') })) return;
+      try {
+        await api.delete(`/housekeeping/visits/${visit.id}`);
+        window.oikos?.showToast(t('housekeeping.visitDeletedToast'), 'success');
+        await loadData();
+        await loadStaffVisits();
+        renderStaff(content);
+      } catch (err) {
+        window.oikos?.showToast(err.message, 'danger');
+      }
+    });
+  });
+}
+
+function renderStaffVisitLog() {
+  const worker = state.workers.find((item) => String(item.id) === String(state.selectedStaffId));
+  if (!worker) return '';
+  const rows = state.staffVisits.map((visit) => {
+    const paid = !!visit.paid_at;
+    return `
+      <article class="housekeeping-staff-log-row">
+        <div>
+          <strong>${esc(formatDate(visit.check_in))}</strong>
+          <span>${esc(money(visit.total_amount))} · ${esc(paid ? t('housekeeping.paymentPaid') : t('housekeeping.paymentPending'))}</span>
+        </div>
+        <div class="housekeeping-staff-log-row__actions">
+          <button class="btn btn--secondary btn--icon" type="button" data-edit-visit="${visit.id}" aria-label="${esc(t('housekeeping.editVisit'))}">
+            <i data-lucide="edit-2" aria-hidden="true"></i>
+          </button>
+          <button class="btn btn--danger-outline btn--icon" type="button" data-delete-visit="${visit.id}" aria-label="${esc(t('housekeeping.deleteVisit'))}">
+            <i data-lucide="trash-2" aria-hidden="true"></i>
+          </button>
+        </div>
+      </article>
+    `;
+  }).join('');
+  return `
+    <section class="housekeeping-card housekeeping-staff-log">
+      <div class="housekeeping-section-heading">
+        <div>
+          <h2>${esc(t('housekeeping.staffLogTitle', { name: worker.display_name }))}</h2>
+          <span>${esc(t('housekeeping.staffLogHint'))}</span>
+        </div>
+        <label class="housekeeping-field housekeeping-field--inline">
+          <span>${esc(t('housekeeping.filterMonth'))}</span>
+          <input id="housekeeping-staff-month" type="month" value="${esc(state.staffLogMonth)}">
+        </label>
+      </div>
+      <div class="housekeeping-staff-log-list">
+        ${rows || `<p class="housekeeping-muted">${esc(t('housekeeping.noVisitReports'))}</p>`}
+      </div>
+    </section>
+  `;
+}
+
+function openVisitEditModal(visit, content) {
+  const worker = state.workers.find((item) => String(item.id) === String(visit.worker_id)) || null;
+  openModal({
+    title: t('housekeeping.editVisit'),
+    size: 'md',
+    content: `
+      <form id="housekeeping-visit-form" class="housekeeping-worker-form">
+        <label class="housekeeping-field">
+          <span>${esc(t('housekeeping.visitDate'))}</span>
+          <input name="date" type="date" required value="${esc(visit.check_in.slice(0, 10))}">
+        </label>
+        <div class="housekeeping-form-grid">
+          <label class="housekeeping-field">
+            <span>${esc(t('housekeeping.dailyRate'))}</span>
+            <input name="daily_rate" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(visit.daily_rate ?? 0)}">
+          </label>
+          <label class="housekeeping-field">
+            <span>${esc(t('housekeeping.extras'))}</span>
+            <input name="extras" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(visit.extras ?? 0)}">
+          </label>
+        </div>
+        <button class="btn btn--primary housekeeping-form-submit" type="submit">
+          <i data-lucide="save" aria-hidden="true"></i>
+          <span>${esc(t('common.save'))}</span>
+        </button>
+      </form>
+    `,
+    onSave: (panel) => {
+      panel.querySelector('#housekeeping-visit-form')?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const fields = form.elements;
+        const dateValue = fields.date.value;
+        const dailyRate = Number(fields.daily_rate.value || 0);
+        const extras = Number(fields.extras.value || 0);
+        try {
+          await api.put(`/housekeeping/visits/${visit.id}`, {
+            date: dateValue,
+            daily_rate: dailyRate,
+            extras,
+            ...visitTextPayload(worker, dateValue, dailyRate, extras),
+          });
+          window.oikos?.showToast(t('housekeeping.visitSavedToast'), 'success');
+          await loadData();
+          state.staffLogMonth = dateValue.slice(0, 7);
+          await loadStaffVisits();
+          closeModal({ force: true });
+          renderStaff(content);
+        } catch (err) {
+          window.oikos?.showToast(err.message, 'danger');
+        }
+      });
+    },
   });
 }
 
