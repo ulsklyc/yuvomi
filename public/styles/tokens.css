@@ -191,6 +191,8 @@
   --module-birthdays:  var(--_module-birthdays);   /* Rose - Geburtstage */
   --_module-budget:    #0F766E;
   --module-budget:     var(--_module-budget);      /* Teal-700 - Finanzen, Stabilität */
+  --_module-split-expenses: #2563EB;
+  --module-split-expenses:  var(--_module-split-expenses); /* Blue - shared family finance */
   --_module-documents: #1D4ED8;
   --module-documents:  var(--_module-documents);    /* Blue - secure family documents */
   --_module-housekeeping: #7C3AED;

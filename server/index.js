@@ -18,6 +18,7 @@ import * as googleCalendar from './services/google-calendar.js';
 import * as appleCalendar from './services/apple-calendar.js';
 import * as icsSubscription from './services/ics-subscription.js';
 import { startScheduler as startBackupScheduler } from './services/backup-scheduler.js';
+import { startScheduler as startSplitExpenseScheduler } from './services/split-expenses-scheduler.js';
 import dashboardRouter from './routes/dashboard.js';
 import tasksRouter from './routes/tasks.js';
 import shoppingRouter from './routes/shopping.js';
@@ -30,6 +31,7 @@ import cardavRouter from './routes/cardav.js';
 import birthdaysRouter from './routes/birthdays.js';
 import budgetRouter from './routes/budget.js';
 import documentsRouter from './routes/documents.js';
+import splitExpensesRouter from './routes/split-expenses.js';
 import weatherRouter from './routes/weather.js';
 import preferencesRouter from './routes/preferences.js';
 import remindersRouter from './routes/reminders.js';
@@ -236,6 +238,7 @@ app.use('/api/v1/contacts', contactsRouter);
 app.use('/api/v1/birthdays', birthdaysRouter);
 app.use('/api/v1/budget', budgetRouter);
 app.use('/api/v1/documents', documentsRouter);
+app.use('/api/v1/split-expenses', splitExpensesRouter);
 app.use('/api/v1/weather', weatherRouter);
 app.use('/api/v1/preferences', preferencesRouter);
 app.use('/api/v1/reminders', remindersRouter);
@@ -317,6 +320,7 @@ app.listen(PORT, () => {
 
   // Backup-Scheduler starten
   startBackupScheduler();
+  startSplitExpenseScheduler();
 });
 
 export default app;

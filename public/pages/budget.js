@@ -10,6 +10,7 @@ import { openModal as openSharedModal, closeModal, confirmModal } from '/compone
 import { stagger, vibrate } from '/utils/ux.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { render as renderSplitExpenses } from '/pages/split-expenses.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -234,6 +235,9 @@ export async function render(container, { user }) {
           <button class="budget-tab" id="budget-tab-loans" type="button" role="tab" aria-selected="false" data-tab="loans">
             ${t('budget.loansTab')}
           </button>
+          <button class="budget-tab" id="budget-tab-split-expenses" type="button" role="tab" aria-selected="false" data-tab="split-expenses">
+            ${t('nav.splitExpenses')}
+          </button>
         </div>
         <button class="btn btn--primary btn--icon" id="budget-add" aria-label="${t('budget.addEntryLabel')}">
           <i data-lucide="plus" aria-hidden="true"></i>
@@ -316,6 +320,15 @@ function renderBody() {
     if (window.lucide) lucide.createIcons();
     return;
   }
+  if (state.activeTab === 'split-expenses') {
+    setHtml(body, '<div class="budget-tab-panel budget-tab-panel--split-expenses" id="budget-split-expenses-panel"></div>');
+    const panel = body.querySelector('#budget-split-expenses-panel');
+    renderSplitExpenses(panel, { embedded: true }).catch((err) => {
+      console.error('[Budget] split expenses render error:', err);
+      setHtml(panel, `<div class="empty-state"><div class="empty-state__title">${t('splitExpenses.title')}</div><div class="empty-state__description">${t('budget.loadError')}</div></div>`);
+    });
+    return;
+  }
 
   const balanceClass = s.balance >= 0 ? 'budget-summary-card--balance-positive' : 'budget-summary-card--balance-negative';
   const prevLabel = p ? formatMonthLabel(p.month).split(' ')[0].slice(0, 3) : '';
@@ -394,6 +407,11 @@ function updateTabs() {
     const active = tab.dataset.tab === state.activeTab;
     tab.classList.toggle('budget-tab--active', active);
     tab.setAttribute('aria-selected', String(active));
+  });
+  const splitActive = state.activeTab === 'split-expenses';
+  ['#budget-prev', '#budget-next', '#budget-today', '#budget-label', '#budget-add', '#fab-new-budget'].forEach((selector) => {
+    const el = _container.querySelector(selector);
+    if (el) el.hidden = splitActive;
   });
 }
 

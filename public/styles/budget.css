@@ -4,6 +4,8 @@
  * Abhängigkeiten: tokens.css, layout.css
  */
 
+@import url('/styles/split-expenses.css');
+
 /* --------------------------------------------------------
  * Modul-Akzent
  * -------------------------------------------------------- */
@@ -19,6 +21,12 @@
   max-width: var(--content-max-width);
   margin: 0 auto;
   overflow: hidden;
+}
+
+.budget-tab-panel--split-expenses {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 @media (min-width: 1024px) {
