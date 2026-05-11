@@ -42,7 +42,7 @@ const VALID_EVENT_ICONS = new Set([
   'tablets', 'bandage', 'ambulance', 'heart-pulse', 'activity', 'cross',
   'scissors', 'shower-head', 'dumbbell', 'trophy', 'car', 'bus', 'train',
   'tram-front', 'plane', 'plane-takeoff', 'fuel', 'parking-meter',
-  'traffic-cone', 'navigation', 'route', 'briefcase', 'laptop', 'monitor',
+  'traffic-cone', 'navigation', 'bike', 'route', 'briefcase', 'laptop', 'monitor',
   'presentation', 'school', 'graduation-cap', 'book-open', 'library',
   'pencil', 'notebook-pen', 'calculator', 'utensils', 'cooking-pot',
   'coffee', 'cake', 'croissant', 'pizza', 'ice-cream', 'beer', 'wine',
