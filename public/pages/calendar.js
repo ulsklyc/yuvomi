@@ -108,6 +108,7 @@ const EVENT_ICON_CATEGORIES = () => [
       { value: 'plane-takeoff', label: t('calendar.iconFlight') },
       { value: 'fuel', label: t('calendar.iconFuel') },
       { value: 'navigation', label: t('calendar.iconNavigation') },
+      { value: 'bike', label: t('calendar.iconBike') },
     ],
   },
   {
