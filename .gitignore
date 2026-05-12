@@ -40,8 +40,13 @@ AGENTS.md
 # Git worktrees
 .worktrees/
 
+# Claude Code local tooling (session state, design context — not for contributors)
+.superpowers/
+.interface-design/
+
 # Claude Code work documents (internal plans/specs, not for contributors)
 docs/superpowers/
+docs/archive/superpowers/
 
 # Audit reports (generated per-session, not for version control)
 docs/audit-report-*.md
