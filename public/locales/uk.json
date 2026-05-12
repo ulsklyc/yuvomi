@@ -1059,9 +1059,9 @@
     "statusError": "Помилка",
     "statusNeverSynced": "Ще не синхронізовано",
     "statusSynced": "Синхронізовано",
-    "statusSyncing": "Синхронізувати…",
-    "syncedAgo": "перед {{time}}",
-    "tabSyncCalendar": "Календер",
+    "statusSyncing": "Синхронізується…",
+    "syncedAgo": "{{time}} тому",
+    "tabSyncCalendar": "Календар",
     "tabSyncContacts": "Контакти"
   },
   "login": {
@@ -1134,8 +1134,8 @@
     "pendingBadgeTitle": "{{count}} нагадування",
     "pendingBadgeTitlePlural": "{{count}} нагадувань",
     "offset2days": "за 2 дні до",
-    "offset1week": "1 тиждень тому",
-    "offset2weeks": "2 тижні тому",
+    "offset1week": "за 1 тиждень до",
+    "offset2weeks": "за 2 тижні до",
     "offsetCustom": "Спеціальний...",
     "customAmountLabel": "Номер",
     "customUnitLabel": "Одиниця",
