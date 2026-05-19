@@ -50,7 +50,7 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "puppeteer": "^24.43.1",
+    "puppeteer": "^25.0.4",
     "sharp": "^0.34.5"
   }
 }
