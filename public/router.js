@@ -829,16 +829,24 @@ function initNavHideOnScroll(container) {
 
   let lastY = 0;
 
+  const setNavHidden = (hidden) => {
+    nav.classList.toggle('nav-bottom--hidden', hidden);
+    document.documentElement.classList.toggle('nav-bottom--hidden', hidden);
+  };
+
   content.addEventListener('scroll', () => {
-    if (window.innerWidth >= 1024) return;
+    if (window.innerWidth >= 1024) {
+      setNavHidden(false);
+      return;
+    }
 
     const y = content.scrollTop;
     if (y < 10) {
-      nav.classList.remove('nav-bottom--hidden');
+      setNavHidden(false);
     } else if (y > lastY + 4) {
-      nav.classList.add('nav-bottom--hidden');
+      setNavHidden(true);
     } else if (y < lastY - 4) {
-      nav.classList.remove('nav-bottom--hidden');
+      setNavHidden(false);
     }
     lastY = y;
   }, { passive: true });

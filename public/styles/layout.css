@@ -559,7 +559,7 @@
   cursor: pointer;
   border: none;
   z-index: calc(var(--z-nav) - 1);
-  transition: transform var(--transition-base), background-color var(--transition-fast);
+  transition: transform var(--transition-base), background-color var(--transition-fast), bottom 0.2s var(--ease-out);
   -webkit-tap-highlight-color: transparent;
   animation: fab-in 0.35s var(--ease-out) backwards;
 }
@@ -590,6 +590,13 @@ html.fab-anim-done .page-fab {
     right: var(--space-8);
     width: var(--target-lg);
     height: var(--target-lg);
+  }
+}
+
+/* FAB folgt der Bottom-Nav wenn diese beim Scrollen ausblendet */
+@media (max-width: 1023px) {
+  html.nav-bottom--hidden .page-fab {
+    bottom: calc(var(--space-6) + var(--safe-area-inset-bottom));
   }
 }
 
