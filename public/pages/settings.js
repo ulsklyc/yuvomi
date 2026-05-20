@@ -862,7 +862,7 @@ docker cp oikos:/data/oikos-backup.db ./oikos-backup.db</code></pre>
       </div>
       ` : ''}
     </div>
-  `;
+  `);
 
   // Meal-Type-Checkboxen initialisieren
   const toggles = container.querySelector('#meal-type-toggles');

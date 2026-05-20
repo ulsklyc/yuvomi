@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.52.12] - 2026-05-20
+
+### Fixed
+- Settings page is accessible again after the v0.52.10 update; a missing closing parenthesis on the `insertAdjacentHTML` call in `settings.js` caused a JavaScript syntax error that prevented the entire settings page from loading
+
 ## [0.52.11] - 2026-05-20
 
 ### Added
