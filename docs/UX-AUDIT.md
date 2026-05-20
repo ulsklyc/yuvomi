@@ -116,7 +116,7 @@ Status-Spalte beim Abarbeiten: `[ ]` offen → `[x]` erledigt
   }
   /* @media (max-width: 767px) Block entfernen */
   ```
-- **Status:** [ ]
+- **Status:** [x]
 
 ---
 
@@ -396,7 +396,8 @@ Diese Aspekte sind gut umgesetzt und sollten nicht verändert werden:
 - **Phase 2 abgeschlossen (v0.52.15):** H5, M2 ✅
 - **Phase 3 abgeschlossen (v0.52.16):** K4, H8 ✅
 - **Phase 4 abgeschlossen (v0.52.17):** H1 ✅
-- **Nächste Phase:** Phase 5 — H3 (Dashboard-Hero Mobile, CSS-only)
+- **Phase 5 abgeschlossen (v0.52.18):** H3 ✅
+- **Nächste Phase:** Phase 6 — H4 (FAB + Nav-Hide, JS + CSS)
 
 ---
 
