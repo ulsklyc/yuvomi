@@ -147,7 +147,7 @@ Status-Spalte beim Abarbeiten: `[ ]` offen → `[x]` erledigt
   toastContainerAssertive.setAttribute('aria-live', 'assertive');
   ```
   In `showToast()` je nach `type` den richtigen Container wählen.
-- **Status:** [ ]
+- **Status:** [x]
 
 ---
 
@@ -213,7 +213,7 @@ Status-Spalte beim Abarbeiten: `[ ]` offen → `[x]` erledigt
   ```js
   // a.setAttribute('role', 'listitem'); // entfernen
   ```
-- **Status:** [ ]
+- **Status:** [x]
 
 ---
 
@@ -390,10 +390,18 @@ Diese Aspekte sind gut umgesetzt und sollten nicht verändert werden:
 
 ---
 
+## Überarbeitungsstand
+
+- **Phase 1 abgeschlossen (v0.52.12–v0.52.14):** K1, K3 ✅
+- **Phase 2 abgeschlossen (v0.52.15):** H5, M2 ✅
+- **Nächste Phase:** Phase 3 — K4 + H8 (Navigation-Refaktor)
+
+---
+
 ## Abarbeitungsreihenfolge (empfohlen)
 
-1. **K1, K3** — Schnell, isoliert, hoher WCAG-Wert
-2. **H5, M2** — Einzelne Zeilen, kein Risiko
+1. **K1, K3** — Schnell, isoliert, hoher WCAG-Wert ✅
+2. **H5, M2** — Einzelne Zeilen, kein Risiko ✅
 3. **K4 + H8** — Navigation-Refaktor (zusammen angehen)
 4. **H1** — Sidebar-Breakpoint (CSS-only, testbar)
 5. **H3** — Dashboard-Hero Mobile (CSS-only)

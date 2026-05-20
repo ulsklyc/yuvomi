@@ -635,10 +635,15 @@ function renderAppShell(container) {
   searchOverlay.appendChild(searchHeader);
   searchOverlay.appendChild(searchResults);
 
-  const toastContainer = document.createElement('div');
-  toastContainer.className = 'toast-container';
-  toastContainer.id = 'toast-container';
-  toastContainer.setAttribute('aria-live', 'assertive');
+  const toastContainerPolite = document.createElement('div');
+  toastContainerPolite.className = 'toast-container';
+  toastContainerPolite.id = 'toast-container-polite';
+  toastContainerPolite.setAttribute('aria-live', 'polite');
+
+  const toastContainerAssertive = document.createElement('div');
+  toastContainerAssertive.className = 'toast-container';
+  toastContainerAssertive.id = 'toast-container-assertive';
+  toastContainerAssertive.setAttribute('aria-live', 'assertive');
 
   const routeAnnouncer = document.createElement('div');
   routeAnnouncer.id = 'route-announcer';
@@ -649,7 +654,7 @@ function renderAppShell(container) {
   const shellNodes = [skipLink, sidebar, main, bottomNav];
   if (backdrop)   shellNodes.push(backdrop);
   if (moreSheet)  shellNodes.push(moreSheet);
-  shellNodes.push(searchOverlay, toastContainer, routeAnnouncer);
+  shellNodes.push(searchOverlay, toastContainerPolite, toastContainerAssertive, routeAnnouncer);
   container.replaceChildren(...shellNodes);
   updateBranding(currentPath || '/');
 
@@ -1055,7 +1060,6 @@ function navItemEl({ path, label, icon }) {
   a.href = path;
   a.dataset.route = path;
   a.className = 'nav-item';
-  a.setAttribute('role', 'listitem');
   a.setAttribute('aria-label', label);
   a.setAttribute('title', label);
   const i = document.createElement('i');
@@ -1075,7 +1079,6 @@ function sidebarKitchenEl() {
   a.href = '/meals';
   a.id = 'sidebar-kitchen-nav';
   a.className = 'nav-item';
-  a.setAttribute('role', 'listitem');
   a.setAttribute('aria-label', t('nav.kitchen'));
   a.setAttribute('title', t('nav.kitchen'));
   const icon = document.createElement('i');
@@ -1227,7 +1230,10 @@ const TOAST_ICONS = {
 };
 
 function showToast(message, type = 'default', duration = 3000, onUndo = null) {
-  const container = document.getElementById('toast-container');
+  const containerId = (type === 'danger' || type === 'warning')
+    ? 'toast-container-assertive'
+    : 'toast-container-polite';
+  const container = document.getElementById(containerId);
   if (!container) return;
 
   // Long Loop: Success-Toasts nach TOAST_SUCCESS_MAX Aufrufen unterdrücken
@@ -1237,8 +1243,8 @@ function showToast(message, type = 'default', duration = 3000, onUndo = null) {
     if (successCount > TOAST_SUCCESS_MAX) return;
   }
 
-  // Max. 3 gleichzeitige Toasts: ältesten entfernen falls Limit erreicht
-  const existing = container.querySelectorAll('.toast');
+  // Max. 3 gleichzeitige Toasts (global): ältesten entfernen falls Limit erreicht
+  const existing = document.querySelectorAll('.toast-container .toast');
   if (existing.length >= 3) existing[0].remove();
 
   const toast = document.createElement('div');

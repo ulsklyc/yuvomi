@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.52.15] - 2026-05-20
+
+### Fixed
+- Toast notifications for success and default messages no longer interrupt screen reader output immediately; only danger and warning toasts use `aria-live="assertive"`, while success and default use `aria-live="polite"`
+- Removed redundant `role="listitem"` attribute from navigation `<a>` elements; the parent container already provides list semantics, and the duplicate role was confusing assistive technologies
+
 ## [0.52.14] - 2026-05-20
 
 ### Fixed
