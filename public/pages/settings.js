@@ -258,7 +258,8 @@ export async function render(container, { user }) {
 
   const panelHidden = (id) => id === activeTab ? '' : ' hidden';
 
-  container.innerHTML = `
+  container.replaceChildren();
+  container.insertAdjacentHTML('beforeend', `
     <div class="page settings-page">
       <div class="page__header">
         <h1 class="page__title">${t('settings.title')}</h1>
@@ -925,10 +926,10 @@ async function loadCalDAVAccounts(container, user) {
               <label class="caldav-calendar-item">
                 <input type="checkbox" class="caldav-calendar-checkbox"
                        data-account-id="${account.id}"
-                       data-calendar-url="${esc(cal.url)}"
+                       data-calendar-url="${esc(cal.calendarUrl)}"
                        ${cal.enabled ? 'checked' : ''}>
-                <span class="caldav-calendar-color" style="background-color: ${esc(cal.color || '#007AFF')}"></span>
-                <span class="caldav-calendar-name">${esc(cal.display_name || cal.url)}</span>
+                <span class="caldav-calendar-color" style="background-color: ${esc(cal.calendarColor || '#007AFF')}"></span>
+                <span class="caldav-calendar-name">${esc(cal.calendarName || cal.calendarUrl)}</span>
               </label>
             `).join('')}
           </div>
@@ -1969,9 +1970,9 @@ function renderApiTokenList(container, tokens) {
   if (!list) return;
   list.replaceChildren();
   tokens.forEach((token) => {
-    const tmp = document.createElement('template');
-    tmp.innerHTML = apiTokenHtml(token);
-    list.appendChild(tmp.content.firstElementChild);
+    const tmp = document.createElement('div');
+    tmp.insertAdjacentHTML('beforeend', apiTokenHtml(token));
+    list.appendChild(tmp.firstElementChild);
   });
   if (window.lucide) window.lucide.createIcons();
 }
@@ -2221,9 +2222,9 @@ function renderCatList(container, cats) {
   // DOM-API statt innerHTML (Security-Constraint des Projekts)
   list.replaceChildren();
   cats.forEach((c, i) => {
-    const tmp = document.createElement('template');
-    tmp.innerHTML = categoryRowHtml(c, i === 0, i === cats.length - 1);
-    list.appendChild(tmp.content.firstElementChild);
+    const tmp = document.createElement('div');
+    tmp.insertAdjacentHTML('beforeend', categoryRowHtml(c, i === 0, i === cats.length - 1));
+    list.appendChild(tmp.firstElementChild);
   });
   if (window.lucide) window.lucide.createIcons();
 }
