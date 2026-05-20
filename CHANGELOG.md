@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.52.13] - 2026-05-20
+
+### Fixed
+- ICS text fields (SUMMARY, DESCRIPTION, LOCATION) now have RFC 5545 escape sequences unescaped on import; characters like `\,`, `\;`, `\n`, and `\\` are now displayed correctly instead of shown as raw backslash sequences
+- When pushing events to a CalDAV server, SUMMARY and DESCRIPTION values are now properly escaped per RFC 5545, preventing corrupted data on round-trip
+- CalDAV calendar names now appear correctly in the event edit modal's sync target dropdown; the dropdown was reading `calendar.url` and `calendar.display_name` instead of the API response fields `calendarUrl` and `calendarName`, causing empty or undefined entries
+
 ## [0.52.12] - 2026-05-20
 
 ### Fixed
