@@ -132,7 +132,7 @@ Status-Spalte beim Abarbeiten: `[ ]` offen → `[x]` erledigt
   }
   ```
   Oder in `initNavHideOnScroll()` per JS die FAB-Position mitanimieren.
-- **Status:** [ ]
+- **Status:** [x]
 
 ---
 
@@ -397,7 +397,8 @@ Diese Aspekte sind gut umgesetzt und sollten nicht verändert werden:
 - **Phase 3 abgeschlossen (v0.52.16):** K4, H8 ✅
 - **Phase 4 abgeschlossen (v0.52.17):** H1 ✅
 - **Phase 5 abgeschlossen (v0.52.18):** H3 ✅
-- **Nächste Phase:** Phase 6 — H4 (FAB + Nav-Hide, JS + CSS)
+- **Phase 6 abgeschlossen (v0.52.19):** H4 ✅
+- **Nächste Phase:** Phase 7 — H7 (Dashboard Skeleton-Screen)
 
 ---
 

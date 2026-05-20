@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.52.19] - 2026-05-21
+
+### Fixed
+- FAB no longer floats in the middle of the screen when the bottom navigation bar hides on scroll; it now animates to the bottom edge in sync with the nav bar and returns when the nav reappears
+
 ## [0.52.18] - 2026-05-21
 
 ### Changed
