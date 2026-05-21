@@ -40,7 +40,7 @@ Status-Spalte beim Abarbeiten: `[ ]` offen → `[x]` erledigt
   makeSection('nav.calendar', events, (i) => `/calendar?open=${i.id}`);
   ```
   Dann im Kalender-Modul `?open=<id>` auswerten und das Event-Modal öffnen.
-- **Status:** [ ]
+- **Status:** [x]
 
 ---
 
@@ -160,7 +160,7 @@ Status-Spalte beim Abarbeiten: `[ ]` offen → `[x]` erledigt
   makeSection('nav.contacts', contacts, (i) => `/contacts?open=${i.id}`);
   makeSection('nav.shopping', items,    (i) => `/shopping?highlight=${i.id}`);
   ```
-- **Status:** [ ]
+- **Status:** [x] (Contacts + Shopping implementiert; Budget/Dokumente als separate Phase möglich)
 
 ---
 
@@ -399,7 +399,8 @@ Diese Aspekte sind gut umgesetzt und sollten nicht verändert werden:
 - **Phase 5 abgeschlossen (v0.52.18):** H3 ✅
 - **Phase 6 abgeschlossen (v0.52.19):** H4 ✅
 - **Phase 7 abgeschlossen (v0.52.20):** H7 ✅
-- **Nächste Phase:** Phase 8 — K2 + H6 (Such-Deep-Links)
+- **Phase 8 abgeschlossen:** K2 + H6 ✅
+- **Nächste Phase:** Phase 9 — offen
 
 ---
 

@@ -13,13 +13,13 @@ const LIMIT = 5;
 
 /**
  * GET /api/v1/search?q=<query>
- * Durchsucht Aufgaben, Kalender-Events und Notizen des Nutzers.
- * Response: { tasks: Task[], events: Event[], notes: Note[] }
+ * Durchsucht Aufgaben, Kalender-Events, Notizen, Kontakte und Einkaufsartikel.
+ * Response: { tasks: Task[], events: Event[], notes: Note[], contacts: Contact[], items: Item[] }
  */
 router.get('/', (req, res) => {
   try {
     const q = String(req.query.q ?? '').trim();
-    if (q.length < 2) return res.json({ tasks: [], events: [], notes: [] });
+    if (q.length < 2) return res.json({ tasks: [], events: [], notes: [], contacts: [], items: [] });
 
     const like = `%${q}%`;
     const userId = req.session.userId;
@@ -53,9 +53,25 @@ router.get('/', (req, res) => {
       LIMIT ?
     `).all(userId, like, like, LIMIT);
 
-    res.json({ tasks, events, notes });
+    const contacts = db.get().prepare(`
+      SELECT id, name AS title
+      FROM contacts
+      WHERE name LIKE ? OR phone LIKE ? OR email LIKE ?
+      ORDER BY name ASC
+      LIMIT ?
+    `).all(like, like, like, LIMIT);
+
+    const items = db.get().prepare(`
+      SELECT id, name AS title, list_id
+      FROM shopping_items
+      WHERE name LIKE ?
+      ORDER BY name ASC
+      LIMIT ?
+    `).all(like, LIMIT);
+
+    res.json({ tasks, events, notes, contacts, items });
   } catch (err) {
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 

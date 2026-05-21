@@ -78,12 +78,13 @@ function renderTabs(container) {
       </button>`;
   }).join('');
 
-  bar.innerHTML = `
+  bar.replaceChildren();
+  bar.insertAdjacentHTML('beforeend', `
     ${tabsHtml}
     <button class="list-tab__new" data-action="new-list" aria-label="Neue Liste erstellen">
       <i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i>
     </button>
-  `;
+  `);
   if (window.lucide) window.lucide.createIcons();
 }
 
@@ -92,21 +93,23 @@ function renderListContent(container) {
   if (!content) return;
 
   if (!state.activeList) {
-    content.innerHTML = `
+    content.replaceChildren();
+    content.insertAdjacentHTML('beforeend', `
       <div class="no-lists">
         <i data-lucide="shopping-cart" style="width:56px;height:56px;color:var(--color-text-disabled)" aria-hidden="true"></i>
         <div style="font-size:var(--text-lg);font-weight:var(--font-weight-semibold)">${t('shopping.noLists')}</div>
         <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">
           ${t('shopping.noListsDescription')}
         </div>
-      </div>`;
+      </div>`);
     if (window.lucide) window.lucide.createIcons();
     return;
   }
 
   const checkedCount = state.items.filter((i) => i.is_checked).length;
 
-  content.innerHTML = `
+  content.replaceChildren();
+  content.insertAdjacentHTML('beforeend', `
     <!-- Liste-Header -->
     <div class="list-header">
       <span class="list-header__name" data-action="rename-list" data-id="${state.activeList.id}"
@@ -152,7 +155,7 @@ function renderListContent(container) {
     <div class="items-list" id="items-list">
       ${renderItems()}
     </div>
-  `;
+  `);
 
   if (window.lucide) window.lucide.createIcons();
   stagger(content.querySelectorAll('.shopping-item'));
@@ -245,9 +248,10 @@ function wireAutocomplete(container) {
         const suggestions = data.data ?? [];
         if (!suggestions.length) { dropdown.hidden = true; return; }
 
-        dropdown.innerHTML = suggestions.map((s, i) =>
+        dropdown.replaceChildren();
+        dropdown.insertAdjacentHTML('beforeend', suggestions.map((s, i) =>
           `<div class="autocomplete-item" data-idx="${i}" data-value="${esc(s)}">${esc(s)}</div>`
-        ).join('');
+        ).join(''));
         dropdown.hidden = false;
         activeIdx = -1;
 
@@ -528,7 +532,8 @@ function wireSwipeGestures(container) {
 function updateItemsList(container) {
   const listEl = container.querySelector('#items-list');
   if (listEl) {
-    listEl.innerHTML = renderItems();
+    listEl.replaceChildren();
+    listEl.insertAdjacentHTML('beforeend', renderItems());
     if (window.lucide) window.lucide.createIcons();
     stagger(listEl.querySelectorAll('.shopping-item'));
     wireSwipeGestures(container);
@@ -554,9 +559,10 @@ function updateItemsList(container) {
       if (checkedCount === 0) {
         clearBtn.remove();
       } else {
-        clearBtn.innerHTML = `
+        clearBtn.replaceChildren();
+        clearBtn.insertAdjacentHTML('beforeend', `
           <i data-lucide="trash-2" style="width:15px;height:15px" aria-hidden="true"></i>
-          ${t('shopping.clearChecked', { count: checkedCount })}`;
+          ${t('shopping.clearChecked', { count: checkedCount })}`);
         if (window.lucide) window.lucide.createIcons();
       }
     }
@@ -834,7 +840,8 @@ function wireListContentEvents(container) {
 // --------------------------------------------------------
 
 export async function render(container, { user }) {
-  container.innerHTML = `
+  container.replaceChildren();
+  container.insertAdjacentHTML('beforeend', `
     <div class="shopping-page">
       <div class="list-tabs-bar" id="list-tabs-bar">
         <div class="skeleton skeleton-line skeleton-line--medium" style="height:36px;width:120px;border-radius:var(--radius-full)"></div>
@@ -848,11 +855,13 @@ export async function render(container, { user }) {
         </div>
       </div>
     </div>
-  `;
+  `);
   try {
     await Promise.all([loadCategories(), loadLists()]);
     if (state.lists.length) {
-      state.activeListId = state.lists[0].id;
+      const listParam = parseInt(new URLSearchParams(window.location.search).get('list'), 10) || null;
+      const target = listParam && state.lists.find((l) => l.id === listParam);
+      state.activeListId = target ? target.id : state.lists[0].id;
       await loadItems(state.activeListId);
     }
   } catch (err) {
@@ -860,7 +869,8 @@ export async function render(container, { user }) {
     window.oikos.showToast(t('shopping.listsLoadError'), 'danger');
   }
 
-  container.innerHTML = `
+  container.replaceChildren();
+  container.insertAdjacentHTML('beforeend', `
     <div class="shopping-page">
       <h1 class="sr-only">${t('shopping.title')}</h1>
       <div class="list-tabs-bar" id="list-tabs-bar"></div>
@@ -869,7 +879,7 @@ export async function render(container, { user }) {
         <i data-lucide="plus" style="width:24px;height:24px" aria-hidden="true"></i>
       </button>
     </div>
-  `;
+  `);
 
   renderKitchenTabsBar(container, '/shopping');
   renderTabs(container);
@@ -887,5 +897,12 @@ export async function render(container, { user }) {
       container.querySelector('[data-action="new-list"]')?.click();
     }
   });
+
+  // Deep-Link: ?highlight=<id> scrollt zum Artikel
+  const highlightId = parseInt(new URLSearchParams(window.location.search).get('highlight'), 10) || null;
+  if (highlightId) {
+    const el = container.querySelector(`[data-action="toggle-item"][data-id="${highlightId}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 

@@ -592,7 +592,8 @@ export async function render(container, { user }) {
   state.cursor = state.today;
   state.view   = getSavedCalendarView();
 
-  container.innerHTML = `
+  container.replaceChildren();
+  container.insertAdjacentHTML('beforeend', `
     <div class="calendar-page" id="calendar-page">
       <div class="cal-toolbar" id="cal-toolbar"></div>
       <div id="cal-body" style="flex:1;display:flex;flex-direction:column;overflow:hidden;"></div>
@@ -600,7 +601,7 @@ export async function render(container, { user }) {
         <i data-lucide="plus" style="width:24px;height:24px" aria-hidden="true"></i>
       </button>
     </div>
-  `;
+  `);
 
   const { from, to } = getMonthRange(state.cursor);
   await Promise.all([loadRange(from, to), loadUsers()]);
@@ -609,6 +610,18 @@ export async function render(container, { user }) {
   renderView();
 
   container.querySelector('#fab-new-event')?.addEventListener('click', () => openEventModal({ mode: 'create' }));
+
+  // Deep-Link: ?open=<id> öffnet direkt das Edit-Modal
+  const openId = new URLSearchParams(window.location.search).get('open');
+  if (openId) {
+    try {
+      const [eventRes, reminder] = await Promise.all([
+        api.get(`/calendar/${openId}`),
+        loadReminderForEvent(openId),
+      ]);
+      openEventModal({ mode: 'edit', event: eventRes.data, reminder });
+    } catch { /* Event existiert nicht oder kein Zugriff */ }
+  }
 }
 
 // --------------------------------------------------------
@@ -619,7 +632,8 @@ function renderToolbar() {
   const bar = _container.querySelector('#cal-toolbar');
   if (!bar) return;
 
-  bar.innerHTML = `
+  bar.replaceChildren();
+  bar.insertAdjacentHTML('beforeend', `
     <h1 class="sr-only">${t('calendar.title')}</h1>
     <div class="cal-toolbar__nav">
       <button class="btn btn--icon" id="cal-prev" aria-label="${t('calendar.back')}">
@@ -643,7 +657,7 @@ function renderToolbar() {
         <i data-lucide="chevron-right" aria-hidden="true"></i>
       </button>
     </div>
-  `;
+  `);
 
   if (window.lucide) lucide.createIcons();
 
@@ -729,7 +743,7 @@ async function reloadForView() {
 function renderView() {
   const body = _container.querySelector('#cal-body');
   if (!body) return;
-  body.innerHTML = '';
+  body.replaceChildren();
 
   if (state.view === 'month')  renderMonthView(body);
   if (state.view === 'week')   renderWeekView(body);
@@ -763,7 +777,8 @@ function renderMonthView(container) {
     return { date: isoDate(dt), inMonth: dt.getMonth() === month };
   });
 
-  container.innerHTML = `
+  container.replaceChildren();
+  container.insertAdjacentHTML('beforeend', `
     <div class="month-view">
       <div class="month-weekdays">
         ${[t('calendar.dayShortMonday'),t('calendar.dayShortTuesday'),t('calendar.dayShortWednesday'),t('calendar.dayShortThursday'),t('calendar.dayShortFriday'),t('calendar.dayShortSaturday'),t('calendar.dayShortSunday')].map((n) => `<div class="month-weekday">${n}</div>`).join('')}
@@ -772,7 +787,7 @@ function renderMonthView(container) {
         ${days.map(({ date, inMonth }) => renderMonthDay(date, inMonth)).join('')}
       </div>
     </div>
-  `;
+  `);
 
   container.querySelector('#month-grid').addEventListener('click', (e) => {
     const evEl = e.target.closest('.month-day__event');
@@ -846,7 +861,8 @@ function renderWeekView(container) {
   );
   const layouts = timedEvs.map((events) => layoutOverlaps(events));
 
-  container.innerHTML = `
+  container.replaceChildren();
+  container.insertAdjacentHTML('beforeend', `
     <div class="week-view">
       <div class="week-view__header" id="week-header"
            style="display:grid;grid-template-columns:48px repeat(${colCount},1fr);">
@@ -896,7 +912,7 @@ function renderWeekView(container) {
         </div>
       </div>
     </div>
-  `;
+  `);
 
   // Event-Delegation
   container.querySelector('#week-cols').addEventListener('click', (e) => {
@@ -1027,7 +1043,8 @@ function renderDayView(container) {
   const timed   = dayEvs.filter((e) => !e.all_day && e.start_datetime.includes('T'));
   const layout = layoutOverlaps(timed);
 
-  container.innerHTML = `
+  container.replaceChildren();
+  container.insertAdjacentHTML('beforeend', `
     <div class="day-view">
       <div class="day-view__header">
         <div class="day-view__date-label">${formatDate(state.cursor, { weekday: true, long: true })}</div>
@@ -1061,7 +1078,7 @@ function renderDayView(container) {
         </div>
       </div>
     </div>
-  `;
+  `);
 
   container.querySelector('#day-col').addEventListener('click', (e) => {
     const evEl = e.target.closest('.week-event');
@@ -1092,7 +1109,8 @@ function renderAgendaView(container) {
     .map((d) => ({ date: d, events: eventsOnDay(d) }))
     .filter((g) => g.events.length > 0);
 
-  container.innerHTML = `
+  container.replaceChildren();
+  container.insertAdjacentHTML('beforeend', `
     <div class="agenda-view" id="agenda-view">
       ${groups.length === 0
         ? `<div class="agenda-empty">${t('calendar.noEvents')}</div>`
@@ -1107,7 +1125,7 @@ function renderAgendaView(container) {
         `).join('')
       }
     </div>
-  `;
+  `);
 
   stagger(container.querySelectorAll('.agenda-event'));
 

@@ -994,8 +994,8 @@ function initSearch(container) {
  */
 function renderSearchResults(container, data, onClose) {
   container.replaceChildren();
-  const { tasks = [], events = [], notes = [] } = data;
-  const total = tasks.length + events.length + notes.length;
+  const { tasks = [], events = [], notes = [], contacts = [], items = [] } = data;
+  const total = tasks.length + events.length + notes.length + contacts.length + items.length;
 
   if (total === 0) {
     const empty = document.createElement('p');
@@ -1029,9 +1029,11 @@ function renderSearchResults(container, data, onClose) {
     container.appendChild(section);
   }
 
-  makeSection('nav.tasks',    tasks,  (i) => `/tasks?open=${i.id}`);
-  makeSection('nav.calendar', events, ()  => '/calendar');
-  makeSection('nav.notes',    notes,  (i) => `/notes?open=${i.id}`);
+  makeSection('nav.tasks',    tasks,    (i) => `/tasks?open=${i.id}`);
+  makeSection('nav.calendar', events,   (i) => `/calendar?open=${i.id}`);
+  makeSection('nav.notes',    notes,    (i) => `/notes?open=${i.id}`);
+  makeSection('nav.contacts', contacts, (i) => `/contacts?open=${i.id}`);
+  makeSection('nav.shopping', items,    (i) => `/shopping?list=${i.list_id}&highlight=${i.id}`);
 }
 
 function navItems() {

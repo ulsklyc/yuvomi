@@ -56,7 +56,8 @@ let _container = null;
 
 export async function render(container, { user }) {
   _container = container;
-  container.innerHTML = `
+  container.replaceChildren();
+  container.insertAdjacentHTML('beforeend', `
     <div class="contacts-page">
       <h1 class="sr-only">${t('contacts.title')}</h1>
       <div class="contacts-toolbar">
@@ -87,13 +88,20 @@ export async function render(container, { user }) {
         <i data-lucide="plus" style="width:24px;height:24px" aria-hidden="true"></i>
       </button>
     </div>
-  `;
+  `);
 
   if (window.lucide) lucide.createIcons();
 
   const res        = await api.get('/contacts');
   state.contacts   = res.data;
   renderList();
+
+  // Deep-Link: ?open=<id> öffnet direkt das Edit-Modal
+  const openId = new URLSearchParams(window.location.search).get('open');
+  if (openId) {
+    const contact = state.contacts.find((c) => c.id === parseInt(openId, 10));
+    if (contact) openContactModal({ mode: 'edit', contact });
+  }
 
   // Suche
   let searchTimer;
@@ -170,7 +178,8 @@ function renderList() {
   const contacts = filterContacts();
 
   if (!contacts.length) {
-    container.innerHTML = `
+    container.replaceChildren();
+    container.insertAdjacentHTML('beforeend', `
       <div class="empty-state">
         <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -186,7 +195,7 @@ function renderList() {
           ${t('contacts.emptyAction')}
         </button>
       </div>
-    `;
+    `);
     if (window.lucide) lucide.createIcons();
     container.querySelector('#empty-cta-contacts')?.addEventListener('click', () => {
       document.querySelector('.page-fab')?.click();
@@ -201,14 +210,15 @@ function renderList() {
     groups[c.category].push(c);
   }
 
-  container.innerHTML = Object.entries(groups)
+  container.replaceChildren();
+  container.insertAdjacentHTML('beforeend', Object.entries(groups)
     .sort(([a], [b]) => CATEGORIES.indexOf(a) - CATEGORIES.indexOf(b))
     .map(([cat, items]) => `
       <div class="contact-group">
         <div class="contact-group__header">${CATEGORY_ICONS[cat] || ''} ${CATEGORY_LABELS()[cat] || esc(cat)}</div>
         ${items.map((c) => renderContactItem(c)).join('')}
       </div>
-    `).join('');
+    `).join(''));
 
   if (window.lucide) lucide.createIcons();
   stagger(container.querySelectorAll('.contact-item'));
