@@ -67,11 +67,11 @@ export async function render(container) {
           </button>
         </div>
         <button class="btn btn--primary" id="documents-add-btn">
-          <i data-lucide="upload" class="icon-base" aria-hidden="true"></i>
+          <i data-lucide="upload" class="icon-md" aria-hidden="true"></i>
           ${t('documents.addButton')}
         </button>
         <button class="btn btn--secondary" id="documents-folder-btn">
-          <i data-lucide="folder-plus" class="icon-base" aria-hidden="true"></i>
+          <i data-lucide="folder-plus" class="icon-md" aria-hidden="true"></i>
           ${t('documents.addFolderButton')}
         </button>
       </div>
@@ -97,7 +97,7 @@ export async function render(container) {
         <div id="documents-list" class="documents-list documents-list--${state.view}"></div>
       </div>
       <button class="page-fab" id="fab-new-document" aria-label="${t('documents.addButton')}">
-        <i data-lucide="upload" class="icon-2xl" aria-hidden="true"></i>
+        <i data-lucide="upload" class="icon-xl" aria-hidden="true"></i>
       </button>
     </div>
   `);
@@ -278,16 +278,16 @@ function renderMeta(doc) {
 function renderActions(doc) {
   return `
     <a class="btn btn--ghost btn--icon btn--icon-sm" href="/api/v1/documents/${doc.id}/download" download title="${t('documents.downloadAction')}" aria-label="${t('documents.downloadAction')}">
-      <i data-lucide="download" class="icon-base" aria-hidden="true"></i>
+      <i data-lucide="download" class="icon-md" aria-hidden="true"></i>
     </a>
     <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="edit" data-id="${doc.id}" title="${t('documents.editAction')}" aria-label="${t('documents.editAction')}">
-      <i data-lucide="settings" class="icon-base" aria-hidden="true"></i>
+      <i data-lucide="settings" class="icon-md" aria-hidden="true"></i>
     </button>
     <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="archive" data-id="${doc.id}" data-archived="${doc.status === 'archived'}" title="${doc.status === 'archived' ? t('documents.restoreAction') : t('documents.archiveAction')}" aria-label="${doc.status === 'archived' ? t('documents.restoreAction') : t('documents.archiveAction')}">
-      <i data-lucide="${doc.status === 'archived' ? 'archive-restore' : 'archive'}" class="icon-base" aria-hidden="true"></i>
+      <i data-lucide="${doc.status === 'archived' ? 'archive-restore' : 'archive'}" class="icon-md" aria-hidden="true"></i>
     </button>
     <button class="btn btn--ghost btn--icon btn--icon-sm documents-danger" data-action="delete" data-id="${doc.id}" title="${t('common.delete')}" aria-label="${t('common.delete')}">
-      <i data-lucide="trash-2" class="icon-base" aria-hidden="true"></i>
+      <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
     </button>
   `;
 }
@@ -336,12 +336,35 @@ async function handleDocumentAction(e) {
     renderDocuments();
   }
   if (btn.dataset.action === 'delete') {
-    if (!confirm(t('documents.deleteConfirm', { name: doc.name }))) return;
-    await api.delete(`/documents/${doc.id}`);
-    window.oikos?.showToast(t('documents.deletedToast'), 'success');
-    await loadDocuments();
+    state.allDocuments = state.allDocuments.filter((d) => d.id !== doc.id);
+    syncFolderDocuments();
     renderFolderBrowser();
     renderDocuments();
+
+    let undone = false;
+    window.oikos?.showToast(t('documents.deletedToast'), 'default', 5000, () => {
+      undone = true;
+      state.allDocuments = [...state.allDocuments, doc].sort((a, b) => a.name.localeCompare(b.name));
+      syncFolderDocuments();
+      renderFolderBrowser();
+      renderDocuments();
+    });
+
+    setTimeout(async () => {
+      if (undone) return;
+      try {
+        await api.delete(`/documents/${doc.id}`);
+        await loadDocuments();
+        renderFolderBrowser();
+        renderDocuments();
+      } catch (err) {
+        state.allDocuments = [...state.allDocuments, doc].sort((a, b) => a.name.localeCompare(b.name));
+        syncFolderDocuments();
+        renderFolderBrowser();
+        renderDocuments();
+        window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      }
+    }, 5000);
   }
 }
 

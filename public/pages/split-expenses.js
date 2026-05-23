@@ -59,7 +59,7 @@ export async function render(container, { user } = {}) {
           <p class="split-subtitle">${t('splitExpenses.subtitle')}</p>
         </div>
         <button class="btn btn--primary" id="split-add-expense">
-          <i data-lucide="plus" class="icon-base" aria-hidden="true"></i>
+          <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
           ${t('splitExpenses.addExpense')}
         </button>
       </header>
@@ -81,7 +81,7 @@ export async function render(container, { user } = {}) {
         <main class="split-main" id="split-main"></main>
       </div>
       <button class="page-fab" id="split-fab" aria-label="${t('splitExpenses.addExpense')}">
-        <i data-lucide="plus" class="icon-2xl" aria-hidden="true"></i>
+        <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
       </button>
     </div>
   `);
@@ -251,11 +251,11 @@ function renderMain() {
           <i data-lucide="trash-2" aria-hidden="true"></i>
         </button>`}
         <button class="btn btn--secondary" id="split-settle">
-          <i data-lucide="hand-coins" class="icon-base" aria-hidden="true"></i>
+          <i data-lucide="hand-coins" class="icon-md" aria-hidden="true"></i>
           ${t('splitExpenses.settle')}
         </button>
         <button class="btn btn--secondary" id="split-invite" ${isSplitGuest() ? 'hidden' : ''}>
-          <i data-lucide="user-plus" class="icon-base" aria-hidden="true"></i>
+          <i data-lucide="user-plus" class="icon-md" aria-hidden="true"></i>
           ${t('splitExpenses.addMember')}
         </button>
       </div>

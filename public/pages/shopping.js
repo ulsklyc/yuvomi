@@ -176,7 +176,7 @@ function renderItems() {
         <div class="empty-state__description">${t('shopping.emptyListDescription')}</div>
         <p class="empty-state__hint">${t('emptyHint.shopping')}</p>
         <button class="btn btn--primary empty-state__cta" id="empty-cta-shopping">
-          <i data-lucide="plus" aria-hidden="true" class="icon-base"></i>
+          <i data-lucide="plus" aria-hidden="true" class="icon-md"></i>
           ${t('shopping.emptyAction')}
         </button>
       </div>`;

@@ -191,7 +191,7 @@ function renderList() {
         <div class="empty-state__description">${t('contacts.emptyDescription')}</div>
         <p class="empty-state__hint">${t('emptyHint.contacts')}</p>
         <button class="btn btn--primary empty-state__cta" id="empty-cta-contacts">
-          <i data-lucide="plus" aria-hidden="true" class="icon-base"></i>
+          <i data-lucide="plus" aria-hidden="true" class="icon-md"></i>
           ${t('contacts.emptyAction')}
         </button>
       </div>

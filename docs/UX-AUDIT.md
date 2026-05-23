@@ -101,7 +101,7 @@ Status-Spalte beim Abarbeiten: `[ ]` offen → `[x]` erledigt
   // Mobile: pointerdown + 400ms Timer → Menü
   ```
   Alternativ: Label dynamisch aktualisieren auf die Zielroute (`t('nav.meals')` etc.) wenn der letzte Kitchen-State bekannt ist.
-- **Status:** [ ]
+- **Status:** [x]
 
 ---
 
@@ -279,7 +279,7 @@ Status-Spalte beim Abarbeiten: `[ ]` offen → `[x]` erledigt
 - **Datei:** `public/router.js:1229` (Undo-Infrastruktur vorhanden, aber nicht überall genutzt)
 - **Problem:** `showToast()` unterstützt `onUndo`-Callback, aber Dokumente, Kontakte und Budget-Einträge bieten beim Löschen keinen Undo-Toast an. Nur Tasks und Shopping sind nachgewiesen.
 - **Fix:** In jedem Modul prüfen ob Löschen einen Undo-Toast aufruft. Kodexregel: *jede* Löschaktion nutzt `showToast(message, 'danger', 5000, undoCallback)`.
-- **Status:** [ ]
+- **Status:** [x] (Documents, Budget-Loans, Budget-LoanPayments auf optimistischen Undo-Toast umgestellt; Contacts/Budget-Entries/Notes hatten bereits Undo)
 
 ---
 
@@ -294,7 +294,7 @@ Status-Spalte beim Abarbeiten: `[ ]` offen → `[x]` erledigt
     if (!document.hidden) updateGreetingGradient();
   });
   ```
-- **Status:** [ ]
+- **Status:** [x]
 
 ---
 
@@ -306,7 +306,7 @@ Status-Spalte beim Abarbeiten: `[ ]` offen → `[x]` erledigt
   const FAB_SEEN_KEY = (module) => `oikos:fabSeen:${module}`;
   // Im FAB-Block: module-spezifischen Key verwenden
   ```
-- **Status:** [ ]
+- **Status:** [x]
 
 ---
 
@@ -330,7 +330,7 @@ Status-Spalte beim Abarbeiten: `[ ]` offen → `[x]` erledigt
     transition: padding-top 0.2s ease;
   }
   ```
-- **Status:** [ ]
+- **Status:** [x]
 
 ---
 
@@ -343,7 +343,7 @@ Status-Spalte beim Abarbeiten: `[ ]` offen → `[x]` erledigt
     .grid--2 { grid-template-columns: repeat(2, 1fr); }
   }
   ```
-- **Status:** [ ]
+- **Status:** [x]
 
 ---
 
@@ -358,7 +358,7 @@ Status-Spalte beim Abarbeiten: `[ ]` offen → `[x]` erledigt
   .icon-xl   { width: 24px; height: 24px; }
   ```
   Bestehende Verwendungen von `.icon-xs`, `.icon-11`, `.icon-md` (14px), `.icon-base` auf die nächste semantische Stufe migrieren.
-- **Status:** [ ]
+- **Status:** [x] (4 semantische Stufen in CSS; alte Klassen als backward-compat-Aliases; JS-Dateien auf neue Namen aktualisiert)
 
 ---
 
@@ -366,7 +366,7 @@ Status-Spalte beim Abarbeiten: `[ ]` offen → `[x]` erledigt
 - **Datei:** `public/pages/dashboard.js:217`
 - **Problem:** `greeting(displayName)` wird einmalig beim Rendern aufgerufen. Morgens geöffnet und nachmittags noch offen → "Guten Morgen" um 15 Uhr.
 - **Fix:** Zusammen mit N1 behandeln (beide nutzen dasselbe `visibilitychange`-Pattern).
-- **Status:** [ ]
+- **Status:** [x]
 
 ---
 
@@ -401,7 +401,8 @@ Diese Aspekte sind gut umgesetzt und sollten nicht verändert werden:
 - **Phase 7 abgeschlossen (v0.52.20):** H7 ✅
 - **Phase 8 abgeschlossen:** K2 + H6 ✅
 - **Phase 9 abgeschlossen:** M1, M3, M4, M5, M6 ✅
-- **Nächste Phase:** Phase 10 — H2, M7, N1–N6
+- **Phase 10 abgeschlossen:** H2, M7, N1–N6 ✅
+- **Nächste Phase:** Phase 11 — alle Items abgeschlossen 🎉
 
 ---
 

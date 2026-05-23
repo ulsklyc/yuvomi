@@ -395,12 +395,13 @@ async function renderPage(route, previousPath = null) {
 
     await module.render(pageWrapper, { user: currentUser });
 
-    // FAB Long Loop: Einstiegsanimation nach FAB_SEEN_MAX Views deaktivieren
+    // FAB Long Loop: Einstiegsanimation nach FAB_SEEN_MAX Views pro Modul deaktivieren
     if (pageWrapper.querySelector('.page-fab')) {
-      let fabCount = parseInt(localStorage.getItem(FAB_SEEN_KEY) ?? '0', 10);
+      const fabKey = FAB_SEEN_KEY(route.module);
+      let fabCount = parseInt(localStorage.getItem(fabKey) ?? '0', 10);
       if (fabCount < FAB_SEEN_MAX) {
         fabCount++;
-        localStorage.setItem(FAB_SEEN_KEY, String(fabCount));
+        localStorage.setItem(fabKey, String(fabCount));
       }
       document.documentElement.classList.toggle('fab-anim-done', fabCount >= FAB_SEEN_MAX);
     }
@@ -676,7 +677,7 @@ function renderAppShell(container) {
   }
 }
 
-const FAB_SEEN_KEY = 'oikos:fabSeenCount';
+const FAB_SEEN_KEY = (module) => `oikos:fabSeen:${module}`;
 const FAB_SEEN_MAX = 5;
 const SEARCH_KBD_KEY = 'oikos:searchKbdUsed';
 
@@ -812,6 +813,9 @@ function initOfflineBanner() {
   function update() {
     banner.hidden = navigator.onLine;
     if (i18nSpan) i18nSpan.textContent = t('offline.banner');
+    document.documentElement.style.setProperty(
+      '--offline-banner-height', navigator.onLine ? '0px' : `${banner.offsetHeight || 40}px`
+    );
   }
   window.addEventListener('online', update);
   window.addEventListener('offline', update);
@@ -1147,14 +1151,39 @@ function updateNav(path) {
     const isKitchen = isKitchenRoute(path);
     kitchenNavBtn.classList.toggle('nav-item--active', isKitchen);
     kitchenNavBtn.toggleAttribute('aria-current', isKitchen);
+
+    const kitchenItems = navItems().filter((i) => i.kitchenGroup);
+    const targetRoute = isKitchen ? path : getLastKitchenRoute();
+    const kitchenTarget = kitchenItems.find((i) => i.path === targetRoute) ?? kitchenItems[0];
+    if (kitchenTarget) {
+      const kitchenBtnLabel = kitchenNavBtn.querySelector('.nav-item__label');
+      const kitchenBtnIcon  = kitchenNavBtn.querySelector('.nav-item__icon');
+      if (kitchenBtnLabel) kitchenBtnLabel.textContent = kitchenTarget.label;
+      if (kitchenBtnIcon)  kitchenBtnIcon.dataset.lucide = kitchenTarget.icon;
+      kitchenNavBtn.setAttribute('aria-label', kitchenTarget.label);
+      kitchenNavBtn.setAttribute('title', kitchenTarget.label);
+    }
   }
 
   const sidebarKitchenNav = document.querySelector('#sidebar-kitchen-nav');
   if (sidebarKitchenNav) {
-    if (isKitchenRoute(path)) {
+    const isKitchen = isKitchenRoute(path);
+    if (isKitchen) {
       sidebarKitchenNav.setAttribute('aria-current', 'page');
     } else {
       sidebarKitchenNav.removeAttribute('aria-current');
+    }
+
+    const kitchenItems = navItems().filter((i) => i.kitchenGroup);
+    const targetRoute = isKitchen ? path : getLastKitchenRoute();
+    const kitchenTarget = kitchenItems.find((i) => i.path === targetRoute) ?? kitchenItems[0];
+    if (kitchenTarget) {
+      const sidebarLabel = sidebarKitchenNav.querySelector('.nav-item__label');
+      const sidebarIcon  = sidebarKitchenNav.querySelector('.nav-item__icon');
+      if (sidebarLabel) sidebarLabel.textContent = kitchenTarget.label;
+      if (sidebarIcon)  sidebarIcon.dataset.lucide = kitchenTarget.icon;
+      sidebarKitchenNav.setAttribute('aria-label', kitchenTarget.label);
+      sidebarKitchenNav.setAttribute('title', kitchenTarget.label);
     }
   }
 

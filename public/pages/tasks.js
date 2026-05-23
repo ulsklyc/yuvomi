@@ -139,7 +139,7 @@ function renderDueDate(dateStr, timeStr) {
   const d = formatDueDate(dateStr, timeStr);
   if (!d) return '';
   return `<span class="due-date ${d.cls}">
-    <i data-lucide="clock" class="icon-11" aria-hidden="true"></i> ${d.label}
+    <i data-lucide="clock" class="icon-sm" aria-hidden="true"></i> ${d.label}
   </span>`;
 }
 
@@ -150,7 +150,7 @@ function renderStartDateBadge(startDateStr) {
   const startDay = new Date(`${startDateStr}T00:00:00`);
   if (startDay <= today) return '';
   return `<span class="due-date">
-    <i data-lucide="calendar-clock" class="icon-11" aria-hidden="true"></i> ${t('tasks.startsOn', { date: formatDate(startDay) })}
+    <i data-lucide="calendar-clock" class="icon-sm" aria-hidden="true"></i> ${t('tasks.startsOn', { date: formatDate(startDay) })}
   </span>`;
 }
 
@@ -220,12 +220,12 @@ function renderTaskCard(task, opts = {}) {
 
         <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="edit-task" data-id="${task.id}"
                 aria-label="${t('tasks.editButton')}">
-          <i data-lucide="pencil" class="icon-base" aria-hidden="true"></i>
+          <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
         </button>
         ${task.status !== 'archived' ? `
         <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="archive-task" data-id="${task.id}"
                 aria-label="${t('tasks.archiveButton')}">
-          <i data-lucide="archive" class="icon-base" aria-hidden="true"></i>
+          <i data-lucide="archive" class="icon-md" aria-hidden="true"></i>
         </button>` : ''}
       </div>
 
@@ -282,7 +282,7 @@ function renderTaskGroups(tasks, groupMode) {
       <div class="empty-state__description">${t('tasks.emptyDescription')}</div>
       <p class="empty-state__hint">${t('emptyHint.tasks')}</p>
       <button class="btn btn--primary empty-state__cta" id="empty-cta-tasks">
-        <i data-lucide="plus" aria-hidden="true" class="icon-base"></i>
+        <i data-lucide="plus" aria-hidden="true" class="icon-md"></i>
         ${t('tasks.emptyAction')}
       </button>
     </div>`;
@@ -785,7 +785,7 @@ function renderKanbanCard(task) {
       <div class="kanban-card__title">${esc(task.title)}</div>
       <div class="kanban-card__meta">
         ${renderPriorityBadge(task.priority)}
-        ${due ? `<span class="due-date ${due.cls}"><i data-lucide="clock" class="icon-xs" aria-hidden="true"></i> ${due.label}</span>` : ''}
+        ${due ? `<span class="due-date ${due.cls}"><i data-lucide="clock" class="icon-sm" aria-hidden="true"></i> ${due.label}</span>` : ''}
       </div>
       <div class="kanban-card__footer">
         ${renderAvatarStack(task.assigned_users ?? [], { size: 22 }) || '<span></span>'}
@@ -1801,19 +1801,19 @@ export async function render(container, { user }) {
           <span class="bulk-actions-bar__count" id="bulk-count"></span>
           <div class="bulk-actions-bar__actions">
             <button class="btn btn--secondary btn--sm" id="bulk-mark-done" data-status="done">
-              <i data-lucide="check" class="icon-base" aria-hidden="true"></i>
+              <i data-lucide="check" class="icon-md" aria-hidden="true"></i>
               ${t('tasks.bulkMarkDone')}
             </button>
             <button class="btn btn--secondary btn--sm" id="bulk-mark-open" data-status="open">
-              <i data-lucide="rotate-ccw" class="icon-base" aria-hidden="true"></i>
+              <i data-lucide="rotate-ccw" class="icon-md" aria-hidden="true"></i>
               ${t('tasks.bulkMarkOpen')}
             </button>
             <button class="btn btn--secondary btn--sm" id="bulk-archive">
-              <i data-lucide="archive" class="icon-base" aria-hidden="true"></i>
+              <i data-lucide="archive" class="icon-md" aria-hidden="true"></i>
               ${t('tasks.bulkArchive')}
             </button>
             <button class="btn btn--danger btn--sm" id="bulk-delete">
-              <i data-lucide="trash-2" class="icon-base" aria-hidden="true"></i>
+              <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
               ${t('tasks.bulkDelete')}
             </button>
           </div>
@@ -1828,7 +1828,7 @@ export async function render(container, { user }) {
             </div>`).join('')}
         </div>
         <button class="page-fab" id="fab-new-task" aria-label="${t('tasks.newTask')}">
-          <i data-lucide="plus" class="icon-2xl" aria-hidden="true"></i>
+          <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
         </button>
       </div>
     </div>

@@ -148,7 +148,7 @@ function renderGrid() {
         <div class="empty-state__description">${isFiltered ? t('notes.noResultsDescription', { query: state.filterQuery }) : t('notes.emptyDescription')}</div>
         ${!isFiltered ? `<p class="empty-state__hint">${t('emptyHint.notes')}</p>
         <button class="btn btn--primary empty-state__cta" id="empty-cta-notes">
-          <i data-lucide="plus" aria-hidden="true" class="icon-base"></i>
+          <i data-lucide="plus" aria-hidden="true" class="icon-md"></i>
           ${t('notes.emptyAction')}
         </button>` : ''}
       </div>

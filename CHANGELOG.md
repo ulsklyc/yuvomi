@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.52.25] - 2026-05-23
+
+### Added
+- Kitchen nav button (bottom bar and sidebar) now dynamically shows the icon and label of the last visited kitchen section (Meals / Recipes / Shopping), making the navigation target predictable at a glance
+- Offline banner now pushes page content down via `--offline-banner-height` CSS variable, preventing content overlap when the app is offline
+- `.grid--2` responsive grid now activates at 600 px instead of 768 px, giving iPad Mini portrait and small tablets a two-column layout
+
+### Changed
+- Dashboard greeting text and date label refresh automatically on `visibilitychange`, so "Good Morning" no longer persists into the afternoon on a long-running session
+- FAB entry animation counter is now tracked per module instead of globally; the animation reappears when visiting a module for the first time even after it was suppressed on other modules
+- Icon size system consolidated from 8 granular sizes to 4 semantic steps — `icon-sm` (12 px), `icon-md` (16 px), `icon-lg` (20 px), `icon-xl` (24 px); old class names kept as backward-compat aliases
+- Document, budget loan, and budget loan payment deletions now use an optimistic undo-toast pattern (5 s window) instead of a blocking confirmation dialog, consistent with Tasks, Notes, and Contacts
+
 ## [0.52.24] - 2026-05-23
 
 ### Changed

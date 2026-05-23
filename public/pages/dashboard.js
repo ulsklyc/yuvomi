@@ -1353,6 +1353,17 @@ export async function render(container, { user }) {
 
   initFab(container, _fabController.signal);
 
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    const titleEl = container.querySelector('.dashboard-overview__title');
+    if (titleEl) {
+      titleEl.replaceChildren();
+      titleEl.insertAdjacentHTML('afterbegin', greeting(user.display_name));
+    }
+    const dateEl  = container.querySelector('.dashboard-overview__date');
+    if (dateEl)  dateEl.textContent = formatDate(new Date());
+  }, { signal: _fabController.signal });
+
   // 30-Minuten Auto-Refresh für Wetter
   const refreshBtn = container.querySelector('#weather-refresh-btn');
   if (refreshBtn) {

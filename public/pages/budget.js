@@ -478,7 +478,7 @@ function renderEntries() {
       <div class="empty-state__description">${t('budget.emptyDescription')}</div>
       <p class="empty-state__hint">${t('emptyHint.budget')}</p>
       <button class="btn btn--primary empty-state__cta" id="empty-cta-budget">
-        <i data-lucide="plus" aria-hidden="true" class="icon-base"></i>
+        <i data-lucide="plus" aria-hidden="true" class="icon-md"></i>
         ${t('budget.emptyAction')}
       </button>
     </div>`;
@@ -650,7 +650,7 @@ function renderLoansPage() {
         <div class="empty-state__title">${t('budget.loansEmpty')}</div>
         <div class="empty-state__description">${t('budget.loansEmptyDescription')}</div>
         <button class="btn btn--primary empty-state__cta" id="budget-empty-loan">
-          <i data-lucide="plus" aria-hidden="true" class="icon-base"></i>
+          <i data-lucide="plus" aria-hidden="true" class="icon-md"></i>
           ${t('budget.newLoan')}
         </button>
       </div>
@@ -1276,27 +1276,63 @@ async function markLoanPayment(id) {
 async function deleteLoan(id) {
   const loan = state.loans.loans.find((item) => item.id === id);
   if (!loan) return;
-  if (!await confirmModal(t('budget.deleteLoanConfirm', { title: loan.title }), { danger: true, confirmLabel: t('common.delete') })) return;
-  try {
-    await api.delete(`/budget/loans/${id}`);
-    await loadMonth(state.month);
+
+  state.loans.loans = state.loans.loans.filter((item) => item.id !== id);
+  renderBody();
+
+  let undone = false;
+  window.oikos?.showToast(t('budget.loanDeletedToast'), 'default', 5000, () => {
+    undone = true;
+    state.loans.loans = [...state.loans.loans, loan];
     renderBody();
-    window.oikos?.showToast(t('budget.loanDeletedToast'), 'success');
-  } catch (err) {
-    window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
-  }
+  });
+
+  setTimeout(async () => {
+    if (undone) return;
+    try {
+      await api.delete(`/budget/loans/${id}`);
+      await loadMonth(state.month);
+      renderBody();
+    } catch (err) {
+      state.loans.loans = [...state.loans.loans, loan];
+      renderBody();
+      window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
+    }
+  }, 5000);
 }
 
 async function deleteLoanPayment(loanId, paymentId) {
-  if (!await confirmModal(t('budget.deleteLoanPaymentConfirm'), { danger: true, confirmLabel: t('common.delete') })) return;
-  try {
-    await api.delete(`/budget/loans/${loanId}/payments/${paymentId}`);
-    await loadMonth(state.month);
+  const loan = state.loans.loans.find((item) => item.id === loanId);
+  const payment = loan?.payments?.find((item) => item.id === paymentId);
+
+  if (loan && payment) {
+    loan.payments = loan.payments.filter((item) => item.id !== paymentId);
     renderBody();
-    window.oikos?.showToast(t('budget.deletedToast'), 'success');
-  } catch (err) {
-    window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
   }
+
+  let undone = false;
+  window.oikos?.showToast(t('budget.deletedToast'), 'default', 5000, () => {
+    undone = true;
+    if (loan && payment) {
+      loan.payments = [...(loan.payments || []), payment];
+      renderBody();
+    }
+  });
+
+  setTimeout(async () => {
+    if (undone) return;
+    try {
+      await api.delete(`/budget/loans/${loanId}/payments/${paymentId}`);
+      await loadMonth(state.month);
+      renderBody();
+    } catch (err) {
+      if (loan && payment) {
+        loan.payments = [...(loan.payments || []), payment];
+        renderBody();
+      }
+      window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    }
+  }, 5000);
 }
 
 // --------------------------------------------------------

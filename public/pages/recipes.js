@@ -133,7 +133,7 @@ function renderRecipeList() {
     emptyHint.textContent = t('emptyHint.recipes');
     const emptyCta = document.createElement('button');
     emptyCta.className = 'btn btn--primary empty-state__cta';
-    emptyCta.insertAdjacentHTML('afterbegin', '<i data-lucide="plus" aria-hidden="true" class="icon-base"></i>');
+    emptyCta.insertAdjacentHTML('afterbegin', '<i data-lucide="plus" aria-hidden="true" class="icon-md"></i>');
     emptyCta.append(document.createTextNode(t('recipes.emptyAction')));
     emptyCta.addEventListener('click', () => {
       document.querySelector('.page-fab')?.click();
