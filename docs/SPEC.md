@@ -29,6 +29,7 @@ Every table: `id INTEGER PRIMARY KEY`, `created_at TEXT`, `updated_at TEXT` (ISO
 | status | TEXT | open, in_progress, done, archived |
 | due_date | TEXT | DATE, nullable |
 | due_time | TEXT | TIME, nullable |
+| start_date | TEXT | DATE, nullable — tasks with a future start date are hidden from the default list view |
 | assigned_to | INTEGER | FK → Users (legacy single-user field, kept for backwards compat) |
 | created_by | INTEGER | FK → Users, NOT NULL |
 | is_recurring | INTEGER | 0/1 |
@@ -674,12 +675,12 @@ Key-value table for OAuth tokens and CalDAV credentials.
 Responsive grid: 1 column on mobile, 2 on tablet, 3 on desktop.
 
 **Widgets:**
-- Greeting: "Good [morning/afternoon/evening], [Name]" + date
+- Greeting: "Good [morning/afternoon/evening], [Name]" + date; auto-refreshes on `visibilitychange` so the greeting stays current during long sessions
 - Weather: OpenWeatherMap proxy, 3-day preview, refresh every 30 min, hide widget on API error
 - Upcoming events: next 3–5, color-coded by person
 - Urgent tasks: priority urgent/high + due_date ≤48h
 - Today's meals: meals for the current day
-- Pinboard preview: 2–3 pinned notes
+- Pinboard preview: 2–3 pinned notes (Markdown formatting rendered)
 - FAB (quick actions): + Task, + Event, + Shopping list item, + Note
 
 **Widget sizes:** each widget has a configurable size using named presets (Tiny, Narrow, Standard, Large, Full) that map to `columns × rows` in the CSS grid. Sizes are persisted in user preferences and survive page reloads.
@@ -701,6 +702,7 @@ Skeleton loading instead of spinners. Clicking any widget navigates to that modu
 - Archive: completed tasks can be archived (status = 'archived'); visible in a separate Archived filter
 - Inline reminder presets: offset from due date/time — 15 min, 1 h, 1 d, 2 d, 1 w, 2 w, or fully custom offset
 - **Bulk actions (list view only):** select multiple tasks via checkboxes and apply batch operations (mark done, mark open, archive, delete); bulk select toggle in toolbar
+- **Start date:** tasks can have an optional start date; tasks with a future start date are hidden from the default list view to reduce cognitive load. A "Show scheduled" toggle chip in the filter bar reveals all upcoming planned tasks. Task cards display a "Starts on …" badge when a start date is set.
 - Mobile swipe: left = done, right = edit
 - Badge for overdue tasks
 
@@ -811,6 +813,7 @@ Unauthenticated users are redirected here. No public registration form - admin c
 - Username + password form
 - Error display for wrong credentials
 - Rate limiting: 5 attempts/min/IP, 15-min lockout
+- Password visibility toggle (eye/eye-off icon) to verify input before submitting
 - After successful login: redirect to dashboard
 
 ### Settings (`/settings`)
@@ -996,7 +999,7 @@ Source of truth: `public/styles/tokens.css`. Key values (as of v0.20.39):
 
 ### Typography
 - System font stack, headings 600–700
-- Body: 16px mobile, 15px desktop, line-height 1.5
+- Body: 16px, line-height 1.5
 - Caption: 13px, `var(--color-text-secondary)`
 
 ### Glass Layer (`public/styles/glass.css`)
@@ -1025,12 +1028,13 @@ Additive CSS file loaded globally after `layout.css`. Implements a Liquid Glass 
 - **Inputs:** `var(--radius-sm)`, 1.5px border, padding 12px 16px. Search inputs use `--radius-glass-button` and `--glass-border-subtle`. `[required]` fields receive validation status on blur (`.form-field--error` / `.form-field--valid`). Enter moves focus to the next field; Enter on the last field triggers submit.
 - **FAB (Floating Action Button):** Color follows the module accent token (`--module-accent`) - each module defines its own accent color. Specular inner highlight + attention ring pulse. Hidden when the virtual keyboard is open (`visualViewport.resize`, threshold 75% of window height).
 - **Module accent colors:** `--module-accent` is applied on three visual layers - (1) active nav tab (bottom bar + sidebar stripe), (2) toolbar `border-top: 3px`, (3) cards/rows `border-left: 3px`. The active accent is written to `--active-module-accent` on `:root` on every navigation change. Falls back to `--color-accent` for pages without a module context.
-- **Navigation:** Bottom tab bar on mobile (Dashboard, Tasks, Calendar, Meals, More), auto-hides on scroll-down. Sidebar on desktop. Both use glass blur surface.
+- **Navigation:** Bottom tab bar on mobile (Dashboard, Calendar, Tasks, Notes + Kitchen button + More button), auto-hides on scroll-down. Sidebar on desktop. Both use glass blur surface. The Kitchen button dynamically shows the icon and label of the last visited kitchen section (Meals / Recipes / Shopping).
 - **Transitions:** Directional slide-X animation on page change (forward = from right, back = from left, 200ms) with spring easing. Respects `prefers-reduced-motion`.
 - **Empty states:** Consistent `.empty-state` class across all modules (icon + title + description, centered). Compact variant `.empty-state--compact` for meal slots.
 - **Modals:** Centered panel on desktop with glass overlay. On mobile (< 768px) bottom sheet - spring slide-in from below, sheet handle visible, swipe-to-close (> 80px downward). `focusin` scrolls inputs into view when the virtual keyboard is open.
 - **List animation:** Staggered spring fade-in on load (`stagger()` from `public/utils/ux.js`) - max 5 elements staggered (30ms gap), rest appear immediately.
 - **Vibration:** `vibrate()` from `public/utils/ux.js` - short pulses for light actions (10-40ms), pattern `[30, 50, 30]` for destructive actions (delete). Respects `prefers-reduced-motion`.
+- **Global search overlay:** Full-text search across tasks, calendar events, notes, contacts, and shopping items. Results are grouped by module and trigger deep-link navigation: contacts via `?open=<id>` (opens edit modal directly), calendar events via `?open=<id>`, notes via `?open=<id>`, shopping items via `?list=<id>&highlight=<id>` (activates the correct list tab and scrolls the item into view). Activated from the search bar in the More-Sheet.
 - **PWA install prompt:** Appears only after 2 user interactions. Dismiss window 7 days; interaction counter resets after dismiss.
 - **PWA offline fallback:** Service worker serves `/offline.html` when the network is unreachable and `index.html` is not cached. Includes a reload button.
 

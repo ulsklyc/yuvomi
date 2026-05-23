@@ -47,7 +47,7 @@ The goal is a single, private place for everything that keeps a household runnin
 
 | Module | Description |
 |---|---|
-| **Tasks** | Shared tasks with deadlines, priorities, subtasks, and recurring schedules. Assign to multiple family members simultaneously with stacked avatar display. Kanban board with touch-friendly one-tap status buttons. Archive completed tasks to keep lists clean. Inline reminder presets (15 min to 2 weeks before due). |
+| **Tasks** | Shared tasks with deadlines, priorities, subtasks, and recurring schedules. Assign to multiple family members simultaneously with stacked avatar display. Kanban board with touch-friendly one-tap status buttons. Archive completed tasks to keep lists clean. Inline reminder presets (15 min to 2 weeks before due). Schedule tasks with a future start date — future tasks are hidden by default and revealed via a "Show scheduled" toggle. |
 | **Shopping Lists** | Collaborative lists organized by aisle. Import ingredients from meal plans in one click. |
 | **Meal Planning** | Weekly drag-and-drop planner. Export ingredient lists directly to your shopping list. |
 | **Recipes** | Create, duplicate, and scale reusable recipes. Pre-fill meal slots from a recipe or save any meal as a recipe. |
