@@ -412,10 +412,23 @@ textarea.form-input {
   animation-timing-function: var(--ease-out);
 }
 
+/* Blank-Screen-on-Scroll Prevention (iOS 26+ WebKit + Android Blink):
+ * Jedes Element mit backdrop-filter innerhalb von overflow:auto wird vom Browser
+ * als eigenständige Compositor-GPU-Layer gerendert. Bei vielen solchen Layern
+ * (Task-Cards, Note-Items, Widgets, Inputs) scheitert der Compositor auf mobilen
+ * Geräten beim Scrollen → kompletter Weißbild-/Leerbild-Fehler.
+ * Elemente AUSSERHALB von .app-content (nav-bottom, Modals, Toasts) behalten
+ * ihren backdrop-filter-Blur unverändert — nur der Scroll-Container ist betroffen.
+ * Referenz: Issue #166 (iOS), nachgemeldet auch auf Android. */
+.app-content *,
+.app-content *::before,
+.app-content *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 /* Performance: backdrop-filter deaktivieren während Seitenübergängen.
- * Auf Android verursachen viele gleichzeitige backdrop-filter-Layer
- * (Widgets, Cards, Inputs) hohen GPU-Aufwand → Transition wirkt träge.
- * html.navigating wird von router.js für die Dauer des Übergangs gesetzt. */
+ * (Superset der obigen Regel — bleibt für semantische Klarheit erhalten.) */
 html.navigating .app-content *,
 html.navigating .app-content *::before,
 html.navigating .app-content *::after {
