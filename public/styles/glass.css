@@ -223,9 +223,9 @@ textarea.form-input {
 
 .input:focus,
 .form-input:focus {
-  border-color: var(--color-accent);
+  border-color: var(--active-module-accent, var(--color-accent));
   box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 20%, transparent),
     var(--glass-inset-input);
 }
 
@@ -742,8 +742,13 @@ html.navigating .app-content *::after {
   background:
     radial-gradient(
       ellipse at 20% 0%,
-      color-mix(in srgb, var(--module-accent, var(--color-accent)) 3%, transparent),
+      color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 5%, transparent),
       transparent 60%
+    ),
+    radial-gradient(
+      ellipse at 85% 90%,
+      color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 3%, transparent),
+      transparent 50%
     ),
     var(--color-bg);
 }

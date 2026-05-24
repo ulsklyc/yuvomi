@@ -1167,19 +1167,23 @@ function sidebarKitchenEl() {
   return a;
 }
 
-function moreItemEl({ path, label, icon }) {
+function moreItemEl({ path, label, icon, module: mod }) {
   const a = document.createElement('a');
   a.href = path;
   a.dataset.route = path;
   a.className = 'more-item';
+  if (mod) a.style.setProperty('--item-module-accent', `var(--module-${mod})`);
+  const well = document.createElement('div');
+  well.className = 'more-item__icon-well';
   const i = document.createElement('i');
   i.dataset.lucide = icon;
   i.className = 'more-item__icon';
   i.setAttribute('aria-hidden', 'true');
+  well.appendChild(i);
   const span = document.createElement('span');
   span.className = 'more-item__label';
   span.textContent = label;
-  a.appendChild(i);
+  a.appendChild(well);
   a.appendChild(span);
   return a;
 }

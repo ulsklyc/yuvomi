@@ -341,9 +341,27 @@
   background-color: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 12%, transparent);
 }
 
+.more-item__icon-well {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--item-module-accent, var(--color-text-secondary)) 12%, transparent);
+  color: var(--item-module-accent, var(--color-text-secondary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.more-item[aria-current="page"] .more-item__icon-well {
+  background: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 20%, transparent);
+  color: var(--active-module-accent, var(--color-accent));
+}
+
 .more-item__icon {
-  width: var(--space-6);
-  height: var(--space-6);
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
 }
 
@@ -800,12 +818,15 @@ html.fab-anim-done .page-fab {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
   gap: var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .page__title {
-  font-size: var(--text-xl);
+  /* Fluid: 20px (375px viewport) → 30px (1440px viewport) */
+  font-size: clamp(1.25rem, 0.94vw + 1.03rem, 1.875rem);
   font-weight: var(--font-weight-bold);
   letter-spacing: -0.5px;
   text-wrap: balance;
@@ -817,7 +838,6 @@ html.fab-anim-done .page-fab {
   }
 
   .page__title {
-    font-size: var(--text-2xl);
     letter-spacing: -0.8px;
   }
 }
