@@ -616,7 +616,8 @@
     "categoryCraftsman": "Usta",
     "categoryEmergency": "Acil",
     "categoryOther": "Diğer",
-    "emptyAction": "Kişi ekle"
+    "emptyAction": "Kişi ekle",
+    "moreActions": "Diğer işlemler"
   },
   "budget": {
     "title": "Bütçe",
@@ -770,7 +771,16 @@
     "loanTransactions": "Borç işlemleri",
     "loanInstallmentNumber": "{{total}} taksitten {{number}}.",
     "loanReportTitle": "Borç raporu",
-    "loanNoTransactions": "Henüz ödeme kaydedilmedi."
+    "loanNoTransactions": "Henüz ödeme kaydedilmedi.",
+    "categoryIncome": "Gelir",
+    "categoryHousing": "Housing / Home",
+    "categoryFood": "Market",
+    "categoryInsurance": "Sigorta",
+    "categoryUtilities": "Electricity / Water / Gas",
+    "categoryHealth": "Sağlık",
+    "categoryFamily": "Aile",
+    "categoryHome": "Ev",
+    "categoryClothing": "Giyim"
   },
   "settings": {
     "title": "Ayarlar",
@@ -1320,7 +1330,9 @@
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "Ev temizliği",
     "calendarItemsFolder": "Takvim öğeleri",
-    "folderBrowserTitle": "Klasörlere göz at"
+    "folderBrowserTitle": "Klasörlere göz at",
+    "emptyPrimary": "Belge ekle",
+    "emptySecondary": "Klasör ekle"
   },
   "shortcuts": {
     "goKitchen": "Mutfak",
@@ -1476,7 +1488,8 @@
         "name": "Balkon/verandayı yıka",
         "area": "Dış alan"
       }
-    }
+    },
+    "setupProfileAction": "Profil oluştur"
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

@@ -616,7 +616,8 @@
     "categoryCraftsman": "Мастер",
     "categoryEmergency": "Экстренная помощь",
     "categoryOther": "Другое",
-    "emptyAction": "Добавить контакт"
+    "emptyAction": "Добавить контакт",
+    "moreActions": "Другие действия"
   },
   "budget": {
     "title": "Бюджет",
@@ -770,7 +771,16 @@
     "loanTransactions": "Операции займа",
     "loanInstallmentNumber": "Платёж {{number}} из {{total}}",
     "loanReportTitle": "Отчёт по займу",
-    "loanNoTransactions": "Платежи ещё не записаны."
+    "loanNoTransactions": "Платежи ещё не записаны.",
+    "categoryIncome": "Доходы",
+    "categoryHousing": "Housing / Home",
+    "categoryFood": "Продукты",
+    "categoryInsurance": "Страховка",
+    "categoryUtilities": "Electricity / Water / Gas",
+    "categoryHealth": "Здоровье",
+    "categoryFamily": "Семья",
+    "categoryHome": "Дом",
+    "categoryClothing": "Одежда"
   },
   "settings": {
     "title": "Настройки",
@@ -1320,7 +1330,9 @@
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "Уборка",
     "calendarItemsFolder": "Элементы календаря",
-    "folderBrowserTitle": "Просмотр папок"
+    "folderBrowserTitle": "Просмотр папок",
+    "emptyPrimary": "Добавить документ",
+    "emptySecondary": "Добавить папку"
   },
   "shortcuts": {
     "goKitchen": "Кухня",
@@ -1476,7 +1488,8 @@
         "name": "Помыть балкон/патио",
         "area": "Улица"
       }
-    }
+    },
+    "setupProfileAction": "Создать профиль"
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

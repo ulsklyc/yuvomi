@@ -616,7 +616,8 @@
     "categoryCraftsman": "職人",
     "categoryEmergency": "緊急連絡先",
     "categoryOther": "その他",
-    "emptyAction": "連絡先を追加"
+    "emptyAction": "連絡先を追加",
+    "moreActions": "その他の操作"
   },
   "budget": {
     "title": "家計",
@@ -770,7 +771,16 @@
     "loanTransactions": "貸付取引",
     "loanInstallmentNumber": "{{total}} 回中 {{number}} 回目",
     "loanReportTitle": "貸付レポート",
-    "loanNoTransactions": "返済はまだ記録されていません。"
+    "loanNoTransactions": "返済はまだ記録されていません。",
+    "categoryIncome": "収入",
+    "categoryHousing": "Housing / Home",
+    "categoryFood": "食費",
+    "categoryInsurance": "保険",
+    "categoryUtilities": "Electricity / Water / Gas",
+    "categoryHealth": "医療",
+    "categoryFamily": "家族",
+    "categoryHome": "家",
+    "categoryClothing": "衣服"
   },
   "settings": {
     "title": "設定",
@@ -1320,7 +1330,9 @@
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "ハウスキーピング",
     "calendarItemsFolder": "カレンダー項目",
-    "folderBrowserTitle": "フォルダーを参照"
+    "folderBrowserTitle": "フォルダーを参照",
+    "emptyPrimary": "書類を追加",
+    "emptySecondary": "フォルダを追加"
   },
   "shortcuts": {
     "goKitchen": "キッチン",
@@ -1476,7 +1488,8 @@
         "name": "バルコニー/パティオを洗う",
         "area": "屋外"
       }
-    }
+    },
+    "setupProfileAction": "プロフィールを作成"
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

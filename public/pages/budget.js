@@ -12,28 +12,11 @@ import { t, formatDate, getLocale } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { render as renderSplitExpenses } from '/pages/split-expenses.js';
 import { toLocalDateKey } from '/utils/date.js';
+import { budgetCategoryLabel } from '/utils/category-labels.js';
 
 // --------------------------------------------------------
 // Konstanten
 // --------------------------------------------------------
-
-const CATEGORY_I18N = () => ({
-  // Expense categories
-  housing:            t('budget.catHousing'),
-  food:               t('budget.catFood'),
-  transport:          t('budget.catTransport'),
-  personal_health:    t('budget.catPersonalHealth'),
-  leisure:            t('budget.catLeisure'),
-  shopping_clothing:  t('budget.catShoppingClothing'),
-  education:          t('budget.catEducation'),
-  financial_other:    t('budget.catFinancialOther'),
-  // Income categories
-  'Erwerbseinkommen':      t('budget.catEarnedIncome'),
-  'Kapitalerträge':        t('budget.catInvestmentIncome'),
-  'Geschenke & Transfers': t('budget.catTransferGiftIncome'),
-  'Sozialleistungen':      t('budget.catGovernmentBenefits'),
-  'Sonstiges Einkommen':   t('budget.catOtherIncome'),
-});
 
 const SUBCATEGORY_I18N = () => ({
   rent_mortgage:            t('budget.subcatRentMortgage'),
@@ -78,7 +61,7 @@ function categoryLabel(category) {
     : [...expenseCategories(), ...incomeCategories()].find((c) => c.key === category);
   const key = item?.key ?? category;
   const name = item?.name ?? category;
-  return CATEGORY_I18N()[key] ?? name;
+  return budgetCategoryLabel(key, name, t);
 }
 
 function subcategoryLabel(subcategory) {

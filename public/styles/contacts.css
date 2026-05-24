@@ -184,6 +184,7 @@
 .contact-item__body {
   flex: 1;
   min-width: 0;
+  max-width: 100%;
 }
 
 .contact-item__name {
@@ -207,6 +208,7 @@
   display: flex;
   gap: var(--space-1);
   flex-shrink: 0;
+  align-items: center;
 }
 
 .contact-action-btn {
@@ -222,6 +224,7 @@
   color: var(--color-text-secondary);
   transition: background-color var(--transition-fast), color var(--transition-fast);
   min-height: var(--target-lg);
+  min-width: var(--target-lg);
   text-decoration: none;
 }
 
@@ -233,5 +236,70 @@
 .contact-action-btn--call:hover  { background-color: var(--color-success-light); color: var(--color-success); }
 .contact-action-btn--mail:hover  { background-color: var(--color-accent-light);   color: var(--color-accent);  }
 .contact-action-btn--maps:hover  { background-color: var(--color-warning-light);  color: var(--color-warning); }
+.contact-action-btn--delete {
+  color: var(--color-danger);
+  background-color: var(--color-danger-light);
+}
 
+.contact-more-menu {
+  display: none;
+  position: relative;
+}
 
+.contact-more-menu summary {
+  list-style: none;
+}
+
+.contact-more-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.contact-more-menu__panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-1));
+  z-index: var(--z-dropdown);
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.contact-action-btn--mobile-menu {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .contact-item {
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .contact-item__icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .contact-item__actions {
+    gap: var(--space-1);
+  }
+
+  .contact-action-btn--desktop-extra {
+    display: none;
+  }
+
+  .contact-more-menu {
+    display: block;
+  }
+
+  .contact-more-menu[open] {
+    z-index: var(--z-dropdown);
+  }
+
+  .contact-action-btn--mobile-menu {
+    display: flex;
+  }
+}

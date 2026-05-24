@@ -13,6 +13,9 @@ test('audited frontend files do not assign innerHTML', () => {
     './public/components/oikos-install-prompt.js',
     './public/pages/notes.js',
     './public/pages/meals.js',
+    './public/pages/contacts.js',
+    './public/pages/documents.js',
+    './public/pages/housekeeping.js',
   ];
 
   for (const file of files) {

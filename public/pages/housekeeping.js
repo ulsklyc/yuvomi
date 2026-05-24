@@ -211,6 +211,10 @@ function renderWorkerSummary() {
         <div>
           <h2>${esc(t('housekeeping.noWorkerTitle'))}</h2>
           <p>${esc(t('housekeeping.noWorkerHint'))}</p>
+          <button class="btn btn--primary housekeeping-worker-empty__cta" type="button" id="housekeeping-create-profile">
+            <i data-lucide="plus" aria-hidden="true"></i>
+            <span>${esc(t('housekeeping.setupProfileAction'))}</span>
+          </button>
         </div>
       </section>
     `;
@@ -245,6 +249,13 @@ function renderWorkerSummary() {
 function renderDashboard(content) {
   content.replaceChildren();
   const data = state.dashboard || {};
+  if (!state.workers.length) {
+    content.insertAdjacentHTML('beforeend', renderWorkerSummary());
+    content.querySelector('#housekeeping-create-profile')?.addEventListener('click', () => {
+      openStaffModal(null, content, { afterSave: () => renderDashboard(content) });
+    });
+    return;
+  }
   const lastVisit = data.last_visit?.check_in ? `${formatDate(data.last_visit.check_in)} · ${formatTime(data.last_visit.check_in)}` : t('housekeeping.noVisits');
   const maxPayment = Math.max(1, ...(data.monthly_payments || []).map((row) => row.total));
   const bars = (data.monthly_payments || []).map((row) => {
@@ -750,7 +761,7 @@ function openVisitEditModal(visit, content) {
   if (window.lucide) window.lucide.createIcons({ el: panel });
 }
 
-function openStaffModal(worker, content) {
+function openStaffModal(worker, content, options = {}) {
   const item = worker || {};
   state.workerAvatar = item.avatar_data ?? null;
   openModal({
@@ -843,7 +854,8 @@ function openStaffModal(worker, content) {
           window.oikos?.showToast(t('housekeeping.workerSavedToast'), 'success');
           await loadData();
           closeModal({ force: true });
-          renderStaff(content);
+          if (typeof options.afterSave === 'function') options.afterSave();
+          else renderStaff(content);
         } catch (err) {
           window.oikos?.showToast(err.message, 'danger');
         }

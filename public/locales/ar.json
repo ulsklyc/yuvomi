@@ -616,7 +616,8 @@
     "categoryCraftsman": "حرفي",
     "categoryEmergency": "طوارئ",
     "categoryOther": "متنوع",
-    "emptyAction": "إضافة جهة اتصال"
+    "emptyAction": "إضافة جهة اتصال",
+    "moreActions": "إجراءات إضافية"
   },
   "budget": {
     "title": "الميزانية",
@@ -770,7 +771,16 @@
     "loanTransactions": "معاملات القرض",
     "loanInstallmentNumber": "القسط {{number}} من {{total}}",
     "loanReportTitle": "تقرير القرض",
-    "loanNoTransactions": "لم يتم تسجيل أي دفعات بعد."
+    "loanNoTransactions": "لم يتم تسجيل أي دفعات بعد.",
+    "categoryIncome": "الدخل",
+    "categoryHousing": "Housing / Home",
+    "categoryFood": "الطعام",
+    "categoryInsurance": "التأمين",
+    "categoryUtilities": "Electricity / Water / Gas",
+    "categoryHealth": "الصحة",
+    "categoryFamily": "العائلة",
+    "categoryHome": "المنزل",
+    "categoryClothing": "الملابس"
   },
   "settings": {
     "title": "الإعدادات",
@@ -1320,7 +1330,9 @@
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "التنظيف المنزلي",
     "calendarItemsFolder": "عناصر التقويم",
-    "folderBrowserTitle": "تصفح المجلدات"
+    "folderBrowserTitle": "تصفح المجلدات",
+    "emptyPrimary": "إضافة مستند",
+    "emptySecondary": "إضافة مجلد"
   },
   "shortcuts": {
     "goKitchen": "المطبخ",
@@ -1476,7 +1488,8 @@
         "name": "غسل الشرفة/الفناء",
         "area": "الخارج"
       }
-    }
+    },
+    "setupProfileAction": "إنشاء ملف شخصي"
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

@@ -616,7 +616,8 @@
     "categoryCraftsman": "Tradesperson",
     "categoryEmergency": "Emergency",
     "categoryOther": "Other",
-    "emptyAction": "Add contact"
+    "emptyAction": "Add contact",
+    "moreActions": "More actions"
   },
   "budget": {
     "title": "Budget",
@@ -770,7 +771,16 @@
     "loanTransactions": "Loan transactions",
     "loanInstallmentNumber": "Installment {{number}} of {{total}}",
     "loanReportTitle": "Loan report",
-    "loanNoTransactions": "No payments recorded yet."
+    "loanNoTransactions": "No payments recorded yet.",
+    "categoryIncome": "Income",
+    "categoryHousing": "Housing / Home",
+    "categoryFood": "Food",
+    "categoryInsurance": "Insurance",
+    "categoryUtilities": "Electricity / Water / Gas",
+    "categoryHealth": "Health",
+    "categoryFamily": "Family",
+    "categoryHome": "Home",
+    "categoryClothing": "Clothing"
   },
   "settings": {
     "title": "Settings",
@@ -1331,7 +1341,9 @@
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "HouseKeeping",
     "calendarItemsFolder": "Calendar items",
-    "folderBrowserTitle": "Browse folders"
+    "folderBrowserTitle": "Browse folders",
+    "emptyPrimary": "Add document",
+    "emptySecondary": "Add folder"
   },
   "housekeeping": {
     "title": "Cleaner workspace",
@@ -1476,7 +1488,8 @@
         "name": "Wash balcony/patio",
         "area": "Outdoor"
       }
-    }
+    },
+    "setupProfileAction": "Create profile"
   },
   "userMultiSelect": {
     "moreUsers": "weitere",
