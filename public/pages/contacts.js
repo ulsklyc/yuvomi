@@ -241,7 +241,27 @@ function renderList() {
 function renderContactItem(c) {
   const phone   = c.phone  ? `<a href="tel:${esc(c.phone)}"   class="contact-action-btn contact-action-btn--call"  aria-label="${t('contacts.callLabel')}"><i data-lucide="phone" style="width:16px;height:16px;" aria-hidden="true"></i></a>` : '';
   const email   = c.email  ? `<a href="mailto:${esc(c.email)}" class="contact-action-btn contact-action-btn--mail"  aria-label="${t('contacts.emailActionLabel')}"><i data-lucide="mail" style="width:16px;height:16px;" aria-hidden="true"></i></a>` : '';
-  const maps    = c.address ? `<a href="https://maps.google.com/?q=${encodeURIComponent(c.address)}" target="_blank" rel="noopener" class="contact-action-btn contact-action-btn--maps" aria-label="${t('contacts.mapsLabel')}"><i data-lucide="map-pin" style="width:16px;height:16px;" aria-hidden="true"></i></a>` : '';
+  const maps    = c.address ? `<a href="https://maps.google.com/?q=${encodeURIComponent(c.address)}" target="_blank" rel="noopener" class="contact-action-btn contact-action-btn--maps contact-action-btn--desktop-extra" aria-label="${t('contacts.mapsLabel')}"><i data-lucide="map-pin" style="width:16px;height:16px;" aria-hidden="true"></i></a>` : '';
+  const mobileMaps = c.address ? `<a href="https://maps.google.com/?q=${encodeURIComponent(c.address)}" target="_blank" rel="noopener" class="contact-action-btn contact-action-btn--maps contact-action-btn--mobile-menu" aria-label="${t('contacts.mapsLabel')}"><i data-lucide="map-pin" style="width:16px;height:16px;" aria-hidden="true"></i></a>` : '';
+  const exportAction = `<a href="/api/v1/contacts/${c.id}/vcard" download="${esc(c.name)}.vcf"
+           class="contact-action-btn contact-action-btn--desktop-extra" aria-label="${t('contacts.exportLabel')}" title="${t('contacts.exportTooltip')}">
+          <i data-lucide="download" style="width:16px;height:16px;" aria-hidden="true"></i>
+        </a>`;
+  const mobileExportAction = `<a href="/api/v1/contacts/${c.id}/vcard" download="${esc(c.name)}.vcf"
+           class="contact-action-btn contact-action-btn--mobile-menu" aria-label="${t('contacts.exportLabel')}" title="${t('contacts.exportTooltip')}">
+          <i data-lucide="download" style="width:16px;height:16px;" aria-hidden="true"></i>
+        </a>`;
+  const deleteAction = !c.family_user_id ? `
+          <button class="contact-action-btn contact-action-btn--delete contact-action-btn--desktop-extra" data-action="delete" data-id="${c.id}" aria-label="${t('contacts.deleteLabel')}">
+            <i data-lucide="trash-2" style="width:16px;height:16px;" aria-hidden="true"></i>
+          </button>
+        ` : '';
+  const mobileDeleteAction = !c.family_user_id ? `
+          <button class="contact-action-btn contact-action-btn--delete contact-action-btn--mobile-menu" data-action="delete" data-id="${c.id}" aria-label="${t('contacts.deleteLabel')}">
+            <i data-lucide="trash-2" style="width:16px;height:16px;" aria-hidden="true"></i>
+          </button>
+        ` : '';
+  const hasMobileMenu = Boolean(c.id);
   const meta    = [c.phone, c.email].filter(Boolean).join(' · ');
 
   return `
@@ -253,15 +273,19 @@ function renderContactItem(c) {
       </div>
       <div class="contact-item__actions">
         ${phone}${email}${maps}
-        <a href="/api/v1/contacts/${c.id}/vcard" download="${esc(c.name)}.vcf"
-           class="contact-action-btn" aria-label="${t('contacts.exportLabel')}" title="${t('contacts.exportTooltip')}">
-          <i data-lucide="download" style="width:16px;height:16px;" aria-hidden="true"></i>
-        </a>
-        ${!c.family_user_id ? `
-          <button class="contact-action-btn" data-action="delete" data-id="${c.id}" aria-label="${t('contacts.deleteLabel')}">
-            <i data-lucide="trash-2" style="width:16px;height:16px;" aria-hidden="true"></i>
-          </button>
-        ` : ''}
+        ${exportAction}
+        ${deleteAction}
+        ${hasMobileMenu ? `
+        <details class="contact-more-menu">
+          <summary class="contact-action-btn" data-action="more" aria-label="${t('contacts.moreActions')}">
+            <i data-lucide="more-horizontal" style="width:16px;height:16px;" aria-hidden="true"></i>
+          </summary>
+          <div class="contact-more-menu__panel">
+            ${mobileMaps}
+            ${mobileExportAction}
+            ${mobileDeleteAction}
+          </div>
+        </details>` : ''}
       </div>
     </div>
   `;

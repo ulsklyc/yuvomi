@@ -616,7 +616,8 @@
     "categoryCraftsman": "Handlare",
     "categoryEmergency": "Nödsituation",
     "categoryOther": "Andra",
-    "emptyAction": "Lägg till kontakt"
+    "emptyAction": "Lägg till kontakt",
+    "moreActions": "Fler åtgärder"
   },
   "budget": {
     "title": "Budget",
@@ -770,7 +771,16 @@
     "loanTransactions": "Lånetransaktioner",
     "loanInstallmentNumber": "Delbetalning {{number}} av {{total}}",
     "loanReportTitle": "Lånrapport",
-    "loanNoTransactions": "Inga betalningar registrerade ännu."
+    "loanNoTransactions": "Inga betalningar registrerade ännu.",
+    "categoryIncome": "Inkomst",
+    "categoryHousing": "Bostad / Hem",
+    "categoryFood": "Specerier",
+    "categoryInsurance": "Försäkring",
+    "categoryUtilities": "El / vatten / gas",
+    "categoryHealth": "Hälsa",
+    "categoryFamily": "Familj",
+    "categoryHome": "Hem",
+    "categoryClothing": "Kläder"
   },
   "settings": {
     "title": "Inställningar",
@@ -1320,7 +1330,9 @@
     "folderCreatedToast": "Mapp skapad.",
     "housekeepingFolder": "Städning",
     "calendarItemsFolder": "Kalenderobjekt",
-    "folderBrowserTitle": "Bläddra bland mappar"
+    "folderBrowserTitle": "Bläddra bland mappar",
+    "emptyPrimary": "Lägg till dokument",
+    "emptySecondary": "Lägg till mapp"
   },
   "shortcuts": {
     "goKitchen": "Kök",
@@ -1476,7 +1488,8 @@
         "name": "Tvätta balkong/uteplats",
         "area": "Utomhus"
       }
-    }
+    },
+    "setupProfileAction": "Skapa profil"
   },
   "userMultiSelect": {
     "moreUsers": "mer",

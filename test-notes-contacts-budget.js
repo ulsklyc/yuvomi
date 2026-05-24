@@ -5,7 +5,9 @@
  */
 
 import { DatabaseSync } from 'node:sqlite';
+import nodeAssert from 'node:assert/strict';
 import { MIGRATIONS_SQL } from './server/db-schema-test.js';
+import { budgetCategoryLabelKey } from './public/utils/category-labels.js';
 
 let passed = 0;
 let failed = 0;
@@ -177,6 +179,12 @@ test('Kontakt löschen', () => {
 console.log('\n[Budget-Test] Einnahmen, Ausgaben, Saldo, Aggregation, CSV-Vorbereitung\n');
 
 let bId1, bId2, bId3, bId4;
+
+test('Budget-Kategorie-Labels mappen bekannte Rohwerte auf Übersetzungsschlüssel', () => {
+  nodeAssert.equal(budgetCategoryLabelKey('income'), 'budget.categoryIncome');
+  nodeAssert.equal(budgetCategoryLabelKey('utilities'), 'budget.categoryUtilities');
+  nodeAssert.equal(budgetCategoryLabelKey('custom'), null);
+});
 
 test('Ausgabe eintragen (Supermarkt)', () => {
   const r = db.prepare(`INSERT INTO budget_entries (title, amount, category, subcategory, date, created_by)

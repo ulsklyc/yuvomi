@@ -616,7 +616,8 @@
     "categoryCraftsman": "Τεχνίτης",
     "categoryEmergency": "Έκτακτη ανάγκη",
     "categoryOther": "Άλλο",
-    "emptyAction": "Προσθήκη επαφής"
+    "emptyAction": "Προσθήκη επαφής",
+    "moreActions": "Περισσότερες ενέργειες"
   },
   "budget": {
     "title": "Προϋπολογισμός",
@@ -770,7 +771,16 @@
     "loanTransactions": "Συναλλαγές δανείου",
     "loanInstallmentNumber": "Δόση {{number}} από {{total}}",
     "loanReportTitle": "Αναφορά δανείου",
-    "loanNoTransactions": "Δεν έχουν καταγραφεί πληρωμές ακόμα."
+    "loanNoTransactions": "Δεν έχουν καταγραφεί πληρωμές ακόμα.",
+    "categoryIncome": "Έσοδα",
+    "categoryHousing": "Housing / Home",
+    "categoryFood": "Τρόφιμα",
+    "categoryInsurance": "Ασφάλεια",
+    "categoryUtilities": "Electricity / Water / Gas",
+    "categoryHealth": "Υγεία",
+    "categoryFamily": "Οικογένεια",
+    "categoryHome": "Σπίτι",
+    "categoryClothing": "Ρουχισμός"
   },
   "settings": {
     "title": "Ρυθμίσεις",
@@ -1320,7 +1330,9 @@
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "Καθαριότητα",
     "calendarItemsFolder": "Στοιχεία ημερολογίου",
-    "folderBrowserTitle": "Περιήγηση φακέλων"
+    "folderBrowserTitle": "Περιήγηση φακέλων",
+    "emptyPrimary": "Προσθήκη εγγράφου",
+    "emptySecondary": "Προσθήκη φακέλου"
   },
   "shortcuts": {
     "goKitchen": "Κουζίνα",
@@ -1476,7 +1488,8 @@
         "name": "Πλύσιμο μπαλκονιού/αυλής",
         "area": "Εξωτερικός χώρος"
       }
-    }
+    },
+    "setupProfileAction": "Δημιουργία προφίλ"
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

@@ -616,7 +616,8 @@
     "categoryCraftsman": "技工",
     "categoryEmergency": "紧急联系",
     "categoryOther": "其他",
-    "emptyAction": "添加联系人"
+    "emptyAction": "添加联系人",
+    "moreActions": "更多操作"
   },
   "budget": {
     "title": "预算",
@@ -770,7 +771,16 @@
     "loanTransactions": "借款交易",
     "loanInstallmentNumber": "第 {{number}} / {{total}} 期",
     "loanReportTitle": "借款报告",
-    "loanNoTransactions": "尚未记录还款。"
+    "loanNoTransactions": "尚未记录还款。",
+    "categoryIncome": "收入",
+    "categoryHousing": "Housing / Home",
+    "categoryFood": "食品",
+    "categoryInsurance": "保险",
+    "categoryUtilities": "Electricity / Water / Gas",
+    "categoryHealth": "健康",
+    "categoryFamily": "家庭",
+    "categoryHome": "家",
+    "categoryClothing": "服装"
   },
   "settings": {
     "title": "设置",
@@ -1320,7 +1330,9 @@
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "家政清洁",
     "calendarItemsFolder": "日历项目",
-    "folderBrowserTitle": "浏览文件夹"
+    "folderBrowserTitle": "浏览文件夹",
+    "emptyPrimary": "添加文档",
+    "emptySecondary": "添加文件夹"
   },
   "shortcuts": {
     "goKitchen": "厨房",
@@ -1476,7 +1488,8 @@
         "name": "清洗阳台/露台",
         "area": "户外"
       }
-    }
+    },
+    "setupProfileAction": "创建档案"
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

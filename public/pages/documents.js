@@ -217,13 +217,25 @@ function renderDocuments() {
   if (!docs.length) {
     list.replaceChildren();
     list.insertAdjacentHTML('beforeend', `
-      <div class="empty-state">
+      <div class="empty-state documents-empty-state">
         <i data-lucide="folder-open" class="empty-state__icon" aria-hidden="true"></i>
         <div class="empty-state__title">${t('documents.emptyTitle')}</div>
         <div class="empty-state__description">${t('documents.emptyDescription')}</div>
+        <div class="documents-empty-state__actions">
+          <button class="btn btn--primary" type="button" id="documents-empty-upload">
+            <i data-lucide="upload" class="icon-md" aria-hidden="true"></i>
+            ${t('documents.emptyPrimary')}
+          </button>
+          <button class="btn btn--secondary" type="button" id="documents-empty-folder">
+            <i data-lucide="folder-plus" class="icon-md" aria-hidden="true"></i>
+            ${t('documents.emptySecondary')}
+          </button>
+        </div>
       </div>
     `);
     if (window.lucide) lucide.createIcons();
+    list.querySelector('#documents-empty-upload')?.addEventListener('click', () => openDocumentModal());
+    list.querySelector('#documents-empty-folder')?.addEventListener('click', () => openFolderModal());
     return;
   }
   list.replaceChildren();

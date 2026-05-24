@@ -616,7 +616,8 @@
     "categoryCraftsman": "Artesão",
     "categoryEmergency": "Emergência",
     "categoryOther": "Outros",
-    "emptyAction": "Adicionar contato"
+    "emptyAction": "Adicionar contato",
+    "moreActions": "Mais ações"
   },
   "budget": {
     "title": "Orçamento",
@@ -770,7 +771,16 @@
     "loanTransactions": "Transações do empréstimo",
     "loanInstallmentNumber": "Parcela {{number}} de {{total}}",
     "loanReportTitle": "Relatório do empréstimo",
-    "loanNoTransactions": "Nenhum pagamento registrado ainda."
+    "loanNoTransactions": "Nenhum pagamento registrado ainda.",
+    "categoryIncome": "Receita",
+    "categoryHousing": "Habitação / Casa",
+    "categoryFood": "Alimentação",
+    "categoryInsurance": "Seguro",
+    "categoryUtilities": "Luz / Água / Gás",
+    "categoryHealth": "Saúde",
+    "categoryFamily": "Família",
+    "categoryHome": "Casa",
+    "categoryClothing": "Roupas"
   },
   "settings": {
     "title": "Configurações",
@@ -1320,7 +1330,9 @@
     "folderCreatedToast": "Pasta criada.",
     "housekeepingFolder": "Faxina",
     "calendarItemsFolder": "Itens do calendário",
-    "folderBrowserTitle": "Navegar por pastas"
+    "folderBrowserTitle": "Navegar por pastas",
+    "emptyPrimary": "Adicionar documento",
+    "emptySecondary": "Adicionar pasta"
   },
   "shortcuts": {
     "goKitchen": "Cozinha",
@@ -1476,7 +1488,8 @@
         "name": "Lavar varanda/pátio",
         "area": "Área externa"
       }
-    }
+    },
+    "setupProfileAction": "Criar perfil"
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

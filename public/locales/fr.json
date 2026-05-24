@@ -616,7 +616,8 @@
     "categoryCraftsman": "Artisan",
     "categoryEmergency": "Urgence",
     "categoryOther": "Autre",
-    "emptyAction": "Ajouter un contact"
+    "emptyAction": "Ajouter un contact",
+    "moreActions": "Plus d’actions"
   },
   "budget": {
     "title": "Budget",
@@ -770,7 +771,16 @@
     "loanTransactions": "Transactions du prêt",
     "loanInstallmentNumber": "Échéance {{number}} sur {{total}}",
     "loanReportTitle": "Rapport du prêt",
-    "loanNoTransactions": "Aucun paiement enregistré."
+    "loanNoTransactions": "Aucun paiement enregistré.",
+    "categoryIncome": "Revenus",
+    "categoryHousing": "Logement / Maison",
+    "categoryFood": "Alimentation",
+    "categoryInsurance": "Assurance",
+    "categoryUtilities": "Électricité / Eau / Gaz",
+    "categoryHealth": "Santé",
+    "categoryFamily": "Famille",
+    "categoryHome": "Maison",
+    "categoryClothing": "Vêtements"
   },
   "settings": {
     "title": "Paramètres",
@@ -1320,7 +1330,9 @@
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "Ménage",
     "calendarItemsFolder": "Éléments du calendrier",
-    "folderBrowserTitle": "Parcourir les dossiers"
+    "folderBrowserTitle": "Parcourir les dossiers",
+    "emptyPrimary": "Ajouter un document",
+    "emptySecondary": "Ajouter un dossier"
   },
   "shortcuts": {
     "goKitchen": "Cuisine",
@@ -1476,7 +1488,8 @@
         "name": "Laver balcon/patio",
         "area": "Extérieur"
       }
-    }
+    },
+    "setupProfileAction": "Créer le profil"
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

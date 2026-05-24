@@ -616,7 +616,8 @@
     "categoryCraftsman": "कारीगर",
     "categoryEmergency": "आपातकालीन",
     "categoryOther": "विविध",
-    "emptyAction": "संपर्क जोड़ें"
+    "emptyAction": "संपर्क जोड़ें",
+    "moreActions": "और कार्रवाइयाँ"
   },
   "budget": {
     "title": "बजट",
@@ -770,7 +771,16 @@
     "loanTransactions": "उधार लेन-देन",
     "loanInstallmentNumber": "{{total}} में से किस्त {{number}}",
     "loanReportTitle": "उधार रिपोर्ट",
-    "loanNoTransactions": "अभी कोई भुगतान दर्ज नहीं है।"
+    "loanNoTransactions": "अभी कोई भुगतान दर्ज नहीं है।",
+    "categoryIncome": "आय",
+    "categoryHousing": "Housing / Home",
+    "categoryFood": "भोजन",
+    "categoryInsurance": "बीमा",
+    "categoryUtilities": "Electricity / Water / Gas",
+    "categoryHealth": "स्वास्थ्य",
+    "categoryFamily": "परिवार",
+    "categoryHome": "घर",
+    "categoryClothing": "कपड़े"
   },
   "settings": {
     "title": "सेटिंग्स",
@@ -1320,7 +1330,9 @@
     "folderCreatedToast": "Folder created.",
     "housekeepingFolder": "हाउसकीपिंग",
     "calendarItemsFolder": "कैलेंडर आइटम",
-    "folderBrowserTitle": "फ़ोल्डर ब्राउज़ करें"
+    "folderBrowserTitle": "फ़ोल्डर ब्राउज़ करें",
+    "emptyPrimary": "दस्तावेज़ जोड़ें",
+    "emptySecondary": "फ़ोल्डर जोड़ें"
   },
   "shortcuts": {
     "goKitchen": "रसोई",
@@ -1476,7 +1488,8 @@
         "name": "बालकनी/आँगन धोएँ",
         "area": "बाहरी क्षेत्र"
       }
-    }
+    },
+    "setupProfileAction": "प्रोफ़ाइल बनाएँ"
   },
   "userMultiSelect": {
     "moreUsers": "weitere",

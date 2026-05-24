@@ -622,7 +622,8 @@
     "categoryInsurance": "Ubezpieczenie",
     "categoryCraftsman": "Rzemieślnik",
     "categoryEmergency": "Nagły wypadek",
-    "categoryOther": "Inne"
+    "categoryOther": "Inne",
+    "moreActions": "Więcej działań"
   },
   "budget": {
     "title": "Budżet",
@@ -776,7 +777,16 @@
     "loanTransactions": "Transakcje pożyczki",
     "loanInstallmentNumber": "Rata {{number}} z {{total}}",
     "loanReportTitle": "Raport pożyczki",
-    "loanNoTransactions": "Brak zarejestrowanych płatności."
+    "loanNoTransactions": "Brak zarejestrowanych płatności.",
+    "categoryIncome": "Przychody",
+    "categoryHousing": "Mieszkanie / Dom",
+    "categoryFood": "Żywność",
+    "categoryInsurance": "Ubezpieczenie",
+    "categoryUtilities": "Prąd / Woda / Gaz",
+    "categoryHealth": "Zdrowie",
+    "categoryFamily": "Rodzina",
+    "categoryHome": "Dom",
+    "categoryClothing": "Odzież"
   },
   "settings": {
     "title": "Ustawienia",
@@ -1331,7 +1341,9 @@
     "folderCreatedToast": "Folder utworzony.",
     "housekeepingFolder": "Sprzątanie",
     "calendarItemsFolder": "Wpisy kalendarza",
-    "folderBrowserTitle": "Przeglądaj foldery"
+    "folderBrowserTitle": "Przeglądaj foldery",
+    "emptyPrimary": "Dodaj dokument",
+    "emptySecondary": "Dodaj folder"
   },
   "userMultiSelect": {
     "nobody": "– Nikt –",
@@ -1480,7 +1492,8 @@
         "name": "Mycie balkonu/tarasu",
         "area": "Na zewnątrz"
       }
-    }
+    },
+    "setupProfileAction": "Utwórz profil"
   },
   "splitExpenses": {
     "title": "Wspólne wydatki",
