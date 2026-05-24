@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.52.43] - 2026-05-24
+
+### Changed
+- Tasks now keeps bulk actions hidden during normal list use, shows them only in bulk-select mode, and disables bulk buttons when no tasks are selected.
+- Shopping items can now be checked by tapping the row text area while preserving existing delete, input, select, and explicit button behavior.
+- Tasks, shopping items, and note pin/delete controls now use tokenized touch target sizing for more comfortable mobile interaction.
+
 ## [0.52.42] - 2026-05-24
 
 ### Changed
