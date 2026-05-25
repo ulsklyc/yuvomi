@@ -370,14 +370,14 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
       <div class="form-group" style="margin-top:var(--space-4)">
         <label class="label" for="task-start-date">${t('tasks.startDateLabel')}</label>
         <input class="input js-date-input" type="text" id="task-start-date" name="start_date"
-               value="${formatDateInput(task?.start_date)}" placeholder="${dateInputPlaceholder()}" inputmode="numeric">
+               value="${formatDateInput(task?.start_date)}" placeholder="${dateInputPlaceholder()}" inputmode="text">
       </div>
 
       <div class="modal-grid modal-grid--2" style="margin-top:var(--space-4)">
         <div class="form-group">
           <label class="label" for="task-due-date">${t('tasks.dueDateLabel')}</label>
           <input class="input js-date-input" type="text" id="task-due-date" name="due_date"
-                 value="${formatDateInput(task?.due_date)}" placeholder="${dateInputPlaceholder()}" inputmode="numeric">
+                 value="${formatDateInput(task?.due_date)}" placeholder="${dateInputPlaceholder()}" inputmode="text">
         </div>
         <div class="form-group">
           <label class="label" for="task-due-time">${t('tasks.dueTimeLabel')}</label>

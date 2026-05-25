@@ -110,7 +110,7 @@ export function renderRRuleFields(prefix, existingRule) {
           <div class="form-group rrule-until-field" style="margin-bottom:0">
             <label class="label form-label" for="${prefix}-rrule-until">${t('rrule.labelUntil')}</label>
             <input class="input form-input js-date-input" type="text" id="${prefix}-rrule-until"
-                   value="${formatDateInput(parsed.until)}" placeholder="${dateInputPlaceholder()}" inputmode="numeric">
+                   value="${formatDateInput(parsed.until)}" placeholder="${dateInputPlaceholder()}" inputmode="text">
           </div>
         </div>
 

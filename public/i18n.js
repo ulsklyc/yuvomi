@@ -169,14 +169,14 @@ export function parseDateInput(value) {
   const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (isoMatch) return isValidDateParts(isoMatch[1], isoMatch[2], isoMatch[3]) ? raw : '';
 
-  const ymdSeparatorMatch = raw.match(/^(\d{4})[\/.](\d{1,2})[\/.](\d{1,2})$/);
+  const ymdSeparatorMatch = raw.match(/^(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})$/);
   if (ymdSeparatorMatch && getDateFormatPreference().startsWith('ymd')) {
     const [, year, month, day] = ymdSeparatorMatch;
     if (!isValidDateParts(year, month, day)) return '';
     return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   }
 
-  const slashMatch = raw.match(/^(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})$/);
+  const slashMatch = raw.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
   if (!slashMatch) return '';
 
   const [, first, second, year] = slashMatch;

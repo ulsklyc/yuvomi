@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Allow task date fields to accept slash and hyphen separators when creating or editing tasks.
+
 ## [0.52.53] - 2026-05-25
 
 ### Fixed
