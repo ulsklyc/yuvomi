@@ -606,6 +606,7 @@ function renderAppShell(container) {
     moreBtn.id = 'more-btn';
     moreBtn.type = 'button';
     moreBtn.setAttribute('aria-label', t('nav.more'));
+    moreBtn.setAttribute('title', t('nav.more'));
     moreBtn.setAttribute('aria-expanded', 'false');
     moreBtn.setAttribute('aria-controls', 'more-sheet');
     const moreBtnWrap = document.createElement('div');
@@ -1190,6 +1191,20 @@ function navItemEl({ path, label, icon, module: mod }) {
   return a;
 }
 
+function replaceLucideIcon(container, selector, iconName) {
+  const current = container.querySelector(selector);
+  if (!current) return;
+  const next = document.createElement('i');
+  next.dataset.lucide = iconName;
+  const classes = (current.getAttribute('class') || '')
+    .split(/\s+/)
+    .filter((className) => className && className !== 'lucide' && !className.startsWith('lucide-'));
+  next.className = classes.join(' ') || 'nav-item__icon';
+  next.setAttribute('aria-hidden', 'true');
+  current.replaceWith(next);
+  if (window.lucide) window.lucide.createIcons({ el: container });
+}
+
 function sidebarKitchenEl() {
   const a = document.createElement('a');
   a.href = '/meals';
@@ -1256,6 +1271,30 @@ function kitchenNavAriaLabel(path) {
  * Aktiven Nav-Link hervorheben und More-Button als aktiv markieren
  * wenn die aktive Route im More-Sheet liegt.
  */
+function setMoreButtonState(moreBtn, activeSecondary) {
+  const inMoreSheet = !!activeSecondary;
+  const moreLabel = activeSecondary ? activeSecondary.label : t('nav.more');
+  const moreIcon = activeSecondary ? activeSecondary.icon : 'grid-2x2';
+
+  moreBtn.classList.toggle('nav-item--active', inMoreSheet);
+  if (inMoreSheet) {
+    moreBtn.setAttribute('aria-current', 'page');
+    if (activeSecondary.module) {
+      moreBtn.style.setProperty('--item-module-accent', `var(--module-${activeSecondary.module})`);
+    }
+  } else {
+    moreBtn.removeAttribute('aria-current');
+    moreBtn.style.removeProperty('--item-module-accent');
+  }
+
+  moreBtn.setAttribute('aria-label', moreLabel);
+  moreBtn.setAttribute('title', moreLabel);
+
+  const moreBtnLabel = moreBtn.querySelector('.nav-item__label');
+  if (moreBtnLabel) moreBtnLabel.textContent = moreLabel;
+  replaceLucideIcon(moreBtn, '.nav-item__icon', moreIcon);
+}
+
 function updateNav(path) {
   document.querySelectorAll('[data-route]').forEach((el) => {
     el.removeAttribute('aria-current');
@@ -1306,26 +1345,7 @@ function updateNav(path) {
   if (moreBtn) {
     const secondaryItems = navItems().filter((i) => !i.kitchenGroup).slice(PRIMARY_NAV);
     const activeSecondary = secondaryItems.find((n) => n.path === path);
-    const inMoreSheet = !!activeSecondary;
-
-    moreBtn.classList.toggle('nav-item--active', inMoreSheet);
-    moreBtn.toggleAttribute('aria-current', inMoreSheet);
-
-    if (inMoreSheet && activeSecondary.module) {
-      moreBtn.style.setProperty('--item-module-accent', `var(--module-${activeSecondary.module})`);
-    } else {
-      moreBtn.style.removeProperty('--item-module-accent');
-    }
-
-    const moreBtnLabel = moreBtn.querySelector('.nav-item__label');
-    const moreBtnIcon  = moreBtn.querySelector('.nav-item__icon');
-
-    if (moreBtnLabel) {
-      moreBtnLabel.textContent = activeSecondary ? activeSecondary.label : t('nav.more');
-    }
-    if (moreBtnIcon) {
-      moreBtnIcon.dataset.lucide = activeSecondary ? activeSecondary.icon : 'grid-2x2';
-    }
+    setMoreButtonState(moreBtn, activeSecondary);
   }
 
   if (window.lucide) {

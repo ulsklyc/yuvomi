@@ -75,6 +75,16 @@ test('mobile More sheet trigger controls its dialog and traps keyboard focus', (
   assert.match(source, /removeEventListener\('keydown',\s*moreSheetTrap/);
 });
 
+test('More button active state keeps visible and accessible labels in sync', () => {
+  const source = read('./public/router.js');
+
+  assert.match(source, /function\s+setMoreButtonState/);
+  assert.match(source, /moreBtn\.setAttribute\('aria-current',\s*'page'\)/);
+  assert.match(source, /moreBtn\.setAttribute\('aria-label',\s*moreLabel\)/);
+  assert.match(source, /moreBtn\.setAttribute\('title',\s*moreLabel\)/);
+  assert.doesNotMatch(source, /moreBtn\.toggleAttribute\('aria-current',\s*inMoreSheet\)/);
+});
+
 test('bottom navigation labels are constrained against localized overflow', () => {
   const layout = read('./public/styles/layout.css');
   const labelRule = cssRuleBody(layout, '.nav-item__label');
