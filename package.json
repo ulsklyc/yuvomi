@@ -42,12 +42,12 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "express-session": "^1.19.0",
-    "helmet": "^8.1.0",
+    "helmet": "^8.2.0",
     "node-cron": "^4.2.1",
     "node-fetch": "^3.3.2"
   },
   "optionalDependencies": {
-    "googleapis": "^171.4.0",
+    "googleapis": "^172.0.0",
     "tsdav": "^2.2.2"
   },
   "license": "MIT",
