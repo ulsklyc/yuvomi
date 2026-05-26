@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.52.57] - 2026-05-26
+
+### Fixed
+- Restored colored inactive icon wells for the mobile Kitchen and More navigation buttons.
+
 ## [0.52.56] - 2026-05-26
 
 ### Security

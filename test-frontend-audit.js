@@ -85,6 +85,15 @@ test('More button active state keeps visible and accessible labels in sync', () 
   assert.doesNotMatch(source, /moreBtn\.toggleAttribute\('aria-current',\s*inMoreSheet\)/);
 });
 
+test('mobile Kitchen and More nav buttons keep colored icon wells while inactive', () => {
+  const source = read('./public/router.js');
+
+  assert.match(source, /kitchenBtn\.style\.setProperty\('--item-module-accent',\s*'var\(--module-meals\)'\)/);
+  assert.match(source, /moreBtn\.style\.setProperty\('--item-module-accent',\s*'var\(--color-accent\)'\)/);
+  assert.doesNotMatch(source, /kitchenNavBtn\.style\.removeProperty\('--item-module-accent'\)/);
+  assert.doesNotMatch(source, /moreBtn\.style\.removeProperty\('--item-module-accent'\)/);
+});
+
 test('More sheet closes route clicks through delegated handler after rebuilds', () => {
   const source = read('./public/router.js');
 

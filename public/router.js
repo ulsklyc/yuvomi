@@ -592,6 +592,7 @@ function renderAppShell(container) {
     kitchenBtn.className = 'nav-item nav-item--kitchen';
     kitchenBtn.id = 'kitchen-btn';
     kitchenBtn.type = 'button';
+    kitchenBtn.style.setProperty('--item-module-accent', 'var(--module-meals)');
     kitchenBtn.setAttribute('aria-label', t('nav.kitchen'));
     kitchenBtn.setAttribute('title', t('nav.kitchen'));
     const kitchenBtnWrap = document.createElement('div');
@@ -616,6 +617,7 @@ function renderAppShell(container) {
     moreBtn.className = 'nav-item nav-item--more';
     moreBtn.id = 'more-btn';
     moreBtn.type = 'button';
+    moreBtn.style.setProperty('--item-module-accent', 'var(--color-accent)');
     moreBtn.setAttribute('aria-label', t('nav.more'));
     moreBtn.setAttribute('title', t('nav.more'));
     moreBtn.setAttribute('aria-expanded', 'false');
@@ -1292,7 +1294,7 @@ function setMoreButtonState(moreBtn, activeSecondary) {
     }
   } else {
     moreBtn.removeAttribute('aria-current');
-    moreBtn.style.removeProperty('--item-module-accent');
+    moreBtn.style.setProperty('--item-module-accent', 'var(--color-accent)');
   }
 
   moreBtn.setAttribute('aria-label', moreLabel);
@@ -1321,7 +1323,8 @@ function updateNav(path) {
       if (kitchenMod) kitchenNavBtn.style.setProperty('--item-module-accent', `var(--module-${kitchenMod})`);
     } else {
       kitchenNavBtn.removeAttribute('aria-current');
-      kitchenNavBtn.style.removeProperty('--item-module-accent');
+      const kitchenMod = navItems().find((n) => n.path === getLastKitchenRoute())?.module;
+      kitchenNavBtn.style.setProperty('--item-module-accent', `var(--module-${kitchenMod || 'meals'})`);
     }
 
     const kitchenBtnLabel = kitchenNavBtn.querySelector('.nav-item__label');
