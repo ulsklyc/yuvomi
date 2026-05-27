@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.52.58] - 2026-05-27
+
+### Added
+- **Task chips in Calendar:** Open and in-progress tasks with a due date now appear as priority-coloured chips in all four calendar views (month, week, day, agenda). Clicking a chip navigates directly to the task edit modal. Tasks with a due time show the time in the chip label. Done and archived tasks are not shown.
+
 ## [0.52.57] - 2026-05-26
 
 ### Fixed
