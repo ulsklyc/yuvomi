@@ -55,17 +55,33 @@
 .split-summary-card,
 .split-card,
 .split-groups-panel {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  background-color: var(--glass-bg-card);
+  border: 1px solid var(--glass-border-subtle);
+  border-radius: var(--radius-glass-card);
+  box-shadow: var(--glass-shadow-sm);
 }
 
 .split-summary-card {
+  position: relative;
   padding: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+.split-summary-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-color: color-mix(in srgb, var(--module-accent) calc(var(--glass-tint-strength) / 2), transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.split-summary-card > * {
+  position: relative;
+  z-index: 1;
 }
 
 .split-summary-card span {
@@ -137,7 +153,7 @@
   align-items: center;
   gap: var(--space-3);
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-glass-inner);
   background: transparent;
   color: inherit;
   text-align: left;
@@ -157,7 +173,7 @@
   flex: 0 0 42px;
   display: grid;
   place-items: center;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-glass-inner);
   background: color-mix(in srgb, var(--module-split-expenses) 14%, var(--color-surface-2));
   color: var(--module-split-expenses);
 }
@@ -197,9 +213,9 @@
 .split-group-header {
   justify-content: space-between;
   padding: var(--space-4);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  background-color: var(--glass-bg-card);
+  border: 1px solid var(--glass-border-subtle);
+  border-radius: var(--radius-glass-card);
 }
 
 .split-kicker {
@@ -294,8 +310,8 @@
 }
 
 .split-participants {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border-subtle);
+  border-radius: var(--radius-glass-inner);
   padding: var(--space-3);
 }
 
