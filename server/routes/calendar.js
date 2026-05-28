@@ -212,9 +212,13 @@ function expandRecurringEvents(events, from, to) {
             d.setDate(d.getDate() + durationDays);
             newEnd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
           } else {
-            newEnd = new Date(new Date(newStart).getTime() + durationMs)
-              .toISOString()
-              .replace('.000Z', 'Z');
+            const endDate = new Date(new Date(newStart).getTime() + durationMs);
+            if (timeSuffix.includes('Z')) {
+              newEnd = endDate.toISOString().replace('.000Z', 'Z');
+            } else {
+              const p = n => String(n).padStart(2, '0');
+              newEnd = `${endDate.getFullYear()}-${p(endDate.getMonth() + 1)}-${p(endDate.getDate())}T${p(endDate.getHours())}:${p(endDate.getMinutes())}`;
+            }
           }
         }
 
