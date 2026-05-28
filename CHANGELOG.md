@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.53.1] - 2026-05-28
+
+### Removed
+- **pyAmortiza module:** Removed the bundled Brazilian mortgage calculator module from the repository; the module system remains fully functional for externally mounted modules.
+
+### Fixed
+- `isIOSInstallFlow()` no longer returns `true` when the app is already running in standalone (installed PWA) mode, restoring the invariant that `getPwaInstallState()` never yields `{installed: true, ios: true}` simultaneously.
+
 ## [0.53.0] - 2026-05-27
 
 ### Added
