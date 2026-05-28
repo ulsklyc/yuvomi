@@ -571,10 +571,10 @@ router.get('/me', requireAuth, (req, res) => {
 
 /**
  * GET /api/v1/auth/users
- * Admin only. Listet alle Familienmitglieder.
+ * Listet alle Familienmitglieder (für Zuweisung in Kalender, Tasks etc.).
  * Response: { data: User[] }
  */
-router.get('/users', requireAuth, requireAdmin, (req, res) => {
+router.get('/users', requireAuth, (req, res) => {
   try {
     const users = db.get()
       .prepare(`

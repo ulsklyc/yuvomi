@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.54.6] - 2026-05-29
+
+### Fixed
+- **Calendar – event assignment for non-admin users:** The `GET /auth/users` endpoint previously required admin privileges, causing the assignee dropdown to silently render empty for child and other non-admin family profiles. Removed the unnecessary `requireAdmin` guard so all authenticated family members can load the user list and assign calendar events.
+
 ## [0.54.5] - 2026-05-28
 
 ### Changed
