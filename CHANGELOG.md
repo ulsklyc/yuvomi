@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.54.5] - 2026-05-28
+
+### Changed
+- **Liquid Glass – Documents & Split Expenses modules:** Migrated `documents.css` and `split-expenses.css` to Glass design tokens. Document folder browser (`.documents-folder-browser`), document cards (`.document-card`), document rows (`.document-row`), the drop zone (`.document-dropzone`) and its icon, the member picker (`.document-member-picker`), and the view toggle (`.documents-view-toggle`) all use `--glass-bg-card`, `--glass-border-subtle`, `--radius-glass-card`/`--radius-glass-inner`, and `--glass-shadow-*` tokens. Split summary cards (`.split-summary-card`) receive a subtle module-accent tint via `::after`. Split cards (`.split-card`), the groups panel (`.split-groups-panel`), group headers (`.split-group-header`), groups (`.split-group`), and participants (`.split-participants`) are migrated to corresponding Glass tokens. All `--shadow-*` → `--glass-shadow-*`, `--radius-md/lg` → `--radius-glass-card/inner/chip`, and `--color-surface` → `--glass-bg-card` replacements applied.
+
 ## [0.54.4] - 2026-05-28
 
 ### Changed
