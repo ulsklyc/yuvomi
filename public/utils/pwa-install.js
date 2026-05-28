@@ -16,6 +16,7 @@ function isStandaloneMode() {
 }
 
 function isIOSInstallFlow() {
+  if (isStandaloneMode()) return false;
   const platform = navigator.platform || '';
   const userAgent = navigator.userAgent || '';
   const isiPadOSDesktopMode = platform === 'MacIntel' && navigator.maxTouchPoints > 1;
