@@ -241,6 +241,9 @@ router.put('/', (req, res) => {
     }
 
     if (disabled_modules !== undefined) {
+      if (req.authRole !== 'admin') {
+        return res.status(403).json({ error: 'Admin access required.', code: 403 });
+      }
       if (!Array.isArray(disabled_modules)) {
         return res.status(400).json({ error: 'disabled_modules muss ein Array sein', code: 400 });
       }

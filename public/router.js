@@ -1294,12 +1294,18 @@ async function refreshThirdPartyModules() {
 
 async function disableFailedThirdPartyModule(moduleId) {
   if (!moduleId) return;
-  _thirdPartyModules = _thirdPartyModules.filter((module) => module.id !== moduleId);
-  rebuildNavigation();
   try {
     await api.patch(`/modules/${encodeURIComponent(moduleId)}`, { enabled: false });
-  } catch {
-    // Members cannot persist module state. The failed module is still removed locally.
+    // Only remove locally if admin successfully disabled it
+    _thirdPartyModules = _thirdPartyModules.filter((module) => module.id !== moduleId);
+    rebuildNavigation();
+  } catch (err) {
+    // Non-admins cannot disable modules; keep module visible
+    // For actual failures (not 403), still remove from local state to avoid broken UI
+    if (err?.status !== 403) {
+      _thirdPartyModules = _thirdPartyModules.filter((module) => module.id !== moduleId);
+      rebuildNavigation();
+    }
   }
 }
 

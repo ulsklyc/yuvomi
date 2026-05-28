@@ -882,6 +882,48 @@ Time-based reminders attached to tasks or calendar events.
 - Dismissing a reminder marks it `dismissed = 1`; dismissed reminders are not shown again
 - API: `GET /api/v1/reminders/pending`, `GET /api/v1/reminders?entity_type=&entity_id=`, `POST /api/v1/reminders`, `DELETE /api/v1/reminders/:id`, `POST /api/v1/reminders/:id/dismiss`
 
+### Third-Party Modules (`/modules/<id>`)
+
+Runtime-loadable modules discovered from the `modules/` directory (v0.53.0). Each module lives in its own subfolder and must include a `module.json` manifest.
+
+**Folder layout:**
+```
+modules/
+  my-module/
+    module.json   # manifest (required)
+    index.js      # render(container, context) export (required)
+    style.css     # optional, loaded only for this page
+```
+
+**`module.json` manifest fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `id` | ✅ | Lowercase letters, numbers, hyphens. Must match the folder name. |
+| `entry` | ✅ | Relative `.js` file exporting `render(container, context)`. |
+| `name` | | Display name shown in navigation and Settings. |
+| `version` | | Semver string, displayed in Settings. |
+| `description` | | Short description shown in Settings. |
+| `style` | | Relative `.css` file loaded only for this module's page. |
+| `icon` | | Lucide icon name for the module's navigation entry. |
+| `accent` | | `#RRGGBB` color used for menu highlighting. |
+| `menu.show` | | Set `false` to hide from navigation. |
+| `menu.label` | | Navigation label (falls back to `name`). |
+| `menu.order` | | Integer sort order in the navigation list. |
+
+**Admin controls (Settings → General → Active modules):**
+- Admins can enable/disable individual third-party modules without restarting the server.
+- Admins can drag-to-reorder navigation entries.
+- Disabled modules are not served to the browser and do not appear in navigation.
+- Enabled module pages are registered automatically in the SPA router at startup.
+
+**Docker:** The default `docker-compose.yml` mounts `${MODULES_DIR:-./modules}` to `/app/modules`. To keep modules outside the Oikos checkout set `MODULES_DIR=/absolute/path` in `.env` and restart. No image rebuild is required.
+
+**Security rules for module authors:**
+- Use `replaceChildren()` and `insertAdjacentHTML()`. Never use `innerHTML`.
+- Escape untrusted values with `esc()` from `/utils/html.js`.
+- Do not use external CDNs or bypass authentication/CSRF/CSP.
+
 ---
 
 ## API Documentation
@@ -899,9 +941,9 @@ Authentication options for external integrations:
 
 ### Colors (CSS Custom Properties)
 
-Source of truth: `public/styles/tokens.css`. Key values (as of v0.20.39):
+Source of truth: `public/styles/tokens.css`. Key values (as of v0.53.0):
 
-**Palette rationale:** Warm-tinted neutral scale (`#FAFAF8 → #121211`) anchored by an **Indigo-600 primary** (`#4F46E5`) that harmonises with the Calendar module violet and the secondary accent. Module colors are semantically separated from severity colors — no hue shared without explicit documentation in `tokens.css`.
+**Palette rationale:** Warm-tinted neutral scale (`#F5F4F1 → #1C1C1A`) anchored by a **Violet primary** (`#6c3aed`) that unifies the brand identity and the Calendar module color. Module colors are semantically separated from severity colors — no hue is shared without explicit documentation in `tokens.css`.
 
 ```css
 :root {
@@ -913,16 +955,16 @@ Source of truth: `public/styles/tokens.css`. Key values (as of v0.20.39):
   --color-text-secondary:  #6C6B67;   /* neutral-600, 5.0:1 on white */
   --color-text-tertiary:   #6A6964;   /* 4.61:1 on bg */
 
-  /* Primary accent — Indigo (warm bias, harmonises with Calendar/violet) */
-  --color-accent:           #4F46E5;  /* Indigo-600, 4.93:1 on white (AA) */
-  --color-accent-hover:     #4338CA;  /* Indigo-700, 7.04:1 (AAA) */
-  --color-accent-active:    #3730A3;  /* Indigo-800 */
-  --color-accent-deep:      #2E2D82;  /* deep Indigo for gradients/weather */
-  --color-accent-secondary: #7C5CFC;  /* violet — logo gradient, same Indigo family */
-  --color-accent-light:     #EEF2FF;  /* Indigo-50 */
-  --color-accent-subtle:    #E0E7FF;  /* Indigo-100 */
-  --color-btn-primary:      #4338CA;  /* Indigo-700, 7.04:1 on white (AAA) */
-  --color-btn-primary-hover:#3730A3;
+  /* Primary accent — Violet */
+  --color-accent:           #6c3aed;  /* Violet-600, 5.63:1 on white (AA) */
+  --color-accent-hover:     #5b2fd4;  /* Violet-700 */
+  --color-accent-active:    #4a26bb;  /* Violet-800 */
+  --color-accent-deep:      #3d1f9e;  /* deep Violet for gradients/weather */
+  --color-accent-secondary: #8b5cf6;  /* Violet-500 — logo gradient */
+  --color-accent-light:     #f5f3ff;  /* Violet-50 */
+  --color-accent-subtle:    #ede9fe;  /* Violet-100 */
+  --color-btn-primary:      #5b2fd4;  /* Violet — WCAG AAA on white */
+  --color-btn-primary-hover:#4a26bb;
 
   /* Severity — hue-separated from module colors */
   --color-success:       #15803D;     /* 4.54:1 */
@@ -931,16 +973,21 @@ Source of truth: `public/styles/tokens.css`. Key values (as of v0.20.39):
   --color-info:          #0969DA;     /* 4.64:1 */
 
   /* Module accents — domain-specific, not interchangeable with severity */
-  --module-dashboard:  #4F46E5;   /* Indigo — follows primary accent */
-  --module-tasks:      #15803D;   /* Green — intentional share with --color-success */
-  --module-calendar:   #8250DF;   /* Violet */
-  --module-meals:      #C2410C;   /* Orange-700 */
-  --module-shopping:   #DB2777;   /* Pink-600 — distinct from Meals/Warning */
-  --module-notes:      #CA8A04;   /* Gold, 4.08:1 — icons/large-text only */
-  --module-contacts:   #0969DA;   /* Blue — distinct from Indigo primary */
-  --module-budget:     #0F766E;   /* Teal-700, 5.11:1 */
-  --module-reminders:  #0E7490;   /* Cyan-700, WCAG AA */
-  --module-settings:   #6E7781;   /* Neutral grey */
+  --module-dashboard:       #6c3aed;  /* Violet — follows primary accent */
+  --module-tasks:           #15803D;  /* Green — intentional share with --color-success */
+  --module-calendar:        #8250DF;  /* Violet-600 — Appointments, time */
+  --module-meals:           #C2410C;  /* Orange-700 — Food, warmth */
+  --module-shopping:        #DB2777;  /* Pink-600 — distinct from Meals/Warning */
+  --module-recipes:         #0D9488;  /* Teal-600 — Recipes */
+  --module-notes:           #A16207;  /* Amber-700 — Notes (6.3:1, WCAG AA) */
+  --module-contacts:        #0969DA;  /* Blue — distinct from Violet primary */
+  --module-birthdays:       #E11D48;  /* Rose — Birthdays */
+  --module-budget:          #0F766E;  /* Teal-700 — Finance, stability */
+  --module-split-expenses:  #2563EB;  /* Blue — Shared family finance */
+  --module-documents:       #1D4ED8;  /* Blue — Secure family documents */
+  --module-housekeeping:    #7C3AED;  /* Violet — Focused service workflow */
+  --module-reminders:       #0E7490;  /* Cyan-700 — Reminders (WCAG AA) */
+  --module-settings:        #6E7781;  /* Neutral grey */
 
   /* Priority */
   --color-priority-medium: #A16207;  /* Amber-700, 6.3:1 — distinct from Warning+Meals */
@@ -970,7 +1017,7 @@ Source of truth: `public/styles/tokens.css`. Key values (as of v0.20.39):
   --glass-inset-strong:   inset 0 1px 0 rgba(255,255,255,0.32);
 }
 
-/* Dark mode — Hue preserved (Indigo-400), only Lightness/Saturation adjusted.
+/* Dark mode — Hue preserved (Violet-400), only Lightness/Saturation adjusted.
    Private --_name tokens prevent duplication between @media and [data-theme]. */
 @media (prefers-color-scheme: dark) {
   :root {
@@ -979,19 +1026,18 @@ Source of truth: `public/styles/tokens.css`. Key values (as of v0.20.39):
     --color-border: #2C2C2A;
     --color-text-primary: #F5F4F1;
     --color-text-secondary: #AEADB0;
-    --color-accent:            #818CF8;  /* Indigo-400, 6.8:1 on dark surface */
-    --color-accent-hover:      #6366F1;  /* Indigo-500 */
-    --color-accent-active:     #4F46E5;  /* Indigo-600 — mirrors light primary */
-    --color-accent-light:      #2E2D5B;
-    --color-accent-subtle:     #252255;
-    --color-btn-primary:       #6366F1;  /* 5.5:1 */
-    --color-btn-primary-hover: #4F46E5;
-    --module-dashboard: #818CF8;
+    --color-accent:            #a78bfa;  /* Violet-400, 6.05:1 on dark surface */
+    --color-accent-hover:      #9066f5;  /* Violet-500 */
+    --color-accent-active:     #7c3aed;  /* Violet-600 — mirrors light primary */
+    --color-accent-light:      #2e1065;
+    --color-accent-subtle:     #1e1040;
+    --color-btn-primary:       #9066f5;  /* Violet-500, good contrast on dark */
+    --color-btn-primary-hover: #7c3aed;
+    --module-dashboard: #a78bfa;  /* Violet-400 */
     --module-meals:     #FB923C;  /* Orange-400 */
-    --module-shopping:  #F472B6;  /* Pink-400 — mirrors light entanglement */
+    --module-shopping:  #F472B6;  /* Pink-400 */
     --module-budget:    #2DD4BF;  /* Teal-400 */
     --module-reminders: #22D3EE;  /* Cyan-400 */
-    --meal-dinner:      #818CF8;
     --glass-bg: rgba(28,28,26,0.75);
     --glass-border: rgba(255,255,255,0.12);
     --glass-bg-card: rgba(38,38,36,0.50);

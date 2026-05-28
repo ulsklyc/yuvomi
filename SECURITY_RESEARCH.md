@@ -1,5 +1,9 @@
 # Security Research Report
 
+> **Status overview:** Issues marked ✅ have been addressed in a subsequent release. Open issues are marked 🔓.
+
+
+
 ## 1. WAF IP-Spoofing & Global Rate Limiting Denial of Service (DoS)
 
 **Location:** `server/index.js` (line 84)
@@ -58,7 +62,7 @@ Update and delete operations for these modules lack ownership or authorization c
 **Recommendation:**
 Implement consistent authorization checks. Ensure only the creator or an administrator can modify or delete a resource, or explicitly define a shared access model with appropriate guardrails.
 
-## 5. Vertical Privilege Escalation in Global Preferences
+## 5. ✅ Vertical Privilege Escalation in Global Preferences — FIXED in v0.53.0
 
 **Location:** `server/routes/preferences.js` (`PUT /api/v1/preferences`)
 
@@ -67,6 +71,8 @@ The endpoint to update global household preferences (currency, date format, appl
 
 **Recommendation:**
 Add the `requireAdmin` middleware to the `PUT /api/v1/preferences` route to ensure only administrators can modify global configuration.
+
+**Fix (v0.53.0):** `PUT /api/v1/preferences` now enforces an admin role check before processing `disabled_modules`. Non-admin users receive a 403 response, preventing household-wide module changes. Additionally, `disableFailedThirdPartyModule` now attempts the API call first; on a 403 (non-admin user) the module remains visible in navigation rather than being silently removed.
 
 ## 6. Information Leak via Reminders IDOR
 

@@ -50,12 +50,28 @@ npm test              # All suites
 Individual suites (faster during development):
 
 ```bash
-npm run test:db && npm run test:tasks && npm run test:shopping
-npm run test:meals && npm run test:calendar && npm run test:ncb
-npm run test:reminders && npm run test:dashboard && npm run test:api
-npm run test:ics-parser && npm run test:ics-sub
-npm run test:modal-utils && npm run test:ux-utils
-npm run test:kitchen-tabs && npm run test:setup
+npm run test:db
+npm run test:tasks
+npm run test:shopping
+npm run test:meals
+npm run test:calendar
+npm run test:ncb            # notes, contacts, budget
+npm run test:reminders
+npm run test:dashboard
+npm run test:api
+npm run test:ics-parser
+npm run test:ics-sub
+npm run test:modal-utils
+npm run test:ux-utils
+npm run test:kitchen-tabs
+npm run test:setup
+npm run test:multi-assignment
+npm run test:caldav
+npm run test:carddav
+npm run test:split-expenses
+npm run test:backup-scheduler
+npm run test:mobile-scroll-layout
+npm run test:frontend-audit
 ```
 
 Tests use the Node.js built-in test runner with in-memory SQLite (`--experimental-sqlite`). No running server or database required — tests import route handlers directly.

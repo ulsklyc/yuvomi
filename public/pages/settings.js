@@ -1119,7 +1119,7 @@ async function loadCardDAVAccounts(container, user) {
             });
             window.oikos?.showToast(enabled ? t('settings.addressbookEnabled') : t('settings.addressbookDisabled'), 'success');
           } catch (err) {
-            window.oikos?.showToast(err.message, 'error');
+            window.oikos?.showToast(err.message, 'danger');
             checkbox.checked = !enabled;
           }
         });
@@ -1134,7 +1134,7 @@ async function loadCardDAVAccounts(container, user) {
             window.oikos?.showToast(t('settings.cardavSyncSuccess'), 'success');
             await loadCardDAVAccounts(container, user);
           } catch (err) {
-            window.oikos?.showToast(t('settings.cardavSyncFailed'), 'error');
+            window.oikos?.showToast(t('settings.cardavSyncFailed'), 'danger');
           }
         });
       }
@@ -1148,7 +1148,7 @@ async function loadCardDAVAccounts(container, user) {
             window.oikos?.showToast(t('settings.addressbooksRefreshed'), 'success');
             await loadCardDAVAccounts(container, user);
           } catch (err) {
-            window.oikos?.showToast(err.message, 'error');
+            window.oikos?.showToast(err.message, 'danger');
           }
         });
       }
@@ -1164,7 +1164,7 @@ async function loadCardDAVAccounts(container, user) {
             window.oikos?.showToast(t('settings.cardavAccountDeleted'), 'success');
             await loadCardDAVAccounts(container, user);
           } catch (err) {
-            window.oikos?.showToast(err.message, 'error');
+            window.oikos?.showToast(err.message, 'danger');
           }
         });
       }
@@ -1525,7 +1525,7 @@ function bindEvents(container, user, users, categories, icsSubscriptions, apiTok
     mealToggles.addEventListener('change', async () => {
       const checked = [...mealToggles.querySelectorAll('input:checked')].map((cb) => cb.value);
       if (checked.length === 0) {
-        window.oikos?.showToast(t('settings.mealTypesMinOne'), 'error');
+        window.oikos?.showToast(t('settings.mealTypesMinOne'), 'danger');
         // Revert: re-check all
         mealToggles.querySelectorAll('input').forEach((cb) => { cb.checked = true; });
         return;

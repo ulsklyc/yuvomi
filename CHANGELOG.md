@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.53.0] - 2026-05-27
+
+### Added
+- **Module system:** Runtime-loadable third-party modules discovered from a configurable `modules/` directory. Each module declares metadata via `module.json` and is validated server-side before being served.
+- **Admin module controls:** Admins can enable/disable individual modules and drag-to-reorder navigation entries in Settings → Modules.
+- **Dynamic SPA routing:** Enabled module pages are registered automatically in the router at startup without any code changes to the host app.
+- **Docker support:** Mount external modules via the `MODULES_DIR` environment variable.
+- **Example module — pyamortiza:** Brazilian mortgage amortization calculator bundled as a reference module implementation.
+- **PWA install utility:** `public/utils/pwa-install.js` centralises the install-prompt lifecycle; `oikos-install-prompt` component now imports from it.
+
+### Fixed
+- Toast notifications in Settings used the unsupported type `'error'`; corrected to `'danger'` in five call-sites (CardDAV and meal-types sections).
+- `PUT /api/v1/preferences` now enforces an admin role check before processing `disabled_modules`; non-admin users receive a 403 response, preventing household-wide module changes.
+- `disableFailedThirdPartyModule` now attempts the API call first; on a 403 (non-admin user) the module remains visible in navigation rather than being silently removed.
+
 ## [0.52.58] - 2026-05-27
 
 ### Added
