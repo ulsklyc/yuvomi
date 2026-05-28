@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.54.1] - 2026-05-28
+
+### Changed
+- **Liquid Glass – Budget module:** Migrated `budget.css` to Glass design tokens. Summary cards (`.budget-summary-card`), the loans panel, individual loan cards, loan transactions, the loan report hero and grid cells, transaction entry hover states, and the inline modal panel now use `--glass-bg-card`, `--radius-glass-card`/`--radius-glass-inner`, `--glass-border-subtle`, and `--glass-shadow-*` tokens. Summary cards receive a subtle module-accent tint via `::after`. The overlay backdrop uses `--color-overlay-glass` instead of a hardcoded `rgba` value.
+
 ## [0.54.0] - 2026-05-28
 
 ### Added
