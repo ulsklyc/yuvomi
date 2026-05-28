@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.54.7] - 2026-05-29
+
+### Fixed
+- **Calendar – recurring event end time shifted by UTC offset:** When expanding recurring events server-side, `end_datetime` for each instance was computed via `.toISOString()`, which always appends a `Z` (UTC) suffix. Stored datetimes use no timezone marker (naive local-time strings), so browsers interpreted the `Z`-suffixed recurring instances as UTC — shifting displayed end times by the user's UTC offset (e.g. +2 h for UTC+2). The fix preserves the format of the original datetime: naive sources produce a timezone-free `YYYY-MM-DDTHH:MM` string; `Z`-suffixed sources (e.g. CalDAV imports) retain the ISO/UTC path.
+
 ## [0.54.6] - 2026-05-29
 
 ### Fixed
