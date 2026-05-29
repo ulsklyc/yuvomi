@@ -636,6 +636,7 @@
     "expenses": "支出",
     "balance": "余额",
     "byCategory": "按分类",
+    "chartSummary": "{{count}} 个类别 · 最大：{{top}}（{{pct}}%）",
     "transactions": "交易记录",
     "emptyTitle": "本月暂无条目",
     "emptyDescription": "通过 + 按钮添加预算条目。",

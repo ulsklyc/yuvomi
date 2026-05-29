@@ -636,6 +636,7 @@
     "expenses": "Витрати",
     "balance": "Баланс",
     "byCategory": "За категоріями",
+    "chartSummary": "{{count}} категорій · Найбільша: {{top}} ({{pct}} %)",
     "transactions": "Транзакції",
     "emptyTitle": "Записів у цьому місяці немає",
     "emptyDescription": "Додайте записи бюджету кнопкою +.",

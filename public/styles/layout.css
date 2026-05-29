@@ -685,12 +685,10 @@ html.fab-anim-done .page-fab {
   }
 }
 
-/* Toolbar-"Neu"-Buttons überall verstecken - FAB übernimmt */
-#btn-new-task,
-#notes-add-btn,
-#contacts-add-btn,
-#budget-add,
-#cal-add {
+/* Toolbar-"Neu"-Buttons überall verstecken - FAB übernimmt.
+ * Gemeinsame Klasse statt ID-Liste (Audit 1.9): neue Module ergänzen nur die
+ * Klasse an ihrem Toolbar-Button, statt diesen Selektor erweitern zu müssen. */
+.toolbar-new-btn {
   display: none !important;
 }
 

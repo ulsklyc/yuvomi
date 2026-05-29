@@ -636,6 +636,7 @@
     "expenses": "Despesas",
     "balance": "Saldo",
     "byCategory": "Por categoria",
+    "chartSummary": "{{count}} categorias · Maior: {{top}} ({{pct}} %)",
     "transactions": "Transações",
     "emptyTitle": "Nenhuma entrada este mês",
     "emptyDescription": "Adicione entradas de orçamento com o botão +.",

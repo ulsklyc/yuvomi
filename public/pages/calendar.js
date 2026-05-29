@@ -704,7 +704,7 @@ function renderToolbar() {
                 data-view="${v}">${VIEW_LABELS()[v]}</button>
       `).join('')}
     </div>
-    <button class="btn btn--primary btn--icon" id="cal-add" aria-label="${t('calendar.addEvent')}"
+    <button class="btn btn--primary btn--icon toolbar-new-btn" id="cal-add" aria-label="${t('calendar.addEvent')}"
             style="margin-left:auto;">
       <i data-lucide="plus" aria-hidden="true"></i>
     </button>

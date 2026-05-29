@@ -117,8 +117,8 @@ Open `http://localhost:3000` and sign in with the admin credentials you created 
 
 ## Documentation
 
-| [Installation](docs/installation.md) | [Spec & Data Model](docs/SPEC.md) | [Contributing](CONTRIBUTING.md) | [Security](SECURITY.md) | [Changelog](CHANGELOG.md) | [Backlog](BACKLOG.md) |
-|---|---|---|---|---|---|
+| [Installation](docs/installation.md) | [Spec & Data Model](docs/SPEC.md) | [Modules](MODULES.md) | [Contributing](CONTRIBUTING.md) | [Security](SECURITY.md) | [Changelog](CHANGELOG.md) | [Backlog](BACKLOG.md) |
+|---|---|---|---|---|---|---|
 
 ## License
 

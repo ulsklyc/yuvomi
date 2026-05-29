@@ -636,6 +636,7 @@
     "expenses": "Расходы",
     "balance": "Баланс",
     "byCategory": "По категориям",
+    "chartSummary": "{{count}} категорий · Наибольшая: {{top}} ({{pct}} %)",
     "transactions": "Транзакции",
     "emptyTitle": "Нет записей за этот месяц",
     "emptyDescription": "Добавьте записи бюджета с помощью кнопки +.",

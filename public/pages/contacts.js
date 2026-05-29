@@ -72,7 +72,7 @@ export async function render(container, { user }) {
           ${t('contacts.importButton')}
           <input type="file" id="contacts-import-input" accept=".vcf,text/vcard" style="display:none">
         </label>
-        <button class="btn btn--primary" id="contacts-add-btn">
+        <button class="btn btn--primary toolbar-new-btn" id="contacts-add-btn">
           <i data-lucide="plus" style="width:16px;height:16px;margin-right:4px;" aria-hidden="true"></i>
           ${t('contacts.addButton')}
         </button>

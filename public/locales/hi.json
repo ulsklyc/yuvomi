@@ -636,6 +636,7 @@
     "expenses": "व्यय",
     "balance": "शेष",
     "byCategory": "श्रेणी द्वारा",
+    "chartSummary": "{{count}} श्रेणियाँ · सबसे बड़ी: {{top}} ({{pct}}%)",
     "transactions": "लेनदेन",
     "emptyTitle": "इस माह कोई प्रविष्टि नहीं",
     "emptyDescription": "+ बटन से बजट प्रविष्टियां जोड़ें।",

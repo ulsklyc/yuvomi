@@ -1793,7 +1793,7 @@ export async function render(container, { user }) {
                   title="${t('tasks.bulkSelect')}" aria-label="${t('tasks.bulkSelect')}">
             <i data-lucide="list-checks" class="icon-lg" aria-hidden="true"></i>
           </button>
-          <button class="btn btn--primary" id="btn-new-task" style="gap:var(--space-1)">
+          <button class="btn btn--primary toolbar-new-btn" id="btn-new-task" style="gap:var(--space-1)">
             <i data-lucide="plus" class="icon-lg" aria-hidden="true"></i> ${t('tasks.newTask')}
           </button>
         </div>

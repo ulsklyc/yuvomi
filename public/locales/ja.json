@@ -636,6 +636,7 @@
     "expenses": "支出",
     "balance": "残高",
     "byCategory": "カテゴリー別",
+    "chartSummary": "{{count}} カテゴリ · 最大: {{top}}（{{pct}}%）",
     "transactions": "取引",
     "emptyTitle": "今月の項目なし",
     "emptyDescription": "+ ボタンで家計項目を追加できます。",

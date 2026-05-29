@@ -636,6 +636,7 @@
     "expenses": "المصروفات",
     "balance": "الرصيد",
     "byCategory": "حسب الفئة",
+    "chartSummary": "{{count}} فئات · الأكبر: {{top}} ({{pct}}٪)",
     "transactions": "المعاملات",
     "emptyTitle": "لا توجد إدخالات هذا الشهر",
     "emptyDescription": "أضف إدخالات الميزانية عبر زر +.",

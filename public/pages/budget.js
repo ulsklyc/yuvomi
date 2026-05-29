@@ -229,7 +229,7 @@ export async function render(container, { user }) {
             ${t('splitExpenses.tabLabel')}
           </button>
         </div>
-        <button class="btn btn--primary btn--icon" id="budget-add" aria-label="${t('budget.addEntryLabel')}">
+        <button class="btn btn--primary btn--icon toolbar-new-btn" id="budget-add" aria-label="${t('budget.addEntryLabel')}">
           <i data-lucide="plus" aria-hidden="true"></i>
         </button>
         <button class="btn btn--icon" id="budget-next" aria-label="${t('budget.nextMonth')}">
@@ -360,6 +360,7 @@ function renderBody() {
     ${s.byCategory.length ? `
     <div class="budget-chart-section">
       <div class="budget-chart-section__title">${t('budget.byCategory')}</div>
+      <p class="sr-only">${esc(chartSummary(s.byCategory))}</p>
       <div class="budget-chart">
         ${renderCategoryBars(s.byCategory)}
       </div>
@@ -427,6 +428,20 @@ function updateTabs() {
     fab.hidden = false;
     fab.setAttribute('aria-label', splitActive ? t('splitExpenses.addExpense') : t('budget.newEntryFabLabel'));
   }
+}
+
+// Screenreader-Zusammenfassung des Kategorie-Diagramms (Audit 1.7): Anzahl
+// Kategorien + größter Posten mit Anteil. Wird als .sr-only-Text vor dem rein
+// visuellen Balken-Chart ausgegeben.
+function chartSummary(byCategory) {
+  const total = byCategory.reduce((sum, c) => sum + Math.abs(c.total), 0) || 1;
+  const top = byCategory.reduce((a, b) => (Math.abs(b.total) > Math.abs(a.total) ? b : a));
+  const pct = Math.round((Math.abs(top.total) / total) * 100);
+  return t('budget.chartSummary', {
+    count: byCategory.length,
+    top: categoryLabel(top.category),
+    pct,
+  });
 }
 
 function renderCategoryBars(byCategory) {

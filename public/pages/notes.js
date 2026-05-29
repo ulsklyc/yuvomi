@@ -69,7 +69,7 @@ export async function render(container, { user }) {
                  placeholder="${t('notes.searchPlaceholder')}" autocomplete="off"
                  value="${esc(state.filterQuery)}">
         </div>
-        <button class="btn btn--primary" id="notes-add-btn">
+        <button class="btn btn--primary toolbar-new-btn" id="notes-add-btn">
           <i data-lucide="plus" style="width:16px;height:16px;margin-right:4px;" aria-hidden="true"></i>
           ${t('notes.addNoteLabel')}
         </button>

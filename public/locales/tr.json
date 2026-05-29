@@ -636,6 +636,7 @@
     "expenses": "Gider",
     "balance": "Bakiye",
     "byCategory": "Kategoriye göre",
+    "chartSummary": "{{count}} kategori · En büyük: {{top}} (%{{pct}})",
     "transactions": "İşlemler",
     "emptyTitle": "Bu ay kayıt yok",
     "emptyDescription": "+ düğmesiyle bütçe kayıtları ekleyin.",

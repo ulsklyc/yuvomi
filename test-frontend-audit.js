@@ -276,3 +276,149 @@ test('dark-mode token blocks stay in sync between @media and [data-theme="dark"]
   const divergent = [...allKeys].filter((k) => media.get(k) !== attr.get(k));
   assert.deepEqual(divergent, [], `dark token blocks diverge for: ${divergent.join(', ')}`);
 });
+
+// ============================================================
+// UX-Audit Mai 2026 — P2/P3 (docs/UI-UX-AUDIT-2026-05.md)
+// ============================================================
+
+const LOCALE_DIR = new URL('./public/locales/', import.meta.url);
+const LOCALES = readdirSync(LOCALE_DIR).filter((f) => f.endsWith('.json'));
+
+// --- Kontrast-Helfer (WCAG 2.x relative luminance) ---
+function parseTokenMap(block) {
+  const map = new Map();
+  for (const [, name, value] of block.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) {
+    map.set(name, value.trim());
+  }
+  return map;
+}
+
+function resolveColor(name, map) {
+  let value = map.get(name);
+  let guard = 0;
+  while (value && /^var\(/.test(value) && guard++ < 12) {
+    const ref = value.match(/^var\(\s*(--[\w-]+)\s*\)$/);
+    if (!ref) break;
+    value = map.get(ref[1]);
+  }
+  return value;
+}
+
+function hexToRgb(hex) {
+  const m = String(hex).trim().match(/^#([0-9a-f]{6})$/i);
+  assert.ok(m, `expected a 6-digit hex color, got: ${hex}`);
+  return [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16));
+}
+
+function relLum([r, g, b]) {
+  const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+
+function contrastRatio(a, b) {
+  const l1 = relLum(hexToRgb(a));
+  const l2 = relLum(hexToRgb(b));
+  const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+test('text/surface token pairs meet WCAG AA 4.5:1 in both themes', () => {
+  const tokens = read('./public/styles/tokens.css');
+  const rootBlock = tokens.match(/:root\s*\{([\s\S]*?)\n\}/);
+  const darkBlock = tokens.match(/\n\[data-theme="dark"\]\s*\{([\s\S]*?)\n\}/);
+  assert.ok(rootBlock, 'expected a :root token block');
+  assert.ok(darkBlock, 'expected a [data-theme="dark"] block');
+
+  const light = parseTokenMap(rootBlock[1]);
+  const dark = new Map(light);
+  for (const [k, v] of parseTokenMap(darkBlock[1])) dark.set(k, v);
+
+  // Normaltext-Paare, die laut Design AA erfüllen müssen.
+  const pairs = [
+    ['--color-text-primary', '--color-surface'],
+    ['--color-text-primary', '--color-bg'],
+    ['--color-text-secondary', '--color-surface'],
+    ['--color-text-secondary', '--color-bg'],
+    ['--color-text-tertiary', '--color-bg'],
+    ['--color-accent', '--color-surface'],
+  ];
+
+  for (const [theme, map] of [['light', light], ['dark', dark]]) {
+    for (const [fg, bg] of pairs) {
+      const fgHex = resolveColor(fg, map);
+      const bgHex = resolveColor(bg, map);
+      const ratio = contrastRatio(fgHex, bgHex);
+      assert.ok(
+        ratio >= 4.5,
+        `${theme}: ${fg} (${fgHex}) on ${bg} (${bgHex}) is ${ratio.toFixed(2)}:1, below WCAG AA 4.5:1`,
+      );
+    }
+  }
+});
+
+test('modal Enter submits the form instead of advancing to the next field (audit 1.4)', () => {
+  const src = read('./public/components/modal.js');
+  const enterBlock = src.match(/if \(e\.key === 'Enter'\) \{[\s\S]*?\n {4}\}/);
+  assert.ok(enterBlock, 'expected an Enter keydown handler');
+  assert.match(enterBlock[0], /submitBtn\.click\(\)/, 'Enter must trigger the submit button');
+  assert.doesNotMatch(enterBlock[0], /next\.focus\(\)/, 'Enter must not advance focus to the next field');
+});
+
+test('shared modal centrally escapes title and select labels (audit 1.8)', () => {
+  const src = read('./public/components/modal.js');
+  assert.match(src, /id="shared-modal-title">\$\{esc\(title\)\}/, 'modal title must be escaped');
+  assert.match(src, /<option value="\$\{esc\(o\.value\)\}">\$\{esc\(o\.label\)\}/, 'select options must be escaped');
+  assert.match(src, /import \{ esc \} from '\/utils\/html\.js'/, 'modal must import esc');
+});
+
+test('modal lifecycle uses an explicit state machine, not the old _isClosing flag (audit 1.5)', () => {
+  const src = read('./public/components/modal.js');
+  assert.match(src, /let modalState = 'idle';/, 'expected an explicit modalState variable');
+  assert.match(src, /modalState === 'closing'/, 'close guard must key off modalState');
+  assert.doesNotMatch(src, /_isClosing/, 'legacy _isClosing flag must be removed');
+});
+
+test('budget chart exposes a screen-reader summary (audit 1.7)', () => {
+  const src = read('./public/pages/budget.js');
+  assert.match(src, /<p class="sr-only">\$\{esc\(chartSummary\(/, 'chart must render an .sr-only summary');
+  assert.match(src, /function chartSummary\(byCategory\)/, 'expected a chartSummary helper');
+
+  for (const file of LOCALES) {
+    const json = JSON.parse(read(`./public/locales/${file}`));
+    assert.ok(json.budget?.chartSummary, `${file} must define budget.chartSummary`);
+    assert.match(json.budget.chartSummary, /\{\{count\}\}/, `${file} chartSummary must interpolate count`);
+    assert.match(json.budget.chartSummary, /\{\{top\}\}/, `${file} chartSummary must interpolate top`);
+    assert.match(json.budget.chartSummary, /\{\{pct\}\}/, `${file} chartSummary must interpolate pct`);
+  }
+});
+
+test('toolbar "new" buttons are hidden via a shared class, not an ID list (audit 1.9)', () => {
+  const layout = read('./public/styles/layout.css');
+  assert.match(layout, /\.toolbar-new-btn\s*\{\s*display:\s*none\s*!important;/, 'expected .toolbar-new-btn rule');
+  assert.doesNotMatch(layout, /#btn-new-task,\s*\n\s*#notes-add-btn/, 'legacy ID-list selector must be gone');
+
+  const pages = {
+    './public/pages/tasks.js': 'btn-new-task',
+    './public/pages/notes.js': 'notes-add-btn',
+    './public/pages/contacts.js': 'contacts-add-btn',
+    './public/pages/budget.js': 'budget-add',
+    './public/pages/calendar.js': 'cal-add',
+  };
+  for (const [file, id] of Object.entries(pages)) {
+    const src = read(file);
+    const btn = src.match(new RegExp(`<button[^>]*id="${id}"[^>]*>`));
+    assert.ok(btn, `${file} must keep #${id}`);
+    assert.match(btn[0], /toolbar-new-btn/, `${file} #${id} must carry the .toolbar-new-btn class`);
+  }
+});
+
+test('login keeps username-style input hints, not email (audit 1.6 — login is by username)', () => {
+  const src = read('./public/pages/login.js');
+  const input = src.match(/<input[\s\S]*?id="username"[\s\S]*?\/>/);
+  assert.ok(input, 'expected a username input');
+  assert.match(input[0], /type="text"/, 'username field stays type=text (login is by username, not email)');
+  assert.match(input[0], /autocomplete="username"/);
+  assert.match(input[0], /autocapitalize="none"/);
+  assert.match(input[0], /autocorrect="off"/);
+  assert.doesNotMatch(input[0], /type="email"|inputmode="email"/, 'must not use email keyboard for username login');
+});

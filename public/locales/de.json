@@ -642,6 +642,7 @@
     "expenses": "Ausgaben",
     "balance": "Saldo",
     "byCategory": "Nach Kategorie",
+    "chartSummary": "{{count}} Kategorien · Größte: {{top}} ({{pct}} %)",
     "transactions": "Transaktionen",
     "emptyTitle": "Keine Einträge diesen Monat",
     "emptyDescription": "Budget-Einträge über den + Button hinzufügen.",

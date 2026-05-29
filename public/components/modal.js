@@ -12,13 +12,22 @@
  */
 
 import { t } from '/i18n.js';
+import { esc } from '/utils/html.js';
 
 let activeOverlay = null;
 let previouslyFocused = null;
 let focusTrapHandler = null;
 let _initialFormSnapshot = null;
 let _initialFormTimeout = null;
-let _isClosing = false;
+
+// Modal-Lebenszyklus als explizite Zustandsmaschine (Audit 1.5). Ersetzt die
+// frühere ad-hoc-Jonglage aus einem Boolean-Schließ-Flag plus temporär
+// genullten Globals. Gültige Zustände:
+//   idle       – kein Modal offen
+//   open       – Modal sichtbar und interaktiv
+//   confirming – „Änderungen verwerfen?"-Dialog liegt über einem dirty Modal
+//   closing    – Schließ-Animation/Cleanup läuft (blockt erneutes Schließen)
+let modalState = 'idle';
 
 // Overlay-Dimming: theme-color abdunkeln im Standalone-Modus
 const OVERLAY_THEME_COLOR = '#1A1A1A';
@@ -55,28 +64,19 @@ function trapFocus(container) {
       return;
     }
 
-    // Enter in einzeiligen Inputs/Selects → zum nächsten Feld springen
+    // Enter in einzeiligen Inputs/Selects → Formular absenden (Standard-Web-
+    // Konvention, Audit 1.4). Textareas behalten ihr Standardverhalten (Zeilen-
+    // umbruch), Submit-/Button-Elemente lösen ohnehin ihren eigenen Klick aus.
     if (e.key === 'Enter') {
       const active = document.activeElement;
       const isInput = active.tagName === 'INPUT' && active.type !== 'submit' && active.type !== 'button';
       const isSelect = active.tagName === 'SELECT';
 
       if (isInput || isSelect) {
-        const focusable = Array.from(container.querySelectorAll(FOCUSABLE));
-        const idx = focusable.indexOf(active);
-        const next = focusable[idx + 1];
-
-        if (next && next.tagName !== 'BUTTON') {
+        const submitBtn = container.querySelector('button[type="submit"], .btn--primary');
+        if (submitBtn && !submitBtn.disabled) {
           e.preventDefault();
-          next.focus();
-        }
-        // Beim letzten Feld oder wenn Next ein Button ist: Submit auslösen
-        if (!next || next.tagName === 'BUTTON') {
-          const submitBtn = container.querySelector('button[type="submit"], .btn--primary');
-          if (submitBtn && !submitBtn.disabled) {
-            e.preventDefault();
-            submitBtn.click();
-          }
+          submitBtn.click();
         }
       }
     }
@@ -171,6 +171,43 @@ function _wireSheetSwipe(panel) {
 }
 
 // --------------------------------------------------------
+// Suspend/Restore für den Dirty-Confirm-Dialog (Audit 1.5)
+//
+// Das Shared-Modal kennt bewusst kein Stacking: ein „Verwerfen?"-Dialog nutzt
+// denselben Overlay-Slot wie das dirty Formular darunter. Damit der nachfolgende
+// openModal()-Aufruf (in confirmModal) das dirty Modal nicht wegräumt, wird es
+// kurzzeitig aus dem aktiven Slot gelöst und in einem Token geparkt. Diese drei
+// Helfer kapseln die Übergänge, statt die Globals frei „auszuleihen".
+// --------------------------------------------------------
+
+function _suspendActiveModal() {
+  const overlay = activeOverlay;
+  const token = { overlay, id: overlay.id, snapshot: _initialFormSnapshot };
+  overlay.removeAttribute('id');
+  activeOverlay = null;
+  modalState = 'confirming';
+  return token;
+}
+
+// Nutzer bricht das Verwerfen ab → dirty Modal exakt wiederherstellen.
+function _resumeSuspendedModal({ overlay, id, snapshot }) {
+  if (id) overlay.id = id;
+  activeOverlay = overlay;
+  _initialFormSnapshot = snapshot;
+  document.body.style.overflow = 'hidden';
+  modalState = 'open';
+  if (window.oikos?.setThemeColor) {
+    window.oikos.setThemeColor(OVERLAY_THEME_COLOR, OVERLAY_THEME_COLOR);
+  }
+}
+
+// Nutzer bestätigt das Verwerfen → dirty Modal wieder zum aktiven Overlay
+// machen, damit die nachfolgende Schließ-Logik es regulär abräumt.
+function _discardSuspendedModal({ overlay }) {
+  activeOverlay = overlay;
+}
+
+// --------------------------------------------------------
 // _doClose - gemeinsame Cleanup-Logik
 // --------------------------------------------------------
 
@@ -183,6 +220,7 @@ function _doClose(overlayEl) {
   // Globalen State nur zurücksetzen wenn kein neues Modal zwischenzeitlich geöffnet wurde.
   if (activeOverlay === target) {
     activeOverlay = null;
+    modalState = 'idle';
 
     // Scroll-Lock aufheben
     document.body.style.overflow = '';
@@ -236,7 +274,7 @@ export function openModal({ title, content, onSave, onDelete, onClose, size = 'm
       <div class="modal-panel${sizeClass}" role="dialog" aria-modal="true"
            aria-labelledby="shared-modal-title">
         <div class="modal-panel__header">
-          <h2 class="modal-panel__title" id="shared-modal-title">${title}</h2>
+          <h2 class="modal-panel__title" id="shared-modal-title">${esc(title)}</h2>
           <button class="modal-panel__close" data-action="close-modal" aria-label="${t('modal.closeLabel')}">
             <i data-lucide="x" style="width:16px;height:16px" aria-hidden="true"></i>
           </button>
@@ -311,6 +349,8 @@ export function openModal({ title, content, onSave, onDelete, onClose, size = 'm
   if (window.oikos?.setThemeColor) {
     window.oikos.setThemeColor(OVERLAY_THEME_COLOR, OVERLAY_THEME_COLOR);
   }
+
+  modalState = 'open';
 }
 
 // --------------------------------------------------------
@@ -318,44 +358,34 @@ export function openModal({ title, content, onSave, onDelete, onClose, size = 'm
 // --------------------------------------------------------
 
 export async function closeModal({ force = false } = {}) {
-  // If already closing, ignore call
-  if (!activeOverlay || _isClosing) return;
+  // Bereits im Schließ-Lauf? Erneute Aufrufe (z.B. schnelles Doppel-Schließen,
+  // Hardware-Back) ignorieren.
+  if (!activeOverlay || modalState === 'closing') return;
 
   if (!force) {
     const panel = activeOverlay.querySelector('.modal-panel');
     if (panel && isFormDirty(panel)) {
-      const dirtyOverlay = activeOverlay;
-      const dirtySnapshot = _initialFormSnapshot;
-      const overlayId = dirtyOverlay.id;
-      
-      // Momentarily clear global state to allow confirmModal to open without deadlock
-      dirtyOverlay.removeAttribute('id');
-      activeOverlay = null;
-      
+      // Dirty Modal in den Confirm-Slot parken (modalState → 'confirming').
+      const suspended = _suspendActiveModal();
+
       const confirmed = await confirmModal(t('modal.unsavedChanges'), {
         danger: false,
         confirmLabel: t('modal.discardChanges'),
       });
 
       if (!confirmed) {
-        // Restore previous modal state if user cancelled discard
-        if (overlayId) dirtyOverlay.id = overlayId;
-        activeOverlay = dirtyOverlay;
-        _initialFormSnapshot = dirtySnapshot;
-        document.body.style.overflow = 'hidden';
-        if (window.oikos?.setThemeColor) {
-          window.oikos.setThemeColor(OVERLAY_THEME_COLOR, OVERLAY_THEME_COLOR);
-        }
+        // Verwerfen abgebrochen → dirty Modal exakt wiederherstellen.
+        _resumeSuspendedModal(suspended);
         return;
       }
-      
-      // User confirmed discard, re-assign activeOverlay so the rest of the logic cleans it up
-      activeOverlay = dirtyOverlay;
+
+      // Verwerfen bestätigt → dirty Modal wieder aktiv, regulär abräumen.
+      _discardSuspendedModal(suspended);
     }
   }
 
-  // Final closing phase starts here
-  _isClosing = true;
+  // Finale Schließphase beginnt hier.
+  modalState = 'closing';
 
   if (_initialFormTimeout) {
     clearTimeout(_initialFormTimeout);
@@ -385,19 +415,17 @@ export async function closeModal({ force = false } = {}) {
   const isMobile = window.innerWidth < 768;
   if (isMobile && panel) {
     panel.classList.add('modal-panel--closing');
-    const fallback = setTimeout(() => { 
-      _isClosing = false; 
-      _doClose(capturedOverlay); 
+    // _doClose setzt modalState auf 'idle', sobald der Overlay final entfernt wird.
+    const fallback = setTimeout(() => {
+      _doClose(capturedOverlay);
     }, 400); // Slightly longer fallback
     panel.addEventListener('animationend', () => {
       clearTimeout(fallback);
-      _isClosing = false;
       _doClose(capturedOverlay);
     }, { once: true });
     return;
   }
 
-  _isClosing = false;
   _doClose(capturedOverlay);
 }
 
@@ -423,7 +451,7 @@ export function promptModal(label, defaultValue = '') {
         <form id="prompt-modal-form" class="form-stack">
           <div class="form-field">
             <input class="form-input" id="prompt-modal-input" type="text"
-                   value="${defaultValue.replace(/"/g, '&quot;')}" autocomplete="off">
+                   value="${esc(defaultValue)}" autocomplete="off">
           </div>
           <div class="modal-actions">
             <button type="button" class="btn btn--ghost" id="prompt-modal-cancel">${t('common.cancel')}</button>
@@ -468,7 +496,7 @@ export function selectModal(label, options) {
     }
 
     const optionsHtml = options
-      .map((o) => `<option value="${String(o.value).replace(/"/g, '&quot;')}">${o.label}</option>`)
+      .map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`)
       .join('');
 
     openModal({

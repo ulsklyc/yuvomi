@@ -636,6 +636,7 @@
     "expenses": "Expenses",
     "balance": "Balance",
     "byCategory": "By category",
+    "chartSummary": "{{count}} categories · Largest: {{top}} ({{pct}}%)",
     "transactions": "Transactions",
     "emptyTitle": "No entries this month",
     "emptyDescription": "Add budget entries with the + button.",

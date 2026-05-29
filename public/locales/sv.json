@@ -636,6 +636,7 @@
     "expenses": "Utgifter",
     "balance": "Balans",
     "byCategory": "Efter kategori",
+    "chartSummary": "{{count}} kategorier · Störst: {{top}} ({{pct}} %)",
     "transactions": "Transaktioner",
     "emptyTitle": "Inga inlägg denna månad",
     "emptyDescription": "Lägg till budgetposter med + knappen.",

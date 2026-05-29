@@ -636,6 +636,7 @@
     "expenses": "Uscite",
     "balance": "Saldo",
     "byCategory": "Per categoria",
+    "chartSummary": "{{count}} categorie · Maggiore: {{top}} ({{pct}} %)",
     "transactions": "Transazioni",
     "emptyTitle": "Nessuna voce questo mese",
     "emptyDescription": "Aggiungi voci di bilancio con il pulsante +.",
