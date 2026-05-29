@@ -10,7 +10,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100dvh;
-  width: 100vw;
+  width: 100%;
   padding: var(--space-4);
   background:
     radial-gradient(

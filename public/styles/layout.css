@@ -781,7 +781,7 @@ html.fab-anim-done .page-fab {
 
   .nav-sidebar__version {
     margin-top: var(--space-0h);
-    font-size: var(--text-2xs);
+    font-size: var(--text-xs);
     font-weight: var(--font-weight-medium);
     letter-spacing: 0.04em;
     color: var(--color-text-tertiary);
@@ -2500,7 +2500,7 @@ textarea.input { resize: vertical; }
 
 /* ── Sidebar: Abschnittsbezeichnung (z.B. "Haushalt") ── */
 .nav-section-label {
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.1em;
   text-transform: uppercase;
