@@ -13,8 +13,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCREENSHOT_DIR = resolve(__dirname, '..', 'docs', 'screenshots');
 const BASE_URL = 'http://localhost:3001';
 
-// iPhone 12 viewport (2x devicePixelRatio)
-const VIEWPORT = { width: 390, height: 844 };
+// iPhone 12 at 85% zoom: viewport = 390/0.85 × 844/0.85 so content fills
+// the full viewport without CSS zoom → no gray bar at the bottom.
+const VIEWPORT = { width: Math.round(390 / 0.85), height: Math.round(844 / 0.85) }; // 459 × 993
 const DEVICE_SCALE = 2;
 
 const MODULES = [
@@ -49,8 +50,6 @@ async function dismissOverlays(page) {
 
 async function applyZoomAndLocale(page) {
   await page.evaluate(() => {
-    document.documentElement.style.zoom = '0.85';
-    // Ensure locale and onboarding flags are set
     localStorage.setItem('oikos-locale', 'en');
     localStorage.setItem('oikos-onboarded', '1');
   });
