@@ -641,17 +641,38 @@
 <!-- SETUP -->
 <section class="setup" id="setup">
   <div class="wrap">
-    <div class="section-label reveal vis" data-t="setup_label">Get Started</div>
-    <h2 class="section-title reveal vis" data-t="setup_title">Up and running in minutes</h2>
-    <div class="setup-inner reveal vis">
-      <div class="code-block"><span class="c"># Pull and start with Docker</span>
+    <div class="section-label reveal" data-t="setup_label">Setup</div>
+    <h2 class="section-title reveal" data-t="setup_title">Up and running in minutes</h2>
+    <div class="setup-steps reveal">
+      <div class="setup-step">
+        <span class="setup-step-num">①</span>
+        <h3 data-t="setup_1_t">Start the installer</h3>
+        <p data-t="setup_1_d">One command launches a setup wizard in your browser. No configuration by hand.</p>
+      </div>
+      <div class="setup-step">
+        <span class="setup-step-num">②</span>
+        <h3 data-t="setup_2_t">Set up your account</h3>
+        <p data-t="setup_2_d">Create an admin account and choose your preferences. Takes 2 minutes.</p>
+      </div>
+      <div class="setup-step">
+        <span class="setup-step-num">③</span>
+        <h3 data-t="setup_3_t">Invite your family</h3>
+        <p data-t="setup_3_d">Add family members, set roles, and start using Oikos together.</p>
+      </div>
+    </div>
+    <div class="setup-inner reveal">
+      <button class="setup-toggle" id="toggle-docker" type="button" data-t="setup_show_code">Show Docker commands ▾</button>
+      <div id="docker-code" style="display:none">
+        <div class="code-block"><span class="c"># Pull and start with Docker</span>
 curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/docker-compose.yml
 curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example
 cp .env.example .env
 <span class="c"># Set SESSION_SECRET and DB_ENCRYPTION_KEY in .env</span>
 <span class="h">docker compose up -d</span>
 <span class="h">docker compose exec oikos node setup.js</span></div>
-      <p class="setup-note" data-t="setup_note">Then open <code>http://localhost:3000</code> and log in. Need a step-by-step guide, HTTPS setup, or troubleshooting? See the <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md" target="_blank" rel="noopener">Installation Guide</a>.</p>
+        <p class="setup-note" data-t="setup_note">Then open <code>http://localhost:3000</code> and log in. Need a step-by-step guide, HTTPS setup, or troubleshooting? See the <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md" target="_blank" rel="noopener">Installation Guide</a>.</p>
+      </div>
+      <a href="install.html" class="setup-guide-link" data-t="setup_guide_link">→ Step-by-step installation guide</a>
     </div>
   </div>
 </section>
@@ -725,7 +746,12 @@ cp .env.example .env
       p_self_t:'Fully Self-Hosted', p_self_d:'Runs on a Raspberry Pi, a NAS, or any server. Docker makes setup a one-liner.',
       p_build_t:'Zero Build Step', p_build_d:'Pure ES modules, vanilla JS, plain CSS. No bundler, no transpiler, no framework. Ships what you write.',
       p_open_t:'Open Source', p_open_d:'MIT licensed. Inspect, modify, extend, contribute. Built in the open for families who care about transparency.',
-      setup_label:'Get Started', setup_title:'Up and running in minutes',
+      setup_label:'Setup', setup_title:'Up and running in minutes',
+      setup_1_t:'Start the installer', setup_1_d:'One command launches a setup wizard in your browser. No configuration by hand.',
+      setup_2_t:'Set up your account', setup_2_d:'Create an admin account and choose your preferences. Takes 2 minutes.',
+      setup_3_t:'Invite your family', setup_3_d:'Add family members, set roles, and start using Oikos together.',
+      setup_show_code:'Show Docker commands ▾', setup_hide_code:'Hide Docker commands ▴',
+      setup_guide_link:'→ Step-by-step installation guide',
       setup_note:'Then open <code>http://localhost:3000</code> and log in. Need a step-by-step guide, HTTPS setup, or troubleshooting? See the <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md" target="_blank" rel="noopener">Installation Guide</a>.',
       cta_title:'Ready to take back control?', cta_desc:'Oikos is free, open-source, and built for families who value their privacy.',
       cta_btn:'Get Started on GitHub',
@@ -768,7 +794,12 @@ cp .env.example .env
       p_self_t:'Vollständig selbstgehostet', p_self_d:'Läuft auf einem Raspberry Pi, NAS oder jedem Server. Docker macht das Setup zum Einzeiler.',
       p_build_t:'Kein Build-Schritt', p_build_d:'Pure ES-Module, Vanilla JS, reines CSS. Kein Bundler, kein Transpiler, kein Framework.',
       p_open_t:'Open Source', p_open_d:'MIT-lizenziert. Einsehen, anpassen, erweitern, beitragen. Offen gebaut für Familien, die Transparenz schätzen.',
-      setup_label:'Loslegen', setup_title:'In Minuten einsatzbereit',
+      setup_label:'Setup', setup_title:'In Minuten einsatzbereit',
+      setup_1_t:'Installer starten', setup_1_d:'Ein Befehl startet den Setup-Assistenten im Browser. Keine manuelle Konfiguration.',
+      setup_2_t:'Konto einrichten', setup_2_d:'Admin-Konto erstellen und Einstellungen wählen. Dauert 2 Minuten.',
+      setup_3_t:'Familie einladen', setup_3_d:'Familienmitglieder hinzufügen, Rollen vergeben und gemeinsam loslegen.',
+      setup_show_code:'Docker-Befehle anzeigen ▾', setup_hide_code:'Docker-Befehle ausblenden ▴',
+      setup_guide_link:'→ Schritt-für-Schritt-Installationsanleitung',
       setup_note:'Dann <code>http://localhost:3000</code> öffnen und einloggen. Schritt-für-Schritt-Anleitung, HTTPS oder Hilfe bei Problemen? Zur <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md" target="_blank" rel="noopener">Installationsanleitung</a>.',
       cta_title:'Bereit, die Kontrolle zurückzugewinnen?', cta_desc:'Oikos ist kostenlos, open-source und gebaut für Familien, die ihre Privatsphäre schätzen.',
       cta_btn:'Auf GitHub starten',
@@ -824,6 +855,17 @@ cp .env.example .env
     lang = lang === 'en' ? 'de' : 'en';
     localStorage.setItem('oikos-lang', lang);
     applyLang();
+  };
+  document.getElementById('toggle-docker').onclick = function() {
+    var el = document.getElementById('docker-code');
+    var btn = document.getElementById('toggle-docker');
+    var opening = el.style.display === 'none';
+    el.style.display = opening ? 'block' : 'none';
+    btn.setAttribute('data-t', opening ? 'setup_hide_code' : 'setup_show_code');
+    var s = T[lang];
+    btn.textContent = opening
+      ? (s.setup_hide_code || 'Hide Docker commands ▴')
+      : (s.setup_show_code || 'Show Docker commands ▾');
   };
   matchMedia('(prefers-color-scheme:dark)').addEventListener('change', function() { if (!theme) applyTheme(); });
 
