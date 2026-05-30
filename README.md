@@ -35,6 +35,8 @@ Oikos is a self-hosted web app that keeps your household organized — tasks, gr
 
 Each module is independent. Use what fits, skip what doesn't.
 
+---
+
 ## Modules
 
 | | |
