@@ -166,16 +166,9 @@
  * ================================================================ */
 @media (hover: hover) {
   .card--interactive:hover {
-    border: 1px solid var(--glass-border-subtle);
-    box-shadow: var(--glass-shadow-md);
-  }
-
-  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-    .card--interactive:hover {
-      background: var(--glass-bg-hover);
-      backdrop-filter: var(--blur-xs);
-      -webkit-backdrop-filter: var(--blur-xs);
-    }
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border-subtle);
+    box-shadow: var(--shadow-md);
   }
 }
 
@@ -623,7 +616,6 @@ html.navigating .app-content *::after {
  * 29. Note-Items — Glass Cards
  * ================================================================ */
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  .notes-page .note-item,
   .dashboard .note-item {
     background-color: var(--glass-bg-card);
     backdrop-filter: var(--blur-xs) saturate(150%);
@@ -632,10 +624,20 @@ html.navigating .app-content *::after {
     box-shadow: var(--glass-shadow-sm);
   }
 
-  .notes-page .note-item:hover,
   .dashboard .note-item:hover {
     background-color: var(--glass-bg-card-hover);
     box-shadow: var(--glass-shadow-md);
+  }
+
+  .notes-page .note-item {
+    background-color: var(--color-surface-work);
+    border: 1px solid var(--color-border-subtle);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .notes-page .note-item:hover {
+    background-color: var(--color-surface-raised);
+    box-shadow: var(--shadow-md);
   }
 }
 
@@ -643,21 +645,30 @@ html.navigating .app-content *::after {
  * 30. Meal-Slots — Glass Grid-Zellen
  * ================================================================ */
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  .dashboard .meal-slot,
-  .meals-page .meal-slot {
+  .dashboard .meal-slot {
     background-color: var(--glass-bg-card);
     backdrop-filter: var(--blur-xs) saturate(140%);
     -webkit-backdrop-filter: var(--blur-xs) saturate(140%);
   }
 
-  .dashboard .meal-slot:hover,
-  .meals-page .meal-slot:hover {
+  .dashboard .meal-slot:hover {
     background-color: var(--glass-bg-card-hover);
   }
 
-  .dashboard .meal-slot--filled,
-  .meals-page .meal-slot--filled {
+  .dashboard .meal-slot--filled {
     background-color: color-mix(in srgb, var(--module-accent, var(--module-meals)) 4%, var(--glass-bg-card));
+  }
+
+  .meals-page .meal-slot {
+    background-color: var(--color-surface-work);
+  }
+
+  .meals-page .meal-slot:hover {
+    background-color: var(--color-surface-raised);
+  }
+
+  .meals-page .meal-slot--filled {
+    background-color: color-mix(in srgb, var(--module-accent, var(--module-meals)) 4%, var(--color-surface-raised));
   }
 }
 
@@ -669,9 +680,7 @@ html.navigating .app-content *::after {
   .form-input,
   select.form-input,
   textarea.form-input {
-    background-color: var(--glass-bg-input);
-    backdrop-filter: var(--blur-xs) saturate(120%);
-    -webkit-backdrop-filter: var(--blur-xs) saturate(120%);
+    background-color: var(--color-surface-work);
   }
 }
 
@@ -681,18 +690,20 @@ html.navigating .app-content *::after {
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
   /* Eltern-Selektoren fuer Spezifitaet (glass.css < page CSS) */
   .tasks-page .task-card {
-    background-color: var(--glass-bg-card);
-    backdrop-filter: var(--blur-xs) saturate(150%);
-    -webkit-backdrop-filter: var(--blur-xs) saturate(150%);
+    background-color: var(--color-surface-work);
   }
 
   .tasks-page .task-card:hover {
-    background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) 4%, var(--glass-bg-card-hover));
+    background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) 4%, var(--color-surface-raised));
   }
 
-  .shopping-page .shopping-item:hover,
+  .shopping-page .shopping-item:hover {
+    background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) 4%, var(--color-surface-raised));
+    border-radius: var(--radius-sm);
+  }
+
   .contacts-page .contact-item:hover {
-    background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) 4%, var(--glass-bg-card-hover));
+    background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) 4%, var(--color-surface-raised));
     border-radius: var(--radius-sm);
   }
 }
@@ -702,15 +713,13 @@ html.navigating .app-content *::after {
  * ================================================================ */
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
   .group-toggle {
-    background-color: var(--glass-bg-input);
-    backdrop-filter: var(--blur-xs) saturate(140%);
-    -webkit-backdrop-filter: var(--blur-xs) saturate(140%);
-    border: 1px solid var(--glass-border-subtle);
+    background-color: var(--color-surface-raised);
+    border: 1px solid var(--color-border-subtle);
   }
 
   .group-toggle__btn--active {
-    background-color: var(--glass-bg-elevated);
-    box-shadow: var(--glass-shadow-sm);
+    background-color: var(--color-surface-work);
+    box-shadow: var(--shadow-sm);
   }
 }
 
@@ -753,19 +762,19 @@ html.navigating .app-content *::after {
   background:
     radial-gradient(
       ellipse at 20% 0%,
-      color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 5%, transparent),
+      color-mix(in srgb, var(--active-module-accent, var(--color-accent)) var(--app-backdrop-accent-strength), transparent),
       transparent 60%
     ),
     radial-gradient(
       ellipse at 85% 90%,
-      color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 3%, transparent),
+      color-mix(in srgb, var(--active-module-accent, var(--color-accent)) var(--app-backdrop-secondary-strength), transparent),
       transparent 50%
     ),
     var(--color-bg);
 }
 
 .app-content {
-  background-color: transparent;
+  background-color: var(--color-bg);
 }
 
 /* ================================================================

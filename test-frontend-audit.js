@@ -277,6 +277,77 @@ test('dark-mode token blocks stay in sync between @media and [data-theme="dark"]
   assert.deepEqual(divergent, [], `dark token blocks diverge for: ${divergent.join(', ')}`);
 });
 
+test('phase 1 defines synchronized surface roles for readable work areas', () => {
+  const tokens = read('./public/styles/tokens.css');
+  const rootBlock = tokens.match(/:root\s*\{([\s\S]*?)\n\}/);
+  const mediaBlock = tokens.match(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root:not\(\[data-theme="light"\]\)\s*\{([\s\S]*?)\n {2}\}\n\}/);
+  const attrBlock = tokens.match(/\n\[data-theme="dark"\]\s*\{([\s\S]*?)\n\}/);
+
+  assert.ok(rootBlock, 'expected a :root token block');
+  assert.ok(mediaBlock, 'expected a prefers-color-scheme dark block');
+  assert.ok(attrBlock, 'expected a [data-theme="dark"] block');
+
+  const root = parseTokenMap(rootBlock[1]);
+  const media = parseTokenMap(mediaBlock[1]);
+  const attr = parseTokenMap(attrBlock[1]);
+  const publicSurfaceTokens = [
+    '--color-surface-work',
+    '--color-surface-raised',
+    '--color-surface-glass',
+    '--app-backdrop-accent-strength',
+    '--app-backdrop-secondary-strength',
+  ];
+  const privateSurfaceTokens = [
+    '--_color-surface-work',
+    '--_color-surface-raised',
+    '--_color-surface-glass',
+    '--_app-backdrop-accent-strength',
+    '--_app-backdrop-secondary-strength',
+  ];
+
+  for (const token of publicSurfaceTokens) {
+    assert.ok(root.has(token), `${token} should be available as a public design token`);
+    assert.match(root.get(token), /var\(--_/, `${token} should point at a private theme value`);
+  }
+
+  for (const token of privateSurfaceTokens) {
+    assert.ok(root.has(token), `${token} should have a light-mode value`);
+    assert.ok(media.has(token), `${token} should have a system dark-mode override`);
+    assert.ok(attr.has(token), `${token} should have an explicit dark-mode override`);
+    assert.equal(media.get(token), attr.get(token), `${token} dark values must stay synchronized`);
+  }
+});
+
+test('phase 1 keeps productive list surfaces opaque instead of high-transparency glass', () => {
+  const glass = read('./public/styles/glass.css');
+  const productiveRules = [
+    ['.tasks-page .task-card', '--color-surface-work'],
+    ['.tasks-page .task-card:hover', '--color-surface-raised'],
+    ['.shopping-page .shopping-item:hover', '--color-surface-raised'],
+    ['.contacts-page .contact-item:hover', '--color-surface-raised'],
+  ];
+
+  for (const [selector, token] of productiveRules) {
+    const body = cssRuleBody(glass, selector);
+    assert.match(body, new RegExp(`var\\(${token}\\)`), `${selector} should use ${token}`);
+    assert.doesNotMatch(body, /var\(--glass-bg-card(?:-hover)?\)/, `${selector} should not use translucent card glass`);
+    assert.doesNotMatch(body, /backdrop-filter/, `${selector} should not add blur inside productive lists`);
+  }
+});
+
+test('phase 1 app backdrop uses subtle tokenized tint and opaque scroll content', () => {
+  const glass = read('./public/styles/glass.css');
+  const layout = read('./public/styles/layout.css');
+  const shellRule = cssRuleBody(glass, '.app-shell');
+  const glassContentRule = cssRuleBody(glass, '.app-content');
+  const layoutContentRule = cssRuleBody(layout, '.app-content');
+
+  assert.match(shellRule, /var\(--app-backdrop-accent-strength\)/, 'app-shell tint strength should be tokenized');
+  assert.match(shellRule, /var\(--app-backdrop-secondary-strength\)/, 'secondary backdrop tint should be tokenized');
+  assert.match(glassContentRule, /background-color:\s*var\(--color-bg\)/, 'glass.css should keep scroll content on an opaque readable base');
+  assert.doesNotMatch(layoutContentRule, /radial-gradient/, 'layout.css should not put decorative radial gradients on the scroll container');
+});
+
 // ============================================================
 // UX-Audit Mai 2026 — P2/P3 (docs/UI-UX-AUDIT-2026-05.md)
 // ============================================================

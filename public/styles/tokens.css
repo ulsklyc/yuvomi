@@ -102,6 +102,15 @@
   --color-surface-elevated:  var(--_color-surface-elevated);
   --_color-surface-hover:    var(--_neutral-150);
   --color-surface-hover:     var(--_color-surface-hover);
+  /* Surface-Rollen für Phase-1-Glass-Disziplin:
+   * work = lesbare Arbeitsflächen, raised = subtile Erhöhung,
+   * glass = rein dekorative/leichte Glass-Bereiche. */
+  --_color-surface-work:      #FFFFFF;
+  --color-surface-work:       var(--_color-surface-work);
+  --_color-surface-raised:    #FAFAF8;
+  --color-surface-raised:     var(--_color-surface-raised);
+  --_color-surface-glass:     rgba(255, 255, 255, 0.70);
+  --color-surface-glass:      var(--_color-surface-glass);
 
   /* --------------------------------------------------------
    * 2. Farben - Akzent (konfigurierbar)
@@ -422,17 +431,17 @@
   --glass-border-overlay: rgba(255, 255, 255, 0.10);  /* immer-dunkle Surfaces (Toasts, Overlays) */
 
   /* a2) Glass-Hintergründe: Vibrancy-Stufe (transparenter, mehr Durchschein) */
-  --_glass-bg-card:       rgba(255, 255, 255, 0.52);
+  --_glass-bg-card:       var(--_color-surface-glass);
   --glass-bg-card:        var(--_glass-bg-card);
-  --_glass-bg-card-hover: rgba(255, 255, 255, 0.65);
+  --_glass-bg-card-hover: rgba(255, 255, 255, 0.78);
   --glass-bg-card-hover:  var(--_glass-bg-card-hover);
-  --_glass-bg-input:      rgba(255, 255, 255, 0.48);
+  --_glass-bg-input:      rgba(255, 255, 255, 0.82);
   --glass-bg-input:       var(--_glass-bg-input);
-  --_glass-bg-toolbar:    rgba(255, 255, 255, 0.58);
+  --_glass-bg-toolbar:    rgba(255, 255, 255, 0.86);
   --glass-bg-toolbar:     var(--_glass-bg-toolbar);
 
   /* a3) Tint: Modul-Akzentfarbe als subtile Glass-Tonung */
-  --_glass-tint-strength: 6%;
+  --_glass-tint-strength: 4%;
   --glass-tint-strength:  var(--_glass-tint-strength);
 
   /* b) Blur-Stufen */
@@ -488,10 +497,14 @@
   --transition-glass: 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* h) Liquid-Glass-Backdrop (Section 17) — driftende Blobs + Specular.
-   *    --lg-blob-opacity wird im Dark-Mode auf 0.55 angehoben (Light: 0.4).
+   *    --lg-blob-opacity bleibt bewusst niedrig, damit Inhalte dominieren.
    *    In prefers-reduced-transparency / prefers-contrast wird sie auf 0
    *    gesetzt, damit der Backdrop dort verschwindet (siehe unten). */
-  --lg-blob-opacity:   0.4;     /* Light; Dark hebt auf 0.55 */
+  --_app-backdrop-accent-strength: 2%;
+  --app-backdrop-accent-strength:  var(--_app-backdrop-accent-strength);
+  --_app-backdrop-secondary-strength: 1%;
+  --app-backdrop-secondary-strength: var(--_app-backdrop-secondary-strength);
+  --lg-blob-opacity:   0.18;
   --lg-glass-saturate: 200%;    /* Backdrop-Sättigung erhöhter Glass-Flächen */
   --lg-card-radius:    var(--radius-glass-card);
   --lg-density:        1;       /* multipliziert Schlüssel-Paddings (Reserve) */
@@ -531,6 +544,9 @@
     --_color-surface-3:        #2A2A28;
     --_color-surface-elevated: #2A2A28;
     --_color-surface-hover:    #333331;
+    --_color-surface-work:     #242422;
+    --_color-surface-raised:   #2E2E2B;
+    --_color-surface-glass:    rgba(34, 34, 32, 0.78);
 
     --_sidebar-bg:           #141413;
     --_sidebar-shadow-light: rgba(255, 255, 255, 0.04);
@@ -604,12 +620,14 @@
     --_glass-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.30), 0 0 0 1px rgba(255, 255, 255, 0.07);
     --_glass-shadow-md: 0 4px 20px rgba(0, 0, 0, 0.40), 0 0 0 1px rgba(255, 255, 255, 0.06);
     --_glass-shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --_glass-bg-card:          rgba(26, 26, 24, 0.50);
-    --_glass-bg-card-hover:    rgba(36, 36, 34, 0.62);
-    --_glass-bg-input:         rgba(22, 22, 20, 0.45);
-    --_glass-bg-toolbar:       rgba(28, 28, 26, 0.55);
-    --_glass-tint-strength:    8%;
-    --lg-blob-opacity:         0.55;  /* Dark: kräftigere Blobs */
+    --_glass-bg-card:          var(--_color-surface-glass);
+    --_glass-bg-card-hover:    rgba(42, 42, 40, 0.86);
+    --_glass-bg-input:         rgba(34, 34, 32, 0.84);
+    --_glass-bg-toolbar:       rgba(34, 34, 32, 0.88);
+    --_glass-tint-strength:    4%;
+    --_app-backdrop-accent-strength: 1.5%;
+    --_app-backdrop-secondary-strength: 0.75%;
+    --lg-blob-opacity:         0.24;
   }
 }
 
@@ -634,6 +652,9 @@
     --_color-surface-3:        #2A2A28;
     --_color-surface-elevated: #2A2A28;
     --_color-surface-hover:    #333331;
+    --_color-surface-work:     #242422;
+    --_color-surface-raised:   #2E2E2B;
+    --_color-surface-glass:    rgba(34, 34, 32, 0.78);
 
     /* Sidebar */
     --_sidebar-bg:           #141413;
@@ -716,12 +737,14 @@
     --_glass-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.30), 0 0 0 1px rgba(255, 255, 255, 0.07);
     --_glass-shadow-md: 0 4px 20px rgba(0, 0, 0, 0.40), 0 0 0 1px rgba(255, 255, 255, 0.06);
     --_glass-shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --_glass-bg-card:         rgba(26, 26, 24, 0.50);
-    --_glass-bg-card-hover:   rgba(36, 36, 34, 0.62);
-    --_glass-bg-input:        rgba(22, 22, 20, 0.45);
-    --_glass-bg-toolbar:      rgba(28, 28, 26, 0.55);
-    --_glass-tint-strength:   8%;
-    --lg-blob-opacity:        0.55;  /* Dark: kräftigere Blobs */
+    --_glass-bg-card:         var(--_color-surface-glass);
+    --_glass-bg-card-hover:   rgba(42, 42, 40, 0.86);
+    --_glass-bg-input:        rgba(34, 34, 32, 0.84);
+    --_glass-bg-toolbar:      rgba(34, 34, 32, 0.88);
+    --_glass-tint-strength:   4%;
+    --_app-backdrop-accent-strength: 1.5%;
+    --_app-backdrop-secondary-strength: 0.75%;
+    --lg-blob-opacity:        0.24;
 }
 
 /* ================================================================

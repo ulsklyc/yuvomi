@@ -138,13 +138,7 @@
   -webkit-overflow-scrolling: touch;
   padding-top: var(--offline-banner-height, 0px);
   transition: padding-top 0.2s ease;
-  background:
-    radial-gradient(
-      ellipse 130% 40% at 50% 0%,
-      color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 4%, transparent),
-      transparent 70%
-    ),
-    var(--color-bg);
+  background-color: var(--color-bg);
 }
 
 .app-content:focus {
