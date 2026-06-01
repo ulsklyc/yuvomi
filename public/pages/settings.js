@@ -290,7 +290,7 @@ export async function render(container, { user }) {
       <div class="settings-tab-panel" data-panel="general" role="tabpanel"${panelHidden('general')}>
         <section class="settings-section">
           <h2 class="settings-section__title">${t('settings.sectionDesign')}</h2>
-          <div class="settings-card">
+          <div class="settings-card settings-card--appearance">
             <h3 class="settings-card__title">${t('settings.cardAppearance')}</h3>
             <div class="theme-toggle" id="theme-toggle">
               <button class="theme-toggle__btn ${currentTheme() === 'system' ? 'theme-toggle__btn--active' : ''}" data-theme-value="system" aria-label="${t('settings.themeSysLabel')}" aria-pressed="${currentTheme() === 'system' ? 'true' : 'false'}">
@@ -312,7 +312,7 @@ export async function render(container, { user }) {
         ${user?.role === 'admin' ? `
         <section class="settings-section">
           <h2 class="settings-section__title">${t('settings.sectionAppName')}</h2>
-          <div class="settings-card">
+          <div class="settings-card settings-card--app-name">
             <h3 class="settings-card__title">${t('settings.appNameTitle')}</h3>
             <p class="form-hint" style="margin-bottom:var(--space-3)">${t('settings.appNameHint')}</p>
             <form class="settings-form settings-form--compact" id="app-name-form" novalidate autocomplete="off">
@@ -339,7 +339,7 @@ export async function render(container, { user }) {
 
         <section class="settings-section">
           <h2 class="settings-section__title">${t('settings.sectionDate')}</h2>
-          <div class="settings-card">
+          <div class="settings-card settings-card--datetime">
             <h3 class="settings-card__title">${t('settings.dateFormatTitle')}</h3>
             <p class="form-hint" style="margin-bottom:var(--space-3)">${t('settings.dateFormatHint')}</p>
             <label class="form-label" for="date-format-select">${t('settings.dateFormatLabel')}</label>
@@ -362,14 +362,14 @@ export async function render(container, { user }) {
 
         <section class="settings-section">
           <h2 class="settings-section__title">${t('settings.languageTitle')}</h2>
-          <div class="settings-card">
+          <div class="settings-card settings-card--language">
             <oikos-locale-picker></oikos-locale-picker>
           </div>
         </section>
 
         <section class="settings-section">
           <h2 class="settings-section__title">${t('settings.sectionPwa')}</h2>
-          <div class="settings-card settings-pwa-card">
+          <div class="settings-card settings-card--pwa settings-pwa-card">
             <div class="settings-pwa-card__icon">
               <i data-lucide="smartphone" aria-hidden="true"></i>
             </div>
@@ -389,7 +389,7 @@ export async function render(container, { user }) {
         ${user?.role === 'admin' ? `
         <section class="settings-section">
           <h2 class="settings-section__title">${t('settings.sectionHousekeeping')}</h2>
-          <div class="settings-card">
+          <div class="settings-card settings-card--housekeeping">
             <h3 class="settings-card__title">${t('settings.housekeepingPaymentsTitle')}</h3>
             <p class="form-hint" style="margin-bottom:var(--space-3)">${t('settings.housekeepingPaymentTasksHint')}</p>
             <label class="toggle-row">
@@ -403,7 +403,7 @@ export async function render(container, { user }) {
         ${user?.role === 'admin' ? `
         <section class="settings-section">
           <h2 class="settings-section__title">${t('settings.sectionModules')}</h2>
-          <div class="settings-card">
+          <div class="settings-card settings-card--modules">
             <h3 class="settings-card__title">${t('settings.modulesTitle')}</h3>
             <p class="form-hint" style="margin-bottom:var(--space-3)">${t('settings.modulesHint')}</p>
             <p class="form-hint" style="margin-bottom:var(--space-3)">${t('settings.modulesDragHint')}</p>
@@ -638,14 +638,14 @@ export async function render(container, { user }) {
       <div class="settings-tab-panel" data-panel="family" role="tabpanel"${panelHidden('family')}>
         <section class="settings-section">
           <h2 class="settings-section__title">${t('settings.sectionFamily')}</h2>
-          <div class="settings-card" id="members-card">
+          <div class="settings-card settings-card--family" id="members-card">
             <ul class="settings-members" id="members-list">
               ${users.map(memberHtml).join('')}
             </ul>
             <button class="btn btn--primary settings-add-btn" id="add-member-btn">${t('settings.addMember')}</button>
           </div>
 
-          <div class="settings-card settings-card--hidden" id="add-member-form-card">
+          <div class="settings-card settings-card--family settings-card--hidden" id="add-member-form-card">
             <h3 class="settings-card__title">${t('settings.newMemberTitle')}</h3>
             <form id="add-member-form" class="settings-form">
               <div class="form-group">
@@ -708,7 +708,7 @@ export async function render(container, { user }) {
       <div class="settings-tab-panel" data-panel="api-tokens" role="tabpanel"${panelHidden('api-tokens')}>
         <section class="settings-section">
           <h2 class="settings-section__title">${t('settings.apiTokensTitle')}</h2>
-          <div class="settings-card">
+          <div class="settings-card settings-card--api-tokens">
             <h3 class="settings-card__title">${t('settings.apiTokensCardTitle')}</h3>
             <p class="form-hint" style="margin-bottom:var(--space-3)">${t('settings.apiTokensHint')}</p>
             <ul class="settings-members" id="api-token-list">
@@ -742,7 +742,7 @@ export async function render(container, { user }) {
         <section class="settings-section">
           <h2 class="settings-section__title">${t('settings.sectionAccount')}</h2>
 
-          <div class="settings-card">
+          <div class="settings-card settings-card--account">
             <div class="settings-user-info">
               ${avatarHtml(user)}
               <div>
@@ -752,7 +752,7 @@ export async function render(container, { user }) {
             </div>
           </div>
 
-          <div class="settings-card">
+          <div class="settings-card settings-card--account">
             <h3 class="settings-card__title">${t('settings.profilePictureTitle')}</h3>
             <form id="profile-form" class="settings-form">
               <div class="settings-profile-editor">
@@ -792,7 +792,7 @@ export async function render(container, { user }) {
             </form>
           </div>
 
-          <div class="settings-card">
+          <div class="settings-card settings-card--account">
             <h3 class="settings-card__title">${t('settings.changePassword')}</h3>
             <form id="password-form" class="settings-form">
               <div class="form-group">
@@ -824,7 +824,7 @@ export async function render(container, { user }) {
         <section class="settings-section">
           <h2 class="settings-section__title">${t('settings.sectionBackup')}</h2>
 
-          <div class="settings-card settings-backup-card">
+          <div class="settings-card settings-card--backup settings-backup-card">
             <div class="settings-backup-card__icon">
               <i data-lucide="database-backup" aria-hidden="true"></i>
             </div>
@@ -837,7 +837,7 @@ export async function render(container, { user }) {
             </div>
           </div>
 
-          <div class="settings-card settings-backup-card settings-backup-card--danger">
+          <div class="settings-card settings-card--backup settings-backup-card settings-backup-card--danger">
             <div class="settings-backup-card__icon">
               <i data-lucide="rotate-ccw" aria-hidden="true"></i>
             </div>
@@ -860,7 +860,7 @@ export async function render(container, { user }) {
             </div>
           </div>
 
-          <div class="settings-card" id="backup-scheduler-card">
+          <div class="settings-card settings-card--backup" id="backup-scheduler-card">
             <h3 class="settings-card__title">${t('settings.backupSchedulerTitle')}</h3>
             <p class="form-hint">${t('settings.backupSchedulerHint')}</p>
             <div class="settings-info-grid" id="backup-scheduler-info">
@@ -868,7 +868,7 @@ export async function render(container, { user }) {
             </div>
           </div>
 
-          <div class="settings-card">
+          <div class="settings-card settings-card--backup">
             <h3 class="settings-card__title">${t('settings.backupCliTitle')}</h3>
             <p class="form-hint">${t('settings.backupCliHint')}</p>
             <pre class="settings-code-block"><code>SERVICE=oikos
@@ -1212,6 +1212,7 @@ function renderSettingsSubTabs(container, user, activeTab) {
     activeId:       activeTab,
     storageKey:     SETTINGS_TAB_KEY,
     ariaLabel:      t('settings.tabsAriaLabel'),
+    extraClass:     'settings-tabs',
     insertPosition: 'afterend',
     onChange: (tabId) => {
       container.querySelectorAll('[data-panel]').forEach((panel) => {

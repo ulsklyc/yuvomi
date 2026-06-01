@@ -765,8 +765,10 @@
 .budget-entry__amount--expenses { color: var(--color-danger);  }
 
 .budget-entry__delete {
-  width: 28px;
-  height: 28px;
+  width: var(--target-base);
+  height: var(--target-base);
+  min-width: var(--target-base);
+  min-height: var(--target-base);
   border-radius: var(--radius-sm);
   background: none;
   border: none;
@@ -790,7 +792,7 @@
 .budget-entry__delete::before {
   content: '';
   position: absolute;
-  inset: -10px;
+  inset: 0;
 }
 
 .budget-entry:hover .budget-entry__delete {
@@ -799,6 +801,12 @@
 
 .budget-entry--loan .budget-entry__delete {
   opacity: 1;
+}
+
+@media (hover: none), (max-width: 640px) {
+  .budget-entry__delete {
+    opacity: 1;
+  }
 }
 
 .budget-entry__delete:hover {

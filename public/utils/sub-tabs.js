@@ -56,6 +56,7 @@ export function renderSubTabs(anchorEl, {
     btn.setAttribute('role', 'tab');
     btn.setAttribute('aria-selected', id === current ? 'true' : 'false');
     btn.setAttribute('aria-controls', panelId);
+    btn.tabIndex = id === current ? 0 : -1;
 
     if (icon) {
       const i = document.createElement('i');
@@ -73,11 +74,10 @@ export function renderSubTabs(anchorEl, {
     bar.appendChild(btn);
   }
 
-  bar.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-tab-id]');
-    if (!btn || btn.dataset.tabId === current) return;
+  const activateTab = (tabId, { focus = false } = {}) => {
+    if (!tabId || tabId === current) return;
 
-    current = btn.dataset.tabId;
+    current = tabId;
 
     if (storageKey) {
       try { sessionStorage.setItem(storageKey, current); } catch { /* ignore */ }
@@ -87,10 +87,38 @@ export function renderSubTabs(anchorEl, {
       const active = b.dataset.tabId === current;
       b.classList.toggle('sub-tab--active', active);
       b.setAttribute('aria-selected', String(active));
+      b.tabIndex = active ? 0 : -1;
+      if (active && focus) b.focus();
     });
     syncTabPanels(anchorEl, bar, current);
 
     onChange(current);
+  };
+
+  bar.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-tab-id]');
+    if (!btn) return;
+
+    activateTab(btn.dataset.tabId);
+  });
+
+  bar.addEventListener('keydown', (e) => {
+    const keys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'];
+    if (!keys.includes(e.key)) return;
+
+    const buttons = [...bar.querySelectorAll('[data-tab-id]')];
+    const focusedIndex = buttons.indexOf(document.activeElement);
+    const currentIndex = Math.max(0, buttons.findIndex((btn) => btn.dataset.tabId === current));
+    const index = focusedIndex >= 0 ? focusedIndex : currentIndex;
+    let nextIndex = index;
+
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextIndex = (index + 1) % buttons.length;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') nextIndex = (index - 1 + buttons.length) % buttons.length;
+    if (e.key === 'Home') nextIndex = 0;
+    if (e.key === 'End') nextIndex = buttons.length - 1;
+
+    e.preventDefault();
+    activateTab(buttons[nextIndex]?.dataset.tabId, { focus: true });
   });
 
   anchorEl.insertAdjacentElement(insertPosition, bar);

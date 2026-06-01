@@ -69,6 +69,9 @@ test('mobile More sheet trigger controls its dialog and traps keyboard focus', (
   const source = read('./public/router.js');
 
   assert.match(source, /moreBtn\.setAttribute\('aria-controls',\s*'more-sheet'\)/);
+  assert.match(source, /const currentMoreBtn = \(\) => container\.querySelector\('#more-btn'\) \|\| moreBtn/);
+  assert.match(source, /currentMoreBtn\(\)\.setAttribute\('aria-expanded',\s*'true'\)/);
+  assert.match(source, /currentMoreBtn\(\)\.setAttribute\('aria-expanded',\s*'false'\)/);
   assert.match(source, /function\s+createFocusTrap/);
   assert.match(source, /moreSheetTrap/);
   assert.match(source, /addEventListener\('keydown',\s*moreSheetTrap/);
@@ -306,6 +309,70 @@ test('phase 4 opens search from More sheet in a single handoff', () => {
   assert.match(routerSource, /requestAnimationFrame\(\(\) => \{\s*openSearch\(\);/);
 });
 
+test('phase 6 Settings tabs become a desktop sticky local navigation', () => {
+  const settingsPage = read('./public/pages/settings.js');
+  const settingsCss = read('./public/styles/settings.css');
+
+  assert.match(settingsPage, /extraClass:\s*'settings-tabs'/);
+  assert.match(
+    settingsCss,
+    /@media \(min-width:\s*960px\)[\s\S]*\.settings-page\s*\{[\s\S]*grid-template-columns:\s*minmax\(var\(--sidebar-width-expanded\),\s*var\(--sidebar-width-expanded\)\)\s+minmax\(0,\s*1fr\)/
+  );
+  assert.match(
+    settingsCss,
+    /@media \(min-width:\s*960px\)[\s\S]*\.settings-page \.settings-tabs\s*\{[\s\S]*position:\s*sticky[\s\S]*flex-direction:\s*column/
+  );
+  assert.match(settingsCss, /\.settings-tab-panel\s*\{[\s\S]*min-width:\s*0/);
+});
+
+test('phase 6 Settings mobile tabs expose horizontal scroll affordance', () => {
+  const settingsCss = read('./public/styles/settings.css');
+
+  assert.match(
+    settingsCss,
+    /@media \(max-width:\s*640px\)[\s\S]*\.settings-page \.settings-tabs\s*\{[\s\S]*mask-image:\s*linear-gradient/
+  );
+  assert.match(
+    settingsCss,
+    /@media \(max-width:\s*640px\)[\s\S]*\.settings-page \.settings-tabs\s*\{[\s\S]*scroll-padding-inline:\s*var\(--space-4\)/
+  );
+  assert.match(
+    settingsCss,
+    /@media \(max-width:\s*640px\)[\s\S]*\.settings-page \.settings-tabs \.sub-tab\s*\{[\s\S]*min-width:\s*max-content/
+  );
+});
+
+test('phase 6 Settings cards carry IA modifiers for scannable admin groups', () => {
+  const settingsPage = read('./public/pages/settings.js');
+  const settingsCss = read('./public/styles/settings.css');
+  const cardModifiers = [
+    'appearance',
+    'app-name',
+    'datetime',
+    'modules',
+    'account',
+    'family',
+    'api-tokens',
+    'backup',
+  ];
+
+  for (const modifier of cardModifiers) {
+    assert.match(settingsPage, new RegExp(`settings-card--${modifier}`), `settings.js should mark ${modifier} settings cards`);
+    assert.match(settingsCss, new RegExp(`\\.settings-card--${modifier}\\b`), `settings.css should style ${modifier} settings cards`);
+  }
+});
+
+test('phase 6 shared sub-tabs support keyboard tab navigation', () => {
+  const source = read('./public/utils/sub-tabs.js');
+
+  assert.match(source, /bar\.addEventListener\('keydown'/);
+  assert.match(source, /e\.key === 'ArrowRight'/);
+  assert.match(source, /e\.key === 'ArrowLeft'/);
+  assert.match(source, /e\.key === 'Home'/);
+  assert.match(source, /e\.key === 'End'/);
+  assert.match(source, /\.focus\(\)/);
+});
+
 // --------------------------------------------------------
 // Liquid-Glass-Migration: Regressions-Guards (UX-Audit)
 // --------------------------------------------------------
@@ -316,6 +383,71 @@ test('calendar week-view time labels use a readable text token, not the disabled
 
   assert.match(body, /color:\s*var\(--color-text-tertiary\)/, 'time labels must use --color-text-tertiary for WCAG AA contrast');
   assert.doesNotMatch(body, /color:\s*var\(--color-text-disabled\)/, 'time labels must not reuse the disabled token (insufficient contrast)');
+});
+
+test('calendar month view uses solid work surfaces and explicit chip boundaries', () => {
+  const calendar = read('./public/styles/calendar.css');
+  const gridBody = cssRuleBody(calendar, '.month-grid');
+  const dayBody = cssRuleBody(calendar, '.month-day');
+  const eventBody = cssRuleBody(calendar, '.month-day__event');
+
+  assert.match(gridBody, /background-color:\s*var\(--color-border-subtle\)/, 'month grid should expose clear cell boundaries');
+  assert.match(gridBody, /gap:\s*var\(--space-px\)/, 'month grid boundaries should use tokenized one-pixel gaps');
+  assert.match(dayBody, /background-color:\s*var\(--color-surface-work\)/, 'month cells should use a stable work surface');
+  assert.match(eventBody, /border:\s*var\(--space-px\)\s+solid\s+color-mix/, 'event chips need a visible boundary, not color alone');
+  assert.match(eventBody, /box-shadow:\s*var\(--shadow-xs\)/, 'event chips should stand out enough for desktop scanning');
+});
+
+test('calendar agenda events and task chips keep readable contrast in mobile agenda', () => {
+  const calendar = read('./public/styles/calendar.css');
+  const eventBody = cssRuleBody(calendar, '.agenda-event');
+  const colorBody = cssRuleBody(calendar, '.agenda-event__color');
+  const taskBody = cssRuleBody(calendar, '.cal-task-chip');
+  const metaBody = cssRuleBody(calendar, '.agenda-event__meta');
+
+  assert.match(eventBody, /background:\s*var\(--color-surface-work\)/, 'agenda rows need a solid surface for mobile contrast');
+  assert.match(eventBody, /border:\s*var\(--space-px\)\s+solid\s+var\(--color-border-subtle\)/, 'agenda rows need a boundary in both themes');
+  assert.match(colorBody, /width:\s*var\(--space-1\)/, 'agenda color rail should be tokenized and visible');
+  assert.match(taskBody, /background:\s*color-mix\(in srgb,\s*currentColor/, 'task chips should tint from their readable text color');
+  assert.match(taskBody, /border-color:\s*color-mix\(in srgb,\s*currentColor/, 'task chips should have more than colored text');
+  assert.match(metaBody, /color:\s*var\(--color-text-secondary\)/, 'metadata should remain legible in light and dark themes');
+});
+
+test('calendar metadata uses lucide icon markup instead of visible emoji', () => {
+  const source = read('./public/pages/calendar.js');
+
+  assert.doesNotMatch(source, /📍|🗓|📅|🎂|👤/, 'calendar metadata must not render visible emoji icons');
+  assert.match(source, /calendarMetaIconHtml\('map-pin'\)/, 'location metadata should use the shared metadata icon helper');
+  assert.match(source, /class="calendar-meta-icon icon-sm"/, 'metadata icons should use tokenized icon classes');
+});
+
+test('phase 7 calendar inline polish keeps icons and all-day labels tokenized', () => {
+  const source = read('./public/pages/calendar.js');
+  const calendar = read('./public/styles/calendar.css');
+  const allDayLabel = cssRuleBody(calendar, '.calendar-all-day-label');
+
+  assert.doesNotMatch(source, /data-lucide="(?:x|plus|trash-2|repeat)"\s+style=/, 'Lucide icons should use icon utility classes, not inline sizing');
+  assert.doesNotMatch(source, /font-size:10px|color:var\(--color-text-disabled\)/, 'all-day labels should not keep low-contrast inline text styles');
+  assert.match(source, /calendarRepeatIconHtml\(\)/, 'recurrence markers should share the tokenized repeat icon helper');
+  assert.match(source, /class="calendar-all-day-label"/, 'all-day gutter labels should use the shared label class');
+  assert.match(allDayLabel, /font-size:\s*var\(--text-xs\)/, 'all-day labels should use a text token');
+  assert.match(allDayLabel, /color:\s*var\(--color-text-secondary\)/, 'all-day labels should use readable secondary text');
+  assert.match(allDayLabel, /width:\s*var\(--space-12\)/, 'all-day gutter width should use a spacing token');
+});
+
+test('phase 7 Budget row actions stay touch-safe on mobile', () => {
+  const source = read('./public/pages/budget.js');
+  const budget = read('./public/styles/budget.css');
+  const deleteRule = cssRuleBody(budget, '.budget-entry__delete');
+
+  assert.match(deleteRule, /width:\s*var\(--target-base\)/, 'Budget delete buttons should use the base touch target width');
+  assert.match(deleteRule, /height:\s*var\(--target-base\)/, 'Budget delete buttons should use the base touch target height');
+  assert.match(
+    budget,
+    /@media \(hover:\s*none\), \(max-width:\s*640px\)[\s\S]*\.budget-entry__delete\s*\{[\s\S]*opacity:\s*1/,
+    'Budget row actions should be visible on touch/mobile viewports',
+  );
+  assert.doesNotMatch(source, /data-lucide="(?:plus|trash-2|pencil)"\s+style=/, 'Budget Lucide actions should use icon utility classes');
 });
 
 test('sticky section headers stack above glass cards via --z-sticky', () => {
@@ -343,6 +475,22 @@ test('every locale resolves nav.section.household as a nested key', () => {
     assert.equal(typeof data.nav?.section?.household, 'string', `${file}: nav.section.household must be a nested string`);
     assert.ok(data.nav.section.household.length > 0, `${file}: nav.section.household must not be empty`);
     assert.ok(!('section.household' in data.nav), `${file}: nav must not keep the flat "section.household" key (t() cannot resolve it)`);
+  }
+});
+
+test('phase 7 locale files keep the de reference key set complete', () => {
+  const reference = JSON.parse(readFileSync(new URL('de.json', LOCALE_DIR), 'utf8'));
+  const referenceKeys = new Set(flattenLocaleKeys(reference));
+
+  assert.ok(referenceKeys.size > 0, 'de locale should expose reference keys');
+  for (const file of LOCALES) {
+    const data = JSON.parse(readFileSync(new URL(file, LOCALE_DIR), 'utf8'));
+    const keys = new Set(flattenLocaleKeys(data));
+    const missing = [...referenceKeys].filter((key) => !keys.has(key));
+    const extra = [...keys].filter((key) => !referenceKeys.has(key));
+
+    assert.deepEqual(missing, [], `${file} is missing locale keys`);
+    assert.deepEqual(extra, [], `${file} has extra locale keys`);
   }
 });
 
@@ -503,6 +651,16 @@ test('phase 2 mobile dashboard quick actions keep accessible names when labels a
 
 const LOCALE_DIR = new URL('./public/locales/', import.meta.url);
 const LOCALES = readdirSync(LOCALE_DIR).filter((f) => f.endsWith('.json'));
+
+function flattenLocaleKeys(obj, prefix = '') {
+  return Object.entries(obj).flatMap(([key, value]) => {
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return flattenLocaleKeys(value, fullKey);
+    }
+    return [fullKey];
+  });
+}
 
 // --- Kontrast-Helfer (WCAG 2.x relative luminance) ---
 function parseTokenMap(block) {

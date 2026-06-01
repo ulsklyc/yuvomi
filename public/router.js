@@ -1089,13 +1089,14 @@ function initMoreSheet(container, openSearch) {
   if (!moreBtn || !backdrop || !sheet) return;
   let lastFocusedBeforeSheet = null;
   const moreSheetTrap = createFocusTrap(sheet);
+  const currentMoreBtn = () => container.querySelector('#more-btn') || moreBtn;
 
   function openSheet() {
     lastFocusedBeforeSheet = document.activeElement;
     setOverlayInteractive(sheet, true);
     sheet.addEventListener('keydown', moreSheetTrap);
     backdrop.classList.add('more-backdrop--visible');
-    moreBtn.setAttribute('aria-expanded', 'true');
+    currentMoreBtn().setAttribute('aria-expanded', 'true');
     sheet.querySelector('#more-sheet-search, [data-route]')?.focus();
     if (window.lucide) window.lucide.createIcons();
   }
@@ -1105,11 +1106,13 @@ function initMoreSheet(container, openSearch) {
     setOverlayInteractive(sheet, false);
     sheet.removeEventListener('keydown', moreSheetTrap);
     backdrop.classList.remove('more-backdrop--visible');
-    moreBtn.setAttribute('aria-expanded', 'false');
-    if (restoreFocus) returnFocus(lastFocusedBeforeSheet || moreBtn);
+    currentMoreBtn().setAttribute('aria-expanded', 'false');
+    if (restoreFocus) returnFocus(lastFocusedBeforeSheet || currentMoreBtn());
   }
 
-  moreBtn.addEventListener('click', () => {
+  container.addEventListener('click', (e) => {
+    if (!e.target.closest('#more-btn')) return;
+    e.preventDefault();
     const isOpen = sheet.getAttribute('aria-hidden') === 'false';
     isOpen ? closeSheet() : openSheet();
   });

@@ -240,7 +240,7 @@ export async function render(container, { user }) {
         <div style="padding:2rem;text-align:center;color:var(--color-text-disabled);">${t('budget.loadingIndicator')}</div>
       </div>
       <button class="page-fab" id="fab-new-budget" aria-label="${t('budget.newEntryFabLabel')}">
-        <i data-lucide="plus" style="width:24px;height:24px" aria-hidden="true"></i>
+        <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
       </button>
     </div>
   `);
@@ -503,7 +503,7 @@ function renderEntries() {
         </div>
         <div class="budget-entry__amount ${amtClass}">${sign}${formatAmount(e.amount)}</div>
         <button class="budget-entry__delete" data-action="delete" data-id="${e.id}" aria-label="${t('budget.deleteLabel')}">
-          <i data-lucide="trash-2" style="width:14px;height:14px;" aria-hidden="true"></i>
+          <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
         </button>
       </div>
     `;
@@ -630,10 +630,10 @@ function renderLoanPaymentEntry(loan, payment) {
       <div class="budget-entry__actions">
         ${entry ? `
         <button class="budget-entry__delete" data-action="loan-payment-edit" data-loan-id="${loan.id}" data-payment-id="${payment.id}" data-entry-id="${entry.id}" aria-label="${t('common.edit')}">
-          <i data-lucide="pencil" style="width:14px;height:14px;" aria-hidden="true"></i>
+          <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
         </button>` : ''}
         <button class="budget-entry__delete" data-action="loan-payment-delete" data-loan-id="${loan.id}" data-payment-id="${payment.id}" data-entry-id="${entry?.id ?? ''}" aria-label="${t('budget.deleteLabel')}">
-          <i data-lucide="trash-2" style="width:14px;height:14px;" aria-hidden="true"></i>
+          <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
         </button>
       </div>
     </div>
@@ -948,7 +948,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
 
     <div class="modal-panel__footer" style="border:none;padding:0;margin-top:var(--space-4)">
       ${isEdit ? `<button class="btn btn--danger btn--icon" id="bm-delete" aria-label="${t('budget.deleteLabel')}">
-        <i data-lucide="trash-2" style="width:16px;height:16px;" aria-hidden="true"></i>
+        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
       </button>` : '<div></div>'}
       <div style="display:flex;gap:var(--space-3)">
         <button class="btn btn--secondary" id="bm-cancel">${t('common.cancel')}</button>

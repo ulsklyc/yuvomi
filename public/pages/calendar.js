@@ -261,7 +261,7 @@ function openIconPickerDialog(selectedIcon, onSelect, onClose = () => {}) {
     <div class="modal-panel__header">
       <span class="modal-panel__title">${esc(t('calendar.iconLabel'))}</span>
       <button class="modal-panel__close btn--ghost" type="button" aria-label="${esc(t('common.close'))}">
-        <i data-lucide="x" style="width:16px;height:16px;" aria-hidden="true"></i>
+        <i data-lucide="x" class="icon-md" aria-hidden="true"></i>
       </button>
     </div>
     <div class="modal-panel__body event-icon-dialog__body">
@@ -447,6 +447,14 @@ function eventIconHtml(icon, className = 'event-icon') {
   const name = eventIconName(icon);
   if (CUSTOM_EVENT_ICONS.has(name)) return customEventIconHtml(name, className);
   return `<i class="${className}" data-lucide="${name}" aria-hidden="true"></i>`;
+}
+
+function calendarMetaIconHtml(icon) {
+  return `<i data-lucide="${icon}" class="calendar-meta-icon icon-sm" aria-hidden="true"></i>`;
+}
+
+function calendarRepeatIconHtml() {
+  return '<i data-lucide="repeat" class="calendar-repeat-icon icon-xs" aria-hidden="true"></i>';
 }
 
 function eventIconElement(icon, className = 'event-icon') {
@@ -654,7 +662,7 @@ export async function render(container, { user }) {
       <div class="cal-toolbar" id="cal-toolbar"></div>
       <div id="cal-body" style="flex:1;display:flex;flex-direction:column;overflow:hidden;"></div>
       <button class="page-fab" id="fab-new-event" aria-label="${t('calendar.newEvent')}">
-        <i data-lucide="plus" style="width:24px;height:24px" aria-hidden="true"></i>
+        <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
       </button>
     </div>
   `);
@@ -896,7 +904,7 @@ function renderMonthDay(date, inMonth) {
          data-id="${ev.id}"
          style="background-color:${esc(bg)};${fg ? `color:${fg};` : ''}"
          title="${esc(ev.title)}${ev.cal_name ? ' · ' + ev.cal_name : ''}"
-    >${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}<span>${esc(ev.title)}</span>${(ev.recurrence_rule || ev.is_recurring_instance) ? '<i data-lucide="repeat" style="width:9px;height:9px;flex-shrink:0;opacity:0.7;margin-left:2px" aria-hidden="true"></i>' : ''}</div>
+    >${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}<span>${esc(ev.title)}</span>${(ev.recurrence_rule || ev.is_recurring_instance) ? calendarRepeatIconHtml() : ''}</div>
   `;
   }).join('');
 
@@ -940,7 +948,7 @@ function renderWeekView(container) {
   container.insertAdjacentHTML('beforeend', `
     <div class="week-view">
       <div class="week-view__header" id="week-header"
-           style="display:grid;grid-template-columns:48px repeat(${colCount},1fr);">
+           style="display:grid;grid-template-columns:var(--space-12) repeat(${colCount},1fr);">
         <div class="week-view__time-gutter"></div>
         ${days.map((d) => {
           const dt = new Date(d + 'T00:00:00');
@@ -951,8 +959,8 @@ function renderWeekView(container) {
         }).join('')}
       </div>
       <!-- Ganztägige Ereignisse -->
-      <div class="allday-row" style="display:grid;grid-template-columns:48px repeat(${colCount},1fr);">
-        <div style="width:48px;padding:2px;font-size:10px;color:var(--color-text-disabled);text-align:right;padding-right:4px;line-height:24px;">${t('calendar.allDayShort')}</div>
+      <div class="allday-row" style="display:grid;grid-template-columns:var(--space-12) repeat(${colCount},1fr);">
+        <div class="calendar-all-day-label">${t('calendar.allDayShort')}</div>
         ${days.map((d, i) => `
           <div class="allday-cell">
             ${alldayEvs[i].map((ev) => `
@@ -1040,7 +1048,7 @@ function renderWeekEvent(ev, layout = null) {
   return `
     <div class="week-event" data-id="${ev.id}"
          style="top:${top}px;height:${height}px;left:${left};width:${width};${ev.cal_color || ev.color ? `background-color:${esc(ev.cal_color || ev.color)};` : ''}${getContrastColor(ev.cal_color || ev.color) ? `color:${getContrastColor(ev.cal_color || ev.color)};` : ''}">
-      <div class="week-event__title">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}<span>${esc(ev.title)}</span>${(ev.recurrence_rule || ev.is_recurring_instance) ? '<i data-lucide="repeat" style="width:9px;height:9px;flex-shrink:0;opacity:0.7;margin-left:2px" aria-hidden="true"></i>' : ''}</div>
+      <div class="week-event__title">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}<span>${esc(ev.title)}</span>${(ev.recurrence_rule || ev.is_recurring_instance) ? calendarRepeatIconHtml() : ''}</div>
       <div class="week-event__time">${formatTime(ev.start_datetime)}${ev.end_datetime ? '–' + formatTime(ev.end_datetime) : ''}</div>
     </div>
   `;
@@ -1136,8 +1144,8 @@ function renderDayView(container) {
         <div class="day-view__date-label">${formatDate(state.cursor, { weekday: true, long: true })}</div>
       </div>
       ${(allday.length || tasksOnDay(state.cursor).length) ? `
-      <div class="allday-row" style="display:grid;grid-template-columns:48px 1fr;">
-        <div style="padding:2px 4px 2px 0;font-size:10px;color:var(--color-text-disabled);text-align:right;line-height:24px;">${t('calendar.allDayShort')}</div>
+      <div class="allday-row" style="display:grid;grid-template-columns:var(--space-12) 1fr;">
+        <div class="calendar-all-day-label">${t('calendar.allDayShort')}</div>
         <div class="allday-cell">
           ${allday.map((ev) => `
             <div class="allday-event" data-id="${ev.id}"
@@ -1258,10 +1266,10 @@ function renderAgendaEvent(ev) {
     <div class="agenda-event" data-id="${ev.id}">
       <div class="agenda-event__color" style="background-color:${esc(displayColor)};"></div>
       <div class="agenda-event__body">
-        <div class="agenda-event__title">${eventIconHtml(ev.icon)}<span>${esc(ev.title)}</span>${(ev.recurrence_rule || ev.is_recurring_instance) ? ' <i data-lucide="repeat" style="width:12px;height:12px;display:inline;vertical-align:middle;opacity:0.5" aria-hidden="true"></i>' : ''}</div>
+        <div class="agenda-event__title">${eventIconHtml(ev.icon)}<span>${esc(ev.title)}</span>${(ev.recurrence_rule || ev.is_recurring_instance) ? calendarRepeatIconHtml() : ''}</div>
         <div class="agenda-event__meta">
-          <span>${timeStr}</span>
-          ${ev.location ? `<span>📍 ${esc(fmtLocation(ev.location))}</span>` : ''}
+          <span class="calendar-meta-item">${calendarMetaIconHtml('clock')}<span>${esc(timeStr)}</span></span>
+          ${ev.location ? `<span class="calendar-meta-item">${calendarMetaIconHtml('map-pin')}<span>${esc(fmtLocation(ev.location))}</span></span>` : ''}
           ${ev.cal_name ? `<span class="event-cal-label" style="--cal-color:${esc(displayColor)}">${esc(ev.cal_name)}</span>` : ''}
           ${assignedUsers.length ? `<span class="agenda-event__assigned">${renderAvatarStack(assignedUsers, { size: 20, maxVisible: 3 })}</span>` : ''}
         </div>
@@ -1292,16 +1300,16 @@ function showEventPopup(ev, anchor) {
     <div class="event-popup__title">${eventIconHtml(ev.icon)}<span>${esc(ev.title)}</span></div>
     <div class="event-popup__meta">
       ${ev.cal_name ? `<div><span class="event-cal-label" style="--cal-color:${esc(displayColor)}">${esc(ev.cal_name)}</span></div>` : ''}
-      <div>${timeStr}</div>
-      ${ev.location ? `<div>📍 ${esc(fmtLocation(ev.location))}</div>` : ''}
+      <div class="calendar-meta-item">${calendarMetaIconHtml('clock')}<span>${esc(timeStr)}</span></div>
+      ${ev.location ? `<div class="calendar-meta-item">${calendarMetaIconHtml('map-pin')}<span>${esc(fmtLocation(ev.location))}</span></div>` : ''}
       ${ev.description ? `<div>${esc(truncateDescription(ev.description, 500))}</div>` : ''}
       ${ev.attachment_data ? attachmentHtml(ev) : ''}
-      ${ev.assigned_name ? `<div>👤 ${esc(ev.assigned_name)}</div>` : ''}
+      ${ev.assigned_name ? `<div class="calendar-meta-item">${calendarMetaIconHtml('user')}<span>${esc(ev.assigned_name)}</span></div>` : ''}
     </div>
     <div class="event-popup__actions">
-      <button class="btn btn--secondary" style="flex:1;" id="popup-edit">${t('calendar.popupEdit')}</button>
+      <button class="btn btn--secondary event-popup__edit" id="popup-edit">${t('calendar.popupEdit')}</button>
       <button class="btn btn--danger"    id="popup-delete">
-        <i data-lucide="trash-2" style="width:16px;height:16px;" aria-hidden="true"></i>
+        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
       </button>
     </div>
   `);
@@ -1438,9 +1446,9 @@ function renderCalendarReminderSection(reminder = null, event = null) {
   const custom = customReminderFromEvent(event, reminder);
   return `
     <div class="reminder-section">
-      <div class="form-group" style="margin:0">
+      <div class="form-group reminder-section__group">
         <label class="form-label" for="modal-reminder-offset">${t('reminders.offsetLabel')}</label>
-        <select class="form-input" id="modal-reminder-offset" style="min-height:44px">
+        <select class="form-input" id="modal-reminder-offset">
           ${REMINDER_OFFSETS().map((o) =>
             `<option value="${o.value}" ${currentOffset === o.value ? 'selected' : ''}>${esc(o.label)}</option>`
           ).join('')}
@@ -1840,7 +1848,7 @@ function buildEventModalContent({ mode, event, date, reminder = null }) {
 
     <div class="modal-panel__footer" style="border:none;padding:0;margin-top:var(--space-4)">
       ${isEdit ? `<button class="btn btn--danger btn--icon" id="modal-delete" aria-label="${t('calendar.deleteEvent')}">
-        <i data-lucide="trash-2" style="width:16px;height:16px;" aria-hidden="true"></i>
+        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
       </button>` : '<div></div>'}
       <div style="display:flex;gap:var(--space-3)">
         <button class="btn btn--secondary" id="modal-cancel">${t('common.cancel')}</button>
