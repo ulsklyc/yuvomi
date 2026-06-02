@@ -36,6 +36,7 @@
     "test:oidc": "node --experimental-sqlite test-oidc.js",
     "test:installer-schema": "node --test test-installer-schema.js",
     "test:installer-env-write": "node --test test-installer-env-write.js",
+    "test:installer-static": "node --test test-installer-static.js",
     "test": "node --experimental-sqlite test-db.js && node --experimental-sqlite test-dashboard.js && node --experimental-sqlite test-tasks.js && node --experimental-sqlite test-multi-assignment.js && node --experimental-sqlite test-shopping.js && npm run test:meals && npm run test:calendar && node --experimental-sqlite test-notes-contacts-budget.js && npm run test:ux-utils && npm run test:modal-utils && npm run test:reminders && npm run test:api && npm run test:ics-parser && npm run test:ics-sub && npm run test:setup && npm run test:kitchen-tabs && npm run test:mobile-scroll-layout && npm run test:frontend-audit && npm run test:backup-scheduler && npm run test:caldav && npm run test:carddav && npm run test:split-expenses && npm run test:oidc"
   },
   "dependencies": {

@@ -9,7 +9,7 @@ import http from 'node:http';
 import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ENV_SCHEMA } from './env-schema.js';
 
@@ -97,6 +97,25 @@ function json(res, status, body) {
   res.end(payload);
 }
 
+/**
+ * Serve a read-only file from the repo's public/ tree so the installer can
+ * reuse the app's design tokens and fonts. Missing files yield a 404 instead
+ * of throwing, keeping the route handler exception-free.
+ */
+function serveStatic(res, filePath, contentType) {
+  try {
+    const body = readFileSync(filePath);
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Content-Length': body.length,
+      'Cache-Control': 'no-store',
+    });
+    res.end(body);
+  } catch {
+    json(res, 404, { error: 'Not found' });
+  }
+}
+
 
 async function route(req, res, server) {
   resetIdle(server);
@@ -107,6 +126,18 @@ async function route(req, res, server) {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': html.length, 'Cache-Control': 'no-store' });
     res.end(html);
     return;
+  }
+
+  // App-Designtokens, read-only aus dem Repo (Phase 3: Token-Angleich).
+  if (req.method === 'GET' && url.pathname === '/tokens.css') {
+    return serveStatic(res, resolve(projectRoot(), 'public', 'styles', 'tokens.css'), 'text/css; charset=utf-8');
+  }
+
+  // Selbstgehostete Variable Fonts. basename() neutralisiert Path-Traversal;
+  // nur .woff2 aus public/fonts wird ausgeliefert.
+  if (req.method === 'GET' && url.pathname.startsWith('/fonts/') && url.pathname.endsWith('.woff2')) {
+    const name = basename(url.pathname);
+    return serveStatic(res, resolve(projectRoot(), 'public', 'fonts', name), 'font/woff2');
   }
 
   if (req.method === 'GET' && url.pathname === '/api/defaults') {
