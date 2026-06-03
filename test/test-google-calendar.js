@@ -13,7 +13,7 @@ process.env.DB_PATH = ':memory:';
 const db = (await import('../server/db.js')).get();
 const { __test } = await import('../server/services/google-calendar.js');
 const { localEventToGoogle, googleAllDayEndToInclusive, localAllDayEndToExclusive,
-        upsertGoogleEvents, upsertExternalCalendar } = __test;
+        upsertGoogleEvents, upsertExternalCalendar, getCalendarId, setCalendarId } = __test;
 
 let passed = 0;
 let failed = 0;
@@ -274,6 +274,56 @@ test('Re-Sync aktualisiert weiterhin die übrigen Felder', () => {
   ).get(gEvent.id);
   assertEqual(row.title, 'Team-Meeting (verschoben)');
   assertEqual(row.color, '#00FF00', 'Farbe bleibt trotz Titeländerung erhalten');
+});
+
+// --------------------------------------------------------
+// getCalendarId / setCalendarId – Kalenderauswahl (Issue #220)
+// --------------------------------------------------------
+console.log('\n[Google Calendar Test] Kalenderauswahl (Issue #220)\n');
+
+function cfgGet(key) {
+  const row = db.prepare('SELECT value FROM sync_config WHERE key = ?').get(key);
+  return row ? row.value : null;
+}
+
+test('getCalendarId: Default ist "primary", wenn nichts gesetzt ist', () => {
+  db.prepare("DELETE FROM sync_config WHERE key = 'google_calendar_id'").run();
+  assertEqual(getCalendarId(), 'primary');
+});
+
+test('setCalendarId: speichert die gewählte Kalender-ID', () => {
+  setCalendarId('family@group.calendar.google.com');
+  assertEqual(getCalendarId(), 'family@group.calendar.google.com');
+});
+
+test('setCalendarId: leere/ungültige ID wird abgelehnt', () => {
+  let threw = false;
+  try { setCalendarId(''); } catch { threw = true; }
+  assert(threw, 'Leere ID muss einen Fehler werfen');
+  // Vorherige gültige Auswahl bleibt erhalten
+  assertEqual(getCalendarId(), 'family@group.calendar.google.com');
+});
+
+test('setCalendarId: Wechsel setzt den Sync-Token zurück', () => {
+  db.prepare(`INSERT INTO sync_config (key, value) VALUES ('google_sync_token', 'abc123')
+              ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run();
+  setCalendarId('work@group.calendar.google.com');
+  assertEqual(cfgGet('google_sync_token'), null, 'Sync-Token muss beim Wechsel gelöscht werden');
+});
+
+test('setCalendarId: Wechsel entfernt bestehende Google-Events', () => {
+  // Google-Event seeden
+  const calRefId = upsertExternalCalendar('google', 'work@group.calendar.google.com', 'Work', '#123456');
+  db.prepare(`INSERT INTO calendar_events
+    (title, start_datetime, all_day, external_calendar_id, external_source, calendar_ref_id, created_by)
+    VALUES ('Altes Event', '2026-06-10T10:00', 0, 'old-evt-220', 'google', ?, 1)`).run(calRefId);
+  const before = db.prepare("SELECT COUNT(*) c FROM calendar_events WHERE external_source = 'google'").get().c;
+  assert(before > 0, 'Vorbedingung: mindestens ein Google-Event vorhanden');
+
+  setCalendarId('newcal@group.calendar.google.com');
+
+  const after = db.prepare("SELECT COUNT(*) c FROM calendar_events WHERE external_source = 'google'").get().c;
+  assertEqual(after, 0, 'Alle Google-Events müssen beim Kalenderwechsel entfernt werden');
 });
 
 // --------------------------------------------------------

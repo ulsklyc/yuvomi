@@ -9,6 +9,7 @@
  *   google_token_expiry   - ISO-8601-Timestamp bis wann Access Token gültig ist
  *   google_sync_token     - Inkrementeller Sync-Token von Google (events.list)
  *   google_last_sync      - ISO-8601-Timestamp des letzten erfolgreichen Syncs
+ *   google_calendar_id    - ID des zu synchronisierenden Kalenders (Default: 'primary')
  */
 
 import { createLogger } from '../logger.js';
@@ -68,6 +69,67 @@ function cfgSet(key, value) {
 
 function cfgDel(key) {
   db.get().prepare('DELETE FROM sync_config WHERE key = ?').run(key);
+}
+
+// --------------------------------------------------------
+// Kalenderauswahl (Issue #220)
+// --------------------------------------------------------
+
+/**
+ * Liefert die ID des zu synchronisierenden Kalenders.
+ * Fällt auf 'primary' zurück, solange der Nutzer nichts ausgewählt hat
+ * (abwärtskompatibel für bestehende Installationen).
+ * @returns {string}
+ */
+function getCalendarId() {
+  return cfgGet('google_calendar_id') || 'primary';
+}
+
+/**
+ * Setzt den zu synchronisierenden Kalender und startet den Sync-State neu.
+ * Beim Wechsel werden der inkrementelle Sync-Token sowie die bereits
+ * importierten Google-Events entfernt, damit der nächste Sync den neuen
+ * Kalender sauber von Grund auf einliest (keine verwaisten Events).
+ * @param {string} calendarId
+ */
+function setCalendarId(calendarId) {
+  if (typeof calendarId !== 'string' || calendarId.trim().length === 0) {
+    throw new Error('[Google] calendarId fehlt oder ist ungültig.');
+  }
+  const next = calendarId.trim();
+  if (next === getCalendarId()) return; // kein Wechsel → State unangetastet lassen
+
+  cfgSet('google_calendar_id', next);
+  cfgDel('google_sync_token');
+  db.get().prepare("DELETE FROM calendar_events WHERE external_source = 'google'").run();
+}
+
+/**
+ * Listet die für den verbundenen Account verfügbaren Google-Kalender.
+ * @returns {Promise<Array<{id,summary,primary,backgroundColor,selected}>>}
+ */
+async function listCalendars() {
+  const client   = loadAuthorizedClient();
+  const calendar = google.calendar({ version: 'v3', auth: client });
+  const selectedId = getCalendarId();
+
+  const items = [];
+  let pageToken;
+  do {
+    const res = await calendar.calendarList.list({ pageToken, maxResults: 250 });
+    for (const cal of res.data.items || []) {
+      items.push({
+        id:              cal.id,
+        summary:         cal.summaryOverride || cal.summary || cal.id,
+        primary:         !!cal.primary,
+        backgroundColor: cal.backgroundColor || GOOGLE_COLOR,
+        selected:        cal.id === selectedId || (cal.primary && selectedId === 'primary'),
+      });
+    }
+    pageToken = res.data.nextPageToken;
+  } while (pageToken);
+
+  return items;
 }
 
 // --------------------------------------------------------
@@ -151,7 +213,7 @@ function getStatus() {
   const configured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REDIRECT_URI);
   const connected  = !!(cfgGet('google_access_token') && cfgGet('google_refresh_token'));
   const lastSync   = cfgGet('google_last_sync');
-  return { configured, connected, lastSync };
+  return { configured, connected, lastSync, calendarId: getCalendarId() };
 }
 
 /**
@@ -159,7 +221,7 @@ function getStatus() {
  */
 function disconnect() {
   ['google_access_token', 'google_refresh_token', 'google_token_expiry',
-   'google_sync_token', 'google_last_sync'].forEach(cfgDel);
+   'google_sync_token', 'google_last_sync', 'google_calendar_id'].forEach(cfgDel);
   log.info('Disconnected.');
 }
 
@@ -171,15 +233,16 @@ function disconnect() {
 async function sync() {
   const client  = loadAuthorizedClient();
   const calendar = google.calendar({ version: 'v3', auth: client });
+  const calendarId = getCalendarId();
 
   // Kalender-Metadaten holen und in external_calendars upserten
   let calRefId = null;
   let calColor = GOOGLE_COLOR;
   try {
-    const meta = await calendar.calendarList.get({ calendarId: 'primary' });
+    const meta = await calendar.calendarList.get({ calendarId });
     calColor  = meta.data.backgroundColor || GOOGLE_COLOR;
-    const calName = meta.data.summary || 'Google Calendar';
-    calRefId  = upsertExternalCalendar('google', 'primary', calName, calColor);
+    const calName = meta.data.summaryOverride || meta.data.summary || 'Google Calendar';
+    calRefId  = upsertExternalCalendar('google', calendarId, calName, calColor);
   } catch (err) {
     log.warn('Calendar metadata is not accessible:', err.message);
   }
@@ -193,7 +256,7 @@ async function sync() {
 
   do {
     let listParams = {
-      calendarId:    'primary',
+      calendarId,
       singleEvents:  true,
       pageToken,
     };
@@ -243,7 +306,7 @@ async function sync() {
     try {
       const gEvent = localEventToGoogle(event);
       const created = await calendar.events.insert({
-        calendarId: 'primary',
+        calendarId,
         requestBody: gEvent,
       });
       db.get().prepare(`
@@ -392,5 +455,5 @@ function localEventToGoogle(event) {
   return gEvent;
 }
 
-export { getAuthUrl, handleCallback, getStatus, disconnect, sync };
-export const __test = { localEventToGoogle, googleAllDayEndToInclusive, localAllDayEndToExclusive, upsertGoogleEvents, upsertExternalCalendar };
+export { getAuthUrl, handleCallback, getStatus, disconnect, sync, listCalendars, getCalendarId, setCalendarId };
+export const __test = { localEventToGoogle, googleAllDayEndToInclusive, localAllDayEndToExclusive, upsertGoogleEvents, upsertExternalCalendar, getCalendarId, setCalendarId };

@@ -579,6 +579,15 @@ export async function render(container, { user }) {
               </div>
             </div>
             ${googleStatus.configured ? `
+              ${googleStatus.connected && user?.role === 'admin' ? `
+                <div class="form-group settings-google-calendar">
+                  <label class="form-label" for="google-calendar-select">${t('settings.googleCalendarSelect')}</label>
+                  <select class="form-input" id="google-calendar-select" disabled>
+                    <option>${t('common.loading')}</option>
+                  </select>
+                  <p class="form-hint">${t('settings.googleCalendarSelectHint')}</p>
+                </div>
+              ` : ''}
               <div class="settings-sync-actions">
                 ${googleStatus.connected ? `
                   <button class="btn btn--secondary" id="google-sync-btn">${t('settings.syncNow')}</button>
@@ -1744,6 +1753,45 @@ function bindEvents(container, user, users, categories, icsSubscriptions, apiTok
       } finally {
         googleSyncBtn.disabled = false;
         googleSyncBtn.textContent = t('settings.syncNow');
+      }
+    });
+  }
+
+  // Google Kalenderauswahl (Admin) – Liste laden und Wechsel verarbeiten
+  const googleCalSelect = container.querySelector('#google-calendar-select');
+  if (googleCalSelect) {
+    (async () => {
+      try {
+        const { data } = await api.get('/calendar/google/calendars');
+        googleCalSelect.replaceChildren();
+        for (const cal of data) {
+          const opt = document.createElement('option');
+          opt.value = cal.id;
+          opt.textContent = cal.primary ? `${cal.summary} (${t('settings.googleCalendarPrimary')})` : cal.summary;
+          if (cal.selected) opt.selected = true;
+          googleCalSelect.appendChild(opt);
+        }
+        googleCalSelect.disabled = false;
+      } catch (err) {
+        const opt = document.createElement('option');
+        opt.textContent = err.message;
+        googleCalSelect.replaceChildren(opt);
+      }
+    })();
+
+    let currentCalId = null;
+    googleCalSelect.addEventListener('focus', () => { currentCalId = googleCalSelect.value; });
+    googleCalSelect.addEventListener('change', async () => {
+      const calendarId = googleCalSelect.value;
+      googleCalSelect.disabled = true;
+      try {
+        await api.put('/calendar/google/calendar', { calendarId });
+        window.oikos?.showToast(t('settings.calendarSwitched'), 'success');
+      } catch (err) {
+        window.oikos?.showToast(err.message, 'danger');
+        if (currentCalId) googleCalSelect.value = currentCalId;
+      } finally {
+        googleCalSelect.disabled = false;
       }
     });
   }

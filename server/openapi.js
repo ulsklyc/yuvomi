@@ -413,6 +413,8 @@ function buildPaths() {
     '/api/v1/calendar/google/callback': { get: op({ summary: 'Google Calendar OAuth callback', tag: 'Calendar', auth: false }) },
     '/api/v1/calendar/google/sync': { post: op({ summary: 'Run Google Calendar sync', tag: 'Calendar', admin: true, stateChanging: true }) },
     '/api/v1/calendar/google/status': { get: op({ summary: 'Get Google Calendar status', tag: 'Calendar' }) },
+    '/api/v1/calendar/google/calendars': { get: op({ summary: 'List available Google calendars', tag: 'Calendar', admin: true }) },
+    '/api/v1/calendar/google/calendar': { put: op({ summary: 'Select Google calendar to sync', tag: 'Calendar', admin: true, stateChanging: true }) },
     '/api/v1/calendar/google/disconnect': { delete: op({ summary: 'Disconnect Google Calendar', tag: 'Calendar', admin: true, stateChanging: true }) },
     '/api/v1/calendar/apple/status': { get: op({ summary: 'Get Apple Calendar status', tag: 'Calendar' }) },
     '/api/v1/calendar/apple/sync': { post: op({ summary: 'Run Apple Calendar sync', tag: 'Calendar', admin: true, stateChanging: true }) },

@@ -435,6 +435,43 @@ router.get('/google/status', (req, res) => {
 });
 
 /**
+ * GET /api/v1/calendar/google/calendars
+ * Admin only. Listet die verfügbaren Google-Kalender des verbundenen Accounts.
+ * Response: { data: [{ id, summary, primary, backgroundColor, selected }] }
+ */
+router.get('/google/calendars', requireAdmin, async (req, res) => {
+  try {
+    const data = await googleCalendar.listCalendars();
+    res.json({ data });
+  } catch (err) {
+    log.error('', err);
+    res.status(500).json({ error: err.message, code: 500 });
+  }
+});
+
+/**
+ * PUT /api/v1/calendar/google/calendar
+ * Admin only. Setzt den zu synchronisierenden Kalender und startet einen Sync.
+ * Body: { calendarId: string }
+ * Response: { ok: true, lastSync: string }
+ */
+router.put('/google/calendar', requireAdmin, async (req, res) => {
+  const { calendarId } = req.body;
+  if (!calendarId || typeof calendarId !== 'string' || calendarId.trim().length === 0) {
+    return res.status(400).json({ error: 'calendarId fehlt oder ist ungültig.', code: 400 });
+  }
+  try {
+    googleCalendar.setCalendarId(calendarId);
+    await googleCalendar.sync();
+    const { lastSync } = googleCalendar.getStatus();
+    res.json({ ok: true, lastSync });
+  } catch (err) {
+    log.error('', err);
+    res.status(500).json({ error: err.message, code: 500 });
+  }
+});
+
+/**
  * DELETE /api/v1/calendar/google/disconnect
  * Admin only. Tokens löschen und Verbindung trennen.
  * Response: { ok: true }
