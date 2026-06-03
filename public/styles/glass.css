@@ -95,11 +95,15 @@
     -webkit-backdrop-filter: var(--blur-xs) saturate(120%);
   }
 
-  .modal-panel {
-    background: var(--glass-bg-elevated);
-    backdrop-filter: var(--blur-sm);
-    -webkit-backdrop-filter: var(--blur-sm);
-  }
+  /* NOTE: deliberately NO backdrop-filter on .modal-panel.
+   * The panel contains the .modal-panel__body scroll container
+   * (overflow-y:auto); a backdrop-filter on that scroll ancestor forces the
+   * browser off the fast async-scroll path and re-rasterizes the blur every
+   * frame, making tall modals (e.g. the event editor) hang while scrolling.
+   * The panel keeps its opaque --color-surface background from layout.css;
+   * the blur lives on the non-scrolling .modal-overlay instead. Same
+   * opaque-background fix already used for the sticky toolbars in
+   * housekeeping.css / shopping.css. */
 
   .modal-panel__header {
     background: var(--glass-bg-elevated);
