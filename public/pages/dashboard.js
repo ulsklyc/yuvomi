@@ -452,7 +452,7 @@ function renderUpcomingEvents(events) {
     const timeStr = e.all_day ? t('dashboard.allDay') : `${formatTime(d)}${_suffix ? ' ' + _suffix : ''}`.trim();
     return `
       <div class="event-item" data-route="/calendar" role="button" tabindex="0">
-        <div class="event-item__bar" style="background-color:${esc(e.cal_color || e.color) || 'var(--color-accent)'}"></div>
+        <div class="event-item__bar" style="background-color:${esc(e.color || e.cal_color) || 'var(--color-accent)'}"></div>
         <div class="event-item__content">
           <div class="event-item__title">${esc(e.title)}</div>
           <div class="event-item__time">

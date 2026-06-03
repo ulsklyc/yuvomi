@@ -306,12 +306,15 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR) {
     ).get(item.id, 'google');
 
     if (existing) {
+      // color wird bewusst NICHT aktualisiert: benutzerdefinierte Event-Farben
+      // sollen über Syncs hinweg erhalten bleiben (Issue #219). Die Kalenderfarbe
+      // dient nur als Default beim ersten Import (INSERT).
       db.get().prepare(`
         UPDATE calendar_events
         SET title = ?, description = ?, start_datetime = ?, end_datetime = ?,
-            all_day = ?, location = ?, recurrence_rule = ?, color = ?, calendar_ref_id = ?
+            all_day = ?, location = ?, recurrence_rule = ?, calendar_ref_id = ?
         WHERE id = ?
-      `).run(title, description, startDt, endDt, allDay ? 1 : 0, location, rrule, calColor, calRefId, existing.id);
+      `).run(title, description, startDt, endDt, allDay ? 1 : 0, location, rrule, calRefId, existing.id);
     } else {
       db.get().prepare(`
         INSERT INTO calendar_events
@@ -390,4 +393,4 @@ function localEventToGoogle(event) {
 }
 
 export { getAuthUrl, handleCallback, getStatus, disconnect, sync };
-export const __test = { localEventToGoogle, googleAllDayEndToInclusive, localAllDayEndToExclusive };
+export const __test = { localEventToGoogle, googleAllDayEndToInclusive, localAllDayEndToExclusive, upsertGoogleEvents, upsertExternalCalendar };

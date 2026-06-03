@@ -5,8 +5,15 @@
  * Ausführen: node test/test-google-calendar.js
  */
 
+// In-Memory-DB für die DB-gestützten Tests (upsertGoogleEvents).
+// Muss VOR dem Import von google-calendar.js gesetzt werden, da db.js beim
+// Import init() ausführt und sich mit DB_PATH verbindet.
+process.env.DB_PATH = ':memory:';
+
+const db = (await import('../server/db.js')).get();
 const { __test } = await import('../server/services/google-calendar.js');
-const { localEventToGoogle, googleAllDayEndToInclusive, localAllDayEndToExclusive } = __test;
+const { localEventToGoogle, googleAllDayEndToInclusive, localAllDayEndToExclusive,
+        upsertGoogleEvents, upsertExternalCalendar } = __test;
 
 let passed = 0;
 let failed = 0;
@@ -217,6 +224,56 @@ test('localEventToGoogle: getimtes UNTIL ohne Zeitteil wird zu UTC date-time', (
   };
   const g = localEventToGoogle(event);
   assertEqual(g.recurrence[0], 'RRULE:FREQ=WEEKLY;UNTIL=20260831T235959Z');
+});
+
+// --------------------------------------------------------
+// upsertGoogleEvents – Event-Farben über Syncs erhalten (Issue #219)
+// --------------------------------------------------------
+console.log('\n[Google Calendar Test] upsertGoogleEvents – Farberhalt\n');
+
+// Seed-User (created_by = 1 in upsertGoogleEvents)
+db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
+  VALUES ('admin', 'Admin', 'x', 'admin')`).run();
+
+const gEvent = {
+  id: 'evt-color-219',
+  status: 'confirmed',
+  summary: 'Team-Meeting',
+  start: { dateTime: '2026-06-03T10:00:00Z' },
+  end:   { dateTime: '2026-06-03T11:00:00Z' },
+};
+
+test('Erst-Import setzt die Kalenderfarbe als Default', () => {
+  const calRefId = upsertExternalCalendar('google', 'primary', 'Mein Kalender', '#FF0000');
+  upsertGoogleEvents([gEvent], calRefId, '#FF0000');
+  const row = db.prepare(
+    'SELECT color FROM calendar_events WHERE external_calendar_id = ?'
+  ).get(gEvent.id);
+  assertEqual(row.color, '#FF0000');
+});
+
+test('Re-Sync überschreibt benutzerdefinierte Event-Farbe NICHT', () => {
+  // Nutzer ändert die Event-Farbe
+  db.prepare('UPDATE calendar_events SET color = ? WHERE external_calendar_id = ?')
+    .run('#00FF00', gEvent.id);
+  // Erneuter Sync mit unveränderter Kalenderfarbe
+  const calRefId = upsertExternalCalendar('google', 'primary', 'Mein Kalender', '#FF0000');
+  upsertGoogleEvents([gEvent], calRefId, '#FF0000');
+  const row = db.prepare(
+    'SELECT color FROM calendar_events WHERE external_calendar_id = ?'
+  ).get(gEvent.id);
+  assertEqual(row.color, '#00FF00', 'Benutzerfarbe muss über den Sync hinweg erhalten bleiben');
+});
+
+test('Re-Sync aktualisiert weiterhin die übrigen Felder', () => {
+  const updated = { ...gEvent, summary: 'Team-Meeting (verschoben)' };
+  const calRefId = upsertExternalCalendar('google', 'primary', 'Mein Kalender', '#FF0000');
+  upsertGoogleEvents([updated], calRefId, '#FF0000');
+  const row = db.prepare(
+    'SELECT title, color FROM calendar_events WHERE external_calendar_id = ?'
+  ).get(gEvent.id);
+  assertEqual(row.title, 'Team-Meeting (verschoben)');
+  assertEqual(row.color, '#00FF00', 'Farbe bleibt trotz Titeländerung erhalten');
 });
 
 // --------------------------------------------------------

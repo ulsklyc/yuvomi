@@ -956,7 +956,7 @@ function renderMonthDay(date, inMonth) {
   const extra    = evs.length - MAX_SHOW;
 
   const evHtml = shown.map((ev) => {
-    const bg = ev.cal_color || ev.color;
+    const bg = ev.color || ev.cal_color;
     const fg = getContrastColor(bg);
     return `
     <div class="month-day__event"
@@ -1024,7 +1024,7 @@ function renderWeekView(container) {
           <div class="allday-cell">
             ${alldayEvs[i].map((ev) => `
               <div class="allday-event" data-id="${ev.id}"
-                   style="${ev.cal_color || ev.color ? `background-color:${esc(ev.cal_color || ev.color)};` : ''}${getContrastColor(ev.cal_color || ev.color) ? `color:${getContrastColor(ev.cal_color || ev.color)};` : ''}"
+                   style="${ev.color || ev.cal_color ? `background-color:${esc(ev.color || ev.cal_color)};` : ''}${getContrastColor(ev.color || ev.cal_color) ? `color:${getContrastColor(ev.color || ev.cal_color)};` : ''}"
                    title="${esc(ev.title)}${ev.cal_name ? ' · ' + ev.cal_name : ''}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}<span>${esc(ev.title)}</span></div>
             `).join('')}
             ${tasksOnDay(d).map(renderTaskChip).join('')}
@@ -1106,7 +1106,7 @@ function renderWeekEvent(ev, layout = null) {
 
   return `
     <div class="week-event" data-id="${ev.id}"
-         style="top:${top}px;height:${height}px;left:${left};width:${width};${ev.cal_color || ev.color ? `background-color:${esc(ev.cal_color || ev.color)};` : ''}${getContrastColor(ev.cal_color || ev.color) ? `color:${getContrastColor(ev.cal_color || ev.color)};` : ''}">
+         style="top:${top}px;height:${height}px;left:${left};width:${width};${ev.color || ev.cal_color ? `background-color:${esc(ev.color || ev.cal_color)};` : ''}${getContrastColor(ev.color || ev.cal_color) ? `color:${getContrastColor(ev.color || ev.cal_color)};` : ''}">
       <div class="week-event__title">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}<span>${esc(ev.title)}</span>${(ev.recurrence_rule || ev.is_recurring_instance) ? calendarRepeatIconHtml() : ''}</div>
       <div class="week-event__time">${formatTime(ev.start_datetime)}${ev.end_datetime ? '–' + formatTime(ev.end_datetime) : ''}</div>
     </div>
@@ -1208,7 +1208,7 @@ function renderDayView(container) {
         <div class="allday-cell">
           ${allday.map((ev) => `
             <div class="allday-event" data-id="${ev.id}"
-                 style="${ev.cal_color || ev.color ? `background-color:${esc(ev.cal_color || ev.color)};` : ''}${getContrastColor(ev.cal_color || ev.color) ? `color:${getContrastColor(ev.cal_color || ev.color)};` : ''}"
+                 style="${ev.color || ev.cal_color ? `background-color:${esc(ev.color || ev.cal_color)};` : ''}${getContrastColor(ev.color || ev.cal_color) ? `color:${getContrastColor(ev.color || ev.cal_color)};` : ''}"
                  title="${esc(ev.title)}${ev.cal_name ? ' · ' + ev.cal_name : ''}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}<span>${esc(ev.title)}</span></div>`).join('')}
           ${tasksOnDay(state.cursor).map(renderTaskChip).join('')}
         </div>
@@ -1319,7 +1319,7 @@ function renderAgendaEvent(ev) {
     : formatTime(ev.start_datetime)
       + (ev.end_datetime ? ` – ${formatTime(ev.end_datetime)} ${t('calendar.timeSuffix')}`.trimEnd() : ` ${t('calendar.timeSuffix')}`.trimEnd());
 
-  const displayColor = ev.cal_color || ev.color;
+  const displayColor = ev.color || ev.cal_color;
   const assignedUsers = ev.assigned_users ?? [];
   return `
     <div class="agenda-event" data-id="${ev.id}">
@@ -1353,7 +1353,7 @@ function showEventPopup(ev, anchor) {
     : formatDateTime(ev.start_datetime)
       + (ev.end_datetime ? ` – ${formatTime(ev.end_datetime)}${t('calendar.timeSuffix') ? ' ' + t('calendar.timeSuffix') : ''}`.trim() : '');
 
-  const displayColor = ev.cal_color || ev.color;
+  const displayColor = ev.color || ev.cal_color;
   popup.insertAdjacentHTML('beforeend', `
     <div class="event-popup__color-bar" style="background-color:${esc(displayColor)};"></div>
     <div class="event-popup__title">${eventIconHtml(ev.icon)}<span>${esc(ev.title)}</span></div>
