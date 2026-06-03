@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Add database indexes for event/task assignment, loan-payment, and recurring-event lookups.
+
 ## [0.57.4] - 2026-06-02
 
 ### Changed
