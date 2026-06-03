@@ -49,7 +49,9 @@
   <link rel="stylesheet" href="/styles/login.css" />
 
   <!-- Lucide Icons (lokal, v0.469.0) -->
-  <script src="/lucide.min.js"></script>
+  <!-- defer: nicht render-blockierend. Laeuft vor den (ebenfalls deferred)
+       Modul-Skripten api.js/router.js, daher ist `lucide` zur Render-Zeit da. -->
+  <script src="/lucide.min.js" defer></script>
 </head>
 <body>
   <!-- Offline-Banner: sichtbar wenn navigator.onLine === false -->

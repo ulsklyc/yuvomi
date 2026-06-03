@@ -6,6 +6,7 @@
 
 import express from 'express';
 import helmet from 'helmet';
+import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { readFileSync } from 'node:fs';
@@ -91,6 +92,16 @@ const _trustProxy = _rawTrustProxy === undefined
   ? 1
   : /^\d+$/.test(_rawTrustProxy) ? parseInt(_rawTrustProxy, 10) : _rawTrustProxy;
 app.set('trust proxy', _trustProxy);
+
+// --------------------------------------------------------
+// Kompression (gzip/deflate)
+//
+// Komprimiert HTML, JS, CSS und JSON-Antworten on-the-fly. Die ungebauten
+// Frontend-Quelldateien (router.js, calendar.js, lucide.min.js, *.css) werden
+// unminifiziert ausgeliefert und sind hochgradig komprimierbar (~70-80%).
+// Bilder/Fonts (woff2, png) werden vom Default-Filter ausgelassen.
+// --------------------------------------------------------
+app.use(compression());
 
 // --------------------------------------------------------
 // Request-Parsing

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Compress CSS/JS/JSON responses with gzip and defer the icon library so it no longer blocks first paint.
+
 ## [0.57.4] - 2026-06-02
 
 ### Changed
