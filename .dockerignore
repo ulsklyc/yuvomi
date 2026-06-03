@@ -24,6 +24,8 @@ coverage/
 
 # Scripts (dev-only)
 scripts/
+!scripts/
+!scripts/build-client.js
 
 # Markdown files (README, CHANGELOG, etc.)
 *.md

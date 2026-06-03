@@ -10,6 +10,7 @@
   "scripts": {
     "start": "node --import dotenv/config server/index.js",
     "dev": "node --import dotenv/config --watch server/index.js",
+    "build:client": "node scripts/build-client.js",
     "setup": "node --import dotenv/config setup.js",
     "test:db": "node --experimental-sqlite test/test-db.js",
     "test:dashboard": "node --experimental-sqlite test/test-dashboard.js",
@@ -66,6 +67,7 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "esbuild": "^0.28.0",
     "puppeteer": "^25.1.0",
     "sharp": "^0.34.5"
   }

@@ -9,10 +9,16 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 # Abhängigkeiten zuerst (Docker-Layer-Caching)
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci
+
+# Production frontend assets: preserve module paths, strip comments, minify JS.
+COPY public ./public
+COPY scripts ./scripts
+RUN npm run build:client && npm prune --omit=dev
 
 # ---- Runtime stage ----
 FROM node:22-slim
@@ -29,6 +35,7 @@ COPY --from=build /app/node_modules ./node_modules
 
 # Anwendungscode (docs/ wird via .dockerignore ausgeschlossen)
 COPY . .
+COPY --from=build /app/dist ./dist
 
 # Daten-Volume-Verzeichnis anlegen (Permissions werden zur Laufzeit gesetzt)
 RUN mkdir -p /data
