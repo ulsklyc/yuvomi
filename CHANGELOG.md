@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Back global search with an FTS5 full-text index instead of full-table LIKE scans.
+
 ## [0.57.4] - 2026-06-02
 
 ### Changed
