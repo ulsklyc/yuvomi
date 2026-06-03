@@ -85,7 +85,7 @@ export async function render(container, { user } = {}) {
       </button>
     </div>
   `);
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons({ el: _container });
   await loadInitial();
   bindShell();
   renderAll();
@@ -178,7 +178,7 @@ function renderAll() {
   renderSummary();
   renderGroups();
   renderMain();
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons({ el: _container });
 }
 
 function renderSummary() {

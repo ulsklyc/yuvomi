@@ -1098,7 +1098,7 @@ function initMoreSheet(container, openSearch) {
     backdrop.classList.add('more-backdrop--visible');
     currentMoreBtn().setAttribute('aria-expanded', 'true');
     sheet.querySelector('#more-sheet-search, [data-route]')?.focus();
-    if (window.lucide) window.lucide.createIcons();
+    if (window.lucide) window.lucide.createIcons({ el: sheet });
   }
 
   function closeSheet({ restoreFocus = true } = {}) {
@@ -1175,7 +1175,7 @@ function initSearch(container) {
     setOverlayInteractive(overlay, true);
     overlay.classList.add('search-overlay--visible');
     setTimeout(() => input.focus(), 50);
-    if (window.lucide) window.lucide.createIcons();
+    if (window.lucide) window.lucide.createIcons({ el: overlay });
 
     _searchTrapHandler = createFocusTrap(overlay);
     overlay.addEventListener('keydown', _searchTrapHandler);
@@ -1629,7 +1629,8 @@ function updateNav(path) {
   }
 
   if (window.lucide) {
-    window.lucide.createIcons();
+    const navRoot = document.getElementById('app');
+    window.lucide.createIcons(navRoot ? { el: navRoot } : undefined);
   }
 
   requestAnimationFrame(() => {

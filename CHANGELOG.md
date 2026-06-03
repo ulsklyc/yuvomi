@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix janky, laggy scrolling in tall modals (e.g. the event editor) caused by a backdrop-filter on the scroll container.
 
 ### Changed
+- Scope icon re-rendering to changed subtrees and index calendar day lookups for smoother large lists and month views.
 - Debounce the documents and split-expenses search inputs.
 - Add database indexes for event/task assignment, loan-payment, and recurring-event lookups.
 - Batch split-expense detail loads to remove an N+1 query and sort dashboard tasks in SQL.

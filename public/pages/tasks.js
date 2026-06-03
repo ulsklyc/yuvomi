@@ -834,7 +834,7 @@ function renderKanban(container) {
   listEl.replaceChildren();
   listEl.insertAdjacentHTML('beforeend', kanbanHtml);
 
-  if (window.lucide) window.lucide.createIcons();
+  if (window.lucide) window.lucide.createIcons({ el: listEl });
   wireKanbanDrag(container);
   wireKanbanTouch(container);
   updateOverdueBadge();
@@ -1066,7 +1066,7 @@ function renderTaskList(container) {
   if (!listEl) return;
   listEl.replaceChildren();
   listEl.insertAdjacentHTML('beforeend', renderTaskGroups(state.tasks, state.groupMode));
-  if (window.lucide) window.lucide.createIcons();
+  if (window.lucide) window.lucide.createIcons({ el: listEl });
   stagger(listEl.querySelectorAll('.swipe-row, .kanban-card'));
   updateOverdueBadge();
   updateBulkActionsBar(container);
@@ -1849,7 +1849,7 @@ export async function render(container, { user }) {
     </div>
   `);
 
-  if (window.lucide) window.lucide.createIcons();
+  if (window.lucide) window.lucide.createIcons({ el: container });
 
   // Daten laden (Filter-State aus vorheriger Session berücksichtigen)
   try {

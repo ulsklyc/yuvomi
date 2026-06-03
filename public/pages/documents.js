@@ -102,7 +102,7 @@ export async function render(container) {
     </div>
   `);
 
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons({ el: _container });
 
   await Promise.all([loadMembers(), loadFolders()]);
   await loadDocuments();
@@ -238,14 +238,14 @@ function renderDocuments() {
         </div>
       </div>
     `);
-    if (window.lucide) lucide.createIcons();
+    if (window.lucide) lucide.createIcons({ el: list });
     list.querySelector('#documents-empty-upload')?.addEventListener('click', () => openDocumentModal());
     list.querySelector('#documents-empty-folder')?.addEventListener('click', () => openFolderModal());
     return;
   }
   list.replaceChildren();
   list.insertAdjacentHTML('beforeend', docs.map((doc) => state.view === 'list' ? renderListItem(doc) : renderGridCard(doc)).join(''));
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons({ el: list });
   stagger(list.querySelectorAll('.document-card, .document-row'));
 }
 
@@ -279,7 +279,7 @@ function renderFolderBrowser() {
       <span class="documents-folder-item__count">${counts.get(item.id) || 0}</span>
     </button>
   `).join(''));
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons({ el: browser });
 }
 
 function renderMeta(doc) {
