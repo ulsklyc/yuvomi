@@ -1274,7 +1274,7 @@ export async function render(container, { user }) {
   try {
     const [dashRes, weatherRes, prefsRes] = await Promise.all([
       api.get('/dashboard'),
-      api.get('/weather').catch(() => ({ data: null })),
+      api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null })),
       api.get('/preferences').catch(() => ({ data: {} })),
     ]);
     data         = dashRes;
@@ -1445,7 +1445,7 @@ export async function render(container, { user }) {
   if (refreshBtn) {
     const doAutoRefresh = async () => {
       try {
-        const res = await api.get('/weather').catch(() => ({ data: null }));
+        const res = await api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null }));
         weather = res.data ?? null;
         rebuildDashboard(widgetConfig);
       } catch { /* silently ignore */ }
@@ -1468,7 +1468,7 @@ function wireWeatherRefresh(container, onUpdated = null) {
     refreshBtn.disabled = true;
     refreshBtn.classList.add('weather-widget__refresh--spinning');
     try {
-      const res = await api.get('/weather').catch(() => ({ data: null }));
+      const res = await api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null }));
       const wWidget = container.querySelector('#weather-widget');
       if (wWidget) {
         const wrapper = wWidget.closest('.widget-wrapper');
