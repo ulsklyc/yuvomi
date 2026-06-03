@@ -40,7 +40,7 @@ REQUIRED: Set a long random SESSION_SECRET.
 RECOMMENDED: Set a strong DB_ENCRYPTION_KEY to encrypt the database at rest — without it the database and any synced calendar/contact credentials are stored unencrypted.
 Generate either secret with: openssl rand -base64 48
 
-After the container starts, open the WebUI and create your admin account. That's it — pick the modules you want and invite your family.</Overview>
+After the container starts, create your admin account by opening the container Console and running: node setup.js (Oikos has no web-based first-run signup — the admin is created via this one-time command). Then open the WebUI and log in — pick the modules you want and invite your family.</Overview>
 
   <!-- Either Support or Project is required -->
   <Support>https://github.com/ulsklyc/oikos/issues</Support>
