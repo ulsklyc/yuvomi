@@ -1157,6 +1157,27 @@
     "orDivider": "oder",
     "ssoError": "SSO-Anmeldung fehlgeschlagen. Bitte erneut versuchen."
   },
+  "setup": {
+    "title": "Willkommen bei Oikos",
+    "tagline": "Richte deinen Administrator-Account ein, um loszulegen.",
+    "usernameLabel": "Benutzername",
+    "usernamePlaceholder": "benutzername",
+    "displayNameLabel": "Anzeigename",
+    "displayNamePlaceholder": "Max Mustermann",
+    "passwordLabel": "Passwort",
+    "passwordPlaceholder": "••••••••",
+    "confirmPasswordLabel": "Passwort bestätigen",
+    "confirmPasswordPlaceholder": "••••••••",
+    "submitButton": "Account erstellen",
+    "creating": "Wird erstellt …",
+    "errorPasswordMismatch": "Die Passwörter stimmen nicht überein.",
+    "errorPasswordTooShort": "Das Passwort muss mindestens 8 Zeichen lang sein.",
+    "errorUsernameInvalid": "Der Benutzername muss 3–64 Zeichen lang sein und darf nur Buchstaben, Zahlen, Punkte, Bindestriche und Unterstriche enthalten.",
+    "errorUsernameTaken": "Dieser Benutzername ist bereits vergeben.",
+    "errorGeneric": "Account konnte nicht erstellt werden. Bitte erneut versuchen.",
+    "showPassword": "Passwort anzeigen",
+    "hidePassword": "Passwort verbergen"
+  },
   "install": {
     "title": "Oikos installieren",
     "subtitle": "Zur App hinzufügen",

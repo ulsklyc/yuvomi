@@ -1151,6 +1151,27 @@
     "orDivider": "أو",
     "ssoError": "فشل تسجيل الدخول بـ SSO. يرجى المحاولة مرة أخرى."
   },
+  "setup": {
+    "title": "مرحبًا بك في Oikos",
+    "tagline": "قم بإعداد حساب المسؤول للبدء.",
+    "usernameLabel": "اسم المستخدم",
+    "usernamePlaceholder": "اسم المستخدم",
+    "displayNameLabel": "الاسم الظاهر",
+    "displayNamePlaceholder": "محمد أحمد",
+    "passwordLabel": "كلمة المرور",
+    "passwordPlaceholder": "••••••••",
+    "confirmPasswordLabel": "تأكيد كلمة المرور",
+    "confirmPasswordPlaceholder": "••••••••",
+    "submitButton": "إنشاء حساب",
+    "creating": "جارٍ الإنشاء…",
+    "errorPasswordMismatch": "كلمتا المرور غير متطابقتين.",
+    "errorPasswordTooShort": "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل.",
+    "errorUsernameInvalid": "يجب أن يتكون اسم المستخدم من 3 إلى 64 حرفًا، ويمكن أن يحتوي فقط على حروف وأرقام ونقاط وشرطات وشرطات سفلية.",
+    "errorUsernameTaken": "اسم المستخدم هذا مستخدم بالفعل.",
+    "errorGeneric": "تعذّر إنشاء الحساب. يرجى المحاولة مرة أخرى.",
+    "showPassword": "إظهار كلمة المرور",
+    "hidePassword": "إخفاء كلمة المرور"
+  },
   "install": {
     "title": "تثبيت Oikos",
     "subtitle": "إضافة إلى التطبيقات",

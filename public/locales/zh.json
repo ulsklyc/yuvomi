@@ -1151,6 +1151,27 @@
     "orDivider": "或",
     "ssoError": "SSO登录失败，请重试。"
   },
+  "setup": {
+    "title": "欢迎使用 Oikos",
+    "tagline": "设置您的管理员账户以开始使用。",
+    "usernameLabel": "用户名",
+    "usernamePlaceholder": "用户名",
+    "displayNameLabel": "显示名称",
+    "displayNamePlaceholder": "张伟",
+    "passwordLabel": "密码",
+    "passwordPlaceholder": "••••••••",
+    "confirmPasswordLabel": "确认密码",
+    "confirmPasswordPlaceholder": "••••••••",
+    "submitButton": "创建账户",
+    "creating": "正在创建…",
+    "errorPasswordMismatch": "两次输入的密码不一致。",
+    "errorPasswordTooShort": "密码长度至少为 8 个字符。",
+    "errorUsernameInvalid": "用户名必须为 3–64 个字符，且只能包含字母、数字、点、连字符和下划线。",
+    "errorUsernameTaken": "该用户名已被占用。",
+    "errorGeneric": "无法创建账户，请重试。",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码"
+  },
   "install": {
     "title": "安装 Oikos",
     "subtitle": "添加到应用",

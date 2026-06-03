@@ -1151,6 +1151,27 @@
     "orDivider": "or",
     "ssoError": "SSO sign-in failed. Please try again."
   },
+  "setup": {
+    "title": "Welcome to Oikos",
+    "tagline": "Set up your administrator account to get started.",
+    "usernameLabel": "Username",
+    "usernamePlaceholder": "username",
+    "displayNameLabel": "Display name",
+    "displayNamePlaceholder": "John Doe",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "••••••••",
+    "confirmPasswordLabel": "Confirm password",
+    "confirmPasswordPlaceholder": "••••••••",
+    "submitButton": "Create account",
+    "creating": "Creating…",
+    "errorPasswordMismatch": "The passwords do not match.",
+    "errorPasswordTooShort": "The password must be at least 8 characters long.",
+    "errorUsernameInvalid": "The username must be 3–64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.",
+    "errorUsernameTaken": "This username is already taken.",
+    "errorGeneric": "Could not create the account. Please try again.",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
+  },
   "install": {
     "title": "Install Oikos",
     "subtitle": "Add to home screen",

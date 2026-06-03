@@ -1151,6 +1151,27 @@
     "orDivider": "या",
     "ssoError": "SSO साइन-इन विफल रहा। कृपया पुनः प्रयास करें।"
   },
+  "setup": {
+    "title": "Oikos में आपका स्वागत है",
+    "tagline": "शुरू करने के लिए अपना व्यवस्थापक खाता सेट करें।",
+    "usernameLabel": "उपयोगकर्ता नाम",
+    "usernamePlaceholder": "उपयोगकर्ता नाम",
+    "displayNameLabel": "प्रदर्शित नाम",
+    "displayNamePlaceholder": "राम कुमार",
+    "passwordLabel": "पासवर्ड",
+    "passwordPlaceholder": "••••••••",
+    "confirmPasswordLabel": "पासवर्ड की पुष्टि करें",
+    "confirmPasswordPlaceholder": "••••••••",
+    "submitButton": "खाता बनाएँ",
+    "creating": "बनाया जा रहा है…",
+    "errorPasswordMismatch": "पासवर्ड मेल नहीं खाते।",
+    "errorPasswordTooShort": "पासवर्ड कम से कम 8 अक्षरों का होना चाहिए।",
+    "errorUsernameInvalid": "उपयोगकर्ता नाम 3–64 अक्षरों का होना चाहिए और इसमें केवल अक्षर, अंक, बिंदु, हाइफ़न और अंडरस्कोर हो सकते हैं।",
+    "errorUsernameTaken": "यह उपयोगकर्ता नाम पहले से लिया जा चुका है।",
+    "errorGeneric": "खाता नहीं बनाया जा सका। कृपया पुनः प्रयास करें।",
+    "showPassword": "पासवर्ड दिखाएँ",
+    "hidePassword": "पासवर्ड छिपाएँ"
+  },
   "install": {
     "title": "Oikos इंस्टॉल करें",
     "subtitle": "ऐप में जोड़ें",

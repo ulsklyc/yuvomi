@@ -1151,6 +1151,27 @@
     "orDivider": "ή",
     "ssoError": "Η σύνδεση SSO απέτυχε. Παρακαλώ δοκιμάστε ξανά."
   },
+  "setup": {
+    "title": "Καλώς ορίσατε στο Oikos",
+    "tagline": "Ρυθμίστε τον λογαριασμό διαχειριστή για να ξεκινήσετε.",
+    "usernameLabel": "Όνομα χρήστη",
+    "usernamePlaceholder": "όνομα χρήστη",
+    "displayNameLabel": "Εμφανιζόμενο όνομα",
+    "displayNamePlaceholder": "Γιάννης Παπαδόπουλος",
+    "passwordLabel": "Κωδικός πρόσβασης",
+    "passwordPlaceholder": "••••••••",
+    "confirmPasswordLabel": "Επιβεβαίωση κωδικού",
+    "confirmPasswordPlaceholder": "••••••••",
+    "submitButton": "Δημιουργία λογαριασμού",
+    "creating": "Δημιουργία…",
+    "errorPasswordMismatch": "Οι κωδικοί πρόσβασης δεν ταιριάζουν.",
+    "errorPasswordTooShort": "Ο κωδικός πρόσβασης πρέπει να έχει τουλάχιστον 8 χαρακτήρες.",
+    "errorUsernameInvalid": "Το όνομα χρήστη πρέπει να έχει 3–64 χαρακτήρες και μπορεί να περιέχει μόνο γράμματα, αριθμούς, τελείες, παύλες και κάτω παύλες.",
+    "errorUsernameTaken": "Αυτό το όνομα χρήστη χρησιμοποιείται ήδη.",
+    "errorGeneric": "Δεν ήταν δυνατή η δημιουργία του λογαριασμού. Δοκιμάστε ξανά.",
+    "showPassword": "Εμφάνιση κωδικού",
+    "hidePassword": "Απόκρυψη κωδικού"
+  },
   "install": {
     "title": "Εγκατάσταση Oikos",
     "subtitle": "Προσθήκη στην αρχική οθόνη",

@@ -1151,6 +1151,27 @@
     "orDivider": "eller",
     "ssoError": "SSO-inloggning misslyckades. Försök igen."
   },
+  "setup": {
+    "title": "Välkommen till Oikos",
+    "tagline": "Skapa ditt administratörskonto för att komma igång.",
+    "usernameLabel": "Användarnamn",
+    "usernamePlaceholder": "användarnamn",
+    "displayNameLabel": "Visningsnamn",
+    "displayNamePlaceholder": "Anna Andersson",
+    "passwordLabel": "Lösenord",
+    "passwordPlaceholder": "••••••••",
+    "confirmPasswordLabel": "Bekräfta lösenord",
+    "confirmPasswordPlaceholder": "••••••••",
+    "submitButton": "Skapa konto",
+    "creating": "Skapar…",
+    "errorPasswordMismatch": "Lösenorden matchar inte.",
+    "errorPasswordTooShort": "Lösenordet måste vara minst 8 tecken långt.",
+    "errorUsernameInvalid": "Användarnamnet måste vara 3–64 tecken långt och får endast innehålla bokstäver, siffror, punkter, bindestreck och understreck.",
+    "errorUsernameTaken": "Det här användarnamnet är redan upptaget.",
+    "errorGeneric": "Det gick inte att skapa kontot. Försök igen.",
+    "showPassword": "Visa lösenord",
+    "hidePassword": "Dölj lösenord"
+  },
   "install": {
     "title": "Installera Oikos",
     "subtitle": "Lägg till på startskärmen",

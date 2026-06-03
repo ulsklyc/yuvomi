@@ -1151,6 +1151,27 @@
     "orDivider": "o",
     "ssoError": "Accesso SSO non riuscito. Riprova."
   },
+  "setup": {
+    "title": "Benvenuto in Oikos",
+    "tagline": "Configura il tuo account amministratore per iniziare.",
+    "usernameLabel": "Nome utente",
+    "usernamePlaceholder": "nomeutente",
+    "displayNameLabel": "Nome visualizzato",
+    "displayNamePlaceholder": "Mario Rossi",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "••••••••",
+    "confirmPasswordLabel": "Conferma password",
+    "confirmPasswordPlaceholder": "••••••••",
+    "submitButton": "Crea account",
+    "creating": "Creazione…",
+    "errorPasswordMismatch": "Le password non corrispondono.",
+    "errorPasswordTooShort": "La password deve contenere almeno 8 caratteri.",
+    "errorUsernameInvalid": "Il nome utente deve contenere da 3 a 64 caratteri e può includere solo lettere, numeri, punti, trattini e trattini bassi.",
+    "errorUsernameTaken": "Questo nome utente è già in uso.",
+    "errorGeneric": "Impossibile creare l’account. Riprova.",
+    "showPassword": "Mostra password",
+    "hidePassword": "Nascondi password"
+  },
   "install": {
     "title": "Installa Oikos",
     "subtitle": "Aggiungi alla schermata home",

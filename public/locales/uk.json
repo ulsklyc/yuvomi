@@ -1151,6 +1151,27 @@
     "orDivider": "або",
     "ssoError": "Вхід через SSO не вдався. Спробуйте ще раз."
   },
+  "setup": {
+    "title": "Ласкаво просимо до Oikos",
+    "tagline": "Налаштуйте обліковий запис адміністратора, щоб почати.",
+    "usernameLabel": "Ім’я користувача",
+    "usernamePlaceholder": "ім’я користувача",
+    "displayNameLabel": "Відображуване ім’я",
+    "displayNamePlaceholder": "Іван Іваненко",
+    "passwordLabel": "Пароль",
+    "passwordPlaceholder": "••••••••",
+    "confirmPasswordLabel": "Підтвердьте пароль",
+    "confirmPasswordPlaceholder": "••••••••",
+    "submitButton": "Створити обліковий запис",
+    "creating": "Створення…",
+    "errorPasswordMismatch": "Паролі не збігаються.",
+    "errorPasswordTooShort": "Пароль має містити щонайменше 8 символів.",
+    "errorUsernameInvalid": "Ім’я користувача має містити від 3 до 64 символів і може включати лише літери, цифри, крапки, дефіси та підкреслення.",
+    "errorUsernameTaken": "Це ім’я користувача вже зайняте.",
+    "errorGeneric": "Не вдалося створити обліковий запис. Спробуйте ще раз.",
+    "showPassword": "Показати пароль",
+    "hidePassword": "Сховати пароль"
+  },
   "install": {
     "title": "Встановити Oikos",
     "subtitle": "Додати на головний екран",

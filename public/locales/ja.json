@@ -1151,6 +1151,27 @@
     "orDivider": "または",
     "ssoError": "SSOサインインに失敗しました。もう一度お試しください。"
   },
+  "setup": {
+    "title": "Oikos へようこそ",
+    "tagline": "始めるには管理者アカウントを設定してください。",
+    "usernameLabel": "ユーザー名",
+    "usernamePlaceholder": "ユーザー名",
+    "displayNameLabel": "表示名",
+    "displayNamePlaceholder": "山田太郎",
+    "passwordLabel": "パスワード",
+    "passwordPlaceholder": "••••••••",
+    "confirmPasswordLabel": "パスワードの確認",
+    "confirmPasswordPlaceholder": "••••••••",
+    "submitButton": "アカウントを作成",
+    "creating": "作成中…",
+    "errorPasswordMismatch": "パスワードが一致しません。",
+    "errorPasswordTooShort": "パスワードは8文字以上で入力してください。",
+    "errorUsernameInvalid": "ユーザー名は3〜64文字で、英数字、ピリオド、ハイフン、アンダースコアのみ使用できます。",
+    "errorUsernameTaken": "このユーザー名はすでに使用されています。",
+    "errorGeneric": "アカウントを作成できませんでした。もう一度お試しください。",
+    "showPassword": "パスワードを表示",
+    "hidePassword": "パスワードを非表示"
+  },
   "install": {
     "title": "Oikos をインストール",
     "subtitle": "アプリに追加",

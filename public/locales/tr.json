@@ -1151,6 +1151,27 @@
     "orDivider": "veya",
     "ssoError": "SSO girişi başarısız oldu. Lütfen tekrar deneyin."
   },
+  "setup": {
+    "title": "Oikos’a hoş geldiniz",
+    "tagline": "Başlamak için yönetici hesabınızı oluşturun.",
+    "usernameLabel": "Kullanıcı adı",
+    "usernamePlaceholder": "kullanıcı adı",
+    "displayNameLabel": "Görünen ad",
+    "displayNamePlaceholder": "Ali Yılmaz",
+    "passwordLabel": "Parola",
+    "passwordPlaceholder": "••••••••",
+    "confirmPasswordLabel": "Parolayı onayla",
+    "confirmPasswordPlaceholder": "••••••••",
+    "submitButton": "Hesap oluştur",
+    "creating": "Oluşturuluyor…",
+    "errorPasswordMismatch": "Parolalar eşleşmiyor.",
+    "errorPasswordTooShort": "Parola en az 8 karakter uzunluğunda olmalıdır.",
+    "errorUsernameInvalid": "Kullanıcı adı 3–64 karakter uzunluğunda olmalı ve yalnızca harf, rakam, nokta, tire ve alt çizgi içerebilir.",
+    "errorUsernameTaken": "Bu kullanıcı adı zaten alınmış.",
+    "errorGeneric": "Hesap oluşturulamadı. Lütfen tekrar deneyin.",
+    "showPassword": "Parolayı göster",
+    "hidePassword": "Parolayı gizle"
+  },
   "install": {
     "title": "Oikos'u Yükle",
     "subtitle": "Ana ekrana ekle",

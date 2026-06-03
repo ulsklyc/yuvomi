@@ -1157,6 +1157,27 @@
     "orDivider": "lub",
     "ssoError": "Logowanie SSO nie powiodło się. Spróbuj ponownie."
   },
+  "setup": {
+    "title": "Witamy w Oikos",
+    "tagline": "Skonfiguruj konto administratora, aby rozpocząć.",
+    "usernameLabel": "Nazwa użytkownika",
+    "usernamePlaceholder": "nazwa użytkownika",
+    "displayNameLabel": "Nazwa wyświetlana",
+    "displayNamePlaceholder": "Jan Kowalski",
+    "passwordLabel": "Hasło",
+    "passwordPlaceholder": "••••••••",
+    "confirmPasswordLabel": "Potwierdź hasło",
+    "confirmPasswordPlaceholder": "••••••••",
+    "submitButton": "Utwórz konto",
+    "creating": "Tworzenie…",
+    "errorPasswordMismatch": "Hasła nie są zgodne.",
+    "errorPasswordTooShort": "Hasło musi mieć co najmniej 8 znaków.",
+    "errorUsernameInvalid": "Nazwa użytkownika musi mieć od 3 do 64 znaków i może zawierać tylko litery, cyfry, kropki, myślniki i podkreślenia.",
+    "errorUsernameTaken": "Ta nazwa użytkownika jest już zajęta.",
+    "errorGeneric": "Nie udało się utworzyć konta. Spróbuj ponownie.",
+    "showPassword": "Pokaż hasło",
+    "hidePassword": "Ukryj hasło"
+  },
   "install": {
     "title": "Zainstaluj Oikos",
     "subtitle": "Dodaj do aplikacji",

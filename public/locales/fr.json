@@ -1151,6 +1151,27 @@
     "orDivider": "ou",
     "ssoError": "La connexion SSO a échoué. Veuillez réessayer."
   },
+  "setup": {
+    "title": "Bienvenue sur Oikos",
+    "tagline": "Configurez votre compte administrateur pour commencer.",
+    "usernameLabel": "Nom d’utilisateur",
+    "usernamePlaceholder": "identifiant",
+    "displayNameLabel": "Nom affiché",
+    "displayNamePlaceholder": "Jean Dupont",
+    "passwordLabel": "Mot de passe",
+    "passwordPlaceholder": "••••••••",
+    "confirmPasswordLabel": "Confirmer le mot de passe",
+    "confirmPasswordPlaceholder": "••••••••",
+    "submitButton": "Créer le compte",
+    "creating": "Création…",
+    "errorPasswordMismatch": "Les mots de passe ne correspondent pas.",
+    "errorPasswordTooShort": "Le mot de passe doit comporter au moins 8 caractères.",
+    "errorUsernameInvalid": "Le nom d’utilisateur doit comporter de 3 à 64 caractères et ne peut contenir que des lettres, des chiffres, des points, des tirets et des traits de soulignement.",
+    "errorUsernameTaken": "Ce nom d’utilisateur est déjà pris.",
+    "errorGeneric": "Impossible de créer le compte. Veuillez réessayer.",
+    "showPassword": "Afficher le mot de passe",
+    "hidePassword": "Masquer le mot de passe"
+  },
   "install": {
     "title": "Installer Oikos",
     "subtitle": "Ajouter à l'écran d'accueil",
