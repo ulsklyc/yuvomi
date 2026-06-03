@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add database indexes for event/task assignment, loan-payment, and recurring-event lookups.
 - Batch split-expense detail loads to remove an N+1 query and sort dashboard tasks in SQL.
 - Back global search with an FTS5 full-text index instead of full-table LIKE scans.
+- Compress CSS/JS/JSON responses with gzip and defer the icon library so it no longer blocks first paint.
 
 ## [0.57.6] - 2026-06-03
 

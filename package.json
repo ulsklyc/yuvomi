@@ -49,6 +49,7 @@
   "dependencies": {
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^12.10.0",
+    "compression": "^1.8.1",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",

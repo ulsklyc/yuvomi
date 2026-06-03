@@ -6,6 +6,7 @@
 
 import express from 'express';
 import helmet from 'helmet';
+import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { readFileSync } from 'node:fs';
@@ -91,6 +92,11 @@ const _trustProxy = _rawTrustProxy === undefined
   ? 1
   : /^\d+$/.test(_rawTrustProxy) ? parseInt(_rawTrustProxy, 10) : _rawTrustProxy;
 app.set('trust proxy', _trustProxy);
+
+// --------------------------------------------------------
+// Kompression (gzip/deflate)
+// --------------------------------------------------------
+app.use(compression());
 
 // --------------------------------------------------------
 // Request-Parsing
