@@ -156,9 +156,14 @@ function bindPageEvents() {
   _container.querySelector('#documents-add-btn')?.addEventListener('click', () => openDocumentModal());
   _container.querySelector('#documents-folder-btn')?.addEventListener('click', () => openFolderModal());
   _container.querySelector('#fab-new-document')?.addEventListener('click', () => openDocumentModal());
+  let documentsSearchTimer;
   _container.querySelector('#documents-search')?.addEventListener('input', (e) => {
-    state.query = e.target.value.trim().toLowerCase();
-    renderDocuments();
+    const value = e.target.value.trim().toLowerCase();
+    clearTimeout(documentsSearchTimer);
+    documentsSearchTimer = setTimeout(() => {
+      state.query = value;
+      renderDocuments();
+    }, 200);
   });
   _container.querySelector('#documents-status')?.addEventListener('change', async (e) => {
     state.status = e.target.value;

@@ -154,11 +154,16 @@ function bindShell() {
   _container.querySelector('#split-add-group')?.addEventListener('click', () => openGroupModal());
   _container.querySelector('#split-add-expense')?.addEventListener('click', () => openExpenseModal());
   _container.querySelector('#split-fab')?.addEventListener('click', () => openExpenseModal());
-  _container.querySelector('#split-group-search')?.addEventListener('input', async (e) => {
-    state.query = e.target.value.trim();
-    await loadGroups();
-    await loadGroupData();
-    renderAll();
+  let groupSearchTimer;
+  _container.querySelector('#split-group-search')?.addEventListener('input', (e) => {
+    const value = e.target.value.trim();
+    clearTimeout(groupSearchTimer);
+    groupSearchTimer = setTimeout(async () => {
+      state.query = value;
+      await loadGroups();
+      await loadGroupData();
+      renderAll();
+    }, 250);
   });
   _container.querySelector('#split-groups')?.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-group-id]');
