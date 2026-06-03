@@ -8,6 +8,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 const { __test: calendarHelpers } = await import('../public/pages/calendar.js');
+const { __test: googleHelpers } = await import('../server/services/google-calendar.js');
 
 let passed = 0;
 let failed = 0;
@@ -328,6 +329,68 @@ test('filterTasksForCalendar: in_progress-Tasks werden behalten', () => {
 
 test('filterTasksForCalendar: leeres Array gibt leeres Array zurück', () => {
   assert(ftc([]).length === 0, 'Leeres Array erwartet');
+});
+
+// --------------------------------------------------------
+// Google-Calendar Outbound-Konvertierung (Issue #203)
+// --------------------------------------------------------
+const { localEventToGoogle, buildGoogleRecurrence } = googleHelpers;
+
+test('Google outbound: mehrtägiges Ganztages-Event nutzt exklusives End-Datum', () => {
+  // Urlaub vom 28.03. bis einschließlich 04.04. (inklusiv gespeichert).
+  // Google verlangt ein EXKLUSIVES end.date → der Tag NACH dem letzten Tag.
+  const g = localEventToGoogle({
+    title: 'Urlaub', all_day: 1,
+    start_datetime: '2026-03-28', end_datetime: '2026-04-04',
+  });
+  assert(g.start.date === '2026-03-28', `start.date falsch: ${g.start.date}`);
+  assert(g.end.date === '2026-04-05', `end.date muss exklusiv (+1 Tag) sein, war: ${g.end.date}`);
+  assert(!g.start.dateTime, 'Ganztages-Event darf kein dateTime haben');
+});
+
+test('Google outbound: eintägiges Ganztages-Event endet am Folgetag (exklusiv)', () => {
+  const g = localEventToGoogle({
+    title: 'Ostern', all_day: 1, start_datetime: '2026-04-05', end_datetime: null,
+  });
+  assert(g.start.date === '2026-04-05', `start.date falsch: ${g.start.date}`);
+  assert(g.end.date === '2026-04-06', `end.date muss +1 Tag sein, war: ${g.end.date}`);
+});
+
+test('Google outbound: lokale RRULE erhält RRULE:-Präfix (gültig für Google)', () => {
+  const g = localEventToGoogle({
+    title: 'Müll', all_day: 1, start_datetime: '2026-03-28', end_datetime: '2026-03-30',
+    recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO',
+  });
+  assert(Array.isArray(g.recurrence) && g.recurrence.length === 1, 'recurrence muss ein Array sein');
+  assert(g.recurrence[0] === 'RRULE:FREQ=WEEKLY;BYDAY=MO',
+    `RRULE: muss vorangestellt sein, war: ${g.recurrence[0]}`);
+});
+
+test('Google outbound: vorhandenes RRULE:-Präfix wird nicht verdoppelt', () => {
+  const out = buildGoogleRecurrence('RRULE:FREQ=DAILY', false);
+  assert(out === 'RRULE:FREQ=DAILY', `Präfix verdoppelt: ${out}`);
+});
+
+test('Google outbound: UNTIL eines Ganztages-Events bleibt datumswertig', () => {
+  const out = buildGoogleRecurrence('FREQ=WEEKLY;BYDAY=MO;UNTIL=20260601T000000Z', true);
+  assert(out === 'RRULE:FREQ=WEEKLY;BYDAY=MO;UNTIL=20260601',
+    `UNTIL muss bei Ganztages datumswertig sein, war: ${out}`);
+});
+
+test('Google outbound: UNTIL eines Termins mit Uhrzeit ist UTC (Z)', () => {
+  const out = buildGoogleRecurrence('FREQ=WEEKLY;UNTIL=20260601', false);
+  assert(out === 'RRULE:FREQ=WEEKLY;UNTIL=20260601T000000Z',
+    `UNTIL muss bei Termin mit Uhrzeit ein Z-Suffix haben, war: ${out}`);
+});
+
+test('Google outbound: mehrtägiges wiederholendes Event liefert gültige RRULE + exklusives Ende', () => {
+  const g = localEventToGoogle({
+    title: 'Sprint', all_day: 1, start_datetime: '2026-03-28', end_datetime: '2026-03-30',
+    recurrence_rule: 'FREQ=WEEKLY;UNTIL=20260601',
+  });
+  assert(g.end.date === '2026-03-31', `mehrtägiges Ende muss exklusiv sein, war: ${g.end.date}`);
+  assert(g.recurrence[0] === 'RRULE:FREQ=WEEKLY;UNTIL=20260601',
+    `RRULE ungültig: ${g.recurrence[0]}`);
 });
 
 // --------------------------------------------------------

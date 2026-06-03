@@ -316,6 +316,49 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR) {
 // Helfer: lokales Event → Google Calendar Event Format
 // --------------------------------------------------------
 
+/**
+ * Adds one day to a YYYY-MM-DD date string.
+ * Google all-day events use an EXCLUSIVE end date (end.date is the day AFTER
+ * the last day), while Oikos stores the inclusive last day. So a 28th–4th
+ * vacation is stored end=...-04 but must be sent to Google as end=...-05.
+ * @param {string} dateStr - YYYY-MM-DD
+ * @returns {string} YYYY-MM-DD, one day later
+ */
+function nextDay(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Normalises a stored RRULE into a Google-/RFC5545-valid recurrence line.
+ * - Google's recurrence[] entries must carry the `RRULE:` property name.
+ *   Oikos stores locally-created rules without it (e.g. "FREQ=WEEKLY;..."),
+ *   which Google rejects as "Invalid recurrence rule".
+ * - UNTIL must match DTSTART's value type: a date-valued (all-day) DTSTART
+ *   needs UNTIL=YYYYMMDD, a datetime DTSTART needs UNTIL=YYYYMMDDTHHMMSSZ.
+ * @param {string} rule    - stored recurrence rule (with or without RRULE: prefix)
+ * @param {boolean} allDay - whether the event is all-day (date-valued DTSTART)
+ * @returns {string} a single "RRULE:..." line
+ */
+function buildGoogleRecurrence(rule, allDay) {
+  // Drop any existing RRULE: prefix so we can normalise the body uniformly.
+  let body = rule.replace(/^RRULE:/i, '').trim();
+
+  // Reconcile UNTIL with the DTSTART value type Google will see.
+  body = body.replace(/UNTIL=([0-9TZ]+)/i, (_m, val) => {
+    const ymd = val.replace(/[TZ]/g, '').slice(0, 8);
+    if (allDay) {
+      // date-valued DTSTART → date-valued UNTIL
+      return `UNTIL=${ymd}`;
+    }
+    // datetime DTSTART → datetime UNTIL in UTC (trailing Z required)
+    return `UNTIL=${ymd}T000000Z`;
+  });
+
+  return `RRULE:${body}`;
+}
+
 function localEventToGoogle(event) {
   const allDay = !!event.all_day;
   const gEvent = {
@@ -325,18 +368,22 @@ function localEventToGoogle(event) {
   };
 
   if (allDay) {
-    gEvent.start = { date: event.start_datetime.slice(0, 10) };
-    gEvent.end   = { date: event.end_datetime ? event.end_datetime.slice(0, 10) : event.start_datetime.slice(0, 10) };
+    const startDate = event.start_datetime.slice(0, 10);
+    // Inclusive stored end → exclusive Google end (add one day).
+    const endInclusive = event.end_datetime ? event.end_datetime.slice(0, 10) : startDate;
+    gEvent.start = { date: startDate };
+    gEvent.end   = { date: nextDay(endInclusive) };
   } else {
     gEvent.start = { dateTime: event.start_datetime, timeZone: 'Europe/Berlin' };
     gEvent.end   = { dateTime: event.end_datetime   || event.start_datetime, timeZone: 'Europe/Berlin' };
   }
 
   if (event.recurrence_rule) {
-    gEvent.recurrence = [event.recurrence_rule];
+    gEvent.recurrence = [buildGoogleRecurrence(event.recurrence_rule, allDay)];
   }
 
   return gEvent;
 }
 
 export { getAuthUrl, handleCallback, getStatus, disconnect, sync };
+export const __test = { localEventToGoogle, buildGoogleRecurrence, nextDay };
