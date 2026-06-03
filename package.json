@@ -33,6 +33,7 @@
     "test:caldav": "node --experimental-sqlite test/test-caldav-sync.js",
     "test:carddav": "node --experimental-sqlite test/test-carddav.js",
     "test:split-expenses": "node --experimental-sqlite test/test-split-expenses.js",
+    "test:search": "node --experimental-sqlite test/test-search.js",
     "test:oidc": "node --experimental-sqlite test/test-oidc.js",
     "test:family-contacts": "node --experimental-sqlite test/test-family-contacts.js",
     "test:google-calendar": "node test/test-google-calendar.js",
