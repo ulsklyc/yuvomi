@@ -640,6 +640,9 @@ router.post('/setup', loginLimiter, async (req, res) => {
   try {
     const { count } = db.get().prepare('SELECT COUNT(*) as count FROM users').get();
     if (count > 0) {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(404).json({ error: 'Not found.', code: 404 });
+      }
       return res.status(403).json({ error: 'Setup has already been completed.', code: 403 });
     }
 

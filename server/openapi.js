@@ -102,7 +102,6 @@ function buildPaths() {
       get: op({
         summary: 'Get application version',
         tag: 'System',
-        auth: false,
         responses: {
           200: {
             description: 'Application version',
@@ -115,7 +114,7 @@ function buildPaths() {
       get: op({
         summary: 'Get OpenAPI specification',
         tag: 'System',
-        auth: false,
+        admin: true,
         description: 'Use `?download=1` to receive the OpenAPI document as a downloadable file.',
       }),
     },
@@ -123,16 +122,16 @@ function buildPaths() {
       get: op({
         summary: 'Get OpenAPI specification',
         tag: 'System',
-        auth: false,
+        admin: true,
         description: 'Alias for `/api/v1/openapi.json`. Use `?download=1` to download the JSON file.',
       }),
     },
     '/docs': {
       get: op({
-        summary: 'Swagger UI documentation',
+        summary: 'API documentation',
         tag: 'System',
-        auth: false,
-        responses: { 200: { description: 'Swagger UI HTML page' } },
+        admin: true,
+        responses: { 200: { description: 'API documentation response' } },
       }),
     },
     '/api/v1/auth/login': {
@@ -286,7 +285,7 @@ function buildPaths() {
         admin: true,
         responses: {
           200: {
-            description: 'SQLite database backup file',
+            description: 'Database backup file',
             content: {
               'application/octet-stream': {
                 schema: { type: 'string', format: 'binary' },
@@ -307,7 +306,7 @@ function buildPaths() {
         stateChanging: true,
         requestBody: {
           required: true,
-          description: 'Raw SQLite database backup file.',
+          description: 'Raw database backup file.',
           content: {
             'application/octet-stream': {
               schema: { type: 'string', format: 'binary' },
@@ -695,8 +694,6 @@ function buildPaths() {
 }
 
 function buildOpenApiSpec(req, appVersion) {
-  const origin = `${req.protocol}://${req.get('host')}`;
-
   return {
     openapi: '3.1.0',
     info: {
@@ -704,9 +701,7 @@ function buildOpenApiSpec(req, appVersion) {
       version: appVersion,
       description: 'OpenAPI documentation for the Oikos family organizer backend.',
     },
-    servers: [
-      { url: origin, description: 'Current server' },
-    ],
+    servers: [{ url: '/', description: 'Current origin' }],
     tags: [
       { name: 'System' },
       { name: 'Auth' },
@@ -788,8 +783,10 @@ function buildOpenApiSpec(req, appVersion) {
           type: 'object',
           properties: {
             version: { type: 'string' },
+            app_name: { type: 'string' },
+            setup_required: { type: 'boolean' },
           },
-          required: ['version'],
+          required: ['app_name', 'setup_required'],
         },
         User: {
           type: 'object',

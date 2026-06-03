@@ -124,7 +124,7 @@ export async function render(container) {
         try { localStorage.setItem(APP_NAME_STORAGE_KEY, d.app_name); } catch (_) {}
         setAppBranding(d.app_name);
       }
-      versionEl.textContent = t('login.version', { version: d.version });
+      versionEl.textContent = d?.version ? t('login.version', { version: d.version }) : '';
     })
     .catch(() => {});
 

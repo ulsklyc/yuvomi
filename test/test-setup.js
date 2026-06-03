@@ -17,6 +17,14 @@ await new Promise(r => setTimeout(r, 400));
 
 const BASE = 'http://localhost:13099';
 
+function cookieHeader(setCookie) {
+  return String(setCookie || '')
+    .split(/,(?=\s*[^;,]+=)/)
+    .map((cookie) => cookie.split(';')[0].trim())
+    .filter(Boolean)
+    .join('; ');
+}
+
 after(() => {
   rmSync(tmpDir, { recursive: true, force: true });
   process.exit(0);
@@ -65,6 +73,22 @@ test('GET /api/v1/version: setup_required is true when no users exist', async ()
   assert.equal(res.status, 200);
   const data = await res.json();
   assert.equal(data.setup_required, true);
+  assert.equal(data.version, undefined);
+});
+
+test('GET /openapi.json: 401 without authentication', async () => {
+  const res = await fetch(`${BASE}/openapi.json`);
+  assert.equal(res.status, 401);
+});
+
+test('GET /api/v1/openapi.json: 401 without authentication', async () => {
+  const res = await fetch(`${BASE}/api/v1/openapi.json`);
+  assert.equal(res.status, 401);
+});
+
+test('GET /docs: 401 without authentication in development', async () => {
+  const res = await fetch(`${BASE}/docs`, { redirect: 'manual' });
+  assert.equal(res.status, 401);
 });
 
 test('POST /api/v1/auth/setup: 201 creates first admin', async () => {
@@ -86,6 +110,26 @@ test('GET /api/v1/version: setup_required is false after admin exists', async ()
   const res = await fetch(`${BASE}/api/v1/version`);
   assert.equal(res.status, 200);
   const data = await res.json();
+  assert.equal(data.setup_required, false);
+  assert.equal(data.version, undefined);
+});
+
+test('GET /api/v1/version: includes version for authenticated session', async () => {
+  const login = await fetch(`${BASE}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'admin', password: 'password123' }),
+  });
+  assert.equal(login.status, 200);
+  const cookie = login.headers.get('set-cookie');
+  assert.ok(cookie?.includes('oikos.sid='));
+
+  const res = await fetch(`${BASE}/api/v1/version`, {
+    headers: { Cookie: cookieHeader(cookie) },
+  });
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(typeof data.version, 'string');
   assert.equal(data.setup_required, false);
 });
 

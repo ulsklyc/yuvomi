@@ -9,10 +9,11 @@ import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
+import { existsSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
 import { createLogger } from './logger.js';
 import * as db from './db.js';
-import { router as authRouter, sessionMiddleware, requireAuth } from './auth.js';
+import { router as authRouter, sessionMiddleware, requireAuth, requireAdmin } from './auth.js';
 import { csrfMiddleware } from './middleware/csrf.js';
 import { buildOpenApiSpec } from './openapi.js';
 import * as googleCalendar from './services/google-calendar.js';
@@ -54,6 +55,10 @@ const DEFAULT_APP_NAME = 'Oikos';
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
+const PUBLIC_DIR = process.env.NODE_ENV === 'production'
+  && existsSync(path.join(import.meta.dirname, '..', 'dist', 'public'))
+  ? path.join(import.meta.dirname, '..', 'dist', 'public')
+  : path.join(import.meta.dirname, '..', 'public');
 
 // --------------------------------------------------------
 // Security-Middleware
@@ -129,6 +134,16 @@ app.use('/api/', (req, res, next) => {
   next();
 });
 
+if (process.env.NODE_ENV === 'production' && process.env.ENABLE_API_DOCS !== 'true') {
+  app.get(['/docs', '/docs/'], (_req, res) => {
+    res.status(404).json({ error: 'Not found.', code: 404 });
+  });
+} else {
+  app.get(['/docs', '/docs/'], requireAuth, requireAdmin, (_req, res) => {
+    res.type('text/plain').send('OpenAPI JSON is available to admins at /api/v1/openapi.json');
+  });
+}
+
 // --------------------------------------------------------
 // Statische Dateien (Frontend) - differenzierte Caching-Strategie
 //
@@ -137,7 +152,7 @@ app.use('/api/', (req, res, next) => {
 // Bilder + Icons + Fonts: 30 Tage immutable (ändern sich praktisch nie).
 // manifest.json + sw.js: no-cache (PWA-Updates sollen sofort greifen).
 // --------------------------------------------------------
-app.use(express.static(path.join(import.meta.dirname, '..', 'public'), {
+app.use(express.static(PUBLIC_DIR, {
   etag: true,
   lastModified: true,
   setHeaders(res, filePath) {
@@ -179,8 +194,7 @@ app.use('/api/', apiLimiter);
 // --------------------------------------------------------
 app.use('/api/v1/auth', authRouter);
 
-// Versionsinformation - keine Authentifizierung erforderlich (Login-/Setup-Seite benötigt diese)
-app.get('/api/v1/version', (req, res) => {
+function buildVersionPayload(includeVersion = false) {
   let appName = DEFAULT_APP_NAME;
   let setupRequired = false;
   try {
@@ -196,7 +210,25 @@ app.get('/api/v1/version', (req, res) => {
     // Fail-safe: bei DB-Fehler kein Setup erzwingen
     setupRequired = false;
   }
-  res.json({ version: APP_VERSION, app_name: appName, setup_required: setupRequired });
+  return {
+    ...(includeVersion ? { version: APP_VERSION } : {}),
+    app_name: appName,
+    setup_required: setupRequired,
+  };
+}
+
+// Public bootstrap metadata for login/setup. The exact app version is returned only
+// when a valid session or API token is present.
+app.get('/api/v1/version', (req, res) => {
+  const hasAuthCredential = Boolean(
+    req.session?.userId
+      || req.headers.authorization
+      || req.headers['x-api-key']
+  );
+  if (!hasAuthCredential) {
+    return res.json(buildVersionPayload(false));
+  }
+  return requireAuth(req, res, () => res.json(buildVersionPayload(true)));
 });
 
 app.get('/manifest.webmanifest', apiLimiter, (req, res) => {
@@ -241,8 +273,8 @@ function sendOpenApi(req, res) {
   res.json(buildOpenApiSpec(req, APP_VERSION));
 }
 
-app.get('/api/v1/openapi.json', sendOpenApi);
-app.get('/openapi.json', sendOpenApi);
+app.get('/api/v1/openapi.json', requireAuth, requireAdmin, sendOpenApi);
+app.get('/openapi.json', requireAuth, requireAdmin, sendOpenApi);
 
 // Alle weiteren API-Routen erfordern Authentifizierung + CSRF-Schutz
 app.use('/api/v1', requireAuth);
@@ -308,7 +340,7 @@ app.get('/{*path}', spaLimiter, (req, res) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ error: 'Not found.', code: 404 });
   }
-  res.sendFile(path.join(import.meta.dirname, '..', 'public', 'index.html'));
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
 });
 
 // --------------------------------------------------------
