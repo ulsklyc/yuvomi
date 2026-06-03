@@ -370,7 +370,7 @@
     "locationPlaceholder": "Optioneel",
     "assignedLabel": "Toegewezen aan",
     "assignedNobody": "- Niemand -",
-    "colorLabel": "Kleur {{color}}",
+    "colorLabel": "Kleur",
     "descriptionLabel": "Beschrijving",
     "descriptionPlaceholder": "Optioneel…",
     "popupEdit": "Bewerken",
