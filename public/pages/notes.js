@@ -81,7 +81,7 @@ export async function render(container, { user }) {
     </div>
   `);
 
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons({ el: container });
 
   try {
     const res  = await api.get('/notes');
@@ -155,7 +155,7 @@ function renderGrid() {
         </button>` : ''}
       </div>
     `);
-    if (window.lucide) lucide.createIcons();
+    if (window.lucide) lucide.createIcons({ el: grid });
     grid.querySelector('#empty-cta-notes')?.addEventListener('click', () => {
       document.querySelector('.page-fab')?.click();
     });
@@ -164,7 +164,7 @@ function renderGrid() {
 
   grid.replaceChildren();
   grid.insertAdjacentHTML('beforeend', visible.map((n) => renderNoteCard(n)).join(''));
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons({ el: grid });
   stagger(grid.querySelectorAll('.note-card'));
 }
 

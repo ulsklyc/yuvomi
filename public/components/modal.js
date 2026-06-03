@@ -290,7 +290,7 @@ export function openModal({ title, content, onSave, onDelete, onClose, size = 'm
   activeOverlay._onCloseCallback = onClose;
 
   // Lucide-Icons rendern
-  if (window.lucide) window.lucide.createIcons();
+  if (window.lucide) window.lucide.createIcons({ el: activeOverlay });
 
   // Focus-Trap
   const panel = activeOverlay.querySelector('.modal-panel');

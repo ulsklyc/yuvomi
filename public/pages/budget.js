@@ -245,7 +245,7 @@ export async function render(container, { user }) {
     </div>
   `);
 
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons({ el: container });
 
   if (user?.access_scope !== 'split_guest') {
     await loadMonth(state.month);
@@ -319,7 +319,7 @@ function renderBody() {
   if (state.activeTab === 'loans') {
     setHtml(body, renderLoansPage());
     wireLoansPage();
-    if (window.lucide) lucide.createIcons();
+    if (window.lucide) lucide.createIcons({ el: body });
     return;
   }
   if (state.activeTab === 'split-expenses') {
@@ -387,7 +387,7 @@ function renderBody() {
     </div>
   `);
 
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons({ el: body });
   _container.querySelector('#empty-cta-budget')?.addEventListener('click', () => {
     document.querySelector('.page-fab')?.click();
   });
@@ -1141,7 +1141,7 @@ function requestNameInPanel(panel, { title, label, placeholder }) {
       </div>
     `);
     panel.append(overlay);
-    if (window.lucide) lucide.createIcons();
+    if (window.lucide) lucide.createIcons({ el: overlay });
 
     const input = overlay.querySelector('#budget-inline-name');
     const cleanup = (value = '') => {

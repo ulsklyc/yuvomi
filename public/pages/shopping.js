@@ -110,7 +110,7 @@ function renderTabs(container) {
       <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
     </button>
   `);
-  if (window.lucide) window.lucide.createIcons();
+  if (window.lucide) window.lucide.createIcons({ el: bar });
 }
 
 function renderListContent(container) {
@@ -127,7 +127,7 @@ function renderListContent(container) {
           ${t('shopping.noListsDescription')}
         </div>
       </div>`);
-    if (window.lucide) window.lucide.createIcons();
+    if (window.lucide) window.lucide.createIcons({ el: content });
     return;
   }
 
@@ -182,7 +182,7 @@ function renderListContent(container) {
     </div>
   `);
 
-  if (window.lucide) window.lucide.createIcons();
+  if (window.lucide) window.lucide.createIcons({ el: content });
   stagger(content.querySelectorAll('.shopping-item'));
   wireAutocomplete(container);
   wireQuickAdd(container);
@@ -288,7 +288,7 @@ function wireAutocomplete(container) {
           });
         });
 
-        if (window.lucide) window.lucide.createIcons();
+        if (window.lucide) window.lucide.createIcons({ el: dropdown });
       } catch { dropdown.hidden = true; }
     }, 200);
   });
@@ -349,7 +349,7 @@ function _flashAddBtn(btn) {
   setTimeout(() => {
     btn.classList.remove('btn--success');
     btn.replaceChildren(...saved);
-    if (window.lucide) window.lucide.createIcons();
+    if (window.lucide) window.lucide.createIcons({ el: btn });
   }, 700);
 }
 
@@ -559,7 +559,7 @@ function updateItemsList(container) {
   if (listEl) {
     listEl.replaceChildren();
     listEl.insertAdjacentHTML('beforeend', renderItems());
-    if (window.lucide) window.lucide.createIcons();
+    if (window.lucide) window.lucide.createIcons({ el: listEl });
     stagger(listEl.querySelectorAll('.shopping-item'));
     wireSwipeGestures(container);
     maybeShowSwipeHint(container);
@@ -579,7 +579,7 @@ function updateItemsList(container) {
           <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
           ${t('shopping.clearChecked', { count: checkedCount })}
         </button>`);
-      if (window.lucide) window.lucide.createIcons();
+      if (window.lucide) window.lucide.createIcons({ el: header });
     } else if (clearBtn) {
       if (checkedCount === 0) {
         clearBtn.remove();
@@ -588,7 +588,7 @@ function updateItemsList(container) {
         clearBtn.insertAdjacentHTML('beforeend', `
           <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
           ${t('shopping.clearChecked', { count: checkedCount })}`);
-        if (window.lucide) window.lucide.createIcons();
+        if (window.lucide) window.lucide.createIcons({ el: clearBtn });
       }
     }
   }

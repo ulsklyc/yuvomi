@@ -216,7 +216,7 @@ function renderList() {
     </article>
   `).join(''));
 
-  if (window.lucide) window.lucide.createIcons();
+  if (window.lucide) window.lucide.createIcons({ el: host });
   stagger(host.querySelectorAll('.birthday-item'));
 }
 
@@ -272,7 +272,7 @@ function renderPage() {
   renderUpcoming();
   renderList();
   renderSuggestions();
-  if (window.lucide) window.lucide.createIcons();
+  if (window.lucide) window.lucide.createIcons({ el: _container });
 }
 
 function bindEvents() {

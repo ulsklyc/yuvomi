@@ -945,7 +945,7 @@ function initFab(container, signal) {
     fabActions.querySelectorAll('[role="button"]').forEach((el) => {
       el.tabIndex = open ? 0 : -1;
     });
-    if (window.lucide) window.lucide.createIcons();
+    if (window.lucide) window.lucide.createIcons({ el: container });
   }
 
   fabMain.addEventListener('click', (e) => { e.stopPropagation(); toggleFab(); });
@@ -1398,7 +1398,7 @@ export async function render(container, { user }) {
       ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing })}
     `);
     wireLinks(container, rerender, { editing: isCustomizing });
-    if (window.lucide) window.lucide.createIcons();
+    if (window.lucide) window.lucide.createIcons({ el: shell });
     wireWeatherRefresh(container, (updatedWeather) => {
       weather = updatedWeather;
       rebuildDashboard(cfg);

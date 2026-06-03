@@ -904,7 +904,7 @@ docker cp oikos:/data/oikos-backup.db ./oikos-backup.db</code></pre>
 
   renderSettingsSubTabs(container, user, activeTab);
   bindEvents(container, user, users, categories, icsSubscriptions, apiTokens, thirdPartyModules);
-  if (window.lucide) window.lucide.createIcons();
+  if (window.lucide) window.lucide.createIcons({ el: container });
 }
 // CalDAV-Konten laden
 async function loadCalDAVAccounts(container, user) {
@@ -2260,7 +2260,7 @@ function renderApiTokenList(container, tokens) {
     tmp.insertAdjacentHTML('beforeend', apiTokenHtml(token));
     list.appendChild(tmp.firstElementChild);
   });
-  if (window.lucide) window.lucide.createIcons();
+  if (window.lucide) window.lucide.createIcons({ el: list });
 }
 
 function datetimeLocalToIso(value) {
@@ -2376,7 +2376,7 @@ async function loadBackupSchedulerStatus(container) {
     infoContainer.replaceChildren();
     infoContainer.insertAdjacentHTML('beforeend', html);
 
-    if (window.lucide) window.lucide.createIcons();
+    if (window.lucide) window.lucide.createIcons({ el: infoContainer });
 
     // Event-Handler für manuellen Trigger
     const triggerBtn = infoContainer.querySelector('#backup-trigger-btn');
@@ -2512,7 +2512,7 @@ function renderCatList(container, cats) {
     tmp.insertAdjacentHTML('beforeend', categoryRowHtml(c, i === 0, i === cats.length - 1));
     list.appendChild(tmp.firstElementChild);
   });
-  if (window.lucide) window.lucide.createIcons();
+  if (window.lucide) window.lucide.createIcons({ el: list });
 }
 
 function bindCategoryEvents(container) {
@@ -2747,7 +2747,7 @@ function renderIcsList(container, subs, user) {
     ul.appendChild(li);
   });
   listEl.appendChild(ul);
-  if (window.lucide) window.lucide.createIcons();
+  if (window.lucide) window.lucide.createIcons({ el: listEl });
 }
 
 function bindIcsEvents(container, user, initialSubs) {
@@ -2823,7 +2823,7 @@ function bindIcsEvents(container, user, initialSubs) {
         target.disabled = true;
         target.title = t('settings.ics.status.syncing');
         if (origIcon) origIcon.setAttribute('data-lucide', 'loader');
-        if (window.lucide) window.lucide.createIcons();
+        if (window.lucide) window.lucide.createIcons({ el: target });
         try {
           const res = await api.post(`/calendar/subscriptions/${id}/sync`, {});
           const idx = subs.findIndex((s) => s.id === id);
@@ -2835,7 +2835,7 @@ function bindIcsEvents(container, user, initialSubs) {
           target.disabled = false;
           target.title = origTitle;
           if (origIcon) origIcon.setAttribute('data-lucide', 'refresh-cw');
-          if (window.lucide) window.lucide.createIcons();
+          if (window.lucide) window.lucide.createIcons({ el: target });
         }
       }
 

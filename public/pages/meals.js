@@ -185,7 +185,7 @@ export async function render(container, { user }) {
     </div>
   `);
 
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons({ el: container });
   renderKitchenTabsBar(container, '/meals');
 
   const today  = toLocalDateKey(new Date());
@@ -260,7 +260,7 @@ function renderWeekGrid() {
     `;
   }).join(''));
 
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons({ el: grid });
   stagger(grid.querySelectorAll('.meal-card'));
   wireGrid(grid);
 }
@@ -660,7 +660,7 @@ function openMealModal(opts) {
           })
           .join(''));
 
-        if (window.lucide) lucide.createIcons();
+        if (window.lucide) lucide.createIcons({ el: ingList });
       };
 
       recipeSelect?.addEventListener('change', () => {
@@ -685,7 +685,7 @@ function openMealModal(opts) {
           ))
           .join(''));
 
-        if (window.lucide) lucide.createIcons();
+        if (window.lucide) lucide.createIcons({ el: ingList });
       });
 
       saveAsRecipeBtn?.addEventListener('click', async () => {
@@ -740,7 +740,7 @@ function openMealModal(opts) {
         tmp.insertAdjacentHTML('beforeend', ingredientRowHTML('', '', null));
         const row = tmp.firstElementChild;
         ingList.appendChild(row);
-        if (window.lucide) lucide.createIcons();
+        if (window.lucide) lucide.createIcons({ el: ingList });
         row.querySelector('input').focus();
       });
 

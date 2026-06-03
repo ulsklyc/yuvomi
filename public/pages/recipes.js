@@ -73,7 +73,7 @@ export async function render(container) {
   container.replaceChildren(page);
   renderKitchenTabsBar(container, '/recipes');
 
-  if (window.lucide) window.lucide.createIcons();
+  if (window.lucide) window.lucide.createIcons({ el: container });
 
   await Promise.all([loadRecipes(), loadCategories()]);
   renderRecipeList();
@@ -322,7 +322,7 @@ function openRecipeModal(mode, recipe = null) {
 
       panel.querySelector('#recipe-add-ingredient')?.addEventListener('click', () => {
         ingList.appendChild(buildIngredientRow('', '', null));
-        if (window.lucide) window.lucide.createIcons();
+        if (window.lucide) window.lucide.createIcons({ el: ingList });
       });
 
       ingList.addEventListener('click', (e) => {
@@ -334,7 +334,7 @@ function openRecipeModal(mode, recipe = null) {
       panel.querySelector('#recipe-cancel')?.addEventListener('click', closeModal);
       panel.querySelector('#recipe-save')?.addEventListener('click', () => saveRecipe(panel, mode, recipe));
 
-      if (window.lucide) window.lucide.createIcons();
+      if (window.lucide) window.lucide.createIcons({ el: panel });
     },
   });
 }

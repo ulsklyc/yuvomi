@@ -576,7 +576,58 @@ function getAgendaRange(dateStr) {
   return { from: dateStr, to: addDays(dateStr, 30) };
 }
 
+// Per-Render-Pass Day-Buckets. Vermeidet, dass jede der 42 Monats-Zellen die
+// komplette state.events/state.tasks-Liste neu filtert und pro Event ein neues
+// Date parst (O(Zellen × Events) → O(Events + Zellen)).
+// _dayIndex.active signalisiert, dass die Maps für die aktuelle Render-Phase
+// gültig sind; ansonsten fallen die Helfer auf direktes Filtern zurück.
+const _dayIndex = {
+  active:  false,
+  events:  new Map(), // isoDate -> Event[]
+  tasks:   new Map(), // isoDate -> Task[]
+};
+
+/**
+ * Baut die Tages-Buckets für Events und Tasks einmal pro Render-Durchlauf.
+ * Jedes Datum wird genau einmal geparst; mehrtägige Events werden in jeden
+ * Tag ihres Bereichs (geklammert auf das geladene Fenster) einsortiert.
+ */
+function buildDayIndex() {
+  const evMap = new Map();
+  // Events in Originalreihenfolge durchlaufen, damit pro Tag die Reihenfolge
+  // identisch zum bisherigen .filter()-Verhalten bleibt.
+  const lo = state.rangeFrom || '';
+  const hi = state.rangeTo   || '';
+  for (const e of state.events) {
+    const start = localDate(e.start_datetime);
+    const end   = e.end_datetime ? localDate(e.end_datetime) : start;
+    // Auf das geladene Fenster klammern, damit mehrtägige/fehlerhafte Events
+    // keinen unbegrenzten Bereich erzeugen.
+    let from = lo && start < lo ? lo : start;
+    const to = hi && end > hi ? hi : end;
+    if (from > to) continue;
+    for (let day = from; day <= to; day = addDays(day, 1)) {
+      const bucket = evMap.get(day);
+      if (bucket) bucket.push(e);
+      else evMap.set(day, [e]);
+    }
+  }
+
+  const taskMap = new Map();
+  for (const t of state.tasks) {
+    if (!t.due_date) continue;
+    const bucket = taskMap.get(t.due_date);
+    if (bucket) bucket.push(t);
+    else taskMap.set(t.due_date, [t]);
+  }
+
+  _dayIndex.events = evMap;
+  _dayIndex.tasks  = taskMap;
+  _dayIndex.active = true;
+}
+
 function eventsOnDay(dateStr) {
+  if (_dayIndex.active) return _dayIndex.events.get(dateStr) ?? [];
   return state.events.filter((e) => {
     const start = localDate(e.start_datetime);
     const end   = e.end_datetime ? localDate(e.end_datetime) : start;
@@ -593,6 +644,7 @@ function filterTasksForCalendar(tasks) {
 
 /** Tasks, die an einem bestimmten Tag fällig sind. */
 function tasksOnDay(dateStr) {
+  if (_dayIndex.active) return _dayIndex.tasks.get(dateStr) ?? [];
   return state.tasks.filter((t) => t.due_date === dateStr);
 }
 
@@ -723,7 +775,7 @@ function renderToolbar() {
     </div>
   `);
 
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons({ el: bar });
 
   updateLabel();
 
@@ -817,11 +869,18 @@ function renderView() {
   if (!body) return;
   body.replaceChildren();
 
-  if (state.view === 'month')  renderMonthView(body);
-  if (state.view === 'week')   renderWeekView(body);
-  if (state.view === 'day')    renderDayView(body);
-  if (state.view === 'agenda') renderAgendaView(body);
-  if (window.lucide) lucide.createIcons();
+  // Tages-Buckets einmal pro Render-Pass aufbauen; danach wieder deaktivieren,
+  // damit spätere State-Mutationen (Modals etc.) keinen veralteten Index lesen.
+  buildDayIndex();
+  try {
+    if (state.view === 'month')  renderMonthView(body);
+    if (state.view === 'week')   renderWeekView(body);
+    if (state.view === 'day')    renderDayView(body);
+    if (state.view === 'agenda') renderAgendaView(body);
+  } finally {
+    _dayIndex.active = false;
+  }
+  if (window.lucide) lucide.createIcons({ el: body });
 }
 
 // --------------------------------------------------------
@@ -1315,7 +1374,7 @@ function showEventPopup(ev, anchor) {
   `);
 
   document.body.appendChild(popup);
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons({ el: popup });
 
   if (ev.external_source === 'ics' && ev.user_modified === 1) {
     const resetLink = document.createElement('a');
@@ -1607,7 +1666,7 @@ function openEventModal({ mode, event = null, date = null, reminder = null }) {
           iconTrigger.dataset.icon = nextIcon;
           iconTrigger.replaceChildren(eventIconElement(nextIcon, 'event-icon-picker__trigger-icon'));
         }
-        if (window.lucide) lucide.createIcons();
+        if (window.lucide) lucide.createIcons({ el: iconTrigger });
       };
 
       iconTrigger?.addEventListener('click', () => {
@@ -1700,7 +1759,7 @@ function openEventModal({ mode, event = null, date = null, reminder = null }) {
       });
 
       panel.querySelector('#modal-save').addEventListener('click', () => saveEvent(panel, mode, event?.id, reminder, attachmentState));
-      if (window.lucide) lucide.createIcons();
+      if (window.lucide) lucide.createIcons({ el: panel });
     },
   });
 }

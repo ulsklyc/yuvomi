@@ -90,7 +90,7 @@ export async function render(container, { user }) {
     </div>
   `);
 
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons({ el: container });
 
   const res        = await api.get('/contacts');
   state.contacts   = res.data;
@@ -196,7 +196,7 @@ function renderList() {
         </button>
       </div>
     `);
-    if (window.lucide) lucide.createIcons();
+    if (window.lucide) lucide.createIcons({ el: container });
     container.querySelector('#empty-cta-contacts')?.addEventListener('click', () => {
       document.querySelector('.page-fab')?.click();
     });
@@ -220,7 +220,7 @@ function renderList() {
       </div>
     `).join(''));
 
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons({ el: container });
   stagger(container.querySelectorAll('.contact-item'));
 
   // Event-Delegation

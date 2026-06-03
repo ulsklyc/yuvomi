@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Scope icon re-rendering to changed subtrees and index calendar day lookups for smoother large lists and month views.
+
 ## [0.57.4] - 2026-06-02
 
 ### Changed
