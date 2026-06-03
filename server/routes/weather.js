@@ -11,9 +11,20 @@ const log = createLogger('Weather');
 
 const router  = express.Router();
 
-// Cache: Daten für 30 Minuten halten
-let cache = { data: null, ts: 0 };
+// Cache: Daten für 30 Minuten halten - pro Stadt/Einheit/Sprache, damit ein
+// Wechsel von Stadt/Sprache/Einheit nicht 30 Minuten lang veraltete (oder
+// falschsprachige) Daten ausliefert.
+const cache = new Map(); // key `${city}|${units}|${lang}` → { data, ts }
 const CACHE_TTL_MS = 30 * 60 * 1000;
+const CACHE_MAX_ENTRIES = 50; // Schutz gegen unbegrenztes Wachstum bei variablen Query-Params
+
+// OpenWeatherMap erwartet bei einem Ortsnamen `q=`, bei einer numerischen
+// City-ID aber `id=`. Ortsnamen lassen sich mit Ländercode disambiguieren,
+// z.B. "Wellington,NZ" (sonst kann OWM die falsche Stadt zurückgeben).
+function cityParam(city) {
+  const c = String(city).trim();
+  return /^\d+$/.test(c) ? `id=${encodeURIComponent(c)}` : `q=${encodeURIComponent(c)}`;
+}
 
 // --------------------------------------------------------
 // GET /api/v1/weather
@@ -24,25 +35,29 @@ const CACHE_TTL_MS = 30 * 60 * 1000;
 router.get('/', async (req, res) => {
   try {
     const apiKey = process.env.OPENWEATHER_API_KEY;
-    const city   = process.env.OPENWEATHER_CITY || 'Berlin';
-    const units  = process.env.OPENWEATHER_UNITS || 'metric';
-    const lang   = process.env.OPENWEATHER_LANG  || 'de';
+    const city   = String(req.query.city  || process.env.OPENWEATHER_CITY  || 'Berlin');
+    const units  = String(req.query.units || process.env.OPENWEATHER_UNITS || 'metric');
+    // Sprache folgt der App-Locale (vom Frontend via ?lang= übergeben),
+    // dann OPENWEATHER_LANG, dann Englisch als neutraler Default.
+    const lang   = String(req.query.lang  || process.env.OPENWEATHER_LANG  || 'en');
 
     // Kein API-Key → leere Antwort (Widget wird ausgeblendet)
     if (!apiKey) {
       return res.json({ data: null });
     }
 
-    // Cache prüfen
-    if (cache.data && Date.now() - cache.ts < CACHE_TTL_MS) {
-      return res.json({ data: cache.data });
+    // Cache prüfen (pro Stadt/Einheit/Sprache)
+    const cacheKey = `${city}|${units}|${lang}`;
+    const cached = cache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+      return res.json({ data: cached.data });
     }
 
     // Dynamischer Import für node-fetch (ESM)
     const { default: fetch } = await import('node-fetch');
 
     // Aktuelles Wetter
-    const currentUrl = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=${units}&lang=${lang}`;
+    const currentUrl = `https://api.openweathermap.org/data/2.5/weather?${cityParam(city)}&appid=${apiKey}&units=${units}&lang=${lang}`;
     const currentRes = await fetch(currentUrl, { signal: AbortSignal.timeout(8000) });
     if (!currentRes.ok) {
       log.warn(`API error: ${currentRes.status}`);
@@ -51,7 +66,7 @@ router.get('/', async (req, res) => {
     const currentJson = await currentRes.json();
 
     // 5-Tage-Forecast (3h-Intervalle → aggregiert zu Tageswerten)
-    const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&appid=${apiKey}&units=${units}&lang=${lang}&cnt=40`;
+    const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?${cityParam(city)}&appid=${apiKey}&units=${units}&lang=${lang}&cnt=40`;
     const forecastRes = await fetch(forecastUrl, { signal: AbortSignal.timeout(8000) });
     let forecastDays = [];
 
@@ -113,7 +128,14 @@ router.get('/', async (req, res) => {
       forecast: forecastDays,
     };
 
-    cache = { data, ts: Date.now() };
+    // Älteste Einträge entfernen, falls der Cache zu groß wird (Map bewahrt Insertionsreihenfolge)
+    if (cache.size >= CACHE_MAX_ENTRIES) {
+      for (const k of cache.keys()) {
+        if (cache.size < CACHE_MAX_ENTRIES) break;
+        cache.delete(k);
+      }
+    }
+    cache.set(cacheKey, { data, ts: Date.now() });
     res.json({ data });
   } catch (err) {
     log.warn('Error:', err.message);
