@@ -196,26 +196,70 @@ function loadExpense(expenseId, req) {
   return expense;
 }
 
-function serializeExpense(expense) {
-  const splits = db.get().prepare(`
-    SELECT s.user_id, s.amount_minor, s.currency, u.display_name
-    FROM expense_splits s
-    LEFT JOIN users u ON u.id = s.user_id
-    WHERE s.expense_id = ?
-    ORDER BY u.display_name COLLATE NOCASE ASC
-  `).all(expense.id).map((row) => ({ ...row, amount: minorToDecimal(row.amount_minor, row.currency) }));
-  const attachments = db.get().prepare(`
-    SELECT a.id, a.document_id, a.kind, d.name, d.original_name, d.mime_type
-    FROM expense_attachments a
-    LEFT JOIN family_documents d ON d.id = a.document_id
-    WHERE a.expense_id = ?
-    ORDER BY a.created_at DESC
-  `).all(expense.id);
+function serializeExpense(expense, prefetched) {
+  const splits = prefetched
+    ? (prefetched.splits.get(expense.id) || [])
+    : db.get().prepare(`
+        SELECT s.user_id, s.amount_minor, s.currency, u.display_name
+        FROM expense_splits s
+        LEFT JOIN users u ON u.id = s.user_id
+        WHERE s.expense_id = ?
+        ORDER BY u.display_name COLLATE NOCASE ASC
+      `).all(expense.id).map((row) => ({ ...row, amount: minorToDecimal(row.amount_minor, row.currency) }));
+  const attachments = prefetched
+    ? (prefetched.attachments.get(expense.id) || [])
+    : db.get().prepare(`
+        SELECT a.id, a.document_id, a.kind, d.name, d.original_name, d.mime_type
+        FROM expense_attachments a
+        LEFT JOIN family_documents d ON d.id = a.document_id
+        WHERE a.expense_id = ?
+        ORDER BY a.created_at DESC
+      `).all(expense.id);
   return {
     ...decorateMoney(expense, ['amount_minor', 'converted_amount_minor']),
     splits,
     attachments,
   };
+}
+
+/**
+ * Serialize a list of expenses, batch-loading splits and attachments for all
+ * rows in 2 queries total (WHERE expense_id IN (...)) instead of 2 per row.
+ * Kills the N+1 in the list endpoints (was up to ~201 queries for 100 rows).
+ */
+function serializeExpenseList(expenses) {
+  if (!expenses.length) return [];
+  const ids = expenses.map((e) => e.id);
+  const placeholders = ids.map(() => '?').join(', ');
+
+  const splits = new Map();
+  for (const row of db.get().prepare(`
+    SELECT s.expense_id, s.user_id, s.amount_minor, s.currency, u.display_name
+    FROM expense_splits s
+    LEFT JOIN users u ON u.id = s.user_id
+    WHERE s.expense_id IN (${placeholders})
+    ORDER BY u.display_name COLLATE NOCASE ASC
+  `).all(...ids)) {
+    const { expense_id, ...rest } = row;
+    if (!splits.has(expense_id)) splits.set(expense_id, []);
+    splits.get(expense_id).push({ ...rest, amount: minorToDecimal(rest.amount_minor, rest.currency) });
+  }
+
+  const attachments = new Map();
+  for (const row of db.get().prepare(`
+    SELECT a.expense_id, a.id, a.document_id, a.kind, d.name, d.original_name, d.mime_type
+    FROM expense_attachments a
+    LEFT JOIN family_documents d ON d.id = a.document_id
+    WHERE a.expense_id IN (${placeholders})
+    ORDER BY a.created_at DESC
+  `).all(...ids)) {
+    const { expense_id, ...rest } = row;
+    if (!attachments.has(expense_id)) attachments.set(expense_id, []);
+    attachments.get(expense_id).push(rest);
+  }
+
+  const prefetched = { splits, attachments };
+  return expenses.map((expense) => serializeExpense(expense, prefetched));
 }
 
 function insertExpenseLedger(database, expense, splits, actorId, sourceType = 'expense') {
@@ -301,8 +345,9 @@ router.get('/dashboard', (req, res) => {
       WHERE e.status = 'active'
       ORDER BY e.expense_date DESC, e.created_at DESC
       LIMIT 8
-    `).all({ uid }).map(serializeExpense);
-    res.json({ data: { total_owed: totalOwed, total_owing: totalOwing, groups, recent_expenses: recent } });
+    `).all({ uid });
+    const recentSerialized = serializeExpenseList(recent);
+    res.json({ data: { total_owed: totalOwed, total_owing: totalOwing, groups, recent_expenses: recentSerialized } });
   } catch (err) {
     log.error('GET /dashboard error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -590,8 +635,9 @@ router.get('/groups/:id/expenses', (req, res) => {
         AND (@recurringOnly = 0 OR e.recurring_rule_id IS NOT NULL)
       ORDER BY e.expense_date DESC, e.created_at DESC
       LIMIT @limit OFFSET @offset
-    `).all({ groupId, search, category, recurringOnly: recurringOnly ? 1 : 0, limit, offset }).map(serializeExpense);
-    res.json({ data: rows, pagination: { limit, offset, has_more: rows.length === limit } });
+    `).all({ groupId, search, category, recurringOnly: recurringOnly ? 1 : 0, limit, offset });
+    const serialized = serializeExpenseList(rows);
+    res.json({ data: serialized, pagination: { limit, offset, has_more: serialized.length === limit } });
   } catch (err) {
     log.error('GET /groups/:id/expenses error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -855,7 +901,8 @@ router.get('/search', (req, res) => {
       WHERE e.status = 'active' AND (@q = '' OR e.title LIKE '%' || @q || '%' OR e.description LIKE '%' || @q || '%')
         AND (@restrictedGroupId IS NULL OR g.id = @restrictedGroupId)
       ORDER BY e.expense_date DESC LIMIT 10
-    `).all({ uid, q, restrictedGroupId }).map(serializeExpense);
+    `).all({ uid, q, restrictedGroupId });
+    const expensesSerialized = serializeExpenseList(expenses);
     const people = db.get().prepare(`
       SELECT DISTINCT u.id, u.display_name, u.username, u.avatar_color
       FROM users u
@@ -865,7 +912,7 @@ router.get('/search', (req, res) => {
         AND (@restrictedGroupId IS NULL OR gm.group_id = @restrictedGroupId)
       ORDER BY u.display_name COLLATE NOCASE ASC LIMIT 10
     `).all({ uid, q, restrictedGroupId });
-    res.json({ data: { groups, expenses, people } });
+    res.json({ data: { groups, expenses: expensesSerialized, people } });
   } catch (err) {
     log.error('GET /search error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

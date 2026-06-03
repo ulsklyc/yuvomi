@@ -60,39 +60,33 @@ router.get('/', (req, res) => {
     result.upcomingEvents = [];
   }
 
-  // Offene Aufgaben: in JS sortiert damit due_time korrekt gegen lokale Zeit geprüft wird
+  // Offene Aufgaben: Sortierung in SQL (overdue zuerst, dann Fälligkeit, dann Priorität).
+  // Faithful translation of the previous JS comparator:
+  //   1. overdue (due_sort < now) before not-overdue
+  //   2. within a group: earlier due date/time first; undated tasks last (NULLS LAST)
+  //   3. ties broken by priority rank (urgent=0..none=4)
+  // due_sort = due_date + due_time, falling back to 23:59:59 when only a date is set,
+  // and NULL when there is no due_date at all.
   try {
-    const allOpen = d.prepare(`
-      SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color
+    const nowIso = `${todayStr}T${now.toISOString().slice(11, 19)}`;
+    result.urgentTasks = d.prepare(`
+      SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color,
+        CASE WHEN t.due_date IS NULL THEN NULL
+             ELSE t.due_date || 'T' || COALESCE(t.due_time, '23:59:59')
+        END AS __due_sort
       FROM tasks t
       LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.status != 'done'
-    `).all();
-
-    const PRIO = { urgent: 0, high: 1, medium: 2, low: 3, none: 4 };
-    const now  = new Date();
-
-    function effectiveDue(task) {
-      if (!task.due_date) return null;
-      return task.due_time
-        ? new Date(`${task.due_date}T${task.due_time}`)
-        : new Date(`${task.due_date}T23:59:59`);
-    }
-
-    allOpen.sort((a, b) => {
-      const aDate  = effectiveDue(a);
-      const bDate  = effectiveDue(b);
-      const aOver  = aDate && aDate < now ? 1 : 0;
-      const bOver  = bDate && bDate < now ? 1 : 0;
-      if (bOver !== aOver) return bOver - aOver;
-      if (!aDate && !bDate) return (PRIO[a.priority] ?? 4) - (PRIO[b.priority] ?? 4);
-      if (!aDate) return 1;
-      if (!bDate) return -1;
-      if (aDate.getTime() !== bDate.getTime()) return aDate < bDate ? -1 : 1;
-      return (PRIO[a.priority] ?? 4) - (PRIO[b.priority] ?? 4);
-    });
-
-    result.urgentTasks = allOpen.slice(0, 5);
+      ORDER BY
+        CASE WHEN __due_sort IS NOT NULL AND __due_sort < @now THEN 0 ELSE 1 END ASC,
+        __due_sort IS NULL ASC,
+        __due_sort ASC,
+        CASE t.priority
+          WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2
+          WHEN 'low' THEN 3 ELSE 4
+        END ASC
+      LIMIT 5
+    `).all({ now: nowIso }).map(({ __due_sort, ...task }) => task);
   } catch (err) {
     log.error('urgentTasks error:', err.message);
     result.urgentTasks = [];

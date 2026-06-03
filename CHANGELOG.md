@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Batch split-expense detail loads to remove an N+1 query and sort dashboard tasks in SQL.
+
 ## [0.57.4] - 2026-06-02
 
 ### Changed
