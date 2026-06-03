@@ -358,6 +358,9 @@ const recurId = insertEvent({
 // Nicht-wiederkehrender Termin in der Vergangenheit -> darf NICHT erscheinen.
 insertEvent({ title: 'Past one-off', start_datetime: isoIn(-2 * DAY), created_by: cuTheo });
 
+// Termin von heute Morgen (Vergangenheit, aber noch heute) -> bei fromToday erscheinen.
+insertEvent({ title: 'Morning Meeting Today', start_datetime: isoIn(-3 * HOUR), created_by: cuTheo });
+
 // Nicht-wiederkehrender Termin in der Zukunft -> erscheint.
 insertEvent({ title: 'Theodore Soccer Game', start_datetime: isoIn(3 * DAY), created_by: cuTheo });
 
@@ -372,6 +375,15 @@ test('getUpcomingEvents: wiederkehrender Termin mit Vergangenheits-Start erschei
 test('getUpcomingEvents: vergangene Einzeltermine erscheinen nicht', () => {
   const events = getUpcomingEvents(cdb, { userId: cuTheo, limit: 10 });
   assert(!events.find((e) => e.title === 'Past one-off'), 'Vergangener Einzeltermin darf nicht erscheinen');
+  assert(!events.find((e) => e.title === 'Morning Meeting Today'), 'Vergangener Heute-Termin ohne fromToday nicht erscheinen');
+});
+
+test('getUpcomingEvents: fromToday=true zeigt heutige vergangene Termine (Issue #230)', () => {
+  const events = getUpcomingEvents(cdb, { userId: cuTheo, limit: 10, fromToday: true });
+  assert(events.find((e) => e.title === 'Morning Meeting Today'),
+    'Heute-Morgen-Termin muss mit fromToday=true erscheinen');
+  assert(!events.find((e) => e.title === 'Past one-off'),
+    'Termin von gestern darf auch mit fromToday nicht erscheinen');
 });
 
 test('getUpcomingEvents: zukünftige Termine sortiert und auf limit begrenzt', () => {

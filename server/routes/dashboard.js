@@ -44,7 +44,7 @@ router.get('/', (req, res) => {
   // Geteilte Logik mit /calendar/upcoming: expandiert wiederkehrende Serien,
   // sodass auch Termine erscheinen, deren Master-Start in der Vergangenheit liegt.
   try {
-    result.upcomingEvents = getUpcomingEvents(d, { userId, limit: 5 })
+    result.upcomingEvents = getUpcomingEvents(d, { userId, limit: 5, fromToday: true })
       .map(({ assigned_users_json, ...event }) => event);
   } catch (err) {
     log.error('upcomingEvents error:', err.message);

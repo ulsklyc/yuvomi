@@ -112,11 +112,14 @@ export function expandRecurringEvents(events, from, to) {
  * @param {number?} opts.userId      Aktueller User (für ICS-Sichtbarkeit)
  * @param {number}  opts.limit       Maximale Anzahl Termine (default 5)
  * @param {number}  opts.windowDays  Vorausschau-Fenster in Tagen (default 90)
+ * @param {boolean} opts.fromToday   true = ab Tagesbeginn (Dashboard); false = ab jetzt (default)
  * @returns {object[]}  Rohe, expandierte Event-Zeilen (inkl. assigned_users_json)
  */
-export function getUpcomingEvents(d, { userId = null, limit = 5, windowDays = 90 } = {}) {
+export function getUpcomingEvents(d, { userId = null, limit = 5, windowDays = 90, fromToday = false } = {}) {
   const nowIso  = new Date().toISOString();
   const nowDate = nowIso.slice(0, 10);
+  // fromToday: ganztägige Sichtbarkeit heutiger Termine (Dashboard-Widget)
+  const filterFrom = fromToday ? `${nowDate}T00:00:00` : nowIso;
   // Fenster: heute bis +windowDays voraus (für Wiederholungs-Expansion)
   const future  = new Date(Date.now() + windowDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
@@ -145,6 +148,6 @@ export function getUpcomingEvents(d, { userId = null, limit = 5, windowDays = 90
   `).all(nowDate, future, future, userId);
 
   return expandRecurringEvents(rawEvents, nowDate, future)
-    .filter((e) => e.start_datetime >= nowIso)
+    .filter((e) => e.start_datetime >= filterFrom)
     .slice(0, limit);
 }
