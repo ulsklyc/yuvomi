@@ -322,7 +322,7 @@ All configuration happens in the `.env` file. The container reads these values o
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
 | `SESSION_SECRET` | Secret key for signing session cookies. **Change this!** | - | **Yes** |
-| `SESSION_SECURE` | Set to `false` if accessing without HTTPS (e.g. direct localhost). Set in `docker-compose.yml` by default. | `true` | No |
+| `SESSION_SECURE` | Set to `true` when running behind an HTTPS reverse proxy (Caddy, Nginx, Traefik). Leave unset for direct HTTP access (e.g. TrueNAS, bare Docker). | `false` | No |
 | `RATE_LIMIT_WINDOW_MS` | Time window for rate limiting (ms) | `60000` | No |
 | `RATE_LIMIT_MAX_ATTEMPTS` | Max login attempts per window | `5` | No |
 | `RATE_LIMIT_BLOCK_DURATION_MS` | Block duration after exceeding limit (ms) | `900000` | No |
