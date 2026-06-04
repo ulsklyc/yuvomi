@@ -58,7 +58,7 @@ const PORT = process.env.PORT || 3000;
 // --------------------------------------------------------
 // Security-Middleware
 // --------------------------------------------------------
-const isSecure = process.env.SESSION_SECURE !== 'false';
+const isSecure = process.env.SESSION_SECURE === 'true';
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {

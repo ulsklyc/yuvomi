@@ -126,8 +126,8 @@ const sessionMiddleware = session({
   name: 'oikos.sid',
   cookie: {
     httpOnly: true,
-    // secure=true by default; set SESSION_SECURE=false in .env to allow HTTP (local dev without reverse proxy)
-    secure: process.env.SESSION_SECURE !== 'false',
+    // secure=false by default; set SESSION_SECURE=true when behind an HTTPS reverse proxy
+    secure: process.env.SESSION_SECURE === 'true',
     // lax (not strict): Safari ITP blocks strict cookies on certain navigations
     // (e.g. reverse proxy, direct URL entry), causing 401 on login. Lax is safe
     // because CSRF is protected by the double-submit token and HTTPS secure flag.
@@ -398,7 +398,7 @@ function setupAuthSession(req, res, user) {
       res.cookie('csrf-token', req.session.csrfToken, {
         httpOnly: false,
         sameSite: 'lax',
-        secure: process.env.SESSION_SECURE !== 'false',
+        secure: process.env.SESSION_SECURE === 'true',
         maxAge: 1000 * 60 * 60 * 24 * 7,
       });
       resolve();
