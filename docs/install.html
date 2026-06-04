@@ -560,6 +560,9 @@
         <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-b" id="tab-b" data-t="tab_b">
           Option C — Build from Source
         </button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-d" id="tab-d" data-t="tab_d">
+          Option D — TrueNAS SCALE
+        </button>
       </div>
 
       <!-- Option A — Web Installer -->
@@ -788,6 +791,37 @@ cd oikos</div>
           </div>
         </div>
       </div>
+      <!-- Option D — TrueNAS SCALE -->
+      <div class="tab-panel" id="panel-d" role="tabpanel" aria-labelledby="tab-d">
+        <div class="callout callout-success reveal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          <span data-t="option_d_info">No terminal required. Oikos is available in the TrueNAS SCALE Community Apps Catalog — install it directly from the TrueNAS web UI in a few clicks.</span>
+        </div>
+
+        <div class="step reveal">
+          <div class="step-num" aria-hidden="true">1</div>
+          <div class="step-content">
+            <h3 class="step-title" data-t="step_d1_title">Open the Apps Catalog</h3>
+            <p class="step-desc" data-t="step_d1_desc">In your TrueNAS SCALE web UI, go to <strong>Apps → Discover Apps</strong> and search for <strong>Oikos</strong>.</p>
+          </div>
+        </div>
+
+        <div class="step reveal">
+          <div class="step-num" aria-hidden="true">2</div>
+          <div class="step-content">
+            <h3 class="step-title" data-t="step_d2_title">Configure and install</h3>
+            <p class="step-desc" data-t="step_d2_desc">Click <strong>Install</strong>. In the configuration form, set a strong value for <strong>Session Secret</strong> (required) and <strong>Database Encryption Key</strong> (recommended — back it up, it cannot be recovered). Adjust the port and storage paths if needed, then click <strong>Install</strong>.</p>
+          </div>
+        </div>
+
+        <div class="step reveal">
+          <div class="step-num" aria-hidden="true">3</div>
+          <div class="step-content">
+            <h3 class="step-title" data-t="step_d3_title">Open the WebUI</h3>
+            <p class="step-desc" data-t="step_d3_desc">Once the app status shows <strong>Running</strong>, click <strong>WebUI</strong> in the Apps overview. The first visit walks you through creating your admin account directly in the browser.</p>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -971,6 +1005,14 @@ docker compose logs | grep "Server läuft"</div>
           tab_installer: 'Option A \u2014 Web Installer',
           tab_a: 'Option B \u2014 Pre-built Image',
           tab_b: 'Option C \u2014 Build from Source',
+          tab_d: 'Option D \u2014 TrueNAS SCALE',
+          option_d_info: 'No terminal required. Oikos is available in the TrueNAS SCALE Community Apps Catalog \u2014 install it directly from the TrueNAS web UI in a few clicks.',
+          step_d1_title: 'Open the Apps Catalog',
+          step_d1_desc: 'In your TrueNAS SCALE web UI, go to Apps \u2192 Discover Apps and search for Oikos.',
+          step_d2_title: 'Configure and install',
+          step_d2_desc: 'Click Install. In the configuration form, set a strong value for Session Secret (required) and Database Encryption Key (recommended \u2014 back it up, it cannot be recovered). Adjust the port and storage paths if needed, then click Install.',
+          step_d3_title: 'Open the WebUI',
+          step_d3_desc: 'Once the app status shows Running, click WebUI in the Apps overview. The first visit walks you through creating your admin account directly in the browser.',
           option_installer_info: 'Recommended for most users. A localized browser wizard (18 languages) detects your container engine (Docker or Podman), then configures your .env \u2014 including optional reverse proxy/HTTPS, Single Sign-On (OIDC), and automatic backups \u2014 starts the container, and creates your admin account. No manual steps. Requires Node.js 18+ on the host.',
           option_a_info: 'No Git, no build step \u2014 just two files and a single command. Requires only Docker or Podman (Podman: use podman-compose.yml).',
           option_b_info: 'For contributors or those who want to run a custom version. Requires Git. The first build takes a few minutes.',
@@ -1067,6 +1109,14 @@ docker compose logs | grep "Server läuft"</div>
           tab_installer: 'Option A \u2014 Web-Installer',
           tab_a: 'Option B \u2014 Fertiges Image',
           tab_b: 'Option C \u2014 Aus Quellcode bauen',
+          tab_d: 'Option D \u2014 TrueNAS SCALE',
+          option_d_info: 'Kein Terminal erforderlich. Oikos ist im TrueNAS SCALE Community Apps Catalog verf\u00fcgbar \u2014 direkt \u00fcber das TrueNAS-Web-UI in wenigen Klicks installierbar.',
+          step_d1_title: 'Apps-Catalog \u00f6ffnen',
+          step_d1_desc: 'Im TrueNAS SCALE Web-UI zu Apps \u2192 Apps entdecken navigieren und nach Oikos suchen.',
+          step_d2_title: 'Konfigurieren und installieren',
+          step_d2_desc: 'Auf Installieren klicken. Im Konfigurationsformular einen starken Wert f\u00fcr Session-Secret (erforderlich) und Datenbank-Verschl\u00fcsselungsschl\u00fcssel (empfohlen \u2014 sichern, da nicht wiederherstellbar) setzen. Port und Speicherpfade nach Bedarf anpassen, dann Installieren klicken.',
+          step_d3_title: 'WebUI \u00f6ffnen',
+          step_d3_desc: 'Sobald der App-Status Aktiv anzeigt, in der App-\u00dcbersicht auf WebUI klicken. Beim ersten Aufruf f\u00fchrt Oikos direkt im Browser durch die Erstellung des Admin-Kontos.',
           option_installer_info: 'Empfohlen f\u00fcr die meisten Nutzer. Ein lokalisierter Browser-Assistent (18 Sprachen) erkennt eure Container-Engine (Docker oder Podman) und konfiguriert dann eure .env \u2014 inklusive optionalem Reverse-Proxy/HTTPS, Single Sign-On (OIDC) und automatischen Backups \u2014 startet den Container und erstellt euer Admin-Konto. Ganz ohne manuelle Schritte. Erfordert Node.js 18+ auf dem Host.',
           option_a_info: 'Kein Git, kein Build-Schritt \u2014 nur zwei Dateien und ein einziger Befehl. Nur Docker oder Podman erforderlich (Podman: podman-compose.yml verwenden).',
           option_b_info: 'F\u00fcr Mitwirkende oder wer eine eigene Version ausf\u00fchren m\u00f6chte. Erfordert Git. Der erste Build dauert einige Minuten.',

@@ -145,7 +145,7 @@ git --version              # git version 2.x.x
 
 ## Step-by-Step Installation
 
-There are three ways to get Oikos running. **Option A** (web installer) is recommended for most users — it walks you through every step in your browser. **Option B** (pre-built image) is a quick manual alternative. **Option C** (build from source) is for contributors or custom builds.
+There are four ways to get Oikos running. **Option A** (web installer) is recommended for most users — it walks you through every step in your browser. **Option B** (pre-built image) is a quick manual alternative. **Option C** (build from source) is for contributors or custom builds. **Option D** (TrueNAS SCALE) installs directly from the Community Apps Catalog with no terminal required.
 
 ---
 
@@ -299,6 +299,30 @@ http://localhost:3000
 ```
 
 Log in with the admin credentials you just created. You can add family members from the **Settings** page.
+
+---
+
+### Option D — TrueNAS SCALE (Community Apps Catalog)
+
+No terminal required. Oikos is available directly in the TrueNAS SCALE Community Apps Catalog.
+
+#### 1. Open the Apps Catalog
+
+In your TrueNAS SCALE web UI, go to **Apps → Discover Apps** and search for **Oikos**.
+
+#### 2. Configure and Install
+
+Click **Install**. Fill in the configuration form:
+
+- **Session Secret** (required) — use a long random string
+- **Database Encryption Key** (recommended) — generate with `openssl rand -hex 32`; back it up, it cannot be recovered or changed on an existing database
+- Adjust port and storage paths as needed
+
+Click **Install** to start the container.
+
+#### 3. Open the WebUI
+
+Once the app status shows **Running**, click **WebUI** in the Apps overview. The first visit guides you through creating your admin account in the browser.
 
 ---
 

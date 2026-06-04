@@ -99,6 +99,10 @@ docker compose up -d --build
 
 Open `http://localhost:3000` — the first visit guides you through creating your admin account in the browser, then signs you in. (For headless setups you can instead run `docker compose exec oikos node setup.js`.)
 
+**Option D — TrueNAS SCALE (Community Apps Catalog)**
+
+Oikos is available in the TrueNAS SCALE Community Apps Catalog — no terminal required. Open **Apps → Discover Apps**, search for **Oikos**, and install it directly from the UI. Set `SESSION_SECRET` (required) and `DB_ENCRYPTION_KEY` (recommended) during installation. The first visit to the WebUI walks you through creating your admin account.
+
 > **Using Podman (RHEL / Fedora / CentOS Stream)?** Both installers above auto-detect
 > Podman and use `podman-compose.yml` (SELinux `:Z` labels, configurable host bind).
 > For a manual start, replace `docker compose` with `podman compose -f podman-compose.yml`
