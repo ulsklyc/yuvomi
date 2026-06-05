@@ -162,7 +162,7 @@ function getSyncToken(calendarId) {
 async function listCalendars() {
   const client   = loadAuthorizedClient();
   const calendar = google.calendar({ version: 'v3', auth: client });
-  const selectedId = getCalendarId();
+  const enabledSet = new Set(enabledCalendarIds());
 
   const items = [];
   let pageToken;
@@ -174,7 +174,7 @@ async function listCalendars() {
         summary:         cal.summaryOverride || cal.summary || cal.id,
         primary:         !!cal.primary,
         backgroundColor: cal.backgroundColor || GOOGLE_COLOR,
-        selected:        cal.id === selectedId || (cal.primary && selectedId === 'primary'),
+        enabled:         enabledSet.has(cal.id),
       });
     }
     pageToken = res.data.nextPageToken;
@@ -264,7 +264,13 @@ function getStatus() {
   const configured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REDIRECT_URI);
   const connected  = !!(cfgGet('google_access_token') && cfgGet('google_refresh_token'));
   const lastSync   = cfgGet('google_last_sync');
-  return { configured, connected, lastSync, calendarId: getCalendarId(), readonly: isReadonly() };
+  return {
+    configured,
+    connected,
+    lastSync,
+    selectedCount: enabledCalendarIds().length,
+    readonly: isReadonly(),
+  };
 }
 
 /**
@@ -272,7 +278,8 @@ function getStatus() {
  */
 function disconnect() {
   ['google_access_token', 'google_refresh_token', 'google_token_expiry',
-   'google_sync_token', 'google_last_sync', 'google_calendar_id', 'google_readonly'].forEach(cfgDel);
+   'google_last_sync', 'google_readonly'].forEach(cfgDel);
+  db.get().prepare('DELETE FROM google_calendar_selection').run();
   log.info('Disconnected.');
 }
 
