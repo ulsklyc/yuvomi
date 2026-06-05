@@ -84,36 +84,75 @@ function setReadonly(enabled) {
 }
 
 // --------------------------------------------------------
-// Kalenderauswahl (Issue #220)
+// Kalenderauswahl (Mehrkalender, Issue #237)
 // --------------------------------------------------------
 
-/**
- * Liefert die ID des zu synchronisierenden Kalenders.
- * Fällt auf 'primary' zurück, solange der Nutzer nichts ausgewählt hat
- * (abwärtskompatibel für bestehende Installationen).
- * @returns {string}
- */
-function getCalendarId() {
-  return cfgGet('google_calendar_id') || 'primary';
+/** Alle bekannten Kalenderauswahl-Zeilen. */
+function listSelection() {
+  return db.get().prepare(
+    'SELECT calendar_id, name, color, enabled, sync_token, last_sync FROM google_calendar_selection'
+  ).all();
+}
+
+/** IDs der aktuell aktivierten Kalender. */
+function enabledCalendarIds() {
+  return db.get().prepare(
+    'SELECT calendar_id FROM google_calendar_selection WHERE enabled = 1'
+  ).all().map((r) => r.calendar_id);
 }
 
 /**
- * Setzt den zu synchronisierenden Kalender und startet den Sync-State neu.
- * Beim Wechsel werden der inkrementelle Sync-Token sowie die bereits
- * importierten Google-Events entfernt, damit der nächste Sync den neuen
- * Kalender sauber von Grund auf einliest (keine verwaisten Events).
+ * Aktiviert/deaktiviert einen Kalender. Beim Aktivieren werden name/color
+ * (sofern übergeben) als Metadaten gespeichert. Beim Deaktivieren werden die
+ * importierten Events dieses Kalenders entfernt und der Sync-Token zurückgesetzt,
+ * damit ein erneutes Aktivieren sauber von Grund auf neu liest.
  * @param {string} calendarId
+ * @param {boolean} enabled
+ * @param {{name?:string,color?:string}} [meta]
  */
-function setCalendarId(calendarId) {
+function setCalendarEnabled(calendarId, enabled, meta = {}) {
   if (typeof calendarId !== 'string' || calendarId.trim().length === 0) {
     throw new Error('[Google] calendarId fehlt oder ist ungültig.');
   }
-  const next = calendarId.trim();
-  if (next === getCalendarId()) return; // kein Wechsel → State unangetastet lassen
+  const id = calendarId.trim();
+  const flag = enabled ? 1 : 0;
 
-  cfgSet('google_calendar_id', next);
-  cfgDel('google_sync_token');
-  db.get().prepare("DELETE FROM calendar_events WHERE external_source = 'google'").run();
+  db.get().prepare(`
+    INSERT INTO google_calendar_selection (calendar_id, name, color, enabled)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(calendar_id) DO UPDATE SET
+      enabled = excluded.enabled,
+      name    = COALESCE(excluded.name, google_calendar_selection.name),
+      color   = COALESCE(excluded.color, google_calendar_selection.color)
+  `).run(id, meta.name || id, meta.color || null, flag);
+
+  if (!enabled) {
+    db.get().prepare(`
+      DELETE FROM calendar_events
+      WHERE external_source = 'google' AND calendar_ref_id IN (
+        SELECT id FROM external_calendars WHERE source = 'google' AND external_id = ?
+      )
+    `).run(id);
+    db.get().prepare(
+      'UPDATE google_calendar_selection SET sync_token = NULL, last_sync = NULL WHERE calendar_id = ?'
+    ).run(id);
+  }
+}
+
+/** Per-Kalender-Sync-Token + last_sync nach erfolgreichem Inbound speichern. */
+function recordSyncToken(calendarId, token) {
+  db.get().prepare(`
+    UPDATE google_calendar_selection
+    SET sync_token = ?, last_sync = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+    WHERE calendar_id = ?
+  `).run(token, calendarId);
+}
+
+function getSyncToken(calendarId) {
+  const row = db.get().prepare(
+    'SELECT sync_token FROM google_calendar_selection WHERE calendar_id = ?'
+  ).get(calendarId);
+  return row ? row.sync_token : null;
 }
 
 /**
@@ -472,5 +511,10 @@ function localEventToGoogle(event) {
   return gEvent;
 }
 
-export { getAuthUrl, handleCallback, getStatus, disconnect, sync, listCalendars, getCalendarId, setCalendarId, setReadonly };
-export const __test = { localEventToGoogle, googleAllDayEndToInclusive, localAllDayEndToExclusive, upsertGoogleEvents, upsertExternalCalendar, getCalendarId, setCalendarId, setReadonly, isReadonly };
+export { getAuthUrl, handleCallback, getStatus, disconnect, sync, listCalendars,
+         listSelection, setCalendarEnabled, setReadonly };
+export const __test = {
+  localEventToGoogle, googleAllDayEndToInclusive, localAllDayEndToExclusive,
+  upsertGoogleEvents, upsertExternalCalendar, setReadonly, isReadonly,
+  listSelection, setCalendarEnabled, recordSyncToken, getSyncToken, enabledCalendarIds,
+};
