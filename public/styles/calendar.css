@@ -927,7 +927,7 @@
 .event-popup {
   position: fixed;
   z-index: calc(var(--z-modal) - 1);
-  background-color: var(--glass-bg-card);
+  background-color: var(--color-surface);
   border-radius: var(--radius-glass-card);
   box-shadow: var(--glass-shadow-lg);
   border: 1px solid var(--glass-border-subtle);
