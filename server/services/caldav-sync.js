@@ -66,7 +66,12 @@ function buildCalDAVICS(event) {
 
   if (event.description)     lines.push(`DESCRIPTION:${escapeICSText(event.description)}`);
   if (event.location)        lines.push(`LOCATION:${escapeICSText(event.location)}`);
-  if (event.recurrence_rule) lines.push(event.recurrence_rule);
+  if (event.recurrence_rule) {
+    const rule = event.recurrence_rule.startsWith('RRULE:')
+      ? event.recurrence_rule
+      : `RRULE:${event.recurrence_rule}`;
+    lines.push(rule);
+  }
 
   lines.push('END:VEVENT', 'END:VCALENDAR');
   return lines.join('\r\n');
