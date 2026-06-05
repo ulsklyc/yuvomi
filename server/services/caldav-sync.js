@@ -22,6 +22,56 @@ function escapeICSText(str) {
   return str.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
 }
 
+// Convert a DB datetime string (YYYY-MM-DDThh:mm or ...hh:mm:ss[.ms][Z/±offset])
+// to RFC 5545 basic format (YYYYMMDDTHHmmss[Z/±hhmm]).
+// parseTimeInput returns HH:MM (no seconds) — without this, servers like mailbox.org
+// receive HHMM (4 digits) instead of HHMMSS (6), and default to 00:00 (#246).
+export function toICSDatetime(dt) {
+  if (!dt) return '';
+  if (!dt.includes('T')) return dt.replace(/-/g, '') + 'T000000';
+  const [datePart, rest] = dt.split('T');
+  const dateStr = datePart.replace(/-/g, '');
+  const m = rest.match(/^(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/);
+  if (!m) return `${dateStr}T000000`;
+  const ss = m[3] || '00';
+  const tz = (m[4] || '').replace(':', '');
+  return `${dateStr}T${m[1]}${m[2]}${ss}${tz}`;
+}
+
+function buildCalDAVICS(event) {
+  const uid  = `oikos-${event.id}@oikos.local`;
+  const now  = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Oikos//CalDAV Sync//EN',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${now}`,
+    `SUMMARY:${escapeICSText(event.title)}`,
+  ];
+
+  if (event.all_day) {
+    const startDate = event.start_datetime.slice(0, 10).replace(/-/g, '');
+    const endSrc    = (event.end_datetime || event.start_datetime).slice(0, 10);
+    const endD      = new Date(endSrc + 'T00:00:00');
+    endD.setDate(endD.getDate() + 1);
+    const endDate = `${endD.getFullYear()}${String(endD.getMonth() + 1).padStart(2, '0')}${String(endD.getDate()).padStart(2, '0')}`;
+    lines.push(`DTSTART;VALUE=DATE:${startDate}`);
+    lines.push(`DTEND;VALUE=DATE:${endDate}`);
+  } else {
+    lines.push(`DTSTART:${toICSDatetime(event.start_datetime)}`);
+    lines.push(`DTEND:${toICSDatetime(event.end_datetime || event.start_datetime)}`);
+  }
+
+  if (event.description)     lines.push(`DESCRIPTION:${escapeICSText(event.description)}`);
+  if (event.location)        lines.push(`LOCATION:${escapeICSText(event.location)}`);
+  if (event.recurrence_rule) lines.push(event.recurrence_rule);
+
+  lines.push('END:VEVENT', 'END:VCALENDAR');
+  return lines.join('\r\n');
+}
+
 // --------------------------------------------------------
 // Helper Functions
 // --------------------------------------------------------
@@ -443,20 +493,8 @@ async function sync() {
             continue;
           }
 
-          // Build ICS (need to import buildICS from apple-calendar or define it)
-          // For now, create simple ICS
-          const uid = `oikos-${event.id}@oikos.local`;
-          const icsData = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//Oikos//CalDAV Sync//EN
-BEGIN:VEVENT
-UID:${uid}
-DTSTART:${event.start_datetime.replace(/[-:]/g, '')}
-DTEND:${event.end_datetime.replace(/[-:]/g, '')}
-SUMMARY:${escapeICSText(event.title)}
-DESCRIPTION:${escapeICSText(event.description)}
-END:VEVENT
-END:VCALENDAR`;
+          const uid     = `oikos-${event.id}@oikos.local`;
+          const icsData = buildCalDAVICS(event);
 
           // Upload to CalDAV
           await client.createCalendarObject({

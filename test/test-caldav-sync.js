@@ -6,6 +6,7 @@
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
+import { toICSDatetime } from '../server/services/caldav-sync.js';
 
 const TEST_DB = ':memory:';
 
@@ -188,5 +189,36 @@ describe('CalDAV Multi-Account Sync', () => {
 
     const migrated = db2.prepare(`SELECT external_source FROM calendar_events_new WHERE title = 'Migrated'`).get();
     assert.strictEqual(migrated.external_source, 'caldav');
+  });
+});
+
+describe('toICSDatetime (#246)', () => {
+  it('pads missing seconds to HHMMSS (main bug: HH:MM → 4-digit time)', () => {
+    assert.strictEqual(toICSDatetime('2024-06-14T14:30'), '20240614T143000');
+  });
+
+  it('handles HH:MM:SS correctly', () => {
+    assert.strictEqual(toICSDatetime('2024-06-14T14:30:00'), '20240614T143000');
+  });
+
+  it('strips milliseconds', () => {
+    assert.strictEqual(toICSDatetime('2024-06-14T14:30:00.000'), '20240614T143000');
+  });
+
+  it('preserves Z suffix', () => {
+    assert.strictEqual(toICSDatetime('2024-06-14T14:30:00Z'), '20240614T143000Z');
+  });
+
+  it('preserves timezone offset and removes colon', () => {
+    assert.strictEqual(toICSDatetime('2024-06-14T14:30:00+02:00'), '20240614T143000+0200');
+  });
+
+  it('returns midnight for date-only strings', () => {
+    assert.strictEqual(toICSDatetime('2024-06-14'), '20240614T000000');
+  });
+
+  it('returns empty string for null/undefined', () => {
+    assert.strictEqual(toICSDatetime(null), '');
+    assert.strictEqual(toICSDatetime(''), '');
   });
 });
