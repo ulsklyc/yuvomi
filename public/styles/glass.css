@@ -221,6 +221,15 @@ textarea.form-input {
   background-color: color-mix(in srgb, var(--color-surface) 95%, transparent);
 }
 
+@media (prefers-contrast: more) {
+  .input,
+  .form-input,
+  select.form-input,
+  textarea.form-input {
+    border-color: var(--color-text-primary);
+  }
+}
+
 .input:focus,
 .form-input:focus {
   border-color: var(--active-module-accent, var(--color-accent));
