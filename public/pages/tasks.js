@@ -1087,6 +1087,17 @@ function renderTaskList(container) {
   });
 }
 
+function makeRemoveSpan() {
+  const rm = document.createElement('span');
+  rm.className = 'filter-chip__remove';
+  rm.setAttribute('aria-hidden', 'true');
+  const icon = document.createElement('i');
+  icon.setAttribute('data-lucide', 'x');
+  icon.className = 'icon-sm';
+  rm.appendChild(icon);
+  return rm;
+}
+
 function renderFilters(container) {
   const bar   = container.querySelector('#filter-bar');
   const panel = container.querySelector('#filter-panel');
@@ -1105,11 +1116,7 @@ function renderFilters(container) {
     chip.className = 'filter-chip filter-chip--active';
     chip.dataset.filter = 'status';
     chip.textContent = statusLabels[state.filters.status];
-    const rm = document.createElement('span');
-    rm.className = 'filter-chip__remove';
-    rm.setAttribute('aria-hidden', 'true');
-    rm.textContent = '×';
-    chip.appendChild(rm);
+    chip.appendChild(makeRemoveSpan());
     bar.appendChild(chip);
   }
   if (state.filters.priority) {
@@ -1117,11 +1124,7 @@ function renderFilters(container) {
     chip.className = 'filter-chip filter-chip--active';
     chip.dataset.filter = 'priority';
     chip.textContent = priorityLabels[state.filters.priority];
-    const rm = document.createElement('span');
-    rm.className = 'filter-chip__remove';
-    rm.setAttribute('aria-hidden', 'true');
-    rm.textContent = '×';
-    chip.appendChild(rm);
+    chip.appendChild(makeRemoveSpan());
     bar.appendChild(chip);
   }
   if (state.filters.assigned_to) {
@@ -1130,11 +1133,7 @@ function renderFilters(container) {
     chip.className = 'filter-chip filter-chip--active';
     chip.dataset.filter = 'assigned_to';
     chip.textContent = u?.display_name ?? t('tasks.filterGroupPerson');
-    const rm = document.createElement('span');
-    rm.className = 'filter-chip__remove';
-    rm.setAttribute('aria-hidden', 'true');
-    rm.textContent = '×';
-    chip.appendChild(rm);
+    chip.appendChild(makeRemoveSpan());
     bar.appendChild(chip);
   }
 
@@ -1144,11 +1143,7 @@ function renderFilters(container) {
   futureChip.id = 'filter-show-future';
   futureChip.textContent = t('tasks.showFuture');
   if (state.showFuture) {
-    const rm = document.createElement('span');
-    rm.className = 'filter-chip__remove';
-    rm.setAttribute('aria-hidden', 'true');
-    rm.textContent = '×';
-    futureChip.appendChild(rm);
+    futureChip.appendChild(makeRemoveSpan());
   }
   bar.appendChild(futureChip);
 
@@ -1244,11 +1239,7 @@ function renderFilters(container) {
         chip.dataset.value = item.value;
         chip.textContent = item.label;
         if (isActive) {
-          const rm = document.createElement('span');
-          rm.className = 'filter-chip__remove';
-          rm.setAttribute('aria-hidden', 'true');
-          rm.textContent = '×';
-          chip.appendChild(rm);
+          chip.appendChild(makeRemoveSpan());
         }
         row.appendChild(chip);
       });
@@ -1264,6 +1255,7 @@ function renderFilters(container) {
       clearBtn.textContent = t('tasks.filterClearAll');
       panel.appendChild(clearBtn);
     }
+    if (window.lucide) window.lucide.createIcons({ el: panel });
   }
 
   wireFilterChips(container);
