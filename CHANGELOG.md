@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.65.6] - 2026-06-07
+
+### Changed
+- Screenshots refreshed across all platforms: web screenshots now target iPad Pro 13" (2752 × 2064 px) and mobile screenshots target iPhone 17 Pro Max portrait (1320 × 2867 px).
+- Demo user Linda added to the screenshot seed with a profile picture and English locale; Dortmund weather configured.
+- Split-expenses module added to the screenshot set (light + dark × web + mobile).
+- Unraid Community Apps gallery composites rebuilt against the new web and mobile sources.
+- Umbrel gallery images (1–5.jpg, 1440 × 900) replaced with current screenshots.
+- GitHub Pages (`docs/index.html`) updated to reference the renamed `-web.png` files.
+- Screenshot script (`scripts/take-screenshots.mjs`) fully automated: seeds demo data, creates Linda user via API, starts an isolated server, and captures all 14 modules in both themes.
+
 ## [0.65.5] - 2026-06-07
 
 ### Fixed
