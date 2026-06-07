@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.65.0] - 2026-06-07
+
+### Added
+- New **Open-Meteo** weather provider for the dashboard widget — free, ECMWF-backed, and requiring no API key. Set your location with the new `WEATHER_LAT`, `WEATHER_LON`, `WEATHER_CITY`, and `WEATHER_UNITS` environment variables, or configure it in-app under Settings → Weather (admin only); the in-app setting takes precedence and activates Open-Meteo automatically.
+- Weather conditions now render as Lucide icons with localized descriptions (WMO weather codes) across all 18 languages.
+
+### Changed
+- The setup installer's weather step now asks for Open-Meteo coordinates (latitude/longitude, optional city, units) instead of an OpenWeatherMap API key.
+- OpenWeatherMap remains supported as a legacy provider: existing `OPENWEATHER_*` configurations keep working and are used automatically when no Open-Meteo location is configured.
+
 ## [0.64.2] - 2026-06-07
 
 ### Fixed
