@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 160 160" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#6c3aed"/>
+    </linearGradient>
+  </defs>
+  <!-- Square corners: Umbrel masks/rounds the icon itself -->
+  <rect width="160" height="160" fill="url(#bg)"/>
+  <!-- House body + roof -->
+  <path d="M80 36L36 72V120C36 122.2 37.8 124 40 124H68V96H92V124H120C122.2 124 124 122.2 124 120V72L80 36Z" fill="white"/>
+  <!-- Chimney -->
+  <rect x="100" y="46" width="12" height="22" rx="2" fill="white"/>
+</svg>

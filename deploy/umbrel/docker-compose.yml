@@ -1,0 +1,29 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: oikos_web_1
+      APP_PORT: 3000
+      # Oikos ships its own session-based login, so Umbrel's proxy auth is
+      # disabled to avoid a double sign-in (same pattern as Immich/Vaultwarden).
+      PROXY_AUTH_ADD: "false"
+
+  web:
+    image: ghcr.io/ulsklyc/oikos:0.65.1@sha256:ad9fa6cfd5844629220774963877e0b91d828144de341de5ec4377fd9253b06b
+    restart: on-failure
+    stop_grace_period: 1m
+    # No `user:` override: the image entrypoint starts as root only to chown the
+    # data/backup volumes, then drops to the unprivileged `node` user via gosu.
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+      - ${APP_DATA_DIR}/backups:/backups
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_PATH=/data/oikos.db
+      - BACKUP_DIR=/backups
+      # SESSION_SECRET is required; Umbrel injects a deterministic per-app secret.
+      - SESSION_SECRET=${APP_SEED}
+      # Umbrel serves apps over plain HTTP on the LAN, so secure cookies stay off.
+      - SESSION_SECURE=false

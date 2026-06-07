@@ -1,0 +1,176 @@
+name: Umbrel Catalog Publish
+
+# Opens/updates a PR to getumbrel/umbrel-apps bumping Oikos to the released
+# version with a freshly resolved, digest-pinned image. Umbrel has NO auto-bump
+# bot (unlike TrueNAS), so this is what keeps the store entry current.
+#
+# Requirements:
+#   - Secret UMBREL_FORK_TOKEN: a classic PAT with `repo` scope (push to the
+#     <owner>/umbrel-apps fork + open a cross-repo PR to getumbrel/umbrel-apps).
+#   - The fork <owner>/umbrel-apps must exist (created during the initial submission).
+#   - Only acts once Oikos is already in upstream master (after the initial
+#     submission PR is merged); before that it skips to avoid re-submitting.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without leading v (e.g. 0.65.1). Defaults to the latest release."
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: umbrel-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (Umbrel source under deploy/umbrel)
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Resolve version
+        id: ver
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -n "$INPUT_VERSION" ]; then
+            V="$INPUT_VERSION"
+          elif [ -n "$RELEASE_TAG" ]; then
+            V="$RELEASE_TAG"
+          else
+            V="$(gh release view --repo "$REPO" --json tagName -q .tagName)"
+          fi
+          V="${V#v}"
+          # Validate: only a semver-like token may flow into later shell/sed/PR steps.
+          if ! printf '%s' "$V" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.+-][0-9A-Za-z.]+)?$'; then
+            echo "::error::Refusing to proceed: '$V' is not a valid version string."
+            exit 1
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $V"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve multi-arch image digest (wait for the image to publish)
+        id: digest
+        run: |
+          set -euo pipefail
+          IMG="ghcr.io/${{ github.repository_owner }}/oikos:${{ steps.ver.outputs.version }}"
+          for i in $(seq 1 40); do
+            D="$(docker buildx imagetools inspect "$IMG" --format '{{json .Manifest}}' 2>/dev/null | jq -r '.digest // empty')"
+            if [ -n "$D" ]; then
+              echo "digest=$D" >> "$GITHUB_OUTPUT"
+              echo "✓ $IMG -> $D"
+              exit 0
+            fi
+            echo "waiting for $IMG to appear ($i/40)…"
+            sleep 30
+          done
+          echo "::error::image $IMG not found after ~20 min — did Docker Publish run?"
+          exit 1
+
+      - name: Build updated app files
+        env:
+          RELEASE_BODY: ${{ github.event.release.body }}
+        run: |
+          set -euo pipefail
+          V="${{ steps.ver.outputs.version }}"
+          D="${{ steps.digest.outputs.digest }}"
+          OWNER="${{ github.repository_owner }}"
+          mkdir -p out/oikos
+          cp deploy/umbrel/umbrel-app.yml out/oikos/umbrel-app.yml
+          cp deploy/umbrel/docker-compose.yml out/oikos/docker-compose.yml
+
+          # version
+          sed -i -E "s|^version: .*|version: \"$V\"|" out/oikos/umbrel-app.yml
+          # image tag + pinned digest
+          sed -i -E "s|image: ghcr.io/$OWNER/oikos:[^@]+@sha256:[0-9a-f]+|image: ghcr.io/$OWNER/oikos:$V@$D|" out/oikos/docker-compose.yml
+
+          # releaseNotes from the GitHub release body (JSON-encoded string is valid YAML;
+          # handles arbitrary multi-line markdown safely)
+          python3 - <<'PY'
+          import json, os, re
+          body = os.environ.get("RELEASE_BODY", "").strip()
+          path = "out/oikos/umbrel-app.yml"
+          with open(path) as f:
+              text = f.read()
+          text = re.sub(r"^releaseNotes:.*$",
+                        "releaseNotes: " + json.dumps(body),
+                        text, count=1, flags=re.M)
+          with open(path, "w") as f:
+              f.write(text)
+          PY
+
+          echo "--- umbrel-app.yml (version/releaseNotes) ---"
+          grep -E '^(version|releaseNotes):' out/oikos/umbrel-app.yml
+          echo "--- docker-compose.yml (image) ---"
+          grep 'image:' out/oikos/docker-compose.yml
+
+      - name: Open / update PR on getumbrel/umbrel-apps
+        env:
+          GH_TOKEN: ${{ secrets.UMBREL_FORK_TOKEN }}
+        run: |
+          set -euo pipefail
+          V="${{ steps.ver.outputs.version }}"
+          OWNER="${{ github.repository_owner }}"
+          FORK="$OWNER/umbrel-apps"
+          UPSTREAM="getumbrel/umbrel-apps"
+          BRANCH="oikos-update"
+
+          git config --global user.name "$OWNER"
+          git config --global user.email "${{ github.actor }}@users.noreply.github.com"
+
+          gh repo fork "$UPSTREAM" --clone=false || true
+
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/$FORK.git" fork
+          cd fork
+          git remote add upstream "https://github.com/$UPSTREAM.git"
+          git fetch --depth 1 upstream master
+          git checkout -B "$BRANCH" upstream/master
+
+          # Guard: only update once Oikos is already accepted upstream. Before the
+          # initial submission is merged, rebuilding from master would re-submit the
+          # whole app — skip instead.
+          if [ ! -f oikos/umbrel-app.yml ]; then
+            echo "::notice::Oikos is not yet in upstream master (initial submission still pending). Skipping auto-update."
+            exit 0
+          fi
+
+          cp ../out/oikos/umbrel-app.yml oikos/umbrel-app.yml
+          cp ../out/oikos/docker-compose.yml oikos/docker-compose.yml
+
+          if git diff --quiet -- oikos/; then
+            echo "Catalog already at v$V — nothing to do."
+            exit 0
+          fi
+
+          git add oikos/
+          git commit -m "oikos: update to v$V"
+          git push --force origin "$BRANCH"
+
+          EXISTING="$(gh pr list --repo "$UPSTREAM" --head "$OWNER:$BRANCH" --state open --json number -q '.[0].number' 2>/dev/null || true)"
+          if [ -z "$EXISTING" ]; then
+            gh pr create --repo "$UPSTREAM" --base master --head "$OWNER:$BRANCH" \
+              --title "oikos: update to v$V" \
+              --body "Automated update of Oikos to v$V (multi-arch image pinned by digest). Source: https://github.com/$OWNER/oikos/releases/tag/v$V"
+          else
+            echo "PR #$EXISTING already open — force-push updated it to v$V."
+            gh pr edit "$EXISTING" --repo "$UPSTREAM" --title "oikos: update to v$V" || true
+          fi
