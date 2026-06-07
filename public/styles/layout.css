@@ -607,15 +607,11 @@
 .nav-item__label {
   font-size: var(--text-xs);
   font-weight: var(--font-weight-medium);
-  line-height: 1;
+  line-height: 1.2;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.nav-bottom .nav-item__label {
-  line-height: 1.2;
 }
 
 /* --------------------------------------------------------

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.65.10] - 2026-06-07
+
+### Fixed
+- Navigation labels no longer clip descenders (e.g. 'g', 'p', 'y') in the sidebar. `line-height: 1` was too tight, cutting letters at the baseline with `overflow: hidden`; raised to `1.2`.
+
 ## [0.65.9] - 2026-06-07
 
 ### Fixed
