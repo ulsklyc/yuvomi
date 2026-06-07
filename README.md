@@ -1,86 +1,190 @@
 <div align="center">
-  <img src="docs/logo.svg" alt="Oikos" width="96" />
+  <img src="docs/logo.svg" alt="Oikos" width="92" />
 
   <h1>Oikos</h1>
   <p><strong>The self-hosted family planner. Private, offline-capable, and beautiful.</strong></p>
 
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License"></a>
-  <a href="https://github.com/ulsklyc/oikos/releases"><img src="https://img.shields.io/github/v/release/ulsklyc/oikos?style=flat-square&color=007AFF&label=release" alt="Latest Release"></a>
-  <a href="https://github.com/ulsklyc/oikos/pkgs/container/oikos"><img src="https://img.shields.io/badge/ghcr.io-oikos-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker Image"></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%E2%89%A522-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js"></a>
-  <a href="https://github.com/ulsklyc/oikos/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs Welcome"></a>
+  <p>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License"></a>
+    <a href="https://github.com/ulsklyc/oikos/releases"><img src="https://img.shields.io/github/v/release/ulsklyc/oikos?style=flat-square&color=6c3aed&label=release" alt="Latest Release"></a>
+    <a href="https://github.com/ulsklyc/oikos/pkgs/container/oikos"><img src="https://img.shields.io/badge/ghcr.io-oikos-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker Image"></a>
+    <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%E2%89%A522-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js ≥22"></a>
+    <img src="https://img.shields.io/badge/PWA-ready-5A0FC8?style=flat-square&logo=pwa&logoColor=white" alt="PWA">
+    <a href="https://github.com/ulsklyc/oikos/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs Welcome"></a>
+  </p>
 
   <p>
     <a href="docs/installation.md"><strong>→ Install</strong></a> &nbsp;·&nbsp;
-    <a href="https://ulsklyc.github.io/oikos/"><strong>Screenshots</strong></a> &nbsp;·&nbsp;
-    <a href="docs/SPEC.md"><strong>Docs</strong></a>
+    <a href="https://ulsklyc.github.io/oikos/"><strong>Website & screenshots</strong></a> &nbsp;·&nbsp;
+    <a href="docs/SPEC.md"><strong>Docs</strong></a> &nbsp;·&nbsp;
+    <a href="CHANGELOG.md"><strong>Changelog</strong></a>
   </p>
 </div>
 
 <br>
 
 <div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark-web.png">
-    <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/dashboard-light-web.png">
-    <img src="docs/screenshots/dashboard-light-web.png" alt="Oikos Dashboard" width="800">
-  </picture>
-  <br>
-  <sub>Toggle GitHub light/dark mode to see both themes &nbsp;·&nbsp; <a href="https://ulsklyc.github.io/oikos/">View all screenshots</a></sub>
+  <table>
+    <tr>
+      <td align="center"><b>14</b><br><sub>modules</sub></td>
+      <td align="center"><sub>·</sub></td>
+      <td align="center"><b>18</b><br><sub>languages</sub></td>
+      <td align="center"><sub>·</sub></td>
+      <td align="center"><b>0</b><br><sub>trackers</sub></td>
+      <td align="center"><sub>·</sub></td>
+      <td align="center"><b>AES-256</b><br><sub>encrypted DB</sub></td>
+      <td align="center"><sub>·</sub></td>
+      <td align="center"><b>MIT</b><br><sub>license</sub></td>
+    </tr>
+  </table>
 </div>
 
 <br>
 
-Oikos is a self-hosted web app that keeps your household organized — tasks, groceries, meals, calendar, budget, and more — in one private place, without cloud accounts or subscriptions. Runs as a Docker or Podman container on any home server or NAS — including rootless Podman on SELinux-enabled RHEL/Fedora/CentOS Stream. Accessible on every device with a polished mobile-first PWA interface.
+<div align="center">
+  <table>
+    <tr>
+      <td width="72%" align="center">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark-web.png">
+          <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/dashboard-light-web.png">
+          <img src="docs/screenshots/dashboard-light-web.png" alt="Oikos dashboard — tasks, calendar events, meals and shopping at a glance" width="680">
+        </picture>
+      </td>
+      <td width="28%" align="center" valign="middle">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark-mobile.png">
+          <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/dashboard-light-mobile.png">
+          <img src="docs/screenshots/dashboard-light-mobile.png" alt="Oikos on mobile" width="148">
+        </picture>
+        <br>
+        <sub>Mobile PWA</sub>
+      </td>
+    </tr>
+  </table>
+  <sub>Switch GitHub to dark mode to preview the dark theme &nbsp;·&nbsp; <a href="https://ulsklyc.github.io/oikos/">See all screenshots →</a></sub>
+</div>
+
+<br>
+
+Oikos keeps your household organized — tasks, groceries, meals, calendar, budget, and more — in one private place, without cloud accounts or subscriptions. Runs as a Docker or Podman container on any home server or NAS, including rootless Podman on SELinux-enabled RHEL/Fedora/CentOS Stream systems. A polished, mobile-first PWA makes it feel native on every device.
 
 Each module is independent. Use what fits, skip what doesn't.
 
 ---
 
-## Modules
+## App screenshots
 
-| | |
-|---|---|
-| **Tasks** | Shared tasks with deadlines, priorities, subtasks, recurring schedules, multi-member assignment, Kanban, and mobile-friendly bulk controls. Optional read-only import of Apple Reminders lists via CalDAV. |
-| **Shopping** | Collaborative lists organized by aisle. Touch-safe quick add, swipe gestures, and meal-plan import in one click. Optional read-only import of Apple Reminders lists via CalDAV. |
-| **Meals** | Weekly drag-and-drop planner with multiple items per slot, direct export to your shopping list. |
-| **Recipes** | Create, duplicate, and scale recipes. Pre-fill meal slots or save any meal as a recipe. |
-| **Calendar** | Google Calendar (OAuth) and CalDAV sync (iCloud, Nextcloud, Radicale). ICS subscriptions, recurring events, file attachments, and readable month/agenda views. |
-| **Documents** | Upload and organize family files. Folders, tags, per-document visibility, drag-and-drop. |
-| **Budget** | Income, expenses, recurring entries, trends, CSV export. Split Expenses for shared costs with automatic debt simplification. |
-| **Housekeeping** | Manage household staff — schedules, check-in/out, daily or hourly billing, chores, supply requests. |
-| **Notes & Contacts** | Colored sticky notes with Markdown. Contact directory with CardDAV sync. |
-| **Birthdays** | Birthday tracker with automatic calendar events, age display, and custom reminders. |
-| **Family** | Member profiles with roles, photos, phone, email, and birthday — synced to Contacts and Birthdays. |
-| **Reminders** | Time-based notifications on tasks and calendar events with in-app badge. |
-| **API Tokens** | Named Bearer / X-API-Key tokens for integrations. OpenAPI 3.0 spec included. |
-| **Backup** | Manual and scheduled database backup and restore, with automatic pre-restore rollback. |
+<div align="center">
+  <table>
+    <tr>
+      <td align="center" width="50%">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/tasks-dark-web.png">
+          <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/tasks-light-web.png">
+          <img src="docs/screenshots/tasks-light-web.png" alt="Tasks — Kanban board with priorities, deadlines and multi-member assignment">
+        </picture>
+        <br><sub><b>Tasks</b> — Kanban board, recurring schedules, multi-assignment</sub>
+      </td>
+      <td align="center" width="50%">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/calendar-dark-web.png">
+          <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/calendar-light-web.png">
+          <img src="docs/screenshots/calendar-light-web.png" alt="Calendar with Google OAuth and CalDAV sync">
+        </picture>
+        <br><sub><b>Calendar</b> — Google OAuth, iCloud, CalDAV, ICS subscriptions</sub>
+      </td>
+    </tr>
+    <tr>
+      <td align="center">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/budget-dark-web.png">
+          <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/budget-light-web.png">
+          <img src="docs/screenshots/budget-light-web.png" alt="Budget — income, expenses and split costs with debt simplification">
+        </picture>
+        <br><sub><b>Budget</b> — Income, expenses, split costs, CSV export</sub>
+      </td>
+      <td align="center">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/meals-dark-web.png">
+          <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/meals-light-web.png">
+          <img src="docs/screenshots/meals-light-web.png" alt="Meals — weekly drag-and-drop planner with recipe import">
+        </picture>
+        <br><sub><b>Meals</b> — Weekly planner, recipes, one-click shopping export</sub>
+      </td>
+    </tr>
+    <tr>
+      <td align="center">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/shopping-dark-web.png">
+          <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/shopping-light-web.png">
+          <img src="docs/screenshots/shopping-light-web.png" alt="Shopping — collaborative aisle-organized lists">
+        </picture>
+        <br><sub><b>Shopping</b> — Shared lists, aisle groups, swipe gestures</sub>
+      </td>
+      <td align="center">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/contacts-dark-web.png">
+          <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/contacts-light-web.png">
+          <img src="docs/screenshots/contacts-light-web.png" alt="Contacts — family directory with CardDAV sync">
+        </picture>
+        <br><sub><b>Contacts</b> — Family directory, CardDAV sync</sub>
+      </td>
+    </tr>
+  </table>
+  <a href="https://ulsklyc.github.io/oikos/">View all screenshots →</a>
+</div>
 
 ---
 
-## Design & Technology
+## Modules
 
-- **Disciplined Liquid Glass UI** — readable work surfaces, subtle translucent navigation, spring animations, and module-tinted overlays — built in pure CSS
-- **PWA** — installable on any device, works offline, responsive from phone to desktop, with tuned mobile navigation, touch targets, and dark mode
-- **Privacy First** — fully self-hosted, SQLCipher AES-256 encrypted database, zero telemetry
-- **SSO / OpenID Connect** — optional single sign-on via any OIDC provider (Authentik, Keycloak, Google, Microsoft Entra). Configure with four env vars; Authorization Code + PKCE flow.
-- **Zero Build Step** — pure ES modules, no bundler, no transpiler, no framework
+| | Module | What it does |
+|:---:|---|---|
+| ✅ | **Tasks** | Shared tasks with deadlines, priorities, subtasks, recurring schedules, multi-member assignment, Kanban, and mobile bulk controls. Optional CalDAV import of Apple Reminders. |
+| 🛒 | **Shopping** | Collaborative lists organized by aisle. Touch-safe quick add, swipe gestures, and meal-plan import in one tap. Optional CalDAV import. |
+| 🍽️ | **Meals** | Weekly drag-and-drop planner with multiple items per slot. Direct export to shopping list. |
+| 📖 | **Recipes** | Create, duplicate, and scale recipes. Pre-fill meal slots or save any planned meal as a recipe. |
+| 📅 | **Calendar** | Google Calendar (OAuth) and CalDAV sync (iCloud, Nextcloud, Radicale). ICS subscriptions, recurring events, file attachments, month and agenda views. |
+| 📂 | **Documents** | Upload and organize family files. Folders, tags, per-document visibility controls, drag-and-drop. |
+| 💰 | **Budget** | Income, expenses, recurring entries, trend charts, CSV export. Split Expenses with automatic debt simplification. |
+| 🏠 | **Housekeeping** | Manage household staff — schedules, check-in/out, daily or hourly billing, chores, supply requests. |
+| 📝 | **Notes & Contacts** | Colored sticky notes with Markdown. Contact directory with CardDAV sync. |
+| 🎂 | **Birthdays** | Birthday tracker with automatic calendar events, age display, and custom reminders. |
+| 👪 | **Family** | Member profiles with roles, photos, phone, email, and birthday — synced to Contacts and Birthdays. |
+| 🔔 | **Reminders** | Time-based notifications on tasks and calendar events with in-app badge counter. |
+| 🔑 | **API Tokens** | Named Bearer / X-API-Key tokens for integrations. OpenAPI 3.0 spec included. |
+| 💾 | **Backup** | Manual and scheduled database backup and restore, with automatic pre-restore rollback. |
+
+---
+
+## Design & technology
+
+- **Disciplined Liquid Glass UI** — readable work surfaces, subtle translucent navigation, spring animations, and module-tinted overlays — built in pure CSS, no framework
+- **PWA** — installable on any device, works offline, responsive from phone to desktop, with tuned mobile navigation and touch targets
+- **Privacy first** — fully self-hosted, SQLCipher AES-256 encrypted database, zero telemetry
+- **SSO / OpenID Connect** — optional single sign-on via any OIDC provider (Authentik, Keycloak, Google, Microsoft Entra) configured with four env vars; Authorization Code + PKCE flow
+- **Zero build step** — pure ES modules, no bundler, no transpiler, no framework
 - **Multilingual** — 18 languages with automatic locale detection (de, en, es, fr, it, sv, el, ru, tr, zh, ja, ar, hi, pt, uk, pl, nl, cs)
 
 ---
 
-## Quick Start
+## Install anywhere
 
-**Option A — Web Installer (recommended)**
+### Web installer (recommended)
+
+A localized setup wizard — 18 languages — that runs in your browser. Auto-detects Docker or Podman, configures HTTPS, SSO, and scheduled backups, then starts the container and creates your admin account.
 
 ```bash
 git clone https://github.com/ulsklyc/oikos.git && cd oikos
 node tools/installer/install-server.js
 ```
 
-Open **http://localhost:8090** in your browser. The localized wizard (18 languages) detects your container engine (Docker or Podman), configures your `.env` — including optional reverse proxy/HTTPS, SSO (OIDC), and automatic backups — starts the container, and creates your admin account. Requires Node.js 18+ on the host.
+Open **http://localhost:8090**. Requires Node.js 18+ on the host.
 
-**Option B — Pre-built image (no clone required)**
+### Docker / Podman
+
+**Pre-built image:**
 
 ```bash
 curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/docker-compose.yml
@@ -89,46 +193,51 @@ cp .env.example .env          # set SESSION_SECRET and DB_ENCRYPTION_KEY
 docker compose up -d
 ```
 
-**Option C — Build from source**
+**Build from source:**
 
 ```bash
 git clone https://github.com/ulsklyc/oikos.git && cd oikos
-cp .env.example .env          # set SESSION_SECRET and DB_ENCRYPTION_KEY
+cp .env.example .env
 docker compose up -d --build
 ```
 
-Open `http://localhost:3000` — the first visit guides you through creating your admin account in the browser, then signs you in. (For headless setups you can instead run `docker compose exec oikos node setup.js`.)
+Open `http://localhost:3000`. The first visit walks you through creating your admin account.
 
-**Option D — TrueNAS SCALE (Community Apps Catalog)**
+> **Podman (RHEL / Fedora / CentOS Stream):** Both installers auto-detect Podman and use `podman-compose.yml` with SELinux `:Z` labels. For a manual start: `podman compose -f podman-compose.yml up -d`. Rootless systemd autostart: `tools/quadlet/oikos.container`.
 
-Oikos is available in the TrueNAS SCALE Community Apps Catalog — no terminal required. Open **Apps → Discover Apps**, search for **Oikos**, and install it directly from the UI. Set `SESSION_SECRET` (required) and `DB_ENCRYPTION_KEY` (recommended) during installation. The first visit to the WebUI walks you through creating your admin account.
+### NAS & home servers
 
-**Option E — Umbrel (App Store)**
+<table>
+  <tr>
+    <td><b>TrueNAS SCALE</b></td>
+    <td>Apps → Discover Apps → search <b>Oikos</b> → Install</td>
+    <td>No terminal required. Community Apps Catalog. Version updates via Renovate.</td>
+  </tr>
+  <tr>
+    <td><b>Umbrel</b></td>
+    <td>App Store → search <b>Oikos</b> → Install</td>
+    <td>One-click install. Everything stays on your Umbrel.</td>
+  </tr>
+  <tr>
+    <td><b>Unraid</b></td>
+    <td>Apps → search <b>Oikos</b> → Apply</td>
+    <td>Community Applications template. Set <code>SESSION_SECRET</code> during install.</td>
+  </tr>
+</table>
 
-Oikos is in the Umbrel App Store — no terminal required. Open the **App Store** on your Umbrel, search for **Oikos**, and install it in one click. Everything runs on, and stays on, your Umbrel. Open Oikos from your home screen and finish the first-run setup right away to create your admin account.
-
-**Option F — Unraid (Community Apps)**
-
-Oikos ships as an Unraid Community Applications template. Open the **Apps** tab, search for **Oikos**, set `SESSION_SECRET` (required) and `DB_ENCRYPTION_KEY` (recommended), then **Apply**. Once the container is running, open the WebUI to create your admin account.
-
-> **Using Podman (RHEL / Fedora / CentOS Stream)?** Both installers above auto-detect
-> Podman and use `podman-compose.yml` (SELinux `:Z` labels, configurable host bind).
-> For a manual start, replace `docker compose` with `podman compose -f podman-compose.yml`
-> (or `podman-compose -f podman-compose.yml`). For rootless systemd autostart, see the
-> Quadlet unit at `tools/quadlet/oikos.container`.
-
-> **New to Docker or Podman?** The **[Installation Guide](docs/installation.md)** covers engine setup, HTTPS, backups, and troubleshooting step by step.
+> **New to Docker or Podman?** The **[Installation Guide](docs/installation.md)** covers engine setup, HTTPS/reverse proxy, backups, and troubleshooting step by step.
 
 ---
 
-## Tech Stack
+## Tech stack
 
 <p>
   <img src="https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white" alt="Express">
-  <img src="https://img.shields.io/badge/SQLite%20%2F%20SQLCipher-003B57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite">
+  <img src="https://img.shields.io/badge/SQLite%20%2F%20SQLCipher-003B57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite / SQLCipher">
   <img src="https://img.shields.io/badge/Vanilla_JS_(ES_Modules)-F7DF1E?style=flat-square&logo=javascript&logoColor=black" alt="Vanilla JS">
-  <img src="https://img.shields.io/badge/Plain_CSS-1572B6?style=flat-square&logo=css3&logoColor=white" alt="CSS">
+  <img src="https://img.shields.io/badge/Plain_CSS-1572B6?style=flat-square&logo=css3&logoColor=white" alt="Plain CSS">
   <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker">
+  <img src="https://img.shields.io/badge/Podman-892CA0?style=flat-square&logo=podman&logoColor=white" alt="Podman">
   <img src="https://img.shields.io/badge/PWA-5A0FC8?style=flat-square&logo=pwa&logoColor=white" alt="PWA">
 </p>
 
@@ -136,7 +245,7 @@ Oikos ships as an Unraid Community Applications template. Open the **Apps** tab,
 
 ## Documentation
 
-[Installation](docs/installation.md) &nbsp;·&nbsp; [Spec & Data Model](docs/SPEC.md) &nbsp;·&nbsp; [Modules](MODULES.md) &nbsp;·&nbsp; [Contributing](CONTRIBUTING.md) &nbsp;·&nbsp; [Security](SECURITY.md) &nbsp;·&nbsp; [Changelog](CHANGELOG.md) &nbsp;·&nbsp; [Backlog](BACKLOG.md)
+[Installation](docs/installation.md) &nbsp;·&nbsp; [Spec & data model](docs/SPEC.md) &nbsp;·&nbsp; [Modules](MODULES.md) &nbsp;·&nbsp; [Contributing](CONTRIBUTING.md) &nbsp;·&nbsp; [Security](SECURITY.md) &nbsp;·&nbsp; [Changelog](CHANGELOG.md) &nbsp;·&nbsp; [Backlog](BACKLOG.md)
 
 ---
 
@@ -145,5 +254,6 @@ Oikos ships as an Unraid Community Applications template. Open the **Apps** tab,
 MIT — see [LICENSE](LICENSE).
 
 <div align="center">
+  <br>
   <sub>Built with care for families who value privacy and simplicity.</sub>
 </div>
