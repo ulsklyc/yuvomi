@@ -135,6 +135,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior-y: contain;
+  touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
   padding-top: var(--offline-banner-height, 0px);
   transition: padding-top 0.2s ease;
