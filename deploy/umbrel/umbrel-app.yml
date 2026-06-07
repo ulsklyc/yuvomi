@@ -56,13 +56,10 @@ website: https://github.com/ulsklyc/oikos
 dependencies: []
 repo: https://github.com/ulsklyc/oikos
 support: https://github.com/ulsklyc/oikos/issues
-port: 8090
-gallery:
-  - 1.jpg
-  - 2.jpg
-  - 3.jpg
-  - 4.jpg
-  - 5.jpg
+port: 8181
+# Must stay empty for submission — the Umbrel team populates icon/gallery from
+# the assets in umbrel-apps-gallery (see deploy/umbrel/icon.svg + gallery/).
+gallery: []
 path: ""
 defaultUsername: ""
 defaultPassword: ""
