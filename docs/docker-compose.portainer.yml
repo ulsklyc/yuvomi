@@ -36,7 +36,12 @@ services:
       # Trust proxy hops (default: 1 for Docker+reverse-proxy setups)
       # Set to 'loopback' if running without a reverse proxy
       - TRUST_PROXY=${TRUST_PROXY:-1}
-      # Weather (optional)
+      # Weather (optional) — Open-Meteo (recommended, free, no API key)
+      - WEATHER_LAT=${WEATHER_LAT:-}
+      - WEATHER_LON=${WEATHER_LON:-}
+      - WEATHER_CITY=${WEATHER_CITY:-}
+      - WEATHER_UNITS=${WEATHER_UNITS:-metric}
+      # Weather (optional) — OpenWeatherMap (legacy; only if you already use it)
       - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-}
       - OPENWEATHER_CITY=${OPENWEATHER_CITY:-Berlin}
       - OPENWEATHER_UNITS=${OPENWEATHER_UNITS:-metric}

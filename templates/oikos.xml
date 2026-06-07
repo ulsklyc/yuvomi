@@ -82,11 +82,16 @@ After the container starts, open the WebUI — the first visit guides you throug
   <!-- Database path (advanced; matches the /data mount) -->
   <Config Name="DB_PATH" Target="DB_PATH" Default="/data/oikos.db" Mode="" Description="Path to the SQLite database inside the container. Keep default unless you know what you are doing." Type="Variable" Display="advanced" Required="false" Mask="false">/data/oikos.db</Config>
 
-  <!-- Weather (optional) -->
-  <Config Name="OPENWEATHER_API_KEY" Target="OPENWEATHER_API_KEY" Default="" Mode="" Description="Optional. OpenWeatherMap API key to enable the weather widget." Type="Variable" Display="advanced" Required="false" Mask="true"/>
-  <Config Name="OPENWEATHER_CITY" Target="OPENWEATHER_CITY" Default="" Mode="" Description="Optional. City for the weather widget, e.g. Berlin." Type="Variable" Display="advanced" Required="false" Mask="false"/>
-  <Config Name="OPENWEATHER_UNITS" Target="OPENWEATHER_UNITS" Default="metric" Mode="" Description="Optional. Unit system for temperatures: metric (°C) or imperial (°F)." Type="Variable" Display="advanced" Required="false" Mask="false">metric</Config>
-  <Config Name="OPENWEATHER_LANG" Target="OPENWEATHER_LANG" Default="en" Mode="" Description="Optional. Language code for weather descriptions, e.g. en, de, fr." Type="Variable" Display="advanced" Required="false" Mask="false">en</Config>
+  <!-- Weather (optional) — Open-Meteo (recommended, free, no API key) -->
+  <Config Name="WEATHER_LAT" Target="WEATHER_LAT" Default="" Mode="" Description="Optional. Latitude for the Open-Meteo weather widget (no API key required). Find coordinates on openstreetmap.org or Google Maps, e.g. 52.52." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="WEATHER_LON" Target="WEATHER_LON" Default="" Mode="" Description="Optional. Longitude for the Open-Meteo weather widget, e.g. 13.41." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="WEATHER_CITY" Target="WEATHER_CITY" Default="" Mode="" Description="Optional. Display name shown on the weather widget, e.g. Berlin." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="WEATHER_UNITS" Target="WEATHER_UNITS" Default="metric" Mode="" Description="Optional. Unit system for temperatures: metric (°C) or imperial (°F)." Type="Variable" Display="advanced" Required="false" Mask="false">metric</Config>
+  <!-- Weather (optional) — OpenWeatherMap (legacy; only if you already use it) -->
+  <Config Name="OPENWEATHER_API_KEY" Target="OPENWEATHER_API_KEY" Default="" Mode="" Description="Optional (legacy). OpenWeatherMap API key to enable the weather widget. Prefer the keyless Open-Meteo variables above." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="OPENWEATHER_CITY" Target="OPENWEATHER_CITY" Default="" Mode="" Description="Optional (legacy). City for the OpenWeatherMap weather widget, e.g. Berlin." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="OPENWEATHER_UNITS" Target="OPENWEATHER_UNITS" Default="metric" Mode="" Description="Optional (legacy). Unit system for temperatures: metric (°C) or imperial (°F)." Type="Variable" Display="advanced" Required="false" Mask="false">metric</Config>
+  <Config Name="OPENWEATHER_LANG" Target="OPENWEATHER_LANG" Default="en" Mode="" Description="Optional (legacy). Language code for OpenWeatherMap descriptions, e.g. en, de, fr." Type="Variable" Display="advanced" Required="false" Mask="false">en</Config>
 
   <!-- Google Calendar (optional) -->
   <Config Name="GOOGLE_CLIENT_ID" Target="GOOGLE_CLIENT_ID" Default="" Mode="" Description="Optional. Google OAuth 2.0 client ID for Google Calendar sync." Type="Variable" Display="advanced" Required="false" Mask="false"/>

@@ -29,7 +29,7 @@ Wants=network-online.target
 Image=ghcr.io/ulsklyc/oikos:latest
 ContainerName=oikos
 
-# Lädt SESSION_SECRET, DB_ENCRYPTION_KEY, TZ, OPENWEATHER_*, OIDC_* … aus der .env.
+# Lädt SESSION_SECRET, DB_ENCRYPTION_KEY, TZ, WEATHER_* (Open-Meteo), OPENWEATHER_* (Legacy), OIDC_* … aus der .env.
 EnvironmentFile=%h/.config/oikos/.env
 
 # Laufzeit-Defaults (entsprechen docker-compose.yml).
