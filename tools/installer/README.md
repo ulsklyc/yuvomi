@@ -35,7 +35,7 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
 2. Guides you through all configuration options, grouped into steps:
    - **Basics** — timezone (`TZ`) and HTTP host port (`OIKOS_HTTP_PORT`)
    - **Security keys** — generates `SESSION_SECRET` and `DB_ENCRYPTION_KEY`
-   - **Optional integrations** — weather, Google Calendar, Apple CalDAV
+   - **Optional integrations** — weather (Open-Meteo coordinates, no API key), Google Calendar, Apple CalDAV
    - **Advanced** — reverse-proxy/HTTPS (`SESSION_SECURE`, `TRUST_PROXY`),
      Single Sign-On (OIDC), and automatic backups
 3. Backs up any existing `.env` to `.env.bak-<ISO>` before writing

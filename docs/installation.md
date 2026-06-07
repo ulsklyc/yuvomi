@@ -377,6 +377,17 @@ openssl rand -hex 32
 
 ### Weather (Optional)
 
+The weather widget defaults to **Open-Meteo** — free, ECMWF-backed, and requiring **no API key**. Just set your coordinates (find them on [openstreetmap.org](https://www.openstreetmap.org) or Google Maps). You can also configure this in-app under **Settings → Weather** (admin only), which takes precedence over the environment variables.
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `WEATHER_LAT` | Latitude of your location (e.g. `52.52`) | - | No |
+| `WEATHER_LON` | Longitude of your location (e.g. `13.41`) | - | No |
+| `WEATHER_CITY` | Display name shown on the widget (e.g. `Berlin`) | - | No |
+| `WEATHER_UNITS` | Unit system (`metric` or `imperial`) | `metric` | No |
+
+**OpenWeatherMap (legacy, optional).** Existing setups using an OpenWeatherMap API key keep working — these variables are still read when the Open-Meteo coordinates above are not set:
+
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
 | `OPENWEATHER_API_KEY` | API key from [openweathermap.org](https://openweathermap.org/api) | - | No |

@@ -737,7 +737,7 @@ Responsive grid: 1 column on mobile, 2 on tablet, 3 on desktop.
 
 **Widgets:**
 - Greeting: "Good [morning/afternoon/evening], [Name]" + date; auto-refreshes on `visibilitychange` so the greeting stays current during long sessions
-- Weather: OpenWeatherMap proxy, 3-day preview, refresh every 30 min, hide widget on API error
+- Weather: server-side proxy with two providers — **Open-Meteo** (default, no API key, WMO codes mapped to Lucide icons and translated via `wmo.*` i18n keys) and **OpenWeatherMap** (legacy, via `OPENWEATHER_*`). Provider resolves from DB preferences (Settings → Weather) first, then env vars. 5-day preview, refresh every 30 min, hide widget on API error
 - Upcoming events: next 3–5, color-coded by person
 - Urgent tasks: priority urgent/high + due_date ≤48h
 - Today's meals: meals for the current day
@@ -907,7 +907,7 @@ User management and app configuration. Logged-in users only.
 - **Synchronization tab:** unified tab for calendar and contact sync, replacing the old Calendar tab. Contains two sections:
   - **Calendar Sync:** connect/disconnect Google Calendar (OAuth 2.0), enable/disable multiple Google calendars to sync via checkboxes, and optionally enable read-only mode to prevent outbound writes; manage multiple CalDAV accounts (iCloud, Nextcloud, Radicale, Baikal) with per-account calendar selection via checkboxes, two-way sync, and a unified per-event sync-target picker (Google or CalDAV); manage ICS URL subscriptions (add, delete, sync now, set color and visibility); configure sync interval
   - **Contact Sync:** manage multiple CardDAV accounts (iCloud, Nextcloud, Radicale, Baikal); per-addressbook enable/disable; manual sync trigger; real-time status badges (success, error, syncing with animated spinner)
-- **Weather:** configure OpenWeatherMap location
+- **Weather:** configure the Open-Meteo location (latitude/longitude, optional city label, units; no API key) — admin only; saving activates Open-Meteo and supersedes any OpenWeatherMap `.env` configuration
 - **Language:** System (follows `navigator.language`), German, English, Spanish, French, Italian, Swedish, Greek, Russian, Turkish, Chinese, Japanese, Arabic, Hindi, Portuguese, Ukrainian, Polish - via `oikos-locale-picker` web component; switch without page reload
 - **API Tokens (admin):** create named Bearer / X-API-Key tokens for external integrations; the full token value is shown only once immediately after creation; tokens can be revoked at any time; support optional expiry and track last-used timestamp
 - **Backup Management (admin):** download the current database as a file (`GET /api/v1/backup/database`) or restore from a backup file (`POST /api/v1/backup/restore`, drag-and-drop supported). Validates that the uploaded file is a valid Oikos database. A rollback copy is created automatically before restore. **Automatic scheduled backups:** configurable via `.env` (`BACKUP_ENABLED`, `BACKUP_SCHEDULE`, `BACKUP_DIR`, `BACKUP_KEEP`); default 2 AM daily, keeps last 7 copies; Settings → Backup shows scheduler status, schedule, retention policy, last backup timestamp, and a manual trigger button.

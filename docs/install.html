@@ -879,7 +879,7 @@ cd oikos</div>
         </div>
         <div class="optional-card reveal reveal-delay-1">
           <h3 data-t="opt_weather_title">Weather Widget</h3>
-          <p data-t="opt_weather_desc">Show the local weather on the dashboard. Set <code>OPENWEATHER_API_KEY</code> and <code>OPENWEATHER_CITY</code> — free API key from <a href="https://openweathermap.org/api" target="_blank" rel="noopener">openweathermap.org</a>.</p>
+          <p data-t="opt_weather_desc">Show the local weather on the dashboard. Powered by <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> — no API key needed. Set <code>WEATHER_LAT</code> and <code>WEATHER_LON</code> to your coordinates (find them on <a href="https://www.openstreetmap.org" target="_blank" rel="noopener">openstreetmap.org</a>).</p>
         </div>
         <div class="optional-card reveal reveal-delay-2">
           <h3 data-t="opt_cal_title">Calendar &amp; Contact Sync</h3>
@@ -1056,7 +1056,7 @@ docker compose logs | grep "Server läuft"</div>
           opt_https_desc: 'Want to reach Oikos from other devices or the internet? Set up Nginx as a reverse proxy with a free Let\u2019s Encrypt SSL certificate.',
           opt_guide: 'Guide \u2192',
           opt_weather_title: 'Weather Widget',
-          opt_weather_desc: 'Show the local weather on the dashboard. Set OPENWEATHER_API_KEY and OPENWEATHER_CITY \u2014 free API key from openweathermap.org.',
+          opt_weather_desc: 'Show the local weather on the dashboard. Powered by Open-Meteo \u2014 no API key needed. Set WEATHER_LAT and WEATHER_LON to your coordinates (find them on openstreetmap.org).',
           opt_cal_title: 'Calendar & Contact Sync',
           opt_cal_desc: 'Two-way sync with Google Calendar (OAuth) and multi-account CalDAV (iCloud, Nextcloud, Radicale, Baikal). Manage CalDAV/CardDAV accounts in Settings → Synchronization. Apple Reminders lists can be mirrored read-only into Tasks or Shopping. Google Calendar uses GOOGLE_* env vars.',
           opt_sso_title: 'SSO / OpenID Connect',
@@ -1160,7 +1160,7 @@ docker compose logs | grep "Server läuft"</div>
           opt_https_desc: 'Oikos von anderen Ger\u00e4ten oder aus dem Internet erreichbar machen? Nginx als Reverse Proxy mit kostenlosem Let\u2019s Encrypt SSL-Zertifikat einrichten.',
           opt_guide: 'Anleitung \u2192',
           opt_weather_title: 'Wetter-Widget',
-          opt_weather_desc: 'Lokales Wetter auf dem Dashboard anzeigen. OPENWEATHER_API_KEY und OPENWEATHER_CITY setzen \u2014 kostenloser API-Key von openweathermap.org.',
+          opt_weather_desc: 'Lokales Wetter auf dem Dashboard \u2014 ohne API-Schl\u00fcssel, via Open-Meteo. WEATHER_LAT und WEATHER_LON mit deinen Koordinaten setzen (z. B. von openstreetmap.org).',
           opt_cal_title: 'Kalender- und Kontakt-Sync',
           opt_cal_desc: 'Zwei-Wege-Sync mit Google Calendar (OAuth) und Multi-Account-CalDAV (iCloud, Nextcloud, Radicale, Baikal). CalDAV/CardDAV-Konten direkt in Einstellungen \u2192 Synchronisierung verwalten. Apple-Erinnerungslisten lassen sich schreibgesch\u00fctzt in Aufgaben oder Einkauf \u00fcbernehmen. Google Calendar erfordert GOOGLE_*-Variablen.',
           opt_sso_title: 'SSO / OpenID Connect',
