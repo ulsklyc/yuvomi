@@ -622,13 +622,13 @@ function buildPaths() {
         },
       }),
     },
-    '/api/v1/weather': { get: op({ summary: 'Get weather data', tag: 'Weather' }) },
+    '/api/v1/weather': { get: op({ summary: 'Get weather data', tag: 'Weather', description: 'Returns `{ data: { provider, city, units, current, forecast } }` or `{ data: null }` when no provider is configured. `provider` is `open-meteo` (icon fields are Lucide icon names, `desc` is a `wmo.<code>` i18n key) or `openweathermap` (legacy; icon fields are OWM icon codes, `desc` is localized text).' }) },
     '/api/v1/weather/icon/{code}': {
       get: op({ summary: 'Get weather icon asset', tag: 'Weather', params: [{ name: 'code', in: 'path', required: true, schema: { type: 'string' } }] }),
     },
     '/api/v1/preferences': {
-      get: op({ summary: 'Get user preferences', tag: 'Preferences' }),
-      put: op({ summary: 'Update user preferences', tag: 'Preferences', stateChanging: true, requestBody: jsonBody(null) }),
+      get: op({ summary: 'Get user preferences', tag: 'Preferences', description: 'Household preferences. Weather fields: `weather_provider` (`open-meteo` | `openweathermap` | `null` = auto-detect from env), `weather_lat`, `weather_lon`, `weather_city`, `weather_units` (`metric` | `imperial`).' }),
+      put: op({ summary: 'Update user preferences', tag: 'Preferences', description: 'Weather fields (`weather_provider`, `weather_lat`, `weather_lon`, `weather_city`, `weather_units`) are admin-only; `weather_lat`/`weather_lon` are validated to ±90 / ±180.', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/reminders/pending': { get: op({ summary: 'List pending reminders', tag: 'Reminders' }) },
     '/api/v1/reminders': {

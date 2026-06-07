@@ -25,6 +25,9 @@ const DEFAULT_DATE_FORMAT = 'mdy';
 const VALID_TIME_FORMATS = ['24h', '12h'];
 const DEFAULT_TIME_FORMAT = '24h';
 
+const VALID_WEATHER_PROVIDERS = ['open-meteo', 'openweathermap'];
+const VALID_WEATHER_UNITS = ['metric', 'imperial'];
+
 const VALID_WIDGET_IDS = ['tasks', 'calendar', 'weather', 'meals', 'shopping', 'birthdays', 'budget', 'family', 'notes'];
 const VALID_WIDGET_SIZES = ['1x1', '1x2', '1x3', '1x4', '2x1', '2x2', '2x3', '2x4', '3x1', '3x2', '3x3', '3x4', '4x1', '4x2', '4x3', '4x4'];
 
@@ -174,6 +177,11 @@ router.get('/', (req, res) => {
         disabled_modules: disabledModules,
         module_order: moduleOrder,
         housekeeping_payment_tasks: cfgGet('housekeeping_payment_tasks') === '1',
+        weather_provider: cfgGet('weather_provider') ?? null,
+        weather_lat:      cfgGet('weather_lat')      ?? null,
+        weather_lon:      cfgGet('weather_lon')      ?? null,
+        weather_city:     cfgGet('weather_city')     ?? '',
+        weather_units:    cfgGet('weather_units')    ?? 'metric',
       },
     });
   } catch (err) {
@@ -191,7 +199,7 @@ router.get('/', (req, res) => {
 
 router.put('/', (req, res) => {
   try {
-    const { visible_meal_types, currency, date_format, time_format, app_name, dashboard_widgets, disabled_modules, module_order, housekeeping_payment_tasks } = req.body;
+    const { visible_meal_types, currency, date_format, time_format, app_name, dashboard_widgets, disabled_modules, module_order, housekeeping_payment_tasks, weather_provider, weather_lat, weather_lon, weather_city, weather_units } = req.body;
 
     if (visible_meal_types !== undefined) {
       if (!Array.isArray(visible_meal_types)) {
@@ -268,6 +276,51 @@ router.put('/', (req, res) => {
       cfgSet('housekeeping_payment_tasks', housekeeping_payment_tasks ? '1' : '0');
     }
 
+    // Weather configuration — admin only
+    if (
+      weather_provider !== undefined ||
+      weather_lat      !== undefined ||
+      weather_lon      !== undefined ||
+      weather_city     !== undefined ||
+      weather_units    !== undefined
+    ) {
+      if (req.authRole !== 'admin') {
+        return res.status(403).json({ error: 'Admin access required.', code: 403 });
+      }
+      if (weather_provider !== undefined) {
+        if (weather_provider !== null && !VALID_WEATHER_PROVIDERS.includes(weather_provider)) {
+          return res.status(400).json({ error: `Ungültiger Anbieter. Erlaubt: ${VALID_WEATHER_PROVIDERS.join(', ')}`, code: 400 });
+        }
+        if (weather_provider === null) cfgDelete('weather_provider');
+        else cfgSet('weather_provider', weather_provider);
+      }
+      if (weather_lat !== undefined) {
+        const v = parseFloat(weather_lat);
+        if (isNaN(v) || v < -90 || v > 90) {
+          return res.status(400).json({ error: 'Ungültiger Breitengrad (–90 bis 90).', code: 400 });
+        }
+        cfgSet('weather_lat', String(v));
+      }
+      if (weather_lon !== undefined) {
+        const v = parseFloat(weather_lon);
+        if (isNaN(v) || v < -180 || v > 180) {
+          return res.status(400).json({ error: 'Ungültiger Längengrad (–180 bis 180).', code: 400 });
+        }
+        cfgSet('weather_lon', String(v));
+      }
+      if (weather_city !== undefined) {
+        const trimmed = String(weather_city).slice(0, 100).trim();
+        if (trimmed) cfgSet('weather_city', trimmed);
+        else cfgDelete('weather_city');
+      }
+      if (weather_units !== undefined) {
+        if (!VALID_WEATHER_UNITS.includes(weather_units)) {
+          return res.status(400).json({ error: `Ungültige Einheit. Erlaubt: ${VALID_WEATHER_UNITS.join(', ')}`, code: 400 });
+        }
+        cfgSet('weather_units', weather_units);
+      }
+    }
+
     const rawMealTypes = cfgGet('visible_meal_types') ?? DEFAULT_MEAL_TYPES;
     const savedMealTypes = rawMealTypes.split(',').filter((t) => VALID_MEAL_TYPES.includes(t));
     const savedCurrency = cfgGet('currency') ?? DEFAULT_CURRENCY;
@@ -290,6 +343,11 @@ router.put('/', (req, res) => {
         disabled_modules: savedDisabledModules,
         module_order: savedModuleOrder,
         housekeeping_payment_tasks: savedHousekeepingPaymentTasks,
+        weather_provider: cfgGet('weather_provider') ?? null,
+        weather_lat:      cfgGet('weather_lat')      ?? null,
+        weather_lon:      cfgGet('weather_lon')      ?? null,
+        weather_city:     cfgGet('weather_city')     ?? '',
+        weather_units:    cfgGet('weather_units')    ?? 'metric',
       },
     });
   } catch (err) {
