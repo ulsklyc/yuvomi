@@ -1,4 +1,9 @@
 {
+  "enabledPlugins": {
+    "nodejs-knowledge-patch@nevaberry-plugins": true,
+    "docker-knowledge-patch@nevaberry-plugins": true,
+    "sqlite-knowledge-patch@nevaberry-plugins": true
+  },
   "permissions": {
     "allow": [
       "Bash(git *)",

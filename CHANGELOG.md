@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.65.13] - 2026-06-07
+
+### Fixed
+- Android PWA scroll freeze: touch gestures starting on non-scrollable elements (card headers, separators, empty backgrounds) no longer lock the touch sequence. Added `touch-action: pan-y` to `.app-content` so Android Chrome correctly identifies the scroll container from the start of the gesture, without propagating through `body { overflow: hidden }`.
+
 ## [0.65.12] - 2026-06-07
 
 ### Fixed
