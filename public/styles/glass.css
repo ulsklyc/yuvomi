@@ -40,9 +40,9 @@
   box-shadow: inset 0 1px 0 var(--glass-highlight-subtle);
 }
 
-/* Hover-State auf Desktop */
+/* Hover-State Bottom-Nav (nur sichtbar auf Mobile) */
 @media (hover: hover) {
-  .nav-item:hover:not([aria-current="page"]) {
+  .nav-bottom .nav-item:hover:not([aria-current="page"]) {
     background: color-mix(in srgb, var(--color-text-tertiary) 8%, transparent);
     border-radius: var(--radius-glass-chip);
   }
