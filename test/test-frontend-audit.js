@@ -243,7 +243,7 @@ test('mobile bottom navigation avoids clipped Android labels and sparse icon spa
   const layout = read('../public/styles/layout.css');
   const navItemRule = cssRuleBody(layout, '.nav-bottom .nav-item');
   const iconWellRule = cssRuleBody(layout, '.nav-bottom .nav-item__icon-well');
-  const labelRule = cssRuleBody(layout, '.nav-bottom .nav-item__label');
+  const labelRule = cssRuleBody(layout, '.nav-item__label');
 
   assert.match(navItemRule, /padding-block:\s*var\(--space-0h\)/);
   assert.match(iconWellRule, /width:\s*var\(--target-base\)/);

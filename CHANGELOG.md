@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.65.11] - 2026-06-07
+
+### Fixed
+- Frontend audit test for mobile bottom navigation now checks the correct CSS selector (`.nav-item__label` instead of `.nav-bottom .nav-item__label`); the `line-height: 1.2` rule lives on the shared label class after a prior CSS consolidation, so the test was failing on CI despite the property being correctly applied.
+
 ## [0.65.10] - 2026-06-07
 
 ### Fixed
