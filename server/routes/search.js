@@ -21,7 +21,7 @@ router.get('/', (req, res) => {
     const q = String(req.query.q ?? '').trim();
     if (q.length < 2) return res.json({ tasks: [], events: [], notes: [], contacts: [], items: [] });
 
-    const userId = req.session.userId;
+    const userId = req.authUserId || req.session.userId;
     res.json(runSearch(db.get(), q, userId));
   } catch (err) {
     res.status(500).json({ error: 'Internal server error.', code: 500 });

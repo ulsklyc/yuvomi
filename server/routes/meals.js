@@ -170,7 +170,7 @@ router.post('/', (req, res) => {
       const result = db.get().prepare(`
         INSERT INTO meals (date, meal_type, title, notes, recipe_url, recipe_id, created_by)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(vDate.value, vType.value, vTitle.value, vNotes.value, vRecipeUrl.value, vRecipeId.value, req.session.userId);
+      `).run(vDate.value, vType.value, vTitle.value, vNotes.value, vRecipeUrl.value, vRecipeId.value, req.authUserId || req.session.userId);
 
       const mealId = result.lastInsertRowid;
 

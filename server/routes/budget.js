@@ -561,7 +561,7 @@ router.post('/loans', (req, res) => {
       installmentCount,
       vStartMonth.value,
       vNotes.value,
-      req.session.userId
+      req.authUserId || req.session.userId
     );
 
     res.status(201).json({ data: loadLoan(result.lastInsertRowid) });
@@ -661,13 +661,13 @@ router.post('/loans/:id/payments', (req, res) => {
         paymentAmount,
         'Geschenke & Transfers',
         vDate.value,
-        req.session.userId
+        req.authUserId || req.session.userId
       );
       const paymentResult = db.get().prepare(`
         INSERT INTO budget_loan_payments
           (loan_id, installment_number, amount, paid_date, budget_entry_id, created_by)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(id, installmentNumber, paymentAmount, vDate.value, budgetResult.lastInsertRowid, req.session.userId);
+      `).run(id, installmentNumber, paymentAmount, vDate.value, budgetResult.lastInsertRowid, req.authUserId || req.session.userId);
       return paymentResult.lastInsertRowid;
     });
 
@@ -893,7 +893,7 @@ router.post('/', (req, res) => {
       vTitle.value, storeAmount, vCat.value || fallbackCategory, subcategory, vDate.value,
       isRecurring, vRrule.value,
       interval, isVirtual, fullAmount,
-      req.session.userId
+      req.authUserId || req.session.userId
     );
 
     const entry = entryWithLoanMeta(result.lastInsertRowid);

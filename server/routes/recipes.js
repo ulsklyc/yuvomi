@@ -79,7 +79,7 @@ router.post('/', (req, res) => {
       const result = db.get().prepare(`
         INSERT INTO recipes (title, notes, recipe_url, created_by)
         VALUES (?, ?, ?, ?)
-      `).run(vTitle.value, vNotes.value, vRecipeUrl.value, req.session.userId);
+      `).run(vTitle.value, vNotes.value, vRecipeUrl.value, req.authUserId || req.session.userId);
 
       const rid = Number(result.lastInsertRowid);
       const insertIng = db.get().prepare(`
@@ -112,7 +112,7 @@ router.put('/:id', (req, res) => {
 
     const existing = db.get().prepare('SELECT id, created_by FROM recipes WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ error: 'Recipe not found', code: 404 });
-    if (existing.created_by !== req.session.userId) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (existing.created_by !== (req.authUserId || req.session.userId)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
 
     const { ingredients = [] } = req.body;
 
@@ -159,7 +159,7 @@ router.delete('/:id', (req, res) => {
 
     const existing = db.get().prepare('SELECT id, created_by FROM recipes WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ error: 'Recipe not found.', code: 404 });
-    if (existing.created_by !== req.session.userId) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (existing.created_by !== (req.authUserId || req.session.userId)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
 
     const result = db.get().prepare('DELETE FROM recipes WHERE id = ?').run(id);
     if (result.changes === 0) return res.status(404).json({ error: 'Recipe not found', code: 404 });

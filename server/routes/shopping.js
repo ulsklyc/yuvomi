@@ -304,7 +304,7 @@ router.post('/', (req, res) => {
 
     const result = db.get()
       .prepare('INSERT INTO shopping_lists (name, created_by) VALUES (?, ?)')
-      .run(vName.value, req.session.userId);
+      .run(vName.value, req.authUserId || req.session.userId);
 
     const list = db.get()
       .prepare('SELECT * FROM shopping_lists WHERE id = ?')

@@ -51,7 +51,7 @@ router.post('/', (req, res) => {
     const result = db.get().prepare(`
       INSERT INTO notes (content, title, color, pinned, created_by)
       VALUES (?, ?, ?, ?, ?)
-    `).run(vContent.value, vTitle.value, vColor.value, pinned ? 1 : 0, req.session.userId);
+    `).run(vContent.value, vTitle.value, vColor.value, pinned ? 1 : 0, req.authUserId || req.session.userId);
 
     const note = db.get().prepare(`
       SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, u.avatar_data AS creator_avatar
