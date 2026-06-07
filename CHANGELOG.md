@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.64.0] - 2026-06-07
+
+### Added
+- Kazakhstani Tenge (KZT) is now selectable as a currency in the global household settings and the Split Expenses module (#272).
+
 ## [0.63.7] - 2026-06-07
 
 ### Fixed
