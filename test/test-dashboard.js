@@ -343,6 +343,10 @@ function insertEvent(fields) {
 const isoIn = (ms) => new Date(Date.now() + ms).toISOString().slice(0, 19);
 const HOUR = 3600000;
 const DAY = 24 * HOUR;
+// Tagesbeginn heute (UTC). Robust gegen die Tageszeit: ein Event hier ist immer
+// "heute" und nie in der Zukunft, anders als now-Nh (rollt nach Mitternacht UTC
+// auf gestern und macht den fromToday-Test #230 flaky).
+const todayStartIso = () => `${new Date().toISOString().slice(0, 10)}T00:00:00`;
 
 // Wiederkehrender Wochentermin, dessen Master-Start 14 Tage in der Vergangenheit liegt.
 // Die nächste Instanz liegt in 7 Tagen relativ zum Master, also innerhalb des Fensters.
@@ -359,7 +363,7 @@ const recurId = insertEvent({
 insertEvent({ title: 'Past one-off', start_datetime: isoIn(-2 * DAY), created_by: cuTheo });
 
 // Termin von heute Morgen (Vergangenheit, aber noch heute) -> bei fromToday erscheinen.
-insertEvent({ title: 'Morning Meeting Today', start_datetime: isoIn(-3 * HOUR), created_by: cuTheo });
+insertEvent({ title: 'Morning Meeting Today', start_datetime: todayStartIso(), created_by: cuTheo });
 
 // Nicht-wiederkehrender Termin in der Zukunft -> erscheint.
 insertEvent({ title: 'Theodore Soccer Game', start_datetime: isoIn(3 * DAY), created_by: cuTheo });
