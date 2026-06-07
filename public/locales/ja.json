@@ -1190,7 +1190,10 @@
     "weatherProviderOpenMeteo": "Open-Meteo",
     "weatherProviderOwm": "OpenWeatherMap（レガシー、.env経由）",
     "weatherProviderNone": "未設定",
-    "weatherSwitchHint": "保存するとOpen-Meteoが有効化され、OWMは無視されます。"
+    "weatherSwitchHint": "保存するとOpen-Meteoが有効化され、OWMは無視されます。",
+    "weatherLocateBtn": "現在地を取得",
+    "weatherLocateSuccess": "現在地を取得しました。",
+    "weatherLocateUnsupported": "お使いのブラウザは位置情報に対応していません。"
   },
   "login": {
     "tagline": "家族計画。安全。プライバシー重視。オープンソース。",

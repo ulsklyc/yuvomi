@@ -1190,7 +1190,10 @@
     "weatherProviderOpenMeteo": "Open-Meteo",
     "weatherProviderOwm": "OpenWeatherMap (παλαιό, μέσω .env)",
     "weatherProviderNone": "Δεν έχει ρυθμιστεί",
-    "weatherSwitchHint": "Το Open-Meteo θα ενεργοποιηθεί κατά την αποθήκευση και το OWM θα αγνοηθεί."
+    "weatherSwitchHint": "Το Open-Meteo θα ενεργοποιηθεί κατά την αποθήκευση και το OWM θα αγνοηθεί.",
+    "weatherLocateBtn": "Εντοπισμός τοποθεσίας",
+    "weatherLocateSuccess": "Τοποθεσία εντοπίστηκε.",
+    "weatherLocateUnsupported": "Ο εντοπισμός γεωγραφικής θέσης δεν υποστηρίζεται από τον περιηγητή σας."
   },
   "login": {
     "tagline": "Οικογενειακός προγραμματισμός. Ασφαλής. Φιλικός προς την ιδιωτικότητα. Ανοιχτός κώδικας.",

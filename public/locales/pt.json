@@ -1190,7 +1190,10 @@
     "weatherProviderOpenMeteo": "Open-Meteo",
     "weatherProviderOwm": "OpenWeatherMap (legacy, via .env)",
     "weatherProviderNone": "Não configurado",
-    "weatherSwitchHint": "Open-Meteo será ativado ao guardar e OWM ignorado."
+    "weatherSwitchHint": "Open-Meteo será ativado ao guardar e OWM ignorado.",
+    "weatherLocateBtn": "Detectar localização",
+    "weatherLocateSuccess": "Localização detectada.",
+    "weatherLocateUnsupported": "A geolocalização não é suportada pelo seu navegador."
   },
   "login": {
     "tagline": "Planejamento familiar. Seguro. Privado. Código aberto.",

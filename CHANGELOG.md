@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.65.17] - 2026-06-08
+
+### Added
+- Weather settings now include a **"Detect location"** button that uses the browser Geolocation API to auto-fill latitude and longitude; a Nominatim reverse-geocoding call (OpenStreetMap, no API key required) also populates the optional city field on success.
+
 ## [0.65.16] - 2026-06-07
 
 ### Fixed

@@ -1190,7 +1190,10 @@
     "weatherProviderOpenMeteo": "Open-Meteo",
     "weatherProviderOwm": "OpenWeatherMap (legacy, via .env)",
     "weatherProviderNone": "Niet geconfigureerd",
-    "weatherSwitchHint": "Open-Meteo wordt geactiveerd bij opslaan en OWM genegeerd."
+    "weatherSwitchHint": "Open-Meteo wordt geactiveerd bij opslaan en OWM genegeerd.",
+    "weatherLocateBtn": "Locatie detecteren",
+    "weatherLocateSuccess": "Locatie gedetecteerd.",
+    "weatherLocateUnsupported": "Geolocatie wordt niet ondersteund door uw browser."
   },
   "login": {
     "tagline": "Gezinsplanning. Veilig. Privacyvriendelijk. Open source.",

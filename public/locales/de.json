@@ -1196,7 +1196,10 @@
     "weatherProviderOpenMeteo": "Open-Meteo",
     "weatherProviderOwm": "OpenWeatherMap (Legacy, via .env)",
     "weatherProviderNone": "Nicht konfiguriert",
-    "weatherSwitchHint": "Open-Meteo wird beim Speichern automatisch aktiviert und OWM ignoriert."
+    "weatherSwitchHint": "Open-Meteo wird beim Speichern automatisch aktiviert und OWM ignoriert.",
+    "weatherLocateBtn": "Standort ermitteln",
+    "weatherLocateSuccess": "Standort erfolgreich ermittelt.",
+    "weatherLocateUnsupported": "Geolokalisierung wird von Ihrem Browser nicht unterstützt."
   },
   "login": {
     "tagline": "Familienplanung. Sicher. Datenschutzfreundlich. Open Source.",

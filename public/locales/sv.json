@@ -1190,7 +1190,10 @@
     "weatherProviderOpenMeteo": "Open-Meteo",
     "weatherProviderOwm": "OpenWeatherMap (legacy, via .env)",
     "weatherProviderNone": "Inte konfigurerat",
-    "weatherSwitchHint": "Open-Meteo aktiveras vid sparning och OWM ignoreras."
+    "weatherSwitchHint": "Open-Meteo aktiveras vid sparning och OWM ignoreras.",
+    "weatherLocateBtn": "Identifiera plats",
+    "weatherLocateSuccess": "Plats identifierad.",
+    "weatherLocateUnsupported": "Geolokalisering stöds inte av din webbläsare."
   },
   "login": {
     "tagline": "Familjeplanering. Säker. Sekretessvänlig. Öppen källkod.",

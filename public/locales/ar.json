@@ -1190,7 +1190,10 @@
     "weatherProviderOpenMeteo": "Open-Meteo",
     "weatherProviderOwm": "OpenWeatherMap (قديم، عبر .env)",
     "weatherProviderNone": "غير مُهيأ",
-    "weatherSwitchHint": "سيتم تفعيل Open-Meteo عند الحفظ وسيتم تجاهل OWM."
+    "weatherSwitchHint": "سيتم تفعيل Open-Meteo عند الحفظ وسيتم تجاهل OWM.",
+    "weatherLocateBtn": "تحديد الموقع",
+    "weatherLocateSuccess": "تم تحديد الموقع بنجاح.",
+    "weatherLocateUnsupported": "المتصفح لا يدعم تحديد الموقع الجغرافي."
   },
   "login": {
     "tagline": "تخطيط عائلي. آمن. يحترم الخصوصية. مفتوح المصدر.",

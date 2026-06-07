@@ -1190,7 +1190,10 @@
     "weatherProviderOpenMeteo": "Open-Meteo",
     "weatherProviderOwm": "OpenWeatherMap (legacy, via .env)",
     "weatherProviderNone": "Non configuré",
-    "weatherSwitchHint": "Open-Meteo sera activé à l'enregistrement et OWM ignoré."
+    "weatherSwitchHint": "Open-Meteo sera activé à l'enregistrement et OWM ignoré.",
+    "weatherLocateBtn": "Détecter ma position",
+    "weatherLocateSuccess": "Position détectée.",
+    "weatherLocateUnsupported": "La géolocalisation n'est pas prise en charge par votre navigateur."
   },
   "login": {
     "tagline": "Planification familiale. Sécurisée. Respectueuse de la vie privée. Open source.",

@@ -1190,7 +1190,10 @@
     "weatherProviderOpenMeteo": "Open-Meteo",
     "weatherProviderOwm": "OpenWeatherMap (legacy, via .env)",
     "weatherProviderNone": "Not configured",
-    "weatherSwitchHint": "Open-Meteo will be activated on save and OWM will be ignored."
+    "weatherSwitchHint": "Open-Meteo will be activated on save and OWM will be ignored.",
+    "weatherLocateBtn": "Detect location",
+    "weatherLocateSuccess": "Location detected.",
+    "weatherLocateUnsupported": "Geolocation is not supported by your browser."
   },
   "login": {
     "tagline": "Family planning. Secure. Privacy-friendly. Open source.",

@@ -1190,7 +1190,10 @@
     "weatherProviderOpenMeteo": "Open-Meteo",
     "weatherProviderOwm": "OpenWeatherMap（旧版，通过.env）",
     "weatherProviderNone": "未配置",
-    "weatherSwitchHint": "保存后将激活Open-Meteo并忽略OWM。"
+    "weatherSwitchHint": "保存后将激活Open-Meteo并忽略OWM。",
+    "weatherLocateBtn": "获取当前位置",
+    "weatherLocateSuccess": "位置获取成功。",
+    "weatherLocateUnsupported": "您的浏览器不支持地理定位。"
   },
   "login": {
     "tagline": "家庭规划。安全。注重隐私。开源。",

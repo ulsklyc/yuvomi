@@ -447,6 +447,12 @@ export async function render(container, { user }) {
                     placeholder="${t('settings.weatherLonPlaceholder')}" />
                 </div>
               </div>
+              <div style="margin-bottom:var(--space-3)">
+                <button type="button" class="btn btn--secondary btn--sm" id="weather-locate-btn">
+                  <i data-lucide="map-pin" aria-hidden="true"></i>
+                  ${t('settings.weatherLocateBtn')}
+                </button>
+              </div>
               <div class="form-group">
                 <label class="form-label" for="weather-city">${t('settings.weatherCityLabel')}</label>
                 <input class="form-input" type="text" id="weather-city" maxlength="100"
@@ -1834,6 +1840,40 @@ function bindEvents(container, user, users, categories, icsSubscriptions, apiTok
         } catch (err) {
           window.oikos?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
         }
+      });
+    }
+
+    const locateBtn = container.querySelector('#weather-locate-btn');
+    if (locateBtn) {
+      locateBtn.addEventListener('click', () => {
+        if (!navigator.geolocation) {
+          window.oikos?.showToast(t('settings.weatherLocateUnsupported'), 'warning');
+          return;
+        }
+        locateBtn.disabled = true;
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const lat = position.coords.latitude.toFixed(4);
+            const lon = position.coords.longitude.toFixed(4);
+            container.querySelector('#weather-lat').value = lat;
+            container.querySelector('#weather-lon').value = lon;
+            try {
+              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+              if (res.ok) {
+                const data = await res.json();
+                const city = data.address?.city || data.address?.town || data.address?.village || data.address?.municipality || '';
+                if (city) container.querySelector('#weather-city').value = city;
+              }
+            } catch { /* Ortsname bleibt leer wenn Reverse-Geocoding fehlschlägt */ }
+            locateBtn.disabled = false;
+            window.oikos?.showToast(t('settings.weatherLocateSuccess'), 'success');
+          },
+          (err) => {
+            locateBtn.disabled = false;
+            window.oikos?.showToast(err.message, 'danger');
+          },
+          { enableHighAccuracy: true, timeout: 8000 },
+        );
       });
     }
   }

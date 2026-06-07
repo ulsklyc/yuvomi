@@ -1190,7 +1190,10 @@
     "weatherProviderOpenMeteo": "Open-Meteo",
     "weatherProviderOwm": "OpenWeatherMap (застарілий, через .env)",
     "weatherProviderNone": "Не налаштовано",
-    "weatherSwitchHint": "Open-Meteo буде активовано при збереженні, OWM ігноруватиметься."
+    "weatherSwitchHint": "Open-Meteo буде активовано при збереженні, OWM ігноруватиметься.",
+    "weatherLocateBtn": "Визначити місцезнаходження",
+    "weatherLocateSuccess": "Місцезнаходження успішно визначено.",
+    "weatherLocateUnsupported": "Ваш браузер не підтримує геолокацію."
   },
   "login": {
     "tagline": "Планування для родини. Безпечно. Конфіденційно. Відкритий код.",

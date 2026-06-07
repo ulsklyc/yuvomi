@@ -1190,7 +1190,10 @@
     "weatherProviderOpenMeteo": "Open-Meteo",
     "weatherProviderOwm": "OpenWeatherMap (legacy, přes .env)",
     "weatherProviderNone": "Není nakonfigurováno",
-    "weatherSwitchHint": "Open-Meteo bude aktivován při uložení a OWM bude ignorován."
+    "weatherSwitchHint": "Open-Meteo bude aktivován při uložení a OWM bude ignorován.",
+    "weatherLocateBtn": "Zjistit polohu",
+    "weatherLocateSuccess": "Poloha úspěšně zjištěna.",
+    "weatherLocateUnsupported": "Geolokalizace není vaším prohlížečem podporována."
   },
   "login": {
     "tagline": "Rodinné plánování. Bezpečné. Soukromé. Open Source.",

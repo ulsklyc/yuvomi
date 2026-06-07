@@ -1190,7 +1190,10 @@
     "weatherProviderOpenMeteo": "Open-Meteo",
     "weatherProviderOwm": "OpenWeatherMap (पुराना, .env के माध्यम से)",
     "weatherProviderNone": "कॉन्फ़िगर नहीं है",
-    "weatherSwitchHint": "सहेजने पर Open-Meteo सक्रिय हो जाएगा और OWM अनदेखा किया जाएगा।"
+    "weatherSwitchHint": "सहेजने पर Open-Meteo सक्रिय हो जाएगा और OWM अनदेखा किया जाएगा।",
+    "weatherLocateBtn": "स्थान पता करें",
+    "weatherLocateSuccess": "स्थान सफलतापूर्वक पता चला।",
+    "weatherLocateUnsupported": "आपका ब्राउज़र जियोलोकेशन का समर्थन नहीं करता।"
   },
   "login": {
     "tagline": "पारिवारिक योजना। सुरक्षित। गोपनीयता-अनुकूल। ओपन सोर्स।",

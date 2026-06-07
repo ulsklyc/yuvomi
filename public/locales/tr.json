@@ -1190,7 +1190,10 @@
     "weatherProviderOpenMeteo": "Open-Meteo",
     "weatherProviderOwm": "OpenWeatherMap (eski, .env üzerinden)",
     "weatherProviderNone": "Yapılandırılmamış",
-    "weatherSwitchHint": "Open-Meteo kaydedildiğinde etkinleştirilecek ve OWM yoksayılacak."
+    "weatherSwitchHint": "Open-Meteo kaydedildiğinde etkinleştirilecek ve OWM yoksayılacak.",
+    "weatherLocateBtn": "Konumu tespit et",
+    "weatherLocateSuccess": "Konum tespit edildi.",
+    "weatherLocateUnsupported": "Tarayıcınız coğrafi konum belirlemeyi desteklemiyor."
   },
   "login": {
     "tagline": "Aile planlaması. Güvenli. Gizlilik dostu. Açık kaynak.",
