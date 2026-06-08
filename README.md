@@ -141,20 +141,20 @@ Each module is independent. Use what fits, skip what doesn't.
 
 | | Module | What it does |
 |:---:|---|---|
-| ✅ | **Tasks** | Shared tasks with deadlines, priorities, subtasks, recurring schedules, multi-member assignment, Kanban, and mobile bulk controls. Optional CalDAV import of Apple Reminders. |
-| 🛒 | **Shopping** | Collaborative lists organized by aisle. Touch-safe quick add, swipe gestures, and meal-plan import in one tap. Optional CalDAV import. |
-| 🍽️ | **Meals** | Weekly drag-and-drop planner with multiple items per slot. Direct export to shopping list. |
-| 📖 | **Recipes** | Create, duplicate, and scale recipes. Pre-fill meal slots or save any planned meal as a recipe. |
-| 📅 | **Calendar** | Google Calendar (OAuth) and CalDAV sync (iCloud, Nextcloud, Radicale). ICS subscriptions, recurring events, file attachments, month and agenda views. |
-| 📂 | **Documents** | Upload and organize family files. Folders, tags, per-document visibility controls, drag-and-drop. |
-| 💰 | **Budget** | Income, expenses, recurring entries, trend charts, CSV export. Split Expenses with automatic debt simplification. |
-| 🏠 | **Housekeeping** | Manage household staff — schedules, check-in/out, daily or hourly billing, chores, supply requests. |
-| 📝 | **Notes & Contacts** | Colored sticky notes with Markdown. Contact directory with CardDAV sync. |
-| 🎂 | **Birthdays** | Birthday tracker with automatic calendar events, age display, and custom reminders. |
-| 👪 | **Family** | Member profiles with roles, photos, phone, email, and birthday — synced to Contacts and Birthdays. |
-| 🔔 | **Reminders** | Time-based notifications on tasks and calendar events with in-app badge counter. |
-| 🔑 | **API Tokens** | Named Bearer / X-API-Key tokens for integrations. OpenAPI 3.0 spec included. |
-| 💾 | **Backup** | Manual and scheduled database backup and restore, with automatic pre-restore rollback. Optional WebDAV upload target (Nextcloud, ownCloud, Hetzner, etc.). |
+| <img src="docs/icons/tasks.svg" width="20"> | **Tasks** | Shared tasks with deadlines, priorities, subtasks, recurring schedules, multi-member assignment, Kanban, and mobile bulk controls. Optional CalDAV import of Apple Reminders. |
+| <img src="docs/icons/shopping.svg" width="20"> | **Shopping** | Collaborative lists organized by aisle. Touch-safe quick add, swipe gestures, and meal-plan import in one tap. Optional CalDAV import. |
+| <img src="docs/icons/meals.svg" width="20"> | **Meals** | Weekly drag-and-drop planner with multiple items per slot. Direct export to shopping list. |
+| <img src="docs/icons/recipes.svg" width="20"> | **Recipes** | Create, duplicate, and scale recipes. Pre-fill meal slots or save any planned meal as a recipe. |
+| <img src="docs/icons/calendar.svg" width="20"> | **Calendar** | Google Calendar (OAuth) and CalDAV sync (iCloud, Nextcloud, Radicale). ICS subscriptions, recurring events, file attachments, month and agenda views. |
+| <img src="docs/icons/documents.svg" width="20"> | **Documents** | Upload and organize family files. Folders, tags, per-document visibility controls, drag-and-drop. |
+| <img src="docs/icons/budget.svg" width="20"> | **Budget** | Income, expenses, recurring entries, trend charts, CSV export. Split Expenses with automatic debt simplification. |
+| <img src="docs/icons/housekeeping.svg" width="20"> | **Housekeeping** | Manage household staff — schedules, check-in/out, daily or hourly billing, chores, supply requests. |
+| <img src="docs/icons/notes.svg" width="20"> | **Notes & Contacts** | Colored sticky notes with Markdown. Contact directory with CardDAV sync. |
+| <img src="docs/icons/birthdays.svg" width="20"> | **Birthdays** | Birthday tracker with automatic calendar events, age display, and custom reminders. |
+| <img src="docs/icons/family.svg" width="20"> | **Family** | Member profiles with roles, photos, phone, email, and birthday — synced to Contacts and Birthdays. |
+| <img src="docs/icons/reminders.svg" width="20"> | **Reminders** | Time-based notifications on tasks and calendar events with in-app badge counter. |
+| <img src="docs/icons/api-tokens.svg" width="20"> | **API Tokens** | Named Bearer / X-API-Key tokens for integrations. OpenAPI 3.0 spec included. |
+| <img src="docs/icons/backup.svg" width="20"> | **Backup** | Manual and scheduled database backup and restore, with automatic pre-restore rollback. Optional WebDAV upload target (Nextcloud, ownCloud, Hetzner, etc.). |
 
 ---
 
