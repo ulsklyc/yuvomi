@@ -1,3 +1,12 @@
+> ### 📣 Oikos is now **Yuvomi**
+> This project was renamed from **Oikos** to **Yuvomi** to avoid a trademark conflict with an unrelated product of the same name. **Nothing about the app changes** — same code, same data, same maintainer.
+>
+> - Old links (`github.com/ulsklyc/oikos`) automatically redirect here.
+> - The Docker image moved to `ghcr.io/ulsklyc/yuvomi`; the old `ghcr.io/ulsklyc/oikos` keeps working for now — please update at your convenience.
+> - Your existing data and settings are fully preserved on upgrade.
+>
+> New home: **https://ulsklyc.github.io/yuvomi/** · Questions? Open a [discussion](https://github.com/ulsklyc/yuvomi/discussions).
+
 <div align="center">
   <img src="docs/logo.svg" alt="Yuvomi" width="92" />
 
