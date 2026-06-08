@@ -149,8 +149,7 @@ function rrule(val, field) {
   const s = String(val).trim();
   if (s.length > MAX_RRULE)
     return { value: null, error: `${field} may be at most ${MAX_RRULE} characters long.` };
-  // Grundlegende Struktur: KEY=VALUE;KEY=VALUE
-  if (!/^FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)/.test(s))
+  if (!RRULE_RE.test(s))
     return { value: null, error: `${field}: invalid recurrence rule.` };
   return { value: s, error: null };
 }
