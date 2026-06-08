@@ -1,5 +1,5 @@
 /**
- * Screenshot Script - Oikos
+ * Screenshot Script - Yuvomi
  * Fully automated: seeds demo data, creates Linda user, starts server,
  * captures all modules in light + dark mode for two device profiles:
  *   - web:    iPad Pro 13"         → 2752 × 2064 px  (viewport 1376×1032, DSF 2.0)

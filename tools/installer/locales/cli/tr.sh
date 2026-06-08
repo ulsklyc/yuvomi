@@ -1,4 +1,4 @@
-# Oikos CLI-Installer — Türkçe (tr)
+# Yuvomi CLI-Installer — Türkçe (tr)
 # Auto-generiert (Schlüssel identisch zu allen Locales). en = Fallback, de = Referenz.
 # Wird von install.sh gesourct; setzt die englische Basis pro Schlüssel außer Kraft.
 # Punkt-Schlüssel → Variablen mit Unterstrich (MSG_<bereich>_<name>).
@@ -59,7 +59,7 @@ MSG_admin_password="Parola (en az 8 karakter):"
 MSG_admin_confirm="Parolayı onaylayın:"
 MSG_admin_mismatch="Parolalar eşleşmiyor, tekrar deneyin."
 MSG_admin_created="Yönetici hesabı oluşturuldu!"
-MSG_admin_ready="  Oikos hazır!"
+MSG_admin_ready="  Yuvomi hazır!"
 MSG_admin_open="  Aç: %s"
 MSG_admin_exists="Zaten bir yönetici hesabı var."
 MSG_admin_failed="Yönetici oluşturulamadı (HTTP %s): %s"

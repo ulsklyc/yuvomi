@@ -1,4 +1,4 @@
-# Oikos Familienplaner - self-hosted, private
+# Yuvomi Familienplaner - self-hosted, private
 # Keine öffentlichen Inhalte zum Indexieren
 
 User-agent: *

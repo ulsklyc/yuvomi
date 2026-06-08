@@ -1,4 +1,4 @@
-# Oikos CLI-Installer — Português (pt)
+# Yuvomi CLI-Installer — Português (pt)
 # Auto-generiert (Schlüssel identisch zu allen Locales). en = Fallback, de = Referenz.
 # Wird von install.sh gesourct; setzt die englische Basis pro Schlüssel außer Kraft.
 # Punkt-Schlüssel → Variablen mit Unterstrich (MSG_<bereich>_<name>).
@@ -59,7 +59,7 @@ MSG_admin_password="Senha (mín. 8 caracteres):"
 MSG_admin_confirm="Confirme a senha:"
 MSG_admin_mismatch="As senhas não coincidem, tente novamente."
 MSG_admin_created="Conta de administrador criada!"
-MSG_admin_ready="  O Oikos está pronto!"
+MSG_admin_ready="  O Yuvomi está pronto!"
 MSG_admin_open="  Abrir: %s"
 MSG_admin_exists="Já existe uma conta de administrador."
 MSG_admin_failed="Falha ao criar administrador (HTTP %s): %s"

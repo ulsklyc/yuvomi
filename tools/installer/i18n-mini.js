@@ -1,5 +1,5 @@
 /**
- * i18n-mini — schlanke Internationalisierung für den Oikos-Installer.
+ * i18n-mini — schlanke Internationalisierung für den Yuvomi-Installer.
  * Spiegelt die Locale-Auflösung der App (public/i18n.js:26-34) wider, ohne
  * deren Abhängigkeiten. Keine externen Libs, reine Fetch-/DOM-/Intl-APIs.
  *

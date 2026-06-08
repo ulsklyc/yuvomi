@@ -1,5 +1,5 @@
 {
-  "title": "Oikos Kurulumu",
+  "title": "Yuvomi Kurulumu",
   "common": {
     "continue": "Devam",
     "back": "Geri",
@@ -11,10 +11,10 @@
   },
   "config": {
     "title": "Temel Yapılandırma",
-    "subtitle": "Oikos'a nasıl erişeceksiniz?",
+    "subtitle": "Yuvomi'a nasıl erişeceksiniz?",
     "existing": "Mevcut yapılandırma algılandı — kaydetmeden önce geçerli .env dosyanızın yedeği alınacak.",
     "hostLabel": "Alan adı veya IP adresi",
-    "hostHint": "Oikos'u tarayıcınızda açmak için kullanacağınız adres.",
+    "hostHint": "Yuvomi'u tarayıcınızda açmak için kullanacağınız adres.",
     "portLabel": "Bağlantı noktası",
     "tzLabel": "Saat dilimi",
     "errHost": "Geçersiz ana bilgisayar adı. Yalnızca harf, rakam, tire ve nokta kullanın.",
@@ -47,7 +47,7 @@
   },
   "calendar": {
     "title": "Takvim Senkronizasyonu",
-    "subtitle": "Oikos'u Google Takvim veya Apple iCloud'a bağlayın. İkisi de isteğe bağlı — yapılandırmak için genişletin.",
+    "subtitle": "Yuvomi'u Google Takvim veya Apple iCloud'a bağlayın. İkisi de isteğe bağlı — yapılandırmak için genişletin.",
     "google": "Google Takvim",
     "googleHint": "{{link}} adresinde OAuth kimlik bilgileri oluşturun. Yönlendirme URI'si: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -79,7 +79,7 @@
     "configured": "yapılandırıldı"
   },
   "docker": {
-    "title": "Oikos başlatılıyor",
+    "title": "Yuvomi başlatılıyor",
     "subtitle": "İmaj indiriliyor ve Docker kapsayıcısı başlatılıyor.",
     "starting": "Kapsayıcı başlatılıyor …",
     "elapsed": "{{n}} sn geçti",
@@ -91,7 +91,7 @@
   },
   "admin": {
     "title": "Yönetici Hesabı Oluştur",
-    "subtitle": "İlk girişinizi ayarlayın. Bu hesap Oikos'a tam erişime sahiptir.",
+    "subtitle": "İlk girişinizi ayarlayın. Bu hesap Yuvomi'a tam erişime sahiptir.",
     "userLabel": "Kullanıcı adı",
     "userHint": "3–64 karakter: harfler, rakamlar, . - _",
     "nameLabel": "Görünen ad",
@@ -107,15 +107,15 @@
     "errCreate": "Yönetici hesabı oluşturulamadı."
   },
   "done": {
-    "title": "Oikos hazır!",
+    "title": "Yuvomi hazır!",
     "subtitle": "Aile planlayıcınız çalışıyor ve yönetici hesabınız ayarlandı.",
-    "open": "Oikos'u aç →"
+    "open": "Yuvomi'u aç →"
   },
   "advanced": {
     "tag": "Gelişmiş · isteğe bağlı",
     "title": "Gelişmiş Ayarlar",
     "subtitle": "Ters proxy, çoklu oturum açma ve otomatik yedeklemeler. Tümü isteğe bağlı — atlamak güvenlidir.",
-    "proxyLabel": "Oikos nasıl yayınlanıyor?",
+    "proxyLabel": "Yuvomi nasıl yayınlanıyor?",
     "proxyBehindHttps": "HTTPS'li bir ters proxy arkasında (Caddy, nginx, Traefik)",
     "proxyDirect": "localhost / HTTP üzerinden doğrudan erişim",
     "proxyHint": "Doğrudan erişim, yalnızca güvenli çerezleri devre dışı bırakır; böylece oturum açma HTTPS olmadan çalışır.",

@@ -1,6 +1,6 @@
-# Oikos Web Installer
+# Yuvomi Web Installer
 
-A browser-based setup wizard for Oikos. Run it once to configure your `.env`,
+A browser-based setup wizard for Yuvomi. Run it once to configure your `.env`,
 start your container engine, and create your admin account — no hand-editing of
 config files. Works with both Docker and Podman (auto-detected).
 

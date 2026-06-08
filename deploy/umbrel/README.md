@@ -1,6 +1,6 @@
-# Oikos — Umbrel App Store source
+# Yuvomi — Umbrel App Store source
 
-This folder is the **tracked source** for the Oikos entry in the official Umbrel
+This folder is the **tracked source** for the Yuvomi entry in the official Umbrel
 App Store ([`getumbrel/umbrel-apps`](https://github.com/getumbrel/umbrel-apps)).
 The initial submission was opened as `getumbrel/umbrel-apps#5732` (manifest +
 compose only — Umbrel's app folder holds no images).
@@ -20,16 +20,16 @@ so any review tweaks (port, gallery, category) are preserved. It needs the
 
 Manual fallback (if you ever need it): run the workflow via `workflow_dispatch`,
 or get the digest with
-`docker buildx imagetools inspect ghcr.io/ulsklyc/oikos:<version>` (top-level
+`docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:<version>` (top-level
 `Digest:`) and bump `version`/`@sha256:` in a fork PR by hand.
 
 ## Config notes (why the compose looks like this)
 
-- **`app_proxy`** is mandatory. Oikos has its own login, so `PROXY_AUTH_ADD: "false"`
-  prevents a double sign-in. `APP_PORT: 3000` is where Oikos listens inside the
+- **`app_proxy`** is mandatory. Yuvomi has its own login, so `PROXY_AUTH_ADD: "false"`
+  prevents a double sign-in. `APP_PORT: 3000` is where Yuvomi listens inside the
   container; the manifest `port:` is `8181` — a free port (the linter rejects
   collisions; 8090 was taken by Urbit). Reviewers may still reassign it.
-  **Security note:** with proxy auth off, Oikos's unauthenticated first-run
+  **Security note:** with proxy auth off, Yuvomi's unauthenticated first-run
   bootstrap (`POST /api/v1/auth/setup`, which creates the first admin while the
   users table is empty) is reachable by any LAN/Tor-accessible client until the
   owner completes setup. The window is short and rate-limited (`loginLimiter`),
@@ -58,17 +58,17 @@ docker run -it --rm --name umbrel --pid=host -p 80:80 \
   --stop-timeout 60 docker.io/dockurr/umbrel
 ```
 
-Then open <http://localhost>, finish onboarding, and sideload Oikos **before it is
+Then open <http://localhost>, finish onboarding, and sideload Yuvomi **before it is
 merged** via a temporary Community App Store:
 
 1. Create a throwaway public git repo with this layout:
    ```
-   umbrel-app-store.yml      # id: oikos-test, name: Oikos Test
+   umbrel-app-store.yml      # id: oikos-test, name: Yuvomi Test
    oikos/umbrel-app.yml      # copy of this folder's manifest
    oikos/docker-compose.yml  # copy of this folder's compose
    ```
 2. In umbrelOS → App Store → "Community App Stores", add the repo URL.
-3. Install Oikos, create the first account, then **restart the app** and confirm the
+3. Install Yuvomi, create the first account, then **restart the app** and confirm the
    calendar/tasks/budget data persisted (volumes under `${APP_DATA_DIR}`).
 
 Once it runs and persists cleanly, open the PR against `getumbrel/umbrel-apps`.

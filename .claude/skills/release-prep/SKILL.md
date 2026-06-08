@@ -27,7 +27,7 @@ Run from inside `oikos/`. Argument selects the semver bump (default: patch).
 5. **Commit** — `git commit -m "chore: release vX.Y.Z"`. Do not pass `--no-verify`. If a hook fails, fix the cause and create a new commit.
 6. **Tag** — `git tag vX.Y.Z`.
 7. **Push** — `git push && git push --tags`.
-8. **GitHub Release** — `gh release create vX.Y.Z --repo ulsklyc/oikos --title "vX.Y.Z" --notes "<CHANGELOG block body>"`. Paste the new CHANGELOG section verbatim as notes.
+8. **GitHub Release** — `gh release create vX.Y.Z --repo ulsklyc/yuvomi --title "vX.Y.Z" --notes "<CHANGELOG block body>"`. Paste the new CHANGELOG section verbatim as notes.
 
 ## Guardrails
 

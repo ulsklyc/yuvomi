@@ -1,4 +1,4 @@
-# Podman-Compose-Manifest für Oikos (RHEL/Fedora/CentOS Stream, rootless + SELinux).
+# Podman-Compose-Manifest für Yuvomi (RHEL/Fedora/CentOS Stream, rootless + SELinux).
 # Nutzbar mit `podman compose -f podman-compose.yml up -d` (Podman 4.1+) oder
 # `podman-compose -f podman-compose.yml up -d`. Der Web-/CLI-Installer wählt das
 # Manifest automatisch, wenn nur Podman vorhanden ist.
@@ -10,7 +10,7 @@
 #     0.0.0.0). Rootless hinter einem Reverse-Proxy: OIKOS_HTTP_BIND=127.0.0.1.
 services:
   oikos:
-    image: ghcr.io/ulsklyc/oikos:latest
+    image: ghcr.io/ulsklyc/yuvomi:latest
     build: .                          # optional: use --build to build locally instead
     container_name: oikos
     restart: unless-stopped
@@ -23,7 +23,7 @@ services:
       # ausschließlich von diesem Container genutzt werden (hier der Fall).
       - ${DATA_DIR:-./data}:/data:Z
       - ${BACKUP_DIR:-./backups}:/backups:Z
-      # Drop Oikos modules into ./modules, or set MODULES_DIR=/path/to/modules.
+      # Drop Yuvomi modules into ./modules, or set MODULES_DIR=/path/to/modules.
       - ${MODULES_DIR:-./modules}:/app/modules:Z
     env_file:
       - .env

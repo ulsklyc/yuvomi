@@ -1,5 +1,5 @@
 {
-  "title": "Konfiguracja Oikos",
+  "title": "Konfiguracja Yuvomi",
   "common": {
     "continue": "Dalej",
     "back": "Wstecz",
@@ -11,10 +11,10 @@
   },
   "config": {
     "title": "Konfiguracja podstawowa",
-    "subtitle": "Jak będziesz uzyskiwać dostęp do Oikos?",
+    "subtitle": "Jak będziesz uzyskiwać dostęp do Yuvomi?",
     "existing": "Wykryto istniejącą konfigurację — przed zapisaniem zostanie utworzona kopia zapasowa bieżącego pliku .env.",
     "hostLabel": "Domena lub adres IP",
-    "hostHint": "Adres, którego użyjesz, aby otworzyć Oikos w przeglądarce.",
+    "hostHint": "Adres, którego użyjesz, aby otworzyć Yuvomi w przeglądarce.",
     "portLabel": "Port",
     "tzLabel": "Strefa czasowa",
     "errHost": "Nieprawidłowa nazwa hosta. Używaj tylko liter, cyfr, myślników i kropek.",
@@ -47,7 +47,7 @@
   },
   "calendar": {
     "title": "Synchronizacja kalendarza",
-    "subtitle": "Połącz Oikos z Kalendarzem Google lub Apple iCloud. Oba są opcjonalne — rozwiń, aby skonfigurować.",
+    "subtitle": "Połącz Yuvomi z Kalendarzem Google lub Apple iCloud. Oba są opcjonalne — rozwiń, aby skonfigurować.",
     "google": "Kalendarz Google",
     "googleHint": "Utwórz dane uwierzytelniające OAuth na {{link}}. URI przekierowania: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -79,7 +79,7 @@
     "configured": "skonfigurowano"
   },
   "docker": {
-    "title": "Uruchamianie Oikos",
+    "title": "Uruchamianie Yuvomi",
     "subtitle": "Pobieranie obrazu i uruchamianie kontenera Docker.",
     "starting": "Uruchamianie kontenera …",
     "elapsed": "upłynęło {{n}} s",
@@ -91,7 +91,7 @@
   },
   "admin": {
     "title": "Utwórz konto administratora",
-    "subtitle": "Skonfiguruj swoje pierwsze logowanie. To konto ma pełny dostęp do Oikos.",
+    "subtitle": "Skonfiguruj swoje pierwsze logowanie. To konto ma pełny dostęp do Yuvomi.",
     "userLabel": "Nazwa użytkownika",
     "userHint": "3–64 znaki: litery, cyfry, . - _",
     "nameLabel": "Wyświetlana nazwa",
@@ -107,15 +107,15 @@
     "errCreate": "Nie udało się utworzyć konta administratora."
   },
   "done": {
-    "title": "Oikos jest gotowy!",
+    "title": "Yuvomi jest gotowy!",
     "subtitle": "Twój planer rodzinny działa, a konto administratora jest skonfigurowane.",
-    "open": "Otwórz Oikos →"
+    "open": "Otwórz Yuvomi →"
   },
   "advanced": {
     "tag": "Zaawansowane · opcjonalne",
     "title": "Ustawienia zaawansowane",
     "subtitle": "Reverse proxy, logowanie jednokrotne i automatyczne kopie zapasowe. Wszystko opcjonalne — pominięcie jest bezpieczne.",
-    "proxyLabel": "Jak udostępniany jest Oikos?",
+    "proxyLabel": "Jak udostępniany jest Yuvomi?",
     "proxyBehindHttps": "Za reverse proxy z HTTPS (Caddy, nginx, Traefik)",
     "proxyDirect": "Bezpośredni dostęp przez localhost / HTTP",
     "proxyHint": "Dostęp bezpośredni wyłącza pliki cookie tylko-bezpieczne, aby logowanie działało bez HTTPS.",

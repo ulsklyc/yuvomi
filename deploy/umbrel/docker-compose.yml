@@ -5,7 +5,7 @@ services:
     environment:
       APP_HOST: oikos_web_1
       APP_PORT: 3000
-      # Oikos ships its own session-based login, so Umbrel's proxy auth is
+      # Yuvomi ships its own session-based login, so Umbrel's proxy auth is
       # disabled to avoid a double sign-in (same pattern as Immich).
       # Caveat: with proxy auth off, the first-run bootstrap endpoint
       # (POST /api/v1/auth/setup) is reachable by any LAN/Tor client until the
@@ -13,7 +13,7 @@ services:
       PROXY_AUTH_ADD: "false"
 
   web:
-    image: ghcr.io/ulsklyc/oikos:0.65.1@sha256:ad9fa6cfd5844629220774963877e0b91d828144de341de5ec4377fd9253b06b
+    image: ghcr.io/ulsklyc/yuvomi:0.65.1@sha256:ad9fa6cfd5844629220774963877e0b91d828144de341de5ec4377fd9253b06b
     restart: on-failure
     stop_grace_period: 1m
     # No `user:` override: the image entrypoint starts as root only to chown the

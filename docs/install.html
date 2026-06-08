@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Install Oikos — Self-Hosted Family Planner</title>
-  <meta name="description" content="Step-by-step installation guide for Oikos. Docker, Podman, TrueNAS, Umbrel or Unraid — get your self-hosted family planner running in minutes.">
+  <title>Install Yuvomi — Self-Hosted Family Planner</title>
+  <meta name="description" content="Step-by-step installation guide for Yuvomi. Docker, Podman, TrueNAS, Umbrel or Unraid — get your self-hosted family planner running in minutes.">
   <meta name="theme-color" content="#fafaf8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#1a1a18" media="(prefers-color-scheme: dark)">
   <link rel="canonical" href="https://ulsklyc.github.io/oikos/install.html">
@@ -317,9 +317,9 @@
 
   <nav class="nav" role="navigation" aria-label="Main">
     <div class="container-wide">
-      <a href="index.html" class="nav-logo" aria-label="Oikos Home">
+      <a href="index.html" class="nav-logo" aria-label="Yuvomi Home">
         <svg viewBox="0 0 160 160" fill="none" aria-hidden="true"><defs><linearGradient id="navbg" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#6c3aed"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#navbg)"/><path d="M80 36L36 72V120C36 122.2 37.8 124 40 124H68V96H92V124H120C122.2 124 124 122.2 124 120V72L80 36Z" fill="white"/><rect x="100" y="46" width="12" height="22" rx="2" fill="white"/></svg>
-        Oikos
+        Yuvomi
       </a>
       <div class="nav-controls">
         <a href="index.html" class="nav-btn" aria-label="Back to overview">
@@ -342,7 +342,7 @@
   <header class="hero">
     <div class="container">
       <p class="eyebrow reveal" style="justify-content:center"><span data-t="hero_eyebrow">Installation</span></p>
-      <h1 class="reveal"><span data-t="hero_title_pre">Install Oikos</span> <em data-t="hero_title_em">your way.</em></h1>
+      <h1 class="reveal"><span data-t="hero_title_pre">Install Yuvomi</span> <em data-t="hero_title_em">your way.</em></h1>
       <p class="hero-desc reveal" data-t="hero_desc">Get your self-hosted family planner running in a few minutes. No programming experience required — Docker, Podman, or a one-click app store.</p>
       <div class="reveal">
         <span class="time-badge">
@@ -358,7 +358,7 @@
     <div class="container">
       <p class="eyebrow reveal" data-t="prereq_label">Before you start</p>
       <h2 class="section-title reveal" data-t="prereq_title">What you need</h2>
-      <p class="section-desc reveal" data-t="prereq_desc">Oikos runs as a Docker or Podman container — you don't need to install Node.js or any other runtime. Just a container engine, and you're good to go. (App-store installs handle even this for you.)</p>
+      <p class="section-desc reveal" data-t="prereq_desc">Yuvomi runs as a Docker or Podman container — you don't need to install Node.js or any other runtime. Just a container engine, and you're good to go. (App-store installs handle even this for you.)</p>
       <div class="prereq-grid">
         <div class="prereq-card reveal">
           <div class="prereq-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
@@ -392,7 +392,7 @@
     <div class="container">
       <p class="eyebrow reveal" data-t="steps_label">Step by step</p>
       <h2 class="section-title reveal" data-t="steps_title">Choose your <em>platform</em></h2>
-      <p class="section-desc reveal" data-t="steps_desc">Six ways to install. Pick the one that matches your setup — the result is the same private Oikos instance.</p>
+      <p class="section-desc reveal" data-t="steps_desc">Six ways to install. Pick the one that matches your setup — the result is the same private Yuvomi instance.</p>
 
       <div class="tab-bar reveal" role="tablist" aria-label="Installation options">
         <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="panel-installer" id="tab-installer" type="button">
@@ -425,9 +425,9 @@
           <div class="step-num">1</div>
           <div class="step-content">
             <h3 class="step-title" data-t="step_inst1_title">Clone the repository</h3>
-            <p class="step-desc" data-t="step_inst1_desc">Open your terminal and clone Oikos to a folder of your choice.</p>
-            <div class="code-wrap"><div class="code-block">git clone https://github.com/ulsklyc/oikos.git
-cd oikos</div><button class="copy-btn" data-copy="git clone https://github.com/ulsklyc/oikos.git&#10;cd oikos" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
+            <p class="step-desc" data-t="step_inst1_desc">Open your terminal and clone Yuvomi to a folder of your choice.</p>
+            <div class="code-wrap"><div class="code-block">git clone https://github.com/ulsklyc/yuvomi.git
+cd yuvomi</div><button class="copy-btn" data-copy="git clone https://github.com/ulsklyc/yuvomi.git&#10;cd yuvomi" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
           </div>
         </div>
         <div class="step">
@@ -446,7 +446,7 @@ cd oikos</div><button class="copy-btn" data-copy="git clone https://github.com/u
             <div class="code-wrap"><div class="code-block"><span class="val">http://localhost:8090</span></div><button class="copy-btn" data-copy="http://localhost:8090" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
             <div class="callout callout-info">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              <span data-t="step_inst3_info">The installer shuts down automatically after setup completes. Your Oikos instance keeps running via Docker or Podman.</span>
+              <span data-t="step_inst3_info">The installer shuts down automatically after setup completes. Your Yuvomi instance keeps running via Docker or Podman.</span>
             </div>
           </div>
         </div>
@@ -463,8 +463,8 @@ cd oikos</div><button class="copy-btn" data-copy="git clone https://github.com/u
           <div class="step-content">
             <h3 class="step-title" data-t="step_a1_title">Download the configuration files</h3>
             <p class="step-desc" data-t="step_a1_desc">Run these two commands. They download the Docker configuration and the template for your settings.</p>
-            <div class="code-wrap"><div class="code-block">curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example</div><button class="copy-btn" data-copy="curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/docker-compose.yml&#10;curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
+            <div class="code-wrap"><div class="code-block">curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example</div><button class="copy-btn" data-copy="curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml&#10;curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
           </div>
         </div>
         <div class="step">
@@ -485,7 +485,7 @@ curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example</div><
           <div class="step-num">3</div>
           <div class="step-content">
             <h3 class="step-title" data-t="step_a3_title">Start the container</h3>
-            <p class="step-desc" data-t="step_a3_desc">Docker downloads the Oikos image and starts it in the background. The first download takes a minute.</p>
+            <p class="step-desc" data-t="step_a3_desc">Docker downloads the Yuvomi image and starts it in the background. The first download takes a minute.</p>
             <div class="code-wrap"><div class="code-block"><span class="cmd">docker compose up -d</span></div><button class="copy-btn" data-copy="docker compose up -d" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
             <div class="callout callout-success">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -497,7 +497,7 @@ curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example</div><
           <div class="step-num">4</div>
           <div class="step-content">
             <h3 class="step-title" data-t="step_setup_title">Create your admin account</h3>
-            <p class="step-desc" data-t="step_setup_desc">On the first visit, Oikos walks you through creating your admin account right in the browser. Prefer the command line? Run the setup wizard instead:</p>
+            <p class="step-desc" data-t="step_setup_desc">On the first visit, Yuvomi walks you through creating your admin account right in the browser. Prefer the command line? Run the setup wizard instead:</p>
             <div class="code-wrap"><div class="code-block"><span class="cmd">docker compose exec oikos node setup.js</span></div><button class="copy-btn" data-copy="docker compose exec oikos node setup.js" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
           </div>
         </div>
@@ -513,8 +513,8 @@ curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example</div><
           <div class="step-num">1</div>
           <div class="step-content">
             <h3 class="step-title" data-t="step_b1_title">Clone the repository</h3>
-            <div class="code-wrap"><div class="code-block">git clone https://github.com/ulsklyc/oikos.git
-cd oikos</div><button class="copy-btn" data-copy="git clone https://github.com/ulsklyc/oikos.git&#10;cd oikos" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
+            <div class="code-wrap"><div class="code-block">git clone https://github.com/ulsklyc/yuvomi.git
+cd yuvomi</div><button class="copy-btn" data-copy="git clone https://github.com/ulsklyc/yuvomi.git&#10;cd yuvomi" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
           </div>
         </div>
         <div class="step">
@@ -538,7 +538,7 @@ openssl rand -hex 32  <span class="comment"># run twice → SESSION_SECRET + DB_
           <div class="step-num">4</div>
           <div class="step-content">
             <h3 class="step-title" data-t="step_setup_title">Create your admin account</h3>
-            <p class="step-desc" data-t="step_setup_desc">On the first visit, Oikos walks you through creating your admin account right in the browser. Prefer the command line? Run the setup wizard instead:</p>
+            <p class="step-desc" data-t="step_setup_desc">On the first visit, Yuvomi walks you through creating your admin account right in the browser. Prefer the command line? Run the setup wizard instead:</p>
             <div class="code-wrap"><div class="code-block"><span class="cmd">docker compose exec oikos node setup.js</span></div><button class="copy-btn" data-copy="docker compose exec oikos node setup.js" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
           </div>
         </div>
@@ -548,9 +548,9 @@ openssl rand -hex 32  <span class="comment"># run twice → SESSION_SECRET + DB_
       <div class="tab-panel" id="panel-truenas" role="tabpanel" aria-labelledby="tab-truenas">
         <div class="callout callout-success">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          <span data-t="opt_truenas_info">No terminal required. Oikos is in the TrueNAS SCALE Community Apps Catalog — install it directly from the TrueNAS web UI in a few clicks.</span>
+          <span data-t="opt_truenas_info">No terminal required. Yuvomi is in the TrueNAS SCALE Community Apps Catalog — install it directly from the TrueNAS web UI in a few clicks.</span>
         </div>
-        <div class="step"><div class="step-num">1</div><div class="step-content"><h3 class="step-title" data-t="step_tn1_title">Open the Apps Catalog</h3><p class="step-desc" data-t="step_tn1_desc">In your TrueNAS SCALE web UI, go to Apps → Discover Apps and search for Oikos.</p></div></div>
+        <div class="step"><div class="step-num">1</div><div class="step-content"><h3 class="step-title" data-t="step_tn1_title">Open the Apps Catalog</h3><p class="step-desc" data-t="step_tn1_desc">In your TrueNAS SCALE web UI, go to Apps → Discover Apps and search for Yuvomi.</p></div></div>
         <div class="step"><div class="step-num">2</div><div class="step-content"><h3 class="step-title" data-t="step_tn2_title">Configure and install</h3><p class="step-desc" data-t="step_tn2_desc">Click Install. Set a strong value for Session Secret (required) and Database Encryption Key (recommended — back it up, it cannot be recovered). Adjust the port and storage paths if needed, then Install.</p></div></div>
         <div class="step"><div class="step-num">3</div><div class="step-content"><h3 class="step-title" data-t="step_tn3_title">Open the WebUI</h3><p class="step-desc" data-t="step_tn3_desc">Once the app status shows Running, click WebUI in the Apps overview. The first visit walks you through creating your admin account directly in the browser.</p></div></div>
       </div>
@@ -559,22 +559,22 @@ openssl rand -hex 32  <span class="comment"># run twice → SESSION_SECRET + DB_
       <div class="tab-panel" id="panel-umbrel" role="tabpanel" aria-labelledby="tab-umbrel">
         <div class="callout callout-success">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          <span data-t="opt_umbrel_info">No terminal required. Install Oikos straight from the Umbrel App Store — everything runs on, and stays on, your Umbrel.</span>
+          <span data-t="opt_umbrel_info">No terminal required. Install Yuvomi straight from the Umbrel App Store — everything runs on, and stays on, your Umbrel.</span>
         </div>
-        <div class="step"><div class="step-num">1</div><div class="step-content"><h3 class="step-title" data-t="step_um1_title">Open the App Store</h3><p class="step-desc" data-t="step_um1_desc">In your Umbrel dashboard, open the App Store and search for Oikos.</p></div></div>
+        <div class="step"><div class="step-num">1</div><div class="step-content"><h3 class="step-title" data-t="step_um1_title">Open the App Store</h3><p class="step-desc" data-t="step_um1_desc">In your Umbrel dashboard, open the App Store and search for Yuvomi.</p></div></div>
         <div class="step"><div class="step-num">2</div><div class="step-content"><h3 class="step-title" data-t="step_um2_title">Install with one click</h3><p class="step-desc" data-t="step_um2_desc">Click Install. Umbrel pulls the image and starts the container for you — no configuration files to edit.</p></div></div>
-        <div class="step"><div class="step-num">3</div><div class="step-content"><h3 class="step-title" data-t="step_um3_title">Open Oikos</h3><p class="step-desc" data-t="step_um3_desc">Launch Oikos from your Umbrel home screen. The first visit walks you through creating your admin account directly in the browser.</p></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-content"><h3 class="step-title" data-t="step_um3_title">Open Yuvomi</h3><p class="step-desc" data-t="step_um3_desc">Launch Yuvomi from your Umbrel home screen. The first visit walks you through creating your admin account directly in the browser.</p></div></div>
       </div>
 
       <!-- Unraid -->
       <div class="tab-panel" id="panel-unraid" role="tabpanel" aria-labelledby="tab-unraid">
         <div class="callout callout-success">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          <span data-t="opt_unraid_info">No terminal required. Oikos ships as a Community Applications template — add it straight from the Unraid Apps tab.</span>
+          <span data-t="opt_unraid_info">No terminal required. Yuvomi ships as a Community Applications template — add it straight from the Unraid Apps tab.</span>
         </div>
-        <div class="step"><div class="step-num">1</div><div class="step-content"><h3 class="step-title" data-t="step_ur1_title">Open Community Applications</h3><p class="step-desc" data-t="step_ur1_desc">In Unraid, open the Apps tab (the Community Applications plugin) and search for Oikos.</p></div></div>
+        <div class="step"><div class="step-num">1</div><div class="step-content"><h3 class="step-title" data-t="step_ur1_title">Open Community Applications</h3><p class="step-desc" data-t="step_ur1_desc">In Unraid, open the Apps tab (the Community Applications plugin) and search for Yuvomi.</p></div></div>
         <div class="step"><div class="step-num">2</div><div class="step-content"><h3 class="step-title" data-t="step_ur2_title">Configure the template</h3><p class="step-desc" data-t="step_ur2_desc">Click Install. Set SESSION_SECRET (required) and DB_ENCRYPTION_KEY (recommended — back it up). Adjust the WebUI port and the appdata path if needed.</p></div></div>
-        <div class="step"><div class="step-num">3</div><div class="step-content"><h3 class="step-title" data-t="step_ur3_title">Apply and open</h3><p class="step-desc" data-t="step_ur3_desc">Click Apply. Once the container is running, click the Oikos icon → WebUI. The first visit walks you through creating your admin account.</p></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-content"><h3 class="step-title" data-t="step_ur3_title">Apply and open</h3><p class="step-desc" data-t="step_ur3_desc">Click Apply. Once the container is running, click the Yuvomi icon → WebUI. The first visit walks you through creating your admin account.</p></div></div>
       </div>
     </div>
   </section>
@@ -589,10 +589,10 @@ openssl rand -hex 32  <span class="comment"># run twice → SESSION_SECRET + DB_
         <div class="success-url">http://localhost:3000</div>
         <p style="font-size:0.88rem" data-t="success_hint">Log in with the admin credentials you just created. You can add more family members from the Settings page.</p>
         <div class="success-links">
-          <a href="https://github.com/ulsklyc/oikos" target="_blank" rel="noopener" class="btn btn-primary">
+          <a href="https://github.com/ulsklyc/yuvomi" target="_blank" rel="noopener" class="btn btn-primary">
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>GitHub
           </a>
-          <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md" target="_blank" rel="noopener" class="btn btn-secondary" data-t="success_full_guide">Full technical guide</a>
+          <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md" target="_blank" rel="noopener" class="btn btn-secondary" data-t="success_full_guide">Full technical guide</a>
         </div>
       </div>
     </div>
@@ -624,13 +624,13 @@ openssl rand -hex 32  <span class="comment"># run twice → SESSION_SECRET + DB_
     <div class="container">
       <p class="eyebrow reveal" data-t="optional_label">Optional</p>
       <h2 class="section-title reveal" data-t="optional_title">Go further</h2>
-      <p class="section-desc reveal" data-t="optional_desc">Once Oikos is running, you can set up these extras. All are configured in your .env file.</p>
+      <p class="section-desc reveal" data-t="optional_desc">Once Yuvomi is running, you can set up these extras. All are configured in your .env file.</p>
       <div class="opt-grid">
-        <div class="opt-card reveal"><h3 data-t="opt_https_title">HTTPS &amp; network access</h3><p data-t="opt_https_desc">Reach Oikos from other devices or the internet — set up Nginx as a reverse proxy with a free Let's Encrypt certificate. <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md#https--reverse-proxy-nginx" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></p></div>
+        <div class="opt-card reveal"><h3 data-t="opt_https_title">HTTPS &amp; network access</h3><p data-t="opt_https_desc">Reach Yuvomi from other devices or the internet — set up Nginx as a reverse proxy with a free Let's Encrypt certificate. <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#https--reverse-proxy-nginx" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></p></div>
         <div class="opt-card reveal reveal-delay-1"><h3 data-t="opt_weather_title">Weather widget</h3><p data-t="opt_weather_desc">Show local weather on the dashboard via Open-Meteo — no API key. Set <code>WEATHER_LAT</code> and <code>WEATHER_LON</code> to your coordinates.</p></div>
-        <div class="opt-card reveal reveal-delay-2"><h3 data-t="opt_cal_title">Calendar &amp; contact sync</h3><p data-t="opt_cal_desc">Two-way sync with Google Calendar (OAuth) and multi-account CalDAV/CardDAV (iCloud, Nextcloud, Radicale). Apple Reminders can mirror read-only into Tasks or Shopping. <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md#environment-variables" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></p></div>
-        <div class="opt-card reveal"><h3 data-t="opt_sso_title">SSO / OpenID Connect</h3><p data-t="opt_sso_desc">Single sign-on via any OIDC provider (Authentik, Keycloak, Google, Microsoft Entra). Set the four <code>OIDC_*</code> vars and a "Sign in with SSO" button appears automatically. <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md#sso--openid-connect-optional" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></p></div>
-        <div class="opt-card reveal reveal-delay-1"><h3 data-t="opt_backup_title">Automated backups</h3><p data-t="opt_backup_desc">Enable scheduled backups via <code>BACKUP_ENABLED=true</code> — daily at 2 AM, 7 copies kept. Manage and restore in Settings → Backup. <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md#backup--restore" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></p></div>
+        <div class="opt-card reveal reveal-delay-2"><h3 data-t="opt_cal_title">Calendar &amp; contact sync</h3><p data-t="opt_cal_desc">Two-way sync with Google Calendar (OAuth) and multi-account CalDAV/CardDAV (iCloud, Nextcloud, Radicale). Apple Reminders can mirror read-only into Tasks or Shopping. <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#environment-variables" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></p></div>
+        <div class="opt-card reveal"><h3 data-t="opt_sso_title">SSO / OpenID Connect</h3><p data-t="opt_sso_desc">Single sign-on via any OIDC provider (Authentik, Keycloak, Google, Microsoft Entra). Set the four <code>OIDC_*</code> vars and a "Sign in with SSO" button appears automatically. <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#sso--openid-connect-optional" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></p></div>
+        <div class="opt-card reveal reveal-delay-1"><h3 data-t="opt_backup_title">Automated backups</h3><p data-t="opt_backup_desc">Enable scheduled backups via <code>BACKUP_ENABLED=true</code> — daily at 2 AM, 7 copies kept. Manage and restore in Settings → Backup. <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#backup--restore" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></p></div>
         <div class="opt-card reveal reveal-delay-2"><h3 data-t="opt_update_title">Updates</h3><p data-t="opt_update_desc">Pull the latest image and restart: <code>docker compose pull &amp;&amp; docker compose up -d</code>. Your data persists across updates.</p></div>
       </div>
     </div>
@@ -675,9 +675,9 @@ docker compose logs | grep "Server läuft"</div></div><p data-t="trouble_nginx_p
       <p class="footer-heart" data-t="footer_heart">Built with care for families who value privacy and simplicity.</p>
       <div class="footer-links">
         <a href="index.html" data-t="footer_home">Home</a>
-        <a href="https://github.com/ulsklyc/oikos" target="_blank" rel="noopener">GitHub</a>
-        <a href="https://github.com/ulsklyc/oikos/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
-        <a href="https://github.com/ulsklyc/oikos/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-t="footer_contrib">Contributing</a>
+        <a href="https://github.com/ulsklyc/yuvomi" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/ulsklyc/yuvomi/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+        <a href="https://github.com/ulsklyc/yuvomi/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-t="footer_contrib">Contributing</a>
       </div>
     </div>
   </footer>
@@ -687,53 +687,53 @@ docker compose logs | grep "Server läuft"</div></div><p data-t="trouble_nginx_p
     'use strict';
     var i18n = {
       en: {
-        hero_eyebrow:'Installation', hero_title_pre:'Install Oikos', hero_title_em:'your way.',
+        hero_eyebrow:'Installation', hero_title_pre:'Install Yuvomi', hero_title_em:'your way.',
         hero_desc:'Get your self-hosted family planner running in a few minutes. No programming experience required — Docker, Podman, or a one-click app store.',
         hero_time:'~10 minutes',
         prereq_label:'Before you start', prereq_title:'What you need',
-        prereq_desc:"Oikos runs as a Docker or Podman container — you don't need to install Node.js or any other runtime. Just a container engine, and you're good to go. (App-store installs handle even this for you.)",
+        prereq_desc:"Yuvomi runs as a Docker or Podman container — you don't need to install Node.js or any other runtime. Just a container engine, and you're good to go. (App-store installs handle even this for you.)",
         prereq_docker_title:'Docker or Podman', prereq_docker_desc:"Packages the app so you don't need to install anything else. Free for personal use. Podman (RHEL/Fedora/CentOS Stream) works too — rootless and SELinux-ready.",
         prereq_terminal_title:'Terminal', prereq_terminal_desc:'A command-line interface to type a few commands. Built into every OS — no extra install needed.',
         prereq_terminal_hint:'macOS: Terminal · Windows: PowerShell · Linux: bash',
         prereq_sys_title:'System', prereq_sys_desc:'256 MB RAM minimum. Runs on a Raspberry Pi, NAS, home server, or any desktop machine.',
         prereq_sys_hint:'~500 MB disk for the Docker image',
-        steps_label:'Step by step', steps_title:'Choose your platform', steps_desc:'Six ways to install. Pick the one that matches your setup — the result is the same private Oikos instance.',
+        steps_label:'Step by step', steps_title:'Choose your platform', steps_desc:'Six ways to install. Pick the one that matches your setup — the result is the same private Yuvomi instance.',
         tab_installer:'Web Installer', tab_docker:'Docker image', tab_source:'From source', tab_truenas:'TrueNAS', tab_umbrel:'Umbrel', tab_unraid:'Unraid', tab_one:'1-click',
         opt_installer_info:'Recommended for most users. A localized browser wizard (19 languages) detects your container engine (Docker or Podman), configures your .env — including optional reverse proxy/HTTPS, Single Sign-On (OIDC), and automatic backups — starts the container, and creates your admin account. No manual steps. Requires Node.js 18+ on the host.',
-        step_inst1_title:'Clone the repository', step_inst1_desc:'Open your terminal and clone Oikos to a folder of your choice.',
+        step_inst1_title:'Clone the repository', step_inst1_desc:'Open your terminal and clone Yuvomi to a folder of your choice.',
         step_inst2_title:'Start the installer', step_inst2_desc:'Run this command from the repository root. The installer server starts on port 8090.',
         step_inst3_title:'Open the wizard in your browser', step_inst3_desc:'Navigate to the following address. The wizard guides you through configuration, container startup, and admin account creation.',
-        step_inst3_info:'The installer shuts down automatically after setup completes. Your Oikos instance keeps running via Docker or Podman.',
+        step_inst3_info:'The installer shuts down automatically after setup completes. Your Yuvomi instance keeps running via Docker or Podman.',
         opt_docker_info:'No Git, no build step — just two files and a single command. Requires only Docker or Podman (Podman: use podman-compose.yml).',
         step_a1_title:'Download the configuration files', step_a1_desc:'Run these two commands. They download the Docker configuration and the template for your settings.',
         step_a2_title:'Create your configuration', step_a2_desc:'Copy the template, then open .env in a text editor and set the two required secrets.',
         step_a2_gen:'Generate a secure value for each secret by running this twice — paste one result as SESSION_SECRET and one as DB_ENCRYPTION_KEY:',
         step_a2_warning:'Keep a backup of your .env file somewhere safe. If you lose the DB_ENCRYPTION_KEY, your data cannot be recovered.',
-        step_a3_title:'Start the container', step_a3_desc:'Docker downloads the Oikos image and starts it in the background. The first download takes a minute.',
+        step_a3_title:'Start the container', step_a3_desc:'Docker downloads the Yuvomi image and starts it in the background. The first download takes a minute.',
         step_a3_success:'Check the logs with docker compose logs -f. You should see Server läuft auf Port 3000. The container keeps running in the background.',
-        step_setup_title:'Create your admin account', step_setup_desc:'On the first visit, Oikos walks you through creating your admin account right in the browser. Prefer the command line? Run the setup wizard instead:',
+        step_setup_title:'Create your admin account', step_setup_desc:'On the first visit, Yuvomi walks you through creating your admin account right in the browser. Prefer the command line? Run the setup wizard instead:',
         opt_source_info:'For contributors or anyone who wants to run a custom version. Requires Git. The first build takes a few minutes.',
         step_b1_title:'Clone the repository', step_b3_title:'Build and start', step_b3_desc:'The --build flag compiles the Docker image locally. This takes a few minutes the first time.',
-        opt_truenas_info:'No terminal required. Oikos is in the TrueNAS SCALE Community Apps Catalog — install it directly from the TrueNAS web UI in a few clicks.',
-        step_tn1_title:'Open the Apps Catalog', step_tn1_desc:'In your TrueNAS SCALE web UI, go to Apps → Discover Apps and search for Oikos.',
+        opt_truenas_info:'No terminal required. Yuvomi is in the TrueNAS SCALE Community Apps Catalog — install it directly from the TrueNAS web UI in a few clicks.',
+        step_tn1_title:'Open the Apps Catalog', step_tn1_desc:'In your TrueNAS SCALE web UI, go to Apps → Discover Apps and search for Yuvomi.',
         step_tn2_title:'Configure and install', step_tn2_desc:'Click Install. Set a strong value for Session Secret (required) and Database Encryption Key (recommended — back it up, it cannot be recovered). Adjust the port and storage paths if needed, then Install.',
         step_tn3_title:'Open the WebUI', step_tn3_desc:'Once the app status shows Running, click WebUI in the Apps overview. The first visit walks you through creating your admin account directly in the browser.',
-        opt_umbrel_info:'No terminal required. Install Oikos straight from the Umbrel App Store — everything runs on, and stays on, your Umbrel.',
-        step_um1_title:'Open the App Store', step_um1_desc:'In your Umbrel dashboard, open the App Store and search for Oikos.',
+        opt_umbrel_info:'No terminal required. Install Yuvomi straight from the Umbrel App Store — everything runs on, and stays on, your Umbrel.',
+        step_um1_title:'Open the App Store', step_um1_desc:'In your Umbrel dashboard, open the App Store and search for Yuvomi.',
         step_um2_title:'Install with one click', step_um2_desc:'Click Install. Umbrel pulls the image and starts the container for you — no configuration files to edit.',
-        step_um3_title:'Open Oikos', step_um3_desc:'Launch Oikos from your Umbrel home screen. The first visit walks you through creating your admin account directly in the browser.',
-        opt_unraid_info:'No terminal required. Oikos ships as a Community Applications template — add it straight from the Unraid Apps tab.',
-        step_ur1_title:'Open Community Applications', step_ur1_desc:'In Unraid, open the Apps tab (the Community Applications plugin) and search for Oikos.',
+        step_um3_title:'Open Yuvomi', step_um3_desc:'Launch Yuvomi from your Umbrel home screen. The first visit walks you through creating your admin account directly in the browser.',
+        opt_unraid_info:'No terminal required. Yuvomi ships as a Community Applications template — add it straight from the Unraid Apps tab.',
+        step_ur1_title:'Open Community Applications', step_ur1_desc:'In Unraid, open the Apps tab (the Community Applications plugin) and search for Yuvomi.',
         step_ur2_title:'Configure the template', step_ur2_desc:'Click Install. Set SESSION_SECRET (required) and DB_ENCRYPTION_KEY (recommended — back it up). Adjust the WebUI port and the appdata path if needed.',
-        step_ur3_title:'Apply and open', step_ur3_desc:'Click Apply. Once the container is running, click the Oikos icon → WebUI. The first visit walks you through creating your admin account.',
+        step_ur3_title:'Apply and open', step_ur3_desc:'Click Apply. Once the container is running, click the Yuvomi icon → WebUI. The first visit walks you through creating your admin account.',
         success_title:"You're all set", success_desc:'Open your browser and navigate to:', success_hint:'Log in with the admin credentials you just created. You can add more family members from the Settings page.',
         success_full_guide:'Full technical guide',
         env_label:'Configuration', env_title:'Required settings', env_desc:'Two variables in your .env file are mandatory. Everything else is optional.',
         env_session_label:'Session Secret', env_session_desc:'Signs and verifies login cookies. Use openssl rand -hex 32 to generate a secure value.',
         env_db_label:'Database Key', env_db_desc:'Encrypts your entire database with AES-256. Generate with openssl rand -hex 32. Back this up — without it, data is unrecoverable.',
         env_required:'Required',
-        optional_label:'Optional', optional_title:'Go further', optional_desc:'Once Oikos is running, you can set up these extras. All are configured in your .env file.',
-        opt_https_title:'HTTPS & network access', opt_https_desc:"Reach Oikos from other devices or the internet — set up Nginx as a reverse proxy with a free Let's Encrypt certificate.",
+        optional_label:'Optional', optional_title:'Go further', optional_desc:'Once Yuvomi is running, you can set up these extras. All are configured in your .env file.',
+        opt_https_title:'HTTPS & network access', opt_https_desc:"Reach Yuvomi from other devices or the internet — set up Nginx as a reverse proxy with a free Let's Encrypt certificate.",
         opt_guide:'Guide →',
         opt_weather_title:'Weather widget', opt_weather_desc:'Show local weather on the dashboard via Open-Meteo — no API key. Set WEATHER_LAT and WEATHER_LON to your coordinates.',
         opt_cal_title:'Calendar & contact sync', opt_cal_desc:'Two-way sync with Google Calendar (OAuth) and multi-account CalDAV/CardDAV (iCloud, Nextcloud, Radicale). Apple Reminders can mirror read-only into Tasks or Shopping.',
@@ -753,53 +753,53 @@ docker compose logs | grep "Server läuft"</div></div><p data-t="trouble_nginx_p
         backLabel:'Overview', copy:'Copy', copied:'Copied!'
       },
       de: {
-        hero_eyebrow:'Installation', hero_title_pre:'Oikos installieren', hero_title_em:'– euer Weg.',
+        hero_eyebrow:'Installation', hero_title_pre:'Yuvomi installieren', hero_title_em:'– euer Weg.',
         hero_desc:'Euren selbstgehosteten Familienplaner in wenigen Minuten zum Laufen bringen. Keine Programmierkenntnisse nötig — Docker, Podman oder ein App-Store mit einem Klick.',
         hero_time:'~10 Minuten',
         prereq_label:'Voraussetzungen', prereq_title:'Was ihr braucht',
-        prereq_desc:'Oikos läuft als Docker- oder Podman-Container — Node.js oder andere Laufzeiten müsst ihr nicht installieren. Nur eine Container-Engine, und ihr seid startklar. (App-Store-Installationen übernehmen sogar das für euch.)',
+        prereq_desc:'Yuvomi läuft als Docker- oder Podman-Container — Node.js oder andere Laufzeiten müsst ihr nicht installieren. Nur eine Container-Engine, und ihr seid startklar. (App-Store-Installationen übernehmen sogar das für euch.)',
         prereq_docker_title:'Docker oder Podman', prereq_docker_desc:'Verpackt die App, sodass ihr nichts weiter installieren müsst. Für den privaten Gebrauch kostenlos. Podman (RHEL/Fedora/CentOS Stream) funktioniert ebenfalls — rootless und SELinux-fähig.',
         prereq_terminal_title:'Terminal', prereq_terminal_desc:'Eine Befehlszeile, um ein paar Befehle einzugeben. In jedem Betriebssystem eingebaut — kein Extra-Install nötig.',
         prereq_terminal_hint:'macOS: Terminal · Windows: PowerShell · Linux: bash',
         prereq_sys_title:'System', prereq_sys_desc:'Mindestens 256 MB RAM. Läuft auf einem Raspberry Pi, NAS, Heimserver oder jedem Desktop-Rechner.',
         prereq_sys_hint:'~500 MB Speicher für das Docker-Image',
-        steps_label:'Schritt für Schritt', steps_title:'Wählt eure Plattform', steps_desc:'Sechs Installationswege. Wählt den, der zu eurem Setup passt — das Ergebnis ist dieselbe private Oikos-Instanz.',
+        steps_label:'Schritt für Schritt', steps_title:'Wählt eure Plattform', steps_desc:'Sechs Installationswege. Wählt den, der zu eurem Setup passt — das Ergebnis ist dieselbe private Yuvomi-Instanz.',
         tab_installer:'Web-Installer', tab_docker:'Docker-Image', tab_source:'Aus Quellcode', tab_truenas:'TrueNAS', tab_umbrel:'Umbrel', tab_unraid:'Unraid', tab_one:'1 Klick',
         opt_installer_info:'Empfohlen für die meisten Nutzer. Ein lokalisierter Browser-Assistent (19 Sprachen) erkennt eure Container-Engine (Docker oder Podman), konfiguriert eure .env — inklusive optionalem Reverse-Proxy/HTTPS, Single Sign-On (OIDC) und automatischen Backups — startet den Container und erstellt euer Admin-Konto. Ohne manuelle Schritte. Erfordert Node.js 18+ auf dem Host.',
-        step_inst1_title:'Repository klonen', step_inst1_desc:'Öffnet euer Terminal und klont Oikos in einen Ordner eurer Wahl.',
+        step_inst1_title:'Repository klonen', step_inst1_desc:'Öffnet euer Terminal und klont Yuvomi in einen Ordner eurer Wahl.',
         step_inst2_title:'Installer starten', step_inst2_desc:'Führt diesen Befehl vom Projektordner aus. Der Installer-Server startet auf Port 8090.',
         step_inst3_title:'Assistenten im Browser öffnen', step_inst3_desc:'Navigiert zur folgenden Adresse. Der Assistent führt euch durch Konfiguration, Container-Start und Admin-Konto-Erstellung.',
-        step_inst3_info:'Der Installer beendet sich automatisch nach Abschluss der Einrichtung. Eure Oikos-Instanz läuft weiter über Docker oder Podman.',
+        step_inst3_info:'Der Installer beendet sich automatisch nach Abschluss der Einrichtung. Eure Yuvomi-Instanz läuft weiter über Docker oder Podman.',
         opt_docker_info:'Kein Git, kein Build-Schritt — nur zwei Dateien und ein einziger Befehl. Nur Docker oder Podman erforderlich (Podman: podman-compose.yml verwenden).',
         step_a1_title:'Konfigurationsdateien herunterladen', step_a1_desc:'Führt diese zwei Befehle aus. Sie laden die Docker-Konfiguration und die Vorlage für eure Einstellungen herunter.',
         step_a2_title:'Konfiguration erstellen', step_a2_desc:'Kopiert die Vorlage, öffnet dann .env in einem Texteditor und setzt die zwei erforderlichen Secrets.',
         step_a2_gen:'Generiert einen sicheren Wert für jedes Secret, indem ihr dies zweimal ausführt — ein Ergebnis als SESSION_SECRET, eines als DB_ENCRYPTION_KEY:',
         step_a2_warning:'Behaltet eine Sicherungskopie eurer .env-Datei an einem sicheren Ort. Wenn ihr den DB_ENCRYPTION_KEY verliert, können eure Daten nicht wiederhergestellt werden.',
-        step_a3_title:'Container starten', step_a3_desc:'Docker lädt das Oikos-Image herunter und startet es im Hintergrund. Der erste Download dauert eine Minute.',
+        step_a3_title:'Container starten', step_a3_desc:'Docker lädt das Yuvomi-Image herunter und startet es im Hintergrund. Der erste Download dauert eine Minute.',
         step_a3_success:'Prüft die Logs mit docker compose logs -f. Ihr solltet sehen: Server läuft auf Port 3000. Der Container läuft im Hintergrund weiter.',
-        step_setup_title:'Admin-Konto erstellen', step_setup_desc:'Beim ersten Aufruf führt euch Oikos direkt im Browser durch die Erstellung eures Admin-Kontos. Lieber per Kommandozeile? Führt stattdessen den Einrichtungsassistenten aus:',
+        step_setup_title:'Admin-Konto erstellen', step_setup_desc:'Beim ersten Aufruf führt euch Yuvomi direkt im Browser durch die Erstellung eures Admin-Kontos. Lieber per Kommandozeile? Führt stattdessen den Einrichtungsassistenten aus:',
         opt_source_info:'Für Mitwirkende oder wer eine eigene Version ausführen möchte. Erfordert Git. Der erste Build dauert einige Minuten.',
         step_b1_title:'Repository klonen', step_b3_title:'Bauen und starten', step_b3_desc:'Das Flag --build kompiliert das Docker-Image lokal. Das dauert beim ersten Mal einige Minuten.',
-        opt_truenas_info:'Kein Terminal erforderlich. Oikos ist im TrueNAS SCALE Community Apps Catalog — direkt über das TrueNAS-Web-UI in wenigen Klicks installierbar.',
-        step_tn1_title:'Apps-Catalog öffnen', step_tn1_desc:'Im TrueNAS SCALE Web-UI zu Apps → Apps entdecken navigieren und nach Oikos suchen.',
+        opt_truenas_info:'Kein Terminal erforderlich. Yuvomi ist im TrueNAS SCALE Community Apps Catalog — direkt über das TrueNAS-Web-UI in wenigen Klicks installierbar.',
+        step_tn1_title:'Apps-Catalog öffnen', step_tn1_desc:'Im TrueNAS SCALE Web-UI zu Apps → Apps entdecken navigieren und nach Yuvomi suchen.',
         step_tn2_title:'Konfigurieren und installieren', step_tn2_desc:'Auf Installieren klicken. Einen starken Wert für Session-Secret (erforderlich) und Datenbank-Verschlüsselungsschlüssel (empfohlen — sichern, da nicht wiederherstellbar) setzen. Port und Speicherpfade nach Bedarf anpassen, dann Installieren.',
-        step_tn3_title:'WebUI öffnen', step_tn3_desc:'Sobald der App-Status Aktiv anzeigt, in der App-Übersicht auf WebUI klicken. Beim ersten Aufruf führt Oikos direkt im Browser durch die Erstellung des Admin-Kontos.',
-        opt_umbrel_info:'Kein Terminal erforderlich. Installiert Oikos direkt aus dem Umbrel App Store — alles läuft auf und bleibt auf eurem Umbrel.',
-        step_um1_title:'App Store öffnen', step_um1_desc:'Im Umbrel-Dashboard den App Store öffnen und nach Oikos suchen.',
+        step_tn3_title:'WebUI öffnen', step_tn3_desc:'Sobald der App-Status Aktiv anzeigt, in der App-Übersicht auf WebUI klicken. Beim ersten Aufruf führt Yuvomi direkt im Browser durch die Erstellung des Admin-Kontos.',
+        opt_umbrel_info:'Kein Terminal erforderlich. Installiert Yuvomi direkt aus dem Umbrel App Store — alles läuft auf und bleibt auf eurem Umbrel.',
+        step_um1_title:'App Store öffnen', step_um1_desc:'Im Umbrel-Dashboard den App Store öffnen und nach Yuvomi suchen.',
         step_um2_title:'Mit einem Klick installieren', step_um2_desc:'Auf Installieren klicken. Umbrel holt das Image und startet den Container für euch — keine Konfigurationsdateien zu bearbeiten.',
-        step_um3_title:'Oikos öffnen', step_um3_desc:'Startet Oikos über den Umbrel-Startbildschirm. Beim ersten Aufruf führt Oikos direkt im Browser durch die Erstellung des Admin-Kontos.',
-        opt_unraid_info:'Kein Terminal erforderlich. Oikos kommt als Community-Applications-Template — direkt über den Unraid-Apps-Tab hinzufügbar.',
-        step_ur1_title:'Community Applications öffnen', step_ur1_desc:'In Unraid den Apps-Tab (das Community-Applications-Plugin) öffnen und nach Oikos suchen.',
+        step_um3_title:'Yuvomi öffnen', step_um3_desc:'Startet Yuvomi über den Umbrel-Startbildschirm. Beim ersten Aufruf führt Yuvomi direkt im Browser durch die Erstellung des Admin-Kontos.',
+        opt_unraid_info:'Kein Terminal erforderlich. Yuvomi kommt als Community-Applications-Template — direkt über den Unraid-Apps-Tab hinzufügbar.',
+        step_ur1_title:'Community Applications öffnen', step_ur1_desc:'In Unraid den Apps-Tab (das Community-Applications-Plugin) öffnen und nach Yuvomi suchen.',
         step_ur2_title:'Template konfigurieren', step_ur2_desc:'Auf Installieren klicken. SESSION_SECRET (erforderlich) und DB_ENCRYPTION_KEY (empfohlen — sichern) setzen. WebUI-Port und appdata-Pfad bei Bedarf anpassen.',
-        step_ur3_title:'Anwenden und öffnen', step_ur3_desc:'Auf Anwenden klicken. Sobald der Container läuft, auf das Oikos-Icon → WebUI klicken. Beim ersten Aufruf führt Oikos durch die Erstellung des Admin-Kontos.',
+        step_ur3_title:'Anwenden und öffnen', step_ur3_desc:'Auf Anwenden klicken. Sobald der Container läuft, auf das Yuvomi-Icon → WebUI klicken. Beim ersten Aufruf führt Yuvomi durch die Erstellung des Admin-Kontos.',
         success_title:'Alles bereit', success_desc:'Öffnet euren Browser und geht zu:', success_hint:'Meldet euch mit den Admin-Zugangsdaten an, die ihr gerade erstellt habt. Weitere Familienmitglieder könnt ihr auf der Einstellungsseite hinzufügen.',
         success_full_guide:'Technische Vollständiganleitung',
         env_label:'Konfiguration', env_title:'Pflichteinstellungen', env_desc:'Zwei Variablen in eurer .env-Datei sind Pflicht. Alles andere ist optional.',
         env_session_label:'Session-Secret', env_session_desc:'Signiert und verifiziert Anmelde-Cookies. Mit openssl rand -hex 32 einen sicheren Wert generieren.',
         env_db_label:'Datenbank-Schlüssel', env_db_desc:'Verschlüsselt die gesamte Datenbank mit AES-256. Mit openssl rand -hex 32 generieren. Unbedingt sichern — ohne diesen Schlüssel sind die Daten nicht wiederherstellbar.',
         env_required:'Pflicht',
-        optional_label:'Optional', optional_title:'Mehr entdecken', optional_desc:'Sobald Oikos läuft, könnt ihr diese Extras einrichten. Alles wird in eurer .env-Datei konfiguriert.',
-        opt_https_title:'HTTPS & Netzwerkzugang', opt_https_desc:"Oikos von anderen Geräten oder aus dem Internet erreichbar machen — Nginx als Reverse Proxy mit kostenlosem Let's-Encrypt-Zertifikat einrichten.",
+        optional_label:'Optional', optional_title:'Mehr entdecken', optional_desc:'Sobald Yuvomi läuft, könnt ihr diese Extras einrichten. Alles wird in eurer .env-Datei konfiguriert.',
+        opt_https_title:'HTTPS & Netzwerkzugang', opt_https_desc:"Yuvomi von anderen Geräten oder aus dem Internet erreichbar machen — Nginx als Reverse Proxy mit kostenlosem Let's-Encrypt-Zertifikat einrichten.",
         opt_guide:'Anleitung →',
         opt_weather_title:'Wetter-Widget', opt_weather_desc:'Lokales Wetter auf dem Dashboard via Open-Meteo — ohne API-Schlüssel. WEATHER_LAT und WEATHER_LON mit euren Koordinaten setzen.',
         opt_cal_title:'Kalender- & Kontakt-Sync', opt_cal_desc:'Zwei-Wege-Sync mit Google Calendar (OAuth) und Multi-Account-CalDAV/CardDAV (iCloud, Nextcloud, Radicale). Apple-Erinnerungen lassen sich schreibgeschützt in Aufgaben oder Einkauf spiegeln.',
@@ -836,7 +836,7 @@ docker compose logs | grep "Server läuft"</div></div><p data-t="trouble_nginx_p
       document.querySelectorAll('[data-t]').forEach(function(el){ var k = el.getAttribute('data-t'); if (s[k] !== undefined) el.textContent = s[k]; });
       document.getElementById('langLabel').textContent = lang === 'en' ? 'DE' : 'EN';
       document.getElementById('backLabel').textContent = s.backLabel;
-      document.title = lang === 'en' ? 'Install Oikos — Self-Hosted Family Planner' : 'Oikos installieren — Selbstgehosteter Familienplaner';
+      document.title = lang === 'en' ? 'Install Yuvomi — Self-Hosted Family Planner' : 'Yuvomi installieren — Selbstgehosteter Familienplaner';
     }
     document.getElementById('themeToggle').addEventListener('click', function(){ theme = isDark() ? 'light' : 'dark'; localStorage.setItem('oikos-theme', theme); applyTheme(); });
     document.getElementById('langToggle').addEventListener('click', function(){ lang = lang === 'en' ? 'de' : 'en'; localStorage.setItem('oikos-lang', lang); applyLang(); });

@@ -1,6 +1,6 @@
 name: Umbrel Catalog Publish
 
-# Opens/updates a PR to getumbrel/umbrel-apps bumping Oikos to the released
+# Opens/updates a PR to getumbrel/umbrel-apps bumping Yuvomi to the released
 # version with a freshly resolved, digest-pinned image. Umbrel has NO auto-bump
 # bot (unlike TrueNAS), so this is what keeps the store entry current.
 #
@@ -8,7 +8,7 @@ name: Umbrel Catalog Publish
 #   - Secret UMBREL_FORK_TOKEN: a classic PAT with `repo` scope (push to the
 #     <owner>/umbrel-apps fork + open a cross-repo PR to getumbrel/umbrel-apps).
 #   - The fork <owner>/umbrel-apps must exist (created during the initial submission).
-#   - Only acts once Oikos is already in upstream master (after the initial
+#   - Only acts once Yuvomi is already in upstream master (after the initial
 #     submission PR is merged); before that it skips to avoid re-submitting.
 #
 # It edits the maintainers' upstream files IN PLACE (version, releaseNotes,
@@ -71,7 +71,7 @@ jobs:
         id: digest
         run: |
           set -euo pipefail
-          IMG="ghcr.io/${{ github.repository_owner }}/oikos:${{ steps.ver.outputs.version }}"
+          IMG="ghcr.io/${{ github.repository_owner }}/yuvomi:${{ steps.ver.outputs.version }}"
           for i in $(seq 1 40); do
             # `|| true` keeps a not-yet-published image (pipefail makes inspect's
             # failure propagate) from tripping `set -e` and aborting the retry loop.
@@ -99,7 +99,7 @@ jobs:
           set -euo pipefail
           FORK="$OWNER/umbrel-apps"
           UPSTREAM="getumbrel/umbrel-apps"
-          BRANCH="oikos-update"
+          BRANCH="yuvomi-update"
 
           git config --global user.name "$OWNER"
           git config --global user.email "$ACTOR@users.noreply.github.com"
@@ -112,46 +112,46 @@ jobs:
           git fetch --depth 1 upstream master
           git checkout -B "$BRANCH" upstream/master
 
-          # Guard: only update once Oikos is already in upstream master. Before the
+          # Guard: only update once Yuvomi is already in upstream master. Before the
           # initial submission is merged there is nothing to edit — skip.
-          if [ ! -f oikos/umbrel-app.yml ]; then
-            echo "::notice::Oikos is not yet in upstream master (initial submission still pending). Skipping auto-update."
+          if [ ! -f yuvomi/umbrel-app.yml ]; then
+            echo "::notice::Yuvomi is not yet in upstream master (initial submission still pending). Skipping auto-update."
             exit 0
           fi
 
           # Edit the maintainers' files IN PLACE — never overwrite them with our
           # source, so their port / gallery / category / review tweaks are preserved.
-          sed -i -E "s|^version: .*|version: \"$VERSION\"|" oikos/umbrel-app.yml
-          sed -i -E "s|image: ghcr.io/$OWNER/oikos:[^@[:space:]]+@sha256:[0-9a-f]+|image: ghcr.io/$OWNER/oikos:$VERSION@$DIGEST|" oikos/docker-compose.yml
+          sed -i -E "s|^version: .*|version: \"$VERSION\"|" yuvomi/umbrel-app.yml
+          sed -i -E "s|image: ghcr.io/$OWNER/yuvomi:[^@[:space:]]+@sha256:[0-9a-f]+|image: ghcr.io/$OWNER/yuvomi:$VERSION@$DIGEST|" yuvomi/docker-compose.yml
           # releaseNotes from the GitHub release body (JSON-encoded string is valid YAML)
           python3 - <<'PY'
           import json, os, re
           body = os.environ.get("RELEASE_BODY", "").strip()
-          p = "oikos/umbrel-app.yml"
+          p = "yuvomi/umbrel-app.yml"
           t = open(p).read()
           t = re.sub(r"^releaseNotes:.*$", "releaseNotes: " + json.dumps(body), t, count=1, flags=re.M)
           open(p, "w").write(t)
           PY
 
           echo "--- updated ---"
-          grep -E '^(version|releaseNotes):' oikos/umbrel-app.yml
-          grep 'image:' oikos/docker-compose.yml
+          grep -E '^(version|releaseNotes):' yuvomi/umbrel-app.yml
+          grep 'image:' yuvomi/docker-compose.yml
 
-          if git diff --quiet -- oikos/; then
+          if git diff --quiet -- yuvomi/; then
             echo "Catalog already at v$VERSION — nothing to do."
             exit 0
           fi
 
-          git add oikos/
-          git commit -m "oikos: update to v$VERSION"
+          git add yuvomi/
+          git commit -m "yuvomi: update to v$VERSION"
           git push --force origin "$BRANCH"
 
           EXISTING="$(gh pr list --repo "$UPSTREAM" --head "$OWNER:$BRANCH" --state open --json number -q '.[0].number' 2>/dev/null || true)"
           if [ -z "$EXISTING" ]; then
             gh pr create --repo "$UPSTREAM" --base master --head "$OWNER:$BRANCH" \
-              --title "oikos: update to v$VERSION" \
-              --body "Automated update of Oikos to v$VERSION (multi-arch image pinned by digest). Source: https://github.com/$OWNER/oikos/releases/tag/v$VERSION"
+              --title "yuvomi: update to v$VERSION" \
+              --body "Automated update of Yuvomi to v$VERSION (multi-arch image pinned by digest). Source: https://github.com/$OWNER/yuvomi/releases/tag/v$VERSION"
           else
             echo "PR #$EXISTING already open — force-push updated it to v$VERSION."
-            gh pr edit "$EXISTING" --repo "$UPSTREAM" --title "oikos: update to v$VERSION" || true
+            gh pr edit "$EXISTING" --repo "$UPSTREAM" --title "yuvomi: update to v$VERSION" || true
           fi

@@ -1,16 +1,16 @@
 <div align="center">
-  <img src="docs/logo.svg" alt="Oikos" width="92" />
+  <img src="docs/logo.svg" alt="Yuvomi" width="92" />
 
-  <h1>Oikos</h1>
+  <h1>Yuvomi</h1>
   <p><strong>The self-hosted family planner. Private, offline-capable, and beautiful.</strong></p>
 
   <p>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License"></a>
-    <a href="https://github.com/ulsklyc/oikos/releases"><img src="https://img.shields.io/github/v/release/ulsklyc/oikos?style=flat-square&color=6c3aed&label=release" alt="Latest Release"></a>
-    <a href="https://github.com/ulsklyc/oikos/pkgs/container/oikos"><img src="https://img.shields.io/badge/ghcr.io-oikos-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker Image"></a>
+    <a href="https://github.com/ulsklyc/yuvomi/releases"><img src="https://img.shields.io/github/v/release/ulsklyc/yuvomi?style=flat-square&color=6c3aed&label=release" alt="Latest Release"></a>
+    <a href="https://github.com/ulsklyc/yuvomi/pkgs/container/yuvomi"><img src="https://img.shields.io/badge/ghcr.io-yuvomi-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker Image"></a>
     <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%E2%89%A522-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js ≥22"></a>
     <img src="https://img.shields.io/badge/PWA-ready-5A0FC8?style=flat-square&logo=pwa&logoColor=white" alt="PWA">
-    <a href="https://github.com/ulsklyc/oikos/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs Welcome"></a>
+    <a href="https://github.com/ulsklyc/yuvomi/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs Welcome"></a>
     <a href="https://apps.truenas.com/catalog/oikos_community/"><img src="https://img.shields.io/badge/TrueNAS-0095D5?style=flat-square&logo=truenas&logoColor=white" alt="TrueNAS SCALE"></a>
     <a href="https://ca.unraid.net/apps/oikos-0s9fwat1sxc881"><img src="https://img.shields.io/badge/Unraid-F1A208?style=flat-square&logo=unraid&logoColor=white" alt="Unraid"></a>
     <img src="https://img.shields.io/badge/Umbrel-241E22?style=flat-square&logo=umbrel&logoColor=white" alt="Umbrel">
@@ -51,14 +51,14 @@
         <picture>
           <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark-web.png">
           <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/dashboard-light-web.png">
-          <img src="docs/screenshots/dashboard-light-web.png" alt="Oikos dashboard — tasks, calendar events, meals and shopping at a glance" width="680">
+          <img src="docs/screenshots/dashboard-light-web.png" alt="Yuvomi dashboard — tasks, calendar events, meals and shopping at a glance" width="680">
         </picture>
       </td>
       <td width="28%" align="center" valign="middle">
         <picture>
           <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark-mobile.png">
           <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/dashboard-light-mobile.png">
-          <img src="docs/screenshots/dashboard-light-mobile.png" alt="Oikos on mobile" width="148">
+          <img src="docs/screenshots/dashboard-light-mobile.png" alt="Yuvomi on mobile" width="148">
         </picture>
         <br>
         <sub>Mobile PWA</sub>
@@ -70,7 +70,7 @@
 
 <br>
 
-Oikos keeps your household organized — tasks, groceries, meals, calendar, budget, and more — in one private place, without cloud accounts or subscriptions. Runs as a Docker or Podman container on any home server or NAS, including rootless Podman on SELinux-enabled RHEL/Fedora/CentOS Stream systems. A polished, mobile-first PWA makes it feel native on every device.
+Yuvomi keeps your household organized — tasks, groceries, meals, calendar, budget, and more — in one private place, without cloud accounts or subscriptions. Runs as a Docker or Podman container on any home server or NAS, including rootless Podman on SELinux-enabled RHEL/Fedora/CentOS Stream systems. A polished, mobile-first PWA makes it feel native on every device.
 
 Each module is independent. Use what fits, skip what doesn't.
 
@@ -144,20 +144,20 @@ Each module is independent. Use what fits, skip what doesn't.
 
 | | Module | What it does |
 |:---:|---|---|
-| ![tasks](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/tasks.png) | **Tasks** | Shared tasks with deadlines, priorities, subtasks, recurring schedules, multi-member assignment, Kanban, and mobile bulk controls. Optional CalDAV import of Apple Reminders. |
-| ![shopping](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/shopping.png) | **Shopping** | Collaborative lists organized by aisle. Touch-safe quick add, swipe gestures, and meal-plan import in one tap. Optional CalDAV import. |
-| ![meals](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/meals.png) | **Meals** | Weekly drag-and-drop planner with multiple items per slot. Direct export to shopping list. |
-| ![recipes](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/recipes.png) | **Recipes** | Create, duplicate, and scale recipes. Pre-fill meal slots or save any planned meal as a recipe. |
-| ![calendar](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/calendar.png) | **Calendar** | Google Calendar (OAuth) and CalDAV sync (iCloud, Nextcloud, Radicale). ICS subscriptions, recurring events, file attachments, month and agenda views. |
-| ![documents](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/documents.png) | **Documents** | Upload and organize family files. Folders, tags, per-document visibility controls, drag-and-drop. |
-| ![budget](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/budget.png) | **Budget** | Income, expenses, recurring entries, trend charts, CSV export. Split Expenses with automatic debt simplification. |
-| ![housekeeping](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/housekeeping.png) | **Housekeeping** | Manage household staff — schedules, check-in/out, daily or hourly billing, chores, supply requests. |
-| ![notes](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/notes.png) | **Notes & Contacts** | Colored sticky notes with Markdown. Contact directory with CardDAV sync. |
-| ![birthdays](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/birthdays.png) | **Birthdays** | Birthday tracker with automatic calendar events, age display, and custom reminders. |
-| ![family](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/family.png) | **Family** | Member profiles with roles, photos, phone, email, and birthday — synced to Contacts and Birthdays. |
-| ![reminders](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/reminders.png) | **Reminders** | Time-based notifications on tasks and calendar events with in-app badge counter. |
-| ![api-tokens](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/api-tokens.png) | **API Tokens** | Named Bearer / X-API-Key tokens for integrations. OpenAPI 3.0 spec included. |
-| ![backup](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/backup.png) | **Backup** | Manual and scheduled database backup and restore, with automatic pre-restore rollback. Optional WebDAV upload target (Nextcloud, ownCloud, Hetzner, etc.). |
+| ![tasks](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/tasks.png) | **Tasks** | Shared tasks with deadlines, priorities, subtasks, recurring schedules, multi-member assignment, Kanban, and mobile bulk controls. Optional CalDAV import of Apple Reminders. |
+| ![shopping](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/shopping.png) | **Shopping** | Collaborative lists organized by aisle. Touch-safe quick add, swipe gestures, and meal-plan import in one tap. Optional CalDAV import. |
+| ![meals](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/meals.png) | **Meals** | Weekly drag-and-drop planner with multiple items per slot. Direct export to shopping list. |
+| ![recipes](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/recipes.png) | **Recipes** | Create, duplicate, and scale recipes. Pre-fill meal slots or save any planned meal as a recipe. |
+| ![calendar](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/calendar.png) | **Calendar** | Google Calendar (OAuth) and CalDAV sync (iCloud, Nextcloud, Radicale). ICS subscriptions, recurring events, file attachments, month and agenda views. |
+| ![documents](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/documents.png) | **Documents** | Upload and organize family files. Folders, tags, per-document visibility controls, drag-and-drop. |
+| ![budget](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/budget.png) | **Budget** | Income, expenses, recurring entries, trend charts, CSV export. Split Expenses with automatic debt simplification. |
+| ![housekeeping](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/housekeeping.png) | **Housekeeping** | Manage household staff — schedules, check-in/out, daily or hourly billing, chores, supply requests. |
+| ![notes](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/notes.png) | **Notes & Contacts** | Colored sticky notes with Markdown. Contact directory with CardDAV sync. |
+| ![birthdays](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/birthdays.png) | **Birthdays** | Birthday tracker with automatic calendar events, age display, and custom reminders. |
+| ![family](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/family.png) | **Family** | Member profiles with roles, photos, phone, email, and birthday — synced to Contacts and Birthdays. |
+| ![reminders](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/reminders.png) | **Reminders** | Time-based notifications on tasks and calendar events with in-app badge counter. |
+| ![api-tokens](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/api-tokens.png) | **API Tokens** | Named Bearer / X-API-Key tokens for integrations. OpenAPI 3.0 spec included. |
+| ![backup](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/backup.png) | **Backup** | Manual and scheduled database backup and restore, with automatic pre-restore rollback. Optional WebDAV upload target (Nextcloud, ownCloud, Hetzner, etc.). |
 
 ---
 
@@ -179,7 +179,7 @@ Each module is independent. Use what fits, skip what doesn't.
 A localized setup wizard — 18 languages — that runs in your browser. Auto-detects Docker or Podman, configures HTTPS, SSO, and scheduled backups, then starts the container and creates your admin account.
 
 ```bash
-git clone https://github.com/ulsklyc/oikos.git && cd oikos
+git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi
 node tools/installer/install-server.js
 ```
 
@@ -190,8 +190,8 @@ Open **http://localhost:8090**. Requires Node.js 18+ on the host.
 **Pre-built image:**
 
 ```bash
-curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example
+curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example
 cp .env.example .env          # set SESSION_SECRET and DB_ENCRYPTION_KEY
 docker compose up -d
 ```
@@ -199,7 +199,7 @@ docker compose up -d
 **Build from source:**
 
 ```bash
-git clone https://github.com/ulsklyc/oikos.git && cd oikos
+git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi
 cp .env.example .env
 docker compose up -d --build
 ```
@@ -213,17 +213,17 @@ Open `http://localhost:3000`. The first visit walks you through creating your ad
 <table>
   <tr>
     <td><b>TrueNAS SCALE</b></td>
-    <td>Apps → Discover Apps → search <b>Oikos</b> → Install</td>
+    <td>Apps → Discover Apps → search <b>Yuvomi</b> → Install</td>
     <td>No terminal required. Community Apps Catalog. Version updates via Renovate.</td>
   </tr>
   <tr>
     <td><b>Umbrel</b></td>
-    <td>App Store → search <b>Oikos</b> → Install</td>
+    <td>App Store → search <b>Yuvomi</b> → Install</td>
     <td>One-click install. Everything stays on your Umbrel.</td>
   </tr>
   <tr>
     <td><b>Unraid</b></td>
-    <td>Apps → search <b>Oikos</b> → Apply</td>
+    <td>Apps → search <b>Yuvomi</b> → Apply</td>
     <td>Community Applications template. Set <code>SESSION_SECRET</code> during install.</td>
   </tr>
 </table>

@@ -1,5 +1,5 @@
 {
-  "title": "Oikos 设置",
+  "title": "Yuvomi 设置",
   "common": {
     "continue": "继续",
     "back": "返回",
@@ -11,10 +11,10 @@
   },
   "config": {
     "title": "基本配置",
-    "subtitle": "您将如何访问 Oikos？",
+    "subtitle": "您将如何访问 Yuvomi？",
     "existing": "检测到现有配置——保存前将备份您当前的 .env 文件。",
     "hostLabel": "域名或 IP 地址",
-    "hostHint": "您将用于在浏览器中打开 Oikos 的地址。",
+    "hostHint": "您将用于在浏览器中打开 Yuvomi 的地址。",
     "portLabel": "端口",
     "tzLabel": "时区",
     "errHost": "主机名无效。只能使用字母、数字、连字符和点。",
@@ -47,7 +47,7 @@
   },
   "calendar": {
     "title": "日历同步",
-    "subtitle": "将 Oikos 连接到 Google 日历或 Apple iCloud。两者均为可选——展开以进行配置。",
+    "subtitle": "将 Yuvomi 连接到 Google 日历或 Apple iCloud。两者均为可选——展开以进行配置。",
     "google": "Google 日历",
     "googleHint": "在 {{link}} 创建 OAuth 凭据。重定向 URI：{{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -79,7 +79,7 @@
     "configured": "已配置"
   },
   "docker": {
-    "title": "正在启动 Oikos",
+    "title": "正在启动 Yuvomi",
     "subtitle": "正在拉取镜像并启动 Docker 容器。",
     "starting": "正在启动容器 …",
     "elapsed": "已用时 {{n}} 秒",
@@ -91,7 +91,7 @@
   },
   "admin": {
     "title": "创建管理员账户",
-    "subtitle": "设置您的首次登录。此账户拥有对 Oikos 的完全访问权限。",
+    "subtitle": "设置您的首次登录。此账户拥有对 Yuvomi 的完全访问权限。",
     "userLabel": "用户名",
     "userHint": "3–64 个字符：字母、数字、. - _",
     "nameLabel": "显示名称",
@@ -107,15 +107,15 @@
     "errCreate": "无法创建管理员账户。"
   },
   "done": {
-    "title": "Oikos 已就绪！",
+    "title": "Yuvomi 已就绪！",
     "subtitle": "您的家庭规划器正在运行，管理员账户已设置完成。",
-    "open": "打开 Oikos →"
+    "open": "打开 Yuvomi →"
   },
   "advanced": {
     "tag": "高级 · 可选",
     "title": "高级设置",
     "subtitle": "反向代理、单点登录和自动备份。全部可选——跳过也很安全。",
-    "proxyLabel": "Oikos 如何对外提供服务？",
+    "proxyLabel": "Yuvomi 如何对外提供服务？",
     "proxyBehindHttps": "位于带 HTTPS 的反向代理之后（Caddy、nginx、Traefik）",
     "proxyDirect": "通过 localhost / HTTP 直接访问",
     "proxyHint": "直接访问会禁用“仅安全”Cookie，使登录在没有 HTTPS 时也能工作。",

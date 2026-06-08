@@ -2,11 +2,11 @@
 <CommunityApplications>
   <!-- Repository overview shown in Community Apps. Markdown supported. -->
   <Profile>
-**Oikos** — the self-hosted family planner PWA.
+**Yuvomi** — the self-hosted family planner PWA.
 
 A private, offline-capable web app that keeps your household organized — tasks, groceries, meals, recipes, calendar, documents, budget, housekeeping, notes, contacts, birthdays and more — in one place, without cloud accounts or subscriptions.
 
-This repository ships the official Docker template for Oikos. The image is published to GitHub Container Registry at `ghcr.io/ulsklyc/oikos`.
+This repository ships the official Docker template for Yuvomi. The image is published to GitHub Container Registry at `ghcr.io/ulsklyc/yuvomi`.
 
 **Support:** open an issue at https://github.com/ulsklyc/oikos/issues
   </Profile>

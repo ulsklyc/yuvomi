@@ -1,4 +1,4 @@
-# Oikos CLI-Installer — 中文 (zh)
+# Yuvomi CLI-Installer — 中文 (zh)
 # Auto-generiert (Schlüssel identisch zu allen Locales). en = Fallback, de = Referenz.
 # Wird von install.sh gesourct; setzt die englische Basis pro Schlüssel außer Kraft.
 # Punkt-Schlüssel → Variablen mit Unterstrich (MSG_<bereich>_<name>).
@@ -59,7 +59,7 @@ MSG_admin_password="密码（至少 8 个字符）："
 MSG_admin_confirm="确认密码："
 MSG_admin_mismatch="两次输入的密码不一致，请重试。"
 MSG_admin_created="管理员账户已创建！"
-MSG_admin_ready="  Oikos 已就绪！"
+MSG_admin_ready="  Yuvomi 已就绪！"
 MSG_admin_open="  打开：%s"
 MSG_admin_exists="管理员账户已存在。"
 MSG_admin_failed="创建管理员失败（HTTP %s）：%s"

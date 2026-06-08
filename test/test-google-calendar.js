@@ -31,7 +31,7 @@ function assertEqual(a, b, msg) {
 console.log('\n[Google Calendar Test] Datumskonvertierung + RRULE-Präfix\n');
 
 // --------------------------------------------------------
-// googleAllDayEndToInclusive – Google exklusiv → Oikos inklusiv
+// googleAllDayEndToInclusive – Google exklusiv → Yuvomi inklusiv
 // --------------------------------------------------------
 test('googleAllDayEndToInclusive: 2-Tage-Event (Jan 1–2)', () => {
   assertEqual(googleAllDayEndToInclusive('2026-01-03'), '2026-01-02');
@@ -50,7 +50,7 @@ test('googleAllDayEndToInclusive: null → null', () => {
 });
 
 // --------------------------------------------------------
-// localAllDayEndToExclusive – Oikos inklusiv → Google exklusiv
+// localAllDayEndToExclusive – Yuvomi inklusiv → Google exklusiv
 // --------------------------------------------------------
 test('localAllDayEndToExclusive: Jan 2 → Jan 3', () => {
   assertEqual(localAllDayEndToExclusive('2026-01-02'), '2026-01-03');
@@ -158,7 +158,7 @@ test('localEventToGoogle: all-day UNTIL wird auf reines DATE reduziert', () => {
 
 // --------------------------------------------------------
 // localEventToGoogle – RFC-3339-konforme dateTime (Sekunden)
-// Regression: Issue #217 – Oikos speichert getimte Events als
+// Regression: Issue #217 – Yuvomi speichert getimte Events als
 // "YYYY-MM-DDTHH:MM" (ohne Sekunden). Google verlangt RFC 3339 mit
 // Sekunden, sonst "Bad Request" bzw. (bei Wiederholung) "Invalid
 // recurrence rule".

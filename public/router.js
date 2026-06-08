@@ -147,7 +147,7 @@ const ROUTE_ORDER = ['/', '/calendar', '/tasks', '/meals', '/recipes', '/shoppin
 
 const PRIMARY_NAV = 4;
 
-const DEFAULT_APP_NAME = 'Oikos';
+const DEFAULT_APP_NAME = 'Yuvomi';
 const APP_NAME_STORAGE_KEY = 'oikos-app-name';
 const APP_VERSION_STORAGE_KEY = 'oikos-app-version';
 
@@ -1842,14 +1842,14 @@ function friendlyError(err) {
 window.addEventListener('error', (e) => {
   // Ressource-Ladefehler (z.B. fehlgeschlagenes Bild): ignorieren
   if (e.target && e.target !== window) return;
-  console.error('[Oikos] Unbehandelter Fehler:', e.error ?? e.message);
+  console.error('[Yuvomi] Unbehandelter Fehler:', e.error ?? e.message);
   showToast(t('common.unexpectedError'), 'danger');
 });
 
 window.addEventListener('unhandledrejection', (e) => {
   // Auth-Fehler werden bereits von auth:expired behandelt
   if (e.reason?.status === 401) return;
-  console.error('[Oikos] Unbehandeltes Promise-Rejection:', e.reason);
+  console.error('[Yuvomi] Unbehandeltes Promise-Rejection:', e.reason);
   showToast(friendlyError(e.reason), 'danger');
   e.preventDefault(); // Konsolenfehler unterdrücken (bereits geloggt)
 });

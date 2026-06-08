@@ -1,5 +1,5 @@
 {
-  "title": "Oikos instellen",
+  "title": "Yuvomi instellen",
   "common": {
     "continue": "Doorgaan",
     "back": "Terug",
@@ -11,10 +11,10 @@
   },
   "config": {
     "title": "Basisconfiguratie",
-    "subtitle": "Hoe wil je Oikos bereiken?",
+    "subtitle": "Hoe wil je Yuvomi bereiken?",
     "existing": "Bestaande configuratie gevonden — je huidige .env-bestand wordt voor het opslaan geback-upt.",
     "hostLabel": "Domein of IP-adres",
-    "hostHint": "Het adres waarmee je Oikos in de browser opent.",
+    "hostHint": "Het adres waarmee je Yuvomi in de browser opent.",
     "portLabel": "Poort",
     "tzLabel": "Tijdzone",
     "errHost": "Ongeldige hostnaam. Gebruik alleen letters, cijfers, koppeltekens en punten.",
@@ -47,7 +47,7 @@
   },
   "calendar": {
     "title": "Kalendersynchronisatie",
-    "subtitle": "Verbind Oikos met Google Agenda of Apple iCloud. Beide optioneel — uitklappen om te configureren.",
+    "subtitle": "Verbind Yuvomi met Google Agenda of Apple iCloud. Beide optioneel — uitklappen om te configureren.",
     "google": "Google Agenda",
     "googleHint": "Maak OAuth-inloggegevens aan op {{link}}. Redirect-URI: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -67,7 +67,7 @@
     "tag": "Geavanceerd · optioneel",
     "title": "Geavanceerde instellingen",
     "subtitle": "Reverse proxy, single sign-on en automatische back-ups. Alles optioneel — overslaan is veilig.",
-    "proxyLabel": "Hoe wordt Oikos aangeboden?",
+    "proxyLabel": "Hoe wordt Yuvomi aangeboden?",
     "proxyBehindHttps": "Achter een reverse proxy met HTTPS (Caddy, nginx, Traefik)",
     "proxyDirect": "Directe toegang via localhost / HTTP",
     "proxyHint": "Directe toegang schakelt Secure-only cookies uit zodat inloggen zonder HTTPS werkt.",
@@ -100,7 +100,7 @@
     "configured": "geconfigureerd"
   },
   "docker": {
-    "title": "Oikos wordt gestart",
+    "title": "Yuvomi wordt gestart",
     "subtitle": "Het image wordt geladen en de Docker-container wordt gestart.",
     "starting": "Container wordt gestart …",
     "elapsed": "{{n}} s verstreken",
@@ -112,7 +112,7 @@
   },
   "admin": {
     "title": "Beheerdersaccount aanmaken",
-    "subtitle": "Stel je eerste login in. Dit account heeft volledige toegang tot Oikos.",
+    "subtitle": "Stel je eerste login in. Dit account heeft volledige toegang tot Yuvomi.",
     "userLabel": "Gebruikersnaam",
     "userHint": "3–64 tekens: letters, cijfers, . - _",
     "nameLabel": "Weergavenaam",
@@ -128,8 +128,8 @@
     "errCreate": "Beheerdersaccount kon niet worden aangemaakt."
   },
   "done": {
-    "title": "Oikos is klaar!",
+    "title": "Yuvomi is klaar!",
     "subtitle": "Je gezinsplanner werkt en je beheerdersaccount is ingesteld.",
-    "open": "Oikos openen →"
+    "open": "Yuvomi openen →"
   }
 }

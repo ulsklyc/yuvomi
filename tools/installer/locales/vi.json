@@ -1,5 +1,5 @@
 {
-  "title": "Cài đặt Oikos",
+  "title": "Cài đặt Yuvomi",
   "common": {
     "continue": "Tiếp tục",
     "back": "Quay lại",
@@ -11,10 +11,10 @@
   },
   "config": {
     "title": "Cấu hình cơ bản",
-    "subtitle": "Bạn sẽ truy cập Oikos như thế nào?",
+    "subtitle": "Bạn sẽ truy cập Yuvomi như thế nào?",
     "existing": "Đã phát hiện cấu hình hiện có — tệp .env hiện tại của bạn sẽ được sao lưu trước khi lưu.",
     "hostLabel": "Tên miền hoặc địa chỉ IP",
-    "hostHint": "Địa chỉ bạn sẽ dùng để mở Oikos trong trình duyệt.",
+    "hostHint": "Địa chỉ bạn sẽ dùng để mở Yuvomi trong trình duyệt.",
     "portLabel": "Cổng",
     "tzLabel": "Múi giờ",
     "errHost": "Tên máy chủ không hợp lệ. Chỉ dùng chữ cái, số, dấu gạch ngang và dấu chấm.",
@@ -47,7 +47,7 @@
   },
   "calendar": {
     "title": "Đồng bộ lịch",
-    "subtitle": "Kết nối Oikos với Google Calendar hoặc Apple iCloud. Cả hai đều tùy chọn — mở rộng để cấu hình.",
+    "subtitle": "Kết nối Yuvomi với Google Calendar hoặc Apple iCloud. Cả hai đều tùy chọn — mở rộng để cấu hình.",
     "google": "Google Calendar",
     "googleHint": "Tạo thông tin xác thực OAuth tại {{link}}. URI chuyển hướng: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -79,7 +79,7 @@
     "configured": "đã cấu hình"
   },
   "docker": {
-    "title": "Đang khởi động Oikos",
+    "title": "Đang khởi động Yuvomi",
     "subtitle": "Đang tải image và khởi động container Docker.",
     "starting": "Đang khởi động container …",
     "elapsed": "Đã qua {{n}}s",
@@ -91,7 +91,7 @@
   },
   "admin": {
     "title": "Tạo tài khoản Admin",
-    "subtitle": "Thiết lập lần đăng nhập đầu tiên. Tài khoản này có toàn quyền truy cập vào Oikos.",
+    "subtitle": "Thiết lập lần đăng nhập đầu tiên. Tài khoản này có toàn quyền truy cập vào Yuvomi.",
     "userLabel": "Tên người dùng",
     "userHint": "3–64 ký tự: chữ cái, số, . - _",
     "nameLabel": "Tên hiển thị",
@@ -107,15 +107,15 @@
     "errCreate": "Không thể tạo tài khoản admin."
   },
   "done": {
-    "title": "Oikos đã sẵn sàng!",
+    "title": "Yuvomi đã sẵn sàng!",
     "subtitle": "Trình lên kế hoạch gia đình của bạn đang chạy và tài khoản admin đã được thiết lập.",
-    "open": "Mở Oikos →"
+    "open": "Mở Yuvomi →"
   },
   "advanced": {
     "tag": "Nâng cao · tùy chọn",
     "title": "Cài đặt nâng cao",
     "subtitle": "Reverse proxy, đăng nhập một lần và sao lưu tự động. Tất cả đều tùy chọn — bỏ qua là an toàn.",
-    "proxyLabel": "Oikos được hiển thị như thế nào?",
+    "proxyLabel": "Yuvomi được hiển thị như thế nào?",
     "proxyBehindHttps": "Sau reverse proxy với HTTPS (Caddy, nginx, Traefik)",
     "proxyDirect": "Truy cập trực tiếp qua localhost / HTTP",
     "proxyHint": "Truy cập trực tiếp tắt cookie chỉ dành cho HTTPS để đăng nhập hoạt động mà không cần HTTPS.",

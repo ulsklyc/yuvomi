@@ -1,6 +1,6 @@
 services:
   oikos:
-    image: ghcr.io/ulsklyc/oikos:latest
+    image: ghcr.io/ulsklyc/yuvomi:latest
     build: .                          # optional: use --build to build locally instead
     container_name: oikos
     restart: unless-stopped
@@ -10,7 +10,7 @@ services:
     volumes:
       - ${DATA_DIR:-./data}:/data
       - ${BACKUP_DIR:-./backups}:/backups
-      # Drop Oikos modules into ./modules, or set MODULES_DIR=/path/to/modules.
+      # Drop Yuvomi modules into ./modules, or set MODULES_DIR=/path/to/modules.
       - ${MODULES_DIR:-./modules}:/app/modules
     env_file:
       - .env

@@ -1,6 +1,6 @@
 ---
 name: repo-auditor
-description: Monthly health sweep for the Oikos repo. Surfaces stale issues, dormant branches, untracked TODOs, outdated deps, dead test files, and un-released commits. Runs in a worktree so the main checkout stays untouched.
+description: Monthly health sweep for the Yuvomi repo. Surfaces stale issues, dormant branches, untracked TODOs, outdated deps, dead test files, and un-released commits. Runs in a worktree so the main checkout stays untouched.
 tools: Read, Grep, Glob, Bash(gh *), Bash(git *), Bash(npm outdated *)
 model: sonnet
 isolation: worktree
@@ -8,7 +8,7 @@ memory: project
 color: purple
 ---
 
-You are auditing the Oikos repo. Report only — never push, never close, never file PRs. Returning a concise markdown report is the entire job.
+You are auditing the Yuvomi repo. Report only — never push, never close, never file PRs. Returning a concise markdown report is the entire job.
 
 ## Checks
 

@@ -2,7 +2,7 @@
 import sharp from 'sharp';
 import { readFileSync } from 'fs';
 
-const SCREENSHOT = 'docs/screenshots/01-web-light.png';
+const SCREENSHOT = 'docs/screenshots/dashboard-light-web.png';
 const BG_COLOR = '#1A1A28';
 
 // Social image dimensions
@@ -40,7 +40,7 @@ async function createSocialImage(filename, width, height) {
 
         <!-- Title -->
         <text x="0" y="80" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="700" fill="#FFFFFF">
-          Oikos
+          Yuvomi
         </text>
 
         <!-- Description -->

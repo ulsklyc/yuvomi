@@ -1,4 +1,4 @@
-# Oikos CLI-Installer — Vietnamese (vi)
+# Yuvomi CLI-Installer — Vietnamese (vi)
 MSG_prereq_step="Kiểm tra điều kiện tiên quyết"
 MSG_prereq_curl_found="curl được tìm thấy"
 MSG_prereq_curl_missing="curl không được tìm thấy"
@@ -56,7 +56,7 @@ MSG_admin_password="Mật khẩu (tối thiểu 8 ký tự):"
 MSG_admin_confirm="Xác nhận mật khẩu:"
 MSG_admin_mismatch="Mật khẩu không khớp, thử lại."
 MSG_admin_created="Đã tạo tài khoản admin!"
-MSG_admin_ready="  Oikos đã sẵn sàng!"
+MSG_admin_ready="  Yuvomi đã sẵn sàng!"
 MSG_admin_open="  Mở: %s"
 MSG_admin_exists="Đã có tài khoản admin."
 MSG_admin_failed="Không thể tạo admin (HTTP %s): %s"

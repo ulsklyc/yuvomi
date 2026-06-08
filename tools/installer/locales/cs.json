@@ -1,5 +1,5 @@
 {
-  "title": "Nastavení Oikos",
+  "title": "Nastavení Yuvomi",
   "common": {
     "continue": "Pokračovat",
     "back": "Zpět",
@@ -11,10 +11,10 @@
   },
   "config": {
     "title": "Základní konfigurace",
-    "subtitle": "Jak chceš přistupovat k Oikos?",
+    "subtitle": "Jak chceš přistupovat k Yuvomi?",
     "existing": "Nalezena stávající konfigurace – před uložením bude záloha tvého souboru .env.",
     "hostLabel": "Doména nebo IP adresa",
-    "hostHint": "Adresa, na které otevřeš Oikos v prohlížeči.",
+    "hostHint": "Adresa, na které otevřeš Yuvomi v prohlížeči.",
     "portLabel": "Port",
     "tzLabel": "Časové pásmo",
     "errHost": "Neplatný název hostitele. Používej jen písmena, číslice, pomlčky a tečky.",
@@ -47,7 +47,7 @@
   },
   "calendar": {
     "title": "Synchronizace kalendáře",
-    "subtitle": "Propoj Oikos s Kalendářem Google nebo Apple iCloud. Obojí je volitelné – rozbal pro konfiguraci.",
+    "subtitle": "Propoj Yuvomi s Kalendářem Google nebo Apple iCloud. Obojí je volitelné – rozbal pro konfiguraci.",
     "google": "Kalendář Google",
     "googleHint": "Vytvoř OAuth přihlašovací údaje na {{link}}. Přesměrovací URI: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -67,7 +67,7 @@
     "tag": "Pokročilé · volitelné",
     "title": "Pokročilá nastavení",
     "subtitle": "Reverzní proxy, jednotné přihlášení a automatické zálohy. Vše volitelné – přeskočení je bezpečné.",
-    "proxyLabel": "Jak je Oikos zpřístupněn?",
+    "proxyLabel": "Jak je Yuvomi zpřístupněn?",
     "proxyBehindHttps": "Za reverzní proxy s HTTPS (Caddy, nginx, Traefik)",
     "proxyDirect": "Přímý přístup přes localhost / HTTP",
     "proxyHint": "Přímý přístup zakáže cookies pouze pro HTTPS, aby přihlášení fungovalo bez HTTPS.",
@@ -100,7 +100,7 @@
     "configured": "nakonfigurováno"
   },
   "docker": {
-    "title": "Spouštění Oikos",
+    "title": "Spouštění Yuvomi",
     "subtitle": "Obraz se načítá a kontejner Docker se spouští.",
     "starting": "Spouštění kontejneru …",
     "elapsed": "{{n}} s uplynulo",
@@ -112,7 +112,7 @@
   },
   "admin": {
     "title": "Vytvoření účtu správce",
-    "subtitle": "Nastav své první přihlášení. Tento účet má úplný přístup k Oikos.",
+    "subtitle": "Nastav své první přihlášení. Tento účet má úplný přístup k Yuvomi.",
     "userLabel": "Uživatelské jméno",
     "userHint": "3–64 znaků: písmena, číslice, . - _",
     "nameLabel": "Zobrazované jméno",
@@ -128,8 +128,8 @@
     "errCreate": "Nepodařilo se vytvořit účet správce."
   },
   "done": {
-    "title": "Oikos je připraven!",
+    "title": "Yuvomi je připraven!",
     "subtitle": "Tvůj rodinný plánovač běží a účet správce je nastaven.",
-    "open": "Otevřít Oikos →"
+    "open": "Otevřít Yuvomi →"
   }
 }

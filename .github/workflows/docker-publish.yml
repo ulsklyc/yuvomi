@@ -33,7 +33,14 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # IMAGE_NAME = github.repository → ghcr.io/ulsklyc/yuvomi (primary, post-rename).
+          # The second image is a TRANSITIONAL parallel push to the old
+          # ghcr.io/ulsklyc/oikos package so existing pulls keep working after the
+          # Oikos→Yuvomi rename. Remove this line after ~2 releases (and verify
+          # the first yuvomi release actually pushed both images).
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/oikos
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}

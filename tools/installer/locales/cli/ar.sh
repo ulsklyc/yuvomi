@@ -1,4 +1,4 @@
-# Oikos CLI-Installer — العربية (ar)
+# Yuvomi CLI-Installer — العربية (ar)
 # Auto-generiert (Schlüssel identisch zu allen Locales). en = Fallback, de = Referenz.
 # Wird von install.sh gesourct; setzt die englische Basis pro Schlüssel außer Kraft.
 # Punkt-Schlüssel → Variablen mit Unterstrich (MSG_<bereich>_<name>).
@@ -59,7 +59,7 @@ MSG_admin_password="كلمة المرور (8 أحرف على الأقل):"
 MSG_admin_confirm="أكّد كلمة المرور:"
 MSG_admin_mismatch="كلمتا المرور غير متطابقتين، حاول مجددًا."
 MSG_admin_created="تم إنشاء حساب المسؤول!"
-MSG_admin_ready="  Oikos جاهز!"
+MSG_admin_ready="  Yuvomi جاهز!"
 MSG_admin_open="  افتح: %s"
 MSG_admin_exists="يوجد حساب مسؤول بالفعل."
 MSG_admin_failed="فشل إنشاء المسؤول (HTTP %s): %s"

@@ -1,11 +1,11 @@
 ## Quick Install
 
-Three ways to get Oikos running from scratch:
+Three ways to get Yuvomi running from scratch:
 
 ### Option A — Web Installer (recommended, all platforms)
 
 ```bash
-git clone https://github.com/ulsklyc/oikos.git && cd oikos
+git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi
 node tools/installer/install-server.js
 # Open http://localhost:8090
 ```
@@ -15,7 +15,7 @@ Requires Node.js 18+ on the host. The browser-based wizard is fully localized (1
 ### Option B — CLI Installer (Linux / macOS)
 
 ```bash
-git clone https://github.com/ulsklyc/oikos.git && cd oikos
+git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi
 bash install.sh
 ```
 
@@ -36,8 +36,8 @@ bash install.sh --env-file /path/to/.env
 ### Option C — Manual (Docker or Podman, no clone required)
 
 ```bash
-curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example
+curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example
 cp .env.example .env  # set SESSION_SECRET and DB_ENCRYPTION_KEY
 docker compose up -d
 ```
@@ -46,8 +46,8 @@ docker compose up -d
 adds the SELinux `:Z` relabel so the rootless container can write to its volumes:
 
 ```bash
-curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/podman-compose.yml
-curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example
+curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/podman-compose.yml
+curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example
 cp .env.example .env  # set SESSION_SECRET and DB_ENCRYPTION_KEY
 podman compose -f podman-compose.yml up -d   # or: podman-compose -f podman-compose.yml up -d
 ```
@@ -60,7 +60,7 @@ the browser. Headless deployments can instead create it from the container conso
 
 # Installation Guide
 
-Complete setup instructions for Oikos - from Docker installation to your first login.
+Complete setup instructions for Yuvomi - from Docker installation to your first login.
 
 ## Table of Contents
 
@@ -78,7 +78,7 @@ Complete setup instructions for Oikos - from Docker installation to your first l
 
 ## Architecture Overview
 
-Oikos is a self-hosted family planner that runs as a single Docker container. The Express.js backend serves both the API and the static frontend files. All data is stored in a SQLCipher-encrypted SQLite database inside a host-mounted data folder, and automated backups are written to a separate host-mounted backup folder.
+Yuvomi is a self-hosted family planner that runs as a single Docker container. The Express.js backend serves both the API and the static frontend files. All data is stored in a SQLCipher-encrypted SQLite database inside a host-mounted data folder, and automated backups are written to a separate host-mounted backup folder.
 
 ```
 Browser ──HTTP──▶ Docker Container (Express.js :3000) ──▶ SQLite/SQLCipher (/data/oikos.db)
@@ -87,7 +87,7 @@ With HTTPS (recommended for network access):
 Browser ──HTTPS──▶ Nginx (Reverse Proxy) ──HTTP──▶ Docker Container (Express.js :3000) ──▶ SQLite/SQLCipher
 ```
 
-For local-only access, the Docker container is all you need. If you want to access Oikos from other devices on your network or the internet, add Nginx as a reverse proxy with SSL.
+For local-only access, the Docker container is all you need. If you want to access Yuvomi from other devices on your network or the internet, add Nginx as a reverse proxy with SSL.
 
 ---
 
@@ -113,7 +113,7 @@ docker compose version     # Docker Compose version v2.x.x
 ### Podman (alternative to Docker, RHEL / Fedora / CentOS Stream)
 
 RHEL-based distributions ship **Podman** (often rootless) and **SELinux** instead of
-Docker. Oikos supports Podman out of the box: both installers auto-detect it, and a
+Docker. Yuvomi supports Podman out of the box: both installers auto-detect it, and a
 dedicated `podman-compose.yml` adds the SELinux `:Z` volume relabel. Install Podman and
 either the `podman compose` subcommand (Podman 4.1+) or the `podman-compose` package:
 
@@ -145,7 +145,7 @@ git --version              # git version 2.x.x
 
 ## Step-by-Step Installation
 
-There are six ways to get Oikos running. **Option A** (web installer) is recommended for most users — it walks you through every step in your browser. **Option B** (pre-built image) is a quick manual alternative. **Option C** (build from source) is for contributors or custom builds. **Options D–F** install directly from a NAS/home-server app store with no terminal required: **Option D** (TrueNAS SCALE), **Option E** (Umbrel), and **Option F** (Unraid).
+There are six ways to get Yuvomi running. **Option A** (web installer) is recommended for most users — it walks you through every step in your browser. **Option B** (pre-built image) is a quick manual alternative. **Option C** (build from source) is for contributors or custom builds. **Options D–F** install directly from a NAS/home-server app store with no terminal required: **Option D** (TrueNAS SCALE), **Option E** (Umbrel), and **Option F** (Unraid).
 
 ---
 
@@ -156,8 +156,8 @@ Requires Node.js 18+ and Docker on the host.
 #### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/ulsklyc/oikos.git
-cd oikos
+git clone https://github.com/ulsklyc/yuvomi.git
+cd yuvomi
 ```
 
 #### 2. Start the Installer
@@ -189,8 +189,8 @@ A ready-to-use Docker image is published to the GitHub Container Registry on eve
 #### 1. Download the Compose File and Example Config
 
 ```bash
-curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example
+curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example
 ```
 
 #### 2. Configure Environment Variables
@@ -220,7 +220,7 @@ Run this command **twice** and paste each result. See [Environment Variables](#e
 docker compose up -d
 ```
 
-Docker pulls `ghcr.io/ulsklyc/oikos:latest` automatically. No build step, no Node.js installation needed.
+Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no Node.js installation needed.
 
 Continue with [Step 4 — Verify](#4-verify-the-container-is-running).
 
@@ -231,8 +231,8 @@ Continue with [Step 4 — Verify](#4-verify-the-container-is-running).
 #### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/ulsklyc/oikos.git
-cd oikos
+git clone https://github.com/ulsklyc/yuvomi.git
+cd yuvomi
 ```
 
 #### 2. Configure Environment Variables
@@ -265,8 +265,8 @@ docker compose logs -f
 You should see output like:
 
 ```
-oikos  | [Oikos] Server läuft auf Port 3000
-oikos  | [Oikos] Umgebung: production
+oikos  | [Yuvomi] Server läuft auf Port 3000
+oikos  | [Yuvomi] Umgebung: production
 oikos  | [Sync] Auto-Sync alle 15 Minuten aktiv.
 ```
 
@@ -274,13 +274,13 @@ Press `Ctrl+C` to stop following the logs (the container keeps running).
 
 ### 5. Create the First Admin Account
 
-On the first visit, Oikos detects that no account exists yet and guides you through
+On the first visit, Yuvomi detects that no account exists yet and guides you through
 creating your admin account directly in the browser (see step 6). The form asks for:
 - **Username** (3–64 characters; letters, numbers, dots, hyphens, underscores)
 - **Display name** (e.g. "Jane Doe")
 - **Password** (minimum 8 characters, with a confirmation field)
 
-After you submit, Oikos creates the admin, signs you in automatically, and the setup
+After you submit, Yuvomi creates the admin, signs you in automatically, and the setup
 form is no longer reachable.
 
 **Headless alternative (CLI):** if you prefer not to use the browser — or are scripting
@@ -290,7 +290,7 @@ a provisioning step — create the admin from the container console instead:
 docker compose exec oikos node setup.js
 ```
 
-### 6. Open Oikos
+### 6. Open Yuvomi
 
 Open your browser and navigate to:
 
@@ -304,11 +304,11 @@ Log in with the admin credentials you just created. You can add family members f
 
 ### Option D — TrueNAS SCALE (Community Apps Catalog)
 
-No terminal required. Oikos is available directly in the TrueNAS SCALE Community Apps Catalog.
+No terminal required. Yuvomi is available directly in the TrueNAS SCALE Community Apps Catalog.
 
 #### 1. Open the Apps Catalog
 
-In your TrueNAS SCALE web UI, go to **Apps → Discover Apps** and search for **Oikos**.
+In your TrueNAS SCALE web UI, go to **Apps → Discover Apps** and search for **Yuvomi**.
 
 #### 2. Configure and Install
 
@@ -328,19 +328,19 @@ Once the app status shows **Running**, click **WebUI** in the Apps overview. The
 
 ### Option E — Umbrel (App Store)
 
-No terminal required. Oikos is available in the Umbrel App Store — everything runs on, and stays on, your Umbrel.
+No terminal required. Yuvomi is available in the Umbrel App Store — everything runs on, and stays on, your Umbrel.
 
 #### 1. Open the App Store
 
-In your Umbrel dashboard, open the **App Store** and search for **Oikos**.
+In your Umbrel dashboard, open the **App Store** and search for **Yuvomi**.
 
 #### 2. Install with One Click
 
 Click **Install**. Umbrel pulls the image and starts the container for you — there are no configuration files to edit.
 
-#### 3. Open Oikos
+#### 3. Open Yuvomi
 
-Launch Oikos from your Umbrel home screen. The first visit guides you through creating your admin account in the browser.
+Launch Yuvomi from your Umbrel home screen. The first visit guides you through creating your admin account in the browser.
 
 > **Finish setup right away.** When Umbrel's reverse-proxy authentication is disabled, the unauthenticated first-run setup endpoint is reachable on your LAN until you create the admin account. Complete the first-run setup immediately after installing.
 
@@ -348,11 +348,11 @@ Launch Oikos from your Umbrel home screen. The first visit guides you through cr
 
 ### Option F — Unraid (Community Apps)
 
-No terminal required. Oikos ships as an Unraid Community Applications template.
+No terminal required. Yuvomi ships as an Unraid Community Applications template.
 
 #### 1. Open Community Applications
 
-In Unraid, open the **Apps** tab (the Community Applications plugin) and search for **Oikos**.
+In Unraid, open the **Apps** tab (the Community Applications plugin) and search for **Yuvomi**.
 
 #### 2. Configure the Template
 
@@ -364,7 +364,7 @@ Click **Install**. In the template, set:
 
 #### 3. Apply and Open
 
-Click **Apply**. Once the container is running, click the Oikos icon → **WebUI**. The first visit guides you through creating your admin account in the browser.
+Click **Apply**. Once the container is running, click the Yuvomi icon → **WebUI**. The first visit guides you through creating your admin account in the browser.
 
 ---
 
@@ -377,7 +377,7 @@ All configuration happens in the `.env` file. The container reads these values o
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
 | `PORT` | Port the Express server listens on **inside the container** (rarely changed) | `3000` | No |
-| `OIKOS_HTTP_PORT` | Host port that the compose file maps to the container's port 3000. Change this to expose Oikos on a different host port; the app inside the container always listens on 3000. | `3000` | No |
+| `OIKOS_HTTP_PORT` | Host port that the compose file maps to the container's port 3000. Change this to expose Yuvomi on a different host port; the app inside the container always listens on 3000. | `3000` | No |
 | `OIKOS_HTTP_BIND` | Host bind address for the published port (`podman-compose.yml` only). Set to `127.0.0.1` for rootless Podman behind a reverse proxy on the same host. | `0.0.0.0` | No |
 | `TZ` | Container timezone (e.g. `Europe/Berlin`). Affects timestamps and the automated-backup schedule. | `UTC` | No |
 | `NODE_ENV` | Runtime environment | `production` | No |
@@ -472,7 +472,7 @@ Enable single sign-on via any OpenID Connect provider (Authentik, Keycloak, Goog
 | `OIDC_CLIENT_SECRET` | Client secret for the registered application | - | No |
 | `OIDC_REDIRECT_URI` | OAuth callback URL — must be registered with the provider (e.g. `https://oikos.example.com/api/v1/auth/oidc/callback`) | - | No |
 
-When all four variables are set, a **"Sign in with SSO"** button appears on the login page. The flow uses Authorization Code + PKCE (S256) with a nonce. A matching Oikos user account (same `oidc_sub`) must already exist — automatic provisioning is not supported.
+When all four variables are set, a **"Sign in with SSO"** button appears on the login page. The flow uses Authorization Code + PKCE (S256) with a nonce. A matching Yuvomi user account (same `oidc_sub`) must already exist — automatic provisioning is not supported.
 
 ### Automated Backups (Optional)
 
@@ -485,7 +485,7 @@ Built-in cron-based database backup (default: 2 AM daily, keep last 7 copies). S
 | `BACKUP_DIR` | Directory (inside container) where backup files are written | `/backups` | No |
 | `BACKUP_KEEP` | Number of most-recent backup files to retain | `7` | No |
 
-**WebDAV backup target (optional):** After each local backup, Oikos can automatically upload the file to any WebDAV-compatible server (Nextcloud, ownCloud, Hetzner Storage Box, Infomaniak kDrive, etc.). Configure in **Settings → Backup → WebDAV Backup Target**, or via environment variables (env vars take precedence over the UI):
+**WebDAV backup target (optional):** After each local backup, Yuvomi can automatically upload the file to any WebDAV-compatible server (Nextcloud, ownCloud, Hetzner Storage Box, Infomaniak kDrive, etc.). Configure in **Settings → Backup → WebDAV Backup Target**, or via environment variables (env vars take precedence over the UI):
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
@@ -500,9 +500,9 @@ Built-in cron-based database backup (default: 2 AM daily, keep last 7 copies). S
 
 ## HTTPS / Reverse Proxy (Nginx)
 
-> **Optional for local access, required for network/internet access.** If you only access Oikos on the same machine (localhost), you can skip this section.
+> **Optional for local access, required for network/internet access.** If you only access Yuvomi on the same machine (localhost), you can skip this section.
 
-When exposing Oikos to your local network or the internet, you need HTTPS for security. Nginx acts as a reverse proxy that handles SSL termination and forwards requests to the Docker container.
+When exposing Yuvomi to your local network or the internet, you need HTTPS for security. Nginx acts as a reverse proxy that handles SSL termination and forwards requests to the Docker container.
 
 ### Install Nginx
 
@@ -514,7 +514,7 @@ sudo apt install nginx
 
 ### Configure Nginx
 
-Oikos ships with an example configuration. Copy it to Nginx:
+Yuvomi ships with an example configuration. Copy it to Nginx:
 
 ```bash
 sudo cp nginx.conf.example /etc/nginx/sites-available/oikos
@@ -551,7 +551,7 @@ Verify auto-renewal is active:
 sudo certbot renew --dry-run
 ```
 
-### Update Oikos for HTTPS
+### Update Yuvomi for HTTPS
 
 `docker-compose.yml` reads `SESSION_SECURE` from your `.env` (`${SESSION_SECURE:-false}`), so you no longer need to edit the Compose file. When running behind an HTTPS reverse proxy, set these in `.env`:
 
@@ -572,8 +572,8 @@ docker compose up -d
 
 ## Podman & systemd Autostart (rootless)
 
-On RHEL-based systems you can run Oikos as a rootless systemd service via Podman
-[Quadlet](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html). Oikos
+On RHEL-based systems you can run Yuvomi as a rootless systemd service via Podman
+[Quadlet](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html). Yuvomi
 ships a ready-made unit at `tools/quadlet/oikos.container`.
 
 ```bash
@@ -616,7 +616,7 @@ No rebuild needed. The database volume persists across updates.
 ### Option C — Build from Source
 
 ```bash
-cd oikos
+cd yuvomi
 git pull
 docker compose up -d --build
 ```
@@ -687,7 +687,7 @@ For a local CLI restore outside Docker, set the same environment variables used 
 DB_PATH=/path/to/oikos.db node --import dotenv/config scripts/restore-backup.js ./oikos-backup-20260401.db
 ```
 
-The restore helper validates that the file is an Oikos database before replacing the active database. It also keeps a pre-restore copy next to the database file for emergency rollback.
+The restore helper validates that the file is an Yuvomi database before replacing the active database. It also keeps a pre-restore copy next to the database file for emergency rollback.
 
 ### Automated Backups
 
@@ -842,7 +842,7 @@ docker compose down -v
 Remove the repository:
 
 ```bash
-cd .. && rm -rf oikos
+cd .. && rm -rf yuvomi
 ```
 
 > **Warning**: `docker compose down -v` permanently deletes all data including the database. Create a backup first if needed.

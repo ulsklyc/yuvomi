@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description: Review a PR against the Oikos Hard Constraints and decide close/request-changes/merge
+description: Review a PR against the Yuvomi Hard Constraints and decide close/request-changes/merge
 disable-model-invocation: true
 user-invocable: true
 argument-hint: "<pr-number>"

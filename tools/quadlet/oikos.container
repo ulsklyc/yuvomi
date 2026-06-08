@@ -1,4 +1,4 @@
-# Oikos als systemd-Dienst über Podman Quadlet (rootless, Podman 5.x).
+# Yuvomi als systemd-Dienst über Podman Quadlet (rootless, Podman 5.x).
 #
 # ── Setup (rootless, empfohlen) ────────────────────────────────────────────────
 #   1. Datenverzeichnisse anlegen:
@@ -21,12 +21,12 @@
 # Pfade ersetzen und `systemctl` (ohne --user) verwenden.
 
 [Unit]
-Description=Oikos family planner
+Description=Yuvomi family planner
 After=network-online.target
 Wants=network-online.target
 
 [Container]
-Image=ghcr.io/ulsklyc/oikos:latest
+Image=ghcr.io/ulsklyc/yuvomi:latest
 ContainerName=oikos
 
 # Lädt SESSION_SECRET, DB_ENCRYPTION_KEY, TZ, WEATHER_* (Open-Meteo), OPENWEATHER_* (Legacy), OIDC_* … aus der .env.

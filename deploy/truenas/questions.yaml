@@ -1,20 +1,20 @@
 groups:
-  - name: Oikos Configuration
-    description: Configure Oikos
+  - name: Yuvomi Configuration
+    description: Configure Yuvomi
   - name: User and Group Configuration
-    description: Configure User and Group for Oikos
+    description: Configure User and Group for Yuvomi
   - name: Network Configuration
-    description: Configure Network for Oikos
+    description: Configure Network for Yuvomi
   - name: Storage Configuration
-    description: Configure Storage for Oikos
+    description: Configure Storage for Yuvomi
   - name: Labels Configuration
-    description: Configure Labels for Oikos
+    description: Configure Labels for Yuvomi
   - name: Resources Configuration
-    description: Configure Resources for Oikos
+    description: Configure Resources for Yuvomi
 
 questions:
   - variable: TZ
-    group: Oikos Configuration
+    group: Yuvomi Configuration
     label: Timezone
     schema:
       type: string
@@ -25,7 +25,7 @@ questions:
 
   - variable: oikos
     label: ""
-    group: Oikos Configuration
+    group: Yuvomi Configuration
     schema:
       type: dict
       attrs:
@@ -81,7 +81,7 @@ questions:
       attrs:
         - variable: user
           label: User ID
-          description: The user id that Oikos files will be owned by.
+          description: The user id that Yuvomi files will be owned by.
           schema:
             type: int
             min: 568
@@ -89,7 +89,7 @@ questions:
             required: true
         - variable: group
           label: Group ID
-          description: The group id that Oikos files will be owned by.
+          description: The group id that Yuvomi files will be owned by.
           schema:
             type: int
             min: 568
@@ -609,14 +609,14 @@ questions:
             attrs:
               - variable: cpus
                 label: CPUs
-                description: CPUs limit for Oikos.
+                description: CPUs limit for Yuvomi.
                 schema:
                   type: int
                   default: 2
                   required: true
               - variable: memory
                 label: Memory (in MB)
-                description: Memory limit for Oikos.
+                description: Memory limit for Yuvomi.
                 schema:
                   type: int
                   default: 4096
