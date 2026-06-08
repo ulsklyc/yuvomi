@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.65.30] - 2026-06-08
+
+### Fixed
+- Tasks and calendar events with a **yearly** recurrence rule (`FREQ=YEARLY`) were rejected by the server with "invalid recurrence rule". The server-side `rrule()` validator now accepts `YEARLY` in addition to `DAILY`, `WEEKLY`, and `MONTHLY`.
+
 ## [0.65.29] - 2026-06-08
 
 ### Added
