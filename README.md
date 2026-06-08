@@ -141,20 +141,20 @@ Each module is independent. Use what fits, skip what doesn't.
 
 | | Module | What it does |
 |:---:|---|---|
-| ![tasks](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/tasks.svg) | **Tasks** | Shared tasks with deadlines, priorities, subtasks, recurring schedules, multi-member assignment, Kanban, and mobile bulk controls. Optional CalDAV import of Apple Reminders. |
-| ![shopping](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/shopping.svg) | **Shopping** | Collaborative lists organized by aisle. Touch-safe quick add, swipe gestures, and meal-plan import in one tap. Optional CalDAV import. |
-| ![meals](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/meals.svg) | **Meals** | Weekly drag-and-drop planner with multiple items per slot. Direct export to shopping list. |
-| ![recipes](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/recipes.svg) | **Recipes** | Create, duplicate, and scale recipes. Pre-fill meal slots or save any planned meal as a recipe. |
-| ![calendar](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/calendar.svg) | **Calendar** | Google Calendar (OAuth) and CalDAV sync (iCloud, Nextcloud, Radicale). ICS subscriptions, recurring events, file attachments, month and agenda views. |
-| ![documents](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/documents.svg) | **Documents** | Upload and organize family files. Folders, tags, per-document visibility controls, drag-and-drop. |
-| ![budget](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/budget.svg) | **Budget** | Income, expenses, recurring entries, trend charts, CSV export. Split Expenses with automatic debt simplification. |
-| ![housekeeping](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/housekeeping.svg) | **Housekeeping** | Manage household staff — schedules, check-in/out, daily or hourly billing, chores, supply requests. |
-| ![notes](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/notes.svg) | **Notes & Contacts** | Colored sticky notes with Markdown. Contact directory with CardDAV sync. |
-| ![birthdays](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/birthdays.svg) | **Birthdays** | Birthday tracker with automatic calendar events, age display, and custom reminders. |
-| ![family](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/family.svg) | **Family** | Member profiles with roles, photos, phone, email, and birthday — synced to Contacts and Birthdays. |
-| ![reminders](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/reminders.svg) | **Reminders** | Time-based notifications on tasks and calendar events with in-app badge counter. |
-| ![api-tokens](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/api-tokens.svg) | **API Tokens** | Named Bearer / X-API-Key tokens for integrations. OpenAPI 3.0 spec included. |
-| ![backup](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/backup.svg) | **Backup** | Manual and scheduled database backup and restore, with automatic pre-restore rollback. Optional WebDAV upload target (Nextcloud, ownCloud, Hetzner, etc.). |
+| ![tasks](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/tasks.png) | **Tasks** | Shared tasks with deadlines, priorities, subtasks, recurring schedules, multi-member assignment, Kanban, and mobile bulk controls. Optional CalDAV import of Apple Reminders. |
+| ![shopping](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/shopping.png) | **Shopping** | Collaborative lists organized by aisle. Touch-safe quick add, swipe gestures, and meal-plan import in one tap. Optional CalDAV import. |
+| ![meals](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/meals.png) | **Meals** | Weekly drag-and-drop planner with multiple items per slot. Direct export to shopping list. |
+| ![recipes](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/recipes.png) | **Recipes** | Create, duplicate, and scale recipes. Pre-fill meal slots or save any planned meal as a recipe. |
+| ![calendar](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/calendar.png) | **Calendar** | Google Calendar (OAuth) and CalDAV sync (iCloud, Nextcloud, Radicale). ICS subscriptions, recurring events, file attachments, month and agenda views. |
+| ![documents](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/documents.png) | **Documents** | Upload and organize family files. Folders, tags, per-document visibility controls, drag-and-drop. |
+| ![budget](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/budget.png) | **Budget** | Income, expenses, recurring entries, trend charts, CSV export. Split Expenses with automatic debt simplification. |
+| ![housekeeping](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/housekeeping.png) | **Housekeeping** | Manage household staff — schedules, check-in/out, daily or hourly billing, chores, supply requests. |
+| ![notes](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/notes.png) | **Notes & Contacts** | Colored sticky notes with Markdown. Contact directory with CardDAV sync. |
+| ![birthdays](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/birthdays.png) | **Birthdays** | Birthday tracker with automatic calendar events, age display, and custom reminders. |
+| ![family](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/family.png) | **Family** | Member profiles with roles, photos, phone, email, and birthday — synced to Contacts and Birthdays. |
+| ![reminders](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/reminders.png) | **Reminders** | Time-based notifications on tasks and calendar events with in-app badge counter. |
+| ![api-tokens](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/api-tokens.png) | **API Tokens** | Named Bearer / X-API-Key tokens for integrations. OpenAPI 3.0 spec included. |
+| ![backup](https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/icons/backup.png) | **Backup** | Manual and scheduled database backup and restore, with automatic pre-restore rollback. Optional WebDAV upload target (Nextcloud, ownCloud, Hetzner, etc.). |
 
 ---
 
