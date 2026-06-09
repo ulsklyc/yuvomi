@@ -936,7 +936,7 @@ html.fab-anim-done .page-fab {
     cursor: pointer;
     color: var(--color-text-tertiary);
     flex-shrink: 0;
-    transition: color var(--transition-fast);
+    transition: color var(--transition-fast), padding var(--transition-slow);
   }
 
   .nav-sidebar__toggle:hover {
@@ -955,8 +955,7 @@ html.fab-anim-done .page-fab {
   }
 
   html.sidebar-collapsed .nav-sidebar .nav-sidebar__logo {
-    justify-content: center;
-    padding-inline: 0;
+    padding-right: 14px;
   }
 
   html.sidebar-collapsed .nav-sidebar .nav-sidebar__brand-text {
@@ -964,13 +963,8 @@ html.fab-anim-done .page-fab {
   }
 
   html.sidebar-collapsed .nav-sidebar .nav-sidebar__toggle {
-    justify-content: center;
-    padding-inline: 0;
-  }
-
-  html.sidebar-collapsed .nav-sidebar .nav-item {
-    justify-content: center;
-    padding-inline: 0;
+    padding-right: var(--space-5);
+    padding-left: 0;
   }
 
   html.sidebar-collapsed .nav-sidebar .nav-item__label {
