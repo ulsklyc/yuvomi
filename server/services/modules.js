@@ -1,6 +1,6 @@
 /**
  * Module: Third-party module registry
- * Purpose: Discover Oikos modules from /modules, validate manifests, and expose enabled client modules.
+ * Purpose: Discover Yuvomi modules from /modules, validate manifests, and expose enabled client modules.
  * Dependencies: node:fs/promises, server/db.js
  */
 

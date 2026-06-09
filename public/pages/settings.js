@@ -13,11 +13,13 @@ import { renderSubTabs } from '/utils/sub-tabs.js';
 import '/components/oikos-locale-picker.js';
 import { getPwaInstallState, onPwaInstallStateChanged, promptPwaInstall } from '/utils/pwa-install.js';
 
-const SUPPORTED_CURRENCIES = ['AED', 'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'HUF', 'INR', 'JPY', 'KZT', 'NOK', 'PLN', 'RUB', 'SAR', 'SEK', 'TRY', 'UAH', 'USD'];
+const SUPPORTED_CURRENCIES = ['AED', 'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'HUF', 'INR', 'JPY', 'KZT', 'NOK', 'PLN', 'RUB', 'SAR', 'SEK', 'TRY', 'UAH', 'USD', 'VND'];
 const SETTINGS_TAB_KEY = 'oikos:settings:tab';
 const APP_NAME_STORAGE_KEY = 'oikos-app-name';
-const DEFAULT_APP_NAME = 'Oikos';
+const DEFAULT_APP_NAME = 'Yuvomi';
 const FAMILY_ROLES = ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'];
+const AVATAR_COLORS = ['#007AFF', '#34C759', '#FF9500', '#FF3B30', '#AF52DE', '#FF2D55'];
+const randomAvatarColor = () => AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
 const MAX_AVATAR_DATA_LENGTH = 768 * 1024;
 const BUILT_IN_MODULES = [
   { id: 'dashboard', labelKey: 'nav.dashboard', icon: 'layout-dashboard', locked: true },
@@ -152,46 +154,30 @@ function bindAvatarPicker(container, prefix) {
   });
 }
 
-function readImageAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    if (!file) return resolve(undefined);
-    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
-      return reject(new Error(t('settings.profilePictureTypeError')));
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      return reject(new Error(t('settings.profilePictureFileTooLarge')));
-    }
+async function readImageAsDataUrl(file) {
+  if (!file) return undefined;
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+    throw new Error(t('settings.profilePictureTypeError'));
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error(t('settings.profilePictureFileTooLarge'));
+  }
 
+  const dataUrl = await new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-      try {
-        const maxSize = 512;
-        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-        const width = Math.max(1, Math.round(img.width * scale));
-        const height = Math.max(1, Math.round(img.height * scale));
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.86);
-        if (dataUrl.length > MAX_AVATAR_DATA_LENGTH) {
-          reject(new Error(t('settings.profilePictureTooLarge')));
-        } else {
-          resolve(dataUrl);
-        }
-      } catch (err) {
-        reject(err);
-      }
-      };
-      img.onerror = () => reject(new Error(t('settings.profilePictureReadError')));
-      img.src = reader.result;
-    };
+    reader.onload = () => resolve(String(reader.result || ''));
     reader.onerror = () => reject(new Error(t('settings.profilePictureReadError')));
     reader.readAsDataURL(file);
   });
+
+  const { openCropDialog } = await import('/utils/avatar-crop.js');
+  const cropped = await openCropDialog(dataUrl);
+  if (cropped === null) return undefined;
+
+  if (cropped.length > MAX_AVATAR_DATA_LENGTH) {
+    throw new Error(t('settings.profilePictureTooLarge'));
+  }
+  return cropped;
 }
 
 /**
@@ -741,7 +727,7 @@ export async function render(container, { user }) {
                 </div>
                 <div class="form-group settings-color-field">
                   <label class="form-label" for="new-avatar-color">${t('settings.colorLabel')}</label>
-                  <input class="settings-color-button" type="color" id="new-avatar-color" value="#007AFF" />
+                  <input class="settings-color-button" type="color" id="new-avatar-color" value="${randomAvatarColor()}" />
                 </div>
               </div>
               <div class="form-group">
@@ -946,6 +932,71 @@ export async function render(container, { user }) {
             <h3 class="settings-card__title">${t('settings.backupSchedulerTitle')}</h3>
             <p class="form-hint">${t('settings.backupSchedulerHint')}</p>
             <div class="settings-info-grid" id="backup-scheduler-info">
+              <!-- Populated by JavaScript -->
+            </div>
+          </div>
+
+          <!-- WebDAV Backup Target -->
+          <div class="settings-card settings-card--backup" id="backup-webdav-card">
+            <h3 class="settings-card__title">
+              <i data-lucide="cloud-upload" class="icon-sm" aria-hidden="true"></i>
+              ${t('settings.backupWebdavTitle')}
+            </h3>
+            <p class="form-hint">${t('settings.backupWebdavHint')}</p>
+            <form class="settings-form" id="backup-webdav-form" novalidate style="margin-top:var(--space-4);">
+              <!-- Enable toggle -->
+              <div class="settings-webdav-toggle-row">
+                <span class="form-label" style="margin:0;">${t('settings.backupWebdavEnabled')}</span>
+                <label class="toggle">
+                  <input type="checkbox" id="webdav-enabled" name="enabled" />
+                  <span class="toggle__track" aria-hidden="true"></span>
+                </label>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="webdav-url">${t('settings.backupWebdavUrl')}</label>
+                <input class="form-input" type="url" id="webdav-url" name="url"
+                  placeholder="${t('settings.backupWebdavUrlPlaceholder')}" autocomplete="off" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="webdav-username">${t('settings.backupWebdavUsername')}</label>
+                <input class="form-input" type="text" id="webdav-username" name="username"
+                  autocomplete="username" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="webdav-password">${t('settings.backupWebdavPassword')}</label>
+                <div class="settings-webdav-pw-wrap">
+                  <input class="form-input" type="password" id="webdav-password" name="password"
+                    autocomplete="current-password"
+                    placeholder="${t('settings.backupWebdavPasswordPlaceholder')}" />
+                  <button type="button" class="btn btn--icon btn--ghost settings-webdav-reveal-btn"
+                    data-reveal-target="webdav-password" aria-label="${t('common.togglePasswordVisibility')}">
+                    <i data-lucide="eye" class="icon-sm" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="webdav-path">${t('settings.backupWebdavPath')}</label>
+                <input class="form-input" type="text" id="webdav-path" name="remotePath"
+                  placeholder="${t('settings.backupWebdavPathPlaceholder')}" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="webdav-keep">${t('settings.backupWebdavKeep')}</label>
+                <input class="form-input" type="number" id="webdav-keep" name="keep" min="1" max="99"
+                  style="max-width:100px;" />
+              </div>
+              <div id="webdav-test-result" class="form-hint" hidden></div>
+              <div class="settings-form-actions">
+                <button type="button" class="btn btn--secondary" id="webdav-test-btn">
+                  <i data-lucide="plug" aria-hidden="true"></i>
+                  ${t('settings.backupWebdavTestBtn')}
+                </button>
+                <button type="submit" class="btn btn--primary" id="webdav-save-btn">
+                  ${t('settings.backupWebdavSaveBtn')}
+                </button>
+              </div>
+            </form>
+
+            <div class="settings-info-grid" id="backup-webdav-status" style="margin-top:var(--space-4);padding-top:var(--space-4);border-top:1px solid var(--color-border);">
               <!-- Populated by JavaScript -->
             </div>
           </div>
@@ -1932,6 +1983,8 @@ function bindEvents(container, user, users, categories, icsSubscriptions, apiTok
             avatar_color: container.querySelector('#profile-avatar-color')?.value || user?.avatar_color,
             avatar_data: avatarData,
           });
+        } else {
+          profileAvatarFile.value = '';
         }
       } catch (err) {
         profileAvatarFile.value = '';
@@ -2347,6 +2400,7 @@ function bindEvents(container, user, users, categories, icsSubscriptions, apiTok
       container.querySelector('#add-member-form-card').classList.add('settings-card--hidden');
       container.querySelector('#add-member-btn').hidden = false;
       container.querySelector('#add-member-form').reset();
+      container.querySelector('#new-avatar-color').value = randomAvatarColor();
       container.querySelector('#member-error').hidden = true;
     });
   }
@@ -2383,6 +2437,7 @@ function bindEvents(container, user, users, categories, icsSubscriptions, apiTok
         users.push(res.user);
         list.insertAdjacentHTML('beforeend', memberHtml(res.user));
         addMemberForm.reset();
+        container.querySelector('#new-avatar-color').value = randomAvatarColor();
         container.querySelector('#add-member-form-card').classList.add('settings-card--hidden');
         container.querySelector('#add-member-btn').hidden = false;
         window.oikos?.showToast(t('settings.memberAddedToast', { name: res.user.display_name }), 'success');
@@ -2525,6 +2580,8 @@ function openEditMemberModal(member, currentUser, users, container) {
               avatar_color: panel.querySelector('#edit-member-avatar-color')?.value || member.avatar_color,
               avatar_data: avatarData,
             });
+          } else {
+            fileInput.value = '';
           }
         } catch (err) {
           fileInput.value = '';
@@ -2758,9 +2815,205 @@ async function loadBackupSchedulerStatus(container) {
   }
 }
 
+// ─── WebDAV Backup ────────────────────────────────────────────────────────────
+
+async function loadWebdavConfig(container) {
+  const form       = container.querySelector('#backup-webdav-form');
+  const statusGrid = container.querySelector('#backup-webdav-status');
+  if (!form) return;
+
+  try {
+    const res = await api.get('/backup/webdav/config');
+    const d   = res.data ?? {};
+
+    const setVal = (id, val) => {
+      const el = form.querySelector(`#${id}`);
+      if (!el) return;
+      if (el.type === 'checkbox') el.checked = Boolean(val);
+      else el.value = val ?? '';
+    };
+
+    setVal('webdav-enabled',  d.enabled);
+    setVal('webdav-url',      d.envControlled ? d.url ?? '' : d.url ?? '');
+    setVal('webdav-username', d.username ?? '');
+    setVal('webdav-password', d.password ?? '');   // will show '****' if set
+    setVal('webdav-path',     d.remotePath ?? '/oikos/backups/');
+    setVal('webdav-keep',     d.keep ?? 7);
+
+    // Mark fields read-only when controlled by env vars
+    if (d.envControlled) {
+      ['webdav-url', 'webdav-username', 'webdav-password', 'webdav-path', 'webdav-keep'].forEach((id) => {
+        const el = form.querySelector(`#${id}`);
+        if (el) {
+          el.readOnly = true;
+          el.disabled = true;
+          el.style.opacity = '0.6';
+        }
+      });
+      const hint = form.querySelector('#webdav-test-result');
+      if (hint) {
+        hint.hidden   = false;
+        hint.textContent = t('settings.backupWebdavEnvHint');
+        hint.className = 'form-hint';
+      }
+    }
+
+    // Render status grid
+    renderWebdavStatus(statusGrid, d);
+
+    if (window.lucide) window.lucide.createIcons({ el: form });
+  } catch (err) {
+    console.error('Failed to load WebDAV config:', err);
+  }
+}
+
+function renderWebdavStatus(grid, d) {
+  if (!grid) return;
+  if (!d.configured) { grid.replaceChildren(); return; }
+
+  // Format date exactly like the scheduler status does
+  const lastUploadValue = d.lastUpload
+    ? formatDate(d.lastUpload) + ' ' + formatTime(d.lastUpload)
+    : t('settings.backupWebdavNeverUploaded');
+
+  const lastUploadColor = d.lastUpload ? 'var(--color-success)' : '';
+
+  const errorRow = d.lastError
+    ? `<div class="settings-info-row">
+         <span class="settings-info-label">${t('settings.backupWebdavLastError')}</span>
+         <span class="settings-info-value" style="color:var(--color-danger);word-break:break-all;">${esc(d.lastError)}</span>
+       </div>`
+    : '';
+
+  grid.replaceChildren();
+  grid.insertAdjacentHTML('beforeend', `
+    <div class="settings-info-row">
+      <span class="settings-info-label">${t('settings.backupWebdavLastUpload')}</span>
+      <span class="settings-info-value" style="${lastUploadColor ? `color:${lastUploadColor};font-weight:var(--font-weight-semibold);` : ''}">${esc(lastUploadValue)}</span>
+    </div>
+    ${errorRow}
+    <div class="settings-form-actions" style="margin-top:var(--space-2);">
+      <button class="btn btn--secondary" id="webdav-trigger-btn">
+        <i data-lucide="upload-cloud" aria-hidden="true"></i>
+        ${t('settings.backupWebdavTriggerBtn')}
+      </button>
+    </div>
+  `);
+
+  if (window.lucide) window.lucide.createIcons({ el: grid });
+
+  const triggerBtn = grid.querySelector('#webdav-trigger-btn');
+  if (triggerBtn) {
+    triggerBtn.addEventListener('click', async () => {
+      triggerBtn.disabled = true;
+      triggerBtn.textContent = t('settings.backupWebdavTriggering');
+      try {
+        await api.post('/backup/webdav/trigger');
+        window.oikos?.showToast(t('settings.backupWebdavTriggeredToast'), 'success');
+        loadWebdavConfig(triggerBtn.closest('.settings-tab-panel') ?? document);
+      } catch (err) {
+        window.oikos?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+        const icon = document.createElement('i');
+        icon.dataset.lucide = 'upload-cloud';
+        icon.setAttribute('aria-hidden', 'true');
+        triggerBtn.replaceChildren(icon, document.createTextNode(' ' + t('settings.backupWebdavTriggerBtn')));
+        if (window.lucide) window.lucide.createIcons({ el: triggerBtn });
+        triggerBtn.disabled = false;
+      }
+    });
+  }
+}
+
+function bindWebdavBackupEvents(container) {
+  const form      = container.querySelector('#backup-webdav-form');
+  const testBtn   = container.querySelector('#webdav-test-btn');
+  const resultEl  = container.querySelector('#webdav-test-result');
+  if (!form) return;
+
+  loadWebdavConfig(container);
+
+  // Password reveal toggle
+  form.querySelectorAll('[data-reveal-target]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const input = form.querySelector(`#${btn.dataset.revealTarget}`);
+      if (!input) return;
+      const isText = input.type === 'text';
+      input.type = isText ? 'password' : 'text';
+      const icon = btn.querySelector('[data-lucide]');
+      if (icon) {
+        icon.setAttribute('data-lucide', isText ? 'eye' : 'eye-off');
+        if (window.lucide) window.lucide.createIcons({ el: btn });
+      }
+    });
+  });
+
+  // Connection test
+  testBtn?.addEventListener('click', async () => {
+    testBtn.disabled = true;
+    if (resultEl) { resultEl.hidden = false; resultEl.textContent = '…'; resultEl.className = 'form-hint'; }
+
+    const overrides = {};
+    const url      = form.querySelector('#webdav-url')?.value?.trim();
+    const username = form.querySelector('#webdav-username')?.value?.trim();
+    const password = form.querySelector('#webdav-password')?.value;
+    const path     = form.querySelector('#webdav-path')?.value?.trim();
+
+    if (url)                             overrides.url        = url;
+    if (username)                        overrides.username   = username;
+    if (password && password !== '****') overrides.password   = password;
+    if (path)                            overrides.remotePath = path;
+
+    try {
+      const res = await api.post('/backup/webdav/test', overrides);
+      if (resultEl) {
+        resultEl.textContent = t('settings.backupWebdavTestSuccess', { files: res.data?.files ?? 0 });
+        resultEl.className   = 'form-hint';
+        resultEl.style.color = 'var(--color-success)';
+      }
+    } catch (err) {
+      if (resultEl) {
+        resultEl.textContent = t('settings.backupWebdavTestFailed', { error: err.message });
+        resultEl.className   = 'form-hint';
+        resultEl.style.color = 'var(--color-danger)';
+      }
+    } finally {
+      testBtn.disabled = false;
+    }
+  });
+
+  // Save form
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const saveBtn = form.querySelector('#webdav-save-btn');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '…'; }
+
+    const password = form.querySelector('#webdav-password')?.value;
+    const payload  = {
+      enabled:    form.querySelector('#webdav-enabled')?.checked ?? false,
+      url:        form.querySelector('#webdav-url')?.value?.trim()     || null,
+      username:   form.querySelector('#webdav-username')?.value?.trim() || null,
+      remotePath: form.querySelector('#webdav-path')?.value?.trim()    || '/oikos/backups/',
+      keep:       Number(form.querySelector('#webdav-keep')?.value)    || 7,
+    };
+    // Only send password if the user changed it (not the masked placeholder)
+    if (password && password !== '****') payload.password = password;
+
+    try {
+      await api.put('/backup/webdav/config', payload);
+      window.oikos?.showToast(t('settings.backupWebdavSaved'), 'success');
+      loadWebdavConfig(container);
+    } catch (err) {
+      window.oikos?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+    } finally {
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = t('settings.backupWebdavSaveBtn'); }
+    }
+  });
+}
+
 function bindBackupEvents(container) {
   // Scheduler-Status laden und anzeigen
   loadBackupSchedulerStatus(container);
+  bindWebdavBackupEvents(container);
 
   const form = container.querySelector('#backup-restore-form');
   const fileInput = container.querySelector('#backup-restore-file');

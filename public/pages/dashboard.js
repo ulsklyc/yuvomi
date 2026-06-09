@@ -19,7 +19,7 @@ const ONBOARDING_KEY = 'oikos-onboarded';
 const APP_NAME_STORAGE_KEY = 'oikos-app-name';
 
 function getAppName() {
-  return localStorage.getItem(APP_NAME_STORAGE_KEY) || 'Oikos';
+  return localStorage.getItem(APP_NAME_STORAGE_KEY) || 'Yuvomi';
 }
 
 function getOnboardingSteps() {

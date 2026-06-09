@@ -401,7 +401,7 @@ async function sync() {
 
 // Google Calendar uses exclusive end dates for all-day events (RFC 5545).
 // A 2-day event Jan 1–2 is stored as end.date = "2026-01-03" (exclusive).
-// Subtract 1 day to convert to Oikos-style inclusive end date.
+// Subtract 1 day to convert to Yuvomi-style inclusive end date.
 function googleAllDayEndToInclusive(dateStr) {
   if (!dateStr) return null;
   const d = new Date(dateStr + 'T00:00:00Z');
@@ -409,7 +409,7 @@ function googleAllDayEndToInclusive(dateStr) {
   return d.toISOString().slice(0, 10);
 }
 
-// Oikos stores inclusive end dates. Add 1 day when sending to Google (exclusive).
+// Yuvomi stores inclusive end dates. Add 1 day when sending to Google (exclusive).
 function localAllDayEndToExclusive(dateStr) {
   if (!dateStr) return null;
   const d = new Date(dateStr + 'T00:00:00Z');
@@ -476,7 +476,7 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR) {
   }
 }
 
-// Oikos speichert getimte Events als "YYYY-MM-DDTHH:MM" (ohne Sekunden,
+// Yuvomi speichert getimte Events als "YYYY-MM-DDTHH:MM" (ohne Sekunden,
 // siehe validate.js). Die Google Calendar API verlangt RFC 3339 mit
 // Sekunden, sonst "Bad Request" bzw. bei Wiederholungen "Invalid
 // recurrence rule" (Issue #217). Sekunden ergänzen, falls sie fehlen.

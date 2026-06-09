@@ -44,7 +44,7 @@ function buildCalDAVICS(event) {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Oikos//CalDAV Sync//EN',
+    'PRODID:-//Yuvomi//CalDAV Sync//EN',
     'BEGIN:VEVENT',
     `UID:${uid}`,
     `DTSTAMP:${now}`,
@@ -409,7 +409,7 @@ async function sync() {
       // Fetch all calendars from server
       const serverCalendars = await client.fetchCalendars();
 
-      // Inbound sync: CalDAV → Oikos
+      // Inbound sync: CalDAV → Yuvomi
       let accountEventCount = 0;
 
       for (const selCal of enabledCalendars) {
@@ -482,7 +482,7 @@ async function sync() {
         }
       }
 
-      // Outbound sync: Oikos → CalDAV (events with target_caldav_account_id)
+      // Outbound sync: Yuvomi → CalDAV (events with target_caldav_account_id)
       const localEvents = db.get().prepare(`
         SELECT * FROM calendar_events
         WHERE external_source = 'local' AND target_caldav_account_id = ?

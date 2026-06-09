@@ -1,5 +1,5 @@
 {
-  "title": "Oikos セットアップ",
+  "title": "Yuvomi セットアップ",
   "common": {
     "continue": "続ける",
     "back": "戻る",
@@ -11,10 +11,10 @@
   },
   "config": {
     "title": "基本設定",
-    "subtitle": "Oikos にどのようにアクセスしますか？",
+    "subtitle": "Yuvomi にどのようにアクセスしますか？",
     "existing": "既存の設定が検出されました — 保存前に現在の .env ファイルがバックアップされます。",
     "hostLabel": "ドメインまたは IP アドレス",
-    "hostHint": "ブラウザで Oikos を開くために使用するアドレスです。",
+    "hostHint": "ブラウザで Yuvomi を開くために使用するアドレスです。",
     "portLabel": "ポート",
     "tzLabel": "タイムゾーン",
     "errHost": "ホスト名が無効です。英字、数字、ハイフン、ピリオドのみを使用してください。",
@@ -47,7 +47,7 @@
   },
   "calendar": {
     "title": "カレンダー同期",
-    "subtitle": "Oikos を Google カレンダーまたは Apple iCloud に接続します。どちらも任意です — 設定するには展開してください。",
+    "subtitle": "Yuvomi を Google カレンダーまたは Apple iCloud に接続します。どちらも任意です — 設定するには展開してください。",
     "google": "Google カレンダー",
     "googleHint": "{{link}} で OAuth 認証情報を作成します。リダイレクト URI: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -79,7 +79,7 @@
     "configured": "設定済み"
   },
   "docker": {
-    "title": "Oikos を起動しています",
+    "title": "Yuvomi を起動しています",
     "subtitle": "イメージを取得し、Docker コンテナを起動しています。",
     "starting": "コンテナを起動しています …",
     "elapsed": "{{n}} 秒経過",
@@ -91,7 +91,7 @@
   },
   "admin": {
     "title": "管理者アカウントを作成",
-    "subtitle": "最初のログインを設定します。このアカウントは Oikos への完全なアクセス権を持ちます。",
+    "subtitle": "最初のログインを設定します。このアカウントは Yuvomi への完全なアクセス権を持ちます。",
     "userLabel": "ユーザー名",
     "userHint": "3〜64 文字：英字、数字、. - _",
     "nameLabel": "表示名",
@@ -107,15 +107,15 @@
     "errCreate": "管理者アカウントの作成に失敗しました。"
   },
   "done": {
-    "title": "Oikos の準備が整いました！",
+    "title": "Yuvomi の準備が整いました！",
     "subtitle": "ファミリープランナーが稼働し、管理者アカウントの設定が完了しました。",
-    "open": "Oikos を開く →"
+    "open": "Yuvomi を開く →"
   },
   "advanced": {
     "tag": "詳細設定 · 任意",
     "title": "詳細設定",
     "subtitle": "リバースプロキシ、シングルサインオン、自動バックアップ。すべて任意です — スキップしても問題ありません。",
-    "proxyLabel": "Oikos はどのように公開されますか？",
+    "proxyLabel": "Yuvomi はどのように公開されますか？",
     "proxyBehindHttps": "HTTPS 付きのリバースプロキシの背後（Caddy、nginx、Traefik）",
     "proxyDirect": "localhost / HTTP による直接アクセス",
     "proxyHint": "直接アクセスでは secure 限定の Cookie を無効にし、HTTPS なしでもログインできるようにします。",

@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { backupToFile } from '../db.js';
 import { createLogger } from '../logger.js';
+import * as webdav from './backup-webdav.js';
 
 const log = createLogger('BackupScheduler');
 
@@ -110,7 +111,7 @@ async function performBackup() {
 
     log.info(`Backup created: ${fileName}`);
 
-    // Rotate old backups
+    // Rotate old local backups
     await rotateBackups();
 
     lastBackup = {
@@ -119,6 +120,18 @@ async function performBackup() {
       success: true,
     };
     lastError = null;
+
+    // ── WebDAV upload (optional, non-fatal) ──────────────────────────────────
+    if (webdav.isEnabled()) {
+      try {
+        await webdav.uploadBackup(filePath);
+        log.info(`WebDAV upload complete: ${fileName}`);
+        lastBackup.webdav = { success: true, timestamp: new Date().toISOString() };
+      } catch (webdavErr) {
+        log.error('WebDAV upload failed (local backup is still intact):', webdavErr);
+        lastBackup.webdav = { success: false, error: webdavErr.message };
+      }
+    }
   } catch (err) {
     log.error('Scheduled backup failed:', err);
     lastError = {
@@ -177,6 +190,7 @@ export function getStatus() {
     running: scheduledTask !== null,
     lastBackup,
     lastError,
+    webdav: webdav.getStatus(),
   };
 }
 

@@ -1,6 +1,6 @@
-# Oikos Modules
+# Yuvomi Modules
 
-Oikos loads third-party modules from the repository-level `modules/` directory. Each module lives in its own folder and must include a `module.json` manifest. Modules are separate code: do not edit Oikos core files to install one.
+Yuvomi loads third-party modules from the repository-level `modules/` directory. Each module lives in its own folder and must include a `module.json` manifest. Modules are separate code: do not edit Yuvomi core files to install one.
 
 ## Folder Layout
 
@@ -21,7 +21,7 @@ The folder name must match the manifest `id`.
   "id": "example-module",
   "name": "Example Module",
   "version": "1.0.0",
-  "description": "Adds a small page to Oikos.",
+  "description": "Adds a small page to Yuvomi.",
   "entry": "index.js",
   "style": "style.css",
   "icon": "box",
@@ -69,7 +69,7 @@ export async function render(container, context) {
 }
 ```
 
-Modules may import public Oikos browser libraries such as `/api.js`, `/i18n.js`, and utilities under `/utils/`. Modules must follow the same frontend security rules as core Oikos:
+Modules may import public Yuvomi browser libraries such as `/api.js`, `/i18n.js`, and utilities under `/utils/`. Modules must follow the same frontend security rules as core Yuvomi:
 
 - Use `replaceChildren()` and `insertAdjacentHTML()`.
 - Escape untrusted values before inserting HTML.
@@ -79,12 +79,12 @@ Modules may import public Oikos browser libraries such as `/api.js`, `/i18n.js`,
 
 ## Loading And Failure Behavior
 
-Oikos scans `modules/` and validates each `module.json`. Invalid modules are shown as errored in Settings and are not loaded. Disabled modules are not served to the browser and do not appear in navigation. If a module page fails while rendering, Oikos shows an error for that page without changing core application code.
+Yuvomi scans `modules/` and validates each `module.json`. Invalid modules are shown as errored in Settings and are not loaded. Disabled modules are not served to the browser and do not appear in navigation. If a module page fails while rendering, Yuvomi shows an error for that page without changing core application code.
 
 Admins can enable, disable, and order modules in Settings -> General -> Active modules. Copying a new folder into `modules/` makes it appear there automatically.
 
 ## Docker / Podman
 
-The default `docker-compose.yml` mounts `${MODULES_DIR:-./modules}` to `/app/modules`. To keep modules outside the Oikos checkout, set `MODULES_DIR=/absolute/path/to/oikos-modules` in `.env` and restart the compose service. New or changed module folders are scanned at runtime; rebuilding the image is not required.
+The default `docker-compose.yml` mounts `${MODULES_DIR:-./modules}` to `/app/modules`. To keep modules outside the Yuvomi checkout, set `MODULES_DIR=/absolute/path/to/oikos-modules` in `.env` and restart the compose service. New or changed module folders are scanned at runtime; rebuilding the image is not required.
 
 On Podman (RHEL/Fedora/CentOS Stream) use `podman-compose.yml` instead — it mounts the same `/app/modules` path with the SELinux `:Z` relabel so the rootless container can read your modules.

@@ -1,5 +1,5 @@
 {
-  "title": "إعداد Oikos",
+  "title": "إعداد Yuvomi",
   "common": {
     "continue": "متابعة",
     "back": "رجوع",
@@ -11,10 +11,10 @@
   },
   "config": {
     "title": "الإعداد الأساسي",
-    "subtitle": "كيف ستصل إلى Oikos؟",
+    "subtitle": "كيف ستصل إلى Yuvomi؟",
     "existing": "تم اكتشاف إعداد موجود — سيتم إنشاء نسخة احتياطية من ملف ‎.env‎ الحالي قبل الحفظ.",
     "hostLabel": "النطاق أو عنوان IP",
-    "hostHint": "العنوان الذي ستستخدمه لفتح Oikos في المتصفح.",
+    "hostHint": "العنوان الذي ستستخدمه لفتح Yuvomi في المتصفح.",
     "portLabel": "المنفذ",
     "tzLabel": "المنطقة الزمنية",
     "errHost": "اسم مضيف غير صالح. استخدم الأحرف والأرقام والشرطات والنقاط فقط.",
@@ -47,7 +47,7 @@
   },
   "calendar": {
     "title": "مزامنة التقويم",
-    "subtitle": "اربط Oikos بتقويم Google أو Apple iCloud. كلاهما اختياري — وسّع للتهيئة.",
+    "subtitle": "اربط Yuvomi بتقويم Google أو Apple iCloud. كلاهما اختياري — وسّع للتهيئة.",
     "google": "تقويم Google",
     "googleHint": "أنشئ بيانات اعتماد OAuth على {{link}}. عنوان URI لإعادة التوجيه: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -79,7 +79,7 @@
     "configured": "تمت التهيئة"
   },
   "docker": {
-    "title": "جارٍ بدء Oikos",
+    "title": "جارٍ بدء Yuvomi",
     "subtitle": "جارٍ سحب الصورة وبدء حاوية Docker.",
     "starting": "جارٍ بدء الحاوية …",
     "elapsed": "مرّت {{n}} ثانية",
@@ -91,7 +91,7 @@
   },
   "admin": {
     "title": "إنشاء حساب المسؤول",
-    "subtitle": "أعدّ أول تسجيل دخول لك. يتمتع هذا الحساب بوصول كامل إلى Oikos.",
+    "subtitle": "أعدّ أول تسجيل دخول لك. يتمتع هذا الحساب بوصول كامل إلى Yuvomi.",
     "userLabel": "اسم المستخدم",
     "userHint": "3–64 حرفًا: أحرف وأرقام و. - _",
     "nameLabel": "الاسم المعروض",
@@ -107,15 +107,15 @@
     "errCreate": "فشل إنشاء حساب المسؤول."
   },
   "done": {
-    "title": "‏Oikos جاهز!",
+    "title": "‏Yuvomi جاهز!",
     "subtitle": "مخطّط عائلتك قيد التشغيل وتم إعداد حساب المسؤول الخاص بك.",
-    "open": "افتح Oikos ←"
+    "open": "افتح Yuvomi ←"
   },
   "advanced": {
     "tag": "متقدّم · اختياري",
     "title": "الإعدادات المتقدّمة",
     "subtitle": "وكيل عكسي، وتسجيل دخول موحّد، ونُسخ احتياطية تلقائية. كلها اختيارية — التخطّي آمن.",
-    "proxyLabel": "كيف يتم عرض Oikos؟",
+    "proxyLabel": "كيف يتم عرض Yuvomi؟",
     "proxyBehindHttps": "خلف وكيل عكسي بـ HTTPS (Caddy، nginx، Traefik)",
     "proxyDirect": "وصول مباشر عبر localhost / HTTP",
     "proxyHint": "يعطّل الوصول المباشر ملفات تعريف الارتباط الآمنة فقط حتى يعمل تسجيل الدخول دون HTTPS.",

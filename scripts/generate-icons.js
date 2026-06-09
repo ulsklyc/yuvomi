@@ -1,5 +1,5 @@
 /**
- * Icon Generator for Oikos PWA
+ * Icon Generator for Yuvomi PWA
  * Generates icons from docs/logo.svg
  * Sizes: 192px and 512px, both "any" and "maskable" variants
  * Maskable icons: full-bleed background, logo content stays within 80% safe zone

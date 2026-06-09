@@ -1058,6 +1058,37 @@
 }
 
 /* --------------------------------------------------------
+   WebDAV Backup Card helpers
+   -------------------------------------------------------- */
+
+/* Enable-toggle row: label links, toggle rechts */
+.settings-webdav-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0 var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-1);
+}
+
+/* Password-Eingabe mit Reveal-Button nebeneinander */
+.settings-webdav-pw-wrap {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.settings-webdav-pw-wrap .form-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-webdav-reveal-btn {
+  flex-shrink: 0;
+}
+
+/* --------------------------------------------------------
    CalDAV Components
    -------------------------------------------------------- */
 

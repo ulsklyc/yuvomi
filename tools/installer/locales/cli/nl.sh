@@ -1,4 +1,4 @@
-# Oikos CLI-Installer — Nederlands (nl)
+# Yuvomi CLI-Installer — Nederlands (nl)
 # Auto-generiert (Schlüssel identisch zu allen Locales). en = Fallback, de = Referenz.
 # Wird von install.sh gesourct; setzt die englische Basis pro Schlüssel außer Kraft.
 # Punt-sleutels → variabelen met underscore (MSG_<bereich>_<name>).
@@ -59,7 +59,7 @@ MSG_admin_password="Wachtwoord (min. 8 tekens):"
 MSG_admin_confirm="Wachtwoord bevestigen:"
 MSG_admin_mismatch="Wachtwoorden komen niet overeen, probeer het opnieuw."
 MSG_admin_created="Beheerdersaccount aangemaakt!"
-MSG_admin_ready="  Oikos is klaar!"
+MSG_admin_ready="  Yuvomi is klaar!"
 MSG_admin_open="  Openen: %s"
 MSG_admin_exists="Er bestaat al een beheerdersaccount."
 MSG_admin_failed="Beheerder aanmaken mislukt (HTTP %s): %s"

@@ -17,10 +17,10 @@ Run from inside `oikos/`. `$1` is a specific issue number or the literal `all` (
 2. **Classify** — for each issue, pick ONE primary class and apply labels via `gh issue edit <n> --repo ulsklyc/oikos --add-label "<labels>"`:
    - `bug` — reproduction + expected vs. actual behaviour present and plausible against current code
    - `enhancement` — new feature or UX improvement, no existing regression
-   - `question` — user needs help using Oikos, not a code change
+   - `question` — user needs help using Yuvomi, not a code change
    - `invalid` — spam, duplicate, or out of scope (self-hosted family planner)
    Add area labels where obvious: `calendar`, `tasks`, `shopping`, `meals`, `budget`, `notes`, `contacts`, `reminders`, `i18n`, `pwa`, `security`, `docs`.
-3. **Request missing info** — if reproduction steps, expected behaviour, Oikos version, or browser are missing on a `bug`, post a single comment asking for exactly what's missing. Apply label `needs-info`.
+3. **Request missing info** — if reproduction steps, expected behaviour, Yuvomi version, or browser are missing on a `bug`, post a single comment asking for exactly what's missing. Apply label `needs-info`.
 4. **Close spam/duplicates** — `gh issue close <n> --repo ulsklyc/oikos --reason "not planned" --comment "<english explanation>"`. Always leave a reason.
 
 ## Guardrails

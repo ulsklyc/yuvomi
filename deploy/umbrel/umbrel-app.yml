@@ -1,11 +1,11 @@
 manifestVersion: 1
-id: oikos
+id: yuvomi
 category: files
-name: Oikos
-version: "0.65.1"
+name: Yuvomi
+version: "0.66.0"
 tagline: Self-hosted family planner — calendar, tasks, shopping, meals & budget
 description: >-
-  Oikos is a self-hosted, privacy-focused family planner that bundles everything
+  Yuvomi is a self-hosted, privacy-focused family planner that bundles everything
   a household needs into a single fast PWA — no cloud, no tracking, no ads.
 
 
@@ -40,7 +40,7 @@ description: >-
   🔒 PRIVACY
 
 
-  Oikos keeps all data in a local SQLite database (optionally encrypted with
+  Yuvomi keeps all data in a local SQLite database (optionally encrypted with
   SQLCipher). Nothing leaves your device unless you explicitly enable a calendar
   or contacts sync to a provider you choose.
 
@@ -48,14 +48,14 @@ description: >-
   🛠️ SET-UP
 
 
-  Open Oikos from your Umbrel dashboard and create the first account — that
+  Open Yuvomi from your Umbrel dashboard and create the first account — that
   account becomes the family admin and can invite the rest of the household.
 releaseNotes: ""
 developer: Ulas Kalayci
-website: https://github.com/ulsklyc/oikos
+website: https://github.com/ulsklyc/yuvomi
 dependencies: []
-repo: https://github.com/ulsklyc/oikos
-support: https://github.com/ulsklyc/oikos/issues
+repo: https://github.com/ulsklyc/yuvomi
+support: https://github.com/ulsklyc/yuvomi/issues
 port: 8181
 # Must stay empty for submission — the Umbrel team populates icon/gallery from
 # the assets in umbrel-apps-gallery (see deploy/umbrel/icon.svg + gallery/).

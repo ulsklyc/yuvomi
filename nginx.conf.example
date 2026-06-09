@@ -1,4 +1,4 @@
-# Nginx Reverse Proxy Konfiguration für Oikos
+# Nginx Reverse Proxy Konfiguration für Yuvomi
 # Für Nginx Proxy Manager: Diese Datei als Vorlage für "Advanced"-Konfiguration nutzen.
 # Ersetze "deine-domain.de" mit deiner tatsächlichen Domain.
 
@@ -25,7 +25,7 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
-    # Proxy zu Oikos
+    # Proxy zu Yuvomi
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;

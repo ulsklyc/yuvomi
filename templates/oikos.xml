@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <Container version="2">
-  <Name>Oikos</Name>
-  <Repository>ghcr.io/ulsklyc/oikos:latest</Repository>
+  <Name>Yuvomi</Name>
+  <Repository>ghcr.io/ulsklyc/yuvomi:latest</Repository>
   <Registry>https://github.com/ulsklyc/oikos/pkgs/container/oikos</Registry>
   <Network>bridge</Network>
   <MyIP/>
@@ -11,7 +11,7 @@
   <TemplateURL>https://raw.githubusercontent.com/ulsklyc/oikos/main/templates/oikos.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/ulsklyc/oikos/main/icon.svg</Icon>
 
-  <Overview>Oikos is a private, self-hosted family planner — one calm home for everything your household needs to stay organized. No cloud accounts, no subscriptions, no tracking: your data lives on your server and nowhere else.
+  <Overview>Yuvomi is a private, self-hosted family planner — one calm home for everything your household needs to stay organized. No cloud accounts, no subscriptions, no tracking: your data lives on your server and nowhere else.
 
 Independent modules — turn on what fits, ignore the rest:
 
@@ -25,7 +25,7 @@ Independent modules — turn on what fits, ignore the rest:
 - Documents — store and find important household files
 - Notes, Contacts &amp; Birthdays — everything else in one tidy place
 
-Why Oikos:
+Why Yuvomi:
 
 - Mobile-first PWA — install it on any phone, works offline
 - Light &amp; dark mode, fast and polished (no bloated frameworks, no build step)
@@ -59,12 +59,12 @@ After the container starts, open the WebUI — the first visit guides you throug
   <Screenshot>https://raw.githubusercontent.com/ulsklyc/oikos/main/docs/screenshots/unraid/budget-combined-dark.png</Screenshot>
 
   <!-- WebUI port (container always listens on 3000) -->
-  <Config Name="WebUI Port" Target="3000" Default="3000" Mode="tcp" Description="Host port for the Oikos web interface." Type="Port" Display="always" Required="true" Mask="false">3000</Config>
+  <Config Name="WebUI Port" Target="3000" Default="3000" Mode="tcp" Description="Host port for the Yuvomi web interface." Type="Port" Display="always" Required="true" Mask="false">3000</Config>
 
   <!-- Persistent data -->
   <Config Name="Data" Target="/data" Default="/mnt/user/appdata/oikos/data" Mode="rw" Description="Database and stored app data (uploads, documents)." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/oikos/data</Config>
   <Config Name="Backups" Target="/backups" Default="/mnt/user/appdata/oikos/backups" Mode="rw" Description="Destination folder for scheduled and manual database backups." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/oikos/backups</Config>
-  <Config Name="Modules (optional)" Target="/app/modules" Default="/mnt/user/appdata/oikos/modules" Mode="rw" Description="Optional: drop-in folder for additional Oikos modules. Leave default if unused." Type="Path" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/oikos/modules</Config>
+  <Config Name="Modules (optional)" Target="/app/modules" Default="/mnt/user/appdata/oikos/modules" Mode="rw" Description="Optional: drop-in folder for additional Yuvomi modules. Leave default if unused." Type="Path" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/oikos/modules</Config>
 
   <!-- Required secret -->
   <Config Name="SESSION_SECRET" Target="SESSION_SECRET" Default="" Mode="" Description="REQUIRED. A long random string used to sign sessions. Generate with: openssl rand -base64 48" Type="Variable" Display="always" Required="true" Mask="true"/>
@@ -76,7 +76,7 @@ After the container starts, open the WebUI — the first visit guides you throug
   <Config Name="Timezone" Target="TZ" Default="Europe/Berlin" Mode="" Description="Container timezone, e.g. Europe/Berlin. Affects scheduled backups and reminders." Type="Variable" Display="always" Required="false" Mask="false">Europe/Berlin</Config>
 
   <!-- HTTPS / cookie security -->
-  <Config Name="SESSION_SECURE" Target="SESSION_SECURE" Default="false" Mode="" Description="Set to true only when serving Oikos over HTTPS behind a reverse proxy. Keep false for direct HTTP access on the LAN." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
+  <Config Name="SESSION_SECURE" Target="SESSION_SECURE" Default="false" Mode="" Description="Set to true only when serving Yuvomi over HTTPS behind a reverse proxy. Keep false for direct HTTP access on the LAN." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
   <Config Name="TRUST_PROXY" Target="TRUST_PROXY" Default="loopback" Mode="" Description="Use 1 behind one reverse proxy (Caddy/nginx/Traefik), or 'loopback' for direct (no proxy) access." Type="Variable" Display="advanced" Required="false" Mask="false">loopback</Config>
 
   <!-- Database path (advanced; matches the /data mount) -->
@@ -116,4 +116,12 @@ After the container starts, open the WebUI — the first visit guides you throug
   <Config Name="BACKUP_ENABLED" Target="BACKUP_ENABLED" Default="true" Mode="" Description="Optional. Enable automated database backups (default: true)." Type="Variable" Display="advanced" Required="false" Mask="false">true</Config>
   <Config Name="BACKUP_SCHEDULE" Target="BACKUP_SCHEDULE" Default="0 2 * * *" Mode="" Description="Optional. Cron schedule for automated backups (default: 2 AM daily)." Type="Variable" Display="advanced" Required="false" Mask="false">0 2 * * *</Config>
   <Config Name="BACKUP_KEEP" Target="BACKUP_KEEP" Default="7" Mode="" Description="Optional. Number of backups to retain (default: 7)." Type="Variable" Display="advanced" Required="false" Mask="false">7</Config>
+
+  <!-- WebDAV backup target (optional) — upload each backup to Nextcloud, ownCloud, Hetzner Storage Box, etc. -->
+  <Config Name="WEBDAV_BACKUP_ENABLED" Target="WEBDAV_BACKUP_ENABLED" Default="" Mode="" Description="Optional. Set to true to enable automatic upload of backups to a WebDAV server after each local backup." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="WEBDAV_BACKUP_URL" Target="WEBDAV_BACKUP_URL" Default="" Mode="" Description="Optional. WebDAV server URL, e.g. https://cloud.example.com/remote.php/dav/files/username/" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="WEBDAV_BACKUP_USERNAME" Target="WEBDAV_BACKUP_USERNAME" Default="" Mode="" Description="Optional. WebDAV username for authentication." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="WEBDAV_BACKUP_PASSWORD" Target="WEBDAV_BACKUP_PASSWORD" Default="" Mode="" Description="Optional. WebDAV password for authentication." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="WEBDAV_BACKUP_PATH" Target="WEBDAV_BACKUP_PATH" Default="/oikos/backups/" Mode="" Description="Optional. Remote directory path where backup files are stored (default: /oikos/backups/)." Type="Variable" Display="advanced" Required="false" Mask="false">/oikos/backups/</Config>
+  <Config Name="WEBDAV_BACKUP_KEEP" Target="WEBDAV_BACKUP_KEEP" Default="7" Mode="" Description="Optional. Number of remote backup files to keep (default: 7)." Type="Variable" Display="advanced" Required="false" Mask="false">7</Config>
 </Container>

@@ -14,7 +14,7 @@ paths:
   - oikos/deploy/umbrel/**
 ---
 
-Oikos ships to several deploy targets that each describe env vars, ports and volumes **separately**. When a task adds, changes, or removes an **env var**, a **port**, or a **volume/mount**, keeping all applicable targets below in sync is **part of that task's definition of done** — do it inline, in the same task, before reporting it complete. Never defer it to a separate step, to `/docs-sync`, or to the user. (`docs-sync` and release-prep are only the release-time backstop.)
+Yuvomi ships to several deploy targets that each describe env vars, ports and volumes **separately**. When a task adds, changes, or removes an **env var**, a **port**, or a **volume/mount**, keeping all applicable targets below in sync is **part of that task's definition of done** — do it inline, in the same task, before reporting it complete. Never defer it to a separate step, to `/docs-sync`, or to the user. (`docs-sync` and release-prep are only the release-time backstop.)
 
 **Source of truth:** `tools/installer/env-schema.js`. Start there, then propagate outward. Its tests must stay green: `npm run test:installer-schema` and `npm run test:installer-env-write`.
 

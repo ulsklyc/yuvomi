@@ -147,7 +147,7 @@ const ROUTE_ORDER = ['/', '/calendar', '/tasks', '/meals', '/recipes', '/shoppin
 
 const PRIMARY_NAV = 4;
 
-const DEFAULT_APP_NAME = 'Oikos';
+const DEFAULT_APP_NAME = 'Yuvomi';
 const APP_NAME_STORAGE_KEY = 'oikos-app-name';
 const APP_VERSION_STORAGE_KEY = 'oikos-app-version';
 
@@ -658,11 +658,31 @@ function renderAppShell(container) {
   sidebarVersion.hidden = !cachedVersion;
   sidebarBrandText.append(sidebarLogoSpan, sidebarVersion);
   sidebarLogo.appendChild(sidebarBrandText);
+
+  const sidebarToggle = document.createElement('button');
+  sidebarToggle.type = 'button';
+  sidebarToggle.className = 'nav-sidebar__toggle';
+  const _sidebarInitCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+  sidebarToggle.setAttribute('aria-label', _sidebarInitCollapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse'));
+  sidebarToggle.setAttribute('title', _sidebarInitCollapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse'));
+  const _toggleIcon = document.createElement('i');
+  _toggleIcon.dataset.lucide = _sidebarInitCollapsed ? 'panel-left-open' : 'panel-left-close';
+  _toggleIcon.setAttribute('aria-hidden', 'true');
+  sidebarToggle.appendChild(_toggleIcon);
+  sidebarToggle.addEventListener('click', () => {
+    const nowCollapsed = !document.documentElement.classList.contains('sidebar-collapsed');
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, nowCollapsed ? '1' : '0');
+    applySidebarCollapsed(nowCollapsed);
+    const lbl = nowCollapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse');
+    sidebarToggle.setAttribute('aria-label', lbl);
+    sidebarToggle.setAttribute('title', lbl);
+    replaceLucideIcon(sidebarToggle, 'i[data-lucide]', nowCollapsed ? 'panel-left-open' : 'panel-left-close');
+  });
+
   const sidebarItems = document.createElement('div');
   sidebarItems.className = 'nav-sidebar__items nav-sidebar__items--liquid';
   sidebarItems.setAttribute('role', 'list');
   sidebarNavItems().forEach((item) => sidebarItems.appendChild(item));
-  if (window.lucide) window.lucide.createIcons({ el: sidebarItems });
 
   // Hover-Delegation: Indikator-Pille zeigt Vorschau wohin sie gleiten würde
   sidebarItems.addEventListener('mouseover', (ev) => {
@@ -678,7 +698,9 @@ function renderAppShell(container) {
   sidebarItems.addEventListener('mouseleave', () => positionSidebarIndicator());
 
   sidebar.appendChild(sidebarLogo);
+  sidebar.appendChild(sidebarToggle);
   sidebar.appendChild(sidebarItems);
+  if (window.lucide) window.lucide.createIcons({ el: sidebar });
 
   const main = document.createElement('main');
   main.className = 'app-content';
@@ -882,6 +904,7 @@ function renderAppShell(container) {
   if (moreSheet)  shellNodes.push(moreSheet);
   shellNodes.push(searchOverlay, toastContainerPolite, toastContainerAssertive, routeAnnouncer);
   container.replaceChildren(...shellNodes);
+  applySidebarCollapsed(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1');
   updateBranding(currentPath || '/');
 
   // Klick-Handler für alle Nav-Links
@@ -905,6 +928,7 @@ function renderAppShell(container) {
 const FAB_SEEN_KEY = (module) => `oikos:fabSeen:${module}`;
 const FAB_SEEN_MAX = 5;
 const SEARCH_KBD_KEY = 'oikos:searchKbdUsed';
+const SIDEBAR_COLLAPSED_KEY = 'oikos.sidebar.collapsed';
 
 const SHORTCUTS = [
   { key: '/',   description: () => t('shortcuts.search'),  action: () => {
@@ -1377,6 +1401,10 @@ function isModuleDisabled(moduleName) {
   return _disabledModules.has(moduleName);
 }
 
+function applySidebarCollapsed(collapsed) {
+  document.documentElement.classList.toggle('sidebar-collapsed', collapsed);
+}
+
 function setDisabledModules(modules) {
   _disabledModules = new Set(Array.isArray(modules) ? modules : []);
   rebuildNavigation();
@@ -1814,14 +1842,14 @@ function friendlyError(err) {
 window.addEventListener('error', (e) => {
   // Ressource-Ladefehler (z.B. fehlgeschlagenes Bild): ignorieren
   if (e.target && e.target !== window) return;
-  console.error('[Oikos] Unbehandelter Fehler:', e.error ?? e.message);
+  console.error('[Yuvomi] Unbehandelter Fehler:', e.error ?? e.message);
   showToast(t('common.unexpectedError'), 'danger');
 });
 
 window.addEventListener('unhandledrejection', (e) => {
   // Auth-Fehler werden bereits von auth:expired behandelt
   if (e.reason?.status === 401) return;
-  console.error('[Oikos] Unbehandeltes Promise-Rejection:', e.reason);
+  console.error('[Yuvomi] Unbehandeltes Promise-Rejection:', e.reason);
   showToast(friendlyError(e.reason), 'danger');
   e.preventDefault(); // Konsolenfehler unterdrücken (bereits geloggt)
 });

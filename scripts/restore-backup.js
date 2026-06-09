@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Restore an Oikos database backup from the CLI.
+ * Restore an Yuvomi database backup from the CLI.
  *
  * Usage:
  *   node --import dotenv/config scripts/restore-backup.js /path/to/oikos-backup.db

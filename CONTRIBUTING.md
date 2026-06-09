@@ -1,6 +1,6 @@
-# Contributing to Oikos
+# Contributing to Yuvomi
 
-Thanks for your interest in contributing! Oikos is a small, opinionated project with deliberate architectural constraints. This guide covers what you need to know before submitting code.
+Thanks for your interest in contributing! Yuvomi is a small, opinionated project with deliberate architectural constraints. This guide covers what you need to know before submitting code.
 
 Have a question before diving in? Start a thread in [Discussions](https://github.com/ulsklyc/oikos/discussions).
 
@@ -8,7 +8,7 @@ Have a question before diving in? Start a thread in [Discussions](https://github
 
 ## Hard Constraints
 
-**Oikos enforces a strict "no frameworks, no build tools" policy.** This is a permanent architectural decision, not a temporary limitation.
+**Yuvomi enforces a strict "no frameworks, no build tools" policy.** This is a permanent architectural decision, not a temporary limitation.
 
 Specifically - the following will **not** be merged:
 

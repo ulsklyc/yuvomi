@@ -1,5 +1,5 @@
 {
-  "title": "Configuration d'Oikos",
+  "title": "Configuration d'Yuvomi",
   "common": {
     "continue": "Continuer",
     "back": "Retour",
@@ -11,10 +11,10 @@
   },
   "config": {
     "title": "Configuration de base",
-    "subtitle": "Comment accéderez-vous à Oikos ?",
+    "subtitle": "Comment accéderez-vous à Yuvomi ?",
     "existing": "Configuration existante détectée — une sauvegarde de votre fichier .env actuel sera créée avant l'enregistrement.",
     "hostLabel": "Domaine ou adresse IP",
-    "hostHint": "L'adresse que vous utiliserez pour ouvrir Oikos dans votre navigateur.",
+    "hostHint": "L'adresse que vous utiliserez pour ouvrir Yuvomi dans votre navigateur.",
     "portLabel": "Port",
     "tzLabel": "Fuseau horaire",
     "errHost": "Nom d'hôte non valide. Utilisez uniquement des lettres, des chiffres, des tirets et des points.",
@@ -47,7 +47,7 @@
   },
   "calendar": {
     "title": "Synchronisation du calendrier",
-    "subtitle": "Connectez Oikos à Google Agenda ou Apple iCloud. Les deux sont facultatifs — dépliez pour configurer.",
+    "subtitle": "Connectez Yuvomi à Google Agenda ou Apple iCloud. Les deux sont facultatifs — dépliez pour configurer.",
     "google": "Google Agenda",
     "googleHint": "Créez des identifiants OAuth sur {{link}}. URI de redirection : {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -79,7 +79,7 @@
     "configured": "configuré"
   },
   "docker": {
-    "title": "Démarrage d'Oikos",
+    "title": "Démarrage d'Yuvomi",
     "subtitle": "Téléchargement de l'image et démarrage du conteneur Docker.",
     "starting": "Démarrage du conteneur …",
     "elapsed": "{{n}} s écoulées",
@@ -91,7 +91,7 @@
   },
   "admin": {
     "title": "Créer un compte administrateur",
-    "subtitle": "Configurez votre première connexion. Ce compte a un accès complet à Oikos.",
+    "subtitle": "Configurez votre première connexion. Ce compte a un accès complet à Yuvomi.",
     "userLabel": "Nom d'utilisateur",
     "userHint": "3–64 caractères : lettres, chiffres, . - _",
     "nameLabel": "Nom affiché",
@@ -107,15 +107,15 @@
     "errCreate": "Échec de la création du compte administrateur."
   },
   "done": {
-    "title": "Oikos est prêt !",
+    "title": "Yuvomi est prêt !",
     "subtitle": "Votre organiseur familial est en marche et votre compte administrateur est configuré.",
-    "open": "Ouvrir Oikos →"
+    "open": "Ouvrir Yuvomi →"
   },
   "advanced": {
     "tag": "Avancé · facultatif",
     "title": "Paramètres avancés",
     "subtitle": "Proxy inverse, authentification unique et sauvegardes automatiques. Tout est facultatif — vous pouvez ignorer cette étape.",
-    "proxyLabel": "Comment Oikos est-il exposé ?",
+    "proxyLabel": "Comment Yuvomi est-il exposé ?",
     "proxyBehindHttps": "Derrière un proxy inverse avec HTTPS (Caddy, nginx, Traefik)",
     "proxyDirect": "Accès direct via localhost / HTTP",
     "proxyHint": "L'accès direct désactive les cookies sécurisés uniquement afin que la connexion fonctionne sans HTTPS.",

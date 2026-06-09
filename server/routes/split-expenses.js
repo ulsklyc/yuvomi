@@ -15,6 +15,9 @@ import { syncBirthdayArtifacts } from '../services/birthdays.js';
 const log = createLogger('SplitExpenses');
 const router = express.Router();
 
+const avatarColors = ['#007AFF', '#34C759', '#FF9500', '#FF3B30', '#AF52DE', '#FF2D55'];
+const randomAvatarColor = () => avatarColors[Math.floor(Math.random() * avatarColors.length)];
+
 const GROUP_TYPES = ['household', 'couple', 'travel', 'event', 'shopping', 'general'];
 const GROUP_ROLES = ['owner', 'admin', 'guest'];
 const SPLIT_METHODS = ['equal', 'exact', 'percentage', 'shares'];
@@ -125,8 +128,8 @@ async function userFromContact(database, contactId, actorId) {
   const passwordHash = await bcrypt.hash(crypto.randomBytes(24).toString('base64url'), 12);
   const created = database.prepare(`
     INSERT INTO users (username, display_name, password_hash, avatar_color, role, family_role)
-    VALUES (?, ?, ?, '#2563EB', 'member', 'other')
-  `).run(username, contact.name, passwordHash);
+    VALUES (?, ?, ?, ?, 'member', 'other')
+  `).run(username, contact.name, passwordHash, randomAvatarColor());
   database.prepare('UPDATE contacts SET family_user_id = ? WHERE id = ?').run(created.lastInsertRowid, contact.id);
   if (contact.birthday) {
     syncGuestArtifacts(database, created.lastInsertRowid, {
@@ -584,8 +587,8 @@ router.post('/groups/:id/guests', async (req, res) => {
     const createdUserId = db.transaction(() => {
       const created = db.get().prepare(`
         INSERT INTO users (username, display_name, password_hash, avatar_color, role, family_role)
-        VALUES (?, ?, ?, '#2563EB', 'member', ?)
-      `).run(username, vDisplayName.value, hash, familyRole);
+        VALUES (?, ?, ?, ?, 'member', ?)
+      `).run(username, vDisplayName.value, hash, randomAvatarColor(), familyRole);
       syncGuestArtifacts(db.get(), created.lastInsertRowid, {
         displayName: vDisplayName.value,
         phone: vPhone.value,

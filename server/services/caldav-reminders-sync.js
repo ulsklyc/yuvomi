@@ -17,7 +17,7 @@ import { parseVTODO } from './ics-parser.js';
 // --------------------------------------------------------
 
 /**
- * Map an RFC-5545 VTODO PRIORITY (1–9, 0/undefined) to an Oikos task priority.
+ * Map an RFC-5545 VTODO PRIORITY (1–9, 0/undefined) to an Yuvomi task priority.
  * 1–4 → high, 5 → medium, 6–9 → low, else none.
  */
 function mapVtodoPriority(p) {
@@ -168,7 +168,7 @@ function updateReminderSelection(accountId, listUrl, { enabled, targetModule } =
 }
 
 // --------------------------------------------------------
-// Upsert Helpers (read-only inbound: iCloud → Oikos)
+// Upsert Helpers (read-only inbound: iCloud → Yuvomi)
 // --------------------------------------------------------
 
 function upsertTask(todo, accountId, createdBy) {

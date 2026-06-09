@@ -7,6 +7,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.66.0] - 2026-06-09
+
+### Changed
+- Renamed the project from **Oikos** to **Yuvomi** to avoid a trademark conflict with an unrelated product of the same name. The app name, documentation, GitHub Pages and deploy descriptors now read Yuvomi — your existing data and settings are fully preserved on upgrade.
+- The Docker image moved to `ghcr.io/ulsklyc/yuvomi`. The previous `ghcr.io/ulsklyc/oikos` image keeps publishing for a couple more releases so existing deployments keep working — please update your image reference at your convenience.
+- The repository moved to `https://github.com/ulsklyc/yuvomi`; existing `ulsklyc/oikos` links (clone URLs, raw assets, releases) redirect automatically.
+
+## [0.65.34] - 2026-06-08
+
+### Added
+- Vietnamese (`vi`) translation — all UI strings are fully localized, including the web installer wizard and CLI installer.
+- VND (Vietnamese Đồng) added to the supported currencies list in Settings → Budget.
+
+## [0.65.33] - 2026-06-08
+
+### Fixed
+- The avatar color picker now resets to a fresh random color after each member is added or the form is cancelled, preventing all subsequent members from receiving the same color as the first.
+
+## [0.65.32] - 2026-06-08
+
+### Fixed
+- The `rrule()` validator now uses the full anchored `RRULE_RE` pattern instead of an unanchored prefix check, preventing malformed rules like `FREQ=YEARLYX` or `FREQ=YEARLY;INTERVAL=abc` from passing validation.
+
+## [0.65.31] - 2026-06-08
+
+### Fixed
+- New family members created via the admin panel, from a contact in split expenses, or as a split guest now receive a random color from the avatar palette instead of always defaulting to blue. The new-member form in Settings also pre-populates the color picker with a random palette color.
+
+## [0.65.30] - 2026-06-08
+
+### Fixed
+- Tasks and calendar events with a **yearly** recurrence rule (`FREQ=YEARLY`) were rejected by the server with "invalid recurrence rule". The server-side `rrule()` validator now accepts `YEARLY` in addition to `DAILY`, `WEEKLY`, and `MONTHLY`.
+
+## [0.65.29] - 2026-06-08
+
+### Added
+- Desktop sidebar is now collapsible: a toggle button folds the navigation down to icon-only mode (56 px). Labels, the brand name, and the section heading are hidden; icons and tooltips remain. The collapsed state is persisted in `localStorage` and restored on reload. Toggling animates smoothly via the existing CSS width and margin transitions.
+
+## [0.65.28] - 2026-06-08
+
+### Added
+- Avatar upload now shows an interactive **crop dialog**: drag to pan, zoom with the slider or mouse wheel, then confirm to save a 256 × 256 px square crop. Works for profile pictures and housekeeping staff avatars.
+
+## [0.65.27] - 2026-06-08
+
+### Added
+- README badges for TrueNAS SCALE, Unraid, and Umbrel with links to their respective app store pages.
+
+### Fixed
+- Shopping list: swipe-affordance chevron (›) no longer overlaps the delete button on desktop — the chevron hint is now hidden at ≥1024 px where the explicit delete button is used instead.
+
+## [0.65.26] - 2026-06-08
+
+### Changed
+- README module icons now use each module's accent color with white icon strokes at 64×64 px, matching the visual style of the GitHub Pages landing page.
+
+## [0.65.25] - 2026-06-08
+
+### Fixed
+- README module icons now render correctly — replaced blank PNGs (produced by a failed qlmanage render) with proper images generated via sharp.
+
+## [0.65.24] - 2026-06-08
+
+### Security
+- Escape `req.url` before embedding it in the mock WebDAV XML response in tests (CodeQL `js/reflected-xss` alert #14).
+
+## [0.65.23] - 2026-06-08
+
+### Fixed
+- README Modules table icons are now visible on GitHub — switched from SVG to PNG to work around GitHub's CSP restriction on raw.githubusercontent.com SVG files.
+
+## [0.65.22] - 2026-06-08
+
+### Changed
+- README Modules table now uses SVG icons instead of emojis, matching the visual style of the GitHub Pages landing page.
+
+## [0.65.21] - 2026-06-08
+
+### Added
+- **WebDAV backup target** — after each automatic local backup, Oikos can now upload the file to any WebDAV-compatible server (Nextcloud, ownCloud, Hetzner Storage Box, Infomaniak kDrive, etc.). Configure in **Settings → Backup → WebDAV Backup Target** or via six new environment variables (`WEBDAV_BACKUP_ENABLED`, `WEBDAV_BACKUP_URL`, `WEBDAV_BACKUP_USERNAME`, `WEBDAV_BACKUP_PASSWORD`, `WEBDAV_BACKUP_PATH`, `WEBDAV_BACKUP_KEEP`). Environment variables take precedence over the UI configuration and make fields read-only. Uses Node 22 built-in `fetch` — zero new npm dependencies. Upload failures are non-fatal: the local backup is always retained. Password is always masked (`****`) in the API and UI.
+- Manual "Upload now" button in Settings → Backup to trigger an immediate WebDAV upload of the latest local backup file.
+- "Test connection" button with inline success/failure feedback.
+- Remote backup rotation: oldest remote files are deleted automatically once the configured `keep` limit is exceeded.
+
 ## [0.65.20] - 2026-06-08
 
 ### Added

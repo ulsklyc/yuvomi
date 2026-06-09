@@ -1,5 +1,5 @@
 {
-  "title": "Oikos-installation",
+  "title": "Yuvomi-installation",
   "common": {
     "continue": "Fortsätt",
     "back": "Tillbaka",
@@ -11,10 +11,10 @@
   },
   "config": {
     "title": "Grundkonfiguration",
-    "subtitle": "Hur kommer du att nå Oikos?",
+    "subtitle": "Hur kommer du att nå Yuvomi?",
     "existing": "Befintlig konfiguration upptäckt — en säkerhetskopia av din nuvarande .env-fil skapas innan den sparas.",
     "hostLabel": "Domän eller IP-adress",
-    "hostHint": "Adressen du använder för att öppna Oikos i webbläsaren.",
+    "hostHint": "Adressen du använder för att öppna Yuvomi i webbläsaren.",
     "portLabel": "Port",
     "tzLabel": "Tidszon",
     "errHost": "Ogiltigt värdnamn. Använd endast bokstäver, siffror, bindestreck och punkter.",
@@ -47,7 +47,7 @@
   },
   "calendar": {
     "title": "Kalendersynkronisering",
-    "subtitle": "Anslut Oikos till Google Kalender eller Apple iCloud. Båda är valfria — expandera för att konfigurera.",
+    "subtitle": "Anslut Yuvomi till Google Kalender eller Apple iCloud. Båda är valfria — expandera för att konfigurera.",
     "google": "Google Kalender",
     "googleHint": "Skapa OAuth-uppgifter på {{link}}. Omdirigerings-URI: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -79,7 +79,7 @@
     "configured": "konfigurerat"
   },
   "docker": {
-    "title": "Startar Oikos",
+    "title": "Startar Yuvomi",
     "subtitle": "Hämtar avbildningen och startar Docker-containern.",
     "starting": "Startar containern …",
     "elapsed": "{{n}} s förflutna",
@@ -91,7 +91,7 @@
   },
   "admin": {
     "title": "Skapa administratörskonto",
-    "subtitle": "Konfigurera din första inloggning. Detta konto har full åtkomst till Oikos.",
+    "subtitle": "Konfigurera din första inloggning. Detta konto har full åtkomst till Yuvomi.",
     "userLabel": "Användarnamn",
     "userHint": "3–64 tecken: bokstäver, siffror, . - _",
     "nameLabel": "Visningsnamn",
@@ -107,15 +107,15 @@
     "errCreate": "Det gick inte att skapa administratörskontot."
   },
   "done": {
-    "title": "Oikos är klart!",
+    "title": "Yuvomi är klart!",
     "subtitle": "Din familjeplanerare körs och ditt administratörskonto är konfigurerat.",
-    "open": "Öppna Oikos →"
+    "open": "Öppna Yuvomi →"
   },
   "advanced": {
     "tag": "Avancerat · valfritt",
     "title": "Avancerade inställningar",
     "subtitle": "Omvänd proxy, enkel inloggning och automatiska säkerhetskopior. Allt valfritt — det är säkert att hoppa över.",
-    "proxyLabel": "Hur exponeras Oikos?",
+    "proxyLabel": "Hur exponeras Yuvomi?",
     "proxyBehindHttps": "Bakom en omvänd proxy med HTTPS (Caddy, nginx, Traefik)",
     "proxyDirect": "Direkt åtkomst via localhost / HTTP",
     "proxyHint": "Direkt åtkomst inaktiverar cookies som endast är säkra så att inloggning fungerar utan HTTPS.",

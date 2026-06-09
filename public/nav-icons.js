@@ -1,6 +1,6 @@
 /**
  * Modul: Nav Icons
- * Zweck: Eigener monoliniger Icon-Set für die Oikos-Navigation (1.6px Strich, 24×24).
+ * Zweck: Eigener monoliniger Icon-Set für die Yuvomi-Navigation (1.6px Strich, 24×24).
  * Jedes Icon ist eine Fabrikfunktion, die ein fertig konfiguriertes SVG-Element via
  * createElementNS zurückgibt — kein innerHTML, kein insertAdjacentHTML.
  *

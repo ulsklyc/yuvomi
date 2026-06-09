@@ -247,7 +247,7 @@ class OikosInstallPrompt extends HTMLElement {
     const icon = document.createElement('img');
     icon.className = 'icon';
     icon.src = '/icons/icon-192.png';
-    icon.alt = 'Oikos';
+    icon.alt = 'Yuvomi';
     icon.width = 40;
     icon.height = 40;
     banner.appendChild(icon);

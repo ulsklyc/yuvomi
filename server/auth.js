@@ -853,7 +853,7 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
       username,
       display_name,
       password,
-      avatar_color = '#007AFF',
+      avatar_color = avatarColors[Math.floor(Math.random() * avatarColors.length)],
       avatar_data,
       family_role = 'other',
       system_admin = req.body.role === 'admin',

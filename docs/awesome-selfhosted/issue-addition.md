@@ -1,7 +1,7 @@
 ---
 name: Addition
 about: Add new software to the list.
-title: Add Oikos
+title: Add Yuvomi
 labels: addition, reviewers wanted
 assignees: ''
 ---
@@ -12,11 +12,11 @@ Please fill out information below (all fields are mandatory unless noted otherwi
 
 ```yaml
 # software name
-name: "Oikos"
+name: "Yuvomi"
 # URL of the software project's homepage
 website_url: "https://ulsklyc.github.io/oikos/"
 # URL where the full source code of the program can be downloaded
-source_code_url: "https://github.com/ulsklyc/oikos"
+source_code_url: "https://github.com/ulsklyc/yuvomi"
 # description of what the software does, shorter than 250 characters, sentence case
 description: "Family planner with shared tasks, shopping lists, meal planning, calendar sync (Google & iCloud), budget tracking, notes, and contacts. PWA with offline support."
 # list of license identifiers, see https://github.com/awesome-selfhosted/awesome-selfhosted-data/blob/master/licenses.yml for the full list of licenses

@@ -45,12 +45,12 @@ import modulesRouter from './routes/modules.js';
 
 const log     = createLogger('Server');
 const logSync = createLogger('Sync');
-const logOikos = createLogger('Oikos');
+const logYuvomi = createLogger('Yuvomi');
 
 const { version: APP_VERSION } = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf-8')
 );
-const DEFAULT_APP_NAME = 'Oikos';
+const DEFAULT_APP_NAME = 'Yuvomi';
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -380,8 +380,8 @@ async function runSync() {
 // Server starten
 // --------------------------------------------------------
 app.listen(PORT, () => {
-  logOikos.info(`Server running on port ${PORT} | Version ${APP_VERSION}`);
-  logOikos.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  logYuvomi.info(`Server running on port ${PORT} | Version ${APP_VERSION}`);
+  logYuvomi.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
   // Erster Sync nach 10 Sekunden (warten bis DB vollständig initialisiert)
   setTimeout(() => {

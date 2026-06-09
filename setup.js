@@ -61,7 +61,7 @@ function promptPassword(question) {
 }
 
 async function main() {
-  console.log('\n=== Oikos Setup ===\n');
+  console.log('\n=== Yuvomi Setup ===\n');
 
   // Prüfen ob bereits Admin vorhanden
   const existingAdmin = db.get()
@@ -128,7 +128,7 @@ async function main() {
     console.log(`  Display name: ${displayName}`);
     console.log(`  Role:         Admin`);
     console.log(`${'─'.repeat(40)}`);
-    console.log(`\n🌐 Oikos is available at:\n`);
+    console.log(`\n🌐 Yuvomi is available at:\n`);
     console.log(`   Local:     http://localhost:${port}`);
     if (host) {
       console.log(`   Network:   http://${host}:${port}`);

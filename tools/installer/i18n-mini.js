@@ -1,12 +1,12 @@
 /**
- * i18n-mini — schlanke Internationalisierung für den Oikos-Installer.
+ * i18n-mini — schlanke Internationalisierung für den Yuvomi-Installer.
  * Spiegelt die Locale-Auflösung der App (public/i18n.js:26-34) wider, ohne
  * deren Abhängigkeiten. Keine externen Libs, reine Fetch-/DOM-/Intl-APIs.
  *
  * de ist die Referenzlocale, en der Fallback für fehlende Schlüssel.
  */
 
-export const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'ja', 'ar', 'hi', 'pt', 'uk', 'pl', 'nl', 'cs'];
+export const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'ja', 'ar', 'hi', 'pt', 'uk', 'pl', 'nl', 'cs', 'vi'];
 const FALLBACK_LOCALE = 'en';
 const RTL_LOCALES = ['ar'];
 

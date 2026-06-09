@@ -1,4 +1,4 @@
-# Oikos - Standalone Docker Compose for Portainer / remote deployment
+# Yuvomi - Standalone Docker Compose for Portainer / remote deployment
 # Pulls the pre-built image from GitHub Container Registry.
 # No git clone required.
 #
@@ -18,7 +18,7 @@
 
 services:
   oikos:
-    image: ghcr.io/ulsklyc/oikos:latest
+    image: ghcr.io/ulsklyc/yuvomi:latest
     container_name: oikos
     restart: unless-stopped
     ports:

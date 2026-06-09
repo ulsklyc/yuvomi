@@ -1,5 +1,5 @@
 {
-  "title": "Oikos einrichten",
+  "title": "Yuvomi einrichten",
   "common": {
     "continue": "Weiter",
     "back": "Zurück",
@@ -11,10 +11,10 @@
   },
   "config": {
     "title": "Grundkonfiguration",
-    "subtitle": "Wie möchtest du auf Oikos zugreifen?",
+    "subtitle": "Wie möchtest du auf Yuvomi zugreifen?",
     "existing": "Bestehende Konfiguration erkannt — deine aktuelle .env-Datei wird vor dem Speichern gesichert.",
     "hostLabel": "Domain oder IP-Adresse",
-    "hostHint": "Die Adresse, über die du Oikos im Browser öffnest.",
+    "hostHint": "Die Adresse, über die du Yuvomi im Browser öffnest.",
     "portLabel": "Port",
     "tzLabel": "Zeitzone",
     "errHost": "Ungültiger Hostname. Verwende nur Buchstaben, Ziffern, Bindestriche und Punkte.",
@@ -47,7 +47,7 @@
   },
   "calendar": {
     "title": "Kalender-Synchronisation",
-    "subtitle": "Verbinde Oikos mit Google Kalender oder Apple iCloud. Beides optional — zum Konfigurieren ausklappen.",
+    "subtitle": "Verbinde Yuvomi mit Google Kalender oder Apple iCloud. Beides optional — zum Konfigurieren ausklappen.",
     "google": "Google Kalender",
     "googleHint": "Erstelle OAuth-Anmeldedaten unter {{link}}. Redirect-URI: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -67,7 +67,7 @@
     "tag": "Erweitert · optional",
     "title": "Erweiterte Einstellungen",
     "subtitle": "Reverse-Proxy, Single Sign-On und automatische Backups. Alles optional — Überspringen ist unbedenklich.",
-    "proxyLabel": "Wie wird Oikos bereitgestellt?",
+    "proxyLabel": "Wie wird Yuvomi bereitgestellt?",
     "proxyBehindHttps": "Hinter einem Reverse-Proxy mit HTTPS (Caddy, nginx, Traefik)",
     "proxyDirect": "Direkter Zugriff über localhost / HTTP",
     "proxyHint": "Direkter Zugriff deaktiviert reine Secure-Cookies, damit der Login ohne HTTPS funktioniert.",
@@ -100,7 +100,7 @@
     "configured": "konfiguriert"
   },
   "docker": {
-    "title": "Oikos wird gestartet",
+    "title": "Yuvomi wird gestartet",
     "subtitle": "Das Image wird geladen und der Docker-Container gestartet.",
     "starting": "Container wird gestartet …",
     "elapsed": "{{n}} s vergangen",
@@ -112,7 +112,7 @@
   },
   "admin": {
     "title": "Admin-Konto erstellen",
-    "subtitle": "Richte deinen ersten Login ein. Dieses Konto hat vollen Zugriff auf Oikos.",
+    "subtitle": "Richte deinen ersten Login ein. Dieses Konto hat vollen Zugriff auf Yuvomi.",
     "userLabel": "Benutzername",
     "userHint": "3–64 Zeichen: Buchstaben, Zahlen, . - _",
     "nameLabel": "Anzeigename",
@@ -128,8 +128,8 @@
     "errCreate": "Admin-Konto konnte nicht erstellt werden."
   },
   "done": {
-    "title": "Oikos ist bereit!",
+    "title": "Yuvomi ist bereit!",
     "subtitle": "Dein Familienplaner läuft und dein Admin-Konto ist eingerichtet.",
-    "open": "Oikos öffnen →"
+    "open": "Yuvomi öffnen →"
   }
 }

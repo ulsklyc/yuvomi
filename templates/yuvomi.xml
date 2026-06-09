@@ -1,0 +1,127 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Yuvomi</Name>
+  <Repository>ghcr.io/ulsklyc/yuvomi:latest</Repository>
+  <Registry>https://github.com/ulsklyc/yuvomi/pkgs/container/yuvomi</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <WebUI>http://[IP]:[PORT:3000]</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/ulsklyc/yuvomi/main/templates/yuvomi.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/ulsklyc/yuvomi/main/icon.svg</Icon>
+
+  <Overview>Yuvomi is a private, self-hosted family planner — one calm home for everything your household needs to stay organized. No cloud accounts, no subscriptions, no tracking: your data lives on your server and nowhere else.
+
+Independent modules — turn on what fits, ignore the rest:
+
+- Dashboard — today's tasks, events, meals and reminders at a glance
+- Tasks — shared to-dos with priorities, due dates and assignees
+- Shopping — collaborative grocery lists, auto-sorted by category
+- Meals &amp; Recipes — weekly meal planner with a built-in recipe book
+- Calendar — family calendar with recurring events and reminders
+- Budget — shared expenses, split costs and a spending overview
+- Housekeeping — chores, supplies and staff/session tracking
+- Documents — store and find important household files
+- Notes, Contacts &amp; Birthdays — everything else in one tidy place
+
+Why Yuvomi:
+
+- Mobile-first PWA — install it on any phone, works offline
+- Light &amp; dark mode, fast and polished (no bloated frameworks, no build step)
+- Optional sync — CalDAV / CardDAV, Apple and Google Calendar
+- OIDC single sign-on for households that already run an identity provider
+- Encrypted-at-rest storage (SQLCipher) with automated, scheduled backups
+- Multi-language, fully self-contained and MIT-licensed
+
+— Setup —
+
+REQUIRED: Set a long random SESSION_SECRET.
+RECOMMENDED: Set a strong DB_ENCRYPTION_KEY to encrypt the database at rest — without it the database and any synced calendar/contact credentials are stored unencrypted.
+Generate either secret with: openssl rand -base64 48
+
+After the container starts, open the WebUI — the first visit guides you through creating your admin account. (Headless setups can alternatively run node setup.js in the container console.) Then log in — pick the modules you want and invite your family.</Overview>
+
+  <!-- Either Support or Project is required -->
+  <Support>https://github.com/ulsklyc/yuvomi/issues</Support>
+  <Project>https://github.com/ulsklyc/yuvomi</Project>
+  <ReadMe>https://raw.githubusercontent.com/ulsklyc/yuvomi/main/README.md</ReadMe>
+
+  <Category>Productivity: HomeAutomation: Tools:</Category>
+  <License>MIT</License>
+  <ExtraSearchTerms>family planner household organizer tasks groceries shopping meals recipes calendar budget chores notes contacts birthdays caldav carddav pwa selfhosted</ExtraSearchTerms>
+
+  <!-- Combined desktop + mobile dark-mode composites (see docs/screenshots/build-unraid-composites.mjs) -->
+  <Screenshot>https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/screenshots/unraid/dashboard-combined-dark.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/screenshots/unraid/calendar-combined-dark.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/screenshots/unraid/meals-combined-dark.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/screenshots/unraid/shopping-combined-dark.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/screenshots/unraid/budget-combined-dark.png</Screenshot>
+
+  <!-- WebUI port (container always listens on 3000) -->
+  <Config Name="WebUI Port" Target="3000" Default="3000" Mode="tcp" Description="Host port for the Yuvomi web interface." Type="Port" Display="always" Required="true" Mask="false">3000</Config>
+
+  <!-- Persistent data -->
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/yuvomi/data" Mode="rw" Description="Database and stored app data (uploads, documents)." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/yuvomi/data</Config>
+  <Config Name="Backups" Target="/backups" Default="/mnt/user/appdata/yuvomi/backups" Mode="rw" Description="Destination folder for scheduled and manual database backups." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/yuvomi/backups</Config>
+  <Config Name="Modules (optional)" Target="/app/modules" Default="/mnt/user/appdata/yuvomi/modules" Mode="rw" Description="Optional: drop-in folder for additional Yuvomi modules. Leave default if unused." Type="Path" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/yuvomi/modules</Config>
+
+  <!-- Required secret -->
+  <Config Name="SESSION_SECRET" Target="SESSION_SECRET" Default="" Mode="" Description="REQUIRED. A long random string used to sign sessions. Generate with: openssl rand -base64 48" Type="Variable" Display="always" Required="true" Mask="true"/>
+
+  <!-- Recommended secret -->
+  <Config Name="DB_ENCRYPTION_KEY" Target="DB_ENCRYPTION_KEY" Default="" Mode="" Description="RECOMMENDED. Strong key to encrypt the database at rest (SQLCipher). Leave empty for unencrypted SQLite. Cannot be changed later without re-encrypting. Generate with: openssl rand -base64 48" Type="Variable" Display="always" Required="false" Mask="true"/>
+
+  <!-- Timezone -->
+  <Config Name="Timezone" Target="TZ" Default="Europe/Berlin" Mode="" Description="Container timezone, e.g. Europe/Berlin. Affects scheduled backups and reminders." Type="Variable" Display="always" Required="false" Mask="false">Europe/Berlin</Config>
+
+  <!-- HTTPS / cookie security -->
+  <Config Name="SESSION_SECURE" Target="SESSION_SECURE" Default="false" Mode="" Description="Set to true only when serving Yuvomi over HTTPS behind a reverse proxy. Keep false for direct HTTP access on the LAN." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
+  <Config Name="TRUST_PROXY" Target="TRUST_PROXY" Default="loopback" Mode="" Description="Use 1 behind one reverse proxy (Caddy/nginx/Traefik), or 'loopback' for direct (no proxy) access." Type="Variable" Display="advanced" Required="false" Mask="false">loopback</Config>
+
+  <!-- Database path (advanced; matches the /data mount) -->
+  <Config Name="DB_PATH" Target="DB_PATH" Default="/data/oikos.db" Mode="" Description="Path to the SQLite database inside the container. Keep default unless you know what you are doing." Type="Variable" Display="advanced" Required="false" Mask="false">/data/oikos.db</Config>
+
+  <!-- Weather (optional) — Open-Meteo (recommended, free, no API key) -->
+  <Config Name="WEATHER_LAT" Target="WEATHER_LAT" Default="" Mode="" Description="Optional. Latitude for the Open-Meteo weather widget (no API key required). Find coordinates on openstreetmap.org or Google Maps, e.g. 52.52." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="WEATHER_LON" Target="WEATHER_LON" Default="" Mode="" Description="Optional. Longitude for the Open-Meteo weather widget, e.g. 13.41." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="WEATHER_CITY" Target="WEATHER_CITY" Default="" Mode="" Description="Optional. Display name shown on the weather widget, e.g. Berlin." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="WEATHER_UNITS" Target="WEATHER_UNITS" Default="metric" Mode="" Description="Optional. Unit system for temperatures: metric (°C) or imperial (°F)." Type="Variable" Display="advanced" Required="false" Mask="false">metric</Config>
+  <!-- Weather (optional) — OpenWeatherMap (legacy; only if you already use it) -->
+  <Config Name="OPENWEATHER_API_KEY" Target="OPENWEATHER_API_KEY" Default="" Mode="" Description="Optional (legacy). OpenWeatherMap API key to enable the weather widget. Prefer the keyless Open-Meteo variables above." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="OPENWEATHER_CITY" Target="OPENWEATHER_CITY" Default="" Mode="" Description="Optional (legacy). City for the OpenWeatherMap weather widget, e.g. Berlin." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="OPENWEATHER_UNITS" Target="OPENWEATHER_UNITS" Default="metric" Mode="" Description="Optional (legacy). Unit system for temperatures: metric (°C) or imperial (°F)." Type="Variable" Display="advanced" Required="false" Mask="false">metric</Config>
+  <Config Name="OPENWEATHER_LANG" Target="OPENWEATHER_LANG" Default="en" Mode="" Description="Optional (legacy). Language code for OpenWeatherMap descriptions, e.g. en, de, fr." Type="Variable" Display="advanced" Required="false" Mask="false">en</Config>
+
+  <!-- Google Calendar (optional) -->
+  <Config Name="GOOGLE_CLIENT_ID" Target="GOOGLE_CLIENT_ID" Default="" Mode="" Description="Optional. Google OAuth 2.0 client ID for Google Calendar sync." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="GOOGLE_CLIENT_SECRET" Target="GOOGLE_CLIENT_SECRET" Default="" Mode="" Description="Optional. Google OAuth 2.0 client secret for Google Calendar sync." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="GOOGLE_REDIRECT_URI" Target="GOOGLE_REDIRECT_URI" Default="" Mode="" Description="Optional. OAuth callback URL, e.g. https://your-domain.com/api/v1/calendar/google/callback" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+
+  <!-- OIDC / SSO (optional — all four values required to enable SSO) -->
+  <Config Name="OIDC_ISSUER" Target="OIDC_ISSUER" Default="" Mode="" Description="Optional. OIDC issuer URL, e.g. https://authentik.example.com/application/o/oikos/" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="OIDC_CLIENT_ID" Target="OIDC_CLIENT_ID" Default="" Mode="" Description="Optional. OIDC client ID from your identity provider." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="OIDC_CLIENT_SECRET" Target="OIDC_CLIENT_SECRET" Default="" Mode="" Description="Optional. OIDC client secret from your identity provider." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="OIDC_REDIRECT_URI" Target="OIDC_REDIRECT_URI" Default="" Mode="" Description="Optional. OIDC callback URL, e.g. https://your-domain.com/api/v1/auth/oidc/callback" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+
+  <!-- Apple Calendar CalDAV (optional) -->
+  <Config Name="APPLE_CALDAV_URL" Target="APPLE_CALDAV_URL" Default="https://caldav.icloud.com" Mode="" Description="Optional. Apple CalDAV server URL (default: iCloud). Change only if using a custom CalDAV server." Type="Variable" Display="advanced" Required="false" Mask="false">https://caldav.icloud.com</Config>
+  <Config Name="APPLE_USERNAME" Target="APPLE_USERNAME" Default="" Mode="" Description="Optional. Apple ID (email) for iCloud Calendar sync." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="APPLE_APP_SPECIFIC_PASSWORD" Target="APPLE_APP_SPECIFIC_PASSWORD" Default="" Mode="" Description="Optional. Apple app-specific password for iCloud Calendar sync (generate at appleid.apple.com)." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+
+  <!-- Calendar sync interval -->
+  <Config Name="SYNC_INTERVAL_MINUTES" Target="SYNC_INTERVAL_MINUTES" Default="15" Mode="" Description="Interval in minutes for calendar sync (Google, Apple, CalDAV). Default: 15." Type="Variable" Display="advanced" Required="false" Mask="false">15</Config>
+
+  <!-- Backups (optional) -->
+  <Config Name="BACKUP_ENABLED" Target="BACKUP_ENABLED" Default="true" Mode="" Description="Optional. Enable automated database backups (default: true)." Type="Variable" Display="advanced" Required="false" Mask="false">true</Config>
+  <Config Name="BACKUP_SCHEDULE" Target="BACKUP_SCHEDULE" Default="0 2 * * *" Mode="" Description="Optional. Cron schedule for automated backups (default: 2 AM daily)." Type="Variable" Display="advanced" Required="false" Mask="false">0 2 * * *</Config>
+  <Config Name="BACKUP_KEEP" Target="BACKUP_KEEP" Default="7" Mode="" Description="Optional. Number of backups to retain (default: 7)." Type="Variable" Display="advanced" Required="false" Mask="false">7</Config>
+
+  <!-- WebDAV backup target (optional) — upload each backup to Nextcloud, ownCloud, Hetzner Storage Box, etc. -->
+  <Config Name="WEBDAV_BACKUP_ENABLED" Target="WEBDAV_BACKUP_ENABLED" Default="" Mode="" Description="Optional. Set to true to enable automatic upload of backups to a WebDAV server after each local backup." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="WEBDAV_BACKUP_URL" Target="WEBDAV_BACKUP_URL" Default="" Mode="" Description="Optional. WebDAV server URL, e.g. https://cloud.example.com/remote.php/dav/files/username/" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="WEBDAV_BACKUP_USERNAME" Target="WEBDAV_BACKUP_USERNAME" Default="" Mode="" Description="Optional. WebDAV username for authentication." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="WEBDAV_BACKUP_PASSWORD" Target="WEBDAV_BACKUP_PASSWORD" Default="" Mode="" Description="Optional. WebDAV password for authentication." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="WEBDAV_BACKUP_PATH" Target="WEBDAV_BACKUP_PATH" Default="/oikos/backups/" Mode="" Description="Optional. Remote directory path where backup files are stored (default: /oikos/backups/)." Type="Variable" Display="advanced" Required="false" Mask="false">/oikos/backups/</Config>
+  <Config Name="WEBDAV_BACKUP_KEEP" Target="WEBDAV_BACKUP_KEEP" Default="7" Mode="" Description="Optional. Number of remote backup files to keep (default: 7)." Type="Variable" Display="advanced" Required="false" Mask="false">7</Config>
+</Container>

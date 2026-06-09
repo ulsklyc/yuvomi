@@ -1055,16 +1055,25 @@ function openStaffModal(worker, content, options = {}) {
   const avatarFile = panel?.querySelector('#housekeeping-avatar-file');
   const avatarButton = panel?.querySelector('#housekeeping-avatar-btn');
   avatarButton?.addEventListener('click', () => avatarFile?.click());
-  avatarFile?.addEventListener('change', () => {
+  avatarFile?.addEventListener('change', async () => {
     const file = avatarFile.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.addEventListener('load', () => {
-      state.workerAvatar = String(reader.result || '');
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.addEventListener('load', () => resolve(String(reader.result || '')));
+        reader.addEventListener('error', () => reject(new Error()));
+        reader.readAsDataURL(file);
+      });
+      const { openCropDialog } = await import('/utils/avatar-crop.js');
+      const cropped = await openCropDialog(dataUrl);
+      if (!cropped) { avatarFile.value = ''; return; }
+      state.workerAvatar = cropped;
       avatarButton.replaceChildren();
       avatarButton.insertAdjacentHTML('beforeend', `<img src="${esc(state.workerAvatar)}" alt="">`);
-    });
-    reader.readAsDataURL(file);
+    } catch {
+      avatarFile.value = '';
+    }
   });
   if (window.lucide) window.lucide.createIcons({ el: panel });
 }

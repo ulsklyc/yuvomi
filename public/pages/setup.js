@@ -10,7 +10,7 @@ import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 
 const VERSION_URL = '/api/v1/version';
-const DEFAULT_APP_NAME = 'Oikos';
+const DEFAULT_APP_NAME = 'Yuvomi';
 const APP_NAME_STORAGE_KEY = 'oikos-app-name';
 const USERNAME_RE = /^[a-zA-Z0-9._-]{3,64}$/;
 

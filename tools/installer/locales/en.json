@@ -1,5 +1,5 @@
 {
-  "title": "Oikos Setup",
+  "title": "Yuvomi Setup",
   "common": {
     "continue": "Continue",
     "back": "Back",
@@ -11,10 +11,10 @@
   },
   "config": {
     "title": "Basic Configuration",
-    "subtitle": "How will you access Oikos?",
+    "subtitle": "How will you access Yuvomi?",
     "existing": "Existing configuration detected — your current .env file will be backed up before saving.",
     "hostLabel": "Domain or IP address",
-    "hostHint": "The address you'll use to open Oikos in your browser.",
+    "hostHint": "The address you'll use to open Yuvomi in your browser.",
     "portLabel": "Port",
     "tzLabel": "Timezone",
     "errHost": "Invalid hostname. Use only letters, digits, hyphens and dots.",
@@ -47,7 +47,7 @@
   },
   "calendar": {
     "title": "Calendar Sync",
-    "subtitle": "Connect Oikos to Google Calendar or Apple iCloud. Both optional — expand to configure.",
+    "subtitle": "Connect Yuvomi to Google Calendar or Apple iCloud. Both optional — expand to configure.",
     "google": "Google Calendar",
     "googleHint": "Create OAuth credentials at {{link}}. Redirect URI: {{redirect}}",
     "googleLink": "console.cloud.google.com",
@@ -79,7 +79,7 @@
     "configured": "configured"
   },
   "docker": {
-    "title": "Starting Oikos",
+    "title": "Starting Yuvomi",
     "subtitle": "Pulling the image and starting the Docker container.",
     "starting": "Starting container …",
     "elapsed": "{{n}}s elapsed",
@@ -91,7 +91,7 @@
   },
   "admin": {
     "title": "Create Admin Account",
-    "subtitle": "Set up your first login. This account has full access to Oikos.",
+    "subtitle": "Set up your first login. This account has full access to Yuvomi.",
     "userLabel": "Username",
     "userHint": "3–64 characters: letters, numbers, . - _",
     "nameLabel": "Display Name",
@@ -107,15 +107,15 @@
     "errCreate": "Failed to create admin account."
   },
   "done": {
-    "title": "Oikos is ready!",
+    "title": "Yuvomi is ready!",
     "subtitle": "Your family planner is running and your admin account is set up.",
-    "open": "Open Oikos →"
+    "open": "Open Yuvomi →"
   },
   "advanced": {
     "tag": "Advanced · optional",
     "title": "Advanced Settings",
     "subtitle": "Reverse proxy, single sign-on and automatic backups. All optional — skipping is safe.",
-    "proxyLabel": "How is Oikos exposed?",
+    "proxyLabel": "How is Yuvomi exposed?",
     "proxyBehindHttps": "Behind a reverse proxy with HTTPS (Caddy, nginx, Traefik)",
     "proxyDirect": "Direct access over localhost / HTTP",
     "proxyHint": "Direct access disables secure-only cookies so login works without HTTPS.",

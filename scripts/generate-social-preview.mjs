@@ -130,13 +130,13 @@ body {
       <rect x="100" y="46" width="12" height="22" rx="2" fill="white"/>
     </svg>
   </div>
-  <div class="logo-name">Oikos</div>
+  <div class="logo-name">Yuvomi</div>
   <div class="logo-sep"></div>
   <div class="logo-tag">Self-hosted &middot; Open Source</div>
 </div>
 
 <div class="screen-wrap">
-  <img class="screen-img" src="${imgSrc}" alt="Oikos Dashboard">
+  <img class="screen-img" src="${imgSrc}" alt="Yuvomi Dashboard">
 </div>
 
 <div class="tagline">The family planner that respects your privacy</div>

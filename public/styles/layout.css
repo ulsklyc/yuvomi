@@ -913,6 +913,64 @@ html.fab-anim-done .page-fab {
   .nav-sidebar__items > a:only-child {
     margin-top: 0;
   }
+
+  /* ── Sidebar Toggle ── */
+  .nav-sidebar__toggle {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    align-self: stretch;
+    padding: 0 var(--space-4) var(--space-2);
+    margin-top: calc(-1 * var(--space-2));
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-tertiary);
+    flex-shrink: 0;
+    transition: color var(--transition-fast);
+  }
+
+  .nav-sidebar__toggle:hover {
+    color: var(--color-text-secondary);
+  }
+
+  .nav-sidebar__toggle svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+  }
+
+  /* ── Sidebar eingeklappt (icon-only) ── */
+  html.sidebar-collapsed {
+    --sidebar-width: 56px;
+  }
+
+  html.sidebar-collapsed .nav-sidebar .nav-sidebar__logo {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  html.sidebar-collapsed .nav-sidebar .nav-sidebar__brand-text {
+    display: none;
+  }
+
+  html.sidebar-collapsed .nav-sidebar .nav-sidebar__toggle {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  html.sidebar-collapsed .nav-sidebar .nav-item {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  html.sidebar-collapsed .nav-sidebar .nav-item__label {
+    display: none;
+  }
+
+  html.sidebar-collapsed .nav-sidebar .nav-section-label {
+    display: none;
+  }
 }
 
 
@@ -2207,6 +2265,10 @@ html.fab-anim-done .page-fab {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .swipe-row::after { display: none; }
+}
+
+@media (min-width: 1024px) {
   .swipe-row::after { display: none; }
 }
 
