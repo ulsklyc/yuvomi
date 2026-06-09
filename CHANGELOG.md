@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.68.0] - 2026-06-09
+
+### Added
+- **Documents**: in-browser document viewer. Uploaded files can now be previewed directly in an `xl` modal without downloading — images (PNG/JPEG/WebP) render inline, PDFs open in a sandboxed same-origin iframe, and text/CSV files are fetched and shown in a monospaced block. Office files (Word/Excel) and other non-previewable types fall back to a download prompt. A new eye-icon action button appears on viewable files, and clicking a card or row opens the viewer. Backed by a new `GET /api/v1/documents/:id/preview` endpoint serving files with `Content-Disposition: inline`.
+
+### Changed
+- **Documents**: grid cards redesigned — the category icon and date now share a header row, with action buttons centered below a divider.
+
+### Security
+- The Content-Security-Policy `frame-src` directive was relaxed from `'none'` to `'self'` to allow same-origin PDF embedding in the document viewer. The PDF iframe is additionally `sandbox`ed (`allow-same-origin` only, no scripts) as defense-in-depth.
+
 ## [0.67.6] - 2026-06-09
 
 ### Fixed

@@ -1514,6 +1514,8 @@
     "calendarItemsFolder": "Kalenderobjekt",
     "folderBrowserTitle": "Bläddra bland mappar",
     "emptyPrimary": "Lägg till dokument",
+    "viewAction": "Visa",
+    "viewerDownloadHint": "Den här filtypen kan inte förhandsgranskas i webbläsaren. Ladda ned filen för att öppna den.",
     "emptySecondary": "Lägg till mapp"
   },
   "shortcuts": {

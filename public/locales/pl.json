@@ -1525,6 +1525,8 @@
     "calendarItemsFolder": "Wpisy kalendarza",
     "folderBrowserTitle": "Przeglądaj foldery",
     "emptyPrimary": "Dodaj dokument",
+    "viewAction": "Wyświetl",
+    "viewerDownloadHint": "Ten typ pliku nie może być wyświetlony w podglądzie przeglądarki. Pobierz plik, aby go otworzyć.",
     "emptySecondary": "Dodaj folder"
   },
   "userMultiSelect": {

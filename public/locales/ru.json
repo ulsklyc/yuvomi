@@ -1514,6 +1514,8 @@
     "calendarItemsFolder": "Элементы календаря",
     "folderBrowserTitle": "Просмотр папок",
     "emptyPrimary": "Добавить документ",
+    "viewAction": "Просмотр",
+    "viewerDownloadHint": "Этот тип файла не может быть отображён в браузере. Загрузите файл, чтобы открыть его.",
     "emptySecondary": "Добавить папку"
   },
   "shortcuts": {

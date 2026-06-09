@@ -1694,6 +1694,8 @@
     "calendarItemsFolder": "Položky kalendáře",
     "folderBrowserTitle": "Procházet složky",
     "emptyPrimary": "Přidat dokument",
+    "viewAction": "Zobrazit",
+    "viewerDownloadHint": "Tento typ souboru nelze v prohlížeči zobrazit. Stáhněte soubor a otevřete jej.",
     "emptySecondary": "Přidat složku"
   },
   "reminders": {

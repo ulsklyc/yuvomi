@@ -1514,6 +1514,8 @@
     "calendarItemsFolder": "عناصر التقويم",
     "folderBrowserTitle": "تصفح المجلدات",
     "emptyPrimary": "إضافة مستند",
+    "viewAction": "عرض",
+    "viewerDownloadHint": "لا يمكن معاينة هذا النوع من الملفات في المتصفح. قم بتنزيل الملف لفتحه.",
     "emptySecondary": "إضافة مجلد"
   },
   "shortcuts": {

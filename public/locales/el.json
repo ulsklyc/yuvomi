@@ -1514,6 +1514,8 @@
     "calendarItemsFolder": "Στοιχεία ημερολογίου",
     "folderBrowserTitle": "Περιήγηση φακέλων",
     "emptyPrimary": "Προσθήκη εγγράφου",
+    "viewAction": "Προβολή",
+    "viewerDownloadHint": "Αυτός ο τύπος αρχείου δεν μπορεί να προβληθεί στο πρόγραμμα περιήγησης. Κατεβάστε το αρχείο για να το ανοίξετε.",
     "emptySecondary": "Προσθήκη φακέλου"
   },
   "shortcuts": {

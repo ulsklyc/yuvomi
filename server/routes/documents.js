@@ -288,6 +288,23 @@ router.patch('/:id/archive', (req, res) => {
   }
 });
 
+router.get('/:id/preview', (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const doc = getVisibleDocument(id, req, true);
+    if (!doc) return res.status(404).json({ error: 'Document not found.', code: 404 });
+    const filename = encodeURIComponent(doc.original_name.replace(/[/\\]/g, '_'));
+    res.setHeader('Content-Type', doc.mime_type);
+    res.setHeader('Content-Length', String(doc.file_size));
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.end(Buffer.from(doc.content_data, 'base64'));
+  } catch (err) {
+    log.error('GET /:id/preview error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
 router.get('/:id/download', (req, res) => {
   try {
     const id = Number(req.params.id);

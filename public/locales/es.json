@@ -1514,6 +1514,8 @@
     "calendarItemsFolder": "Elementos del calendario",
     "folderBrowserTitle": "Explorar carpetas",
     "emptyPrimary": "Añadir documento",
+    "viewAction": "Ver",
+    "viewerDownloadHint": "Este tipo de archivo no se puede previsualizar en el navegador. Descarga el archivo para abrirlo.",
     "emptySecondary": "Añadir carpeta"
   },
   "shortcuts": {

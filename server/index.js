@@ -70,7 +70,7 @@ app.use(helmet({
       connectSrc: ["'self'"],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
-      frameSrc: ["'none'"],
+      frameSrc: ["'self'"],
       // upgrade-insecure-requests nur mit HTTPS aktivieren
       upgradeInsecureRequests: isSecure ? [] : null,
     },

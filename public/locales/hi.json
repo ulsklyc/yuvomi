@@ -1514,6 +1514,8 @@
     "calendarItemsFolder": "कैलेंडर आइटम",
     "folderBrowserTitle": "फ़ोल्डर ब्राउज़ करें",
     "emptyPrimary": "दस्तावेज़ जोड़ें",
+    "viewAction": "देखें",
+    "viewerDownloadHint": "इस फ़ाइल प्रकार को ब्राउज़र में पूर्वावलोकन नहीं किया जा सकता। इसे खोलने के लिए फ़ाइल डाउनलोड करें।",
     "emptySecondary": "फ़ोल्डर जोड़ें"
   },
   "shortcuts": {

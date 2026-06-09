@@ -13,6 +13,16 @@ import { stagger } from '/utils/ux.js';
 const CATEGORIES = ['medical', 'school', 'identity', 'insurance', 'finance', 'home', 'vehicle', 'legal', 'travel', 'pets', 'warranty', 'taxes', 'work', 'other'];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
+// MIME-Typen, die der Browser direkt anzeigen kann
+const VIEWABLE_MIME = new Set([
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'text/plain',
+  'text/csv',
+]);
+
 const CATEGORY_ICONS = {
   medical: 'heart-pulse',
   school: 'graduation-cap',
@@ -293,7 +303,12 @@ function renderMeta(doc) {
 }
 
 function renderActions(doc) {
+  const canView = VIEWABLE_MIME.has(doc.mime_type);
   return `
+    ${canView ? `
+    <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="view" data-id="${doc.id}" title="${t('documents.viewAction')}" aria-label="${t('documents.viewAction')}">
+      <i data-lucide="eye" class="icon-md" aria-hidden="true"></i>
+    </button>` : ''}
     <a class="btn btn--ghost btn--icon btn--icon-sm" href="/api/v1/documents/${doc.id}/download" download title="${t('documents.downloadAction')}" aria-label="${t('documents.downloadAction')}">
       <i data-lucide="download" class="icon-md" aria-hidden="true"></i>
     </a>
@@ -312,16 +327,16 @@ function renderActions(doc) {
 function renderGridCard(doc) {
   return `
     <article class="document-card" data-id="${doc.id}">
-      <div class="document-card__icon"><i data-lucide="${CATEGORY_ICONS[doc.category] || 'file'}" aria-hidden="true"></i></div>
+      <div class="document-card__header">
+        <div class="document-card__icon"><i data-lucide="${CATEGORY_ICONS[doc.category] || 'file'}" aria-hidden="true"></i></div>
+        <span class="document-card__date">${formatDate(doc.updated_at)}</span>
+      </div>
       <div class="document-card__body">
         <h2 class="document-card__title">${esc(doc.name)}</h2>
         <p class="document-card__description">${esc(doc.description || doc.original_name)}</p>
         <div class="document-card__meta">${renderMeta(doc)}</div>
       </div>
-      <div class="document-card__footer">
-        <span>${formatDate(doc.updated_at)}</span>
-        <div class="document-card__actions">${renderActions(doc)}</div>
-      </div>
+      <div class="document-card__actions">${renderActions(doc)}</div>
     </article>
   `;
 }
@@ -340,10 +355,21 @@ function renderListItem(doc) {
 }
 
 async function handleDocumentAction(e) {
+  // Klick auf Karte/Zeile (nicht auf einen Button/Link) → Viewer öffnen
+  if (!e.target.closest('[data-action]') && !e.target.closest('a') && !e.target.closest('.btn')) {
+    const card = e.target.closest('[data-id]');
+    if (card) {
+      const doc = state.documents.find((item) => String(item.id) === String(card.dataset.id));
+      if (doc) openDocumentViewer(doc);
+    }
+    return;
+  }
+
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
   const doc = state.documents.find((item) => String(item.id) === String(btn.dataset.id));
   if (!doc) return;
+  if (btn.dataset.action === 'view') openDocumentViewer(doc);
   if (btn.dataset.action === 'edit') openDocumentModal(doc);
   if (btn.dataset.action === 'archive') {
     await api.patch(`/documents/${doc.id}/archive`, { archived: doc.status !== 'archived' });
@@ -612,4 +638,92 @@ function formatFileSize(bytes) {
   if (!bytes) return '0 KB';
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// --------------------------------------------------------
+// Document Viewer
+// --------------------------------------------------------
+
+function openDocumentViewer(doc) {
+  const labels = categoryLabels();
+  const previewUrl = `/api/v1/documents/${doc.id}/preview`;
+  const downloadUrl = `/api/v1/documents/${doc.id}/download`;
+
+  openSharedModal({
+    title: esc(doc.name),
+    size: 'xl',
+    content: `
+      <div class="document-viewer">
+        <div class="document-viewer__meta">
+          <span><i data-lucide="${CATEGORY_ICONS[doc.category] || 'folder'}" aria-hidden="true"></i>${labels[doc.category] || doc.category}</span>
+          ${doc.folder_name ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
+          <span>${formatFileSize(doc.file_size)}</span>
+          <span class="document-viewer__actions">
+            <a class="btn btn--primary btn--icon btn--icon-sm" href="${downloadUrl}" download
+               title="${t('documents.downloadAction')}" aria-label="${t('documents.downloadAction')}">
+              <i data-lucide="download" class="icon-md" aria-hidden="true"></i>
+            </a>
+          </span>
+        </div>
+        <div class="document-viewer__body" id="document-viewer-body">
+          ${renderViewerContent(doc, previewUrl, downloadUrl)}
+        </div>
+      </div>
+    `,
+    onSave(panel) {
+      if (window.lucide) window.lucide.createIcons({ el: panel });
+      // Text-Dokumente: Inhalt asynchron laden
+      if (doc.mime_type === 'text/plain' || doc.mime_type === 'text/csv') {
+        const body = panel.querySelector('#document-viewer-body');
+        fetch(previewUrl, { credentials: 'same-origin' })
+          .then((res) => res.text())
+          .then((text) => {
+            if (!body) return;
+            body.replaceChildren();
+            body.insertAdjacentHTML('beforeend', `<pre class="document-viewer__text">${esc(text)}</pre>`);
+          })
+          .catch(() => {
+            if (!body) return;
+            body.replaceChildren();
+            body.insertAdjacentHTML('beforeend', renderViewerUnsupported(doc, downloadUrl));
+            if (window.lucide) window.lucide.createIcons({ el: body });
+          });
+      }
+    },
+  });
+}
+
+function renderViewerContent(doc, previewUrl, downloadUrl) {
+  if (doc.mime_type === 'application/pdf') {
+    return `<iframe class="document-viewer__pdf" src="${previewUrl}" title="${esc(doc.name)}" sandbox="allow-same-origin"></iframe>`;
+  }
+  if (doc.mime_type === 'image/png' || doc.mime_type === 'image/jpeg' || doc.mime_type === 'image/webp') {
+    return `<img class="document-viewer__image" src="${previewUrl}" alt="${esc(doc.name)}"`
+      + ` loading="lazy">`;
+  }
+  if (doc.mime_type === 'text/plain' || doc.mime_type === 'text/csv') {
+    // Inhalt wird asynchron in onSave geladen; Platzhalter anzeigen
+    return `<div class="document-viewer__loading">
+      <i data-lucide="loader-circle" style="width:18px;height:18px" aria-hidden="true"></i>
+      ${esc(doc.original_name)}
+    </div>`;
+  }
+  // Nicht darstellbare Typen: nur Download
+  return renderViewerUnsupported(doc, downloadUrl);
+}
+
+function renderViewerUnsupported(doc, downloadUrl) {
+  return `
+    <div class="document-viewer__unsupported">
+      <span class="document-viewer__unsupported-icon">
+        <i data-lucide="file-x" aria-hidden="true"></i>
+      </span>
+      <div class="document-viewer__unsupported-title">${esc(doc.original_name)}</div>
+      <div class="document-viewer__unsupported-hint">${t('documents.viewerDownloadHint')}</div>
+      <a class="btn btn--primary" href="${downloadUrl}" download>
+        <i data-lucide="download" class="icon-md" aria-hidden="true"></i>
+        ${t('documents.downloadAction')}
+      </a>
+    </div>
+  `;
 }

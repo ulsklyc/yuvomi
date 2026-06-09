@@ -1525,6 +1525,8 @@
     "calendarItemsFolder": "Calendar items",
     "folderBrowserTitle": "Browse folders",
     "emptyPrimary": "Add document",
+    "viewAction": "View",
+    "viewerDownloadHint": "This file type cannot be previewed in the browser. Download the file to open it.",
     "emptySecondary": "Add folder"
   },
   "housekeeping": {

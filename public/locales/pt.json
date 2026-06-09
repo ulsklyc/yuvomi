@@ -1514,6 +1514,8 @@
     "calendarItemsFolder": "Itens do calendário",
     "folderBrowserTitle": "Navegar por pastas",
     "emptyPrimary": "Adicionar documento",
+    "viewAction": "Ver",
+    "viewerDownloadHint": "Este tipo de ficheiro não pode ser pré-visualizado no navegador. Descarregue o ficheiro para o abrir.",
     "emptySecondary": "Adicionar pasta"
   },
   "shortcuts": {

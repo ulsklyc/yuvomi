@@ -1514,6 +1514,8 @@
     "calendarItemsFolder": "日历项目",
     "folderBrowserTitle": "浏览文件夹",
     "emptyPrimary": "添加文档",
+    "viewAction": "查看",
+    "viewerDownloadHint": "此文件类型无法在浏览器中预览。请下载文件以打开。",
     "emptySecondary": "添加文件夹"
   },
   "shortcuts": {

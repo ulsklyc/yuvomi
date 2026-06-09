@@ -1525,6 +1525,8 @@
     "calendarItemsFolder": "Kalendereinträge",
     "folderBrowserTitle": "Ordner durchsuchen",
     "emptyPrimary": "Dokument hinzufügen",
+    "viewAction": "Ansehen",
+    "viewerDownloadHint": "Dieser Dateityp kann im Browser nicht angezeigt werden. Lade die Datei herunter, um sie zu öffnen.",
     "emptySecondary": "Ordner hinzufügen"
   },
   "userMultiSelect": {

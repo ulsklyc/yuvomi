@@ -1514,6 +1514,8 @@
     "calendarItemsFolder": "カレンダー項目",
     "folderBrowserTitle": "フォルダーを参照",
     "emptyPrimary": "書類を追加",
+    "viewAction": "表示",
+    "viewerDownloadHint": "このファイル形式はブラウザでプレビューできません。ファイルをダウンロードして開いてください。",
     "emptySecondary": "フォルダを追加"
   },
   "shortcuts": {

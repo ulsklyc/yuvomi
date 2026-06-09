@@ -1514,6 +1514,8 @@
     "calendarItemsFolder": "Takvim öğeleri",
     "folderBrowserTitle": "Klasörlere göz at",
     "emptyPrimary": "Belge ekle",
+    "viewAction": "Görüntüle",
+    "viewerDownloadHint": "Bu dosya türü tarayıcıda önizlenemiyor. Dosyayı açmak için indirin.",
     "emptySecondary": "Klasör ekle"
   },
   "shortcuts": {

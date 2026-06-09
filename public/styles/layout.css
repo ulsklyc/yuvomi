@@ -1177,6 +1177,7 @@ html.fab-anim-done .page-fab {
   }
   .modal-panel--sm { max-width: 400px; }
   .modal-panel--lg { max-width: 680px; }
+  .modal-panel--xl { max-width: min(960px, 95vw); max-height: calc(100dvh - (2 * var(--space-6))); }
 }
 
 .modal-panel__header {
