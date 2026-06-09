@@ -679,11 +679,13 @@ function openDocumentViewer(doc) {
           .then((res) => res.text())
           .then((text) => {
             if (!body) return;
-            body.innerHTML = `<pre class="document-viewer__text">${esc(text)}</pre>`;
+            body.replaceChildren();
+            body.insertAdjacentHTML('beforeend', `<pre class="document-viewer__text">${esc(text)}</pre>`);
           })
           .catch(() => {
             if (!body) return;
-            body.innerHTML = renderViewerUnsupported(doc, downloadUrl);
+            body.replaceChildren();
+            body.insertAdjacentHTML('beforeend', renderViewerUnsupported(doc, downloadUrl));
             if (window.lucide) window.lucide.createIcons({ el: body });
           });
       }
