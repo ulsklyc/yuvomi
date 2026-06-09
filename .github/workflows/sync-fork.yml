@@ -1,0 +1,34 @@
+name: Sync fork with upstream
+
+on:
+  schedule:
+    - cron: "0 * * * *" # every hour
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/ulsklyc/oikos.git
+
+      - name: Fetch upstream
+        run: git fetch upstream
+
+      - name: Checkout main
+        run: git checkout main
+
+      - name: Merge upstream/main into main
+        run: git merge upstream/main --ff-only
+
+      - name: Push changes
+        run: git push origin main
