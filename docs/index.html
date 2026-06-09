@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Security headers via meta (GitHub Pages allows no custom HTTP headers).
+       Note: X-Frame-Options / CSP frame-ancestors only take effect as HTTP headers, not via meta. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>Yuvomi — The Self-Hosted Family Planner</title>
   <meta name="description" content="A privacy-first, self-hosted family planner. Tasks, shopping, meals, calendar sync, budget — one private home for everything your household runs on. No cloud, no subscriptions.">
   <meta name="theme-color" content="#fafaf8" media="(prefers-color-scheme: light)">
@@ -558,7 +562,7 @@
     <span class="sep dt">·</span>
     <span data-t="proof_mit">MIT licensed</span>
     <span class="sep">·</span>
-    <span><b>v0.67.4</b></span>
+    <span><b>v0.67.5</b></span>
   </div>
 </div>
 
@@ -903,7 +907,7 @@ cp .env.example .env  <span class="c"># set SESSION_SECRET and DB_ENCRYPTION_KEY
       </div>
     </div>
     <div class="foot-bottom">
-      <span><span id="gh-stars-footer" data-gh-stars>★ 810 · </span><b>v0.67.4</b> · June 2026</span>
+      <span><span id="gh-stars-footer" data-gh-stars>★ 810 · </span><b>v0.67.5</b> · June 2026</span>
       <span data-t="foot_madewith">Self-hosted · Privacy-first · Open source</span>
     </div>
   </div>

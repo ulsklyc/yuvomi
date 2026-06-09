@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.67.5] - 2026-06-09
+
+### Security
+- Added `Content-Security-Policy` and `Referrer-Policy` meta tags to all landing-site pages (`index.html`, `install.html`, `impressum.html`, `datenschutz.html`). The CSP restricts resources to same-origin plus the inline styles/scripts the pages actually use; the referrer policy is `strict-origin-when-cross-origin`. (Clickjacking headers such as `X-Frame-Options`/`frame-ancestors` only take effect as real HTTP headers and cannot be enforced on plain GitHub Pages.)
+
 ## [0.67.4] - 2026-06-09
 
 ### Added
