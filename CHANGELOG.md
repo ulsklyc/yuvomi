@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.68.4] - 2026-06-09
+
+### Fixed
+- **Documents**: PDF previews no longer fail with "This page was blocked by Chrome" in Chromium-based browsers. The preview iframe dropped its `sandbox` attribute (Chromium refuses to start its internal PDF viewer inside sandboxed frames) and the `/documents/:id/preview` endpoint now sends a PDF-specific Content-Security-Policy (`default-src 'self'`) instead of the strict `default-src 'none'` that blocked the native viewer. PDFs are still served same-origin as `application/pdf` with `X-Content-Type-Options: nosniff`, so no scripts can execute; non-PDF previews keep the strict policy.
+
 ## [0.68.3] - 2026-06-09
 
 ### Changed

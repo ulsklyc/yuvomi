@@ -320,7 +320,15 @@ router.get('/:id/preview', (req, res) => {
     // Defense-in-Depth: MIME-Sniffing unterbinden und jegliche Skriptausführung im
     // Antwortdokument verbieten, falls ein Inhalt je fehlklassifiziert würde.
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'");
+    // Chromium rendert PDFs über den internen Plugin-Viewer, der same-origin-Ressourcen
+    // und Inline-Styles benötigt. Ein `default-src 'none'` blockiert diesen Viewer komplett
+    // ("This page was blocked by Chrome"). Da `nosniff` + fester Content-Type application/pdf
+    // jede HTML/JS-Ausführung verhindern, ist die gelockerte Policy für PDFs unbedenklich.
+    if (doc.mime_type === 'application/pdf') {
+      res.setHeader('Content-Security-Policy', "default-src 'self'; style-src 'unsafe-inline'; object-src 'self'");
+    } else {
+      res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'");
+    }
     res.end(Buffer.from(doc.content_data, 'base64'));
   } catch (err) {
     log.error('GET /:id/preview error:', err);

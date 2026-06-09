@@ -695,7 +695,11 @@ function openDocumentViewer(doc) {
 
 function renderViewerContent(doc, previewUrl, downloadUrl) {
   if (doc.mime_type === 'application/pdf') {
-    return `<iframe class="document-viewer__pdf" src="${previewUrl}" title="${esc(doc.name)}" sandbox="allow-same-origin"></iframe>`;
+    // Kein `sandbox` am PDF-iframe: Chromium verweigert die Initialisierung seines internen
+    // PDF-Viewers in sandboxed Frames und zeigt stattdessen "This page was blocked by Chrome".
+    // Die Auslieferung erfolgt same-origin als application/pdf mit nosniff, daher keine
+    // Skriptausführung im Frame.
+    return `<iframe class="document-viewer__pdf" src="${previewUrl}" title="${esc(doc.name)}"></iframe>`;
   }
   if (doc.mime_type === 'image/png' || doc.mime_type === 'image/jpeg' || doc.mime_type === 'image/webp') {
     return `<img class="document-viewer__image" src="${previewUrl}" alt="${esc(doc.name)}"`
