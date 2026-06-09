@@ -53,7 +53,7 @@ questions:
             private: true
         - variable: additional_envs
           label: Additional Environment Variables
-          description: See https://github.com/ulsklyc/oikos/blob/main/docs/installation.md#environment-variables for available environment variables.
+          description: See https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#environment-variables for available environment variables.
           schema:
             type: list
             default: []
