@@ -67,6 +67,9 @@ docs/installer-phase-prompts.md
 !public/robots.txt
 CLAUDE.md
 
+# Removing github workflow automation 
+.github/workflows/sync-fork.yml
+
 # Screenshot generation scripts (dev tooling, not part of the app)
 create-screenshots*.js
 custom-screenshots.js
