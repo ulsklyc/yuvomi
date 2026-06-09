@@ -461,7 +461,7 @@ function renderUpcomingEvents(events) {
             ${e.cal_name ? `<span class="event-item__cal">${esc(e.cal_name)}</span>` : ''}
           </div>
         </div>
-        ${renderAvatarStack(e.assigned_users ?? [], { size: 26 })}
+        ${renderAvatarStack(e.assigned_users ?? [], { size: 32 })}
       </div>
     `;
   }).join('');
