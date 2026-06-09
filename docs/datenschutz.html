@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Datenschutzerklärung — Yuvomi</title>
+  <meta name="description" content="Datenschutzerklärung nach Art. 13 DSGVO für yuvomi.cloud.">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#fafaf8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1a1a18" media="(prefers-color-scheme: dark)">
+  <link rel="canonical" href="https://yuvomi.cloud/datenschutz.html">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+
+  <style>
+    @font-face {
+      font-family: 'Plus Jakarta Sans';
+      src: url('fonts/plus-jakarta-sans-variable.woff2') format('woff2-variations');
+      font-weight: 200 800; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: 'Plus Jakarta Sans';
+      src: url('fonts/plus-jakarta-sans-variable-italic.woff2') format('woff2-variations');
+      font-weight: 200 800; font-style: italic; font-display: swap;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ff: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --bg: #FAFAF8;
+      --bg-alt: #F2F1ED;
+      --surface: #FFFFFF;
+      --border: #E8E7E2;
+      --border-strong: #D8D7D1;
+      --text-1: #1C1C1A;
+      --text-2: #56554F;
+      --text-3: #8B8A85;
+      --accent: #6c3aed;
+      --accent-hover: #5b2fd4;
+      --accent-soft: #EDE9FE;
+      --r-md: 12px; --r-lg: 16px; --r-xl: 22px;
+      --shadow-sm: 0 1px 2px rgba(18,14,8,0.05), 0 1px 4px rgba(18,14,8,0.04);
+      --shadow-md: 0 2px 8px rgba(18,14,8,0.08), 0 1px 3px rgba(18,14,8,0.05);
+      --maxw: 820px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1A1A18;
+        --bg-alt: #141413;
+        --surface: #222220;
+        --border: #2A2A28;
+        --border-strong: #3A3A37;
+        --text-1: #F5F4F1;
+        --text-2: #B4B3B0;
+        --text-3: #8E8D89;
+        --accent: #a78bfa;
+        --accent-hover: #9066f5;
+        --accent-soft: #1E1040;
+      }
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--ff);
+      font-size: 16px;
+      line-height: 1.65;
+      color: var(--text-1);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; width: 100%; }
+
+    header.top {
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      padding: 18px 0;
+    }
+    header.top .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text-1);
+      text-decoration: none;
+    }
+    .nav-logo svg { width: 28px; height: 28px; }
+    .back-link {
+      color: var(--text-2);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 8px 14px;
+      border-radius: var(--r-md);
+      border: 1px solid var(--border);
+      transition: all .18s ease;
+    }
+    .back-link:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    main { flex: 1; padding: 48px 0 64px; }
+
+    h1 {
+      font-size: clamp(28px, 4vw, 40px);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 8px;
+      color: var(--text-1);
+    }
+    .subtitle {
+      color: var(--text-3);
+      font-size: 15px;
+      margin-bottom: 40px;
+    }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 36px 0 12px;
+      color: var(--text-1);
+    }
+    h2:first-of-type { margin-top: 0; }
+    h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin: 20px 0 8px;
+      color: var(--text-2);
+    }
+
+    p { margin-bottom: 12px; color: var(--text-1); }
+    ul { margin: 0 0 12px 22px; }
+    li { margin-bottom: 4px; }
+    address { font-style: normal; }
+    code { font-family: ui-monospace, 'SF Mono', monospace; font-size: 13px; background: var(--bg-alt); padding: 1px 5px; border-radius: 4px; }
+
+    a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; word-break: break-word; }
+    a:hover { color: var(--accent-hover); }
+
+    .legal-disclaimer {
+      background: var(--bg-alt);
+      border: 1px solid var(--border-strong);
+      border-left: 4px solid var(--accent);
+      border-radius: var(--r-md);
+      padding: 16px 20px;
+      margin-bottom: 40px;
+      font-size: 14px;
+      color: var(--text-2);
+    }
+    .legal-disclaimer strong { color: var(--text-1); }
+
+    .info-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 4px 24px;
+      margin: 12px 0 16px;
+      box-shadow: var(--shadow-sm);
+    }
+    .info-block p:first-child { margin-top: 14px; }
+    .info-block p:last-child { margin-bottom: 14px; }
+
+    table { border-collapse: collapse; width: 100%; margin: 8px 0 16px; font-size: 14px; }
+    th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+    th { background: var(--bg-alt); font-weight: 600; color: var(--text-2); }
+
+    .small { font-size: 13px; color: var(--text-3); }
+
+    footer.bot {
+      border-top: 1px solid var(--border);
+      background: var(--bg-alt);
+      padding: 24px 0;
+      margin-top: auto;
+    }
+    footer.bot .wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: var(--text-3);
+    }
+    footer.bot a { color: var(--text-2); text-decoration: none; }
+    footer.bot a:hover { color: var(--accent); }
+    footer.bot nav { display: flex; gap: 18px; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a href="index.html" class="nav-logo">
+      <svg viewBox="0 0 160 160" fill="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="gf" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#8b5cf6"/>
+            <stop offset="100%" stop-color="#6c3aed"/>
+          </linearGradient>
+        </defs>
+        <rect width="160" height="160" rx="36" fill="url(#gf)"/>
+        <path d="M80 36L36 72V120C36 122.2 37.8 124 40 124H68V96H92V124H120C122.2 124 124 122.2 124 120V72L80 36Z" fill="white"/>
+        <rect x="100" y="46" width="12" height="22" rx="2" fill="white"/>
+      </svg>
+      Yuvomi
+    </a>
+    <a href="index.html" class="back-link">&larr; Zur Startseite</a>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <h1>Datenschutzerklärung</h1>
+    <p class="subtitle">Informationen nach Art. 13 DSGVO · Stand: 09.06.2026</p>
+
+    <div class="legal-disclaimer">
+      <strong>Hinweis:</strong> Diese Datenschutzerklärung gilt für die Website unter
+      <code>yuvomi.cloud</code>. Sie betrifft <strong>nicht</strong> die selbstgehostete
+      Yuvomi-Anwendung, die auf Ihrem eigenen Server läuft — dafür ist der jeweilige Betreiber
+      verantwortlich (siehe Hinweise für Selfhoster im Projekt-Repository).
+    </div>
+
+    <h2>1. Verantwortlicher im Sinne der DSGVO</h2>
+    <p>Verantwortlich für die Datenverarbeitung auf dieser Website ist:</p>
+    <div class="info-block">
+      <address>
+        Ulas Kalayci<br>
+        c/o MDC#885<br>
+        Welserstraße 3<br>
+        87463 Dietmannsried<br>
+        Deutschland<br><br>
+        E-Mail: <a href="mailto:info@yuvomi.cloud">info@yuvomi.cloud</a><br>
+        Telefon: <a href="tel:+4915229278918">+49 1522 927 89 18</a>
+      </address>
+    </div>
+    <p>Weitere Angaben finden Sie im <a href="impressum.html">Impressum</a>.</p>
+
+    <h2>2. Datenschutzbeauftragter</h2>
+    <p>
+      Ein Datenschutzbeauftragter ist gesetzlich nicht erforderlich (§ 38 BDSG: weniger als
+      20 Personen, die ständig mit der automatisierten Verarbeitung personenbezogener Daten
+      beschäftigt sind; keine besonderen Kategorien personenbezogener Daten i. S. v. Art. 9 DSGVO).
+      Bei Fragen zum Datenschutz wenden Sie sich bitte direkt an den oben genannten Verantwortlichen.
+    </p>
+
+    <h2>3. Allgemeines zur Datenverarbeitung</h2>
+    <p>
+      Wir verarbeiten personenbezogene Daten unserer Besucherinnen und Besucher grundsätzlich nur,
+      soweit dies zur Bereitstellung einer funktionsfähigen Website sowie unserer Inhalte
+      erforderlich ist. Rechtsgrundlagen sind insbesondere Art. 6 Abs. 1 lit. f DSGVO (berechtigte
+      Interessen) sowie § 25 TDDDG (Schutz der Privatsphäre in Endeinrichtungen).
+    </p>
+
+    <h2>4. Hosting über GitHub Pages (Drittland-Transfer USA)</h2>
+    <p>
+      Diese Website wird über den Dienst <strong>GitHub Pages</strong> ausgeliefert. Anbieter ist die
+      <strong>GitHub, Inc.</strong>, 88 Colin P Kelly Jr Street, San Francisco, CA 94107, USA — eine
+      Tochtergesellschaft der Microsoft Corporation.
+    </p>
+    <p>
+      Bei jedem Aufruf einer Seite werden automatisch durch den Browser Daten an die Server von GitHub
+      übermittelt und in sogenannten Server-Logfiles gespeichert. Hierzu gehören typischerweise:
+    </p>
+    <ul>
+      <li>die IP-Adresse Ihres Endgeräts</li>
+      <li>Datum und Uhrzeit des Zugriffs</li>
+      <li>die abgerufene URL und der Referrer</li>
+      <li>verwendeter Browser-Typ und -Version</li>
+      <li>verwendetes Betriebssystem</li>
+    </ul>
+    <p>
+      <strong>Zweck:</strong> technische Bereitstellung der Website, Aufrechterhaltung von Stabilität
+      und Sicherheit, Schutz vor Missbrauch und Angriffen.
+    </p>
+    <p>
+      <strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. f DSGVO. Unser berechtigtes Interesse liegt
+      in der zuverlässigen, sicheren und kostengünstigen Auslieferung dieser Open-Source-Projektseite.
+    </p>
+    <p>
+      <strong>Drittland-Transfer:</strong> GitHub verarbeitet Daten auch in den USA. Die USA gelten als
+      Drittland im Sinne der DSGVO. Die Übermittlung erfolgt auf Grundlage des
+      Angemessenheitsbeschlusses der EU-Kommission vom 10.07.2023 (EU-US Data Privacy Framework,
+      Beschluss 2023/1795); die Microsoft Corporation als Muttergesellschaft von GitHub ist unter dem
+      Data Privacy Framework zertifiziert. Ergänzend bzw. ersatzweise kommen Standardvertragsklauseln
+      nach Art. 46 Abs. 2 lit. c DSGVO (Durchführungsbeschluss 2021/914/EU) zur Anwendung. Trotz dieser
+      Garantien kann nicht vollständig ausgeschlossen werden, dass US-Sicherheitsbehörden auf der
+      Grundlage US-amerikanischer Gesetze (insbesondere FISA 702, CLOUD Act) auf Daten zugreifen.
+    </p>
+    <p>
+      <strong>Speicherdauer:</strong> Die Speicherdauer der Server-Logs wird durch GitHub festgelegt.
+      Wir selbst haben auf diese Logdaten keinen direkten Zugriff. Nähere Informationen finden Sie in
+      der Datenschutzerklärung von GitHub:
+      <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">docs.github.com/site-policy/privacy-policies/github-general-privacy-statement</a>.
+    </p>
+
+    <h2>5. Speicherung im lokalen Browser-Speicher (LocalStorage)</h2>
+    <p>
+      Damit Ihre Anzeige-Präferenzen über Seitenaufrufe hinweg erhalten bleiben, speichert die Website
+      folgende Werte im <em>localStorage</em> Ihres Browsers:
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Schlüssel</th>
+          <th>Inhalt</th>
+          <th>Zweck</th>
+          <th>Speicherdauer</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>oikos-theme</code></td>
+          <td>z. B. <code>light</code> / <code>dark</code></td>
+          <td>Beibehaltung des gewählten Farbschemas</td>
+          <td>bis zur Löschung durch Sie</td>
+        </tr>
+        <tr>
+          <td><code>oikos-lang</code></td>
+          <td>z. B. <code>de</code> / <code>en</code></td>
+          <td>Beibehaltung der gewählten Sprache</td>
+          <td>bis zur Löschung durch Sie</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      <strong>Rechtsgrundlage:</strong> § 25 Abs. 2 Nr. 2 TDDDG. Die Speicherung dieser Präferenzen ist
+      unbedingt erforderlich, damit der von Ihnen ausdrücklich gewünschte Telemediendienst — die
+      Darstellung der Website in der von Ihnen ausgewählten Sprache und Farbgebung — bereitgestellt
+      werden kann. Eine Einwilligung ist daher nicht erforderlich. Eine Übermittlung dieser Werte an
+      Dritte oder an Server findet nicht statt.
+    </p>
+    <p>
+      <strong>So löschen Sie diese Werte:</strong> Über die Browser-Einstellungen unter
+      „Website-Daten löschen" / „Cookies und andere Website-Daten" oder über die Entwicklerwerkzeuge
+      (Application → Local Storage → yuvomi.cloud).
+    </p>
+
+    <h2>6. Keine Cookies, kein Tracking, keine Analyse-Tools, keine externen Requests</h2>
+    <p>
+      Diese Website setzt <strong>keine</strong> Cookies im rechtstechnischen Sinne ein. Es werden
+      insbesondere <strong>keine</strong> Analyse- oder Tracking-Dienste (z. B. Google Analytics,
+      Matomo, Plausible), <strong>keine</strong> Marketing-Pixel (z. B. Meta-, TikTok-, LinkedIn-Pixel),
+      <strong>keine</strong> Social-Media-Einbettungen und <strong>kein</strong> reCAPTCHA verwendet.
+      Schriftarten werden ausschließlich von unserem Server ausgeliefert (selbst-gehostete
+      WOFF2-Dateien); Google Fonts wird <strong>nicht</strong> nachgeladen. Es findet beim Seitenaufruf
+      <strong>kein</strong> Abruf externer Dienste statt — etwaige angezeigte Werte (z. B. die Anzahl
+      der GitHub-„Stars") werden bereits vor der Veröffentlichung statisch in die Seite eingebettet,
+      sodass Ihr Browser hierfür keine Verbindung zu Dritten aufbauen muss.
+    </p>
+
+    <h2>7. Kontaktaufnahme per E-Mail</h2>
+    <p>
+      Wenn Sie uns per E-Mail kontaktieren, verarbeiten wir die in der E-Mail enthaltenen
+      personenbezogenen Daten (Absenderadresse, Inhalt) zum Zweck der Bearbeitung Ihrer Anfrage.
+      Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (vorvertragliche Maßnahmen / Vertragsdurchführung)
+      bzw. Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an der Beantwortung von Anfragen). Wir
+      löschen die Daten, sobald sie für die Zweckerreichung nicht mehr erforderlich sind und keine
+      gesetzlichen Aufbewahrungsfristen (z. B. § 257 HGB, § 147 AO) entgegenstehen.
+    </p>
+
+    <h2>8. Empfänger personenbezogener Daten</h2>
+    <p>Empfänger Ihrer personenbezogenen Daten ist:</p>
+    <ul>
+      <li>
+        <strong>GitHub, Inc.</strong>, 88 Colin P Kelly Jr Street, San Francisco, CA 94107, USA — als
+        Hosting-Dienstleister (Server-Logs).
+      </li>
+    </ul>
+    <p>
+      Eine Übermittlung an weitere Dritte findet nicht statt, soweit wir nicht ausdrücklich an anderer
+      Stelle dieser Erklärung darüber informieren oder Sie ausdrücklich einwilligen.
+    </p>
+
+    <h2>9. Speicherdauer</h2>
+    <ul>
+      <li><strong>Server-Logs bei GitHub:</strong> Speicherdauer wird von GitHub festgelegt (siehe verlinkte GitHub-Datenschutzerklärung).</li>
+      <li><strong>LocalStorage-Einträge:</strong> bis zur Löschung durch Sie im Browser.</li>
+      <li><strong>E-Mail-Korrespondenz:</strong> bis zur abschließenden Bearbeitung der Anfrage, längstens im Rahmen gesetzlicher Aufbewahrungspflichten.</li>
+    </ul>
+
+    <h2>10. Ihre Rechte als betroffene Person</h2>
+    <p>Soweit wir personenbezogene Daten über Sie verarbeiten, stehen Ihnen folgende Rechte zu:</p>
+    <ul>
+      <li><strong>Auskunft</strong> nach Art. 15 DSGVO</li>
+      <li><strong>Berichtigung</strong> nach Art. 16 DSGVO</li>
+      <li><strong>Löschung</strong> nach Art. 17 DSGVO</li>
+      <li><strong>Einschränkung der Verarbeitung</strong> nach Art. 18 DSGVO</li>
+      <li><strong>Datenübertragbarkeit</strong> nach Art. 20 DSGVO</li>
+      <li><strong>Widerspruch</strong> gegen Verarbeitungen auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO, nach Art. 21 DSGVO</li>
+      <li>Recht, eine erteilte Einwilligung jederzeit mit Wirkung für die Zukunft <strong>zu widerrufen</strong> (Art. 7 Abs. 3 DSGVO)</li>
+    </ul>
+    <p>Diese Rechte können Sie formlos gegenüber dem unter Ziffer 1 genannten Verantwortlichen geltend machen.</p>
+
+    <h3>Widerspruchsrecht nach Art. 21 DSGVO</h3>
+    <p>
+      Sie haben das Recht, aus Gründen, die sich aus Ihrer besonderen Situation ergeben, jederzeit
+      gegen die Verarbeitung Sie betreffender personenbezogener Daten, die aufgrund von Art. 6 Abs. 1
+      lit. f DSGVO erfolgt, Widerspruch einzulegen. Wir verarbeiten die personenbezogenen Daten dann
+      nicht mehr, es sei denn, wir können zwingende schutzwürdige Gründe für die Verarbeitung
+      nachweisen, die Ihre Interessen, Rechte und Freiheiten überwiegen, oder die Verarbeitung dient
+      der Geltendmachung, Ausübung oder Verteidigung von Rechtsansprüchen.
+    </p>
+
+    <h2>11. Beschwerderecht bei einer Aufsichtsbehörde</h2>
+    <p>
+      Sie haben unbeschadet anderweitiger Rechtsbehelfe das Recht, sich bei einer
+      Datenschutz-Aufsichtsbehörde zu beschweren, insbesondere in dem Mitgliedstaat Ihres
+      Aufenthaltsorts, Ihres Arbeitsplatzes oder des Orts des mutmaßlichen Verstoßes (Art. 77 DSGVO).
+    </p>
+    <p>Die für den Verantwortlichen zuständige Aufsichtsbehörde ist:</p>
+    <div class="info-block">
+      <address>
+        Bayerisches Landesamt für Datenschutzaufsicht (BayLDA)<br>
+        Promenade 18<br>
+        91522 Ansbach<br>
+        Deutschland<br>
+        <a href="https://www.lda.bayern.de/" target="_blank" rel="noopener">www.lda.bayern.de</a>
+      </address>
+    </div>
+
+    <h2>12. Pflicht zur Bereitstellung der Daten</h2>
+    <p>
+      Die Bereitstellung personenbezogener Daten ist weder gesetzlich noch vertraglich vorgeschrieben.
+      Sie sind nicht verpflichtet, personenbezogene Daten anzugeben. Eine Nichtbereitstellung kann
+      jedoch dazu führen, dass wir Anfragen nicht beantworten können.
+    </p>
+
+    <h2>13. Automatisierte Entscheidungsfindung und Profiling</h2>
+    <p>
+      Eine automatisierte Entscheidungsfindung einschließlich Profiling gemäß Art. 22 DSGVO findet auf
+      dieser Website nicht statt.
+    </p>
+
+    <h2>14. Aktualität und Änderung dieser Datenschutzerklärung</h2>
+    <p>
+      Diese Datenschutzerklärung hat den Stand vom <strong>09.06.2026</strong>. Durch die
+      Weiterentwicklung der Website oder aufgrund geänderter gesetzlicher bzw. behördlicher Vorgaben
+      kann es notwendig werden, diese Datenschutzerklärung anzupassen. Die jeweils aktuelle Fassung ist
+      stets unter <a href="https://yuvomi.cloud/datenschutz.html">https://yuvomi.cloud/datenschutz.html</a>
+      abrufbar.
+    </p>
+
+  </div>
+</main>
+
+<footer class="bot">
+  <div class="wrap">
+    <span>&copy; <span id="year">2026</span> Ulas Kalayci · Yuvomi</span>
+    <nav>
+      <a href="index.html">Startseite</a>
+      <a href="impressum.html">Impressum</a>
+      <a href="datenschutz.html">Datenschutz</a>
+      <a href="https://github.com/ulsklyc/yuvomi" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+</script>
+
+</body>
+</html>

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.67.3] - 2026-06-09
+
+### Added
+- Imprint (`impressum.html`) and privacy policy (`datenschutz.html`) pages for the yuvomi.cloud landing site, linked from the footer of every public page.
+
+### Changed
+- The landing page now embeds the GitHub star count at build time (`scripts/update-gh-stars.mjs`, refreshed by a weekly workflow) instead of fetching the GitHub API from the visitor's browser — so opening the page no longer transmits any visitor data to a third party.
+- Clarified the AES-256/SQLCipher database encryption as optional (enabled in the recommended Docker setup) across the README, landing page, and SECURITY.md, to match the actual default install.
+- Corrected the session/CSRF cookie description in SECURITY.md from `SameSite=Strict` to `SameSite=Lax` to match the implementation, with a note on the Safari ITP rationale and Double-Submit-Cookie CSRF protection.
+
 ## [0.67.2] - 2026-06-09
 
 ### Changed

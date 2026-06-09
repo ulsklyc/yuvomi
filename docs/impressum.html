@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Impressum — Yuvomi</title>
+  <meta name="description" content="Anbieterkennzeichnung nach § 5 DDG für yuvomi.cloud.">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#fafaf8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1a1a18" media="(prefers-color-scheme: dark)">
+  <link rel="canonical" href="https://yuvomi.cloud/impressum.html">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+
+  <style>
+    @font-face {
+      font-family: 'Plus Jakarta Sans';
+      src: url('fonts/plus-jakarta-sans-variable.woff2') format('woff2-variations');
+      font-weight: 200 800; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: 'Plus Jakarta Sans';
+      src: url('fonts/plus-jakarta-sans-variable-italic.woff2') format('woff2-variations');
+      font-weight: 200 800; font-style: italic; font-display: swap;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ff: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --bg: #FAFAF8;
+      --bg-alt: #F2F1ED;
+      --surface: #FFFFFF;
+      --border: #E8E7E2;
+      --border-strong: #D8D7D1;
+      --text-1: #1C1C1A;
+      --text-2: #56554F;
+      --text-3: #8B8A85;
+      --accent: #6c3aed;
+      --accent-hover: #5b2fd4;
+      --accent-soft: #EDE9FE;
+      --r-md: 12px; --r-lg: 16px; --r-xl: 22px;
+      --shadow-sm: 0 1px 2px rgba(18,14,8,0.05), 0 1px 4px rgba(18,14,8,0.04);
+      --shadow-md: 0 2px 8px rgba(18,14,8,0.08), 0 1px 3px rgba(18,14,8,0.05);
+      --maxw: 820px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1A1A18;
+        --bg-alt: #141413;
+        --surface: #222220;
+        --border: #2A2A28;
+        --border-strong: #3A3A37;
+        --text-1: #F5F4F1;
+        --text-2: #B4B3B0;
+        --text-3: #8E8D89;
+        --accent: #a78bfa;
+        --accent-hover: #9066f5;
+        --accent-soft: #1E1040;
+      }
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--ff);
+      font-size: 16px;
+      line-height: 1.65;
+      color: var(--text-1);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; width: 100%; }
+
+    header.top {
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      padding: 18px 0;
+    }
+    header.top .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text-1);
+      text-decoration: none;
+    }
+    .nav-logo svg { width: 28px; height: 28px; }
+    .back-link {
+      color: var(--text-2);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 8px 14px;
+      border-radius: var(--r-md);
+      border: 1px solid var(--border);
+      transition: all .18s ease;
+    }
+    .back-link:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    main { flex: 1; padding: 48px 0 64px; }
+
+    h1 {
+      font-size: clamp(28px, 4vw, 40px);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 8px;
+      color: var(--text-1);
+    }
+    .subtitle {
+      color: var(--text-3);
+      font-size: 15px;
+      margin-bottom: 40px;
+    }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 36px 0 12px;
+      color: var(--text-1);
+    }
+    h2:first-of-type { margin-top: 0; }
+
+    p { margin-bottom: 12px; color: var(--text-1); }
+
+    a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+    a:hover { color: var(--accent-hover); }
+
+    .legal-disclaimer {
+      background: var(--bg-alt);
+      border: 1px solid var(--border-strong);
+      border-left: 4px solid var(--accent);
+      border-radius: var(--r-md);
+      padding: 16px 20px;
+      margin-bottom: 40px;
+      font-size: 14px;
+      color: var(--text-2);
+    }
+    .legal-disclaimer strong { color: var(--text-1); }
+    .legal-disclaimer code { font-family: ui-monospace, 'SF Mono', monospace; font-size: 13px; }
+
+    .info-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+    .info-block dl { display: grid; grid-template-columns: 200px 1fr; gap: 8px 24px; }
+    .info-block dt { color: var(--text-3); font-size: 14px; font-weight: 600; }
+    .info-block dd { color: var(--text-1); font-size: 15px; word-break: break-word; }
+    @media (max-width: 560px) {
+      .info-block dl { grid-template-columns: 1fr; gap: 2px 0; }
+      .info-block dd { margin-bottom: 12px; }
+    }
+
+    .small { font-size: 13px; color: var(--text-3); }
+
+    footer.bot {
+      border-top: 1px solid var(--border);
+      background: var(--bg-alt);
+      padding: 24px 0;
+      margin-top: auto;
+    }
+    footer.bot .wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: var(--text-3);
+    }
+    footer.bot a { color: var(--text-2); text-decoration: none; }
+    footer.bot a:hover { color: var(--accent); }
+    footer.bot nav { display: flex; gap: 18px; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a href="index.html" class="nav-logo">
+      <svg viewBox="0 0 160 160" fill="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="gf" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#8b5cf6"/>
+            <stop offset="100%" stop-color="#6c3aed"/>
+          </linearGradient>
+        </defs>
+        <rect width="160" height="160" rx="36" fill="url(#gf)"/>
+        <path d="M80 36L36 72V120C36 122.2 37.8 124 40 124H68V96H92V124H120C122.2 124 124 122.2 124 120V72L80 36Z" fill="white"/>
+        <rect x="100" y="46" width="12" height="22" rx="2" fill="white"/>
+      </svg>
+      Yuvomi
+    </a>
+    <a href="index.html" class="back-link">&larr; Zur Startseite</a>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <h1>Impressum</h1>
+    <p class="subtitle">Anbieterkennzeichnung gemäß § 5 Digitale-Dienste-Gesetz (DDG)</p>
+
+    <div class="legal-disclaimer">
+      <strong>Hinweis:</strong> Diese Seite enthält die gesetzlich vorgeschriebene Anbieterkennzeichnung
+      für das digitale Angebot unter <code>yuvomi.cloud</code> sowie das zugehörige Open-Source-Projekt
+      <a href="https://github.com/ulsklyc/yuvomi">github.com/ulsklyc/yuvomi</a>. Die hier genannten
+      Kontaktdaten dienen ausschließlich der Erfüllung der Pflichten nach § 5 DDG und § 18 Medienstaatsvertrag (MStV).
+    </div>
+
+    <h2>Anbieter / Diensteanbieter</h2>
+    <div class="info-block">
+      <dl>
+        <dt>Name</dt>
+        <dd>Ulas Kalayci</dd>
+
+        <dt>Anschrift</dt>
+        <dd>
+          c/o MDC#885<br>
+          Welserstraße 3<br>
+          87463 Dietmannsried<br>
+          Deutschland
+        </dd>
+      </dl>
+    </div>
+
+    <h2>Kontakt</h2>
+    <div class="info-block">
+      <dl>
+        <dt>E-Mail</dt>
+        <dd><a href="mailto:info@yuvomi.cloud">info@yuvomi.cloud</a></dd>
+
+        <dt>Telefon</dt>
+        <dd><a href="tel:+4915229278918">+49 1522 927 89 18</a></dd>
+
+        <dt>GitHub</dt>
+        <dd><a href="https://github.com/ulsklyc" target="_blank" rel="noopener">github.com/ulsklyc</a></dd>
+      </dl>
+    </div>
+
+    <h2>Umsatzsteuer</h2>
+    <div class="info-block">
+      <p>
+        Aufgrund der Kleinunternehmerregelung gemäß § 19 Umsatzsteuergesetz (UStG) wird keine
+        Umsatzsteuer ausgewiesen.
+      </p>
+    </div>
+
+    <h2>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h2>
+    <div class="info-block">
+      <dl>
+        <dt>Name</dt>
+        <dd>Ulas Kalayci</dd>
+        <dt>Anschrift</dt>
+        <dd>identisch mit der Anbieter-Anschrift (siehe oben)</dd>
+      </dl>
+    </div>
+
+    <h2>EU-Streitschlichtung</h2>
+    <div class="info-block">
+      <p>
+        Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit:
+        <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener">https://ec.europa.eu/consumers/odr/</a>.
+      </p>
+      <p class="small" style="margin-top:8px;">
+        Da yuvomi.cloud kein kostenpflichtiges Angebot enthält, ist diese Angabe formal nicht zwingend,
+        wird aber zur Vermeidung von Abmahnrisiken bereitgestellt.
+      </p>
+    </div>
+
+    <h2>Verbraucherstreitbeilegung / Universalschlichtungsstelle</h2>
+    <div class="info-block">
+      <p>
+        Der Anbieter ist nicht bereit und nicht verpflichtet, an Streitbeilegungsverfahren vor einer
+        Verbraucherschlichtungsstelle teilzunehmen (§ 36 Verbraucherstreitbeilegungsgesetz — VSBG).
+      </p>
+    </div>
+
+    <h2>Haftung für Inhalte</h2>
+    <p>
+      Als Diensteanbieter ist der Betreiber gemäß § 7 Abs. 1 DDG für eigene Inhalte auf diesen Seiten
+      nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 DDG ist der Betreiber als
+      Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen
+      zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen.
+      Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den allgemeinen
+      Gesetzen bleiben hiervon unberührt. Eine diesbezügliche Haftung ist jedoch erst ab dem Zeitpunkt
+      der Kenntnis einer konkreten Rechtsverletzung möglich. Bei Bekanntwerden von entsprechenden
+      Rechtsverletzungen werden diese Inhalte umgehend entfernt.
+    </p>
+
+    <h2>Haftung für Links</h2>
+    <p>
+      Dieses Angebot enthält Links zu externen Websites Dritter (z. B. github.com), auf deren Inhalte
+      der Betreiber keinen Einfluss hat. Deshalb kann für diese fremden Inhalte auch keine Gewähr
+      übernommen werden. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder
+      Betreiber der Seiten verantwortlich. Die verlinkten Seiten wurden zum Zeitpunkt der Verlinkung
+      auf mögliche Rechtsverstöße überprüft. Rechtswidrige Inhalte waren zum Zeitpunkt der Verlinkung
+      nicht erkennbar. Eine permanente inhaltliche Kontrolle der verlinkten Seiten ist jedoch ohne
+      konkrete Anhaltspunkte einer Rechtsverletzung nicht zumutbar. Bei Bekanntwerden von
+      Rechtsverletzungen werden derartige Links umgehend entfernt.
+    </p>
+
+    <h2>Urheberrecht</h2>
+    <p>
+      Die durch den Betreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen
+      Urheberrecht. Der Quellcode des Yuvomi-Projekts steht unter der
+      <a href="https://github.com/ulsklyc/yuvomi/blob/main/LICENSE" target="_blank" rel="noopener">MIT-Lizenz</a>;
+      es gelten die dort genannten Bedingungen. Darüber hinausgehende Vervielfältigung, Bearbeitung,
+      Verbreitung und jede Art der Verwertung außerhalb der Grenzen des Urheberrechts bedürfen der
+      schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers.
+    </p>
+
+    <p class="small" style="margin-top:32px; padding-top:24px; border-top:1px solid var(--border);">
+      Stand: 09.06.2026. Informationen zur Verarbeitung personenbezogener Daten finden Sie in der
+      <a href="datenschutz.html">Datenschutzerklärung</a>.
+    </p>
+
+  </div>
+</main>
+
+<footer class="bot">
+  <div class="wrap">
+    <span>&copy; <span id="year">2026</span> Ulas Kalayci · Yuvomi</span>
+    <nav>
+      <a href="index.html">Startseite</a>
+      <a href="impressum.html">Impressum</a>
+      <a href="datenschutz.html">Datenschutz</a>
+      <a href="https://github.com/ulsklyc/yuvomi" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+</script>
+
+</body>
+</html>
