@@ -5,7 +5,7 @@
 > - The Docker image moved to `ghcr.io/ulsklyc/yuvomi`; the old `ghcr.io/ulsklyc/oikos` keeps working for now — please update at your convenience.
 > - Your existing data and settings are fully preserved on upgrade.
 >
-> New home: **https://ulsklyc.github.io/yuvomi/** · Questions? Open a [discussion](https://github.com/ulsklyc/yuvomi/discussions).
+> New home: **https://yuvomi.cloud/** · Questions? Open a [discussion](https://github.com/ulsklyc/yuvomi/discussions).
 
 <div align="center">
   <img src="docs/logo.svg" alt="Yuvomi" width="92" />
@@ -27,7 +27,7 @@
 
   <p>
     <a href="docs/installation.md"><strong>→ Install</strong></a> &nbsp;·&nbsp;
-    <a href="https://ulsklyc.github.io/oikos/"><strong>Website & screenshots</strong></a> &nbsp;·&nbsp;
+    <a href="https://yuvomi.cloud/"><strong>Website & screenshots</strong></a> &nbsp;·&nbsp;
     <a href="docs/SPEC.md"><strong>Docs</strong></a> &nbsp;·&nbsp;
     <a href="CHANGELOG.md"><strong>Changelog</strong></a>
   </p>
@@ -74,7 +74,7 @@
       </td>
     </tr>
   </table>
-  <sub>Switch GitHub to dark mode to preview the dark theme &nbsp;·&nbsp; <a href="https://ulsklyc.github.io/oikos/">See all screenshots →</a></sub>
+  <sub>Switch GitHub to dark mode to preview the dark theme &nbsp;·&nbsp; <a href="https://yuvomi.cloud/">See all screenshots →</a></sub>
 </div>
 
 <br>
@@ -144,7 +144,7 @@ Each module is independent. Use what fits, skip what doesn't.
       </td>
     </tr>
   </table>
-  <a href="https://ulsklyc.github.io/oikos/">View all screenshots →</a>
+  <a href="https://yuvomi.cloud/">View all screenshots →</a>
 </div>
 
 ---

@@ -14,7 +14,7 @@ Please fill out information below (all fields are mandatory unless noted otherwi
 # software name
 name: "Yuvomi"
 # URL of the software project's homepage
-website_url: "https://ulsklyc.github.io/oikos/"
+website_url: "https://yuvomi.cloud/"
 # URL where the full source code of the program can be downloaded
 source_code_url: "https://github.com/ulsklyc/yuvomi"
 # description of what the software does, shorter than 250 characters, sentence case
