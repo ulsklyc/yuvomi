@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.67.2] - 2026-06-09
+
+### Changed
+- Redesigned the GitHub social preview and Open Graph image (`docs/social-preview.png`, `docs/og-image.png`) with a more modern, professional editorial layout: brand logo mark and wordmark, a kicker pill, a gradient headline, feature chips with real icons, and the dashboard shown inside a macOS-style window frame with an ambient glow. The internal generator (`scripts/generate-social-preview.mjs`) was rewritten to embed the Plus Jakarta Sans brand font for crisp, on-brand typography. Image paths are unchanged, so existing Open Graph references keep working.
+
 ## [0.67.1] - 2026-06-09
 
 ### Changed
