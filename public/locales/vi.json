@@ -1525,6 +1525,8 @@
     "calendarItemsFolder": "Mục trên lịch",
     "folderBrowserTitle": "Duyệt thư mục",
     "emptyPrimary": "Thêm tài liệu",
+    "viewAction": "Xem",
+    "viewerDownloadHint": "Loại tệp này không thể xem trước trong trình duyệt. Tải xuống tệp để mở.",
     "emptySecondary": "Thêm thư mục"
   },
   "housekeeping": {
