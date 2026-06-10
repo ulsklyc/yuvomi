@@ -74,6 +74,17 @@ export class PaperlessAdapter {
     };
   }
 
+  async upload({ buffer, filename, mime, title, tags = [] }) {
+    if (!filename) throw new Error('DMS upload requires a filename');
+    const form = new FormData();
+    form.append('document', new Blob([buffer], { type: mime || 'application/octet-stream' }), filename);
+    if (title) form.append('title', title);
+    for (const tag of tags) form.append('tags', String(tag));
+    const res = await this.#request('/api/documents/post_document/', { method: 'POST', body: form });
+    const taskId = await res.json();
+    return { taskId: typeof taskId === 'string' ? taskId : String(taskId) };
+  }
+
   async testConnection() {
     try {
       const res = await fetch(`${this.base}/api/`, {

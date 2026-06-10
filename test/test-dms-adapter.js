@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import test, { beforeEach, afterEach } from 'node:test';
 import { PaperlessAdapter } from '../server/services/dms/paperless.js';
+import { getAdapter } from '../server/services/dms/index.js';
 
 const account = { provider: 'paperless', base_url: 'https://dms.example.com/', api_token: 'tok123' };
 
@@ -110,4 +111,39 @@ test('testConnection: ok=false bei 403', async () => {
   const out = await adapter.testConnection();
   assert.equal(out.ok, false);
   assert.equal(out.status, 403);
+});
+
+test('upload: POSTet multipart an post_document/, gibt taskId zurück', async () => {
+  mockFetch(() => jsonResponse('b7c4-task-uuid'));
+  const adapter = new PaperlessAdapter(account);
+  const out = await adapter.upload({
+    buffer: Buffer.from('hello'), filename: 'a.pdf', mime: 'application/pdf', title: 'Brief',
+  });
+  assert.equal(calls[0].url, 'https://dms.example.com/api/documents/post_document/');
+  assert.equal(calls[0].opts.method, 'POST');
+  assert.ok(calls[0].opts.body instanceof FormData);
+  assert.equal(out.taskId, 'b7c4-task-uuid');
+});
+
+test('upload: übergibt tags als wiederholte Felder und erfordert filename', async () => {
+  mockFetch(() => jsonResponse('uuid-abc'));
+  const adapter = new PaperlessAdapter(account);
+  const out = await adapter.upload({
+    buffer: Buffer.from('x'), filename: 'b.pdf', mime: 'application/pdf', tags: [3, 7],
+  });
+  assert.equal(out.taskId, 'uuid-abc');
+  assert.equal(calls[0].opts.method, 'POST');
+  await assert.rejects(
+    () => adapter.upload({ buffer: Buffer.from('x'), mime: 'application/pdf' }),
+    /requires a filename/,
+  );
+});
+
+test('getAdapter: liefert PaperlessAdapter für provider=paperless', () => {
+  const a = getAdapter({ provider: 'paperless', base_url: 'https://x/', api_token: 't' });
+  assert.equal(a.provider, 'paperless');
+});
+
+test('getAdapter: wirft bei unbekanntem Provider', () => {
+  assert.throws(() => getAdapter({ provider: 'nope' }), /Unknown DMS provider/);
 });
