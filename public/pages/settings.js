@@ -496,7 +496,7 @@ export async function render(container, { user }) {
                 <label class="form-label" for="document-storage-password">${t('settings.documentStoragePassword')}</label>
                 <div class="settings-webdav-pw-wrap">
                   <input class="form-input" type="password" id="document-storage-password" name="password"
-                    autocomplete="off" placeholder="${t('settings.documentStoragePasswordPlaceholder')}" />
+                    autocomplete="current-password" placeholder="${t('settings.documentStoragePasswordPlaceholder')}" />
                   <button type="button" class="btn btn--icon btn--ghost settings-webdav-reveal-btn"
                     data-reveal-target="document-storage-password" aria-label="${t('common.togglePasswordVisibility')}">
                     <i data-lucide="eye" aria-hidden="true"></i>
@@ -543,7 +543,7 @@ export async function render(container, { user }) {
               </div>
               <div class="form-group">
                 <label class="form-label" for="dms-token">${t('settings.dmsToken')}</label>
-                <input class="form-input" type="password" id="dms-token" required autocomplete="off" />
+                <input class="form-input" type="password" id="dms-token" required autocomplete="current-password" />
               </div>
               <div id="dms-form-error" class="form-error" hidden></div>
               <div class="settings-form-actions">
@@ -1124,7 +1124,7 @@ export async function render(container, { user }) {
                 <label class="form-label" for="webdav-password">${t('settings.backupWebdavPassword')}</label>
                 <div class="settings-webdav-pw-wrap">
                   <input class="form-input" type="password" id="webdav-password" name="password"
-                    autocomplete="off"
+                    autocomplete="current-password"
                     placeholder="${t('settings.backupWebdavPasswordPlaceholder')}" />
                   <button type="button" class="btn btn--icon btn--ghost settings-webdav-reveal-btn"
                     data-reveal-target="webdav-password" aria-label="${t('common.togglePasswordVisibility')}">
@@ -2878,7 +2878,7 @@ function bindEvents(container, user, users, categories, icsSubscriptions, apiTok
             </div>
             <div class="form-group">
               <label class="form-label" for="caldav-password">${t('settings.caldavPasswordLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-              <input class="form-input" type="password" id="caldav-password" required autocomplete="off" />
+              <input class="form-input" type="password" id="caldav-password" required autocomplete="current-password" />
               <small class="form-hint">${t('settings.caldavPasswordHint')}</small>
             </div>
             <div id="caldav-add-error" class="form-error" hidden></div>
@@ -2953,7 +2953,7 @@ function bindEvents(container, user, users, categories, icsSubscriptions, apiTok
             </div>
             <div class="form-group">
               <label class="form-label" for="cardav-password">${t('settings.cardavPasswordLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-              <input class="form-input" type="password" id="cardav-password" required autocomplete="off" />
+              <input class="form-input" type="password" id="cardav-password" required autocomplete="current-password" />
               <small class="form-hint">${t('settings.cardavPasswordHint')}</small>
             </div>
             <div id="cardav-add-error" class="form-error" hidden></div>
