@@ -472,10 +472,15 @@ Upload and manage family files with per-document access control.
 | original_name | TEXT | NOT NULL (original filename) |
 | mime_type | TEXT | NOT NULL |
 | file_size | INTEGER | NOT NULL (bytes) |
-| content_data | TEXT | NOT NULL (Base64 data URL) |
+| content_data | TEXT | NOT NULL (Base64 data URL; empty string for `external` documents whose bytes live in the DMS) |
 | storage_provider | TEXT | local (default), external |
-| storage_key | TEXT | nullable (external storage path) |
+| storage_key | TEXT | nullable (for `external`: the DMS document ID) |
+| dms_account_id | INTEGER | FK → DMS Accounts (ON DELETE SET NULL), nullable (migration v50) |
+| external_url | TEXT | nullable (deep link to the document in the DMS) |
+| external_meta | TEXT | nullable (JSON `{ correspondent, tags }` mirrored from the DMS for display) |
 | created_by | INTEGER | FK → Users (CASCADE delete), NOT NULL |
+
+For `storage_provider = 'external'` documents (linked from a DMS), preview/download are proxied live from the DMS via the configured adapter; the per-document visibility check still applies before any proxying.
 
 ### Family Document Access
 Allowlist for `visibility = 'restricted'` documents — only listed users can see the document.
@@ -497,6 +502,20 @@ Custom folders for organizing family documents (migration v37). A "Hausreinigung
 | updated_at | TEXT | ISO 8601 |
 
 `family_documents.folder_id` references this table (ON DELETE SET NULL, nullable).
+
+### DMS Accounts
+Connections to an external document management system (Paperless-ngx) for the Documents module (migration v50). Admin-managed in Settings.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| provider | TEXT | paperless (CHECK constraint) |
+| name | TEXT | NOT NULL (display name) |
+| base_url | TEXT | NOT NULL UNIQUE (one account per server) |
+| api_token | TEXT | NOT NULL (write-only; never returned by the API, protected by optional SQLCipher) |
+| created_at | TEXT | ISO 8601 |
+| last_check | TEXT | nullable (last connection test) |
+
+**DMS integration:** Admins connect a Paperless-ngx instance, then search it and **link** existing DMS documents into the Documents module as `external` references (no duplication of the binary), or **push** a local document up into the DMS (asynchronous OCR ingestion — returns a Paperless task ID). All DMS operations (account management, search, link, push) are **admin-only**; searching the DMS is gated because it would otherwise bypass the per-document `restricted`/`private` visibility boundaries. Linked documents are previewed/downloaded by proxying the DMS live. The adapter layer (`server/services/dms/`) is provider-pluggable; Paperless-ngx is the first adapter.
 
 ### Budget Loans
 Instalment-based loans with per-payment tracking. Active loans show remaining balance and due months; paid-off loans are automatically closed.
