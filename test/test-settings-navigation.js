@@ -18,6 +18,8 @@ import {
   normalizeModuleOrder,
 } from '../public/settings/module-order.js';
 import {
+  resolveHolidayLocation,
+  runHolidayDiscovery,
   shouldApplySubdivisionResponse,
 } from '../public/settings/pages/modules-calendar.js';
 import {
@@ -290,6 +292,46 @@ test('stale holiday subdivision responses are rejected', () => {
     requestedCountry: 'AT',
     currentCountry: 'AT',
   }), true);
+});
+
+test('holiday location preserves persisted values until discovery is ready', () => {
+  assert.deepEqual(resolveHolidayLocation({
+    countryReady: false,
+    subdivisionReady: false,
+    selectedCountry: '',
+    selectedSubdivision: '',
+    persistedCountry: 'DE',
+    persistedSubdivision: 'DE-BY',
+  }), {
+    country: 'DE',
+    subdivision: 'DE-BY',
+  });
+
+  assert.deepEqual(resolveHolidayLocation({
+    countryReady: true,
+    subdivisionReady: false,
+    selectedCountry: 'DE',
+    selectedSubdivision: '',
+    persistedCountry: 'DE',
+    persistedSubdivision: 'DE-BY',
+  }), {
+    country: 'DE',
+    subdivision: 'DE-BY',
+  });
+});
+
+test('holiday discovery failures stay local to the calendar leaf', async () => {
+  const errors = [];
+  const result = await runHolidayDiscovery(
+    async () => {
+      throw new Error('discovery failed');
+    },
+    (error) => errors.push(error.message),
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.value, null);
+  assert.deepEqual(errors, ['discovery failed']);
 });
 
 test('Kitchen persistence disables controls and restores the saved selection on failure', async () => {

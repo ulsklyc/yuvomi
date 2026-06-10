@@ -375,9 +375,10 @@ test('module-specific settings leaves preserve their required controls and behav
   assert.match(calendar, /api\.post\('\/preferences\/holidays\/sync', \{\}\)/);
   assert.doesNotMatch(calendar, /caldav|carddav|google|apple|subscriptions|sync accounts/i);
   assert.doesNotMatch(calendar, /#[0-9a-f]{6}/i);
+  assert.match(calendar, /id="holiday-country" disabled/);
   assert.ok(
     calendar.indexOf("form.addEventListener('submit'") <
-      calendar.indexOf("await api.get('/preferences/holidays/countries')"),
+      calendar.indexOf('const countriesResult = await runHolidayDiscovery'),
     'Calendar must bind submit handling before loading holiday discovery data',
   );
 
