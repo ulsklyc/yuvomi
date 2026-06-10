@@ -273,3 +273,7 @@ test('POST /push: Member bekommt 403', async () => {
   assert.equal(res.status, 403);
   session = { userId: adminId, role: 'admin' };
 });
+
+// Server schließen, damit der offene Listener die Event-Loop nicht offen hält
+// (sonst beendet sich `node --test` nie). Gleiches Muster wie in test-documents.js.
+test.after(() => server.close());
