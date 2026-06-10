@@ -90,7 +90,7 @@
     "documentWebdavUsernameLabel": "Gebruikersnaam",
     "documentWebdavPasswordLabel": "Wachtwoord",
     "documentWebdavPathLabel": "Basispad",
-    "documentWebdavPathHint": "Externe map voor documenten. Laat leeg om yuvomi-documents te gebruiken."
+    "documentWebdavPathHint": "Externe map voor documenten. Laat leeg om /yuvomi/documents/ te gebruiken."
   },
   "review": {
     "title": "Controleren",

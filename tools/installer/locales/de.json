@@ -90,7 +90,7 @@
     "documentWebdavUsernameLabel": "Benutzername",
     "documentWebdavPasswordLabel": "Passwort",
     "documentWebdavPathLabel": "Basispfad",
-    "documentWebdavPathHint": "Remote-Ordner für Dokumentdateien. Leer lassen für yuvomi-documents."
+    "documentWebdavPathHint": "Remote-Ordner für Dokumentdateien. Leer lassen für /yuvomi/documents/."
   },
   "review": {
     "title": "Überprüfung",

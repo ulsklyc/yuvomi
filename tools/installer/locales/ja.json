@@ -139,6 +139,6 @@
     "documentWebdavUsernameLabel": "ユーザー名",
     "documentWebdavPasswordLabel": "パスワード",
     "documentWebdavPathLabel": "ベースパス",
-    "documentWebdavPathHint": "ドキュメント用のリモートフォルダー。空の場合は yuvomi-documents を使用します。"
+    "documentWebdavPathHint": "ドキュメント用のリモートフォルダー。空の場合は /yuvomi/documents/ を使用します。"
   }
 }

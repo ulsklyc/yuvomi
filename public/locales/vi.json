@@ -1211,7 +1211,7 @@
     "backupWebdavPassword": "Mật khẩu",
     "backupWebdavPasswordPlaceholder": "Nhập để thay đổi mật khẩu đã lưu",
     "backupWebdavPath": "Đường dẫn từ xa",
-    "backupWebdavPathPlaceholder": "/oikos/backups/",
+    "backupWebdavPathPlaceholder": "/yuvomi/backup/",
     "backupWebdavSaveBtn": "Lưu",
     "backupWebdavSaved": "Đã lưu cấu hình WebDAV.",
     "backupWebdavTestBtn": "Kiểm tra kết nối",

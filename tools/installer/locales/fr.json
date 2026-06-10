@@ -139,6 +139,6 @@
     "documentWebdavUsernameLabel": "Nom d’utilisateur",
     "documentWebdavPasswordLabel": "Mot de passe",
     "documentWebdavPathLabel": "Chemin de base",
-    "documentWebdavPathHint": "Dossier distant des documents. Laisser vide pour utiliser yuvomi-documents."
+    "documentWebdavPathHint": "Dossier distant des documents. Laisser vide pour utiliser /yuvomi/documents/."
   }
 }

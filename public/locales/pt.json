@@ -1106,7 +1106,7 @@
     "backupWebdavPassword": "Palavra-passe",
     "backupWebdavPasswordPlaceholder": "Introduza para alterar a palavra-passe guardada",
     "backupWebdavPath": "Caminho remoto",
-    "backupWebdavPathPlaceholder": "/oikos/backups/",
+    "backupWebdavPathPlaceholder": "/yuvomi/backup/",
     "backupWebdavKeep": "Backups remotos a manter",
     "backupWebdavTestBtn": "Testar ligação",
     "backupWebdavSaveBtn": "Guardar",

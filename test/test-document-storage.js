@@ -531,7 +531,7 @@ test('getConfig defaults and normalizes safe paths while rejecting invalid confi
     username: 'user',
     password: 'pass',
   });
-  assert.equal(storage.getConfig().basePath, 'yuvomi-documents');
+  assert.equal(storage.getConfig().basePath, 'yuvomi/documents');
   await assert.rejects(
     storage.stageDocumentUpload({
       buffer: Buffer.from('x'),

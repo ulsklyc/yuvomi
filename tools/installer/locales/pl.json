@@ -139,6 +139,6 @@
     "documentWebdavUsernameLabel": "Nazwa użytkownika",
     "documentWebdavPasswordLabel": "Hasło",
     "documentWebdavPathLabel": "Ścieżka bazowa",
-    "documentWebdavPathHint": "Zdalny folder dokumentów. Pozostaw puste, aby użyć yuvomi-documents."
+    "documentWebdavPathHint": "Zdalny folder dokumentów. Pozostaw puste, aby użyć /yuvomi/documents/."
   }
 }

@@ -139,6 +139,6 @@
     "documentWebdavUsernameLabel": "उपयोगकर्ता नाम",
     "documentWebdavPasswordLabel": "पासवर्ड",
     "documentWebdavPathLabel": "मूल पथ",
-    "documentWebdavPathHint": "दस्तावेज़ों का दूरस्थ फ़ोल्डर। yuvomi-documents के लिए खाली छोड़ें।"
+    "documentWebdavPathHint": "दस्तावेज़ों का दूरस्थ फ़ोल्डर। /yuvomi/documents/ के लिए खाली छोड़ें।"
   }
 }

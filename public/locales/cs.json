@@ -1093,7 +1093,7 @@
     "backupWebdavPassword": "Heslo",
     "backupWebdavPasswordPlaceholder": "Zadejte pro změnu uloženého hesla",
     "backupWebdavPath": "Vzdálená cesta",
-    "backupWebdavPathPlaceholder": "/oikos/backups/",
+    "backupWebdavPathPlaceholder": "/yuvomi/backup/",
     "backupWebdavKeep": "Ponechat vzdálených záloh",
     "backupWebdavTestBtn": "Testovat připojení",
     "backupWebdavSaveBtn": "Uložit",

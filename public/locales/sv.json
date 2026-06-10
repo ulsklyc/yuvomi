@@ -1106,7 +1106,7 @@
     "backupWebdavPassword": "Lösenord",
     "backupWebdavPasswordPlaceholder": "Ange för att ändra sparat lösenord",
     "backupWebdavPath": "Fjärrsökväg",
-    "backupWebdavPathPlaceholder": "/oikos/backups/",
+    "backupWebdavPathPlaceholder": "/yuvomi/backup/",
     "backupWebdavKeep": "Fjärrsäkerhetskopior att behålla",
     "backupWebdavTestBtn": "Testa anslutning",
     "backupWebdavSaveBtn": "Spara",

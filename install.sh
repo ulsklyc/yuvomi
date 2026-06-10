@@ -213,7 +213,7 @@ configure_document_storage() {
     ask "$(t document_webdav.username)"; read -r DOCUMENT_STORAGE_WEBDAV_USERNAME
     ask "$(t document_webdav.password)"; read -rs DOCUMENT_STORAGE_WEBDAV_PASSWORD; printf "\n"
     ask "$(t document_webdav.path)"; read -r DOCUMENT_STORAGE_WEBDAV_PATH
-    DOCUMENT_STORAGE_WEBDAV_PATH="${DOCUMENT_STORAGE_WEBDAV_PATH:-yuvomi-documents}"
+    DOCUMENT_STORAGE_WEBDAV_PATH="${DOCUMENT_STORAGE_WEBDAV_PATH:-/yuvomi/documents/}"
   fi
 }
 

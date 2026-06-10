@@ -139,6 +139,6 @@
     "documentWebdavUsernameLabel": "Username",
     "documentWebdavPasswordLabel": "Password",
     "documentWebdavPathLabel": "Base path",
-    "documentWebdavPathHint": "Remote folder for document files. Leave empty to use yuvomi-documents."
+    "documentWebdavPathHint": "Remote folder for document files. Leave empty to use /yuvomi/documents/."
   }
 }

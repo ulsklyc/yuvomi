@@ -1106,7 +1106,7 @@
     "backupWebdavPassword": "Password",
     "backupWebdavPasswordPlaceholder": "Enter to change saved password",
     "backupWebdavPath": "Remote path",
-    "backupWebdavPathPlaceholder": "/oikos/backups/",
+    "backupWebdavPathPlaceholder": "/yuvomi/backup/",
     "backupWebdavKeep": "Remote backups to keep",
     "backupWebdavTestBtn": "Test connection",
     "backupWebdavSaveBtn": "Save",

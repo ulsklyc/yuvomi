@@ -139,6 +139,6 @@
     "documentWebdavUsernameLabel": "Kullanıcı adı",
     "documentWebdavPasswordLabel": "Parola",
     "documentWebdavPathLabel": "Temel yol",
-    "documentWebdavPathHint": "Belgeler için uzak klasör. yuvomi-documents kullanmak için boş bırakın."
+    "documentWebdavPathHint": "Belgeler için uzak klasör. /yuvomi/documents/ kullanmak için boş bırakın."
   }
 }

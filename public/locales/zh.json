@@ -1106,7 +1106,7 @@
     "backupWebdavPassword": "密码",
     "backupWebdavPasswordPlaceholder": "输入以更改已保存的密码",
     "backupWebdavPath": "远程路径",
-    "backupWebdavPathPlaceholder": "/oikos/backups/",
+    "backupWebdavPathPlaceholder": "/yuvomi/backup/",
     "backupWebdavKeep": "保留远程备份数量",
     "backupWebdavTestBtn": "测试连接",
     "backupWebdavSaveBtn": "保存",

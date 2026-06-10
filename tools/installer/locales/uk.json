@@ -139,6 +139,6 @@
     "documentWebdavUsernameLabel": "Ім’я користувача",
     "documentWebdavPasswordLabel": "Пароль",
     "documentWebdavPathLabel": "Базовий шлях",
-    "documentWebdavPathHint": "Віддалена папка для документів. Залиште порожньою для yuvomi-documents."
+    "documentWebdavPathHint": "Віддалена папка для документів. Залиште порожньою для /yuvomi/documents/."
   }
 }

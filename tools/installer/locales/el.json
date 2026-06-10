@@ -139,6 +139,6 @@
     "documentWebdavUsernameLabel": "Όνομα χρήστη",
     "documentWebdavPasswordLabel": "Κωδικός πρόσβασης",
     "documentWebdavPathLabel": "Βασική διαδρομή",
-    "documentWebdavPathHint": "Απομακρυσμένος φάκελος εγγράφων. Αφήστε κενό για yuvomi-documents."
+    "documentWebdavPathHint": "Απομακρυσμένος φάκελος εγγράφων. Αφήστε κενό για /yuvomi/documents/."
   }
 }

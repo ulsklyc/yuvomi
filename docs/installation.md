@@ -529,7 +529,7 @@ Built-in cron-based database backup (default: 2 AM daily, keep last 7 copies). S
 | `WEBDAV_BACKUP_URL` | WebDAV server URL (e.g. `https://cloud.example.com/remote.php/dav/files/user/`) | — | No |
 | `WEBDAV_BACKUP_USERNAME` | WebDAV username | — | No |
 | `WEBDAV_BACKUP_PASSWORD` | WebDAV password | — | No |
-| `WEBDAV_BACKUP_PATH` | Remote directory path for backup files | `/oikos/backups/` | No |
+| `WEBDAV_BACKUP_PATH` | Remote directory path for backup files | `/yuvomi/backup/` | No |
 | `WEBDAV_BACKUP_KEEP` | Number of remote backup files to keep | `7` | No |
 
 ---

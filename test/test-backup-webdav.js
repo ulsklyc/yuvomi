@@ -143,7 +143,7 @@ process.env.BACKUP_ENABLED         = 'false';
 process.env.WEBDAV_BACKUP_ENABLED  = 'true';
 process.env.WEBDAV_BACKUP_USERNAME = 'testuser';
 process.env.WEBDAV_BACKUP_PASSWORD = 'testpass';
-process.env.WEBDAV_BACKUP_PATH     = '/oikos/backups/';
+process.env.WEBDAV_BACKUP_PATH     = '/yuvomi/backup/';
 process.env.WEBDAV_BACKUP_KEEP     = '3';
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -179,7 +179,7 @@ describe('WebDAV Backup — service module', async () => {
     assert.strictEqual(cfg.url,        WEBDAV_URL,        'url from env');
     assert.strictEqual(cfg.username,   'testuser',        'username from env');
     assert.strictEqual(cfg.password,   'testpass',        'password from env');
-    assert.strictEqual(cfg.remotePath, '/oikos/backups/', 'remotePath');
+    assert.strictEqual(cfg.remotePath, '/yuvomi/backup/', 'remotePath');
     assert.strictEqual(cfg.keep,       3,                 'keep');
   });
 
@@ -229,7 +229,7 @@ describe('WebDAV Backup — service module', async () => {
     it('should PUT the file to the remote server', async () => {
       const fp = await createTempBackup();
       await webdav.uploadBackup(fp);
-      const remotePath = `/oikos/backups/${path.basename(fp)}`;
+      const remotePath = `/yuvomi/backup/${path.basename(fp)}`;
       assert.ok(mockCtx.files.has(remotePath), 'file should exist on mock server');
     });
 
@@ -237,7 +237,7 @@ describe('WebDAV Backup — service module', async () => {
       const fp = await createTempBackup('yuvomi-backup-2099-02-01T00-00-00-000Z.db');
       await webdav.uploadBackup(fp);
       assert.ok(
-        mockCtx.files.has(`/oikos/backups/${path.basename(fp)}`),
+        mockCtx.files.has(`/yuvomi/backup/${path.basename(fp)}`),
         'yuvomi-prefixed file should be uploaded'
       );
       const listed = await webdav.getRemoteFiles();
@@ -262,7 +262,7 @@ describe('WebDAV Backup — service module', async () => {
         await new Promise((r) => setTimeout(r, 10));
       }
       const remoteFiles = [...mockCtx.files.keys()].filter((k) =>
-        k.startsWith('/oikos/backups/') && k.endsWith('.db')
+        k.startsWith('/yuvomi/backup/') && k.endsWith('.db')
       );
       assert.ok(
         remoteFiles.length <= 3,
@@ -295,7 +295,7 @@ describe('WebDAV Backup — service module', async () => {
       const fp = await createTempBackup('oikos-backup-2099-06-01T12-00-00-000Z.db');
       const fileName = await webdav.triggerUpload(tmpDir);
       assert.ok(fileName.startsWith('oikos-backup-'), 'returned file name');
-      const remotePath = `/oikos/backups/${fileName}`;
+      const remotePath = `/yuvomi/backup/${fileName}`;
       assert.ok(mockCtx.files.has(remotePath), 'file uploaded to mock server');
     });
   });

@@ -90,7 +90,7 @@
     "documentWebdavUsernameLabel": "Uživatelské jméno",
     "documentWebdavPasswordLabel": "Heslo",
     "documentWebdavPathLabel": "Základní cesta",
-    "documentWebdavPathHint": "Vzdálená složka dokumentů. Ponechte prázdné pro yuvomi-documents."
+    "documentWebdavPathHint": "Vzdálená složka dokumentů. Ponechte prázdné pro /yuvomi/documents/."
   },
   "review": {
     "title": "Přehled",

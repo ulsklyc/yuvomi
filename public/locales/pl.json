@@ -1099,7 +1099,7 @@
     "backupWebdavPassword": "Hasło",
     "backupWebdavPasswordPlaceholder": "Wprowadź, aby zmienić zapisane hasło",
     "backupWebdavPath": "Ścieżka zdalna",
-    "backupWebdavPathPlaceholder": "/oikos/backups/",
+    "backupWebdavPathPlaceholder": "/yuvomi/backup/",
     "backupWebdavKeep": "Liczba zdalnych kopii",
     "backupWebdavTestBtn": "Testuj połączenie",
     "backupWebdavSaveBtn": "Zapisz",

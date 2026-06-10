@@ -139,6 +139,6 @@
     "documentWebdavUsernameLabel": "اسم المستخدم",
     "documentWebdavPasswordLabel": "كلمة المرور",
     "documentWebdavPathLabel": "المسار الأساسي",
-    "documentWebdavPathHint": "المجلد البعيد للمستندات. اتركه فارغًا لاستخدام yuvomi-documents."
+    "documentWebdavPathHint": "المجلد البعيد للمستندات. اتركه فارغًا لاستخدام /yuvomi/documents/."
   }
 }

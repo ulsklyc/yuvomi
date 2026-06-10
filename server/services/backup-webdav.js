@@ -75,7 +75,7 @@ export function getConfig() {
   const username = ENV_USER ?? cfgGet('webdav_backup_username')  ?? null;
   const password = ENV_PASS ?? cfgGet('webdav_backup_password')  ?? null;
 
-  const rawPath  = ENV_PATH ?? cfgGet('webdav_backup_path') ?? '/oikos/backups/';
+  const rawPath  = ENV_PATH ?? cfgGet('webdav_backup_path') ?? '/yuvomi/backup/';
   const remotePath = rawPath.endsWith('/') ? rawPath : `${rawPath}/`;
 
   const keepRaw  = ENV_KEEP ?? cfgGet('webdav_backup_keep') ?? '7';
@@ -111,7 +111,7 @@ export function saveConfig(data) {
     cfgSet('webdav_backup_password', data.password);
   }
   if (data.remotePath !== undefined) {
-    const p = String(data.remotePath).trim() || '/oikos/backups/';
+    const p = String(data.remotePath).trim() || '/yuvomi/backup/';
     cfgSet('webdav_backup_path', p.endsWith('/') ? p : `${p}/`);
   }
   if (data.keep !== undefined) {

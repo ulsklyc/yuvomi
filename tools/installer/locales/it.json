@@ -139,6 +139,6 @@
     "documentWebdavUsernameLabel": "Nome utente",
     "documentWebdavPasswordLabel": "Password",
     "documentWebdavPathLabel": "Percorso base",
-    "documentWebdavPathHint": "Cartella remota per i documenti. Lascia vuoto per usare yuvomi-documents."
+    "documentWebdavPathHint": "Cartella remota per i documenti. Lascia vuoto per usare /yuvomi/documents/."
   }
 }

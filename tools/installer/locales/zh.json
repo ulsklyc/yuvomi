@@ -139,6 +139,6 @@
     "documentWebdavUsernameLabel": "用户名",
     "documentWebdavPasswordLabel": "密码",
     "documentWebdavPathLabel": "基础路径",
-    "documentWebdavPathHint": "文档的远程文件夹。留空则使用 yuvomi-documents。"
+    "documentWebdavPathHint": "文档的远程文件夹。留空则使用 /yuvomi/documents/。"
   }
 }

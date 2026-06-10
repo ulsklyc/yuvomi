@@ -139,6 +139,6 @@
     "documentWebdavUsernameLabel": "Nome de usuário",
     "documentWebdavPasswordLabel": "Senha",
     "documentWebdavPathLabel": "Caminho base",
-    "documentWebdavPathHint": "Pasta remota para documentos. Deixe vazio para usar yuvomi-documents."
+    "documentWebdavPathHint": "Pasta remota para documentos. Deixe vazio para usar /yuvomi/documents/."
   }
 }

@@ -12,7 +12,7 @@ import fetch from 'node-fetch';
 import * as db from '../db.js';
 
 const CONFIG_PREFIX = 'document_storage_webdav_';
-const DEFAULT_BASE_PATH = 'yuvomi-documents';
+const DEFAULT_BASE_PATH = 'yuvomi/documents';
 const DEFAULT_TIMEOUT_MS = 8_000;
 const MAX_READ_BYTES = 5 * 1024 * 1024;
 

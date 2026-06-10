@@ -139,6 +139,6 @@
     "documentWebdavUsernameLabel": "Användarnamn",
     "documentWebdavPasswordLabel": "Lösenord",
     "documentWebdavPathLabel": "Bassökväg",
-    "documentWebdavPathHint": "Fjärrmapp för dokument. Lämna tomt för att använda yuvomi-documents."
+    "documentWebdavPathHint": "Fjärrmapp för dokument. Lämna tomt för att använda /yuvomi/documents/."
   }
 }

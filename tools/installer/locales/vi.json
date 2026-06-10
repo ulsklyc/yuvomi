@@ -139,6 +139,6 @@
     "documentWebdavUsernameLabel": "Tên người dùng",
     "documentWebdavPasswordLabel": "Mật khẩu",
     "documentWebdavPathLabel": "Đường dẫn gốc",
-    "documentWebdavPathHint": "Thư mục từ xa cho tài liệu. Để trống để dùng yuvomi-documents."
+    "documentWebdavPathHint": "Thư mục từ xa cho tài liệu. Để trống để dùng /yuvomi/documents/."
   }
 }
