@@ -623,6 +623,152 @@ function buildPaths() {
         },
       }),
     },
+    '/api/v1/documents/dms/accounts': {
+      get: op({
+        summary: 'List DMS accounts',
+        tag: 'Documents',
+        admin: true,
+        description: 'Returns configured DMS accounts without the api_token. Each item includes `has_token` to indicate whether a token is stored.',
+        responses: {
+          200: {
+            description: 'DMS accounts',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/DmsAccountsResponse' } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+      post: op({
+        summary: 'Create DMS account',
+        tag: 'Documents',
+        admin: true,
+        stateChanging: true,
+        requestBody: jsonBody('#/components/schemas/DmsAccountCreateRequest'),
+        responses: {
+          201: {
+            description: 'DMS account created',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/DmsAccountResponse' } } },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          409: { description: 'An account with this base_url already exists' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
+    '/api/v1/documents/dms/accounts/{id}': {
+      delete: op({
+        summary: 'Delete DMS account',
+        tag: 'Documents',
+        admin: true,
+        stateChanging: true,
+        params: [idParam('id', 'DMS account ID')],
+        responses: {
+          204: { description: 'DMS account deleted' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'DMS account not found' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
+    '/api/v1/documents/dms/accounts/{id}/test': {
+      post: op({
+        summary: 'Test DMS account connection',
+        tag: 'Documents',
+        admin: true,
+        stateChanging: true,
+        params: [idParam('id', 'DMS account ID')],
+        responses: {
+          200: {
+            description: 'Connection test result',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/DmsTestResponse' } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
+    '/api/v1/documents/dms/search': {
+      get: op({
+        summary: 'Search documents in a DMS account',
+        tag: 'Documents',
+        admin: true,
+        params: [
+          {
+            name: 'account_id',
+            in: 'query',
+            required: true,
+            schema: { type: 'integer' },
+            description: 'DMS account ID to search in',
+          },
+          {
+            name: 'q',
+            in: 'query',
+            required: true,
+            schema: { type: 'string' },
+            description: 'Search query string',
+          },
+        ],
+        responses: {
+          200: {
+            description: 'DMS search results',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/DmsSearchResponse' } } },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'DMS account not found' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
+    '/api/v1/documents/dms/link': {
+      post: op({
+        summary: 'Link a DMS document to the family document library',
+        tag: 'Documents',
+        admin: true,
+        stateChanging: true,
+        description: 'Creates a family_documents entry with storage_provider `external` pointing to a document already stored in the DMS.',
+        requestBody: jsonBody('#/components/schemas/DmsLinkRequest'),
+        responses: {
+          201: {
+            description: 'Document linked',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/DmsLinkResponse' } } },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'DMS document not found in the remote system' },
+          409: { description: 'Document is already linked' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
+    '/api/v1/documents/dms/push': {
+      post: op({
+        summary: 'Push a local document to a DMS account',
+        tag: 'Documents',
+        admin: true,
+        stateChanging: true,
+        description: 'Uploads a locally stored document to the specified DMS account. Returns a task ID for async tracking.',
+        requestBody: jsonBody('#/components/schemas/DmsPushRequest'),
+        responses: {
+          202: {
+            description: 'Push task accepted',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/DmsPushResponse' } } },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'Document or DMS account not found' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
     '/api/v1/weather': { get: op({ summary: 'Get weather data', tag: 'Weather', description: 'Returns `{ data: { provider, city, units, current, forecast } }` or `{ data: null }` when no provider is configured. `provider` is `open-meteo` (icon fields are Lucide icon names, `desc` is a `wmo.<code>` i18n key) or `openweathermap` (legacy; icon fields are OWM icon codes, `desc` is localized text).' }) },
     '/api/v1/weather/icon/{code}': {
       get: op({ summary: 'Get weather icon asset', tag: 'Weather', params: [{ name: 'code', in: 'path', required: true, schema: { type: 'string' } }] }),
@@ -945,6 +1091,128 @@ function buildOpenApiSpec(req, appVersion) {
             token: { type: 'string' },
           },
           required: ['data', 'token'],
+        },
+        DmsAccount: {
+          type: 'object',
+          description: 'A configured DMS account. The api_token is never returned; use has_token to check whether one is stored.',
+          properties: {
+            id: { type: 'integer' },
+            provider: { type: 'string', enum: ['paperless'], description: 'DMS provider type' },
+            name: { type: 'string' },
+            base_url: { type: 'string', format: 'uri' },
+            created_at: { type: 'string', format: 'date-time' },
+            last_check: { type: ['string', 'null'], format: 'date-time' },
+            has_token: { type: 'boolean', description: 'Whether an API token is stored for this account' },
+          },
+          required: ['id', 'provider', 'name', 'base_url', 'created_at', 'has_token'],
+        },
+        DmsAccountsResponse: {
+          type: 'object',
+          properties: {
+            data: { type: 'array', items: { $ref: '#/components/schemas/DmsAccount' } },
+          },
+          required: ['data'],
+        },
+        DmsAccountResponse: {
+          type: 'object',
+          properties: {
+            data: { $ref: '#/components/schemas/DmsAccount' },
+          },
+          required: ['data'],
+        },
+        DmsAccountCreateRequest: {
+          type: 'object',
+          properties: {
+            provider: { type: 'string', enum: ['paperless'] },
+            name: { type: 'string' },
+            base_url: { type: 'string', format: 'uri' },
+            api_token: { type: 'string', description: 'API token for authenticating with the DMS. Write-only; never returned in responses.' },
+          },
+          required: ['provider', 'name', 'base_url', 'api_token'],
+        },
+        DmsTestResponse: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                ok: { type: 'boolean' },
+                status: { type: 'integer' },
+              },
+              required: ['ok', 'status'],
+            },
+          },
+          required: ['data'],
+        },
+        DmsSearchResult: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' },
+            title: { type: 'string' },
+            created: { type: 'string', format: 'date-time' },
+            filename: { type: ['string', 'null'] },
+            url: { type: 'string', format: 'uri' },
+          },
+          required: ['id', 'title'],
+        },
+        DmsSearchResponse: {
+          type: 'object',
+          properties: {
+            data: { type: 'array', items: { $ref: '#/components/schemas/DmsSearchResult' } },
+          },
+          required: ['data'],
+        },
+        DmsLinkRequest: {
+          type: 'object',
+          properties: {
+            account_id: { type: 'integer' },
+            dms_document_id: { type: 'integer' },
+            category: { type: 'string', enum: ['medical', 'school', 'identity', 'insurance', 'finance', 'home', 'vehicle', 'legal', 'travel', 'pets', 'warranty', 'taxes', 'work', 'other'] },
+            visibility: { type: 'string', enum: ['family', 'restricted', 'private'] },
+          },
+          required: ['account_id', 'dms_document_id'],
+        },
+        DmsLinkResponse: {
+          type: 'object',
+          description: 'The created family_documents row. storage_provider is always `external` for linked DMS documents.',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                id: { type: 'integer' },
+                name: { type: 'string' },
+                category: { type: ['string', 'null'] },
+                visibility: { type: 'string' },
+                storage_provider: { type: 'string', enum: ['local', 'external'] },
+                dms_account_id: { type: ['integer', 'null'] },
+                external_url: { type: ['string', 'null'], format: 'uri' },
+                created_at: { type: 'string', format: 'date-time' },
+              },
+              required: ['id', 'name', 'storage_provider'],
+            },
+          },
+          required: ['data'],
+        },
+        DmsPushRequest: {
+          type: 'object',
+          properties: {
+            account_id: { type: 'integer' },
+            document_id: { type: 'integer' },
+          },
+          required: ['account_id', 'document_id'],
+        },
+        DmsPushResponse: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                taskId: { type: 'string' },
+              },
+              required: ['taskId'],
+            },
+          },
+          required: ['data'],
         },
       },
     },
