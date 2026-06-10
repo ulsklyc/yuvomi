@@ -218,6 +218,17 @@ export function findSettingsLeaf(path, user) {
   return leaf;
 }
 
+export function settingsOverviewUrl(domainId = null) {
+  return domainId
+    ? `/settings?view=domain&domain=${encodeURIComponent(domainId)}`
+    : '/settings?view=domains';
+}
+
+export function resolveSettingsDestination(path, user, storedPath) {
+  if (path !== '/settings') return findSettingsLeaf(path, user)?.path ?? '/settings/personal/account';
+  return findSettingsLeaf(storedPath, user)?.path ?? '/settings/personal/account';
+}
+
 export function migrateLegacySettingsTab(value) {
   return LEGACY_SETTINGS_PATHS[value] ?? null;
 }

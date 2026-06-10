@@ -1,0 +1,343 @@
+import { t } from '/i18n.js';
+import { createRetryState } from './components.js';
+import {
+  SETTINGS_LEAVES,
+  filterSettingsDomains,
+  findSettingsLeaf,
+  settingsOverviewUrl,
+} from './registry.js';
+
+function createIcon(name, className) {
+  const icon = document.createElement('i');
+  icon.className = className;
+  icon.dataset.lucide = name;
+  icon.setAttribute('aria-hidden', 'true');
+  return icon;
+}
+
+function hydrateIcons(container) {
+  if (window.lucide) window.lucide.createIcons({ el: container });
+}
+
+function bindSpaNavigation(link, href) {
+  link.addEventListener('click', (event) => {
+    if (
+      event.defaultPrevented
+      || event.button !== 0
+      || event.metaKey
+      || event.ctrlKey
+      || event.shiftKey
+      || event.altKey
+      || !window.oikos?.navigate
+    ) {
+      return;
+    }
+    event.preventDefault();
+    window.oikos.navigate(href);
+  });
+}
+
+function createLink(href, className) {
+  const link = document.createElement('a');
+  link.href = href;
+  link.className = className;
+  bindSpaNavigation(link, href);
+  return link;
+}
+
+function allowedLeavesForDomain(domainId, user) {
+  return SETTINGS_LEAVES.filter((entry) => (
+    entry.domainId === domainId
+    && (!entry.adminOnly || user?.role === 'admin')
+  ));
+}
+
+function createNavigation(domains, user, activeLeaf) {
+  const navigation = document.createElement('nav');
+  navigation.className = 'settings-shell__navigation';
+  navigation.setAttribute('aria-label', t('settings.navigationLabel'));
+
+  for (const domain of domains) {
+    const group = document.createElement('section');
+    group.className = 'settings-shell__navigation-group';
+    if (domain.id === activeLeaf?.domainId) {
+      group.classList.add('settings-shell__navigation-group--active');
+    }
+
+    const heading = document.createElement('h2');
+    heading.className = 'settings-shell__navigation-heading';
+    heading.append(
+      createIcon(domain.icon, 'settings-shell__navigation-domain-icon'),
+      document.createTextNode(t(domain.labelKey)),
+    );
+
+    const list = document.createElement('ul');
+    list.className = 'settings-shell__navigation-list';
+    for (const entry of allowedLeavesForDomain(domain.id, user)) {
+      const item = document.createElement('li');
+      const link = createLink(entry.path, 'settings-shell__navigation-link');
+      link.append(
+        createIcon(entry.icon, 'settings-shell__navigation-link-icon'),
+        document.createTextNode(t(entry.labelKey)),
+      );
+      if (entry.id === activeLeaf?.id) {
+        link.classList.add('settings-shell__navigation-link--active');
+        link.setAttribute('aria-current', 'page');
+      }
+      item.appendChild(link);
+      list.appendChild(item);
+    }
+
+    group.append(heading, list);
+    navigation.appendChild(group);
+  }
+
+  return navigation;
+}
+
+function createOverviewLink({ href, icon, title, description }) {
+  const link = createLink(href, 'settings-overview-link');
+  link.appendChild(createIcon(icon, 'settings-overview-link__icon'));
+
+  const copy = document.createElement('span');
+  copy.className = 'settings-overview-link__copy';
+
+  const label = document.createElement('span');
+  label.className = 'settings-overview-link__title';
+  label.textContent = title;
+  copy.appendChild(label);
+
+  if (description) {
+    const detail = document.createElement('span');
+    detail.className = 'settings-overview-link__description';
+    detail.textContent = description;
+    copy.appendChild(detail);
+  }
+
+  link.append(
+    copy,
+    createIcon('chevron-right', 'settings-overview-link__chevron'),
+  );
+  return link;
+}
+
+function createOverviewHeader(title, description = null) {
+  const header = document.createElement('header');
+  header.className = 'settings-mobile-overview__header';
+
+  const heading = document.createElement('h2');
+  heading.className = 'settings-mobile-overview__title';
+  heading.textContent = title;
+  header.appendChild(heading);
+
+  if (description) {
+    const detail = document.createElement('p');
+    detail.className = 'settings-mobile-overview__description';
+    detail.textContent = description;
+    header.appendChild(detail);
+  }
+
+  return header;
+}
+
+function renderDomainsOverview(content, domains) {
+  const overview = document.createElement('section');
+  overview.className = 'settings-mobile-overview';
+  overview.appendChild(createOverviewHeader(
+    t('settings.mobileOverviewTitle'),
+    t('settings.mobileOverviewDescription'),
+  ));
+
+  const links = document.createElement('div');
+  links.className = 'settings-mobile-overview__links';
+  for (const domain of domains) {
+    links.appendChild(createOverviewLink({
+      href: settingsOverviewUrl(domain.id),
+      icon: domain.icon,
+      title: t(domain.labelKey),
+    }));
+  }
+
+  overview.appendChild(links);
+  content.replaceChildren(overview);
+}
+
+function renderDomainOverview(content, domain, user) {
+  const overview = document.createElement('section');
+  overview.className = 'settings-mobile-overview settings-domain-overview';
+  overview.appendChild(createOverviewHeader(
+    t('settings.mobileDomainTitle', { domain: t(domain.labelKey) }),
+  ));
+
+  const backLink = createLink(settingsOverviewUrl(), 'settings-overview-back-link');
+  backLink.append(
+    createIcon('arrow-left', 'settings-overview-back-link__icon'),
+    document.createTextNode(t('settings.backToSettings')),
+  );
+  overview.appendChild(backLink);
+
+  const links = document.createElement('div');
+  links.className = 'settings-mobile-overview__links';
+  for (const entry of allowedLeavesForDomain(domain.id, user)) {
+    links.appendChild(createOverviewLink({
+      href: entry.path,
+      icon: entry.icon,
+      title: t(entry.labelKey),
+      description: t(entry.descriptionKey),
+    }));
+  }
+
+  overview.appendChild(links);
+  content.replaceChildren(overview);
+}
+
+function createBreadcrumb(domain, leaf) {
+  const breadcrumb = document.createElement('nav');
+  breadcrumb.className = 'settings-breadcrumb';
+  breadcrumb.setAttribute('aria-label', t('settings.breadcrumbLabel'));
+
+  const list = document.createElement('ol');
+  list.className = 'settings-breadcrumb__list';
+
+  const settingsItem = document.createElement('li');
+  settingsItem.className = 'settings-breadcrumb__item';
+  const settingsLink = createLink(settingsOverviewUrl(), 'settings-breadcrumb__link');
+  settingsLink.textContent = t('settings.title');
+  settingsItem.appendChild(settingsLink);
+
+  const domainItem = document.createElement('li');
+  domainItem.className = 'settings-breadcrumb__item';
+  const domainLink = createLink(
+    settingsOverviewUrl(domain.id),
+    'settings-breadcrumb__link',
+  );
+  domainLink.textContent = t(domain.labelKey);
+  domainItem.appendChild(domainLink);
+
+  const currentItem = document.createElement('li');
+  currentItem.className = 'settings-breadcrumb__item settings-breadcrumb__item--current';
+  currentItem.textContent = t(leaf.labelKey);
+  currentItem.setAttribute('aria-current', 'page');
+
+  for (const item of [settingsItem, domainItem, currentItem]) {
+    if (list.childElementCount) {
+      const separator = document.createElement('li');
+      separator.className = 'settings-breadcrumb__separator';
+      separator.textContent = '/';
+      separator.setAttribute('aria-hidden', 'true');
+      list.appendChild(separator);
+    }
+    list.appendChild(item);
+  }
+
+  breadcrumb.appendChild(list);
+  return breadcrumb;
+}
+
+function createLeafHeader(leaf) {
+  const header = document.createElement('header');
+  header.className = 'settings-leaf-header';
+
+  const heading = document.createElement('h1');
+  heading.className = 'settings-leaf-header__title';
+  heading.textContent = t(leaf.labelKey);
+
+  const description = document.createElement('p');
+  description.className = 'settings-leaf-header__description';
+  description.textContent = t(leaf.descriptionKey);
+
+  header.append(heading, description);
+  return header;
+}
+
+async function renderLeafContent(shell, content, leaf, domain, user, query) {
+  const breadcrumb = createBreadcrumb(domain, leaf);
+  const backLink = createLink(
+    settingsOverviewUrl(domain.id),
+    'settings-leaf-back-link',
+  );
+  backLink.append(
+    createIcon('arrow-left', 'settings-leaf-back-link__icon'),
+    document.createTextNode(t('settings.backToSettings')),
+  );
+
+  const leafContainer = document.createElement('div');
+  leafContainer.className = 'settings-leaf';
+  content.replaceChildren(breadcrumb, backLink, leafContainer);
+
+  const loadAndRender = async () => {
+    leafContainer.replaceChildren();
+    try {
+      const module = await leaf.loader();
+      if (typeof module.render !== 'function') throw new TypeError('Settings leaf must export render()');
+      await module.render(leafContainer, { user, query });
+
+      let heading = leafContainer.querySelector('h1');
+      if (!heading) {
+        const header = createLeafHeader(leaf);
+        leafContainer.prepend(header);
+        heading = header.querySelector('h1');
+      }
+
+      heading.tabIndex = -1;
+      requestAnimationFrame(() => {
+        heading.focus({ preventScroll: true });
+      });
+      hydrateIcons(shell);
+    } catch (error) {
+      console.error(`[Settings] Failed to render ${leaf.id}:`, error);
+      leafContainer.replaceChildren(createRetryState({
+        message: t('settings.loadError'),
+        onRetry: loadAndRender,
+      }));
+      hydrateIcons(shell);
+    }
+  };
+
+  await loadAndRender();
+}
+
+export async function renderSettingsShell(container, {
+  user,
+  leaf = null,
+  view = null,
+  domainId = null,
+  query = new URLSearchParams(),
+}) {
+  const domains = filterSettingsDomains(user);
+  const activeLeaf = leaf?.path ? findSettingsLeaf(leaf.path, user) : null;
+
+  const page = document.createElement('div');
+  page.className = 'page settings-page';
+
+  const pageHeader = document.createElement('header');
+  pageHeader.className = 'page__header settings-shell-header';
+  const pageTitle = document.createElement('h1');
+  pageTitle.className = 'page__title';
+  pageTitle.textContent = t('settings.title');
+  pageHeader.appendChild(pageTitle);
+
+  const shell = document.createElement('div');
+  shell.className = 'settings-shell';
+  const navigation = createNavigation(domains, user, activeLeaf);
+  const content = document.createElement('div');
+  content.className = 'settings-shell__content';
+  shell.append(navigation, content);
+  page.append(pageHeader, shell);
+  container.replaceChildren(page);
+
+  if (activeLeaf) {
+    const domain = domains.find((entry) => entry.id === activeLeaf.domainId);
+    await renderLeafContent(shell, content, activeLeaf, domain, user, query);
+  } else {
+    const domain = view === 'domain'
+      ? domains.find((entry) => entry.id === domainId)
+      : null;
+    if (domain) {
+      renderDomainOverview(content, domain, user);
+    } else {
+      renderDomainsOverview(content, domains);
+    }
+    hydrateIcons(shell);
+  }
+}

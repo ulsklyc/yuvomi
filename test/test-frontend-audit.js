@@ -163,6 +163,34 @@ test('settings theme toggle exposes pressed state', () => {
   assert.match(source, /setAttribute\('aria-pressed'/);
 });
 
+test('responsive settings shell defines desktop and mobile navigation layouts', () => {
+  const source = read('../public/styles/settings.css');
+
+  assert.match(
+    source,
+    /@media \(min-width:\s*960px\)[\s\S]*\.settings-shell__navigation\s*\{[\s\S]*position:\s*sticky/,
+  );
+  assert.match(
+    source,
+    /@media \(max-width:\s*959px\)[\s\S]*\.settings-mobile-overview\s*\{/,
+  );
+});
+
+test('settings disclosure exposes its expanded state and controlled panel', () => {
+  const source = read('../public/settings/components.js');
+
+  assert.match(source, /aria-expanded/);
+  assert.match(source, /aria-controls/);
+});
+
+test('settings shell marks and focuses the active page', () => {
+  const source = read('../public/settings/shell.js');
+
+  assert.match(source, /setAttribute\('aria-current',\s*'page'\)/);
+  assert.match(source, /\.tabIndex\s*=\s*-1/);
+  assert.match(source, /\.focus\(\{\s*preventScroll:\s*true\s*\}\)/);
+});
+
 test('router hides inactive overlays from keyboard focus', () => {
   const source = read('../public/router.js');
   assert.match(source, /\.inert\s*=/);

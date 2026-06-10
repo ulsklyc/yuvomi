@@ -8,6 +8,8 @@ import {
   filterSettingsDomains,
   findSettingsLeaf,
   migrateLegacySettingsTab,
+  resolveSettingsDestination,
+  settingsOverviewUrl,
 } from '../public/settings/registry.js';
 import {
   KITCHEN_CHILD_IDS,
@@ -107,6 +109,49 @@ test('legacy settings migration covers every previous tab', () => {
 test('findSettingsLeaf enforces role access', () => {
   assert.equal(findSettingsLeaf('/settings/admin/system', member), null);
   assert.equal(findSettingsLeaf('/settings/admin/system', admin)?.id, 'admin-system');
+});
+
+test('settingsOverviewUrl builds the settings domains overview URL', () => {
+  assert.equal(settingsOverviewUrl(), '/settings?view=domains');
+});
+
+test('settingsOverviewUrl builds an encoded domain overview URL', () => {
+  assert.equal(
+    settingsOverviewUrl('sync'),
+    '/settings?view=domain&domain=sync',
+  );
+});
+
+test('resolveSettingsDestination restores an allowed stored leaf at the settings root', () => {
+  assert.equal(
+    resolveSettingsDestination('/settings', admin, '/settings/documents/storage'),
+    '/settings/documents/storage',
+  );
+});
+
+test('resolveSettingsDestination falls back when a stored leaf is invalid or forbidden', () => {
+  assert.equal(
+    resolveSettingsDestination('/settings', member, '/settings/admin/system'),
+    '/settings/personal/account',
+  );
+  assert.equal(
+    resolveSettingsDestination('/settings', member, '/settings/unknown'),
+    '/settings/personal/account',
+  );
+});
+
+test('resolveSettingsDestination preserves a directly allowed leaf', () => {
+  assert.equal(
+    resolveSettingsDestination('/settings/personal/device', member),
+    '/settings/personal/device',
+  );
+});
+
+test('resolveSettingsDestination falls back from an unknown direct settings path', () => {
+  assert.equal(
+    resolveSettingsDestination('/settings/not-a-page', admin),
+    '/settings/personal/account',
+  );
 });
 
 test('Kitchen child IDs use the canonical order', () => {
