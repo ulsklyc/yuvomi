@@ -705,3 +705,33 @@
   white-space: nowrap;
 }
 
+/* --------------------------------------------------------
+   DMS External Badge
+   -------------------------------------------------------- */
+
+.doc-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.4;
+}
+
+.doc-badge--dms {
+  background: var(--color-info-light);
+  color: var(--color-info);
+}
+
+/* --------------------------------------------------------
+   DMS Viewer Deep-Link
+   -------------------------------------------------------- */
+
+.doc-viewer__dms-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+

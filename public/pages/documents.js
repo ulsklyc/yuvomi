@@ -336,6 +336,7 @@ function renderMeta(doc) {
     ${doc.folder_name ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
     <span><i data-lucide="${doc.visibility === 'family' ? 'users' : doc.visibility === 'private' ? 'lock' : 'user-check'}" aria-hidden="true"></i>${t(`documents.visibility.${doc.visibility}`)}</span>
     <span>${formatFileSize(doc.file_size)}</span>
+    ${doc.storage_provider === 'external' ? `<span class="doc-badge doc-badge--dms">${t('documents.dmsLinked')}</span>` : ''}
   `;
 }
 
@@ -355,6 +356,10 @@ function renderActions(doc) {
     <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="archive" data-id="${doc.id}" data-archived="${doc.status === 'archived'}" title="${doc.status === 'archived' ? t('documents.restoreAction') : t('documents.archiveAction')}" aria-label="${doc.status === 'archived' ? t('documents.restoreAction') : t('documents.archiveAction')}">
       <i data-lucide="${doc.status === 'archived' ? 'archive-restore' : 'archive'}" class="icon-md" aria-hidden="true"></i>
     </button>
+    ${doc.storage_provider === 'local' && state.dmsAccounts.length > 0 ? `
+    <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="push-dms" data-id="${doc.id}" title="${t('documents.pushToDms')}" aria-label="${t('documents.pushToDms')}">
+      <i data-lucide="upload" class="icon-md" aria-hidden="true"></i>
+    </button>` : ''}
     <button class="btn btn--ghost btn--icon btn--icon-sm documents-danger" data-action="delete" data-id="${doc.id}" title="${t('common.delete')}" aria-label="${t('common.delete')}">
       <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
     </button>
@@ -414,6 +419,16 @@ async function handleDocumentAction(e) {
     await loadDocuments();
     renderFolderBrowser();
     renderDocuments();
+  }
+  if (btn.dataset.action === 'push-dms') {
+    if (!state.dmsAccounts.length) return;
+    try {
+      await api.post('/documents/dms/push', { account_id: state.dmsAccounts[0].id, document_id: doc.id });
+      window.oikos?.showToast(t('documents.pushToDmsQueued'), 'success');
+    } catch (err) {
+      window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    }
+    return;
   }
   if (btn.dataset.action === 'delete') {
     state.allDocuments = state.allDocuments.filter((d) => d.id !== doc.id);
@@ -782,6 +797,11 @@ function openDocumentViewer(doc) {
   const labels = categoryLabels();
   const previewUrl = `/api/v1/documents/${doc.id}/preview`;
   const downloadUrl = `/api/v1/documents/${doc.id}/download`;
+  // Defense-in-Depth: nur http(s)-Deep-Links rendern, niemals javascript:/data:-Schemata
+  // (zusätzlich zur serverseitigen base_url-Validierung bei der DMS-Account-Anlage).
+  const externalUrl = doc.storage_provider === 'external' && /^https?:\/\//i.test(doc.external_url || '')
+    ? doc.external_url
+    : '';
 
   openSharedModal({
     title: esc(doc.name),
@@ -793,6 +813,11 @@ function openDocumentViewer(doc) {
           ${doc.folder_name ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
           <span>${formatFileSize(doc.file_size)}</span>
           <span class="document-viewer__actions">
+            ${externalUrl ? `
+            <a class="btn btn--ghost btn--sm doc-viewer__dms-link" href="${esc(externalUrl)}" target="_blank" rel="noopener noreferrer">
+              <i data-lucide="external-link" class="icon-md" aria-hidden="true"></i>
+              ${t('documents.dmsOpenExternal')}
+            </a>` : ''}
             <a class="btn btn--primary btn--icon btn--icon-sm" href="${downloadUrl}" download
                title="${t('documents.downloadAction')}" aria-label="${t('documents.downloadAction')}">
               <i data-lucide="download" class="icon-md" aria-hidden="true"></i>
