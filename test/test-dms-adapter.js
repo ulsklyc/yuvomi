@@ -60,3 +60,54 @@ test('search: HTTP-Fehler wirft mit Statuscode', async () => {
   const adapter = new PaperlessAdapter(account);
   await assert.rejects(() => adapter.search('x'), /DMS request failed \(401\)/);
 });
+
+function binaryResponse(buffer, mime, status = 200) {
+  return {
+    ok: status >= 200 && status < 300, status,
+    headers: { get: (h) => (h.toLowerCase() === 'content-type' ? mime : null) },
+    arrayBuffer: async () => buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
+  };
+}
+
+test('getDocument: liefert normalisierte Metadaten (id, title, filename, url, tags)', async () => {
+  mockFetch(() => jsonResponse({
+    id: 42, title: 'Stromrechnung', created: '2026-01-02T00:00:00Z',
+    correspondent: 7, tags: [3], archived_file_name: 'strom.pdf',
+    original_file_name: 'scan.pdf', archive_serial_number: null,
+  }));
+  const adapter = new PaperlessAdapter(account);
+  const doc = await adapter.getDocument('42');
+  assert.equal(calls[0].url, 'https://dms.example.com/api/documents/42/');
+  assert.equal(doc.id, '42');
+  assert.equal(doc.title, 'Stromrechnung');
+  assert.equal(doc.filename, 'strom.pdf');
+  assert.equal(doc.url, 'https://dms.example.com/documents/42');
+});
+
+test('fetchContent: lädt Binärdaten herunter, gibt buffer + mime zurück', async () => {
+  const buf = Buffer.from('%PDF-1.4 fake');
+  mockFetch(() => binaryResponse(buf, 'application/pdf'));
+  const adapter = new PaperlessAdapter(account);
+  const out = await adapter.fetchContent('42');
+  assert.equal(calls[0].url, 'https://dms.example.com/api/documents/42/download/');
+  assert.equal(out.mime, 'application/pdf');
+  assert.ok(Buffer.isBuffer(out.buffer));
+  assert.equal(out.buffer.toString(), '%PDF-1.4 fake');
+});
+
+test('testConnection: ok=true bei 200 auf /api/', async () => {
+  mockFetch(() => jsonResponse({ documents: 'https://dms.example.com/api/documents/' }));
+  const adapter = new PaperlessAdapter(account);
+  const out = await adapter.testConnection();
+  assert.equal(calls[0].url, 'https://dms.example.com/api/');
+  assert.equal(calls[0].opts.headers.Authorization, 'Token tok123');
+  assert.equal(out.ok, true);
+});
+
+test('testConnection: ok=false bei 403', async () => {
+  mockFetch(() => jsonResponse({}, 403));
+  const adapter = new PaperlessAdapter(account);
+  const out = await adapter.testConnection();
+  assert.equal(out.ok, false);
+  assert.equal(out.status, 403);
+});

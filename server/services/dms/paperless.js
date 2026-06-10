@@ -50,4 +50,39 @@ export class PaperlessAdapter {
       url: this.docUrl(r.id),
     }));
   }
+
+  async getDocument(id) {
+    const res = await this.#request(`/api/documents/${encodeURIComponent(id)}/`);
+    const r = await res.json();
+    return {
+      id: String(r.id),
+      title: r.title || r.original_file_name || `#${r.id}`,
+      created: r.created || null,
+      filename: r.archived_file_name || r.original_file_name || `${r.id}.pdf`,
+      url: this.docUrl(r.id),
+      correspondent: r.correspondent ?? null,
+      tags: Array.isArray(r.tags) ? r.tags : [],
+    };
+  }
+
+  async fetchContent(id) {
+    const res = await this.#request(`/api/documents/${encodeURIComponent(id)}/download/`);
+    const arrayBuf = await res.arrayBuffer();
+    return {
+      buffer: Buffer.from(arrayBuf),
+      mime: res.headers.get('content-type') || 'application/octet-stream',
+    };
+  }
+
+  async testConnection() {
+    try {
+      const res = await fetch(`${this.base}/api/`, {
+        headers: this.headers(),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      return { ok: res.ok, status: res.status };
+    } catch (err) {
+      return { ok: false, status: 0, error: err.message };
+    }
+  }
 }
