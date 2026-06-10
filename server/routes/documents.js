@@ -8,6 +8,14 @@ import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { str, collectErrors, id as validateId, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { getAdapter as defaultGetDmsAdapter } from '../services/dms/index.js';
+
+let dmsAdapterFactory = defaultGetDmsAdapter;
+export function _setDmsAdapterFactory(fn) { dmsAdapterFactory = fn || defaultGetDmsAdapter; }
+
+function loadDmsAccount(id) {
+  return db.get().prepare('SELECT * FROM dms_accounts WHERE id = ?').get(id);
+}
 
 const log = createLogger('Documents');
 const router = express.Router();
@@ -84,7 +92,7 @@ function documentSelect() {
   return `
     SELECT d.id, d.name, d.description, d.category, d.status, d.visibility,
            d.original_name, d.mime_type, d.file_size, d.storage_provider,
-           d.storage_key, d.folder_id, d.created_by, d.created_at, d.updated_at,
+           d.storage_key, d.dms_account_id, d.external_url, d.external_meta, d.folder_id, d.created_by, d.created_at, d.updated_at,
            f.name AS folder_name,
            u.display_name AS creator_name, u.avatar_color AS creator_color,
            GROUP_CONCAT(a.user_id) AS allowed_member_ids
@@ -131,6 +139,7 @@ function ensureFolder(name, actorId) {
 }
 
 router.get('/meta/options', (_req, res) => {
+  const dmsAccounts = db.get().prepare('SELECT id, name, provider FROM dms_accounts ORDER BY name COLLATE NOCASE').all();
   res.json({
     data: {
       categories: CATEGORIES,
@@ -138,7 +147,8 @@ router.get('/meta/options', (_req, res) => {
       statuses: STATUSES,
       max_file_size: MAX_FILE_BYTES,
       allowed_mime_types: Array.from(ALLOWED_MIME),
-      storage_providers: ['local'],
+      storage_providers: ['local', 'external'],
+      dms_accounts: dmsAccounts,
     },
   });
 });
@@ -302,11 +312,34 @@ router.patch('/:id/archive', (req, res) => {
   }
 });
 
-router.get('/:id/preview', (req, res) => {
+router.get('/:id/preview', async (req, res) => {
   try {
     const id = Number(req.params.id);
     const doc = getVisibleDocument(id, req, true);
     if (!doc) return res.status(404).json({ error: 'Document not found.', code: 404 });
+    if (doc.storage_provider === 'external') {
+      const account = loadDmsAccount(doc.dms_account_id);
+      if (!account) return res.status(404).json({ error: 'Linked DMS account is gone.', code: 404 });
+      const content = await dmsAdapterFactory(account).fetchContent(doc.storage_key);
+      // DMS-MIME normalisieren (kann ein charset-Parameter tragen, z.B. "text/plain; charset=utf-8").
+      const rawMime = (content.mime || 'application/octet-stream').split(';')[0].trim().toLowerCase();
+      // Dieselbe Allowlist wie beim lokalen Pfad: niemals skriptfähige Inhalte (HTML/SVG) inline
+      // ausliefern, auch wenn der DMS sie so meldet. Sonst /download (als attachment) nutzen.
+      if (!PREVIEWABLE_MIME.has(rawMime)) {
+        return res.status(415).json({ error: 'Preview not supported for this file type.', code: 415 });
+      }
+      const filename = encodeURIComponent((doc.original_name || `${doc.id}`).replace(/[/\\]/g, '_'));
+      res.setHeader('Content-Type', rawMime);
+      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Cache-Control', 'private, max-age=60');
+      if (rawMime === 'application/pdf') {
+        res.setHeader('Content-Security-Policy', "default-src 'self'; style-src 'unsafe-inline'; object-src 'self'");
+      } else {
+        res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'");
+      }
+      return res.end(content.buffer);
+    }
     // Inline-Auslieferung nur für nicht-skriptfähige Typen. Alles andere kann über
     // /download (als attachment) geholt werden.
     if (!PREVIEWABLE_MIME.has(doc.mime_type)) {
@@ -336,11 +369,23 @@ router.get('/:id/preview', (req, res) => {
   }
 });
 
-router.get('/:id/download', (req, res) => {
+router.get('/:id/download', async (req, res) => {
   try {
     const id = Number(req.params.id);
     const doc = getVisibleDocument(id, req, true);
     if (!doc) return res.status(404).json({ error: 'Document not found.', code: 404 });
+    if (doc.storage_provider === 'external') {
+      const account = loadDmsAccount(doc.dms_account_id);
+      if (!account) return res.status(404).json({ error: 'Linked DMS account is gone.', code: 404 });
+      const content = await dmsAdapterFactory(account).fetchContent(doc.storage_key);
+      const rawMime = (content.mime || 'application/octet-stream').split(';')[0].trim().toLowerCase();
+      const filename = encodeURIComponent((doc.original_name || `${doc.id}`).replace(/[/\\]/g, '_'));
+      res.setHeader('Content-Type', rawMime);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      // Defense-in-Depth: der DMS ist eine externe Trust-Boundary; Sniffing unterbinden.
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      return res.end(content.buffer);
+    }
     const filename = encodeURIComponent(doc.original_name.replace(/[/\\]/g, '_'));
     res.setHeader('Content-Type', doc.mime_type);
     res.setHeader('Content-Length', String(doc.file_size));

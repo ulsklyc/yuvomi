@@ -10,6 +10,7 @@ import express from 'express';
 import Database from 'better-sqlite3';
 import { MIGRATIONS, _setTestDatabase } from '../server/db.js';
 import dmsRouter, { _setAdapterFactory } from '../server/routes/dms.js';
+import documentsRouter, { _setDmsAdapterFactory } from '../server/routes/documents.js';
 
 function buildTestDb() {
   const db = new Database(':memory:');
@@ -37,6 +38,7 @@ const app = express();
 app.use(express.json());
 app.use((req, _res, next) => { req.session = session; next(); });
 app.use('/api/v1/documents/dms', dmsRouter);
+app.use('/api/v1/documents', documentsRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/documents/dms`;
@@ -180,4 +182,52 @@ test('POST /link: Member bekommt 403 und legt keinen Row an', async () => {
   const count = db.prepare('SELECT COUNT(*) AS n FROM family_documents WHERE storage_key = ?').get('99').n;
   assert.equal(count, 0);
   session = { userId: adminId, role: 'admin' };
+});
+
+test('GET /:id/preview: external-Dokument wird aus dem DMS geproxyt', async () => {
+  session = { userId: adminId, role: 'admin' };
+  // Link a fresh external doc via the dms /link route (needs getDocument), then proxy its content.
+  _setAdapterFactory(() => ({
+    async getDocument(id) { return { id, title: 'Proxy', filename: 'p.pdf', url: `https://t/d/${id}`, correspondent: null, tags: [] }; },
+  }));
+  const accId = (await call('GET', '/accounts')).body.data[0].id;
+  const linked = (await call('POST', '/link', { account_id: accId, dms_document_id: '777' })).body.data;
+
+  _setDmsAdapterFactory(() => ({
+    async fetchContent() { return { buffer: Buffer.from('%PDF-1.4 proxied'), mime: 'application/pdf' }; },
+  }));
+  const res = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/documents/${linked.id}/preview`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('content-type'), 'application/pdf');
+  assert.equal(await res.text(), '%PDF-1.4 proxied');
+});
+
+test('GET /:id/preview: charset im DMS-MIME wird normalisiert (PDF bleibt PDF)', async () => {
+  session = { userId: adminId, role: 'admin' };
+  _setAdapterFactory(() => ({
+    async getDocument(id) { return { id, title: 'Charset', filename: 'c.pdf', url: `https://t/d/${id}`, correspondent: null, tags: [] }; },
+  }));
+  const accId = (await call('GET', '/accounts')).body.data[0].id;
+  const linked = (await call('POST', '/link', { account_id: accId, dms_document_id: '778' })).body.data;
+  _setDmsAdapterFactory(() => ({
+    async fetchContent() { return { buffer: Buffer.from('%PDF'), mime: 'application/pdf; charset=binary' }; },
+  }));
+  const res = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/documents/${linked.id}/preview`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('content-type'), 'application/pdf');
+  assert.match(res.headers.get('content-security-policy'), /default-src 'self'/);
+});
+
+test('GET /:id/preview: nicht-vorschaufähiger DMS-MIME wird mit 415 abgelehnt', async () => {
+  session = { userId: adminId, role: 'admin' };
+  _setAdapterFactory(() => ({
+    async getDocument(id) { return { id, title: 'Evil', filename: 'x.html', url: `https://t/d/${id}`, correspondent: null, tags: [] }; },
+  }));
+  const accId = (await call('GET', '/accounts')).body.data[0].id;
+  const linked = (await call('POST', '/link', { account_id: accId, dms_document_id: '779' })).body.data;
+  _setDmsAdapterFactory(() => ({
+    async fetchContent() { return { buffer: Buffer.from('<script>alert(1)</script>'), mime: 'text/html' }; },
+  }));
+  const res = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/documents/${linked.id}/preview`);
+  assert.equal(res.status, 415);
 });
