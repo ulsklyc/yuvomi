@@ -1252,7 +1252,19 @@
     "holidayLastSync": "Ostatnia synchronizacja: {{date}}",
     "holidayNeverSynced": "Jeszcze nie zsynchronizowano",
     "holidayCountryRequired": "Najpierw wybierz kraj.",
-    "adminOnly": "Ta sekcja jest dostępna tylko dla administratorów."
+    "adminOnly": "Ta sekcja jest dostępna tylko dla administratorów.",
+    "sectionDms": "Zarządzanie dokumentami (DMS)",
+    "dmsDescription": "Połącz Yuvomi z systemem zarządzania dokumentami Paperless-ngx, aby wyszukiwać, linkować i przesyłać dokumenty.",
+    "dmsName": "Nazwa wyświetlana",
+    "dmsBaseUrl": "URL serwera",
+    "dmsToken": "Token API",
+    "dmsAddBtn": "Połącz DMS",
+    "dmsTestBtn": "Testuj połączenie",
+    "dmsTestOk": "Połączenie udane.",
+    "dmsTestFail": "Połączenie nieudane ({{status}}).",
+    "dmsRemove": "Usuń",
+    "dmsRemoveConfirm": "Usunąć to połączenie DMS? Powiązane dokumenty stracą podgląd.",
+    "dmsNone": "Brak skonfigurowanego połączenia DMS."
   },
   "login": {
     "tagline": "Planowanie rodziny. Bezpieczne. Chroniące prywatność. Open Source.",
@@ -1527,7 +1539,16 @@
     "emptyPrimary": "Dodaj dokument",
     "viewAction": "Wyświetl",
     "viewerDownloadHint": "Ten typ pliku nie może być wyświetlony w podglądzie przeglądarki. Pobierz plik, aby go otworzyć.",
-    "emptySecondary": "Dodaj folder"
+    "emptySecondary": "Dodaj folder",
+    "linkFromDms": "Połącz z DMS",
+    "dmsSearchPlaceholder": "Szukaj w DMS …",
+    "dmsNoResults": "Brak wyników w DMS.",
+    "dmsLinkBtn": "Połącz",
+    "dmsLinked": "Z DMS",
+    "dmsOpenExternal": "Otwórz w DMS",
+    "pushToDms": "Prześlij do DMS",
+    "pushToDmsQueued": "Dokument został dodany do DMS i jest tam przetwarzany.",
+    "dmsAccountLabel": "Konto DMS"
   },
   "userMultiSelect": {
     "nobody": "– Nikt –",

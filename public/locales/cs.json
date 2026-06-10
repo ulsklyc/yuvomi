@@ -1246,7 +1246,19 @@
     "holidayLastSync": "Poslední synchronizace: {{date}}",
     "holidayNeverSynced": "Dosud nesynchronizováno",
     "holidayCountryRequired": "Nejprve vyberte zemi.",
-    "adminOnly": "Tato sekce je dostupná pouze administrátorům."
+    "adminOnly": "Tato sekce je dostupná pouze administrátorům.",
+    "sectionDms": "Správa dokumentů (DMS)",
+    "dmsDescription": "Propojte Yuvomi se systémem správy dokumentů Paperless-ngx pro vyhledávání, propojování a nahrávání dokumentů.",
+    "dmsName": "Zobrazovaný název",
+    "dmsBaseUrl": "URL serveru",
+    "dmsToken": "API token",
+    "dmsAddBtn": "Připojit DMS",
+    "dmsTestBtn": "Otestovat připojení",
+    "dmsTestOk": "Připojení úspěšné.",
+    "dmsTestFail": "Připojení selhalo ({{status}}).",
+    "dmsRemove": "Odebrat",
+    "dmsRemoveConfirm": "Odebrat toto připojení DMS? Propojené dokumenty ztratí náhled.",
+    "dmsNone": "Zatím není nastaveno žádné připojení DMS."
   },
   "login": {
     "tagline": "Rodinné plánování. Bezpečné. Soukromé. Open Source.",
@@ -1696,7 +1708,16 @@
     "emptyPrimary": "Přidat dokument",
     "viewAction": "Zobrazit",
     "viewerDownloadHint": "Tento typ souboru nelze v prohlížeči zobrazit. Stáhněte soubor a otevřete jej.",
-    "emptySecondary": "Přidat složku"
+    "emptySecondary": "Přidat složku",
+    "linkFromDms": "Propojit z DMS",
+    "dmsSearchPlaceholder": "Hledat v DMS …",
+    "dmsNoResults": "V DMS nebyly nalezeny žádné výsledky.",
+    "dmsLinkBtn": "Propojit",
+    "dmsLinked": "Z DMS",
+    "dmsOpenExternal": "Otevřít v DMS",
+    "pushToDms": "Nahrát do DMS",
+    "pushToDmsQueued": "Dokument byl přidán do DMS a bude tam zpracován.",
+    "dmsAccountLabel": "Účet DMS"
   },
   "reminders": {
     "sectionTitle": "Připomínka",

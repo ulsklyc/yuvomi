@@ -1246,7 +1246,19 @@
     "holidayLastSync": "Lần đồng bộ cuối: {{date}}",
     "holidayNeverSynced": "Chưa đồng bộ",
     "holidayCountryRequired": "Vui lòng chọn một quốc gia trước.",
-    "adminOnly": "Phần này chỉ dành cho quản trị viên."
+    "adminOnly": "Phần này chỉ dành cho quản trị viên.",
+    "sectionDms": "Quản lý tài liệu (DMS)",
+    "dmsDescription": "Kết nối Yuvomi với hệ thống quản lý tài liệu Paperless-ngx để tìm kiếm, liên kết và tải lên tài liệu.",
+    "dmsName": "Tên hiển thị",
+    "dmsBaseUrl": "URL máy chủ",
+    "dmsToken": "Token API",
+    "dmsAddBtn": "Kết nối DMS",
+    "dmsTestBtn": "Kiểm tra kết nối",
+    "dmsTestOk": "Kết nối thành công.",
+    "dmsTestFail": "Kết nối thất bại ({{status}}).",
+    "dmsRemove": "Xóa",
+    "dmsRemoveConfirm": "Xóa kết nối DMS này? Các tài liệu được liên kết sẽ mất bản xem trước.",
+    "dmsNone": "Chưa có kết nối DMS nào được cấu hình."
   },
   "login": {
     "tagline": "Kế hoạch gia đình. Bảo mật. Thân thiện với quyền riêng tư. Mã nguồn mở.",
@@ -1527,7 +1539,16 @@
     "emptyPrimary": "Thêm tài liệu",
     "viewAction": "Xem",
     "viewerDownloadHint": "Loại tệp này không thể xem trước trong trình duyệt. Hãy tải tệp xuống để mở.",
-    "emptySecondary": "Thêm thư mục"
+    "emptySecondary": "Thêm thư mục",
+    "linkFromDms": "Liên kết từ DMS",
+    "dmsSearchPlaceholder": "Tìm kiếm trong DMS …",
+    "dmsNoResults": "Không có kết quả trong DMS.",
+    "dmsLinkBtn": "Liên kết",
+    "dmsLinked": "Từ DMS",
+    "dmsOpenExternal": "Mở trong DMS",
+    "pushToDms": "Tải lên DMS",
+    "pushToDmsQueued": "Tài liệu đã được thêm vào DMS và đang được xử lý ở đó.",
+    "dmsAccountLabel": "Tài khoản DMS"
   },
   "housekeeping": {
     "title": "Không gian dọn dẹp",

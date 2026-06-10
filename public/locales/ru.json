@@ -1246,7 +1246,19 @@
     "holidayLastSync": "Последняя синхронизация: {{date}}",
     "holidayNeverSynced": "Ещё не синхронизировано",
     "holidayCountryRequired": "Сначала выберите страну.",
-    "adminOnly": "Этот раздел доступен только администраторам."
+    "adminOnly": "Этот раздел доступен только администраторам.",
+    "sectionDms": "Управление документами (DMS)",
+    "dmsDescription": "Подключите Yuvomi к системе управления документами Paperless-ngx для поиска, привязки и загрузки документов.",
+    "dmsName": "Отображаемое имя",
+    "dmsBaseUrl": "URL сервера",
+    "dmsToken": "API-токен",
+    "dmsAddBtn": "Подключить DMS",
+    "dmsTestBtn": "Проверить соединение",
+    "dmsTestOk": "Соединение успешно.",
+    "dmsTestFail": "Соединение не удалось ({{status}}).",
+    "dmsRemove": "Удалить",
+    "dmsRemoveConfirm": "Удалить это DMS-соединение? Связанные документы потеряют предварительный просмотр.",
+    "dmsNone": "DMS-соединение ещё не настроено."
   },
   "login": {
     "tagline": "Семейное планирование. Безопасно. С уважением к приватности. Открытый исходный код.",
@@ -1516,7 +1528,16 @@
     "emptyPrimary": "Добавить документ",
     "viewAction": "Просмотр",
     "viewerDownloadHint": "Этот тип файла не может быть отображён в браузере. Загрузите файл, чтобы открыть его.",
-    "emptySecondary": "Добавить папку"
+    "emptySecondary": "Добавить папку",
+    "linkFromDms": "Привязать из DMS",
+    "dmsSearchPlaceholder": "Поиск в DMS …",
+    "dmsNoResults": "Нет совпадений в DMS.",
+    "dmsLinkBtn": "Привязать",
+    "dmsLinked": "Из DMS",
+    "dmsOpenExternal": "Открыть в DMS",
+    "pushToDms": "Загрузить в DMS",
+    "pushToDmsQueued": "Документ добавлен в DMS и обрабатывается там.",
+    "dmsAccountLabel": "Аккаунт DMS"
   },
   "shortcuts": {
     "goKitchen": "Кухня",

@@ -1246,7 +1246,19 @@
     "holidayLastSync": "Laatste synchronisatie: {{date}}",
     "holidayNeverSynced": "Nog niet gesynchroniseerd",
     "holidayCountryRequired": "Selecteer eerst een land.",
-    "adminOnly": "Dit gedeelte is alleen beschikbaar voor beheerders."
+    "adminOnly": "Dit gedeelte is alleen beschikbaar voor beheerders.",
+    "sectionDms": "Documentbeheer (DMS)",
+    "dmsDescription": "Verbind Yuvomi met een Paperless-ngx documentbeheersysteem om documenten te zoeken, te koppelen en te uploaden.",
+    "dmsName": "Weergavenaam",
+    "dmsBaseUrl": "Server-URL",
+    "dmsToken": "API-token",
+    "dmsAddBtn": "DMS verbinden",
+    "dmsTestBtn": "Verbinding testen",
+    "dmsTestOk": "Verbinding geslaagd.",
+    "dmsTestFail": "Verbinding mislukt ({{status}}).",
+    "dmsRemove": "Verwijderen",
+    "dmsRemoveConfirm": "Deze DMS-verbinding verwijderen? Gekoppelde documenten verliezen hun voorbeeld.",
+    "dmsNone": "Nog geen DMS-verbinding geconfigureerd."
   },
   "login": {
     "tagline": "Gezinsplanning. Veilig. Privacyvriendelijk. Open source.",
@@ -1527,7 +1539,16 @@
     "emptyPrimary": "Document toevoegen",
     "viewAction": "Bekijken",
     "viewerDownloadHint": "Dit bestandstype kan niet worden weergegeven in de browser. Download het bestand om het te openen.",
-    "emptySecondary": "Map toevoegen"
+    "emptySecondary": "Map toevoegen",
+    "linkFromDms": "Koppelen vanuit DMS",
+    "dmsSearchPlaceholder": "Zoeken in DMS …",
+    "dmsNoResults": "Geen overeenkomsten in het DMS.",
+    "dmsLinkBtn": "Koppelen",
+    "dmsLinked": "Vanuit DMS",
+    "dmsOpenExternal": "Openen in DMS",
+    "pushToDms": "Uploaden naar DMS",
+    "pushToDmsQueued": "Document is toegevoegd aan het DMS en wordt daar verwerkt.",
+    "dmsAccountLabel": "DMS-account"
   },
   "housekeeping": {
     "title": "Werkruimte schoonmaker",

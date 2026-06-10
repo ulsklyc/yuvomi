@@ -1246,7 +1246,19 @@
     "holidayLastSync": "अंतिम सिंक: {{date}}",
     "holidayNeverSynced": "अभी तक सिंक नहीं हुआ",
     "holidayCountryRequired": "कृपया पहले एक देश चुनें।",
-    "adminOnly": "यह अनुभाग केवल व्यवस्थापकों के लिए उपलब्ध है।"
+    "adminOnly": "यह अनुभाग केवल व्यवस्थापकों के लिए उपलब्ध है।",
+    "sectionDms": "दस्तावेज़ प्रबंधन (DMS)",
+    "dmsDescription": "Yuvomi को Paperless-ngx दस्तावेज़ प्रबंधन प्रणाली से जोड़ें ताकि दस्तावेज़ खोज सकें, लिंक कर सकें और अपलोड कर सकें।",
+    "dmsName": "प्रदर्शन नाम",
+    "dmsBaseUrl": "सर्वर URL",
+    "dmsToken": "API टोकन",
+    "dmsAddBtn": "DMS जोड़ें",
+    "dmsTestBtn": "कनेक्शन परीक्षण",
+    "dmsTestOk": "कनेक्शन सफल।",
+    "dmsTestFail": "कनेक्शन विफल ({{status}}).",
+    "dmsRemove": "हटाएं",
+    "dmsRemoveConfirm": "इस DMS कनेक्शन को हटाएं? लिंक किए गए दस्तावेज़ अपना पूर्वावलोकन खो देंगे।",
+    "dmsNone": "अभी तक कोई DMS कनेक्शन कॉन्फ़िगर नहीं किया गया।"
   },
   "login": {
     "tagline": "पारिवारिक योजना। सुरक्षित। गोपनीयता-अनुकूल। ओपन सोर्स।",
@@ -1516,7 +1528,16 @@
     "emptyPrimary": "दस्तावेज़ जोड़ें",
     "viewAction": "देखें",
     "viewerDownloadHint": "इस फ़ाइल प्रकार को ब्राउज़र में पूर्वावलोकन नहीं किया जा सकता। इसे खोलने के लिए फ़ाइल डाउनलोड करें।",
-    "emptySecondary": "फ़ोल्डर जोड़ें"
+    "emptySecondary": "फ़ोल्डर जोड़ें",
+    "linkFromDms": "DMS से लिंक करें",
+    "dmsSearchPlaceholder": "DMS में खोजें …",
+    "dmsNoResults": "DMS में कोई परिणाम नहीं।",
+    "dmsLinkBtn": "लिंक करें",
+    "dmsLinked": "DMS से",
+    "dmsOpenExternal": "DMS में खोलें",
+    "pushToDms": "DMS में अपलोड करें",
+    "pushToDmsQueued": "दस्तावेज़ DMS में जोड़ा गया और वहाँ प्रसंस्करण हो रहा है।",
+    "dmsAccountLabel": "DMS खाता"
   },
   "shortcuts": {
     "goKitchen": "रसोई",

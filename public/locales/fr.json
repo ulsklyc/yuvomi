@@ -1246,7 +1246,19 @@
     "holidayLastSync": "Dernière synchro : {{date}}",
     "holidayNeverSynced": "Pas encore synchronisé",
     "holidayCountryRequired": "Veuillez d’abord sélectionner un pays.",
-    "adminOnly": "Cette section est réservée aux administrateurs."
+    "adminOnly": "Cette section est réservée aux administrateurs.",
+    "sectionDms": "Gestion documentaire (DMS)",
+    "dmsDescription": "Connectez Yuvomi à un système de gestion documentaire Paperless-ngx pour rechercher, lier et téléverser des documents.",
+    "dmsName": "Nom d'affichage",
+    "dmsBaseUrl": "URL du serveur",
+    "dmsToken": "Jeton API",
+    "dmsAddBtn": "Connecter le DMS",
+    "dmsTestBtn": "Tester la connexion",
+    "dmsTestOk": "Connexion réussie.",
+    "dmsTestFail": "Connexion échouée ({{status}}).",
+    "dmsRemove": "Supprimer",
+    "dmsRemoveConfirm": "Supprimer cette connexion DMS ? Les documents liés perdront leur aperçu.",
+    "dmsNone": "Aucune connexion DMS configurée pour l'instant."
   },
   "login": {
     "tagline": "Planification familiale. Sécurisée. Respectueuse de la vie privée. Open source.",
@@ -1516,7 +1528,16 @@
     "emptyPrimary": "Ajouter un document",
     "viewAction": "Afficher",
     "viewerDownloadHint": "Ce type de fichier ne peut pas être prévisualisé dans le navigateur. Téléchargez le fichier pour l'ouvrir.",
-    "emptySecondary": "Ajouter un dossier"
+    "emptySecondary": "Ajouter un dossier",
+    "linkFromDms": "Lier depuis le DMS",
+    "dmsSearchPlaceholder": "Rechercher dans le DMS …",
+    "dmsNoResults": "Aucun résultat dans le DMS.",
+    "dmsLinkBtn": "Lier",
+    "dmsLinked": "Depuis DMS",
+    "dmsOpenExternal": "Ouvrir dans le DMS",
+    "pushToDms": "Envoyer vers le DMS",
+    "pushToDmsQueued": "Le document a été ajouté au DMS et y est en cours de traitement.",
+    "dmsAccountLabel": "Compte DMS"
   },
   "shortcuts": {
     "goKitchen": "Cuisine",

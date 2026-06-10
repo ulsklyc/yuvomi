@@ -1246,7 +1246,19 @@
     "holidayLastSync": "Última sincronização: {{date}}",
     "holidayNeverSynced": "Ainda não sincronizado",
     "holidayCountryRequired": "Selecione primeiro um país.",
-    "adminOnly": "Esta seção está disponível apenas para administradores."
+    "adminOnly": "Esta seção está disponível apenas para administradores.",
+    "sectionDms": "Gestão documental (DMS)",
+    "dmsDescription": "Ligue o Yuvomi a um sistema de gestão documental Paperless-ngx para pesquisar, vincular e carregar documentos.",
+    "dmsName": "Nome de exibição",
+    "dmsBaseUrl": "URL do servidor",
+    "dmsToken": "Token de API",
+    "dmsAddBtn": "Ligar DMS",
+    "dmsTestBtn": "Testar ligação",
+    "dmsTestOk": "Ligação bem-sucedida.",
+    "dmsTestFail": "Ligação falhou ({{status}}).",
+    "dmsRemove": "Remover",
+    "dmsRemoveConfirm": "Remover esta ligação DMS? Os documentos vinculados perderão a sua pré-visualização.",
+    "dmsNone": "Ainda não há nenhuma ligação DMS configurada."
   },
   "login": {
     "tagline": "Planejamento familiar. Seguro. Privado. Código aberto.",
@@ -1516,7 +1528,16 @@
     "emptyPrimary": "Adicionar documento",
     "viewAction": "Ver",
     "viewerDownloadHint": "Este tipo de ficheiro não pode ser pré-visualizado no navegador. Descarregue o ficheiro para o abrir.",
-    "emptySecondary": "Adicionar pasta"
+    "emptySecondary": "Adicionar pasta",
+    "linkFromDms": "Vincular a partir do DMS",
+    "dmsSearchPlaceholder": "Pesquisar no DMS …",
+    "dmsNoResults": "Sem correspondências no DMS.",
+    "dmsLinkBtn": "Vincular",
+    "dmsLinked": "Do DMS",
+    "dmsOpenExternal": "Abrir no DMS",
+    "pushToDms": "Carregar para o DMS",
+    "pushToDmsQueued": "O documento foi adicionado ao DMS e está a ser processado lá.",
+    "dmsAccountLabel": "Conta DMS"
   },
   "shortcuts": {
     "goKitchen": "Cozinha",

@@ -1246,7 +1246,19 @@
     "holidayLastSync": "上次同步：{{date}}",
     "holidayNeverSynced": "尚未同步",
     "holidayCountryRequired": "请先选择一个国家/地区。",
-    "adminOnly": "此部分仅对管理员可用。"
+    "adminOnly": "此部分仅对管理员可用。",
+    "sectionDms": "文档管理 (DMS)",
+    "dmsDescription": "将 Yuvomi 连接到 Paperless-ngx 文档管理系统，以搜索、链接和上传文档。",
+    "dmsName": "显示名称",
+    "dmsBaseUrl": "服务器 URL",
+    "dmsToken": "API 令牌",
+    "dmsAddBtn": "连接 DMS",
+    "dmsTestBtn": "测试连接",
+    "dmsTestOk": "连接成功。",
+    "dmsTestFail": "连接失败 ({{status}}).",
+    "dmsRemove": "删除",
+    "dmsRemoveConfirm": "删除此 DMS 连接？已链接的文档将失去预览。",
+    "dmsNone": "尚未配置任何 DMS 连接。"
   },
   "login": {
     "tagline": "家庭规划。安全。注重隐私。开源。",
@@ -1516,7 +1528,16 @@
     "emptyPrimary": "添加文档",
     "viewAction": "查看",
     "viewerDownloadHint": "此文件类型无法在浏览器中预览。请下载文件以打开。",
-    "emptySecondary": "添加文件夹"
+    "emptySecondary": "添加文件夹",
+    "linkFromDms": "从 DMS 链接",
+    "dmsSearchPlaceholder": "在 DMS 中搜索 …",
+    "dmsNoResults": "DMS 中无匹配项。",
+    "dmsLinkBtn": "链接",
+    "dmsLinked": "来自 DMS",
+    "dmsOpenExternal": "在 DMS 中打开",
+    "pushToDms": "上传至 DMS",
+    "pushToDmsQueued": "文档已添加到 DMS 并在那里处理中。",
+    "dmsAccountLabel": "DMS 账户"
   },
   "shortcuts": {
     "goKitchen": "厨房",

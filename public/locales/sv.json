@@ -1246,7 +1246,19 @@
     "holidayLastSync": "Senaste synkronisering: {{date}}",
     "holidayNeverSynced": "Inte synkroniserat ännu",
     "holidayCountryRequired": "Välj ett land först.",
-    "adminOnly": "Det här avsnittet är endast tillgängligt för administratörer."
+    "adminOnly": "Det här avsnittet är endast tillgängligt för administratörer.",
+    "sectionDms": "Dokumenthantering (DMS)",
+    "dmsDescription": "Anslut Yuvomi till ett Paperless-ngx dokumenthanteringssystem för att söka, länka och ladda upp dokument.",
+    "dmsName": "Visningsnamn",
+    "dmsBaseUrl": "Server-URL",
+    "dmsToken": "API-token",
+    "dmsAddBtn": "Anslut DMS",
+    "dmsTestBtn": "Testa anslutning",
+    "dmsTestOk": "Anslutningen lyckades.",
+    "dmsTestFail": "Anslutningen misslyckades ({{status}}).",
+    "dmsRemove": "Ta bort",
+    "dmsRemoveConfirm": "Ta bort den här DMS-anslutningen? Länkade dokument förlorar sin förhandsgranskning.",
+    "dmsNone": "Ingen DMS-anslutning konfigurerad ännu."
   },
   "login": {
     "tagline": "Familjeplanering. Säker. Sekretessvänlig. Öppen källkod.",
@@ -1516,7 +1528,16 @@
     "emptyPrimary": "Lägg till dokument",
     "viewAction": "Visa",
     "viewerDownloadHint": "Den här filtypen kan inte förhandsgranskas i webbläsaren. Ladda ned filen för att öppna den.",
-    "emptySecondary": "Lägg till mapp"
+    "emptySecondary": "Lägg till mapp",
+    "linkFromDms": "Länka från DMS",
+    "dmsSearchPlaceholder": "Sök i DMS …",
+    "dmsNoResults": "Inga träffar i DMS.",
+    "dmsLinkBtn": "Länka",
+    "dmsLinked": "Från DMS",
+    "dmsOpenExternal": "Öppna i DMS",
+    "pushToDms": "Ladda upp till DMS",
+    "pushToDmsQueued": "Dokumentet lades till i DMS och bearbetas där.",
+    "dmsAccountLabel": "DMS-konto"
   },
   "shortcuts": {
     "goKitchen": "Kök",

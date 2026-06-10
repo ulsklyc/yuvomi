@@ -1246,7 +1246,19 @@
     "holidayLastSync": "Остання синхронізація: {{date}}",
     "holidayNeverSynced": "Ще не синхронізовано",
     "holidayCountryRequired": "Спочатку виберіть країну.",
-    "adminOnly": "Цей розділ доступний лише адміністраторам."
+    "adminOnly": "Цей розділ доступний лише адміністраторам.",
+    "sectionDms": "Управління документами (DMS)",
+    "dmsDescription": "Підключіть Yuvomi до системи управління документами Paperless-ngx для пошуку, прив'язки та завантаження документів.",
+    "dmsName": "Відображуване ім'я",
+    "dmsBaseUrl": "URL сервера",
+    "dmsToken": "API-токен",
+    "dmsAddBtn": "Підключити DMS",
+    "dmsTestBtn": "Перевірити з'єднання",
+    "dmsTestOk": "З'єднання успішне.",
+    "dmsTestFail": "З'єднання не вдалося ({{status}}).",
+    "dmsRemove": "Видалити",
+    "dmsRemoveConfirm": "Видалити це DMS-з'єднання? Пов'язані документи втратять попередній перегляд.",
+    "dmsNone": "DMS-з'єднання ще не налаштоване."
   },
   "login": {
     "tagline": "Планування для родини. Безпечно. Конфіденційно. Відкритий код.",
@@ -1516,7 +1528,16 @@
     "emptyPrimary": "Додати документ",
     "viewAction": "Перегляд",
     "viewerDownloadHint": "Цей тип файлу не може бути відображений у браузері. Завантажте файл, щоб відкрити його.",
-    "emptySecondary": "Додати папку"
+    "emptySecondary": "Додати папку",
+    "linkFromDms": "Прив'язати з DMS",
+    "dmsSearchPlaceholder": "Пошук у DMS …",
+    "dmsNoResults": "Немає збігів у DMS.",
+    "dmsLinkBtn": "Прив'язати",
+    "dmsLinked": "З DMS",
+    "dmsOpenExternal": "Відкрити в DMS",
+    "pushToDms": "Завантажити до DMS",
+    "pushToDmsQueued": "Документ додано до DMS і обробляється там.",
+    "dmsAccountLabel": "Акаунт DMS"
   },
   "shortcuts": {
     "goKitchen": "Кухня",

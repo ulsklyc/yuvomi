@@ -1246,7 +1246,19 @@
     "holidayLastSync": "آخر مزامنة: {{date}}",
     "holidayNeverSynced": "لم تتم المزامنة بعد",
     "holidayCountryRequired": "يرجى اختيار دولة أولاً.",
-    "adminOnly": "هذا القسم متاح للمسؤولين فقط."
+    "adminOnly": "هذا القسم متاح للمسؤولين فقط.",
+    "sectionDms": "إدارة المستندات (DMS)",
+    "dmsDescription": "اربط Yuvomi بنظام إدارة مستندات Paperless-ngx للبحث عن المستندات وربطها ورفعها.",
+    "dmsName": "اسم العرض",
+    "dmsBaseUrl": "عنوان URL للخادم",
+    "dmsToken": "رمز API",
+    "dmsAddBtn": "ربط DMS",
+    "dmsTestBtn": "اختبار الاتصال",
+    "dmsTestOk": "الاتصال ناجح.",
+    "dmsTestFail": "فشل الاتصال ({{status}}).",
+    "dmsRemove": "إزالة",
+    "dmsRemoveConfirm": "إزالة اتصال DMS هذا؟ ستفقد المستندات المرتبطة معاينتها.",
+    "dmsNone": "لم يتم إعداد اتصال DMS بعد."
   },
   "login": {
     "tagline": "تخطيط عائلي. آمن. يحترم الخصوصية. مفتوح المصدر.",
@@ -1516,7 +1528,16 @@
     "emptyPrimary": "إضافة مستند",
     "viewAction": "عرض",
     "viewerDownloadHint": "لا يمكن معاينة هذا النوع من الملفات في المتصفح. قم بتنزيل الملف لفتحه.",
-    "emptySecondary": "إضافة مجلد"
+    "emptySecondary": "إضافة مجلد",
+    "linkFromDms": "ربط من DMS",
+    "dmsSearchPlaceholder": "البحث في DMS …",
+    "dmsNoResults": "لا توجد نتائج في DMS.",
+    "dmsLinkBtn": "ربط",
+    "dmsLinked": "من DMS",
+    "dmsOpenExternal": "فتح في DMS",
+    "pushToDms": "رفع إلى DMS",
+    "pushToDmsQueued": "تمت إضافة المستند إلى DMS وجارٍ معالجته هناك.",
+    "dmsAccountLabel": "حساب DMS"
   },
   "shortcuts": {
     "goKitchen": "المطبخ",

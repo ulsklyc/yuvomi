@@ -1252,7 +1252,19 @@
     "holidayLastSync": "Zuletzt: {{date}}",
     "holidayNeverSynced": "Noch nicht synchronisiert",
     "holidayCountryRequired": "Bitte zuerst ein Land auswählen.",
-    "adminOnly": "Dieser Bereich ist nur für Administratoren verfügbar."
+    "adminOnly": "Dieser Bereich ist nur für Administratoren verfügbar.",
+    "sectionDms": "Dokumentenverwaltung (DMS)",
+    "dmsDescription": "Verbinde Yuvomi mit einem Paperless-ngx-Dokumentenverwaltungssystem, um Dokumente zu durchsuchen, zu verlinken und hochzuladen.",
+    "dmsName": "Anzeigename",
+    "dmsBaseUrl": "Server-URL",
+    "dmsToken": "API-Token",
+    "dmsAddBtn": "DMS verbinden",
+    "dmsTestBtn": "Verbindung testen",
+    "dmsTestOk": "Verbindung erfolgreich.",
+    "dmsTestFail": "Verbindung fehlgeschlagen ({{status}}).",
+    "dmsRemove": "Entfernen",
+    "dmsRemoveConfirm": "Diese DMS-Verbindung entfernen? Verlinkte Dokumente verlieren ihre Vorschau.",
+    "dmsNone": "Noch keine DMS-Verbindung eingerichtet."
   },
   "login": {
     "tagline": "Familienplanung. Sicher. Datenschutzfreundlich. Open Source.",
@@ -1527,7 +1539,16 @@
     "emptyPrimary": "Dokument hinzufügen",
     "viewAction": "Ansehen",
     "viewerDownloadHint": "Dieser Dateityp kann im Browser nicht angezeigt werden. Lade die Datei herunter, um sie zu öffnen.",
-    "emptySecondary": "Ordner hinzufügen"
+    "emptySecondary": "Ordner hinzufügen",
+    "linkFromDms": "Aus DMS verlinken",
+    "dmsSearchPlaceholder": "Im DMS suchen …",
+    "dmsNoResults": "Keine Treffer im DMS.",
+    "dmsLinkBtn": "Verlinken",
+    "dmsLinked": "Aus DMS",
+    "dmsOpenExternal": "Im DMS öffnen",
+    "pushToDms": "In DMS hochladen",
+    "pushToDmsQueued": "Dokument wurde zum DMS hinzugefügt und wird dort verarbeitet.",
+    "dmsAccountLabel": "DMS-Konto"
   },
   "userMultiSelect": {
     "nobody": "- Niemand -",

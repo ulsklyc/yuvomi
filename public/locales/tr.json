@@ -1246,7 +1246,19 @@
     "holidayLastSync": "Son senkronizasyon: {{date}}",
     "holidayNeverSynced": "Henüz senkronize edilmedi",
     "holidayCountryRequired": "Lütfen önce bir ülke seçin.",
-    "adminOnly": "Bu bölüm yalnızca yöneticiler için kullanılabilir."
+    "adminOnly": "Bu bölüm yalnızca yöneticiler için kullanılabilir.",
+    "sectionDms": "Belge yönetimi (DMS)",
+    "dmsDescription": "Belgeleri aramak, bağlamak ve yüklemek için Yuvomi'yi Paperless-ngx belge yönetim sistemine bağlayın.",
+    "dmsName": "Görünen ad",
+    "dmsBaseUrl": "Sunucu URL'si",
+    "dmsToken": "API token",
+    "dmsAddBtn": "DMS'e bağlan",
+    "dmsTestBtn": "Bağlantıyı test et",
+    "dmsTestOk": "Bağlantı başarılı.",
+    "dmsTestFail": "Bağlantı başarısız ({{status}}).",
+    "dmsRemove": "Kaldır",
+    "dmsRemoveConfirm": "Bu DMS bağlantısını kaldırmak istiyor musunuz? Bağlı belgeler önizlemelerini kaybedecek.",
+    "dmsNone": "Henüz DMS bağlantısı yapılandırılmadı."
   },
   "login": {
     "tagline": "Aile planlaması. Güvenli. Gizlilik dostu. Açık kaynak.",
@@ -1516,7 +1528,16 @@
     "emptyPrimary": "Belge ekle",
     "viewAction": "Görüntüle",
     "viewerDownloadHint": "Bu dosya türü tarayıcıda önizlenemiyor. Dosyayı açmak için indirin.",
-    "emptySecondary": "Klasör ekle"
+    "emptySecondary": "Klasör ekle",
+    "linkFromDms": "DMS'den bağla",
+    "dmsSearchPlaceholder": "DMS'de ara …",
+    "dmsNoResults": "DMS'de eşleşme bulunamadı.",
+    "dmsLinkBtn": "Bağla",
+    "dmsLinked": "DMS'den",
+    "dmsOpenExternal": "DMS'de aç",
+    "pushToDms": "DMS'e yükle",
+    "pushToDmsQueued": "Belge DMS'e eklendi ve orada işleniyor.",
+    "dmsAccountLabel": "DMS hesabı"
   },
   "shortcuts": {
     "goKitchen": "Mutfak",
