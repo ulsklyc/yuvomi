@@ -489,14 +489,14 @@ export async function render(container, { user }) {
               </div>
               <div class="form-group">
                 <label class="form-label" for="document-storage-username">${t('settings.documentStorageUsername')}</label>
-                <input class="form-input" type="text" id="document-storage-username" name="username" autocomplete="username" />
+                <input class="form-input" type="text" id="document-storage-username" name="username" autocomplete="off" />
                 <span class="form-hint" data-env-hint="username" hidden>${t('settings.documentStorageEnvHint')}</span>
               </div>
               <div class="form-group">
                 <label class="form-label" for="document-storage-password">${t('settings.documentStoragePassword')}</label>
                 <div class="settings-webdav-pw-wrap">
                   <input class="form-input" type="password" id="document-storage-password" name="password"
-                    autocomplete="new-password" placeholder="${t('settings.documentStoragePasswordPlaceholder')}" />
+                    autocomplete="off" placeholder="${t('settings.documentStoragePasswordPlaceholder')}" />
                   <button type="button" class="btn btn--icon btn--ghost settings-webdav-reveal-btn"
                     data-reveal-target="document-storage-password" aria-label="${t('common.togglePasswordVisibility')}">
                     <i data-lucide="eye" aria-hidden="true"></i>
@@ -543,7 +543,7 @@ export async function render(container, { user }) {
               </div>
               <div class="form-group">
                 <label class="form-label" for="dms-token">${t('settings.dmsToken')}</label>
-                <input class="form-input" type="password" id="dms-token" required autocomplete="new-password" />
+                <input class="form-input" type="password" id="dms-token" required autocomplete="off" />
               </div>
               <div id="dms-form-error" class="form-error" hidden></div>
               <div class="settings-form-actions">
@@ -1118,13 +1118,13 @@ export async function render(container, { user }) {
               <div class="form-group">
                 <label class="form-label" for="webdav-username">${t('settings.backupWebdavUsername')}</label>
                 <input class="form-input" type="text" id="webdav-username" name="username"
-                  autocomplete="username" />
+                  autocomplete="off" />
               </div>
               <div class="form-group">
                 <label class="form-label" for="webdav-password">${t('settings.backupWebdavPassword')}</label>
                 <div class="settings-webdav-pw-wrap">
                   <input class="form-input" type="password" id="webdav-password" name="password"
-                    autocomplete="current-password"
+                    autocomplete="off"
                     placeholder="${t('settings.backupWebdavPasswordPlaceholder')}" />
                   <button type="button" class="btn btn--icon btn--ghost settings-webdav-reveal-btn"
                     data-reveal-target="webdav-password" aria-label="${t('common.togglePasswordVisibility')}">
@@ -2874,11 +2874,11 @@ function bindEvents(container, user, users, categories, icsSubscriptions, apiTok
             </div>
             <div class="form-group">
               <label class="form-label" for="caldav-username">${t('settings.caldavUsernameLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-              <input class="form-input" type="text" id="caldav-username" required autocomplete="username" />
+              <input class="form-input" type="text" id="caldav-username" required autocomplete="off" />
             </div>
             <div class="form-group">
               <label class="form-label" for="caldav-password">${t('settings.caldavPasswordLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-              <input class="form-input" type="password" id="caldav-password" required autocomplete="current-password" />
+              <input class="form-input" type="password" id="caldav-password" required autocomplete="off" />
               <small class="form-hint">${t('settings.caldavPasswordHint')}</small>
             </div>
             <div id="caldav-add-error" class="form-error" hidden></div>
@@ -2949,11 +2949,11 @@ function bindEvents(container, user, users, categories, icsSubscriptions, apiTok
             </div>
             <div class="form-group">
               <label class="form-label" for="cardav-username">${t('settings.cardavUsernameLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-              <input class="form-input" type="text" id="cardav-username" required autocomplete="username" />
+              <input class="form-input" type="text" id="cardav-username" required autocomplete="off" />
             </div>
             <div class="form-group">
               <label class="form-label" for="cardav-password">${t('settings.cardavPasswordLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-              <input class="form-input" type="password" id="cardav-password" required autocomplete="current-password" />
+              <input class="form-input" type="password" id="cardav-password" required autocomplete="off" />
               <small class="form-hint">${t('settings.cardavPasswordHint')}</small>
             </div>
             <div id="cardav-add-error" class="form-error" hidden></div>
