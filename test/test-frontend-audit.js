@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r/g, '');
 
@@ -161,6 +161,77 @@ test('settings theme toggle exposes pressed state', () => {
   const source = read('../public/pages/settings.js');
   assert.match(source, /aria-pressed/);
   assert.match(source, /setAttribute\('aria-pressed'/);
+});
+
+test('personal settings leaves exist and export async render functions', () => {
+  const files = [
+    '../public/settings/pages/personal-account.js',
+    '../public/settings/pages/personal-appearance.js',
+    '../public/settings/pages/personal-device.js',
+  ];
+
+  for (const file of files) {
+    assert.equal(existsSync(new URL(file, import.meta.url)), true, `${file} must exist`);
+    assert.match(read(file), /export async function render\(container,\s*\{\s*user\s*\}\)/);
+  }
+});
+
+test('personal account leaf preserves self-profile, password, and logout contracts', () => {
+  const source = read('../public/settings/pages/personal-account.js');
+
+  assert.match(source, /await auth\.me\(\)/);
+  assert.match(source, /Object\.assign\(user,\s*.*user/);
+  assert.match(source, /auth\.updateProfile\(\{/);
+  assert.match(source, /avatar_data:/);
+  assert.match(source, /phone:/);
+  assert.match(source, /email:/);
+  assert.match(source, /birth_date:/);
+  assert.match(source, /api\.patch\('\/auth\/me\/password',\s*\{\s*current_password:/);
+  assert.match(source, /await auth\.logout\(\)/);
+  assert.match(source, /window\.oikos\?\.navigate\('\/login'\)/);
+});
+
+test('personal appearance leaf owns theme, locale, and regional preferences', () => {
+  const source = read('../public/settings/pages/personal-appearance.js');
+
+  assert.match(source, /await api\.get\('\/preferences'\)/);
+  assert.match(source, /getSupportedLocales\(\)/);
+  assert.match(source, /setLocale\(/);
+  assert.match(source, /aria-pressed/);
+  assert.match(source, /setAttribute\('aria-pressed'/);
+  assert.match(source, /data-lucide="monitor"/);
+  assert.match(source, /data-lucide="sun"/);
+  assert.match(source, /data-lucide="moon"/);
+  assert.match(source, /date_format/);
+  assert.match(source, /time_format/);
+  assert.match(source, /api\.put\('\/preferences'/);
+});
+
+test('personal device leaf owns PWA installation state and disconnect cleanup', () => {
+  const source = read('../public/settings/pages/personal-device.js');
+
+  assert.match(
+    source,
+    /import \{\s*getPwaInstallState,\s*onPwaInstallStateChanged,\s*promptPwaInstall\s*\} from '\/utils\/pwa-install\.js';/,
+  );
+  assert.match(source, /onPwaInstallStateChanged\(/);
+  assert.match(source, /promptPwaInstall\(\)/);
+  assert.match(source, /!container\.isConnected/);
+  assert.match(source, /if \(unsubscribed\) return/);
+  assert.match(source, /stopListening\(\)/);
+});
+
+test('browser loader supports personal settings API and auth imports', () => {
+  const source = read('./test-browser-loader.mjs');
+
+  assert.match(source, /patch:\s*async/);
+  assert.match(source, /export const auth/);
+  assert.match(source, /me:\s*async/);
+  assert.match(source, /getUsers:\s*async/);
+});
+
+test('legacy settings page remains available during the leaf migration', () => {
+  assert.equal(existsSync(new URL('../public/pages/settings.js', import.meta.url)), true);
 });
 
 test('responsive settings shell defines desktop and mobile navigation layouts', () => {

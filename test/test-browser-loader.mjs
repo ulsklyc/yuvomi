@@ -12,7 +12,14 @@ const STUBS = {
       get: async () => ({ data: null }),
       post: async () => ({ data: null }),
       put: async () => ({ data: null }),
+      patch: async () => ({ data: null }),
       delete: async () => ({ data: null }),
+    };
+    export const auth = {
+      me: async () => ({ user: null }),
+      getUsers: async () => ({ data: [] }),
+      logout: async () => ({ ok: true }),
+      updateProfile: async () => ({ user: null }),
     };
   `,
   '/i18n.js': `
