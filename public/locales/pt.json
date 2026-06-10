@@ -1258,7 +1258,8 @@
     "dmsTestFail": "Ligação falhou ({{status}}).",
     "dmsRemove": "Remover",
     "dmsRemoveConfirm": "Remover esta ligação DMS? Os documentos vinculados perderão a sua pré-visualização.",
-    "dmsNone": "Ainda não há nenhuma ligação DMS configurada."
+    "dmsNone": "Ainda não há nenhuma ligação DMS configurada.",
+    "dmsConnected": "Conexão DMS adicionada."
   },
   "login": {
     "tagline": "Planejamento familiar. Seguro. Privado. Código aberto.",

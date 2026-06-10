@@ -1258,7 +1258,8 @@
     "dmsTestFail": "Anslutningen misslyckades ({{status}}).",
     "dmsRemove": "Ta bort",
     "dmsRemoveConfirm": "Ta bort den här DMS-anslutningen? Länkade dokument förlorar sin förhandsgranskning.",
-    "dmsNone": "Ingen DMS-anslutning konfigurerad ännu."
+    "dmsNone": "Ingen DMS-anslutning konfigurerad ännu.",
+    "dmsConnected": "DMS-anslutning tillagd."
   },
   "login": {
     "tagline": "Familjeplanering. Säker. Sekretessvänlig. Öppen källkod.",

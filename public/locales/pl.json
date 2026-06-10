@@ -1264,7 +1264,8 @@
     "dmsTestFail": "Połączenie nieudane ({{status}}).",
     "dmsRemove": "Usuń",
     "dmsRemoveConfirm": "Usunąć to połączenie DMS? Powiązane dokumenty stracą podgląd.",
-    "dmsNone": "Brak skonfigurowanego połączenia DMS."
+    "dmsNone": "Brak skonfigurowanego połączenia DMS.",
+    "dmsConnected": "Dodano połączenie DMS."
   },
   "login": {
     "tagline": "Planowanie rodziny. Bezpieczne. Chroniące prywatność. Open Source.",

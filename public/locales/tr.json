@@ -1258,7 +1258,8 @@
     "dmsTestFail": "Bağlantı başarısız ({{status}}).",
     "dmsRemove": "Kaldır",
     "dmsRemoveConfirm": "Bu DMS bağlantısını kaldırmak istiyor musunuz? Bağlı belgeler önizlemelerini kaybedecek.",
-    "dmsNone": "Henüz DMS bağlantısı yapılandırılmadı."
+    "dmsNone": "Henüz DMS bağlantısı yapılandırılmadı.",
+    "dmsConnected": "DMS bağlantısı eklendi."
   },
   "login": {
     "tagline": "Aile planlaması. Güvenli. Gizlilik dostu. Açık kaynak.",

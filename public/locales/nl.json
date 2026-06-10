@@ -1258,7 +1258,8 @@
     "dmsTestFail": "Verbinding mislukt ({{status}}).",
     "dmsRemove": "Verwijderen",
     "dmsRemoveConfirm": "Deze DMS-verbinding verwijderen? Gekoppelde documenten verliezen hun voorbeeld.",
-    "dmsNone": "Nog geen DMS-verbinding geconfigureerd."
+    "dmsNone": "Nog geen DMS-verbinding geconfigureerd.",
+    "dmsConnected": "DMS-verbinding toegevoegd."
   },
   "login": {
     "tagline": "Gezinsplanning. Veilig. Privacyvriendelijk. Open source.",

@@ -1264,7 +1264,8 @@
     "dmsTestFail": "Verbindung fehlgeschlagen ({{status}}).",
     "dmsRemove": "Entfernen",
     "dmsRemoveConfirm": "Diese DMS-Verbindung entfernen? Verlinkte Dokumente verlieren ihre Vorschau.",
-    "dmsNone": "Noch keine DMS-Verbindung eingerichtet."
+    "dmsNone": "Noch keine DMS-Verbindung eingerichtet.",
+    "dmsConnected": "DMS-Verbindung hinzugefügt."
   },
   "login": {
     "tagline": "Familienplanung. Sicher. Datenschutzfreundlich. Open Source.",

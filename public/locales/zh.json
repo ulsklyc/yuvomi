@@ -1258,7 +1258,8 @@
     "dmsTestFail": "连接失败 ({{status}}).",
     "dmsRemove": "删除",
     "dmsRemoveConfirm": "删除此 DMS 连接？已链接的文档将失去预览。",
-    "dmsNone": "尚未配置任何 DMS 连接。"
+    "dmsNone": "尚未配置任何 DMS 连接。",
+    "dmsConnected": "已添加 DMS 连接。"
   },
   "login": {
     "tagline": "家庭规划。安全。注重隐私。开源。",

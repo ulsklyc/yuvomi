@@ -207,9 +207,10 @@ export async function render(container, { user }) {
   let icsSubscriptions = [];
   let apiTokens       = [];
   let thirdPartyModules = [];
+  let dmsAccounts       = [];
 
   try {
-    const [usersRes, gStatus, aStatus, prefsRes, catsRes, icsRes, apiTokensRes, modulesRes] = await Promise.allSettled([
+    const [usersRes, gStatus, aStatus, prefsRes, catsRes, icsRes, apiTokensRes, modulesRes, dmsRes] = await Promise.allSettled([
       user.role === 'admin' ? auth.getUsers() : Promise.resolve({ data: [] }),
       api.get('/calendar/google/status'),
       api.get('/calendar/apple/status'),
@@ -218,6 +219,7 @@ export async function render(container, { user }) {
       api.get('/calendar/subscriptions'),
       user.role === 'admin' ? api.get('/auth/api-tokens') : Promise.resolve({ data: [] }),
       user.role === 'admin' ? api.get('/modules?admin=1') : Promise.resolve({ data: [] }),
+      user.role === 'admin' ? api.get('/documents/dms/accounts') : Promise.resolve({ data: [] }),
     ]);
     if (usersRes.status === 'fulfilled')  users            = usersRes.value.data  ?? [];
     if (gStatus.status  === 'fulfilled')  googleStatus     = gStatus.value;
@@ -227,6 +229,7 @@ export async function render(container, { user }) {
     if (icsRes.status   === 'fulfilled')  icsSubscriptions = icsRes.value.data    ?? [];
     if (apiTokensRes.status === 'fulfilled') apiTokens     = apiTokensRes.value.data ?? [];
     if (modulesRes.status === 'fulfilled') thirdPartyModules = modulesRes.value.data ?? [];
+    if (dmsRes.status   === 'fulfilled')  dmsAccounts      = dmsRes.value.data    ?? [];
   } catch (_) { /* non-critical */ }
 
   if (prefs.date_format) {
@@ -460,6 +463,34 @@ export async function render(container, { user }) {
                 ${prefs.weather_provider === 'open-meteo' ? `
                   <button type="button" class="btn btn--danger" id="weather-remove-btn">${t('settings.weatherRemove')}</button>
                 ` : ''}
+              </div>
+            </form>
+          </div>
+        </section>
+        ` : ''}
+
+        ${user?.role === 'admin' ? `
+        <section class="settings-section" id="dms-section">
+          <h2 class="settings-section__title">${t('settings.sectionDms')}</h2>
+          <div class="settings-card" id="dms-card">
+            <p class="settings-card-description">${t('settings.dmsDescription')}</p>
+            <ul class="dms-account-list" id="dms-account-list"></ul>
+            <form class="settings-form settings-form--compact" id="dms-form" novalidate autocomplete="off">
+              <div class="form-group">
+                <label class="form-label" for="dms-name">${t('settings.dmsName')}</label>
+                <input class="form-input" type="text" id="dms-name" maxlength="100" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="dms-url">${t('settings.dmsBaseUrl')}</label>
+                <input class="form-input" type="url" id="dms-url" required placeholder="https://..." />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="dms-token">${t('settings.dmsToken')}</label>
+                <input class="form-input" type="password" id="dms-token" required autocomplete="new-password" />
+              </div>
+              <div id="dms-form-error" class="form-error" hidden></div>
+              <div class="settings-form-actions">
+                <button type="submit" class="btn btn--primary">${t('settings.dmsAddBtn')}</button>
               </div>
             </form>
           </div>
@@ -1105,8 +1136,14 @@ docker cp oikos:/data/oikos-backup.db ./oikos-backup.db</code></pre>
     loadCardDAVAccounts(container, user);
   }
 
+  // Initial render: DMS accounts (admin only)
+  if (container.querySelector('#dms-account-list')) {
+    renderDmsAccounts(dmsAccounts);
+  }
+
   renderSettingsSubTabs(container, user, activeTab);
   bindEvents(container, user, users, categories, icsSubscriptions, apiTokens, thirdPartyModules);
+  bindDmsEvents(container);
   if (window.lucide) window.lucide.createIcons({ el: container });
 }
 // CalDAV-Konten laden
@@ -1492,6 +1529,118 @@ async function loadCardDAVAccounts(container, user) {
   } catch (err) {
     console.error('Failed to load CardDAV accounts:', err);
   }
+}
+
+// --------------------------------------------------------
+// DMS accounts
+// --------------------------------------------------------
+
+function renderDmsAccounts(accounts) {
+  const list = document.getElementById('dms-account-list');
+  if (!list) return;
+  list.replaceChildren();
+  if (!accounts.length) {
+    const li = document.createElement('li');
+    li.className = 'dms-account-empty form-hint';
+    li.textContent = t('settings.dmsNone');
+    list.appendChild(li);
+    return;
+  }
+  for (const acc of accounts) {
+    const li = document.createElement('li');
+    li.className = 'dms-account-item';
+    li.dataset.id = acc.id;
+
+    const meta = document.createElement('div');
+    meta.className = 'dms-account-meta';
+    const name = document.createElement('strong');
+    name.textContent = acc.name;
+    const url = document.createElement('span');
+    url.className = 'form-hint';
+    url.textContent = acc.base_url;
+    meta.append(name, document.createElement('br'), url);
+
+    const testBtn = document.createElement('button');
+    testBtn.type = 'button';
+    testBtn.className = 'btn btn--secondary btn--sm';
+    testBtn.dataset.action = 'test-dms';
+    testBtn.dataset.id = acc.id;
+    testBtn.textContent = t('settings.dmsTestBtn');
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn btn--danger btn--sm';
+    delBtn.dataset.action = 'remove-dms';
+    delBtn.dataset.id = acc.id;
+    delBtn.textContent = t('settings.dmsRemove');
+
+    li.append(meta, testBtn, delBtn);
+    list.appendChild(li);
+  }
+}
+
+function bindDmsEvents(container) {
+  const dmsForm = container.querySelector('#dms-form');
+  if (!dmsForm) return;
+
+  dmsForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = container.querySelector('#dms-form-error');
+    errEl.hidden = true;
+    const name      = container.querySelector('#dms-name').value.trim();
+    const base_url  = container.querySelector('#dms-url').value.trim();
+    const api_token = container.querySelector('#dms-token').value;
+    try {
+      const res = await api.post('/documents/dms/accounts', { provider: 'paperless', name, base_url, api_token });
+      const accounts = res.data ?? [];
+      renderDmsAccounts(Array.isArray(accounts) ? accounts : [accounts]);
+      // Reload full list to get up-to-date state
+      const listRes = await api.get('/documents/dms/accounts');
+      renderDmsAccounts(listRes.data ?? []);
+      dmsForm.reset();
+      window.oikos?.showToast(t('settings.dmsConnected'), 'success');
+    } catch (err) {
+      showError(errEl, err.message ?? t('common.errorGeneric'));
+    }
+  });
+
+  const list = container.querySelector('#dms-account-list');
+  if (!list) return;
+
+  list.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const action = btn.dataset.action;
+
+    if (action === 'test-dms') {
+      btn.disabled = true;
+      try {
+        const res = await api.post(`/documents/dms/accounts/${id}/test`);
+        const result = res.data ?? {};
+        if (result.ok) {
+          window.oikos?.showToast(t('settings.dmsTestOk'), 'success');
+        } else {
+          window.oikos?.showToast(t('settings.dmsTestFail', { status: result.status }), 'danger');
+        }
+      } catch (err) {
+        window.oikos?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    if (action === 'remove-dms') {
+      if (!confirm(t('settings.dmsRemoveConfirm'))) return;
+      try {
+        await api.delete(`/documents/dms/accounts/${id}`);
+        const listRes = await api.get('/documents/dms/accounts');
+        renderDmsAccounts(listRes.data ?? []);
+      } catch (err) {
+        window.oikos?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+      }
+    }
+  });
 }
 
 // --------------------------------------------------------
@@ -2031,7 +2180,10 @@ function bindEvents(container, user, users, categories, icsSubscriptions, apiTok
 
     // Load subdivisions for a given country code
     async function loadSubdivisions(countryCode, selectedCode) {
-      subdivisionSelect.innerHTML = `<option value="">${t('settings.holidaySubdivisionNone')}</option>`;
+      const noneOpt = document.createElement('option');
+      noneOpt.value = '';
+      noneOpt.textContent = t('settings.holidaySubdivisionNone');
+      subdivisionSelect.replaceChildren(noneOpt);
       subdivisionSelect.disabled = true;
       if (!countryCode) return;
       try {

@@ -1258,7 +1258,8 @@
     "dmsTestFail": "接続に失敗しました ({{status}}).",
     "dmsRemove": "削除",
     "dmsRemoveConfirm": "この DMS 接続を削除しますか？リンクされた文書のプレビューが失われます。",
-    "dmsNone": "DMS 接続がまだ設定されていません。"
+    "dmsNone": "DMS 接続がまだ設定されていません。",
+    "dmsConnected": "DMS接続を追加しました。"
   },
   "login": {
     "tagline": "家族計画。安全。プライバシー重視。オープンソース。",

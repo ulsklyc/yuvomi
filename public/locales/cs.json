@@ -1258,7 +1258,8 @@
     "dmsTestFail": "Připojení selhalo ({{status}}).",
     "dmsRemove": "Odebrat",
     "dmsRemoveConfirm": "Odebrat toto připojení DMS? Propojené dokumenty ztratí náhled.",
-    "dmsNone": "Zatím není nastaveno žádné připojení DMS."
+    "dmsNone": "Zatím není nastaveno žádné připojení DMS.",
+    "dmsConnected": "Připojení DMS přidáno."
   },
   "login": {
     "tagline": "Rodinné plánování. Bezpečné. Soukromé. Open Source.",

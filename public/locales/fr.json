@@ -1258,7 +1258,8 @@
     "dmsTestFail": "Connexion échouée ({{status}}).",
     "dmsRemove": "Supprimer",
     "dmsRemoveConfirm": "Supprimer cette connexion DMS ? Les documents liés perdront leur aperçu.",
-    "dmsNone": "Aucune connexion DMS configurée pour l'instant."
+    "dmsNone": "Aucune connexion DMS configurée pour l'instant.",
+    "dmsConnected": "Connexion DMS ajoutée."
   },
   "login": {
     "tagline": "Planification familiale. Sécurisée. Respectueuse de la vie privée. Open source.",

@@ -1258,7 +1258,8 @@
     "dmsTestFail": "Connection failed ({{status}}).",
     "dmsRemove": "Remove",
     "dmsRemoveConfirm": "Remove this DMS connection? Linked documents will lose their preview.",
-    "dmsNone": "No DMS connection configured yet."
+    "dmsNone": "No DMS connection configured yet.",
+    "dmsConnected": "DMS connection added."
   },
   "login": {
     "tagline": "Family planning. Secure. Privacy-friendly. Open source.",

@@ -1258,7 +1258,8 @@
     "dmsTestFail": "Conexión fallida ({{status}}).",
     "dmsRemove": "Eliminar",
     "dmsRemoveConfirm": "¿Eliminar esta conexión DMS? Los documentos vinculados perderán su vista previa.",
-    "dmsNone": "Todavía no hay ninguna conexión DMS configurada."
+    "dmsNone": "Todavía no hay ninguna conexión DMS configurada.",
+    "dmsConnected": "Conexión DMS añadida."
   },
   "login": {
     "tagline": "Planificación familiar. Segura. Privada. Código abierto.",

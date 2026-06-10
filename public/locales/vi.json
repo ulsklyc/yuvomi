@@ -1258,7 +1258,8 @@
     "dmsTestFail": "Kết nối thất bại ({{status}}).",
     "dmsRemove": "Xóa",
     "dmsRemoveConfirm": "Xóa kết nối DMS này? Các tài liệu được liên kết sẽ mất bản xem trước.",
-    "dmsNone": "Chưa có kết nối DMS nào được cấu hình."
+    "dmsNone": "Chưa có kết nối DMS nào được cấu hình.",
+    "dmsConnected": "Đã thêm kết nối DMS."
   },
   "login": {
     "tagline": "Kế hoạch gia đình. Bảo mật. Thân thiện với quyền riêng tư. Mã nguồn mở.",
