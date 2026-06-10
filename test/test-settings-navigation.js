@@ -149,6 +149,19 @@ test('groupBuiltInModules replaces Kitchen children at their first definition po
   assert.equal(modules[2], tasks);
 });
 
+test('groupBuiltInModules replaces an explicit Kitchen definition in place', () => {
+  const calendar = { id: 'calendar', icon: 'calendar-days', enabled: false };
+  const kitchen = { id: 'kitchen', icon: 'utensils', legacy: true };
+  const tasks = { id: 'tasks', icon: 'list-checks', custom: true };
+
+  const modules = groupBuiltInModules([], [calendar, kitchen, tasks]);
+
+  assert.deepEqual(modules.map((module) => module.id), ['calendar', 'kitchen', 'tasks']);
+  assert.equal(modules[0], calendar);
+  assert.equal(modules[2], tasks);
+  assert.notEqual(modules[1], kitchen);
+});
+
 test('normalizeModuleOrder replaces legacy Kitchen children with one Kitchen position', () => {
   assert.deepEqual(
     normalizeModuleOrder(['calendar', 'recipes', 'tasks', 'shopping', 'meals']),

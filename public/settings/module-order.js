@@ -48,7 +48,7 @@ export function groupBuiltInModules(disabledModules = [], definitions = []) {
   let kitchenInserted = false;
 
   for (const definition of Array.isArray(definitions) ? definitions : []) {
-    if (KITCHEN_CHILD_ID_SET.has(definition?.id)) {
+    if (definition?.id === 'kitchen' || KITCHEN_CHILD_ID_SET.has(definition?.id)) {
       if (!kitchenInserted) {
         grouped.push(kitchen);
         kitchenInserted = true;
@@ -56,9 +56,7 @@ export function groupBuiltInModules(disabledModules = [], definitions = []) {
       continue;
     }
 
-    if (definition?.id !== 'kitchen') {
-      grouped.push(definition);
-    }
+    grouped.push(definition);
   }
 
   if (!kitchenInserted) {
