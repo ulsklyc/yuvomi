@@ -141,3 +141,43 @@ test('GET /search: Member bekommt 403', async () => {
   assert.equal(res.status, 403);
   session = { userId: adminId, role: 'admin' };
 });
+
+test('POST /link: legt external-Referenz in family_documents an', async () => {
+  session = { userId: adminId, role: 'admin' };
+  _setAdapterFactory(() => ({
+    async getDocument(id) {
+      return { id, title: 'Stromrechnung', filename: 'strom.pdf', url: `https://t/d/${id}`, correspondent: 7, tags: [3] };
+    },
+  }));
+  const accId = (await call('GET', '/accounts')).body.data[0].id;
+  const res = await call('POST', '/link', {
+    account_id: accId, dms_document_id: '42', category: 'finance', visibility: 'family',
+  });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.data.storage_provider, 'external');
+  assert.equal(res.body.data.storage_key, '42');
+  assert.equal(res.body.data.name, 'Stromrechnung');
+
+  const row = db.prepare('SELECT * FROM family_documents WHERE id = ?').get(res.body.data.id);
+  assert.equal(row.content_data, '');
+  assert.equal(row.dms_account_id, accId);
+  assert.equal(row.external_url, 'https://t/d/42');
+});
+
+test('POST /link: 409 wenn dasselbe DMS-Dokument schon verlinkt ist', async () => {
+  session = { userId: adminId, role: 'admin' };
+  const accId = (await call('GET', '/accounts')).body.data[0].id;
+  const res = await call('POST', '/link', { account_id: accId, dms_document_id: '42' });
+  assert.equal(res.status, 409);
+});
+
+test('POST /link: Member bekommt 403 und legt keinen Row an', async () => {
+  session = { userId: adminId, role: 'admin' };
+  const list = await call('GET', '/accounts');
+  session = { userId: memberId, role: 'member' };
+  const res = await call('POST', '/link', { account_id: list.body.data[0].id, dms_document_id: '99' });
+  assert.equal(res.status, 403);
+  const count = db.prepare('SELECT COUNT(*) AS n FROM family_documents WHERE storage_key = ?').get('99').n;
+  assert.equal(count, 0);
+  session = { userId: adminId, role: 'admin' };
+});

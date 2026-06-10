@@ -15,6 +15,9 @@ export function _setAdapterFactory(fn) { adapterFactory = fn || defaultGetAdapte
 const log = createLogger('DMS');
 const router = express.Router();
 
+const CATEGORIES = ['medical', 'school', 'identity', 'insurance', 'finance', 'home', 'vehicle', 'legal', 'travel', 'pets', 'warranty', 'taxes', 'work', 'other'];
+const VISIBILITIES = ['family', 'restricted', 'private'];
+
 function userId(req) { return req.authUserId || req.session?.userId; }
 function isAdmin(req) { return req.authRole === 'admin' || req.session?.role === 'admin'; }
 
@@ -104,6 +107,41 @@ router.get('/search', async (req, res) => {
   } catch (err) {
     log.error('GET /search error:', err);
     res.status(502).json({ error: 'DMS search failed.', code: 502 });
+  }
+});
+
+router.post('/link', async (req, res) => {
+  try {
+    if (!isAdmin(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    const account = getAccount(Number(req.body.account_id));
+    if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404 });
+    const dmsId = String(req.body.dms_document_id || '').trim();
+    if (!dmsId) return res.status(400).json({ error: 'dms_document_id is required.', code: 400 });
+
+    const dupe = db.get().prepare(`
+      SELECT id FROM family_documents
+      WHERE storage_provider = 'external' AND dms_account_id = ? AND storage_key = ?
+    `).get(account.id, dmsId);
+    if (dupe) return res.status(409).json({ error: 'This DMS document is already linked.', code: 409 });
+
+    const doc = await adapterFactory(account).getDocument(dmsId);
+    const category = CATEGORIES.includes(req.body.category) ? req.body.category : 'other';
+    const visibility = VISIBILITIES.includes(req.body.visibility) ? req.body.visibility : 'family';
+    const meta = JSON.stringify({ correspondent: doc.correspondent ?? null, tags: doc.tags ?? [] });
+
+    const result = db.get().prepare(`
+      INSERT INTO family_documents
+        (name, category, visibility, original_name, mime_type, file_size, content_data,
+         storage_provider, storage_key, dms_account_id, external_url, external_meta, created_by)
+      VALUES (?, ?, ?, ?, 'application/pdf', 0, '', 'external', ?, ?, ?, ?, ?)
+    `).run(doc.title, category, visibility, doc.filename, dmsId, account.id, doc.url, meta, userId(req));
+
+    const row = db.get().prepare('SELECT * FROM family_documents WHERE id = ?').get(result.lastInsertRowid);
+    res.status(201).json({ data: row });
+  } catch (err) {
+    if (err.status === 404) return res.status(404).json({ error: 'DMS document not found.', code: 404 });
+    log.error('POST /link error:', err);
+    res.status(502).json({ error: 'Failed to link DMS document.', code: 502 });
   }
 });
 
