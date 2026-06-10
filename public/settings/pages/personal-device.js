@@ -17,10 +17,10 @@ function renderPage(container) {
         </div>
         <div class="settings-pwa-card__body">
           <h3 class="settings-card__title">${t('settings.pwaInstallTitle')}</h3>
-          <p class="form-hint" id="pwa-install-status">${t('settings.pwaInstallChecking')}</p>
-          <div id="pwa-install-error" class="form-error" hidden></div>
+          <p class="form-hint" id="pwa-install-status" aria-live="polite">${t('settings.pwaInstallChecking')}</p>
+          <div id="pwa-install-error" class="form-error" role="alert" hidden></div>
           <div class="settings-form-actions">
-            <button type="button" class="btn btn--primary" id="pwa-install-btn">
+            <button type="button" class="btn btn--primary" id="pwa-install-btn" aria-describedby="pwa-install-status pwa-install-error">
               <i data-lucide="download" aria-hidden="true"></i>
               <span>${t('settings.pwaInstallButton')}</span>
             </button>
@@ -41,6 +41,7 @@ function bindPwaInstall(container) {
   let unsubscribe = null;
   let unsubscribeRequested = false;
   let unsubscribed = false;
+  let observer = null;
 
   const stopListening = () => {
     if (unsubscribed) return;
@@ -51,7 +52,12 @@ function bindPwaInstall(container) {
     unsubscribed = true;
     const stop = unsubscribe;
     unsubscribe = null;
-    stop();
+    try {
+      stop();
+    } finally {
+      observer?.disconnect();
+      observer = null;
+    }
   };
 
   const renderState = (state = getPwaInstallState()) => {
@@ -85,7 +91,18 @@ function bindPwaInstall(container) {
   };
 
   unsubscribe = onPwaInstallStateChanged(renderState);
-  if (unsubscribeRequested) stopListening();
+  if (unsubscribeRequested || !container.isConnected) {
+    stopListening();
+  } else {
+    observer = new MutationObserver(() => {
+      if (!container.isConnected) stopListening();
+    });
+    observer.observe(document.body || document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
+    if (!container.isConnected) stopListening();
+  }
 
   button.addEventListener('click', async () => {
     errorElement.hidden = true;

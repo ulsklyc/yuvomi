@@ -80,6 +80,16 @@ const STUBS = {
   '/utils/kitchen-tabs.js': `
     export const renderKitchenTabsBar = () => {};
   `,
+  '/utils/pwa-install.js': `
+    export const getPwaInstallState = () => ({
+      installed: false,
+      ios: false,
+      canPrompt: false,
+      supported: false,
+    });
+    export const onPwaInstallStateChanged = () => () => {};
+    export const promptPwaInstall = async () => ({ outcome: 'unavailable' });
+  `,
   '/utils/date.js': `
     const pad = (n) => String(n).padStart(2, '0');
     export const toLocalDateKey = (date) => {

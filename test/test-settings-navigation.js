@@ -67,6 +67,18 @@ test('settings registry is immutable', () => {
   assert.equal(SETTINGS_LEAVES.every(Object.isFrozen), true);
 });
 
+test('personal settings leaf modules import without browser globals', async () => {
+  const modules = await Promise.all([
+    import('/settings/pages/personal-account.js'),
+    import('/settings/pages/personal-appearance.js'),
+    import('/settings/pages/personal-device.js'),
+  ]);
+
+  for (const module of modules) {
+    assert.equal(typeof module.render, 'function');
+  }
+});
+
 test('members only see the personal settings domain', () => {
   assert.deepEqual(filterSettingsDomains(member).map((domain) => domain.id), ['personal']);
 });

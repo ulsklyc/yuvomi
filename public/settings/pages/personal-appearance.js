@@ -17,8 +17,32 @@ const DATE_FORMATS = [
   ['ymd_slash', 'YYYY/MM/DD'],
 ];
 
+function safeStorageGet(key, fallback = null) {
+  try {
+    return localStorage.getItem(key) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function safeStorageSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+}
+
+function safeStorageRemove(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+}
+
 function currentTheme() {
-  return localStorage.getItem('oikos-theme') || 'system';
+  return safeStorageGet('oikos-theme', 'system') || 'system';
 }
 
 function formatOptions(selected) {
@@ -36,7 +60,7 @@ function localeLabel(locale) {
 }
 
 function localeOptions() {
-  const storedLocale = localStorage.getItem('oikos-locale');
+  const storedLocale = safeStorageGet('oikos-locale');
   return [
     `<option value="system"${storedLocale ? '' : ' selected'}>${t('settings.localeSystem')}</option>`,
     ...getSupportedLocales().map((locale) => (
@@ -65,7 +89,7 @@ function renderLoadError(container) {
       <p class="settings-leaf-header__description">${t('settings.pageAppearanceDescription')}</p>
     </header>
     <div class="settings-card settings-card--appearance">
-      <p class="form-error">${t('settings.loadError')}</p>
+      <p class="form-error" role="alert">${t('settings.loadError')}</p>
       <div class="settings-form-actions">
         <button type="button" class="btn btn--secondary" id="appearance-retry">${t('settings.retry')}</button>
       </div>
@@ -108,11 +132,11 @@ function renderPage(container, preferences) {
       <div class="settings-card settings-card--language">
         <div class="form-group">
           <label class="form-label" for="locale-select">${t('settings.localeLabel')}</label>
-          <select class="form-input locale-picker__select" id="locale-select">
+          <select class="form-input locale-picker__select" id="locale-select" aria-describedby="locale-error">
             ${localeOptions()}
           </select>
         </div>
-        <div id="locale-error" class="form-error" hidden></div>
+        <div id="locale-error" class="form-error" role="alert" hidden></div>
       </div>
     </section>
 
@@ -123,31 +147,35 @@ function renderPage(container, preferences) {
         <p class="form-hint">${t('settings.dateFormatHint')}</p>
         <div class="form-group">
           <label class="form-label" for="date-format-select">${t('settings.dateFormatLabel')}</label>
-          <select class="form-input" id="date-format-select">
+          <select class="form-input" id="date-format-select" aria-describedby="date-format-error">
             ${formatOptions(preferences.date_format)}
           </select>
         </div>
-        <div id="date-format-error" class="form-error" hidden></div>
+        <div id="date-format-error" class="form-error" role="alert" hidden></div>
         <div class="form-group">
           <label class="form-label" for="time-format-select">${t('settings.timeFormatLabel')}</label>
-          <select class="form-input" id="time-format-select">
+          <select class="form-input" id="time-format-select" aria-describedby="time-format-error">
             <option value="24h"${preferences.time_format === '24h' ? ' selected' : ''}>24 ${t('settings.timeFormatHours')}</option>
             <option value="12h"${preferences.time_format === '12h' ? ' selected' : ''}>AM/PM</option>
           </select>
         </div>
-        <div id="time-format-error" class="form-error" hidden></div>
+        <div id="time-format-error" class="form-error" role="alert" hidden></div>
       </div>
     </section>
   `);
 }
 
 function applyTheme(value) {
+  safeStorageSet('oikos-theme', value);
   if (window.oikos?.applyTheme) {
-    window.oikos.applyTheme(value);
-    return;
+    try {
+      window.oikos.applyTheme(value);
+      return;
+    } catch {
+      // Fall back to applying the theme directly when router storage fails.
+    }
   }
 
-  localStorage.setItem('oikos-theme', value);
   if (value === 'dark' || value === 'light') {
     document.documentElement.setAttribute('data-theme', value);
   } else {
@@ -155,7 +183,7 @@ function applyTheme(value) {
   }
 }
 
-function bindEvents(container) {
+function bindEvents(container, user) {
   const themeToggle = container.querySelector('#theme-toggle');
   themeToggle?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-theme-value]');
@@ -175,15 +203,17 @@ function bindEvents(container) {
     localeSelect.disabled = true;
     try {
       if (localeSelect.value === 'system') {
-        localStorage.removeItem('oikos-locale');
+        safeStorageRemove('oikos-locale');
         location.reload();
         return;
       }
-      await setLocale(localeSelect.value);
+      const locale = localeSelect.value;
+      await setLocale(locale);
+      await render(container, { user });
     } catch (error) {
       showError(errorElement, error.message);
     } finally {
-      localeSelect.disabled = false;
+      if (localeSelect.isConnected) localeSelect.disabled = false;
     }
   });
 
@@ -194,7 +224,7 @@ function bindEvents(container) {
     dateFormatSelect.disabled = true;
     try {
       await api.put('/preferences', { date_format: dateFormatSelect.value });
-      localStorage.setItem('oikos-date-format', dateFormatSelect.value);
+      safeStorageSet('oikos-date-format', dateFormatSelect.value);
       window.dispatchEvent(new CustomEvent('date-format-changed', {
         detail: { dateFormat: dateFormatSelect.value },
       }));
@@ -213,7 +243,7 @@ function bindEvents(container) {
     timeFormatSelect.disabled = true;
     try {
       await api.put('/preferences', { time_format: timeFormatSelect.value });
-      localStorage.setItem('oikos-time-format', timeFormatSelect.value);
+      safeStorageSet('oikos-time-format', timeFormatSelect.value);
       window.dispatchEvent(new CustomEvent('time-format-changed', {
         detail: { timeFormat: timeFormatSelect.value },
       }));
@@ -235,10 +265,10 @@ export async function render(container, { user }) {
       time_format: response?.data?.time_format || '24h',
     };
 
-    localStorage.setItem('oikos-date-format', preferences.date_format);
-    localStorage.setItem('oikos-time-format', preferences.time_format);
+    safeStorageSet('oikos-date-format', preferences.date_format);
+    safeStorageSet('oikos-time-format', preferences.time_format);
     renderPage(container, preferences);
-    bindEvents(container);
+    bindEvents(container, user);
     window.lucide?.createIcons({ el: container });
   } catch {
     renderLoadError(container);

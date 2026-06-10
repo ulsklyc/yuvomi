@@ -35,7 +35,7 @@ function avatarEditorHtml(user) {
       <button type="button" class="settings-avatar-button" id="profile-avatar-preview" aria-label="${t('settings.profilePictureLabel')}">
         ${avatarHtml(user, 'settings-avatar settings-avatar--lg')}
       </button>
-      <input class="sr-only" type="file" id="profile-avatar-file" accept="image/png,image/jpeg,image/webp">
+      <input class="sr-only" type="file" id="profile-avatar-file" accept="image/png,image/jpeg,image/webp" aria-label="${t('settings.profilePictureLabel')}" aria-describedby="profile-error" tabindex="-1">
       <div class="settings-avatar-actions">
         <button type="button" class="settings-avatar-action" id="profile-avatar-edit" aria-label="${t('settings.profilePictureLabel')}" title="${t('settings.profilePictureLabel')}">
           <i data-lucide="edit-2" aria-hidden="true"></i>
@@ -115,8 +115,8 @@ function renderPage(container, user, refreshFailed) {
     </header>
 
     ${refreshFailed ? `
-      <div class="settings-card settings-card--account" role="status">
-        <p class="form-error">${t('settings.loadError')}</p>
+      <div class="settings-card settings-card--account">
+        <p class="form-error" role="alert">${t('settings.loadError')}</p>
         <div class="settings-form-actions">
           <button type="button" class="btn btn--secondary" id="account-retry">${t('settings.retry')}</button>
         </div>
@@ -145,11 +145,11 @@ function renderPage(container, user, refreshFailed) {
               <div class="settings-name-color-row">
                 <div class="form-group settings-name-color-row__name">
                   <label class="form-label" for="profile-display-name">${t('settings.displayNameLabel')}</label>
-                  <input class="form-input" type="text" id="profile-display-name" maxlength="128" value="${esc(user?.display_name || '')}" required>
+                  <input class="form-input" type="text" id="profile-display-name" maxlength="128" value="${esc(user?.display_name || '')}" aria-describedby="profile-error" required>
                 </div>
                 <div class="form-group settings-color-field">
                   <label class="form-label" for="profile-avatar-color">${t('settings.colorLabel')}</label>
-                  <input class="settings-color-button" type="color" id="profile-avatar-color" value="${esc(user?.avatar_color || '')}">
+                  <input class="settings-color-button" type="color" id="profile-avatar-color" value="${esc(user?.avatar_color || '')}" aria-describedby="profile-error">
                 </div>
               </div>
             </div>
@@ -157,19 +157,19 @@ function renderPage(container, user, refreshFailed) {
           <div class="modal-grid modal-grid--2">
             <div class="form-group">
               <label class="form-label" for="profile-phone">${t('settings.memberPhoneLabel')}</label>
-              <input class="form-input" type="tel" id="profile-phone" value="${esc(user?.phone || '')}" autocomplete="tel">
+              <input class="form-input" type="tel" id="profile-phone" value="${esc(user?.phone || '')}" autocomplete="tel" aria-describedby="profile-error">
             </div>
             <div class="form-group">
               <label class="form-label" for="profile-email">${t('settings.memberEmailLabel')}</label>
-              <input class="form-input" type="email" id="profile-email" value="${esc(user?.email || '')}" autocomplete="email">
+              <input class="form-input" type="email" id="profile-email" value="${esc(user?.email || '')}" autocomplete="email" aria-describedby="profile-error">
             </div>
           </div>
           <div class="form-group">
             <label class="form-label" for="profile-birth-date">${t('settings.memberBirthDateLabel')}</label>
-            <input class="form-input" type="date" id="profile-birth-date" value="${esc(user?.birth_date || '')}">
+            <input class="form-input" type="date" id="profile-birth-date" value="${esc(user?.birth_date || '')}" aria-describedby="profile-error">
             <p class="form-hint">${t('settings.memberContactBirthdayHint')}</p>
           </div>
-          <div id="profile-error" class="form-error" hidden></div>
+          <div id="profile-error" class="form-error" role="alert" hidden></div>
           <div class="settings-form-actions">
             <button type="submit" class="btn btn--primary">${t('common.save')}</button>
           </div>
@@ -181,17 +181,17 @@ function renderPage(container, user, refreshFailed) {
         <form id="password-form" class="settings-form">
           <div class="form-group">
             <label class="form-label" for="current-password">${t('settings.currentPasswordLabel')}</label>
-            <input class="form-input" type="password" id="current-password" autocomplete="current-password" required>
+            <input class="form-input" type="password" id="current-password" autocomplete="current-password" aria-describedby="password-error" required>
           </div>
           <div class="form-group">
             <label class="form-label" for="new-password">${t('settings.newPasswordLabel')}</label>
-            <input class="form-input" type="password" id="new-password" autocomplete="new-password" minlength="8" required>
+            <input class="form-input" type="password" id="new-password" autocomplete="new-password" minlength="8" aria-describedby="password-error" required>
           </div>
           <div class="form-group">
             <label class="form-label" for="confirm-password">${t('settings.confirmPasswordLabel')}</label>
-            <input class="form-input" type="password" id="confirm-password" autocomplete="new-password" minlength="8" required>
+            <input class="form-input" type="password" id="confirm-password" autocomplete="new-password" minlength="8" aria-describedby="password-error" required>
           </div>
-          <div id="password-error" class="form-error" hidden></div>
+          <div id="password-error" class="form-error" role="alert" hidden></div>
           <button type="submit" class="btn btn--primary">${t('settings.savePassword')}</button>
         </form>
       </div>

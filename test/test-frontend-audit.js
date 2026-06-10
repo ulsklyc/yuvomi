@@ -189,6 +189,19 @@ test('personal account leaf preserves self-profile, password, and logout contrac
   assert.match(source, /api\.patch\('\/auth\/me\/password',\s*\{\s*current_password:/);
   assert.match(source, /await auth\.logout\(\)/);
   assert.match(source, /window\.oikos\?\.navigate\('\/login'\)/);
+  assert.match(source, /id="profile-avatar-file"[^>]*aria-label=/);
+  assert.match(source, /id="profile-avatar-file"[^>]*tabindex="-1"/);
+  assert.match(source, /id="profile-avatar-file"[^>]*aria-describedby="profile-error"/);
+  assert.match(source, /id="profile-error"[^>]*role="alert"/);
+  assert.match(source, /id="password-error"[^>]*role="alert"/);
+  assert.match(source, /id="profile-display-name"[^>]*aria-describedby="profile-error"/);
+  assert.match(source, /id="profile-phone"[^>]*aria-describedby="profile-error"/);
+  assert.match(source, /id="profile-email"[^>]*aria-describedby="profile-error"/);
+  assert.match(source, /id="profile-birth-date"[^>]*aria-describedby="profile-error"/);
+  assert.match(source, /id="current-password"[^>]*aria-describedby="password-error"/);
+  assert.match(source, /id="new-password"[^>]*aria-describedby="password-error"/);
+  assert.match(source, /id="confirm-password"[^>]*aria-describedby="password-error"/);
+  assert.match(source, /role="alert"[^>]*>\$\{t\('settings\.loadError'\)\}/);
 });
 
 test('personal appearance leaf owns theme, locale, and regional preferences', () => {
@@ -205,6 +218,25 @@ test('personal appearance leaf owns theme, locale, and regional preferences', ()
   assert.match(source, /date_format/);
   assert.match(source, /time_format/);
   assert.match(source, /api\.put\('\/preferences'/);
+  assert.match(source, /function safeStorageGet\(/);
+  assert.match(source, /function safeStorageSet\(/);
+  assert.match(source, /function safeStorageRemove\(/);
+  assert.match(source, /function safeStorageGet[\s\S]*try \{[\s\S]*localStorage\.getItem[\s\S]*catch/);
+  assert.match(source, /function safeStorageSet[\s\S]*try \{[\s\S]*localStorage\.setItem[\s\S]*catch/);
+  assert.match(source, /function safeStorageRemove[\s\S]*try \{[\s\S]*localStorage\.removeItem[\s\S]*catch/);
+  assert.equal([...source.matchAll(/localStorage\.getItem/g)].length, 1);
+  assert.equal([...source.matchAll(/localStorage\.setItem/g)].length, 1);
+  assert.equal([...source.matchAll(/localStorage\.removeItem/g)].length, 1);
+  assert.match(source, /function bindEvents\(container,\s*user\)/);
+  assert.match(source, /await setLocale\(locale\);[\s\S]*await render\(container,\s*\{\s*user\s*\}\)/);
+  assert.match(source, /if \(localeSelect\.isConnected\)\s*localeSelect\.disabled = false/);
+  assert.match(source, /id="locale-error"[^>]*role="alert"/);
+  assert.match(source, /id="date-format-error"[^>]*role="alert"/);
+  assert.match(source, /id="time-format-error"[^>]*role="alert"/);
+  assert.match(source, /id="locale-select"[^>]*aria-describedby="locale-error"/);
+  assert.match(source, /id="date-format-select"[^>]*aria-describedby="date-format-error"/);
+  assert.match(source, /id="time-format-select"[^>]*aria-describedby="time-format-error"/);
+  assert.match(source, /role="alert"[^>]*>\$\{t\('settings\.loadError'\)\}/);
 });
 
 test('personal device leaf owns PWA installation state and disconnect cleanup', () => {
@@ -219,6 +251,12 @@ test('personal device leaf owns PWA installation state and disconnect cleanup', 
   assert.match(source, /!container\.isConnected/);
   assert.match(source, /if \(unsubscribed\) return/);
   assert.match(source, /stopListening\(\)/);
+  assert.match(source, /new MutationObserver\(/);
+  assert.match(source, /observer\.observe\(document\.body \|\| document\.documentElement/);
+  assert.match(source, /observer\?\.disconnect\(\)/);
+  assert.match(source, /id="pwa-install-status"[^>]*aria-live=/);
+  assert.match(source, /id="pwa-install-error"[^>]*role="alert"/);
+  assert.match(source, /id="pwa-install-btn"[^>]*aria-describedby="pwa-install-status pwa-install-error"/);
 });
 
 test('browser loader supports personal settings API and auth imports', () => {
@@ -228,6 +266,10 @@ test('browser loader supports personal settings API and auth imports', () => {
   assert.match(source, /export const auth/);
   assert.match(source, /me:\s*async/);
   assert.match(source, /getUsers:\s*async/);
+  assert.match(source, /'\/utils\/pwa-install\.js'/);
+  assert.match(source, /getPwaInstallState/);
+  assert.match(source, /onPwaInstallStateChanged/);
+  assert.match(source, /promptPwaInstall/);
 });
 
 test('legacy settings page remains available during the leaf migration', () => {
