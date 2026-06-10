@@ -231,3 +231,45 @@ test('GET /:id/preview: nicht-vorschaufähiger DMS-MIME wird mit 415 abgelehnt',
   const res = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/documents/${linked.id}/preview`);
   assert.equal(res.status, 415);
 });
+
+test('POST /push: lädt lokales Dokument hoch, gibt taskId zurück', async () => {
+  session = { userId: adminId, role: 'admin' };
+  const content = Buffer.from('hello').toString('base64');
+  const localId = db.prepare(`INSERT INTO family_documents
+    (name, category, visibility, original_name, mime_type, file_size, content_data, created_by)
+    VALUES ('Brief', 'other', 'family', 'brief.pdf', 'application/pdf', 5, ?, ?)`)
+    .run(content, adminId).lastInsertRowid;
+
+  let uploaded = null;
+  _setAdapterFactory(() => ({ async upload(args) { uploaded = args; return { taskId: 'task-1' }; } }));
+  const accId = (await call('GET', '/accounts')).body.data[0].id;
+  const res = await call('POST', '/push', { account_id: accId, document_id: localId });
+
+  assert.equal(res.status, 202);
+  assert.equal(res.body.data.taskId, 'task-1');
+  assert.equal(uploaded.filename, 'brief.pdf');
+  assert.equal(uploaded.buffer.toString(), 'hello');
+});
+
+test('POST /push: 400 für bereits externes Dokument', async () => {
+  session = { userId: adminId, role: 'admin' };
+  const accId = (await call('GET', '/accounts')).body.data[0].id;
+  const ext = db.prepare(`INSERT INTO family_documents
+    (name, category, visibility, original_name, mime_type, file_size, content_data, storage_provider, storage_key, dms_account_id, created_by)
+    VALUES ('X','other','family','x.pdf','application/pdf',0,'','external','9',?,?)`).run(accId, adminId).lastInsertRowid;
+  const res = await call('POST', '/push', { account_id: accId, document_id: ext });
+  assert.equal(res.status, 400);
+});
+
+test('POST /push: Member bekommt 403', async () => {
+  session = { userId: adminId, role: 'admin' };
+  const content = Buffer.from('x').toString('base64');
+  const localId = db.prepare(`INSERT INTO family_documents
+    (name, category, visibility, original_name, mime_type, file_size, content_data, created_by)
+    VALUES ('M','other','family','m.pdf','application/pdf',1,?,?)`).run(content, adminId).lastInsertRowid;
+  const accId = (await call('GET', '/accounts')).body.data[0].id;
+  session = { userId: memberId, role: 'member' };
+  const res = await call('POST', '/push', { account_id: accId, document_id: localId });
+  assert.equal(res.status, 403);
+  session = { userId: adminId, role: 'admin' };
+});

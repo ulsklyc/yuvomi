@@ -145,4 +145,33 @@ router.post('/link', async (req, res) => {
   }
 });
 
+router.post('/push', async (req, res) => {
+  try {
+    if (!isAdmin(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    const account = getAccount(Number(req.body.account_id));
+    if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404 });
+    const docId = Number(req.body.document_id);
+    const doc = db.get().prepare(`
+      SELECT d.* FROM family_documents d
+      WHERE d.id = @id AND (
+        d.created_by = @userId OR d.visibility = 'family'
+        OR EXISTS (SELECT 1 FROM family_document_access a WHERE a.document_id = d.id AND a.user_id = @userId)
+      )
+    `).get({ id: docId, userId: userId(req) });
+    if (!doc) return res.status(404).json({ error: 'Document not found.', code: 404 });
+    if (doc.storage_provider === 'external') {
+      return res.status(400).json({ error: 'Document is already stored in a DMS.', code: 400 });
+    }
+
+    const buffer = Buffer.from(doc.content_data, 'base64');
+    const out = await adapterFactory(account).upload({
+      buffer, filename: doc.original_name, mime: doc.mime_type, title: doc.name,
+    });
+    res.status(202).json({ data: { taskId: out.taskId } });
+  } catch (err) {
+    log.error('POST /push error:', err);
+    res.status(502).json({ error: 'Failed to upload document to DMS.', code: 502 });
+  }
+});
+
 export default router;
