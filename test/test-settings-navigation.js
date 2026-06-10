@@ -18,12 +18,15 @@ import {
   normalizeModuleOrder,
 } from '../public/settings/module-order.js';
 import {
+  ensureHolidayLayerSelection,
+  isHolidayCountryResolved,
   resolveHolidayLocation,
   runHolidayDiscovery,
   shouldApplySubdivisionResponse,
 } from '../public/settings/pages/modules-calendar.js';
 import {
   persistCurrencySelection,
+  SUPPORTED_CURRENCIES,
 } from '../public/settings/pages/modules-budget.js';
 import {
   isConnectedWeatherControl,
@@ -320,6 +323,30 @@ test('holiday location preserves persisted values until discovery is ready', () 
   });
 });
 
+test('holiday sync enables public holidays when every layer is disabled', () => {
+  assert.deepEqual(ensureHolidayLayerSelection({
+    showPublic: false,
+    showSchool: false,
+  }), {
+    showPublic: true,
+    showSchool: false,
+  });
+  assert.deepEqual(ensureHolidayLayerSelection({
+    showPublic: false,
+    showSchool: true,
+  }), {
+    showPublic: false,
+    showSchool: true,
+  });
+});
+
+test('holiday country remains unresolved until discovery contains the persisted value', () => {
+  assert.equal(isHolidayCountryResolved([], 'DE'), false);
+  assert.equal(isHolidayCountryResolved([{ isoCode: 'AT' }], 'DE'), false);
+  assert.equal(isHolidayCountryResolved([{ isoCode: 'DE' }], 'DE'), true);
+  assert.equal(isHolidayCountryResolved([], null), true);
+});
+
 test('holiday discovery failures stay local to the calendar leaf', async () => {
   const errors = [];
   const result = await runHolidayDiscovery(
@@ -372,6 +399,19 @@ test('Budget persistence restores the previous currency on failure', async () =>
   await assert.rejects(persistence, /save failed/);
   assert.equal(select.value, 'EUR');
   assert.equal(select.disabled, false);
+});
+
+test('Budget currency options match the existing preferences API contract', async () => {
+  const source = await readFile(
+    new URL('../server/routes/preferences.js', import.meta.url),
+    'utf8',
+  );
+  const declaration = source.match(/const VALID_CURRENCIES = \[([^\]]+)\]/);
+  assert.ok(declaration, 'preferences route must declare VALID_CURRENCIES');
+  const backendCurrencies = [...declaration[1].matchAll(/'([A-Z]{3})'/g)]
+    .map((match) => match[1]);
+
+  assert.deepEqual(SUPPORTED_CURRENCIES, backendCurrencies);
 });
 
 test('weather geolocation callbacks only update the active leaf', () => {

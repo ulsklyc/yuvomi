@@ -99,6 +99,22 @@ export function shouldApplySubdivisionResponse({
   return requestId === latestRequestId && requestedCountry === currentCountry;
 }
 
+export function ensureHolidayLayerSelection({ showPublic, showSchool }) {
+  if (!showPublic && !showSchool) {
+    return { showPublic: true, showSchool: false };
+  }
+  return { showPublic, showSchool };
+}
+
+function isHolidayValueResolved(entries, persistedValue) {
+  return !persistedValue ||
+    (Array.isArray(entries) && entries.some((entry) => entry?.isoCode === persistedValue));
+}
+
+export function isHolidayCountryResolved(countries, persistedCountry) {
+  return isHolidayValueResolved(countries, persistedCountry);
+}
+
 export function resolveHolidayLocation({
   countryReady,
   subdivisionReady,
@@ -141,7 +157,7 @@ async function loadSubdivisions(
   noneOption.textContent = t('settings.holidaySubdivisionNone');
   select.replaceChildren(noneOption);
   select.disabled = true;
-  if (!countryCode) return true;
+  if (!countryCode) return { selectedResolved: true };
 
   try {
     const response = await api.get(`/preferences/holidays/subdivisions/${countryCode}`);
@@ -151,13 +167,15 @@ async function loadSubdivisions(
       requestedCountry: countryCode,
       currentCountry: countrySelect.value,
     })) {
-      return false;
+      return null;
     }
 
-    const subdivisions = response?.data ?? [];
+    const subdivisions = Array.isArray(response?.data) ? response.data : [];
     appendOptions(select, subdivisions, selectedCode);
     select.disabled = subdivisions.length === 0;
-    return true;
+    return {
+      selectedResolved: isHolidayValueResolved(subdivisions, selectedCode),
+    };
   } catch (error) {
     if (shouldApplySubdivisionResponse({
       requestId,
@@ -167,7 +185,7 @@ async function loadSubdivisions(
     })) {
       throw error;
     }
-    return false;
+    return null;
   }
 }
 
@@ -231,6 +249,7 @@ async function bindEvents(container, preferences) {
   countrySelect.addEventListener('change', async () => {
     errorElement.hidden = true;
     const countryCode = countrySelect.value;
+    discoveryState.countryReady = true;
     discoveryState.subdivisionReady = false;
     updateSyncState();
     const result = await runHolidayDiscovery(
@@ -243,7 +262,9 @@ async function bindEvents(container, preferences) {
       ),
       showDiscoveryError,
     );
-    if (result.ok && result.value) discoveryState.subdivisionReady = true;
+    if (result.ok && result.value) {
+      discoveryState.subdivisionReady = result.value.selectedResolved;
+    }
     updateSyncState();
   });
 
@@ -277,17 +298,22 @@ async function bindEvents(container, preferences) {
   });
 
   syncButton.addEventListener('click', async () => {
-    const preferenceData = holidayPreferenceData(container, discoveryState);
-    if (!preferenceData.holiday_country) {
+    const currentPreferenceData = holidayPreferenceData(container, discoveryState);
+    if (!currentPreferenceData.holiday_country) {
       window.oikos?.showToast(t('settings.holidayCountryRequired'), 'warning');
       return;
     }
 
-    if (!showPublic.checked && !showSchool.checked) {
-      showPublic.checked = true;
-      publicColorGroup.hidden = false;
-    }
+    const layerSelection = ensureHolidayLayerSelection({
+      showPublic: showPublic.checked,
+      showSchool: showSchool.checked,
+    });
+    showPublic.checked = layerSelection.showPublic;
+    showSchool.checked = layerSelection.showSchool;
+    publicColorGroup.hidden = !layerSelection.showPublic;
+    schoolColorGroup.hidden = !layerSelection.showSchool;
 
+    const preferenceData = holidayPreferenceData(container, discoveryState);
     syncButton.disabled = true;
     try {
       await api.put('/preferences', {
@@ -319,17 +345,23 @@ async function bindEvents(container, preferences) {
   );
   if (!countriesResult.ok || !container.isConnected) return;
 
+  const countries = Array.isArray(countriesResult.value?.data)
+    ? countriesResult.value.data
+    : [];
   appendOptions(
     countrySelect,
-    countriesResult.value?.data ?? [],
+    countries,
     preferences.holiday_country || '',
   );
   countrySelect.disabled = false;
-  discoveryState.countryReady = true;
+  discoveryState.countryReady = isHolidayCountryResolved(
+    countries,
+    preferences.holiday_country,
+  );
 
   if (!preferences.holiday_country) {
     discoveryState.subdivisionReady = true;
-  } else {
+  } else if (discoveryState.countryReady) {
     const subdivisionsResult = await runHolidayDiscovery(
       () => loadSubdivisions(
         subdivisionSelect,
@@ -341,7 +373,7 @@ async function bindEvents(container, preferences) {
       showDiscoveryError,
     );
     if (subdivisionsResult.ok && subdivisionsResult.value) {
-      discoveryState.subdivisionReady = true;
+      discoveryState.subdivisionReady = subdivisionsResult.value.selectedResolved;
     }
   }
   updateSyncState();

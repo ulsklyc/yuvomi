@@ -1,10 +1,9 @@
 import { api } from '/api.js';
 import { getLocale, t } from '/i18n.js';
 
-const SUPPORTED_CURRENCIES = [
+export const SUPPORTED_CURRENCIES = [
   'AED', 'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'HUF',
   'INR', 'JPY', 'KZT', 'NOK', 'PLN', 'RUB', 'SAR', 'SEK', 'TRY', 'UAH', 'USD',
-  'VND',
 ];
 
 export async function persistCurrencySelection(select, previousCurrency, save) {
