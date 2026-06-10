@@ -18,6 +18,22 @@ const router = express.Router();
 const CATEGORIES = ['medical', 'school', 'identity', 'insurance', 'finance', 'home', 'vehicle', 'legal', 'travel', 'pets', 'warranty', 'taxes', 'work', 'other'];
 const VISIBILITIES = ['family', 'restricted', 'private'];
 
+// Bestmögliche MIME-Ableitung aus der DMS-Dateiendung beim Verlinken. Der echte
+// Content-Type wird ohnehin beim Preview/Download live aus dem DMS geliefert; dieser
+// Wert steuert nur Listen-Icon/Viewer-Renderer. Unbekannt → octet-stream (Download-only).
+function mimeFromFilename(filename) {
+  const ext = String(filename || '').toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  const map = {
+    pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    webp: 'image/webp', txt: 'text/plain', csv: 'text/csv',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  };
+  return map[ext] || 'application/octet-stream';
+}
+
 function userId(req) { return req.authUserId || req.session?.userId; }
 function isAdmin(req) { return req.authRole === 'admin' || req.session?.role === 'admin'; }
 
@@ -133,8 +149,8 @@ router.post('/link', async (req, res) => {
       INSERT INTO family_documents
         (name, category, visibility, original_name, mime_type, file_size, content_data,
          storage_provider, storage_key, dms_account_id, external_url, external_meta, created_by)
-      VALUES (?, ?, ?, ?, 'application/pdf', 0, '', 'external', ?, ?, ?, ?, ?)
-    `).run(doc.title, category, visibility, doc.filename, dmsId, account.id, doc.url, meta, userId(req));
+      VALUES (?, ?, ?, ?, ?, 0, '', 'external', ?, ?, ?, ?, ?)
+    `).run(doc.title, category, visibility, doc.filename, mimeFromFilename(doc.filename), dmsId, account.id, doc.url, meta, userId(req));
 
     const row = db.get().prepare('SELECT * FROM family_documents WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json({ data: row });

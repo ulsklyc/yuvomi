@@ -274,6 +274,28 @@ test('POST /push: Member bekommt 403', async () => {
   session = { userId: adminId, role: 'admin' };
 });
 
+test('DELETE account: verlinktes Dokument verliert dms_account_id (SET NULL) und Preview wird 404', async () => {
+  session = { userId: adminId, role: 'admin' };
+  // Eigener Account, damit andere Tests unberührt bleiben.
+  const acc = (await call('POST', '/accounts', {
+    provider: 'paperless', name: 'DelDMS', base_url: 'https://del.example.com', api_token: 'tok',
+  })).body.data;
+  _setAdapterFactory(() => ({
+    async getDocument(id) { return { id, title: 'Wird verwaist', filename: 'orphan.pdf', url: `https://del/d/${id}`, correspondent: null, tags: [] }; },
+  }));
+  const linked = (await call('POST', '/link', { account_id: acc.id, dms_document_id: '4242' })).body.data;
+
+  // Account löschen → FK ON DELETE SET NULL
+  assert.equal((await call('DELETE', `/accounts/${acc.id}`)).status, 204);
+  const row = db.prepare('SELECT dms_account_id, storage_provider FROM family_documents WHERE id = ?').get(linked.id);
+  assert.equal(row.dms_account_id, null);
+  assert.equal(row.storage_provider, 'external');
+
+  // Preview kann den Inhalt nicht mehr proxen → 404 statt Crash
+  const res = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/documents/${linked.id}/preview`);
+  assert.equal(res.status, 404);
+});
+
 // Server schließen, damit der offene Listener die Event-Loop nicht offen hält
 // (sonst beendet sich `node --test` nie). Gleiches Muster wie in test-documents.js.
 test.after(() => server.close());
