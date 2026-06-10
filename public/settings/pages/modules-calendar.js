@@ -115,6 +115,10 @@ export function isHolidayCountryResolved(countries, persistedCountry) {
   return isHolidayValueResolved(countries, persistedCountry);
 }
 
+export function applyHolidaySubdivisionSelection(discoveryState) {
+  discoveryState.subdivisionReady = true;
+}
+
 export function resolveHolidayLocation({
   countryReady,
   subdivisionReady,
@@ -265,6 +269,11 @@ async function bindEvents(container, preferences) {
     if (result.ok && result.value) {
       discoveryState.subdivisionReady = result.value.selectedResolved;
     }
+    updateSyncState();
+  });
+
+  subdivisionSelect.addEventListener('change', () => {
+    applyHolidaySubdivisionSelection(discoveryState);
     updateSyncState();
   });
 

@@ -18,6 +18,7 @@ import {
   normalizeModuleOrder,
 } from '../public/settings/module-order.js';
 import {
+  applyHolidaySubdivisionSelection,
   ensureHolidayLayerSelection,
   isHolidayCountryResolved,
   resolveHolidayLocation,
@@ -345,6 +346,42 @@ test('holiday country remains unresolved until discovery contains the persisted 
   assert.equal(isHolidayCountryResolved([{ isoCode: 'AT' }], 'DE'), false);
   assert.equal(isHolidayCountryResolved([{ isoCode: 'DE' }], 'DE'), true);
   assert.equal(isHolidayCountryResolved([], null), true);
+});
+
+test('holiday subdivision replacement resolves an incomplete discovery selection', () => {
+  const discoveryState = {
+    countryReady: true,
+    subdivisionReady: false,
+    persistedCountry: 'DE',
+    persistedSubdivision: 'DE-BY',
+  };
+  assert.deepEqual(resolveHolidayLocation({
+    ...discoveryState,
+    selectedCountry: 'DE',
+    selectedSubdivision: 'DE-HE',
+  }), {
+    country: 'DE',
+    subdivision: 'DE-BY',
+  });
+
+  applyHolidaySubdivisionSelection(discoveryState);
+
+  assert.deepEqual(resolveHolidayLocation({
+    ...discoveryState,
+    selectedCountry: 'DE',
+    selectedSubdivision: 'DE-HE',
+  }), {
+    country: 'DE',
+    subdivision: 'DE-HE',
+  });
+  assert.deepEqual(resolveHolidayLocation({
+    ...discoveryState,
+    selectedCountry: 'DE',
+    selectedSubdivision: '',
+  }), {
+    country: 'DE',
+    subdivision: null,
+  });
 });
 
 test('holiday discovery failures stay local to the calendar leaf', async () => {
