@@ -1305,7 +1305,7 @@
     "pageNavigation": "Navigace",
     "pageNavigationDescription": "Výběr viditelných modulů a jejich pořadí.",
     "pageKitchen": "Kuchyně",
-    "pageKitchenDescription": "Nastavení jídel, receptů a nákupních kategorií.",
+    "pageKitchenDescription": "Zde vyberte viditelné typy jídel. Recepty a nákupní kategorie spravujte v modulech Recepty a Nákupy.",
     "pageCalendarModule": "Kalendář",
     "pageCalendarModuleDescription": "Nastavení svátků a chování kalendáře.",
     "pageBudgetModule": "Rozpočet",

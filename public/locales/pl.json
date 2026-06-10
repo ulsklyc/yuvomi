@@ -1311,7 +1311,7 @@
     "pageNavigation": "Nawigacja",
     "pageNavigationDescription": "Wybierz widoczne moduły i ustaw ich kolejność.",
     "pageKitchen": "Kuchnia",
-    "pageKitchenDescription": "Skonfiguruj posiłki, przepisy i kategorie zakupów.",
+    "pageKitchenDescription": "Tutaj wybierz widoczne typy posiłków. Przepisy i kategorie zakupów zarządzaj w modułach Przepisy i Zakupy.",
     "pageCalendarModule": "Kalendarz",
     "pageCalendarModuleDescription": "Ustaw święta i działanie modułu kalendarza.",
     "pageBudgetModule": "Budżet",

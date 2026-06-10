@@ -1305,7 +1305,7 @@
     "pageNavigation": "नेविगेशन",
     "pageNavigationDescription": "दिखने वाले मॉड्यूल चुनें और उनका क्रम तय करें।",
     "pageKitchen": "रसोई",
-    "pageKitchenDescription": "भोजन, रेसिपी और खरीदारी श्रेणियाँ सेट करें।",
+    "pageKitchenDescription": "यहाँ दिखाई देने वाले भोजन प्रकार चुनें। रेसिपी और खरीदारी श्रेणियाँ रेसिपी और खरीदारी मॉड्यूल में प्रबंधित करें।",
     "pageCalendarModule": "कैलेंडर",
     "pageCalendarModuleDescription": "छुट्टियाँ और कैलेंडर का व्यवहार सेट करें।",
     "pageBudgetModule": "बजट",

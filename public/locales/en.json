@@ -1305,7 +1305,7 @@
     "pageNavigation": "Navigation",
     "pageNavigationDescription": "Choose visible modules and arrange their order.",
     "pageKitchen": "Kitchen",
-    "pageKitchenDescription": "Configure meals, recipes, and shopping categories.",
+    "pageKitchenDescription": "Choose visible meal types here. Manage recipes and shopping categories in the Recipes and Shopping modules.",
     "pageCalendarModule": "Calendar",
     "pageCalendarModuleDescription": "Set holidays and calendar module behavior.",
     "pageBudgetModule": "Budget",

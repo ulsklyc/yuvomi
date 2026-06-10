@@ -1305,7 +1305,7 @@
     "pageNavigation": "ナビゲーション",
     "pageNavigationDescription": "表示するモジュールと順序を設定します。",
     "pageKitchen": "キッチン",
-    "pageKitchenDescription": "食事、レシピ、買い物カテゴリを設定します。",
+    "pageKitchenDescription": "ここでは表示する食事タイプを選択します。レシピと買い物カテゴリは「レシピ」と「買い物」モジュールで管理します。",
     "pageCalendarModule": "カレンダー",
     "pageCalendarModuleDescription": "祝日とカレンダーの動作を設定します。",
     "pageBudgetModule": "予算",

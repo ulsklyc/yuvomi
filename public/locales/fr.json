@@ -1305,7 +1305,7 @@
     "pageNavigation": "Navigation",
     "pageNavigationDescription": "Choisissez les modules visibles et leur ordre.",
     "pageKitchen": "Cuisine",
-    "pageKitchenDescription": "Configurez les repas, recettes et catégories de courses.",
+    "pageKitchenDescription": "Choisissez ici les types de repas visibles. Gérez les recettes et les catégories de courses dans les modules Recettes et Courses.",
     "pageCalendarModule": "Calendrier",
     "pageCalendarModuleDescription": "Réglez les jours fériés et le comportement du calendrier.",
     "pageBudgetModule": "Budget",

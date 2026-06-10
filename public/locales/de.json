@@ -1311,7 +1311,7 @@
     "pageNavigation": "Navigation",
     "pageNavigationDescription": "Sichtbare Module auswählen und ihre Reihenfolge festlegen.",
     "pageKitchen": "Küche",
-    "pageKitchenDescription": "Mahlzeiten, Rezepte und Einkaufskategorien konfigurieren.",
+    "pageKitchenDescription": "Hier sichtbare Mahlzeitentypen auswählen. Rezepte und Einkaufskategorien werden in den Modulen Rezepte und Einkauf verwaltet.",
     "pageCalendarModule": "Kalender",
     "pageCalendarModuleDescription": "Feiertage und das Verhalten des Kalendermoduls festlegen.",
     "pageBudgetModule": "Budget",

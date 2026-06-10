@@ -1305,7 +1305,7 @@
     "pageNavigation": "Навигация",
     "pageNavigationDescription": "Выбор видимых модулей и порядка их отображения.",
     "pageKitchen": "Кухня",
-    "pageKitchenDescription": "Настройка блюд, рецептов и категорий покупок.",
+    "pageKitchenDescription": "Здесь выберите видимые типы приёмов пищи. Рецепты и категории покупок настраиваются в модулях «Рецепты» и «Покупки».",
     "pageCalendarModule": "Календарь",
     "pageCalendarModuleDescription": "Настройка праздников и поведения календаря.",
     "pageBudgetModule": "Бюджет",

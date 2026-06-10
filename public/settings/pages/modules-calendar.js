@@ -1,0 +1,229 @@
+import { api } from '/api.js';
+import { formatDate, formatTime, t } from '/i18n.js';
+import { esc } from '/utils/html.js';
+
+const DEFAULT_PUBLIC_COLOR = '#FF3B30';
+const DEFAULT_SCHOOL_COLOR = '#34C759';
+
+function formatSyncTime(value) {
+  if (!value) return t('settings.holidayNeverSynced');
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return t('settings.holidayNeverSynced');
+  return t('settings.holidayLastSync', {
+    date: `${formatDate(date)} ${formatTime(date)}`.trim(),
+  });
+}
+
+function renderPage(container, preferences) {
+  container.replaceChildren();
+  container.insertAdjacentHTML('beforeend', `
+    <header class="settings-leaf-header">
+      <h1 class="settings-leaf-header__title">${t('settings.pageCalendarModule')}</h1>
+      <p class="settings-leaf-header__description">${t('settings.pageCalendarModuleDescription')}</p>
+    </header>
+
+    <section class="settings-section">
+      <h2 class="settings-section__title">${t('settings.sectionHolidays')}</h2>
+      <div class="settings-card">
+        <h3 class="settings-card__title">${t('settings.holidayTitle')}</h3>
+        <p class="settings-card-description">${t('settings.holidayDescription')}</p>
+
+        <form class="settings-form settings-form--compact" id="holidays-form" novalidate autocomplete="off">
+          <div class="form-group">
+            <label class="form-label" for="holiday-country">${t('settings.holidayCountryLabel')}</label>
+            <select class="form-input" id="holiday-country">
+              <option value="">${t('settings.holidayCountryPlaceholder')}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="holiday-subdivision">${t('settings.holidaySubdivisionLabel')}</label>
+            <select class="form-input" id="holiday-subdivision" disabled>
+              <option value="">${t('settings.holidaySubdivisionNone')}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="toggle-row">
+              <input type="checkbox" id="holiday-show-public"${preferences.holiday_show_public ? ' checked' : ''}>
+              <span>${t('settings.holidayPublicLabel')}</span>
+            </label>
+          </div>
+          <div class="form-group" id="holiday-public-color-group"${preferences.holiday_show_public ? '' : ' hidden'}>
+            <label class="form-label" for="holiday-public-color">${t('settings.holidayPublicColor')}</label>
+            <input class="form-input" type="color" id="holiday-public-color"
+              value="${esc(preferences.holiday_public_color || DEFAULT_PUBLIC_COLOR)}">
+          </div>
+          <div class="form-group">
+            <label class="toggle-row">
+              <input type="checkbox" id="holiday-show-school"${preferences.holiday_show_school ? ' checked' : ''}>
+              <span>${t('settings.holidaySchoolLabel')}</span>
+            </label>
+          </div>
+          <div class="form-group" id="holiday-school-color-group"${preferences.holiday_show_school ? '' : ' hidden'}>
+            <label class="form-label" for="holiday-school-color">${t('settings.holidaySchoolColor')}</label>
+            <input class="form-input" type="color" id="holiday-school-color"
+              value="${esc(preferences.holiday_school_color || DEFAULT_SCHOOL_COLOR)}">
+          </div>
+          <div id="holidays-form-error" class="form-error" role="alert" hidden></div>
+          <div class="settings-form-actions">
+            <button type="submit" class="btn btn--primary">${t('settings.holidaySaveBtn')}</button>
+          </div>
+        </form>
+
+        <div class="settings-sync-info">
+          <span class="form-label" id="holiday-last-sync-label">
+            ${formatSyncTime(preferences.holiday_last_sync)}
+          </span>
+          <button type="button" class="btn btn--secondary btn--sm" id="holiday-sync-btn">
+            <i data-lucide="refresh-cw" aria-hidden="true"></i>
+            ${t('settings.holidaySyncBtn')}
+          </button>
+        </div>
+      </div>
+    </section>
+  `);
+}
+
+function appendOptions(select, entries, selectedCode) {
+  for (const entry of entries) {
+    const option = document.createElement('option');
+    option.value = entry.isoCode;
+    option.textContent = entry.name;
+    option.selected = entry.isoCode === selectedCode;
+    select.appendChild(option);
+  }
+}
+
+async function loadSubdivisions(select, countryCode, selectedCode = '') {
+  const noneOption = document.createElement('option');
+  noneOption.value = '';
+  noneOption.textContent = t('settings.holidaySubdivisionNone');
+  select.replaceChildren(noneOption);
+  select.disabled = true;
+  if (!countryCode) return;
+
+  const response = await api.get(`/preferences/holidays/subdivisions/${countryCode}`);
+  const subdivisions = response?.data ?? [];
+  appendOptions(select, subdivisions, selectedCode);
+  select.disabled = subdivisions.length === 0;
+}
+
+function holidayPreferenceData(container) {
+  return {
+    holiday_country: container.querySelector('#holiday-country')?.value || null,
+    holiday_subdivision: container.querySelector('#holiday-subdivision')?.value || null,
+    holiday_show_public: container.querySelector('#holiday-show-public')?.checked ?? false,
+    holiday_show_school: container.querySelector('#holiday-show-school')?.checked ?? false,
+    holiday_public_color: container.querySelector('#holiday-public-color')?.value || DEFAULT_PUBLIC_COLOR,
+    holiday_school_color: container.querySelector('#holiday-school-color')?.value || DEFAULT_SCHOOL_COLOR,
+  };
+}
+
+async function bindEvents(container, preferences) {
+  const form = container.querySelector('#holidays-form');
+  const countrySelect = container.querySelector('#holiday-country');
+  const subdivisionSelect = container.querySelector('#holiday-subdivision');
+  const showPublic = container.querySelector('#holiday-show-public');
+  const showSchool = container.querySelector('#holiday-show-school');
+  const publicColorGroup = container.querySelector('#holiday-public-color-group');
+  const schoolColorGroup = container.querySelector('#holiday-school-color-group');
+  const syncButton = container.querySelector('#holiday-sync-btn');
+  const errorElement = container.querySelector('#holidays-form-error');
+
+  const countriesResponse = await api.get('/preferences/holidays/countries');
+  appendOptions(countrySelect, countriesResponse?.data ?? [], preferences.holiday_country || '');
+  if (preferences.holiday_country) {
+    await loadSubdivisions(
+      subdivisionSelect,
+      preferences.holiday_country,
+      preferences.holiday_subdivision || '',
+    );
+  }
+
+  const updateSyncState = () => {
+    syncButton.disabled = !countrySelect.value;
+    syncButton.title = countrySelect.value ? '' : t('settings.holidayCountryRequired');
+  };
+  updateSyncState();
+
+  countrySelect.addEventListener('change', async () => {
+    errorElement.hidden = true;
+    try {
+      await loadSubdivisions(subdivisionSelect, countrySelect.value);
+    } catch (error) {
+      errorElement.textContent = error.message || t('common.errorGeneric');
+      errorElement.hidden = false;
+    }
+    updateSyncState();
+  });
+
+  showPublic.addEventListener('change', () => {
+    publicColorGroup.hidden = !showPublic.checked;
+  });
+  showSchool.addEventListener('change', () => {
+    schoolColorGroup.hidden = !showSchool.checked;
+  });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    errorElement.hidden = true;
+    try {
+      const preferenceData = holidayPreferenceData(container);
+      await api.put('/preferences', {
+        holiday_country: preferenceData.holiday_country,
+        holiday_subdivision: preferenceData.holiday_subdivision,
+        holiday_show_public: preferenceData.holiday_show_public,
+        holiday_show_school: preferenceData.holiday_show_school,
+        holiday_public_color: preferenceData.holiday_public_color,
+        holiday_school_color: preferenceData.holiday_school_color,
+      });
+      window.oikos?.showToast(t('settings.holidaySaved'), 'success');
+    } catch (error) {
+      errorElement.textContent = error.message || t('common.errorGeneric');
+      errorElement.hidden = false;
+    }
+  });
+
+  syncButton.addEventListener('click', async () => {
+    if (!countrySelect.value) {
+      window.oikos?.showToast(t('settings.holidayCountryRequired'), 'warning');
+      return;
+    }
+
+    if (!showPublic.checked && !showSchool.checked) {
+      showPublic.checked = true;
+      publicColorGroup.hidden = false;
+    }
+
+    syncButton.disabled = true;
+    try {
+      const preferenceData = holidayPreferenceData(container);
+      await api.put('/preferences', {
+        holiday_country: preferenceData.holiday_country,
+        holiday_subdivision: preferenceData.holiday_subdivision,
+        holiday_show_public: preferenceData.holiday_show_public,
+        holiday_show_school: preferenceData.holiday_show_school,
+        holiday_public_color: preferenceData.holiday_public_color,
+        holiday_school_color: preferenceData.holiday_school_color,
+      });
+      const response = await api.post('/preferences/holidays/sync', {});
+      const lastSyncLabel = container.querySelector('#holiday-last-sync-label');
+      if (lastSyncLabel && response?.data?.last_sync) {
+        lastSyncLabel.textContent = formatSyncTime(response.data.last_sync);
+      }
+      window.oikos?.showToast(t('settings.holidaySynced'), 'success');
+    } catch (error) {
+      window.oikos?.showToast(error.message || t('settings.holidaySyncError'), 'danger');
+    } finally {
+      updateSyncState();
+    }
+  });
+}
+
+export async function render(container, { user }) {
+  void user;
+  const response = await api.get('/preferences');
+  const preferences = response?.data ?? {};
+  renderPage(container, preferences);
+  await bindEvents(container, preferences);
+  window.lucide?.createIcons({ el: container });
+}

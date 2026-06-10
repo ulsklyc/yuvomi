@@ -1305,7 +1305,7 @@
     "pageNavigation": "Navigering",
     "pageNavigationDescription": "Välj synliga moduler och ordna deras följd.",
     "pageKitchen": "Kök",
-    "pageKitchenDescription": "Ställ in måltider, recept och inköpskategorier.",
+    "pageKitchenDescription": "Välj synliga måltidstyper här. Hantera recept och inköpskategorier i modulerna Recept och Inköp.",
     "pageCalendarModule": "Kalender",
     "pageCalendarModuleDescription": "Ställ in helgdagar och kalenderns beteende.",
     "pageBudgetModule": "Budget",

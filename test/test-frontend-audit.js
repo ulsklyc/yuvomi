@@ -259,6 +259,170 @@ test('personal device leaf owns PWA installation state and disconnect cleanup', 
   assert.match(source, /id="pwa-install-btn"[^>]*aria-describedby="pwa-install-status pwa-install-error"/);
 });
 
+test('module-specific settings leaves exist and export async render functions', () => {
+  const files = [
+    '../public/settings/pages/modules-kitchen.js',
+    '../public/settings/pages/modules-calendar.js',
+    '../public/settings/pages/modules-budget.js',
+    '../public/settings/pages/modules-housekeeping.js',
+    '../public/settings/pages/modules-dashboard.js',
+  ];
+
+  for (const file of files) {
+    assert.equal(existsSync(new URL(file, import.meta.url)), true, `${file} must exist`);
+    const source = read(file);
+    assert.match(source, /export async function render\(container,\s*\{\s*user\s*\}\)/);
+    assert.doesNotMatch(source, /\.innerHTML\s*=/, `${file} must not assign innerHTML`);
+    assert.doesNotMatch(source, /\bfetch\(/, `${file} must use the shared API client`);
+  }
+});
+
+test('module-specific settings leaves only reference their owned preferences and endpoints', () => {
+  const ownership = {
+    '../public/settings/pages/modules-kitchen.js': {
+      endpoints: ['/preferences'],
+      preferences: ['visible_meal_types'],
+    },
+    '../public/settings/pages/modules-calendar.js': {
+      endpoints: [
+        '/preferences',
+        '/preferences/holidays/countries',
+        '/preferences/holidays/subdivisions/',
+        '/preferences/holidays/sync',
+      ],
+      preferences: [
+        'holiday_country',
+        'holiday_subdivision',
+        'holiday_show_public',
+        'holiday_show_school',
+        'holiday_public_color',
+        'holiday_school_color',
+        'holiday_last_sync',
+      ],
+    },
+    '../public/settings/pages/modules-budget.js': {
+      endpoints: ['/preferences'],
+      preferences: ['currency'],
+    },
+    '../public/settings/pages/modules-housekeeping.js': {
+      endpoints: ['/preferences'],
+      preferences: ['housekeeping_payment_tasks'],
+    },
+    '../public/settings/pages/modules-dashboard.js': {
+      endpoints: ['/preferences'],
+      preferences: [
+        'app_name',
+        'weather_provider',
+        'weather_lat',
+        'weather_lon',
+        'weather_city',
+        'weather_units',
+      ],
+    },
+  };
+
+  for (const [file, approved] of Object.entries(ownership)) {
+    const source = read(file);
+    const endpoints = [
+      ...source.matchAll(/\bapi\.(?:get|put|post|patch|delete)\(\s*`([^`$]*)/g),
+      ...source.matchAll(/\bapi\.(?:get|put|post|patch|delete)\(\s*['"]([^'"]+)/g),
+    ].map((match) => match[1]);
+    const preferenceKeys = new Set(
+      [...source.matchAll(/\b(?:preferences|preferenceData)\.([a-z][a-z0-9_]*)/g)]
+        .map((match) => match[1]),
+    );
+    for (const match of source.matchAll(/api\.put\(\s*['"]\/preferences['"]\s*,\s*\{([\s\S]*?)\}\s*\)/g)) {
+      for (const keyMatch of match[1].matchAll(/\b([a-z][a-z0-9_]*)\s*:/g)) {
+        preferenceKeys.add(keyMatch[1]);
+      }
+    }
+
+    assert.deepEqual(
+      [...new Set(endpoints)].sort(),
+      [...approved.endpoints].sort(),
+      `${file} must only call its approved endpoints`,
+    );
+    assert.deepEqual(
+      [...preferenceKeys].sort(),
+      [...approved.preferences].sort(),
+      `${file} must only reference its owned preference keys`,
+    );
+  }
+});
+
+test('module-specific settings leaves preserve their required controls and behaviors', () => {
+  const kitchen = read('../public/settings/pages/modules-kitchen.js');
+  assert.match(kitchen, /const MEAL_TYPES = \['breakfast', 'lunch', 'dinner', 'snack'\]/);
+  assert.match(kitchen, /await api\.get\('\/preferences'\)/);
+  assert.match(kitchen, /api\.put\('\/preferences', \{ visible_meal_types: checkedMealTypes \}\)/);
+  assert.match(kitchen, /MEAL_TYPES\.map\(/);
+  assert.doesNotMatch(kitchen, /\/(?:recipes|shopping)|shopping\/categories|recipe_settings|shopping_settings/);
+
+  const calendar = read('../public/settings/pages/modules-calendar.js');
+  for (const id of [
+    'holiday-country',
+    'holiday-subdivision',
+    'holiday-show-public',
+    'holiday-public-color',
+    'holiday-show-school',
+    'holiday-school-color',
+    'holiday-sync-btn',
+  ]) {
+    assert.match(calendar, new RegExp(`id="${id}"`));
+  }
+  assert.match(calendar, /api\.get\('\/preferences\/holidays\/countries'\)/);
+  assert.match(calendar, /api\.get\(`\/preferences\/holidays\/subdivisions\/\$\{countryCode\}`\)/);
+  assert.match(calendar, /api\.post\('\/preferences\/holidays\/sync', \{\}\)/);
+  assert.doesNotMatch(calendar, /caldav|carddav|google|apple|subscriptions|sync accounts/i);
+
+  const budget = read('../public/settings/pages/modules-budget.js');
+  assert.match(budget, /id="currency-select"/);
+  assert.match(budget, /api\.put\('\/preferences', \{ currency: currencySelect\.value \}\)/);
+  assert.equal([...budget.matchAll(/<(?:input|select|textarea)\b/g)].length, 1);
+
+  const housekeeping = read('../public/settings/pages/modules-housekeeping.js');
+  assert.match(housekeeping, /id="housekeeping-payment-tasks"/);
+  assert.match(
+    housekeeping,
+    /api\.put\('\/preferences', \{ housekeeping_payment_tasks: toggle\.checked \}\)/,
+  );
+  assert.equal([...housekeeping.matchAll(/<(?:input|select|textarea)\b/g)].length, 1);
+
+  const dashboard = read('../public/settings/pages/modules-dashboard.js');
+  for (const id of [
+    'weather-lat',
+    'weather-lon',
+    'weather-city',
+    'weather-units',
+    'app-name-input',
+  ]) {
+    assert.match(dashboard, new RegExp(`id="${id}"`));
+  }
+  assert.match(dashboard, /weather_provider: 'open-meteo'/);
+  assert.match(dashboard, /weather_provider: null/);
+  assert.match(dashboard, /latitude >= -90/);
+  assert.match(dashboard, /latitude <= 90/);
+  assert.match(dashboard, /longitude >= -180/);
+  assert.match(dashboard, /longitude <= 180/);
+  assert.match(dashboard, /localStorage\.setItem\(key, value\)/);
+  assert.match(dashboard, /localStorage\.removeItem\(key\)/);
+  assert.match(dashboard, /new CustomEvent\('app-name-changed'/);
+  assert.match(dashboard, /window\.oikos\?\.showToast/);
+  assert.match(dashboard, /await render\(container, \{ user \}\)/);
+});
+
+test('Kitchen settings copy directs Recipes and Shopping content settings to their modules', () => {
+  const english = JSON.parse(read('../public/locales/en.json'));
+  const german = JSON.parse(read('../public/locales/de.json'));
+
+  assert.match(english.settings.pageKitchenDescription, /Recipes/);
+  assert.match(english.settings.pageKitchenDescription, /Shopping/);
+  assert.match(english.settings.pageKitchenDescription, /modules/);
+  assert.match(german.settings.pageKitchenDescription, /Rezepte/);
+  assert.match(german.settings.pageKitchenDescription, /Einkauf/);
+  assert.match(german.settings.pageKitchenDescription, /Modulen/);
+});
+
 test('browser loader supports personal settings API and auth imports', () => {
   const source = read('./test-browser-loader.mjs');
 

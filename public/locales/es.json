@@ -1305,7 +1305,7 @@
     "pageNavigation": "Navegación",
     "pageNavigationDescription": "Elige los módulos visibles y ordena su posición.",
     "pageKitchen": "Cocina",
-    "pageKitchenDescription": "Configura comidas, recetas y categorías de compra.",
+    "pageKitchenDescription": "Elige aquí los tipos de comida visibles. Gestiona las recetas y las categorías de compra en los módulos Recetas y Compras.",
     "pageCalendarModule": "Calendario",
     "pageCalendarModuleDescription": "Configura festivos y el comportamiento del calendario.",
     "pageBudgetModule": "Presupuesto",

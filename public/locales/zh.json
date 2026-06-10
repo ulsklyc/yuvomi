@@ -1305,7 +1305,7 @@
     "pageNavigation": "导航",
     "pageNavigationDescription": "选择可见模块并调整显示顺序。",
     "pageKitchen": "厨房",
-    "pageKitchenDescription": "设置餐食、食谱和购物分类。",
+    "pageKitchenDescription": "在此选择要显示的餐食类型。食谱和购物分类请在“食谱”和“购物”模块中管理。",
     "pageCalendarModule": "日历",
     "pageCalendarModuleDescription": "设置节假日和日历模块行为。",
     "pageBudgetModule": "预算",
