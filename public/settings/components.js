@@ -1,5 +1,7 @@
 import { t } from '/i18n.js';
 
+let settingRowIdCounter = 0;
+
 function appendContent(container, content) {
   if (content == null) return;
   if (typeof content === 'object' && typeof content.nodeType === 'number') {
@@ -50,22 +52,41 @@ export function createDisclosure({
 }
 
 export function createSettingRow({ label, description, control }) {
+  const rowId = `settings-setting-row-${++settingRowIdCounter}`;
+  const formControl = control?.matches?.('input, select, textarea, button')
+    ? control
+    : control?.querySelector?.('input, select, textarea, button') ?? null;
+
+  if (formControl && !formControl.id) {
+    formControl.id = `${rowId}-control`;
+  }
+
   const row = document.createElement('div');
   row.className = 'settings-setting-row';
 
   const copy = document.createElement('div');
   copy.className = 'settings-setting-row__copy';
 
-  const title = document.createElement('div');
+  const title = document.createElement(formControl ? 'label' : 'div');
   title.className = 'settings-setting-row__label';
   title.textContent = String(label ?? '');
+  if (formControl) title.htmlFor = formControl.id;
   copy.appendChild(title);
 
   if (description) {
     const detail = document.createElement('p');
+    detail.id = `${rowId}-description`;
     detail.className = 'settings-setting-row__description';
     detail.textContent = String(description);
     copy.appendChild(detail);
+
+    if (formControl) {
+      const describedBy = (formControl.getAttribute('aria-describedby') ?? '')
+        .split(/\s+/)
+        .filter(Boolean);
+      if (!describedBy.includes(detail.id)) describedBy.push(detail.id);
+      formControl.setAttribute('aria-describedby', describedBy.join(' '));
+    }
   }
 
   const controlContainer = document.createElement('div');

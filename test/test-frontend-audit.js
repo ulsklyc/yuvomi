@@ -183,12 +183,47 @@ test('settings disclosure exposes its expanded state and controlled panel', () =
   assert.match(source, /aria-controls/);
 });
 
+test('settings rows programmatically label form controls and preserve descriptions', () => {
+  const source = read('../public/settings/components.js');
+
+  assert.match(source, /let settingRowIdCounter\s*=\s*0/);
+  assert.match(source, /control\?\.matches\?\.\(['"]input,\s*select,\s*textarea,\s*button['"]\)/);
+  assert.match(source, /control\?\.querySelector\?\.\(['"]input,\s*select,\s*textarea,\s*button['"]\)/);
+  assert.match(source, /if \(formControl && !formControl\.id\)/);
+  assert.match(source, /document\.createElement\(formControl \? 'label' : 'div'\)/);
+  assert.match(source, /title\.htmlFor\s*=\s*formControl\.id/);
+  assert.match(source, /detail\.id\s*=/);
+  assert.match(source, /formControl\.getAttribute\('aria-describedby'\)/);
+  assert.match(source, /describedBy\.push\(detail\.id\)/);
+  assert.match(source, /describedBy\.join\(' '\)/);
+  assert.match(source, /formControl\.setAttribute\('aria-describedby'/);
+});
+
 test('settings shell marks and focuses the active page', () => {
   const source = read('../public/settings/shell.js');
 
   assert.match(source, /setAttribute\('aria-current',\s*'page'\)/);
   assert.match(source, /\.tabIndex\s*=\s*-1/);
   assert.match(source, /\.focus\(\{\s*preventScroll:\s*true\s*\}\)/);
+});
+
+test('settings retry focus only moves to a connected replacement button after retry failure', () => {
+  const source = read('../public/settings/shell.js');
+
+  assert.match(source, /const loadAndRender = async \(\{\s*focusRetry = false\s*\} = \{\}\) =>/);
+  assert.match(source, /onRetry:\s*\(\) => loadAndRender\(\{\s*focusRetry:\s*true\s*\}\)/);
+  assert.match(
+    source,
+    /if \(focusRetry\)[\s\S]*requestAnimationFrame\(\(\) => \{[\s\S]*retryButton\?\.isConnected[\s\S]*retryButton\.focus\(\{\s*preventScroll:\s*true\s*\}\)/,
+  );
+  assert.match(source, /await loadAndRender\(\);/);
+});
+
+test('settings shell falls back to the domains overview for orphaned active leaves', () => {
+  const source = read('../public/settings/shell.js');
+
+  assert.match(source, /if \(!domain\)\s*\{[\s\S]*console\.error\([\s\S]*renderDomainsOverview\(content,\s*domains\)/);
+  assert.match(source, /else\s*\{[\s\S]*await renderLeafContent\(shell,\s*content,\s*activeLeaf,\s*domain,\s*user,\s*query\)/);
 });
 
 test('router hides inactive overlays from keyboard focus', () => {

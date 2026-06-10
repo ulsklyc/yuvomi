@@ -265,7 +265,7 @@ async function renderLeafContent(shell, content, leaf, domain, user, query) {
   leafContainer.className = 'settings-leaf';
   content.replaceChildren(breadcrumb, backLink, leafContainer);
 
-  const loadAndRender = async () => {
+  const loadAndRender = async ({ focusRetry = false } = {}) => {
     leafContainer.replaceChildren();
     try {
       const module = await leaf.loader();
@@ -286,11 +286,21 @@ async function renderLeafContent(shell, content, leaf, domain, user, query) {
       hydrateIcons(shell);
     } catch (error) {
       console.error(`[Settings] Failed to render ${leaf.id}:`, error);
-      leafContainer.replaceChildren(createRetryState({
+      const retryState = createRetryState({
         message: t('settings.loadError'),
-        onRetry: loadAndRender,
-      }));
+        onRetry: () => loadAndRender({ focusRetry: true }),
+      });
+      leafContainer.replaceChildren(retryState);
       hydrateIcons(shell);
+
+      if (focusRetry) {
+        const retryButton = retryState.querySelector('.settings-retry-state__button');
+        requestAnimationFrame(() => {
+          if (retryButton?.isConnected && leafContainer.contains(retryButton)) {
+            retryButton.focus({ preventScroll: true });
+          }
+        });
+      }
     }
   };
 
@@ -328,7 +338,15 @@ export async function renderSettingsShell(container, {
 
   if (activeLeaf) {
     const domain = domains.find((entry) => entry.id === activeLeaf.domainId);
-    await renderLeafContent(shell, content, activeLeaf, domain, user, query);
+    if (!domain) {
+      console.error(
+        `[Settings] Cannot render ${activeLeaf.id}: domain "${activeLeaf.domainId}" is not available.`,
+      );
+      renderDomainsOverview(content, domains);
+      hydrateIcons(shell);
+    } else {
+      await renderLeafContent(shell, content, activeLeaf, domain, user, query);
+    }
   } else {
     const domain = view === 'domain'
       ? domains.find((entry) => entry.id === domainId)
