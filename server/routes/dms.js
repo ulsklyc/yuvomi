@@ -7,7 +7,10 @@ import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { str, MAX_TITLE } from '../middleware/validate.js';
-import { SUPPORTED_PROVIDERS } from '../services/dms/index.js';
+import { getAdapter as defaultGetAdapter, SUPPORTED_PROVIDERS } from '../services/dms/index.js';
+
+let adapterFactory = defaultGetAdapter;
+export function _setAdapterFactory(fn) { adapterFactory = fn || defaultGetAdapter; }
 
 const log = createLogger('DMS');
 const router = express.Router();
@@ -70,6 +73,37 @@ router.delete('/accounts/:id', (req, res) => {
   } catch (err) {
     log.error('DELETE /accounts/:id error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+router.post('/accounts/:id/test', async (req, res) => {
+  try {
+    if (!isAdmin(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    const account = getAccount(Number(req.params.id));
+    if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404 });
+    const result = await adapterFactory(account).testConnection();
+    db.get().prepare("UPDATE dms_accounts SET last_check = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ?").run(account.id);
+    res.json({ data: result });
+  } catch (err) {
+    log.error('POST /accounts/:id/test error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+router.get('/search', async (req, res) => {
+  try {
+    // Admin-only: DMS search proxies the entire Paperless instance ungescoped, which would
+    // bypass the per-document restricted/private visibility boundaries of the documents module.
+    if (!isAdmin(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    const account = getAccount(Number(req.query.account_id));
+    if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404 });
+    const q = String(req.query.q || '').trim();
+    if (!q) return res.status(400).json({ error: 'Query is required.', code: 400 });
+    const results = await adapterFactory(account).search(q, { limit: 20 });
+    res.json({ data: results });
+  } catch (err) {
+    log.error('GET /search error:', err);
+    res.status(502).json({ error: 'DMS search failed.', code: 502 });
   }
 });
 

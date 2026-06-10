@@ -9,7 +9,7 @@ import http from 'node:http';
 import express from 'express';
 import Database from 'better-sqlite3';
 import { MIGRATIONS, _setTestDatabase } from '../server/db.js';
-import dmsRouter from '../server/routes/dms.js';
+import dmsRouter, { _setAdapterFactory } from '../server/routes/dms.js';
 
 function buildTestDb() {
   const db = new Database(':memory:');
@@ -92,4 +92,52 @@ test('DELETE /accounts/:id: Admin entfernt Account', async () => {
   assert.equal(res.status, 204);
   const after = await call('GET', '/accounts');
   assert.equal(after.body.data.length, 0);
+});
+
+test('POST /accounts/:id/test: ok=true durchgereicht', async () => {
+  session = { userId: adminId, role: 'admin' };
+  const acc = (await call('POST', '/accounts', {
+    provider: 'paperless', name: 'TestDMS', base_url: 'https://t.example.com', api_token: 'tok',
+  })).body.data;
+  _setAdapterFactory(() => ({ async testConnection() { return { ok: true, status: 200 }; } }));
+  const res = await call('POST', `/accounts/${acc.id}/test`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.ok, true);
+});
+
+test('POST /accounts/:id/test: Member bekommt 403', async () => {
+  session = { userId: adminId, role: 'admin' };
+  const acc = (await call('GET', '/accounts')).body.data[0];
+  session = { userId: memberId, role: 'member' };
+  const res = await call('POST', `/accounts/${acc.id}/test`);
+  assert.equal(res.status, 403);
+  session = { userId: adminId, role: 'admin' };
+});
+
+test('GET /search: mappt Adapter-Treffer durch', async () => {
+  session = { userId: adminId, role: 'admin' };
+  _setAdapterFactory(() => ({
+    async search(q) { return [{ id: '5', title: `T:${q}`, created: null, filename: 'f.pdf', url: 'https://t/d/5' }]; },
+  }));
+  const list = await call('GET', '/accounts');
+  const accId = list.body.data[0].id;
+  const res = await call('GET', `/search?account_id=${accId}&q=brief`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data[0].title, 'T:brief');
+});
+
+test('GET /search: 400 ohne Query', async () => {
+  session = { userId: adminId, role: 'admin' };
+  const list = await call('GET', '/accounts');
+  const res = await call('GET', `/search?account_id=${list.body.data[0].id}&q=`);
+  assert.equal(res.status, 400);
+});
+
+test('GET /search: Member bekommt 403', async () => {
+  session = { userId: adminId, role: 'admin' };
+  const accId = (await call('GET', '/accounts')).body.data[0].id;
+  session = { userId: memberId, role: 'member' };
+  const res = await call('GET', `/search?account_id=${accId}&q=brief`);
+  assert.equal(res.status, 403);
+  session = { userId: adminId, role: 'admin' };
 });
