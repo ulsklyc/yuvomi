@@ -9,6 +9,12 @@ import {
   findSettingsLeaf,
   migrateLegacySettingsTab,
 } from '../public/settings/registry.js';
+import {
+  KITCHEN_CHILD_IDS,
+  expandModuleOrder,
+  groupBuiltInModules,
+  normalizeModuleOrder,
+} from '../public/settings/module-order.js';
 
 const member = { role: 'member' };
 const admin = { role: 'admin' };
@@ -101,6 +107,92 @@ test('legacy settings migration covers every previous tab', () => {
 test('findSettingsLeaf enforces role access', () => {
   assert.equal(findSettingsLeaf('/settings/admin/system', member), null);
   assert.equal(findSettingsLeaf('/settings/admin/system', admin)?.id, 'admin-system');
+});
+
+test('Kitchen child IDs use the canonical order', () => {
+  assert.deepEqual(KITCHEN_CHILD_IDS, ['meals', 'recipes', 'shopping']);
+  assert.equal(Object.isFrozen(KITCHEN_CHILD_IDS), true);
+});
+
+test('groupBuiltInModules enables Kitchen while any child is enabled', () => {
+  const modules = groupBuiltInModules(['recipes']);
+  const kitchen = modules.find((module) => module.id === 'kitchen');
+
+  assert.deepEqual(kitchen.children, [
+    { id: 'meals', enabled: true },
+    { id: 'recipes', enabled: false },
+    { id: 'shopping', enabled: true },
+  ]);
+  assert.equal(kitchen.enabledChildren, 2);
+  assert.equal(kitchen.enabled, true);
+});
+
+test('groupBuiltInModules disables Kitchen when every child is disabled', () => {
+  const [kitchen] = groupBuiltInModules(['meals', 'recipes', 'shopping']);
+
+  assert.equal(kitchen.id, 'kitchen');
+  assert.equal(kitchen.enabledChildren, 0);
+  assert.equal(kitchen.enabled, false);
+});
+
+test('groupBuiltInModules replaces Kitchen children at their first definition position', () => {
+  const calendar = { id: 'calendar', icon: 'calendar-days', enabled: false };
+  const recipes = { id: 'recipes', icon: 'book-text' };
+  const tasks = { id: 'tasks', icon: 'list-checks', custom: true };
+  const meals = { id: 'meals', icon: 'utensils' };
+  const shopping = { id: 'shopping', icon: 'shopping-cart' };
+
+  const modules = groupBuiltInModules([], [calendar, recipes, tasks, meals, shopping]);
+
+  assert.deepEqual(modules.map((module) => module.id), ['calendar', 'kitchen', 'tasks']);
+  assert.equal(modules[0], calendar);
+  assert.equal(modules[2], tasks);
+});
+
+test('normalizeModuleOrder replaces legacy Kitchen children with one Kitchen position', () => {
+  assert.deepEqual(
+    normalizeModuleOrder(['calendar', 'recipes', 'tasks', 'shopping', 'meals']),
+    ['calendar', 'kitchen', 'tasks'],
+  );
+});
+
+test('expandModuleOrder restores canonical Kitchen children', () => {
+  assert.deepEqual(
+    expandModuleOrder(['calendar', 'kitchen', 'tasks']),
+    ['calendar', 'meals', 'recipes', 'shopping', 'tasks'],
+  );
+});
+
+test('module order helpers handle empty orders', () => {
+  assert.deepEqual(normalizeModuleOrder(), []);
+  assert.deepEqual(expandModuleOrder([]), []);
+});
+
+test('module order helpers deduplicate repeated Kitchen children', () => {
+  const order = ['meals', 'recipes', 'meals', 'shopping', 'recipes'];
+
+  assert.deepEqual(normalizeModuleOrder(order), ['kitchen']);
+  assert.deepEqual(expandModuleOrder(order), ['meals', 'recipes', 'shopping']);
+});
+
+test('explicit Kitchen and legacy children produce one Kitchen position', () => {
+  const order = ['calendar', 'kitchen', 'recipes', 'tasks', 'shopping', 'meals'];
+
+  assert.deepEqual(normalizeModuleOrder(order), ['calendar', 'kitchen', 'tasks']);
+  assert.deepEqual(
+    expandModuleOrder(order),
+    ['calendar', 'meals', 'recipes', 'shopping', 'tasks'],
+  );
+});
+
+test('module order helpers preserve stable unique non-Kitchen IDs', () => {
+  const order = ['tasks', 'calendar', 'tasks', 'recipes', 'notes', 'calendar', 'shopping'];
+
+  assert.deepEqual(normalizeModuleOrder(order), ['tasks', 'calendar', 'kitchen', 'notes']);
+  assert.deepEqual(
+    expandModuleOrder(order),
+    ['tasks', 'calendar', 'meals', 'recipes', 'shopping', 'notes'],
+  );
 });
 
 test('all locales contain the settings IA translation foundation', async () => {
