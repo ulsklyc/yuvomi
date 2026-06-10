@@ -62,9 +62,6 @@
     "housekeeping": "Housekeeping",
     "splitExpenses": "Böl",
     "kitchenActiveLabel": "Mutfak, {{section}} aktif",
-    "section": {
-      "household": "Ev"
-    },
     "reminders": "Hatırlatıcılar",
     "sidebarCollapse": "Kenar çubuğunu daralt",
     "sidebarExpand": "Kenar çubuğunu genişlet",

@@ -62,9 +62,6 @@
     "housekeeping": "Housekeeping",
     "splitExpenses": "分割",
     "kitchenActiveLabel": "キッチン、{{section}} がアクティブ",
-    "section": {
-      "household": "家庭"
-    },
     "reminders": "リマインダー",
     "sidebarCollapse": "サイドバーを閉じる",
     "sidebarExpand": "サイドバーを開く",

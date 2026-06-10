@@ -62,9 +62,6 @@
     "housekeeping": "Dọn dẹp",
     "splitExpenses": "Chia sẻ chi phí",
     "kitchenActiveLabel": "Nhà bếp, {{section}} đang hoạt động",
-    "section": {
-      "household": "Hộ gia đình"
-    },
     "reminders": "Nhắc nhở",
     "sidebarCollapse": "Thu gọn thanh bên",
     "sidebarExpand": "Mở rộng thanh bên",

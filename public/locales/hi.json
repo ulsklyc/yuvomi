@@ -62,9 +62,6 @@
     "housekeeping": "Housekeeping",
     "splitExpenses": "बांटें",
     "kitchenActiveLabel": "रसोई, {{section}} सक्रिय",
-    "section": {
-      "household": "घरेलू"
-    },
     "reminders": "रिमाइंडर",
     "sidebarCollapse": "साइडबार समेटें",
     "sidebarExpand": "साइडबार फैलाएं",

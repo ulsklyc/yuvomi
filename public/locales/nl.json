@@ -62,9 +62,6 @@
     "housekeeping": "Huishouden",
     "splitExpenses": "Splitsen",
     "kitchenActiveLabel": "Keuken, {{section}} actief",
-    "section": {
-      "household": "Huishouden"
-    },
     "reminders": "Herinneringen",
     "sidebarCollapse": "Zijbalk inklappen",
     "sidebarExpand": "Zijbalk uitklappen",

@@ -97,6 +97,21 @@ test('personal settings leaf modules import without browser globals', async () =
   }
 });
 
+test('navigation settings leaf imports without browser globals and exports render', async () => {
+  const module = await import('/settings/pages/modules-navigation.js');
+  assert.equal(typeof module.render, 'function');
+});
+
+test('navigation settings leaf reuses the canonical module-order helpers', async () => {
+  const source = await readFile(
+    new URL('../public/settings/pages/modules-navigation.js', import.meta.url),
+    'utf8',
+  );
+  assert.match(source, /normalizeModuleOrder/);
+  assert.match(source, /expandModuleOrder/);
+  assert.match(source, /from\s*'\/settings\/module-order\.js'/);
+});
+
 test('members only see the personal settings domain', () => {
   assert.deepEqual(filterSettingsDomains(member).map((domain) => domain.id), ['personal']);
 });

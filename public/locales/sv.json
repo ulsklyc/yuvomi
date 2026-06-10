@@ -62,9 +62,6 @@
     "housekeeping": "Städning",
     "splitExpenses": "Dela",
     "kitchenActiveLabel": "Kök, {{section}} aktivt",
-    "section": {
-      "household": "Hushåll"
-    },
     "reminders": "Påminnelser",
     "sidebarCollapse": "Fäll ihop sidofältet",
     "sidebarExpand": "Fäll ut sidofältet",

@@ -62,9 +62,6 @@
     "housekeeping": "Domácí práce",
     "splitExpenses": "Rozdělení",
     "kitchenActiveLabel": "Kuchyně, aktivní sekce {{section}}",
-    "section": {
-      "household": "Domácnost"
-    },
     "reminders": "Připomínky",
     "sidebarCollapse": "Sbalit postranní panel",
     "sidebarExpand": "Rozbalit postranní panel",

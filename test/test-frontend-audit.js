@@ -706,6 +706,35 @@ test('phase 4 keeps Kitchen navigation identity stable', () => {
   assert.doesNotMatch(routerSource, /sidebarIcon\)\s*sidebarIcon\.dataset\.lucide\s*=\s*kitchenTarget\.icon/);
 });
 
+test('global navigation groups domains with translated section labels', () => {
+  const routerSource = read('../public/router.js');
+
+  // The grouped main-app navigation references the Overview, Plan and Home label keys
+  // and resolves section labels through t().
+  assert.match(routerSource, /'nav\.sectionOverview'/);
+  assert.match(routerSource, /'nav\.sectionPlan'/);
+  assert.match(routerSource, /'nav\.sectionHome'/);
+  assert.match(routerSource, /t\(labelKey\)/);
+
+  // The replaced household section label is no longer referenced.
+  assert.doesNotMatch(routerSource, /nav\.section\.household/);
+});
+
+test('global navigation derives exactly one Kitchen destination', () => {
+  const routerSource = read('../public/router.js');
+
+  // Kitchen is inserted once via sidebarKitchenEl(), gated by a single-shot flag.
+  assert.equal((routerSource.match(/elements\.push\(sidebarKitchenEl\(\)\)/g) ?? []).length, 1);
+  assert.match(routerSource, /if \(!kitchenAdded\)/);
+});
+
+test('navigation settings leaf reuses the canonical module-order helpers', () => {
+  const leaf = read('../public/settings/pages/modules-navigation.js');
+
+  assert.match(leaf, /import\s*\{[^}]*normalizeModuleOrder[^}]*\}\s*from\s*'\/settings\/module-order\.js'/s);
+  assert.match(leaf, /import\s*\{[^}]*expandModuleOrder[^}]*\}\s*from\s*'\/settings\/module-order\.js'/s);
+});
+
 test('phase 4 keeps More bottom-nav identity stable while exposing active section accessibly', () => {
   const routerSource = read('../public/router.js');
 
@@ -925,15 +954,18 @@ test('sticky section headers stack above glass cards via --z-sticky', () => {
   }
 });
 
-test('every locale resolves nav.section.household as a nested key', () => {
+test('every locale resolves the grouped navigation section labels', () => {
   const localesDir = new URL('../public/locales/', import.meta.url);
   const files = readdirSync(localesDir).filter((f) => f.endsWith('.json'));
+  const sectionKeys = ['sectionOverview', 'sectionPlan', 'sectionHome'];
 
   assert.ok(files.length >= 16, 'expected at least 16 locale files');
   for (const file of files) {
     const data = JSON.parse(readFileSync(new URL(file, localesDir), 'utf8'));
-    assert.equal(typeof data.nav?.section?.household, 'string', `${file}: nav.section.household must be a nested string`);
-    assert.ok(data.nav.section.household.length > 0, `${file}: nav.section.household must not be empty`);
+    for (const key of sectionKeys) {
+      assert.equal(typeof data.nav?.[key], 'string', `${file}: nav.${key} must be a string`);
+      assert.ok(data.nav[key].length > 0, `${file}: nav.${key} must not be empty`);
+    }
     assert.ok(!('section.household' in data.nav), `${file}: nav must not keep the flat "section.household" key (t() cannot resolve it)`);
   }
 });

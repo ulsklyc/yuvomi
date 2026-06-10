@@ -30,6 +30,10 @@ test('KITCHEN_ROUTES enthält alle drei Sub-Routen', () => {
   assert.deepEqual(KITCHEN_ROUTES, ['/meals', '/recipes', '/shopping']);
 });
 
+test('KITCHEN_ROUTES ist eingefroren (kanonische Kitchen-Routen)', () => {
+  assert.equal(Object.isFrozen(KITCHEN_ROUTES), true);
+});
+
 test('KITCHEN_STORAGE_KEY ist korrekt', () => {
   assert.equal(KITCHEN_STORAGE_KEY, 'oikos-kitchen-tab');
 });

@@ -62,9 +62,6 @@
     "housekeeping": "Housekeeping",
     "splitExpenses": "Μοίρασμα",
     "kitchenActiveLabel": "Κουζίνα, {{section}} ενεργό",
-    "section": {
-      "household": "Νοικοκυριό"
-    },
     "reminders": "Υπενθυμίσεις",
     "sidebarCollapse": "Σύμπτυξη πλευρικής στήλης",
     "sidebarExpand": "Επέκταση πλευρικής στήλης",

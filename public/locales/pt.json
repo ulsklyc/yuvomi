@@ -62,9 +62,6 @@
     "housekeeping": "Faxina",
     "splitExpenses": "Dividir",
     "kitchenActiveLabel": "Cozinha, {{section}} ativo",
-    "section": {
-      "household": "Casa"
-    },
     "reminders": "Lembretes",
     "sidebarCollapse": "Recolher barra lateral",
     "sidebarExpand": "Expandir barra lateral",

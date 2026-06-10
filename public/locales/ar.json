@@ -62,9 +62,6 @@
     "housekeeping": "Housekeeping",
     "splitExpenses": "تقسيم",
     "kitchenActiveLabel": "المطبخ، {{section}} نشط",
-    "section": {
-      "household": "المنزل"
-    },
     "reminders": "التذكيرات",
     "sidebarCollapse": "طيّ الشريط الجانبي",
     "sidebarExpand": "توسيع الشريط الجانبي",

@@ -62,9 +62,6 @@
     "housekeeping": "Housekeeping",
     "splitExpenses": "Разделить",
     "kitchenActiveLabel": "Кухня, {{section}} активно",
-    "section": {
-      "household": "Хозяйство"
-    },
     "reminders": "Напоминания",
     "sidebarCollapse": "Свернуть боковую панель",
     "sidebarExpand": "Развернуть боковую панель",

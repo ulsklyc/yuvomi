@@ -147,6 +147,16 @@ const ROUTE_ORDER = ['/', '/calendar', '/tasks', '/meals', '/recipes', '/shoppin
 
 const PRIMARY_NAV = 4;
 
+// Domänen-Gruppierung der Haupt-Navigation. Die Reihenfolge bestimmt die
+// Sortierung der Sektionen (Overview → Plan → Home); die Label-Keys werden in
+// der Sidebar via t() aufgelöst.
+const NAV_SECTION = Object.freeze({ overview: 0, plan: 1, home: 2 });
+const NAV_SECTION_LABEL_KEYS = Object.freeze({
+  [NAV_SECTION.overview]: 'nav.sectionOverview',
+  [NAV_SECTION.plan]: 'nav.sectionPlan',
+  [NAV_SECTION.home]: 'nav.sectionHome',
+});
+
 const DEFAULT_APP_NAME = 'Yuvomi';
 const APP_NAME_STORAGE_KEY = 'oikos-app-name';
 const APP_VERSION_STORAGE_KEY = 'oikos-app-version';
@@ -1322,21 +1332,23 @@ function navItems() {
     ];
   }
   const baseItems = [
-    { path: '/',          label: t('nav.dashboard'), icon: 'layout-dashboard', module: 'dashboard' },
-    { path: '/calendar',  label: t('nav.calendar'),  icon: 'calendar',         module: 'calendar'  },
-    { path: '/tasks',     label: t('nav.tasks'),     icon: 'check-square',     module: 'tasks'     },
-    { path: '/notes',     label: t('nav.notes'),     icon: 'sticky-note',      module: 'notes'     },
-    // More-Sheet Items:
-    { path: '/birthdays', label: t('nav.birthdays'), icon: 'cake',             module: 'birthdays' },
-    { path: '/contacts',  label: t('nav.contacts'),  icon: 'book-user',        module: 'contacts'  },
-    { path: '/budget',    label: t('nav.budget'),    icon: 'wallet',           module: 'budget'    },
-    { path: '/documents', label: t('nav.documents'), icon: 'folder-lock',      module: 'documents' },
-    { path: '/housekeeping', label: t('nav.housekeeping'), icon: 'paintbrush', module: 'housekeeping' },
-    { path: '/settings',  label: t('nav.settings'),  icon: 'settings',         module: 'settings'  },
-    // Kitchen-Gruppe: via Küche-Nav-Button (Bottom-Nav + Sidebar) + kitchen-tabs-bar erreichbar
-    { path: '/meals',     label: t('nav.meals'),     icon: 'utensils',      module: 'meals',    kitchenGroup: true },
-    { path: '/recipes',   label: t('nav.recipes'),   icon: 'book-text',     module: 'recipes',  kitchenGroup: true },
-    { path: '/shopping',  label: t('nav.shopping'),  icon: 'shopping-cart', module: 'shopping', kitchenGroup: true },
+    // Overview
+    { path: '/',          label: t('nav.dashboard'), icon: 'layout-dashboard', module: 'dashboard', section: NAV_SECTION.overview },
+    // Plan
+    { path: '/calendar',  label: t('nav.calendar'),  icon: 'calendar',         module: 'calendar',  section: NAV_SECTION.plan },
+    { path: '/tasks',     label: t('nav.tasks'),     icon: 'check-square',     module: 'tasks',     section: NAV_SECTION.plan },
+    { path: '/notes',     label: t('nav.notes'),     icon: 'sticky-note',      module: 'notes',     section: NAV_SECTION.plan },
+    // Home — Kitchen-Gruppe zuerst, dann die übrigen Haushalts-Module
+    { path: '/meals',     label: t('nav.meals'),     icon: 'utensils',      module: 'meals',    section: NAV_SECTION.home, kitchenGroup: true },
+    { path: '/recipes',   label: t('nav.recipes'),   icon: 'book-text',     module: 'recipes',  section: NAV_SECTION.home, kitchenGroup: true },
+    { path: '/shopping',  label: t('nav.shopping'),  icon: 'shopping-cart', module: 'shopping', section: NAV_SECTION.home, kitchenGroup: true },
+    { path: '/contacts',  label: t('nav.contacts'),  icon: 'book-user',        module: 'contacts',    section: NAV_SECTION.home },
+    { path: '/birthdays', label: t('nav.birthdays'), icon: 'cake',             module: 'birthdays',   section: NAV_SECTION.home },
+    { path: '/budget',    label: t('nav.budget'),    icon: 'wallet',           module: 'budget',      section: NAV_SECTION.home },
+    { path: '/documents', label: t('nav.documents'), icon: 'folder-lock',      module: 'documents',   section: NAV_SECTION.home },
+    { path: '/housekeeping', label: t('nav.housekeeping'), icon: 'paintbrush', module: 'housekeeping', section: NAV_SECTION.home },
+    // Settings ist am Ende gepinnt (siehe unten).
+    { path: '/settings',  label: t('nav.settings'),  icon: 'settings',         module: 'settings',    section: NAV_SECTION.home },
   ];
   const thirdPartyItems = _thirdPartyModules
     .filter((module) => module.enabled && module.status === 'enabled' && module.menu?.show && module.route?.path)
@@ -1347,6 +1359,8 @@ function navItems() {
       module: `third-party-${module.id}`,
       accent: module.accent,
       order: module.menu.order ?? 1000,
+      // Drittanbieter-Module folgen dem bestehenden Platzierungsverhalten am Ende der Home-Sektion.
+      section: NAV_SECTION.home,
     }))
     .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
   const settings = baseItems.find((item) => item.module === 'settings');
@@ -1356,6 +1370,9 @@ function navItems() {
   ];
   const orderIndex = new Map(_moduleOrder.map((id, index) => [id, index]));
   sortable.sort((a, b) => {
+    // Sektionen (Overview → Plan → Home) bestimmen die Gruppierung; innerhalb
+    // einer Sektion entscheidet die nutzerdefinierte Modul-Reihenfolge.
+    if (a.section !== b.section) return a.section - b.section;
     const ai = orderIndex.has(a.module) ? orderIndex.get(a.module) : Number.MAX_SAFE_INTEGER;
     const bi = orderIndex.has(b.module) ? orderIndex.get(b.module) : Number.MAX_SAFE_INTEGER;
     if (ai !== bi) return ai - bi;
@@ -1374,10 +1391,23 @@ function sidebarNavItems() {
   elements.push(indicator);
 
   let kitchenAdded = false;
-  let nonKitchenCount = 0;
-  let sectionAdded = false;
+  let currentSection = null;
+
+  const pushSectionLabel = (section) => {
+    if (section === currentSection) return;
+    currentSection = section;
+    const labelKey = NAV_SECTION_LABEL_KEYS[section];
+    if (!labelKey) return;
+    const label = document.createElement('div');
+    label.className = 'nav-section-label';
+    label.textContent = t(labelKey);
+    elements.push(label);
+  };
 
   navItems().forEach((item) => {
+    // Settings ist gepinnt und gehört zu keiner sichtbaren Sektionsgruppe.
+    if (item.module !== 'settings') pushSectionLabel(item.section);
+
     if (item.kitchenGroup) {
       if (!kitchenAdded) {
         elements.push(sidebarKitchenEl());
@@ -1385,15 +1415,6 @@ function sidebarNavItems() {
       }
       return;
     }
-    // Abschnittsbezeichnung vor dem (PRIMARY_NAV+1)ten Nicht-Küche-Eintrag
-    if (!sectionAdded && nonKitchenCount === PRIMARY_NAV) {
-      sectionAdded = true;
-      const label = document.createElement('div');
-      label.className = 'nav-section-label';
-      label.textContent = t('nav.section.household');
-      elements.push(label);
-    }
-    nonKitchenCount++;
     elements.push(navItemEl(item));
   });
   return elements;

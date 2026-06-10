@@ -62,9 +62,6 @@
     "housekeeping": "Pulizie",
     "splitExpenses": "Dividi",
     "kitchenActiveLabel": "Cucina, {{section}} attiva",
-    "section": {
-      "household": "Casa"
-    },
     "reminders": "Promemoria",
     "sidebarCollapse": "Comprimi barra laterale",
     "sidebarExpand": "Espandi barra laterale",
