@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, selectModal } from '/components/modal.js';
 import { t, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { stagger } from '/utils/ux.js';
@@ -422,8 +422,18 @@ async function handleDocumentAction(e) {
   }
   if (btn.dataset.action === 'push-dms') {
     if (!state.dmsAccounts.length) return;
+    let accountId = state.dmsAccounts[0].id;
+    if (state.dmsAccounts.length > 1) {
+      // Bei mehreren DMS-Konten Ziel auswählen lassen (promise-basiertes Auswahl-Modal
+      // ohne Dirty-Check, Abbruch → null).
+      accountId = await selectModal(
+        t('documents.pushToDms'),
+        state.dmsAccounts.map((account) => ({ value: account.id, label: account.name })),
+      );
+      if (!accountId) return;
+    }
     try {
-      await api.post('/documents/dms/push', { account_id: state.dmsAccounts[0].id, document_id: doc.id });
+      await api.post('/documents/dms/push', { account_id: accountId, document_id: doc.id });
       window.oikos?.showToast(t('documents.pushToDmsQueued'), 'success');
     } catch (err) {
       window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
@@ -683,7 +693,6 @@ function openFolderModal() {
 
 function openDmsLinkModal() {
   if (!state.dmsAccounts.length) return;
-  const accountId = state.dmsAccounts[0].id;
   openSharedModal({
     title: t('documents.linkFromDms'),
     size: 'md',
@@ -691,6 +700,37 @@ function openDmsLinkModal() {
     onSave(panel) {
       const root = panel.querySelector('#dms-modal-root');
       if (!root) return;
+
+      let selectedAccountId = state.dmsAccounts[0].id;
+
+      // Account selector — only render when multiple accounts exist
+      if (state.dmsAccounts.length > 1) {
+        const accountLabel = document.createElement('label');
+        accountLabel.className = 'label';
+        accountLabel.setAttribute('for', 'dms-account-select');
+        accountLabel.textContent = t('documents.dmsAccountLabel');
+
+        const accountSelect = document.createElement('select');
+        accountSelect.className = 'input dms-account-select';
+        accountSelect.id = 'dms-account-select';
+        for (const account of state.dmsAccounts) {
+          const option = document.createElement('option');
+          option.value = account.id;
+          option.textContent = account.name;
+          accountSelect.appendChild(option);
+        }
+
+        accountSelect.addEventListener('change', () => {
+          selectedAccountId = accountSelect.value;
+          // Clear results and re-run search with new account
+          results.replaceChildren();
+          if (input.value.trim()) {
+            input.dispatchEvent(new Event('input'));
+          }
+        });
+
+        root.append(accountLabel, accountSelect);
+      }
 
       const input = document.createElement('input');
       input.className = 'input';
@@ -712,8 +752,8 @@ function openDmsLinkModal() {
           results.replaceChildren();
           if (!q) return;
           try {
-            const res = await api.get(`/documents/dms/search?account_id=${accountId}&q=${encodeURIComponent(q)}`);
-            renderDmsResults(results, res.data, accountId);
+            const res = await api.get(`/documents/dms/search?account_id=${selectedAccountId}&q=${encodeURIComponent(q)}`);
+            renderDmsResults(results, res.data, selectedAccountId);
           } catch {
             const li = document.createElement('li');
             li.className = 'form-hint';

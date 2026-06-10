@@ -675,6 +675,12 @@
    DMS Link Modal
    -------------------------------------------------------- */
 
+.dms-account-select {
+  display: block;
+  width: 100%;
+  margin-bottom: var(--space-3);
+}
+
 .dms-results {
   list-style: none;
   margin: var(--space-3) 0 0;
