@@ -5,6 +5,10 @@ import { esc } from '/utils/html.js';
 const APP_NAME_STORAGE_KEY = 'oikos-app-name';
 const DEFAULT_APP_NAME = 'Yuvomi';
 
+export function isConnectedWeatherControl(control, container) {
+  return Boolean(control?.isConnected && container?.isConnected);
+}
+
 function safeStorageSet(key, value) {
   try {
     localStorage.setItem(key, value);
@@ -198,12 +202,18 @@ function bindWeatherEvents(container, user) {
     locateButton.disabled = true;
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        container.querySelector('#weather-lat').value = position.coords.latitude.toFixed(4);
-        container.querySelector('#weather-lon').value = position.coords.longitude.toFixed(4);
+        if (!isConnectedWeatherControl(locateButton, container)) return;
+
+        const latitudeInput = container.querySelector('#weather-lat');
+        const longitudeInput = container.querySelector('#weather-lon');
+        latitudeInput.value = position.coords.latitude.toFixed(4);
+        longitudeInput.value = position.coords.longitude.toFixed(4);
         locateButton.disabled = false;
         window.oikos?.showToast(t('settings.weatherLocateSuccess'), 'success');
       },
       (error) => {
+        if (!isConnectedWeatherControl(locateButton, container)) return;
+
         locateButton.disabled = false;
         window.oikos?.showToast(error.message || t('common.errorGeneric'), 'danger');
       },

@@ -7,6 +7,18 @@ const SUPPORTED_CURRENCIES = [
   'VND',
 ];
 
+export async function persistCurrencySelection(select, previousCurrency, save) {
+  select.disabled = true;
+  try {
+    await save();
+  } catch (error) {
+    select.value = previousCurrency;
+    throw error;
+  } finally {
+    select.disabled = false;
+  }
+}
+
 function appendCurrencyOptions(select, selectedCurrency) {
   let displayNames = null;
   try {
@@ -50,17 +62,23 @@ function renderPage(container, preferences) {
   );
 }
 
-function bindEvents(container) {
+function bindEvents(container, initialCurrency) {
   const currencySelect = container.querySelector('#currency-select');
+  let persistedCurrency = initialCurrency;
+
   currencySelect?.addEventListener('change', async () => {
-    currencySelect.disabled = true;
+    if (currencySelect.disabled) return;
+
     try {
-      await api.put('/preferences', { currency: currencySelect.value });
+      await persistCurrencySelection(
+        currencySelect,
+        persistedCurrency,
+        () => api.put('/preferences', { currency: currencySelect.value }),
+      );
+      persistedCurrency = currencySelect.value;
       window.oikos?.showToast(t('settings.currencySaved'), 'success');
     } catch (error) {
       window.oikos?.showToast(error.message || t('common.errorGeneric'), 'danger');
-    } finally {
-      currencySelect.disabled = false;
     }
   });
 }
@@ -70,5 +88,5 @@ export async function render(container, { user }) {
   const response = await api.get('/preferences');
   const preferences = response?.data ?? {};
   renderPage(container, preferences);
-  bindEvents(container);
+  bindEvents(container, preferences.currency || 'EUR');
 }

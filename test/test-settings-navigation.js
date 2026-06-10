@@ -17,6 +17,18 @@ import {
   groupBuiltInModules,
   normalizeModuleOrder,
 } from '../public/settings/module-order.js';
+import {
+  shouldApplySubdivisionResponse,
+} from '../public/settings/pages/modules-calendar.js';
+import {
+  persistCurrencySelection,
+} from '../public/settings/pages/modules-budget.js';
+import {
+  isConnectedWeatherControl,
+} from '../public/settings/pages/modules-dashboard.js';
+import {
+  persistMealTypeSelection,
+} from '../public/settings/pages/modules-kitchen.js';
 
 const member = { role: 'member' };
 const admin = { role: 'admin' };
@@ -262,6 +274,76 @@ test('module order helpers preserve stable unique non-Kitchen IDs', () => {
   assert.deepEqual(
     expandModuleOrder(order),
     ['tasks', 'calendar', 'meals', 'recipes', 'shopping', 'notes'],
+  );
+});
+
+test('stale holiday subdivision responses are rejected', () => {
+  assert.equal(shouldApplySubdivisionResponse({
+    requestId: 1,
+    latestRequestId: 2,
+    requestedCountry: 'DE',
+    currentCountry: 'AT',
+  }), false);
+  assert.equal(shouldApplySubdivisionResponse({
+    requestId: 2,
+    latestRequestId: 2,
+    requestedCountry: 'AT',
+    currentCountry: 'AT',
+  }), true);
+});
+
+test('Kitchen persistence disables controls and restores the saved selection on failure', async () => {
+  const inputs = [
+    { value: 'breakfast', checked: false, disabled: false },
+    { value: 'lunch', checked: true, disabled: false },
+  ];
+  let rejectSave;
+  const save = new Promise((resolve, reject) => {
+    void resolve;
+    rejectSave = reject;
+  });
+  const persistence = persistMealTypeSelection(
+    inputs,
+    ['lunch'],
+    ['breakfast'],
+    () => save,
+  );
+
+  assert.equal(inputs.every((input) => input.disabled), true);
+  rejectSave(new Error('save failed'));
+  await assert.rejects(persistence, /save failed/);
+  assert.deepEqual(inputs.map(({ checked }) => checked), [true, false]);
+  assert.equal(inputs.every((input) => !input.disabled), true);
+});
+
+test('Budget persistence restores the previous currency on failure', async () => {
+  const select = { value: 'USD', disabled: false };
+  const persistence = persistCurrencySelection(
+    select,
+    'EUR',
+    async () => {
+      assert.equal(select.disabled, true);
+      throw new Error('save failed');
+    },
+  );
+
+  await assert.rejects(persistence, /save failed/);
+  assert.equal(select.value, 'EUR');
+  assert.equal(select.disabled, false);
+});
+
+test('weather geolocation callbacks only update the active leaf', () => {
+  assert.equal(
+    isConnectedWeatherControl({ isConnected: true }, { isConnected: true }),
+    true,
+  );
+  assert.equal(
+    isConnectedWeatherControl({ isConnected: false }, { isConnected: true }),
+    false,
+  );
+  assert.equal(
+    isConnectedWeatherControl({ isConnected: true }, { isConnected: false }),
+    false,
   );
 });
 

@@ -2,9 +2,6 @@ import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 
-const DEFAULT_PUBLIC_COLOR = '#FF3B30';
-const DEFAULT_SCHOOL_COLOR = '#34C759';
-
 function formatSyncTime(value) {
   if (!value) return t('settings.holidayNeverSynced');
   const date = new Date(value);
@@ -50,7 +47,7 @@ function renderPage(container, preferences) {
           <div class="form-group" id="holiday-public-color-group"${preferences.holiday_show_public ? '' : ' hidden'}>
             <label class="form-label" for="holiday-public-color">${t('settings.holidayPublicColor')}</label>
             <input class="form-input" type="color" id="holiday-public-color"
-              value="${esc(preferences.holiday_public_color || DEFAULT_PUBLIC_COLOR)}">
+              value="${esc(preferences.holiday_public_color)}">
           </div>
           <div class="form-group">
             <label class="toggle-row">
@@ -61,7 +58,7 @@ function renderPage(container, preferences) {
           <div class="form-group" id="holiday-school-color-group"${preferences.holiday_show_school ? '' : ' hidden'}>
             <label class="form-label" for="holiday-school-color">${t('settings.holidaySchoolColor')}</label>
             <input class="form-input" type="color" id="holiday-school-color"
-              value="${esc(preferences.holiday_school_color || DEFAULT_SCHOOL_COLOR)}">
+              value="${esc(preferences.holiday_school_color)}">
           </div>
           <div id="holidays-form-error" class="form-error" role="alert" hidden></div>
           <div class="settings-form-actions">
@@ -93,18 +90,56 @@ function appendOptions(select, entries, selectedCode) {
   }
 }
 
-async function loadSubdivisions(select, countryCode, selectedCode = '') {
+export function shouldApplySubdivisionResponse({
+  requestId,
+  latestRequestId,
+  requestedCountry,
+  currentCountry,
+}) {
+  return requestId === latestRequestId && requestedCountry === currentCountry;
+}
+
+async function loadSubdivisions(
+  select,
+  countrySelect,
+  countryCode,
+  selectedCode,
+  requestState,
+) {
+  const requestId = ++requestState.latestRequestId;
   const noneOption = document.createElement('option');
   noneOption.value = '';
   noneOption.textContent = t('settings.holidaySubdivisionNone');
   select.replaceChildren(noneOption);
   select.disabled = true;
-  if (!countryCode) return;
+  if (!countryCode) return true;
 
-  const response = await api.get(`/preferences/holidays/subdivisions/${countryCode}`);
-  const subdivisions = response?.data ?? [];
-  appendOptions(select, subdivisions, selectedCode);
-  select.disabled = subdivisions.length === 0;
+  try {
+    const response = await api.get(`/preferences/holidays/subdivisions/${countryCode}`);
+    if (!shouldApplySubdivisionResponse({
+      requestId,
+      latestRequestId: requestState.latestRequestId,
+      requestedCountry: countryCode,
+      currentCountry: countrySelect.value,
+    })) {
+      return false;
+    }
+
+    const subdivisions = response?.data ?? [];
+    appendOptions(select, subdivisions, selectedCode);
+    select.disabled = subdivisions.length === 0;
+    return true;
+  } catch (error) {
+    if (shouldApplySubdivisionResponse({
+      requestId,
+      latestRequestId: requestState.latestRequestId,
+      requestedCountry: countryCode,
+      currentCountry: countrySelect.value,
+    })) {
+      throw error;
+    }
+    return false;
+  }
 }
 
 function holidayPreferenceData(container) {
@@ -113,8 +148,8 @@ function holidayPreferenceData(container) {
     holiday_subdivision: container.querySelector('#holiday-subdivision')?.value || null,
     holiday_show_public: container.querySelector('#holiday-show-public')?.checked ?? false,
     holiday_show_school: container.querySelector('#holiday-show-school')?.checked ?? false,
-    holiday_public_color: container.querySelector('#holiday-public-color')?.value || DEFAULT_PUBLIC_COLOR,
-    holiday_school_color: container.querySelector('#holiday-school-color')?.value || DEFAULT_SCHOOL_COLOR,
+    holiday_public_color: container.querySelector('#holiday-public-color').value,
+    holiday_school_color: container.querySelector('#holiday-school-color').value,
   };
 }
 
@@ -128,16 +163,7 @@ async function bindEvents(container, preferences) {
   const schoolColorGroup = container.querySelector('#holiday-school-color-group');
   const syncButton = container.querySelector('#holiday-sync-btn');
   const errorElement = container.querySelector('#holidays-form-error');
-
-  const countriesResponse = await api.get('/preferences/holidays/countries');
-  appendOptions(countrySelect, countriesResponse?.data ?? [], preferences.holiday_country || '');
-  if (preferences.holiday_country) {
-    await loadSubdivisions(
-      subdivisionSelect,
-      preferences.holiday_country,
-      preferences.holiday_subdivision || '',
-    );
-  }
+  const subdivisionRequests = { latestRequestId: 0 };
 
   const updateSyncState = () => {
     syncButton.disabled = !countrySelect.value;
@@ -147,13 +173,20 @@ async function bindEvents(container, preferences) {
 
   countrySelect.addEventListener('change', async () => {
     errorElement.hidden = true;
+    const countryCode = countrySelect.value;
+    updateSyncState();
     try {
-      await loadSubdivisions(subdivisionSelect, countrySelect.value);
+      await loadSubdivisions(
+        subdivisionSelect,
+        countrySelect,
+        countryCode,
+        '',
+        subdivisionRequests,
+      );
     } catch (error) {
       errorElement.textContent = error.message || t('common.errorGeneric');
       errorElement.hidden = false;
     }
-    updateSyncState();
   });
 
   showPublic.addEventListener('change', () => {
@@ -217,6 +250,21 @@ async function bindEvents(container, preferences) {
       updateSyncState();
     }
   });
+
+  const countriesResponse = await api.get('/preferences/holidays/countries');
+  if (!container.isConnected) return;
+
+  appendOptions(countrySelect, countriesResponse?.data ?? [], preferences.holiday_country || '');
+  if (preferences.holiday_country) {
+    await loadSubdivisions(
+      subdivisionSelect,
+      countrySelect,
+      preferences.holiday_country,
+      preferences.holiday_subdivision || '',
+      subdivisionRequests,
+    );
+  }
+  updateSyncState();
 }
 
 export async function render(container, { user }) {

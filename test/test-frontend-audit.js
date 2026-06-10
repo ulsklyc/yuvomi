@@ -374,6 +374,12 @@ test('module-specific settings leaves preserve their required controls and behav
   assert.match(calendar, /api\.get\(`\/preferences\/holidays\/subdivisions\/\$\{countryCode\}`\)/);
   assert.match(calendar, /api\.post\('\/preferences\/holidays\/sync', \{\}\)/);
   assert.doesNotMatch(calendar, /caldav|carddav|google|apple|subscriptions|sync accounts/i);
+  assert.doesNotMatch(calendar, /#[0-9a-f]{6}/i);
+  assert.ok(
+    calendar.indexOf("form.addEventListener('submit'") <
+      calendar.indexOf("await api.get('/preferences/holidays/countries')"),
+    'Calendar must bind submit handling before loading holiday discovery data',
+  );
 
   const budget = read('../public/settings/pages/modules-budget.js');
   assert.match(budget, /id="currency-select"/);
