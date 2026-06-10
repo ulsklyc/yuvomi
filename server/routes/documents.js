@@ -138,19 +138,24 @@ function ensureFolder(name, actorId) {
   return result.lastInsertRowid;
 }
 
-router.get('/meta/options', (_req, res) => {
-  const dmsAccounts = db.get().prepare('SELECT id, name, provider FROM dms_accounts ORDER BY name COLLATE NOCASE').all();
-  res.json({
-    data: {
-      categories: CATEGORIES,
-      visibilities: VISIBILITIES,
-      statuses: STATUSES,
-      max_file_size: MAX_FILE_BYTES,
-      allowed_mime_types: Array.from(ALLOWED_MIME),
-      storage_providers: ['local', 'external'],
-      dms_accounts: dmsAccounts,
-    },
-  });
+router.get('/meta/options', (req, res) => {
+  try {
+    const dmsAccounts = db.get().prepare('SELECT id, name, provider FROM dms_accounts ORDER BY name COLLATE NOCASE').all();
+    res.json({
+      data: {
+        categories: CATEGORIES,
+        visibilities: VISIBILITIES,
+        statuses: STATUSES,
+        max_file_size: MAX_FILE_BYTES,
+        allowed_mime_types: Array.from(ALLOWED_MIME),
+        storage_providers: ['local', 'external'],
+        dms_accounts: isAdmin(req) ? dmsAccounts : [],
+      },
+    });
+  } catch (err) {
+    log.error('GET /meta/options error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
 });
 
 router.get('/folders', (_req, res) => {

@@ -49,6 +49,7 @@ let state = {
   documents: [],
   folders: [],
   members: [],
+  dmsAccounts: [],
   view: localStorage.getItem('oikos-documents-view') || 'grid',
   status: 'active',
   category: '',
@@ -114,8 +115,9 @@ export async function render(container) {
 
   if (window.lucide) lucide.createIcons({ el: _container });
 
-  await Promise.all([loadMembers(), loadFolders()]);
+  await Promise.all([loadMembers(), loadFolders(), loadMetaOptions()]);
   await loadDocuments();
+  renderDmsHeaderBtn();
   bindPageEvents();
   renderFolderOptions();
   renderFolderBrowser();
@@ -139,6 +141,41 @@ async function loadDocuments() {
 async function loadFolders() {
   const res = await api.get('/documents/folders');
   state.folders = res.data || [];
+}
+
+async function loadMetaOptions() {
+  try {
+    const res = await api.get('/documents/meta/options');
+    state.dmsAccounts = res.data?.dms_accounts || [];
+  } catch {
+    state.dmsAccounts = [];
+  }
+}
+
+function renderDmsHeaderBtn() {
+  const toolbar = _container.querySelector('.documents-toolbar');
+  if (!toolbar) return;
+  const existing = toolbar.querySelector('#documents-dms-link-btn');
+  if (existing) existing.remove();
+  if (!state.dmsAccounts.length) return;
+  const btn = document.createElement('button');
+  btn.className = 'btn btn--secondary';
+  btn.id = 'documents-dms-link-btn';
+  const icon = document.createElement('i');
+  icon.dataset.lucide = 'link';
+  icon.className = 'icon-md';
+  icon.setAttribute('aria-hidden', 'true');
+  btn.append(icon);
+  btn.append(document.createTextNode(t('documents.linkFromDms')));
+  btn.addEventListener('click', () => openDmsLinkModal());
+  // Insert after the folder button
+  const folderBtn = toolbar.querySelector('#documents-folder-btn');
+  if (folderBtn) {
+    folderBtn.insertAdjacentElement('afterend', btn);
+  } else {
+    toolbar.append(btn);
+  }
+  if (window.lucide) lucide.createIcons({ el: btn });
 }
 
 function renderFolderOptions() {
@@ -623,6 +660,103 @@ function openFolderModal() {
       });
     },
   });
+}
+
+// --------------------------------------------------------
+// DMS Link Modal
+// --------------------------------------------------------
+
+function openDmsLinkModal() {
+  if (!state.dmsAccounts.length) return;
+  const accountId = state.dmsAccounts[0].id;
+  openSharedModal({
+    title: t('documents.linkFromDms'),
+    size: 'md',
+    content: '<div id="dms-modal-root"></div>',
+    onSave(panel) {
+      const root = panel.querySelector('#dms-modal-root');
+      if (!root) return;
+
+      const input = document.createElement('input');
+      input.className = 'input';
+      input.id = 'dms-search';
+      input.type = 'search';
+      input.placeholder = t('documents.dmsSearchPlaceholder');
+
+      const results = document.createElement('ul');
+      results.id = 'dms-results';
+      results.className = 'dms-results';
+
+      root.append(input, results);
+
+      let dmsSearchTimer;
+      input.addEventListener('input', () => {
+        clearTimeout(dmsSearchTimer);
+        dmsSearchTimer = setTimeout(async () => {
+          const q = input.value.trim();
+          results.replaceChildren();
+          if (!q) return;
+          try {
+            const res = await api.get(`/documents/dms/search?account_id=${accountId}&q=${encodeURIComponent(q)}`);
+            renderDmsResults(results, res.data, accountId);
+          } catch {
+            const li = document.createElement('li');
+            li.className = 'form-hint';
+            li.textContent = t('documents.dmsNoResults');
+            results.appendChild(li);
+          }
+        }, 300);
+      });
+
+      setTimeout(() => input.focus(), 60);
+    },
+  });
+}
+
+function renderDmsResults(container, items, accountId) {
+  container.replaceChildren();
+  if (!items || !items.length) {
+    const li = document.createElement('li');
+    li.className = 'form-hint';
+    li.textContent = t('documents.dmsNoResults');
+    container.appendChild(li);
+    return;
+  }
+  for (const item of items) {
+    const li = document.createElement('li');
+    li.className = 'dms-result';
+
+    const label = document.createElement('span');
+    label.className = 'dms-result__title';
+    label.textContent = item.title;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn--primary btn--sm';
+    btn.textContent = t('documents.dmsLinkBtn');
+
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        await api.post('/documents/dms/link', {
+          account_id: accountId,
+          dms_document_id: item.id,
+          category: state.category || 'other',
+          visibility: 'family',
+        });
+        closeModal({ force: true });
+        await loadDocuments();
+        renderFolderBrowser();
+        renderDocuments();
+      } catch (err) {
+        btn.disabled = false;
+        window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      }
+    });
+
+    li.append(label, btn);
+    container.appendChild(li);
+  }
 }
 
 function readFileAsDataUrl(file) {
