@@ -256,7 +256,15 @@ function dispatchFetch(request, url) {
     return networkFirst(request, LOCALES_CACHE);
   }
 
-  if (url.pathname.startsWith('/pages/')) {
+  // Lazy geladene Seiten-Module liegen in PAGES_CACHE. Neben /pages/ gehören dazu
+  // die Settings-Leaves unter /settings/ und der Einkaufskategorien-Manager —
+  // ohne diesen Zweig würden sie via SHELL_CACHE bedient und offline (vor dem
+  // ersten Online-Besuch) als index.html statt als JS-Modul ausgeliefert.
+  if (
+    url.pathname.startsWith('/pages/') ||
+    url.pathname.startsWith('/settings/') ||
+    url.pathname === '/components/shopping-category-manager.js'
+  ) {
     return networkFirst(request, PAGES_CACHE);
   }
 
