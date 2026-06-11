@@ -18,10 +18,6 @@
   margin: 0 auto;
 }
 
-.settings-tab-panel {
-  min-width: 0;
-}
-
 /* --------------------------------------------------------
    Responsive Settings Shell
    -------------------------------------------------------- */
@@ -452,76 +448,10 @@
   border: 1px solid var(--color-danger);
 }
 
-/* --------------------------------------------------------
-   Sub-Tab-Navigation (via shared sub-tabs.css)
-   -------------------------------------------------------- */
-
-/* Abstand zwischen Tab-Leiste und erstem Panel-Inhalt */
-.settings-page .sub-tabs-bar {
-  margin-bottom: var(--space-6);
-}
-
-@media (min-width: 960px) {
-  .settings-page {
-    display: grid;
-    grid-template-columns: minmax(var(--sidebar-width-expanded), var(--sidebar-width-expanded)) minmax(0, 1fr);
-    column-gap: var(--space-6);
-    align-items: start;
-  }
-
-  .settings-page > .page__header,
-  .settings-page > .settings-banner {
-    grid-column: 1 / -1;
-  }
-
-  .settings-page .settings-tabs {
-    grid-column: 1;
-    align-self: start;
-    position: sticky;
-    top: calc(var(--space-4) + var(--safe-area-inset-top));
-    z-index: var(--z-sticky);
-    flex-direction: column;
-    align-items: stretch;
-    height: auto;
-    max-height: calc(100vh - var(--space-8));
-    margin-bottom: 0;
-    padding: var(--space-3);
-    overflow-x: hidden;
-    overflow-y: auto;
-    border: 1px solid var(--glass-border-subtle);
-    border-radius: var(--radius-glass-card);
-    background-color: var(--color-surface-raised);
-    box-shadow: var(--glass-shadow-sm);
-  }
-
-  .settings-page .settings-tabs .sub-tab {
-    width: 100%;
-    justify-content: flex-start;
-    border-radius: var(--radius-sm);
-  }
-
-  .settings-page .settings-tabs .sub-tabs-separator {
-    width: 100%;
-    height: var(--space-px);
-    margin: var(--space-1) 0;
-  }
-
-  .settings-page .settings-tab-panel {
-    grid-column: 2;
-  }
-}
-
-@media (max-width: 640px) {
-  .settings-page .settings-tabs {
-    margin-inline: calc(var(--space-4) * -1);
-    padding-inline: var(--space-4);
-    scroll-padding-inline: var(--space-4);
-    mask-image: linear-gradient(to right, transparent, black var(--space-4), black calc(100% - var(--space-4)), transparent);
-  }
-
-  .settings-page .settings-tabs .sub-tab {
-    min-width: max-content;
-  }
+.settings-banner--info {
+  background: var(--color-info-light);
+  color: var(--color-info);
+  border: 1px solid var(--color-info);
 }
 
 /* --------------------------------------------------------
@@ -579,59 +509,6 @@
 .settings-card--document-storage {
   background-color: var(--color-surface-work);
   border-color: var(--color-border-subtle);
-}
-
-.settings-card--appearance::before,
-.settings-card--app-name::before,
-.settings-card--datetime::before,
-.settings-card--language::before,
-.settings-card--pwa::before,
-.settings-card--housekeeping::before,
-.settings-card--modules::before,
-.settings-card--family::before,
-.settings-card--api-tokens::before,
-.settings-card--account::before,
-.settings-card--backup::before,
-.settings-card--document-storage::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: var(--space-1);
-  background: var(--settings-card-accent, var(--module-settings));
-  border-radius: var(--radius-glass-card) 0 0 var(--radius-glass-card);
-}
-
-.settings-card--appearance,
-.settings-card--language,
-.settings-card--pwa {
-  --settings-card-accent: var(--module-settings);
-}
-
-.settings-card--app-name {
-  --settings-card-accent: var(--module-dashboard);
-}
-
-.settings-card--datetime {
-  --settings-card-accent: var(--module-calendar);
-}
-
-.settings-card--housekeeping {
-  --settings-card-accent: var(--module-housekeeping);
-}
-
-.settings-card--modules,
-.settings-card--backup,
-.settings-card--document-storage {
-  --settings-card-accent: var(--module-documents);
-}
-
-.settings-card--family,
-.settings-card--account {
-  --settings-card-accent: var(--module-contacts);
-}
-
-.settings-card--api-tokens {
-  --settings-card-accent: var(--color-accent);
 }
 
 .settings-card__title {

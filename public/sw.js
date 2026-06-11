@@ -13,10 +13,10 @@
  *   → bypassCacheUntil (in-memory + Cache API für SW-Restart-Robustheit)
  */
 
-const SHELL_CACHE   = 'oikos-shell-v72';
-const PAGES_CACHE   = 'oikos-pages-v67';
-const LOCALES_CACHE = 'oikos-locales-v19';
-const ASSETS_CACHE  = 'oikos-assets-v67';
+const SHELL_CACHE   = 'oikos-shell-v73';
+const PAGES_CACHE   = 'oikos-pages-v68';
+const LOCALES_CACHE = 'oikos-locales-v20';
+const ASSETS_CACHE  = 'oikos-assets-v68';
 const BYPASS_CACHE  = 'oikos-bypass-flag';
 const ALL_CACHES    = [SHELL_CACHE, PAGES_CACHE, LOCALES_CACHE, ASSETS_CACHE];
 
@@ -99,6 +99,29 @@ const PAGE_MODULES = [
   '/pages/settings.js',
   '/pages/login.js',
   '/pages/recipes.js',
+  '/components/shopping-category-manager.js',
+  '/settings/registry.js',
+  '/settings/shell.js',
+  '/settings/components.js',
+  '/settings/module-order.js',
+  '/settings/pages/personal-account.js',
+  '/settings/pages/personal-appearance.js',
+  '/settings/pages/personal-device.js',
+  '/settings/pages/modules-navigation.js',
+  '/settings/pages/modules-kitchen.js',
+  '/settings/pages/modules-calendar.js',
+  '/settings/pages/modules-budget.js',
+  '/settings/pages/modules-housekeeping.js',
+  '/settings/pages/modules-dashboard.js',
+  '/settings/pages/sync-calendar.js',
+  '/settings/pages/sync-contacts.js',
+  '/settings/pages/sync-reminders.js',
+  '/settings/pages/documents-storage.js',
+  '/settings/pages/documents-dms.js',
+  '/settings/pages/admin-family.js',
+  '/settings/pages/admin-api.js',
+  '/settings/pages/admin-backup.js',
+  '/settings/pages/admin-system.js',
 ];
 
 // --------------------------------------------------------

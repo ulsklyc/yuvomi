@@ -10,6 +10,7 @@ import { esc } from '/utils/html.js';
 import { init as initReminders, stop as stopReminders } from '/reminders.js';
 import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
 import { NAV_ICONS } from '/nav-icons.js';
+import { SETTINGS_LEAVES } from '/settings/registry.js';
 
 // --------------------------------------------------------
 // Routen-Definitionen
@@ -30,8 +31,17 @@ const ROUTES = [
   { path: '/budget',   page: '/pages/budget.js',    requiresAuth: true, module: 'budget'    },
   { path: '/documents', page: '/pages/documents.js', requiresAuth: true, module: 'documents' },
   { path: '/housekeeping', page: '/pages/housekeeping.js', requiresAuth: true, module: 'housekeeping' },
-  { path: '/settings', page: '/pages/settings.js',  requiresAuth: true, module: 'settings'  },
 ];
+
+// Settings ist eine Sektion mit einer Wurzel und je einer exakten Route pro
+// Blatt (Leaf). Die Routen werden aus der Registry abgeleitet, damit es keine
+// doppelten Pfad-Definitionen gibt.
+const SETTINGS_ROUTES = [
+  { path: '/settings', page: '/pages/settings.js', requiresAuth: true, module: 'settings' },
+  ...SETTINGS_LEAVES.map(({ path }) => ({ path, page: '/pages/settings.js', requiresAuth: true, module: 'settings' })),
+];
+
+ROUTES.push(...SETTINGS_ROUTES);
 
 // --------------------------------------------------------
 // Standalone-Modus: Dynamische theme-color Anpassung
@@ -161,10 +171,20 @@ const DEFAULT_APP_NAME = 'Yuvomi';
 const APP_NAME_STORAGE_KEY = 'oikos-app-name';
 const APP_VERSION_STORAGE_KEY = 'oikos-app-version';
 
+// Reduziert einen (Sub-)Pfad auf seine Top-Level-Sektion. /settings/* Blätter
+// teilen sich dadurch eine Sektion: ein Wechsel zwischen zwei Settings-Blättern
+// gilt als gleiche Sektion (keine seitliche Seitentransition).
+function topLevelSection(path) {
+  if (typeof path === 'string' && path.startsWith('/settings')) return '/settings';
+  return path ?? '/';
+}
+
 function getDirection(fromPath, toPath) {
-  const fromIdx = ROUTE_ORDER.indexOf(fromPath ?? '/');
-  const toIdx   = ROUTE_ORDER.indexOf(toPath);
-  if (fromIdx === -1 || toIdx === -1 || fromPath === toPath) return 'right';
+  const fromSection = topLevelSection(fromPath ?? '/');
+  const toSection   = topLevelSection(toPath);
+  const fromIdx = ROUTE_ORDER.indexOf(fromSection);
+  const toIdx   = ROUTE_ORDER.indexOf(toSection);
+  if (fromIdx === -1 || toIdx === -1 || fromSection === toSection) return 'right';
   return toIdx > fromIdx ? 'right' : 'left';
 }
 
@@ -195,6 +215,7 @@ function setAppVersion(version) {
 }
 
 function routeTitle(path) {
+  if (typeof path === 'string' && path.startsWith('/settings')) return t('nav.settings');
   const map = {
     '/': t('dashboard.title'),
     '/tasks': t('nav.tasks'),
@@ -208,7 +229,6 @@ function routeTitle(path) {
     '/budget': t('nav.budget'),
     '/documents': t('nav.documents'),
     '/housekeeping': t('nav.housekeeping'),
-    '/settings': t('nav.settings'),
   };
   return map[path] || _thirdPartyModules.find((module) => module.route?.path === path)?.menu?.label || getAppName();
 }
@@ -407,7 +427,8 @@ async function navigate(path, userOrPushState = true, pushState = true) {
     document.documentElement.style.setProperty('--active-module-accent', accent);
 
     await renderPage(route, previousPath);
-    updateNav(basePath);
+    // Settings-Blätter teilen sich den /settings Nav-Eintrag (aria-current).
+    updateNav(topLevelSection(basePath));
     updateThemeColorForRoute(route);
     updateBranding(basePath);
     focusMainContentAfterNavigation(basePath);

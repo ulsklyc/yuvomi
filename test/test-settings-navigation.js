@@ -3,11 +3,14 @@ import { readdir, readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
 import {
+  LEGACY_SETTINGS_STORAGE_KEY,
   SETTINGS_DOMAINS,
   SETTINGS_LEAVES,
+  SETTINGS_STORAGE_KEY,
   filterSettingsDomains,
   findSettingsLeaf,
   migrateLegacySettingsTab,
+  readStoredSettingsDestination,
   resolveSettingsDestination,
   settingsOverviewUrl,
 } from '../public/settings/registry.js';
@@ -201,6 +204,120 @@ test('resolveSettingsDestination falls back from an unknown direct settings path
     resolveSettingsDestination('/settings/not-a-page', admin),
     '/settings/personal/account',
   );
+});
+
+function createMemoryStorage(initial = {}) {
+  const map = new Map(Object.entries(initial));
+  return {
+    getItem: (key) => (map.has(key) ? map.get(key) : null),
+    setItem: (key, value) => map.set(key, String(value)),
+    removeItem: (key) => map.delete(key),
+    has: (key) => map.has(key),
+    get size() {
+      return map.size;
+    },
+  };
+}
+
+test('readStoredSettingsDestination restores a valid stored leaf', () => {
+  const storage = createMemoryStorage({ [SETTINGS_STORAGE_KEY]: '/settings/documents/storage' });
+  assert.equal(readStoredSettingsDestination(admin, storage), '/settings/documents/storage');
+});
+
+test('readStoredSettingsDestination falls back to account for an invalid stored leaf', () => {
+  const storage = createMemoryStorage({ [SETTINGS_STORAGE_KEY]: '/settings/not-a-page' });
+  assert.equal(readStoredSettingsDestination(admin, storage), '/settings/personal/account');
+});
+
+test('readStoredSettingsDestination ignores a stored admin leaf for a member', () => {
+  const storage = createMemoryStorage({ [SETTINGS_STORAGE_KEY]: '/settings/admin/system' });
+  assert.equal(readStoredSettingsDestination(member, storage), '/settings/personal/account');
+});
+
+test('readStoredSettingsDestination removes the legacy key only after a successful migration', () => {
+  const storage = createMemoryStorage({ [LEGACY_SETTINGS_STORAGE_KEY]: 'backup' });
+  assert.equal(readStoredSettingsDestination(admin, storage), '/settings/admin/backup');
+  assert.equal(storage.has(LEGACY_SETTINGS_STORAGE_KEY), false);
+  assert.equal(storage.getItem(SETTINGS_STORAGE_KEY), '/settings/admin/backup');
+});
+
+test('readStoredSettingsDestination keeps an unmigratable legacy key in place', () => {
+  const storage = createMemoryStorage({ [LEGACY_SETTINGS_STORAGE_KEY]: 'totally-unknown' });
+  assert.equal(readStoredSettingsDestination(admin, storage), '/settings/personal/account');
+  assert.equal(storage.has(LEGACY_SETTINGS_STORAGE_KEY), true);
+  assert.equal(storage.getItem(SETTINGS_STORAGE_KEY), null);
+});
+
+test('readStoredSettingsDestination does not persist a migration that leaves Settings', () => {
+  const storage = createMemoryStorage({ [LEGACY_SETTINGS_STORAGE_KEY]: 'shopping' });
+  assert.equal(readStoredSettingsDestination(admin, storage), '/shopping?manage=categories');
+  assert.equal(storage.has(LEGACY_SETTINGS_STORAGE_KEY), false);
+  assert.equal(storage.getItem(SETTINGS_STORAGE_KEY), null);
+});
+
+test('readStoredSettingsDestination defaults to account when storage is empty', () => {
+  const storage = createMemoryStorage();
+  assert.equal(readStoredSettingsDestination(admin, storage), '/settings/personal/account');
+});
+
+test('every approved settings leaf is registered as an exact SPA route', async () => {
+  const source = await readFile(
+    new URL('../public/router.js', import.meta.url),
+    'utf8',
+  );
+  assert.match(source, /import\s*\{\s*SETTINGS_LEAVES\s*\}\s*from\s*'\/settings\/registry\.js'/);
+  assert.match(
+    source,
+    /SETTINGS_LEAVES\.map\(\(\{\s*path\s*\}\)\s*=>\s*\(\{\s*path,\s*page:\s*'\/pages\/settings\.js',\s*requiresAuth:\s*true,\s*module:\s*'settings'\s*\}\)\)/,
+  );
+});
+
+test('the live Settings controller contains no page-specific endpoint strings', async () => {
+  const source = await readFile(
+    new URL('../public/pages/settings.js', import.meta.url),
+    'utf8',
+  );
+  const forbiddenEndpoints = [
+    '/preferences',
+    '/auth/api-tokens',
+    '/auth/me/password',
+    '/calendar/google',
+    '/calendar/apple',
+    '/calendar/caldav',
+    '/calendar/subscriptions',
+    '/contacts/cardav',
+    '/documents/dms',
+    '/shopping/categories',
+    '/modules?admin=1',
+  ];
+  for (const endpoint of forbiddenEndpoints) {
+    assert.equal(
+      source.includes(endpoint),
+      false,
+      `controller must not reference endpoint ${endpoint}`,
+    );
+  }
+});
+
+test('the former Shopping category tab and handlers are absent from Settings', async () => {
+  const source = await readFile(
+    new URL('../public/pages/settings.js', import.meta.url),
+    'utf8',
+  );
+  assert.doesNotMatch(source, /data-panel="shopping"/);
+  assert.doesNotMatch(source, /CATEGORY_I18N/);
+  assert.doesNotMatch(source, /catLabel/);
+});
+
+test('the Settings controller delegates to the shell instead of rendering tab panels', async () => {
+  const source = await readFile(
+    new URL('../public/pages/settings.js', import.meta.url),
+    'utf8',
+  );
+  assert.match(source, /renderSettingsShell/);
+  assert.match(source, /readStoredSettingsDestination/);
+  assert.doesNotMatch(source, /settings-tab-panel/);
+  assert.doesNotMatch(source, /settings-nav\.js/);
 });
 
 test('Kitchen child IDs use the canonical order', () => {

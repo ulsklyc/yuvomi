@@ -106,13 +106,33 @@ async function readImageAsDataUrl(file) {
   return cropped;
 }
 
-function renderPage(container, user, refreshFailed) {
+const SETTINGS_NOTICE_KEY = 'oikos:settings:notice';
+
+// Einmaliger Zugriffs-Hinweis: wurde ein Mitglied von einem unzulässigen Blatt
+// hierher umgeleitet, hinterlässt der Controller eine Notiz, die wir genau
+// einmal konsumieren und als barrierefreien Banner anzeigen.
+function consumeAccessNotice() {
+  let notice = null;
+  try {
+    notice = sessionStorage.getItem(SETTINGS_NOTICE_KEY);
+    if (notice) sessionStorage.removeItem(SETTINGS_NOTICE_KEY);
+  } catch {
+    return null;
+  }
+  return notice === 'accessRedirected' ? t('settings.accessRedirected') : null;
+}
+
+function renderPage(container, user, refreshFailed, accessNotice) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <header class="settings-leaf-header">
       <h1 class="settings-leaf-header__title">${t('settings.pageAccount')}</h1>
       <p class="settings-leaf-header__description">${t('settings.pageAccountDescription')}</p>
     </header>
+
+    ${accessNotice ? `
+      <div class="settings-banner settings-banner--info" role="status">${esc(accessNotice)}</div>
+    ` : ''}
 
     ${refreshFailed ? `
       <div class="settings-card settings-card--account">
@@ -331,8 +351,10 @@ export async function render(container, { user }) {
     refreshFailed = true;
   }
 
+  const accessNotice = consumeAccessNotice();
+
   try {
-    renderPage(container, currentUser, refreshFailed);
+    renderPage(container, currentUser, refreshFailed, accessNotice);
     bindEvents(container, currentUser, {
       avatarData: currentUser?.avatar_data ?? null,
     });

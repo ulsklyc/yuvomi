@@ -5,6 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { SETTINGS_DOMAINS, SETTINGS_LEAVES } from '../public/settings/registry.js';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r/g, '');
 
@@ -116,6 +117,50 @@ test('dynamic frontend translation key domains exist in every locale', () => {
   assertKeysExistInEveryLocale(keys);
 });
 
+test('settings information-architecture keys exist in every locale', () => {
+  const keys = new Set();
+
+  // Registry-derived labels/descriptions — the source of truth, never duplicated here.
+  for (const domain of SETTINGS_DOMAINS) keys.add(domain.labelKey);
+  for (const leaf of SETTINGS_LEAVES) {
+    keys.add(leaf.labelKey);
+    keys.add(leaf.descriptionKey);
+  }
+
+  // Shared Settings-IA copy that lives outside the registry but is part of the same surface.
+  [
+    // Shell chrome + overview headings.
+    'settings.title',
+    'settings.navigationLabel',
+    'settings.breadcrumbLabel',
+    'settings.backToSettings',
+    'settings.loadError',
+    'settings.retry',
+    // Domain + mobile overview labels.
+    'settings.mobileOverviewTitle',
+    'settings.mobileOverviewDescription',
+    'settings.mobileDomainTitle',
+    // Status-first integration copy + progressive disclosure.
+    'settings.providerSpecific',
+    'settings.moreProviders',
+    // Apple-legacy copy.
+    'settings.legacy',
+    'settings.appleLegacyHint',
+    // Document backup warning.
+    'settings.documentStorageBackupWarning',
+    // Kitchen active count.
+    'settings.kitchenActiveCount',
+    // App navigation section labels.
+    'nav.sectionOverview',
+    'nav.sectionPlan',
+    'nav.sectionHome',
+    // Unauthorized / access-redirected notice.
+    'settings.accessRedirected',
+  ].forEach((key) => keys.add(key));
+
+  assertKeysExistInEveryLocale([...keys]);
+});
+
 test('service worker precaches every supported locale file', () => {
   const i18n = read('../public/i18n.js');
   const sw = read('../public/sw.js');
@@ -159,7 +204,7 @@ test('shared sub-tabs wire tabs to panels with aria-controls and aria-labelledby
 });
 
 test('settings theme toggle exposes pressed state', () => {
-  const source = read('../public/pages/settings.js');
+  const source = read('../public/settings/pages/personal-appearance.js');
   assert.match(source, /aria-pressed/);
   assert.match(source, /setAttribute\('aria-pressed'/);
 });
@@ -1075,7 +1120,7 @@ test('phase 4 touched icon markup uses icon classes instead of inline icon sizin
 });
 
 test('phase 4 settings theme toggle uses Lucide placeholders instead of inline SVG icons', () => {
-  const settings = read('../public/pages/settings.js');
+  const settings = read('../public/settings/pages/personal-appearance.js');
 
   assert.doesNotMatch(settings, /<svg\s+width="18"\s+height="18"[\s\S]*?data-theme-value=/);
   assert.match(settings, /data-lucide="monitor"/);
@@ -1090,57 +1135,52 @@ test('phase 4 opens search from More sheet in a single handoff', () => {
   assert.match(routerSource, /requestAnimationFrame\(\(\) => \{\s*openSearch\(\);/);
 });
 
-test('phase 6 Settings tabs become a desktop sticky local navigation', () => {
+test('settings cutover: the controller is a thin shell delegate without the legacy monolith', () => {
   const settingsPage = read('../public/pages/settings.js');
-  const settingsCss = read('../public/styles/settings.css');
 
-  assert.match(settingsPage, /extraClass:\s*'settings-tabs'/);
-  assert.match(
-    settingsCss,
-    /@media \(min-width:\s*960px\)[\s\S]*\.settings-page\s*\{[\s\S]*grid-template-columns:\s*minmax\(var\(--sidebar-width-expanded\),\s*var\(--sidebar-width-expanded\)\)\s+minmax\(0,\s*1fr\)/
-  );
-  assert.match(
-    settingsCss,
-    /@media \(min-width:\s*960px\)[\s\S]*\.settings-page \.settings-tabs\s*\{[\s\S]*position:\s*sticky[\s\S]*flex-direction:\s*column/
-  );
-  assert.match(settingsCss, /\.settings-tab-panel\s*\{[\s\S]*min-width:\s*0/);
+  assert.match(settingsPage, /renderSettingsShell/, 'controller must delegate rendering to the shell');
+  assert.match(settingsPage, /readStoredSettingsDestination/, 'controller must read & migrate stored settings state');
+  assert.doesNotMatch(settingsPage, /settings-tab-panel/, 'controller must not render legacy tab panels');
+  assert.doesNotMatch(settingsPage, /data-panel=/, 'controller must not render legacy data-panel attributes');
+  assert.doesNotMatch(settingsPage, /settings-nav\.js/, 'controller must not import the removed settings-nav helpers');
+  assert.doesNotMatch(settingsPage, /extraClass:\s*'settings-tabs'/, 'controller must not render the legacy sub-tab bar');
+
+  const lineCount = settingsPage.split('\n').length;
+  assert.ok(lineCount <= 160, `settings controller should be a thin shell (was ${lineCount} lines)`);
 });
 
-test('phase 6 Settings mobile tabs expose horizontal scroll affordance', () => {
-  const settingsCss = read('../public/styles/settings.css');
-
-  assert.match(
-    settingsCss,
-    /@media \(max-width:\s*640px\)[\s\S]*\.settings-page \.settings-tabs\s*\{[\s\S]*mask-image:\s*linear-gradient/
-  );
-  assert.match(
-    settingsCss,
-    /@media \(max-width:\s*640px\)[\s\S]*\.settings-page \.settings-tabs\s*\{[\s\S]*scroll-padding-inline:\s*var\(--space-4\)/
-  );
-  assert.match(
-    settingsCss,
-    /@media \(max-width:\s*640px\)[\s\S]*\.settings-page \.settings-tabs \.sub-tab\s*\{[\s\S]*min-width:\s*max-content/
-  );
+test('settings cutover: obsolete navigation modules and stylesheet are removed', () => {
+  assert.equal(existsSync(new URL('../public/utils/settings-nav.js', import.meta.url)), false);
+  assert.equal(existsSync(new URL('../public/styles/settings-nav.css', import.meta.url)), false);
 });
 
-test('phase 6 Settings cards carry IA modifiers for scannable admin groups', () => {
-  const settingsPage = read('../public/pages/settings.js');
-  const settingsCss = read('../public/styles/settings.css');
-  const cardModifiers = [
-    'appearance',
-    'app-name',
-    'datetime',
-    'modules',
-    'account',
-    'family',
-    'api-tokens',
-    'backup',
-  ];
-
-  for (const modifier of cardModifiers) {
-    assert.match(settingsPage, new RegExp(`settings-card--${modifier}`), `settings.js should mark ${modifier} settings cards`);
-    assert.match(settingsCss, new RegExp(`\\.settings-card--${modifier}\\b`), `settings.css should style ${modifier} settings cards`);
+test('settings cutover: no obsolete settings-tab / panel references remain in public', () => {
+  const offenders = [];
+  for (const file of walkFrontendFiles('../public/')) {
+    const source = read(file);
+    if (/settings-nav\b|settings-tabs\b|settings-tab-panel\b|data-panel=|renderSettingsSidebar\b/.test(source)) {
+      offenders.push(file);
+    }
   }
+  assert.deepEqual(offenders, [], `obsolete settings navigation references remain: ${offenders.join(', ')}`);
+});
+
+test('settings cutover: the access-redirected notice is consumed once on the account leaf', () => {
+  const account = read('../public/settings/pages/personal-account.js');
+
+  assert.match(account, /oikos:settings:notice/, 'account leaf must read the one-time redirect notice');
+  assert.match(account, /accessRedirected/, 'account leaf must surface the access-redirected message');
+  assert.match(account, /removeItem\(/, 'account leaf must consume the notice once');
+});
+
+test('settings cutover: route direction treats settings sub-paths as one section', () => {
+  const routerSource = read('../public/router.js');
+
+  assert.match(
+    routerSource,
+    /startsWith\('\/settings'\)/,
+    'router must normalise /settings sub-paths for title and direction handling',
+  );
 });
 
 test('phase 6 shared sub-tabs support keyboard tab navigation', () => {

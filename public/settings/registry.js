@@ -232,3 +232,18 @@ export function resolveSettingsDestination(path, user, storedPath) {
 export function migrateLegacySettingsTab(value) {
   return LEGACY_SETTINGS_PATHS[value] ?? null;
 }
+
+export function readStoredSettingsDestination(user, storage = sessionStorage) {
+  const current = storage.getItem(SETTINGS_STORAGE_KEY);
+  if (findSettingsLeaf(current, user)) return current;
+  const legacy = storage.getItem(LEGACY_SETTINGS_STORAGE_KEY);
+  const migrated = migrateLegacySettingsTab(legacy);
+  if (migrated) {
+    storage.removeItem(LEGACY_SETTINGS_STORAGE_KEY);
+    if (migrated.startsWith('/settings/') && findSettingsLeaf(migrated, user)) {
+      storage.setItem(SETTINGS_STORAGE_KEY, migrated);
+    }
+    return migrated;
+  }
+  return '/settings/personal/account';
+}
