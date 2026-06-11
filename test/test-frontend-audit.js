@@ -64,6 +64,7 @@ function assertRuleUsesToken(css, selector, property, token, file) {
 test('audited frontend files do not assign innerHTML', () => {
   const files = [
     '../public/components/oikos-install-prompt.js',
+    '../public/components/shopping-category-manager.js',
     '../public/pages/notes.js',
     '../public/pages/meals.js',
     '../public/pages/contacts.js',
@@ -416,6 +417,27 @@ test('module-specific settings leaves preserve their required controls and behav
   assert.match(dashboard, /new CustomEvent\('app-name-changed'/);
   assert.match(dashboard, /window\.oikos\?\.showToast/);
   assert.match(dashboard, /await render\(container, \{ user \}\)/);
+});
+
+test('Shopping owns shopping category management via a dedicated web component', () => {
+  const component = read('../public/components/shopping-category-manager.js');
+  assert.match(component, /customElements\.define\(\s*'oikos-shopping-category-manager'/);
+  assert.match(component, /import \{ api \} from '\/api\.js'/);
+  assert.match(component, /import \{ t \} from '\/i18n\.js'/);
+  assert.match(component, /import \{ esc \} from '\/utils\/html\.js'/);
+  assert.match(component, /api\.get\('\/shopping\/categories'\)/);
+  assert.match(component, /api\.post\('\/shopping\/categories'/);
+  assert.match(component, /api\.patch\('\/shopping\/categories\/reorder'/);
+  assert.match(component, /shopping-categories-changed/);
+  assert.match(component, /disconnectedCallback\(\)/);
+  assert.match(component, /removeEventListener/);
+  assert.doesNotMatch(component, /#[0-9a-f]{6}/i);
+
+  const shopping = read('../public/pages/shopping.js');
+  assert.match(shopping, /components\/shopping-category-manager\.js/);
+  assert.match(shopping, /<oikos-shopping-category-manager>/);
+  assert.match(shopping, /shopping\.manageCategories/);
+  assert.match(shopping, /shopping-categories-changed/);
 });
 
 test('Kitchen settings copy directs Recipes and Shopping content settings to their modules', () => {

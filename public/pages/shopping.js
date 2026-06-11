@@ -11,6 +11,7 @@ import { esc } from '/utils/html.js';
 import { promptModal } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
+import '/components/shopping-category-manager.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -157,6 +158,11 @@ function renderListContent(container) {
             <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
             ${t('shopping.clearChecked', { count: checkedCount })}
           </button>` : ''}
+        <button class="btn btn--ghost btn--icon" data-action="manage-categories"
+                aria-label="${t('shopping.manageCategories')}" title="${t('shopping.manageCategories')}"
+                style="color:var(--color-text-secondary)">
+          <i data-lucide="tags" class="icon-md" aria-hidden="true"></i>
+        </button>
         <button class="btn btn--ghost btn--icon" data-action="delete-list"
                 data-id="${state.activeList.id}" aria-label="${t('shopping.deleteListLabel')}"
                 style="color:var(--color-text-secondary)">
@@ -846,6 +852,11 @@ function wireListContentEvents(container) {
       }, 4100);
     }
 
+    // ---- Kategorien verwalten ----
+    if (action === 'manage-categories') {
+      openCategoryManager(container);
+    }
+
     // ---- Liste umbenennen ----
     if (action === 'rename-list') {
       const newName = await promptModal(t('shopping.renameListPrompt'), state.activeList?.name ?? '');
@@ -899,6 +910,55 @@ function wireListContentEvents(container) {
   // Rename per Enter
   content.querySelector('[data-action="rename-list"]')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') e.currentTarget.click();
+  });
+}
+
+// --------------------------------------------------------
+// Kategorie-Verwaltung (kanonischer Ort, früher in Settings)
+// --------------------------------------------------------
+
+/**
+ * Öffnet den Kategorie-Manager in einem Modal. Reagiert auf
+ * `shopping-categories-changed`, um den lokalen State und die aktive Liste
+ * zu aktualisieren. Schließen navigiert zurück nach /shopping (Query entfernen).
+ * @param {Element} container Seiten-Container
+ * @param {object}  [opts]
+ * @param {boolean} [opts.fromDeepLink] true, wenn via ?manage=categories geöffnet
+ */
+async function openCategoryManager(container, { fromDeepLink = false } = {}) {
+  const { openModal } = await import('/components/modal.js');
+
+  let changed = false;
+  const onCategoriesChanged = async (e) => {
+    changed = true;
+    if (e.detail?.categories?.length) {
+      state.categories = e.detail.categories;
+    } else {
+      await loadCategories();
+    }
+  };
+
+  openModal({
+    title: t('shopping.manageCategories'),
+    content: '<oikos-shopping-category-manager></oikos-shopping-category-manager>',
+    onSave: (panel) => {
+      const manager = panel.querySelector('oikos-shopping-category-manager');
+      if (!manager) return;
+      manager.addEventListener('shopping-categories-changed', onCategoriesChanged);
+      // Überschrift fokussieren, sobald die Komponente gerendert hat.
+      requestAnimationFrame(() => manager.focusHeading?.());
+    },
+    onClose: () => {
+      // Bei Mutationen die sichtbare Liste neu aufbauen (Gruppierung/Quick-Add-Select).
+      if (changed && state.activeList) {
+        renderListContent(container);
+        wireListContentEvents(container);
+      }
+      // Deep-Link-Query entfernen, wenn der Manager über die URL geöffnet wurde.
+      if (fromDeepLink && new URLSearchParams(window.location.search).has('manage')) {
+        window.oikos?.navigate?.('/shopping');
+      }
+    },
   });
 }
 
@@ -970,6 +1030,11 @@ export async function render(container, { user }) {
   if (highlightId) {
     const el = container.querySelector(`[data-action="toggle-item"][data-id="${highlightId}"]`);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // Deep-Link: ?manage=categories öffnet den Kategorie-Manager sofort.
+  if (new URLSearchParams(window.location.search).get('manage') === 'categories') {
+    openCategoryManager(container, { fromDeepLink: true });
   }
 }
 
