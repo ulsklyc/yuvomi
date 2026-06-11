@@ -1130,16 +1130,41 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
           if (mode === 'create') {
             const res = await api.post('/budget', body);
             state.entries.unshift(res.data);
+            await loadMonth(state.month);
+            closeModal({ force: true });
+            renderBody();
+            window.oikos?.showToast(t('budget.addedToast'), 'success');
+          } else if (entry.recurrence_parent_id) {
+            // Kind-Instanz: Nutzer fragen, ob nur dieser oder alle zukünftigen
+            saveBtn.disabled = false;
+            saveBtn.textContent = t('common.save');
+            closeModal({ force: true });
+            const scope = await recurringChoiceModal({
+              title: t('budget.recurringSeriesScope'),
+              thisLabel: t('budget.recurringThisOnly'),
+              seriesLabel: t('budget.recurringEditSeries'),
+            });
+            if (scope === null) { openBudgetModal({ mode: 'edit', entry }); return; }
+            if (scope === 'series') {
+              await api.put(`/budget/${entry.id}/series`, body);
+              window.oikos?.showToast(t('budget.recurringSeriesSaved'), 'success');
+            } else {
+              const res = await api.put(`/budget/${entry.id}`, body);
+              const idx = state.entries.findIndex((e) => e.id === entry.id);
+              if (idx !== -1) state.entries[idx] = res.data;
+              window.oikos?.showToast(t('budget.savedToast'), 'success');
+            }
+            await loadMonth(state.month);
+            renderBody();
           } else {
             const res = await api.put(`/budget/${entry.id}`, body);
             const idx = state.entries.findIndex((e) => e.id === entry.id);
             if (idx !== -1) state.entries[idx] = res.data;
+            await loadMonth(state.month);
+            closeModal({ force: true });
+            renderBody();
+            window.oikos?.showToast(t('budget.savedToast'), 'success');
           }
-          await loadMonth(state.month);
-
-          closeModal({ force: true });
-          renderBody();
-          window.oikos?.showToast(mode === 'create' ? t('budget.addedToast') : t('budget.savedToast'), 'success');
         } catch (err) {
           window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
           saveBtn.disabled    = false;
@@ -1373,6 +1398,18 @@ async function deleteLoanPayment(loanId, paymentId) {
 
 async function deleteEntry(id) {
   const entry = state.entries.find((e) => e.id === id);
+
+  if (entry && (entry.is_recurring || entry.recurrence_parent_id)) {
+    const scope = await recurringChoiceModal({
+      title: t('budget.recurringSeriesScope'),
+      thisLabel: t('budget.recurringThisOnly'),
+      seriesLabel: t('budget.recurringEntireSeries'),
+      seriesDanger: true,
+    });
+    if (scope === null) return;
+    if (scope === 'series') { await deleteEntrySeries(id); return; }
+  }
+
   state.entries = state.entries.filter((e) => e.id !== id);
   renderBody();
   vibrate([30, 50, 30]);
@@ -1405,3 +1442,59 @@ async function deleteEntry(id) {
 // --------------------------------------------------------
 // Hilfsfunktion
 // --------------------------------------------------------
+
+/**
+ * Zeigt ein Modal mit zwei Wahloptionen für wiederkehrende Einträge.
+ * Gibt 'this' | 'series' | null (abgebrochen) zurück.
+ */
+function recurringChoiceModal({ title, thisLabel, seriesLabel, seriesDanger = false }) {
+  return new Promise((resolve) => {
+    let resolved = false;
+    function finish(value) {
+      if (resolved) return;
+      resolved = true;
+      closeModal({ force: true });
+      resolve(value);
+    }
+    openSharedModal({
+      title,
+      size: 'sm',
+      content: `
+        <div class="modal-actions modal-actions--stack">
+          <button type="button" class="btn btn--secondary" id="rcs-this">${thisLabel}</button>
+          <button type="button" class="btn ${seriesDanger ? 'btn--danger' : 'btn--primary'}" id="rcs-series">${seriesLabel}</button>
+          <button type="button" class="btn btn--ghost" id="rcs-cancel">${t('common.cancel')}</button>
+        </div>`,
+      onClose: () => finish(null),
+      onSave(panel) {
+        panel.querySelector('#rcs-this')?.addEventListener('click', () => finish('this'));
+        panel.querySelector('#rcs-series')?.addEventListener('click', () => finish('series'));
+        panel.querySelector('#rcs-cancel')?.addEventListener('click', () => finish(null));
+      },
+    });
+  });
+}
+
+async function deleteEntrySeries(id) {
+  const entry = state.entries.find((e) => e.id === id);
+  const parentId = entry?.recurrence_parent_id ?? (entry?.is_recurring ? entry.id : id);
+  state.entries = state.entries.filter((e) => e.id !== parentId && e.recurrence_parent_id !== parentId);
+  renderBody();
+  vibrate([30, 50, 30]);
+
+  let undone = false;
+  window.oikos?.showToast(t('budget.recurringSeriesDeleted'), 'default', 5000, () => { undone = true; });
+
+  setTimeout(async () => {
+    if (undone) return;
+    try {
+      await api.delete(`/budget/${id}/series`);
+      await loadMonth(state.month);
+      renderBody();
+    } catch (err) {
+      await loadMonth(state.month);
+      renderBody();
+      window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    }
+  }, 5000);
+}

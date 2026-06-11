@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.71.7] - 2026-06-11
+
+### Added
+- **Recurring payment series management**: deleting or editing a recurring budget entry now asks whether to affect only the current occurrence or the entire series. "Delete entire series" removes the parent rule and all its instances; "Change all future occurrences" updates the parent rule and purges future instances so they regenerate with the new values on next visit.
+
 ## [0.71.6] - 2026-06-11
 
 ### Changed
