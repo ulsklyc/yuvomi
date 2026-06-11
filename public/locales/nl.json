@@ -1167,7 +1167,6 @@
     "helpTooltipCardDAV": "CardDAV maakt contactsynchronisatie mogelijk met iCloud, Nextcloud en andere CardDAV-servers.",
     "navigationLabel": "Instellingennavigatie",
     "sectionAdmin": "Beheer",
-    "sectionCloudServices": "Clouddiensten",
     "sectionModulesNav": "Modules",
     "sectionOpenStandards": "CalDAV & CardDAV",
     "sectionPersonal": "Persoonlijk",

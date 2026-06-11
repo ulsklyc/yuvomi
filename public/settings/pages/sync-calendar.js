@@ -119,7 +119,6 @@ function renderPage(container, user) {
     </section>
 
     <section class="settings-section">
-      <h2 class="settings-section__title">${t('settings.sectionCloudServices')}</h2>
       <div id="sync-more-providers-container"></div>
     </section>
   `);
