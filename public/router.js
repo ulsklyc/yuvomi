@@ -987,7 +987,7 @@ function renderAppShell(container) {
   container.querySelectorAll('[data-route]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.preventDefault();
-      navigate(el.dataset.route);
+      navigate(el.dataset.navHref ?? el.dataset.route);
     });
   });
 
@@ -1412,7 +1412,7 @@ function navItems() {
     { path: '/documents', label: t('nav.documents'), icon: 'folder-lock',      module: 'documents',   section: NAV_SECTION.home },
     { path: '/housekeeping', label: t('nav.housekeeping'), icon: 'paintbrush', module: 'housekeeping', section: NAV_SECTION.home },
     // Settings ist am Ende gepinnt (siehe unten).
-    { path: '/settings',  label: t('nav.settings'),  icon: 'settings',         module: 'settings',    section: NAV_SECTION.home },
+    { path: '/settings',  navHref: '/settings?view=domains', label: t('nav.settings'),  icon: 'settings',         module: 'settings',    section: NAV_SECTION.home },
   ];
   const thirdPartyItems = _thirdPartyModules
     .filter((module) => module.enabled && module.status === 'enabled' && module.menu?.show && module.route?.path)
@@ -1524,10 +1524,11 @@ async function disableFailedThirdPartyModule(moduleId) {
   }
 }
 
-function navItemEl({ path, label, icon, module: mod, accent }) {
+function navItemEl({ path, navHref, label, icon, module: mod, accent }) {
   const a = document.createElement('a');
-  a.href = path;
+  a.href = navHref ?? path;
   a.dataset.route = path;
+  if (navHref) a.dataset.navHref = navHref;
   a.className = 'nav-item';
   a.setAttribute('aria-label', label);
   a.setAttribute('title', label);
@@ -1647,10 +1648,11 @@ function sidebarKitchenEl() {
   return a;
 }
 
-function moreItemEl({ path, label, icon, module: mod, accent }) {
+function moreItemEl({ path, navHref, label, icon, module: mod, accent }) {
   const a = document.createElement('a');
-  a.href = path;
+  a.href = navHref ?? path;
   a.dataset.route = path;
+  if (navHref) a.dataset.navHref = navHref;
   a.className = 'more-item';
   if (accent) a.style.setProperty('--item-module-accent', accent);
   else if (mod) a.style.setProperty('--item-module-accent', `var(--module-${mod})`);
@@ -2026,7 +2028,7 @@ function rebuildNavigation({ updateLabels = true } = {}) {
   document.querySelectorAll('[data-route]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.preventDefault();
-      navigate(el.dataset.route);
+      navigate(el.dataset.navHref ?? el.dataset.route);
     });
   });
 
