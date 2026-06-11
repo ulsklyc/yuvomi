@@ -433,11 +433,21 @@ test('Shopping owns shopping category management via a dedicated web component',
   assert.match(component, /removeEventListener/);
   assert.doesNotMatch(component, /#[0-9a-f]{6}/i);
 
+  // Optimistisches Reorder muss bei API-Fehler auf den Snapshot zurückrollen.
+  const moveFn = component.match(/async _move\([\s\S]*?\n  \}/)?.[0] ?? '';
+  assert.match(moveFn, /const snapshot = \[\.\.\.this\._cats\]/);
+  const moveCatch = moveFn.match(/catch \(err\) \{[\s\S]*?\n    \}/)?.[0] ?? '';
+  assert.match(moveCatch, /this\._cats = snapshot/);
+  assert.doesNotMatch(moveCatch, /this\._notifyChanged\(\)/);
+
   const shopping = read('../public/pages/shopping.js');
   assert.match(shopping, /components\/shopping-category-manager\.js/);
   assert.match(shopping, /<oikos-shopping-category-manager>/);
   assert.match(shopping, /shopping\.manageCategories/);
   assert.match(shopping, /shopping-categories-changed/);
+  // onClose muss den Listener wieder abräumen (kein Leak bei Modal-Reuse).
+  const openMgr = shopping.match(/async function openCategoryManager[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.match(openMgr, /manager\?\.removeEventListener\('shopping-categories-changed'/);
 });
 
 test('Kitchen settings copy directs Recipes and Shopping content settings to their modules', () => {

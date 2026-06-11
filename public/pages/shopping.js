@@ -938,17 +938,21 @@ async function openCategoryManager(container, { fromDeepLink = false } = {}) {
     }
   };
 
+  let manager = null;
   openModal({
     title: t('shopping.manageCategories'),
     content: '<oikos-shopping-category-manager></oikos-shopping-category-manager>',
     onSave: (panel) => {
-      const manager = panel.querySelector('oikos-shopping-category-manager');
+      manager = panel.querySelector('oikos-shopping-category-manager');
       if (!manager) return;
       manager.addEventListener('shopping-categories-changed', onCategoriesChanged);
       // Überschrift fokussieren, sobald die Komponente gerendert hat.
-      requestAnimationFrame(() => manager.focusHeading?.());
+      requestAnimationFrame(() => manager?.focusHeading?.());
     },
     onClose: () => {
+      // Listener-Cleanup, damit beim Modal-Reuse kein Leak entsteht.
+      manager?.removeEventListener('shopping-categories-changed', onCategoriesChanged);
+      manager = null;
       // Bei Mutationen die sichtbare Liste neu aufbauen (Gruppierung/Quick-Add-Select).
       if (changed && state.activeList) {
         renderListContent(container);

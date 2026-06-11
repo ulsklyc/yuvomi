@@ -179,12 +179,16 @@ class ShoppingCategoryManagerElement extends HTMLElement {
     const idx = this._cats.findIndex((c) => c.id === id);
     const nextIdx = idx + delta;
     if (idx < 0 || nextIdx < 0 || nextIdx >= this._cats.length) return;
+    // Snapshot vor der optimistischen Mutation, um bei API-Fehler zurückzurollen.
+    const snapshot = [...this._cats];
     [this._cats[idx], this._cats[nextIdx]] = [this._cats[nextIdx], this._cats[idx]];
     this._renderList();
     try {
       await api.patch('/shopping/categories/reorder', { order: this._cats.map((c) => c.id) });
       this._notifyChanged();
     } catch (err) {
+      this._cats = snapshot;
+      this._renderList();
       window.oikos?.showToast(err.message, 'danger');
     }
   }
