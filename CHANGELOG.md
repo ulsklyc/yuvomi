@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Settings reorganized into five clear areas**: Settings is now grouped into **Personal**, **Modules**, **Sync**, **Documents**, and **Administration**, each with its own focused pages instead of one long row of tabs. Members see only Personal; administrators see everything. On a wide screen a sticky side menu keeps every page one click away; on a phone you drill down from an overview into an area and into a page, with breadcrumbs and a working Back button. Each page loads on demand and remembers where you were.
+- **Synchronization is organized by what you sync** — separate **Calendar**, **Contacts**, and **Reminders** pages, each opening with a clear connection status. CalDAV and Webcal/ICS are front and center; Google and Apple/iCloud now live under a **"More providers"** section, with Apple marked as legacy and new iCloud users pointed at the standard CalDAV setup.
+- **Documents has its own area** with separate **Document storage** (local/WebDAV) and **Document management (Paperless/DMS)** pages; database-backup settings stay under Administration.
+- **Kitchen is one place in the navigation**: Meals, Recipes, and Shopping are grouped under a single **Kitchen** entry you can reorder as one item, while each still has its own page. The main navigation is grouped into **Overview**, **Plan**, and **Home**.
+- **Shopping categories are managed inside Shopping** (via a "Manage categories" action) instead of in Settings. Old Settings links and bookmarks are redirected to the right new place automatically.
+
+### Fixed
+- **Opening Settings directly now works reliably**: loading, refreshing, or bookmarking the Settings URL no longer occasionally lands on the dashboard.
+
 ## [0.70.2] - 2026-06-10
 
 ### Security
