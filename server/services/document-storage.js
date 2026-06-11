@@ -392,8 +392,7 @@ function remoteUrl(config, relativeSegments) {
 async function davFetch(config, method, relativeSegments, { body, headers } = {}) {
   const url = remoteUrl(config, relativeSegments);
   const agent = requestAgent(url, config);
-  // codeql[js/request-forgery] - SSRF mitigated: agent uses validatedLookup (blocks private IPs at DNS time) + assertWebdavTargetAllowed pre-flight
-  return fetch(url, {
+  return fetch(url, { // codeql[js/request-forgery] - SSRF mitigated: agent uses validatedLookup (blocks private IPs at DNS time) + assertWebdavTargetAllowed pre-flight
     method,
     redirect: 'manual',
     agent,
