@@ -94,13 +94,15 @@ function bindPwaInstall(container) {
   if (unsubscribeRequested || !container.isConnected) {
     stopListening();
   } else {
+    // Cleanup-Erkennung: Der SPA-Router tauscht Seiten per
+    // #main-content.replaceChildren() aus. Wir beobachten nur diesen einen
+    // persistenten Container (childList, ohne subtree) statt das gesamte
+    // document.body-Subtree — Letzteres würde bei jeder DOM-Mutation der App feuern.
+    const swapRoot = document.getElementById('main-content') || container.parentNode;
     observer = new MutationObserver(() => {
       if (!container.isConnected) stopListening();
     });
-    observer.observe(document.body || document.documentElement, {
-      childList: true,
-      subtree: true,
-    });
+    if (swapRoot) observer.observe(swapRoot, { childList: true });
     if (!container.isConnected) stopListening();
   }
 

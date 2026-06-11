@@ -298,7 +298,11 @@ test('personal device leaf owns PWA installation state and disconnect cleanup', 
   assert.match(source, /if \(unsubscribed\) return/);
   assert.match(source, /stopListening\(\)/);
   assert.match(source, /new MutationObserver\(/);
-  assert.match(source, /observer\.observe\(document\.body \|\| document\.documentElement/);
+  // Cleanup observes only the router's persistent swap container (#main-content),
+  // not the whole document.body subtree (which fires on every app DOM mutation).
+  assert.match(source, /getElementById\('main-content'\)/);
+  assert.match(source, /observer\.observe\(swapRoot, \{ childList: true \}\)/);
+  assert.doesNotMatch(source, /subtree:\s*true/);
   assert.match(source, /observer\?\.disconnect\(\)/);
   assert.match(source, /id="pwa-install-status"[^>]*aria-live=/);
   assert.match(source, /id="pwa-install-error"[^>]*role="alert"/);
