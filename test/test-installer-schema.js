@@ -17,9 +17,17 @@ const P5_KEYS = [
   'BACKUP_ENABLED', 'BACKUP_SCHEDULE', 'BACKUP_KEEP',
 ];
 
-const TOTAL_KEYS = ORIGINAL_KEYS.length + 2 + P5_KEYS.length; // + TZ + OIKOS_HTTP_PORT
+const DOCUMENT_STORAGE_KEYS = [
+  'DOCUMENT_STORAGE_WEBDAV_ENABLED',
+  'DOCUMENT_STORAGE_WEBDAV_URL',
+  'DOCUMENT_STORAGE_WEBDAV_USERNAME',
+  'DOCUMENT_STORAGE_WEBDAV_PASSWORD',
+  'DOCUMENT_STORAGE_WEBDAV_PATH',
+];
 
-test('ENV_SCHEMA enthält alle Original-Keys, TZ, OIKOS_HTTP_PORT und die P5-Settings', () => {
+const TOTAL_KEYS = ORIGINAL_KEYS.length + 2 + P5_KEYS.length + DOCUMENT_STORAGE_KEYS.length; // + TZ + OIKOS_HTTP_PORT
+
+test('ENV_SCHEMA enthält alle Original-Keys, TZ, OIKOS_HTTP_PORT, P5 und Dokument-WebDAV', () => {
   assert.equal(ENV_SCHEMA.length, TOTAL_KEYS);
   const keys = ENV_SCHEMA.map(e => e.key);
   for (const k of ORIGINAL_KEYS) {
@@ -30,6 +38,9 @@ test('ENV_SCHEMA enthält alle Original-Keys, TZ, OIKOS_HTTP_PORT und die P5-Set
   for (const k of P5_KEYS) {
     assert.ok(keys.includes(k), `P5-Key fehlt: ${k}`);
   }
+  for (const k of DOCUMENT_STORAGE_KEYS) {
+    assert.ok(keys.includes(k), `Dokument-WebDAV-Key fehlt: ${k}`);
+  }
 });
 
 test('TZ und OIKOS_HTTP_PORT haben writeToEnv: true', () => {
@@ -38,6 +49,22 @@ test('TZ und OIKOS_HTTP_PORT haben writeToEnv: true', () => {
     assert.ok(entry, `${key} nicht in ENV_SCHEMA`);
     assert.equal(entry.writeToEnv, true, `${key}.writeToEnv ist nicht true`);
   }
+});
+
+test('Dokument-WebDAV ist optional, standardmäßig deaktiviert und maskiert das Passwort', () => {
+  for (const key of DOCUMENT_STORAGE_KEYS) {
+    const entry = ENV_SCHEMA.find(e => e.key === key);
+    assert.ok(entry, `${key} nicht in ENV_SCHEMA`);
+    assert.equal(entry.required, false, `${key} muss optional sein`);
+    assert.equal(entry.writeToEnv, true, `${key}.writeToEnv ist nicht true`);
+  }
+
+  const enabled = ENV_SCHEMA.find(e => e.key === 'DOCUMENT_STORAGE_WEBDAV_ENABLED');
+  assert.equal(enabled.type, 'default');
+  assert.equal(enabled.default, 'false');
+
+  const password = ENV_SCHEMA.find(e => e.key === 'DOCUMENT_STORAGE_WEBDAV_PASSWORD');
+  assert.equal(password.secret, true, 'WebDAV-Passwort muss als Secret markiert sein');
 });
 
 test('Alle Schema-Einträge haben die Pflichtfelder key, type, label, group, writeToEnv', () => {
@@ -70,6 +97,41 @@ test('install.html nimmt TZ und OIKOS_HTTP_PORT ins gesendete env-Objekt auf', (
   assert.match(src, /OIKOS_HTTP_PORT:\s*S\.port/, 'install.html sendet OIKOS_HTTP_PORT nicht im env-Objekt');
 });
 
+test('Web-Installer zeigt, sammelt und sendet alle Dokument-WebDAV-Werte', () => {
+  const src = readFileSync(new URL('../tools/installer/install.html', import.meta.url), 'utf8');
+  for (const id of [
+    'adv-document-webdav-enable',
+    'adv-document-webdav-url',
+    'adv-document-webdav-username',
+    'adv-document-webdav-password',
+    'adv-document-webdav-path',
+  ]) {
+    assert.match(src, new RegExp(`id="${id}"`), `Web-Installer-Feld fehlt: ${id}`);
+  }
+  assert.match(
+    src,
+    /id="adv-document-webdav-password"[^>]*type="password"|type="password"[^>]*id="adv-document-webdav-password"/,
+    'WebDAV-Passwortfeld muss maskiert sein'
+  );
+  for (const key of DOCUMENT_STORAGE_KEYS) {
+    assert.match(src, new RegExp(`${key}:\\s*S\\.${key}`), `Web-Installer sendet ${key} nicht`);
+    assert.match(src, new RegExp(`${key}:\\s*''`), `Web-Installer-State fehlt ${key}`);
+  }
+});
+
+test('CLI-Installer sammelt und schreibt alle Dokument-WebDAV-Werte', () => {
+  const src = readFileSync(new URL('../install.sh', import.meta.url), 'utf8');
+  assert.match(src, /configure_document_storage\b/, 'CLI-Installer konfiguriert Dokument-WebDAV nicht');
+  for (const key of DOCUMENT_STORAGE_KEYS) {
+    assert.match(src, new RegExp(`^${key}=`, 'm'), `CLI-Installer schreibt ${key} nicht in .env`);
+  }
+  assert.match(
+    src,
+    /read -rs DOCUMENT_STORAGE_WEBDAV_PASSWORD/,
+    'CLI-Installer muss das WebDAV-Passwort verdeckt einlesen'
+  );
+});
+
 test('docker-compose.yml mappt den Host-Port über OIKOS_HTTP_PORT mit Default 3000', () => {
   const src = readFileSync(new URL('../docker-compose.yml', import.meta.url), 'utf8');
   assert.match(
@@ -93,4 +155,48 @@ test('install.sh schreibt TZ und OIKOS_HTTP_PORT in die generierte .env', () => 
 test('.env.example dokumentiert OIKOS_HTTP_PORT', () => {
   const src = readFileSync(new URL('../.env.example', import.meta.url), 'utf8');
   assert.match(src, /OIKOS_HTTP_PORT/, '.env.example dokumentiert OIKOS_HTTP_PORT nicht');
+});
+
+test('.env.example dokumentiert alle optionalen Dokument-WebDAV-Werte', () => {
+  const src = readFileSync(new URL('../.env.example', import.meta.url), 'utf8');
+  for (const key of DOCUMENT_STORAGE_KEYS) {
+    assert.match(src, new RegExp(`^#?\\s*${key}=`, 'm'), `.env.example fehlt ${key}`);
+  }
+});
+
+test('Unraid deklariert alle Dokument-WebDAV-Werte advanced und maskiert das Passwort', () => {
+  const src = readFileSync(new URL('../templates/yuvomi.xml', import.meta.url), 'utf8');
+  for (const key of DOCUMENT_STORAGE_KEYS) {
+    const config = src.match(new RegExp(`<Config[^>]+Target="${key}"[^>]*>`));
+    assert.ok(config, `Unraid fehlt ${key}`);
+    assert.match(config[0], /Display="advanced"/, `${key} muss advanced sein`);
+    assert.match(config[0], /Required="false"/, `${key} muss optional sein`);
+  }
+  const password = src.match(/<Config[^>]+Target="DOCUMENT_STORAGE_WEBDAV_PASSWORD"[^>]*>/);
+  assert.match(password[0], /Mask="true"/, 'Unraid muss WebDAV-Passwort maskieren');
+});
+
+test('Portainer Compose reicht alle explizit aufgezählten Dokument-WebDAV-Werte durch', () => {
+  const src = readFileSync(new URL('../docs/docker-compose.portainer.yml', import.meta.url), 'utf8');
+  for (const key of DOCUMENT_STORAGE_KEYS) {
+    assert.match(
+      src,
+      new RegExp(`- ${key}=\\$\\{${key}:-`),
+      `Portainer Compose fehlt ${key}`
+    );
+  }
+});
+
+test('Optionale Dokument-WebDAV-Werte erzeugen keine TrueNAS- oder Umbrel-Fragen', () => {
+  for (const path of [
+    '../deploy/truenas/questions.yaml',
+    '../deploy/truenas/templates/docker-compose.yaml',
+    '../deploy/umbrel/docker-compose.yml',
+    '../deploy/umbrel/umbrel-app.yml',
+  ]) {
+    const src = readFileSync(new URL(path, import.meta.url), 'utf8');
+    for (const key of DOCUMENT_STORAGE_KEYS) {
+      assert.doesNotMatch(src, new RegExp(key), `${path} darf ${key} nicht explizit deklarieren`);
+    }
+  }
 });

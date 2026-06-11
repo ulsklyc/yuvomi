@@ -169,7 +169,8 @@
 .settings-card--family,
 .settings-card--api-tokens,
 .settings-card--account,
-.settings-card--backup {
+.settings-card--backup,
+.settings-card--document-storage {
   background-color: var(--color-surface-work);
   border-color: var(--color-border-subtle);
 }
@@ -184,7 +185,8 @@
 .settings-card--family::before,
 .settings-card--api-tokens::before,
 .settings-card--account::before,
-.settings-card--backup::before {
+.settings-card--backup::before,
+.settings-card--document-storage::before {
   content: '';
   position: absolute;
   inset: 0 auto 0 0;
@@ -212,7 +214,8 @@
 }
 
 .settings-card--modules,
-.settings-card--backup {
+.settings-card--backup,
+.settings-card--document-storage {
   --settings-card-accent: var(--module-documents);
 }
 
@@ -1057,6 +1060,37 @@
   border-radius: var(--radius-sm);
 }
 
+.document-storage-status {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.settings-document-storage-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-light);
+  color: var(--color-warning);
+  font-size: var(--text-sm);
+}
+
+.settings-document-storage-warning svg {
+  flex: 0 0 auto;
+}
+
+.settings-document-storage-success {
+  color: var(--color-success);
+}
+
+.settings-document-storage-error {
+  color: var(--color-danger);
+  overflow-wrap: anywhere;
+}
+
 /* --------------------------------------------------------
    WebDAV Backup Card helpers
    -------------------------------------------------------- */
@@ -1337,5 +1371,62 @@
 
   .settings-module-row__toggle {
     grid-column: 3 / -1;
+  }
+}
+
+/* ── DMS accounts ─────────────────────────────────────────── */
+
+.dms-account-list {
+  list-style: none;
+  margin: 0 0 var(--space-4) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.dms-account-empty {
+  padding: var(--space-2) 0;
+}
+
+.dms-account-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.dms-account-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.dms-account-meta strong {
+  display: block;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dms-account-meta .form-hint {
+  display: block;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 480px) {
+  .dms-account-item {
+    flex-wrap: wrap;
+  }
+
+  .dms-account-meta {
+    width: 100%;
   }
 }

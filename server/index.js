@@ -19,6 +19,7 @@ import * as googleCalendar from './services/google-calendar.js';
 import * as appleCalendar from './services/apple-calendar.js';
 import * as icsSubscription from './services/ics-subscription.js';
 import * as caldavReminders from './services/caldav-reminders-sync.js';
+import * as holidays from './services/holidays.js';
 import { startScheduler as startBackupScheduler } from './services/backup-scheduler.js';
 import { startScheduler as startSplitExpenseScheduler } from './services/split-expenses-scheduler.js';
 import dashboardRouter from './routes/dashboard.js';
@@ -33,6 +34,7 @@ import cardavRouter from './routes/cardav.js';
 import birthdaysRouter from './routes/birthdays.js';
 import budgetRouter from './routes/budget.js';
 import documentsRouter from './routes/documents.js';
+import dmsRouter from './routes/dms.js';
 import splitExpensesRouter from './routes/split-expenses.js';
 import weatherRouter from './routes/weather.js';
 import preferencesRouter from './routes/preferences.js';
@@ -69,7 +71,7 @@ app.use(helmet({
       connectSrc: ["'self'"],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
-      frameSrc: ["'none'"],
+      frameSrc: ["'self'"],
       // upgrade-insecure-requests nur mit HTTPS aktivieren
       upgradeInsecureRequests: isSecure ? [] : null,
     },
@@ -304,6 +306,7 @@ app.use('/api/v1/contacts/cardav', cardavRouter);
 app.use('/api/v1/contacts', contactsRouter);
 app.use('/api/v1/birthdays', birthdaysRouter);
 app.use('/api/v1/budget', budgetRouter);
+app.use('/api/v1/documents/dms', dmsRouter);
 app.use('/api/v1/documents', documentsRouter);
 app.use('/api/v1/split-expenses', splitExpensesRouter);
 app.use('/api/v1/weather', weatherRouter);
@@ -374,6 +377,9 @@ async function runSync() {
   // CalDAV Reminders (VTODO → Tasks/Shopping): kein Guard nötig — sync() kehrt sofort
   // zurück, wenn keine aktivierten Reminder-Listen konfiguriert sind.
   caldavReminders.sync().catch((e) => logSync.error('CalDAV reminders error:', e.message));
+
+  // Holidays: kein Guard nötig — sync() kehrt sofort zurück, wenn kein Land konfiguriert ist.
+  holidays.sync().catch((e) => logSync.error('Holidays error:', e.message));
 }
 
 // --------------------------------------------------------

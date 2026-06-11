@@ -692,7 +692,9 @@ function renderAppShell(container) {
     if (!ind) return;
     const cr = sidebarItems.getBoundingClientRect();
     const ir = item.getBoundingClientRect();
-    ind.style.transform = `translateY(${ir.top - cr.top + sidebarItems.scrollTop}px)`;
+    // Pille (44px) vertikal im Item (48px) zentrieren — aus realen Höhen, token-unabhängig
+    const centerOffset = (ir.height - ind.getBoundingClientRect().height) / 2;
+    ind.style.transform = `translateY(${ir.top - cr.top + sidebarItems.scrollTop + centerOffset}px)`;
     ind.style.opacity = '0.5';
   });
   sidebarItems.addEventListener('mouseleave', () => positionSidebarIndicator());
@@ -1519,7 +1521,9 @@ function positionSidebarIndicator() {
   }
   const cr = container.getBoundingClientRect();
   const ar = active.getBoundingClientRect();
-  indicator.style.transform = `translateY(${ar.top - cr.top + container.scrollTop}px)`;
+  // Pille (44px) vertikal im Item (48px) zentrieren — aus realen Höhen, token-unabhängig
+  const centerOffset = (ar.height - indicator.getBoundingClientRect().height) / 2;
+  indicator.style.transform = `translateY(${ar.top - cr.top + container.scrollTop + centerOffset}px)`;
   indicator.style.opacity = '';
 }
 

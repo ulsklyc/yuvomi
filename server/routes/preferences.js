@@ -7,6 +7,7 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
+import * as holidays from '../services/holidays.js';
 import { str, MAX_SHORT } from '../middleware/validate.js';
 
 const log = createLogger('Preferences');
@@ -27,6 +28,10 @@ const DEFAULT_TIME_FORMAT = '24h';
 
 const VALID_WEATHER_PROVIDERS = ['open-meteo', 'openweathermap'];
 const VALID_WEATHER_UNITS = ['metric', 'imperial'];
+
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+const COUNTRY_ISO_RE = /^[A-Z]{2}$/;
+const SUBDIVISION_RE = /^[A-Z]{2}-[A-Z0-9-]{1,10}$/;
 
 const VALID_WIDGET_IDS = ['tasks', 'calendar', 'weather', 'meals', 'shopping', 'birthdays', 'budget', 'family', 'notes'];
 const VALID_WIDGET_SIZES = ['1x1', '1x2', '1x3', '1x4', '2x1', '2x2', '2x3', '2x4', '3x1', '3x2', '3x3', '3x4', '4x1', '4x2', '4x3', '4x4'];
@@ -182,6 +187,13 @@ router.get('/', (req, res) => {
         weather_lon:      cfgGet('weather_lon')      ?? null,
         weather_city:     cfgGet('weather_city')     ?? '',
         weather_units:    cfgGet('weather_units')    ?? 'metric',
+        holiday_country:       cfgGet('holiday_country')       ?? null,
+        holiday_subdivision:   cfgGet('holiday_subdivision')   ?? null,
+        holiday_show_public:   cfgGet('holiday_show_public')   === '1',
+        holiday_show_school:   cfgGet('holiday_show_school')   === '1',
+        holiday_public_color:  cfgGet('holiday_public_color')  ?? '#FF3B30',
+        holiday_school_color:  cfgGet('holiday_school_color')  ?? '#34C759',
+        holiday_last_sync:     cfgGet('holiday_last_sync')     ?? null,
       },
     });
   } catch (err) {
@@ -199,7 +211,7 @@ router.get('/', (req, res) => {
 
 router.put('/', (req, res) => {
   try {
-    const { visible_meal_types, currency, date_format, time_format, app_name, dashboard_widgets, disabled_modules, module_order, housekeeping_payment_tasks, weather_provider, weather_lat, weather_lon, weather_city, weather_units } = req.body;
+    const { visible_meal_types, currency, date_format, time_format, app_name, dashboard_widgets, disabled_modules, module_order, housekeeping_payment_tasks, weather_provider, weather_lat, weather_lon, weather_city, weather_units, holiday_country, holiday_subdivision, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
 
     if (visible_meal_types !== undefined) {
       if (!Array.isArray(visible_meal_types)) {
@@ -321,6 +333,62 @@ router.put('/', (req, res) => {
       }
     }
 
+    // Holiday configuration — admin only
+    if (
+      holiday_country      !== undefined ||
+      holiday_subdivision  !== undefined ||
+      holiday_show_public  !== undefined ||
+      holiday_show_school  !== undefined ||
+      holiday_public_color !== undefined ||
+      holiday_school_color !== undefined
+    ) {
+      if (req.authRole !== 'admin') {
+        return res.status(403).json({ error: 'Admin access required.', code: 403 });
+      }
+      if (holiday_country !== undefined) {
+        if (holiday_country !== null && !COUNTRY_ISO_RE.test(holiday_country)) {
+          return res.status(400).json({ error: 'Ungültiger Ländercode (2 Großbuchstaben, z. B. DE).', code: 400 });
+        }
+        if (holiday_country === null) {
+          cfgDelete('holiday_country');
+          cfgDelete('holiday_subdivision');
+        } else {
+          cfgSet('holiday_country', holiday_country);
+        }
+      }
+      if (holiday_subdivision !== undefined) {
+        if (holiday_subdivision !== null && !SUBDIVISION_RE.test(holiday_subdivision)) {
+          return res.status(400).json({ error: 'Ungültiger Regionscode (z. B. DE-BY).', code: 400 });
+        }
+        if (holiday_subdivision === null) cfgDelete('holiday_subdivision');
+        else cfgSet('holiday_subdivision', holiday_subdivision);
+      }
+      if (holiday_show_public !== undefined) {
+        if (typeof holiday_show_public !== 'boolean') {
+          return res.status(400).json({ error: 'holiday_show_public must be a boolean.', code: 400 });
+        }
+        cfgSet('holiday_show_public', holiday_show_public ? '1' : '0');
+      }
+      if (holiday_show_school !== undefined) {
+        if (typeof holiday_show_school !== 'boolean') {
+          return res.status(400).json({ error: 'holiday_show_school must be a boolean.', code: 400 });
+        }
+        cfgSet('holiday_show_school', holiday_show_school ? '1' : '0');
+      }
+      if (holiday_public_color !== undefined) {
+        if (!HEX_COLOR_RE.test(holiday_public_color)) {
+          return res.status(400).json({ error: 'holiday_public_color muss ein gültiger Hex-Farbwert sein (z. B. #FF3B30).', code: 400 });
+        }
+        cfgSet('holiday_public_color', holiday_public_color);
+      }
+      if (holiday_school_color !== undefined) {
+        if (!HEX_COLOR_RE.test(holiday_school_color)) {
+          return res.status(400).json({ error: 'holiday_school_color muss ein gültiger Hex-Farbwert sein (z. B. #34C759).', code: 400 });
+        }
+        cfgSet('holiday_school_color', holiday_school_color);
+      }
+    }
+
     const rawMealTypes = cfgGet('visible_meal_types') ?? DEFAULT_MEAL_TYPES;
     const savedMealTypes = rawMealTypes.split(',').filter((t) => VALID_MEAL_TYPES.includes(t));
     const savedCurrency = cfgGet('currency') ?? DEFAULT_CURRENCY;
@@ -348,11 +416,58 @@ router.put('/', (req, res) => {
         weather_lon:      cfgGet('weather_lon')      ?? null,
         weather_city:     cfgGet('weather_city')     ?? '',
         weather_units:    cfgGet('weather_units')    ?? 'metric',
+        holiday_country:       cfgGet('holiday_country')       ?? null,
+        holiday_subdivision:   cfgGet('holiday_subdivision')   ?? null,
+        holiday_show_public:   cfgGet('holiday_show_public')   === '1',
+        holiday_show_school:   cfgGet('holiday_show_school')   === '1',
+        holiday_public_color:  cfgGet('holiday_public_color')  ?? '#FF3B30',
+        holiday_school_color:  cfgGet('holiday_school_color')  ?? '#34C759',
+        holiday_last_sync:     cfgGet('holiday_last_sync')     ?? null,
       },
     });
   } catch (err) {
     log.error('PUT /', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
+  }
+});
+
+// GET /api/v1/preferences/holidays/countries
+router.get('/holidays/countries', async (_req, res) => {
+  try {
+    const countries = await holidays.getCountries();
+    res.json({ data: countries });
+  } catch (err) {
+    log.error('GET /holidays/countries', err);
+    res.status(502).json({ error: 'Fehler beim Abrufen der Länderliste.', code: 502 });
+  }
+});
+
+// GET /api/v1/preferences/holidays/subdivisions/:countryCode
+router.get('/holidays/subdivisions/:countryCode', async (req, res) => {
+  const { countryCode } = req.params;
+  if (!COUNTRY_ISO_RE.test(countryCode)) {
+    return res.status(400).json({ error: 'Ungültiger Ländercode.', code: 400 });
+  }
+  try {
+    const subdivisions = await holidays.getSubdivisions(countryCode);
+    res.json({ data: subdivisions });
+  } catch (err) {
+    log.error('GET /holidays/subdivisions/:countryCode', err);
+    res.status(502).json({ error: 'Fehler beim Abrufen der Regionsliste.', code: 502 });
+  }
+});
+
+// POST /api/v1/preferences/holidays/sync  (admin only)
+router.post('/holidays/sync', async (req, res) => {
+  if (req.authRole !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required.', code: 403 });
+  }
+  try {
+    await holidays.sync();
+    res.json({ data: { last_sync: cfgGet('holiday_last_sync') ?? null } });
+  } catch (err) {
+    log.error('POST /holidays/sync', err);
+    res.status(502).json({ error: 'Fehler bei der Feiertags-Synchronisierung: ' + err.message, code: 502 });
   }
 });
 

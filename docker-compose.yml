@@ -17,7 +17,7 @@ services:
     environment:
       - NODE_ENV=production
       - DB_PATH=${DB_PATH:-/data/oikos.db}
-      - BACKUP_DIR=${BACKUP_DIR:-/backups}
+      - BACKUP_DIR=/backups
       # Secure cookies come from .env (the installer sets them):
       #   - Reverse proxy + HTTPS → SESSION_SECURE=true, TRUST_PROXY=1
       #   - Direct HTTP access     → SESSION_SECURE=false, TRUST_PROXY=loopback

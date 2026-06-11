@@ -3,11 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Security headers via meta (GitHub Pages allows no custom HTTP headers).
+       Note: X-Frame-Options / CSP frame-ancestors only take effect as HTTP headers, not via meta. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>Install Yuvomi — Self-Hosted Family Planner</title>
   <meta name="description" content="Step-by-step installation guide for Yuvomi. Docker, Podman, TrueNAS, Umbrel or Unraid — get your self-hosted family planner running in minutes.">
   <meta name="theme-color" content="#fafaf8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#1a1a18" media="(prefers-color-scheme: dark)">
-  <link rel="canonical" href="https://ulsklyc.github.io/oikos/install.html">
+  <link rel="canonical" href="https://yuvomi.cloud/install.html">
   <link rel="icon" type="image/svg+xml" href="logo.svg">
 
   <style>
@@ -631,6 +635,7 @@ openssl rand -hex 32  <span class="comment"># run twice → SESSION_SECRET + DB_
         <div class="opt-card reveal reveal-delay-2"><h3 data-t="opt_cal_title">Calendar &amp; contact sync</h3><p data-t="opt_cal_desc">Two-way sync with Google Calendar (OAuth) and multi-account CalDAV/CardDAV (iCloud, Nextcloud, Radicale). Apple Reminders can mirror read-only into Tasks or Shopping. <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#environment-variables" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></p></div>
         <div class="opt-card reveal"><h3 data-t="opt_sso_title">SSO / OpenID Connect</h3><p data-t="opt_sso_desc">Single sign-on via any OIDC provider (Authentik, Keycloak, Google, Microsoft Entra). Set the four <code>OIDC_*</code> vars and a "Sign in with SSO" button appears automatically. <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#sso--openid-connect-optional" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></p></div>
         <div class="opt-card reveal reveal-delay-1"><h3 data-t="opt_backup_title">Automated backups</h3><p data-t="opt_backup_desc">Enable scheduled backups via <code>BACKUP_ENABLED=true</code> — daily at 2 AM, 7 copies kept. Manage and restore in Settings → Backup. <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#backup--restore" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></p></div>
+        <div class="opt-card reveal reveal-delay-2"><h3 data-t="opt_doc_storage_title">WebDAV document storage</h3><p data-t="opt_doc_storage_desc">Store all new document files, including calendar attachments, on WebDAV with the five <code>DOCUMENT_STORAGE_WEBDAV_*</code> variables. Use the deployment variables for private or LAN targets; UI-managed URLs must be public. Database backups do not contain these remote binaries, so back up the WebDAV target separately. <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#webdav-document-storage-optional" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></p></div>
         <div class="opt-card reveal reveal-delay-2"><h3 data-t="opt_update_title">Updates</h3><p data-t="opt_update_desc">Pull the latest image and restart: <code>docker compose pull &amp;&amp; docker compose up -d</code>. Your data persists across updates.</p></div>
       </div>
     </div>
@@ -678,6 +683,8 @@ docker compose logs | grep "Server läuft"</div></div><p data-t="trouble_nginx_p
         <a href="https://github.com/ulsklyc/yuvomi" target="_blank" rel="noopener">GitHub</a>
         <a href="https://github.com/ulsklyc/yuvomi/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
         <a href="https://github.com/ulsklyc/yuvomi/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-t="footer_contrib">Contributing</a>
+        <a href="impressum.html" data-t="footer_impressum">Impressum</a>
+        <a href="datenschutz.html" data-t="footer_privacy">Datenschutz</a>
       </div>
     </div>
   </footer>
@@ -739,6 +746,7 @@ docker compose logs | grep "Server läuft"</div></div><p data-t="trouble_nginx_p
         opt_cal_title:'Calendar & contact sync', opt_cal_desc:'Two-way sync with Google Calendar (OAuth) and multi-account CalDAV/CardDAV (iCloud, Nextcloud, Radicale). Apple Reminders can mirror read-only into Tasks or Shopping.',
         opt_sso_title:'SSO / OpenID Connect', opt_sso_desc:'Single sign-on via any OIDC provider (Authentik, Keycloak, Google, Microsoft Entra). Set the four OIDC_* vars and a "Sign in with SSO" button appears automatically.',
         opt_backup_title:'Automated backups', opt_backup_desc:'Enable scheduled backups via BACKUP_ENABLED=true — daily at 2 AM, 7 copies kept. Optionally upload each backup to a WebDAV server (Nextcloud, ownCloud, Hetzner, etc.). Manage and restore in Settings → Backup.',
+        opt_doc_storage_title:'WebDAV document storage', opt_doc_storage_desc:'Store all new document files, including calendar attachments, on WebDAV with the five DOCUMENT_STORAGE_WEBDAV_* variables. Use the deployment variables for private or LAN targets; UI-managed URLs must be public. Database backups do not contain these remote binaries, so back up the WebDAV target separately.',
         opt_update_title:'Updates', opt_update_desc:'Pull the latest image and restart: docker compose pull && docker compose up -d. Your data persists across updates.',
         trouble_label:'Troubleshooting', trouble_title:'Something not working?', trouble_desc:"Most issues have a simple fix. If you're still stuck, open an issue on GitHub.",
         trouble_port_title:'Port 3000 is already in use', trouble_port_desc:'Another application is using port 3000. Either stop it, or change the port in docker-compose.yml:',
@@ -749,7 +757,7 @@ docker compose logs | grep "Server läuft"</div></div><p data-t="trouble_nginx_p
         trouble_db_warning:'docker compose down -v deletes all data. Only use this on a fresh install with no data.',
         trouble_nginx_title:'Nginx shows 502 Bad Gateway', trouble_nginx_desc:"Nginx can't reach the container. Check it's running and the port matches:",
         trouble_nginx_port:'Ensure the proxy_pass port in your Nginx config matches the host port in docker-compose.yml (default: 3000).',
-        footer_home:'Home', footer_heart:'Built with care for families who value privacy and simplicity.', footer_contrib:'Contributing',
+        footer_home:'Home', footer_heart:'Built with care for families who value privacy and simplicity.', footer_contrib:'Contributing', footer_impressum:'Imprint', footer_privacy:'Privacy',
         backLabel:'Overview', copy:'Copy', copied:'Copied!'
       },
       de: {
@@ -805,6 +813,7 @@ docker compose logs | grep "Server läuft"</div></div><p data-t="trouble_nginx_p
         opt_cal_title:'Kalender- & Kontakt-Sync', opt_cal_desc:'Zwei-Wege-Sync mit Google Calendar (OAuth) und Multi-Account-CalDAV/CardDAV (iCloud, Nextcloud, Radicale). Apple-Erinnerungen lassen sich schreibgeschützt in Aufgaben oder Einkauf spiegeln.',
         opt_sso_title:'SSO / OpenID Connect', opt_sso_desc:'Single Sign-On über jeden OIDC-Provider (Authentik, Keycloak, Google, Microsoft Entra). Die vier OIDC_*-Variablen setzen, und ein „Anmelden mit SSO"-Button erscheint automatisch.',
         opt_backup_title:'Automatische Backups', opt_backup_desc:'Geplante Backups \xfcber BACKUP_ENABLED=true aktivieren — t\xe4glich um 2:00\xa0Uhr, 7\xa0Kopien. Optional jeden Backup auf einen WebDAV-Server hochladen (Nextcloud, ownCloud, Hetzner usw.). Verwalten und Wiederherstellen in Einstellungen → Datensicherung.',
+        opt_doc_storage_title:'WebDAV-Dokumentspeicher', opt_doc_storage_desc:'Alle neuen Dokumentdateien einschlie\xdflich Kalenderanh\xe4ngen mit den f\xfcnf DOCUMENT_STORAGE_WEBDAV_*-Variablen auf WebDAV speichern. F\xfcr private oder LAN-Ziele die Deployment-Variablen verwenden; in der UI verwaltete URLs m\xfcssen \xf6ffentlich sein. Datenbank-Backups enthalten diese entfernten Bin\xe4rdateien nicht; das WebDAV-Ziel daher separat sichern.',
         opt_update_title:'Updates', opt_update_desc:'Neuestes Image holen und neu starten: docker compose pull && docker compose up -d. Eure Daten bleiben bei Updates erhalten.',
         trouble_label:'Problemlösung', trouble_title:'Etwas funktioniert nicht?', trouble_desc:'Die meisten Probleme haben eine einfache Lösung. Wenn ihr weiterhin Schwierigkeiten habt, öffnet ein Issue auf GitHub.',
         trouble_port_title:'Port 3000 ist bereits belegt', trouble_port_desc:'Eine andere Anwendung nutzt Port 3000. Entweder stoppen oder den Port in docker-compose.yml ändern:',
@@ -815,7 +824,7 @@ docker compose logs | grep "Server läuft"</div></div><p data-t="trouble_nginx_p
         trouble_db_warning:'docker compose down -v löscht alle Daten. Nur bei einer Neuinstallation ohne Daten verwenden.',
         trouble_nginx_title:'Nginx zeigt 502 Bad Gateway', trouble_nginx_desc:'Nginx kann den Container nicht erreichen. Prüfen, ob er läuft und der Port stimmt:',
         trouble_nginx_port:'Sicherstellen, dass der proxy_pass-Port in der Nginx-Konfiguration mit dem Host-Port in docker-compose.yml übereinstimmt (Standard: 3000).',
-        footer_home:'Startseite', footer_heart:'Mit Sorgfalt gebaut für Familien, die Privatsphäre und Einfachheit schätzen.', footer_contrib:'Mitmachen',
+        footer_home:'Startseite', footer_heart:'Mit Sorgfalt gebaut für Familien, die Privatsphäre und Einfachheit schätzen.', footer_contrib:'Mitmachen', footer_impressum:'Impressum', footer_privacy:'Datenschutz',
         backLabel:'Übersicht', copy:'Kopieren', copied:'Kopiert!'
       }
     };

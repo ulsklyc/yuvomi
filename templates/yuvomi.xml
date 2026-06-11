@@ -124,4 +124,11 @@ After the container starts, open the WebUI — the first visit guides you throug
   <Config Name="WEBDAV_BACKUP_PASSWORD" Target="WEBDAV_BACKUP_PASSWORD" Default="" Mode="" Description="Optional. WebDAV password for authentication." Type="Variable" Display="advanced" Required="false" Mask="true"/>
   <Config Name="WEBDAV_BACKUP_PATH" Target="WEBDAV_BACKUP_PATH" Default="/oikos/backups/" Mode="" Description="Optional. Remote directory path where backup files are stored (default: /oikos/backups/)." Type="Variable" Display="advanced" Required="false" Mask="false">/oikos/backups/</Config>
   <Config Name="WEBDAV_BACKUP_KEEP" Target="WEBDAV_BACKUP_KEEP" Default="7" Mode="" Description="Optional. Number of remote backup files to keep (default: 7)." Type="Variable" Display="advanced" Required="false" Mask="false">7</Config>
+
+  <!-- WebDAV document storage (optional) — non-empty values override the matching database settings. -->
+  <Config Name="DOCUMENT_STORAGE_WEBDAV_ENABLED" Target="DOCUMENT_STORAGE_WEBDAV_ENABLED" Default="false" Mode="" Description="Optional. Store newly uploaded document files on WebDAV. Existing files are not migrated." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
+  <Config Name="DOCUMENT_STORAGE_WEBDAV_URL" Target="DOCUMENT_STORAGE_WEBDAV_URL" Default="" Mode="" Description="Optional. WebDAV server URL for document storage, e.g. https://cloud.example.com/remote.php/dav/files/username/" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="DOCUMENT_STORAGE_WEBDAV_USERNAME" Target="DOCUMENT_STORAGE_WEBDAV_USERNAME" Default="" Mode="" Description="Optional. WebDAV username for document storage." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="DOCUMENT_STORAGE_WEBDAV_PASSWORD" Target="DOCUMENT_STORAGE_WEBDAV_PASSWORD" Default="" Mode="" Description="Optional. WebDAV password for document storage." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="DOCUMENT_STORAGE_WEBDAV_PATH" Target="DOCUMENT_STORAGE_WEBDAV_PATH" Default="yuvomi-documents" Mode="" Description="Optional. Remote base folder for document files (default: yuvomi-documents)." Type="Variable" Display="advanced" Required="false" Mask="false">yuvomi-documents</Config>
 </Container>

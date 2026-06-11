@@ -78,7 +78,7 @@ Complete setup instructions for Yuvomi - from Docker installation to your first 
 
 ## Architecture Overview
 
-Yuvomi is a self-hosted family planner that runs as a single Docker container. The Express.js backend serves both the API and the static frontend files. All data is stored in a SQLCipher-encrypted SQLite database inside a host-mounted data folder, and automated backups are written to a separate host-mounted backup folder.
+Yuvomi is a self-hosted family planner that runs as a single Docker container. The Express.js backend serves both the API and the static frontend files. Application data is stored in a SQLCipher-encrypted SQLite database inside a host-mounted data folder, and automated database backups are written to a separate host-mounted backup folder. Optionally, newly uploaded document files can be stored on a WebDAV server instead of inside SQLite.
 
 ```
 Browser ──HTTP──▶ Docker Container (Express.js :3000) ──▶ SQLite/SQLCipher (/data/oikos.db)
@@ -172,7 +172,7 @@ Open your browser and navigate to **http://localhost:8090**. The wizard detects 
 
 - Basics — timezone (`TZ`) and HTTP host port (`OIKOS_HTTP_PORT`)
 - Security key generation (`SESSION_SECRET`, `DB_ENCRYPTION_KEY`)
-- Optional integrations (weather, Google Calendar, Apple CalDAV)
+- Optional integrations (weather, Google Calendar, Apple CalDAV, WebDAV document storage)
 - Advanced settings — reverse-proxy/HTTPS (`SESSION_SECURE`, `TRUST_PROXY`), Single Sign-On (OIDC), and automatic backups
 - Writing your `.env` file (an existing `.env` is backed up to `.env.bak-<timestamp>` first)
 - Starting the container (via Docker or Podman, whichever was detected)
@@ -372,6 +372,8 @@ Click **Apply**. Once the container is running, click the Yuvomi icon → **WebU
 
 All configuration happens in the `.env` file. The container reads these values on startup.
 
+> **Self-hosting under the GDPR?** Several optional integrations below (weather, Google/OIDC SSO, WebDAV backup, WebDAV document storage) can send data to third parties, some outside the EU/EEA. See [Privacy for self-hosters](PRIVACY-FOR-SELFHOSTERS.md) for per-service third-country assessments, data-processing-agreement notes and log-retention guidance before enabling them.
+
 ### Server
 
 | Variable | Description | Default | Required |
@@ -416,6 +418,40 @@ openssl rand -hex 32
 ```
 
 > **Warning**: If you lose this key, you cannot access your database. Keep a backup of your `.env` file in a safe place.
+
+### WebDAV Document Storage (Optional)
+
+Admins can configure **Settings → Documents → WebDAV Storage** as the global destination for all
+new document files, including calendar attachments. Existing local documents are not migrated.
+Uploads fail closed: if WebDAV cannot accept the file, Yuvomi rejects the upload instead of silently
+storing it in SQLite. Disabling WebDAV changes only future uploads; existing WebDAV documents remain
+readable and deletable.
+
+The settings UI and the environment use hybrid per-field precedence. Every non-empty environment
+value below overrides only its corresponding database value and makes that field read-only in the
+UI. Empty values fall back to the database configuration.
+
+For SSRF protection, URLs entered through the admin UI must resolve only to public network
+addresses. Private, loopback, link-local, and internal DNS targets are rejected and rechecked when
+the connection is opened. To use a trusted WebDAV server on the local network, configure
+`DOCUMENT_STORAGE_WEBDAV_URL` through the deployment environment instead.
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `DOCUMENT_STORAGE_WEBDAV_ENABLED` | Use WebDAV for new document files (`true`/`false`) | `false` | No |
+| `DOCUMENT_STORAGE_WEBDAV_URL` | HTTP(S) WebDAV server URL | — | No |
+| `DOCUMENT_STORAGE_WEBDAV_USERNAME` | Basic Auth username | — | No |
+| `DOCUMENT_STORAGE_WEBDAV_PASSWORD` | Basic Auth password or app password | — | No |
+| `DOCUMENT_STORAGE_WEBDAV_PATH` | Base folder for document objects | — | No |
+
+When WebDAV documents already exist, changing the URL, username, password, or base path requires an
+explicit confirmation and a successful read test against an existing object. Required connection
+data cannot be removed while those documents exist. The connection test performs a temporary
+PUT/GET/DELETE roundtrip in the target folder.
+
+> **Important backup boundary:** SQLite/database backups do **not** contain document binaries stored
+> on WebDAV. Back up the WebDAV target separately and retain it together with the corresponding
+> database backup.
 
 ### Weather (Optional)
 
@@ -648,6 +684,10 @@ docker compose up -d --build
 The SQLite database lives in the host folder configured through `DATA_DIR` and is mounted at `/data` inside the container. The database file is `/data/oikos.db`.
 
 Scheduled backups are written to the host folder configured through `BACKUP_DIR` and mounted at `/backups` inside the container.
+
+> **WebDAV documents are outside the database.** A SQLite/database backup contains their metadata
+> and storage keys, but not their binary files. If WebDAV document storage is enabled, back up the
+> configured WebDAV target separately. A complete restore requires both matching backups.
 
 ### Backup
 

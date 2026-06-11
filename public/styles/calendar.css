@@ -472,6 +472,19 @@
   word-break: break-word;
 }
 
+.document-storage-target {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+#modal-remove-attachment[hidden] {
+  display: none;
+}
+
 .document-dropzone {
   display: flex;
   flex-direction: column;
@@ -1144,4 +1157,155 @@
 
 .agenda-tasks .cal-task-chip {
   margin-bottom: 0;
+}
+
+/* --------------------------------------------------------
+ * Holiday layer – month, week/day all-day row, agenda
+ * -------------------------------------------------------- */
+
+/* Month view: slim colored band below day number */
+.month-day__holiday {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  padding: 1px var(--space-1);
+  border-radius: var(--radius-xs);
+  margin-bottom: 2px;
+  color: #fff;
+  background: color-mix(in srgb, var(--holi-color) 90%, transparent);
+  border-left: 3px solid var(--holi-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  user-select: none;
+}
+
+.month-day__holiday span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Week/Day view: holiday chip in the all-day row */
+.allday-holiday {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  padding: var(--space-px) var(--space-1);
+  border-radius: var(--radius-xs);
+  color: #fff;
+  background: color-mix(in srgb, var(--holi-color) 88%, transparent);
+  border-left: 3px solid var(--holi-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: var(--space-0h);
+  pointer-events: none;
+  user-select: none;
+}
+
+.allday-holiday span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Agenda view: compact holiday row before events */
+.agenda-holidays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+}
+
+.agenda-holiday {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--holi-color) 15%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--holi-color) 40%, transparent);
+}
+
+.agenda-holiday__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--holi-color);
+  flex-shrink: 0;
+}
+
+/* --------------------------------------------------------
+ * Toolbar holiday layer toggle buttons
+ * -------------------------------------------------------- */
+.cal-toolbar__layers {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.cal-toolbar__layer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  border: 1px solid color-mix(in srgb, var(--layer-color) 40%, transparent);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.cal-toolbar__layer-btn:hover {
+  background: color-mix(in srgb, var(--layer-color) 12%, transparent);
+  color: var(--color-text-primary);
+}
+
+.cal-toolbar__layer-btn--active {
+  background: color-mix(in srgb, var(--layer-color) 18%, var(--color-surface));
+  color: var(--color-text-primary);
+  border-color: color-mix(in srgb, var(--layer-color) 60%, transparent);
+}
+
+.cal-toolbar__layer-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--layer-color);
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+
+.cal-toolbar__layer-btn--active .cal-toolbar__layer-dot {
+  opacity: 1;
+}
+
+@media (max-width: 639px) {
+  .cal-toolbar__layer-btn span:not(.cal-toolbar__layer-dot) {
+    display: none;
+  }
+  .cal-toolbar__layer-btn {
+    padding: var(--space-1);
+    border-radius: var(--radius-full);
+    width: 28px;
+    height: 28px;
+    justify-content: center;
+  }
 }

@@ -34,7 +34,6 @@ data/
 .idea/
 *.swp
 *.swo
-.codex 
 AGENTS.md
 
 # Claude Code — share skills/agents/rules/hooks/settings; keep local permissions and worktrees out

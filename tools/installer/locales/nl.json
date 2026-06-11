@@ -82,7 +82,15 @@
     "backupEnable": "Automatische back-ups inschakelen",
     "backupScheduleLabel": "Schema (cron)",
     "backupScheduleHint": "Wanneer back-ups worden gemaakt. Standaard: dagelijks om 2:00 uur.",
-    "backupKeepLabel": "Te bewaren back-ups"
+    "backupKeepLabel": "Te bewaren back-ups",
+    "documentWebdav": "WebDAV-documentopslag",
+    "documentWebdavHint": "Niet-lege omgevingswaarden overschrijven de bijbehorende instellingen in de database.",
+    "documentWebdavEnable": "Nieuwe documenten op WebDAV opslaan",
+    "documentWebdavUrlLabel": "WebDAV-URL",
+    "documentWebdavUsernameLabel": "Gebruikersnaam",
+    "documentWebdavPasswordLabel": "Wachtwoord",
+    "documentWebdavPathLabel": "Basispad",
+    "documentWebdavPathHint": "Externe map voor documenten. Laat leeg om yuvomi-documents te gebruiken."
   },
   "review": {
     "title": "Controleren",
@@ -93,6 +101,7 @@
     "weather": "Weer",
     "google": "Google Agenda",
     "apple": "Apple CalDAV",
+    "documentWebdav": "WebDAV-documenten",
     "save": "Opslaan & Docker starten",
     "saving": "Wordt opgeslagen …",
     "errSave": "Opslaan van .env mislukt.",

@@ -11,7 +11,7 @@ You are reviewing a single PR for Yuvomi, a self-hosted family planner PWA. The 
 
 ## Inputs
 
-Expect the parent to pass the PR number. Start with `gh pr view <n> --repo ulsklyc/oikos --json title,body,headRefName,baseRefName,files,author,state` and `gh pr diff <n> --repo ulsklyc/oikos`.
+Expect the parent to pass the PR number. Start with `gh pr view <n> --repo ulsklyc/yuvomi --json title,body,headRefName,baseRefName,files,author,state` and `gh pr diff <n> --repo ulsklyc/yuvomi`.
 
 ## How to read
 

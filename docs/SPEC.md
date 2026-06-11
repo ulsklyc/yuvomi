@@ -132,7 +132,8 @@ Reusable recipe cards that can be pre-filled into meal slots.
 | attachment_name | TEXT | Original filename of attached file, nullable |
 | attachment_mime | TEXT | MIME type (e.g. image/jpeg, application/pdf), nullable |
 | attachment_size | INTEGER | File size in bytes, nullable |
-| attachment_data | TEXT | Base64 data URL of attachment (≤ 5 MB), nullable |
+| attachment_data | TEXT | Legacy Base64 data URL of attachment (≤ 5 MB), nullable; new attachments leave this NULL |
+| attachment_document_id | INTEGER | FK → Family Documents (SET NULL on delete), nullable (migration v38) |
 | target_caldav_account_id | INTEGER | FK → CalDAV Accounts (for outbound sync), nullable |
 | target_caldav_calendar_url | TEXT | CalDAV calendar URL (for outbound sync), nullable |
 | target_google_calendar_id | TEXT | Google calendar ID for outbound sync, nullable. Mutually exclusive with the CalDAV target columns — an event syncs to at most one destination |
@@ -156,6 +157,28 @@ Display metadata (name, color) for synced Google/CalDAV calendars. Populated aut
 | name | TEXT | Display name from the provider, NOT NULL |
 | color | TEXT | Background color from the provider (HEX) |
 | UNIQUE | | (source, external_id) |
+
+### Holiday Cache
+Cached public holidays and school holidays from the free [OpenHolidays API](https://openholidaysapi.org)
+(no API key). Populated by an admin-configured country/subdivision in Settings → Calendar and refreshed
+by the auto-sync scheduler (covers previous, current, and next two years). Displayed as a read-only
+overlay in the calendar; layer visibility is toggled client-side. Outbound requests carry only the
+country/subdivision code — no household data leaves the server.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| type | TEXT | 'public' or 'school', NOT NULL |
+| country | TEXT | ISO-3166 alpha-2 country code, NOT NULL |
+| subdivision | TEXT | Region code (e.g. `DE-BY`), nullable for whole-country |
+| start_date | TEXT | YYYY-MM-DD, NOT NULL |
+| end_date | TEXT | YYYY-MM-DD, NOT NULL |
+| name | TEXT | Localized holiday name, NOT NULL |
+| year | INTEGER | Source year (used for scoped re-sync), NOT NULL |
+
+Indexes: `idx_holiday_cache_dates (start_date, end_date)`, `idx_holiday_cache_lookup (type, country, subdivision, year)`.
+Configuration lives in `sync_config`: `holiday_country`, `holiday_subdivision`, `holiday_show_public`,
+`holiday_show_school`, `holiday_public_color`, `holiday_school_color`, `holiday_last_sync` (all admin-only).
 
 ### CalDAV Accounts
 Multi-account CalDAV integration. Stores credentials for CalDAV servers (iCloud, Nextcloud, Radicale, Baikal, etc.).
@@ -450,10 +473,24 @@ Upload and manage family files with per-document access control.
 | original_name | TEXT | NOT NULL (original filename) |
 | mime_type | TEXT | NOT NULL |
 | file_size | INTEGER | NOT NULL (bytes) |
-| content_data | TEXT | NOT NULL (Base64 data URL) |
-| storage_provider | TEXT | local (default), external |
-| storage_key | TEXT | nullable (external storage path) |
+| content_data | TEXT | NOT NULL (Base64 payload for `local`; empty string for `webdav` and `dms`) |
+| storage_provider | TEXT | Compatibility field: local (default), external |
+| storage_backend | TEXT | Authoritative backend: local (default), webdav, dms (migration v51) |
+| storage_key | TEXT | nullable (WebDAV object key or DMS document ID) |
+| dms_account_id | INTEGER | FK → DMS Accounts (ON DELETE SET NULL), nullable (migration v50) |
+| external_url | TEXT | nullable (deep link to the document in the DMS) |
+| external_meta | TEXT | nullable (JSON `{ correspondent, tags }` mirrored from the DMS for display) |
 | created_by | INTEGER | FK → Users (CASCADE delete), NOT NULL |
+
+`storage_backend` is the authoritative discriminator. Valid compatibility pairs are
+`local/local`, `external/webdav`, and `external/dms`; database triggers reject invalid
+provider/backend combinations. Existing `external` rows were migrated to `dms`, including
+orphaned DMS links. `dms_account_id IS NULL` is never used to identify WebDAV documents.
+
+Preview, download, and DMS/Paperless push read through the shared document-storage layer. Local
+bytes come from SQLite, WebDAV bytes are fetched from the configured remote object, and DMS-linked
+documents are proxied through their adapter. The per-document visibility check applies before any
+content is read.
 
 ### Family Document Access
 Allowlist for `visibility = 'restricted'` documents — only listed users can see the document.
@@ -475,6 +512,20 @@ Custom folders for organizing family documents (migration v37). A "Hausreinigung
 | updated_at | TEXT | ISO 8601 |
 
 `family_documents.folder_id` references this table (ON DELETE SET NULL, nullable).
+
+### DMS Accounts
+Connections to an external document management system (Paperless-ngx) for the Documents module (migration v50). Admin-managed in Settings.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| provider | TEXT | paperless (CHECK constraint) |
+| name | TEXT | NOT NULL (display name) |
+| base_url | TEXT | NOT NULL UNIQUE (one account per server) |
+| api_token | TEXT | NOT NULL (write-only; never returned by the API, protected by optional SQLCipher) |
+| created_at | TEXT | ISO 8601 |
+| last_check | TEXT | nullable (last connection test) |
+
+**DMS integration:** Admins connect a Paperless-ngx instance, then search it and **link** existing DMS documents into the Documents module as `external`/`dms` references (no duplication of the binary), or **push** a local or WebDAV-backed document into the DMS (asynchronous OCR ingestion — returns a Paperless task ID). Only `storage_backend = 'dms'` means a document is already stored in the DMS. All DMS operations (account management, search, link, push) are **admin-only**; searching the DMS is gated because it would otherwise bypass the per-document `restricted`/`private` visibility boundaries. Linked documents are previewed/downloaded by proxying the DMS live. The adapter layer (`server/services/dms/`) is provider-pluggable; Paperless-ngx is the first adapter.
 
 ### Budget Loans
 Instalment-based loans with per-payment tracking. Active loans show remaining balance and due months; paid-off loans are automatically closed.
@@ -816,7 +867,7 @@ Reusable recipe cards linked to meal slots.
 - **External calendar names & colors:** Google and Apple sync stores each calendar's display name and background color in the `external_calendars` table (migration v14). A colored `event-cal-label` badge appears in event popups, agenda, month, week, and day views when `cal_name` is present.
 - **Event location:** Event popup and dashboard display the location field with RFC 5545 backslash-escape normalization (`\n`, `\,`, `\;`, `\\`) via `fmtLocation()` in `public/utils/html.js`.
 - **Custom event icons:** Each event can have an icon chosen from 102 validated Lucide icons via a visual picker. Birthday events are automatically assigned the `cake` icon. Icon stored in `calendar_events.icon`.
-- **File attachments:** Events support a single file attachment (images, PDFs, Office documents, ≤ 5 MB). Images are displayed inline in the event popup; other files show a download link. Drag-and-drop upload supported in the event modal. Stored as Base64 in `attachment_data`.
+- **File attachments:** Events support a single file attachment (images, PDFs, Office documents, ≤ 5 MB). Images are displayed inline in the event popup; other files show a download link. Drag-and-drop upload is supported in the event modal. New attachments create one `family_documents` object through the active document-storage backend and link it via `attachment_document_id`; no second binary copy is written to `attachment_data`. Existing legacy Base64 attachments remain readable. Unchanged attachments are not re-uploaded, and removing an attachment only unlinks it from the event.
 - **Overlapping events:** In week and day views, timed events that overlap in time are rendered side-by-side using a column-layout algorithm instead of stacking.
 - **Task chips:** Open and in-progress tasks with a `due_date` appear as read-only priority-coloured chips in all four calendar views (month, week/day all-day row, agenda). Clicking a chip navigates to `/tasks?open=<id>` and opens the task edit modal. Tasks with `due_time` show the time in the chip label. Done/archived tasks are not shown. No server changes required — tasks are fetched in parallel with events on each range load (`GET /api/v1/tasks?include_future=1`), filtered client-side, and rendered via `renderTaskChip()`.
 - **Readability polish (v0.55.10):** month cells use stronger work surfaces, explicit grid/chip boundaries, and clearer today emphasis. Agenda rows and task chips use solid surfaces plus borders for contrast in both themes. Calendar metadata uses Lucide icon placeholders and shared icon classes instead of visible emoji markers.
@@ -858,6 +909,8 @@ Upload and manage family files with per-document access control.
 - **Visibility:** family (all members see it), restricted (only selected members), private (only the uploader)
 - **Archive / restore** — archived documents hidden from the main view, accessible via the Archive filter
 - **Download** — original file downloaded with its original filename
+- **Storage backends (v0.70.0):** an admin can select WebDAV as the global destination for all new document files, including calendar attachments. Existing local files are not migrated. WebDAV upload failures reject the upload without a silent local fallback; a failed database write after a successful remote upload triggers compensating deletion. Disabling WebDAV affects only future uploads, while existing WebDAV files remain readable and deletable.
+- **Shared content access:** preview, download, calendar attachment access, and Paperless/DMS push use the same storage layer. Backend badges distinguish local, WebDAV, DMS, and orphaned/unavailable DMS entries.
 - API: `GET /api/v1/documents`, `POST /api/v1/documents`, `GET /api/v1/documents/:id`, `PUT /api/v1/documents/:id`, `DELETE /api/v1/documents/:id`, `GET /api/v1/documents/:id/download`
 
 ### Housekeeping (`/housekeeping`)
@@ -910,7 +963,9 @@ User management and app configuration. Logged-in users only.
 - **Weather:** configure the Open-Meteo location (latitude/longitude, optional city label, units; no API key) — admin only; saving activates Open-Meteo and supersedes any OpenWeatherMap `.env` configuration. A **"Detect location"** button uses the browser's Geolocation API to auto-fill latitude and longitude; on success, a Nominatim reverse-geocoding call (OpenStreetMap, no API key) also fills the optional city field.
 - **Language:** System (follows `navigator.language`), German, English, Spanish, French, Italian, Swedish, Greek, Russian, Turkish, Chinese, Japanese, Arabic, Hindi, Portuguese, Ukrainian, Polish, Dutch, Czech, Vietnamese - via `oikos-locale-picker` web component; switch without page reload
 - **API Tokens (admin):** create named Bearer / X-API-Key tokens for external integrations; the full token value is shown only once immediately after creation; tokens can be revoked at any time; support optional expiry and track last-used timestamp
+- **Documents (admin):** separate WebDAV Storage and DMS/Paperless cards show the active upload target, effective destination, stored WebDAV document count, and latest connection test. WebDAV connection fields use per-field hybrid configuration: each non-empty `DOCUMENT_STORAGE_WEBDAV_*` environment value overrides only its matching database field and is read-only in the UI. UI-managed WebDAV URLs must resolve exclusively to public addresses; private, loopback, link-local, internal-DNS, and DNS-rebinding targets are blocked at configuration time and again during socket lookup. Trusted private-network targets require the deployment-controlled `DOCUMENT_STORAGE_WEBDAV_URL` override. When WebDAV documents exist, URL, username, password, and base-path changes require explicit confirmation plus a successful read test against an existing object; required connection data cannot be removed. The connection test performs a temporary PUT/GET/DELETE roundtrip.
 - **Backup Management (admin):** download the current database as a file (`GET /api/v1/backup/database`) or restore from a backup file (`POST /api/v1/backup/restore`, drag-and-drop supported). Validates that the uploaded file is a valid Yuvomi database. A rollback copy is created automatically before restore. **Automatic scheduled backups:** configurable via `.env` (`BACKUP_ENABLED`, `BACKUP_SCHEDULE`, `BACKUP_DIR`, `BACKUP_KEEP`); default 2 AM daily, keeps last 7 copies; Settings → Backup shows scheduler status, schedule, retention policy, last backup timestamp, and a manual trigger button. **WebDAV backup target:** optional upload of each backup to a WebDAV server (Nextcloud, ownCloud, Hetzner Storage Box, etc.) after each local backup; configurable via Settings → Backup or env vars (`WEBDAV_BACKUP_ENABLED`, `WEBDAV_BACKUP_URL`, `WEBDAV_BACKUP_USERNAME`, `WEBDAV_BACKUP_PASSWORD`, `WEBDAV_BACKUP_PATH`, `WEBDAV_BACKUP_KEEP`); uses Node 22 native fetch, no extra dependencies; password is masked in the UI and API; upload failures are non-fatal (local backup is always retained).
+- **Backup boundary:** SQLite/database backups include WebDAV document metadata and storage keys, but never the remote WebDAV binaries. The document-storage WebDAV target must be backed up separately and restored together with the matching database.
 - **Tab navigation:** Settings is organized in nine tabs (General, Meals, Budget, Shopping, Synchronization, Family, API Tokens, Backup, Account). Admin-only tabs: Family, API Tokens, Backup. Active tab persists in sessionStorage, Synchronization tab auto-activates after OAuth callbacks. On desktop the shared sub-tab bar becomes a sticky local navigation column; on mobile it remains horizontally scrollable with gradient scroll affordances and keyboard-accessible tab behavior.
 - **Information architecture (v0.55.10):** major settings areas use distinct card modifiers for theme, app info, localization/date-time, modules, account, family, API tokens, sync, and backup sections while preserving existing form IDs and API behavior.
 - **Family management (admin):** assign a `family_role` (Dad, Mom, Parent, Child, Grandparent, Relative, Other) to each user, and set per-member phone, email, and birthday — automatically synced to Contacts and Birthdays. Displayed in the family member list and profile views.

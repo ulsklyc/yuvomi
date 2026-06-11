@@ -33,6 +33,7 @@ function mockResponse(status, body = {}, headers = {}) {
 }
 
 const { api, auth, ApiError } = await import('../public/api.js');
+const { buildOpenApiSpec } = await import('../server/openapi.js');
 
 function setup() {
   dispatchedEvents = [];
@@ -109,4 +110,131 @@ test('auth.login: Erfolg speichert csrfToken aus Body', async () => {
   assert.equal(result.user.username, 'admin');
   assert.equal(result.csrfToken, token);
   assert.equal(dispatchedEvents.length, 0, 'Kein Event bei erfolgreichem Login');
+});
+
+// ─── OpenAPI: Dokument-Storage-Vertrag ──────────────────────────────────────
+
+function schemaProperties(spec, name) {
+  return spec.components.schemas[name]?.properties ?? {};
+}
+
+function responseSchema(operation, status = 200) {
+  const schema = operation.responses[status].content['application/json'].schema;
+  if (!schema.$ref) return schema;
+  return openApi.components.schemas[schema.$ref.split('/').pop()];
+}
+
+const openApi = buildOpenApiSpec({}, 'test');
+
+test('OpenAPI dokumentiert Dokument-Backend und Legacy-Provider', () => {
+  const document = openApi.components.schemas.FamilyDocument;
+  assert.deepEqual(document.properties.storage_backend.enum, ['local', 'webdav', 'dms']);
+  assert.deepEqual(document.properties.storage_provider.enum, ['local', 'external']);
+  assert.ok(document.required.includes('storage_backend'));
+
+  const list = responseSchema(openApi.paths['/api/v1/documents'].get);
+  assert.equal(list.properties.data.items.$ref, '#/components/schemas/FamilyDocument');
+  const create = responseSchema(openApi.paths['/api/v1/documents'].post, 201);
+  assert.equal(create.properties.data.$ref, '#/components/schemas/FamilyDocument');
+});
+
+test('OpenAPI dokumentiert aktive Upload-Backend-Option bei stabilem Legacy-Provider', () => {
+  const options = responseSchema(openApi.paths['/api/v1/documents/meta/options'].get);
+  const data = options.properties.data;
+  assert.deepEqual(data.properties.storage_providers.items.enum, ['local', 'external']);
+  assert.deepEqual(data.properties.active_upload_backend.enum, ['local', 'webdav']);
+});
+
+test('OpenAPI dokumentiert admin-only WebDAV-Konfiguration ohne Passwortausgabe', () => {
+  const path = openApi.paths['/api/v1/documents/storage/config'];
+  assert.ok(path.get.responses[403]);
+  assert.ok(path.put.responses[403]);
+
+  const request = openApi.components.schemas.DocumentStorageConfigRequest;
+  for (const field of [
+    'enabled',
+    'url',
+    'username',
+    'password',
+    'path',
+    'confirm_existing_access',
+    'clear_password',
+  ]) {
+    assert.ok(request.properties[field], `Requestfeld fehlt: ${field}`);
+  }
+
+  const status = openApi.components.schemas.DocumentStorageStatus;
+  for (const field of [
+    'enabled',
+    'configured',
+    'active_upload_backend',
+    'effective_target',
+    'webdav_document_count',
+    'last_test',
+    'last_error',
+    'env_controlled',
+  ]) {
+    assert.ok(status.properties[field], `Statusfeld fehlt: ${field}`);
+  }
+  assert.deepEqual(
+    Object.keys(status.properties.env_controlled.properties),
+    ['enabled', 'url', 'username', 'password', 'path']
+  );
+  assert.equal(Object.hasOwn(status.properties, 'password'), false);
+  assert.equal(
+    responseSchema(path.get).properties.data.$ref,
+    '#/components/schemas/DocumentStorageStatus'
+  );
+
+  const testPath = openApi.paths['/api/v1/documents/storage/test'].post;
+  assert.ok(testPath.responses[403]);
+  assert.equal(
+    testPath.requestBody.content['application/json'].schema.$ref,
+    '#/components/schemas/DocumentStorageTestRequest'
+  );
+});
+
+test('OpenAPI dokumentiert Kalender-Dokumentlinks und Legacy-Anhangsdaten', () => {
+  const calendarEvent = schemaProperties(openApi, 'CalendarEvent');
+  assert.equal(calendarEvent.attachment_document_id.type.includes('null'), true);
+  assert.equal(calendarEvent.attachment_preview_url.type.includes('null'), true);
+  assert.equal(calendarEvent.attachment_download_url.type.includes('null'), true);
+  assert.equal(calendarEvent.attachment_data.type.includes('null'), true);
+
+  const list = responseSchema(openApi.paths['/api/v1/calendar'].get);
+  assert.equal(list.properties.data.items.$ref, '#/components/schemas/CalendarEvent');
+});
+
+test('OpenAPI dokumentiert stabile Storage-Fehlercodes', () => {
+  const codes = openApi.components.schemas.DocumentStorageErrorCode.enum;
+  for (const suffix of [
+    'INVALID_CONFIG',
+    'NOT_CONFIGURED',
+    'UPLOAD_FAILED',
+    'READ_FAILED',
+    'DELETE_FAILED',
+    'CLEANUP_FAILED',
+    'TOO_LARGE',
+    'CONNECTION_TEST_FAILED',
+    'CONFIG_PROTECTED',
+  ]) {
+    assert.ok(
+      codes.includes(`DOCUMENT_STORAGE_${suffix}`),
+      `Storage-Fehlercode fehlt: ${suffix}`
+    );
+  }
+  assert.equal(
+    openApi.components.schemas.ApiError.properties.storage_code.$ref,
+    '#/components/schemas/DocumentStorageErrorCode'
+  );
+});
+
+test('OpenAPI erlaubt DMS-Push für local und webdav, aber nicht dms', () => {
+  const push = openApi.paths['/api/v1/documents/dms/push'].post;
+  assert.match(push.description, /local.*webdav/i);
+  assert.match(push.description, /storage_backend.*dms/i);
+
+  const linked = openApi.components.schemas.DmsLinkResponse.properties.data;
+  assert.deepEqual(linked.properties.storage_backend.enum, ['dms']);
+  assert.ok(linked.required.includes('storage_backend'));
 });

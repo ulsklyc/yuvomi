@@ -72,6 +72,7 @@
     "weather": "Météo",
     "google": "Google Agenda",
     "apple": "Apple CalDAV",
+    "documentWebdav": "Documents WebDAV",
     "save": "Enregistrer et démarrer Docker",
     "saving": "Enregistrement …",
     "errSave": "Échec de l'enregistrement de .env.",
@@ -130,6 +131,14 @@
     "backupEnable": "Activer les sauvegardes automatiques",
     "backupScheduleLabel": "Planification (cron)",
     "backupScheduleHint": "Quand exécuter les sauvegardes. Par défaut : tous les jours à 2 h.",
-    "backupKeepLabel": "Sauvegardes à conserver"
+    "backupKeepLabel": "Sauvegardes à conserver",
+    "documentWebdav": "Stockage de documents WebDAV",
+    "documentWebdavHint": "Les valeurs d’environnement non vides remplacent les réglages correspondants enregistrés dans la base de données.",
+    "documentWebdavEnable": "Stocker les nouveaux documents sur WebDAV",
+    "documentWebdavUrlLabel": "URL WebDAV",
+    "documentWebdavUsernameLabel": "Nom d’utilisateur",
+    "documentWebdavPasswordLabel": "Mot de passe",
+    "documentWebdavPathLabel": "Chemin de base",
+    "documentWebdavPathHint": "Dossier distant des documents. Laisser vide pour utiliser yuvomi-documents."
   }
 }

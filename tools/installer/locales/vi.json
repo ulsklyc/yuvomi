@@ -72,6 +72,7 @@
     "weather": "Thời tiết",
     "google": "Google Calendar",
     "apple": "Apple CalDAV",
+    "documentWebdav": "Tài liệu WebDAV",
     "save": "Lưu & Khởi động Docker",
     "saving": "Đang lưu …",
     "errSave": "Không thể lưu .env.",
@@ -130,6 +131,14 @@
     "backupEnable": "Bật sao lưu tự động",
     "backupScheduleLabel": "Lịch (cron)",
     "backupScheduleHint": "Thời điểm chạy sao lưu. Mặc định: hàng ngày lúc 2 giờ sáng.",
-    "backupKeepLabel": "Số bản sao lưu cần giữ"
+    "backupKeepLabel": "Số bản sao lưu cần giữ",
+    "documentWebdav": "Lưu trữ tài liệu WebDAV",
+    "documentWebdavHint": "Giá trị môi trường không trống sẽ ghi đè cài đặt tương ứng trong cơ sở dữ liệu.",
+    "documentWebdavEnable": "Lưu tài liệu mới trên WebDAV",
+    "documentWebdavUrlLabel": "URL WebDAV",
+    "documentWebdavUsernameLabel": "Tên người dùng",
+    "documentWebdavPasswordLabel": "Mật khẩu",
+    "documentWebdavPathLabel": "Đường dẫn gốc",
+    "documentWebdavPathHint": "Thư mục từ xa cho tài liệu. Để trống để dùng yuvomi-documents."
   }
 }

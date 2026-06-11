@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 
-const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r/g, '');
 
 function walkJsFiles(dir) {
   const entries = readdirSync(new URL(dir, import.meta.url), { withFileTypes: true });
@@ -523,6 +523,15 @@ test('calendar metadata uses lucide icon markup instead of visible emoji', () =>
   assert.doesNotMatch(source, /📍|🗓|📅|🎂|👤/, 'calendar metadata must not render visible emoji icons');
   assert.match(source, /calendarMetaIconHtml\('map-pin'\)/, 'location metadata should use the shared metadata icon helper');
   assert.match(source, /class="calendar-meta-icon icon-sm"/, 'metadata icons should use tokenized icon classes');
+});
+
+test('calendar attachment removal control honors its hidden state', () => {
+  const calendarCss = read('../public/styles/calendar.css');
+  assert.match(
+    calendarCss,
+    /#modal-remove-attachment\[hidden\]\s*\{\s*display:\s*none;/,
+    'the remove-attachment button must stay hidden for events without an attachment'
+  );
 });
 
 test('phase 7 calendar inline polish keeps icons and all-day labels tokenized', () => {

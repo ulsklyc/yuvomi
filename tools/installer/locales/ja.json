@@ -72,6 +72,7 @@
     "weather": "天気",
     "google": "Google カレンダー",
     "apple": "Apple CalDAV",
+    "documentWebdav": "WebDAV ドキュメント",
     "save": "保存して Docker を起動",
     "saving": "保存中 …",
     "errSave": ".env の保存に失敗しました。",
@@ -130,6 +131,14 @@
     "backupEnable": "自動バックアップを有効にする",
     "backupScheduleLabel": "スケジュール（cron）",
     "backupScheduleHint": "バックアップを実行するタイミング。既定: 毎日午前 2 時。",
-    "backupKeepLabel": "保持するバックアップ数"
+    "backupKeepLabel": "保持するバックアップ数",
+    "documentWebdav": "WebDAV ドキュメントストレージ",
+    "documentWebdavHint": "空でない環境変数は、データベースに保存された対応する設定を上書きします。",
+    "documentWebdavEnable": "新しいドキュメントを WebDAV に保存",
+    "documentWebdavUrlLabel": "WebDAV URL",
+    "documentWebdavUsernameLabel": "ユーザー名",
+    "documentWebdavPasswordLabel": "パスワード",
+    "documentWebdavPathLabel": "ベースパス",
+    "documentWebdavPathHint": "ドキュメント用のリモートフォルダー。空の場合は yuvomi-documents を使用します。"
   }
 }

@@ -2,7 +2,7 @@
 
 Thanks for your interest in contributing! Yuvomi is a small, opinionated project with deliberate architectural constraints. This guide covers what you need to know before submitting code.
 
-Have a question before diving in? Start a thread in [Discussions](https://github.com/ulsklyc/oikos/discussions).
+Have a question before diving in? Start a thread in [Discussions](https://github.com/ulsklyc/yuvomi/discussions).
 
 ---
 
@@ -31,8 +31,8 @@ Backend dependencies are evaluated case-by-case but must remain minimal. When in
 ### Getting started
 
 ```bash
-git clone https://github.com/ulsklyc/oikos.git
-cd oikos
+git clone https://github.com/ulsklyc/yuvomi.git
+cd yuvomi
 npm install
 cp .env.example .env
 # Set SESSION_SECRET - leave DB_ENCRYPTION_KEY empty (no SQLCipher needed locally)
@@ -117,15 +117,15 @@ docs/                  # Product spec, screenshots
 
 ### 1. Find or create an issue
 
-Before starting work, check the [existing issues](https://github.com/ulsklyc/oikos/issues). For anything beyond a trivial fix, open an issue first to discuss the approach. This avoids wasted effort on changes that conflict with the project's direction.
+Before starting work, check the [existing issues](https://github.com/ulsklyc/yuvomi/issues). For anything beyond a trivial fix, open an issue first to discuss the approach. This avoids wasted effort on changes that conflict with the project's direction.
 
 ### 2. Fork and branch
 
 ```bash
 # Fork on GitHub, then:
-git clone https://github.com/YOUR-USERNAME/oikos.git
-cd oikos
-git remote add upstream https://github.com/ulsklyc/oikos.git
+git clone https://github.com/YOUR-USERNAME/yuvomi.git
+cd yuvomi
+git remote add upstream https://github.com/ulsklyc/yuvomi.git
 git checkout -b feat/your-feature-name
 ```
 
@@ -248,7 +248,7 @@ Format: imperative mood, one line per change, user-oriented language.
 
 ### Bugs
 
-[Open an issue](https://github.com/ulsklyc/oikos/issues/new) with:
+[Open an issue](https://github.com/ulsklyc/yuvomi/issues/new) with:
 
 - What you expected vs. what happened
 - Steps to reproduce
@@ -263,13 +263,13 @@ Features that conflict with the project's [hard constraints](#hard-constraints) 
 
 ### Security vulnerabilities
 
-Do **not** open a public issue. Use [GitHub Private Vulnerability Reporting](https://github.com/ulsklyc/oikos/security/advisories/new) instead. See [`SECURITY.md`](SECURITY.md) for details.
+Do **not** open a public issue. Use [GitHub Private Vulnerability Reporting](https://github.com/ulsklyc/yuvomi/security/advisories/new) instead. See [`SECURITY.md`](SECURITY.md) for details.
 
 ---
 
 ## Questions?
 
-If something in this guide is unclear or you're unsure whether a contribution fits, open a thread in [Discussions](https://github.com/ulsklyc/oikos/discussions) or comment on the relevant issue. We're happy to help.
+If something in this guide is unclear or you're unsure whether a contribution fits, open a thread in [Discussions](https://github.com/ulsklyc/yuvomi/discussions) or comment on the relevant issue. We're happy to help.
 
 ---
 

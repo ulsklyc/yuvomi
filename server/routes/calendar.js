@@ -13,9 +13,15 @@ import * as appleCalendar from '../services/apple-calendar.js';
 import * as icsSubscription from '../services/ics-subscription.js';
 import * as caldavSync from '../services/caldav-sync.js';
 import * as caldavReminders from '../services/caldav-reminders-sync.js';
+import * as holidays from '../services/holidays.js';
 import { requireAdmin } from '../auth.js';
 import { str, color, datetime, rrule, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE, DATETIME_RE } from '../middleware/validate.js';
 import { expandRecurringEvents, getUpcomingEvents } from '../services/calendar-events.js';
+import {
+  StorageError,
+  cleanupStagedUpload,
+  stageDocumentUpload,
+} from '../services/document-storage.js';
 
 const log = createLogger('Calendar');
 
@@ -77,7 +83,7 @@ function eventIcon(value) {
 
 function parseAttachment(dataUrl) {
   const raw = typeof dataUrl === 'string' ? dataUrl.trim() : '';
-  if (!raw) return { name: null, mime: null, size: null, data: null };
+  if (!raw) return { mime: null, size: null, buffer: null };
   const match = raw.match(/^data:([^;,]+);base64,([A-Za-z0-9+/=\s]+)$/);
   if (!match) throw new Error('attachment_data: ungültiges Dateiformat.');
   const mime = match[1].toLowerCase();
@@ -86,7 +92,7 @@ function parseAttachment(dataUrl) {
   const buffer = Buffer.from(base64, 'base64');
   if (!buffer.length) throw new Error('attachment_data: Datei ist leer.');
   if (buffer.length > MAX_ATTACHMENT_BYTES) throw new Error('attachment_data: Datei darf höchstens 5 MB groß sein.');
-  return { name: null, mime, size: buffer.length, data: base64 };
+  return { mime, size: buffer.length, buffer };
 }
 
 // CalDAV-Ziel eines Events validieren (Issue #241). Liefert {value, error}
@@ -136,14 +142,15 @@ function ensureDocumentFolder(database, name, actorId) {
   return result.lastInsertRowid;
 }
 
-function createAttachmentDocument(database, attachment, body, actorId) {
-  if (!attachment?.data) return null;
+function createAttachmentDocument(database, attachment, staged, body, actorId) {
+  if (!attachment?.buffer || !staged) return null;
   const originalName = String(body.attachment_name || 'Attachment').trim() || 'Attachment';
   const folderId = ensureDocumentFolder(database, body.document_folder_name || DEFAULT_ATTACHMENT_FOLDER, actorId);
   const result = database.prepare(`
     INSERT INTO family_documents
-      (name, description, category, visibility, folder_id, original_name, mime_type, file_size, content_data, created_by)
-    VALUES (?, ?, 'other', 'family', ?, ?, ?, ?, ?, ?)
+      (name, description, category, visibility, folder_id, original_name, mime_type,
+       file_size, content_data, storage_provider, storage_backend, storage_key, created_by)
+    VALUES (?, ?, 'other', 'family', ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     body.document_name || originalName.replace(/\.[^.]+$/, ''),
     body.document_description || null,
@@ -151,7 +158,10 @@ function createAttachmentDocument(database, attachment, body, actorId) {
     originalName,
     attachment.mime,
     attachment.size,
-    attachment.data,
+    staged.content_data,
+    staged.storage_provider,
+    staged.storage_backend,
+    staged.storage_key,
     actorId,
   );
   return result.lastInsertRowid;
@@ -189,12 +199,30 @@ function serializeEvent(event) {
   if (!event) return event;
   const assigned_users = event.assigned_users_json ? JSON.parse(event.assigned_users_json) : [];
   const { assigned_users_json, ...rest } = event;
+  const documentId = event.attachment_document_id ?? null;
   return {
     ...rest,
     assigned_users,
-    attachment_data: attachmentDataUrl(event),
+    attachment_document_id: documentId,
+    attachment_data: documentId ? null : attachmentDataUrl(event),
+    attachment_preview_url: documentId
+      ? `/api/v1/documents/${documentId}/preview`
+      : null,
+    attachment_download_url: documentId
+      ? `/api/v1/documents/${documentId}/download`
+      : null,
     housekeeping_visit_id: event.housekeeping_visit_id ?? null,
   };
+}
+
+function sendStorageError(res, error, fallbackMessage) {
+  if (!(error instanceof StorageError)) return false;
+  res.status(502).json({
+    error: fallbackMessage,
+    code: 502,
+    storage_code: error.storageCode,
+  });
+  return true;
 }
 
 // RRULE-Expansion (expandRecurringEvents) lebt nun in
@@ -620,6 +648,24 @@ router.post('/subscriptions/:id/sync', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// GET /api/v1/calendar/holidays?from=YYYY-MM-DD&to=YYYY-MM-DD
+// Muss VOR /:id stehen, damit "holidays" nicht als ID-Parameter interpretiert wird.
+// ---------------------------------------------------------------------------
+router.get('/holidays', (req, res) => {
+  try {
+    const { from, to } = req.query;
+    if (!from || !to || !/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      return res.status(400).json({ error: 'Query params from and to (YYYY-MM-DD) required.', code: 400 });
+    }
+    const data = holidays.getForRange(from, to);
+    res.json({ data });
+  } catch (err) {
+    log.error('GET /holidays', err);
+    res.status(500).json({ error: 'Interner Fehler.', code: 500 });
+  }
+});
+
 // --------------------------------------------------------
 // GET /api/v1/calendar/:id
 // Einzelnen Termin abrufen.
@@ -657,7 +703,8 @@ router.get('/:id', (req, res) => {
 //         recurrence_rule? }
 // Response: { data: Event }
 // --------------------------------------------------------
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
+  let stagedUpload;
   try {
     const userId = getUserId(req);
     if (!userId) {
@@ -688,10 +735,26 @@ router.post('/', (req, res) => {
     const userIds  = parseAssignedTo(req.body.assigned_to);
     const firstUid = userIds[0] ?? null;
 
-    const attachment = req.body.attachment_data ? parseAttachment(req.body.attachment_data) : { mime: null, size: null, data: null };
+    const attachment = req.body.attachment_data
+      ? parseAttachment(req.body.attachment_data)
+      : { mime: null, size: null, buffer: null };
+    if (attachment.buffer) {
+      stagedUpload = await stageDocumentUpload({
+        buffer: attachment.buffer,
+        mime: attachment.mime,
+        category: 'other',
+        originalName: req.body.attachment_name || 'Attachment',
+      });
+    }
 
     const eventId = db.get().transaction(() => {
-      const documentId = createAttachmentDocument(db.get(), attachment, req.body, userId);
+      const documentId = createAttachmentDocument(
+        db.get(),
+        attachment,
+        stagedUpload,
+        req.body,
+        userId
+      );
       const result = db.get().prepare(`
         INSERT INTO calendar_events
           (title, description, start_datetime, end_datetime, all_day,
@@ -708,7 +771,7 @@ router.post('/', (req, res) => {
         req.body.attachment_name || null,
         attachment.mime,
         attachment.size,
-        attachment.data,
+        null,
         documentId,
         vCaldav.value.accountId,
         vCaldav.value.calendarUrl,
@@ -732,7 +795,23 @@ router.post('/', (req, res) => {
 
     res.status(201).json({ data: serializeEvent(event) });
   } catch (err) {
+    if (err instanceof StorageError && !stagedUpload) {
+      log.error('POST / storage error:', err);
+      return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
+    }
     log.error('', err);
+    if (stagedUpload?.storage_backend === 'webdav') {
+      try {
+        await cleanupStagedUpload(stagedUpload);
+      } catch (cleanupError) {
+        log.error('POST / cleanup error after database failure:', cleanupError);
+        return sendStorageError(
+          res,
+          cleanupError,
+          'Calendar attachment storage cleanup failed.'
+        );
+      }
+    }
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
   }
 });
@@ -743,7 +822,8 @@ router.post('/', (req, res) => {
 // Body: alle Felder optional außer title + start_datetime
 // Response: { data: Event }
 // --------------------------------------------------------
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
+  let stagedUpload;
   try {
     const id    = parseInt(req.params.id, 10);
     const event = db.get().prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
@@ -770,17 +850,41 @@ router.put('/:id', (req, res) => {
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     const vIcon = req.body.icon !== undefined ? eventIcon(req.body.icon) : event.icon;
     if (!vIcon) return res.status(400).json({ error: 'icon: invalid calendar event icon.', code: 400 });
-    const attachment = req.body.attachment_data !== undefined
-      ? (req.body.attachment_data ? parseAttachment(req.body.attachment_data) : { mime: null, size: null, data: null })
-      : {
-          mime: event.attachment_mime,
-          size: event.attachment_size,
-          data: event.attachment_data,
-        };
+    if (
+      req.body.remove_attachment !== undefined
+      && typeof req.body.remove_attachment !== 'boolean'
+    ) {
+      return res.status(400).json({
+        error: 'remove_attachment: muss ein Boolean sein.',
+        code: 400,
+      });
+    }
+    const attachmentDataProvided = Object.hasOwn(req.body, 'attachment_data');
+    const replacementRequested = typeof req.body.attachment_data === 'string'
+      && req.body.attachment_data.trim() !== '';
+    const removalRequested = req.body.remove_attachment === true
+      || (attachmentDataProvided && req.body.attachment_data === null);
+    if (replacementRequested && removalRequested) {
+      return res.status(400).json({
+        error: 'attachment_data und remove_attachment widersprechen sich.',
+        code: 400,
+      });
+    }
+    const attachment = replacementRequested
+      ? parseAttachment(req.body.attachment_data)
+      : null;
+    if (attachment?.buffer) {
+      stagedUpload = await stageDocumentUpload({
+        buffer: attachment.buffer,
+        mime: attachment.mime,
+        category: 'other',
+        originalName: req.body.attachment_name || 'Attachment',
+      });
+    }
 
     const {
       title, description, start_datetime, end_datetime,
-      all_day, location, color: colorVal, recurrence_rule, attachment_name,
+      all_day, location, color: colorVal, recurrence_rule,
     } = req.body;
 
     const userIds  = req.body.assigned_to !== undefined
@@ -796,9 +900,35 @@ router.put('/:id', (req, res) => {
     const googleTargetId = vGoogle ? vGoogle.value : event.target_google_calendar_id;
 
     db.get().transaction(() => {
-      const documentId = req.body.attachment_data
-        ? createAttachmentDocument(db.get(), attachment, req.body, event.created_by)
-        : event.attachment_document_id;
+      const documentId = replacementRequested
+        ? createAttachmentDocument(
+            db.get(),
+            attachment,
+            stagedUpload,
+            req.body,
+            event.created_by
+          )
+        : removalRequested
+          ? null
+          : event.attachment_document_id;
+      const attachmentName = replacementRequested
+        ? (req.body.attachment_name || 'Attachment')
+        : removalRequested
+          ? null
+          : event.attachment_name;
+      const attachmentMime = replacementRequested
+        ? attachment.mime
+        : removalRequested
+          ? null
+          : event.attachment_mime;
+      const attachmentSize = replacementRequested
+        ? attachment.size
+        : removalRequested
+          ? null
+          : event.attachment_size;
+      const attachmentData = replacementRequested || removalRequested
+        ? null
+        : event.attachment_data;
       db.get().prepare(`
         UPDATE calendar_events
         SET title           = COALESCE(?, title),
@@ -832,10 +962,10 @@ router.put('/:id', (req, res) => {
         req.body.icon !== undefined ? vIcon : null,
         firstUid !== undefined ? firstUid : event.assigned_to,
         recurrence_rule !== undefined ? (recurrence_rule || null) : event.recurrence_rule,
-        attachment_name !== undefined ? (attachment_name || null) : event.attachment_name,
-        attachment.mime,
-        attachment.size,
-        attachment.data,
+        attachmentName,
+        attachmentMime,
+        attachmentSize,
+        attachmentData,
         documentId,
         caldavAccountId,
         caldavCalendarUrl,
@@ -860,7 +990,23 @@ router.put('/:id', (req, res) => {
 
     res.json({ data: serializeEvent(updated) });
   } catch (err) {
+    if (err instanceof StorageError && !stagedUpload) {
+      log.error('PUT /:id storage error:', err);
+      return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
+    }
     log.error('', err);
+    if (stagedUpload?.storage_backend === 'webdav') {
+      try {
+        await cleanupStagedUpload(stagedUpload);
+      } catch (cleanupError) {
+        log.error('PUT /:id cleanup error after database failure:', cleanupError);
+        return sendStorageError(
+          res,
+          cleanupError,
+          'Calendar attachment storage cleanup failed.'
+        );
+      }
+    }
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
   }
 });

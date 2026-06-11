@@ -348,6 +348,39 @@
           </div>
         </div>
 
+        <div class="toggle-card">
+          <button type="button" class="toggle-head" data-toggle="document-webdav-body" aria-expanded="false" aria-controls="document-webdav-body">
+            <span data-i18n="advanced.documentWebdav">WebDAV Document Storage</span>
+            <span class="toggle-badge" data-i18n="common.optional">Optional</span>
+          </button>
+          <div class="toggle-body" id="document-webdav-body">
+            <p class="hint" style="margin-bottom:12px" data-i18n="advanced.documentWebdavHint">Non-empty environment values override the corresponding settings stored in the database.</p>
+            <div class="field">
+              <label><input type="checkbox" id="adv-document-webdav-enable"> <span data-i18n="advanced.documentWebdavEnable">Store new documents on WebDAV</span></label>
+            </div>
+            <div class="field">
+              <label for="adv-document-webdav-url" data-i18n="advanced.documentWebdavUrlLabel">WebDAV URL</label>
+              <input type="text" id="adv-document-webdav-url" placeholder="https://cloud.example.com/remote.php/dav/files/user/">
+            </div>
+            <div class="field">
+              <label for="adv-document-webdav-username" data-i18n="advanced.documentWebdavUsernameLabel">Username</label>
+              <input type="text" id="adv-document-webdav-username" autocomplete="username">
+            </div>
+            <div class="field">
+              <label for="adv-document-webdav-password" data-i18n="advanced.documentWebdavPasswordLabel">Password</label>
+              <div class="secret-row">
+                <input type="password" id="adv-document-webdav-password" autocomplete="new-password">
+                <button type="button" class="btn btn-ghost btn-sm" data-eye="adv-document-webdav-password" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">&#x1F441;</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="adv-document-webdav-path" data-i18n="advanced.documentWebdavPathLabel">Base path</label>
+              <input type="text" id="adv-document-webdav-path" placeholder="yuvomi-documents">
+              <div class="hint" data-i18n="advanced.documentWebdavPathHint">Remote folder for document files. Leave empty to use yuvomi-documents.</div>
+            </div>
+          </div>
+        </div>
+
         <div class="error-banner" id="adv-err" role="alert"></div>
       </div>
       <div class="card-foot">
@@ -373,6 +406,7 @@
           <div class="review-key" data-i18n="review.weather">Weather</div>        <div id="rv-weather"></div>
           <div class="review-key" data-i18n="review.google">Google Calendar</div><div id="rv-google"></div>
           <div class="review-key" data-i18n="review.apple">Apple CalDAV</div>   <div id="rv-apple"></div>
+          <div class="review-key" data-i18n="review.documentWebdav">WebDAV documents</div><div id="rv-document-webdav"></div>
         </div>
         <div class="error-banner" id="rev-err" role="alert"></div>
       </div>
@@ -507,6 +541,11 @@ const S = {
   SESSION_SECURE: '', TRUST_PROXY: '',
   OIDC_ISSUER: '', OIDC_CLIENT_ID: '', OIDC_CLIENT_SECRET: '', OIDC_REDIRECT_URI: '',
   BACKUP_ENABLED: '', BACKUP_SCHEDULE: '', BACKUP_KEEP: '',
+  DOCUMENT_STORAGE_WEBDAV_ENABLED: '',
+  DOCUMENT_STORAGE_WEBDAV_URL: '',
+  DOCUMENT_STORAGE_WEBDAV_USERNAME: '',
+  DOCUMENT_STORAGE_WEBDAV_PASSWORD: '',
+  DOCUMENT_STORAGE_WEBDAV_PATH: '',
 };
 
 S.tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -692,6 +731,12 @@ $('adv-next').addEventListener('click', () => {
   S.BACKUP_SCHEDULE = $('adv-backup-enable').checked ? $('adv-backup-schedule').value.trim() : '';
   S.BACKUP_KEEP = $('adv-backup-enable').checked ? $('adv-backup-keep').value.trim() : '';
 
+  S.DOCUMENT_STORAGE_WEBDAV_ENABLED = $('adv-document-webdav-enable').checked ? 'true' : 'false';
+  S.DOCUMENT_STORAGE_WEBDAV_URL = $('adv-document-webdav-url').value.trim();
+  S.DOCUMENT_STORAGE_WEBDAV_USERNAME = $('adv-document-webdav-username').value.trim();
+  S.DOCUMENT_STORAGE_WEBDAV_PASSWORD = $('adv-document-webdav-password').value;
+  S.DOCUMENT_STORAGE_WEBDAV_PATH = $('adv-document-webdav-path').value.trim();
+
   $('rv-host').textContent    = S.host;
   $('rv-port').textContent    = S.port;
   $('rv-tz').textContent      = S.tz;
@@ -700,6 +745,9 @@ $('adv-next').addEventListener('click', () => {
     : '-';
   $('rv-google').textContent  = S.GOOGLE_CLIENT_ID ? t('review.configured') : '-';
   $('rv-apple').textContent   = S.APPLE_USERNAME || '-';
+  $('rv-document-webdav').textContent = S.DOCUMENT_STORAGE_WEBDAV_ENABLED === 'true'
+    ? (S.DOCUMENT_STORAGE_WEBDAV_URL || t('review.configured'))
+    : '-';
 
   showStep(5);
 });
@@ -719,6 +767,11 @@ $('rev-next').addEventListener('click', async () => {
     OIDC_ISSUER: S.OIDC_ISSUER, OIDC_CLIENT_ID: S.OIDC_CLIENT_ID,
     OIDC_CLIENT_SECRET: S.OIDC_CLIENT_SECRET, OIDC_REDIRECT_URI: S.OIDC_REDIRECT_URI,
     BACKUP_ENABLED: S.BACKUP_ENABLED, BACKUP_SCHEDULE: S.BACKUP_SCHEDULE, BACKUP_KEEP: S.BACKUP_KEEP,
+    DOCUMENT_STORAGE_WEBDAV_ENABLED: S.DOCUMENT_STORAGE_WEBDAV_ENABLED,
+    DOCUMENT_STORAGE_WEBDAV_URL: S.DOCUMENT_STORAGE_WEBDAV_URL,
+    DOCUMENT_STORAGE_WEBDAV_USERNAME: S.DOCUMENT_STORAGE_WEBDAV_USERNAME,
+    DOCUMENT_STORAGE_WEBDAV_PASSWORD: S.DOCUMENT_STORAGE_WEBDAV_PASSWORD,
+    DOCUMENT_STORAGE_WEBDAV_PATH: S.DOCUMENT_STORAGE_WEBDAV_PATH,
     SYNC_INTERVAL_MINUTES: '15',
     TZ: S.tz, OIKOS_HTTP_PORT: S.port,
   };

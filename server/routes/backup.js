@@ -11,7 +11,7 @@ import fs from 'node:fs/promises';
 import { backupToFile, currentVersion, restoreFromFile } from '../db.js';
 import { requireAdmin } from '../auth.js';
 import { createLogger } from '../logger.js';
-import { getStatus as getSchedulerStatus, triggerBackup } from '../services/backup-scheduler.js';
+import { createLocalBackup, getStatus as getSchedulerStatus, triggerBackup } from '../services/backup-scheduler.js';
 import * as webdavBackup from '../services/backup-webdav.js';
 
 const router = express.Router();
@@ -20,7 +20,7 @@ const RESTORE_LIMIT = process.env.BACKUP_UPLOAD_LIMIT || '100mb';
 
 function backupFileName() {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  return `oikos-backup-${stamp}.db`;
+  return `yuvomi-backup-${stamp}.db`;
 }
 
 router.get('/status', requireAdmin, (req, res) => {
@@ -37,7 +37,7 @@ router.get('/status', requireAdmin, (req, res) => {
 router.get('/database', requireAdmin, async (req, res) => {
   let tmpPath = null;
   try {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'oikos-backup-'));
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yuvomi-backup-'));
     tmpPath = path.join(dir, backupFileName());
     await backupToFile(tmpPath);
 
@@ -68,7 +68,7 @@ router.post(
         return res.status(400).json({ error: 'Backup file is required.', code: 400 });
       }
 
-      dir = await fs.mkdtemp(path.join(os.tmpdir(), 'oikos-restore-'));
+      dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yuvomi-restore-'));
       const uploadPath = path.join(dir, 'restore.db');
       await fs.writeFile(uploadPath, req.body);
       const result = await restoreFromFile(uploadPath);
@@ -179,13 +179,15 @@ router.get('/webdav/files', requireAdmin, async (req, res) => {
 
 /**
  * POST /api/v1/backup/webdav/trigger
- * Uploads the most recent local backup to WebDAV immediately.
+ * Creates a fresh backup snapshot and uploads it to WebDAV immediately.
+ * A fresh, uniquely named file is created on every trigger so manual uploads
+ * never overwrite a previous remote backup.
  */
 router.post('/webdav/trigger', requireAdmin, async (req, res) => {
   try {
-    const backupDir = process.env.BACKUP_DIR || './backups';
-    const fileName  = await webdavBackup.triggerUpload(backupDir);
-    res.json({ data: { file: fileName, timestamp: new Date().toISOString() } });
+    const filePath = await createLocalBackup();
+    await webdavBackup.uploadBackup(filePath);
+    res.json({ data: { file: path.basename(filePath), timestamp: new Date().toISOString() } });
   } catch (err) {
     log.error('WebDAV manual upload failed:', err);
     res.status(500).json({ error: err.message ?? 'WebDAV upload failed.', code: 500 });

@@ -72,6 +72,7 @@
     "weather": "الطقس",
     "google": "تقويم Google",
     "apple": "Apple CalDAV",
+    "documentWebdav": "مستندات WebDAV",
     "save": "حفظ وبدء Docker",
     "saving": "جارٍ الحفظ …",
     "errSave": "فشل حفظ ‎.env‎.",
@@ -130,6 +131,14 @@
     "backupEnable": "تفعيل النُّسخ الاحتياطية التلقائية",
     "backupScheduleLabel": "الجدولة (cron)",
     "backupScheduleHint": "متى تُجرى النُّسخ الاحتياطية. الافتراضي: يوميًا الساعة 2 صباحًا.",
-    "backupKeepLabel": "عدد النُّسخ المحتفظ بها"
+    "backupKeepLabel": "عدد النُّسخ المحتفظ بها",
+    "documentWebdav": "تخزين مستندات WebDAV",
+    "documentWebdavHint": "تتجاوز قيم البيئة غير الفارغة الإعدادات المقابلة المحفوظة في قاعدة البيانات.",
+    "documentWebdavEnable": "تخزين المستندات الجديدة على WebDAV",
+    "documentWebdavUrlLabel": "عنوان WebDAV",
+    "documentWebdavUsernameLabel": "اسم المستخدم",
+    "documentWebdavPasswordLabel": "كلمة المرور",
+    "documentWebdavPathLabel": "المسار الأساسي",
+    "documentWebdavPathHint": "المجلد البعيد للمستندات. اتركه فارغًا لاستخدام yuvomi-documents."
   }
 }

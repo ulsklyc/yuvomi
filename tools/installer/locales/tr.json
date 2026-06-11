@@ -72,6 +72,7 @@
     "weather": "Hava durumu",
     "google": "Google Takvim",
     "apple": "Apple CalDAV",
+    "documentWebdav": "WebDAV belgeleri",
     "save": "Kaydet ve Docker'ı başlat",
     "saving": "Kaydediliyor …",
     "errSave": ".env kaydedilemedi.",
@@ -130,6 +131,14 @@
     "backupEnable": "Otomatik yedeklemeleri etkinleştir",
     "backupScheduleLabel": "Zamanlama (cron)",
     "backupScheduleHint": "Yedeklemelerin ne zaman çalışacağı. Varsayılan: her gün saat 02.00.",
-    "backupKeepLabel": "Saklanacak yedek sayısı"
+    "backupKeepLabel": "Saklanacak yedek sayısı",
+    "documentWebdav": "WebDAV belge depolama",
+    "documentWebdavHint": "Boş olmayan ortam değerleri veritabanındaki ilgili ayarların üzerine yazılır.",
+    "documentWebdavEnable": "Yeni belgeleri WebDAV'da sakla",
+    "documentWebdavUrlLabel": "WebDAV URL'si",
+    "documentWebdavUsernameLabel": "Kullanıcı adı",
+    "documentWebdavPasswordLabel": "Parola",
+    "documentWebdavPathLabel": "Temel yol",
+    "documentWebdavPathHint": "Belgeler için uzak klasör. yuvomi-documents kullanmak için boş bırakın."
   }
 }

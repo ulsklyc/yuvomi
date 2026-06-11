@@ -35,7 +35,7 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
 2. Guides you through all configuration options, grouped into steps:
    - **Basics** — timezone (`TZ`) and HTTP host port (`OIKOS_HTTP_PORT`)
    - **Security keys** — generates `SESSION_SECRET` and `DB_ENCRYPTION_KEY`
-   - **Optional integrations** — weather (Open-Meteo coordinates, no API key), Google Calendar, Apple CalDAV
+   - **Optional integrations** — weather (Open-Meteo coordinates, no API key), Google Calendar, Apple CalDAV, and WebDAV document storage
    - **Advanced** — reverse-proxy/HTTPS (`SESSION_SECURE`, `TRUST_PROXY`),
      Single Sign-On (OIDC), and automatic backups
 3. Backs up any existing `.env` to `.env.bak-<ISO>` before writing
@@ -45,6 +45,16 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
    podman-compose.yml up -d` / `podman-compose -f podman-compose.yml up -d`)
 6. Polls the health endpoint until the container is ready
 7. Creates your first admin account via `POST /api/v1/auth/setup`
+
+The WebDAV document-storage fields are optional. Non-empty
+`DOCUMENT_STORAGE_WEBDAV_ENABLED`, `_URL`, `_USERNAME`, `_PASSWORD`, and `_PATH` values override
+their matching in-app settings individually. They control the destination for new document files,
+including calendar attachments; existing local files are not migrated. Private or LAN WebDAV
+targets must be supplied through these deployment variables because URLs managed in the admin UI
+are restricted to public network addresses.
+
+> SQLite/database backups do not contain document binaries stored on WebDAV. Back up the WebDAV
+> target separately.
 
 ## Localization
 

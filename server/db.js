@@ -1798,6 +1798,106 @@ const MIGRATIONS = [
       ALTER TABLE housekeeping_work_sessions ADD COLUMN minutes_worked INTEGER;
     `,
   },
+  {
+    version: 49,
+    description: 'Holiday cache for public holidays and school holidays',
+    up: `
+      CREATE TABLE IF NOT EXISTS holiday_cache (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        type        TEXT    NOT NULL CHECK(type IN ('public', 'school')),
+        country     TEXT    NOT NULL,
+        subdivision TEXT,
+        start_date  TEXT    NOT NULL,
+        end_date    TEXT    NOT NULL,
+        name        TEXT    NOT NULL,
+        year        INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_holiday_cache_dates
+        ON holiday_cache(start_date, end_date);
+      CREATE INDEX IF NOT EXISTS idx_holiday_cache_lookup
+        ON holiday_cache(type, country, subdivision, year);
+    `,
+  },
+  {
+    version: 50,
+    description: 'DMS integration: dms_accounts table + external document reference columns',
+    up: `
+      CREATE TABLE IF NOT EXISTS dms_accounts (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider    TEXT    NOT NULL DEFAULT 'paperless'
+                              CHECK(provider IN ('paperless')),
+        name        TEXT    NOT NULL,
+        base_url    TEXT    NOT NULL,
+        api_token   TEXT    NOT NULL,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        last_check  TEXT,
+        UNIQUE(base_url)  -- one DMS account per server (intentional)
+      );
+
+      ALTER TABLE family_documents ADD COLUMN dms_account_id INTEGER
+        REFERENCES dms_accounts(id) ON DELETE SET NULL;
+      ALTER TABLE family_documents ADD COLUMN external_url TEXT;
+      -- external_meta: JSON { correspondent, tags } mirrored from the DMS for display only (not queried)
+      ALTER TABLE family_documents ADD COLUMN external_meta TEXT;
+
+      CREATE INDEX IF NOT EXISTS idx_family_documents_dms ON family_documents(dms_account_id);
+    `,
+  },
+  {
+    version: 51,
+    description: 'Document storage backend discriminator and consistency constraints',
+    up: `
+      ALTER TABLE family_documents ADD COLUMN storage_backend TEXT NOT NULL DEFAULT 'local'
+        CHECK(storage_backend IN ('local', 'webdav', 'dms'));
+
+      UPDATE family_documents
+      SET storage_backend = CASE storage_provider
+        WHEN 'external' THEN 'dms'
+        ELSE 'local'
+      END;
+
+      UPDATE family_documents
+      SET dms_account_id = NULL
+      WHERE storage_backend != 'dms' AND dms_account_id IS NOT NULL;
+
+      CREATE TRIGGER IF NOT EXISTS trg_family_documents_storage_insert
+        BEFORE INSERT ON family_documents
+        FOR EACH ROW
+        BEGIN
+          SELECT CASE
+            WHEN NOT (
+              (NEW.storage_provider = 'local' AND NEW.storage_backend = 'local')
+              OR (NEW.storage_provider = 'external' AND NEW.storage_backend = 'webdav')
+              OR (NEW.storage_provider = 'external' AND NEW.storage_backend = 'dms')
+            )
+            THEN RAISE(ABORT, 'invalid document storage provider/backend combination')
+          END;
+          SELECT CASE
+            WHEN NEW.storage_backend != 'dms' AND NEW.dms_account_id IS NOT NULL
+            THEN RAISE(ABORT, 'dms_account_id requires dms storage backend')
+          END;
+        END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_family_documents_storage_update
+        BEFORE UPDATE OF storage_provider, storage_backend, dms_account_id ON family_documents
+        FOR EACH ROW
+        BEGIN
+          SELECT CASE
+            WHEN NOT (
+              (NEW.storage_provider = 'local' AND NEW.storage_backend = 'local')
+              OR (NEW.storage_provider = 'external' AND NEW.storage_backend = 'webdav')
+              OR (NEW.storage_provider = 'external' AND NEW.storage_backend = 'dms')
+            )
+            THEN RAISE(ABORT, 'invalid document storage provider/backend combination')
+          END;
+          SELECT CASE
+            WHEN NEW.storage_backend != 'dms' AND NEW.dms_account_id IS NOT NULL
+            THEN RAISE(ABORT, 'dms_account_id requires dms storage backend')
+          END;
+        END;
+    `,
+  },
 ];
 
 /**

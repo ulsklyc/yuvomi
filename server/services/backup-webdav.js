@@ -22,8 +22,18 @@ const ENV_PASS     = process.env.WEBDAV_BACKUP_PASSWORD;
 const ENV_PATH     = process.env.WEBDAV_BACKUP_PATH;
 const ENV_KEEP     = process.env.WEBDAV_BACKUP_KEEP;
 
-const BACKUP_FILE_PREFIX = 'oikos-backup-';
+// New backups use the `yuvomi-` prefix; pre-rebrand files use `oikos-`.
+// Both are still recognised for listing/rotation so legacy backups are not
+// orphaned (never rotated, invisible to the UI) after the rename.
+const BACKUP_FILE_PREFIX = 'yuvomi-backup-';
+const LEGACY_FILE_PREFIX = 'oikos-backup-';
 const BACKUP_FILE_SUFFIX = '.db';
+
+/** Whether a basename is a backup file (new or legacy naming). */
+function isBackupFile(name) {
+  return (name.startsWith(BACKUP_FILE_PREFIX) || name.startsWith(LEGACY_FILE_PREFIX))
+    && name.endsWith(BACKUP_FILE_SUFFIX);
+}
 
 // ─── DB-Helpers ───────────────────────────────────────────────────────────────
 
@@ -145,7 +155,7 @@ async function davFetch(method, url, { username, password, headers = {}, body } 
 
 /**
  * Parse a WebDAV PROPFIND Multi-Status XML response.
- * Returns only plain files whose basename matches the oikos backup pattern.
+ * Returns only plain files whose basename matches the backup pattern.
  */
 function parsePropfindXml(xml) {
   const results = [];
@@ -163,7 +173,7 @@ function parsePropfindXml(xml) {
     const basename = href.split('/').filter(Boolean).pop() ?? '';
     const lastmod  = lastmodMatch ? lastmodMatch[1].trim() : new Date().toUTCString();
 
-    if (basename.startsWith(BACKUP_FILE_PREFIX) && basename.endsWith(BACKUP_FILE_SUFFIX)) {
+    if (isBackupFile(basename)) {
       results.push({ filename: basename, lastmod, remotePath: href });
     }
   }
@@ -331,9 +341,7 @@ export async function getRemoteFiles() {
  */
 export async function triggerUpload(backupDir) {
   const entries = await fs.readdir(backupDir);
-  const dbFiles = entries.filter(
-    (f) => f.startsWith(BACKUP_FILE_PREFIX) && f.endsWith(BACKUP_FILE_SUFFIX)
-  );
+  const dbFiles = entries.filter(isBackupFile);
   if (dbFiles.length === 0) throw new Error('No local backup files found to upload.');
 
   const withStats = await Promise.all(

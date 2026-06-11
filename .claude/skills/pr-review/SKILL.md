@@ -17,7 +17,7 @@ allowed-tools:
 
 Run from inside `oikos/`. `$1` is the PR number.
 
-1. **Fetch** — `gh pr view $1 --repo ulsklyc/oikos`, `gh pr diff $1 --repo ulsklyc/oikos`, `gh pr checks $1 --repo ulsklyc/oikos`. Note failing checks. Delegate the deep read to the `pr-reviewer` subagent (`Agent({ subagent_type: "pr-reviewer", ... })`) so main-thread context stays free.
+1. **Fetch** — `gh pr view $1 --repo ulsklyc/yuvomi`, `gh pr diff $1 --repo ulsklyc/yuvomi`, `gh pr checks $1 --repo ulsklyc/yuvomi`. Note failing checks. Delegate the deep read to the `pr-reviewer` subagent (`Agent({ subagent_type: "pr-reviewer", ... })`) so main-thread context stays free.
 2. **Constraint check** — walk the diff against CLAUDE.md Hard Constraints:
    - No frontend frameworks / bundlers / CSS libraries added
    - No `require`, only `import`/`export`

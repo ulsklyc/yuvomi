@@ -53,14 +53,14 @@ sync targets below and update **only** what the change actually affects.
 | `docker-compose.yml` | Port mapping, env passthrough, volumes (only when deployment behavior changed) |
 | `podman-compose.yml` | Mirror `docker-compose.yml`: port mapping, env passthrough, volumes |
 | `tools/quadlet/oikos.container` | Podman Quadlet — ports, env, volumes (mirror compose) |
-| `templates/oikos.xml` | Unraid CA template — **every** env var/port/volume is a hand-written `<Config>` (no fallback). Add/edit/remove the matching entry; mask secrets (`Mask="true"`), put optional integrations on `Display="advanced"` |
+| `templates/yuvomi.xml` | Unraid CA template — **every** env var/port/volume is a hand-written `<Config>` (no fallback). Add/edit/remove the matching entry; mask secrets (`Mask="true"`), put optional integrations on `Display="advanced"` |
 | `ca_profile.xml` | Unraid CA profile blurb — only when the app overview / module list changed |
 | `deploy/truenas/questions.yaml` + `deploy/truenas/templates/docker-compose.yaml` | TrueNAS catalog-config source. Required secrets / new ports / new volumes only — optional env vars are covered by the generic `additional_envs` list. Version bumps reach the upstream `truenas/apps` catalog automatically via the `truenasbot` Renovate bot (new ghcr image tags); config changes need a manual PR carrying these edits |
 | `tools/installer/README.md` | Installer steps, requirements, endpoints, localization, design |
 | `docs/index.html` | Version badge (hero + footer), feature showcase/grid, social-proof counts. **EN + DE i18n in lockstep** |
 | `docs/install.html` | Install options/cards, optional-integration cards. **EN + DE i18n in lockstep** |
-| `docs/awesome-selfhosted/oikos.yml` | `description` + `tags` reflect current modules |
-| `docs/awesome-selfhosted/issue-addition.md` | Directory-submission blurb matches `oikos.yml` |
+| `docs/awesome-selfhosted/yuvomi.yml` | `description` + `tags` reflect current modules |
+| `docs/awesome-selfhosted/issue-addition.md` | Directory-submission blurb matches `yuvomi.yml` |
 | `CONTRIBUTING.md` | Only when commit format, conventions, or test workflow changed |
 | `SECURITY.md` | Only when the security model or supported-version policy changed |
 | `CLAUDE.md` | **Only two sections:** the `## Commands` test-script list (keep in lockstep with the `test:*` scripts in `package.json`) and the `## Environment` env-var list (keep in lockstep with `.env.example`). Never touch any other part — architecture, hard constraints, key locations, conventions belong to the separate CLAUDE.md maintenance process |

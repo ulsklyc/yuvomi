@@ -72,6 +72,7 @@
     "weather": "天气",
     "google": "Google 日历",
     "apple": "Apple CalDAV",
+    "documentWebdav": "WebDAV 文档",
     "save": "保存并启动 Docker",
     "saving": "正在保存 …",
     "errSave": "无法保存 .env。",
@@ -130,6 +131,14 @@
     "backupEnable": "启用自动备份",
     "backupScheduleLabel": "计划（cron）",
     "backupScheduleHint": "何时运行备份。默认：每天凌晨 2 点。",
-    "backupKeepLabel": "保留的备份数量"
+    "backupKeepLabel": "保留的备份数量",
+    "documentWebdav": "WebDAV 文档存储",
+    "documentWebdavHint": "非空环境变量会覆盖数据库中对应的设置。",
+    "documentWebdavEnable": "将新文档存储到 WebDAV",
+    "documentWebdavUrlLabel": "WebDAV URL",
+    "documentWebdavUsernameLabel": "用户名",
+    "documentWebdavPasswordLabel": "密码",
+    "documentWebdavPathLabel": "基础路径",
+    "documentWebdavPathHint": "文档的远程文件夹。留空则使用 yuvomi-documents。"
   }
 }

@@ -45,7 +45,7 @@ an individual is officially representing the community in public spaces.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported via [GitHub Private Vulnerability Reporting](https://github.com/ulsklyc/oikos/security/advisories/new)
+reported via [GitHub Private Vulnerability Reporting](https://github.com/ulsklyc/yuvomi/security/advisories/new)
 or by opening a private issue on GitHub. All complaints will be reviewed and
 investigated promptly and fairly.
 

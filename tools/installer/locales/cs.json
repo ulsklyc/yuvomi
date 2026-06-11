@@ -82,7 +82,15 @@
     "backupEnable": "Povolit automatické zálohy",
     "backupScheduleLabel": "Plán (cron)",
     "backupScheduleHint": "Kdy se zálohy vytváří. Výchozí: denně ve 2:00.",
-    "backupKeepLabel": "Počet uchovávaných záloh"
+    "backupKeepLabel": "Počet uchovávaných záloh",
+    "documentWebdav": "Úložiště dokumentů WebDAV",
+    "documentWebdavHint": "Neprázdné hodnoty prostředí přepíší odpovídající nastavení uložená v databázi.",
+    "documentWebdavEnable": "Ukládat nové dokumenty na WebDAV",
+    "documentWebdavUrlLabel": "URL WebDAV",
+    "documentWebdavUsernameLabel": "Uživatelské jméno",
+    "documentWebdavPasswordLabel": "Heslo",
+    "documentWebdavPathLabel": "Základní cesta",
+    "documentWebdavPathHint": "Vzdálená složka dokumentů. Ponechte prázdné pro yuvomi-documents."
   },
   "review": {
     "title": "Přehled",
@@ -93,6 +101,7 @@
     "weather": "Počasí",
     "google": "Kalendář Google",
     "apple": "Apple CalDAV",
+    "documentWebdav": "Dokumenty WebDAV",
     "save": "Uložit a spustit Docker",
     "saving": "Ukládá se …",
     "errSave": "Uložení .env se nezdařilo.",

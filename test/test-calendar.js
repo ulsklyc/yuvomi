@@ -18,6 +18,38 @@ function test(name, fn) {
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion fehlgeschlagen'); }
 
+test('Kalenderanhänge verwenden Dokument-Endpunkte und behalten Legacy-Data-URLs lesbar', () => {
+  const linked = {
+    attachment_document_id: 42,
+    attachment_preview_url: '/api/v1/documents/42/preview',
+    attachment_download_url: '/api/v1/documents/42/download',
+    attachment_data: null,
+  };
+  assert(calendarHelpers.hasAttachment(linked) === true, 'Dokumentlink wird als Anhang erkannt');
+  assert(
+    JSON.stringify(calendarHelpers.attachmentUrls(linked)) === JSON.stringify({
+      preview: '/api/v1/documents/42/preview',
+      download: '/api/v1/documents/42/download',
+    }),
+    'Dokument-Endpunkte werden bevorzugt'
+  );
+
+  const legacy = {
+    attachment_document_id: null,
+    attachment_data: 'bGVnYWN5',
+    attachment_mime: 'text/plain',
+  };
+  assert(calendarHelpers.hasAttachment(legacy) === true, 'Legacy-Blob wird als Anhang erkannt');
+  assert(
+    JSON.stringify(calendarHelpers.attachmentUrls(legacy)) === JSON.stringify({
+      preview: 'data:text/plain;base64,bGVnYWN5',
+      download: 'data:text/plain;base64,bGVnYWN5',
+    }),
+    'Legacy-Blob bleibt als Data URL lesbar'
+  );
+  assert(calendarHelpers.hasAttachment({}) === false, 'Leeres Event hat keinen Anhang');
+});
+
 const db = new DatabaseSync(':memory:');
 db.exec('PRAGMA foreign_keys = ON;');
 db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (

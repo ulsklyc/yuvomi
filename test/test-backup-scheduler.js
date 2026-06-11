@@ -60,7 +60,7 @@ describe('Backup Scheduler', () => {
     const newFiles = afterFiles.filter(f => !beforeFiles.includes(f));
 
     assert.strictEqual(newFiles.length, 1, 'Should create exactly one new backup file');
-    assert.ok(newFiles[0].startsWith('oikos-backup-'), 'Backup file should have correct prefix');
+    assert.ok(newFiles[0].startsWith('yuvomi-backup-'), 'Backup file should have correct prefix');
     assert.ok(newFiles[0].endsWith('.db'), 'Backup file should have .db extension');
   });
 
@@ -73,7 +73,7 @@ describe('Backup Scheduler', () => {
     }
 
     const files = await fs.readdir(TEST_BACKUP_DIR);
-    const backupFiles = files.filter(f => f.startsWith('oikos-backup-') && f.endsWith('.db'));
+    const backupFiles = files.filter(f => f.startsWith('yuvomi-backup-') && f.endsWith('.db'));
 
     assert.strictEqual(backupFiles.length, 3, 'Should keep only last 3 backups');
   });
@@ -86,6 +86,27 @@ describe('Backup Scheduler', () => {
     assert.ok(status.lastBackup.timestamp, 'Last backup should have timestamp');
     assert.strictEqual(status.lastBackup.success, true, 'Last backup should be successful');
     assert.ok(status.lastBackup.file, 'Last backup should have filename');
+  });
+
+  it('createLocalBackup() should create a fresh, uniquely named file each call', async () => {
+    // Regression: the manual WebDAV "upload now" flow relies on this producing a
+    // new, distinct snapshot every time so remote uploads never overwrite each other.
+    assert.ok(backupScheduler.createLocalBackup, 'createLocalBackup function should exist');
+
+    const first = await backupScheduler.createLocalBackup();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const second = await backupScheduler.createLocalBackup();
+
+    assert.ok(first.endsWith('.db'), 'first call returns a .db path');
+    assert.ok(second.endsWith('.db'), 'second call returns a .db path');
+    assert.notStrictEqual(
+      path.basename(first),
+      path.basename(second),
+      'consecutive backups must have distinct filenames'
+    );
+
+    const existsSecond = await fs.access(second).then(() => true).catch(() => false);
+    assert.ok(existsSecond, 'newest backup file should exist on disk');
   });
 
   it('should cleanup test directory', async () => {

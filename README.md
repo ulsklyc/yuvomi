@@ -5,7 +5,7 @@
 > - The Docker image moved to `ghcr.io/ulsklyc/yuvomi`; the old `ghcr.io/ulsklyc/oikos` keeps working for now — please update at your convenience.
 > - Your existing data and settings are fully preserved on upgrade.
 >
-> New home: **https://ulsklyc.github.io/yuvomi/** · Questions? Open a [discussion](https://github.com/ulsklyc/yuvomi/discussions).
+> New home: **https://yuvomi.cloud/** · Questions? Open a [discussion](https://github.com/ulsklyc/yuvomi/discussions).
 
 <div align="center">
   <img src="docs/logo.svg" alt="Yuvomi" width="92" />
@@ -27,7 +27,7 @@
 
   <p>
     <a href="docs/installation.md"><strong>→ Install</strong></a> &nbsp;·&nbsp;
-    <a href="https://ulsklyc.github.io/oikos/"><strong>Website & screenshots</strong></a> &nbsp;·&nbsp;
+    <a href="https://yuvomi.cloud/"><strong>Website & screenshots</strong></a> &nbsp;·&nbsp;
     <a href="docs/SPEC.md"><strong>Docs</strong></a> &nbsp;·&nbsp;
     <a href="CHANGELOG.md"><strong>Changelog</strong></a>
   </p>
@@ -44,7 +44,7 @@
       <td align="center"><sub>·</sub></td>
       <td align="center"><b>0</b><br><sub>trackers</sub></td>
       <td align="center"><sub>·</sub></td>
-      <td align="center"><b>AES-256</b><br><sub>encrypted DB</sub></td>
+      <td align="center"><b>AES-256</b><br><sub>optional DB encryption</sub></td>
       <td align="center"><sub>·</sub></td>
       <td align="center"><b>MIT</b><br><sub>license</sub></td>
     </tr>
@@ -74,7 +74,7 @@
       </td>
     </tr>
   </table>
-  <sub>Switch GitHub to dark mode to preview the dark theme &nbsp;·&nbsp; <a href="https://ulsklyc.github.io/oikos/">See all screenshots →</a></sub>
+  <sub>Switch GitHub to dark mode to preview the dark theme &nbsp;·&nbsp; <a href="https://yuvomi.cloud/">See all screenshots →</a></sub>
 </div>
 
 <br>
@@ -144,7 +144,7 @@ Each module is independent. Use what fits, skip what doesn't.
       </td>
     </tr>
   </table>
-  <a href="https://ulsklyc.github.io/oikos/">View all screenshots →</a>
+  <a href="https://yuvomi.cloud/">View all screenshots →</a>
 </div>
 
 ---
@@ -157,8 +157,8 @@ Each module is independent. Use what fits, skip what doesn't.
 | ![shopping](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/shopping.png) | **Shopping** | Collaborative lists organized by aisle. Touch-safe quick add, swipe gestures, and meal-plan import in one tap. Optional CalDAV import. |
 | ![meals](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/meals.png) | **Meals** | Weekly drag-and-drop planner with multiple items per slot. Direct export to shopping list. |
 | ![recipes](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/recipes.png) | **Recipes** | Create, duplicate, and scale recipes. Pre-fill meal slots or save any planned meal as a recipe. |
-| ![calendar](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/calendar.png) | **Calendar** | Google Calendar (OAuth) and CalDAV sync (iCloud, Nextcloud, Radicale). ICS subscriptions, recurring events, file attachments, month and agenda views. |
-| ![documents](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/documents.png) | **Documents** | Upload and organize family files. Folders, tags, per-document visibility controls, drag-and-drop. |
+| ![calendar](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/calendar.png) | **Calendar** | Google Calendar (OAuth) and CalDAV sync (iCloud, Nextcloud, Radicale). ICS subscriptions, recurring events, file attachments, public & school holiday overlays (OpenHolidays), month and agenda views. |
+| ![documents](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/documents.png) | **Documents** | Upload and organize family files. Folders, tags, per-document visibility controls, in-browser preview, drag-and-drop. New files, including calendar attachments, can optionally use WebDAV storage; Paperless-ngx (DMS) linking and uploads remain supported. |
 | ![budget](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/budget.png) | **Budget** | Income, expenses, recurring entries, trend charts, CSV export. Split Expenses with automatic debt simplification. |
 | ![housekeeping](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/housekeeping.png) | **Housekeeping** | Manage household staff — schedules, check-in/out, daily or hourly billing, chores, supply requests. |
 | ![notes](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/notes.png) | **Notes & Contacts** | Colored sticky notes with Markdown. Contact directory with CardDAV sync. |
@@ -168,13 +168,17 @@ Each module is independent. Use what fits, skip what doesn't.
 | ![api-tokens](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/api-tokens.png) | **API Tokens** | Named Bearer / X-API-Key tokens for integrations. OpenAPI 3.0 spec included. |
 | ![backup](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/backup.png) | **Backup** | Manual and scheduled database backup and restore, with automatic pre-restore rollback. Optional WebDAV upload target (Nextcloud, ownCloud, Hetzner, etc.). |
 
+> **WebDAV document storage needs its own backup.** SQLite/database backups contain document metadata and links, but not document binaries stored on WebDAV. Back up the WebDAV target separately.
+> WebDAV targets configured in the admin UI must resolve to public network addresses. For a trusted
+> LAN or loopback target, set `DOCUMENT_STORAGE_WEBDAV_URL` through the deployment environment.
+
 ---
 
 ## Design & technology
 
 - **Disciplined Liquid Glass UI** — readable work surfaces, subtle translucent navigation, spring animations, and module-tinted overlays — built in pure CSS, no framework
 - **PWA** — installable on any device, works offline, responsive from phone to desktop, with tuned mobile navigation and touch targets
-- **Privacy first** — fully self-hosted, SQLCipher AES-256 encrypted database, zero telemetry
+- **Privacy first** — fully self-hosted, optional SQLCipher AES-256 database encryption (enabled in the recommended Docker setup), zero telemetry
 - **SSO / OpenID Connect** — optional single sign-on via any OIDC provider (Authentik, Keycloak, Google, Microsoft Entra) configured with four env vars; Authorization Code + PKCE flow
 - **Zero build step** — pure ES modules, no bundler, no transpiler, no framework
 - **Multilingual** — 19 languages with automatic locale detection (de, en, es, fr, it, sv, el, ru, tr, zh, ja, ar, hi, pt, uk, pl, nl, cs, vi)
@@ -257,7 +261,9 @@ Open `http://localhost:3000`. The first visit walks you through creating your ad
 
 ## Documentation
 
-[Installation](docs/installation.md) &nbsp;·&nbsp; [Spec & data model](docs/SPEC.md) &nbsp;·&nbsp; [Modules](MODULES.md) &nbsp;·&nbsp; [Contributing](CONTRIBUTING.md) &nbsp;·&nbsp; [Security](SECURITY.md) &nbsp;·&nbsp; [Changelog](CHANGELOG.md) &nbsp;·&nbsp; [Backlog](BACKLOG.md)
+[Installation](docs/installation.md) &nbsp;·&nbsp; [Spec & data model](docs/SPEC.md) &nbsp;·&nbsp; [Modules](MODULES.md) &nbsp;·&nbsp; [Contributing](CONTRIBUTING.md) &nbsp;·&nbsp; [Security](SECURITY.md) &nbsp;·&nbsp; [Privacy for self-hosters](docs/PRIVACY-FOR-SELFHOSTERS.md) &nbsp;·&nbsp; [Changelog](CHANGELOG.md) &nbsp;·&nbsp; [Backlog](BACKLOG.md)
+
+If you self-host Yuvomi in a GDPR context (EU/EEA, processing other people's data), read [docs/PRIVACY-FOR-SELFHOSTERS.md](docs/PRIVACY-FOR-SELFHOSTERS.md) before going live: it covers third-country assessments for every external service (weather, CalDAV/CardDAV, OIDC, WebDAV backup and document storage), data-processing-agreement notes, log-retention guidance, and a records-of-processing template.
 
 ---
 

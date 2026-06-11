@@ -5,18 +5,20 @@ export const KITCHEN_ROUTES = ['/meals', '/recipes', '/shopping'];
 export const KITCHEN_STORAGE_KEY = 'oikos-kitchen-tab';
 
 const TABS = () => [
-  { route: '/meals',    labelKey: 'nav.meals',    icon: 'utensils'       },
-  { route: '/recipes',  labelKey: 'nav.recipes',  icon: 'book-text'      },
-  { route: '/shopping', labelKey: 'nav.shopping', icon: 'shopping-cart'  },
-];
+  { route: '/meals',    labelKey: 'nav.meals',    icon: 'utensils'      },
+  { route: '/recipes',  labelKey: 'nav.recipes',  icon: 'book-text'     },
+  { route: '/shopping', labelKey: 'nav.shopping', icon: 'shopping-cart' },
+].filter(({ route }) => !window.oikos?.isModuleDisabled(route.slice(1)));
 
 export function getLastKitchenRoute() {
   try {
     const stored = sessionStorage.getItem(KITCHEN_STORAGE_KEY);
-    return KITCHEN_ROUTES.includes(stored) ? stored : '/meals';
-  } catch {
-    return '/meals';
-  }
+    if (KITCHEN_ROUTES.includes(stored) && !window.oikos?.isModuleDisabled(stored.slice(1))) {
+      return stored;
+    }
+  } catch { /* ignore */ }
+  const first = ['meals', 'recipes', 'shopping'].find((m) => !window.oikos?.isModuleDisabled(m));
+  return first ? `/${first}` : '/meals';
 }
 
 export function isKitchenRoute(path) {

@@ -7,6 +7,142 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.70.2] - 2026-06-10
+
+### Security
+- **WebDAV document storage**: UI-managed targets now reject private, loopback, link-local, internal-DNS, and DNS-rebinding destinations both before persistence and during socket lookup. Trusted private-network targets remain available through `DOCUMENT_STORAGE_WEBDAV_URL`.
+- **WebDAV path normalization**: replaced ambiguous trailing-slash regular expressions with linear path processing to prevent polynomial-time matching on attacker-controlled configuration.
+
+## [0.70.1] - 2026-06-10
+
+### Removed
+- **Repository metadata**: removed the last published reference to an internal development tool.
+
+## [0.70.0] - 2026-06-10
+
+### Added
+- **WebDAV document storage**: admins can select WebDAV as the global destination for new document files, including calendar attachments, with per-field environment overrides, connection tests, protected configuration changes, and clear local/WebDAV/DMS status throughout the interface.
+
+### Changed
+- **Document binary handling**: previews, downloads, calendar attachments, deletion, and Paperless/DMS uploads now share one storage layer. Existing local files stay local, failed WebDAV uploads never fall back silently, failed database writes clean up staged remote files, and database backups explicitly exclude WebDAV binaries, which must be backed up separately.
+
+## [0.69.0] - 2026-06-10
+
+### Added
+- **Documents — Paperless-ngx (DMS) integration**: admins can connect a Paperless-ngx document management system in Settings (server URL + API token, with a connection test). Multiple DMS accounts are supported.
+- **Link from DMS**: search a connected DMS and link existing documents into the Documents module as references — the binary stays in the DMS and is not duplicated. Previews and downloads of linked documents are proxied live from the DMS, while each document's family/restricted/private visibility is still enforced.
+- **Upload to DMS**: push a local document up into the connected DMS (asynchronous OCR ingestion); when several DMS accounts are configured, an account picker lets you choose the target.
+
+All DMS operations are admin-only, and the API token is never returned in responses. The integration uses a provider-pluggable adapter layer (Paperless-ngx is the first adapter) and requires no new environment variables — everything is configured in-app.
+
+## [0.68.4] - 2026-06-09
+
+### Fixed
+- **Documents**: PDF previews no longer fail with "This page was blocked by Chrome" in Chromium-based browsers. The preview iframe dropped its `sandbox` attribute (Chromium refuses to start its internal PDF viewer inside sandboxed frames) and the `/documents/:id/preview` endpoint now sends a PDF-specific Content-Security-Policy (`default-src 'self'`) instead of the strict `default-src 'none'` that blocked the native viewer. PDFs are still served same-origin as `application/pdf` with `X-Content-Type-Options: nosniff`, so no scripts can execute; non-PDF previews keep the strict policy.
+
+## [0.68.3] - 2026-06-09
+
+### Changed
+- **Dashboard**: assignee avatars in the calendar widget's event rows are now 28px, matching the tasks widget and the app-wide default. They were previously 26px — a slight outlier — so the two side-by-side dashboard widgets now present assignees at a consistent size with better visual presence.
+
+## [0.68.2] - 2026-06-09
+
+### Fixed
+- **Desktop sidebar**: collapsing/expanding the navigation sidebar no longer makes the icons, logo, and toggle button jump horizontally. Elements now keep stable horizontal centers and the toggle button's padding transitions smoothly in sync with the width animation, instead of snapping via instant `justify-content` changes.
+
+## [0.68.1] - 2026-06-09
+
+### Security
+- **Documents preview**: hardened the new `GET /api/v1/documents/:id/preview` endpoint with defense-in-depth against stored XSS. It now enforces its own server-side allowlist of previewable MIME types (PDF, PNG, JPEG, WebP, plain text, CSV) and returns `415` for anything else, instead of serving any stored `mime_type` inline. Responses additionally carry `X-Content-Type-Options: nosniff` and a restrictive `Content-Security-Policy` (`default-src 'none'`) so no inline content can execute scripts even if a file were ever misclassified. (Not exploitable in 0.68.0 — uploads already reject HTML/SVG — but this removes the implicit dependency on the upload allowlist.)
+
+## [0.68.0] - 2026-06-09
+
+### Added
+- **Documents**: in-browser document viewer. Uploaded files can now be previewed directly in an `xl` modal without downloading — images (PNG/JPEG/WebP) render inline, PDFs open in a sandboxed same-origin iframe, and text/CSV files are fetched and shown in a monospaced block. Office files (Word/Excel) and other non-previewable types fall back to a download prompt. A new eye-icon action button appears on viewable files, and clicking a card or row opens the viewer. Backed by a new `GET /api/v1/documents/:id/preview` endpoint serving files with `Content-Disposition: inline`.
+
+### Changed
+- **Documents**: grid cards redesigned — the category icon and date now share a header row, with action buttons centered below a divider.
+
+### Security
+- The Content-Security-Policy `frame-src` directive was relaxed from `'none'` to `'self'` to allow same-origin PDF embedding in the document viewer. The PDF iframe is additionally `sandbox`ed (`allow-same-origin` only, no scripts) as defense-in-depth.
+
+## [0.67.6] - 2026-06-09
+
+### Fixed
+- **Docker/Podman**: `BACKUP_DIR` in `docker-compose.yml` and `podman-compose.yml` is now hardcoded to `/backups` in the container's `environment:` section. Previously, setting `BACKUP_DIR=./backups` in `.env` to control the host-side volume mount source would also inject that host path into the container, where it does not exist — causing backups to fail silently. The container-side mount target is always `/backups` (fixed in `volumes:`), so the env var is now set unconditionally to that value.
+
+## [0.67.5] - 2026-06-09
+
+### Security
+- Added `Content-Security-Policy` and `Referrer-Policy` meta tags to all landing-site pages (`index.html`, `install.html`, `impressum.html`, `datenschutz.html`). The CSP restricts resources to same-origin plus the inline styles/scripts the pages actually use; the referrer policy is `strict-origin-when-cross-origin`. (Clickjacking headers such as `X-Frame-Options`/`frame-ancestors` only take effect as real HTTP headers and cannot be enforced on plain GitHub Pages.)
+
+## [0.67.4] - 2026-06-09
+
+### Added
+- Privacy guide for self-hosters (`docs/PRIVACY-FOR-SELFHOSTERS.md`): per-service third-country assessments for every external integration (Open-Meteo/OpenWeatherMap weather, CalDAV/CardDAV sync, OIDC single sign-on, WebDAV backup), data-processing-agreement notes, GDPR log-retention guidance, a household-exemption explainer, and a records-of-processing template. Linked from the README, the installation guide, and `.env.example`.
+
+## [0.67.3] - 2026-06-09
+
+### Added
+- Imprint (`impressum.html`) and privacy policy (`datenschutz.html`) pages for the yuvomi.cloud landing site, linked from the footer of every public page.
+
+### Changed
+- The landing page now embeds the GitHub star count at build time (`scripts/update-gh-stars.mjs`, refreshed by a weekly workflow) instead of fetching the GitHub API from the visitor's browser — so opening the page no longer transmits any visitor data to a third party.
+- Clarified the AES-256/SQLCipher database encryption as optional (enabled in the recommended Docker setup) across the README, landing page, and SECURITY.md, to match the actual default install.
+- Corrected the session/CSRF cookie description in SECURITY.md from `SameSite=Strict` to `SameSite=Lax` to match the implementation, with a note on the Safari ITP rationale and Double-Submit-Cookie CSRF protection.
+
+## [0.67.2] - 2026-06-09
+
+### Changed
+- Redesigned the GitHub social preview and Open Graph image (`docs/social-preview.png`, `docs/og-image.png`) with a more modern, professional editorial layout: brand logo mark and wordmark, a kicker pill, a gradient headline, feature chips with real icons, and the dashboard shown inside a macOS-style window frame with an ambient glow. The internal generator (`scripts/generate-social-preview.mjs`) was rewritten to embed the Plus Jakarta Sans brand font for crisp, on-brand typography. Image paths are unchanged, so existing Open Graph references keep working.
+
+## [0.67.1] - 2026-06-09
+
+### Changed
+- Internal: added an automated test suite for the holidays service (`test:holidays`) covering cache lookup with date-overlap, layer-toggle and subdivision filtering, sync caching/idempotency, and country/region listing against a mocked OpenHolidays API. No user-facing or runtime behavior change.
+
+## [0.67.0] - 2026-06-09
+
+### Added
+- Public & school holidays calendar layer powered by the free [OpenHolidays API](https://openholidaysapi.org) (no API key required). Under **Settings → Calendar**, an admin picks a country and optional state/region, sets the layer colors, and syncs; holidays are then cached locally and shown as a read-only overlay across the month, week, day, and agenda views. Each layer (public holidays / school holidays) has its own show/hide toggle in the calendar toolbar. The auto-sync scheduler keeps the cache current across the previous, current, and next two years, and outbound requests carry only the country/region code — no household data leaves the server.
+
+### Fixed
+- Calendar month view now loads events, tasks, and holidays for the leading days of the grid (the trailing days of the previous month shown in the first week), which were previously outside the fetched date range.
+
+## [0.66.6] - 2026-06-09
+
+### Fixed
+- Backup files are now named `yuvomi-backup-<timestamp>.db` instead of the pre-rebrand `oikos-backup-…`. This applies to scheduled backups, the WebDAV "Upload now" snapshot, and the admin database download. Existing `oikos-backup-…` files (local and on WebDAV) continue to be listed and rotated, so older backups are not orphaned after the rename.
+
+## [0.66.5] - 2026-06-09
+
+### Fixed
+- Unraid Community Applications: removed the leftover `oikos.xml` template, which carried the same `<Name>Yuvomi</Name>` (and the same `ghcr.io/ulsklyc/yuvomi` image) as the current `yuvomi.xml`. The duplicate name caused a conflict in the Community Apps feed; `yuvomi.xml` is now the single, authoritative Unraid template.
+
+## [0.66.4] - 2026-06-09
+
+### Fixed
+- Sidebar navigation is now consistently aligned: the brand logomark and the icon wells of all nav items share the same horizontal center axis, the active/hover indicator pill is inset as a floating shape and vertically centered within its item, and the logo header has a fixed height so it no longer jumps when collapsing or expanding the sidebar.
+
+## [0.66.3] - 2026-06-09
+
+### Fixed
+- WebDAV "Upload now" now creates a fresh, uniquely timestamped backup of the current database and uploads that, instead of re-uploading the latest existing local backup under its original filename. Manual uploads no longer overwrite the previous remote backup, so each trigger adds a distinct file (subject to the configured keep limit).
+
+## [0.66.2] - 2026-06-09
+
+### Security
+- Avatar color selection now uses `crypto.randomInt` instead of `Math.random` (CWE-338).
+
+## [0.66.1] - 2026-06-09
+
+### Fixed
+- Deactivated kitchen modules (Meals, Recipes, Shopping) no longer appear as sub-tabs in the Kitchen view; clicking Kitchen now navigates to the first enabled kitchen module instead of looping back to the dashboard.
+- Dashboard "Today" cockpit cards for disabled modules are now hidden.
+- Dashboard widgets for disabled modules are no longer rendered.
+- Settings navigation icon now displays a gear/cogwheel instead of a sun shape.
+- Sidebar logo and navigation icon wells are now pixel-aligned on the horizontal center axis.
+
 ## [0.66.0] - 2026-06-09
 
 ### Changed

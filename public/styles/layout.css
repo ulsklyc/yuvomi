@@ -786,7 +786,12 @@ html.fab-anim-done .page-fab {
     display: flex;
     justify-content: flex-start;
     align-items: center;
-    padding: var(--space-2) var(--space-5) var(--space-4);
+    /* Feste Höhe verhindert vertikales Springen beim Ein-/Ausklappen.
+     * padding-left 14px zentriert den 28px-Logomark auf X=28 — fluchtet mit
+     * den Nav-Item-Icon-Wells (siehe .nav-sidebar .nav-item). Krumme px-Werte,
+     * weil exakte Pixel-Zentrierung nicht auf die 4px-Token-Skala fällt. */
+    height: 56px;
+    padding: 0 var(--space-5) 0 14px;
     margin-bottom: var(--space-1);
     flex-shrink: 0;
     gap: var(--space-3);
@@ -835,7 +840,9 @@ html.fab-anim-done .page-fab {
     display: flex;
     flex-direction: column;
     gap: var(--space-0h);
-    padding: 0 var(--space-2);
+    /* Kein Container-Padding: Item-Padding allein steuert die Icon-Flucht,
+     * die schwebende Indikator-Pille zieht ihren Einzug über left/right. */
+    padding: 0;
     flex: 1;
     overflow-y: auto;
     scrollbar-width: none;
@@ -849,7 +856,9 @@ html.fab-anim-done .page-fab {
     justify-content: flex-start;
     align-items: center;
     border-radius: var(--radius-sm);
-    padding: var(--space-2) var(--space-3);
+    /* padding-left 15px zentriert das 26px-Icon-Well auf X=28 — fluchtet mit
+     * dem Logomark. Krumm, weil exakte Zentrierung neben der 4px-Token-Skala liegt. */
+    padding: var(--space-2) var(--space-3) var(--space-2) 15px;
     gap: var(--space-3);
     min-height: var(--target-lg);
     font-size: var(--text-sm);
@@ -927,7 +936,7 @@ html.fab-anim-done .page-fab {
     cursor: pointer;
     color: var(--color-text-tertiary);
     flex-shrink: 0;
-    transition: color var(--transition-fast);
+    transition: color var(--transition-fast), padding var(--transition-slow);
   }
 
   .nav-sidebar__toggle:hover {
@@ -946,8 +955,7 @@ html.fab-anim-done .page-fab {
   }
 
   html.sidebar-collapsed .nav-sidebar .nav-sidebar__logo {
-    justify-content: center;
-    padding-inline: 0;
+    padding-right: 14px;
   }
 
   html.sidebar-collapsed .nav-sidebar .nav-sidebar__brand-text {
@@ -955,13 +963,8 @@ html.fab-anim-done .page-fab {
   }
 
   html.sidebar-collapsed .nav-sidebar .nav-sidebar__toggle {
-    justify-content: center;
-    padding-inline: 0;
-  }
-
-  html.sidebar-collapsed .nav-sidebar .nav-item {
-    justify-content: center;
-    padding-inline: 0;
+    padding-right: var(--space-5);
+    padding-left: 0;
   }
 
   html.sidebar-collapsed .nav-sidebar .nav-item__label {
@@ -1168,6 +1171,7 @@ html.fab-anim-done .page-fab {
   }
   .modal-panel--sm { max-width: 400px; }
   .modal-panel--lg { max-width: 680px; }
+  .modal-panel--xl { max-width: min(960px, 95vw); max-height: calc(100dvh - (2 * var(--space-6))); }
 }
 
 .modal-panel__header {
@@ -2576,8 +2580,9 @@ textarea.input { resize: vertical; }
 /* ── Sidebar: Morphende Indikator-Pille (Strukturell) ── */
 .nav-sidebar__indicator {
   position: absolute;
-  left: 0;
-  right: 0;
+  /* Schwebend zentriert: seitlicher Einzug statt voller Breite */
+  left: var(--space-1);
+  right: var(--space-1);
   top: 0;
   height: var(--target-base); /* 44px */
   border-radius: var(--radius-sm);
@@ -2601,6 +2606,13 @@ textarea.input { resize: vertical; }
 
 /* Kein statischer Hintergrund und kein Shadow-Highlight wenn Indikator aktiv */
 .nav-sidebar__items--liquid .nav-item[aria-current="page"] {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Kein statischer Hover-Hintergrund wenn Liquid-Indikator aktiv —
+ * die schwebende Pille übernimmt die Hover-Vorschau (opacity 0.5 via router.js) */
+.nav-sidebar__items--liquid .nav-item:hover:not([aria-current="page"]) {
   background: transparent !important;
   box-shadow: none !important;
 }

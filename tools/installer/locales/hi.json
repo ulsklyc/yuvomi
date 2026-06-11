@@ -72,6 +72,7 @@
     "weather": "मौसम",
     "google": "Google Calendar",
     "apple": "Apple CalDAV",
+    "documentWebdav": "WebDAV दस्तावेज़",
     "save": "सहेजें और Docker शुरू करें",
     "saving": "सहेजा जा रहा है …",
     "errSave": ".env सहेजने में विफल।",
@@ -130,6 +131,14 @@
     "backupEnable": "स्वचालित बैकअप सक्षम करें",
     "backupScheduleLabel": "शेड्यूल (cron)",
     "backupScheduleHint": "बैकअप कब चलाने हैं। डिफ़ॉल्ट: प्रतिदिन रात 2 बजे।",
-    "backupKeepLabel": "रखने योग्य बैकअप की संख्या"
+    "backupKeepLabel": "रखने योग्य बैकअप की संख्या",
+    "documentWebdav": "WebDAV दस्तावेज़ संग्रहण",
+    "documentWebdavHint": "गैर-रिक्त पर्यावरण मान डेटाबेस में सहेजी गई संबंधित सेटिंग को अधिलेखित करते हैं।",
+    "documentWebdavEnable": "नए दस्तावेज़ WebDAV पर संग्रहीत करें",
+    "documentWebdavUrlLabel": "WebDAV URL",
+    "documentWebdavUsernameLabel": "उपयोगकर्ता नाम",
+    "documentWebdavPasswordLabel": "पासवर्ड",
+    "documentWebdavPathLabel": "मूल पथ",
+    "documentWebdavPathHint": "दस्तावेज़ों का दूरस्थ फ़ोल्डर। yuvomi-documents के लिए खाली छोड़ें।"
   }
 }

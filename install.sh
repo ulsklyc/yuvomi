@@ -195,6 +195,28 @@ configure_calendar() {
   fi
 }
 
+# ── Optional: WebDAV document storage ─────────────────────────────────────────
+configure_document_storage() {
+  DOCUMENT_STORAGE_WEBDAV_ENABLED='false'
+  DOCUMENT_STORAGE_WEBDAV_URL=''
+  DOCUMENT_STORAGE_WEBDAV_USERNAME=''
+  DOCUMENT_STORAGE_WEBDAV_PASSWORD=''
+  DOCUMENT_STORAGE_WEBDAV_PATH=''
+
+  step "$(t document_webdav.step)"
+  info "$(t document_webdav.hint)"
+  ask "$(t document_webdav.enable)"
+  read -r want_document_webdav
+  if [ "${want_document_webdav,,}" = "y" ]; then
+    DOCUMENT_STORAGE_WEBDAV_ENABLED='true'
+    ask "$(t document_webdav.url)"; read -r DOCUMENT_STORAGE_WEBDAV_URL
+    ask "$(t document_webdav.username)"; read -r DOCUMENT_STORAGE_WEBDAV_USERNAME
+    ask "$(t document_webdav.password)"; read -rs DOCUMENT_STORAGE_WEBDAV_PASSWORD; printf "\n"
+    ask "$(t document_webdav.path)"; read -r DOCUMENT_STORAGE_WEBDAV_PATH
+    DOCUMENT_STORAGE_WEBDAV_PATH="${DOCUMENT_STORAGE_WEBDAV_PATH:-yuvomi-documents}"
+  fi
+}
+
 # ── Step 5: Review ─────────────────────────────────────────────────────────────
 review_and_confirm() {
   step "$(t review.step)"
@@ -207,6 +229,7 @@ review_and_confirm() {
   [ -n "$OPENWEATHER_API_KEY" ] && printf "  %-16s %s%s%s\n" "$(t review.weather)" "$GREEN" "$(t review.weather_value "$OPENWEATHER_CITY")" "$RESET"
   [ -n "$GOOGLE_CLIENT_ID" ]    && printf "  %-16s %s%s%s\n" "$(t review.google)"  "$GREEN" "$(t review.google_value)" "$RESET"
   [ -n "$APPLE_USERNAME" ]      && printf "  %-16s %s%s%s\n" "$(t review.apple)"   "$GREEN" "$APPLE_USERNAME" "$RESET"
+  [ "$DOCUMENT_STORAGE_WEBDAV_ENABLED" = "true" ] && printf "  %-16s %s%s%s\n" "$(t review.document_webdav)" "$GREEN" "$DOCUMENT_STORAGE_WEBDAV_URL" "$RESET"
   printf "\n"
   ask "$(t review.proceed)"
   read -r confirm
@@ -239,6 +262,11 @@ GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
 GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
 APPLE_USERNAME=${APPLE_USERNAME}
 APPLE_APP_SPECIFIC_PASSWORD=${APPLE_APP_SPECIFIC_PASSWORD}
+DOCUMENT_STORAGE_WEBDAV_ENABLED=${DOCUMENT_STORAGE_WEBDAV_ENABLED}
+DOCUMENT_STORAGE_WEBDAV_URL=${DOCUMENT_STORAGE_WEBDAV_URL}
+DOCUMENT_STORAGE_WEBDAV_USERNAME=${DOCUMENT_STORAGE_WEBDAV_USERNAME}
+DOCUMENT_STORAGE_WEBDAV_PASSWORD=${DOCUMENT_STORAGE_WEBDAV_PASSWORD}
+DOCUMENT_STORAGE_WEBDAV_PATH=${DOCUMENT_STORAGE_WEBDAV_PATH}
 SYNC_INTERVAL_MINUTES=15
 TZ=${OIKOS_TZ}
 OIKOS_HTTP_PORT=${OIKOS_PORT}
@@ -379,6 +407,7 @@ main() {
   configure_secrets
   configure_weather
   configure_calendar
+  configure_document_storage
   review_and_confirm
   write_env_and_start
   create_admin

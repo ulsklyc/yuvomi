@@ -14,10 +14,10 @@ You are auditing the Yuvomi repo. Report only — never push, never close, never
 
 Run all six and report each even if clean.
 
-1. **Stale issues** — `gh issue list --repo ulsklyc/oikos --state open --json number,title,updatedAt,labels`. Flag any open issue with `updatedAt` older than 90 days or labelled `needs-info` for >14 days.
+1. **Stale issues** — `gh issue list --repo ulsklyc/yuvomi --state open --json number,title,updatedAt,labels`. Flag any open issue with `updatedAt` older than 90 days or labelled `needs-info` for >14 days.
 2. **Dormant branches** — `git branch -r --format '%(refname:short) %(committerdate:iso)'`. Flag remote branches with no commits in 30+ days that aren't `main` or a protected branch.
 3. **Untracked TODOs** — `grep -rn "TODO\|FIXME\|XXX\|HACK" --include='*.js' --include='*.css' --include='*.md' --exclude-dir=node_modules`. Cross-reference with open issues. Flag TODOs that don't link to an issue number.
-4. **Outdated deps** — `npm outdated --json` inside `oikos/`. Flag anything with a major upgrade available and anything with a known CVE (check `gh api /repos/ulsklyc/oikos/dependabot/alerts` if dependabot is on).
+4. **Outdated deps** — `npm outdated --json` inside `oikos/`. Flag anything with a major upgrade available and anything with a known CVE (check `gh api /repos/ulsklyc/yuvomi/dependabot/alerts` if dependabot is on).
 5. **Dead test files** — list all `test-*.js` in `oikos/test/`, cross-check against `package.json` scripts. Flag any `test-*.js` not wired into a `test:*` script. Flag any `test:*` script pointing at a missing file.
 6. **Un-released commits** — `git log v<latest-tag>..main --oneline`. If there are commits on `main` beyond the latest tag AND `## [Unreleased]` in `CHANGELOG.md` has bullets, recommend running `/release-prep`.
 

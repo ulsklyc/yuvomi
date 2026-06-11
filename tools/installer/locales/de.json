@@ -82,7 +82,15 @@
     "backupEnable": "Automatische Backups aktivieren",
     "backupScheduleLabel": "Zeitplan (Cron)",
     "backupScheduleHint": "Wann Backups laufen. Standard: täglich um 2 Uhr.",
-    "backupKeepLabel": "Aufzubewahrende Backups"
+    "backupKeepLabel": "Aufzubewahrende Backups",
+    "documentWebdav": "WebDAV-Dokumentspeicher",
+    "documentWebdavHint": "Nichtleere Umgebungswerte überschreiben jeweils die in der Datenbank gespeicherte Einstellung.",
+    "documentWebdavEnable": "Neue Dokumente auf WebDAV speichern",
+    "documentWebdavUrlLabel": "WebDAV-URL",
+    "documentWebdavUsernameLabel": "Benutzername",
+    "documentWebdavPasswordLabel": "Passwort",
+    "documentWebdavPathLabel": "Basispfad",
+    "documentWebdavPathHint": "Remote-Ordner für Dokumentdateien. Leer lassen für yuvomi-documents."
   },
   "review": {
     "title": "Überprüfung",
@@ -93,6 +101,7 @@
     "weather": "Wetter",
     "google": "Google Kalender",
     "apple": "Apple CalDAV",
+    "documentWebdav": "WebDAV-Dokumente",
     "save": "Speichern & Docker starten",
     "saving": "Wird gespeichert …",
     "errSave": "Speichern der .env fehlgeschlagen.",

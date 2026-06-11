@@ -4,7 +4,7 @@ description: Keep every deploy descriptor (installer schema, Compose, Podman, Un
 paths:
   - oikos/tools/installer/env-schema.js
   - oikos/.env.example
-  - oikos/templates/oikos.xml
+  - oikos/templates/yuvomi.xml
   - oikos/ca_profile.xml
   - oikos/docker-compose.yml
   - oikos/podman-compose.yml
@@ -22,7 +22,7 @@ Yuvomi ships to several deploy targets that each describe env vars, ports and vo
 
 - **`tools/installer/env-schema.js`** — the canonical entry (key, type, default, `required`, secret/mask flag). This drives the web + CLI installer.
 - **`.env.example`** — keep in lockstep with the schema (matching comment + default).
-- **`templates/oikos.xml`** (Unraid CA) — add/edit/remove the matching `<Config ... Type="Variable">`. Unraid enumerates **every** variable by hand and has **no fallback**, so a missing entry means Unraid users cannot set it. Mask secrets with `Mask="true"`; put optional integrations on `Display="advanced"`, required ones on `Display="always"`.
+- **`templates/yuvomi.xml`** (Unraid CA) — add/edit/remove the matching `<Config ... Type="Variable">`. Unraid enumerates **every** variable by hand and has **no fallback**, so a missing entry means Unraid users cannot set it. Mask secrets with `Mask="true"`; put optional integrations on `Display="advanced"`, required ones on `Display="always"`.
 - **Compose / Podman / Quadlet** — `docker-compose.yml`, `podman-compose.yml`, `docs/docker-compose.portainer.yml`, `tools/quadlet/oikos.container`: only when the var needs an explicit passthrough or default there. Follow the existing pattern in each file (most read from the environment / `.env`).
 - **TrueNAS** — optional env vars need **no** change to `deploy/truenas/questions.yaml`: they are covered by the generic `additional_envs` list (TrueNAS library convention, and a safety net). Add an explicit question **only** for a new **required** secret (like `SESSION_SECRET`); when you do, also set the env in `deploy/truenas/templates/docker-compose.yaml`.
 - **Umbrel** — `deploy/umbrel/docker-compose.yml`: only when the var needs an explicit passthrough or default (e.g. a new **required** secret that Umbrel can satisfy from `${APP_SEED}`/`${APP_PASSWORD}`). Optional integration vars need no change — Umbrel users set them via the app's own settings, not the compose. There is no Umbrel auto-bump bot: any change here only reaches the store via a **manual PR** to `getumbrel/umbrel-apps` (see `deploy/umbrel/README.md`).
@@ -31,7 +31,7 @@ Yuvomi ships to several deploy targets that each describe env vars, ports and vo
 ### A new / changed PORT or VOLUME/MOUNT — update **all** of these (no fallback anywhere):
 
 - `docker-compose.yml`, `podman-compose.yml`, `docs/docker-compose.portainer.yml`, `tools/quadlet/oikos.container`.
-- `templates/oikos.xml` — `<Config ... Type="Port">` or `Type="Path">`.
+- `templates/yuvomi.xml` — `<Config ... Type="Port">` or `Type="Path">`.
 - `deploy/truenas/questions.yaml` (the storage / network group) **and** `deploy/truenas/templates/docker-compose.yaml` (the matching `add_storage` / `add_port`).
 - `deploy/umbrel/docker-compose.yml` (volume under `${APP_DATA_DIR}`, or `app_proxy` `APP_PORT`) **and** `deploy/umbrel/umbrel-app.yml` (the external `port:` for a new port). Reaches the store only via a manual PR.
 - A new volume also needs the directory created in `Dockerfile` (`mkdir -p`) and chowned in `entrypoint.sh` — check both.

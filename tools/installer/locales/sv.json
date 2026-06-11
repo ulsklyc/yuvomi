@@ -72,6 +72,7 @@
     "weather": "Väder",
     "google": "Google Kalender",
     "apple": "Apple CalDAV",
+    "documentWebdav": "WebDAV-dokument",
     "save": "Spara och starta Docker",
     "saving": "Sparar …",
     "errSave": "Det gick inte att spara .env.",
@@ -130,6 +131,14 @@
     "backupEnable": "Aktivera automatiska säkerhetskopior",
     "backupScheduleLabel": "Schema (cron)",
     "backupScheduleHint": "När säkerhetskopior ska köras. Standard: varje dag kl. 02.",
-    "backupKeepLabel": "Antal säkerhetskopior att behålla"
+    "backupKeepLabel": "Antal säkerhetskopior att behålla",
+    "documentWebdav": "WebDAV-dokumentlagring",
+    "documentWebdavHint": "Icke-tomma miljövärden ersätter motsvarande inställningar i databasen.",
+    "documentWebdavEnable": "Lagra nya dokument på WebDAV",
+    "documentWebdavUrlLabel": "WebDAV-URL",
+    "documentWebdavUsernameLabel": "Användarnamn",
+    "documentWebdavPasswordLabel": "Lösenord",
+    "documentWebdavPathLabel": "Bassökväg",
+    "documentWebdavPathHint": "Fjärrmapp för dokument. Lämna tomt för att använda yuvomi-documents."
   }
 }

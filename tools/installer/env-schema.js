@@ -27,4 +27,10 @@ export const ENV_SCHEMA = [
   { key: 'BACKUP_ENABLED',              type: 'default', label: 'Backups Enabled',          default: 'true', group: 'backup',  writeToEnv: true },
   { key: 'BACKUP_SCHEDULE',             type: 'default', label: 'Backup Schedule (cron)',   default: '0 2 * * *', group: 'backup', writeToEnv: true },
   { key: 'BACKUP_KEEP',                 type: 'default', label: 'Backups to Keep',          default: '7',    group: 'backup',  writeToEnv: true },
+  // Optionaler WebDAV-Speicher für neu hochgeladene Dokumentdateien.
+  { key: 'DOCUMENT_STORAGE_WEBDAV_ENABLED',  type: 'default', label: 'WebDAV Document Storage Enabled',  default: 'false', required: false, group: 'documentStorage', writeToEnv: true },
+  { key: 'DOCUMENT_STORAGE_WEBDAV_URL',      type: 'user',    label: 'WebDAV Document Storage URL',      required: false, group: 'documentStorage', writeToEnv: true },
+  { key: 'DOCUMENT_STORAGE_WEBDAV_USERNAME', type: 'user',    label: 'WebDAV Document Storage Username', required: false, group: 'documentStorage', writeToEnv: true },
+  { key: 'DOCUMENT_STORAGE_WEBDAV_PASSWORD', type: 'user',    label: 'WebDAV Document Storage Password', required: false, group: 'documentStorage', writeToEnv: true, secret: true },
+  { key: 'DOCUMENT_STORAGE_WEBDAV_PATH',     type: 'user',    label: 'WebDAV Document Storage Path',     required: false, group: 'documentStorage', writeToEnv: true },
 ];

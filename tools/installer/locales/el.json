@@ -72,6 +72,7 @@
     "weather": "Καιρός",
     "google": "Ημερολόγιο Google",
     "apple": "Apple CalDAV",
+    "documentWebdav": "Έγγραφα WebDAV",
     "save": "Αποθήκευση και εκκίνηση Docker",
     "saving": "Αποθήκευση …",
     "errSave": "Αποτυχία αποθήκευσης του .env.",
@@ -130,6 +131,14 @@
     "backupEnable": "Ενεργοποίηση αυτόματων αντιγράφων ασφαλείας",
     "backupScheduleLabel": "Χρονοδιάγραμμα (cron)",
     "backupScheduleHint": "Πότε εκτελούνται τα αντίγραφα. Προεπιλογή: καθημερινά στις 2 π.μ.",
-    "backupKeepLabel": "Αντίγραφα προς διατήρηση"
+    "backupKeepLabel": "Αντίγραφα προς διατήρηση",
+    "documentWebdav": "Αποθήκευση εγγράφων WebDAV",
+    "documentWebdavHint": "Οι μη κενές τιμές περιβάλλοντος αντικαθιστούν τις αντίστοιχες ρυθμίσεις της βάσης δεδομένων.",
+    "documentWebdavEnable": "Αποθήκευση νέων εγγράφων στο WebDAV",
+    "documentWebdavUrlLabel": "URL WebDAV",
+    "documentWebdavUsernameLabel": "Όνομα χρήστη",
+    "documentWebdavPasswordLabel": "Κωδικός πρόσβασης",
+    "documentWebdavPathLabel": "Βασική διαδρομή",
+    "documentWebdavPathHint": "Απομακρυσμένος φάκελος εγγράφων. Αφήστε κενό για yuvomi-documents."
   }
 }
