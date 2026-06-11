@@ -1347,7 +1347,18 @@
     "enabledReminderListCount": "{{count}} herinneringslijsten ingeschakeld",
     "syncLatestError": "Laatste fout: {{error}}",
     "lastSyncValue": "Laatste synchronisatie: {{value}}",
-    "neverSynced": "Nooit gesynchroniseerd"
+    "neverSynced": "Nooit gesynchroniseerd",
+    "systemTitle": "Systeeminformatie",
+    "systemDescription": "Applicatieversie, licentie en status in één oogopslag.",
+    "systemVersionLabel": "Applicatieversie",
+    "systemVersionValue": "v{{version}}",
+    "systemAppNameLabel": "Applicatienaam",
+    "systemLicenseLabel": "Licentie",
+    "systemSetupStatusLabel": "Installatiestatus",
+    "systemSetupComplete": "Voltooid",
+    "systemSetupRequired": "Installatie vereist",
+    "apiTokensEmpty": "Nog geen API-tokens.",
+    "familyEmpty": "Nog geen gezinsleden."
   },
   "login": {
     "tagline": "Gezinsplanning. Veilig. Privacyvriendelijk. Open source.",

@@ -1353,7 +1353,18 @@
     "enabledReminderListCount": "{{count}} Erinnerungslisten aktiviert",
     "syncLatestError": "Letzter Fehler: {{error}}",
     "lastSyncValue": "Letzte Synchronisation: {{value}}",
-    "neverSynced": "Noch nie synchronisiert"
+    "neverSynced": "Noch nie synchronisiert",
+    "systemTitle": "Systeminformationen",
+    "systemDescription": "Anwendungsversion, Lizenz und Status auf einen Blick.",
+    "systemVersionLabel": "Anwendungsversion",
+    "systemVersionValue": "v{{version}}",
+    "systemAppNameLabel": "Anwendungsname",
+    "systemLicenseLabel": "Lizenz",
+    "systemSetupStatusLabel": "Einrichtungsstatus",
+    "systemSetupComplete": "Abgeschlossen",
+    "systemSetupRequired": "Einrichtung erforderlich",
+    "apiTokensEmpty": "Noch keine API-Tokens vorhanden.",
+    "familyEmpty": "Noch keine Familienmitglieder vorhanden."
   },
   "login": {
     "tagline": "Familienplanung. Sicher. Datenschutzfreundlich. Open Source.",

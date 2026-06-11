@@ -1347,7 +1347,18 @@
     "enabledReminderListCount": "Включено списков напоминаний: {{count}}",
     "syncLatestError": "Последняя ошибка: {{error}}",
     "lastSyncValue": "Последняя синхронизация: {{value}}",
-    "neverSynced": "Синхронизации ещё не было"
+    "neverSynced": "Синхронизации ещё не было",
+    "systemTitle": "Сведения о системе",
+    "systemDescription": "Версия приложения, лицензия и состояние с первого взгляда.",
+    "systemVersionLabel": "Версия приложения",
+    "systemVersionValue": "v{{version}}",
+    "systemAppNameLabel": "Имя приложения",
+    "systemLicenseLabel": "Лицензия",
+    "systemSetupStatusLabel": "Состояние настройки",
+    "systemSetupComplete": "Завершена",
+    "systemSetupRequired": "Требуется настройка",
+    "apiTokensEmpty": "Токенов API пока нет.",
+    "familyEmpty": "Членов семьи пока нет."
   },
   "login": {
     "tagline": "Семейное планирование. Безопасно. С уважением к приватности. Открытый исходный код.",

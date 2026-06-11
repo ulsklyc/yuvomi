@@ -1347,7 +1347,18 @@
     "enabledReminderListCount": "{{count}} danh sách nhắc nhở đã bật",
     "syncLatestError": "Lỗi gần nhất: {{error}}",
     "lastSyncValue": "Đồng bộ gần nhất: {{value}}",
-    "neverSynced": "Chưa từng đồng bộ"
+    "neverSynced": "Chưa từng đồng bộ",
+    "systemTitle": "Thông tin hệ thống",
+    "systemDescription": "Phiên bản ứng dụng, giấy phép và trạng thái trong nháy mắt.",
+    "systemVersionLabel": "Phiên bản ứng dụng",
+    "systemVersionValue": "v{{version}}",
+    "systemAppNameLabel": "Tên ứng dụng",
+    "systemLicenseLabel": "Giấy phép",
+    "systemSetupStatusLabel": "Trạng thái thiết lập",
+    "systemSetupComplete": "Hoàn tất",
+    "systemSetupRequired": "Cần thiết lập",
+    "apiTokensEmpty": "Chưa có mã thông báo API.",
+    "familyEmpty": "Chưa có thành viên gia đình."
   },
   "login": {
     "tagline": "Kế hoạch gia đình. Bảo mật. Thân thiện với quyền riêng tư. Mã nguồn mở.",

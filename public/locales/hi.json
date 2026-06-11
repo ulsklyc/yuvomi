@@ -1347,7 +1347,18 @@
     "enabledReminderListCount": "{{count}} अनुस्मारक सूचियाँ सक्षम",
     "syncLatestError": "अंतिम त्रुटि: {{error}}",
     "lastSyncValue": "पिछला सिंक: {{value}}",
-    "neverSynced": "कभी सिंक नहीं किया"
+    "neverSynced": "कभी सिंक नहीं किया",
+    "systemTitle": "सिस्टम जानकारी",
+    "systemDescription": "एप्लिकेशन संस्करण, लाइसेंस और स्थिति एक नज़र में।",
+    "systemVersionLabel": "एप्लिकेशन संस्करण",
+    "systemVersionValue": "v{{version}}",
+    "systemAppNameLabel": "एप्लिकेशन नाम",
+    "systemLicenseLabel": "लाइसेंस",
+    "systemSetupStatusLabel": "सेटअप स्थिति",
+    "systemSetupComplete": "पूर्ण",
+    "systemSetupRequired": "सेटअप आवश्यक",
+    "apiTokensEmpty": "अभी तक कोई API टोकन नहीं।",
+    "familyEmpty": "अभी तक कोई परिवार सदस्य नहीं।"
   },
   "login": {
     "tagline": "पारिवारिक योजना। सुरक्षित। गोपनीयता-अनुकूल। ओपन सोर्स।",

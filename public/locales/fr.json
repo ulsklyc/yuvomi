@@ -1347,7 +1347,18 @@
     "enabledReminderListCount": "{{count}} listes de rappels activées",
     "syncLatestError": "Dernière erreur : {{error}}",
     "lastSyncValue": "Dernière synchronisation : {{value}}",
-    "neverSynced": "Jamais synchronisé"
+    "neverSynced": "Jamais synchronisé",
+    "systemTitle": "Informations système",
+    "systemDescription": "Version de l’application, licence et statut en un coup d’œil.",
+    "systemVersionLabel": "Version de l’application",
+    "systemVersionValue": "v{{version}}",
+    "systemAppNameLabel": "Nom de l’application",
+    "systemLicenseLabel": "Licence",
+    "systemSetupStatusLabel": "État de la configuration",
+    "systemSetupComplete": "Terminée",
+    "systemSetupRequired": "Configuration requise",
+    "apiTokensEmpty": "Aucun jeton d’API pour le moment.",
+    "familyEmpty": "Aucun membre de la famille pour le moment."
   },
   "login": {
     "tagline": "Planification familiale. Sécurisée. Respectueuse de la vie privée. Open source.",

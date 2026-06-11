@@ -1347,7 +1347,18 @@
     "enabledReminderListCount": "{{count}} ενεργές λίστες υπενθυμίσεων",
     "syncLatestError": "Τελευταίο σφάλμα: {{error}}",
     "lastSyncValue": "Τελευταίος συγχρονισμός: {{value}}",
-    "neverSynced": "Δεν έγινε ποτέ συγχρονισμός"
+    "neverSynced": "Δεν έγινε ποτέ συγχρονισμός",
+    "systemTitle": "Πληροφορίες συστήματος",
+    "systemDescription": "Έκδοση εφαρμογής, άδεια και κατάσταση με μια ματιά.",
+    "systemVersionLabel": "Έκδοση εφαρμογής",
+    "systemVersionValue": "v{{version}}",
+    "systemAppNameLabel": "Όνομα εφαρμογής",
+    "systemLicenseLabel": "Άδεια",
+    "systemSetupStatusLabel": "Κατάσταση εγκατάστασης",
+    "systemSetupComplete": "Ολοκληρώθηκε",
+    "systemSetupRequired": "Απαιτείται εγκατάσταση",
+    "apiTokensEmpty": "Δεν υπάρχουν ακόμη διακριτικά API.",
+    "familyEmpty": "Δεν υπάρχουν ακόμη μέλη οικογένειας."
   },
   "login": {
     "tagline": "Οικογενειακός προγραμματισμός. Ασφαλής. Φιλικός προς την ιδιωτικότητα. Ανοιχτός κώδικας.",

@@ -1347,7 +1347,18 @@
     "enabledReminderListCount": "{{count}} hatırlatma listesi etkin",
     "syncLatestError": "Son hata: {{error}}",
     "lastSyncValue": "Son eşitleme: {{value}}",
-    "neverSynced": "Hiç eşitlenmedi"
+    "neverSynced": "Hiç eşitlenmedi",
+    "systemTitle": "Sistem bilgileri",
+    "systemDescription": "Uygulama sürümü, lisansı ve durumu bir bakışta.",
+    "systemVersionLabel": "Uygulama sürümü",
+    "systemVersionValue": "v{{version}}",
+    "systemAppNameLabel": "Uygulama adı",
+    "systemLicenseLabel": "Lisans",
+    "systemSetupStatusLabel": "Kurulum durumu",
+    "systemSetupComplete": "Tamamlandı",
+    "systemSetupRequired": "Kurulum gerekli",
+    "apiTokensEmpty": "Henüz API belirteci yok.",
+    "familyEmpty": "Henüz aile üyesi yok."
   },
   "login": {
     "tagline": "Aile planlaması. Güvenli. Gizlilik dostu. Açık kaynak.",

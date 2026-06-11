@@ -1347,7 +1347,18 @@
     "enabledReminderListCount": "{{count}} من قوائم التذكير مفعّلة",
     "syncLatestError": "آخر خطأ: {{error}}",
     "lastSyncValue": "آخر مزامنة: {{value}}",
-    "neverSynced": "لم تتم المزامنة مطلقًا"
+    "neverSynced": "لم تتم المزامنة مطلقًا",
+    "systemTitle": "معلومات النظام",
+    "systemDescription": "إصدار التطبيق والترخيص والحالة في لمحة.",
+    "systemVersionLabel": "إصدار التطبيق",
+    "systemVersionValue": "v{{version}}",
+    "systemAppNameLabel": "اسم التطبيق",
+    "systemLicenseLabel": "الترخيص",
+    "systemSetupStatusLabel": "حالة الإعداد",
+    "systemSetupComplete": "مكتمل",
+    "systemSetupRequired": "الإعداد مطلوب",
+    "apiTokensEmpty": "لا توجد رموز API بعد.",
+    "familyEmpty": "لا يوجد أفراد عائلة بعد."
   },
   "login": {
     "tagline": "تخطيط عائلي. آمن. يحترم الخصوصية. مفتوح المصدر.",

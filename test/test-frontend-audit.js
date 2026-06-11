@@ -595,6 +595,99 @@ test('documents-dms leaf owns Paperless DMS account management', () => {
   assert.doesNotMatch(source, /\/documents\/storage/);
 });
 
+test('administration-domain leaves exist and export async render functions', () => {
+  const files = [
+    '../public/settings/pages/admin-family.js',
+    '../public/settings/pages/admin-api.js',
+    '../public/settings/pages/admin-backup.js',
+    '../public/settings/pages/admin-system.js',
+  ];
+
+  for (const file of files) {
+    assert.equal(existsSync(new URL(file, import.meta.url)), true, `${file} must exist`);
+    const source = read(file);
+    assert.match(source, /export async function render\(container,\s*\{[^}]*\}(?:\s*=\s*\{\})?\)/);
+    assert.doesNotMatch(source, /\.innerHTML\s*=/, `${file} must not assign innerHTML`);
+    assert.doesNotMatch(source, /\bfetch\(/, `${file} must use the shared API client`);
+    assert.doesNotMatch(source, /\brequire\(/, `${file} must use import, not require`);
+    assert.match(
+      source,
+      /import \{ api(?:,\s*auth)? \} from '\/api\.js'/,
+      `${file} must import the shared API client`,
+    );
+  }
+});
+
+test('admin-family leaf owns family member + role management lazily', () => {
+  const source = read('../public/settings/pages/admin-family.js');
+
+  // Users are fetched only when the leaf is active, via the auth helper.
+  assert.match(source, /auth\.getUsers\(\)/);
+  assert.match(source, /auth\.createUser\(/);
+  assert.match(source, /auth\.updateUser\(/);
+  assert.match(source, /auth\.deleteUser\(/);
+  assert.match(source, /buildFamilyRoleOptions/);
+  assert.match(source, /family_role/);
+  assert.match(source, /birth_date/);
+
+  // Family leaf must not own API token, backup, or version concerns.
+  assert.doesNotMatch(source, /\/auth\/api-tokens/);
+  assert.doesNotMatch(source, /\/backup\//);
+  assert.doesNotMatch(source, /\/version/);
+});
+
+test('admin-api leaf owns API token lifecycle with one-time secret display', () => {
+  const source = read('../public/settings/pages/admin-api.js');
+
+  assert.match(source, /api\.get\('\/auth\/api-tokens'\)/);
+  assert.match(source, /api\.post\('\/auth\/api-tokens'/);
+  assert.match(source, /api\.delete\(`\/auth\/api-tokens\/\$\{[^}]+\}`\)/);
+
+  // The raw token is only ever read from the creation response.
+  assert.match(source, /res\.token/);
+
+  // API leaf must not own family, backup, or version concerns.
+  assert.doesNotMatch(source, /\/auth\/users/);
+  assert.doesNotMatch(source, /\/backup\//);
+  assert.doesNotMatch(source, /\/version/);
+});
+
+test('admin-backup leaf owns database + WebDAV backup without document storage', () => {
+  const source = read('../public/settings/pages/admin-backup.js');
+
+  assert.match(source, /\/api\/v1\/backup\/database/);
+  assert.match(source, /api\.rawPost\('\/backup\/restore'/);
+  assert.match(source, /api\.get\('\/backup\/status'\)/);
+  assert.match(source, /api\.post\('\/backup\/trigger'\)/);
+  assert.match(source, /api\.get\('\/backup\/webdav\/config'\)/);
+  assert.match(source, /api\.put\('\/backup\/webdav\/config'/);
+  assert.match(source, /api\.post\('\/backup\/webdav\/test'/);
+  assert.match(source, /api\.post\('\/backup\/webdav\/trigger'\)/);
+
+  // CLI recovery guidance lives behind a collapsed disclosure.
+  assert.match(source, /createDisclosure\(/);
+  assert.match(source, /settings\.backupCliTitle/);
+
+  // Backup leaf must not own document-storage WebDAV or API/version concerns.
+  assert.doesNotMatch(source, /\/documents\/storage/);
+  assert.doesNotMatch(source, /\/auth\/api-tokens/);
+  assert.doesNotMatch(source, /\/version/);
+});
+
+test('admin-system leaf reads /version and renders safe translated rows only', () => {
+  const source = read('../public/settings/pages/admin-system.js');
+
+  assert.match(source, /api\.get\('\/version'\)/);
+  assert.match(source, /settings\.systemVersionLabel/);
+  assert.match(source, /MIT/);
+  assert.match(source, /setup_required/);
+
+  // System leaf is read-only: no other backend domains, no secrets.
+  assert.doesNotMatch(source, /\/documents\//);
+  assert.doesNotMatch(source, /\/backup\//);
+  assert.doesNotMatch(source, /\/auth\/api-tokens/);
+});
+
 test('Shopping owns shopping category management via a dedicated web component', () => {
   const component = read('../public/components/shopping-category-manager.js');
   assert.match(component, /customElements\.define\(\s*'oikos-shopping-category-manager'/);

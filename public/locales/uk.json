@@ -1347,7 +1347,18 @@
     "enabledReminderListCount": "Увімкнено списків нагадувань: {{count}}",
     "syncLatestError": "Остання помилка: {{error}}",
     "lastSyncValue": "Остання синхронізація: {{value}}",
-    "neverSynced": "Ще не синхронізовано"
+    "neverSynced": "Ще не синхронізовано",
+    "systemTitle": "Відомості про систему",
+    "systemDescription": "Версія застосунку, ліцензія та стан з першого погляду.",
+    "systemVersionLabel": "Версія застосунку",
+    "systemVersionValue": "v{{version}}",
+    "systemAppNameLabel": "Назва застосунку",
+    "systemLicenseLabel": "Ліцензія",
+    "systemSetupStatusLabel": "Стан налаштування",
+    "systemSetupComplete": "Завершено",
+    "systemSetupRequired": "Потрібне налаштування",
+    "apiTokensEmpty": "Токенів API ще немає.",
+    "familyEmpty": "Членів родини ще немає."
   },
   "login": {
     "tagline": "Планування для родини. Безпечно. Конфіденційно. Відкритий код.",

@@ -1347,7 +1347,18 @@
     "enabledReminderListCount": "{{count}} reminder lists enabled",
     "syncLatestError": "Latest error: {{error}}",
     "lastSyncValue": "Last sync: {{value}}",
-    "neverSynced": "Never synced"
+    "neverSynced": "Never synced",
+    "systemTitle": "System information",
+    "systemDescription": "Application version, license and status at a glance.",
+    "systemVersionLabel": "Application version",
+    "systemVersionValue": "v{{version}}",
+    "systemAppNameLabel": "Application name",
+    "systemLicenseLabel": "License",
+    "systemSetupStatusLabel": "Setup status",
+    "systemSetupComplete": "Complete",
+    "systemSetupRequired": "Setup required",
+    "apiTokensEmpty": "No API tokens yet.",
+    "familyEmpty": "No family members yet."
   },
   "login": {
     "tagline": "Family planning. Secure. Privacy-friendly. Open source.",

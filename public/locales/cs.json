@@ -1347,7 +1347,18 @@
     "enabledReminderListCount": "Povolené seznamy připomínek: {{count}}",
     "syncLatestError": "Poslední chyba: {{error}}",
     "lastSyncValue": "Poslední synchronizace: {{value}}",
-    "neverSynced": "Dosud nesynchronizováno"
+    "neverSynced": "Dosud nesynchronizováno",
+    "systemTitle": "Systémové informace",
+    "systemDescription": "Verze aplikace, licence a stav na první pohled.",
+    "systemVersionLabel": "Verze aplikace",
+    "systemVersionValue": "v{{version}}",
+    "systemAppNameLabel": "Název aplikace",
+    "systemLicenseLabel": "Licence",
+    "systemSetupStatusLabel": "Stav nastavení",
+    "systemSetupComplete": "Dokončeno",
+    "systemSetupRequired": "Vyžadováno nastavení",
+    "apiTokensEmpty": "Zatím žádné API tokeny.",
+    "familyEmpty": "Zatím žádní členové rodiny."
   },
   "login": {
     "tagline": "Rodinné plánování. Bezpečné. Soukromé. Open Source.",

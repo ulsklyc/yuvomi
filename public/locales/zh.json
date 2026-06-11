@@ -1347,7 +1347,18 @@
     "enabledReminderListCount": "已启用 {{count}} 个提醒列表",
     "syncLatestError": "最近错误：{{error}}",
     "lastSyncValue": "上次同步：{{value}}",
-    "neverSynced": "从未同步"
+    "neverSynced": "从未同步",
+    "systemTitle": "系统信息",
+    "systemDescription": "一目了然地查看应用版本、许可证和状态。",
+    "systemVersionLabel": "应用版本",
+    "systemVersionValue": "v{{version}}",
+    "systemAppNameLabel": "应用名称",
+    "systemLicenseLabel": "许可证",
+    "systemSetupStatusLabel": "设置状态",
+    "systemSetupComplete": "已完成",
+    "systemSetupRequired": "需要设置",
+    "apiTokensEmpty": "暂无 API 令牌。",
+    "familyEmpty": "暂无家庭成员。"
   },
   "login": {
     "tagline": "家庭规划。安全。注重隐私。开源。",

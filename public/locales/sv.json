@@ -1347,7 +1347,18 @@
     "enabledReminderListCount": "{{count}} påminnelselistor aktiverade",
     "syncLatestError": "Senaste fel: {{error}}",
     "lastSyncValue": "Senaste synkronisering: {{value}}",
-    "neverSynced": "Aldrig synkroniserad"
+    "neverSynced": "Aldrig synkroniserad",
+    "systemTitle": "Systeminformation",
+    "systemDescription": "Programversion, licens och status i överblick.",
+    "systemVersionLabel": "Programversion",
+    "systemVersionValue": "v{{version}}",
+    "systemAppNameLabel": "Programnamn",
+    "systemLicenseLabel": "Licens",
+    "systemSetupStatusLabel": "Installationsstatus",
+    "systemSetupComplete": "Slutförd",
+    "systemSetupRequired": "Installation krävs",
+    "apiTokensEmpty": "Inga API-tokens ännu.",
+    "familyEmpty": "Inga familjemedlemmar ännu."
   },
   "login": {
     "tagline": "Familjeplanering. Säker. Sekretessvänlig. Öppen källkod.",

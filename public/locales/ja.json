@@ -1347,7 +1347,18 @@
     "enabledReminderListCount": "リマインダーリスト {{count}} 件が有効",
     "syncLatestError": "最新のエラー: {{error}}",
     "lastSyncValue": "最終同期: {{value}}",
-    "neverSynced": "未同期"
+    "neverSynced": "未同期",
+    "systemTitle": "システム情報",
+    "systemDescription": "アプリのバージョン、ライセンス、ステータスを一目で確認できます。",
+    "systemVersionLabel": "アプリのバージョン",
+    "systemVersionValue": "v{{version}}",
+    "systemAppNameLabel": "アプリ名",
+    "systemLicenseLabel": "ライセンス",
+    "systemSetupStatusLabel": "セットアップの状態",
+    "systemSetupComplete": "完了",
+    "systemSetupRequired": "セットアップが必要",
+    "apiTokensEmpty": "API トークンはまだありません。",
+    "familyEmpty": "家族のメンバーはまだいません。"
   },
   "login": {
     "tagline": "家族計画。安全。プライバシー重視。オープンソース。",
