@@ -532,6 +532,69 @@ test('sync-reminders leaf maps CalDAV reminder lists and syncs without calendars
   assert.doesNotMatch(source, /\/calendar\/caldav\/sync\b/);
 });
 
+test('documents-domain leaves exist and export async render functions', () => {
+  const files = [
+    '../public/settings/pages/documents-storage.js',
+    '../public/settings/pages/documents-dms.js',
+  ];
+
+  for (const file of files) {
+    assert.equal(existsSync(new URL(file, import.meta.url)), true, `${file} must exist`);
+    const source = read(file);
+    assert.match(source, /export async function render\(container,\s*\{[^}]*\}(?:\s*=\s*\{\})?\)/);
+    assert.doesNotMatch(source, /\.innerHTML\s*=/, `${file} must not assign innerHTML`);
+    assert.doesNotMatch(source, /\bfetch\(/, `${file} must use the shared API client`);
+    assert.doesNotMatch(source, /\brequire\(/, `${file} must use import, not require`);
+    assert.match(
+      source,
+      /import \{ api \} from '\/api\.js'/,
+      `${file} must import the shared API client`,
+    );
+  }
+});
+
+test('documents-storage leaf owns WebDAV document storage with a status-first layout', () => {
+  const source = read('../public/settings/pages/documents-storage.js');
+
+  // Storage config + test endpoints preserved unchanged.
+  assert.match(source, /api\.get\('\/documents\/storage\/config'\)/);
+  assert.match(source, /api\.put\('\/documents\/storage\/config'/);
+  assert.match(source, /api\.post\('\/documents\/storage\/test'/);
+
+  // Status-first: render the active backend and target before the connection fields.
+  assert.match(source, /createStatusSummary\(/);
+  assert.match(source, /active_upload_backend/);
+  assert.match(source, /webdav_document_count/);
+  assert.match(source, /documentStorageTarget/);
+
+  // Connection fields live behind an accessible disclosure.
+  assert.match(source, /createDisclosure\(/);
+
+  // Protected-change detection + confirm before save.
+  assert.match(source, /hasProtectedDocumentStorageChange/);
+  assert.match(source, /settings\.documentStorageConfirmExisting/);
+
+  // Env-controlled handling + backup warning preserved.
+  assert.match(source, /env_controlled/);
+  assert.match(source, /settings\.documentStorageBackupWarning/);
+
+  // Storage leaf must not own DMS concerns.
+  assert.doesNotMatch(source, /\/documents\/dms/);
+});
+
+test('documents-dms leaf owns Paperless DMS account management', () => {
+  const source = read('../public/settings/pages/documents-dms.js');
+
+  assert.match(source, /api\.get\('\/documents\/dms\/accounts'\)/);
+  assert.match(source, /api\.post\('\/documents\/dms\/accounts'/);
+  assert.match(source, /api\.delete\(`\/documents\/dms\/accounts\/\$\{[^}]+\}`\)/);
+  assert.match(source, /\/documents\/dms\/accounts\/\$\{[^}]+\}\/test/);
+  assert.match(source, /provider: 'paperless'/);
+
+  // DMS leaf must not own storage concerns.
+  assert.doesNotMatch(source, /\/documents\/storage/);
+});
+
 test('Shopping owns shopping category management via a dedicated web component', () => {
   const component = read('../public/components/shopping-category-manager.js');
   assert.match(component, /customElements\.define\(\s*'oikos-shopping-category-manager'/);
