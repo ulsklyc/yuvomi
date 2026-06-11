@@ -1343,6 +1343,9 @@
     "documentBackupWarning": "Bản sao cơ sở dữ liệu không gồm tài liệu lưu bên ngoài.",
     "kitchenActiveCount": "{{count}} mô-đun bếp đang hoạt động",
     "enabledCalendarCount": "{{count}} lịch đã bật",
+    "enabledAddressbookCount": "{{count}} sổ địa chỉ đã bật",
+    "enabledReminderListCount": "{{count}} danh sách nhắc nhở đã bật",
+    "syncLatestError": "Lỗi gần nhất: {{error}}",
     "lastSyncValue": "Đồng bộ gần nhất: {{value}}",
     "neverSynced": "Chưa từng đồng bộ"
   },

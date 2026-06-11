@@ -419,6 +419,119 @@ test('module-specific settings leaves preserve their required controls and behav
   assert.match(dashboard, /await render\(container, \{ user \}\)/);
 });
 
+test('synchronization-by-data-type leaves exist and export async render functions', () => {
+  const files = [
+    '../public/settings/pages/sync-calendar.js',
+    '../public/settings/pages/sync-contacts.js',
+    '../public/settings/pages/sync-reminders.js',
+  ];
+
+  for (const file of files) {
+    assert.equal(existsSync(new URL(file, import.meta.url)), true, `${file} must exist`);
+    const source = read(file);
+    assert.match(source, /export async function render\(container,\s*\{[^}]*\}(?:\s*=\s*\{\})?\)/);
+    assert.doesNotMatch(source, /\.innerHTML\s*=/, `${file} must not assign innerHTML`);
+    assert.doesNotMatch(source, /\bfetch\(/, `${file} must use the shared API client`);
+    assert.doesNotMatch(source, /\brequire\(/, `${file} must use import, not require`);
+    assert.match(
+      source,
+      /import \{ api \} from '\/api\.js'/,
+      `${file} must import the shared API client`,
+    );
+  }
+});
+
+test('sync-calendar leaf loads CalDAV, ICS, Google, and Apple with independent status', () => {
+  const source = read('../public/settings/pages/sync-calendar.js');
+
+  // CalDAV calendar account management + status before forms.
+  assert.match(source, /api\.get\('\/calendar\/caldav\/accounts'\)/);
+  assert.match(source, /api\.post\('\/calendar\/caldav\/accounts'/);
+  assert.match(source, /api\.delete\(`\/calendar\/caldav\/accounts\/\$\{[^}]+\}`\)/);
+  assert.match(source, /\/calendar\/caldav\/accounts\/\$\{[^}]+\}\/calendars/);
+  assert.match(source, /api\.post\('\/calendar\/caldav\/sync'\)/);
+  assert.match(source, /createStatusSummary\(/);
+  assert.match(source, /t\('settings\.caldavTitle'\)/);
+  assert.match(source, /enabledCalendarCount/);
+  assert.match(source, /neverSynced/);
+
+  // Webcal / ICS subscriptions.
+  assert.match(source, /api\.get\('\/calendar\/subscriptions'\)/);
+  assert.match(source, /api\.post\('\/calendar\/subscriptions'/);
+  assert.match(source, /api\.patch\(`\/calendar\/subscriptions\/\$\{[^}]+\}`/);
+  assert.match(source, /api\.delete\(`\/calendar\/subscriptions\/\$\{[^}]+\}`\)/);
+
+  // Independent fetches so one failure does not hide the others.
+  assert.match(source, /Promise\.allSettled/);
+
+  // Reminder-list collections must NOT leak into the calendar leaf.
+  assert.doesNotMatch(source, /reminder-lists/);
+  assert.doesNotMatch(source, /\/calendar\/caldav\/reminders\/sync/);
+
+  // Google + Apple live behind one accessible "More providers" disclosure.
+  assert.match(source, /createDisclosure\(/);
+  assert.match(source, /settings\.moreProviders/);
+
+  // Google: provider-specific labelled, all endpoints preserved.
+  assert.match(source, /settings\.providerSpecific/);
+  assert.match(source, /api\.get\('\/calendar\/google\/status'\)/);
+  assert.match(source, /\/api\/v1\/calendar\/google\/auth/);
+  assert.match(source, /api\.post\('\/calendar\/google\/sync'/);
+  assert.match(source, /api\.get\('\/calendar\/google\/calendars'\)/);
+  assert.match(source, /api\.patch\('\/calendar\/google\/calendars'/);
+  assert.match(source, /api\.put\('\/calendar\/google\/readonly'/);
+  assert.match(source, /api\.delete\('\/calendar\/google\/disconnect'\)/);
+
+  // Apple: legacy badge + hint steering new users to CalDAV, endpoints preserved.
+  assert.match(source, /settings\.legacy/);
+  assert.match(source, /settings\.appleLegacyHint/);
+  assert.match(source, /api\.get\('\/calendar\/apple\/status'\)/);
+  assert.match(source, /api\.post\('\/calendar\/apple\/connect'/);
+  assert.match(source, /api\.post\('\/calendar\/apple\/sync'/);
+  assert.match(source, /api\.delete\('\/calendar\/apple\/disconnect'\)/);
+
+  // OAuth callback handling: localized banner, expand disclosure, scrub only callback params.
+  assert.match(source, /sync_ok/);
+  assert.match(source, /sync_error/);
+  assert.match(source, /history\.replaceState/);
+});
+
+test('sync-contacts leaf owns CardDAV account management', () => {
+  const source = read('../public/settings/pages/sync-contacts.js');
+
+  assert.match(source, /api\.get\('\/contacts\/cardav\/accounts'\)/);
+  assert.match(source, /api\.post\('\/contacts\/cardav\/accounts'/);
+  assert.match(source, /api\.delete\(`\/contacts\/cardav\/accounts\/\$\{[^}]+\}`\)/);
+  assert.match(source, /\/contacts\/cardav\/accounts\/\$\{[^}]+\}\/addressbooks/);
+  assert.match(source, /addressbooks\/toggle/);
+  assert.match(source, /addressbooks\/refresh/);
+  assert.match(source, /\/contacts\/cardav\/accounts\/\$\{[^}]+\}\/sync/);
+  assert.match(source, /last_sync/);
+
+  // Contacts leaf must not own calendar or reminder concerns.
+  assert.doesNotMatch(source, /\/calendar\/caldav/);
+  assert.doesNotMatch(source, /\/calendar\/google/);
+  assert.doesNotMatch(source, /\/calendar\/apple/);
+});
+
+test('sync-reminders leaf maps CalDAV reminder lists and syncs without calendars', () => {
+  const source = read('../public/settings/pages/sync-reminders.js');
+
+  // Reuse CalDAV accounts but render only reminder/task collections.
+  assert.match(source, /api\.get\('\/calendar\/caldav\/accounts'\)/);
+  assert.match(source, /reminder-lists/);
+  assert.match(source, /api\.patch\(`\/calendar\/caldav\/accounts\/\$\{[^}]+\}\/reminder-lists`/);
+  assert.match(source, /api\.post\('\/calendar\/caldav\/reminders\/sync'\)/);
+  assert.match(source, /targetModule/);
+  assert.match(source, /settings\.caldavReminderMapTasks/);
+  assert.match(source, /settings\.caldavReminderMapShopping/);
+  assert.match(source, /settings\.caldavRemindersHint/);
+
+  // Calendar collections must NOT appear in the reminders leaf.
+  assert.doesNotMatch(source, /\/calendars\b/);
+  assert.doesNotMatch(source, /\/calendar\/caldav\/sync\b/);
+});
+
 test('Shopping owns shopping category management via a dedicated web component', () => {
   const component = read('../public/components/shopping-category-manager.js');
   assert.match(component, /customElements\.define\(\s*'oikos-shopping-category-manager'/);

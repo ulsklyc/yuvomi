@@ -1343,6 +1343,9 @@
     "documentBackupWarning": "لا تتضمن نسخ قاعدة البيانات ملفات المستندات المخزنة خارجيًا.",
     "kitchenActiveCount": "{{count}} من وحدات المطبخ نشطة",
     "enabledCalendarCount": "{{count}} من التقاويم مفعلة",
+    "enabledAddressbookCount": "{{count}} من دفاتر العناوين مفعّلة",
+    "enabledReminderListCount": "{{count}} من قوائم التذكير مفعّلة",
+    "syncLatestError": "آخر خطأ: {{error}}",
     "lastSyncValue": "آخر مزامنة: {{value}}",
     "neverSynced": "لم تتم المزامنة مطلقًا"
   },

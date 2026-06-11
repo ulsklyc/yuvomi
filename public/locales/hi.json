@@ -1343,6 +1343,9 @@
     "documentBackupWarning": "डेटाबेस बैकअप में बाहर संग्रहीत दस्तावेज़ शामिल नहीं होते।",
     "kitchenActiveCount": "{{count}} रसोई मॉड्यूल सक्रिय",
     "enabledCalendarCount": "{{count}} कैलेंडर सक्षम",
+    "enabledAddressbookCount": "{{count}} पता पुस्तिकाएँ सक्षम",
+    "enabledReminderListCount": "{{count}} अनुस्मारक सूचियाँ सक्षम",
+    "syncLatestError": "अंतिम त्रुटि: {{error}}",
     "lastSyncValue": "पिछला सिंक: {{value}}",
     "neverSynced": "कभी सिंक नहीं किया"
   },

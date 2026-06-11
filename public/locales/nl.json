@@ -1343,6 +1343,9 @@
     "documentBackupWarning": "Databaseback-ups bevatten geen extern opgeslagen documenten.",
     "kitchenActiveCount": "{{count}} keukenmodules actief",
     "enabledCalendarCount": "{{count}} agenda’s ingeschakeld",
+    "enabledAddressbookCount": "{{count}} adresboeken ingeschakeld",
+    "enabledReminderListCount": "{{count}} herinneringslijsten ingeschakeld",
+    "syncLatestError": "Laatste fout: {{error}}",
     "lastSyncValue": "Laatste synchronisatie: {{value}}",
     "neverSynced": "Nooit gesynchroniseerd"
   },

@@ -1343,6 +1343,9 @@
     "documentBackupWarning": "Zálohy databáze neobsahují externě uložené soubory dokumentů.",
     "kitchenActiveCount": "Aktivní moduly kuchyně: {{count}}",
     "enabledCalendarCount": "Povolené kalendáře: {{count}}",
+    "enabledAddressbookCount": "Povolené adresáře: {{count}}",
+    "enabledReminderListCount": "Povolené seznamy připomínek: {{count}}",
+    "syncLatestError": "Poslední chyba: {{error}}",
     "lastSyncValue": "Poslední synchronizace: {{value}}",
     "neverSynced": "Dosud nesynchronizováno"
   },

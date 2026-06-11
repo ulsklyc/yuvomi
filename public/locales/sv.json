@@ -1343,6 +1343,9 @@
     "documentBackupWarning": "Databaskopior innehåller inte externt lagrade dokument.",
     "kitchenActiveCount": "{{count}} köksmoduler aktiva",
     "enabledCalendarCount": "{{count}} kalendrar aktiverade",
+    "enabledAddressbookCount": "{{count}} adressböcker aktiverade",
+    "enabledReminderListCount": "{{count}} påminnelselistor aktiverade",
+    "syncLatestError": "Senaste fel: {{error}}",
     "lastSyncValue": "Senaste synkronisering: {{value}}",
     "neverSynced": "Aldrig synkroniserad"
   },

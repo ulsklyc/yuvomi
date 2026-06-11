@@ -1343,6 +1343,9 @@
     "documentBackupWarning": "データベースのバックアップに外部保存の文書は含まれません。",
     "kitchenActiveCount": "キッチンモジュール {{count}} 件が有効",
     "enabledCalendarCount": "カレンダー {{count}} 件が有効",
+    "enabledAddressbookCount": "アドレス帳 {{count}} 件が有効",
+    "enabledReminderListCount": "リマインダーリスト {{count}} 件が有効",
+    "syncLatestError": "最新のエラー: {{error}}",
     "lastSyncValue": "最終同期: {{value}}",
     "neverSynced": "未同期"
   },

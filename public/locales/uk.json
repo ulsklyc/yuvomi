@@ -1343,6 +1343,9 @@
     "documentBackupWarning": "Копії бази не містять документи із зовнішнього сховища.",
     "kitchenActiveCount": "Активних модулів кухні: {{count}}",
     "enabledCalendarCount": "Увімкнено календарів: {{count}}",
+    "enabledAddressbookCount": "Увімкнено адресних книг: {{count}}",
+    "enabledReminderListCount": "Увімкнено списків нагадувань: {{count}}",
+    "syncLatestError": "Остання помилка: {{error}}",
     "lastSyncValue": "Остання синхронізація: {{value}}",
     "neverSynced": "Ще не синхронізовано"
   },

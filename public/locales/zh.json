@@ -1343,6 +1343,9 @@
     "documentBackupWarning": "数据库备份不包含存储在外部的文档文件。",
     "kitchenActiveCount": "已启用 {{count}} 个厨房模块",
     "enabledCalendarCount": "已启用 {{count}} 个日历",
+    "enabledAddressbookCount": "已启用 {{count}} 个通讯录",
+    "enabledReminderListCount": "已启用 {{count}} 个提醒列表",
+    "syncLatestError": "最近错误：{{error}}",
     "lastSyncValue": "上次同步：{{value}}",
     "neverSynced": "从未同步"
   },

@@ -1343,6 +1343,9 @@
     "documentBackupWarning": "Τα αντίγραφα βάσης δεν περιλαμβάνουν εξωτερικά αρχεία εγγράφων.",
     "kitchenActiveCount": "{{count}} ενεργές μονάδες κουζίνας",
     "enabledCalendarCount": "{{count}} ενεργά ημερολόγια",
+    "enabledAddressbookCount": "{{count}} ενεργά βιβλία διευθύνσεων",
+    "enabledReminderListCount": "{{count}} ενεργές λίστες υπενθυμίσεων",
+    "syncLatestError": "Τελευταίο σφάλμα: {{error}}",
     "lastSyncValue": "Τελευταίος συγχρονισμός: {{value}}",
     "neverSynced": "Δεν έγινε ποτέ συγχρονισμός"
   },

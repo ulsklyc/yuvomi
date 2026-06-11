@@ -1343,6 +1343,9 @@
     "documentBackupWarning": "As cópias da base não incluem documentos guardados externamente.",
     "kitchenActiveCount": "{{count}} módulos de cozinha ativos",
     "enabledCalendarCount": "{{count}} calendários ativados",
+    "enabledAddressbookCount": "{{count}} catálogos de endereços ativados",
+    "enabledReminderListCount": "{{count}} listas de lembretes ativadas",
+    "syncLatestError": "Último erro: {{error}}",
     "lastSyncValue": "Última sincronização: {{value}}",
     "neverSynced": "Nunca sincronizado"
   },

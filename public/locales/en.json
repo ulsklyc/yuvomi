@@ -1343,6 +1343,9 @@
     "documentBackupWarning": "Database backups do not include externally stored document files.",
     "kitchenActiveCount": "{{count}} kitchen modules active",
     "enabledCalendarCount": "{{count}} calendars enabled",
+    "enabledAddressbookCount": "{{count}} address books enabled",
+    "enabledReminderListCount": "{{count}} reminder lists enabled",
+    "syncLatestError": "Latest error: {{error}}",
     "lastSyncValue": "Last sync: {{value}}",
     "neverSynced": "Never synced"
   },

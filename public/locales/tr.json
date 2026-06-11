@@ -1343,6 +1343,9 @@
     "documentBackupWarning": "Veritabanı yedekleri harici belgeleri içermez.",
     "kitchenActiveCount": "{{count}} mutfak modülü etkin",
     "enabledCalendarCount": "{{count}} takvim etkin",
+    "enabledAddressbookCount": "{{count}} adres defteri etkin",
+    "enabledReminderListCount": "{{count}} hatırlatma listesi etkin",
+    "syncLatestError": "Son hata: {{error}}",
     "lastSyncValue": "Son eşitleme: {{value}}",
     "neverSynced": "Hiç eşitlenmedi"
   },

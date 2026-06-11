@@ -1349,6 +1349,9 @@
     "documentBackupWarning": "Kopie bazy nie zawierają dokumentów zapisanych zewnętrznie.",
     "kitchenActiveCount": "Aktywne moduły kuchni: {{count}}",
     "enabledCalendarCount": "Włączone kalendarze: {{count}}",
+    "enabledAddressbookCount": "Włączone książki adresowe: {{count}}",
+    "enabledReminderListCount": "Włączone listy przypomnień: {{count}}",
+    "syncLatestError": "Ostatni błąd: {{error}}",
     "lastSyncValue": "Ostatnia synchronizacja: {{value}}",
     "neverSynced": "Nigdy nie synchronizowano"
   },

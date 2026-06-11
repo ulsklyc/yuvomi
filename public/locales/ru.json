@@ -1343,6 +1343,9 @@
     "documentBackupWarning": "Копии базы не содержат документы из внешнего хранилища.",
     "kitchenActiveCount": "Активных модулей кухни: {{count}}",
     "enabledCalendarCount": "Включено календарей: {{count}}",
+    "enabledAddressbookCount": "Включено адресных книг: {{count}}",
+    "enabledReminderListCount": "Включено списков напоминаний: {{count}}",
+    "syncLatestError": "Последняя ошибка: {{error}}",
     "lastSyncValue": "Последняя синхронизация: {{value}}",
     "neverSynced": "Синхронизации ещё не было"
   },

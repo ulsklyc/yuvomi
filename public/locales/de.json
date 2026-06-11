@@ -1349,6 +1349,9 @@
     "documentBackupWarning": "Datenbank-Backups enthalten keine extern gespeicherten Dokumentdateien.",
     "kitchenActiveCount": "{{count}} Küchenmodule aktiv",
     "enabledCalendarCount": "{{count}} Kalender aktiviert",
+    "enabledAddressbookCount": "{{count}} Adressbücher aktiviert",
+    "enabledReminderListCount": "{{count}} Erinnerungslisten aktiviert",
+    "syncLatestError": "Letzter Fehler: {{error}}",
     "lastSyncValue": "Letzte Synchronisation: {{value}}",
     "neverSynced": "Noch nie synchronisiert"
   },
