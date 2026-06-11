@@ -35,6 +35,10 @@ import {
 import {
   persistMealTypeSelection,
 } from '../public/settings/pages/modules-kitchen.js';
+import {
+  buildNavigationPayload,
+  persistModuleToggle,
+} from '../public/settings/pages/modules-navigation.js';
 
 const member = { role: 'member' };
 const admin = { role: 'admin' };
@@ -479,6 +483,88 @@ test('weather geolocation callbacks only update the active leaf', () => {
     isConnectedWeatherControl({ isConnected: true }, { isConnected: false }),
     false,
   );
+});
+
+test('buildNavigationPayload expands the visible order back to canonical Kitchen children', () => {
+  const payload = buildNavigationPayload(
+    ['notes'],
+    new Set(['meals', 'recipes', 'shopping']),
+    ['calendar', 'tasks', 'kitchen', 'notes'],
+  );
+
+  assert.deepEqual(payload, {
+    disabled_modules: ['notes'],
+    module_order: ['calendar', 'tasks', 'meals', 'recipes', 'shopping', 'notes'],
+  });
+});
+
+test('buildNavigationPayload yields an empty module order for an empty visible order', () => {
+  const payload = buildNavigationPayload([], new Set(['meals', 'recipes', 'shopping']), []);
+
+  assert.deepEqual(payload, { disabled_modules: [], module_order: [] });
+});
+
+test('buildNavigationPayload keeps the single Kitchen position when expanding', () => {
+  const payload = buildNavigationPayload([], new Set(KITCHEN_CHILD_IDS), ['kitchen']);
+
+  assert.deepEqual(payload.module_order, ['meals', 'recipes', 'shopping']);
+});
+
+test('buildNavigationPayload disables Kitchen children that are not enabled', () => {
+  const payload = buildNavigationPayload(
+    ['budget'],
+    new Set(['meals']),
+    ['kitchen', 'budget'],
+  );
+
+  assert.deepEqual(payload.disabled_modules, ['budget', 'recipes', 'shopping']);
+  assert.deepEqual(payload.module_order, ['meals', 'recipes', 'shopping', 'budget']);
+});
+
+test('persistModuleToggle restores the toggle and re-enables it when saving fails', async () => {
+  const input = { checked: true, disabled: true };
+  let rerendered = false;
+
+  await assert.rejects(
+    persistModuleToggle(input, true, async () => {
+      throw new Error('save failed');
+    }, async () => {
+      rerendered = true;
+    }),
+    /save failed/,
+  );
+
+  assert.equal(input.checked, false);
+  assert.equal(input.disabled, false);
+  assert.equal(rerendered, false);
+});
+
+test('persistModuleToggle re-renders only after a successful save', async () => {
+  const input = { checked: false, disabled: true };
+  const calls = [];
+
+  await persistModuleToggle(input, false, async () => {
+    calls.push('save');
+  }, async () => {
+    calls.push('render');
+  });
+
+  assert.deepEqual(calls, ['save', 'render']);
+  assert.equal(input.checked, false);
+});
+
+test('persistModuleToggle does not restore the input when the re-render fails', async () => {
+  const input = { checked: true, disabled: true };
+
+  await assert.rejects(
+    persistModuleToggle(input, true, async () => {}, async () => {
+      throw new Error('render failed');
+    }),
+    /render failed/,
+  );
+
+  // Save succeeded, so the toggle must keep its new state and not be reverted.
+  assert.equal(input.checked, true);
 });
 
 test('all locales contain the settings IA translation foundation', async () => {

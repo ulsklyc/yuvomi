@@ -287,17 +287,45 @@ function collectEnabledKitchenChildren(list) {
   );
 }
 
+// Reine, testbare Berechnung der Save-Payload: gewöhnliche disabled IDs plus die
+// nicht aktivierten Kitchen-Kinder ergeben `disabled_modules`; die sichtbare
+// Order (inkl. dem einen Kitchen-Eintrag) wird via expandModuleOrder zurück auf
+// die kanonischen Kitchen-Kinder erweitert.
+export function buildNavigationPayload(ordinaryDisabledIds, enabledKitchenChildren, visibleGlobalOrder) {
+  return {
+    disabled_modules: [
+      ...ordinaryDisabledIds,
+      ...KITCHEN_CHILD_IDS.filter((id) => !enabledKitchenChildren.has(id)),
+    ],
+    module_order: expandModuleOrder(visibleGlobalOrder),
+  };
+}
+
+// Reine, testbare Toggle-Persistenz: deaktiviert den Input während des Saves,
+// stellt bei Fehlschlag den vorherigen Zustand wieder her und re-rendert nur bei
+// erfolgreichem Save (ein fehlschlagender Re-Render darf NICHT den Restore-Pfad
+// auslösen).
+export async function persistModuleToggle(input, enabled, save, rerender) {
+  input.disabled = true;
+  try {
+    await save();
+  } catch (error) {
+    input.checked = !enabled;
+    input.disabled = false;
+    throw error;
+  }
+  await rerender();
+}
+
 async function saveNavigationState(list) {
-  const ordinaryDisabledIds = collectOrdinaryDisabledIds(list);
-  const enabledKitchenChildren = collectEnabledKitchenChildren(list);
-  const disabledModules = [
-    ...ordinaryDisabledIds,
-    ...KITCHEN_CHILD_IDS.filter((id) => !enabledKitchenChildren.has(id)),
-  ];
-  const moduleOrder = expandModuleOrder(collectVisibleGlobalOrder(list));
-  const response = await api.put('/preferences', { disabled_modules: disabledModules, module_order: moduleOrder });
-  const savedDisabled = response?.data?.disabled_modules ?? disabledModules;
-  const savedOrder = response?.data?.module_order ?? moduleOrder;
+  const payload = buildNavigationPayload(
+    collectOrdinaryDisabledIds(list),
+    collectEnabledKitchenChildren(list),
+    collectVisibleGlobalOrder(list),
+  );
+  const response = await api.put('/preferences', payload);
+  const savedDisabled = response?.data?.disabled_modules ?? payload.disabled_modules;
+  const savedOrder = response?.data?.module_order ?? payload.module_order;
   window.oikos?.setDisabledModules?.(savedDisabled);
   window.oikos?.setModuleOrder?.(savedOrder);
 }
@@ -391,18 +419,21 @@ function bindModuleListEvents(container, user) {
     );
     if (!input) return;
     const enabled = input.checked;
-    input.disabled = true;
     try {
-      if (input.dataset.thirdPartyModuleToggle) {
-        await api.patch(`/modules/${encodeURIComponent(input.dataset.thirdPartyModuleToggle)}`, { enabled });
-        await window.oikos?.refreshThirdPartyModules?.();
-      }
-      await saveNavigationState(list);
-      window.oikos?.showToast(t('settings.thirdPartyModulesSaved'), 'success');
-      await render(container, { user });
+      await persistModuleToggle(
+        input,
+        enabled,
+        async () => {
+          if (input.dataset.thirdPartyModuleToggle) {
+            await api.patch(`/modules/${encodeURIComponent(input.dataset.thirdPartyModuleToggle)}`, { enabled });
+            await window.oikos?.refreshThirdPartyModules?.();
+          }
+          await saveNavigationState(list);
+          window.oikos?.showToast(t('settings.thirdPartyModulesSaved'), 'success');
+        },
+        () => render(container, { user }),
+      );
     } catch (error) {
-      input.checked = !enabled;
-      input.disabled = false;
       window.oikos?.showToast(error.message ?? t('common.errorGeneric'), 'danger');
     }
   });
