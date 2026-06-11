@@ -39,6 +39,58 @@ test('Einkaufslisten-Zeilen toggeln nur außerhalb interaktiver Controls', () =>
   assert(/data-item-id/.test(source), 'Zeilen-Toggle muss die Artikel-ID aus data-item-id lesen');
 });
 
+// --------------------------------------------------------
+// Kategorie-Verwaltung wandert nach Shopping (Task 7)
+// --------------------------------------------------------
+test('Shopping-Seite importiert den Category-Manager und öffnet ihn bei manage=categories', () => {
+  const source = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
+  assert(/components\/shopping-category-manager\.js/.test(source), 'shopping.js muss den Category-Manager importieren');
+  assert(/oikos-shopping-category-manager/.test(source), 'shopping.js muss das Custom Element verwenden');
+  assert(/manage.*===\s*'categories'|get\('manage'\)|manage=categories|'manage'/.test(source), 'shopping.js muss den manage-Query-Parameter auswerten');
+  assert(/shopping\.manageCategories/.test(source), 'Eine übersetzte „Kategorien verwalten"-Aktion muss vorhanden sein');
+  assert(/shopping-categories-changed/.test(source), 'shopping.js muss auf das shopping-categories-changed-Event reagieren');
+});
+
+test('Shopping-Category-Manager-Komponente erfüllt die Web-Component-Verträge', () => {
+  const source = readFileSync(new URL('../public/components/shopping-category-manager.js', import.meta.url), 'utf8');
+  assert(/customElements\.define\(\s*'oikos-shopping-category-manager'/.test(source), 'Tag-Name muss oikos-shopping-category-manager sein');
+  assert(/connectedCallback/.test(source) && /disconnectedCallback/.test(source), 'Lifecycle-Callbacks müssen vorhanden sein');
+  assert(/api\.get\('\/shopping\/categories'\)/.test(source), 'Komponente muss Kategorien per API laden');
+  assert(/api\.post\('\/shopping\/categories'/.test(source), 'Hinzufügen muss POST nutzen');
+  assert(/api\.put\(`\/shopping\/categories\/\$\{[^}]+\}`/.test(source), 'Umbenennen muss PUT nutzen');
+  assert(/api\.patch\('\/shopping\/categories\/reorder'/.test(source), 'Reorder muss PATCH nutzen');
+  assert(/api\.delete\(`\/shopping\/categories\/\$\{[^}]+\}`/.test(source), 'Löschen muss DELETE nutzen');
+  assert(/shopping-categories-changed/.test(source), 'Mutationen müssen shopping-categories-changed dispatchen');
+  assert(/import\s*\{\s*esc\s*\}\s*from\s*'\/utils\/html\.js'/.test(source), 'User-Daten müssen via esc() escaped werden');
+  assert(!/\.innerHTML\s*=/.test(source), 'Komponente darf innerHTML nicht zuweisen');
+  // disconnectedCallback muss Listener wieder abräumen (kein Leak)
+  const disconnectFn = source.match(/disconnectedCallback\(\)\s*\{[\s\S]*?\n  \}/)?.[0] ?? '';
+  assert(/removeEventListener/.test(disconnectFn), 'disconnectedCallback muss Listener entfernen');
+});
+
+test('Shopping-Category-Manager rollt optimistisches Reorder bei API-Fehler zurück', () => {
+  const source = readFileSync(new URL('../public/components/shopping-category-manager.js', import.meta.url), 'utf8');
+  const moveFn = source.match(/async _move\([\s\S]*?\n  \}/)?.[0] ?? '';
+  assert(moveFn, '_move-Methode muss auffindbar sein');
+  // Snapshot vor der Mutation, Rollback im catch (analog zu den Task-5/6-Leaves).
+  assert(/const snapshot = \[\.\.\.this\._cats\]/.test(moveFn), '_move muss vor der Mutation einen Snapshot ziehen');
+  const catchBlock = moveFn.match(/catch \(err\) \{[\s\S]*?\n    \}/)?.[0] ?? '';
+  assert(catchBlock, '_move muss einen catch-Block besitzen');
+  assert(/this\._cats = snapshot/.test(catchBlock), 'catch muss this._cats auf den Snapshot zurücksetzen');
+  assert(/this\._renderList\(\)/.test(catchBlock), 'catch muss die wiederhergestellte Liste neu rendern');
+  assert(!/this\._notifyChanged\(\)/.test(catchBlock), 'catch darf kein shopping-categories-changed dispatchen');
+});
+
+test('Shopping-Seite räumt den shopping-categories-changed-Listener in onClose ab', () => {
+  const source = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
+  const fn = source.match(/async function openCategoryManager[\s\S]*?\n\}/)?.[0] ?? '';
+  assert(fn, 'openCategoryManager muss auffindbar sein');
+  // Manager-Referenz im äußeren Scope, damit onClose ihn abräumen kann (kein Leak bei Modal-Reuse).
+  assert(/let manager = null/.test(fn), 'Manager-Referenz muss im äußeren Scope gehalten werden');
+  assert(/manager\.addEventListener\('shopping-categories-changed'/.test(fn), 'onSave muss den Listener registrieren');
+  assert(/manager\?\.removeEventListener\('shopping-categories-changed'/.test(fn), 'onClose muss den Listener wieder entfernen');
+});
+
 let listId, list2Id, itemId1, itemId2, itemId3;
 
 // --------------------------------------------------------

@@ -168,6 +168,10 @@ if (process.env.NODE_ENV === 'production' && process.env.ENABLE_API_DOCS !== 'tr
 app.use(express.static(path.join(import.meta.dirname, '..', 'public'), {
   etag: true,
   lastModified: true,
+  // Kein automatischer Trailing-Slash-Redirect für Verzeichnisse (z. B. /settings →
+  // /settings/), sonst kollidiert das public/settings/-Verzeichnis mit der SPA-Route
+  // /settings und der Client-Router landet beim Hard-Load auf dem Dashboard.
+  redirect: false,
   setHeaders(res, filePath) {
     const ext = path.extname(filePath).toLowerCase();
     const isPwaIcon = /\/icons\/(icon-|apple-touch-icon|favicon)/.test(filePath);

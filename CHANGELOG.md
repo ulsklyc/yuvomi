@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.71.4] - 2026-06-11
+
+### Changed
+- **Faster Settings navigation**: switching between settings pages now swaps only the content area instead of re-rendering the whole screen. The side menu stays put and pages change instantly — without a reload, an extra authentication round-trip, or a slide animation. Browser back/forward between settings pages is just as fast.
+- **Consistent Settings headings**: section headings are now larger than the cards they group, fixing an inverted type hierarchy where group titles appeared smaller than the content beneath them.
+
+## [0.71.3] - 2026-06-11
+
+### Changed
+- **WebDAV backup default path**: changed from `/oikos/backups/` to `/yuvomi/backups/` to reflect the app rename. Existing installations with a saved or explicitly configured path are not affected.
+
+## [0.71.2] - 2026-06-11
+
+### Fixed
+- **Settings credentials inputs**: replaced incorrect `autocomplete="new-password"` with `current-password` on external-service password fields (WebDAV document storage, DMS token), and replaced `autocomplete="username"` with `off` on external-service username fields (WebDAV backup, CalDAV, CardDAV, document storage) to prevent browsers from auto-filling app login credentials into unrelated service forms.
+
+## [0.71.1] - 2026-06-11
+
+### Fixed
+- **Calendar week and day view timeline**: hour labels on the left now respect the AM/PM time format preference. Previously the timeline always showed 24-hour labels even when AM/PM was selected in Settings.
+
+### Security
+- **Storage test endpoint**: added SSRF pre-flight check to `/storage/test` so UI-initiated connectivity tests cannot reach private, loopback, or link-local addresses.
+
+## [0.71.0] - 2026-06-11
+
+### Changed
+- **Settings reorganized into five clear areas**: Settings is now grouped into **Personal**, **Modules**, **Sync**, **Documents**, and **Administration**, each with its own focused pages instead of one long row of tabs. Members see only Personal; administrators see everything. On a wide screen a sticky side menu keeps every page one click away; on a phone you drill down from an overview into an area and into a page, with breadcrumbs and a working Back button. Each page loads on demand and remembers where you were.
+- **Synchronization is organized by what you sync** — separate **Calendar**, **Contacts**, and **Reminders** pages, each opening with a clear connection status. CalDAV and Webcal/ICS are front and center; Google and Apple/iCloud now live under a **"More providers"** section, with Apple marked as legacy and new iCloud users pointed at the standard CalDAV setup.
+- **Documents has its own area** with separate **Document storage** (local/WebDAV) and **Document management (Paperless/DMS)** pages; database-backup settings stay under Administration.
+- **Kitchen is one place in the navigation**: Meals, Recipes, and Shopping are grouped under a single **Kitchen** entry you can reorder as one item, while each still has its own page. The main navigation is grouped into **Overview**, **Plan**, and **Home**.
+- **Shopping categories are managed inside Shopping** (via a "Manage categories" action) instead of in Settings. Old Settings links and bookmarks are redirected to the right new place automatically.
+
+### Fixed
+- **Opening Settings directly now works reliably**: loading, refreshing, or bookmarking the Settings URL no longer occasionally lands on the dashboard.
+
 ## [0.70.2] - 2026-06-10
 
 ### Security

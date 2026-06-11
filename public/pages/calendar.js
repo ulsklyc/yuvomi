@@ -1221,7 +1221,7 @@ function renderWeekView(container) {
           <div class="week-view__times">
             ${Array.from({ length: 24 }, (_, h) => `
               <div class="week-view__time-slot" style="height:${HOUR_HEIGHT}px;">
-                <span class="week-view__time-label">${h === 0 ? '' : `${pad(h)}:00`}</span>
+                <span class="week-view__time-label">${h === 0 ? '' : formatTime(new Date(2000, 0, 1, h, 0, 0))}</span>
               </div>
             `).join('')}
           </div>
@@ -1414,7 +1414,7 @@ function renderDayView(container) {
           <div class="day-view__times">
             ${Array.from({ length: 24 }, (_, h) => `
               <div class="week-view__time-slot" style="height:${HOUR_HEIGHT}px;">
-                <span class="week-view__time-label">${h === 0 ? '' : `${pad(h)}:00`}</span>
+                <span class="week-view__time-label">${h === 0 ? '' : formatTime(new Date(2000, 0, 1, h, 0, 0))}</span>
               </div>
             `).join('')}
           </div>

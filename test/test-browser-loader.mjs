@@ -12,7 +12,14 @@ const STUBS = {
       get: async () => ({ data: null }),
       post: async () => ({ data: null }),
       put: async () => ({ data: null }),
+      patch: async () => ({ data: null }),
       delete: async () => ({ data: null }),
+    };
+    export const auth = {
+      me: async () => ({ user: null }),
+      getUsers: async () => ({ data: [] }),
+      logout: async () => ({ ok: true }),
+      updateProfile: async () => ({ user: null }),
     };
   `,
   '/i18n.js': `
@@ -72,6 +79,16 @@ const STUBS = {
   `,
   '/utils/kitchen-tabs.js': `
     export const renderKitchenTabsBar = () => {};
+  `,
+  '/utils/pwa-install.js': `
+    export const getPwaInstallState = () => ({
+      installed: false,
+      ios: false,
+      canPrompt: false,
+      supported: false,
+    });
+    export const onPwaInstallStateChanged = () => () => {};
+    export const promptPwaInstall = async () => ({ outcome: 'unavailable' });
   `,
   '/utils/date.js': `
     const pad = (n) => String(n).padStart(2, '0');

@@ -10,6 +10,7 @@ import { esc } from '/utils/html.js';
 import { init as initReminders, stop as stopReminders } from '/reminders.js';
 import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
 import { NAV_ICONS } from '/nav-icons.js';
+import { SETTINGS_LEAVES } from '/settings/registry.js';
 
 // --------------------------------------------------------
 // Routen-Definitionen
@@ -30,8 +31,17 @@ const ROUTES = [
   { path: '/budget',   page: '/pages/budget.js',    requiresAuth: true, module: 'budget'    },
   { path: '/documents', page: '/pages/documents.js', requiresAuth: true, module: 'documents' },
   { path: '/housekeeping', page: '/pages/housekeeping.js', requiresAuth: true, module: 'housekeeping' },
-  { path: '/settings', page: '/pages/settings.js',  requiresAuth: true, module: 'settings'  },
 ];
+
+// Settings ist eine Sektion mit einer Wurzel und je einer exakten Route pro
+// Blatt (Leaf). Die Routen werden aus der Registry abgeleitet, damit es keine
+// doppelten Pfad-Definitionen gibt.
+const SETTINGS_ROUTES = [
+  { path: '/settings', page: '/pages/settings.js', requiresAuth: true, module: 'settings' },
+  ...SETTINGS_LEAVES.map(({ path }) => ({ path, page: '/pages/settings.js', requiresAuth: true, module: 'settings' })),
+];
+
+ROUTES.push(...SETTINGS_ROUTES);
 
 // --------------------------------------------------------
 // Standalone-Modus: Dynamische theme-color Anpassung
@@ -127,6 +137,12 @@ async function importPage(pagePath) {
 let currentUser = null;
 let currentPath = null;
 let isNavigating = false;
+// Zuletzt erfolgreich gerendertes Seiten-Modul. Erlaubt Soft-Navigation
+// innerhalb desselben Moduls (z. B. Settings-Blatt → Blatt): Statt das Modul
+// komplett neu zu rendern (Teardown + Slide-Transition), tauscht das Modul über
+// seine optionale update()-Funktion nur den betroffenen Detailbereich aus.
+let _renderedModule = null;
+let _renderedModuleName = null;
 let _preferencesLoaded = false;
 let _disabledModules = new Set();
 let _thirdPartyModules = [];
@@ -147,14 +163,34 @@ const ROUTE_ORDER = ['/', '/calendar', '/tasks', '/meals', '/recipes', '/shoppin
 
 const PRIMARY_NAV = 4;
 
+// Domänen-Gruppierung der Haupt-Navigation. Die Reihenfolge bestimmt die
+// Sortierung der Sektionen (Overview → Plan → Home); die Label-Keys werden in
+// der Sidebar via t() aufgelöst.
+const NAV_SECTION = Object.freeze({ overview: 0, plan: 1, home: 2 });
+const NAV_SECTION_LABEL_KEYS = Object.freeze({
+  [NAV_SECTION.overview]: 'nav.sectionOverview',
+  [NAV_SECTION.plan]: 'nav.sectionPlan',
+  [NAV_SECTION.home]: 'nav.sectionHome',
+});
+
 const DEFAULT_APP_NAME = 'Yuvomi';
 const APP_NAME_STORAGE_KEY = 'oikos-app-name';
 const APP_VERSION_STORAGE_KEY = 'oikos-app-version';
 
+// Reduziert einen (Sub-)Pfad auf seine Top-Level-Sektion. /settings/* Blätter
+// teilen sich dadurch eine Sektion: ein Wechsel zwischen zwei Settings-Blättern
+// gilt als gleiche Sektion (keine seitliche Seitentransition).
+function topLevelSection(path) {
+  if (typeof path === 'string' && path.startsWith('/settings')) return '/settings';
+  return path ?? '/';
+}
+
 function getDirection(fromPath, toPath) {
-  const fromIdx = ROUTE_ORDER.indexOf(fromPath ?? '/');
-  const toIdx   = ROUTE_ORDER.indexOf(toPath);
-  if (fromIdx === -1 || toIdx === -1 || fromPath === toPath) return 'right';
+  const fromSection = topLevelSection(fromPath ?? '/');
+  const toSection   = topLevelSection(toPath);
+  const fromIdx = ROUTE_ORDER.indexOf(fromSection);
+  const toIdx   = ROUTE_ORDER.indexOf(toSection);
+  if (fromIdx === -1 || toIdx === -1 || fromSection === toSection) return 'right';
   return toIdx > fromIdx ? 'right' : 'left';
 }
 
@@ -185,6 +221,7 @@ function setAppVersion(version) {
 }
 
 function routeTitle(path) {
+  if (typeof path === 'string' && path.startsWith('/settings')) return t('nav.settings');
   const map = {
     '/': t('dashboard.title'),
     '/tasks': t('nav.tasks'),
@@ -198,7 +235,6 @@ function routeTitle(path) {
     '/budget': t('nav.budget'),
     '/documents': t('nav.documents'),
     '/housekeeping': t('nav.housekeeping'),
-    '/settings': t('nav.settings'),
   };
   return map[path] || _thirdPartyModules.find((module) => module.route?.path === path)?.menu?.label || getAppName();
 }
@@ -393,11 +429,40 @@ async function navigate(path, userOrPushState = true, pushState = true) {
       history.pushState({ path }, '', path);
     }
 
+    // Soft-Navigation innerhalb desselben Moduls (z. B. Settings-Blatt → Blatt
+    // oder Browser-Zurück innerhalb der Einstellungen): Das bereits gerenderte
+    // Modul tauscht nur seinen Detailbereich aus — keine App-Shell-Teardown,
+    // keine Slide-Transition, kein erneuter Auth-Refresh. Gibt update() false
+    // zurück (z. B. Redirect nötig), fällt die Navigation auf das volle Rendern
+    // zurück.
+    if (
+      route.module
+      && route.module === _renderedModuleName
+      && typeof _renderedModule?.update === 'function'
+    ) {
+      let handled = false;
+      try {
+        handled = await _renderedModule.update({
+          user: currentUser,
+          path: basePath,
+          query: new URLSearchParams(path.split('?')[1] ?? ''),
+        });
+      } catch (error) {
+        console.error('[Router] Soft-Update fehlgeschlagen, vollständiges Rendern folgt:', error);
+        handled = false;
+      }
+      if (handled) {
+        updateNav(topLevelSection(basePath));
+        return;
+      }
+    }
+
     const accent = route?.thirdPartyModule?.accent || (route?.module ? getCSSToken(`--module-${route.module}`) : '');
     document.documentElement.style.setProperty('--active-module-accent', accent);
 
     await renderPage(route, previousPath);
-    updateNav(basePath);
+    // Settings-Blätter teilen sich den /settings Nav-Eintrag (aria-current).
+    updateNav(topLevelSection(basePath));
     updateThemeColorForRoute(route);
     updateBranding(basePath);
     focusMainContentAfterNavigation(basePath);
@@ -545,7 +610,16 @@ async function renderPage(route, previousPath = null) {
     content.replaceChildren(pageWrapper);
     style.cleanup();
 
+    // Teardown abgeschlossen: ein evtl. gemerktes Soft-Update-Ziel ist jetzt
+    // ungültig, bis das neue Modul erfolgreich gerendert hat.
+    _renderedModule = null;
+    _renderedModuleName = null;
+
     await module.render(pageWrapper, { user: currentUser });
+
+    // Ab hier kann das Modul Soft-Navigationen bedienen (sofern es update() bietet).
+    _renderedModule = module;
+    _renderedModuleName = route.module;
 
     // FAB Long Loop: Einstiegsanimation nach FAB_SEEN_MAX Views pro Modul deaktivieren
     if (pageWrapper.querySelector('.page-fab')) {
@@ -1322,21 +1396,23 @@ function navItems() {
     ];
   }
   const baseItems = [
-    { path: '/',          label: t('nav.dashboard'), icon: 'layout-dashboard', module: 'dashboard' },
-    { path: '/calendar',  label: t('nav.calendar'),  icon: 'calendar',         module: 'calendar'  },
-    { path: '/tasks',     label: t('nav.tasks'),     icon: 'check-square',     module: 'tasks'     },
-    { path: '/notes',     label: t('nav.notes'),     icon: 'sticky-note',      module: 'notes'     },
-    // More-Sheet Items:
-    { path: '/birthdays', label: t('nav.birthdays'), icon: 'cake',             module: 'birthdays' },
-    { path: '/contacts',  label: t('nav.contacts'),  icon: 'book-user',        module: 'contacts'  },
-    { path: '/budget',    label: t('nav.budget'),    icon: 'wallet',           module: 'budget'    },
-    { path: '/documents', label: t('nav.documents'), icon: 'folder-lock',      module: 'documents' },
-    { path: '/housekeeping', label: t('nav.housekeeping'), icon: 'paintbrush', module: 'housekeeping' },
-    { path: '/settings',  label: t('nav.settings'),  icon: 'settings',         module: 'settings'  },
-    // Kitchen-Gruppe: via Küche-Nav-Button (Bottom-Nav + Sidebar) + kitchen-tabs-bar erreichbar
-    { path: '/meals',     label: t('nav.meals'),     icon: 'utensils',      module: 'meals',    kitchenGroup: true },
-    { path: '/recipes',   label: t('nav.recipes'),   icon: 'book-text',     module: 'recipes',  kitchenGroup: true },
-    { path: '/shopping',  label: t('nav.shopping'),  icon: 'shopping-cart', module: 'shopping', kitchenGroup: true },
+    // Overview
+    { path: '/',          label: t('nav.dashboard'), icon: 'layout-dashboard', module: 'dashboard', section: NAV_SECTION.overview },
+    // Plan
+    { path: '/calendar',  label: t('nav.calendar'),  icon: 'calendar',         module: 'calendar',  section: NAV_SECTION.plan },
+    { path: '/tasks',     label: t('nav.tasks'),     icon: 'check-square',     module: 'tasks',     section: NAV_SECTION.plan },
+    { path: '/notes',     label: t('nav.notes'),     icon: 'sticky-note',      module: 'notes',     section: NAV_SECTION.plan },
+    // Home — Kitchen-Gruppe zuerst, dann die übrigen Haushalts-Module
+    { path: '/meals',     label: t('nav.meals'),     icon: 'utensils',      module: 'meals',    section: NAV_SECTION.home, kitchenGroup: true },
+    { path: '/recipes',   label: t('nav.recipes'),   icon: 'book-text',     module: 'recipes',  section: NAV_SECTION.home, kitchenGroup: true },
+    { path: '/shopping',  label: t('nav.shopping'),  icon: 'shopping-cart', module: 'shopping', section: NAV_SECTION.home, kitchenGroup: true },
+    { path: '/contacts',  label: t('nav.contacts'),  icon: 'book-user',        module: 'contacts',    section: NAV_SECTION.home },
+    { path: '/birthdays', label: t('nav.birthdays'), icon: 'cake',             module: 'birthdays',   section: NAV_SECTION.home },
+    { path: '/budget',    label: t('nav.budget'),    icon: 'wallet',           module: 'budget',      section: NAV_SECTION.home },
+    { path: '/documents', label: t('nav.documents'), icon: 'folder-lock',      module: 'documents',   section: NAV_SECTION.home },
+    { path: '/housekeeping', label: t('nav.housekeeping'), icon: 'paintbrush', module: 'housekeeping', section: NAV_SECTION.home },
+    // Settings ist am Ende gepinnt (siehe unten).
+    { path: '/settings',  label: t('nav.settings'),  icon: 'settings',         module: 'settings',    section: NAV_SECTION.home },
   ];
   const thirdPartyItems = _thirdPartyModules
     .filter((module) => module.enabled && module.status === 'enabled' && module.menu?.show && module.route?.path)
@@ -1347,6 +1423,8 @@ function navItems() {
       module: `third-party-${module.id}`,
       accent: module.accent,
       order: module.menu.order ?? 1000,
+      // Drittanbieter-Module folgen dem bestehenden Platzierungsverhalten am Ende der Home-Sektion.
+      section: NAV_SECTION.home,
     }))
     .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
   const settings = baseItems.find((item) => item.module === 'settings');
@@ -1356,6 +1434,9 @@ function navItems() {
   ];
   const orderIndex = new Map(_moduleOrder.map((id, index) => [id, index]));
   sortable.sort((a, b) => {
+    // Sektionen (Overview → Plan → Home) bestimmen die Gruppierung; innerhalb
+    // einer Sektion entscheidet die nutzerdefinierte Modul-Reihenfolge.
+    if (a.section !== b.section) return a.section - b.section;
     const ai = orderIndex.has(a.module) ? orderIndex.get(a.module) : Number.MAX_SAFE_INTEGER;
     const bi = orderIndex.has(b.module) ? orderIndex.get(b.module) : Number.MAX_SAFE_INTEGER;
     if (ai !== bi) return ai - bi;
@@ -1374,10 +1455,23 @@ function sidebarNavItems() {
   elements.push(indicator);
 
   let kitchenAdded = false;
-  let nonKitchenCount = 0;
-  let sectionAdded = false;
+  let currentSection = null;
+
+  const pushSectionLabel = (section) => {
+    if (section === currentSection) return;
+    currentSection = section;
+    const labelKey = NAV_SECTION_LABEL_KEYS[section];
+    if (!labelKey) return;
+    const label = document.createElement('div');
+    label.className = 'nav-section-label';
+    label.textContent = t(labelKey);
+    elements.push(label);
+  };
 
   navItems().forEach((item) => {
+    // Settings ist gepinnt und gehört zu keiner sichtbaren Sektionsgruppe.
+    if (item.module !== 'settings') pushSectionLabel(item.section);
+
     if (item.kitchenGroup) {
       if (!kitchenAdded) {
         elements.push(sidebarKitchenEl());
@@ -1385,15 +1479,6 @@ function sidebarNavItems() {
       }
       return;
     }
-    // Abschnittsbezeichnung vor dem (PRIMARY_NAV+1)ten Nicht-Küche-Eintrag
-    if (!sectionAdded && nonKitchenCount === PRIMARY_NAV) {
-      sectionAdded = true;
-      const label = document.createElement('div');
-      label.className = 'nav-section-label';
-      label.textContent = t('nav.section.household');
-      elements.push(label);
-    }
-    nonKitchenCount++;
     elements.push(navItemEl(item));
   });
   return elements;

@@ -4,7 +4,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { SETTINGS_DOMAINS, SETTINGS_LEAVES } from '../public/settings/registry.js';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r/g, '');
 
@@ -64,6 +65,7 @@ function assertRuleUsesToken(css, selector, property, token, file) {
 test('audited frontend files do not assign innerHTML', () => {
   const files = [
     '../public/components/oikos-install-prompt.js',
+    '../public/components/shopping-category-manager.js',
     '../public/pages/notes.js',
     '../public/pages/meals.js',
     '../public/pages/contacts.js',
@@ -115,6 +117,50 @@ test('dynamic frontend translation key domains exist in every locale', () => {
   assertKeysExistInEveryLocale(keys);
 });
 
+test('settings information-architecture keys exist in every locale', () => {
+  const keys = new Set();
+
+  // Registry-derived labels/descriptions — the source of truth, never duplicated here.
+  for (const domain of SETTINGS_DOMAINS) keys.add(domain.labelKey);
+  for (const leaf of SETTINGS_LEAVES) {
+    keys.add(leaf.labelKey);
+    keys.add(leaf.descriptionKey);
+  }
+
+  // Shared Settings-IA copy that lives outside the registry but is part of the same surface.
+  [
+    // Shell chrome + overview headings.
+    'settings.title',
+    'settings.navigationLabel',
+    'settings.breadcrumbLabel',
+    'settings.backToSettings',
+    'settings.loadError',
+    'settings.retry',
+    // Domain + mobile overview labels.
+    'settings.mobileOverviewTitle',
+    'settings.mobileOverviewDescription',
+    'settings.mobileDomainTitle',
+    // Status-first integration copy + progressive disclosure.
+    'settings.providerSpecific',
+    'settings.moreProviders',
+    // Apple-legacy copy.
+    'settings.legacy',
+    'settings.appleLegacyHint',
+    // Document backup warning.
+    'settings.documentStorageBackupWarning',
+    // Kitchen active count.
+    'settings.kitchenActiveCount',
+    // App navigation section labels.
+    'nav.sectionOverview',
+    'nav.sectionPlan',
+    'nav.sectionHome',
+    // Unauthorized / access-redirected notice.
+    'settings.accessRedirected',
+  ].forEach((key) => keys.add(key));
+
+  assertKeysExistInEveryLocale([...keys]);
+});
+
 test('service worker precaches every supported locale file', () => {
   const i18n = read('../public/i18n.js');
   const sw = read('../public/sw.js');
@@ -158,9 +204,660 @@ test('shared sub-tabs wire tabs to panels with aria-controls and aria-labelledby
 });
 
 test('settings theme toggle exposes pressed state', () => {
-  const source = read('../public/pages/settings.js');
+  const source = read('../public/settings/pages/personal-appearance.js');
   assert.match(source, /aria-pressed/);
   assert.match(source, /setAttribute\('aria-pressed'/);
+});
+
+test('personal settings leaves exist and export async render functions', () => {
+  const files = [
+    '../public/settings/pages/personal-account.js',
+    '../public/settings/pages/personal-appearance.js',
+    '../public/settings/pages/personal-device.js',
+  ];
+
+  for (const file of files) {
+    assert.equal(existsSync(new URL(file, import.meta.url)), true, `${file} must exist`);
+    assert.match(read(file), /export async function render\(container,\s*\{\s*user\s*\}\)/);
+  }
+});
+
+test('personal account leaf preserves self-profile, password, and logout contracts', () => {
+  const source = read('../public/settings/pages/personal-account.js');
+
+  assert.match(source, /await auth\.me\(\)/);
+  assert.match(source, /Object\.assign\(user,\s*.*user/);
+  assert.match(source, /auth\.updateProfile\(\{/);
+  assert.match(source, /avatar_data:/);
+  assert.match(source, /phone:/);
+  assert.match(source, /email:/);
+  assert.match(source, /birth_date:/);
+  assert.match(source, /api\.patch\('\/auth\/me\/password',\s*\{\s*current_password:/);
+  assert.match(source, /await auth\.logout\(\)/);
+  assert.match(source, /window\.oikos\?\.navigate\('\/login'\)/);
+  assert.match(source, /id="profile-avatar-file"[^>]*aria-label=/);
+  assert.match(source, /id="profile-avatar-file"[^>]*tabindex="-1"/);
+  assert.match(source, /id="profile-avatar-file"[^>]*aria-describedby="profile-error"/);
+  assert.match(source, /id="profile-error"[^>]*role="alert"/);
+  assert.match(source, /id="password-error"[^>]*role="alert"/);
+  assert.match(source, /id="profile-display-name"[^>]*aria-describedby="profile-error"/);
+  assert.match(source, /id="profile-phone"[^>]*aria-describedby="profile-error"/);
+  assert.match(source, /id="profile-email"[^>]*aria-describedby="profile-error"/);
+  assert.match(source, /id="profile-birth-date"[^>]*aria-describedby="profile-error"/);
+  assert.match(source, /id="current-password"[^>]*aria-describedby="password-error"/);
+  assert.match(source, /id="new-password"[^>]*aria-describedby="password-error"/);
+  assert.match(source, /id="confirm-password"[^>]*aria-describedby="password-error"/);
+  assert.match(source, /role="alert"[^>]*>\$\{t\('settings\.loadError'\)\}/);
+});
+
+test('personal appearance leaf owns theme, locale, and regional preferences', () => {
+  const source = read('../public/settings/pages/personal-appearance.js');
+
+  assert.match(source, /await api\.get\('\/preferences'\)/);
+  assert.match(source, /getSupportedLocales\(\)/);
+  assert.match(source, /setLocale\(/);
+  assert.match(source, /aria-pressed/);
+  assert.match(source, /setAttribute\('aria-pressed'/);
+  assert.match(source, /data-lucide="monitor"/);
+  assert.match(source, /data-lucide="sun"/);
+  assert.match(source, /data-lucide="moon"/);
+  assert.match(source, /date_format/);
+  assert.match(source, /time_format/);
+  assert.match(source, /api\.put\('\/preferences'/);
+  assert.match(source, /function safeStorageGet\(/);
+  assert.match(source, /function safeStorageSet\(/);
+  assert.match(source, /function safeStorageRemove\(/);
+  assert.match(source, /function safeStorageGet[\s\S]*try \{[\s\S]*localStorage\.getItem[\s\S]*catch/);
+  assert.match(source, /function safeStorageSet[\s\S]*try \{[\s\S]*localStorage\.setItem[\s\S]*catch/);
+  assert.match(source, /function safeStorageRemove[\s\S]*try \{[\s\S]*localStorage\.removeItem[\s\S]*catch/);
+  assert.equal([...source.matchAll(/localStorage\.getItem/g)].length, 1);
+  assert.equal([...source.matchAll(/localStorage\.setItem/g)].length, 1);
+  assert.equal([...source.matchAll(/localStorage\.removeItem/g)].length, 1);
+  assert.match(source, /function bindEvents\(container,\s*user\)/);
+  assert.match(source, /await setLocale\(locale\);[\s\S]*await render\(container,\s*\{\s*user\s*\}\)/);
+  assert.match(source, /if \(localeSelect\.isConnected\)\s*localeSelect\.disabled = false/);
+  assert.match(source, /id="locale-error"[^>]*role="alert"/);
+  assert.match(source, /id="date-format-error"[^>]*role="alert"/);
+  assert.match(source, /id="time-format-error"[^>]*role="alert"/);
+  assert.match(source, /id="locale-select"[^>]*aria-describedby="locale-error"/);
+  assert.match(source, /id="date-format-select"[^>]*aria-describedby="date-format-error"/);
+  assert.match(source, /id="time-format-select"[^>]*aria-describedby="time-format-error"/);
+  assert.match(source, /role="alert"[^>]*>\$\{t\('settings\.loadError'\)\}/);
+});
+
+test('personal device leaf owns PWA installation state and disconnect cleanup', () => {
+  const source = read('../public/settings/pages/personal-device.js');
+
+  assert.match(
+    source,
+    /import \{\s*getPwaInstallState,\s*onPwaInstallStateChanged,\s*promptPwaInstall\s*\} from '\/utils\/pwa-install\.js';/,
+  );
+  assert.match(source, /onPwaInstallStateChanged\(/);
+  assert.match(source, /promptPwaInstall\(\)/);
+  assert.match(source, /!container\.isConnected/);
+  assert.match(source, /if \(unsubscribed\) return/);
+  assert.match(source, /stopListening\(\)/);
+  assert.match(source, /new MutationObserver\(/);
+  // Cleanup observes only the router's persistent swap container (#main-content),
+  // not the whole document.body subtree (which fires on every app DOM mutation).
+  assert.match(source, /getElementById\('main-content'\)/);
+  assert.match(source, /observer\.observe\(swapRoot, \{ childList: true \}\)/);
+  assert.doesNotMatch(source, /subtree:\s*true/);
+  assert.match(source, /observer\?\.disconnect\(\)/);
+  assert.match(source, /id="pwa-install-status"[^>]*aria-live=/);
+  assert.match(source, /id="pwa-install-error"[^>]*role="alert"/);
+  assert.match(source, /id="pwa-install-btn"[^>]*aria-describedby="pwa-install-status pwa-install-error"/);
+});
+
+test('module-specific settings leaves exist and export async render functions', () => {
+  const files = [
+    '../public/settings/pages/modules-kitchen.js',
+    '../public/settings/pages/modules-calendar.js',
+    '../public/settings/pages/modules-budget.js',
+    '../public/settings/pages/modules-housekeeping.js',
+    '../public/settings/pages/modules-dashboard.js',
+  ];
+
+  for (const file of files) {
+    assert.equal(existsSync(new URL(file, import.meta.url)), true, `${file} must exist`);
+    const source = read(file);
+    assert.match(source, /export async function render\(container,\s*\{\s*user\s*\}\)/);
+    assert.doesNotMatch(source, /\.innerHTML\s*=/, `${file} must not assign innerHTML`);
+    assert.doesNotMatch(source, /\bfetch\(/, `${file} must use the shared API client`);
+  }
+});
+
+test('module-specific settings leaves only reference their owned preferences and endpoints', () => {
+  const ownership = {
+    '../public/settings/pages/modules-kitchen.js': {
+      endpoints: ['/preferences'],
+      preferences: ['visible_meal_types'],
+    },
+    '../public/settings/pages/modules-calendar.js': {
+      endpoints: [
+        '/preferences',
+        '/preferences/holidays/countries',
+        '/preferences/holidays/subdivisions/',
+        '/preferences/holidays/sync',
+      ],
+      preferences: [
+        'holiday_country',
+        'holiday_subdivision',
+        'holiday_show_public',
+        'holiday_show_school',
+        'holiday_public_color',
+        'holiday_school_color',
+        'holiday_last_sync',
+      ],
+    },
+    '../public/settings/pages/modules-budget.js': {
+      endpoints: ['/preferences'],
+      preferences: ['currency'],
+    },
+    '../public/settings/pages/modules-housekeeping.js': {
+      endpoints: ['/preferences'],
+      preferences: ['housekeeping_payment_tasks'],
+    },
+    '../public/settings/pages/modules-dashboard.js': {
+      endpoints: ['/preferences'],
+      preferences: [
+        'app_name',
+        'weather_provider',
+        'weather_lat',
+        'weather_lon',
+        'weather_city',
+        'weather_units',
+      ],
+    },
+  };
+
+  for (const [file, approved] of Object.entries(ownership)) {
+    const source = read(file);
+    const endpoints = [
+      ...source.matchAll(/\bapi\.(?:get|put|post|patch|delete)\(\s*`([^`$]*)/g),
+      ...source.matchAll(/\bapi\.(?:get|put|post|patch|delete)\(\s*['"]([^'"]+)/g),
+    ].map((match) => match[1]);
+    const preferenceKeys = new Set(
+      [...source.matchAll(/\b(?:preferences|preferenceData)\.([a-z][a-z0-9_]*)/g)]
+        .map((match) => match[1]),
+    );
+    for (const match of source.matchAll(/api\.put\(\s*['"]\/preferences['"]\s*,\s*\{([\s\S]*?)\}\s*\)/g)) {
+      for (const keyMatch of match[1].matchAll(/\b([a-z][a-z0-9_]*)\s*:/g)) {
+        preferenceKeys.add(keyMatch[1]);
+      }
+    }
+
+    assert.deepEqual(
+      [...new Set(endpoints)].sort(),
+      [...approved.endpoints].sort(),
+      `${file} must only call its approved endpoints`,
+    );
+    assert.deepEqual(
+      [...preferenceKeys].sort(),
+      [...approved.preferences].sort(),
+      `${file} must only reference its owned preference keys`,
+    );
+  }
+});
+
+test('module-specific settings leaves preserve their required controls and behaviors', () => {
+  const kitchen = read('../public/settings/pages/modules-kitchen.js');
+  assert.match(kitchen, /const MEAL_TYPES = \['breakfast', 'lunch', 'dinner', 'snack'\]/);
+  assert.match(kitchen, /await api\.get\('\/preferences'\)/);
+  assert.match(kitchen, /api\.put\('\/preferences', \{ visible_meal_types: checkedMealTypes \}\)/);
+  assert.match(kitchen, /MEAL_TYPES\.map\(/);
+  assert.doesNotMatch(kitchen, /\/(?:recipes|shopping)|shopping\/categories|recipe_settings|shopping_settings/);
+
+  const calendar = read('../public/settings/pages/modules-calendar.js');
+  for (const id of [
+    'holiday-country',
+    'holiday-subdivision',
+    'holiday-show-public',
+    'holiday-public-color',
+    'holiday-show-school',
+    'holiday-school-color',
+    'holiday-sync-btn',
+  ]) {
+    assert.match(calendar, new RegExp(`id="${id}"`));
+  }
+  assert.match(calendar, /api\.get\('\/preferences\/holidays\/countries'\)/);
+  assert.match(calendar, /api\.get\(`\/preferences\/holidays\/subdivisions\/\$\{countryCode\}`\)/);
+  assert.match(calendar, /api\.post\('\/preferences\/holidays\/sync', \{\}\)/);
+  assert.doesNotMatch(calendar, /caldav|carddav|google|apple|subscriptions|sync accounts/i);
+  assert.doesNotMatch(calendar, /#[0-9a-f]{6}/i);
+  assert.match(calendar, /id="holiday-country" disabled/);
+  assert.ok(
+    calendar.indexOf("form.addEventListener('submit'") <
+      calendar.indexOf('const countriesResult = await runHolidayDiscovery'),
+    'Calendar must bind submit handling before loading holiday discovery data',
+  );
+
+  const budget = read('../public/settings/pages/modules-budget.js');
+  assert.match(budget, /id="currency-select"/);
+  assert.match(budget, /api\.put\('\/preferences', \{ currency: currencySelect\.value \}\)/);
+  assert.equal([...budget.matchAll(/<(?:input|select|textarea)\b/g)].length, 1);
+
+  const housekeeping = read('../public/settings/pages/modules-housekeeping.js');
+  assert.match(housekeeping, /id="housekeeping-payment-tasks"/);
+  assert.match(
+    housekeeping,
+    /api\.put\('\/preferences', \{ housekeeping_payment_tasks: toggle\.checked \}\)/,
+  );
+  assert.equal([...housekeeping.matchAll(/<(?:input|select|textarea)\b/g)].length, 1);
+
+  const dashboard = read('../public/settings/pages/modules-dashboard.js');
+  for (const id of [
+    'weather-lat',
+    'weather-lon',
+    'weather-city',
+    'weather-units',
+    'app-name-input',
+  ]) {
+    assert.match(dashboard, new RegExp(`id="${id}"`));
+  }
+  assert.match(dashboard, /weather_provider: 'open-meteo'/);
+  assert.match(dashboard, /weather_provider: null/);
+  assert.match(dashboard, /latitude >= -90/);
+  assert.match(dashboard, /latitude <= 90/);
+  assert.match(dashboard, /longitude >= -180/);
+  assert.match(dashboard, /longitude <= 180/);
+  assert.match(dashboard, /localStorage\.setItem\(key, value\)/);
+  assert.match(dashboard, /localStorage\.removeItem\(key\)/);
+  assert.match(dashboard, /new CustomEvent\('app-name-changed'/);
+  assert.match(dashboard, /window\.oikos\?\.showToast/);
+  assert.match(dashboard, /await render\(container, \{ user \}\)/);
+});
+
+test('synchronization-by-data-type leaves exist and export async render functions', () => {
+  const files = [
+    '../public/settings/pages/sync-calendar.js',
+    '../public/settings/pages/sync-contacts.js',
+    '../public/settings/pages/sync-reminders.js',
+  ];
+
+  for (const file of files) {
+    assert.equal(existsSync(new URL(file, import.meta.url)), true, `${file} must exist`);
+    const source = read(file);
+    assert.match(source, /export async function render\(container,\s*\{[^}]*\}(?:\s*=\s*\{\})?\)/);
+    assert.doesNotMatch(source, /\.innerHTML\s*=/, `${file} must not assign innerHTML`);
+    assert.doesNotMatch(source, /\bfetch\(/, `${file} must use the shared API client`);
+    assert.doesNotMatch(source, /\brequire\(/, `${file} must use import, not require`);
+    assert.match(
+      source,
+      /import \{ api \} from '\/api\.js'/,
+      `${file} must import the shared API client`,
+    );
+  }
+});
+
+test('sync-calendar leaf loads CalDAV, ICS, Google, and Apple with independent status', () => {
+  const source = read('../public/settings/pages/sync-calendar.js');
+
+  // CalDAV calendar account management + status before forms.
+  assert.match(source, /api\.get\('\/calendar\/caldav\/accounts'\)/);
+  assert.match(source, /api\.post\('\/calendar\/caldav\/accounts'/);
+  assert.match(source, /api\.delete\(`\/calendar\/caldav\/accounts\/\$\{[^}]+\}`\)/);
+  assert.match(source, /\/calendar\/caldav\/accounts\/\$\{[^}]+\}\/calendars/);
+  assert.match(source, /api\.post\('\/calendar\/caldav\/sync'\)/);
+  assert.match(source, /createStatusSummary\(/);
+  assert.match(source, /t\('settings\.caldavTitle'\)/);
+  assert.match(source, /enabledCalendarCount/);
+  assert.match(source, /neverSynced/);
+
+  // Webcal / ICS subscriptions.
+  assert.match(source, /api\.get\('\/calendar\/subscriptions'\)/);
+  assert.match(source, /api\.post\('\/calendar\/subscriptions'/);
+  assert.match(source, /api\.patch\(`\/calendar\/subscriptions\/\$\{[^}]+\}`/);
+  assert.match(source, /api\.delete\(`\/calendar\/subscriptions\/\$\{[^}]+\}`\)/);
+
+  // Independent fetches so one failure does not hide the others.
+  assert.match(source, /Promise\.allSettled/);
+
+  // Reminder-list collections must NOT leak into the calendar leaf.
+  assert.doesNotMatch(source, /reminder-lists/);
+  assert.doesNotMatch(source, /\/calendar\/caldav\/reminders\/sync/);
+
+  // Google + Apple live behind one accessible "More providers" disclosure.
+  assert.match(source, /createDisclosure\(/);
+  assert.match(source, /settings\.moreProviders/);
+
+  // Google: provider-specific labelled, all endpoints preserved.
+  assert.match(source, /settings\.providerSpecific/);
+  assert.match(source, /api\.get\('\/calendar\/google\/status'\)/);
+  assert.match(source, /\/api\/v1\/calendar\/google\/auth/);
+  assert.match(source, /api\.post\('\/calendar\/google\/sync'/);
+  assert.match(source, /api\.get\('\/calendar\/google\/calendars'\)/);
+  assert.match(source, /api\.patch\('\/calendar\/google\/calendars'/);
+  assert.match(source, /api\.put\('\/calendar\/google\/readonly'/);
+  assert.match(source, /api\.delete\('\/calendar\/google\/disconnect'\)/);
+
+  // Apple: legacy badge + hint steering new users to CalDAV, endpoints preserved.
+  assert.match(source, /settings\.legacy/);
+  assert.match(source, /settings\.appleLegacyHint/);
+  assert.match(source, /api\.get\('\/calendar\/apple\/status'\)/);
+  assert.match(source, /api\.post\('\/calendar\/apple\/connect'/);
+  assert.match(source, /api\.post\('\/calendar\/apple\/sync'/);
+  assert.match(source, /api\.delete\('\/calendar\/apple\/disconnect'\)/);
+
+  // OAuth callback handling: localized banner, expand disclosure, scrub only callback params.
+  assert.match(source, /sync_ok/);
+  assert.match(source, /sync_error/);
+  assert.match(source, /history\.replaceState/);
+});
+
+test('sync-contacts leaf owns CardDAV account management', () => {
+  const source = read('../public/settings/pages/sync-contacts.js');
+
+  assert.match(source, /api\.get\('\/contacts\/cardav\/accounts'\)/);
+  assert.match(source, /api\.post\('\/contacts\/cardav\/accounts'/);
+  assert.match(source, /api\.delete\(`\/contacts\/cardav\/accounts\/\$\{[^}]+\}`\)/);
+  assert.match(source, /\/contacts\/cardav\/accounts\/\$\{[^}]+\}\/addressbooks/);
+  assert.match(source, /addressbooks\/toggle/);
+  assert.match(source, /addressbooks\/refresh/);
+  assert.match(source, /\/contacts\/cardav\/accounts\/\$\{[^}]+\}\/sync/);
+  assert.match(source, /last_sync/);
+
+  // Contacts leaf must not own calendar or reminder concerns.
+  assert.doesNotMatch(source, /\/calendar\/caldav/);
+  assert.doesNotMatch(source, /\/calendar\/google/);
+  assert.doesNotMatch(source, /\/calendar\/apple/);
+});
+
+test('sync-reminders leaf maps CalDAV reminder lists and syncs without calendars', () => {
+  const source = read('../public/settings/pages/sync-reminders.js');
+
+  // Reuse CalDAV accounts but render only reminder/task collections.
+  assert.match(source, /api\.get\('\/calendar\/caldav\/accounts'\)/);
+  assert.match(source, /reminder-lists/);
+  assert.match(source, /api\.patch\(`\/calendar\/caldav\/accounts\/\$\{[^}]+\}\/reminder-lists`/);
+  assert.match(source, /api\.post\('\/calendar\/caldav\/reminders\/sync'\)/);
+  assert.match(source, /targetModule/);
+  assert.match(source, /settings\.caldavReminderMapTasks/);
+  assert.match(source, /settings\.caldavReminderMapShopping/);
+  assert.match(source, /settings\.caldavRemindersHint/);
+
+  // Calendar collections must NOT appear in the reminders leaf.
+  assert.doesNotMatch(source, /\/calendars\b/);
+  assert.doesNotMatch(source, /\/calendar\/caldav\/sync\b/);
+});
+
+test('documents-domain leaves exist and export async render functions', () => {
+  const files = [
+    '../public/settings/pages/documents-storage.js',
+    '../public/settings/pages/documents-dms.js',
+  ];
+
+  for (const file of files) {
+    assert.equal(existsSync(new URL(file, import.meta.url)), true, `${file} must exist`);
+    const source = read(file);
+    assert.match(source, /export async function render\(container,\s*\{[^}]*\}(?:\s*=\s*\{\})?\)/);
+    assert.doesNotMatch(source, /\.innerHTML\s*=/, `${file} must not assign innerHTML`);
+    assert.doesNotMatch(source, /\bfetch\(/, `${file} must use the shared API client`);
+    assert.doesNotMatch(source, /\brequire\(/, `${file} must use import, not require`);
+    assert.match(
+      source,
+      /import \{ api \} from '\/api\.js'/,
+      `${file} must import the shared API client`,
+    );
+  }
+});
+
+test('documents-storage leaf owns WebDAV document storage with a status-first layout', () => {
+  const source = read('../public/settings/pages/documents-storage.js');
+
+  // Storage config + test endpoints preserved unchanged.
+  assert.match(source, /api\.get\('\/documents\/storage\/config'\)/);
+  assert.match(source, /api\.put\('\/documents\/storage\/config'/);
+  assert.match(source, /api\.post\('\/documents\/storage\/test'/);
+
+  // Status-first: render the active backend and target before the connection fields.
+  assert.match(source, /createStatusSummary\(/);
+  assert.match(source, /active_upload_backend/);
+  assert.match(source, /webdav_document_count/);
+  assert.match(source, /documentStorageTarget/);
+
+  // Connection fields live behind an accessible disclosure.
+  assert.match(source, /createDisclosure\(/);
+
+  // Protected-change detection + confirm before save.
+  assert.match(source, /hasProtectedDocumentStorageChange/);
+  assert.match(source, /settings\.documentStorageConfirmExisting/);
+
+  // Env-controlled handling + backup warning preserved.
+  assert.match(source, /env_controlled/);
+  assert.match(source, /settings\.documentStorageBackupWarning/);
+
+  // Storage leaf must not own DMS concerns.
+  assert.doesNotMatch(source, /\/documents\/dms/);
+});
+
+test('documents-dms leaf owns Paperless DMS account management', () => {
+  const source = read('../public/settings/pages/documents-dms.js');
+
+  assert.match(source, /api\.get\('\/documents\/dms\/accounts'\)/);
+  assert.match(source, /api\.post\('\/documents\/dms\/accounts'/);
+  assert.match(source, /api\.delete\(`\/documents\/dms\/accounts\/\$\{[^}]+\}`\)/);
+  assert.match(source, /\/documents\/dms\/accounts\/\$\{[^}]+\}\/test/);
+  assert.match(source, /provider: 'paperless'/);
+
+  // DMS leaf must not own storage concerns.
+  assert.doesNotMatch(source, /\/documents\/storage/);
+});
+
+test('administration-domain leaves exist and export async render functions', () => {
+  const files = [
+    '../public/settings/pages/admin-family.js',
+    '../public/settings/pages/admin-api.js',
+    '../public/settings/pages/admin-backup.js',
+    '../public/settings/pages/admin-system.js',
+  ];
+
+  for (const file of files) {
+    assert.equal(existsSync(new URL(file, import.meta.url)), true, `${file} must exist`);
+    const source = read(file);
+    assert.match(source, /export async function render\(container,\s*\{[^}]*\}(?:\s*=\s*\{\})?\)/);
+    assert.doesNotMatch(source, /\.innerHTML\s*=/, `${file} must not assign innerHTML`);
+    assert.doesNotMatch(source, /\bfetch\(/, `${file} must use the shared API client`);
+    assert.doesNotMatch(source, /\brequire\(/, `${file} must use import, not require`);
+    assert.match(
+      source,
+      /import \{ api(?:,\s*auth)? \} from '\/api\.js'/,
+      `${file} must import the shared API client`,
+    );
+  }
+});
+
+test('admin-family leaf owns family member + role management lazily', () => {
+  const source = read('../public/settings/pages/admin-family.js');
+
+  // Users are fetched only when the leaf is active, via the auth helper.
+  assert.match(source, /auth\.getUsers\(\)/);
+  assert.match(source, /auth\.createUser\(/);
+  assert.match(source, /auth\.updateUser\(/);
+  assert.match(source, /auth\.deleteUser\(/);
+  assert.match(source, /buildFamilyRoleOptions/);
+  assert.match(source, /family_role/);
+  assert.match(source, /birth_date/);
+
+  // Family leaf must not own API token, backup, or version concerns.
+  assert.doesNotMatch(source, /\/auth\/api-tokens/);
+  assert.doesNotMatch(source, /\/backup\//);
+  assert.doesNotMatch(source, /\/version/);
+});
+
+test('admin-api leaf owns API token lifecycle with one-time secret display', () => {
+  const source = read('../public/settings/pages/admin-api.js');
+
+  assert.match(source, /api\.get\('\/auth\/api-tokens'\)/);
+  assert.match(source, /api\.post\('\/auth\/api-tokens'/);
+  assert.match(source, /api\.delete\(`\/auth\/api-tokens\/\$\{[^}]+\}`\)/);
+
+  // The raw token is only ever read from the creation response.
+  assert.match(source, /res\.token/);
+
+  // API leaf must not own family, backup, or version concerns.
+  assert.doesNotMatch(source, /\/auth\/users/);
+  assert.doesNotMatch(source, /\/backup\//);
+  assert.doesNotMatch(source, /\/version/);
+});
+
+test('admin-backup leaf owns database + WebDAV backup without document storage', () => {
+  const source = read('../public/settings/pages/admin-backup.js');
+
+  assert.match(source, /\/api\/v1\/backup\/database/);
+  assert.match(source, /api\.rawPost\('\/backup\/restore'/);
+  assert.match(source, /api\.get\('\/backup\/status'\)/);
+  assert.match(source, /api\.post\('\/backup\/trigger'\)/);
+  assert.match(source, /api\.get\('\/backup\/webdav\/config'\)/);
+  assert.match(source, /api\.put\('\/backup\/webdav\/config'/);
+  assert.match(source, /api\.post\('\/backup\/webdav\/test'/);
+  assert.match(source, /api\.post\('\/backup\/webdav\/trigger'\)/);
+
+  // CLI recovery guidance lives behind a collapsed disclosure.
+  assert.match(source, /createDisclosure\(/);
+  assert.match(source, /settings\.backupCliTitle/);
+
+  // Backup leaf must not own document-storage WebDAV or API/version concerns.
+  assert.doesNotMatch(source, /\/documents\/storage/);
+  assert.doesNotMatch(source, /\/auth\/api-tokens/);
+  assert.doesNotMatch(source, /\/version/);
+});
+
+test('admin-system leaf reads /version and renders safe translated rows only', () => {
+  const source = read('../public/settings/pages/admin-system.js');
+
+  assert.match(source, /api\.get\('\/version'\)/);
+  assert.match(source, /settings\.systemVersionLabel/);
+  assert.match(source, /MIT/);
+  assert.match(source, /setup_required/);
+
+  // System leaf is read-only: no other backend domains, no secrets.
+  assert.doesNotMatch(source, /\/documents\//);
+  assert.doesNotMatch(source, /\/backup\//);
+  assert.doesNotMatch(source, /\/auth\/api-tokens/);
+});
+
+test('Shopping owns shopping category management via a dedicated web component', () => {
+  const component = read('../public/components/shopping-category-manager.js');
+  assert.match(component, /customElements\.define\(\s*'oikos-shopping-category-manager'/);
+  assert.match(component, /import \{ api \} from '\/api\.js'/);
+  assert.match(component, /import \{ t \} from '\/i18n\.js'/);
+  assert.match(component, /import \{ esc \} from '\/utils\/html\.js'/);
+  assert.match(component, /api\.get\('\/shopping\/categories'\)/);
+  assert.match(component, /api\.post\('\/shopping\/categories'/);
+  assert.match(component, /api\.patch\('\/shopping\/categories\/reorder'/);
+  assert.match(component, /shopping-categories-changed/);
+  assert.match(component, /disconnectedCallback\(\)/);
+  assert.match(component, /removeEventListener/);
+  assert.doesNotMatch(component, /#[0-9a-f]{6}/i);
+
+  // Optimistisches Reorder muss bei API-Fehler auf den Snapshot zurückrollen.
+  const moveFn = component.match(/async _move\([\s\S]*?\n  \}/)?.[0] ?? '';
+  assert.match(moveFn, /const snapshot = \[\.\.\.this\._cats\]/);
+  const moveCatch = moveFn.match(/catch \(err\) \{[\s\S]*?\n    \}/)?.[0] ?? '';
+  assert.match(moveCatch, /this\._cats = snapshot/);
+  assert.doesNotMatch(moveCatch, /this\._notifyChanged\(\)/);
+
+  const shopping = read('../public/pages/shopping.js');
+  assert.match(shopping, /components\/shopping-category-manager\.js/);
+  assert.match(shopping, /<oikos-shopping-category-manager>/);
+  assert.match(shopping, /shopping\.manageCategories/);
+  assert.match(shopping, /shopping-categories-changed/);
+  // onClose muss den Listener wieder abräumen (kein Leak bei Modal-Reuse).
+  const openMgr = shopping.match(/async function openCategoryManager[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.match(openMgr, /manager\?\.removeEventListener\('shopping-categories-changed'/);
+});
+
+test('Kitchen settings copy directs Recipes and Shopping content settings to their modules', () => {
+  const english = JSON.parse(read('../public/locales/en.json'));
+  const german = JSON.parse(read('../public/locales/de.json'));
+
+  assert.match(english.settings.pageKitchenDescription, /Recipes/);
+  assert.match(english.settings.pageKitchenDescription, /Shopping/);
+  assert.match(english.settings.pageKitchenDescription, /modules/);
+  assert.match(german.settings.pageKitchenDescription, /Rezepte/);
+  assert.match(german.settings.pageKitchenDescription, /Einkauf/);
+  assert.match(german.settings.pageKitchenDescription, /Modulen/);
+});
+
+test('browser loader supports personal settings API and auth imports', () => {
+  const source = read('./test-browser-loader.mjs');
+
+  assert.match(source, /patch:\s*async/);
+  assert.match(source, /export const auth/);
+  assert.match(source, /me:\s*async/);
+  assert.match(source, /getUsers:\s*async/);
+  assert.match(source, /'\/utils\/pwa-install\.js'/);
+  assert.match(source, /getPwaInstallState/);
+  assert.match(source, /onPwaInstallStateChanged/);
+  assert.match(source, /promptPwaInstall/);
+});
+
+test('legacy settings page remains available during the leaf migration', () => {
+  assert.equal(existsSync(new URL('../public/pages/settings.js', import.meta.url)), true);
+});
+
+test('responsive settings shell defines desktop and mobile navigation layouts', () => {
+  const source = read('../public/styles/settings.css');
+
+  assert.match(
+    source,
+    /@media \(min-width:\s*960px\)[\s\S]*\.settings-shell__navigation\s*\{[\s\S]*position:\s*sticky/,
+  );
+  assert.match(
+    source,
+    /@media \(max-width:\s*959px\)[\s\S]*\.settings-mobile-overview\s*\{/,
+  );
+});
+
+test('settings disclosure exposes its expanded state and controlled panel', () => {
+  const source = read('../public/settings/components.js');
+
+  assert.match(source, /aria-expanded/);
+  assert.match(source, /aria-controls/);
+});
+
+test('settings rows programmatically label form controls and preserve descriptions', () => {
+  const source = read('../public/settings/components.js');
+
+  assert.match(source, /let settingRowIdCounter\s*=\s*0/);
+  assert.match(source, /control\?\.matches\?\.\(['"]input,\s*select,\s*textarea,\s*button['"]\)/);
+  assert.match(source, /control\?\.querySelector\?\.\(['"]input,\s*select,\s*textarea,\s*button['"]\)/);
+  assert.match(source, /if \(formControl && !formControl\.id\)/);
+  assert.match(source, /document\.createElement\(formControl \? 'label' : 'div'\)/);
+  assert.match(source, /title\.htmlFor\s*=\s*formControl\.id/);
+  assert.match(source, /detail\.id\s*=/);
+  assert.match(source, /formControl\.getAttribute\('aria-describedby'\)/);
+  assert.match(source, /describedBy\.push\(detail\.id\)/);
+  assert.match(source, /describedBy\.join\(' '\)/);
+  assert.match(source, /formControl\.setAttribute\('aria-describedby'/);
+});
+
+test('settings shell marks and focuses the active page', () => {
+  const source = read('../public/settings/shell.js');
+
+  assert.match(source, /setAttribute\('aria-current',\s*'page'\)/);
+  assert.match(source, /\.tabIndex\s*=\s*-1/);
+  assert.match(source, /\.focus\(\{\s*preventScroll:\s*true\s*\}\)/);
+});
+
+test('settings retry focus only moves to a connected replacement button after retry failure', () => {
+  const source = read('../public/settings/shell.js');
+
+  assert.match(source, /const loadAndRender = async \(\{\s*focusRetry = false\s*\} = \{\}\) =>/);
+  assert.match(source, /onRetry:\s*\(\) => loadAndRender\(\{\s*focusRetry:\s*true\s*\}\)/);
+  assert.match(
+    source,
+    /if \(focusRetry\)[\s\S]*requestAnimationFrame\(\(\) => \{[\s\S]*retryButton\?\.isConnected[\s\S]*retryButton\.focus\(\{\s*preventScroll:\s*true\s*\}\)/,
+  );
+  assert.match(source, /await loadAndRender\(\);/);
+});
+
+test('settings shell falls back to the domains overview for orphaned active leaves', () => {
+  const source = read('../public/settings/shell.js');
+
+  assert.match(source, /if \(!domain\)\s*\{[\s\S]*console\.error\([\s\S]*renderDomainsOverview\(content,\s*domains\)/);
+  assert.match(source, /else\s*\{[\s\S]*await renderLeafContent\(content,\s*activeLeaf,\s*domain,\s*user,\s*query\)/);
 });
 
 test('router hides inactive overlays from keyboard focus', () => {
@@ -359,6 +1056,35 @@ test('phase 4 keeps Kitchen navigation identity stable', () => {
   assert.doesNotMatch(routerSource, /sidebarIcon\)\s*sidebarIcon\.dataset\.lucide\s*=\s*kitchenTarget\.icon/);
 });
 
+test('global navigation groups domains with translated section labels', () => {
+  const routerSource = read('../public/router.js');
+
+  // The grouped main-app navigation references the Overview, Plan and Home label keys
+  // and resolves section labels through t().
+  assert.match(routerSource, /'nav\.sectionOverview'/);
+  assert.match(routerSource, /'nav\.sectionPlan'/);
+  assert.match(routerSource, /'nav\.sectionHome'/);
+  assert.match(routerSource, /t\(labelKey\)/);
+
+  // The replaced household section label is no longer referenced.
+  assert.doesNotMatch(routerSource, /nav\.section\.household/);
+});
+
+test('global navigation derives exactly one Kitchen destination', () => {
+  const routerSource = read('../public/router.js');
+
+  // Kitchen is inserted once via sidebarKitchenEl(), gated by a single-shot flag.
+  assert.equal((routerSource.match(/elements\.push\(sidebarKitchenEl\(\)\)/g) ?? []).length, 1);
+  assert.match(routerSource, /if \(!kitchenAdded\)/);
+});
+
+test('navigation settings leaf reuses the canonical module-order helpers', () => {
+  const leaf = read('../public/settings/pages/modules-navigation.js');
+
+  assert.match(leaf, /import\s*\{[^}]*normalizeModuleOrder[^}]*\}\s*from\s*'\/settings\/module-order\.js'/s);
+  assert.match(leaf, /import\s*\{[^}]*expandModuleOrder[^}]*\}\s*from\s*'\/settings\/module-order\.js'/s);
+});
+
 test('phase 4 keeps More bottom-nav identity stable while exposing active section accessibly', () => {
   const routerSource = read('../public/router.js');
 
@@ -398,7 +1124,7 @@ test('phase 4 touched icon markup uses icon classes instead of inline icon sizin
 });
 
 test('phase 4 settings theme toggle uses Lucide placeholders instead of inline SVG icons', () => {
-  const settings = read('../public/pages/settings.js');
+  const settings = read('../public/settings/pages/personal-appearance.js');
 
   assert.doesNotMatch(settings, /<svg\s+width="18"\s+height="18"[\s\S]*?data-theme-value=/);
   assert.match(settings, /data-lucide="monitor"/);
@@ -413,57 +1139,52 @@ test('phase 4 opens search from More sheet in a single handoff', () => {
   assert.match(routerSource, /requestAnimationFrame\(\(\) => \{\s*openSearch\(\);/);
 });
 
-test('phase 6 Settings tabs become a desktop sticky local navigation', () => {
+test('settings cutover: the controller is a thin shell delegate without the legacy monolith', () => {
   const settingsPage = read('../public/pages/settings.js');
-  const settingsCss = read('../public/styles/settings.css');
 
-  assert.match(settingsPage, /extraClass:\s*'settings-tabs'/);
-  assert.match(
-    settingsCss,
-    /@media \(min-width:\s*960px\)[\s\S]*\.settings-page\s*\{[\s\S]*grid-template-columns:\s*minmax\(var\(--sidebar-width-expanded\),\s*var\(--sidebar-width-expanded\)\)\s+minmax\(0,\s*1fr\)/
-  );
-  assert.match(
-    settingsCss,
-    /@media \(min-width:\s*960px\)[\s\S]*\.settings-page \.settings-tabs\s*\{[\s\S]*position:\s*sticky[\s\S]*flex-direction:\s*column/
-  );
-  assert.match(settingsCss, /\.settings-tab-panel\s*\{[\s\S]*min-width:\s*0/);
+  assert.match(settingsPage, /renderSettingsShell/, 'controller must delegate rendering to the shell');
+  assert.match(settingsPage, /readStoredSettingsDestination/, 'controller must read & migrate stored settings state');
+  assert.doesNotMatch(settingsPage, /settings-tab-panel/, 'controller must not render legacy tab panels');
+  assert.doesNotMatch(settingsPage, /data-panel=/, 'controller must not render legacy data-panel attributes');
+  assert.doesNotMatch(settingsPage, /settings-nav\.js/, 'controller must not import the removed settings-nav helpers');
+  assert.doesNotMatch(settingsPage, /extraClass:\s*'settings-tabs'/, 'controller must not render the legacy sub-tab bar');
+
+  const lineCount = settingsPage.split('\n').length;
+  assert.ok(lineCount <= 160, `settings controller should be a thin shell (was ${lineCount} lines)`);
 });
 
-test('phase 6 Settings mobile tabs expose horizontal scroll affordance', () => {
-  const settingsCss = read('../public/styles/settings.css');
-
-  assert.match(
-    settingsCss,
-    /@media \(max-width:\s*640px\)[\s\S]*\.settings-page \.settings-tabs\s*\{[\s\S]*mask-image:\s*linear-gradient/
-  );
-  assert.match(
-    settingsCss,
-    /@media \(max-width:\s*640px\)[\s\S]*\.settings-page \.settings-tabs\s*\{[\s\S]*scroll-padding-inline:\s*var\(--space-4\)/
-  );
-  assert.match(
-    settingsCss,
-    /@media \(max-width:\s*640px\)[\s\S]*\.settings-page \.settings-tabs \.sub-tab\s*\{[\s\S]*min-width:\s*max-content/
-  );
+test('settings cutover: obsolete navigation modules and stylesheet are removed', () => {
+  assert.equal(existsSync(new URL('../public/utils/settings-nav.js', import.meta.url)), false);
+  assert.equal(existsSync(new URL('../public/styles/settings-nav.css', import.meta.url)), false);
 });
 
-test('phase 6 Settings cards carry IA modifiers for scannable admin groups', () => {
-  const settingsPage = read('../public/pages/settings.js');
-  const settingsCss = read('../public/styles/settings.css');
-  const cardModifiers = [
-    'appearance',
-    'app-name',
-    'datetime',
-    'modules',
-    'account',
-    'family',
-    'api-tokens',
-    'backup',
-  ];
-
-  for (const modifier of cardModifiers) {
-    assert.match(settingsPage, new RegExp(`settings-card--${modifier}`), `settings.js should mark ${modifier} settings cards`);
-    assert.match(settingsCss, new RegExp(`\\.settings-card--${modifier}\\b`), `settings.css should style ${modifier} settings cards`);
+test('settings cutover: no obsolete settings-tab / panel references remain in public', () => {
+  const offenders = [];
+  for (const file of walkFrontendFiles('../public/')) {
+    const source = read(file);
+    if (/settings-nav\b|settings-tabs\b|settings-tab-panel\b|data-panel=|renderSettingsSidebar\b/.test(source)) {
+      offenders.push(file);
+    }
   }
+  assert.deepEqual(offenders, [], `obsolete settings navigation references remain: ${offenders.join(', ')}`);
+});
+
+test('settings cutover: the access-redirected notice is consumed once on the account leaf', () => {
+  const account = read('../public/settings/pages/personal-account.js');
+
+  assert.match(account, /oikos:settings:notice/, 'account leaf must read the one-time redirect notice');
+  assert.match(account, /accessRedirected/, 'account leaf must surface the access-redirected message');
+  assert.match(account, /removeItem\(/, 'account leaf must consume the notice once');
+});
+
+test('settings cutover: route direction treats settings sub-paths as one section', () => {
+  const routerSource = read('../public/router.js');
+
+  assert.match(
+    routerSource,
+    /startsWith\('\/settings'\)/,
+    'router must normalise /settings sub-paths for title and direction handling',
+  );
 });
 
 test('phase 6 shared sub-tabs support keyboard tab navigation', () => {
@@ -578,15 +1299,18 @@ test('sticky section headers stack above glass cards via --z-sticky', () => {
   }
 });
 
-test('every locale resolves nav.section.household as a nested key', () => {
+test('every locale resolves the grouped navigation section labels', () => {
   const localesDir = new URL('../public/locales/', import.meta.url);
   const files = readdirSync(localesDir).filter((f) => f.endsWith('.json'));
+  const sectionKeys = ['sectionOverview', 'sectionPlan', 'sectionHome'];
 
   assert.ok(files.length >= 16, 'expected at least 16 locale files');
   for (const file of files) {
     const data = JSON.parse(readFileSync(new URL(file, localesDir), 'utf8'));
-    assert.equal(typeof data.nav?.section?.household, 'string', `${file}: nav.section.household must be a nested string`);
-    assert.ok(data.nav.section.household.length > 0, `${file}: nav.section.household must not be empty`);
+    for (const key of sectionKeys) {
+      assert.equal(typeof data.nav?.[key], 'string', `${file}: nav.${key} must be a string`);
+      assert.ok(data.nav[key].length > 0, `${file}: nav.${key} must not be empty`);
+    }
     assert.ok(!('section.household' in data.nav), `${file}: nav must not keep the flat "section.household" key (t() cannot resolve it)`);
   }
 });

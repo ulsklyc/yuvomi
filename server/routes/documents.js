@@ -337,6 +337,7 @@ router.post('/storage/test', async (req, res) => {
     if (!isAdmin(req)) {
       return res.status(403).json({ error: 'Not authorized.', code: 403 });
     }
+    await assertWebdavTargetAllowed(resolveConfig(req.body));
     const result = await testStorageConnection(req.body);
     res.json({ data: result });
   } catch (err) {

@@ -455,7 +455,7 @@ PUT/GET/DELETE roundtrip in the target folder.
 
 ### Weather (Optional)
 
-The weather widget defaults to **Open-Meteo** — free, ECMWF-backed, and requiring **no API key**. Just set your coordinates (find them on [openstreetmap.org](https://www.openstreetmap.org) or Google Maps). You can also configure this in-app under **Settings → Weather** (admin only), which takes precedence over the environment variables.
+The weather widget defaults to **Open-Meteo** — free, ECMWF-backed, and requiring **no API key**. Just set your coordinates (find them on [openstreetmap.org](https://www.openstreetmap.org) or Google Maps). You can also configure this in-app under **Settings → Modules → Overview** (admin only), which takes precedence over the environment variables.
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
@@ -512,7 +512,7 @@ When all four variables are set, a **"Sign in with SSO"** button appears on the 
 
 ### Automated Backups (Optional)
 
-Built-in cron-based database backup (default: 2 AM daily, keep last 7 copies). Status and manual trigger available in **Settings → Backup Management**.
+Built-in cron-based database backup (default: 2 AM daily, keep last 7 copies). Status and manual trigger available in **Settings → Administration → Backup and restore**.
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
@@ -521,7 +521,7 @@ Built-in cron-based database backup (default: 2 AM daily, keep last 7 copies). S
 | `BACKUP_DIR` | Directory (inside container) where backup files are written | `/backups` | No |
 | `BACKUP_KEEP` | Number of most-recent backup files to retain | `7` | No |
 
-**WebDAV backup target (optional):** After each local backup, Yuvomi can automatically upload the file to any WebDAV-compatible server (Nextcloud, ownCloud, Hetzner Storage Box, Infomaniak kDrive, etc.). Configure in **Settings → Backup → WebDAV Backup Target**, or via environment variables (env vars take precedence over the UI):
+**WebDAV backup target (optional):** After each local backup, Yuvomi can automatically upload the file to any WebDAV-compatible server (Nextcloud, ownCloud, Hetzner Storage Box, Infomaniak kDrive, etc.). Configure in **Settings → Administration → Backup and restore → WebDAV Backup Target**, or via environment variables (env vars take precedence over the UI):
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
@@ -698,7 +698,7 @@ docker compose exec oikos node -e "import('./server/db.js').then(async db => { a
 docker cp oikos:/data/oikos-backup.db ./oikos-backup-$(date +%Y%m%d).db
 ```
 
-Admins can also download a backup from **Settings → Backup Management**.
+Admins can also download a backup from **Settings → Administration → Backup and restore**.
 
 If you want to store the database and backups in specific local folders, set these in `.env` before starting Compose:
 
@@ -709,7 +709,7 @@ BACKUP_DIR=./backups
 
 ### Restore
 
-Admins can restore a backup from **Settings → Backup Management**. For operational restores via Docker Compose, stop the running app, mount the backup into a temporary container that uses the same Docker volume, and replace the database file:
+Admins can restore a backup from **Settings → Administration → Backup and restore**. For operational restores via Docker Compose, stop the running app, mount the backup into a temporary container that uses the same Docker volume, and replace the database file:
 
 ```bash
 SERVICE=oikos

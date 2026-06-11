@@ -34,27 +34,34 @@ data/
 .idea/
 *.swp
 *.swo
-AGENTS.md
 
-# Claude Code — share skills/agents/rules/hooks/settings; keep local permissions and worktrees out
-.claude/settings.local.json
-.claude/worktrees/
+# AI dev tooling — local only, never published (Claude Code, Codex, agent skills)
+.claude/
+.codex/
+.agents/
+.github/skills/
+AGENTS.md
+DESIGN.md
+PRODUCT.md
 
 # Git worktrees
 .worktrees/
 
-# Claude Code local tooling (session state, design context — not for contributors)
+# Local tooling (session state, design context — not for contributors)
 .superpowers/
 .interface-design/
+.impeccable/
 
 # Claude Code work documents (internal plans/specs, not for contributors)
 docs/superpowers/
 docs/archive/superpowers/
+REBRANDING.md
 
 # Audit reports (generated per-session, not for version control)
 docs/audit-report-*.md
 docs/claude-md-audit.md
 docs/repo-audit-*.md
+docs/legal-audit/
 
 # Installer modernization working docs (internal audit/plan/prompts, not for contributors)
 docs/installer-audit.md
@@ -81,3 +88,6 @@ screenshots/
 
 # Duplicate GitHub Pages staging folder
 docs/github-pages/
+
+# macOS sync duplicates (" 2" suffix)
+* 2.*

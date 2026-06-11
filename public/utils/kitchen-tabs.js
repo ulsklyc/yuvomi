@@ -1,7 +1,7 @@
 import { t } from '/i18n.js';
 import { renderSubTabs } from '/utils/sub-tabs.js';
 
-export const KITCHEN_ROUTES = ['/meals', '/recipes', '/shopping'];
+export const KITCHEN_ROUTES = Object.freeze(['/meals', '/recipes', '/shopping']);
 export const KITCHEN_STORAGE_KEY = 'oikos-kitchen-tab';
 
 const TABS = () => [

@@ -91,6 +91,15 @@ test('GET /docs: 401 without authentication in development', async () => {
   assert.equal(res.status, 401);
 });
 
+test('GET /settings: no trailing-slash redirect despite public/settings/ directory', async () => {
+  // Regression: the public/settings/ module directory must not make express.static
+  // 301-redirect /settings → /settings/. The trailing slash breaks the SPA router,
+  // which then falls back to the dashboard on a hard load of the Settings route.
+  const res = await fetch(`${BASE}/settings`, { redirect: 'manual' });
+  assert.notEqual(res.status, 301, '/settings must not be redirected to /settings/');
+  assert.equal(res.headers.get('location'), null, '/settings must not emit a redirect Location');
+});
+
 test('POST /api/v1/auth/setup: 201 creates first admin', async () => {
   const res = await fetch(`${BASE}/api/v1/auth/setup`, {
     method: 'POST',

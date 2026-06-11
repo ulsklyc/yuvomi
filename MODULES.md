@@ -81,7 +81,7 @@ Modules may import public Yuvomi browser libraries such as `/api.js`, `/i18n.js`
 
 Yuvomi scans `modules/` and validates each `module.json`. Invalid modules are shown as errored in Settings and are not loaded. Disabled modules are not served to the browser and do not appear in navigation. If a module page fails while rendering, Yuvomi shows an error for that page without changing core application code.
 
-Admins can enable, disable, and order modules in Settings -> General -> Active modules. Copying a new folder into `modules/` makes it appear there automatically.
+Admins can enable, disable, and order modules in Settings -> Modules -> Navigation. Copying a new folder into `modules/` makes it appear there automatically.
 
 ## Docker / Podman
 
