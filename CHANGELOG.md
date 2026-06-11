@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.71.10] - 2026-06-11
+
+### Fixed
+- **CI test fix**: updated `test-frontend-audit` assertion for the DMS settings page to check for both `paperless` and `papra` provider option values, replacing the old static `provider: 'paperless'` literal that no longer exists after the multi-provider select was introduced in v0.71.9.
+
 ## [0.71.9] - 2026-06-11
 
 ### Added
