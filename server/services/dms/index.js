@@ -4,9 +4,11 @@
  * Dependencies: ./paperless.js
  */
 import { PaperlessAdapter } from './paperless.js';
+import { PapraAdapter } from './papra.js';
 
 const ADAPTERS = {
   paperless: PaperlessAdapter,
+  papra: PapraAdapter,
 };
 
 export const SUPPORTED_PROVIDERS = Object.keys(ADAPTERS);

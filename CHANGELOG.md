@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.71.9] - 2026-06-11
+
+### Added
+- **Papra DMS integration**: Papra is now a second supported document management system alongside Paperless-ngx. Admins can connect a Papra instance by selecting "Papra" from the provider selector in Settings → Documents → Document management, entering the server URL, organization ID, and API token. The adapter layer handles search, link, upload, and connection test; existing Paperless-ngx connections are unaffected. DB migration v52 adds the  column and updates the CHECK / UNIQUE constraints on .
+
 ## [0.71.8] - 2026-06-11
 
 ### Fixed

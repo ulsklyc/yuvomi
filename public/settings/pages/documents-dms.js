@@ -20,12 +20,23 @@ function buildAddForm(container) {
   form.autocomplete = 'off';
   form.insertAdjacentHTML('beforeend', `
     <div class="form-group">
+      <label class="form-label" for="dms-provider">${t('settings.dmsProvider')}</label>
+      <select class="form-input" id="dms-provider">
+        <option value="paperless">${t('settings.dmsProviderPaperless')}</option>
+        <option value="papra">${t('settings.dmsProviderPapra')}</option>
+      </select>
+    </div>
+    <div class="form-group">
       <label class="form-label" for="dms-name">${t('settings.dmsName')}</label>
       <input class="form-input" type="text" id="dms-name" maxlength="100" required />
     </div>
     <div class="form-group">
       <label class="form-label" for="dms-url">${t('settings.dmsBaseUrl')}</label>
       <input class="form-input" type="url" id="dms-url" required placeholder="https://..." />
+    </div>
+    <div class="form-group" id="dms-org-group" hidden>
+      <label class="form-label" for="dms-org-id">${t('settings.dmsOrgId')}</label>
+      <input class="form-input" type="text" id="dms-org-id" maxlength="200" />
     </div>
     <div class="form-group">
       <label class="form-label" for="dms-token">${t('settings.dmsToken')}</label>
@@ -37,21 +48,30 @@ function buildAddForm(container) {
     </div>
   `);
 
+  const providerSelect = form.querySelector('#dms-provider');
+  const orgGroup = form.querySelector('#dms-org-group');
+  const orgInput = form.querySelector('#dms-org-id');
+  providerSelect.addEventListener('change', () => {
+    const isPapra = providerSelect.value === 'papra';
+    orgGroup.hidden = !isPapra;
+    orgInput.required = isPapra;
+  });
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const errorHost = form.querySelector('#dms-form-error-host');
     errorHost.replaceChildren();
+    const provider = providerSelect.value;
     const name = form.querySelector('#dms-name').value.trim();
     const base_url = form.querySelector('#dms-url').value.trim();
     const api_token = form.querySelector('#dms-token').value;
+    const payload = { provider, name, base_url, api_token };
+    if (provider === 'papra') payload.org_id = orgInput.value.trim();
     try {
-      await api.post('/documents/dms/accounts', {
-        provider: 'paperless',
-        name,
-        base_url,
-        api_token,
-      });
+      await api.post('/documents/dms/accounts', payload);
       form.reset();
+      orgGroup.hidden = true;
+      orgInput.required = false;
       showToast(t('settings.dmsConnected'), 'success');
       await loadDmsAccounts(container);
     } catch (err) {

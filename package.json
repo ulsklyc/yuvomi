@@ -1,6 +1,6 @@
 {
   "name": "oikos",
-  "version": "0.71.8",
+  "version": "0.71.9",
   "description": "Self-hosted family planner - calendar, tasks, shopping, meal planning, budget and more. Private, open-source, no subscription.",
   "main": "server/index.js",
   "type": "module",
@@ -50,6 +50,7 @@
     "test:document-storage": "node --experimental-sqlite --test test/test-document-storage.js",
     "test:dms-adapter": "node --test test/test-dms-adapter.js",
     "test:dms-routes": "node --test test/test-dms-routes.js",
+    "test:dms-papra-adapter": "node --test test/test-dms-papra-adapter.js",
     "test:weather": "node --experimental-sqlite --test test/test-weather.js",
     "test:holidays": "node --experimental-sqlite --test test/test-holidays.js",
     "test:preferences-weather": "node --experimental-sqlite --test test/test-preferences-weather.js",
@@ -60,7 +61,7 @@
     "test:installer-cli-i18n": "node --test test/test-installer-cli-i18n.js",
     "test:installer-prereq": "node --test test/test-installer-prereq.js",
     "test:installer-a11y": "node --test test/test-installer-a11y.js",
-    "test": "node --experimental-sqlite test/test-db.js && node --experimental-sqlite test/test-dashboard.js && node --experimental-sqlite test/test-tasks.js && node --experimental-sqlite test/test-multi-assignment.js && node --experimental-sqlite test/test-shopping.js && npm run test:meals && npm run test:calendar && node --experimental-sqlite test/test-notes-contacts-budget.js && npm run test:budget-recurrence && npm run test:ux-utils && npm run test:date-utils && npm run test:modal-utils && npm run test:reminders && npm run test:api && npm run test:auth-userid && npm run test:ics-parser && npm run test:ics-sub && npm run test:setup && npm run test:kitchen-tabs && npm run test:settings-navigation && npm run test:mobile-scroll-layout && npm run test:frontend-audit && npm run test:backup-scheduler && npm run test:backup-webdav && npm run test:caldav && npm run test:caldav-reminders && npm run test:caldav-event-target && npm run test:carddav && npm run test:split-expenses && npm run test:oidc && npm run test:family-contacts && npm run test:google-calendar && npm run test:google-multi && npm run test:housekeeping && npm run test:documents && npm run test:document-storage && npm run test:dms-adapter && npm run test:dms-routes && npm run test:weather && npm run test:holidays && npm run test:preferences-weather && npm run test:installer-schema && npm run test:installer-env-write && npm run test:installer-static && npm run test:installer-i18n && npm run test:installer-cli-i18n && npm run test:installer-prereq && npm run test:installer-a11y"
+    "test": "node --experimental-sqlite test/test-db.js && node --experimental-sqlite test/test-dashboard.js && node --experimental-sqlite test/test-tasks.js && node --experimental-sqlite test/test-multi-assignment.js && node --experimental-sqlite test/test-shopping.js && npm run test:meals && npm run test:calendar && node --experimental-sqlite test/test-notes-contacts-budget.js && npm run test:budget-recurrence && npm run test:ux-utils && npm run test:date-utils && npm run test:modal-utils && npm run test:reminders && npm run test:api && npm run test:auth-userid && npm run test:ics-parser && npm run test:ics-sub && npm run test:setup && npm run test:kitchen-tabs && npm run test:settings-navigation && npm run test:mobile-scroll-layout && npm run test:frontend-audit && npm run test:backup-scheduler && npm run test:backup-webdav && npm run test:caldav && npm run test:caldav-reminders && npm run test:caldav-event-target && npm run test:carddav && npm run test:split-expenses && npm run test:oidc && npm run test:family-contacts && npm run test:google-calendar && npm run test:google-multi && npm run test:housekeeping && npm run test:documents && npm run test:document-storage && npm run test:dms-adapter && npm run test:dms-routes && npm run test:dms-papra-adapter && npm run test:weather && npm run test:holidays && npm run test:preferences-weather && npm run test:installer-schema && npm run test:installer-env-write && npm run test:installer-static && npm run test:installer-i18n && npm run test:installer-cli-i18n && npm run test:installer-prereq && npm run test:installer-a11y"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

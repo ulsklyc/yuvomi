@@ -514,18 +514,21 @@ Custom folders for organizing family documents (migration v37). A "Hausreinigung
 `family_documents.folder_id` references this table (ON DELETE SET NULL, nullable).
 
 ### DMS Accounts
-Connections to an external document management system (Paperless-ngx) for the Documents module (migration v50). Admin-managed in Settings.
+Connections to an external document management system for the Documents module (migration v50, extended v52). Admin-managed in Settings. Supported providers: `paperless` (Paperless-ngx) and `papra` (Papra).
 
 | Column | Type | Constraint |
 |--------|------|-----------|
-| provider | TEXT | paperless (CHECK constraint) |
+| provider | TEXT | `paperless` \| `papra` (CHECK constraint, migration v52) |
 | name | TEXT | NOT NULL (display name) |
-| base_url | TEXT | NOT NULL UNIQUE (one account per server) |
+| base_url | TEXT | NOT NULL |
+| org_id | TEXT | NOT NULL DEFAULT '' (Papra organization ID; empty for Paperless-ngx; migration v52) |
 | api_token | TEXT | NOT NULL (write-only; never returned by the API, protected by optional SQLCipher) |
 | created_at | TEXT | ISO 8601 |
 | last_check | TEXT | nullable (last connection test) |
 
-**DMS integration:** Admins connect a Paperless-ngx instance, then search it and **link** existing DMS documents into the Documents module as `external`/`dms` references (no duplication of the binary), or **push** a local or WebDAV-backed document into the DMS (asynchronous OCR ingestion — returns a Paperless task ID). Only `storage_backend = 'dms'` means a document is already stored in the DMS. All DMS operations (account management, search, link, push) are **admin-only**; searching the DMS is gated because it would otherwise bypass the per-document `restricted`/`private` visibility boundaries. Linked documents are previewed/downloaded by proxying the DMS live. The adapter layer (`server/services/dms/`) is provider-pluggable; Paperless-ngx is the first adapter.
+UNIQUE constraint: `(base_url, org_id)` — allows multiple Papra organizations on the same server; Paperless-ngx uses `org_id = ''` so only one account per server.
+
+**DMS integration:** Admins connect a DMS instance (Paperless-ngx or Papra), then search it and **link** existing DMS documents into the Documents module as `external`/`dms` references (no duplication of the binary), or **push** a local or WebDAV-backed document into the DMS. Only `storage_backend = 'dms'` means a document is already stored in the DMS. All DMS operations (account management, search, link, push) are **admin-only**; searching the DMS is gated because it would otherwise bypass the per-document `restricted`/`private` visibility boundaries. Linked documents are previewed/downloaded by proxying the DMS live. The adapter layer (`server/services/dms/`) is provider-pluggable; Paperless-ngx and Papra are the two built-in adapters.
 
 ### Budget Loans
 Instalment-based loans with per-payment tracking. Active loans show remaining balance and due months; paid-off loans are automatically closed.
