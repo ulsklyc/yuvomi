@@ -392,7 +392,12 @@ function remoteUrl(config, relativeSegments) {
 async function davFetch(config, method, relativeSegments, { body, headers } = {}) {
   const url = remoteUrl(config, relativeSegments);
   const agent = requestAgent(url, config);
-  return fetch(url, { // codeql[js/request-forgery] - SSRF mitigated: agent uses validatedLookup (blocks private IPs at DNS time) + assertWebdavTargetAllowed pre-flight
+  // SSRF-Schutz: URL ist ausschliesslich admin-konfigurierbar; agent nutzt
+  // validatedLookup (blockiert private/loopback/link-local IPs zur DNS-Zeit)
+  // und assertWebdavTargetAllowed als Pre-Flight. CodeQL js/request-forgery
+  // ist als False Positive dismissed (GitHub-Alert #19) — Inline-Suppression-
+  // Kommentare werden von GitHub Code Scanning fuer CodeQL nicht ausgewertet.
+  return fetch(url, {
     method,
     redirect: 'manual',
     agent,
