@@ -631,14 +631,15 @@ test('documents-storage leaf owns WebDAV document storage with a status-first la
   assert.doesNotMatch(source, /\/documents\/dms/);
 });
 
-test('documents-dms leaf owns Paperless DMS account management', () => {
+test('documents-dms leaf owns DMS account management (Paperless + Papra)', () => {
   const source = read('../public/settings/pages/documents-dms.js');
 
   assert.match(source, /api\.get\('\/documents\/dms\/accounts'\)/);
   assert.match(source, /api\.post\('\/documents\/dms\/accounts'/);
   assert.match(source, /api\.delete\(`\/documents\/dms\/accounts\/\$\{[^}]+\}`\)/);
   assert.match(source, /\/documents\/dms\/accounts\/\$\{[^}]+\}\/test/);
-  assert.match(source, /provider: 'paperless'/);
+  assert.match(source, /value="paperless"/);
+  assert.match(source, /value="papra"/);
 
   // DMS leaf must not own storage concerns.
   assert.doesNotMatch(source, /\/documents\/storage/);
