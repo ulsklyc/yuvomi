@@ -3,7 +3,19 @@ import net from 'node:net';
 
 const MAX_HTML_BYTES = 1024 * 1024;
 const MAX_IMAGE_BYTES = 500 * 1024;
-const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/x-icon', 'image/vnd.microsoft.icon']);
+const MAX_REDIRECTS = 5;
+const ALLOWED_IMAGE_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/svg+xml',
+  'image/x-icon',
+  'image/vnd.microsoft.icon',
+]);
+const REQUEST_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (compatible; Yuvomi/1.0; +https://github.com/ulsklyc/yuvomi)',
+  Accept: 'text/html,application/xhtml+xml,image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5',
+};
 
 function privateAddress(address) {
   if (net.isIPv4(address)) {
@@ -32,6 +44,22 @@ async function assertPublicHttps(url) {
   return parsed;
 }
 
+async function fetchPublic(url, options = {}, redirectCount = 0) {
+  const parsed = await assertPublicHttps(url);
+  const response = await fetch(parsed, {
+    ...options,
+    headers: { ...REQUEST_HEADERS, ...options.headers },
+    redirect: 'manual',
+  });
+  if (response.status >= 300 && response.status < 400) {
+    if (redirectCount >= MAX_REDIRECTS) throw new Error('Logo search followed too many redirects.');
+    const location = response.headers.get('location');
+    if (!location) throw new Error('Website returned a redirect without a location.');
+    return fetchPublic(new URL(location, parsed).href, options, redirectCount + 1);
+  }
+  return { response, finalUrl: parsed };
+}
+
 async function readLimited(response, limit) {
   const length = Number(response.headers.get('content-length') || 0);
   if (length > limit) throw new Error('Remote response is too large.');
@@ -52,7 +80,7 @@ function iconUrl(html, pageUrl) {
   const links = [...html.matchAll(/<link\b[^>]*>/gi)].map((match) => match[0]);
   for (const link of links) {
     const rel = link.match(/\brel\s*=\s*["']([^"']+)["']/i)?.[1] || '';
-    if (!/\b(icon|apple-touch-icon)\b/i.test(rel)) continue;
+    if (!/(^|\s)(icon|shortcut icon|apple-touch-icon)(\s|$)/i.test(rel)) continue;
     const href = link.match(/\bhref\s*=\s*["']([^"']+)["']/i)?.[1];
     if (href) return new URL(href, pageUrl).href;
   }
@@ -60,23 +88,23 @@ function iconUrl(html, pageUrl) {
 }
 
 async function findLogo(websiteUrl) {
-  const page = await assertPublicHttps(websiteUrl);
-  const pageResponse = await fetch(page, {
-    headers: { 'User-Agent': 'Yuvomi subscription logo finder' },
-    redirect: 'error',
+  const normalized = /^https:\/\//i.test(websiteUrl) ? websiteUrl : `https://${websiteUrl}`;
+  const pageResult = await fetchPublic(normalized, {
     signal: AbortSignal.timeout(8000),
   });
+  const pageResponse = pageResult.response;
   if (!pageResponse.ok) throw new Error(`Website returned HTTP ${pageResponse.status}.`);
   const html = (await readLimited(pageResponse, MAX_HTML_BYTES)).toString('utf8');
-  const candidate = iconUrl(html, page);
-  await assertPublicHttps(candidate);
-  const imageResponse = await fetch(candidate, {
-    headers: { 'User-Agent': 'Yuvomi subscription logo finder' },
-    redirect: 'error',
+  const candidate = iconUrl(html, pageResult.finalUrl);
+  const imageResult = await fetchPublic(candidate, {
     signal: AbortSignal.timeout(8000),
   });
+  const imageResponse = imageResult.response;
   if (!imageResponse.ok) throw new Error(`Logo returned HTTP ${imageResponse.status}.`);
-  const contentType = (imageResponse.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  let contentType = (imageResponse.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  if (contentType === 'application/octet-stream' && /\.ico(?:$|\?)/i.test(imageResult.finalUrl.pathname)) {
+    contentType = 'image/x-icon';
+  }
   if (!ALLOWED_IMAGE_TYPES.has(contentType)) throw new Error('Website icon is not a supported image type.');
   const image = await readLimited(imageResponse, MAX_IMAGE_BYTES);
   return `data:${contentType};base64,${image.toString('base64')}`;

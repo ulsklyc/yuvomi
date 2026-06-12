@@ -11,7 +11,6 @@ const service = await import('../server/services/subscriptions.js');
 const db = await import('../server/db.js');
 const { default: subscriptionsRouter } = await import('../server/routes/subscriptions.js');
 const logoService = await import('../server/services/subscription-logo.js');
-const aiService = await import('../server/services/subscription-ai.js');
 const notificationService = await import('../server/services/subscription-notifications.js');
 
 try {
@@ -30,8 +29,6 @@ try {
   assert.equal(logoService.privateAddress('127.0.0.1'), true);
   assert.equal(logoService.privateAddress('192.168.1.4'), true);
   assert.equal(logoService.privateAddress('8.8.8.8'), false);
-  assert.equal(aiService.parseRecommendations('[{"subscription_id":1,"title":"Review","insight":"Check usage","type":"review"}]').length, 1);
-  assert.equal(aiService.localRecommendations([{ id: 1, name: 'A', monthly_base: 10 }], 'EUR')[0].subscription_id, 1);
   await assert.rejects(
     notificationService.assertAllowedUrl('http://127.0.0.1:8080/hook'),
     /Private notification targets/,
@@ -101,6 +98,12 @@ try {
     const created = (await createResponse.json()).data;
     assert.equal(created.name, 'Video service');
     assert.equal(created.enabled, true);
+    assert.ok(created.budget_entry_id);
+    const linkedExpense = database.prepare('SELECT * FROM budget_entries WHERE id = ?').get(created.budget_entry_id);
+    assert.equal(linkedExpense.title, 'Video service');
+    assert.equal(linkedExpense.amount, -120);
+    assert.equal(linkedExpense.date, '2026-08-10');
+    assert.equal(linkedExpense.category, 'financial_other');
 
     const listResponse = await fetch(baseUrl);
     assert.equal(listResponse.status, 200);
@@ -118,6 +121,33 @@ try {
     assert.equal(
       database.prepare("SELECT COUNT(*) AS n FROM reminders WHERE entity_type = 'subscription' AND entity_id = ?").get(created.id).n,
       0,
+    );
+    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM budget_entries WHERE id = ?').get(created.budget_entry_id).n, 0);
+
+    const enableResponse = await fetch(`${baseUrl}/${created.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: true, amount: 144, next_payment_date: '2026-09-10' }),
+    });
+    assert.equal(enableResponse.status, 200);
+    const enabled = (await enableResponse.json()).data;
+    const renewedExpense = database.prepare('SELECT * FROM budget_entries WHERE id = ?').get(enabled.budget_entry_id);
+    assert.equal(renewedExpense.amount, -144);
+    assert.equal(renewedExpense.date, '2026-09-10');
+
+    const renewResponse = await fetch(`${baseUrl}/${created.id}/renew`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(renewResponse.status, 200);
+    const renewed = (await renewResponse.json()).data;
+    assert.equal(renewed.next_payment_date, '2027-09-10');
+    assert.notEqual(renewed.budget_entry_id, enabled.budget_entry_id);
+    assert.ok(database.prepare('SELECT 1 FROM budget_entries WHERE id = ?').get(enabled.budget_entry_id));
+    assert.equal(
+      database.prepare('SELECT date FROM budget_entries WHERE id = ?').get(renewed.budget_entry_id).date,
+      '2027-09-10',
     );
 
     const agentResponse = await fetch(`${baseUrl}/notification-agents`, {

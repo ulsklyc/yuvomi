@@ -583,9 +583,6 @@ function buildPaths() {
     '/api/v1/budget/subscriptions/logo-search': {
       post: op({ summary: 'Find a public HTTPS website icon for a subscription', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) }),
     },
-    '/api/v1/budget/subscriptions/insights/recommendations': {
-      get: op({ summary: 'Generate local or configured-provider subscription insights', tag: 'Budget' }),
-    },
     '/api/v1/budget/subscriptions/notification-agents': {
       get: op({ summary: 'List subscription notification agents without secrets', tag: 'Budget', admin: true }),
       post: op({ summary: 'Create subscription notification agent', tag: 'Budget', admin: true, stateChanging: true, requestBody: jsonBody(null) }),

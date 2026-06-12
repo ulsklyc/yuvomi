@@ -14,7 +14,6 @@ import {
 } from '../services/subscriptions.js';
 import { getRates } from '../services/subscription-rates.js';
 import { findLogo } from '../services/subscription-logo.js';
-import { recommendations as buildRecommendations } from '../services/subscription-ai.js';
 import { sendAgent } from '../services/subscription-notifications.js';
 
 const log = createLogger('Subscriptions');
@@ -66,6 +65,60 @@ function loadSubscription(id) {
     LEFT JOIN users u ON u.id = s.created_by
     WHERE s.id = ?
   `).get(id);
+}
+
+function budgetCurrency() {
+  return db.get().prepare("SELECT value FROM sync_config WHERE key = 'currency'").get()?.value
+    || settings().base_currency
+    || 'EUR';
+}
+
+async function budgetExpenseAmount(subscription) {
+  const currency = budgetCurrency();
+  if (subscription.currency === currency) return Math.abs(Number(subscription.amount));
+  const result = await getRates(currency, [subscription.currency]);
+  return Math.abs(convertAmount(subscription.amount, subscription.currency, currency, result.rates) ?? Number(subscription.amount));
+}
+
+function budgetEntryTitle(subscription) {
+  const suffix = subscription.currency === budgetCurrency() ? '' : ` (${subscription.currency})`;
+  return `${subscription.name}${suffix}`;
+}
+
+async function syncBudgetExpense(subscription, { preserveCurrent = false } = {}) {
+  const database = db.get();
+  if (!subscription.enabled) {
+    if (subscription.budget_entry_id) {
+      database.prepare('DELETE FROM budget_entries WHERE id = ?').run(subscription.budget_entry_id);
+      database.prepare('UPDATE budget_subscriptions SET budget_entry_id = NULL WHERE id = ?').run(subscription.id);
+    }
+    return loadSubscription(subscription.id);
+  }
+
+  const amount = await budgetExpenseAmount(subscription);
+  let entryId = preserveCurrent ? null : subscription.budget_entry_id;
+  if (entryId) {
+    const updated = database.prepare(`
+      UPDATE budget_entries
+      SET title = ?, amount = ?, category = 'financial_other', subcategory = 'bank_fees', date = ?
+      WHERE id = ?
+    `).run(budgetEntryTitle(subscription), -amount, subscription.next_payment_date, entryId);
+    if (!updated.changes) entryId = null;
+  }
+  if (!entryId) {
+    entryId = database.prepare(`
+      INSERT INTO budget_entries
+        (title, amount, category, subcategory, date, is_recurring, created_by)
+      VALUES (?, ?, 'financial_other', 'bank_fees', ?, 0, ?)
+    `).run(
+      budgetEntryTitle(subscription),
+      -amount,
+      subscription.next_payment_date,
+      subscription.created_by,
+    ).lastInsertRowid;
+    database.prepare('UPDATE budget_subscriptions SET budget_entry_id = ? WHERE id = ?').run(entryId, subscription.id);
+  }
+  return loadSubscription(subscription.id);
 }
 
 function publicAgent(row) {
@@ -122,7 +175,7 @@ function validatePayload(body, { partial = false } = {}) {
     try { parseDateKey(body.next_payment_date); } catch (err) { errors.push(err.message); }
   }
   if (body.website_url && !URL_RE.test(body.website_url)) errors.push('Website URL must use HTTP or HTTPS.');
-  if (body.logo_data && (!String(body.logo_data).startsWith('data:image/') || String(body.logo_data).length > 500000)) {
+  if (body.logo_data && (!String(body.logo_data).startsWith('data:image/') || String(body.logo_data).length > 700000)) {
     errors.push('Logo must be an image data URL smaller than 500 KB.');
   }
   for (const key of ['category_id', 'payment_method_id']) {
@@ -363,7 +416,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const validated = validatePayload(req.body);
     if (validated.errors.length) return res.status(400).json({ error: validated.errors.join(' '), code: 400 });
@@ -380,7 +433,8 @@ router.post('/', (req, res) => {
       req.body.enabled === false ? 0 : 1, req.body.website_url?.trim() || null, req.body.logo_data || null,
       req.body.brand_color || null, req.body.notes?.trim() || null, actorId(req),
     );
-    const row = loadSubscription(result.lastInsertRowid);
+    let row = loadSubscription(result.lastInsertRowid);
+    row = await syncBudgetExpense(row);
     syncReminder(row);
     res.status(201).json({ data: { ...row, enabled: Boolean(row.enabled) } });
   } catch (err) {
@@ -389,7 +443,7 @@ router.post('/', (req, res) => {
   }
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
     const current = loadSubscription(id);
@@ -413,7 +467,8 @@ router.put('/:id', (req, res) => {
       value('website_url', current.website_url)?.trim() || null, value('logo_data', current.logo_data) || null,
       value('brand_color', current.brand_color) || null, value('notes', current.notes)?.trim() || null, id,
     );
-    const row = loadSubscription(id);
+    let row = loadSubscription(id);
+    row = await syncBudgetExpense(row);
     syncReminder(row);
     res.json({ data: { ...row, enabled: Boolean(row.enabled) } });
   } catch (err) {
@@ -422,13 +477,14 @@ router.put('/:id', (req, res) => {
   }
 });
 
-router.post('/:id/renew', (req, res) => {
+router.post('/:id/renew', async (req, res) => {
   const id = Number(req.params.id);
   const current = loadSubscription(id);
   if (!current) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
   const nextDate = addBillingCycle(current.next_payment_date, current.billing_cycle, current.cycle_interval);
   db.get().prepare('UPDATE budget_subscriptions SET next_payment_date = ? WHERE id = ?').run(nextDate, id);
-  const row = loadSubscription(id);
+  let row = loadSubscription(id);
+  row = await syncBudgetExpense(row, { preserveCurrent: true });
   syncReminder(row);
   res.json({ data: { ...row, enabled: Boolean(row.enabled) } });
 });
@@ -437,23 +493,14 @@ router.delete('/:id', (req, res) => {
   const id = Number(req.params.id);
   if (!loadSubscription(id)) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
   db.get().transaction(() => {
+    const subscription = loadSubscription(id);
     db.get().prepare("DELETE FROM reminders WHERE entity_type = 'subscription' AND entity_id = ?").run(id);
     db.get().prepare('DELETE FROM budget_subscriptions WHERE id = ?').run(id);
+    if (subscription?.budget_entry_id) {
+      db.get().prepare('DELETE FROM budget_entries WHERE id = ?').run(subscription.budget_entry_id);
+    }
   })();
   res.status(204).end();
-});
-
-router.get('/insights/recommendations', async (_req, res) => {
-  const rows = db.get().prepare('SELECT * FROM budget_subscriptions WHERE enabled = 1').all();
-  const configured = settings();
-  const converted = await subscriptionsWithConversions(rows, configured.base_currency);
-  const result = await buildRecommendations(converted.rows, configured.base_currency);
-  res.json({
-    data: {
-      ...result,
-      base_currency: configured.base_currency,
-    },
-  });
 });
 
 router.use((err, _req, res, _next) => {
