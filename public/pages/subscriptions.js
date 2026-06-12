@@ -29,6 +29,9 @@ let state = {
   paymentMethodId: '',
   status: 'all',
   sort: 'due',
+  recommendations: [],
+  recommendationProvider: '',
+  user: null,
 };
 let container = null;
 
@@ -86,8 +89,9 @@ async function load({ refreshRates = false } = {}) {
   state.settings = settings.data || state.settings;
 }
 
-export async function render(target) {
+export async function render(target, { user } = {}) {
   container = target;
+  state.user = user || null;
   setHtml(container, `
     <div class="subscriptions-page" aria-busy="true">
       <div class="subscriptions-toolbar">
@@ -209,6 +213,7 @@ function renderContent() {
   const rows = sortedSubscriptions();
   setHtml(content, `
     ${renderSummary()}
+    ${renderRecommendations()}
     ${renderAnalytics()}
     <section class="subscriptions-list-section">
       <div class="subscriptions-section-head">
@@ -229,6 +234,34 @@ function renderContent() {
   `);
   bindContent();
   if (window.lucide) window.lucide.createIcons({ el: content });
+}
+
+function renderRecommendations() {
+  return `
+    <section class="subscriptions-insights">
+      <div class="subscriptions-section-head">
+        <div>
+          <h2>${t('subscriptions.insightsTitle')}</h2>
+          <span>${state.recommendationProvider
+            ? t('subscriptions.insightsProvider', { provider: state.recommendationProvider })
+            : t('subscriptions.insightsHint')}</span>
+        </div>
+        <button class="btn btn--secondary" id="subscriptions-generate-insights">
+          <i data-lucide="sparkles" aria-hidden="true"></i>${t('subscriptions.generateInsights')}
+        </button>
+      </div>
+      ${state.recommendations.length ? `
+        <div class="subscriptions-insight-list">
+          ${state.recommendations.map((item) => `
+            <article>
+              <i data-lucide="lightbulb" aria-hidden="true"></i>
+              <div><strong>${esc(item.title || t('subscriptions.insightTitle'))}</strong><p>${esc(item.insight)}</p></div>
+            </article>
+          `).join('')}
+        </div>
+      ` : ''}
+    </section>
+  `;
 }
 
 function renderSummary() {
@@ -362,6 +395,20 @@ function renderEmpty() {
 
 function bindContent() {
   container.querySelector('#subscriptions-refresh-rates')?.addEventListener('click', () => reload({ refreshRates: true }));
+  container.querySelector('#subscriptions-generate-insights')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      const result = await api.get('/budget/subscriptions/insights/recommendations');
+      state.recommendations = result.data?.recommendations || [];
+      state.recommendationProvider = result.data?.provider || 'local';
+      renderContent();
+    } catch (err) {
+      window.oikos?.showToast(err.data?.error || t('subscriptions.insightsError'), 'danger');
+    } finally {
+      button.disabled = false;
+    }
+  });
   container.querySelector('#subscriptions-empty-add')?.addEventListener('click', () => openSubscriptionModal());
   container.querySelector('#subscriptions-list')?.addEventListener('click', async (event) => {
     const action = event.target.closest('[data-action]');
@@ -443,7 +490,11 @@ export function openSubscriptionModal(subscription = null) {
       </div>
       <div class="form-group">
         <label class="form-label" for="subscription-website">${t('subscriptions.websiteLabel')}</label>
-        <input class="form-input" id="subscription-website" type="url" placeholder="https://" value="${esc(subscription?.website_url || '')}">
+        <div class="subscriptions-logo-search">
+          <input class="form-input" id="subscription-website" type="url" placeholder="https://" value="${esc(subscription?.website_url || '')}">
+          <button class="btn btn--secondary" type="button" id="subscription-find-logo">${t('subscriptions.findLogo')}</button>
+        </div>
+        <small>${t('subscriptions.findLogoHint')}</small>
       </div>
       <div class="form-grid-2">
         <div class="form-group">
@@ -477,10 +528,26 @@ export function openSubscriptionModal(subscription = null) {
     content,
     size: 'lg',
     onSave(panel) {
+      let searchedLogoData = null;
       panel.querySelector('#subscription-cancel').addEventListener('click', closeModal);
+      panel.querySelector('#subscription-find-logo').addEventListener('click', async () => {
+        const website = panel.querySelector('#subscription-website').value.trim();
+        if (!website) return;
+        const button = panel.querySelector('#subscription-find-logo');
+        button.disabled = true;
+        try {
+          const result = await api.post('/budget/subscriptions/logo-search', { website_url: website });
+          searchedLogoData = result.data.logo_data;
+          window.oikos?.showToast(t('subscriptions.logoFound'), 'success');
+        } catch (err) {
+          window.oikos?.showToast(err.data?.error || t('subscriptions.logoNotFound'), 'danger');
+        } finally {
+          button.disabled = false;
+        }
+      });
       panel.querySelector('#subscription-form').addEventListener('submit', async (event) => {
         event.preventDefault();
-        await saveSubscription(panel, subscription);
+        await saveSubscription(panel, subscription, searchedLogoData);
       });
     },
   });
@@ -497,7 +564,7 @@ async function fileToDataUrl(file) {
   });
 }
 
-async function saveSubscription(panel, existing) {
+async function saveSubscription(panel, existing, searchedLogoData = null) {
   const dateInput = panel.querySelector('#subscription-next-date');
   if (!isDateInputValid(dateInput.value)) {
     window.oikos?.showToast(t('subscriptions.invalidDate'), 'danger');
@@ -508,7 +575,7 @@ async function saveSubscription(panel, existing) {
   submit.disabled = true;
   try {
     const file = panel.querySelector('#subscription-logo').files[0];
-    const logoData = file ? await fileToDataUrl(file) : existing?.logo_data || null;
+    const logoData = file ? await fileToDataUrl(file) : searchedLogoData || existing?.logo_data || null;
     const payload = {
       name: panel.querySelector('#subscription-name').value.trim(),
       description: panel.querySelector('#subscription-description').value.trim() || null,
@@ -570,13 +637,32 @@ async function deleteSubscription(subscription) {
   }
 }
 
-function openSettingsModal() {
+async function openSettingsModal() {
+  let agents = [];
+  if (state.user?.role === 'admin') {
+    try {
+      agents = (await api.get('/budget/subscriptions/notification-agents')).data || [];
+    } catch (err) {
+      window.oikos?.showToast(err.data?.error || t('subscriptions.notificationsLoadError'), 'danger');
+    }
+  }
   const content = `
     <form id="subscriptions-settings-form">
       <div class="form-group">
         <label class="form-label" for="subscriptions-budget">${t('subscriptions.monthlyBudgetLabel')}</label>
         <input class="form-input" id="subscriptions-budget" type="number" min="0" step="0.01" value="${state.settings.monthly_budget}">
       </div>
+      ${state.user?.role === 'admin' ? `
+        <div class="subscriptions-settings-section">
+          <div>
+            <strong>${t('subscriptions.notificationsTitle')}</strong>
+            <small>${t('subscriptions.notificationsHint')}</small>
+          </div>
+          <button class="btn btn--secondary" type="button" id="subscriptions-notifications-manage">
+            ${t('subscriptions.manageNotifications', { count: agents.length })}
+          </button>
+        </div>
+      ` : ''}
       <div class="form-group">
         <label class="form-label" for="subscriptions-base-currency">${t('subscriptions.baseCurrencyLabel')}</label>
         <input class="form-input" id="subscriptions-base-currency" maxlength="3" pattern="[A-Za-z]{3}" value="${esc(state.settings.base_currency)}">
@@ -594,6 +680,10 @@ function openSettingsModal() {
     size: 'sm',
     onSave(panel) {
       panel.querySelector('#subscriptions-settings-cancel').addEventListener('click', closeModal);
+      panel.querySelector('#subscriptions-notifications-manage')?.addEventListener('click', async () => {
+        await closeModal({ force: true });
+        openNotificationModal(agents);
+      });
       panel.querySelector('#subscriptions-settings-form').addEventListener('submit', async (event) => {
         event.preventDefault();
         try {
@@ -607,6 +697,117 @@ function openSettingsModal() {
         } catch (err) {
           window.oikos?.showToast(err.data?.error || t('common.unknownError'), 'danger');
         }
+      });
+    },
+  });
+}
+
+const AGENT_CONFIG_EXAMPLES = {
+  email: '{"recipient":"name@example.com"}',
+  discord: '{"url":"https://discord.com/api/webhooks/..."}',
+  telegram: '{"bot_token":"...","chat_id":"..."}',
+  pushover: '{"app_token":"...","user_key":"..."}',
+  gotify: '{"url":"https://gotify.example.com","token":"..."}',
+  serverchan: '{"send_key":"..."}',
+  ntfy: '{"url":"https://ntfy.sh","topic":"family","token":""}',
+  webhook: '{"url":"https://example.com/hooks/subscriptions","token":""}',
+};
+
+function agentRows(agents) {
+  return agents.length ? agents.map((agent) => `
+    <li data-agent-id="${agent.id}">
+      <i data-lucide="send" aria-hidden="true"></i>
+      <div>
+        <strong>${esc(agent.name)}</strong>
+        <span>${esc(agent.type)}${agent.last_error ? ` · ${esc(agent.last_error)}` : ''}</span>
+      </div>
+      <label class="toggle" title="${t('subscriptions.enabledLabel')}">
+        <input type="checkbox" data-agent-action="toggle" ${agent.enabled ? 'checked' : ''}>
+        <span class="toggle__track"></span>
+      </label>
+      <button class="btn btn--secondary" data-agent-action="test">${t('subscriptions.testNotification')}</button>
+      <button class="btn btn--secondary btn--icon" data-agent-action="delete" aria-label="${t('common.delete')}">
+        <i data-lucide="trash-2" aria-hidden="true"></i>
+      </button>
+    </li>
+  `).join('') : `<p>${t('subscriptions.noNotificationAgents')}</p>`;
+}
+
+function openNotificationModal(agents) {
+  const content = `
+    <div class="subscriptions-notifications">
+      <ul>${agentRows(agents)}</ul>
+      <form id="subscription-agent-form">
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="subscription-agent-name">${t('subscriptions.agentNameLabel')}</label>
+            <input class="form-input" id="subscription-agent-name" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="subscription-agent-type">${t('subscriptions.agentTypeLabel')}</label>
+            <select class="form-input" id="subscription-agent-type">
+              ${Object.keys(AGENT_CONFIG_EXAMPLES).map((type) => `<option value="${type}">${esc(type)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="subscription-agent-config">${t('subscriptions.agentConfigLabel')}</label>
+          <textarea class="form-input" id="subscription-agent-config" rows="4">${esc(AGENT_CONFIG_EXAMPLES.email)}</textarea>
+          <small>${t('subscriptions.agentConfigHint')}</small>
+        </div>
+        <div class="modal-panel__footer subscriptions-modal-footer">
+          <button class="btn btn--secondary" type="button" id="subscription-agent-close">${t('common.close')}</button>
+          <button class="btn btn--primary" type="submit">${t('subscriptions.addAgent')}</button>
+        </div>
+      </form>
+    </div>
+  `;
+  openModal({
+    title: t('subscriptions.notificationsTitle'),
+    content,
+    size: 'lg',
+    onSave(panel) {
+      panel.querySelector('#subscription-agent-close').addEventListener('click', closeModal);
+      const type = panel.querySelector('#subscription-agent-type');
+      type.addEventListener('change', () => {
+        panel.querySelector('#subscription-agent-config').value = AGENT_CONFIG_EXAMPLES[type.value];
+      });
+      panel.querySelector('#subscription-agent-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        try {
+          await api.post('/budget/subscriptions/notification-agents', {
+            name: panel.querySelector('#subscription-agent-name').value.trim(),
+            type: type.value,
+            config: JSON.parse(panel.querySelector('#subscription-agent-config').value),
+          });
+          await closeModal({ force: true });
+          const refreshed = (await api.get('/budget/subscriptions/notification-agents')).data || [];
+          openNotificationModal(refreshed);
+        } catch (err) {
+          window.oikos?.showToast(err.data?.error || err.message || t('common.unknownError'), 'danger');
+        }
+      });
+      panel.querySelectorAll('[data-agent-action]').forEach((control) => {
+        control.addEventListener('click', async () => {
+          const row = control.closest('[data-agent-id]');
+          const id = Number(row.dataset.agentId);
+          const action = control.dataset.agentAction;
+          try {
+            if (action === 'toggle') {
+              await api.put(`/budget/subscriptions/notification-agents/${id}`, { enabled: control.checked });
+            }
+            if (action === 'test') {
+              await api.post(`/budget/subscriptions/notification-agents/${id}/test`, {});
+              window.oikos?.showToast(t('subscriptions.notificationTestSent'), 'success');
+            }
+            if (action === 'delete') await api.delete(`/budget/subscriptions/notification-agents/${id}`);
+            const refreshed = (await api.get('/budget/subscriptions/notification-agents')).data || [];
+            await closeModal({ force: true });
+            openNotificationModal(refreshed);
+          } catch (err) {
+            window.oikos?.showToast(err.data?.error || t('common.unknownError'), 'danger');
+          }
+        });
       });
     },
   });

@@ -22,6 +22,7 @@ import * as caldavReminders from './services/caldav-reminders-sync.js';
 import * as holidays from './services/holidays.js';
 import { startScheduler as startBackupScheduler } from './services/backup-scheduler.js';
 import { startScheduler as startSplitExpenseScheduler } from './services/split-expenses-scheduler.js';
+import { startScheduler as startSubscriptionNotificationScheduler } from './services/subscription-notifications.js';
 import dashboardRouter from './routes/dashboard.js';
 import tasksRouter from './routes/tasks.js';
 import shoppingRouter from './routes/shopping.js';
@@ -405,6 +406,7 @@ app.listen(PORT, () => {
   // Backup-Scheduler starten
   startBackupScheduler();
   startSplitExpenseScheduler();
+  startSubscriptionNotificationScheduler();
 });
 
 export default app;

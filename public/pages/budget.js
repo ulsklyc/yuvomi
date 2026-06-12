@@ -333,7 +333,7 @@ function renderBody() {
   }
   if (state.activeTab === 'subscriptions') {
     setHtml(body, '<div class="budget-tab-panel budget-tab-panel--subscriptions" id="budget-subscriptions-panel"></div>');
-    renderSubscriptions(body.querySelector('#budget-subscriptions-panel')).catch((err) => {
+    renderSubscriptions(body.querySelector('#budget-subscriptions-panel'), { user: _user }).catch((err) => {
       console.error('[Budget] subscriptions render error:', err);
     });
     return;

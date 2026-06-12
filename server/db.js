@@ -2048,6 +2048,42 @@ const MIGRATIONS = [
       CREATE INDEX idx_reminders_user ON reminders(created_by);
     `,
   },
+  {
+    version: 55,
+    description: 'Subscription notification agents and delivery history',
+    up: `
+      CREATE TABLE IF NOT EXISTS subscription_notification_agents (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        name       TEXT    NOT NULL,
+        type       TEXT    NOT NULL CHECK(type IN ('email', 'discord', 'telegram', 'pushover', 'gotify', 'serverchan', 'ntfy', 'webhook')),
+        config_json TEXT   NOT NULL,
+        enabled    INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0, 1)),
+        last_test_at TEXT,
+        last_error TEXT,
+        created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS subscription_notification_deliveries (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        subscription_id INTEGER NOT NULL REFERENCES budget_subscriptions(id) ON DELETE CASCADE,
+        agent_id         INTEGER NOT NULL REFERENCES subscription_notification_agents(id) ON DELETE CASCADE,
+        payment_date     TEXT    NOT NULL,
+        sent_at          TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        UNIQUE(subscription_id, agent_id, payment_date)
+      );
+
+      CREATE TRIGGER IF NOT EXISTS trg_subscription_notification_agents_updated_at
+        AFTER UPDATE ON subscription_notification_agents FOR EACH ROW
+        BEGIN UPDATE subscription_notification_agents SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+
+      CREATE INDEX IF NOT EXISTS idx_subscription_notification_agents_enabled
+        ON subscription_notification_agents(enabled);
+      CREATE INDEX IF NOT EXISTS idx_subscription_notification_deliveries_lookup
+        ON subscription_notification_deliveries(subscription_id, agent_id, payment_date);
+    `,
+  },
 ];
 
 /**

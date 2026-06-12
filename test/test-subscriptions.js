@@ -5,10 +5,14 @@ import path from 'node:path';
 import express from 'express';
 
 process.env.DB_PATH = path.join(os.tmpdir(), `oikos-subscriptions-${process.pid}.db`);
+process.env.SESSION_SECRET = 'subscription-test-session-secret-32-bytes';
 
 const service = await import('../server/services/subscriptions.js');
 const db = await import('../server/db.js');
 const { default: subscriptionsRouter } = await import('../server/routes/subscriptions.js');
+const logoService = await import('../server/services/subscription-logo.js');
+const aiService = await import('../server/services/subscription-ai.js');
+const notificationService = await import('../server/services/subscription-notifications.js');
 
 try {
   assert.equal(service.addBillingCycle('2026-01-31', 'monthly', 1), '2026-02-28');
@@ -23,6 +27,15 @@ try {
   assert.equal(service.convertAmount(10, 'USD', 'EUR', { USD: 0.9 }), 9);
   assert.equal(service.convertAmount(10, 'EUR', 'EUR', {}), 10);
   assert.equal(service.convertAmount(10, 'USD', 'EUR', {}), null);
+  assert.equal(logoService.privateAddress('127.0.0.1'), true);
+  assert.equal(logoService.privateAddress('192.168.1.4'), true);
+  assert.equal(logoService.privateAddress('8.8.8.8'), false);
+  assert.equal(aiService.parseRecommendations('[{"subscription_id":1,"title":"Review","insight":"Check usage","type":"review"}]').length, 1);
+  assert.equal(aiService.localRecommendations([{ id: 1, name: 'A', monthly_base: 10 }], 'EUR')[0].subscription_id, 1);
+  await assert.rejects(
+    notificationService.assertAllowedUrl('http://127.0.0.1:8080/hook'),
+    /Private notification targets/,
+  );
 
   const database = db.get();
   const tables = database.prepare(`
@@ -33,10 +46,13 @@ try {
   assert.deepEqual(tables, [
     'subscription_categories',
     'subscription_exchange_rates',
+    'subscription_notification_agents',
+    'subscription_notification_deliveries',
     'subscription_payment_methods',
     'subscription_settings',
   ]);
   assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'budget_subscriptions'").get());
+  assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'subscription_notification_agents'").get());
 
   database.prepare(`
     INSERT INTO users (username, display_name, password_hash, role)
@@ -60,6 +76,7 @@ try {
   app.use(express.json());
   app.use((req, _res, next) => {
     req.authUserId = 1;
+    req.authRole = 'admin';
     next();
   });
   app.use('/subscriptions', subscriptionsRouter);
@@ -102,6 +119,24 @@ try {
       database.prepare("SELECT COUNT(*) AS n FROM reminders WHERE entity_type = 'subscription' AND entity_id = ?").get(created.id).n,
       0,
     );
+
+    const agentResponse = await fetch(`${baseUrl}/notification-agents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Family webhook',
+        type: 'webhook',
+        config: { url: 'https://example.com/hook', token: 'secret-token' },
+      }),
+    });
+    assert.equal(agentResponse.status, 201);
+    const agent = (await agentResponse.json()).data;
+    assert.deepEqual(agent.configured_fields.sort(), ['token', 'url']);
+    assert.equal(JSON.stringify(agent).includes('secret-token'), false);
+
+    const agentsResponse = await fetch(`${baseUrl}/notification-agents`);
+    assert.equal(agentsResponse.status, 200);
+    assert.equal(JSON.stringify(await agentsResponse.json()).includes('secret-token'), false);
   } finally {
     await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
   }
