@@ -1,7 +1,7 @@
 import dns from 'node:dns/promises';
 import net from 'node:net';
 
-const MAX_HTML_BYTES = 1024 * 1024;
+const MAX_HTML_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 500 * 1024;
 const MAX_REDIRECTS = 5;
 const ALLOWED_IMAGE_TYPES = new Set([
@@ -76,15 +76,44 @@ async function readLimited(response, limit) {
   return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
 }
 
-function iconUrl(html, pageUrl) {
+async function readHtmlHead(response) {
+  const reader = response.body.getReader();
+  const chunks = [];
+  let size = 0;
+  while (size < MAX_HTML_BYTES) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    chunks.push(value);
+    const html = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString('utf8');
+    if (/<\/head\s*>/i.test(html)) {
+      await reader.cancel();
+      return html;
+    }
+  }
+  await reader.cancel();
+  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString('utf8');
+}
+
+function iconUrls(html, pageUrl) {
   const links = [...html.matchAll(/<link\b[^>]*>/gi)].map((match) => match[0]);
+  const candidates = [];
   for (const link of links) {
     const rel = link.match(/\brel\s*=\s*["']([^"']+)["']/i)?.[1] || '';
     if (!/(^|\s)(icon|shortcut icon|apple-touch-icon)(\s|$)/i.test(rel)) continue;
     const href = link.match(/\bhref\s*=\s*["']([^"']+)["']/i)?.[1];
-    if (href) return new URL(href, pageUrl).href;
+    if (!href || href.startsWith('data:')) continue;
+    candidates.push({
+      url: new URL(href, pageUrl).href,
+      priority: /apple-touch-icon/i.test(rel) ? 1 : 0,
+    });
   }
-  return new URL('/favicon.ico', pageUrl).href;
+  candidates.push({ url: new URL('/favicon.ico', pageUrl).href, priority: 2 });
+  return [...new Map(
+    candidates
+      .sort((a, b) => a.priority - b.priority)
+      .map((candidate) => [candidate.url, candidate.url]),
+  ).values()];
 }
 
 async function findLogo(websiteUrl) {
@@ -94,20 +123,24 @@ async function findLogo(websiteUrl) {
   });
   const pageResponse = pageResult.response;
   if (!pageResponse.ok) throw new Error(`Website returned HTTP ${pageResponse.status}.`);
-  const html = (await readLimited(pageResponse, MAX_HTML_BYTES)).toString('utf8');
-  const candidate = iconUrl(html, pageResult.finalUrl);
-  const imageResult = await fetchPublic(candidate, {
-    signal: AbortSignal.timeout(8000),
-  });
-  const imageResponse = imageResult.response;
-  if (!imageResponse.ok) throw new Error(`Logo returned HTTP ${imageResponse.status}.`);
-  let contentType = (imageResponse.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
-  if (contentType === 'application/octet-stream' && /\.ico(?:$|\?)/i.test(imageResult.finalUrl.pathname)) {
-    contentType = 'image/x-icon';
+  const html = await readHtmlHead(pageResponse);
+  for (const candidate of iconUrls(html, pageResult.finalUrl)) {
+    try {
+      const imageResult = await fetchPublic(candidate, {
+        signal: AbortSignal.timeout(8000),
+      });
+      const imageResponse = imageResult.response;
+      if (!imageResponse.ok) throw new Error(`Logo returned HTTP ${imageResponse.status}.`);
+      let contentType = (imageResponse.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+      if (contentType === 'application/octet-stream' && /\.ico(?:$|\?)/i.test(imageResult.finalUrl.pathname)) {
+        contentType = 'image/x-icon';
+      }
+      if (!ALLOWED_IMAGE_TYPES.has(contentType)) throw new Error('Website icon is not a supported image type.');
+      const image = await readLimited(imageResponse, MAX_IMAGE_BYTES);
+      return `data:${contentType};base64,${image.toString('base64')}`;
+    } catch {}
   }
-  if (!ALLOWED_IMAGE_TYPES.has(contentType)) throw new Error('Website icon is not a supported image type.');
-  const image = await readLimited(imageResponse, MAX_IMAGE_BYTES);
-  return `data:${contentType};base64,${image.toString('base64')}`;
+  throw new Error('No supported logo could be found.');
 }
 
-export { findLogo, privateAddress };
+export { findLogo, iconUrls, privateAddress };

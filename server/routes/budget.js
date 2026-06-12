@@ -15,7 +15,10 @@ const log = createLogger('Budget');
 
 const router  = express.Router();
 const LOCALE_CACHE = new Map();
-const SUPPORTED_LANGS = new Set(['ar', 'de', 'el', 'en', 'es', 'fr', 'hi', 'it', 'ja', 'pt', 'ru', 'sv', 'tr', 'uk', 'zh']);
+const SUPPORTED_LANGS = new Set([
+  'ar', 'cs', 'de', 'el', 'en', 'es', 'fr', 'hi', 'it', 'ja',
+  'nl', 'pl', 'pt', 'ru', 'sv', 'tr', 'uk', 'vi', 'zh',
+]);
 const CATEGORY_LABEL_KEYS = {
   housing: 'catHousing',
   food: 'catFood',
@@ -25,6 +28,7 @@ const CATEGORY_LABEL_KEYS = {
   shopping_clothing: 'catShoppingClothing',
   education: 'catEducation',
   financial_other: 'catFinancialOther',
+  subscriptions: 'catSubscriptions',
   'Erwerbseinkommen': 'catEarnedIncome',
   'Kapitalerträge': 'catInvestmentIncome',
   'Geschenke & Transfers': 'catTransferGiftIncome',
@@ -66,6 +70,12 @@ const SUBCATEGORY_LABEL_KEYS = {
   insurance_other: 'subcatInsuranceOther',
   investments: 'subcatInvestments',
   taxes: 'subcatTaxes',
+  subscription_entertainment: 'subcatSubscriptionEntertainment',
+  subscription_productivity: 'subcatSubscriptionProductivity',
+  subscription_utilities: 'subcatSubscriptionUtilities',
+  subscription_health: 'subcatSubscriptionHealth',
+  subscription_education: 'subcatSubscriptionEducation',
+  subscription_other: 'subcatSubscriptionOther',
 };
 
 function normalizeLang(raw) {

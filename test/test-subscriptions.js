@@ -11,7 +11,6 @@ const service = await import('../server/services/subscriptions.js');
 const db = await import('../server/db.js');
 const { default: subscriptionsRouter } = await import('../server/routes/subscriptions.js');
 const logoService = await import('../server/services/subscription-logo.js');
-const notificationService = await import('../server/services/subscription-notifications.js');
 
 try {
   assert.equal(service.addBillingCycle('2026-01-31', 'monthly', 1), '2026-02-28');
@@ -29,9 +28,12 @@ try {
   assert.equal(logoService.privateAddress('127.0.0.1'), true);
   assert.equal(logoService.privateAddress('192.168.1.4'), true);
   assert.equal(logoService.privateAddress('8.8.8.8'), false);
-  await assert.rejects(
-    notificationService.assertAllowedUrl('http://127.0.0.1:8080/hook'),
-    /Private notification targets/,
+  assert.deepEqual(
+    logoService.iconUrls(
+      '<link rel="apple-touch-icon" href="/large.png"><link rel="icon" href="/small.png">',
+      new URL('https://example.com/path'),
+    ),
+    ['https://example.com/small.png', 'https://example.com/large.png', 'https://example.com/favicon.ico'],
   );
 
   const database = db.get();
@@ -49,7 +51,14 @@ try {
     'subscription_settings',
   ]);
   assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'budget_subscriptions'").get());
-  assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'subscription_notification_agents'").get());
+  assert.equal(
+    database.prepare("SELECT name FROM budget_categories WHERE key = 'subscriptions'").get().name,
+    'Subscription',
+  );
+  assert.equal(
+    database.prepare("SELECT COUNT(*) AS n FROM budget_subcategories WHERE category_key = 'subscriptions'").get().n,
+    6,
+  );
 
   database.prepare(`
     INSERT INTO users (username, display_name, password_hash, role)
@@ -81,6 +90,9 @@ try {
   await new Promise((resolve) => server.once('listening', resolve));
   try {
     const baseUrl = `http://127.0.0.1:${server.address().port}/subscriptions`;
+    const entertainment = database.prepare(
+      "SELECT id FROM subscription_categories WHERE name = 'Entertainment'",
+    ).get();
     const createResponse = await fetch(baseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -92,6 +104,7 @@ try {
         cycle_interval: 1,
         next_payment_date: '2026-08-10',
         reminder_days: 5,
+        category_id: entertainment.id,
       }),
     });
     assert.equal(createResponse.status, 201);
@@ -103,7 +116,8 @@ try {
     assert.equal(linkedExpense.title, 'Video service');
     assert.equal(linkedExpense.amount, -120);
     assert.equal(linkedExpense.date, '2026-08-10');
-    assert.equal(linkedExpense.category, 'financial_other');
+    assert.equal(linkedExpense.category, 'subscriptions');
+    assert.equal(linkedExpense.subcategory, 'subscription_entertainment');
 
     const listResponse = await fetch(baseUrl);
     assert.equal(listResponse.status, 200);
@@ -150,23 +164,24 @@ try {
       '2027-09-10',
     );
 
-    const agentResponse = await fetch(`${baseUrl}/notification-agents`, {
+    const categoryResponse = await fetch(`${baseUrl}/categories`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: 'Family webhook',
-        type: 'webhook',
-        config: { url: 'https://example.com/hook', token: 'secret-token' },
+        name: 'Developer tools',
+        color: '#334155',
       }),
     });
-    assert.equal(agentResponse.status, 201);
-    const agent = (await agentResponse.json()).data;
-    assert.deepEqual(agent.configured_fields.sort(), ['token', 'url']);
-    assert.equal(JSON.stringify(agent).includes('secret-token'), false);
+    assert.equal(categoryResponse.status, 201);
+    const category = (await categoryResponse.json()).data;
+    assert.equal(category.budget_subcategory_key, `subscription_category_${category.id}`);
+    assert.equal(
+      database.prepare('SELECT name FROM budget_subcategories WHERE key = ?').get(category.budget_subcategory_key).name,
+      'Developer tools',
+    );
 
-    const agentsResponse = await fetch(`${baseUrl}/notification-agents`);
-    assert.equal(agentsResponse.status, 200);
-    assert.equal(JSON.stringify(await agentsResponse.json()).includes('secret-token'), false);
+    const removedNotificationsResponse = await fetch(`${baseUrl}/notification-agents`);
+    assert.equal(removedNotificationsResponse.status, 404);
   } finally {
     await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
   }

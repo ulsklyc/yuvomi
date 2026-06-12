@@ -1,7 +1,6 @@
 import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
-import { requireAdmin } from '../auth.js';
 import { color, collectErrors, date, num, oneOf, str, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import {
   BILLING_CYCLES,
@@ -14,22 +13,10 @@ import {
 } from '../services/subscriptions.js';
 import { getRates } from '../services/subscription-rates.js';
 import { findLogo } from '../services/subscription-logo.js';
-import { sendAgent } from '../services/subscription-notifications.js';
 
 const log = createLogger('Subscriptions');
 const router = express.Router();
 const URL_RE = /^https?:\/\/[^\s]+$/i;
-const AGENT_TYPES = ['email', 'discord', 'telegram', 'pushover', 'gotify', 'serverchan', 'ntfy', 'webhook'];
-const AGENT_REQUIRED_CONFIG = {
-  email: ['recipient'],
-  discord: ['url'],
-  telegram: ['bot_token', 'chat_id'],
-  pushover: ['app_token', 'user_key'],
-  gotify: ['url', 'token'],
-  serverchan: ['send_key'],
-  ntfy: ['url', 'topic'],
-  webhook: ['url'],
-};
 
 function actorId(req) {
   return req.authUserId || req.session.userId;
@@ -58,6 +45,7 @@ function syncReminder(subscription) {
 function loadSubscription(id) {
   return db.get().prepare(`
     SELECT s.*, c.name AS category_name, c.color AS category_color,
+           c.budget_subcategory_key,
            p.name AS payment_method_name, u.display_name AS creator_name
     FROM budget_subscriptions s
     LEFT JOIN subscription_categories c ON c.id = s.category_id
@@ -96,56 +84,31 @@ async function syncBudgetExpense(subscription, { preserveCurrent = false } = {})
   }
 
   const amount = await budgetExpenseAmount(subscription);
+  const subcategory = subscription.budget_subcategory_key || '';
   let entryId = preserveCurrent ? null : subscription.budget_entry_id;
   if (entryId) {
     const updated = database.prepare(`
       UPDATE budget_entries
-      SET title = ?, amount = ?, category = 'financial_other', subcategory = 'bank_fees', date = ?
+      SET title = ?, amount = ?, category = 'subscriptions', subcategory = ?, date = ?
       WHERE id = ?
-    `).run(budgetEntryTitle(subscription), -amount, subscription.next_payment_date, entryId);
+    `).run(budgetEntryTitle(subscription), -amount, subcategory, subscription.next_payment_date, entryId);
     if (!updated.changes) entryId = null;
   }
   if (!entryId) {
     entryId = database.prepare(`
       INSERT INTO budget_entries
         (title, amount, category, subcategory, date, is_recurring, created_by)
-      VALUES (?, ?, 'financial_other', 'bank_fees', ?, 0, ?)
+      VALUES (?, ?, 'subscriptions', ?, ?, 0, ?)
     `).run(
       budgetEntryTitle(subscription),
       -amount,
+      subcategory,
       subscription.next_payment_date,
       subscription.created_by,
     ).lastInsertRowid;
     database.prepare('UPDATE budget_subscriptions SET budget_entry_id = ? WHERE id = ?').run(entryId, subscription.id);
   }
   return loadSubscription(subscription.id);
-}
-
-function publicAgent(row) {
-  const config = JSON.parse(row.config_json);
-  return {
-    id: row.id,
-    name: row.name,
-    type: row.type,
-    enabled: Boolean(row.enabled),
-    configured_fields: Object.keys(config),
-    last_test_at: row.last_test_at,
-    last_error: row.last_error,
-    created_at: row.created_at,
-  };
-}
-
-function validateAgent(body) {
-  const name = str(body.name, 'Name', { max: MAX_SHORT });
-  const type = oneOf(body.type, AGENT_TYPES, 'Type');
-  const errors = collectErrors([name, type]);
-  const config = body.config && typeof body.config === 'object' && !Array.isArray(body.config) ? body.config : {};
-  for (const field of AGENT_REQUIRED_CONFIG[body.type] || []) {
-    if (!String(config[field] || '').trim()) errors.push(`${field} is required.`);
-  }
-  const serialized = JSON.stringify(config);
-  if (serialized.length > 10000) errors.push('Notification configuration is too large.');
-  return { errors, name: name.value, type: type.value, config };
 }
 
 function validatePayload(body, { partial = false } = {}) {
@@ -237,10 +200,21 @@ router.post('/categories', (req, res) => {
   const errors = collectErrors([name, categoryColor]);
   if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
   try {
-    const order = db.get().prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM subscription_categories').get().n;
-    const result = db.get().prepare('INSERT INTO subscription_categories (name, color, sort_order) VALUES (?, ?, ?)')
-      .run(name.value, categoryColor.value, order);
-    res.status(201).json({ data: db.get().prepare('SELECT * FROM subscription_categories WHERE id = ?').get(result.lastInsertRowid) });
+    const database = db.get();
+    const category = database.transaction(() => {
+      const order = database.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM subscription_categories').get().n;
+      const result = database.prepare('INSERT INTO subscription_categories (name, color, sort_order) VALUES (?, ?, ?)')
+        .run(name.value, categoryColor.value, order);
+      const budgetKey = `subscription_category_${result.lastInsertRowid}`;
+      database.prepare('UPDATE subscription_categories SET budget_subcategory_key = ? WHERE id = ?')
+        .run(budgetKey, result.lastInsertRowid);
+      database.prepare(`
+        INSERT INTO budget_subcategories (key, category_key, name, sort_order)
+        VALUES (?, 'subscriptions', ?, ?)
+      `).run(budgetKey, name.value, order);
+      return database.prepare('SELECT * FROM subscription_categories WHERE id = ?').get(result.lastInsertRowid);
+    })();
+    res.status(201).json({ data: category });
   } catch (err) {
     if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'Category already exists.', code: 409 });
     throw err;
@@ -266,9 +240,17 @@ router.put('/meta/order', (req, res) => {
   const methods = Array.isArray(req.body.payment_methods) ? req.body.payment_methods.map(Number) : null;
   if (!categories && !methods) return res.status(400).json({ error: 'An order list is required.', code: 400 });
   const updateCategories = db.get().prepare('UPDATE subscription_categories SET sort_order = ? WHERE id = ?');
+  const updateBudgetSubcategories = db.get().prepare(`
+    UPDATE budget_subcategories
+    SET sort_order = ?
+    WHERE key = (SELECT budget_subcategory_key FROM subscription_categories WHERE id = ?)
+  `);
   const updateMethods = db.get().prepare('UPDATE subscription_payment_methods SET sort_order = ? WHERE id = ?');
   db.get().transaction(() => {
-    categories?.forEach((id, index) => updateCategories.run(index, id));
+    categories?.forEach((id, index) => {
+      updateCategories.run(index, id);
+      updateBudgetSubcategories.run(index, id);
+    });
     methods?.forEach((id, index) => updateMethods.run(index, id));
   })();
   res.json({ data: { updated: true } });
@@ -283,72 +265,6 @@ router.post('/logo-search', async (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message || 'Logo could not be found.', code: 400 });
   }
-});
-
-router.get('/notification-agents', requireAdmin, (_req, res) => {
-  const agents = db.get().prepare(`
-    SELECT * FROM subscription_notification_agents ORDER BY created_at, id
-  `).all().map(publicAgent);
-  res.json({ data: agents });
-});
-
-router.post('/notification-agents', requireAdmin, (req, res) => {
-  const validated = validateAgent(req.body);
-  if (validated.errors.length) return res.status(400).json({ error: validated.errors.join(' '), code: 400 });
-  const result = db.get().prepare(`
-    INSERT INTO subscription_notification_agents (name, type, config_json, enabled, created_by)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(
-    validated.name,
-    validated.type,
-    JSON.stringify(validated.config),
-    req.body.enabled === false ? 0 : 1,
-    actorId(req),
-  );
-  const row = db.get().prepare('SELECT * FROM subscription_notification_agents WHERE id = ?').get(result.lastInsertRowid);
-  res.status(201).json({ data: publicAgent(row) });
-});
-
-router.put('/notification-agents/:id', requireAdmin, (req, res) => {
-  const id = Number(req.params.id);
-  const current = db.get().prepare('SELECT * FROM subscription_notification_agents WHERE id = ?').get(id);
-  if (!current) return res.status(404).json({ error: 'Notification agent not found.', code: 404 });
-  if (req.body.enabled !== undefined && typeof req.body.enabled !== 'boolean') {
-    return res.status(400).json({ error: 'Enabled must be a boolean.', code: 400 });
-  }
-  db.get().prepare('UPDATE subscription_notification_agents SET enabled = ? WHERE id = ?')
-    .run(req.body.enabled === undefined ? current.enabled : (req.body.enabled ? 1 : 0), id);
-  res.json({ data: publicAgent(db.get().prepare('SELECT * FROM subscription_notification_agents WHERE id = ?').get(id)) });
-});
-
-router.post('/notification-agents/:id/test', requireAdmin, async (req, res) => {
-  const id = Number(req.params.id);
-  const agent = db.get().prepare('SELECT * FROM subscription_notification_agents WHERE id = ?').get(id);
-  if (!agent) return res.status(404).json({ error: 'Notification agent not found.', code: 404 });
-  const sample = db.get().prepare('SELECT * FROM budget_subscriptions ORDER BY created_at DESC LIMIT 1').get() || {
-    id: 0,
-    name: 'Example subscription',
-    amount: 9.99,
-    currency: settings().base_currency,
-    next_payment_date: new Date().toISOString().slice(0, 10),
-  };
-  try {
-    await sendAgent(agent, sample);
-    db.get().prepare(`
-      UPDATE subscription_notification_agents SET last_test_at = ?, last_error = NULL WHERE id = ?
-    `).run(new Date().toISOString(), id);
-    res.json({ data: { ok: true } });
-  } catch (err) {
-    db.get().prepare('UPDATE subscription_notification_agents SET last_error = ? WHERE id = ?')
-      .run(String(err.message).slice(0, 1000), id);
-    res.status(502).json({ error: err.message || 'Notification test failed.', code: 502 });
-  }
-});
-
-router.delete('/notification-agents/:id', requireAdmin, (req, res) => {
-  const result = db.get().prepare('DELETE FROM subscription_notification_agents WHERE id = ?').run(Number(req.params.id));
-  if (!result.changes) return res.status(404).json({ error: 'Notification agent not found.', code: 404 });
-  res.status(204).end();
 });
 
 router.get('/', async (req, res) => {
@@ -374,6 +290,7 @@ router.get('/', async (req, res) => {
     }
     const rows = db.get().prepare(`
       SELECT s.*, c.name AS category_name, c.color AS category_color,
+             c.budget_subcategory_key,
              p.name AS payment_method_name, u.display_name AS creator_name
       FROM budget_subscriptions s
       LEFT JOIN subscription_categories c ON c.id = s.category_id
