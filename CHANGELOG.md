@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.71.23] - 2026-06-12
+
+### Fixed
+- **Task reminders no longer drift by the timezone offset on every save**: a task reminder was stored as UTC but read back as local time, so reopening a task in a non-UTC timezone showed the wrong offset (e.g. "1 hour before" became "Custom – 360 minutes" at UTC+5), and each save without changes added the offset again. Reminder times are now read back as UTC consistently, so the offset round-trips correctly and stays stable across repeated saves.
+
 ## [0.71.22] - 2026-06-12
 
 ### Changed

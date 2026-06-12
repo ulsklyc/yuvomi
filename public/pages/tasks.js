@@ -12,6 +12,7 @@ import { t, formatDate, formatTime, dateInputPlaceholder, formatDateInput, parse
 import { esc } from '/utils/html.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
+import { resolveReminderPreset } from '/utils/reminder-offset.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -474,32 +475,6 @@ async function loadReminderForTask(taskId) {
   } catch {
     return null;
   }
-}
-
-function parseOffsetMsFromReminder(task, reminder) {
-  if (!task?.due_date || !reminder?.remind_at) return null;
-  const due = task.due_time ? new Date(`${task.due_date}T${task.due_time}`) : new Date(`${task.due_date}T23:59:59`);
-  const remind = new Date(reminder.remind_at);
-  if (Number.isNaN(due.getTime()) || Number.isNaN(remind.getTime())) return null;
-  return due.getTime() - remind.getTime();
-}
-
-function resolveReminderPreset(task, reminder) {
-  const offset = parseOffsetMsFromReminder(task, reminder);
-  if (offset === null) return { preset: 'offset_15m', amount: '15', unit: 'minutes' };
-  const map = new Map([
-    [0, 'offset_at_time'],
-    [15 * 60 * 1000, 'offset_15m'],
-    [60 * 60 * 1000, 'offset_1h'],
-    [24 * 60 * 60 * 1000, 'offset_1d'],
-    [2 * 24 * 60 * 60 * 1000, 'offset_2d'],
-    [7 * 24 * 60 * 60 * 1000, 'offset_1w'],
-    [14 * 24 * 60 * 60 * 1000, 'offset_2w'],
-  ]);
-  if (map.has(offset)) return { preset: map.get(offset), amount: '1', unit: 'days' };
-  const minutes = Math.round(offset / 60000);
-  if (minutes > 0) return { preset: 'offset_custom', amount: String(minutes), unit: 'minutes' };
-  return { preset: 'offset_at_time', amount: '1', unit: 'days' };
 }
 
 function renderReminderSection(task = null, reminder = null) {
