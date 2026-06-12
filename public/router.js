@@ -606,10 +606,11 @@ async function renderPage(route, previousPath = null) {
     // Richtung bestimmen (previousPath ist der alte Pfad vor der Navigation)
     const direction = getDirection(previousPath, route.path);
     const inClass   = direction === 'right' ? 'page-transition--in-right' : 'page-transition--in-left';
+    const shouldAnimate = Boolean(previousPath);
 
     // Performance: backdrop-filter während Übergang deaktivieren (Android-Optimierung).
     // glass.css setzt alle backdrop-filter im app-content auf none solange diese Klasse aktiv ist.
-    document.documentElement.classList.add('navigating');
+    if (shouldAnimate) document.documentElement.classList.add('navigating');
 
     // Alter Inhalt ist jetzt weg - altes Stylesheet kann entfernt werden
     const pageWrapper = document.createElement('div');
@@ -632,18 +633,22 @@ async function renderPage(route, previousPath = null) {
     const renderPromise = module.render(pageWrapper, { user: currentUser });
 
     // Sichtbar machen und Einblend-Animation starten (Skeleton/Grundgerüst).
-    pageWrapper.style.opacity = '';
-    pageWrapper.classList.add(inClass);
+    pageWrapper.style.opacity = shouldAnimate ? '' : '1';
+    if (shouldAnimate) {
+      pageWrapper.classList.add(inClass);
 
-    // navigating-Klasse nach Ende der Einblend-Animation entfernen.
-    // Fallback-Timeout falls animationend nicht feuert (z.B. prefers-reduced-motion).
-    const navEndTimeout = setTimeout(() => {
+      // navigating-Klasse nach Ende der Einblend-Animation entfernen.
+      // Fallback-Timeout falls animationend nicht feuert (z.B. prefers-reduced-motion).
+      const navEndTimeout = setTimeout(() => {
+        document.documentElement.classList.remove('navigating');
+      }, 300);
+      pageWrapper.addEventListener('animationend', () => {
+        clearTimeout(navEndTimeout);
+        document.documentElement.classList.remove('navigating');
+      }, { once: true });
+    } else {
       document.documentElement.classList.remove('navigating');
-    }, 300);
-    pageWrapper.addEventListener('animationend', () => {
-      clearTimeout(navEndTimeout);
-      document.documentElement.classList.remove('navigating');
-    }, { once: true });
+    }
 
     await renderPromise;
 

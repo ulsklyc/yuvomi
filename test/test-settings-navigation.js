@@ -117,6 +117,19 @@ test('personal settings leaf modules import without browser globals', async () =
   }
 });
 
+test('settings reuse the authenticated router user instead of blocking on auth.me', async () => {
+  const source = await readFile(
+    new URL('../public/pages/settings.js', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(
+    source,
+    /async function refreshUser\(user\) \{\s*if \(user\) return user;/,
+    'settings should only refresh auth when the router did not provide a user',
+  );
+});
+
 test('navigation settings leaf imports without browser globals and exports render', async () => {
   const module = await import('/settings/pages/modules-navigation.js');
   assert.equal(typeof module.render, 'function');

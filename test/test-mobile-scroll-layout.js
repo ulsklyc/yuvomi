@@ -76,3 +76,26 @@ test('mobile bottom navigation keeps five equal slots with inset indicator geome
   assert.match(indicatorRule, /bottom:\s*var\(--space-1\)/);
   assert.doesNotMatch(indicatorRule, /transition:[^;]*\bwidth\b/);
 });
+
+test('cold dashboard load does not transform the scroll surface', () => {
+  assert.match(
+    routerJs,
+    /const shouldAnimate = Boolean\(previousPath\);/,
+    'the router must distinguish a cold load from an in-app navigation',
+  );
+  assert.match(
+    routerJs,
+    /if \(shouldAnimate\) \{\s*pageWrapper\.classList\.add\(inClass\);/,
+    'the slide class must only be applied after an existing route',
+  );
+});
+
+test('closed dashboard speed dial cannot capture first-scroll gestures', () => {
+  const dashboardCss = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const containerRule = cssRuleBody(dashboardCss, '.fab-container');
+  const mainRule = cssRuleBody(dashboardCss, '.fab-main');
+
+  assert.match(containerRule, /pointer-events:\s*none/);
+  assert.match(mainRule, /pointer-events:\s*auto/);
+  assert.match(dashboardCss, /\.fab-actions--visible\s*\{[^}]*pointer-events:\s*auto/s);
+});

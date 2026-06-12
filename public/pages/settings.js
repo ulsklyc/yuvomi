@@ -25,15 +25,13 @@ const OVERVIEW_VIEWS = new Set(['domains', 'domain']);
 let mountedContainer = null;
 
 async function refreshUser(user) {
+  if (user) return user;
+
   try {
     const me = await auth.me();
-    if (me?.user && user) {
-      Object.assign(user, me.user);
-      return user;
-    }
     if (me?.user) return me.user;
   } catch {
-    // Non-critical: render with the user object provided by the router.
+    // Non-critical: the router owns the auth redirect if no user is available.
   }
   return user;
 }

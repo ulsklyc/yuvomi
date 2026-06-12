@@ -1172,6 +1172,23 @@ test('dashboard polish keeps one page heading and native quick-action controls',
   );
 });
 
+test('dashboard today cockpit keeps content visibly below its section heading', () => {
+  const dashboard = read('../public/styles/dashboard.css');
+  const typography = read('../public/styles/typography.css');
+  const valueRule = cssRuleBody(dashboard, '.today-cockpit-card__value');
+
+  assert.match(
+    typography,
+    /\.today-cockpit__header h2,[\s\S]*?font-size:\s*var\(--type-section-title\)/,
+    'Heute wichtig must keep the section-title role',
+  );
+  assert.match(
+    valueRule,
+    /font-size:\s*var\(--type-secondary\)/,
+    'cockpit values must stay below the 18px section heading',
+  );
+});
+
 test('polished rounded cards use subtle full borders instead of thick accent caps', () => {
   const dashboard = read('../public/styles/dashboard.css');
   const housekeeping = read('../public/styles/housekeeping.css');
@@ -1744,6 +1761,44 @@ test('phase 2 dashboard FAB uses tokenized position and reserved mobile scroll r
     /@media \(max-width:\s*640px\)[\s\S]*\.dashboard-shell\s*\{[\s\S]*padding-bottom:\s*calc\(var\(--target-lg\)\s*\+\s*var\(--space-8\)\)/,
     'mobile dashboard should reserve scroll room for the fixed FAB'
   );
+});
+
+test('calendar desktop layout matches the dashboard gutter and compacts weekday headers', () => {
+  const calendar = read('../public/styles/calendar.css');
+
+  assert.match(
+    calendar,
+    /@media \(min-width:\s*1024px\)[\s\S]*?\.calendar-page\s*\{[\s\S]*?padding:\s*var\(--space-6\)\s+var\(--space-8\)/,
+    'desktop calendar should keep breathing room beside the sidebar',
+  );
+  assert.match(
+    calendar,
+    /@media \(min-width:\s*1024px\)[\s\S]*?\.week-view__day-header\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?justify-content:\s*center/,
+    'desktop weekday and date should sit side by side',
+  );
+  assert.match(
+    calendar,
+    /@media \(min-width:\s*1024px\)[\s\S]*?\.week-view__day-num\s*\{[\s\S]*?width:\s*var\(--target-sm\);[\s\S]*?height:\s*var\(--target-sm\)/,
+    'desktop date markers should use the compact touch-size token',
+  );
+});
+
+test('dashboard and calendar keep distinct navigation accents in light and dark themes', () => {
+  const tokens = read('../public/styles/tokens.css');
+  const rootBlock = tokens.match(/:root\s*\{([\s\S]*?)\n\}/);
+  const darkBlock = tokens.match(/\n\[data-theme="dark"\]\s*\{([\s\S]*?)\n\}/);
+
+  assert.ok(rootBlock, 'expected a :root token block');
+  assert.ok(darkBlock, 'expected a [data-theme="dark"] block');
+
+  for (const [theme, block] of [['light', rootBlock[1]], ['dark', darkBlock[1]]]) {
+    const values = parseTokenMap(block);
+    assert.notEqual(
+      values.get('--_module-dashboard')?.toLowerCase(),
+      values.get('--_module-calendar')?.toLowerCase(),
+      `${theme} dashboard and calendar accents must be visually distinct`,
+    );
+  }
 });
 
 // ============================================================

@@ -194,7 +194,7 @@
   --module-dashboard:  var(--_module-dashboard);  /* Violet — Übersicht (= --color-accent, bewusster Share) */
   --_module-tasks:     #15803D;
   --module-tasks:      var(--_module-tasks);       /* Grün - Erledigung (= --color-success, bewusster Share) */
-  --_module-calendar:  #8250DF;
+  --_module-calendar:  #4F46E5;
   --module-calendar:   var(--_module-calendar);    /* Violett - Termine, Zeit */
   --_module-meals:     #C2410C;
   --module-meals:      var(--_module-meals);       /* Orange-700 - Essen, Wärme */
@@ -637,7 +637,7 @@
 
     --_module-dashboard: #a78bfa;
     --_module-tasks:     #4ADE80;
-    --_module-calendar:  #A78BFA;
+    --_module-calendar:  #818CF8;
     --_module-meals:     #FB923C;
     --_module-shopping:  #F472B6;
     --_module-notes:     #FCD34D;
@@ -752,7 +752,7 @@
     /* Modul-Akzente (Entflechtung Meals/Shopping spiegelt Light-Mode) */
     --_module-dashboard: #a78bfa;   /* Violet-400 */
     --_module-tasks:     #4ADE80;
-    --_module-calendar:  #A78BFA;
+    --_module-calendar:  #818CF8;
     --_module-meals:     #FB923C;   /* Orange-400 */
     --_module-shopping:  #F472B6;   /* Pink-400 */
     --_module-notes:     #FCD34D;

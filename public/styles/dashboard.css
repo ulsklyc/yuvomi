@@ -1184,6 +1184,7 @@ svg.weather-forecast__icon {
   flex-direction: column-reverse;
   align-items: flex-end;
   gap: var(--space-3);
+  pointer-events: none;
 }
 
 @media (min-width: 1024px) {
@@ -1208,6 +1209,7 @@ svg.weather-forecast__icon {
     background-color var(--transition-fast);
   border: none;
   flex-shrink: 0;
+  pointer-events: auto;
 }
 
 @media (min-width: 1024px) {
@@ -1753,7 +1755,7 @@ svg.weather-forecast__icon {
   overflow: hidden;
   align-self: start;
   color: var(--today-card-accent);
-  font-size: var(--text-base);
+  font-size: var(--type-secondary);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-snug);
   overflow-wrap: normal;
@@ -2666,7 +2668,7 @@ svg.weather-forecast__icon {
   }
 
   .today-cockpit-card__value {
-    font-size: var(--text-sm);
+    font-size: var(--type-secondary);
   }
 
   .dashboard-kpi {

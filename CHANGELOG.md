@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.71.35] - 2026-06-13
+
+### Fixed
+- **Dashboard interactions now feel proportionate and respond on the first mobile swipe**: the "Today important" values no longer overpower their heading, the initial route skips the page-slide transform, and the closed quick-action layer no longer captures gestures in the lower half of the screen.
+- **Calendar gains clearer desktop spacing and denser date navigation**: the page now keeps a consistent gutter beside the sidebar, while weekday and date sit side by side in a shorter header row.
+- **Settings open faster and mobile navigation accents stay distinct**: Settings reuse the authenticated router user instead of repeating the session request, and Dashboard and Calendar retain separate colors in light and dark themes.
+
 ## [0.71.34] - 2026-06-13
 
 ### Fixed
