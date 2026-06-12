@@ -48,45 +48,11 @@
 
 .subscriptions-summary-card,
 .subscriptions-chart,
-.subscriptions-insights,
 .subscriptions-list-section {
   border: 1px solid var(--glass-border-subtle);
   border-radius: var(--radius-glass-card);
   background: var(--glass-bg-card);
   box-shadow: var(--glass-shadow-sm);
-}
-
-.subscriptions-insights {
-  margin-bottom: var(--space-4);
-  padding: var(--space-4);
-}
-
-.subscriptions-insight-list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-
-.subscriptions-insight-list article {
-  display: flex;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-glass-inner);
-  background: var(--color-surface);
-}
-
-.subscriptions-insight-list svg {
-  flex: 0 0 18px;
-  width: 18px;
-  color: var(--module-budget);
-}
-
-.subscriptions-insight-list p {
-  margin: var(--space-1) 0 0;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
 }
 
 .subscriptions-summary-card {
@@ -312,6 +278,188 @@
   flex: 1;
 }
 
+.subscriptions-logo-search .btn {
+  flex: 0 0 auto;
+}
+
+.subscriptions-logo-search .btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.subscription-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.subscription-form__section {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-glass-inner);
+  background: color-mix(in srgb, var(--glass-bg-card) 76%, transparent);
+}
+
+.subscription-form__section > h3 {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.subscription-form__section > h3 svg {
+  width: 17px;
+  height: 17px;
+  color: var(--module-budget);
+}
+
+.subscription-form__identity {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.subscription-form__identity-fields {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.subscription-logo-picker {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+  cursor: pointer;
+}
+
+.subscription-logo-picker > span {
+  display: grid;
+  width: 84px;
+  height: 84px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--module-budget);
+  font-size: var(--text-xl);
+}
+
+.subscription-logo-picker img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.subscription-logo-picker small {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.subscription-logo-picker small svg {
+  width: 14px;
+  height: 14px;
+}
+
+.subscription-logo-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.subscription-form__billing-grid {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.8fr) minmax(180px, 1.3fr) minmax(130px, 1fr) minmax(90px, 0.65fr);
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.subscription-form__organization-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 90px;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.subscription-form__color .form-input--color {
+  width: 100%;
+}
+
+.subscriptions-combobox {
+  position: relative;
+}
+
+.subscriptions-combobox__control {
+  position: relative;
+}
+
+.subscriptions-combobox__control > svg {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: var(--space-3);
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  color: var(--color-text-secondary);
+  pointer-events: none;
+}
+
+.subscriptions-combobox__control .form-input {
+  padding-left: calc(var(--space-3) + 22px);
+}
+
+.subscriptions-combobox__options {
+  position: absolute;
+  z-index: var(--z-dropdown);
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.subscriptions-combobox__options button {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  text-align: start;
+  cursor: pointer;
+}
+
+.subscriptions-combobox__options button:hover,
+.subscriptions-combobox__options button:focus,
+.subscriptions-combobox__options button[aria-selected="true"] {
+  outline: none;
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+}
+
+.subscriptions-enabled-row > div {
+  display: grid;
+  gap: 2px;
+}
+
+.subscriptions-enabled-row small {
+  color: var(--color-text-secondary);
+}
+
 .subscriptions-settings-section {
   justify-content: space-between;
   margin-top: var(--space-4);
@@ -442,7 +590,6 @@
   .subscriptions-toolbar,
   .subscriptions-summary,
   .subscriptions-analytics,
-  .subscriptions-insight-list,
   .subscriptions-metadata {
     grid-template-columns: 1fr;
   }
@@ -479,5 +626,27 @@
 
   .subscriptions-section-head {
     align-items: flex-start;
+  }
+
+  .subscription-form__identity,
+  .subscription-form__billing-grid,
+  .subscription-form__organization-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .subscription-logo-picker {
+    grid-template-columns: auto 1fr;
+    justify-items: start;
+  }
+
+  .subscription-logo-picker > span {
+    grid-row: span 2;
+    width: 68px;
+    height: 68px;
+  }
+
+  .subscriptions-logo-search {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

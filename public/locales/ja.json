@@ -2070,12 +2070,6 @@
         "newPaymentMethodPlaceholder": "New payment method",
         "moveUp": "Move up",
         "moveDown": "Move down",
-        "insightsTitle": "スマート分析",
-        "insightsHint": "Generate private spending insights on demand.",
-        "insightsProvider": "Provider: {{provider}}",
-        "generateInsights": "分析を生成",
-        "insightTitle": "Subscription insight",
-        "insightsError": "Insights could not be generated.",
         "findLogo": "ロゴを検索",
         "findLogoHint": "Securely checks the public HTTPS website for its icon.",
         "logoFound": "Logo found.",
@@ -2091,6 +2085,15 @@
         "agentConfigLabel": "Configuration",
         "agentConfigHint": "JSON configuration is stored only on your self-hosted server. Secrets are never returned to the browser.",
         "addAgent": "エージェントを追加",
-        "notificationTestSent": "Test notification sent."
+        "notificationTestSent": "Test notification sent.",
+        "billingDetails": "Billing details",
+        "renewalDetails": "Renewal and reminders",
+        "organizationDetails": "Organization",
+        "serviceDetails": "Service details",
+        "currencySearchPlaceholder": "Search currency...",
+        "categorySearchPlaceholder": "Search category...",
+        "paymentMethodSearchPlaceholder": "Search payment method...",
+        "enabledHint": "Active subscriptions are included in Budget expenses.",
+        "currencyRequired": "Select a currency."
     }
 }

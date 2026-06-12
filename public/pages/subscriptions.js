@@ -29,11 +29,13 @@ let state = {
   paymentMethodId: '',
   status: 'all',
   sort: 'due',
-  recommendations: [],
-  recommendationProvider: '',
   user: null,
 };
 let container = null;
+const CURRENCIES = [
+  'AED', 'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'HUF', 'INR',
+  'JPY', 'KZT', 'NOK', 'PLN', 'RUB', 'SAR', 'SEK', 'TRY', 'UAH', 'USD',
+];
 
 function setHtml(element, html) {
   element.replaceChildren();
@@ -114,7 +116,7 @@ export async function render(target, { user } = {}) {
           <option value="name">${t('subscriptions.sortName')}</option>
         </select>
         <button class="btn btn--secondary btn--icon" id="subscriptions-manage" aria-label="${t('subscriptions.manageMetadata')}">
-          <i data-lucide="list-settings" aria-hidden="true"></i>
+          <i data-lucide="tags" aria-hidden="true"></i>
         </button>
         <button class="btn btn--secondary btn--icon" id="subscriptions-settings" aria-label="${t('subscriptions.settingsTitle')}">
           <i data-lucide="settings-2" aria-hidden="true"></i>
@@ -213,7 +215,6 @@ function renderContent() {
   const rows = sortedSubscriptions();
   setHtml(content, `
     ${renderSummary()}
-    ${renderRecommendations()}
     ${renderAnalytics()}
     <section class="subscriptions-list-section">
       <div class="subscriptions-section-head">
@@ -234,34 +235,6 @@ function renderContent() {
   `);
   bindContent();
   if (window.lucide) window.lucide.createIcons({ el: content });
-}
-
-function renderRecommendations() {
-  return `
-    <section class="subscriptions-insights">
-      <div class="subscriptions-section-head">
-        <div>
-          <h2>${t('subscriptions.insightsTitle')}</h2>
-          <span>${state.recommendationProvider
-            ? t('subscriptions.insightsProvider', { provider: state.recommendationProvider })
-            : t('subscriptions.insightsHint')}</span>
-        </div>
-        <button class="btn btn--secondary" id="subscriptions-generate-insights">
-          <i data-lucide="sparkles" aria-hidden="true"></i>${t('subscriptions.generateInsights')}
-        </button>
-      </div>
-      ${state.recommendations.length ? `
-        <div class="subscriptions-insight-list">
-          ${state.recommendations.map((item) => `
-            <article>
-              <i data-lucide="lightbulb" aria-hidden="true"></i>
-              <div><strong>${esc(item.title || t('subscriptions.insightTitle'))}</strong><p>${esc(item.insight)}</p></div>
-            </article>
-          `).join('')}
-        </div>
-      ` : ''}
-    </section>
-  `;
 }
 
 function renderSummary() {
@@ -395,20 +368,6 @@ function renderEmpty() {
 
 function bindContent() {
   container.querySelector('#subscriptions-refresh-rates')?.addEventListener('click', () => reload({ refreshRates: true }));
-  container.querySelector('#subscriptions-generate-insights')?.addEventListener('click', async (event) => {
-    const button = event.currentTarget;
-    button.disabled = true;
-    try {
-      const result = await api.get('/budget/subscriptions/insights/recommendations');
-      state.recommendations = result.data?.recommendations || [];
-      state.recommendationProvider = result.data?.provider || 'local';
-      renderContent();
-    } catch (err) {
-      window.oikos?.showToast(err.data?.error || t('subscriptions.insightsError'), 'danger');
-    } finally {
-      button.disabled = false;
-    }
-  });
   container.querySelector('#subscriptions-empty-add')?.addEventListener('click', () => openSubscriptionModal());
   container.querySelector('#subscriptions-list')?.addEventListener('click', async (event) => {
     const action = event.target.closest('[data-action]');
@@ -423,100 +382,244 @@ function bindContent() {
   });
 }
 
+function currencyItems() {
+  let names;
+  try {
+    names = new Intl.DisplayNames([getLocale()], { type: 'currency' });
+  } catch {
+    names = null;
+  }
+  return CURRENCIES.map((code) => ({
+    value: code,
+    label: `${code} · ${names?.of(code) || code}`,
+  }));
+}
+
+function comboboxMarkup({ id, label, items, value = '', placeholder }) {
+  const selected = items.find((item) => String(item.value) === String(value));
+  return `
+    <div class="form-group subscriptions-combobox" data-combobox="${id}">
+      <label class="form-label" for="${id}-search">${label}</label>
+      <div class="subscriptions-combobox__control">
+        <i data-lucide="search" aria-hidden="true"></i>
+        <input class="form-input" id="${id}-search" type="search" role="combobox"
+               aria-autocomplete="list" aria-expanded="false" aria-controls="${id}-options"
+               autocomplete="off" placeholder="${esc(placeholder)}" value="${esc(selected?.label || '')}">
+        <input id="${id}" type="hidden" value="${esc(selected?.value ?? '')}">
+      </div>
+      <div class="subscriptions-combobox__options" id="${id}-options" role="listbox" hidden>
+        ${items.map((item) => `
+          <button type="button" role="option" data-value="${esc(item.value)}"
+                  aria-selected="${String(item.value) === String(value)}">${esc(item.label)}</button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function wireCombobox(panel, id) {
+  const root = panel.querySelector(`[data-combobox="${id}"]`);
+  const search = root.querySelector(`#${id}-search`);
+  const value = root.querySelector(`#${id}`);
+  const options = [...root.querySelectorAll('[role="option"]')];
+  let suppressFocusOpen = false;
+  const open = () => {
+    root.querySelector('.subscriptions-combobox__options').hidden = false;
+    search.setAttribute('aria-expanded', 'true');
+  };
+  const close = () => {
+    root.querySelector('.subscriptions-combobox__options').hidden = true;
+    search.setAttribute('aria-expanded', 'false');
+  };
+  const select = (option) => {
+    value.value = option.dataset.value;
+    search.value = option.textContent.trim();
+    options.forEach((item) => item.setAttribute('aria-selected', String(item === option)));
+    close();
+    suppressFocusOpen = true;
+    search.focus();
+    queueMicrotask(() => { suppressFocusOpen = false; });
+  };
+  const filter = () => {
+    const query = search.value.trim().toLocaleLowerCase(getLocale());
+    options.forEach((option) => {
+      option.hidden = Boolean(query) && !option.textContent.toLocaleLowerCase(getLocale()).includes(query);
+    });
+    open();
+  };
+  search.addEventListener('focus', () => {
+    if (suppressFocusOpen) return;
+    search.select();
+    filter();
+  });
+  search.addEventListener('input', () => {
+    value.value = '';
+    filter();
+  });
+  search.addEventListener('keydown', (event) => {
+    const visible = options.filter((option) => !option.hidden);
+    const active = visible.indexOf(document.activeElement);
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      open();
+      (visible[Math.min(active + 1, visible.length - 1)] || visible[0])?.focus();
+    }
+    if (event.key === 'Enter' && visible.length) {
+      event.preventDefault();
+      event.stopPropagation();
+      select(visible[0]);
+    }
+    if (event.key === 'Escape') close();
+  });
+  options.forEach((option) => {
+    option.addEventListener('click', () => select(option));
+    option.addEventListener('keydown', (event) => {
+      const visible = options.filter((item) => !item.hidden);
+      const index = visible.indexOf(option);
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        visible[Math.max(0, Math.min(visible.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))]?.focus();
+      }
+      if (event.key === 'Escape') {
+        close();
+        search.focus();
+      }
+    });
+  });
+  root.addEventListener('focusout', () => setTimeout(() => {
+    if (!root.contains(document.activeElement)) close();
+  }, 0));
+}
+
 export function openSubscriptionModal(subscription = null) {
   const edit = Boolean(subscription);
-  const categoryOptions = state.meta.categories.map((item) => `
-    <option value="${item.id}" ${subscription?.category_id === item.id ? 'selected' : ''}>${esc(item.name)}</option>
-  `).join('');
-  const methodOptions = state.meta.payment_methods.map((item) => `
-    <option value="${item.id}" ${subscription?.payment_method_id === item.id ? 'selected' : ''}>${esc(item.name)}</option>
-  `).join('');
+  const categoryItems = [
+    { value: '', label: t('subscriptions.uncategorized') },
+    ...state.meta.categories.map((item) => ({ value: item.id, label: item.name })),
+  ];
+  const methodItems = [
+    { value: '', label: t('subscriptions.unspecified') },
+    ...state.meta.payment_methods.map((item) => ({ value: item.id, label: item.name })),
+  ];
+  const initialLogo = subscription?.logo_data || '';
+  const initialName = subscription?.name || '';
   const content = `
-    <form id="subscription-form">
-      <div class="form-group">
-        <label class="form-label" for="subscription-name">${t('subscriptions.nameLabel')}</label>
-        <input class="form-input" id="subscription-name" maxlength="200" required value="${esc(subscription?.name || '')}">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="subscription-description">${t('subscriptions.descriptionLabel')}</label>
-        <input class="form-input" id="subscription-description" maxlength="5000" value="${esc(subscription?.description || '')}">
-      </div>
-      <div class="form-grid-2">
-        <div class="form-group">
-          <label class="form-label" for="subscription-amount">${t('subscriptions.amountLabel')}</label>
-          <input class="form-input" id="subscription-amount" type="number" min="0" step="0.01" inputmode="decimal" required value="${subscription?.amount ?? ''}">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="subscription-currency">${t('subscriptions.currencyLabel')}</label>
-          <input class="form-input" id="subscription-currency" maxlength="3" pattern="[A-Za-z]{3}" required value="${esc(subscription?.currency || state.settings.base_currency)}">
-        </div>
-      </div>
-      <div class="form-grid-2">
-        <div class="form-group">
-          <label class="form-label" for="subscription-cycle">${t('subscriptions.billingCycleLabel')}</label>
-          <select class="form-input" id="subscription-cycle">
-            ${state.meta.billing_cycles.map((cycle) => `<option value="${cycle}" ${subscription?.billing_cycle === cycle ? 'selected' : ''}>${t(`subscriptions.cycle.${cycle}`)}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="subscription-interval">${t('subscriptions.intervalLabel')}</label>
-          <input class="form-input" id="subscription-interval" type="number" min="1" max="365" step="1" value="${subscription?.cycle_interval || 1}">
-        </div>
-      </div>
-      <div class="form-grid-2">
-        <div class="form-group">
-          <label class="form-label" for="subscription-next-date">${t('subscriptions.nextPaymentLabel')}</label>
-          <input class="form-input" id="subscription-next-date" inputmode="numeric"
-                 placeholder="${dateInputPlaceholder()}" value="${esc(formatDateInput(subscription?.next_payment_date || toLocalDateKey(new Date())))}" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="subscription-reminder">${t('subscriptions.reminderDaysLabel')}</label>
-          <input class="form-input" id="subscription-reminder" type="number" min="0" max="365" step="1" value="${subscription?.reminder_days ?? 3}">
-        </div>
-      </div>
-      <div class="form-grid-2">
-        <div class="form-group">
-          <label class="form-label" for="subscription-category">${t('subscriptions.categoryLabel')}</label>
-          <select class="form-input" id="subscription-category">
-            <option value="">${t('subscriptions.uncategorized')}</option>${categoryOptions}
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="subscription-method">${t('subscriptions.paymentMethodLabel')}</label>
-          <select class="form-input" id="subscription-method">
-            <option value="">${t('subscriptions.unspecified')}</option>${methodOptions}
-          </select>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="subscription-website">${t('subscriptions.websiteLabel')}</label>
-        <div class="subscriptions-logo-search">
-          <input class="form-input" id="subscription-website" type="url" placeholder="https://" value="${esc(subscription?.website_url || '')}">
-          <button class="btn btn--secondary" type="button" id="subscription-find-logo">${t('subscriptions.findLogo')}</button>
-        </div>
-        <small>${t('subscriptions.findLogoHint')}</small>
-      </div>
-      <div class="form-grid-2">
-        <div class="form-group">
-          <label class="form-label" for="subscription-color">${t('subscriptions.brandColorLabel')}</label>
-          <input class="form-input form-input--color" id="subscription-color" type="color" value="${esc(subscription?.brand_color || '#0F766E')}">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="subscription-logo">${t('subscriptions.logoLabel')}</label>
-          <input class="form-input" id="subscription-logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="subscription-notes">${t('subscriptions.notesLabel')}</label>
-        <textarea class="form-input" id="subscription-notes" rows="3">${esc(subscription?.notes || '')}</textarea>
-      </div>
-      <div class="subscriptions-enabled-row">
-        <span>${t('subscriptions.enabledLabel')}</span>
-        <label class="toggle">
-          <input id="subscription-enabled" type="checkbox" ${subscription?.enabled === false ? '' : 'checked'}>
-          <span class="toggle__track"></span>
+    <form id="subscription-form" class="subscription-form">
+      <section class="subscription-form__section subscription-form__identity">
+        <label class="subscription-logo-picker" for="subscription-logo" title="${t('subscriptions.logoLabel')}">
+          <span id="subscription-logo-preview">
+            ${initialLogo
+              ? `<img src="${esc(initialLogo)}" alt="">`
+              : `<strong>${esc(initialName.slice(0, 2).toUpperCase() || '+')}</strong>`}
+          </span>
+          <small><i data-lucide="upload" aria-hidden="true"></i>${t('subscriptions.logoLabel')}</small>
+          <input id="subscription-logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
         </label>
-      </div>
+        <div class="subscription-form__identity-fields">
+          <div class="form-group">
+            <label class="form-label" for="subscription-name">${t('subscriptions.nameLabel')}</label>
+            <input class="form-input" id="subscription-name" maxlength="200" required value="${esc(initialName)}">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="subscription-description">${t('subscriptions.descriptionLabel')}</label>
+            <input class="form-input" id="subscription-description" maxlength="5000" value="${esc(subscription?.description || '')}">
+          </div>
+        </div>
+      </section>
+
+      <section class="subscription-form__section">
+        <h3><i data-lucide="receipt-text" aria-hidden="true"></i>${t('subscriptions.billingDetails')}</h3>
+        <div class="subscription-form__billing-grid">
+          <div class="form-group">
+            <label class="form-label" for="subscription-amount">${t('subscriptions.amountLabel')}</label>
+            <input class="form-input" id="subscription-amount" type="number" min="0" step="0.01" inputmode="decimal" required value="${subscription?.amount ?? ''}">
+          </div>
+          ${comboboxMarkup({
+            id: 'subscription-currency',
+            label: t('subscriptions.currencyLabel'),
+            items: currencyItems(),
+            value: subscription?.currency || state.settings.base_currency,
+            placeholder: t('subscriptions.currencySearchPlaceholder'),
+          })}
+          <div class="form-group">
+            <label class="form-label" for="subscription-cycle">${t('subscriptions.billingCycleLabel')}</label>
+            <select class="form-input" id="subscription-cycle">
+              ${state.meta.billing_cycles.map((cycle) => `<option value="${cycle}" ${subscription?.billing_cycle === cycle ? 'selected' : ''}>${t(`subscriptions.cycle.${cycle}`)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="subscription-interval">${t('subscriptions.intervalLabel')}</label>
+            <input class="form-input" id="subscription-interval" type="number" min="1" max="365" step="1" value="${subscription?.cycle_interval || 1}">
+          </div>
+        </div>
+      </section>
+
+      <section class="subscription-form__section">
+        <h3><i data-lucide="calendar-clock" aria-hidden="true"></i>${t('subscriptions.renewalDetails')}</h3>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="subscription-next-date">${t('subscriptions.nextPaymentLabel')}</label>
+            <input class="form-input" id="subscription-next-date" inputmode="numeric"
+                   placeholder="${dateInputPlaceholder()}" value="${esc(formatDateInput(subscription?.next_payment_date || toLocalDateKey(new Date())))}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="subscription-reminder">${t('subscriptions.reminderDaysLabel')}</label>
+            <input class="form-input" id="subscription-reminder" type="number" min="0" max="365" step="1" value="${subscription?.reminder_days ?? 3}">
+          </div>
+        </div>
+      </section>
+
+      <section class="subscription-form__section">
+        <h3><i data-lucide="tags" aria-hidden="true"></i>${t('subscriptions.organizationDetails')}</h3>
+        <div class="subscription-form__organization-grid">
+          ${comboboxMarkup({
+            id: 'subscription-category',
+            label: t('subscriptions.categoryLabel'),
+            items: categoryItems,
+            value: subscription?.category_id || '',
+            placeholder: t('subscriptions.categorySearchPlaceholder'),
+          })}
+          ${comboboxMarkup({
+            id: 'subscription-method',
+            label: t('subscriptions.paymentMethodLabel'),
+            items: methodItems,
+            value: subscription?.payment_method_id || '',
+            placeholder: t('subscriptions.paymentMethodSearchPlaceholder'),
+          })}
+          <div class="form-group subscription-form__color">
+            <label class="form-label" for="subscription-color">${t('subscriptions.brandColorLabel')}</label>
+            <input class="form-input form-input--color" id="subscription-color" type="color" value="${esc(subscription?.brand_color || '#0F766E')}">
+          </div>
+        </div>
+      </section>
+
+      <section class="subscription-form__section">
+        <h3><i data-lucide="panel-top" aria-hidden="true"></i>${t('subscriptions.serviceDetails')}</h3>
+        <div class="form-group">
+          <label class="form-label" for="subscription-website">${t('subscriptions.websiteLabel')}</label>
+          <div class="subscriptions-logo-search">
+            <input class="form-input" id="subscription-website" inputmode="url" placeholder="example.com" value="${esc(subscription?.website_url || '')}">
+            <button class="btn btn--secondary" type="button" id="subscription-find-logo">
+              <i data-lucide="image-search" aria-hidden="true"></i>${t('subscriptions.findLogo')}
+            </button>
+          </div>
+          <small>${t('subscriptions.findLogoHint')}</small>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="subscription-notes">${t('subscriptions.notesLabel')}</label>
+          <textarea class="form-input" id="subscription-notes" rows="3">${esc(subscription?.notes || '')}</textarea>
+        </div>
+        <div class="subscriptions-enabled-row">
+          <div>
+            <strong>${t('subscriptions.enabledLabel')}</strong>
+            <small>${t('subscriptions.enabledHint')}</small>
+          </div>
+          <label class="toggle">
+            <input id="subscription-enabled" type="checkbox" ${subscription?.enabled === false ? '' : 'checked'}>
+            <span class="toggle__track"></span>
+          </label>
+        </div>
+      </section>
       <div class="modal-panel__footer subscriptions-modal-footer">
         <button class="btn btn--secondary" type="button" id="subscription-cancel">${t('common.cancel')}</button>
         <button class="btn btn--primary" type="submit">${edit ? t('common.save') : t('common.add')}</button>
@@ -529,15 +632,44 @@ export function openSubscriptionModal(subscription = null) {
     size: 'lg',
     onSave(panel) {
       let searchedLogoData = null;
+      const logoPreview = panel.querySelector('#subscription-logo-preview');
+      const showLogo = (data) => {
+        logoPreview.replaceChildren();
+        if (data) {
+          logoPreview.insertAdjacentHTML('afterbegin', `<img src="${esc(data)}" alt="">`);
+        } else {
+          logoPreview.insertAdjacentHTML('afterbegin', `<strong>${esc(panel.querySelector('#subscription-name').value.slice(0, 2).toUpperCase() || '+')}</strong>`);
+        }
+      };
+      wireCombobox(panel, 'subscription-currency');
+      wireCombobox(panel, 'subscription-category');
+      wireCombobox(panel, 'subscription-method');
       panel.querySelector('#subscription-cancel').addEventListener('click', closeModal);
+      panel.querySelector('#subscription-logo').addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        try {
+          searchedLogoData = await fileToDataUrl(file);
+          showLogo(searchedLogoData);
+        } catch (err) {
+          event.target.value = '';
+          window.oikos?.showToast(err.message, 'danger');
+        }
+      });
+      panel.querySelector('#subscription-name').addEventListener('input', () => {
+        if (!logoPreview.querySelector('img')) showLogo(null);
+      });
       panel.querySelector('#subscription-find-logo').addEventListener('click', async () => {
-        const website = panel.querySelector('#subscription-website').value.trim();
+        let website = panel.querySelector('#subscription-website').value.trim();
         if (!website) return;
+        if (!/^https:\/\//i.test(website)) website = `https://${website}`;
+        panel.querySelector('#subscription-website').value = website;
         const button = panel.querySelector('#subscription-find-logo');
         button.disabled = true;
         try {
           const result = await api.post('/budget/subscriptions/logo-search', { website_url: website });
           searchedLogoData = result.data.logo_data;
+          showLogo(searchedLogoData);
           window.oikos?.showToast(t('subscriptions.logoFound'), 'success');
         } catch (err) {
           window.oikos?.showToast(err.data?.error || t('subscriptions.logoNotFound'), 'danger');
@@ -566,16 +698,22 @@ async function fileToDataUrl(file) {
 
 async function saveSubscription(panel, existing, searchedLogoData = null) {
   const dateInput = panel.querySelector('#subscription-next-date');
+  const currencyInput = panel.querySelector('#subscription-currency');
   if (!isDateInputValid(dateInput.value)) {
     window.oikos?.showToast(t('subscriptions.invalidDate'), 'danger');
     dateInput.focus();
+    return;
+  }
+  if (!currencyInput.value) {
+    window.oikos?.showToast(t('subscriptions.currencyRequired'), 'danger');
+    panel.querySelector('#subscription-currency-search').focus();
     return;
   }
   const submit = panel.querySelector('[type="submit"]');
   submit.disabled = true;
   try {
     const file = panel.querySelector('#subscription-logo').files[0];
-    const logoData = file ? await fileToDataUrl(file) : searchedLogoData || existing?.logo_data || null;
+    const logoData = searchedLogoData || (file ? await fileToDataUrl(file) : existing?.logo_data || null);
     const payload = {
       name: panel.querySelector('#subscription-name').value.trim(),
       description: panel.querySelector('#subscription-description').value.trim() || null,
