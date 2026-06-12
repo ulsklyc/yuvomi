@@ -7,13 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.71.15] - 2026-06-12
+
 ### Changed
-- **Konsistentes Lade-Feedback**: eine geteilte Skeleton-Lade-Sprache (`public/utils/skeleton.js` → `renderSkeletonList()`) ersetzt die modul-eigenen „Lädt…"-Texte in Budget, Mahlzeiten und Haushalt. Die Skeleton-Klassen (`.skeleton-list`/`.skeleton-card`/`.skeleton-line`) liegen jetzt global in `layout.css` statt nur in `dashboard.css`.
-- **Z-Index-Disziplin**: die zwei verbliebenen Magic-Number-Z-Indizes (`9999` Skip-Link, `1000` Kanban-Drag-Ghost) sind auf neue semantische Tokens (`--z-skip-link`, `--z-drag`) der dokumentierten Skala gemappt.
+- **Consistent loading feedback**: a shared skeleton loading language (`public/utils/skeleton.js` → `renderSkeletonList()`) replaces the per-module "loading…" text placeholders in Budget, Meals, and Housekeeping. The skeleton classes (`.skeleton-list`/`.skeleton-card`/`.skeleton-line`) now live globally in `layout.css` instead of only in `dashboard.css`.
+- **Z-index discipline**: the two remaining magic-number z-indexes (`9999` skip link, `1000` kanban drag ghost) are mapped to new semantic tokens (`--z-skip-link`, `--z-drag`) on the documented scale.
 
 ### Fixed
-- **Skeleton-Breiten außerhalb des Dashboards**: die `.skeleton-line--short/medium/full`-Varianten lagen nur in `dashboard.css` und blieben auf anderen Seiten (Tasks, Shopping) wirkungslos, weil CSS pro Modul dynamisch geladen wird; sie sind jetzt global verfügbar.
-- **Skeleton & Reduced-Motion**: der Skeleton-Shimmer respektiert nun `prefers-reduced-motion: reduce` (statische Fläche statt Animation).
+- **Skeleton widths outside the dashboard**: the `.skeleton-line--short/medium/full` variants previously lived only in `dashboard.css` and silently had no effect on other pages (Tasks, Shopping), because CSS is loaded per module; they are now globally available.
+- **Skeleton and reduced motion**: the skeleton shimmer now respects `prefers-reduced-motion: reduce` (static surface instead of animation).
 
 ## [0.71.14] - 2026-06-12
 
