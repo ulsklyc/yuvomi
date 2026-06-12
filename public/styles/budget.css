@@ -5,6 +5,7 @@
  */
 
 @import url('/styles/split-expenses.css');
+@import url('/styles/subscriptions.css');
 
 /* --------------------------------------------------------
  * Modul-Akzent
@@ -129,6 +130,11 @@
   background: var(--color-info);
 }
 
+.budget-tab[data-tab="subscriptions"].budget-tab--active {
+  background: var(--module-budget);
+  color: var(--color-ink-on-vivid);
+}
+
 .budget-tab[data-tab="split-expenses"].budget-tab--active {
   background: var(--module-split-expenses);
 }
@@ -147,6 +153,10 @@
 .budget-tab-panel--loans {
   overflow-y: auto;
   padding-top: var(--space-3);
+}
+
+.budget-tab-panel--subscriptions {
+  overflow-y: auto;
 }
 
 /* --------------------------------------------------------
