@@ -822,7 +822,14 @@
         "categoryHealth": "Zdrowie",
         "categoryFamily": "Rodzina",
         "categoryHome": "Dom",
-        "categoryClothing": "Odzież"
+        "categoryClothing": "Odzież",
+        "catSubscriptions": "Subskrypcja",
+        "subcatSubscriptionEntertainment": "Rozrywka",
+        "subcatSubscriptionProductivity": "Produktywność",
+        "subcatSubscriptionUtilities": "Media i usługi",
+        "subcatSubscriptionHealth": "Zdrowie",
+        "subcatSubscriptionEducation": "Edukacja",
+        "subcatSubscriptionOther": "Inne"
     },
     "settings": {
         "title": "Ustawienia",
@@ -2074,18 +2081,6 @@
         "findLogoHint": "Securely checks the public HTTPS website for its icon.",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
-        "notificationsTitle": "Payment notifications",
-        "notificationsHint": "Send upcoming payment alerts through your preferred services.",
-        "manageNotifications": "Manage agents ({{count}})",
-        "notificationsLoadError": "Notification agents could not be loaded.",
-        "testNotification": "Test",
-        "noNotificationAgents": "No notification agents configured.",
-        "agentNameLabel": "Agent name",
-        "agentTypeLabel": "Agent type",
-        "agentConfigLabel": "Configuration",
-        "agentConfigHint": "JSON configuration is stored only on your self-hosted server. Secrets are never returned to the browser.",
-        "addAgent": "Add agent",
-        "notificationTestSent": "Test notification sent.",
         "billingDetails": "Billing details",
         "renewalDetails": "Renewal and reminders",
         "organizationDetails": "Organization",
@@ -2094,6 +2089,9 @@
         "categorySearchPlaceholder": "Search category...",
         "paymentMethodSearchPlaceholder": "Search payment method...",
         "enabledHint": "Active subscriptions are included in Budget expenses.",
-        "currencyRequired": "Select a currency."
+        "currencyRequired": "Select a currency.",
+        "noBudgetLimit": "Brak limitu budżetu",
+        "unlimited": "Bez limitu",
+        "setBudgetHint": "Ustaw miesięczny budżet, aby śledzić limit."
     }
 }

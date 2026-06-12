@@ -816,7 +816,14 @@
         "categoryHealth": "医療",
         "categoryFamily": "家族",
         "categoryHome": "家",
-        "categoryClothing": "衣服"
+        "categoryClothing": "衣服",
+        "catSubscriptions": "サブスクリプション",
+        "subcatSubscriptionEntertainment": "エンターテインメント",
+        "subcatSubscriptionProductivity": "生産性",
+        "subcatSubscriptionUtilities": "公共料金",
+        "subcatSubscriptionHealth": "健康",
+        "subcatSubscriptionEducation": "教育",
+        "subcatSubscriptionOther": "その他"
     },
     "settings": {
         "title": "設定",
@@ -2074,18 +2081,6 @@
         "findLogoHint": "Securely checks the public HTTPS website for its icon.",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
-        "notificationsTitle": "支払い通知",
-        "notificationsHint": "Send upcoming payment alerts through your preferred services.",
-        "manageNotifications": "Manage agents ({{count}})",
-        "notificationsLoadError": "Notification agents could not be loaded.",
-        "testNotification": "テスト",
-        "noNotificationAgents": "No notification agents configured.",
-        "agentNameLabel": "Agent name",
-        "agentTypeLabel": "Agent type",
-        "agentConfigLabel": "Configuration",
-        "agentConfigHint": "JSON configuration is stored only on your self-hosted server. Secrets are never returned to the browser.",
-        "addAgent": "エージェントを追加",
-        "notificationTestSent": "Test notification sent.",
         "billingDetails": "Billing details",
         "renewalDetails": "Renewal and reminders",
         "organizationDetails": "Organization",
@@ -2094,6 +2089,9 @@
         "categorySearchPlaceholder": "Search category...",
         "paymentMethodSearchPlaceholder": "Search payment method...",
         "enabledHint": "Active subscriptions are included in Budget expenses.",
-        "currencyRequired": "Select a currency."
+        "currencyRequired": "Select a currency.",
+        "noBudgetLimit": "予算上限なし",
+        "unlimited": "無制限",
+        "setBudgetHint": "上限を追跡するには月間予算を設定してください。"
     }
 }

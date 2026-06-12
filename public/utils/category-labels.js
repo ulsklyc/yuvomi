@@ -14,6 +14,7 @@ const BUDGET_CATEGORY_LABEL_KEYS = {
   shopping_clothing: 'budget.catShoppingClothing',
   education: 'budget.catEducation',
   financial_other: 'budget.catFinancialOther',
+  subscriptions: 'budget.catSubscriptions',
   Erwerbseinkommen: 'budget.catEarnedIncome',
   Kapitalerträge: 'budget.catInvestmentIncome',
   'Geschenke & Transfers': 'budget.catTransferGiftIncome',

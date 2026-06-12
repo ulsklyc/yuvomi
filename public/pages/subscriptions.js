@@ -36,6 +36,14 @@ const CURRENCIES = [
   'AED', 'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'HUF', 'INR',
   'JPY', 'KZT', 'NOK', 'PLN', 'RUB', 'SAR', 'SEK', 'TRY', 'UAH', 'USD',
 ];
+const DEFAULT_CATEGORY_LABELS = {
+  Entertainment: 'budget.subcatSubscriptionEntertainment',
+  Productivity: 'budget.subcatSubscriptionProductivity',
+  Utilities: 'budget.subcatSubscriptionUtilities',
+  Health: 'budget.subcatSubscriptionHealth',
+  Education: 'budget.subcatSubscriptionEducation',
+  Other: 'budget.subcatSubscriptionOther',
+};
 
 function setHtml(element, html) {
   element.replaceChildren();
@@ -45,6 +53,11 @@ function setHtml(element, html) {
 function money(amount, currency = state.summary?.base_currency || state.settings.base_currency) {
   const value = Number(amount || 0);
   return new Intl.NumberFormat(getLocale(), { style: 'currency', currency }).format(value);
+}
+
+function categoryLabel(category) {
+  const name = typeof category === 'object' ? category?.name : category;
+  return DEFAULT_CATEGORY_LABELS[name] ? t(DEFAULT_CATEGORY_LABELS[name]) : (name || t('subscriptions.uncategorized'));
 }
 
 function cycleLabel(subscription) {
@@ -150,7 +163,7 @@ function renderFilters() {
   const method = container.querySelector('#subscriptions-method-filter');
   setHtml(category, `
     <option value="">${t('subscriptions.allCategories')}</option>
-    ${state.meta.categories.map((item) => `<option value="${item.id}">${esc(item.name)}</option>`).join('')}
+    ${state.meta.categories.map((item) => `<option value="${item.id}">${esc(categoryLabel(item))}</option>`).join('')}
   `);
   setHtml(method, `
     <option value="">${t('subscriptions.allPaymentMethods')}</option>
@@ -247,7 +260,9 @@ function renderSummary() {
   };
   const budget = Number(summary.monthly_budget || 0);
   const used = Number(summary.monthly_total || 0);
-  const percentage = budget > 0 ? Math.min(100, Math.round((used / budget) * 100)) : 0;
+  const hasBudget = budget > 0;
+  const percentage = hasBudget ? Math.min(100, Math.round((used / budget) * 100)) : 0;
+  const isOverBudget = hasBudget && summary.remaining_budget < 0;
   return `
     <section class="subscriptions-summary">
       <article class="subscriptions-summary-card">
@@ -262,10 +277,10 @@ function renderSummary() {
           <span style="width:${percentage}%"></span>
         </div>
       </article>
-      <article class="subscriptions-summary-card ${summary.remaining_budget < 0 ? 'subscriptions-summary-card--danger' : ''}">
-        <span>${summary.remaining_budget < 0 ? t('subscriptions.overBudget') : t('subscriptions.remainingBudget')}</span>
-        <strong>${money(Math.abs(summary.remaining_budget))}</strong>
-        <small>${percentage}% ${t('subscriptions.budgetUsed')}</small>
+      <article class="subscriptions-summary-card ${isOverBudget ? 'subscriptions-summary-card--danger' : ''}">
+        <span>${hasBudget ? (isOverBudget ? t('subscriptions.overBudget') : t('subscriptions.remainingBudget')) : t('subscriptions.noBudgetLimit')}</span>
+        <strong>${hasBudget ? money(Math.abs(summary.remaining_budget)) : t('subscriptions.unlimited')}</strong>
+        <small>${hasBudget ? `${percentage}% ${t('subscriptions.budgetUsed')}` : t('subscriptions.setBudgetHint')}</small>
       </article>
       <article class="subscriptions-summary-card">
         <span>${t('subscriptions.yearlyProjection')}</span>
@@ -281,20 +296,20 @@ function renderAnalytics() {
   const methods = state.summary?.by_payment_method || [];
   return `
     <section class="subscriptions-analytics">
-      ${renderBreakdown(t('subscriptions.byCategory'), categories)}
+      ${renderBreakdown(t('subscriptions.byCategory'), categories, categoryLabel)}
       ${renderBreakdown(t('subscriptions.byPaymentMethod'), methods)}
     </section>
   `;
 }
 
-function renderBreakdown(title, rows) {
+function renderBreakdown(title, rows, labelFor = (name) => name) {
   const max = Math.max(...rows.map((row) => row.amount), 1);
   return `
     <article class="subscriptions-chart">
       <h2>${title}</h2>
       ${rows.length ? rows.map((row) => `
         <div class="subscriptions-chart-row">
-          <span title="${esc(row.name)}">${esc(row.name)}</span>
+          <span title="${esc(labelFor(row.name))}">${esc(labelFor(row.name))}</span>
           <div><i style="width:${Math.round((row.amount / max) * 100)}%"></i></div>
           <strong>${money(row.amount)}</strong>
         </div>
@@ -320,7 +335,7 @@ function renderCard(subscription) {
         <div class="subscription-card__title-row">
           <div>
             <h3>${esc(subscription.name)}</h3>
-            <p>${esc(subscription.description || subscription.category_name || t('subscriptions.uncategorized'))}</p>
+            <p>${esc(subscription.description || categoryLabel(subscription.category_name))}</p>
           </div>
           <span class="subscription-status ${subscription.enabled ? 'subscription-status--active' : ''}">
             ${subscription.enabled ? t('subscriptions.active') : t('subscriptions.disabled')}
@@ -495,7 +510,7 @@ export function openSubscriptionModal(subscription = null) {
   const edit = Boolean(subscription);
   const categoryItems = [
     { value: '', label: t('subscriptions.uncategorized') },
-    ...state.meta.categories.map((item) => ({ value: item.id, label: item.name })),
+    ...state.meta.categories.map((item) => ({ value: item.id, label: categoryLabel(item) })),
   ];
   const methodItems = [
     { value: '', label: t('subscriptions.unspecified') },
@@ -776,34 +791,20 @@ async function deleteSubscription(subscription) {
 }
 
 async function openSettingsModal() {
-  let agents = [];
-  if (state.user?.role === 'admin') {
-    try {
-      agents = (await api.get('/budget/subscriptions/notification-agents')).data || [];
-    } catch (err) {
-      window.oikos?.showToast(err.data?.error || t('subscriptions.notificationsLoadError'), 'danger');
-    }
-  }
   const content = `
     <form id="subscriptions-settings-form">
       <div class="form-group">
         <label class="form-label" for="subscriptions-budget">${t('subscriptions.monthlyBudgetLabel')}</label>
         <input class="form-input" id="subscriptions-budget" type="number" min="0" step="0.01" value="${state.settings.monthly_budget}">
       </div>
-      ${state.user?.role === 'admin' ? `
-        <div class="subscriptions-settings-section">
-          <div>
-            <strong>${t('subscriptions.notificationsTitle')}</strong>
-            <small>${t('subscriptions.notificationsHint')}</small>
-          </div>
-          <button class="btn btn--secondary" type="button" id="subscriptions-notifications-manage">
-            ${t('subscriptions.manageNotifications', { count: agents.length })}
-          </button>
-        </div>
-      ` : ''}
+      ${comboboxMarkup({
+        id: 'subscriptions-base-currency',
+        label: t('subscriptions.baseCurrencyLabel'),
+        items: currencyItems(),
+        value: state.settings.base_currency,
+        placeholder: t('subscriptions.currencySearchPlaceholder'),
+      })}
       <div class="form-group">
-        <label class="form-label" for="subscriptions-base-currency">${t('subscriptions.baseCurrencyLabel')}</label>
-        <input class="form-input" id="subscriptions-base-currency" maxlength="3" pattern="[A-Za-z]{3}" value="${esc(state.settings.base_currency)}">
         <small>${t('subscriptions.fixerHint')}</small>
       </div>
       <div class="modal-panel__footer subscriptions-modal-footer">
@@ -817,17 +818,20 @@ async function openSettingsModal() {
     content,
     size: 'sm',
     onSave(panel) {
+      wireCombobox(panel, 'subscriptions-base-currency');
       panel.querySelector('#subscriptions-settings-cancel').addEventListener('click', closeModal);
-      panel.querySelector('#subscriptions-notifications-manage')?.addEventListener('click', async () => {
-        await closeModal({ force: true });
-        openNotificationModal(agents);
-      });
       panel.querySelector('#subscriptions-settings-form').addEventListener('submit', async (event) => {
         event.preventDefault();
+        const baseCurrency = panel.querySelector('#subscriptions-base-currency').value;
+        if (!baseCurrency) {
+          window.oikos?.showToast(t('subscriptions.currencyRequired'), 'danger');
+          panel.querySelector('#subscriptions-base-currency-search').focus();
+          return;
+        }
         try {
           await api.put('/budget/subscriptions/settings', {
             monthly_budget: Number(panel.querySelector('#subscriptions-budget').value),
-            base_currency: panel.querySelector('#subscriptions-base-currency').value.trim().toUpperCase(),
+            base_currency: baseCurrency,
           });
           await closeModal({ force: true });
           await reload({ refreshRates: true });
@@ -840,122 +844,11 @@ async function openSettingsModal() {
   });
 }
 
-const AGENT_CONFIG_EXAMPLES = {
-  email: '{"recipient":"name@example.com"}',
-  discord: '{"url":"https://discord.com/api/webhooks/..."}',
-  telegram: '{"bot_token":"...","chat_id":"..."}',
-  pushover: '{"app_token":"...","user_key":"..."}',
-  gotify: '{"url":"https://gotify.example.com","token":"..."}',
-  serverchan: '{"send_key":"..."}',
-  ntfy: '{"url":"https://ntfy.sh","topic":"family","token":""}',
-  webhook: '{"url":"https://example.com/hooks/subscriptions","token":""}',
-};
-
-function agentRows(agents) {
-  return agents.length ? agents.map((agent) => `
-    <li data-agent-id="${agent.id}">
-      <i data-lucide="send" aria-hidden="true"></i>
-      <div>
-        <strong>${esc(agent.name)}</strong>
-        <span>${esc(agent.type)}${agent.last_error ? ` · ${esc(agent.last_error)}` : ''}</span>
-      </div>
-      <label class="toggle" title="${t('subscriptions.enabledLabel')}">
-        <input type="checkbox" data-agent-action="toggle" ${agent.enabled ? 'checked' : ''}>
-        <span class="toggle__track"></span>
-      </label>
-      <button class="btn btn--secondary" data-agent-action="test">${t('subscriptions.testNotification')}</button>
-      <button class="btn btn--secondary btn--icon" data-agent-action="delete" aria-label="${t('common.delete')}">
-        <i data-lucide="trash-2" aria-hidden="true"></i>
-      </button>
-    </li>
-  `).join('') : `<p>${t('subscriptions.noNotificationAgents')}</p>`;
-}
-
-function openNotificationModal(agents) {
-  const content = `
-    <div class="subscriptions-notifications">
-      <ul>${agentRows(agents)}</ul>
-      <form id="subscription-agent-form">
-        <div class="form-grid-2">
-          <div class="form-group">
-            <label class="form-label" for="subscription-agent-name">${t('subscriptions.agentNameLabel')}</label>
-            <input class="form-input" id="subscription-agent-name" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="subscription-agent-type">${t('subscriptions.agentTypeLabel')}</label>
-            <select class="form-input" id="subscription-agent-type">
-              ${Object.keys(AGENT_CONFIG_EXAMPLES).map((type) => `<option value="${type}">${esc(type)}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="subscription-agent-config">${t('subscriptions.agentConfigLabel')}</label>
-          <textarea class="form-input" id="subscription-agent-config" rows="4">${esc(AGENT_CONFIG_EXAMPLES.email)}</textarea>
-          <small>${t('subscriptions.agentConfigHint')}</small>
-        </div>
-        <div class="modal-panel__footer subscriptions-modal-footer">
-          <button class="btn btn--secondary" type="button" id="subscription-agent-close">${t('common.close')}</button>
-          <button class="btn btn--primary" type="submit">${t('subscriptions.addAgent')}</button>
-        </div>
-      </form>
-    </div>
-  `;
-  openModal({
-    title: t('subscriptions.notificationsTitle'),
-    content,
-    size: 'lg',
-    onSave(panel) {
-      panel.querySelector('#subscription-agent-close').addEventListener('click', closeModal);
-      const type = panel.querySelector('#subscription-agent-type');
-      type.addEventListener('change', () => {
-        panel.querySelector('#subscription-agent-config').value = AGENT_CONFIG_EXAMPLES[type.value];
-      });
-      panel.querySelector('#subscription-agent-form').addEventListener('submit', async (event) => {
-        event.preventDefault();
-        try {
-          await api.post('/budget/subscriptions/notification-agents', {
-            name: panel.querySelector('#subscription-agent-name').value.trim(),
-            type: type.value,
-            config: JSON.parse(panel.querySelector('#subscription-agent-config').value),
-          });
-          await closeModal({ force: true });
-          const refreshed = (await api.get('/budget/subscriptions/notification-agents')).data || [];
-          openNotificationModal(refreshed);
-        } catch (err) {
-          window.oikos?.showToast(err.data?.error || err.message || t('common.unknownError'), 'danger');
-        }
-      });
-      panel.querySelectorAll('[data-agent-action]').forEach((control) => {
-        control.addEventListener('click', async () => {
-          const row = control.closest('[data-agent-id]');
-          const id = Number(row.dataset.agentId);
-          const action = control.dataset.agentAction;
-          try {
-            if (action === 'toggle') {
-              await api.put(`/budget/subscriptions/notification-agents/${id}`, { enabled: control.checked });
-            }
-            if (action === 'test') {
-              await api.post(`/budget/subscriptions/notification-agents/${id}/test`, {});
-              window.oikos?.showToast(t('subscriptions.notificationTestSent'), 'success');
-            }
-            if (action === 'delete') await api.delete(`/budget/subscriptions/notification-agents/${id}`);
-            const refreshed = (await api.get('/budget/subscriptions/notification-agents')).data || [];
-            await closeModal({ force: true });
-            openNotificationModal(refreshed);
-          } catch (err) {
-            window.oikos?.showToast(err.data?.error || t('common.unknownError'), 'danger');
-          }
-        });
-      });
-    },
-  });
-}
-
 function metadataRows(items, kind) {
   return items.map((item, index) => `
     <li data-id="${item.id}">
       ${kind === 'categories' ? `<i style="background:${esc(item.color)}"></i>` : '<i data-lucide="credit-card" aria-hidden="true"></i>'}
-      <span>${esc(item.name)}</span>
+      <span>${esc(kind === 'categories' ? categoryLabel(item) : item.name)}</span>
       <button class="btn btn--icon" data-move="-1" ${index === 0 ? 'disabled' : ''} aria-label="${t('subscriptions.moveUp')}">
         <i data-lucide="chevron-up" aria-hidden="true"></i>
       </button>

@@ -816,7 +816,14 @@
         "categoryHealth": "健康",
         "categoryFamily": "家庭",
         "categoryHome": "家",
-        "categoryClothing": "服装"
+        "categoryClothing": "服装",
+        "catSubscriptions": "订阅",
+        "subcatSubscriptionEntertainment": "娱乐",
+        "subcatSubscriptionProductivity": "效率工具",
+        "subcatSubscriptionUtilities": "公用事业",
+        "subcatSubscriptionHealth": "健康",
+        "subcatSubscriptionEducation": "教育",
+        "subcatSubscriptionOther": "其他"
     },
     "settings": {
         "title": "设置",
@@ -2074,18 +2081,6 @@
         "findLogoHint": "Securely checks the public HTTPS website for its icon.",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
-        "notificationsTitle": "付款通知",
-        "notificationsHint": "Send upcoming payment alerts through your preferred services.",
-        "manageNotifications": "Manage agents ({{count}})",
-        "notificationsLoadError": "Notification agents could not be loaded.",
-        "testNotification": "测试",
-        "noNotificationAgents": "No notification agents configured.",
-        "agentNameLabel": "Agent name",
-        "agentTypeLabel": "Agent type",
-        "agentConfigLabel": "Configuration",
-        "agentConfigHint": "JSON configuration is stored only on your self-hosted server. Secrets are never returned to the browser.",
-        "addAgent": "添加通知代理",
-        "notificationTestSent": "Test notification sent.",
         "billingDetails": "Billing details",
         "renewalDetails": "Renewal and reminders",
         "organizationDetails": "Organization",
@@ -2094,6 +2089,9 @@
         "categorySearchPlaceholder": "Search category...",
         "paymentMethodSearchPlaceholder": "Search payment method...",
         "enabledHint": "Active subscriptions are included in Budget expenses.",
-        "currencyRequired": "Select a currency."
+        "currencyRequired": "Select a currency.",
+        "noBudgetLimit": "无预算限制",
+        "unlimited": "无限制",
+        "setBudgetHint": "设置每月预算以跟踪限额。"
     }
 }

@@ -816,7 +816,14 @@
         "categoryHealth": "Sức khỏe",
         "categoryFamily": "Gia đình",
         "categoryHome": "Nhà",
-        "categoryClothing": "Quần áo"
+        "categoryClothing": "Quần áo",
+        "catSubscriptions": "Đăng ký",
+        "subcatSubscriptionEntertainment": "Giải trí",
+        "subcatSubscriptionProductivity": "Năng suất",
+        "subcatSubscriptionUtilities": "Tiện ích",
+        "subcatSubscriptionHealth": "Sức khỏe",
+        "subcatSubscriptionEducation": "Giáo dục",
+        "subcatSubscriptionOther": "Khác"
     },
     "settings": {
         "title": "Cài đặt",
@@ -2074,18 +2081,6 @@
         "findLogoHint": "Securely checks the public HTTPS website for its icon.",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
-        "notificationsTitle": "Payment notifications",
-        "notificationsHint": "Send upcoming payment alerts through your preferred services.",
-        "manageNotifications": "Manage agents ({{count}})",
-        "notificationsLoadError": "Notification agents could not be loaded.",
-        "testNotification": "Test",
-        "noNotificationAgents": "No notification agents configured.",
-        "agentNameLabel": "Agent name",
-        "agentTypeLabel": "Agent type",
-        "agentConfigLabel": "Configuration",
-        "agentConfigHint": "JSON configuration is stored only on your self-hosted server. Secrets are never returned to the browser.",
-        "addAgent": "Add agent",
-        "notificationTestSent": "Test notification sent.",
         "billingDetails": "Billing details",
         "renewalDetails": "Renewal and reminders",
         "organizationDetails": "Organization",
@@ -2094,6 +2089,9 @@
         "categorySearchPlaceholder": "Search category...",
         "paymentMethodSearchPlaceholder": "Search payment method...",
         "enabledHint": "Active subscriptions are included in Budget expenses.",
-        "currencyRequired": "Select a currency."
+        "currencyRequired": "Select a currency.",
+        "noBudgetLimit": "Không giới hạn ngân sách",
+        "unlimited": "Không giới hạn",
+        "setBudgetHint": "Đặt ngân sách hàng tháng để theo dõi giới hạn."
     }
 }

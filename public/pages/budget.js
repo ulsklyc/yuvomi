@@ -55,6 +55,12 @@ const SUBCATEGORY_I18N = () => ({
   insurance_other:          t('budget.subcatInsuranceOther'),
   investments:              t('budget.subcatInvestments'),
   taxes:                    t('budget.subcatTaxes'),
+  subscription_entertainment: t('budget.subcatSubscriptionEntertainment'),
+  subscription_productivity:  t('budget.subcatSubscriptionProductivity'),
+  subscription_utilities:     t('budget.subcatSubscriptionUtilities'),
+  subscription_health:        t('budget.subcatSubscriptionHealth'),
+  subscription_education:     t('budget.subcatSubscriptionEducation'),
+  subscription_other:         t('budget.subcatSubscriptionOther'),
 });
 
 function categoryLabel(category) {
