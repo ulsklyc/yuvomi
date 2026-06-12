@@ -10,12 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Subscriptions tracker under Budget:** a new tab between Budget and Loans tracks daily, weekly, monthly, and yearly services with renewal dates, pause/disable state, custom categories and payment methods, search/filter/sort controls, uploaded or securely discovered logos, brand colors, and responsive mobile cards.
 - **Subscription budgeting and analytics:** configurable monthly budget, remaining/over-budget status, yearly projection, category and payment-method breakdowns, native-currency amounts, and optional Fixer-backed conversion into a household base currency with a 12-hour server cache.
-- **Subscription reminders and integrations:** per-subscription reminder timing feeds the existing in-app reminder center. Admins can additionally configure Email/SMTP, Discord, Telegram, Pushover, Gotify, Serverchan, Ntfy, and generic webhook agents; delivery is scheduled hourly and secrets are never returned by the API.
-- **Budget-linked subscription expenses:** every active subscription maintains its next payment as a Budget expense. Disabling removes the pending expense, while renewal preserves the paid entry and creates the next one.
+- **Subscription reminders:** per-subscription reminder timing feeds the existing in-app reminder center.
+- **Budget-linked subscription expenses:** every active subscription maintains its next payment as a Budget expense under a localized `Subscription` category. Subscription categories are mirrored as Budget subcategories, disabling removes the pending expense, and renewal preserves the paid entry while creating the next one.
 - **Redesigned subscription editor:** grouped identity, billing, renewal, organization, and service sections replace the flat form. The logo sits beside the name, currency/category/payment method use searchable in-modal lists, and logo discovery shows an immediate preview.
 
 ### Security
-- **Protected external subscription integrations:** all subscription APIs require the existing authenticated session and CSRF middleware; notification-agent management is admin-only, private notification targets require an explicit deployment opt-in, logo discovery validates every public HTTPS redirect, blocks private/link-local addresses, and constrains remote image size/type.
+- **Protected external subscription integrations:** all subscription APIs require the existing authenticated session and CSRF middleware; logo discovery validates every public HTTPS redirect, blocks private/link-local addresses, reads only bounded page metadata, and constrains remote image size/type.
+
+### Fixed
+- **Subscription settings and logo discovery:** the base currency now uses the searchable currency picker, an unset subscription budget is shown as unlimited instead of over budget, and logo search tries page icons plus the standard favicon without failing on large page bodies.
 
 ## [0.71.19] - 2026-06-12
 
