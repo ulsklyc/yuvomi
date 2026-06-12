@@ -514,9 +514,8 @@ When all four OIDC variables are set, a **"Sign in with SSO"** button appears on
 ### Subscription Integrations (Optional)
 
 Budget → Subscriptions works fully without external services. The options below enable live exchange
-rates, external notifications, or LLM-backed insights. They may send subscription names, amounts,
-currencies, and renewal dates to the configured provider; keep them disabled when local-only
-processing is required.
+rates or external notifications. They may send subscription names, amounts, currencies, and renewal
+dates to the configured provider; keep them disabled when local-only processing is required.
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
@@ -529,11 +528,6 @@ processing is required.
 | `SMTP_USER` / `SMTP_PASS` | Optional SMTP authentication credentials. | — | No |
 | `SMTP_FROM` | Sender address for subscription reminder email. | — | For email |
 | `SMTP_HELO` | SMTP EHLO hostname. | `yuvomi.local` | No |
-| `SUBSCRIPTION_AI_PROVIDER` | Insights provider: `local`, `openai`, `gemini`, or `ollama`. | `local` | No |
-| `SUBSCRIPTION_AI_MODEL` | Provider-specific model override. | Provider default | No |
-| `OPENAI_API_KEY` | OpenAI API key when the provider is `openai`. | — | For OpenAI |
-| `GEMINI_API_KEY` | Gemini API key when the provider is `gemini`. | — | For Gemini |
-| `OLLAMA_URL` | Ollama server URL when the provider is `ollama`. | `http://ollama:11434` | No |
 
 Notification-agent secrets are entered by an admin and stored in the encrypted database when
 `DB_ENCRYPTION_KEY` is enabled. The API returns only configured field names, never secret values.

@@ -213,10 +213,9 @@ Konfiguration so, dass du auf einen EU-Provider umstellen könntest.
 
 ### 2.7 Abonnement-Integrationen
 
-- **Standardverhalten:** Abonnementdaten, lokale Erinnerungen, Budgets und
-  regelbasierte Empfehlungen bleiben vollständig in der selbst gehosteten
-  Instanz. Externe Übertragungen erfolgen nur nach aktiver Konfiguration oder
-  einem expliziten Logo-/KI-Aufruf.
+- **Standardverhalten:** Abonnementdaten, lokale Erinnerungen und Budgets
+  bleiben vollständig in der selbst gehosteten Instanz. Externe Übertragungen
+  erfolgen nur nach aktiver Konfiguration oder einem expliziten Logo-Aufruf.
 - **Fixer:** Bei gesetztem `FIXER_API_KEY` werden Währungscodes und die
   Server-IP an Fixer übertragen. Namen einzelner Abonnements werden nicht
   gesendet.
@@ -228,13 +227,6 @@ Konfiguration so, dass du auf einen EU-Provider umstellen könntest.
   Fälligkeitsdatum eines Abonnements an SMTP, Discord, Telegram, Pushover,
   Gotify, Serverchan, Ntfy oder einen Webhook übertragen. Für private/LAN-Ziele
   ist eine ausdrückliche Deployment-Freigabe erforderlich.
-- **KI-Empfehlungen:** Bei `SUBSCRIPTION_AI_PROVIDER=openai|gemini|ollama`
-  werden Abonnementname, normalisierte Monatskosten, Kategorie, Status und
-  nächstes Fälligkeitsdatum an den gewählten Dienst übertragen. `local`
-  überträgt nichts. Prüfe bei Cloud-Anbietern AVV, Speicher-/Trainingsoptionen
-  und Drittlandtransfer; bevorzuge bei hohen Datenschutzanforderungen lokales
-  Ollama oder den Standard `local`.
-
 ---
 
 ## 3. Logging und Speicherbegrenzung (Art. 5 Abs. 1 lit. e DSGVO)
