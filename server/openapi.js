@@ -569,6 +569,41 @@ function buildPaths() {
       put: op({ summary: 'Update budget entry', tag: 'Budget', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete budget entry', tag: 'Budget', params: [idParam()], stateChanging: true }),
     },
+    '/api/v1/budget/subscriptions': {
+      get: op({ summary: 'List subscriptions with normalized costs and analytics', tag: 'Budget' }),
+      post: op({ summary: 'Create subscription', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) }),
+    },
+    '/api/v1/budget/subscriptions/meta': {
+      get: op({ summary: 'Get subscription categories, payment methods, and billing cycles', tag: 'Budget' }),
+    },
+    '/api/v1/budget/subscriptions/settings': {
+      get: op({ summary: 'Get subscription budget and base currency', tag: 'Budget' }),
+      put: op({ summary: 'Update subscription budget and base currency', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) }),
+    },
+    '/api/v1/budget/subscriptions/logo-search': {
+      post: op({ summary: 'Find a public HTTPS website icon for a subscription', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) }),
+    },
+    '/api/v1/budget/subscriptions/insights/recommendations': {
+      get: op({ summary: 'Generate local or configured-provider subscription insights', tag: 'Budget' }),
+    },
+    '/api/v1/budget/subscriptions/notification-agents': {
+      get: op({ summary: 'List subscription notification agents without secrets', tag: 'Budget', admin: true }),
+      post: op({ summary: 'Create subscription notification agent', tag: 'Budget', admin: true, stateChanging: true, requestBody: jsonBody(null) }),
+    },
+    '/api/v1/budget/subscriptions/notification-agents/{id}': {
+      put: op({ summary: 'Enable or disable subscription notification agent', tag: 'Budget', admin: true, params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      delete: op({ summary: 'Delete subscription notification agent', tag: 'Budget', admin: true, params: [idParam()], stateChanging: true }),
+    },
+    '/api/v1/budget/subscriptions/notification-agents/{id}/test': {
+      post: op({ summary: 'Send a test subscription notification', tag: 'Budget', admin: true, params: [idParam()], stateChanging: true }),
+    },
+    '/api/v1/budget/subscriptions/{id}/renew': {
+      post: op({ summary: 'Advance a subscription to its next renewal date', tag: 'Budget', params: [idParam()], stateChanging: true }),
+    },
+    '/api/v1/budget/subscriptions/{id}': {
+      put: op({ summary: 'Update subscription', tag: 'Budget', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      delete: op({ summary: 'Delete subscription', tag: 'Budget', params: [idParam()], stateChanging: true }),
+    },
     '/api/v1/documents/meta/options': {
       get: op({
         summary: 'Get family document options',

@@ -28,6 +28,7 @@
    - 2.4 [OIDC-Provider (Single Sign-On)](#24-oidc-provider-single-sign-on)
    - 2.5 [WebDAV-Backup](#25-webdav-backup)
    - 2.6 [WebDAV-Dokumentspeicher](#26-webdav-dokumentspeicher)
+   - 2.7 [Abonnement-Integrationen](#27-abonnement-integrationen)
 3. [Logging und Speicherbegrenzung](#3-logging-und-speicherbegrenzung-art-5-abs-1-lit-e-dsgvo)
 4. [Haushaltsausnahme](#4-haushaltsausnahme-art-2-abs-2-lit-c-dsgvo)
 5. [Verarbeitungsverzeichnis-Vorlage (Art. 30 DSGVO)](#5-verarbeitungsverzeichnis-vorlage-art-30-dsgvo)
@@ -71,6 +72,7 @@ Betreiber daraus resultieren.
 | OIDC-Provider | `server/auth.js`, `server/services/oidc.js` | nur wenn konfiguriert | abhängig vom Provider | meistens ja (siehe 2.4) |
 | WebDAV-Backup | `server/services/backup-webdav.js` | nur wenn konfiguriert | abhängig vom Provider | ja, bei kommerziellen Anbietern (siehe 2.5) |
 | WebDAV-Dokumentspeicher | `server/services/document-storage.js` | nur wenn konfiguriert | abhängig vom Provider | ja, bei kommerziellen Anbietern (siehe 2.6) |
+| Abonnement-Integrationen | `server/services/subscription-*` | nur wenn konfiguriert/ausgelöst | abhängig von Fixer, Benachrichtigungs- oder KI-Provider | abhängig vom Provider (siehe 2.7) |
 
 ### 2.1 Open-Meteo (Wetter-Standard)
 
@@ -208,6 +210,30 @@ Konfiguration so, dass du auf einen EU-Provider umstellen könntest.
   WebDAV-Dienst, beschränke den Zugriff auf ein eigenes Verzeichnis und sichere
   dieses Ziel separat. SQLite-Backups enthalten nur Metadaten und
   Speicher-Schlüssel, nicht die dort abgelegten Binärdateien.
+
+### 2.7 Abonnement-Integrationen
+
+- **Standardverhalten:** Abonnementdaten, lokale Erinnerungen, Budgets und
+  regelbasierte Empfehlungen bleiben vollständig in der selbst gehosteten
+  Instanz. Externe Übertragungen erfolgen nur nach aktiver Konfiguration oder
+  einem expliziten Logo-/KI-Aufruf.
+- **Fixer:** Bei gesetztem `FIXER_API_KEY` werden Währungscodes und die
+  Server-IP an Fixer übertragen. Namen einzelner Abonnements werden nicht
+  gesendet.
+- **Logo-Suche:** Überträgt die konfigurierte öffentliche HTTPS-Website und
+  die Server-IP an den jeweiligen Website-Betreiber. Private, Loopback- und
+  Link-Local-Ziele werden blockiert; Skripte der Website werden nicht
+  ausgeführt.
+- **Benachrichtigungsdienste:** Je nach Agent werden Name, Betrag, Währung und
+  Fälligkeitsdatum eines Abonnements an SMTP, Discord, Telegram, Pushover,
+  Gotify, Serverchan, Ntfy oder einen Webhook übertragen. Für private/LAN-Ziele
+  ist eine ausdrückliche Deployment-Freigabe erforderlich.
+- **KI-Empfehlungen:** Bei `SUBSCRIPTION_AI_PROVIDER=openai|gemini|ollama`
+  werden Abonnementname, normalisierte Monatskosten, Kategorie, Status und
+  nächstes Fälligkeitsdatum an den gewählten Dienst übertragen. `local`
+  überträgt nichts. Prüfe bei Cloud-Anbietern AVV, Speicher-/Trainingsoptionen
+  und Drittlandtransfer; bevorzuge bei hohen Datenschutzanforderungen lokales
+  Ollama oder den Standard `local`.
 
 ---
 

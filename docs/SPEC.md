@@ -401,14 +401,36 @@ Stores instances of a recurring entry deleted by the user so they are not re-gen
 | month | TEXT | YYYY-MM, NOT NULL |
 | PRIMARY KEY | | (parent_id, month) |
 
-### Reminders
-
-Per-user reminders attached to tasks or calendar events.
+### Budget Subscriptions
+Recurring service and payment records shown in Budget → Subscriptions.
 
 | Column | Type | Constraint |
 |--------|------|-----------|
-| entity_type | TEXT | 'task' or 'event', NOT NULL |
-| entity_id | INTEGER | FK → tasks or calendar_events, NOT NULL |
+| name | TEXT | NOT NULL |
+| amount | REAL | Native billing amount, CHECK(>= 0) |
+| currency | TEXT | ISO 4217 code, NOT NULL |
+| billing_cycle | TEXT | `daily` \| `weekly` \| `monthly` \| `yearly` |
+| cycle_interval | INTEGER | Every N cycles, 1–365 |
+| next_payment_date | TEXT | DATE, NOT NULL |
+| category_id | INTEGER | FK → Subscription Categories (SET NULL) |
+| payment_method_id | INTEGER | FK → Subscription Payment Methods (SET NULL) |
+| reminder_days | INTEGER | Days before renewal, 0–365 |
+| enabled | INTEGER | 0/1; disabled records are retained but excluded from totals and reminders |
+| website_url | TEXT | Optional public service URL |
+| logo_data | TEXT | Optional local image data URL, max 500 KB |
+| brand_color | TEXT | Optional HEX color |
+| created_by | INTEGER | FK → Users (CASCADE delete), NOT NULL |
+
+Supporting tables store customizable/sortable categories and payment methods, the single household subscription budget/base-currency setting, cached exchange rates, admin-managed notification agents, and a unique delivery record per subscription/agent/payment date. Database backup and restore automatically include all of these tables.
+
+### Reminders
+
+Per-user reminders attached to tasks, calendar events, or subscriptions.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| entity_type | TEXT | `task`, `event`, or `subscription`, NOT NULL |
+| entity_id | INTEGER | Entity identifier, NOT NULL |
 | remind_at | TEXT | ISO 8601 datetime, NOT NULL |
 | dismissed | INTEGER | 0/1, default 0 |
 | created_by | INTEGER | FK → Users (CASCADE delete), NOT NULL |
@@ -985,7 +1007,7 @@ User management and app configuration. Logged-in users only.
 
 ### Budget (`/budget`)
 
-**Tabs:** Overview, Transactions, Loans, Split Expenses.
+**Tabs:** Budget, Subscriptions, Loans, Split Expenses.
 
 **Views:**
 - Monthly overview: income vs. expenses, balance, bar chart by category (Canvas, no library)
@@ -999,9 +1021,15 @@ User management and app configuration. Logged-in users only.
 - CSV export includes a subcategory column and English column headers
 - **Category bar chart accessibility:** the chart exposes a concise `.sr-only` summary (number of categories, largest category and its share) for assistive technologies (v0.55.0)
 - **Loans tab:** create instalment-based loans (borrower, total amount, number of instalments, start month); record individual payments; remaining balance and due months shown automatically; paid-off loans marked as closed; filter budget transactions by loan
+- **Subscriptions tab:** recurring service CRUD with daily/weekly/monthly/yearly cycles and exact next-renewal calculation; enable/disable without deleting; custom sortable categories and payment methods; uploaded logos plus SSRF-protected public HTTPS logo discovery; configurable reminder lead time; search, status/category/payment filters, and cost/date/name sorting.
+- **Subscription finances:** native billing currencies, configurable base currency and monthly budget, 12-hour exchange-rate cache with optional Fixer refresh, monthly normalization and yearly projection, remaining/over-budget status, and category/payment-method charts.
+- **Subscription notifications:** upcoming payments appear in the existing in-app reminder center. Admin-only external agents support SMTP email, Discord, Telegram, Pushover, Gotify, Serverchan, Ntfy, and generic webhooks. The hourly scheduler records deliveries idempotently; private/LAN targets require `SUBSCRIPTION_NOTIFICATION_ALLOW_PRIVATE=true`.
+- **Subscription insights:** local deterministic high-cost reviews are always available. Optional OpenAI, Gemini, or Ollama providers are configured only through server environment variables; provider failures fall back to local recommendations.
+- **Platform inheritance:** Subscriptions uses the application's existing household multi-user authorization, OIDC/OAuth login, SQLCipher option, backup/restore, responsive PWA shell, offline shell caching, themes, and 19-locale i18n system rather than duplicating those controls inside the tab.
 - **Split Expenses tab:** shared expense tracking within named groups (household, couple, travel, event, shopping, general). Split methods: equal, exact amounts, percentage, shares. Balances derived from an immutable double-entry ledger — amounts stored as integer minor currency units (cents) to avoid floating-point errors. **Settlements:** record payments between members; a debt-simplification algorithm produces the minimal transfer set. **Recurring expenses:** daily, weekly, monthly, yearly schedule with automatic generation via hourly scheduler. **Guest accounts:** invite people outside the family as restricted users who can only access the Split module and see their invited groups. **Multi-currency:** each group has a default currency; individual expenses can use any currency with historical exchange rate snapshots. **Activity feed:** per-group log of all expense, member, and settlement events.
 - API: `GET /api/v1/budget/categories`, `GET /api/v1/budget/categories/:key/subcategories` (optional `?lang=` localisation), `POST /api/v1/budget/categories`, `POST /api/v1/budget/categories/:key/subcategories`
 - Loans API: `GET /api/v1/budget/loans`, `POST /api/v1/budget/loans`, `GET /api/v1/budget/loans/:id`, `PUT /api/v1/budget/loans/:id`, `DELETE /api/v1/budget/loans/:id`, `GET /api/v1/budget/loans/:id/payments`, `POST /api/v1/budget/loans/:id/payments`, `DELETE /api/v1/budget/loans/:id/payments/:paymentId`
+- Subscriptions API: `/api/v1/budget/subscriptions` CRUD and analytics; `/meta`, `/settings`, `/logo-search`, `/insights/recommendations`; admin-only `/notification-agents` management and test endpoints.
 - Split API: `/api/v1/split/*` — CRUD for groups, members, expenses, settlements, recurring expenses, and activity feed
 
 ### Birthdays (`/birthdays`)

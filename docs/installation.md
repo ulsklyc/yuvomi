@@ -511,6 +511,35 @@ Enable single sign-on via any OpenID Connect provider (Authentik, Keycloak, Goog
 
 When all four OIDC variables are set, a **"Sign in with SSO"** button appears on the login page. The flow uses Authorization Code + PKCE (S256) with a nonce. On first login, the user is matched by their OIDC `sub`. If no match exists, an existing local account is linked automatically **only when the provider reports a verified email (`email_verified: true`) and exactly one local account holds that email address**; otherwise a new account is provisioned. Unverified or ambiguous emails never take over an existing account. If your provider omits the `email_verified` claim, set `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=true` to enable linking.
 
+### Subscription Integrations (Optional)
+
+Budget → Subscriptions works fully without external services. The options below enable live exchange
+rates, external notifications, or LLM-backed insights. They may send subscription names, amounts,
+currencies, and renewal dates to the configured provider; keep them disabled when local-only
+processing is required.
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `FIXER_API_KEY` | Fixer API key for live currency conversion. Rates are cached for 12 hours. | — | No |
+| `SUBSCRIPTION_NOTIFICATIONS_ENABLED` | Run the hourly external-notification scheduler. | `true` | No |
+| `SUBSCRIPTION_NOTIFICATION_ALLOW_PRIVATE` | Allow admin-configured Gotify/Ntfy/webhook targets on private or loopback networks. Leave disabled unless the target is trusted. | `false` | No |
+| `SMTP_HOST` | SMTP host used by email notification agents. | — | For email |
+| `SMTP_PORT` | SMTP port. | `465` when secure, otherwise `25` | No |
+| `SMTP_SECURE` | Use implicit TLS SMTP. | `false` | No |
+| `SMTP_USER` / `SMTP_PASS` | Optional SMTP authentication credentials. | — | No |
+| `SMTP_FROM` | Sender address for subscription reminder email. | — | For email |
+| `SMTP_HELO` | SMTP EHLO hostname. | `yuvomi.local` | No |
+| `SUBSCRIPTION_AI_PROVIDER` | Insights provider: `local`, `openai`, `gemini`, or `ollama`. | `local` | No |
+| `SUBSCRIPTION_AI_MODEL` | Provider-specific model override. | Provider default | No |
+| `OPENAI_API_KEY` | OpenAI API key when the provider is `openai`. | — | For OpenAI |
+| `GEMINI_API_KEY` | Gemini API key when the provider is `gemini`. | — | For Gemini |
+| `OLLAMA_URL` | Ollama server URL when the provider is `ollama`. | `http://ollama:11434` | No |
+
+Notification-agent secrets are entered by an admin and stored in the encrypted database when
+`DB_ENCRYPTION_KEY` is enabled. The API returns only configured field names, never secret values.
+Logo discovery is separate: it fetches only public HTTPS sites, rejects private/link-local targets,
+does not execute page scripts, and stores only a size-limited image.
+
 ### Automated Backups (Optional)
 
 Built-in cron-based database backup (default: 2 AM daily, keep last 7 copies). Status and manual trigger available in **Settings → Administration → Backup and restore**.

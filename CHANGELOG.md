@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Subscriptions tracker under Budget:** a new tab between Budget and Loans tracks daily, weekly, monthly, and yearly services with renewal dates, pause/disable state, custom categories and payment methods, search/filter/sort controls, uploaded or securely discovered logos, brand colors, and responsive mobile cards.
+- **Subscription budgeting and analytics:** configurable monthly budget, remaining/over-budget status, yearly projection, category and payment-method breakdowns, native-currency amounts, and optional Fixer-backed conversion into a household base currency with a 12-hour server cache.
+- **Subscription reminders and integrations:** per-subscription reminder timing feeds the existing in-app reminder center. Admins can additionally configure Email/SMTP, Discord, Telegram, Pushover, Gotify, Serverchan, Ntfy, and generic webhook agents; delivery is scheduled hourly and secrets are never returned by the API.
+- **Optional subscription insights:** deterministic local recommendations work without external services; OpenAI Responses API, Gemini, and Ollama adapters can be enabled through deployment environment variables.
+
+### Security
+- **Protected external subscription integrations:** all subscription APIs require the existing authenticated session and CSRF middleware; notification-agent management is admin-only, private notification targets require an explicit deployment opt-in, logo discovery accepts only public HTTPS targets and blocks private/link-local addresses, and remote images are size/type constrained.
+
 ## [0.71.19] - 2026-06-12
 
 ### Fixed
