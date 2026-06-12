@@ -33,11 +33,6 @@ function showToast(message, tone = 'default') {
 function renderPage(container, user) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <header class="settings-leaf-header">
-      <h1 class="settings-leaf-header__title">${t('settings.pageSyncContacts')}</h1>
-      <p class="settings-leaf-header__description">${t('settings.pageSyncContactsDescription')}</p>
-    </header>
-
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.cardavTitle')}</h2>
       <div class="settings-card">

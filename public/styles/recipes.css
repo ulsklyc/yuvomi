@@ -32,7 +32,6 @@
 
 .recipes-header__title {
   margin: 0;
-  font-size: var(--text-xl);
 }
 
 .recipes-list {
@@ -62,7 +61,6 @@
 
 .recipe-card__title {
   margin: 0;
-  font-size: var(--text-base);
   color: var(--color-text-primary);
 }
 

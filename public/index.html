@@ -37,6 +37,10 @@
        direkt per CSS behandelt — kein JS-matchMedia erforderlich. -->
   <script src="/theme-init.js"></script>
 
+  <!-- Lang: echte Nutzer-Locale vor dem Render setzen, damit Chromium-Browser nicht
+       fälschlich „aus dem Deutschen übersetzen" anbieten (statisches lang="de"). -->
+  <script src="/lang-init.js"></script>
+
   <!-- Styles (Basis - seitenspezifische CSS wird vom Router on-demand geladen) -->
   <link rel="stylesheet" href="/styles/tokens.css" />
   <link rel="stylesheet" href="/styles/reset.css" />
@@ -47,6 +51,7 @@
   <link rel="stylesheet" href="/styles/kitchen-tabs.css" />
   <link rel="stylesheet" href="/styles/user-multi-select.css" />
   <link rel="stylesheet" href="/styles/login.css" />
+  <link rel="stylesheet" href="/styles/typography.css" />
 
   <!-- Lucide Icons (lokal, v0.469.0) -->
   <script src="/lucide.min.js" defer></script>

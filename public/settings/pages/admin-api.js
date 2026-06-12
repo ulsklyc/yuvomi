@@ -81,14 +81,9 @@ function renderApiTokenList(container, tokens) {
 function renderPage(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <header class="settings-leaf-header">
-      <h1 class="settings-leaf-header__title">${t('settings.pageApiAccess')}</h1>
-      <p class="settings-leaf-header__description">${t('settings.pageApiAccessDescription')}</p>
-    </header>
-
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.apiTokensTitle')}</h2>
-      <div class="settings-card settings-card--api-tokens">
+      <div class="settings-card">
         <h3 class="settings-card__title">${t('settings.apiTokensCardTitle')}</h3>
         <p class="form-hint" style="margin-bottom:var(--space-3)">${t('settings.apiTokensHint')}</p>
         <ul class="settings-members" id="api-token-list"></ul>

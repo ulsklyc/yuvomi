@@ -21,6 +21,9 @@
   /* overflow:clip inside overflow:auto (.app-content) triggers iOS WebKit blank-screen on scroll.
    * overflow:hidden provides identical clipping without the compositor bug. */
   overflow: hidden;
+  /* Container für das Masonry-Grid: Spaltenzahl reflowt nach EIGENEM Platz
+   * (Sidebar-bewusst), nicht nach Viewport. Siehe tokens.css §11c. */
+  container: notes-page / inline-size;
 }
 
 @media (min-width: 1024px) {
@@ -57,7 +60,7 @@
   border-radius: var(--radius-glass-button);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: var(--text-md);
+  font-size: var(--text-base);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
@@ -83,15 +86,21 @@
   column-gap: var(--space-3);
 }
 
-@media (min-width: 600px) {
+/* Lade-Zustand: Multi-Column aufheben, damit die geteilte Skeleton-Liste
+ * (Flex-Spalte) full-width erscheint — eine Lade-Sprache über alle Module. */
+.notes-grid[aria-busy="true"] {
+  columns: auto;
+}
+
+@container notes-page (min-width: 600px) {
   .notes-grid { columns: 3; }
 }
 
-@media (min-width: 900px) {
+@container notes-page (min-width: 900px) {
   .notes-grid { columns: 4; }
 }
 
-@media (min-width: 1200px) {
+@container notes-page (min-width: 1200px) {
   .notes-grid { columns: 5; }
 }
 
@@ -158,8 +167,6 @@
 }
 
 .note-card__title {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
   margin-bottom: var(--space-1);
   color: inherit;
   padding-right: var(--target-base);

@@ -1,8 +1,7 @@
 import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
-import { esc } from '/utils/html.js';
 import { confirmModal } from '/components/modal.js';
-import { createDisclosure } from '/settings/components.js';
+import { createDisclosure, createInfoRow } from '/settings/components.js';
 
 function showError(element, message) {
   if (!element) return;
@@ -13,15 +12,10 @@ function showError(element, message) {
 function renderPage(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <header class="settings-leaf-header">
-      <h1 class="settings-leaf-header__title">${t('settings.pageBackupRestore')}</h1>
-      <p class="settings-leaf-header__description">${t('settings.pageBackupRestoreDescription')}</p>
-    </header>
-
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.sectionBackup')}</h2>
 
-      <div class="settings-card settings-card--backup settings-backup-card">
+      <div class="settings-card settings-backup-card">
         <div class="settings-backup-card__icon">
           <i data-lucide="database-backup" aria-hidden="true"></i>
         </div>
@@ -34,7 +28,7 @@ function renderPage(container) {
         </div>
       </div>
 
-      <div class="settings-card settings-card--backup settings-backup-card settings-backup-card--danger">
+      <div class="settings-card settings-backup-card settings-backup-card--danger">
         <div class="settings-backup-card__icon">
           <i data-lucide="rotate-ccw" aria-hidden="true"></i>
         </div>
@@ -57,21 +51,21 @@ function renderPage(container) {
         </div>
       </div>
 
-      <div class="settings-card settings-card--backup" id="backup-scheduler-card">
+      <div class="settings-card" id="backup-scheduler-card">
         <h3 class="settings-card__title">${t('settings.backupSchedulerTitle')}</h3>
         <p class="form-hint">${t('settings.backupSchedulerHint')}</p>
         <div class="settings-info-grid" id="backup-scheduler-info"></div>
       </div>
 
-      <div class="settings-card settings-card--backup" id="backup-webdav-card">
+      <div class="settings-card" id="backup-webdav-card">
         <h3 class="settings-card__title">
           <i data-lucide="cloud-upload" class="icon-sm" aria-hidden="true"></i>
           ${t('settings.backupWebdavTitle')}
         </h3>
         <p class="form-hint">${t('settings.backupWebdavHint')}</p>
-        <form class="settings-form" id="backup-webdav-form" novalidate style="margin-top:var(--space-4);">
+        <form class="settings-form settings-webdav-form" id="backup-webdav-form" novalidate>
           <div class="settings-webdav-toggle-row">
-            <span class="form-label" style="margin:0;">${t('settings.backupWebdavEnabled')}</span>
+            <span class="form-label">${t('settings.backupWebdavEnabled')}</span>
             <label class="toggle">
               <input type="checkbox" id="webdav-enabled" name="enabled" />
               <span class="toggle__track" aria-hidden="true"></span>
@@ -105,7 +99,7 @@ function renderPage(container) {
           </div>
           <div class="form-group">
             <label class="form-label" for="webdav-keep">${t('settings.backupWebdavKeep')}</label>
-            <input class="form-input" type="number" id="webdav-keep" name="keep" min="1" max="99" style="max-width:100px;" />
+            <input class="form-input settings-input--compact" type="number" id="webdav-keep" name="keep" min="1" max="99" />
           </div>
           <div id="webdav-test-result" class="form-hint" hidden></div>
           <div class="settings-form-actions">
@@ -117,7 +111,7 @@ function renderPage(container) {
           </div>
         </form>
 
-        <div class="settings-info-grid" id="backup-webdav-status" style="margin-top:var(--space-4);padding-top:var(--space-4);border-top:1px solid var(--color-border);"></div>
+        <div class="settings-info-grid settings-info-grid--divided" id="backup-webdav-status"></div>
       </div>
 
       <div id="backup-cli-host"></div>
@@ -146,7 +140,7 @@ function renderCliDisclosure(container) {
   const host = container.querySelector('#backup-cli-host');
   if (!host) return;
   const card = document.createElement('div');
-  card.className = 'settings-card settings-card--backup';
+  card.className = 'settings-card';
   card.appendChild(createDisclosure({
     id: 'backup-cli',
     summary: t('settings.backupCliTitle'),
@@ -175,35 +169,34 @@ async function loadBackupSchedulerStatus(container) {
         : t('settings.backupSchedulerLastFail', { date });
     }
 
-    const html = `
-      <div class="settings-info-row">
-        <span class="settings-info-label">${t('settings.backupSchedulerStatus')}</span>
-        <span class="settings-info-value ${enabled ? 'settings-info-value--success' : ''}">
-          ${enabled ? t('settings.backupSchedulerEnabled') : t('settings.backupSchedulerDisabled')}
-        </span>
-      </div>
-      ${enabled ? `
-        <div class="settings-info-row">
-          <span class="settings-info-label">${t('settings.backupSchedulerSchedule')}</span>
-          <span class="settings-info-value"><code>${esc(schedule)}</code></span>
-        </div>
-        <div class="settings-info-row">
-          <span class="settings-info-label">${t('settings.backupSchedulerKeep')}</span>
-          <span class="settings-info-value">${t('settings.backupSchedulerKeepCount', { count: keepCount })}</span>
-        </div>
-        <div class="settings-info-row">
-          <span class="settings-info-label">${t('settings.backupSchedulerLastBackup')}</span>
-          <span class="settings-info-value">${esc(lastBackupText)}</span>
-        </div>
-        <div class="settings-form-actions">
-          <button class="btn btn--secondary" id="backup-trigger-btn">${t('settings.backupSchedulerTrigger')}</button>
-        </div>
-      ` : ''}
-    `;
+    const rows = [
+      createInfoRow({
+        label: t('settings.backupSchedulerStatus'),
+        value: enabled ? t('settings.backupSchedulerEnabled') : t('settings.backupSchedulerDisabled'),
+        tone: enabled ? 'success' : null,
+      }),
+    ];
 
-    infoContainer.replaceChildren();
-    infoContainer.insertAdjacentHTML('beforeend', html);
-    window.lucide?.createIcons({ el: infoContainer });
+    if (enabled) {
+      rows.push(createInfoRow({ label: t('settings.backupSchedulerSchedule'), value: schedule, code: true }));
+      rows.push(createInfoRow({
+        label: t('settings.backupSchedulerKeep'),
+        value: t('settings.backupSchedulerKeepCount', { count: keepCount }),
+      }));
+      rows.push(createInfoRow({ label: t('settings.backupSchedulerLastBackup'), value: lastBackupText }));
+
+      const actions = document.createElement('div');
+      actions.className = 'settings-form-actions';
+      const triggerButton = document.createElement('button');
+      triggerButton.type = 'button';
+      triggerButton.className = 'btn btn--secondary';
+      triggerButton.id = 'backup-trigger-btn';
+      triggerButton.textContent = t('settings.backupSchedulerTrigger');
+      actions.appendChild(triggerButton);
+      rows.push(actions);
+    }
+
+    infoContainer.replaceChildren(...rows);
 
     const triggerBtn = infoContainer.querySelector('#backup-trigger-btn');
     if (triggerBtn) {
@@ -234,29 +227,36 @@ function renderWebdavStatus(grid, container, d) {
     ? `${formatDate(d.lastUpload)} ${formatTime(d.lastUpload)}`
     : t('settings.backupWebdavNeverUploaded');
 
-  const lastUploadColor = d.lastUpload ? 'var(--color-success)' : '';
+  const rows = [
+    createInfoRow({
+      label: t('settings.backupWebdavLastUpload'),
+      value: lastUploadValue,
+      tone: d.lastUpload ? 'success' : null,
+    }),
+  ];
 
-  const errorRow = d.lastError
-    ? `<div class="settings-info-row">
-         <span class="settings-info-label">${t('settings.backupWebdavLastError')}</span>
-         <span class="settings-info-value" style="color:var(--color-danger);word-break:break-all;">${esc(d.lastError)}</span>
-       </div>`
-    : '';
+  if (d.lastError) {
+    rows.push(createInfoRow({
+      label: t('settings.backupWebdavLastError'),
+      value: d.lastError,
+      tone: 'danger',
+    }));
+  }
 
-  grid.replaceChildren();
-  grid.insertAdjacentHTML('beforeend', `
-    <div class="settings-info-row">
-      <span class="settings-info-label">${t('settings.backupWebdavLastUpload')}</span>
-      <span class="settings-info-value" style="${lastUploadColor ? `color:${lastUploadColor};font-weight:var(--font-weight-semibold);` : ''}">${esc(lastUploadValue)}</span>
-    </div>
-    ${errorRow}
-    <div class="settings-form-actions" style="margin-top:var(--space-2);">
-      <button class="btn btn--secondary" id="webdav-trigger-btn">
-        <i data-lucide="upload-cloud" aria-hidden="true"></i>
-        ${t('settings.backupWebdavTriggerBtn')}
-      </button>
-    </div>
-  `);
+  const actions = document.createElement('div');
+  actions.className = 'settings-form-actions settings-form-actions--tight';
+  const triggerButton = document.createElement('button');
+  triggerButton.type = 'button';
+  triggerButton.className = 'btn btn--secondary';
+  triggerButton.id = 'webdav-trigger-btn';
+  const triggerIcon = document.createElement('i');
+  triggerIcon.dataset.lucide = 'upload-cloud';
+  triggerIcon.setAttribute('aria-hidden', 'true');
+  triggerButton.append(triggerIcon, document.createTextNode(` ${t('settings.backupWebdavTriggerBtn')}`));
+  actions.appendChild(triggerButton);
+  rows.push(actions);
+
+  grid.replaceChildren(...rows);
   window.lucide?.createIcons({ el: grid });
 
   const triggerBtn = grid.querySelector('#webdav-trigger-btn');

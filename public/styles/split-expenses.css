@@ -34,8 +34,6 @@
 }
 
 .split-title {
-  font-size: var(--text-3xl);
-  line-height: 1.1;
 }
 
 .split-subtitle,
@@ -86,11 +84,11 @@
 
 .split-summary-card span {
   color: var(--color-text-secondary);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
 }
 
 .split-summary-card strong {
-  font-size: 1.35rem;
+  font-size: var(--text-xl);
   color: var(--color-text-primary);
 }
 
@@ -200,7 +198,7 @@
 .split-expense__body span,
 .split-activity-item span {
   color: var(--color-text-secondary);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 
 .split-main {
@@ -223,7 +221,7 @@
   color: var(--module-split-expenses);
   font-weight: 800;
   text-transform: uppercase;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
 }
 
 .split-header-actions {
@@ -340,7 +338,7 @@
   min-height: 360px;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1023px) {
   .split-layout,
   .split-content-grid {
     grid-template-columns: 1fr;
@@ -361,7 +359,7 @@
   }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 767px) {
   .split-page {
     padding: var(--space-3);
     padding-bottom: calc(var(--space-8) + 72px);

@@ -59,11 +59,6 @@ function providerConnectionStatus(status) {
 function renderPage(container, user) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <header class="settings-leaf-header">
-      <h1 class="settings-leaf-header__title">${t('settings.pageSyncCalendar')}</h1>
-      <p class="settings-leaf-header__description">${t('settings.pageSyncCalendarDescription')}</p>
-    </header>
-
     <div id="sync-calendar-banner"></div>
 
     <section class="settings-section">

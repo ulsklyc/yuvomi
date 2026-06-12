@@ -1,7 +1,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
-import { esc } from '/utils/html.js';
 import {
+  createInfoList,
   createRetryState,
   createStatusSummary,
 } from '/settings/components.js';
@@ -9,14 +9,9 @@ import {
 function renderPage(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <header class="settings-leaf-header">
-      <h1 class="settings-leaf-header__title">${t('settings.pageSystem')}</h1>
-      <p class="settings-leaf-header__description">${t('settings.pageSystemDescription')}</p>
-    </header>
-
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.systemTitle')}</h2>
-      <div class="settings-card settings-card--system" id="system-info-card">
+      <div class="settings-card" id="system-info-card">
         <p class="settings-card-description">${t('settings.systemDescription')}</p>
         <div id="system-info-host"></div>
       </div>
@@ -54,18 +49,7 @@ function buildInfoRows(info) {
 }
 
 function renderInfo(host, info) {
-  const grid = document.createElement('div');
-  grid.className = 'settings-info-grid';
-  for (const row of buildInfoRows(info)) {
-    const rowEl = document.createElement('div');
-    rowEl.className = 'settings-info-row';
-    rowEl.insertAdjacentHTML('beforeend', `
-      <span class="settings-info-label">${esc(row.label)}</span>
-      <span class="settings-info-value">${esc(row.value)}</span>
-    `);
-    grid.appendChild(rowEl);
-  }
-  host.replaceChildren(grid);
+  host.replaceChildren(createInfoList(buildInfoRows(info)));
 }
 
 async function loadSystemInfo(container) {

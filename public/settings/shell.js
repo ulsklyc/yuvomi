@@ -287,9 +287,16 @@ async function renderLeafContent(content, leaf, domain, user, query) {
     document.createTextNode(t('settings.backToSettings')),
   );
 
+  // Der Leaf-Header wird zentral aus der Registry gerendert (Prio 5/B1): die
+  // Blätter liefern nur noch Content. Der Header liegt als Geschwister *über*
+  // dem Content-Container, damit Leaf-interne Re-Renders (die `leafContainer`
+  // per replaceChildren leeren) ihn nicht entfernen.
+  const header = createLeafHeader(leaf);
+  const heading = header.querySelector('.settings-leaf-header__title');
+
   const leafContainer = document.createElement('div');
   leafContainer.className = 'settings-leaf';
-  content.replaceChildren(breadcrumb, backLink, leafContainer);
+  content.replaceChildren(breadcrumb, backLink, header, leafContainer);
 
   const loadAndRender = async ({ focusRetry = false } = {}) => {
     leafContainer.replaceChildren();
@@ -297,13 +304,6 @@ async function renderLeafContent(content, leaf, domain, user, query) {
       const module = await leaf.loader();
       if (typeof module.render !== 'function') throw new TypeError('Settings leaf must export render()');
       await module.render(leafContainer, { user, query });
-
-      let heading = leafContainer.querySelector('h1');
-      if (!heading) {
-        const header = createLeafHeader(leaf);
-        leafContainer.prepend(header);
-        heading = header.querySelector('h1');
-      }
 
       heading.tabIndex = -1;
       requestAnimationFrame(() => {

@@ -514,18 +514,21 @@ Custom folders for organizing family documents (migration v37). A "Hausreinigung
 `family_documents.folder_id` references this table (ON DELETE SET NULL, nullable).
 
 ### DMS Accounts
-Connections to an external document management system (Paperless-ngx) for the Documents module (migration v50). Admin-managed in Settings.
+Connections to an external document management system for the Documents module (migration v50, extended v52). Admin-managed in Settings. Supported providers: `paperless` (Paperless-ngx) and `papra` (Papra).
 
 | Column | Type | Constraint |
 |--------|------|-----------|
-| provider | TEXT | paperless (CHECK constraint) |
+| provider | TEXT | `paperless` \| `papra` (CHECK constraint, migration v52) |
 | name | TEXT | NOT NULL (display name) |
-| base_url | TEXT | NOT NULL UNIQUE (one account per server) |
+| base_url | TEXT | NOT NULL |
+| org_id | TEXT | NOT NULL DEFAULT '' (Papra organization ID; empty for Paperless-ngx; migration v52) |
 | api_token | TEXT | NOT NULL (write-only; never returned by the API, protected by optional SQLCipher) |
 | created_at | TEXT | ISO 8601 |
 | last_check | TEXT | nullable (last connection test) |
 
-**DMS integration:** Admins connect a Paperless-ngx instance, then search it and **link** existing DMS documents into the Documents module as `external`/`dms` references (no duplication of the binary), or **push** a local or WebDAV-backed document into the DMS (asynchronous OCR ingestion — returns a Paperless task ID). Only `storage_backend = 'dms'` means a document is already stored in the DMS. All DMS operations (account management, search, link, push) are **admin-only**; searching the DMS is gated because it would otherwise bypass the per-document `restricted`/`private` visibility boundaries. Linked documents are previewed/downloaded by proxying the DMS live. The adapter layer (`server/services/dms/`) is provider-pluggable; Paperless-ngx is the first adapter.
+UNIQUE constraint: `(base_url, org_id)` — allows multiple Papra organizations on the same server; Paperless-ngx uses `org_id = ''` so only one account per server.
+
+**DMS integration:** Admins connect a DMS instance (Paperless-ngx or Papra), then search it and **link** existing DMS documents into the Documents module as `external`/`dms` references (no duplication of the binary), or **push** a local or WebDAV-backed document into the DMS. Only `storage_backend = 'dms'` means a document is already stored in the DMS. All DMS operations (account management, search, link, push) are **admin-only**; searching the DMS is gated because it would otherwise bypass the per-document `restricted`/`private` visibility boundaries. Linked documents are previewed/downloaded by proxying the DMS live. The adapter layer (`server/services/dms/`) is provider-pluggable; Paperless-ngx and Papra are the two built-in adapters.
 
 ### Budget Loans
 Instalment-based loans with per-payment tracking. Active loans show remaining balance and due months; paid-off loans are automatically closed.
@@ -946,7 +949,7 @@ Unauthenticated users are redirected here. No public registration form - the fir
 - Error display for wrong credentials
 - Rate limiting: 5 attempts/min/IP, 15-min lockout
 - Password visibility toggle (eye/eye-off icon) to verify input before submitting
-- **SSO / OpenID Connect (v0.55.14):** When OIDC is configured (`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI`), a "Sign in with SSO" button appears below the divider. Clicking it initiates an Authorization Code flow with PKCE (S256) and a nonce; state, nonce, and code verifier are stored in the session and consumed once. On successful callback, the user's `oidc_sub` is matched to a local user account — a matching Yuvomi account must already exist (provisioning is not automatic). SSO errors display a localized message.
+- **SSO / OpenID Connect (v0.55.14):** When OIDC is configured (`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI`), a "Sign in with SSO" button appears below the divider. Clicking it initiates an Authorization Code flow with PKCE (S256) and a nonce; state, nonce, and code verifier are stored in the session and consumed once. On successful callback, the user is matched by `oidc_sub`. With no `sub` match, an existing local account is linked **only when the provider reports `email_verified: true` and exactly one account holds that email** (matched against `contacts.email` / `contact_emails.value`, case-insensitive); unverified or ambiguous emails never link, and a new account is provisioned instead. SSO errors display a localized message. Providers that omit the `email_verified` claim entirely are supported via the opt-in `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=true` env var (v0.71.11).
 - **Failed-login logging (v0.55.15):** Failed attempts are logged as warnings with IP, username, and failure reason (`user_not_found` / `invalid_password`), enabling fail2ban / CrowdSec integration.
 - After successful login: redirect to dashboard
 

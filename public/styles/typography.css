@@ -1,0 +1,164 @@
+/* ==========================================================================
+ * Typografie-Rollen — eine Quelle der Wahrheit
+ *
+ * Jede Rolle definiert Größe + Weight + Line-Height + Tracking + Transform an
+ * EINER Stelle. Ein Element nimmt eine Rolle auf einem von zwei Wegen an:
+ *
+ *   1. Neuer/bevorzugter Weg: die Utility-Klasse im Markup mitführen
+ *      (z.B. class="task-card__title u-card-title").
+ *   2. Bestands-Weg: der BEM-Selektor ist unten in der Selektor-Liste der
+ *      Rolle registriert. So werden ganze Module ohne Markup-Änderung
+ *      vereinheitlicht; das Modul-CSS trägt dann nur noch Farbe/Accent/Layout.
+ *
+ * Beide Wege treffen denselben Deklarationsblock. Werte ausschließlich aus
+ * tokens.css. Wird als letzte Basis-Datei geladen, damit Rollen gegenüber
+ * Basis-Komponenten gewinnen; on-demand geladenes Modul-CSS darf die hier
+ * gesetzten Eigenschaften nicht mehr doppeln.
+ *
+ * Siehe Typo-Konsistenz-Plan Phase 2.
+ * ========================================================================== */
+
+/* --------------------------------------------------------------------------
+ * Hero / Begrüßung — eine Instanz pro Screen
+ * ------------------------------------------------------------------------ */
+.u-hero,
+.dashboard-hero__title {
+  font-size: var(--text-4xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  letter-spacing: var(--tracking-tight);
+}
+
+/* --------------------------------------------------------------------------
+ * Seitentitel — fluide 24→30px aus EINER Token-Quelle
+ * ------------------------------------------------------------------------ */
+.u-page-title,
+.page__title,
+.dashboard-overview__title,
+.settings-leaf-header__title,
+.split-title {
+  font-size: var(--type-page-title-size);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  letter-spacing: var(--tracking-tight);
+}
+
+/* --------------------------------------------------------------------------
+ * Section-/Bereichs-Überschrift (normale Schreibweise)
+ * ------------------------------------------------------------------------ */
+.u-section-title,
+.birthdays-toolbar__title,
+.birthdays-section__header h3,
+.recipes-header__title,
+.list-header__name,
+.shopping-cat-manager__title,
+.loan-report__title,
+.day-view__date-label,
+.today-cockpit__header h2,
+.settings-section__title,
+.settings-empty-state__title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
+  letter-spacing: var(--tracking-normal);
+}
+
+/* --------------------------------------------------------------------------
+ * Eyebrow / Uppercase-Mikro-Label — der EINE konsistente Tracking-Wert.
+ * Ersetzt die zuvor gestreuten 0/0.05/0.06/0.07/0.08/0.1em-Werte.
+ * ------------------------------------------------------------------------ */
+.u-eyebrow,
+.dashboard-metric__title,
+.today-cockpit-card__label,
+.dashboard-hero__summary-label,
+.event-icon-picker__category-label,
+.budget-summary-card__label,
+.budget-chart-section__title,
+.loan-report__section-title,
+.budget-list-header__title,
+.contact-group__header,
+.day-header__name,
+.meal-slot__type-label,
+.item-category__header,
+.documents-folder-browser__title,
+.nav-section-label,
+.settings-shell__navigation-heading {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+/* --------------------------------------------------------------------------
+ * Card-/Item-Titel
+ * ------------------------------------------------------------------------ */
+.u-card-title,
+.agenda-event__title,
+.event-popup__title,
+.budget-loan-card__title,
+.budget-entry__title,
+.contact-item__name,
+.birthday-item__name,
+.document-row__title,
+.document-viewer__unsupported-title,
+.recipe-card__title,
+.settings-card__title,
+.settings-member__name,
+.settings-provider__name,
+.settings-sync-info__name {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
+}
+
+/* Dichte-Variante: eine Stufe kompakter. Macht hohe Informationsdichte
+ * (Dashboard-Widgets, Kanban-Karten, Listen-Items) zu einer BEWUSSTEN
+ * Entscheidung statt zu einem zufälligen Größen-Override pro Selektor. */
+.u-card-title.u-compact,
+.widget__title,
+.task-item__title,
+.event-item__title,
+.shopping-widget-list__name,
+.note-item__title,
+.customize-row__name,
+.note-card__title,
+.documents-folder-item__name,
+.document-dropzone__title,
+.dms-result__title,
+.meal-card__title,
+.shopping-cat-row__name,
+.housekeeping-section-heading span,
+.reminder-section__title,
+.cat-row__name {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
+}
+
+/* --------------------------------------------------------------------------
+ * Generische Rollen für neuen Code (Markup trägt u-* direkt)
+ * ------------------------------------------------------------------------ */
+.u-body {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-base);
+}
+.u-meta {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-base);
+}
+.u-label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-tight);
+}
+.u-badge {
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+}
+.u-section-title.u-compact {
+  font-size: var(--text-base);
+}

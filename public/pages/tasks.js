@@ -204,7 +204,7 @@ function renderTaskCard(task, opts = {}) {
         </button>
 
         <div class="task-card__body">
-          <div class="task-card__title" data-action="open-task" data-id="${task.id}">
+          <div class="task-card__title u-card-title" data-action="open-task" data-id="${task.id}">
             ${esc(task.title)}
           </div>
           <div class="task-card__meta">
@@ -296,7 +296,7 @@ function renderTaskGroups(tasks, groupMode) {
     return `
     <div class="task-group">
       <div class="task-group__header">
-        <span class="task-group__title">${catLabelsMap[name] ?? name}</span>
+        <span class="task-group__title u-eyebrow">${catLabelsMap[name] ?? name}</span>
         <span class="task-group__count">${groupTasks.length}</span>
       </div>
       ${sorted.map((t) => renderSwipeRow(t, renderTaskCard(t, {
@@ -792,7 +792,7 @@ function renderKanbanCard(task) {
   return `
     <div class="kanban-card ${task.status === 'done' ? 'kanban-card--done' : ''}"
          data-task-id="${task.id}" draggable="true">
-      <div class="kanban-card__title">${esc(task.title)}</div>
+      <div class="kanban-card__title u-card-title u-compact">${esc(task.title)}</div>
       <div class="kanban-card__meta">
         ${renderPriorityBadge(task.priority)}
         ${due ? `<span class="due-date ${due.cls}"><i data-lucide="clock" class="icon-sm" aria-hidden="true"></i> ${due.label}</span>` : ''}
@@ -829,7 +829,7 @@ function renderKanban(container) {
       ${cols.map((col) => `
         <div class="kanban-col" data-status="${col.status}">
           <div class="kanban-col__header">
-            <span class="kanban-col__title" style="color:${col.colorVar.startsWith('--') ? `var(${col.colorVar})` : col.colorVar}">
+            <span class="kanban-col__title u-eyebrow" style="color:${col.colorVar.startsWith('--') ? `var(${col.colorVar})` : col.colorVar}">
               ${col.label}
             </span>
             <span class="kanban-col__count">${grouped[col.status].length}</span>
@@ -1224,7 +1224,7 @@ function renderFilters(container) {
       section.className = 'filter-panel__group';
 
       const heading = document.createElement('div');
-      heading.className = 'filter-panel__label';
+      heading.className = 'filter-panel__label u-eyebrow';
       heading.textContent = group.label;
       section.appendChild(heading);
 

@@ -7,6 +7,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.71.19] - 2026-06-12
+
+### Fixed
+- **No false translation prompt on non-German devices** (#353): the app shipped a hardcoded `<html lang="de">`, so Chromium-based browsers (e.g. Brave) repeatedly offered to translate the already-localized interface from German on non-German systems. The document language is now set to the resolved user locale before the page renders, so the declared language matches the displayed content.
+
+## [0.71.18] - 2026-06-12
+
+### Changed
+- **Modal size reference completed**: the `openModal({ size })` documentation now lists all four sizes (`sm`/`md`/`lg`/`xl`) with their widths, matching the CSS and the design system instead of omitting the `xl` size that the Documents module already uses.
+
+### Removed
+- **Dead loading translation keys**: two unused `loadingIndicator` strings (Recipes and Budget) were removed across all 19 locales; the shared skeleton loading state replaced them in v0.71.14–0.71.17.
+
+## [0.71.17] - 2026-06-12
+
+### Fixed
+- **Loading skeletons now appear on first navigation**: opening a page used to show a blank content area until its data finished loading, because the router only revealed a page once its `render()` (including the data fetch) had fully resolved, so any skeleton placed before that fetch never showed. The page shell and its loading skeleton now appear immediately while data loads, so every module gives feedback on slow connections instead of looking stuck.
+- **Skeleton contrast in dark mode**: skeleton placeholder lines were nearly invisible against the dark card surface. Their colour is now mixed from the surface and text colours, so they have clear, consistent contrast in both light and dark themes.
+
+### Changed
+- **Skeleton loading for the remaining list modules**: Contacts, Notes, Birthdays, Documents, Recipes, and Shared expenses now show the shared skeleton loading language while their lists load, completing the rollout so all modules use one consistent loading state.
+
+## [0.71.16] - 2026-06-12
+
+### Changed
+- **Container-query responsive layout**: component-internal grids now reflow by their own available width instead of the viewport. The notes board, meal-day slots, budget summary cards, modal two-column forms, and the dashboard "today at a glance" strip and overview header all use CSS `@container` queries. Sidebar-aware result: a narrow modal on a wide desktop, or a panel squeezed by the sidebar, collapses based on its real width rather than the window size.
+- **Canonical breakpoints**: roughly 33 ad-hoc viewport breakpoints (900/820/780/720/700/680/600/599/560/520/480/420/959/960/980/1100/1180/1200/1280px) were consolidated onto the four documented boundaries (640/768/1024/1440px), so layout transitions are consistent across modules.
+
+### Fixed
+- **Side-stripe accents removed**: the colored left-border stripes on the dashboard "today at a glance" cards and on calendar holiday chips are gone; module/holiday identity is now carried by the full border, background tint, and icon for a cleaner, more consistent look.
+
+### Removed
+- **Dead dashboard CSS**: eight unused responsive blocks for never-rendered layout-generation classes were removed.
+
+## [0.71.15] - 2026-06-12
+
+### Changed
+- **Consistent loading feedback**: a shared skeleton loading language (`public/utils/skeleton.js` → `renderSkeletonList()`) replaces the per-module "loading…" text placeholders in Budget, Meals, and Housekeeping. The skeleton classes (`.skeleton-list`/`.skeleton-card`/`.skeleton-line`) now live globally in `layout.css` instead of only in `dashboard.css`.
+- **Z-index discipline**: the two remaining magic-number z-indexes (`9999` skip link, `1000` kanban drag ghost) are mapped to new semantic tokens (`--z-skip-link`, `--z-drag`) on the documented scale.
+
+### Fixed
+- **Skeleton widths outside the dashboard**: the `.skeleton-line--short/medium/full` variants previously lived only in `dashboard.css` and silently had no effect on other pages (Tasks, Shopping), because CSS is loaded per module; they are now globally available.
+- **Skeleton and reduced motion**: the skeleton shimmer now respects `prefers-reduced-motion: reduce` (static surface instead of animation).
+
+## [0.71.14] - 2026-06-12
+
+### Changed
+- **Typography consistency**: unified font sizes, weights, line-heights, and letter-spacing across every module and sub-module (dashboard, calendar, tasks, budget, kitchen, settings, and the rest) behind a shared typographic role layer. Page titles, section headings, eyebrow labels, and card titles now render consistently on mobile and desktop. Font sizes and letter-spacing are fully token-driven, and canonical breakpoint tokens document the mobile/tablet/desktop/wide boundaries.
+
+### Fixed
+- **Label legibility**: meal-slot type labels and several uppercase section/eyebrow labels used the too-faint "disabled"/"tertiary" text colors; they now use the readable secondary text color, improving contrast and visual consistency.
+
+## [0.71.13] - 2026-06-11
+
+### Changed
+- **Docs**: updated installation guide, SPEC, and Unraid CA template to document the `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM` opt-in variable introduced in v0.71.11.
+
+## [0.71.12] - 2026-06-11
+
+### Security
+- **OIDC account linking (revert v0.71.11)**: the relaxed `email_verified !== false` check introduced in v0.71.11 is replaced with a strict opt-in. The default is restored to `email_verified === true` required; the new `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=true` env var lets admins opt in explicitly for IdPs that omit the claim but only issue verified addresses.
+
+## [0.71.11] - 2026-06-11
+
+### Added
+- **`OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM`** env var (opt-in): set to `true` to allow account linking when the IdP omits the `email_verified` claim entirely. The default remains strict (`email_verified: true` required) to prevent account-takeover via unverified addresses. Only enable this for IdPs fully under your control that never issue accounts with unverified email addresses (e.g. older Authentik deployments without an explicit `email_verified` property mapping).
+
+## [0.71.10] - 2026-06-11
+
+### Fixed
+- **CI test fix**: updated `test-frontend-audit` assertion for the DMS settings page to check for both `paperless` and `papra` provider option values, replacing the old static `provider: 'paperless'` literal that no longer exists after the multi-provider select was introduced in v0.71.9.
+
+## [0.71.9] - 2026-06-11
+
+### Added
+- **Papra DMS integration**: Papra is now a second supported document management system alongside Paperless-ngx. Admins can connect a Papra instance by selecting "Papra" from the provider selector in Settings → Documents → Document management, entering the server URL, organization ID, and API token. The adapter layer handles search, link, upload, and connection test; existing Paperless-ngx connections are unaffected. DB migration v52 adds the  column and updates the CHECK / UNIQUE constraints on .
+
+## [0.71.8] - 2026-06-11
+
+### Fixed
+- **Settings nav link**: tapping "Settings" in the mobile nav bar or the overflow sheet now opens the settings overview instead of jumping directly to the last-visited settings page.
+
+## [0.71.7] - 2026-06-11
+
+### Added
+- **Recurring payment series management**: deleting or editing a recurring budget entry now asks whether to affect only the current occurrence or the entire series. "Delete entire series" removes the parent rule and all its instances; "Change all future occurrences" updates the parent rule and purges future instances so they regenerate with the new values on next visit.
+
+## [0.71.6] - 2026-06-11
+
+### Changed
+- **Consistent Settings cards**: every card across the settings pages now shares one surface style. A few cards that still rendered with a translucent "glass" background have been brought in line so all cards match.
+
+## [0.71.5] - 2026-06-11
+
+### Fixed
+- **SSO account matching**: signing in via OIDC no longer always creates a new account (e.g. `username-1`) when one with the same email already exists. An existing local account is now linked automatically when the provider reports a verified email (`email_verified: true`) and exactly one account holds that address. Unverified or ambiguous emails still get a separate account, preventing account takeover.
+
 ## [0.71.4] - 2026-06-11
 
 ### Changed

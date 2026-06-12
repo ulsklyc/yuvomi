@@ -123,9 +123,6 @@
 .dashboard-metric__title {
   font-size: var(--text-xs); /* was: var(--text-2xs) — WCAG minimum 12px */
   color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  font-weight: var(--font-weight-medium);
 }
 
 .dashboard-metric__value {
@@ -258,7 +255,7 @@
   }
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1440px) {
   .dashboard__grid {
     grid-template-columns: repeat(4, 1fr);
   }
@@ -342,7 +339,7 @@
 
 .widget-greeting__title {
   /* Fluid: 18px (375px viewport) → 24px (1440px viewport) */
-  font-size: clamp(1.125rem, 0.56vw + 0.99rem, 1.5rem);
+  font-size: var(--type-greeting-size);
   font-weight: var(--font-weight-bold);
 }
 
@@ -442,8 +439,6 @@
 }
 
 .widget__title {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   display: flex;
   align-items: center;
@@ -575,13 +570,10 @@
 }
 
 .task-item__title {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: var(--line-height-snug);
 }
 
 .task-item__meta {
@@ -665,13 +657,10 @@
 }
 
 .event-item__title {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: var(--line-height-snug);
 }
 
 .event-item__time {
@@ -762,9 +751,9 @@
 .meal-slot__type {
   font-size: var(--text-xs);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text-disabled);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: var(--tracking-label);
 }
 
 .meal-slot--filled .meal-slot__type {
@@ -838,8 +827,6 @@
 }
 
 .shopping-widget-list__name {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
 
@@ -938,8 +925,6 @@
 }
 
 .note-item__title {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   margin-bottom: 2px;
   white-space: nowrap;
@@ -1202,15 +1187,13 @@ svg.weather-forecast__icon {
   padding: var(--space-3) var(--space-4);
 }
 
-.skeleton-line {
+/* Dashboard-Widget-Override: engere Zeilen + margin-basiertes Spacing für das
+ * bestehende Widget-Skeleton-Markup. Breiten-Varianten (--short/medium/full)
+ * leben jetzt global in layout.css. */
+.dashboard .widget-skeleton .skeleton-line {
   height: 12px;
   margin-bottom: var(--space-2);
-  border-radius: var(--radius-xs);
 }
-
-.skeleton-line--short  { width: 35%; }
-.skeleton-line--medium { width: 60%; }
-.skeleton-line--full   { width: 100%; }
 
 /* --------------------------------------------------------
  * FAB Speed-Dial
@@ -1464,8 +1447,6 @@ svg.weather-forecast__icon {
 
 .customize-row__name {
   flex: 1;
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
 }
 
 .customize-row__size {
@@ -1609,7 +1590,7 @@ svg.weather-forecast__icon {
   .onboarding-dot { transition: none; }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 640px) {
   .onboarding-overlay {
     align-items: flex-start;
     padding: var(--space-4);
@@ -1668,12 +1649,6 @@ svg.weather-forecast__icon {
   gap: var(--space-4);
 }
 
-@media (min-width: 1100px) {
-  .dashboard-hero {
-    grid-template-columns: minmax(0, 1.45fr) minmax(340px, 0.85fr);
-  }
-}
-
 .dashboard-hero__panel {
   position: relative;
   overflow: hidden;
@@ -1726,7 +1701,7 @@ svg.weather-forecast__icon {
   color: var(--color-accent);
   font-size: var(--text-xs);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
 }
 
@@ -1734,10 +1709,6 @@ svg.weather-forecast__icon {
   margin: var(--space-3) 0 0;
   /* Feste Token-Stufe statt fluidem clamp (Produkt-Register + Token-Disziplin).
    * --text-4xl (36px) ist die DESIGN.md-Display-Stufe — der frühere 69px-Hero „schrie". */
-  font-size: var(--text-4xl);
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-  font-weight: var(--font-weight-bold);
   max-width: 18ch;
 }
 
@@ -1855,6 +1826,9 @@ svg.weather-forecast__icon {
   background: var(--color-surface);
   padding: var(--space-4);
   box-shadow: var(--shadow-sm);
+  /* Container: die Glance-Metriken werden vierspaltig nach EIGENEM Platz,
+   * sidebar-bewusst, nicht nach Viewport. Siehe tokens.css §11c. */
+  container: today-cockpit / inline-size;
 }
 
 .today-cockpit__header {
@@ -1867,9 +1841,6 @@ svg.weather-forecast__icon {
 .today-cockpit__header h2 {
   margin: 0;
   color: var(--color-text-primary);
-  font-size: var(--text-lg);
-  line-height: var(--line-height-tight);
-  font-weight: var(--font-weight-bold);
 }
 
 .today-cockpit__date {
@@ -1896,8 +1867,7 @@ svg.weather-forecast__icon {
   min-height: calc(var(--target-lg) + var(--space-12));
   height: 100%;
   padding: var(--space-3);
-  border: 1px solid color-mix(in srgb, var(--today-card-accent) 22%, var(--color-border));
-  border-inline-start: var(--space-1) solid var(--today-card-accent);
+  border: 1px solid color-mix(in srgb, var(--today-card-accent) 34%, var(--color-border));
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--today-card-accent) 5%, var(--color-surface));
   color: var(--color-text-primary);
@@ -1934,11 +1904,6 @@ svg.weather-forecast__icon {
 
 .today-cockpit-card__label {
   color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0;
-  line-height: var(--line-height-tight);
-  text-transform: uppercase;
 }
 
 .today-cockpit-card__value {
@@ -1972,7 +1937,7 @@ svg.weather-forecast__icon {
   --today-card-accent: var(--module-meals);
 }
 
-@media (min-width: 900px) {
+@container today-cockpit (min-width: 680px) {
   .today-cockpit__grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -1986,10 +1951,7 @@ svg.weather-forecast__icon {
 }
 
 .dashboard-hero__summary-label {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
 }
 
 .dashboard-hero__summary-value {
@@ -2004,12 +1966,6 @@ svg.weather-forecast__icon {
   gap: var(--space-3);
   grid-template-columns: 1fr;
   margin-top: var(--space-4);
-}
-
-@media (min-width: 680px) {
-  .dashboard-hero__summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 .dashboard-stat {
@@ -2112,36 +2068,15 @@ svg.weather-forecast__icon {
   gap: var(--space-5);
 }
 
-@media (min-width: 1100px) {
-  .dashboard-layout {
-    grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.92fr);
-    align-items: start;
-  }
-}
-
 .dashboard-layout__main,
 .dashboard-layout__side {
   min-width: 0;
-}
-
-@media (min-width: 1100px) {
-  .dashboard-layout__side {
-    position: sticky;
-    top: calc(var(--space-4) + 72px);
-    align-self: start;
-  }
 }
 
 .dashboard-layout__grid {
   display: grid;
   gap: var(--space-4);
   grid-template-columns: minmax(0, 1fr);
-}
-
-@media (min-width: 780px) {
-  .dashboard-layout__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 .dashboard-layout__stack {
@@ -2256,6 +2191,8 @@ svg.weather-forecast__icon {
   background-color: var(--color-surface);
   padding: var(--space-4);
   box-shadow: var(--shadow-sm);
+  /* Container: Kopfzeile bricht nach eigenem Platz von Spalte auf Zeile um. */
+  container: dashboard-overview / inline-size;
 }
 
 @media (min-width: 1024px) {
@@ -2273,7 +2210,7 @@ svg.weather-forecast__icon {
   gap: var(--space-3);
 }
 
-@media (min-width: 900px) {
+@container dashboard-overview (min-width: 640px) {
   .dashboard-overview__header {
     flex-direction: row;
     align-items: center;
@@ -2295,10 +2232,6 @@ svg.weather-forecast__icon {
 .dashboard-overview__title {
   margin: var(--space-1) 0 0;
   color: var(--color-text-primary);
-  font-size: var(--text-2xl);
-  line-height: var(--line-height-tight);
-  letter-spacing: 0;
-  font-weight: var(--font-weight-bold);
   overflow-wrap: normal;
   word-break: normal;
   hyphens: manual;
@@ -2651,12 +2584,6 @@ svg.weather-forecast__icon {
   align-items: start;
 }
 
-@media (min-width: 1180px) {
-  .dashboard-workspace {
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
-  }
-}
-
 .dashboard-workspace__main,
 .dashboard-workspace__side {
   min-width: 0;
@@ -2669,12 +2596,6 @@ svg.weather-forecast__icon {
   align-items: start;
 }
 
-@media (min-width: 820px) {
-  .dashboard-widget-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 .dashboard-side-stack {
   display: grid;
   gap: var(--space-4);
@@ -2683,12 +2604,6 @@ svg.weather-forecast__icon {
 
 .dashboard-tile {
   min-width: 0;
-}
-
-@media (min-width: 820px) {
-  .dashboard-tile--wide {
-    grid-column: 1 / -1;
-  }
 }
 
 .dashboard .widget,
@@ -2962,7 +2877,7 @@ svg.weather-forecast__icon {
   line-height: 1.4;
 }
 
-@media (max-width: 520px) {
+@media (max-width: 640px) {
   .dashboard {
     padding-left: var(--space-3);
     padding-right: var(--space-3);
@@ -2987,7 +2902,6 @@ svg.weather-forecast__icon {
   }
 
   .dashboard-overview__title {
-    font-size: var(--text-xl);
   }
 
   .dashboard-overview__tools {

@@ -410,23 +410,55 @@ function setupAuthSession(req, res, user) {
 /**
  * Findet oder erstellt einen User anhand der (validierten) OIDC-Claims.
  *
- * Sicherheit: KEIN automatisches Linking bestehender lokaler Accounts. Die
- * Username-Regex verbietet '@', es gibt keine email-Spalte, und Linking ohne
- * email_verified-Prüfung wäre ein Account-Takeover-Vektor. Identität wird
- * ausschließlich über den (kryptografisch validierten) `sub` etabliert.
+ * Identität primär über den (kryptografisch validierten) `sub`. Existiert kein
+ * sub-Match, wird ein bestehender lokaler Account NUR verknüpft, wenn der IdP
+ * `email_verified: true` liefert UND genau ein noch nicht OIDC-gebundener Account
+ * dieselbe E-Mail führt. Ohne verifizierte E-Mail (oder bei Mehrdeutigkeit) wird
+ * ein separater Account angelegt — Linking auf unverifizierte E-Mails wäre ein
+ * Account-Takeover-Vektor.
+ *
+ * Ausnahme: `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=true` — Opt-in für IdPs, die
+ * den Claim zwar weglassen, aber nur verifizierte Adressen ausgeben (z. B. ältere
+ * Authentik-Deployments). Nur setzen, wenn der IdP vollständig unter eigener
+ * Kontrolle steht und keine unverifizierten E-Mails zulässt.
  *
  * @param {import('better-sqlite3').Database} database
- * @param {{ sub: string, email?: string, name?: string, preferred_username?: string }} claims
+ * @param {{ sub: string, email?: string, email_verified?: boolean, name?: string, preferred_username?: string }} claims
  * @returns {{ id: number, role: string, [key: string]: any }}
  */
 export function findOrCreateOidcUser(database, claims) {
-  const { sub, email, name, preferred_username } = claims;
+  const { sub, email, email_verified, name, preferred_username } = claims;
 
   // 1. Bestehenden OIDC-Nutzer über den eindeutigen sub finden
   const existing = database.prepare('SELECT * FROM users WHERE oidc_sub = ?').get(sub);
   if (existing) return existing;
 
-  // 2. Eindeutigen username ableiten (Kollision mit bestehenden Usernamen vermeiden)
+  // 2. Linking an bestehenden lokalen Account — ausschließlich bei verifizierter
+  //    E-Mail oder explizitem Opt-in via OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM.
+  //    Family-User-E-Mails hängen an contacts.email (Primär) bzw.
+  //    contact_emails.value (Sekundär). Verknüpft wird nur, wenn GENAU EIN noch
+  //    nicht OIDC-gebundener Account die E-Mail führt; 0 oder >1 Treffer →
+  //    sicherheitshalber neuer Account.
+  const trustMissingVerified = process.env.OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM === 'true';
+  if (email && (email_verified === true || (trustMissingVerified && email_verified !== false))) {
+    const matches = database.prepare(`
+      SELECT DISTINCT u.id
+      FROM users u
+      JOIN contacts c ON c.family_user_id = u.id
+      LEFT JOIN contact_emails ce ON ce.contact_id = c.id
+      WHERE u.oidc_sub IS NULL
+        AND (lower(c.email) = lower(?) OR lower(ce.value) = lower(?))
+    `).all(email, email);
+
+    if (matches.length === 1) {
+      database.prepare(
+        'UPDATE users SET oidc_sub = ?, oidc_provider = ? WHERE id = ?',
+      ).run(sub, process.env.OIDC_ISSUER ?? null, matches[0].id);
+      return database.prepare('SELECT * FROM users WHERE id = ?').get(matches[0].id);
+    }
+  }
+
+  // 3. Eindeutigen username ableiten (Kollision mit bestehenden Usernamen vermeiden)
   const base = (preferred_username || email || `oidc-${sub}`).slice(0, 64);
   let username = base;
   for (let n = 1; database.prepare('SELECT 1 FROM users WHERE username = ?').get(username); n++) {
@@ -623,6 +655,8 @@ router.get('/oidc/callback', async (req, res) => {
     const user = findOrCreateOidcUser(db.get(), {
       sub:                claims.sub,
       email:              userinfo.email,
+      // email_verified kann je nach Provider im UserInfo oder im ID-Token stehen
+      email_verified:     userinfo.email_verified ?? claims.email_verified,
       name:               userinfo.name,
       preferred_username: userinfo.preferred_username,
     });

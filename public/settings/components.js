@@ -140,6 +140,43 @@ export function createStatusSummary({
   return summary;
 }
 
+export function createInfoRow({ label, value, tone = null, code = false }) {
+  const row = document.createElement('div');
+  row.className = 'settings-info-row';
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'settings-info-label';
+  labelEl.textContent = String(label ?? '');
+
+  const valueEl = document.createElement('span');
+  valueEl.className = 'settings-info-value';
+  const allowedTones = new Set(['success', 'danger', 'warning']);
+  if (allowedTones.has(tone)) valueEl.classList.add(`settings-info-value--${tone}`);
+
+  if (value != null && typeof value === 'object' && typeof value.nodeType === 'number') {
+    valueEl.appendChild(value);
+  } else if (code) {
+    const codeEl = document.createElement('code');
+    codeEl.textContent = String(value ?? '');
+    valueEl.appendChild(codeEl);
+  } else {
+    valueEl.textContent = String(value ?? '');
+  }
+
+  row.append(labelEl, valueEl);
+  return row;
+}
+
+export function createInfoList(rows = []) {
+  const grid = document.createElement('div');
+  grid.className = 'settings-info-grid';
+  for (const row of rows) {
+    if (row == null) continue;
+    grid.appendChild(typeof row.nodeType === 'number' ? row : createInfoRow(row));
+  }
+  return grid;
+}
+
 export function createInlineError(message) {
   const error = document.createElement('p');
   error.className = 'settings-inline-error';

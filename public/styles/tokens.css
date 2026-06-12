@@ -320,19 +320,32 @@
   --text-2xs:  0.625rem;   /* 10px - Sehr kleine Badges (z.B. Erinnerungs-Zähler) */
   --text-xs:   0.75rem;    /* 12px - Minimum, Captions, Badges, Nav-Labels */
   --text-sm:   0.8125rem;  /* 13px - Small/Secondary */
-  --text-base: 1rem;       /* 16px - Body (Desktop) */
-  --text-md:   1rem;       /* 16px - Body (Mobile), Inputs */
+  --text-base: 1rem;       /* 16px - Body, Inputs */
+  --text-md:   var(--text-base); /* DEPRECATED: Alias auf --text-base. Nicht neu verwenden; bestehende Nutzer auf --text-base migrieren. */
   --text-lg:   1.125rem;   /* 18px - Section-Title */
   --text-xl:   1.25rem;    /* 20px - Subtitle */
-  --text-2xl:  1.5rem;     /* 24px - Page-Title */
-  --text-3xl:  1.875rem;   /* 30px - Page-Title Desktop */
+  --text-2xl:  1.5rem;     /* 24px - Page-Title (Mobile) */
+  --text-3xl:  1.875rem;   /* 30px - Page-Title (Desktop) */
   --text-4xl:  2.25rem;    /* 36px - Hero/Greeting */
+
+  /* Fluide Rollen-Größe: EINE Quelle für den Page-Title statt Modul-Overrides.
+     24px (Mobile) → 30px (Desktop), siehe Typo-Konsistenz-Plan Phase 1c. */
+  --type-page-title-size: clamp(1.5rem, 1.2rem + 1.2vw, 1.875rem);
+  /* Fluide Einzelfall-Größen (kein Rollen-Token, aber tokenisiert): */
+  --type-greeting-size: clamp(1.125rem, 0.56vw + 0.99rem, 1.5rem); /* Begrüßungs-Widget */
+  --type-login-hero-size: clamp(2rem, 5vw, 3rem);                  /* Login-Hero */
 
   /* Line-Heights */
   --line-height-tight:   1.25;
   --line-height-snug:    1.375;
   --line-height-base:    1.5;
   --line-height-relaxed: 1.625;
+
+  /* Letter-Spacing (Tracking) — verbindliche Werte für die jeweilige Rolle.
+     Ersetzt die zuvor gestreuten 0.01/0.06/0.07/0.08/0.1em- und px-Werte. */
+  --tracking-tight:  -0.02em;  /* Große Titel (≥ 24px) enger setzen */
+  --tracking-normal:  0;       /* Standard */
+  --tracking-label:   0.05em;  /* Uppercase-Mikro-Labels / Eyebrows — der EINE Wert */
 
   /* Font-Weights */
   --font-weight-regular:  400;
@@ -364,6 +377,28 @@
   --target-md: 40px;    /* Desktop Touch-Target (Maus) */
   --target-lg: 48px;    /* Mobile Touch-Target (Finger) */
   --target-base: 44px;  /* iOS-Minimum Touch-Target (44pt) */
+
+  /* --------------------------------------------------------
+   * 11c. Breakpoints — verbindlicher Kontrakt
+   *
+   * VIER kanonische, strukturelle Grenzen. Media-Queries können keine
+   * Variablen lesen; diese Tokens dienen Doku und JS (matchMedia). Die
+   * px-Werte in @media-Queries MÜSSEN einer dieser Grenzen entsprechen:
+   *
+   *   ≤ 640px            Mobile  — eine Spalte, Bottom-Nav
+   *   641–767px          Tablet  hoch (min-width: 768px Komplement: max 767px)
+   *   ≥ 1024px           Desktop — Sidebar, mehrspaltig (Komplement: max 1023px)
+   *   ≥ 1440px           Wide    — breite Desktop-Optimierung (optional)
+   *
+   * REGEL: Komponenten-interne Umbrüche (ein Karten-/Formular-Raster, das je
+   * nach EIGENEM Platz die Spaltenzahl ändert) gehören in @container-Queries,
+   * NICHT in neue Viewport-Breakpoints. So reflowt eine Komponente unabhängig
+   * vom Modul-Kontext gleich — statt 28 verschiedener Viewport-Schwellen.
+   * -------------------------------------------------------- */
+  --bp-mobile:  640px;
+  --bp-tablet:  768px;
+  --bp-desktop: 1024px;
+  --bp-wide:    1440px;
 
   /* --------------------------------------------------------
    * 12. Layout
@@ -411,7 +446,9 @@
   --z-dropdown: 50;
   --z-nav:     100;
   --z-modal:   200;
+  --z-drag:    250;   /* Drag-Ghost (z.B. Kanban) — über Modal, unter Toast */
   --z-toast:   300;
+  --z-skip-link: 400; /* Skip-Link im Keyboard-Fokus — bewusst über allem */
 
   /* --------------------------------------------------------
    * 16. Glass-Design-System (Liquid Glass Layer)

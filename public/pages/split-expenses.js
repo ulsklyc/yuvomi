@@ -8,6 +8,7 @@ import { openModal as openSharedModal, closeModal, confirmModal } from '/compone
 import { t, formatDate, getLocale, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { stagger } from '/utils/ux.js';
+import { renderSkeletonList } from '/utils/skeleton.js';
 
 let state = {
   meta: null,
@@ -78,7 +79,7 @@ export async function render(container, { user } = {}) {
           </div>
           <div class="split-groups" id="split-groups"></div>
         </aside>
-        <main class="split-main" id="split-main"></main>
+        <main class="split-main" id="split-main" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 2 })}</main>
       </div>
       <button class="page-fab" id="split-fab" aria-label="${t('splitExpenses.addExpense')}">
         <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
@@ -226,6 +227,7 @@ function renderGroups() {
 
 function renderMain() {
   const main = _container.querySelector('#split-main');
+  main.removeAttribute('aria-busy');
   const group = state.groups.find((g) => g.id === state.activeGroupId);
   if (!group) {
     setHtml(main, `

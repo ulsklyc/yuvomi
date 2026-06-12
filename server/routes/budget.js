@@ -906,6 +906,112 @@ router.post('/', (req, res) => {
 });
 
 /**
+ * PUT /api/v1/budget/:id/series
+ * Aktualisiert das Serien-Original und löscht zukünftige Instanzen (ab aktuellem Monat),
+ * sodass sie beim nächsten Monatsaufruf mit den neuen Werten neu erzeugt werden.
+ * Body: wie PUT /:id (date wird ignoriert – das Datum des Originals bleibt erhalten)
+ * Response: { data: Parent-Entry }
+ */
+router.put('/:id/series', (req, res) => {
+  try {
+    const id    = parseInt(req.params.id, 10);
+    const entry = db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(id);
+    if (!entry) return res.status(404).json({ error: 'Entry not found', code: 404 });
+
+    const parentId = entry.recurrence_parent_id ?? (entry.is_recurring ? entry.id : null);
+    if (!parentId) return res.status(400).json({ error: 'Not a recurring entry.', code: 400 });
+
+    const parent = db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(parentId);
+    if (!parent) return res.status(404).json({ error: 'Series parent not found', code: 404 });
+
+    const checks = [];
+    if (req.body.title    !== undefined) checks.push(str(req.body.title,    'Titel',  { max: MAX_TITLE, required: false }));
+    if (req.body.amount   !== undefined) checks.push(num(req.body.amount,   'Betrag'));
+    if (req.body.category !== undefined) checks.push(oneOf(req.body.category, validCategoryKeys(), 'Kategorie'));
+    if (req.body.recurrence_rule !== undefined) checks.push(rrule(req.body.recurrence_rule, 'Wiederholung'));
+    if (req.body.recurrence_interval !== undefined) checks.push(oneOf(req.body.recurrence_interval, RECURRENCE_INTERVAL_KEYS, 'Intervall'));
+    const errors = collectErrors(checks);
+    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+
+    const { title, amount, category, subcategory: requestedSubcategory, is_recurring, recurrence_rule } = req.body;
+    const finalTitle    = title     !== undefined ? title.trim()                        : parent.title;
+    const finalAmount   = amount    !== undefined ? Number(amount)                     : parent.amount;
+    const finalCategory = category  !== undefined ? category                           : parent.category;
+    const finalSubcat   = requestedSubcategory !== undefined
+      ? (validateSubcategory(finalCategory, requestedSubcategory) ?? parent.subcategory)
+      : parent.subcategory;
+    const finalRecurring = is_recurring !== undefined ? (is_recurring ? 1 : 0) : parent.is_recurring;
+    const finalInterval  = req.body.recurrence_interval !== undefined
+      ? req.body.recurrence_interval
+      : (parent.recurrence_interval || 'monthly');
+    const finalVirtual   = req.body.recurrence_virtual !== undefined
+      ? (req.body.recurrence_virtual ? 1 : 0)
+      : parent.recurrence_virtual;
+    const finalFull      = finalVirtual
+      ? (amount !== undefined ? cents(finalAmount) : (parent.recurrence_full_amount ?? parent.amount))
+      : null;
+    const storeAmount    = finalVirtual ? effectiveMonthly(finalFull, finalInterval) : finalAmount;
+    const finalRrule     = recurrence_rule !== undefined ? (recurrence_rule || null) : parent.recurrence_rule;
+
+    const currentMonthStart = new Date().toISOString().slice(0, 7) + '-01';
+
+    db.get().transaction(() => {
+      db.get().prepare(`
+        UPDATE budget_entries SET
+          title                  = ?,
+          amount                 = ?,
+          category               = ?,
+          subcategory            = ?,
+          is_recurring           = ?,
+          recurrence_rule        = ?,
+          recurrence_interval    = ?,
+          recurrence_virtual     = ?,
+          recurrence_full_amount = ?
+        WHERE id = ?
+      `).run(finalTitle, storeAmount, finalCategory, finalSubcat,
+             finalRecurring, finalRrule, finalInterval, finalVirtual, finalFull,
+             parentId);
+
+      db.get().prepare(`
+        DELETE FROM budget_entries WHERE recurrence_parent_id = ? AND date >= ?
+      `).run(parentId, currentMonthStart);
+    })();
+
+    const updated = entryWithLoanMeta(parentId);
+    res.json({ data: updated });
+  } catch (err) {
+    log.error('PUT /budget/:id/series error:', err);
+    res.status(500).json({ error: 'Internal error', code: 500 });
+  }
+});
+
+/**
+ * DELETE /api/v1/budget/:id/series
+ * Löscht das Serien-Original und alle zugehörigen Instanzen.
+ * Response: 204 No Content
+ */
+router.delete('/:id/series', (req, res) => {
+  try {
+    const id    = parseInt(req.params.id, 10);
+    const entry = db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(id);
+    if (!entry) return res.status(404).json({ error: 'Entry not found', code: 404 });
+
+    const parentId = entry.recurrence_parent_id ?? (entry.is_recurring ? entry.id : null);
+    if (!parentId) return res.status(400).json({ error: 'Not a recurring entry.', code: 400 });
+
+    db.get().transaction(() => {
+      db.get().prepare('DELETE FROM budget_entries WHERE recurrence_parent_id = ?').run(parentId);
+      db.get().prepare('DELETE FROM budget_entries WHERE id = ?').run(parentId);
+    })();
+
+    res.status(204).end();
+  } catch (err) {
+    log.error('DELETE /budget/:id/series error:', err);
+    res.status(500).json({ error: 'Internal error', code: 500 });
+  }
+});
+
+/**
  * PUT /api/v1/budget/:id
  * Eintrag bearbeiten.
  * Body: alle Felder optional

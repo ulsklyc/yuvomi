@@ -4,14 +4,9 @@ import { getPwaInstallState, onPwaInstallStateChanged, promptPwaInstall } from '
 function renderPage(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <header class="settings-leaf-header">
-      <h1 class="settings-leaf-header__title">${t('settings.pageDevice')}</h1>
-      <p class="settings-leaf-header__description">${t('settings.pageDeviceDescription')}</p>
-    </header>
-
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.sectionPwa')}</h2>
-      <div class="settings-card settings-card--pwa settings-pwa-card">
+      <div class="settings-card settings-pwa-card">
         <div class="settings-pwa-card__icon">
           <i data-lucide="smartphone" aria-hidden="true"></i>
         </div>

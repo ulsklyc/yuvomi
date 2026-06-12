@@ -51,7 +51,7 @@
 .toast__reminder-text strong {
   font-size: var(--text-xs, 0.75rem);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: var(--tracking-label);
   opacity: 0.7;
 }
 
@@ -78,8 +78,6 @@
 }
 
 .reminder-section__title {
-  font-size: var(--text-sm, 0.875rem);
-  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
 

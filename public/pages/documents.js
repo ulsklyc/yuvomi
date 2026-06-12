@@ -9,6 +9,7 @@ import { openModal as openSharedModal, closeModal, selectModal } from '/componen
 import { t, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { stagger } from '/utils/ux.js';
+import { renderSkeletonList } from '/utils/skeleton.js';
 
 const CATEGORIES = ['medical', 'school', 'identity', 'insurance', 'finance', 'home', 'vehicle', 'legal', 'travel', 'pets', 'warranty', 'taxes', 'work', 'other'];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -106,7 +107,7 @@ export async function render(container) {
           <div class="documents-folder-browser__title">${t('documents.folderBrowserTitle')}</div>
           <div class="documents-folder-browser__list" id="documents-folder-browser"></div>
         </aside>
-        <div id="documents-list" class="documents-list documents-list--${state.view}"></div>
+        <div id="documents-list" class="documents-list documents-list--${state.view}" aria-busy="true">${renderSkeletonList({ rows: 6, lines: 2 })}</div>
       </div>
       <button class="page-fab" id="fab-new-document" aria-label="${t('documents.addButton')}">
         <i data-lucide="upload" class="icon-xl" aria-hidden="true"></i>
@@ -267,6 +268,7 @@ function filteredDocuments() {
 function renderDocuments() {
   const list = _container.querySelector('#documents-list');
   if (!list) return;
+  list.removeAttribute('aria-busy');
   const docs = filteredDocuments();
   list.className = `documents-list documents-list--${state.view}`;
   if (!docs.length) {

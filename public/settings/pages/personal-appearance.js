@@ -84,11 +84,7 @@ function clearError(element) {
 function renderLoadError(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <header class="settings-leaf-header">
-      <h1 class="settings-leaf-header__title">${t('settings.pageAppearance')}</h1>
-      <p class="settings-leaf-header__description">${t('settings.pageAppearanceDescription')}</p>
-    </header>
-    <div class="settings-card settings-card--appearance">
+    <div class="settings-card">
       <p class="form-error" role="alert">${t('settings.loadError')}</p>
       <div class="settings-form-actions">
         <button type="button" class="btn btn--secondary" id="appearance-retry">${t('settings.retry')}</button>
@@ -101,14 +97,9 @@ function renderPage(container, preferences) {
   const theme = currentTheme();
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <header class="settings-leaf-header">
-      <h1 class="settings-leaf-header__title">${t('settings.pageAppearance')}</h1>
-      <p class="settings-leaf-header__description">${t('settings.pageAppearanceDescription')}</p>
-    </header>
-
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.sectionDesign')}</h2>
-      <div class="settings-card settings-card--appearance">
+      <div class="settings-card">
         <h3 class="settings-card__title">${t('settings.cardAppearance')}</h3>
         <div class="theme-toggle" id="theme-toggle">
           <button class="theme-toggle__btn ${theme === 'system' ? 'theme-toggle__btn--active' : ''}" type="button" data-theme-value="system" aria-label="${t('settings.themeSysLabel')}" aria-pressed="${theme === 'system'}">
@@ -129,7 +120,7 @@ function renderPage(container, preferences) {
 
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.languageTitle')}</h2>
-      <div class="settings-card settings-card--language">
+      <div class="settings-card">
         <div class="form-group">
           <label class="form-label" for="locale-select">${t('settings.localeLabel')}</label>
           <select class="form-input locale-picker__select" id="locale-select" aria-describedby="locale-error">
@@ -142,7 +133,7 @@ function renderPage(container, preferences) {
 
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.sectionDate')}</h2>
-      <div class="settings-card settings-card--datetime">
+      <div class="settings-card">
         <h3 class="settings-card__title">${t('settings.dateFormatTitle')}</h3>
         <p class="form-hint">${t('settings.dateFormatHint')}</p>
         <div class="form-group">

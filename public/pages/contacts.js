@@ -9,6 +9,7 @@ import { openModal as openSharedModal, closeModal } from '/components/modal.js';
 import { stagger, vibrate } from '/utils/ux.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { renderSkeletonList } from '/utils/skeleton.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -83,7 +84,7 @@ export async function render(container, { user }) {
           <button class="contact-filter-chip" data-cat="${esc(c)}">${CATEGORY_ICONS[c] || ''} ${CATEGORY_LABELS()[c] || esc(c)}</button>
         `).join('')}
       </div>
-      <div id="contacts-list" class="contacts-list"></div>
+      <div id="contacts-list" class="contacts-list" aria-busy="true">${renderSkeletonList({ rows: 6, lines: 2 })}</div>
       <button class="page-fab" id="fab-new-contact" aria-label="${t('contacts.newContactLabel')}">
         <i data-lucide="plus" style="width:24px;height:24px" aria-hidden="true"></i>
       </button>
@@ -174,6 +175,7 @@ function filterContacts() {
 function renderList() {
   const container = _container.querySelector('#contacts-list');
   if (!container) return;
+  container.removeAttribute('aria-busy');
 
   const contacts = filterContacts();
 

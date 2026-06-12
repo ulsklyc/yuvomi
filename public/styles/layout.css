@@ -479,7 +479,7 @@
   font-size: var(--text-xs);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-secondary);
-  letter-spacing: 0.01em;
+  letter-spacing: var(--tracking-normal);
   margin-bottom: var(--space-2);
 }
 
@@ -820,7 +820,7 @@ html.fab-anim-done .page-fab {
   .nav-sidebar__brand-name {
     font-size: var(--text-lg);
     font-weight: var(--font-weight-bold);
-    letter-spacing: -0.6px;
+    letter-spacing: var(--tracking-tight);
     color: var(--color-text-primary);
     white-space: nowrap;
     overflow: hidden;
@@ -831,7 +831,7 @@ html.fab-anim-done .page-fab {
     margin-top: var(--space-0h);
     font-size: var(--text-xs);
     font-weight: var(--font-weight-medium);
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-label);
     color: var(--color-text-tertiary);
   }
 
@@ -999,9 +999,6 @@ html.fab-anim-done .page-fab {
 .page__title {
   /* Feste Token-Stufen statt fluidem clamp (Produkt-Register: feste rem-Skala,
    * keine literalen rem). Mobil --text-2xl (24px), Desktop --text-3xl (30px). */
-  font-size: var(--text-2xl);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: -0.5px;
   text-wrap: balance;
 }
 
@@ -1011,8 +1008,6 @@ html.fab-anim-done .page-fab {
   }
 
   .page__title {
-    font-size: var(--text-3xl);
-    letter-spacing: -0.8px;
   }
 }
 
@@ -1185,7 +1180,7 @@ html.fab-anim-done .page-fab {
 }
 
 .modal-panel__title {
-  font-size: var(--text-md);
+  font-size: var(--text-base);
   font-weight: var(--font-weight-semibold);
   text-wrap: balance;
 }
@@ -1217,6 +1212,10 @@ html.fab-anim-done .page-fab {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  /* Container für Formular-Raster: 2-Spalten-Felder collabieren nach
+   * MODALBREITE (sm 400 / md 520 / lg 680), nicht Viewport. Ein sm-Modal
+   * auf großem Desktop bleibt so einspaltig statt gequetscht. */
+  container: modal-body / inline-size;
 }
 
 /* Modal-Content-Grids (z. B. 2 Spalten in Formularen) */
@@ -1250,7 +1249,7 @@ html.fab-anim-done .page-fab {
   flex-direction: column;
 }
 
-@media (max-width: 639px) {
+@container modal-body (max-width: 480px) {
   .modal-grid--2 {
     grid-template-columns: 1fr;
   }
@@ -1266,6 +1265,11 @@ html.fab-anim-done .page-fab {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
+}
+
+.modal-actions--stack {
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .modal-panel__footer {
@@ -1459,7 +1463,7 @@ html.fab-anim-done .page-fab {
   border: 1.5px solid var(--color-border);
   background-color: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: var(--text-md);
+  font-size: var(--text-base);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
   min-height: var(--target-lg);
 }
@@ -1637,11 +1641,14 @@ html.fab-anim-done .page-fab {
  * Skeleton-Loading
  * -------------------------------------------------------- */
 .skeleton {
+  /* Linienfarbe aus Surface + Ink gemischt: garantierter Kontrast in beiden
+   * Themes mit EINER Definition (zuvor border-subtle/surface-2 — im Dark Mode
+   * deckungsgleich mit der Kartenfläche #222220, dadurch unsichtbar). */
   background: linear-gradient(
     90deg,
-    var(--color-border-subtle) 25%,
-    var(--color-surface-2) 50%,
-    var(--color-border-subtle) 75%
+    color-mix(in srgb, var(--color-text-primary) 18%, var(--color-surface)) 25%,
+    color-mix(in srgb, var(--color-text-primary) 30%, var(--color-surface)) 50%,
+    color-mix(in srgb, var(--color-text-primary) 18%, var(--color-surface)) 75%
   );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s infinite;
@@ -1652,6 +1659,42 @@ html.fab-anim-done .page-fab {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* Reduced-Motion: Shimmer aus, statische Fläche bleibt sichtbar. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
+
+/* ── Geteilte Skeleton-Liste (alle Module) ──
+ * EINE Lade-Sprache statt modul-eigener „Lädt…"-Texte. Global definiert,
+ * damit die Breiten-Varianten auf JEDER Seite greifen (zuvor lagen sie nur
+ * in dashboard.css und waren außerhalb des Dashboards wirkungslos).
+ * Markup-Hilfe: public/utils/skeleton.js → renderSkeletonList(). */
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skeleton-card {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.skeleton-line {
+  height: 14px;
+  border-radius: var(--radius-xs);
+}
+
+.skeleton-line--title  { height: 18px; width: 45%; }
+.skeleton-line--short  { width: 35%; }
+.skeleton-line--medium { width: 60%; }
+.skeleton-line--full   { width: 100%; }
 
 /* --------------------------------------------------------
  * Leer-Zustände (Empty States)
@@ -1684,7 +1727,7 @@ html.fab-anim-done .page-fab {
 }
 
 .empty-state__title {
-  font-size: var(--text-md);
+  font-size: var(--text-base);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
@@ -1730,7 +1773,7 @@ html.fab-anim-done .page-fab {
   grid-template-columns: 1fr;
 }
 
-@media (min-width: 600px) {
+@media (min-width: 640px) {
   .grid--2 { grid-template-columns: repeat(2, 1fr); }
 }
 
@@ -2438,7 +2481,7 @@ html.fab-anim-done .page-fab {
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 9999;
+  z-index: var(--z-skip-link);
   width: auto;
   height: auto;
   padding: var(--space-2) var(--space-4);
@@ -2619,11 +2662,7 @@ textarea.input { resize: vertical; }
 
 /* ── Sidebar: Abschnittsbezeichnung (z.B. "Haushalt") ── */
 .nav-section-label {
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   padding: var(--space-3) var(--space-3) var(--space-1);
   user-select: none;
   pointer-events: none;

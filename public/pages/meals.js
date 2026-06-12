@@ -9,6 +9,7 @@ import { openModal as openSharedModal, closeModal as closeSharedModal, selectMod
 import { stagger } from '/utils/ux.js';
 import { t, formatDate, dateInputPlaceholder, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { renderSkeletonList } from '/utils/skeleton.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
 import { addLocalDays, startOfLocalWeekKey, toLocalDateKey } from '/utils/date.js';
@@ -177,7 +178,7 @@ export async function render(container, { user }) {
         </button>
       </div>
       <div class="week-grid" id="week-grid">
-        <div style="margin:auto;padding:2rem;text-align:center;color:var(--color-text-disabled)">${t('meals.loadingIndicator')}</div>
+        <div style="grid-column:1/-1">${renderSkeletonList({ rows: 5, lines: 2 })}</div>
       </div>
       <button class="page-fab" id="fab-new-meal" aria-label="${t('meals.addMealTitle')}">
         <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>

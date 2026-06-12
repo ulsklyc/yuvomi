@@ -7,6 +7,7 @@
 import { api } from '/api.js';
 import { t, formatDate, formatTime, getLocale } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { renderSkeletonList } from '/utils/skeleton.js';
 import { openModal, closeModal, confirmModal } from '/components/modal.js';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -1081,8 +1082,8 @@ function openStaffModal(worker, content, options = {}) {
 export async function render(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <section class="housekeeping-page housekeeping-page--loading">
-      <div class="housekeeping-loading">${esc(t('common.loading'))}</div>
+    <section class="housekeeping-page housekeeping-page--loading" aria-busy="true">
+      ${renderSkeletonList({ rows: 6, lines: 2 })}
     </section>
   `);
   try {

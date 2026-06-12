@@ -47,10 +47,10 @@
 }
 
 .login-hero__title {
-  font-size: clamp(2rem, 5vw, 3rem);
+  font-size: var(--type-login-hero-size);
   font-weight: var(--font-weight-bold);
   color: var(--color-accent);
-  letter-spacing: -0.02em;
+  letter-spacing: var(--tracking-tight);
   margin-bottom: var(--space-2);
 }
 

@@ -8,6 +8,7 @@ import { t } from '/i18n.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
+import { renderSkeletonList } from '/utils/skeleton.js';
 
 let _container = null;
 
@@ -58,6 +59,10 @@ export async function render(container) {
   const list = document.createElement('div');
   list.className = 'recipes-list';
   list.id = 'recipes-list';
+  // Lade-Skeleton bis loadRecipes() aufgelöst ist (Router blendet den Wrapper
+  // bereits vor dem Daten-await ein).
+  list.setAttribute('aria-busy', 'true');
+  list.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 5, lines: 2 }));
 
   const fab = document.createElement('button');
   fab.className = 'page-fab';
@@ -113,6 +118,7 @@ export async function render(container) {
 function renderRecipeList() {
   const list = _container.querySelector('#recipes-list');
   if (!list) return;
+  list.removeAttribute('aria-busy');
 
   list.replaceChildren();
 

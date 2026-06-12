@@ -125,17 +125,12 @@ function consumeAccessNotice() {
 function renderPage(container, user, refreshFailed, accessNotice) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <header class="settings-leaf-header">
-      <h1 class="settings-leaf-header__title">${t('settings.pageAccount')}</h1>
-      <p class="settings-leaf-header__description">${t('settings.pageAccountDescription')}</p>
-    </header>
-
     ${accessNotice ? `
       <div class="settings-banner settings-banner--info" role="status">${esc(accessNotice)}</div>
     ` : ''}
 
     ${refreshFailed ? `
-      <div class="settings-card settings-card--account">
+      <div class="settings-card">
         <p class="form-error" role="alert">${t('settings.loadError')}</p>
         <div class="settings-form-actions">
           <button type="button" class="btn btn--secondary" id="account-retry">${t('settings.retry')}</button>
@@ -146,7 +141,7 @@ function renderPage(container, user, refreshFailed, accessNotice) {
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.sectionAccount')}</h2>
 
-      <div class="settings-card settings-card--account">
+      <div class="settings-card">
         <div class="settings-user-info">
           ${avatarHtml(user)}
           <div>
@@ -156,7 +151,7 @@ function renderPage(container, user, refreshFailed, accessNotice) {
         </div>
       </div>
 
-      <div class="settings-card settings-card--account">
+      <div class="settings-card">
         <h3 class="settings-card__title">${t('settings.profilePictureTitle')}</h3>
         <form id="profile-form" class="settings-form">
           <div class="settings-profile-editor">
@@ -196,7 +191,7 @@ function renderPage(container, user, refreshFailed, accessNotice) {
         </form>
       </div>
 
-      <div class="settings-card settings-card--account">
+      <div class="settings-card">
         <h3 class="settings-card__title">${t('settings.changePassword')}</h3>
         <form id="password-form" class="settings-form">
           <div class="form-group">

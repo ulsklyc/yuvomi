@@ -188,6 +188,75 @@ test('Startmonat selbst bekommt keine zusätzliche Instanz', () => {
 });
 
 // --------------------------------------------------------
+// Serien-Löschung (DELETE /series-Logik)
+// --------------------------------------------------------
+console.log('\n[Budget-Recurrence-Test] Serien-Löschung + Serien-Update\n');
+
+test('DELETE series: löscht Parent und alle Kinder', () => {
+  const db = freshDb();
+  const pid = insertParent(db, { amount: -100, date: '2025-01-15', interval: 'monthly' });
+  generateRecurringInstances(db, '2025-02');
+  generateRecurringInstances(db, '2025-03');
+  const before = instances(db, pid);
+  assert(before.length === 2, `Sollte 2 Kinder haben, hat ${before.length}`);
+
+  // Serienlogik: alle Kinder löschen, dann Parent
+  db.prepare('DELETE FROM budget_entries WHERE recurrence_parent_id = ?').run(pid);
+  db.prepare('DELETE FROM budget_entries WHERE id = ?').run(pid);
+
+  const parentGone = !db.prepare('SELECT 1 FROM budget_entries WHERE id = ?').get(pid);
+  assert(parentGone, 'Parent wurde nicht gelöscht');
+  const childrenGone = instances(db, pid).length === 0;
+  assert(childrenGone, 'Kinder wurden nicht gelöscht');
+});
+
+test('DELETE series via Kind-ID: findet Parent korrekt', () => {
+  const db = freshDb();
+  const pid = insertParent(db, { amount: -200, date: '2025-01-10', interval: 'monthly' });
+  generateRecurringInstances(db, '2025-02');
+  const child = instanceIn(db, pid, '2025-02');
+  assert(child, 'Kind für Feb vorhanden');
+
+  // Route-Logik: parentId = child.recurrence_parent_id
+  const entry = db.prepare('SELECT * FROM budget_entries WHERE id = ?').get(child.id);
+  const parentId = entry.recurrence_parent_id ?? (entry.is_recurring ? entry.id : null);
+  assert(parentId === pid, `parentId sollte ${pid} sein, ist ${parentId}`);
+
+  db.prepare('DELETE FROM budget_entries WHERE recurrence_parent_id = ?').run(parentId);
+  db.prepare('DELETE FROM budget_entries WHERE id = ?').run(parentId);
+
+  assert(!db.prepare('SELECT 1 FROM budget_entries WHERE id = ?').get(pid), 'Parent weg');
+  assert(!db.prepare('SELECT 1 FROM budget_entries WHERE id = ?').get(child.id), 'Kind weg');
+});
+
+test('PUT series: aktualisiert Parent und löscht Zukunfts-Kinder', () => {
+  const db = freshDb();
+  const pid = insertParent(db, { amount: -100, date: '2025-01-15', interval: 'monthly' });
+  // Vergangene Instanz (bleibt erhalten)
+  generateRecurringInstances(db, '2025-02');
+  // Zukünftige Instanz im aktuellen oder späteren Monat (wird gelöscht)
+  const future = '2030-01';
+  generateRecurringInstances(db, future);
+  const futureInst = instanceIn(db, pid, future);
+  assert(futureInst, 'Zukünftige Instanz vorhanden');
+
+  // Route-Logik: Parent aktualisieren, Kinder ab cutoff löschen
+  const cutoff = '2030-01-01';
+  db.prepare(`UPDATE budget_entries SET title = 'Neue Miete', amount = -120 WHERE id = ?`).run(pid);
+  db.prepare(`DELETE FROM budget_entries WHERE recurrence_parent_id = ? AND date >= ?`).run(pid, cutoff);
+
+  const updated = db.prepare('SELECT * FROM budget_entries WHERE id = ?').get(pid);
+  assert(updated.title === 'Neue Miete', 'Parent-Titel aktualisiert');
+  assert(updated.amount === -120, 'Parent-Betrag aktualisiert');
+
+  const futureGone = !db.prepare('SELECT 1 FROM budget_entries WHERE id = ?').get(futureInst.id);
+  assert(futureGone, 'Zukünftige Instanz wurde gelöscht');
+
+  const pastInst = instanceIn(db, pid, '2025-02');
+  assert(pastInst, 'Vergangene Instanz bleibt erhalten');
+});
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 console.log(`\n[Budget-Recurrence-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

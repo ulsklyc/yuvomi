@@ -3,11 +3,13 @@ import { openModal as openSharedModal, closeModal, confirmModal } from '/compone
 import { stagger, deleteWithUndo } from '/utils/ux.js';
 import { t, formatDate, dateInputPlaceholder, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { renderSkeletonList } from '/utils/skeleton.js';
 
 let state = {
   birthdays: [],
   upcoming: [],
   query: '',
+  loading: true,
 };
 let _container = null;
 
@@ -150,6 +152,13 @@ function renderSuggestions() {
 function renderUpcoming() {
   const host = _container.querySelector('#birthdays-upcoming');
   if (!host) return;
+  if (state.loading) {
+    host.setAttribute('aria-busy', 'true');
+    host.replaceChildren();
+    host.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 2, lines: 2 }));
+    return;
+  }
+  host.removeAttribute('aria-busy');
   if (!state.upcoming.length) {
     host.replaceChildren();
     host.insertAdjacentHTML('beforeend', `<div class="empty-state empty-state--compact">
@@ -181,6 +190,13 @@ function renderUpcoming() {
 function renderList() {
   const host = _container.querySelector('#birthdays-list');
   if (!host) return;
+  if (state.loading) {
+    host.setAttribute('aria-busy', 'true');
+    host.replaceChildren();
+    host.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 6, lines: 2 }));
+    return;
+  }
+  host.removeAttribute('aria-busy');
   const list = filteredBirthdays();
   if (!list.length) {
     host.replaceChildren();
@@ -495,7 +511,15 @@ async function deleteBirthday(id, name) {
 
 export async function render(container) {
   _container = container;
-  await loadData();
+  // Shell zuerst (synchron) bauen, damit das Lade-Skeleton sofort sichtbar ist
+  // (der Router blendet den Wrapper bereits vor dem Daten-await ein). Danach
+  // Daten laden und mit echtem Inhalt füllen.
+  state.loading = true;
   renderPage();
   bindEvents();
+  await loadData();
+  state.loading = false;
+  renderUpcoming();
+  renderList();
+  renderSuggestions();
 }

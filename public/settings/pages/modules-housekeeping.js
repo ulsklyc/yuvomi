@@ -4,14 +4,9 @@ import { t } from '/i18n.js';
 function renderPage(container, preferences) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <header class="settings-leaf-header">
-      <h1 class="settings-leaf-header__title">${t('settings.pageHousekeepingModule')}</h1>
-      <p class="settings-leaf-header__description">${t('settings.pageHousekeepingModuleDescription')}</p>
-    </header>
-
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.sectionHousekeeping')}</h2>
-      <div class="settings-card settings-card--housekeeping">
+      <div class="settings-card">
         <h3 class="settings-card__title">${t('settings.housekeepingPaymentsTitle')}</h3>
         <p class="form-hint">${t('settings.housekeepingPaymentTasksHint')}</p>
         <label class="toggle-row">

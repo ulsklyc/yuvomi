@@ -32,11 +32,6 @@ function showToast(message, tone = 'default') {
 function renderPage(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <header class="settings-leaf-header">
-      <h1 class="settings-leaf-header__title">${t('settings.pageSyncReminders')}</h1>
-      <p class="settings-leaf-header__description">${t('settings.pageSyncRemindersDescription')}</p>
-    </header>
-
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.caldavRemindersToggle')}</h2>
       <div class="settings-card">

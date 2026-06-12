@@ -69,6 +69,8 @@
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  /* Container für die Slot-Raster: reflowt nach eigenem Platz, nicht Viewport. */
+  container: week-grid / inline-size;
 }
 
 .mobile-meal-section {
@@ -99,11 +101,7 @@
 }
 
 .day-header__name {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
   color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 .day-header__date {
@@ -123,13 +121,13 @@
   padding: 0 var(--space-4) var(--space-3);
 }
 
-@media (min-width: 600px) {
+@container week-grid (min-width: 600px) {
   .day-slots {
     grid-template-columns: repeat(4, 1fr);
   }
 }
 
-@media (max-width: 599px) {
+@media (max-width: 640px) {
   .week-grid {
     padding-bottom: var(--space-8);
   }
@@ -202,11 +200,7 @@
 }
 
 .meal-slot__type-label {
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-disabled);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
   padding: var(--space-1) var(--space-2) 0;
   text-align: left;
 }
@@ -280,14 +274,11 @@
 }
 
 .meal-card__title {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: left;
-  line-height: 1.4;
   align-self: stretch;
 }
 

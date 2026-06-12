@@ -9,6 +9,7 @@ import { openModal as openSharedModal, closeModal, btnError } from '/components/
 import { stagger, vibrate } from '/utils/ux.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { renderSkeletonList } from '/utils/skeleton.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -74,7 +75,7 @@ export async function render(container, { user }) {
           ${t('notes.addNoteLabel')}
         </button>
       </div>
-      <div id="notes-grid" class="notes-grid"></div>
+      <div id="notes-grid" class="notes-grid" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 3 })}</div>
       <button class="page-fab" id="fab-new-note" aria-label="${t('notes.addNoteLabel')}">
         <i data-lucide="plus" style="width:24px;height:24px" aria-hidden="true"></i>
       </button>
@@ -125,6 +126,7 @@ export async function render(container, { user }) {
 function renderGrid() {
   const grid = _container.querySelector('#notes-grid');
   if (!grid) return;
+  grid.removeAttribute('aria-busy');
 
   const q = state.filterQuery.trim().toLowerCase();
   const visible = q

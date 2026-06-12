@@ -67,7 +67,7 @@
   border: 1.5px solid var(--glass-border-subtle);
   background-color: var(--color-surface-2);
   color: var(--color-text-primary);
-  font-size: var(--text-md);
+  font-size: var(--text-base);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
   min-height: 36px;
 }
@@ -140,11 +140,7 @@
 }
 
 .contact-group__header {
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-semibold);
   color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   padding: var(--space-2) var(--space-4) var(--space-1);
   background-color: var(--color-bg);
   border-bottom: 1px solid var(--color-border);
@@ -187,8 +183,6 @@
 }
 
 .contact-item__name {
-  font-size: var(--text-base);
-  font-weight: var(--font-weight-medium);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -271,7 +265,7 @@
   display: none;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   .contact-item {
     gap: var(--space-2);
     padding: var(--space-3);

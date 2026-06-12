@@ -247,13 +247,8 @@ function renderPage(container, rows) {
     `;
 
   container.insertAdjacentHTML('beforeend', `
-    <header class="settings-leaf-header">
-      <h1 class="settings-leaf-header__title">${t('settings.pageNavigation')}</h1>
-      <p class="settings-leaf-header__description">${t('settings.pageNavigationDescription')}</p>
-    </header>
-
     <section class="settings-section">
-      <div class="settings-card settings-card--modules">
+      <div class="settings-card">
         <h3 class="settings-card__title">${t('settings.modulesTitle')}</h3>
         <p class="form-hint">${t('settings.modulesHint')}</p>
         <p class="form-hint">${t('settings.modulesDragHint')}</p>

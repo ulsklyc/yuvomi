@@ -251,7 +251,7 @@ function _doClose(overlayEl) {
  * @param {Function} [opts.onSave]   - Callback, wird nach Einfügen in DOM aufgerufen
  * @param {Function} [opts.onClose]  - Callback, wird aufgerufen wenn das Modal geschlossen wird
  * @param {Function} [opts.onDelete] - Falls vorhanden, wird ein Löschen-Button eingebaut
- * @param {string}   [opts.size='md'] - 'sm' | 'md' | 'lg'
+ * @param {string}   [opts.size='md'] - 'sm' (400px) | 'md' (520px) | 'lg' (680px) | 'xl' (min(960px, 95vw)); Breiten siehe layout.css .modal-panel--*
  */
 export function openModal({ title, content, onSave, onDelete, onClose, size = 'md' } = {}) {
   // Vorheriges Modal schließen (kein Stacking).

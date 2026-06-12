@@ -137,19 +137,14 @@ function memberHtml(u) {
 function renderPage(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <header class="settings-leaf-header">
-      <h1 class="settings-leaf-header__title">${t('settings.pageFamilyRoles')}</h1>
-      <p class="settings-leaf-header__description">${t('settings.pageFamilyRolesDescription')}</p>
-    </header>
-
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.sectionFamily')}</h2>
-      <div class="settings-card settings-card--family" id="members-card">
+      <div class="settings-card" id="members-card">
         <ul class="settings-members" id="members-list"></ul>
         <button class="btn btn--primary settings-add-btn" id="add-member-btn" hidden>${t('settings.addMember')}</button>
       </div>
 
-      <div class="settings-card settings-card--family settings-card--hidden" id="add-member-form-card">
+      <div class="settings-card settings-card--hidden" id="add-member-form-card">
         <h3 class="settings-card__title">${t('settings.newMemberTitle')}</h3>
         <form id="add-member-form" class="settings-form">
           <div class="form-group">

@@ -111,14 +111,9 @@ function buildConnectionForm() {
 function renderPage(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <header class="settings-leaf-header">
-      <h1 class="settings-leaf-header__title">${t('settings.pageDocumentStorage')}</h1>
-      <p class="settings-leaf-header__description">${t('settings.pageDocumentStorageDescription')}</p>
-    </header>
-
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.documentStorageTitle')}</h2>
-      <div class="settings-card settings-card--document-storage" id="document-storage-card">
+      <div class="settings-card" id="document-storage-card">
         <p class="settings-card-description">${t('settings.documentStorageDescription')}</p>
         <div id="document-storage-status-host"></div>
         <p class="settings-document-storage-warning">

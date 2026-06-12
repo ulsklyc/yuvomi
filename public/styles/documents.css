@@ -99,9 +99,6 @@
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border-subtle);
   color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-semibold);
-  text-transform: uppercase;
 }
 
 .documents-folder-browser__list {
@@ -145,8 +142,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
 }
 
 .documents-folder-item__count {
@@ -184,6 +179,12 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--space-4);
+}
+
+/* Lade-Zustand: Grid/Flex aufheben, damit die geteilte Skeleton-Liste
+ * full-width erscheint — eine Lade-Sprache über alle Module. */
+.documents-list[aria-busy="true"] {
+  display: block;
 }
 
 .documents-list--list {
@@ -259,8 +260,6 @@
 .document-card__title,
 .document-row__title {
   margin: 0;
-  font-size: var(--text-base);
-  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   overflow-wrap: anywhere;
 }
@@ -379,8 +378,6 @@
 }
 
 .document-dropzone__title {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
 
@@ -423,7 +420,7 @@
   font-size: var(--text-sm);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   .documents-toolbar {
     flex-wrap: wrap;
   }
@@ -650,8 +647,6 @@
 }
 
 .document-viewer__unsupported-title {
-  font-size: var(--text-base);
-  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
 
@@ -704,7 +699,6 @@
 
 .dms-result__title {
   flex: 1;
-  font-size: var(--text-sm);
   color: var(--color-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;

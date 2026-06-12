@@ -507,8 +507,9 @@ Enable single sign-on via any OpenID Connect provider (Authentik, Keycloak, Goog
 | `OIDC_CLIENT_ID` | Client ID registered with your OIDC provider | - | No |
 | `OIDC_CLIENT_SECRET` | Client secret for the registered application | - | No |
 | `OIDC_REDIRECT_URI` | OAuth callback URL — must be registered with the provider (e.g. `https://oikos.example.com/api/v1/auth/oidc/callback`) | - | No |
+| `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM` | Set to `true` to allow account linking when the IdP omits the `email_verified` claim entirely. Only enable for IdPs fully under your control that never issue unverified addresses (e.g. older Authentik without an explicit `email_verified` property mapping). | - | No |
 
-When all four variables are set, a **"Sign in with SSO"** button appears on the login page. The flow uses Authorization Code + PKCE (S256) with a nonce. A matching Yuvomi user account (same `oidc_sub`) must already exist — automatic provisioning is not supported.
+When all four OIDC variables are set, a **"Sign in with SSO"** button appears on the login page. The flow uses Authorization Code + PKCE (S256) with a nonce. On first login, the user is matched by their OIDC `sub`. If no match exists, an existing local account is linked automatically **only when the provider reports a verified email (`email_verified: true`) and exactly one local account holds that email address**; otherwise a new account is provisioned. Unverified or ambiguous emails never take over an existing account. If your provider omits the `email_verified` claim, set `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=true` to enable linking.
 
 ### Automated Backups (Optional)
 

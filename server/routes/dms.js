@@ -66,12 +66,13 @@ router.post('/accounts', (req, res) => {
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
     const vUrl = str(req.body.base_url, 'Base URL', { max: 500 });
     const vToken = str(req.body.api_token, 'API token', { max: 500 });
-    for (const v of [vName, vUrl, vToken]) if (v.error) return res.status(400).json({ error: v.error, code: 400 });
+    const vOrgId = provider === 'papra' ? str(req.body.org_id, 'Organization ID', { max: 200 }) : { value: '', error: null };
+    for (const v of [vName, vUrl, vToken, vOrgId]) if (v.error) return res.status(400).json({ error: v.error, code: 400 });
     if (!/^https?:\/\//i.test(vUrl.value)) return res.status(400).json({ error: 'Base URL must start with http(s)://', code: 400 });
 
     const result = db.get().prepare(`
-      INSERT INTO dms_accounts (provider, name, base_url, api_token) VALUES (?, ?, ?, ?)
-    `).run(provider, vName.value, vUrl.value.replace(/\/+$/, ''), vToken.value);
+      INSERT INTO dms_accounts (provider, name, base_url, org_id, api_token) VALUES (?, ?, ?, ?, ?)
+    `).run(provider, vName.value, vUrl.value.replace(/\/+$/, ''), vOrgId.value, vToken.value);
     res.status(201).json({ data: publicAccount(getAccount(result.lastInsertRowid)) });
   } catch (err) {
     if (err.message?.includes('UNIQUE constraint')) {

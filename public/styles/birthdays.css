@@ -55,8 +55,6 @@
   gap: var(--space-2);
   min-width: 0;
   flex: 1;
-  font-size: var(--text-lg);
-  font-weight: var(--font-weight-bold);
 }
 
 .birthdays-toolbar__title-icon {
@@ -110,7 +108,6 @@
 .birthdays-section__header h2,
 .birthdays-section__header h3 {
   margin: 0;
-  font-size: var(--text-lg);
 }
 
 .birthdays-section__header p {
@@ -156,8 +153,6 @@
 
 .birthday-card__name,
 .birthday-item__name {
-  font-size: var(--text-base);
-  font-weight: var(--font-weight-semibold);
 }
 
 .birthday-card__date,
@@ -377,7 +372,7 @@
   }
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1023px) {
   .birthdays-grid {
     grid-template-columns: 1fr;
   }

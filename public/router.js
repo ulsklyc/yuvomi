@@ -615,7 +615,29 @@ async function renderPage(route, previousPath = null) {
     _renderedModule = null;
     _renderedModuleName = null;
 
-    await module.render(pageWrapper, { user: currentUser });
+    // render() synchron starten: Der synchrone Teil (Grundgerüst + Lade-Skeleton)
+    // ist danach bereits im DOM. Den Wrapper SOFORT einblenden — so wird das
+    // Skeleton während des Daten-await des Moduls sichtbar (statt leerer Fläche;
+    // der Wrapper war zuvor bis zur vollständigen Auflösung von render() opak-0,
+    // wodurch jedes vor dem Daten-await geseedete Skeleton beim Erstladen nie
+    // erschien). Der Rest von render() (Daten + Verdrahtung) wird danach abgewartet.
+    const renderPromise = module.render(pageWrapper, { user: currentUser });
+
+    // Sichtbar machen und Einblend-Animation starten (Skeleton/Grundgerüst).
+    pageWrapper.style.opacity = '';
+    pageWrapper.classList.add(inClass);
+
+    // navigating-Klasse nach Ende der Einblend-Animation entfernen.
+    // Fallback-Timeout falls animationend nicht feuert (z.B. prefers-reduced-motion).
+    const navEndTimeout = setTimeout(() => {
+      document.documentElement.classList.remove('navigating');
+    }, 300);
+    pageWrapper.addEventListener('animationend', () => {
+      clearTimeout(navEndTimeout);
+      document.documentElement.classList.remove('navigating');
+    }, { once: true });
+
+    await renderPromise;
 
     // Ab hier kann das Modul Soft-Navigationen bedienen (sofern es update() bietet).
     _renderedModule = module;
@@ -639,20 +661,6 @@ async function renderPage(route, previousPath = null) {
       announcer.textContent = '';
       setTimeout(() => { announcer.textContent = pageLabel; }, 50);
     }
-
-    // Erst nach render() + CSS sichtbar machen und Animation starten
-    pageWrapper.style.opacity = '';
-    pageWrapper.classList.add(inClass);
-
-    // navigating-Klasse nach Ende der Einblend-Animation entfernen.
-    // Fallback-Timeout falls animationend nicht feuert (z.B. prefers-reduced-motion).
-    const navEndTimeout = setTimeout(() => {
-      document.documentElement.classList.remove('navigating');
-    }, 300);
-    pageWrapper.addEventListener('animationend', () => {
-      clearTimeout(navEndTimeout);
-      document.documentElement.classList.remove('navigating');
-    }, { once: true });
 
   } catch (err) {
     document.documentElement.classList.remove('navigating');
@@ -987,7 +995,7 @@ function renderAppShell(container) {
   container.querySelectorAll('[data-route]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.preventDefault();
-      navigate(el.dataset.route);
+      navigate(el.dataset.navHref ?? el.dataset.route);
     });
   });
 
@@ -1412,7 +1420,7 @@ function navItems() {
     { path: '/documents', label: t('nav.documents'), icon: 'folder-lock',      module: 'documents',   section: NAV_SECTION.home },
     { path: '/housekeeping', label: t('nav.housekeeping'), icon: 'paintbrush', module: 'housekeeping', section: NAV_SECTION.home },
     // Settings ist am Ende gepinnt (siehe unten).
-    { path: '/settings',  label: t('nav.settings'),  icon: 'settings',         module: 'settings',    section: NAV_SECTION.home },
+    { path: '/settings',  navHref: '/settings?view=domains', label: t('nav.settings'),  icon: 'settings',         module: 'settings',    section: NAV_SECTION.home },
   ];
   const thirdPartyItems = _thirdPartyModules
     .filter((module) => module.enabled && module.status === 'enabled' && module.menu?.show && module.route?.path)
@@ -1524,10 +1532,11 @@ async function disableFailedThirdPartyModule(moduleId) {
   }
 }
 
-function navItemEl({ path, label, icon, module: mod, accent }) {
+function navItemEl({ path, navHref, label, icon, module: mod, accent }) {
   const a = document.createElement('a');
-  a.href = path;
+  a.href = navHref ?? path;
   a.dataset.route = path;
+  if (navHref) a.dataset.navHref = navHref;
   a.className = 'nav-item';
   a.setAttribute('aria-label', label);
   a.setAttribute('title', label);
@@ -1647,10 +1656,11 @@ function sidebarKitchenEl() {
   return a;
 }
 
-function moreItemEl({ path, label, icon, module: mod, accent }) {
+function moreItemEl({ path, navHref, label, icon, module: mod, accent }) {
   const a = document.createElement('a');
-  a.href = path;
+  a.href = navHref ?? path;
   a.dataset.route = path;
+  if (navHref) a.dataset.navHref = navHref;
   a.className = 'more-item';
   if (accent) a.style.setProperty('--item-module-accent', accent);
   else if (mod) a.style.setProperty('--item-module-accent', `var(--module-${mod})`);
@@ -2026,7 +2036,7 @@ function rebuildNavigation({ updateLabels = true } = {}) {
   document.querySelectorAll('[data-route]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.preventDefault();
-      navigate(el.dataset.route);
+      navigate(el.dataset.navHref ?? el.dataset.route);
     });
   });
 
