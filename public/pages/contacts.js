@@ -18,15 +18,23 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 const CATEGORIES = ['Arzt', 'Schule/Kita', 'Behörde', 'Versicherung',
                     'Handwerker', 'Notfall', 'Sonstiges'];
 
+// Kategorie → Lucide-Iconname (Linien-Stil, konsistent mit übrigen UI-Icons)
 const CATEGORY_ICONS = {
-  'Arzt':         '🏥',
-  'Schule/Kita':  '🏫',
-  'Behörde':      '🏛️',
-  'Versicherung': '🛡️',
-  'Handwerker':   '🔧',
-  'Notfall':      '🚨',
-  'Sonstiges':    '📋',
+  'Arzt':         'stethoscope',
+  'Schule/Kita':  'graduation-cap',
+  'Behörde':      'landmark',
+  'Versicherung': 'shield',
+  'Handwerker':   'wrench',
+  'Notfall':      'siren',
+  'Sonstiges':    'tag',
 };
+
+// Liefert das Lucide-Placeholder-Markup für eine Kategorie; aria-hidden, da stets
+// von einem Text-Label begleitet. lucide.createIcons() ersetzt den Platzhalter.
+function categoryIcon(cat, size = 16) {
+  const name = CATEGORY_ICONS[cat] || 'tag';
+  return `<i data-lucide="${name}" class="contact-cat-icon" style="width:${size}px;height:${size}px;" aria-hidden="true"></i>`;
+}
 
 function CATEGORY_LABELS() {
   return {
@@ -86,7 +94,7 @@ export async function render(container, { user }) {
       <div class="contacts-filters" id="contacts-filters">
         <button class="contact-filter-chip contact-filter-chip--active" data-cat="">${t('contacts.filterAll')}</button>
         ${CATEGORIES.map((c) => `
-          <button class="contact-filter-chip" data-cat="${esc(c)}">${CATEGORY_ICONS[c] || ''} ${CATEGORY_LABELS()[c] || esc(c)}</button>
+          <button class="contact-filter-chip" data-cat="${esc(c)}">${categoryIcon(c)} ${CATEGORY_LABELS()[c] || esc(c)}</button>
         `).join('')}
       </div>
       <div id="contacts-list" class="contacts-list" aria-busy="true">${renderSkeletonList({ rows: 6, lines: 2 })}</div>
@@ -222,7 +230,7 @@ function renderList() {
     .sort(([a], [b]) => CATEGORIES.indexOf(a) - CATEGORIES.indexOf(b))
     .map(([cat, items]) => `
       <div class="contact-group">
-        <div class="contact-group__header">${CATEGORY_ICONS[cat] || ''} ${CATEGORY_LABELS()[cat] || esc(cat)}</div>
+        <div class="contact-group__header">${categoryIcon(cat)} ${CATEGORY_LABELS()[cat] || esc(cat)}</div>
         ${items.map((c) => renderContactItem(c)).join('')}
       </div>
     `).join(''));
@@ -274,7 +282,7 @@ function renderContactItem(c) {
 
   return `
     <div class="contact-item" data-id="${c.id}">
-      <div class="contact-item__icon">${CATEGORY_ICONS[c.category] || '📋'}</div>
+      <div class="contact-item__icon">${categoryIcon(c.category, 20)}</div>
       <div class="contact-item__body">
         <div class="contact-item__name">${esc(c.name)}</div>
         ${meta ? `<div class="contact-item__meta">${esc(meta)}</div>` : ''}

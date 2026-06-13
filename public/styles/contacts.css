@@ -142,6 +142,9 @@
 }
 
 .contact-group__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   color: var(--color-text-secondary);
   padding: var(--space-2) var(--space-4) var(--space-1);
   background-color: var(--color-bg);
@@ -149,6 +152,11 @@
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
+}
+
+/* Kategorie-Icons (Lucide) erben die Akzent-/Sekundärfarbe ihres Containers */
+.contact-cat-icon {
+  flex-shrink: 0;
 }
 
 .contact-item {
