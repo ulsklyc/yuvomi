@@ -502,7 +502,7 @@ router.post('/holidays/sync', async (req, res) => {
     return res.status(403).json({ error: 'Admin access required.', code: 403 });
   }
   try {
-    await holidays.sync();
+    await holidays.sync(true);
     res.json({ data: { last_sync: cfgGet('holiday_last_sync') ?? null } });
   } catch (err) {
     log.error('POST /holidays/sync', err);
