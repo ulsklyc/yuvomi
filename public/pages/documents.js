@@ -68,16 +68,12 @@ export async function render(container) {
       <div class="page-toolbar documents-toolbar">
         <h1 class="page-toolbar__title">${t('documents.title')}</h1>
         <label class="documents-toolbar__search" for="documents-search">
-          <span class="documents-toolbar__search-label">${t('documents.searchPlaceholder')}</span>
+          <span class="documents-toolbar__search-label sr-only">${t('documents.searchPlaceholder')}</span>
           <span class="documents-toolbar__search-control">
             <i data-lucide="search" class="documents-toolbar__search-icon" aria-hidden="true"></i>
             <input class="documents-toolbar__search-input" id="documents-search" type="search" placeholder="${t('documents.searchPlaceholder')}" autocomplete="off">
           </span>
         </label>
-        <button class="btn btn--primary" id="documents-add-btn">
-          <i data-lucide="upload" class="icon-md" aria-hidden="true"></i>
-          ${t('documents.addButton')}
-        </button>
         <details class="documents-secondary-controls">
           <summary class="btn btn--secondary btn--icon documents-secondary-controls__trigger" aria-label="${t('nav.more')}">
             <i data-lucide="sliders-horizontal" class="icon-md" aria-hidden="true"></i>
@@ -221,7 +217,6 @@ function syncFolderDocuments() {
 }
 
 function bindPageEvents() {
-  _container.querySelector('#documents-add-btn')?.addEventListener('click', () => openDocumentModal());
   _container.querySelector('#documents-folder-btn')?.addEventListener('click', () => openFolderModal());
   _container.querySelector('#fab-new-document')?.addEventListener('click', () => openDocumentModal());
   let documentsSearchTimer;

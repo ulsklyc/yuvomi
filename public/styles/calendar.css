@@ -115,10 +115,12 @@
   color: var(--color-text-primary);
 }
 
+/* Vereinheitlichter Active-State für segmentierte Umschalter: Modul-Akzent
+ * gefüllt (wie .budget-tab--active), trägt die Modul-Identität. --color-ink-on-vivid
+ * kippt im Dark Mode auf dunkle Tinte, passend zum dort hellen Modul-Akzent. */
 .cal-toolbar__view-btn--active {
-  background-color: var(--color-surface);
-  color: var(--color-text-primary);
-  box-shadow: var(--glass-shadow-sm);
+  background-color: var(--module-accent, var(--color-accent));
+  color: var(--color-ink-on-vivid);
 }
 
 /* ── Mobile: kompakte Toolbar mit scrollbaren Ansichten ── */

@@ -63,7 +63,7 @@ export async function render(container, { user }) {
       <h1 class="sr-only">${t('contacts.title')}</h1>
       <div class="contacts-toolbar">
         <label class="contacts-toolbar__search" for="contacts-search">
-          <span class="contacts-toolbar__search-label">${t('contacts.searchPlaceholder')}</span>
+          <span class="contacts-toolbar__search-label sr-only">${t('contacts.searchPlaceholder')}</span>
           <span class="contacts-toolbar__search-control">
             <i data-lucide="search" class="contacts-toolbar__search-icon" aria-hidden="true"></i>
             <input type="search" class="contacts-toolbar__search-input"
