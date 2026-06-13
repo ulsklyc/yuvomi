@@ -1916,44 +1916,8 @@
   padding: var(--space-2) 0;
 }
 
-.dms-account-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
 .dms-account-meta {
-  flex: 1;
-  min-width: 0;
-}
-
-.dms-account-meta strong {
-  display: block;
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dms-account-meta .form-hint {
-  display: block;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-@media (max-width: 640px) {
-  .dms-account-item {
-    flex-wrap: wrap;
-  }
-
-  .dms-account-meta {
-    width: 100%;
-  }
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
