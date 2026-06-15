@@ -8,6 +8,7 @@
  */
 
 import { auth } from '/api.js';
+import { getLocale } from '/i18n.js';
 import {
   SETTINGS_STORAGE_KEY,
   filterSettingsDomains,
@@ -23,6 +24,8 @@ const OVERVIEW_VIEWS = new Set(['domains', 'domain']);
 
 // Container der zuletzt gemounteten Shell — Basis für das Soft-Update (update()).
 let mountedContainer = null;
+// Sprache der zuletzt gerenderten Shell; ein Wechsel erzwingt vollen Re-Render.
+let renderedLocale = null;
 
 async function refreshUser(user) {
   if (user) return user;
@@ -51,6 +54,7 @@ function redirectTo(target) {
 export async function render(container, { user } = {}) {
   try {
     mountedContainer = container;
+    renderedLocale = getLocale();
     const currentUser = await refreshUser(user);
 
     const path = window.location.pathname;
@@ -120,6 +124,12 @@ export async function render(container, { user } = {}) {
 export async function update({ user, path, query } = {}) {
   if (!mountedContainer?.isConnected) return false;
 
+  // Bei locale-changed bliebe inkrementell die Sidebar/der Seitenkopf in der alten
+  // Sprache — ein Locale-Wechsel erzwingt daher ein volles Neu-Rendern der Shell.
+  const currentLocale = getLocale();
+  const localeChanged = renderedLocale !== currentLocale;
+  renderedLocale = currentLocale;
+
   const search = query ?? new URLSearchParams();
   const view = search.get('view');
   const hasOAuthResult = search.has('sync_ok') || search.has('sync_error');
@@ -136,7 +146,7 @@ export async function update({ user, path, query } = {}) {
       view: resolvedView,
       domainId: resolvedView === 'domain' ? domainId : null,
       query: search,
-      incremental: true,
+      incremental: !localeChanged,
     });
     return true;
   }
@@ -150,6 +160,6 @@ export async function update({ user, path, query } = {}) {
     // Persistenz ist optional; ein fehlschlagender Storage darf nichts blockieren.
   }
 
-  await renderSettingsShell(mountedContainer, { user, leaf, query: search, incremental: true });
+  await renderSettingsShell(mountedContainer, { user, leaf, query: search, incremental: !localeChanged });
   return true;
 }

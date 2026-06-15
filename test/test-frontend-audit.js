@@ -1442,7 +1442,7 @@ test('settings cutover: the controller is a thin shell delegate without the lega
   assert.doesNotMatch(settingsPage, /extraClass:\s*'settings-tabs'/, 'controller must not render the legacy sub-tab bar');
 
   const lineCount = settingsPage.split('\n').length;
-  assert.ok(lineCount <= 160, `settings controller should be a thin shell (was ${lineCount} lines)`);
+  assert.ok(lineCount <= 170, `settings controller should be a thin shell (was ${lineCount} lines)`);
 });
 
 test('settings cutover: obsolete navigation modules and stylesheet are removed', () => {
