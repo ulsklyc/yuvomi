@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.71.46] - 2026-06-15
+
+### Fixed
+- **Editing an hourly housekeeping visit no longer fails with "daily_rate is required"**: saving changes to a visit billed by the hour (e.g. adjusting the hours worked) returned a 400 error because the update endpoint always demanded a daily rate, even though hourly visits submit minutes worked instead. The daily rate is now only required for daily-rate visits; hourly visits recompute the amount from the minutes worked.
+
 ## [0.71.45] - 2026-06-15
 
 ### Fixed

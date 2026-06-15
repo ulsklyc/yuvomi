@@ -5,10 +5,17 @@
  */
 
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import test from 'node:test';
+import express from 'express';
 import Database from 'better-sqlite3';
 import { MIGRATIONS, _setTestDatabase, _resetTestDatabase } from '../server/db.js';
 import { roundMinutesTo15, computeHourlyAmount } from '../server/services/housekeeping-billing.js';
+
+// auth.js (via Route-Import) erwartet SESSION_SECRET; vor dem dynamischen
+// Import setzen, da statische Imports gehoistet würden.
+process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
+const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
 
 // In-Memory-DB mit allen Migrationen aufbauen
 function buildTestDb() {
@@ -199,3 +206,70 @@ test('hourly checkout: minutes_worked and daily_rate computed from check_in/chec
   assert.equal(row.rate_type, 'hourly');
   assert.equal(Number(row.hourly_rate), 10);
 });
+
+// Express-App für Route-Level-Tests (PUT /visits/:id)
+const app = express();
+app.use(express.json());
+app.use((req, _res, next) => { req.authUserId = 1; req.session = { userId: 1 }; next(); });
+app.use('/api/v1/housekeeping', housekeepingRouter);
+const server = app.listen(0);
+await new Promise((resolve) => server.once('listening', resolve));
+const port = server.address().port;
+
+function request(method, path, body) {
+  return new Promise((resolve, reject) => {
+    const data = body !== undefined ? JSON.stringify(body) : null;
+    const req = http.request({ host: '127.0.0.1', port, path, method,
+      headers: { 'content-type': 'application/json' } }, (res) => {
+      let buf = '';
+      res.on('data', (c) => { buf += c; });
+      res.on('end', () => resolve({ status: res.statusCode, body: buf ? JSON.parse(buf) : null }));
+    });
+    req.on('error', reject);
+    if (data) req.write(data);
+    req.end();
+  });
+}
+
+test('PUT /visits/:id: hourly visit updates without daily_rate (regression #367)', async () => {
+  // Stündlicher Worker + Besuch mit minutes_worked, ohne daily_rate-Feld
+  const uId = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
+    VALUES ('hk-hourly', 'HK Hourly', 'x', 'member')`).run().lastInsertRowid;
+  const wId = db.prepare(`
+    INSERT INTO housekeeping_workers (user_id, daily_rate, rate_type, hourly_rate)
+    VALUES (?, 0, 'hourly', 12)
+  `).run(uId).lastInsertRowid;
+  const vId = db.prepare(`
+    INSERT INTO housekeeping_work_sessions (worker_id, check_in, check_out, daily_rate, extras, created_by, rate_type, hourly_rate, minutes_worked)
+    VALUES (?, '2026-06-01T09:00:00.000Z', '2026-06-01T09:00:00.000Z', 12, 0, 1, 'hourly', 12, 60)
+  `).run(wId).lastInsertRowid;
+
+  // Frontend sendet bei hourly minutes_worked statt daily_rate
+  const res = await request('PUT', `/api/v1/housekeeping/visits/${vId}`, {
+    date: '2026-06-01',
+    minutes_worked: 120,
+    extras: 0,
+  });
+
+  assert.equal(res.status, 200, `expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+  const row = db.prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(vId);
+  assert.equal(Number(row.minutes_worked), 120);
+  // 120 min * 12/h = 24
+  assert.equal(Number(row.daily_rate), computeHourlyAmount(120, 12));
+});
+
+test('PUT /visits/:id: non-hourly visit still requires daily_rate', async () => {
+  const uId = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
+    VALUES ('hk-daily', 'HK Daily', 'x', 'member')`).run().lastInsertRowid;
+  const wId = db.prepare(`INSERT INTO housekeeping_workers (user_id, daily_rate) VALUES (?, 80)`).run(uId).lastInsertRowid;
+  const vId = db.prepare(`
+    INSERT INTO housekeeping_work_sessions (worker_id, check_in, check_out, daily_rate, extras, created_by)
+    VALUES (?, '2026-06-02T09:00:00.000Z', '2026-06-02T09:00:00.000Z', 80, 0, 1)
+  `).run(wId).lastInsertRowid;
+
+  const res = await request('PUT', `/api/v1/housekeeping/visits/${vId}`, { date: '2026-06-02', extras: 0 });
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /daily_rate is required/);
+});
+
+test.after(() => server.close());
