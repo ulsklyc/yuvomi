@@ -359,6 +359,22 @@ test('the Settings controller delegates to the shell instead of rendering tab pa
   assert.doesNotMatch(source, /settings-nav\.js/);
 });
 
+test('the Settings controller forces a full shell render when the locale changes', async () => {
+  const source = await readFile(
+    new URL('../public/pages/settings.js', import.meta.url),
+    'utf8',
+  );
+  // Locale muss aus i18n importiert und beim Mount sowie im Soft-Update verglichen
+  // werden, damit ein Sprachwechsel die Sidebar/den Seitenkopf nicht stale lässt.
+  assert.match(source, /import\s*\{\s*getLocale\s*\}\s*from\s*'\/i18n\.js'/);
+  assert.match(source, /renderedLocale\s*=\s*getLocale\(\)/);
+  assert.match(source, /const\s+localeChanged\s*=\s*renderedLocale\s*!==\s*currentLocale/);
+  // Beide Soft-Update-Pfade dürfen bei Sprachwechsel nicht inkrementell rendern.
+  assert.doesNotMatch(source, /incremental:\s*true/);
+  const incrementalFlags = source.match(/incremental:\s*!localeChanged/g) ?? [];
+  assert.equal(incrementalFlags.length, 2);
+});
+
 test('Kitchen child IDs use the canonical order', () => {
   assert.deepEqual(KITCHEN_CHILD_IDS, ['meals', 'recipes', 'shopping']);
   assert.equal(Object.isFrozen(KITCHEN_CHILD_IDS), true);
