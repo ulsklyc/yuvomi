@@ -24,9 +24,7 @@ const OVERVIEW_VIEWS = new Set(['domains', 'domain']);
 
 // Container der zuletzt gemounteten Shell — Basis für das Soft-Update (update()).
 let mountedContainer = null;
-// Sprache, mit der die Shell zuletzt gerendert wurde. Wechselt sie zwischen zwei
-// Soft-Updates (locale-changed), muss die Shell voll neu gerendert werden, sonst
-// bleiben Seitenkopf und Sidebar in der alten Sprache stehen.
+// Sprache der zuletzt gerenderten Shell; ein Wechsel erzwingt vollen Re-Render.
 let renderedLocale = null;
 
 async function refreshUser(user) {
@@ -126,9 +124,8 @@ export async function render(container, { user } = {}) {
 export async function update({ user, path, query } = {}) {
   if (!mountedContainer?.isConnected) return false;
 
-  // Bei einem Sprachwechsel (locale-changed) trägt der Router das Soft-Update an.
-  // Inkrementell bliebe die Sidebar/der Seitenkopf in der alten Sprache — daher
-  // erzwingt ein Locale-Wechsel ein volles Neu-Rendern der Shell.
+  // Bei locale-changed bliebe inkrementell die Sidebar/der Seitenkopf in der alten
+  // Sprache — ein Locale-Wechsel erzwingt daher ein volles Neu-Rendern der Shell.
   const currentLocale = getLocale();
   const localeChanged = renderedLocale !== currentLocale;
   renderedLocale = currentLocale;
