@@ -84,6 +84,7 @@
     "helmet": "^8.2.0",
     "node-cron": "^4.2.1",
     "node-fetch": "^3.3.2",
+    "nodemailer": "^7.0.13",
     "openid-client": "^6.8.4",
     "web-push": "^3.6.7"
   },
