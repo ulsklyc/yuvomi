@@ -972,6 +972,10 @@ function buildPaths() {
       put: op({ summary: 'Update guest account', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete guest account', tag: 'SplitExpenses', params: [idParam()], stateChanging: true }),
     },
+    '/api/v1/push/vapid-public-key': { get: op({ summary: 'Get VAPID public key', tag: 'Push' }) },
+    '/api/v1/push/subscribe': { post: op({ summary: 'Register a push subscription', tag: 'Push', stateChanging: true, requestBody: jsonBody(null) }) },
+    '/api/v1/push/unsubscribe': { post: op({ summary: 'Remove a push subscription', tag: 'Push', stateChanging: true, requestBody: jsonBody(null) }) },
+    '/api/v1/push/test': { post: op({ summary: 'Send a test push to the current user', tag: 'Push', stateChanging: true }) },
   };
 }
 
@@ -1005,6 +1009,7 @@ function buildOpenApiSpec(req, appVersion) {
       { name: 'Preferences' },
       { name: 'Reminders' },
       { name: 'Search' },
+      { name: 'Push' },
     ],
     paths: buildPaths(),
     components: {

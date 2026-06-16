@@ -768,7 +768,8 @@ router.put('/visits/:id', (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Visit not found.', code: 404 });
 
     const vDate = date(req.body.date, 'date', true);
-    const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: true });
+    const isHourly = existing.rate_type === 'hourly';
+    const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: !isHourly });
     const vExtras = num(req.body.extras, 'extras');
     const vEventTitle = str(req.body.event_title, 'event_title', { max: MAX_TITLE, required: false });
     const vPaymentTitle = str(req.body.payment_title, 'payment_title', { max: MAX_TITLE, required: false });
@@ -776,7 +777,7 @@ router.put('/visits/:id', (req, res) => {
     const vReceiptId = req.body.receipt_document_id !== undefined && req.body.receipt_document_id !== null && req.body.receipt_document_id !== ''
       ? validateId(req.body.receipt_document_id, 'receipt_document_id')
       : { value: null, error: null };
-    const vMinutesWorked = existing.rate_type === 'hourly' && req.body.minutes_worked !== undefined
+    const vMinutesWorked = isHourly && req.body.minutes_worked !== undefined
       ? num(req.body.minutes_worked, 'minutes_worked')
       : { value: null, error: null };
     if (vMinutesWorked.error) return res.status(400).json({ error: vMinutesWorked.error, code: 400 });
@@ -786,8 +787,8 @@ router.put('/visits/:id', (req, res) => {
       return res.status(400).json({ error: 'Amounts must be greater than or equal to zero.', code: 400 });
     }
 
-    let effectiveDailyRate = vDailyRate.value;
-    if (existing.rate_type === 'hourly' && vMinutesWorked.value !== null) {
+    let effectiveDailyRate = vDailyRate.value ?? existing.daily_rate;
+    if (isHourly && vMinutesWorked.value !== null) {
       effectiveDailyRate = computeHourlyAmount(vMinutesWorked.value, existing.hourly_rate || 0);
     }
 

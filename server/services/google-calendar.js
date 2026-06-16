@@ -18,10 +18,13 @@ const log = createLogger('Google');
 import { google } from 'googleapis';
 import crypto from 'node:crypto';
 import * as db from '../db.js';
+import { decodeHtmlEntities } from '../utils/html-entities.js';
 
 const GOOGLE_COLOR = '#4285F4';
 
 function upsertExternalCalendar(source, externalId, name, color) {
+  // Provider-Namen können HTML-entity-encoded sein (Google liefert das z. B. für
+  // Import-Kalender) — zu Klartext normalisieren, sonst escaped die UI doppelt.
   const row = db.get().prepare(`
     INSERT INTO external_calendars (source, external_id, name, color)
     VALUES (?, ?, ?, ?)
@@ -29,7 +32,7 @@ function upsertExternalCalendar(source, externalId, name, color) {
       name  = excluded.name,
       color = excluded.color
     RETURNING id
-  `).get(source, externalId, name, color);
+  `).get(source, externalId, decodeHtmlEntities(name), color);
   return row.id;
 }
 

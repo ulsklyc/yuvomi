@@ -33,16 +33,24 @@
   }
 }
 
-/* Active-State: Glass-Kapsel hinter aktivem Nav-Item */
-.nav-item[aria-current="page"] {
-  background: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 18%, transparent);
-  border-radius: var(--radius-glass-chip);
-  box-shadow: inset 0 1px 0 var(--glass-highlight-subtle);
+/* Active-State: eine eingezogene Glass-Kapsel im gleitenden Indikator */
+.nav-bottom__indicator::before {
+  background: color-mix(
+    in srgb,
+    var(--active-module-accent, var(--color-accent)) 16%,
+    var(--glass-bg)
+  );
+  box-shadow: inset 0 var(--space-px) 0 var(--glass-highlight-subtle);
+}
+
+.nav-bottom .nav-item__icon-well {
+  background: color-mix(in srgb, var(--color-text-secondary) 7%, transparent);
+  box-shadow: none;
 }
 
 /* Hover-State Bottom-Nav (nur sichtbar auf Mobile) */
 @media (hover: hover) {
-  .nav-bottom .nav-item:hover:not([aria-current="page"]) {
+  .nav-bottom .nav-item:hover:not([aria-current="page"]):not(.nav-item--active) {
     background: color-mix(in srgb, var(--color-text-tertiary) 8%, transparent);
     border-radius: var(--radius-glass-chip);
   }
@@ -172,8 +180,12 @@
  * 7. Accessibility Overrides — Phase 1
  * ================================================================ */
 @media (prefers-reduced-transparency: reduce) {
-  .nav-item[aria-current="page"],
-  .nav-item:hover:not([aria-current="page"]) {
+  .nav-bottom__indicator::before {
+    background: color-mix(
+      in srgb,
+      var(--active-module-accent, var(--color-accent)) 14%,
+      var(--color-surface)
+    );
     box-shadow: none;
   }
 
@@ -184,7 +196,7 @@
 
   .nav-item[aria-current="page"] .nav-item__icon-well,
   .nav-item--active .nav-item__icon-well {
-    background: color-mix(in srgb, var(--item-module-accent, var(--color-accent)) 20%, var(--color-surface-elevated));
+    background: transparent;
     box-shadow: none;
   }
 
@@ -193,6 +205,12 @@
   .fab,
   .fab:hover {
     box-shadow: var(--shadow-sm);
+  }
+}
+
+@media (prefers-contrast: more) {
+  .nav-bottom__indicator::before {
+    box-shadow: inset 0 0 0 var(--space-px) currentColor;
   }
 }
 
@@ -350,21 +368,13 @@ textarea.form-input {
  * ================================================================ */
 
 /* ================================================================
- * 17. Bottom-Nav Auto-Hide on Scroll
+ * 17. Bottom-Nav Surface Transitions
  * ================================================================ */
 .nav-bottom {
   margin-bottom: 0;
   transition:
-    transform var(--transition-base) var(--ease-out),
     background-color var(--transition-fast),
     box-shadow var(--transition-fast);
-  /* will-change: transform absichtlich weggelassen - auf iOS (WebKit) korrumpiert die
-   * dauerhafte GPU-Layer-Promotion eines position:relative Flex-Kinds dessen Position. */
-}
-
-.nav-bottom--hidden {
-  transform: translateY(100%);
-  pointer-events: none;
 }
 
 /* ================================================================
@@ -497,10 +507,6 @@ html.navigating .app-content *::after {
  * ================================================================ */
 @media (prefers-reduced-motion: reduce) {
   .nav-bottom {
-    transition: none;
-  }
-
-  .nav-bottom--hidden {
     transition: none;
   }
 

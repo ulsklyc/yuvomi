@@ -67,7 +67,8 @@
         "sidebarExpand": "Agrandir la barre latérale",
         "sectionOverview": "Vue d’ensemble",
         "sectionPlan": "Planifier",
-        "sectionHome": "Maison"
+        "sectionHome": "Maison",
+        "help": "Hilfe"
     },
     "dashboard": {
         "title": "Accueil",
@@ -1194,7 +1195,7 @@
         "thirdPartyModulesStatusDisabled": "Disabled",
         "thirdPartyModulesStatusError": "Error",
         "thirdPartyModulesSaved": "Module setting saved.",
-        "modulesDragHint": "Drag modules to define the left menu order. Settings always stays last.",
+        "modulesDragHint": "Faites glisser les modules ou utilisez les flèches pour modifier leur ordre uniquement dans leur groupe.",
         "modulesDragHandle": "Drag to reorder",
         "modulesBuiltInBadge": "Intégré",
         "modulesThirdPartyBadge": "Module",
@@ -1365,7 +1366,35 @@
         "systemSetupComplete": "Terminée",
         "systemSetupRequired": "Configuration requise",
         "apiTokensEmpty": "Aucun jeton d’API pour le moment.",
-        "familyEmpty": "Aucun membre de la famille pour le moment."
+        "familyEmpty": "Aucun membre de la famille pour le moment.",
+        "mobileNavigationTitle": "Navigation mobile",
+        "mobileNavigationHint": "Choisissez trois destinations à afficher entre Vue d’ensemble et Plus dans la navigation inférieure.",
+        "mobileNavigationSlotLabel": "Position {{position}}",
+        "mobileNavigationEmptyOption": "Non utilisé",
+        "desktopNavigationTitle": "Navigation web",
+        "desktopNavigationHint": "Activez les modules et triez-les dans les groupes Vue d’ensemble, Planifier et Maison.",
+        "mobileNavigationSaved": "Navigation mobile enregistrée.",
+        "regionTitle": "Région / Format",
+        "regionLabel": "Région",
+        "regionHint": "Définit la devise et les formats de date et d’heure selon la région. Choisissez « Personnalisé » pour les régler individuellement.",
+        "regionCustom": "Personnalisé",
+        "regionSaved": "Région enregistrée.",
+        "currencyMovedHint": "La devise se configure désormais dans Apparence → Région / Format.",
+        "pageNotifications": "Notifications",
+        "pageNotificationsDescription": "Gérer les notifications push sur cet appareil",
+        "notificationsTitle": "Notifications",
+        "pushToggleTitle": "Notifications push",
+        "pushToggleLabel": "Activer sur cet appareil",
+        "pushChecking": "Vérification du statut …",
+        "pushEnabled": "Les notifications push sont actives sur cet appareil.",
+        "pushDisabled": "Les notifications push sont désactivées sur cet appareil.",
+        "pushDenied": "Les notifications ont été bloquées dans le navigateur. Veuillez les autoriser dans les paramètres du navigateur.",
+        "pushUnsupported": "Ce navigateur ne prend pas en charge les notifications push.",
+        "pushError": "Échec de l’action. Veuillez réessayer.",
+        "pushTestButton": "Envoyer une notification de test",
+        "pushTestSent": "Notification de test envoyée.",
+        "pushTestTitle": "Yuvomi",
+        "pushTestBody": "Ceci est une notification de test."
     },
     "login": {
         "tagline": "Planification familiale. Sécurisée. Respectueuse de la vie privée. Open source.",
@@ -1967,5 +1996,12 @@
         "95": "Orage",
         "96": "Orage avec grêle",
         "99": "Orage violent"
+    },
+    "help": {
+        "title": "Hilfe",
+        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
+        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
+        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
+        "mobileSettings": "Einstellungen findest du unter „Mehr“."
     }
 }

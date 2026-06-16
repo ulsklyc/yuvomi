@@ -70,6 +70,16 @@ function eventDescription(name, birthDate) {
 }
 
 function syncBirthdayCalendarEvent(database, birthday) {
+  // "Keine Benachrichtigung" → Geburtstag soll weder im Dashboard noch im
+  // Kalender als Termin erscheinen. Vorhandenes Event löschen und null zurückgeben.
+  if (birthday.reminder_offset === '') {
+    if (birthday.calendar_event_id) {
+      database.prepare('DELETE FROM calendar_events WHERE id = ?').run(birthday.calendar_event_id);
+      database.prepare('UPDATE birthdays SET calendar_event_id = NULL WHERE id = ?').run(birthday.id);
+    }
+    return null;
+  }
+
   const payload = {
     title: eventTitle(birthday.name),
     description: eventDescription(birthday.name, birthday.birth_date),
@@ -201,13 +211,7 @@ function syncAllBirthdayReminders(database, userId, from = new Date()) {
   const birthdays = database.prepare(`
     SELECT * FROM birthdays WHERE created_by = ? ORDER BY birth_date ASC
   `).all(userId);
-  birthdays.forEach((birthday) => {
-    const refreshed = birthday.calendar_event_id ? birthday : {
-      ...birthday,
-      calendar_event_id: syncBirthdayCalendarEvent(database, birthday),
-    };
-    syncBirthdayReminder(database, refreshed, from);
-  });
+  birthdays.forEach((birthday) => syncBirthdayArtifacts(database, birthday, from));
 }
 
 export {

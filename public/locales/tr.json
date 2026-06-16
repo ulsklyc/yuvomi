@@ -67,7 +67,8 @@
         "sidebarExpand": "Kenar çubuğunu genişlet",
         "sectionOverview": "Genel bakış",
         "sectionPlan": "Planla",
-        "sectionHome": "Ev"
+        "sectionHome": "Ev",
+        "help": "Hilfe"
     },
     "dashboard": {
         "title": "Genel Bakış",
@@ -1194,7 +1195,7 @@
         "thirdPartyModulesStatusDisabled": "Disabled",
         "thirdPartyModulesStatusError": "Error",
         "thirdPartyModulesSaved": "Module setting saved.",
-        "modulesDragHint": "Drag modules to define the left menu order. Settings always stays last.",
+        "modulesDragHint": "Modülleri sürükleyin veya okları kullanarak sıralarını yalnızca kendi grupları içinde değiştirin.",
         "modulesDragHandle": "Drag to reorder",
         "modulesBuiltInBadge": "Yerleşik",
         "modulesThirdPartyBadge": "Module",
@@ -1365,7 +1366,35 @@
         "systemSetupComplete": "Tamamlandı",
         "systemSetupRequired": "Kurulum gerekli",
         "apiTokensEmpty": "Henüz API belirteci yok.",
-        "familyEmpty": "Henüz aile üyesi yok."
+        "familyEmpty": "Henüz aile üyesi yok.",
+        "mobileNavigationTitle": "Mobil gezinme",
+        "mobileNavigationHint": "Alt gezinmede Genel Bakış ile Daha Fazla arasında gösterilecek üç hedef seçin.",
+        "mobileNavigationSlotLabel": "Konum {{position}}",
+        "mobileNavigationEmptyOption": "Kullanılmıyor",
+        "desktopNavigationTitle": "Web gezinmesi",
+        "desktopNavigationHint": "Modülleri etkinleştirin ve Genel Bakış, Planlama ve Ev grupları içinde sıralayın.",
+        "mobileNavigationSaved": "Mobil gezinme kaydedildi.",
+        "regionTitle": "Bölge / Biçim",
+        "regionLabel": "Bölge",
+        "regionHint": "Para birimini, tarih ve saat biçimini bölgeye göre ayarlar. Bunları ayrı ayrı yapılandırmak için „Özel“ seçeneğini seçin.",
+        "regionCustom": "Özel",
+        "regionSaved": "Bölge kaydedildi.",
+        "currencyMovedHint": "Para birimi artık Görünüm → Bölge / Biçim altında ayarlanır.",
+        "pageNotifications": "Bildirimler",
+        "pageNotificationsDescription": "Bu cihazdaki anlık bildirimleri yönet",
+        "notificationsTitle": "Bildirimler",
+        "pushToggleTitle": "Anlık bildirimler",
+        "pushToggleLabel": "Bu cihazda etkinleştir",
+        "pushChecking": "Durum kontrol ediliyor …",
+        "pushEnabled": "Anlık bildirimler bu cihazda etkin.",
+        "pushDisabled": "Anlık bildirimler bu cihazda devre dışı.",
+        "pushDenied": "Bildirimler tarayıcıda engellendi. Lütfen tarayıcı ayarlarından izin verin.",
+        "pushUnsupported": "Bu tarayıcı anlık bildirimleri desteklemiyor.",
+        "pushError": "İşlem başarısız oldu. Lütfen tekrar deneyin.",
+        "pushTestButton": "Test bildirimi gönder",
+        "pushTestSent": "Test bildirimi gönderildi.",
+        "pushTestTitle": "Yuvomi",
+        "pushTestBody": "Bu bir test bildirimidir."
     },
     "login": {
         "tagline": "Aile planlaması. Güvenli. Gizlilik dostu. Açık kaynak.",
@@ -1967,5 +1996,12 @@
         "95": "Gök gürültülü fırtına",
         "96": "Dolu eşliğinde fırtına",
         "99": "Şiddetli fırtına"
+    },
+    "help": {
+        "title": "Hilfe",
+        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
+        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
+        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
+        "mobileSettings": "Einstellungen findest du unter „Mehr“."
     }
 }

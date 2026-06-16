@@ -450,6 +450,7 @@ export function promptModal(label, defaultValue = '') {
       content: `
         <form id="prompt-modal-form" class="form-stack">
           <div class="form-field">
+            <label class="sr-only" for="prompt-modal-input">${esc(label)}</label>
             <input class="form-input" id="prompt-modal-input" type="text"
                    value="${esc(defaultValue)}" autocomplete="off">
           </div>
@@ -505,6 +506,7 @@ export function selectModal(label, options) {
       content: `
         <form id="select-modal-form" class="form-stack">
           <div class="form-field">
+            <label class="sr-only" for="select-modal-input">${esc(label)}</label>
             <select class="form-input" id="select-modal-input">${optionsHtml}</select>
           </div>
           <div class="modal-actions">

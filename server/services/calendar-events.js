@@ -149,6 +149,12 @@ export function getUpcomingEvents(d, { userId = null, limit = 5, windowDays = 90
   `).all(nowDate, future, future, userId);
 
   return expandRecurringEvents(rawEvents, nowDate, future)
-    .filter((e) => e.start_datetime >= filterFrom)
+    .filter((e) => {
+      // All-day events store start_datetime as 'YYYY-MM-DD' (no time suffix).
+      // Normalise to 'T00:00:00' before comparing, otherwise today's all-day
+      // events are always excluded ('2026-06-13' < '2026-06-13T00:00:00').
+      const start = e.all_day ? e.start_datetime.slice(0, 10) + 'T00:00:00' : e.start_datetime;
+      return start >= filterFrom;
+    })
     .slice(0, limit);
 }

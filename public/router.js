@@ -8,9 +8,16 @@ import { api, auth } from '/api.js';
 import { initI18n, getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { init as initReminders, stop as stopReminders } from '/reminders.js';
+import { initPush, stopPush } from '/push.js';
 import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
+import { buildHelpRows } from '/utils/help.js';
 import { NAV_ICONS } from '/nav-icons.js';
 import { SETTINGS_LEAVES } from '/settings/registry.js';
+import {
+  NAV_SECTION,
+  resolveMobileNavOrder,
+  sortNavigationItems,
+} from '/settings/module-order.js';
 
 // --------------------------------------------------------
 // Routen-Definitionen
@@ -147,6 +154,7 @@ let _preferencesLoaded = false;
 let _disabledModules = new Set();
 let _thirdPartyModules = [];
 let _moduleOrder = [];
+let _mobileNavOrder = [];
 let _moduleRefreshTimer = null;
 // Gesetzt wenn auth:expired waehrend einer laufenden Navigation feuert.
 // Die Weiterleitung zu /login wird nach Abschluss der Navigation nachgeholt.
@@ -161,12 +169,11 @@ let _setupRequired = false;
 const ROUTE_ORDER = ['/', '/calendar', '/tasks', '/meals', '/recipes', '/shopping',
                      '/birthdays', '/notes', '/contacts', '/budget', '/documents', '/housekeeping', '/settings'];
 
-const PRIMARY_NAV = 4;
+const MOBILE_FAVORITE_COUNT = 3;
 
 // Domänen-Gruppierung der Haupt-Navigation. Die Reihenfolge bestimmt die
 // Sortierung der Sektionen (Overview → Plan → Home); die Label-Keys werden in
 // der Sidebar via t() aufgelöst.
-const NAV_SECTION = Object.freeze({ overview: 0, plan: 1, home: 2 });
 const NAV_SECTION_LABEL_KEYS = Object.freeze({
   [NAV_SECTION.overview]: 'nav.sectionOverview',
   [NAV_SECTION.plan]: 'nav.sectionPlan',
@@ -341,6 +348,7 @@ async function navigate(path, userOrPushState = true, pushState = true) {
       if (currentUser && currentUser.access_scope !== 'split_guest') {
         loadReminderStyles();
         initReminders();
+        initPush();
       }
     } else {
       pushState = userOrPushState;
@@ -396,6 +404,7 @@ async function navigate(path, userOrPushState = true, pushState = true) {
         if (currentUser && currentUser.access_scope !== 'split_guest') {
           loadReminderStyles();
           initReminders();
+          initPush();
         }
       } catch {
         currentPath = null; // Reset damit navigate('/login') nicht geblockt wird
@@ -501,6 +510,9 @@ async function syncPreferencesOnce() {
     if (Array.isArray(res?.data?.module_order)) {
       _moduleOrder = res.data.module_order;
     }
+    if (Array.isArray(res?.data?.mobile_nav_order)) {
+      _mobileNavOrder = res.data.mobile_nav_order;
+    }
   } catch {
     // Non-critical. The settings page can refresh this later.
   }
@@ -598,10 +610,11 @@ async function renderPage(route, previousPath = null) {
     // Richtung bestimmen (previousPath ist der alte Pfad vor der Navigation)
     const direction = getDirection(previousPath, route.path);
     const inClass   = direction === 'right' ? 'page-transition--in-right' : 'page-transition--in-left';
+    const shouldAnimate = Boolean(previousPath);
 
     // Performance: backdrop-filter während Übergang deaktivieren (Android-Optimierung).
     // glass.css setzt alle backdrop-filter im app-content auf none solange diese Klasse aktiv ist.
-    document.documentElement.classList.add('navigating');
+    if (shouldAnimate) document.documentElement.classList.add('navigating');
 
     // Alter Inhalt ist jetzt weg - altes Stylesheet kann entfernt werden
     const pageWrapper = document.createElement('div');
@@ -624,18 +637,22 @@ async function renderPage(route, previousPath = null) {
     const renderPromise = module.render(pageWrapper, { user: currentUser });
 
     // Sichtbar machen und Einblend-Animation starten (Skeleton/Grundgerüst).
-    pageWrapper.style.opacity = '';
-    pageWrapper.classList.add(inClass);
+    pageWrapper.style.opacity = shouldAnimate ? '' : '1';
+    if (shouldAnimate) {
+      pageWrapper.classList.add(inClass);
 
-    // navigating-Klasse nach Ende der Einblend-Animation entfernen.
-    // Fallback-Timeout falls animationend nicht feuert (z.B. prefers-reduced-motion).
-    const navEndTimeout = setTimeout(() => {
+      // navigating-Klasse nach Ende der Einblend-Animation entfernen.
+      // Fallback-Timeout falls animationend nicht feuert (z.B. prefers-reduced-motion).
+      const navEndTimeout = setTimeout(() => {
+        document.documentElement.classList.remove('navigating');
+      }, 300);
+      pageWrapper.addEventListener('animationend', () => {
+        clearTimeout(navEndTimeout);
+        document.documentElement.classList.remove('navigating');
+      }, { once: true });
+    } else {
       document.documentElement.classList.remove('navigating');
-    }, 300);
-    pageWrapper.addEventListener('animationend', () => {
-      clearTimeout(navEndTimeout);
-      document.documentElement.classList.remove('navigating');
-    }, { once: true });
+    }
 
     await renderPromise;
 
@@ -784,6 +801,32 @@ function renderAppShell(container) {
   sidebar.appendChild(sidebarLogo);
   sidebar.appendChild(sidebarToggle);
   sidebar.appendChild(sidebarItems);
+
+  // Hilfe-Eintrag im Sidebar-Footer (Aktion, keine Route → kein data-route, damit
+  // Route-Delegation/Indikator ihn ignorieren).
+  const sidebarHelp = document.createElement('button');
+  sidebarHelp.type = 'button';
+  sidebarHelp.className = 'nav-item nav-item--help';
+  sidebarHelp.setAttribute('aria-label', t('nav.help'));
+  sidebarHelp.setAttribute('title', t('nav.help'));
+  sidebarHelp.addEventListener('click', () => showHelpModal());
+  const helpWrap = document.createElement('div');
+  helpWrap.className = 'nav-item__icon-wrap';
+  const helpWell = document.createElement('div');
+  helpWell.className = 'nav-item__icon-well';
+  const helpIcon = document.createElement('i');
+  helpIcon.dataset.lucide = 'circle-help';
+  helpIcon.className = 'nav-item__icon';
+  helpIcon.setAttribute('aria-hidden', 'true');
+  helpWell.appendChild(helpIcon);
+  helpWrap.appendChild(helpWell);
+  const helpLabel = document.createElement('span');
+  helpLabel.className = 'nav-item__label';
+  helpLabel.textContent = t('nav.help');
+  sidebarHelp.appendChild(helpWrap);
+  sidebarHelp.appendChild(helpLabel);
+  sidebar.appendChild(sidebarHelp);
+
   if (window.lucide) window.lucide.createIcons({ el: sidebar });
 
   const main = document.createElement('main');
@@ -796,79 +839,14 @@ function renderAppShell(container) {
   bottomNav.setAttribute('aria-label', t('nav.navigation'));
   const bottomItems = document.createElement('div');
   bottomItems.className = 'nav-bottom__items';
-  navItems().filter((item) => !item.kitchenGroup).slice(0, PRIMARY_NAV).forEach((item) => bottomItems.appendChild(navItemEl(item)));
+  if (isGuest) {
+    navItems().forEach((item) => bottomItems.appendChild(navItemEl(item)));
+  }
 
   let backdrop, moreSheet;
 
   if (!isGuest) {
-    const kitchenBtn = document.createElement('button');
-    kitchenBtn.className = 'nav-item nav-item--kitchen';
-    kitchenBtn.id = 'kitchen-btn';
-    kitchenBtn.type = 'button';
-    kitchenBtn.style.setProperty('--item-module-accent', 'var(--module-meals)');
-    kitchenBtn.setAttribute('aria-label', t('nav.kitchen'));
-    kitchenBtn.setAttribute('title', t('nav.kitchen'));
-    const kitchenBtnWrap = document.createElement('div');
-    kitchenBtnWrap.className = 'nav-item__icon-wrap';
-    const kitchenBtnWell = document.createElement('div');
-    kitchenBtnWell.className = 'nav-item__icon-well';
-    {
-      const iconFactory = NAV_ICONS['utensils'];
-      if (iconFactory) {
-        const svg = iconFactory();
-        svg.classList.add('nav-item__icon');
-        kitchenBtnWell.appendChild(svg);
-      } else {
-        const kitchenBtnIcon = document.createElement('i');
-        kitchenBtnIcon.dataset.lucide = 'utensils';
-        kitchenBtnIcon.className = 'nav-item__icon';
-        kitchenBtnIcon.setAttribute('aria-hidden', 'true');
-        kitchenBtnWell.appendChild(kitchenBtnIcon);
-      }
-    }
-    kitchenBtnWrap.appendChild(kitchenBtnWell);
-    const kitchenBtnLabel = document.createElement('span');
-    kitchenBtnLabel.className = 'nav-item__label';
-    kitchenBtnLabel.textContent = t('nav.kitchen');
-    kitchenBtn.appendChild(kitchenBtnWrap);
-    kitchenBtn.appendChild(kitchenBtnLabel);
-    kitchenBtn.addEventListener('click', () => navigate(getLastKitchenRoute()));
-    bottomItems.appendChild(kitchenBtn);
-
-    const moreBtn = document.createElement('button');
-    moreBtn.className = 'nav-item nav-item--more';
-    moreBtn.id = 'more-btn';
-    moreBtn.type = 'button';
-    moreBtn.style.setProperty('--item-module-accent', 'var(--color-accent)');
-    moreBtn.setAttribute('aria-label', t('nav.more'));
-    moreBtn.setAttribute('title', t('nav.more'));
-    moreBtn.setAttribute('aria-expanded', 'false');
-    moreBtn.setAttribute('aria-controls', 'more-sheet');
-    const moreBtnWrap = document.createElement('div');
-    moreBtnWrap.className = 'nav-item__icon-wrap';
-    const moreBtnWell = document.createElement('div');
-    moreBtnWell.className = 'nav-item__icon-well';
-    {
-      const iconFactory = NAV_ICONS['grid-2x2'];
-      if (iconFactory) {
-        const svg = iconFactory();
-        svg.classList.add('nav-item__icon');
-        moreBtnWell.appendChild(svg);
-      } else {
-        const moreBtnIcon = document.createElement('i');
-        moreBtnIcon.dataset.lucide = 'grid-2x2';
-        moreBtnIcon.className = 'nav-item__icon';
-        moreBtnIcon.setAttribute('aria-hidden', 'true');
-        moreBtnWell.appendChild(moreBtnIcon);
-      }
-    }
-    moreBtnWrap.appendChild(moreBtnWell);
-    const moreBtnLabel = document.createElement('span');
-    moreBtnLabel.className = 'nav-item__label';
-    moreBtnLabel.textContent = t('nav.more');
-    moreBtn.appendChild(moreBtnWrap);
-    moreBtn.appendChild(moreBtnLabel);
-    bottomItems.appendChild(moreBtn);
+    bottomItems.replaceChildren(...buildBottomNavItems());
 
     backdrop = document.createElement('div');
     backdrop.className = 'more-backdrop';
@@ -908,7 +886,30 @@ function renderAppShell(container) {
     moreSearchBar.appendChild(moreSearchKbd);
     moreSheet.appendChild(moreSearchBar);
 
-    navItems().filter((i) => !i.kitchenGroup).slice(PRIMARY_NAV).forEach((item) => moreSheet.appendChild(moreItemEl(item)));
+    secondaryMobileItems().forEach((item) => moreSheet.appendChild(moreItemEl(item)));
+
+    // Hilfe-Zeile im „Mehr“-Sheet: schließt das Sheet und öffnet das Overlay.
+    const moreHelp = document.createElement('button');
+    moreHelp.type = 'button';
+    moreHelp.className = 'more-item more-item--help';
+    moreHelp.setAttribute('aria-label', t('nav.help'));
+    moreHelp.addEventListener('click', () => {
+      if (window._closeMoreSheet) window._closeMoreSheet({ restoreFocus: false });
+      showHelpModal();
+    });
+    const moreHelpWell = document.createElement('div');
+    moreHelpWell.className = 'more-item__icon-well';
+    const moreHelpIcon = document.createElement('i');
+    moreHelpIcon.dataset.lucide = 'circle-help';
+    moreHelpIcon.className = 'more-item__icon';
+    moreHelpIcon.setAttribute('aria-hidden', 'true');
+    moreHelpWell.appendChild(moreHelpIcon);
+    const moreHelpLabel = document.createElement('span');
+    moreHelpLabel.className = 'more-item__label';
+    moreHelpLabel.textContent = t('nav.help');
+    moreHelp.appendChild(moreHelpWell);
+    moreHelp.appendChild(moreHelpLabel);
+    moreSheet.appendChild(moreHelp);
   }
 
   bottomNav.appendChild(bottomItems);
@@ -1001,7 +1002,6 @@ function renderAppShell(container) {
 
   const openSearch = initSearch(container);
   initMoreSheet(container, openSearch);
-  initNavHideOnScroll(container);
   initOfflineBanner();
   initKeyboardShortcuts();
   if (localStorage.getItem(SEARCH_KBD_KEY)) {
@@ -1023,7 +1023,7 @@ const SHORTCUTS = [
     document.getElementById('more-sheet-search')?.click();
   } },
   { key: 'n',   description: () => t('shortcuts.new'),     action: () => document.querySelector('.page-fab')?.click() },
-  { key: '?',   description: () => t('shortcuts.help'),    action: () => showShortcutsModal() },
+  { key: '?',   description: () => t('shortcuts.help'),    action: () => showHelpModal() },
   { key: 'g d', description: () => t('shortcuts.goDash'),  action: () => navigate('/') },
   { key: 'g t', description: () => t('shortcuts.goTasks'), action: () => navigate('/tasks') },
   { key: 'g c', description: () => t('shortcuts.goCal'),   action: () => navigate('/calendar') },
@@ -1091,7 +1091,12 @@ function initKeyboardShortcuts() {
   });
 }
 
-function showShortcutsModal() {
+function showHelpModal() {
+  // Mirrors the CSS sidebar↔bottom-nav breakpoint (sidebar is min-width:1024px):
+  // without a keyboard, shortcut rows are useless — show a plain-language guide.
+  const coarsePointer = window.matchMedia('(max-width: 1023px)').matches;
+  const helpRows = buildHelpRows({ coarsePointer, shortcuts: SHORTCUTS, t });
+
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.setAttribute('aria-modal', 'true');
@@ -1100,18 +1105,22 @@ function showShortcutsModal() {
   const panel = document.createElement('div');
   panel.className = 'modal-panel modal-panel--sm';
   panel.setAttribute('role', 'dialog');
-  panel.setAttribute('aria-label', t('shortcuts.help'));
+  panel.setAttribute('aria-label', t('help.title'));
 
-  const rows = SHORTCUTS.map((s) => `
-    <div class="shortcuts-row">
-      <kbd class="shortcut-kbd">${esc(s.key)}</kbd>
-      <span class="shortcut-desc">${esc(s.description())}</span>
-    </div>
-  `).join('');
+  const rows = helpRows.map((r) => r.key
+    ? `<div class="help-row">
+         <kbd class="shortcut-kbd">${esc(r.key)}</kbd>
+         <span class="shortcut-desc">${esc(r.desc)}</span>
+       </div>`
+    : `<div class="help-row">
+         <i data-lucide="${esc(r.icon)}" class="help-row__icon icon-md" aria-hidden="true"></i>
+         <span class="shortcut-desc">${esc(r.desc)}</span>
+       </div>`
+  ).join('');
 
   panel.insertAdjacentHTML('beforeend', `
     <div class="modal-panel__header">
-      <span class="modal-panel__title">${esc(t('shortcuts.help'))}</span>
+      <span class="modal-panel__title">${esc(t('help.title'))}</span>
       <button class="modal-panel__close btn--ghost" aria-label="${esc(t('common.close'))}">
         <i data-lucide="x" class="icon-md" aria-hidden="true"></i>
       </button>
@@ -1153,58 +1162,6 @@ function initOfflineBanner() {
   window.addEventListener('online', update);
   window.addEventListener('offline', update);
   update();
-}
-
-/**
- * Versteckt die Bottom-Nav beim Runterscrollen, zeigt sie beim Hochscrollen.
- * Nur auf Mobile aktiv (< 1024px), da auf Desktop die Sidebar fest sichtbar ist.
- */
-function initNavHideOnScroll(container) {
-  const nav = container.querySelector('.nav-bottom');
-  if (!nav) return;
-
-  let lastY = 0;
-  let lastTarget = null;
-
-  const setNavHidden = (hidden) => {
-    nav.classList.toggle('nav-bottom--hidden', hidden);
-  };
-
-  // capture:true catches scroll on any descendant without bubbling.
-  // Accept only the two possible main scroll containers:
-  //   #main-content  — .app-content, used by all pages except Dashboard
-  //   #dashboard-shell — internal scroll container on the Dashboard page
-  document.addEventListener('scroll', (e) => {
-    if (window.innerWidth >= 1024) {
-      setNavHidden(false);
-      return;
-    }
-
-    // Dashboard is the only mobile page that still hit the scroll-blank compositor path.
-    // Keep the bottom nav stable there; other pages retain auto-hide behavior.
-    if (currentPath === '/') {
-      setNavHidden(false);
-      return;
-    }
-
-    const target = e.target;
-    if (target.id !== 'main-content' && target.id !== 'dashboard-shell') return;
-
-    if (target !== lastTarget) {
-      lastY = target.scrollTop;
-      lastTarget = target;
-    }
-
-    const y = target.scrollTop;
-    if (y < 10) {
-      setNavHidden(false);
-    } else if (y > lastY + 4) {
-      setNavHidden(true);
-    } else if (y < lastY - 4) {
-      setNavHidden(false);
-    }
-    lastY = y;
-  }, { passive: true, capture: true });
 }
 
 /**
@@ -1440,17 +1397,57 @@ function navItems() {
     ...baseItems.filter((item) => item.module !== 'settings' && !_disabledModules.has(item.module)),
     ...thirdPartyItems,
   ];
-  const orderIndex = new Map(_moduleOrder.map((id, index) => [id, index]));
-  sortable.sort((a, b) => {
-    // Sektionen (Overview → Plan → Home) bestimmen die Gruppierung; innerhalb
-    // einer Sektion entscheidet die nutzerdefinierte Modul-Reihenfolge.
-    if (a.section !== b.section) return a.section - b.section;
-    const ai = orderIndex.has(a.module) ? orderIndex.get(a.module) : Number.MAX_SAFE_INTEGER;
-    const bi = orderIndex.has(b.module) ? orderIndex.get(b.module) : Number.MAX_SAFE_INTEGER;
-    if (ai !== bi) return ai - bi;
-    return 0;
-  });
-  return settings ? [...sortable, settings] : sortable;
+  const ordered = sortNavigationItems(sortable, _moduleOrder);
+  return settings ? [...ordered, settings] : ordered;
+}
+
+function currentKitchenDestination() {
+  const kitchenItems = navItems().filter((item) => item.kitchenGroup);
+  return kitchenItems.find((item) => item.path === getLastKitchenRoute()) ?? kitchenItems[0] ?? null;
+}
+
+function mobileNavigationCandidates() {
+  const candidates = [];
+  let kitchenAdded = false;
+
+  for (const item of navItems()) {
+    if (item.module === 'dashboard' || item.module === 'settings') continue;
+    if (item.kitchenGroup) {
+      if (!kitchenAdded) {
+        const kitchen = currentKitchenDestination();
+        if (kitchen) {
+          candidates.push({
+            ...kitchen,
+            label: t('nav.kitchen'),
+            icon: 'utensils',
+            navId: 'kitchen',
+          });
+        }
+        kitchenAdded = true;
+      }
+      continue;
+    }
+    candidates.push({ ...item, navId: item.module });
+  }
+
+  return candidates;
+}
+
+function mobileFavoriteItems() {
+  const candidates = mobileNavigationCandidates();
+  const byId = new Map(candidates.map((item) => [item.navId, item]));
+  const selectedIds = resolveMobileNavOrder(_mobileNavOrder, [...byId.keys()])
+    .slice(0, MOBILE_FAVORITE_COUNT);
+  return selectedIds.map((id) => byId.get(id)).filter(Boolean);
+}
+
+function secondaryMobileItems() {
+  const favoriteIds = new Set(mobileFavoriteItems().map((item) => item.navId));
+  const settings = navItems().find((item) => item.module === 'settings');
+  return [
+    ...mobileNavigationCandidates().filter((item) => !favoriteIds.has(item.navId)),
+    ...(settings ? [{ ...settings, navId: settings.module }] : []),
+  ];
 }
 
 function sidebarNavItems() {
@@ -1510,6 +1507,11 @@ function setModuleOrder(order) {
   rebuildNavigation();
 }
 
+function setMobileNavOrder(order) {
+  _mobileNavOrder = Array.isArray(order) ? order : [];
+  rebuildNavigation();
+}
+
 async function refreshThirdPartyModules() {
   await syncThirdPartyModules();
   rebuildNavigation();
@@ -1532,10 +1534,11 @@ async function disableFailedThirdPartyModule(moduleId) {
   }
 }
 
-function navItemEl({ path, navHref, label, icon, module: mod, accent }) {
+function navItemEl({ path, navHref, label, icon, module: mod, accent, navId }) {
   const a = document.createElement('a');
   a.href = navHref ?? path;
   a.dataset.route = path;
+  a.dataset.navId = navId ?? mod;
   if (navHref) a.dataset.navHref = navHref;
   a.className = 'nav-item';
   a.setAttribute('aria-label', label);
@@ -1565,6 +1568,94 @@ function navItemEl({ path, navHref, label, icon, module: mod, accent }) {
   a.appendChild(iconWrap);
   a.appendChild(span);
   return a;
+}
+
+function kitchenNavButtonEl(item) {
+  const kitchenBtn = document.createElement('button');
+  kitchenBtn.className = 'nav-item nav-item--kitchen';
+  kitchenBtn.id = 'kitchen-btn';
+  kitchenBtn.type = 'button';
+  kitchenBtn.dataset.navId = 'kitchen';
+  kitchenBtn.style.setProperty('--item-module-accent', `var(--module-${item.module || 'meals'})`);
+  kitchenBtn.setAttribute('aria-label', t('nav.kitchen'));
+  kitchenBtn.setAttribute('title', t('nav.kitchen'));
+
+  const iconWrap = document.createElement('div');
+  iconWrap.className = 'nav-item__icon-wrap';
+  const well = document.createElement('div');
+  well.className = 'nav-item__icon-well';
+  const iconFactory = NAV_ICONS.utensils;
+  if (iconFactory) {
+    const svg = iconFactory();
+    svg.classList.add('nav-item__icon');
+    well.appendChild(svg);
+  } else {
+    const icon = document.createElement('i');
+    icon.dataset.lucide = 'utensils';
+    icon.className = 'nav-item__icon';
+    icon.setAttribute('aria-hidden', 'true');
+    well.appendChild(icon);
+  }
+  iconWrap.appendChild(well);
+
+  const label = document.createElement('span');
+  label.className = 'nav-item__label';
+  label.textContent = t('nav.kitchen');
+  kitchenBtn.append(iconWrap, label);
+  kitchenBtn.addEventListener('click', () => {
+    const destination = currentKitchenDestination();
+    if (destination) navigate(destination.path);
+  });
+  return kitchenBtn;
+}
+
+function moreNavButtonEl() {
+  const moreBtn = document.createElement('button');
+  moreBtn.className = 'nav-item nav-item--more';
+  moreBtn.id = 'more-btn';
+  moreBtn.type = 'button';
+  moreBtn.style.setProperty('--item-module-accent', 'var(--color-accent)');
+  moreBtn.setAttribute('aria-label', t('nav.more'));
+  moreBtn.setAttribute('title', t('nav.more'));
+  moreBtn.setAttribute('aria-expanded', 'false');
+  moreBtn.setAttribute('aria-controls', 'more-sheet');
+
+  const iconWrap = document.createElement('div');
+  iconWrap.className = 'nav-item__icon-wrap';
+  const well = document.createElement('div');
+  well.className = 'nav-item__icon-well';
+  const iconFactory = NAV_ICONS['grid-2x2'];
+  if (iconFactory) {
+    const svg = iconFactory();
+    svg.classList.add('nav-item__icon');
+    well.appendChild(svg);
+  } else {
+    const icon = document.createElement('i');
+    icon.dataset.lucide = 'grid-2x2';
+    icon.className = 'nav-item__icon';
+    icon.setAttribute('aria-hidden', 'true');
+    well.appendChild(icon);
+  }
+  iconWrap.appendChild(well);
+
+  const label = document.createElement('span');
+  label.className = 'nav-item__label';
+  label.textContent = t('nav.more');
+  moreBtn.append(iconWrap, label);
+  return moreBtn;
+}
+
+function mobileDestinationEl(item) {
+  return item.navId === 'kitchen' ? kitchenNavButtonEl(item) : navItemEl(item);
+}
+
+function buildBottomNavItems(moreBtn = moreNavButtonEl()) {
+  const dashboard = navItems().find((item) => item.module === 'dashboard');
+  return [
+    ...(dashboard ? [navItemEl({ ...dashboard, navId: 'dashboard' })] : []),
+    ...mobileFavoriteItems().map(mobileDestinationEl),
+    moreBtn,
+  ];
 }
 
 function replaceLucideIcon(container, selector, iconName) {
@@ -1648,6 +1739,7 @@ function sidebarKitchenEl() {
     label: t('nav.kitchen'),
     icon: 'utensils',
     module: navItems().find((n) => n.path === getLastKitchenRoute())?.module || 'meals',
+    navId: 'kitchen',
   };
   const a = navItemEl(item);
   a.id = 'sidebar-kitchen-nav';
@@ -1656,10 +1748,11 @@ function sidebarKitchenEl() {
   return a;
 }
 
-function moreItemEl({ path, navHref, label, icon, module: mod, accent }) {
+function moreItemEl({ path, navHref, label, icon, module: mod, accent, navId }) {
   const a = document.createElement('a');
   a.href = navHref ?? path;
   a.dataset.route = path;
+  a.dataset.navId = navId ?? mod;
   if (navHref) a.dataset.navHref = navHref;
   a.className = 'more-item';
   if (accent) a.style.setProperty('--item-module-accent', accent);
@@ -1710,7 +1803,9 @@ function setMoreButtonState(moreBtn, activeSecondary) {
   moreBtn.classList.toggle('nav-item--active', inMoreSheet);
   if (inMoreSheet) {
     moreBtn.setAttribute('aria-current', 'page');
-    if (activeSecondary.module) {
+    if (activeSecondary.accent) {
+      moreBtn.style.setProperty('--item-module-accent', activeSecondary.accent);
+    } else if (activeSecondary.module) {
       moreBtn.style.setProperty('--item-module-accent', `var(--module-${activeSecondary.module})`);
     }
   } else {
@@ -1727,9 +1822,15 @@ function setMoreButtonState(moreBtn, activeSecondary) {
 }
 
 function updateNav(path) {
+  const kitchenDestination = currentKitchenDestination();
   document.querySelectorAll('[data-route]').forEach((el) => {
+    if (el.dataset.navId === 'kitchen' && kitchenDestination) {
+      el.dataset.route = kitchenDestination.path;
+      if (el.tagName === 'A') el.href = kitchenDestination.path;
+    }
     el.removeAttribute('aria-current');
-    if (el.dataset.route === path) {
+    const isActiveKitchenDestination = el.dataset.navId === 'kitchen' && isKitchenRoute(path);
+    if (el.dataset.route === path || isActiveKitchenDestination) {
       el.setAttribute('aria-current', 'page');
     }
   });
@@ -1770,8 +1871,9 @@ function updateNav(path) {
 
   const moreBtn = document.querySelector('#more-btn');
   if (moreBtn) {
-    const secondaryItems = navItems().filter((i) => !i.kitchenGroup).slice(PRIMARY_NAV);
-    const activeSecondary = secondaryItems.find((n) => n.path === path);
+    const activeSecondary = secondaryMobileItems().find((item) => (
+      item.navId === 'kitchen' ? isKitchenRoute(path) : item.path === path
+    ));
     setMoreButtonState(moreBtn, activeSecondary);
   }
 
@@ -1789,12 +1891,14 @@ function updateNav(path) {
 function renderError(container, err) {
   const state = document.createElement('div');
   state.className = 'empty-state';
+  state.tabIndex = -1;
+  state.setAttribute('role', 'alert');
   const title = document.createElement('div');
   title.className = 'empty-state__title';
   title.textContent = t('common.errorOccurred');
   const desc = document.createElement('div');
   desc.className = 'empty-state__description';
-  desc.textContent = err.message;
+  desc.textContent = friendlyError(err);
   const btn = document.createElement('button');
   btn.className = 'btn btn--primary';
   btn.id = 'error-reload-btn';
@@ -1802,6 +1906,7 @@ function renderError(container, err) {
   btn.addEventListener('click', () => location.reload());
   state.append(title, desc, btn);
   container.replaceChildren(state);
+  state.focus({ preventScroll: true });
 }
 
 // --------------------------------------------------------
@@ -1931,6 +2036,8 @@ function friendlyError(err) {
   if (status === 404) return t('common.errorNotFound');
   if (status >= 500) return t('common.errorServer');
   if (err?.name === 'AbortError' || err?.name === 'TimeoutError') return t('common.errorTimeout');
+  if (/Failed to fetch|NetworkError|Load failed/i.test(err?.message || '')) return t('common.errorServer');
+  if (err?.name === 'TypeError') return t('common.unexpectedError');
   return err?.data?.error || err?.message || t('common.errorGeneric');
 }
 
@@ -1975,6 +2082,7 @@ window.addEventListener('auth:expired', () => {
   currentUser = null;
   stopThirdPartyModulePolling();
   stopReminders();
+  stopPush();
   if (isNavigating) {
     // navigate('/login') kann nicht sofort aufgerufen werden - wird im finally-Block
     // der laufenden Navigation nachgeholt.
@@ -2009,16 +2117,8 @@ function rebuildNavigation({ updateLabels = true } = {}) {
     requestAnimationFrame(() => positionSidebarIndicator());
   }
   if (bottomItems) {
-    const kitchenBtnEl = bottomItems.querySelector('#kitchen-btn');
-    const moreBtn      = bottomItems.querySelector('#more-btn');
-    const kitchenVisible = ['meals', 'recipes', 'shopping'].some((m) => !_disabledModules.has(m));
-    if (kitchenBtnEl) {
-      kitchenBtnEl.querySelector('.nav-item__label').textContent = t('nav.kitchen');
-      kitchenBtnEl.hidden = !kitchenVisible;
-    }
-    const newItems = navItems().filter((item) => !item.kitchenGroup).slice(0, PRIMARY_NAV).map(navItemEl);
-    const tail = [kitchenBtnEl, moreBtn].filter(Boolean);
-    bottomItems.replaceChildren(...newItems, ...tail);
+    const moreBtn = bottomItems.querySelector('#more-btn') ?? moreNavButtonEl();
+    bottomItems.replaceChildren(...buildBottomNavItems(moreBtn));
     requestAnimationFrame(() => positionTabIndicator());
   }
   if (moreSheet) {
@@ -2029,7 +2129,7 @@ function rebuildNavigation({ updateLabels = true } = {}) {
       if (placeholder) placeholder.textContent = t('search.placeholder');
       searchBar.setAttribute('aria-label', t('search.placeholder'));
     }
-    const newMoreItems = navItems().filter((i) => !i.kitchenGroup).slice(PRIMARY_NAV).map(moreItemEl);
+    const newMoreItems = secondaryMobileItems().map(moreItemEl);
     moreSheet.replaceChildren(handle, ...(searchBar ? [searchBar] : []), ...newMoreItems);
   }
 
@@ -2044,8 +2144,11 @@ function rebuildNavigation({ updateLabels = true } = {}) {
   updateBranding(currentPath || '/');
 }
 
-// Sprache geändert: Navigation neu rendern damit Labels aktualisiert werden
-window.addEventListener('locale-changed', () => rebuildNavigation());
+// Sprache geändert: Navigation und aktuelle Seite gemeinsam neu rendern.
+window.addEventListener('locale-changed', () => {
+  rebuildNavigation();
+  refreshCurrentRoute();
+});
 
 window.addEventListener('app-name-changed', () => {
   updateBranding(currentPath || '/');
@@ -2152,6 +2255,7 @@ window.oikos = {
   setThemeColor,
   setDisabledModules,
   setModuleOrder,
+  setMobileNavOrder,
   refreshThirdPartyModules,
   isModuleDisabled,
   applyTheme: (value) => {

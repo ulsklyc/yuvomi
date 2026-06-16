@@ -64,7 +64,9 @@ const DEVICES = [
 ];
 
 // ── Module list ───────────────────────────────────────────────────────────────
-// tab: if set, click that tab-button ID after navigating to path
+// tab: if set, a CSS selector for the sub-tab button to click after navigating.
+//      Captures sub-modules (budget loans / split-expenses, housekeeping tabs).
+// Settings are intentionally excluded.
 
 const MODULES = [
   { path: '/',             name: 'dashboard'      },
@@ -76,11 +78,14 @@ const MODULES = [
   { path: '/birthdays',    name: 'birthdays'      },
   { path: '/notes',        name: 'notes'          },
   { path: '/contacts',     name: 'contacts'       },
-  { path: '/budget',       name: 'budget'         },
-  { path: '/budget',       name: 'split-expenses', tab: 'budget-tab-split-expenses' },
+  { path: '/budget',       name: 'budget'              },
+  { path: '/budget',       name: 'budget-loans',         tab: '#budget-tab-loans' },
+  { path: '/budget',       name: 'split-expenses',       tab: '#budget-tab-split-expenses' },
   { path: '/documents',    name: 'documents'      },
-  { path: '/housekeeping', name: 'housekeeping'   },
-  { path: '/settings',     name: 'settings'       },
+  { path: '/housekeeping', name: 'housekeeping'          },
+  { path: '/housekeeping', name: 'housekeeping-tasks',   tab: '[data-housekeeping-tab="tasks"]' },
+  { path: '/housekeeping', name: 'housekeeping-reports', tab: '[data-housekeeping-tab="reports"]' },
+  { path: '/housekeeping', name: 'housekeeping-staff',   tab: '[data-housekeeping-tab="staff"]' },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -161,12 +166,13 @@ async function captureModule(page, dev, theme, mod) {
 
   await waitForPageLoad(page);
 
-  // Click tab if specified (e.g. split-expenses within budget)
+  // Click sub-tab if specified (e.g. split-expenses within budget,
+  // or the housekeeping staff/reports tabs). mod.tab is a CSS selector.
   if (mod.tab) {
     try {
-      const tabBtn = page.locator(`#${mod.tab}`);
+      const tabBtn = page.locator(mod.tab);
       if (await tabBtn.count() > 0) {
-        await tabBtn.click({ timeout: 2000 });
+        await tabBtn.first().click({ timeout: 2000 });
         await wait(1000);
       }
     } catch {}
@@ -330,23 +336,48 @@ async function setupDemoDb(browser) {
   if (!createResp.ok()) throw new Error(`Failed to create Linda: ${await createResp.text()}`);
   console.log('  Linda user created ✓');
 
-  // Set weather preferences (Dortmund)
+  // Set weather preferences (Berlin). weather_provider is required — without it
+  // the weather route falls back to { data: null } and the widget stays hidden.
   const weatherResp = await apiCtx.request.put(`${BASE_URL}/api/v1/preferences`, {
     data: {
-      weather_lat:   51.5136,
-      weather_lon:   7.4653,
-      weather_city:  'Dortmund',
+      weather_provider: 'open-meteo',
+      weather_lat:   52.5200,
+      weather_lon:   13.4050,
+      weather_city:  'Berlin',
       weather_units: 'metric',
     },
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
   });
   if (!weatherResp.ok()) throw new Error(`Failed to set weather: ${await weatherResp.text()}`);
-  console.log('  Weather set to Dortmund ✓');
+  console.log('  Weather set to Berlin ✓');
 
   await apiCtx.close();
   stopServer();
   await wait(500);
   console.log('Demo database ready.\n');
+}
+
+// ── Weather cache warm-up ─────────────────────────────────────────────────────
+// The weather route caches Open-Meteo responses in-memory for 30 min, keyed by
+// coords+units. One authenticated GET fills that cache so every dashboard
+// screenshot renders the (slow, ~1–2 s) widget instantly instead of empty.
+
+async function warmWeatherCache(browser) {
+  try {
+    const ctx = await browser.newContext();
+    const loginResp = await ctx.request.post(`${BASE_URL}/api/v1/auth/login`, {
+      data: { username: 'alex', password: 'demo1234' },
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (loginResp.ok()) {
+      const wRes = await ctx.request.get(`${BASE_URL}/api/v1/weather`);
+      const body = await wRes.json().catch(() => ({}));
+      console.log(body?.data ? '  Weather cache warmed (Berlin) ✓' : '  ⚠️  Weather cache empty (data: null)');
+    }
+    await ctx.close();
+  } catch (err) {
+    console.log(`  ⚠️  Weather warm-up skipped: ${err.message}`);
+  }
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -363,6 +394,7 @@ async function main() {
     console.log('Starting server for screenshots…');
     await startServer();
     await waitForServer();
+    await warmWeatherCache(browser);
     console.log(`Server ready at ${BASE_URL}\n`);
 
     for (const dev of DEVICES) {

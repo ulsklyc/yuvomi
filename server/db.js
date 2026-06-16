@@ -12,7 +12,9 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'node:fs/promises';
+import { mkdirSync } from 'node:fs';
 import { createLogger } from './logger.js';
+import { decodeHtmlEntities } from './utils/html-entities.js';
 
 const log = createLogger('DB');
 
@@ -32,6 +34,14 @@ let db;
  */
 function init() {
   if (db) return db;
+  if (!path.isAbsolute(DB_PATH)) {
+    log.warn(
+      `DB_PATH "${DB_PATH}" is a relative path — inside Docker this resolves to ` +
+      `"${path.resolve(DB_PATH)}", which is NOT the mounted volume. ` +
+      `Data will be lost on container restart. Use an absolute path, e.g. DB_PATH=/data/oikos.db`
+    );
+  }
+  mkdirSync(path.dirname(DB_PATH), { recursive: true });
   db = new Database(DB_PATH);
 
   applyEncryptionKey(db);
@@ -1933,6 +1943,42 @@ const MIGRATIONS = [
           SET dms_account_id = (SELECT dms_account_id FROM _m52_refs r WHERE r.id = family_documents.id)
           WHERE id IN (SELECT id FROM _m52_refs);
         DROP TABLE _m52_refs;
+      `);
+    },
+  },
+  {
+    version: 53,
+    description: 'Repair HTML-entity-encoded external calendar names (e.g. "&amp;")',
+    up(db) {
+      // Provider-Namen wurden bisher verbatim gespeichert; Google liefert für
+      // Import-Kalender HTML-entity-encodierte Namen ("Termine &amp; …"), die
+      // im UI doppelt escaped als literales "&amp;" erscheinen. Der Ingest
+      // normalisiert ab jetzt zu Klartext — Bestandszeilen hier nachziehen.
+      const rows = db.prepare('SELECT id, name FROM external_calendars').all();
+      const update = db.prepare('UPDATE external_calendars SET name = ? WHERE id = ?');
+      for (const { id, name } of rows) {
+        const decoded = decodeHtmlEntities(name);
+        if (decoded !== name) update.run(decoded, id);
+      }
+    },
+  },
+  {
+    version: 54,
+    description: 'Web Push: push_subscriptions table + reminders.pushed_at column',
+    up(db) {
+      db.exec(`
+        CREATE TABLE push_subscriptions (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          endpoint     TEXT    NOT NULL UNIQUE,
+          p256dh       TEXT    NOT NULL,
+          auth         TEXT    NOT NULL,
+          user_agent   TEXT,
+          created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+          last_used_at TEXT
+        );
+        CREATE INDEX idx_push_subs_user ON push_subscriptions(user_id);
+        ALTER TABLE reminders ADD COLUMN pushed_at TEXT;
       `);
     },
   },

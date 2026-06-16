@@ -118,6 +118,17 @@
 }
 
 .split-search {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.split-search__label {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.split-search__control {
   display: flex;
   align-items: center;
   gap: var(--space-2);

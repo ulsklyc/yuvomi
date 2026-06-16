@@ -67,7 +67,8 @@
         "sidebarExpand": "Επέκταση πλευρικής στήλης",
         "sectionOverview": "Επισκόπηση",
         "sectionPlan": "Σχεδιασμός",
-        "sectionHome": "Σπίτι"
+        "sectionHome": "Σπίτι",
+        "help": "Hilfe"
     },
     "dashboard": {
         "title": "Επισκόπηση",
@@ -1194,7 +1195,7 @@
         "thirdPartyModulesStatusDisabled": "Disabled",
         "thirdPartyModulesStatusError": "Error",
         "thirdPartyModulesSaved": "Module setting saved.",
-        "modulesDragHint": "Drag modules to define the left menu order. Settings always stays last.",
+        "modulesDragHint": "Σύρετε τις μονάδες ή χρησιμοποιήστε τα βέλη για να αλλάξετε τη σειρά μόνο μέσα στην ομάδα τους.",
         "modulesDragHandle": "Drag to reorder",
         "modulesBuiltInBadge": "Ενσωματωμένο",
         "modulesThirdPartyBadge": "Module",
@@ -1365,7 +1366,35 @@
         "systemSetupComplete": "Ολοκληρώθηκε",
         "systemSetupRequired": "Απαιτείται εγκατάσταση",
         "apiTokensEmpty": "Δεν υπάρχουν ακόμη διακριτικά API.",
-        "familyEmpty": "Δεν υπάρχουν ακόμη μέλη οικογένειας."
+        "familyEmpty": "Δεν υπάρχουν ακόμη μέλη οικογένειας.",
+        "mobileNavigationTitle": "Πλοήγηση για κινητά",
+        "mobileNavigationHint": "Επιλέξτε τρεις προορισμούς που θα εμφανίζονται ανάμεσα στην Επισκόπηση και τα Περισσότερα στην κάτω πλοήγηση.",
+        "mobileNavigationSlotLabel": "Θέση {{position}}",
+        "mobileNavigationEmptyOption": "Δεν χρησιμοποιείται",
+        "desktopNavigationTitle": "Πλοήγηση ιστού",
+        "desktopNavigationHint": "Ενεργοποιήστε μονάδες και ταξινομήστε τις μέσα στις ομάδες Επισκόπηση, Σχεδιασμός και Σπίτι.",
+        "mobileNavigationSaved": "Η πλοήγηση για κινητά αποθηκεύτηκε.",
+        "regionTitle": "Περιοχή / Μορφή",
+        "regionLabel": "Περιοχή",
+        "regionHint": "Ορίζει το νόμισμα και τη μορφή ημερομηνίας και ώρας ανάλογα με την περιοχή. Επιλέξτε «Προσαρμοσμένο» για να τα ρυθμίσετε ξεχωριστά.",
+        "regionCustom": "Προσαρμοσμένο",
+        "regionSaved": "Η περιοχή αποθηκεύτηκε.",
+        "currencyMovedHint": "Το νόμισμα ορίζεται πλέον στην Εμφάνιση → Περιοχή / Μορφή.",
+        "pageNotifications": "Ειδοποιήσεις",
+        "pageNotificationsDescription": "Διαχείριση ειδοποιήσεων push σε αυτή τη συσκευή",
+        "notificationsTitle": "Ειδοποιήσεις",
+        "pushToggleTitle": "Ειδοποιήσεις push",
+        "pushToggleLabel": "Ενεργοποίηση σε αυτή τη συσκευή",
+        "pushChecking": "Έλεγχος κατάστασης …",
+        "pushEnabled": "Οι ειδοποιήσεις push είναι ενεργές σε αυτή τη συσκευή.",
+        "pushDisabled": "Οι ειδοποιήσεις push είναι απενεργοποιημένες σε αυτή τη συσκευή.",
+        "pushDenied": "Οι ειδοποιήσεις αποκλείστηκαν στο πρόγραμμα περιήγησης. Επιτρέψτε τις στις ρυθμίσεις του προγράμματος περιήγησης.",
+        "pushUnsupported": "Αυτό το πρόγραμμα περιήγησης δεν υποστηρίζει ειδοποιήσεις push.",
+        "pushError": "Η ενέργεια απέτυχε. Προσπαθήστε ξανά.",
+        "pushTestButton": "Αποστολή δοκιμαστικής ειδοποίησης",
+        "pushTestSent": "Η δοκιμαστική ειδοποίηση στάλθηκε.",
+        "pushTestTitle": "Yuvomi",
+        "pushTestBody": "Αυτή είναι μια δοκιμαστική ειδοποίηση."
     },
     "login": {
         "tagline": "Οικογενειακός προγραμματισμός. Ασφαλής. Φιλικός προς την ιδιωτικότητα. Ανοιχτός κώδικας.",
@@ -1967,5 +1996,12 @@
         "95": "Καταιγίδα",
         "96": "Καταιγίδα με χαλάζι",
         "99": "Σφοδρή καταιγίδα"
+    },
+    "help": {
+        "title": "Hilfe",
+        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
+        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
+        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
+        "mobileSettings": "Einstellungen findest du unter „Mehr“."
     }
 }

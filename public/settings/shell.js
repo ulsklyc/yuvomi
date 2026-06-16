@@ -52,10 +52,57 @@ function allowedLeavesForDomain(domainId, user) {
   ));
 }
 
+let navPanelIdCounter = 0;
+
+// Setzt den Auf-/Zu-Zustand einer Domänen-Gruppe konsistent über alle Träger:
+// CSS-Klasse (treibt die Höhen-Animation), aria-expanded am Trigger und `inert`
+// am Panel (nimmt kollabierte Links aus Tab-Reihenfolge und A11y-Baum).
+function setGroupExpanded(group, expanded) {
+  group.classList.toggle('settings-shell__navigation-group--expanded', expanded);
+  const toggle = group.querySelector('.settings-shell__navigation-toggle');
+  const panel = group.querySelector('.settings-shell__navigation-panel');
+  if (toggle) toggle.setAttribute('aria-expanded', String(expanded));
+  if (panel) panel.inert = !expanded;
+}
+
+function collapseAllGroups(navigation) {
+  for (const open of navigation.querySelectorAll('.settings-shell__navigation-group--expanded')) {
+    setGroupExpanded(open, false);
+  }
+}
+
+function createDomainToggle(domain, panelId, expanded) {
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'settings-shell__navigation-toggle';
+  toggle.setAttribute('aria-controls', panelId);
+  toggle.setAttribute('aria-expanded', String(expanded));
+
+  const label = document.createElement('span');
+  label.className = 'settings-shell__navigation-domain-label';
+  label.textContent = t(domain.labelKey);
+
+  toggle.append(
+    createIcon(domain.icon, 'settings-shell__navigation-domain-icon'),
+    label,
+    createIcon('chevron-down', 'settings-shell__navigation-chevron'),
+  );
+  return toggle;
+}
+
 function createNavigation(domains, user, activeLeaf) {
   const navigation = document.createElement('nav');
   navigation.className = 'settings-shell__navigation';
   navigation.setAttribute('aria-label', t('settings.navigationLabel'));
+
+  // Eine einzelne Domäne (z. B. Familienmitglieder ohne Admin-Bereiche) braucht
+  // kein Akkordeon — sie bleibt dauerhaft offen ohne Collapse-Affordance.
+  const collapsible = domains.length > 1;
+  navigation.classList.toggle('settings-shell__navigation--collapsible', collapsible);
+
+  // Single-Open: genau die aktive Domäne ist offen. Ohne aktives Blatt (Desktop-
+  // Übersicht) klappt die erste Domäne auf, damit nie alles zu ist.
+  const expandedDomainId = activeLeaf?.domainId ?? domains[0]?.id ?? null;
 
   for (const domain of domains) {
     const group = document.createElement('section');
@@ -64,13 +111,6 @@ function createNavigation(domains, user, activeLeaf) {
     if (domain.id === activeLeaf?.domainId) {
       group.classList.add('settings-shell__navigation-group--active');
     }
-
-    const heading = document.createElement('h2');
-    heading.className = 'settings-shell__navigation-heading';
-    heading.append(
-      createIcon(domain.icon, 'settings-shell__navigation-domain-icon'),
-      document.createTextNode(t(domain.labelKey)),
-    );
 
     const list = document.createElement('ul');
     list.className = 'settings-shell__navigation-list';
@@ -90,7 +130,39 @@ function createNavigation(domains, user, activeLeaf) {
       list.appendChild(item);
     }
 
-    group.append(heading, list);
+    if (collapsible) {
+      const expanded = domain.id === expandedDomainId;
+      group.classList.toggle('settings-shell__navigation-group--expanded', expanded);
+
+      const panelId = `settings-domain-panel-${++navPanelIdCounter}`;
+      const heading = document.createElement('h2');
+      heading.className = 'settings-shell__navigation-heading';
+      const toggle = createDomainToggle(domain, panelId, expanded);
+      heading.appendChild(toggle);
+
+      const panel = document.createElement('div');
+      panel.className = 'settings-shell__navigation-panel';
+      panel.id = panelId;
+      panel.inert = !expanded;
+      panel.appendChild(list);
+
+      toggle.addEventListener('click', () => {
+        const willExpand = toggle.getAttribute('aria-expanded') !== 'true';
+        if (willExpand) collapseAllGroups(navigation);
+        setGroupExpanded(group, willExpand);
+      });
+
+      group.append(heading, panel);
+    } else {
+      const heading = document.createElement('h2');
+      heading.className = 'settings-shell__navigation-heading';
+      heading.append(
+        createIcon(domain.icon, 'settings-shell__navigation-domain-icon'),
+        document.createTextNode(t(domain.labelKey)),
+      );
+      group.append(heading, list);
+    }
+
     navigation.appendChild(group);
   }
 
@@ -103,11 +175,17 @@ function createNavigation(domains, user, activeLeaf) {
 function updateNavigationActiveState(navigation, activeLeaf) {
   if (!navigation) return;
 
+  const collapsible = navigation.classList.contains('settings-shell__navigation--collapsible');
+  const activeDomainId = activeLeaf?.domainId ?? null;
+
   for (const group of navigation.querySelectorAll('.settings-shell__navigation-group')) {
-    group.classList.toggle(
-      'settings-shell__navigation-group--active',
-      group.dataset.domainId === activeLeaf?.domainId,
-    );
+    const isActiveDomain = group.dataset.domainId === activeDomainId;
+    group.classList.toggle('settings-shell__navigation-group--active', isActiveDomain);
+    // Single-Open: die aktive Domäne wird aufgeklappt, alle anderen schließen mit.
+    // Ohne aktives Blatt (Übersicht) bleibt der manuelle Zustand unangetastet.
+    if (collapsible && activeDomainId) {
+      setGroupExpanded(group, isActiveDomain);
+    }
   }
 
   for (const link of navigation.querySelectorAll('.settings-shell__navigation-link')) {
@@ -169,10 +247,11 @@ function createOverviewHeader(title, description = null) {
 function renderDomainsOverview(content, domains) {
   const overview = document.createElement('section');
   overview.className = 'settings-mobile-overview';
-  overview.appendChild(createOverviewHeader(
-    t('settings.mobileOverviewTitle'),
-    t('settings.mobileOverviewDescription'),
-  ));
+
+  const description = document.createElement('p');
+  description.className = 'settings-mobile-overview__description';
+  description.textContent = t('settings.mobileOverviewDescription');
+  overview.appendChild(description);
 
   const links = document.createElement('div');
   links.className = 'settings-mobile-overview__links';
@@ -380,6 +459,9 @@ export async function renderSettingsShell(container, {
     // pro Render separat (nur im Content-Bereich) hydriert.
     hydrateIcons(navigation);
   }
+
+  const page = shell.closest('.settings-page');
+  page?.classList.toggle('settings-page--leaf', Boolean(activeLeaf));
 
   if (activeLeaf) {
     const domain = domains.find((entry) => entry.id === activeLeaf.domainId);

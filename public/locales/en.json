@@ -67,7 +67,8 @@
         "sidebarExpand": "Expand sidebar",
         "sectionOverview": "Overview",
         "sectionPlan": "Plan",
-        "sectionHome": "Home"
+        "sectionHome": "Home",
+        "help": "Help"
     },
     "dashboard": {
         "title": "Overview",
@@ -1194,7 +1195,7 @@
         "thirdPartyModulesStatusDisabled": "Disabled",
         "thirdPartyModulesStatusError": "Error",
         "thirdPartyModulesSaved": "Module setting saved.",
-        "modulesDragHint": "Drag modules to define the left menu order. Settings always stays last.",
+        "modulesDragHint": "Drag modules or use the arrows to change their order within their group only.",
         "modulesDragHandle": "Drag to reorder",
         "modulesBuiltInBadge": "Built-in",
         "modulesThirdPartyBadge": "Module",
@@ -1365,7 +1366,35 @@
         "systemSetupComplete": "Complete",
         "systemSetupRequired": "Setup required",
         "apiTokensEmpty": "No API tokens yet.",
-        "familyEmpty": "No family members yet."
+        "familyEmpty": "No family members yet.",
+        "mobileNavigationTitle": "Mobile navigation",
+        "mobileNavigationHint": "Choose three destinations to show between Overview and More in the bottom navigation.",
+        "mobileNavigationSlotLabel": "Position {{position}}",
+        "mobileNavigationEmptyOption": "Not used",
+        "desktopNavigationTitle": "Web navigation",
+        "desktopNavigationHint": "Enable modules and sort them within the Overview, Plan, and Home groups.",
+        "mobileNavigationSaved": "Mobile navigation saved.",
+        "regionTitle": "Region / Format",
+        "regionLabel": "Region",
+        "regionHint": "Sets currency, date and time format to match the region. Choose “Custom” to configure them individually.",
+        "regionCustom": "Custom",
+        "regionSaved": "Region saved.",
+        "currencyMovedHint": "The currency is now set under Appearance → Region / Format.",
+        "pageNotifications": "Notifications",
+        "pageNotificationsDescription": "Manage push notifications on this device",
+        "notificationsTitle": "Notifications",
+        "pushToggleTitle": "Push notifications",
+        "pushToggleLabel": "Enable on this device",
+        "pushChecking": "Checking status …",
+        "pushEnabled": "Push notifications are active on this device.",
+        "pushDisabled": "Push notifications are disabled on this device.",
+        "pushDenied": "Notifications were blocked in the browser. Please allow them in your browser settings.",
+        "pushUnsupported": "This browser does not support push notifications.",
+        "pushError": "Action failed. Please try again.",
+        "pushTestButton": "Send test notification",
+        "pushTestSent": "Test notification sent.",
+        "pushTestTitle": "Yuvomi",
+        "pushTestBody": "This is a test notification."
     },
     "login": {
         "tagline": "Family planning. Secure. Privacy-friendly. Open source.",
@@ -1967,5 +1996,12 @@
         "95": "Thunderstorm",
         "96": "Thunderstorm with hail",
         "99": "Severe thunderstorm"
+    },
+    "help": {
+        "title": "Help",
+        "mobileNavigate": "Use the bar at the bottom and “More” to navigate.",
+        "mobileCreate": "Create new items with the + button at the bottom right.",
+        "mobileSearch": "Open search via “More” → Search.",
+        "mobileSettings": "Find settings under “More”."
     }
 }

@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 // Minimales Window/Navigator-Mock für Node
 const { stagger, vibrate, deleteWithUndo } = await (async () => {
@@ -79,6 +79,18 @@ test('vibrate: ruft navigator.vibrate auf wenn vorhanden', () => {
   Object.defineProperty(global, 'navigator', { value: { vibrate: (p) => { called = p; } }, writable: true, configurable: true });
   vibrate(15);
   assert.equal(called, 15);
+});
+
+test('readable text color selects a WCAG-safe ink for arbitrary card colors', async () => {
+  const utilityUrl = new URL('../public/utils/color.js', import.meta.url);
+  assert.equal(existsSync(utilityUrl), true, 'expected a shared color contrast utility');
+
+  const { getReadableTextColor } = await import(utilityUrl);
+  assert.equal(getReadableTextColor('#F97316'), 'var(--color-ink-on-bright)');
+  assert.equal(getReadableTextColor('#10B981'), 'var(--color-ink-on-bright)');
+  assert.equal(getReadableTextColor('#6B7280'), 'var(--color-text-on-accent)');
+  assert.equal(getReadableTextColor('#111827'), 'var(--color-text-on-accent)');
+  assert.equal(getReadableTextColor('#FFFFFF'), 'var(--color-ink-on-bright)');
 });
 
 test('deleteWithUndo: ruft onDelete auf', async () => {

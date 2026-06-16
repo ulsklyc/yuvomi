@@ -59,7 +59,7 @@
   min-height: var(--target-base);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 1023px) {
   /* Shell-Padding/Titel/Actions kommen aus .page-toolbar (layout.css).
    * Das Overflow-Panel ankert an .tasks-toolbar__secondary, daher reicht hier
    * dessen position:relative. */
@@ -81,7 +81,7 @@
   .tasks-toolbar__secondary-panel {
     position: absolute;
     top: calc(100% + var(--space-2));
-    right: 0;
+    inset-inline-end: 0;
     display: none;
     flex-direction: column;
     align-items: stretch;
@@ -94,6 +94,11 @@
     background-color: var(--color-surface-raised);
     box-shadow: var(--shadow-lg);
     z-index: var(--z-dropdown);
+  }
+
+  [dir='rtl'] .tasks-toolbar__secondary-panel {
+    inset-inline-start: 0;
+    inset-inline-end: auto;
   }
 
   .tasks-toolbar__secondary[open] .tasks-toolbar__secondary-panel {
@@ -185,7 +190,7 @@
   background-color: var(--color-surface);
   color: var(--color-text-secondary);
   transition: all var(--transition-fast);
-  min-height: 32px;
+  min-height: var(--target-lg);
 }
 
 .filter-chip:hover:not(.filter-chip--active) {
@@ -194,17 +199,17 @@
 }
 
 .filter-chip--active {
-  background-color: var(--color-accent-light);
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) 14%, transparent);
+  border-color: var(--module-accent, var(--color-accent));
+  color: var(--module-accent, var(--color-accent));
 }
 
 @supports (backdrop-filter: blur(1px)) {
   .filter-chip--active {
-    background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+    background: color-mix(in srgb, var(--module-accent, var(--color-accent)) 18%, transparent);
     backdrop-filter: var(--blur-xs);
     -webkit-backdrop-filter: var(--blur-xs);
-    border-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+    border-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) 50%, transparent);
     box-shadow: var(--glass-inset-base);
   }
 }
@@ -217,8 +222,8 @@
 
 .filter-chip--recent:hover {
   opacity: 1;
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  border-color: var(--module-accent, var(--color-accent));
+  color: var(--module-accent, var(--color-accent));
 }
 
 .filter-chip__remove {
@@ -229,7 +234,7 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-full);
-  background-color: var(--color-accent);
+  background-color: var(--module-accent, var(--color-accent));
   color: var(--color-ink-on-vivid);
 }
 
@@ -248,7 +253,7 @@
   background-color: var(--color-surface);
   color: var(--color-text-secondary);
   transition: all var(--transition-fast);
-  min-height: 32px;
+  min-height: var(--target-lg);
   flex-shrink: 0;
 }
 
@@ -259,8 +264,8 @@
 }
 
 .filter-toggle-btn--active {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  border-color: var(--module-accent, var(--color-accent));
+  color: var(--module-accent, var(--color-accent));
 }
 
 .filter-toggle-btn__count {
@@ -271,7 +276,7 @@
   height: 18px;
   padding: 0 var(--space-1);
   border-radius: var(--radius-full);
-  background-color: var(--color-accent);
+  background-color: var(--module-accent, var(--color-accent));
   color: var(--color-ink-on-vivid);
   font-size: var(--text-xs);
   font-weight: var(--font-weight-semibold);
@@ -617,7 +622,9 @@
   height: 100%;
   background-color: var(--color-success);
   border-radius: var(--radius-full);
-  transition: width var(--transition-slow);
+  transform-origin: left;
+  transform: scaleX(var(--progress-scale, 0));
+  transition: transform var(--transition-slow);
 }
 
 .subtask-progress__text {

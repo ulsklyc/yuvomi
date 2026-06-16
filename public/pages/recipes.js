@@ -48,8 +48,10 @@ export async function render(container) {
   title.className = 'recipes-header__title';
   title.textContent = t('recipes.title');
 
+  // toolbar-new-btn: global per CSS ausgeblendet (Audit 1.9) — der FAB ist die
+  // einzige Create-Affordanz, konsistent mit allen anderen Modulen.
   const addBtn = document.createElement('button');
-  addBtn.className = 'btn btn--primary';
+  addBtn.className = 'btn btn--primary toolbar-new-btn';
   addBtn.type = 'button';
   addBtn.id = 'recipes-add';
   addBtn.textContent = t('recipes.addRecipe');

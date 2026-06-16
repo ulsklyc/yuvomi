@@ -34,30 +34,6 @@
   }
 }
 
-.dashboard-hero {
-  display: grid;
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
-}
-
-@media (min-width: 1024px) {
-  .dashboard-hero {
-    grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.9fr);
-    align-items: stretch;
-  }
-}
-
-.dashboard-hero .widget-greeting {
-  box-shadow: var(--glass-shadow-md);
-  min-height: 100%;
-}
-
-.dashboard-hero__rail {
-  display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 .dashboard-metric {
   display: flex;
   align-items: center;
@@ -73,6 +49,7 @@
   appearance: none;
   color: inherit;
   cursor: pointer;
+  touch-action: pan-y;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
@@ -338,13 +315,13 @@
 }
 
 .widget-greeting__title {
-  /* Fluid: 18px (375px viewport) → 24px (1440px viewport) */
-  font-size: var(--type-greeting-size);
+  font-size: var(--type-hero-mobile);
   font-weight: var(--font-weight-bold);
 }
 
 @media (min-width: 1024px) {
   .widget-greeting__title {
+    font-size: var(--type-hero-desktop);
     opacity: 0.85;
     white-space: nowrap;
     padding-top: 4px;
@@ -452,7 +429,7 @@
 }
 
 .widget__link {
-  font-size: var(--text-xs);
+  font-size: var(--type-secondary);
   color: var(--widget-accent, var(--color-accent));
   font-weight: var(--font-weight-medium);
   display: inline-flex;
@@ -636,13 +613,15 @@
   opacity: 0.7;
 }
 
+/* Kalenderfarbe als Dot statt Seitenstreifen — gleiches Vokabular wie die
+ * farbigen Status-Dots der Aufgabenliste. */
 .event-item__bar {
-  width: 3px;
-  align-self: stretch;
+  width: var(--space-2);
+  height: var(--space-2);
+  align-self: center;
   border-radius: var(--radius-full);
   flex-shrink: 0;
   background-color: var(--color-accent);
-  opacity: 0.5;
 }
 
 .event-item__content {
@@ -664,7 +643,7 @@
 }
 
 .event-item__time {
-  font-size: var(--text-xs);
+  font-size: var(--type-secondary);
   color: var(--color-text-tertiary);
   margin-top: 1px;
   display: flex;
@@ -761,7 +740,7 @@
 }
 
 .meal-slot__title {
-  font-size: var(--text-xs);
+  font-size: var(--type-secondary);
   color: var(--color-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -848,7 +827,9 @@
   height: 100%;
   background-color: var(--color-success);
   border-radius: var(--radius-full);
-  transition: width var(--transition-base);
+  transform-origin: left;
+  transform: scaleX(var(--progress-scale, 0));
+  transition: transform var(--transition-base);
 }
 
 .shopping-widget-list__items {
@@ -861,7 +842,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--text-xs);
+  font-size: var(--type-secondary);
   color: var(--color-text-secondary);
   line-height: 1.4;
 }
@@ -898,14 +879,14 @@
  * -------------------------------------------------------- */
 .notes-grid-widget {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
 }
 
 @media (min-width: 1024px) {
   .notes-grid-widget {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -933,7 +914,7 @@
 }
 
 .note-item__content {
-  font-size: var(--text-xs);
+  font-size: var(--type-secondary);
   color: var(--color-text-secondary);
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1207,6 +1188,7 @@ svg.weather-forecast__icon {
   flex-direction: column-reverse;
   align-items: flex-end;
   gap: var(--space-3);
+  pointer-events: none;
 }
 
 @media (min-width: 1024px) {
@@ -1231,6 +1213,7 @@ svg.weather-forecast__icon {
     background-color var(--transition-fast);
   border: none;
   flex-shrink: 0;
+  pointer-events: auto;
 }
 
 @media (min-width: 1024px) {
@@ -1293,6 +1276,11 @@ svg.weather-forecast__icon {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   cursor: pointer;
 }
 
@@ -1323,8 +1311,18 @@ svg.weather-forecast__icon {
   transition: background-color var(--transition-fast);
 }
 
-.fab-action__btn:hover {
+.fab-action:hover .fab-action__btn,
+.fab-action:focus-visible .fab-action__btn {
   background-color: var(--color-accent-light);
+}
+
+.fab-action:focus-visible {
+  outline: none;
+}
+
+.fab-action:focus-visible .fab-action__btn {
+  outline: 2px solid var(--active-module-accent, var(--color-accent));
+  outline-offset: 2px;
 }
 
 /* --------------------------------------------------------
@@ -1644,87 +1642,6 @@ svg.weather-forecast__icon {
   gap: var(--space-6);
 }
 
-.dashboard-hero {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.dashboard-hero__panel {
-  position: relative;
-  overflow: hidden;
-  border-radius: clamp(22px, 3vw, 34px);
-  padding: clamp(1.25rem, 2vw, 2rem);
-  border: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);
-  box-shadow: 0 18px 60px color-mix(in srgb, var(--color-shadow) 22%, transparent);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-}
-
-.dashboard-hero__panel::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--module-dashboard) 20%, transparent), transparent 42%),
-    radial-gradient(circle at bottom left, color-mix(in srgb, var(--module-calendar) 14%, transparent), transparent 38%);
-  opacity: 0.9;
-  pointer-events: none;
-}
-
-.dashboard-hero__panel > * {
-  position: relative;
-  z-index: 1;
-}
-
-.dashboard-hero__panel--intro {
-  background:
-    linear-gradient(135deg,
-      color-mix(in srgb, var(--module-dashboard) 20%, var(--color-surface)) 0%,
-      color-mix(in srgb, var(--module-calendar) 10%, var(--color-surface)) 48%,
-      color-mix(in srgb, var(--module-shopping) 8%, var(--color-surface)) 100%);
-}
-
-.dashboard-hero__panel--summary {
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--color-surface) 90%, transparent) 0%,
-      color-mix(in srgb, var(--color-surface-2) 78%, transparent) 100%);
-}
-
-.dashboard-hero__eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
-  color: var(--color-accent);
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-}
-
-.dashboard-hero__title {
-  margin: var(--space-3) 0 0;
-  /* Feste Token-Stufe statt fluidem clamp (Produkt-Register + Token-Disziplin).
-   * --text-4xl (36px) ist die DESIGN.md-Display-Stufe — der frühere 69px-Hero „schrie". */
-  max-width: 18ch;
-}
-
-.dashboard-hero__subtitle {
-  margin: var(--space-3) 0 0;
-  color: var(--color-text-secondary);
-  font-size: var(--text-base);
-}
-
-.dashboard-hero__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-}
-
 .dashboard-chip {
   display: inline-flex;
   align-items: center;
@@ -1752,76 +1669,11 @@ svg.weather-forecast__icon {
   color: var(--module-dashboard);
 }
 
-.dashboard-hero__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-5);
-}
-
-.dashboard-action {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-full);
-  border: 1px solid color-mix(in srgb, var(--color-border) 40%, transparent);
-  background: color-mix(in srgb, var(--color-surface) 76%, transparent);
-  color: var(--color-text-primary);
-  box-shadow: var(--shadow-xs);
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
-}
-
-.dashboard-action:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
-  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
-}
-
-.dashboard-action__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-  color: var(--color-accent);
-  flex-shrink: 0;
-}
-
-.dashboard-action--blue .dashboard-action__icon {
-  background: color-mix(in srgb, var(--module-tasks) 14%, transparent);
-  color: var(--module-tasks);
-}
-
-.dashboard-action--violet .dashboard-action__icon {
-  background: color-mix(in srgb, var(--module-calendar) 14%, transparent);
-  color: var(--module-calendar);
-}
-
-.dashboard-action--green .dashboard-action__icon {
-  background: color-mix(in srgb, var(--module-shopping) 14%, transparent);
-  color: var(--module-shopping);
-}
-
-.dashboard-action--amber .dashboard-action__icon {
-  background: color-mix(in srgb, var(--module-notes) 14%, transparent);
-  color: var(--module-notes);
-}
-
-.dashboard-action__label {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
-}
-
 .today-cockpit {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-top: var(--space-1) solid var(--module-accent);
+  border: 1px solid color-mix(in srgb, var(--module-accent) 24%, var(--color-border));
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   padding: var(--space-4);
@@ -1843,13 +1695,6 @@ svg.weather-forecast__icon {
   color: var(--color-text-primary);
 }
 
-.today-cockpit__date {
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  white-space: nowrap;
-}
-
 .today-cockpit__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1867,12 +1712,13 @@ svg.weather-forecast__icon {
   min-height: calc(var(--target-lg) + var(--space-12));
   height: 100%;
   padding: var(--space-3);
-  border: 1px solid color-mix(in srgb, var(--today-card-accent) 34%, var(--color-border));
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--today-card-accent) 5%, var(--color-surface));
+  background: color-mix(in srgb, var(--today-card-accent) 4%, var(--color-surface));
   color: var(--color-text-primary);
   text-align: left;
   cursor: pointer;
+  touch-action: pan-y;
   box-shadow: none;
   transition: border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
 }
@@ -1912,13 +1758,31 @@ svg.weather-forecast__icon {
   -webkit-line-clamp: 2;
   overflow: hidden;
   align-self: start;
-  color: var(--today-card-accent);
-  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  font-size: var(--type-secondary);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-snug);
   overflow-wrap: normal;
   word-break: normal;
   hyphens: manual;
+}
+
+/* Aggregat-Count: macht die Karte zur Zusammenfassung statt zum Echo der
+ * ersten Widget-Zeile. Getönt in der Domänenfarbe, klein und ruhig. */
+.today-cockpit-card__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-4);
+  height: var(--space-4);
+  margin-left: var(--space-1);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--today-card-accent) 16%, var(--color-surface-elevated));
+  color: var(--today-card-accent);
+  font-size: var(--type-micro);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
 }
 
 .today-cockpit-card--task {
@@ -1943,29 +1807,12 @@ svg.weather-forecast__icon {
   }
 }
 
-.dashboard-hero__summary-head {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.dashboard-hero__summary-label {
-  color: var(--color-text-secondary);
-}
-
-.dashboard-hero__summary-value {
-  margin-top: var(--space-1);
-  font-size: var(--text-lg);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
-}
-
-.dashboard-hero__summary-grid {
-  display: grid;
-  gap: var(--space-3);
-  grid-template-columns: 1fr;
-  margin-top: var(--space-4);
+/* Sehr schmale Container (iPhone-SE-Klasse): 2×2 würde zu eng — auf 1 Spalte
+ * zurückfallen. Container-Query statt Viewport-Breakpoint (Token-Doktrin §11c). */
+@container today-cockpit (max-width: 270px) {
+  .today-cockpit__grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .dashboard-stat {
@@ -2063,35 +1910,6 @@ svg.weather-forecast__icon {
   animation: dashboard-sheen 1.8s ease-in-out infinite;
 }
 
-.dashboard-layout {
-  display: grid;
-  gap: var(--space-5);
-}
-
-.dashboard-layout__main,
-.dashboard-layout__side {
-  min-width: 0;
-}
-
-.dashboard-layout__grid {
-  display: grid;
-  gap: var(--space-4);
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.dashboard-layout__stack {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.dashboard-tile {
-  min-width: 0;
-}
-
-.dashboard-tile--wide {
-  grid-column: 1 / -1;
-}
-
 .dashboard .widget {
   border-radius: var(--radius-2xl);
   border: 1px solid color-mix(in srgb, var(--color-border) 42%, transparent);
@@ -2103,8 +1921,8 @@ svg.weather-forecast__icon {
 }
 
 .dashboard .widget::before {
-  height: 4px;
-  background: linear-gradient(90deg, var(--widget-accent, var(--color-accent)), transparent 78%);
+  height: 1px;
+  background: color-mix(in srgb, var(--widget-accent, var(--color-accent)) 32%, transparent);
   opacity: 1;
 }
 
@@ -2183,8 +2001,8 @@ svg.weather-forecast__icon {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  border-top: 3px solid var(--module-accent);
-  border-bottom: 1px solid var(--color-border);
+  border: 1px solid color-mix(in srgb, var(--module-accent) 24%, var(--color-border));
+  border-radius: var(--radius-sm);
   /* Opaque background required: linear-gradient with color-mix() stops on a scrolled
    * element triggers the WebKit/Blink scroll-rasterization bug (Issue #166).
    * Same pattern as .app-content before v0.52.32. */
@@ -2197,21 +2015,28 @@ svg.weather-forecast__icon {
 
 @media (min-width: 1024px) {
   .dashboard-overview {
-    border: 1px solid var(--color-border);
-    border-top: 3px solid var(--module-accent);
-    border-radius: var(--radius-sm);
     padding: var(--space-5);
   }
 }
 
 .dashboard-overview__header {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
 }
 
+/* Bearbeiten-Modus: die Customize-Toolbar braucht volle Breite, daher mobil unter
+ * die Begrüßung umbrechen; ab Container-Breite wieder einzeilig. Der schlanke
+ * Normalzustand bleibt einzeilig (Icon rechts, vertikal zur Begrüßung zentriert). */
+.dashboard-overview__header--editing {
+  flex-direction: column;
+  align-items: stretch;
+}
+
 @container dashboard-overview (min-width: 640px) {
-  .dashboard-overview__header {
+  .dashboard-overview__header--editing {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
@@ -2242,61 +2067,15 @@ svg.weather-forecast__icon {
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
-}
-
-.dashboard-overview__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  overflow-x: auto;
-  scrollbar-width: none;
-  min-width: 0;
-  padding-bottom: 1px;
-}
-
-.dashboard-overview__actions::-webkit-scrollbar {
-  display: none;
-}
-
-.dashboard-action {
-  min-height: 36px;
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  box-shadow: none;
   flex: 0 0 auto;
-}
-
-.dashboard-action:hover {
-  transform: none;
-  box-shadow: var(--shadow-xs);
-  border-color: color-mix(in srgb, var(--module-accent) 42%, var(--color-border));
-}
-
-.dashboard-action__icon {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-xs);
-}
-
-.dashboard-action__icon svg {
-  width: 15px;
-  height: 15px;
-}
-
-.dashboard-action__label {
-  font-size: var(--text-sm);
-  white-space: nowrap;
 }
 
 .dashboard-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: var(--target-lg);
+  height: var(--target-lg);
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
@@ -2315,6 +2094,13 @@ svg.weather-forecast__icon {
 .dashboard-icon-btn svg {
   width: 18px;
   height: 18px;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-icon-btn {
+    width: var(--target-md);
+    height: var(--target-md);
+  }
 }
 
 .dashboard-customize-toolbar {
@@ -2578,46 +2364,18 @@ svg.weather-forecast__icon {
   animation: dashboard-sheen 1.6s ease-in-out infinite;
 }
 
-.dashboard-workspace {
-  display: grid;
-  gap: var(--space-4);
-  align-items: start;
-}
-
-.dashboard-workspace__main,
-.dashboard-workspace__side {
-  min-width: 0;
-}
-
-.dashboard-widget-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-4);
-  align-items: start;
-}
-
-.dashboard-side-stack {
-  display: grid;
-  gap: var(--space-4);
-  align-items: start;
-}
-
-.dashboard-tile {
-  min-width: 0;
-}
-
 .dashboard .widget,
 .dashboard .widget-skeleton {
   border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
+  border: 1px solid color-mix(in srgb, var(--widget-accent, var(--module-accent)) 20%, var(--color-border));
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
   min-width: 0;
 }
 
 .dashboard .widget::before {
-  height: 3px;
-  background: var(--widget-accent, var(--module-accent));
+  height: 1px;
+  background: color-mix(in srgb, var(--widget-accent, var(--module-accent)) 32%, transparent);
   opacity: 1;
 }
 
@@ -2873,7 +2631,7 @@ svg.weather-forecast__icon {
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--module-budget) 10%, transparent);
   color: var(--color-text-secondary);
-  font-size: var(--text-xs);
+  font-size: var(--type-secondary);
   line-height: 1.4;
 }
 
@@ -2901,32 +2659,13 @@ svg.weather-forecast__icon {
     gap: var(--space-2);
   }
 
-  .dashboard-overview__title {
-  }
-
   .dashboard-overview__tools {
     align-items: stretch;
   }
 
-  .dashboard-overview__actions {
-    flex: 1;
-  }
-
-  .dashboard-action__label {
-    display: none;
-  }
-
-  .dashboard-action {
-    width: var(--target-base);
-    height: var(--target-base);
-    min-height: var(--target-base);
-    justify-content: center;
-    padding: 0;
-  }
-
   .dashboard-icon-btn {
-    width: var(--target-base);
-    height: var(--target-base);
+    width: var(--target-lg);
+    height: var(--target-lg);
   }
 
   .today-cockpit {
@@ -2939,31 +2678,23 @@ svg.weather-forecast__icon {
     gap: var(--space-2);
   }
 
-  .today-cockpit__date {
-    font-size: var(--text-xs);
-  }
-
+  /* 2×2-Glance-Raster: halbe Höhe ggü. 1×4, damit die Aufgabenliste
+   * above the fold rückt. Karten belegen je eine Spalte (kein 1/-1-Span). */
   .today-cockpit__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-auto-rows: auto;
+    grid-auto-rows: 1fr;
     gap: var(--space-2);
   }
 
   .today-cockpit-card {
-    grid-column: 1 / -1;
     min-height: calc(var(--target-lg) + var(--space-4));
-    height: auto;
+    height: 100%;
     padding: var(--space-2) var(--space-3);
     gap: var(--space-1) var(--space-2);
   }
 
-  .today-cockpit-card--task,
-  .today-cockpit-card--event {
-    grid-column: 1 / -1;
-  }
-
   .today-cockpit-card__value {
-    font-size: var(--text-sm);
+    font-size: var(--type-secondary);
   }
 
   .dashboard-kpi {

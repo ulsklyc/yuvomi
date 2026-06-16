@@ -67,7 +67,8 @@
         "sidebarExpand": "توسيع الشريط الجانبي",
         "sectionOverview": "نظرة عامة",
         "sectionPlan": "التخطيط",
-        "sectionHome": "المنزل"
+        "sectionHome": "المنزل",
+        "help": "Hilfe"
     },
     "dashboard": {
         "title": "لوحة التحكم",
@@ -1194,7 +1195,7 @@
         "thirdPartyModulesStatusDisabled": "Disabled",
         "thirdPartyModulesStatusError": "Error",
         "thirdPartyModulesSaved": "Module setting saved.",
-        "modulesDragHint": "Drag modules to define the left menu order. Settings always stays last.",
+        "modulesDragHint": "اسحب الوحدات أو استخدم الأسهم لتغيير ترتيبها داخل مجموعتها فقط.",
         "modulesDragHandle": "Drag to reorder",
         "modulesBuiltInBadge": "مدمج",
         "modulesThirdPartyBadge": "Module",
@@ -1365,7 +1366,35 @@
         "systemSetupComplete": "مكتمل",
         "systemSetupRequired": "الإعداد مطلوب",
         "apiTokensEmpty": "لا توجد رموز API بعد.",
-        "familyEmpty": "لا يوجد أفراد عائلة بعد."
+        "familyEmpty": "لا يوجد أفراد عائلة بعد.",
+        "mobileNavigationTitle": "التنقل على الهاتف",
+        "mobileNavigationHint": "اختر ثلاث وجهات تظهر بين النظرة العامة والمزيد في شريط التنقل السفلي.",
+        "mobileNavigationSlotLabel": "الموضع {{position}}",
+        "mobileNavigationEmptyOption": "غير مستخدم",
+        "desktopNavigationTitle": "التنقل على الويب",
+        "desktopNavigationHint": "فعّل الوحدات ورتّبها داخل مجموعات النظرة العامة والتخطيط والمنزل.",
+        "mobileNavigationSaved": "تم حفظ التنقل على الهاتف.",
+        "regionTitle": "المنطقة / التنسيق",
+        "regionLabel": "المنطقة",
+        "regionHint": "يضبط العملة وتنسيق التاريخ والوقت بما يتناسب مع المنطقة. اختر «مخصص» لضبطها بشكل فردي.",
+        "regionCustom": "مخصص",
+        "regionSaved": "تم حفظ المنطقة.",
+        "currencyMovedHint": "تُضبط العملة الآن ضمن المظهر ← المنطقة / التنسيق.",
+        "pageNotifications": "الإشعارات",
+        "pageNotificationsDescription": "إدارة إشعارات الدفع على هذا الجهاز",
+        "notificationsTitle": "الإشعارات",
+        "pushToggleTitle": "إشعارات الدفع",
+        "pushToggleLabel": "تفعيل على هذا الجهاز",
+        "pushChecking": "جارٍ التحقق من الحالة …",
+        "pushEnabled": "إشعارات الدفع مفعّلة على هذا الجهاز.",
+        "pushDisabled": "إشعارات الدفع معطّلة على هذا الجهاز.",
+        "pushDenied": "تم حظر الإشعارات في المتصفح. يُرجى السماح بها في إعدادات المتصفح.",
+        "pushUnsupported": "هذا المتصفح لا يدعم إشعارات الدفع.",
+        "pushError": "فشل الإجراء. يُرجى المحاولة مرة أخرى.",
+        "pushTestButton": "إرسال إشعار تجريبي",
+        "pushTestSent": "تم إرسال الإشعار التجريبي.",
+        "pushTestTitle": "Yuvomi",
+        "pushTestBody": "هذا إشعار تجريبي."
     },
     "login": {
         "tagline": "تخطيط عائلي. آمن. يحترم الخصوصية. مفتوح المصدر.",
@@ -1967,5 +1996,12 @@
         "95": "عاصفة رعدية",
         "96": "عاصفة رعدية مع برد",
         "99": "عاصفة رعدية شديدة"
+    },
+    "help": {
+        "title": "Hilfe",
+        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
+        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
+        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
+        "mobileSettings": "Einstellungen findest du unter „Mehr“."
     }
 }

@@ -25,6 +25,14 @@
   display: none;
 }
 
+/* Optionaler Modul-Titel links der Tabs (Canonical Page Head).
+ * Größe/Weight aus der u-toolbar-title-Rolle (typography.css). */
+.sub-tabs-bar__title {
+  flex-shrink: 0;
+  margin-right: var(--space-2);
+  color: var(--color-text-primary);
+}
+
 .sub-tab {
   display: inline-flex;
   align-items: center;

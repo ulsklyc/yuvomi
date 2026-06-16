@@ -67,7 +67,8 @@
         "sidebarExpand": "Fäll ut sidofältet",
         "sectionOverview": "Översikt",
         "sectionPlan": "Planera",
-        "sectionHome": "Hem"
+        "sectionHome": "Hem",
+        "help": "Hilfe"
     },
     "dashboard": {
         "title": "Översikt",
@@ -1194,7 +1195,7 @@
         "thirdPartyModulesStatusDisabled": "Disabled",
         "thirdPartyModulesStatusError": "Error",
         "thirdPartyModulesSaved": "Module setting saved.",
-        "modulesDragHint": "Drag modules to define the left menu order. Settings always stays last.",
+        "modulesDragHint": "Dra moduler eller använd pilarna för att ändra ordningen endast inom respektive grupp.",
         "modulesDragHandle": "Drag to reorder",
         "modulesBuiltInBadge": "Inbyggd",
         "modulesThirdPartyBadge": "Module",
@@ -1365,7 +1366,35 @@
         "systemSetupComplete": "Slutförd",
         "systemSetupRequired": "Installation krävs",
         "apiTokensEmpty": "Inga API-tokens ännu.",
-        "familyEmpty": "Inga familjemedlemmar ännu."
+        "familyEmpty": "Inga familjemedlemmar ännu.",
+        "mobileNavigationTitle": "Mobil navigering",
+        "mobileNavigationHint": "Välj tre mål som visas mellan Översikt och Mer i den nedre navigeringen.",
+        "mobileNavigationSlotLabel": "Position {{position}}",
+        "mobileNavigationEmptyOption": "Används inte",
+        "desktopNavigationTitle": "Webbnavigering",
+        "desktopNavigationHint": "Aktivera moduler och sortera dem inom grupperna Översikt, Planera och Hem.",
+        "mobileNavigationSaved": "Mobil navigering sparad.",
+        "regionTitle": "Region / Format",
+        "regionLabel": "Region",
+        "regionHint": "Ställer in valuta samt datum- och tidsformat efter regionen. Välj ”Anpassad” för att ställa in dem individuellt.",
+        "regionCustom": "Anpassad",
+        "regionSaved": "Region sparad.",
+        "currencyMovedHint": "Valutan ställs nu in under Utseende → Region / Format.",
+        "pageNotifications": "Aviseringar",
+        "pageNotificationsDescription": "Hantera push-aviseringar på den här enheten",
+        "notificationsTitle": "Aviseringar",
+        "pushToggleTitle": "Push-aviseringar",
+        "pushToggleLabel": "Aktivera på den här enheten",
+        "pushChecking": "Kontrollerar status …",
+        "pushEnabled": "Push-aviseringar är aktiva på den här enheten.",
+        "pushDisabled": "Push-aviseringar är inaktiverade på den här enheten.",
+        "pushDenied": "Aviseringar har blockerats i webbläsaren. Tillåt dem i webbläsarens inställningar.",
+        "pushUnsupported": "Den här webbläsaren stöder inte push-aviseringar.",
+        "pushError": "Åtgärden misslyckades. Försök igen.",
+        "pushTestButton": "Skicka testavisering",
+        "pushTestSent": "Testavisering skickad.",
+        "pushTestTitle": "Yuvomi",
+        "pushTestBody": "Detta är en testavisering."
     },
     "login": {
         "tagline": "Familjeplanering. Säker. Sekretessvänlig. Öppen källkod.",
@@ -1967,5 +1996,12 @@
         "95": "Åska",
         "96": "Åska med hagel",
         "99": "Kraftig åska"
+    },
+    "help": {
+        "title": "Hilfe",
+        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
+        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
+        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
+        "mobileSettings": "Einstellungen findest du unter „Mehr“."
     }
 }

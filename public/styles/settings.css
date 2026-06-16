@@ -18,6 +18,10 @@
   margin: 0 auto;
 }
 
+.settings-page--leaf .settings-shell-header {
+  display: none;
+}
+
 /* --------------------------------------------------------
    Responsive Settings Shell
    -------------------------------------------------------- */
@@ -55,6 +59,81 @@
 
 .settings-shell__navigation-group--active .settings-shell__navigation-heading {
   color: var(--color-accent);
+}
+
+/* --------------------------------------------------------
+   Akkordeon-Navigation (Desktop, ab 2 Domänen)
+   Single-Open: die aktive Domäne ist offen, die übrigen kollabieren auf ihre
+   Kopfzeile. Die Höhe animiert per grid-template-rows 0fr→1fr (kein JS-Messen).
+   -------------------------------------------------------- */
+
+.settings-shell__navigation--collapsible .settings-shell__navigation-group + .settings-shell__navigation-group {
+  margin-top: var(--space-1);
+}
+
+.settings-shell__navigation--collapsible .settings-shell__navigation-heading {
+  margin: 0;
+}
+
+.settings-shell__navigation-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--target-md);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  /* Typo (Größe/Tracking/Versal) kommt aus der Rollenebene (typography.css);
+     der Button erbt nur die Schriftfamilie, die er sonst per UA-Default verlöre. */
+  font-family: inherit;
+  color: var(--color-text-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.settings-shell__navigation-toggle:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.settings-shell__navigation-group--active .settings-shell__navigation-toggle {
+  color: var(--color-accent);
+}
+
+.settings-shell__navigation-domain-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-shell__navigation-chevron {
+  width: var(--space-4);
+  height: var(--space-4);
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+  transition: transform var(--transition-base);
+}
+
+.settings-shell__navigation-toggle[aria-expanded='true'] .settings-shell__navigation-chevron {
+  transform: rotate(180deg);
+}
+
+.settings-shell__navigation-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--transition-base);
+}
+
+.settings-shell__navigation-group--expanded .settings-shell__navigation-panel {
+  grid-template-rows: 1fr;
+}
+
+.settings-shell__navigation-panel > .settings-shell__navigation-list {
+  overflow: hidden;
+  min-height: 0;
+  padding-top: var(--space-1);
 }
 
 .settings-shell__navigation-domain-icon,
@@ -112,6 +191,15 @@
 .settings-leaf-header__title {
   margin: 0;
   color: var(--color-text-primary);
+}
+
+/* Nach der Leaf-Navigation erhält der Titel programmatisch den Fokus
+ * (tabIndex=-1 + focus()), damit Screenreader/Tastatur in die neue Seite
+ * springen. Er ist ein Region-Fokus-Ziel, kein interaktives Element — daher
+ * kein sichtbarer Fokusring (gleiche Behandlung wie .app-content/#main-content). */
+.settings-leaf-header__title:focus,
+.settings-leaf-header__title:focus-visible {
+  outline: none;
 }
 
 .settings-mobile-overview__description,
@@ -222,6 +310,14 @@
 .settings-breadcrumb__item--current {
   color: var(--color-text-primary);
   font-weight: var(--font-weight-semibold);
+}
+
+@media (max-width: 767px) {
+  .settings-breadcrumb__link {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--target-lg);
+  }
 }
 
 .settings-leaf {
@@ -408,10 +504,19 @@
   }
 }
 
+@media (min-width: 768px) and (max-width: 1023px) {
+  .settings-mobile-overview__links {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .settings-shell__navigation-link,
   .settings-overview-link,
-  .settings-disclosure__icon {
+  .settings-disclosure__icon,
+  .settings-shell__navigation-panel,
+  .settings-shell__navigation-chevron,
+  .settings-shell__navigation-toggle {
     transition: none;
   }
 
@@ -609,8 +714,8 @@
 }
 
 .settings-avatar-action {
-  width: 28px;
-  height: 28px;
+  width: var(--target-md);
+  height: var(--target-md);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -699,6 +804,11 @@
 
   .settings-avatar-editor {
     align-items: flex-start;
+  }
+
+  .settings-avatar-action {
+    width: var(--target-lg);
+    height: var(--target-lg);
   }
 }
 
@@ -1594,15 +1704,77 @@
   gap: var(--space-3);
 }
 
+.settings-mobile-nav-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.settings-navigation-panel {
+  padding-block: var(--space-4) var(--space-6);
+  border-bottom: var(--space-px) solid var(--color-border-subtle);
+}
+
+.settings-navigation-panel:first-child {
+  padding-top: 0;
+}
+
+.settings-navigation-panel:last-child {
+  border-bottom: 0;
+}
+
+.settings-navigation-panel__title {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-primary);
+}
+
+.settings-mobile-nav-slot {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--space-px) solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.settings-mobile-nav-slot__label,
+.settings-navigation-group__title {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.settings-navigation-groups {
+  display: grid;
+  gap: var(--space-6);
+  margin-top: var(--space-4);
+}
+
+.settings-navigation-group {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.settings-navigation-group__title {
+  margin: 0;
+  padding-bottom: var(--space-2);
+  border-bottom: var(--space-px) solid var(--color-border-subtle);
+}
+
 .settings-module-row {
   display: grid;
-  grid-template-columns: 32px 32px 44px minmax(0, 1fr) auto;
+  grid-template-columns: var(--target-base) var(--target-base) var(--target-base) minmax(0, 1fr) auto;
   gap: var(--space-3);
   align-items: center;
   padding: var(--space-4);
   border: 1px solid var(--glass-border-subtle);
   border-radius: var(--radius-glass-inner);
   background-color: var(--glass-bg-card);
+}
+
+.settings-module-row--fixed {
+  grid-template-columns: var(--target-base) minmax(0, 1fr) auto;
 }
 
 .settings-module-row--dragging {
@@ -1612,8 +1784,8 @@
 .settings-module-drag {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: var(--target-base);
+  height: var(--target-base);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -1628,14 +1800,14 @@
 
 .settings-module-move-buttons {
   display: grid;
-  gap: 2px;
+  gap: var(--space-1);
 }
 
 .settings-module-move {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 22px;
+  width: var(--target-base);
+  height: var(--target-base);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
@@ -1649,8 +1821,8 @@
 .settings-module-row__icon {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: var(--target-base);
+  height: var(--target-base);
   border-radius: var(--radius-md);
   color: var(--module-row-accent, var(--color-accent));
   background: color-mix(in srgb, var(--module-row-accent, var(--color-accent)) 14%, transparent);
@@ -1708,12 +1880,24 @@
 }
 
 @media (max-width: 640px) {
+  .settings-mobile-nav-slots {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-module-drag {
+    display: none;
+  }
+
   .settings-module-row {
-    grid-template-columns: 32px 32px 44px minmax(0, 1fr);
+    grid-template-columns: var(--target-base) var(--target-base) minmax(0, 1fr);
   }
 
   .settings-module-row__toggle {
-    grid-column: 3 / -1;
+    grid-column: 2 / -1;
+  }
+
+  .settings-module-row--fixed .settings-module-row__toggle {
+    grid-column: auto;
   }
 }
 
@@ -1732,44 +1916,8 @@
   padding: var(--space-2) 0;
 }
 
-.dms-account-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
 .dms-account-meta {
-  flex: 1;
-  min-width: 0;
-}
-
-.dms-account-meta strong {
-  display: block;
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dms-account-meta .form-hint {
-  display: block;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-@media (max-width: 640px) {
-  .dms-account-item {
-    flex-wrap: wrap;
-  }
-
-  .dms-account-meta {
-    width: 100%;
-  }
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }

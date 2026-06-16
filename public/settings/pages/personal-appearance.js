@@ -6,6 +6,14 @@ import {
   t,
 } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { appendCurrencyOptions, persistCurrencySelection } from '/settings/currency.js';
+import {
+  CUSTOM_REGION,
+  REGION_CODES,
+  REGION_PRESETS,
+  detectRegion,
+  regionLabel,
+} from '/settings/region-presets.js';
 
 const DATE_FORMATS = [
   ['mdy', 'MM/DD/YYYY'],
@@ -51,6 +59,15 @@ function formatOptions(selected) {
   )).join('');
 }
 
+function regionOptions(selectedRegion) {
+  const locale = getLocale();
+  const presets = REGION_CODES.map((code) => (
+    `<option value="${esc(code)}"${selectedRegion === code ? ' selected' : ''}>${esc(regionLabel(code, locale))}</option>`
+  )).join('');
+  const custom = `<option value="${CUSTOM_REGION}"${selectedRegion === CUSTOM_REGION ? ' selected' : ''}>${t('settings.regionCustom')}</option>`;
+  return presets + custom;
+}
+
 function localeLabel(locale) {
   try {
     return new Intl.DisplayNames([getLocale()], { type: 'language' }).of(locale) || locale;
@@ -93,8 +110,10 @@ function renderLoadError(container) {
   `);
 }
 
-function renderPage(container, preferences) {
+function renderPage(container, preferences, isAdmin) {
   const theme = currentTheme();
+  const activeRegion = detectRegion(preferences);
+  const customHidden = isAdmin && activeRegion !== CUSTOM_REGION;
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <section class="settings-section">
@@ -132,10 +151,25 @@ function renderPage(container, preferences) {
     </section>
 
     <section class="settings-section">
-      <h2 class="settings-section__title">${t('settings.sectionDate')}</h2>
+      <h2 class="settings-section__title">${t('settings.regionTitle')}</h2>
+      ${isAdmin ? `
       <div class="settings-card">
-        <h3 class="settings-card__title">${t('settings.dateFormatTitle')}</h3>
-        <p class="form-hint">${t('settings.dateFormatHint')}</p>
+        <p class="form-hint">${t('settings.regionHint')}</p>
+        <div class="form-group">
+          <label class="form-label" for="region-select">${t('settings.regionLabel')}</label>
+          <select class="form-input" id="region-select" aria-describedby="region-error">
+            ${regionOptions(activeRegion)}
+          </select>
+        </div>
+        <div id="region-error" class="form-error" role="alert" hidden></div>
+      </div>` : ''}
+      <div class="settings-card" id="custom-formats"${customHidden ? ' hidden' : ''}>
+        ${isAdmin ? `
+        <div class="form-group">
+          <label class="form-label" for="currency-select">${t('settings.currencyLabel')}</label>
+          <select class="form-input" id="currency-select" aria-describedby="currency-error"></select>
+        </div>
+        <div id="currency-error" class="form-error" role="alert" hidden></div>` : ''}
         <div class="form-group">
           <label class="form-label" for="date-format-select">${t('settings.dateFormatLabel')}</label>
           <select class="form-input" id="date-format-select" aria-describedby="date-format-error">
@@ -174,6 +208,18 @@ function applyTheme(value) {
   }
 }
 
+// Hält den Region-Dropdown mit den drei Einzel-Selects synchron (Preset oder
+// "Benutzerdefiniert"), nachdem ein Einzelwert manuell geändert wurde.
+function syncRegionSelect(container) {
+  const regionSelect = container.querySelector('#region-select');
+  if (!regionSelect) return;
+  regionSelect.value = detectRegion({
+    currency: container.querySelector('#currency-select')?.value,
+    date_format: container.querySelector('#date-format-select')?.value,
+    time_format: container.querySelector('#time-format-select')?.value,
+  });
+}
+
 function bindEvents(container, user) {
   const themeToggle = container.querySelector('#theme-toggle');
   themeToggle?.addEventListener('click', (event) => {
@@ -208,6 +254,67 @@ function bindEvents(container, user) {
     }
   });
 
+  const regionSelect = container.querySelector('#region-select');
+  regionSelect?.addEventListener('change', async () => {
+    const customBlock = container.querySelector('#custom-formats');
+    if (regionSelect.value === CUSTOM_REGION) {
+      if (customBlock) customBlock.hidden = false;
+      return;
+    }
+    const preset = REGION_PRESETS[regionSelect.value];
+    if (!preset) return;
+    const errorElement = container.querySelector('#region-error');
+    clearError(errorElement);
+    regionSelect.disabled = true;
+    try {
+      await api.put('/preferences', {
+        currency: preset.currency,
+        date_format: preset.date_format,
+        time_format: preset.time_format,
+      });
+      const currencySelect = container.querySelector('#currency-select');
+      if (currencySelect) currencySelect.value = preset.currency;
+      const dateSelect = container.querySelector('#date-format-select');
+      if (dateSelect) dateSelect.value = preset.date_format;
+      const timeSelect = container.querySelector('#time-format-select');
+      if (timeSelect) timeSelect.value = preset.time_format;
+      safeStorageSet('oikos-date-format', preset.date_format);
+      safeStorageSet('oikos-time-format', preset.time_format);
+      window.dispatchEvent(new CustomEvent('date-format-changed', {
+        detail: { dateFormat: preset.date_format },
+      }));
+      window.dispatchEvent(new CustomEvent('time-format-changed', {
+        detail: { timeFormat: preset.time_format },
+      }));
+      if (customBlock) customBlock.hidden = true;
+      window.oikos?.showToast(t('settings.regionSaved'), 'success');
+    } catch (error) {
+      showError(errorElement, error.message);
+    } finally {
+      if (regionSelect.isConnected) regionSelect.disabled = false;
+    }
+  });
+
+  const currencySelect = container.querySelector('#currency-select');
+  let persistedCurrency = currencySelect?.value;
+  currencySelect?.addEventListener('change', async () => {
+    if (currencySelect.disabled) return;
+    const errorElement = container.querySelector('#currency-error');
+    clearError(errorElement);
+    try {
+      await persistCurrencySelection(
+        currencySelect,
+        persistedCurrency,
+        () => api.put('/preferences', { currency: currencySelect.value }),
+      );
+      persistedCurrency = currencySelect.value;
+      syncRegionSelect(container);
+      window.oikos?.showToast(t('settings.currencySaved'), 'success');
+    } catch (error) {
+      showError(errorElement, error.message);
+    }
+  });
+
   const dateFormatSelect = container.querySelector('#date-format-select');
   dateFormatSelect?.addEventListener('change', async () => {
     const errorElement = container.querySelector('#date-format-error');
@@ -219,6 +326,7 @@ function bindEvents(container, user) {
       window.dispatchEvent(new CustomEvent('date-format-changed', {
         detail: { dateFormat: dateFormatSelect.value },
       }));
+      syncRegionSelect(container);
       window.oikos?.showToast(t('settings.dateFormatSavedToast'), 'success');
     } catch (error) {
       showError(errorElement, error.message);
@@ -238,6 +346,7 @@ function bindEvents(container, user) {
       window.dispatchEvent(new CustomEvent('time-format-changed', {
         detail: { timeFormat: timeFormatSelect.value },
       }));
+      syncRegionSelect(container);
       window.oikos?.showToast(t('settings.timeFormatSavedToast'), 'success');
     } catch (error) {
       showError(errorElement, error.message);
@@ -248,17 +357,21 @@ function bindEvents(container, user) {
 }
 
 export async function render(container, { user }) {
-  void user;
   try {
     const response = await api.get('/preferences');
     const preferences = {
+      currency: response?.data?.currency || 'EUR',
       date_format: response?.data?.date_format || 'dmy',
       time_format: response?.data?.time_format || '24h',
     };
 
     safeStorageSet('oikos-date-format', preferences.date_format);
     safeStorageSet('oikos-time-format', preferences.time_format);
-    renderPage(container, preferences);
+    const isAdmin = user?.role === 'admin';
+    renderPage(container, preferences, isAdmin);
+    if (isAdmin) {
+      appendCurrencyOptions(container.querySelector('#currency-select'), preferences.currency);
+    }
     bindEvents(container, user);
     window.lucide?.createIcons({ el: container });
   } catch {

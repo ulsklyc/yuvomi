@@ -67,7 +67,8 @@
         "sidebarExpand": "Expandir barra lateral",
         "sectionOverview": "Visão geral",
         "sectionPlan": "Planejar",
-        "sectionHome": "Casa"
+        "sectionHome": "Casa",
+        "help": "Hilfe"
     },
     "dashboard": {
         "title": "Painel",
@@ -1194,7 +1195,7 @@
         "thirdPartyModulesStatusDisabled": "Desativado",
         "thirdPartyModulesStatusError": "Erro",
         "thirdPartyModulesSaved": "Configuração do módulo salva.",
-        "modulesDragHint": "Arraste os modulos para definir a ordem do menu esquerdo. Configuracoes sempre fica por ultimo.",
+        "modulesDragHint": "Arraste os módulos ou use as setas para alterar a ordem apenas dentro do respetivo grupo.",
         "modulesDragHandle": "Arrastar para reordenar",
         "modulesBuiltInBadge": "Integrado",
         "modulesThirdPartyBadge": "Modulo",
@@ -1365,7 +1366,35 @@
         "systemSetupComplete": "Concluída",
         "systemSetupRequired": "Configuração necessária",
         "apiTokensEmpty": "Ainda não há tokens de API.",
-        "familyEmpty": "Ainda não há membros da família."
+        "familyEmpty": "Ainda não há membros da família.",
+        "mobileNavigationTitle": "Navegação móvel",
+        "mobileNavigationHint": "Escolha três destinos para mostrar entre Visão geral e Mais na navegação inferior.",
+        "mobileNavigationSlotLabel": "Posição {{position}}",
+        "mobileNavigationEmptyOption": "Não utilizado",
+        "desktopNavigationTitle": "Navegação web",
+        "desktopNavigationHint": "Ative módulos e ordene-os nos grupos Visão geral, Planejar e Casa.",
+        "mobileNavigationSaved": "Navegação móvel guardada.",
+        "regionTitle": "Região / Formato",
+        "regionLabel": "Região",
+        "regionHint": "Define a moeda e os formatos de data e hora de acordo com a região. Escolha «Personalizado» para configurá-los individualmente.",
+        "regionCustom": "Personalizado",
+        "regionSaved": "Região guardada.",
+        "currencyMovedHint": "A moeda agora é definida em Aparência → Região / Formato.",
+        "pageNotifications": "Notificações",
+        "pageNotificationsDescription": "Gerir as notificações push neste dispositivo",
+        "notificationsTitle": "Notificações",
+        "pushToggleTitle": "Notificações push",
+        "pushToggleLabel": "Ativar neste dispositivo",
+        "pushChecking": "A verificar o estado …",
+        "pushEnabled": "As notificações push estão ativas neste dispositivo.",
+        "pushDisabled": "As notificações push estão desativadas neste dispositivo.",
+        "pushDenied": "As notificações foram bloqueadas no navegador. Permita-as nas definições do navegador.",
+        "pushUnsupported": "Este navegador não suporta notificações push.",
+        "pushError": "A ação falhou. Tente novamente.",
+        "pushTestButton": "Enviar notificação de teste",
+        "pushTestSent": "Notificação de teste enviada.",
+        "pushTestTitle": "Yuvomi",
+        "pushTestBody": "Esta é uma notificação de teste."
     },
     "login": {
         "tagline": "Planejamento familiar. Seguro. Privado. Código aberto.",
@@ -1967,5 +1996,12 @@
         "95": "Trovoada",
         "96": "Trovoada com granizo",
         "99": "Trovoada severa"
+    },
+    "help": {
+        "title": "Hilfe",
+        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
+        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
+        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
+        "mobileSettings": "Einstellungen findest du unter „Mehr“."
     }
 }

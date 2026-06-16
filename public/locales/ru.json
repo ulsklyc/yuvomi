@@ -67,7 +67,8 @@
         "sidebarExpand": "Развернуть боковую панель",
         "sectionOverview": "Обзор",
         "sectionPlan": "План",
-        "sectionHome": "Дом"
+        "sectionHome": "Дом",
+        "help": "Hilfe"
     },
     "dashboard": {
         "title": "Обзор",
@@ -1194,7 +1195,7 @@
         "thirdPartyModulesStatusDisabled": "Disabled",
         "thirdPartyModulesStatusError": "Error",
         "thirdPartyModulesSaved": "Module setting saved.",
-        "modulesDragHint": "Drag modules to define the left menu order. Settings always stays last.",
+        "modulesDragHint": "Перетаскивайте модули или используйте стрелки, чтобы менять порядок только внутри их группы.",
         "modulesDragHandle": "Drag to reorder",
         "modulesBuiltInBadge": "Встроенный",
         "modulesThirdPartyBadge": "Module",
@@ -1365,7 +1366,35 @@
         "systemSetupComplete": "Завершена",
         "systemSetupRequired": "Требуется настройка",
         "apiTokensEmpty": "Токенов API пока нет.",
-        "familyEmpty": "Членов семьи пока нет."
+        "familyEmpty": "Членов семьи пока нет.",
+        "mobileNavigationTitle": "Мобильная навигация",
+        "mobileNavigationHint": "Выберите три раздела, которые будут показаны между Обзором и Ещё в нижней навигации.",
+        "mobileNavigationSlotLabel": "Позиция {{position}}",
+        "mobileNavigationEmptyOption": "Не используется",
+        "desktopNavigationTitle": "Веб-навигация",
+        "desktopNavigationHint": "Включайте модули и сортируйте их внутри групп Обзор, Планирование и Дом.",
+        "mobileNavigationSaved": "Мобильная навигация сохранена.",
+        "regionTitle": "Регион / Формат",
+        "regionLabel": "Регион",
+        "regionHint": "Устанавливает валюту, формат даты и времени в соответствии с регионом. Выберите «Пользовательский», чтобы настроить их по отдельности.",
+        "regionCustom": "Пользовательский",
+        "regionSaved": "Регион сохранён.",
+        "currencyMovedHint": "Валюта теперь настраивается в Внешний вид → Регион / Формат.",
+        "pageNotifications": "Уведомления",
+        "pageNotificationsDescription": "Управление push-уведомлениями на этом устройстве",
+        "notificationsTitle": "Уведомления",
+        "pushToggleTitle": "Push-уведомления",
+        "pushToggleLabel": "Включить на этом устройстве",
+        "pushChecking": "Проверка состояния …",
+        "pushEnabled": "Push-уведомления активны на этом устройстве.",
+        "pushDisabled": "Push-уведомления отключены на этом устройстве.",
+        "pushDenied": "Уведомления заблокированы в браузере. Разрешите их в настройках браузера.",
+        "pushUnsupported": "Этот браузер не поддерживает push-уведомления.",
+        "pushError": "Не удалось выполнить действие. Попробуйте ещё раз.",
+        "pushTestButton": "Отправить тестовое уведомление",
+        "pushTestSent": "Тестовое уведомление отправлено.",
+        "pushTestTitle": "Yuvomi",
+        "pushTestBody": "Это тестовое уведомление."
     },
     "login": {
         "tagline": "Семейное планирование. Безопасно. С уважением к приватности. Открытый исходный код.",
@@ -1967,5 +1996,12 @@
         "95": "Гроза",
         "96": "Гроза с градом",
         "99": "Сильная гроза"
+    },
+    "help": {
+        "title": "Hilfe",
+        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
+        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
+        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
+        "mobileSettings": "Einstellungen findest du unter „Mehr“."
     }
 }

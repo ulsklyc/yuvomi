@@ -402,6 +402,25 @@ Generate a secure `SESSION_SECRET`:
 openssl rand -hex 32
 ```
 
+### Web Push (Optional)
+
+Push notifications deliver due reminders to a device as system notifications even when the app
+is closed. **Requires HTTPS** (the Push API and service workers only work over a secure origin —
+see [HTTPS / Reverse Proxy](#https--reverse-proxy-nginx)). Each device opts in under
+Settings → Personal → Notifications.
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `VAPID_PUBLIC_KEY` | VAPID public key. Auto-generated on first use and stored in the database if unset. | auto | No |
+| `VAPID_PRIVATE_KEY` | VAPID private key. Set together with the public key to pin a fixed pair across redeployments. | auto | No |
+| `VAPID_SUBJECT` | Contact URI (`mailto:` or `https:`) sent to push services. | `mailto:admin@localhost` | No |
+
+Generate a fixed key pair (optional):
+
+```bash
+npx web-push generate-vapid-keys
+```
+
 ### Database & Storage
 
 | Variable | Description | Default | Required |

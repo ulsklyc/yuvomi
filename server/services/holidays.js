@@ -123,7 +123,7 @@ async function syncYearAndType(country, subdivision, year, type, langCode) {
  * Sync Feiertage und/oder Schulferien für das konfigurierte Land/Region.
  * Wird vom Auto-Scheduler und manuell aus den Settings aufgerufen.
  */
-async function sync() {
+async function sync(force = false) {
   const country     = db.get().prepare("SELECT value FROM sync_config WHERE key='holiday_country'").get()?.value;
   const subdivision = db.get().prepare("SELECT value FROM sync_config WHERE key='holiday_subdivision'").get()?.value ?? null;
   const showPublic  = db.get().prepare("SELECT value FROM sync_config WHERE key='holiday_show_public'").get()?.value === '1';
@@ -137,6 +137,18 @@ async function sync() {
   if (!showPublic && !showSchool) {
     log.info('Both holiday layers disabled – skipping sync.');
     return { synced: 0 };
+  }
+
+  const lastSyncStr = db.get().prepare("SELECT value FROM sync_config WHERE key='holiday_last_sync'").get()?.value;
+  if (!force && lastSyncStr) {
+    const lastSyncDate = new Date(lastSyncStr);
+    if (!Number.isNaN(lastSyncDate.getTime())) {
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+      if (Date.now() - lastSyncDate.getTime() < thirtyDaysMs) {
+        log.info('Holidays synced recently – skipping automatic sync.');
+        return { synced: 0 };
+      }
+    }
   }
 
   // Sprache aus Land ableiten (Fallback EN)

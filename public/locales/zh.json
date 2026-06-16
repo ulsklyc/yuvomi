@@ -67,7 +67,8 @@
         "sidebarExpand": "展开侧边栏",
         "sectionOverview": "概览",
         "sectionPlan": "计划",
-        "sectionHome": "家庭"
+        "sectionHome": "家庭",
+        "help": "Hilfe"
     },
     "dashboard": {
         "title": "概览",
@@ -1194,7 +1195,7 @@
         "thirdPartyModulesStatusDisabled": "Disabled",
         "thirdPartyModulesStatusError": "Error",
         "thirdPartyModulesSaved": "Module setting saved.",
-        "modulesDragHint": "Drag modules to define the left menu order. Settings always stays last.",
+        "modulesDragHint": "拖动模块或使用箭头，仅在所属分组内调整顺序。",
         "modulesDragHandle": "Drag to reorder",
         "modulesBuiltInBadge": "内置",
         "modulesThirdPartyBadge": "Module",
@@ -1365,7 +1366,35 @@
         "systemSetupComplete": "已完成",
         "systemSetupRequired": "需要设置",
         "apiTokensEmpty": "暂无 API 令牌。",
-        "familyEmpty": "暂无家庭成员。"
+        "familyEmpty": "暂无家庭成员。",
+        "mobileNavigationTitle": "移动导航",
+        "mobileNavigationHint": "选择三个目标，在底部导航的概览与更多之间显示。",
+        "mobileNavigationSlotLabel": "位置 {{position}}",
+        "mobileNavigationEmptyOption": "未使用",
+        "desktopNavigationTitle": "网页导航",
+        "desktopNavigationHint": "启用模块，并在概览、计划和家庭分组内排序。",
+        "mobileNavigationSaved": "移动导航已保存。",
+        "regionTitle": "地区 / 格式",
+        "regionLabel": "地区",
+        "regionHint": "根据地区设置货币、日期和时间格式。选择“自定义”可单独配置。",
+        "regionCustom": "自定义",
+        "regionSaved": "地区已保存。",
+        "currencyMovedHint": "货币现在在“外观 → 地区 / 格式”中设置。",
+        "pageNotifications": "通知",
+        "pageNotificationsDescription": "管理此设备上的推送通知",
+        "notificationsTitle": "通知",
+        "pushToggleTitle": "推送通知",
+        "pushToggleLabel": "在此设备上启用",
+        "pushChecking": "正在检查状态 …",
+        "pushEnabled": "此设备已启用推送通知。",
+        "pushDisabled": "此设备已停用推送通知。",
+        "pushDenied": "通知已在浏览器中被屏蔽。请在浏览器设置中允许通知。",
+        "pushUnsupported": "此浏览器不支持推送通知。",
+        "pushError": "操作失败。请重试。",
+        "pushTestButton": "发送测试通知",
+        "pushTestSent": "测试通知已发送。",
+        "pushTestTitle": "Yuvomi",
+        "pushTestBody": "这是一条测试通知。"
     },
     "login": {
         "tagline": "家庭规划。安全。注重隐私。开源。",
@@ -1967,5 +1996,12 @@
         "95": "雷阵雨",
         "96": "雷暴伴冰雹",
         "99": "强雷暴"
+    },
+    "help": {
+        "title": "Hilfe",
+        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
+        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
+        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
+        "mobileSettings": "Einstellungen findest du unter „Mehr“."
     }
 }

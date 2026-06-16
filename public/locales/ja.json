@@ -67,7 +67,8 @@
         "sidebarExpand": "サイドバーを開く",
         "sectionOverview": "概要",
         "sectionPlan": "予定",
-        "sectionHome": "ホーム"
+        "sectionHome": "ホーム",
+        "help": "Hilfe"
     },
     "dashboard": {
         "title": "ダッシュボード",
@@ -1194,7 +1195,7 @@
         "thirdPartyModulesStatusDisabled": "Disabled",
         "thirdPartyModulesStatusError": "Error",
         "thirdPartyModulesSaved": "Module setting saved.",
-        "modulesDragHint": "Drag modules to define the left menu order. Settings always stays last.",
+        "modulesDragHint": "モジュールをドラッグするか矢印を使い、同じグループ内でのみ順序を変更します。",
         "modulesDragHandle": "Drag to reorder",
         "modulesBuiltInBadge": "組み込み",
         "modulesThirdPartyBadge": "Module",
@@ -1365,7 +1366,35 @@
         "systemSetupComplete": "完了",
         "systemSetupRequired": "セットアップが必要",
         "apiTokensEmpty": "API トークンはまだありません。",
-        "familyEmpty": "家族のメンバーはまだいません。"
+        "familyEmpty": "家族のメンバーはまだいません。",
+        "mobileNavigationTitle": "モバイルナビゲーション",
+        "mobileNavigationHint": "下部ナビゲーションの概要とその他の間に表示する3つの移動先を選択します。",
+        "mobileNavigationSlotLabel": "位置 {{position}}",
+        "mobileNavigationEmptyOption": "未使用",
+        "desktopNavigationTitle": "ウェブナビゲーション",
+        "desktopNavigationHint": "モジュールを有効にし、概要、計画、ホームの各グループ内で並べ替えます。",
+        "mobileNavigationSaved": "モバイルナビゲーションを保存しました。",
+        "regionTitle": "地域 / 形式",
+        "regionLabel": "地域",
+        "regionHint": "地域に合わせて通貨・日付・時刻の形式を設定します。個別に設定するには「カスタム」を選択してください。",
+        "regionCustom": "カスタム",
+        "regionSaved": "地域を保存しました。",
+        "currencyMovedHint": "通貨は「外観 → 地域 / 形式」で設定するようになりました。",
+        "pageNotifications": "通知",
+        "pageNotificationsDescription": "このデバイスのプッシュ通知を管理",
+        "notificationsTitle": "通知",
+        "pushToggleTitle": "プッシュ通知",
+        "pushToggleLabel": "このデバイスで有効にする",
+        "pushChecking": "ステータスを確認しています …",
+        "pushEnabled": "このデバイスでプッシュ通知が有効です。",
+        "pushDisabled": "このデバイスでプッシュ通知は無効です。",
+        "pushDenied": "ブラウザで通知がブロックされています。ブラウザの設定で許可してください。",
+        "pushUnsupported": "このブラウザはプッシュ通知に対応していません。",
+        "pushError": "操作に失敗しました。もう一度お試しください。",
+        "pushTestButton": "テスト通知を送信",
+        "pushTestSent": "テスト通知を送信しました。",
+        "pushTestTitle": "Yuvomi",
+        "pushTestBody": "これはテスト通知です。"
     },
     "login": {
         "tagline": "家族計画。安全。プライバシー重視。オープンソース。",
@@ -1967,5 +1996,12 @@
         "95": "雷雨",
         "96": "雹を伴う雷雨",
         "99": "激しい雷雨"
+    },
+    "help": {
+        "title": "Hilfe",
+        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
+        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
+        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
+        "mobileSettings": "Einstellungen findest du unter „Mehr“."
     }
 }

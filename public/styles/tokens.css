@@ -98,6 +98,7 @@
   --color-text-quaternary: var(--neutral-500);  /* nur dekorativ (z.B. Kbd-Hint), nie für Fließtext */
   --color-text-disabled:  var(--neutral-300);
   --color-text-on-accent: #ffffff;  /* Weißer Text auf farbigen Hintergründen */
+  --color-ink-on-bright:  #000000;  /* Maximalkontrast auf frei wählbaren hellen Flächen */
 
   /* Tinte für VIVIDE Füllungen (Akzent/Semantik/Modul), die im Dark Mode auf helle
    * Töne kippen. Light: weiß auf dunkler Füllung. Dark: dunkle Tinte auf heller Füllung.
@@ -193,7 +194,7 @@
   --module-dashboard:  var(--_module-dashboard);  /* Violet — Übersicht (= --color-accent, bewusster Share) */
   --_module-tasks:     #15803D;
   --module-tasks:      var(--_module-tasks);       /* Grün - Erledigung (= --color-success, bewusster Share) */
-  --_module-calendar:  #8250DF;
+  --_module-calendar:  #4F46E5;
   --module-calendar:   var(--_module-calendar);    /* Violett - Termine, Zeit */
   --_module-meals:     #C2410C;
   --module-meals:      var(--_module-meals);       /* Orange-700 - Essen, Wärme */
@@ -228,25 +229,31 @@
   --meal-breakfast:        var(--_meal-breakfast);       /* Morgensonne-Amber (= --color-warning, bewusster Share) */
   --_meal-breakfast-light: #FFF4D4;
   --meal-breakfast-light:  var(--_meal-breakfast-light);
-  --meal-lunch:            #2DA44E;
+  --_meal-lunch:           #1F7A3A;
+  --meal-lunch:            var(--_meal-lunch);
   --_meal-lunch-light:     #DAFBE1;
   --meal-lunch-light:      var(--_meal-lunch-light);
   --_meal-dinner:          #6c3aed;
   --meal-dinner:           var(--_meal-dinner);          /* Violet — Abend (= --color-accent) */
   --_meal-dinner-light:    #f5f3ff;
   --meal-dinner-light:     var(--_meal-dinner-light);
-  --meal-snack:            #C2410C;                      /* = --module-meals — Snack ist Sub-Domain */
+  --_meal-snack:           #C2410C;
+  --meal-snack:            var(--_meal-snack);           /* = --module-meals — Snack ist Sub-Domain */
   --_meal-snack-light:     #FFECE3;
   --meal-snack-light:      var(--_meal-snack-light);
 
   /* --------------------------------------------------------
    * 6. Farben - Prioritäten
    * -------------------------------------------------------- */
-  --color-priority-none:   var(--neutral-400);
-  --color-priority-low:    var(--neutral-500);
-  --color-priority-medium: #A16207;   /* Amber-700 — trennt von --color-warning + --module-meals */
-  --color-priority-high:   #C2410C;   /* = --module-meals (bewusster Share: „heiß") */
-  --color-priority-urgent: #B91C1C;   /* = --color-danger (bewusster Share: „gefährlich") */
+  --color-priority-none:     var(--neutral-400);
+  --_color-priority-low:     #5F5E5A;
+  --color-priority-low:      var(--_color-priority-low);
+  --_color-priority-medium:  #854D0E;
+  --color-priority-medium:   var(--_color-priority-medium);
+  --_color-priority-high:    #9A3412;
+  --color-priority-high:     var(--_color-priority-high);
+  --_color-priority-urgent:  #991B1B;
+  --color-priority-urgent:   var(--_color-priority-urgent);
 
   /* Hintergrundfarben für Priority-Badges */
   --_color-priority-none-bg:   rgba(142, 141, 137, 0.08);
@@ -316,23 +323,32 @@
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
 
-  /* Size-Skala */
+  /* Größen-Skala (Kompatibilitäts- und Layout-Tokens) */
   --text-2xs:  0.625rem;   /* 10px - Sehr kleine Badges (z.B. Erinnerungs-Zähler) */
   --text-xs:   0.75rem;    /* 12px - Minimum, Captions, Badges, Nav-Labels */
-  --text-sm:   0.8125rem;  /* 13px - Small/Secondary */
+  --text-sm:   0.875rem;   /* 14px - Kompakte Interaktion und Sekundärtext */
   --text-base: 1rem;       /* 16px - Body, Inputs */
-  --text-md:   var(--text-base); /* DEPRECATED: Alias auf --text-base. Nicht neu verwenden; bestehende Nutzer auf --text-base migrieren. */
   --text-lg:   1.125rem;   /* 18px - Section-Title */
   --text-xl:   1.25rem;    /* 20px - Subtitle */
   --text-2xl:  1.5rem;     /* 24px - Page-Title (Mobile) */
   --text-3xl:  1.875rem;   /* 30px - Page-Title (Desktop) */
   --text-4xl:  2.25rem;    /* 36px - Hero/Greeting */
 
-  /* Fluide Rollen-Größe: EINE Quelle für den Page-Title statt Modul-Overrides.
-     24px (Mobile) → 30px (Desktop), siehe Typo-Konsistenz-Plan Phase 1c. */
-  --type-page-title-size: clamp(1.5rem, 1.2rem + 1.2vw, 1.875rem);
-  /* Fluide Einzelfall-Größen (kein Rollen-Token, aber tokenisiert): */
-  --type-greeting-size: clamp(1.125rem, 0.56vw + 0.99rem, 1.5rem); /* Begrüßungs-Widget */
+  /* Semantische Rollen. Produktoberflächen nutzen feste rem-Werte; responsive
+     Unterschiede werden ausschließlich an den kanonischen Breakpoints gesetzt. */
+  --type-hero-mobile:          1.5rem;    /* 24px */
+  --type-hero-desktop:         1.875rem;  /* 30px */
+  --type-page-title-mobile:    1.375rem;  /* 22px */
+  --type-page-title-desktop:   1.75rem;   /* 28px */
+  --type-toolbar-title:        1.25rem;   /* 20px — Modul-Kopf-Titel (Canonical Page Head: alle Module + Settings-Leaf + Split) */
+  --type-section-title:        1.125rem;  /* 18px */
+  --type-card-title:           1rem;      /* 16px */
+  --type-body:                 1rem;      /* 16px */
+  --type-secondary:            0.875rem;  /* 14px */
+  --type-caption:              0.75rem;   /* 12px */
+  --type-micro:                0.625rem;  /* 10px */
+
+  /* Einzelfall-Größe außerhalb der authentifizierten Produktoberfläche. */
   --type-login-hero-size: clamp(2rem, 5vw, 3rem);                  /* Login-Hero */
 
   /* Line-Heights */
@@ -628,7 +644,7 @@
 
     --_module-dashboard: #a78bfa;
     --_module-tasks:     #4ADE80;
-    --_module-calendar:  #A78BFA;
+    --_module-calendar:  #818CF8;
     --_module-meals:     #FB923C;
     --_module-shopping:  #F472B6;
     --_module-notes:     #FCD34D;
@@ -641,11 +657,17 @@
 
     --_meal-breakfast:       #F59E0B;
     --_meal-breakfast-light: #332400;
+    --_meal-lunch:           #4ADE80;
     --_meal-lunch-light:     #1A3325;
     --_meal-dinner:          #a78bfa;
     --_meal-dinner-light:    #1e1040;
+    --_meal-snack:           #FB923C;
     --_meal-snack-light:     #3D2010;
 
+    --_color-priority-low:       #C8C7C3;
+    --_color-priority-medium:    #FBBF24;
+    --_color-priority-high:      #FB923C;
+    --_color-priority-urgent:    #FCA5A5;
     --_color-priority-none-bg:   rgba(142, 141, 137, 0.12);
     --_color-priority-low-bg:    rgba(142, 141, 137, 0.18);
     --_color-priority-medium-bg: rgba(230, 147, 10, 0.18);
@@ -743,7 +765,7 @@
     /* Modul-Akzente (Entflechtung Meals/Shopping spiegelt Light-Mode) */
     --_module-dashboard: #a78bfa;   /* Violet-400 */
     --_module-tasks:     #4ADE80;
-    --_module-calendar:  #A78BFA;
+    --_module-calendar:  #818CF8;
     --_module-meals:     #FB923C;   /* Orange-400 */
     --_module-shopping:  #F472B6;   /* Pink-400 */
     --_module-notes:     #FCD34D;
@@ -757,12 +779,18 @@
     /* Mahlzeit-Typ */
     --_meal-breakfast:       #F59E0B;
     --_meal-breakfast-light: #332400;
+    --_meal-lunch:           #4ADE80;
     --_meal-lunch-light:     #1A3325;
     --_meal-dinner:          #a78bfa;   /* Violet-400 */
     --_meal-dinner-light:    #1e1040;
+    --_meal-snack:           #FB923C;
     --_meal-snack-light:     #3D2010;
 
     /* Priority-Badge Hintergründe */
+    --_color-priority-low:       #C8C7C3;
+    --_color-priority-medium:    #FBBF24;
+    --_color-priority-high:      #FB923C;
+    --_color-priority-urgent:    #FCA5A5;
     --_color-priority-none-bg:   rgba(142, 141, 137, 0.12);
     --_color-priority-low-bg:    rgba(142, 141, 137, 0.18);
     --_color-priority-medium-bg: rgba(230, 147, 10, 0.18);

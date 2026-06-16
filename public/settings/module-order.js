@@ -1,6 +1,23 @@
 export const KITCHEN_CHILD_IDS = Object.freeze(['meals', 'recipes', 'shopping']);
+export const DEFAULT_MOBILE_NAV_ORDER = Object.freeze(['calendar', 'tasks', 'kitchen']);
+export const NAV_SECTION = Object.freeze({
+  overview: 0,
+  plan: 1,
+  home: 2,
+});
 
 const KITCHEN_CHILD_ID_SET = new Set(KITCHEN_CHILD_IDS);
+const PLAN_MODULE_IDS = new Set(['calendar', 'tasks', 'notes']);
+const MOBILE_NAV_ID_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+function isMobileNavId(id) {
+  return (
+    typeof id === 'string'
+    && MOBILE_NAV_ID_RE.test(id)
+    && id !== 'dashboard'
+    && id !== 'settings'
+  );
+}
 
 export function normalizeModuleOrder(order = []) {
   const normalized = [];
@@ -29,6 +46,64 @@ export function expandModuleOrder(order = []) {
   return normalizeModuleOrder(order).flatMap((id) => (
     id === 'kitchen' ? KITCHEN_CHILD_IDS : [id]
   ));
+}
+
+export function moduleSection(id) {
+  if (id === 'dashboard') return NAV_SECTION.overview;
+  if (PLAN_MODULE_IDS.has(id)) return NAV_SECTION.plan;
+  return NAV_SECTION.home;
+}
+
+export function sortNavigationItems(items = [], order = []) {
+  const orderIndex = new Map(
+    normalizeModuleOrder(order).map((id, index) => [id, index]),
+  );
+
+  return (Array.isArray(items) ? items : [])
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) => {
+      const leftId = left.item?.orderId || left.item?.module || left.item?.id;
+      const rightId = right.item?.orderId || right.item?.module || right.item?.id;
+      const sectionDelta = moduleSection(leftId) - moduleSection(rightId);
+      if (sectionDelta !== 0) return sectionDelta;
+
+      if (leftId === 'dashboard') return rightId === 'dashboard' ? left.index - right.index : -1;
+      if (rightId === 'dashboard') return 1;
+      if (leftId === 'settings') return rightId === 'settings' ? left.index - right.index : 1;
+      if (rightId === 'settings') return -1;
+
+      const leftOrderId = KITCHEN_CHILD_ID_SET.has(leftId) ? 'kitchen' : leftId;
+      const rightOrderId = KITCHEN_CHILD_ID_SET.has(rightId) ? 'kitchen' : rightId;
+      const leftRank = orderIndex.get(leftOrderId) ?? Number.MAX_SAFE_INTEGER;
+      const rightRank = orderIndex.get(rightOrderId) ?? Number.MAX_SAFE_INTEGER;
+      return leftRank - rightRank || left.index - right.index;
+    })
+    .map(({ item }) => item);
+}
+
+export function normalizeMobileNavOrder(order = []) {
+  return normalizeModuleOrder(order)
+    .filter(isMobileNavId)
+    .slice(0, 3);
+}
+
+export function resolveMobileNavOrder(order = [], availableIds = []) {
+  const available = normalizeModuleOrder(availableIds).filter(isMobileNavId);
+  const availableSet = new Set(available);
+  const resolved = [];
+
+  for (const id of [
+    ...normalizeMobileNavOrder(order),
+    ...DEFAULT_MOBILE_NAV_ORDER,
+    ...available,
+  ]) {
+    if (availableSet.has(id) && !resolved.includes(id)) {
+      resolved.push(id);
+    }
+    if (resolved.length === 3) break;
+  }
+
+  return resolved;
 }
 
 export function groupBuiltInModules(disabledModules = [], definitions = []) {

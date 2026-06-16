@@ -178,7 +178,7 @@ test('sync: public-only fetches PublicHolidays per year, caches them, sets last_
   __setFetchImpl(mock);
   setConfig({ holiday_country: 'DE', holiday_show_public: '1', holiday_show_school: '0' });
 
-  const res = await sync();
+  const res = await sync(true);
 
   assert.equal(res.synced, SYNC_YEAR_SPAN);
   assert.ok(mock.calls.every((u) => u.includes('/PublicHolidays')));
@@ -195,8 +195,8 @@ test('sync: public-only fetches PublicHolidays per year, caches them, sets last_
 test('sync: is idempotent – re-running does not duplicate cached rows', async () => {
   __setFetchImpl(makeApiMock());
   setConfig({ holiday_country: 'DE', holiday_show_public: '1', holiday_show_school: '0' });
-  await sync();
-  await sync();
+  await sync(true);
+  await sync(true);
   const pub = db.prepare("SELECT COUNT(*) c FROM holiday_cache WHERE type='public'").get().c;
   assert.equal(pub, SYNC_YEAR_SPAN);
 });
@@ -204,10 +204,32 @@ test('sync: is idempotent – re-running does not duplicate cached rows', async 
 test('sync: both layers enabled caches public and school entries', async () => {
   __setFetchImpl(makeApiMock());
   setConfig({ holiday_country: 'DE', holiday_show_public: '1', holiday_show_school: '1' });
-  const res = await sync();
+  const res = await sync(true);
   assert.equal(res.synced, SYNC_YEAR_SPAN * 2);
   assert.equal(db.prepare("SELECT COUNT(*) c FROM holiday_cache WHERE type='public'").get().c, SYNC_YEAR_SPAN);
   assert.equal(db.prepare("SELECT COUNT(*) c FROM holiday_cache WHERE type='school'").get().c, SYNC_YEAR_SPAN);
+});
+
+test('sync: throttles automatic sync if executed within 30 days', async () => {
+  const mock = makeApiMock();
+  __setFetchImpl(mock);
+  setConfig({ holiday_country: 'DE', holiday_show_public: '1', holiday_show_school: '0' });
+
+  // First sync (force=false) - should run because DB has no last_sync
+  const res1 = await sync(false);
+  assert.equal(res1.synced, SYNC_YEAR_SPAN);
+  const firstCallCount = mock.calls.length;
+  assert.ok(firstCallCount > 0);
+
+  // Second sync (force=false) - should throttle (skip)
+  const res2 = await sync(false);
+  assert.deepEqual(res2, { synced: 0 });
+  assert.equal(mock.calls.length, firstCallCount); // no new API calls
+
+  // Third sync (force=true) - should bypass throttle
+  const res3 = await sync(true);
+  assert.equal(res3.synced, SYNC_YEAR_SPAN);
+  assert.equal(mock.calls.length, firstCallCount * 2); // new API calls made
 });
 
 // ---- getCountries / getSubdivisions -----------------------------------------

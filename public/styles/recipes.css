@@ -67,7 +67,7 @@
 .recipe-card__notes {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
+  font-size: var(--type-body);
   white-space: pre-wrap;
 }
 
@@ -80,7 +80,7 @@
 }
 
 .recipe-card__ingredient {
-  font-size: var(--text-sm);
+  font-size: var(--type-body);
   color: var(--color-text-secondary);
 }
 

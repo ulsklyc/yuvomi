@@ -11,6 +11,7 @@ import { stagger } from '/utils/ux.js';
 import { t, formatDate as formatPreferredDate, formatTime, dateInputPlaceholder, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput, timeInputPlaceholder } from '/i18n.js';
 import { esc, fmtLocation } from '/utils/html.js';
 import { shiftEndDateKey, isEndBeforeStart } from '/utils/date.js';
+import { getReadableTextColor } from '/utils/color.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 
@@ -826,7 +827,7 @@ export async function render(container, { user }) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="calendar-page" id="calendar-page">
-      <div class="page-toolbar cal-toolbar" id="cal-toolbar"></div>
+      <div class="page-toolbar page-toolbar--wrap cal-toolbar" id="cal-toolbar"></div>
       <div id="cal-body" style="flex:1;display:flex;flex-direction:column;overflow:hidden;"></div>
       <button class="page-fab" id="fab-new-event" aria-label="${t('calendar.newEvent')}">
         <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
@@ -901,28 +902,27 @@ function renderToolbar() {
 
   bar.replaceChildren();
   bar.insertAdjacentHTML('beforeend', `
-    <h1 class="sr-only">${t('calendar.title')}</h1>
-    <div class="cal-toolbar__nav">
+    <h1 class="page-toolbar__title">${t('calendar.title')}</h1>
+    <div class="page-toolbar__center cal-toolbar__month">
       <button class="btn btn--icon" id="cal-prev" aria-label="${t('calendar.back')}">
         <i data-lucide="chevron-left" aria-hidden="true"></i>
       </button>
-    </div>
-    <button class="cal-toolbar__today" id="cal-today">${t('calendar.today')}</button>
-    <span class="cal-toolbar__label" id="cal-label"></span>
-    ${holidayToggleHtml}
-    <div class="cal-toolbar__views">
-      ${VIEWS.map((v) => `
-        <button class="cal-toolbar__view-btn ${v === state.view ? 'cal-toolbar__view-btn--active' : ''}"
-                data-view="${v}">${VIEW_LABELS()[v]}</button>
-      `).join('')}
-    </div>
-    <button class="btn btn--primary btn--icon toolbar-new-btn" id="cal-add" aria-label="${t('calendar.addEvent')}"
-            style="margin-left:auto;">
-      <i data-lucide="plus" aria-hidden="true"></i>
-    </button>
-    <div class="cal-toolbar__nav">
+      <button class="cal-toolbar__today" id="cal-today">${t('calendar.today')}</button>
+      <span class="cal-toolbar__label" id="cal-label"></span>
       <button class="btn btn--icon" id="cal-next" aria-label="${t('calendar.forward')}">
         <i data-lucide="chevron-right" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="page-toolbar__actions">
+      ${holidayToggleHtml}
+      <div class="cal-toolbar__views">
+        ${VIEWS.map((v) => `
+          <button class="cal-toolbar__view-btn ${v === state.view ? 'cal-toolbar__view-btn--active' : ''}"
+                  data-view="${v}">${VIEW_LABELS()[v]}</button>
+        `).join('')}
+      </div>
+      <button class="btn btn--primary btn--icon toolbar-new-btn" id="cal-add" aria-label="${t('calendar.addEvent')}">
+        <i data-lucide="plus" aria-hidden="true"></i>
       </button>
     </div>
   `);
@@ -1140,7 +1140,7 @@ function renderMonthDay(date, inMonth) {
   const taskHtml = dayTasks.slice(0, MAX_TASK_SHOW).map(renderTaskChip).join('');
 
   const holHtml = dayHols.map((h) => `
-    <div class="month-day__holiday" style="--holi-color:${esc(h.color)}" title="${esc(h.name)}">
+    <div class="month-day__holiday" style="--holi-color:${esc(h.color)};--holi-ink:${esc(getReadableTextColor(h.color))}" title="${esc(h.name)}">
       <span>${esc(h.name)}</span>
     </div>
   `).join('');
@@ -1199,7 +1199,7 @@ function renderWeekView(container) {
         ${days.map((d, i) => `
           <div class="allday-cell">
             ${holidaysOnDay(d).map((h) => `
-              <div class="allday-holiday" style="--holi-color:${esc(h.color)}" title="${esc(h.name)}">
+              <div class="allday-holiday" style="--holi-color:${esc(h.color)};--holi-ink:${esc(getReadableTextColor(h.color))}" title="${esc(h.name)}">
                 <span>${esc(h.name)}</span>
               </div>
             `).join('')}
@@ -1394,7 +1394,7 @@ function renderDayView(container) {
         <div class="calendar-all-day-label">${t('calendar.allDayShort')}</div>
         <div class="allday-cell">
           ${holidaysOnDay(state.cursor).map((h) => `
-            <div class="allday-holiday" style="--holi-color:${esc(h.color)}" title="${esc(h.name)}">
+            <div class="allday-holiday" style="--holi-color:${esc(h.color)};--holi-ink:${esc(getReadableTextColor(h.color))}" title="${esc(h.name)}">
               <span>${esc(h.name)}</span>
             </div>
           `).join('')}

@@ -67,7 +67,8 @@
         "sidebarExpand": "Rozbalit postranní panel",
         "sectionOverview": "Přehled",
         "sectionPlan": "Plán",
-        "sectionHome": "Domov"
+        "sectionHome": "Domov",
+        "help": "Hilfe"
     },
     "dashboard": {
         "title": "Přehled",
@@ -1194,7 +1195,7 @@
         "thirdPartyModulesStatusDisabled": "Deaktivováno",
         "thirdPartyModulesStatusError": "Chyba",
         "thirdPartyModulesSaved": "Nastavení modulu uloženo.",
-        "modulesDragHint": "Přetáhněte moduly pro nastavení pořadí v levém menu. Nastavení zůstává vždy poslední.",
+        "modulesDragHint": "Přetažením nebo šipkami změňte pořadí modulů pouze v jejich skupině.",
         "modulesDragHandle": "Přetáhněte pro seřazení",
         "modulesBuiltInBadge": "Vestavěný",
         "modulesThirdPartyBadge": "Modul",
@@ -1365,7 +1366,35 @@
         "systemSetupComplete": "Dokončeno",
         "systemSetupRequired": "Vyžadováno nastavení",
         "apiTokensEmpty": "Zatím žádné API tokeny.",
-        "familyEmpty": "Zatím žádní členové rodiny."
+        "familyEmpty": "Zatím žádní členové rodiny.",
+        "mobileNavigationTitle": "Mobilní navigace",
+        "mobileNavigationHint": "Vyberte tři cíle, které se zobrazí mezi Přehledem a Dalšími ve spodní navigaci.",
+        "mobileNavigationSlotLabel": "Pozice {{position}}",
+        "mobileNavigationEmptyOption": "Nepoužito",
+        "desktopNavigationTitle": "Webová navigace",
+        "desktopNavigationHint": "Zapněte moduly a seřaďte je v rámci skupin Přehled, Plánování a Domov.",
+        "mobileNavigationSaved": "Mobilní navigace byla uložena.",
+        "regionTitle": "Region / Formát",
+        "regionLabel": "Region",
+        "regionHint": "Nastaví měnu a formát data a času podle regionu. Pro individuální nastavení zvolte „Vlastní“.",
+        "regionCustom": "Vlastní",
+        "regionSaved": "Region uložen.",
+        "currencyMovedHint": "Měna se nyní nastavuje v Vzhled → Region / Formát.",
+        "pageNotifications": "Oznámení",
+        "pageNotificationsDescription": "Spravovat push oznámení na tomto zařízení",
+        "notificationsTitle": "Oznámení",
+        "pushToggleTitle": "Push oznámení",
+        "pushToggleLabel": "Aktivovat na tomto zařízení",
+        "pushChecking": "Kontrola stavu …",
+        "pushEnabled": "Push oznámení jsou na tomto zařízení aktivní.",
+        "pushDisabled": "Push oznámení jsou na tomto zařízení vypnutá.",
+        "pushDenied": "Oznámení byla v prohlížeči zablokována. Povolte je v nastavení prohlížeče.",
+        "pushUnsupported": "Tento prohlížeč nepodporuje push oznámení.",
+        "pushError": "Akce se nezdařila. Zkuste to znovu.",
+        "pushTestButton": "Odeslat testovací oznámení",
+        "pushTestSent": "Testovací oznámení odesláno.",
+        "pushTestTitle": "Yuvomi",
+        "pushTestBody": "Toto je testovací oznámení."
     },
     "login": {
         "tagline": "Rodinné plánování. Bezpečné. Soukromé. Open Source.",
@@ -1967,5 +1996,12 @@
         "95": "Bouřka",
         "96": "Bouřka s krupobitím",
         "99": "Silná bouřka"
+    },
+    "help": {
+        "title": "Hilfe",
+        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
+        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
+        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
+        "mobileSettings": "Einstellungen findest du unter „Mehr“."
     }
 }

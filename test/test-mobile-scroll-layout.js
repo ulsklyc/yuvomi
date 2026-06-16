@@ -19,17 +19,17 @@ function cssRuleBody(css, selector) {
   return match?.[1] ?? '';
 }
 
-test('mobile dashboard scroll does not mutate root or fixed layers', () => {
+test('mobile scrolling keeps navigation and fixed layers stable', () => {
   assert.equal(
     routerJs.includes('document.documentElement.classList.toggle(\'nav-bottom--hidden\''),
     false,
     'Scroll-Handler darf den Bottom-Nav-Status nicht auf <html> spiegeln'
   );
 
-  assert.match(
-    routerJs,
-    /currentPath\s*===\s*'\/'[\s\S]{0,240}setNavHidden\(false\)[\s\S]{0,240}return/,
-    'Dashboard-Scroll darf die mobile Bottom-Nav nicht ausblenden'
+  assert.equal(
+    routerJs.includes('setNavHidden'),
+    false,
+    'Kein Scrollpfad darf die mobile Bottom-Nav ausblenden'
   );
 
   assert.equal(
@@ -45,11 +45,10 @@ test('mobile dashboard scroll does not mutate root or fixed layers', () => {
     'FAB darf bottom nicht animieren; fixed Layer sollen beim Scrollen stabil bleiben'
   );
 
-  const navHiddenRule = cssRuleBody(glassCss, '.nav-bottom--hidden');
   assert.equal(
-    /margin-bottom\s*:/.test(navHiddenRule),
+    glassCss.includes('.nav-bottom--hidden'),
     false,
-    'Ausblendende Bottom-Nav darf kein margin-bottom setzen; das verändert Layout während Momentum-Scroll'
+    'Die Glass-Schicht darf keinen versteckten Bottom-Nav-Zustand definieren'
   );
 });
 
@@ -60,4 +59,43 @@ test('mobile bottom navigation reserves safe-area space without scroll-time root
   assert.match(navRule, /padding-bottom:\s*var\(--safe-area-inset-bottom\)/);
   assert.match(tokensCss, /--nav-bottom-height:\s*calc\(var\(--nav-height-mobile\)\s*\+\s*var\(--safe-area-inset-bottom\)\)/);
   assert.equal(rootRule.includes('nav-bottom--hidden'), false);
+});
+
+test('mobile bottom navigation keeps five equal slots with inset indicator geometry', () => {
+  const itemsRule = cssRuleBody(layoutCss, '.nav-bottom__items');
+  const itemRule = cssRuleBody(layoutCss, '.nav-bottom .nav-item');
+  const baseItemRule = cssRuleBody(layoutCss, '.nav-item');
+  const indicatorRule = cssRuleBody(layoutCss, '.nav-bottom__indicator');
+  const indicatorSurfaceRule = cssRuleBody(layoutCss, '.nav-bottom__indicator::before');
+
+  assert.match(itemsRule, /display:\s*flex/);
+  assert.match(baseItemRule, /flex:\s*1/);
+  assert.match(itemRule, /min-width:\s*0/);
+  assert.match(indicatorSurfaceRule, /inset-inline:\s*var\(--space-1\)/);
+  assert.match(indicatorRule, /top:\s*var\(--space-1\)/);
+  assert.match(indicatorRule, /bottom:\s*var\(--space-1\)/);
+  assert.doesNotMatch(indicatorRule, /transition:[^;]*\bwidth\b/);
+});
+
+test('cold dashboard load does not transform the scroll surface', () => {
+  assert.match(
+    routerJs,
+    /const shouldAnimate = Boolean\(previousPath\);/,
+    'the router must distinguish a cold load from an in-app navigation',
+  );
+  assert.match(
+    routerJs,
+    /if \(shouldAnimate\) \{\s*pageWrapper\.classList\.add\(inClass\);/,
+    'the slide class must only be applied after an existing route',
+  );
+});
+
+test('closed dashboard speed dial cannot capture first-scroll gestures', () => {
+  const dashboardCss = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const containerRule = cssRuleBody(dashboardCss, '.fab-container');
+  const mainRule = cssRuleBody(dashboardCss, '.fab-main');
+
+  assert.match(containerRule, /pointer-events:\s*none/);
+  assert.match(mainRule, /pointer-events:\s*auto/);
+  assert.match(dashboardCss, /\.fab-actions--visible\s*\{[^}]*pointer-events:\s*auto/s);
 });

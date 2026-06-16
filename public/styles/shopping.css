@@ -238,8 +238,8 @@
   }
 
   .quick-add__input { font-size: var(--text-base); }
-  .quick-add__qty   { font-size: var(--text-sm); }
-  .quick-add__cat   { font-size: var(--text-sm); }
+  .quick-add__qty   { font-size: var(--text-base); }
+  .quick-add__cat   { font-size: var(--text-base); }
 }
 
 .quick-add__btn {

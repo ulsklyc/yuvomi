@@ -43,6 +43,16 @@ export const SETTINGS_LEAVES = freezeEntries([
     loader: () => import('/settings/pages/personal-device.js'),
   },
   {
+    id: 'personal-notifications',
+    domainId: 'personal',
+    path: '/settings/personal/notifications',
+    labelKey: 'settings.pageNotifications',
+    descriptionKey: 'settings.pageNotificationsDescription',
+    icon: 'bell',
+    adminOnly: false,
+    loader: () => import('/settings/pages/notifications.js'),
+  },
+  {
     id: 'modules-navigation',
     domainId: 'modules',
     path: '/settings/modules/navigation',

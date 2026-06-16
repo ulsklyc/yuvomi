@@ -252,20 +252,40 @@ async function setupDemoDb(browser) {
 
   const weatherResp = await apiCtx.request.put(`${BASE_URL}/api/v1/preferences`, {
     data: {
-      weather_lat:   51.5136,
-      weather_lon:   7.4653,
-      weather_city:  'Dortmund',
+      weather_provider: 'open-meteo',
+      weather_lat:   52.5200,
+      weather_lon:   13.4050,
+      weather_city:  'Berlin',
       weather_units: 'metric',
     },
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
   });
   if (!weatherResp.ok()) throw new Error(`Failed to set weather: ${await weatherResp.text()}`);
-  console.log('  Weather set to Dortmund ✓');
+  console.log('  Weather set to Berlin ✓');
 
   await apiCtx.close();
   stopServer();
   await wait(500);
   console.log('Demo database ready.\n');
+}
+
+// Fill the server-side weather cache so the dashboard widget renders instantly.
+async function warmWeatherCache(browser) {
+  try {
+    const ctx = await browser.newContext();
+    const loginResp = await ctx.request.post(`${BASE_URL}/api/v1/auth/login`, {
+      data: { username: 'alex', password: 'demo1234' },
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (loginResp.ok()) {
+      const wRes = await ctx.request.get(`${BASE_URL}/api/v1/weather`);
+      const body = await wRes.json().catch(() => ({}));
+      console.log(body?.data ? '  Weather cache warmed (Berlin) ✓' : '  ⚠️  Weather cache empty (data: null)');
+    }
+    await ctx.close();
+  } catch (err) {
+    console.log(`  ⚠️  Weather warm-up skipped: ${err.message}`);
+  }
 }
 
 async function main() {
@@ -278,6 +298,7 @@ async function main() {
     console.log('Starting server for screenshots…');
     await startServer();
     await waitForServer();
+    await warmWeatherCache(browser);
     console.log(`Server ready at ${BASE_URL}\n`);
 
     for (const dev of DEVICES) {

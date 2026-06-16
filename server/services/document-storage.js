@@ -23,6 +23,7 @@ const ENV_FIELDS = {
   password: 'DOCUMENT_STORAGE_WEBDAV_PASSWORD',
   path: 'DOCUMENT_STORAGE_WEBDAV_PATH',
 };
+const ENV_ALLOW_PRIVATE_NETWORK = 'DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK';
 const PASSWORD_MASK_RE = /^(?:\*|•){4,}$/;
 const BLOCKED_HOST_SUFFIXES = ['.localhost', '.local', '.internal', '.home.arpa'];
 const BLOCKED_NETWORKS = new BlockList();
@@ -243,8 +244,17 @@ function normalizedHostname(hostname) {
     : value;
 }
 
+function isPrivateNetworkEnvAllowed() {
+  const raw = process.env[ENV_ALLOW_PRIVATE_NETWORK];
+  return raw !== undefined && (raw.trim() === 'true' || raw.trim() === '1');
+}
+
 function privateNetworkAllowed(config) {
-  return privateNetworkAccessForTests || config.envControlled?.url === true;
+  return (
+    privateNetworkAccessForTests
+    || config.envControlled?.url === true
+    || isPrivateNetworkEnvAllowed()
+  );
 }
 
 function assertHostnameAllowed(hostname, allowPrivate = false) {
@@ -549,6 +559,7 @@ export function getStatus() {
     lastTest: config.lastTest,
     lastError: config.lastError,
     envControlled: config.envControlled,
+    allowPrivateNetwork: isPrivateNetworkEnvAllowed(),
   };
 }
 

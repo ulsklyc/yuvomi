@@ -1,6 +1,6 @@
 {
   "name": "oikos",
-  "version": "0.71.19",
+  "version": "0.71.50",
   "description": "Self-hosted family planner - calendar, tasks, shopping, meal planning, budget and more. Private, open-source, no subscription.",
   "main": "server/index.js",
   "type": "module",
@@ -23,13 +23,19 @@
     "test:ux-utils": "node test/test-ux-utils.js",
     "test:skeleton-utils": "node test/test-skeleton-utils.js",
     "test:date-utils": "node test/test-date-utils.js",
+    "test:html-entities": "node test/test-html-entities.js",
+    "test:help": "node test/test-help.js",
     "test:lang-init": "node --test test/test-lang-init.js",
     "test:modal-utils": "node --loader ./test/test-browser-loader.mjs test/test-modal-utils.js",
     "test:kitchen-tabs": "node --loader ./test/test-browser-loader.mjs test/test-kitchen-tabs.js",
     "test:settings-navigation": "node --loader ./test/test-browser-loader.mjs --test test/test-settings-navigation.js",
     "test:mobile-scroll-layout": "node --test test/test-mobile-scroll-layout.js",
     "test:frontend-audit": "node --test test/test-frontend-audit.js",
+    "test:region-presets": "node --test test/test-region-presets.js",
+    "test:docker-publish": "node --test test/test-docker-publish.js",
+    "test:push": "node --experimental-sqlite test/test-push.js",
     "test:reminders": "node --experimental-sqlite test/test-reminders.js",
+    "test:reminder-offset": "node test/test-reminder-offset.js",
     "test:api": "node test/test-api.js",
     "test:auth-userid": "node --test test/test-auth-userid.js",
     "test:setup": "node test/test-setup.js",
@@ -56,6 +62,7 @@
     "test:weather": "node --experimental-sqlite --test test/test-weather.js",
     "test:holidays": "node --experimental-sqlite --test test/test-holidays.js",
     "test:preferences-weather": "node --experimental-sqlite --test test/test-preferences-weather.js",
+    "test:preferences-navigation": "node --experimental-sqlite --test test/test-preferences-navigation.js",
     "test:installer-schema": "node --test test/test-installer-schema.js",
     "test:installer-env-write": "node --test test/test-installer-env-write.js",
     "test:installer-static": "node --test test/test-installer-static.js",
@@ -64,11 +71,11 @@
     "test:installer-prereq": "node --test test/test-installer-prereq.js",
     "test:installer-a11y": "node --test test/test-installer-a11y.js",
     "test:typography": "node --test test/test-typography.js",
-    "test": "node --experimental-sqlite test/test-db.js && node --experimental-sqlite test/test-dashboard.js && node --experimental-sqlite test/test-tasks.js && node --experimental-sqlite test/test-multi-assignment.js && node --experimental-sqlite test/test-shopping.js && npm run test:meals && npm run test:calendar && node --experimental-sqlite test/test-notes-contacts-budget.js && npm run test:budget-recurrence && npm run test:ux-utils && npm run test:skeleton-utils && npm run test:date-utils && npm run test:lang-init && npm run test:modal-utils && npm run test:reminders && npm run test:api && npm run test:auth-userid && npm run test:ics-parser && npm run test:ics-sub && npm run test:setup && npm run test:kitchen-tabs && npm run test:settings-navigation && npm run test:mobile-scroll-layout && npm run test:frontend-audit && npm run test:backup-scheduler && npm run test:backup-webdav && npm run test:caldav && npm run test:caldav-reminders && npm run test:caldav-event-target && npm run test:carddav && npm run test:split-expenses && npm run test:oidc && npm run test:family-contacts && npm run test:google-calendar && npm run test:google-multi && npm run test:housekeeping && npm run test:documents && npm run test:document-storage && npm run test:dms-adapter && npm run test:dms-routes && npm run test:dms-papra-adapter && npm run test:weather && npm run test:holidays && npm run test:preferences-weather && npm run test:installer-schema && npm run test:installer-env-write && npm run test:installer-static && npm run test:installer-i18n && npm run test:installer-cli-i18n && npm run test:installer-prereq && npm run test:installer-a11y && npm run test:typography"
+    "test": "node --experimental-sqlite test/test-db.js && node --experimental-sqlite test/test-dashboard.js && node --experimental-sqlite test/test-tasks.js && node --experimental-sqlite test/test-multi-assignment.js && node --experimental-sqlite test/test-shopping.js && npm run test:meals && npm run test:calendar && node --experimental-sqlite test/test-notes-contacts-budget.js && npm run test:budget-recurrence && npm run test:ux-utils && npm run test:skeleton-utils && npm run test:date-utils && npm run test:html-entities && npm run test:help && npm run test:lang-init && npm run test:modal-utils && npm run test:reminders && npm run test:reminder-offset && npm run test:push && npm run test:api && npm run test:auth-userid && npm run test:ics-parser && npm run test:ics-sub && npm run test:setup && npm run test:kitchen-tabs && npm run test:settings-navigation && npm run test:mobile-scroll-layout && npm run test:frontend-audit && npm run test:region-presets && npm run test:docker-publish && npm run test:backup-scheduler && npm run test:backup-webdav && npm run test:caldav && npm run test:caldav-reminders && npm run test:caldav-event-target && npm run test:carddav && npm run test:split-expenses && npm run test:oidc && npm run test:family-contacts && npm run test:google-calendar && npm run test:google-multi && npm run test:housekeeping && npm run test:documents && npm run test:document-storage && npm run test:dms-adapter && npm run test:dms-routes && npm run test:dms-papra-adapter && npm run test:weather && npm run test:holidays && npm run test:preferences-weather && npm run test:preferences-navigation && npm run test:installer-schema && npm run test:installer-env-write && npm run test:installer-static && npm run test:installer-i18n && npm run test:installer-cli-i18n && npm run test:installer-prereq && npm run test:installer-a11y && npm run test:typography"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
-    "better-sqlite3": "^12.10.0",
+    "better-sqlite3": "^12.11.1",
     "compression": "^1.8.1",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
@@ -77,7 +84,8 @@
     "helmet": "^8.2.0",
     "node-cron": "^4.2.1",
     "node-fetch": "^3.3.2",
-    "openid-client": "^6.8.4"
+    "openid-client": "^6.8.4",
+    "web-push": "^3.6.7"
   },
   "optionalDependencies": {
     "googleapis": "^173.0.0",
@@ -86,6 +94,6 @@
   "license": "MIT",
   "devDependencies": {
     "puppeteer": "^25.1.0",
-    "sharp": "^0.34.5"
+    "sharp": "^0.35.1"
   }
 }

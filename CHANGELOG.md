@@ -7,6 +7,193 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.71.50] - 2026-06-16
+
+### Added
+- **Web Push notifications for reminders**: opt-in push notifications (Settings → Personal → Notifications) deliver due reminders as system notifications even when the app is closed. A background scheduler sends due task, event and birthday reminders via the Web Push standard (VAPID / RFC 8291); VAPID keys are generated automatically on first use, or can be pinned across redeployments via `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT`. Requires HTTPS. On devices where push is enabled, the in-app reminder toast still appears while the duplicate in-page browser notification is suppressed.
+
+## [0.71.49] - 2026-06-16
+
+### Added
+- **Unified Region / Format setting**: a single Region dropdown in Appearance settings presets currency, date format and time format together for 24 supported locales (e.g. de-DE, en-US, pt-BR). Selecting "Custom" reveals the individual currency, date and time controls. The Region control is admin-only, matching the previous currency permission.
+
+### Changed
+- **Currency moved out of Budget settings**: the currency selector now lives in the unified Region / Format control in Appearance settings; the Budget settings page links there instead.
+
+## [0.71.47] - 2026-06-15
+
+### Changed
+- **Weather widget appears first on the dashboard**: the default dashboard layout now places the weather card above the tasks and calendar widgets, so it is visible at the top without scrolling. This applies to new installs and anyone who has not customised their widget order; existing custom layouts are preserved.
+
+## [0.71.46] - 2026-06-15
+
+### Fixed
+- **Editing an hourly housekeeping visit no longer fails with "daily_rate is required"**: saving changes to a visit billed by the hour (e.g. adjusting the hours worked) returned a 400 error because the update endpoint always demanded a daily rate, even though hourly visits submit minutes worked instead. The daily rate is now only required for daily-rate visits; hourly visits recompute the amount from the minutes worked.
+
+## [0.71.45] - 2026-06-15
+
+### Fixed
+- **Settings side navigation updates its language on locale switch**: changing the application language while on a Settings page left the side navigation menu and the page header in the previous language until a hard reload. The Settings shell now tracks the locale it last rendered with and performs a full re-render when it changes, so the labels update immediately like the rest of the app.
+
+## [0.71.44] - 2026-06-14
+
+### Changed
+- **Holiday data syncs at most once every 30 days**: the automatic background holiday sync no longer calls the OpenHolidays API on every sync cycle (every 15 minutes by default) — it now skips when the cache was refreshed within the last 30 days, cutting needless external requests for data that changes at most yearly. The manual "Sync now" button in Settings still forces an immediate refresh.
+
+### Fixed
+- **"Heute wichtig" calendar card shows only today's events**: the dashboard Today Cockpit's calendar card listed the next upcoming event even when it was days away; it now counts and shows only events that fall on the current day.
+- **DMS account action buttons aligned inside the card**: the Test/Remove buttons for a connected document-management account are now rendered inside the account's status card instead of spilling outside its border.
+
+## [0.71.43] - 2026-06-14
+
+### Added
+- **Visible help entry**: a "Hilfe" item now sits in the desktop sidebar and in the mobile "More" sheet, opening a help overlay. On desktop it lists the keyboard shortcuts; on touch devices (where shortcuts don't apply) it shows a short plain-language guide — how to navigate, create with the + button, search, and find settings. The `?` keyboard shortcut still opens the same overlay.
+
+## [0.71.42] - 2026-06-13
+
+### Changed
+- **Contact category icons** now use Lucide line icons (stethoscope, graduation cap, landmark, shield, wrench, …) instead of emoji, matching the line-icon style used across the rest of the app.
+- **Calendar event colour shown as a dot**: the agenda list and the dashboard calendar widget now mark an event's calendar colour with a small dot instead of a coloured bar on the card's edge, using the same vocabulary as the task list's status dots.
+- **Tasks filter row uses the module accent**: the active filter chip, the clear badge, and the filter toggle now use the Tasks green instead of the global violet, so the filter row matches the rest of the module.
+
+### Fixed
+- **Single way to add a recipe**: Recipes no longer shows a toolbar "Add recipe" button next to the floating action button; the floating action button is now the only create action, consistent with every other module.
+- **Calendar names with "&" display correctly**: external calendar names that arrived HTML-entity-encoded (e.g. an imported Google calendar shown as "Termine &amp; Verabredungen") are now stored and displayed as plain text; existing names are repaired automatically.
+
+## [0.71.41] - 2026-06-13
+
+### Changed
+- **Consistent module headers across the app**: every module now shows a same-sized page title and a shared, slot-based toolbar — the title sits left, search or date navigation in the centre, and view switchers and actions grouped on the right — so the header no longer changes size or layout when moving between Tasks, Documents, Notes, Housekeeping, Contacts, Budget, Kitchen, Calendar, and Birthdays. On phones the centre slot (search/date navigation) drops to its own row as a cohesive group.
+- **Kitchen shows a "Küche" title**: the Meals/Recipes/Shopping tab bar now carries the module title beside the tabs.
+- **Calendar view switcher matches Budget**: the active Month/Week/Day/Agenda tab now uses the module-accent fill instead of a neutral pill, giving segmented switchers one consistent active style.
+
+### Fixed
+- **Single way to add in Documents and Birthdays**: these modules previously showed both a toolbar button and a floating action button to create an item; the floating action button — in the module's own colour — is now the only one.
+- **No more duplicated search label**: the search field in Documents, Contacts, and Birthdays no longer repeats its placeholder text as a visible label above the box.
+- **No stray focus outline on settings titles**: opening a settings page no longer draws an accent box around the page title.
+
+## [0.71.40] - 2026-06-13
+
+### Fixed
+- **Week view day numbers highlight on hover again**: hovering a non-today day header in the calendar's week view now shows the intended circular highlight; it previously referenced an undefined colour token and had no effect.
+
+
+
+### Changed
+- **Dashboard "Today at a glance" is easier to scan on phones**: the important-today cards now use a compact 2×2 glance grid instead of a full-height stack, so the actionable lists below appear without scrolling; very narrow screens fall back to a single column.
+- **Dashboard glance cards read more calmly**: the task and event cards show an open-count badge and now use neutral titles with a single coloured module icon, reducing the colour load at the top of the screen.
+
+## [0.71.38] - 2026-06-13
+
+### Fixed
+- **All-day events now appear in the dashboard's upcoming events widget**: events stored with a date-only timestamp (no time component) were excluded by an off-by-one string comparison; they are now handled correctly.
+- **Birthdays set to "no notification" no longer appear as calendar events**: selecting "keine Benachrichtigung" now removes the associated calendar event so the birthday is no longer shown in upcoming events or the calendar view.
+
+## [0.71.37] - 2026-06-13
+
+### Changed
+- **Mobile controls are easier to operate**: task filters, Calendar's Today action, loan filters, and Settings breadcrumbs now use consistent touch-safe targets.
+- **Progress indicators animate without layout work**: Dashboard shopping progress and task subtask progress now use transform-based animation.
+
+### Fixed
+- **Shared dialogs and Housekeeping expose clearer semantics**: prompt and selection fields have accessible labels, and Housekeeping starts with a proper page heading.
+- **User-selected and semantic colors remain readable**: avatars choose a contrasting foreground automatically, while priority and meal labels meet WCAG AA contrast in light and dark themes.
+
+## [0.71.36] - 2026-06-13
+
+### Changed
+- **Dense mobile modules now reveal complexity progressively**: Contacts keep one primary row action with secondary actions under More, Documents collapse view and filter controls behind a bounded overflow panel, and Navigation settings use lighter sections with a sequential heading hierarchy.
+- **Mobile controls now use consistent touch-safe sizing and quieter motion**: meal actions remain visible with 48 px targets, audited profile, birthday, navigation, contact, housekeeping, and budget controls meet the same target standard, and budget bars animate with transforms instead of layout-driving widths.
+
+### Fixed
+- **Forms, housekeeping copy, and holiday chips are more accessible**: search fields retain visible labels, German housekeeping strings no longer fall back to English, worker identity spacing is restored, and custom holiday colors choose readable foreground text.
+
+## [0.71.35] - 2026-06-13
+
+### Fixed
+- **Dashboard interactions now feel proportionate and respond on the first mobile swipe**: the "Today important" values no longer overpower their heading, the initial route skips the page-slide transform, and the closed quick-action layer no longer captures gestures in the lower half of the screen.
+- **Calendar gains clearer desktop spacing and denser date navigation**: the page now keeps a consistent gutter beside the sidebar, while weekday and date sit side by side in a shorter header row.
+- **Settings open faster and mobile navigation accents stay distinct**: Settings reuse the authenticated router user instead of repeating the session request, and Dashboard and Calendar retain separate colors in light and dark themes.
+
+## [0.71.34] - 2026-06-13
+
+### Fixed
+- **PWA updates and final interface details now remain current, readable, and consistent**: release-bound service-worker caches deliver every published UI revision, the early locale bootstrap remains available offline, colored Notes choose WCAG-safe text automatically, Dashboard quick actions use native controls with one clear page heading, mobile customization keeps a 48 px touch target, and rounded Dashboard and Housekeeping cards use quieter full borders instead of heavy accent caps.
+- **Docker publishing no longer reports a failed release after images were pushed successfully**: transient GitHub Actions cache-export errors are treated as failures of an optional optimization, while image builds and registry pushes remain strict.
+
+## [0.71.33] - 2026-06-12
+
+### Fixed
+- **RTL, extreme-content, and route-error resilience are hardened across the responsive UI**: Arabic now applies RTL before first paint and re-renders the active page when languages change; mixed-script and unbroken Notes and Birthdays content stays within its layout; adapted search and overflow controls align logically; and failed page loads show a localized, focused recovery state instead of raw network errors or false empty data.
+
+## [0.71.32] - 2026-06-12
+
+### Changed
+- **Responsive module layouts now preserve readability from narrow phones through tablets**: Notes use width-aware grid columns without horizontal overflow, dense Tasks and Documents controls collapse or wrap before labels are squeezed, Kitchen tabs remain visible, Settings overview links use tablet space efficiently, dashboard note cards constrain long content, and Birthdays presents one clear mobile creation action.
+
+## [0.71.31] - 2026-06-12
+
+### Changed
+- **App-wide typography now follows one responsive semantic hierarchy**: mobile and desktop use fixed hero, page, section, card, body, secondary, caption, and micro roles instead of drifting module-specific sizes. Oversized mobile headings were reduced, readable supporting text now starts at 14px, prose and inputs stay at 16px, document and split-expense headings are consistent, and Settings leaf pages show one clear primary title.
+
+## [0.71.30] - 2026-06-12
+
+### Changed
+- **Mobile bottom navigation now uses a quieter, more precise active state**: the inset module-tinted indicator, flatter inactive icon wells, stable labels, focused keyboard ring, and icon-only press feedback improve clarity across light, dark, reduced-motion, reduced-transparency, high-contrast, and forced-color modes.
+
+## [0.71.29] - 2026-06-12
+
+### Fixed
+- **WebDAV document storage now works with local/private-network targets**: setting `DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK=true` lifts the SSRF block for Nextcloud or other WebDAV servers that resolve to RFC 1918 / loopback addresses (e.g. same Docker Compose stack, LAN domain via Caddy). The guard remains active by default; the opt-in is explicit and documented.
+
+## [0.71.28] - 2026-06-12
+
+### Fixed
+- **Relative `DB_PATH` no longer crashes with a cryptic error**: `init()` now creates the database directory before opening the connection (consistent with the existing restore path) and logs a clear warning when `DB_PATH` is relative, explaining that data will not survive container restarts and pointing to the correct absolute-path form (`/data/oikos.db`).
+
+## [0.71.27] - 2026-06-12
+
+### Fixed
+- **Website version badge synchronized**: the GitHub Pages landing page now shows the current release in both the proof bar and footer instead of the stale `v0.71.21` label.
+
+## [0.71.26] - 2026-06-12
+
+### Changed
+- **Responsive navigation personalization**: the mobile bottom bar now keeps exactly five stable destinations visible — Overview, three user-selected favorites, and More — and remains present while content scrolls. Inactive buttons use neutral surfaces while the current module alone carries its accent through a faster 200 ms sliding indicator. Settings → Modules → Navigation now separates mobile favorites from web navigation; desktop entries can only be reordered within the Overview, Plan, and Home groups, with Dashboard and Settings pinned.
+
+## [0.71.25] - 2026-06-12
+
+### Fixed
+- **Settings page no longer shifts horizontally when the scrollbar appears or disappears**: `.app-content` now declares `scrollbar-gutter: stable`, which pre-reserves the scrollbar lane at all times. Previously, toggling between long and short pages caused the entire content area to jump by the scrollbar width.
+
+## [0.71.24] - 2026-06-12
+
+### Fixed
+- **Dashboard scroll on Android no longer requires a tap before the first swipe**: interactive cards (`.today-cockpit-card`, `.dashboard-metric`) were missing `touch-action: pan-y`, causing Chrome to enter tap/scroll disambiguation mode on the first touch. A preliminary tap was needed to activate the scroll context. All dashboard interactive items now declare `touch-action: pan-y` consistently, so the first swipe scrolls immediately.
+
+## [0.71.23] - 2026-06-12
+
+### Fixed
+- **Task reminders no longer drift by the timezone offset on every save**: a task reminder was stored as UTC but read back as local time, so reopening a task in a non-UTC timezone showed the wrong offset (e.g. "1 hour before" became "Custom – 360 minutes" at UTC+5), and each save without changes added the offset again. Reminder times are now read back as UTC consistently, so the offset round-trips correctly and stays stable across repeated saves.
+
+## [0.71.22] - 2026-06-12
+
+### Changed
+- **Collapsible settings sidebar on desktop**: the settings navigation (≥1024px) used to list every domain and all its pages at once, which ran very long for admins (5 sections, 18 links). The five domain groups (Personal, Modules, Sync, Documents, Administration) are now a single-open accordion: the domain you are currently in is expanded and the others collapse to just their header, with a smooth height animation and a rotating chevron. Switching pages automatically opens the matching domain and closes the rest. Collapsed sections are removed from the keyboard tab order, the open/close motion respects reduced-motion preferences, and the accordion only activates when more than one domain is visible (single-domain members keep the flat list). The mobile drill-down navigation is unchanged.
+
+## [0.71.21] - 2026-06-12
+
+### Changed
+- **Slimmer dashboard header on mobile**: the home dashboard header used to stack three rows on phones (date, greeting, then the customize button on its own line). The customize button now sits on the greeting row, right-aligned and vertically centered, so the header takes less vertical space and "Today at a glance" appears sooner. The desktop layout and the edit-mode toolbar (which still wraps below on narrow screens) are unchanged.
+
+### Removed
+- **Dead dashboard styles and a deprecated token**: removed unused CSS for the previous dashboard layout system (hero, layout, workspace, tile, side-stack, and the `dashboard-widget-grid` class) that was left behind when the current widget grid replaced it, and dropped the deprecated `--text-md` font-size alias. Internal cleanup only, no visible change.
+
+## [0.71.20] - 2026-06-12
+
+### Changed
+- **Calmer dashboard above the fold**: the home dashboard no longer stacks three separate representations of the same four areas (Tasks, Calendar, Shopping, Meals) before any new information appears. The redundant quick-action row in the greeting header has been removed — the bottom-right action button (and the sidebar on desktop) already cover creating and navigating — so the personal greeting and the "Today at a glance" summary now lead the screen. On mobile this also removes a row of unlabeled icon-only buttons. The duplicate date that the summary repeated directly under the greeting is gone, leaving a single date. No data, widgets, or customization were changed.
+
 ## [0.71.19] - 2026-06-12
 
 ### Fixed

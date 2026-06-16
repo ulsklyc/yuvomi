@@ -67,7 +67,8 @@
         "sidebarExpand": "Розгорнути бічну панель",
         "sectionOverview": "Огляд",
         "sectionPlan": "План",
-        "sectionHome": "Дім"
+        "sectionHome": "Дім",
+        "help": "Hilfe"
     },
     "dashboard": {
         "title": "Огляд",
@@ -1194,7 +1195,7 @@
         "thirdPartyModulesStatusDisabled": "Disabled",
         "thirdPartyModulesStatusError": "Error",
         "thirdPartyModulesSaved": "Module setting saved.",
-        "modulesDragHint": "Drag modules to define the left menu order. Settings always stays last.",
+        "modulesDragHint": "Перетягуйте модулі або використовуйте стрілки, щоб змінювати порядок лише в межах їхньої групи.",
         "modulesDragHandle": "Drag to reorder",
         "modulesBuiltInBadge": "Вбудований",
         "modulesThirdPartyBadge": "Module",
@@ -1365,7 +1366,35 @@
         "systemSetupComplete": "Завершено",
         "systemSetupRequired": "Потрібне налаштування",
         "apiTokensEmpty": "Токенів API ще немає.",
-        "familyEmpty": "Членів родини ще немає."
+        "familyEmpty": "Членів родини ще немає.",
+        "mobileNavigationTitle": "Мобільна навігація",
+        "mobileNavigationHint": "Виберіть три розділи, які відображатимуться між Оглядом і Більше в нижній навігації.",
+        "mobileNavigationSlotLabel": "Позиція {{position}}",
+        "mobileNavigationEmptyOption": "Не використовується",
+        "desktopNavigationTitle": "Вебнавігація",
+        "desktopNavigationHint": "Увімкніть модулі та впорядкуйте їх у групах Огляд, Планування й Дім.",
+        "mobileNavigationSaved": "Мобільну навігацію збережено.",
+        "regionTitle": "Регіон / Формат",
+        "regionLabel": "Регіон",
+        "regionHint": "Встановлює валюту, формат дати й часу відповідно до регіону. Виберіть «Власний», щоб налаштувати їх окремо.",
+        "regionCustom": "Власний",
+        "regionSaved": "Регіон збережено.",
+        "currencyMovedHint": "Валюта тепер налаштовується в Вигляд → Регіон / Формат.",
+        "pageNotifications": "Сповіщення",
+        "pageNotificationsDescription": "Керування push-сповіщеннями на цьому пристрої",
+        "notificationsTitle": "Сповіщення",
+        "pushToggleTitle": "Push-сповіщення",
+        "pushToggleLabel": "Увімкнути на цьому пристрої",
+        "pushChecking": "Перевірка стану …",
+        "pushEnabled": "Push-сповіщення активні на цьому пристрої.",
+        "pushDisabled": "Push-сповіщення вимкнені на цьому пристрої.",
+        "pushDenied": "Сповіщення заблоковано в браузері. Дозвольте їх у налаштуваннях браузера.",
+        "pushUnsupported": "Цей браузер не підтримує push-сповіщення.",
+        "pushError": "Не вдалося виконати дію. Спробуйте ще раз.",
+        "pushTestButton": "Надіслати тестове сповіщення",
+        "pushTestSent": "Тестове сповіщення надіслано.",
+        "pushTestTitle": "Yuvomi",
+        "pushTestBody": "Це тестове сповіщення."
     },
     "login": {
         "tagline": "Планування для родини. Безпечно. Конфіденційно. Відкритий код.",
@@ -1967,5 +1996,12 @@
         "95": "Гроза",
         "96": "Гроза з градом",
         "99": "Сильна гроза"
+    },
+    "help": {
+        "title": "Hilfe",
+        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
+        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
+        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
+        "mobileSettings": "Einstellungen findest du unter „Mehr“."
     }
 }

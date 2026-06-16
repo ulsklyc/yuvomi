@@ -73,6 +73,7 @@ npm run test:backup-scheduler
 npm run test:housekeeping
 npm run test:mobile-scroll-layout
 npm run test:frontend-audit
+npm run test:docker-publish
 ```
 
 Tests use the Node.js built-in test runner with in-memory SQLite (`--experimental-sqlite`). No running server or database required — tests import route handlers directly.
