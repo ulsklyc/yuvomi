@@ -123,3 +123,97 @@ test('sendTest reports failure reason without throwing', async () => {
   assert.equal(res.ok, false);
   assert.match(res.error, /verify-failed/);
 });
+
+// --- Routes ---------------------------------------------------------------
+import express from 'express';
+import { buildRouter as buildEmailRouter } from '../server/routes/email.js';
+
+function makeRouteApp(db, svc, { userEmail = 'admin@test' } = {}) {
+  const app = express();
+  app.use(express.json());
+  // Stub the auth context the global middleware would normally set.
+  app.use((req, _res, next) => { req.authUserId = 1; req.userRole = 'admin'; next(); });
+  app.use('/email', buildEmailRouter({
+    database: db,
+    emailService: svc,
+    resolveUserEmail: () => userEmail,
+  }));
+  return app;
+}
+
+async function call(app, method, path, body) {
+  const { createServer } = await import('node:http');
+  const server = createServer(app);
+  await new Promise((r) => server.listen(0, r));
+  const { port } = server.address();
+  const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+    method,
+    headers: { 'content-type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const json = await res.json().catch(() => null);
+  server.close();
+  return { status: res.status, json };
+}
+
+test('GET /config returns masked public config', async () => {
+  const db = makeDb();
+  setCfg(db, { email_smtp_host: 'smtp.test', email_from_address: 'a@test', email_smtp_pass: 's' });
+  const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
+  const app = makeRouteApp(db, svc);
+  const { status, json } = await call(app, 'GET', '/email/config');
+  assert.equal(status, 200);
+  assert.equal(json.data.host, 'smtp.test');
+  assert.equal(json.data.passwordSet, true);
+  assert.ok(!('pass' in json.data));
+});
+
+test('PUT /config persists fields and keeps existing password when pass omitted', async () => {
+  const db = makeDb();
+  setCfg(db, { email_smtp_pass: 'keepme' });
+  const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
+  const app = makeRouteApp(db, svc);
+  const { status } = await call(app, 'PUT', '/email/config', {
+    host: 'smtp.new', port: 587, secure: 'starttls', user: 'u', fromAddress: 'a@test', fromName: 'A',
+  });
+  assert.equal(status, 200);
+  assert.equal(db.prepare("SELECT value FROM sync_config WHERE key='email_smtp_host'").get().value, 'smtp.new');
+  assert.equal(db.prepare("SELECT value FROM sync_config WHERE key='email_smtp_pass'").get().value, 'keepme');
+});
+
+test('PUT /config sets a new password when provided', async () => {
+  const db = makeDb();
+  const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
+  const app = makeRouteApp(db, svc);
+  await call(app, 'PUT', '/email/config', { host: 'smtp.test', fromAddress: 'a@test', pass: 'newpass' });
+  assert.equal(db.prepare("SELECT value FROM sync_config WHERE key='email_smtp_pass'").get().value, 'newpass');
+});
+
+test('PUT /config rejects invalid secure value', async () => {
+  const db = makeDb();
+  const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
+  const app = makeRouteApp(db, svc);
+  const { status } = await call(app, 'PUT', '/email/config', { host: 'smtp.test', fromAddress: 'a@test', secure: 'bogus' });
+  assert.equal(status, 400);
+});
+
+test('POST /test sends to the admin email and reports ok', async () => {
+  const db = makeDb();
+  setCfg(db, { email_smtp_host: 'smtp.test', email_smtp_port: '25', email_smtp_secure: 'none', email_from_address: 'a@test' });
+  const nm = makeNodemailerMock();
+  const svc = createEmailService({ db, nodemailer: nm, env: {} });
+  const app = makeRouteApp(db, svc, { userEmail: 'admin@test' });
+  const { status, json } = await call(app, 'POST', '/email/test', {});
+  assert.equal(status, 200);
+  assert.equal(json.data.ok, true);
+  assert.equal(nm.sent[0].to, 'admin@test');
+});
+
+test('POST /test returns 400 when no recipient resolvable', async () => {
+  const db = makeDb();
+  setCfg(db, { email_smtp_host: 'smtp.test', email_from_address: 'a@test' });
+  const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
+  const app = makeRouteApp(db, svc, { userEmail: null });
+  const { status } = await call(app, 'POST', '/email/test', {});
+  assert.equal(status, 400);
+});
