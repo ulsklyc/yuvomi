@@ -2,9 +2,12 @@ import dns from 'node:dns/promises';
 import net from 'node:net';
 
 const MAX_HTML_BYTES = 5 * 1024 * 1024;
+const MAX_HTML_SCAN_BYTES = 2 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 500 * 1024;
+const MAX_LOGO_OPTIONS = 16;
 const MAX_REDIRECTS = 5;
 const ALLOWED_IMAGE_TYPES = new Set([
+  'image/avif',
   'image/png',
   'image/jpeg',
   'image/webp',
@@ -95,13 +98,40 @@ async function readHtmlHead(response) {
   return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString('utf8');
 }
 
+async function readHtmlPreview(response) {
+  const reader = response.body.getReader();
+  const chunks = [];
+  let size = 0;
+  while (size < MAX_HTML_SCAN_BYTES) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    chunks.push(value);
+  }
+  await reader.cancel();
+  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString('utf8');
+}
+
+function decodeHtml(value) {
+  return String(value || '')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>');
+}
+
+function attrValue(markup, name) {
+  return decodeHtml(markup.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']+)["']`, 'i'))?.[1] || '');
+}
+
 function iconUrls(html, pageUrl) {
   const links = [...html.matchAll(/<link\b[^>]*>/gi)].map((match) => match[0]);
   const candidates = [];
   for (const link of links) {
-    const rel = link.match(/\brel\s*=\s*["']([^"']+)["']/i)?.[1] || '';
+    const rel = attrValue(link, 'rel');
     if (!/(^|\s)(icon|shortcut icon|apple-touch-icon)(\s|$)/i.test(rel)) continue;
-    const href = link.match(/\bhref\s*=\s*["']([^"']+)["']/i)?.[1];
+    const href = attrValue(link, 'href');
     if (!href || href.startsWith('data:')) continue;
     candidates.push({
       url: new URL(href, pageUrl).href,
@@ -116,8 +146,176 @@ function iconUrls(html, pageUrl) {
   ).values()];
 }
 
+function normalizedWebsiteUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) throw new Error('Website is required.');
+  if (/^https?:\/\//i.test(raw)) {
+    const parsed = new URL(raw);
+    parsed.protocol = 'https:';
+    return parsed.href;
+  }
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(?:[/:?#].*)?$/i.test(raw)) return `https://${raw}`;
+  throw new Error('Website must be a public domain or HTTPS URL.');
+}
+
+function websiteQuery(value) {
+  const raw = String(value || '').trim();
+  try {
+    return new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).hostname.replace(/^www\./i, '');
+  } catch {
+    return raw;
+  }
+}
+
+function websiteImageUrls(html, pageUrl) {
+  const urls = iconUrls(html, pageUrl).map((url) => ({ url, priority: 0 }));
+
+  const metas = [...html.matchAll(/<meta\b[^>]*>/gi)].map((match) => match[0]);
+  for (const meta of metas) {
+    const property = `${attrValue(meta, 'property')} ${attrValue(meta, 'name')}`;
+    if (!/(^|\s)(og:image|twitter:image|msapplication-tileimage)(\s|$)/i.test(property)) continue;
+    const content = attrValue(meta, 'content');
+    if (content && !content.startsWith('data:')) urls.push({ url: new URL(content, pageUrl).href, priority: 1 });
+  }
+
+  const images = [...html.matchAll(/<(?:img|source)\b[^>]*>/gi)].map((match) => match[0]);
+  for (const image of images) {
+    const marker = `${attrValue(image, 'alt')} ${attrValue(image, 'class')} ${attrValue(image, 'id')} ${attrValue(image, 'title')}`;
+    const src = attrValue(image, 'src') || attrValue(image, 'data-src') || attrValue(image, 'srcset').split(/\s+/)[0];
+    if (!src || src.startsWith('data:') || !/(logo|brand|mark|icon)/i.test(`${marker} ${src}`)) continue;
+    urls.push({ url: new URL(src, pageUrl).href, priority: 2 });
+  }
+
+  return [...new Map(
+    urls
+      .sort((a, b) => a.priority - b.priority)
+      .map((candidate) => [candidate.url, candidate.url]),
+  ).values()];
+}
+
+function decodeGoogleImageUrl(value) {
+  return decodeHtml(value)
+    .replace(/\\u003d/g, '=')
+    .replace(/\\u0026/g, '&')
+    .replace(/\\\//g, '/');
+}
+
+function googleImageUrls(html) {
+  const urls = [];
+  for (const match of html.matchAll(/https:(?:\\\/|\/){2}encrypted-tbn\d\.gstatic\.com(?:\\\/|\/)images\?[^"'<> ]+/g)) {
+    urls.push(decodeGoogleImageUrl(match[0]));
+  }
+  for (const match of html.matchAll(/[?&]imgurl=([^&"']+)/g)) {
+    try {
+      urls.push(decodeURIComponent(decodeGoogleImageUrl(match[1])));
+    } catch {}
+  }
+  return [...new Set(urls)].filter((url) => /^https:\/\//i.test(url)).slice(0, 12);
+}
+
+async function googleLogoUrls(query) {
+  const search = new URL('https://www.google.com/search');
+  search.searchParams.set('tbm', 'isch');
+  search.searchParams.set('safe', 'active');
+  search.searchParams.set('q', `${websiteQuery(query)} logo`);
+  const { response } = await fetchPublic(search.href, {
+    signal: AbortSignal.timeout(8000),
+    headers: {
+      Accept: 'text/html,application/xhtml+xml,*/*;q=0.8',
+    },
+  });
+  if (!response.ok) throw new Error(`Google returned HTTP ${response.status}.`);
+  const urls = googleImageUrls(await readHtmlPreview(response));
+  const favicon = new URL('https://www.google.com/s2/favicons');
+  favicon.searchParams.set('domain', websiteQuery(query));
+  favicon.searchParams.set('sz', '256');
+  urls.push(favicon.href);
+  return [...new Set(urls)];
+}
+
+function imageType(response, finalUrl) {
+  let contentType = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  const pathname = finalUrl.pathname.toLowerCase();
+  if (contentType === 'application/octet-stream' || !contentType) {
+    if (/\.ico(?:$|\?)/i.test(pathname)) contentType = 'image/x-icon';
+    if (/\.svg(?:$|\?)/i.test(pathname)) contentType = 'image/svg+xml';
+    if (/\.png(?:$|\?)/i.test(pathname)) contentType = 'image/png';
+    if (/\.jpe?g(?:$|\?)/i.test(pathname)) contentType = 'image/jpeg';
+    if (/\.webp(?:$|\?)/i.test(pathname)) contentType = 'image/webp';
+  }
+  return contentType;
+}
+
+async function logoDataFromUrl(url) {
+  const imageResult = await fetchPublic(url, {
+    signal: AbortSignal.timeout(8000),
+    headers: { Accept: 'image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5' },
+  });
+  const imageResponse = imageResult.response;
+  if (!imageResponse.ok) throw new Error(`Logo returned HTTP ${imageResponse.status}.`);
+  const contentType = imageType(imageResponse, imageResult.finalUrl);
+  if (!ALLOWED_IMAGE_TYPES.has(contentType)) throw new Error('Website icon is not a supported image type.');
+  const image = await readLimited(imageResponse, MAX_IMAGE_BYTES);
+  return {
+    content_type: contentType,
+    logo_data: `data:${contentType};base64,${image.toString('base64')}`,
+    url: imageResult.finalUrl.href,
+  };
+}
+
+async function logoOptionsFromUrls(urls, source, seenUrls, seenData, limit = MAX_LOGO_OPTIONS) {
+  const uniqueUrls = urls.filter((url) => {
+    if (seenUrls.has(url)) return false;
+    seenUrls.add(url);
+    return true;
+  }).slice(0, limit * 2);
+  const settled = await Promise.allSettled(uniqueUrls.map((url) => logoDataFromUrl(url)));
+  const options = [];
+  for (const result of settled) {
+    if (result.status !== 'fulfilled') continue;
+    if (seenData.has(result.value.logo_data)) continue;
+    seenData.add(result.value.logo_data);
+    options.push({ ...result.value, source });
+    if (options.length >= limit) break;
+  }
+  return options;
+}
+
+async function findLogoOptions(input) {
+  const seenUrls = new Set();
+  const seenData = new Set();
+  const options = [];
+
+  try {
+    const normalized = normalizedWebsiteUrl(input);
+    const pageResult = await fetchPublic(normalized, { signal: AbortSignal.timeout(8000) });
+    if (pageResult.response.ok) {
+      const html = await readHtmlPreview(pageResult.response);
+      options.push(...await logoOptionsFromUrls(
+        websiteImageUrls(html, pageResult.finalUrl),
+        'website',
+        seenUrls,
+        seenData,
+        Math.ceil(MAX_LOGO_OPTIONS / 2),
+      ));
+    }
+  } catch {}
+
+  try {
+    options.push(...await logoOptionsFromUrls(
+      await googleLogoUrls(input),
+      'google',
+      seenUrls,
+      seenData,
+      MAX_LOGO_OPTIONS - options.length,
+    ));
+  } catch {}
+
+  return options.slice(0, MAX_LOGO_OPTIONS);
+}
+
 async function findLogo(websiteUrl) {
-  const normalized = /^https:\/\//i.test(websiteUrl) ? websiteUrl : `https://${websiteUrl}`;
+  const normalized = normalizedWebsiteUrl(websiteUrl);
   const pageResult = await fetchPublic(normalized, {
     signal: AbortSignal.timeout(8000),
   });
@@ -143,4 +341,4 @@ async function findLogo(websiteUrl) {
   throw new Error('No supported logo could be found.');
 }
 
-export { findLogo, iconUrls, privateAddress };
+export { findLogo, findLogoOptions, googleImageUrls, iconUrls, privateAddress, websiteImageUrls };

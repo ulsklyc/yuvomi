@@ -35,6 +35,17 @@ try {
     ),
     ['https://example.com/small.png', 'https://example.com/large.png', 'https://example.com/favicon.ico'],
   );
+  assert.deepEqual(
+    logoService.websiteImageUrls(
+      '<meta property="og:image" content="/brand.png"><img alt="Example logo" src="/logo.svg">',
+      new URL('https://example.com/path'),
+    ),
+    ['https://example.com/favicon.ico', 'https://example.com/brand.png', 'https://example.com/logo.svg'],
+  );
+  assert.deepEqual(
+    logoService.googleImageUrls('["https://encrypted-tbn0.gstatic.com/images?q=tbn:abc\\u0026usqp=CAU"]'),
+    ['https://encrypted-tbn0.gstatic.com/images?q=tbn:abc&usqp=CAU'],
+  );
 
   const database = db.get();
   const tables = database.prepare(`

@@ -12,7 +12,7 @@ import {
   reminderDate,
 } from '../services/subscriptions.js';
 import { getRates } from '../services/subscription-rates.js';
-import { findLogo } from '../services/subscription-logo.js';
+import { findLogoOptions } from '../services/subscription-logo.js';
 
 const log = createLogger('Subscriptions');
 const router = express.Router();
@@ -260,8 +260,9 @@ router.post('/logo-search', async (req, res) => {
   try {
     const website = str(req.body.website_url, 'Website', { max: 2000 });
     if (website.error) return res.status(400).json({ error: website.error, code: 400 });
-    const logoData = await findLogo(website.value);
-    res.json({ data: { logo_data: logoData } });
+    const options = await findLogoOptions(website.value);
+    if (!options.length) return res.status(404).json({ error: 'No supported logo could be found.', code: 404 });
+    res.json({ data: { logo_data: options[0].logo_data, options } });
   } catch (err) {
     res.status(400).json({ error: err.message || 'Logo could not be found.', code: 400 });
   }
