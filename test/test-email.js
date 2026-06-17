@@ -128,11 +128,11 @@ test('sendTest reports failure reason without throwing', async () => {
 import express from 'express';
 import { buildRouter as buildEmailRouter } from '../server/routes/email.js';
 
-function makeRouteApp(db, svc, { userEmail = 'admin@test' } = {}) {
+function makeRouteApp(db, svc, { userEmail = 'admin@test', authRole = 'admin' } = {}) {
   const app = express();
   app.use(express.json());
-  // Stub the auth context the global middleware would normally set.
-  app.use((req, _res, next) => { req.authUserId = 1; req.userRole = 'admin'; next(); });
+  // Stub the auth context the global middleware (requireAuth) would normally set.
+  app.use((req, _res, next) => { req.authUserId = 1; req.authRole = authRole; next(); });
   app.use('/email', buildEmailRouter({
     database: db,
     emailService: svc,
@@ -155,6 +155,15 @@ async function call(app, method, path, body) {
   server.close();
   return { status: res.status, json };
 }
+
+test('email routes reject non-admin users (gate reads req.authRole)', async () => {
+  const db = makeDb();
+  const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
+  const app = makeRouteApp(db, svc, { authRole: 'member' });
+  assert.equal((await call(app, 'GET', '/email/config')).status, 403);
+  assert.equal((await call(app, 'PUT', '/email/config', { host: 'x', fromAddress: 'a@b' })).status, 403);
+  assert.equal((await call(app, 'POST', '/email/test', {})).status, 403);
+});
 
 test('GET /config returns masked public config', async () => {
   const db = makeDb();

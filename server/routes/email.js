@@ -34,7 +34,8 @@ export function buildRouter({ database, emailService = defaultEmailService, reso
   const router = express.Router();
 
   function requireAdmin(req, res, next) {
-    if (req.userRole !== 'admin') {
+    // requireAuth (server/auth.js) populates req.authRole for both session and API-token auth.
+    if (req.authRole !== 'admin') {
       return res.status(403).json({ error: 'Admin access required.', code: 403 });
     }
     next();
