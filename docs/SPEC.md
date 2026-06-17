@@ -788,8 +788,23 @@ Tracks which users were created as restricted guests for a split group (migratio
 | created_by | INTEGER | FK → Users (SET NULL on delete), nullable |
 | created_at | TEXT | ISO 8601 |
 
+### Password Resets (v0.71.51)
+Self-service "Forgot password" tokens (migration 55). One active token per user — issuing a new
+one replaces the prior row.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| user_id | INTEGER | FK → Users (CASCADE delete), NOT NULL |
+| token_hash | TEXT | SHA-256 hash of the raw token; the raw token is only ever in the emailed link, never stored. UNIQUE index. |
+| expires_at | INTEGER | Epoch ms; tokens are valid for 1 hour |
+| created_at | TEXT | ISO 8601 datetime, default now |
+
 ### Sync Config
-Key-value table for OAuth tokens and CalDAV credentials.
+Key-value table for OAuth tokens and CalDAV credentials. Also stores SMTP settings
+(`email_smtp_host`, `email_smtp_port`, `email_smtp_secure`, `email_smtp_user`, `email_smtp_pass`,
+`email_from_address`, `email_from_name`) for the optional email/SMTP feature (v0.71.51) — plaintext,
+like `apple_app_password` and Google OAuth tokens; encryption-at-rest is via the optional
+`DB_ENCRYPTION_KEY` (SQLCipher). The API never returns `email_smtp_pass`.
 
 | Column | Type | Constraint |
 |--------|------|-----------|
@@ -973,6 +988,7 @@ Unauthenticated users are redirected here. No public registration form - the fir
 - Password visibility toggle (eye/eye-off icon) to verify input before submitting
 - **SSO / OpenID Connect (v0.55.14):** When OIDC is configured (`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI`), a "Sign in with SSO" button appears below the divider. Clicking it initiates an Authorization Code flow with PKCE (S256) and a nonce; state, nonce, and code verifier are stored in the session and consumed once. On successful callback, the user is matched by `oidc_sub`. With no `sub` match, an existing local account is linked **only when the provider reports `email_verified: true` and exactly one account holds that email** (matched against `contacts.email` / `contact_emails.value`, case-insensitive); unverified or ambiguous emails never link, and a new account is provisioned instead. SSO errors display a localized message. Providers that omit the `email_verified` claim entirely are supported via the opt-in `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=true` env var (v0.71.11).
 - **Failed-login logging (v0.55.15):** Failed attempts are logged as warnings with IP, username, and failure reason (`user_not_found` / `invalid_password`), enabling fail2ban / CrowdSec integration.
+- **Forgot password (v0.71.51):** A "Forgot password?" link opens `/forgot-password`, where entering a username or email always returns a generic "if an account exists…" response (anti-enumeration), regardless of whether the identifier matched a user or whether SMTP is configured. When it does match and the user has a linked email (`contacts.email`), a reset link `${BASE_URL}/reset-password?token=…` is emailed; the token is single-use and expires after 1 hour. `/reset-password` reads the token from the query string and sets a new password (min. 8 characters); on success, the token is consumed and other sessions for that user are invalidated. Requires an admin-configured SMTP server (Settings → Administration → Email) and the `BASE_URL` env var — reset links are only sent when `BASE_URL` is set, since the request `Host` header is never trusted for this purpose (prevents reset-link poisoning). API: `POST /api/v1/auth/forgot-password`, `POST /api/v1/auth/reset-password` (both public, rate-limited).
 - After successful login: redirect to dashboard
 
 ### Settings (`/settings`)
@@ -993,12 +1009,13 @@ User management and app configuration. Logged-in users only.
 - **Documents (admin):** separate WebDAV Storage and DMS/Paperless cards show the active upload target, effective destination, stored WebDAV document count, and latest connection test. WebDAV connection fields use per-field hybrid configuration: each non-empty `DOCUMENT_STORAGE_WEBDAV_*` environment value overrides only its matching database field and is read-only in the UI. UI-managed WebDAV URLs must resolve exclusively to public addresses; private, loopback, link-local, internal-DNS, and DNS-rebinding targets are blocked at configuration time and again during socket lookup. Trusted private-network targets require the deployment-controlled `DOCUMENT_STORAGE_WEBDAV_URL` override. When WebDAV documents exist, URL, username, password, and base-path changes require explicit confirmation plus a successful read test against an existing object; required connection data cannot be removed. The connection test performs a temporary PUT/GET/DELETE roundtrip.
 - **Backup Management (admin):** download the current database as a file (`GET /api/v1/backup/database`) or restore from a backup file (`POST /api/v1/backup/restore`, drag-and-drop supported). Validates that the uploaded file is a valid Yuvomi database. A rollback copy is created automatically before restore. **Automatic scheduled backups:** configurable via `.env` (`BACKUP_ENABLED`, `BACKUP_SCHEDULE`, `BACKUP_DIR`, `BACKUP_KEEP`); default 2 AM daily, keeps last 7 copies; Settings → Administration → Backup and restore shows scheduler status, schedule, retention policy, last backup timestamp, and a manual trigger button. **WebDAV backup target:** optional upload of each backup to a WebDAV server (Nextcloud, ownCloud, Hetzner Storage Box, etc.) after each local backup; configurable via Settings → Administration → Backup and restore or env vars (`WEBDAV_BACKUP_ENABLED`, `WEBDAV_BACKUP_URL`, `WEBDAV_BACKUP_USERNAME`, `WEBDAV_BACKUP_PASSWORD`, `WEBDAV_BACKUP_PATH`, `WEBDAV_BACKUP_KEEP`); uses Node 22 native fetch, no extra dependencies; password is masked in the UI and API; upload failures are non-fatal (local backup is always retained).
 - **Backup boundary:** SQLite/database backups include WebDAV document metadata and storage keys, but never the remote WebDAV binaries. The document-storage WebDAV target must be backed up separately and restored together with the matching database.
+- **Email / SMTP (admin, v0.71.51):** Settings → Administration → Email configures an outgoing SMTP server (host, port, `ssl`/`starttls`/`none`, user, password, from-address, from-name) that powers the self-service "Forgot password" flow. Each field follows the same per-field hybrid pattern as other integrations: a non-empty `EMAIL_SMTP_*` / `EMAIL_FROM_*` env var overrides its matching `sync_config` field and the field becomes read-only in the UI. The password is write-only — `GET /api/v1/email/config` never returns it, only a `passwordSet` boolean. A **"Test connection"** button (`POST /api/v1/email/test`, admin-only) verifies the SMTP connection and sends a probe email to the requesting admin's own linked address (or an explicit override). API: `GET/PUT /api/v1/email/config`, `POST /api/v1/email/test`.
 - **Information architecture:** Settings is organized into five role-aware domains, each with dedicated leaf pages addressed by stable routes under `/settings/<domain>/<page>`:
   - **Personal** (all users): Account, Appearance, This device
   - **Modules** (admin): Navigation, Kitchen, Calendar, Budget, Housekeeping, Overview
   - **Sync** (admin): Calendar sync, Contact sync, Reminder sync
   - **Documents** (admin): Document storage, Document management (DMS)
-  - **Administration** (admin): Family and roles, API access, Backup and restore, System
+  - **Administration** (admin): Family and roles, API access, Backup and restore, Email (SMTP), System
 
   A central registry (`public/settings/registry.js`) is the single source of truth for domains, routes, roles, labels, icons, and legacy-tab mappings; each leaf is **lazy-loaded** and owns only its own API domain. Members see only Personal; deep links to admin pages redirect to Personal → Account with a localized notice. The shared responsive shell (`public/settings/shell.js`) renders a **sticky local navigation column** on desktop (≥ 1024px, with `aria-current="page"` and a focus-managed page heading) and a **history-aware drill-down** below 1024px (settings overview → domain overview → leaf, with breadcrumbs and Back traversal). Tablet overview pages use two columns from 768–1023px instead of leaving half the content area empty. Each leaf catches its own load/save errors with inline retry without dropping sibling sections. Legacy `oikos:settings:tab` values migrate once to the new paths; the former flat tab bar and `settings-nav.js`/`settings-nav.css` are removed.
 - **Family management (admin):** assign a `family_role` (Dad, Mom, Parent, Child, Grandparent, Relative, Other) to each user, and set per-member phone, email, and birthday — automatically synced to Contacts and Birthdays. Displayed in the family member list and profile views.

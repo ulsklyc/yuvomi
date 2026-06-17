@@ -180,6 +180,7 @@ Each module is independent. Use what fits, skip what doesn't.
 - **PWA** — installable on any device, works offline, refreshes release-bound caches reliably, and stays responsive from phone to desktop with a persistent five-destination mobile bar, configurable favorites, and tuned touch targets
 - **Privacy first** — fully self-hosted, optional SQLCipher AES-256 database encryption (enabled in the recommended Docker setup), zero telemetry
 - **SSO / OpenID Connect** — optional single sign-on via any OIDC provider (Authentik, Keycloak, Google, Microsoft Entra) configured with four env vars; Authorization Code + PKCE flow
+- **Self-service password reset** — optional SMTP email lets users reset a forgotten password themselves via a time-limited emailed link; anti-enumeration by design
 - **Zero build step** — pure ES modules, no bundler, no transpiler, no framework
 - **Multilingual** — 19 languages with automatic locale detection (de, en, es, fr, it, sv, el, ru, tr, zh, ja, ar, hi, pt, uk, pl, nl, cs, vi)
 
