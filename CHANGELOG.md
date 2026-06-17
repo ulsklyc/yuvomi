@@ -13,9 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Subscription reminders:** per-subscription reminder timing feeds the existing in-app reminder center.
 - **Budget-linked subscription expenses:** every active subscription maintains its next payment as a Budget expense under a localized `Subscription` category. Subscription categories are mirrored as Budget subcategories, disabling removes the pending expense, and renewal preserves the paid entry while creating the next one.
 - **Redesigned subscription editor:** grouped identity, billing, renewal, organization, and service sections replace the flat form. The logo sits beside the name, currency/category/payment method use searchable in-modal lists, and logo discovery shows an immediate preview.
+- **Compact subscription dashboard:** the Subscriptions tab now uses the Budget accent tab color, Split-style page gradient, denser subscription rows, compact summary cards, a renewal forecast area chart, category pie chart, and payment-method breakdown.
+- **Selectable subscription logo search:** logo discovery now opens a picker with website-derived images plus Google-sourced candidates, so users can choose the exact logo before saving.
 
 ### Security
-- **Protected external subscription integrations:** all subscription APIs require the existing authenticated session and CSRF middleware; logo discovery validates every public HTTPS redirect, blocks private/link-local addresses, reads only bounded page metadata, and constrains remote image size/type.
+- **Protected external subscription integrations:** all subscription APIs require the existing authenticated session and CSRF middleware; logo discovery validates every public HTTPS redirect, blocks private/link-local addresses, reads only bounded page/search metadata, and constrains remote image size/type.
 
 ### Fixed
 - **Subscription settings and logo discovery:** the base currency now uses the searchable currency picker, an unset subscription budget is shown as unlimited instead of over budget, and logo search tries page icons plus the standard favicon without failing on large page bodies.
