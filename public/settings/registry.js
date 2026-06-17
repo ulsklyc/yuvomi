@@ -193,6 +193,16 @@ export const SETTINGS_LEAVES = freezeEntries([
     loader: () => import('/settings/pages/admin-backup.js'),
   },
   {
+    id: 'admin-email',
+    domainId: 'admin',
+    path: '/settings/admin/email',
+    labelKey: 'settings.pageEmail',
+    descriptionKey: 'settings.pageEmailDescription',
+    icon: 'mail',
+    adminOnly: true,
+    loader: () => import('/settings/pages/admin-email.js'),
+  },
+  {
     id: 'admin-system',
     domainId: 'admin',
     path: '/settings/admin/system',
