@@ -9,6 +9,8 @@ import crypto from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { createPasswordResetService } from '../server/services/password-reset.js';
 
+process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
+
 function makeDb() {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON;');
@@ -76,5 +78,119 @@ test('cleanupExpired deletes only stale rows', () => {
   svc.createToken(1);
   const later = createPasswordResetService({ db, now: () => 1000 + 3_600_001 });
   assert.equal(later.cleanupExpired(), 1);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM password_resets').get().c, 0);
+});
+
+// --- Routes (forgot/reset) ------------------------------------------------
+import express from 'express';
+import bcrypt from 'bcrypt';
+
+function makeAuthApp(db, { baseUrl = 'https://oikos.test' } = {}) {
+  // Lazy import so the route module reads our injected services.
+  return import('../server/auth.js').then(({ buildResetRoutes }) => {
+    const sent = [];
+    const app = express();
+    app.use(express.json());
+    const router = express.Router();
+    buildResetRoutes(router, {
+      database: db,
+      emailService: { isConfigured: () => true, sendMail: async (m) => { sent.push(m); } },
+      resetService: createPasswordResetService({ db }),
+      baseUrl,
+    });
+    app.use('/auth', router);
+    return { app, sent };
+  });
+}
+
+async function callJson(app, method, path, body) {
+  const { createServer } = await import('node:http');
+  const server = createServer(app);
+  await new Promise((r) => server.listen(0, r));
+  const { port } = server.address();
+  const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+    method, headers: { 'content-type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const json = await res.json().catch(() => null);
+  server.close();
+  return { status: res.status, json };
+}
+
+function seedContactsAndEmail(db) {
+  db.exec(`CREATE TABLE contacts (id INTEGER PRIMARY KEY AUTOINCREMENT,
+    family_user_id INTEGER, email TEXT);`);
+  db.prepare("INSERT INTO contacts (family_user_id, email) VALUES (1, 'alice@test')").run();
+}
+
+test('forgot-password returns generic ok for unknown user (no email sent)', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  const { app, sent } = await makeAuthApp(db);
+  const { status, json } = await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'ghost' });
+  assert.equal(status, 200);
+  assert.equal(json.data.ok, true);
+  assert.equal(sent.length, 0);
+});
+
+test('forgot-password sends a reset link for a known username', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  const { app, sent } = await makeAuthApp(db);
+  const { status, json } = await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'alice' });
+  assert.equal(status, 200);
+  assert.equal(json.data.ok, true);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, 'alice@test');
+  assert.match(sent[0].html, /https:\/\/oikos\.test\/reset-password\?token=[a-f0-9]+/);
+});
+
+test('forgot-password sends no link when no trusted BASE_URL is configured (no host-header fallback)', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  const { app, sent } = await makeAuthApp(db, { baseUrl: '' });
+  const { status, json } = await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'alice' });
+  assert.equal(status, 200);
+  assert.equal(json.data.ok, true);
+  assert.equal(sent.length, 0);
+});
+
+test('forgot-password also resolves a user by email', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  const { app, sent } = await makeAuthApp(db);
+  await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'alice@test' });
+  assert.equal(sent.length, 1);
+});
+
+test('reset-password rejects an invalid token', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  const { app } = await makeAuthApp(db);
+  const { status } = await callJson(app, 'POST', '/auth/reset-password', { token: 'bad', password: 'longenough' });
+  assert.equal(status, 400);
+});
+
+test('reset-password rejects a short password', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  const svc = createPasswordResetService({ db });
+  const { token } = svc.createToken(1);
+  const { app } = await makeAuthApp(db);
+  const { status } = await callJson(app, 'POST', '/auth/reset-password', { token, password: 'short' });
+  assert.equal(status, 400);
+});
+
+test('reset-password updates the hash and consumes the token', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  // Re-issue the token through the same service instance the route uses:
+  const { app, sent } = await makeAuthApp(db);
+  await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'alice' });
+  const token = sent[0].html.match(/token=([a-f0-9]+)/)[1];
+  const { status } = await callJson(app, 'POST', '/auth/reset-password', { token, password: 'brandnewpw' });
+  assert.equal(status, 200);
+  const hash = db.prepare('SELECT password_hash FROM users WHERE id = 1').get().password_hash;
+  assert.equal(await bcrypt.compare('brandnewpw', hash), true);
   assert.equal(db.prepare('SELECT COUNT(*) c FROM password_resets').get().c, 0);
 });
