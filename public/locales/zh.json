@@ -68,7 +68,8 @@
     "sectionOverview": "概览",
     "sectionPlan": "计划",
     "sectionHome": "家庭",
-    "help": "Hilfe"
+    "help": "帮助",
+    "sectionCustomModules": "自定义模块"
   },
   "dashboard": {
     "title": "概览",
@@ -1372,7 +1373,7 @@
     "mobileNavigationSlotLabel": "位置 {{position}}",
     "mobileNavigationEmptyOption": "未使用",
     "desktopNavigationTitle": "网页导航",
-    "desktopNavigationHint": "启用模块，并在概览、计划和家庭分组内排序。",
+    "desktopNavigationHint": "启用模块，并在概览、计划、家庭和自定义模块分组内排序。",
     "mobileNavigationSaved": "移动导航已保存。",
     "regionTitle": "地区 / 格式",
     "regionLabel": "地区",
@@ -2001,7 +2002,7 @@
     "99": "强雷暴"
   },
   "help": {
-    "title": "Hilfe",
+    "title": "帮助",
     "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
     "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
     "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",

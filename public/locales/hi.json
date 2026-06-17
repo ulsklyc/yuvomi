@@ -68,7 +68,8 @@
     "sectionOverview": "अवलोकन",
     "sectionPlan": "योजना",
     "sectionHome": "घर",
-    "help": "Hilfe"
+    "help": "सहायता",
+    "sectionCustomModules": "कस्टम मॉड्यूल"
   },
   "dashboard": {
     "title": "डैशबोर्ड",
@@ -1372,7 +1373,7 @@
     "mobileNavigationSlotLabel": "स्थान {{position}}",
     "mobileNavigationEmptyOption": "उपयोग नहीं",
     "desktopNavigationTitle": "वेब नेविगेशन",
-    "desktopNavigationHint": "मॉड्यूल चालू करें और उन्हें अवलोकन, योजना और घर समूहों के भीतर क्रमबद्ध करें।",
+    "desktopNavigationHint": "मॉड्यूल सक्षम करें और उन्हें अवलोकन, योजना, घर और कस्टम मॉड्यूल समूहों में क्रमबद्ध करें।",
     "mobileNavigationSaved": "मोबाइल नेविगेशन सहेजा गया।",
     "regionTitle": "क्षेत्र / प्रारूप",
     "regionLabel": "क्षेत्र",
@@ -2001,7 +2002,7 @@
     "99": "भीषण तूफान"
   },
   "help": {
-    "title": "Hilfe",
+    "title": "सहायता",
     "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
     "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
     "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",

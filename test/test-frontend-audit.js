@@ -154,6 +154,7 @@ test('settings information-architecture keys exist in every locale', () => {
     'nav.sectionOverview',
     'nav.sectionPlan',
     'nav.sectionHome',
+    'nav.sectionCustomModules',
     // Unauthorized / access-redirected notice.
     'settings.accessRedirected',
   ].forEach((key) => keys.add(key));
@@ -1382,11 +1383,12 @@ test('phase 4 keeps Kitchen navigation identity stable', () => {
 test('global navigation groups domains with translated section labels', () => {
   const routerSource = read('../public/router.js');
 
-  // The grouped main-app navigation references the Overview, Plan and Home label keys
-  // and resolves section labels through t().
+  // The grouped main-app navigation references every section label key and
+  // resolves section labels through t().
   assert.match(routerSource, /'nav\.sectionOverview'/);
   assert.match(routerSource, /'nav\.sectionPlan'/);
   assert.match(routerSource, /'nav\.sectionHome'/);
+  assert.match(routerSource, /'nav\.sectionCustomModules'/);
   assert.match(routerSource, /t\(labelKey\)/);
 
   // The replaced household section label is no longer referenced.
@@ -1629,7 +1631,7 @@ test('sticky section headers stack above glass cards via --z-sticky', () => {
 test('every locale resolves the grouped navigation section labels', () => {
   const localesDir = new URL('../public/locales/', import.meta.url);
   const files = readdirSync(localesDir).filter((f) => f.endsWith('.json'));
-  const sectionKeys = ['sectionOverview', 'sectionPlan', 'sectionHome'];
+  const sectionKeys = ['sectionOverview', 'sectionPlan', 'sectionHome', 'sectionCustomModules'];
 
   assert.ok(files.length >= 16, 'expected at least 16 locale files');
   for (const file of files) {
@@ -1640,6 +1642,14 @@ test('every locale resolves the grouped navigation section labels', () => {
     }
     assert.ok(!('section.household' in data.nav), `${file}: nav must not keep the flat "section.household" key (t() cannot resolve it)`);
   }
+});
+
+test('Brazilian Portuguese uses localized Help navigation copy', () => {
+  const data = JSON.parse(read('../public/locales/pt.json'));
+
+  assert.equal(data.nav?.help, 'Ajuda');
+  assert.equal(data.help?.title, 'Ajuda');
+  assert.doesNotMatch(JSON.stringify({ nav: data.nav, help: data.help }), /Hilfe/);
 });
 
 test('phase 7 locale files keep the de reference key set complete', () => {

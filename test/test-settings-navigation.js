@@ -84,6 +84,7 @@ const sharedTranslationKeys = [
   'nav.sectionOverview',
   'nav.sectionPlan',
   'nav.sectionHome',
+  'nav.sectionCustomModules',
   'shopping.manageCategories',
 ];
 const settingsTranslationKeys = [...new Set([...registryTranslationKeys, ...sharedTranslationKeys])];
@@ -481,7 +482,7 @@ test('navigation sections match the grouped desktop information architecture', (
   assert.equal(moduleSection('notes'), NAV_SECTION.plan);
   assert.equal(moduleSection('kitchen'), NAV_SECTION.home);
   assert.equal(moduleSection('contacts'), NAV_SECTION.home);
-  assert.equal(moduleSection('third-party-weather-station'), NAV_SECTION.home);
+  assert.equal(moduleSection('third-party-weather-station'), NAV_SECTION.customModules);
   assert.equal(moduleSection('settings'), NAV_SECTION.home);
 });
 
@@ -493,6 +494,7 @@ test('desktop navigation order is applied only inside each section', () => {
     { module: 'budget' },
     { module: 'notes' },
     { module: 'tasks' },
+    { module: 'third-party-weather-station' },
     { module: 'settings' },
   ];
 
@@ -505,6 +507,7 @@ test('desktop navigation order is applied only inside each section', () => {
       { module: 'notes' },
       { module: 'budget' },
       { module: 'contacts' },
+      { module: 'third-party-weather-station' },
       { module: 'settings' },
     ],
   );

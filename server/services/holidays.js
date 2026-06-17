@@ -77,6 +77,84 @@ function resolveName(nameArr, preferLang = 'EN') {
   return (preferred ?? nameArr[0]).text ?? '';
 }
 
+function formatIsoDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function utcDate(year, month, day) {
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function addDays(date, days) {
+  const next = new Date(date.getTime());
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function easterSunday(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return utcDate(year, month, day);
+}
+
+function localizedBrazilHolidayName(key, langCode) {
+  const names = {
+    universalBrotherhood: { PT: 'Confraternização Universal', EN: 'Universal Brotherhood Day' },
+    goodFriday:           { PT: 'Sexta-feira Santa', EN: 'Good Friday' },
+    tiradentes:           { PT: 'Tiradentes', EN: 'Tiradentes Day' },
+    labourDay:            { PT: 'Dia do Trabalho', EN: 'Labour Day' },
+    independence:         { PT: 'Independência do Brasil', EN: 'Independence Day' },
+    aparecida:            { PT: 'Nossa Senhora Aparecida', EN: 'Our Lady of Aparecida' },
+    allSouls:             { PT: 'Finados', EN: "All Souls' Day" },
+    republic:             { PT: 'Proclamação da República', EN: 'Republic Proclamation Day' },
+    blackConsciousness:   { PT: 'Dia Nacional de Zumbi e da Consciência Negra', EN: 'National Zumbi and Black Consciousness Day' },
+    christmas:            { PT: 'Natal', EN: 'Christmas Day' },
+  };
+  const lang = String(langCode || '').toUpperCase();
+  return names[key]?.[lang] ?? names[key]?.PT ?? key;
+}
+
+function brazilPublicHolidays(year, langCode) {
+  const fixed = [
+    ['universalBrotherhood', 1, 1],
+    ['tiradentes', 4, 21],
+    ['labourDay', 5, 1],
+    ['independence', 9, 7],
+    ['aparecida', 10, 12],
+    ['allSouls', 11, 2],
+    ['republic', 11, 15],
+    ['blackConsciousness', 11, 20],
+    ['christmas', 12, 25],
+  ].map(([key, month, day]) => {
+    const date = formatIsoDate(utcDate(year, month, day));
+    return { startDate: date, endDate: date, name: localizedBrazilHolidayName(key, langCode) };
+  });
+
+  const goodFriday = formatIsoDate(addDays(easterSunday(year), -2));
+  return [
+    fixed[0],
+    { startDate: goodFriday, endDate: goodFriday, name: localizedBrazilHolidayName('goodFriday', langCode) },
+    ...fixed.slice(1),
+  ];
+}
+
+function localHolidayFallback(country, type, year, langCode) {
+  if (country === 'BR' && type === 'public') return brazilPublicHolidays(year, langCode);
+  return [];
+}
+
 // --------------------------------------------------------
 // Sync-Logik
 // --------------------------------------------------------
@@ -94,9 +172,12 @@ async function syncYearAndType(country, subdivision, year, type, langCode) {
     holidays = await apiFetch(`/${endpoint}?${params}`);
   } catch (err) {
     log.warn(`Fetch ${endpoint} ${country}/${subdivision ?? '-'}/${year}: ${err.message}`);
-    return 0;
+    holidays = localHolidayFallback(country, type, year, langCode);
   }
 
+  if (!Array.isArray(holidays) || holidays.length === 0) {
+    holidays = localHolidayFallback(country, type, year, langCode);
+  }
   if (!Array.isArray(holidays) || holidays.length === 0) return 0;
 
   const insert = db.get().prepare(`
@@ -106,7 +187,10 @@ async function syncYearAndType(country, subdivision, year, type, langCode) {
 
   const insertAll = db.get().transaction((rows) => {
     for (const h of rows) {
-      insert.run(type, country, subdivision ?? null, h.startDate, h.endDate, resolveName(h.name, langCode.toUpperCase()), year);
+      const name = typeof h.name === 'string'
+        ? h.name
+        : resolveName(h.name, langCode.toUpperCase());
+      insert.run(type, country, subdivision ?? null, h.startDate, h.endDate, name, year);
     }
   });
 
@@ -153,6 +237,7 @@ async function sync(force = false) {
 
   // Sprache aus Land ableiten (Fallback EN)
   const langMap = {
+    BR: 'PT',
     DE: 'DE', AT: 'DE', CH: 'DE', FR: 'FR', ES: 'ES', IT: 'IT',
     NL: 'NL', PL: 'PL', PT: 'PT', RU: 'RU', TR: 'TR', CZ: 'CS',
     SE: 'SV', NO: 'NO', DK: 'DA', FI: 'FI', HU: 'HU', RO: 'RO',

@@ -68,7 +68,8 @@
     "sectionOverview": "Tổng quan",
     "sectionPlan": "Lập kế hoạch",
     "sectionHome": "Nhà",
-    "help": "Hilfe"
+    "help": "Trợ giúp",
+    "sectionCustomModules": "Mô-đun tùy chỉnh"
   },
   "dashboard": {
     "title": "Tổng quan",
@@ -1372,7 +1373,7 @@
     "mobileNavigationSlotLabel": "Vị trí {{position}}",
     "mobileNavigationEmptyOption": "Không sử dụng",
     "desktopNavigationTitle": "Điều hướng web",
-    "desktopNavigationHint": "Bật mô-đun và sắp xếp chúng trong các nhóm Tổng quan, Lập kế hoạch và Nhà.",
+    "desktopNavigationHint": "Bật mô-đun và sắp xếp chúng trong các nhóm Tổng quan, Lập kế hoạch, Nhà và Mô-đun tùy chỉnh.",
     "mobileNavigationSaved": "Đã lưu điều hướng di động.",
     "regionTitle": "Khu vực / Định dạng",
     "regionLabel": "Khu vực",
@@ -2001,7 +2002,7 @@
     "99": "Giông bão nghiêm trọng"
   },
   "help": {
-    "title": "Hilfe",
+    "title": "Trợ giúp",
     "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
     "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
     "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",

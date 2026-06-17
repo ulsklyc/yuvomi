@@ -68,7 +68,8 @@
     "sectionOverview": "Genel bakış",
     "sectionPlan": "Planla",
     "sectionHome": "Ev",
-    "help": "Hilfe"
+    "help": "Yardım",
+    "sectionCustomModules": "Özel modüller"
   },
   "dashboard": {
     "title": "Genel Bakış",
@@ -1372,7 +1373,7 @@
     "mobileNavigationSlotLabel": "Konum {{position}}",
     "mobileNavigationEmptyOption": "Kullanılmıyor",
     "desktopNavigationTitle": "Web gezinmesi",
-    "desktopNavigationHint": "Modülleri etkinleştirin ve Genel Bakış, Planlama ve Ev grupları içinde sıralayın.",
+    "desktopNavigationHint": "Modülleri etkinleştirin ve Genel bakış, Planla, Ev ve Özel modüller gruplarında sıralayın.",
     "mobileNavigationSaved": "Mobil gezinme kaydedildi.",
     "regionTitle": "Bölge / Biçim",
     "regionLabel": "Bölge",
@@ -2001,7 +2002,7 @@
     "99": "Şiddetli fırtına"
   },
   "help": {
-    "title": "Hilfe",
+    "title": "Yardım",
     "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
     "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
     "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",

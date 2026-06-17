@@ -44,11 +44,13 @@ const NAV_SECTION_LABEL_KEYS = Object.freeze({
   [NAV_SECTION.overview]: 'nav.sectionOverview',
   [NAV_SECTION.plan]: 'nav.sectionPlan',
   [NAV_SECTION.home]: 'nav.sectionHome',
+  [NAV_SECTION.customModules]: 'nav.sectionCustomModules',
 });
 const NAV_SECTIONS = Object.freeze([
   NAV_SECTION.overview,
   NAV_SECTION.plan,
   NAV_SECTION.home,
+  NAV_SECTION.customModules,
 ]);
 
 function thirdPartyStatusLabel(module) {
@@ -107,7 +109,7 @@ function buildRows(preferences, thirdPartyModules) {
       type: 'third-party',
       id: module.id,
       orderId: `third-party-${module.id}`,
-      section: NAV_SECTION.home,
+      section: NAV_SECTION.customModules,
       label: module.menu?.label || module.name || module.id,
       icon: module.menu?.icon || module.icon || 'box',
       enabled: module.enabled && module.status === 'enabled',

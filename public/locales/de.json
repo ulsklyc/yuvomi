@@ -68,7 +68,8 @@
     "sectionOverview": "Übersicht",
     "sectionPlan": "Planen",
     "sectionHome": "Zuhause",
-    "help": "Hilfe"
+    "help": "Hilfe",
+    "sectionCustomModules": "Benutzerdefinierte Module"
   },
   "search": {
     "title": "Suche",
@@ -1378,7 +1379,7 @@
     "mobileNavigationSlotLabel": "Position {{position}}",
     "mobileNavigationEmptyOption": "Nicht belegt",
     "desktopNavigationTitle": "Web-Navigation",
-    "desktopNavigationHint": "Aktiviere Module und sortiere sie innerhalb der Gruppen Übersicht, Planen und Zuhause.",
+    "desktopNavigationHint": "Aktiviere Module und sortiere sie innerhalb der Gruppen Übersicht, Planen, Zuhause und Benutzerdefinierte Module.",
     "mobileNavigationSaved": "Mobile Navigation gespeichert.",
     "regionTitle": "Region / Format",
     "regionLabel": "Region",

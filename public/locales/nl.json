@@ -68,7 +68,8 @@
     "sectionOverview": "Overzicht",
     "sectionPlan": "Plannen",
     "sectionHome": "Thuis",
-    "help": "Hilfe"
+    "help": "Help",
+    "sectionCustomModules": "Aangepaste modules"
   },
   "dashboard": {
     "title": "Overzicht",
@@ -1372,7 +1373,7 @@
     "mobileNavigationSlotLabel": "Positie {{position}}",
     "mobileNavigationEmptyOption": "Niet gebruikt",
     "desktopNavigationTitle": "Webnavigatie",
-    "desktopNavigationHint": "Schakel modules in en sorteer ze binnen de groepen Overzicht, Plannen en Thuis.",
+    "desktopNavigationHint": "Schakel modules in en sorteer ze binnen de groepen Overzicht, Plannen, Thuis en Aangepaste modules.",
     "mobileNavigationSaved": "Mobiele navigatie opgeslagen.",
     "regionTitle": "Regio / Formaat",
     "regionLabel": "Regio",
@@ -2001,7 +2002,7 @@
     "99": "Zwaar onweer"
   },
   "help": {
-    "title": "Hilfe",
+    "title": "Help",
     "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
     "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
     "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
