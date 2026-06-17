@@ -2078,7 +2078,7 @@
         "moveUp": "Mover arriba",
         "moveDown": "Mover abajo",
         "findLogo": "Buscar logotipo",
-        "findLogoHint": "Busca iconos del sitio web y resultados de Google Imágenes.",
+        "findLogoHint": "Busca iconos del sitio web y metadatos públicos del sitio.",
         "logoFound": "Logo encontrado.",
         "logoNotFound": "No se encontró ningún logo compatible.",
         "billingDetails": "Detalles de facturación",
@@ -2102,7 +2102,6 @@
         "logoSearchEmpty": "No se encontraron logotipos compatibles.",
         "logoSearchError": "No se pudieron cargar los logotipos.",
         "logoSourceWebsite": "Del sitio web",
-        "logoSourceGoogle": "De Google",
         "useLogo": "Usar este logotipo"
     }
 }

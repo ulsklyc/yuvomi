@@ -20,7 +20,7 @@
     "test:calendar": "node --loader ./test/test-browser-loader.mjs --experimental-sqlite test/test-calendar.js",
     "test:ncb": "node --experimental-sqlite test/test-notes-contacts-budget.js",
     "test:budget-recurrence": "node --experimental-sqlite test/test-budget-recurrence.js",
-    "test:subscriptions": "node test/test-subscriptions.js",
+    "test:subscriptions": "node --experimental-sqlite test/test-subscriptions.js",
     "test:ux-utils": "node test/test-ux-utils.js",
     "test:skeleton-utils": "node test/test-skeleton-utils.js",
     "test:date-utils": "node test/test-date-utils.js",

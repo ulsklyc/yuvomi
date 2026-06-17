@@ -1977,14 +1977,14 @@
     },
     "subscriptions": {
         "tabLabel": "Abonnements",
-        "searchLabel": "Search subscriptions",
+        "searchLabel": "Abonnements suchen",
         "searchPlaceholder": "Abonnements suchen...",
-        "categoryFilter": "Filter by category",
-        "paymentMethodFilter": "Filter by payment method",
-        "statusFilter": "Filter by status",
-        "statusAll": "All statuses",
-        "statusActive": "Active",
-        "statusDisabled": "Disabled",
+        "categoryFilter": "Nach Kategorie filtern",
+        "paymentMethodFilter": "Nach Zahlungsart filtern",
+        "statusFilter": "Nach Status filtern",
+        "statusAll": "Alle Status",
+        "statusActive": "Aktiv",
+        "statusDisabled": "Deaktiviert",
         "sortLabel": "Abonnements sortieren",
         "sortDue": "Nächstes Fälligkeitsdatum",
         "sortCostDesc": "Höchste monatliche Kosten",
@@ -2078,7 +2078,7 @@
         "moveUp": "Nach oben",
         "moveDown": "Nach unten",
         "findLogo": "Logo finden",
-        "findLogoHint": "Durchsucht Website-Icons und Google-Bildergebnisse.",
+        "findLogoHint": "Durchsucht Website-Icons und öffentliche Website-Metadaten.",
         "logoFound": "Logo gefunden.",
         "logoNotFound": "Kein unterstütztes Logo gefunden.",
         "billingDetails": "Abrechnungsdetails",
@@ -2102,7 +2102,6 @@
         "logoSearchEmpty": "Keine unterstützten Logos gefunden.",
         "logoSearchError": "Logos konnten nicht geladen werden.",
         "logoSourceWebsite": "Von der Website",
-        "logoSourceGoogle": "Von Google",
         "useLogo": "Dieses Logo verwenden"
     }
 }

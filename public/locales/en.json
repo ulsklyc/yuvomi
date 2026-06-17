@@ -2078,7 +2078,7 @@
         "moveUp": "Move up",
         "moveDown": "Move down",
         "findLogo": "Find logo",
-        "findLogoHint": "Searches website icons and Google image results.",
+        "findLogoHint": "Searches website icons and public site metadata.",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
         "billingDetails": "Billing details",
@@ -2102,7 +2102,6 @@
         "logoSearchEmpty": "No supported logos found.",
         "logoSearchError": "Logos could not be loaded.",
         "logoSourceWebsite": "From website",
-        "logoSourceGoogle": "From Google",
         "useLogo": "Use this logo"
     }
 }

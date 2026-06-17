@@ -521,7 +521,8 @@ exchange rates; this sends only currency codes to the configured provider.
 | `FIXER_API_KEY` | Fixer API key for live currency conversion. Rates are cached for 12 hours. | — | No |
 
 Logo discovery fetches only public HTTPS sites, rejects private/link-local targets, does not execute
-page scripts, and stores only a size-limited image.
+page scripts, and stores only a size-limited image. Service-name logo searches derive likely public
+domains and inspect those sites directly; they do not scrape search-engine image results.
 
 ### Automated Backups (Optional)
 

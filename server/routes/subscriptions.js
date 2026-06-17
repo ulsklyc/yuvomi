@@ -172,26 +172,41 @@ async function subscriptionsWithConversions(rows, baseCurrency, refresh = false)
 }
 
 router.get('/meta', (_req, res) => {
-  const categories = db.get().prepare('SELECT * FROM subscription_categories ORDER BY sort_order, name COLLATE NOCASE').all();
-  const paymentMethods = db.get().prepare('SELECT * FROM subscription_payment_methods ORDER BY sort_order, name COLLATE NOCASE').all();
-  res.json({ data: { categories, payment_methods: paymentMethods, billing_cycles: BILLING_CYCLES } });
+  try {
+    const categories = db.get().prepare('SELECT * FROM subscription_categories ORDER BY sort_order, name COLLATE NOCASE').all();
+    const paymentMethods = db.get().prepare('SELECT * FROM subscription_payment_methods ORDER BY sort_order, name COLLATE NOCASE').all();
+    res.json({ data: { categories, payment_methods: paymentMethods, billing_cycles: BILLING_CYCLES } });
+  } catch (err) {
+    log.error('GET /meta error:', err);
+    res.status(500).json({ error: 'Subscription metadata could not be loaded.', code: 500 });
+  }
 });
 
 router.get('/settings', (_req, res) => {
-  res.json({ data: settings() });
+  try {
+    res.json({ data: settings() });
+  } catch (err) {
+    log.error('GET /settings error:', err);
+    res.status(500).json({ error: 'Subscription settings could not be loaded.', code: 500 });
+  }
 });
 
 router.put('/settings', (req, res) => {
-  const monthlyBudget = Number(req.body.monthly_budget);
-  const baseCurrency = String(req.body.base_currency || '').toUpperCase();
-  const errors = [];
-  if (!Number.isFinite(monthlyBudget) || monthlyBudget < 0) errors.push('Monthly budget must not be negative.');
-  if (!CURRENCY_RE.test(baseCurrency)) errors.push('Base currency must be a three-letter ISO code.');
-  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-  db.get().prepare(`
-    UPDATE subscription_settings SET monthly_budget = ?, base_currency = ? WHERE id = 1
-  `).run(monthlyBudget, baseCurrency);
-  res.json({ data: settings() });
+  try {
+    const monthlyBudget = Number(req.body.monthly_budget);
+    const baseCurrency = String(req.body.base_currency || '').toUpperCase();
+    const errors = [];
+    if (!Number.isFinite(monthlyBudget) || monthlyBudget < 0) errors.push('Monthly budget must not be negative.');
+    if (!CURRENCY_RE.test(baseCurrency)) errors.push('Base currency must be a three-letter ISO code.');
+    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    db.get().prepare(`
+      UPDATE subscription_settings SET monthly_budget = ?, base_currency = ? WHERE id = 1
+    `).run(monthlyBudget, baseCurrency);
+    res.json({ data: settings() });
+  } catch (err) {
+    log.error('PUT /settings error:', err);
+    res.status(500).json({ error: 'Subscription settings could not be saved.', code: 500 });
+  }
 });
 
 router.post('/categories', (req, res) => {
@@ -236,24 +251,29 @@ router.post('/payment-methods', (req, res) => {
 });
 
 router.put('/meta/order', (req, res) => {
-  const categories = Array.isArray(req.body.categories) ? req.body.categories.map(Number) : null;
-  const methods = Array.isArray(req.body.payment_methods) ? req.body.payment_methods.map(Number) : null;
-  if (!categories && !methods) return res.status(400).json({ error: 'An order list is required.', code: 400 });
-  const updateCategories = db.get().prepare('UPDATE subscription_categories SET sort_order = ? WHERE id = ?');
-  const updateBudgetSubcategories = db.get().prepare(`
-    UPDATE budget_subcategories
-    SET sort_order = ?
-    WHERE key = (SELECT budget_subcategory_key FROM subscription_categories WHERE id = ?)
-  `);
-  const updateMethods = db.get().prepare('UPDATE subscription_payment_methods SET sort_order = ? WHERE id = ?');
-  db.get().transaction(() => {
-    categories?.forEach((id, index) => {
-      updateCategories.run(index, id);
-      updateBudgetSubcategories.run(index, id);
-    });
-    methods?.forEach((id, index) => updateMethods.run(index, id));
-  })();
-  res.json({ data: { updated: true } });
+  try {
+    const categories = Array.isArray(req.body.categories) ? req.body.categories.map(Number) : null;
+    const methods = Array.isArray(req.body.payment_methods) ? req.body.payment_methods.map(Number) : null;
+    if (!categories && !methods) return res.status(400).json({ error: 'An order list is required.', code: 400 });
+    const updateCategories = db.get().prepare('UPDATE subscription_categories SET sort_order = ? WHERE id = ?');
+    const updateBudgetSubcategories = db.get().prepare(`
+      UPDATE budget_subcategories
+      SET sort_order = ?
+      WHERE key = (SELECT budget_subcategory_key FROM subscription_categories WHERE id = ?)
+    `);
+    const updateMethods = db.get().prepare('UPDATE subscription_payment_methods SET sort_order = ? WHERE id = ?');
+    db.get().transaction(() => {
+      categories?.forEach((id, index) => {
+        updateCategories.run(index, id);
+        updateBudgetSubcategories.run(index, id);
+      });
+      methods?.forEach((id, index) => updateMethods.run(index, id));
+    })();
+    res.json({ data: { updated: true } });
+  } catch (err) {
+    log.error('PUT /meta/order error:', err);
+    res.status(500).json({ error: 'Subscription metadata order could not be saved.', code: 500 });
+  }
 });
 
 function logoSearchLogError(err) {
@@ -424,29 +444,39 @@ router.put('/:id', async (req, res) => {
 });
 
 router.post('/:id/renew', async (req, res) => {
-  const id = Number(req.params.id);
-  const current = loadSubscription(id);
-  if (!current) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
-  const nextDate = addBillingCycle(current.next_payment_date, current.billing_cycle, current.cycle_interval);
-  db.get().prepare('UPDATE budget_subscriptions SET next_payment_date = ? WHERE id = ?').run(nextDate, id);
-  let row = loadSubscription(id);
-  row = await syncBudgetExpense(row, { preserveCurrent: true });
-  syncReminder(row);
-  res.json({ data: { ...row, enabled: Boolean(row.enabled) } });
+  try {
+    const id = Number(req.params.id);
+    const current = loadSubscription(id);
+    if (!current) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
+    const nextDate = addBillingCycle(current.next_payment_date, current.billing_cycle, current.cycle_interval);
+    db.get().prepare('UPDATE budget_subscriptions SET next_payment_date = ? WHERE id = ?').run(nextDate, id);
+    let row = loadSubscription(id);
+    row = await syncBudgetExpense(row, { preserveCurrent: true });
+    syncReminder(row);
+    res.json({ data: { ...row, enabled: Boolean(row.enabled) } });
+  } catch (err) {
+    log.error('POST /:id/renew error:', err);
+    res.status(500).json({ error: 'Subscription renewal could not be saved.', code: 500 });
+  }
 });
 
 router.delete('/:id', (req, res) => {
-  const id = Number(req.params.id);
-  if (!loadSubscription(id)) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
-  db.get().transaction(() => {
-    const subscription = loadSubscription(id);
-    db.get().prepare("DELETE FROM reminders WHERE entity_type = 'subscription' AND entity_id = ?").run(id);
-    db.get().prepare('DELETE FROM budget_subscriptions WHERE id = ?').run(id);
-    if (subscription?.budget_entry_id) {
-      db.get().prepare('DELETE FROM budget_entries WHERE id = ?').run(subscription.budget_entry_id);
-    }
-  })();
-  res.status(204).end();
+  try {
+    const id = Number(req.params.id);
+    if (!loadSubscription(id)) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
+    db.get().transaction(() => {
+      const subscription = loadSubscription(id);
+      db.get().prepare("DELETE FROM reminders WHERE entity_type = 'subscription' AND entity_id = ?").run(id);
+      db.get().prepare('DELETE FROM budget_subscriptions WHERE id = ?').run(id);
+      if (subscription?.budget_entry_id) {
+        db.get().prepare('DELETE FROM budget_entries WHERE id = ?').run(subscription.budget_entry_id);
+      }
+    })();
+    res.status(204).end();
+  } catch (err) {
+    log.error('DELETE /:id error:', err);
+    res.status(500).json({ error: 'Subscription could not be deleted.', code: 500 });
+  }
 });
 
 router.use((err, _req, res, _next) => {

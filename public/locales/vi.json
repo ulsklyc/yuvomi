@@ -2078,7 +2078,7 @@
         "moveUp": "Di chuyển lên",
         "moveDown": "Di chuyển xuống",
         "findLogo": "Find logo",
-        "findLogoHint": "Tìm biểu tượng trang web và kết quả Google Hình ảnh.",
+        "findLogoHint": "Tìm biểu tượng trang web và siêu dữ liệu công khai của trang.",
         "logoFound": "Đã tìm thấy logo.",
         "logoNotFound": "Không tìm thấy logo được hỗ trợ.",
         "billingDetails": "Chi tiết thanh toán",
@@ -2102,7 +2102,6 @@
         "logoSearchEmpty": "Không tìm thấy logo được hỗ trợ.",
         "logoSearchError": "Không thể tải logo.",
         "logoSourceWebsite": "Từ trang web",
-        "logoSourceGoogle": "Từ Google",
         "useLogo": "Dùng logo này"
     }
 }

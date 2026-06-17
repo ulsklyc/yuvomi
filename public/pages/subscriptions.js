@@ -878,15 +878,11 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
   }
 }
 
-function logoSourceLabel(source) {
-  return source === 'website' ? t('subscriptions.logoSourceWebsite') : t('subscriptions.logoSourceGoogle');
-}
-
 function logoOptionsMarkup(options) {
   return options.length ? options.map((option, index) => `
     <button class="subscriptions-logo-option" type="button" data-logo-index="${index}" aria-label="${esc(t('subscriptions.useLogo'))}">
       <img src="${esc(option.logo_data)}" alt="">
-      <span>${esc(logoSourceLabel(option.source))}</span>
+      <span>${esc(t('subscriptions.logoSourceWebsite'))}</span>
     </button>
   `).join('') : `<p class="subscriptions-logo-empty">${t('subscriptions.logoSearchEmpty')}</p>`;
 }

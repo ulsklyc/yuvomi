@@ -2078,7 +2078,7 @@
         "moveUp": "Yukarı taşı",
         "moveDown": "Aşağı taşı",
         "findLogo": "Find logo",
-        "findLogoHint": "Web sitesi simgelerini ve Google Görseller sonuçlarını arar.",
+        "findLogoHint": "Web sitesi simgelerini ve herkese açık site meta verilerini arar.",
         "logoFound": "Logo bulundu.",
         "logoNotFound": "Desteklenen logo bulunamadı.",
         "billingDetails": "Faturalama ayrıntıları",
@@ -2102,7 +2102,6 @@
         "logoSearchEmpty": "Desteklenen logo bulunamadı.",
         "logoSearchError": "Logolar yüklenemedi.",
         "logoSourceWebsite": "Web sitesinden",
-        "logoSourceGoogle": "Google’dan",
         "useLogo": "Bu logoyu kullan"
     }
 }

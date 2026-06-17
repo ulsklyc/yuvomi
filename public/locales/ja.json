@@ -2078,7 +2078,7 @@
         "moveUp": "上へ移動",
         "moveDown": "下へ移動",
         "findLogo": "ロゴを検索",
-        "findLogoHint": "WebサイトのアイコンとGoogle画像検索結果を探します。",
+        "findLogoHint": "Webサイトのアイコンと公開サイトメタデータを探します。",
         "logoFound": "ロゴが見つかりました。",
         "logoNotFound": "対応するロゴが見つかりませんでした。",
         "billingDetails": "請求詳細",
@@ -2102,7 +2102,6 @@
         "logoSearchEmpty": "対応しているロゴが見つかりません。",
         "logoSearchError": "ロゴを読み込めませんでした。",
         "logoSourceWebsite": "Webサイトから",
-        "logoSourceGoogle": "Googleから",
         "useLogo": "このロゴを使う"
     }
 }

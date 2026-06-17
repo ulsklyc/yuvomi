@@ -2078,7 +2078,7 @@
         "moveUp": "Déplacer vers le haut",
         "moveDown": "Déplacer vers le bas",
         "findLogo": "Trouver le logo",
-        "findLogoHint": "Recherche les icônes du site et les résultats Google Images.",
+        "findLogoHint": "Recherche les icônes du site et les métadonnées publiques du site.",
         "logoFound": "Logo trouvé.",
         "logoNotFound": "Aucun logo compatible trouvé.",
         "billingDetails": "Détails de facturation",
@@ -2102,7 +2102,6 @@
         "logoSearchEmpty": "Aucun logo compatible trouvé.",
         "logoSearchError": "Les logos n’ont pas pu être chargés.",
         "logoSourceWebsite": "Depuis le site",
-        "logoSourceGoogle": "Depuis Google",
         "useLogo": "Utiliser ce logo"
     }
 }

@@ -2078,7 +2078,7 @@
         "moveUp": "نقل لأعلى",
         "moveDown": "نقل لأسفل",
         "findLogo": "Find logo",
-        "findLogoHint": "يبحث في أيقونات الموقع ونتائج صور Google.",
+        "findLogoHint": "يبحث في أيقونات الموقع وبيانات الموقع الوصفية العامة.",
         "logoFound": "تم العثور على الشعار.",
         "logoNotFound": "لم يتم العثور على شعار مدعوم.",
         "billingDetails": "تفاصيل الفوترة",
@@ -2102,7 +2102,6 @@
         "logoSearchEmpty": "لم يتم العثور على شعارات مدعومة.",
         "logoSearchError": "تعذر تحميل الشعارات.",
         "logoSourceWebsite": "من الموقع",
-        "logoSourceGoogle": "من Google",
         "useLogo": "استخدام هذا الشعار"
     }
 }

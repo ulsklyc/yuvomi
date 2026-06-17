@@ -2078,7 +2078,7 @@
         "moveUp": "Přesunout nahoru",
         "moveDown": "Přesunout dolů",
         "findLogo": "Find logo",
-        "findLogoHint": "Vyhledá ikony webu a výsledky obrázků Google.",
+        "findLogoHint": "Vyhledá ikony webu a veřejná metadata webu.",
         "logoFound": "Logo nalezeno.",
         "logoNotFound": "Nebylo nalezeno žádné podporované logo.",
         "billingDetails": "Fakturační údaje",
@@ -2102,7 +2102,6 @@
         "logoSearchEmpty": "Nebyla nalezena žádná podporovaná loga.",
         "logoSearchError": "Loga se nepodařilo načíst.",
         "logoSourceWebsite": "Z webu",
-        "logoSourceGoogle": "Z Googlu",
         "useLogo": "Použít toto logo"
     }
 }

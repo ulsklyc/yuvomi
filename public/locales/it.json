@@ -2078,7 +2078,7 @@
         "moveUp": "Sposta su",
         "moveDown": "Sposta giù",
         "findLogo": "Trova logo",
-        "findLogoHint": "Cerca icone del sito e risultati di Google Immagini.",
+        "findLogoHint": "Cerca icone del sito e metadati pubblici del sito.",
         "logoFound": "Logo trovato.",
         "logoNotFound": "Nessun logo supportato trovato.",
         "billingDetails": "Dettagli di fatturazione",
@@ -2102,7 +2102,6 @@
         "logoSearchEmpty": "Nessun logo supportato trovato.",
         "logoSearchError": "Impossibile caricare i loghi.",
         "logoSourceWebsite": "Dal sito",
-        "logoSourceGoogle": "Da Google",
         "useLogo": "Usa questo logo"
     }
 }

@@ -2078,7 +2078,7 @@
         "moveUp": "上移",
         "moveDown": "下移",
         "findLogo": "查找徽标",
-        "findLogoHint": "搜索网站图标和 Google 图片结果。",
+        "findLogoHint": "搜索网站图标和公开的网站元数据。",
         "logoFound": "已找到 Logo。",
         "logoNotFound": "未找到支持的 Logo。",
         "billingDetails": "账单详情",
@@ -2102,7 +2102,6 @@
         "logoSearchEmpty": "未找到支持的标志。",
         "logoSearchError": "无法加载标志。",
         "logoSourceWebsite": "来自网站",
-        "logoSourceGoogle": "来自 Google",
         "useLogo": "使用此标志"
     }
 }

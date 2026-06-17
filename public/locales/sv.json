@@ -2078,7 +2078,7 @@
         "moveUp": "Flytta upp",
         "moveDown": "Flytta ned",
         "findLogo": "Find logo",
-        "findLogoHint": "Söker webbplatsikoner och Google Bildresultat.",
+        "findLogoHint": "Söker webbplatsikoner och offentliga webbplatsmetadata.",
         "logoFound": "Logotyp hittad.",
         "logoNotFound": "Ingen stödd logotyp hittades.",
         "billingDetails": "Faktureringsdetaljer",
@@ -2102,7 +2102,6 @@
         "logoSearchEmpty": "Inga logotyper som stöds hittades.",
         "logoSearchError": "Logotyper kunde inte läsas in.",
         "logoSourceWebsite": "Från webbplats",
-        "logoSourceGoogle": "Från Google",
         "useLogo": "Använd denna logotyp"
     }
 }

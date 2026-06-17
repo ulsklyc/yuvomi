@@ -2078,7 +2078,7 @@
         "moveUp": "Przenieś w górę",
         "moveDown": "Przenieś w dół",
         "findLogo": "Find logo",
-        "findLogoHint": "Wyszukuje ikony witryny i wyniki Grafiki Google.",
+        "findLogoHint": "Wyszukuje ikony witryny i publiczne metadane witryny.",
         "logoFound": "Logo znalezione.",
         "logoNotFound": "Nie znaleziono obsługiwanego logo.",
         "billingDetails": "Szczegóły rozliczeń",
@@ -2102,7 +2102,6 @@
         "logoSearchEmpty": "Nie znaleziono obsługiwanych logo.",
         "logoSearchError": "Nie udało się załadować logo.",
         "logoSourceWebsite": "Ze strony",
-        "logoSourceGoogle": "Z Google",
         "useLogo": "Użyj tego logo"
     }
 }

@@ -2078,7 +2078,7 @@
         "moveUp": "Omhoog verplaatsen",
         "moveDown": "Omlaag verplaatsen",
         "findLogo": "Logo zoeken",
-        "findLogoHint": "Zoekt websitepictogrammen en Google Afbeeldingen-resultaten.",
+        "findLogoHint": "Zoekt websitepictogrammen en openbare sitemetadata.",
         "logoFound": "Logo gevonden.",
         "logoNotFound": "Geen ondersteund logo gevonden.",
         "billingDetails": "Facturatiedetails",
@@ -2102,7 +2102,6 @@
         "logoSearchEmpty": "Geen ondersteunde logo’s gevonden.",
         "logoSearchError": "Logo’s konden niet worden geladen.",
         "logoSourceWebsite": "Van website",
-        "logoSourceGoogle": "Van Google",
         "useLogo": "Dit logo gebruiken"
     }
 }

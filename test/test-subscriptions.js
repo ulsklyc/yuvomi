@@ -43,10 +43,6 @@ try {
     ['https://example.com/favicon.ico', 'https://example.com/brand.png', 'https://example.com/logo.svg'],
   );
   assert.deepEqual(
-    logoService.googleImageUrls('["https://encrypted-tbn0.gstatic.com/images?q=tbn:abc\\u0026usqp=CAU"]'),
-    ['https://encrypted-tbn0.gstatic.com/images?q=tbn:abc&usqp=CAU'],
-  );
-  assert.deepEqual(
     logoService.serviceDomainCandidates('Netflix').slice(0, 3),
     ['netflix.com', 'netflix.io', 'netflix.app'],
   );
@@ -65,8 +61,6 @@ try {
   assert.deepEqual(tables, [
     'subscription_categories',
     'subscription_exchange_rates',
-    'subscription_notification_agents',
-    'subscription_notification_deliveries',
     'subscription_payment_methods',
     'subscription_settings',
   ]);

@@ -2078,7 +2078,7 @@
         "moveUp": "ऊपर ले जाएँ",
         "moveDown": "नीचे ले जाएँ",
         "findLogo": "Find logo",
-        "findLogoHint": "वेबसाइट आइकन और Google छवि परिणाम खोजता है।",
+        "findLogoHint": "वेबसाइट आइकन और सार्वजनिक साइट मेटाडेटा खोजता है।",
         "logoFound": "लोगो मिला।",
         "logoNotFound": "कोई समर्थित लोगो नहीं मिला।",
         "billingDetails": "बिलिंग विवरण",
@@ -2102,7 +2102,6 @@
         "logoSearchEmpty": "कोई समर्थित लोगो नहीं मिला।",
         "logoSearchError": "लोगो लोड नहीं हो सके।",
         "logoSourceWebsite": "वेबसाइट से",
-        "logoSourceGoogle": "Google से",
         "useLogo": "यह लोगो उपयोग करें"
     }
 }

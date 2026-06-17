@@ -2078,7 +2078,7 @@
         "moveUp": "Перемістити вгору",
         "moveDown": "Перемістити вниз",
         "findLogo": "Find logo",
-        "findLogoHint": "Шукає іконки сайту та результати Google Зображень.",
+        "findLogoHint": "Шукає іконки сайту та публічні метадані сайту.",
         "logoFound": "Логотип знайдено.",
         "logoNotFound": "Підтримуваний логотип не знайдено.",
         "billingDetails": "Деталі оплати",
@@ -2102,7 +2102,6 @@
         "logoSearchEmpty": "Підтримувані логотипи не знайдено.",
         "logoSearchError": "Не вдалося завантажити логотипи.",
         "logoSourceWebsite": "Із сайту",
-        "logoSourceGoogle": "З Google",
         "useLogo": "Використати цей логотип"
     }
 }

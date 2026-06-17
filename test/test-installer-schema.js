@@ -25,9 +25,11 @@ const DOCUMENT_STORAGE_KEYS = [
   'DOCUMENT_STORAGE_WEBDAV_PATH',
 ];
 
-const TOTAL_KEYS = ORIGINAL_KEYS.length + 2 + P5_KEYS.length + DOCUMENT_STORAGE_KEYS.length; // + TZ + OIKOS_HTTP_PORT
+const SUBSCRIPTION_KEYS = ['FIXER_API_KEY'];
 
-test('ENV_SCHEMA enthält alle Original-Keys, TZ, OIKOS_HTTP_PORT, P5 und Dokument-WebDAV', () => {
+const TOTAL_KEYS = ORIGINAL_KEYS.length + 2 + P5_KEYS.length + DOCUMENT_STORAGE_KEYS.length + SUBSCRIPTION_KEYS.length; // + TZ + OIKOS_HTTP_PORT
+
+test('ENV_SCHEMA enthält alle Original-Keys, TZ, OIKOS_HTTP_PORT, P5, Subscriptions und Dokument-WebDAV', () => {
   assert.equal(ENV_SCHEMA.length, TOTAL_KEYS);
   const keys = ENV_SCHEMA.map(e => e.key);
   for (const k of ORIGINAL_KEYS) {
@@ -37,6 +39,9 @@ test('ENV_SCHEMA enthält alle Original-Keys, TZ, OIKOS_HTTP_PORT, P5 und Dokume
   assert.ok(keys.includes('OIKOS_HTTP_PORT'), 'Key fehlt: OIKOS_HTTP_PORT');
   for (const k of P5_KEYS) {
     assert.ok(keys.includes(k), `P5-Key fehlt: ${k}`);
+  }
+  for (const k of SUBSCRIPTION_KEYS) {
+    assert.ok(keys.includes(k), `Subscription-Key fehlt: ${k}`);
   }
   for (const k of DOCUMENT_STORAGE_KEYS) {
     assert.ok(keys.includes(k), `Dokument-WebDAV-Key fehlt: ${k}`);
@@ -65,6 +70,14 @@ test('Dokument-WebDAV ist optional, standardmäßig deaktiviert und maskiert das
 
   const password = ENV_SCHEMA.find(e => e.key === 'DOCUMENT_STORAGE_WEBDAV_PASSWORD');
   assert.equal(password.secret, true, 'WebDAV-Passwort muss als Secret markiert sein');
+});
+
+test('FIXER_API_KEY ist optional und als Secret markiert', () => {
+  const fixer = ENV_SCHEMA.find(e => e.key === 'FIXER_API_KEY');
+  assert.ok(fixer, 'FIXER_API_KEY nicht in ENV_SCHEMA');
+  assert.equal(fixer.required, false);
+  assert.equal(fixer.writeToEnv, true);
+  assert.equal(fixer.secret, true);
 });
 
 test('Alle Schema-Einträge haben die Pflichtfelder key, type, label, group, writeToEnv', () => {

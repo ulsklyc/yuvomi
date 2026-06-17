@@ -5,6 +5,7 @@ export const ENV_SCHEMA = [
   { key: 'WEATHER_LON',                 type: 'user',    label: 'Weather Longitude',        required: false, group: 'weather', writeToEnv: true },
   { key: 'WEATHER_CITY',                type: 'default', label: 'City Display Name',        default: '',       group: 'weather', writeToEnv: true },
   { key: 'WEATHER_UNITS',               type: 'default', label: 'Units',                    default: 'metric', group: 'weather', writeToEnv: true },
+  { key: 'FIXER_API_KEY',               type: 'user',    label: 'Fixer API Key',            required: false, group: 'subscriptions', writeToEnv: true, secret: true },
   { key: 'GOOGLE_CLIENT_ID',            type: 'user',    label: 'Google Client ID',         required: false, group: 'google',  writeToEnv: true },
   { key: 'GOOGLE_CLIENT_SECRET',        type: 'user',    label: 'Google Client Secret',     required: false, group: 'google',  writeToEnv: true },
   { key: 'GOOGLE_REDIRECT_URI',         type: 'user',    label: 'Google Redirect URI',      required: false, group: 'google',  writeToEnv: true },

@@ -6,6 +6,7 @@ const MAX_HTML_SCAN_BYTES = 2 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 500 * 1024;
 const MAX_LOGO_OPTIONS = 16;
 const MAX_REDIRECTS = 5;
+const SERVICE_DOMAIN_FETCH_LIMIT = 8;
 const DOMAIN_SUFFIXES = ['.com', '.io', '.app', '.tv', '.net', '.org'];
 const TRAILING_SERVICE_WORDS = new Set([
   'app',
@@ -250,15 +251,6 @@ function normalizedWebsiteUrl(value) {
   throw new Error('Website must be a public domain or HTTPS URL.');
 }
 
-function websiteQuery(value) {
-  const raw = String(value || '').trim();
-  try {
-    return new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).hostname.replace(/^www\./i, '');
-  } catch {
-    return raw;
-  }
-}
-
 function websiteImageUrls(html, pageUrl) {
   const urls = iconUrls(html, pageUrl).map((url) => ({ url, priority: 0 }));
 
@@ -283,56 +275,6 @@ function websiteImageUrls(html, pageUrl) {
       .sort((a, b) => a.priority - b.priority)
       .map((candidate) => [candidate.url, candidate.url]),
   ).values()];
-}
-
-function decodeGoogleImageUrl(value) {
-  return decodeHtml(value)
-    .replace(/\\u003d/g, '=')
-    .replace(/\\u0026/g, '&')
-    .replace(/\\\//g, '/');
-}
-
-function googleImageUrls(html) {
-  const urls = [];
-  for (const match of html.matchAll(/https:(?:\\\/|\/){2}encrypted-tbn\d\.gstatic\.com(?:\\\/|\/)images\?[^"'<> ]+/g)) {
-    urls.push(decodeGoogleImageUrl(match[0]));
-  }
-  for (const match of html.matchAll(/[?&]imgurl=([^&"']+)/g)) {
-    try {
-      urls.push(decodeURIComponent(decodeGoogleImageUrl(match[1])));
-    } catch {}
-  }
-  return [...new Set(urls)].filter((url) => /^https:\/\//i.test(url)).slice(0, 12);
-}
-
-async function googleLogoUrls(query, diagnostics = null) {
-  const started = Date.now();
-  const search = new URL('https://www.google.com/search');
-  search.searchParams.set('tbm', 'isch');
-  search.searchParams.set('safe', 'active');
-  search.searchParams.set('q', `${websiteQuery(query)} logo`);
-  const { response } = await fetchPublic(search.href, {
-    signal: AbortSignal.timeout(8000),
-    headers: {
-      Accept: 'text/html,application/xhtml+xml,*/*;q=0.8',
-    },
-  });
-  if (!response.ok) throw new Error(`Google returned HTTP ${response.status}.`);
-  const imageUrls = googleImageUrls(await readHtmlPreview(response));
-  const urls = [...imageUrls];
-  const domains = serviceDomainCandidates(query);
-  for (const domain of domains) {
-    const favicon = new URL('https://www.google.com/s2/favicons');
-    favicon.searchParams.set('domain', domain);
-    favicon.searchParams.set('sz', '256');
-    urls.push(favicon.href);
-  }
-  addDiagnostic(
-    diagnostics,
-    'google-candidates',
-    { image_result_count: imageUrls.length, domain_candidates: domains, elapsed_ms: Date.now() - started },
-  );
-  return [...new Set(urls)];
 }
 
 function imageType(response, finalUrl) {
@@ -394,6 +336,50 @@ async function logoOptionsFromUrls(urls, source, seenUrls, seenData, limit = MAX
   return options;
 }
 
+async function candidateDomainLogoUrls(input, diagnostics = null) {
+  const domains = serviceDomainCandidates(input).slice(0, SERVICE_DOMAIN_FETCH_LIMIT);
+  if (!domains.length) return [];
+
+  const settled = await Promise.allSettled(domains.map(async (domain) => {
+    const homepage = `https://${domain}/`;
+    const fallbackIcon = new URL('/favicon.ico', homepage).href;
+    try {
+      const pageResult = await fetchPublic(homepage, { signal: AbortSignal.timeout(6000) });
+      addDiagnostic(diagnostics, 'domain-response', {
+        domain,
+        status: pageResult.response.status,
+        final_url: safeLogUrl(pageResult.finalUrl.href),
+      });
+      if (!pageResult.response.ok) return [fallbackIcon];
+      const html = await readHtmlPreview(pageResult.response);
+      return [...new Set([...websiteImageUrls(html, pageResult.finalUrl), fallbackIcon])];
+    } catch (err) {
+      addDiagnostic(diagnostics, 'domain-error', { domain, error: diagnosticError(err) });
+      return [fallbackIcon];
+    }
+  }));
+
+  const urls = [];
+  let successCount = 0;
+  let failureCount = 0;
+  for (const result of settled) {
+    if (result.status === 'fulfilled') {
+      if (result.value.length) successCount += 1;
+      urls.push(...result.value);
+    } else {
+      failureCount += 1;
+      addDiagnostic(diagnostics, 'domain-error', { error: diagnosticError(result.reason) });
+    }
+  }
+  addDiagnostic(diagnostics, 'domain-candidates', {
+    domain_count: domains.length,
+    url_count: urls.length,
+    success_count: successCount,
+    failure_count: failureCount,
+  });
+  return [...new Set(urls)];
+}
+
 async function findLogoOptions(input, { diagnostics = null } = {}) {
   const started = Date.now();
   const seenUrls = new Set();
@@ -426,17 +412,19 @@ async function findLogoOptions(input, { diagnostics = null } = {}) {
     addDiagnostic(diagnostics, 'website-error', { error: diagnosticError(err) });
   }
 
-  try {
-    options.push(...await logoOptionsFromUrls(
-      await googleLogoUrls(input, diagnostics),
-      'google',
-      seenUrls,
-      seenData,
-      MAX_LOGO_OPTIONS - options.length,
-      diagnostics,
-    ));
-  } catch (err) {
-    addDiagnostic(diagnostics, 'google-error', { error: diagnosticError(err) });
+  if (options.length < MAX_LOGO_OPTIONS) {
+    try {
+      options.push(...await logoOptionsFromUrls(
+        await candidateDomainLogoUrls(input, diagnostics),
+        'website',
+        seenUrls,
+        seenData,
+        MAX_LOGO_OPTIONS - options.length,
+        diagnostics,
+      ));
+    } catch (err) {
+      addDiagnostic(diagnostics, 'domain-candidates-error', { error: diagnosticError(err) });
+    }
   }
 
   addDiagnostic(diagnostics, 'complete', { result_count: options.length, elapsed_ms: Date.now() - started });
@@ -470,4 +458,4 @@ async function findLogo(websiteUrl) {
   throw new Error('No supported logo could be found.');
 }
 
-export { findLogo, findLogoOptions, googleImageUrls, iconUrls, privateAddress, serviceDomainCandidates, websiteImageUrls };
+export { findLogo, findLogoOptions, iconUrls, privateAddress, serviceDomainCandidates, websiteImageUrls };
