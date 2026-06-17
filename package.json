@@ -35,6 +35,7 @@
     "test:docker-publish": "node --test test/test-docker-publish.js",
     "test:push": "node --experimental-sqlite test/test-push.js",
     "test:email": "node --experimental-sqlite test/test-email.js",
+    "test:password-reset": "node --experimental-sqlite test/test-password-reset.js",
     "test:reminders": "node --experimental-sqlite test/test-reminders.js",
     "test:reminder-offset": "node test/test-reminder-offset.js",
     "test:api": "node test/test-api.js",
