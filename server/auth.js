@@ -16,6 +16,8 @@ import { createLogger } from './logger.js';
 import { deleteBirthdayArtifacts, syncBirthdayArtifacts } from './services/birthdays.js';
 import * as oidcClient from 'openid-client';
 import { isOidcEnabled, getConfig as getOidcConfig } from './services/oidc.js';
+import { emailService as defaultEmailService } from './services/email.js';
+import { passwordResetService as defaultResetService } from './services/password-reset.js';
 
 const log = createLogger('Auth');
 const router = express.Router();
@@ -146,6 +148,18 @@ const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Zu viele Login-Versuche. Bitte warte kurz.', code: 429 },
+});
+
+// Eigener Limiter für Passwort-Reset: zählt ALLE Antworten (kein
+// skipSuccessfulRequests). /forgot-password antwortet aus Anti-Enumeration-
+// Gründen immer mit 200 — würden erfolgreiche Antworten übersprungen, könnte
+// ein bekannter Account unbegrenzt Reset-Mails/Token erzeugen.
+const passwordResetLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60_000,
+  max: parseInt(process.env.RATE_LIMIT_MAX_ATTEMPTS) || 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Zu viele Anfragen. Bitte warte kurz.', code: 429 },
 });
 
 function hashApiToken(token) {
@@ -546,6 +560,105 @@ router.post('/login', loginLimiter, async (req, res) => {
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
+
+/**
+ * Registriert die öffentlichen Forgot-/Reset-Routen auf dem gegebenen Router.
+ * Dependency-Injection für Tests (DB, Email-Service, Reset-Service, baseUrl).
+ */
+export function buildResetRoutes(targetRouter, {
+  database = null,
+  emailService = defaultEmailService,
+  resetService = defaultResetService,
+  baseUrl = process.env.BASE_URL || '',
+  limiter = passwordResetLimiter,
+} = {}) {
+  const getDb = () => (database || db.get());
+
+  function resolveUser(identifier) {
+    const id = String(identifier || '').trim();
+    if (!id) return null;
+    const byName = getDb().prepare('SELECT id FROM users WHERE username = ?').get(id);
+    if (byName) return byName.id;
+    const byEmail = getDb().prepare(
+      'SELECT family_user_id AS id FROM contacts WHERE email = ? AND family_user_id IS NOT NULL LIMIT 1'
+    ).get(id);
+    return byEmail?.id ?? null;
+  }
+
+  function emailFor(userId) {
+    const row = getDb().prepare(
+      'SELECT email FROM contacts WHERE family_user_id = ? AND email IS NOT NULL AND email != \'\' LIMIT 1'
+    ).get(userId);
+    return row?.email ?? null;
+  }
+
+  targetRouter.post('/forgot-password', limiter, async (req, res) => {
+    try {
+      const { identifier } = req.body || {};
+      const userId = resolveUser(identifier);
+      // Anti-enumeration: identical response regardless of outcome.
+      if (userId && emailService.isConfigured()) {
+        const to = emailFor(userId);
+        // Reset links MUST use an explicitly configured, trusted origin.
+        // Never derive it from the request Host header (password-reset
+        // poisoning: a forged Host would point the victim's token at an
+        // attacker-controlled domain).
+        const origin = String(baseUrl || '').trim().replace(/\/$/, '');
+        if (to && origin) {
+          const { token } = resetService.createToken(userId);
+          const link = `${origin}/reset-password?token=${token}`;
+          await emailService.sendMail({
+            to,
+            subject: 'Reset your Yuvomi password',
+            text: `Open this link to choose a new password (valid for 1 hour): ${link}`,
+            html: `<p>Open this link to choose a new password (valid for 1 hour):</p>`
+              + `<p><a href="${link}">${link}</a></p>`,
+          }).catch((err) => log.error('Reset mail failed:', err.message));
+        } else if (to && !origin) {
+          log.warn('BASE_URL not configured; password-reset link not sent.');
+        }
+      }
+      res.json({ data: { ok: true } });
+    } catch (err) {
+      log.error('forgot-password error:', err.message);
+      // Still return generic success to avoid leaking failures.
+      res.json({ data: { ok: true } });
+    }
+  });
+
+  targetRouter.post('/reset-password', limiter, async (req, res) => {
+    try {
+      const { token, password } = req.body || {};
+      if (!token || !password) {
+        return res.status(400).json({ error: 'Token and password are required.', code: 400 });
+      }
+      if (String(password).length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters long.', code: 400 });
+      }
+      const userId = resetService.verifyToken(token);
+      if (!userId) {
+        return res.status(400).json({ error: 'Invalid or expired token.', code: 400 });
+      }
+      const hash = await bcrypt.hash(password, 12);
+      getDb().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId);
+      resetService.consumeToken(token);
+      // Best-effort: invalidate existing sessions for this user.
+      try {
+        const rows = getDb().prepare('SELECT sid, sess FROM sessions').all();
+        for (const r of rows) {
+          try { if (JSON.parse(r.sess)?.userId === userId) getDb().prepare('DELETE FROM sessions WHERE sid = ?').run(r.sid); }
+          catch { /* ignore malformed session rows */ }
+        }
+      } catch { /* sessions table may not exist in tests */ }
+      res.json({ data: { ok: true } });
+    } catch (err) {
+      log.error('reset-password error:', err.message);
+      res.status(500).json({ error: 'Internal server error.', code: 500 });
+    }
+  });
+}
+
+buildResetRoutes(router);
 
 /**
  * POST /api/v1/auth/logout
@@ -1173,5 +1286,9 @@ router.delete('/users/:id', requireAuth, requireAdmin, csrfMiddleware, (req, res
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
+
+setInterval(() => {
+  try { defaultResetService.cleanupExpired(); } catch { /* best effort */ }
+}, 60 * 60_000).unref();
 
 export { router, sessionMiddleware, requireAuth, requireAdmin, syncFamilyMemberArtifacts, normalizeAvatarData };

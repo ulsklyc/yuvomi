@@ -13,7 +13,7 @@
  *   → bypassCacheUntil (in-memory + Cache API für SW-Restart-Robustheit)
  */
 
-const APP_RELEASE   = '0.71.50';
+const APP_RELEASE   = '0.71.51';
 const SHELL_CACHE   = `oikos-shell-${APP_RELEASE}`;
 const PAGES_CACHE   = `oikos-pages-${APP_RELEASE}`;
 const LOCALES_CACHE = `oikos-locales-${APP_RELEASE}`;

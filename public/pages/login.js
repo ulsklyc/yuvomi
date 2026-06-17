@@ -72,6 +72,9 @@ export async function render(container) {
           <button type="submit" class="btn btn--primary login-form__submit" id="login-btn">
             <span class="login-btn__label">${esc(t('login.loginButton'))}</span>
           </button>
+          <p class="login-form__forgot">
+            <a href="/forgot-password" data-link>${esc(t('login.forgotPassword'))}</a>
+          </p>
         </form>
       </div>
       <p class="login-version" id="login-version"></p>
@@ -82,6 +85,9 @@ export async function render(container) {
   const errorEl = container.querySelector('#login-error');
   const submitBtn = container.querySelector('#login-btn');
   const versionEl = container.querySelector('#login-version');
+
+  container.querySelectorAll('a[data-link]').forEach((a) =>
+    a.addEventListener('click', (e) => { e.preventDefault(); window.oikos.navigate(a.getAttribute('href')); }));
 
   // OIDC-Fehlermeldung aus URL-Parameter anzeigen (z.B. ?error=oidc_failed nach gescheitertem Callback)
   const urlParams = new URLSearchParams(window.location.search);

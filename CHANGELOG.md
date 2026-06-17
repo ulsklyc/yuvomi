@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.71.51] - 2026-06-17
+
+### Added
+- **SMTP email & self-service password reset**: administrators can configure an SMTP server under Settings → Administration → Email (or via the `EMAIL_SMTP_*` / `EMAIL_FROM_*` environment variables), with a "Test connection" button to validate the setup. Once email is configured, the login page offers a "Forgot password?" link — users request a reset by username or email and receive a time-limited (1 hour) reset link. The absolute origin for reset links is taken from the new `BASE_URL` setting.
+
+### Security
+- Password-reset links are built only from the configured `BASE_URL` and never from the request Host header (host-header / reset-poisoning protection). The forgot-password endpoint always returns a generic response to prevent account enumeration, reset endpoints are rate-limited, and tokens are single-use, hashed at rest, and expire after one hour. The configured SMTP password is never returned by the API.
+
 ## [0.71.50] - 2026-06-16
 
 ### Added

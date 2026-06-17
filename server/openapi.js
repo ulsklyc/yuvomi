@@ -165,6 +165,56 @@ function buildPaths() {
         },
       }),
     },
+    '/api/v1/auth/forgot-password': {
+      post: op({
+        summary: 'Request a password-reset link',
+        description: 'Always responds 200 with a generic body to prevent account enumeration. '
+          + 'A reset email is sent only when the account exists, has a linked email, SMTP is configured, and BASE_URL is set.',
+        tag: 'Auth',
+        auth: false,
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['identifier'],
+                properties: { identifier: { type: 'string', description: 'Username or email address.' } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Generic acknowledgement (sent regardless of whether the account exists).' },
+        },
+      }),
+    },
+    '/api/v1/auth/reset-password': {
+      post: op({
+        summary: 'Set a new password using a reset token',
+        tag: 'Auth',
+        auth: false,
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['token', 'password'],
+                properties: {
+                  token: { type: 'string' },
+                  password: { type: 'string', minLength: 8 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Password updated.' },
+          400: { $ref: '#/components/responses/BadRequest' },
+        },
+      }),
+    },
     '/api/v1/auth/me': {
       get: op({
         summary: 'Get current authenticated user',
@@ -254,6 +304,58 @@ function buildPaths() {
         admin: true,
         stateChanging: true,
         params: [idParam('id', 'API token ID')],
+      }),
+    },
+    '/api/v1/email/config': {
+      get: op({
+        summary: 'Get SMTP email configuration (password masked)',
+        tag: 'Email',
+        admin: true,
+      }),
+      put: op({
+        summary: 'Update SMTP email configuration',
+        tag: 'Email',
+        admin: true,
+        stateChanging: true,
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  host: { type: 'string' },
+                  port: { type: 'integer' },
+                  secure: { type: 'string', enum: ['ssl', 'starttls', 'none'] },
+                  user: { type: 'string' },
+                  pass: { type: 'string', description: 'Write-only. Omit to keep the stored password.' },
+                  clearPassword: { type: 'boolean' },
+                  fromAddress: { type: 'string' },
+                  fromName: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      }),
+    },
+    '/api/v1/email/test': {
+      post: op({
+        summary: 'Send a test email to validate SMTP settings',
+        tag: 'Email',
+        admin: true,
+        stateChanging: true,
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: { to: { type: 'string', description: 'Optional recipient override; defaults to the admin\'s linked email.' } },
+              },
+            },
+          },
+        },
       }),
     },
     '/api/v1/family/members': {
@@ -1010,6 +1112,7 @@ function buildOpenApiSpec(req, appVersion) {
       { name: 'Reminders' },
       { name: 'Search' },
       { name: 'Push' },
+      { name: 'Email' },
     ],
     paths: buildPaths(),
     components: {
