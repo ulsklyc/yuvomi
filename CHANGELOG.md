@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Subscription settings and logo discovery:** the base currency now uses the searchable currency picker, an unset subscription budget is shown as unlimited instead of over budget, and logo search tries page icons plus the standard favicon without failing on large page bodies.
 - **Subscription service-name logo search:** plain service names now generate likely public domain candidates for Google favicon lookup, and logo search failures surface in the UI while detailed diagnostics are written to server logs.
+- **Subscription modal polish:** the next payment field now uses the native date picker, the billing cycle control no longer relies on the unstable native select in the modal, and newer subscription labels are localized across all supported languages.
 
 ## [0.71.19] - 2026-06-12
 

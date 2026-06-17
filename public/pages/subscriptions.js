@@ -6,9 +6,7 @@
 import { api } from '/api.js';
 import { closeModal, confirmModal, openModal } from '/components/modal.js';
 import {
-  dateInputPlaceholder,
   formatDate,
-  formatDateInput,
   getLocale,
   isDateInputValid,
   parseDateInput,
@@ -574,9 +572,12 @@ function wireCombobox(panel, id) {
     search.value = option.textContent.trim();
     options.forEach((item) => item.setAttribute('aria-selected', String(item === option)));
     close();
+  };
+  const selectFromKeyboard = (option) => {
+    select(option);
     suppressFocusOpen = true;
-    search.focus();
-    queueMicrotask(() => { suppressFocusOpen = false; });
+    search.focus({ preventScroll: true });
+    setTimeout(() => { suppressFocusOpen = false; }, 120);
   };
   const filter = () => {
     const query = search.value.trim().toLocaleLowerCase(getLocale());
@@ -605,12 +606,18 @@ function wireCombobox(panel, id) {
     if (event.key === 'Enter' && visible.length) {
       event.preventDefault();
       event.stopPropagation();
-      select(visible[0]);
+      selectFromKeyboard(visible[0]);
     }
     if (event.key === 'Escape') close();
   });
   options.forEach((option) => {
-    option.addEventListener('click', () => select(option));
+    option.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+    });
+    option.addEventListener('click', (event) => {
+      event.preventDefault();
+      select(option);
+    });
     option.addEventListener('keydown', (event) => {
       const visible = options.filter((item) => !item.hidden);
       const index = visible.indexOf(option);
@@ -631,6 +638,10 @@ function wireCombobox(panel, id) {
 
 export function openSubscriptionModal(subscription = null) {
   const edit = Boolean(subscription);
+  const cycleItems = state.meta.billing_cycles.map((cycle) => ({
+    value: cycle,
+    label: t(`subscriptions.cycle.${cycle}`),
+  }));
   const categoryItems = [
     { value: '', label: t('subscriptions.uncategorized') },
     ...state.meta.categories.map((item) => ({ value: item.id, label: categoryLabel(item) })),
@@ -684,12 +695,13 @@ export function openSubscriptionModal(subscription = null) {
             value: subscription?.currency || state.settings.base_currency,
             placeholder: t('subscriptions.currencySearchPlaceholder'),
           })}
-          <div class="form-group">
-            <label class="form-label" for="subscription-cycle">${t('subscriptions.billingCycleLabel')}</label>
-            <select class="form-input" id="subscription-cycle">
-              ${state.meta.billing_cycles.map((cycle) => `<option value="${cycle}" ${subscription?.billing_cycle === cycle ? 'selected' : ''}>${t(`subscriptions.cycle.${cycle}`)}</option>`).join('')}
-            </select>
-          </div>
+          ${comboboxMarkup({
+            id: 'subscription-cycle',
+            label: t('subscriptions.billingCycleLabel'),
+            items: cycleItems,
+            value: subscription?.billing_cycle || 'monthly',
+            placeholder: t('subscriptions.billingCycleLabel'),
+          })}
           <div class="form-group">
             <label class="form-label" for="subscription-interval">${t('subscriptions.intervalLabel')}</label>
             <input class="form-input" id="subscription-interval" type="number" min="1" max="365" step="1" value="${subscription?.cycle_interval || 1}">
@@ -702,8 +714,8 @@ export function openSubscriptionModal(subscription = null) {
         <div class="form-grid-2">
           <div class="form-group">
             <label class="form-label" for="subscription-next-date">${t('subscriptions.nextPaymentLabel')}</label>
-            <input class="form-input" id="subscription-next-date" inputmode="numeric"
-                   placeholder="${dateInputPlaceholder()}" value="${esc(formatDateInput(subscription?.next_payment_date || toLocalDateKey(new Date())))}" required>
+            <input class="form-input" id="subscription-next-date" type="date"
+                   value="${esc(subscription?.next_payment_date || toLocalDateKey(new Date()))}" required>
           </div>
           <div class="form-group">
             <label class="form-label" for="subscription-reminder">${t('subscriptions.reminderDaysLabel')}</label>
@@ -775,6 +787,7 @@ export function openSubscriptionModal(subscription = null) {
         }
       };
       wireCombobox(panel, 'subscription-currency');
+      wireCombobox(panel, 'subscription-cycle');
       wireCombobox(panel, 'subscription-category');
       wireCombobox(panel, 'subscription-method');
       panel.querySelector('#subscription-cancel').addEventListener('click', closeModal);
