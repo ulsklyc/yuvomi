@@ -1110,6 +1110,34 @@ test('responsive adaptation keeps Notes vertical and prevents intrinsic-width ov
   );
 });
 
+test('dashboard weather widget adapts to selected widget size', () => {
+  const dashboard = read('../public/styles/dashboard.css');
+  const wrapperRule = cssRuleBody(dashboard, '.widget-wrapper');
+
+  assert.match(wrapperRule, /container:\s*dashboard-widget\s*\/\s*inline-size/);
+  assert.match(
+    dashboard,
+    /@container dashboard-widget \(min-width:\s*480px\)[\s\S]*\.weather-widget__inner\s*\{[\s\S]*flex-direction:\s*row/,
+    'weather should switch to horizontal layout from its widget width, not viewport width',
+  );
+  assert.match(
+    dashboard,
+    /\.widget-size--1x1\s*>\s*\.weather-widget \.weather-widget__meta,[\s\S]*\.widget-size--1x1\s*>\s*\.weather-widget \.weather-forecast\s*\{[\s\S]*display:\s*none/,
+    'tiny weather widgets should not force rich forecast content into the tile',
+  );
+  assert.match(
+    dashboard,
+    /\.widget-size--2x1\s*>\s*\.weather-widget \.weather-widget__meta,[\s\S]*\.widget-size--4x1\s*>\s*\.weather-widget \.weather-widget__meta\s*\{[\s\S]*display:\s*none/,
+    'one-row weather widgets should use a denser summary',
+  );
+  assert.doesNotMatch(
+    dashboard,
+    /@media \(min-width:\s*(?:768|1024|1440)px\)\s*\{\s*\.weather-widget\s*\{/,
+    'weather layout must not be driven by viewport breakpoints',
+  );
+  assert.doesNotMatch(dashboard, /\.weather-widget\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/);
+});
+
 test('responsive adaptation keeps all three Kitchen tabs visible on narrow phones', () => {
   const kitchenTabs = read('../public/styles/kitchen-tabs.css');
 
