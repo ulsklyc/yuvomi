@@ -199,6 +199,22 @@ function uniqueKey(table, base) {
   return key;
 }
 
+function categoryInUseCount(database, key) {
+  return database.prepare('SELECT COUNT(*) AS n FROM budget_entries WHERE category = ?').get(key).n;
+}
+
+function subcategoryInUseCount(database, key) {
+  return database.prepare('SELECT COUNT(*) AS n FROM budget_entries WHERE subcategory = ?').get(key).n;
+}
+
+function categoryCountByType(database, type) {
+  return database.prepare('SELECT COUNT(*) AS n FROM budget_categories WHERE type = ?').get(type).n;
+}
+
+function subcategoryCountForCategory(database, categoryKey) {
+  return database.prepare('SELECT COUNT(*) AS n FROM budget_subcategories WHERE category_key = ?').get(categoryKey).n;
+}
+
 function loadBudgetMeta() {
   const categories = db.get().prepare(`
     SELECT key, name, type, sort_order
@@ -1167,4 +1183,7 @@ router.delete('/:id', (req, res) => {
 });
 
 export default router;
-export { generateRecurringInstances, monthsPerInterval, effectiveMonthly, RECURRENCE_INTERVAL_KEYS };
+export {
+  generateRecurringInstances, monthsPerInterval, effectiveMonthly, RECURRENCE_INTERVAL_KEYS,
+  categoryInUseCount, subcategoryInUseCount, categoryCountByType, subcategoryCountForCategory,
+};

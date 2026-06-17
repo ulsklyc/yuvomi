@@ -8,6 +8,12 @@ import { DatabaseSync } from 'node:sqlite';
 import nodeAssert from 'node:assert/strict';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { budgetCategoryLabelKey } from '../public/utils/category-labels.js';
+import {
+  categoryInUseCount,
+  subcategoryInUseCount,
+  categoryCountByType,
+  subcategoryCountForCategory,
+} from '../server/routes/budget.js';
 
 let passed = 0;
 let failed = 0;
@@ -347,6 +353,43 @@ test('Empréstimo com parcelas calcula restante', () => {
   assert(Math.abs(totals.paid_amount - 200) < 0.01, `Pago: ${totals.paid_amount}`);
   assert(Math.abs((totals.total_amount - totals.paid_amount) - 800) < 0.01, 'Restante deve ser 800');
   assert(totals.installment_count - totals.paid_installments === 4, 'Devem restar 4 parcelas');
+});
+
+// --- Guard-Helfer (Kategorienverwaltung) ---
+// Fixtures: Kategorien/Subkategorien selbst seeden (Test-Schema seedet sie nicht).
+console.log('\n[Budget-Guards] Kategorie-Verwaltung\n');
+db.exec(`
+  INSERT OR IGNORE INTO budget_categories (key, name, type, sort_order) VALUES
+    ('housing', 'Housing', 'expense', 0),
+    ('food', 'Food', 'expense', 1),
+    ('leisure', 'Leisure', 'expense', 2),
+    ('inc_main', 'Haupteinkommen', 'income', 0);
+  INSERT OR IGNORE INTO budget_subcategories (key, category_key, name, sort_order) VALUES
+    ('rent_mortgage', 'housing', 'Miete', 0),
+    ('condominium', 'housing', 'Hausgeld', 1),
+    ('utilities', 'housing', 'Nebenkosten', 2),
+    ('groceries', 'food', 'Lebensmittel', 0);
+`);
+
+test('Guard: categoryInUseCount zählt Einträge der Kategorie', () => {
+  // 'housing' hat aus den bestehenden Budget-Tests >=1 Eintrag; 'leisure' ist frei.
+  assert(categoryInUseCount(db, 'housing') >= 1, 'housing muss >=1 Eintrag haben');
+  assert(categoryInUseCount(db, 'leisure') === 0, 'leisure muss 0 Einträge haben');
+});
+
+test('Guard: subcategoryInUseCount zählt Einträge der Subkategorie', () => {
+  assert(subcategoryInUseCount(db, 'rent_mortgage') >= 1, 'rent_mortgage muss in Benutzung sein');
+  assert(subcategoryInUseCount(db, 'condominium') === 0, 'condominium muss frei sein');
+});
+
+test('Guard: categoryCountByType zählt Kategorien je Typ', () => {
+  assert(categoryCountByType(db, 'expense') === 3, 'expense: housing, food, leisure');
+  assert(categoryCountByType(db, 'income') === 1, 'income: inc_main');
+});
+
+test('Guard: subcategoryCountForCategory zählt Subkategorien einer Kategorie', () => {
+  assert(subcategoryCountForCategory(db, 'housing') === 3, 'housing hat 3 Subkategorien');
+  assert(subcategoryCountForCategory(db, 'food') === 1, 'food hat 1 Subkategorie');
 });
 
 // --------------------------------------------------------
