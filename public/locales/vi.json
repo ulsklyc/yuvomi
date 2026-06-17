@@ -2043,5 +2043,19 @@
     "testSuccess": "Test email sent successfully.",
     "testFailed": "Test failed: {error}",
     "saved": "Settings saved."
+  },
+  "category": {
+    "manageTitle": "Manage categories",
+    "manageHint": "Add, rename, reorder or delete.",
+    "addPlaceholder": "New category",
+    "renameHint": "Tap to rename",
+    "renamePrompt": "New name",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "delete": "Delete",
+    "deleteConfirm": "Delete category “{{name}}”?",
+    "added": "Category added",
+    "renamed": "Category renamed",
+    "deleted": "Category deleted"
   }
 }
