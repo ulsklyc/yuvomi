@@ -165,6 +165,56 @@ function buildPaths() {
         },
       }),
     },
+    '/api/v1/auth/forgot-password': {
+      post: op({
+        summary: 'Request a password-reset link',
+        description: 'Always responds 200 with a generic body to prevent account enumeration. '
+          + 'A reset email is sent only when the account exists, has a linked email, SMTP is configured, and BASE_URL is set.',
+        tag: 'Auth',
+        auth: false,
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['identifier'],
+                properties: { identifier: { type: 'string', description: 'Username or email address.' } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Generic acknowledgement (sent regardless of whether the account exists).' },
+        },
+      }),
+    },
+    '/api/v1/auth/reset-password': {
+      post: op({
+        summary: 'Set a new password using a reset token',
+        tag: 'Auth',
+        auth: false,
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['token', 'password'],
+                properties: {
+                  token: { type: 'string' },
+                  password: { type: 'string', minLength: 8 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Password updated.' },
+          400: { $ref: '#/components/responses/BadRequest' },
+        },
+      }),
+    },
     '/api/v1/auth/me': {
       get: op({
         summary: 'Get current authenticated user',
