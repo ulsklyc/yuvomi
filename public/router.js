@@ -26,6 +26,8 @@ import {
 const ROUTES = [
   { path: '/login',    page: '/pages/login.js',    requiresAuth: false, module: null        },
   { path: '/setup',    page: '/pages/setup.js',    requiresAuth: false, module: null        },
+  { path: '/forgot-password', page: '/pages/forgot-password.js', requiresAuth: false, module: null },
+  { path: '/reset-password',  page: '/pages/reset-password.js',  requiresAuth: false, module: null },
   { path: '/',         page: '/pages/dashboard.js', requiresAuth: true, module: 'dashboard' },
   { path: '/tasks',    page: '/pages/tasks.js',     requiresAuth: true, module: 'tasks'     },
   { path: '/shopping', page: '/pages/shopping.js',  requiresAuth: true, module: 'shopping'  },
