@@ -97,6 +97,7 @@ function makeAuthApp(db, { baseUrl = 'https://oikos.test' } = {}) {
       emailService: { isConfigured: () => true, sendMail: async (m) => { sent.push(m); } },
       resetService: createPasswordResetService({ db }),
       baseUrl,
+      limiter: (_req, _res, next) => next(), // bypass rate limiting in tests
     });
     app.use('/auth', router);
     return { app, sent };
@@ -153,6 +154,28 @@ test('forgot-password sends no link when no trusted BASE_URL is configured (no h
   assert.equal(status, 200);
   assert.equal(json.data.ok, true);
   assert.equal(sent.length, 0);
+});
+
+test('forgot-password runs the rate limiter on every request (counts 200 responses)', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  let calls = 0;
+  const { buildResetRoutes } = await import('../server/auth.js');
+  const app = express();
+  app.use(express.json());
+  const router = express.Router();
+  buildResetRoutes(router, {
+    database: db,
+    emailService: { isConfigured: () => true, sendMail: async () => {} },
+    resetService: createPasswordResetService({ db }),
+    baseUrl: 'https://oikos.test',
+    limiter: (_req, _res, next) => { calls += 1; next(); },
+  });
+  app.use('/auth', router);
+  // Two known-user requests both return 200 — the limiter must still count both.
+  await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'alice' });
+  await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'alice' });
+  assert.equal(calls, 2);
 });
 
 test('forgot-password also resolves a user by email', async () => {

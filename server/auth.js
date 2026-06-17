@@ -150,6 +150,18 @@ const loginLimiter = rateLimit({
   message: { error: 'Zu viele Login-Versuche. Bitte warte kurz.', code: 429 },
 });
 
+// Eigener Limiter für Passwort-Reset: zählt ALLE Antworten (kein
+// skipSuccessfulRequests). /forgot-password antwortet aus Anti-Enumeration-
+// Gründen immer mit 200 — würden erfolgreiche Antworten übersprungen, könnte
+// ein bekannter Account unbegrenzt Reset-Mails/Token erzeugen.
+const passwordResetLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60_000,
+  max: parseInt(process.env.RATE_LIMIT_MAX_ATTEMPTS) || 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Zu viele Anfragen. Bitte warte kurz.', code: 429 },
+});
+
 function hashApiToken(token) {
   return crypto.createHash('sha256').update(token, 'utf8').digest('hex');
 }
@@ -558,6 +570,7 @@ export function buildResetRoutes(targetRouter, {
   emailService = defaultEmailService,
   resetService = defaultResetService,
   baseUrl = process.env.BASE_URL || '',
+  limiter = passwordResetLimiter,
 } = {}) {
   const getDb = () => (database || db.get());
 
@@ -579,7 +592,7 @@ export function buildResetRoutes(targetRouter, {
     return row?.email ?? null;
   }
 
-  targetRouter.post('/forgot-password', loginLimiter, async (req, res) => {
+  targetRouter.post('/forgot-password', limiter, async (req, res) => {
     try {
       const { identifier } = req.body || {};
       const userId = resolveUser(identifier);
@@ -613,7 +626,7 @@ export function buildResetRoutes(targetRouter, {
     }
   });
 
-  targetRouter.post('/reset-password', loginLimiter, async (req, res) => {
+  targetRouter.post('/reset-password', limiter, async (req, res) => {
     try {
       const { token, password } = req.body || {};
       if (!token || !password) {
