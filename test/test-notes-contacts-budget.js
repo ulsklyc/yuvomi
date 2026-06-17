@@ -8,6 +8,12 @@ import { DatabaseSync } from 'node:sqlite';
 import nodeAssert from 'node:assert/strict';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { budgetCategoryLabelKey } from '../public/utils/category-labels.js';
+import {
+  categoryInUseCount,
+  subcategoryInUseCount,
+  categoryCountByType,
+  subcategoryCountForCategory,
+} from '../server/routes/budget.js';
 
 let passed = 0;
 let failed = 0;
@@ -347,6 +353,184 @@ test('Empréstimo com parcelas calcula restante', () => {
   assert(Math.abs(totals.paid_amount - 200) < 0.01, `Pago: ${totals.paid_amount}`);
   assert(Math.abs((totals.total_amount - totals.paid_amount) - 800) < 0.01, 'Restante deve ser 800');
   assert(totals.installment_count - totals.paid_installments === 4, 'Devem restar 4 parcelas');
+});
+
+// --- Guard-Helfer (Kategorienverwaltung) ---
+// Fixtures: Kategorien/Subkategorien selbst seeden (Test-Schema seedet sie nicht).
+console.log('\n[Budget-Guards] Kategorie-Verwaltung\n');
+db.exec(`
+  INSERT OR IGNORE INTO budget_categories (key, name, type, sort_order) VALUES
+    ('housing', 'Housing', 'expense', 0),
+    ('food', 'Food', 'expense', 1),
+    ('leisure', 'Leisure', 'expense', 2),
+    ('inc_main', 'Haupteinkommen', 'income', 0);
+  INSERT OR IGNORE INTO budget_subcategories (key, category_key, name, sort_order) VALUES
+    ('rent_mortgage', 'housing', 'Miete', 0),
+    ('condominium', 'housing', 'Hausgeld', 1),
+    ('utilities', 'housing', 'Nebenkosten', 2),
+    ('groceries', 'food', 'Lebensmittel', 0);
+`);
+
+test('Guard: categoryInUseCount zählt Einträge der Kategorie', () => {
+  // 'housing' hat aus den bestehenden Budget-Tests >=1 Eintrag; 'leisure' ist frei.
+  assert(categoryInUseCount(db, 'housing') >= 1, 'housing muss >=1 Eintrag haben');
+  assert(categoryInUseCount(db, 'leisure') === 0, 'leisure muss 0 Einträge haben');
+});
+
+test('Guard: subcategoryInUseCount zählt Einträge der Subkategorie', () => {
+  assert(subcategoryInUseCount(db, 'rent_mortgage') >= 1, 'rent_mortgage muss in Benutzung sein');
+  assert(subcategoryInUseCount(db, 'condominium') === 0, 'condominium muss frei sein');
+});
+
+test('Guard: categoryCountByType zählt Kategorien je Typ', () => {
+  assert(categoryCountByType(db, 'expense') === 3, 'expense: housing, food, leisure');
+  assert(categoryCountByType(db, 'income') === 1, 'income: inc_main');
+});
+
+test('Guard: subcategoryCountForCategory zählt Subkategorien einer Kategorie', () => {
+  assert(subcategoryCountForCategory(db, 'housing') === 3, 'housing hat 3 Subkategorien');
+  assert(subcategoryCountForCategory(db, 'food') === 1, 'food hat 1 Subkategorie');
+});
+
+// --- Endpunkte: PUT/DELETE/PATCH-reorder Kategorien (DB-Level, gespiegelt an Routen) ---
+test('Kategorie umbenennen: name wird aktualisiert, key bleibt', () => {
+  db.prepare("UPDATE budget_categories SET name = ? WHERE key = 'food'").run('Lebensmittel');
+  const row = db.prepare("SELECT name FROM budget_categories WHERE key = 'food'").get();
+  assert(row.name === 'Lebensmittel', 'Name muss aktualisiert sein');
+});
+
+test('PUT /categories/:key Konflikt-Query: erkennt Namenskollision innerhalb desselben Typs (case-insensitive)', () => {
+  db.exec(`
+    INSERT OR IGNORE INTO budget_categories (key, name, type, sort_order) VALUES
+      ('rename_a', 'Alpha', 'expense', 20),
+      ('rename_b', 'Beta', 'expense', 21),
+      ('rename_inc', 'Beta', 'income', 22);
+  `);
+
+  const conflictQuery = `
+    SELECT key FROM budget_categories WHERE type = ? AND name = ? COLLATE NOCASE AND key != ?
+  `;
+
+  // Umbenennen von rename_a -> 'beta' (case-insensitive Treffer auf rename_b, gleicher Typ) -> Konflikt.
+  const collision = db.prepare(conflictQuery).get('expense', 'beta', 'rename_a');
+  assert(collision !== undefined, 'Umbenennen auf einen bereits vergebenen Namen (case-insensitive) muss einen Konflikt liefern -> Endpunkt liefert 409');
+  assert(collision.key === 'rename_b', 'Der gemeldete Konflikt muss auf die andere Kategorie (rename_b) zeigen');
+
+  // Umbenennen von rename_a -> eigener aktueller Name 'Alpha' -> kein Konflikt (key != ? schließt sich selbst aus).
+  const selfRename = db.prepare(conflictQuery).get('expense', 'Alpha', 'rename_a');
+  assert(selfRename === undefined, 'Umbenennen auf den eigenen aktuellen Namen darf KEINEN Konflikt liefern (key != ? schließt die Kategorie selbst aus)');
+
+  // rename_inc (income) heißt ebenfalls 'Beta' -- exakt wie rename_b (expense).
+  // Beim Umbenennen von rename_inc (income) auf 'Beta' darf NUR der eigene Typ (income) geprüft werden;
+  // rename_b (expense, gleicher Name) liegt im anderen Typ und darf keinen Konflikt auslösen.
+  const crossType = db.prepare(conflictQuery).get('income', 'Beta', 'rename_inc');
+  assert(crossType === undefined, 'Gleicher Name in einem ANDEREN Typ (expense: rename_b) darf keinen Konflikt für die income-Umbenennung von rename_inc auslösen -> type-Scoping greift');
+
+  db.exec("DELETE FROM budget_categories WHERE key IN ('rename_a','rename_b','rename_inc')");
+});
+
+test('Kategorie löschen blockiert, wenn in Benutzung (Guard hat Priorität vor letzter-Kategorie-Check)', () => {
+  // Endpunkt-Reihenfolge (server/routes/budget.js DELETE /categories/:key):
+  // 1. inUse > 0  -> 409 "in use"      (geprüft zuerst)
+  // 2. countByType <= 1 -> 409 "last"  (nur falls inUse === 0)
+  const inUse = categoryInUseCount(db, 'housing');
+  const blockedByInUse = inUse > 0;
+  assert(blockedByInUse === true, 'housing muss in Benutzung sein -> Endpunkt liefert 409 "in use", BEVOR der letzte-Kategorie-Check überhaupt ausgewertet wird');
+  // Der in-use-Guard greift unabhängig davon, ob housing auch die letzte ihres Typs wäre.
+  assert(categoryCountByType(db, 'expense') > 1, 'Kontrolle: housing ist hier nicht die letzte expense-Kategorie, der Block kommt also wirklich vom in-use-Guard');
+});
+
+test('Kategorie löschen blockiert, wenn letzte ihres Typs (Guard greift nur wenn NICHT in Benutzung)', () => {
+  // inc_main ist frei (keine Budgeteinträge) UND die einzige income-Kategorie
+  // -> erster Guard (inUse) lässt durch, zweiter Guard (countByType<=1) blockiert -> 409 "last".
+  const inUse = categoryInUseCount(db, 'inc_main');
+  assert(inUse === 0, 'inc_main muss frei sein, sonst würde der in-use-Guard zuerst greifen, nicht der letzte-Kategorie-Guard');
+  const blockedByLastOfType = categoryCountByType(db, 'income') <= 1;
+  assert(blockedByLastOfType === true, 'Nur eine income-Kategorie -> letzter-Guard greift -> Endpunkt liefert 409 "last category"');
+});
+
+test('Kategorie löschen erlaubt, wenn frei und nicht letzte: Subkategorien per ON DELETE CASCADE entfernt', () => {
+  // Wegwerf-Kategorie mit Subkategorie anlegen, dann löschen.
+  db.exec(`
+    INSERT INTO budget_categories (key, name, type, sort_order) VALUES ('misc', 'Misc', 'expense', 9);
+    INSERT INTO budget_subcategories (key, category_key, name, sort_order) VALUES ('misc_sub', 'misc', 'Sub', 0);
+  `);
+  assert(categoryInUseCount(db, 'misc') === 0, 'misc muss frei sein');
+  assert(categoryCountByType(db, 'expense') > 1, 'misc ist nicht die letzte expense-Kategorie');
+  db.prepare('DELETE FROM budget_categories WHERE key = ?').run('misc');
+  const sub = db.prepare("SELECT COUNT(*) AS n FROM budget_subcategories WHERE category_key = 'misc'").get().n;
+  assert(sub === 0, 'Subkategorien müssen per Cascade entfernt sein');
+});
+
+test('Reorder: sort_order folgt der übergebenen Reihenfolge', () => {
+  const expense = db.prepare("SELECT key FROM budget_categories WHERE type='expense' ORDER BY sort_order").all().map(r => r.key);
+  const reversed = [...expense].reverse();
+  reversed.forEach((key, i) => db.prepare('UPDATE budget_categories SET sort_order = ? WHERE key = ? AND type = ?').run(i, key, 'expense'));
+  const after = db.prepare("SELECT key FROM budget_categories WHERE type='expense' ORDER BY sort_order").all().map(r => r.key);
+  assert(after[0] === reversed[0], 'Erste Kategorie muss der neuen Reihenfolge entsprechen');
+});
+
+// --- Endpunkte: PUT/DELETE/PATCH-reorder Subkategorien (DB-Level, gespiegelt an Routen) ---
+// Achtung: 'utilities' ist durch den bestehenden „Strom April"-Eintrag der Budget-Tests in Benutzung
+// -> hier 'condominium' als freie Subkategorie verwenden, NICHT 'utilities'.
+
+test('Subkategorie löschen blockiert, wenn in Benutzung (Guard)', () => {
+  assert(subcategoryInUseCount(db, 'rent_mortgage') > 0, 'rent_mortgage muss in Benutzung sein');
+});
+
+test('Subkategorie löschen erlaubt, wenn frei und nicht letzte', () => {
+  assert(subcategoryInUseCount(db, 'condominium') === 0, 'condominium muss frei sein');
+  assert(subcategoryCountForCategory(db, 'housing') > 1, 'housing muss >1 Subkategorie haben');
+  db.prepare('DELETE FROM budget_subcategories WHERE key = ?').run('condominium');
+  assert(subcategoryCountForCategory(db, 'housing') >= 1, 'housing behält >=1 Subkategorie');
+});
+
+test('Subkategorie umbenennen: name aktualisiert', () => {
+  db.prepare("UPDATE budget_subcategories SET name = ? WHERE key = 'utilities'").run('Nebenkosten neu');
+  const row = db.prepare("SELECT name FROM budget_subcategories WHERE key = 'utilities'").get();
+  assert(row.name === 'Nebenkosten neu', 'Name muss aktualisiert sein');
+});
+
+test('PUT /categories/:key/subcategories/:subKey Konflikt-Query: erkennt Namenskollision innerhalb derselben Kategorie (case-insensitive)', () => {
+  // 'rent_mortgage' (housing) heißt 'Miete'; 'groceries' (food) heißt 'Lebensmittel'.
+  db.exec(`
+    INSERT OR IGNORE INTO budget_subcategories (key, category_key, name, sort_order) VALUES
+      ('sub_rename_a', 'housing', 'Sub Alpha', 10),
+      ('sub_rename_b', 'housing', 'Sub Beta', 11),
+      ('sub_rename_food', 'food', 'Sub Beta', 0);
+  `);
+
+  const conflictQuery = `
+    SELECT key FROM budget_subcategories WHERE category_key = ? AND name = ? COLLATE NOCASE AND key != ?
+  `;
+
+  // Umbenennen von sub_rename_a -> 'sub beta' (case-insensitive Treffer auf sub_rename_b, gleiche Kategorie) -> Konflikt.
+  const collision = db.prepare(conflictQuery).get('housing', 'sub beta', 'sub_rename_a');
+  assert(collision !== undefined, 'Umbenennen auf einen bereits vergebenen Namen (case-insensitive) innerhalb derselben Kategorie muss einen Konflikt liefern -> Endpunkt liefert 409');
+  assert(collision.key === 'sub_rename_b', 'Der gemeldete Konflikt muss auf die andere Subkategorie (sub_rename_b) zeigen');
+
+  // Umbenennen von sub_rename_a -> eigener aktueller Name 'Sub Alpha' -> kein Konflikt (key != ? schließt sich selbst aus).
+  const selfRename = db.prepare(conflictQuery).get('housing', 'Sub Alpha', 'sub_rename_a');
+  assert(selfRename === undefined, 'Umbenennen auf den eigenen aktuellen Namen darf KEINEN Konflikt liefern (key != ? schließt die Subkategorie selbst aus)');
+
+  // sub_rename_food (Kategorie food) heißt ebenfalls 'Sub Beta' -- exakt wie sub_rename_b (Kategorie housing).
+  // Beim Umbenennen von sub_rename_food auf 'Sub Beta' darf NUR innerhalb der eigenen Kategorie (food) geprüft werden;
+  // sub_rename_b (housing, gleicher Name) liegt in einer anderen Kategorie und darf keinen Konflikt auslösen.
+  const crossCategory = db.prepare(conflictQuery).get('food', 'Sub Beta', 'sub_rename_food');
+  assert(crossCategory === undefined, 'Gleicher Name in einer ANDEREN Kategorie (housing: sub_rename_b) darf keinen Konflikt für die Umbenennung von sub_rename_food (food) auslösen -> category_key-Scoping greift');
+
+  db.exec("DELETE FROM budget_subcategories WHERE key IN ('sub_rename_a','sub_rename_b','sub_rename_food')");
+});
+
+test('Subkategorie-Reorder: sort_order folgt der übergebenen Reihenfolge, scoped auf category_key', () => {
+  const housingSubs = db.prepare("SELECT key FROM budget_subcategories WHERE category_key='housing' ORDER BY sort_order").all().map(r => r.key);
+  const reversed = [...housingSubs].reverse();
+  reversed.forEach((key, i) => db.prepare('UPDATE budget_subcategories SET sort_order = ? WHERE key = ? AND category_key = ?').run(i, key, 'housing'));
+  const after = db.prepare("SELECT key FROM budget_subcategories WHERE category_key='housing' ORDER BY sort_order").all().map(r => r.key);
+  assert(after[0] === reversed[0], 'Erste Subkategorie muss der neuen Reihenfolge entsprechen');
+  // food-Subkategorien dürfen vom housing-Reorder unberührt bleiben (category_key-Scoping).
+  const groceries = db.prepare("SELECT sort_order FROM budget_subcategories WHERE key = 'groceries'").get();
+  assert(groceries.sort_order === 0, 'groceries (food) darf vom housing-Reorder nicht beeinflusst werden');
 });
 
 // --------------------------------------------------------

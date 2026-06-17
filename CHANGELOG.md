@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.72.0] - 2026-06-17
+
+### Added
+- **Budget category management (#357):** a "Manage categories" button in the Budget tab header opens a modal to rename, reorder, and delete budget categories and their subcategories, built on a reusable `oikos-category-manager` web component. Deletion is blocked while a category or subcategory is still referenced by entries, or when it is the last category of its type / last subcategory of its category.
+
 ## [0.71.51] - 2026-06-17
 
 ### Added

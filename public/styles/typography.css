@@ -150,7 +150,8 @@
 .shopping-cat-row__name,
 .housekeeping-section-heading span,
 .reminder-section__title,
-.cat-row__name {
+.cat-row__name,
+.cat-subrow__name {
   font-size: var(--type-secondary);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-snug);

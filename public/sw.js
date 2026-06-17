@@ -13,7 +13,7 @@
  *   → bypassCacheUntil (in-memory + Cache API für SW-Restart-Robustheit)
  */
 
-const APP_RELEASE   = '0.71.51';
+const APP_RELEASE   = '0.72.0';
 const SHELL_CACHE   = `oikos-shell-${APP_RELEASE}`;
 const PAGES_CACHE   = `oikos-pages-${APP_RELEASE}`;
 const LOCALES_CACHE = `oikos-locales-${APP_RELEASE}`;
@@ -103,6 +103,7 @@ const PAGE_MODULES = [
   '/pages/login.js',
   '/pages/recipes.js',
   '/components/shopping-category-manager.js',
+  '/components/category-manager.js',
   '/settings/registry.js',
   '/settings/shell.js',
   '/settings/components.js',
@@ -261,13 +262,14 @@ function dispatchFetch(request, url) {
   }
 
   // Lazy geladene Seiten-Module liegen in PAGES_CACHE. Neben /pages/ gehören dazu
-  // die Settings-Leaves unter /settings/ und der Einkaufskategorien-Manager —
+  // die Settings-Leaves unter /settings/ und die Kategorie-Manager-Komponenten —
   // ohne diesen Zweig würden sie via SHELL_CACHE bedient und offline (vor dem
   // ersten Online-Besuch) als index.html statt als JS-Modul ausgeliefert.
   if (
     url.pathname.startsWith('/pages/') ||
     url.pathname.startsWith('/settings/') ||
-    url.pathname === '/components/shopping-category-manager.js'
+    url.pathname === '/components/shopping-category-manager.js' ||
+    url.pathname === '/components/category-manager.js'
   ) {
     return networkFirst(request, PAGES_CACHE);
   }

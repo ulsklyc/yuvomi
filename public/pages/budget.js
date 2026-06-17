@@ -14,6 +14,7 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { render as renderSplitExpenses } from '/pages/split-expenses.js';
 import { toLocalDateKey } from '/utils/date.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
+import '/components/category-manager.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -378,6 +379,10 @@ function renderBody() {
           <span class="budget-list-header__title">${t('budget.transactions')}</span>
         </div>
         <div class="budget-list-header__actions">
+        <button class="btn btn--icon btn--ghost" id="budget-manage-categories"
+          aria-label="${t('budget.manageCategories')}" title="${t('budget.manageCategories')}">
+          <i data-lucide="tags" class="icon-md" aria-hidden="true"></i>
+        </button>
         ${state.entries.length ? `
         <a href="/api/v1/budget/export?month=${state.month}" class="btn btn--secondary"
            style="font-size:var(--text-sm);padding:var(--space-1) var(--space-3);">
@@ -396,6 +401,7 @@ function renderBody() {
   _container.querySelector('#empty-cta-budget')?.addEventListener('click', () => {
     document.querySelector('.page-fab')?.click();
   });
+  _container.querySelector('#budget-manage-categories')?.addEventListener('click', openCategoryManager);
   stagger(_container.querySelector('#budget-list')?.querySelectorAll('.budget-entry') ?? []);
 
   _container.querySelector('#budget-list')?.addEventListener('click', async (e) => {
@@ -850,6 +856,35 @@ function formatEntryDate(dateStr) {
 // --------------------------------------------------------
 // Modal
 // --------------------------------------------------------
+
+function openCategoryManager() {
+  let manager = null;
+  const onChanged = async () => {
+    await loadBudgetMeta();
+    renderBody();
+  };
+  openSharedModal({
+    title: t('budget.manageCategories'),
+    content: '<oikos-category-manager></oikos-category-manager>',
+    size: 'lg',
+    onSave: (panel) => {
+      manager = panel.querySelector('oikos-category-manager');
+      manager.addEventListener('category-manager-changed', onChanged);
+      manager.configure({
+        basePath: '/budget/categories',
+        groups: [
+          { key: 'expense', labelKey: 'budget.expenses', addLabelKey: 'budget.addCategory', subcategories: true },
+          { key: 'income',  labelKey: 'budget.income',   addLabelKey: 'budget.addCategory' },
+        ],
+        supportsSubcategories: true,
+        labelResolver: (item) => item.label ?? budgetCategoryLabel(item.key, item.name, t),
+        titleKey: 'budget.manageCategories',
+        hintKey: 'category.manageHint',
+      });
+    },
+    onClose: () => manager?.removeEventListener('category-manager-changed', onChanged),
+  });
+}
 
 function openBudgetModal({ mode, entry = null, initialType = '' }) {
   const isEdit = mode === 'edit';

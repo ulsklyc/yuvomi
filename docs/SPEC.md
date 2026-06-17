@@ -370,7 +370,7 @@ Index: CREATE INDEX idx_carddav_addressbook_account ON carddav_addressbook_selec
 Recurring entries generate one instance per month on demand. Non-virtual series post the full amount only on due months (every `monthsPerInterval(interval)` months); **virtual** series store the smoothed monthly share on the original and post it every month, so a 1,200/year bill shows as 100/month in the summary, balance and CSV export.
 
 ### Budget Categories
-Expense and income category list, DB-backed with stable English slug keys. Predefined set (8 expense, 5 income); users can add custom categories inline from the entry modal.
+Expense and income category list, DB-backed with stable English slug keys. Predefined set (8 expense, 5 income); users can add custom categories inline from the entry modal. A "Manage categories" button in the Budget tab header opens a modal (the reusable `oikos-category-manager` component) to rename, reorder, and delete categories. Deletion is blocked while a category is still referenced by entries (`409`) or when it is the last category of its type.
 
 | Column | Type | Constraint |
 |--------|------|-----------|
@@ -381,7 +381,7 @@ Expense and income category list, DB-backed with stable English slug keys. Prede
 | created_at | TEXT | ISO 8601 |
 
 ### Budget Subcategories
-Optional subcategories scoped to an expense category. Predefined set (35 entries); users can add custom subcategories inline. Income categories have no subcategories.
+Optional subcategories scoped to an expense category. Predefined set (35 entries); users can add custom subcategories inline. Income categories have no subcategories. The "Manage categories" modal also renames, reorders, and deletes subcategories per expense category (with the same in-use and last-subcategory deletion guards).
 
 | Column | Type | Constraint |
 |--------|------|-----------|

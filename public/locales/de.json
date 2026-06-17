@@ -824,7 +824,8 @@
     "categoryHealth": "Gesundheit",
     "categoryFamily": "Familie",
     "categoryHome": "Zuhause",
-    "categoryClothing": "Kleidung"
+    "categoryClothing": "Kleidung",
+    "manageCategories": "Kategorien verwalten"
   },
   "settings": {
     "title": "Einstellungen",
@@ -2044,5 +2045,21 @@
     "testSuccess": "Testmail erfolgreich gesendet.",
     "testFailed": "Test fehlgeschlagen: {error}",
     "saved": "Einstellungen gespeichert."
+  },
+  "category": {
+    "manageTitle": "Kategorien verwalten",
+    "manageHint": "Hinzufügen, umbenennen, sortieren oder löschen.",
+    "addPlaceholder": "Neue Kategorie",
+    "addSubPlaceholder": "Neue Unterkategorie",
+    "renameHint": "Zum Umbenennen tippen",
+    "renamePrompt": "Neuer Name",
+    "moveUp": "Nach oben",
+    "moveDown": "Nach unten",
+    "delete": "Löschen",
+    "deleteConfirm": "Kategorie „{{name}}“ löschen?",
+    "added": "Kategorie hinzugefügt",
+    "renamed": "Kategorie umbenannt",
+    "deleted": "Kategorie gelöscht",
+    "deleteSubConfirm": "Unterkategorie „{{name}}“ löschen?"
   }
 }

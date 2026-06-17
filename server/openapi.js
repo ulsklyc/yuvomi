@@ -659,9 +659,23 @@ function buildPaths() {
       get: op({ summary: 'List budget categories', tag: 'Budget', params: [langParam()] }),
       post: op({ summary: 'Create budget category', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) }),
     },
+    '/api/v1/budget/categories/reorder': {
+      patch: op({ summary: 'Reorder budget categories', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) }),
+    },
+    '/api/v1/budget/categories/{key}': {
+      put: op({ summary: 'Rename budget category', tag: 'Budget', params: [{ name: 'key', in: 'path', required: true, schema: { type: 'string' } }], stateChanging: true, requestBody: jsonBody(null) }),
+      delete: op({ summary: 'Delete budget category', tag: 'Budget', params: [{ name: 'key', in: 'path', required: true, schema: { type: 'string' } }], stateChanging: true }),
+    },
     '/api/v1/budget/categories/{categoryKey}/subcategories': {
       get: op({ summary: 'List subcategories for a budget category', tag: 'Budget', params: [{ name: 'categoryKey', in: 'path', required: true, schema: { type: 'string' } }, langParam()] }),
       post: op({ summary: 'Create budget subcategory', tag: 'Budget', params: [{ name: 'categoryKey', in: 'path', required: true, schema: { type: 'string' } }], stateChanging: true, requestBody: jsonBody(null) }),
+    },
+    '/api/v1/budget/categories/{key}/subcategories/reorder': {
+      patch: op({ summary: 'Reorder budget subcategories', tag: 'Budget', params: [{ name: 'key', in: 'path', required: true, schema: { type: 'string' } }], stateChanging: true, requestBody: jsonBody(null) }),
+    },
+    '/api/v1/budget/categories/{key}/subcategories/{subKey}': {
+      put: op({ summary: 'Rename budget subcategory', tag: 'Budget', params: [{ name: 'key', in: 'path', required: true, schema: { type: 'string' } }, { name: 'subKey', in: 'path', required: true, schema: { type: 'string' } }], stateChanging: true, requestBody: jsonBody(null) }),
+      delete: op({ summary: 'Delete budget subcategory', tag: 'Budget', params: [{ name: 'key', in: 'path', required: true, schema: { type: 'string' } }, { name: 'subKey', in: 'path', required: true, schema: { type: 'string' } }], stateChanging: true }),
     },
     '/api/v1/budget': {
       get: op({ summary: 'List budget entries', tag: 'Budget' }),

@@ -818,7 +818,8 @@
     "categoryHealth": "الصحة",
     "categoryFamily": "العائلة",
     "categoryHome": "المنزل",
-    "categoryClothing": "الملابس"
+    "categoryClothing": "الملابس",
+    "manageCategories": "إدارة الفئات"
   },
   "settings": {
     "title": "الإعدادات",
@@ -2044,5 +2045,21 @@
     "testSuccess": "Test email sent successfully.",
     "testFailed": "Test failed: {error}",
     "saved": "Settings saved."
+  },
+  "category": {
+    "manageTitle": "Manage categories",
+    "manageHint": "Add, rename, reorder or delete.",
+    "addPlaceholder": "New category",
+    "addSubPlaceholder": "New subcategory",
+    "renameHint": "Tap to rename",
+    "renamePrompt": "New name",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "delete": "Delete",
+    "deleteConfirm": "Delete category “{{name}}”?",
+    "added": "Category added",
+    "renamed": "Category renamed",
+    "deleted": "Category deleted",
+    "deleteSubConfirm": "Delete subcategory \"{{name}}\"?"
   }
 }
