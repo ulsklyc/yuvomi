@@ -46,6 +46,15 @@ try {
     logoService.googleImageUrls('["https://encrypted-tbn0.gstatic.com/images?q=tbn:abc\\u0026usqp=CAU"]'),
     ['https://encrypted-tbn0.gstatic.com/images?q=tbn:abc&usqp=CAU'],
   );
+  assert.deepEqual(
+    logoService.serviceDomainCandidates('Netflix').slice(0, 3),
+    ['netflix.com', 'netflix.io', 'netflix.app'],
+  );
+  assert.ok(logoService.serviceDomainCandidates('Amazon Prime').includes('amazon.com'));
+  assert.deepEqual(
+    logoService.serviceDomainCandidates('https://www.example.com/billing'),
+    ['example.com'],
+  );
 
   const database = db.get();
   const tables = database.prepare(`

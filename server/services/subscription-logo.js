@@ -6,6 +6,22 @@ const MAX_HTML_SCAN_BYTES = 2 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 500 * 1024;
 const MAX_LOGO_OPTIONS = 16;
 const MAX_REDIRECTS = 5;
+const DOMAIN_SUFFIXES = ['.com', '.io', '.app', '.tv', '.net', '.org'];
+const TRAILING_SERVICE_WORDS = new Set([
+  'app',
+  'cloud',
+  'drive',
+  'go',
+  'max',
+  'music',
+  'one',
+  'plus',
+  'premium',
+  'prime',
+  'pro',
+  'tv',
+  'video',
+]);
 const ALLOWED_IMAGE_TYPES = new Set([
   'image/avif',
   'image/png',
@@ -125,6 +141,82 @@ function attrValue(markup, name) {
   return decodeHtml(markup.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']+)["']`, 'i'))?.[1] || '');
 }
 
+function diagnosticError(error) {
+  return {
+    name: error?.name || 'Error',
+    message: error?.message || String(error),
+  };
+}
+
+function addDiagnostic(diagnostics, stage, detail = {}) {
+  if (!diagnostics) return;
+  diagnostics.push({ stage, ...detail });
+}
+
+function safeLogUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return `${parsed.origin}${parsed.pathname}`.slice(0, 300);
+  } catch {
+    return String(value || '').slice(0, 300);
+  }
+}
+
+function domainFromInput(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  try {
+    return new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).hostname.replace(/^www\./i, '').toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function domainLikeInput(value) {
+  return /^[a-z0-9.-]+\.[a-z]{2,}(?:[/:?#].*)?$/i.test(String(value || '').trim());
+}
+
+function serviceTokens(value) {
+  return String(value || '')
+    .trim()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function serviceDomainCandidates(value) {
+  if (/^https?:\/\//i.test(String(value || '').trim()) || domainLikeInput(value)) {
+    const domain = domainFromInput(value);
+    return domain ? [domain] : [];
+  }
+
+  const tokens = serviceTokens(value);
+  if (!tokens.length) return [];
+
+  const bases = [];
+  const addBase = (base) => {
+    const normalized = String(base || '').replace(/[^a-z0-9-]/g, '');
+    if (normalized && !bases.includes(normalized)) bases.push(normalized);
+  };
+
+  addBase(tokens.join(''));
+  if (tokens.length > 1) {
+    addBase(tokens.join('-'));
+    addBase(tokens[0]);
+    if (TRAILING_SERVICE_WORDS.has(tokens[tokens.length - 1])) {
+      addBase(tokens.slice(0, -1).join(''));
+      addBase(tokens.slice(0, -1).join('-'));
+    }
+  }
+
+  return [...new Set(bases.flatMap((base) => DOMAIN_SUFFIXES.map((suffix) => `${base}${suffix}`)))].slice(0, 24);
+}
+
 function iconUrls(html, pageUrl) {
   const links = [...html.matchAll(/<link\b[^>]*>/gi)].map((match) => match[0]);
   const candidates = [];
@@ -213,7 +305,8 @@ function googleImageUrls(html) {
   return [...new Set(urls)].filter((url) => /^https:\/\//i.test(url)).slice(0, 12);
 }
 
-async function googleLogoUrls(query) {
+async function googleLogoUrls(query, diagnostics = null) {
+  const started = Date.now();
   const search = new URL('https://www.google.com/search');
   search.searchParams.set('tbm', 'isch');
   search.searchParams.set('safe', 'active');
@@ -225,11 +318,20 @@ async function googleLogoUrls(query) {
     },
   });
   if (!response.ok) throw new Error(`Google returned HTTP ${response.status}.`);
-  const urls = googleImageUrls(await readHtmlPreview(response));
-  const favicon = new URL('https://www.google.com/s2/favicons');
-  favicon.searchParams.set('domain', websiteQuery(query));
-  favicon.searchParams.set('sz', '256');
-  urls.push(favicon.href);
+  const imageUrls = googleImageUrls(await readHtmlPreview(response));
+  const urls = [...imageUrls];
+  const domains = serviceDomainCandidates(query);
+  for (const domain of domains) {
+    const favicon = new URL('https://www.google.com/s2/favicons');
+    favicon.searchParams.set('domain', domain);
+    favicon.searchParams.set('sz', '256');
+    urls.push(favicon.href);
+  }
+  addDiagnostic(
+    diagnostics,
+    'google-candidates',
+    { image_result_count: imageUrls.length, domain_candidates: domains, elapsed_ms: Date.now() - started },
+  );
   return [...new Set(urls)];
 }
 
@@ -263,7 +365,7 @@ async function logoDataFromUrl(url) {
   };
 }
 
-async function logoOptionsFromUrls(urls, source, seenUrls, seenData, limit = MAX_LOGO_OPTIONS) {
+async function logoOptionsFromUrls(urls, source, seenUrls, seenData, limit = MAX_LOGO_OPTIONS, diagnostics = null) {
   const uniqueUrls = urls.filter((url) => {
     if (seenUrls.has(url)) return false;
     seenUrls.add(url);
@@ -271,46 +373,73 @@ async function logoOptionsFromUrls(urls, source, seenUrls, seenData, limit = MAX
   }).slice(0, limit * 2);
   const settled = await Promise.allSettled(uniqueUrls.map((url) => logoDataFromUrl(url)));
   const options = [];
-  for (const result of settled) {
-    if (result.status !== 'fulfilled') continue;
+  const failures = [];
+  for (const [index, result] of settled.entries()) {
+    if (result.status !== 'fulfilled') {
+      failures.push({ url: safeLogUrl(uniqueUrls[index]), error: diagnosticError(result.reason) });
+      continue;
+    }
     if (seenData.has(result.value.logo_data)) continue;
     seenData.add(result.value.logo_data);
     options.push({ ...result.value, source });
     if (options.length >= limit) break;
   }
+  addDiagnostic(diagnostics, `${source}-fetch`, {
+    candidate_count: urls.length,
+    attempted_count: uniqueUrls.length,
+    success_count: options.length,
+    failure_count: failures.length,
+    failures: failures.slice(0, 8),
+  });
   return options;
 }
 
-async function findLogoOptions(input) {
+async function findLogoOptions(input, { diagnostics = null } = {}) {
+  const started = Date.now();
   const seenUrls = new Set();
   const seenData = new Set();
   const options = [];
+  addDiagnostic(diagnostics, 'start', {
+    input_type: /^https?:\/\//i.test(String(input || '').trim()) || domainLikeInput(input) ? 'website' : 'service_name',
+    domain_candidates: serviceDomainCandidates(input),
+  });
 
   try {
     const normalized = normalizedWebsiteUrl(input);
+    addDiagnostic(diagnostics, 'website-request', { url: safeLogUrl(normalized) });
     const pageResult = await fetchPublic(normalized, { signal: AbortSignal.timeout(8000) });
+    addDiagnostic(diagnostics, 'website-response', { status: pageResult.response.status, final_url: safeLogUrl(pageResult.finalUrl.href) });
     if (pageResult.response.ok) {
       const html = await readHtmlPreview(pageResult.response);
+      const websiteUrls = websiteImageUrls(html, pageResult.finalUrl);
+      addDiagnostic(diagnostics, 'website-candidates', { candidate_count: websiteUrls.length });
       options.push(...await logoOptionsFromUrls(
-        websiteImageUrls(html, pageResult.finalUrl),
+        websiteUrls,
         'website',
         seenUrls,
         seenData,
         Math.ceil(MAX_LOGO_OPTIONS / 2),
+        diagnostics,
       ));
     }
-  } catch {}
+  } catch (err) {
+    addDiagnostic(diagnostics, 'website-error', { error: diagnosticError(err) });
+  }
 
   try {
     options.push(...await logoOptionsFromUrls(
-      await googleLogoUrls(input),
+      await googleLogoUrls(input, diagnostics),
       'google',
       seenUrls,
       seenData,
       MAX_LOGO_OPTIONS - options.length,
+      diagnostics,
     ));
-  } catch {}
+  } catch (err) {
+    addDiagnostic(diagnostics, 'google-error', { error: diagnosticError(err) });
+  }
 
+  addDiagnostic(diagnostics, 'complete', { result_count: options.length, elapsed_ms: Date.now() - started });
   return options.slice(0, MAX_LOGO_OPTIONS);
 }
 
@@ -341,4 +470,4 @@ async function findLogo(websiteUrl) {
   throw new Error('No supported logo could be found.');
 }
 
-export { findLogo, findLogoOptions, googleImageUrls, iconUrls, privateAddress, websiteImageUrls };
+export { findLogo, findLogoOptions, googleImageUrls, iconUrls, privateAddress, serviceDomainCandidates, websiteImageUrls };

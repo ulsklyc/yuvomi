@@ -917,12 +917,14 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
     button.disabled = true;
     setHtml(results, `<p class="subscriptions-logo-empty">${t('subscriptions.logoSearching')}</p>`);
     try {
-      const response = await api.post('/budget/subscriptions/logo-search', { website_url: query });
+      const response = await api.post('/budget/subscriptions/logo-search', { query });
       options = response.data?.options || [];
       setHtml(results, logoOptionsMarkup(options));
     } catch (err) {
+      const message = err.data?.error || t('subscriptions.logoSearchError');
       options = [];
-      setHtml(results, `<p class="subscriptions-logo-empty">${esc(err.data?.error || t('subscriptions.logoSearchError'))}</p>`);
+      setHtml(results, `<p class="subscriptions-logo-empty">${esc(message)}</p>`);
+      window.oikos?.showToast(message, 'danger');
     } finally {
       button.disabled = false;
       if (window.lucide) window.lucide.createIcons({ el: overlay });

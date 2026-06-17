@@ -256,14 +256,42 @@ router.put('/meta/order', (req, res) => {
   res.json({ data: { updated: true } });
 });
 
+function logoSearchLogError(err) {
+  return {
+    name: err?.name || 'Error',
+    message: err?.message || String(err),
+    stack: err?.stack,
+  };
+}
+
 router.post('/logo-search', async (req, res) => {
+  const diagnostics = [];
+  let logoQuery = '';
+  const started = Date.now();
   try {
-    const website = str(req.body.website_url, 'Website', { max: 2000 });
-    if (website.error) return res.status(400).json({ error: website.error, code: 400 });
-    const options = await findLogoOptions(website.value);
-    if (!options.length) return res.status(404).json({ error: 'No supported logo could be found.', code: 404 });
+    const query = str(req.body.query ?? req.body.website_url, 'Logo search query', { max: 2000 });
+    if (query.error) {
+      log.warn('Subscription logo search rejected invalid input', { error: query.error });
+      return res.status(400).json({ error: query.error, code: 400 });
+    }
+    logoQuery = query.value;
+    const options = await findLogoOptions(logoQuery, { diagnostics });
+    if (!options.length) {
+      log.warn('Subscription logo search returned no supported logos', {
+        query: logoQuery,
+        elapsed_ms: Date.now() - started,
+        diagnostics,
+      });
+      return res.status(404).json({ error: 'No supported logo could be found.', code: 404 });
+    }
     res.json({ data: { logo_data: options[0].logo_data, options } });
   } catch (err) {
+    log.error('Subscription logo search failed', {
+      query: logoQuery,
+      elapsed_ms: Date.now() - started,
+      error: logoSearchLogError(err),
+      diagnostics,
+    });
     res.status(400).json({ error: err.message || 'Logo could not be found.', code: 400 });
   }
 });
