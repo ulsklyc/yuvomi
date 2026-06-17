@@ -152,6 +152,18 @@ const auth = {
   updateUser: (id, data) => api.patch(`/auth/users/${id}`, data),
   updateProfile: (data) => api.patch('/auth/me/profile', data),
   deleteUser: (id) => api.delete(`/auth/users/${id}`),
+  forgotPassword: (identifier) => api.post('/auth/forgot-password', { identifier }),
+  resetPassword: (token, password) => api.post('/auth/reset-password', { token, password }),
 };
 
-export { api, auth, ApiError };
+// --------------------------------------------------------
+// E-Mail (SMTP) – Admin-Konfiguration
+// --------------------------------------------------------
+
+const email = {
+  getConfig: () => api.get('/email/config'),
+  saveConfig: (cfg) => api.put('/email/config', cfg),
+  test: (to) => api.post('/email/test', to ? { to } : {}),
+};
+
+export { api, auth, email, ApiError };
