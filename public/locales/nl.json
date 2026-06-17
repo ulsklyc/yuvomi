@@ -2078,7 +2078,7 @@
         "moveUp": "Move up",
         "moveDown": "Move down",
         "findLogo": "Logo zoeken",
-        "findLogoHint": "Securely checks the public HTTPS website for its icon.",
+        "findLogoHint": "Zoekt websitepictogrammen en Google Afbeeldingen-resultaten.",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
         "billingDetails": "Billing details",
@@ -2092,6 +2092,17 @@
         "currencyRequired": "Select a currency.",
         "noBudgetLimit": "Geen budgetlimiet",
         "unlimited": "Onbeperkt",
-        "setBudgetHint": "Stel een maandbudget in om een limiet bij te houden."
+        "setBudgetHint": "Stel een maandbudget in om een limiet bij te houden.",
+        "renewalForecast": "Vernieuwingsprognose",
+        "logoSearchTitle": "Logo kiezen",
+        "logoSearchLabel": "Website of servicenaam",
+        "logoSearchPlaceholder": "example.com of Spotify",
+        "searchLogo": "Zoeken",
+        "logoSearching": "Logo’s zoeken...",
+        "logoSearchEmpty": "Geen ondersteunde logo’s gevonden.",
+        "logoSearchError": "Logo’s konden niet worden geladen.",
+        "logoSourceWebsite": "Van website",
+        "logoSourceGoogle": "Van Google",
+        "useLogo": "Dit logo gebruiken"
     }
 }

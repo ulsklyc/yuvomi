@@ -2078,7 +2078,7 @@
         "moveUp": "Move up",
         "moveDown": "Move down",
         "findLogo": "Find logo",
-        "findLogoHint": "Securely checks the public HTTPS website for its icon.",
+        "findLogoHint": "Wyszukuje ikony witryny i wyniki Grafiki Google.",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
         "billingDetails": "Billing details",
@@ -2092,6 +2092,17 @@
         "currencyRequired": "Select a currency.",
         "noBudgetLimit": "Brak limitu budżetu",
         "unlimited": "Bez limitu",
-        "setBudgetHint": "Ustaw miesięczny budżet, aby śledzić limit."
+        "setBudgetHint": "Ustaw miesięczny budżet, aby śledzić limit.",
+        "renewalForecast": "Prognoza odnowień",
+        "logoSearchTitle": "Wybierz logo",
+        "logoSearchLabel": "Witryna lub nazwa usługi",
+        "logoSearchPlaceholder": "example.com lub Spotify",
+        "searchLogo": "Szukaj",
+        "logoSearching": "Wyszukiwanie logo...",
+        "logoSearchEmpty": "Nie znaleziono obsługiwanych logo.",
+        "logoSearchError": "Nie udało się załadować logo.",
+        "logoSourceWebsite": "Ze strony",
+        "logoSourceGoogle": "Z Google",
+        "useLogo": "Użyj tego logo"
     }
 }

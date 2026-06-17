@@ -2078,7 +2078,7 @@
         "moveUp": "Move up",
         "moveDown": "Move down",
         "findLogo": "Find logo",
-        "findLogoHint": "Securely checks the public HTTPS website for its icon.",
+        "findLogoHint": "Αναζητά εικονίδια ιστότοπου και αποτελέσματα εικόνων Google.",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
         "billingDetails": "Billing details",
@@ -2092,6 +2092,17 @@
         "currencyRequired": "Select a currency.",
         "noBudgetLimit": "Χωρίς όριο προϋπολογισμού",
         "unlimited": "Απεριόριστο",
-        "setBudgetHint": "Ορίστε μηνιαίο προϋπολογισμό για παρακολούθηση του ορίου."
+        "setBudgetHint": "Ορίστε μηνιαίο προϋπολογισμό για παρακολούθηση του ορίου.",
+        "renewalForecast": "Πρόβλεψη ανανεώσεων",
+        "logoSearchTitle": "Επιλογή λογότυπου",
+        "logoSearchLabel": "Ιστότοπος ή όνομα υπηρεσίας",
+        "logoSearchPlaceholder": "example.com ή Spotify",
+        "searchLogo": "Αναζήτηση",
+        "logoSearching": "Αναζήτηση λογότυπων...",
+        "logoSearchEmpty": "Δεν βρέθηκαν υποστηριζόμενα λογότυπα.",
+        "logoSearchError": "Δεν ήταν δυνατή η φόρτωση λογότυπων.",
+        "logoSourceWebsite": "Από τον ιστότοπο",
+        "logoSourceGoogle": "Από το Google",
+        "useLogo": "Χρήση αυτού του λογότυπου"
     }
 }

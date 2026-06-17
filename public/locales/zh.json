@@ -2078,7 +2078,7 @@
         "moveUp": "Move up",
         "moveDown": "Move down",
         "findLogo": "查找徽标",
-        "findLogoHint": "Securely checks the public HTTPS website for its icon.",
+        "findLogoHint": "搜索网站图标和 Google 图片结果。",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
         "billingDetails": "Billing details",
@@ -2092,6 +2092,17 @@
         "currencyRequired": "Select a currency.",
         "noBudgetLimit": "无预算限制",
         "unlimited": "无限制",
-        "setBudgetHint": "设置每月预算以跟踪限额。"
+        "setBudgetHint": "设置每月预算以跟踪限额。",
+        "renewalForecast": "续订预测",
+        "logoSearchTitle": "选择标志",
+        "logoSearchLabel": "网站或服务名称",
+        "logoSearchPlaceholder": "example.com 或 Spotify",
+        "searchLogo": "搜索",
+        "logoSearching": "正在搜索标志...",
+        "logoSearchEmpty": "未找到支持的标志。",
+        "logoSearchError": "无法加载标志。",
+        "logoSourceWebsite": "来自网站",
+        "logoSourceGoogle": "来自 Google",
+        "useLogo": "使用此标志"
     }
 }

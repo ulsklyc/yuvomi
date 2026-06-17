@@ -2078,7 +2078,7 @@
         "moveUp": "Move up",
         "moveDown": "Move down",
         "findLogo": "Find logo",
-        "findLogoHint": "Securely checks the public HTTPS website for its icon.",
+        "findLogoHint": "Tìm biểu tượng trang web và kết quả Google Hình ảnh.",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
         "billingDetails": "Billing details",
@@ -2092,6 +2092,17 @@
         "currencyRequired": "Select a currency.",
         "noBudgetLimit": "Không giới hạn ngân sách",
         "unlimited": "Không giới hạn",
-        "setBudgetHint": "Đặt ngân sách hàng tháng để theo dõi giới hạn."
+        "setBudgetHint": "Đặt ngân sách hàng tháng để theo dõi giới hạn.",
+        "renewalForecast": "Dự báo gia hạn",
+        "logoSearchTitle": "Chọn logo",
+        "logoSearchLabel": "Trang web hoặc tên dịch vụ",
+        "logoSearchPlaceholder": "example.com hoặc Spotify",
+        "searchLogo": "Tìm kiếm",
+        "logoSearching": "Đang tìm logo...",
+        "logoSearchEmpty": "Không tìm thấy logo được hỗ trợ.",
+        "logoSearchError": "Không thể tải logo.",
+        "logoSourceWebsite": "Từ trang web",
+        "logoSourceGoogle": "Từ Google",
+        "useLogo": "Dùng logo này"
     }
 }

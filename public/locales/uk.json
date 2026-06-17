@@ -2078,7 +2078,7 @@
         "moveUp": "Move up",
         "moveDown": "Move down",
         "findLogo": "Find logo",
-        "findLogoHint": "Securely checks the public HTTPS website for its icon.",
+        "findLogoHint": "Шукає іконки сайту та результати Google Зображень.",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
         "billingDetails": "Billing details",
@@ -2092,6 +2092,17 @@
         "currencyRequired": "Select a currency.",
         "noBudgetLimit": "Без обмеження бюджету",
         "unlimited": "Без обмежень",
-        "setBudgetHint": "Установіть місячний бюджет, щоб відстежувати ліміт."
+        "setBudgetHint": "Установіть місячний бюджет, щоб відстежувати ліміт.",
+        "renewalForecast": "Прогноз поновлень",
+        "logoSearchTitle": "Вибрати логотип",
+        "logoSearchLabel": "Сайт або назва сервісу",
+        "logoSearchPlaceholder": "example.com або Spotify",
+        "searchLogo": "Пошук",
+        "logoSearching": "Пошук логотипів...",
+        "logoSearchEmpty": "Підтримувані логотипи не знайдено.",
+        "logoSearchError": "Не вдалося завантажити логотипи.",
+        "logoSourceWebsite": "Із сайту",
+        "logoSourceGoogle": "З Google",
+        "useLogo": "Використати цей логотип"
     }
 }

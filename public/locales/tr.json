@@ -2078,7 +2078,7 @@
         "moveUp": "Move up",
         "moveDown": "Move down",
         "findLogo": "Find logo",
-        "findLogoHint": "Securely checks the public HTTPS website for its icon.",
+        "findLogoHint": "Web sitesi simgelerini ve Google Görseller sonuçlarını arar.",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
         "billingDetails": "Billing details",
@@ -2092,6 +2092,17 @@
         "currencyRequired": "Select a currency.",
         "noBudgetLimit": "Bütçe sınırı yok",
         "unlimited": "Sınırsız",
-        "setBudgetHint": "Bir sınırı takip etmek için aylık bütçe belirleyin."
+        "setBudgetHint": "Bir sınırı takip etmek için aylık bütçe belirleyin.",
+        "renewalForecast": "Yenileme tahmini",
+        "logoSearchTitle": "Logo seç",
+        "logoSearchLabel": "Web sitesi veya hizmet adı",
+        "logoSearchPlaceholder": "example.com veya Spotify",
+        "searchLogo": "Ara",
+        "logoSearching": "Logolar aranıyor...",
+        "logoSearchEmpty": "Desteklenen logo bulunamadı.",
+        "logoSearchError": "Logolar yüklenemedi.",
+        "logoSourceWebsite": "Web sitesinden",
+        "logoSourceGoogle": "Google’dan",
+        "useLogo": "Bu logoyu kullan"
     }
 }

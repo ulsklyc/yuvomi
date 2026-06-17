@@ -2078,7 +2078,7 @@
         "moveUp": "Move up",
         "moveDown": "Move down",
         "findLogo": "Find logo",
-        "findLogoHint": "Securely checks the public HTTPS website for its icon.",
+        "findLogoHint": "Ищет значки сайта и результаты Google Картинок.",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
         "billingDetails": "Billing details",
@@ -2092,6 +2092,17 @@
         "currencyRequired": "Select a currency.",
         "noBudgetLimit": "Без ограничения бюджета",
         "unlimited": "Без ограничений",
-        "setBudgetHint": "Установите месячный бюджет, чтобы отслеживать лимит."
+        "setBudgetHint": "Установите месячный бюджет, чтобы отслеживать лимит.",
+        "renewalForecast": "Прогноз продлений",
+        "logoSearchTitle": "Выбрать логотип",
+        "logoSearchLabel": "Сайт или название сервиса",
+        "logoSearchPlaceholder": "example.com или Spotify",
+        "searchLogo": "Поиск",
+        "logoSearching": "Поиск логотипов...",
+        "logoSearchEmpty": "Поддерживаемые логотипы не найдены.",
+        "logoSearchError": "Не удалось загрузить логотипы.",
+        "logoSourceWebsite": "С сайта",
+        "logoSourceGoogle": "Из Google",
+        "useLogo": "Использовать этот логотип"
     }
 }

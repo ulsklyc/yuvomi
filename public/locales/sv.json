@@ -2078,7 +2078,7 @@
         "moveUp": "Move up",
         "moveDown": "Move down",
         "findLogo": "Find logo",
-        "findLogoHint": "Securely checks the public HTTPS website for its icon.",
+        "findLogoHint": "Söker webbplatsikoner och Google Bildresultat.",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
         "billingDetails": "Billing details",
@@ -2092,6 +2092,17 @@
         "currencyRequired": "Select a currency.",
         "noBudgetLimit": "Ingen budgetgräns",
         "unlimited": "Obegränsat",
-        "setBudgetHint": "Ange en månadsbudget för att följa en gräns."
+        "setBudgetHint": "Ange en månadsbudget för att följa en gräns.",
+        "renewalForecast": "Förnyelseprognos",
+        "logoSearchTitle": "Välj logotyp",
+        "logoSearchLabel": "Webbplats eller tjänstens namn",
+        "logoSearchPlaceholder": "example.com eller Spotify",
+        "searchLogo": "Sök",
+        "logoSearching": "Söker logotyper...",
+        "logoSearchEmpty": "Inga logotyper som stöds hittades.",
+        "logoSearchError": "Logotyper kunde inte läsas in.",
+        "logoSourceWebsite": "Från webbplats",
+        "logoSourceGoogle": "Från Google",
+        "useLogo": "Använd denna logotyp"
     }
 }

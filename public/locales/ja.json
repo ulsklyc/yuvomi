@@ -2078,7 +2078,7 @@
         "moveUp": "Move up",
         "moveDown": "Move down",
         "findLogo": "ロゴを検索",
-        "findLogoHint": "Securely checks the public HTTPS website for its icon.",
+        "findLogoHint": "WebサイトのアイコンとGoogle画像検索結果を探します。",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
         "billingDetails": "Billing details",
@@ -2092,6 +2092,17 @@
         "currencyRequired": "Select a currency.",
         "noBudgetLimit": "予算上限なし",
         "unlimited": "無制限",
-        "setBudgetHint": "上限を追跡するには月間予算を設定してください。"
+        "setBudgetHint": "上限を追跡するには月間予算を設定してください。",
+        "renewalForecast": "更新予測",
+        "logoSearchTitle": "ロゴを選択",
+        "logoSearchLabel": "Webサイトまたはサービス名",
+        "logoSearchPlaceholder": "example.com または Spotify",
+        "searchLogo": "検索",
+        "logoSearching": "ロゴを検索中...",
+        "logoSearchEmpty": "対応しているロゴが見つかりません。",
+        "logoSearchError": "ロゴを読み込めませんでした。",
+        "logoSourceWebsite": "Webサイトから",
+        "logoSourceGoogle": "Googleから",
+        "useLogo": "このロゴを使う"
     }
 }

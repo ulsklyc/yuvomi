@@ -60,6 +60,33 @@ function categoryLabel(category) {
   return DEFAULT_CATEGORY_LABELS[name] ? t(DEFAULT_CATEGORY_LABELS[name]) : (name || t('subscriptions.uncategorized'));
 }
 
+function addMonths(date, count) {
+  const next = new Date(date);
+  const day = next.getDate();
+  next.setMonth(next.getMonth() + count, 1);
+  const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+  next.setDate(Math.min(day, lastDay));
+  return next;
+}
+
+function addCycleDate(date, cycle, interval) {
+  const next = new Date(date);
+  if (cycle === 'daily') next.setDate(next.getDate() + interval);
+  else if (cycle === 'weekly') next.setDate(next.getDate() + (interval * 7));
+  else if (cycle === 'yearly') next.setFullYear(next.getFullYear() + interval);
+  else return addMonths(next, interval);
+  return next;
+}
+
+function monthKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthLabel(key) {
+  const [year, month] = key.split('-').map(Number);
+  return new Intl.DateTimeFormat(getLocale(), { month: 'short' }).format(new Date(year, month - 1, 1));
+}
+
 function cycleLabel(subscription) {
   const key = `subscriptions.cycle.${subscription.billing_cycle}`;
   return subscription.cycle_interval === 1
@@ -292,24 +319,120 @@ function renderSummary() {
 }
 
 function renderAnalytics() {
-  const categories = state.summary?.by_category || [];
-  const methods = state.summary?.by_payment_method || [];
+  const categories = amountRows(state.summary?.by_category || [], categoryLabel);
+  const methods = amountRows(state.summary?.by_payment_method || []);
+  const forecast = renewalForecast();
   return `
     <section class="subscriptions-analytics">
-      ${renderBreakdown(t('subscriptions.byCategory'), categories, categoryLabel)}
+      ${renderAreaChart(t('subscriptions.renewalForecast'), forecast)}
+      ${renderPieChart(t('subscriptions.byCategory'), categories)}
       ${renderBreakdown(t('subscriptions.byPaymentMethod'), methods)}
     </section>
   `;
 }
 
-function renderBreakdown(title, rows, labelFor = (name) => name) {
+function amountRows(rows, labelFor = (name) => name) {
+  return rows
+    .map((row) => ({ ...row, label: labelFor(row.name), amount: Number(row.amount || 0) }))
+    .filter((row) => row.amount > 0)
+    .sort((a, b) => b.amount - a.amount);
+}
+
+function dueAmount(subscription) {
+  if (subscription.monthly_base === null) return 0;
+  if (subscription.currency === (state.summary?.base_currency || state.settings.base_currency)) return Number(subscription.amount || 0);
+  const nativeMonthly = Number(subscription.monthly_native || 0);
+  if (!nativeMonthly) return Number(subscription.monthly_base || 0);
+  return Number(subscription.amount || 0) * (Number(subscription.monthly_base || 0) / nativeMonthly);
+}
+
+function renewalForecast() {
+  const today = new Date(`${toLocalDateKey(new Date())}T00:00:00`);
+  const start = new Date(today.getFullYear(), today.getMonth(), 1);
+  const months = Array.from({ length: 6 }, (_, index) => {
+    const date = addMonths(start, index);
+    return { key: monthKey(date), label: monthLabel(monthKey(date)), amount: 0 };
+  });
+  const monthMap = new Map(months.map((row) => [row.key, row]));
+  const end = addMonths(start, months.length);
+  for (const subscription of state.subscriptions.filter((row) => row.enabled)) {
+    let due = new Date(`${subscription.next_payment_date}T00:00:00`);
+    while (due < start) due = addCycleDate(due, subscription.billing_cycle, subscription.cycle_interval || 1);
+    while (due < end) {
+      const row = monthMap.get(monthKey(due));
+      if (row) row.amount += dueAmount(subscription);
+      due = addCycleDate(due, subscription.billing_cycle, subscription.cycle_interval || 1);
+    }
+  }
+  return months.map((row) => ({ ...row, amount: Number(row.amount.toFixed(2)) }));
+}
+
+function renderAreaChart(title, rows) {
+  const max = Math.max(...rows.map((row) => row.amount), 1);
+  const points = rows.map((row, index) => {
+    const x = rows.length === 1 ? 50 : Math.round((index / (rows.length - 1)) * 100);
+    const y = Math.round(46 - ((row.amount / max) * 34));
+    return `${x},${y}`;
+  }).join(' ');
+  const areaPoints = `0,52 ${points} 100,52`;
+  return `
+    <article class="subscriptions-chart subscriptions-chart--area">
+      <div class="subscriptions-chart__head">
+        <h2>${title}</h2>
+        <strong>${money(Math.max(...rows.map((row) => row.amount), 0))}</strong>
+      </div>
+      <svg class="subscriptions-area-chart" viewBox="0 0 100 52" preserveAspectRatio="none" aria-hidden="true">
+        <polygon points="${areaPoints}"></polygon>
+        <polyline points="${points}"></polyline>
+      </svg>
+      <div class="subscriptions-chart-axis">
+        ${rows.map((row) => `<span>${esc(row.label)}</span>`).join('')}
+      </div>
+    </article>
+  `;
+}
+
+function renderPieChart(title, rows) {
+  const colors = ['#6c3aed', '#0f766e', '#0969da', '#d97706', '#b91c1c', '#64748b'];
+  const total = rows.reduce((sum, row) => sum + row.amount, 0);
+  let offset = 0;
+  const gradient = total > 0
+    ? rows.slice(0, 6).map((row, index) => {
+      const start = offset;
+      offset += (row.amount / total) * 360;
+      return `${colors[index % colors.length]} ${start}deg ${offset}deg`;
+    }).join(', ')
+    : 'var(--color-surface-3) 0deg 360deg';
+  return `
+    <article class="subscriptions-chart subscriptions-chart--pie">
+      <div class="subscriptions-chart__head">
+        <h2>${title}</h2>
+        <strong>${money(total)}</strong>
+      </div>
+      ${rows.length ? `
+        <div class="subscriptions-pie-layout">
+          <div class="subscriptions-pie" style="background:conic-gradient(${gradient})"></div>
+          <div class="subscriptions-pie-legend">
+            ${rows.slice(0, 4).map((row, index) => `
+              <span><i style="background:${colors[index % colors.length]}"></i>${esc(row.label)}</span>
+            `).join('')}
+          </div>
+        </div>
+      ` : `<p>${t('subscriptions.noAnalytics')}</p>`}
+    </article>
+  `;
+}
+
+function renderBreakdown(title, rows) {
   const max = Math.max(...rows.map((row) => row.amount), 1);
   return `
     <article class="subscriptions-chart">
-      <h2>${title}</h2>
+      <div class="subscriptions-chart__head">
+        <h2>${title}</h2>
+      </div>
       ${rows.length ? rows.map((row) => `
         <div class="subscriptions-chart-row">
-          <span title="${esc(labelFor(row.name))}">${esc(labelFor(row.name))}</span>
+          <span title="${esc(row.label)}">${esc(row.label)}</span>
           <div><i style="width:${Math.round((row.amount / max) * 100)}%"></i></div>
           <strong>${money(row.amount)}</strong>
         </div>
@@ -521,15 +644,20 @@ export function openSubscriptionModal(subscription = null) {
   const content = `
     <form id="subscription-form" class="subscription-form">
       <section class="subscription-form__section subscription-form__identity">
-        <label class="subscription-logo-picker" for="subscription-logo" title="${t('subscriptions.logoLabel')}">
-          <span id="subscription-logo-preview">
-            ${initialLogo
-              ? `<img src="${esc(initialLogo)}" alt="">`
-              : `<strong>${esc(initialName.slice(0, 2).toUpperCase() || '+')}</strong>`}
-          </span>
-          <small><i data-lucide="upload" aria-hidden="true"></i>${t('subscriptions.logoLabel')}</small>
-          <input id="subscription-logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
-        </label>
+        <div class="subscription-logo-tools">
+          <label class="subscription-logo-picker" for="subscription-logo" title="${t('subscriptions.logoLabel')}">
+            <span id="subscription-logo-preview">
+              ${initialLogo
+                ? `<img src="${esc(initialLogo)}" alt="">`
+                : `<strong>${esc(initialName.slice(0, 2).toUpperCase() || '+')}</strong>`}
+            </span>
+            <small><i data-lucide="upload" aria-hidden="true"></i>${t('subscriptions.logoLabel')}</small>
+            <input id="subscription-logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+          </label>
+          <button class="btn btn--secondary subscription-find-logo-btn" type="button" id="subscription-find-logo">
+            <i data-lucide="image-search" aria-hidden="true"></i>${t('subscriptions.findLogo')}
+          </button>
+        </div>
         <div class="subscription-form__identity-fields">
           <div class="form-group">
             <label class="form-label" for="subscription-name">${t('subscriptions.nameLabel')}</label>
@@ -611,16 +739,6 @@ export function openSubscriptionModal(subscription = null) {
       <section class="subscription-form__section">
         <h3><i data-lucide="panel-top" aria-hidden="true"></i>${t('subscriptions.serviceDetails')}</h3>
         <div class="form-group">
-          <label class="form-label" for="subscription-website">${t('subscriptions.websiteLabel')}</label>
-          <div class="subscriptions-logo-search">
-            <input class="form-input" id="subscription-website" inputmode="url" placeholder="example.com" value="${esc(subscription?.website_url || '')}">
-            <button class="btn btn--secondary" type="button" id="subscription-find-logo">
-              <i data-lucide="image-search" aria-hidden="true"></i>${t('subscriptions.findLogo')}
-            </button>
-          </div>
-          <small>${t('subscriptions.findLogoHint')}</small>
-        </div>
-        <div class="form-group">
           <label class="form-label" for="subscription-notes">${t('subscriptions.notesLabel')}</label>
           <textarea class="form-input" id="subscription-notes" rows="3">${esc(subscription?.notes || '')}</textarea>
         </div>
@@ -675,22 +793,11 @@ export function openSubscriptionModal(subscription = null) {
         if (!logoPreview.querySelector('img')) showLogo(null);
       });
       panel.querySelector('#subscription-find-logo').addEventListener('click', async () => {
-        let website = panel.querySelector('#subscription-website').value.trim();
-        if (!website) return;
-        if (!/^https:\/\//i.test(website)) website = `https://${website}`;
-        panel.querySelector('#subscription-website').value = website;
-        const button = panel.querySelector('#subscription-find-logo');
-        button.disabled = true;
-        try {
-          const result = await api.post('/budget/subscriptions/logo-search', { website_url: website });
-          searchedLogoData = result.data.logo_data;
+        openLogoPickerModal(panel, subscription?.website_url || panel.querySelector('#subscription-name').value.trim(), (logoData) => {
+          searchedLogoData = logoData;
           showLogo(searchedLogoData);
           window.oikos?.showToast(t('subscriptions.logoFound'), 'success');
-        } catch (err) {
-          window.oikos?.showToast(err.data?.error || t('subscriptions.logoNotFound'), 'danger');
-        } finally {
-          button.disabled = false;
-        }
+        });
       });
       panel.querySelector('#subscription-form').addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -740,7 +847,7 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
       reminder_days: Number(panel.querySelector('#subscription-reminder').value),
       category_id: Number(panel.querySelector('#subscription-category').value) || null,
       payment_method_id: Number(panel.querySelector('#subscription-method').value) || null,
-      website_url: panel.querySelector('#subscription-website').value.trim() || null,
+      website_url: existing?.website_url || null,
       brand_color: panel.querySelector('#subscription-color').value,
       logo_data: logoData,
       notes: panel.querySelector('#subscription-notes').value.trim() || null,
@@ -756,6 +863,90 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
   } finally {
     submit.disabled = false;
   }
+}
+
+function logoSourceLabel(source) {
+  return source === 'website' ? t('subscriptions.logoSourceWebsite') : t('subscriptions.logoSourceGoogle');
+}
+
+function logoOptionsMarkup(options) {
+  return options.length ? options.map((option, index) => `
+    <button class="subscriptions-logo-option" type="button" data-logo-index="${index}" aria-label="${esc(t('subscriptions.useLogo'))}">
+      <img src="${esc(option.logo_data)}" alt="">
+      <span>${esc(logoSourceLabel(option.source))}</span>
+    </button>
+  `).join('') : `<p class="subscriptions-logo-empty">${t('subscriptions.logoSearchEmpty')}</p>`;
+}
+
+function openLogoPickerModal(panel, initialQuery, onSelect) {
+  panel.querySelector('.subscriptions-logo-picker-modal')?.remove();
+  panel.insertAdjacentHTML('beforeend', `
+    <div class="subscriptions-logo-picker-modal" role="dialog" aria-modal="true" aria-labelledby="subscription-logo-picker-title">
+      <div class="subscriptions-logo-picker-panel">
+        <div class="subscriptions-logo-picker-head">
+          <h3 id="subscription-logo-picker-title">${t('subscriptions.logoSearchTitle')}</h3>
+          <button class="btn btn--secondary btn--icon" type="button" id="subscription-logo-picker-close" aria-label="${esc(t('common.close'))}">
+            <i data-lucide="x" aria-hidden="true"></i>
+          </button>
+        </div>
+        <form id="subscription-logo-search-form" class="subscriptions-logo-search-form">
+          <label class="form-label" for="subscription-logo-search-input">${t('subscriptions.logoSearchLabel')}</label>
+          <div class="subscriptions-logo-search">
+            <input class="form-input" id="subscription-logo-search-input" inputmode="url"
+                   placeholder="${esc(t('subscriptions.logoSearchPlaceholder'))}" value="${esc(initialQuery || '')}">
+            <button class="btn btn--primary" type="submit">
+              <i data-lucide="search" aria-hidden="true"></i>${t('subscriptions.searchLogo')}
+            </button>
+          </div>
+        </form>
+        <div class="subscriptions-logo-results" id="subscription-logo-results">
+          <p class="subscriptions-logo-empty">${t('subscriptions.findLogoHint')}</p>
+        </div>
+      </div>
+    </div>
+  `);
+  const overlay = panel.querySelector('.subscriptions-logo-picker-modal');
+  const results = overlay.querySelector('#subscription-logo-results');
+  const input = overlay.querySelector('#subscription-logo-search-input');
+  let options = [];
+  const close = () => overlay.remove();
+  const search = async () => {
+    const query = input.value.trim();
+    if (!query) return;
+    const button = overlay.querySelector('[type="submit"]');
+    button.disabled = true;
+    setHtml(results, `<p class="subscriptions-logo-empty">${t('subscriptions.logoSearching')}</p>`);
+    try {
+      const response = await api.post('/budget/subscriptions/logo-search', { website_url: query });
+      options = response.data?.options || [];
+      setHtml(results, logoOptionsMarkup(options));
+    } catch (err) {
+      options = [];
+      setHtml(results, `<p class="subscriptions-logo-empty">${esc(err.data?.error || t('subscriptions.logoSearchError'))}</p>`);
+    } finally {
+      button.disabled = false;
+      if (window.lucide) window.lucide.createIcons({ el: overlay });
+    }
+  };
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) close();
+    const option = event.target.closest('[data-logo-index]');
+    if (!option) return;
+    const selected = options[Number(option.dataset.logoIndex)];
+    if (!selected) return;
+    onSelect(selected.logo_data);
+    close();
+  });
+  overlay.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') close();
+  });
+  overlay.querySelector('#subscription-logo-picker-close').addEventListener('click', close);
+  overlay.querySelector('#subscription-logo-search-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await search();
+  });
+  if (window.lucide) window.lucide.createIcons({ el: overlay });
+  setTimeout(() => input.focus(), 50);
 }
 
 async function toggleSubscription(subscription) {

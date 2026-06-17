@@ -2078,7 +2078,7 @@
         "moveUp": "Move up",
         "moveDown": "Move down",
         "findLogo": "Encontrar logótipo",
-        "findLogoHint": "Securely checks the public HTTPS website for its icon.",
+        "findLogoHint": "Pesquisa ícones do site e resultados do Google Imagens.",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
         "billingDetails": "Billing details",
@@ -2092,6 +2092,17 @@
         "currencyRequired": "Select a currency.",
         "noBudgetLimit": "Sem limite de orçamento",
         "unlimited": "Ilimitado",
-        "setBudgetHint": "Defina um orçamento mensal para acompanhar um limite."
+        "setBudgetHint": "Defina um orçamento mensal para acompanhar um limite.",
+        "renewalForecast": "Previsão de renovações",
+        "logoSearchTitle": "Escolher logótipo",
+        "logoSearchLabel": "Site ou nome do serviço",
+        "logoSearchPlaceholder": "example.com ou Spotify",
+        "searchLogo": "Pesquisar",
+        "logoSearching": "A pesquisar logótipos...",
+        "logoSearchEmpty": "Nenhum logótipo suportado encontrado.",
+        "logoSearchError": "Não foi possível carregar os logótipos.",
+        "logoSourceWebsite": "Do site",
+        "logoSourceGoogle": "Do Google",
+        "useLogo": "Usar este logótipo"
     }
 }

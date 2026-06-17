@@ -2078,7 +2078,7 @@
         "moveUp": "Move up",
         "moveDown": "Move down",
         "findLogo": "Find logo",
-        "findLogoHint": "Securely checks the public HTTPS website for its icon.",
+        "findLogoHint": "Vyhledá ikony webu a výsledky obrázků Google.",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
         "billingDetails": "Billing details",
@@ -2092,6 +2092,17 @@
         "currencyRequired": "Select a currency.",
         "noBudgetLimit": "Bez rozpočtového limitu",
         "unlimited": "Neomezeně",
-        "setBudgetHint": "Nastavte měsíční rozpočet pro sledování limitu."
+        "setBudgetHint": "Nastavte měsíční rozpočet pro sledování limitu.",
+        "renewalForecast": "Prognóza obnovení",
+        "logoSearchTitle": "Vybrat logo",
+        "logoSearchLabel": "Web nebo název služby",
+        "logoSearchPlaceholder": "example.com nebo Spotify",
+        "searchLogo": "Hledat",
+        "logoSearching": "Hledají se loga...",
+        "logoSearchEmpty": "Nebyla nalezena žádná podporovaná loga.",
+        "logoSearchError": "Loga se nepodařilo načíst.",
+        "logoSourceWebsite": "Z webu",
+        "logoSourceGoogle": "Z Googlu",
+        "useLogo": "Použít toto logo"
     }
 }

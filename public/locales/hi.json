@@ -2078,7 +2078,7 @@
         "moveUp": "Move up",
         "moveDown": "Move down",
         "findLogo": "Find logo",
-        "findLogoHint": "Securely checks the public HTTPS website for its icon.",
+        "findLogoHint": "वेबसाइट आइकन और Google छवि परिणाम खोजता है।",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
         "billingDetails": "Billing details",
@@ -2092,6 +2092,17 @@
         "currencyRequired": "Select a currency.",
         "noBudgetLimit": "कोई बजट सीमा नहीं",
         "unlimited": "असीमित",
-        "setBudgetHint": "सीमा ट्रैक करने के लिए मासिक बजट सेट करें।"
+        "setBudgetHint": "सीमा ट्रैक करने के लिए मासिक बजट सेट करें।",
+        "renewalForecast": "नवीनीकरण पूर्वानुमान",
+        "logoSearchTitle": "लोगो चुनें",
+        "logoSearchLabel": "वेबसाइट या सेवा का नाम",
+        "logoSearchPlaceholder": "example.com या Spotify",
+        "searchLogo": "खोजें",
+        "logoSearching": "लोगो खोजे जा रहे हैं...",
+        "logoSearchEmpty": "कोई समर्थित लोगो नहीं मिला।",
+        "logoSearchError": "लोगो लोड नहीं हो सके।",
+        "logoSourceWebsite": "वेबसाइट से",
+        "logoSourceGoogle": "Google से",
+        "useLogo": "यह लोगो उपयोग करें"
     }
 }

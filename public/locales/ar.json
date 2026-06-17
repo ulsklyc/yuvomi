@@ -2078,7 +2078,7 @@
         "moveUp": "Move up",
         "moveDown": "Move down",
         "findLogo": "Find logo",
-        "findLogoHint": "Securely checks the public HTTPS website for its icon.",
+        "findLogoHint": "يبحث في أيقونات الموقع ونتائج صور Google.",
         "logoFound": "Logo found.",
         "logoNotFound": "No supported logo could be found.",
         "billingDetails": "Billing details",
@@ -2092,6 +2092,17 @@
         "currencyRequired": "Select a currency.",
         "noBudgetLimit": "لا يوجد حد للميزانية",
         "unlimited": "غير محدود",
-        "setBudgetHint": "حدد ميزانية شهرية لتتبع الحد."
+        "setBudgetHint": "حدد ميزانية شهرية لتتبع الحد.",
+        "renewalForecast": "توقعات التجديد",
+        "logoSearchTitle": "اختيار شعار",
+        "logoSearchLabel": "الموقع أو اسم الخدمة",
+        "logoSearchPlaceholder": "example.com أو Spotify",
+        "searchLogo": "البحث",
+        "logoSearching": "جارٍ البحث عن الشعارات...",
+        "logoSearchEmpty": "لم يتم العثور على شعارات مدعومة.",
+        "logoSearchError": "تعذر تحميل الشعارات.",
+        "logoSourceWebsite": "من الموقع",
+        "logoSourceGoogle": "من Google",
+        "useLogo": "استخدام هذا الشعار"
     }
 }

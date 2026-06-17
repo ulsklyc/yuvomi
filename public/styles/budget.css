@@ -131,8 +131,8 @@
 }
 
 .budget-tab[data-tab="subscriptions"].budget-tab--active {
-  background: var(--module-budget);
-  color: var(--color-ink-on-vivid);
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
 }
 
 .budget-tab[data-tab="split-expenses"].budget-tab--active {
