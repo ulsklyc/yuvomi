@@ -68,7 +68,8 @@
         "sectionOverview": "Översikt",
         "sectionPlan": "Planera",
         "sectionHome": "Hem",
-        "help": "Hilfe"
+        "help": "Hjälp",
+        "sectionCustomModules": "Anpassade moduler"
     },
     "dashboard": {
         "title": "Översikt",
@@ -1380,7 +1381,7 @@
         "mobileNavigationSlotLabel": "Position {{position}}",
         "mobileNavigationEmptyOption": "Används inte",
         "desktopNavigationTitle": "Webbnavigering",
-        "desktopNavigationHint": "Aktivera moduler och sortera dem inom grupperna Översikt, Planera och Hem.",
+        "desktopNavigationHint": "Aktivera moduler och sortera dem i grupperna Översikt, Planera, Hem och Anpassade moduler.",
         "mobileNavigationSaved": "Mobil navigering sparad.",
         "regionTitle": "Region / Format",
         "regionLabel": "Region",
@@ -2010,7 +2011,7 @@
         "99": "Kraftig åska"
     },
     "help": {
-        "title": "Hilfe",
+        "title": "Hjälp",
         "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
         "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
         "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",

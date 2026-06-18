@@ -68,7 +68,8 @@
         "sectionOverview": "نظرة عامة",
         "sectionPlan": "التخطيط",
         "sectionHome": "المنزل",
-        "help": "Hilfe"
+        "help": "مساعدة",
+        "sectionCustomModules": "الوحدات المخصصة"
     },
     "dashboard": {
         "title": "لوحة التحكم",
@@ -1380,7 +1381,7 @@
         "mobileNavigationSlotLabel": "الموضع {{position}}",
         "mobileNavigationEmptyOption": "غير مستخدم",
         "desktopNavigationTitle": "التنقل على الويب",
-        "desktopNavigationHint": "فعّل الوحدات ورتّبها داخل مجموعات النظرة العامة والتخطيط والمنزل.",
+        "desktopNavigationHint": "فعّل الوحدات ورتّبها ضمن مجموعات نظرة عامة والتخطيط والمنزل والوحدات المخصصة.",
         "mobileNavigationSaved": "تم حفظ التنقل على الهاتف.",
         "regionTitle": "المنطقة / التنسيق",
         "regionLabel": "المنطقة",
@@ -2010,7 +2011,7 @@
         "99": "عاصفة رعدية شديدة"
     },
     "help": {
-        "title": "Hilfe",
+        "title": "مساعدة",
         "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
         "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
         "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",

@@ -64,7 +64,9 @@ function makeApiMock() {
     const s = String(url);
     calls.push(s);
     const path = new URL(s).pathname;
+    const country = new URL(s).searchParams.get('countryIsoCode');
     if (path === '/PublicHolidays') {
+      if (country === 'BR') return okJson([]);
       return okJson([{ startDate: '2026-01-01', endDate: '2026-01-01',
         name: [{ language: 'DE', text: 'Neujahr' }, { language: 'EN', text: "New Year's Day" }] }]);
     }
@@ -91,6 +93,7 @@ function makeApiMock() {
 }
 
 const SYNC_YEAR_SPAN = 4; // currentYear-1 .. currentYear+2
+const BRAZIL_PUBLIC_HOLIDAYS_PER_YEAR = 10;
 
 beforeEach(() => { resetState(); __setFetchImpl(null); });
 
@@ -208,6 +211,26 @@ test('sync: both layers enabled caches public and school entries', async () => {
   assert.equal(res.synced, SYNC_YEAR_SPAN * 2);
   assert.equal(db.prepare("SELECT COUNT(*) c FROM holiday_cache WHERE type='public'").get().c, SYNC_YEAR_SPAN);
   assert.equal(db.prepare("SELECT COUNT(*) c FROM holiday_cache WHERE type='school'").get().c, SYNC_YEAR_SPAN);
+});
+
+test('sync: Brazil public holidays use PT and local fallback when OpenHolidays has no rows', async () => {
+  const mock = makeApiMock();
+  __setFetchImpl(mock);
+  setConfig({ holiday_country: 'BR', holiday_show_public: '1', holiday_show_school: '0' });
+
+  const res = await sync(true);
+
+  assert.equal(res.synced, SYNC_YEAR_SPAN * BRAZIL_PUBLIC_HOLIDAYS_PER_YEAR);
+  assert.ok(mock.calls.every((url) => url.includes('countryIsoCode=BR')));
+  assert.ok(mock.calls.every((url) => url.includes('languageIsoCode=PT')));
+
+  const currentYear = new Date().getFullYear();
+  const names = db.prepare(
+    "SELECT name FROM holiday_cache WHERE country='BR' AND type='public' AND year=? ORDER BY start_date"
+  ).all(currentYear).map((row) => row.name);
+  assert.ok(names.includes('Tiradentes'));
+  assert.ok(names.includes('Dia Nacional de Zumbi e da Consciência Negra'));
+  assert.ok(names.includes('Natal'));
 });
 
 test('sync: throttles automatic sync if executed within 30 days', async () => {

@@ -154,6 +154,7 @@ test('settings information-architecture keys exist in every locale', () => {
     'nav.sectionOverview',
     'nav.sectionPlan',
     'nav.sectionHome',
+    'nav.sectionCustomModules',
     // Unauthorized / access-redirected notice.
     'settings.accessRedirected',
   ].forEach((key) => keys.add(key));
@@ -1110,6 +1111,34 @@ test('responsive adaptation keeps Notes vertical and prevents intrinsic-width ov
   );
 });
 
+test('dashboard weather widget adapts to selected widget size', () => {
+  const dashboard = read('../public/styles/dashboard.css');
+  const wrapperRule = cssRuleBody(dashboard, '.widget-wrapper');
+
+  assert.match(wrapperRule, /container:\s*dashboard-widget\s*\/\s*inline-size/);
+  assert.match(
+    dashboard,
+    /@container dashboard-widget \(min-width:\s*480px\)[\s\S]*\.weather-widget__inner\s*\{[\s\S]*flex-direction:\s*row/,
+    'weather should switch to horizontal layout from its widget width, not viewport width',
+  );
+  assert.match(
+    dashboard,
+    /\.widget-size--1x1\s*>\s*\.weather-widget \.weather-widget__meta,[\s\S]*\.widget-size--1x1\s*>\s*\.weather-widget \.weather-forecast\s*\{[\s\S]*display:\s*none/,
+    'tiny weather widgets should not force rich forecast content into the tile',
+  );
+  assert.match(
+    dashboard,
+    /\.widget-size--2x1\s*>\s*\.weather-widget \.weather-widget__meta,[\s\S]*\.widget-size--4x1\s*>\s*\.weather-widget \.weather-widget__meta\s*\{[\s\S]*display:\s*none/,
+    'one-row weather widgets should use a denser summary',
+  );
+  assert.doesNotMatch(
+    dashboard,
+    /@media \(min-width:\s*(?:768|1024|1440)px\)\s*\{\s*\.weather-widget\s*\{/,
+    'weather layout must not be driven by viewport breakpoints',
+  );
+  assert.doesNotMatch(dashboard, /\.weather-widget\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/);
+});
+
 test('responsive adaptation keeps all three Kitchen tabs visible on narrow phones', () => {
   const kitchenTabs = read('../public/styles/kitchen-tabs.css');
 
@@ -1354,11 +1383,12 @@ test('phase 4 keeps Kitchen navigation identity stable', () => {
 test('global navigation groups domains with translated section labels', () => {
   const routerSource = read('../public/router.js');
 
-  // The grouped main-app navigation references the Overview, Plan and Home label keys
-  // and resolves section labels through t().
+  // The grouped main-app navigation references every section label key and
+  // resolves section labels through t().
   assert.match(routerSource, /'nav\.sectionOverview'/);
   assert.match(routerSource, /'nav\.sectionPlan'/);
   assert.match(routerSource, /'nav\.sectionHome'/);
+  assert.match(routerSource, /'nav\.sectionCustomModules'/);
   assert.match(routerSource, /t\(labelKey\)/);
 
   // The replaced household section label is no longer referenced.
@@ -1601,7 +1631,7 @@ test('sticky section headers stack above glass cards via --z-sticky', () => {
 test('every locale resolves the grouped navigation section labels', () => {
   const localesDir = new URL('../public/locales/', import.meta.url);
   const files = readdirSync(localesDir).filter((f) => f.endsWith('.json'));
-  const sectionKeys = ['sectionOverview', 'sectionPlan', 'sectionHome'];
+  const sectionKeys = ['sectionOverview', 'sectionPlan', 'sectionHome', 'sectionCustomModules'];
 
   assert.ok(files.length >= 16, 'expected at least 16 locale files');
   for (const file of files) {
@@ -1612,6 +1642,14 @@ test('every locale resolves the grouped navigation section labels', () => {
     }
     assert.ok(!('section.household' in data.nav), `${file}: nav must not keep the flat "section.household" key (t() cannot resolve it)`);
   }
+});
+
+test('Brazilian Portuguese uses localized Help navigation copy', () => {
+  const data = JSON.parse(read('../public/locales/pt.json'));
+
+  assert.equal(data.nav?.help, 'Ajuda');
+  assert.equal(data.help?.title, 'Ajuda');
+  assert.doesNotMatch(JSON.stringify({ nav: data.nav, help: data.help }), /Hilfe/);
 });
 
 test('phase 7 locale files keep the de reference key set complete', () => {

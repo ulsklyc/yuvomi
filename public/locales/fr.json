@@ -68,7 +68,8 @@
         "sectionOverview": "Vue d’ensemble",
         "sectionPlan": "Planifier",
         "sectionHome": "Maison",
-        "help": "Hilfe"
+        "help": "Aide",
+        "sectionCustomModules": "Modules personnalisés"
     },
     "dashboard": {
         "title": "Accueil",
@@ -1380,7 +1381,7 @@
         "mobileNavigationSlotLabel": "Position {{position}}",
         "mobileNavigationEmptyOption": "Non utilisé",
         "desktopNavigationTitle": "Navigation web",
-        "desktopNavigationHint": "Activez les modules et triez-les dans les groupes Vue d’ensemble, Planifier et Maison.",
+        "desktopNavigationHint": "Activez les modules et triez-les dans les groupes Vue d’ensemble, Planifier, Maison et Modules personnalisés.",
         "mobileNavigationSaved": "Navigation mobile enregistrée.",
         "regionTitle": "Région / Format",
         "regionLabel": "Région",
@@ -2010,7 +2011,7 @@
         "99": "Orage violent"
     },
     "help": {
-        "title": "Hilfe",
+        "title": "Aide",
         "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
         "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
         "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",

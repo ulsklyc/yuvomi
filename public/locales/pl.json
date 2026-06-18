@@ -68,7 +68,8 @@
         "sectionOverview": "Przegląd",
         "sectionPlan": "Plan",
         "sectionHome": "Dom",
-        "help": "Hilfe"
+        "help": "Pomoc",
+        "sectionCustomModules": "Moduły niestandardowe"
     },
     "search": {
         "title": "Szukaj",
@@ -1386,7 +1387,7 @@
         "mobileNavigationSlotLabel": "Pozycja {{position}}",
         "mobileNavigationEmptyOption": "Nieużywane",
         "desktopNavigationTitle": "Nawigacja internetowa",
-        "desktopNavigationHint": "Włącz moduły i sortuj je w grupach Przegląd, Planowanie i Dom.",
+        "desktopNavigationHint": "Włącz moduły i sortuj je w grupach Przegląd, Plan, Dom i Moduły niestandardowe.",
         "mobileNavigationSaved": "Nawigacja mobilna została zapisana.",
         "regionTitle": "Region / Format",
         "regionLabel": "Region",
@@ -2010,7 +2011,7 @@
         "99": "Gwałtowna burza"
     },
     "help": {
-        "title": "Hilfe",
+        "title": "Pomoc",
         "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
         "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
         "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",

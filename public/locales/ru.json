@@ -68,7 +68,8 @@
         "sectionOverview": "Обзор",
         "sectionPlan": "План",
         "sectionHome": "Дом",
-        "help": "Hilfe"
+        "help": "Справка",
+        "sectionCustomModules": "Пользовательские модули"
     },
     "dashboard": {
         "title": "Обзор",
@@ -1380,7 +1381,7 @@
         "mobileNavigationSlotLabel": "Позиция {{position}}",
         "mobileNavigationEmptyOption": "Не используется",
         "desktopNavigationTitle": "Веб-навигация",
-        "desktopNavigationHint": "Включайте модули и сортируйте их внутри групп Обзор, Планирование и Дом.",
+        "desktopNavigationHint": "Включайте модули и сортируйте их в группах Обзор, План, Дом и Пользовательские модули.",
         "mobileNavigationSaved": "Мобильная навигация сохранена.",
         "regionTitle": "Регион / Формат",
         "regionLabel": "Регион",
@@ -2010,7 +2011,7 @@
         "99": "Сильная гроза"
     },
     "help": {
-        "title": "Hilfe",
+        "title": "Справка",
         "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
         "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
         "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",

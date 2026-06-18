@@ -143,6 +143,7 @@
   flex-direction: column;
   position: relative;
   min-width: 0;
+  container: dashboard-widget / inline-size;
 }
 
 .widget-wrapper > .widget {
@@ -925,15 +926,18 @@
 /* --------------------------------------------------------
  * Wetter-Widget
  *
- * Eigener Gradient, überschreibt .widget Hintergrund.
- * Mobile: kompakt, 3-Tage-Vorhersage.
- * Desktop: volle Breite über allen Widgets, horizontales
- *          Layout mit bis zu 5-Tage-Vorhersage.
+ * Eigener Gradient, ueberschreibt .widget Hintergrund.
+ * Die Inhalte reagieren auf die tatsaechliche Widget-Breite statt auf den
+ * Viewport, damit Tiny/Narrow/Standard/Large eigene sinnvolle Dichten haben.
  * -------------------------------------------------------- */
 .weather-widget {
   position: relative;
   background: linear-gradient(135deg, var(--color-accent-hover) 0%, var(--color-accent-deep) 100%);
   color: var(--color-text-on-accent);
+  min-height: 100%;
+  --weather-temp-size: var(--text-3xl);
+  --weather-icon-size: 56px;
+  --weather-forecast-icon-size: 24px;
 }
 
 .weather-widget__refresh {
@@ -971,19 +975,35 @@
   animation: spin 0.7s linear infinite;
 }
 
+.weather-widget__inner {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-3);
+  min-width: 0;
+  height: 100%;
+}
+
 .weather-widget__main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.weather-widget__left {
+  flex: 1;
+  min-width: 0;
 }
 
 .weather-widget__temp {
-  font-size: var(--text-4xl);
+  font-size: var(--weather-temp-size);
   font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
   line-height: 1;
   margin-bottom: 2px;
+  white-space: nowrap;
 }
 
 .weather-widget__desc {
@@ -991,12 +1011,18 @@
   font-weight: var(--font-weight-medium);
   text-transform: capitalize;
   margin-bottom: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .weather-widget__city {
   font-size: var(--text-xs);
   opacity: 0.85;
   margin-bottom: var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .weather-widget__meta {
@@ -1006,16 +1032,18 @@
 }
 
 .weather-widget__icon {
-  width: 64px;
-  height: 64px;
+  width: var(--weather-icon-size);
+  height: var(--weather-icon-size);
   flex-shrink: 0;
 }
 
 .weather-forecast {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   border-top: 1px solid var(--color-glass-border);
-  padding: var(--space-2) var(--space-4);
-  gap: var(--space-3);
+  padding-top: var(--space-3);
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .weather-forecast__day {
@@ -1023,7 +1051,7 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  flex: 1;
+  min-width: 0;
 }
 
 /* Tage 4+5 nur auf breiteren Bildschirmen sichtbar */
@@ -1036,11 +1064,15 @@
   font-weight: var(--font-weight-semibold);
   opacity: 0.85;
   text-transform: capitalize;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .weather-forecast__icon {
-  width: 28px;
-  height: 28px;
+  width: var(--weather-forecast-icon-size);
+  height: var(--weather-forecast-icon-size);
 }
 
 /* Open-Meteo rendert Wetter-Icons als Lucide-<svg> (Klassen werden vom
@@ -1056,6 +1088,7 @@ svg.weather-forecast__icon {
   gap: var(--space-1);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .weather-forecast__high {
@@ -1066,27 +1099,77 @@ svg.weather-forecast__icon {
   opacity: 0.6;
 }
 
-/* Tablet: Wetter über volle Breite, 4 Tage */
-@media (min-width: 768px) {
+/* Tiny weather keeps the current conditions readable instead of forcing
+ * forecast rows into a 1x1 tile. */
+.widget-size--1x1 > .weather-widget .weather-widget__meta,
+.widget-size--1x1 > .weather-widget .weather-widget__icon,
+.widget-size--1x1 > .weather-widget .weather-forecast {
+  display: none;
+}
+
+.widget-size--1x1 > .weather-widget .weather-widget__inner {
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.widget-size--1x1 > .weather-widget .weather-widget__main {
+  justify-content: flex-start;
+}
+
+.widget-size--1x1 > .weather-widget .weather-widget__left {
+  padding-right: var(--target-base);
+}
+
+.widget-size--1x1 > .weather-widget .weather-widget__temp {
+  font-size: var(--text-3xl);
+}
+
+/* One-row weather cards prioritize scan density; taller sizes keep the richer
+ * feels-like/humidity/wind line. */
+.widget-size--2x1 > .weather-widget .weather-widget__meta,
+.widget-size--3x1 > .weather-widget .weather-widget__meta,
+.widget-size--4x1 > .weather-widget .weather-widget__meta {
+  display: none;
+}
+
+@container dashboard-widget (max-width: 399px) {
+  .widget-size--2x1 > .weather-widget .weather-forecast {
+    display: none;
+  }
+}
+
+@container dashboard-widget (min-width: 480px) {
   .weather-widget {
-    grid-column: 1 / -1;
+    --weather-temp-size: var(--text-4xl);
+    --weather-icon-size: 64px;
+    --weather-forecast-icon-size: 28px;
   }
 
   .weather-widget__inner {
-    display: flex;
+    flex-direction: row;
     align-items: stretch;
+    justify-content: flex-start;
+    gap: var(--space-4);
   }
 
   .weather-widget__main {
-    flex-shrink: 0;
+    flex: 0 0 min(42%, 260px);
   }
 
   .weather-forecast {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     border-top: none;
     border-left: 1px solid var(--color-glass-border);
     flex: 1;
     align-items: center;
-    padding: var(--space-3) var(--space-4);
+    padding-top: 0;
+    padding-left: var(--space-4);
+  }
+}
+
+@container dashboard-widget (min-width: 640px) {
+  .weather-forecast {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .weather-forecast__day--extended:nth-child(-n+4) {
@@ -1094,37 +1177,24 @@ svg.weather-forecast__icon {
   }
 }
 
-/* Desktop: 5-Tage-Vorhersage, größere Elemente */
-@media (min-width: 1024px) {
+@container dashboard-widget (min-width: 860px) {
   .weather-widget {
-    grid-column: 1 / -1;
+    --weather-icon-size: 80px;
+    --weather-forecast-icon-size: 36px;
   }
 
   .weather-widget__main {
-    padding: var(--space-4) var(--space-5);
-  }
-
-  .weather-widget__temp {
-    font-size: var(--text-4xl);
-  }
-
-  .weather-widget__icon {
-    width: 80px;
-    height: 80px;
+    flex-basis: min(36%, 300px);
   }
 
   .weather-forecast {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: var(--space-4);
-    padding: var(--space-3) var(--space-5);
+    padding-left: var(--space-5);
   }
 
   .weather-forecast__day--extended {
     display: flex;
-  }
-
-  .weather-forecast__icon {
-    width: 36px;
-    height: 36px;
   }
 
   .weather-forecast__temps {
@@ -1136,24 +1206,14 @@ svg.weather-forecast__icon {
   }
 }
 
-/* Wide Desktop: noch mehr Platz */
-@media (min-width: 1440px) {
-  .weather-widget {
-    grid-column: 1 / -1;
-  }
-
-  .weather-widget__main {
-    padding: var(--space-4) var(--space-6);
-  }
-
+@container dashboard-widget (min-width: 1120px) {
   .weather-forecast {
     gap: var(--space-5);
-    padding: var(--space-3) var(--space-6);
+    padding-left: var(--space-6);
   }
 
-  .weather-forecast__icon {
-    width: 40px;
-    height: 40px;
+  .weather-widget {
+    --weather-forecast-icon-size: 40px;
   }
 }
 
