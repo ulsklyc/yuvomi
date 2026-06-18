@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.74.3] - 2026-06-18
+
+### Added
+- **Brazilian public holidays:** a local fallback (9 national holidays plus computed Good Friday) now populates the calendar when OpenHolidays returns no rows for `BR`, using Portuguese labels.
+- **Custom modules navigation group:** enabled third-party modules now get their own localized "Custom modules" sidebar section instead of being grouped under Home.
+
+### Changed
+- **Weather widget sizing:** the dashboard weather widget now uses container queries instead of viewport media queries, so its layout density actually reflects its configured grid size instead of always forcing full width on larger screens.
+
+### Fixed
+- **Help label fallback:** the navigation and help-page "Help" label no longer falls back to the German string "Hilfe" in non-German locales; all locales now show the correctly translated label.
+
 ## [0.74.2] - 2026-06-18
 
 ### Fixed
