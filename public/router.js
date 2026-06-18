@@ -180,6 +180,7 @@ const NAV_SECTION_LABEL_KEYS = Object.freeze({
   [NAV_SECTION.overview]: 'nav.sectionOverview',
   [NAV_SECTION.plan]: 'nav.sectionPlan',
   [NAV_SECTION.home]: 'nav.sectionHome',
+  [NAV_SECTION.customModules]: 'nav.sectionCustomModules',
 });
 
 const DEFAULT_APP_NAME = 'Yuvomi';
@@ -1390,8 +1391,8 @@ function navItems() {
       module: `third-party-${module.id}`,
       accent: module.accent,
       order: module.menu.order ?? 1000,
-      // Drittanbieter-Module folgen dem bestehenden Platzierungsverhalten am Ende der Home-Sektion.
-      section: NAV_SECTION.home,
+      orderId: `third-party-${module.id}`,
+      section: NAV_SECTION.customModules,
     }))
     .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
   const settings = baseItems.find((item) => item.module === 'settings');

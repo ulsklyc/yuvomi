@@ -4,6 +4,7 @@ export const NAV_SECTION = Object.freeze({
   overview: 0,
   plan: 1,
   home: 2,
+  customModules: 3,
 });
 
 const KITCHEN_CHILD_ID_SET = new Set(KITCHEN_CHILD_IDS);
@@ -51,6 +52,7 @@ export function expandModuleOrder(order = []) {
 export function moduleSection(id) {
   if (id === 'dashboard') return NAV_SECTION.overview;
   if (PLAN_MODULE_IDS.has(id)) return NAV_SECTION.plan;
+  if (typeof id === 'string' && id.startsWith('third-party-')) return NAV_SECTION.customModules;
   return NAV_SECTION.home;
 }
 
@@ -64,13 +66,14 @@ export function sortNavigationItems(items = [], order = []) {
     .sort((left, right) => {
       const leftId = left.item?.orderId || left.item?.module || left.item?.id;
       const rightId = right.item?.orderId || right.item?.module || right.item?.id;
-      const sectionDelta = moduleSection(leftId) - moduleSection(rightId);
-      if (sectionDelta !== 0) return sectionDelta;
 
       if (leftId === 'dashboard') return rightId === 'dashboard' ? left.index - right.index : -1;
       if (rightId === 'dashboard') return 1;
       if (leftId === 'settings') return rightId === 'settings' ? left.index - right.index : 1;
       if (rightId === 'settings') return -1;
+
+      const sectionDelta = moduleSection(leftId) - moduleSection(rightId);
+      if (sectionDelta !== 0) return sectionDelta;
 
       const leftOrderId = KITCHEN_CHILD_ID_SET.has(leftId) ? 'kitchen' : leftId;
       const rightOrderId = KITCHEN_CHILD_ID_SET.has(rightId) ? 'kitchen' : rightId;

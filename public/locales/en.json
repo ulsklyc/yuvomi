@@ -68,7 +68,8 @@
         "sectionOverview": "Overview",
         "sectionPlan": "Plan",
         "sectionHome": "Home",
-        "help": "Help"
+        "help": "Help",
+        "sectionCustomModules": "Custom modules"
     },
     "dashboard": {
         "title": "Overview",
@@ -1380,7 +1381,7 @@
         "mobileNavigationSlotLabel": "Position {{position}}",
         "mobileNavigationEmptyOption": "Not used",
         "desktopNavigationTitle": "Web navigation",
-        "desktopNavigationHint": "Enable modules and sort them within the Overview, Plan, and Home groups.",
+        "desktopNavigationHint": "Enable modules and sort them within the Overview, Plan, Home, and Custom modules groups.",
         "mobileNavigationSaved": "Mobile navigation saved.",
         "regionTitle": "Region / Format",
         "regionLabel": "Region",
