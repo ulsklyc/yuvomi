@@ -1256,7 +1256,10 @@ function renderWeekView(container) {
       return;
     }
     const col = e.target.closest('[data-date]');
-    if (col) openEventModal({ mode: 'create', date: col.dataset.date });
+    if (col) {
+      const time = clickedTime(e, col);
+      openEventModal({ mode: 'create', date: col.dataset.date, time });
+    }
   });
 
   container.querySelector('.allday-row').addEventListener('click', (e) => {
@@ -1310,6 +1313,16 @@ function nowTop() {
   const now = new Date();
   const minutes = now.getHours() * 60 + now.getMinutes();
   return (minutes / 60) * HOUR_HEIGHT;
+}
+
+/** Berechnet die geklickte Uhrzeit (auf 15-Minuten gerundet) aus einem Click-Event
+ *  relativ zum übergebenen Spalten-Element. */
+function clickedTime(e, colEl) {
+  const rect = colEl.getBoundingClientRect();
+  const yOffset = Math.max(0, e.clientY - rect.top);
+  const totalMinutes = Math.round((yOffset / HOUR_HEIGHT) * 60 / 15) * 15;
+  const clamped = Math.min(Math.max(totalMinutes, 0), 23 * 60 + 30);
+  return `${pad(Math.floor(clamped / 60))}:${pad(clamped % 60)}`;
 }
 
 function timeRangeForEvent(ev) {
@@ -1450,7 +1463,8 @@ function renderDayView(container) {
       if (ev) showEventPopup(ev, evEl);
       return;
     }
-    openEventModal({ mode: 'create', date: state.cursor });
+    const time = clickedTime(e, e.currentTarget);
+    openEventModal({ mode: 'create', date: state.cursor, time });
   });
 
   const scroll = container.querySelector('#day-scroll');
@@ -1860,13 +1874,13 @@ async function loadSyncTargets(selectElement, currentEvent = null) {
 // Event-Modal (Erstellen / Bearbeiten)
 // --------------------------------------------------------
 
-function openEventModal({ mode, event = null, date = null, reminder = null }) {
+function openEventModal({ mode, event = null, date = null, reminder = null, time = null }) {
   if (mode === 'edit' && event?.housekeeping_visit_id) {
     window.oikos.navigate(`/housekeeping?editVisit=${event.housekeeping_visit_id}`);
     return;
   }
   const isEdit = mode === 'edit';
-  const content = buildEventModalContent({ mode, event, date, reminder });
+  const content = buildEventModalContent({ mode, event, date, reminder, time });
 
   openSharedModal({
     title: isEdit ? t('calendar.editEvent') : t('calendar.newEvent'),
@@ -2098,16 +2112,22 @@ function openEventModal({ mode, event = null, date = null, reminder = null }) {
   });
 }
 
-function buildEventModalContent({ mode, event, date, reminder = null }) {
+function buildEventModalContent({ mode, event, date, reminder = null, time = null }) {
   const isEdit = mode === 'edit';
   const today  = date || state.today;
 
   const startDate = isEdit ? localDate(event.start_datetime) : today;
   const startTime = isEdit && event.start_datetime.length > 10
-    ? localTime(event.start_datetime) : '09:00';
+    ? localTime(event.start_datetime) : (time ?? '09:00');
   const endDate   = isEdit && event.end_datetime ? localDate(event.end_datetime) : startDate;
   const endTime   = isEdit && event.end_datetime && event.end_datetime.length > 10
-    ? localTime(event.end_datetime) : '10:00';
+    ? localTime(event.end_datetime)
+    : (() => {
+        if (!time) return '10:00';
+        const totalMins = timeToMinutes(time) + 60;
+        const clamped   = Math.min(totalMins, 24 * 60 - 1);
+        return `${pad(Math.floor(clamped / 60))}:${pad(clamped % 60)}`;
+      })();
   const selectedIcon = eventIconName(isEdit ? event.icon : 'calendar');
 
   const selectedUserIds = isEdit
