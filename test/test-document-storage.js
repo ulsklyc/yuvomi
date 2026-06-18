@@ -41,6 +41,7 @@ const STORAGE_ENV_KEYS = [
   'DOCUMENT_STORAGE_WEBDAV_USERNAME',
   'DOCUMENT_STORAGE_WEBDAV_PASSWORD',
   'DOCUMENT_STORAGE_WEBDAV_PATH',
+  'DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK',
 ];
 
 function clearStorageConfig() {
@@ -669,6 +670,55 @@ test('trusted environment WebDAV targets may use private network addresses', asy
     webdav.requests.map(({ method }) => method),
     ['MKCOL', 'PUT', 'GET', 'DELETE']
   );
+});
+
+test('DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK opt-in allows UI-configured private targets', async (t) => {
+  storage.__setPrivateNetworkAccessForTests?.(false);
+  const webdav = await createWebdavServer(t);
+  // Resolve nas.local to 127.0.0.1 so the HTTP agent actually reaches the test server,
+  // while the SSRF guard (which would normally block 127.x) must be bypassed by the flag.
+  storage.__setHostnameLookupForTests?.(async () => [
+    { address: '127.0.0.1', family: 4 },
+  ]);
+  process.env.DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK = 'true';
+  setConfig({
+    enabled: '1',
+    url: `http://nas.local:${new URL(webdav.url).port}`,
+    username: 'alice',
+    password: 'secret',
+    path: 'documents',
+  });
+
+  const result = await storage.testConnection();
+
+  assert.deepEqual(result, { ok: true });
+  assert.equal(storage.getStatus().allowPrivateNetwork, true);
+});
+
+test('DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK=false keeps SSRF protection active', async (t) => {
+  storage.__setPrivateNetworkAccessForTests?.(false);
+  storage.__setHostnameLookupForTests?.(async () => [
+    { address: '192.168.1.50', family: 4 },
+  ]);
+  process.env.DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK = 'false';
+  setConfig({
+    enabled: '0',
+    url: 'https://files.example.test/dav',
+    username: 'alice',
+    password: 'secret',
+    path: 'documents',
+  });
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+
+  const result = await routeCall(harness, 'PUT', '/storage/config', {
+    url: 'https://webdav.example.test/dav',
+  });
+
+  assert.equal(result.response.status, 400);
+  assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_INVALID_CONFIG');
+  assert.equal(storage.getStatus().allowPrivateNetwork, false);
 });
 
 test('document storage avoids ambiguous trailing-slash regular expressions', () => {

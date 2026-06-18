@@ -73,10 +73,13 @@ export async function render(container, { user } = {}) {
               <i data-lucide="plus" aria-hidden="true"></i>
             </button>
           </div>
-          <div class="split-search">
-            <i data-lucide="search" aria-hidden="true"></i>
-            <input id="split-group-search" type="search" placeholder="${t('splitExpenses.searchGroups')}" autocomplete="off">
-          </div>
+          <label class="split-search" for="split-group-search">
+            <span class="split-search__label">${t('splitExpenses.searchGroups')}</span>
+            <span class="split-search__control">
+              <i data-lucide="search" aria-hidden="true"></i>
+              <input id="split-group-search" type="search" placeholder="${t('splitExpenses.searchGroups')}" autocomplete="off">
+            </span>
+          </label>
           <div class="split-groups" id="split-groups"></div>
         </aside>
         <main class="split-main" id="split-main" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 2 })}</main>

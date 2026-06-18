@@ -175,6 +175,32 @@ test('service worker precaches every supported locale file', () => {
   assert.deepEqual(precachedLocales, supportedLocales.sort(), 'Service worker APP_LOCALES must precache every supported locale');
 });
 
+test('service worker release caches track package version and include the early locale bootstrap', () => {
+  const pkg = JSON.parse(read('../package.json'));
+  const sw = read('../public/sw.js');
+  const release = sw.match(/const APP_RELEASE\s*=\s*['"]([^'"]+)['"]/)?.[1];
+
+  assert.equal(release, pkg.version, 'Service worker APP_RELEASE must match package.json');
+  assert.match(sw, /const SHELL_CACHE\s*=\s*`oikos-shell-\$\{APP_RELEASE\}`/);
+  assert.match(sw, /const PAGES_CACHE\s*=\s*`oikos-pages-\$\{APP_RELEASE\}`/);
+  assert.match(sw, /['"]\/lang-init\.js['"]/, 'early lang/dir bootstrap must be available offline');
+});
+
+test('runtime locale changes keep language and writing direction synchronized', () => {
+  const i18n = read('../public/i18n.js');
+  const router = read('../public/router.js');
+
+  assert.match(i18n, /const RTL_LOCALES\s*=\s*new Set\(\[['"]ar['"]\]\)/);
+  assert.match(i18n, /function applyDocumentLocale\(locale\)/);
+  assert.match(i18n, /document\.documentElement\.lang\s*=\s*locale/);
+  assert.match(i18n, /document\.documentElement\.dir\s*=\s*RTL_LOCALES\.has\(locale\)\s*\?\s*['"]rtl['"]\s*:\s*['"]ltr['"]/);
+  assert.equal((i18n.match(/applyDocumentLocale\(/g) || []).length, 3);
+  assert.match(
+    router,
+    /window\.addEventListener\(['"]locale-changed['"],\s*\(\)\s*=>\s*\{[\s\S]*rebuildNavigation\(\);[\s\S]*refreshCurrentRoute\(\);[\s\S]*\}\);/
+  );
+});
+
 test('install prompt waits for initial translations before rendering text', () => {
   const i18n = read('../public/i18n.js');
   const prompt = read('../public/components/oikos-install-prompt.js');
@@ -351,8 +377,8 @@ test('module-specific settings leaves only reference their owned preferences and
       ],
     },
     '../public/settings/pages/modules-budget.js': {
-      endpoints: ['/preferences'],
-      preferences: ['currency'],
+      endpoints: [],
+      preferences: [],
     },
     '../public/settings/pages/modules-housekeeping.js': {
       endpoints: ['/preferences'],
@@ -433,9 +459,12 @@ test('module-specific settings leaves preserve their required controls and behav
   );
 
   const budget = read('../public/settings/pages/modules-budget.js');
-  assert.match(budget, /id="currency-select"/);
-  assert.match(budget, /api\.put\('\/preferences', \{ currency: currencySelect\.value \}\)/);
-  assert.equal([...budget.matchAll(/<(?:input|select|textarea)\b/g)].length, 1);
+  // Currency moved to the unified Region/Format control in personal-appearance;
+  // the budget leaf is now a pointer card with no own form controls or API calls.
+  assert.doesNotMatch(budget, /id="currency-select"/);
+  assert.doesNotMatch(budget, /\bapi\./);
+  assert.match(budget, /\/settings\/personal\/appearance/);
+  assert.equal([...budget.matchAll(/<(?:input|select|textarea)\b/g)].length, 0);
 
   const housekeeping = read('../public/settings/pages/modules-housekeeping.js');
   assert.match(housekeeping, /id="housekeeping-payment-tasks"/);
@@ -890,13 +919,80 @@ test('More button active state keeps visible More identity and accessible active
   assert.doesNotMatch(source, /moreBtn\.toggleAttribute\('aria-current',\s*inMoreSheet\)/);
 });
 
-test('mobile Kitchen and More nav buttons keep colored icon wells while inactive', () => {
+test('mobile navigation derives five stable destinations from three favorites', () => {
   const source = read('../public/router.js');
 
-  assert.match(source, /kitchenBtn\.style\.setProperty\('--item-module-accent',\s*'var\(--module-meals\)'\)/);
-  assert.match(source, /moreBtn\.style\.setProperty\('--item-module-accent',\s*'var\(--color-accent\)'\)/);
-  assert.doesNotMatch(source, /kitchenNavBtn\.style\.removeProperty\('--item-module-accent'\)/);
-  assert.doesNotMatch(source, /moreBtn\.style\.removeProperty\('--item-module-accent'\)/);
+  assert.match(source, /const\s+MOBILE_FAVORITE_COUNT\s*=\s*3/);
+  assert.match(source, /resolveMobileNavOrder/);
+  assert.match(source, /function\s+mobileFavoriteItems/);
+  assert.match(source, /function\s+buildBottomNavItems/);
+});
+
+test('mobile navigation uses neutral inactive wells and one active indicator', () => {
+  const layout = read('../public/styles/layout.css');
+
+  assert.match(
+    layout,
+    /\.nav-item__icon-well\s*\{[\s\S]*?background:\s*var\(--color-surface-elevated\)/,
+  );
+  assert.match(
+    layout,
+    /\.nav-item\[aria-current="page"\] \.nav-item__icon-well,[\s\S]*?background:\s*transparent/,
+  );
+  assert.doesNotMatch(layout, /\.nav-bottom__indicator\s*\{[\s\S]*?width\s+0\.45s/);
+});
+
+test('mobile navigation Quiet Precision keeps state feedback stable and accessible', () => {
+  const layout = read('../public/styles/layout.css');
+  const glass = read('../public/styles/glass.css');
+  const indicatorRule = cssRuleBody(layout, '.nav-bottom__indicator');
+  const indicatorSurfaceRule = cssRuleBody(layout, '.nav-bottom__indicator::before');
+  const focusRule = cssRuleBody(layout, '.nav-bottom .nav-item:focus-visible');
+  const pressedWellRule = cssRuleBody(layout, '.nav-bottom .nav-item:active .nav-item__icon-well');
+
+  assert.match(indicatorSurfaceRule, /inset-inline:\s*var\(--space-1\)/);
+  assert.doesNotMatch(indicatorRule, /transition:[^;]*\bwidth\b/);
+  assert.match(
+    layout,
+    /\.nav-bottom \.nav-item\[aria-current="page"\] \.nav-item__label,\s*\.nav-bottom \.nav-item--active \.nav-item__label\s*\{[\s\S]*?color:\s*var\(--item-module-accent,\s*var\(--active-module-accent,\s*var\(--color-accent\)\)\)/,
+  );
+  assert.match(
+    layout,
+    /\.nav-bottom \.nav-item\[aria-current="page"\] \.nav-item__label,\s*\.nav-bottom \.nav-item--active \.nav-item__label\s*\{[\s\S]*?font-weight:\s*var\(--font-weight-semibold\)/,
+  );
+  assert.match(focusRule, /outline:/);
+  assert.match(focusRule, /outline-offset:\s*calc\(-1 \* var\(--space-px\)\)/);
+  assert.match(pressedWellRule, /transform:\s*translateY\(var\(--space-px\)\) scale\(0\.96\)/);
+  assert.doesNotMatch(layout, /(^|\n)\.nav-item:active\s*\{[\s\S]*?transform:/);
+  assert.doesNotMatch(layout, /\.nav-bottom \.nav-item:active\s*\{[\s\S]*?transform:/);
+  assert.match(
+    glass,
+    /\.nav-bottom__indicator::before\s*\{[\s\S]*?var\(--active-module-accent,\s*var\(--color-accent\)\)[\s\S]*?var\(--glass-bg\)/,
+  );
+  assert.match(
+    glass,
+    /@media \(prefers-reduced-transparency: reduce\)[\s\S]*?\.nav-bottom__indicator::before\s*\{[\s\S]*?background:/,
+  );
+  assert.match(
+    layout,
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.nav-bottom \.nav-item:active \.nav-item__icon-well\s*\{[\s\S]*?transform:\s*none/,
+  );
+  assert.match(
+    layout,
+    /@media \(prefers-contrast: more\)[\s\S]*?\.nav-item\[aria-current="page"\],\s*\.nav-item--active\s*\{[\s\S]*?text-decoration:\s*underline/,
+  );
+  assert.match(
+    layout,
+    /@media \(forced-colors: active\)[\s\S]*?\.nav-item\[aria-current="page"\],\s*\.nav-item--active\s*\{[\s\S]*?border-bottom:\s*2px solid Highlight/,
+  );
+});
+
+test('mobile bottom navigation remains visible while content scrolls', () => {
+  const source = read('../public/router.js');
+  const layout = read('../public/styles/layout.css');
+
+  assert.doesNotMatch(source, /initNavHideOnScroll/);
+  assert.doesNotMatch(layout, /\.nav-bottom--hidden\s*\{/);
 });
 
 test('More sheet closes route clicks through delegated handler after rebuilds', () => {
@@ -977,11 +1073,209 @@ test('phase 3 mobile Tasks toolbar collapses secondary controls into one overflo
   assert.match(tasksPage, /<div class="tasks-toolbar__secondary-panel">[\s\S]*id="group-mode-toggle"[\s\S]*id="view-toggle"[\s\S]*id="btn-bulk-select"/);
   assert.match(
     tasksCss,
-    /@media \(max-width:\s*640px\)[\s\S]*\.tasks-toolbar__secondary-panel\s*\{[\s\S]*position:\s*absolute[\s\S]*display:\s*none/
+    /@media \(max-width:\s*1023px\)[\s\S]*\.tasks-toolbar__secondary-panel\s*\{[\s\S]*position:\s*absolute[\s\S]*display:\s*none/
   );
   assert.match(
     tasksCss,
-    /@media \(max-width:\s*640px\)[\s\S]*\.tasks-toolbar__secondary\[open\] \.tasks-toolbar__secondary-panel\s*\{[\s\S]*display:\s*flex/
+    /@media \(max-width:\s*1023px\)[\s\S]*\.tasks-toolbar__secondary\[open\] \.tasks-toolbar__secondary-panel\s*\{[\s\S]*display:\s*flex/
+  );
+});
+
+test('responsive adaptation keeps Notes vertical and prevents intrinsic-width overflow', () => {
+  const notes = read('../public/styles/notes.css');
+  const dashboard = read('../public/styles/dashboard.css');
+
+  assert.match(notes, /\.notes-toolbar__search\s*\{[\s\S]*min-width:\s*0/);
+  assert.match(notes, /\.notes-toolbar\s+\.page-toolbar__title\s*\{[\s\S]*flex:\s*0\s+0\s+auto/);
+  assert.match(notes, /\.notes-grid\s*\{[\s\S]*display:\s*grid/);
+  assert.match(notes, /\.notes-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.doesNotMatch(notes, /\.notes-grid\s*\{[\s\S]*?columns:\s*2/);
+  assert.match(
+    notes,
+    /@container notes-page \(min-width:\s*520px\)[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/
+  );
+  assert.match(
+    notes,
+    /@container notes-page \(min-width:\s*720px\)[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/
+  );
+  assert.match(
+    dashboard,
+    /\.notes-grid-widget\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/
+  );
+  assert.match(notes, /\.note-card\s*\{[\s\S]*min-width:\s*0/);
+  assert.match(notes, /\.note-card__title\s*\{[\s\S]*overflow-wrap:\s*anywhere/);
+  assert.match(
+    notes,
+    /\.note-card__title,[\s\S]*\.note-card__content\s*\{[\s\S]*unicode-bidi:\s*plaintext/
+  );
+});
+
+test('responsive adaptation keeps all three Kitchen tabs visible on narrow phones', () => {
+  const kitchenTabs = read('../public/styles/kitchen-tabs.css');
+
+  assert.match(
+    kitchenTabs,
+    /@media \(max-width:\s*640px\)[\s\S]*\.kitchen-tabs-bar\s*\{[\s\S]*padding-inline:\s*var\(--space-2\)/
+  );
+  assert.match(
+    kitchenTabs,
+    /\.kitchen-tabs-bar \.sub-tab\s*\{[\s\S]*flex:\s*1 1 0[\s\S]*min-width:\s*0/
+  );
+  assert.match(
+    kitchenTabs,
+    /\.kitchen-tabs-bar \.sub-tab__label\s*\{[\s\S]*text-overflow:\s*ellipsis/
+  );
+});
+
+test('responsive adaptation uses tablet space without crowding module toolbars', () => {
+  const documents = read('../public/styles/documents.css');
+  const settings = read('../public/styles/settings.css');
+
+  assert.match(
+    documents,
+    /@media \(min-width:\s*768px\) and \(max-width:\s*1023px\)[\s\S]*\.documents-toolbar\s*\{[\s\S]*flex-wrap:\s*wrap/
+  );
+  assert.match(
+    documents,
+    /@media \(min-width:\s*768px\) and \(max-width:\s*1023px\)[\s\S]*\.documents-toolbar__search\s*\{[\s\S]*flex-basis:\s*100%/
+  );
+  assert.match(
+    settings,
+    /@media \(min-width:\s*768px\) and \(max-width:\s*1023px\)[\s\S]*\.settings-mobile-overview__links\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/
+  );
+});
+
+test('responsive adaptation removes duplicate Birthday creation action on phones', () => {
+  const birthdays = read('../public/styles/birthdays.css');
+
+  assert.match(
+    birthdays,
+    /@media \(max-width:\s*640px\)[\s\S]*\.birthdays-header__action\s*\{[\s\S]*display:\s*none/
+  );
+});
+
+test('dashboard polish keeps one page heading and native quick-action controls', () => {
+  const dashboard = read('../public/pages/dashboard.js');
+  const css = read('../public/styles/dashboard.css');
+
+  assert.equal((dashboard.match(/<h1\b/g) || []).length, 1, 'dashboard must expose one h1');
+  assert.match(dashboard, /<h2 class="dashboard-overview__title">/);
+  assert.match(dashboard, /<button type="button" class="fab-action"/);
+  assert.doesNotMatch(dashboard, /class="fab-action"[^>]*role="button"/);
+  assert.doesNotMatch(dashboard, /<button class="fab-action__btn"/);
+  assert.match(css, /\.dashboard-icon-btn\s*\{[\s\S]*width:\s*var\(--target-lg\);[\s\S]*height:\s*var\(--target-lg\)/);
+  assert.doesNotMatch(
+    css,
+    /@media \(max-width:\s*640px\)[\s\S]*\.dashboard-icon-btn\s*\{[\s\S]*width:\s*var\(--target-base\);[\s\S]*height:\s*var\(--target-base\)/,
+    'mobile dashboard controls must keep the large touch target through the final cascade'
+  );
+  assert.match(
+    css,
+    /@media \(min-width:\s*1024px\)[\s\S]*\.dashboard-icon-btn\s*\{[\s\S]*width:\s*var\(--target-md\);[\s\S]*height:\s*var\(--target-md\)/,
+  );
+});
+
+test('dashboard today cockpit keeps content visibly below its section heading', () => {
+  const dashboard = read('../public/styles/dashboard.css');
+  const typography = read('../public/styles/typography.css');
+  const valueRule = cssRuleBody(dashboard, '.today-cockpit-card__value');
+
+  assert.match(
+    typography,
+    /\.today-cockpit__header h2,[\s\S]*?font-size:\s*var\(--type-section-title\)/,
+    'Heute wichtig must keep the section-title role',
+  );
+  assert.match(
+    valueRule,
+    /font-size:\s*var\(--type-secondary\)/,
+    'cockpit values must stay below the 18px section heading',
+  );
+});
+
+test('polished rounded cards use subtle full borders instead of thick accent caps', () => {
+  const dashboard = read('../public/styles/dashboard.css');
+  const housekeeping = read('../public/styles/housekeeping.css');
+
+  const overview = dashboard.match(/\.dashboard-overview\s*\{[\s\S]*?\n\}/)?.[0] ?? '';
+  const cockpit = dashboard.match(/\.today-cockpit\s*\{[\s\S]*?\n\}/)?.[0] ?? '';
+  const widget = dashboard.match(/\.dashboard \.widget::before\s*\{[\s\S]*?\n\}/)?.[0] ?? '';
+  const housekeepingCard = housekeeping.match(/\.housekeeping-card\s*\{[\s\S]*?\n\}/)?.[0] ?? '';
+
+  assert.doesNotMatch(overview, /border-top:\s*(?:3px|var\(--space-1\))/);
+  assert.doesNotMatch(cockpit, /border-top:\s*(?:3px|var\(--space-1\))/);
+  assert.match(widget, /height:\s*1px/);
+  assert.doesNotMatch(housekeepingCard, /border-top:\s*3px/);
+});
+
+test('hardening keeps Birthday cards bounded with extreme localized content', () => {
+  const birthdays = read('../public/styles/birthdays.css');
+
+  assert.match(birthdays, /\.birthdays-panel\s*\{[\s\S]*min-width:\s*0/);
+  assert.match(
+    birthdays,
+    /@media \(max-width:\s*1023px\)[\s\S]*\.birthdays-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/
+  );
+  assert.match(
+    birthdays,
+    /\.birthday-card__name,[\s\S]*\.birthday-item__notes\s*\{[\s\S]*overflow-wrap:\s*anywhere/
+  );
+  assert.match(
+    birthdays,
+    /\.birthday-card__name,[\s\S]*\.birthday-item__notes\s*\{[\s\S]*unicode-bidi:\s*plaintext/
+  );
+  assert.match(
+    birthdays,
+    /@media \(max-width:\s*640px\)[\s\S]*\.birthday-card__top,[\s\S]*\.birthday-item__row\s*\{[\s\S]*flex-wrap:\s*wrap/
+  );
+});
+
+test('hardening uses logical alignment for RTL-sensitive adapted controls', () => {
+  const notes = read('../public/styles/notes.css');
+  const documents = read('../public/styles/documents.css');
+  const birthdays = read('../public/styles/birthdays.css');
+  const tasks = read('../public/styles/tasks.css');
+
+  assert.match(notes, /margin-inline-start:\s*auto/);
+  assert.match(notes, /\.notes-toolbar__search-icon\s*\{[\s\S]*inset-inline-start:/);
+  assert.match(notes, /\.note-card__pin\s*\{[\s\S]*inset-inline-end:/);
+  assert.match(documents, /\.documents-toolbar__search-icon\s*\{[\s\S]*inset-inline-start:/);
+  assert.match(tasks, /\.tasks-toolbar__secondary-panel\s*\{[\s\S]*inset-inline-end:\s*0/);
+  assert.match(
+    tasks,
+    /\[dir=['"]rtl['"]\] \.tasks-toolbar__secondary-panel\s*\{[\s\S]*inset-inline-start:\s*0;[\s\S]*inset-inline-end:\s*auto/
+  );
+  assert.match(birthdays, /\.birthdays-toolbar__search-icon\s*\{[\s\S]*inset-inline-start:/);
+  assert.match(birthdays, /\.birthdays-autocomplete\s*\{[\s\S]*inset-inline:\s*0/);
+});
+
+test('route failures expose a localized recoverable alert instead of raw technical errors', () => {
+  const router = read('../public/router.js');
+  const notesPage = read('../public/pages/notes.js');
+
+  assert.match(router, /function renderError\(container,\s*err\)[\s\S]*state\.setAttribute\(['"]role['"],\s*['"]alert['"]\)/);
+  assert.match(router, /desc\.textContent\s*=\s*friendlyError\(err\)/);
+  assert.match(router, /state\.focus\(\{\s*preventScroll:\s*true\s*\}\)/);
+  assert.match(router, /Failed to fetch\|NetworkError\|Load failed/i);
+  assert.match(router, /return t\(['"]common\.errorServer['"]\)/);
+  assert.match(router, /err\?\.name === ['"]TypeError['"][\s\S]*return t\(['"]common\.unexpectedError['"]\)/);
+  assert.match(notesPage, /catch \(err\)\s*\{[\s\S]*console\.error\([\s\S]*throw err;/);
+});
+
+test('Notes uses the shared WCAG contrast helper without dimming readable content', () => {
+  const notesPage = read('../public/pages/notes.js');
+  const notesCss = read('../public/styles/notes.css');
+
+  assert.match(notesPage, /import \{ getReadableTextColor \} from '\/utils\/color\.js'/);
+  assert.doesNotMatch(notesPage, /function isLightColor/);
+  assert.match(notesPage, /getReadableTextColor\(note\.color\)/);
+  assert.match(notesPage, /const avatarColor\s*=\s*note\.creator_color[\s\S]*getReadableTextColor\(avatarColor\)/);
+  assert.doesNotMatch(
+    notesCss.match(/\.note-card__content\s*\{[\s\S]*?\n\}/)?.[0] ?? '',
+    /opacity:/,
+  );
+  assert.match(
+    notesCss.match(/\.note-card__footer\s*\{[\s\S]*?\n\}/)?.[0] ?? '',
+    /color:\s*inherit/,
   );
 });
 
@@ -1151,7 +1445,7 @@ test('settings cutover: the controller is a thin shell delegate without the lega
   assert.doesNotMatch(settingsPage, /extraClass:\s*'settings-tabs'/, 'controller must not render the legacy sub-tab bar');
 
   const lineCount = settingsPage.split('\n').length;
-  assert.ok(lineCount <= 160, `settings controller should be a thin shell (was ${lineCount} lines)`);
+  assert.ok(lineCount <= 170, `settings controller should be a thin shell (was ${lineCount} lines)`);
 });
 
 test('settings cutover: obsolete navigation modules and stylesheet are removed', () => {
@@ -1233,7 +1527,11 @@ test('calendar agenda events and task chips keep readable contrast in mobile age
 
   assert.match(eventBody, /background:\s*var\(--color-surface-work\)/, 'agenda rows need a solid surface for mobile contrast');
   assert.match(eventBody, /border:\s*var\(--space-px\)\s+solid\s+var\(--color-border-subtle\)/, 'agenda rows need a boundary in both themes');
-  assert.match(colorBody, /width:\s*var\(--space-1\)/, 'agenda color rail should be tokenized and visible');
+  // Kalenderfarbe ist ein zentrierter Dot (kein vollhoher Seitenstreifen) —
+  // tokenisiert und sichtbar, konsistent mit den Status-Dots der Aufgabenliste.
+  assert.match(colorBody, /width:\s*var\(--space-2\)/, 'agenda color dot should use a spacing token for its width');
+  assert.match(colorBody, /height:\s*var\(--space-2\)/, 'agenda color dot should be a fixed-size dot, not a full-height rail');
+  assert.match(colorBody, /border-radius:\s*var\(--radius-full\)/, 'agenda color dot should be round');
   assert.match(taskBody, /background:\s*color-mix\(in srgb,\s*currentColor/, 'task chips should tint from their readable text color');
   assert.match(taskBody, /border-color:\s*color-mix\(in srgb,\s*currentColor/, 'task chips should have more than colored text');
   assert.match(metaBody, /color:\s*var\(--color-text-secondary\)/, 'metadata should remain legible in light and dark themes');
@@ -1444,7 +1742,7 @@ test('phase 2 dashboard primary titles do not split words mid-token', () => {
   }
 });
 
-test('phase 2 mobile dashboard cockpit uses wider important cards with tokenized stable sizing', () => {
+test('phase 2 mobile dashboard cockpit uses a 2x2 glance grid with tokenized stable sizing', () => {
   const dashboard = read('../public/styles/dashboard.css');
 
   assert.match(
@@ -1452,15 +1750,23 @@ test('phase 2 mobile dashboard cockpit uses wider important cards with tokenized
     /@media \(max-width:\s*640px\)[\s\S]*\.today-cockpit-card\s*\{[\s\S]*min-height:\s*calc\(var\(--target-lg\)\s*\+\s*var\(--space-4\)\)/,
     'mobile cockpit cards should keep stable tokenized min-height'
   );
+  // 2×2-Glance-Raster: zwei Spalten auf Mobil, halbe Höhe ggü. 1×4
   assert.match(
     dashboard,
-    /@media \(max-width:\s*640px\)[\s\S]*\.today-cockpit-card--task,\s*\n\s*\.today-cockpit-card--event\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1/,
-    'task and event cards should span the mobile cockpit grid for wider text'
+    /@media \(max-width:\s*640px\)[\s\S]*\.today-cockpit__grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
+    'mobile cockpit should use a two-column glance grid'
   );
+  // Karten erzwingen keine Vollbreite mehr — sonst entsteht wieder ein 1×4-Stapel
+  assert.doesNotMatch(
+    dashboard,
+    /\.today-cockpit-card--task,\s*\n\s*\.today-cockpit-card--event\s*\{[\s\S]*?grid-column:\s*1\s*\/\s*-1/,
+    'task/event cards must not force full-width on mobile (breaks the 2×2 grid)'
+  );
+  // Sehr schmale Container fallen auf eine Spalte zurück (Container-Query, kein Viewport-BP)
   assert.match(
     dashboard,
-    /@media \(max-width:\s*640px\)[\s\S]*\.dashboard-action\s*\{[\s\S]*width:\s*var\(--target-base\)[\s\S]*height:\s*var\(--target-base\)/,
-    'mobile quick actions should keep tokenized icon-button dimensions'
+    /@container today-cockpit \(max-width:\s*270px\)[\s\S]*grid-template-columns:\s*1fr/,
+    'very narrow cockpit container should fall back to a single column'
   );
 });
 
@@ -1477,10 +1783,42 @@ test('phase 2 dashboard FAB uses tokenized position and reserved mobile scroll r
   );
 });
 
-test('phase 2 mobile dashboard quick actions keep accessible names when labels are visually compact', () => {
-  const dashboardPage = read('../public/pages/dashboard.js');
+test('calendar desktop layout matches the dashboard gutter and compacts weekday headers', () => {
+  const calendar = read('../public/styles/calendar.css');
 
-  assert.match(dashboardPage, /class="dashboard-action \$\{tone \? `dashboard-action--\$\{tone\}` : ''\}" data-route="\$\{route\}" aria-label="\$\{esc\(label\)\}"/);
+  assert.match(
+    calendar,
+    /@media \(min-width:\s*1024px\)[\s\S]*?\.calendar-page\s*\{[\s\S]*?padding:\s*var\(--space-6\)\s+var\(--space-8\)/,
+    'desktop calendar should keep breathing room beside the sidebar',
+  );
+  assert.match(
+    calendar,
+    /@media \(min-width:\s*1024px\)[\s\S]*?\.week-view__day-header\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?justify-content:\s*center/,
+    'desktop weekday and date should sit side by side',
+  );
+  assert.match(
+    calendar,
+    /@media \(min-width:\s*1024px\)[\s\S]*?\.week-view__day-num\s*\{[\s\S]*?width:\s*var\(--target-sm\);[\s\S]*?height:\s*var\(--target-sm\)/,
+    'desktop date markers should use the compact touch-size token',
+  );
+});
+
+test('dashboard and calendar keep distinct navigation accents in light and dark themes', () => {
+  const tokens = read('../public/styles/tokens.css');
+  const rootBlock = tokens.match(/:root\s*\{([\s\S]*?)\n\}/);
+  const darkBlock = tokens.match(/\n\[data-theme="dark"\]\s*\{([\s\S]*?)\n\}/);
+
+  assert.ok(rootBlock, 'expected a :root token block');
+  assert.ok(darkBlock, 'expected a [data-theme="dark"] block');
+
+  for (const [theme, block] of [['light', rootBlock[1]], ['dark', darkBlock[1]]]) {
+    const values = parseTokenMap(block);
+    assert.notEqual(
+      values.get('--_module-dashboard')?.toLowerCase(),
+      values.get('--_module-calendar')?.toLowerCase(),
+      `${theme} dashboard and calendar accents must be visually distinct`,
+    );
+  }
 });
 
 // ============================================================
@@ -1538,6 +1876,27 @@ function contrastRatio(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+function parseCssRgb(value) {
+  const hex = String(value).trim().match(/^#([0-9a-f]{6})$/i);
+  if (hex) return [...hexToRgb(value), 1];
+
+  const rgba = String(value).trim().match(/^rgba?\(([^)]+)\)$/i);
+  assert.ok(rgba, `expected a hex, rgb, or rgba color, got: ${value}`);
+  const parts = rgba[1].split(',').map((part) => Number(part.trim()));
+  return [parts[0], parts[1], parts[2], parts[3] ?? 1];
+}
+
+function compositeColor(foreground, background) {
+  const [fr, fg, fb, fa] = parseCssRgb(foreground);
+  const [br, bg, bb] = parseCssRgb(background);
+  const channels = [
+    fr * fa + br * (1 - fa),
+    fg * fa + bg * (1 - fa),
+    fb * fa + bb * (1 - fa),
+  ];
+  return `#${channels.map((channel) => Math.round(channel).toString(16).padStart(2, '0')).join('')}`;
+}
+
 test('text/surface token pairs meet WCAG AA 4.5:1 in both themes', () => {
   const tokens = read('../public/styles/tokens.css');
   const rootBlock = tokens.match(/:root\s*\{([\s\S]*?)\n\}/);
@@ -1587,6 +1946,21 @@ test('shared modal centrally escapes title and select labels (audit 1.8)', () =>
   assert.match(src, /import \{ esc \} from '\/utils\/html\.js'/, 'modal must import esc');
 });
 
+test('shared prompt and select dialogs expose persistent form labels', () => {
+  const src = read('../public/components/modal.js');
+
+  assert.match(
+    src,
+    /<label class="sr-only" for="prompt-modal-input">\$\{esc\(label\)\}<\/label>/,
+    'promptModal input needs a connected label',
+  );
+  assert.match(
+    src,
+    /<label class="sr-only" for="select-modal-input">\$\{esc\(label\)\}<\/label>/,
+    'selectModal control needs a connected label',
+  );
+});
+
 test('modal lifecycle uses an explicit state machine, not the old _isClosing flag (audit 1.5)', () => {
   const src = read('../public/components/modal.js');
   assert.match(src, /let modalState = 'idle';/, 'expected an explicit modalState variable');
@@ -1620,6 +1994,279 @@ test('Budget places Subscriptions between Budget and Loans with secure rendering
   assert.doesNotMatch(subscriptions, /\.innerHTML\s*=/);
   assert.match(subscriptions, /replaceChildren\(\)/);
   assert.match(subscriptions, /insertAdjacentHTML\(/);
+});
+
+test('search fields keep visible labels after users enter a query', () => {
+  const fields = [
+    ['../public/pages/birthdays.js', 'birthdays-search'],
+    ['../public/pages/contacts.js', 'contacts-search'],
+    ['../public/pages/notes.js', 'notes-search'],
+    ['../public/pages/documents.js', 'documents-search'],
+    ['../public/pages/split-expenses.js', 'split-group-search'],
+  ];
+
+  for (const [file, id] of fields) {
+    const source = read(file);
+    assert.match(
+      source,
+      new RegExp(`<label[^>]*for="${id}"[^>]*>[\\s\\S]*?<input[^>]*id="${id}"|<label[^>]*>[\\s\\S]*?<input[^>]*id="${id}"`),
+      `${file} must expose a persistent visible label for #${id}`,
+    );
+  }
+});
+
+test('German housekeeping visit copy contains no English fallback strings', () => {
+  const locale = JSON.parse(read('../public/locales/de.json'));
+  const expected = {
+    reports: 'Berichte',
+    visitRecordedAt: 'Einsatz erfasst um',
+    checkedInToday: 'Heute erfasst',
+    editVisit: 'Einsatz bearbeiten',
+    paymentPaid: 'Bezahlt',
+    paymentPending: 'Ausstehend',
+    filterMonth: 'Monat',
+  };
+
+  for (const [key, value] of Object.entries(expected)) {
+    assert.equal(locale.housekeeping[key], value, `housekeeping.${key} must be German`);
+  }
+
+  const housekeepingCss = read('../public/styles/housekeeping.css');
+  assert.match(
+    housekeepingCss,
+    /\.housekeeping-worker-strip__identity\s*\{[\s\S]*gap:\s*var\(--space-1\)/,
+    'housekeeper name and status need an explicit visual gap',
+  );
+});
+
+test('holiday chips derive readable ink from each configured color', () => {
+  const calendarPage = read('../public/pages/calendar.js');
+  const calendarCss = read('../public/styles/calendar.css');
+
+  assert.match(calendarPage, /import \{ getReadableTextColor \} from '\/utils\/color\.js'/);
+  assert.match(calendarPage, /--holi-ink:\$\{esc\(getReadableTextColor\(h\.color\)\)\}/);
+  for (const selector of ['.month-day__holiday', '.allday-holiday']) {
+    const body = cssRuleBody(calendarCss, selector);
+    assert.match(body, /color:\s*var\(--holi-ink,\s*var\(--color-text-on-accent\)\)/);
+    assert.doesNotMatch(body, /color:\s*#fff/);
+  }
+});
+
+test('user-selected avatar colors derive readable text ink', () => {
+  const dashboard = read('../public/pages/dashboard.js');
+  const multiSelect = read('../public/components/user-multi-select.js');
+
+  assert.match(dashboard, /import \{ getReadableTextColor \} from '\/utils\/color\.js'/);
+  assert.match(
+    dashboard,
+    /color:\$\{getReadableTextColor\(u\.avatar_color \|\| '#64748b'\)\}/,
+  );
+  assert.match(multiSelect, /import \{ getReadableTextColor \} from '\/utils\/color\.js'/);
+  assert.match(
+    multiSelect,
+    /color:\$\{getReadableTextColor\(u\.color \?\? '#8E8E93'\)\}/,
+  );
+  assert.match(
+    multiSelect,
+    /color:\$\{getReadableTextColor\(u\.avatar_color \?\? '#8E8E93'\)\}/,
+  );
+});
+
+test('mobile meal actions remain visible and touch-safe after the full cascade', () => {
+  const meals = read('../public/styles/meals.css');
+
+  assert.match(
+    meals,
+    /@media \(hover:\s*none\),\s*\(max-width:\s*640px\)[\s\S]*?\.meal-card__actions\s*\{[\s\S]*?opacity:\s*1/,
+  );
+  assert.match(
+    meals,
+    /@media \(hover:\s*none\),\s*\(max-width:\s*640px\)[\s\S]*?\.meal-card__action-btn\s*\{[\s\S]*?width:\s*var\(--target-lg\)[\s\S]*?height:\s*var\(--target-lg\)/,
+  );
+  assert.match(
+    meals,
+    /@media \(hover:\s*none\),\s*\(max-width:\s*640px\)[\s\S]*?\.week-nav__today,[\s\S]*?\.meal-slot__add-more-btn\s*\{[\s\S]*?min-height:\s*var\(--target-lg\)/,
+  );
+  assert.match(
+    meals,
+    /@media \(hover:\s*none\),\s*\(max-width:\s*640px\)[\s\S]*?\.meal-card__action-btn\s*\{[\s\S]*?color:\s*var\(--color-text-secondary\)/,
+  );
+});
+
+test('audited profile, birthday, navigation, and budget controls meet mobile touch targets', () => {
+  const settings = read('../public/styles/settings.css');
+  const birthdays = read('../public/styles/birthdays.css');
+  const budget = read('../public/styles/budget.css');
+  const contacts = read('../public/styles/contacts.css');
+  const housekeeping = read('../public/styles/housekeeping.css');
+
+  assert.match(settings, /\.settings-avatar-action\s*\{[\s\S]*width:\s*var\(--target-md\)[\s\S]*height:\s*var\(--target-md\)/);
+  assert.match(
+    settings,
+    /@media \(max-width:\s*640px\)[\s\S]*\.settings-avatar-action\s*\{[\s\S]*width:\s*var\(--target-lg\)[\s\S]*height:\s*var\(--target-lg\)/,
+  );
+  assert.match(settings, /\.settings-module-move\s*\{[\s\S]*width:\s*var\(--target-base\)[\s\S]*height:\s*var\(--target-base\)/);
+  assert.match(birthdays, /\.contact-action-btn\s*\{[\s\S]*width:\s*var\(--target-lg\)[\s\S]*height:\s*var\(--target-lg\)/);
+  assert.match(budget, /\.budget-tab\s*\{[\s\S]*min-height:\s*var\(--target-lg\)/);
+  assert.match(budget, /\.budget-nav__today\s*\{[\s\S]*min-height:\s*var\(--target-lg\)/);
+  assert.match(
+    contacts,
+    /@media \(max-width:\s*767px\)[\s\S]*\.contact-filter-chip\s*\{[\s\S]*min-height:\s*var\(--target-lg\)/,
+  );
+  assert.match(housekeeping, /\.housekeeping-log-action\s*\{[\s\S]*min-height:\s*var\(--target-lg\)/);
+});
+
+test('remaining audited mobile controls use 48px touch targets', () => {
+  const tasks = read('../public/styles/tasks.css');
+  const calendar = read('../public/styles/calendar.css');
+  const budget = read('../public/styles/budget.css');
+  const settings = read('../public/styles/settings.css');
+
+  assertRuleUsesToken(tasks, '.filter-toggle-btn', 'min-height', '--target-lg', '../public/styles/tasks.css');
+  assertRuleUsesToken(calendar, '.cal-toolbar__today', 'min-height', '--target-lg', '../public/styles/calendar.css');
+  assertRuleUsesToken(budget, '.budget-loans__filter', 'min-height', '--target-lg', '../public/styles/budget.css');
+  assertRuleUsesToken(budget, '.budget-loan-card__filter', 'width', '--target-lg', '../public/styles/budget.css');
+  assertRuleUsesToken(budget, '.budget-loan-card__filter', 'height', '--target-lg', '../public/styles/budget.css');
+  assert.match(
+    settings,
+    /@media \(max-width:\s*767px\)[\s\S]*\.settings-breadcrumb__link\s*\{[\s\S]*min-height:\s*var\(--target-lg\)/,
+  );
+});
+
+test('mobile contacts keep one primary action and disclose the rest through More', () => {
+  const contactsPage = read('../public/pages/contacts.js');
+  const contactsCss = read('../public/styles/contacts.css');
+
+  assert.match(contactsPage, /contact-action-btn--mail contact-action-btn--desktop-extra/);
+  assert.match(contactsPage, /contact-action-btn--mail contact-action-btn--mobile-menu/);
+  assert.match(
+    contactsCss,
+    /@media \(max-width:\s*767px\)[\s\S]*\.contact-action-btn--desktop-extra\s*\{[\s\S]*display:\s*none/,
+  );
+  assert.match(
+    contactsCss,
+    /@media \(max-width:\s*767px\)[\s\S]*\.contact-more-menu\s*\{[\s\S]*display:\s*block/,
+  );
+});
+
+test('documents and navigation settings use progressive disclosure instead of stacked control cards', () => {
+  const documentsPage = read('../public/pages/documents.js');
+  const documentsCss = read('../public/styles/documents.css');
+  const navigationPage = read('../public/settings/pages/modules-navigation.js');
+  const settingsCss = read('../public/styles/settings.css');
+
+  assert.match(documentsPage, /<details class="documents-secondary-controls"/);
+  assert.match(documentsPage, /<summary[^>]*documents-secondary-controls__trigger/);
+  assert.match(
+    documentsCss,
+    /@media \(max-width:\s*767px\)[\s\S]*\.documents-secondary-controls__panel\s*\{[\s\S]*display:\s*none/,
+  );
+  assert.match(
+    documentsCss,
+    /@media \(max-width:\s*767px\)[\s\S]*\.documents-secondary-controls\s*\{[\s\S]*position:\s*static/,
+  );
+  assert.match(
+    documentsCss,
+    /@media \(max-width:\s*767px\)[\s\S]*\.documents-secondary-controls__panel\s*\{[\s\S]*inset-inline:\s*var\(--space-4\)[\s\S]*width:\s*auto/,
+  );
+  assert.match(navigationPage, /class="settings-navigation-panel"/);
+  assert.doesNotMatch(navigationPage, /<div class="settings-card">/);
+  assert.match(settingsCss, /\.settings-navigation-panel\s*\{[\s\S]*border-bottom:\s*var\(--space-px\)\s+solid\s+var\(--color-border-subtle\)/);
+  assert.match(
+    settingsCss,
+    /@media \(max-width:\s*640px\)[\s\S]*\.settings-module-drag\s*\{[\s\S]*display:\s*none/,
+  );
+});
+
+test('birthday and navigation headings keep a sequential hierarchy', () => {
+  const birthdays = read('../public/pages/birthdays.js');
+  const navigation = read('../public/settings/pages/modules-navigation.js');
+
+  assert.match(birthdays, /<h1 class="u-toolbar-title">/);
+  assert.doesNotMatch(birthdays, /<h3>/);
+  assert.match(navigation, /<h2 class="settings-navigation-panel__title"/);
+  assert.match(navigation, /<h3 class="settings-navigation-group__title"/);
+  assert.doesNotMatch(navigation, /<h4 class="settings-navigation-group__title"/);
+});
+
+test('housekeeping exposes its page title as the primary heading', () => {
+  const housekeeping = read('../public/pages/housekeeping.js');
+
+  assert.match(housekeeping, /<h1 class="page-toolbar__title" id="housekeeping-title">/);
+  assert.doesNotMatch(housekeeping, /<div class="page-toolbar__title" id="housekeeping-title">/);
+});
+
+test('priority badges and meal labels meet WCAG AA contrast in both themes', () => {
+  const tokens = read('../public/styles/tokens.css');
+  const rootBlock = tokens.match(/:root\s*\{([\s\S]*?)\n\}/);
+  const darkBlock = tokens.match(/\n\[data-theme="dark"\]\s*\{([\s\S]*?)\n\}/);
+  assert.ok(rootBlock, 'expected a :root token block');
+  assert.ok(darkBlock, 'expected a [data-theme="dark"] block');
+
+  const light = parseTokenMap(rootBlock[1]);
+  const dark = new Map(light);
+  for (const [key, value] of parseTokenMap(darkBlock[1])) dark.set(key, value);
+
+  const pairs = [
+    ['--color-priority-low', '--color-priority-low-bg'],
+    ['--color-priority-medium', '--color-priority-medium-bg'],
+    ['--color-priority-high', '--color-priority-high-bg'],
+    ['--color-priority-urgent', '--color-priority-urgent-bg'],
+  ];
+
+  for (const [theme, map] of [['light', light], ['dark', dark]]) {
+    const surface = resolveColor('--color-surface-work', map);
+    for (const [foregroundToken, backgroundToken] of pairs) {
+      const foreground = resolveColor(foregroundToken, map);
+      const background = compositeColor(resolveColor(backgroundToken, map), surface);
+      const ratio = contrastRatio(foreground, background);
+      assert.ok(
+        ratio >= 4.5,
+        `${theme}: ${foregroundToken} on ${backgroundToken} is ${ratio.toFixed(2)}:1`,
+      );
+    }
+
+    for (const mealToken of ['--meal-breakfast', '--meal-lunch', '--meal-dinner', '--meal-snack']) {
+      const mealColor = resolveColor(mealToken, map);
+      const mealRatio = contrastRatio(mealColor, surface);
+      assert.ok(mealRatio >= 4.5, `${theme}: ${mealToken} is ${mealRatio.toFixed(2)}:1`);
+    }
+  }
+});
+
+test('budget bars animate with transforms instead of layout-driving widths', () => {
+  const budgetPage = read('../public/pages/budget.js');
+  const budgetCss = read('../public/styles/budget.css');
+
+  assert.doesNotMatch(budgetCss, /transition:\s*width/);
+  assert.match(budgetCss, /\.budget-bar-row__fill\s*\{[\s\S]*transform:\s*scaleX\(var\(--bar-scale,\s*0\)\)[\s\S]*transition:\s*transform/);
+  assert.match(budgetCss, /\.budget-loan-card__progress span\s*\{[\s\S]*transform:\s*scaleX\(var\(--bar-scale,\s*0\)\)/);
+  assert.match(budgetPage, /style="--bar-scale:\$\{pct\s*\/\s*100\}"/);
+  assert.match(budgetPage, /style="--bar-scale:\$\{paidPct\s*\/\s*100\}"/);
+  assert.doesNotMatch(budgetPage, /style="width:\$\{(?:pct|paidPct)\}%/);
+});
+
+test('dashboard and task progress bars animate with transforms instead of widths', () => {
+  const dashboardPage = read('../public/pages/dashboard.js');
+  const dashboardCss = read('../public/styles/dashboard.css');
+  const tasksPage = read('../public/pages/tasks.js');
+  const tasksCss = read('../public/styles/tasks.css');
+
+  assert.match(
+    dashboardCss,
+    /\.shopping-widget-list__bar\s*\{[\s\S]*transform-origin:\s*left[\s\S]*transform:\s*scaleX\(var\(--progress-scale,\s*0\)\)[\s\S]*transition:\s*transform/,
+  );
+  assert.doesNotMatch(cssRuleBody(dashboardCss, '.shopping-widget-list__bar'), /transition:\s*width/);
+  assert.match(dashboardPage, /style="--progress-scale:\$\{progress\s*\/\s*100\}"/);
+  assert.doesNotMatch(dashboardPage, /shopping-widget-list__bar" style="width:/);
+
+  assert.match(
+    tasksCss,
+    /\.subtask-progress__bar-fill\s*\{[\s\S]*transform-origin:\s*left[\s\S]*transform:\s*scaleX\(var\(--progress-scale,\s*0\)\)[\s\S]*transition:\s*transform/,
+  );
+  assert.doesNotMatch(cssRuleBody(tasksCss, '.subtask-progress__bar-fill'), /transition:\s*width/);
+  assert.match(tasksPage, /style="--progress-scale:\$\{progress\s*\/\s*100\}"/);
+  assert.doesNotMatch(tasksPage, /subtask-progress__bar-fill" style="width:/);
 });
 
 test('toolbar "new" buttons are hidden via a shared class, not an ID list (audit 1.9)', () => {

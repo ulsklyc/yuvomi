@@ -72,7 +72,7 @@
 }
 
 .housekeeping-card {
-  border-top: 3px solid var(--module-accent);
+  border-color: color-mix(in srgb, var(--module-accent) 24%, var(--glass-border-subtle));
   border-radius: var(--radius-glass-card);
   box-shadow: var(--glass-shadow-sm);
   padding: var(--space-4);
@@ -100,9 +100,9 @@
   gap: var(--space-3);
 }
 
-.housekeeping-worker-strip div:last-child {
+.housekeeping-worker-strip__identity {
   display: grid;
-  gap: 2px;
+  gap: var(--space-1);
   min-width: 0;
 }
 
@@ -559,7 +559,7 @@
 }
 
 .housekeeping-log-action {
-  min-height: var(--target-sm);
+  min-height: var(--target-lg);
   padding-inline: var(--space-3);
   gap: var(--space-2);
 }

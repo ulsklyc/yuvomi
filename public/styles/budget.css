@@ -43,33 +43,14 @@
   .budget-page { height: 100dvh; }
 }
 
-@media (max-width: 640px) {
-  .budget-nav {
-    flex-wrap: wrap;
-  }
-
-  .budget-nav__label {
-    order: 3;
-    flex-basis: 100%;
-  }
-
-  .budget-tabs {
-    margin-left: auto;
-  }
-}
-
 /* --------------------------------------------------------
- * Monat-Navigation
+ * Monat-Navigation — Struktur (Flex/Sticky/3px-Streifen) kommt aus
+ * .page-toolbar (Canonical Page Head). Mobiles Umbrechen über
+ * .page-toolbar--wrap: der Monats-Block (.budget-nav__month = Center-Slot)
+ * rutscht als Gruppe auf Zeile 2. Hier nur Budget-Spezifika.
  * -------------------------------------------------------- */
 .budget-nav {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border-top: 3px solid var(--module-accent);
-  border-bottom: 1px solid var(--color-border);
   background-color: var(--color-surface);
-  flex-shrink: 0;
 }
 
 .budget-nav__label {
@@ -80,6 +61,7 @@
 }
 
 .budget-nav__today {
+  min-height: var(--target-lg);
   font-size: var(--text-sm);
   color: var(--color-accent);
   font-weight: var(--font-weight-medium);
@@ -95,7 +77,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  margin-left: auto;
   padding: 2px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -103,7 +84,7 @@
 }
 
 .budget-tab {
-  min-height: 40px;
+  min-height: var(--target-lg);
   padding: 0 var(--space-2);
   border: 0;
   border-radius: var(--radius-xs);
@@ -277,9 +258,12 @@
 }
 
 .budget-bar-row__fill {
+  width: 100%;
   height: 100%;
   border-radius: var(--radius-full);
-  transition: width var(--transition-slow);
+  transform: scaleX(var(--bar-scale, 0));
+  transform-origin: left center;
+  transition: transform var(--transition-slow);
 }
 
 .budget-bar-row__fill--income   { background-color: var(--color-success); }
@@ -339,7 +323,7 @@
 }
 
 .budget-loans__filter {
-  min-height: 30px;
+  min-height: var(--target-lg);
   padding: 0 var(--space-2);
   border: 0;
   border-radius: var(--radius-xs);
@@ -445,8 +429,8 @@
 }
 
 .budget-loan-card__filter {
-  width: 30px;
-  height: 30px;
+  width: var(--target-lg);
+  height: var(--target-lg);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -488,9 +472,25 @@
 
 .budget-loan-card__progress span {
   display: block;
+  width: 100%;
   height: 100%;
   border-radius: inherit;
   background: var(--color-success);
+  transform: scaleX(var(--bar-scale, 0));
+  transform-origin: left center;
+  transition: transform var(--transition-slow);
+}
+
+[dir='rtl'] .budget-bar-row__fill,
+[dir='rtl'] .budget-loan-card__progress span {
+  transform-origin: right center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .budget-bar-row__fill,
+  .budget-loan-card__progress span {
+    transition: none;
+  }
 }
 
 .budget-loan-card__footer {

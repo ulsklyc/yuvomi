@@ -15,6 +15,7 @@ import { render as renderSplitExpenses } from '/pages/split-expenses.js';
 import { openSubscriptionModal, render as renderSubscriptions } from '/pages/subscriptions.js';
 import { toLocalDateKey } from '/utils/date.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
+import '/components/category-manager.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -218,34 +219,38 @@ export async function render(container, { user }) {
 
   setHtml(container, `
     <div class="budget-page">
-      <h1 class="sr-only">${t('budget.title')}</h1>
-      <div class="budget-nav">
-        <button class="btn btn--icon" id="budget-prev" aria-label="${t('budget.prevMonth')}">
-          <i data-lucide="chevron-left" aria-hidden="true"></i>
-        </button>
-        <button class="budget-nav__today" id="budget-today">${t('budget.currentMonth')}</button>
-        <span class="budget-nav__label" id="budget-label"></span>
-        <div class="budget-tabs" role="tablist" aria-label="${t('budget.tabsLabel')}">
-          ${user?.access_scope === 'split_guest' ? '' : `
-          <button class="budget-tab" id="budget-tab-budget" type="button" role="tab" aria-selected="true" data-tab="budget">
-            ${t('budget.budgetTab')}
+      <div class="page-toolbar page-toolbar--wrap budget-nav">
+        <h1 class="page-toolbar__title">${t('budget.title')}</h1>
+        <div class="page-toolbar__center budget-nav__month">
+          <button class="btn btn--icon" id="budget-prev" aria-label="${t('budget.prevMonth')}">
+            <i data-lucide="chevron-left" aria-hidden="true"></i>
           </button>
-          <button class="budget-tab" id="budget-tab-subscriptions" type="button" role="tab" aria-selected="false" data-tab="subscriptions">
-            ${t('subscriptions.tabLabel')}
-          </button>
-          <button class="budget-tab" id="budget-tab-loans" type="button" role="tab" aria-selected="false" data-tab="loans">
-            ${t('budget.loansTab')}
-          </button>`}
-          <button class="budget-tab" id="budget-tab-split-expenses" type="button" role="tab" aria-selected="false" data-tab="split-expenses">
-            ${t('splitExpenses.tabLabel')}
+          <button class="budget-nav__today" id="budget-today">${t('budget.currentMonth')}</button>
+          <span class="budget-nav__label" id="budget-label"></span>
+          <button class="btn btn--icon" id="budget-next" aria-label="${t('budget.nextMonth')}">
+            <i data-lucide="chevron-right" aria-hidden="true"></i>
           </button>
         </div>
-        <button class="btn btn--primary btn--icon toolbar-new-btn" id="budget-add" aria-label="${t('budget.addEntryLabel')}">
-          <i data-lucide="plus" aria-hidden="true"></i>
-        </button>
-        <button class="btn btn--icon" id="budget-next" aria-label="${t('budget.nextMonth')}">
-          <i data-lucide="chevron-right" aria-hidden="true"></i>
-        </button>
+        <div class="page-toolbar__actions">
+          <div class="budget-tabs" role="tablist" aria-label="${t('budget.tabsLabel')}">
+            ${user?.access_scope === 'split_guest' ? '' : `
+            <button class="budget-tab" id="budget-tab-budget" type="button" role="tab" aria-selected="true" data-tab="budget">
+              ${t('budget.budgetTab')}
+            </button>
+            <button class="budget-tab" id="budget-tab-subscriptions" type="button" role="tab" aria-selected="false" data-tab="subscriptions">
+              ${t('subscriptions.tabLabel')}
+            </button>
+            <button class="budget-tab" id="budget-tab-loans" type="button" role="tab" aria-selected="false" data-tab="loans">
+              ${t('budget.loansTab')}
+            </button>`}
+            <button class="budget-tab" id="budget-tab-split-expenses" type="button" role="tab" aria-selected="false" data-tab="split-expenses">
+              ${t('splitExpenses.tabLabel')}
+            </button>
+          </div>
+          <button class="btn btn--primary btn--icon toolbar-new-btn" id="budget-add" aria-label="${t('budget.addEntryLabel')}">
+            <i data-lucide="plus" aria-hidden="true"></i>
+          </button>
+        </div>
       </div>
       <div id="budget-body" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
         ${renderSkeletonList({ rows: 6, lines: 2 })}
@@ -395,6 +400,10 @@ function renderBody() {
           <span class="budget-list-header__title">${t('budget.transactions')}</span>
         </div>
         <div class="budget-list-header__actions">
+        <button class="btn btn--icon btn--ghost" id="budget-manage-categories"
+          aria-label="${t('budget.manageCategories')}" title="${t('budget.manageCategories')}">
+          <i data-lucide="tags" class="icon-md" aria-hidden="true"></i>
+        </button>
         ${state.entries.length ? `
         <a href="/api/v1/budget/export?month=${state.month}" class="btn btn--secondary"
            style="font-size:var(--text-sm);padding:var(--space-1) var(--space-3);">
@@ -413,6 +422,7 @@ function renderBody() {
   _container.querySelector('#empty-cta-budget')?.addEventListener('click', () => {
     document.querySelector('.page-fab')?.click();
   });
+  _container.querySelector('#budget-manage-categories')?.addEventListener('click', openCategoryManager);
   stagger(_container.querySelector('#budget-list')?.querySelectorAll('.budget-entry') ?? []);
 
   _container.querySelector('#budget-list')?.addEventListener('click', async (e) => {
@@ -482,7 +492,7 @@ function renderCategoryBars(byCategory) {
       <div class="budget-bar-row">
         <div class="budget-bar-row__label" title="${esc(categoryLabel(c.category))}">${esc(categoryLabel(c.category))}</div>
         <div class="budget-bar-row__track">
-          <div class="budget-bar-row__fill ${cls}" style="width:${pct}%;"></div>
+          <div class="budget-bar-row__fill ${cls}" style="--bar-scale:${pct / 100}"></div>
         </div>
         <div class="budget-bar-row__amount" style="color:${isExpense ? 'var(--color-danger)' : 'var(--color-success)'};">
           ${formatAmount(c.total)}
@@ -822,7 +832,7 @@ function renderLoanCard(loan) {
         <span>${t('budget.loanRemainingOf', { total: formatAmount(loan.total_amount) })}</span>
       </div>
       <div class="budget-loan-card__progress" aria-label="${paidPct}%">
-        <span style="width:${paidPct}%"></span>
+        <span style="--bar-scale:${paidPct / 100}"></span>
       </div>
       <div class="budget-loan-card__footer">
         <span>${t('budget.loanNextDue', { month: nextDue })}</span>
@@ -871,6 +881,35 @@ function formatEntryDate(dateStr) {
 // --------------------------------------------------------
 // Modal
 // --------------------------------------------------------
+
+function openCategoryManager() {
+  let manager = null;
+  const onChanged = async () => {
+    await loadBudgetMeta();
+    renderBody();
+  };
+  openSharedModal({
+    title: t('budget.manageCategories'),
+    content: '<oikos-category-manager></oikos-category-manager>',
+    size: 'lg',
+    onSave: (panel) => {
+      manager = panel.querySelector('oikos-category-manager');
+      manager.addEventListener('category-manager-changed', onChanged);
+      manager.configure({
+        basePath: '/budget/categories',
+        groups: [
+          { key: 'expense', labelKey: 'budget.expenses', addLabelKey: 'budget.addCategory', subcategories: true },
+          { key: 'income',  labelKey: 'budget.income',   addLabelKey: 'budget.addCategory' },
+        ],
+        supportsSubcategories: true,
+        labelResolver: (item) => item.label ?? budgetCategoryLabel(item.key, item.name, t),
+        titleKey: 'budget.manageCategories',
+        hintKey: 'category.manageHint',
+      });
+    },
+    onClose: () => manager?.removeEventListener('category-manager-changed', onChanged),
+  });
+}
 
 function openBudgetModal({ mode, entry = null, initialType = '' }) {
   const isEdit = mode === 'edit';

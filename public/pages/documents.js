@@ -67,40 +67,53 @@ export async function render(container) {
     <div class="documents-page">
       <div class="page-toolbar documents-toolbar">
         <h1 class="page-toolbar__title">${t('documents.title')}</h1>
-        <div class="documents-toolbar__search">
-          <i data-lucide="search" class="documents-toolbar__search-icon" aria-hidden="true"></i>
-          <input class="documents-toolbar__search-input" id="documents-search" type="search" placeholder="${t('documents.searchPlaceholder')}" autocomplete="off">
-        </div>
-        <div class="documents-view-toggle" role="group" aria-label="${t('documents.viewToggle')}">
-          <button class="documents-view-toggle__btn ${state.view === 'grid' ? 'documents-view-toggle__btn--active' : ''}" data-view="grid" aria-label="${t('documents.gridView')}">
-            <i data-lucide="layout-grid" aria-hidden="true"></i>
-          </button>
-          <button class="documents-view-toggle__btn ${state.view === 'list' ? 'documents-view-toggle__btn--active' : ''}" data-view="list" aria-label="${t('documents.listView')}">
-            <i data-lucide="list" aria-hidden="true"></i>
-          </button>
-        </div>
-        <button class="btn btn--primary" id="documents-add-btn">
-          <i data-lucide="upload" class="icon-md" aria-hidden="true"></i>
-          ${t('documents.addButton')}
-        </button>
-        <button class="btn btn--secondary" id="documents-folder-btn">
-          <i data-lucide="folder-plus" class="icon-md" aria-hidden="true"></i>
-          ${t('documents.addFolderButton')}
-        </button>
-      </div>
-      <div class="documents-filters">
-        <select class="input documents-filter-select" id="documents-status">
-          <option value="active">${t('documents.statusActive')}</option>
-          <option value="archived">${t('documents.statusArchived')}</option>
-        </select>
-        <select class="input documents-filter-select" id="documents-category">
-          <option value="">${t('documents.allCategories')}</option>
-          ${CATEGORIES.map((category) => `<option value="${category}">${categoryLabels()[category]}</option>`).join('')}
-        </select>
-        <select class="input documents-filter-select" id="documents-folder">
-          <option value="">${t('documents.allFolders')}</option>
-          <option value="__none">${t('documents.noFolder')}</option>
-        </select>
+        <label class="documents-toolbar__search" for="documents-search">
+          <span class="documents-toolbar__search-label sr-only">${t('documents.searchPlaceholder')}</span>
+          <span class="documents-toolbar__search-control">
+            <i data-lucide="search" class="documents-toolbar__search-icon" aria-hidden="true"></i>
+            <input class="documents-toolbar__search-input" id="documents-search" type="search" placeholder="${t('documents.searchPlaceholder')}" autocomplete="off">
+          </span>
+        </label>
+        <details class="documents-secondary-controls">
+          <summary class="btn btn--secondary btn--icon documents-secondary-controls__trigger" aria-label="${t('nav.more')}">
+            <i data-lucide="sliders-horizontal" class="icon-md" aria-hidden="true"></i>
+          </summary>
+          <div class="documents-secondary-controls__panel">
+            <div class="documents-view-toggle" role="group" aria-label="${t('documents.viewToggle')}">
+              <button class="documents-view-toggle__btn ${state.view === 'grid' ? 'documents-view-toggle__btn--active' : ''}" data-view="grid" aria-label="${t('documents.gridView')}">
+                <i data-lucide="layout-grid" aria-hidden="true"></i>
+              </button>
+              <button class="documents-view-toggle__btn ${state.view === 'list' ? 'documents-view-toggle__btn--active' : ''}" data-view="list" aria-label="${t('documents.listView')}">
+                <i data-lucide="list" aria-hidden="true"></i>
+              </button>
+            </div>
+            <button class="btn btn--secondary" id="documents-folder-btn">
+              <i data-lucide="folder-plus" class="icon-md" aria-hidden="true"></i>
+              ${t('documents.addFolderButton')}
+            </button>
+            <label class="documents-filter-field" for="documents-status">
+              <span>${t('documents.statusLabel')}</span>
+              <select class="input documents-filter-select" id="documents-status">
+                <option value="active">${t('documents.statusActive')}</option>
+                <option value="archived">${t('documents.statusArchived')}</option>
+              </select>
+            </label>
+            <label class="documents-filter-field" for="documents-category">
+              <span>${t('documents.categoryLabel')}</span>
+              <select class="input documents-filter-select" id="documents-category">
+                <option value="">${t('documents.allCategories')}</option>
+                ${CATEGORIES.map((category) => `<option value="${category}">${categoryLabels()[category]}</option>`).join('')}
+              </select>
+            </label>
+            <label class="documents-filter-field" for="documents-folder">
+              <span>${t('documents.folderBrowserTitle')}</span>
+              <select class="input documents-filter-select" id="documents-folder">
+                <option value="">${t('documents.allFolders')}</option>
+                <option value="__none">${t('documents.noFolder')}</option>
+              </select>
+            </label>
+          </div>
+        </details>
       </div>
       <div class="documents-browser-layout">
         <aside class="documents-folder-browser" aria-label="${t('documents.folderBrowserTitle')}">
@@ -204,7 +217,6 @@ function syncFolderDocuments() {
 }
 
 function bindPageEvents() {
-  _container.querySelector('#documents-add-btn')?.addEventListener('click', () => openDocumentModal());
   _container.querySelector('#documents-folder-btn')?.addEventListener('click', () => openFolderModal());
   _container.querySelector('#fab-new-document')?.addEventListener('click', () => openDocumentModal());
   let documentsSearchTimer;

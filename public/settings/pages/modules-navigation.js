@@ -3,8 +3,13 @@ import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import {
   KITCHEN_CHILD_IDS,
+  NAV_SECTION,
   expandModuleOrder,
+  moduleSection,
   normalizeModuleOrder,
+  normalizeMobileNavOrder,
+  resolveMobileNavOrder,
+  sortNavigationItems,
 } from '/settings/module-order.js';
 
 // Eingebaute Module in kanonischer Domänen-Reihenfolge. Dashboard und Settings
@@ -35,6 +40,16 @@ const KITCHEN_CHILD_ICONS = Object.freeze({
 });
 
 const DEFAULT_MODULE_ACCENT = 'var(--color-accent)';
+const NAV_SECTION_LABEL_KEYS = Object.freeze({
+  [NAV_SECTION.overview]: 'nav.sectionOverview',
+  [NAV_SECTION.plan]: 'nav.sectionPlan',
+  [NAV_SECTION.home]: 'nav.sectionHome',
+});
+const NAV_SECTIONS = Object.freeze([
+  NAV_SECTION.overview,
+  NAV_SECTION.plan,
+  NAV_SECTION.home,
+]);
 
 function thirdPartyStatusLabel(module) {
   if (module.status === 'error') return t('settings.thirdPartyModulesStatusError');
@@ -62,6 +77,7 @@ function buildRows(preferences, thirdPartyModules) {
       type: 'built-in',
       id: module.id,
       orderId: module.id,
+      section: moduleSection(module.id),
       label: t(module.labelKey),
       icon: module.icon,
       enabled: module.locked || !disabled.has(module.id),
@@ -75,6 +91,7 @@ function buildRows(preferences, thirdPartyModules) {
     type: 'kitchen',
     id: 'kitchen',
     orderId: 'kitchen',
+    section: NAV_SECTION.home,
     label: t('nav.kitchen'),
     icon: 'utensils',
     children: kitchenChildren,
@@ -90,6 +107,7 @@ function buildRows(preferences, thirdPartyModules) {
       type: 'third-party',
       id: module.id,
       orderId: `third-party-${module.id}`,
+      section: NAV_SECTION.home,
       label: module.menu?.label || module.name || module.id,
       icon: module.menu?.icon || module.icon || 'box',
       enabled: module.enabled && module.status === 'enabled',
@@ -117,31 +135,23 @@ function buildRows(preferences, thirdPartyModules) {
   if (!kitchenInserted) ordered.push(kitchenRow);
   ordered.push(...thirdPartyRows);
 
-  // Stabil nach normalisierter Modul-Reihenfolge sortieren. Locked-Rows bleiben
-  // an ihrer Definitionsposition (sie tauchen nicht in module_order auf).
+  // Die gespeicherte Reihenfolge gilt nur innerhalb der drei Navigationsgruppen.
+  // Dashboard und Settings bleiben an ihren festen Positionen.
   const normalizedOrder = normalizeModuleOrder(preferences.module_order || []);
-  const orderIndex = new Map(normalizedOrder.map((id, index) => [id, index]));
-  return ordered
-    .map((row, index) => ({ row, index }))
-    .sort((a, b) => {
-      const ai = orderIndex.has(a.row.orderId) ? orderIndex.get(a.row.orderId) : Number.MAX_SAFE_INTEGER;
-      const bi = orderIndex.has(b.row.orderId) ? orderIndex.get(b.row.orderId) : Number.MAX_SAFE_INTEGER;
-      if (ai !== bi) return ai - bi;
-      return a.index - b.index;
-    })
-    .map(({ row }) => row);
+  return sortNavigationItems(ordered, normalizedOrder);
 }
 
 function rowControlsHtml(row) {
+  if (!row.sortable) return '';
   return `
-    <button type="button" class="settings-module-drag" aria-label="${esc(t('settings.modulesDragHandle'))}" title="${esc(t('settings.modulesDragHandle'))}"${row.sortable ? '' : ' disabled'}>
+    <button type="button" class="settings-module-drag" aria-label="${esc(t('settings.modulesDragHandle'))}" title="${esc(t('settings.modulesDragHandle'))}">
       <i data-lucide="grip-vertical" aria-hidden="true"></i>
     </button>
     <div class="settings-module-move-buttons">
-      <button type="button" class="settings-module-move" data-module-move="up" aria-label="${esc(t('settings.modulesMoveUp'))}" title="${esc(t('settings.modulesMoveUp'))}"${row.sortable ? '' : ' disabled'}>
+      <button type="button" class="settings-module-move" data-module-move="up" aria-label="${esc(t('settings.modulesMoveUp'))}" title="${esc(t('settings.modulesMoveUp'))}">
         <i data-lucide="chevron-up" aria-hidden="true"></i>
       </button>
-      <button type="button" class="settings-module-move" data-module-move="down" aria-label="${esc(t('settings.modulesMoveDown'))}" title="${esc(t('settings.modulesMoveDown'))}"${row.sortable ? '' : ' disabled'}>
+      <button type="button" class="settings-module-move" data-module-move="down" aria-label="${esc(t('settings.modulesMoveDown'))}" title="${esc(t('settings.modulesMoveDown'))}">
         <i data-lucide="chevron-down" aria-hidden="true"></i>
       </button>
     </div>
@@ -152,7 +162,7 @@ function builtInRowHtml(row) {
   const statusLabel = row.enabled ? t('settings.thirdPartyModulesStatusEnabled') : t('settings.thirdPartyModulesStatusDisabled');
   const statusClass = row.enabled ? 'settings-module-status--enabled' : 'settings-module-status--disabled';
   return `
-    <div class="settings-module-row settings-module-row--sortable" data-module-row-id="${esc(row.orderId)}"${row.sortable ? ` draggable="true" data-module-order-id="${esc(row.orderId)}"` : ''}>
+    <div class="settings-module-row settings-module-row--sortable${row.sortable ? '' : ' settings-module-row--fixed'}" data-module-row-id="${esc(row.orderId)}"${row.sortable ? ` draggable="true" data-module-order-id="${esc(row.orderId)}"` : ''}>
       ${rowControlsHtml(row)}
       <div class="settings-module-row__icon">
         <i data-lucide="${esc(row.icon)}" aria-hidden="true"></i>
@@ -208,7 +218,7 @@ function thirdPartyRowHtml(row) {
     ? 'settings-module-status--error'
     : row.enabled ? 'settings-module-status--enabled' : 'settings-module-status--disabled';
   return `
-    <div class="settings-module-row settings-module-row--sortable" data-module-row-id="${esc(row.orderId)}"${row.sortable ? ` draggable="true" data-module-order-id="${esc(row.orderId)}"` : ''}>
+    <div class="settings-module-row settings-module-row--sortable${row.sortable ? '' : ' settings-module-row--fixed'}" data-module-row-id="${esc(row.orderId)}"${row.sortable ? ` draggable="true" data-module-order-id="${esc(row.orderId)}"` : ''}>
       ${rowControlsHtml(row)}
       <div class="settings-module-row__icon" style="--module-row-accent:${esc(row.accent) || DEFAULT_MODULE_ACCENT}">
         <i data-lucide="${esc(row.icon)}" aria-hidden="true"></i>
@@ -235,25 +245,76 @@ function rowHtml(row) {
   return builtInRowHtml(row);
 }
 
-function renderPage(container, rows) {
+function mobileCandidateRows(rows) {
+  return rows.filter((row) => (
+    row.enabled
+    && !row.locked
+    && row.sortable
+    && !row.menuHidden
+  ));
+}
+
+function mobileSlotHtml(rows, selectedIds, index) {
+  const selectedId = selectedIds[index] ?? '';
+  const selectedElsewhere = new Set(selectedIds.filter((_, slot) => slot !== index));
+  const label = t('settings.mobileNavigationSlotLabel', { position: index + 1 });
+
+  return `
+    <label class="settings-mobile-nav-slot">
+      <span class="settings-mobile-nav-slot__label">${esc(label)}</span>
+      <select class="form-input" data-mobile-nav-slot aria-label="${esc(label)}"${selectedId ? '' : ' disabled'}>
+        ${selectedId ? '' : `<option value="" selected>${esc(t('settings.mobileNavigationEmptyOption'))}</option>`}
+        ${rows.map((row) => `
+          <option value="${esc(row.orderId)}"${row.orderId === selectedId ? ' selected' : ''}${selectedElsewhere.has(row.orderId) ? ' disabled' : ''}>
+            ${esc(row.label)}
+          </option>
+        `).join('')}
+      </select>
+    </label>
+  `;
+}
+
+function desktopGroupHtml(section, rows) {
+  const sectionRows = rows.filter((row) => row.section === section);
+  if (!sectionRows.length) return '';
+
+  return `
+    <section class="settings-navigation-group" data-module-section="${section}">
+      <h3 class="settings-navigation-group__title">${esc(t(NAV_SECTION_LABEL_KEYS[section]))}</h3>
+      <div class="settings-modules-list settings-modules-list--sortable" data-module-list>
+        ${sectionRows.map(rowHtml).join('')}
+      </div>
+    </section>
+  `;
+}
+
+function renderPage(container, rows, mobileOrder) {
   container.replaceChildren();
-  const list = rows.length
-    ? `<div class="settings-modules-list settings-modules-list--sortable" id="module-toggles">${rows.map(rowHtml).join('')}</div>`
+  const desktopGroups = rows.length
+    ? `<div class="settings-navigation-groups" id="module-toggles">${NAV_SECTIONS.map((section) => desktopGroupHtml(section, rows)).join('')}</div>`
     : `
       <div class="empty-state empty-state--compact">
         <div class="empty-state__title">${t('settings.thirdPartyModulesEmptyTitle')}</div>
         <div class="empty-state__description">${t('settings.thirdPartyModulesEmptyHint')}</div>
       </div>
     `;
+  const mobileRows = mobileCandidateRows(rows);
 
   container.insertAdjacentHTML('beforeend', `
     <section class="settings-section">
-      <div class="settings-card">
-        <h3 class="settings-card__title">${t('settings.modulesTitle')}</h3>
-        <p class="form-hint">${t('settings.modulesHint')}</p>
+      <section class="settings-navigation-panel">
+        <h2 class="settings-navigation-panel__title">${t('settings.mobileNavigationTitle')}</h2>
+        <p class="form-hint">${t('settings.mobileNavigationHint')}</p>
+        <div class="settings-mobile-nav-slots">
+          ${[0, 1, 2].map((index) => mobileSlotHtml(mobileRows, mobileOrder, index)).join('')}
+        </div>
+      </section>
+      <section class="settings-navigation-panel">
+        <h2 class="settings-navigation-panel__title">${t('settings.desktopNavigationTitle')}</h2>
+        <p class="form-hint">${t('settings.desktopNavigationHint')}</p>
         <p class="form-hint">${t('settings.modulesDragHint')}</p>
-        ${list}
-      </div>
+        ${desktopGroups}
+      </section>
     </section>
   `);
   window.lucide?.createIcons({ el: container });
@@ -293,6 +354,12 @@ export function buildNavigationPayload(ordinaryDisabledIds, enabledKitchenChildr
       ...KITCHEN_CHILD_IDS.filter((id) => !enabledKitchenChildren.has(id)),
     ],
     module_order: expandModuleOrder(visibleGlobalOrder),
+  };
+}
+
+export function buildMobileNavigationPayload(order) {
+  return {
+    mobile_nav_order: normalizeMobileNavOrder(order),
   };
 }
 
@@ -378,12 +445,15 @@ function bindModuleListEvents(container, user) {
 
   list.addEventListener('dragover', (event) => {
     if (!dragged) return;
-    event.preventDefault();
     const row = event.target.closest('[data-module-order-id]');
     if (!row || row === dragged) return;
+    const draggedGroup = dragged.closest('[data-module-section]');
+    const targetGroup = row.closest('[data-module-section]');
+    if (!draggedGroup || draggedGroup !== targetGroup) return;
+    event.preventDefault();
     const rect = row.getBoundingClientRect();
     const before = event.clientY < rect.top + rect.height / 2;
-    list.insertBefore(dragged, before ? row : row.nextSibling);
+    row.parentElement.insertBefore(dragged, before ? row : row.nextSibling);
   });
 
   list.addEventListener('drop', (event) => {
@@ -400,10 +470,10 @@ function bindModuleListEvents(container, user) {
     const previousOrder = collectVisibleGlobalOrder(list).join('|');
     if (btn.dataset.moduleMove === 'up') {
       const prev = row.previousElementSibling;
-      if (prev?.matches('[data-module-order-id]')) list.insertBefore(row, prev);
+      if (prev?.matches('[data-module-order-id]')) row.parentElement.insertBefore(row, prev);
     } else {
       const next = row.nextElementSibling;
-      if (next?.matches('[data-module-order-id]')) list.insertBefore(next, row);
+      if (next?.matches('[data-module-order-id]')) row.parentElement.insertBefore(next, row);
     }
     await saveIfChanged(previousOrder);
   });
@@ -434,6 +504,29 @@ function bindModuleListEvents(container, user) {
   });
 }
 
+function bindMobileNavigationEvents(container, user) {
+  const selects = [...container.querySelectorAll('[data-mobile-nav-slot]')];
+  if (!selects.length) return;
+
+  selects.forEach((changedSelect) => {
+    changedSelect.addEventListener('change', async () => {
+      const payload = buildMobileNavigationPayload(selects.map((select) => select.value));
+      selects.forEach((select) => { select.disabled = true; });
+
+      try {
+        const response = await api.put('/preferences', payload);
+        const savedOrder = response?.data?.mobile_nav_order ?? payload.mobile_nav_order;
+        window.oikos?.setMobileNavOrder?.(savedOrder);
+        window.oikos?.showToast(t('settings.mobileNavigationSaved'), 'success');
+        await render(container, { user });
+      } catch (error) {
+        selects.forEach((select) => { select.disabled = false; });
+        window.oikos?.showToast(error.message ?? t('common.errorGeneric'), 'danger');
+      }
+    });
+  });
+}
+
 export async function render(container, { user }) {
   const isAdmin = user?.role === 'admin';
   const [preferencesResult, modulesResult] = await Promise.allSettled([
@@ -445,7 +538,10 @@ export async function render(container, { user }) {
   const thirdPartyModules = modulesResult.status === 'fulfilled' ? (modulesResult.value?.data ?? []) : [];
 
   const rows = buildRows(preferences, thirdPartyModules);
-  renderPage(container, rows);
+  const availableMobileIds = mobileCandidateRows(rows).map((row) => row.orderId);
+  const mobileOrder = resolveMobileNavOrder(preferences.mobile_nav_order, availableMobileIds);
+  renderPage(container, rows, mobileOrder);
   bindKitchenDisclosure(container);
   bindModuleListEvents(container, user);
+  bindMobileNavigationEvents(container, user);
 }

@@ -43,6 +43,16 @@ export const SETTINGS_LEAVES = freezeEntries([
     loader: () => import('/settings/pages/personal-device.js'),
   },
   {
+    id: 'personal-notifications',
+    domainId: 'personal',
+    path: '/settings/personal/notifications',
+    labelKey: 'settings.pageNotifications',
+    descriptionKey: 'settings.pageNotificationsDescription',
+    icon: 'bell',
+    adminOnly: false,
+    loader: () => import('/settings/pages/notifications.js'),
+  },
+  {
     id: 'modules-navigation',
     domainId: 'modules',
     path: '/settings/modules/navigation',
@@ -181,6 +191,16 @@ export const SETTINGS_LEAVES = freezeEntries([
     icon: 'database-backup',
     adminOnly: true,
     loader: () => import('/settings/pages/admin-backup.js'),
+  },
+  {
+    id: 'admin-email',
+    domainId: 'admin',
+    path: '/settings/admin/email',
+    labelKey: 'settings.pageEmail',
+    descriptionKey: 'settings.pageEmailDescription',
+    icon: 'mail',
+    adminOnly: true,
+    loader: () => import('/settings/pages/admin-email.js'),
   },
   {
     id: 'admin-system',

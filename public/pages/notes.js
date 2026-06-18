@@ -9,6 +9,7 @@ import { openModal as openSharedModal, closeModal, btnError } from '/components/
 import { stagger, vibrate } from '/utils/ux.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { getReadableTextColor } from '/utils/color.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 
 // --------------------------------------------------------
@@ -64,12 +65,15 @@ export async function render(container, { user }) {
     <div class="notes-page">
       <div class="page-toolbar notes-toolbar">
         <h1 class="page-toolbar__title">${t('notes.title')}</h1>
-        <div class="notes-toolbar__search">
-          <i data-lucide="search" class="notes-toolbar__search-icon" aria-hidden="true"></i>
-          <input type="search" id="notes-search" class="notes-toolbar__search-input"
-                 placeholder="${t('notes.searchPlaceholder')}" autocomplete="off"
-                 value="${esc(state.filterQuery)}">
-        </div>
+        <label class="notes-toolbar__search" for="notes-search">
+          <span class="notes-toolbar__search-label">${t('notes.searchPlaceholder')}</span>
+          <span class="notes-toolbar__search-control">
+            <i data-lucide="search" class="notes-toolbar__search-icon" aria-hidden="true"></i>
+            <input type="search" id="notes-search" class="notes-toolbar__search-input"
+                   placeholder="${t('notes.searchPlaceholder')}" autocomplete="off"
+                   value="${esc(state.filterQuery)}">
+          </span>
+        </label>
         <button class="btn btn--primary toolbar-new-btn" id="notes-add-btn">
           <i data-lucide="plus" style="width:16px;height:16px;margin-right:4px;" aria-hidden="true"></i>
           ${t('notes.addNoteLabel')}
@@ -89,8 +93,7 @@ export async function render(container, { user }) {
     state.notes = res.data;
   } catch (err) {
     console.error('[Notes] Laden fehlgeschlagen:', err);
-    state.notes = [];
-    window.oikos?.showToast(t('notes.loadError'), 'danger');
+    throw err;
   }
   const grid = container.querySelector('#notes-grid');
   grid.addEventListener('click', async (e) => {
@@ -175,7 +178,9 @@ function renderNoteCard(note) {
     ? note.creator_name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
     : '?';
 
-  const textColor = isLightColor(note.color) ? 'rgba(0,0,0,0.8)' : '#ffffff';
+  const textColor = getReadableTextColor(note.color);
+  const avatarColor = note.creator_color || '#8E8E93';
+  const avatarTextColor = getReadableTextColor(avatarColor);
 
   return `
     <div class="note-card ${note.pinned ? 'note-card--pinned' : ''}"
@@ -190,7 +195,7 @@ function renderNoteCard(note) {
       <div class="note-card__footer">
         <div class="note-card__creator">
           <span class="note-card__avatar"
-                style="background-color:${esc(note.creator_color || '#8E8E93')}">
+                style="background-color:${esc(avatarColor)};color:${avatarTextColor}">
             ${note.creator_avatar
               ? `<img src="${esc(note.creator_avatar)}" alt="${esc(note.creator_name || '')}" loading="lazy">`
               : initials}
@@ -557,16 +562,4 @@ async function deleteNote(id) {
       window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     }
   }, 5000);
-}
-
-// --------------------------------------------------------
-// Hilfsfunktionen
-// --------------------------------------------------------
-
-function isLightColor(hex) {
-  if (!hex) return true;
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return (r * 299 + g * 587 + b * 114) / 1000 > 150;
 }

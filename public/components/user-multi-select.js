@@ -6,6 +6,7 @@
 
 import { esc } from '/utils/html.js';
 import { t } from '/i18n.js';
+import { getReadableTextColor } from '/utils/color.js';
 
 /**
  * Rendert einen Avatar-Stack für mehrere zugewiesene Benutzer.
@@ -31,7 +32,7 @@ export function renderAvatarStack(users, { size = 28, maxVisible = 3 } = {}) {
       ? `<img src="${esc(u.avatar_data)}" alt="${esc(u.display_name ?? '')}" loading="lazy">`
       : esc(initials);
     return `<span class="avatar-stack__item"
-      style="width:${size}px;height:${size}px;font-size:${fs}px;background-color:${esc(u.color ?? '#8E8E93')}"
+      style="width:${size}px;height:${size}px;font-size:${fs}px;background-color:${esc(u.color ?? '#8E8E93')};color:${getReadableTextColor(u.color ?? '#8E8E93')}"
       title="${esc(u.display_name ?? '')}">
       ${inner}
     </span>`;
@@ -69,7 +70,7 @@ export function renderUserMultiSelect(allUsers, selectedIds, inputName, labelKey
       <label class="user-ms__option">
         <input type="checkbox" class="user-ms__checkbox" value="${u.id}" ${checked}
                data-ms-input="${esc(inputName)}">
-        <span class="user-ms__avatar" style="background-color:${esc(u.avatar_color ?? '#8E8E93')}">
+        <span class="user-ms__avatar" style="background-color:${esc(u.avatar_color ?? '#8E8E93')};color:${getReadableTextColor(u.avatar_color ?? '#8E8E93')}">
           ${inner}
         </span>
         <span class="user-ms__name">${esc(u.display_name)}</span>

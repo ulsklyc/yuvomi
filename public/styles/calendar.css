@@ -26,6 +26,26 @@
 @media (min-width: 1024px) {
   .calendar-page {
     height: 100dvh;
+    padding: var(--space-6) var(--space-8);
+  }
+
+  .week-view__day-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+  }
+
+  .week-view__day-num {
+    width: var(--target-sm);
+    height: var(--target-sm);
+    margin: 0;
+  }
+}
+
+@media (min-width: 1440px) {
+  .calendar-page {
+    padding-inline: var(--space-10);
   }
 }
 
@@ -49,11 +69,18 @@
   font-size: var(--text-base);
   font-weight: var(--font-weight-semibold);
   flex: 1;
+  min-width: 0;
   text-align: center;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cal-toolbar__today {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--target-lg);
   font-size: var(--text-sm);
   color: var(--color-accent);
   font-weight: var(--font-weight-medium);
@@ -74,7 +101,7 @@
 }
 
 .cal-toolbar__view-btn {
-  font-size: var(--text-xs);
+  font-size: var(--type-secondary);
   font-weight: var(--font-weight-medium);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-xs);
@@ -91,38 +118,20 @@
   color: var(--color-text-primary);
 }
 
+/* Vereinheitlichter Active-State für segmentierte Umschalter: Modul-Akzent
+ * gefüllt (wie .budget-tab--active), trägt die Modul-Identität. --color-ink-on-vivid
+ * kippt im Dark Mode auf dunkle Tinte, passend zum dort hellen Modul-Akzent. */
 .cal-toolbar__view-btn--active {
-  background-color: var(--color-surface);
-  color: var(--color-text-primary);
-  box-shadow: var(--glass-shadow-sm);
+  background-color: var(--module-accent, var(--color-accent));
+  color: var(--color-ink-on-vivid);
 }
 
-/* ── Mobile: kompakte Toolbar mit scrollbaren Ansichten ── */
+/* Mobiles Umbrechen kommt jetzt aus .page-toolbar--wrap (layout.css): die
+ * Datums-Navigation (.cal-toolbar__month = Center-Slot) rutscht als Gruppe auf
+ * Zeile 2, Titel + Ansichts-Umschalter bleiben auf Zeile 1. Die Ansichts-Buttons
+ * dürfen bei Enge horizontal scrollen. */
 @media (max-width: 767px) {
-  .cal-toolbar {
-    flex-wrap: wrap;
-    row-gap: var(--space-2);
-    padding-bottom: var(--space-2);
-  }
-
-  .cal-toolbar__label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .cal-toolbar > .cal-toolbar__nav:last-child {
-    order: 4;
-  }
-
-  #cal-add {
-    display: none;
-  }
-
   .cal-toolbar__views {
-    order: 10;
-    flex-basis: 100%;
-    justify-content: flex-start;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
@@ -308,7 +317,7 @@
 }
 
 .week-view__day-header:hover .week-view__day-num:not(.week-view__day-num--today) {
-  background-color: var(--color-bg-subtle);
+  background-color: var(--color-surface-hover);
   border-radius: var(--radius-full);
 }
 
@@ -563,9 +572,6 @@
   flex-shrink: 0;
 }
 
-.day-view__date-label {
-}
-
 .day-view__scroll {
   flex: 1;
   overflow-y: auto;
@@ -634,7 +640,7 @@
 .agenda-event {
   display: flex;
   align-items: stretch;
-  gap: var(--space-3);
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   border: var(--space-px) solid var(--color-border-subtle);
@@ -650,11 +656,14 @@
   border-color: var(--color-border);
 }
 
+/* Kalenderfarbe als Dot statt vollhohem Seitenstreifen — konsistent mit den
+ * Status-Dots der Aufgabenliste und dem Dashboard-Kalenderwidget. */
 .agenda-event__color {
-  width: var(--space-1);
+  width: var(--space-2);
+  height: var(--space-2);
+  align-self: center;
   border-radius: var(--radius-full);
   flex-shrink: 0;
-  opacity: 0.9;
 }
 
 .agenda-event__body {
@@ -1163,7 +1172,7 @@
   padding: 1px var(--space-1);
   border-radius: var(--radius-xs);
   margin-bottom: 2px;
-  color: #fff;
+  color: var(--holi-ink, var(--color-text-on-accent));
   background: color-mix(in srgb, var(--holi-color) 90%, transparent);
   white-space: nowrap;
   overflow: hidden;
@@ -1188,7 +1197,7 @@
   font-weight: var(--font-weight-medium);
   padding: var(--space-px) var(--space-1);
   border-radius: var(--radius-xs);
-  color: #fff;
+  color: var(--holi-ink, var(--color-text-on-accent));
   background: color-mix(in srgb, var(--holi-color) 88%, transparent);
   white-space: nowrap;
   overflow: hidden;
@@ -1256,7 +1265,7 @@
   font-size: var(--text-xs);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
   white-space: nowrap;
 }
 
@@ -1278,7 +1287,7 @@
   background: var(--layer-color);
   flex-shrink: 0;
   opacity: 0.5;
-  transition: opacity 0.15s;
+  transition: opacity var(--transition-fast);
 }
 
 .cal-toolbar__layer-btn--active .cal-toolbar__layer-dot {

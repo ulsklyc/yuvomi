@@ -18,15 +18,23 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 const CATEGORIES = ['Arzt', 'Schule/Kita', 'Behörde', 'Versicherung',
                     'Handwerker', 'Notfall', 'Sonstiges'];
 
+// Kategorie → Lucide-Iconname (Linien-Stil, konsistent mit übrigen UI-Icons)
 const CATEGORY_ICONS = {
-  'Arzt':         '🏥',
-  'Schule/Kita':  '🏫',
-  'Behörde':      '🏛️',
-  'Versicherung': '🛡️',
-  'Handwerker':   '🔧',
-  'Notfall':      '🚨',
-  'Sonstiges':    '📋',
+  'Arzt':         'stethoscope',
+  'Schule/Kita':  'graduation-cap',
+  'Behörde':      'landmark',
+  'Versicherung': 'shield',
+  'Handwerker':   'wrench',
+  'Notfall':      'siren',
+  'Sonstiges':    'tag',
 };
+
+// Liefert das Lucide-Placeholder-Markup für eine Kategorie; aria-hidden, da stets
+// von einem Text-Label begleitet. lucide.createIcons() ersetzt den Platzhalter.
+function categoryIcon(cat, size = 16) {
+  const name = CATEGORY_ICONS[cat] || 'tag';
+  return `<i data-lucide="${name}" class="contact-cat-icon" style="width:${size}px;height:${size}px;" aria-hidden="true"></i>`;
+}
 
 function CATEGORY_LABELS() {
   return {
@@ -60,28 +68,33 @@ export async function render(container, { user }) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="contacts-page">
-      <h1 class="sr-only">${t('contacts.title')}</h1>
-      <div class="contacts-toolbar">
-        <div class="contacts-toolbar__search">
-          <i data-lucide="search" class="contacts-toolbar__search-icon" aria-hidden="true"></i>
-          <input type="search" class="contacts-toolbar__search-input"
-                 id="contacts-search" placeholder="${t('contacts.searchPlaceholder')}"
-                 autocomplete="off">
-        </div>
-        <label class="btn btn--secondary" title="${t('contacts.importTooltip')}" aria-label="${t('contacts.importLabel')}">
-          <i data-lucide="upload" style="width:16px;height:16px;margin-right:4px;" aria-hidden="true"></i>
-          ${t('contacts.importButton')}
-          <input type="file" id="contacts-import-input" accept=".vcf,text/vcard" style="display:none">
+      <div class="page-toolbar page-toolbar--wrap contacts-toolbar">
+        <h1 class="page-toolbar__title">${t('contacts.title')}</h1>
+        <label class="contacts-toolbar__search page-toolbar__center" for="contacts-search">
+          <span class="contacts-toolbar__search-label sr-only">${t('contacts.searchPlaceholder')}</span>
+          <span class="contacts-toolbar__search-control">
+            <i data-lucide="search" class="contacts-toolbar__search-icon" aria-hidden="true"></i>
+            <input type="search" class="contacts-toolbar__search-input"
+                   id="contacts-search" placeholder="${t('contacts.searchPlaceholder')}"
+                   autocomplete="off">
+          </span>
         </label>
-        <button class="btn btn--primary toolbar-new-btn" id="contacts-add-btn">
-          <i data-lucide="plus" style="width:16px;height:16px;margin-right:4px;" aria-hidden="true"></i>
-          ${t('contacts.addButton')}
-        </button>
+        <div class="page-toolbar__actions">
+          <label class="btn btn--secondary" title="${t('contacts.importTooltip')}" aria-label="${t('contacts.importLabel')}">
+            <i data-lucide="upload" style="width:16px;height:16px;margin-right:4px;" aria-hidden="true"></i>
+            ${t('contacts.importButton')}
+            <input type="file" id="contacts-import-input" accept=".vcf,text/vcard" style="display:none">
+          </label>
+          <button class="btn btn--primary toolbar-new-btn" id="contacts-add-btn">
+            <i data-lucide="plus" style="width:16px;height:16px;margin-right:4px;" aria-hidden="true"></i>
+            ${t('contacts.addButton')}
+          </button>
+        </div>
       </div>
       <div class="contacts-filters" id="contacts-filters">
         <button class="contact-filter-chip contact-filter-chip--active" data-cat="">${t('contacts.filterAll')}</button>
         ${CATEGORIES.map((c) => `
-          <button class="contact-filter-chip" data-cat="${esc(c)}">${CATEGORY_ICONS[c] || ''} ${CATEGORY_LABELS()[c] || esc(c)}</button>
+          <button class="contact-filter-chip" data-cat="${esc(c)}">${categoryIcon(c)} ${CATEGORY_LABELS()[c] || esc(c)}</button>
         `).join('')}
       </div>
       <div id="contacts-list" class="contacts-list" aria-busy="true">${renderSkeletonList({ rows: 6, lines: 2 })}</div>
@@ -217,7 +230,7 @@ function renderList() {
     .sort(([a], [b]) => CATEGORIES.indexOf(a) - CATEGORIES.indexOf(b))
     .map(([cat, items]) => `
       <div class="contact-group">
-        <div class="contact-group__header">${CATEGORY_ICONS[cat] || ''} ${CATEGORY_LABELS()[cat] || esc(cat)}</div>
+        <div class="contact-group__header">${categoryIcon(cat)} ${CATEGORY_LABELS()[cat] || esc(cat)}</div>
         ${items.map((c) => renderContactItem(c)).join('')}
       </div>
     `).join(''));
@@ -242,7 +255,8 @@ function renderList() {
 
 function renderContactItem(c) {
   const phone   = c.phone  ? `<a href="tel:${esc(c.phone)}"   class="contact-action-btn contact-action-btn--call"  aria-label="${t('contacts.callLabel')}"><i data-lucide="phone" style="width:16px;height:16px;" aria-hidden="true"></i></a>` : '';
-  const email   = c.email  ? `<a href="mailto:${esc(c.email)}" class="contact-action-btn contact-action-btn--mail"  aria-label="${t('contacts.emailActionLabel')}"><i data-lucide="mail" style="width:16px;height:16px;" aria-hidden="true"></i></a>` : '';
+  const email   = c.email  ? `<a href="mailto:${esc(c.email)}" class="contact-action-btn contact-action-btn--mail contact-action-btn--desktop-extra" aria-label="${t('contacts.emailActionLabel')}"><i data-lucide="mail" style="width:16px;height:16px;" aria-hidden="true"></i></a>` : '';
+  const mobileEmail = c.email ? `<a href="mailto:${esc(c.email)}" class="contact-action-btn contact-action-btn--mail contact-action-btn--mobile-menu" aria-label="${t('contacts.emailActionLabel')}"><i data-lucide="mail" style="width:16px;height:16px;" aria-hidden="true"></i></a>` : '';
   const maps    = c.address ? `<a href="https://maps.google.com/?q=${encodeURIComponent(c.address)}" target="_blank" rel="noopener" class="contact-action-btn contact-action-btn--maps contact-action-btn--desktop-extra" aria-label="${t('contacts.mapsLabel')}"><i data-lucide="map-pin" style="width:16px;height:16px;" aria-hidden="true"></i></a>` : '';
   const mobileMaps = c.address ? `<a href="https://maps.google.com/?q=${encodeURIComponent(c.address)}" target="_blank" rel="noopener" class="contact-action-btn contact-action-btn--maps contact-action-btn--mobile-menu" aria-label="${t('contacts.mapsLabel')}"><i data-lucide="map-pin" style="width:16px;height:16px;" aria-hidden="true"></i></a>` : '';
   const exportAction = `<a href="/api/v1/contacts/${c.id}/vcard" download="${esc(c.name)}.vcf"
@@ -268,7 +282,7 @@ function renderContactItem(c) {
 
   return `
     <div class="contact-item" data-id="${c.id}">
-      <div class="contact-item__icon">${CATEGORY_ICONS[c.category] || '📋'}</div>
+      <div class="contact-item__icon">${categoryIcon(c.category, 20)}</div>
       <div class="contact-item__body">
         <div class="contact-item__name">${esc(c.name)}</div>
         ${meta ? `<div class="contact-item__meta">${esc(meta)}</div>` : ''}
@@ -283,6 +297,7 @@ function renderContactItem(c) {
             <i data-lucide="more-horizontal" style="width:16px;height:16px;" aria-hidden="true"></i>
           </summary>
           <div class="contact-more-menu__panel">
+            ${mobileEmail}
             ${mobileMaps}
             ${mobileExportAction}
             ${mobileDeleteAction}

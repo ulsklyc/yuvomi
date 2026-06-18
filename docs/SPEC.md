@@ -370,7 +370,7 @@ Index: CREATE INDEX idx_carddav_addressbook_account ON carddav_addressbook_selec
 Recurring entries generate one instance per month on demand. Non-virtual series post the full amount only on due months (every `monthsPerInterval(interval)` months); **virtual** series store the smoothed monthly share on the original and post it every month, so a 1,200/year bill shows as 100/month in the summary, balance and CSV export.
 
 ### Budget Categories
-Expense and income category list, DB-backed with stable English slug keys. Predefined set (8 expense, 5 income); users can add custom categories inline from the entry modal.
+Expense and income category list, DB-backed with stable English slug keys. Predefined set (8 expense, 5 income); users can add custom categories inline from the entry modal. A "Manage categories" button in the Budget tab header opens a modal (the reusable `oikos-category-manager` component) to rename, reorder, and delete categories. Deletion is blocked while a category is still referenced by entries (`409`) or when it is the last category of its type.
 
 | Column | Type | Constraint |
 |--------|------|-----------|
@@ -381,7 +381,7 @@ Expense and income category list, DB-backed with stable English slug keys. Prede
 | created_at | TEXT | ISO 8601 |
 
 ### Budget Subcategories
-Optional subcategories scoped to an expense category. Predefined set (35 entries); users can add custom subcategories inline. Income categories have no subcategories.
+Optional subcategories scoped to an expense category. Predefined set (35 entries); users can add custom subcategories inline. Income categories have no subcategories. The "Manage categories" modal also renames, reorders, and deletes subcategories per expense category (with the same in-use and last-subcategory deletion guards).
 
 | Column | Type | Constraint |
 |--------|------|-----------|
@@ -434,7 +434,26 @@ Per-user reminders attached to tasks, calendar events, or subscriptions.
 | entity_id | INTEGER | Entity identifier, NOT NULL |
 | remind_at | TEXT | ISO 8601 datetime, NOT NULL |
 | dismissed | INTEGER | 0/1, default 0 |
+| pushed_at | TEXT | ISO 8601 datetime, nullable — set once the reminder has been delivered as a Web Push, so it is not pushed again |
 | created_by | INTEGER | FK → Users (CASCADE delete), NOT NULL |
+
+### Push Subscriptions
+
+Per-device Web Push subscriptions (one row per browser/device endpoint). Used by the push
+scheduler to deliver due reminders as system notifications even when the PWA is closed.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| user_id | INTEGER | FK → Users (CASCADE delete), NOT NULL |
+| endpoint | TEXT | Push service endpoint URL, NOT NULL, UNIQUE |
+| p256dh | TEXT | Client public key (ECDH), NOT NULL |
+| auth | TEXT | Client auth secret, NOT NULL |
+| user_agent | TEXT | Nullable — device/browser label |
+| created_at | TEXT | ISO 8601 datetime, default now |
+| last_used_at | TEXT | ISO 8601 datetime, nullable — updated on each successful push |
+
+VAPID keys are generated on first use and stored in **Sync Config** (`push_vapid_public`,
+`push_vapid_private`); they can be overridden via `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` env vars.
 
 ### Birthdays
 
@@ -792,8 +811,23 @@ Tracks which users were created as restricted guests for a split group (migratio
 | created_by | INTEGER | FK → Users (SET NULL on delete), nullable |
 | created_at | TEXT | ISO 8601 |
 
+### Password Resets (v0.71.51)
+Self-service "Forgot password" tokens (migration 55). One active token per user — issuing a new
+one replaces the prior row.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| user_id | INTEGER | FK → Users (CASCADE delete), NOT NULL |
+| token_hash | TEXT | SHA-256 hash of the raw token; the raw token is only ever in the emailed link, never stored. UNIQUE index. |
+| expires_at | INTEGER | Epoch ms; tokens are valid for 1 hour |
+| created_at | TEXT | ISO 8601 datetime, default now |
+
 ### Sync Config
-Key-value table for OAuth tokens and CalDAV credentials.
+Key-value table for OAuth tokens and CalDAV credentials. Also stores SMTP settings
+(`email_smtp_host`, `email_smtp_port`, `email_smtp_secure`, `email_smtp_user`, `email_smtp_pass`,
+`email_from_address`, `email_from_name`) for the optional email/SMTP feature (v0.71.51) — plaintext,
+like `apple_app_password` and Google OAuth tokens; encryption-at-rest is via the optional
+`DB_ENCRYPTION_KEY` (SQLCipher). The API never returns `email_smtp_pass`.
 
 | Column | Type | Constraint |
 |--------|------|-----------|
@@ -811,6 +845,8 @@ Responsive grid: 1 column on mobile, 2 on tablet, 3 on desktop.
 **Today Cockpit (v0.52.40):** a compact summary strip renders above the widget grid that highlights at a glance: the next urgent/high-priority task, the next upcoming calendar event, the open shopping item count, and the planned dinner for today. Tapping any cockpit item navigates directly to the relevant module.
 
 **Mobile readability (v0.55.7):** on narrow phones, important cockpit cards span the full grid width so long German task/event titles do not split mid-word. Quick actions keep tokenized icon-button dimensions, and the dashboard reserves scroll room for the fixed FAB so it does not cover the first widget.
+
+**Semantic interaction polish (v0.71.34):** the page exposes one primary heading, the greeting is a subordinate section heading, and FAB quick actions are native buttons without nested interactive controls. The customize control keeps a 48 px touch target on phones and a compact 40 px target on desktop.
 
 **Widgets:**
 - Greeting: "Good [morning/afternoon/evening], [Name]" + date; auto-refreshes on `visibilitychange` so the greeting stays current during long sessions
@@ -841,7 +877,7 @@ Skeleton loading instead of spinners (skeleton renders all 9 widgets at their co
 - Inline reminder presets: offset from due date/time — 15 min, 1 h, 1 d, 2 d, 1 w, 2 w, or fully custom offset
 - **Bulk actions (list view only):** select multiple tasks via checkboxes and apply batch operations (mark done, mark open, archive, delete); bulk select toggle in toolbar
 - **Start date:** tasks can have an optional start date; tasks with a future start date are hidden from the default list view to reduce cognitive load. A "Show scheduled" toggle chip in the filter bar reveals all upcoming planned tasks. Task cards display a "Starts on …" badge when a start date is set.
-- **Mobile toolbar (v0.55.8):** secondary controls collapse into a single overflow trigger on small screens; bulk actions remain hidden until at least one task is selected. Checkbox and row actions use the shared 44px target tokens.
+- **Responsive toolbar:** secondary controls collapse into a single overflow trigger through phone and tablet widths (≤ 1023px); bulk actions remain hidden until at least one task is selected. Checkbox and row actions use the shared touch-target tokens.
 - Mobile swipe: left = done, right = edit
 - Badge for overdue tasks
 
@@ -904,7 +940,7 @@ Reusable recipe cards linked to meal slots.
 
 ### Notes (`/notes`)
 
-Masonry grid with colored sticky notes.
+Responsive grid with colored sticky notes. Phones use one readable column; wider containers progressively use two columns from 520px, three from 720px, four from 900px, and five from 1200px. The title keeps its intrinsic width while search flexes into the remaining toolbar space, preventing clipping on narrow screens.
 
 - CRUD: title (optional), content, color
 - Pin → appears at top + on dashboard
@@ -932,6 +968,7 @@ Upload and manage family files with per-document access control.
 - Drag-and-drop upload in the new-document modal
 - **Folder browser:** documents can be organized into custom folders; a sidebar lists all folders plus "Alle Ordner"; a "Hausreinigung" folder is auto-created when the first housekeeping worker is added
 - **Grid / list view** toggle; view mode persisted in localStorage
+- **Responsive toolbar:** at tablet widths (768–1023px), the search field moves to a full-width second row so the page title, filters, and view controls remain readable.
 - **Category tags:** 14 predefined categories (medical, school, identity, insurance, finance, home, vehicle, legal, travel, pets, warranty, taxes, work, other)
 - **Visibility:** family (all members see it), restricted (only selected members), private (only the uploader)
 - **Archive / restore** — archived documents hidden from the main view, accessible via the Archive filter
@@ -974,6 +1011,7 @@ Unauthenticated users are redirected here. No public registration form - the fir
 - Password visibility toggle (eye/eye-off icon) to verify input before submitting
 - **SSO / OpenID Connect (v0.55.14):** When OIDC is configured (`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI`), a "Sign in with SSO" button appears below the divider. Clicking it initiates an Authorization Code flow with PKCE (S256) and a nonce; state, nonce, and code verifier are stored in the session and consumed once. On successful callback, the user is matched by `oidc_sub`. With no `sub` match, an existing local account is linked **only when the provider reports `email_verified: true` and exactly one account holds that email** (matched against `contacts.email` / `contact_emails.value`, case-insensitive); unverified or ambiguous emails never link, and a new account is provisioned instead. SSO errors display a localized message. Providers that omit the `email_verified` claim entirely are supported via the opt-in `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=true` env var (v0.71.11).
 - **Failed-login logging (v0.55.15):** Failed attempts are logged as warnings with IP, username, and failure reason (`user_not_found` / `invalid_password`), enabling fail2ban / CrowdSec integration.
+- **Forgot password (v0.71.51):** A "Forgot password?" link opens `/forgot-password`, where entering a username or email always returns a generic "if an account exists…" response (anti-enumeration), regardless of whether the identifier matched a user or whether SMTP is configured. When it does match and the user has a linked email (`contacts.email`), a reset link `${BASE_URL}/reset-password?token=…` is emailed; the token is single-use and expires after 1 hour. `/reset-password` reads the token from the query string and sets a new password (min. 8 characters); on success, the token is consumed and other sessions for that user are invalidated. Requires an admin-configured SMTP server (Settings → Administration → Email) and the `BASE_URL` env var — reset links are only sent when `BASE_URL` is set, since the request `Host` header is never trusted for this purpose (prevents reset-link poisoning). API: `POST /api/v1/auth/forgot-password`, `POST /api/v1/auth/reset-password` (both public, rate-limited).
 - After successful login: redirect to dashboard
 
 ### Settings (`/settings`)
@@ -982,7 +1020,7 @@ User management and app configuration. Logged-in users only.
 
 - **Profile:** change display name, avatar color, password
 - **User management (admin):** create new users, edit/delete existing users, assign roles (admin/member)
-- **Module toggles (admin, Settings → Modules → Navigation):** individual modules (Tasks, Calendar, Shopping, Meals, Recipes, Birthdays, Notes, Contacts, Budget, Documents, Housekeeping) can be disabled to hide them from navigation. Data is preserved and reappears when re-enabled. Dashboard and Settings remain essential and cannot be disabled. Stored as `disabled_modules` key in `sync_config`. **Kitchen grouping:** Meals, Recipes, and Shopping are presented as one global **Kitchen** destination with three individually toggleable children; the navigation list shows Kitchen as a single sortable row, while the local pages keep Meals, Recipes, and Shopping. The expanded module order is normalized so legacy per-child positions collapse to one Kitchen position and expand back to the canonical children on save.
+- **Navigation and module controls (admin, Settings → Modules → Navigation):** individual modules (Tasks, Calendar, Shopping, Meals, Recipes, Birthdays, Notes, Contacts, Budget, Documents, Housekeeping) can be disabled to hide them from navigation. Data is preserved and reappears when re-enabled. Dashboard and Settings remain essential and cannot be disabled. Stored as `disabled_modules` in `sync_config`. **Kitchen grouping:** Meals, Recipes, and Shopping are presented as one global **Kitchen** destination with three individually toggleable children; local pages keep their individual routes. The web navigation is grouped into Overview, Plan, and Home, and `module_order:user:<id>` only changes order inside each group; Dashboard and Settings stay pinned. The mobile bottom bar has five stable slots — Overview, three configurable favorites, and More. Favorites default to Calendar, Tasks, and Kitchen, are stored per user as `mobile_nav_order:user:<id>`, and automatically fall back to enabled destinations when a selected module becomes unavailable.
 - **Housekeeping (admin):** toggle for automatic payment task creation on work session check-in.
 - **Synchronization (Settings → Sync):** organized by data type into three dedicated pages — Calendar, Contacts, and Reminders — each opening with a status summary before any setup forms:
   - **Calendar sync (`/settings/sync/calendar`):** CalDAV accounts and Webcal/ICS subscriptions are primary. Manage multiple CalDAV accounts (iCloud, Nextcloud, Radicale, Baikal) with per-account calendar selection via checkboxes, two-way sync, and a unified per-event sync-target picker; manage ICS URL subscriptions (add, delete, sync now, set color and visibility); configure sync interval. Google Calendar (OAuth 2.0, multi-calendar selection, read-only mode) and Apple/iCloud CalDAV live inside an accessible **"More providers"** disclosure that always shows current connection state; Apple carries a **legacy** badge directing new iCloud users to the generic CalDAV setup. OAuth callbacks (`sync_ok` / `sync_error`) render a localized banner, expand the matching provider disclosure, and are then stripped from the URL.
@@ -994,14 +1032,15 @@ User management and app configuration. Logged-in users only.
 - **Documents (admin):** separate WebDAV Storage and DMS/Paperless cards show the active upload target, effective destination, stored WebDAV document count, and latest connection test. WebDAV connection fields use per-field hybrid configuration: each non-empty `DOCUMENT_STORAGE_WEBDAV_*` environment value overrides only its matching database field and is read-only in the UI. UI-managed WebDAV URLs must resolve exclusively to public addresses; private, loopback, link-local, internal-DNS, and DNS-rebinding targets are blocked at configuration time and again during socket lookup. Trusted private-network targets require the deployment-controlled `DOCUMENT_STORAGE_WEBDAV_URL` override. When WebDAV documents exist, URL, username, password, and base-path changes require explicit confirmation plus a successful read test against an existing object; required connection data cannot be removed. The connection test performs a temporary PUT/GET/DELETE roundtrip.
 - **Backup Management (admin):** download the current database as a file (`GET /api/v1/backup/database`) or restore from a backup file (`POST /api/v1/backup/restore`, drag-and-drop supported). Validates that the uploaded file is a valid Yuvomi database. A rollback copy is created automatically before restore. **Automatic scheduled backups:** configurable via `.env` (`BACKUP_ENABLED`, `BACKUP_SCHEDULE`, `BACKUP_DIR`, `BACKUP_KEEP`); default 2 AM daily, keeps last 7 copies; Settings → Administration → Backup and restore shows scheduler status, schedule, retention policy, last backup timestamp, and a manual trigger button. **WebDAV backup target:** optional upload of each backup to a WebDAV server (Nextcloud, ownCloud, Hetzner Storage Box, etc.) after each local backup; configurable via Settings → Administration → Backup and restore or env vars (`WEBDAV_BACKUP_ENABLED`, `WEBDAV_BACKUP_URL`, `WEBDAV_BACKUP_USERNAME`, `WEBDAV_BACKUP_PASSWORD`, `WEBDAV_BACKUP_PATH`, `WEBDAV_BACKUP_KEEP`); uses Node 22 native fetch, no extra dependencies; password is masked in the UI and API; upload failures are non-fatal (local backup is always retained).
 - **Backup boundary:** SQLite/database backups include WebDAV document metadata and storage keys, but never the remote WebDAV binaries. The document-storage WebDAV target must be backed up separately and restored together with the matching database.
+- **Email / SMTP (admin, v0.71.51):** Settings → Administration → Email configures an outgoing SMTP server (host, port, `ssl`/`starttls`/`none`, user, password, from-address, from-name) that powers the self-service "Forgot password" flow. Each field follows the same per-field hybrid pattern as other integrations: a non-empty `EMAIL_SMTP_*` / `EMAIL_FROM_*` env var overrides its matching `sync_config` field and the field becomes read-only in the UI. The password is write-only — `GET /api/v1/email/config` never returns it, only a `passwordSet` boolean. A **"Test connection"** button (`POST /api/v1/email/test`, admin-only) verifies the SMTP connection and sends a probe email to the requesting admin's own linked address (or an explicit override). API: `GET/PUT /api/v1/email/config`, `POST /api/v1/email/test`.
 - **Information architecture:** Settings is organized into five role-aware domains, each with dedicated leaf pages addressed by stable routes under `/settings/<domain>/<page>`:
   - **Personal** (all users): Account, Appearance, This device
   - **Modules** (admin): Navigation, Kitchen, Calendar, Budget, Housekeeping, Overview
   - **Sync** (admin): Calendar sync, Contact sync, Reminder sync
   - **Documents** (admin): Document storage, Document management (DMS)
-  - **Administration** (admin): Family and roles, API access, Backup and restore, System
+  - **Administration** (admin): Family and roles, API access, Backup and restore, Email (SMTP), System
 
-  A central registry (`public/settings/registry.js`) is the single source of truth for domains, routes, roles, labels, icons, and legacy-tab mappings; each leaf is **lazy-loaded** and owns only its own API domain. Members see only Personal; deep links to admin pages redirect to Personal → Account with a localized notice. The shared responsive shell (`public/settings/shell.js`) renders a **sticky local navigation column** on desktop (≥ 960 px, with `aria-current="page"` and a focus-managed page heading) and a **history-aware mobile drill-down** below 960 px (settings overview → domain overview → leaf, with breadcrumbs and Back traversal). Each leaf catches its own load/save errors with inline retry without dropping sibling sections. Legacy `oikos:settings:tab` values migrate once to the new paths; the former flat tab bar and `settings-nav.js`/`settings-nav.css` are removed.
+  A central registry (`public/settings/registry.js`) is the single source of truth for domains, routes, roles, labels, icons, and legacy-tab mappings; each leaf is **lazy-loaded** and owns only its own API domain. Members see only Personal; deep links to admin pages redirect to Personal → Account with a localized notice. The shared responsive shell (`public/settings/shell.js`) renders a **sticky local navigation column** on desktop (≥ 1024px, with `aria-current="page"` and a focus-managed page heading) and a **history-aware drill-down** below 1024px (settings overview → domain overview → leaf, with breadcrumbs and Back traversal). Tablet overview pages use two columns from 768–1023px instead of leaving half the content area empty. Each leaf catches its own load/save errors with inline retry without dropping sibling sections. Legacy `oikos:settings:tab` values migrate once to the new paths; the former flat tab bar and `settings-nav.js`/`settings-nav.css` are removed.
 - **Family management (admin):** assign a `family_role` (Dad, Mom, Parent, Child, Grandparent, Relative, Other) to each user, and set per-member phone, email, and birthday — automatically synced to Contacts and Birthdays. Displayed in the family member list and profile views.
 - **Profile picture:** users can upload a personal avatar (PNG/JPEG/WebP, ≤ 5 MB), stored as a Base64 JPEG data URL in `avatar_data` at 256 × 256 px. After selecting a file a **canvas crop dialog** opens: the user can drag the image and zoom (slider or mouse wheel) to choose the square crop region before confirming. Shown in all avatar circles throughout the app — task cards, calendar agenda, user assignment picker, dashboard task widget, dashboard calendar widget, and notes creator badge — with coloured initials as fallback when no photo is set. Housekeeping staff avatars use the same crop dialog.
 - **App info:** version, license
@@ -1039,6 +1078,7 @@ Personal birthday tracker with automatic calendar integration.
 - CRUD: name, birth_date (day/month/year or day/month only for age-unknown entries), notes, photo
 - Profile photo upload (PNG/JPEG/WebP/GIF, ≤ 5 MB, stored as Base64 data URL)
 - **Upcoming view:** birthdays sorted by days until next occurrence; shows age when year is known
+- **Mobile action hierarchy:** phones expose creation through the persistent FAB only; the duplicate header action is hidden so the title retains the available width.
 - **Calendar integration:** creating or updating a birthday automatically creates/updates a recurring annual all-day calendar event (title: "🎂 {Name}"); deleting a birthday removes the linked event
 - **Configurable reminder:** customizable reminder offset per birthday with preset options (none, at time, 15 min, 1 h, 1 d, 2 d, 1 w, 2 w) and a fully custom interval (amount + unit). Reminder time calculated from offset; auto-dismissed when the birthday passes
 - Search filter by name
@@ -1054,6 +1094,7 @@ Time-based reminders attached to tasks or calendar events.
 - **Birthday reminders** auto-synced from the Birthdays module (1 day before each occurrence)
 - Dismissing a reminder marks it `dismissed = 1`; dismissed reminders are not shown again
 - API: `GET /api/v1/reminders/pending`, `GET /api/v1/reminders?entity_type=&entity_id=`, `POST /api/v1/reminders`, `DELETE /api/v1/reminders/:id`, `POST /api/v1/reminders/:id/dismiss`
+- **Web Push (PWA):** when a device opts in via Settings → Personal → Notifications, a service-worker push handler shows due reminders as system notifications even while the app is closed. A 60-second server-side scheduler (`server/services/push-scheduler.js`) delivers due, undismissed, unpushed reminders via VAPID/RFC 8291 (`web-push`) and marks `pushed_at`. The foreground in-app toast still runs; only the in-page `Notification(...)` is suppressed on devices with an active push subscription (push takes over). **Requires HTTPS** (service workers + Push API). API: `GET /api/v1/push/vapid-public-key`, `POST /api/v1/push/subscribe`, `POST /api/v1/push/unsubscribe`, `POST /api/v1/push/test`
 
 ### Third-Party Modules (`/modules/<id>`)
 
@@ -1086,7 +1127,7 @@ modules/
 
 **Admin controls (Settings → Modules → Navigation):**
 - Admins can enable/disable individual third-party modules without restarting the server.
-- Admins can drag-to-reorder navigation entries.
+- Admins can drag-to-reorder navigation entries inside their Overview, Plan, or Home group; entries cannot cross group boundaries.
 - Disabled modules are not served to the browser and do not appear in navigation.
 - Enabled module pages are registered automatically in the SPA router at startup.
 
@@ -1227,9 +1268,23 @@ Source of truth: `public/styles/tokens.css`. Key values (as of v0.55.10):
 ```
 
 ### Typography
-- System font stack, headings 600–700
-- Body: 16px, line-height 1.5
-- Caption: 13px, `var(--color-text-secondary)`
+- Plus Jakarta Sans is the single self-hosted UI family; headings use weight 600–700.
+- Hero: 24px mobile / 30px desktop, reserved for the dashboard greeting.
+- Page title: 22px mobile / 28px desktop, one primary title per page or settings leaf.
+- Section title: 18px; card title and body: 16px.
+- Secondary text and compact controls: 14px.
+- Caption/label: 12px for short navigation, badge, chip, kicker, and constrained calendar-grid text only.
+- Micro: 10px for numeric counters and notification indicators only.
+- Typography is assigned through semantic `--type-*` tokens. Hero and page-title roles switch at the 1024px breakpoint; app headings do not use fluid `clamp()` sizing.
+- Inputs and prose stay at 16px. Readable supporting text and interactive controls have a 14px minimum.
+
+### Responsive Composition
+- Phone layouts prioritize one readable content column, complete titles, and one clear primary creation action. Horizontal scrolling is reserved for deliberate tab or timeline patterns, never used to compensate for clipped cards or toolbars.
+- Tablet layouts (768–1023px) may wrap dense toolbars and use two-column overview grids while retaining the mobile navigation model.
+- Desktop composition starts at 1024px. Full secondary toolbars and persistent local navigation return only when their labels and controls fit without compression.
+- Grid tracks that contain variable text use `minmax(0, 1fr)` so long localized content cannot enlarge the page beyond the viewport.
+- Cards, rows, and controls that display user-generated text must contain unbroken strings and mixed scripts without creating page-level horizontal overflow. Text blocks use per-paragraph bidirectional resolution where user content can mix RTL and LTR scripts.
+- Route-level load failures replace the page with a localized recovery state. The state uses `role="alert"`, receives focus without scrolling, and offers a reload action; modules must not convert failed initial loads into misleading empty states.
 
 ### Glass Layer (`public/styles/glass.css`)
 
@@ -1241,7 +1296,7 @@ Additive CSS file loaded globally after `layout.css`. Implements a Liquid Glass 
 - **Capsule shapes:** Buttons, FAB, and search inputs use `--radius-glass-button` (pill shape).
 - **Spring animations:** Modal entrance (`glass-modal-scale-in` / `glass-sheet-in`), page transitions, and list stagger all use `cubic-bezier(0.34, 1.56, 0.64, 1)` spring easing.
 - **FAB attention pulse:** `fab-ring-pulse` keyframe expands a ring around the FAB to signal readiness.
-- **Nav auto-hide:** Bottom bar hides on scroll-down, reappears on scroll-up (mobile only, < 1024px, 4 px hysteresis). CSS: `.nav-bottom--hidden { transform: translateY(calc(100% + var(--safe-area-inset-bottom))); }`. JS: `initNavHideOnScroll()` in `router.js`.
+- **Persistent mobile navigation:** The bottom bar stays visible while content scrolls so primary destinations never move away from the user's thumb.
 
 **Phase 4 (Vibrancy + Tint):**
 - **Deeper glass penetration:** Dashboard widgets, task cards, note items, meal slots, form inputs, toolbars, group toggles, and FAB speed-dial actions all use semi-transparent glass backgrounds (`--glass-bg-card`, 52% opacity) with `backdrop-filter: blur() saturate()` so underlying content shines through.
@@ -1252,9 +1307,9 @@ Additive CSS file loaded globally after `layout.css`. Implements a Liquid Glass 
 **Mobile compositor safety (v0.52.26):** a single permanent CSS rule disables `backdrop-filter` for all children of the `.app-content` scroll container. Bottom navigation, modals, and toasts sit outside the scroll container and retain their blur. This prevents mobile WebKit/Blink from creating excessive GPU compositor layers during scroll that would trigger blank-screen rendering bugs on iOS Safari and Android Chrome.
 
 **Phase 5 — Navigation Liquid Glass (v0.54.0):**
-- **Sliding glass pill indicator:** The sidebar (desktop) and mobile bottom bar now display an animated pill that slides to the active navigation entry using spring easing (`--ease-glass`). Hover over an inactive sidebar entry shows the destination indicator at 50 % opacity as a preview before navigation.
+- **Sliding glass pill indicator:** The sidebar (desktop) and mobile bottom bar display an animated pill that slides to the active navigation entry. The mobile indicator uses a restrained 200 ms transform/opacity transition without animated width; hovering an inactive sidebar entry shows the destination indicator at 50 % opacity as a preview.
 - **Custom monoline SVG icons:** `public/nav-icons.js` provides a full icon set for all navigation entries, built with the DOM API (`createElementNS`) — no `innerHTML`. A Lucide icon is used as fallback for entries without a custom SVG.
-- **"Haushalt" section heading:** A sidebar section label appears between the four primary entries (Dashboard, Calendar, Tasks, Notes) and the module entries (Meals, Recipes, Shopping, etc.), matching the visual grouping already present in the mobile More-sheet. Locale key `nav.section.household` is defined in all 16 locale files.
+- **Grouped sidebar headings:** The sidebar separates Overview (Dashboard), Plan (Calendar, Tasks, Notes), and Home (Kitchen and household modules) with localized labels. User ordering is applied only within each group.
 - **Accessibility:** Navigation animations are suppressed when `prefers-reduced-motion` is active; glass pill and blur effects are disabled when `prefers-reduced-transparency` is active.
 
 **Phase 6 — Module CSS Migration (v0.54.1–v0.54.5):** The Liquid Glass design language has been extended to all remaining core modules via targeted CSS-only changes to each module's stylesheet. All `--shadow-*`, `--radius-md/lg`, and `--color-surface` values on card containers have been replaced with the Glass tokens (`--glass-bg-card`, `--glass-border-subtle`, `--radius-glass-card/inner/chip`, `--glass-shadow-sm/md/lg`). Modules completed:
@@ -1272,7 +1327,7 @@ Additive CSS file loaded globally after `layout.css`. Implements a Liquid Glass 
 **Phase 8 — Frontend UI/UX Audit Rollout (v0.55.7–v0.55.10):**
 - **Glass discipline:** `tokens.css` now separates `--color-surface-work`, `--color-surface-raised`, and `--color-surface-glass` so productive pages can use stronger, more readable surfaces while nav, modals, dashboard hero, and lightweight widgets keep decorative glass.
 - **Mobile ergonomics:** dashboard cockpit cards, Tasks secondary controls, Shopping quick-add controls, and Budget row actions use tokenized touch targets and responsive constraints tested at 390px width.
-- **Navigation identity:** Kitchen and More keep stable labels/icons in the mobile bar; the active subsection is exposed through localized accessible labels instead of replacing the visible nav identity.
+- **Navigation identity:** Overview and More are fixed in the mobile bar, with three user-selected favorites between them. Kitchen and More keep stable labels/icons; the active subsection is exposed through localized accessible labels instead of replacing the visible identity.
 - **Calendar and Settings polish:** calendar month/agenda views use explicit readable surfaces and boundaries; Settings uses a sticky local navigation column on desktop and a history-aware drill-down on mobile.
 
 **Accessibility:** `prefers-reduced-transparency`, `prefers-reduced-motion`, and `prefers-contrast: more` blocks deactivate blur/animation and restore solid fallbacks across all phases.
@@ -1283,7 +1338,7 @@ Additive CSS file loaded globally after `layout.css`. Implements a Liquid Glass 
 - **Inputs:** `var(--radius-sm)`, 1.5px border, padding 12px 16px. Search inputs use `--radius-glass-button` and `--glass-border-subtle`. `[required]` fields receive validation status on blur (`.form-field--error` / `.form-field--valid`). Enter in a **single-line field** submits the modal form (standard web convention, v0.55.0); in a multi-line textarea Enter inserts a newline.
 - **FAB (Floating Action Button):** Color follows the module accent token (`--module-accent`) - each module defines its own accent color. Specular inner highlight + attention ring pulse. Hidden when the virtual keyboard is open (`visualViewport.resize`, threshold 75% of window height).
 - **Module accent colors:** `--module-accent` is applied on three visual layers - (1) active nav tab (bottom bar + sidebar stripe), (2) toolbar `border-top: 3px`, (3) cards/rows `border-left: 3px`. The active accent is written to `--active-module-accent` on `:root` on every navigation change. Falls back to `--color-accent` for pages without a module context.
-- **Navigation:** Bottom tab bar on mobile (Dashboard, Calendar, Tasks, Notes + Kitchen button + More button), auto-hides on scroll-down. Sidebar on desktop. Both use glass blur surfaces with a **sliding glass pill indicator** that animates to the active entry using spring easing. Hovering an inactive sidebar entry shows the indicator at 50 % opacity as a destination preview. Custom monoline SVG icons are served from `public/nav-icons.js` (DOM API, no `innerHTML`); Lucide is used as fallback. The sidebar groups entries under three localized **section headings** — Overview (Dashboard), Plan (Calendar, Tasks, Notes), and Home (Kitchen, Contacts, Birthdays, Budget, Documents, Housekeeping) — with Settings pinned at the end. Kitchen and More keep stable visible labels/icons; active subsections are communicated via localized `aria-label`/`aria-current` state and shared sub-tabs inside the module. **Collapsible sidebar (desktop only):** a toggle button collapses the sidebar to icon-only mode (56 px) so the content area gains additional horizontal space; the state persists via `localStorage` key `oikos.sidebar.collapsed`. Collapsed: only icon wells are visible, labels and the brand name are hidden; the `html.sidebar-collapsed` class drives a CSS-only transition on `--sidebar-width`. Hovering an icon shows the native tooltip (title attribute) for discoverability.
+- **Navigation:** The persistent mobile bottom bar contains exactly five destinations: fixed Overview, three configurable favorites (default Calendar, Tasks, Kitchen), and fixed More. Inactive buttons are neutral; the active module alone supplies color to the icon and 200 ms sliding indicator. The desktop sidebar uses the same glass surface and groups entries under three localized headings — Overview (Dashboard), Plan (Calendar, Tasks, Notes), and Home (Kitchen, Contacts, Birthdays, Budget, Documents, Housekeeping, third-party modules) — with Settings pinned at the end. Ordering is user-specific and limited to each group. Custom monoline SVG icons are served from `public/nav-icons.js` (DOM API, no `innerHTML`); Lucide is the fallback. Kitchen and More keep stable visible labels/icons; active subsections use localized `aria-label`/`aria-current`. **Collapsible sidebar (desktop only):** a toggle button collapses the sidebar to icon-only mode (56 px); state persists in `oikos.sidebar.collapsed`, and native title tooltips preserve discoverability.
 - **Sub-tabs:** `public/utils/sub-tabs.js` renders the sticky pill-style tab bar for Kitchen. It wires `role="tablist"`, `aria-selected`, `aria-controls`, `aria-labelledby`, keyboard arrow navigation, and panel focus coordination from one shared helper. (Settings no longer uses sub-tabs; it has its own responsive shell — see the Settings section.)
 - **Transitions:** Directional slide-X animation on page change (forward = from right, back = from left, 200ms) with spring easing. Respects `prefers-reduced-motion`.
 - **Empty states:** Consistent `.empty-state` class across all modules (icon + title + description, centered). Compact variant `.empty-state--compact` for meal slots.
@@ -1292,7 +1347,8 @@ Additive CSS file loaded globally after `layout.css`. Implements a Liquid Glass 
 - **Vibration:** `vibrate()` from `public/utils/ux.js` - short pulses for light actions (10-40ms), pattern `[30, 50, 30]` for destructive actions (delete). Respects `prefers-reduced-motion`.
 - **Global search overlay:** Full-text search across tasks, calendar events, notes, contacts, and shopping items. Results are grouped by module and trigger deep-link navigation: contacts via `?open=<id>` (opens edit modal directly), calendar events via `?open=<id>`, notes via `?open=<id>`, shopping items via `?list=<id>&highlight=<id>` (activates the correct list tab and scrolls the item into view). Activated from the search bar in the More-Sheet.
 - **PWA install prompt:** Appears only after 2 user interactions. Dismiss window 7 days; interaction counter resets after dismiss.
-- **PWA offline fallback:** Service worker serves `/offline.html` when the network is unreachable and `index.html` is not cached. Includes a reload button.
+- **PWA offline and update contract (v0.71.34):** Service-worker shell, page, locale, and asset caches are keyed to the package release so every published UI revision installs fresh cache namespaces. The early `/lang-init.js` locale/direction bootstrap is part of the offline shell. When the network is unreachable and `index.html` is not cached, the worker serves `/offline.html` with a reload button.
+- **User-selected note colors (v0.71.34):** note titles, content, creator metadata, and fallback avatars choose black or white ink from WCAG relative luminance instead of a brightness heuristic; supporting text remains fully opaque so every built-in note color meets AA contrast.
 
 ### Breakpoints
 - Mobile: < 768px (1 column, bottom nav)
@@ -1348,4 +1404,4 @@ All UI strings are managed via `public/i18n.js`. No hardcoded text in JS files o
 
 ### Locale Switching
 
-`setLocale(locale)` saves the selection, loads the new locale file, and fires the `locale-changed` custom event. All page modules and web components listen to this event and re-render - no page reload required.
+The early language bootstrap applies both `lang` and writing direction before the app renders (`ar` uses `dir="rtl"`; all other supported locales use `dir="ltr"`). `setLocale(locale)` saves the selection, loads the new locale file, updates both document attributes, and fires the `locale-changed` custom event. The router rebuilds shared navigation and re-renders the active route so every visible label changes without a page reload.

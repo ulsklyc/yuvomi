@@ -34,17 +34,35 @@
  * Header / Toolbar
  * -------------------------------------------------------- */
 /* Gerüst (Shell + Titel) jetzt geteilt via .page-toolbar in layout.css.
- * margin-left:auto drängt die Suche an den rechten Rand (ersetzt das frühere
+ * margin-inline-start:auto drängt die Suche ans logische Zeilenende (ersetzt das frühere
  * justify-content:space-between des bespoke Toolbars). */
 .notes-toolbar__search {
+  flex: 1 1 0;
+  display: grid;
+  gap: var(--space-1);
+  max-width: 280px;
+  min-width: 0;
+  margin-inline-start: auto;
+}
+
+.notes-toolbar__search-label {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.notes-toolbar__search-control {
+  display: block;
   position: relative;
-  flex: 0 1 280px;
-  margin-left: auto;
+}
+
+.notes-toolbar .page-toolbar__title {
+  flex: 0 0 auto;
 }
 
 .notes-toolbar__search-icon {
   position: absolute;
-  left: var(--space-2);
+  inset-inline-start: var(--space-2);
   top: 50%;
   transform: translateY(-50%);
   width: 16px;
@@ -70,10 +88,6 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
 }
 
-@media (min-width: 1024px) {
-  .notes-toolbar__search-input { font-size: var(--text-sm); }
-}
-
 /* --------------------------------------------------------
  * Masonry-Grid
  * -------------------------------------------------------- */
@@ -82,34 +96,44 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: var(--space-4);
-  columns: 2;
-  column-gap: var(--space-3);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  align-items: start;
+  gap: var(--space-3);
 }
 
-/* Lade-Zustand: Multi-Column aufheben, damit die geteilte Skeleton-Liste
+/* Lade-Zustand: Grid aufheben, damit die geteilte Skeleton-Liste
  * (Flex-Spalte) full-width erscheint — eine Lade-Sprache über alle Module. */
 .notes-grid[aria-busy="true"] {
-  columns: auto;
+  display: block;
 }
 
-@container notes-page (min-width: 600px) {
-  .notes-grid { columns: 3; }
+@container notes-page (min-width: 520px) {
+  .notes-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@container notes-page (min-width: 720px) {
+  .notes-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @container notes-page (min-width: 900px) {
-  .notes-grid { columns: 4; }
+  .notes-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 @container notes-page (min-width: 1200px) {
-  .notes-grid { columns: 5; }
+  .notes-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+.notes-grid > .empty-state {
+  grid-column: 1 / -1;
 }
 
 /* --------------------------------------------------------
  * Notiz-Karte
  * -------------------------------------------------------- */
 .note-card {
-  break-inside: avoid;
-  margin-bottom: var(--space-3);
+  min-width: 0;
   border-radius: var(--radius-md);
   padding: var(--space-3);
   cursor: pointer;
@@ -130,7 +154,7 @@
 .note-card__pin {
   position: absolute;
   top: var(--space-2);
-  right: var(--space-2);
+  inset-inline-end: var(--space-2);
   width: var(--target-base);
   height: var(--target-base);
   border-radius: var(--radius-full);
@@ -169,14 +193,19 @@
 .note-card__title {
   margin-bottom: var(--space-1);
   color: inherit;
-  padding-right: var(--target-base);
+  padding-inline-end: var(--target-base);
+  overflow-wrap: anywhere;
+}
+
+.note-card__title,
+.note-card__content {
+  unicode-bidi: plaintext;
 }
 
 .note-card__content {
-  font-size: var(--text-sm);
+  font-size: var(--type-body);
   line-height: var(--line-height-relaxed);
   color: inherit;
-  opacity: 0.78;
   word-break: break-word;
   white-space: pre-wrap;
 }
@@ -191,8 +220,8 @@
   justify-content: space-between;
   margin-top: var(--space-2);
   padding-top: var(--space-2);
-  border-top: 1px solid currentColor;
-  color: color-mix(in srgb, currentColor 55%, transparent);
+  border-top: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  color: inherit;
 }
 
 .note-card__creator {

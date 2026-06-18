@@ -83,17 +83,6 @@ function buildAddForm(container) {
 }
 
 function renderAccount(listEl, account, reload) {
-  const card = document.createElement('article');
-  card.className = 'dms-account-item';
-  card.dataset.id = account.id;
-
-  card.appendChild(createStatusSummary({
-    title: account.name,
-    status: account.base_url,
-    details: [t('settings.dmsDescription')],
-    tone: 'neutral',
-  }));
-
   const actions = document.createElement('div');
   actions.className = 'dms-account-meta';
 
@@ -134,7 +123,16 @@ function renderAccount(listEl, account, reload) {
   });
   actions.appendChild(delBtn);
 
-  card.appendChild(actions);
+  const card = createStatusSummary({
+    title: account.name,
+    status: account.base_url,
+    details: [t('settings.dmsDescription')],
+    tone: 'neutral',
+    action: actions,
+  });
+  card.className += ' dms-account-item';
+  card.dataset.id = account.id;
+
   listEl.appendChild(card);
 }
 

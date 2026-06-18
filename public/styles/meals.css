@@ -412,7 +412,7 @@
 .ingredient-row__cat {
   flex: 1.5;
   min-width: 0;
-  font-size: var(--text-sm);
+  font-size: var(--type-body);
 }
 
 .ingredient-row__remove {
@@ -481,7 +481,7 @@
   border: 1px solid var(--color-accent);
   background-color: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: var(--text-sm);
+  font-size: var(--type-body);
 }
 
 .shopping-transfer__btn {
@@ -539,5 +539,29 @@
 @media (prefers-reduced-motion: reduce) {
   .meal-card--ghost {
     transform: none;
+  }
+}
+
+@media (hover: none), (max-width: 640px) {
+  .meal-card__actions {
+    opacity: 1;
+  }
+
+  .week-nav__today,
+  .meal-slot__add-more-btn {
+    opacity: 1;
+    min-height: var(--target-lg);
+  }
+
+  .meal-card__action-btn {
+    width: var(--target-lg);
+    height: var(--target-lg);
+    min-width: var(--target-lg);
+    min-height: var(--target-lg);
+    color: var(--color-text-secondary);
+  }
+
+  .meal-card__action-btn::before {
+    inset: 0;
   }
 }

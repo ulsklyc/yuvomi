@@ -6,6 +6,7 @@
  */
 
 const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'ja', 'ar', 'hi', 'pt', 'uk', 'pl', 'nl', 'cs', 'vi'];
+const RTL_LOCALES = new Set(['ar']);
 const DEFAULT_LOCALE = 'de';
 const STORAGE_KEY = 'oikos-locale';
 const DATE_FORMAT_KEY = 'oikos-date-format';
@@ -22,6 +23,11 @@ let resolveI18nReady;
 const i18nReadyPromise = new Promise((resolve) => {
   resolveI18nReady = resolve;
 });
+
+function applyDocumentLocale(locale) {
+  document.documentElement.lang = locale;
+  document.documentElement.dir = RTL_LOCALES.has(locale) ? 'rtl' : 'ltr';
+}
 
 /** Resolve locale: manual override > navigator.language > English > default */
 function resolveLocale() {
@@ -57,7 +63,7 @@ export async function initI18n() {
   } else {
     translations = fallbackTranslations;
   }
-  document.documentElement.lang = currentLocale;
+  applyDocumentLocale(currentLocale);
   i18nReady = true;
   resolveI18nReady();
   window.dispatchEvent(new CustomEvent('i18n-ready', { detail: { locale: currentLocale } }));
@@ -78,7 +84,7 @@ export async function setLocale(locale) {
     : await loadLocale(locale);
   if (currentLocale !== locale) return;
   translations = loaded;
-  document.documentElement.lang = locale;
+  applyDocumentLocale(locale);
   window.dispatchEvent(new CustomEvent('locale-changed', { detail: { locale } }));
 }
 

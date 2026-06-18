@@ -12,14 +12,27 @@
 /* Gerüst (Shell + Titel) jetzt geteilt via .page-toolbar in layout.css.
  * Damit wird der Documents-Kopf wie alle anderen sticky und nutzt --color-bg. */
 .documents-toolbar__search {
-  position: relative;
   flex: 1;
+  display: grid;
+  gap: var(--space-1);
   min-width: 180px;
+}
+
+.documents-toolbar__search-label,
+.documents-filter-field > span {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.documents-toolbar__search-control {
+  display: block;
+  position: relative;
 }
 
 .documents-toolbar__search-icon {
   position: absolute;
-  left: var(--space-4);
+  inset-inline-start: var(--space-4);
   top: 50%;
   width: 18px;
   height: 18px;
@@ -31,7 +44,8 @@
 .documents-toolbar__search-input {
   width: 100%;
   min-height: var(--target-base);
-  padding: 0 var(--space-3) 0 calc(var(--space-10) + var(--space-1));
+  padding-block: 0;
+  padding-inline: calc(var(--space-10) + var(--space-1)) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface-2);
@@ -67,10 +81,32 @@
   box-shadow: var(--glass-shadow-sm);
 }
 
-.documents-filters {
+.documents-secondary-controls {
+  position: relative;
+}
+
+.documents-secondary-controls summary {
+  list-style: none;
+}
+
+.documents-secondary-controls summary::-webkit-details-marker {
+  display: none;
+}
+
+.documents-secondary-controls__trigger {
+  display: none;
+}
+
+.documents-secondary-controls__panel {
   display: flex;
+  align-items: end;
+  flex-wrap: wrap;
   gap: var(--space-3);
-  padding: var(--space-4);
+}
+
+.documents-filter-field {
+  display: grid;
+  gap: var(--space-1);
 }
 
 .documents-filter-select {
@@ -420,6 +456,22 @@
   font-size: var(--text-sm);
 }
 
+@media (min-width: 768px) and (max-width: 1023px) {
+  .documents-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .documents-toolbar__search {
+    order: 4;
+    flex-basis: 100%;
+  }
+
+  .documents-secondary-controls {
+    order: 5;
+    flex-basis: 100%;
+  }
+}
+
 @media (max-width: 767px) {
   .documents-toolbar {
     flex-wrap: wrap;
@@ -434,8 +486,33 @@
     flex-basis: 100%;
   }
 
-  .documents-filters {
+  .documents-secondary-controls {
+    order: 3;
+    position: static;
+  }
+
+  .documents-secondary-controls__trigger {
+    display: inline-flex;
+  }
+
+  .documents-secondary-controls__panel {
+    position: absolute;
+    inset-inline: var(--space-4);
+    top: calc(100% + var(--space-2));
+    z-index: var(--z-dropdown);
+    display: none;
+    width: auto;
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .documents-secondary-controls[open] .documents-secondary-controls__panel {
+    display: flex;
     flex-direction: column;
+    align-items: stretch;
   }
 
   .documents-filter-select {

@@ -8,6 +8,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('CalDAV');
 
 import * as db from '../db.js';
+import { decodeHtmlEntities } from '../utils/html-entities.js';
 
 // Reused functions from apple-calendar.js
 import {
@@ -89,6 +90,8 @@ function normalizeCalColor(c) {
 }
 
 function upsertExternalCalendar(source, externalId, name, color) {
+  // Provider-Namen können HTML-entity-encoded sein — zu Klartext normalisieren,
+  // sonst escaped die UI doppelt (z. B. literales "&amp;").
   const row = db.get().prepare(`
     INSERT INTO external_calendars (source, external_id, name, color)
     VALUES (?, ?, ?, ?)
@@ -96,7 +99,7 @@ function upsertExternalCalendar(source, externalId, name, color) {
       name  = excluded.name,
       color = excluded.color
     RETURNING id
-  `).get(source, externalId, name, color);
+  `).get(source, externalId, decodeHtmlEntities(name), color);
   return row.id;
 }
 

@@ -6,6 +6,7 @@
 
 import { api } from '/api.js';
 import { t, formatDate, formatTime, getLocale } from '/i18n.js';
+import { getReadableTextColor } from '/utils/color.js';
 import { esc, fmtLocation, renderMarkdownLight } from '/utils/html.js';
 import { openModal, closeModal } from '/components/modal.js';
 import { renderAvatarStack } from '/components/user-multi-select.js';
@@ -123,8 +124,8 @@ function showOnboarding(appContainer) {
 // Widget-Definitionen (Reihenfolge = Standard-Layout)
 // --------------------------------------------------------
 
-// NEU — primäre Inhalte (tasks, calendar) ganz oben
-const WIDGET_IDS = ['tasks', 'calendar', 'weather', 'meals', 'shopping', 'birthdays', 'budget', 'family', 'notes'];
+// weather (kompaktes 2x1) ganz oben, danach primäre Inhalte (tasks, calendar)
+const WIDGET_IDS = ['weather', 'tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'budget', 'family', 'notes'];
 
 const WIDGET_SIZE_PRESETS = [
   { value: '1x1', labelKey: 'dashboard.widgetSizeTiny'     },
@@ -360,7 +361,15 @@ function buildTodayHighlights(data) {
   const meals = data?.meals ?? data?.todayMeals ?? null;
 
   const urgentTask = tasks.find((task) => task.priority === 'urgent') ?? tasks[0] ?? null;
-  const nextEvent = events[0] ?? null;
+
+  const today = new Date().toDateString();
+  const todayEvents = events.filter((e) => {
+    if (!e.start_datetime) return true;
+    const d = new Date(e.start_datetime);
+    return d.toDateString() === today;
+  });
+  const nextEvent = todayEvents[0] ?? null;
+
   const openShoppingCount = shoppingItems.length
     ? shoppingItems.filter((item) => !item.is_checked).length
     : shoppingLists.reduce((sum, list) => {
@@ -378,6 +387,8 @@ function buildTodayHighlights(data) {
     nextEvent,
     openShoppingCount,
     dinner,
+    taskCount: tasks.length,
+    eventCount: todayEvents.length,
   };
 }
 
@@ -559,7 +570,7 @@ function renderPinnedNotes(notes) {
 function renderFamilyWidget(users) {
   const visible = users.slice(0, 6);
   const avatars = visible.map((u) => `
-    <span class="family-widget-avatar" style="background:${esc(u.avatar_color || '#64748b')}" title="${esc(u.display_name)}">
+    <span class="family-widget-avatar" style="background:${esc(u.avatar_color || '#64748b')};color:${getReadableTextColor(u.avatar_color || '#64748b')}" title="${esc(u.display_name)}">
       ${u.avatar_data ? `<img src="${esc(u.avatar_data)}" alt="${esc(u.display_name)}" loading="lazy">` : esc(initials(u.display_name))}
     </span>
   `).join('');
@@ -616,20 +627,14 @@ function renderBudgetWidget(budget, currency) {
   </div>`;
 }
 
-function renderQuickAction({ route, label, icon, tone = '' }) {
-  return `
-    <button type="button" class="dashboard-action ${tone ? `dashboard-action--${tone}` : ''}" data-route="${route}" aria-label="${esc(label)}">
-      <span class="dashboard-action__icon"><i data-lucide="${icon}" aria-hidden="true"></i></span>
-      <span class="dashboard-action__label">${label}</span>
-    </button>
-  `;
-}
-
-function renderTodayCard(icon, label, value, route, tone) {
+function renderTodayCard(icon, label, value, route, tone, count = null) {
+  const badge = Number.isFinite(count) && count > 0
+    ? `<span class="today-cockpit-card__count">${count}</span>`
+    : '';
   return `
     <button type="button" class="today-cockpit-card today-cockpit-card--${tone}" data-route="${route}">
       <span class="today-cockpit-card__icon"><i data-lucide="${icon}" aria-hidden="true"></i></span>
-      <span class="today-cockpit-card__label">${esc(label)}</span>
+      <span class="today-cockpit-card__label">${esc(label)}${badge}</span>
       <strong class="today-cockpit-card__value">${esc(value)}</strong>
     </button>
   `;
@@ -645,11 +650,10 @@ function renderTodayCockpit(data) {
     <section class="today-cockpit" aria-labelledby="today-cockpit-title">
       <div class="today-cockpit__header">
         <h2 id="today-cockpit-title">${esc(t('dashboard.todayTitle'))}</h2>
-        <span class="today-cockpit__date">${esc(formatDate(new Date()))}</span>
       </div>
       <div class="today-cockpit__grid">
-        ${!window.oikos?.isModuleDisabled('tasks')    ? renderTodayCard('check-square',   t('dashboard.todayTask'),     taskTitle, '/tasks', 'task') : ''}
-        ${!window.oikos?.isModuleDisabled('calendar') ? renderTodayCard('calendar',        t('dashboard.todayEvent'),    eventTitle, '/calendar', 'event') : ''}
+        ${!window.oikos?.isModuleDisabled('tasks')    ? renderTodayCard('check-square',   t('dashboard.todayTask'),     taskTitle, '/tasks', 'task', highlights.taskCount) : ''}
+        ${!window.oikos?.isModuleDisabled('calendar') ? renderTodayCard('calendar',        t('dashboard.todayEvent'),    eventTitle, '/calendar', 'event', highlights.eventCount) : ''}
         ${!window.oikos?.isModuleDisabled('shopping') ? renderTodayCard('shopping-cart',   t('dashboard.todayShopping'), t('dashboard.todayShoppingCount', { count: highlights.openShoppingCount }), '/shopping', 'shopping') : ''}
         ${!window.oikos?.isModuleDisabled('meals')    ? renderTodayCard('utensils',        t('dashboard.todayDinner'),   dinnerTitle, '/meals', 'dinner') : ''}
       </div>
@@ -661,19 +665,12 @@ function renderTodayCockpit(data) {
 function renderDashboardOverview(user, editing = false) {
   const dateLabel = formatDate(new Date());
 
-  const actions = [
-    { route: '/tasks', label: t('nav.tasks'), icon: 'check-square', tone: 'blue' },
-    { route: '/calendar', label: t('nav.calendar'), icon: 'calendar', tone: 'violet' },
-    { route: '/shopping', label: t('nav.shopping'), icon: 'shopping-cart', tone: 'green' },
-    { route: '/notes', label: t('nav.notes'), icon: 'sticky-note', tone: 'amber' },
-  ].map(renderQuickAction).join('');
-
   return `
     <section class="dashboard-overview">
-      <div class="dashboard-overview__header">
+      <div class="dashboard-overview__header${editing ? ' dashboard-overview__header--editing' : ''}">
         <div class="dashboard-overview__heading">
           <span class="dashboard-overview__date">${dateLabel}</span>
-          <h1 class="dashboard-overview__title">${greeting(user.display_name)}</h1>
+          <h2 class="dashboard-overview__title">${greeting(user.display_name)}</h2>
         </div>
         <div class="dashboard-overview__tools">
           ${editing ? `
@@ -685,7 +682,7 @@ function renderDashboardOverview(user, editing = false) {
             <button class="btn btn--ghost" id="dashboard-customize-reset">${t('dashboard.customizeReset')}</button>
             <button class="btn btn--secondary" id="dashboard-customize-cancel">${t('common.cancel')}</button>
             <button class="btn btn--primary" id="dashboard-customize-save">${t('common.save')}</button>
-          </div>` : `<div class="dashboard-overview__actions">${actions}</div>`}
+          </div>` : ''}
           <button class="dashboard-icon-btn" id="dashboard-customize-btn"
                   aria-label="${editing ? t('dashboard.customizeExit') : t('dashboard.customize')}"
                   title="${editing ? t('dashboard.customizeExit') : t('dashboard.customize')}"
@@ -822,7 +819,7 @@ function renderShoppingLists(lists) {
           <span class="shopping-widget-list__count">${list.total_count - list.open_count}/${list.total_count}</span>
         </div>
         <div class="shopping-widget-list__progress">
-          <div class="shopping-widget-list__bar" style="width:${progress}%"></div>
+          <div class="shopping-widget-list__bar" style="--progress-scale:${progress / 100}"></div>
         </div>
         <div class="shopping-widget-list__items">
           ${itemsHtml}
@@ -915,13 +912,13 @@ const FAB_ACTIONS = () => [
 
 function renderFab() {
   const actionsHtml = FAB_ACTIONS().map((a) => `
-    <div class="fab-action" data-route="${a.route}" role="button" tabindex="-1"
-         aria-label="${a.label}">
+    <button type="button" class="fab-action" data-route="${a.route}" tabindex="-1"
+            aria-label="${a.label}">
       <span class="fab-action__label">${a.label}</span>
-      <button class="fab-action__btn" tabindex="-1" aria-hidden="true">
+      <span class="fab-action__btn" aria-hidden="true">
         <i data-lucide="${a.icon}" aria-hidden="true"></i>
-      </button>
-    </div>
+      </span>
+    </button>
   `).join('');
 
   return `
@@ -960,7 +957,7 @@ function initFab(container, signal) {
     fabActions.classList.toggle('fab-actions--visible', open);
     fabActions.setAttribute('aria-hidden', String(!open));
     fabBackdrop?.classList.toggle('fab-backdrop--visible', open);
-    fabActions.querySelectorAll('[role="button"]').forEach((el) => {
+    fabActions.querySelectorAll('.fab-action').forEach((el) => {
       el.tabIndex = open ? 0 : -1;
     });
     if (window.lucide) window.lucide.createIcons({ el: container });

@@ -17,6 +17,7 @@ const log = createLogger('Apple');
 
 import * as db from '../db.js';
 import { unfoldLines, parseICS, formatICSDate, tzLocalToUTC, applyDuration } from './ics-parser.js';
+import { decodeHtmlEntities } from '../utils/html-entities.js';
 
 const APPLE_COLOR = '#FC3C44';
 
@@ -32,6 +33,8 @@ function normalizeCalColor(c) {
 }
 
 function upsertExternalCalendar(source, externalId, name, color) {
+  // Provider-Namen können HTML-entity-encoded sein — zu Klartext normalisieren,
+  // sonst escaped die UI doppelt (z. B. literales "&amp;").
   const row = db.get().prepare(`
     INSERT INTO external_calendars (source, external_id, name, color)
     VALUES (?, ?, ?, ?)
@@ -39,7 +42,7 @@ function upsertExternalCalendar(source, externalId, name, color) {
       name  = excluded.name,
       color = excluded.color
     RETURNING id
-  `).get(source, externalId, name, color);
+  `).get(source, externalId, decodeHtmlEntities(name), color);
   return row.id;
 }
 

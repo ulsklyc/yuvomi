@@ -402,6 +402,51 @@ Generate a secure `SESSION_SECRET`:
 openssl rand -hex 32
 ```
 
+### Web Push (Optional)
+
+Push notifications deliver due reminders to a device as system notifications even when the app
+is closed. **Requires HTTPS** (the Push API and service workers only work over a secure origin —
+see [HTTPS / Reverse Proxy](#https--reverse-proxy-nginx)). Each device opts in under
+Settings → Personal → Notifications.
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `VAPID_PUBLIC_KEY` | VAPID public key. Auto-generated on first use and stored in the database if unset. | auto | No |
+| `VAPID_PRIVATE_KEY` | VAPID private key. Set together with the public key to pin a fixed pair across redeployments. | auto | No |
+| `VAPID_SUBJECT` | Contact URI (`mailto:` or `https:`) sent to push services. | `mailto:admin@localhost` | No |
+
+Generate a fixed key pair (optional):
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+### Email / SMTP (Optional)
+
+Configuring an outgoing SMTP server enables the self-service **"Forgot password"** flow on the
+login page. Without it, only an admin can reset another user's password. Can also be configured
+in Settings → Administration → Email (non-empty env values here override the database).
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `EMAIL_SMTP_HOST` | SMTP server hostname. | - | No |
+| `EMAIL_SMTP_PORT` | SMTP server port. | `587` | No |
+| `EMAIL_SMTP_SECURE` | Connection security: `ssl`, `starttls`, or `none`. | `starttls` | No |
+| `EMAIL_SMTP_USER` | SMTP auth username. | - | No |
+| `EMAIL_SMTP_PASS` | SMTP auth password. | - | No |
+| `EMAIL_FROM_ADDRESS` | Sender email address. | - | No |
+| `EMAIL_FROM_NAME` | Sender display name. | `Yuvomi` | No |
+| `BASE_URL` | Absolute origin used to build password-reset links, e.g. `https://yuvomi.example.com`. **Required for reset emails to be sent** — the request `Host` header is never trusted as a fallback, to prevent reset-link poisoning. | - | No* |
+
+\* Not required to start Yuvomi, but without it the "Forgot password" flow silently sends no email
+even when SMTP is otherwise configured.
+
+The "Test connection" button in Settings → Administration → Email verifies the SMTP connection and
+sends a probe email to the signed-in admin's own linked address. The SMTP password is never
+returned by the API once saved; it is stored in the database the same way as other integration
+credentials (e.g. the Apple app-specific password), with encryption-at-rest available via the
+optional `DB_ENCRYPTION_KEY`.
+
 ### Database & Storage
 
 | Variable | Description | Default | Required |

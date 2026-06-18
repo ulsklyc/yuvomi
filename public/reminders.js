@@ -7,6 +7,7 @@
 
 import { api } from '/api.js';
 import { t } from '/i18n.js';
+import { isPushSubscribed } from '/push.js';
 
 // --------------------------------------------------------
 // Konfiguration
@@ -51,6 +52,7 @@ async function requestPermission() {
  * @param {string} body
  */
 function showBrowserNotification(title, body) {
+  if (isPushSubscribed()) return; // Web Push übernimmt die System-Benachrichtigung
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   try {
     const n = new Notification(title, { body, icon: '/icons/icon-192.png' });

@@ -12,7 +12,9 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'node:fs/promises';
+import { mkdirSync } from 'node:fs';
 import { createLogger } from './logger.js';
+import { decodeHtmlEntities } from './utils/html-entities.js';
 
 const log = createLogger('DB');
 
@@ -32,6 +34,14 @@ let db;
  */
 function init() {
   if (db) return db;
+  if (!path.isAbsolute(DB_PATH)) {
+    log.warn(
+      `DB_PATH "${DB_PATH}" is a relative path — inside Docker this resolves to ` +
+      `"${path.resolve(DB_PATH)}", which is NOT the mounted volume. ` +
+      `Data will be lost on container restart. Use an absolute path, e.g. DB_PATH=/data/oikos.db`
+    );
+  }
+  mkdirSync(path.dirname(DB_PATH), { recursive: true });
   db = new Database(DB_PATH);
 
   applyEncryptionKey(db);
@@ -1938,6 +1948,57 @@ const MIGRATIONS = [
   },
   {
     version: 53,
+    description: 'Repair HTML-entity-encoded external calendar names (e.g. "&amp;")',
+    up(db) {
+      // Provider-Namen wurden bisher verbatim gespeichert; Google liefert für
+      // Import-Kalender HTML-entity-encodierte Namen ("Termine &amp; …"), die
+      // im UI doppelt escaped als literales "&amp;" erscheinen. Der Ingest
+      // normalisiert ab jetzt zu Klartext — Bestandszeilen hier nachziehen.
+      const rows = db.prepare('SELECT id, name FROM external_calendars').all();
+      const update = db.prepare('UPDATE external_calendars SET name = ? WHERE id = ?');
+      for (const { id, name } of rows) {
+        const decoded = decodeHtmlEntities(name);
+        if (decoded !== name) update.run(decoded, id);
+      }
+    },
+  },
+  {
+    version: 54,
+    description: 'Web Push: push_subscriptions table + reminders.pushed_at column',
+    up(db) {
+      db.exec(`
+        CREATE TABLE push_subscriptions (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          endpoint     TEXT    NOT NULL UNIQUE,
+          p256dh       TEXT    NOT NULL,
+          auth         TEXT    NOT NULL,
+          user_agent   TEXT,
+          created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+          last_used_at TEXT
+        );
+        CREATE INDEX idx_push_subs_user ON push_subscriptions(user_id);
+        ALTER TABLE reminders ADD COLUMN pushed_at TEXT;
+      `);
+    },
+  },
+  {
+    version: 55,
+    description: 'Password reset tokens table',
+    up: `
+      CREATE TABLE password_resets (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_hash TEXT    NOT NULL,
+        expires_at INTEGER NOT NULL,
+        created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+      );
+      CREATE UNIQUE INDEX idx_password_resets_hash ON password_resets(token_hash);
+      CREATE INDEX idx_password_resets_user ON password_resets(user_id);
+    `,
+  },
+  {
+    version: 56,
     description: 'Budget subscription tracker with categories, payment methods, settings, and exchange-rate cache',
     up: `
       CREATE TABLE IF NOT EXISTS subscription_categories (
@@ -2027,7 +2088,7 @@ const MIGRATIONS = [
     `,
   },
   {
-    version: 54,
+    version: 57,
     description: 'Allow subscription entities in the existing reminder center',
     up: `
       CREATE TABLE reminders_new (
@@ -2049,7 +2110,7 @@ const MIGRATIONS = [
     `,
   },
   {
-    version: 55,
+    version: 58,
     description: 'Link each active subscription renewal to its pending Budget expense',
     up: `
       ALTER TABLE budget_subscriptions ADD COLUMN budget_entry_id INTEGER
@@ -2082,7 +2143,7 @@ const MIGRATIONS = [
     },
   },
   {
-    version: 56,
+    version: 59,
     description: 'Mirror subscription categories into Budget and recategorize linked expenses',
     up: `
       ALTER TABLE subscription_categories ADD COLUMN budget_subcategory_key TEXT;

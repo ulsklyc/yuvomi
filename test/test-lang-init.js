@@ -13,9 +13,9 @@ import { createContext, runInContext } from 'node:vm';
 
 const SRC = readFileSync(new URL('../public/lang-init.js', import.meta.url), 'utf8');
 
-/** Führt lang-init.js in einer Sandbox aus und liefert den gesetzten lang-Wert. */
-function runLangInit({ stored = null, languages = undefined, language = undefined, throwOnStorage = false } = {}) {
-  const html = { lang: '' };
+/** Führt lang-init.js in einer Sandbox aus und liefert die gesetzten HTML-Metadaten. */
+function runLangInitState({ stored = null, languages = undefined, language = undefined, throwOnStorage = false } = {}) {
+  const html = { lang: '', dir: '' };
   const sandbox = {
     document: { documentElement: html },
     navigator: { languages, language },
@@ -27,7 +27,11 @@ function runLangInit({ stored = null, languages = undefined, language = undefine
     },
   };
   runInContext(SRC, createContext(sandbox));
-  return html.lang;
+  return html;
+}
+
+function runLangInit(options = {}) {
+  return runLangInitState(options).lang;
 }
 
 test('gültiger localStorage-Override gewinnt', () => {
@@ -64,4 +68,18 @@ test('blockierter localStorage (Privatmodus) wirft nicht, nutzt navigator', () =
 
 test('keine brauchbaren Signale → en', () => {
   assert.equal(runLangInit({ languages: [] }), 'en');
+});
+
+test('Arabisch setzt vor dem Rendern die Schreibrichtung auf rtl', () => {
+  assert.deepEqual(
+    runLangInitState({ stored: 'ar', languages: ['de-DE'] }),
+    { lang: 'ar', dir: 'rtl' },
+  );
+});
+
+test('Nicht-RTL-Sprachen setzen die Schreibrichtung explizit auf ltr zurück', () => {
+  assert.deepEqual(
+    runLangInitState({ stored: 'de', languages: ['ar'] }),
+    { lang: 'de', dir: 'ltr' },
+  );
 });

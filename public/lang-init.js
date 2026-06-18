@@ -28,5 +28,7 @@
     return 'en';
   }
 
-  document.documentElement.lang = resolve();
+  var locale = resolve();
+  document.documentElement.lang = locale;
+  document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr';
 })();

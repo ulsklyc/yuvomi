@@ -10,6 +10,9 @@
  * @param {string}      [opts.storageKey]      - sessionStorage key for persistence
  * @param {string}      [opts.extraClass]      - additional CSS class on bar element
  * @param {string}      [opts.ariaLabel]
+ * @param {string}      [opts.title]           - optional visible module title (left of the tabs).
+ *                                               Decorative (aria-hidden): the tablist's ariaLabel
+ *                                               already names the cluster for assistive tech.
  * @param {InsertPosition} [opts.insertPosition='afterbegin']
  * @returns {HTMLElement} the rendered bar element
  */
@@ -22,6 +25,7 @@ export function renderSubTabs(anchorEl, {
   storageKey,
   extraClass,
   ariaLabel,
+  title,
   insertPosition = 'afterbegin',
 }) {
   let current = activeId;
@@ -35,6 +39,17 @@ export function renderSubTabs(anchorEl, {
   bar.className = 'sub-tabs-bar' + (extraClass ? ' ' + extraClass : '');
   bar.setAttribute('role', 'tablist');
   if (ariaLabel) bar.setAttribute('aria-label', ariaLabel);
+
+  // Optionaler Modul-Titel links der Tabs (Canonical Page Head). Dekorativ:
+  // aria-hidden, da die Tablist via aria-label denselben Namen bereits trägt;
+  // role="tablist" exponiert dadurch weiterhin nur die Tabs.
+  if (title) {
+    const titleEl = document.createElement('span');
+    titleEl.className = 'sub-tabs-bar__title u-toolbar-title';
+    titleEl.setAttribute('aria-hidden', 'true');
+    titleEl.textContent = title;
+    bar.appendChild(titleEl);
+  }
 
   for (const { id, label, icon, separatorBefore } of tabs) {
     if (separatorBefore) {

@@ -19,25 +19,38 @@
  * ========================================================================== */
 
 /* --------------------------------------------------------------------------
- * Hero / Begrüßung — eine Instanz pro Screen
+ * Hero / Begrüßung — eine Instanz pro Screen, feste Produkt-Skala
  * ------------------------------------------------------------------------ */
 .u-hero,
-.dashboard-hero__title {
-  font-size: var(--text-4xl);
+.dashboard-hero__title,
+.dashboard-overview__title {
+  font-size: var(--type-hero-mobile);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-tight);
   letter-spacing: var(--tracking-tight);
 }
 
 /* --------------------------------------------------------------------------
- * Seitentitel — fluide 24→30px aus EINER Token-Quelle
+ * Seitentitel — feste 22px mobil, 28px Desktop
  * ------------------------------------------------------------------------ */
 .u-page-title,
-.page__title,
-.dashboard-overview__title,
+.page__title {
+  font-size: var(--type-page-title-mobile);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  letter-spacing: var(--tracking-tight);
+}
+
+/* --------------------------------------------------------------------------
+ * Canonical Page Head — Modul-Kopf-Titel (20px). EINE Rolle für den
+ * Titel im Sticky-Modulkopf: alle Module, Settings-Leaf, Split. Löst den
+ * zuvor gestreuten 18/22/28px-Konflikt der Seitentitel auf.
+ * ------------------------------------------------------------------------ */
+.u-toolbar-title,
+.page-toolbar__title,
 .settings-leaf-header__title,
 .split-title {
-  font-size: var(--type-page-title-size);
+  font-size: var(--type-toolbar-title);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-tight);
   letter-spacing: var(--tracking-tight);
@@ -48,7 +61,7 @@
  * ------------------------------------------------------------------------ */
 .u-section-title,
 .birthdays-toolbar__title,
-.birthdays-section__header h3,
+.birthdays-section__header h2,
 .recipes-header__title,
 .list-header__name,
 .shopping-cat-manager__title,
@@ -56,8 +69,12 @@
 .day-view__date-label,
 .today-cockpit__header h2,
 .settings-section__title,
+.settings-navigation-panel__title,
+.settings-navigation-group__title,
+.settings-mobile-overview__title,
+.split-group-header h2,
 .settings-empty-state__title {
-  font-size: var(--text-lg);
+  font-size: var(--type-section-title);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-snug);
   letter-spacing: var(--tracking-normal);
@@ -82,7 +99,8 @@
 .item-category__header,
 .documents-folder-browser__title,
 .nav-section-label,
-.settings-shell__navigation-heading {
+.settings-shell__navigation-heading,
+.settings-shell__navigation-toggle {
   font-size: var(--text-xs);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tight);
@@ -100,14 +118,16 @@
 .budget-entry__title,
 .contact-item__name,
 .birthday-item__name,
+.document-card__title,
 .document-row__title,
 .document-viewer__unsupported-title,
 .recipe-card__title,
+.split-card h3,
 .settings-card__title,
 .settings-member__name,
 .settings-provider__name,
 .settings-sync-info__name {
-  font-size: var(--text-base);
+  font-size: var(--type-card-title);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-snug);
 }
@@ -130,8 +150,9 @@
 .shopping-cat-row__name,
 .housekeeping-section-heading span,
 .reminder-section__title,
-.cat-row__name {
-  font-size: var(--text-sm);
+.cat-row__name,
+.cat-subrow__name {
+  font-size: var(--type-secondary);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-snug);
 }
@@ -140,25 +161,38 @@
  * Generische Rollen für neuen Code (Markup trägt u-* direkt)
  * ------------------------------------------------------------------------ */
 .u-body {
-  font-size: var(--text-base);
+  font-size: var(--type-body);
   font-weight: var(--font-weight-regular);
   line-height: var(--line-height-base);
 }
 .u-meta {
-  font-size: var(--text-sm);
+  font-size: var(--type-secondary);
   font-weight: var(--font-weight-regular);
   line-height: var(--line-height-base);
 }
 .u-label {
-  font-size: var(--text-xs);
+  font-size: var(--type-caption);
   font-weight: var(--font-weight-medium);
   line-height: var(--line-height-tight);
 }
 .u-badge {
-  font-size: var(--text-2xs);
+  font-size: var(--type-micro);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tight);
 }
 .u-section-title.u-compact {
-  font-size: var(--text-base);
+  font-size: var(--type-card-title);
+}
+
+@media (min-width: 1024px) {
+  .u-hero,
+  .dashboard-hero__title,
+  .dashboard-overview__title {
+    font-size: var(--type-hero-desktop);
+  }
+
+  .u-page-title,
+  .page__title {
+    font-size: var(--type-page-title-desktop);
+  }
 }

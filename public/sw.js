@@ -13,10 +13,11 @@
  *   → bypassCacheUntil (in-memory + Cache API für SW-Restart-Robustheit)
  */
 
-const SHELL_CACHE   = 'oikos-shell-v73';
-const PAGES_CACHE   = 'oikos-pages-v68';
-const LOCALES_CACHE = 'oikos-locales-v20';
-const ASSETS_CACHE  = 'oikos-assets-v68';
+const APP_RELEASE   = '0.72.0';
+const SHELL_CACHE   = `oikos-shell-${APP_RELEASE}`;
+const PAGES_CACHE   = `oikos-pages-${APP_RELEASE}`;
+const LOCALES_CACHE = `oikos-locales-${APP_RELEASE}`;
+const ASSETS_CACHE  = `oikos-assets-${APP_RELEASE}`;
 const BYPASS_CACHE  = 'oikos-bypass-flag';
 const ALL_CACHES    = [SHELL_CACHE, PAGES_CACHE, LOCALES_CACHE, ASSETS_CACHE];
 
@@ -25,10 +26,12 @@ const APP_SHELL = [
   '/',
   '/index.html',
   '/api.js',
+  '/lang-init.js',
   '/router.js',
   '/i18n.js',
   '/rrule-ui.js',
   '/reminders.js',
+  '/push.js',
   '/sw-register.js',
   '/lucide.min.js',
   '/styles/tokens.css',
@@ -100,6 +103,7 @@ const PAGE_MODULES = [
   '/pages/login.js',
   '/pages/recipes.js',
   '/components/shopping-category-manager.js',
+  '/components/category-manager.js',
   '/settings/registry.js',
   '/settings/shell.js',
   '/settings/components.js',
@@ -116,6 +120,7 @@ const PAGE_MODULES = [
   '/settings/pages/sync-calendar.js',
   '/settings/pages/sync-contacts.js',
   '/settings/pages/sync-reminders.js',
+  '/settings/pages/notifications.js',
   '/settings/pages/documents-storage.js',
   '/settings/pages/documents-dms.js',
   '/settings/pages/admin-family.js',
@@ -257,13 +262,14 @@ function dispatchFetch(request, url) {
   }
 
   // Lazy geladene Seiten-Module liegen in PAGES_CACHE. Neben /pages/ gehören dazu
-  // die Settings-Leaves unter /settings/ und der Einkaufskategorien-Manager —
+  // die Settings-Leaves unter /settings/ und die Kategorie-Manager-Komponenten —
   // ohne diesen Zweig würden sie via SHELL_CACHE bedient und offline (vor dem
   // ersten Online-Besuch) als index.html statt als JS-Modul ausgeliefert.
   if (
     url.pathname.startsWith('/pages/') ||
     url.pathname.startsWith('/settings/') ||
-    url.pathname === '/components/shopping-category-manager.js'
+    url.pathname === '/components/shopping-category-manager.js' ||
+    url.pathname === '/components/category-manager.js'
   ) {
     return networkFirst(request, PAGES_CACHE);
   }
@@ -338,3 +344,42 @@ function isMutableAppResource(pathname) {
     || pathname === '/manifest.json'
     || /\.(css|js|json|html)$/i.test(pathname);
 }
+
+// --------------------------------------------------------
+// Web Push
+// --------------------------------------------------------
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = { title: 'Yuvomi', body: event.data ? event.data.text() : '' };
+  }
+  const title = payload.title || 'Yuvomi';
+  const options = {
+    body: payload.body || '',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    tag: payload.tag || 'yuvomi-push',
+    data: { url: payload.url || '/reminders' },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/reminders';
+  event.waitUntil((async () => {
+    const all = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of all) {
+      if ('focus' in client) {
+        client.focus();
+        if ('navigate' in client) {
+          try { await client.navigate(targetUrl); } catch { /* cross-origin/navigation guard */ }
+        }
+        return;
+      }
+    }
+    if (clients.openWindow) await clients.openWindow(targetUrl);
+  })());
+});

@@ -8,6 +8,27 @@
   --sub-tabs-height: var(--kitchen-tabs-height);
 }
 
+@media (max-width: 640px) {
+  .kitchen-tabs-bar {
+    gap: var(--space-0h);
+    padding-inline: var(--space-2);
+  }
+
+  .kitchen-tabs-bar .sub-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    gap: var(--space-0h);
+    padding-inline: var(--space-1);
+  }
+
+  .kitchen-tabs-bar .sub-tab__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
 /* Mahlzeiten + Rezepte: Viewport-Höhe um Tab-Leiste reduzieren (Mobile).
  * Ohne diese Reduktion ist die Seite um --kitchen-tabs-height zu hoch und
  * der äußere .app-content-Scrollcontainer läuft über → beim Scrollen wandert

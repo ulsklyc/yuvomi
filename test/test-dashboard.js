@@ -7,7 +7,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { register } from 'node:module';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
-import { hydrateBirthday } from '../server/services/birthdays.js';
+import { hydrateBirthday, syncBirthdayArtifacts } from '../server/services/birthdays.js';
 import { getUpcomingEvents } from '../server/services/calendar-events.js';
 
 register('./test-browser-loader.mjs', import.meta.url);
@@ -130,6 +130,22 @@ test('Today-Highlights priorisieren dringende Aufgaben und nächsten Termin', as
   assert(result.nextEvent.title === 'Dentist', 'Nächster Termin sollte übernommen werden');
   assert(result.openShoppingCount === 1, 'Offene Einkaufsartikel sollten gezählt werden');
   assert(result.dinner.title === 'Soup', 'Abendessen sollte übernommen werden');
+});
+
+test('Today-Highlights filtert Termine auf den heutigen Tag', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+
+  const result = __test.buildTodayHighlights({
+    events: [
+      { id: 1, title: 'Termin Morgen', start_datetime: `${tomorrowStr}T10:00:00` },
+      { id: 2, title: 'Termin Heute', start_datetime: `${todayStr}T14:30:00` },
+    ],
+  });
+
+  assert(result.eventCount === 1, `Erwartet 1 Termin für heute, erhalten ${result.eventCount}`);
+  assert(result.nextEvent.title === 'Termin Heute', 'Erwartet "Termin Heute" als nächsten Termin');
 });
 
 // --------------------------------------------------------
@@ -470,6 +486,131 @@ test('getUpcomingEvents: private ICS-Termine fremder User werden ausgeblendet', 
   const ownerEvents = getUpcomingEvents(cdb, { userId: cuSofia, limit: 20 });
   assert(ownerEvents.find((e) => e.title === 'Sofias privater ICS-Termin'),
     'Eigentümer sieht seinen privaten ICS-Termin');
+});
+
+// --------------------------------------------------------
+// Bug #360: Geburtstag mit reminder_offset='' darf nicht als Kalender-Event existieren
+// --------------------------------------------------------
+{
+  const bdb = new DatabaseSync(':memory:');
+  bdb.exec(`
+    CREATE TABLE users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL, display_name TEXT NOT NULL,
+      password_hash TEXT NOT NULL, avatar_color TEXT NOT NULL DEFAULT '#007AFF',
+      avatar_data TEXT
+    );
+    CREATE TABLE calendar_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL, description TEXT,
+      start_datetime TEXT NOT NULL, end_datetime TEXT,
+      all_day INTEGER NOT NULL DEFAULT 0, location TEXT,
+      color TEXT NOT NULL DEFAULT '#007AFF', icon TEXT NOT NULL DEFAULT 'calendar',
+      assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      external_source TEXT NOT NULL DEFAULT 'local',
+      recurrence_rule TEXT,
+      subscription_id INTEGER,
+      calendar_ref_id INTEGER
+    );
+    CREATE TABLE birthdays (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL, birth_date TEXT NOT NULL, notes TEXT,
+      photo_data TEXT, created_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      calendar_event_id INTEGER REFERENCES calendar_events(id) ON DELETE SET NULL,
+      reminder_offset TEXT, reminder_custom_amount TEXT, reminder_custom_unit TEXT,
+      updated_at TEXT
+    );
+    CREATE TABLE event_assignments (
+      event_id INTEGER NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
+      user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      PRIMARY KEY (event_id, user_id)
+    );
+    CREATE TABLE ics_subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL, shared INTEGER NOT NULL DEFAULT 0,
+      created_by INTEGER REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE TABLE reminders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity_type TEXT NOT NULL, entity_id INTEGER NOT NULL,
+      remind_at TEXT NOT NULL,
+      created_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    );
+  `);
+  const bUserId = bdb.prepare(
+    `INSERT INTO users (username, display_name, password_hash, avatar_color) VALUES ('bert', 'Bert', 'x', '#ff0')`
+  ).run().lastInsertRowid;
+
+  test('syncBirthdayArtifacts: reminder_offset="" → kein calendar_event_id (Issue #360)', () => {
+    const bdId = bdb.prepare(
+      `INSERT INTO birthdays (name, birth_date, created_by, reminder_offset) VALUES ('Max', '1990-05-10', ?, '')`
+    ).run(bUserId).lastInsertRowid;
+    const bd = bdb.prepare('SELECT * FROM birthdays WHERE id = ?').get(bdId);
+    syncBirthdayArtifacts(bdb, bd);
+    const updated = bdb.prepare('SELECT calendar_event_id FROM birthdays WHERE id = ?').get(bdId);
+    assert(updated.calendar_event_id === null, 'Geburtstag ohne Benachrichtigung darf kein Kalender-Event haben');
+    const evCount = bdb.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+    assert(evCount === 0, 'Keine Kalender-Events in der DB erwartet');
+  });
+
+  test('syncBirthdayArtifacts: vorhandenes Event wird bei reminder_offset="" gelöscht (Issue #360)', () => {
+    const evId = bdb.prepare(
+      `INSERT INTO calendar_events (title, start_datetime, all_day, created_by) VALUES ('Geburtstag Hans', '1985-03-15', 1, ?)`
+    ).run(bUserId).lastInsertRowid;
+    const bdId = bdb.prepare(
+      `INSERT INTO birthdays (name, birth_date, created_by, calendar_event_id, reminder_offset) VALUES ('Hans', '1985-03-15', ?, ?, '')`
+    ).run(bUserId, evId).lastInsertRowid;
+    const bd = bdb.prepare('SELECT * FROM birthdays WHERE id = ?').get(bdId);
+    syncBirthdayArtifacts(bdb, bd);
+    const ev = bdb.prepare('SELECT * FROM calendar_events WHERE id = ?').get(evId);
+    assert(!ev, 'Vorhandenes Kalender-Event muss gelöscht worden sein');
+    const updated = bdb.prepare('SELECT calendar_event_id FROM birthdays WHERE id = ?').get(bdId);
+    assert(updated.calendar_event_id === null, 'calendar_event_id in birthdays muss NULL sein');
+  });
+
+  test('syncBirthdayArtifacts: reminder_offset gesetzt → Kalender-Event wird angelegt (Issue #360)', () => {
+    const bdId = bdb.prepare(
+      `INSERT INTO birthdays (name, birth_date, created_by, reminder_offset) VALUES ('Lisa', '1992-07-20', ?, '1440')`
+    ).run(bUserId).lastInsertRowid;
+    const bd = bdb.prepare('SELECT * FROM birthdays WHERE id = ?').get(bdId);
+    syncBirthdayArtifacts(bdb, bd);
+    const updated = bdb.prepare('SELECT calendar_event_id FROM birthdays WHERE id = ?').get(bdId);
+    assert(updated.calendar_event_id !== null, 'Geburtstag mit Erinnerung muss ein Kalender-Event haben');
+    const ev = bdb.prepare('SELECT * FROM calendar_events WHERE id = ?').get(updated.calendar_event_id);
+    assert(ev, 'Kalender-Event muss existieren');
+    assert(ev.all_day === 1, 'Geburtstags-Event muss ganztägig sein');
+  });
+}
+
+// --------------------------------------------------------
+// Bug-Fixes: ganztägige Termine + Geburtstags-Filterung
+// --------------------------------------------------------
+test('getUpcomingEvents: ganztägiger Termin heute erscheint mit fromToday=true (Issue #360)', () => {
+  const todayDate = new Date().toISOString().slice(0, 10);
+  insertEvent({
+    title: 'Ganztägiger Termin heute',
+    start_datetime: todayDate, // kein T-Teil – genau das war das Problem
+    all_day: 1,
+    created_by: cuTheo,
+  });
+  const events = getUpcomingEvents(cdb, { userId: cuTheo, limit: 20, fromToday: true });
+  assert(events.find((e) => e.title === 'Ganztägiger Termin heute'),
+    'Heutiger ganztägiger Termin muss im Dashboard erscheinen (start_datetime ohne Zeit-Teil)');
+});
+
+test('getUpcomingEvents: ganztägiger Termin in der Zukunft erscheint (Issue #360)', () => {
+  const futureDate = new Date(Date.now() + 3 * DAY).toISOString().slice(0, 10);
+  insertEvent({
+    title: 'Ganztägiger Zukunfts-Termin',
+    start_datetime: futureDate,
+    all_day: 1,
+    created_by: cuTheo,
+  });
+  const events = getUpcomingEvents(cdb, { userId: cuTheo, limit: 20, fromToday: true });
+  assert(events.find((e) => e.title === 'Ganztägiger Zukunfts-Termin'),
+    'Zukünftiger ganztägiger Termin muss im Dashboard erscheinen');
 });
 
 // --------------------------------------------------------

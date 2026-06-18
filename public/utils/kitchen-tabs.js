@@ -34,6 +34,7 @@ export function renderKitchenTabsBar(container, activeRoute) {
     storageKey: KITCHEN_STORAGE_KEY,
     extraClass: 'kitchen-tabs-bar',
     ariaLabel: t('nav.kitchen'),
+    title: t('nav.kitchen'),
     insertPosition: 'afterbegin',
     onChange: (route) => window.oikos?.navigate(route),
   });

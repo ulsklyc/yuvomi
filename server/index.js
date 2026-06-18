@@ -22,6 +22,7 @@ import * as caldavReminders from './services/caldav-reminders-sync.js';
 import * as holidays from './services/holidays.js';
 import { startScheduler as startBackupScheduler } from './services/backup-scheduler.js';
 import { startScheduler as startSplitExpenseScheduler } from './services/split-expenses-scheduler.js';
+import { startScheduler as startPushScheduler } from './services/push-scheduler.js';
 import dashboardRouter from './routes/dashboard.js';
 import tasksRouter from './routes/tasks.js';
 import shoppingRouter from './routes/shopping.js';
@@ -45,6 +46,8 @@ import familyRouter from './routes/family.js';
 import backupRouter from './routes/backup.js';
 import housekeepingRouter from './routes/housekeeping.js';
 import modulesRouter from './routes/modules.js';
+import pushRouter from './routes/push.js';
+import emailRouter from './routes/email.js';
 
 const log     = createLogger('Server');
 const logSync = createLogger('Sync');
@@ -323,6 +326,8 @@ app.use('/api/v1/family', familyRouter);
 app.use('/api/v1/backup', backupRouter);
 app.use('/api/v1/housekeeping', housekeepingRouter);
 app.use('/api/v1/modules', modulesRouter);
+app.use('/api/v1/push', pushRouter);
+app.use('/api/v1/email', emailRouter);
 
 // --------------------------------------------------------
 // Health-Check (für Docker)
@@ -405,6 +410,7 @@ app.listen(PORT, () => {
   // Backup-Scheduler starten
   startBackupScheduler();
   startSplitExpenseScheduler();
+  startPushScheduler();
 });
 
 export default app;
