@@ -215,6 +215,7 @@ router.get('/', (req, res) => {
         weather_lon:      cfgGet('weather_lon')      ?? null,
         weather_city:     cfgGet('weather_city')     ?? '',
         weather_units:    cfgGet('weather_units')    ?? 'metric',
+        weather_auto_locate: cfgGet('weather_auto_locate') === '1',
         holiday_country:       cfgGet('holiday_country')       ?? null,
         holiday_subdivision:   cfgGet('holiday_subdivision')   ?? null,
         holiday_show_public:   cfgGet('holiday_show_public')   === '1',
@@ -239,7 +240,7 @@ router.get('/', (req, res) => {
 
 router.put('/', (req, res) => {
   try {
-    const { visible_meal_types, currency, date_format, time_format, app_name, dashboard_widgets, disabled_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, weather_provider, weather_lat, weather_lon, weather_city, weather_units, holiday_country, holiday_subdivision, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
+    const { visible_meal_types, currency, date_format, time_format, app_name, dashboard_widgets, disabled_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, holiday_country, holiday_subdivision, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
 
     if (visible_meal_types !== undefined) {
       if (!Array.isArray(visible_meal_types)) {
@@ -333,7 +334,8 @@ router.put('/', (req, res) => {
       weather_lat      !== undefined ||
       weather_lon      !== undefined ||
       weather_city     !== undefined ||
-      weather_units    !== undefined
+      weather_units    !== undefined ||
+      weather_auto_locate !== undefined
     ) {
       if (req.authRole !== 'admin') {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
@@ -369,6 +371,12 @@ router.put('/', (req, res) => {
           return res.status(400).json({ error: `Ungültige Einheit. Erlaubt: ${VALID_WEATHER_UNITS.join(', ')}`, code: 400 });
         }
         cfgSet('weather_units', weather_units);
+      }
+      if (weather_auto_locate !== undefined) {
+        if (typeof weather_auto_locate !== 'boolean') {
+          return res.status(400).json({ error: 'weather_auto_locate muss ein Boolean sein.', code: 400 });
+        }
+        cfgSet('weather_auto_locate', weather_auto_locate ? '1' : '0');
       }
     }
 
@@ -457,6 +465,7 @@ router.put('/', (req, res) => {
         weather_lon:      cfgGet('weather_lon')      ?? null,
         weather_city:     cfgGet('weather_city')     ?? '',
         weather_units:    cfgGet('weather_units')    ?? 'metric',
+        weather_auto_locate: cfgGet('weather_auto_locate') === '1',
         holiday_country:       cfgGet('holiday_country')       ?? null,
         holiday_subdivision:   cfgGet('holiday_subdivision')   ?? null,
         holiday_show_public:   cfgGet('holiday_show_public')   === '1',
