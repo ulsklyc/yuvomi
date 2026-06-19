@@ -1276,6 +1276,9 @@ export async function maybeUpdateAutoLocation({ autoLocateEnabled, userRole, geo
     await putPreferences({
       weather_lat: position.coords.latitude.toFixed(4),
       weather_lon: position.coords.longitude.toFixed(4),
+      // Stadt-Label gehört zu den alten Koordinaten — löschen, damit das Widget
+      // auf die "lat, lon"-Anzeige zurückfällt statt einen veralteten Namen zu zeigen.
+      weather_city: '',
     });
     return true;
   } catch {
