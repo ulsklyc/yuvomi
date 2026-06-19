@@ -414,6 +414,40 @@ test('agendaSegmentKind: Ganztags-Event ist all-day', () => {
   assert(agendaSegmentKind(ev, '2026-06-14') === 'all-day', 'Ganztägig → all-day');
 });
 
+const { clickedTime, HOUR_HEIGHT } = calendarHelpers;
+
+function colAt(top) {
+  return { getBoundingClientRect: () => ({ top }) };
+}
+
+test('clickedTime: Klick auf Spaltenanfang ergibt 00:00', () => {
+  assert(clickedTime({ clientY: 0 }, colAt(0)) === '00:00', 'yOffset 0 → 00:00');
+});
+
+test('clickedTime: Klick wird auf 30 Minuten gerundet', () => {
+  const y = (14.5 / 24) * (HOUR_HEIGHT * 24);
+  assert(clickedTime({ clientY: y }, colAt(0)) === '14:30', 'Klick bei 14:30 bleibt 14:30');
+});
+
+test('clickedTime: Minuten zwischen den Rastern runden zum nächsten 30-Minuten-Schritt', () => {
+  const y = (HOUR_HEIGHT * 10) + (HOUR_HEIGHT * 20 / 60);
+  assert(clickedTime({ clientY: y }, colAt(0)) === '10:30', '10:20 rundet auf 10:30');
+});
+
+test('clickedTime: Klick oberhalb der Spalte wird auf 00:00 geklemmt', () => {
+  assert(clickedTime({ clientY: 5 }, colAt(50)) === '00:00', 'negativer yOffset → 00:00');
+});
+
+test('clickedTime: Klick am Tagesende wird auf 23:30 geklemmt', () => {
+  const y = HOUR_HEIGHT * 25;
+  assert(clickedTime({ clientY: y }, colAt(0)) === '23:30', 'yOffset über 24h → 23:30');
+});
+
+test('clickedTime: berücksichtigt die Scroll-Position der Spalte (rect.top)', () => {
+  const y = 200 + (HOUR_HEIGHT * 2);
+  assert(clickedTime({ clientY: y }, colAt(200)) === '02:00', 'rect.top wird von clientY abgezogen');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------

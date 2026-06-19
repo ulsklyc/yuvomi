@@ -1315,7 +1315,7 @@ function nowTop() {
   return (minutes / 60) * HOUR_HEIGHT;
 }
 
-/** Berechnet die geklickte Uhrzeit (auf 15-Minuten gerundet) aus einem Click-Event
+/** Berechnet die geklickte Uhrzeit (auf 30-Minuten gerundet) aus einem Click-Event
  *  relativ zum übergebenen Spalten-Element. */
 function clickedTime(e, colEl) {
   const rect = colEl.getBoundingClientRect();
@@ -1536,6 +1536,8 @@ export const __test = {
   agendaSegmentKind,
   hasAttachment,
   attachmentUrls,
+  clickedTime,
+  HOUR_HEIGHT,
 };
 
 function renderAgendaEvent(ev, dayStr) {
