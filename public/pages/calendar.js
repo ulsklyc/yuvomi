@@ -1320,7 +1320,7 @@ function nowTop() {
 function clickedTime(e, colEl) {
   const rect = colEl.getBoundingClientRect();
   const yOffset = Math.max(0, e.clientY - rect.top);
-  const totalMinutes = Math.round((yOffset / HOUR_HEIGHT) * 60 / 15) * 15;
+  const totalMinutes = Math.round((yOffset / HOUR_HEIGHT) * 60 / 30) * 30;
   const clamped = Math.min(Math.max(totalMinutes, 0), 23 * 60 + 30);
   return `${pad(Math.floor(clamped / 60))}:${pad(clamped % 60)}`;
 }
