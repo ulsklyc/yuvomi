@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.75.0] - 2026-06-19
+
+### Added
+- **Per-user weather location:** any user — not just the admin — can now set their own weather location, units, and automatic-location-updates toggle under Settings → Personal → My Weather, overriding the household default just for their own dashboard widget. A status indicator shows whether a personal location or the household default is active, and a "Use household default" action clears the override. The dashboard's automatic location updates (introduced in v0.74.7) now write to this per-user override for every user instead of being admin-only.
+
 ## [0.74.8] - 2026-06-19
 
 ### Fixed
