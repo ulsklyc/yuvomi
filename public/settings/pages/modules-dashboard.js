@@ -68,6 +68,13 @@ function renderPage(container, preferences) {
             </button>
           </div>
           <div class="form-group">
+            <label class="toggle-row">
+              <input type="checkbox" id="weather-auto-locate"${preferences.weather_auto_locate ? ' checked' : ''}>
+              <span>${t('settings.weatherAutoLocateLabel')}</span>
+            </label>
+            <p class="form-hint">${t('settings.weatherAutoLocateHint')}</p>
+          </div>
+          <div class="form-group">
             <label class="form-label" for="weather-city">${t('settings.weatherCityLabel')}</label>
             <input class="form-input" type="text" id="weather-city" maxlength="100"
               value="${esc(preferences.weather_city ?? '')}"
@@ -123,6 +130,7 @@ function weatherPreferenceData(container) {
     weather_city: container.querySelector('#weather-city')?.value.trim() ?? '',
     weather_units: container.querySelector('#weather-units')?.value ?? 'metric',
     weather_provider: 'open-meteo',
+    weather_auto_locate: container.querySelector('#weather-auto-locate')?.checked ?? false,
   };
 }
 
@@ -147,6 +155,34 @@ function refreshBranding(appName) {
   }));
 }
 
+function requestLocation(container, locateButton) {
+  if (!navigator.geolocation) {
+    window.oikos?.showToast(t('settings.weatherLocateUnsupported'), 'warning');
+    return;
+  }
+
+  locateButton.disabled = true;
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      if (!isConnectedWeatherControl(locateButton, container)) return;
+
+      const latitudeInput = container.querySelector('#weather-lat');
+      const longitudeInput = container.querySelector('#weather-lon');
+      latitudeInput.value = position.coords.latitude.toFixed(4);
+      longitudeInput.value = position.coords.longitude.toFixed(4);
+      locateButton.disabled = false;
+      window.oikos?.showToast(t('settings.weatherLocateSuccess'), 'success');
+    },
+    (error) => {
+      if (!isConnectedWeatherControl(locateButton, container)) return;
+
+      locateButton.disabled = false;
+      window.oikos?.showToast(error.message || t('common.errorGeneric'), 'danger');
+    },
+    { enableHighAccuracy: true, timeout: 8000 },
+  );
+}
+
 function bindWeatherEvents(container, user) {
   const form = container.querySelector('#weather-form');
   const errorElement = container.querySelector('#weather-form-error');
@@ -168,6 +204,7 @@ function bindWeatherEvents(container, user) {
         weather_city: preferenceData.weather_city,
         weather_units: preferenceData.weather_units,
         weather_provider: preferenceData.weather_provider,
+        weather_auto_locate: preferenceData.weather_auto_locate,
       });
       window.oikos?.showToast(t('settings.weatherSaved'), 'success');
       await render(container, { user });
@@ -188,32 +225,11 @@ function bindWeatherEvents(container, user) {
   });
 
   const locateButton = container.querySelector('#weather-locate-btn');
-  locateButton.addEventListener('click', () => {
-    if (!navigator.geolocation) {
-      window.oikos?.showToast(t('settings.weatherLocateUnsupported'), 'warning');
-      return;
-    }
+  locateButton.addEventListener('click', () => requestLocation(container, locateButton));
 
-    locateButton.disabled = true;
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        if (!isConnectedWeatherControl(locateButton, container)) return;
-
-        const latitudeInput = container.querySelector('#weather-lat');
-        const longitudeInput = container.querySelector('#weather-lon');
-        latitudeInput.value = position.coords.latitude.toFixed(4);
-        longitudeInput.value = position.coords.longitude.toFixed(4);
-        locateButton.disabled = false;
-        window.oikos?.showToast(t('settings.weatherLocateSuccess'), 'success');
-      },
-      (error) => {
-        if (!isConnectedWeatherControl(locateButton, container)) return;
-
-        locateButton.disabled = false;
-        window.oikos?.showToast(error.message || t('common.errorGeneric'), 'danger');
-      },
-      { enableHighAccuracy: true, timeout: 8000 },
-    );
+  const autoLocateCheckbox = container.querySelector('#weather-auto-locate');
+  autoLocateCheckbox?.addEventListener('change', () => {
+    if (autoLocateCheckbox.checked) requestLocation(container, locateButton);
   });
 }
 

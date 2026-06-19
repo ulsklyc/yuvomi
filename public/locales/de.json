@@ -1414,7 +1414,9 @@
         "pageEmailDescription": "SMTP-Server für Passwort-Zurücksetzen und Benachrichtigungen.",
         "resetPasswordLabel": "Neues Passwort",
         "resetPasswordPlaceholder": "Leer lassen, um das Passwort beizubehalten",
-        "resetPasswordHint": "Optional. Nur ausfüllen, um das Passwort dieses Mitglieds zurückzusetzen."
+        "resetPasswordHint": "Optional. Nur ausfüllen, um das Passwort dieses Mitglieds zurückzusetzen.",
+        "weatherAutoLocateLabel": "Standort automatisch alle 30 Minuten aktualisieren",
+        "weatherAutoLocateHint": "Fragt die Standortfreigabe einmalig an und aktualisiert den Standort danach automatisch, solange das Dashboard geöffnet ist."
     },
     "login": {
         "tagline": "Familienplanung. Sicher. Datenschutzfreundlich. Open Source.",
