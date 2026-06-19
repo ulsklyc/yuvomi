@@ -394,6 +394,7 @@ test('module-specific settings leaves only reference their owned preferences and
         'weather_lon',
         'weather_city',
         'weather_units',
+        'weather_auto_locate',
       ],
     },
   };
