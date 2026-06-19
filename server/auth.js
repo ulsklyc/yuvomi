@@ -326,6 +326,19 @@ function updateUserRoleSessions(userId, role) {
   }
 }
 
+function invalidateUserSessions(userId, exceptSid) {
+  const allSessions = db.get().prepare('SELECT sid, sess FROM sessions').all();
+  for (const row of allSessions) {
+    if (row.sid === exceptSid) continue;
+    try {
+      const sess = JSON.parse(row.sess);
+      if (sess.userId === userId) {
+        db.get().prepare('DELETE FROM sessions WHERE sid = ?').run(row.sid);
+      }
+    } catch { /* ignore malformed session */ }
+  }
+}
+
 function authenticateApiToken(req) {
   const token = extractApiToken(req);
   if (!token) return null;
@@ -1072,7 +1085,9 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
 
 /**
  * PATCH /api/v1/auth/users/:id
- * Admin only. Updates a family member profile and system-admin flag.
+ * Admin only. Updates a family member profile, system-admin flag, and
+ * optionally resets the member's password (e.g. when they forgot it and
+ * have no working email for the self-service reset flow).
  */
 router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req, res) => {
   try {
@@ -1113,8 +1128,15 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
       return res.status(400).json({ error: memberFields.errors.join(' '), code: 400 });
     }
 
+    const newPassword = req.body.password !== undefined ? String(req.body.password) : '';
+    if (newPassword && newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters long.', code: 400 });
+    }
+
     const adminError = assertAdminWouldRemain(userId, nextRole);
     if (adminError) return res.status(400).json({ error: adminError, code: 400 });
+
+    const newPasswordHash = newPassword ? await bcrypt.hash(newPassword, 12) : null;
 
     db.transaction(() => {
       db.get().prepare(`
@@ -1122,6 +1144,10 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
         SET username = ?, display_name = ?, avatar_color = ?, avatar_data = ?, role = ?, family_role = ?
         WHERE id = ?
       `).run(username, displayName, avatarColor || '#007AFF', avatarData ?? null, nextRole, familyRole, userId);
+
+      if (newPasswordHash) {
+        db.get().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newPasswordHash, userId);
+      }
 
       syncFamilyMemberArtifacts(db.get(), userId, {
         displayName,
@@ -1132,6 +1158,10 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
         actorUserId: req.authUserId,
       });
     });
+
+    if (newPasswordHash) {
+      invalidateUserSessions(userId, req.sessionID);
+    }
 
     if (nextRole !== existing.role) {
       updateUserRoleSessions(userId, nextRole);
@@ -1226,18 +1256,7 @@ router.patch('/me/password', requireAuth, csrfMiddleware, async (req, res) => {
     const hash = await bcrypt.hash(new_password, 12);
     db.get().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.authUserId);
 
-    // Alle anderen Sessions dieses Users invalidieren (aktuelle behalten)
-    const currentSid = req.sessionID;
-    const allSessions = db.get().prepare('SELECT sid, sess FROM sessions').all();
-    for (const row of allSessions) {
-      if (row.sid === currentSid) continue;
-      try {
-        const sess = JSON.parse(row.sess);
-        if (sess.userId === req.authUserId) {
-          db.get().prepare('DELETE FROM sessions WHERE sid = ?').run(row.sid);
-        }
-      } catch { /* ignore malformed session */ }
-    }
+    invalidateUserSessions(req.authUserId, req.sessionID);
 
     res.json({ ok: true });
   } catch (err) {

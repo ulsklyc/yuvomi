@@ -1411,7 +1411,10 @@
         "pushTestTitle": "Yuvomi",
         "pushTestBody": "Das ist eine Testbenachrichtigung.",
         "pageEmail": "E-Mail (SMTP)",
-        "pageEmailDescription": "SMTP-Server für Passwort-Zurücksetzen und Benachrichtigungen."
+        "pageEmailDescription": "SMTP-Server für Passwort-Zurücksetzen und Benachrichtigungen.",
+        "resetPasswordLabel": "Neues Passwort",
+        "resetPasswordPlaceholder": "Leer lassen, um das Passwort beizubehalten",
+        "resetPasswordHint": "Optional. Nur ausfüllen, um das Passwort dieses Mitglieds zurückzusetzen."
     },
     "login": {
         "tagline": "Familienplanung. Sicher. Datenschutzfreundlich. Open Source.",

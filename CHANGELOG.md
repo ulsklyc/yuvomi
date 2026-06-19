@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.74.6] - 2026-06-19
+
+### Added
+- **Admin password reset for family members:** the "Edit member" dialog now has an optional "Reset password" field (min. 8 characters, leave blank to keep the current password), so an admin can set a new password for a family member who forgot theirs — no SMTP/`BASE_URL` setup required, unlike the self-service "Forgot password" flow. Changing a member's password invalidates their other active sessions. (Fixes #372)
+
 ## [0.74.5] - 2026-06-19
 
 ### Added

@@ -300,6 +300,11 @@ function openEditMemberModal(member, currentUser, users, container) {
           <input class="form-input" type="date" id="edit-member-birth-date" value="${esc(member.birth_date || '')}" />
           <p class="form-hint">${t('settings.memberContactBirthdayHint')}</p>
         </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-member-password">${t('settings.resetPasswordLabel')}</label>
+          <input class="form-input" type="password" id="edit-member-password" minlength="8" autocomplete="new-password" placeholder="${t('settings.resetPasswordPlaceholder')}" />
+          <p class="form-hint">${t('settings.resetPasswordHint')}</p>
+        </div>
         <label class="toggle-row">
           <input type="checkbox" id="edit-member-system-admin" ${member.role === 'admin' ? 'checked' : ''} />
           <span>${t('settings.systemAdminLabel')}</span>
@@ -357,6 +362,7 @@ function openEditMemberModal(member, currentUser, users, container) {
           submitBtn.disabled = false;
           return;
         }
+        const newPassword = panel.querySelector('#edit-member-password')?.value || '';
         submitBtn.disabled = true;
         try {
           const res = await auth.updateUser(member.id, {
@@ -369,6 +375,7 @@ function openEditMemberModal(member, currentUser, users, container) {
             phone: panel.querySelector('#edit-member-phone')?.value.trim() || null,
             email: panel.querySelector('#edit-member-email')?.value.trim() || null,
             birth_date: parseDateInput(birthDateRaw) || null,
+            ...(newPassword ? { password: newPassword } : {}),
           });
           const idx = users.findIndex((u) => u.id === member.id);
           if (idx !== -1) users[idx] = res.user;

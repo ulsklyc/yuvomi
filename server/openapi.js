@@ -1587,6 +1587,7 @@ function buildOpenApiSpec(req, appVersion) {
           properties: {
             username: { type: 'string' },
             display_name: { type: 'string' },
+            password: { type: 'string', description: 'Write-only. Omit or leave empty to keep the current password.' },
             avatar_color: { type: 'string' },
             avatar_data: { type: ['string', 'null'], description: 'PNG, JPEG, or WebP data URL. Use null to remove.' },
             family_role: { type: 'string', enum: ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'] },

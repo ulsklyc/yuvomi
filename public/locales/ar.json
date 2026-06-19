@@ -1405,7 +1405,10 @@
         "pushTestTitle": "Yuvomi",
         "pushTestBody": "هذا إشعار تجريبي.",
         "pageEmail": "Email (SMTP)",
-        "pageEmailDescription": "SMTP server for password resets and notifications."
+        "pageEmailDescription": "SMTP server for password resets and notifications.",
+        "resetPasswordLabel": "[de: Neues Passwort]",
+        "resetPasswordPlaceholder": "[de: Leer lassen, um das Passwort beizubehalten]",
+        "resetPasswordHint": "[de: Optional. Nur ausfüllen, um das Passwort dieses Mitglieds zurückzusetzen.]"
     },
     "login": {
         "tagline": "تخطيط عائلي. آمن. يحترم الخصوصية. مفتوح المصدر.",
