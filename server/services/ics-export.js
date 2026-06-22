@@ -43,6 +43,32 @@ function formatUTC(iso) {
          `T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
 }
 
+function hasExplicitOffset(iso) {
+  // true, wenn der String ein 'Z' oder ein explizites [+-]HH:MM / [+-]HHMM Offset trägt.
+  return /Z$|[+-]\d{2}:?\d{2}$/.test(iso);
+}
+
+function formatLocal(iso) {
+  // iso (naiv, ohne Offset): 'YYYY-MM-DDTHH:MM' oder 'YYYY-MM-DDTHH:MM:SS'
+  // → 'YYYYMMDDTHHMMSS', reines String-Parsing (kein Date-Objekt!), damit die
+  // Ziffern unverändert vom Eingabewert übernommen werden (floating local time,
+  // RFC 5545 — kein 'Z', kein TZID).
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/.exec(iso);
+  if (!m) throw new Error(`formatLocal: unerwartetes Format: ${iso}`);
+  const [, y, mo, d, h, mi, s] = m;
+  return `${y}${mo}${d}T${h}${mi}${s || '00'}`;
+}
+
+function isRecurrenceExpired(rrule, windowStart) {
+  // Begrenzte Prüfung: nur UNTIL=-Klauseln werden berücksichtigt (RFC 5545: YYYYMMDD
+  // oder YYYYMMDDTHHMMSSZ). COUNT-basierte oder offene RRULEs gelten als nicht
+  // abgelaufen — eine vollständige Occurrence-Expansion ist hier bewusst out of scope.
+  const m = /UNTIL=(\d{8})/.exec(rrule || '');
+  if (!m) return false;
+  const untilDate = `${m[1].slice(0, 4)}-${m[1].slice(4, 6)}-${m[1].slice(6, 8)}`;
+  return untilDate < windowStart;
+}
+
 function formatDate(dateKey) {
   // dateKey: 'YYYY-MM-DD' → 'YYYYMMDD'
   return dateKey.slice(0, 10).replace(/-/g, '');
@@ -64,8 +90,15 @@ function buildVEvent(ev, dtstamp) {
     const endKey = ev.end_datetime || ev.start_datetime;
     lines.push(`DTEND;VALUE=DATE:${addDaysDateKey(endKey, 1)}`);
   } else {
-    lines.push(`DTSTART:${formatUTC(ev.start_datetime)}`);
-    if (ev.end_datetime) lines.push(`DTEND:${formatUTC(ev.end_datetime)}`);
+    // Extern synchronisierte Events tragen ein explizites Z/Offset → echte UTC-Konvertierung.
+    // Lokal angelegte Events sind naiv (keine Z/Offset) → floating local time, unverändert
+    // übernommen, damit sie beim Abonnenten exakt wie in der App selbst angezeigt werden.
+    const startFmt = hasExplicitOffset(ev.start_datetime) ? formatUTC(ev.start_datetime) : formatLocal(ev.start_datetime);
+    lines.push(`DTSTART:${startFmt}`);
+    if (ev.end_datetime) {
+      const endFmt = hasExplicitOffset(ev.end_datetime) ? formatUTC(ev.end_datetime) : formatLocal(ev.end_datetime);
+      lines.push(`DTEND:${endFmt}`);
+    }
   }
   lines.push(`SUMMARY:${escapeICSText(ev.title)}`);
   if (ev.description) lines.push(`DESCRIPTION:${escapeICSText(ev.description)}`);
@@ -96,7 +129,8 @@ function buildFeed(conn, userId, now = new Date()) {
       OR DATE(e.start_datetime) >= ?
     )
     ORDER BY e.start_datetime ASC
-  `).all(userId, windowStart);
+  `).all(userId, windowStart)
+    .filter(ev => !isRecurrenceExpired(ev.recurrence_rule, windowStart));
 
   const dtstamp = formatUTC(now.toISOString());
   const out = [

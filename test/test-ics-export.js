@@ -78,6 +78,24 @@ test('buildFeed enthält eigenes lokales Event', () => {
   assert(ics.includes('BEGIN:VCALENDAR'), 'kein VCALENDAR');
   assert(ics.includes('SUMMARY:Zahnarzt'), 'Titel fehlt');
   assert(ics.includes('DTSTART:20260625T090000Z'), 'DTSTART falsch: ' + ics);
+  assert(ics.includes('DTEND:20260625T100000Z'), 'DTEND falsch: ' + ics);
+  assert(/DTSTART:20260625T090000Z\r\n/.test(ics), 'DTSTART sollte mit Z (UTC) enden, extern/offset-behaftete Eingabe darf nicht in floating local übergehen: ' + ics);
+});
+
+test('buildFeed: naives lokales Event (ohne Z) wird als floating local time exportiert, NICHT als UTC', () => {
+  // Spiegelt exakt, was das Erstellen-Formular erzeugt: kein Offset, keine Sekunden.
+  d2.prepare(`INSERT INTO calendar_events (title,start_datetime,end_datetime,all_day,external_source,created_by) VALUES ('Naiv','2026-06-26T14:30','2026-06-26T15:30',0,'local',?)`).run(u1);
+  const ics = buildFeed(d2, u1, NOW);
+  assert(ics.includes('SUMMARY:Naiv'), 'Titel fehlt');
+  assert(ics.includes('DTSTART:20260626T143000'), 'DTSTART-Ziffern falsch: ' + ics);
+  assert(ics.includes('DTEND:20260626T153000'), 'DTEND-Ziffern falsch: ' + ics);
+  // Regression: vorher hätte formatUTC() fälschlich ein 'Z' angehängt und das Event
+  // als UTC interpretiert (Verschiebung um die Server-Zeitzone beim Client). Floating
+  // local time darf KEIN 'Z' tragen.
+  assert(!/DTSTART:20260626T143000Z/.test(ics), 'DTSTART darf kein Z (UTC-Marker) tragen: ' + ics);
+  assert(!/DTEND:20260626T153000Z/.test(ics), 'DTEND darf kein Z (UTC-Marker) tragen: ' + ics);
+  assert(/DTSTART:20260626T143000\r\n/.test(ics), 'DTSTART-Zeile muss exakt ohne Z enden: ' + ics);
+  assert(/DTEND:20260626T153000\r\n/.test(ics), 'DTEND-Zeile muss exakt ohne Z enden: ' + ics);
 });
 
 test('buildFeed: Ganztags-Event nutzt VALUE=DATE, DTEND exklusiv', () => {
@@ -91,6 +109,18 @@ test('buildFeed: RRULE wird mit Präfix übernommen', () => {
   d2.prepare(`INSERT INTO calendar_events (title,start_datetime,all_day,external_source,recurrence_rule,created_by) VALUES ('Müll','2026-01-05T07:00:00Z',0,'local','FREQ=WEEKLY;BYDAY=MO',?)`).run(u1);
   const ics = buildFeed(d2, u1, NOW);
   assert(ics.includes('RRULE:FREQ=WEEKLY;BYDAY=MO'), 'RRULE fehlt: ' + ics);
+});
+
+test('buildFeed: wiederkehrendes Event mit abgelaufenem UNTIL (Vergangenheit) wird ausgeschlossen', () => {
+  d2.prepare(`INSERT INTO calendar_events (title,start_datetime,all_day,external_source,recurrence_rule,created_by) VALUES ('AlteSerie','2019-01-07T07:00:00Z',0,'local','FREQ=WEEKLY;BYDAY=MO;UNTIL=20200101T000000Z',?)`).run(u1);
+  const ics = buildFeed(d2, u1, NOW);
+  assert(!ics.includes('AlteSerie'), 'abgelaufene Serie (UNTIL in Vergangenheit) sollte nicht im Feed sein: ' + ics);
+});
+
+test('buildFeed: wiederkehrendes Event mit zukünftigem UNTIL bleibt enthalten', () => {
+  d2.prepare(`INSERT INTO calendar_events (title,start_datetime,all_day,external_source,recurrence_rule,created_by) VALUES ('LaufendeSerie','2026-01-05T07:00:00Z',0,'local','FREQ=WEEKLY;BYDAY=MO;UNTIL=20271231T000000Z',?)`).run(u1);
+  const ics = buildFeed(d2, u1, NOW);
+  assert(ics.includes('LaufendeSerie'), 'Serie mit zukünftigem UNTIL sollte im Feed sein: ' + ics);
 });
 
 test('buildFeed: geteiltes ICS-Abo-Event ist enthalten', () => {
