@@ -113,5 +113,34 @@ test('buildFeed: altes nicht-wiederkehrendes Event außerhalb Fenster fehlt', ()
   assert(!ics.includes('Uralt'), '90-Tage-Fenster nicht angewandt');
 });
 
+import { getFeedToken, regenerateFeedToken, clearFeedToken, findUserIdByFeedToken }
+  from '../server/services/ics-export.js';
+
+test('regenerateFeedToken erzeugt Token und persistiert', () => {
+  const tok = regenerateFeedToken(d2, u1);
+  assert(typeof tok === 'string' && tok.length >= 32, 'Token zu kurz');
+  assert(getFeedToken(d2, u1) === tok, 'nicht persistiert');
+});
+
+test('findUserIdByFeedToken findet Nutzer', () => {
+  const tok = regenerateFeedToken(d2, u2);
+  assert(findUserIdByFeedToken(d2, tok) === u2, 'Lookup falsch');
+  assert(findUserIdByFeedToken(d2, 'unbekannt') === null, 'unbekannter Token darf null sein');
+});
+
+test('regenerate ersetzt alten Token (alter wird ungültig)', () => {
+  const oldTok = regenerateFeedToken(d2, u1);
+  const newTok = regenerateFeedToken(d2, u1);
+  assert(oldTok !== newTok, 'Token unverändert');
+  assert(findUserIdByFeedToken(d2, oldTok) === null, 'alter Token noch gültig');
+  assert(findUserIdByFeedToken(d2, newTok) === u1, 'neuer Token ungültig');
+});
+
+test('clearFeedToken deaktiviert Feed', () => {
+  regenerateFeedToken(d2, u1);
+  clearFeedToken(d2, u1);
+  assert(getFeedToken(d2, u1) === null, 'Token nicht gelöscht');
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

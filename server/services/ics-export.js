@@ -5,6 +5,8 @@
  * Abhängigkeiten: keine externen.
  */
 
+import { randomBytes } from 'node:crypto';
+
 function escapeICSText(s) {
   if (s == null) return '';
   return String(s)
@@ -110,4 +112,28 @@ function buildFeed(conn, userId, now = new Date()) {
   return out.join('\r\n') + '\r\n';
 }
 
-export { escapeICSText, foldLine, buildFeed };
+function getFeedToken(conn, userId) {
+  const row = conn.prepare(`SELECT calendar_feed_token AS t FROM users WHERE id = ?`).get(userId);
+  return row?.t ?? null;
+}
+
+function regenerateFeedToken(conn, userId) {
+  const token = randomBytes(32).toString('base64url');
+  conn.prepare(`UPDATE users SET calendar_feed_token = ? WHERE id = ?`).run(token, userId);
+  return token;
+}
+
+function clearFeedToken(conn, userId) {
+  conn.prepare(`UPDATE users SET calendar_feed_token = NULL WHERE id = ?`).run(userId);
+}
+
+function findUserIdByFeedToken(conn, token) {
+  if (!token) return null;
+  const row = conn.prepare(`SELECT id FROM users WHERE calendar_feed_token = ?`).get(token);
+  return row?.id ?? null;
+}
+
+export {
+  escapeICSText, foldLine, buildFeed,
+  getFeedToken, regenerateFeedToken, clearFeedToken, findUserIdByFeedToken,
+};
