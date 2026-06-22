@@ -602,6 +602,13 @@ const MIGRATIONS_SQL = {
     INSERT INTO search_index (entity, entity_id, title, body)
       SELECT 'item', id, COALESCE(name, ''), '' FROM shopping_items;
   `,
+  61: `
+    ALTER TABLE users ADD COLUMN calendar_feed_token TEXT;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_calendar_feed_token
+      ON users(calendar_feed_token)
+      WHERE calendar_feed_token IS NOT NULL;
+  `,
 };
 
 export { MIGRATIONS_SQL };
