@@ -88,7 +88,7 @@
     "express-rate-limit": "^8.5.2",
     "express-session": "^1.19.0",
     "helmet": "^8.2.0",
-    "node-cron": "^4.2.1",
+    "node-cron": "^4.5.0",
     "node-fetch": "^3.3.2",
     "nodemailer": "^9.0.1",
     "openid-client": "^6.8.4",
