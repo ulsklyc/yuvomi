@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.76.0] - 2026-06-22
+
+### Added
+- **Read-only calendar export feed:** Settings → Calendar now lets any user expose their visible calendar events (own events, assigned events, and shared/own ICS subscriptions) as a `webcal://`/`https://` ICS feed for subscribing in Apple Calendar, Google Calendar, Thunderbird, and similar apps. Enabling the feed generates a secret token; "Regenerate link" rotates it (invalidating the old URL) and "Disable feed" clears it. The feed is served by a public, token-authenticated `GET /feed/calendar/:token.ics` route, rate-limited to 30 requests/minute per IP. (Discussion #387)
+
 ## [0.75.2] - 2026-06-20
 
 ### Changed
