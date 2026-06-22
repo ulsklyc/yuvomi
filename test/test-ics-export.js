@@ -98,6 +98,17 @@ test('buildFeed: naives lokales Event (ohne Z) wird als floating local time expo
   assert(/DTEND:20260626T153000\r\n/.test(ics), 'DTEND-Zeile muss exakt ohne Z enden: ' + ics);
 });
 
+test('buildFeed: Event mit explizitem Offset (z.B. Google-Sync) wird korrekt nach UTC konvertiert', () => {
+  // Google liefert RFC3339 mit Offset statt Z, z.B. '+02:00'. formatUTC() darf hier
+  // KEIN 'Z' anhängen (sonst '...+02:00Z' → Date invalid → 'NaN...' im Feed).
+  d2.prepare(`INSERT INTO calendar_events (title,start_datetime,end_datetime,all_day,external_source,created_by) VALUES ('Google-Termin','2026-06-25T09:00:00+02:00','2026-06-25T10:00:00+02:00',0,'local',?)`).run(u1);
+  const ics = buildFeed(d2, u1, NOW);
+  assert(ics.includes('SUMMARY:Google-Termin'), 'Titel fehlt');
+  assert(!/NaN/.test(ics), 'Feed enthält NaN: ' + ics);
+  assert(ics.includes('DTSTART:20260625T070000Z'), 'DTSTART falsch nach UTC konvertiert: ' + ics);
+  assert(ics.includes('DTEND:20260625T080000Z'), 'DTEND falsch nach UTC konvertiert: ' + ics);
+});
+
 test('buildFeed: Ganztags-Event nutzt VALUE=DATE, DTEND exklusiv', () => {
   d2.prepare(`INSERT INTO calendar_events (title,start_datetime,end_datetime,all_day,external_source,created_by) VALUES ('Urlaub','2026-07-01','2026-07-03',1,'local',?)`).run(u1);
   const ics = buildFeed(d2, u1, NOW);

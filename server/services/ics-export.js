@@ -36,16 +36,19 @@ function foldLine(line) {
 
 function pad(n) { return String(n).padStart(2, '0'); }
 
-function formatUTC(iso) {
-  // iso: 'YYYY-MM-DDTHH:MM:SSZ' (oder ohne Z → als UTC interpretiert)
-  const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
-  return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}` +
-         `T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
-}
-
 function hasExplicitOffset(iso) {
   // true, wenn der String ein 'Z' oder ein explizites [+-]HH:MM / [+-]HHMM Offset trägt.
   return /Z$|[+-]\d{2}:?\d{2}$/.test(iso);
+}
+
+function formatUTC(iso) {
+  // iso: 'YYYY-MM-DDTHH:MM:SSZ', mit explizitem Offset (z.B. '+02:00') oder naiv
+  // (→ als UTC interpretiert). Nur naive Werte bekommen ein 'Z' angehängt — bei
+  // einem vorhandenen Offset würde das sonst einen ungültigen String erzeugen
+  // (z.B. '...+02:00Z' → Date ist invalid → 'NaN...' im Feed).
+  const d = new Date(hasExplicitOffset(iso) ? iso : iso + 'Z');
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}` +
+         `T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
 }
 
 function formatLocal(iso) {
