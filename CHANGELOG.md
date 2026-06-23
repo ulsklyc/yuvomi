@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Shopping lists: can't check/uncheck items after switching lists:** switching to another list (or renaming one) re-bound the click handler on the persistent list container without removing the previous one, so each tap on an item's checkbox fired the toggle twice and cancelled itself out — only adding items still worked. The click delegation is now bound once per container. (Fixes #398)
+
 ## [0.77.1] - 2026-06-23
 
 ### Fixed

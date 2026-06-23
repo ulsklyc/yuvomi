@@ -300,6 +300,26 @@ test('Abhaken aktualisiert nur die betroffene Zeile statt die ganze Liste neu zu
 });
 
 // --------------------------------------------------------
+test('Klick-Delegation wird pro #list-content nur einmal gebunden (Issue #398)', () => {
+  const source = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
+  const wireFn = source.match(/function wireListContentEvents[\s\S]*?\n}/)?.[0] ?? '';
+  assert(wireFn, 'wireListContentEvents muss auffindbar sein');
+
+  // Die Klick-Delegation hängt am stabilen #list-content (nur Kinder werden via
+  // replaceChildren ersetzt). switchList/rename rufen wireListContentEvents erneut auf —
+  // ohne Guard würde der Listener dupliziert und ein Toggle-Klick höbe sich auf.
+  const guardIdx = wireFn.search(/dataset\.eventsWired/);
+  const clickIdx = wireFn.search(/addEventListener\('click'/);
+  assert(guardIdx >= 0, 'wireListContentEvents muss einen Einmal-Guard (dataset.eventsWired) besitzen');
+  assert(clickIdx >= 0, 'wireListContentEvents muss die Klick-Delegation binden');
+  assert(guardIdx < clickIdx, 'Der Einmal-Guard muss vor der Klick-Bindung greifen');
+
+  // Rename-per-Enter hängt an einem pro Render neu erzeugten Element und muss
+  // weiterhin bei jedem Aufruf verdrahtet werden.
+  assert(/function wireRenameKeydown/.test(source), 'wireRenameKeydown-Helper muss existieren');
+});
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 console.log(`\n[Shopping-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

@@ -739,6 +739,16 @@ function wireListContentEvents(container) {
   const content = container.querySelector('#list-content');
   if (!content) return;
 
+  // Die Klick-Delegation an das stabile #list-content-Element nur EINMAL anhängen.
+  // renderListContent ersetzt lediglich die Kinder (replaceChildren), nicht das
+  // Element selbst — würde der Listener bei jedem switchList/rename erneut gebunden,
+  // feuerte ein Toggle-Klick mehrfach und höbe sich auf (Issue #398).
+  if (content.dataset.eventsWired) {
+    wireRenameKeydown(content);
+    return;
+  }
+  content.dataset.eventsWired = 'true';
+
   content.addEventListener('click', async (e) => {
     const target = e.target.closest('[data-action]');
     if (!target) {
@@ -907,7 +917,15 @@ function wireListContentEvents(container) {
     }
   });
 
-  // Rename per Enter
+  wireRenameKeydown(content);
+}
+
+/**
+ * Verdrahtet „Rename per Enter" auf dem Listen-Header. Das Element wird bei jedem
+ * renderListContent neu erzeugt, daher muss diese Bindung pro Render erfolgen —
+ * im Gegensatz zur delegierten Klick-Bindung am stabilen #list-content (Issue #398).
+ */
+function wireRenameKeydown(content) {
   content.querySelector('[data-action="rename-list"]')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') e.currentTarget.click();
   });
