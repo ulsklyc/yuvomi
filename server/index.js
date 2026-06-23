@@ -18,6 +18,7 @@ import { buildOpenApiSpec } from './openapi.js';
 import * as googleCalendar from './services/google-calendar.js';
 import * as appleCalendar from './services/apple-calendar.js';
 import * as icsSubscription from './services/ics-subscription.js';
+import * as icsExport from './services/ics-export.js';
 import * as caldavReminders from './services/caldav-reminders-sync.js';
 import * as holidays from './services/holidays.js';
 import { startScheduler as startBackupScheduler } from './services/backup-scheduler.js';
@@ -286,6 +287,31 @@ function sendOpenApi(req, res) {
 app.get('/api/v1/openapi.json', requireAuth, requireAdmin, sendOpenApi);
 // /openapi.json liegt außerhalb von /api/, daher Rate-Limiter explizit als Route-Middleware.
 app.get('/openapi.json', apiLimiter, requireAuth, requireAdmin, sendOpenApi);
+
+// --------------------------------------------------------
+// Öffentlicher read-only ICS-Feed (Discussion #387)
+// Außerhalb /api/v1: keine Session/CSRF — Token in URL ist das Geheimnis.
+// --------------------------------------------------------
+const feedLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.get('/feed/calendar/:token.ics', feedLimiter, (req, res) => {
+  try {
+    const userId = icsExport.findUserIdByFeedToken(db.get(), req.params.token);
+    if (!userId) return res.status(404).type('text/plain').send('Not found');
+    const ics = icsExport.buildFeed(db.get(), userId);
+    res.set('Cache-Control', 'private, no-store');
+    res.set('Content-Disposition', 'inline; filename="yuvomi.ics"');
+    res.type('text/calendar; charset=utf-8').send(ics);
+  } catch (err) {
+    log.error('', err);
+    res.status(500).type('text/plain').send('Internal error');
+  }
+});
 
 // Alle weiteren API-Routen erfordern Authentifizierung + CSRF-Schutz
 app.use('/api/v1', requireAuth);

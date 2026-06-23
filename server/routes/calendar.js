@@ -11,6 +11,7 @@ import * as db from '../db.js';
 import * as googleCalendar from '../services/google-calendar.js';
 import * as appleCalendar from '../services/apple-calendar.js';
 import * as icsSubscription from '../services/ics-subscription.js';
+import * as icsExport from '../services/ics-export.js';
 import * as caldavSync from '../services/caldav-sync.js';
 import * as caldavReminders from '../services/caldav-reminders-sync.js';
 import * as holidays from '../services/holidays.js';
@@ -642,6 +643,49 @@ router.post('/subscriptions/:id/sync', async (req, res) => {
     await icsSubscription.sync(subId);
     const updated = db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').get(subId);
     res.json({ data: updated });
+  } catch (err) {
+    log.error('', err);
+    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+  }
+});
+
+// --------------------------------------------------------
+// Read-only ICS-Export-Feed (Discussion #387)
+// --------------------------------------------------------
+function feedUrl(req, token) {
+  const base = process.env.BASE_URL?.replace(/\/+$/, '')
+    || `${req.protocol}://${req.get('host')}`;
+  return `${base}/feed/calendar/${token}.ics`;
+}
+
+// GET /api/v1/calendar/feed → aktueller Feed-Status
+router.get('/feed', (req, res) => {
+  try {
+    const token = icsExport.getFeedToken(db.get(), getUserId(req));
+    if (!token) return res.json({ data: null });
+    res.json({ data: { token, url: feedUrl(req, token) } });
+  } catch (err) {
+    log.error('', err);
+    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+  }
+});
+
+// POST /api/v1/calendar/feed/regenerate → neuen Token erzeugen
+router.post('/feed/regenerate', (req, res) => {
+  try {
+    const token = icsExport.regenerateFeedToken(db.get(), getUserId(req));
+    res.json({ data: { token, url: feedUrl(req, token) } });
+  } catch (err) {
+    log.error('', err);
+    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+  }
+});
+
+// DELETE /api/v1/calendar/feed → Feed deaktivieren
+router.delete('/feed', (req, res) => {
+  try {
+    icsExport.clearFeedToken(db.get(), getUserId(req));
+    res.json({ data: { token: null } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
