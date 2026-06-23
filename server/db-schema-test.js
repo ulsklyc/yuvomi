@@ -609,6 +609,9 @@ const MIGRATIONS_SQL = {
       ON users(calendar_feed_token)
       WHERE calendar_feed_token IS NOT NULL;
   `,
+  62: `
+    ALTER TABLE reminders ADD COLUMN pushed_at TEXT;
+  `,
 };
 
 export { MIGRATIONS_SQL };
