@@ -116,6 +116,14 @@ function renderPage(container, user) {
     <section class="settings-section">
       <div id="sync-more-providers-container"></div>
     </section>
+
+    <section class="settings-section">
+      <h2 class="settings-section__title">${t('settings.feedExportTitle')}</h2>
+      <div class="settings-card">
+        <p class="settings-card-description">${t('settings.feedExportDescription')}</p>
+        <div id="feed-export-body"></div>
+      </div>
+    </section>
   `);
 }
 
@@ -984,6 +992,98 @@ async function renderMoreProviders(container, user) {
 }
 
 // --------------------------------------------------------------------------
+// Read-only ICS export feed
+// --------------------------------------------------------------------------
+
+function renderFeedExportInactive(body) {
+  body.replaceChildren();
+  body.insertAdjacentHTML('beforeend', `
+    <p class="settings-card-description">${t('settings.feedExportInactive')}</p>
+    <div class="settings-form-actions">
+      <button type="button" class="btn btn--primary" id="feed-activate">${t('settings.feedExportActivate')}</button>
+    </div>
+  `);
+}
+
+function renderFeedExportActive(body, data) {
+  const webcal = data.url.replace(/^https?:\/\//i, 'webcal://');
+  body.replaceChildren();
+  body.insertAdjacentHTML('beforeend', `
+    <div class="form-group">
+      <label class="form-label" for="feed-url">${t('settings.feedExportUrlLabel')}</label>
+      <input id="feed-url" class="form-input" type="text" readonly value="${esc(data.url)}">
+      <p class="form-hint">${t('settings.feedExportHint')}</p>
+    </div>
+    <div class="settings-form-actions">
+      <button type="button" class="btn btn--secondary" id="feed-copy">${t('settings.feedExportCopy')}</button>
+      <a class="btn btn--secondary" href="${esc(webcal)}">${t('settings.feedExportSubscribe')}</a>
+      <button type="button" class="btn btn--secondary" id="feed-regen">${t('settings.feedExportRegenerate')}</button>
+      <button type="button" class="btn btn--danger-outline" id="feed-disable">${t('settings.feedExportDisable')}</button>
+    </div>
+  `);
+}
+
+async function loadFeedExport(container, user) {
+  const body = container.querySelector('#feed-export-body');
+  if (!body) return;
+
+  const reload = () => loadFeedExport(container, user);
+
+  let res;
+  try {
+    res = await api.get('/calendar/feed');
+  } catch (err) {
+    body.replaceChildren();
+    body.appendChild(createInlineError(err.message || t('common.errorGeneric')));
+    return;
+  }
+
+  const data = res?.data;
+  if (!data) {
+    renderFeedExportInactive(body);
+    body.querySelector('#feed-activate')?.addEventListener('click', async () => {
+      try {
+        await api.post('/calendar/feed/regenerate');
+        showToast(t('settings.feedExportTitle'), 'success');
+        await reload();
+      } catch (err) {
+        showToast(err.message || t('common.errorGeneric'), 'danger');
+      }
+    });
+    return;
+  }
+
+  renderFeedExportActive(body, data);
+
+  body.querySelector('#feed-copy')?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard?.writeText(data.url);
+      showToast(t('settings.feedExportCopied'), 'success');
+    } catch (err) {
+      showToast(err.message || t('common.errorGeneric'), 'danger');
+    }
+  });
+  body.querySelector('#feed-regen')?.addEventListener('click', async () => {
+    if (!await confirmModal(t('settings.feedExportRegenerateConfirm'), { danger: true })) return;
+    try {
+      await api.post('/calendar/feed/regenerate');
+      await reload();
+    } catch (err) {
+      showToast(err.message || t('common.errorGeneric'), 'danger');
+    }
+  });
+  body.querySelector('#feed-disable')?.addEventListener('click', async () => {
+    if (!await confirmModal(t('settings.feedExportDisableConfirm'), { danger: true })) return;
+    try {
+      await api.delete('/calendar/feed');
+      await reload();
+    } catch (err) {
+      showToast(err.message || t('common.errorGeneric'), 'danger');
+    }
+  });
+}
+
+// --------------------------------------------------------------------------
 // OAuth callback banner
 // --------------------------------------------------------------------------
 
@@ -1050,6 +1150,7 @@ export async function render(container, { user, query } = {}) {
 
   await loadCalDAVAccounts(container, user);
   await renderMoreProviders(container, user);
+  await loadFeedExport(container, user);
 
   handleOAuthCallback(container, query);
 
