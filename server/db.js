@@ -2268,6 +2268,13 @@ const MIGRATIONS = [
         WHERE calendar_feed_token IS NOT NULL;
     `,
   },
+  {
+    version: 62,
+    description: 'restore reminders.pushed_at dropped by the migration 57 table rebuild',
+    up: `
+      ALTER TABLE reminders ADD COLUMN pushed_at TEXT;
+    `,
+  },
 ];
 
 /**
