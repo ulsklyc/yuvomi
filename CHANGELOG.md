@@ -10,6 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Hungarian locale**: full Hungarian (`hu`) translation added, covering all UI strings across all modules (tasks, calendar, shopping, meals, budget, notes, contacts, birthdays, recipes, documents, housekeeping, settings, and more). Hungarian is now selectable in Settings → Language. The web installer wizard and CLI installer are localized as well.
 
+## [0.77.3] - 2026-06-24
+
+### Fixed
+- **Split expenses: adding a family member as a group guest restricted their navigation to the Split page only:** when an existing user was added to an expense group with the `guest` role via the members endpoint, they were incorrectly written into the `split_expense_guest_users` table. This caused `access_scope` to be resolved as `split_guest` on their next login, hiding all navigation items except Budget/Split. The `split_expense_guest_users` table is now exclusively populated by the dedicated guest-account creation flow. A database migration removes existing incorrect entries for users who have no `guest_created` activity record. (Fixes #400)
+
+## [0.77.2] - 2026-06-23
+
+### Fixed
+- **Shopping lists: can't check/uncheck items after switching lists:** switching to another list (or renaming one) re-bound the click handler on the persistent list container without removing the previous one, so each tap on an item's checkbox fired the toggle twice and cancelled itself out — only adding items still worked. The click delegation is now bound once per container. (Fixes #398)
+
+## [0.77.1] - 2026-06-23
+
+### Fixed
+- **Missing `reminders.pushed_at` column after database rebuild:** migration 57 rebuilt the `reminders` table without carrying over the `pushed_at` column added in migration 54, causing `PushScheduler` to fail with `no such column: r.pushed_at` on every fresh install or update. A new migration restores the column. (Fixes #393)
+- **Schema-test export out of sync:** the node:sqlite-synchronized schema export used by tests had stopped at migration 61, so schema tests applying the exported migrations never picked up the restored `reminders.pushed_at` column.
+
+## [0.77.0] - 2026-06-23
+
+### Fixed
+- **Calendar export feed: events with an explicit UTC offset:** events synced from sources that store an explicit timezone offset (e.g. Google Calendar, like `+02:00`) were exported with an invalid timestamp (`...+02:00Z`), producing `NaN` date/time values in the ICS feed instead of being converted to UTC. The export now correctly distinguishes offset-qualified timestamps from naive local ones.
+
+## [0.76.0] - 2026-06-22
+
+### Added
+- **Read-only calendar export feed:** Settings → Calendar now lets any user expose their visible calendar events (own events, assigned events, and shared/own ICS subscriptions) as a `webcal://`/`https://` ICS feed for subscribing in Apple Calendar, Google Calendar, Thunderbird, and similar apps. Enabling the feed generates a secret token; "Regenerate link" rotates it (invalidating the old URL) and "Disable feed" clears it. The feed is served by a public, token-authenticated `GET /feed/calendar/:token.ics` route, rate-limited to 30 requests/minute per IP. (Discussion #387)
+
 ## [0.75.2] - 2026-06-20
 
 ### Changed

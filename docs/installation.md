@@ -441,7 +441,7 @@ in Settings → Administration → Email (non-empty env values here override the
 | `EMAIL_SMTP_PASS` | SMTP auth password. | - | No |
 | `EMAIL_FROM_ADDRESS` | Sender email address. | - | No |
 | `EMAIL_FROM_NAME` | Sender display name. | `Yuvomi` | No |
-| `BASE_URL` | Absolute origin used to build password-reset links, e.g. `https://yuvomi.example.com`. **Required for reset emails to be sent** — the request `Host` header is never trusted as a fallback, to prevent reset-link poisoning. | - | No* |
+| `BASE_URL` | Absolute origin used to build password-reset links and calendar export-feed URLs, e.g. `https://yuvomi.example.com`. **Required for reset emails to be sent** — the request `Host` header is never trusted as a fallback, to prevent reset-link poisoning. The export feed falls back to the request's protocol/host when unset. | - | No* |
 
 \* Not required to start Yuvomi, but without it the "Forgot password" flow silently sends no email
 even when SMTP is otherwise configured.

@@ -527,15 +527,6 @@ router.post('/groups/:id/members', async (req, res) => {
       VALUES (?, ?, ?, ?)
       ON CONFLICT(group_id, user_id) DO UPDATE SET role = excluded.role
     `).run(groupId, memberUserId, role, userId(req));
-    if (role === 'guest') {
-      const existingGuestRow = db.get().prepare('SELECT group_id FROM split_expense_guest_users WHERE user_id = ?').get(memberUserId);
-      if (existingGuestRow && existingGuestRow.group_id !== groupId) {
-        return res.status(409).json({ error: 'This guest account is already assigned to another group.', code: 409 });
-      }
-      if (!existingGuestRow) {
-        db.get().prepare('INSERT INTO split_expense_guest_users (user_id, group_id, created_by) VALUES (?, ?, ?)').run(memberUserId, groupId, userId(req));
-      }
-    }
     activity(groupId, userId(req), 'member_added', 'member', memberUserId, { role });
     res.status(201).json({ data: { group_id: groupId, user_id: memberUserId, role } });
   } catch (err) {

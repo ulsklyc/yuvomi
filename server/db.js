@@ -2257,6 +2257,35 @@ const MIGRATIONS = [
         ON notification_deliveries(status, next_attempt_at);
     `,
   },
+  {
+    version: 61,
+    description: 'add per-user read-only calendar feed token',
+    up: `
+      ALTER TABLE users ADD COLUMN calendar_feed_token TEXT;
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_calendar_feed_token
+        ON users(calendar_feed_token)
+        WHERE calendar_feed_token IS NOT NULL;
+    `,
+  },
+  {
+    version: 62,
+    description: 'restore reminders.pushed_at dropped by the migration 57 table rebuild',
+    up: `
+      ALTER TABLE reminders ADD COLUMN pushed_at TEXT;
+    `,
+  },
+  {
+    version: 63,
+    description: 'Remove existing family members incorrectly added to split_expense_guest_users',
+    up: `
+      DELETE FROM split_expense_guest_users
+      WHERE user_id NOT IN (
+        SELECT DISTINCT entity_id FROM expense_activity
+        WHERE type = 'guest_created' AND entity_type = 'member' AND entity_id IS NOT NULL
+      );
+    `,
+  },
 ];
 
 /**
