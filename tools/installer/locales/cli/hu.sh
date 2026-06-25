@@ -1,4 +1,4 @@
-# Yuvomi CLI-Installer — English (en)
+# Yuvomi CLI-Installer — Hungarian (hu)
 # Auto-generiert (Schlüssel identisch zu allen Locales). en = Fallback, de = Referenz.
 # Wird von install.sh gesourct; setzt die englische Basis pro Schlüssel außer Kraft.
 # Punkt-Schlüssel → Variablen mit Unterstrich (MSG_<bereich>_<name>).

@@ -196,7 +196,7 @@ Each module is independent. Use what fits, skip what doesn't.
 
 ### Web installer (recommended)
 
-A localized setup wizard — 19 languages — that runs in your browser. Auto-detects Docker or Podman, configures HTTPS, SSO, and scheduled backups, then starts the container and creates your admin account.
+A localized setup wizard — 20 languages — that runs in your browser. Auto-detects Docker or Podman, configures HTTPS, SSO, and scheduled backups, then starts the container and creates your admin account.
 
 ```bash
 git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi

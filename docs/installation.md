@@ -10,7 +10,7 @@ node tools/installer/install-server.js
 # Open http://localhost:8090
 ```
 
-Requires Node.js 18+ on the host. The browser-based wizard is fully localized (19 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` — including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups — starts the container, and creates your admin account. The engine still runs the app itself.
+Requires Node.js 18+ on the host. The browser-based wizard is fully localized (20 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` — including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups — starts the container, and creates your admin account. The engine still runs the app itself.
 
 ### Option B — CLI Installer (Linux / macOS)
 
@@ -19,9 +19,9 @@ git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi
 bash install.sh
 ```
 
-The script checks prerequisites, generates security keys, configures optional integrations, starts the container (Docker or Podman — auto-detected), and creates your admin account. Like the web installer, it is fully localized in 19 languages and auto-detects yours from the shell environment (`LANG`/`LC_ALL`).
+The script checks prerequisites, generates security keys, configures optional integrations, starts the container (Docker or Podman — auto-detected), and creates your admin account. Like the web installer, it is fully localized in 20 languages and auto-detects yours from the shell environment (`LANG`/`LC_ALL`).
 
-Force a specific language with `--lang` (one of `de en es fr it sv el ru tr zh ja ar hi pt uk pl nl vi`):
+Force a specific language with `--lang` (one of `de en es fr it sv el ru tr zh ja ar hi pt uk pl nl cs vi hu`):
 
 ```bash
 bash install.sh --lang de
@@ -168,7 +168,7 @@ node tools/installer/install-server.js
 
 #### 3. Open the Wizard
 
-Open your browser and navigate to **http://localhost:8090**. The wizard detects your browser language (19 languages supported), verifies that a container engine is available (Docker with Compose v2, or Podman with `podman compose` / `podman-compose`), and reports any existing `.env` file or running container before you start. It then guides you through:
+Open your browser and navigate to **http://localhost:8090**. The wizard detects your browser language (20 languages supported), verifies that a container engine is available (Docker with Compose v2, or Podman with `podman compose` / `podman-compose`), and reports any existing `.env` file or running container before you start. It then guides you through:
 
 - Basics — timezone (`TZ`) and HTTP host port (`OIKOS_HTTP_PORT`)
 - Security key generation (`SESSION_SECRET`, `DB_ENCRYPTION_KEY`)
