@@ -462,7 +462,7 @@ function renderUpcomingEvents(events) {
     const _suffix = t('calendar.timeSuffix');
     const timeStr = e.all_day ? t('dashboard.allDay') : `${formatTime(d)}${_suffix ? ' ' + _suffix : ''}`.trim();
     return `
-      <div class="event-item" data-route="/calendar" role="button" tabindex="0">
+      <div class="event-item" data-route="/calendar?open=${e.id}" role="button" tabindex="0">
         <div class="event-item__bar" style="background-color:${esc(e.color || e.cal_color) || 'var(--color-accent)'}"></div>
         <div class="event-item__content">
           <div class="event-item__title">${esc(e.title)}</div>
@@ -653,7 +653,7 @@ function renderTodayCockpit(data) {
       </div>
       <div class="today-cockpit__grid">
         ${!window.oikos?.isModuleDisabled('tasks')    ? renderTodayCard('check-square',   t('dashboard.todayTask'),     taskTitle, '/tasks', 'task', highlights.taskCount) : ''}
-        ${!window.oikos?.isModuleDisabled('calendar') ? renderTodayCard('calendar',        t('dashboard.todayEvent'),    eventTitle, '/calendar', 'event', highlights.eventCount) : ''}
+        ${!window.oikos?.isModuleDisabled('calendar') ? renderTodayCard('calendar',        t('dashboard.todayEvent'),    eventTitle, highlights.nextEvent ? `/calendar?open=${highlights.nextEvent.id}` : '/calendar', 'event', highlights.eventCount) : ''}
         ${!window.oikos?.isModuleDisabled('shopping') ? renderTodayCard('shopping-cart',   t('dashboard.todayShopping'), t('dashboard.todayShoppingCount', { count: highlights.openShoppingCount }), '/shopping', 'shopping') : ''}
         ${!window.oikos?.isModuleDisabled('meals')    ? renderTodayCard('utensils',        t('dashboard.todayDinner'),   dinnerTitle, '/meals', 'dinner') : ''}
       </div>

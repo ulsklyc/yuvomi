@@ -835,6 +835,20 @@ export async function render(container, { user }) {
     </div>
   `);
 
+  const openId = new URLSearchParams(window.location.search).get('open');
+  let initialEvent = null;
+  if (openId) {
+    try {
+      const eventRes = await api.get(`/calendar/${openId}`);
+      if (eventRes?.data) {
+        initialEvent = eventRes.data;
+        state.cursor = localDate(initialEvent.start_datetime);
+      }
+    } catch (err) {
+      console.warn('[Calendar] Deep-link event load failed:', err);
+    }
+  }
+
   const { from, to } = getRangeForView(state.view, state.cursor);
   const [,, prefsRes, documentOptionsRes] = await Promise.all([
     loadRange(from, to),
@@ -852,16 +866,18 @@ export async function render(container, { user }) {
 
   container.querySelector('#fab-new-event')?.addEventListener('click', () => openEventModal({ mode: 'create' }));
 
-  // Deep-Link: ?open=<id> öffnet direkt das Edit-Modal
-  const openId = new URLSearchParams(window.location.search).get('open');
-  if (openId) {
-    try {
-      const [eventRes, reminder] = await Promise.all([
-        api.get(`/calendar/${openId}`),
-        loadReminderForEvent(openId),
-      ]);
-      openEventModal({ mode: 'edit', event: eventRes.data, reminder });
-    } catch { /* Event existiert nicht oder kein Zugriff */ }
+  if (initialEvent) {
+    const chip = container.querySelector(`[data-id="${openId}"]`);
+    if (chip) {
+      showEventPopup(initialEvent, chip);
+    } else {
+      try {
+        const reminder = await loadReminderForEvent(openId);
+        openEventModal({ mode: 'edit', event: initialEvent, reminder });
+      } catch {
+        openEventModal({ mode: 'edit', event: initialEvent });
+      }
+    }
   }
 }
 
