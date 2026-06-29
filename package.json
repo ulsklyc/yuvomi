@@ -98,7 +98,7 @@
   },
   "optionalDependencies": {
     "googleapis": "^173.0.0",
-    "tsdav": "^2.2.2"
+    "tsdav": "^2.3.0"
   },
   "license": "MIT",
   "devDependencies": {
