@@ -187,6 +187,59 @@ function generateRecurringInstances(database, month) {
   }
 }
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const STATS_RANGES = new Set(['week', 'month', 'year']);
+
+function ymd(d) { return d.toISOString().slice(0, 10); }        // YYYY-MM-DD (UTC)
+function ym(d)  { return d.toISOString().slice(0, 7);  }        // YYYY-MM   (UTC)
+
+/**
+ * Leitet Zeitraum, Vorperiode und lückenlose Bucket-Keys aus range+anchor ab.
+ * @param {'week'|'month'|'year'} range
+ * @param {string} anchor  YYYY-MM-DD
+ */
+export function computeStatsRange(range, anchor) {
+  if (!STATS_RANGES.has(range)) throw new Error('invalid range');
+  if (!DATE_RE.test(anchor)) throw new Error('invalid anchor');
+  const a = new Date(`${anchor}T00:00:00Z`);
+  if (Number.isNaN(a.getTime())) throw new Error('invalid anchor');
+
+  if (range === 'week') {
+    const dow = (a.getUTCDay() + 6) % 7; // Mo=0 .. So=6
+    const start = new Date(a); start.setUTCDate(a.getUTCDate() - dow);
+    const end   = new Date(start); end.setUTCDate(start.getUTCDate() + 6);
+    const prevS = new Date(start); prevS.setUTCDate(start.getUTCDate() - 7);
+    const prevE = new Date(start); prevE.setUTCDate(start.getUTCDate() - 1);
+    const bucketKeys = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start); d.setUTCDate(start.getUTCDate() + i);
+      bucketKeys.push(ymd(d));
+    }
+    return { range, from: ymd(start), to: ymd(end), prevFrom: ymd(prevS), prevTo: ymd(prevE), granularity: 'day', bucketKeys };
+  }
+
+  if (range === 'month') {
+    const y = a.getUTCFullYear(), m = a.getUTCMonth();
+    const start = new Date(Date.UTC(y, m, 1));
+    const end   = new Date(Date.UTC(y, m + 1, 0));
+    const prevS = new Date(Date.UTC(y, m - 1, 1));
+    const prevE = new Date(Date.UTC(y, m, 0));
+    const bucketKeys = [];
+    for (let d = 1; d <= end.getUTCDate(); d++) bucketKeys.push(ymd(new Date(Date.UTC(y, m, d))));
+    return { range, from: ymd(start), to: ymd(end), prevFrom: ymd(prevS), prevTo: ymd(prevE), granularity: 'day', bucketKeys };
+  }
+
+  // year
+  const y = a.getUTCFullYear();
+  const bucketKeys = [];
+  for (let mo = 0; mo < 12; mo++) bucketKeys.push(ym(new Date(Date.UTC(y, mo, 1))));
+  return {
+    range, from: `${y}-01-01`, to: `${y}-12-31`,
+    prevFrom: `${y - 1}-01-01`, prevTo: `${y - 1}-12-31`,
+    granularity: 'month', bucketKeys,
+  };
+}
+
 function slugify(value) {
   return String(value || '')
     .normalize('NFD')
