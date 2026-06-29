@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.78.0] - 2026-06-29
+
+### Added
+- **Budget → Statistics tab:** new dedicated view with weekly/monthly/yearly range buttons, a period stepper, summary cards for income/expense/balance plus comparison against the previous period, an SVG trend chart of income vs. expenses, category bars, an expense-share donut, and a CSV-export button for the active range. Translated for all 20 locales.
+- **`GET /api/v1/budget/stats`:** new endpoint backing the Statistics tab — `?range=week|month|year&anchor=YYYY-MM-DD` returns totals, prior-period comparison, per-period series, and per-category breakdown.
+
+### Changed
+- **`GET /api/v1/budget/export`:** also accepts `?from=YYYY-MM-DD&to=YYYY-MM-DD` to export an arbitrary date range; the legacy `?month=YYYY-MM` form keeps working.
+
 ## [0.77.9] - 2026-06-28
 
 ### Changed
