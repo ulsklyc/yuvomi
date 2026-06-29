@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.78.4] - 2026-06-30
+
+### Fixed
+- **Dashboard → Calendar deep links:** recurring events opened from the upcoming-events widget or Today Cockpit now jump to the displayed occurrence instead of the original series start date, and the popup/edit flow receives the expanded occurrence date. (PR #415)
+
 ## [0.78.3] - 2026-06-29
 
 ### Fixed

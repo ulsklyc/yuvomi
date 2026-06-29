@@ -923,7 +923,7 @@ like `apple_app_password` and Google OAuth tokens; encryption-at-rest is via the
 
 Responsive grid: 1 column on mobile, 2 on tablet, 3 on desktop.
 
-**Today Cockpit (v0.52.40):** a compact summary strip renders above the widget grid that highlights at a glance: the next urgent/high-priority task, the next upcoming calendar event, the open shopping item count, and the planned dinner for today. Tapping any cockpit item navigates directly to the relevant module. The calendar cockpit card deep-links to the next event via `?open=<id>` so the event detail popup opens immediately on arrival.
+**Today Cockpit (v0.52.40):** a compact summary strip renders above the widget grid that highlights at a glance: the next urgent/high-priority task, the next upcoming calendar event, the open shopping item count, and the planned dinner for today. Tapping any cockpit item navigates directly to the relevant module. The calendar cockpit card deep-links to the next event via `?open=<id>&date=YYYY-MM-DD` so the event detail popup opens immediately on the displayed occurrence.
 
 **Mobile readability (v0.55.7):** on narrow phones, important cockpit cards span the full grid width so long German task/event titles do not split mid-word. Quick actions keep tokenized icon-button dimensions, and the dashboard reserves scroll room for the fixed FAB so it does not cover the first widget.
 
@@ -932,7 +932,7 @@ Responsive grid: 1 column on mobile, 2 on tablet, 3 on desktop.
 **Widgets:**
 - Greeting: "Good [morning/afternoon/evening], [Name]" + date; auto-refreshes on `visibilitychange` so the greeting stays current during long sessions
 - Weather: server-side proxy with two providers — **Open-Meteo** (default, no API key, WMO codes mapped to Lucide icons and translated via `wmo.*` i18n keys) and **OpenWeatherMap** (legacy, via `OPENWEATHER_*`). Provider resolves from DB preferences (Settings → Modules → Overview) first, then env vars. 5-day preview, refresh every 30 min, hide widget on API error
-- Upcoming events: next 3–5, color-coded by person; each row navigates to `/calendar?open=<id>` so the event detail popup opens immediately
+- Upcoming events: next 3–5, color-coded by person; each row navigates to `/calendar?open=<id>&date=YYYY-MM-DD` so the event detail popup opens on the displayed occurrence, including recurring series instances
 - Urgent tasks: priority urgent/high + due_date ≤48h
 - Today's meals: meals for the current day
 - Pinboard preview: 2–3 pinned notes (Markdown formatting rendered)
