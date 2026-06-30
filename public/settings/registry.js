@@ -1,5 +1,5 @@
-export const SETTINGS_STORAGE_KEY = 'oikos:settings:path';
-export const LEGACY_SETTINGS_STORAGE_KEY = 'oikos:settings:tab';
+export const SETTINGS_STORAGE_KEY = 'yuvomi:settings:path';
+export const LEGACY_SETTINGS_STORAGE_KEY = 'yuvomi:settings:tab';
 
 const freezeEntries = (entries) => Object.freeze(entries.map((entry) => Object.freeze(entry)));
 

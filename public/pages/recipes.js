@@ -112,7 +112,7 @@ export async function render(container) {
     }
 
     if (actionBtn.dataset.action === 'add-to-meals') {
-      window.oikos?.navigate(`/meals?recipe=${recipe.id}`);
+      window.yuvomi?.navigate(`/meals?recipe=${recipe.id}`);
     }
   });
 }
@@ -360,7 +360,7 @@ async function saveRecipe(panel, mode, recipe) {
   const recipe_url = panel.querySelector('#recipe-url')?.value.trim() || null;
 
   if (!title) {
-    window.oikos?.showToast(t('recipes.titleRequired'), 'error');
+    window.yuvomi?.showToast(t('recipes.titleRequired'), 'error');
     return;
   }
 
@@ -386,10 +386,10 @@ async function saveRecipe(panel, mode, recipe) {
 
     closeModal({ force: true });
     renderRecipeList();
-    window.oikos?.showToast(mode === 'create' ? t('recipes.created') : t('recipes.updated'), 'success');
+    window.yuvomi?.showToast(mode === 'create' ? t('recipes.created') : t('recipes.updated'), 'success');
   } catch (err) {
     saveBtn.disabled = false;
-    window.oikos?.showToast(err.data?.error ?? t('common.errorGeneric'), 'error');
+    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'error');
   }
 }
 
@@ -398,7 +398,7 @@ async function removeRecipe(recipe) {
   if (itemEl) itemEl.style.display = 'none';
 
   let undone = false;
-  window.oikos?.showToast(t('recipes.deleted'), 'default', 5000, () => {
+  window.yuvomi?.showToast(t('recipes.deleted'), 'default', 5000, () => {
     undone = true;
     if (itemEl) itemEl.style.display = '';
   });
@@ -411,7 +411,7 @@ async function removeRecipe(recipe) {
       renderRecipeList();
     } catch (err) {
       if (itemEl) itemEl.style.display = '';
-      window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     }
   }, 5000);
 }
@@ -431,8 +431,8 @@ async function duplicateRecipe(recipe) {
     const res = await api.post('/recipes', { title, notes, recipe_url, ingredients });
     state.recipes.push(res.data);
     renderRecipeList();
-    window.oikos?.showToast(t('recipes.duplicated'), 'success');
+    window.yuvomi?.showToast(t('recipes.duplicated'), 'success');
   } catch (err) {
-    window.oikos?.showToast(err.data?.error ?? t('common.errorGeneric'), 'error');
+    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'error');
   }
 }

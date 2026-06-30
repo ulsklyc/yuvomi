@@ -22,7 +22,7 @@ function runLangInitState({ stored = null, languages = undefined, language = und
     localStorage: {
       getItem(key) {
         if (throwOnStorage) throw new Error('blocked');
-        return key === 'oikos-locale' ? stored : null;
+        return key === 'yuvomi-locale' ? stored : null;
       },
     },
   };

@@ -124,14 +124,14 @@ function buildCliContent() {
   wrap.className = 'settings-backup-cli';
   wrap.insertAdjacentHTML('beforeend', `
     <p class="form-hint">${t('settings.backupCliHint')}</p>
-    <pre class="settings-code-block"><code>SERVICE=oikos
-BACKUP="$PWD/oikos-backup.db"
+    <pre class="settings-code-block"><code>SERVICE=yuvomi
+BACKUP="$PWD/yuvomi-backup.db"
 docker compose stop "$SERVICE"
-docker compose run --rm -v "$BACKUP:/tmp/oikos-restore.db:ro" --entrypoint sh "$SERVICE" -c 'set -eu; target="\${DB_PATH:-/data/oikos.db}"; stamp=$(date -u +%Y%m%dT%H%M%SZ); if [ -f "$target" ]; then cp "$target" "$target.pre-restore-$stamp"; fi; rm -f "$target-wal" "$target-shm"; cp /tmp/oikos-restore.db "$target"; chown node:node "$target" 2&gt;/dev/null || true'
+docker compose run --rm -v "$BACKUP:/tmp/yuvomi-restore.db:ro" --entrypoint sh "$SERVICE" -c 'set -eu; target="\${DB_PATH:-/data/yuvomi.db}"; stamp=$(date -u +%Y%m%dT%H%M%SZ); if [ -f "$target" ]; then cp "$target" "$target.pre-restore-$stamp"; fi; rm -f "$target-wal" "$target-shm"; cp /tmp/yuvomi-restore.db "$target"; chown node:node "$target" 2&gt;/dev/null || true'
 docker compose up -d "$SERVICE"</code></pre>
     <p class="form-hint">${t('settings.backupCliBackupHint')}</p>
-    <pre class="settings-code-block"><code>docker compose exec oikos node -e "import('./server/db.js').then(async db =&gt; { await db.backupToFile('/data/oikos-backup.db'); process.exit(0); })"
-docker cp oikos:/data/oikos-backup.db ./oikos-backup.db</code></pre>
+    <pre class="settings-code-block"><code>docker compose exec yuvomi node -e "import('./server/db.js').then(async db =&gt; { await db.backupToFile('/data/yuvomi-backup.db'); process.exit(0); })"
+docker cp yuvomi:/data/yuvomi-backup.db ./yuvomi-backup.db</code></pre>
   `);
   return wrap;
 }
@@ -205,10 +205,10 @@ async function loadBackupSchedulerStatus(container) {
         triggerBtn.textContent = t('settings.backupSchedulerTriggering');
         try {
           await api.post('/backup/trigger');
-          window.oikos?.showToast(t('settings.backupSchedulerTriggeredToast'), 'success');
+          window.yuvomi?.showToast(t('settings.backupSchedulerTriggeredToast'), 'success');
           loadBackupSchedulerStatus(container);
         } catch (err) {
-          window.oikos?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+          window.yuvomi?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
           triggerBtn.disabled = false;
           triggerBtn.textContent = t('settings.backupSchedulerTrigger');
         }
@@ -266,10 +266,10 @@ function renderWebdavStatus(grid, container, d) {
       triggerBtn.textContent = t('settings.backupWebdavTriggering');
       try {
         await api.post('/backup/webdav/trigger');
-        window.oikos?.showToast(t('settings.backupWebdavTriggeredToast'), 'success');
+        window.yuvomi?.showToast(t('settings.backupWebdavTriggeredToast'), 'success');
         loadWebdavConfig(container);
       } catch (err) {
-        window.oikos?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+        window.yuvomi?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
         const icon = document.createElement('i');
         icon.dataset.lucide = 'upload-cloud';
         icon.setAttribute('aria-hidden', 'true');
@@ -400,10 +400,10 @@ function bindWebdavBackupEvents(container) {
 
     try {
       await api.put('/backup/webdav/config', payload);
-      window.oikos?.showToast(t('settings.backupWebdavSaved'), 'success');
+      window.yuvomi?.showToast(t('settings.backupWebdavSaved'), 'success');
       loadWebdavConfig(container);
     } catch (err) {
-      window.oikos?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
     } finally {
       if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = t('settings.backupWebdavSaveBtn'); }
     }
@@ -472,7 +472,7 @@ function bindRestoreEvents(container) {
     restoreBtn.textContent = t('settings.backupRestoring');
     try {
       await api.rawPost('/backup/restore', file);
-      window.oikos?.showToast(t('settings.backupRestoredToast'), 'success');
+      window.yuvomi?.showToast(t('settings.backupRestoredToast'), 'success');
       window.location.reload();
     } catch (err) {
       showError(errorEl, err.message ?? t('common.errorGeneric'));

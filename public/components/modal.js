@@ -196,8 +196,8 @@ function _resumeSuspendedModal({ overlay, id, snapshot }) {
   _initialFormSnapshot = snapshot;
   document.body.style.overflow = 'hidden';
   modalState = 'open';
-  if (window.oikos?.setThemeColor) {
-    window.oikos.setThemeColor(OVERLAY_THEME_COLOR, OVERLAY_THEME_COLOR);
+  if (window.yuvomi?.setThemeColor) {
+    window.yuvomi.setThemeColor(OVERLAY_THEME_COLOR, OVERLAY_THEME_COLOR);
   }
 }
 
@@ -232,8 +232,8 @@ function _doClose(overlayEl) {
     }
 
     // Standalone: Statusbar-Farbe zur aktuellen Route wiederherstellen
-    if (window.oikos?.restoreThemeColor) {
-      window.oikos.restoreThemeColor();
+    if (window.yuvomi?.restoreThemeColor) {
+      window.yuvomi.restoreThemeColor();
     }
   }
 }
@@ -346,8 +346,8 @@ export function openModal({ title, content, onSave, onDelete, onClose, size = 'm
   }, { capture: true });
 
   // Standalone: Statusbar abdunkeln
-  if (window.oikos?.setThemeColor) {
-    window.oikos.setThemeColor(OVERLAY_THEME_COLOR, OVERLAY_THEME_COLOR);
+  if (window.yuvomi?.setThemeColor) {
+    window.yuvomi.setThemeColor(OVERLAY_THEME_COLOR, OVERLAY_THEME_COLOR);
   }
 
   modalState = 'open';

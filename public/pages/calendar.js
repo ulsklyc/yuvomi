@@ -1,7 +1,7 @@
 /**
  * Modul: Kalender (Calendar)
  * Zweck: Monats-/Wochen-/Tages-/Agenda-Ansicht mit vollem Termin-CRUD
- * Abhängigkeiten: /api.js, /router.js (window.oikos)
+ * Abhängigkeiten: /api.js, /router.js (window.yuvomi)
  */
 
 import { api } from '/api.js';
@@ -209,10 +209,10 @@ const EVENT_ICONS = EVENT_ICON_CATEGORIES().flatMap((cat) => cat.icons);
 const CUSTOM_EVENT_ICONS = new Set(['tooth']);
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const ATTACHMENT_IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
-const CALENDAR_VIEW_STORAGE_KEY = 'oikos:calendar:view';
-const LEGACY_CALENDAR_VIEW_STORAGE_KEY = 'oikos-calendar-view';
-const LAYER_HOLIDAYS_KEY = 'oikos:calendar:layer:holidays';
-const LAYER_SCHOOL_KEY   = 'oikos:calendar:layer:school';
+const CALENDAR_VIEW_STORAGE_KEY = 'yuvomi:calendar:view';
+const LEGACY_CALENDAR_VIEW_STORAGE_KEY = 'yuvomi-calendar-view';
+const LAYER_HOLIDAYS_KEY = 'yuvomi:calendar:layer:holidays';
+const LAYER_SCHOOL_KEY   = 'yuvomi:calendar:layer:school';
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const HOUR_HEIGHT = 56; // px pro Stunde in Wochen-/Tagesansicht
@@ -821,7 +821,7 @@ async function loadRange(from, to) {
     state.tasks    = [];
     state.holidays = [];
     state.offlineSince = null;
-    window.oikos?.showToast(t('calendar.loadError'), 'danger');
+    window.yuvomi?.showToast(t('calendar.loadError'), 'danger');
   }
   state.rangeFrom = from;
   state.rangeTo   = to;
@@ -1195,7 +1195,7 @@ function renderMonthView(container) {
     const taskChip = e.target.closest('.cal-task-chip');
     if (taskChip) {
       e.stopPropagation();
-      window.oikos.navigate(`/tasks?open=${taskChip.dataset.taskId}`);
+      window.yuvomi.navigate(`/tasks?open=${taskChip.dataset.taskId}`);
       return;
     }
     const evEl = e.target.closest('.month-day__event');
@@ -1368,7 +1368,7 @@ function renderWeekView(container) {
   container.querySelector('.allday-row').addEventListener('click', (e) => {
     const taskChip = e.target.closest('.cal-task-chip');
     if (taskChip) {
-      window.oikos.navigate(`/tasks?open=${taskChip.dataset.taskId}`);
+      window.yuvomi.navigate(`/tasks?open=${taskChip.dataset.taskId}`);
       return;
     }
     const evEl = e.target.closest('.allday-event');
@@ -1549,7 +1549,7 @@ function renderDayView(container) {
   container.querySelector('.allday-row')?.addEventListener('click', (e) => {
     const taskChip = e.target.closest('.cal-task-chip');
     if (taskChip) {
-      window.oikos.navigate(`/tasks?open=${taskChip.dataset.taskId}`);
+      window.yuvomi.navigate(`/tasks?open=${taskChip.dataset.taskId}`);
       return;
     }
     const evEl = e.target.closest('.allday-event');
@@ -1618,7 +1618,7 @@ function renderAgendaView(container) {
   container.querySelector('#agenda-view').addEventListener('click', (e) => {
     const taskChip = e.target.closest('.cal-task-chip');
     if (taskChip) {
-      window.oikos.navigate(`/tasks?open=${taskChip.dataset.taskId}`);
+      window.yuvomi.navigate(`/tasks?open=${taskChip.dataset.taskId}`);
       return;
     }
     const evEl = e.target.closest('.agenda-event');
@@ -1738,9 +1738,9 @@ function showEventPopup(ev, anchor) {
         await api.post(`/calendar/${ev.id}/reset`, {});
         popup.remove();
         await reloadForView();
-        window.oikos?.showToast(t('calendar.ics.resetToast'), 'success');
+        window.yuvomi?.showToast(t('calendar.ics.resetToast'), 'success');
       } catch (err) {
-        window.oikos?.showToast(err.message, 'danger');
+        window.yuvomi?.showToast(err.message, 'danger');
       }
     });
     popup.querySelector('.event-popup__actions').before(resetLink);
@@ -1984,7 +1984,7 @@ async function loadSyncTargets(selectElement, currentEvent = null) {
 
 function openEventModal({ mode, event = null, date = null, reminder = null, time = null }) {
   if (mode === 'edit' && event?.housekeeping_visit_id) {
-    window.oikos.navigate(`/housekeeping?editVisit=${event.housekeeping_visit_id}`);
+    window.yuvomi.navigate(`/housekeeping?editVisit=${event.housekeeping_visit_id}`);
     return;
   }
   const isEdit = mode === 'edit';
@@ -2402,7 +2402,7 @@ async function saveEvent(overlay, mode, eventId, existingReminder = null, attach
   const title   = overlay.querySelector('#modal-title').value.trim();
 
   if (!title) {
-    window.oikos?.showToast(t('calendar.titleRequired'), 'error');
+    window.yuvomi?.showToast(t('calendar.titleRequired'), 'error');
     return;
   }
 
@@ -2429,7 +2429,7 @@ async function saveEvent(overlay, mode, eventId, existingReminder = null, attach
     const etRaw = overlay.querySelector('#modal-end-time').value;
     const et = parseTimeInput(etRaw);
     if ((stRaw && !st) || (etRaw && !et)) {
-      window.oikos?.showToast(t('calendar.invalidDate'), 'error');
+      window.yuvomi?.showToast(t('calendar.invalidDate'), 'error');
       return;
     }
     start_datetime = st ? `${sd}T${st}` : sd;
@@ -2441,11 +2441,11 @@ async function saveEvent(overlay, mode, eventId, existingReminder = null, attach
     : ['#modal-start-date', '#modal-end-date'];
   const hasInvalidDate = visibleDateFields.some((selector) => !isDateInputValid(overlay.querySelector(selector)?.value));
   if (!start_datetime || hasInvalidDate) {
-    window.oikos?.showToast(t('calendar.invalidDate'), 'error');
+    window.yuvomi?.showToast(t('calendar.invalidDate'), 'error');
     return;
   }
   if (isEndBeforeStart(start_datetime, end_datetime)) {
-    window.oikos?.showToast(t('calendar.endBeforeStart'), 'error');
+    window.yuvomi?.showToast(t('calendar.endBeforeStart'), 'error');
     return;
   }
 
@@ -2455,7 +2455,7 @@ async function saveEvent(overlay, mode, eventId, existingReminder = null, attach
   try {
     const rrule = getRRuleValues(overlay, 'event');
     if (!rrule.valid_until) {
-      window.oikos?.showToast(t('calendar.invalidDate'), 'error');
+      window.yuvomi?.showToast(t('calendar.invalidDate'), 'error');
       saveBtn.disabled    = false;
       saveBtn.textContent = mode === 'edit' ? t('common.save') : t('common.create');
       return;
@@ -2547,9 +2547,9 @@ async function saveEvent(overlay, mode, eventId, existingReminder = null, attach
 
     closeModal({ force: true });
     renderView();
-    window.oikos?.showToast(mode === 'create' ? t('calendar.createdToast') : t('calendar.savedToast'), 'success');
+    window.yuvomi?.showToast(mode === 'create' ? t('calendar.createdToast') : t('calendar.savedToast'), 'success');
   } catch (err) {
-    window.oikos?.showToast(err.data?.error ?? err.message ?? t('calendar.saveError'), 'error');
+    window.yuvomi?.showToast(err.data?.error ?? err.message ?? t('calendar.saveError'), 'error');
     saveBtn.disabled    = false;
     saveBtn.textContent = mode === 'edit' ? t('common.save') : t('common.create');
   }
@@ -2561,7 +2561,7 @@ async function deleteEvent(id) {
   renderView();
 
   let undone = false;
-  window.oikos?.showToast(t('calendar.deletedToast'), 'default', 5000, () => {
+  window.yuvomi?.showToast(t('calendar.deletedToast'), 'default', 5000, () => {
     undone = true;
     if (event) {
       state.events = [...state.events, event];
@@ -2580,7 +2580,7 @@ async function deleteEvent(id) {
         state.events = [...state.events, event];
         renderView();
       }
-      window.oikos?.showToast(err.data?.error ?? t('calendar.deleteError'), 'danger');
+      window.yuvomi?.showToast(err.data?.error ?? t('calendar.deleteError'), 'danger');
     }
   }, 5000);
 }

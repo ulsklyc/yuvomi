@@ -2,22 +2,22 @@ import { t } from '/i18n.js';
 import { renderSubTabs } from '/utils/sub-tabs.js';
 
 export const KITCHEN_ROUTES = Object.freeze(['/meals', '/recipes', '/shopping']);
-export const KITCHEN_STORAGE_KEY = 'oikos-kitchen-tab';
+export const KITCHEN_STORAGE_KEY = 'yuvomi-kitchen-tab';
 
 const TABS = () => [
   { route: '/meals',    labelKey: 'nav.meals',    icon: 'utensils'      },
   { route: '/recipes',  labelKey: 'nav.recipes',  icon: 'book-text'     },
   { route: '/shopping', labelKey: 'nav.shopping', icon: 'shopping-cart' },
-].filter(({ route }) => !window.oikos?.isModuleDisabled(route.slice(1)));
+].filter(({ route }) => !window.yuvomi?.isModuleDisabled(route.slice(1)));
 
 export function getLastKitchenRoute() {
   try {
     const stored = sessionStorage.getItem(KITCHEN_STORAGE_KEY);
-    if (KITCHEN_ROUTES.includes(stored) && !window.oikos?.isModuleDisabled(stored.slice(1))) {
+    if (KITCHEN_ROUTES.includes(stored) && !window.yuvomi?.isModuleDisabled(stored.slice(1))) {
       return stored;
     }
   } catch { /* ignore */ }
-  const first = ['meals', 'recipes', 'shopping'].find((m) => !window.oikos?.isModuleDisabled(m));
+  const first = ['meals', 'recipes', 'shopping'].find((m) => !window.yuvomi?.isModuleDisabled(m));
   return first ? `/${first}` : '/meals';
 }
 
@@ -36,6 +36,6 @@ export function renderKitchenTabsBar(container, activeRoute) {
     ariaLabel: t('nav.kitchen'),
     title: t('nav.kitchen'),
     insertPosition: 'afterbegin',
-    onChange: (route) => window.oikos?.navigate(route),
+    onChange: (route) => window.yuvomi?.navigate(route),
   });
 }

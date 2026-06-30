@@ -52,8 +52,8 @@ export function vibrate(pattern) {
  */
 export async function deleteWithUndo({ onDelete, onUndo, toastMessage, toastType = 'success' }) {
   await onDelete();
-  if (window.oikos?.showToast) {
-    window.oikos.showToast(
+  if (window.yuvomi?.showToast) {
+    window.yuvomi.showToast(
       toastMessage,
       toastType,
       onUndo ? 4000 : 2000,

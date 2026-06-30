@@ -9,7 +9,7 @@ import {
 } from '/settings/components.js';
 
 function showToast(message, tone = 'default') {
-  window.oikos?.showToast(message, tone);
+  window.yuvomi?.showToast(message, tone);
 }
 
 function buildAddForm(container) {

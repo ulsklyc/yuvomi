@@ -11,7 +11,7 @@ import { esc } from '/utils/html.js';
 
 const VERSION_URL = '/api/v1/version';
 const DEFAULT_APP_NAME = 'Yuvomi';
-const APP_NAME_STORAGE_KEY = 'oikos-app-name';
+const APP_NAME_STORAGE_KEY = 'yuvomi-app-name';
 const USERNAME_RE = /^[a-zA-Z0-9._-]{3,64}$/;
 
 function getStoredAppName() {
@@ -154,13 +154,13 @@ export async function render(container) {
       await auth.setup(username, displayName, password);
       // Setup erfolgreich -> direkt einloggen
       const result = await auth.login(username, password);
-      window.oikos.navigate('/', result.user);
+      window.yuvomi.navigate('/', result.user);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         showError(errorEl, t('setup.errorUsernameTaken'));
       } else if (err instanceof ApiError && err.status === 403) {
         // Setup wurde zwischenzeitlich abgeschlossen
-        window.oikos.navigate('/login');
+        window.yuvomi.navigate('/login');
         return;
       } else if (err instanceof ApiError && err.status === 429) {
         showError(errorEl, t('login.tooManyAttempts'));

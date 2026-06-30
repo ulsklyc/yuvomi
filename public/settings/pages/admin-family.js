@@ -232,9 +232,9 @@ function bindDeleteButtons(container) {
       try {
         await auth.deleteUser(id);
         btn.closest('.settings-member').remove();
-        window.oikos?.showToast(t('settings.memberDeletedToast', { name }), 'default');
+        window.yuvomi?.showToast(t('settings.memberDeletedToast', { name }), 'default');
       } catch (err) {
-        window.oikos?.showToast(err.message, 'danger');
+        window.yuvomi?.showToast(err.message, 'danger');
       }
     });
   });
@@ -381,7 +381,7 @@ function openEditMemberModal(member, currentUser, users, container) {
           if (idx !== -1) users[idx] = res.user;
           if (currentUser?.id === member.id) Object.assign(currentUser, res.user);
           closeModal({ force: true });
-          window.oikos?.showToast(t('settings.memberUpdatedToast', { name: res.user.display_name }), 'success');
+          window.yuvomi?.showToast(t('settings.memberUpdatedToast', { name: res.user.display_name }), 'success');
           renderMemberList(container, users);
           bindDeleteButtons(container);
           bindEditButtons(container, currentUser, users);
@@ -450,7 +450,7 @@ function bindEvents(container, currentUser, users) {
         container.querySelector('#new-avatar-color').value = randomAvatarColor();
         container.querySelector('#add-member-form-card').classList.add('settings-card--hidden');
         container.querySelector('#add-member-btn').hidden = false;
-        window.oikos?.showToast(t('settings.memberAddedToast', { name: res.user.display_name }), 'success');
+        window.yuvomi?.showToast(t('settings.memberAddedToast', { name: res.user.display_name }), 'success');
         bindDeleteButtons(container);
         bindEditButtons(container, currentUser, users);
       } catch (err) {

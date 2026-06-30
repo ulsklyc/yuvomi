@@ -90,7 +90,7 @@ async function toggleShoppingItem(id, checked, container) {
       updateListCounter(state.activeListId, 0, newVal ? -1 : 1);
       renderTabs(container);
     }
-    window.oikos.showToast(err.message, 'danger');
+    window.yuvomi.showToast(err.message, 'danger');
   }
 }
 
@@ -398,7 +398,7 @@ function wireQuickAdd(container) {
       nameInput.classList.add('quick-add__input--flash');
       nameInput.addEventListener('animationend', () => nameInput.classList.remove('quick-add__input--flash'), { once: true });
     } catch (err) {
-      window.oikos.showToast(err.message, 'danger');
+      window.yuvomi.showToast(err.message, 'danger');
     }
   });
 }
@@ -408,7 +408,7 @@ function wireQuickAdd(container) {
 // Zeigt den Nudge-Hinweis maximal 3x (gespeichert in localStorage).
 // --------------------------------------------------------
 
-const SWIPE_HINT_KEY  = 'oikos:swipeHintSeen';
+const SWIPE_HINT_KEY  = 'yuvomi:swipeHintSeen';
 const SWIPE_HINT_MAX  = 3;
 
 function maybeShowSwipeHint(container) {
@@ -541,7 +541,7 @@ function wireSwipeGestures(container) {
               updateListCounter(state.activeListId, 0, newVal ? -1 : 1);
               renderTabs(container);
             }
-            window.oikos.showToast(err.message, 'danger');
+            window.yuvomi.showToast(err.message, 'danger');
           }
         }, 200);
 
@@ -560,7 +560,7 @@ function wireSwipeGestures(container) {
             renderTabs(container);
           } catch (err) {
             resetCard(true);
-            window.oikos.showToast(err.message, 'danger');
+            window.yuvomi.showToast(err.message, 'danger');
           }
         }, 200);
 
@@ -672,7 +672,7 @@ async function loadLists() {
   } catch (err) {
     console.error('[Shopping] loadLists Fehler:', err);
     state.lists = [];
-    window.oikos?.showToast(t('shopping.listsLoadError'), 'danger');
+    window.yuvomi?.showToast(t('shopping.listsLoadError'), 'danger');
   }
 }
 
@@ -702,7 +702,7 @@ async function switchList(listId, container) {
     console.error('[Shopping] loadItems Fehler:', err);
     state.items = [];
     state.activeList = state.lists.find((l) => l.id === listId) ?? null;
-    window.oikos?.showToast(t('shopping.itemsLoadError'), 'danger');
+    window.yuvomi?.showToast(t('shopping.itemsLoadError'), 'danger');
   }
   renderListContent(container);
   wireListContentEvents(container);
@@ -729,7 +729,7 @@ function wireTabBar(container) {
         state.lists.push({ ...data.data, item_total: 0, item_checked: 0 });
         await switchList(data.data.id, container);
       } catch (err) {
-        window.oikos.showToast(err.message, 'danger');
+        window.yuvomi.showToast(err.message, 'danger');
       }
     }
   });
@@ -782,7 +782,7 @@ function wireListContentEvents(container) {
       renderTabs(container);
 
       let undone = false;
-      window.oikos.showToast(
+      window.yuvomi.showToast(
         t('shopping.itemDeletedToast', { name: snapshot?.name ?? '' }),
         'default',
         4000,
@@ -813,7 +813,7 @@ function wireListContentEvents(container) {
             updateListCounter(state.activeListId, 1, snapshot.is_checked ? 1 : 0);
             renderTabs(container);
           }
-          window.oikos.showToast(err.message, 'danger');
+          window.yuvomi.showToast(err.message, 'danger');
         }
       }, 4100);
     }
@@ -833,7 +833,7 @@ function wireListContentEvents(container) {
       renderTabs(container);
 
       let undone = false;
-      window.oikos.showToast(
+      window.yuvomi.showToast(
         t('shopping.itemsRemovedToast', { count }),
         'default',
         4000,
@@ -857,7 +857,7 @@ function wireListContentEvents(container) {
           updateItemsList(container);
           updateListCounter(state.activeListId, count, count);
           renderTabs(container);
-          window.oikos.showToast(err.message, 'danger');
+          window.yuvomi.showToast(err.message, 'danger');
         }
       }, 4100);
     }
@@ -880,7 +880,7 @@ function wireListContentEvents(container) {
         renderListContent(container);
         wireListContentEvents(container);
       } catch (err) {
-        window.oikos.showToast(err.message, 'danger');
+        window.yuvomi.showToast(err.message, 'danger');
       }
     }
 
@@ -889,7 +889,7 @@ function wireListContentEvents(container) {
       const deletedListId = state.activeListId;
 
       let undone = false;
-      window.oikos.showToast(t('shopping.deletedListToast'), 'default', 5000, () => {
+      window.yuvomi.showToast(t('shopping.deletedListToast'), 'default', 5000, () => {
         undone = true;
         // Liste wurde nie optimistisch ausgeblendet → kein visuelles Restore nötig
       });
@@ -909,7 +909,7 @@ function wireListContentEvents(container) {
             renderListContent(container);
           }
         } catch (err) {
-          window.oikos.showToast(err.message ?? t('common.unknownError'), 'danger');
+          window.yuvomi.showToast(err.message ?? t('common.unknownError'), 'danger');
           await loadLists();
           renderTabs(container);
         }
@@ -959,9 +959,9 @@ async function openCategoryManager(container, { fromDeepLink = false } = {}) {
   let manager = null;
   openModal({
     title: t('shopping.manageCategories'),
-    content: '<oikos-shopping-category-manager></oikos-shopping-category-manager>',
+    content: '<yuvomi-shopping-category-manager></yuvomi-shopping-category-manager>',
     onSave: (panel) => {
-      manager = panel.querySelector('oikos-shopping-category-manager');
+      manager = panel.querySelector('yuvomi-shopping-category-manager');
       if (!manager) return;
       manager.addEventListener('shopping-categories-changed', onCategoriesChanged);
       // Überschrift fokussieren, sobald die Komponente gerendert hat.
@@ -978,7 +978,7 @@ async function openCategoryManager(container, { fromDeepLink = false } = {}) {
       }
       // Deep-Link-Query entfernen, wenn der Manager über die URL geöffnet wurde.
       if (fromDeepLink && new URLSearchParams(window.location.search).has('manage')) {
-        window.oikos?.navigate?.('/shopping');
+        window.yuvomi?.navigate?.('/shopping');
       }
     },
   });
@@ -1015,7 +1015,7 @@ export async function render(container, { user }) {
     }
   } catch (err) {
     console.error('[Shopping] Ladefehler:', err.message);
-    window.oikos.showToast(t('shopping.listsLoadError'), 'danger');
+    window.yuvomi.showToast(t('shopping.listsLoadError'), 'danger');
   }
 
   container.replaceChildren();

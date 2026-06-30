@@ -54,7 +54,7 @@ podman compose -f podman-compose.yml up -d   # or: podman-compose -f podman-comp
 
 Then open the WebUI — the first visit guides you through creating your admin account in
 the browser. Headless deployments can instead create it from the container console with
-`docker compose exec oikos node setup.js` (or the matching `podman compose … exec`).
+`docker compose exec yuvomi node setup.js` (or the matching `podman compose … exec`).
 
 ---
 
@@ -81,7 +81,7 @@ Complete setup instructions for Yuvomi - from Docker installation to your first 
 Yuvomi is a self-hosted family planner that runs as a single Docker container. The Express.js backend serves both the API and the static frontend files. Application data is stored in a SQLCipher-encrypted SQLite database inside a host-mounted data folder, and automated database backups are written to a separate host-mounted backup folder. Optionally, newly uploaded document files can be stored on a WebDAV server instead of inside SQLite.
 
 ```
-Browser ──HTTP──▶ Docker Container (Express.js :3000) ──▶ SQLite/SQLCipher (/data/oikos.db)
+Browser ──HTTP──▶ Docker Container (Express.js :3000) ──▶ SQLite/SQLCipher (/data/yuvomi.db)
 
 With HTTPS (recommended for network access):
 Browser ──HTTPS──▶ Nginx (Reverse Proxy) ──HTTP──▶ Docker Container (Express.js :3000) ──▶ SQLite/SQLCipher
@@ -265,9 +265,9 @@ docker compose logs -f
 You should see output like:
 
 ```
-oikos  | [Yuvomi] Server läuft auf Port 3000
-oikos  | [Yuvomi] Umgebung: production
-oikos  | [Sync] Auto-Sync alle 15 Minuten aktiv.
+yuvomi  | [Yuvomi] Server läuft auf Port 3000
+yuvomi  | [Yuvomi] Umgebung: production
+yuvomi  | [Sync] Auto-Sync alle 15 Minuten aktiv.
 ```
 
 Press `Ctrl+C` to stop following the logs (the container keeps running).
@@ -287,7 +287,7 @@ form is no longer reachable.
 a provisioning step — create the admin from the container console instead:
 
 ```bash
-docker compose exec oikos node setup.js
+docker compose exec yuvomi node setup.js
 ```
 
 ### 6. Open Yuvomi
@@ -456,7 +456,7 @@ optional `DB_ENCRYPTION_KEY`.
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `DB_PATH` | Path to the SQLite database file inside the container | `/data/oikos.db` | No |
+| `DB_PATH` | Path to the SQLite database file inside the container | `/data/yuvomi.db` | No |
 | `DB_ENCRYPTION_KEY` | Encryption key for SQLCipher AES-256. **Change this!** | - | **Yes** |
 | `DATA_DIR` | Host directory mounted at `/data` inside the container (set in `.env` or `docker-compose.yml`). | `./data` | No |
 | `BACKUP_DIR` | Host directory mounted at `/backups` for scheduled backup files. | `./backups` | No |
@@ -553,10 +553,10 @@ Enable single sign-on via any OpenID Connect provider (Authentik, Keycloak, Goog
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `OIDC_ISSUER` | OIDC provider issuer URL (e.g. `https://authentik.example.com/application/o/oikos/`) | - | No |
+| `OIDC_ISSUER` | OIDC provider issuer URL (e.g. `https://authentik.example.com/application/o/yuvomi/`) | - | No |
 | `OIDC_CLIENT_ID` | Client ID registered with your OIDC provider | - | No |
 | `OIDC_CLIENT_SECRET` | Client secret for the registered application | - | No |
-| `OIDC_REDIRECT_URI` | OAuth callback URL — must be registered with the provider (e.g. `https://oikos.example.com/api/v1/auth/oidc/callback`) | - | No |
+| `OIDC_REDIRECT_URI` | OAuth callback URL — must be registered with the provider (e.g. `https://yuvomi.example.com/api/v1/auth/oidc/callback`) | - | No |
 | `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM` | Set to `true` to allow account linking when the IdP omits the `email_verified` claim entirely. Only enable for IdPs fully under your control that never issue unverified addresses (e.g. older Authentik without an explicit `email_verified` property mapping). | - | No |
 
 When all four OIDC variables are set, a **"Sign in with SSO"** button appears on the login page. The flow uses Authorization Code + PKCE (S256) with a nonce. On first login, the user is matched by their OIDC `sub`. If no match exists, an existing local account is linked automatically **only when the provider reports a verified email (`email_verified: true`) and exactly one local account holds that email address**; otherwise a new account is provisioned. Unverified or ambiguous emails never take over an existing account. If your provider omits the `email_verified` claim, set `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=true` to enable linking.
@@ -745,7 +745,7 @@ docker compose up -d --build
 
 ### Where is the Data?
 
-The SQLite database lives in the host folder configured through `DATA_DIR` and is mounted at `/data` inside the container. The database file is `/data/oikos.db`.
+The SQLite database lives in the host folder configured through `DATA_DIR` and is mounted at `/data` inside the container. The database file is `/data/yuvomi.db`.
 
 Scheduled backups are written to the host folder configured through `BACKUP_DIR` and mounted at `/backups` inside the container.
 
@@ -758,8 +758,8 @@ Scheduled backups are written to the host folder configured through `BACKUP_DIR`
 Use the built-in backup helper to create a consistent SQLite backup from the running container, then copy it to your host:
 
 ```bash
-docker compose exec oikos node -e "import('./server/db.js').then(async db => { await db.backupToFile('/data/oikos-backup.db'); process.exit(0); })"
-docker cp oikos:/data/oikos-backup.db ./oikos-backup-$(date +%Y%m%d).db
+docker compose exec yuvomi node -e "import('./server/db.js').then(async db => { await db.backupToFile('/data/yuvomi-backup.db'); process.exit(0); })"
+docker cp yuvomi:/data/yuvomi-backup.db ./yuvomi-backup-$(date +%Y%m%d).db
 ```
 
 Admins can also download a backup from **Settings → Administration → Backup and restore**.
@@ -776,10 +776,10 @@ BACKUP_DIR=./backups
 Admins can restore a backup from **Settings → Administration → Backup and restore**. For operational restores via Docker Compose, stop the running app, mount the backup into a temporary container that uses the same Docker volume, and replace the database file:
 
 ```bash
-SERVICE=oikos
-BACKUP="$PWD/oikos-backup-20260401.db"
+SERVICE=yuvomi
+BACKUP="$PWD/yuvomi-backup-20260401.db"
 docker compose stop "$SERVICE"
-docker compose run --rm -v "$BACKUP:/tmp/oikos-restore.db:ro" --entrypoint sh "$SERVICE" -c 'set -eu; target="${DB_PATH:-/data/oikos.db}"; stamp=$(date -u +%Y%m%dT%H%M%SZ); if [ -f "$target" ]; then cp "$target" "$target.pre-restore-$stamp"; fi; rm -f "$target-wal" "$target-shm"; cp /tmp/oikos-restore.db "$target"; chown node:node "$target" 2>/dev/null || true'
+docker compose run --rm -v "$BACKUP:/tmp/yuvomi-restore.db:ro" --entrypoint sh "$SERVICE" -c 'set -eu; target="${DB_PATH:-/data/yuvomi.db}"; stamp=$(date -u +%Y%m%dT%H%M%SZ); if [ -f "$target" ]; then cp "$target" "$target.pre-restore-$stamp"; fi; rm -f "$target-wal" "$target-shm"; cp /tmp/yuvomi-restore.db "$target"; chown node:node "$target" 2>/dev/null || true'
 docker compose up -d "$SERVICE"
 ```
 
@@ -788,7 +788,7 @@ If your Compose service is renamed, set `SERVICE` to that name, for example `SER
 For a local CLI restore outside Docker, set the same environment variables used by the app and run:
 
 ```bash
-DB_PATH=/path/to/oikos.db node --import dotenv/config scripts/restore-backup.js ./oikos-backup-20260401.db
+DB_PATH=/path/to/yuvomi.db node --import dotenv/config scripts/restore-backup.js ./yuvomi-backup-20260401.db
 ```
 
 The restore helper validates that the file is an Yuvomi database before replacing the active database. It also keeps a pre-restore copy next to the database file for emergency rollback.
@@ -804,7 +804,7 @@ crontab -e
 Add this line:
 
 ```
-0 3 * * * docker compose exec -T oikos node -e "import('./server/db.js').then(async db => { await db.backupToFile('/data/oikos-cron-backup.db'); process.exit(0); })" && docker cp oikos:/data/oikos-cron-backup.db /path/to/backups/oikos-$(date +\%Y\%m\%d).db
+0 3 * * * docker compose exec -T yuvomi node -e "import('./server/db.js').then(async db => { await db.backupToFile('/data/yuvomi-cron-backup.db'); process.exit(0); })" && docker cp yuvomi:/data/yuvomi-cron-backup.db /path/to/backups/yuvomi-$(date +\%Y\%m\%d).db
 ```
 
 This creates a backup at 3:00 AM every day.

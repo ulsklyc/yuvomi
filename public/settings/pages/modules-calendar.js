@@ -294,7 +294,7 @@ async function bindEvents(container, preferences) {
       });
       discoveryState.persistedCountry = preferenceData.holiday_country;
       discoveryState.persistedSubdivision = preferenceData.holiday_subdivision;
-      window.oikos?.showToast(t('settings.holidaySaved'), 'success');
+      window.yuvomi?.showToast(t('settings.holidaySaved'), 'success');
     } catch (error) {
       errorElement.textContent = error.message || t('common.errorGeneric');
       errorElement.hidden = false;
@@ -304,7 +304,7 @@ async function bindEvents(container, preferences) {
   syncButton.addEventListener('click', async () => {
     const currentPreferenceData = holidayPreferenceData(container, discoveryState);
     if (!currentPreferenceData.holiday_country) {
-      window.oikos?.showToast(t('settings.holidayCountryRequired'), 'warning');
+      window.yuvomi?.showToast(t('settings.holidayCountryRequired'), 'warning');
       return;
     }
 
@@ -335,9 +335,9 @@ async function bindEvents(container, preferences) {
       if (lastSyncLabel && response?.data?.last_sync) {
         lastSyncLabel.textContent = formatSyncTime(response.data.last_sync);
       }
-      window.oikos?.showToast(t('settings.holidaySynced'), 'success');
+      window.yuvomi?.showToast(t('settings.holidaySynced'), 'success');
     } catch (error) {
-      window.oikos?.showToast(error.message || t('settings.holidaySyncError'), 'danger');
+      window.yuvomi?.showToast(error.message || t('settings.holidaySyncError'), 'danger');
     } finally {
       updateSyncState();
     }

@@ -50,7 +50,7 @@ function safeStorageRemove(key) {
 }
 
 function currentTheme() {
-  return safeStorageGet('oikos-theme', 'system') || 'system';
+  return safeStorageGet('yuvomi-theme', 'system') || 'system';
 }
 
 function formatOptions(selected) {
@@ -77,7 +77,7 @@ function localeLabel(locale) {
 }
 
 function localeOptions() {
-  const storedLocale = safeStorageGet('oikos-locale');
+  const storedLocale = safeStorageGet('yuvomi-locale');
   return [
     `<option value="system"${storedLocale ? '' : ' selected'}>${t('settings.localeSystem')}</option>`,
     ...getSupportedLocales().map((locale) => (
@@ -191,10 +191,10 @@ function renderPage(container, preferences, isAdmin) {
 }
 
 function applyTheme(value) {
-  safeStorageSet('oikos-theme', value);
-  if (window.oikos?.applyTheme) {
+  safeStorageSet('yuvomi-theme', value);
+  if (window.yuvomi?.applyTheme) {
     try {
-      window.oikos.applyTheme(value);
+      window.yuvomi.applyTheme(value);
       return;
     } catch {
       // Fall back to applying the theme directly when router storage fails.
@@ -240,7 +240,7 @@ function bindEvents(container, user) {
     localeSelect.disabled = true;
     try {
       if (localeSelect.value === 'system') {
-        safeStorageRemove('oikos-locale');
+        safeStorageRemove('yuvomi-locale');
         location.reload();
         return;
       }
@@ -278,8 +278,8 @@ function bindEvents(container, user) {
       if (dateSelect) dateSelect.value = preset.date_format;
       const timeSelect = container.querySelector('#time-format-select');
       if (timeSelect) timeSelect.value = preset.time_format;
-      safeStorageSet('oikos-date-format', preset.date_format);
-      safeStorageSet('oikos-time-format', preset.time_format);
+      safeStorageSet('yuvomi-date-format', preset.date_format);
+      safeStorageSet('yuvomi-time-format', preset.time_format);
       window.dispatchEvent(new CustomEvent('date-format-changed', {
         detail: { dateFormat: preset.date_format },
       }));
@@ -287,7 +287,7 @@ function bindEvents(container, user) {
         detail: { timeFormat: preset.time_format },
       }));
       if (customBlock) customBlock.hidden = true;
-      window.oikos?.showToast(t('settings.regionSaved'), 'success');
+      window.yuvomi?.showToast(t('settings.regionSaved'), 'success');
     } catch (error) {
       showError(errorElement, error.message);
     } finally {
@@ -309,7 +309,7 @@ function bindEvents(container, user) {
       );
       persistedCurrency = currencySelect.value;
       syncRegionSelect(container);
-      window.oikos?.showToast(t('settings.currencySaved'), 'success');
+      window.yuvomi?.showToast(t('settings.currencySaved'), 'success');
     } catch (error) {
       showError(errorElement, error.message);
     }
@@ -322,12 +322,12 @@ function bindEvents(container, user) {
     dateFormatSelect.disabled = true;
     try {
       await api.put('/preferences', { date_format: dateFormatSelect.value });
-      safeStorageSet('oikos-date-format', dateFormatSelect.value);
+      safeStorageSet('yuvomi-date-format', dateFormatSelect.value);
       window.dispatchEvent(new CustomEvent('date-format-changed', {
         detail: { dateFormat: dateFormatSelect.value },
       }));
       syncRegionSelect(container);
-      window.oikos?.showToast(t('settings.dateFormatSavedToast'), 'success');
+      window.yuvomi?.showToast(t('settings.dateFormatSavedToast'), 'success');
     } catch (error) {
       showError(errorElement, error.message);
     } finally {
@@ -342,12 +342,12 @@ function bindEvents(container, user) {
     timeFormatSelect.disabled = true;
     try {
       await api.put('/preferences', { time_format: timeFormatSelect.value });
-      safeStorageSet('oikos-time-format', timeFormatSelect.value);
+      safeStorageSet('yuvomi-time-format', timeFormatSelect.value);
       window.dispatchEvent(new CustomEvent('time-format-changed', {
         detail: { timeFormat: timeFormatSelect.value },
       }));
       syncRegionSelect(container);
-      window.oikos?.showToast(t('settings.timeFormatSavedToast'), 'success');
+      window.yuvomi?.showToast(t('settings.timeFormatSavedToast'), 'success');
     } catch (error) {
       showError(errorElement, error.message);
     } finally {
@@ -365,8 +365,8 @@ export async function render(container, { user }) {
       time_format: response?.data?.time_format || '24h',
     };
 
-    safeStorageSet('oikos-date-format', preferences.date_format);
-    safeStorageSet('oikos-time-format', preferences.time_format);
+    safeStorageSet('yuvomi-date-format', preferences.date_format);
+    safeStorageSet('yuvomi-time-format', preferences.time_format);
     const isAdmin = user?.role === 'admin';
     renderPage(container, preferences, isAdmin);
     if (isAdmin) {

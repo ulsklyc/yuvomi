@@ -16,14 +16,14 @@
  */
 
 const APP_RELEASE   = '0.78.13';
-const SHELL_CACHE   = `oikos-shell-${APP_RELEASE}`;
-const PAGES_CACHE   = `oikos-pages-${APP_RELEASE}`;
-const LOCALES_CACHE = `oikos-locales-${APP_RELEASE}`;
-const ASSETS_CACHE  = `oikos-assets-${APP_RELEASE}`;
+const SHELL_CACHE   = `yuvomi-shell-${APP_RELEASE}`;
+const PAGES_CACHE   = `yuvomi-pages-${APP_RELEASE}`;
+const LOCALES_CACHE = `yuvomi-locales-${APP_RELEASE}`;
+const ASSETS_CACHE  = `yuvomi-assets-${APP_RELEASE}`;
 // API-Cache bewusst NICHT in ALL_CACHES: er wird bei jedem SW-Update neu benannt
 // (Version im Namen) und bei Logout/Session-Ende gezielt geleert.
-const API_CACHE     = `oikos-api-${APP_RELEASE}`;
-const BYPASS_CACHE  = 'oikos-bypass-flag';
+const API_CACHE     = `yuvomi-api-${APP_RELEASE}`;
+const BYPASS_CACHE  = 'yuvomi-bypass-flag';
 const ALL_CACHES    = [SHELL_CACHE, PAGES_CACHE, LOCALES_CACHE, ASSETS_CACHE];
 
 // GET-API-Pfade (nach /api/v1), die für Read-only-Offline gecacht werden dürfen.
@@ -62,7 +62,7 @@ const APP_SHELL = [
   '/styles/documents.css',
   '/styles/settings.css',
   '/styles/recipes.css',
-  '/components/oikos-install-prompt.js',
+  '/components/yuvomi-install-prompt.js',
   '/offline.html',
   '/manifest.json',
   '/favicon.ico',
@@ -190,7 +190,8 @@ self.addEventListener('activate', (event) => {
       Promise.all(
         keys
           // Versions-Caches der laufenden Release behalten; alles andere entfernen —
-          // inklusive alter oikos-api-*-Caches der Vorversionen (Cache-Invalidierung).
+          // inklusive alter Vorversions-Caches UND der Legacy-`oikos-*`-Caches aus der
+          // Zeit vor dem Yuvomi-Rename (Cache-Invalidierung, kein User-Eingriff nötig).
           .filter((key) => !ALL_CACHES.includes(key) && key !== API_CACHE)
           .map((key) => caches.delete(key))
       )

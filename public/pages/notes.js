@@ -1,7 +1,7 @@
 /**
  * Modul: Pinnwand / Notizen (Notes)
  * Zweck: Masonry-Grid mit farbigen Sticky Notes, Pin-Toggle, CRUD
- * Abhängigkeiten: /api.js, /router.js (window.oikos)
+ * Abhängigkeiten: /api.js, /router.js (window.yuvomi)
  */
 
 import { api } from '/api.js';
@@ -491,7 +491,7 @@ function openNoteModal({ mode, note = null }) {
         const color   = panel.querySelector('.note-color-swatch--active')?.dataset.color || NOTE_COLORS[0];
         const pinned  = panel.querySelector('#note-pinned').checked ? 1 : 0;
 
-        if (!cnt) { window.oikos?.showToast(t('common.contentRequired'), 'error'); return; }
+        if (!cnt) { window.yuvomi?.showToast(t('common.contentRequired'), 'error'); return; }
 
         saveBtn.disabled    = true;
         saveBtn.textContent = '…';
@@ -508,9 +508,9 @@ function openNoteModal({ mode, note = null }) {
           }
           closeModal({ force: true });
           renderGrid();
-          window.oikos?.showToast(mode === 'create' ? t('notes.createdToast') : t('notes.savedToast'), 'success');
+          window.yuvomi?.showToast(mode === 'create' ? t('notes.createdToast') : t('notes.savedToast'), 'success');
         } catch (err) {
-          window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
+          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
           btnError(saveBtn);
           saveBtn.disabled    = false;
           saveBtn.textContent = isEdit ? t('common.save') : t('common.create');
@@ -532,7 +532,7 @@ async function togglePin(id) {
     state.notes.sort((a, b) => b.pinned - a.pinned);
     renderGrid();
   } catch (err) {
-    window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
+    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
   }
 }
 
@@ -544,7 +544,7 @@ async function deleteNote(id) {
   vibrate([30, 50, 30]);
 
   let undone = false;
-  window.oikos?.showToast(t('notes.deletedToast'), 'default', 5000, () => {
+  window.yuvomi?.showToast(t('notes.deletedToast'), 'default', 5000, () => {
     undone = true;
     if (note) {
       state.notes = [...state.notes, note].sort((a, b) => b.pinned - a.pinned);
@@ -561,7 +561,7 @@ async function deleteNote(id) {
         state.notes = [...state.notes, note].sort((a, b) => b.pinned - a.pinned);
         renderGrid();
       }
-      window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     }
   }, 5000);
 }

@@ -45,7 +45,7 @@ test('Einkaufslisten-Zeilen toggeln nur außerhalb interaktiver Controls', () =>
 test('Shopping-Seite importiert den Category-Manager und öffnet ihn bei manage=categories', () => {
   const source = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
   assert(/components\/shopping-category-manager\.js/.test(source), 'shopping.js muss den Category-Manager importieren');
-  assert(/oikos-shopping-category-manager/.test(source), 'shopping.js muss das Custom Element verwenden');
+  assert(/yuvomi-shopping-category-manager/.test(source), 'shopping.js muss das Custom Element verwenden');
   assert(/manage.*===\s*'categories'|get\('manage'\)|manage=categories|'manage'/.test(source), 'shopping.js muss den manage-Query-Parameter auswerten');
   assert(/shopping\.manageCategories/.test(source), 'Eine übersetzte „Kategorien verwalten"-Aktion muss vorhanden sein');
   assert(/shopping-categories-changed/.test(source), 'shopping.js muss auf das shopping-categories-changed-Event reagieren');
@@ -53,7 +53,7 @@ test('Shopping-Seite importiert den Category-Manager und öffnet ihn bei manage=
 
 test('Shopping-Category-Manager-Komponente erfüllt die Web-Component-Verträge', () => {
   const source = readFileSync(new URL('../public/components/shopping-category-manager.js', import.meta.url), 'utf8');
-  assert(/customElements\.define\(\s*'oikos-shopping-category-manager'/.test(source), 'Tag-Name muss oikos-shopping-category-manager sein');
+  assert(/customElements\.define\(\s*'yuvomi-shopping-category-manager'/.test(source), 'Tag-Name muss yuvomi-shopping-category-manager sein');
   assert(/connectedCallback/.test(source) && /disconnectedCallback/.test(source), 'Lifecycle-Callbacks müssen vorhanden sein');
   assert(/api\.get\('\/shopping\/categories'\)/.test(source), 'Komponente muss Kategorien per API laden');
   assert(/api\.post\('\/shopping\/categories'/.test(source), 'Hinzufügen muss POST nutzen');

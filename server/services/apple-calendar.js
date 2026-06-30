@@ -138,6 +138,10 @@ async function testConnection() {
  * @returns {string}
  */
 function buildICS(event) {
+  // UID-Format bewusst auf `oikos-…@oikos.local` belassen (kein Rebrand):
+  // bereits synchronisierte Events tragen diese UID auf dem entfernten CalDAV-Server
+  // und in external_calendar_id. Eine Änderung würde beim nächsten Sync Duplikate
+  // bzw. verwaiste Remote-Objekte erzeugen.
   const uid   = `oikos-${event.id}@oikos.local`;
   const now   = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const lines = [

@@ -1,8 +1,8 @@
 services:
-  oikos:
+  yuvomi:
     image: ghcr.io/ulsklyc/yuvomi:latest
     build: .                          # optional: use --build to build locally instead
-    container_name: oikos
+    container_name: yuvomi
     restart: unless-stopped
     ports:
       # Host-Port aus .env (OIKOS_HTTP_PORT); App im Container bleibt auf 3000.
@@ -16,7 +16,7 @@ services:
       - .env
     environment:
       - NODE_ENV=production
-      - DB_PATH=${DB_PATH:-/data/oikos.db}
+      - DB_PATH=${DB_PATH:-/data/yuvomi.db}
       - BACKUP_DIR=/backups
       # Secure cookies come from .env (the installer sets them):
       #   - Reverse proxy + HTTPS → SESSION_SECURE=true, TRUST_PROXY=1

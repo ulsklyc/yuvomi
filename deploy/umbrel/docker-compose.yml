@@ -24,7 +24,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DB_PATH=/data/oikos.db
+      - DB_PATH=/data/yuvomi.db
       - BACKUP_DIR=/backups
       # SESSION_SECRET is required; Umbrel injects a deterministic per-app secret.
       - SESSION_SECRET=${APP_SEED}

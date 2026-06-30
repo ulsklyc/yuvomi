@@ -2,7 +2,7 @@
  * Modul: Budget-Tracker (Budget)
  * Zweck: Monatsübersicht, Kategorie-Balkendiagramm (Canvas), Transaktionsliste,
  *        CRUD, CSV-Export
- * Abhängigkeiten: /api.js, /router.js (window.oikos)
+ * Abhängigkeiten: /api.js, /router.js (window.yuvomi)
  */
 
 import { api } from '/api.js';
@@ -178,7 +178,7 @@ async function loadMonth(month) {
     state.summary     = { income: 0, expenses: 0, balance: 0, byCategory: [] };
     state.prevSummary = null;
     state.loans       = { loans: [], summary: { active_count: 0, remaining_amount: 0, remaining_installments: 0 } };
-    window.oikos?.showToast(t('budget.loadError'), 'danger');
+    window.yuvomi?.showToast(t('budget.loadError'), 'danger');
   }
 }
 
@@ -193,7 +193,7 @@ async function loadBudgetMeta() {
   } catch (err) {
     console.error('[Budget] meta Fehler:', err);
     state.meta = { expenseCategories: [], incomeCategories: [], expenseSubcategories: {} };
-    window.oikos?.showToast(t('budget.metaLoadError'), 'danger');
+    window.yuvomi?.showToast(t('budget.metaLoadError'), 'danger');
   }
 }
 
@@ -903,10 +903,10 @@ function openCategoryManager() {
   };
   openSharedModal({
     title: t('budget.manageCategories'),
-    content: '<oikos-category-manager></oikos-category-manager>',
+    content: '<yuvomi-category-manager></yuvomi-category-manager>',
     size: 'lg',
     onSave: (panel) => {
-      manager = panel.querySelector('oikos-category-manager');
+      manager = panel.querySelector('yuvomi-category-manager');
       manager.addEventListener('category-manager-changed', onChanged);
       manager.configure({
         basePath: '/budget/categories',
@@ -1134,9 +1134,9 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
           const res = await api.post('/budget/categories', { name: name.trim(), type: currentType });
           await loadBudgetMeta();
           updateCategoryOptions(res.data.key);
-          window.oikos?.showToast(t('budget.categoryAddedToast'), 'success');
+          window.yuvomi?.showToast(t('budget.categoryAddedToast'), 'success');
         } catch (err) {
-          window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
+          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
         }
       };
 
@@ -1154,9 +1154,9 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
           const res = await api.post(`/budget/categories/${encodeURIComponent(category)}/subcategories`, { name: name.trim() });
           await loadBudgetMeta();
           updateSubcategoryOptions(res.data.key);
-          window.oikos?.showToast(t('budget.subcategoryAddedToast'), 'success');
+          window.yuvomi?.showToast(t('budget.subcategoryAddedToast'), 'success');
         } catch (err) {
-          window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
+          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
         }
       };
 
@@ -1198,9 +1198,9 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
         const interval   = panel.querySelector('#bm-interval').value;
         const virtual    = recurring && panel.querySelector('#bm-virtual').checked ? 1 : 0;
 
-        if (!title)           { window.oikos?.showToast(t('common.titleRequired'), 'error'); return; }
-        if (isNaN(absVal) || absVal <= 0) { window.oikos?.showToast(t('budget.validAmountRequired'), 'error'); return; }
-        if (!date) { window.oikos?.showToast(t('calendar.invalidDate'), 'error'); return; }
+        if (!title)           { window.yuvomi?.showToast(t('common.titleRequired'), 'error'); return; }
+        if (isNaN(absVal) || absVal <= 0) { window.yuvomi?.showToast(t('budget.validAmountRequired'), 'error'); return; }
+        if (!date) { window.yuvomi?.showToast(t('calendar.invalidDate'), 'error'); return; }
 
         const amount = currentType === 'expense' ? -absVal : absVal;
 
@@ -1215,7 +1215,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
             await loadMonth(state.month);
             closeModal({ force: true });
             renderBody();
-            window.oikos?.showToast(t('budget.addedToast'), 'success');
+            window.yuvomi?.showToast(t('budget.addedToast'), 'success');
           } else if (entry.recurrence_parent_id) {
             // Kind-Instanz: Nutzer fragen, ob nur dieser oder alle zukünftigen
             saveBtn.disabled = false;
@@ -1229,12 +1229,12 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
             if (scope === null) { openBudgetModal({ mode: 'edit', entry }); return; }
             if (scope === 'series') {
               await api.put(`/budget/${entry.id}/series`, body);
-              window.oikos?.showToast(t('budget.recurringSeriesSaved'), 'success');
+              window.yuvomi?.showToast(t('budget.recurringSeriesSaved'), 'success');
             } else {
               const res = await api.put(`/budget/${entry.id}`, body);
               const idx = state.entries.findIndex((e) => e.id === entry.id);
               if (idx !== -1) state.entries[idx] = res.data;
-              window.oikos?.showToast(t('budget.savedToast'), 'success');
+              window.yuvomi?.showToast(t('budget.savedToast'), 'success');
             }
             await loadMonth(state.month);
             renderBody();
@@ -1245,10 +1245,10 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
             await loadMonth(state.month);
             closeModal({ force: true });
             renderBody();
-            window.oikos?.showToast(t('budget.savedToast'), 'success');
+            window.yuvomi?.showToast(t('budget.savedToast'), 'success');
           }
         } catch (err) {
-          window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
+          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
           saveBtn.disabled    = false;
           saveBtn.textContent = isEdit ? t('common.save') : t('common.add');
         }
@@ -1311,10 +1311,10 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
   const start_month = panel.querySelector('#lm-start').value;
   const notes = panel.querySelector('#lm-notes').value.trim();
 
-  if (!borrower) { window.oikos?.showToast(t('budget.loanBorrowerRequired'), 'error'); return; }
-  if (isNaN(total_amount) || total_amount <= 0) { window.oikos?.showToast(t('budget.validAmountRequired'), 'error'); return; }
-  if (!Number.isInteger(installment_count) || installment_count < 1) { window.oikos?.showToast(t('budget.loanInstallmentsRequired'), 'error'); return; }
-  if (!/^\d{4}-\d{2}$/.test(start_month)) { window.oikos?.showToast(t('budget.loanStartMonthRequired'), 'error'); return; }
+  if (!borrower) { window.yuvomi?.showToast(t('budget.loanBorrowerRequired'), 'error'); return; }
+  if (isNaN(total_amount) || total_amount <= 0) { window.yuvomi?.showToast(t('budget.validAmountRequired'), 'error'); return; }
+  if (!Number.isInteger(installment_count) || installment_count < 1) { window.yuvomi?.showToast(t('budget.loanInstallmentsRequired'), 'error'); return; }
+  if (!/^\d{4}-\d{2}$/.test(start_month)) { window.yuvomi?.showToast(t('budget.loanStartMonthRequired'), 'error'); return; }
 
   saveBtn.disabled = true;
   saveBtn.textContent = '...';
@@ -1328,9 +1328,9 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
     await loadMonth(state.month);
     if (closeAfterSave) closeModal({ force: true });
     renderBody();
-    window.oikos?.showToast(isEdit ? t('budget.loanSavedToast') : t('budget.loanAddedToast'), 'success');
+    window.yuvomi?.showToast(isEdit ? t('budget.loanSavedToast') : t('budget.loanAddedToast'), 'success');
   } catch (err) {
-    window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
+    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
     saveBtn.disabled = false;
     saveBtn.textContent = isEdit ? t('common.save') : t('budget.createLoan');
   }
@@ -1406,9 +1406,9 @@ async function markLoanPayment(id) {
     });
     await loadMonth(state.month);
     renderBody();
-    window.oikos?.showToast(t('budget.loanPaymentAddedToast'), 'success');
+    window.yuvomi?.showToast(t('budget.loanPaymentAddedToast'), 'success');
   } catch (err) {
-    window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
+    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
   }
 }
 
@@ -1420,7 +1420,7 @@ async function deleteLoan(id) {
   renderBody();
 
   let undone = false;
-  window.oikos?.showToast(t('budget.loanDeletedToast'), 'default', 5000, () => {
+  window.yuvomi?.showToast(t('budget.loanDeletedToast'), 'default', 5000, () => {
     undone = true;
     state.loans.loans = [...state.loans.loans, loan];
     renderBody();
@@ -1435,7 +1435,7 @@ async function deleteLoan(id) {
     } catch (err) {
       state.loans.loans = [...state.loans.loans, loan];
       renderBody();
-      window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
+      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
     }
   }, 5000);
 }
@@ -1450,7 +1450,7 @@ async function deleteLoanPayment(loanId, paymentId) {
   }
 
   let undone = false;
-  window.oikos?.showToast(t('budget.deletedToast'), 'default', 5000, () => {
+  window.yuvomi?.showToast(t('budget.deletedToast'), 'default', 5000, () => {
     undone = true;
     if (loan && payment) {
       loan.payments = [...(loan.payments || []), payment];
@@ -1469,7 +1469,7 @@ async function deleteLoanPayment(loanId, paymentId) {
         loan.payments = [...(loan.payments || []), payment];
         renderBody();
       }
-      window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     }
   }, 5000);
 }
@@ -1497,7 +1497,7 @@ async function deleteEntry(id) {
   vibrate([30, 50, 30]);
 
   let undone = false;
-  window.oikos?.showToast(t('budget.deletedToast'), 'default', 5000, () => {
+  window.yuvomi?.showToast(t('budget.deletedToast'), 'default', 5000, () => {
     undone = true;
     if (entry) {
       state.entries = [...state.entries, entry].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -1516,7 +1516,7 @@ async function deleteEntry(id) {
         state.entries = [...state.entries, entry].sort((a, b) => new Date(b.date) - new Date(a.date));
         renderBody();
       }
-      window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     }
   }, 5000);
 }
@@ -1565,7 +1565,7 @@ async function deleteEntrySeries(id) {
   vibrate([30, 50, 30]);
 
   let undone = false;
-  window.oikos?.showToast(t('budget.recurringSeriesDeleted'), 'default', 5000, () => { undone = true; });
+  window.yuvomi?.showToast(t('budget.recurringSeriesDeleted'), 'default', 5000, () => { undone = true; });
 
   setTimeout(async () => {
     if (undone) return;
@@ -1576,7 +1576,7 @@ async function deleteEntrySeries(id) {
     } catch (err) {
       await loadMonth(state.month);
       renderBody();
-      window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     }
   }, 5000);
 }

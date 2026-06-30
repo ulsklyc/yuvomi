@@ -12,14 +12,98 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'node:fs/promises';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, existsSync, renameSync } from 'node:fs';
 import { createLogger } from './logger.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
 
 const log = createLogger('DB');
 
-const DB_PATH = process.env.DB_PATH || path.join(import.meta.dirname, '..', 'oikos.db');
 const DB_KEY = process.env.DB_ENCRYPTION_KEY;
+
+// --------------------------------------------------------
+// Pfad-Auflösung (Legacy-Migration oikos.db → yuvomi.db)
+// --------------------------------------------------------
+//
+// Yuvomi hieß früher „Oikos". Die DB-Datei lag standardmäßig unter `oikos.db`
+// (bzw. `/data/oikos.db` in allen ausgelieferten Docker-Templates). Damit
+// Bestands-Nutzer beim Update NICHTS von Hand ändern müssen, leiten wir den
+// effektiven Pfad ab:
+//   - kein DB_PATH gesetzt              → <root>/yuvomi.db
+//   - DB_PATH endet auf oikos.db        → <dir>/yuvomi.db  (Legacy-Default erkannt)
+//   - DB_PATH endet auf yuvomi.db       → <dir>/yuvomi.db  (neuer Default)
+//   - beliebiger anderer DB_PATH        → unverändert (Custom-Pfad wird respektiert)
+// In allen „managed" Fällen wird eine vorhandene `oikos.db` beim Start einmalig
+// nach `yuvomi.db` migriert. Dass auch der NEUE Default `yuvomi.db` als managed
+// gilt, ist bewusst: aktualisiert ein Bestands-User seine Compose-Datei auf den
+// neuen Default, läge die Daten weiter in `oikos.db` — die Migration greift trotzdem.
+let DB_PATH;
+let LEGACY_DB_PATH; // null außer bei „managed" Layout
+{
+  const configured = process.env.DB_PATH;
+  const baseDir = configured
+    ? path.dirname(configured)
+    : path.join(import.meta.dirname, '..');
+  const base = configured ? path.basename(configured) : null;
+  const isManagedLayout = !configured || base === 'oikos.db' || base === 'yuvomi.db';
+  DB_PATH = isManagedLayout ? path.join(baseDir, 'yuvomi.db') : configured;
+  LEGACY_DB_PATH = isManagedLayout ? path.join(baseDir, 'oikos.db') : null;
+}
+
+/**
+ * Einmalige, idempotente Migration der Legacy-Datenbankdatei `oikos.db` → `yuvomi.db`.
+ * Läuft beim Start VOR dem Öffnen der Verbindung. Absturzsicher:
+ *   - Nichts zu tun (frische Installation / bereits migriert) → return.
+ *   - Doppelzustand (beide existieren) → Ziel gewinnt, Legacy bleibt liegen, Warnung.
+ *   - Read-only-Volume → kein Crash, Fallback auf Legacy-Pfad.
+ */
+function migrateLegacyDbFile() {
+  if (!LEGACY_DB_PATH) return;             // Custom-Pfad → keine Migration
+  if (existsSync(DB_PATH)) {
+    if (existsSync(LEGACY_DB_PATH)) {
+      log.warn(
+        `Both ${path.basename(DB_PATH)} and legacy ${path.basename(LEGACY_DB_PATH)} exist — ` +
+        `using ${path.basename(DB_PATH)} and leaving the legacy file untouched.`
+      );
+    }
+    return;                                // bereits migriert / frisch
+  }
+  if (!existsSync(LEGACY_DB_PATH)) return;  // nichts zu migrieren
+
+  log.info(`Legacy database detected — migrating ${LEGACY_DB_PATH} → ${DB_PATH}`);
+
+  // 1. WAL des Legacy-Files in die Hauptdatei einfalten, damit der Rename vollständig ist.
+  try {
+    const legacy = new Database(LEGACY_DB_PATH);
+    try {
+      applyEncryptionKey(legacy);
+      legacy.pragma('wal_checkpoint(TRUNCATE)');
+    } finally {
+      legacy.close();
+    }
+  } catch (err) {
+    // Best effort (z. B. SQLCipher/Key) — Sidecars werden unten mitverschoben.
+    log.warn(`Legacy checkpoint skipped (${err?.message}); moving WAL/SHM alongside.`);
+  }
+
+  // 2. Datei (und verbliebene Sidecars) auf den neuen Namen verschieben.
+  try {
+    renameSync(LEGACY_DB_PATH, DB_PATH);
+    for (const suffix of ['-wal', '-shm']) {
+      const from = `${LEGACY_DB_PATH}${suffix}`;
+      if (existsSync(from)) {
+        try { renameSync(from, `${DB_PATH}${suffix}`); } catch { /* stale sidecar */ }
+      }
+    }
+    log.info(`Database migrated to ${DB_PATH}`);
+  } catch (err) {
+    // z. B. read-only Volume → NICHT crashen, weiter auf Legacy-Pfad laufen.
+    log.warn(
+      `Could not rename legacy database (${err?.message}); ` +
+      `continuing on legacy path ${LEGACY_DB_PATH}.`
+    );
+    DB_PATH = LEGACY_DB_PATH;
+  }
+}
 
 let db;
 
@@ -38,10 +122,11 @@ function init() {
     log.warn(
       `DB_PATH "${DB_PATH}" is a relative path — inside Docker this resolves to ` +
       `"${path.resolve(DB_PATH)}", which is NOT the mounted volume. ` +
-      `Data will be lost on container restart. Use an absolute path, e.g. DB_PATH=/data/oikos.db`
+      `Data will be lost on container restart. Use an absolute path, e.g. DB_PATH=/data/yuvomi.db`
     );
   }
   mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  migrateLegacyDbFile();
   db = new Database(DB_PATH);
 
   applyEncryptionKey(db);

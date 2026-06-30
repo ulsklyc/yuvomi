@@ -4,7 +4,7 @@
  * Restore an Yuvomi database backup from the CLI.
  *
  * Usage:
- *   node --import dotenv/config scripts/restore-backup.js /path/to/oikos-backup.db
+ *   node --import dotenv/config scripts/restore-backup.js /path/to/yuvomi-backup.db
  */
 
 import path from 'node:path';
@@ -15,7 +15,7 @@ import { getPath, restoreFromFile } from '../server/db.js';
 const backupPath = process.argv[2];
 
 if (!backupPath) {
-  console.error('Usage: node --import dotenv/config scripts/restore-backup.js /path/to/oikos-backup.db');
+  console.error('Usage: node --import dotenv/config scripts/restore-backup.js /path/to/yuvomi-backup.db');
   process.exit(1);
 }
 

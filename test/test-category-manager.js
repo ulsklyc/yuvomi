@@ -16,8 +16,8 @@ console.log('\n[Category-Manager-Test]\n');
 
 const comp = readFileSync(new URL('../public/components/category-manager.js', import.meta.url), 'utf8');
 
-test('Definiert das Custom Element oikos-category-manager', () => {
-  assert(/customElements\.define\(\s*'oikos-category-manager'/.test(comp), 'Tag-Name muss oikos-category-manager sein');
+test('Definiert das Custom Element yuvomi-category-manager', () => {
+  assert(/customElements\.define\(\s*'yuvomi-category-manager'/.test(comp), 'Tag-Name muss yuvomi-category-manager sein');
 });
 test('Bietet eine configure()-Methode für Properties', () => {
   assert(/configure\s*\(/.test(comp), 'configure() muss existieren');
@@ -54,7 +54,7 @@ test('Unterstützt Subkategorien unter basePath/:key/subcategories', () => {
 const budgetPage = readFileSync(new URL('../public/pages/budget.js', import.meta.url), 'utf8');
 test('Budget importiert die generische Komponente', () => {
   assert(/components\/category-manager\.js/.test(budgetPage), 'budget.js muss die Komponente importieren');
-  assert(/oikos-category-manager/.test(budgetPage), 'budget.js muss das Element verwenden');
+  assert(/yuvomi-category-manager/.test(budgetPage), 'budget.js muss das Element verwenden');
 });
 test('Budget konfiguriert basePath /budget/categories und Gruppen', () => {
   assert(/configure\(/.test(budgetPage), 'configure() muss aufgerufen werden');

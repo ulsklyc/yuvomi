@@ -157,7 +157,7 @@ test('navigation settings expose separate mobile slots and grouped desktop lists
 
   assert.match(source, /data-mobile-nav-slot/);
   assert.match(source, /data-module-section/);
-  assert.match(source, /window\.oikos\?\.setMobileNavOrder/);
+  assert.match(source, /window\.yuvomi\?\.setMobileNavOrder/);
 });
 
 test('members only see the personal settings domain', () => {

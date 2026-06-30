@@ -1,5 +1,5 @@
 /**
- * oikos-locale-picker - Sprachauswahl-Web-Component
+ * yuvomi-locale-picker - Sprachauswahl-Web-Component
  * Zeigt ein <select>-Dropdown für System/Deutsch/English.
  * Bei Auswahl: setLocale() oder localStorage-Eintrag löschen (System).
  * Dependencies: i18n.js
@@ -29,7 +29,7 @@ const LOCALE_LABELS = {
   vi: 'Tiếng Việt',
 };
 
-class OikosLocalePicker extends HTMLElement {
+class YuvomiLocalePicker extends HTMLElement {
   connectedCallback() {
     this._render();
     this._onLocaleChanged = () => this._render();
@@ -41,7 +41,7 @@ class OikosLocalePicker extends HTMLElement {
   }
 
   _render() {
-    const stored = localStorage.getItem('oikos-locale');
+    const stored = localStorage.getItem('yuvomi-locale');
 
     const label = document.createElement('label');
     label.className = 'locale-picker__label';
@@ -72,7 +72,7 @@ class OikosLocalePicker extends HTMLElement {
       select.disabled = true;
       select.style.opacity = '0.5';
       if (select.value === 'system') {
-        localStorage.removeItem('oikos-locale');
+        localStorage.removeItem('yuvomi-locale');
         // Kurze Verzögerung damit der Browser den disabled-Zustand rendert
         setTimeout(() => location.reload(), 60);
       } else {
@@ -84,4 +84,4 @@ class OikosLocalePicker extends HTMLElement {
   }
 }
 
-customElements.define('oikos-locale-picker', OikosLocalePicker);
+customElements.define('yuvomi-locale-picker', YuvomiLocalePicker);

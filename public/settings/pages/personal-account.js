@@ -106,7 +106,7 @@ async function readImageAsDataUrl(file) {
   return cropped;
 }
 
-const SETTINGS_NOTICE_KEY = 'oikos:settings:notice';
+const SETTINGS_NOTICE_KEY = 'yuvomi:settings:notice';
 
 // Einmaliger Zugriffs-Hinweis: wurde ein Mitglied von einem unzulässigen Blatt
 // hierher umgeleitet, hinterlässt der Controller eine Notiz, die wir genau
@@ -287,7 +287,7 @@ function bindEvents(container, user, profileState) {
         updatePreview();
       }
       updateAccountSummary(container, user);
-      window.oikos?.showToast(t('settings.profileSavedToast'), 'success');
+      window.yuvomi?.showToast(t('settings.profileSavedToast'), 'success');
     } catch (error) {
       showError(profileError, error.message);
     } finally {
@@ -317,7 +317,7 @@ function bindEvents(container, user, profileState) {
         new_password: newPassword,
       });
       passwordForm.reset();
-      window.oikos?.showToast(t('settings.passwordSavedToast'), 'success');
+      window.yuvomi?.showToast(t('settings.passwordSavedToast'), 'success');
     } catch (error) {
       showError(passwordError, error.message);
     } finally {
@@ -329,7 +329,7 @@ function bindEvents(container, user, profileState) {
     try {
       await auth.logout();
     } finally {
-      window.oikos?.navigate('/login');
+      window.yuvomi?.navigate('/login');
     }
   });
 }

@@ -178,14 +178,14 @@ async function toggleSession(container, workerId) {
   const worker = state.workers.find((item) => String(item.id) === String(workerId));
   const current = worker?.today_session;
   if (!state.workers.length) {
-    window.oikos?.showToast(t('housekeeping.checkInDisabled'), 'warning');
+    window.yuvomi?.showToast(t('housekeeping.checkInDisabled'), 'warning');
     return;
   }
   if (!worker) return;
   try {
     if (current) {
       await api.post('/housekeeping/work-sessions/check-out', { worker_id: worker.id });
-      window.oikos?.showToast(t('housekeeping.checkedOutToast'), 'success');
+      window.yuvomi?.showToast(t('housekeeping.checkedOutToast'), 'success');
     } else {
       await api.post('/housekeeping/work-sessions/check-in', {
         worker_id: worker.id,
@@ -195,12 +195,12 @@ async function toggleSession(container, workerId) {
         timezone_offset_minutes: new Date().getTimezoneOffset(),
         ...visitTextPayload(worker, localDate(), worker.rate_type === 'hourly' ? 0 : (worker.daily_rate || 0), 0),
       });
-      window.oikos?.showToast(t('housekeeping.checkedInToast'), 'success');
+      window.yuvomi?.showToast(t('housekeeping.checkedInToast'), 'success');
     }
     await loadData();
     renderShell(container);
   } catch (err) {
-    window.oikos?.showToast(err.message, 'danger');
+    window.yuvomi?.showToast(err.message, 'danger');
   }
 }
 
@@ -339,11 +339,11 @@ function renderDashboard(content) {
 async function createTask(payload, content) {
   try {
     await api.post('/housekeeping/decay-tasks', payload);
-    window.oikos?.showToast(t('housekeeping.taskCreatedToast'), 'success');
+    window.yuvomi?.showToast(t('housekeeping.taskCreatedToast'), 'success');
     await loadData();
     renderTasks(content);
   } catch (err) {
-    window.oikos?.showToast(err.message, 'danger');
+    window.yuvomi?.showToast(err.message, 'danger');
   }
 }
 
@@ -450,11 +450,11 @@ function renderTasks(content) {
     btn.addEventListener('click', async () => {
       try {
         await api.post(`/housekeeping/decay-tasks/${btn.dataset.completeTask}/complete`, {});
-        window.oikos?.showToast(t('housekeeping.taskDoneToast'), 'success');
+        window.yuvomi?.showToast(t('housekeeping.taskDoneToast'), 'success');
         await loadData();
         renderTasks(content);
       } catch (err) {
-        window.oikos?.showToast(err.message, 'danger');
+        window.yuvomi?.showToast(err.message, 'danger');
       }
     });
   });
@@ -463,11 +463,11 @@ function renderTasks(content) {
     btn.addEventListener('click', async () => {
       try {
         await api.patch(`/housekeeping/decay-tasks/${btn.dataset.undoTask}`, { last_completed: null });
-        window.oikos?.showToast(t('housekeeping.taskUndoneToast'), 'success');
+        window.yuvomi?.showToast(t('housekeeping.taskUndoneToast'), 'success');
         await loadData();
         renderTasks(content);
       } catch (err) {
-        window.oikos?.showToast(err.message, 'danger');
+        window.yuvomi?.showToast(err.message, 'danger');
       }
     });
   });
@@ -479,11 +479,11 @@ function renderTasks(content) {
       if (!window.confirm(t('housekeeping.deleteTaskConfirm', { name: task.name }))) return;
       try {
         await api.delete(`/housekeeping/decay-tasks/${task.id}`);
-        window.oikos?.showToast(t('housekeeping.taskDeletedToast'), 'success');
+        window.yuvomi?.showToast(t('housekeeping.taskDeletedToast'), 'success');
         await loadData();
         renderTasks(content);
       } catch (err) {
-        window.oikos?.showToast(err.message, 'danger');
+        window.yuvomi?.showToast(err.message, 'danger');
       }
     });
   });
@@ -625,7 +625,7 @@ function renderStaff(content) {
         await loadStaffVisits();
         renderStaff(content);
       } catch (err) {
-        window.oikos?.showToast(err.message, 'danger');
+        window.yuvomi?.showToast(err.message, 'danger');
       }
     };
     row.addEventListener('click', (event) => {
@@ -651,7 +651,7 @@ function renderStaff(content) {
       await loadStaffVisits();
       renderStaff(content);
     } catch (err) {
-      window.oikos?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   });
   content.querySelectorAll('[data-edit-visit]').forEach((btn) => {
@@ -666,12 +666,12 @@ function renderStaff(content) {
       if (!visit) return;
       try {
         await api.post(`/housekeeping/visits/${visit.id}/pay`, {});
-        window.oikos?.showToast(t('housekeeping.visitPaidToast'), 'success');
+        window.yuvomi?.showToast(t('housekeeping.visitPaidToast'), 'success');
         await loadData();
         await loadStaffVisits();
         renderStaff(content);
       } catch (err) {
-        window.oikos?.showToast(err.message, 'danger');
+        window.yuvomi?.showToast(err.message, 'danger');
       }
     });
   });
@@ -682,12 +682,12 @@ function renderStaff(content) {
       if (!await confirmModal(t('housekeeping.deleteVisitConfirm'), { danger: true, confirmLabel: t('common.delete') })) return;
       try {
         await api.delete(`/housekeeping/visits/${visit.id}`);
-        window.oikos?.showToast(t('housekeeping.visitDeletedToast'), 'success');
+        window.yuvomi?.showToast(t('housekeeping.visitDeletedToast'), 'success');
         await loadData();
         await loadStaffVisits();
         renderStaff(content);
       } catch (err) {
-        window.oikos?.showToast(err.message, 'danger');
+        window.yuvomi?.showToast(err.message, 'danger');
       }
     });
   });
@@ -778,12 +778,12 @@ function openTaskEditModal(task, content) {
             area: fields.area.value.trim(),
             frequency_days: frequencyDays,
           });
-          window.oikos?.showToast(t('housekeeping.taskUpdatedToast'), 'success');
+          window.yuvomi?.showToast(t('housekeeping.taskUpdatedToast'), 'success');
           await loadData();
           closeModal({ force: true });
           renderTasks(content);
         } catch (err) {
-          window.oikos?.showToast(err.message, 'danger');
+          window.yuvomi?.showToast(err.message, 'danger');
         }
       });
     },
@@ -885,14 +885,14 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
             receipt_document_id: receiptDocumentId,
             ...visitTextPayload(worker, dateValue, dailyRate ?? visit.daily_rate, extras),
           });
-          window.oikos?.showToast(t('housekeeping.visitSavedToast'), 'success');
+          window.yuvomi?.showToast(t('housekeeping.visitSavedToast'), 'success');
           await loadData();
           state.staffLogMonth = dateValue.slice(0, 7);
           await loadStaffVisits();
           closeModal({ force: true });
           (onDone || renderStaff)(content);
         } catch (err) {
-          window.oikos?.showToast(err.message, 'danger');
+          window.yuvomi?.showToast(err.message, 'danger');
         }
       });
     },
@@ -1028,13 +1028,13 @@ function openStaffModal(worker, content, options = {}) {
             avatar_data: state.workerAvatar,
             notes: fields.notes.value.trim() || null,
           });
-          window.oikos?.showToast(t('housekeeping.workerSavedToast'), 'success');
+          window.yuvomi?.showToast(t('housekeeping.workerSavedToast'), 'success');
           await loadData();
           closeModal({ force: true });
           if (typeof options.afterSave === 'function') options.afterSave();
           else renderStaff(content);
         } catch (err) {
-          window.oikos?.showToast(err.message, 'danger');
+          window.yuvomi?.showToast(err.message, 'danger');
         }
       });
     },

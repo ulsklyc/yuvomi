@@ -661,11 +661,11 @@ async function handleFormSubmit(e, container) {
     let savedTaskId = taskId;
     if (taskId) {
       await api.put(`/tasks/${taskId}`, body);
-      window.oikos.showToast(t('tasks.savedToast'), 'success');
+      window.yuvomi.showToast(t('tasks.savedToast'), 'success');
     } else {
       const res = await api.post('/tasks', body);
       savedTaskId = res.data?.id;
-      window.oikos.showToast(t('tasks.createdToast'), 'success');
+      window.yuvomi.showToast(t('tasks.createdToast'), 'success');
     }
 
     // Erinnerung speichern oder löschen
@@ -719,7 +719,7 @@ async function handleDeleteTask(id, container) {
   if (itemEl) itemEl.style.display = 'none';
 
   let undone = false;
-  window.oikos.showToast(t('tasks.deletedToast'), 'default', 5000, () => {
+  window.yuvomi.showToast(t('tasks.deletedToast'), 'default', 5000, () => {
     undone = true;
     if (itemEl) itemEl.style.display = '';
   });
@@ -734,7 +734,7 @@ async function handleDeleteTask(id, container) {
       await loadTasks(container);
     } catch (err) {
       if (itemEl) itemEl.style.display = '';
-      window.oikos.showToast(err.message ?? t('common.unknownError'), 'danger');
+      window.yuvomi.showToast(err.message ?? t('common.unknownError'), 'danger');
     }
   }, 5000);
 }
@@ -746,7 +746,7 @@ async function handleAddSubtask(parentId, container) {
     await api.post('/tasks', { title, parent_task_id: parentId });
     await loadTasks(container);
   } catch (err) {
-    window.oikos.showToast(err.message, 'danger');
+    window.yuvomi.showToast(err.message, 'danger');
   }
 }
 
@@ -896,7 +896,7 @@ function wireKanbanDrag(container) {
       await api.patch(`/tasks/${taskId}/status`, { status: newStatus });
       await loadTasks(container); // sync
     } catch (err) {
-      window.oikos.showToast(err.message, 'danger');
+      window.yuvomi.showToast(err.message, 'danger');
       await loadTasks(container);
     }
   });
@@ -918,7 +918,7 @@ function wireKanbanDrag(container) {
         await api.patch(`/tasks/${taskId}/status`, { status: newStatus });
         await loadTasks(container);
       } catch (err) {
-        window.oikos.showToast(err.message, 'danger');
+        window.yuvomi.showToast(err.message, 'danger');
         await loadTasks(container);
       }
       return;
@@ -935,7 +935,7 @@ function wireKanbanDrag(container) {
         ]);
         openTaskModal({ task, users: state.users, reminder }, container);
       } catch (err) {
-        window.oikos.showToast(t('tasks.loadError'), 'danger');
+        window.yuvomi.showToast(t('tasks.loadError'), 'danger');
       }
     }
   });
@@ -1042,7 +1042,7 @@ function wireKanbanTouch(container) {
       await api.patch(`/tasks/${tid}/status`, { status: newStatus });
       await loadTasks(container);
     } catch (err) {
-      window.oikos.showToast(err.message, 'danger');
+      window.yuvomi.showToast(err.message, 'danger');
       await loadTasks(container);
     }
   }, { passive: true });
@@ -1293,11 +1293,11 @@ const SWIPE_THRESHOLD    = 80;   // px - Mindestweg für Aktion
 const SWIPE_MAX_VERT     = 12;   // px - vertikaler Bewegungs-Toleranzbereich (darunter: kein Scroll-Abbruch)
 const SWIPE_LOCK_VERT    = 30;   // px - ab diesem Weg gilt es als Scroll (Swipe abgebrochen)
 
-const SWIPE_HINT_KEY  = 'oikos:swipeHintSeen';
+const SWIPE_HINT_KEY  = 'yuvomi:swipeHintSeen';
 const SWIPE_HINT_MAX  = 3;
-const RECENT_FILTERS_KEY = 'oikos:recentTaskFilters';
+const RECENT_FILTERS_KEY = 'yuvomi:recentTaskFilters';
 const RECENT_FILTERS_MAX = 3;
-const SHOW_FUTURE_KEY = 'oikos:taskShowFuture';
+const SHOW_FUTURE_KEY = 'yuvomi:taskShowFuture';
 
 function getRecentFilters() {
   try { return JSON.parse(localStorage.getItem(RECENT_FILTERS_KEY) ?? '[]'); } catch { return []; }
@@ -1413,7 +1413,7 @@ function wireSwipeGestures(container) {
           try {
             await toggleTaskStatus(taskId, capturedStatus);
             await loadTasks(container);
-            window.oikos.showToast(
+            window.yuvomi.showToast(
               t(nextStatus === 'done' ? 'tasks.swipedDoneToast' : 'tasks.swipedOpenToast'),
               'default',
               5000,
@@ -1422,12 +1422,12 @@ function wireSwipeGestures(container) {
                   await toggleTaskStatus(taskId, nextStatus);
                   await loadTasks(container);
                 } catch (err) {
-                  window.oikos.showToast(err.message, 'danger');
+                  window.yuvomi.showToast(err.message, 'danger');
                 }
               },
             );
           } catch (err) {
-            window.oikos.showToast(err.message, 'danger');
+            window.yuvomi.showToast(err.message, 'danger');
             await loadTasks(container);
           }
         }, 200);
@@ -1443,7 +1443,7 @@ function wireSwipeGestures(container) {
           ]);
           openTaskModal({ task, users: state.users, reminder }, container);
         } catch (err) {
-          window.oikos.showToast(t('tasks.loadError'), 'danger');
+          window.yuvomi.showToast(t('tasks.loadError'), 'danger');
         }
 
       } else {
@@ -1534,7 +1534,7 @@ function wireViewToggle(container) {
   toggle.querySelectorAll('[data-view]').forEach((btn) => {
     btn.addEventListener('click', () => {
       state.viewMode = btn.dataset.view;
-      localStorage.setItem('oikos-tasks-view', state.viewMode);
+      localStorage.setItem('yuvomi-tasks-view', state.viewMode);
       toggle.querySelectorAll('[data-view]').forEach((b) =>
         b.classList.toggle('group-toggle__btn--active', b.dataset.view === state.viewMode)
       );
@@ -1658,20 +1658,20 @@ function wireBulkActions(container) {
       if (action === 'bulk-mark-done' || action === 'bulk-mark-open') {
         const status = btn.dataset.status;
         await Promise.all(taskIds.map(id => api.patch(`/tasks/${id}/status`, { status })));
-        window.oikos.showToast(t('tasks.bulkStatusChanged'), 'success');
+        window.yuvomi.showToast(t('tasks.bulkStatusChanged'), 'success');
       } else if (action === 'bulk-archive') {
         await Promise.all(taskIds.map(id => api.patch(`/tasks/${id}/status`, { status: 'archived' })));
-        window.oikos.showToast(t('tasks.bulkArchived'), 'success');
+        window.yuvomi.showToast(t('tasks.bulkArchived'), 'success');
       } else if (action === 'bulk-delete') {
         await Promise.all(taskIds.map(id => api.delete(`/tasks/${id}`)));
-        window.oikos.showToast(t('tasks.bulkDeleted'), 'success');
+        window.yuvomi.showToast(t('tasks.bulkDeleted'), 'success');
       }
 
       state.selectedTaskIds.clear();
       updateBulkActionsBar(container);
       await loadTasks(container);
     } catch (err) {
-      window.oikos.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+      window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
     }
   });
 }
@@ -1695,7 +1695,7 @@ function wireTaskList(container) {
         await toggleTaskStatus(id, status);
         await loadTasks(container);
       } catch (err) {
-        window.oikos.showToast(err.message, 'danger');
+        window.yuvomi.showToast(err.message, 'danger');
         await loadTasks(container);
       }
     }
@@ -1710,7 +1710,7 @@ function wireTaskList(container) {
         await toggleSubtaskStatus(id, target.dataset.status);
         await loadTasks(container);
       } catch (err) {
-        window.oikos.showToast(err.message, 'danger');
+        window.yuvomi.showToast(err.message, 'danger');
       }
     }
 
@@ -1722,17 +1722,17 @@ function wireTaskList(container) {
         ]);
         openTaskModal({ task, users: state.users, reminder }, container);
       } catch (err) {
-        window.oikos.showToast(t('tasks.loadError'), 'danger');
+        window.yuvomi.showToast(t('tasks.loadError'), 'danger');
       }
     }
 
     if (action === 'archive-task') {
       try {
         await api.patch(`/tasks/${id}/status`, { status: 'archived' });
-        window.oikos.showToast(t('tasks.archivedToast'), 'success');
+        window.yuvomi.showToast(t('tasks.archivedToast'), 'success');
         await loadTasks(container);
       } catch (err) {
-        window.oikos.showToast(err.message, 'danger');
+        window.yuvomi.showToast(err.message, 'danger');
       }
     }
 
@@ -1749,7 +1749,7 @@ function wireTaskList(container) {
 export async function render(container, { user }) {
   // View-Mode: URL-Parameter > localStorage > Default 'list'
   const urlView = new URLSearchParams(window.location.search).get('view');
-  const savedView = localStorage.getItem('oikos-tasks-view');
+  const savedView = localStorage.getItem('yuvomi-tasks-view');
   state.viewMode = (urlView === 'kanban' || urlView === 'list') ? urlView
     : (savedView === 'kanban' || savedView === 'list') ? savedView
     : 'list';
@@ -1857,7 +1857,7 @@ export async function render(container, { user }) {
     state.users = metaData.users ?? [];
   } catch (err) {
     console.error('[Tasks] Ladefehler:', err.message);
-    window.oikos.showToast(t('tasks.loadError'), 'danger');
+    window.yuvomi.showToast(t('tasks.loadError'), 'danger');
     state.tasks = [];
     state.users = [];
   }

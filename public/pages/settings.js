@@ -47,7 +47,7 @@ async function refreshUser(user) {
 function redirectTo(target) {
   history.replaceState({ path: target }, '', target);
   setTimeout(() => {
-    window.oikos?.navigate(target, false);
+    window.yuvomi?.navigate(target, false);
   }, 0);
 }
 
@@ -99,7 +99,7 @@ export async function render(container, { user } = {}) {
     // Direkter Aufruf eines Blatts: Rollen-Guard + Persistenz.
     const leaf = findSettingsLeaf(path, currentUser);
     if (!leaf) {
-      sessionStorage.setItem('oikos:settings:notice', 'accessRedirected');
+      sessionStorage.setItem('yuvomi:settings:notice', 'accessRedirected');
       await redirectTo(ACCOUNT_LEAF);
       return;
     }

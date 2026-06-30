@@ -21,7 +21,9 @@ import { passwordResetService as defaultResetService } from './services/password
 
 const log = createLogger('Auth');
 const router = express.Router();
-const API_TOKEN_PREFIX = 'oikos_';
+// Präfix für NEUE API-Tokens. Bereits ausgegebene `oikos_`-Tokens bleiben gültig:
+// validiert wird über den Hash des gesamten Tokens, nicht über den Präfix.
+const API_TOKEN_PREFIX = 'yuvomi_';
 const FAMILY_ROLES = ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'];
 const MAX_AVATAR_DATA_LENGTH = 768 * 1024;
 const USER_PUBLIC_COLUMNS = `
@@ -120,12 +122,20 @@ if (!process.env.SESSION_SECRET) {
   throw new Error('[Auth] SESSION_SECRET must be set in .env. Run: node setup.js');
 }
 
-const sessionMiddleware = session({
+// Session-Cookie-Name. Legacy „Oikos"-Installationen nutzten `oikos.sid`; der
+// Name ist nun `yuvomi.sid`. Der Wechsel ist NAHTLOS (kein Zwangs-Logout): der
+// signierte Session-Wert ist nur über den Wert (die sid) signiert, nicht über den
+// Cookie-Namen — daher kann ein vorhandenes `oikos.sid` transparent als
+// `yuvomi.sid` weitergereicht werden (siehe sessionMiddleware unten).
+const SESSION_COOKIE = 'yuvomi.sid';
+const LEGACY_SESSION_COOKIE = 'oikos.sid';
+
+const expressSession = session({
   store: sessionStore,
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  name: 'oikos.sid',
+  name: SESSION_COOKIE,
   cookie: {
     httpOnly: true,
     // secure=false by default; set SESSION_SECURE=true when behind an HTTPS reverse proxy
@@ -137,6 +147,27 @@ const sessionMiddleware = session({
     maxAge: 1000 * 60 * 60 * 24 * 7, // 7 Tage in ms
   },
 });
+
+/**
+ * Session-Middleware mit nahtloser Legacy-Cookie-Migration.
+ * Trägt ein vorhandenes `oikos.sid`-Cookie einmalig als `yuvomi.sid` nach, sodass
+ * bestehende Anmeldungen über das Rename hinweg gültig bleiben (gleiche signierte
+ * sid, gleiches SESSION_SECRET). Das alte Cookie wird dabei verworfen.
+ */
+function sessionMiddleware(req, res, next) {
+  const header = req.headers.cookie;
+  if (header && header.includes(`${LEGACY_SESSION_COOKIE}=`) && !header.includes(`${SESSION_COOKIE}=`)) {
+    const match = header.match(/(?:^|;\s*)oikos\.sid=([^;]+)/);
+    if (match) {
+      // Legacy-Wert zusätzlich unter dem neuen Namen exponieren, damit
+      // express-session ihn findet …
+      req.headers.cookie = `${header}; ${SESSION_COOKIE}=${match[1]}`;
+      // … und das veraltete Cookie im Browser entfernen.
+      res.clearCookie(LEGACY_SESSION_COOKIE, { path: '/' });
+    }
+  }
+  return expressSession(req, res, next);
+}
 
 // --------------------------------------------------------
 // Rate Limiting für Login
@@ -686,7 +717,8 @@ router.post('/logout', requireAuth, csrfMiddleware, (req, res) => {
       log.error('Logout error:', err);
       return res.status(500).json({ error: 'Logout failed.', code: 500 });
     }
-    res.clearCookie('oikos.sid');
+    res.clearCookie(SESSION_COOKIE);
+    res.clearCookie(LEGACY_SESSION_COOKIE); // best effort: verwaistes Legacy-Cookie räumen
     res.json({ ok: true });
   });
 });

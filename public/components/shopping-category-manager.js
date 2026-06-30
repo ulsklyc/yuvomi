@@ -74,7 +74,7 @@ class ShoppingCategoryManagerElement extends HTMLElement {
       this._cats = res.data ?? [];
       this._renderList();
     } catch (err) {
-      window.oikos?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   }
 
@@ -133,9 +133,9 @@ class ShoppingCategoryManagerElement extends HTMLElement {
       this._addInput.value = '';
       this._addInput.focus();
       this._notifyChanged();
-      window.oikos?.showToast(t('settings.shoppingCategoryAdded'), 'success');
+      window.yuvomi?.showToast(t('settings.shoppingCategoryAdded'), 'success');
     } catch (err) {
-      window.oikos?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   }
 
@@ -169,9 +169,9 @@ class ShoppingCategoryManagerElement extends HTMLElement {
       if (idx >= 0) this._cats[idx] = res.data;
       this._renderList();
       this._notifyChanged();
-      window.oikos?.showToast(t('settings.shoppingCategoryRenamed'), 'success');
+      window.yuvomi?.showToast(t('settings.shoppingCategoryRenamed'), 'success');
     } catch (err) {
-      window.oikos?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   }
 
@@ -189,7 +189,7 @@ class ShoppingCategoryManagerElement extends HTMLElement {
     } catch (err) {
       this._cats = snapshot;
       this._renderList();
-      window.oikos?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   }
 
@@ -209,13 +209,13 @@ class ShoppingCategoryManagerElement extends HTMLElement {
       this._cats = this._cats.filter((c) => c.id !== id);
       this._renderList();
       this._notifyChanged();
-      window.oikos?.showToast(t('settings.shoppingCategoryDeleted'), 'default');
+      window.yuvomi?.showToast(t('settings.shoppingCategoryDeleted'), 'default');
     } catch (err) {
-      window.oikos?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   }
 }
 
-customElements.define('oikos-shopping-category-manager', ShoppingCategoryManagerElement);
+customElements.define('yuvomi-shopping-category-manager', ShoppingCategoryManagerElement);
 
 export { ShoppingCategoryManagerElement };

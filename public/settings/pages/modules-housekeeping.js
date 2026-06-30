@@ -24,10 +24,10 @@ function bindEvents(container) {
     toggle.disabled = true;
     try {
       await api.put('/preferences', { housekeeping_payment_tasks: toggle.checked });
-      window.oikos?.showToast(t('settings.housekeepingPaymentTasksSaved'), 'success');
+      window.yuvomi?.showToast(t('settings.housekeepingPaymentTasksSaved'), 'success');
     } catch (error) {
       toggle.checked = !toggle.checked;
-      window.oikos?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
     } finally {
       toggle.disabled = false;
     }

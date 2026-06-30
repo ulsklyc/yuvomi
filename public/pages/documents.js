@@ -52,7 +52,7 @@ let state = {
   members: [],
   dmsAccounts: [],
   activeUploadBackend: 'local',
-  view: localStorage.getItem('oikos-documents-view') || 'grid',
+  view: localStorage.getItem('yuvomi-documents-view') || 'grid',
   status: 'active',
   category: '',
   folderId: '',
@@ -250,7 +250,7 @@ function bindPageEvents() {
     const btn = e.target.closest('[data-view]');
     if (!btn) return;
     state.view = btn.dataset.view;
-    localStorage.setItem('oikos-documents-view', state.view);
+    localStorage.setItem('yuvomi-documents-view', state.view);
     _container.querySelectorAll('.documents-view-toggle__btn').forEach((el) =>
       el.classList.toggle('documents-view-toggle__btn--active', el === btn)
     );
@@ -452,7 +452,7 @@ async function handleDocumentAction(e) {
   if (btn.dataset.action === 'edit') openDocumentModal(doc);
   if (btn.dataset.action === 'archive') {
     await api.patch(`/documents/${doc.id}/archive`, { archived: doc.status !== 'archived' });
-    window.oikos?.showToast(doc.status === 'archived' ? t('documents.restoredToast') : t('documents.archivedToast'), 'success');
+    window.yuvomi?.showToast(doc.status === 'archived' ? t('documents.restoredToast') : t('documents.archivedToast'), 'success');
     await loadDocuments();
     renderFolderBrowser();
     renderDocuments();
@@ -471,9 +471,9 @@ async function handleDocumentAction(e) {
     }
     try {
       await api.post('/documents/dms/push', { account_id: accountId, document_id: doc.id });
-      window.oikos?.showToast(t('documents.pushToDmsQueued'), 'success');
+      window.yuvomi?.showToast(t('documents.pushToDmsQueued'), 'success');
     } catch (err) {
-      window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     }
     return;
   }
@@ -484,7 +484,7 @@ async function handleDocumentAction(e) {
     renderDocuments();
 
     let undone = false;
-    window.oikos?.showToast(t('documents.deletedToast'), 'default', 5000, () => {
+    window.yuvomi?.showToast(t('documents.deletedToast'), 'default', 5000, () => {
       undone = true;
       state.allDocuments = [...state.allDocuments, doc].sort((a, b) => a.name.localeCompare(b.name));
       syncFolderDocuments();
@@ -504,7 +504,7 @@ async function handleDocumentAction(e) {
         syncFolderDocuments();
         renderFolderBrowser();
         renderDocuments();
-        window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+        window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
       }
     }, 5000);
   }
@@ -689,7 +689,7 @@ async function saveDocument(event, doc) {
     if (!payload.name) throw new Error(t('common.required'));
     if (doc) await api.put(`/documents/${doc.id}`, payload);
     else await api.post('/documents', payload);
-    window.oikos?.showToast(doc ? t('documents.savedToast') : t('documents.uploadedToast'), 'success');
+    window.yuvomi?.showToast(doc ? t('documents.savedToast') : t('documents.uploadedToast'), 'success');
     closeModal({ force: true });
     await loadDocuments();
     renderFolderBrowser();
@@ -726,7 +726,7 @@ function openFolderModal() {
         error.hidden = true;
         try {
           const res = await api.post('/documents/folders', { name: input.value.trim() });
-          window.oikos?.showToast(t('documents.folderCreatedToast'), 'success');
+          window.yuvomi?.showToast(t('documents.folderCreatedToast'), 'success');
           state.folderId = String(res.data?.id || '');
           await loadFolders();
           await loadDocuments();
@@ -861,7 +861,7 @@ function renderDmsResults(container, items, accountId) {
         renderDocuments();
       } catch (err) {
         btn.disabled = false;
-        window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+        window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
       }
     });
 

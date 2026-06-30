@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from 'node:fs';
 const { stagger, vibrate, deleteWithUndo } = await (async () => {
   global.window = {
     matchMedia: () => ({ matches: false }),
-    oikos: { showToast: () => {} },
+    yuvomi: { showToast: () => {} },
   };
   global.t = (k) => k;
   Object.defineProperty(global, 'navigator', {
@@ -39,7 +39,7 @@ test('stagger: setzt opacity:0 auf alle Elemente', () => {
 });
 
 test('date inputs: accept slash, dot, and hyphen separators for DMY dates', () => {
-  localStorage.setItem('oikos-date-format', 'dmy');
+  localStorage.setItem('yuvomi-date-format', 'dmy');
   assert.equal(parseDateInput('26/05/2026'), '2026-05-26');
   assert.equal(parseDateInput('26.05.2026'), '2026-05-26');
   assert.equal(parseDateInput('26-05-2026'), '2026-05-26');
@@ -47,7 +47,7 @@ test('date inputs: accept slash, dot, and hyphen separators for DMY dates', () =
 });
 
 test('date inputs: accept hyphen separators for YMD dates', () => {
-  localStorage.setItem('oikos-date-format', 'ymd');
+  localStorage.setItem('yuvomi-date-format', 'ymd');
   assert.equal(parseDateInput('2026-5-6'), '2026-05-06');
   assert.equal(parseDateInput('2026/05/06'), '2026-05-06');
   assert.equal(parseDateInput('2026.05.06'), '2026-05-06');
@@ -95,7 +95,7 @@ test('readable text color selects a WCAG-safe ink for arbitrary card colors', as
 
 test('deleteWithUndo: ruft onDelete auf', async () => {
   let deleteCalled = false;
-  global.window.oikos = { showToast: () => {} };
+  global.window.yuvomi = { showToast: () => {} };
   await deleteWithUndo({
     onDelete: async () => { deleteCalled = true; },
     toastMessage: 'Gelöscht',
@@ -106,7 +106,7 @@ test('deleteWithUndo: ruft onDelete auf', async () => {
 test('deleteWithUndo: übergibt onUndo an showToast', async () => {
   let undoCalled = false;
   let capturedUndo = null;
-  global.window.oikos = {
+  global.window.yuvomi = {
     showToast: (_msg, _type, _duration, undoFn) => { capturedUndo = undoFn; },
   };
   await deleteWithUndo({
@@ -120,7 +120,7 @@ test('deleteWithUndo: übergibt onUndo an showToast', async () => {
 });
 
 test('parseTimeInput: bare hour (24 h) expands to HH:00', () => {
-  localStorage.setItem('oikos-time-format', '24h');
+  localStorage.setItem('yuvomi-time-format', '24h');
   assert.equal(parseTimeInput('15'), '15:00');
   assert.equal(parseTimeInput('9'),  '09:00');
   assert.equal(parseTimeInput('0'),  '00:00');
@@ -128,36 +128,36 @@ test('parseTimeInput: bare hour (24 h) expands to HH:00', () => {
 });
 
 test('parseTimeInput: bare hour out-of-range returns empty string', () => {
-  localStorage.setItem('oikos-time-format', '24h');
+  localStorage.setItem('yuvomi-time-format', '24h');
   assert.equal(parseTimeInput('24'), '');
   assert.equal(parseTimeInput('99'), '');
 });
 
 test('formatTimeInput: bare hour (12 h) formats with AM/PM', () => {
-  localStorage.setItem('oikos-time-format', '12h');
+  localStorage.setItem('yuvomi-time-format', '12h');
   assert.equal(formatTimeInput('9'),  '9:00 AM');
   assert.equal(formatTimeInput('15'), '3:00 PM');
-  localStorage.setItem('oikos-time-format', '24h');
+  localStorage.setItem('yuvomi-time-format', '24h');
 });
 
 test('parseDateInput: 8 raw digits (DMY)', () => {
-  localStorage.setItem('oikos-date-format', 'dmy');
+  localStorage.setItem('yuvomi-date-format', 'dmy');
   assert.equal(parseDateInput('09062026'), '2026-06-09');
   assert.equal(parseDateInput('01012000'), '2000-01-01');
 });
 
 test('parseDateInput: 8 raw digits (MDY)', () => {
-  localStorage.setItem('oikos-date-format', 'mdy');
+  localStorage.setItem('yuvomi-date-format', 'mdy');
   assert.equal(parseDateInput('09062026'), '2026-09-06');
 });
 
 test('parseDateInput: 8 raw digits (YMD)', () => {
-  localStorage.setItem('oikos-date-format', 'ymd');
+  localStorage.setItem('yuvomi-date-format', 'ymd');
   assert.equal(parseDateInput('20260609'), '2026-06-09');
 });
 
 test('parseDateInput: 8 raw digits — invalid date returns empty string', () => {
-  localStorage.setItem('oikos-date-format', 'dmy');
+  localStorage.setItem('yuvomi-date-format', 'dmy');
   assert.equal(parseDateInput('99992026'), '');
   assert.equal(parseDateInput('00000000'), '');
 });
