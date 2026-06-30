@@ -43,6 +43,24 @@ function tmpDir() {
   return mkdtempSync(join(tmpdir(), 'yuvomi-rename-'));
 }
 
+test('Stale Legacy-Sidecars (-wal/-shm) werden nach erfolgreichem Checkpoint entfernt', async () => {
+  const dir = tmpDir();
+  const legacy = join(dir, 'oikos.db');
+  const target = join(dir, 'yuvomi.db');
+  seedLegacyDb(legacy, 'sidecar-cleanup');
+  // Verwaiste Sidecars simulieren (z. B. aus einem früheren WAL-Lauf).
+  writeFileSync(`${legacy}-wal`, '');
+  writeFileSync(`${legacy}-shm`, '');
+
+  const mod = await bootDb(legacy);
+
+  assert.ok(existsSync(target), 'yuvomi.db muss existieren');
+  assert.ok(!existsSync(`${legacy}-wal`), 'Legacy -wal muss entfernt sein');
+  assert.ok(!existsSync(`${legacy}-shm`), 'Legacy -shm muss entfernt sein');
+  const row = mod.get().prepare('SELECT note FROM rename_marker').get();
+  assert.equal(row.note, 'sidecar-cleanup', 'Daten müssen erhalten bleiben');
+});
+
 test('Legacy-Default: DB_PATH=…/oikos.db wird nach yuvomi.db migriert (Daten erhalten)', async () => {
   const dir = tmpDir();
   const legacy = join(dir, 'oikos.db');

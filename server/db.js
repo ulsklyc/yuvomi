@@ -12,7 +12,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'node:fs/promises';
-import { mkdirSync, existsSync, renameSync } from 'node:fs';
+import { mkdirSync, existsSync, renameSync, rmSync } from 'node:fs';
 import { createLogger } from './logger.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
 
@@ -71,27 +71,43 @@ function migrateLegacyDbFile() {
 
   log.info(`Legacy database detected — migrating ${LEGACY_DB_PATH} → ${DB_PATH}`);
 
-  // 1. WAL des Legacy-Files in die Hauptdatei einfalten, damit der Rename vollständig ist.
+  // 1. WAL des Legacy-Files VOLLSTÄNDIG in die Hauptdatei einfalten. Erst wenn der
+  //    TRUNCATE-Checkpoint nachweislich gelang, trägt `oikos.db` allein den
+  //    kompletten Zustand (WAL = 0 Bytes) — dann ist ein Rename der reinen .db
+  //    verlustfrei. Schlägt der Checkpoint fehl, könnten committete Frames noch im
+  //    WAL liegen; dann NICHT teil-migrieren.
+  let checkpointed = false;
   try {
     const legacy = new Database(LEGACY_DB_PATH);
     try {
       applyEncryptionKey(legacy);
       legacy.pragma('wal_checkpoint(TRUNCATE)');
+      checkpointed = true;
     } finally {
       legacy.close();
     }
   } catch (err) {
-    // Best effort (z. B. SQLCipher/Key) — Sidecars werden unten mitverschoben.
-    log.warn(`Legacy checkpoint skipped (${err?.message}); moving WAL/SHM alongside.`);
+    log.warn(`Legacy checkpoint failed (${err?.message}).`);
   }
 
-  // 2. Datei (und verbliebene Sidecars) auf den neuen Namen verschieben.
+  if (!checkpointed) {
+    // WAL könnte committete Daten enthalten, die wir nicht sicher von der .db
+    // trennen können → KEINE Teil-Migration. Auf dem Legacy-Pfad weiterlaufen
+    // (SQLite öffnet oikos.db samt intaktem WAL); nächster Boot versucht es erneut.
+    log.warn(`Deferring migration — continuing on legacy path ${LEGACY_DB_PATH}.`);
+    DB_PATH = LEGACY_DB_PATH;
+    return;
+  }
+
+  // 2. Checkpoint gelang → die .db ist vollständig und eigenständig. Nur sie
+  //    umbenennen; die nun leeren Legacy-Sidecars best-effort entfernen (SQLite
+  //    legt -wal/-shm für yuvomi.db bei Bedarf neu an).
   try {
     renameSync(LEGACY_DB_PATH, DB_PATH);
     for (const suffix of ['-wal', '-shm']) {
-      const from = `${LEGACY_DB_PATH}${suffix}`;
-      if (existsSync(from)) {
-        try { renameSync(from, `${DB_PATH}${suffix}`); } catch { /* stale sidecar */ }
+      const stale = `${LEGACY_DB_PATH}${suffix}`;
+      if (existsSync(stale)) {
+        try { rmSync(stale); } catch { /* harmlos: leeres/locked Sidecar */ }
       }
     }
     log.info(`Database migrated to ${DB_PATH}`);
