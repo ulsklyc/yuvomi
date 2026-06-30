@@ -4,9 +4,11 @@
 // Benennt jeden Key, der mit `oikos-`, `oikos:` oder `oikos.` beginnt, auf das
 // gleiche Suffix mit `yuvomi`-Präfix um (z. B. `oikos-theme` → `yuvomi-theme`).
 (function migrateLegacyStorage() {
+  // Kein gemeinsames Flag: sessionStorage ist pro Tab. Würde ein localStorage-Flag
+  // die Migration kurzschließen, verlöre ein zweiter, vor dem Update geöffneter Tab
+  // seine eigenen sessionStorage-Keys. Der Scan ist idempotent und günstig (wenige
+  // Keys), daher laufen wir ihn bei jedem Load über BEIDE Stores.
   try {
-    var FLAG = 'yuvomi:migratedFrom:oikos';
-    if (localStorage.getItem(FLAG) === '1') return;
     var stores = [localStorage, sessionStorage];
     for (var s = 0; s < stores.length; s++) {
       var store = stores[s];
@@ -24,7 +26,6 @@
         store.removeItem(oldKey);
       }
     }
-    localStorage.setItem(FLAG, '1');
   } catch (e) { /* Storage nicht verfügbar (Privatmodus) → ignorieren */ }
 })();
 

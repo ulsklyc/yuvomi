@@ -2283,3 +2283,9 @@ window.yuvomi = {
     updateThemeColorForRoute(route);
   },
 };
+
+// Legacy-Alias: Drittanbieter-Module unter modules/ wurden ggf. gegen die alte
+// globale API `window.oikos` geschrieben. Ohne diesen Alias würfen ihre Aufrufe
+// (window.oikos.navigate/showToast …) nach dem Rename, und der Router würde das
+// Modul als fehlerhaft deaktivieren. Der Alias hält den Upgrade-Pfad nahtlos.
+window.oikos = window.yuvomi;
