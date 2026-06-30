@@ -115,10 +115,10 @@ configure_basic() {
   step "$(t basic.step)"
 
   ask "$(t basic.host)"
-  read -r OIKOS_HOST; OIKOS_HOST="${OIKOS_HOST:-localhost}"
+  read -r YUVOMI_HOST; YUVOMI_HOST="${YUVOMI_HOST:-localhost}"
 
   ask "$(t basic.port)"
-  read -r OIKOS_PORT; OIKOS_PORT="${OIKOS_PORT:-3000}"
+  read -r YUVOMI_PORT; YUVOMI_PORT="${YUVOMI_PORT:-3000}"
 
   local sys_tz="UTC"
   if [ -f /etc/timezone ]; then
@@ -130,7 +130,7 @@ configure_basic() {
   fi
 
   ask "$(t basic.tz "$sys_tz")"
-  read -r OIKOS_TZ; OIKOS_TZ="${OIKOS_TZ:-$sys_tz}"
+  read -r YUVOMI_TZ; YUVOMI_TZ="${YUVOMI_TZ:-$sys_tz}"
 }
 
 # ── Step 2: Secrets ────────────────────────────────────────────────────────────
@@ -180,10 +180,10 @@ configure_calendar() {
   read -r want_google
   if [ "${want_google,,}" = "y" ]; then
     info "$(t calendar.google_hint)"
-    info "$(t calendar.redirect_hint "http://${OIKOS_HOST}:${OIKOS_PORT}/api/v1/calendar/google/callback")"
+    info "$(t calendar.redirect_hint "http://${YUVOMI_HOST}:${YUVOMI_PORT}/api/v1/calendar/google/callback")"
     ask "$(t calendar.client_id)"; read -r GOOGLE_CLIENT_ID
     ask "$(t calendar.client_secret)"; read -rs GOOGLE_CLIENT_SECRET; printf "\n"
-    GOOGLE_REDIRECT_URI="http://${OIKOS_HOST}:${OIKOS_PORT}/api/v1/calendar/google/callback"
+    GOOGLE_REDIRECT_URI="http://${YUVOMI_HOST}:${YUVOMI_PORT}/api/v1/calendar/google/callback"
   fi
 
   ask "$(t calendar.apple_enable)"
@@ -221,9 +221,9 @@ configure_document_storage() {
 review_and_confirm() {
   step "$(t review.step)"
   printf "\n"
-  printf "  %-16s %s%s%s\n"  "$(t review.host)"     "$CYAN"   "$OIKOS_HOST" "$RESET"
-  printf "  %-16s %s%s%s\n"  "$(t review.port)"     "$CYAN"   "$OIKOS_PORT" "$RESET"
-  printf "  %-16s %s%s%s\n"  "$(t review.timezone)" "$CYAN"   "$OIKOS_TZ"   "$RESET"
+  printf "  %-16s %s%s%s\n"  "$(t review.host)"     "$CYAN"   "$YUVOMI_HOST" "$RESET"
+  printf "  %-16s %s%s%s\n"  "$(t review.port)"     "$CYAN"   "$YUVOMI_PORT" "$RESET"
+  printf "  %-16s %s%s%s\n"  "$(t review.timezone)" "$CYAN"   "$YUVOMI_TZ"   "$RESET"
   printf "  %-16s %s***%s\n" "SESSION_SECRET"       "$YELLOW" "$RESET"
   printf "  %-16s %s***%s\n" "DB_ENCRYPT_KEY"       "$YELLOW" "$RESET"
   [ -n "$OPENWEATHER_API_KEY" ] && printf "  %-16s %s%s%s\n" "$(t review.weather)" "$GREEN" "$(t review.weather_value "$OPENWEATHER_CITY")" "$RESET"
@@ -268,8 +268,8 @@ DOCUMENT_STORAGE_WEBDAV_USERNAME=${DOCUMENT_STORAGE_WEBDAV_USERNAME}
 DOCUMENT_STORAGE_WEBDAV_PASSWORD=${DOCUMENT_STORAGE_WEBDAV_PASSWORD}
 DOCUMENT_STORAGE_WEBDAV_PATH=${DOCUMENT_STORAGE_WEBDAV_PATH}
 SYNC_INTERVAL_MINUTES=15
-TZ=${OIKOS_TZ}
-OIKOS_HTTP_PORT=${OIKOS_PORT}
+TZ=${YUVOMI_TZ}
+OIKOS_HTTP_PORT=${YUVOMI_PORT}
 ENVEOF
 
   success "$(t container.env_written)"
@@ -285,7 +285,7 @@ ENVEOF
   while [ $elapsed -lt 120 ]; do
     local http_code
     http_code=$(curl -s -o /dev/null -w "%{http_code}" \
-      "http://localhost:${OIKOS_PORT}/health" 2>/dev/null || echo "000")
+      "http://localhost:${YUVOMI_PORT}/health" 2>/dev/null || echo "000")
     if [ "$http_code" = "200" ]; then
       printf "\n"; success "$(t container.healthy)"; return 0
     fi
@@ -323,13 +323,13 @@ create_admin() {
 
   local response http_code body
   response=$(curl -s -w "\n%{http_code}" \
-    -X POST "http://localhost:${OIKOS_PORT}/api/v1/auth/setup" \
+    -X POST "http://localhost:${YUVOMI_PORT}/api/v1/auth/setup" \
     -H "Content-Type: application/json" \
     -d "$payload")
   http_code=$(printf '%s' "$response" | tail -n1)
   body=$(printf '%s' "$response" | head -n-1)
 
-  local url="http://${OIKOS_HOST}:${OIKOS_PORT}"
+  local url="http://${YUVOMI_HOST}:${YUVOMI_PORT}"
   if [ "$http_code" = "201" ]; then
     success "$(t admin.created)"
     printf "\n%s%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n"   "$BOLD" "$GREEN" "$RESET"
@@ -342,7 +342,7 @@ create_admin() {
   else
     warn "$(t admin.failed "$http_code" "$body")"
     printf "%s\n" "$(t admin.manual)"
-    printf "  curl -X POST http://localhost:%s/api/v1/auth/setup \\\n" "$OIKOS_PORT"
+    printf "  curl -X POST http://localhost:%s/api/v1/auth/setup \\\n" "$YUVOMI_PORT"
     printf "    -H 'Content-Type: application/json' \\\n"
     printf "    -d '{\"username\":\"admin\",\"display_name\":\"Admin\",\"password\":\"yourpassword\"}'\n\n"
   fi
@@ -358,9 +358,9 @@ run_noninteractive() {
   detect_engine || err "$(t noninteractive.no_engine)"
   info "$(t noninteractive.engine "$ENGINE_NAME" "${COMPOSE[*]}")"
 
-  OIKOS_PORT=$(grep -E '^PORT=' .env 2>/dev/null | cut -d= -f2- | head -n1)
-  OIKOS_PORT="${OIKOS_PORT:-3000}"
-  OIKOS_HOST="localhost"
+  YUVOMI_PORT=$(grep -E '^PORT=' .env 2>/dev/null | cut -d= -f2- | head -n1)
+  YUVOMI_PORT="${YUVOMI_PORT:-3000}"
+  YUVOMI_HOST="localhost"
 
   if ! "${COMPOSE[@]}" up -d; then "${COMPOSE[@]}" logs --tail 50; exit 1; fi
 
@@ -369,13 +369,13 @@ run_noninteractive() {
   while [ $elapsed -lt 120 ]; do
     local http_code
     http_code=$(curl -s -o /dev/null -w "%{http_code}" \
-      "http://localhost:${OIKOS_PORT}/health" 2>/dev/null || echo "000")
+      "http://localhost:${YUVOMI_PORT}/health" 2>/dev/null || echo "000")
     [ "$http_code" = "200" ] && { printf "\n"; success "$(t noninteractive.ready)"; break; }
     printf "."; sleep 2; elapsed=$((elapsed + 2))
   done
 
   printf "\n%s%s%s %s\n\n" "$GREEN" "$(t noninteractive.started)" "$RESET" "$(t noninteractive.create_admin)"
-  printf "  curl -X POST http://localhost:%s/api/v1/auth/setup \\\n" "$OIKOS_PORT"
+  printf "  curl -X POST http://localhost:%s/api/v1/auth/setup \\\n" "$YUVOMI_PORT"
   printf "    -H 'Content-Type: application/json' \\\n"
   printf "    -d '{\"username\":\"admin\",\"display_name\":\"Admin\",\"password\":\"yourpassword\"}'\n\n"
 }

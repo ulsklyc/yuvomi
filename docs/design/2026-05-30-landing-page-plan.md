@@ -162,7 +162,7 @@ function loadStars() {
   if (cached) { applyStars(cached); return; }
   var timedOut = false;
   var timer = setTimeout(function() { timedOut = true; }, 3000);
-  fetch('https://api.github.com/repos/ulsklyc/oikos')
+  fetch('https://api.github.com/repos/ulsklyc/yuvomi')
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (timedOut) return;
@@ -222,7 +222,7 @@ Find `<!-- HERO -->` and replace the entire `<header class="hero">...</header>` 
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           <span data-t="hero_install">Installation Guide</span>
         </a>
-        <a href="https://github.com/ulsklyc/oikos" class="btn-ghost" target="_blank" rel="noopener">
+        <a href="https://github.com/ulsklyc/yuvomi" class="btn-ghost" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"></path></svg>
           <span data-t="nav_gh">GitHub</span>
         </a>
@@ -237,7 +237,7 @@ Find `<!-- HERO -->` and replace the entire `<header class="hero">...</header>` 
     </div>
     <div class="hero-mockup">
       <div class="mockup-tablet">
-        <img class="sc" data-light="screenshots/dashboard-light-desktop.png" data-dark="screenshots/dashboard-dark-desktop.png" src="screenshots/dashboard-light-desktop.png" alt="Oikos Dashboard">
+        <img class="sc" data-light="screenshots/dashboard-light-desktop.png" data-dark="screenshots/dashboard-dark-desktop.png" src="screenshots/dashboard-light-desktop.png" alt="Yuvomi Dashboard">
       </div>
     </div>
   </div>
@@ -426,7 +426,7 @@ In the pasted philosophy section header, change:
 To:
 
 ```html
-<p class="section-label" data-t="why_label">Why Oikos</p>
+<p class="section-label" data-t="why_label">Why Yuvomi</p>
 <h2 class="section-title" data-t="why_title">Built for families, not for profit.</h2>
 ```
 
@@ -452,13 +452,13 @@ After the swap, the `.phil-grid` should contain the four `.phil-card` divs in th
 
 In `en`:
 ```javascript
-why_label: 'Why Oikos',
+why_label: 'Why Yuvomi',
 why_title: 'Built for families, not for profit.',
 ```
 
 In `de`:
 ```javascript
-why_label: 'Warum Oikos',
+why_label: 'Warum Yuvomi',
 why_title: 'Für Familien gebaut, nicht für Profit.',
 ```
 
@@ -466,13 +466,13 @@ why_title: 'Für Familien gebaut, nicht für Profit.',
 
 - [ ] **Step 6: Verify philosophy section position and content**
 
-Open in browser. Scroll order should now be: Hero → Proof Bar → Problem → **Philosophy** → Feature-Alt grid → Feature Showcase → Carousel → Setup → CTA → Footer. Section label reads "Why Oikos", title "Built for families, not for profit." Card 3 is Open Source, card 4 is Zero Build. Toggle DE/EN.
+Open in browser. Scroll order should now be: Hero → Proof Bar → Problem → **Philosophy** → Feature-Alt grid → Feature Showcase → Carousel → Setup → CTA → Footer. Section label reads "Why Yuvomi", title "Built for families, not for profit." Card 3 is Open Source, card 4 is Zero Build. Toggle DE/EN.
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add docs/index.html
-git commit -m "feat(landing): move philosophy section up, rename to Why Oikos, reorder cards"
+git commit -m "feat(landing): move philosophy section up, rename to Why Yuvomi, reorder cards"
 ```
 
 ---
@@ -639,20 +639,20 @@ Find `<section class="setup" id="setup">` and replace everything between the ope
       <div class="setup-step">
         <span class="setup-step-num">③</span>
         <h3 data-t="setup_3_t">Invite your family</h3>
-        <p data-t="setup_3_d">Add family members, set roles, and start using Oikos together.</p>
+        <p data-t="setup_3_d">Add family members, set roles, and start using Yuvomi together.</p>
       </div>
     </div>
     <div class="setup-inner reveal">
       <button class="setup-toggle" id="toggle-docker" type="button" data-t="setup_show_code">Show Docker commands ▾</button>
       <div id="docker-code" style="display:none">
         <div class="code-block"><span class="c"># Pull and start with Docker</span>
-curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/ulsklyc/oikos/main/.env.example
+curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example
 cp .env.example .env
 <span class="c"># Set SESSION_SECRET and DB_ENCRYPTION_KEY in .env</span>
 <span class="h">docker compose up -d</span>
 <span class="h">docker compose exec oikos node setup.js</span></div>
-        <p class="setup-note" data-t="setup_note">Then open <code>http://localhost:3000</code> and log in. Need a step-by-step guide, HTTPS setup, or troubleshooting? See the <a href="https://github.com/ulsklyc/oikos/blob/main/docs/installation.md" target="_blank" rel="noopener">Installation Guide</a>.</p>
+        <p class="setup-note" data-t="setup_note">Then open <code>http://localhost:3000</code> and log in. Need a step-by-step guide, HTTPS setup, or troubleshooting? See the <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md" target="_blank" rel="noopener">Installation Guide</a>.</p>
       </div>
       <a href="install.html" class="setup-guide-link" data-t="setup_guide_link">→ Step-by-step installation guide</a>
     </div>
@@ -689,7 +689,7 @@ setup_1_d: 'One command launches a setup wizard in your browser. No configuratio
 setup_2_t: 'Set up your account',
 setup_2_d: 'Create an admin account and choose your preferences. Takes 2 minutes.',
 setup_3_t: 'Invite your family',
-setup_3_d: 'Add family members, set roles, and start using Oikos together.',
+setup_3_d: 'Add family members, set roles, and start using Yuvomi together.',
 setup_show_code: 'Show Docker commands ▾',
 setup_hide_code: 'Hide Docker commands ▴',
 setup_guide_link: '→ Step-by-step installation guide',
@@ -746,7 +746,7 @@ Find `<section class="cta-section">` and replace its entire `.cta-box` div with:
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
           <span data-t="cta_btn_demo">See all screenshots</span>
         </a>
-        <a href="https://github.com/ulsklyc/oikos" class="btn-ghost" target="_blank" rel="noopener">
+        <a href="https://github.com/ulsklyc/yuvomi" class="btn-ghost" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"></path></svg>
           <span data-t="cta_btn_gh">View on GitHub</span>
         </a>
@@ -803,9 +803,9 @@ Find `<footer>` and replace the entire block with:
     <p data-t="footer_heart">Built with care for families who value privacy and simplicity.</p>
     <div class="footer-links">
       <a href="install.html" data-t="footer_install">Install</a>
-      <a href="https://github.com/ulsklyc/oikos" target="_blank" rel="noopener">GitHub</a>
-      <a href="https://github.com/ulsklyc/oikos/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
-      <a href="https://github.com/ulsklyc/oikos/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-t="footer_contrib">Contributing</a>
+      <a href="https://github.com/ulsklyc/yuvomi" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/ulsklyc/yuvomi/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+      <a href="https://github.com/ulsklyc/yuvomi/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-t="footer_contrib">Contributing</a>
     </div>
   </div>
 </footer>

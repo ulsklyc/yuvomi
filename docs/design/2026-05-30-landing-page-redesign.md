@@ -21,7 +21,7 @@
 2.  Hero                 (neue Copy, 3 CTAs)
 3.  Social Proof Bar     [NEU] Live-Sterne, Module-Zahl, Sprachen, Version
 4.  "Das Problem"        [NEU] 3 Pain-Point-Karten + Überleitung
-5.  Philosophie          [VORGEZOGEN] Umbenannt "Why Oikos", neue Reihenfolge
+5.  Philosophie          [VORGEZOGEN] Umbenannt "Why Yuvomi", neue Reihenfolge
 6.  Feature-Showcase     3 Bild-Zeilen, Benefit-Titel, Benefit-Einstiegssatz
 7.  Feature-Grid         5 statt 9 Cards, Benefit-fokussierte Section-Title
 8.  Carousel             unverändert
@@ -37,7 +37,7 @@ Die bisherige Reihenfolge (Feature-Grid vor Philosophie) wird umgekehrt: Vertrau
 ## 3. Nav
 
 - Optisch identisch
-- GitHub-Button: Live-Sternzahl per `fetch('https://api.github.com/repos/ulsklyc/oikos')`, gecacht in `sessionStorage` als `gh-stars`, Fallback "GitHub" wenn Fetch scheitert oder > 3 s dauert
+- GitHub-Button: Live-Sternzahl per `fetch('https://api.github.com/repos/ulsklyc/yuvomi')`, gecacht in `sessionStorage` als `gh-stars`, Fallback "GitHub" wenn Fetch scheitert oder > 3 s dauert
 - Timeout: 3000 ms, dann Fallback — kein Layout-Shift
 - Anzeige: `★ 2.4k` neben dem GitHub-Label (kompakt: `Math.round(count/100)/10 + 'k'` ab 1000)
 
@@ -119,7 +119,7 @@ Kein Hover-Effekt (sind keine interaktiven Elemente — Informationsträger).
 
 Inhalt der 4 Karten bleibt identisch. Änderungen:
 
-- **Section Label:** `"Philosophy"` → `"Why Oikos"` / `"Warum Oikos"`
+- **Section Label:** `"Philosophy"` → `"Why Yuvomi"` / `"Warum Yuvomi"`
 - **Section Title:** `"Built different, on purpose"` → `"Built for families, not for profit."` / `"Für Familien gebaut, nicht für Profit."`
 - **Karten-Reihenfolge:** Privacy First → Self-Hosted → Open Source → Zero Build Step  
   (Zero Build Step ist für Nicht-Techniker irrelevant und wandert ans Ende)
@@ -180,7 +180,7 @@ Inhalt und Stil: unverändert. Einzige Änderung: `id="carousel"` zum `<section>
 | Schritt 1 | Schritt 2 | Schritt 3 |
 |---|---|---|
 | **①  Start the installer** | **②  Set up your account** | **③  Invite your family** |
-| One command launches a setup wizard in your browser. No configuration by hand. | Create an admin account and choose your preferences. Takes 2 minutes. | Add family members, set roles, and start using Oikos together. |
+| One command launches a setup wizard in your browser. No configuration by hand. | Create an admin account and choose your preferences. Takes 2 minutes. | Add family members, set roles, and start using Yuvomi together. |
 
 **Sekundäre Ansicht — Code-Block:**  
 Ein Toggle-Button `"Show Docker commands ▾"` / `"Docker-Befehle anzeigen ▾"` klappt den bestehenden `<div class="code-block">` aus (CSS `display: none` → `display: block`, kein JS-Framework).
@@ -195,7 +195,7 @@ Link zur `install.html` unter den 3 Schritten:
 ## 12. CTA-Sektion
 
 **Headline:** `"Ready to take back control?"` — bleibt (stark).  
-**Subtext:** `"Oikos is free, open-source, and built for families who value their privacy."` → `"Free. Open source. Runs on your server. No subscriptions, ever."` / `"Kostenlos. Open Source. Läuft auf eurem Server. Keine Abos, nie."`
+**Subtext:** `"Yuvomi is free, open-source, and built for families who value their privacy."` → `"Free. Open source. Runs on your server. No subscriptions, ever."` / `"Kostenlos. Open Source. Läuft auf eurem Server. Keine Abos, nie."`
 
 **3 Buttons:**
 
@@ -239,7 +239,7 @@ Alle neuen Texte erhalten `data-t`-Keys und werden in beide Sprachen (`en`, `de`
 | `prob_3_t` | Your data, everywhere | Eure Daten, überall |
 | `prob_3_d` | Your calendar on Google's servers… | Euer Kalender auf Googles Servern… |
 | `prob_cta` | There's a better way. | Es geht auch anders. |
-| `why_label` | Why Oikos | Warum Oikos |
+| `why_label` | Why Yuvomi | Warum Yuvomi |
 | `why_title` | Built for families, not for profit. | Für Familien gebaut, nicht für Profit. |
 | `f_tasks_t` | Everyone knows what needs to be done. | Alle wissen, was zu tun ist. |
 | `f_meals_t` | Dinner sorted before anyone asks. | Das Abendessen ist geplant, bevor jemand fragt. |
@@ -251,7 +251,7 @@ Alle neuen Texte erhalten `data-t`-Keys und werden in beide Sprachen (`en`, `de`
 | `setup_2_t` | Set up your account | Konto einrichten |
 | `setup_2_d` | Create an admin account and choose your preferences. | Admin-Konto erstellen und Einstellungen wählen. |
 | `setup_3_t` | Invite your family | Familie einladen |
-| `setup_3_d` | Add family members, set roles, start using Oikos. | Familienmitglieder hinzufügen und loslegen. |
+| `setup_3_d` | Add family members, set roles, start using Yuvomi. | Familienmitglieder hinzufügen und loslegen. |
 | `setup_show_code` | Show Docker commands ▾ | Docker-Befehle anzeigen ▾ |
 | `setup_guide_link` | → Step-by-step installation guide | → Schritt-für-Schritt-Installationsanleitung |
 | `cta_desc` | Free. Open source. Runs on your server. No subscriptions, ever. | Kostenlos. Open Source. Läuft auf eurem Server. Keine Abos, nie. |

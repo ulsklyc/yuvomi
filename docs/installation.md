@@ -617,14 +617,14 @@ sudo apt install nginx
 Yuvomi ships with an example configuration. Copy it to Nginx:
 
 ```bash
-sudo cp nginx.conf.example /etc/nginx/sites-available/oikos
-sudo ln -s /etc/nginx/sites-available/oikos /etc/nginx/sites-enabled/
+sudo cp nginx.conf.example /etc/nginx/sites-available/yuvomi
+sudo ln -s /etc/nginx/sites-available/yuvomi /etc/nginx/sites-enabled/
 ```
 
 Edit the file and replace `deine-domain.de` with your actual domain:
 
 ```bash
-sudo nano /etc/nginx/sites-available/oikos
+sudo nano /etc/nginx/sites-available/yuvomi
 ```
 
 The configuration includes:
