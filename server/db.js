@@ -81,8 +81,16 @@ function migrateLegacyDbFile() {
     const legacy = new Database(LEGACY_DB_PATH);
     try {
       applyEncryptionKey(legacy);
-      legacy.pragma('wal_checkpoint(TRUNCATE)');
-      checkpointed = true;
+      // wal_checkpoint(TRUNCATE) WIRFT nicht, wenn eine andere Verbindung den
+      // WAL-Lock hält — es liefert eine Zeile { busy, log, checkpointed }. Nur
+      // busy === 0 bedeutet, dass der WAL vollständig gefaltet & getrunct wurde
+      // (busy === 0 gilt auch für Nicht-WAL-DBs, die kein WAL haben). Bei busy != 0
+      // dürfen wir NICHT umbenennen, sonst lösen wir die .db von ungefalteten Frames.
+      const [row] = legacy.pragma('wal_checkpoint(TRUNCATE)');
+      checkpointed = row != null && row.busy === 0;
+      if (!checkpointed) {
+        log.warn(`Legacy checkpoint incomplete (busy=${row?.busy}).`);
+      }
     } finally {
       legacy.close();
     }
