@@ -9,10 +9,10 @@
 #   - Die Host-Bind-Adresse ist über OIKOS_HTTP_BIND konfigurierbar (Default
 #     0.0.0.0). Rootless hinter einem Reverse-Proxy: OIKOS_HTTP_BIND=127.0.0.1.
 services:
-  yuvomi:
+  oikos:
     image: ghcr.io/ulsklyc/yuvomi:latest
     build: .                          # optional: use --build to build locally instead
-    container_name: yuvomi
+    container_name: oikos
     restart: unless-stopped
     ports:
       # Host-Bind aus .env (OIKOS_HTTP_BIND, Default 0.0.0.0) + Host-Port

@@ -6,7 +6,7 @@
 #   1. Copy this file and the .env section below to your server
 #   2. Create a .env file next to this compose file (see below)
 #   3. docker compose -f docker-compose.portainer.yml up -d
-#   4. docker compose -f docker-compose.portainer.yml exec yuvomi node setup.js
+#   4. docker compose -f docker-compose.portainer.yml exec oikos node setup.js
 #   5. Open http://<your-host>:3000
 #
 # Required .env variables:
@@ -17,9 +17,9 @@
 #   openssl rand -base64 32
 
 services:
-  yuvomi:
+  oikos:
     image: ghcr.io/ulsklyc/yuvomi:latest
-    container_name: yuvomi
+    container_name: oikos
     restart: unless-stopped
     ports:
       - "3000:3000"

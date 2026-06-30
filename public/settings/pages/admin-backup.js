@@ -124,14 +124,14 @@ function buildCliContent() {
   wrap.className = 'settings-backup-cli';
   wrap.insertAdjacentHTML('beforeend', `
     <p class="form-hint">${t('settings.backupCliHint')}</p>
-    <pre class="settings-code-block"><code>SERVICE=yuvomi
+    <pre class="settings-code-block"><code>SERVICE=oikos
 BACKUP="$PWD/yuvomi-backup.db"
 docker compose stop "$SERVICE"
 docker compose run --rm -v "$BACKUP:/tmp/yuvomi-restore.db:ro" --entrypoint sh "$SERVICE" -c 'set -eu; target="\${DB_PATH:-/data/yuvomi.db}"; stamp=$(date -u +%Y%m%dT%H%M%SZ); if [ -f "$target" ]; then cp "$target" "$target.pre-restore-$stamp"; fi; rm -f "$target-wal" "$target-shm"; cp /tmp/yuvomi-restore.db "$target"; chown node:node "$target" 2&gt;/dev/null || true'
 docker compose up -d "$SERVICE"</code></pre>
     <p class="form-hint">${t('settings.backupCliBackupHint')}</p>
-    <pre class="settings-code-block"><code>docker compose exec yuvomi node -e "import('./server/db.js').then(async db =&gt; { await db.backupToFile('/data/yuvomi-backup.db'); process.exit(0); })"
-docker cp yuvomi:/data/yuvomi-backup.db ./yuvomi-backup.db</code></pre>
+    <pre class="settings-code-block"><code>docker compose exec oikos node -e "import('./server/db.js').then(async db =&gt; { await db.backupToFile('/data/yuvomi-backup.db'); process.exit(0); })"
+docker cp oikos:/data/yuvomi-backup.db ./yuvomi-backup.db</code></pre>
   `);
   return wrap;
 }

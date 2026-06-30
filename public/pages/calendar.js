@@ -836,7 +836,7 @@ async function getCachedAt(path) {
   if (typeof caches === 'undefined') return null;
   try {
     const names    = await caches.keys();
-    const apiCache = names.find((n) => n.startsWith('oikos-api-'));
+    const apiCache = names.find((n) => n.startsWith('yuvomi-api-'));
     if (!apiCache) return null;
     const cache = await caches.open(apiCache);
     const res   = await cache.match(`/api/v1${path}`);
