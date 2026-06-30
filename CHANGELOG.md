@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.78.12] - 2026-06-30
+
+### Changed
+- **Module accent colors rationalized:** the four near-identical blues are now visually distinct — Documents moves to a steel-blue and Split-expenses to an azure-cyan, while Recipes and Budget (previously the same teal hue) are separated. Birthdays moves to a rosé so it no longer clashes with the red used for delete/danger actions, and the Info color is decoupled from the byte-identical Contacts accent.
+- **Calmer dark mode:** module accent colors are desaturated one step in dark mode for a quieter palette without losing contrast.
+- **Glass tint:** module-accent tint on glass surfaces raised from 4% to 6% so each module's identity registers.
+
+### Fixed
+- **Dark mode contrast:** primary button labels, info text, and the Documents and Split-expenses module accents now meet WCAG AA in dark mode (all were previously below the required contrast ratio).
+- **Design-token documentation:** corrected several inaccurate contrast ratios noted in the design tokens.
+
 ## [0.78.11] - 2026-06-30
 
 ### Removed

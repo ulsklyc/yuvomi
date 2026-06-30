@@ -92,9 +92,9 @@
   --color-border-subtle:  var(--neutral-150);
   --color-border-strong:  var(--neutral-300);  /* kräftigere Trennlinie (Hover, betonte Rahmen) */
   --color-text-primary:   var(--neutral-900);
-  --color-text-secondary: var(--neutral-600);  /* WCAG AA: ~5.0:1 auf weiß */
+  --color-text-secondary: var(--neutral-600);  /* WCAG AA: 5.33:1 auf weiß */
   --_color-text-tertiary: #6A6964;
-  --color-text-tertiary:  var(--_color-text-tertiary);  /* WCAG AA: 4.61:1 auf --color-bg */
+  --color-text-tertiary:  var(--_color-text-tertiary);  /* WCAG AA: 5.00:1 auf --color-bg, 5.50:1 auf weiß */
   --color-text-quaternary: var(--neutral-500);  /* nur dekorativ (z.B. Kbd-Hint), nie für Fließtext */
   --color-text-disabled:  var(--neutral-300);
   --color-text-on-accent: #ffffff;  /* Weißer Text auf farbigen Hintergründen */
@@ -128,7 +128,7 @@
    *    Harmoniert mit --module-calendar und dem Abend-Gradienten.
    * -------------------------------------------------------- */
   --_color-accent:            #6c3aed;
-  --color-accent:             var(--_color-accent);   /* Violet — 5.63:1 auf weiß */
+  --color-accent:             var(--_color-accent);   /* Violet — 6.06:1 auf weiß */
   --_color-accent-hover:      #5b2fd4;
   --color-accent-hover:       var(--_color-accent-hover);   /* Violet darker */
   --_color-accent-active:     #4a26bb;
@@ -160,16 +160,17 @@
   --_color-success-light: #DAFBE1;
   --color-success-light:  var(--_color-success-light);
   --_color-warning:       #A15C0A;
-  --color-warning:        var(--_color-warning);   /* Hue-Trennung von --module-meals, 5.23:1 auf weiß */
+  --color-warning:        var(--_color-warning);   /* Hue-Trennung von --module-meals, 5.18:1 auf weiß */
   --color-warning-hover:  #824908;
   --_color-warning-light: #FFF4D4;
   --color-warning-light:  var(--_color-warning-light);
   --_color-danger:        #B91C1C;
-  --color-danger:         var(--_color-danger);    /* Red-700 — 6.90:1 auf weiß */
+  --color-danger:         var(--_color-danger);    /* Red-700 — 6.47:1 auf weiß */
   --color-danger-hover:   #991B1B;                 /* Red-800 */
   --_color-danger-light:  #FFE2E0;
   --color-danger-light:   var(--_color-danger-light);
-  --color-info:           #0969DA;  /* WCAG AA: ~4.6:1 auf weiß */
+  --_color-info:          #0B66C3;
+  --color-info:           var(--_color-info);  /* eigener Wert, getrennt von --module-contacts; 5.67:1 auf weiß */
   --color-info-hover:     #0550AE;
   --_color-info-light:    #DDF4FF;
   --color-info-light:     var(--_color-info-light);
@@ -198,28 +199,28 @@
   --module-calendar:   var(--_module-calendar);    /* Violett - Termine, Zeit */
   --_module-meals:     #C2410C;
   --module-meals:      var(--_module-meals);       /* Orange-700 - Essen, Wärme */
-  --_module-recipes:   #0D9488;
-  --module-recipes:    var(--_module-recipes);     /* Teal-600 - Rezepte */
+  --_module-recipes:   #109C6B;
+  --module-recipes:    var(--_module-recipes);     /* Teal-Grün - Rezepte (159°, von --module-budget 175° getrennt) */
   --_module-shopping:  #DB2777;
   --module-shopping:   var(--_module-shopping);    /* Pink-600 - Einkaufen (trennt von Meals) */
   --_module-notes:     #A16207;
-  --module-notes:      var(--_module-notes);       /* Amber-700 - Notizen (6.3:1 auf weiß — WCAG AA) */
+  --module-notes:      var(--_module-notes);       /* Amber-700 - Notizen (4.92:1 auf weiß — WCAG AA) */
   --_module-contacts:  #0969DA;
   --module-contacts:   var(--_module-contacts);    /* Kräftiges Blau - Kontakte */
-  --_module-birthdays: #E11D48;
-  --module-birthdays:  var(--_module-birthdays);   /* Rose - Geburtstage */
+  --_module-birthdays: #D6336C;
+  --module-birthdays:  var(--_module-birthdays);   /* Rosé - Geburtstage (entkoppelt von --color-danger #B91C1C) */
   --_module-budget:    #0F766E;
   --module-budget:     var(--_module-budget);      /* Teal-700 - Finanzen, Stabilität */
-  --_module-split-expenses: #2563EB;
-  --module-split-expenses:  var(--_module-split-expenses); /* Blue - shared family finance */
-  --_module-documents: #1D4ED8;
-  --module-documents:  var(--_module-documents);    /* Blue - secure family documents */
+  --_module-split-expenses: #1A7BAE;
+  --module-split-expenses:  var(--_module-split-expenses); /* Azur-Cyan - geteilte Familienfinanzen (201°, von --module-reminders 193° getrennt) */
+  --_module-documents: #42587E;
+  --module-documents:  var(--_module-documents);    /* Stahlblau - sichere Familiendokumente (aus dem Blau-Band gelöst) */
   --_module-housekeeping: #7C3AED;
   --module-housekeeping:  var(--_module-housekeeping); /* Violet - focused service workflow */
   --_module-settings:   #6E7781;
   --module-settings:    var(--_module-settings);   /* Grau - Konfiguration */
   --_module-reminders:  #0E7490;
-  --module-reminders:   var(--_module-reminders);  /* Cyan-700 - Erinnerungen, 6.3:1 auf weiß — WCAG AA */
+  --module-reminders:   var(--_module-reminders);  /* Cyan-700 - Erinnerungen, 5.36:1 auf weiß — WCAG AA */
 
   /* --------------------------------------------------------
    * 5. Farben - Mahlzeit-Typen
@@ -505,7 +506,7 @@
   --glass-bg-toolbar:     var(--_glass-bg-toolbar);
 
   /* a3) Tint: Modul-Akzentfarbe als subtile Glass-Tonung */
-  --_glass-tint-strength: 4%;
+  --_glass-tint-strength: 6%;
   --glass-tint-strength:  var(--_glass-tint-strength);
 
   /* b) Blur-Stufen */
@@ -621,13 +622,14 @@
     --_color-accent-active:     #7c3aed;
     --_color-accent-light:      #1e1040;
     --_color-accent-subtle:     #160b30;
-    --_color-btn-primary:       #9066f5;
-    --_color-btn-primary-hover: #7c3aed;
+    --_color-btn-primary:       #7c3aed;
+    --_color-btn-primary-hover: #6d28d9;
     --_color-accent-secondary:  #c4b5fd;
 
     --_color-success:       #4ADE80;
     --_color-warning:       #F59E0B;
     --_color-danger:        #FCA5A5;
+    --_color-info:          #4493F0;
     --_color-text-tertiary: #A3A3A0;
     --_color-success-light: #1A3325;
     --_color-warning-light: #332400;
@@ -635,25 +637,28 @@
     --_color-info-light:    #1A2D40;
 
     /* Toast: dunkler Text auf vividen Farben (#4ADE80, #F59E0B, #FCA5A5) */
-    --_toast-success-text: #062010;   /* 13.6:1 auf #4ADE80 */
-    --_toast-warning-text: #291400;   /* 13.1:1 auf #F59E0B */
-    --_toast-danger-text:  #330808;   /* 15.1:1 auf #FCA5A5 */
+    --_toast-success-text: #062010;   /* 9.86:1 auf #4ADE80 */
+    --_toast-warning-text: #291400;   /* 8.19:1 auf #F59E0B */
+    --_toast-danger-text:  #330808;   /* 9.38:1 auf #FCA5A5 */
 
     /* Dunkle Tinte auf den vividen Hell-Füllungen des Dark Mode (FAB, Badges, aktive Chips) */
     --_color-ink-on-vivid: #1A1A18;
 
     --_module-dashboard: #a78bfa;
-    --_module-tasks:     #4ADE80;
+    --_module-tasks:     #5FBF84;
     --_module-calendar:  #818CF8;
-    --_module-meals:     #FB923C;
-    --_module-shopping:  #F472B6;
-    --_module-notes:     #FCD34D;
+    --_module-meals:     #E0944F;
+    --_module-shopping:  #E68AB0;
+    --_module-notes:     #E6C56A;
     --_module-contacts:  #60A5FA;
-    --_module-birthdays: #FB7185;
-    --_module-budget:      #2DD4BF;
+    --_module-birthdays: #E58A98;
+    --_module-budget:      #5CC4B4;
+    --_module-recipes:     #2ECC99;
+    --_module-split-expenses: #3AAEE0;
+    --_module-documents:   #7E9BCC;
     --_module-housekeeping: #C4B5FD;
     --_module-settings:    #94A3B8;
-    --_module-reminders:   #22D3EE;   /* Cyan-400 */
+    --_module-reminders:   #4FB8C9;   /* Cyan-400 */
 
     --_meal-breakfast:       #F59E0B;
     --_meal-breakfast-light: #332400;
@@ -697,7 +702,7 @@
     --_glass-bg-card-hover:    rgba(42, 42, 40, 0.86);
     --_glass-bg-input:         rgba(34, 34, 32, 0.84);
     --_glass-bg-toolbar:       rgba(34, 34, 32, 0.88);
-    --_glass-tint-strength:    4%;
+    --_glass-tint-strength:    6%;
     --_app-backdrop-accent-strength: 1.5%;
     --_app-backdrop-secondary-strength: 0.75%;
     --lg-blob-opacity:         0.24;
@@ -714,7 +719,7 @@
     --_neutral-300: #3D3D3A;
     --_neutral-400: #636360;
     --_neutral-500: #8E8D89;
-    --_neutral-600: #AEADB0;   /* WCAG AA: ~5.6:1 auf #222220 */
+    --_neutral-600: #AEADB0;   /* WCAG AA: 7.14:1 auf #222220 */
     --_neutral-700: #C8C7C3;
     --_neutral-800: #E2E1DC;
     --_neutral-900: #F5F4F1;
@@ -735,19 +740,20 @@
     --_sidebar-shadow-dark:  rgba(0, 0, 0, 0.4);
 
     /* Akzent - Dark Mode (Violet hellt auf für Kontrast auf dunklen Flächen) */
-    --_color-accent:            #a78bfa;   /* Violet-400 — 6.05:1 auf #222220 */
+    --_color-accent:            #a78bfa;   /* Violet-400 — 5.86:1 auf #222220 */
     --_color-accent-hover:      #9066f5;   /* Violet-500 */
     --_color-accent-active:     #7c3aed;   /* Violet-600 */
     --_color-accent-light:      #1e1040;
     --_color-accent-subtle:     #160b30;
-    --_color-btn-primary:       #9066f5;   /* Violet-500 — guter Kontrast auf Dark-Surface */
-    --_color-btn-primary-hover: #7c3aed;
+    --_color-btn-primary:       #7c3aed;   /* Violet-600 — weißes Label 5.70:1 (Violet-500 #9066f5 ergab nur 3.89:1) */
+    --_color-btn-primary-hover: #6d28d9;
     --_color-accent-secondary:  #c4b5fd;   /* Violet-300 */
 
     /* Semantische Farben */
     --_color-success:       #4ADE80;
     --_color-warning:       #F59E0B;
     --_color-danger:        #FCA5A5;
+    --_color-info:          #4493F0;   /* Dark-Override: 5.07:1 auf #222220 (Light #0B66C3 ergäbe nur 3.07:1) */
     --_color-text-tertiary: #A3A3A0;
     --_color-success-light: #1A3325;
     --_color-warning-light: #332400;
@@ -755,26 +761,29 @@
     --_color-info-light:    #1A2D40;
 
     /* Toast: dunkler Text auf vividen Farben (#4ADE80, #F59E0B, #FCA5A5) */
-    --_toast-success-text: #062010;   /* 13.6:1 auf #4ADE80 */
-    --_toast-warning-text: #291400;   /* 13.1:1 auf #F59E0B */
-    --_toast-danger-text:  #330808;   /* 15.1:1 auf #FCA5A5 */
+    --_toast-success-text: #062010;   /* 9.86:1 auf #4ADE80 */
+    --_toast-warning-text: #291400;   /* 8.19:1 auf #F59E0B */
+    --_toast-danger-text:  #330808;   /* 9.38:1 auf #FCA5A5 */
 
     /* Dunkle Tinte auf den vividen Hell-Füllungen des Dark Mode (FAB, Badges, aktive Chips) */
     --_color-ink-on-vivid: #1A1A18;
 
     /* Modul-Akzente (Entflechtung Meals/Shopping spiegelt Light-Mode) */
     --_module-dashboard: #a78bfa;   /* Violet-400 */
-    --_module-tasks:     #4ADE80;
+    --_module-tasks:     #5FBF84;   /* Grün, entsättigt — Kraft ohne Lärm */
     --_module-calendar:  #818CF8;
-    --_module-meals:     #FB923C;   /* Orange-400 */
-    --_module-shopping:  #F472B6;   /* Pink-400 */
-    --_module-notes:     #FCD34D;
+    --_module-meals:     #E0944F;   /* Orange, entsättigt */
+    --_module-shopping:  #E68AB0;   /* Pink, entsättigt */
+    --_module-notes:     #E6C56A;   /* Amber, entsättigt */
     --_module-contacts:  #60A5FA;
-    --_module-birthdays: #FB7185;
-    --_module-budget:      #2DD4BF;   /* Teal-400 */
+    --_module-birthdays: #E58A98;   /* Rosé, entsättigt */
+    --_module-budget:      #5CC4B4;   /* Teal, entsättigt */
+    --_module-recipes:     #2ECC99;   /* Teal-Grün — Dark-Override, von budget entkoppelt (161°) */
+    --_module-split-expenses: #3AAEE0;   /* Azur-Cyan — von reminders 188° auf 198° gelöst */
+    --_module-documents:   #7E9BCC;   /* Stahlblau — Dark-Override (vorher fehlend, erbte 2.38:1) */
     --_module-housekeeping: #C4B5FD;
     --_module-settings:    #94A3B8;
-    --_module-reminders:   #22D3EE;   /* Cyan-400 */
+    --_module-reminders:   #4FB8C9;   /* Cyan, entsättigt */
 
     /* Mahlzeit-Typ */
     --_meal-breakfast:       #F59E0B;
@@ -823,7 +832,7 @@
     --_glass-bg-card-hover:   rgba(42, 42, 40, 0.86);
     --_glass-bg-input:        rgba(34, 34, 32, 0.84);
     --_glass-bg-toolbar:      rgba(34, 34, 32, 0.88);
-    --_glass-tint-strength:   4%;
+    --_glass-tint-strength:   6%;
     --_app-backdrop-accent-strength: 1.5%;
     --_app-backdrop-secondary-strength: 0.75%;
     --lg-blob-opacity:        0.24;
