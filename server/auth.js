@@ -159,10 +159,24 @@ function sessionMiddleware(req, res, next) {
   if (header && header.includes(`${LEGACY_SESSION_COOKIE}=`) && !header.includes(`${SESSION_COOKIE}=`)) {
     const match = header.match(/(?:^|;\s*)oikos\.sid=([^;]+)/);
     if (match) {
-      // Legacy-Wert zusätzlich unter dem neuen Namen exponieren, damit
-      // express-session ihn findet …
-      req.headers.cookie = `${header}; ${SESSION_COOKIE}=${match[1]}`;
-      // … und das veraltete Cookie im Browser entfernen.
+      const legacyValue = match[1];
+      // 1. Legacy-Wert zusätzlich unter dem neuen Namen exponieren, damit
+      //    express-session die Session in DIESEM Request findet.
+      req.headers.cookie = `${header}; ${SESSION_COOKIE}=${legacyValue}`;
+      // 2. Den neuen Cookie EXPLIZIT setzen — mit demselben (bereits signierten,
+      //    bereits URL-kodierten) Wert und denselben Attributen wie expressSession.
+      //    Sonst sendet express-session bei read-only-Requests (/auth/me, /version),
+      //    die die Session nicht verändern, KEIN Set-Cookie — und der Browser bliebe
+      //    nach dem Verwerfen von oikos.sid komplett ohne Session-Cookie zurück.
+      res.cookie(SESSION_COOKIE, legacyValue, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.SESSION_SECURE === 'true',
+        maxAge: 1000 * 60 * 60 * 24 * 7,
+        path: '/',
+        encode: (v) => v, // Wert ist bereits kodiert → kein Doppel-Encoding
+      });
+      // 3. Erst jetzt das Legacy-Cookie verwerfen (der neue Cookie ist gesetzt).
       res.clearCookie(LEGACY_SESSION_COOKIE, { path: '/' });
     }
   }
