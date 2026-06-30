@@ -13,6 +13,7 @@ import { esc, fmtLocation } from '/utils/html.js';
 import { shiftEndDateKey, isEndBeforeStart } from '/utils/date.js';
 import { getReadableTextColor } from '/utils/color.js';
 import { refresh as refreshReminders } from '/reminders.js';
+import { parseRemindAtAsUtc } from '/utils/reminder-offset.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 
 // --------------------------------------------------------
@@ -1814,7 +1815,7 @@ const REMINDER_OFFSETS = () => [
 
 function reminderOffsetFromEvent(event, reminder) {
   if (!reminder || !event?.start_datetime) return '';
-  const remindMs = new Date(reminder.remind_at).getTime();
+  const remindMs = parseRemindAtAsUtc(reminder.remind_at).getTime();
   const startMs  = new Date(reminderStartValue(event.start_datetime)).getTime();
   const diffMin  = Math.round((startMs - remindMs) / 60000);
   const opts = [0, 15, 60, 1440, 2880, 10080, 20160];
@@ -1826,7 +1827,7 @@ function customReminderFromEvent(event, reminder) {
   const fallback = { amount: 1, unit: 'days' };
   if (!reminder || !event?.start_datetime) return fallback;
   const diffMin = Math.max(0, Math.round(
-    (new Date(reminderStartValue(event.start_datetime)).getTime() - new Date(reminder.remind_at).getTime()) / 60000
+    (new Date(reminderStartValue(event.start_datetime)).getTime() - parseRemindAtAsUtc(reminder.remind_at).getTime()) / 60000
   ));
   if (diffMin % 10080 === 0 && diffMin >= 10080) return { amount: diffMin / 10080, unit: 'weeks' };
   if (diffMin % 1440 === 0 && diffMin >= 1440) return { amount: diffMin / 1440, unit: 'days' };
@@ -1844,10 +1845,6 @@ function customReminderMinutes(amount, unit) {
 
 function reminderStartValue(startDatetime) {
   return startDatetime?.includes('T') ? startDatetime : `${startDatetime}T09:00`;
-}
-
-function toLocalDateTimeString(date) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function renderCalendarReminderSection(reminder = null, event = null) {
@@ -2536,7 +2533,7 @@ async function saveEvent(overlay, mode, eventId, existingReminder = null, attach
               overlay.querySelector('#modal-reminder-custom-unit')?.value
             )
           : parseInt(offsetVal, 10);
-        const remindAt = toLocalDateTimeString(new Date(startMs - offsetMinutes * 60000));
+        const remindAt = new Date(startMs - offsetMinutes * 60000).toISOString().slice(0, 19);
         await api.post('/reminders', { entity_type: 'event', entity_id: savedEventId, remind_at: remindAt });
         refreshReminders();
       } else {

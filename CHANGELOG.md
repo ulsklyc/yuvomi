@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.80.1] - 2026-06-30
+
+### Fixed
+- **Calendar event reminders now fire on time.** Event reminders were saved in local time while the notification scheduler compares against UTC, so they fired late by the local UTC offset and appeared not to arrive at all. Reminder times are now stored in UTC, consistent with task reminders, fixing Web Push, Gotify and ntfy delivery for calendar events. Existing event reminders fire correctly once the event is saved again.
+
 ## [0.80.0] - 2026-06-30
 
 ### Changed
