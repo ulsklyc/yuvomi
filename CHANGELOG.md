@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.78.13] - 2026-06-30
+
+### Changed
+- **Dark mode accents restored to vivid:** reverted the one-step desaturation of dark-mode module accent colors introduced in 0.78.12 — the dark palette is lively again. The 0.78.12 dark-mode contrast fixes, the blue/teal hue separation, and the rosé Birthdays color are all retained.
+
 ## [0.78.12] - 2026-06-30
 
 ### Changed

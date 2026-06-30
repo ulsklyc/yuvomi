@@ -645,20 +645,20 @@
     --_color-ink-on-vivid: #1A1A18;
 
     --_module-dashboard: #a78bfa;
-    --_module-tasks:     #5FBF84;
+    --_module-tasks:     #4ADE80;
     --_module-calendar:  #818CF8;
-    --_module-meals:     #E0944F;
-    --_module-shopping:  #E68AB0;
-    --_module-notes:     #E6C56A;
+    --_module-meals:     #FB923C;
+    --_module-shopping:  #F472B6;
+    --_module-notes:     #FCD34D;
     --_module-contacts:  #60A5FA;
-    --_module-birthdays: #E58A98;
-    --_module-budget:      #5CC4B4;
+    --_module-birthdays: #FB7185;
+    --_module-budget:      #2DD4BF;
     --_module-recipes:     #2ECC99;
-    --_module-split-expenses: #3AAEE0;
+    --_module-split-expenses: #2FB6E8;
     --_module-documents:   #7E9BCC;
     --_module-housekeeping: #C4B5FD;
     --_module-settings:    #94A3B8;
-    --_module-reminders:   #4FB8C9;   /* Cyan-400 */
+    --_module-reminders:   #22D3EE;   /* Cyan-400 */
 
     --_meal-breakfast:       #F59E0B;
     --_meal-breakfast-light: #332400;
@@ -770,20 +770,20 @@
 
     /* Modul-Akzente (Entflechtung Meals/Shopping spiegelt Light-Mode) */
     --_module-dashboard: #a78bfa;   /* Violet-400 */
-    --_module-tasks:     #5FBF84;   /* Grün, entsättigt — Kraft ohne Lärm */
+    --_module-tasks:     #4ADE80;   /* Grün-400 — lebendig */
     --_module-calendar:  #818CF8;
-    --_module-meals:     #E0944F;   /* Orange, entsättigt */
-    --_module-shopping:  #E68AB0;   /* Pink, entsättigt */
-    --_module-notes:     #E6C56A;   /* Amber, entsättigt */
+    --_module-meals:     #FB923C;   /* Orange-400 */
+    --_module-shopping:  #F472B6;   /* Pink-400 */
+    --_module-notes:     #FCD34D;   /* Amber-300 */
     --_module-contacts:  #60A5FA;
-    --_module-birthdays: #E58A98;   /* Rosé, entsättigt */
-    --_module-budget:      #5CC4B4;   /* Teal, entsättigt */
-    --_module-recipes:     #2ECC99;   /* Teal-Grün — Dark-Override, von budget entkoppelt (161°) */
-    --_module-split-expenses: #3AAEE0;   /* Azur-Cyan — von reminders 188° auf 198° gelöst */
+    --_module-birthdays: #FB7185;   /* Rosé-400 */
+    --_module-budget:      #2DD4BF;   /* Teal-400 */
+    --_module-recipes:     #2ECC99;   /* Teal-Grün — Dark-Override, von budget 172° entkoppelt (161°) */
+    --_module-split-expenses: #2FB6E8;   /* Cyan — von reminders 188° getrennt (196°) */
     --_module-documents:   #7E9BCC;   /* Stahlblau — Dark-Override (vorher fehlend, erbte 2.38:1) */
     --_module-housekeeping: #C4B5FD;
     --_module-settings:    #94A3B8;
-    --_module-reminders:   #4FB8C9;   /* Cyan, entsättigt */
+    --_module-reminders:   #22D3EE;   /* Cyan-400 */
 
     /* Mahlzeit-Typ */
     --_meal-breakfast:       #F59E0B;
