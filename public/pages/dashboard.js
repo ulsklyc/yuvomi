@@ -18,8 +18,8 @@ let _fabController = null;
 
 // ── Onboarding ──────────────────────────────────────────────────────────────
 
-const ONBOARDING_KEY = 'oikos-onboarded';
-const APP_NAME_STORAGE_KEY = 'oikos-app-name';
+const ONBOARDING_KEY = 'yuvomi-onboarded';
+const APP_NAME_STORAGE_KEY = 'yuvomi-app-name';
 
 function eventOccurrenceDateKey(event) {
   const value = String(event?.start_datetime || '');
@@ -682,10 +682,10 @@ function renderTodayCockpit(data) {
         <h2 id="today-cockpit-title">${esc(t('dashboard.todayTitle'))}</h2>
       </div>
       <div class="today-cockpit__grid">
-        ${!window.oikos?.isModuleDisabled('tasks')    ? renderTodayCard('check-square',   t('dashboard.todayTask'),     taskTitle, '/tasks', 'task', highlights.taskCount) : ''}
-        ${!window.oikos?.isModuleDisabled('calendar') ? renderTodayCard('calendar',        t('dashboard.todayEvent'),    eventTitle, calendarEventRoute(highlights.nextEvent), 'event', highlights.eventCount) : ''}
-        ${!window.oikos?.isModuleDisabled('shopping') ? renderTodayCard('shopping-cart',   t('dashboard.todayShopping'), t('dashboard.todayShoppingCount', { count: highlights.openShoppingCount }), '/shopping', 'shopping') : ''}
-        ${!window.oikos?.isModuleDisabled('meals')    ? renderTodayCard('utensils',        t('dashboard.todayDinner'),   dinnerTitle, '/meals', 'dinner') : ''}
+        ${!window.yuvomi?.isModuleDisabled('tasks')    ? renderTodayCard('check-square',   t('dashboard.todayTask'),     taskTitle, '/tasks', 'task', highlights.taskCount) : ''}
+        ${!window.yuvomi?.isModuleDisabled('calendar') ? renderTodayCard('calendar',        t('dashboard.todayEvent'),    eventTitle, calendarEventRoute(highlights.nextEvent), 'event', highlights.eventCount) : ''}
+        ${!window.yuvomi?.isModuleDisabled('shopping') ? renderTodayCard('shopping-cart',   t('dashboard.todayShopping'), t('dashboard.todayShoppingCount', { count: highlights.openShoppingCount }), '/shopping', 'shopping') : ''}
+        ${!window.yuvomi?.isModuleDisabled('meals')    ? renderTodayCard('utensils',        t('dashboard.todayDinner'),   dinnerTitle, '/meals', 'dinner') : ''}
       </div>
     </section>
   `;
@@ -784,7 +784,7 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     .filter((w) => {
       if (!w.visible || !widgetById[w.id]) return false;
       const mod = MODULE_FOR_WIDGET[w.id];
-      return !mod || !window.oikos?.isModuleDisabled(mod);
+      return !mod || !window.yuvomi?.isModuleDisabled(mod);
     })
     .map((w) => {
       const html = widgetById[w.id]();
@@ -998,7 +998,7 @@ function initFab(container, signal) {
   fabActions.querySelectorAll('[data-route]').forEach((el) => {
     const go = async () => {
       toggleFab(false);
-      await window.oikos.navigate(el.dataset.route);
+      await window.yuvomi.navigate(el.dataset.route);
       const btnSelector = FAB_NEW_BTN[el.dataset.route];
       if (btnSelector) document.querySelector(btnSelector)?.click();
     };
@@ -1166,9 +1166,9 @@ function openCustomizeModal(currentConfig, onSave) {
           await api.put('/preferences', { dashboard_widgets: draft });
           closeModal({ force: true });
           onSave(draft);
-          window.oikos?.showToast(t('dashboard.customizeSaved'), 'success', 1500);
+          window.yuvomi?.showToast(t('dashboard.customizeSaved'), 'success', 1500);
         } catch {
-          window.oikos?.showToast(t('common.errorGeneric'), 'error');
+          window.yuvomi?.showToast(t('common.errorGeneric'), 'error');
         } finally {
           saveBtn.disabled = false;
         }
@@ -1202,15 +1202,15 @@ function openTaskQuickAction(taskId, taskTitle, rerender) {
         try {
           await api.patch(`/tasks/${taskId}/status`, { status: 'done' });
           closeModal({ force: true });
-          window.oikos?.showToast(t('tasks.swipedDoneToast'), 'success');
+          window.yuvomi?.showToast(t('tasks.swipedDoneToast'), 'success');
           rerender();
         } catch (err) {
-          window.oikos?.showToast(err.message, 'danger');
+          window.yuvomi?.showToast(err.message, 'danger');
         }
       });
       panel.querySelector('[data-action="edit"]').addEventListener('click', () => {
         closeModal({ force: true });
-        window.oikos.navigate(`/tasks?open=${taskId}`);
+        window.yuvomi.navigate(`/tasks?open=${taskId}`);
       });
     },
   });
@@ -1224,7 +1224,7 @@ function wireLinks(container, rerender, { editing = false } = {}) {
   container.querySelectorAll('[data-route]').forEach((el) => {
     if (el.id === 'fab-main' || el.closest('#fab-actions')) return;
     if (editing && el.closest('.widget-wrapper--editing')) return;
-    const go = () => window.oikos.navigate(el.dataset.route);
+    const go = () => window.yuvomi.navigate(el.dataset.route);
     if (el.tagName === 'A') {
       el.addEventListener('click', (e) => { e.preventDefault(); go(); });
     } else {
@@ -1355,7 +1355,7 @@ export async function render(container, { user }) {
     visibleMealTypes = normalizeVisibleMealTypes(prefsRes.data?.visible_meal_types);
   } catch (err) {
     console.error('[Dashboard] Ladefehler:', err.message, 'Status:', err.status ?? 'network');
-    window.oikos?.showToast(t('dashboard.loadError'), 'warning');
+    window.yuvomi?.showToast(t('dashboard.loadError'), 'warning');
   }
 
   const rerender = () => render(container, { user });
@@ -1366,9 +1366,9 @@ export async function render(container, { user }) {
       savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
       isCustomizing = false;
       rebuildDashboard(widgetConfig);
-      window.oikos?.showToast(t('dashboard.customizeSaved'), 'success', 1500);
+      window.yuvomi?.showToast(t('dashboard.customizeSaved'), 'success', 1500);
     } catch {
-      window.oikos?.showToast(t('common.errorGeneric'), 'error');
+      window.yuvomi?.showToast(t('common.errorGeneric'), 'error');
     }
   }
 
@@ -1556,7 +1556,7 @@ function wireWeatherRefresh(container, onUpdated = null) {
         const newWidget = container.querySelector('#weather-widget');
         if (newWidget && window.lucide) window.lucide.createIcons({ el: newWidget });
         onUpdated?.(res.data ?? null);
-        window.oikos?.showToast(t('dashboard.weatherUpdated'), 'success', 1500);
+        window.yuvomi?.showToast(t('dashboard.weatherUpdated'), 'success', 1500);
       }
     } catch { /* silently ignore */ }
   };

@@ -78,7 +78,7 @@ function renderPage(container, prefs) {
 
 function requestLocation(container, locateButton) {
   if (!navigator.geolocation) {
-    window.oikos?.showToast(t('settings.weatherLocateUnsupported'), 'warning');
+    window.yuvomi?.showToast(t('settings.weatherLocateUnsupported'), 'warning');
     return;
   }
   locateButton.disabled = true;
@@ -88,12 +88,12 @@ function requestLocation(container, locateButton) {
       container.querySelector('#pweather-lat').value = position.coords.latitude.toFixed(4);
       container.querySelector('#pweather-lon').value = position.coords.longitude.toFixed(4);
       locateButton.disabled = false;
-      window.oikos?.showToast(t('settings.weatherLocateSuccess'), 'success');
+      window.yuvomi?.showToast(t('settings.weatherLocateSuccess'), 'success');
     },
     (error) => {
       if (!isConnected(locateButton, container)) return;
       locateButton.disabled = false;
-      window.oikos?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
     },
     { enableHighAccuracy: true, timeout: 8000 },
   );
@@ -146,7 +146,7 @@ function bindEvents(container, user) {
           auto_locate: v.auto_locate,
         },
       });
-      window.oikos?.showToast(t('settings.personalWeatherSaved'), 'success');
+      window.yuvomi?.showToast(t('settings.personalWeatherSaved'), 'success');
       await render(container, { user });
     } catch (error) {
       errorElement.textContent = error.message || t('common.errorGeneric');
@@ -159,10 +159,10 @@ function bindEvents(container, user) {
       await api.put('/preferences', {
         weather_user: { lat: null, lon: null, city: null, units: null, auto_locate: null },
       });
-      window.oikos?.showToast(t('settings.personalWeatherReset'), 'success');
+      window.yuvomi?.showToast(t('settings.personalWeatherReset'), 'success');
       await render(container, { user });
     } catch (error) {
-      window.oikos?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
     }
   });
 }

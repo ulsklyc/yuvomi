@@ -9,7 +9,7 @@
 
 {% do c1.environment.add_env("NODE_ENV", "production") %}
 {% do c1.environment.add_env("PORT", values.network.web_port.port_number) %}
-{% do c1.environment.add_env("DB_PATH", "/data/oikos.db") %}
+{% do c1.environment.add_env("DB_PATH", "/data/yuvomi.db") %}
 {% do c1.environment.add_env("DATA_DIR", "/data") %}
 {% do c1.environment.add_env("BACKUP_DIR", "/backups") %}
 {% do c1.environment.add_env("SESSION_SECRET", values.oikos.session_secret) %}

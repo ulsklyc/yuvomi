@@ -2,7 +2,7 @@ import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 
-const APP_NAME_STORAGE_KEY = 'oikos-app-name';
+const APP_NAME_STORAGE_KEY = 'yuvomi-app-name';
 const DEFAULT_APP_NAME = 'Yuvomi';
 
 export function isConnectedWeatherControl(control, container) {
@@ -157,7 +157,7 @@ function refreshBranding(appName) {
 
 function requestLocation(container, locateButton) {
   if (!navigator.geolocation) {
-    window.oikos?.showToast(t('settings.weatherLocateUnsupported'), 'warning');
+    window.yuvomi?.showToast(t('settings.weatherLocateUnsupported'), 'warning');
     return;
   }
 
@@ -171,13 +171,13 @@ function requestLocation(container, locateButton) {
       latitudeInput.value = position.coords.latitude.toFixed(4);
       longitudeInput.value = position.coords.longitude.toFixed(4);
       locateButton.disabled = false;
-      window.oikos?.showToast(t('settings.weatherLocateSuccess'), 'success');
+      window.yuvomi?.showToast(t('settings.weatherLocateSuccess'), 'success');
     },
     (error) => {
       if (!isConnectedWeatherControl(locateButton, container)) return;
 
       locateButton.disabled = false;
-      window.oikos?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
     },
     { enableHighAccuracy: true, timeout: 8000 },
   );
@@ -206,7 +206,7 @@ function bindWeatherEvents(container, user) {
         weather_provider: preferenceData.weather_provider,
         weather_auto_locate: preferenceData.weather_auto_locate,
       });
-      window.oikos?.showToast(t('settings.weatherSaved'), 'success');
+      window.yuvomi?.showToast(t('settings.weatherSaved'), 'success');
       await render(container, { user });
     } catch (error) {
       errorElement.textContent = error.message || t('common.errorGeneric');
@@ -217,10 +217,10 @@ function bindWeatherEvents(container, user) {
   container.querySelector('#weather-remove-btn')?.addEventListener('click', async () => {
     try {
       await api.put('/preferences', { weather_provider: null });
-      window.oikos?.showToast(t('settings.weatherRemoved'), 'success');
+      window.yuvomi?.showToast(t('settings.weatherRemoved'), 'success');
       await render(container, { user });
     } catch (error) {
-      window.oikos?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
     }
   });
 
@@ -246,7 +246,7 @@ function bindAppNameEvents(container) {
       await api.put('/preferences', { app_name: value });
       input.value = value || DEFAULT_APP_NAME;
       refreshBranding(value);
-      window.oikos?.showToast(t('settings.appNameSavedToast'), 'success');
+      window.yuvomi?.showToast(t('settings.appNameSavedToast'), 'success');
     } catch (error) {
       errorElement.textContent = error.message || t('common.errorGeneric');
       errorElement.hidden = false;
@@ -259,7 +259,7 @@ function bindAppNameEvents(container) {
       await api.put('/preferences', { app_name: '' });
       input.value = DEFAULT_APP_NAME;
       refreshBranding('');
-      window.oikos?.showToast(t('settings.appNameSavedToast'), 'success');
+      window.yuvomi?.showToast(t('settings.appNameSavedToast'), 'success');
     } catch (error) {
       errorElement.textContent = error.message || t('common.errorGeneric');
       errorElement.hidden = false;

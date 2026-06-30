@@ -1,7 +1,7 @@
 /**
  * Demo Seed Script - Yuvomi
  * Fills the database with realistic English demo content for screenshots/mockups.
- * Usage: node scripts/seed-demo.js [--db /path/to/oikos.db]
+ * Usage: node scripts/seed-demo.js [--db /path/to/yuvomi.db]
  *
  * Requires a database already migrated to the current schema (open the app once,
  * or run the server, before seeding). Populates EVERY module:
@@ -32,7 +32,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const args = process.argv.slice(2);
 const dbIdx = args.indexOf('--db');
-const DB_PATH = dbIdx !== -1 ? args[dbIdx + 1] : resolve(__dirname, '..', 'oikos.db');
+const DB_PATH = dbIdx !== -1 ? args[dbIdx + 1] : resolve(__dirname, '..', 'yuvomi.db');
 
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');

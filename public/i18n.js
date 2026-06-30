@@ -8,9 +8,9 @@
 const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'ja', 'ar', 'hi', 'pt', 'uk', 'pl', 'nl', 'cs', 'vi', 'hu'];
 const RTL_LOCALES = new Set(['ar']);
 const DEFAULT_LOCALE = 'de';
-const STORAGE_KEY = 'oikos-locale';
-const DATE_FORMAT_KEY = 'oikos-date-format';
-const TIME_FORMAT_KEY = 'oikos-time-format';
+const STORAGE_KEY = 'yuvomi-locale';
+const DATE_FORMAT_KEY = 'yuvomi-date-format';
+const TIME_FORMAT_KEY = 'yuvomi-time-format';
 const DEFAULT_DATE_FORMAT = 'dmy';
 const DEFAULT_TIME_FORMAT = '24h';
 const VALID_TIME_FORMATS = ['24h', '12h'];

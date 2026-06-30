@@ -21,9 +21,9 @@ function renderPage(container) {
 function bindEvents(container) {
   const link = container.querySelector('#budget-region-link');
   link?.addEventListener('click', (event) => {
-    if (!window.oikos?.navigate) return;
+    if (!window.yuvomi?.navigate) return;
     event.preventDefault();
-    window.oikos.navigate(APPEARANCE_PATH);
+    window.yuvomi.navigate(APPEARANCE_PATH);
   });
 }
 

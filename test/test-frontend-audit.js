@@ -64,7 +64,7 @@ function assertRuleUsesToken(css, selector, property, token, file) {
 
 test('audited frontend files do not assign innerHTML', () => {
   const files = [
-    '../public/components/oikos-install-prompt.js',
+    '../public/components/yuvomi-install-prompt.js',
     '../public/components/shopping-category-manager.js',
     '../public/pages/notes.js',
     '../public/pages/meals.js',
@@ -211,8 +211,8 @@ test('service worker release caches track package version and include the early 
   const release = sw.match(/const APP_RELEASE\s*=\s*['"]([^'"]+)['"]/)?.[1];
 
   assert.equal(release, pkg.version, 'Service worker APP_RELEASE must match package.json');
-  assert.match(sw, /const SHELL_CACHE\s*=\s*`oikos-shell-\$\{APP_RELEASE\}`/);
-  assert.match(sw, /const PAGES_CACHE\s*=\s*`oikos-pages-\$\{APP_RELEASE\}`/);
+  assert.match(sw, /const SHELL_CACHE\s*=\s*`yuvomi-shell-\$\{APP_RELEASE\}`/);
+  assert.match(sw, /const PAGES_CACHE\s*=\s*`yuvomi-pages-\$\{APP_RELEASE\}`/);
   assert.match(sw, /['"]\/lang-init\.js['"]/, 'early lang/dir bootstrap must be available offline');
 });
 
@@ -233,7 +233,7 @@ test('runtime locale changes keep language and writing direction synchronized', 
 
 test('install prompt waits for initial translations before rendering text', () => {
   const i18n = read('../public/i18n.js');
-  const prompt = read('../public/components/oikos-install-prompt.js');
+  const prompt = read('../public/components/yuvomi-install-prompt.js');
 
   assert.match(i18n, /export function whenI18nReady/);
   assert.match(prompt, /import \{ t,\s*whenI18nReady \} from '\/i18n\.js';/);
@@ -290,7 +290,7 @@ test('personal account leaf preserves self-profile, password, and logout contrac
   assert.match(source, /birth_date:/);
   assert.match(source, /api\.patch\('\/auth\/me\/password',\s*\{\s*current_password:/);
   assert.match(source, /await auth\.logout\(\)/);
-  assert.match(source, /window\.oikos\?\.navigate\('\/login'\)/);
+  assert.match(source, /window\.yuvomi\?\.navigate\('\/login'\)/);
   assert.match(source, /id="profile-avatar-file"[^>]*aria-label=/);
   assert.match(source, /id="profile-avatar-file"[^>]*tabindex="-1"/);
   assert.match(source, /id="profile-avatar-file"[^>]*aria-describedby="profile-error"/);
@@ -524,7 +524,7 @@ test('module-specific settings leaves preserve their required controls and behav
   assert.match(dashboard, /localStorage\.setItem\(key, value\)/);
   assert.match(dashboard, /localStorage\.removeItem\(key\)/);
   assert.match(dashboard, /new CustomEvent\('app-name-changed'/);
-  assert.match(dashboard, /window\.oikos\?\.showToast/);
+  assert.match(dashboard, /window\.yuvomi\?\.showToast/);
   assert.match(dashboard, /await render\(container, \{ user \}\)/);
 });
 
@@ -800,7 +800,7 @@ test('admin-system leaf reads /version and renders safe translated rows only', (
 
 test('Shopping owns shopping category management via a dedicated web component', () => {
   const component = read('../public/components/shopping-category-manager.js');
-  assert.match(component, /customElements\.define\(\s*'oikos-shopping-category-manager'/);
+  assert.match(component, /customElements\.define\(\s*'yuvomi-shopping-category-manager'/);
   assert.match(component, /import \{ api \} from '\/api\.js'/);
   assert.match(component, /import \{ t \} from '\/i18n\.js'/);
   assert.match(component, /import \{ esc \} from '\/utils\/html\.js'/);
@@ -821,7 +821,7 @@ test('Shopping owns shopping category management via a dedicated web component',
 
   const shopping = read('../public/pages/shopping.js');
   assert.match(shopping, /components\/shopping-category-manager\.js/);
-  assert.match(shopping, /<oikos-shopping-category-manager>/);
+  assert.match(shopping, /<yuvomi-shopping-category-manager>/);
   assert.match(shopping, /shopping\.manageCategories/);
   assert.match(shopping, /shopping-categories-changed/);
   // onClose muss den Listener wieder abräumen (kein Leak bei Modal-Reuse).
@@ -1527,7 +1527,7 @@ test('settings cutover: no obsolete settings-tab / panel references remain in pu
 test('settings cutover: the access-redirected notice is consumed once on the account leaf', () => {
   const account = read('../public/settings/pages/personal-account.js');
 
-  assert.match(account, /oikos:settings:notice/, 'account leaf must read the one-time redirect notice');
+  assert.match(account, /yuvomi:settings:notice/, 'account leaf must read the one-time redirect notice');
   assert.match(account, /accessRedirected/, 'account leaf must surface the access-redirected message');
   assert.match(account, /removeItem\(/, 'account leaf must consume the notice once');
 });

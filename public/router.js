@@ -185,8 +185,8 @@ const NAV_SECTION_LABEL_KEYS = Object.freeze({
 });
 
 const DEFAULT_APP_NAME = 'Yuvomi';
-const APP_NAME_STORAGE_KEY = 'oikos-app-name';
-const APP_VERSION_STORAGE_KEY = 'oikos-app-version';
+const APP_NAME_STORAGE_KEY = 'yuvomi-app-name';
+const APP_VERSION_STORAGE_KEY = 'yuvomi-app-version';
 
 // Reduziert einen (Sub-)Pfad auf seine Top-Level-Sektion. /settings/* Blätter
 // teilen sich dadurch eine Sektion: ein Wechsel zwischen zwei Settings-Blättern
@@ -498,11 +498,11 @@ async function syncPreferencesOnce() {
     const res = await api.get('/preferences');
     const dateFormat = res?.data?.date_format;
     if (dateFormat) {
-      localStorage.setItem('oikos-date-format', dateFormat);
+      localStorage.setItem('yuvomi-date-format', dateFormat);
     }
     const timeFormat = res?.data?.time_format;
     if (timeFormat) {
-      localStorage.setItem('oikos-time-format', timeFormat);
+      localStorage.setItem('yuvomi-time-format', timeFormat);
     }
     if (res?.data?.app_name) {
       setAppName(res.data.app_name);
@@ -719,7 +719,7 @@ function renderAppShell(container) {
   logoSvg.setAttribute('fill', 'none');
   const defs = document.createElementNS(SVG_NS, 'defs');
   const grad = document.createElementNS(SVG_NS, 'linearGradient');
-  const gradId = `oikos-logo-bg-${Math.random().toString(36).slice(2, 7)}`;
+  const gradId = `yuvomi-logo-bg-${Math.random().toString(36).slice(2, 7)}`;
   grad.setAttribute('id', gradId);
   grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
   grad.setAttribute('x2', '160'); grad.setAttribute('y2', '160');
@@ -1013,10 +1013,10 @@ function renderAppShell(container) {
   }
 }
 
-const FAB_SEEN_KEY = (module) => `oikos:fabSeen:${module}`;
+const FAB_SEEN_KEY = (module) => `yuvomi:fabSeen:${module}`;
 const FAB_SEEN_MAX = 5;
-const SEARCH_KBD_KEY = 'oikos:searchKbdUsed';
-const SIDEBAR_COLLAPSED_KEY = 'oikos.sidebar.collapsed';
+const SEARCH_KBD_KEY = 'yuvomi:searchKbdUsed';
+const SIDEBAR_COLLAPSED_KEY = 'yuvomi.sidebar.collapsed';
 
 const SHORTCUTS = [
   { key: '/',   description: () => t('shortcuts.search'),  action: () => {
@@ -1923,7 +1923,7 @@ function renderError(container, err) {
  * @param {'default'|'success'|'danger'|'warning'} type
  * @param {number} duration - ms
  */
-const TOAST_SUCCESS_KEY = 'oikos:toastSuccessCount';
+const TOAST_SUCCESS_KEY = 'yuvomi:toastSuccessCount';
 const TOAST_SUCCESS_MAX = 50;
 
 function _toastSvg(children) {
@@ -2229,8 +2229,8 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
 // --------------------------------------------------------
 (async () => {
   try {
-    // Vorab-Theme-Anwendung ohne Abhängigkeit von window.oikos
-    const stored = localStorage.getItem('oikos-theme');
+    // Vorab-Theme-Anwendung ohne Abhängigkeit von window.yuvomi
+    const stored = localStorage.getItem('yuvomi-theme');
     if (stored === 'dark') {
       document.documentElement.setAttribute('data-theme', 'dark');
     } else if (stored === 'light') {
@@ -2258,7 +2258,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
 })();
 
 // Globale Exporte
-window.oikos = {
+window.yuvomi = {
   navigate,
   showToast,
   friendlyError,
@@ -2269,7 +2269,7 @@ window.oikos = {
   refreshThirdPartyModules,
   isModuleDisabled,
   applyTheme: (value) => {
-    localStorage.setItem('oikos-theme', value);
+    localStorage.setItem('yuvomi-theme', value);
     if (value === 'dark') {
       document.documentElement.setAttribute('data-theme', 'dark');
     } else if (value === 'light') {
@@ -2283,3 +2283,9 @@ window.oikos = {
     updateThemeColorForRoute(route);
   },
 };
+
+// Legacy-Alias: Drittanbieter-Module unter modules/ wurden ggf. gegen die alte
+// globale API `window.oikos` geschrieben. Ohne diesen Alias würfen ihre Aufrufe
+// (window.oikos.navigate/showToast …) nach dem Rename, und der Router würde das
+// Modul als fehlerhaft deaktivieren. Der Alias hält den Upgrade-Pfad nahtlos.
+window.oikos = window.yuvomi;

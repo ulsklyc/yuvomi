@@ -414,7 +414,7 @@ function openBirthdayModal({ mode, birthday = null }) {
           photoData = await readFileAsDataUrl(file);
           renderPreview();
         } catch (err) {
-          window.oikos?.showToast(err.message, 'danger');
+          window.yuvomi?.showToast(err.message, 'danger');
         }
       });
       panel.querySelector('#bd-remove-photo').addEventListener('click', () => {
@@ -449,7 +449,7 @@ function openBirthdayModal({ mode, birthday = null }) {
         };
 
         if (!body.name || !body.birth_date || !isDateInputValid(birthDateRaw)) {
-          window.oikos?.showToast(t('birthdays.requiredFields'), 'warning');
+          window.yuvomi?.showToast(t('birthdays.requiredFields'), 'warning');
           return;
         }
 
@@ -459,11 +459,11 @@ function openBirthdayModal({ mode, birthday = null }) {
             const res = await api.put(`/birthdays/${birthday.id}`, body);
             const idx = state.birthdays.findIndex((item) => item.id === birthday.id);
             if (idx !== -1) state.birthdays[idx] = res.data;
-            window.oikos?.showToast(t('birthdays.updatedToast'), 'success');
+            window.yuvomi?.showToast(t('birthdays.updatedToast'), 'success');
           } else {
             const res = await api.post('/birthdays', body);
             state.birthdays.push(res.data);
-            window.oikos?.showToast(t('birthdays.createdToast'), 'success');
+            window.yuvomi?.showToast(t('birthdays.createdToast'), 'success');
           }
           state.birthdays.sort((a, b) => a.name.localeCompare(b.name));
           const upcomingRes = await api.get('/birthdays/upcoming?limit=4');
@@ -473,7 +473,7 @@ function openBirthdayModal({ mode, birthday = null }) {
           renderList();
           closeModal({ force: true });
         } catch (err) {
-          window.oikos?.showToast(err.message, 'danger');
+          window.yuvomi?.showToast(err.message, 'danger');
           saveBtn.disabled = false;
         }
       });

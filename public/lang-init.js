@@ -12,7 +12,7 @@
 // Resolve-Logik gespiegelt aus i18n.js (resolveLocale): bei Änderung dort mitziehen.
 (function() {
   var SUPPORTED = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'ja', 'ar', 'hi', 'pt', 'uk', 'pl', 'nl', 'cs', 'vi'];
-  var STORAGE_KEY = 'oikos-locale';
+  var STORAGE_KEY = 'yuvomi-locale';
 
   function resolve() {
     try {

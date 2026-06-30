@@ -28,7 +28,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DB_PATH=/data/oikos.db
+      - DB_PATH=/data/yuvomi.db
       - SESSION_SECRET=${SESSION_SECRET:?Set SESSION_SECRET in .env}
       - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY:?Set DB_ENCRYPTION_KEY in .env}
       # Set to true when behind a reverse proxy with HTTPS (Caddy, nginx, Traefik)

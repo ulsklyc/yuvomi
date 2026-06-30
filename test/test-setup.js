@@ -131,7 +131,7 @@ test('GET /api/v1/version: includes version for authenticated session', async ()
   });
   assert.equal(login.status, 200);
   const cookie = login.headers.get('set-cookie');
-  assert.ok(cookie?.includes('oikos.sid='));
+  assert.ok(cookie?.includes('yuvomi.sid='));
 
   const res = await fetch(`${BASE}/api/v1/version`, {
     headers: { Cookie: cookieHeader(cookie) },

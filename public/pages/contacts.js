@@ -1,7 +1,7 @@
 /**
  * Modul: Kontakte (Contacts)
  * Zweck: Kontaktliste mit Kategorie-Filter, Suche, CRUD, tel:/mailto:/maps-Links
- * Abhängigkeiten: /api.js, /router.js (window.oikos)
+ * Abhängigkeiten: /api.js, /router.js (window.yuvomi)
  */
 
 import { api } from '/api.js';
@@ -151,13 +151,13 @@ export async function render(container, { user }) {
     try {
       const text    = await file.text();
       const contact = parseVCard(text);
-      if (!contact.name) { window.oikos?.showToast(t('contacts.vcardNoName'), 'warning'); return; }
+      if (!contact.name) { window.yuvomi?.showToast(t('contacts.vcardNoName'), 'warning'); return; }
       const res = await api.post('/contacts', contact);
       state.contacts.push(res.data);
       renderList();
-      window.oikos?.showToast(t('contacts.importedToast', { name: res.data.name }), 'success');
+      window.yuvomi?.showToast(t('contacts.importedToast', { name: res.data.name }), 'success');
     } catch (err) {
-      window.oikos?.showToast(t('contacts.importError', { error: err.message }), 'danger');
+      window.yuvomi?.showToast(t('contacts.importError', { error: err.message }), 'danger');
     }
   });
 }
@@ -384,7 +384,7 @@ function openContactModal({ mode, contact = null }) {
         const address  = panel.querySelector('#cm-address').value.trim() || null;
         const notes    = panel.querySelector('#cm-notes').value.trim() || null;
 
-        if (!name) { window.oikos?.showToast(t('common.nameRequired'), 'error'); return; }
+        if (!name) { window.yuvomi?.showToast(t('common.nameRequired'), 'error'); return; }
 
         saveBtn.disabled    = true;
         saveBtn.textContent = '…';
@@ -405,9 +405,9 @@ function openContactModal({ mode, contact = null }) {
           }
           closeModal({ force: true });
           renderList();
-          window.oikos?.showToast(mode === 'create' ? t('contacts.savedToast') : t('contacts.updatedToast'), 'success');
+          window.yuvomi?.showToast(mode === 'create' ? t('contacts.savedToast') : t('contacts.updatedToast'), 'success');
         } catch (err) {
-          window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
+          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
           saveBtn.disabled    = false;
           saveBtn.textContent = isEdit ? t('common.save') : t('common.create');
         }
@@ -423,7 +423,7 @@ async function deleteContact(id) {
   vibrate([30, 50, 30]);
 
   let undone = false;
-  window.oikos?.showToast(t('contacts.deletedToast'), 'default', 5000, () => {
+  window.yuvomi?.showToast(t('contacts.deletedToast'), 'default', 5000, () => {
     undone = true;
     if (contact) {
       state.contacts = [...state.contacts, contact].sort((a, b) => a.name.localeCompare(b.name));
@@ -440,7 +440,7 @@ async function deleteContact(id) {
         state.contacts = [...state.contacts, contact].sort((a, b) => a.name.localeCompare(b.name));
         renderList();
       }
-      window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     }
   }, 5000);
 }

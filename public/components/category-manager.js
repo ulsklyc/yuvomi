@@ -65,7 +65,7 @@ class CategoryManagerElement extends HTMLElement {
       this._cats = res.data ?? [];
       this._render();
     } catch (err) {
-      window.oikos?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   }
 
@@ -171,10 +171,10 @@ class CategoryManagerElement extends HTMLElement {
       const res = await api.post(this._basePath, body);
       this._cats.push(res.data);
       this._render();
-      window.oikos?.showToast(t('category.added'), 'success');
+      window.yuvomi?.showToast(t('category.added'), 'success');
       this._notifyChanged();
     } catch (err) {
-      window.oikos?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   }
 
@@ -214,10 +214,10 @@ class CategoryManagerElement extends HTMLElement {
       const idx = this._cats.findIndex((c) => String(c.key) === key);
       if (idx >= 0) this._cats[idx] = res.data;
       this._render();
-      window.oikos?.showToast(t('category.renamed'), 'success');
+      window.yuvomi?.showToast(t('category.renamed'), 'success');
       this._notifyChanged();
     } catch (err) {
-      window.oikos?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   }
 
@@ -237,7 +237,7 @@ class CategoryManagerElement extends HTMLElement {
       await this._load();
       this._notifyChanged();
     } catch (err) {
-      window.oikos?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   }
 
@@ -254,10 +254,10 @@ class CategoryManagerElement extends HTMLElement {
       await api.delete(`${this._basePath}/${encodeURIComponent(key)}`);
       this._cats = this._cats.filter((c) => String(c.key) !== key);
       this._render();
-      window.oikos?.showToast(t('category.deleted'), 'default');
+      window.yuvomi?.showToast(t('category.deleted'), 'default');
       this._notifyChanged();
     } catch (err) {
-      window.oikos?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   }
 
@@ -275,11 +275,11 @@ class CategoryManagerElement extends HTMLElement {
         { name }
       );
       await this._load();
-      window.oikos?.showToast(t('category.added'), 'success');
+      window.yuvomi?.showToast(t('category.added'), 'success');
       this._notifyChanged();
       return res;
     } catch (err) {
-      window.oikos?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   }
 
@@ -296,10 +296,10 @@ class CategoryManagerElement extends HTMLElement {
         { name: newName }
       );
       await this._load();
-      window.oikos?.showToast(t('category.renamed'), 'success');
+      window.yuvomi?.showToast(t('category.renamed'), 'success');
       this._notifyChanged();
     } catch (err) {
-      window.oikos?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   }
 
@@ -319,7 +319,7 @@ class CategoryManagerElement extends HTMLElement {
       await this._load();
       this._notifyChanged();
     } catch (err) {
-      window.oikos?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   }
 
@@ -337,13 +337,13 @@ class CategoryManagerElement extends HTMLElement {
         `${this._basePath}/${encodeURIComponent(parent)}/subcategories/${encodeURIComponent(subKey)}`
       );
       await this._load();
-      window.oikos?.showToast(t('category.deleted'), 'default');
+      window.yuvomi?.showToast(t('category.deleted'), 'default');
       this._notifyChanged();
     } catch (err) {
-      window.oikos?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   }
 }
 
-customElements.define('oikos-category-manager', CategoryManagerElement);
+customElements.define('yuvomi-category-manager', CategoryManagerElement);
 export { CategoryManagerElement };

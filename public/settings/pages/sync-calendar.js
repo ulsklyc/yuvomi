@@ -32,7 +32,7 @@ function enabledCalendarCount(calendars) {
 }
 
 function showToast(message, tone = 'default') {
-  window.oikos?.showToast(message, tone);
+  window.yuvomi?.showToast(message, tone);
 }
 
 function providerConnectionStatus(status) {
@@ -698,7 +698,7 @@ function buildGoogleProvider(googleStatus, user) {
         try {
           await api.delete('/calendar/google/disconnect');
           showToast(t('settings.disconnectedToast', { provider: 'Google Calendar' }), 'default');
-          window.oikos?.navigate('/settings/sync/calendar');
+          window.yuvomi?.navigate('/settings/sync/calendar');
         } catch (err) {
           showToast(err.message || t('common.errorGeneric'), 'danger');
         }
@@ -898,7 +898,7 @@ function buildAppleProvider(appleStatus, user) {
         try {
           await api.delete('/calendar/apple/disconnect');
           showToast(t('settings.disconnectedToast', { provider: 'Apple Calendar' }), 'default');
-          window.oikos?.navigate('/settings/sync/calendar');
+          window.yuvomi?.navigate('/settings/sync/calendar');
         } catch (err) {
           showToast(err.message || t('common.errorGeneric'), 'danger');
         }
@@ -950,7 +950,7 @@ function buildAppleConnectForm() {
     try {
       await api.post('/calendar/apple/connect', { url, username, password });
       showToast(t('settings.appleConnectedToast'), 'success');
-      window.oikos?.navigate('/settings/sync/calendar');
+      window.yuvomi?.navigate('/settings/sync/calendar');
     } catch (err) {
       errorEl.textContent = err.message || t('common.errorGeneric');
       errorEl.hidden = false;

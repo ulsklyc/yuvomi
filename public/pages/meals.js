@@ -1,7 +1,7 @@
 /**
  * Modul: Essensplan (Meals)
  * Zweck: Wochenansicht mit Mahlzeit-CRUD, Zutaten-Verwaltung und Einkaufslisten-Integration
- * Abhängigkeiten: /api.js, /router.js (window.oikos)
+ * Abhängigkeiten: /api.js, /router.js (window.yuvomi)
  */
 
 import { api } from '/api.js';
@@ -92,7 +92,7 @@ async function loadWeek(week) {
     console.error('[Meals] loadWeek Fehler:', err);
     state.meals       = [];
     state.currentWeek = getMondayOf(week);
-    window.oikos?.showToast(t('meals.loadError'), 'danger');
+    window.yuvomi?.showToast(t('meals.loadError'), 'danger');
   }
 }
 
@@ -655,7 +655,7 @@ function openMealModal(opts) {
       saveAsRecipeBtn?.addEventListener('click', async () => {
         const title = panel.querySelector('#modal-title').value.trim();
         if (!title) {
-          window.oikos?.showToast(t('meals.titleRequired'), 'error');
+          window.yuvomi?.showToast(t('meals.titleRequired'), 'error');
           return;
         }
 
@@ -680,9 +680,9 @@ function openMealModal(opts) {
             recipeSelect.value = String(created.data.id);
           }
 
-          window.oikos?.showToast(t('recipes.created'), 'success');
+          window.yuvomi?.showToast(t('recipes.created'), 'success');
         } catch (err) {
-          window.oikos?.showToast(err.data?.error ?? t('common.errorGeneric'), 'error');
+          window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'error');
         } finally {
           saveAsRecipeBtn.disabled = false;
         }
@@ -728,16 +728,16 @@ function openMealModal(opts) {
         try {
           const res = await api.post(`/meals/${state.modal.meal.id}/to-shopping-list`, { listId });
           if (res.data.transferred > 0) {
-            window.oikos?.showToast(res.data.transferred !== 1 ? t('meals.transferSuccessPlural', { count: res.data.transferred }) : t('meals.transferSuccess', { count: res.data.transferred }), 'success');
+            window.yuvomi?.showToast(res.data.transferred !== 1 ? t('meals.transferSuccessPlural', { count: res.data.transferred }) : t('meals.transferSuccess', { count: res.data.transferred }), 'success');
             await loadWeek(state.currentWeek);
             closeModal({ force: true });
             renderWeekGrid();
           } else {
-            window.oikos?.showToast(t('meals.transferAlreadyDone'), 'info');
+            window.yuvomi?.showToast(t('meals.transferAlreadyDone'), 'info');
             btn.disabled = false;
           }
         } catch (err) {
-          window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
+          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'error');
           btn.disabled = false;
         }
       });
@@ -906,12 +906,12 @@ async function saveModal(overlay) {
     : false;
 
   if (!date || !isDateInputValid(dateRaw)) {
-    window.oikos?.showToast(t('calendar.invalidDate'), 'error');
+    window.yuvomi?.showToast(t('calendar.invalidDate'), 'error');
     return;
   }
 
   if (!title) {
-    window.oikos?.showToast(t('meals.titleRequired'), 'error');
+    window.yuvomi?.showToast(t('meals.titleRequired'), 'error');
     return;
   }
 
@@ -949,9 +949,9 @@ async function saveModal(overlay) {
 
     closeModal({ force: true });
     renderWeekGrid();
-    window.oikos?.showToast(mode === 'create' ? t('meals.addMealTitle') : t('meals.editMeal'), 'success');
+    window.yuvomi?.showToast(mode === 'create' ? t('meals.addMealTitle') : t('meals.editMeal'), 'success');
   } catch (err) {
-    window.oikos?.showToast(err.data?.error ?? t('common.errorGeneric'), 'error');
+    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'error');
     saveBtn.disabled    = false;
     saveBtn.textContent = state.modal?.mode === 'edit' ? t('common.save') : t('common.add');
   }
@@ -978,7 +978,7 @@ async function deleteMeal(mealId) {
   if (itemEl) itemEl.style.display = 'none';
 
   let undone = false;
-  window.oikos?.showToast(t('meals.deletedToast'), 'default', 5000, () => {
+  window.yuvomi?.showToast(t('meals.deletedToast'), 'default', 5000, () => {
     undone = true;
     if (itemEl) itemEl.style.display = '';
   });
@@ -991,7 +991,7 @@ async function deleteMeal(mealId) {
       renderWeekGrid();
     } catch (err) {
       if (itemEl) itemEl.style.display = '';
-      window.oikos?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     }
   }, 5000);
 }
@@ -1002,7 +1002,7 @@ async function deleteMeal(mealId) {
 
 async function transferMeal(mealId) {
   if (!state.lists.length) {
-    window.oikos?.showToast(t('meals.noShoppingLists'), 'error');
+    window.yuvomi?.showToast(t('meals.noShoppingLists'), 'error');
     return;
   }
 
@@ -1018,14 +1018,14 @@ async function transferMeal(mealId) {
   try {
     const res = await api.post(`/meals/${mealId}/to-shopping-list`, { listId });
     if (res.data.transferred > 0) {
-      window.oikos?.showToast(res.data.transferred !== 1 ? t('meals.transferSuccessPlural', { count: res.data.transferred }) : t('meals.transferSuccess', { count: res.data.transferred }), 'success');
+      window.yuvomi?.showToast(res.data.transferred !== 1 ? t('meals.transferSuccessPlural', { count: res.data.transferred }) : t('meals.transferSuccess', { count: res.data.transferred }), 'success');
       await loadWeek(state.currentWeek);
       renderWeekGrid();
     } else {
-      window.oikos?.showToast(t('meals.transferAlreadyDone'), 'info');
+      window.yuvomi?.showToast(t('meals.transferAlreadyDone'), 'info');
     }
   } catch (err) {
-    window.oikos?.showToast(err.data?.error ?? t('common.errorGeneric'), 'error');
+    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'error');
   }
 }
 

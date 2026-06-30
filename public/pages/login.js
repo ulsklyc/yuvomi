@@ -10,7 +10,7 @@ import { esc } from '/utils/html.js';
 
 const VERSION_URL = '/api/v1/version';
 const DEFAULT_APP_NAME = 'Yuvomi';
-const APP_NAME_STORAGE_KEY = 'oikos-app-name';
+const APP_NAME_STORAGE_KEY = 'yuvomi-app-name';
 
 function getStoredAppName() {
   return localStorage.getItem(APP_NAME_STORAGE_KEY) || DEFAULT_APP_NAME;
@@ -87,7 +87,7 @@ export async function render(container) {
   const versionEl = container.querySelector('#login-version');
 
   container.querySelectorAll('a[data-link]').forEach((a) =>
-    a.addEventListener('click', (e) => { e.preventDefault(); window.oikos.navigate(a.getAttribute('href')); }));
+    a.addEventListener('click', (e) => { e.preventDefault(); window.yuvomi.navigate(a.getAttribute('href')); }));
 
   // OIDC-Fehlermeldung aus URL-Parameter anzeigen (z.B. ?error=oidc_failed nach gescheitertem Callback)
   const urlParams = new URLSearchParams(window.location.search);
@@ -189,7 +189,7 @@ export async function render(container) {
 
     try {
       const result = await auth.login(username, password);
-      window.oikos.navigate('/', result.user);
+      window.yuvomi.navigate('/', result.user);
     } catch (err) {
       showError(errorEl, err.status === 429
         ? t('login.tooManyAttempts')

@@ -28,12 +28,12 @@ function bindSpaNavigation(link, href) {
       || event.ctrlKey
       || event.shiftKey
       || event.altKey
-      || !window.oikos?.navigate
+      || !window.yuvomi?.navigate
     ) {
       return;
     }
     event.preventDefault();
-    window.oikos.navigate(href);
+    window.yuvomi.navigate(href);
   });
 }
 

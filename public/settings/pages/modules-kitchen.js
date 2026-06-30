@@ -72,7 +72,7 @@ function bindEvents(container) {
       inputs.forEach((input) => {
         input.checked = persistedMealTypes.includes(input.value);
       });
-      window.oikos?.showToast(t('settings.mealTypesMinOne'), 'danger');
+      window.yuvomi?.showToast(t('settings.mealTypesMinOne'), 'danger');
       return;
     }
 
@@ -83,9 +83,9 @@ function bindEvents(container) {
         persistedMealTypes,
         () => api.put('/preferences', { visible_meal_types: checkedMealTypes }),
       );
-      window.oikos?.showToast(t('settings.mealTypesSaved'), 'success');
+      window.yuvomi?.showToast(t('settings.mealTypesSaved'), 'success');
     } catch (error) {
-      window.oikos?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
     }
   });
 }

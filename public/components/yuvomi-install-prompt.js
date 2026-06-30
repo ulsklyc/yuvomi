@@ -18,13 +18,13 @@ import {
   promptPwaInstall,
 } from '/utils/pwa-install.js';
 
-const DISMISS_KEY = 'oikos-install-dismissed';
+const DISMISS_KEY = 'yuvomi-install-dismissed';
 const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 Tage
 
-const INTERACTION_KEY = 'oikos-install-interactions';
+const INTERACTION_KEY = 'yuvomi-install-interactions';
 const INTERACTION_THRESHOLD = 2;
 
-class OikosInstallPrompt extends HTMLElement {
+class YuvomiInstallPrompt extends HTMLElement {
   constructor() {
     super();
     this._deferredPrompt = null;
@@ -366,13 +366,13 @@ class OikosInstallPrompt extends HTMLElement {
   async _onInstallClick() {
     try {
       const result = await promptPwaInstall();
-      console.log('[oikos-install-prompt] Ergebnis:', result.outcome);
+      console.log('[yuvomi-install-prompt] Ergebnis:', result.outcome);
 
       if (result.outcome === 'accepted') {
         this._remove();
       }
     } catch (err) {
-      console.error('[oikos-install-prompt] Fehler:', err);
+      console.error('[yuvomi-install-prompt] Fehler:', err);
     }
     this._deferredPrompt = null;
   }
@@ -399,4 +399,4 @@ class OikosInstallPrompt extends HTMLElement {
   }
 }
 
-customElements.define('oikos-install-prompt', OikosInstallPrompt);
+customElements.define('yuvomi-install-prompt', YuvomiInstallPrompt);

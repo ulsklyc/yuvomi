@@ -34,10 +34,13 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           # IMAGE_NAME = github.repository → ghcr.io/ulsklyc/yuvomi (primary, post-rename).
-          # The second image is a TRANSITIONAL parallel push to the old
-          # ghcr.io/ulsklyc/oikos package so existing pulls keep working after the
-          # Oikos→Yuvomi rename. Remove this line after ~2 releases (and verify
-          # the first yuvomi release actually pushed both images).
+          # The second image is a PERMANENT parallel push to the legacy
+          # ghcr.io/ulsklyc/oikos package. It must NOT be removed: legacy users run
+          # docker-compose/Unraid/TrueNAS configs that still reference the old image
+          # name, and the app self-migrates the database on boot — so an unchanged
+          # legacy config keeps receiving updates indefinitely without any manual edit.
+          # Dropping this mirror would break `docker pull ghcr.io/ulsklyc/oikos` and
+          # force every legacy user to hand-edit their config. Keep it.
           images: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/oikos

@@ -235,7 +235,7 @@ async function reload(options) {
     renderFilters();
     renderContent();
   } catch (err) {
-    window.oikos?.showToast(err.data?.error || t('subscriptions.loadError'), 'danger');
+    window.yuvomi?.showToast(err.data?.error || t('subscriptions.loadError'), 'danger');
   }
 }
 
@@ -813,7 +813,7 @@ export function openSubscriptionModal(subscription = null) {
           showLogo(searchedLogoData);
         } catch (err) {
           event.target.value = '';
-          window.oikos?.showToast(err.message, 'danger');
+          window.yuvomi?.showToast(err.message, 'danger');
         }
       });
       panel.querySelector('#subscription-name').addEventListener('input', () => {
@@ -823,7 +823,7 @@ export function openSubscriptionModal(subscription = null) {
         openLogoPickerModal(panel, subscription?.website_url || panel.querySelector('#subscription-name').value.trim(), (logoData) => {
           searchedLogoData = logoData;
           showLogo(searchedLogoData);
-          window.oikos?.showToast(t('subscriptions.logoFound'), 'success');
+          window.yuvomi?.showToast(t('subscriptions.logoFound'), 'success');
         });
       });
       panel.querySelector('#subscription-form').addEventListener('submit', async (event) => {
@@ -849,12 +849,12 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
   const dateInput = panel.querySelector('#subscription-next-date');
   const currencyInput = panel.querySelector('#subscription-currency');
   if (!isDateInputValid(dateInput.value)) {
-    window.oikos?.showToast(t('subscriptions.invalidDate'), 'danger');
+    window.yuvomi?.showToast(t('subscriptions.invalidDate'), 'danger');
     dateInput.focus();
     return;
   }
   if (!currencyInput.value) {
-    window.oikos?.showToast(t('subscriptions.currencyRequired'), 'danger');
+    window.yuvomi?.showToast(t('subscriptions.currencyRequired'), 'danger');
     panel.querySelector('#subscription-currency-search').focus();
     return;
   }
@@ -884,9 +884,9 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
     else await api.post('/budget/subscriptions', payload);
     await closeModal({ force: true });
     await reload();
-    window.oikos?.showToast(t(existing ? 'subscriptions.savedToast' : 'subscriptions.addedToast'), 'success');
+    window.yuvomi?.showToast(t(existing ? 'subscriptions.savedToast' : 'subscriptions.addedToast'), 'success');
   } catch (err) {
-    window.oikos?.showToast(err.data?.error || err.message || t('common.unknownError'), 'danger');
+    window.yuvomi?.showToast(err.data?.error || err.message || t('common.unknownError'), 'danger');
   } finally {
     submit.disabled = false;
   }
@@ -947,7 +947,7 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
       const message = err.data?.error || t('subscriptions.logoSearchError');
       options = [];
       setHtml(results, `<p class="subscriptions-logo-empty">${esc(message)}</p>`);
-      window.oikos?.showToast(message, 'danger');
+      window.yuvomi?.showToast(message, 'danger');
     } finally {
       button.disabled = false;
       if (window.lucide) window.lucide.createIcons({ el: overlay });
@@ -978,9 +978,9 @@ async function toggleSubscription(subscription) {
   try {
     await api.put(`/budget/subscriptions/${subscription.id}`, { enabled: !subscription.enabled });
     await reload();
-    window.oikos?.showToast(t(subscription.enabled ? 'subscriptions.disabledToast' : 'subscriptions.enabledToast'), 'success');
+    window.yuvomi?.showToast(t(subscription.enabled ? 'subscriptions.disabledToast' : 'subscriptions.enabledToast'), 'success');
   } catch (err) {
-    window.oikos?.showToast(err.data?.error || t('common.unknownError'), 'danger');
+    window.yuvomi?.showToast(err.data?.error || t('common.unknownError'), 'danger');
   }
 }
 
@@ -988,9 +988,9 @@ async function renewSubscription(subscription) {
   try {
     await api.post(`/budget/subscriptions/${subscription.id}/renew`, {});
     await reload();
-    window.oikos?.showToast(t('subscriptions.renewedToast'), 'success');
+    window.yuvomi?.showToast(t('subscriptions.renewedToast'), 'success');
   } catch (err) {
-    window.oikos?.showToast(err.data?.error || t('common.unknownError'), 'danger');
+    window.yuvomi?.showToast(err.data?.error || t('common.unknownError'), 'danger');
   }
 }
 
@@ -1000,9 +1000,9 @@ async function deleteSubscription(subscription) {
   try {
     await api.delete(`/budget/subscriptions/${subscription.id}`);
     await reload();
-    window.oikos?.showToast(t('subscriptions.deletedToast'), 'success');
+    window.yuvomi?.showToast(t('subscriptions.deletedToast'), 'success');
   } catch (err) {
-    window.oikos?.showToast(err.data?.error || t('common.unknownError'), 'danger');
+    window.yuvomi?.showToast(err.data?.error || t('common.unknownError'), 'danger');
   }
 }
 
@@ -1040,7 +1040,7 @@ async function openSettingsModal() {
         event.preventDefault();
         const baseCurrency = panel.querySelector('#subscriptions-base-currency').value;
         if (!baseCurrency) {
-          window.oikos?.showToast(t('subscriptions.currencyRequired'), 'danger');
+          window.yuvomi?.showToast(t('subscriptions.currencyRequired'), 'danger');
           panel.querySelector('#subscriptions-base-currency-search').focus();
           return;
         }
@@ -1051,9 +1051,9 @@ async function openSettingsModal() {
           });
           await closeModal({ force: true });
           await reload({ refreshRates: true });
-          window.oikos?.showToast(t('subscriptions.settingsSaved'), 'success');
+          window.yuvomi?.showToast(t('subscriptions.settingsSaved'), 'success');
         } catch (err) {
-          window.oikos?.showToast(err.data?.error || t('common.unknownError'), 'danger');
+          window.yuvomi?.showToast(err.data?.error || t('common.unknownError'), 'danger');
         }
       });
     },

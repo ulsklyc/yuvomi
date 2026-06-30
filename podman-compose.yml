@@ -29,7 +29,7 @@ services:
       - .env
     environment:
       - NODE_ENV=production
-      - DB_PATH=${DB_PATH:-/data/oikos.db}
+      - DB_PATH=${DB_PATH:-/data/yuvomi.db}
       - BACKUP_DIR=/backups
       # Secure cookies come from .env (the installer sets them):
       #   - Reverse proxy + HTTPS → SESSION_SECURE=true, TRUST_PROXY=1

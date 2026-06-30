@@ -9,7 +9,7 @@ import { esc } from '/utils/html.js';
 
 function wireLinks(container) {
   container.querySelectorAll('a[data-link]').forEach((a) =>
-    a.addEventListener('click', (e) => { e.preventDefault(); window.oikos.navigate(a.getAttribute('href')); }));
+    a.addEventListener('click', (e) => { e.preventDefault(); window.yuvomi.navigate(a.getAttribute('href')); }));
 }
 
 export async function render(container) {
@@ -63,7 +63,7 @@ export async function render(container) {
       await auth.resetPassword(token, password);
       form.hidden = true;
       show(successEl, t('resetPassword.success'));
-      setTimeout(() => window.oikos.navigate('/login'), 1500);
+      setTimeout(() => window.yuvomi.navigate('/login'), 1500);
     } catch (err) {
       show(errorEl, t('resetPassword.invalidToken'));
       btn.disabled = false;

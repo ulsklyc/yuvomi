@@ -24,6 +24,11 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      # Bewusst /data/oikos.db: der oben gepinnte Image-Digest (0.66.0) enthält die
+      # oikos.db→yuvomi.db-Boot-Migration noch NICHT. Würde hier yuvomi.db stehen,
+      # bootete das alte Image gegen eine leere DB und ignorierte vorhandene Daten.
+      # Beim nächsten Image-Bump (auf eine migrations-fähige Version) migriert der
+      # Resolver oikos.db automatisch — dieser Pfad darf dann unverändert bleiben.
       - DB_PATH=/data/oikos.db
       - BACKUP_DIR=/backups
       # SESSION_SECRET is required; Umbrel injects a deterministic per-app secret.

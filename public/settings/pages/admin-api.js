@@ -145,7 +145,7 @@ function bindEvents(container, initialTokens) {
       output.hidden = false;
       outputValue.focus();
       outputValue.select();
-      window.oikos?.showToast(t('settings.apiTokenCreatedToast'), 'success');
+      window.yuvomi?.showToast(t('settings.apiTokenCreatedToast'), 'success');
     } catch (err) {
       showError(errorEl, err.message);
     } finally {
@@ -168,9 +168,9 @@ function bindEvents(container, initialTokens) {
         token.id === id ? { ...token, revoked_at: new Date().toISOString() } : token
       ));
       renderApiTokenList(container, tokens);
-      window.oikos?.showToast(t('settings.apiTokenRevokedToast'), 'default');
+      window.yuvomi?.showToast(t('settings.apiTokenRevokedToast'), 'default');
     } catch (err) {
-      window.oikos?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   });
 }

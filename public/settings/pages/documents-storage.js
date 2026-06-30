@@ -15,7 +15,7 @@ function formatSyncTime(value) {
 }
 
 function showToast(message, tone = 'default') {
-  window.oikos?.showToast(message, tone);
+  window.yuvomi?.showToast(message, tone);
 }
 
 function documentStorageTarget(data) {

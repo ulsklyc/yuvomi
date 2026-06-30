@@ -1231,7 +1231,7 @@ function buildOpenApiSpec(req, appVersion) {
         cookieAuth: {
           type: 'apiKey',
           in: 'cookie',
-          name: 'oikos.sid',
+          name: 'yuvomi.sid',
           description: 'Browser session cookie. State-changing requests also require `X-CSRF-Token`.',
         },
       },
