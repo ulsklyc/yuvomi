@@ -148,8 +148,9 @@ async function syncOne(sub) {
     db.get().transaction(() => {
       for (const ev of flatEvents) {
         try {
+          // Event-Eigenfarbe (RFC 7986) hat Vorrang, sonst die Abo-Farbe.
           upsert.run(ev.summary, ev.description, ev.dtstart, ev.dtend,
-            ev.allDay ? 1 : 0, ev.location, sub.color, ev.uid, sub.id, ev.rrule, createdBy);
+            ev.allDay ? 1 : 0, ev.location, ev.color || sub.color, ev.uid, sub.id, ev.rrule, createdBy);
         } catch (err) { log.error(`Upsert UID ${ev.uid}: ${err.message}`); }
       }
       deleteStale.run(sub.id, JSON.stringify([...seenUids]));

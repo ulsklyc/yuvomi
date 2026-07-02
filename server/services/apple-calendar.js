@@ -258,19 +258,26 @@ async function sync() {
       const parsed = parseICS(obj.data || '');
       for (const ev of parsed) {
         try {
+          // Event-Eigenfarbe (RFC 7986) hat Vorrang, sonst Kalenderfarbe.
+          const evColor = ev.color || calColor;
+
           const existing = db.get().prepare(
             `SELECT id FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'apple'`
           ).get(ev.uid);
 
           if (existing) {
+            // color nur überschreiben, solange der Nutzer nicht lokal umgefärbt
+            // hat (user_modified = 0); Titel/Zeit bleiben remote-geführt.
             db.get().prepare(`
               UPDATE calendar_events
               SET title = ?, description = ?, start_datetime = ?, end_datetime = ?,
-                  all_day = ?, location = ?, recurrence_rule = ?, color = ?, calendar_ref_id = ?
+                  all_day = ?, location = ?, recurrence_rule = ?,
+                  color = CASE WHEN user_modified = 0 THEN ? ELSE color END,
+                  calendar_ref_id = ?
               WHERE id = ?
             `).run(
               ev.summary, ev.description, ev.dtstart, ev.dtend,
-              ev.allDay ? 1 : 0, ev.location, ev.rrule, calColor, calRefId, existing.id
+              ev.allDay ? 1 : 0, ev.location, ev.rrule, evColor, calRefId, existing.id
             );
           } else {
             db.get().prepare(`
@@ -280,7 +287,7 @@ async function sync() {
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'apple', ?, ?, ?)
             `).run(
               ev.summary, ev.description, ev.dtstart, ev.dtend,
-              ev.allDay ? 1 : 0, ev.location, calColor, ev.uid, ev.rrule, calRefId, createdBy
+              ev.allDay ? 1 : 0, ev.location, evColor, ev.uid, ev.rrule, calRefId, createdBy
             );
           }
         } catch (err) {

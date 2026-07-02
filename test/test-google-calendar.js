@@ -14,7 +14,15 @@ const db = (await import('../server/db.js')).get();
 const { __test } = await import('../server/services/google-calendar.js');
 const { localEventToGoogle, googleAllDayEndToInclusive, localAllDayEndToExclusive,
         upsertGoogleEvents, upsertExternalCalendar,
-        setReadonly, isReadonly } = __test;
+        setReadonly, isReadonly, fetchEventColorMap } = __test;
+const { nearestColorId } = await import('../server/utils/ical-color.js');
+
+// Reale Google-Event-Palette (colors.get → event), Basis für Nearest-Match.
+const GOOGLE_EVENT_PALETTE = {
+  '1': '#A4BDFC', '2': '#7AE7BF', '3': '#DBADFF', '4': '#FF887C',
+  '5': '#FBD75B', '6': '#FFB878', '7': '#46D6DB', '8': '#E1E1E1',
+  '9': '#5484ED', '10': '#51B749', '11': '#DC2127',
+};
 
 let passed = 0;
 let failed = 0;
@@ -228,13 +236,63 @@ test('localEventToGoogle: getimtes UNTIL ohne Zeitteil wird zu UTC date-time', (
 });
 
 // --------------------------------------------------------
-// upsertGoogleEvents – Event-Farben über Syncs erhalten (Issue #219)
+// Outbound-Farbe: Hex → nächste Google-colorId (#427, Schritt 2)
 // --------------------------------------------------------
-console.log('\n[Google Calendar Test] upsertGoogleEvents – Farberhalt\n');
+test('nearestColorId: exakter Palettentreffer', () => {
+  assertEqual(nearestColorId('#DC2127', GOOGLE_EVENT_PALETTE), '11');
+});
+
+test('nearestColorId: minimal verschobene Farbe trifft dieselbe ID', () => {
+  assertEqual(nearestColorId('#DD2228', GOOGLE_EVENT_PALETTE), '11');
+});
+
+test('nearestColorId: Yuvomi-Preset-Blau → Blueberry (9)', () => {
+  assertEqual(nearestColorId('#007AFF', GOOGLE_EVENT_PALETTE), '9');
+});
+
+test('nearestColorId: leere Palette → null', () => {
+  assertEqual(nearestColorId('#007AFF', {}), null);
+});
+
+test('nearestColorId: ungültiges Ziel-Hex → null', () => {
+  assertEqual(nearestColorId('nicht-hex', GOOGLE_EVENT_PALETTE), null);
+});
+
+test('localEventToGoogle: event.color wird zur nächsten colorId', () => {
+  const g = localEventToGoogle(
+    { title: 'Rot', all_day: 1, start_datetime: '2026-06-03', color: '#DC2127' },
+    GOOGLE_EVENT_PALETTE
+  );
+  assertEqual(g.colorId, '11');
+});
+
+test('localEventToGoogle: ohne Palette bleibt colorId ungesetzt', () => {
+  const g = localEventToGoogle(
+    { title: 'Rot', all_day: 1, start_datetime: '2026-06-03', color: '#DC2127' },
+    {}
+  );
+  assertEqual(g.colorId, undefined);
+});
+
+test('localEventToGoogle: ohne event.color bleibt colorId ungesetzt', () => {
+  const g = localEventToGoogle(
+    { title: 'Farblos', all_day: 1, start_datetime: '2026-06-03' },
+    GOOGLE_EVENT_PALETTE
+  );
+  assertEqual(g.colorId, undefined);
+});
+
+// --------------------------------------------------------
+// upsertGoogleEvents – Event-Farbsync + user_modified-Gate (Issue #219, #427)
+// --------------------------------------------------------
+console.log('\n[Google Calendar Test] upsertGoogleEvents – Farbsync\n');
 
 // Seed-User (created_by = 1 in upsertGoogleEvents)
 db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
   VALUES ('admin', 'Admin', 'x', 'admin')`).run();
+
+// colorId → Hex, wie fetchEventColorMap es aus colors.get aufbaut.
+const COLOR_MAP = { '6': '#FFA500', '10': '#00FF00' };
 
 const gEvent = {
   id: 'evt-color-219',
@@ -244,37 +302,66 @@ const gEvent = {
   end:   { dateTime: '2026-06-03T11:00:00Z' },
 };
 
-test('Erst-Import setzt die Kalenderfarbe als Default', () => {
+test('Erst-Import ohne colorId setzt die Kalenderfarbe als Default', () => {
   const calRefId = upsertExternalCalendar('google', 'primary', 'Mein Kalender', '#FF0000');
-  upsertGoogleEvents([gEvent], calRefId, '#FF0000');
+  upsertGoogleEvents([gEvent], calRefId, '#FF0000', COLOR_MAP);
   const row = db.prepare(
     'SELECT color FROM calendar_events WHERE external_calendar_id = ?'
   ).get(gEvent.id);
   assertEqual(row.color, '#FF0000');
 });
 
-test('Re-Sync überschreibt benutzerdefinierte Event-Farbe NICHT', () => {
-  // Nutzer ändert die Event-Farbe
-  db.prepare('UPDATE calendar_events SET color = ? WHERE external_calendar_id = ?')
-    .run('#00FF00', gEvent.id);
-  // Erneuter Sync mit unveränderter Kalenderfarbe
+test('colorId wird zur Event-Eigenfarbe aufgelöst (#427)', () => {
+  const colored = { ...gEvent, id: 'evt-colorid', colorId: '6' };
   const calRefId = upsertExternalCalendar('google', 'primary', 'Mein Kalender', '#FF0000');
-  upsertGoogleEvents([gEvent], calRefId, '#FF0000');
+  upsertGoogleEvents([colored], calRefId, '#FF0000', COLOR_MAP);
+  const row = db.prepare(
+    'SELECT color FROM calendar_events WHERE external_calendar_id = ?'
+  ).get('evt-colorid');
+  assertEqual(row.color, '#FFA500', 'colorId 6 muss auf den Paletten-Hex gemappt werden');
+});
+
+test('Unbekannte colorId fällt auf die Kalenderfarbe zurück', () => {
+  const colored = { ...gEvent, id: 'evt-colorid-unknown', colorId: '99' };
+  const calRefId = upsertExternalCalendar('google', 'primary', 'Mein Kalender', '#FF0000');
+  upsertGoogleEvents([colored], calRefId, '#FF0000', COLOR_MAP);
+  const row = db.prepare(
+    'SELECT color FROM calendar_events WHERE external_calendar_id = ?'
+  ).get('evt-colorid-unknown');
+  assertEqual(row.color, '#FF0000');
+});
+
+test('Re-Sync übernimmt geänderte Google-Farbe, solange user_modified = 0', () => {
+  const recolored = { ...gEvent, colorId: '10' };
+  const calRefId = upsertExternalCalendar('google', 'primary', 'Mein Kalender', '#FF0000');
+  upsertGoogleEvents([recolored], calRefId, '#FF0000', COLOR_MAP);
   const row = db.prepare(
     'SELECT color FROM calendar_events WHERE external_calendar_id = ?'
   ).get(gEvent.id);
-  assertEqual(row.color, '#00FF00', 'Benutzerfarbe muss über den Sync hinweg erhalten bleiben');
+  assertEqual(row.color, '#00FF00', 'Remote-Farbänderung muss ohne lokalen Override durchkommen');
 });
 
-test('Re-Sync aktualisiert weiterhin die übrigen Felder', () => {
+test('Re-Sync überschreibt Farbe NICHT nach lokalem Umfärben (user_modified = 1)', () => {
+  // Nutzer ändert die Event-Farbe – die App setzt dabei user_modified = 1.
+  db.prepare('UPDATE calendar_events SET color = ?, user_modified = 1 WHERE external_calendar_id = ?')
+    .run('#0000FF', gEvent.id);
+  const calRefId = upsertExternalCalendar('google', 'primary', 'Mein Kalender', '#FF0000');
+  upsertGoogleEvents([gEvent], calRefId, '#FF0000', COLOR_MAP);
+  const row = db.prepare(
+    'SELECT color FROM calendar_events WHERE external_calendar_id = ?'
+  ).get(gEvent.id);
+  assertEqual(row.color, '#0000FF', 'Benutzerfarbe muss über den Sync hinweg erhalten bleiben');
+});
+
+test('Re-Sync aktualisiert übrige Felder, Farbschutz bei user_modified = 1 bleibt', () => {
   const updated = { ...gEvent, summary: 'Team-Meeting (verschoben)' };
   const calRefId = upsertExternalCalendar('google', 'primary', 'Mein Kalender', '#FF0000');
-  upsertGoogleEvents([updated], calRefId, '#FF0000');
+  upsertGoogleEvents([updated], calRefId, '#FF0000', COLOR_MAP);
   const row = db.prepare(
     'SELECT title, color FROM calendar_events WHERE external_calendar_id = ?'
   ).get(gEvent.id);
   assertEqual(row.title, 'Team-Meeting (verschoben)');
-  assertEqual(row.color, '#00FF00', 'Farbe bleibt trotz Titeländerung erhalten');
+  assertEqual(row.color, '#0000FF', 'Farbe bleibt trotz Titeländerung erhalten');
 });
 
 // --------------------------------------------------------
@@ -311,6 +398,41 @@ test('isReadonly: true nach setReadonly(true)', () => {
   setReadonly(true);
   assert(isReadonly(), 'isReadonly() muss true sein');
   setReadonly(false); // aufräumen
+});
+
+// --------------------------------------------------------
+// fetchEventColorMap – Palette-Cache (Optimierung)
+// --------------------------------------------------------
+async function testAsync(name, fn) {
+  try { await fn(); console.log(`  ✓ ${name}`); passed++; }
+  catch (err) { console.error(`  ✗ ${name}: ${err.message}`); failed++; }
+}
+
+console.log('\n[Google Calendar Test] fetchEventColorMap – Palette-Cache\n');
+
+// Muss VOR dem Erfolgsfall laufen, solange der Modul-Cache noch leer ist.
+await testAsync('Fehler ohne vorhandenen Cache → leeres Objekt', async () => {
+  const failing = { colors: { get: async () => { throw new Error('boom'); } } };
+  const map = await fetchEventColorMap(failing);
+  assertEqual(Object.keys(map).length, 0);
+});
+
+let paletteCalls = 0;
+const okCalendar = { colors: { get: async () => {
+  paletteCalls++;
+  return { data: { event: { '11': { background: '#dc2127' } } } };
+} } };
+
+await testAsync('Erster Aufruf lädt die Palette und normalisiert auf Uppercase', async () => {
+  const map = await fetchEventColorMap(okCalendar);
+  assertEqual(map['11'], '#DC2127');
+  assertEqual(paletteCalls, 1);
+});
+
+await testAsync('Zweiter Aufruf trifft den Cache (kein weiterer colors.get)', async () => {
+  const map = await fetchEventColorMap(okCalendar);
+  assertEqual(map['11'], '#DC2127');
+  assertEqual(paletteCalls, 1, 'colors.get darf innerhalb der TTL nicht erneut aufgerufen werden');
 });
 
 // --------------------------------------------------------

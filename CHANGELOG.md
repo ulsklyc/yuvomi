@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.84.0] - 2026-07-02
+
+### Added
+- **Calendar event colors now sync per event (Discussion #427)** — Google Calendar event colors are shown in Yuvomi, and per-event colors are also read from CalDAV, Apple, and ICS calendars (iCalendar `COLOR`, RFC 7986); an event without its own color still inherits its calendar's color. When a local event is pushed out to Google, its color is mapped to the nearest of Google's event colors.
+
+### Fixed
+- **CalDAV and Apple syncs no longer discard an event color you set in Yuvomi** — previously every resync overwrote it with the calendar color. A resync now only updates the color of events you haven't recolored yourself, matching how Google and ICS calendars already behaved.
+
 ## [0.83.1] - 2026-07-02
 
 ### Added

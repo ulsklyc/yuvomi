@@ -1,4 +1,5 @@
 import { unfoldLines, unescapeICSText, parseICS, parseVTODO, expandRRULE } from '../server/services/ics-parser.js';
+import { resolveIcalColor } from '../server/utils/ical-color.js';
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -183,6 +184,66 @@ test('parseVTODO: DUE mit VALUE=DATE bleibt reines Datum', () => {
     + 'DUE;VALUE=DATE:20260615\r\nEND:VTODO\r\nEND:VCALENDAR';
   const [t] = parseVTODO(ics);
   assert(t.due === '2026-06-15', `due: ${t.due}`);
+});
+
+// --------------------------------------------------------
+// resolveIcalColor + COLOR-Property (RFC 7986)
+// --------------------------------------------------------
+test('resolveIcalColor: CSS3-Name → Hex', () => {
+  assert(resolveIcalColor('cornflowerblue') === '#6495ED', resolveIcalColor('cornflowerblue'));
+});
+
+test('resolveIcalColor: Groß-/Kleinschreibung und Whitespace egal', () => {
+  assert(resolveIcalColor('  Tomato  ') === '#FF6347', resolveIcalColor('  Tomato  '));
+});
+
+test('resolveIcalColor: grey/gray-Synonym', () => {
+  assert(resolveIcalColor('grey') === '#808080', 'grey');
+});
+
+test('resolveIcalColor: Hex direkt wird durchgereicht (uppercase)', () => {
+  assert(resolveIcalColor('#a4bdfc') === '#A4BDFC', resolveIcalColor('#a4bdfc'));
+});
+
+test('resolveIcalColor: #RGB-Kurzform wird expandiert', () => {
+  assert(resolveIcalColor('#0f0') === '#00FF00', resolveIcalColor('#0f0'));
+});
+
+test('resolveIcalColor: optionaler Parameter hinter dem Namen wird abgeschnitten', () => {
+  assert(resolveIcalColor('red;X-FOO=bar') === '#FF0000', resolveIcalColor('red;X-FOO=bar'));
+});
+
+test('resolveIcalColor: unbekannter Name → null', () => {
+  assert(resolveIcalColor('notacolor') === null, 'unknown');
+});
+
+test('resolveIcalColor: leer/kein String → null', () => {
+  assert(resolveIcalColor('') === null && resolveIcalColor(null) === null
+    && resolveIcalColor(undefined) === null, 'empty');
+});
+
+test('parseICS: COLOR-Property wird zur Event-Eigenfarbe', () => {
+  const ics = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:col@x\r\nSUMMARY:Bunt\r\n'
+    + 'DTSTART:20260615T140000Z\r\nDTEND:20260615T150000Z\r\nCOLOR:cornflowerblue\r\nEND:VEVENT\r\nEND:VCALENDAR';
+  const [ev] = parseICS(ics);
+  assert(ev.color === '#6495ED', `color: ${ev.color}`);
+});
+
+test('parseICS: fehlende COLOR-Property → color null', () => {
+  const ics = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:nocol@x\r\nSUMMARY:Neutral\r\n'
+    + 'DTSTART:20260615T140000Z\r\nDTEND:20260615T150000Z\r\nEND:VEVENT\r\nEND:VCALENDAR';
+  const [ev] = parseICS(ics);
+  assert(ev.color === null, `color: ${ev.color}`);
+});
+
+test('expandRRULE: Event-Eigenfarbe wird auf alle Instanzen übertragen', () => {
+  const ics = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:colrec@x\r\nSUMMARY:Serie\r\n'
+    + 'DTSTART:20260601T090000Z\r\nDTEND:20260601T100000Z\r\nCOLOR:tomato\r\n'
+    + 'RRULE:FREQ=DAILY;COUNT=3\r\nEND:VEVENT\r\nEND:VCALENDAR';
+  const [vevent] = parseICS(ics);
+  const occ = expandRRULE(vevent, '2026-06-01', '2026-06-10');
+  assert(occ.length === 3, `count: ${occ.length}`);
+  assert(occ.every((o) => o.color === '#FF6347'), 'all instances keep the color');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

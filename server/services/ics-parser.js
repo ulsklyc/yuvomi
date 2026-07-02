@@ -6,6 +6,7 @@
  */
 
 import { nextOccurrence } from './recurrence.js';
+import { resolveIcalColor } from '../utils/ical-color.js';
 
 function unfoldLines(ics) {
   return ics.replace(/\r?\n[ \t]/g, '');
@@ -37,6 +38,8 @@ function parseICS(ics) {
     const description = unescapeICSText(get('DESCRIPTION')) || null;
     const location    = unescapeICSText(get('LOCATION'))    || null;
     const rrule       = get('RRULE')       ? `RRULE:${get('RRULE')}` : null;
+    // RFC 7986: COLOR trägt einen CSS3-Namen (oder Hex) für die Event-Eigenfarbe.
+    const color       = resolveIcalColor(get('COLOR'));
     const parseDTLine = (prop) => {
       const re = new RegExp(`^${prop}((?:;[^:;]*)*):(.*)$`, 'im');
       const m = block.match(re);
@@ -63,7 +66,7 @@ function parseICS(ics) {
       if (durMatch) dtend = applyDuration(dtstart, durMatch[1].trim(), allDay);
     }
     if (!uid || !dtstart) continue;
-    events.push({ uid, summary, description, location, dtstart, dtend, rrule, allDay });
+    events.push({ uid, summary, description, location, dtstart, dtend, rrule, allDay, color });
   }
   return events;
 }
@@ -191,6 +194,7 @@ function expandRRULE(vevent, windowStart, windowEnd) {
         uid: `${vevent.uid}__${current}`, summary: vevent.summary,
         description: vevent.description, location: vevent.location,
         dtstart: occStart, dtend: occEnd, rrule: null, allDay: vevent.allDay,
+        color: vevent.color,
       });
     }
     const next = nextOccurrence(current, vevent.rrule);
