@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.83.1] - 2026-07-02
+
+### Added
+- **ZAR (South African Rand)** added to the currency list — Budget subscriptions, split expenses, and household base currency now accept ZAR alongside the existing currencies.
+
 ## [0.83.0] - 2026-07-01
 
 ### Added
