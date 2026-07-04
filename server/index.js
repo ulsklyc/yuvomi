@@ -25,6 +25,7 @@ import { startScheduler as startBackupScheduler } from './services/backup-schedu
 import { startScheduler as startSplitExpenseScheduler } from './services/split-expenses-scheduler.js';
 import { startScheduler as startPushScheduler } from './services/push-scheduler.js';
 import { startScheduler as startMedicationScheduler } from './services/medication-scheduler.js';
+import { emailService } from './services/email.js';
 import dashboardRouter from './routes/dashboard.js';
 import tasksRouter from './routes/tasks.js';
 import shoppingRouter from './routes/shopping.js';
@@ -224,10 +225,22 @@ function buildVersionPayload(includeVersion = false) {
     // Fail-safe: bei DB-Fehler kein Setup erzwingen
     setupRequired = false;
   }
+  // Password reset can only deliver when SMTP is configured AND an explicit
+  // BASE_URL origin is set (the request Host is deliberately not trusted, to
+  // prevent reset poisoning). Expose the capability so the login page can gate
+  // the "forgot password" affordance instead of offering a dead end.
+  let passwordResetEnabled = false;
+  try {
+    passwordResetEnabled = emailService.isConfigured()
+      && Boolean(String(process.env.BASE_URL || '').trim());
+  } catch {
+    passwordResetEnabled = false;
+  }
   return {
     ...(includeVersion ? { version: APP_VERSION } : {}),
     app_name: appName,
     setup_required: setupRequired,
+    password_reset_enabled: passwordResetEnabled,
   };
 }
 

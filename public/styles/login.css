@@ -46,6 +46,28 @@
   margin-bottom: var(--space-8);
 }
 
+/* Marken-Anker: App-Tile mit Home-Glyph. Selbstbewusst (gefülltes Tile,
+ * weicher Schatten) und warm (gerundet, Home-Zeichen) – „Würde ohne Kälte". */
+.login-hero__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-16);
+  height: var(--space-16);
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-accent);
+  color: var(--color-text-on-accent);
+  box-shadow:
+    var(--shadow-md),
+    inset 0 1px 0 color-mix(in srgb, var(--color-text-on-accent) 22%, transparent);
+}
+
+.login-hero__mark svg {
+  width: 55%;
+  height: 55%;
+}
+
 .login-hero__title {
   font-size: var(--type-login-hero-size);
   font-weight: var(--font-weight-bold);
@@ -87,10 +109,30 @@
 
 .login-version {
   margin-top: var(--space-4);
+  /* Platz reservieren, damit die spät nachgeladene Version das zentrierte
+   * Formular nicht nach oben schiebt (CLS). */
+  min-height: var(--text-sm);
   font-size: var(--text-xs);
   color: var(--color-text-tertiary, var(--color-text-secondary));
   text-align: center;
-  opacity: 0.6;
+}
+
+/* „oder"-Trenner zwischen Passwort- und SSO-Anmeldung */
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background-color: var(--color-border);
 }
 
 /* Passwort-Sichtbarkeit-Toggle */

@@ -33,6 +33,13 @@ export async function render(container) {
   container.insertAdjacentHTML('beforeend', `
     <main class="login-page" id="main-content">
       <div class="login-hero">
+        <span class="login-hero__mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 11 L12 4 L20 11" />
+            <path d="M6 10 V19 a1 1 0 0 0 1 1 H17 a1 1 0 0 0 1 -1 V10" />
+            <path d="M10 20 V15 a1 1 0 0 1 1 -1 H13 a1 1 0 0 1 1 1 V20" />
+          </svg>
+        </span>
         <h1 class="login-hero__title">${esc(storedAppName)}</h1>
         <p class="login-hero__tagline">${esc(t('login.tagline'))}</p>
       </div>
@@ -72,7 +79,7 @@ export async function render(container) {
           <button type="submit" class="btn btn--primary login-form__submit" id="login-btn">
             <span class="login-btn__label">${esc(t('login.loginButton'))}</span>
           </button>
-          <p class="login-form__forgot">
+          <p class="login-form__forgot" hidden>
             <a href="/forgot-password" data-link>${esc(t('login.forgotPassword'))}</a>
           </p>
         </form>
@@ -128,7 +135,15 @@ export async function render(container) {
     .then((d) => {
       if (d?.app_name) {
         try { localStorage.setItem(APP_NAME_STORAGE_KEY, d.app_name); } catch (_) {}
-        setAppBranding(d.app_name);
+        // Nur neu anwenden, wenn sich der Name tatsächlich geändert hat –
+        // verhindert ein sichtbares Titel-Flackern bei jedem Aufruf.
+        if (d.app_name !== storedAppName) setAppBranding(d.app_name);
+      }
+      // „Passwort vergessen?" wie SSO gaten: nur anbieten, wenn der Server eine
+      // Reset-Mail tatsächlich zustellen kann (SMTP + BASE_URL). Sonst Sackgasse.
+      if (d?.password_reset_enabled) {
+        const forgot = container.querySelector('.login-form__forgot');
+        if (forgot) forgot.hidden = false;
       }
       versionEl.textContent = d?.version ? t('login.version', { version: d.version }) : '';
     })
@@ -140,8 +155,6 @@ export async function render(container) {
     .then(data => {
       if (!data?.enabled) return;
 
-      const card = container.querySelector('.login-card');
-
       const divider = document.createElement('div');
       divider.className = 'login-divider';
       divider.textContent = t('login.orDivider');
@@ -151,8 +164,11 @@ export async function render(container) {
       ssoBtn.className = 'btn btn--secondary login-form__submit';
       ssoBtn.textContent = t('login.loginWithSso');
 
-      card.appendChild(divider);
-      card.appendChild(ssoBtn);
+      // Die beiden Anmeldewege (Passwort + SSO) gehören zusammen; der Recovery-
+      // Link steht unter beiden. Deshalb vor dem Forgot-Absatz einfügen.
+      const forgot = form.querySelector('.login-form__forgot');
+      form.insertBefore(divider, forgot);
+      form.insertBefore(ssoBtn, forgot);
     })
     .catch(() => {});
 

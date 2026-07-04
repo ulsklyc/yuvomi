@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.92.3] - 2026-07-04
+
+### Added
+- **Login brand mark** — the login page now shows an app-tile mark with a home glyph above the wordmark, giving the sign-in screen a clear, warm identity instead of a plain text heading.
+
+### Changed
+- **"Forgot password" link no longer a dead end** — the link now appears only when the server can actually deliver a reset mail (SMTP configured and `BASE_URL` set); on instances without email it is hidden entirely rather than leading to a flow that sends nothing. A new `password_reset_enabled` flag on `GET /api/v1/version` drives this.
+- **Login sign-in order** — the SSO button and its "or" divider now sit between the primary "Sign in" button and the "Forgot password" link, keeping the two sign-in paths together.
+
+### Fixed
+- **Login page layout stability** — reserved space for the version line and only re-apply app-name branding when it actually changes, reducing layout shift on load; also improved the version text contrast.
+
 ## [0.92.2] - 2026-07-04
 
 ### Changed

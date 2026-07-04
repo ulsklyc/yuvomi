@@ -443,8 +443,10 @@ in Settings → Administration → Email (non-empty env values here override the
 | `EMAIL_FROM_NAME` | Sender display name. | `Yuvomi` | No |
 | `BASE_URL` | Absolute origin used to build password-reset links and calendar export-feed URLs, e.g. `https://yuvomi.example.com`. **Required for reset emails to be sent** — the request `Host` header is never trusted as a fallback, to prevent reset-link poisoning. The export feed falls back to the request's protocol/host when unset. | - | No* |
 
-\* Not required to start Yuvomi, but without it the "Forgot password" flow silently sends no email
-even when SMTP is otherwise configured.
+\* Not required to start Yuvomi. Without it (or without SMTP configured) the self-service reset
+cannot deliver a mail, so the login page hides the "Forgot password" link entirely rather than
+offering a dead end — an admin can still reset a member's password directly under
+Settings → Administration → Family.
 
 The "Test connection" button in Settings → Administration → Email verifies the SMTP connection and
 sends a probe email to the signed-in admin's own linked address. The SMTP password is never

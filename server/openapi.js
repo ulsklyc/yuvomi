@@ -1674,8 +1674,14 @@ function buildOpenApiSpec(req, appVersion) {
             version: { type: 'string' },
             app_name: { type: 'string' },
             setup_required: { type: 'boolean' },
+            password_reset_enabled: {
+              type: 'boolean',
+              description: 'True when self-service password reset can actually deliver a mail '
+                + '(SMTP configured AND BASE_URL set). The login page gates the "forgot password" '
+                + 'link on this flag so it is never a dead end.',
+            },
           },
-          required: ['app_name', 'setup_required'],
+          required: ['app_name', 'setup_required', 'password_reset_enabled'],
         },
         User: {
           type: 'object',
