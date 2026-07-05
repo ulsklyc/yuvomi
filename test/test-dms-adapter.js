@@ -113,6 +113,39 @@ test('testConnection: ok=false bei 403', async () => {
   assert.equal(out.status, 403);
 });
 
+test('testConnection: fordert explizite API-Version im Accept-Header an', async () => {
+  mockFetch(() => jsonResponse({}));
+  const adapter = new PaperlessAdapter(account);
+  await adapter.testConnection();
+  assert.match(calls[0].opts.headers.Accept, /application\/json; version=\d+/);
+});
+
+test('testConnection: 406 löst Fallback ohne Version aus (#438)', async () => {
+  mockFetch((_url, opts) => {
+    const hasVersion = /version=/.test(opts.headers.Accept);
+    return jsonResponse(hasVersion ? { detail: 'Not Acceptable' } : { documents: 'x' }, hasVersion ? 406 : 200);
+  });
+  const adapter = new PaperlessAdapter(account);
+  const out = await adapter.testConnection();
+  assert.equal(calls.length, 2);
+  assert.match(calls[0].opts.headers.Accept, /version=/);
+  assert.equal(calls[1].opts.headers.Accept, 'application/json');
+  assert.equal(out.ok, true);
+  assert.equal(out.status, 200);
+});
+
+test('search: 406 auf versionierten Request fällt auf unversioniert zurück (#438)', async () => {
+  mockFetch((_url, opts) => {
+    if (/version=/.test(opts.headers.Accept)) return jsonResponse({ detail: 'Not Acceptable' }, 406);
+    return jsonResponse({ results: [{ id: 5, title: 'Vertrag', original_file_name: 'v.pdf' }] });
+  });
+  const adapter = new PaperlessAdapter(account);
+  const results = await adapter.search('vertrag');
+  assert.equal(calls.length, 2);
+  assert.equal(results.length, 1);
+  assert.equal(results[0].id, '5');
+});
+
 test('upload: POSTet multipart an post_document/, gibt taskId zurück', async () => {
   mockFetch(() => jsonResponse('b7c4-task-uuid'));
   const adapter = new PaperlessAdapter(account);

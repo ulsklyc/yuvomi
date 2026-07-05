@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.96.2] - 2026-07-05
+
+### Fixed
+- **Paperless-ngx DMS connection failing with 406** — linking and testing a Paperless-ngx account no longer fails with an "unexpected error" / HTTP 406. The adapter now negotiates the Paperless REST API with an explicit supported `Accept` version header and transparently falls back to the unversioned default for older instances that do not know that version. No extra environment variables are required.
+
 ## [0.96.1] - 2026-07-05
 
 ### Fixed
