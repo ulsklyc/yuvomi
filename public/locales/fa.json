@@ -176,7 +176,8 @@
         "housekeepingLastVisit": "آخرین بازدید: {{date}}",
         "housekeepingNoVisits": "هنوز بازدیدی نیست",
         "housekeepingVisitsMonth": "{{count}} بازدید این ماه",
-        "housekeepingUnpaid": "{{amount}} پرداخت‌نشده"
+        "housekeepingUnpaid": "{{amount}} پرداخت‌نشده",
+        "widgetError": "بارگذاری نشد"
     },
     "tasks": {
         "title": "کارها",

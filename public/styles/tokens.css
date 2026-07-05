@@ -135,9 +135,13 @@
   --color-accent-active:      var(--_color-accent-active);  /* Violet-800 */
   --color-accent-deep:        #3d1f9e;       /* Tiefer Akzent für Gradienten, Wetter-Widget */
 
-  /* Greeting-Gradienten: Tageszeit-Varianten */
+  /* Greeting-Gradienten: Tageszeit-Varianten (der eine sanktionierte Zwei-Stopp-
+   * Verlauf pro Screen, DESIGN.md §2). Alle Stops ≥3:1 auf --color-surface → als
+   * großer, fetter Hero-Text WCAG-AA. */
   --greeting-morning-from: #C2410C;  /* Orange-700 — Morgensonne */
   --greeting-morning-to:   #D97706;  /* Amber-600 */
+  --greeting-day-from:     #B45309;  /* Amber-700 — hohe Mittagssonne (4.8:1 auf Weiß) */
+  --greeting-day-to:       #C2410C;  /* Orange-700 (4.5:1) — beide Stops komfortabel AA, kein grenzwertiger Pixel */
   --greeting-evening-from: #6D28D9;  /* Violet-700 */
   --greeting-evening-to:   #8250DF;  /* = --module-calendar */
   --_color-accent-secondary:  #8b5cf6;
@@ -669,6 +673,14 @@
     --_module-reminders:   #22D3EE;   /* Cyan-400 */
     --_module-rewards:     #E68CA6;   /* Rosé-Kupfer — Dark-Override (7.0:1 auf #1C1C1A) */
 
+    /* Greeting-Gradienten Dark: hellere/höher-chromatische Stops (≥5.5:1 auf #1C1C1A) */
+    --greeting-morning-from: #FB923C;  /* Orange-400 */
+    --greeting-morning-to:   #FBBF24;  /* Amber-400 */
+    --greeting-day-from:     #FBBF24;  /* Amber-400 */
+    --greeting-day-to:       #FCD34D;  /* Amber-300 */
+    --greeting-evening-from: #a78bfa;  /* Violet-400 = --module-dashboard dark */
+    --greeting-evening-to:   #818CF8;  /* = --module-calendar dark */
+
     --_meal-breakfast:       #F59E0B;
     --_meal-breakfast-light: #332400;
     --_meal-lunch:           #4ADE80;
@@ -792,6 +804,15 @@
     --_module-documents:   #7E9BCC;   /* Stahlblau — Dark-Override (vorher fehlend, erbte 2.38:1) */
     --_module-housekeeping: #C4B5FD;
     --_module-health:      #DB60CB;   /* Beeren-Fuchsia — Dark-Override (5.3:1 auf #1C1C1A, ≥20° zu birthdays/shopping dark) */
+
+    /* Greeting-Gradienten Dark: hellere/höher-chromatische Stops (≥5.5:1 auf #1C1C1A) */
+    --greeting-morning-from: #FB923C;
+    --greeting-morning-to:   #FBBF24;
+    --greeting-day-from:     #FBBF24;
+    --greeting-day-to:       #FCD34D;
+    --greeting-evening-from: #a78bfa;
+    --greeting-evening-to:   #818CF8;
+
     --_module-settings:    #94A3B8;
     --_module-reminders:   #22D3EE;   /* Cyan-400 */
     --_module-rewards:     #E68CA6;   /* Rosé-Kupfer — Dark-Override (7.0:1 auf #1C1C1A) */

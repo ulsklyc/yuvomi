@@ -170,7 +170,8 @@
         "housekeepingLastVisit": "آخر زيارة: {{date}}",
         "housekeepingNoVisits": "لا زيارات بعد",
         "housekeepingVisitsMonth": "{{count}} زيارة هذا الشهر",
-        "housekeepingUnpaid": "{{amount}} مستحقة"
+        "housekeepingUnpaid": "{{amount}} مستحقة",
+        "widgetError": "تعذّر التحميل"
     },
     "tasks": {
         "title": "المهام",

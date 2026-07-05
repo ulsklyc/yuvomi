@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.96.4] - 2026-07-05
+
+### Added
+- **Time-of-day greeting on the dashboard** — the personal greeting now carries a warm gradient that shifts with the time of day (sunrise orange in the morning, deep amber at midday, violet in the evening), with solid-color fallbacks when reduced transparency or higher contrast is preferred.
+- **Auto-hiding quick-action button** — the floating "+" button on the dashboard slides out of the way as you scroll down and returns when you scroll up, so it no longer covers a widget's "All" shortcut on small screens.
+
+### Changed
+- **Per-widget error handling on the dashboard** — if a single widget's data fails to load, only that widget shows an inline error with a "Retry" button; the rest of the dashboard stays usable instead of failing as a whole.
+- **Custom widget order is preserved** — a dashboard you have re-ordered yourself is no longer re-packed automatically, while the default layout still packs tightly to avoid empty gaps on wide screens.
+- **Simpler widget sizes** — the widget size picker now offers four clear presets; layouts using older sizes are mapped to the nearest one.
+
+### Fixed
+- **Budget widget footer** — no longer shows a misleading "no budget data" message when budget data exists but no top spending category is available.
+
 ## [0.96.3] - 2026-07-05
 
 ### Fixed

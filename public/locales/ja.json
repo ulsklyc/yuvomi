@@ -170,7 +170,8 @@
         "housekeepingLastVisit": "前回: {{date}}",
         "housekeepingNoVisits": "まだ訪問がありません",
         "housekeepingVisitsMonth": "今月 {{count}} 回訪問",
-        "housekeepingUnpaid": "{{amount}} 未払い"
+        "housekeepingUnpaid": "{{amount}} 未払い",
+        "widgetError": "読み込めませんでした"
     },
     "tasks": {
         "title": "タスク",

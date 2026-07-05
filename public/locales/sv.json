@@ -170,7 +170,8 @@
         "housekeepingLastVisit": "Senaste besök: {{date}}",
         "housekeepingNoVisits": "Inga besök än",
         "housekeepingVisitsMonth": "{{count}} besök denna månad",
-        "housekeepingUnpaid": "{{amount}} obetalt"
+        "housekeepingUnpaid": "{{amount}} obetalt",
+        "widgetError": "Kunde inte laddas"
     },
     "tasks": {
         "title": "Uppgifter",

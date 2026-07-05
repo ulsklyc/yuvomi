@@ -170,7 +170,8 @@
         "housekeepingLastVisit": "上次：{{date}}",
         "housekeepingNoVisits": "暂无到访",
         "housekeepingVisitsMonth": "本月 {{count}} 次到访",
-        "housekeepingUnpaid": "{{amount}} 待付"
+        "housekeepingUnpaid": "{{amount}} 待付",
+        "widgetError": "无法加载"
     },
     "tasks": {
         "title": "任务",

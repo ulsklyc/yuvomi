@@ -170,7 +170,8 @@
         "housekeepingLastVisit": "Última visita: {{date}}",
         "housekeepingNoVisits": "Ainda sem visitas",
         "housekeepingVisitsMonth": "{{count}} visitas este mês",
-        "housekeepingUnpaid": "{{amount}} em aberto"
+        "housekeepingUnpaid": "{{amount}} em aberto",
+        "widgetError": "Não foi possível carregar"
     },
     "tasks": {
         "title": "Tarefas",

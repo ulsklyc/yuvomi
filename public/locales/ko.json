@@ -176,7 +176,8 @@
         "housekeepingLastVisit": "마지막 방문: {{date}}",
         "housekeepingNoVisits": "아직 방문 없음",
         "housekeepingVisitsMonth": "이번 달 {{count}}회 방문",
-        "housekeepingUnpaid": "{{amount}} 미결제"
+        "housekeepingUnpaid": "{{amount}} 미결제",
+        "widgetError": "불러올 수 없습니다"
     },
     "tasks": {
         "title": "할 일",

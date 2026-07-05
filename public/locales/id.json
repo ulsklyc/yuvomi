@@ -176,7 +176,8 @@
         "housekeepingLastVisit": "Kunjungan terakhir: {{date}}",
         "housekeepingNoVisits": "Belum ada kunjungan",
         "housekeepingVisitsMonth": "{{count}} kunjungan bulan ini",
-        "housekeepingUnpaid": "{{amount}} belum dibayar"
+        "housekeepingUnpaid": "{{amount}} belum dibayar",
+        "widgetError": "Tidak dapat dimuat"
     },
     "tasks": {
         "title": "Tugas",

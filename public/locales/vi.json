@@ -170,7 +170,8 @@
         "housekeepingLastVisit": "Lần cuối: {{date}}",
         "housekeepingNoVisits": "Chưa có lượt nào",
         "housekeepingVisitsMonth": "{{count}} lượt tháng này",
-        "housekeepingUnpaid": "Còn nợ {{amount}}"
+        "housekeepingUnpaid": "Còn nợ {{amount}}",
+        "widgetError": "Không thể tải"
     },
     "tasks": {
         "title": "Nhiệm vụ",

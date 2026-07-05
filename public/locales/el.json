@@ -170,7 +170,8 @@
         "housekeepingLastVisit": "Τελευταία επίσκεψη: {{date}}",
         "housekeepingNoVisits": "Καμία επίσκεψη ακόμη",
         "housekeepingVisitsMonth": "{{count}} επισκέψεις αυτόν τον μήνα",
-        "housekeepingUnpaid": "{{amount}} οφειλόμενα"
+        "housekeepingUnpaid": "{{amount}} οφειλόμενα",
+        "widgetError": "Δεν ήταν δυνατή η φόρτωση"
     },
     "tasks": {
         "title": "Εργασίες",

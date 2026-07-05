@@ -170,7 +170,8 @@
         "housekeepingLastVisit": "Last visit: {{date}}",
         "housekeepingNoVisits": "No visits yet",
         "housekeepingVisitsMonth": "{{count}} visits this month",
-        "housekeepingUnpaid": "{{amount}} outstanding"
+        "housekeepingUnpaid": "{{amount}} outstanding",
+        "widgetError": "Couldn’t be loaded"
     },
     "tasks": {
         "title": "Tasks",

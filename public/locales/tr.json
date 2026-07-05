@@ -170,7 +170,8 @@
         "housekeepingLastVisit": "Son ziyaret: {{date}}",
         "housekeepingNoVisits": "Henüz ziyaret yok",
         "housekeepingVisitsMonth": "Bu ay {{count}} ziyaret",
-        "housekeepingUnpaid": "{{amount}} ödenmemiş"
+        "housekeepingUnpaid": "{{amount}} ödenmemiş",
+        "widgetError": "Yüklenemedi"
     },
     "tasks": {
         "title": "Görevler",

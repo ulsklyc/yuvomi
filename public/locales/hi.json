@@ -170,7 +170,8 @@
         "housekeepingLastVisit": "पिछली विज़िट: {{date}}",
         "housekeepingNoVisits": "अभी कोई विज़िट नहीं",
         "housekeepingVisitsMonth": "इस माह {{count}} विज़िट",
-        "housekeepingUnpaid": "{{amount}} बकाया"
+        "housekeepingUnpaid": "{{amount}} बकाया",
+        "widgetError": "लोड नहीं हो सका"
     },
     "tasks": {
         "title": "कार्य",

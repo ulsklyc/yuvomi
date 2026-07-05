@@ -16,7 +16,11 @@
  * -------------------------------------------------------- */
 .dashboard {
   padding: var(--space-4);
-  padding-bottom: var(--space-16);
+  /* FAB-Clearance: der schwebende FAB (52px, --space-6 über der Bottom-Nav) darf
+   * keinen Widget-Header-Link am unteren Rand verdecken. Das Scroll-Gutter reicht
+   * über die FAB-Höhe hinaus, damit die letzte Widget-Reihe frei über ihm liegt
+   * statt dahinter zu klemmen (Critique P1: FAB-Kollision, Mobile). */
+  padding-bottom: calc(52px + var(--space-6) * 2 + var(--space-4));
   max-width: var(--content-max-width);
   margin: 0 auto;
 }
@@ -24,7 +28,8 @@
 @media (min-width: 1024px) {
   .dashboard {
     padding: var(--space-6) var(--space-8);
-    padding-bottom: var(--space-12);
+    /* Desktop-FAB: 48px, --space-8 über dem Rand */
+    padding-bottom: calc(48px + var(--space-8) + var(--space-6));
   }
 }
 
@@ -94,9 +99,16 @@
     grid-template-columns: repeat(3, 1fr);
     grid-auto-rows: minmax(132px, auto);
     gap: var(--space-5);
-    /* Dense-Packing: kleine 1x1-Widgets füllen die Lücken, die breite 2x1/2x2-Kacheln
-     * im Auto-Placement hinterlassen — kein toter Weißraum mehr im Grid. */
+    /* Default (Autor-Layout): `dense` packt kleine Kacheln in die Lücken breiter
+     * Kacheln — kein toter Weißraum auf breitem Desktop. Sobald der Nutzer die
+     * Reihenfolge bewusst ändert, schaltet `.dashboard__grid--preserve-order` auf
+     * reines `row` um und bewahrt die gesetzte Ordnung (Critique P2). */
     grid-auto-flow: row dense;
+  }
+
+  /* Bewusst umsortiert oder im Bearbeiten-Modus: Quellordnung vor Lückenfüllung. */
+  .dashboard__grid--preserve-order {
+    grid-auto-flow: row;
   }
 
   .widget-size--2x1,
@@ -157,6 +169,12 @@
   .dashboard__grid {
     grid-template-columns: repeat(4, 1fr);
     grid-auto-flow: row dense;
+  }
+
+  /* Override hier wiederholen: sonst gewinnt die spätere `.dashboard__grid`-Regel
+   * bei gleicher Spezifität und packt umsortierte Layouts doch wieder dicht. */
+  .dashboard__grid--preserve-order {
+    grid-auto-flow: row;
   }
 
   .widget-size--1x1,
@@ -334,6 +352,17 @@
   flex-shrink: 0;
   color: var(--color-text-tertiary);
   opacity: 0.6;
+}
+
+/* Fehlerkachel eines einzelnen Widgets: dezent danger-getönter Rahmen, damit
+ * „kaputt" auf einen Blick von „leer" unterscheidbar ist, ohne zu schreien.
+ * Der Retry rutscht ans Zeilenende wie die Empty-State-CTA. */
+.widget--error {
+  border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
+}
+
+.widget__retry {
+  margin-inline-start: auto;
 }
 
 /* Aktivierungs-CTA im Empty-State: dezente Akzent-Affordance am Zeilenende,
@@ -1177,6 +1206,27 @@ svg.weather-forecast__icon {
   align-items: flex-end;
   gap: var(--space-3);
   pointer-events: none;
+  transition:
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Scroll-Ausblenden: gleitet nach unten aus dem Weg, damit der FAB keine Widget-
+ * Header-Links überdeckt/abfängt; kein Pointer-Fang, solange versteckt. */
+.fab-container--hidden {
+  transform: translateY(calc(100% + var(--nav-bottom-height) + var(--space-6)));
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fab-container {
+    transition: opacity 0.15s linear;
+  }
+  .fab-container--hidden {
+    transform: none;
+    opacity: 0;
+  }
 }
 
 @media (min-width: 1024px) {
@@ -1850,6 +1900,44 @@ svg.weather-forecast__icon {
   overflow-wrap: normal;
   word-break: normal;
   hyphens: manual;
+}
+
+/* Begrüßungs-Hero: der eine sanktionierte Zwei-Stopp-Verlauf pro Screen
+ * (DESIGN.md §2 „Greeting Gradients"). Tageszeit steuert die Stops; reiner
+ * Text-Clip, keine Flächenfüllung. Solid-Ink-Fallback für fehlende
+ * background-clip-Unterstützung, prefers-reduced-transparency und
+ * prefers-contrast: more — der Kopf muss ohne Verlauf voll lesbar bleiben. */
+.dashboard-overview__title--morning,
+.dashboard-overview__title--day,
+.dashboard-overview__title--evening {
+  background-image: linear-gradient(100deg, var(--greeting-from), var(--greeting-to));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.dashboard-overview__title--morning { --greeting-from: var(--greeting-morning-from); --greeting-to: var(--greeting-morning-to); }
+.dashboard-overview__title--day     { --greeting-from: var(--greeting-day-from);     --greeting-to: var(--greeting-day-to); }
+.dashboard-overview__title--evening { --greeting-from: var(--greeting-evening-from); --greeting-to: var(--greeting-evening-to); }
+
+@supports not ((background-clip: text) or (-webkit-background-clip: text)) {
+  .dashboard-overview__title--morning,
+  .dashboard-overview__title--day,
+  .dashboard-overview__title--evening {
+    background-image: none;
+    -webkit-text-fill-color: var(--color-text-primary);
+    color: var(--color-text-primary);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .dashboard-overview__title--morning,
+  .dashboard-overview__title--day,
+  .dashboard-overview__title--evening {
+    background-image: none;
+    -webkit-text-fill-color: var(--color-text-primary);
+    color: var(--color-text-primary);
+  }
 }
 
 .dashboard-overview__tools {

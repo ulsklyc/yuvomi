@@ -170,7 +170,8 @@
         "housekeepingLastVisit": "Dernière visite : {{date}}",
         "housekeepingNoVisits": "Aucune visite",
         "housekeepingVisitsMonth": "{{count}} visites ce mois-ci",
-        "housekeepingUnpaid": "{{amount}} à payer"
+        "housekeepingUnpaid": "{{amount}} à payer",
+        "widgetError": "Impossible à charger"
     },
     "tasks": {
         "title": "Tâches",

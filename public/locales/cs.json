@@ -170,7 +170,8 @@
         "housekeepingLastVisit": "Poslední návštěva: {{date}}",
         "housekeepingNoVisits": "Zatím žádné návštěvy",
         "housekeepingVisitsMonth": "{{count}} návštěv tento měsíc",
-        "housekeepingUnpaid": "{{amount}} k úhradě"
+        "housekeepingUnpaid": "{{amount}} k úhradě",
+        "widgetError": "Nepodařilo se načíst"
     },
     "tasks": {
         "title": "Úkoly",

@@ -170,7 +170,8 @@
         "housekeepingLastVisit": "Utolsó látogatás: {{date}}",
         "housekeepingNoVisits": "Még nincs látogatás",
         "housekeepingVisitsMonth": "{{count}} látogatás e hónapban",
-        "housekeepingUnpaid": "{{amount}} rendezendő"
+        "housekeepingUnpaid": "{{amount}} rendezendő",
+        "widgetError": "Nem sikerült betölteni"
     },
     "tasks": {
         "title": "Feladatok",

@@ -170,7 +170,8 @@
         "housekeepingLastVisit": "Laatste bezoek: {{date}}",
         "housekeepingNoVisits": "Nog geen bezoeken",
         "housekeepingVisitsMonth": "{{count}} bezoeken deze maand",
-        "housekeepingUnpaid": "{{amount}} openstaand"
+        "housekeepingUnpaid": "{{amount}} openstaand",
+        "widgetError": "Kon niet worden geladen"
     },
     "tasks": {
         "title": "Taken",

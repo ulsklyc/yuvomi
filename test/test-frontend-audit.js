@@ -1218,7 +1218,7 @@ test('dashboard polish keeps one page heading and native quick-action controls',
   const css = read('../public/styles/dashboard.css');
 
   assert.equal((dashboard.match(/<h1\b/g) || []).length, 1, 'dashboard must expose one h1');
-  assert.match(dashboard, /<h2 class="dashboard-overview__title">/);
+  assert.match(dashboard, /<h2 class="dashboard-overview__title(?: dashboard-overview__title--\$\{greetingPeriod\(\)\})?"/);
   assert.match(dashboard, /<button type="button" class="fab-action"/);
   assert.doesNotMatch(dashboard, /class="fab-action"[^>]*role="button"/);
   assert.doesNotMatch(dashboard, /<button class="fab-action__btn"/);

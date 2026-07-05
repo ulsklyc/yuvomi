@@ -169,13 +169,16 @@ function maybeHintCustomize(container) {
 // (weather) steht bewusst am Ende, statt die sichtbare Grid-Spitze zu belegen.
 const WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'budget', 'rewards', 'health', 'housekeeping', 'family', 'notes', 'weather'];
 
+// Vier kuratierte Formen statt sechs: über vier Auswahlmöglichkeiten pro Widget
+// (× bis zu 12 Widgets) kippt der Anpassen-Modus in Mikro-Entscheidungs-Overhead
+// für ein Familienpublikum (Critique P2, ≤4-Choices-Regel). Die früheren 3x2/4x2
+// bleiben als Legacy-Werte gültig (WIDGET_SIZE_OPTIONS) — bestehende Layouts werden
+// nicht zurückgesetzt, nur die Neu-Auswahl steuert auf diese vier zu.
 const WIDGET_SIZE_PRESETS = [
   { value: '1x1', labelKey: 'dashboard.widgetSizeTiny'     },
   { value: '2x1', labelKey: 'dashboard.widgetSizeNarrow'   },
   { value: '1x2', labelKey: 'dashboard.widgetSizeTall'     },
   { value: '2x2', labelKey: 'dashboard.widgetSizeStandard' },
-  { value: '3x2', labelKey: 'dashboard.widgetSizeLarge'    },
-  { value: '4x2', labelKey: 'dashboard.widgetSizeFull'     },
 ];
 
 // Alle bekannten Größen inkl. Legacy-Werte — für normalizeDashboardConfig-Validierung
@@ -189,10 +192,21 @@ function widgetSizeLabel(size) {
   return preset ? t(preset.labelKey) : size;
 }
 
-// Größen-Auswahl: dieselben fünf kuratierten Presets in Inline- und Modal-Ansicht.
-// Ist der aktuelle Wert ein Alt-Wert (z.B. 4x4 aus einer früheren Version), bleibt
-// er als einzelne Option erhalten, damit ein bestehendes Layout nicht still
-// zurückgesetzt wird — neue Auswahl steuert aber immer auf die Presets.
+// Bildet einen beliebigen (auch Legacy-)Größenwert auf das nächstliegende der vier
+// kuratierten Presets ab: Breite/Höhe ≥2 → 2, sonst 1. So kann normalizeDashboardConfig
+// migrierte Layouts (z.B. 4x2 aus einer früheren Version) auf ein Preset zusammenziehen,
+// statt dem betroffenen Nutzer als einziger eine 5. Dropdown-Option zu zeigen (Critique P2).
+function nearestPreset(size) {
+  const values = WIDGET_SIZE_PRESETS.map((p) => p.value);
+  if (values.includes(size)) return size;
+  const [cols, rows] = String(size).split('x').map(Number);
+  if (!Number.isFinite(cols) || !Number.isFinite(rows)) return '1x1';
+  return `${cols >= 2 ? 2 : 1}x${rows >= 2 ? 2 : 1}`;
+}
+
+// Größen-Auswahl: die vier kuratierten Presets in Inline- und Modal-Ansicht. Da
+// normalizeDashboardConfig jeden Wert bereits auf ein Preset abbildet, ist der
+// aktuelle Wert stets in der Liste — jeder Nutzer sieht dieselben vier Optionen.
 function widgetSizeOptionsHtml(currentSize) {
   const values = WIDGET_SIZE_PRESETS.map((p) => p.value);
   const options = values.includes(currentSize) ? values : [currentSize, ...values];
@@ -238,7 +252,9 @@ function normalizeDashboardConfig(input) {
         id: w.id,
         visible: w.visible !== false,
         order: Number.isFinite(Number(w.order)) ? Number(w.order) : i,
-        size: WIDGET_SIZE_OPTIONS.includes(w.size) ? w.size : defaultWidgetSize(w.id),
+        // Gültige (inkl. Legacy-)Größen auf das nächste Preset ziehen; Unbekanntes
+        // fällt auf den Domänen-Default. So sieht niemand eine 5. Größen-Option.
+        size: WIDGET_SIZE_OPTIONS.includes(w.size) ? nearestPreset(w.size) : defaultWidgetSize(w.id),
       }))
     : [];
   const presentIds = new Set(valid.map((w) => w.id));
@@ -253,6 +269,18 @@ function normalizeDashboardConfig(input) {
   return valid
     .sort((a, b) => a.order - b.order)
     .map((w, i) => ({ ...w, order: i }));
+}
+
+// Hat der Nutzer die Widget-Reihenfolge bewusst geändert (vs. dem Autor-Default)?
+// Nur dann darf das Grid auf `grid-auto-flow: row` umschalten, um die gesetzte
+// Ordnung zu bewahren. Beim unveränderten Default packt `dense` die Kacheln dicht
+// (kein toter Weißraum auf breitem Desktop) — die Löcher entstünden sonst nicht aus
+// „Nutzerabsicht", sondern nur, weil der Default-Satz nicht sauber tesselliert (Critique P2).
+function isUserOrderedConfig(cfg) {
+  if (!Array.isArray(cfg)) return false;
+  const defaultOrder = DEFAULT_WIDGET_CONFIG.map((w) => w.id).join(',');
+  const currentOrder = [...cfg].sort((a, b) => a.order - b.order).map((w) => w.id).join(',');
+  return currentOrder !== defaultOrder;
 }
 
 function sameWidgetConfig(a, b) {
@@ -315,6 +343,14 @@ function greeting(displayName) {
   if (h < 12) return t('dashboard.greetingMorning', { name: esc(displayName) });
   if (h < 18) return t('dashboard.greetingDay',     { name: esc(displayName) });
   return t('dashboard.greetingEvening', { name: esc(displayName) });
+}
+
+// Tageszeit-Fenster für den Begrüßungs-Gradienten (deckt sich mit greeting()).
+function greetingPeriod() {
+  const h = new Date().getHours();
+  if (h < 12) return 'morning';
+  if (h < 18) return 'day';
+  return 'evening';
 }
 
 function formatDateTime(isoString) {
@@ -693,7 +729,10 @@ function renderPinnedNotes(notes) {
     </div>
   `).join('');
 
-  return `<div class="widget widget--notes widget--wide">
+  // Breite kommt aus dem Größenklassen-System am .widget-wrapper (widget-size--2x1);
+  // die frühere .widget--wide war in keinem CSS definiert und damit tot — entfernt,
+  // damit Notizen wie jedes andere Widget genau ein Größen-Vokabular trägt (Critique P2).
+  return `<div class="widget widget--notes">
     ${widgetHeader('pin', t('nav.notes'), notes.length, '/notes')}
     <div class="notes-grid-widget">${items}</div>
   </div>`;
@@ -757,11 +796,9 @@ function renderBudgetWidget(budget, currency) {
           <strong>${formatCurrency(expenses, currency)}</strong>
         </span>
       </div>
-      <div class="budget-widget__footer">
-        ${hasData && budget?.topExpenseCategory
-          ? `${t('dashboard.topExpense')}: <strong>${esc(budgetCategoryLabel(budget.topExpenseCategory))}</strong> · ${formatCurrency(budget.topExpenseAmount, currency)}`
-          : t('dashboard.noBudgetData')}
-      </div>
+      ${budget?.topExpenseCategory
+        ? `<div class="budget-widget__footer">${t('dashboard.topExpense')}: <strong>${esc(budgetCategoryLabel(budget.topExpenseCategory))}</strong> · ${formatCurrency(budget.topExpenseAmount, currency)}</div>`
+        : ''}
     </div>
   </div>`;
 }
@@ -983,7 +1020,7 @@ function renderDashboardOverview(user, editing = false) {
       <div class="dashboard-overview__header${editing ? ' dashboard-overview__header--editing' : ''}">
         <div class="dashboard-overview__heading">
           <span class="dashboard-overview__date">${dateLabel}</span>
-          <h2 class="dashboard-overview__title">${greeting(user.display_name)}</h2>
+          <h2 class="dashboard-overview__title dashboard-overview__title--${greetingPeriod()}">${greeting(user.display_name)}</h2>
         </div>
         <div class="dashboard-overview__tools">
           ${editing ? `
@@ -1084,7 +1121,17 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
       return !mod || !window.yuvomi?.isModuleDisabled(mod);
     })
     .map((w, index, arr) => {
-      const html = widgetById[w.id]();
+      // Widget-weise Fehler-Isolation: wirft ein einzelner Renderer (kaputtes oder
+      // fehlendes Daten-Slice), fällt nur dieses Widget auf eine ruhige Inline-
+      // Fehlerkachel zurück — die übrigen Widgets und das Cockpit bleiben nutzbar,
+      // statt dass ein Payload-Defekt das ganze Grid killt (Critique P2).
+      let html;
+      try {
+        html = widgetById[w.id]();
+      } catch (err) {
+        console.error(`[dashboard] Widget "${w.id}" konnte nicht gerendert werden`, err);
+        html = renderWidgetError(w.id);
+      }
       if (!html) return '';
       return `<div class="widget-wrapper ${widgetSizeClass(w.size)} ${editing ? 'widget-wrapper--editing' : ''}"
                    data-widget-id="${esc(w.id)}" ${editing ? 'draggable="true"' : ''}>
@@ -1102,7 +1149,10 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
       <p>${t('dashboard.allWidgetsHidden')}</p>
     </div>
   `;
-  return `<div class="dashboard__grid ${editing ? 'dashboard__grid--editing' : ''}" id="dashboard-widget-grid">${gridInner}</div>`;
+  // Beim Bearbeiten und bei bewusst umsortierten Layouts die Quellordnung bewahren
+  // (kein dense-Umpacken); der Autor-Default darf dicht packen.
+  const preserveOrder = (editing || isUserOrderedConfig(cfg)) ? ' dashboard__grid--preserve-order' : '';
+  return `<div class="dashboard__grid ${editing ? 'dashboard__grid--editing' : ''}${preserveOrder}" id="dashboard-widget-grid">${gridInner}</div>`;
 }
 
 function renderDashboardSkeleton() {
@@ -1143,6 +1193,28 @@ function renderDashboardError(status = null) {
       </button>
     </div>
   `;
+}
+
+// Inline-Fehlerkachel für ein einzelnes Widget (siehe Fehler-Isolation in
+// renderDashboardLayout). Nutzt die vorhandene .widget/.widget__empty-Grammatik,
+// damit sie sich ruhig einreiht statt wie ein Systemfehler zu schreien.
+function renderWidgetError(id) {
+  return `<div class="widget widget--error" role="alert">
+    <div class="widget__header">
+      <span class="widget__title">
+        <i data-lucide="${widgetIcon(id)}" class="widget__title-icon" aria-hidden="true"></i>
+        ${widgetLabel(id)}
+      </span>
+    </div>
+    <div class="widget__empty">
+      <i data-lucide="cloud-off" class="empty-state__icon" aria-hidden="true"></i>
+      <div>${t('dashboard.widgetError')}</div>
+      <button type="button" class="btn btn--secondary widget__retry" data-widget-retry="${esc(id)}">
+        <i data-lucide="refresh-cw" aria-hidden="true"></i>
+        ${t('common.retry')}
+      </button>
+    </div>
+  </div>`;
 }
 
 // --------------------------------------------------------
@@ -1863,6 +1935,10 @@ export async function render(container, { user }) {
       ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes })}
     `);
     wireLinks(container, rerender, { editing: isCustomizing });
+    // Retry einer isolierten Widget-Fehlerkachel: da /dashboard aggregiert lädt,
+    // ist „erneut versuchen" ein voller Neuaufbau (wie der Page-Level-Retry).
+    container.querySelectorAll('[data-widget-retry]').forEach((btn) =>
+      btn.addEventListener('click', rerender, { signal: _fabController.signal }));
     if (window.lucide) window.lucide.createIcons({ el: shell });
     wireWeatherRefresh(container, (updatedWeather) => {
       weather = updatedWeather;
@@ -1895,6 +1971,7 @@ export async function render(container, { user }) {
     container.querySelector('#fab-backdrop')?.remove();
   } else {
     initFab(container, _fabController.signal);
+    wireFabAutoHide(container, _fabController.signal);
   }
 
   document.addEventListener('visibilitychange', () => {
@@ -1903,6 +1980,14 @@ export async function render(container, { user }) {
     if (titleEl) {
       titleEl.replaceChildren();
       titleEl.insertAdjacentHTML('afterbegin', greeting(user.display_name));
+      // Gradient-Periode mit-resyncen: sonst aktualisieren sich über Mittag/18 Uhr
+      // die Worte, aber der Tageszeit-Gradient bliebe auf dem alten Fenster stehen.
+      titleEl.classList.remove(
+        'dashboard-overview__title--morning',
+        'dashboard-overview__title--day',
+        'dashboard-overview__title--evening',
+      );
+      titleEl.classList.add(`dashboard-overview__title--${greetingPeriod()}`);
     }
     const dateEl  = container.querySelector('.dashboard-overview__date');
     if (dateEl)  dateEl.textContent = formatDate(new Date());
@@ -1960,4 +2045,31 @@ function wireWeatherRefresh(container, onUpdated = null) {
     } catch { /* silently ignore */ }
   };
   refreshBtn.addEventListener('click', doWeatherRefresh, { signal: _fabController.signal });
+}
+
+// Scroll-bewusstes Ausblenden des FAB: beim Runterscrollen weicht der schwebende
+// FAB nach unten aus, damit er die „Alle"-Header-Links der Widgets nicht überdeckt
+// und ihre Klicks nicht abfängt (Critique P2, per Hit-Test belegt); beim Hochscrollen
+// (Handlungsabsicht) und nahe dem oberen Rand kommt er zurück. Offen (Speed-Dial
+// ausgeklappt) wird nie versteckt. `passive` + rAF halten das Scrollen flüssig.
+function wireFabAutoHide(container, signal) {
+  const scroller = container.closest('.app-content') || document.querySelector('.app-content');
+  const fab = container.querySelector('#fab-container');
+  if (!scroller || !fab) return;
+  let lastY = scroller.scrollTop;
+  let ticking = false;
+  scroller.addEventListener('scroll', () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      const y = scroller.scrollTop;
+      const isOpen = fab.querySelector('.fab-main')?.classList.contains('fab-main--open');
+      if (!isOpen) {
+        if (y < 24 || y < lastY - 4) fab.classList.remove('fab-container--hidden');
+        else if (y > lastY + 4) fab.classList.add('fab-container--hidden');
+      }
+      lastY = y;
+      ticking = false;
+    });
+  }, { passive: true, signal });
 }

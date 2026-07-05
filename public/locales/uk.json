@@ -170,7 +170,8 @@
         "housekeepingLastVisit": "Останній візит: {{date}}",
         "housekeepingNoVisits": "Ще немає візитів",
         "housekeepingVisitsMonth": "{{count}} візитів цього місяця",
-        "housekeepingUnpaid": "{{amount}} до сплати"
+        "housekeepingUnpaid": "{{amount}} до сплати",
+        "widgetError": "Не вдалося завантажити"
     },
     "tasks": {
         "title": "Завдання",
