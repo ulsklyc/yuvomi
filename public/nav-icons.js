@@ -124,6 +124,17 @@ export const NAV_ICONS = {
     return s;
   },
 
+  // Overflow-Glyph für den „Mehr"-Tab: die nahezu universelle horizontale
+  // Ellipse liest eindeutig als „mehr/Überlauf" statt als „Apps/Dashboard"
+  // (das 3×3-Raster war mehrdeutig).
+  'more-horizontal': () => {
+    const s = makeSvg();
+    for (const cx of ['5.5', '12', '18.5']) {
+      s.appendChild(e('circle', { cx, cy: '12', r: '1.7' }));
+    }
+    return s;
+  },
+
   'shopping-cart': () => makeSvg(
     e('path', { d: 'M3 4.5h2.4L7.5 16h10.2l2-7H7' }),
     e('circle', { cx: '9',  cy: '19.2', r: '1.4' }),

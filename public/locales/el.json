@@ -60,6 +60,7 @@
         "moreActiveLabel": "Περισσότερα, {{section}} ενεργό",
         "documents": "Έγγραφα",
         "kitchen": "Κουζίνα",
+        "kitchenGoLabel": "Κουζίνα, άνοιγμα {{section}}",
         "search": "Αναζήτηση",
         "housekeeping": "Νοικοκυριό",
         "splitExpenses": "Μοίρασμα",

@@ -60,6 +60,7 @@
         "moreActiveLabel": "Daha fazla, {{section}} aktif",
         "documents": "Belgeler",
         "kitchen": "Mutfak",
+        "kitchenGoLabel": "Mutfak, {{section}} bölümünü aç",
         "search": "Ara",
         "housekeeping": "Ev işleri",
         "splitExpenses": "Böl",

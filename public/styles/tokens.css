@@ -428,7 +428,7 @@
   /* --------------------------------------------------------
    * 12. Layout
    * -------------------------------------------------------- */
-  --nav-height-mobile: 56px;
+  --nav-height-mobile: 60px;
   --nav-bottom-height: calc(var(--nav-height-mobile) + var(--safe-area-inset-bottom));
   --sidebar-width: 56px;             /* Fallback (mobile: sidebar hidden) */
   --sidebar-width-expanded: 220px;   /* full sidebar (≥1024px), max 240px laut Spec */

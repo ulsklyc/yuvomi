@@ -60,6 +60,7 @@
         "moreActiveLabel": "Több, {{section}} aktív",
         "documents": "Dokumentumok",
         "kitchen": "Konyha",
+        "kitchenGoLabel": "Konyha, {{section}} megnyitása",
         "search": "Keresés",
         "housekeeping": "Háztartás",
         "splitExpenses": "Költségek megosztása",

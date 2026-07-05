@@ -60,6 +60,7 @@
         "moreActiveLabel": "更多，{{section}} 已激活",
         "documents": "文档",
         "kitchen": "厨房",
+        "kitchenGoLabel": "厨房，打开 {{section}}",
         "search": "搜索",
         "housekeeping": "家务",
         "splitExpenses": "分摊",

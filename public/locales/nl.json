@@ -60,6 +60,7 @@
         "moreActiveLabel": "Meer, {{section}} actief",
         "documents": "Documenten",
         "kitchen": "Keuken",
+        "kitchenGoLabel": "Keuken, {{section}} openen",
         "search": "Zoeken",
         "housekeeping": "Huishouden",
         "splitExpenses": "Splitsen",

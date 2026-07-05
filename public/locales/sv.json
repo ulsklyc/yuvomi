@@ -60,6 +60,7 @@
         "moreActiveLabel": "Mer, {{section}} aktivt",
         "documents": "Dokument",
         "kitchen": "Kök",
+        "kitchenGoLabel": "Kök, öppna {{section}}",
         "search": "Sök",
         "housekeeping": "Städning",
         "splitExpenses": "Dela",

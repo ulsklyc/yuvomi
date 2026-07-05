@@ -60,6 +60,7 @@
         "recipes": "دستورهای غذا",
         "documents": "اسناد",
         "kitchen": "آشپزخانه",
+        "kitchenGoLabel": "آشپزخانه، باز کردن {{section}}",
         "search": "جستجو",
         "housekeeping": "خدمتکار خانه",
         "splitExpenses": "تقسیم",

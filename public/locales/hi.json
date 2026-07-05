@@ -60,6 +60,7 @@
         "moreActiveLabel": "अधिक, {{section}} सक्रिय",
         "documents": "दस्तावेज़",
         "kitchen": "रसोई",
+        "kitchenGoLabel": "रसोई, {{section}} खोलें",
         "search": "खोज",
         "housekeeping": "गृहकार्य",
         "splitExpenses": "बांटें",

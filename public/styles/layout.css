@@ -187,7 +187,10 @@
 /* ── Items-Reihe ── */
 .nav-bottom__items {
   display: flex;
-  height: var(--nav-height-mobile);
+  /* min-height statt fixer Höhe: lange Labels (de/fr, z. B. „Haushaltsbuch",
+   * „Paramètres") dürfen die Bar auf zwei Zeilen wachsen lassen, statt zu
+   * clippen. Kurze Labels behalten die kompakte Höhe. */
+  min-height: var(--nav-height-mobile);
 }
 
 /* ── More-Button (Button-Basis, ansonsten wie nav-item) ── */
@@ -393,6 +396,10 @@
   font-weight: var(--font-weight-medium);
   text-align: center;
   line-height: 1.2;
+  /* Verhindert Overflow im 3-Spalten-Grid auf sehr schmalen Geräten (~320px);
+   * lange Modulnamen brechen um statt aus der Kachel zu laufen. */
+  overflow-wrap: anywhere;
+  hyphens: auto;
 }
 
 /* ── Such-Overlay ── */
@@ -569,7 +576,9 @@
 
 .nav-bottom .nav-item__icon-well {
   width: var(--target-base);
-  height: var(--target-sm);
+  /* Sichtbare Tap-Fläche 44×40 statt 44×32 — füllt die 44×44-Komfortzone für
+   * Ein-Daumen-Nutzung besser aus und senkt das Fehl-Tap-Risiko. */
+  height: var(--target-md);
   border-radius: var(--radius-full);
   transition:
     background-color var(--transition-fast),
@@ -613,6 +622,21 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Bottom-Bar-Labels dürfen zweizeilig umbrechen statt einzeilig zu ellipsieren.
+ * In 5 gleichen Flex-Slots (~72px bei 360px) clippt eine Single-Line lange
+ * Komposita (de/fr) zu „Einst…"; zwei zentrierte Zeilen erhalten die
+ * Recognition. overflow-wrap:anywhere bricht auch fugenlose Langwörter. */
+.nav-bottom .nav-item__label {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  text-align: center;
+  overflow-wrap: anywhere;
+  line-height: 1.1;
 }
 
 .nav-bottom .nav-item[aria-current="page"] .nav-item__label,
@@ -2861,6 +2885,34 @@ textarea.input { resize: vertical; }
 
   .nav-bottom .nav-item:active .nav-item__icon-well {
     transform: none;
+    opacity: 1;
+  }
+
+  /* More-Sheet: kein vestibulär belastender Slide-up. Der Transform snappt
+   * ohne Bewegung; das Erscheinen trägt ein sanfter Opacity-Fade (die
+   * kanonische Reduced-Motion-Alternative). Backdrop faded weiterhin nur
+   * Opacity (bewegungsfrei) und bleibt daher unverändert. */
+  .more-sheet {
+    transition: opacity var(--transition-fast);
+    opacity: 0;
+  }
+
+  .more-sheet[aria-hidden="false"] {
+    opacity: 1;
+  }
+
+  .more-sheet__search:active {
+    transform: none;
+  }
+
+  /* Das aus der More-Sheet-Suche geöffnete Voll-Overlay teilt denselben
+   * translateY-Slide — ebenfalls durch einen bewegungsfreien Fade ersetzen. */
+  .search-overlay {
+    transition: opacity var(--transition-fast);
+    opacity: 0;
+  }
+
+  .search-overlay--visible {
     opacity: 1;
   }
 }

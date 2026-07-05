@@ -60,6 +60,7 @@
         "recipes": "레시피",
         "documents": "문서",
         "kitchen": "주방",
+        "kitchenGoLabel": "주방, {{section}} 열기",
         "search": "검색",
         "housekeeping": "가사 도우미",
         "splitExpenses": "정산",

@@ -60,6 +60,7 @@
         "moreActiveLabel": "その他、{{section}} がアクティブ",
         "documents": "書類",
         "kitchen": "キッチン",
+        "kitchenGoLabel": "キッチン、{{section}} を開く",
         "search": "検索",
         "housekeeping": "家事",
         "splitExpenses": "分割",

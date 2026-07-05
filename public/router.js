@@ -1740,14 +1740,14 @@ function moreNavButtonEl() {
   iconWrap.className = 'nav-item__icon-wrap';
   const well = document.createElement('div');
   well.className = 'nav-item__icon-well';
-  const iconFactory = NAV_ICONS['grid-2x2'];
+  const iconFactory = NAV_ICONS['more-horizontal'];
   if (iconFactory) {
     const svg = iconFactory();
     svg.classList.add('nav-item__icon');
     well.appendChild(svg);
   } else {
     const icon = document.createElement('i');
-    icon.dataset.lucide = 'grid-2x2';
+    icon.dataset.lucide = 'more-horizontal';
     icon.className = 'nav-item__icon';
     icon.setAttribute('aria-hidden', 'true');
     well.appendChild(icon);
@@ -1902,8 +1902,13 @@ function kitchenSectionLabel(path) {
 }
 
 function kitchenNavAriaLabel(path) {
-  if (!isKitchenRoute(path)) return t('nav.kitchen');
-  return t('nav.kitchenActiveLabel', { section: kitchenSectionLabel(path) });
+  if (isKitchenRoute(path)) {
+    return t('nav.kitchenActiveLabel', { section: kitchenSectionLabel(path) });
+  }
+  // Inaktiv das Ziel offenlegen: der Küche-Tab führt zur zuletzt besuchten
+  // Sektion (Meals/Recipes/Shopping). Ohne diese Ansage ist für Screenreader-
+  // und Tastatur-Nutzer nicht vorhersagbar, wohin der Tab navigiert.
+  return t('nav.kitchenGoLabel', { section: kitchenSectionLabel(path) });
 }
 
 /**
@@ -1934,7 +1939,7 @@ function setMoreButtonState(moreBtn, activeSecondary) {
 
   const moreBtnLabel = moreBtn.querySelector('.nav-item__label');
   if (moreBtnLabel) moreBtnLabel.textContent = t('nav.more');
-  replaceNavIcon(moreBtn, '.nav-item__icon', 'grid-2x2');
+  replaceNavIcon(moreBtn, '.nav-item__icon', 'more-horizontal');
 }
 
 function updateNav(path) {

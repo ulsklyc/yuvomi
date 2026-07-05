@@ -60,6 +60,7 @@
         "recipes": "Resep",
         "documents": "Dokumen",
         "kitchen": "Dapur",
+        "kitchenGoLabel": "Dapur, buka {{section}}",
         "search": "Cari",
         "housekeeping": "Asisten Rumah Tangga",
         "splitExpenses": "Bagi",

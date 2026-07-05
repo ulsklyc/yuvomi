@@ -60,6 +60,7 @@
         "moreActiveLabel": "Thêm, {{section}} đang hoạt động",
         "documents": "Tài liệu",
         "kitchen": "Nhà bếp",
+        "kitchenGoLabel": "Nhà bếp, mở {{section}}",
         "search": "Tìm kiếm",
         "housekeeping": "Dọn dẹp",
         "splitExpenses": "Chia sẻ chi phí",

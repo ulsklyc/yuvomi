@@ -1018,6 +1018,109 @@ test('mobile navigation Quiet Precision keeps state feedback stable and accessib
   );
 });
 
+test('More-Sheet honours prefers-reduced-motion (no vestibular slide-up)', () => {
+  const layout = read('../public/styles/layout.css');
+
+  // Normalzustand: der Slide trägt einen transform-Transition.
+  assert.match(cssRuleBody(layout, '.more-sheet'), /transition:\s*transform/);
+
+  // Reduced-Motion: der translateY-Slide wird durch einen bewegungsfreien
+  // Opacity-Fade ersetzt — der Transform snappt ohne Bewegung.
+  assert.match(
+    layout,
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.more-sheet\s*\{[\s\S]*?transition:\s*opacity[\s\S]*?opacity:\s*0/,
+  );
+  assert.match(
+    layout,
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.more-sheet\[aria-hidden="false"\]\s*\{[\s\S]*?opacity:\s*1/,
+  );
+
+  // Das Such-Overlay der More-Sheet teilt denselben Slide und muss ebenfalls
+  // bewegungsfrei faden.
+  assert.match(cssRuleBody(layout, '.search-overlay'), /transition:\s*transform/);
+  assert.match(
+    layout,
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.search-overlay\s*\{[\s\S]*?transition:\s*opacity[\s\S]*?opacity:\s*0/,
+  );
+});
+
+test('bottom-nav labels wrap to two lines instead of clipping across locales', () => {
+  const layout = read('../public/styles/layout.css');
+  const labelRule = cssRuleBody(layout, '.nav-bottom .nav-item__label');
+
+  // Zweizeiliges Wrapping statt Single-Line-Ellipsis; Langwörter brechen um.
+  assert.match(labelRule, /white-space:\s*normal/);
+  assert.match(labelRule, /-webkit-line-clamp:\s*2/);
+  assert.match(labelRule, /overflow-wrap:\s*anywhere/);
+
+  // Die Items-Reihe wächst mit dem Inhalt (min-height statt fixer Höhe).
+  assert.match(cssRuleBody(layout, '.nav-bottom__items'), /min-height:\s*var\(--nav-height-mobile\)/);
+  assert.doesNotMatch(cssRuleBody(layout, '.nav-bottom__items'), /(^|[^-])height:\s*var\(--nav-height-mobile\)/);
+
+  // Longest-String-Guard: kein bottom-bar-Nav-Label darf so lang werden, dass
+  // selbst zwei Zeilen in einem ~72px-Slot es nicht mehr fassen.
+  const NAV_KEYS = [
+    'dashboard', 'calendar', 'tasks', 'notes', 'kitchen', 'contacts', 'birthdays',
+    'budget', 'documents', 'housekeeping', 'rewards', 'health', 'settings', 'more',
+    'shopping', 'meals', 'recipes',
+  ];
+  const localeFiles = readdirSync(new URL('../public/locales/', import.meta.url)).filter((f) => f.endsWith('.json'));
+  const offenders = [];
+  for (const file of localeFiles) {
+    const nav = JSON.parse(read(`../public/locales/${file}`)).nav || {};
+    for (const key of NAV_KEYS) {
+      const value = nav[key];
+      if (typeof value === 'string' && value.length > 24) offenders.push(`${file}:nav.${key} (${value.length}) "${value}"`);
+    }
+  }
+  assert.deepEqual(offenders, [], `bottom-bar nav labels over 24 chars need a shorter canonical label:\n${offenders.join('\n')}`);
+});
+
+test('bottom-nav icon-well fills the 44x44 touch-comfort zone', () => {
+  const layout = read('../public/styles/layout.css');
+  const tokens = read('../public/styles/tokens.css');
+  const wellRule = cssRuleBody(layout, '.nav-bottom .nav-item__icon-well');
+
+  // Sichtbares Well: 44 breit × 40 hoch (kein 32px-Streifen mehr).
+  assert.match(wellRule, /width:\s*var\(--target-base\)/);
+  assert.match(wellRule, /height:\s*var\(--target-md\)/);
+  assert.doesNotMatch(wellRule, /height:\s*var\(--target-sm\)/);
+
+  // Bar-Höhe innerhalb der iOS/Android-Norm (≥60px exkl. Safe-Area).
+  assert.match(tokens, /--nav-height-mobile:\s*6[0-4]px/);
+});
+
+test('bottom nav keeps a navigation landmark with a disclosure button, not a tablist', () => {
+  const source = read('../public/router.js');
+
+  // Landmark statt ARIA-Tablist (Navigation, keine Tabs in einem Tabpanel).
+  assert.match(source, /bottomNav\.setAttribute\('aria-label', t\('nav\.navigation'\)\)/);
+  assert.doesNotMatch(source, /'role',\s*'tablist'/);
+  assert.doesNotMatch(source, /setAttribute\('role', 'tab'\)/);
+
+  // More bleibt ein korrekter Disclosure-Button.
+  assert.match(source, /moreBtn\.setAttribute\('aria-expanded', 'false'\)/);
+  assert.match(source, /moreBtn\.setAttribute\('aria-controls', 'more-sheet'\)/);
+});
+
+test('kitchen tab discloses its (variable) destination in the accessible name', () => {
+  const source = read('../public/router.js');
+
+  // Beide Zustände legen die Sektion offen — inaktiv nicht mehr nur "Küche".
+  assert.match(
+    source,
+    /function kitchenNavAriaLabel\(path\)\s*\{[\s\S]*?nav\.kitchenActiveLabel[\s\S]*?nav\.kitchenGoLabel[\s\S]*?\}/,
+  );
+  assertKeysExistInEveryLocale(['nav.kitchenGoLabel']);
+
+  // Der Zielhinweis trägt den {{section}}-Platzhalter in jeder Locale.
+  const localeFiles = readdirSync(new URL('../public/locales/', import.meta.url)).filter((f) => f.endsWith('.json'));
+  for (const file of localeFiles) {
+    const value = JSON.parse(read(`../public/locales/${file}`)).nav?.kitchenGoLabel;
+    assert.match(value ?? '', /\{\{section\}\}/, `${file}: nav.kitchenGoLabel must interpolate {{section}}`);
+  }
+});
+
 test('mobile bottom navigation remains visible while content scrolls', () => {
   const source = read('../public/router.js');
   const layout = read('../public/styles/layout.css');
@@ -1072,7 +1175,8 @@ test('mobile bottom navigation avoids clipped Android labels and sparse icon spa
 
   assert.match(navItemRule, /padding-block:\s*var\(--space-0h\)/);
   assert.match(iconWellRule, /width:\s*var\(--target-base\)/);
-  assert.match(iconWellRule, /height:\s*var\(--target-sm\)/);
+  // Well 44×40 (--target-md) füllt die Komfortzone besser als das alte 44×32.
+  assert.match(iconWellRule, /height:\s*var\(--target-md\)/);
   assert.match(iconWellRule, /border-radius:\s*var\(--radius-full\)/);
   assert.match(labelRule, /line-height:\s*1\.2/);
 });
@@ -1449,9 +1553,15 @@ test('phase 4 keeps More bottom-nav identity stable while exposing active sectio
 
   assert.match(routerSource, /t\('nav\.moreActiveLabel',\s*\{\s*section:\s*activeSecondary\.label\s*\}\)/);
   assert.match(routerSource, /moreBtnLabel\.textContent\s*=\s*t\('nav\.more'\)/);
-  assert.match(routerSource, /replaceNavIcon\(moreBtn,\s*'\.nav-item__icon',\s*'grid-2x2'\)/);
+  assert.match(routerSource, /replaceNavIcon\(moreBtn,\s*'\.nav-item__icon',\s*'more-horizontal'\)/);
   assert.doesNotMatch(routerSource, /const\s+moreIcon\s*=\s*activeSecondary\s*\?\s*activeSecondary\.icon/);
   assert.doesNotMatch(routerSource, /moreBtnLabel\.textContent\s*=\s*moreLabel/);
+
+  // More nutzt den eindeutigen Overflow-Glyph, nicht das mehrdeutige 3×3-Raster.
+  const navIcons = read('../public/nav-icons.js');
+  assert.match(navIcons, /'more-horizontal':\s*\(\)\s*=>/);
+  assert.match(routerSource, /const iconFactory = NAV_ICONS\['more-horizontal'\]/);
+  assert.doesNotMatch(routerSource, /grid-2x2/);
 });
 
 test('phase 4 locales include More active accessible label', () => {

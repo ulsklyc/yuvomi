@@ -60,6 +60,7 @@
         "moreActiveLabel": "Plus, {{section}} actif",
         "documents": "Documents",
         "kitchen": "Cuisine",
+        "kitchenGoLabel": "Cuisine, ouvrir {{section}}",
         "search": "Recherche",
         "housekeeping": "Ménage",
         "splitExpenses": "Partager",

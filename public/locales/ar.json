@@ -60,6 +60,7 @@
         "moreActiveLabel": "المزيد، {{section}} نشط",
         "documents": "المستندات",
         "kitchen": "المطبخ",
+        "kitchenGoLabel": "المطبخ، فتح {{section}}",
         "search": "بحث",
         "housekeeping": "التدبير المنزلي",
         "splitExpenses": "تقسيم",

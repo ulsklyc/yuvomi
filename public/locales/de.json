@@ -60,6 +60,7 @@
         "recipes": "Rezepte",
         "documents": "Dokumente",
         "kitchen": "Küche",
+        "kitchenGoLabel": "Küche, {{section}} öffnen",
         "search": "Suche",
         "housekeeping": "Haushaltshilfe",
         "splitExpenses": "Aufteilen",

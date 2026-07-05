@@ -60,6 +60,7 @@
         "moreActiveLabel": "Ещё, {{section}} активно",
         "documents": "Документы",
         "kitchen": "Кухня",
+        "kitchenGoLabel": "Кухня, открыть {{section}}",
         "search": "Поиск",
         "housekeeping": "Уборка",
         "splitExpenses": "Разделить",

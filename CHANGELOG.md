@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.96.6] - 2026-07-05
+
+### Changed
+- **Clearer "More" navigation icon (mobile)** — the bottom-bar overflow tab now uses a horizontal-ellipsis glyph that reads unambiguously as "more", replacing the previous grid-of-dots icon.
+- **Larger mobile navigation touch targets** — the bottom bar and its icon buttons are taller, making one-handed taps more comfortable and reducing mis-taps.
+- **Kitchen tab announces its destination** — screen-reader and keyboard users now hear which section (Meals, Recipes, or Shopping) the Kitchen tab will open, even before it becomes active.
+
+### Fixed
+- **Navigation labels no longer clip in longer languages** — mobile bottom-bar labels wrap to two lines instead of truncating (e.g. longer German and French module names).
+- **"More" sheet respects reduced motion** — the mobile "More" sheet and its full-screen search overlay now fade in place instead of sliding up when the system "reduce motion" preference is enabled.
+
 ## [0.96.5] - 2026-07-05
 
 ### Fixed
