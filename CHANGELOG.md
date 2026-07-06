@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.96.9] - 2026-07-06
+
+### Fixed
+- **Split balances reset after archiving a group** — the "You owe" / "You are owed" totals under Budget → Split now exclude archived groups. The dashboard balance query was missing an active-status filter, so an archived group's ledger entries kept inflating the totals, and archiving/deleting a group did not refresh the summary (#446).
+
 ## [0.96.8] - 2026-07-05
 
 ### Fixed

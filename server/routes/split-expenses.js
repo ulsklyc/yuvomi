@@ -328,6 +328,7 @@ router.get('/dashboard', (req, res) => {
       SELECT l.currency, l.user_id, u.display_name, SUM(l.amount_minor) AS net_minor
       FROM expense_ledger_entries l
       JOIN expense_group_members gm ON gm.group_id = l.group_id AND gm.user_id = @uid
+      JOIN expense_groups g ON g.id = l.group_id AND g.status = 'active'
       LEFT JOIN users u ON u.id = l.user_id
       GROUP BY l.currency, l.user_id
     `).all({ uid });

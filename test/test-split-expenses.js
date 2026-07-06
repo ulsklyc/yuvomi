@@ -129,11 +129,43 @@ function testLedgerDerivation() {
   ]);
 }
 
+function testDashboardExcludesArchivedGroups() {
+  const database = db.get();
+  // A second, archived group where Alice (user 1) is still owed money.
+  const archivedId = database.prepare("INSERT INTO expense_groups (name, type, default_currency, created_by, status, archived_at) VALUES ('Old Trip', 'travel', 'EUR', 1, 'archived', '2026-01-01T00:00:00Z')").run().lastInsertRowid;
+  for (const userId of [1, 2]) {
+    database.prepare('INSERT INTO expense_group_members (group_id, user_id, role, invited_by) VALUES (?, ?, ?, 1)')
+      .run(archivedId, userId, userId === 1 ? 'owner' : 'guest');
+  }
+  const insertLedger = database.prepare(`
+    INSERT INTO expense_ledger_entries
+      (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
+    VALUES (?, 'expense', 0, ?, ?, ?, 'EUR', 'Old', 1)
+  `);
+  insertLedger.run(archivedId, 1, 2, 5000);
+  insertLedger.run(archivedId, 2, 2, -5000);
+
+  const uid = 1;
+  // Mirrors the GET /dashboard balance query: archived groups must not contribute.
+  const balances = database.prepare(`
+    SELECT l.currency, l.user_id, SUM(l.amount_minor) AS net_minor
+    FROM expense_ledger_entries l
+    JOIN expense_group_members gm ON gm.group_id = l.group_id AND gm.user_id = @uid
+    JOIN expense_groups g ON g.id = l.group_id AND g.status = 'active'
+    GROUP BY l.currency, l.user_id
+  `).all({ uid });
+  const mine = balances.filter((row) => row.user_id === uid);
+  const owed = mine.filter((row) => row.net_minor > 0).reduce((sum, row) => sum + row.net_minor, 0);
+  // Alice's only positive balance lived in the archived group → dashboard shows 0 owed.
+  assert.equal(owed, 0, 'archived group balances must not appear in the dashboard total');
+}
+
 try {
   testMoneyParsing();
   testSplitAllocation();
   testDebtSimplification();
   testLedgerDerivation();
+  testDashboardExcludesArchivedGroups();
   console.log('Split expense tests passed');
 } finally {
   db.get().close();

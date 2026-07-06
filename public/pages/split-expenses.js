@@ -363,9 +363,15 @@ async function archiveGroup(groupId) {
   });
   if (!confirmed) return;
   await api.post(`/split-expenses/groups/${groupId}/archive`, {});
+  await refreshDashboard();
   await loadGroups();
   await loadGroupData();
   renderAll();
+}
+
+async function refreshDashboard() {
+  const dash = await api.get('/split-expenses/dashboard');
+  state.dashboard = dash.data;
 }
 
 async function deleteGroup(groupId) {
@@ -375,6 +381,7 @@ async function deleteGroup(groupId) {
   });
   if (!confirmed) return;
   await api.delete(`/split-expenses/groups/${groupId}`);
+  await refreshDashboard();
   await loadGroups();
   await loadGroupData();
   renderAll();
@@ -619,8 +626,7 @@ function openExpenseModal(prefill = {}) {
         const { participants, splits } = collectSplitPayload(form);
         await api.post(`/split-expenses/groups/${state.activeGroupId}/expenses`, { ...data, participants, splits });
         closeModal({ force: true });
-        const dash = await api.get('/split-expenses/dashboard');
-        state.dashboard = dash.data;
+        await refreshDashboard();
         await loadGroupData();
         renderAll();
       });
@@ -656,8 +662,7 @@ function openSettlementModal() {
         const data = Object.fromEntries(new FormData(panel.querySelector('#split-settlement-form')));
         await api.post(`/split-expenses/groups/${state.activeGroupId}/settlements`, data);
         closeModal({ force: true });
-        const dash = await api.get('/split-expenses/dashboard');
-        state.dashboard = dash.data;
+        await refreshDashboard();
         await loadGroupData();
         renderAll();
       });
