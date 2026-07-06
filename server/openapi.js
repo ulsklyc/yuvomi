@@ -1638,7 +1638,7 @@ function buildOpenApiSpec(req, appVersion) {
           type: 'apiKey',
           in: 'header',
           name: 'X-API-Key',
-          description: 'API token sent in the `X-API-Key` header.',
+          description: 'API token sent in the `X-API-Key` header. `API-Key` is also accepted for MCP compatibility.',
         },
         cookieAuth: {
           type: 'apiKey',

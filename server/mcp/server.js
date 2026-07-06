@@ -16,7 +16,7 @@ const log = createLogger('MCP');
 const router = express.Router();
 
 // POST: einzelne JSON-RPC-Nachricht → einzelne JSON-Antwort (oder 202 bei Notification).
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     if (req.body === undefined || req.body === null || typeof req.body !== 'object') {
       return res.status(400).json({
@@ -25,9 +25,15 @@ router.post('/', (req, res) => {
       });
     }
     const actor = { id: req.authUserId, role: req.authRole };
-    const response = handleMcpRequest(db.get(), actor, req.body, (err) => {
-      log.error('MCP tool error:', err);
-    });
+    const response = await handleMcpRequest(
+      db.get(),
+      actor,
+      req.body,
+      (err) => {
+        log.error('MCP tool error:', err);
+      },
+      { requestHeaders: req.headers },
+    );
     if (response === null) return res.status(202).end();
     return res.json(response);
   } catch (err) {
