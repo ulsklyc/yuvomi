@@ -1,19 +1,30 @@
 /**
  * Modul: MCP-Tools
- * Zweck: Kuratiertes Tool-Set für den MCP-Endpoint (Lesen/Anlegen der häufigsten
- *        Entitäten). Reine Funktionen `(database, actorId, args)` — testbar ohne
- *        laufenden Server, wiederverwendbar zur Laufzeit über `db.get()`.
- * Abhängigkeiten: server/middleware/validate.js
+ * Zweck: Tool-Set für den internen MCP-Endpoint in zwei bewusst getrennten Schichten:
+ *   1. Kuratierte Kern-Tools als reine `(db, actor, args)`-Funktionen — schnell,
+ *      in-process gegen SQLite, ohne laufenden Server testbar. Deckt die
+ *      häufigsten Aktionen ab (Tasks, Shopping, Kalender lesen/anlegen).
+ *   2. EINE generische OpenAPI-Brücke (`list_api_operations`, `get_api_operation`,
+ *      `call_api_operation`), die jede dokumentierte REST-Operation erreichbar
+ *      macht — ein Mechanismus statt hunderter handgepflegter Wrapper. Der Aufruf
+ *      geht per authentifiziertem Loopback (`fetch` → eigener HTTP-Server) und
+ *      erbt exakt die Rechte des aufrufenden API-Tokens; Rollen- und
+ *      CSRF-Prüfung greifen serverseitig auf `/api/v1/*` wie bei jedem Client.
+ * Abhängigkeiten: server/middleware/validate.js, server/openapi.js
  *
- * Architektur: Jedes Tool ist EIN Eintrag in TOOLS (Definition + Handler zusammen)
- *   — daraus werden `tools/list` und der Dispatch abgeleitet, damit Name, Schema
- *   und Implementierung nicht auseinanderlaufen können.
+ * Architektur: Jedes Tool ist EIN Eintrag in der Registry (Definition + Handler
+ *   zusammen) — daraus werden `tools/list` und der Dispatch abgeleitet, damit
+ *   Name, Schema und Implementierung nicht auseinanderlaufen können.
  *
- * Quelle der Validierungs-/Enum-Regeln: server/routes/tasks.js, shopping.js,
- * calendar.js. Bei Änderungen dort diese Datei mitziehen.
+ * Quelle der Validierungs-/Enum-Regeln der Kern-Tools: server/routes/tasks.js,
+ * shopping.js, calendar.js. Bei Änderungen dort diese Datei mitziehen.
  */
 
 import * as v from '../middleware/validate.js';
+import { readFileSync } from 'node:fs';
+import { buildOpenApiSpec } from '../openapi.js';
+
+const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
 
 // Spiegelt server/routes/tasks.js (bewusst dupliziert, um die Tool-Schicht von
 // express/db in tasks.js zu entkoppeln — siehe Modul-Header).
@@ -25,7 +36,7 @@ const VALID_CATEGORIES = ['household', 'school', 'shopping', 'repair',
 class ToolError extends Error {}
 
 // --------------------------------------------------------
-// Tool-Implementierungen (reine Funktionen)
+// Kern-Tools: reine Funktionen (db, actorId, args)
 // --------------------------------------------------------
 
 function listTasks(db, args) {
@@ -164,11 +175,214 @@ function createEvent(db, actorId, args) {
 }
 
 // --------------------------------------------------------
-// Registry: Definition + Handler je Tool an EINER Stelle.
-// `handler(ctx, args)` mit ctx = { db, actor: { id, role } }.
+// OpenAPI-Brücke: EIN generischer Zugang zur gesamten REST-API.
+// Der Loopback re-authentifiziert über die weitergereichten Header des
+// eingehenden MCP-Requests, daher erbt jeder Aufruf die Rechte des Tokens.
 // --------------------------------------------------------
 
-const TOOLS = [
+const HTTP_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete', 'head', 'options']);
+
+// Die OpenAPI-Spec ist zur Laufzeit statisch (hängt nur an der Paketversion) —
+// einmal ableiten und cachen statt bei jedem Tool-Aufruf neu zu bauen.
+let cachedOperations = null;
+
+function normalizeText(value) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function openApiSpec() {
+  return buildOpenApiSpec(null, pkg.version);
+}
+
+function operationKey(method, path) {
+  const parts = [];
+  for (const segment of path.replace(/^\/+|\/+$/g, '').split('/')) {
+    if (segment === 'api' || segment === 'v1') continue;
+    if (segment.startsWith('{') && segment.endsWith('}')) {
+      parts.push('by', segment.slice(1, -1));
+    } else {
+      parts.push(segment);
+    }
+  }
+  return `${method.toLowerCase()}_${parts.join('_') || 'root'}`
+    .replace(/[^a-zA-Z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .replace(/_+/g, '_')
+    .toLowerCase();
+}
+
+function openApiOperations() {
+  if (cachedOperations) return cachedOperations;
+  const spec = openApiSpec();
+  const operations = new Map();
+  const used = new Map();
+  for (const [path, pathItem] of Object.entries(spec.paths || {})) {
+    for (const [method, operation] of Object.entries(pathItem || {})) {
+      if (!HTTP_METHODS.has(method.toLowerCase()) || !operation || typeof operation !== 'object') continue;
+      let key = operationKey(method, path);
+      const count = (used.get(key) || 0) + 1;
+      used.set(key, count);
+      if (count > 1) key = `${key}_${count}`;
+      const parameters = Array.isArray(operation.parameters) ? operation.parameters : [];
+      const requestBody = operation.requestBody && typeof operation.requestBody === 'object' ? operation.requestBody : {};
+      const content = requestBody.content && typeof requestBody.content === 'object' ? requestBody.content : {};
+      operations.set(key, {
+        operation_key: key,
+        method: method.toUpperCase(),
+        path,
+        tag: (operation.tags || [''])[0],
+        summary: operation.summary || '',
+        description: operation.description || '',
+        parameters,
+        path_parameters: parameters.filter((p) => p.in === 'path').map((p) => p.name),
+        query_parameters: parameters.filter((p) => p.in === 'query').map((p) => p.name),
+        header_parameters: parameters.filter((p) => p.in === 'header' && p.name !== 'X-CSRF-Token').map((p) => p.name),
+        request_body_required: Boolean(requestBody.required),
+        request_content_types: Object.keys(content),
+        authenticated: Boolean(operation.security),
+      });
+    }
+  }
+  cachedOperations = operations;
+  return operations;
+}
+
+function publicOperationView(operation, includeParameters = false) {
+  const view = {
+    operation_key: operation.operation_key,
+    method: operation.method,
+    path: operation.path,
+    tag: operation.tag,
+    summary: operation.summary,
+    path_parameters: operation.path_parameters,
+    query_parameters: operation.query_parameters,
+    request_body_required: operation.request_body_required,
+    request_content_types: operation.request_content_types,
+    authenticated: operation.authenticated,
+  };
+  if (includeParameters) {
+    view.parameters = operation.parameters;
+    view.description = operation.description;
+    view.header_parameters = operation.header_parameters;
+  }
+  return view;
+}
+
+function resolveOpenApiOperation({ operation_key: key, method, path }) {
+  const operations = openApiOperations();
+  if (key) {
+    const operation = operations.get(key);
+    if (!operation) throw new ToolError(`Unknown operation_key: ${key}`);
+    return operation;
+  }
+  if (!method || !path) throw new ToolError('Pass operation_key, or pass both method and path.');
+  const normalizedMethod = String(method).toUpperCase();
+  const normalizedPath = String(path).startsWith('/') ? String(path) : `/${path}`;
+  for (const operation of operations.values()) {
+    if (operation.method === normalizedMethod && operation.path === normalizedPath) return operation;
+  }
+  throw new ToolError(`OpenAPI operation not found for ${normalizedMethod} ${normalizedPath}`);
+}
+
+function renderPath(path, pathParams = {}) {
+  return path.replace(/\{([^}]+)\}/g, (_match, name) => {
+    if (pathParams[name] === undefined || pathParams[name] === null) {
+      throw new ToolError(`Missing path parameter: ${name}`);
+    }
+    return encodeURIComponent(String(pathParams[name]));
+  });
+}
+
+function contentBytes(contentData) {
+  let raw = String(contentData || '').trim();
+  if (raw.startsWith('data:')) {
+    const match = raw.match(/^data:[^;,]+;base64,(.+)$/is);
+    if (!match) throw new ToolError('content_data must be a valid base64 data URL.');
+    raw = match[1];
+  }
+  raw = raw.replace(/\s+/g, '');
+  if (!raw) throw new ToolError('content_data is required.');
+  return Buffer.from(raw, 'base64');
+}
+
+function internalBaseUrl() {
+  return (
+    process.env.MCP_INTERNAL_BASE_URL
+    || process.env.BASE_URL
+    || `http://127.0.0.1:${process.env.PORT || 3000}`
+  ).replace(/\/+$/, '');
+}
+
+// Reicht die Authentifizierung des eingehenden MCP-Requests an den Loopback
+// weiter (Bearer-Token, API-Key, Session-Cookie samt CSRF-Token).
+function forwardedAuthHeaders(ctx) {
+  const headers = {};
+  const source = ctx.requestHeaders || {};
+  const auth = source.authorization || source.Authorization;
+  const apiKey = source['x-api-key'] || source['X-API-Key'] || source['api-key'] || source['API-Key'];
+  const cookie = source.cookie || source.Cookie;
+  const csrf = source['x-csrf-token'] || source['X-CSRF-Token'];
+  if (auth) headers.Authorization = auth;
+  if (apiKey) headers['X-API-Key'] = apiKey;
+  if (cookie) headers.Cookie = cookie;
+  if (csrf) headers['X-CSRF-Token'] = csrf;
+  return headers;
+}
+
+async function internalApiRequest(ctx, method, path, { query, payload, contentData, contentType } = {}) {
+  const url = new URL(path, `${internalBaseUrl()}/`);
+  for (const [key, value] of Object.entries(query || {})) {
+    if (value === undefined || value === null) continue;
+    if (Array.isArray(value)) {
+      for (const item of value) url.searchParams.append(key, String(item));
+    } else {
+      url.searchParams.set(key, String(value));
+    }
+  }
+
+  const headers = { Accept: 'application/json', ...forwardedAuthHeaders(ctx) };
+  const options = { method, headers };
+  if (contentData !== undefined && contentData !== null) {
+    options.body = contentBytes(contentData);
+    headers['Content-Type'] = contentType || 'application/octet-stream';
+  } else if (!['GET', 'HEAD'].includes(method.toUpperCase()) && payload !== undefined) {
+    options.body = JSON.stringify(payload ?? {});
+    headers['Content-Type'] = 'application/json';
+  }
+
+  const response = await fetch(url, options);
+  const responseContentType = response.headers.get('content-type') || '';
+  let data;
+  if (responseContentType.includes('application/json')) {
+    data = await response.json().catch(() => null);
+  } else if (responseContentType.startsWith('text/') || responseContentType.includes('text/calendar')) {
+    data = { text: await response.text(), content_type: responseContentType };
+  } else {
+    const buffer = Buffer.from(await response.arrayBuffer());
+    data = buffer.length
+      ? {
+          content_base64: buffer.toString('base64'),
+          content_type: responseContentType,
+          content_length: buffer.length,
+        }
+      : null;
+  }
+
+  if (!response.ok) {
+    const message = data && typeof data === 'object' && data.error
+      ? data.error
+      : `HTTP ${response.status}`;
+    throw new ToolError(`${message}`);
+  }
+  return data;
+}
+
+// --------------------------------------------------------
+// Registry: Definition + Handler je Tool an EINER Stelle.
+// `handler(ctx, args)` mit ctx = { db, actor: { id, role }, requestHeaders }.
+// --------------------------------------------------------
+
+const CORE_TOOLS = [
   {
     name: 'list_tasks',
     description: 'List the family\'s current top-level tasks (open by default). Optionally filter by status.',
@@ -253,19 +467,100 @@ const TOOLS = [
   },
 ];
 
-// Abgeleitet aus TOOLS — keine getrennt zu pflegende Struktur.
-const TOOL_DEFINITIONS = TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }));
-const TOOL_MAP = new Map(TOOLS.map((t) => [t.name, t]));
+// Generische Brücke — hält die Tool-Liste schlank und deckt trotzdem die
+// gesamte dokumentierte API ab, ohne pro Route einen Wrapper zu pflegen.
+const OPENAPI_TOOLS = [
+  {
+    name: 'list_api_operations',
+    description: 'List Yuvomi REST API operations reachable through call_api_operation.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tag: { type: 'string', description: 'Optional OpenAPI tag filter (e.g. Budget, Calendar).' },
+        search: { type: 'string', description: 'Optional text search across key, path, tag and summary.' },
+        include_parameters: { type: 'boolean', description: 'Include full OpenAPI parameter metadata.' },
+      },
+    },
+    handler: (_ctx, args) => {
+      const tagFilter = args.tag ? normalizeText(args.tag) : '';
+      const searchFilter = args.search ? normalizeText(args.search) : '';
+      const operations = [];
+      for (const operation of openApiOperations().values()) {
+        const haystack = normalizeText([
+          operation.operation_key,
+          operation.method,
+          operation.path,
+          operation.tag,
+          operation.summary,
+          operation.description,
+        ].join(' '));
+        if (tagFilter && normalizeText(operation.tag) !== tagFilter) continue;
+        if (searchFilter && !haystack.includes(searchFilter)) continue;
+        operations.push(publicOperationView(operation, args.include_parameters === true));
+      }
+      operations.sort((a, b) => `${a.tag} ${a.path} ${a.method}`.localeCompare(`${b.tag} ${b.path} ${b.method}`));
+      return { count: operations.length, operations };
+    },
+  },
+  {
+    name: 'get_api_operation',
+    description: 'Return OpenAPI metadata for one Yuvomi API operation key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        operation_key: { type: 'string', description: 'Operation key returned by list_api_operations.' },
+      },
+      required: ['operation_key'],
+    },
+    handler: (_ctx, args) => publicOperationView(resolveOpenApiOperation(args), true),
+  },
+  {
+    name: 'call_api_operation',
+    description: 'Call any Yuvomi REST API operation from the live OpenAPI spec. Runs with the permissions of the authenticated MCP token — admin-only routes require an admin token.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        operation_key: { type: 'string', description: 'Operation key returned by list_api_operations.' },
+        method: { type: 'string', description: 'HTTP method, used with path when operation_key is omitted.' },
+        path: { type: 'string', description: 'OpenAPI path, used with method when operation_key is omitted.' },
+        path_params: { type: 'object', description: 'Values for path template parameters.' },
+        query: { type: 'object', description: 'Query string parameters.' },
+        payload: { description: 'JSON request body.' },
+        content_data: { type: 'string', description: 'Base64 or base64 data URL for binary uploads.' },
+      },
+    },
+    handler: (ctx, args) => {
+      const operation = resolveOpenApiOperation(args);
+      const path = renderPath(operation.path, args.path_params || {});
+      const contentTypes = operation.request_content_types || [];
+      const contentType = contentTypes.includes('application/octet-stream')
+        ? 'application/octet-stream'
+        : contentTypes[0];
+      return internalApiRequest(ctx, operation.method, path, {
+        query: args.query,
+        payload: args.payload,
+        contentData: args.content_data,
+        contentType,
+      });
+    },
+  },
+];
+
+const ALL_TOOLS = [...CORE_TOOLS, ...OPENAPI_TOOLS];
+
+// Abgeleitet aus der Registry — keine getrennt zu pflegende Struktur.
+const TOOL_DEFINITIONS = ALL_TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }));
+const TOOL_MAP = new Map(ALL_TOOLS.map((t) => [t.name, t]));
 
 /**
  * Führt ein Tool aus.
- * @param {{ db: object, actor: { id: number, role?: string } }} ctx
+ * @param {{ db: object, actor: { id: number, role?: string }, requestHeaders?: object }} ctx
  * @param {string} name  - Tool-Name
  * @param {object} args  - Tool-Argumente
- * @returns {any} rohes Ergebnis (wird vom Protokoll-Layer serialisiert)
+ * @returns {Promise<any>} rohes Ergebnis (wird vom Protokoll-Layer serialisiert)
  * @throws {ToolError} bei unbekanntem Tool oder Validierungsfehler
  */
-function callTool(ctx, name, args = {}) {
+async function callTool(ctx, name, args = {}) {
   const tool = TOOL_MAP.get(name);
   if (!tool) throw new ToolError(`Unknown tool: ${name}`);
   return tool.handler(ctx, args || {});

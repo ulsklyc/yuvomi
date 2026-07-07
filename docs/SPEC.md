@@ -1474,15 +1474,17 @@ An OpenAPI 3.0 specification is served at `/api/v1/openapi.json` and `/openapi.j
 Authentication options for external integrations:
 - **Session cookie:** standard browser session after login
 - **Bearer token:** `Authorization: Bearer <token>` — tokens created via Settings → Administration → API access (admin only)
-- **X-API-Key header:** `X-API-Key: <token>` — alternative header accepted alongside Bearer
+- **X-API-Key header:** `X-API-Key: <token>` — alternative header accepted alongside Bearer (the plain `API-Key` header is also accepted for MCP-client compatibility)
 
 ### MCP Endpoint
 
-A stateless [Model Context Protocol](https://modelcontextprotocol.io) endpoint is served at `/mcp` (JSON-RPC 2.0 over HTTP). It lets AI agents such as Claude Desktop read and create the most common entities via natural language. Authentication reuses the API tokens above — send the token as `Authorization: Bearer <token>`; no CSRF token is required, and no additional env var or port is needed.
+A stateless [Model Context Protocol](https://modelcontextprotocol.io) endpoint is served at `/mcp` (JSON-RPC 2.0 over HTTP). It lets AI agents such as Claude Desktop drive the planner via natural language. Authentication reuses the API tokens above — send the token as `Authorization: Bearer <token>`; no CSRF token is required, and no new port is needed.
 
 - **Methods:** `initialize`, `tools/list`, `tools/call`, `ping`.
-- **Tools (v1):** `list_tasks`, `create_task`, `list_shopping_items`, `add_shopping_item`, `list_upcoming_events`, `create_event`.
+- **Curated core tools:** `list_tasks`, `create_task`, `list_shopping_items`, `add_shopping_item`, `list_upcoming_events`, `create_event` — fast, in-process handlers for the most common actions.
+- **OpenAPI bridge:** `list_api_operations` and `get_api_operation` discover every documented REST operation; `call_api_operation` invokes any of them over an authenticated loopback call. This exposes the full API through one mechanism instead of a per-route tool, and every call inherits the token's permissions (admin-only routes require an admin token).
 - Each call runs as the token's creating user and inherits that user's role. HTTPS is strongly recommended.
+- **Optional:** `MCP_INTERNAL_BASE_URL` overrides the base URL the bridge calls back into; it defaults to `BASE_URL` or `http://127.0.0.1:<PORT>` and is only needed for non-standard bind addresses.
 
 ---
 

@@ -38,9 +38,11 @@ function fail(id, code, message) {
  * @param {{ id: number, role?: string }} actor - authentifizierter Akteur
  * @param {any}    body      - geparster Request-Body
  * @param {(err: Error) => void} [onInternalError] - Logging-Hook für interne Fehler
- * @returns {object|null} JSON-RPC-Antwort oder null (Notification)
+ * @param {{ requestHeaders?: object }} [requestContext] - Request-Kontext für die
+ *        OpenAPI-Brücke (Auth-Header-Weiterleitung beim Loopback-Aufruf)
+ * @returns {Promise<object|null>} JSON-RPC-Antwort oder null (Notification)
  */
-function handleMcpRequest(database, actor, body, onInternalError) {
+async function handleMcpRequest(database, actor, body, onInternalError, requestContext = {}) {
   // Batches werden ab MCP 2025-06-18 nicht unterstützt.
   if (Array.isArray(body)) {
     return fail(null, INVALID_REQUEST, 'Batch requests are not supported.');
@@ -86,7 +88,11 @@ function handleMcpRequest(database, actor, body, onInternalError) {
         }
         const args = (params && params.arguments) || {};
         try {
-          const data = callTool({ db: database, actor }, name, args);
+          const data = await callTool(
+            { db: database, actor, requestHeaders: requestContext.requestHeaders || {} },
+            name,
+            args,
+          );
           return ok(id, {
             content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
             isError: false,

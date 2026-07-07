@@ -395,6 +395,7 @@ All configuration happens in the `.env` file. The container reads these values o
 | `RATE_LIMIT_MAX_ATTEMPTS` | Max login attempts per window | `5` | No |
 | `RATE_LIMIT_BLOCK_DURATION_MS` | Block duration after exceeding limit (ms) | `900000` | No |
 | `ENABLE_API_DOCS` | API documentation (`/docs`, `/openapi.json`) is admin-only and hidden entirely in production. Set to `true` to expose it to signed-in admins in production too. | `false` (hidden) | No |
+| `MCP_INTERNAL_BASE_URL` | Base URL the built-in MCP endpoint (`/mcp`) uses when its `call_api_operation` bridge calls the REST API back over loopback. Only needed for non-standard bind addresses. | `BASE_URL` or `http://127.0.0.1:<PORT>` | No |
 
 Generate a secure `SESSION_SECRET`:
 

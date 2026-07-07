@@ -214,7 +214,7 @@ function hashApiToken(token) {
 function extractApiToken(req) {
   const auth = req.headers.authorization || '';
   if (auth.toLowerCase().startsWith('bearer ')) return auth.slice(7).trim();
-  return String(req.headers['x-api-key'] || '').trim();
+  return String(req.headers['x-api-key'] || req.headers['api-key'] || '').trim();
 }
 
 function publicApiToken(row) {

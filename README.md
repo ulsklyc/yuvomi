@@ -180,7 +180,7 @@ New home: **https://yuvomi.cloud/** · Questions? Open a [discussion](https://gi
 | ![birthdays](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/birthdays.png) | **Birthdays** | Birthday tracker with automatic calendar events, age display, and custom reminders. |
 | ![family](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/family.png) | **Family** | Member profiles with roles, photos, and contact details — synced to Contacts and Birthdays. |
 | ![reminders](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/reminders.png) | **Reminders** | Task and calendar reminders via in-app badges, opt-in Web Push (HTTPS), and household Gotify/ntfy channels. |
-| ![api-tokens](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/api-tokens.png) | **API Tokens** | Bearer / X-API-Key tokens with an OpenAPI 3.0 spec and a built-in MCP endpoint (`/mcp`) for AI agents like Claude Desktop. |
+| ![api-tokens](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/api-tokens.png) | **API Tokens** | Bearer / X-API-Key tokens with an OpenAPI 3.0 spec and a built-in MCP endpoint (`/mcp`) that lets AI agents like Claude Desktop drive the whole API in natural language. |
 | ![backup](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/backup.png) | **Backup** | Manual and scheduled database backup/restore with pre-restore rollback. Optional WebDAV upload (Nextcloud, ownCloud, etc.). |
 
 <sub>Full data model and per-module details in the <a href="docs/SPEC.md">Spec</a>.</sub>
