@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.101.0] - 2026-07-07
+
+### Added
+- **Rename and delete document folders** — custom folders in the Documents module can now be renamed or deleted from a per-folder overflow menu. Deleting a folder keeps its documents; their folder link is simply cleared (#453).
+- **Context-aware document upload** — new uploads are pre-assigned to the folder currently selected in the folder browser (still changeable in the upload dialog) (#453).
+
+### Changed
+- **Streamlined document folder controls** — the redundant folder filter dropdown was removed so the folder browser is the single place to pick a folder, and "New folder" moved into the folder browser header. The browser stays responsive across the desktop sidebar and the mobile chip rail (#453).
+
 ## [0.100.0] - 2026-07-07
 
 ### Added

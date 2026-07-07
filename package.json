@@ -1,6 +1,6 @@
 {
   "name": "yuvomi",
-  "version": "0.100.0",
+  "version": "0.101.0",
   "description": "Self-hosted family planner - calendar, tasks, shopping, meal planning, budget and more. Private, open-source, no subscription.",
   "main": "server/index.js",
   "type": "module",
@@ -80,6 +80,7 @@
     "test:housekeeping": "node --experimental-sqlite test/test-housekeeping.js",
     "test:documents": "node --experimental-sqlite test/test-documents.js",
     "test:document-storage": "node --experimental-sqlite --test test/test-document-storage.js",
+    "test:document-folders": "node --experimental-sqlite --test test/test-document-folders.js",
     "test:dms-adapter": "node --test test/test-dms-adapter.js",
     "test:dms-routes": "node --test test/test-dms-routes.js",
     "test:dms-papra-adapter": "node --test test/test-dms-papra-adapter.js",

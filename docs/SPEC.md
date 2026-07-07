@@ -1274,7 +1274,7 @@ Upload and manage family files with per-document access control.
 
 - CRUD: name, description, category, file upload (PDF, images, text, Office documents; ≤ 5 MB)
 - Drag-and-drop upload in the new-document modal
-- **Folder browser:** documents can be organized into custom folders; a sidebar lists all folders plus "Alle Ordner"; a "Hausreinigung" folder is auto-created when the first housekeeping worker is added
+- **Folder browser:** documents can be organized into custom folders; a sidebar lists all folders plus "Alle Ordner" and "Kein Ordner". Custom folders can be created, renamed, and deleted (via a per-folder overflow menu); deleting a folder keeps its documents (their folder link is cleared). New uploads are pre-assigned to the currently selected folder. A "Hausreinigung" folder is auto-created when the first housekeeping worker is added
 - **Grid / list view** toggle; view mode persisted in localStorage
 - **Responsive toolbar:** at tablet widths (768–1023px), the search field moves to a full-width second row so the page title, filters, and view controls remain readable.
 - **Category tags:** 14 predefined categories (medical, school, identity, insurance, finance, home, vehicle, legal, travel, pets, warranty, taxes, work, other)

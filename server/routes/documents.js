@@ -415,6 +415,45 @@ router.post('/folders', (req, res) => {
   }
 });
 
+router.put('/folders/:id', (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'Invalid folder id.', code: 400 });
+    }
+    const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
+    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
+    const existing = db.get().prepare('SELECT id FROM family_document_folders WHERE id = ?').get(id);
+    if (!existing) return res.status(404).json({ error: 'Folder not found.', code: 404 });
+    db.get().prepare('UPDATE family_document_folders SET name = ? WHERE id = ?').run(vName.value, id);
+    const row = db.get().prepare('SELECT id, name, created_by, created_at, updated_at FROM family_document_folders WHERE id = ?').get(id);
+    res.json({ data: row });
+  } catch (err) {
+    if (err.message?.includes('UNIQUE constraint')) {
+      return res.status(409).json({ error: 'Folder already exists.', code: 409 });
+    }
+    log.error('PUT /folders/:id error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+router.delete('/folders/:id', (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'Invalid folder id.', code: 400 });
+    }
+    const existing = db.get().prepare('SELECT id FROM family_document_folders WHERE id = ?').get(id);
+    if (!existing) return res.status(404).json({ error: 'Folder not found.', code: 404 });
+    // Dokumente behalten ihre Zeile: folder_id wird per ON DELETE SET NULL geleert.
+    db.get().prepare('DELETE FROM family_document_folders WHERE id = ?').run(id);
+    res.json({ data: { id } });
+  } catch (err) {
+    log.error('DELETE /folders/:id error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
 router.get('/', (req, res) => {
   try {
     const status = STATUSES.includes(req.query.status) ? req.query.status : 'active';

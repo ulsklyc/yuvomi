@@ -144,10 +144,40 @@
   overflow: hidden;
 }
 
-.documents-folder-browser__title {
-  padding: var(--space-3) var(--space-4);
+.documents-folder-browser__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.documents-folder-browser__title {
   color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.documents-folder-browser__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--target-sm);
+  height: var(--target-sm);
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  color: var(--module-accent);
+  transition: background-color var(--transition-fast);
+}
+
+.documents-folder-browser__add:hover {
+  background: color-mix(in srgb, var(--module-accent) 12%, transparent);
+}
+
+.documents-folder-browser__add svg {
+  width: 18px;
+  height: 18px;
 }
 
 .documents-folder-browser__list {
@@ -158,6 +188,15 @@
 }
 
 .documents-folder-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+}
+
+.documents-folder-item__select {
+  flex: 1;
+  min-width: 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -172,7 +211,97 @@
 .documents-folder-item:hover,
 .documents-folder-item--active {
   background: color-mix(in srgb, var(--module-accent) 12%, transparent);
+}
+
+.documents-folder-item:hover .documents-folder-item__select,
+.documents-folder-item--active .documents-folder-item__select {
   color: var(--module-accent);
+}
+
+/* Overflow-Kebab: dezent, erscheint bei Hover/Fokus; auf Touch stets sichtbar. */
+.documents-folder-item__menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--target-sm);
+  height: var(--target-sm);
+  margin-right: 2px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  opacity: 0;
+  transition: opacity var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.documents-folder-item__menu svg {
+  width: 16px;
+  height: 16px;
+}
+
+.documents-folder-item:hover .documents-folder-item__menu,
+.documents-folder-item:focus-within .documents-folder-item__menu {
+  opacity: 1;
+}
+
+.documents-folder-item__menu:hover {
+  color: var(--module-accent);
+  background: color-mix(in srgb, var(--module-accent) 14%, transparent);
+}
+
+@media (hover: none) {
+  .documents-folder-item__menu {
+    opacity: 1;
+  }
+}
+
+/* Body-Level Popover für Ordner-Aktionen (entkommt overflow-Clipping). */
+.documents-folder-menu {
+  position: fixed;
+  z-index: var(--z-dropdown);
+  min-width: 184px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.documents-folder-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--target-sm);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+.documents-folder-menu__item svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+}
+
+.documents-folder-menu__item:hover,
+.documents-folder-menu__item:focus-visible {
+  background: var(--color-surface-2);
+}
+
+.documents-folder-menu__item--danger,
+.documents-folder-menu__item--danger svg {
+  color: var(--color-danger);
+}
+
+.documents-folder-menu__item--danger:hover,
+.documents-folder-menu__item--danger:focus-visible {
+  background: var(--color-danger-light);
 }
 
 .documents-folder-item__icon {

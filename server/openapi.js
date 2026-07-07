@@ -1014,6 +1014,10 @@ function buildPaths() {
       get: op({ summary: 'List document folders', tag: 'Documents' }),
       post: op({ summary: 'Create document folder', tag: 'Documents', stateChanging: true, requestBody: jsonBody(null) }),
     },
+    '/api/v1/documents/folders/{id}': {
+      put: op({ summary: 'Rename document folder', tag: 'Documents', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      delete: op({ summary: 'Delete document folder (documents keep their row, folder link is cleared)', tag: 'Documents', params: [idParam()], stateChanging: true }),
+    },
     '/api/v1/documents': {
       get: op({
         summary: 'List family documents',

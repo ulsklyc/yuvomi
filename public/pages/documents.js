@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, selectModal, advancedSection } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal } from '/components/modal.js';
 import { t, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { stagger } from '/utils/ux.js';
@@ -87,10 +87,6 @@ export async function render(container) {
                 <i data-lucide="list" aria-hidden="true"></i>
               </button>
             </div>
-            <button class="btn btn--secondary" id="documents-folder-btn">
-              <i data-lucide="folder-plus" class="icon-md" aria-hidden="true"></i>
-              ${t('documents.addFolderButton')}
-            </button>
             <label class="documents-filter-field" for="documents-status">
               <span>${t('documents.statusLabel')}</span>
               <select class="input documents-filter-select" id="documents-status">
@@ -105,19 +101,17 @@ export async function render(container) {
                 ${CATEGORIES.map((category) => `<option value="${category}">${categoryLabels()[category]}</option>`).join('')}
               </select>
             </label>
-            <label class="documents-filter-field" for="documents-folder">
-              <span>${t('documents.folderBrowserTitle')}</span>
-              <select class="input documents-filter-select" id="documents-folder">
-                <option value="">${t('documents.allFolders')}</option>
-                <option value="__none">${t('documents.noFolder')}</option>
-              </select>
-            </label>
           </div>
         </details>
       </div>
       <div class="documents-browser-layout">
         <aside class="documents-folder-browser" aria-label="${t('documents.folderBrowserTitle')}">
-          <div class="documents-folder-browser__title">${t('documents.folderBrowserTitle')}</div>
+          <div class="documents-folder-browser__head">
+            <span class="documents-folder-browser__title">${t('documents.folderBrowserTitle')}</span>
+            <button class="documents-folder-browser__add" id="documents-folder-add" type="button" aria-label="${t('documents.addFolderButton')}" title="${t('documents.addFolderButton')}">
+              <i data-lucide="folder-plus" aria-hidden="true"></i>
+            </button>
+          </div>
           <div class="documents-folder-browser__list" id="documents-folder-browser"></div>
         </aside>
         <div id="documents-list" class="documents-list documents-list--${state.view}" aria-busy="true">${renderSkeletonList({ rows: 6, lines: 2 })}</div>
@@ -134,7 +128,6 @@ export async function render(container) {
   await loadDocuments();
   renderDmsHeaderBtn();
   bindPageEvents();
-  renderFolderOptions();
   renderFolderBrowser();
   renderDocuments();
 }
@@ -185,25 +178,11 @@ function renderDmsHeaderBtn() {
   btn.append(icon);
   btn.append(document.createTextNode(t('documents.linkFromDms')));
   btn.addEventListener('click', () => openDmsLinkModal());
-  // Insert after the folder button
-  const folderBtn = toolbar.querySelector('#documents-folder-btn');
-  if (folderBtn) {
-    folderBtn.insertAdjacentElement('afterend', btn);
-  } else {
-    toolbar.append(btn);
-  }
+  // Vor die Sekundär-Steuerung (Slider) hängen, damit die Toolbar-Reihenfolge stimmt.
+  const secondary = toolbar.querySelector('.documents-secondary-controls');
+  if (secondary) secondary.insertAdjacentElement('beforebegin', btn);
+  else toolbar.append(btn);
   if (window.lucide) lucide.createIcons({ el: btn });
-}
-
-function renderFolderOptions() {
-  const select = _container.querySelector('#documents-folder');
-  if (!select) return;
-  select.replaceChildren();
-  select.insertAdjacentHTML('beforeend', `<option value="">${t('documents.allFolders')}</option>`);
-  select.insertAdjacentHTML('beforeend', `<option value="__none" ${state.folderId === '__none' ? 'selected' : ''}>${t('documents.noFolder')}</option>`);
-  state.folders.forEach((folder) => {
-    select.insertAdjacentHTML('beforeend', `<option value="${folder.id}" ${String(folder.id) === String(state.folderId) ? 'selected' : ''}>${esc(folder.name)}</option>`);
-  });
 }
 
 function syncFolderDocuments() {
@@ -217,7 +196,7 @@ function syncFolderDocuments() {
 }
 
 function bindPageEvents() {
-  _container.querySelector('#documents-folder-btn')?.addEventListener('click', () => openFolderModal());
+  _container.querySelector('#documents-folder-add')?.addEventListener('click', () => openFolderModal());
   _container.querySelector('#fab-new-document')?.addEventListener('click', () => openDocumentModal());
   let documentsSearchTimer;
   _container.querySelector('#documents-search')?.addEventListener('input', (e) => {
@@ -240,12 +219,6 @@ function bindPageEvents() {
     renderFolderBrowser();
     renderDocuments();
   });
-  _container.querySelector('#documents-folder')?.addEventListener('change', async (e) => {
-    state.folderId = e.target.value;
-    syncFolderDocuments();
-    renderFolderBrowser();
-    renderDocuments();
-  });
   _container.querySelector('.documents-view-toggle')?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-view]');
     if (!btn) return;
@@ -258,11 +231,16 @@ function bindPageEvents() {
   });
   _container.querySelector('#documents-list')?.addEventListener('click', handleDocumentAction);
   _container.querySelector('#documents-folder-browser')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-folder-id]');
+    const menuBtn = e.target.closest('[data-folder-menu]');
+    if (menuBtn) {
+      const folder = state.folders.find((f) => String(f.id) === menuBtn.dataset.folderMenu);
+      if (folder) openFolderMenu(folder, menuBtn);
+      return;
+    }
+    const btn = e.target.closest('[data-folder-select]');
     if (!btn) return;
-    state.folderId = btn.dataset.folderId;
+    state.folderId = btn.dataset.folderSelect;
     syncFolderDocuments();
-    renderFolderOptions();
     renderFolderBrowser();
     renderDocuments();
   });
@@ -331,19 +309,128 @@ function renderFolderBrowser() {
   if (!browser) return;
   const counts = folderCounts();
   const items = [
-    { id: '', name: t('documents.allFolders'), icon: 'folders' },
-    { id: '__none', name: t('documents.noFolder'), icon: 'folder-x' },
-    ...state.folders.map((folder) => ({ id: String(folder.id), name: folder.name, icon: 'folder' })),
+    { id: '', name: t('documents.allFolders'), icon: 'folders', managed: false },
+    { id: '__none', name: t('documents.noFolder'), icon: 'folder-x', managed: false },
+    ...state.folders.map((folder) => ({ id: String(folder.id), name: folder.name, icon: 'folder', managed: true })),
   ];
   browser.replaceChildren();
-  browser.insertAdjacentHTML('beforeend', items.map((item) => `
-    <button class="documents-folder-item ${String(state.folderId) === item.id ? 'documents-folder-item--active' : ''}" type="button" data-folder-id="${esc(item.id)}" aria-current="${String(state.folderId) === item.id ? 'true' : 'false'}">
-      <span class="documents-folder-item__icon"><i data-lucide="${esc(item.icon)}" aria-hidden="true"></i></span>
-      <span class="documents-folder-item__name">${esc(item.name)}</span>
-      <span class="documents-folder-item__count">${counts.get(item.id) || 0}</span>
-    </button>
-  `).join(''));
+  browser.insertAdjacentHTML('beforeend', items.map((item) => {
+    const active = String(state.folderId) === item.id;
+    return `
+    <div class="documents-folder-item ${active ? 'documents-folder-item--active' : ''} ${item.managed ? 'documents-folder-item--managed' : ''}">
+      <button class="documents-folder-item__select" type="button" data-folder-select="${esc(item.id)}" aria-current="${active ? 'true' : 'false'}">
+        <span class="documents-folder-item__icon"><i data-lucide="${esc(item.icon)}" aria-hidden="true"></i></span>
+        <span class="documents-folder-item__name">${esc(item.name)}</span>
+        <span class="documents-folder-item__count">${counts.get(item.id) || 0}</span>
+      </button>
+      ${item.managed ? `
+      <button class="documents-folder-item__menu" type="button" data-folder-menu="${esc(item.id)}" aria-label="${t('documents.folderActions')}" title="${t('documents.folderActions')}">
+        <i data-lucide="more-vertical" aria-hidden="true"></i>
+      </button>` : ''}
+    </div>`;
+  }).join(''));
   if (window.lucide) lucide.createIcons({ el: browser });
+}
+
+// --------------------------------------------------------
+// Ordner-Aktionen: Overflow-Menü (umbenennen / löschen)
+// --------------------------------------------------------
+
+let _folderMenu = null;
+
+function closeFolderMenu() {
+  if (!_folderMenu) return;
+  const { el, onDoc, onKey } = _folderMenu;
+  document.removeEventListener('click', onDoc, true);
+  document.removeEventListener('keydown', onKey, true);
+  window.removeEventListener('resize', closeFolderMenu, true);
+  window.removeEventListener('scroll', closeFolderMenu, true);
+  el.remove();
+  _folderMenu = null;
+}
+
+function openFolderMenu(folder, anchorBtn) {
+  closeFolderMenu();
+  const menu = document.createElement('div');
+  menu.className = 'documents-folder-menu';
+  menu.setAttribute('role', 'menu');
+  // Body-Level + position:fixed → entkommt overflow-Clipping der Chip-Leiste/Sidebar.
+  menu.insertAdjacentHTML('beforeend', `
+    <button class="documents-folder-menu__item" type="button" role="menuitem" data-menu-action="rename">
+      <i data-lucide="pencil" aria-hidden="true"></i><span>${t('documents.renameFolder')}</span>
+    </button>
+    <button class="documents-folder-menu__item documents-folder-menu__item--danger" type="button" role="menuitem" data-menu-action="delete">
+      <i data-lucide="trash-2" aria-hidden="true"></i><span>${t('documents.deleteFolder')}</span>
+    </button>
+  `);
+  document.body.appendChild(menu);
+  if (window.lucide) lucide.createIcons({ el: menu });
+
+  const r = anchorBtn.getBoundingClientRect();
+  const mw = menu.offsetWidth;
+  const mh = menu.offsetHeight;
+  let left = Math.max(8, r.right - mw);
+  left = Math.min(left, window.innerWidth - mw - 8);
+  let top = r.bottom + 4;
+  if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 4);
+  menu.style.left = `${Math.round(left)}px`;
+  menu.style.top = `${Math.round(top)}px`;
+
+  const onDoc = (e) => {
+    if (menu.contains(e.target) || anchorBtn.contains(e.target)) return;
+    closeFolderMenu();
+  };
+  const onKey = (e) => { if (e.key === 'Escape') { closeFolderMenu(); anchorBtn.focus(); } };
+
+  menu.addEventListener('click', async (e) => {
+    const item = e.target.closest('[data-menu-action]');
+    if (!item) return;
+    const action = item.dataset.menuAction;
+    closeFolderMenu();
+    if (action === 'rename') await renameFolder(folder);
+    else if (action === 'delete') await deleteFolder(folder);
+  });
+
+  _folderMenu = { el: menu, onDoc, onKey };
+  setTimeout(() => {
+    document.addEventListener('click', onDoc, true);
+    document.addEventListener('keydown', onKey, true);
+    window.addEventListener('resize', closeFolderMenu, true);
+    window.addEventListener('scroll', closeFolderMenu, true);
+    menu.querySelector('[data-menu-action]')?.focus();
+  }, 0);
+}
+
+async function renameFolder(folder) {
+  const newName = await promptModal(t('documents.renameFolder'), folder.name);
+  if (!newName || newName === folder.name) return;
+  try {
+    await api.put(`/documents/folders/${folder.id}`, { name: newName });
+    window.yuvomi?.showToast(t('documents.folderRenamedToast'), 'success');
+    await loadFolders();
+    renderFolderBrowser();
+  } catch (err) {
+    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+  }
+}
+
+async function deleteFolder(folder) {
+  const confirmed = await confirmModal(
+    t('documents.deleteFolderConfirm', { name: folder.name }),
+    { danger: true, confirmLabel: t('documents.deleteFolder') },
+  );
+  if (!confirmed) return;
+  try {
+    await api.delete(`/documents/folders/${folder.id}`);
+    window.yuvomi?.showToast(t('documents.folderDeletedToast'), 'default');
+    if (String(state.folderId) === String(folder.id)) state.folderId = '';
+    await loadFolders();
+    await loadDocuments();
+    renderFolderBrowser();
+    renderDocuments();
+  } catch (err) {
+    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+  }
 }
 
 function renderMeta(doc) {
@@ -525,6 +612,13 @@ function memberOptions(selected = []) {
 function openDocumentModal(doc = null) {
   const isEdit = !!doc;
 
+  // Kontextbezogener Upload: ist im Browser ein echter Ordner gewählt, wird er
+  // im Modal vorausgewählt (weiterhin änderbar). „Alle Ordner"/„Kein Ordner"
+  // (leer bzw. __none) setzen keinen Zielordner.
+  const presetFolderId = (!isEdit && state.folderId && state.folderId !== '__none')
+    ? String(state.folderId)
+    : String(doc?.folder_id || '');
+
   // Sekundärfelder: Beschreibung, Sichtbarkeit/Status + Mitglieder-Freigabe.
   const advancedOpen = isEdit && (
     !!doc.description
@@ -579,7 +673,7 @@ function openDocumentModal(doc = null) {
             <label class="label" for="document-folder">${t('documents.folderLabel')}</label>
             <select class="input" id="document-folder">
               <option value="">${t('documents.noFolder')}</option>
-              ${state.folders.map((folder) => `<option value="${folder.id}" ${String(doc?.folder_id || '') === String(folder.id) ? 'selected' : ''}>${esc(folder.name)}</option>`).join('')}
+              ${state.folders.map((folder) => `<option value="${folder.id}" ${presetFolderId === String(folder.id) ? 'selected' : ''}>${esc(folder.name)}</option>`).join('')}
             </select>
           </div>
         </div>
@@ -733,7 +827,7 @@ function openFolderModal() {
           await loadFolders();
           await loadDocuments();
           closeModal({ force: true });
-          renderFolderOptions();
+          syncFolderDocuments();
           renderFolderBrowser();
           renderDocuments();
         } catch (err) {
