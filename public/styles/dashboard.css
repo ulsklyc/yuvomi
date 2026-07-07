@@ -61,11 +61,13 @@
   position: relative;
   min-width: 0;
   container: dashboard-widget / inline-size;
-  /* content-fit: ein Widget mit kurzer „Heute"-Liste streckt sich NICHT auf die
-   * volle Höhe seiner (evtl. 2 Reihen hohen) Grid-Zelle — es bleibt so hoch wie
-   * sein Inhalt und rückt nach oben. Kein halbleerer Rahmen mehr; der Restraum
-   * wird zu ruhigem Weißraum statt zur toten Kartenfläche. */
-  align-self: start;
+  /* row-fill: Widgets füllen die volle Höhe ihrer Grid-Zelle, damit alle Kacheln
+   * einer Reihe bündig gleich hoch abschließen. Der frühere content-fit
+   * (align-self:start) ließ kurze Widgets oben „kleben" und erzeugte genau die
+   * ausgefransten Unterkanten + toten Lücken, die als „unschöne Verteilung"
+   * gelesen wurden. Der Inhalt bleibt oben ausgerichtet (Widget-Body flex:1),
+   * überschüssige Höhe wird zu ruhigem Innenraum statt zum Zeilen-Void. */
+  align-self: stretch;
 }
 
 .widget-wrapper > .widget {
@@ -96,13 +98,15 @@
 
 @media (min-width: 1024px) {
   .dashboard__grid {
-    grid-template-columns: repeat(3, 1fr);
+    /* Auto-fill-Bento (Critique P0 „tote Spalte"): die Spaltenzahl folgt der
+     * TATSÄCHLICHEN Grid-Breite (sidebar-bewusst) statt einer starren 3/4-Stufe.
+     * So springt das Raster nicht bei genau 3 Spalten in eine halb-leere rechte
+     * Spalte, sondern atmet mit der Fensterbreite (3–6 Spalten). `dense` + die
+     * Zeilen-Spans der hohen Widgets füllen Restlücken; verbleibender Weißraum
+     * wandert ans ruhige Grid-Ende statt in die Mitte. */
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
     grid-auto-rows: minmax(132px, auto);
     gap: var(--space-5);
-    /* Default (Autor-Layout): `dense` packt kleine Kacheln in die Lücken breiter
-     * Kacheln — kein toter Weißraum auf breitem Desktop. Sobald der Nutzer die
-     * Reihenfolge bewusst ändert, schaltet `.dashboard__grid--preserve-order` auf
-     * reines `row` um und bewahrt die gesetzte Ordnung (Critique P2). */
     grid-auto-flow: row dense;
   }
 
@@ -165,41 +169,10 @@
   }
 }
 
-@media (min-width: 1440px) {
-  .dashboard__grid {
-    grid-template-columns: repeat(4, 1fr);
-    grid-auto-flow: row dense;
-  }
-
-  /* Override hier wiederholen: sonst gewinnt die spätere `.dashboard__grid`-Regel
-   * bei gleicher Spezifität und packt umsortierte Layouts doch wieder dicht. */
-  .dashboard__grid--preserve-order {
-    grid-auto-flow: row;
-  }
-
-  .widget-size--1x1,
-  .widget-size--1x2,
-  .widget-size--1x3,
-  .widget-size--1x4 { grid-column: span 1; }
-  .widget-size--2x1,
-  .widget-size--2x2,
-  .widget-size--2x3,
-  .widget-size--2x4 {
-    grid-column: span 2;
-  }
-  .widget-size--3x1,
-  .widget-size--3x2,
-  .widget-size--3x3,
-  .widget-size--3x4 {
-    grid-column: span 3;
-  }
-  .widget-size--4x1,
-  .widget-size--4x2,
-  .widget-size--4x3,
-  .widget-size--4x4 {
-    grid-column: span 4;
-  }
-}
+/* Kein eigener 1440px-Block mehr: `repeat(auto-fill, minmax(240px, 1fr))` ab 1024px
+ * leitet die Spaltenzahl aus der Breite ab und deckt Wide-Screens (4–6 Spalten)
+ * stufenlos ab — die frühere feste 3-→4-Spalten-Stufe war die Quelle der starren
+ * halbleeren Spalte. Breite Widgets kappen bei span 3 (siehe 1024px-Block). */
 
 /* Primäre Widgets: subtile Akzentlinie oben — auf Dashboard einheitlich gedämpft */
 .widget-size--1x2 > .widget,
@@ -573,7 +546,9 @@
 .event-item__cal {
   width: 100%;
   font-size: var(--text-xs);
-  color: var(--color-text-disabled);
+  /* Sichtbarer Kalendername = echter Meta-Text → lesbares Tertiär-Token
+   * (WCAG AA verifiziert) statt der disabled-Farbe (Critique/Assessment B). */
+  color: var(--color-text-tertiary);
 }
 
 .event-time-badge {
@@ -1463,7 +1438,7 @@ svg.weather-forecast__icon {
 }
 
 .customize-row__select {
-  min-height: var(--target-md);
+  min-height: var(--target-base);
   width: 132px;
   padding: 0 var(--space-1);
   font-size: var(--text-xs);
@@ -1497,6 +1472,19 @@ svg.weather-forecast__icon {
 .customize-row__btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+/* Auf Touch-Eingabe (Finger) müssen die kompakten Anpassen-/Edit-Controls das
+ * 44px-iOS-Minimum erreichen; auf dem Desktop (Maus) bleiben sie schlank bei
+ * --target-md (Assessment B: Touch-Target < 44px). */
+@media (pointer: coarse) {
+  .customize-row__btn,
+  .widget-edit-controls__handle,
+  .widget-edit-controls__hide,
+  .widget-edit-controls__move-btn {
+    min-width: var(--target-base);
+    min-height: var(--target-base);
+  }
 }
 
 /* ── Onboarding Overlay ── */
@@ -1669,7 +1657,12 @@ svg.weather-forecast__icon {
   gap: var(--space-3);
   border: 1px solid color-mix(in srgb, var(--module-accent) 24%, var(--color-border));
   border-radius: var(--radius-sm);
-  background: var(--color-surface);
+  /* Cockpit-Differenzierung (Critique P1): das „Heute"-Band trägt eine subtile,
+   * solide Akzent-Tönung und liest so als hervorgehobene Glance-Zusammenfassung —
+   * klar abgesetzt von der ruhigen weißen Modul-Ebene darunter. Solide color-mix
+   * (kein Verlauf) ist #166-sicher, gleiches Muster wie die Cockpit-Karten; die
+   * ~5%-Tönung bleibt weit unter der 10%-Akzent-Schwelle (DESIGN.md Scarcity). */
+  background: color-mix(in srgb, var(--module-accent) 5%, var(--color-surface));
   padding: var(--space-4);
   box-shadow: var(--shadow-sm);
   /* Container: die Glance-Metriken werden vierspaltig nach EIGENEM Platz,
@@ -2010,9 +2003,9 @@ svg.weather-forecast__icon {
   flex-wrap: wrap;
 }
 
-.dashboard-customize-toolbar .btn {
-  min-height: var(--target-md);
-}
+/* Kein min-height-Override hier: der Basis-.btn ist bereits 48px (mobil) / 40px
+ * (Desktop). Der frühere Override auf --target-md (40px) schrumpfte die Toolbar-
+ * Buttons auch mobil unter das 44px-iOS-Minimum (Assessment B). */
 
 .dashboard-customize-toolbar .btn i {
   width: 16px;

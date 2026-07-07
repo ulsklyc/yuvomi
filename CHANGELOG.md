@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.99.1] - 2026-07-07
+
+### Changed
+- **Dashboard grid breathes with the window width** — on desktop the widget grid now derives its column count from the actual grid width (`auto-fill`, 3–6 columns) instead of jumping between fixed 3- and 4-column steps, removing the rigid half-empty column that appeared at exactly 3 columns. Widgets also stretch to fill their row height so tiles in a row end flush, replacing the frayed bottom edges and dead gaps left by the previous content-fit behaviour.
+- **Dashboard "Today" band stands out** — the glance summary band now carries a subtle solid accent tint so it reads as a highlighted cockpit summary, clearly set apart from the calm surface below it.
+
+### Fixed
+- **Dashboard calendar names were hard to read** — the calendar label under each event used the disabled text colour; it now uses the readable tertiary text token (WCAG AA verified).
+- **Dashboard customize/edit controls were too small to tap** — the compact customize, edit, hide and reorder controls plus the customize-toolbar buttons now meet the 44px minimum touch target on touch devices, while staying slim on desktop with a mouse.
+
 ## [0.99.0] - 2026-07-07
 
 ### Added
