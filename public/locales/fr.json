@@ -1385,7 +1385,7 @@
         "dmsConnected": "Connexion DMS ajoutée.",
         "domainPersonal": "Personnel",
         "domainModules": "Modules",
-        "domainSync": "Synchronisation",
+        "domainSync": "Synchronization",
         "domainDocuments": "Documents",
         "domainAdministration": "Administration",
         "pageAccount": "Compte",
@@ -2139,10 +2139,10 @@
     },
     "help": {
         "title": "Aide",
-        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
-        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
-        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
-        "mobileSettings": "Einstellungen findest du unter „Mehr“."
+        "mobileNavigate": "Naviguez via la barre en bas et « Plus ».",
+        "mobileCreate": "Créez de nouveaux éléments avec le bouton + en bas à droite.",
+        "mobileSearch": "Ouvrez la recherche via « Plus » → Rechercher.",
+        "mobileSettings": "Vous trouvez les paramètres sous « Plus »."
     },
     "forgotPassword": {
         "title": "Reset password",
@@ -2333,7 +2333,7 @@
             "meds": "Médicaments",
             "labs": "Analyses",
             "activity": "Activité",
-            "cycle": "Zyklus"
+            "cycle": "Cycle"
         },
         "overview": {
             "title": "Aperçu",
@@ -2655,65 +2655,65 @@
         "disclaimer": "À des fins de documentation personnelle uniquement. Ne remplace pas un avis, un diagnostic ou un traitement médical.",
         "readOnlyBanner": "Vous consultez les données de {{name}} — lecture seule.",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "Cycle",
+            "emptyTitle": "Aucune donnée de cycle pour l’instant",
+            "emptyDesc": "Enregistrez vos premières règles pour voir les prévisions, le calendrier et les statistiques.",
+            "emptyCta": "Enregistrer les premières règles",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "Enregistrer les règles",
+            "loadError": "Impossible de charger les données du cycle.",
+            "loadErrorDesc": "Veuillez réessayer plus tard.",
+            "retry": "Réessayer",
+            "saved": "Enregistré.",
+            "saveError": "Impossible d’enregistrer.",
+            "deleted": "Supprimé.",
+            "deleteError": "Impossible de supprimer.",
+            "deleteConfirm": "Voulez-vous vraiment supprimer cette entrée ?",
+            "invalid": "Veuillez saisir des valeurs valides.",
+            "fertilityDisclaimer": "La fenêtre de fécondité et l’ovulation sont estimées par la méthode du calendrier. Elles ne constituent ni une contraception ni un avis médical.",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "Anneau du cycle",
+                "cycleDay": "Jour de cycle {{day}}",
+                "of": "sur {{total}}"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "Phase folliculaire",
+                "fertile": "Fenêtre de fécondité",
+                "ovulation": "Ovulation",
+                "luteal": "Phase lutéale"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "prévues aujourd’hui",
+                "inDays": "dans {{count}} jours",
+                "overdue": "{{count}} jours de retard",
+                "nextPeriod": "Prochaines règles",
+                "fertileWindow": "Fenêtre de fécondité",
+                "ovulation": "Ovulation",
+                "avgCycle": "Durée moyenne du cycle",
+                "avgPeriod": "Durée moyenne des règles",
+                "regularity": "Régularité",
+                "regular": "Régulier",
+                "irregular": "Irrégulier",
+                "notEnoughData": "Données insuffisantes",
+                "noPrediction": "Enregistrez des règles pour obtenir des prévisions."
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} jours"
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "Aujourd'hui",
+                "startPeriod": "Règles commencées",
+                "endPeriod": "Règles terminées",
+                "logDay": "Enregistrer le jour",
+                "startedToast": "Règles enregistrées pour aujourd’hui.",
+                "endedToast": "Règles terminées.",
+                "noOpenPeriod": "Aucune période en cours à terminer."
             },
             "calendar": {
-                "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "title": "Calendrier",
+                "prevMonth": "Mois précédent",
+                "nextMonth": "Mois suivant"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "Règles",
+                "predicted": "Prévu",
+                "fertile": "Fécond",
+                "ovulation": "Ovulation",
+                "today": "Aujourd'hui",
+                "logged": "Entrée"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "Évolution",
+                "ongoing": "en cours",
+                "empty": "Aucune période enregistrée pour l’instant.",
+                "cycleLength": "Cycle {{value}} jours"
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "Flux",
+                "none": "Aucune",
+                "spotting": "Spotting",
+                "light": "Léger",
+                "medium": "Moyenne",
+                "heavy": "Abondant"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "Symptômes",
+                "cramps": "Crampes",
+                "headache": "Mal de tête",
+                "backache": "Mal de dos",
+                "bloating": "Ballonnements",
+                "tenderBreasts": "Seins tendus",
+                "acne": "Acné",
+                "fatigue": "Fatigue",
+                "nausea": "Nausées",
+                "cravings": "Fringales",
+                "insomnia": "Insomnie"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "Humeur",
+                "none": "Non précisé",
+                "great": "Très bien",
+                "good": "Bien",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "Sensible",
+                "sad": "Triste",
+                "irritable": "Irritable",
+                "anxious": "Anxieux"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "Début",
+                "endDate": "Fin (facultatif)",
+                "note": "Note",
+                "visibility": "Visibilité"
             },
             "visibility": {
-                "private": "Privat",
-                "family": "Familie"
+                "private": "Privé",
+                "family": "Famille"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "Enregistrer les règles",
+                "edit": "Modifier les règles"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
-                "date": "Datum"
+                "title": "Enregistrer le jour",
+                "date": "Date"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "Exporter au format CSV"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "Paramètres",
+                "title": "Paramètres du cycle",
+                "cycleLength": "Durée moyenne du cycle",
+                "periodLength": "Durée moyenne des règles",
+                "lutealLength": "Durée de la phase lutéale",
+                "trackFertility": "Afficher la fenêtre de fécondité",
+                "autoHint": "Laisser vide = calculé automatiquement à partir de votre historique.",
+                "saved": "Settings saved."
             }
         }
     },

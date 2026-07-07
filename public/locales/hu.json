@@ -762,7 +762,7 @@
         "subcatRentMortgage": "Bérlet / Jelzálog",
         "subcatCondominium": "Társasházi díjak",
         "subcatUtilities": "Villany / Víz / Gáz",
-        "subcatInternetTvPhone": "Internet / TV / Telefon",
+        "subcatInternetTvPhone": "Internet / TV / telefon",
         "subcatRenovationMaintenance": "Felújítás / Karbantartás",
         "subcatCleaning": "Takarítás",
         "subcatGroceries": "Élelmiszer",
@@ -2333,7 +2333,7 @@
             "meds": "Gyógyszerek",
             "labs": "Laborértékek",
             "activity": "Tevékenység",
-            "cycle": "Zyklus"
+            "cycle": "Ciklus"
         },
         "overview": {
             "title": "Áttekintés",
@@ -2655,65 +2655,65 @@
         "disclaimer": "Csak személyes dokumentációhoz. Nem helyettesíti az orvosi tanácsadást, diagnózist vagy kezelést.",
         "readOnlyBanner": "{{name}} adatait látod – csak olvasható.",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "Ciklus",
+            "emptyTitle": "Még nincsenek ciklusadatok",
+            "emptyDesc": "Rögzítsd az első menstruációdat, hogy lásd az előrejelzéseket, a naptárat és a statisztikát.",
+            "emptyCta": "Első menstruáció rögzítése",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "Menstruáció rögzítése",
+            "loadError": "A ciklusadatok betöltése nem sikerült.",
+            "loadErrorDesc": "Kérjük, próbáld újra később.",
+            "retry": "Újra",
+            "saved": "Mentve.",
+            "saveError": "Nem sikerült menteni.",
+            "deleted": "Törölve.",
+            "deleteError": "Nem sikerült törölni.",
+            "deleteConfirm": "Biztosan törlöd ezt a bejegyzést?",
+            "invalid": "Adj meg érvényes értékeket.",
+            "fertilityDisclaimer": "A termékeny időszakot és az ovulációt a naptármódszer becsli. Ezek nem fogamzásgátlók és nem helyettesítik az orvosi tanácsadást.",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "Ciklusgyűrű",
+                "cycleDay": "{{day}}. ciklusnap",
+                "of": "{{total}}-ból"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "Follikuláris fázis",
+                "fertile": "Termékeny időszak",
+                "ovulation": "Ovuláció",
+                "luteal": "Luteális fázis"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "ma várható",
+                "inDays": "{{count}} nap múlva",
+                "overdue": "{{count}} nap késésben",
+                "nextPeriod": "Következő menstruáció",
+                "fertileWindow": "Termékeny időszak",
+                "ovulation": "Ovuláció",
+                "avgCycle": "Átl. ciklushossz",
+                "avgPeriod": "Átl. menstruációhossz",
+                "regularity": "Szabályosság",
+                "regular": "Szabályos",
+                "irregular": "Szabálytalan",
+                "notEnoughData": "Kevés adat",
+                "noPrediction": "Rögzíts egy menstruációt az előrejelzésekhez."
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} nap"
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "Ma",
+                "startPeriod": "Menstruáció elindítva",
+                "endPeriod": "Menstruáció befejezve",
+                "logDay": "Nap rögzítése",
+                "startedToast": "Menstruáció rögzítve mára.",
+                "endedToast": "Menstruáció befejezve.",
+                "noOpenPeriod": "Nincs folyamatban lévő menstruáció a befejezéshez."
             },
             "calendar": {
-                "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "title": "Naptár",
+                "prevMonth": "Előző hónap",
+                "nextMonth": "Következő hónap"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "Menstruáció",
+                "predicted": "Előrejelzett",
+                "fertile": "Termékeny",
+                "ovulation": "Ovuláció",
+                "today": "Ma",
+                "logged": "Bejegyzés"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "Tendencia",
+                "ongoing": "folyamatban",
+                "empty": "Még nincs rögzített menstruáció.",
+                "cycleLength": "Ciklus {{value}} nap"
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "Vérzés erőssége",
+                "none": "Nincs",
+                "spotting": "Pecsételő vérzés",
+                "light": "Enyhe",
+                "medium": "Közepes",
+                "heavy": "Erős"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "Tünetek",
+                "cramps": "Görcsök",
+                "headache": "Fejfájás",
+                "backache": "Hátfájás",
+                "bloating": "Puffadás",
+                "tenderBreasts": "Mellérzékenység",
+                "acne": "Pattanások",
+                "fatigue": "Fáradtság",
+                "nausea": "Hányinger",
+                "cravings": "Étvágyroham",
+                "insomnia": "Álmatlanság"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "Hangulat",
+                "none": "Nincs megadva",
+                "great": "Nagyon jó",
+                "good": "Jó",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "Érzékeny",
+                "sad": "Szomorú",
+                "irritable": "Ingerlékeny",
+                "anxious": "Szorongó"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "Kezdet",
+                "endDate": "Vége (opcionális)",
+                "note": "Jegyzet",
+                "visibility": "Láthatóság"
             },
             "visibility": {
-                "private": "Privat",
-                "family": "Familie"
+                "private": "Privát",
+                "family": "Család"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "Menstruáció rögzítése",
+                "edit": "Menstruáció szerkesztése"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
-                "date": "Datum"
+                "title": "Nap rögzítése",
+                "date": "Dátum"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "Exportálás CSV-ként"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "Beállítások",
+                "title": "Ciklusbeállítások",
+                "cycleLength": "Átlagos ciklushossz",
+                "periodLength": "Átlagos menstruációhossz",
+                "lutealLength": "Luteális fázis hossza",
+                "trackFertility": "Termékeny időszak megjelenítése",
+                "autoHint": "Hagyd üresen = automatikusan az előzményeidből számolódik.",
+                "saved": "Beállítások mentve."
             }
         }
     },

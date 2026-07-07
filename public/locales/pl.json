@@ -769,7 +769,7 @@
         "subcatRentMortgage": "Czynsz / Kredyt hipoteczny",
         "subcatCondominium": "Wspólnota mieszkaniowa",
         "subcatUtilities": "Prąd / Woda / Gaz",
-        "subcatInternetTvPhone": "Internet / TV / Telefon",
+        "subcatInternetTvPhone": "Internet / TV / telefon",
         "subcatRenovationMaintenance": "Remont / Konserwacja",
         "subcatCleaning": "Sprzątanie",
         "subcatGroceries": "Supermarket",
@@ -2139,10 +2139,10 @@
     },
     "help": {
         "title": "Pomoc",
-        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
-        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
-        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
-        "mobileSettings": "Einstellungen findest du unter „Mehr“."
+        "mobileNavigate": "Nawiguj przez pasek na dole i „Więcej”.",
+        "mobileCreate": "Nowe elementy dodasz przyciskiem + w prawym dolnym rogu.",
+        "mobileSearch": "Wyszukiwanie otworzysz przez „Więcej” → Szukaj.",
+        "mobileSettings": "Ustawienia znajdziesz w „Więcej”."
     },
     "forgotPassword": {
         "title": "Reset password",
@@ -2333,7 +2333,7 @@
             "meds": "Leki",
             "labs": "Wyniki badań",
             "activity": "Aktywność",
-            "cycle": "Zyklus"
+            "cycle": "Cykl"
         },
         "overview": {
             "title": "Przegląd",
@@ -2655,65 +2655,65 @@
         "disclaimer": "Wyłącznie do dokumentacji osobistej. Nie zastępuje porady, diagnozy ani leczenia lekarskiego.",
         "readOnlyBanner": "Przeglądasz dane osoby {{name}} — tylko do odczytu.",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "Cykl",
+            "emptyTitle": "Brak danych o cyklu",
+            "emptyDesc": "Zapisz pierwszą miesiączkę, aby zobaczyć prognozy, kalendarz i statystyki.",
+            "emptyCta": "Zapisz pierwszą miesiączkę",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "Zapisz miesiączkę",
+            "loadError": "Nie udało się wczytać danych cyklu.",
+            "loadErrorDesc": "Spróbuj ponownie później.",
+            "retry": "Spróbuj ponownie",
+            "saved": "Zapisano.",
+            "saveError": "Nie udało się zapisać.",
+            "deleted": "Usunięto.",
+            "deleteError": "Nie udało się usunąć.",
+            "deleteConfirm": "Na pewno usunąć ten wpis?",
+            "invalid": "Wprowadź prawidłowe wartości.",
+            "fertilityDisclaimer": "Okno płodności i owulacja są szacowane metodą kalendarzową. Nie są antykoncepcją ani nie zastępują porady lekarskiej.",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "Pierścień cyklu",
+                "cycleDay": "Dzień cyklu {{day}}",
+                "of": "z {{total}}"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "Faza folikularna",
+                "fertile": "Okno płodności",
+                "ovulation": "Owulacja",
+                "luteal": "Faza lutealna"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "oczekiwana dzisiaj",
+                "inDays": "za {{count}} dni",
+                "overdue": "{{count}} dni po terminie",
+                "nextPeriod": "Następna miesiączka",
+                "fertileWindow": "Okno płodności",
+                "ovulation": "Owulacja",
+                "avgCycle": "Śr. długość cyklu",
+                "avgPeriod": "Śr. długość miesiączki",
+                "regularity": "Regularność",
+                "regular": "Regularny",
+                "irregular": "Nieregularny",
+                "notEnoughData": "Za mało danych",
+                "noPrediction": "Zapisz miesiączkę, aby uzyskać prognozy."
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} dni"
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "Dzisiaj",
+                "startPeriod": "Miesiączka rozpoczęta",
+                "endPeriod": "Miesiączka zakończona",
+                "logDay": "Zapisz dzień",
+                "startedToast": "Miesiączka zapisana na dziś.",
+                "endedToast": "Miesiączka zakończona.",
+                "noOpenPeriod": "Brak trwającej miesiączki do zakończenia."
             },
             "calendar": {
-                "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "title": "Kalendarz",
+                "prevMonth": "Poprzedni miesiąc",
+                "nextMonth": "Następny miesiąc"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "Miesiączka",
+                "predicted": "Prognoza",
+                "fertile": "Płodne",
+                "ovulation": "Owulacja",
+                "today": "Dzisiaj",
+                "logged": "Wpis"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "Trend",
+                "ongoing": "w toku",
+                "empty": "Nie zapisano jeszcze miesiączek.",
+                "cycleLength": "Cykl {{value}} dni"
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "Intensywność krwawienia",
+                "none": "Brak",
+                "spotting": "Plamienie",
+                "light": "Lekkie",
+                "medium": "Średnie",
+                "heavy": "Obfite"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "Objawy",
+                "cramps": "Skurcze",
+                "headache": "Ból głowy",
+                "backache": "Ból pleców",
+                "bloating": "Wzdęcia",
+                "tenderBreasts": "Tkliwość piersi",
+                "acne": "Trądzik",
+                "fatigue": "Zmęczenie",
+                "nausea": "Nudności",
+                "cravings": "Napady głodu",
+                "insomnia": "Bezsenność"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "Nastrój",
+                "none": "Nie podano",
+                "great": "Bardzo dobry",
+                "good": "Dobry",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "Wrażliwy",
+                "sad": "Smutny",
+                "irritable": "Rozdrażniony",
+                "anxious": "Niespokojny"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "Początek",
+                "endDate": "Koniec (opcjonalnie)",
+                "note": "Notatka",
+                "visibility": "Widoczność"
             },
             "visibility": {
-                "private": "Privat",
-                "family": "Familie"
+                "private": "Prywatna",
+                "family": "Rodzina"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "Zapisz miesiączkę",
+                "edit": "Edytuj miesiączkę"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
-                "date": "Datum"
+                "title": "Zapisz dzień",
+                "date": "Data"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "Eksportuj jako CSV"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "Ustawienia",
+                "title": "Ustawienia cyklu",
+                "cycleLength": "Średnia długość cyklu",
+                "periodLength": "Średnia długość miesiączki",
+                "lutealLength": "Długość fazy lutealnej",
+                "trackFertility": "Pokaż okno płodności",
+                "autoHint": "Pozostaw puste = obliczane automatycznie z historii.",
+                "saved": "Settings saved."
             }
         }
     },

@@ -1123,7 +1123,7 @@
             },
             "confirm_delete": "Anda benar-benar ingin menghapus langganan ini? Semua acara terkait juga akan dihapus.",
             "badges": {
-                "private": "Privat",
+                "private": "Pribadi",
                 "shared": "Dibagikan"
             },
             "empty": "Belum ada langganan.",
@@ -2333,7 +2333,7 @@
             "meds": "Obat",
             "labs": "Hasil lab",
             "activity": "Aktivitas",
-            "cycle": "Zyklus"
+            "cycle": "Siklus"
         },
         "overview": {
             "title": "Ringkasan",
@@ -2414,7 +2414,7 @@
                 "pulse": "Denyut nadi"
             },
             "visibility": {
-                "private": "Privat",
+                "private": "Pribadi",
                 "family": "Keluarga"
             },
             "sparse": "Terlalu sedikit pengukuran untuk menampilkan tren."
@@ -2499,7 +2499,7 @@
                 "sun": "Min"
             },
             "visibility": {
-                "private": "Privat",
+                "private": "Pribadi",
                 "family": "Keluarga"
             }
         },
@@ -2550,7 +2550,7 @@
                 "note": "Catatan"
             },
             "visibility": {
-                "private": "Privat",
+                "private": "Pribadi",
                 "family": "Keluarga"
             },
             "results": {
@@ -2635,7 +2635,7 @@
                 "note": "Catatan"
             },
             "visibility": {
-                "private": "Privat",
+                "private": "Pribadi",
                 "family": "Keluarga"
             },
             "col": {
@@ -2655,65 +2655,65 @@
         "disclaimer": "Hanya untuk dokumentasi pribadi. Bukan pengganti nasihat, diagnosis, atau perawatan medis.",
         "readOnlyBanner": "Anda melihat data {{name}} — hanya baca.",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "Siklus",
+            "emptyTitle": "Belum ada data siklus",
+            "emptyDesc": "Catat menstruasi pertamamu untuk melihat prediksi, kalender, dan statistik.",
+            "emptyCta": "Catat menstruasi pertama",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "Catat menstruasi",
+            "loadError": "Data siklus gagal dimuat.",
+            "loadErrorDesc": "Silakan coba lagi nanti.",
+            "retry": "Coba lagi",
+            "saved": "Tersimpan.",
+            "saveError": "Gagal menyimpan.",
+            "deleted": "Terhapus.",
+            "deleteError": "Gagal menghapus.",
+            "deleteConfirm": "Yakin ingin menghapus entri ini?",
+            "invalid": "Harap masukkan nilai yang valid.",
+            "fertilityDisclaimer": "Masa subur dan ovulasi diperkirakan dengan metode kalender. Ini bukan alat kontrasepsi dan bukan pengganti nasihat medis.",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "Cincin siklus",
+                "cycleDay": "Hari siklus {{day}}",
+                "of": "dari {{total}}"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "Fase folikuler",
+                "fertile": "Masa subur",
+                "ovulation": "Ovulasi",
+                "luteal": "Fase luteal"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "diperkirakan hari ini",
+                "inDays": "dalam {{count}} hari",
+                "overdue": "terlambat {{count}} hari",
+                "nextPeriod": "Menstruasi berikutnya",
+                "fertileWindow": "Masa subur",
+                "ovulation": "Ovulasi",
+                "avgCycle": "Rata-rata panjang siklus",
+                "avgPeriod": "Rata-rata lama menstruasi",
+                "regularity": "Keteraturan",
+                "regular": "Teratur",
+                "irregular": "Tidak teratur",
+                "notEnoughData": "Data tidak cukup",
+                "noPrediction": "Catat menstruasi untuk mendapatkan prediksi."
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} hari"
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "Hari ini",
+                "startPeriod": "Menstruasi dimulai",
+                "endPeriod": "Menstruasi berakhir",
+                "logDay": "Catat hari",
+                "startedToast": "Menstruasi dicatat untuk hari ini.",
+                "endedToast": "Menstruasi berakhir.",
+                "noOpenPeriod": "Tidak ada menstruasi berlangsung untuk diakhiri."
             },
             "calendar": {
                 "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "prevMonth": "Bulan sebelumnya",
+                "nextMonth": "Bulan berikutnya"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "Menstruasi",
+                "predicted": "Diprediksi",
+                "fertile": "Subur",
+                "ovulation": "Ovulasi",
+                "today": "Hari ini",
+                "logged": "Entri"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "Tren",
+                "ongoing": "berlangsung",
+                "empty": "Belum ada menstruasi yang dicatat.",
+                "cycleLength": "Siklus {{value}} hari"
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "Volume darah",
+                "none": "Tidak ada",
+                "spotting": "Bercak",
+                "light": "Ringan",
+                "medium": "Sedang",
+                "heavy": "Berat"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "Gejala",
+                "cramps": "Kram",
+                "headache": "Sakit kepala",
+                "backache": "Sakit punggung",
+                "bloating": "Kembung",
+                "tenderBreasts": "Payudara nyeri",
+                "acne": "Jerawat",
+                "fatigue": "Kelelahan",
+                "nausea": "Mual",
+                "cravings": "Ngidam",
+                "insomnia": "Sulit tidur"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "Suasana hati",
+                "none": "Tidak ditentukan",
+                "great": "Sangat baik",
+                "good": "Baik",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "Sensitif",
+                "sad": "Sedih",
+                "irritable": "Mudah marah",
+                "anxious": "Cemas"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "Mulai",
+                "endDate": "Selesai (opsional)",
+                "note": "Catatan",
+                "visibility": "Visibilitas"
             },
             "visibility": {
-                "private": "Privat",
-                "family": "Familie"
+                "private": "Pribadi",
+                "family": "Keluarga"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "Catat menstruasi",
+                "edit": "Edit menstruasi"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
-                "date": "Datum"
+                "title": "Catat hari",
+                "date": "Tanggal"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "Ekspor sebagai CSV"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "Pengaturan",
+                "title": "Pengaturan siklus",
+                "cycleLength": "Panjang siklus rata-rata",
+                "periodLength": "Lama menstruasi rata-rata",
+                "lutealLength": "Panjang fase luteal",
+                "trackFertility": "Tampilkan masa subur",
+                "autoHint": "Kosongkan = dihitung otomatis dari riwayatmu.",
+                "saved": "Pengaturan disimpan."
             }
         }
     },

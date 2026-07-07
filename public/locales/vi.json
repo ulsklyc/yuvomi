@@ -2139,10 +2139,10 @@
     },
     "help": {
         "title": "Trợ giúp",
-        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
-        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
-        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
-        "mobileSettings": "Einstellungen findest du unter „Mehr“."
+        "mobileNavigate": "Điều hướng qua thanh bên dưới và “Thêm”.",
+        "mobileCreate": "Tạo mục mới bằng nút + ở dưới cùng bên phải.",
+        "mobileSearch": "Mở tìm kiếm qua “Thêm” → Tìm kiếm.",
+        "mobileSettings": "Bạn tìm thấy cài đặt trong “Thêm”."
     },
     "forgotPassword": {
         "title": "Reset password",
@@ -2333,7 +2333,7 @@
             "meds": "Thuốc",
             "labs": "Xét nghiệm",
             "activity": "Hoạt động",
-            "cycle": "Zyklus"
+            "cycle": "Chu kỳ"
         },
         "overview": {
             "title": "Tổng quan",
@@ -2655,65 +2655,65 @@
         "disclaimer": "Chỉ dùng để ghi chép cá nhân. Không thay thế cho tư vấn, chẩn đoán hay điều trị y tế.",
         "readOnlyBanner": "Bạn đang xem dữ liệu của {{name}} — chỉ đọc.",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "Chu kỳ",
+            "emptyTitle": "Chưa có dữ liệu chu kỳ",
+            "emptyDesc": "Ghi lại kỳ kinh đầu tiên để xem dự đoán, lịch và thống kê.",
+            "emptyCta": "Ghi kỳ kinh đầu tiên",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "Ghi kỳ kinh",
+            "loadError": "Không thể tải dữ liệu chu kỳ.",
+            "loadErrorDesc": "Vui lòng thử lại sau.",
+            "retry": "Thử lại",
+            "saved": "Đã lưu.",
+            "saveError": "Không thể lưu.",
+            "deleted": "Đã xoá.",
+            "deleteError": "Không thể xoá.",
+            "deleteConfirm": "Thực sự xoá mục này?",
+            "invalid": "Vui lòng nhập giá trị hợp lệ.",
+            "fertilityDisclaimer": "Cửa sổ dễ thụ thai và rụng trứng được ước tính bằng phương pháp lịch. Đây không phải biện pháp tránh thai và không thay thế tư vấn y tế.",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "Vòng chu kỳ",
+                "cycleDay": "Ngày chu kỳ {{day}}",
+                "of": "trong số {{total}}"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "Giai đoạn nang trứng",
+                "fertile": "Cửa sổ dễ thụ thai",
+                "ovulation": "Rụng trứng",
+                "luteal": "Giai đoạn hoàng thể"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "dự kiến hôm nay",
+                "inDays": "trong {{count}} ngày",
+                "overdue": "Quá hạn {{count}} ngày",
+                "nextPeriod": "Kỳ kinh tiếp theo",
+                "fertileWindow": "Cửa sổ dễ thụ thai",
+                "ovulation": "Rụng trứng",
+                "avgCycle": "Độ dài chu kỳ TB",
+                "avgPeriod": "Độ dài kỳ kinh TB",
+                "regularity": "Độ đều đặn",
+                "regular": "Đều đặn",
+                "irregular": "Không đều",
+                "notEnoughData": "Chưa đủ dữ liệu",
+                "noPrediction": "Ghi một kỳ kinh để có dự đoán."
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} ngày"
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "Hôm nay",
+                "startPeriod": "Đã bắt đầu kỳ kinh",
+                "endPeriod": "Đã kết thúc kỳ kinh",
+                "logDay": "Ghi lại ngày",
+                "startedToast": "Đã ghi kỳ kinh cho hôm nay.",
+                "endedToast": "Đã kết thúc kỳ kinh.",
+                "noOpenPeriod": "Không có kỳ kinh đang diễn ra để kết thúc."
             },
             "calendar": {
-                "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "title": "Lịch",
+                "prevMonth": "Tháng trước",
+                "nextMonth": "Tháng sau"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "Kỳ kinh",
+                "predicted": "Dự đoán",
+                "fertile": "Dễ thụ thai",
+                "ovulation": "Rụng trứng",
+                "today": "Hôm nay",
+                "logged": "Mục"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "Xu hướng",
+                "ongoing": "đang diễn ra",
+                "empty": "Chưa ghi kỳ kinh nào.",
+                "cycleLength": "Chu kỳ {{value}} ngày"
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "Lượng máu",
+                "none": "Không",
+                "spotting": "Ra máu nhẹ",
+                "light": "Nhẹ",
+                "medium": "Trung bình",
+                "heavy": "Nhiều"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "Triệu chứng",
+                "cramps": "Đau bụng",
+                "headache": "Đau đầu",
+                "backache": "Đau lưng",
+                "bloating": "Đầy hơi",
+                "tenderBreasts": "Căng tức ngực",
+                "acne": "Mụn",
+                "fatigue": "Mệt mỏi",
+                "nausea": "Buồn nôn",
+                "cravings": "Thèm ăn",
+                "insomnia": "Mất ngủ"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "Tâm trạng",
+                "none": "Không xác định",
+                "great": "Rất tốt",
+                "good": "Tốt",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "Nhạy cảm",
+                "sad": "Buồn",
+                "irritable": "Cáu gắt",
+                "anxious": "Lo âu"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "Bắt đầu",
+                "endDate": "Kết thúc (tuỳ chọn)",
+                "note": "Ghi chú",
+                "visibility": "Khả năng hiển thị"
             },
             "visibility": {
-                "private": "Privat",
-                "family": "Familie"
+                "private": "Riêng tư",
+                "family": "Gia đình"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "Ghi kỳ kinh",
+                "edit": "Sửa kỳ kinh"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
-                "date": "Datum"
+                "title": "Ghi lại ngày",
+                "date": "Ngày"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "Xuất ra CSV"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "Cài đặt",
+                "title": "Cài đặt chu kỳ",
+                "cycleLength": "Độ dài chu kỳ trung bình",
+                "periodLength": "Độ dài kỳ kinh trung bình",
+                "lutealLength": "Độ dài giai đoạn hoàng thể",
+                "trackFertility": "Hiển thị cửa sổ dễ thụ thai",
+                "autoHint": "Để trống = tự động tính từ lịch sử của bạn.",
+                "saved": "Settings saved."
             }
         }
     },

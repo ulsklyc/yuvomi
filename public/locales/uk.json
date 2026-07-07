@@ -2139,10 +2139,10 @@
     },
     "help": {
         "title": "Довідка",
-        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
-        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
-        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
-        "mobileSettings": "Einstellungen findest du unter „Mehr“."
+        "mobileNavigate": "Навігація через нижню панель і «Більше».",
+        "mobileCreate": "Створюйте нове кнопкою + унизу праворуч.",
+        "mobileSearch": "Пошук відкривається через «Більше» → Пошук.",
+        "mobileSettings": "Налаштування — у розділі «Більше»."
     },
     "forgotPassword": {
         "title": "Reset password",
@@ -2333,7 +2333,7 @@
             "meds": "Ліки",
             "labs": "Аналізи",
             "activity": "Активність",
-            "cycle": "Zyklus"
+            "cycle": "Цикл"
         },
         "overview": {
             "title": "Огляд",
@@ -2655,65 +2655,65 @@
         "disclaimer": "Лише для особистого обліку. Не замінює медичну консультацію, діагностику чи лікування.",
         "readOnlyBanner": "Ви переглядаєте дані {{name}} — лише читання.",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "Цикл",
+            "emptyTitle": "Ще немає даних циклу",
+            "emptyDesc": "Запишіть першу менструацію, щоб побачити прогнози, календар і статистику.",
+            "emptyCta": "Записати першу менструацію",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "Записати менструацію",
+            "loadError": "Не вдалося завантажити дані циклу.",
+            "loadErrorDesc": "Будь ласка, спробуйте пізніше.",
+            "retry": "Спробувати ще раз",
+            "saved": "Збережено.",
+            "saveError": "Не вдалося зберегти.",
+            "deleted": "Видалено.",
+            "deleteError": "Не вдалося видалити.",
+            "deleteConfirm": "Справді видалити цей запис?",
+            "invalid": "Введіть коректні значення.",
+            "fertilityDisclaimer": "Фертильне вікно та овуляція оцінюються календарним методом. Вони не є засобом контрацепції та не замінюють медичну консультацію.",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "Кільце циклу",
+                "cycleDay": "День циклу {{day}}",
+                "of": "з {{total}}"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "Фолікулярна фаза",
+                "fertile": "Фертильне вікно",
+                "ovulation": "Овуляція",
+                "luteal": "Лютеїнова фаза"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "очікується сьогодні",
+                "inDays": "через {{count}} дн.",
+                "overdue": "Прострочено на {{count}} дн.",
+                "nextPeriod": "Наступна менструація",
+                "fertileWindow": "Фертильне вікно",
+                "ovulation": "Овуляція",
+                "avgCycle": "Сер. довжина циклу",
+                "avgPeriod": "Сер. тривалість менструації",
+                "regularity": "Регулярність",
+                "regular": "Регулярний",
+                "irregular": "Нерегулярний",
+                "notEnoughData": "Замало даних",
+                "noPrediction": "Запишіть менструацію для прогнозів."
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} дн."
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "Сьогодні",
+                "startPeriod": "Менструацію розпочато",
+                "endPeriod": "Менструацію завершено",
+                "logDay": "Записати день",
+                "startedToast": "Менструацію записано на сьогодні.",
+                "endedToast": "Менструацію завершено.",
+                "noOpenPeriod": "Немає поточної менструації для завершення."
             },
             "calendar": {
-                "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "title": "Календар",
+                "prevMonth": "Попередній місяць",
+                "nextMonth": "Наступний місяць"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "Менструація",
+                "predicted": "Прогноз",
+                "fertile": "Фертильний",
+                "ovulation": "Овуляція",
+                "today": "Сьогодні",
+                "logged": "Запис"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "Динаміка",
+                "ongoing": "триває",
+                "empty": "Менструації ще не записані.",
+                "cycleLength": "Цикл {{value}} дн."
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "Інтенсивність виділень",
+                "none": "Без пріоритету",
+                "spotting": "Мажучі виділення",
+                "light": "Слабкі",
+                "medium": "Середній",
+                "heavy": "Рясні"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "Симптоми",
+                "cramps": "Спазми",
+                "headache": "Головний біль",
+                "backache": "Біль у спині",
+                "bloating": "Здуття",
+                "tenderBreasts": "Чутливість грудей",
+                "acne": "Висипання",
+                "fatigue": "Втома",
+                "nausea": "Нудота",
+                "cravings": "Тяга до їжі",
+                "insomnia": "Безсоння"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "Настрій",
+                "none": "Не вказано",
+                "great": "Дуже добре",
+                "good": "Добре",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "Чутливий",
+                "sad": "Сумний",
+                "irritable": "Роздратований",
+                "anxious": "Тривожний"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "Початок",
+                "endDate": "Кінець (необов’язково)",
+                "note": "Нотатка",
+                "visibility": "Видимість"
             },
             "visibility": {
-                "private": "Privat",
-                "family": "Familie"
+                "private": "Приватне",
+                "family": "Сім'я"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "Записати менструацію",
+                "edit": "Редагувати менструацію"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
-                "date": "Datum"
+                "title": "Записати день",
+                "date": "Дата"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "Експортувати як CSV"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "Налаштування",
+                "title": "Налаштування циклу",
+                "cycleLength": "Середня довжина циклу",
+                "periodLength": "Середня тривалість менструації",
+                "lutealLength": "Довжина лютеїнової фази",
+                "trackFertility": "Показувати фертильне вікно",
+                "autoHint": "Залиште порожнім = обчислюється автоматично з вашої історії.",
+                "saved": "Settings saved."
             }
         }
     },

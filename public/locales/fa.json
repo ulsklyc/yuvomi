@@ -2333,7 +2333,7 @@
             "meds": "داروها",
             "labs": "آزمایش‌ها",
             "activity": "فعالیت",
-            "cycle": "Zyklus"
+            "cycle": "چرخه"
         },
         "overview": {
             "title": "نمای کلی",
@@ -2655,65 +2655,65 @@
         "disclaimer": "فقط برای مستندسازی شخصی. جایگزین مشاوره، تشخیص یا درمان پزشکی نیست.",
         "readOnlyBanner": "شما داده‌های {{name}} را می‌بینید — فقط‌خواندنی.",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "چرخه",
+            "emptyTitle": "هنوز داده‌ای برای چرخه نیست",
+            "emptyDesc": "اولین قاعدگی خود را ثبت کنید تا پیش‌بینی‌ها، تقویم و آمار را ببینید.",
+            "emptyCta": "ثبت اولین قاعدگی",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "ثبت قاعدگی",
+            "loadError": "داده‌های چرخه بارگذاری نشد.",
+            "loadErrorDesc": "لطفاً بعداً دوباره تلاش کنید.",
+            "retry": "تلاش مجدد",
+            "saved": "ذخیره شد.",
+            "saveError": "ذخیره نشد.",
+            "deleted": "حذف شد.",
+            "deleteError": "حذف نشد.",
+            "deleteConfirm": "واقعاً این مورد حذف شود؟",
+            "invalid": "لطفاً مقادیر معتبری وارد کنید.",
+            "fertilityDisclaimer": "پنجره باروری و تخمک‌گذاری با روش تقویمی برآورد می‌شوند. این‌ها روش پیشگیری از بارداری نیستند و جایگزین مشاوره پزشکی نمی‌شوند.",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "حلقه چرخه",
+                "cycleDay": "روز چرخه {{day}}",
+                "of": "از {{total}}"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "فاز فولیکولی",
+                "fertile": "پنجره باروری",
+                "ovulation": "تخمک‌گذاری",
+                "luteal": "فاز لوتئال"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "انتظار امروز",
+                "inDays": "در {{count}} روز",
+                "overdue": "{{count}} روز معوق",
+                "nextPeriod": "قاعدگی بعدی",
+                "fertileWindow": "پنجره باروری",
+                "ovulation": "تخمک‌گذاری",
+                "avgCycle": "میانگین طول چرخه",
+                "avgPeriod": "میانگین طول قاعدگی",
+                "regularity": "منظم بودن",
+                "regular": "منظم",
+                "irregular": "نامنظم",
+                "notEnoughData": "داده کافی نیست",
+                "noPrediction": "برای پیش‌بینی یک قاعدگی ثبت کنید."
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} روز"
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "امروز",
+                "startPeriod": "قاعدگی آغاز شد",
+                "endPeriod": "قاعدگی پایان یافت",
+                "logDay": "ثبت روز",
+                "startedToast": "قاعدگی برای امروز ثبت شد.",
+                "endedToast": "قاعدگی پایان یافت.",
+                "noOpenPeriod": "قاعدگی جاری برای پایان دادن وجود ندارد."
             },
             "calendar": {
-                "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "title": "تقویم",
+                "prevMonth": "ماه قبل",
+                "nextMonth": "ماه بعد"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "قاعدگی",
+                "predicted": "پیش‌بینی‌شده",
+                "fertile": "بارور",
+                "ovulation": "تخمک‌گذاری",
+                "today": "امروز",
+                "logged": "ورودی"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "روند",
+                "ongoing": "در جریان",
+                "empty": "هنوز قاعدگی‌ای ثبت نشده است.",
+                "cycleLength": "چرخه {{value}} روز"
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "شدت خونریزی",
+                "none": "هیچ",
+                "spotting": "لکه‌بینی",
+                "light": "کم",
+                "medium": "متوسط",
+                "heavy": "زیاد"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "علائم",
+                "cramps": "گرفتگی",
+                "headache": "سردرد",
+                "backache": "کمردرد",
+                "bloating": "نفخ",
+                "tenderBreasts": "حساسیت سینه",
+                "acne": "جوش پوستی",
+                "fatigue": "خستگی",
+                "nausea": "تهوع",
+                "cravings": "ولع غذایی",
+                "insomnia": "بی‌خوابی"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "خلق‌وخو",
+                "none": "مشخص‌نشده",
+                "great": "عالی",
+                "good": "خوب",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "حساس",
+                "sad": "غمگین",
+                "irritable": "تحریک‌پذیر",
+                "anxious": "مضطرب"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "شروع",
+                "endDate": "پایان (اختیاری)",
+                "note": "یادداشت",
+                "visibility": "نمایانی"
             },
             "visibility": {
-                "private": "Privat",
-                "family": "Familie"
+                "private": "خصوصی",
+                "family": "خانواده"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "ثبت قاعدگی",
+                "edit": "ویرایش قاعدگی"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
-                "date": "Datum"
+                "title": "ثبت روز",
+                "date": "تاریخ"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "خروجی CSV"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "تنظیمات",
+                "title": "تنظیمات چرخه",
+                "cycleLength": "میانگین طول چرخه",
+                "periodLength": "میانگین طول قاعدگی",
+                "lutealLength": "طول فاز لوتئال",
+                "trackFertility": "نمایش پنجره باروری",
+                "autoHint": "خالی بگذارید = به‌طور خودکار از سابقه شما محاسبه می‌شود.",
+                "saved": "تنظیمات ذخیره شد."
             }
         }
     },

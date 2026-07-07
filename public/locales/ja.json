@@ -2139,10 +2139,10 @@
     },
     "help": {
         "title": "ヘルプ",
-        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
-        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
-        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
-        "mobileSettings": "Einstellungen findest du unter „Mehr“."
+        "mobileNavigate": "下部のバーと「その他」でナビゲートします。",
+        "mobileCreate": "右下の＋ボタンで新規作成できます。",
+        "mobileSearch": "検索は「その他」→「検索」で開きます。",
+        "mobileSettings": "設定は「その他」にあります。"
     },
     "forgotPassword": {
         "title": "Reset password",
@@ -2333,7 +2333,7 @@
             "meds": "薬",
             "labs": "検査値",
             "activity": "アクティビティ",
-            "cycle": "Zyklus"
+            "cycle": "周期"
         },
         "overview": {
             "title": "概要",
@@ -2655,65 +2655,65 @@
         "disclaimer": "個人的な記録のみを目的としています。医師の助言・診断・治療の代わりにはなりません。",
         "readOnlyBanner": "{{name}}さんのデータを表示中 — 閲覧のみ。",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "周期",
+            "emptyTitle": "周期データはまだありません",
+            "emptyDesc": "予測・カレンダー・統計を表示するには、最初の生理を記録してください。",
+            "emptyCta": "最初の生理を記録",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "生理を記録",
+            "loadError": "周期データを読み込めませんでした。",
+            "loadErrorDesc": "後でもう一度お試しください。",
+            "retry": "再試行",
+            "saved": "保存しました。",
+            "saveError": "保存できませんでした。",
+            "deleted": "削除しました。",
+            "deleteError": "削除できませんでした。",
+            "deleteConfirm": "このエントリを削除しますか？",
+            "invalid": "有効な値を入力してください。",
+            "fertilityDisclaimer": "妊娠可能期間と排卵はカレンダー法による推定です。避妊法ではなく、医学的アドバイスの代わりにもなりません。",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "周期リング",
+                "cycleDay": "周期{{day}}日目",
+                "of": "{{total}} のうち"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "卵胞期",
+                "fertile": "妊娠可能期間",
+                "ovulation": "排卵",
+                "luteal": "黄体期"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "本日予定",
+                "inDays": "{{count}}日後",
+                "overdue": "{{count}}日遅れ",
+                "nextPeriod": "次の生理",
+                "fertileWindow": "妊娠可能期間",
+                "ovulation": "排卵",
+                "avgCycle": "平均周期日数",
+                "avgPeriod": "平均生理日数",
+                "regularity": "規則性",
+                "regular": "規則的",
+                "irregular": "不規則",
+                "notEnoughData": "データ不足",
+                "noPrediction": "予測するには生理を記録してください。"
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}}日"
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "今日",
+                "startPeriod": "生理を開始",
+                "endPeriod": "生理を終了",
+                "logDay": "その日を記録",
+                "startedToast": "本日の生理を記録しました。",
+                "endedToast": "生理を終了しました。",
+                "noOpenPeriod": "終了できる進行中の生理がありません。"
             },
             "calendar": {
-                "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "title": "カレンダー",
+                "prevMonth": "先月",
+                "nextMonth": "来月"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "生理",
+                "predicted": "予測",
+                "fertile": "妊娠可能",
+                "ovulation": "排卵",
+                "today": "今日",
+                "logged": "記録"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "推移",
+                "ongoing": "進行中",
+                "empty": "まだ生理が記録されていません。",
+                "cycleLength": "周期{{value}}日"
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "経血量",
+                "none": "なし",
+                "spotting": "少量出血",
+                "light": "少ない",
+                "medium": "中",
+                "heavy": "多い"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "症状",
+                "cramps": "生理痛",
+                "headache": "頭痛",
+                "backache": "腰痛",
+                "bloating": "膨満感",
+                "tenderBreasts": "胸の張り",
+                "acne": "肌荒れ",
+                "fatigue": "倦怠感",
+                "nausea": "吐き気",
+                "cravings": "食欲増進",
+                "insomnia": "不眠"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "気分",
+                "none": "指定なし",
+                "great": "とても良い",
+                "good": "良い",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "敏感",
+                "sad": "悲しい",
+                "irritable": "イライラ",
+                "anxious": "不安"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "開始",
+                "endDate": "終了（任意）",
+                "note": "メモ",
+                "visibility": "公開範囲"
             },
             "visibility": {
-                "private": "Privat",
-                "family": "Familie"
+                "private": "プライベート",
+                "family": "家族"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "生理を記録",
+                "edit": "生理を編集"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
-                "date": "Datum"
+                "title": "その日を記録",
+                "date": "日付"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "CSVでエクスポート"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "設定",
+                "title": "周期設定",
+                "cycleLength": "平均周期日数",
+                "periodLength": "平均生理日数",
+                "lutealLength": "黄体期の長さ",
+                "trackFertility": "妊娠可能期間を表示",
+                "autoHint": "空欄のまま = 履歴から自動計算します。",
+                "saved": "Settings saved."
             }
         }
     },

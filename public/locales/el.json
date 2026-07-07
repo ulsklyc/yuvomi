@@ -2139,10 +2139,10 @@
     },
     "help": {
         "title": "Βοήθεια",
-        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
-        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
-        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
-        "mobileSettings": "Einstellungen findest du unter „Mehr“."
+        "mobileNavigate": "Πλοηγήσου μέσω της μπάρας κάτω και «Περισσότερα».",
+        "mobileCreate": "Δημιούργησε νέα με το κουμπί + κάτω δεξιά.",
+        "mobileSearch": "Άνοιξε την αναζήτηση μέσω «Περισσότερα» → Αναζήτηση.",
+        "mobileSettings": "Οι ρυθμίσεις βρίσκονται στο «Περισσότερα»."
     },
     "forgotPassword": {
         "title": "Reset password",
@@ -2333,7 +2333,7 @@
             "meds": "Φάρμακα",
             "labs": "Εργαστηριακά",
             "activity": "Δραστηριότητα",
-            "cycle": "Zyklus"
+            "cycle": "Κύκλος"
         },
         "overview": {
             "title": "Επισκόπηση",
@@ -2655,65 +2655,65 @@
         "disclaimer": "Μόνο για προσωπική τεκμηρίωση. Δεν υποκαθιστά ιατρική συμβουλή, διάγνωση ή θεραπεία.",
         "readOnlyBanner": "Βλέπετε τα δεδομένα του/της {{name}} — μόνο για ανάγνωση.",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "Κύκλος",
+            "emptyTitle": "Δεν υπάρχουν ακόμη δεδομένα κύκλου",
+            "emptyDesc": "Καταχώρισε την πρώτη σου περίοδο για να δεις προβλέψεις, ημερολόγιο και στατιστικά.",
+            "emptyCta": "Καταχώριση πρώτης περιόδου",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "Καταχώριση περιόδου",
+            "loadError": "Δεν ήταν δυνατή η φόρτωση των δεδομένων κύκλου.",
+            "loadErrorDesc": "Δοκιμάστε ξανά αργότερα.",
+            "retry": "Δοκιμάστε ξανά",
+            "saved": "Αποθηκεύτηκε.",
+            "saveError": "Δεν ήταν δυνατή η αποθήκευση.",
+            "deleted": "Διαγράφηκε.",
+            "deleteError": "Δεν ήταν δυνατή η διαγραφή.",
+            "deleteConfirm": "Να διαγραφεί πραγματικά αυτή η καταχώριση;",
+            "invalid": "Εισαγάγετε έγκυρες τιμές.",
+            "fertilityDisclaimer": "Το γόνιμο παράθυρο και η ωορρηξία υπολογίζονται με τη μέθοδο του ημερολογίου. Δεν αποτελούν μέθοδο αντισύλληψης ούτε υποκαθιστούν ιατρική συμβουλή.",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "Δακτύλιος κύκλου",
+                "cycleDay": "Ημέρα κύκλου {{day}}",
+                "of": "από {{total}}"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "Ωοθυλακική φάση",
+                "fertile": "Γόνιμο παράθυρο",
+                "ovulation": "Ωορρηξία",
+                "luteal": "Ωχρινική φάση"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "αναμένεται σήμερα",
+                "inDays": "σε {{count}} ημέρες",
+                "overdue": "{{count}} ημέρες καθυστέρηση",
+                "nextPeriod": "Επόμενη περίοδος",
+                "fertileWindow": "Γόνιμο παράθυρο",
+                "ovulation": "Ωορρηξία",
+                "avgCycle": "Μέση διάρκεια κύκλου",
+                "avgPeriod": "Μέση διάρκεια περιόδου",
+                "regularity": "Κανονικότητα",
+                "regular": "Κανονικός",
+                "irregular": "Ακανόνιστος",
+                "notEnoughData": "Ανεπαρκή δεδομένα",
+                "noPrediction": "Καταχώρισε μια περίοδο για προβλέψεις."
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} ημέρες"
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "Σήμερα",
+                "startPeriod": "Η περίοδος ξεκίνησε",
+                "endPeriod": "Η περίοδος έληξε",
+                "logDay": "Καταγραφή ημέρας",
+                "startedToast": "Καταχωρίστηκε περίοδος για σήμερα.",
+                "endedToast": "Η περίοδος έληξε.",
+                "noOpenPeriod": "Δεν υπάρχει περίοδος σε εξέλιξη για λήξη."
             },
             "calendar": {
-                "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "title": "Ημερολόγιο",
+                "prevMonth": "Προηγούμενος μήνας",
+                "nextMonth": "Επόμενος μήνας"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "Περίοδος",
+                "predicted": "Προβλεπόμενη",
+                "fertile": "Γόνιμη",
+                "ovulation": "Ωορρηξία",
+                "today": "Σήμερα",
+                "logged": "Καταχώριση"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "Τάση",
+                "ongoing": "σε εξέλιξη",
+                "empty": "Δεν έχουν καταχωριστεί περίοδοι ακόμη.",
+                "cycleLength": "Κύκλος {{value}} ημέρες"
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "Ένταση ροής",
+                "none": "Καμία",
+                "spotting": "Κηλίδωση",
+                "light": "Ελαφριά",
+                "medium": "Μέτρια",
+                "heavy": "Έντονη"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "Συμπτώματα",
+                "cramps": "Κράμπες",
+                "headache": "Πονοκέφαλος",
+                "backache": "Πόνος στην πλάτη",
+                "bloating": "Φούσκωμα",
+                "tenderBreasts": "Ευαισθησία στήθους",
+                "acne": "Ακμή",
+                "fatigue": "Κόπωση",
+                "nausea": "Ναυτία",
+                "cravings": "Λιγούρες",
+                "insomnia": "Αϋπνία"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "Διάθεση",
+                "none": "Δεν καθορίστηκε",
+                "great": "Πολύ καλή",
+                "good": "Καλή",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "Ευαίσθητη",
+                "sad": "Λυπημένη",
+                "irritable": "Ευερέθιστη",
+                "anxious": "Αγχωμένη"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "Έναρξη",
+                "endDate": "Λήξη (προαιρετικό)",
+                "note": "Σημείωση",
+                "visibility": "Ορατότητα"
             },
             "visibility": {
-                "private": "Privat",
-                "family": "Familie"
+                "private": "Ιδιωτικό",
+                "family": "Οικογένεια"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "Καταχώριση περιόδου",
+                "edit": "Επεξεργασία περιόδου"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
-                "date": "Datum"
+                "title": "Καταγραφή ημέρας",
+                "date": "Ημερομηνία"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "Εξαγωγή ως CSV"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "Ρυθμίσεις",
+                "title": "Ρυθμίσεις κύκλου",
+                "cycleLength": "Μέση διάρκεια κύκλου",
+                "periodLength": "Μέση διάρκεια περιόδου",
+                "lutealLength": "Διάρκεια ωχρινικής φάσης",
+                "trackFertility": "Εμφάνιση γόνιμου παραθύρου",
+                "autoHint": "Άφησέ το κενό = υπολογίζεται αυτόματα από το ιστορικό σου.",
+                "saved": "Settings saved."
             }
         }
     },

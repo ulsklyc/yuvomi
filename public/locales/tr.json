@@ -641,7 +641,7 @@
         "nameLabel": "Ad *",
         "namePlaceholder": "Tam ad",
         "categoryLabel": "Kategori",
-        "phoneLabel": "Telefon",
+        "phoneLabel": "Phone",
         "phonePlaceholder": "+90 …",
         "emailLabel": "E-posta",
         "emailPlaceholder": "ad@ornek.com.tr",
@@ -2092,7 +2092,7 @@
         "displayName": "Görünen ad",
         "usernameOptional": "Kullanıcı adı (isteğe bağlı)",
         "temporaryPassword": "Geçici parola",
-        "phone": "Telefon",
+        "phone": "Phone",
         "email": "E-posta",
         "birthDate": "Doğum tarihi",
         "guestSyncHint": "Bilgi girilirse misafir Aile Yönetimi, Kişiler ve Doğum Günleri listesine eklenir.",
@@ -2139,10 +2139,10 @@
     },
     "help": {
         "title": "Yardım",
-        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
-        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
-        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
-        "mobileSettings": "Einstellungen findest du unter „Mehr“."
+        "mobileNavigate": "Alttaki çubuk ve „Daha fazla” ile gezinin.",
+        "mobileCreate": "Sağ alttaki + düğmesiyle yeni öğe oluşturun.",
+        "mobileSearch": "Aramayı „Daha fazla” → Ara ile açın.",
+        "mobileSettings": "Ayarları „Daha fazla” altında bulursunuz."
     },
     "forgotPassword": {
         "title": "Reset password",
@@ -2333,7 +2333,7 @@
             "meds": "İlaçlar",
             "labs": "Laboratuvar",
             "activity": "Aktivite",
-            "cycle": "Zyklus"
+            "cycle": "Döngü"
         },
         "overview": {
             "title": "Genel bakış",
@@ -2655,65 +2655,65 @@
         "disclaimer": "Yalnızca kişisel kayıt içindir. Tıbbi danışmanlık, teşhis veya tedavinin yerini tutmaz.",
         "readOnlyBanner": "{{name}} adlı kişinin verilerini görüntülüyorsunuz — yalnızca okuma.",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "Döngü",
+            "emptyTitle": "Henüz döngü verisi yok",
+            "emptyDesc": "Tahminleri, takvimi ve istatistikleri görmek için ilk adet dönemini kaydet.",
+            "emptyCta": "İlk adeti kaydet",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "Adeti kaydet",
+            "loadError": "Döngü verileri yüklenemedi.",
+            "loadErrorDesc": "Lütfen daha sonra tekrar deneyin.",
+            "retry": "Tekrar dene",
+            "saved": "Kaydedildi.",
+            "saveError": "Kaydedilemedi.",
+            "deleted": "Silindi.",
+            "deleteError": "Silinemedi.",
+            "deleteConfirm": "Bu kayıt gerçekten silinsin mi?",
+            "invalid": "Lütfen geçerli değerler girin.",
+            "fertilityDisclaimer": "Doğurgan pencere ve yumurtlama takvim yöntemiyle tahmin edilir. Bunlar bir doğum kontrol yöntemi değildir ve tıbbi tavsiyenin yerini tutmaz.",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "Döngü halkası",
+                "cycleDay": "Döngü günü {{day}}",
+                "of": "{{total}} içinden"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "Foliküler faz",
+                "fertile": "Doğurgan pencere",
+                "ovulation": "Yumurtlama",
+                "luteal": "Luteal faz"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "bugün bekleniyor",
+                "inDays": "{{count}} gün içinde",
+                "overdue": "{{count}} gün gecikmiş",
+                "nextPeriod": "Sonraki adet",
+                "fertileWindow": "Doğurgan pencere",
+                "ovulation": "Yumurtlama",
+                "avgCycle": "Ort. döngü uzunluğu",
+                "avgPeriod": "Ort. adet süresi",
+                "regularity": "Düzenlilik",
+                "regular": "Düzenli",
+                "irregular": "Düzensiz",
+                "notEnoughData": "Yetersiz veri",
+                "noPrediction": "Tahminler için bir adet dönemi kaydet."
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} gün"
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "Bugün",
+                "startPeriod": "Adet başladı",
+                "endPeriod": "Adet bitti",
+                "logDay": "Günü kaydet",
+                "startedToast": "Bugün için adet kaydedildi.",
+                "endedToast": "Adet bitti.",
+                "noOpenPeriod": "Bitirilecek devam eden adet yok."
             },
             "calendar": {
-                "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "title": "Takvim",
+                "prevMonth": "Önceki ay",
+                "nextMonth": "Sonraki ay"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "Adet",
+                "predicted": "Tahmini",
+                "fertile": "Doğurgan",
+                "ovulation": "Yumurtlama",
+                "today": "Bugün",
+                "logged": "Kayıt"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "Eğilim",
+                "ongoing": "devam ediyor",
+                "empty": "Henüz adet dönemi kaydedilmedi.",
+                "cycleLength": "Döngü {{value}} gün"
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "Kanama yoğunluğu",
+                "none": "Yok",
+                "spotting": "Lekelenme",
+                "light": "Hafif",
+                "medium": "Orta",
+                "heavy": "Yoğun"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "Belirtiler",
+                "cramps": "Kramp",
+                "headache": "Baş ağrısı",
+                "backache": "Sırt ağrısı",
+                "bloating": "Şişkinlik",
+                "tenderBreasts": "Göğüs hassasiyeti",
+                "acne": "Sivilce",
+                "fatigue": "Yorgunluk",
+                "nausea": "Bulantı",
+                "cravings": "Ani açlık",
+                "insomnia": "Uykusuzluk"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "Ruh hâli",
+                "none": "Belirtilmedi",
+                "great": "Çok iyi",
+                "good": "İyi",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "Hassas",
+                "sad": "Üzgün",
+                "irritable": "Sinirli",
+                "anxious": "Kaygılı"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "Başlangıç",
+                "endDate": "Bitiş (isteğe bağlı)",
+                "note": "Not",
+                "visibility": "Görünürlük"
             },
             "visibility": {
-                "private": "Privat",
-                "family": "Familie"
+                "private": "Özel",
+                "family": "Aile"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "Adeti kaydet",
+                "edit": "Adeti düzenle"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
-                "date": "Datum"
+                "title": "Günü kaydet",
+                "date": "Tarih"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "CSV olarak dışa aktar"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "Ayarlar",
+                "title": "Döngü ayarları",
+                "cycleLength": "Ortalama döngü uzunluğu",
+                "periodLength": "Ortalama adet süresi",
+                "lutealLength": "Luteal faz uzunluğu",
+                "trackFertility": "Doğurgan pencereyi göster",
+                "autoHint": "Boş bırak = geçmişinden otomatik hesaplanır.",
+                "saved": "Settings saved."
             }
         }
     },

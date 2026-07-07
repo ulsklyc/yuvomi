@@ -2333,7 +2333,7 @@
             "meds": "Farmaci",
             "labs": "Esami",
             "activity": "Attività",
-            "cycle": "Zyklus"
+            "cycle": "Ciclo"
         },
         "overview": {
             "title": "Panoramica",
@@ -2655,65 +2655,65 @@
         "disclaimer": "Solo per documentazione personale. Non sostituisce la consulenza, la diagnosi o il trattamento medico.",
         "readOnlyBanner": "Stai visualizzando i dati di {{name}} — sola lettura.",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "Ciclo",
+            "emptyTitle": "Ancora nessun dato sul ciclo",
+            "emptyDesc": "Registra il tuo primo ciclo per vedere previsioni, calendario e statistiche.",
+            "emptyCta": "Registra il primo ciclo",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "Registra ciclo",
+            "loadError": "Impossibile caricare i dati del ciclo.",
+            "loadErrorDesc": "Riprova più tardi.",
+            "retry": "Riprova",
+            "saved": "Salvato.",
+            "saveError": "Impossibile salvare.",
+            "deleted": "Eliminato.",
+            "deleteError": "Impossibile eliminare.",
+            "deleteConfirm": "Eliminare davvero questa voce?",
+            "invalid": "Inserisci valori validi.",
+            "fertilityDisclaimer": "La finestra fertile e l’ovulazione sono stimate con il metodo del calendario. Non sono un metodo contraccettivo né sostituiscono il parere medico.",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "Anello del ciclo",
+                "cycleDay": "Giorno del ciclo {{day}}",
+                "of": "di {{total}}"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "Fase follicolare",
+                "fertile": "Finestra fertile",
+                "ovulation": "Ovulazione",
+                "luteal": "Fase luteale"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "prevista oggi",
+                "inDays": "tra {{count}} giorni",
+                "overdue": "{{count}} giorni di ritardo",
+                "nextPeriod": "Prossimo ciclo",
+                "fertileWindow": "Finestra fertile",
+                "ovulation": "Ovulazione",
+                "avgCycle": "Durata media del ciclo",
+                "avgPeriod": "Durata media del ciclo mestruale",
+                "regularity": "Regolarità",
+                "regular": "Regolare",
+                "irregular": "Irregolare",
+                "notEnoughData": "Dati insufficienti",
+                "noPrediction": "Registra un ciclo per le previsioni."
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} giorni"
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "Oggi",
+                "startPeriod": "Ciclo iniziato",
+                "endPeriod": "Ciclo terminato",
+                "logDay": "Registra giorno",
+                "startedToast": "Ciclo registrato per oggi.",
+                "endedToast": "Ciclo terminato.",
+                "noOpenPeriod": "Nessun ciclo in corso da terminare."
             },
             "calendar": {
-                "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "title": "Calendario",
+                "prevMonth": "Mese precedente",
+                "nextMonth": "Mese successivo"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "Ciclo",
+                "predicted": "Previsto",
+                "fertile": "Fertile",
+                "ovulation": "Ovulazione",
+                "today": "Oggi",
+                "logged": "Voce"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "Andamento",
+                "ongoing": "in corso",
+                "empty": "Ancora nessun ciclo registrato.",
+                "cycleLength": "Ciclo {{value}} giorni"
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "Intensità del flusso",
+                "none": "Nessuna",
+                "spotting": "Spotting",
+                "light": "Leggero",
+                "medium": "Media",
+                "heavy": "Abbondante"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "Sintomi",
+                "cramps": "Crampi",
+                "headache": "Mal di testa",
+                "backache": "Mal di schiena",
+                "bloating": "Gonfiore",
+                "tenderBreasts": "Tensione al seno",
+                "acne": "Acne",
+                "fatigue": "Stanchezza",
+                "nausea": "Nausea",
+                "cravings": "Voglie",
+                "insomnia": "Insonnia"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "Umore",
+                "none": "Non specificato",
+                "great": "Ottimo",
+                "good": "Buono",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "Sensibile",
+                "sad": "Triste",
+                "irritable": "Irritabile",
+                "anxious": "Ansioso"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "Inizio",
+                "endDate": "Fine (facoltativo)",
+                "note": "Nota",
+                "visibility": "Visibilità"
             },
             "visibility": {
-                "private": "Privat",
-                "family": "Familie"
+                "private": "Privato",
+                "family": "Famiglia"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "Registra ciclo",
+                "edit": "Modifica ciclo"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
-                "date": "Datum"
+                "title": "Registra giorno",
+                "date": "Data"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "Esporta come CSV"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "Impostazioni",
+                "title": "Impostazioni ciclo",
+                "cycleLength": "Durata media del ciclo",
+                "periodLength": "Durata media del ciclo mestruale",
+                "lutealLength": "Durata della fase luteale",
+                "trackFertility": "Mostra finestra fertile",
+                "autoHint": "Lascia vuoto = calcolato automaticamente dalla tua cronologia.",
+                "saved": "Impostazioni salvate."
             }
         }
     },

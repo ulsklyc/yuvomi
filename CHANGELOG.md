@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.98.2] - 2026-07-07
+
+### Fixed
+- **German text leaked into every non-German interface** — 2,207 UI strings across all 21 non-German, non-English locales still displayed their German source text. The most visible gap was the entire new Health → Cycle tab (predictions, calendar, ring, flow/symptom/mood pickers, history, settings and its fertility disclaimer), which was completely untranslated in every language; smaller gaps affected scattered labels in Budget, Calendar, Contacts, Documents, Settings, Split Expenses, Subscriptions, Housekeeping, Reminders and the mobile onboarding help hints. All are now translated, so no module falls back to German for non-German users. German (reference) and English were already complete and are unchanged.
+
 ## [0.98.1] - 2026-07-07
 
 ### Fixed

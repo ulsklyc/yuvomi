@@ -2139,10 +2139,10 @@
     },
     "help": {
         "title": "帮助",
-        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
-        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
-        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
-        "mobileSettings": "Einstellungen findest du unter „Mehr“."
+        "mobileNavigate": "通过底部栏和“更多”进行导航。",
+        "mobileCreate": "用右下角的 + 按钮创建新内容。",
+        "mobileSearch": "通过“更多”→搜索打开搜索。",
+        "mobileSettings": "设置在“更多”中。"
     },
     "forgotPassword": {
         "title": "Reset password",
@@ -2333,7 +2333,7 @@
             "meds": "药物",
             "labs": "化验值",
             "activity": "活动",
-            "cycle": "Zyklus"
+            "cycle": "周期"
         },
         "overview": {
             "title": "概览",
@@ -2655,65 +2655,65 @@
         "disclaimer": "仅供个人记录，不能替代医疗咨询、诊断或治疗。",
         "readOnlyBanner": "您正在查看 {{name}} 的数据 — 仅可查看。",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "周期",
+            "emptyTitle": "暂无周期数据",
+            "emptyDesc": "记录你的第一次月经，即可查看预测、日历和统计。",
+            "emptyCta": "记录第一次月经",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "记录月经",
+            "loadError": "无法加载周期数据。",
+            "loadErrorDesc": "请稍后重试。",
+            "retry": "重试",
+            "saved": "已保存。",
+            "saveError": "无法保存。",
+            "deleted": "已删除。",
+            "deleteError": "无法删除。",
+            "deleteConfirm": "确定要删除此记录吗？",
+            "invalid": "请输入有效的数值。",
+            "fertilityDisclaimer": "易孕期和排卵日基于日历法推算，不能作为避孕手段，也不能替代医疗建议。",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "周期环",
+                "cycleDay": "周期第 {{day}} 天",
+                "of": "共 {{total}}"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "卵泡期",
+                "fertile": "易孕期",
+                "ovulation": "排卵",
+                "luteal": "黄体期"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "预计今天",
+                "inDays": "{{count}} 天后",
+                "overdue": "逾期 {{count}} 天",
+                "nextPeriod": "下次月经",
+                "fertileWindow": "易孕期",
+                "ovulation": "排卵",
+                "avgCycle": "平均周期长度",
+                "avgPeriod": "平均经期长度",
+                "regularity": "规律性",
+                "regular": "规律",
+                "irregular": "不规律",
+                "notEnoughData": "数据不足",
+                "noPrediction": "记录一次月经以获得预测。"
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} 天"
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "今天",
+                "startPeriod": "月经已开始",
+                "endPeriod": "月经已结束",
+                "logDay": "记录当天",
+                "startedToast": "已记录今天的月经。",
+                "endedToast": "月经已结束。",
+                "noOpenPeriod": "没有可结束的进行中月经。"
             },
             "calendar": {
-                "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "title": "日历",
+                "prevMonth": "上个月",
+                "nextMonth": "下个月"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "月经",
+                "predicted": "预测",
+                "fertile": "易孕",
+                "ovulation": "排卵",
+                "today": "今天",
+                "logged": "记录"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "趋势",
+                "ongoing": "进行中",
+                "empty": "尚未记录任何月经。",
+                "cycleLength": "周期 {{value}} 天"
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "经量",
+                "none": "无",
+                "spotting": "点滴出血",
+                "light": "少量",
+                "medium": "中",
+                "heavy": "大量"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "症状",
+                "cramps": "痉挛",
+                "headache": "头痛",
+                "backache": "背痛",
+                "bloating": "腹胀",
+                "tenderBreasts": "乳房胀痛",
+                "acne": "皮肤问题",
+                "fatigue": "疲劳",
+                "nausea": "恶心",
+                "cravings": "食欲大增",
+                "insomnia": "失眠"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "心情",
+                "none": "未指定",
+                "great": "很好",
+                "good": "好",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "敏感",
+                "sad": "难过",
+                "irritable": "烦躁",
+                "anxious": "焦虑"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "开始",
+                "endDate": "结束（可选）",
+                "note": "便签",
+                "visibility": "可见性"
             },
             "visibility": {
-                "private": "Privat",
-                "family": "Familie"
+                "private": "私人",
+                "family": "家庭"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "记录月经",
+                "edit": "编辑月经"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
-                "date": "Datum"
+                "title": "记录当天",
+                "date": "日期"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "导出为 CSV"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "设置",
+                "title": "周期设置",
+                "cycleLength": "平均周期长度",
+                "periodLength": "平均经期长度",
+                "lutealLength": "黄体期长度",
+                "trackFertility": "显示易孕期",
+                "autoHint": "留空 = 根据历史记录自动计算。",
+                "saved": "Settings saved."
             }
         }
     },

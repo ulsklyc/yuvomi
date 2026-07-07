@@ -2139,10 +2139,10 @@
     },
     "help": {
         "title": "Справка",
-        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
-        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
-        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
-        "mobileSettings": "Einstellungen findest du unter „Mehr“."
+        "mobileNavigate": "Навигация через нижнюю панель и «Ещё».",
+        "mobileCreate": "Создавайте новое кнопкой + внизу справа.",
+        "mobileSearch": "Поиск открывается через «Ещё» → Поиск.",
+        "mobileSettings": "Настройки находятся в разделе «Ещё»."
     },
     "forgotPassword": {
         "title": "Reset password",
@@ -2333,7 +2333,7 @@
             "meds": "Лекарства",
             "labs": "Анализы",
             "activity": "Активность",
-            "cycle": "Zyklus"
+            "cycle": "Цикл"
         },
         "overview": {
             "title": "Обзор",
@@ -2655,65 +2655,65 @@
         "disclaimer": "Только для личного учёта. Не заменяет медицинскую консультацию, диагностику или лечение.",
         "readOnlyBanner": "Вы просматриваете данные {{name}} — только чтение.",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "Цикл",
+            "emptyTitle": "Пока нет данных о цикле",
+            "emptyDesc": "Запишите первую менструацию, чтобы увидеть прогнозы, календарь и статистику.",
+            "emptyCta": "Записать первую менструацию",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "Записать менструацию",
+            "loadError": "Не удалось загрузить данные цикла.",
+            "loadErrorDesc": "Пожалуйста, попробуйте позже.",
+            "retry": "Повторить",
+            "saved": "Сохранено.",
+            "saveError": "Не удалось сохранить.",
+            "deleted": "Удалено.",
+            "deleteError": "Не удалось удалить.",
+            "deleteConfirm": "Действительно удалить эту запись?",
+            "invalid": "Введите корректные значения.",
+            "fertilityDisclaimer": "Фертильное окно и овуляция рассчитываются календарным методом. Это не средство контрацепции и не замена медицинской консультации.",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "Кольцо цикла",
+                "cycleDay": "День цикла {{day}}",
+                "of": "из {{total}}"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "Фолликулярная фаза",
+                "fertile": "Фертильное окно",
+                "ovulation": "Овуляция",
+                "luteal": "Лютеиновая фаза"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "ожидается сегодня",
+                "inDays": "через {{count}} дн.",
+                "overdue": "Просрочено на {{count}} дн.",
+                "nextPeriod": "Следующая менструация",
+                "fertileWindow": "Фертильное окно",
+                "ovulation": "Овуляция",
+                "avgCycle": "Ср. длина цикла",
+                "avgPeriod": "Ср. длительность менструации",
+                "regularity": "Регулярность",
+                "regular": "Регулярный",
+                "irregular": "Нерегулярный",
+                "notEnoughData": "Недостаточно данных",
+                "noPrediction": "Запишите менструацию для прогнозов."
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} дн."
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "Сегодня",
+                "startPeriod": "Менструация начата",
+                "endPeriod": "Менструация завершена",
+                "logDay": "Записать день",
+                "startedToast": "Менструация записана на сегодня.",
+                "endedToast": "Менструация завершена.",
+                "noOpenPeriod": "Нет текущей менструации для завершения."
             },
             "calendar": {
-                "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "title": "Календарь",
+                "prevMonth": "Предыдущий месяц",
+                "nextMonth": "Следующий месяц"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "Менструация",
+                "predicted": "Прогноз",
+                "fertile": "Фертильный",
+                "ovulation": "Овуляция",
+                "today": "Сегодня",
+                "logged": "Запись"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "Динамика",
+                "ongoing": "текущая",
+                "empty": "Менструации ещё не записаны.",
+                "cycleLength": "Цикл {{value}} дн."
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "Интенсивность выделений",
+                "none": "Нет",
+                "spotting": "Мажущие выделения",
+                "light": "Слабые",
+                "medium": "Средний",
+                "heavy": "Обильные"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "Симптомы",
+                "cramps": "Спазмы",
+                "headache": "Головная боль",
+                "backache": "Боль в спине",
+                "bloating": "Вздутие",
+                "tenderBreasts": "Болезненность груди",
+                "acne": "Высыпания",
+                "fatigue": "Усталость",
+                "nausea": "Тошнота",
+                "cravings": "Тяга к еде",
+                "insomnia": "Бессонница"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "Настроение",
+                "none": "Не указано",
+                "great": "Отлично",
+                "good": "Хорошо",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "Чувствительное",
+                "sad": "Грустное",
+                "irritable": "Раздражённое",
+                "anxious": "Тревожное"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "Начало",
+                "endDate": "Окончание (необязательно)",
+                "note": "Заметка",
+                "visibility": "Видимость"
             },
             "visibility": {
-                "private": "Privat",
-                "family": "Familie"
+                "private": "Личное",
+                "family": "Семья"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "Записать менструацию",
+                "edit": "Изменить менструацию"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
-                "date": "Datum"
+                "title": "Записать день",
+                "date": "Дата"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "Экспорт в CSV"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "Настройки",
+                "title": "Настройки цикла",
+                "cycleLength": "Средняя длина цикла",
+                "periodLength": "Средняя длительность менструации",
+                "lutealLength": "Длина лютеиновой фазы",
+                "trackFertility": "Показывать фертильное окно",
+                "autoHint": "Оставьте пустым = рассчитается автоматически по вашей истории.",
+                "saved": "Settings saved."
             }
         }
     },

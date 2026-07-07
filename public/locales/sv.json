@@ -129,7 +129,7 @@
         "budgetOverview": "Budgetöversikt",
         "monthlyIncome": "Inkomster",
         "monthlyExpenses": "Utgifter",
-        "monthlyBalance": "Saldo",
+        "monthlyBalance": "Balans",
         "savingsRate": "Sparandegrad",
         "topExpense": "Största utgift",
         "noBudgetData": "Ingen budgetdata denna månad.",
@@ -762,7 +762,7 @@
         "subcatRentMortgage": "Hyra / inteckning",
         "subcatCondominium": "Bostadsrättsavgifter",
         "subcatUtilities": "El / vatten / gas",
-        "subcatInternetTvPhone": "Internet / TV / Telefon",
+        "subcatInternetTvPhone": "Internet / TV / telefon",
         "subcatRenovationMaintenance": "Renovering/underhåll",
         "subcatCleaning": "Rengöring",
         "subcatGroceries": "Specerier",
@@ -818,7 +818,7 @@
         "loanNextDue": "Nästa: {{month}}",
         "loanPaidStatus": "Betalt",
         "markLoanPaid": "Markera betalt",
-        "loanBorrowerLabel": "Person *",
+        "loanBorrowerLabel": "Låntagare *",
         "loanBorrowerPlaceholder": "t.ex. Lais",
         "loanTitleLabel": "Lånetitel",
         "loanTitlePlaceholder": "t.ex. Privat lån",
@@ -878,7 +878,7 @@
         "statsRangeYear": "År",
         "statsIncome": "Inkomster",
         "statsExpenses": "Utgifter",
-        "statsBalance": "Saldo",
+        "statsBalance": "Balans",
         "statsTrendTitle": "Trend",
         "statsCategoryTitle": "Per kategori",
         "statsDonutTitle": "Utgiftsandelar",
@@ -1069,7 +1069,7 @@
         "apiTokenRevoke": "Återkalla token",
         "apiTokenRevoked": "Återkallad",
         "apiTokenExpired": "Utgått",
-        "apiTokenActive": "Aktiv",
+        "apiTokenActive": "Aktiva",
         "apiTokenPrefix": "Prefix",
         "apiTokenExpires": "Upphör att gälla",
         "apiTokenNeverExpires": "Inget utgångsdatum",
@@ -1766,7 +1766,7 @@
         "fileRequired": "Välj en fil att ladda upp.",
         "fileTooLarge": "Filen får vara högst 5 MB.",
         "fileReadError": "Filen kunde inte läsas.",
-        "statusActive": "Aktiv",
+        "statusActive": "Aktiva",
         "statusArchived": "Arkiverad",
         "visibility": {
             "family": "Hela familjen",
@@ -2139,10 +2139,10 @@
     },
     "help": {
         "title": "Hjälp",
-        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
-        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
-        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
-        "mobileSettings": "Einstellungen findest du unter „Mehr“."
+        "mobileNavigate": "Navigera via fältet längst ned och ”Mer”.",
+        "mobileCreate": "Skapa nytt med +-knappen längst ned till höger.",
+        "mobileSearch": "Öppna sök via ”Mer” → Sök.",
+        "mobileSettings": "Inställningar hittar du under ”Mer”."
     },
     "forgotPassword": {
         "title": "Reset password",
@@ -2250,7 +2250,7 @@
         "noAnalytics": "Inga utgiftsdata ännu.",
         "uncategorized": "Okategoriserad",
         "unspecified": "Ej angivet",
-        "active": "Aktiv",
+        "active": "Aktiva",
         "disabled": "Inaktiverad",
         "disable": "Inaktivera prenumeration",
         "enable": "Aktivera prenumeration",
@@ -2333,7 +2333,7 @@
             "meds": "Mediciner",
             "labs": "Provsvar",
             "activity": "Aktivitet",
-            "cycle": "Zyklus"
+            "cycle": "Cykel"
         },
         "overview": {
             "title": "Översikt",
@@ -2474,7 +2474,7 @@
                 "refillThreshold": "Påfyllningsgräns",
                 "note": "Anteckning",
                 "visibility": "Synlighet",
-                "active": "Aktiv",
+                "active": "Aktiva",
                 "prn": "Vid behov (PRN)"
             },
             "schedule": {
@@ -2655,65 +2655,65 @@
         "disclaimer": "Endast för personlig dokumentation. Ersätter inte medicinsk rådgivning, diagnos eller behandling.",
         "readOnlyBanner": "Du ser {{name}}s data — skrivskyddat.",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "Cykel",
+            "emptyTitle": "Inga cykeldata ännu",
+            "emptyDesc": "Registrera din första mens för att se prognoser, kalender och statistik.",
+            "emptyCta": "Registrera första mens",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "Registrera mens",
+            "loadError": "Cykeldata kunde inte laddas.",
+            "loadErrorDesc": "Försök igen senare.",
+            "retry": "Försök igen",
+            "saved": "Sparat.",
+            "saveError": "Kunde inte sparas.",
+            "deleted": "Borttaget.",
+            "deleteError": "Kunde inte tas bort.",
+            "deleteConfirm": "Vill du verkligen ta bort den här posten?",
+            "invalid": "Ange giltiga värden.",
+            "fertilityDisclaimer": "Fertilt fönster och ägglossning uppskattas med kalendermetoden. De är inte ett preventivmedel och ersätter inte medicinsk rådgivning.",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "Cykelring",
+                "cycleDay": "Cykeldag {{day}}",
+                "of": "av {{total}}"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "Follikelfas",
+                "fertile": "Fertilt fönster",
+                "ovulation": "Ägglossning",
+                "luteal": "Lutealfas"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "väntas i dag",
+                "inDays": "om {{count}} dagar",
+                "overdue": "{{count}} dagar försenad",
+                "nextPeriod": "Nästa mens",
+                "fertileWindow": "Fertilt fönster",
+                "ovulation": "Ägglossning",
+                "avgCycle": "Snittlängd cykel",
+                "avgPeriod": "Snittlängd mens",
+                "regularity": "Regelbundenhet",
+                "regular": "Regelbunden",
+                "irregular": "Oregelbunden",
+                "notEnoughData": "För lite data",
+                "noPrediction": "Registrera en mens för prognoser."
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} dagar"
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "I dag",
+                "startPeriod": "Mens startad",
+                "endPeriod": "Mens avslutad",
+                "logDay": "Logga dag",
+                "startedToast": "Mens registrerad för i dag.",
+                "endedToast": "Mens avslutad.",
+                "noOpenPeriod": "Ingen pågående mens att avsluta."
             },
             "calendar": {
                 "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "prevMonth": "Föregående månad",
+                "nextMonth": "Nästa månad"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "Mens",
+                "predicted": "Prognos",
+                "fertile": "Fertil",
+                "ovulation": "Ägglossning",
+                "today": "I dag",
+                "logged": "Post"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "Trend",
+                "ongoing": "pågående",
+                "empty": "Inga menstruationer registrerade ännu.",
+                "cycleLength": "Cykel {{value}} dagar"
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "Flöde",
+                "none": "Ingen",
+                "spotting": "Stänkblödning",
+                "light": "Lätt",
+                "medium": "Medium",
+                "heavy": "Riklig"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "Symtom",
+                "cramps": "Kramper",
+                "headache": "Huvudvärk",
+                "backache": "Ryggont",
+                "bloating": "Uppblåsthet",
+                "tenderBreasts": "Ömma bröst",
+                "acne": "Orenheter",
+                "fatigue": "Trötthet",
+                "nausea": "Illamående",
+                "cravings": "Sötsug",
+                "insomnia": "Sömnlöshet"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "Humör",
+                "none": "Ej angivet",
+                "great": "Mycket bra",
+                "good": "Bra",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "Känslig",
+                "sad": "Ledsen",
+                "irritable": "Irriterad",
+                "anxious": "Ängslig"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "Start",
+                "endDate": "Slut (valfritt)",
+                "note": "Anteckning",
+                "visibility": "Synlighet"
             },
             "visibility": {
                 "private": "Privat",
-                "family": "Familie"
+                "family": "Familj"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "Registrera mens",
+                "edit": "Redigera mens"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
+                "title": "Logga dag",
                 "date": "Datum"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "Exportera som CSV"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "Inställningar",
+                "title": "Cykelinställningar",
+                "cycleLength": "Genomsnittlig cykellängd",
+                "periodLength": "Genomsnittlig menslängd",
+                "lutealLength": "Lutealfasens längd",
+                "trackFertility": "Visa fertilt fönster",
+                "autoHint": "Lämna tomt = beräknas automatiskt från din historik.",
+                "saved": "Settings saved."
             }
         }
     },

@@ -2139,10 +2139,10 @@
     },
     "help": {
         "title": "सहायता",
-        "mobileNavigate": "Navigiere über die Leiste unten und „Mehr“.",
-        "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
-        "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
-        "mobileSettings": "Einstellungen findest du unter „Mehr“."
+        "mobileNavigate": "नीचे की पट्टी और „अधिक” से नेविगेट करें।",
+        "mobileCreate": "नीचे दाईं ओर + बटन से नया बनाएँ।",
+        "mobileSearch": "„अधिक” → खोज से खोज खोलें।",
+        "mobileSettings": "सेटिंग्स „अधिक” के अंतर्गत मिलती हैं।"
     },
     "forgotPassword": {
         "title": "Reset password",
@@ -2333,7 +2333,7 @@
             "meds": "दवाइयाँ",
             "labs": "लैब मान",
             "activity": "गतिविधि",
-            "cycle": "Zyklus"
+            "cycle": "चक्र"
         },
         "overview": {
             "title": "अवलोकन",
@@ -2655,65 +2655,65 @@
         "disclaimer": "केवल व्यक्तिगत दस्तावेज़ीकरण हेतु। यह चिकित्सकीय परामर्श, निदान या उपचार का विकल्प नहीं है।",
         "readOnlyBanner": "आप {{name}} का डेटा देख रहे हैं — केवल पढ़ने योग्य।",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "चक्र",
+            "emptyTitle": "अभी तक कोई चक्र डेटा नहीं",
+            "emptyDesc": "पूर्वानुमान, कैलेंडर और आँकड़े देखने के लिए अपनी पहली माहवारी दर्ज करें।",
+            "emptyCta": "पहली माहवारी दर्ज करें",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "माहवारी दर्ज करें",
+            "loadError": "चक्र डेटा लोड नहीं हो सका।",
+            "loadErrorDesc": "कृपया बाद में पुनः प्रयास करें।",
+            "retry": "पुनः प्रयास करें",
+            "saved": "सहेजा गया।",
+            "saveError": "सहेजा नहीं जा सका।",
+            "deleted": "हटाया गया।",
+            "deleteError": "हटाया नहीं जा सका।",
+            "deleteConfirm": "क्या वाकई यह प्रविष्टि हटानी है?",
+            "invalid": "कृपया मान्य मान दर्ज करें।",
+            "fertilityDisclaimer": "उपजाऊ अवधि और ओव्यूलेशन कैलेंडर विधि से अनुमानित हैं। ये गर्भनिरोधक नहीं हैं और चिकित्सीय सलाह का विकल्प नहीं हैं।",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "चक्र वलय",
+                "cycleDay": "चक्र दिन {{day}}",
+                "of": "{{total}} में से"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "फॉलिक्युलर चरण",
+                "fertile": "उपजाऊ अवधि",
+                "ovulation": "ओव्यूलेशन",
+                "luteal": "ल्यूटियल चरण"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "आज अपेक्षित",
+                "inDays": "{{count}} दिनों में",
+                "overdue": "{{count}} दिन overdue",
+                "nextPeriod": "अगली माहवारी",
+                "fertileWindow": "उपजाऊ अवधि",
+                "ovulation": "ओव्यूलेशन",
+                "avgCycle": "औसत चक्र अवधि",
+                "avgPeriod": "औसत माहवारी अवधि",
+                "regularity": "नियमितता",
+                "regular": "नियमित",
+                "irregular": "अनियमित",
+                "notEnoughData": "पर्याप्त डेटा नहीं",
+                "noPrediction": "पूर्वानुमान के लिए एक माहवारी दर्ज करें।"
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} दिन"
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "आज",
+                "startPeriod": "माहवारी शुरू",
+                "endPeriod": "माहवारी समाप्त",
+                "logDay": "दिन दर्ज करें",
+                "startedToast": "आज के लिए माहवारी दर्ज की गई।",
+                "endedToast": "माहवारी समाप्त।",
+                "noOpenPeriod": "समाप्त करने के लिए कोई चालू माहवारी नहीं।"
             },
             "calendar": {
-                "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "title": "कैलेंडर",
+                "prevMonth": "पिछला माह",
+                "nextMonth": "अगला माह"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "माहवारी",
+                "predicted": "पूर्वानुमानित",
+                "fertile": "उपजाऊ",
+                "ovulation": "ओव्यूलेशन",
+                "today": "आज",
+                "logged": "प्रविष्टि"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "प्रवृत्ति",
+                "ongoing": "चालू",
+                "empty": "अभी तक कोई माहवारी दर्ज नहीं।",
+                "cycleLength": "चक्र {{value}} दिन"
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "रक्तस्राव की मात्रा",
+                "none": "कोई नहीं",
+                "spotting": "हल्का धब्बा",
+                "light": "हल्का",
+                "medium": "मध्यम",
+                "heavy": "भारी"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "लक्षण",
+                "cramps": "ऐंठन",
+                "headache": "सिरदर्द",
+                "backache": "पीठ दर्द",
+                "bloating": "पेट फूलना",
+                "tenderBreasts": "स्तनों में तनाव",
+                "acne": "मुँहासे",
+                "fatigue": "थकान",
+                "nausea": "मिचली",
+                "cravings": "तीव्र भूख",
+                "insomnia": "अनिद्रा"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "मनोदशा",
+                "none": "निर्दिष्ट नहीं",
+                "great": "बहुत अच्छा",
+                "good": "अच्छा",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "संवेदनशील",
+                "sad": "उदास",
+                "irritable": "चिड़चिड़ा",
+                "anxious": "चिंतित"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "शुरुआत",
+                "endDate": "अंत (वैकल्पिक)",
+                "note": "नोट",
+                "visibility": "दृश्यता"
             },
             "visibility": {
-                "private": "Privat",
-                "family": "Familie"
+                "private": "निजी",
+                "family": "परिवार"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "माहवारी दर्ज करें",
+                "edit": "माहवारी संपादित करें"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
-                "date": "Datum"
+                "title": "दिन दर्ज करें",
+                "date": "तारीख"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "CSV के रूप में निर्यात करें"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "सेटिंग्स",
+                "title": "चक्र सेटिंग्स",
+                "cycleLength": "औसत चक्र अवधि",
+                "periodLength": "औसत माहवारी अवधि",
+                "lutealLength": "ल्यूटियल चरण की अवधि",
+                "trackFertility": "उपजाऊ अवधि दिखाएँ",
+                "autoHint": "खाली छोड़ें = आपके इतिहास से स्वतः गणना।",
+                "saved": "Settings saved."
             }
         }
     },

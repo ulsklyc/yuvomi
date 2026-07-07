@@ -2333,7 +2333,7 @@
             "meds": "약",
             "labs": "검사 결과",
             "activity": "활동",
-            "cycle": "Zyklus"
+            "cycle": "주기"
         },
         "overview": {
             "title": "개요",
@@ -2655,65 +2655,65 @@
         "disclaimer": "개인 기록용입니다. 의료 상담, 진단, 치료를 대체하지 않습니다.",
         "readOnlyBanner": "{{name}}의 데이터를 보고 있습니다 — 읽기 전용.",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "주기",
+            "emptyTitle": "아직 주기 데이터가 없습니다",
+            "emptyDesc": "예측, 캘린더, 통계를 보려면 첫 생리를 기록하세요.",
+            "emptyCta": "첫 생리 기록",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "생리 기록",
+            "loadError": "주기 데이터를 불러오지 못했습니다.",
+            "loadErrorDesc": "나중에 다시 시도해 주세요.",
+            "retry": "다시 시도",
+            "saved": "저장되었습니다.",
+            "saveError": "저장하지 못했습니다.",
+            "deleted": "삭제되었습니다.",
+            "deleteError": "삭제하지 못했습니다.",
+            "deleteConfirm": "이 항목을 정말 삭제할까요?",
+            "invalid": "유효한 값을 입력하세요.",
+            "fertilityDisclaimer": "가임기와 배란은 달력법으로 추정한 값입니다. 피임 수단이 아니며 의학적 상담을 대신하지 않습니다.",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "주기 링",
+                "cycleDay": "주기 {{day}}일차",
+                "of": "{{total}} 중"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "난포기",
+                "fertile": "가임기",
+                "ovulation": "배란",
+                "luteal": "황체기"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "오늘 예상",
+                "inDays": "{{count}}일 후",
+                "overdue": "{{count}}일 지남",
+                "nextPeriod": "다음 생리",
+                "fertileWindow": "가임기",
+                "ovulation": "배란",
+                "avgCycle": "평균 주기 길이",
+                "avgPeriod": "평균 생리 기간",
+                "regularity": "규칙성",
+                "regular": "규칙적",
+                "irregular": "불규칙",
+                "notEnoughData": "데이터 부족",
+                "noPrediction": "예측을 위해 생리를 기록하세요."
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}}일"
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "오늘",
+                "startPeriod": "생리 시작",
+                "endPeriod": "생리 종료",
+                "logDay": "하루 기록",
+                "startedToast": "오늘 생리를 기록했습니다.",
+                "endedToast": "생리가 종료되었습니다.",
+                "noOpenPeriod": "종료할 진행 중인 생리가 없습니다."
             },
             "calendar": {
-                "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "title": "캘린더",
+                "prevMonth": "지난달",
+                "nextMonth": "다음 달"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "생리",
+                "predicted": "예측",
+                "fertile": "가임",
+                "ovulation": "배란",
+                "today": "오늘",
+                "logged": "기록"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "추이",
+                "ongoing": "진행 중",
+                "empty": "아직 기록된 생리가 없습니다.",
+                "cycleLength": "주기 {{value}}일"
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "생리량",
+                "none": "없음",
+                "spotting": "점상 출혈",
+                "light": "약함",
+                "medium": "보통",
+                "heavy": "강함"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "증상",
+                "cramps": "경련",
+                "headache": "두통",
+                "backache": "요통",
+                "bloating": "복부 팽만",
+                "tenderBreasts": "가슴 통증",
+                "acne": "여드름",
+                "fatigue": "피로",
+                "nausea": "메스꺼움",
+                "cravings": "식욕 폭발",
+                "insomnia": "불면"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "기분",
+                "none": "미지정",
+                "great": "아주 좋음",
+                "good": "좋음",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "예민함",
+                "sad": "슬픔",
+                "irritable": "짜증남",
+                "anxious": "불안함"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "시작",
+                "endDate": "종료(선택)",
+                "note": "메모",
+                "visibility": "공개 범위"
             },
             "visibility": {
-                "private": "Privat",
-                "family": "Familie"
+                "private": "비공개",
+                "family": "가족"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "생리 기록",
+                "edit": "생리 편집"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
-                "date": "Datum"
+                "title": "하루 기록",
+                "date": "날짜"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "CSV로 내보내기"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "설정",
+                "title": "주기 설정",
+                "cycleLength": "평균 주기 길이",
+                "periodLength": "평균 생리 기간",
+                "lutealLength": "황체기 길이",
+                "trackFertility": "가임기 표시",
+                "autoHint": "비워 두면 기록에서 자동 계산됩니다.",
+                "saved": "설정이 저장되었습니다."
             }
         }
     },

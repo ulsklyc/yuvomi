@@ -904,7 +904,7 @@
         "tabApiTokens": "API Tokens",
         "tabAccount": "Conta",
         "tabsAriaLabel": "Seções de configurações",
-        "sectionDesign": "Design",
+        "sectionDesign": "Aparência",
         "sectionAppName": "Nome da aplicação",
         "sectionShopping": "Compras",
         "shoppingCategoriesLabel": "Categorias de compras",
@@ -2333,7 +2333,7 @@
             "meds": "Medicamentos",
             "labs": "Exames",
             "activity": "Atividade",
-            "cycle": "Zyklus"
+            "cycle": "Ciclo"
         },
         "overview": {
             "title": "Visão geral",
@@ -2655,65 +2655,65 @@
         "disclaimer": "Apenas para documentação pessoal. Não substitui aconselhamento, diagnóstico ou tratamento médico.",
         "readOnlyBanner": "Está a ver os dados de {{name}} — apenas leitura.",
         "cycle": {
-            "title": "Zyklus",
-            "emptyTitle": "Noch keine Zyklusdaten",
-            "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
-            "emptyCta": "Erste Periode erfassen",
+            "title": "Ciclo",
+            "emptyTitle": "Ainda não há dados do ciclo",
+            "emptyDesc": "Registe o seu primeiro período para ver previsões, calendário e estatísticas.",
+            "emptyCta": "Registar primeiro período",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
-            "loadError": "Zyklusdaten konnten nicht geladen werden.",
-            "loadErrorDesc": "Bitte versuche es später erneut.",
-            "retry": "Erneut versuchen",
-            "saved": "Gespeichert.",
-            "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
-            "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "invalid": "Bitte gültige Werte eingeben.",
-            "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "add": "Registar período",
+            "loadError": "Não foi possível carregar os dados do ciclo.",
+            "loadErrorDesc": "Tente novamente mais tarde.",
+            "retry": "Tentar novamente",
+            "saved": "Guardado.",
+            "saveError": "Não foi possível guardar.",
+            "deleted": "Eliminado.",
+            "deleteError": "Não foi possível eliminar.",
+            "deleteConfirm": "Eliminar mesmo esta entrada?",
+            "invalid": "Introduza valores válidos.",
+            "fertilityDisclaimer": "A janela fértil e a ovulação são estimadas pelo método do calendário. Não são um contracetivo nem substituem o aconselhamento médico.",
             "ring": {
-                "label": "Zyklus-Ring",
-                "cycleDay": "Zyklustag {{day}}",
-                "of": "von {{total}}"
+                "label": "Anel do ciclo",
+                "cycleDay": "Dia do ciclo {{day}}",
+                "of": "de {{total}}"
             },
             "phase": {
                 "menstruation": "Menstruation",
-                "follicular": "Follikelphase",
-                "fertile": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "luteal": "Lutealphase"
+                "follicular": "Fase folicular",
+                "fertile": "Janela fértil",
+                "ovulation": "Ovulação",
+                "luteal": "Fase lútea"
             },
             "status": {
-                "today": "heute erwartet",
-                "inDays": "in {{count}} Tagen",
-                "overdue": "{{count}} Tage überfällig",
-                "nextPeriod": "Nächste Periode",
-                "fertileWindow": "Fruchtbares Fenster",
-                "ovulation": "Eisprung",
-                "avgCycle": "Ø Zykluslänge",
-                "avgPeriod": "Ø Periodenlänge",
-                "regularity": "Regelmäßigkeit",
-                "regular": "Regelmäßig",
-                "irregular": "Unregelmäßig",
-                "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "today": "prevista para hoje",
+                "inDays": "em {{count}} dias",
+                "overdue": "{{count}} dias em atraso",
+                "nextPeriod": "Próximo período",
+                "fertileWindow": "Janela fértil",
+                "ovulation": "Ovulação",
+                "avgCycle": "Duração média do ciclo",
+                "avgPeriod": "Duração média do período",
+                "regularity": "Regularidade",
+                "regular": "Regular",
+                "irregular": "Irregular",
+                "notEnoughData": "Dados insuficientes",
+                "noPrediction": "Registe um período para obter previsões."
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} dias"
             },
             "today": {
-                "title": "Heute",
-                "startPeriod": "Periode gestartet",
-                "endPeriod": "Periode beendet",
-                "logDay": "Tag protokollieren",
-                "startedToast": "Periode für heute erfasst.",
-                "endedToast": "Periode beendet.",
-                "noOpenPeriod": "Keine laufende Periode zum Beenden."
+                "title": "Hoje",
+                "startPeriod": "Período iniciado",
+                "endPeriod": "Período terminado",
+                "logDay": "Registar dia",
+                "startedToast": "Período registado para hoje.",
+                "endedToast": "Período terminado.",
+                "noOpenPeriod": "Não há período em curso para terminar."
             },
             "calendar": {
-                "title": "Kalender",
-                "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "title": "Calendário",
+                "prevMonth": "Mês anterior",
+                "nextMonth": "Próximo mês"
             },
             "weekday": {
                 "mon": "Mo",
@@ -2725,81 +2725,81 @@
                 "sun": "So"
             },
             "legend": {
-                "period": "Periode",
-                "predicted": "Vorhergesagt",
-                "fertile": "Fruchtbar",
-                "ovulation": "Eisprung",
-                "today": "Heute",
-                "logged": "Eintrag"
+                "period": "Período",
+                "predicted": "Previsto",
+                "fertile": "Fértil",
+                "ovulation": "Ovulação",
+                "today": "Hoje",
+                "logged": "Entrada"
             },
             "history": {
-                "title": "Verlauf",
-                "ongoing": "laufend",
-                "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "title": "Evolução",
+                "ongoing": "em curso",
+                "empty": "Ainda não há períodos registados.",
+                "cycleLength": "Ciclo {{value}} dias"
             },
             "flow": {
-                "label": "Blutungsstärke",
-                "none": "Keine",
-                "spotting": "Schmierblutung",
-                "light": "Leicht",
-                "medium": "Mittel",
-                "heavy": "Stark"
+                "label": "Intensidade do fluxo",
+                "none": "Nenhuma",
+                "spotting": "Spotting",
+                "light": "Leve",
+                "medium": "Média",
+                "heavy": "Intenso"
             },
             "symptom": {
-                "label": "Symptome",
-                "cramps": "Krämpfe",
-                "headache": "Kopfschmerz",
-                "backache": "Rückenschmerz",
-                "bloating": "Blähbauch",
-                "tenderBreasts": "Spannen der Brust",
-                "acne": "Unreine Haut",
-                "fatigue": "Müdigkeit",
-                "nausea": "Übelkeit",
-                "cravings": "Heißhunger",
-                "insomnia": "Schlaflosigkeit"
+                "label": "Sintomas",
+                "cramps": "Cólicas",
+                "headache": "Dor de cabeça",
+                "backache": "Dor nas costas",
+                "bloating": "Inchaço",
+                "tenderBreasts": "Sensibilidade nos seios",
+                "acne": "Acne",
+                "fatigue": "Fadiga",
+                "nausea": "Náuseas",
+                "cravings": "Desejos alimentares",
+                "insomnia": "Insónia"
             },
             "mood": {
-                "label": "Stimmung",
-                "none": "Keine Angabe",
-                "great": "Sehr gut",
-                "good": "Gut",
+                "label": "Humor",
+                "none": "Não especificado",
+                "great": "Muito bem",
+                "good": "Bem",
                 "neutral": "Neutral",
-                "sensitive": "Empfindlich",
-                "sad": "Traurig",
-                "irritable": "Gereizt",
-                "anxious": "Ängstlich"
+                "sensitive": "Sensível",
+                "sad": "Triste",
+                "irritable": "Irritável",
+                "anxious": "Ansiosa"
             },
             "field": {
-                "startDate": "Beginn",
-                "endDate": "Ende (optional)",
-                "note": "Notiz",
-                "visibility": "Sichtbarkeit"
+                "startDate": "Início",
+                "endDate": "Fim (opcional)",
+                "note": "Nota",
+                "visibility": "Visibilidade"
             },
             "visibility": {
-                "private": "Privat",
-                "family": "Familie"
+                "private": "Privado",
+                "family": "Família"
             },
             "period": {
-                "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "add": "Registar período",
+                "edit": "Editar período"
             },
             "dayLog": {
-                "title": "Tag protokollieren",
-                "date": "Datum"
+                "title": "Registar dia",
+                "date": "Data"
             },
             "export": {
-                "csv": "Als CSV exportieren"
+                "csv": "Exportar como CSV"
             },
             "settings": {
-                "open": "Einstellungen",
-                "title": "Zyklus-Einstellungen",
-                "cycleLength": "Durchschnittliche Zykluslänge",
-                "periodLength": "Durchschnittliche Periodenlänge",
-                "lutealLength": "Länge der Lutealphase",
-                "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
-                "saved": "Einstellungen gespeichert."
+                "open": "Configurações",
+                "title": "Definições do ciclo",
+                "cycleLength": "Duração média do ciclo",
+                "periodLength": "Duração média do período",
+                "lutealLength": "Duração da fase lútea",
+                "trackFertility": "Mostrar janela fértil",
+                "autoHint": "Deixe vazio = calculado automaticamente a partir do seu histórico.",
+                "saved": "Settings saved."
             }
         }
     },
