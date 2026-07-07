@@ -329,6 +329,50 @@ function forwardedAuthHeaders(ctx) {
   return headers;
 }
 
+// Obergrenze für inline durchgereichte Binärantworten. Die Brücke base64-kodiert
+// den Body für die JSON-RPC-Antwort — ein LLM kann mit größeren Blobs ohnehin
+// nichts anfangen, und ohne Deckel würde ein großes Backup/Dokument mehrere
+// Vollkopien im Prozess allokieren (OOM-Risiko). Große Downloads laufen weiter
+// über die dedizierte, streamende REST-Route.
+const MAX_BINARY_RESPONSE_BYTES = 5 * 1024 * 1024; // 5 MiB
+
+// Liest einen Binär-Response speicherbeschränkt: verwirft früh anhand von
+// Content-Length und bricht sonst den Stream ab, sobald der Deckel überschritten
+// wird — es wird also nie mehr als der Deckel gepuffert.
+async function readCappedBinary(response, cap = MAX_BINARY_RESPONSE_BYTES) {
+  const tooLarge = (size) => new ToolError(
+    `Binary response too large for the MCP bridge (${size} bytes, max ${cap}). `
+    + 'Use the dedicated download route directly instead.',
+  );
+
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > cap) throw tooLarge(declared);
+
+  const reader = response.body && typeof response.body.getReader === 'function'
+    ? response.body.getReader()
+    : null;
+  if (!reader) {
+    // Kein Stream-Reader (z. B. im Test): puffern und danach prüfen.
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length > cap) throw tooLarge(buffer.length);
+    return buffer;
+  }
+
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > cap) {
+      await reader.cancel().catch(() => {});
+      throw tooLarge(total);
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks);
+}
+
 async function internalApiRequest(ctx, method, path, { query, payload, contentData, contentType } = {}) {
   const url = new URL(path, `${internalBaseUrl()}/`);
   for (const [key, value] of Object.entries(query || {})) {
@@ -358,7 +402,7 @@ async function internalApiRequest(ctx, method, path, { query, payload, contentDa
   } else if (responseContentType.startsWith('text/') || responseContentType.includes('text/calendar')) {
     data = { text: await response.text(), content_type: responseContentType };
   } else {
-    const buffer = Buffer.from(await response.arrayBuffer());
+    const buffer = await readCappedBinary(response);
     data = buffer.length
       ? {
           content_base64: buffer.toString('base64'),

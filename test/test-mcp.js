@@ -82,6 +82,19 @@ function jsonResponse(body, { ok = true, status = 200 } = {}) {
     arrayBuffer: async () => Buffer.from(JSON.stringify(body)),
   };
 }
+function binaryResponse(bytes, { contentLength, contentType = 'application/octet-stream', ok = true, status = 200 } = {}) {
+  const buf = Buffer.from(bytes);
+  const map = { 'content-type': contentType };
+  if (contentLength !== undefined) map['content-length'] = String(contentLength);
+  return {
+    ok, status,
+    headers: { get: (h) => (map[String(h).toLowerCase()] ?? null) },
+    json: async () => null,
+    text: async () => buf.toString(),
+    // Kein body.getReader → readCappedBinary nutzt den arrayBuffer-Fallback.
+    arrayBuffer: async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength),
+  };
+}
 
 // ── initialize ───────────────────────────────────────────────────────────────
 
@@ -308,6 +321,41 @@ test('call_api_operation: Upstream-Fehler wird als isError durchgereicht', async
     );
     assert.equal(res.result.isError, true);
     assert.match(res.result.content[0].text, /Task not found/);
+  } finally {
+    global.fetch = realFetch;
+  }
+});
+
+test('call_api_operation: kleine Binärantwort wird als base64 durchgereicht', async () => {
+  installFetchMock(() => binaryResponse(Buffer.from('PDFDATA'), { contentLength: 7 }));
+  try {
+    const res = await toolCallWithHeaders(
+      'call_api_operation',
+      { operation_key: 'get_dashboard' },
+      { authorization: 'Bearer test-token' },
+    );
+    assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+    const payload = parseContent(res);
+    assert.equal(payload.content_type, 'application/octet-stream');
+    assert.equal(Buffer.from(payload.content_base64, 'base64').toString(), 'PDFDATA');
+  } finally {
+    global.fetch = realFetch;
+  }
+});
+
+test('call_api_operation: übergroße Binärantwort wird per Content-Length abgelehnt', async () => {
+  const huge = 50 * 1024 * 1024; // 50 MiB > 5-MiB-Deckel
+  const calls = installFetchMock(() => binaryResponse(Buffer.alloc(0), { contentLength: huge }));
+  try {
+    const res = await toolCallWithHeaders(
+      'call_api_operation',
+      { operation_key: 'get_dashboard' },
+      { authorization: 'Bearer test-token' },
+    );
+    assert.equal(res.result.isError, true);
+    assert.match(res.result.content[0].text, /too large/i);
+    // Abweisung vor dem Puffern — arrayBuffer darf nicht angefasst werden.
+    assert.equal(calls.length, 1);
   } finally {
     global.fetch = realFetch;
   }
