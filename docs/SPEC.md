@@ -1484,6 +1484,7 @@ A stateless [Model Context Protocol](https://modelcontextprotocol.io) endpoint i
 - **Curated core tools:** `list_tasks`, `create_task`, `list_shopping_items`, `add_shopping_item`, `list_upcoming_events`, `create_event` — fast, in-process handlers for the most common actions.
 - **OpenAPI bridge:** `list_api_operations` and `get_api_operation` discover every documented REST operation; `call_api_operation` invokes any of them over an authenticated loopback call. This exposes the full API through one mechanism instead of a per-route tool, and every call inherits the token's permissions (admin-only routes require an admin token).
 - Each call runs as the token's creating user and inherits that user's role. HTTPS is strongly recommended.
+- Binary responses through the bridge (e.g. document/backup downloads) are inlined as base64 up to **5 MiB**; larger downloads are rejected and should use the dedicated streaming REST route directly.
 - **Optional:** `MCP_INTERNAL_BASE_URL` overrides the base URL the bridge calls back into; it defaults to `BASE_URL` or `http://127.0.0.1:<PORT>` and is only needed for non-standard bind addresses.
 
 ---
