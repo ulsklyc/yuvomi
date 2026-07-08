@@ -145,6 +145,8 @@
         "customizeExit": "カスタマイズを終了",
         "customizeSize": "サイズ",
         "customizeSizeFor": "{{widget}} のサイズ",
+        "widgetSizeOneRowGroup": "1行",
+        "widgetSizeTwoRowsGroup": "2行",
         "customizeHide": "{{widget}} を非表示",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

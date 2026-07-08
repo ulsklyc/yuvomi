@@ -145,6 +145,8 @@
         "customizeExit": "अनुकूलन से बाहर निकलें",
         "customizeSize": "आकार",
         "customizeSizeFor": "{{widget}} का आकार",
+        "widgetSizeOneRowGroup": "1 पंक्ति",
+        "widgetSizeTwoRowsGroup": "2 पंक्तियाँ",
         "customizeHide": "{{widget}} छिपाएँ",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

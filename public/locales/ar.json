@@ -145,6 +145,8 @@
         "customizeExit": "إنهاء التخصيص",
         "customizeSize": "الحجم",
         "customizeSizeFor": "حجم {{widget}}",
+        "widgetSizeOneRowGroup": "صف واحد",
+        "widgetSizeTwoRowsGroup": "صفان",
         "customizeHide": "إخفاء {{widget}}",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

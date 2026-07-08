@@ -201,7 +201,7 @@ test('Today-Meals-Widget rendert nur sichtbare Mahlzeit-Typen', async () => {
   nodeAssert.ok(!html.includes('data-type="lunch"'));
 });
 
-test('Dashboard-Widgetgrößen bieten ein- und zweizeilige breite Presets und bewahren gültige Matrixwerte', async () => {
+test('Dashboard-Widgetgrößen bieten gruppierte ein-/zweizeilige Presets und normalisieren versteckte Matrixwerte', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   const presetValues = __test.WIDGET_SIZE_PRESETS.map((p) => p.value);
 
@@ -216,8 +216,14 @@ test('Dashboard-Widgetgrößen bieten ein- und zweizeilige breite Presets und be
 
   nodeAssert.equal(normalized.find((w) => w.id === 'tasks').size, '3x1');
   nodeAssert.equal(normalized.find((w) => w.id === 'calendar').size, '4x1');
-  nodeAssert.equal(normalized.find((w) => w.id === 'family').size, '4x3');
+  nodeAssert.equal(normalized.find((w) => w.id === 'family').size, '4x2');
   nodeAssert.equal(normalized.find((w) => w.id === 'weather').size, '2x1');
+
+  const controls = __test.renderWidgetCustomizeControls({ id: 'family', visible: true, order: 0, size: '4x2' }, 0, 1);
+  nodeAssert.equal((controls.match(/class="widget-size-row"/g) || []).length, 2);
+  nodeAssert.ok(controls.includes('data-widget-size-preset="4x1"'));
+  nodeAssert.ok(controls.includes('data-widget-size-preset="4x2"'));
+  nodeAssert.ok(!controls.includes('data-widget-size-preset="4x3"'));
 });
 
 // --------------------------------------------------------

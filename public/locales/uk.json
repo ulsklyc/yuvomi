@@ -145,6 +145,8 @@
         "customizeExit": "Вийти з налаштування",
         "customizeSize": "Розмір",
         "customizeSizeFor": "Розмір для {{widget}}",
+        "widgetSizeOneRowGroup": "1 рядок",
+        "widgetSizeTwoRowsGroup": "2 рядки",
         "customizeHide": "Приховати {{widget}}",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

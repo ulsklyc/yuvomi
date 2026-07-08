@@ -151,6 +151,8 @@
         "customizeExit": "Selesai menyesuaikan",
         "customizeSize": "Ukuran",
         "customizeSizeFor": "Ukuran untuk {{widget}}",
+        "widgetSizeOneRowGroup": "1 baris",
+        "widgetSizeTwoRowsGroup": "2 baris",
         "customizeHide": "Sembunyikan {{widget}}",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

@@ -145,6 +145,8 @@
         "customizeExit": "Özelleştirmeden çık",
         "customizeSize": "Boyut",
         "customizeSizeFor": "{{widget}} boyutu",
+        "widgetSizeOneRowGroup": "1 satır",
+        "widgetSizeTwoRowsGroup": "2 satır",
         "customizeHide": "{{widget}} gizle",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

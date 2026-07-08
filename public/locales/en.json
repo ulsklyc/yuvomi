@@ -145,6 +145,8 @@
         "customizeExit": "Exit customization",
         "customizeSize": "Size",
         "customizeSizeFor": "Size for {{widget}}",
+        "widgetSizeOneRowGroup": "1 row",
+        "widgetSizeTwoRowsGroup": "2 rows",
         "customizeHide": "Hide {{widget}}",
         "customizeHiddenTitle": "Hidden widgets",
         "customizeShow": "Show {{widget}}",

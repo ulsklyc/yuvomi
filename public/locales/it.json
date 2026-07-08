@@ -145,6 +145,8 @@
         "customizeExit": "Esci dalla personalizzazione",
         "customizeSize": "Dimensione",
         "customizeSizeFor": "Dimensione di {{widget}}",
+        "widgetSizeOneRowGroup": "1 riga",
+        "widgetSizeTwoRowsGroup": "2 righe",
         "customizeHide": "Nascondi {{widget}}",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

@@ -145,6 +145,8 @@
         "customizeExit": "Kilépés a testreszabásból",
         "customizeSize": "Méret",
         "customizeSizeFor": "Méret {{widget}} számára",
+        "widgetSizeOneRowGroup": "1 sor",
+        "widgetSizeTwoRowsGroup": "2 sor",
         "customizeHide": "Elrejtés {{widget}}",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

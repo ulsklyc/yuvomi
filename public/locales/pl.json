@@ -151,6 +151,8 @@
         "customizeExit": "Zakończ dostosowywanie",
         "customizeSize": "Rozmiar",
         "customizeSizeFor": "Rozmiar dla {{widget}}",
+        "widgetSizeOneRowGroup": "1 wiersz",
+        "widgetSizeTwoRowsGroup": "2 wiersze",
         "customizeHide": "Ukryj {{widget}}",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

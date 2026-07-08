@@ -151,6 +151,8 @@
         "customizeExit": "맞춤 설정 종료",
         "customizeSize": "크기",
         "customizeSizeFor": "{{widget}} 크기",
+        "widgetSizeOneRowGroup": "1행",
+        "widgetSizeTwoRowsGroup": "2행",
         "customizeHide": "{{widget}} 숨기기",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

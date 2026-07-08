@@ -145,6 +145,8 @@
         "customizeExit": "Ukončit přizpůsobení",
         "customizeSize": "Velikost",
         "customizeSizeFor": "Velikost pro {{widget}}",
+        "widgetSizeOneRowGroup": "1 řádek",
+        "widgetSizeTwoRowsGroup": "2 řádky",
         "customizeHide": "Skrýt {{widget}}",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

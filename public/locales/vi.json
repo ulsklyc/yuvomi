@@ -145,6 +145,8 @@
         "customizeExit": "Thoát tùy chỉnh",
         "customizeSize": "Kích thước",
         "customizeSizeFor": "Kích thước cho {{widget}}",
+        "widgetSizeOneRowGroup": "1 hàng",
+        "widgetSizeTwoRowsGroup": "2 hàng",
         "customizeHide": "Ẩn {{widget}}",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

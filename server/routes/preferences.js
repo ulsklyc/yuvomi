@@ -45,7 +45,7 @@ const SUBDIVISION_RE = /^[A-Z]{2}-[A-Z0-9-]{1,10}$/;
 // Order defines the default dashboard layout (weather first, then primary content).
 // Must stay in sync with WIDGET_IDS in public/pages/dashboard.js.
 const VALID_WIDGET_IDS = ['weather', 'tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'budget', 'family', 'notes'];
-const VALID_WIDGET_SIZES = ['1x1', '1x2', '1x3', '1x4', '2x1', '2x2', '2x3', '2x4', '3x1', '3x2', '3x3', '3x4', '4x1', '4x2', '4x3', '4x4'];
+const VALID_WIDGET_SIZES = ['1x1', '2x1', '3x1', '4x1', '1x2', '2x2', '3x2', '4x2'];
 
 // Modul-Slugs, die per Settings deaktiviert werden können.
 // Dashboard und Settings sind absichtlich nicht enthalten — sie sind essentiell.
@@ -62,6 +62,21 @@ function defaultWidgetSize(id) {
   if (['tasks', 'calendar'].includes(id)) return '2x2';
   if (['weather', 'shopping', 'notes'].includes(id)) return '2x1';
   return '1x1';
+}
+
+function collapseMatrixSizeToPreset(size) {
+  const match = String(size || '').match(/^([1-4])x([1-4])$/);
+  if (!match) return null;
+  const cols = Number(match[1]);
+  const rows = Number(match[2]) > 1 ? 2 : 1;
+  return `${cols}x${rows}`;
+}
+
+function normalizeWidgetSize(size, widgetId) {
+  if (VALID_WIDGET_SIZES.includes(size)) return size;
+  const collapsed = collapseMatrixSizeToPreset(size);
+  if (collapsed && VALID_WIDGET_SIZES.includes(collapsed)) return collapsed;
+  return defaultWidgetSize(widgetId);
 }
 
 const DEFAULT_WIDGET_CONFIG = JSON.stringify(VALID_WIDGET_IDS.map((id, order) => ({
@@ -184,7 +199,7 @@ function normalizeWidgetConfig(input) {
         id: w.id,
         visible: w.visible !== false,
         order: Number.isFinite(Number(w.order)) ? Number(w.order) : order,
-        size: VALID_WIDGET_SIZES.includes(w.size) ? w.size : defaultWidgetSize(w.id),
+        size: normalizeWidgetSize(w.size, w.id),
       }))
     : [];
 

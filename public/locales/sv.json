@@ -145,6 +145,8 @@
         "customizeExit": "Avsluta anpassning",
         "customizeSize": "Storlek",
         "customizeSizeFor": "Storlek för {{widget}}",
+        "widgetSizeOneRowGroup": "1 rad",
+        "widgetSizeTwoRowsGroup": "2 rader",
         "customizeHide": "Dölj {{widget}}",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

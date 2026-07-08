@@ -145,6 +145,8 @@
         "customizeExit": "Aanpassing beëindigen",
         "customizeSize": "Grootte",
         "customizeSizeFor": "Grootte voor {{widget}}",
+        "widgetSizeOneRowGroup": "1 rij",
+        "widgetSizeTwoRowsGroup": "2 rijen",
         "customizeHide": "{{widget}} verbergen",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

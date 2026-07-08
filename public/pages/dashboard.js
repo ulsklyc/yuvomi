@@ -198,9 +198,10 @@ const WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'budg
 
 // Benannte Formen decken die üblichen Dashboard-Bedürfnisse ab: kompakte
 // Statuskacheln, hohe Listen, Standardkarten sowie breite Übersichten in echter
-// Ein-Zeilen- und Zwei-Zeilen-Höhe. Die volle
-// 1-4 x 1-4-Matrix bleibt als gespeicherter/validierter Wert erhalten, damit
-// bestehende Layouts nicht beim nächsten Rendern zusammengezogen werden.
+// Ein-Zeilen- und Zwei-Zeilen-Höhe. Gespeicherte 3-/4-Zeilen-Matrixwerte aus
+// alten oder direkten API-Konfigurationen werden auf das nächste angebotene
+// Preset normalisiert, damit gespeicherter Wert und UI-Aktivzustand nicht
+// auseinanderlaufen.
 const WIDGET_SIZE_PRESETS = [
   { value: '1x1', labelKey: 'dashboard.widgetSizeTiny'     },
   { value: '2x1', labelKey: 'dashboard.widgetSizeNarrow'   },
@@ -212,25 +213,28 @@ const WIDGET_SIZE_PRESETS = [
   { value: '4x2', labelKey: 'dashboard.widgetSizeFull'     },
 ];
 
-// Alle bekannten Größen inkl. API-validierter Legacy-/Direktwerte.
-const WIDGET_SIZE_OPTIONS = [
-  '1x1', '1x2', '1x3', '1x4',
-  '2x1', '2x2', '2x3', '2x4',
-  '3x1', '3x2', '3x3', '3x4',
-  '4x1', '4x2', '4x3', '4x4',
+const WIDGET_SIZE_PRESET_GROUPS = [
+  { labelKey: 'dashboard.widgetSizeOneRowGroup', values: ['1x1', '2x1', '3x1', '4x1'] },
+  { labelKey: 'dashboard.widgetSizeTwoRowsGroup', values: ['1x2', '2x2', '3x2', '4x2'] },
 ];
 
-// Markiert in der UI bei nicht direkt angebotenen Matrixwerten das nächstliegende
-// benannte Preset, ohne den gespeicherten Wert zu verändern.
-function nearestPreset(size) {
-  const values = WIDGET_SIZE_PRESETS.map((p) => p.value);
-  if (values.includes(size)) return size;
-  const [cols, rows] = String(size).split('x').map(Number);
-  if (!Number.isFinite(cols) || !Number.isFinite(rows)) return '1x1';
-  if (cols >= 4) return rows >= 2 ? '4x2' : '4x1';
-  if (cols >= 3) return rows >= 2 ? '3x2' : '3x1';
-  if (cols >= 2) return rows >= 2 ? '2x2' : '2x1';
-  return rows >= 2 ? '1x2' : '1x1';
+const WIDGET_SIZE_PRESET_VALUES = WIDGET_SIZE_PRESETS.map((p) => p.value);
+const WIDGET_SIZE_PRESETS_BY_VALUE = new Map(WIDGET_SIZE_PRESETS.map((p) => [p.value, p]));
+const WIDGET_SIZE_OPTIONS = WIDGET_SIZE_PRESET_VALUES;
+
+function collapseMatrixSizeToPreset(size) {
+  const match = String(size || '').match(/^([1-4])x([1-4])$/);
+  if (!match) return null;
+  const cols = Number(match[1]);
+  const rows = Number(match[2]) > 1 ? 2 : 1;
+  return `${cols}x${rows}`;
+}
+
+function normalizeWidgetSize(size, widgetId) {
+  if (WIDGET_SIZE_PRESET_VALUES.includes(size)) return size;
+  const collapsed = collapseMatrixSizeToPreset(size);
+  if (collapsed && WIDGET_SIZE_PRESET_VALUES.includes(collapsed)) return collapsed;
+  return defaultWidgetSize(widgetId);
 }
 
 function defaultWidgetSize(id) {
@@ -283,7 +287,7 @@ function normalizeDashboardConfig(input) {
         id: w.id,
         visible: w.visible !== false,
         order: Number.isFinite(Number(w.order)) ? Number(w.order) : i,
-        size: WIDGET_SIZE_OPTIONS.includes(w.size) ? w.size : defaultWidgetSize(w.id),
+        size: normalizeWidgetSize(w.size, w.id),
       }))
     : [];
   const presentIds = new Set(valid.map((w) => w.id));
@@ -1191,22 +1195,36 @@ function renderSizeMiniGridCells(size) {
   }).join('');
 }
 
+function renderSizeButton(p, activeSize, widgetId) {
+  const active = p.value === activeSize;
+  return `<button type="button" class="widget-size-btn${active ? ' widget-size-btn--active' : ''}"
+            data-widget-size-preset="${p.value}" data-widget-id="${esc(widgetId)}"
+            aria-pressed="${active ? 'true' : 'false'}" aria-label="${esc(t(p.labelKey))}" title="${esc(t(p.labelKey))}">
+      ${renderSizeMiniGrid(p.value)}
+    </button>`;
+}
+
 function renderWidgetCustomizeControls(w, index = 0, total = 1) {
   const isFirst = index === 0;
   const isLast = index === total - 1;
-  const activeSize = nearestPreset(w.size);
+  const activeSize = WIDGET_SIZE_PRESET_VALUES.includes(w.size) ? w.size : null;
 
   // Segmentiertes Größen-Steuerelement: klickbare Mini-Grid-Presets ersetzen
   // die frühere Kombination aus dekorativem Mini-Grid + „Größe"-Label + 132px-
-  // <select> (Critique P1: doppelte Kontrolle + Overflow auf 1×1-Kacheln). Jeder
-  // Button zeigt seine Form direkt und markiert die aktive Größe.
-  const sizeButtons = WIDGET_SIZE_PRESETS.map((p) => {
-    const active = p.value === activeSize;
-    return `<button type="button" class="widget-size-btn${active ? ' widget-size-btn--active' : ''}"
-              data-widget-size-preset="${p.value}" data-widget-id="${esc(w.id)}"
-              aria-pressed="${active ? 'true' : 'false'}" aria-label="${esc(t(p.labelKey))}" title="${esc(t(p.labelKey))}">
-        ${renderSizeMiniGrid(p.value)}
-      </button>`;
+  // <select> (Critique P1: doppelte Kontrolle + Overflow auf 1×1-Kacheln). Die
+  // acht Presets sind in 1- und 2-Zeilen-Gruppen sortiert, damit pro Entscheidung
+  // nur noch die Breite verglichen werden muss.
+  const sizeButtons = WIDGET_SIZE_PRESET_GROUPS.map((group) => {
+    const label = t(group.labelKey);
+    const buttons = group.values
+      .map((value) => WIDGET_SIZE_PRESETS_BY_VALUE.get(value))
+      .filter(Boolean)
+      .map((p) => renderSizeButton(p, activeSize, w.id))
+      .join('');
+    return `<div class="widget-size-row" role="group" aria-label="${esc(label)}">
+        <span class="widget-size-row__label">${esc(label)}</span>
+        <div class="widget-size-row__buttons">${buttons}</div>
+      </div>`;
   }).join('');
 
   return `
@@ -2091,6 +2109,7 @@ export const __test = {
   calendarEventRoute,
   eventOccurrenceDateKey,
   normalizeDashboardConfig,
+  renderWidgetCustomizeControls,
   WIDGET_SIZE_PRESETS,
 };
 

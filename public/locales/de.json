@@ -151,6 +151,8 @@
         "customizeExit": "Anpassung beenden",
         "customizeSize": "Größe",
         "customizeSizeFor": "Größe für {{widget}}",
+        "widgetSizeOneRowGroup": "1 Zeile",
+        "widgetSizeTwoRowsGroup": "2 Zeilen",
         "customizeHide": "{{widget}} ausblenden",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

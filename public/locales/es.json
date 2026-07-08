@@ -145,6 +145,8 @@
         "customizeExit": "Salir de personalización",
         "customizeSize": "Tamaño",
         "customizeSizeFor": "Tamaño de {{widget}}",
+        "widgetSizeOneRowGroup": "1 fila",
+        "widgetSizeTwoRowsGroup": "2 filas",
         "customizeHide": "Ocultar {{widget}}",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

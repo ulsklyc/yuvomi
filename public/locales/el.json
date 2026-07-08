@@ -145,6 +145,8 @@
         "customizeExit": "Έξοδος από προσαρμογή",
         "customizeSize": "Μέγεθος",
         "customizeSizeFor": "Μέγεθος για {{widget}}",
+        "widgetSizeOneRowGroup": "1 σειρά",
+        "widgetSizeTwoRowsGroup": "2 σειρές",
         "customizeHide": "Απόκρυψη {{widget}}",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",

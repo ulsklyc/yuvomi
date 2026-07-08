@@ -151,6 +151,8 @@
         "customizeExit": "پایان سفارشی‌سازی",
         "customizeSize": "اندازه",
         "customizeSizeFor": "اندازه برای {{widget}}",
+        "widgetSizeOneRowGroup": "۱ ردیف",
+        "widgetSizeTwoRowsGroup": "۲ ردیف",
         "customizeHide": "پنهان کردن {{widget}}",
         "customizeHiddenTitle": "Ausgeblendete Widgets",
         "customizeShow": "{{widget}} einblenden",
