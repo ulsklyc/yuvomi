@@ -45,6 +45,16 @@ function categoryLabels() {
   return Object.fromEntries(CATEGORIES.map((category) => [category, t(`documents.category.${category}`)]));
 }
 
+// Nutzerfreundliche Fehlermeldung: strukturierte Server-Meldung (err.data.error)
+// bevorzugt; lokalisierte Client-Validierungsfehler (plain Error mit t()-Text)
+// bleiben erhalten; technische ApiError-Strings („HTTP 500"/„offline") werden auf
+// eine generische Copy gemappt statt roh angezeigt.
+function friendlyError(err) {
+  return err?.data?.error
+    || (err?.name === 'ApiError' ? t('common.unknownError') : err?.message)
+    || t('common.unknownError');
+}
+
 let state = {
   allDocuments: [],
   documents: [],
@@ -80,10 +90,10 @@ export async function render(container) {
           </summary>
           <div class="documents-secondary-controls__panel">
             <div class="documents-view-toggle" role="group" aria-label="${t('documents.viewToggle')}">
-              <button class="documents-view-toggle__btn ${state.view === 'grid' ? 'documents-view-toggle__btn--active' : ''}" data-view="grid" aria-label="${t('documents.gridView')}">
+              <button class="documents-view-toggle__btn ${state.view === 'grid' ? 'documents-view-toggle__btn--active' : ''}" data-view="grid" aria-label="${t('documents.gridView')}" aria-pressed="${state.view === 'grid'}">
                 <i data-lucide="layout-grid" aria-hidden="true"></i>
               </button>
-              <button class="documents-view-toggle__btn ${state.view === 'list' ? 'documents-view-toggle__btn--active' : ''}" data-view="list" aria-label="${t('documents.listView')}">
+              <button class="documents-view-toggle__btn ${state.view === 'list' ? 'documents-view-toggle__btn--active' : ''}" data-view="list" aria-label="${t('documents.listView')}" aria-pressed="${state.view === 'list'}">
                 <i data-lucide="list" aria-hidden="true"></i>
               </button>
             </div>
@@ -198,6 +208,30 @@ function syncFolderDocuments() {
 function bindPageEvents() {
   _container.querySelector('#documents-folder-add')?.addEventListener('click', () => openFolderModal());
   _container.querySelector('#fab-new-document')?.addEventListener('click', () => openDocumentModal());
+
+  // Sekundär-Steuerung (<details>-Slider, nur auf Mobile als Overlay-Panel):
+  // per Außenklick oder Escape schließbar machen — sonst bleibt das Panel über
+  // dem Inhalt liegen, bis der kleine Summary-Trigger erneut getroffen wird.
+  // Listener nur im geöffneten Zustand aktiv (kein Dauer-Leak); auf Desktop
+  // bleibt das Summary ausgeblendet, das Panel öffnet dort nie.
+  const secondary = _container.querySelector('.documents-secondary-controls');
+  if (secondary) {
+    const onOutside = (e) => { if (!secondary.contains(e.target)) secondary.removeAttribute('open'); };
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      secondary.removeAttribute('open');
+      secondary.querySelector('summary')?.focus();
+    };
+    secondary.addEventListener('toggle', () => {
+      if (secondary.open) {
+        document.addEventListener('click', onOutside, true);
+        document.addEventListener('keydown', onKey, true);
+      } else {
+        document.removeEventListener('click', onOutside, true);
+        document.removeEventListener('keydown', onKey, true);
+      }
+    });
+  }
   let documentsSearchTimer;
   _container.querySelector('#documents-search')?.addEventListener('input', (e) => {
     const value = e.target.value.trim().toLowerCase();
@@ -209,12 +243,14 @@ function bindPageEvents() {
   });
   _container.querySelector('#documents-status')?.addEventListener('change', async (e) => {
     state.status = e.target.value;
+    showDocumentsLoading();
     await loadDocuments();
     renderFolderBrowser();
     renderDocuments();
   });
   _container.querySelector('#documents-category')?.addEventListener('change', async (e) => {
     state.category = e.target.value;
+    showDocumentsLoading();
     await loadDocuments();
     renderFolderBrowser();
     renderDocuments();
@@ -224,13 +260,18 @@ function bindPageEvents() {
     if (!btn) return;
     state.view = btn.dataset.view;
     localStorage.setItem('yuvomi-documents-view', state.view);
-    _container.querySelectorAll('.documents-view-toggle__btn').forEach((el) =>
-      el.classList.toggle('documents-view-toggle__btn--active', el === btn)
-    );
+    _container.querySelectorAll('.documents-view-toggle__btn').forEach((el) => {
+      const active = el === btn;
+      el.classList.toggle('documents-view-toggle__btn--active', active);
+      el.setAttribute('aria-pressed', String(active));
+    });
     renderDocuments();
   });
   _container.querySelector('#documents-list')?.addEventListener('click', handleDocumentAction);
-  _container.querySelector('#documents-folder-browser')?.addEventListener('click', (e) => {
+  const folderBrowser = _container.querySelector('#documents-folder-browser');
+  // Horizontale Chip-Leiste (≤1023px): Rand-Fade signalisiert weitere Ordner.
+  folderBrowser?.addEventListener('scroll', () => updateFolderScrollHint(folderBrowser), { passive: true });
+  folderBrowser?.addEventListener('click', (e) => {
     const menuBtn = e.target.closest('[data-folder-menu]');
     if (menuBtn) {
       const folder = state.folders.find((f) => String(f.id) === menuBtn.dataset.folderMenu);
@@ -253,6 +294,19 @@ function filteredDocuments() {
     (doc.description || '').toLowerCase().includes(state.query) ||
     doc.original_name.toLowerCase().includes(state.query)
   );
+}
+
+// Ladezustand beim Netzwerk-gebundenen Filterwechsel (Status/Kategorie):
+// dieselbe Skeleton-Sprache wie beim Erstaufbau, statt die veraltete Liste
+// stumm stehen zu lassen. `aria-busy` schaltet die Grid/Flex-Ansicht via CSS
+// auf full-width-Block. renderDocuments() räumt beides wieder ab.
+function showDocumentsLoading() {
+  const list = _container?.querySelector('#documents-list');
+  if (!list) return;
+  list.className = `documents-list documents-list--${state.view}`;
+  list.setAttribute('aria-busy', 'true');
+  list.replaceChildren();
+  list.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 6, lines: 2 }));
 }
 
 function renderDocuments() {
@@ -330,39 +384,50 @@ function renderFolderBrowser() {
     </div>`;
   }).join(''));
   if (window.lucide) lucide.createIcons({ el: browser });
+  updateFolderScrollHint(browser);
+}
+
+// Rand-Fade der horizontalen Ordner-Leiste (Mobile/Tablet): nur zeigen, wenn
+// tatsächlich überlaufend, und am rechten Ende ausblenden — ehrliche Affordanz
+// „hier gibt es mehr Ordner", statt einer ständig abgeschnittenen letzten Kachel.
+function updateFolderScrollHint(browser) {
+  if (!browser) return;
+  const scrollable = browser.scrollWidth - browser.clientWidth > 1;
+  const atEnd = browser.scrollLeft + browser.clientWidth >= browser.scrollWidth - 1;
+  browser.classList.toggle('documents-folder-browser__list--scrollable', scrollable);
+  browser.classList.toggle('documents-folder-browser__list--at-end', atEnd);
 }
 
 // --------------------------------------------------------
-// Ordner-Aktionen: Overflow-Menü (umbenennen / löschen)
+// Kontext-Popover (Ordner- & Dokument-Aktionen)
+// Body-Level + position:fixed → entkommt overflow-Clipping der Chip-Leiste/Sidebar.
 // --------------------------------------------------------
 
-let _folderMenu = null;
+let _contextMenu = null;
 
-function closeFolderMenu() {
-  if (!_folderMenu) return;
-  const { el, onDoc, onKey } = _folderMenu;
+function closeContextMenu() {
+  if (!_contextMenu) return;
+  const { el, anchorBtn, onDoc, onKey } = _contextMenu;
   document.removeEventListener('click', onDoc, true);
   document.removeEventListener('keydown', onKey, true);
-  window.removeEventListener('resize', closeFolderMenu, true);
-  window.removeEventListener('scroll', closeFolderMenu, true);
+  window.removeEventListener('resize', closeContextMenu, true);
+  window.removeEventListener('scroll', closeContextMenu, true);
   el.remove();
-  _folderMenu = null;
+  anchorBtn?.setAttribute('aria-expanded', 'false');
+  _contextMenu = null;
 }
 
-function openFolderMenu(folder, anchorBtn) {
-  closeFolderMenu();
+// Geteiltes Body-Level-Popover für Ordner- und Dokument-Aktionen.
+// `itemsHtml` liefert die <button role="menuitem" data-menu-action="…">-Einträge,
+// `onAction(action)` wird nach dem Schließen mit dem gewählten Wert aufgerufen.
+// Tastatur: Pfeil hoch/runter + Home/End wandern zwischen den Einträgen, Escape
+// schließt und gibt den Fokus an den Auslöser zurück.
+function openContextMenu(anchorBtn, itemsHtml, onAction) {
+  closeContextMenu();
   const menu = document.createElement('div');
-  menu.className = 'documents-folder-menu';
+  menu.className = 'documents-context-menu';
   menu.setAttribute('role', 'menu');
-  // Body-Level + position:fixed → entkommt overflow-Clipping der Chip-Leiste/Sidebar.
-  menu.insertAdjacentHTML('beforeend', `
-    <button class="documents-folder-menu__item" type="button" role="menuitem" data-menu-action="rename">
-      <i data-lucide="pencil" aria-hidden="true"></i><span>${t('documents.renameFolder')}</span>
-    </button>
-    <button class="documents-folder-menu__item documents-folder-menu__item--danger" type="button" role="menuitem" data-menu-action="delete">
-      <i data-lucide="trash-2" aria-hidden="true"></i><span>${t('documents.deleteFolder')}</span>
-    </button>
-  `);
+  menu.insertAdjacentHTML('beforeend', itemsHtml);
   document.body.appendChild(menu);
   if (window.lucide) lucide.createIcons({ el: menu });
 
@@ -375,30 +440,81 @@ function openFolderMenu(folder, anchorBtn) {
   if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 4);
   menu.style.left = `${Math.round(left)}px`;
   menu.style.top = `${Math.round(top)}px`;
+  anchorBtn.setAttribute('aria-expanded', 'true');
 
   const onDoc = (e) => {
     if (menu.contains(e.target) || anchorBtn.contains(e.target)) return;
-    closeFolderMenu();
+    closeContextMenu();
   };
-  const onKey = (e) => { if (e.key === 'Escape') { closeFolderMenu(); anchorBtn.focus(); } };
+  const items = () => Array.from(menu.querySelectorAll('[data-menu-action]'));
+  const onKey = (e) => {
+    if (e.key === 'Escape') { closeContextMenu(); anchorBtn.focus(); return; }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return;
+    e.preventDefault();
+    const list = items();
+    if (!list.length) return;
+    const current = list.indexOf(document.activeElement);
+    let next;
+    if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = list.length - 1;
+    else if (e.key === 'ArrowDown') next = current < 0 ? 0 : (current + 1) % list.length;
+    else next = current <= 0 ? list.length - 1 : current - 1;
+    list[next].focus();
+  };
 
-  menu.addEventListener('click', async (e) => {
+  menu.addEventListener('click', (e) => {
     const item = e.target.closest('[data-menu-action]');
     if (!item) return;
     const action = item.dataset.menuAction;
-    closeFolderMenu();
-    if (action === 'rename') await renameFolder(folder);
-    else if (action === 'delete') await deleteFolder(folder);
+    closeContextMenu();
+    onAction(action);
   });
 
-  _folderMenu = { el: menu, onDoc, onKey };
+  _contextMenu = { el: menu, anchorBtn, onDoc, onKey };
   setTimeout(() => {
     document.addEventListener('click', onDoc, true);
     document.addEventListener('keydown', onKey, true);
-    window.addEventListener('resize', closeFolderMenu, true);
-    window.addEventListener('scroll', closeFolderMenu, true);
-    menu.querySelector('[data-menu-action]')?.focus();
+    window.addEventListener('resize', closeContextMenu, true);
+    window.addEventListener('scroll', closeContextMenu, true);
+    items()[0]?.focus();
   }, 0);
+}
+
+function openFolderMenu(folder, anchorBtn) {
+  openContextMenu(anchorBtn, `
+    <button class="documents-context-menu__item" type="button" role="menuitem" data-menu-action="rename">
+      <i data-lucide="pencil" aria-hidden="true"></i><span>${t('documents.renameFolder')}</span>
+    </button>
+    <button class="documents-context-menu__item documents-context-menu__item--danger" type="button" role="menuitem" data-menu-action="delete">
+      <i data-lucide="trash-2" aria-hidden="true"></i><span>${t('documents.deleteFolder')}</span>
+    </button>
+  `, async (action) => {
+    if (action === 'rename') await renameFolder(folder);
+    else if (action === 'delete') await deleteFolder(folder);
+  });
+}
+
+// Overflow-Menü einer Dokumentkarte/-zeile: Sekundäraktionen aus der Aktionszeile
+// (bearbeiten, archivieren, an DMS senden, löschen) — hält die Zeile auf zwei
+// Primäraktionen (Ansehen/Download) + Kebab begrenzt.
+function openDocumentMenu(doc, anchorBtn) {
+  const archived = doc.status === 'archived';
+  const canPushDms = documentStorageBackend(doc) !== 'dms' && state.dmsAccounts.length > 0;
+  openContextMenu(anchorBtn, `
+    <button class="documents-context-menu__item" type="button" role="menuitem" data-menu-action="edit">
+      <i data-lucide="pencil" aria-hidden="true"></i><span>${t('documents.editAction')}</span>
+    </button>
+    <button class="documents-context-menu__item" type="button" role="menuitem" data-menu-action="archive">
+      <i data-lucide="${archived ? 'archive-restore' : 'archive'}" aria-hidden="true"></i><span>${archived ? t('documents.restoreAction') : t('documents.archiveAction')}</span>
+    </button>
+    ${canPushDms ? `
+    <button class="documents-context-menu__item" type="button" role="menuitem" data-menu-action="push-dms">
+      <i data-lucide="upload" aria-hidden="true"></i><span>${t('documents.pushToDms')}</span>
+    </button>` : ''}
+    <button class="documents-context-menu__item documents-context-menu__item--danger" type="button" role="menuitem" data-menu-action="delete">
+      <i data-lucide="trash-2" aria-hidden="true"></i><span>${t('common.delete')}</span>
+    </button>
+  `, (action) => runDocumentAction(action, doc));
 }
 
 async function renameFolder(folder) {
@@ -465,29 +581,20 @@ function storageBadgeHtml(doc) {
   return '';
 }
 
+// Zwei Primäraktionen (Ansehen/Download) bleiben in der Zeile; alles Weitere
+// (bearbeiten, archivieren, DMS, löschen) liegt hinter dem Kebab-Overflow.
+// „Ansehen" wird für ALLE Typen gerendert — auch nicht darstellbare öffnen die
+// Detailansicht (mit Download-Fallback) und sind so per Tastatur erreichbar.
 function renderActions(doc) {
-  const canView = VIEWABLE_MIME.has(doc.mime_type);
-  const storageBackend = documentStorageBackend(doc);
   return `
-    ${canView ? `
     <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="view" data-id="${doc.id}" title="${t('documents.viewAction')}" aria-label="${t('documents.viewAction')}">
       <i data-lucide="eye" class="icon-md" aria-hidden="true"></i>
-    </button>` : ''}
+    </button>
     <a class="btn btn--ghost btn--icon btn--icon-sm" href="/api/v1/documents/${doc.id}/download" download title="${t('documents.downloadAction')}" aria-label="${t('documents.downloadAction')}">
       <i data-lucide="download" class="icon-md" aria-hidden="true"></i>
     </a>
-    <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="edit" data-id="${doc.id}" title="${t('documents.editAction')}" aria-label="${t('documents.editAction')}">
-      <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
-    </button>
-    <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="archive" data-id="${doc.id}" data-archived="${doc.status === 'archived'}" title="${doc.status === 'archived' ? t('documents.restoreAction') : t('documents.archiveAction')}" aria-label="${doc.status === 'archived' ? t('documents.restoreAction') : t('documents.archiveAction')}">
-      <i data-lucide="${doc.status === 'archived' ? 'archive-restore' : 'archive'}" class="icon-md" aria-hidden="true"></i>
-    </button>
-    ${storageBackend !== 'dms' && state.dmsAccounts.length > 0 ? `
-    <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="push-dms" data-id="${doc.id}" title="${t('documents.pushToDms')}" aria-label="${t('documents.pushToDms')}">
-      <i data-lucide="upload" class="icon-md" aria-hidden="true"></i>
-    </button>` : ''}
-    <button class="btn btn--ghost btn--icon btn--icon-sm documents-danger" data-action="delete" data-id="${doc.id}" title="${t('common.delete')}" aria-label="${t('common.delete')}">
-      <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
+    <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="menu" data-id="${doc.id}" title="${t('nav.more')}" aria-label="${t('nav.more')}" aria-haspopup="menu" aria-expanded="false">
+      <i data-lucide="more-vertical" class="icon-md" aria-hidden="true"></i>
     </button>
   `;
 }
@@ -522,7 +629,13 @@ function renderListItem(doc) {
   `;
 }
 
-async function handleDocumentAction(e) {
+function handleDocumentAction(e) {
+  const menuBtn = e.target.closest('[data-action="menu"]');
+  if (menuBtn) {
+    const doc = state.documents.find((item) => String(item.id) === String(menuBtn.dataset.id));
+    if (doc) openDocumentMenu(doc, menuBtn);
+    return;
+  }
   // Klick auf Karte/Zeile (nicht auf einen Button/Link) → Viewer öffnen
   if (!e.target.closest('[data-action]') && !e.target.closest('a') && !e.target.closest('.btn')) {
     const card = e.target.closest('[data-id]');
@@ -532,21 +645,23 @@ async function handleDocumentAction(e) {
     }
     return;
   }
-
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
   const doc = state.documents.find((item) => String(item.id) === String(btn.dataset.id));
-  if (!doc) return;
-  if (btn.dataset.action === 'view') openDocumentViewer(doc);
-  if (btn.dataset.action === 'edit') openDocumentModal(doc);
-  if (btn.dataset.action === 'archive') {
+  if (doc) runDocumentAction(btn.dataset.action, doc);
+}
+
+async function runDocumentAction(action, doc) {
+  if (action === 'view') openDocumentViewer(doc);
+  if (action === 'edit') openDocumentModal(doc);
+  if (action === 'archive') {
     await api.patch(`/documents/${doc.id}/archive`, { archived: doc.status !== 'archived' });
     window.yuvomi?.showToast(doc.status === 'archived' ? t('documents.restoredToast') : t('documents.archivedToast'), 'success');
     await loadDocuments();
     renderFolderBrowser();
     renderDocuments();
   }
-  if (btn.dataset.action === 'push-dms') {
+  if (action === 'push-dms') {
     if (!state.dmsAccounts.length) return;
     let accountId = state.dmsAccounts[0].id;
     if (state.dmsAccounts.length > 1) {
@@ -566,7 +681,7 @@ async function handleDocumentAction(e) {
     }
     return;
   }
-  if (btn.dataset.action === 'delete') {
+  if (action === 'delete') {
     state.allDocuments = state.allDocuments.filter((d) => d.id !== doc.id);
     syncFolderDocuments();
     renderFolderBrowser();
@@ -791,7 +906,7 @@ async function saveDocument(event, doc) {
     renderFolderBrowser();
     renderDocuments();
   } catch (err) {
-    error.textContent = err.message;
+    error.textContent = friendlyError(err);
     error.hidden = false;
   } finally {
     submit.disabled = false;
@@ -831,7 +946,7 @@ function openFolderModal() {
           renderFolderBrowser();
           renderDocuments();
         } catch (err) {
-          error.textContent = err.message;
+          error.textContent = friendlyError(err);
           error.hidden = false;
         }
       });
@@ -978,6 +1093,9 @@ function readFileAsDataUrl(file) {
 }
 
 function formatFileSize(bytes) {
+  // Fehlende/unbekannte Größe (z. B. DMS-verknüpfte Dokumente) → „—" statt „0 KB",
+  // das wie ein leeres Dokument aussähe.
+  if (bytes == null) return '—';
   if (!bytes) return '0 KB';
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -1061,7 +1179,7 @@ function renderViewerContent(doc, previewUrl, downloadUrl) {
   if (doc.mime_type === 'text/plain' || doc.mime_type === 'text/csv') {
     // Inhalt wird asynchron in onSave geladen; Platzhalter anzeigen
     return `<div class="document-viewer__loading">
-      <i data-lucide="loader-circle" style="width:18px;height:18px" aria-hidden="true"></i>
+      <i data-lucide="loader-circle" class="document-viewer__spinner" aria-hidden="true"></i>
       ${esc(doc.original_name)}
     </div>`;
   }

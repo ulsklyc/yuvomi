@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.102.0] - 2026-07-08
+
+### Changed
+- Documents: each file card now shows two primary actions (view and download) plus a "more" menu for edit, archive, DMS push, and delete — replacing the previous row of up to six icon buttons. The menu is fully keyboard-navigable (arrow keys, Home/End, Escape) and the grid/list view toggle now announces its active state to screen readers.
+- Documents: bigger touch targets for folder actions and the member picker on touch devices, and the horizontal folder strip now shows a fade cue when more folders are scrolled off-screen.
+
+### Fixed
+- Documents: the file list now shows a loading skeleton while switching the status or category filter, instead of leaving the stale list in place.
+- Documents: the mobile filter panel can now be dismissed by tapping outside it or pressing Escape.
+- Documents: upload and folder dialogs now show friendly error messages instead of raw technical strings, a missing file size shows "—" instead of "0 KB", and the text-preview loader now animates.
+
 ## [0.101.3] - 2026-07-08
 
 ### Fixed
