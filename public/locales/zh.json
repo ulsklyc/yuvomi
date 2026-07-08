@@ -146,6 +146,8 @@
         "customizeSize": "大小",
         "customizeSizeFor": "{{widget}} 的大小",
         "customizeHide": "隐藏 {{widget}}",
+        "customizeHiddenTitle": "Ausgeblendete Widgets",
+        "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "小 (1×1)",
         "widgetSizeNarrow": "窄 (2×1)",
         "widgetSizeTall": "高 (1×2)",

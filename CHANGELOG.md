@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-08
+
+A design and accessibility overhaul of three core areas — the Dashboard, the Kitchen (meals, recipes, shopping), and the Calendar — sharing one calmer visual grammar and AA-contrast throughout.
+
+### Added
+- Dashboard: a "Today" masthead where the greeting and the "Today" glance cards share one elevated band; it collapses to a slim greeting header when every domain already has a visible widget.
+- Dashboard: a "hidden widgets" tray in edit mode to bring back any widget you have hidden, making the inline editor the single place to arrange the dashboard.
+- Kitchen (Meals): a seven-column week canvas on desktop, with each day as its own column.
+- Calendar: a proper empty state with an icon and a "New event" button, plus loading skeletons while a view loads.
+
+### Changed
+- Dashboard: one shared card material (consistent elevation and rounding) so the widget grid reads as a single system instead of flat tiles beside one rich card; larger widget titles with a tighter header; the budget balance now shows at hero size on a taller default tile.
+- Dashboard: the edit-mode size picker is now a single segmented control of four preview tiles, replacing the previous dropdown-plus-preview pairing; count badges are tinted rather than fully saturated and the "All" header links stay neutral until hovered.
+- Kitchen: a shared ingredient-row component across meals and recipes; meal type shown as a colored dot with a neutral, readable label; recipe ingredient lists capped at four with a "+N" indicator; empty meal slots reduced to a single add affordance (mobile collapses empty slots to one add button per day).
+- Calendar: a refreshed, AA-contrast event color palette.
+
+### Fixed
+- Dashboard: the onboarding overlay now traps keyboard focus and restores it on close; progress bars honor reduced-motion; weather text meets AA contrast on the violet gradient; a manual weather refresh now reports failures instead of silently doing nothing; row hovers no longer dim their own text.
+- Kitchen: AA-contrast primary actions and active tabs across meals, recipes, and shopping; `aria-busy` announced on week and list switches; unified, friendly error messages; empty-state calls-to-action across all three tabs; a duplicate-listener bug on meal week changes.
+- Calendar: `aria-busy` announced while a view loads and accessible labels on event popups.
+- Dashboard: the desktop floating action button now sits in the corner instead of reserving space for a bottom nav bar that only exists on mobile, so it no longer overlaps the budget card's content.
+
+### Removed
+- Dashboard: the separate "Manage widgets" modal, folded into the inline editor together with the new restore tray.
+
 ## [0.102.0] - 2026-07-08
 
 ### Changed

@@ -146,6 +146,8 @@
         "customizeSize": "Méret",
         "customizeSizeFor": "Méret {{widget}} számára",
         "customizeHide": "Elrejtés {{widget}}",
+        "customizeHiddenTitle": "Ausgeblendete Widgets",
+        "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "Kicsi (1×1)",
         "widgetSizeNarrow": "Keskeny (2×1)",
         "widgetSizeTall": "Magas (1×2)",

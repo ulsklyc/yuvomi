@@ -1353,10 +1353,13 @@ test('dashboard today cockpit keeps content visibly below its section heading', 
     /\.today-cockpit__header h2,[\s\S]*?font-size:\s*var\(--type-section-title\)/,
     'Heute wichtig must keep the section-title role',
   );
+  // Der Value trägt die Card-Title-Rolle (16px): dominant genug, um den
+  // Icon-Chip zu überwiegen (das glanzbare Datum der Karte), aber weiterhin
+  // unter der 18px-Section-Heading „Heute wichtig".
   assert.match(
     valueRule,
-    /font-size:\s*var\(--type-secondary\)/,
-    'cockpit values must stay below the 18px section heading',
+    /font-size:\s*var\(--type-card-title\)/,
+    'cockpit value must carry the 16px card-title role, still below the 18px section heading',
   );
 });
 
@@ -1680,7 +1683,7 @@ test('calendar week-view time labels use a readable text token, not the disabled
   assert.doesNotMatch(body, /color:\s*var\(--color-text-disabled\)/, 'time labels must not reuse the disabled token (insufficient contrast)');
 });
 
-test('calendar month view uses solid work surfaces and explicit chip boundaries', () => {
+test('calendar month view uses tinted event surfaces derived from --ev-color', () => {
   const calendar = read('../public/styles/calendar.css');
   const gridBody = cssRuleBody(calendar, '.month-grid');
   const dayBody = cssRuleBody(calendar, '.month-day');
@@ -1689,8 +1692,13 @@ test('calendar month view uses solid work surfaces and explicit chip boundaries'
   assert.match(gridBody, /background-color:\s*var\(--color-border-subtle\)/, 'month grid should expose clear cell boundaries');
   assert.match(gridBody, /gap:\s*var\(--space-px\)/, 'month grid boundaries should use tokenized one-pixel gaps');
   assert.match(dayBody, /background-color:\s*var\(--color-surface-work\)/, 'month cells should use a stable work surface');
-  assert.match(eventBody, /border:\s*var\(--space-px\)\s+solid\s+color-mix/, 'event chips need a visible boundary, not color alone');
-  assert.match(eventBody, /box-shadow:\s*var\(--shadow-xs\)/, 'event chips should stand out enough for desktop scanning');
+  // Getönte „Ton"-Fläche statt vollgesättigter Füllung: Tönung, lesbare Tinte und
+  // Kante werden per color-mix aus --ev-color abgeleitet — theme-korrekt, weil
+  // --color-surface-work und --color-text-primary im Dark Mode kippen.
+  assert.match(eventBody, /background:\s*color-mix\(in srgb,\s*var\(--ev-color\)\s*\d+%,\s*var\(--color-surface-work\)\)/, 'event chips should sit on a tinted work surface, not a saturated fill');
+  assert.match(eventBody, /color:\s*color-mix\(in srgb,\s*var\(--ev-color\)\s*\d+%,\s*var\(--color-text-primary\)\)/, 'event chip text should be a readable ink derived from the event colour');
+  assert.match(eventBody, /border:\s*var\(--space-px\)\s+solid\s+color-mix\(in srgb,\s*var\(--ev-color\)/, 'event chips need a visible boundary derived from --ev-color, not color alone');
+  assert.doesNotMatch(eventBody, /box-shadow/, 'tinted event chips should read flat, without a drop shadow');
 });
 
 test('calendar agenda events and task chips keep readable contrast in mobile agenda', () => {

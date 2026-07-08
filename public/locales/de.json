@@ -152,6 +152,8 @@
         "customizeSize": "Größe",
         "customizeSizeFor": "Größe für {{widget}}",
         "customizeHide": "{{widget}} ausblenden",
+        "customizeHiddenTitle": "Ausgeblendete Widgets",
+        "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "Klein (1×1)",
         "widgetSizeNarrow": "Schmal (2×1)",
         "widgetSizeTall": "Hoch (1×2)",

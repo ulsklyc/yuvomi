@@ -146,6 +146,8 @@
         "customizeSize": "الحجم",
         "customizeSizeFor": "حجم {{widget}}",
         "customizeHide": "إخفاء {{widget}}",
+        "customizeHiddenTitle": "Ausgeblendete Widgets",
+        "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "صغير (1×1)",
         "widgetSizeNarrow": "ضيق (2×1)",
         "widgetSizeTall": "طويل (1×2)",

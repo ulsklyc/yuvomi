@@ -146,6 +146,8 @@
         "customizeSize": "Velikost",
         "customizeSizeFor": "Velikost pro {{widget}}",
         "customizeHide": "Skrýt {{widget}}",
+        "customizeHiddenTitle": "Ausgeblendete Widgets",
+        "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "Malý (1×1)",
         "widgetSizeNarrow": "Úzký (2×1)",
         "widgetSizeTall": "Vysoký (1×2)",

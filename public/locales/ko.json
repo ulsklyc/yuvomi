@@ -152,6 +152,8 @@
         "customizeSize": "크기",
         "customizeSizeFor": "{{widget}} 크기",
         "customizeHide": "{{widget}} 숨기기",
+        "customizeHiddenTitle": "Ausgeblendete Widgets",
+        "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "작게 (1×1)",
         "widgetSizeNarrow": "좁게 (2×1)",
         "widgetSizeTall": "세로형 (1×2)",

@@ -146,6 +146,8 @@
         "customizeSize": "Size",
         "customizeSizeFor": "Size for {{widget}}",
         "customizeHide": "Hide {{widget}}",
+        "customizeHiddenTitle": "Hidden widgets",
+        "customizeShow": "Show {{widget}}",
         "widgetSizeTiny": "Small (1×1)",
         "widgetSizeNarrow": "Narrow (2×1)",
         "widgetSizeTall": "Tall (1×2)",

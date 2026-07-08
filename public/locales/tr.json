@@ -146,6 +146,8 @@
         "customizeSize": "Boyut",
         "customizeSizeFor": "{{widget}} boyutu",
         "customizeHide": "{{widget}} gizle",
+        "customizeHiddenTitle": "Ausgeblendete Widgets",
+        "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "Küçük (1×1)",
         "widgetSizeNarrow": "Dar (2×1)",
         "widgetSizeTall": "Yüksek (1×2)",

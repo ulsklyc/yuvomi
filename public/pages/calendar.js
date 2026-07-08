@@ -16,6 +16,7 @@ import { refresh as refreshReminders } from '/reminders.js';
 import { parseRemindAtAsUtc } from '/utils/reminder-offset.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 import { wireTablist } from '/utils/tablist.js';
+import { renderSkeletonList } from '/utils/skeleton.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -46,23 +47,28 @@ const MONTH_NAMES     = () => [
   t('calendar.monthOctober'), t('calendar.monthNovember'), t('calendar.monthDecember'),
 ];
 
+// Kuratierte OKLCH-Palette (gedämpfte Jewel-Töne, verankert auf dem Violett der
+// App-Identität statt der geliehenen iOS-System-Farben). Gleichmäßiger Chroma-/
+// Hue-Abstand; jede Farbe ergibt sowohl eine ruhige getönte Fläche als auch eine
+// WCAG-AA-lesbare dunkle Tinte (siehe eventSurfaceStyle + calendar.css). Konkreter
+// Hex, weil Events die Farbe als Hex in der DB speichern und color.js Luminanz rechnet.
 const EVENT_COLORS = [
-  '#007AFF', '#34C759', '#FF9500', '#FF3B30',
-  '#AF52DE', '#FF6B35', '#5AC8FA', '#FFCC00',
-  '#8E8E93', '#30B0C7',
+  '#587DCE', '#3CA368', '#E0843E', '#CE5053',
+  '#8156C0', '#DB684C', '#3E9DCA', '#D8B349',
+  '#85868B', '#279EA4',
 ];
 
 const EVENT_COLOR_NAMES = () => ({
-  '#007AFF': t('calendar.colorBlue'),
-  '#34C759': t('calendar.colorGreen'),
-  '#FF9500': t('calendar.colorOrange'),
-  '#FF3B30': t('calendar.colorRed'),
-  '#AF52DE': t('calendar.colorPurple'),
-  '#FF6B35': t('calendar.colorCoral'),
-  '#5AC8FA': t('calendar.colorSkyBlue'),
-  '#FFCC00': t('calendar.colorYellow'),
-  '#8E8E93': t('calendar.colorGray'),
-  '#30B0C7': t('calendar.colorCyan'),
+  '#587DCE': t('calendar.colorBlue'),
+  '#3CA368': t('calendar.colorGreen'),
+  '#E0843E': t('calendar.colorOrange'),
+  '#CE5053': t('calendar.colorRed'),
+  '#8156C0': t('calendar.colorPurple'),
+  '#DB684C': t('calendar.colorCoral'),
+  '#3E9DCA': t('calendar.colorSkyBlue'),
+  '#D8B349': t('calendar.colorYellow'),
+  '#85868B': t('calendar.colorGray'),
+  '#279EA4': t('calendar.colorCyan'),
 });
 
 const EVENT_ICON_ALIASES = {
@@ -312,27 +318,6 @@ function openIconPickerDialog(selectedIcon, onSelect, onClose = () => {}) {
   if (window.lucide) lucide.createIcons({ el: panel });
 }
 
-/**
- * Gibt eine lesbare Textfarbe für eine Hintergrundfarbe zurück.
- * Helle Hintergründe (z.B. Hellgelb, Hellgrün) → dunkles Grau statt Weiß.
- */
-function getContrastColor(hex) {
-  if (!hex || hex.length < 7) return null;
-  try {
-    const r = parseInt(hex.slice(1, 3), 16) / 255;
-    const g = parseInt(hex.slice(3, 5), 16) / 255;
-    const b = parseInt(hex.slice(5, 7), 16) / 255;
-    const lin = (c) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-    const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-    // WCAG-Kontrast gegen Weiß bzw. dunkle Tinte vergleichen und die
-    // besser lesbare Textfarbe wählen — statt eines starren Luminanz-Cutoffs,
-    // der mittelhelle Fills (Orange/Coral/Pink) mit zu schwachem Weiß beließ.
-    const contrastWhite = 1.05 / (L + 0.05);
-    const contrastDark  = (L + 0.05) / 0.05;
-    return contrastDark > contrastWhite ? '#1D1D1B' : null; // null → CSS-Standard (weiß) bleibt
-  } catch { return null; }
-}
-
 // --------------------------------------------------------
 // Farbberechnung: Assignee-Farben haben Vorrang
 // Hierarchie: Assignees → manuelle Event-Farbe → Kalenderfarbe → Grau
@@ -361,6 +346,16 @@ function resolveEventColor(ev) {
  */
 function resolveEventBackground(ev) {
   return resolveEventColor(ev);
+}
+
+/**
+ * Inline-Style für eine getönte Event-Fläche (Monat/Woche/Tag/Ganztägig).
+ * Setzt nur `--ev-color`; Tönung, lesbare Tinte und Kante leitet calendar.css per
+ * color-mix ab (theme-korrekt in Light & Dark, WCAG-AA für die gesamte Palette).
+ * Ersetzt die frühere vollgesättigte Füllung + getContrastColor-Textfarbe.
+ */
+function eventSurfaceStyle(ev) {
+  return `--ev-color:${esc(resolveEventColor(ev))};`;
 }
 
 // --------------------------------------------------------
@@ -879,6 +874,13 @@ export async function render(container, { user }) {
     </div>
   `);
 
+  // Lade-Skeleton sofort einblenden, damit der erste Frame nicht leer bleibt,
+  // während Termine/Präferenzen laden (Sichtbarkeit des Systemstatus). Wird von
+  // renderView() beim ersten Render ersetzt; aria-busy quittiert den Ladezustand.
+  const bodyEl = container.querySelector('#cal-body');
+  bodyEl.setAttribute('aria-busy', 'true');
+  bodyEl.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 6, lines: 2 }));
+
   const params    = new URLSearchParams(window.location.search);
   const openId    = params.get('open');
   const dateParam = validDateParam(params.get('date'));
@@ -912,6 +914,7 @@ export async function render(container, { user }) {
 
   renderToolbar();
   renderView();
+  bodyEl.removeAttribute('aria-busy');
 
   container.querySelector('#fab-new-event')?.addEventListener('click', () => openEventModal({ mode: 'create' }));
 
@@ -976,10 +979,10 @@ function renderToolbar() {
   bar.insertAdjacentHTML('beforeend', `
     <h1 class="page-toolbar__title">${t('calendar.title')}</h1>
     <div class="page-toolbar__center cal-toolbar__month">
+      <button class="cal-toolbar__today" id="cal-today">${t('calendar.today')}</button>
       <button class="btn btn--icon" id="cal-prev" aria-label="${t('calendar.back')}">
         <i data-lucide="chevron-left" aria-hidden="true"></i>
       </button>
-      <button class="cal-toolbar__today" id="cal-today">${t('calendar.today')}</button>
       <span class="cal-toolbar__label" id="cal-label"></span>
       <button class="btn btn--icon" id="cal-next" aria-label="${t('calendar.forward')}">
         <i data-lucide="chevron-right" aria-hidden="true"></i>
@@ -1235,17 +1238,13 @@ function renderMonthDay(date, inMonth) {
   const shown    = evs.slice(0, MAX_SHOW);
   const extra    = evs.length - MAX_SHOW;
 
-  const evHtml = shown.map((ev) => {
-    const bg = resolveEventBackground(ev);
-    const fg = getContrastColor(resolveEventColor(ev));
-    return `
+  const evHtml = shown.map((ev) => `
     <div class="month-day__event"
          data-id="${ev.id}"
-         style="background:${esc(bg)};${fg ? `color:${fg};` : ''}"
+         style="${eventSurfaceStyle(ev)}"
          title="${esc(ev.title)}${ev.cal_name ? ' · ' + ev.cal_name : ''}"
     >${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}<span>${esc(ev.title)}</span></div>
-  `;
-  }).join('');
+  `).join('');
 
   const MAX_TASK_SHOW = 2;
   const taskHtml = dayTasks.slice(0, MAX_TASK_SHOW).map(renderTaskChip).join('');
@@ -1314,15 +1313,11 @@ function renderWeekView(container) {
                 <span>${esc(h.name)}</span>
               </div>
             `).join('')}
-            ${alldayEvs[i].map((ev) => {
-              const bg = resolveEventBackground(ev);
-              const fg = getContrastColor(resolveEventColor(ev));
-              return `
+            ${alldayEvs[i].map((ev) => `
               <div class="allday-event" data-id="${ev.id}"
-                   style="background:${esc(bg)};${fg ? `color:${fg};` : ''}"
+                   style="${eventSurfaceStyle(ev)}"
                    title="${esc(ev.title)}${ev.cal_name ? ' · ' + ev.cal_name : ''}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}<span>${esc(ev.title)}</span></div>
-            `;
-            }).join('')}
+            `).join('')}
             ${tasksOnDay(d).map(renderTaskChip).join('')}
           </div>
         `).join('')}
@@ -1402,12 +1397,10 @@ function renderWeekEvent(ev, layout = null) {
   const height = (duration / 60) * HOUR_HEIGHT - 2;
   const left = layout ? `calc(${(layout.colIndex / layout.totalCols) * 100}% + 2px)` : '2px';
   const width = layout ? `calc(${100 / layout.totalCols}% - 4px)` : 'auto';
-  const bg = resolveEventBackground(ev);
-  const fg = getContrastColor(resolveEventColor(ev));
 
   return `
     <div class="week-event" data-id="${ev.id}"
-         style="top:${top}px;height:${height}px;left:${left};width:${width};background:${esc(bg)};${fg ? `color:${fg};` : ''}">
+         style="top:${top}px;height:${height}px;left:${left};width:${width};${eventSurfaceStyle(ev)}">
       <div class="week-event__title">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}<span>${esc(ev.title)}</span>${(ev.recurrence_rule || ev.is_recurring_instance) ? calendarRepeatIconHtml() : ''}</div>
       <div class="week-event__time">${formatTime(ev.start_datetime)}${ev.end_datetime ? '–' + formatTime(ev.end_datetime) : ''}</div>
     </div>
@@ -1537,14 +1530,10 @@ function renderDayView(container) {
               <span>${esc(h.name)}</span>
             </div>
           `).join('')}
-          ${allday.map((ev) => {
-            const bg = resolveEventBackground(ev);
-            const fg = getContrastColor(resolveEventColor(ev));
-            return `
+          ${allday.map((ev) => `
             <div class="allday-event" data-id="${ev.id}"
-                 style="background:${esc(bg)};${fg ? `color:${fg};` : ''}"
-                 title="${esc(ev.title)}${ev.cal_name ? ' · ' + ev.cal_name : ''}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}<span>${esc(ev.title)}</span></div>`;
-          }).join('')}
+                 style="${eventSurfaceStyle(ev)}"
+                 title="${esc(ev.title)}${ev.cal_name ? ' · ' + ev.cal_name : ''}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}<span>${esc(ev.title)}</span></div>`).join('')}
           ${tasksOnDay(state.cursor).map(renderTaskChip).join('')}
         </div>
       </div>` : ''}
@@ -1616,7 +1605,11 @@ function renderAgendaView(container) {
   container.insertAdjacentHTML('beforeend', `
     <div class="agenda-view" id="agenda-view">
       ${groups.length === 0
-        ? `<div class="agenda-empty">${t('calendar.agendaEmpty')}</div>`
+        ? `<div class="empty-state">
+             <i data-lucide="calendar-plus" class="empty-state__icon" aria-hidden="true"></i>
+             <div class="empty-state__title">${t('calendar.agendaEmpty')}</div>
+             <button class="btn btn--primary empty-state__cta" id="agenda-empty-cta">${t('calendar.newEvent')}</button>
+           </div>`
         : groups.map(({ date, events, tasks, holidays }) => `
           <div class="agenda-day">
             <div class="agenda-day__header ${date === state.today ? 'agenda-day__header--today' : ''}">
@@ -1639,6 +1632,10 @@ function renderAgendaView(container) {
   stagger(container.querySelectorAll('.agenda-event'));
 
   container.querySelector('#agenda-view').addEventListener('click', (e) => {
+    if (e.target.closest('#agenda-empty-cta')) {
+      openEventModal({ mode: 'create' });
+      return;
+    }
     const taskChip = e.target.closest('.cal-task-chip');
     if (taskChip) {
       window.yuvomi.navigate(`/tasks?open=${taskChip.dataset.taskId}`);
@@ -1718,6 +1715,9 @@ function showEventPopup(ev, anchor) {
   const popup = document.createElement('div');
   popup.id        = 'event-popup';
   popup.className = 'event-popup';
+  popup.setAttribute('role', 'dialog');
+  popup.setAttribute('aria-label', ev.title || t('calendar.title'));
+  popup.tabIndex  = -1;
 
   const timeStr = ev.all_day
     ? t('calendar.allDay')
@@ -1759,11 +1759,13 @@ function showEventPopup(ev, anchor) {
       e.preventDefault();
       try {
         await api.post(`/calendar/${ev.id}/reset`, {});
-        popup.remove();
+        dismiss();
         await reloadForView();
         window.yuvomi?.showToast(t('calendar.ics.resetToast'), 'success');
       } catch (err) {
-        window.yuvomi?.showToast(err.message, 'danger');
+        // Server-Meldung bevorzugen (nutzerorientiert), sonst lokalisierter
+        // Fallback — nie den rohen JS-/Netzwerk-Fehlertext zeigen.
+        window.yuvomi?.showToast(err.data?.error ?? t('calendar.saveError'), 'danger');
       }
     });
     popup.querySelector('.event-popup__actions').before(resetLink);
@@ -1788,26 +1790,35 @@ function showEventPopup(ev, anchor) {
   popup.style.top = `${Math.min(Math.max(margin, top), maxTop)}px`;
   popup.style.left = `${left}px`;
 
-  popup.querySelector('#popup-edit').addEventListener('click', async () => {
+  // Gemeinsames Schließen: entfernt Popup und beide globalen Listener, damit
+  // kein keydown-/click-Handler verwaist zurückbleibt.
+  const onKeydown = (e) => {
+    if (e.key === 'Escape') { e.stopPropagation(); dismiss(); anchor?.focus?.(); }
+  };
+  function dismiss() {
     popup.remove();
+    document.removeEventListener('keydown', onKeydown);
+    document.removeEventListener('click', onOutsideClick);
+  }
+  function onOutsideClick(e) {
+    if (!popup.isConnected || !popup.contains(e.target)) dismiss();
+  }
+
+  popup.querySelector('#popup-edit').addEventListener('click', async () => {
+    dismiss();
     const reminder = await loadReminderForEvent(ev.id);
     openEventModal({ mode: 'edit', event: ev, reminder });
   });
 
   popup.querySelector('#popup-delete').addEventListener('click', async () => {
-    popup.remove();
+    dismiss();
     await deleteEvent(ev.id);
   });
 
-  // Schließen bei Klick außerhalb
-  setTimeout(() => {
-    document.addEventListener('click', function closePopup(e) {
-      if (!popup.isConnected || !popup.contains(e.target)) {
-        popup.remove();
-        document.removeEventListener('click', closePopup);
-      }
-    });
-  }, 0);
+  // Escape schließt und gibt den Fokus an den Auslöser zurück; Außenklick schließt.
+  document.addEventListener('keydown', onKeydown);
+  setTimeout(() => document.addEventListener('click', onOutsideClick), 0);
+  popup.focus();
 }
 
 // --------------------------------------------------------
@@ -2714,7 +2725,10 @@ async function saveEvent(overlay, mode, eventId, existingReminder = null, attach
     renderView();
     window.yuvomi?.showToast(mode === 'create' ? t('calendar.createdToast') : t('calendar.savedToast'), 'success');
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? err.message ?? t('calendar.saveError'), 'error');
+    // Server-Validierungsmeldung bevorzugen, sonst lokalisierter Fallback; der
+    // rohe err.message-Text (Netzwerk/JS) wird nie gezeigt. Das Modal bleibt offen
+    // und der Button reaktiviert — die Eingaben des Nutzers bleiben erhalten.
+    window.yuvomi?.showToast(err.data?.error ?? t('calendar.saveError'), 'error');
     saveBtn.disabled    = false;
     saveBtn.textContent = mode === 'edit' ? t('common.save') : t('common.create');
   }

@@ -146,6 +146,8 @@
         "customizeSize": "Grootte",
         "customizeSizeFor": "Grootte voor {{widget}}",
         "customizeHide": "{{widget}} verbergen",
+        "customizeHiddenTitle": "Ausgeblendete Widgets",
+        "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "Klein (1×1)",
         "widgetSizeNarrow": "Smal (2×1)",
         "widgetSizeTall": "Hoog (1×2)",

@@ -146,6 +146,8 @@
         "customizeSize": "Storlek",
         "customizeSizeFor": "Storlek för {{widget}}",
         "customizeHide": "Dölj {{widget}}",
+        "customizeHiddenTitle": "Ausgeblendete Widgets",
+        "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "Liten (1×1)",
         "widgetSizeNarrow": "Smal (2×1)",
         "widgetSizeTall": "Hög (1×2)",

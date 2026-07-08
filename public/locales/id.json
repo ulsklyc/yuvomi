@@ -152,6 +152,8 @@
         "customizeSize": "Ukuran",
         "customizeSizeFor": "Ukuran untuk {{widget}}",
         "customizeHide": "Sembunyikan {{widget}}",
+        "customizeHiddenTitle": "Ausgeblendete Widgets",
+        "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "Kecil (1×1)",
         "widgetSizeNarrow": "Sempit (2×1)",
         "widgetSizeTall": "Tinggi (1×2)",

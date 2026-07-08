@@ -146,6 +146,8 @@
         "customizeSize": "サイズ",
         "customizeSizeFor": "{{widget}} のサイズ",
         "customizeHide": "{{widget}} を非表示",
+        "customizeHiddenTitle": "Ausgeblendete Widgets",
+        "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "小 (1×1)",
         "widgetSizeNarrow": "縦長 (2×1)",
         "widgetSizeTall": "縦長 (1×2)",

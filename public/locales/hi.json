@@ -146,6 +146,8 @@
         "customizeSize": "आकार",
         "customizeSizeFor": "{{widget}} का आकार",
         "customizeHide": "{{widget}} छिपाएँ",
+        "customizeHiddenTitle": "Ausgeblendete Widgets",
+        "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "छोटा (1×1)",
         "widgetSizeNarrow": "संकरा (2×1)",
         "widgetSizeTall": "लंबा (1×2)",

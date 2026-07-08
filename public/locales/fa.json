@@ -152,6 +152,8 @@
         "customizeSize": "اندازه",
         "customizeSizeFor": "اندازه برای {{widget}}",
         "customizeHide": "پنهان کردن {{widget}}",
+        "customizeHiddenTitle": "Ausgeblendete Widgets",
+        "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "کوچک (۱×۱)",
         "widgetSizeNarrow": "باریک (۲×۱)",
         "widgetSizeTall": "بلند (1×2)",

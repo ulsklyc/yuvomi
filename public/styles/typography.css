@@ -144,7 +144,10 @@
 .settings-card__title,
 .settings-member__name,
 .settings-provider__name,
-.settings-sync-info__name {
+.settings-sync-info__name,
+/* Dashboard-Widget-Titel eine Stufe über den Zeilen-Titeln (16px vs. 14px):
+ * gibt jedem Widget innere Hierarchie zwischen Name und Inhalt (Critique P3). */
+.widget__title {
   font-size: var(--type-card-title);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-snug);
@@ -154,12 +157,10 @@
  * (Dashboard-Widgets, Kanban-Karten, Listen-Items) zu einer BEWUSSTEN
  * Entscheidung statt zu einem zufälligen Größen-Override pro Selektor. */
 .u-card-title.u-compact,
-.widget__title,
 .task-item__title,
 .event-item__title,
 .shopping-widget-list__name,
 .note-item__title,
-.customize-row__name,
 .note-card__title,
 .documents-folder-item__name,
 .document-dropzone__title,

@@ -225,6 +225,15 @@
   opacity: 0.5;
 }
 
+/* Wochenende dezent zur Orientierung getönt (Richtung Modul-Akzent). Heute und
+ * Tage außerhalb des Monats sind explizit ausgenommen, damit kein Spezifitäts-
+ * konflikt ihre eigenen Flächen überschreibt. Mo-basiertes 7-Spalten-Raster:
+ * 7n = Sonntag, 7n-1 = Samstag. */
+.month-day:nth-child(7n):not(.month-day--today):not(.month-day--outside),
+.month-day:nth-child(7n-1):not(.month-day--today):not(.month-day--outside) {
+  background-color: color-mix(in srgb, var(--module-accent) 4%, var(--color-surface-work));
+}
+
 .month-day__number {
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
@@ -250,7 +259,12 @@
   outline-offset: calc(var(--space-px) * -1);
 }
 
+/* Getönte Event-Fläche: eine ruhige „Ton"-Sprache statt vollgesättigter Füllung,
+ * abgeleitet aus --ev-color (Inline). Tönung, lesbare Tinte und Kante entstehen per
+ * color-mix; --color-surface-work + --color-text-primary kippen im Dark Mode, daher
+ * bleibt der WCAG-Kontrast in beiden Themes erhalten (rechnerisch ~7–9:1). */
 .month-day__event {
+  --ev-color: var(--color-accent);
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -258,15 +272,29 @@
   font-weight: var(--font-weight-medium);
   padding: var(--space-px) var(--space-1);
   border-radius: var(--radius-xs);
-  border: var(--space-px) solid color-mix(in srgb, currentColor 40%, transparent);
-  box-shadow: var(--shadow-xs);
+  border: var(--space-px) solid color-mix(in srgb, var(--ev-color) 30%, transparent);
   margin-bottom: var(--space-0h);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
-  color: var(--color-text-on-accent);
-  line-height: 1.6;
+  line-height: 1.4;
+  background: color-mix(in srgb, var(--ev-color) 16%, var(--color-surface-work));
+  color: color-mix(in srgb, var(--ev-color) 35%, var(--color-text-primary));
+  transition: background-color var(--transition-fast);
+}
+
+.month-day__event:hover {
+  background: color-mix(in srgb, var(--ev-color) 24%, var(--color-surface-work));
+}
+
+/* Voll gesättigtes Icon trägt das Farbsignal (der „Dot"), während der Titel in
+ * ruhiger, lesbarer Tinte bleibt — Agenda-Bildsprache über alle Ansichten. */
+.month-day__event .event-icon,
+.allday-event .event-icon,
+.week-event .event-icon {
+  color: var(--ev-color);
+  opacity: 1;
 }
 
 .month-day__event span,
@@ -409,6 +437,13 @@
   position: relative;
 }
 
+/* Dezenter Slot-Hover macht den „Klick-zum-Anlegen"-Affordance im Zeitraster
+ * sichtbar; die getönten Event-Blöcke liegen deckend darüber und bleiben lesbar. */
+.week-view__col:hover,
+.day-view__col:hover {
+  background-color: color-mix(in srgb, var(--module-accent) 3%, transparent);
+}
+
 .week-view__hour-line {
   position: absolute;
   left: 0;
@@ -440,23 +475,24 @@
 }
 
 .week-event {
+  --ev-color: var(--color-accent);
   position: absolute;
   border-radius: var(--radius-xs);
   padding: var(--space-0h) var(--space-1);
   font-size: var(--text-xs);
   font-weight: var(--font-weight-medium);
-  color: var(--color-text-on-accent);
-  border: var(--space-px) solid color-mix(in srgb, currentColor 35%, transparent);
-  box-shadow: var(--shadow-xs);
+  background: color-mix(in srgb, var(--ev-color) 18%, var(--color-surface-work));
+  color: color-mix(in srgb, var(--ev-color) 38%, var(--color-text-primary));
+  border: var(--space-px) solid color-mix(in srgb, var(--ev-color) 42%, transparent);
   overflow: hidden;
   cursor: pointer;
   z-index: 1;
   line-height: 1.4;
-  transition: opacity var(--transition-fast);
+  transition: background-color var(--transition-fast);
 }
 
 .week-event:hover {
-  opacity: 0.85;
+  background: color-mix(in srgb, var(--ev-color) 26%, var(--color-surface-work));
 }
 
 .week-event__title {
@@ -898,13 +934,6 @@
   flex-shrink: 0;
 }
 
-.agenda-empty {
-  text-align: center;
-  padding: var(--space-8);
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-}
-
 /* --------------------------------------------------------
  * Calendar-Modal Content-Styles (Overlay/Panel via shared modal.js)
  * -------------------------------------------------------- */
@@ -973,10 +1002,9 @@
 }
 
 .event-popup__color-bar {
-  height: 4px;
+  height: 3px;
   border-radius: var(--radius-full);
   margin-bottom: var(--space-3);
-  opacity: 0.65;
 }
 
 .event-popup__title {
@@ -1080,6 +1108,7 @@
 }
 
 .allday-event {
+  --ev-color: var(--color-accent);
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -1087,14 +1116,19 @@
   font-weight: var(--font-weight-medium);
   padding: var(--space-px) var(--space-1);
   border-radius: var(--radius-xs);
-  border: var(--space-px) solid color-mix(in srgb, currentColor 35%, transparent);
-  box-shadow: var(--shadow-xs);
-  color: var(--color-text-on-accent);
+  border: var(--space-px) solid color-mix(in srgb, var(--ev-color) 30%, transparent);
+  background: color-mix(in srgb, var(--ev-color) 16%, var(--color-surface-work));
+  color: color-mix(in srgb, var(--ev-color) 35%, var(--color-text-primary));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   margin-bottom: var(--space-0h);
   cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.allday-event:hover {
+  background: color-mix(in srgb, var(--ev-color) 24%, var(--color-surface-work));
 }
 
 @media (max-width: 640px) {
@@ -1256,6 +1290,12 @@
     border-radius: var(--radius-full);
     vertical-align: middle;
     overflow: hidden;
+  }
+
+  /* Als 8px-Punkt trägt die volle --ev-color das Signal (nicht die blasse
+   * Tönung der Desktop-Kachel). */
+  .month-day .month-day__event {
+    background: var(--ev-color);
   }
 
   .month-day .month-day__holiday {

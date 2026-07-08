@@ -146,6 +146,8 @@
         "customizeSize": "Размер",
         "customizeSizeFor": "Размер для {{widget}}",
         "customizeHide": "Скрыть {{widget}}",
+        "customizeHiddenTitle": "Ausgeblendete Widgets",
+        "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "Маленький (1×1)",
         "widgetSizeNarrow": "Узкий (2×1)",
         "widgetSizeTall": "Высокий (1×2)",

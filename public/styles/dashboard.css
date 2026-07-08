@@ -262,12 +262,15 @@
 
 .widget__link {
   font-size: var(--type-secondary);
-  color: var(--widget-accent, var(--color-accent));
+  /* Neutral im Ruhezustand (Critique R3 P3): die „Alle"-Links trugen alle volle
+   * Modulfarbe → ~5–6 Töne board-weit. Identität lebt in Icon + getöntem Badge;
+   * der Akzent kommt erst beim Hover. */
+  color: var(--color-text-secondary);
   font-weight: var(--font-weight-medium);
   display: inline-flex;
   align-items: center;
   gap: var(--space-0h);
-  transition: opacity var(--transition-fast), background-color var(--transition-fast);
+  transition: opacity var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
   min-height: var(--target-base);
   padding: 0 var(--space-2);
   border-radius: var(--radius-sm);
@@ -276,6 +279,7 @@
 
 .widget__link:hover {
   opacity: 1;
+  color: var(--widget-accent, var(--color-accent));
   background-color: color-mix(in srgb, var(--widget-accent, var(--color-accent)) 10%, transparent);
 }
 
@@ -283,8 +287,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--widget-accent, var(--color-accent));
-  color: var(--color-ink-on-vivid);
+  /* Getönt statt voll gesättigt (Critique P5): ein volles Akzent-Badge pro Karte —
+   * plus Haarlinie, Link und Icon — summierte sich über ein volles Board zu ~8–10
+   * schreienden Farbtupfern. Der Zähler bleibt modul-getönt, aber ruhig; die
+   * Identität tragen Icon + Haarlinie. */
+  background-color: color-mix(in srgb, var(--widget-accent, var(--color-accent)) 15%, var(--color-surface));
+  /* Text stärker zur Ink-Seite gemischt (58% statt 72% Akzent) → sicherer
+   * AA-Kontrast für den kleinen Bold-Zähler auf der hellen Tönung, auch bei
+   * helleren Modultönen (Critique R3, Sam). */
+  color: color-mix(in srgb, var(--widget-accent, var(--color-accent)) 58%, var(--color-text-primary));
   font-size: var(--text-xs);
   font-weight: var(--font-weight-bold);
   min-width: 16px;
@@ -387,7 +398,7 @@
   border-bottom: 1px solid var(--color-border-subtle);
   cursor: pointer;
   touch-action: pan-y;
-  transition: opacity var(--transition-fast);
+  transition: background-color var(--transition-fast);
 }
 
 .task-item:last-child {
@@ -395,7 +406,7 @@
 }
 
 .task-item:hover {
-  opacity: 0.7;
+  background-color: var(--color-surface-hover);
 }
 
 .task-item__priority {
@@ -493,7 +504,7 @@
   border-bottom: 1px solid var(--color-border-subtle);
   cursor: pointer;
   touch-action: pan-y;
-  transition: opacity var(--transition-fast);
+  transition: background-color var(--transition-fast);
 }
 
 .event-item:last-child {
@@ -501,7 +512,7 @@
 }
 
 .event-item:hover {
-  opacity: 0.7;
+  background-color: var(--color-surface-hover);
 }
 
 /* Kalenderfarbe als Dot statt Seitenstreifen — gleiches Vokabular wie die
@@ -627,30 +638,35 @@
 }
 
 .meal-slot__type {
-  font-size: var(--type-secondary);
+  /* Kategorielabel eine Stufe kleiner als das Gericht (12px), damit „Frühstück"
+   * und der Gerichtname sich in der Hierarchie trennen (Critique Minor). */
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-medium);
   color: var(--color-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.meal-slot--filled .meal-slot__type {
-  color: var(--slot-color, var(--color-text-secondary));
-}
+/* Label bleibt neutral: die Slot-Farbe trägt allein das Icon — ein Akzent pro
+ * Slot statt Label + Icon doppelt gefärbt (Critique R3 P2). */
 
 .meal-slot__title {
-  display: block;
+  /* Gericht darf auf zwei Zeilen umbrechen statt auf ~1 Wort zu clippen. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
   margin-top: var(--space-1);
   font-size: var(--type-secondary);
   color: var(--color-text-secondary);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   max-width: 100%;
 }
 
 .meal-slot--filled .meal-slot__title {
   color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* Leerer Slot: gedämpfter Em-Dash liest als bewusst leer (kein verirrter
@@ -943,7 +959,10 @@
 
 .weather-widget__meta {
   font-size: var(--text-xs);
-  opacity: 0.7;
+  /* 12px-Text auf dem Violett-Verlauf: 0.85 statt 0.7 hält auch über der
+   * hellsten Glow-Region (oben rechts) den AA-Kontrast (4.5:1) für Kleintext,
+   * bleibt aber sichtbar sekundär gegenüber Temp/Beschreibung. */
+  opacity: 0.85;
   line-height: 1.3;
 }
 
@@ -1012,7 +1031,10 @@ svg.weather-forecast__icon {
 }
 
 .weather-forecast__low {
-  opacity: 0.72;
+  /* Tiefsttemperatur bleibt gegenüber der semibold-Höchsttemperatur zurück,
+   * aber 0.85 statt 0.72 sichert AA für die 12px-Zahl auch am hellsten Rand
+   * des Verlaufs. */
+  opacity: 0.85;
 }
 
 /* Tiny weather keeps the current conditions readable instead of forcing
@@ -1186,6 +1208,16 @@ svg.weather-forecast__icon {
     opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Desktop hat keine Bottom-Nav (Sidebar-Navigation), daher entfällt der
+ * 60px-Nav-Offset: der FAB rutscht in die untere rechte Ecke, in die vorhandene
+ * Bottom-Safe-Area der Seite — statt ~84px hochzuschweben und den Inhalt der
+ * unteren rechten Kachel (Budget) zu überlappen (Critique R3 P1). */
+@media (min-width: 1024px) {
+  .fab-container {
+    bottom: var(--space-8);
+  }
+}
+
 /* Scroll-Ausblenden: gleitet nach unten aus dem Weg, damit der FAB keine Widget-
  * Header-Links überdeckt/abfängt; kein Pointer-Fang, solange versteckt. */
 .fab-container--hidden {
@@ -1346,139 +1378,72 @@ svg.weather-forecast__icon {
 }
 
 /* --------------------------------------------------------
- * Dashboard-Customize-Modal
+ * Wieder-Einblenden-Leiste (Inline-Edit-Modus)
+ * Löst die Einbahnstraße des früheren Nur-Ausblenden-Inline-Modus ab; ersetzt
+ * zugleich das entfernte zweite Editor-Modal.
  * -------------------------------------------------------- */
-.customize-list {
+.widget-restore {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.widget-restore__title {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.widget-restore__chips {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
-.customize-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-2);
-  border-radius: var(--radius-sm);
-  transition: background-color var(--transition-fast);
-}
-
-.customize-row:hover {
-  background-color: var(--color-surface-hover);
-}
-
-.customize-row__toggle {
-  position: relative;
+.widget-restore-chip {
   display: inline-flex;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.customize-row__check {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.customize-row__slider {
-  display: inline-block;
-  width: 36px;
-  height: 20px;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
-  background-color: var(--color-border);
-  transition: background-color var(--transition-fast);
-  position: relative;
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
-.customize-row__slider::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: white;
-  transition: transform var(--transition-fast);
-  box-shadow: var(--shadow-xs);
+.widget-restore-chip:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-accent);
 }
 
-.customize-row__check:checked + .customize-row__slider {
-  background-color: var(--color-accent);
-}
-
-.customize-row__check:checked + .customize-row__slider::after {
-  transform: translateX(16px);
-}
-
-.customize-row__check:focus-visible + .customize-row__slider {
+.widget-restore-chip:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
-.customize-row__icon {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
+.widget-restore-chip__icon {
+  width: var(--space-4);
+  height: var(--space-4);
   color: var(--color-text-secondary);
 }
 
-.customize-row__name {
-  flex: 1;
-}
-
-.customize-row__size {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-  min-width: 190px;
-}
-
-.customize-row__select {
-  min-height: var(--target-base);
-  width: 132px;
-  padding: 0 var(--space-1);
-  font-size: var(--text-xs);
-}
-
-.customize-row__actions {
-  display: flex;
-  gap: var(--space-1);
-  flex-shrink: 0;
-}
-
-.customize-row__btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--target-md);
-  height: var(--target-md);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
-}
-
-.customize-row__btn:hover:not(:disabled) {
-  background-color: var(--color-surface-hover);
-  color: var(--color-text-primary);
-}
-
-.customize-row__btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
+.widget-restore-chip__add {
+  width: var(--space-4);
+  height: var(--space-4);
+  color: var(--color-accent);
 }
 
 /* Auf Touch-Eingabe (Finger) müssen die kompakten Anpassen-/Edit-Controls das
  * 44px-iOS-Minimum erreichen; auf dem Desktop (Maus) bleiben sie schlank bei
  * --target-md (Assessment B: Touch-Target < 44px). */
 @media (pointer: coarse) {
-  .customize-row__btn,
   .widget-edit-controls__handle,
   .widget-edit-controls__hide,
   .widget-edit-controls__move-btn {
@@ -1655,16 +1620,10 @@ svg.weather-forecast__icon {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  border: 1px solid color-mix(in srgb, var(--module-accent) 24%, var(--color-border));
-  border-radius: var(--radius-sm);
-  /* Cockpit-Differenzierung (Critique P1): das „Heute"-Band trägt eine subtile,
-   * solide Akzent-Tönung und liest so als hervorgehobene Glance-Zusammenfassung —
-   * klar abgesetzt von der ruhigen weißen Modul-Ebene darunter. Solide color-mix
-   * (kein Verlauf) ist #166-sicher, gleiches Muster wie die Cockpit-Karten; die
-   * ~5%-Tönung bleibt weit unter der 10%-Akzent-Schwelle (DESIGN.md Scarcity). */
-  background: color-mix(in srgb, var(--module-accent) 5%, var(--color-surface));
-  padding: var(--space-4);
-  box-shadow: var(--shadow-sm);
+  /* Teil des Masthead-Bands: kein eigener Rahmen, nur ein feiner Divider trennt
+   * die Glance-Zeile von der Begrüßung darüber. */
+  padding-top: var(--space-4);
+  border-top: 1px solid color-mix(in srgb, var(--module-accent) 16%, var(--color-border));
   /* Container: die Glance-Metriken werden vierspaltig nach EIGENEM Platz,
    * sidebar-bewusst, nicht nach Viewport. Siehe tokens.css §11c. */
   container: today-cockpit / inline-size;
@@ -1738,8 +1697,10 @@ svg.weather-forecast__icon {
 }
 
 .today-cockpit-card__icon svg {
-  width: var(--space-5);
-  height: var(--space-5);
+  /* Ornament tritt hinter den Value zurück: der Titel ist das glanzbare Datum,
+   * das Icon nur der Domänen-Marker (16px statt zuvor 20px). */
+  width: var(--space-4);
+  height: var(--space-4);
 }
 
 .today-cockpit-card__label {
@@ -1758,7 +1719,10 @@ svg.weather-forecast__icon {
   overflow: hidden;
   align-self: start;
   color: var(--color-text-primary);
-  font-size: var(--type-secondary);
+  /* Der Value ist das glanzbare Datum der Karte („was kommt als Nächstes?") —
+   * er trägt die Card-Title-Rolle (16px) statt Sekundärtext (14px), damit die
+   * Information den Icon-Chip überwiegt statt umgekehrt. */
+  font-size: var(--type-card-title);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-snug);
   overflow-wrap: normal;
@@ -1830,26 +1794,93 @@ svg.weather-forecast__icon {
   overflow: visible;
 }
 
+/* --------------------------------------------------------
+ * „Heute"-Masthead: EIN erhöhtes Material-Band trägt Begrüßung + Glance-Cockpit
+ * als Signature-Kopf (statt zwei gestapelter gerahmter Kästen). Solide Tönung
+ * (opak, #166-sicher); die Tageszeit spricht über einen weichen Eck-Glow
+ * (Pseudo-Element wie die Wetterkarte) und den Verlaufstext der Begrüßung —
+ * nie über eine Flächenfüllung des Bandes.
+ * -------------------------------------------------------- */
+.dashboard-masthead {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid color-mix(in srgb, var(--module-accent) 20%, var(--color-border));
+  border-radius: var(--radius-md);
+  background-color: color-mix(in srgb, var(--module-accent) 6%, var(--color-surface));
+  box-shadow: var(--shadow-md);
+}
+
+@media (min-width: 1024px) {
+  .dashboard-masthead {
+    padding: var(--space-6);
+  }
+}
+
+/* Tageszeit-Signatur: weicher Glow oben rechts, Farbe folgt dem Begrüßungs-
+ * Verlauf. Pseudo-Element (opak-sicher), rein dekorativ, hinter dem Inhalt. */
+.dashboard-masthead::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(115% 125% at 100% 0%,
+    color-mix(in srgb, var(--masthead-glow, var(--module-accent)) 20%, transparent) 0%,
+    transparent 58%);
+}
+
+.dashboard-masthead > * {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-masthead--morning { --masthead-glow: var(--greeting-morning-from); }
+.dashboard-masthead--day     { --masthead-glow: var(--greeting-day-from); }
+.dashboard-masthead--evening { --masthead-glow: var(--greeting-evening-from); }
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .dashboard-masthead::before { display: none; }
+}
+
+/* Dark-Mode: der 20%-Warmmix über Fast-Schwarz liest als brauner Schmier
+ * (Critique R3 P2). Auf 10% + engeren Falloff zurücknehmen → eine faint-warme
+ * Ecke statt eines Render-Artefakts. Beide Dark-Mechanismen abdecken. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .dashboard-masthead::before {
+    background: radial-gradient(115% 125% at 100% 0%,
+      color-mix(in srgb, var(--masthead-glow, var(--module-accent)) 10%, transparent) 0%,
+      transparent 52%);
+  }
+}
+[data-theme="dark"] .dashboard-masthead::before {
+  background: radial-gradient(115% 125% at 100% 0%,
+    color-mix(in srgb, var(--masthead-glow, var(--module-accent)) 10%, transparent) 0%,
+    transparent 52%);
+}
+
+/* Leeres Cockpit → kein Material-Band, nur eine schlanke Gruß-Leiste statt eines
+ * großen leeren Rechtecks (Critique R3 P1). Nach der Desktop-Padding-Media-Regel
+ * platziert, damit das Zurücksetzen bei gleicher Spezifität gewinnt. */
+.dashboard-masthead--slim {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dashboard-masthead--slim::before { display: none; }
+
+/* Entrahmte innere Zone: das Masthead-Band trägt Rahmen/Schatten/Padding. */
 .dashboard-overview {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  border: 1px solid color-mix(in srgb, var(--module-accent) 24%, var(--color-border));
-  border-radius: var(--radius-sm);
-  /* Opaque background required: linear-gradient with color-mix() stops on a scrolled
-   * element triggers the WebKit/Blink scroll-rasterization bug (Issue #166).
-   * Same pattern as .app-content before v0.52.32. */
-  background-color: var(--color-surface);
-  padding: var(--space-4);
-  box-shadow: var(--shadow-sm);
   /* Container: Kopfzeile bricht nach eigenem Platz von Spalte auf Zeile um. */
   container: dashboard-overview / inline-size;
-}
-
-@media (min-width: 1024px) {
-  .dashboard-overview {
-    padding: var(--space-5);
-  }
 }
 
 .dashboard-overview__header {
@@ -2042,6 +2073,9 @@ svg.weather-forecast__icon {
   z-index: 4;
   display: flex;
   align-items: center;
+  /* Umbrechen statt Überlaufen: auf schmalen 1×1-Kacheln weichen die Segmente in
+   * eine zweite Zeile aus, statt sich zu quetschen (Critique P1). */
+  flex-wrap: wrap;
   gap: var(--space-2);
   padding: 4px;
   border: 1px solid var(--color-border);
@@ -2117,35 +2151,51 @@ svg.weather-forecast__icon {
   align-items: center;
   gap: var(--space-1);
   min-width: 0;
-  flex: 1;
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
+  flex: 1 1 auto;
+  flex-wrap: wrap;
 }
 
-.widget-edit-controls__select {
-  min-width: 132px;
-  height: var(--target-md);
+/* Segmentierter Größen-Button: ein klickbares Mini-Grid pro Preset. Ersetzt das
+ * frühere Mini-Grid+Select+Label-Trio — eine Kontrolle, glanzbar, platzsparend. */
+.widget-size-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xs);
   background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.widget-size-btn:hover {
+  border-color: var(--module-accent);
+}
+
+.widget-size-btn--active {
+  border-color: var(--module-accent);
+  background: color-mix(in srgb, var(--module-accent) 12%, var(--color-surface));
+}
+
+.widget-size-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 /* Edit-Mode-Controls sind auf dem Desktop bewusst kompakt (40px = --target-md,
    Maus-Minimum), müssen auf Fingereingabe aber das 44px-Minimum erreichen. */
 @media (pointer: coarse) {
-  .customize-row__select,
-  .widget-edit-controls__select,
+  .widget-restore-chip,
   .dashboard-customize-toolbar .btn {
     min-height: var(--target-base);
   }
 
-  .customize-row__btn,
+  .widget-size-btn,
   .widget-edit-controls__hide,
   .widget-edit-controls__move-btn {
-    width: var(--target-base);
-    height: var(--target-base);
+    min-width: var(--target-base);
+    min-height: var(--target-base);
   }
 
   /* Der Drag-Grip feuert auf Touch nicht — durch die Up/Down-Buttons ersetzen. */
@@ -2207,10 +2257,15 @@ svg.weather-forecast__icon {
 
 .dashboard .widget,
 .dashboard .widget-skeleton {
-  border-radius: var(--radius-sm);
+  /* Geteiltes Kartenmaterial (Critique P2): eine spürbare, aber weiche Elevation
+   * (--shadow-md) hebt jede Kachel vom warmen Papier ab, statt als flaches
+   * Rechteck zu liegen — dieselbe Tiefe wie die Wetterkarte, damit das Grid als
+   * EIN Kartensystem liest statt „elf flache + eine reiche". Radius-md eint die
+   * Rundung mit dem Masthead. */
+  border-radius: var(--radius-md);
   border: 1px solid color-mix(in srgb, var(--widget-accent, var(--module-accent)) 20%, var(--color-border));
   background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
   min-width: 0;
 }
 
@@ -2221,7 +2276,10 @@ svg.weather-forecast__icon {
 }
 
 .dashboard .widget__header {
-  min-height: 54px;
+  /* Kompakter Kopf (Critique P3): der 16px-Titel füllt die Zeile, statt in einer
+   * über-hohen 54px-Leiste zu schwimmen. --target-base (44px) hält zugleich das
+   * Touch-Minimum für die „Alle"-Verknüpfung. */
+  min-height: var(--target-base);
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
 }
@@ -2267,11 +2325,16 @@ svg.weather-forecast__icon {
 .dashboard .meal-slot:hover,
 .dashboard .shopping-widget-list:hover,
 .dashboard .note-item:hover {
+  /* Konsistent mit task/event: Hover gibt Feedback OHNE Lesbarkeit zu senken.
+   * Farbige Zettel vertragen keinen Flächen-Tint → sanfter Schatten-Lift statt
+   * des früheren opacity:0.8-Dimmens. */
   transform: none;
+  opacity: 1;
+  box-shadow: var(--shadow-sm);
 }
 
 .dashboard .weather-widget {
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   /* Atmosphärischer Verlauf statt flachem dunklen Slab: ein weicher „Sonnen"-Glow
    * in der oberen rechten Ecke gibt dem Modulton (Dashboard-Violett) Tiefe und Licht.
    * Beide Verlaufs-Stops sind bewusst tiefviolett-dominant (Deep-Violet als Anker) —
@@ -2451,7 +2514,11 @@ svg.weather-forecast__icon {
 
 .budget-widget__balance {
   color: var(--color-text-primary);
-  font-size: var(--text-xl);
+  /* Die wichtigste Zahl der Finanzkarte trägt Hero-Gewicht (24px statt 20px):
+   * selbstbewusst statt zaghaft (Critique P4). */
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
   white-space: nowrap;
 }
 
@@ -2821,7 +2888,9 @@ svg.weather-forecast__icon {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cycle-widget__ring-arc { transition: none; }
+  .cycle-widget__ring-arc,
+  .health-widget__bar-fill,
+  .shopping-widget-list__bar { transition: none; }
 }
 
 .health-widget__none {
