@@ -105,7 +105,7 @@
      * Zeilen-Spans der hohen Widgets füllen Restlücken; verbleibender Weißraum
      * wandert ans ruhige Grid-Ende statt in die Mitte. */
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
-    grid-auto-rows: minmax(132px, auto);
+    grid-auto-rows: 206px;
     gap: var(--space-5);
     grid-auto-flow: row dense;
   }
