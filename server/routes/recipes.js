@@ -11,6 +11,18 @@ import { str, num, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../midd
 
 const log = createLogger('Recipes');
 const router = express.Router();
+const RECIPE_MEAL_TYPE_KEYS = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+function normalizeRecipeMealTypes(value) {
+  const source = Array.isArray(value)
+    ? value
+    : String(value || '')
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  const unique = [...new Set(source.filter((type) => RECIPE_MEAL_TYPE_KEYS.includes(type)))];
+  return unique.length ? unique : [...RECIPE_MEAL_TYPE_KEYS];
+}
 
 function loadRecipeWithIngredients(id) {
   const recipe = db.get().prepare(`
@@ -28,7 +40,7 @@ function loadRecipeWithIngredients(id) {
     ORDER BY id ASC
   `).all(id);
 
-  return { ...recipe, ingredients };
+  return { ...recipe, meal_types: normalizeRecipeMealTypes(recipe.meal_types), ingredients };
 }
 
 router.get('/', (_req, res) => {
@@ -57,7 +69,11 @@ router.get('/', (_req, res) => {
       }
     }
 
-    res.json({ data: recipes.map((r) => ({ ...r, ingredients: ingredientMap[r.id] || [] })) });
+    res.json({ data: recipes.map((r) => ({
+      ...r,
+      meal_types: normalizeRecipeMealTypes(r.meal_types),
+      ingredients: ingredientMap[r.id] || [],
+    })) });
   } catch (err) {
     log.error('GET / error:', err);
     res.status(500).json({ error: 'Internal error', code: 500 });
@@ -71,15 +87,16 @@ router.post('/', (req, res) => {
     const vTitle = str(req.body.title, 'Titel', { max: MAX_TITLE });
     const vNotes = str(req.body.notes, 'Notizen', { max: MAX_TEXT, required: false });
     const vRecipeUrl = str(req.body.recipe_url, 'Rezept-URL', { max: MAX_TEXT, required: false });
+    const mealTypes = normalizeRecipeMealTypes(req.body.meal_types);
 
     const errors = collectErrors([vTitle, vNotes, vRecipeUrl]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const recipeId = db.transaction(() => {
       const result = db.get().prepare(`
-        INSERT INTO recipes (title, notes, recipe_url, created_by)
-        VALUES (?, ?, ?, ?)
-      `).run(vTitle.value, vNotes.value, vRecipeUrl.value, req.authUserId || req.session.userId);
+        INSERT INTO recipes (title, notes, recipe_url, meal_types, created_by)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(vTitle.value, vNotes.value, vRecipeUrl.value, mealTypes.join(','), req.authUserId || req.session.userId);
 
       const rid = Number(result.lastInsertRowid);
       const insertIng = db.get().prepare(`
@@ -119,15 +136,16 @@ router.put('/:id', (req, res) => {
     const vTitle = str(req.body.title, 'Titel', { max: MAX_TITLE });
     const vNotes = str(req.body.notes, 'Notizen', { max: MAX_TEXT, required: false });
     const vRecipeUrl = str(req.body.recipe_url, 'Rezept-URL', { max: MAX_TEXT, required: false });
+    const mealTypes = normalizeRecipeMealTypes(req.body.meal_types);
     const errors = collectErrors([vTitle, vNotes, vRecipeUrl]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     db.transaction(() => {
       db.get().prepare(`
         UPDATE recipes
-        SET title = ?, notes = ?, recipe_url = ?
+        SET title = ?, notes = ?, recipe_url = ?, meal_types = ?
         WHERE id = ?
-      `).run(vTitle.value, vNotes.value, vRecipeUrl.value, id);
+      `).run(vTitle.value, vNotes.value, vRecipeUrl.value, mealTypes.join(','), id);
 
       db.get().prepare('DELETE FROM recipe_ingredients WHERE recipe_id = ?').run(id);
 

@@ -21,6 +21,11 @@
   overflow: hidden;
 }
 
+.meals-layout {
+  flex: 1;
+  min-height: 0;
+}
+
 @media (min-width: 1024px) {
   .meals-page {
     height: 100dvh;
@@ -65,6 +70,16 @@
   white-space: nowrap;
 }
 
+.week-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.week-nav__randomize {
+  min-height: var(--target-base);
+}
+
 /* --------------------------------------------------------
  * Wochengitter (scroll horizontal auf Mobil)
  * -------------------------------------------------------- */
@@ -74,6 +89,10 @@
   -webkit-overflow-scrolling: touch;
   /* Container für die Slot-Raster: reflowt nach eigenem Platz, nicht Viewport. */
   container: week-grid / inline-size;
+}
+
+.recipe-sidebar {
+  display: none;
 }
 
 /* Lade-Feedback beim Wochenwechsel: dimmt das alte Raster, bis das neue steht. */
@@ -134,6 +153,15 @@
 }
 
 @media (max-width: 640px) {
+  .week-nav {
+    flex-wrap: wrap;
+  }
+
+  .week-nav__label {
+    order: -1;
+    flex-basis: 100%;
+  }
+
   .week-grid {
     padding-bottom: var(--space-8);
   }
@@ -496,6 +524,15 @@
   align-self: flex-start;
 }
 
+.meal-randomize-modal {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.meal-randomize-modal__toggle {
+  align-items: center;
+}
+
 .meal-recurrence-option,
 .meal-recurrence-note {
   display: flex;
@@ -601,12 +638,71 @@
  * Späte Quell-Order: überschreibt die .day-slots-Container-Query bewusst.
  * -------------------------------------------------------- */
 @media (min-width: 1024px) {
+  .meals-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: var(--space-4);
+    padding: 0 var(--space-4) var(--space-8);
+  }
+
   .week-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
     align-items: start;
     gap: 0;
-    padding: 0 var(--space-4) var(--space-8);
+    padding: 0;
+    min-width: 0;
+  }
+
+  .recipe-sidebar {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-left: 1px solid var(--color-border-subtle);
+    padding-left: var(--space-4);
+  }
+
+  .recipe-sidebar__title {
+    margin: 0;
+    padding: var(--space-3) 0 var(--space-2);
+    color: var(--color-text-primary);
+  }
+
+  .recipe-sidebar__list {
+    display: grid;
+    gap: var(--space-2);
+    overflow-y: auto;
+    padding-right: var(--space-1);
+  }
+
+  .recipe-sidebar__card {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    cursor: grab;
+  }
+
+  .recipe-sidebar__card--dragging {
+    opacity: 0.5;
+  }
+
+  .recipe-sidebar__card-title {
+    color: var(--color-text-primary);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .recipe-sidebar__card-types {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+
+  .recipe-sidebar__empty {
+    color: var(--color-text-secondary);
+    padding: var(--space-3) 0;
   }
 
   .day-column {

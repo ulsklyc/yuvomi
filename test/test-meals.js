@@ -8,6 +8,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { datesForTemplateInRange, mealWeekday } from '../server/services/meal-recurrence.js';
+import { __test as mealsUi } from '../public/pages/meals.js';
 
 let passed = 0;
 let failed = 0;
@@ -27,6 +28,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
 db.exec(MIGRATIONS_SQL[1]);
 db.exec(MIGRATIONS_SQL[13]);
 db.exec(MIGRATIONS_SQL[64]);
+db.exec(MIGRATIONS_SQL[73]);
 
 // Test-Benutzer
 const u1 = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
@@ -408,6 +410,47 @@ test('added_from_meal FK auf meals(id) gesetzt', () => {
   `).all();
   assert(items.length > 0, 'Mindestens ein Artikel mit Mahlzeit-Referenz');
   assert(items[0].meal_title, 'meal_title verknüpft');
+});
+
+test('Rezepte speichern passende meal_types für Planer-Features', () => {
+  const recipeId = db.prepare(`
+    INSERT INTO recipes (title, meal_types, created_by)
+    VALUES ('Porridge', 'breakfast,snack', ?)
+  `).run(uid).lastInsertRowid;
+  const recipe = db.prepare('SELECT meal_types FROM recipes WHERE id = ?').get(recipeId);
+  assert(recipe.meal_types === 'breakfast,snack', `meal_types gespeichert: ${recipe.meal_types}`);
+});
+
+test('Randomize-Helfer plant nur kompatible Rezepte in freie Slots', () => {
+  const plan = mealsUi.buildRandomMealAssignments({
+    weekStart: '2026-03-23',
+    visibleMealTypes: ['breakfast', 'dinner'],
+    meals: [{ id: 99, date: '2026-03-23', meal_type: 'breakfast', title: 'Bestehend' }],
+    recipes: [
+      { id: 1, title: 'Porridge', meal_types: ['breakfast'], ingredients: [] },
+      { id: 2, title: 'Pasta', meal_types: ['dinner'], ingredients: [] },
+    ],
+    replaceExisting: false,
+    pick: () => 0,
+  });
+
+  assert(plan.assignments.every((item) => item.mealType === 'dinner' || item.date !== '2026-03-23'), 'belegte Slots bleiben ohne Replace unberührt');
+  assert(plan.assignments.some((item) => item.mealType === 'dinner' && item.recipe.id === 2), 'kompatibles Dinner-Rezept wird zugewiesen');
+  assert(plan.deleteMealIds.length === 0, 'ohne Replace werden keine Mahlzeiten gelöscht');
+});
+
+test('Randomize-Helfer markiert bestehende Mahlzeiten zum Ersetzen', () => {
+  const plan = mealsUi.buildRandomMealAssignments({
+    weekStart: '2026-03-23',
+    visibleMealTypes: ['breakfast'],
+    meals: [{ id: 42, date: '2026-03-23', meal_type: 'breakfast', title: 'Bestehend' }],
+    recipes: [{ id: 1, title: 'Porridge', meal_types: ['breakfast'], ingredients: [] }],
+    replaceExisting: true,
+    pick: () => 0,
+  });
+
+  assert(plan.assignments.some((item) => item.date === '2026-03-23' && item.mealType === 'breakfast'), 'belegte Slots werden bei Replace neu geplant');
+  assert(plan.deleteMealIds.includes(42), 'bestehende Mahlzeit wird zum Löschen markiert');
 });
 
 // --------------------------------------------------------

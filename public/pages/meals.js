@@ -14,6 +14,7 @@ import { DEFAULT_CATEGORY_NAME } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
 import { ingredientRowHTML } from '/utils/ingredient-row.js';
 import { addLocalDays, startOfLocalWeekKey, toLocalDateKey } from '/utils/date.js';
+import { normalizeRecipeMealTypes, recipeSupportsMealType } from '/utils/recipe-meal-types.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -49,6 +50,7 @@ let state = {
 
 // Container-Referenz für Hilfsfunktionen (wird in render() gesetzt)
 let _container = null;
+let _dragRecipeId = null;
 
 // --------------------------------------------------------
 // Datumshelfer
@@ -77,6 +79,57 @@ function formatDayDate(dateStr) {
 
 function mealCategories() {
   return state.categories.filter((c) => !EXCLUDED_MEAL_CATEGORY_NAMES.has(c.name));
+}
+
+function recipeMealTypeOptions() {
+  return [
+    { key: 'breakfast', label: t('meals.typeBreakfast') },
+    { key: 'lunch', label: t('meals.typeLunch') },
+    { key: 'dinner', label: t('meals.typeDinner') },
+    { key: 'snack', label: t('meals.typeSnack') },
+  ];
+}
+
+function mealPayloadFromRecipe(recipe, date, mealType) {
+  return {
+    date,
+    meal_type: mealType,
+    title: recipe.title,
+    notes: recipe.notes || null,
+    recipe_url: recipe.recipe_url || null,
+    recipe_id: recipe.id,
+    ingredients: (recipe.ingredients || []).map((ingredient) => ({
+      name: ingredient.name,
+      quantity: ingredient.quantity || null,
+      category: ingredient.category || DEFAULT_CATEGORY_NAME,
+    })),
+  };
+}
+
+function buildRandomMealAssignments({ weekStart, visibleMealTypes, meals, recipes, replaceExisting = false, pick = Math.random }) {
+  const assignments = [];
+  const deleteMealIds = [];
+
+  for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+    const date = addDays(weekStart, dayOffset);
+    for (const mealType of visibleMealTypes) {
+      const slotMeals = meals.filter((meal) => meal.date === date && meal.meal_type === mealType);
+      if (!replaceExisting && slotMeals.length) continue;
+      const compatible = recipes.filter((recipe) => recipeSupportsMealType(recipe, mealType));
+      if (!compatible.length) continue;
+      const index = Math.floor(Math.max(0, Math.min(0.999999, Number(pick()) || 0)) * compatible.length);
+      const recipe = compatible[index] || compatible[0];
+      assignments.push({
+        date,
+        mealType,
+        recipe,
+        payload: mealPayloadFromRecipe(recipe, date, mealType),
+      });
+      if (replaceExisting) deleteMealIds.push(...slotMeals.map((meal) => meal.id));
+    }
+  }
+
+  return { assignments, deleteMealIds: [...new Set(deleteMealIds)] };
 }
 
 // --------------------------------------------------------
@@ -148,13 +201,19 @@ export async function render(container, { user }) {
           <i data-lucide="chevron-left" aria-hidden="true"></i>
         </button>
         <span class="week-nav__label" id="week-label"></span>
-        <button class="week-nav__today" id="week-today">${t('meals.today')}</button>
+        <div class="week-nav__actions">
+          <button class="week-nav__today" id="week-today">${t('meals.today')}</button>
+          <button class="btn btn--secondary week-nav__randomize" id="week-randomize">${t('meals.randomizePlan')}</button>
+        </div>
         <button class="btn btn--icon" id="week-next" aria-label="${t('meals.nextWeek')}">
           <i data-lucide="chevron-right" aria-hidden="true"></i>
         </button>
       </div>
-      <div class="week-grid" id="week-grid">
-        <div style="grid-column:1/-1">${renderSkeletonList({ rows: 5, lines: 2 })}</div>
+      <div class="meals-layout">
+        <div class="week-grid" id="week-grid">
+          <div style="grid-column:1/-1">${renderSkeletonList({ rows: 5, lines: 2 })}</div>
+        </div>
+        <aside class="recipe-sidebar" id="recipe-sidebar"></aside>
       </div>
       <button class="page-fab" id="fab-new-meal" aria-label="${t('meals.addMealTitle')}">
         <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
@@ -170,7 +229,9 @@ export async function render(container, { user }) {
 
   await Promise.all([loadWeek(monday), loadLists(), loadPreferences(), loadCategories(), loadRecipes()]);
   renderWeekGrid();
+  renderRecipeSidebar();
   wireNav();
+  wireRecipeSidebar();
 
   const selectedRecipeId = Number(new URLSearchParams(window.location.search).get('recipe'));
   if (selectedRecipeId) {
@@ -236,6 +297,56 @@ function renderWeekGrid() {
     grid.querySelector('.day-header--today')?.closest('.day-column')
       ?.scrollIntoView({ block: 'start' });
   }
+}
+
+function renderRecipeSidebar() {
+  const sidebar = _container.querySelector('#recipe-sidebar');
+  if (!sidebar) return;
+  sidebar.replaceChildren();
+
+  const title = document.createElement('h2');
+  title.className = 'recipe-sidebar__title';
+  title.textContent = t('recipes.title');
+  sidebar.appendChild(title);
+
+  if (!state.recipes.length) {
+    const empty = document.createElement('div');
+    empty.className = 'recipe-sidebar__empty';
+    empty.textContent = t('recipes.emptyTitle');
+    sidebar.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'recipe-sidebar__list';
+
+  state.recipes.forEach((recipe) => {
+    const card = document.createElement('article');
+    card.className = 'recipe-sidebar__card';
+    card.draggable = true;
+    card.dataset.recipeId = String(recipe.id);
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'recipe-sidebar__card-title';
+    titleEl.textContent = recipe.title;
+    card.appendChild(titleEl);
+
+    const types = document.createElement('div');
+    types.className = 'recipe-sidebar__card-types';
+    recipeMealTypeOptions()
+      .filter((option) => normalizeRecipeMealTypes(recipe.meal_types).includes(option.key))
+      .forEach((option) => {
+        const badge = document.createElement('span');
+        badge.className = `meal-type-badge meal-type-badge--${option.key}`;
+        badge.textContent = option.label;
+        types.appendChild(badge);
+      });
+    card.appendChild(types);
+
+    list.appendChild(card);
+  });
+
+  sidebar.appendChild(list);
 }
 
 function renderSlot(date, type, mealsForDay) {
@@ -345,6 +456,8 @@ function wireNav() {
     await loadWeek(monday);
     renderWeekGrid();
   });
+
+  _container.querySelector('#week-randomize')?.addEventListener('click', openRandomizeModal);
 }
 
 function wireGrid(grid) {
@@ -396,7 +509,123 @@ function wireGrid(grid) {
     }
   });
 
+  grid.addEventListener('dragover', (e) => {
+    if (!_dragRecipeId) return;
+    const slot = e.target.closest('.meal-slot');
+    if (!slot) return;
+    const recipe = state.recipes.find((entry) => entry.id === _dragRecipeId);
+    if (!recipe || !recipeSupportsMealType(recipe, slot.dataset.type)) return;
+    e.preventDefault();
+    clearRecipeDropTargets();
+    slot.classList.add('meal-slot--drop-target');
+  });
+
+  grid.addEventListener('drop', async (e) => {
+    if (!_dragRecipeId) return;
+    const slot = e.target.closest('.meal-slot');
+    const recipeId = _dragRecipeId;
+    _dragRecipeId = null;
+    clearRecipeDropTargets();
+    if (!slot) return;
+    const recipe = state.recipes.find((entry) => entry.id === recipeId);
+    if (!recipe || !recipeSupportsMealType(recipe, slot.dataset.type)) return;
+    e.preventDefault();
+    await addRecipeToSlot(recipe, slot.dataset.date, slot.dataset.type);
+  });
+
   wireDragDrop(grid);
+}
+
+function wireRecipeSidebar() {
+  const sidebar = _container.querySelector('#recipe-sidebar');
+  if (!sidebar || sidebar.dataset.eventsWired) return;
+  sidebar.dataset.eventsWired = 'true';
+
+  sidebar.addEventListener('dragstart', (e) => {
+    const card = e.target.closest('.recipe-sidebar__card');
+    if (!card) return;
+    _dragRecipeId = Number(card.dataset.recipeId);
+    card.classList.add('recipe-sidebar__card--dragging');
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', card.dataset.recipeId);
+  });
+
+  sidebar.addEventListener('dragend', (e) => {
+    e.target.closest('.recipe-sidebar__card')?.classList.remove('recipe-sidebar__card--dragging');
+    _dragRecipeId = null;
+    clearRecipeDropTargets();
+  });
+}
+
+function clearRecipeDropTargets() {
+  _container.querySelectorAll('.meal-slot--drop-target').forEach((slot) => slot.classList.remove('meal-slot--drop-target'));
+}
+
+async function addRecipeToSlot(recipe, date, mealType) {
+  try {
+    const res = await api.post('/meals', mealPayloadFromRecipe(recipe, date, mealType));
+    state.meals.push(res.data);
+    renderWeekGrid();
+  } catch (err) {
+    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'error');
+  }
+}
+
+function openRandomizeModal() {
+  openSharedModal({
+    title: t('meals.randomizeTitle'),
+    size: 'sm',
+    content: `
+      <div class="meal-randomize-modal">
+        <label class="toggle meal-randomize-modal__toggle">
+          <input type="checkbox" id="meal-randomize-replace">
+          <span class="toggle__track"></span>
+          <span>${t('meals.randomizeReplaceExisting')}</span>
+        </label>
+        <div class="modal-panel__footer" style="border:none;padding:0;margin-top:var(--space-4)">
+          <button class="btn btn--secondary" id="meal-randomize-cancel">${t('common.cancel')}</button>
+          <button class="btn btn--primary" id="meal-randomize-run">${t('meals.randomizePlan')}</button>
+        </div>
+      </div>`,
+    onSave(panel) {
+      panel.querySelector('#meal-randomize-cancel')?.addEventListener('click', closeModal);
+      panel.querySelector('#meal-randomize-run')?.addEventListener('click', () => runRandomize(panel));
+    },
+  });
+}
+
+async function runRandomize(panel) {
+  const replaceExisting = Boolean(panel.querySelector('#meal-randomize-replace')?.checked);
+  const runBtn = panel.querySelector('#meal-randomize-run');
+  const plan = buildRandomMealAssignments({
+    weekStart: state.currentWeek,
+    visibleMealTypes: state.visibleMealTypes,
+    meals: state.meals,
+    recipes: state.recipes,
+    replaceExisting,
+  });
+
+  if (!plan.assignments.length) {
+    window.yuvomi?.showToast(t('meals.randomizeNoRecipes'), 'info');
+    return;
+  }
+
+  runBtn.disabled = true;
+  try {
+    for (const mealId of plan.deleteMealIds) {
+      await api.delete(`/meals/${mealId}`);
+    }
+    for (const assignment of plan.assignments) {
+      await api.post('/meals', assignment.payload);
+    }
+    await loadWeek(state.currentWeek);
+    closeModal({ force: true });
+    renderWeekGrid();
+    window.yuvomi?.showToast(t('meals.randomizeSuccess', { count: plan.assignments.length }), 'success');
+  } catch (err) {
+    runBtn.disabled = false;
+    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'error');
+  }
 }
 
 // --------------------------------------------------------
@@ -694,6 +923,7 @@ function openMealModal(opts) {
         try {
           const created = await api.post('/recipes', { title, notes, recipe_url, ingredients });
           state.recipes.push(created.data);
+          renderRecipeSidebar();
 
           if (recipeSelect) {
             const option = document.createElement('option');
@@ -1073,6 +1303,8 @@ async function transferMeal(mealId) {
     window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'error');
   }
 }
+
+export const __test = { buildRandomMealAssignments, mealPayloadFromRecipe };
 
 // --------------------------------------------------------
 // Hilfsfunktion

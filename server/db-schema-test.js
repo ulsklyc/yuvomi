@@ -746,6 +746,9 @@ const MIGRATIONS_SQL = {
     INSERT INTO search_index (entity, entity_id, title, body)
       SELECT 'activity', id, COALESCE(type, ''), COALESCE(note, '') FROM health_activities;
   `,
+  73: `
+    ALTER TABLE recipes ADD COLUMN meal_types TEXT NOT NULL DEFAULT 'breakfast,lunch,dinner,snack';
+  `,
 };
 
 export { MIGRATIONS_SQL };
