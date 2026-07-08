@@ -196,34 +196,38 @@ function maybeHintCustomize(container) {
 // (weather) steht bewusst am Ende, statt die sichtbare Grid-Spitze zu belegen.
 const WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'budget', 'rewards', 'health', 'cycle', 'housekeeping', 'family', 'notes', 'weather'];
 
-// Vier kuratierte Formen statt sechs: über vier Auswahlmöglichkeiten pro Widget
-// (× bis zu 12 Widgets) kippt der Anpassen-Modus in Mikro-Entscheidungs-Overhead
-// für ein Familienpublikum (Critique P2, ≤4-Choices-Regel). Die früheren 3x2/4x2
-// bleiben als Legacy-Werte gültig (WIDGET_SIZE_OPTIONS) — bestehende Layouts werden
-// nicht zurückgesetzt, nur die Neu-Auswahl steuert auf diese vier zu.
+// Sechs benannte Formen decken die üblichen Dashboard-Bedürfnisse ab: kompakte
+// Statuskacheln, hohe Listen, Standardkarten sowie breite Übersichten. Die volle
+// 1-4 x 1-4-Matrix bleibt als gespeicherter/validierter Wert erhalten, damit
+// bestehende Layouts nicht beim nächsten Rendern zusammengezogen werden.
 const WIDGET_SIZE_PRESETS = [
   { value: '1x1', labelKey: 'dashboard.widgetSizeTiny'     },
   { value: '2x1', labelKey: 'dashboard.widgetSizeNarrow'   },
   { value: '1x2', labelKey: 'dashboard.widgetSizeTall'     },
   { value: '2x2', labelKey: 'dashboard.widgetSizeStandard' },
+  { value: '3x2', labelKey: 'dashboard.widgetSizeLarge'    },
+  { value: '4x2', labelKey: 'dashboard.widgetSizeFull'     },
 ];
 
-// Alle bekannten Größen inkl. Legacy-Werte — für normalizeDashboardConfig-Validierung
-const WIDGET_SIZE_OPTIONS = [...new Set([
-  ...WIDGET_SIZE_PRESETS.map((p) => p.value),
-  '1x2', '1x3', '1x4', '2x3', '2x4', '3x1', '3x3', '3x4', '4x1', '4x3', '4x4',
-])];
+// Alle bekannten Größen inkl. API-validierter Legacy-/Direktwerte.
+const WIDGET_SIZE_OPTIONS = [
+  '1x1', '1x2', '1x3', '1x4',
+  '2x1', '2x2', '2x3', '2x4',
+  '3x1', '3x2', '3x3', '3x4',
+  '4x1', '4x2', '4x3', '4x4',
+];
 
-// Bildet einen beliebigen (auch Legacy-)Größenwert auf das nächstliegende der vier
-// kuratierten Presets ab: Breite/Höhe ≥2 → 2, sonst 1. So kann normalizeDashboardConfig
-// migrierte Layouts (z.B. 4x2 aus einer früheren Version) auf ein Preset zusammenziehen,
-// statt dem betroffenen Nutzer als einziger eine 5. Dropdown-Option zu zeigen (Critique P2).
+// Markiert in der UI bei nicht direkt angebotenen Matrixwerten das nächstliegende
+// benannte Preset, ohne den gespeicherten Wert zu verändern.
 function nearestPreset(size) {
   const values = WIDGET_SIZE_PRESETS.map((p) => p.value);
   if (values.includes(size)) return size;
   const [cols, rows] = String(size).split('x').map(Number);
   if (!Number.isFinite(cols) || !Number.isFinite(rows)) return '1x1';
-  return `${cols >= 2 ? 2 : 1}x${rows >= 2 ? 2 : 1}`;
+  if (cols >= 4) return '4x2';
+  if (cols >= 3) return '3x2';
+  if (cols >= 2) return rows >= 2 ? '2x2' : '2x1';
+  return rows >= 2 ? '1x2' : '1x1';
 }
 
 function defaultWidgetSize(id) {
@@ -276,9 +280,7 @@ function normalizeDashboardConfig(input) {
         id: w.id,
         visible: w.visible !== false,
         order: Number.isFinite(Number(w.order)) ? Number(w.order) : i,
-        // Gültige (inkl. Legacy-)Größen auf das nächste Preset ziehen; Unbekanntes
-        // fällt auf den Domänen-Default. So sieht niemand eine 5. Größen-Option.
-        size: WIDGET_SIZE_OPTIONS.includes(w.size) ? nearestPreset(w.size) : defaultWidgetSize(w.id),
+        size: WIDGET_SIZE_OPTIONS.includes(w.size) ? w.size : defaultWidgetSize(w.id),
       }))
     : [];
   const presentIds = new Set(valid.map((w) => w.id));
@@ -1191,7 +1193,7 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1) {
   const isLast = index === total - 1;
   const activeSize = nearestPreset(w.size);
 
-  // Segmentiertes Größen-Steuerelement: vier klickbare Mini-Grid-Presets ersetzen
+  // Segmentiertes Größen-Steuerelement: klickbare Mini-Grid-Presets ersetzen
   // die frühere Kombination aus dekorativem Mini-Grid + „Größe"-Label + 132px-
   // <select> (Critique P1: doppelte Kontrolle + Overflow auf 1×1-Kacheln). Jeder
   // Button zeigt seine Form direkt und markiert die aktive Größe.
@@ -2079,7 +2081,15 @@ export async function render(container, { user }) {
   }
 }
 
-export const __test = { buildTodayHighlights, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey };
+export const __test = {
+  buildTodayHighlights,
+  normalizeVisibleMealTypes,
+  renderTodayMeals,
+  calendarEventRoute,
+  eventOccurrenceDateKey,
+  normalizeDashboardConfig,
+  WIDGET_SIZE_PRESETS,
+};
 
 function wireWeatherRefresh(container, onUpdated = null) {
   const refreshBtn = container.querySelector('#weather-refresh-btn');

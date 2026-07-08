@@ -201,6 +201,25 @@ test('Today-Meals-Widget rendert nur sichtbare Mahlzeit-Typen', async () => {
   nodeAssert.ok(!html.includes('data-type="lunch"'));
 });
 
+test('Dashboard-Widgetgrößen bieten große Presets und bewahren gültige Matrixwerte', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const presetValues = __test.WIDGET_SIZE_PRESETS.map((p) => p.value);
+
+  nodeAssert.deepEqual(presetValues, ['1x1', '2x1', '1x2', '2x2', '3x2', '4x2']);
+
+  const normalized = __test.normalizeDashboardConfig([
+    { id: 'tasks', visible: true, order: 0, size: '3x2' },
+    { id: 'calendar', visible: true, order: 1, size: '4x2' },
+    { id: 'family', visible: true, order: 2, size: '4x3' },
+    { id: 'weather', visible: true, order: 3, size: '9x9' },
+  ]);
+
+  nodeAssert.equal(normalized.find((w) => w.id === 'tasks').size, '3x2');
+  nodeAssert.equal(normalized.find((w) => w.id === 'calendar').size, '4x2');
+  nodeAssert.equal(normalized.find((w) => w.id === 'family').size, '4x3');
+  nodeAssert.equal(normalized.find((w) => w.id === 'weather').size, '2x1');
+});
+
 // --------------------------------------------------------
 // Tests: Dringende Aufgaben
 // --------------------------------------------------------
