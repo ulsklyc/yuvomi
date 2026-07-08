@@ -196,34 +196,45 @@ function maybeHintCustomize(container) {
 // (weather) steht bewusst am Ende, statt die sichtbare Grid-Spitze zu belegen.
 const WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'budget', 'rewards', 'health', 'cycle', 'housekeeping', 'family', 'notes', 'weather'];
 
-// Vier kuratierte Formen statt sechs: über vier Auswahlmöglichkeiten pro Widget
-// (× bis zu 12 Widgets) kippt der Anpassen-Modus in Mikro-Entscheidungs-Overhead
-// für ein Familienpublikum (Critique P2, ≤4-Choices-Regel). Die früheren 3x2/4x2
-// bleiben als Legacy-Werte gültig (WIDGET_SIZE_OPTIONS) — bestehende Layouts werden
-// nicht zurückgesetzt, nur die Neu-Auswahl steuert auf diese vier zu.
+// Benannte Formen decken die üblichen Dashboard-Bedürfnisse ab: kompakte
+// Statuskacheln, hohe Listen, Standardkarten sowie breite Übersichten in echter
+// Ein-Zeilen- und Zwei-Zeilen-Höhe. Gespeicherte 3-/4-Zeilen-Matrixwerte aus
+// alten oder direkten API-Konfigurationen werden auf das nächste angebotene
+// Preset normalisiert, damit gespeicherter Wert und UI-Aktivzustand nicht
+// auseinanderlaufen.
 const WIDGET_SIZE_PRESETS = [
   { value: '1x1', labelKey: 'dashboard.widgetSizeTiny'     },
   { value: '2x1', labelKey: 'dashboard.widgetSizeNarrow'   },
+  { value: '3x1', labelKey: 'dashboard.widgetSizeWide'     },
+  { value: '4x1', labelKey: 'dashboard.widgetSizeFullRow'  },
   { value: '1x2', labelKey: 'dashboard.widgetSizeTall'     },
   { value: '2x2', labelKey: 'dashboard.widgetSizeStandard' },
+  { value: '3x2', labelKey: 'dashboard.widgetSizeLarge'    },
+  { value: '4x2', labelKey: 'dashboard.widgetSizeFull'     },
 ];
 
-// Alle bekannten Größen inkl. Legacy-Werte — für normalizeDashboardConfig-Validierung
-const WIDGET_SIZE_OPTIONS = [...new Set([
-  ...WIDGET_SIZE_PRESETS.map((p) => p.value),
-  '1x2', '1x3', '1x4', '2x3', '2x4', '3x1', '3x3', '3x4', '4x1', '4x3', '4x4',
-])];
+const WIDGET_SIZE_PRESET_GROUPS = [
+  { labelKey: 'dashboard.widgetSizeOneRowGroup', values: ['1x1', '2x1', '3x1', '4x1'] },
+  { labelKey: 'dashboard.widgetSizeTwoRowsGroup', values: ['1x2', '2x2', '3x2', '4x2'] },
+];
 
-// Bildet einen beliebigen (auch Legacy-)Größenwert auf das nächstliegende der vier
-// kuratierten Presets ab: Breite/Höhe ≥2 → 2, sonst 1. So kann normalizeDashboardConfig
-// migrierte Layouts (z.B. 4x2 aus einer früheren Version) auf ein Preset zusammenziehen,
-// statt dem betroffenen Nutzer als einziger eine 5. Dropdown-Option zu zeigen (Critique P2).
-function nearestPreset(size) {
-  const values = WIDGET_SIZE_PRESETS.map((p) => p.value);
-  if (values.includes(size)) return size;
-  const [cols, rows] = String(size).split('x').map(Number);
-  if (!Number.isFinite(cols) || !Number.isFinite(rows)) return '1x1';
-  return `${cols >= 2 ? 2 : 1}x${rows >= 2 ? 2 : 1}`;
+const WIDGET_SIZE_PRESET_VALUES = WIDGET_SIZE_PRESETS.map((p) => p.value);
+const WIDGET_SIZE_PRESETS_BY_VALUE = new Map(WIDGET_SIZE_PRESETS.map((p) => [p.value, p]));
+const WIDGET_SIZE_OPTIONS = WIDGET_SIZE_PRESET_VALUES;
+
+function collapseMatrixSizeToPreset(size) {
+  const match = String(size || '').match(/^([1-4])x([1-4])$/);
+  if (!match) return null;
+  const cols = Number(match[1]);
+  const rows = Number(match[2]) > 1 ? 2 : 1;
+  return `${cols}x${rows}`;
+}
+
+function normalizeWidgetSize(size, widgetId) {
+  if (WIDGET_SIZE_PRESET_VALUES.includes(size)) return size;
+  const collapsed = collapseMatrixSizeToPreset(size);
+  if (collapsed && WIDGET_SIZE_PRESET_VALUES.includes(collapsed)) return collapsed;
+  return defaultWidgetSize(widgetId);
 }
 
 function defaultWidgetSize(id) {
@@ -276,9 +287,7 @@ function normalizeDashboardConfig(input) {
         id: w.id,
         visible: w.visible !== false,
         order: Number.isFinite(Number(w.order)) ? Number(w.order) : i,
-        // Gültige (inkl. Legacy-)Größen auf das nächste Preset ziehen; Unbekanntes
-        // fällt auf den Domänen-Default. So sieht niemand eine 5. Größen-Option.
-        size: WIDGET_SIZE_OPTIONS.includes(w.size) ? nearestPreset(w.size) : defaultWidgetSize(w.id),
+        size: normalizeWidgetSize(w.size, w.id),
       }))
     : [];
   const presentIds = new Set(valid.map((w) => w.id));
@@ -1186,22 +1195,36 @@ function renderSizeMiniGridCells(size) {
   }).join('');
 }
 
+function renderSizeButton(p, activeSize, widgetId) {
+  const active = p.value === activeSize;
+  return `<button type="button" class="widget-size-btn${active ? ' widget-size-btn--active' : ''}"
+            data-widget-size-preset="${p.value}" data-widget-id="${esc(widgetId)}"
+            aria-pressed="${active ? 'true' : 'false'}" aria-label="${esc(t(p.labelKey))}" title="${esc(t(p.labelKey))}">
+      ${renderSizeMiniGrid(p.value)}
+    </button>`;
+}
+
 function renderWidgetCustomizeControls(w, index = 0, total = 1) {
   const isFirst = index === 0;
   const isLast = index === total - 1;
-  const activeSize = nearestPreset(w.size);
+  const activeSize = WIDGET_SIZE_PRESET_VALUES.includes(w.size) ? w.size : null;
 
-  // Segmentiertes Größen-Steuerelement: vier klickbare Mini-Grid-Presets ersetzen
+  // Segmentiertes Größen-Steuerelement: klickbare Mini-Grid-Presets ersetzen
   // die frühere Kombination aus dekorativem Mini-Grid + „Größe"-Label + 132px-
-  // <select> (Critique P1: doppelte Kontrolle + Overflow auf 1×1-Kacheln). Jeder
-  // Button zeigt seine Form direkt und markiert die aktive Größe.
-  const sizeButtons = WIDGET_SIZE_PRESETS.map((p) => {
-    const active = p.value === activeSize;
-    return `<button type="button" class="widget-size-btn${active ? ' widget-size-btn--active' : ''}"
-              data-widget-size-preset="${p.value}" data-widget-id="${esc(w.id)}"
-              aria-pressed="${active ? 'true' : 'false'}" aria-label="${esc(t(p.labelKey))}" title="${esc(t(p.labelKey))}">
-        ${renderSizeMiniGrid(p.value)}
-      </button>`;
+  // <select> (Critique P1: doppelte Kontrolle + Overflow auf 1×1-Kacheln). Die
+  // acht Presets sind in 1- und 2-Zeilen-Gruppen sortiert, damit pro Entscheidung
+  // nur noch die Breite verglichen werden muss.
+  const sizeButtons = WIDGET_SIZE_PRESET_GROUPS.map((group) => {
+    const label = t(group.labelKey);
+    const buttons = group.values
+      .map((value) => WIDGET_SIZE_PRESETS_BY_VALUE.get(value))
+      .filter(Boolean)
+      .map((p) => renderSizeButton(p, activeSize, w.id))
+      .join('');
+    return `<div class="widget-size-row" role="group" aria-label="${esc(label)}">
+        <span class="widget-size-row__label">${esc(label)}</span>
+        <div class="widget-size-row__buttons">${buttons}</div>
+      </div>`;
   }).join('');
 
   return `
@@ -2079,7 +2102,16 @@ export async function render(container, { user }) {
   }
 }
 
-export const __test = { buildTodayHighlights, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey };
+export const __test = {
+  buildTodayHighlights,
+  normalizeVisibleMealTypes,
+  renderTodayMeals,
+  calendarEventRoute,
+  eventOccurrenceDateKey,
+  normalizeDashboardConfig,
+  renderWidgetCustomizeControls,
+  WIDGET_SIZE_PRESETS,
+};
 
 function wireWeatherRefresh(container, onUpdated = null) {
   const refreshBtn = container.querySelector('#weather-refresh-btn');
