@@ -187,6 +187,33 @@ test('Today-Highlights filtert Termine auf den heutigen Tag', async () => {
   assert(result.nextEvent.title === 'Termin Heute', 'Erwartet "Termin Heute" als nächsten Termin');
 });
 
+test('Dashboard-Date-Helper bewahrt date-only Eventtage ohne UTC-Shift', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const dateKey = '2026-07-10';
+
+  const occurrenceKey = __test.eventOccurrenceDateKey({ start_datetime: dateKey, all_day: 1 });
+  const occurrenceDate = __test.eventOccurrenceDate({ start_datetime: dateKey, all_day: 1 });
+
+  assert(occurrenceKey === dateKey, `Erwartet unveränderten Date-Key ${dateKey}, erhalten ${occurrenceKey}`);
+  assert(toLocalDateKey(occurrenceDate) === dateKey, 'Date-only Event darf nicht auf den Vortag driften');
+});
+
+test('Today-Highlights behandeln date-only Events als lokalen Kalendertag', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const todayStr = toLocalDateKey(new Date());
+  const tomorrowStr = addLocalDays(todayStr, 1);
+
+  const result = __test.buildTodayHighlights({
+    events: [
+      { id: 1, title: 'Ganztag heute', start_datetime: todayStr, all_day: 1 },
+      { id: 2, title: 'Ganztag morgen', start_datetime: tomorrowStr, all_day: 1 },
+    ],
+  });
+
+  assert(result.eventCount === 1, `Erwartet 1 date-only Termin für heute, erhalten ${result.eventCount}`);
+  assert(result.nextEvent.title === 'Ganztag heute', 'Date-only Event für heute sollte korrekt erkannt werden');
+});
+
 test('Today-Meals-Widget rendert nur sichtbare Mahlzeit-Typen', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   const html = __test.renderTodayMeals([

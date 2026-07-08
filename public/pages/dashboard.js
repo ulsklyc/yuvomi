@@ -8,7 +8,7 @@ import { api } from '/api.js';
 import { t, formatDate, formatTime, getLocale } from '/i18n.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { esc, fmtLocation, renderMarkdownLight } from '/utils/html.js';
-import { toLocalDateKey } from '/utils/date.js';
+import { parseLocalDateKey, toLocalDateKey } from '/utils/date.js';
 import { predictCycle, PHASE } from '/utils/health-cycle.js';
 import { openModal, closeModal, confirmModal } from '/components/modal.js';
 import { renderAvatarStack } from '/components/user-multi-select.js';
@@ -30,6 +30,13 @@ function eventOccurrenceDateKey(event) {
 
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value.slice(0, 10) : toLocalDateKey(date);
+}
+
+function eventOccurrenceDate(event) {
+  const occurrenceKey = eventOccurrenceDateKey(event);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(occurrenceKey)) return parseLocalDateKey(occurrenceKey);
+  const fallback = new Date(event?.start_datetime || '');
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
 }
 
 function calendarEventRoute(event) {
@@ -537,11 +544,10 @@ function buildTodayHighlights(data) {
 
   const urgentTask = tasks.find((task) => task.priority === 'urgent') ?? tasks[0] ?? null;
 
-  const today = new Date().toDateString();
+  const today = toLocalDateKey(new Date());
   const todayEvents = events.filter((e) => {
     if (!e.start_datetime) return true;
-    const d = new Date(e.start_datetime);
-    return d.toDateString() === today;
+    return eventOccurrenceDateKey(e) === today;
   });
   const nextEvent = todayEvents[0] ?? null;
 
@@ -650,10 +656,10 @@ function renderUpcomingEvents(events) {
     </div>`;
   }
 
-  const today = new Date().toDateString();
+  const today = toLocalDateKey(new Date());
   const items = events.map((e) => {
-    const d = new Date(e.start_datetime);
-    const isToday = d.toDateString() === today;
+    const d = eventOccurrenceDate(e);
+    const isToday = eventOccurrenceDateKey(e) === today;
     const _suffix = t('calendar.timeSuffix');
     const timeStr = e.all_day ? t('dashboard.allDay') : `${formatTime(d)}${_suffix ? ' ' + _suffix : ''}`.trim();
     return `
@@ -662,7 +668,7 @@ function renderUpcomingEvents(events) {
         <div class="event-item__content">
           <div class="event-item__title">${esc(e.title)}</div>
           <div class="event-item__time">
-            <span class="event-time-badge ${isToday ? 'event-time-badge--today' : ''}">${isToday ? t('common.today') : relativeDateLabel(new Date(e.start_datetime))}</span>
+            <span class="event-time-badge ${isToday ? 'event-time-badge--today' : ''}">${isToday ? t('common.today') : relativeDateLabel(d)}</span>
             ${timeStr}
             ${e.location ? ` · ${esc(fmtLocation(e.location))}` : ''}
             ${e.cal_name ? `<span class="event-item__cal">${esc(e.cal_name)}</span>` : ''}
@@ -2079,7 +2085,7 @@ export async function render(container, { user }) {
   }
 }
 
-export const __test = { buildTodayHighlights, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey };
+export const __test = { buildTodayHighlights, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventOccurrenceDate };
 
 function wireWeatherRefresh(container, onUpdated = null) {
   const refreshBtn = container.querySelector('#weather-refresh-btn');
