@@ -919,8 +919,10 @@ html.fab-anim-done .page-fab {
 
   .nav-sidebar__footer-actions {
     display: flex;
-    gap: var(--space-1);
-    padding: var(--space-2) var(--space-2) 0;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--space-0h);
+    padding: var(--space-2) var(--space-1) 0;
     flex-shrink: 0;
   }
 
@@ -961,11 +963,11 @@ html.fab-anim-done .page-fab {
   }
 
   .nav-sidebar__footer-actions .nav-item {
-    flex: 1 1 0;
+    flex: 0 1 auto;
     min-width: 0;
-    justify-content: center;
-    padding: var(--space-2);
-    gap: var(--space-2);
+    justify-content: flex-start;
+    padding: var(--space-2) var(--space-1);
+    gap: var(--space-1);
   }
 
   /* ── Hover: dezente Hintergrundfarbe ── */
