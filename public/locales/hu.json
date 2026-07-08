@@ -150,6 +150,8 @@
         "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "Kicsi (1×1)",
         "widgetSizeNarrow": "Keskeny (2×1)",
+        "widgetSizeWide": "Széles (3×1)",
+        "widgetSizeFullRow": "Teljes sor (4×1)",
         "widgetSizeTall": "Magas (1×2)",
         "widgetSizeStandard": "Normál (2×2)",
         "widgetSizeLarge": "Nagy (3×2)",

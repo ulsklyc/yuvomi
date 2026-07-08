@@ -1158,7 +1158,7 @@ Responsive grid: 1 column on mobile, 2 on tablet, 3 on desktop.
 
 The three newer modules (Rewards, Health, Housekeeping) start **hidden** by default — they are specialised and not active in every household, so they are offered as opt-ins in **Customize** rather than adding empty tiles to a fresh dashboard. Existing saved layouts are untouched.
 
-**Widget sizes:** each widget has a configurable size using named presets — Tiny (1×1), Narrow (2×1), Tall (1×2), Standard (2×2), Large (3×2), and Full (4×2) — that map to `columns × rows` in the CSS grid. List widgets (tasks, calendar) default to the tall/narrow **Tall** (1×2) preset so a short list keeps useful height without occupying a full two-column row. Sizes are persisted in user preferences and survive page reloads.
+**Widget sizes:** each widget has a configurable size using named presets — Tiny (1×1), Narrow (2×1), Wide (3×1), Full row (4×1), Tall (1×2), Standard (2×2), Large (3×2), and Full (4×2) — that map to `columns × rows` in the CSS grid. List widgets (tasks, calendar) default to the tall/narrow **Tall** (1×2) preset so a short list keeps useful height without occupying a full two-column row. Sizes are persisted in user preferences and survive page reloads.
 
 Skeleton loading instead of spinners (the skeleton mirrors the default-visible widgets at their correct grid-spanning sizes to prevent layout shift). Clicking any widget navigates to that module.
 

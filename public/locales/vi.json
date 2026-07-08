@@ -150,6 +150,8 @@
         "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "Nhỏ (1×1)",
         "widgetSizeNarrow": "Hẹp (2×1)",
+        "widgetSizeWide": "Rộng (3×1)",
+        "widgetSizeFullRow": "Toàn hàng (4×1)",
         "widgetSizeTall": "Cao (1×2)",
         "widgetSizeStandard": "Tiêu chuẩn (2×2)",
         "widgetSizeLarge": "Lớn (3×2)",

@@ -150,6 +150,8 @@
         "customizeShow": "Show {{widget}}",
         "widgetSizeTiny": "Small (1×1)",
         "widgetSizeNarrow": "Narrow (2×1)",
+        "widgetSizeWide": "Wide (3×1)",
+        "widgetSizeFullRow": "Full row (4×1)",
         "widgetSizeTall": "Tall (1×2)",
         "widgetSizeStandard": "Standard (2×2)",
         "widgetSizeLarge": "Large (3×2)",

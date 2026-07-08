@@ -156,6 +156,8 @@
         "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "Kecil (1×1)",
         "widgetSizeNarrow": "Sempit (2×1)",
+        "widgetSizeWide": "Lebar (3×1)",
+        "widgetSizeFullRow": "Baris penuh (4×1)",
         "widgetSizeTall": "Tinggi (1×2)",
         "widgetSizeStandard": "Standar (2×2)",
         "widgetSizeLarge": "Besar (3×2)",

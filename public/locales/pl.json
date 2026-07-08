@@ -156,6 +156,8 @@
         "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "Mały (1×1)",
         "widgetSizeNarrow": "Wąski (2×1)",
+        "widgetSizeWide": "Szeroki (3×1)",
+        "widgetSizeFullRow": "Cały wiersz (4×1)",
         "widgetSizeTall": "Wysoki (1×2)",
         "widgetSizeStandard": "Standardowy (2×2)",
         "widgetSizeLarge": "Duży (3×2)",

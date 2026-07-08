@@ -150,6 +150,8 @@
         "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "छोटा (1×1)",
         "widgetSizeNarrow": "संकरा (2×1)",
+        "widgetSizeWide": "चौड़ा (3×1)",
+        "widgetSizeFullRow": "पूरी पंक्ति (4×1)",
         "widgetSizeTall": "लंबा (1×2)",
         "widgetSizeStandard": "मानक (2×2)",
         "widgetSizeLarge": "बड़ा (3×2)",

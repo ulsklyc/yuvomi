@@ -150,6 +150,8 @@
         "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "Klein (1×1)",
         "widgetSizeNarrow": "Smal (2×1)",
+        "widgetSizeWide": "Breed (3×1)",
+        "widgetSizeFullRow": "Volledige rij (4×1)",
         "widgetSizeTall": "Hoog (1×2)",
         "widgetSizeStandard": "Standaard (2×2)",
         "widgetSizeLarge": "Groot (3×2)",

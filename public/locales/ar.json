@@ -150,6 +150,8 @@
         "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "صغير (1×1)",
         "widgetSizeNarrow": "ضيق (2×1)",
+        "widgetSizeWide": "عريض (3×1)",
+        "widgetSizeFullRow": "صف كامل (4×1)",
         "widgetSizeTall": "طويل (1×2)",
         "widgetSizeStandard": "قياسي (2×2)",
         "widgetSizeLarge": "كبير (3×2)",

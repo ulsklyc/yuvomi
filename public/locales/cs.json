@@ -150,6 +150,8 @@
         "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "Malý (1×1)",
         "widgetSizeNarrow": "Úzký (2×1)",
+        "widgetSizeWide": "Široký (3×1)",
+        "widgetSizeFullRow": "Celý řádek (4×1)",
         "widgetSizeTall": "Vysoký (1×2)",
         "widgetSizeStandard": "Standardní (2×2)",
         "widgetSizeLarge": "Velký (3×2)",

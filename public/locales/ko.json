@@ -156,6 +156,8 @@
         "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "작게 (1×1)",
         "widgetSizeNarrow": "좁게 (2×1)",
+        "widgetSizeWide": "넓게 (3×1)",
+        "widgetSizeFullRow": "전체 행 (4×1)",
         "widgetSizeTall": "세로형 (1×2)",
         "widgetSizeStandard": "표준 (2×2)",
         "widgetSizeLarge": "크게 (3×2)",

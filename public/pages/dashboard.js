@@ -196,13 +196,16 @@ function maybeHintCustomize(container) {
 // (weather) steht bewusst am Ende, statt die sichtbare Grid-Spitze zu belegen.
 const WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'budget', 'rewards', 'health', 'cycle', 'housekeeping', 'family', 'notes', 'weather'];
 
-// Sechs benannte Formen decken die üblichen Dashboard-Bedürfnisse ab: kompakte
-// Statuskacheln, hohe Listen, Standardkarten sowie breite Übersichten. Die volle
+// Benannte Formen decken die üblichen Dashboard-Bedürfnisse ab: kompakte
+// Statuskacheln, hohe Listen, Standardkarten sowie breite Übersichten in echter
+// Ein-Zeilen- und Zwei-Zeilen-Höhe. Die volle
 // 1-4 x 1-4-Matrix bleibt als gespeicherter/validierter Wert erhalten, damit
 // bestehende Layouts nicht beim nächsten Rendern zusammengezogen werden.
 const WIDGET_SIZE_PRESETS = [
   { value: '1x1', labelKey: 'dashboard.widgetSizeTiny'     },
   { value: '2x1', labelKey: 'dashboard.widgetSizeNarrow'   },
+  { value: '3x1', labelKey: 'dashboard.widgetSizeWide'     },
+  { value: '4x1', labelKey: 'dashboard.widgetSizeFullRow'  },
   { value: '1x2', labelKey: 'dashboard.widgetSizeTall'     },
   { value: '2x2', labelKey: 'dashboard.widgetSizeStandard' },
   { value: '3x2', labelKey: 'dashboard.widgetSizeLarge'    },
@@ -224,8 +227,8 @@ function nearestPreset(size) {
   if (values.includes(size)) return size;
   const [cols, rows] = String(size).split('x').map(Number);
   if (!Number.isFinite(cols) || !Number.isFinite(rows)) return '1x1';
-  if (cols >= 4) return '4x2';
-  if (cols >= 3) return '3x2';
+  if (cols >= 4) return rows >= 2 ? '4x2' : '4x1';
+  if (cols >= 3) return rows >= 2 ? '3x2' : '3x1';
   if (cols >= 2) return rows >= 2 ? '2x2' : '2x1';
   return rows >= 2 ? '1x2' : '1x1';
 }

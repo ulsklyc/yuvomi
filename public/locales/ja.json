@@ -150,6 +150,8 @@
         "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "小 (1×1)",
         "widgetSizeNarrow": "縦長 (2×1)",
+        "widgetSizeWide": "ワイド (3×1)",
+        "widgetSizeFullRow": "行全体 (4×1)",
         "widgetSizeTall": "縦長 (1×2)",
         "widgetSizeStandard": "標準 (2×2)",
         "widgetSizeLarge": "大 (3×2)",

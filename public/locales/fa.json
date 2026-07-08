@@ -156,6 +156,8 @@
         "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "کوچک (۱×۱)",
         "widgetSizeNarrow": "باریک (۲×۱)",
+        "widgetSizeWide": "عریض (۳×۱)",
+        "widgetSizeFullRow": "ردیف کامل (۴×۱)",
         "widgetSizeTall": "بلند (1×2)",
         "widgetSizeStandard": "استاندارد (۲×۲)",
         "widgetSizeLarge": "بزرگ (۳×۲)",

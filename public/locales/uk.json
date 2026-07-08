@@ -150,6 +150,8 @@
         "customizeShow": "{{widget}} einblenden",
         "widgetSizeTiny": "Маленький (1×1)",
         "widgetSizeNarrow": "Вузький (2×1)",
+        "widgetSizeWide": "Широкий (3×1)",
+        "widgetSizeFullRow": "На весь рядок (4×1)",
         "widgetSizeTall": "Високий (1×2)",
         "widgetSizeStandard": "Стандартний (2×2)",
         "widgetSizeLarge": "Великий (3×2)",
