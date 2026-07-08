@@ -369,6 +369,7 @@
         "randomizeReplaceExisting": "Bestaande maaltijden vervangen",
         "replaceExistingConfirm": "Bestaande maaltijden vervangen?",
         "randomizeSuccess": "{{count}} maaltijden gepland.",
+        "randomizeWeekFull": "De zichtbare week is al volledig gevuld.",
         "randomizeNoRecipes": "Er zijn geen passende recepten beschikbaar voor de huidige week.",
         "ingredientCount": "{{count}} ingrediënt",
         "ingredientCountPlural": "{{count}} ingrediënten",

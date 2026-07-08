@@ -369,6 +369,7 @@
         "randomizeReplaceExisting": "Replace existing meals",
         "replaceExistingConfirm": "Replace existing meals?",
         "randomizeSuccess": "{{count}} meals planned.",
+        "randomizeWeekFull": "The visible week is already full.",
         "randomizeNoRecipes": "No compatible recipes are available for the current week.",
         "ingredientCount": "{{count}} ingredient",
         "ingredientCountPlural": "{{count}} ingredients",

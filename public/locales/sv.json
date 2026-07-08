@@ -369,6 +369,7 @@
         "randomizeReplaceExisting": "Ersätt befintliga måltider",
         "replaceExistingConfirm": "Ersätta befintliga måltider?",
         "randomizeSuccess": "{{count}} måltider planerade.",
+        "randomizeWeekFull": "Den visade veckan är redan helt fylld.",
         "randomizeNoRecipes": "Inga passande recept finns för den aktuella veckan.",
         "ingredientCount": "{{count}} ingrediens",
         "ingredientCountPlural": "{{count}} ingredienser",

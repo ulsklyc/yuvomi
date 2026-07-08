@@ -369,6 +369,7 @@
         "randomizeReplaceExisting": "मौजूदा भोजन बदलें",
         "replaceExistingConfirm": "मौजूदा भोजन बदलें?",
         "randomizeSuccess": "{{count}} भोजन योजनाबद्ध किए गए।",
+        "randomizeWeekFull": "दिखाई जा रही सप्ताह पहले से पूरी भरी हुई है।",
         "randomizeNoRecipes": "वर्तमान सप्ताह के लिए कोई उपयुक्त रेसिपी उपलब्ध नहीं है।",
         "ingredientCount": "{{count}} सामग्री",
         "ingredientCountPlural": "{{count}} सामग्रियां",

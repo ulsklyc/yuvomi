@@ -369,6 +369,7 @@
         "randomizeReplaceExisting": "Thay thế các bữa ăn hiện có",
         "replaceExistingConfirm": "Thay thế các bữa ăn hiện có?",
         "randomizeSuccess": "Đã lên kế hoạch {{count}} bữa ăn.",
+        "randomizeWeekFull": "Tuần đang hiển thị đã kín chỗ.",
         "randomizeNoRecipes": "Không có công thức phù hợp cho tuần hiện tại.",
         "ingredientCount": "{{count}} nguyên liệu",
         "ingredientCountPlural": "{{count}} nguyên liệu",

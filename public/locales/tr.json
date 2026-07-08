@@ -369,6 +369,7 @@
         "randomizeReplaceExisting": "Mevcut öğünleri değiştir",
         "replaceExistingConfirm": "Mevcut öğünler değiştirilsin mi?",
         "randomizeSuccess": "{{count}} öğün planlandı.",
+        "randomizeWeekFull": "Görünen hafta zaten tamamen dolu.",
         "randomizeNoRecipes": "Geçerli hafta için uygun tarif bulunmuyor.",
         "ingredientCount": "{{count}} malzeme",
         "ingredientCountPlural": "{{count}} malzeme",

@@ -876,6 +876,7 @@ test('Meals page adds a recipe sidebar and randomize planner controls', () => {
     'meals.randomizeReplaceExisting',
     'meals.replaceExistingConfirm',
     'meals.randomizeSuccess',
+    'meals.randomizeWeekFull',
     'meals.randomizeNoRecipes',
   ]);
 });

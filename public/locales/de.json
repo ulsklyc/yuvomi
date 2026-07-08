@@ -375,6 +375,7 @@
         "randomizeReplaceExisting": "Vorhandene Mahlzeiten ersetzen",
         "replaceExistingConfirm": "Vorhandene Mahlzeiten ersetzen?",
         "randomizeSuccess": "{{count}} Mahlzeiten geplant.",
+        "randomizeWeekFull": "Die sichtbare Woche ist bereits vollständig belegt.",
         "randomizeNoRecipes": "Für die aktuelle Woche sind keine passenden Rezepte verfügbar.",
         "ingredientCount": "{{count}} Zutat",
         "ingredientCountPlural": "{{count}} Zutaten",

@@ -369,6 +369,7 @@
         "randomizeReplaceExisting": "استبدال الوجبات الحالية",
         "replaceExistingConfirm": "هل تريد استبدال الوجبات الحالية؟",
         "randomizeSuccess": "تم تخطيط {{count}} وجبات.",
+        "randomizeWeekFull": "الأسبوع المعروض ممتلئ بالفعل.",
         "randomizeNoRecipes": "لا توجد وصفات مناسبة متاحة للأسبوع الحالي.",
         "ingredientCount": "{{count}} مكون",
         "ingredientCountPlural": "{{count}} مكونات",

@@ -369,6 +369,7 @@
         "randomizeReplaceExisting": "Meglévő ételek lecserélése",
         "replaceExistingConfirm": "Lecseréljük a meglévő ételeket?",
         "randomizeSuccess": "{{count}} étel megtervezve.",
+        "randomizeWeekFull": "A látható hét már teljesen tele van.",
         "randomizeNoRecipes": "Nincs megfelelő recept az aktuális hétre.",
         "ingredientCount": "{{count}} hozzávaló",
         "ingredientCountPlural": "{{count}} hozzávaló",

@@ -369,6 +369,7 @@
         "randomizeReplaceExisting": "Sostituisci i pasti esistenti",
         "replaceExistingConfirm": "Sostituire i pasti esistenti?",
         "randomizeSuccess": "{{count}} pasti pianificati.",
+        "randomizeWeekFull": "La settimana visibile è già completa.",
         "randomizeNoRecipes": "Non ci sono ricette compatibili disponibili per la settimana corrente.",
         "ingredientCount": "{{count}} ingrediente",
         "ingredientCountPlural": "{{count}} ingredienti",

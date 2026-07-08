@@ -110,6 +110,8 @@ function buildRandomMealAssignments({ weekStart, visibleMealTypes, meals, recipe
   const assignments = [];
   const deleteMealIds = [];
   const previousDayByMealType = new Map();
+  let hasOpenSlot = false;
+  let hasCompatibleSlot = false;
 
   for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
     const date = addDays(weekStart, dayOffset);
@@ -117,8 +119,10 @@ function buildRandomMealAssignments({ weekStart, visibleMealTypes, meals, recipe
     for (const mealType of visibleMealTypes) {
       const slotMeals = meals.filter((meal) => meal.date === date && meal.meal_type === mealType);
       if (!replaceExisting && slotMeals.length) continue;
+      hasOpenSlot = true;
       const compatible = recipes.filter((recipe) => recipeSupportsMealType(recipe, mealType));
       if (!compatible.length) continue;
+      hasCompatibleSlot = true;
       const blockedIds = new Set([previousRecipeIdSameDay, previousDayByMealType.get(mealType)].filter(Boolean));
       const preferred = compatible.filter((recipe) => !blockedIds.has(recipe.id));
       const pool = preferred.length ? preferred : compatible;
@@ -136,7 +140,15 @@ function buildRandomMealAssignments({ weekStart, visibleMealTypes, meals, recipe
     }
   }
 
-  return { assignments, deleteMealIds: [...new Set(deleteMealIds)] };
+  const reason = assignments.length
+    ? null
+    : !hasOpenSlot
+      ? 'week_full'
+      : !hasCompatibleSlot
+        ? 'no_compatible_recipes'
+        : 'no_assignments';
+
+  return { assignments, deleteMealIds: [...new Set(deleteMealIds)], reason };
 }
 
 // --------------------------------------------------------
@@ -591,7 +603,7 @@ async function addRecipeToSlot(recipe, date, mealType, { replaceMeals = [] } = {
     }
     renderWeekGrid();
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'error');
+    window.yuvomi?.showToast(window.yuvomi?.friendlyError?.(err) ?? t('common.errorGeneric'), 'error');
   }
 }
 
@@ -630,7 +642,10 @@ async function runRandomize(panel) {
   });
 
   if (!plan.assignments.length) {
-    window.yuvomi?.showToast(t('meals.randomizeNoRecipes'), 'info');
+    window.yuvomi?.showToast(
+      plan.reason === 'week_full' ? t('meals.randomizeWeekFull') : t('meals.randomizeNoRecipes'),
+      'info'
+    );
     return;
   }
 
@@ -643,7 +658,7 @@ async function runRandomize(panel) {
     window.yuvomi?.showToast(t('meals.randomizeSuccess', { count: plan.assignments.length }), 'success');
   } catch (err) {
     runBtn.disabled = false;
-    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'error');
+    window.yuvomi?.showToast(window.yuvomi?.friendlyError?.(err) ?? t('common.errorGeneric'), 'error');
   }
 }
 

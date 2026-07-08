@@ -369,6 +369,7 @@
         "randomizeReplaceExisting": "替换现有餐食",
         "replaceExistingConfirm": "要替换现有餐食吗？",
         "randomizeSuccess": "已规划 {{count}} 餐。",
+        "randomizeWeekFull": "当前显示的这一周已经排满了。",
         "randomizeNoRecipes": "当前这一周没有可用的匹配食谱。",
         "ingredientCount": "{{count}} 种食材",
         "ingredientCountPlural": "{{count}} 种食材",

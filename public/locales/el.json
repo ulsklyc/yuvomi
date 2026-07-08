@@ -369,6 +369,7 @@
         "randomizeReplaceExisting": "Αντικατάσταση υπαρχόντων γευμάτων",
         "replaceExistingConfirm": "Να αντικατασταθούν τα υπάρχοντα γεύματα;",
         "randomizeSuccess": "Προγραμματίστηκαν {{count}} γεύματα.",
+        "randomizeWeekFull": "Η ορατή εβδομάδα είναι ήδη πλήρης.",
         "randomizeNoRecipes": "Δεν υπάρχουν κατάλληλες συνταγές για την τρέχουσα εβδομάδα.",
         "ingredientCount": "{{count}} υλικό",
         "ingredientCountPlural": "{{count}} υλικά",

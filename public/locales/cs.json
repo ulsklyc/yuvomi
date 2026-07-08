@@ -369,6 +369,7 @@
         "randomizeReplaceExisting": "Nahradit existující jídla",
         "replaceExistingConfirm": "Nahradit existující jídla?",
         "randomizeSuccess": "Naplánováno {{count}} jídel.",
+        "randomizeWeekFull": "Zobrazený týden je již zcela zaplněn.",
         "randomizeNoRecipes": "Pro aktuální týden nejsou k dispozici žádné vhodné recepty.",
         "ingredientCount": "{{count}} ingredience",
         "ingredientCountPlural": "{{count}} ingrediencí",

@@ -375,6 +375,7 @@
         "randomizeReplaceExisting": "Ganti makanan yang ada",
         "replaceExistingConfirm": "Ganti makanan yang sudah ada?",
         "randomizeSuccess": "{{count}} makanan direncanakan.",
+        "randomizeWeekFull": "Minggu yang terlihat sudah penuh.",
         "randomizeNoRecipes": "Tidak ada resep yang cocok untuk minggu ini.",
         "ingredientCount": "{{count}} bahan",
         "ingredientCountPlural": "{{count}} bahan",

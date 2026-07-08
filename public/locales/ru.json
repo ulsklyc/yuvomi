@@ -369,6 +369,7 @@
         "randomizeReplaceExisting": "Заменить существующие блюда",
         "replaceExistingConfirm": "Заменить существующие блюда?",
         "randomizeSuccess": "Запланировано {{count}} блюд.",
+        "randomizeWeekFull": "Отображаемая неделя уже полностью заполнена.",
         "randomizeNoRecipes": "Для текущей недели нет подходящих рецептов.",
         "ingredientCount": "{{count}} ингредиент",
         "ingredientCountPlural": "{{count}} ингредиентов",

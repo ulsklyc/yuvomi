@@ -369,6 +369,7 @@
         "randomizeReplaceExisting": "Substituir refeições existentes",
         "replaceExistingConfirm": "Substituir as refeições existentes?",
         "randomizeSuccess": "{{count}} refeições planeadas.",
+        "randomizeWeekFull": "A semana visível já está totalmente preenchida.",
         "randomizeNoRecipes": "Não há receitas compatíveis disponíveis para a semana atual.",
         "ingredientCount": "{{count}} ingrediente",
         "ingredientCountPlural": "{{count}} ingredientes",

@@ -369,6 +369,7 @@
         "randomizeReplaceExisting": "既存の食事を置き換える",
         "replaceExistingConfirm": "既存の食事を置き換えますか？",
         "randomizeSuccess": "{{count}} 件の食事を計画しました。",
+        "randomizeWeekFull": "表示中の週はすでに埋まっています。",
         "randomizeNoRecipes": "現在の週に使える適切なレシピがありません。",
         "ingredientCount": "材料 {{count}} 種",
         "ingredientCountPlural": "材料 {{count}} 種",

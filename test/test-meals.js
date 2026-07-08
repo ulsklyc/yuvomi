@@ -454,6 +454,20 @@ test('Randomize-Helfer markiert bestehende Mahlzeiten zum Ersetzen', () => {
   assert(plan.deleteMealIds.includes(42), 'bestehende Mahlzeit wird zum Löschen markiert');
 });
 
+test('Randomize-Helfer meldet volle Wochen getrennt von Rezeptmangel', () => {
+  const plan = mealsUi.buildRandomMealAssignments({
+    weekStart: '2026-03-23',
+    visibleMealTypes: ['breakfast'],
+    meals: Array.from({ length: 7 }, (_, i) => ({ id: i + 1, date: `2026-03-${String(23 + i).padStart(2, '0')}`, meal_type: 'breakfast', title: 'Belegt' })),
+    recipes: [{ id: 1, title: 'Porridge', meal_types: ['breakfast'], ingredients: [] }],
+    replaceExisting: false,
+    pick: () => 0,
+  });
+
+  assert(plan.assignments.length === 0, 'bei voller Woche werden keine neuen Mahlzeiten geplant');
+  assert(plan.reason === 'week_full', `Erwarteter Grund week_full, erhalten ${plan.reason}`);
+});
+
 test('Randomize-Helfer vermeidet gleiche Rezepte in benachbarten Tages-Slots wenn Alternativen existieren', () => {
   const plan = mealsUi.buildRandomMealAssignments({
     weekStart: '2026-03-23',

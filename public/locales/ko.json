@@ -375,6 +375,7 @@
         "randomizeReplaceExisting": "기존 식사 바꾸기",
         "replaceExistingConfirm": "기존 식사를 바꿀까요?",
         "randomizeSuccess": "{{count}}개의 식사가 계획되었습니다.",
+        "randomizeWeekFull": "현재 보이는 주간은 이미 가득 차 있습니다.",
         "randomizeNoRecipes": "현재 주간에 맞는 레시피가 없습니다.",
         "ingredientCount": "재료 {{count}}개",
         "ingredientCountPlural": "재료 {{count}}개",

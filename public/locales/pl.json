@@ -375,6 +375,7 @@
         "randomizeReplaceExisting": "Zastąp istniejące posiłki",
         "replaceExistingConfirm": "Zastąpić istniejące posiłki?",
         "randomizeSuccess": "Zaplanowano {{count}} posiłków.",
+        "randomizeWeekFull": "Widoczny tydzień jest już w pełni zapełniony.",
         "randomizeNoRecipes": "Brak pasujących przepisów na bieżący tydzień.",
         "ingredientCount": "{{count}} składnik",
         "ingredientCountPlural": "{{count}} składniki",
