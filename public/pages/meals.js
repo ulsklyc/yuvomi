@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, advancedSection } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, advancedSection } from '/components/modal.js';
 import { stagger } from '/utils/ux.js';
 import { t, formatDate, dateInputPlaceholder, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc } from '/utils/html.js';
@@ -109,22 +109,29 @@ function mealPayloadFromRecipe(recipe, date, mealType) {
 function buildRandomMealAssignments({ weekStart, visibleMealTypes, meals, recipes, replaceExisting = false, pick = Math.random }) {
   const assignments = [];
   const deleteMealIds = [];
+  const previousDayByMealType = new Map();
 
   for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
     const date = addDays(weekStart, dayOffset);
+    let previousRecipeIdSameDay = null;
     for (const mealType of visibleMealTypes) {
       const slotMeals = meals.filter((meal) => meal.date === date && meal.meal_type === mealType);
       if (!replaceExisting && slotMeals.length) continue;
       const compatible = recipes.filter((recipe) => recipeSupportsMealType(recipe, mealType));
       if (!compatible.length) continue;
-      const index = Math.floor(Math.max(0, Math.min(0.999999, Number(pick()) || 0)) * compatible.length);
-      const recipe = compatible[index] || compatible[0];
+      const blockedIds = new Set([previousRecipeIdSameDay, previousDayByMealType.get(mealType)].filter(Boolean));
+      const preferred = compatible.filter((recipe) => !blockedIds.has(recipe.id));
+      const pool = preferred.length ? preferred : compatible;
+      const index = Math.floor(Math.max(0, Math.min(0.999999, Number(pick()) || 0)) * pool.length);
+      const recipe = pool[index] || pool[0];
       assignments.push({
         date,
         mealType,
         recipe,
         payload: mealPayloadFromRecipe(recipe, date, mealType),
       });
+      previousRecipeIdSameDay = recipe.id;
+      previousDayByMealType.set(mealType, recipe.id);
       if (replaceExisting) deleteMealIds.push(...slotMeals.map((meal) => meal.id));
     }
   }
@@ -530,7 +537,12 @@ function wireGrid(grid) {
     const recipe = state.recipes.find((entry) => entry.id === recipeId);
     if (!recipe || !recipeSupportsMealType(recipe, slot.dataset.type)) return;
     e.preventDefault();
-    await addRecipeToSlot(recipe, slot.dataset.date, slot.dataset.type);
+    const slotMeals = state.meals.filter((meal) => meal.date === slot.dataset.date && meal.meal_type === slot.dataset.type);
+    if (slotMeals.length) {
+      const confirmed = await confirmModal(`${t('meals.randomizeReplaceExisting')}?`, { confirmLabel: t('common.confirm') });
+      if (!confirmed) return;
+    }
+    await addRecipeToSlot(recipe, slot.dataset.date, slot.dataset.type, { replaceMeals: slotMeals });
   });
 
   wireDragDrop(grid);
@@ -561,8 +573,12 @@ function clearRecipeDropTargets() {
   _container.querySelectorAll('.meal-slot--drop-target').forEach((slot) => slot.classList.remove('meal-slot--drop-target'));
 }
 
-async function addRecipeToSlot(recipe, date, mealType) {
+async function addRecipeToSlot(recipe, date, mealType, { replaceMeals = [] } = {}) {
   try {
+    for (const meal of replaceMeals) {
+      await api.delete(`/meals/${meal.id}`);
+      state.meals = state.meals.filter((entry) => entry.id !== meal.id);
+    }
     const res = await api.post('/meals', mealPayloadFromRecipe(recipe, date, mealType));
     state.meals.push(res.data);
     renderWeekGrid();

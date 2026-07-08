@@ -863,6 +863,7 @@ test('Meals page adds a recipe sidebar and randomize planner controls', () => {
   assert.match(mealsPage, /function renderRecipeSidebar/);
   assert.match(mealsPage, /function openRandomizeModal/);
   assert.match(mealsPage, /function wireRecipeSidebar/);
+  assert.match(mealsPage, /confirmModal\(`\$\{t\('meals\.randomizeReplaceExisting'\)\}\?/, 'dropping onto occupied slots should confirm replacement');
   assert.match(mealsPage, /recipeSupportsMealType/);
   assert.match(mealsCss, /\.meals-layout\s*\{/);
   assert.match(mealsCss, /\.recipe-sidebar\s*\{/);

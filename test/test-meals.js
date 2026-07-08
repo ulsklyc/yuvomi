@@ -453,6 +453,44 @@ test('Randomize-Helfer markiert bestehende Mahlzeiten zum Ersetzen', () => {
   assert(plan.deleteMealIds.includes(42), 'bestehende Mahlzeit wird zum Löschen markiert');
 });
 
+test('Randomize-Helfer vermeidet gleiche Rezepte in benachbarten Tages-Slots wenn Alternativen existieren', () => {
+  const plan = mealsUi.buildRandomMealAssignments({
+    weekStart: '2026-03-23',
+    visibleMealTypes: ['dinner'],
+    meals: [],
+    recipes: [
+      { id: 1, title: 'Pasta', meal_types: ['dinner'], ingredients: [] },
+      { id: 2, title: 'Soup', meal_types: ['dinner'], ingredients: [] },
+    ],
+    replaceExisting: false,
+    pick: () => 0,
+  });
+
+  const first = plan.assignments.find((item) => item.date === '2026-03-23' && item.mealType === 'dinner');
+  const second = plan.assignments.find((item) => item.date === '2026-03-24' && item.mealType === 'dinner');
+  assert(first && second, 'benachbarte Dinner-Slots müssen geplant sein');
+  assert(first.recipe.id !== second.recipe.id, 'aufeinanderfolgende Tage sollen unterschiedliche Rezepte nutzen');
+});
+
+test('Randomize-Helfer vermeidet gleiche Rezepte in benachbarten Mahlzeiten desselben Tages', () => {
+  const plan = mealsUi.buildRandomMealAssignments({
+    weekStart: '2026-03-23',
+    visibleMealTypes: ['breakfast', 'lunch'],
+    meals: [],
+    recipes: [
+      { id: 1, title: 'Wrap', meal_types: ['breakfast', 'lunch'], ingredients: [] },
+      { id: 2, title: 'Salad', meal_types: ['breakfast', 'lunch'], ingredients: [] },
+    ],
+    replaceExisting: false,
+    pick: () => 0,
+  });
+
+  const breakfast = plan.assignments.find((item) => item.date === '2026-03-23' && item.mealType === 'breakfast');
+  const lunch = plan.assignments.find((item) => item.date === '2026-03-23' && item.mealType === 'lunch');
+  assert(breakfast && lunch, 'benachbarte Mahlzeiten desselben Tages müssen geplant sein');
+  assert(breakfast.recipe.id !== lunch.recipe.id, 'benachbarte Mahlzeiten desselben Tages sollen unterschiedliche Rezepte nutzen');
+});
+
 // --------------------------------------------------------
 // Mehrere Mahlzeiten pro Slot
 // --------------------------------------------------------
