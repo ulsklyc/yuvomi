@@ -907,6 +907,17 @@ function renderAppShell(container) {
     if (!sidebarItems.contains(ev.relatedTarget)) positionSidebarIndicator();
   });
 
+  const syncSidebarIndicator = () => {
+    requestAnimationFrame(() => positionSidebarIndicator());
+  };
+  // In collapsed mode the section headers are hidden. Expanding the rail on
+  // hover/focus puts them back into layout, which shifts the nav items down.
+  // Re-sync the active pill after those layout changes.
+  sidebar.addEventListener('mouseenter', syncSidebarIndicator);
+  sidebar.addEventListener('mouseleave', syncSidebarIndicator);
+  sidebar.addEventListener('focusin', syncSidebarIndicator);
+  sidebar.addEventListener('focusout', syncSidebarIndicator);
+
   sidebar.appendChild(sidebarLogo);
   sidebar.appendChild(sidebarToggle);
   sidebar.appendChild(sidebarItems);
