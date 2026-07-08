@@ -378,7 +378,7 @@ router.post('/apply-plan', (req, res) => {
       }
 
       return prepared.map((assignment) => createMealRecord(assignment, actorId));
-    })();
+    });
 
     res.status(201).json({ data: created });
   } catch (err) {

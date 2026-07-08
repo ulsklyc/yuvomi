@@ -511,6 +511,7 @@ test('Meals-Route bietet einen atomaren apply-plan Endpunkt für Replace-Flows',
   assert(/router\.post\('\/apply-plan'/.test(source), 'apply-plan Route muss existieren');
   assert(/db\.transaction\(\(\) => \{[\s\S]*replaceExisting/.test(source), 'apply-plan muss als DB-Transaktion laufen');
   assert(/deleteMealOccurrence/.test(source), 'apply-plan soll bestehende Mahlzeiten serverseitig mit Wiederholungs-Semantik ersetzen');
+  assert(!/const created = db\.transaction\([\s\S]*\}\)\(\);/.test(source), 'apply-plan darf das Ergebnis des DB-Transaction-Helfers nicht erneut aufrufen');
 });
 
 // --------------------------------------------------------
