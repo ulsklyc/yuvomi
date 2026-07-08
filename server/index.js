@@ -54,6 +54,7 @@ import emailRouter from './routes/email.js';
 import notificationsRouter from './routes/notifications.js';
 import healthRouter from './routes/health.js';
 import rewardsRouter from './routes/rewards.js';
+import changelogRouter from './routes/changelog.js';
 import mcpRouter from './mcp/server.js';
 import { moduleForPath, requiredAccess, tokenAllows } from './scopes.js';
 
@@ -337,6 +338,9 @@ app.use('/mcp', apiLimiter, requireAuth, mcpRouter);
 
 // Alle weiteren API-Routen erfordern Authentifizierung + CSRF-Schutz
 app.use('/api/v1', requireAuth);
+// System-Metadaten: authentifiziert, aber bewusst vor Guest-/Token-Scope-Gates
+// wie /version behandelt. Keine Haushaltsdaten, nur upstream Release Notes.
+app.use('/api/v1/changelog', changelogRouter);
 app.use('/api/v1', (req, res, next) => {
   try {
     const guest = db.get().prepare('SELECT 1 FROM split_expense_guest_users WHERE user_id = ?').get(req.authUserId);

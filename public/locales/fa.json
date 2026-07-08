@@ -72,6 +72,7 @@
         "sectionPlan": "برنامه‌ریزی",
         "sectionHome": "خانه",
         "help": "راهنما",
+        "changelog": "تغییرات",
         "sectionCustomModules": "ماژول‌های سفارشی",
         "health": "سلامت",
         "rewards": "پاداش‌ها"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "با دکمه + در پایین سمت راست، موارد جدید می‌سازید.",
         "mobileSearch": "جستجو را از طریق «بیشتر» ← جستجو باز می‌کنید.",
         "mobileSettings": "تنظیمات را در «بیشتر» می‌یابید."
+    },
+    "changelog": {
+        "title": "تغییرات",
+        "currentVersion": "نسخه فعلی",
+        "latestVersion": "جدیدترین نسخه",
+        "loadingShort": "...",
+        "loading": "در حال بارگذاری تغییرات...",
+        "loadError": "امکان بارگذاری تغییرات وجود ندارد.",
+        "empty": "هیچ نسخه‌ای موجود نیست.",
+        "currentBadge": "فعلی",
+        "currentFound": "نسخه نصب‌شده در انتشارهای GitHub وجود دارد.",
+        "currentMissing": "نسخه نصب‌شده در انتشارهای GitHub فهرست نشده است.",
+        "unknownVersion": "نامشخص",
+        "changes": "تغییرات",
+        "noReleaseNotes": "برای این نسخه یادداشت انتشاری وجود ندارد."
     },
     "forgotPassword": {
         "title": "بازنشانی رمز عبور",

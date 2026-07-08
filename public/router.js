@@ -14,6 +14,7 @@ import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
 import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
 import { activityType } from '/utils/health-activity.js';
 import { buildHelpRows } from '/utils/help.js';
+import { openModal } from '/components/modal.js';
 import { NAV_ICONS } from '/nav-icons.js';
 import { SETTINGS_LEAVES } from '/settings/registry.js';
 import {
@@ -665,6 +666,56 @@ function allRoutes() {
   return [...ROUTES, ...moduleRoutes];
 }
 
+function sidebarActionEl({ labelKey, icon, className, onClick }) {
+  const label = t(labelKey);
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `nav-item ${className}`;
+  button.setAttribute('aria-label', label);
+  button.setAttribute('title', label);
+  button.addEventListener('click', onClick);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'nav-item__icon-wrap';
+  const well = document.createElement('div');
+  well.className = 'nav-item__icon-well';
+  const iconEl = document.createElement('i');
+  iconEl.dataset.lucide = icon;
+  iconEl.className = 'nav-item__icon';
+  iconEl.setAttribute('aria-hidden', 'true');
+  well.appendChild(iconEl);
+  wrap.appendChild(well);
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'nav-item__label';
+  labelEl.textContent = label;
+  button.append(wrap, labelEl);
+  return button;
+}
+
+function moreActionEl({ labelKey, icon, className, onClick }) {
+  const label = t(labelKey);
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `more-item ${className}`;
+  button.setAttribute('aria-label', label);
+  button.addEventListener('click', onClick);
+
+  const well = document.createElement('div');
+  well.className = 'more-item__icon-well';
+  const iconEl = document.createElement('i');
+  iconEl.dataset.lucide = icon;
+  iconEl.className = 'more-item__icon';
+  iconEl.setAttribute('aria-hidden', 'true');
+  well.appendChild(iconEl);
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'more-item__label';
+  labelEl.textContent = label;
+  button.append(well, labelEl);
+  return button;
+}
+
 /**
  * Lädt und rendert eine Seite dynamisch.
  * @param {{ path: string, page: string }} route
@@ -905,30 +956,25 @@ function renderAppShell(container) {
   sidebar.appendChild(sidebarToggle);
   sidebar.appendChild(sidebarItems);
 
-  // Hilfe-Eintrag im Sidebar-Footer (Aktion, keine Route → kein data-route, damit
-  // Route-Delegation/Indikator ihn ignorieren).
-  const sidebarHelp = document.createElement('button');
-  sidebarHelp.type = 'button';
-  sidebarHelp.className = 'nav-item nav-item--help';
-  sidebarHelp.setAttribute('aria-label', t('nav.help'));
-  sidebarHelp.setAttribute('title', t('nav.help'));
-  sidebarHelp.addEventListener('click', () => showHelpModal());
-  const helpWrap = document.createElement('div');
-  helpWrap.className = 'nav-item__icon-wrap';
-  const helpWell = document.createElement('div');
-  helpWell.className = 'nav-item__icon-well';
-  const helpIcon = document.createElement('i');
-  helpIcon.dataset.lucide = 'circle-help';
-  helpIcon.className = 'nav-item__icon';
-  helpIcon.setAttribute('aria-hidden', 'true');
-  helpWell.appendChild(helpIcon);
-  helpWrap.appendChild(helpWell);
-  const helpLabel = document.createElement('span');
-  helpLabel.className = 'nav-item__label';
-  helpLabel.textContent = t('nav.help');
-  sidebarHelp.appendChild(helpWrap);
-  sidebarHelp.appendChild(helpLabel);
-  sidebar.appendChild(sidebarHelp);
+  // Footer-Aktionen (keine Routen → kein data-route, damit Delegation/Indikator
+  // sie ignorieren): Hilfe und Live-Changelog.
+  const sidebarFooter = document.createElement('div');
+  sidebarFooter.className = 'nav-sidebar__footer-actions';
+  sidebarFooter.append(
+    sidebarActionEl({
+      labelKey: 'nav.help',
+      icon: 'circle-help',
+      className: 'nav-item--help',
+      onClick: () => showHelpModal(),
+    }),
+    sidebarActionEl({
+      labelKey: 'nav.changelog',
+      icon: 'history',
+      className: 'nav-item--changelog',
+      onClick: () => showChangelogModal(),
+    }),
+  );
+  sidebar.appendChild(sidebarFooter);
 
   if (window.lucide) window.lucide.createIcons({ el: sidebar });
 
@@ -991,28 +1037,26 @@ function renderAppShell(container) {
 
     secondaryMobileItems().forEach((item) => moreSheet.appendChild(moreItemEl(item)));
 
-    // Hilfe-Zeile im „Mehr“-Sheet: schließt das Sheet und öffnet das Overlay.
-    const moreHelp = document.createElement('button');
-    moreHelp.type = 'button';
-    moreHelp.className = 'more-item more-item--help';
-    moreHelp.setAttribute('aria-label', t('nav.help'));
-    moreHelp.addEventListener('click', () => {
-      if (window._closeMoreSheet) window._closeMoreSheet({ restoreFocus: false });
-      showHelpModal();
-    });
-    const moreHelpWell = document.createElement('div');
-    moreHelpWell.className = 'more-item__icon-well';
-    const moreHelpIcon = document.createElement('i');
-    moreHelpIcon.dataset.lucide = 'circle-help';
-    moreHelpIcon.className = 'more-item__icon';
-    moreHelpIcon.setAttribute('aria-hidden', 'true');
-    moreHelpWell.appendChild(moreHelpIcon);
-    const moreHelpLabel = document.createElement('span');
-    moreHelpLabel.className = 'more-item__label';
-    moreHelpLabel.textContent = t('nav.help');
-    moreHelp.appendChild(moreHelpWell);
-    moreHelp.appendChild(moreHelpLabel);
-    moreSheet.appendChild(moreHelp);
+    // Hilfe-/Changelog-Zeilen im „Mehr“-Sheet: schließen das Sheet und öffnen
+    // das jeweilige Overlay.
+    moreSheet.appendChild(moreActionEl({
+      labelKey: 'nav.help',
+      icon: 'circle-help',
+      className: 'more-item--help',
+      onClick: () => {
+        if (window._closeMoreSheet) window._closeMoreSheet({ restoreFocus: false });
+        showHelpModal();
+      },
+    }));
+    moreSheet.appendChild(moreActionEl({
+      labelKey: 'nav.changelog',
+      icon: 'history',
+      className: 'more-item--changelog',
+      onClick: () => {
+        if (window._closeMoreSheet) window._closeMoreSheet({ restoreFocus: false });
+        showChangelogModal();
+      },
+    }));
   }
 
   bottomNav.appendChild(bottomItems);
@@ -1256,6 +1300,139 @@ function showHelpModal() {
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
   if (window.lucide) window.lucide.createIcons({ el: panel });
+}
+
+function versionText(value) {
+  return String(value || '').trim() || t('changelog.unknownVersion');
+}
+
+function versionKey(value) {
+  return String(value || '').trim().replace(/^v/i, '').toLowerCase();
+}
+
+function renderChangelogStatus(panel, message, tone = 'muted') {
+  const status = panel.querySelector('#changelog-status');
+  if (!status) return;
+  status.hidden = false;
+  status.className = `changelog-status changelog-status--${tone}`;
+  status.textContent = message;
+}
+
+function appendReleaseSection(parent, section) {
+  const block = document.createElement('section');
+  block.className = 'changelog-section';
+
+  const title = document.createElement('h4');
+  title.className = 'changelog-section__title';
+  title.textContent = section.title || t('changelog.changes');
+  block.appendChild(title);
+
+  const list = document.createElement('ul');
+  list.className = 'changelog-section__list';
+  for (const item of Array.isArray(section.items) ? section.items : []) {
+    const li = document.createElement('li');
+    li.textContent = String(item || '');
+    list.appendChild(li);
+  }
+  block.appendChild(list);
+  parent.appendChild(block);
+}
+
+function appendReleaseCard(parent, release, currentVersion) {
+  const isCurrent = Boolean(versionKey(release.version))
+    && versionKey(release.version) === versionKey(currentVersion);
+  const card = document.createElement('article');
+  card.className = `changelog-release${isCurrent ? ' changelog-release--current' : ''}`;
+
+  const header = document.createElement('div');
+  header.className = 'changelog-release__header';
+  const title = document.createElement('h3');
+  title.className = 'changelog-release__version';
+  title.textContent = versionText(release.version);
+  header.appendChild(title);
+
+  if (isCurrent) {
+    const badge = document.createElement('span');
+    badge.className = 'changelog-release__badge';
+    badge.textContent = t('changelog.currentBadge');
+    header.appendChild(badge);
+  }
+  card.appendChild(header);
+
+  const sections = Array.isArray(release.sections) ? release.sections : [];
+  if (sections.length) {
+    for (const section of sections) appendReleaseSection(card, section);
+  } else {
+    const empty = document.createElement('p');
+    empty.className = 'changelog-release__empty';
+    empty.textContent = t('changelog.noReleaseNotes');
+    card.appendChild(empty);
+  }
+  parent.appendChild(card);
+}
+
+function renderChangelog(panel, payload) {
+  const data = payload?.data ?? {};
+  const currentVersion = data.current_version;
+  const latestVersion = data.latest_version;
+  const releases = Array.isArray(data.releases) ? data.releases : [];
+
+  panel.querySelector('#changelog-current-version').textContent = versionText(currentVersion);
+  panel.querySelector('#changelog-latest-version').textContent = versionText(latestVersion);
+
+  const note = panel.querySelector('#changelog-version-note');
+  note.textContent = data.current_in_releases
+    ? t('changelog.currentFound')
+    : t('changelog.currentMissing');
+  note.classList.toggle('changelog-version-note--warning', !data.current_in_releases);
+
+  const status = panel.querySelector('#changelog-status');
+  if (status) status.hidden = true;
+
+  const list = panel.querySelector('#changelog-list');
+  list.replaceChildren();
+  if (!releases.length) {
+    renderChangelogStatus(panel, t('changelog.empty'), 'muted');
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  for (const release of releases) appendReleaseCard(fragment, release, currentVersion);
+  list.appendChild(fragment);
+}
+
+function showChangelogModal() {
+  openModal({
+    title: t('changelog.title'),
+    size: 'xl',
+    content: `
+      <div class="changelog-modal">
+        <div class="changelog-summary" aria-live="polite">
+          <div class="changelog-summary__item">
+            <span>${esc(t('changelog.currentVersion'))}</span>
+            <strong id="changelog-current-version">${esc(t('changelog.loadingShort'))}</strong>
+          </div>
+          <div class="changelog-summary__item">
+            <span>${esc(t('changelog.latestVersion'))}</span>
+            <strong id="changelog-latest-version">${esc(t('changelog.loadingShort'))}</strong>
+          </div>
+        </div>
+        <p class="changelog-version-note" id="changelog-version-note"></p>
+        <div class="changelog-status changelog-status--muted" id="changelog-status" role="status">
+          ${esc(t('changelog.loading'))}
+        </div>
+        <div class="changelog-list" id="changelog-list"></div>
+      </div>
+    `,
+    onSave(panel) {
+      api.get('/changelog')
+        .then((payload) => renderChangelog(panel, payload))
+        .catch(() => {
+          panel.querySelector('#changelog-list')?.replaceChildren();
+          renderChangelogStatus(panel, t('changelog.loadError'), 'error');
+        });
+    },
+  });
 }
 
 function loadReminderStyles() {

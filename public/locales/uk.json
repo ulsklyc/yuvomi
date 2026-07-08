@@ -72,6 +72,7 @@
         "sectionPlan": "План",
         "sectionHome": "Дім",
         "help": "Довідка",
+        "changelog": "Зміни",
         "sectionCustomModules": "Користувацькі модулі",
         "health": "Здоровʼя",
         "rewards": "Нагороди"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "Створюйте нове кнопкою + унизу праворуч.",
         "mobileSearch": "Пошук відкривається через «Більше» → Пошук.",
         "mobileSettings": "Налаштування — у розділі «Більше»."
+    },
+    "changelog": {
+        "title": "Зміни",
+        "currentVersion": "Поточна версія",
+        "latestVersion": "Найновіша версія",
+        "loadingShort": "...",
+        "loading": "Завантаження змін...",
+        "loadError": "Не вдалося завантажити зміни.",
+        "empty": "Немає доступних релізів.",
+        "currentBadge": "Поточна",
+        "currentFound": "Установлена версія є в релізах GitHub.",
+        "currentMissing": "Установленої версії немає в релізах GitHub.",
+        "unknownVersion": "Невідома",
+        "changes": "Зміни",
+        "noReleaseNotes": "Для цієї версії немає приміток до випуску."
     },
     "forgotPassword": {
         "title": "Reset password",

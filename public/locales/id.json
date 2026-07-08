@@ -72,6 +72,7 @@
         "sectionPlan": "Rencana",
         "sectionHome": "Rumah",
         "help": "Bantuan",
+        "changelog": "Perubahan",
         "sectionCustomModules": "Modul Kustom",
         "health": "Kesehatan",
         "rewards": "Hadiah"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "Dengan tombol + di kanan bawah, Anda membuat sesuatu yang baru.",
         "mobileSearch": "Pencarian dibuka melalui „Lainnya\" → Cari.",
         "mobileSettings": "Pengaturan dapat ditemukan di „Lainnya\"."
+    },
+    "changelog": {
+        "title": "Catatan perubahan",
+        "currentVersion": "Versi saat ini",
+        "latestVersion": "Versi terbaru",
+        "loadingShort": "...",
+        "loading": "Memuat catatan perubahan...",
+        "loadError": "Catatan perubahan belum bisa dimuat.",
+        "empty": "Tidak ada rilis tersedia.",
+        "currentBadge": "Saat ini",
+        "currentFound": "Versi terpasang ada di rilis GitHub.",
+        "currentMissing": "Versi terpasang tidak ada di rilis GitHub.",
+        "unknownVersion": "Tidak diketahui",
+        "changes": "Perubahan",
+        "noReleaseNotes": "Tidak ada catatan rilis untuk versi ini."
     },
     "forgotPassword": {
         "title": "Atur ulang kata sandi",

@@ -72,6 +72,7 @@
         "sectionPlan": "Plannen",
         "sectionHome": "Thuis",
         "help": "Help",
+        "changelog": "Wijzigingen",
         "sectionCustomModules": "Aangepaste modules",
         "health": "Gezondheid",
         "rewards": "Beloningen"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "Maak nieuwe items met de +-knop rechtsonder.",
         "mobileSearch": "Open zoeken via ‘Meer’ → Zoeken.",
         "mobileSettings": "Je vindt instellingen onder ‘Meer’."
+    },
+    "changelog": {
+        "title": "Wijzigingen",
+        "currentVersion": "Huidige versie",
+        "latestVersion": "Nieuwste versie",
+        "loadingShort": "...",
+        "loading": "Wijzigingen laden...",
+        "loadError": "De wijzigingen kunnen nu niet worden geladen.",
+        "empty": "Geen releases beschikbaar.",
+        "currentBadge": "Huidig",
+        "currentFound": "De geïnstalleerde versie staat in de GitHub-releases.",
+        "currentMissing": "De geïnstalleerde versie staat niet in de GitHub-releases.",
+        "unknownVersion": "Onbekend",
+        "changes": "Wijzigingen",
+        "noReleaseNotes": "Geen release-opmerkingen voor deze versie."
     },
     "forgotPassword": {
         "title": "Reset password",

@@ -72,6 +72,7 @@
         "sectionPlan": "План",
         "sectionHome": "Дом",
         "help": "Справка",
+        "changelog": "Изменения",
         "sectionCustomModules": "Пользовательские модули",
         "health": "Здоровье",
         "rewards": "Награды"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "Создавайте новое кнопкой + внизу справа.",
         "mobileSearch": "Поиск открывается через «Ещё» → Поиск.",
         "mobileSettings": "Настройки находятся в разделе «Ещё»."
+    },
+    "changelog": {
+        "title": "Изменения",
+        "currentVersion": "Текущая версия",
+        "latestVersion": "Последняя версия",
+        "loadingShort": "...",
+        "loading": "Загрузка изменений...",
+        "loadError": "Не удалось загрузить изменения.",
+        "empty": "Нет доступных релизов.",
+        "currentBadge": "Текущая",
+        "currentFound": "Установленная версия есть в релизах GitHub.",
+        "currentMissing": "Установленной версии нет в релизах GitHub.",
+        "unknownVersion": "Неизвестно",
+        "changes": "Изменения",
+        "noReleaseNotes": "Для этой версии нет примечаний к выпуску."
     },
     "forgotPassword": {
         "title": "Reset password",

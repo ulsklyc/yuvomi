@@ -72,6 +72,7 @@
         "sectionPlan": "Σχεδιασμός",
         "sectionHome": "Σπίτι",
         "help": "Βοήθεια",
+        "changelog": "Αλλαγές",
         "sectionCustomModules": "Προσαρμοσμένες μονάδες",
         "health": "Υγεία",
         "rewards": "Επιβραβεύσεις"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "Δημιούργησε νέα με το κουμπί + κάτω δεξιά.",
         "mobileSearch": "Άνοιξε την αναζήτηση μέσω «Περισσότερα» → Αναζήτηση.",
         "mobileSettings": "Οι ρυθμίσεις βρίσκονται στο «Περισσότερα»."
+    },
+    "changelog": {
+        "title": "Αλλαγές",
+        "currentVersion": "Τρέχουσα έκδοση",
+        "latestVersion": "Νεότερη έκδοση",
+        "loadingShort": "...",
+        "loading": "Φόρτωση αλλαγών...",
+        "loadError": "Δεν ήταν δυνατή η φόρτωση των αλλαγών.",
+        "empty": "Δεν υπάρχουν διαθέσιμες εκδόσεις.",
+        "currentBadge": "Τρέχουσα",
+        "currentFound": "Η τρέχουσα έκδοση υπάρχει στις εκδόσεις του GitHub.",
+        "currentMissing": "Η τρέχουσα έκδοση δεν υπάρχει στις εκδόσεις του GitHub.",
+        "unknownVersion": "Άγνωστη",
+        "changes": "Αλλαγές",
+        "noReleaseNotes": "Δεν υπάρχουν σημειώσεις έκδοσης για αυτήν την έκδοση."
     },
     "forgotPassword": {
         "title": "Reset password",

@@ -72,6 +72,7 @@
         "sectionPlan": "Planera",
         "sectionHome": "Hem",
         "help": "Hjälp",
+        "changelog": "Ändringar",
         "sectionCustomModules": "Anpassade moduler",
         "health": "Hälsa",
         "rewards": "Belöningar"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "Skapa nytt med +-knappen längst ned till höger.",
         "mobileSearch": "Öppna sök via ”Mer” → Sök.",
         "mobileSettings": "Inställningar hittar du under ”Mer”."
+    },
+    "changelog": {
+        "title": "Ändringar",
+        "currentVersion": "Aktuell version",
+        "latestVersion": "Senaste version",
+        "loadingShort": "...",
+        "loading": "Läser in ändringar...",
+        "loadError": "Ändringarna kunde inte läsas in just nu.",
+        "empty": "Inga versioner finns tillgängliga.",
+        "currentBadge": "Aktuell",
+        "currentFound": "Den installerade versionen finns i GitHub-versionerna.",
+        "currentMissing": "Den installerade versionen finns inte i GitHub-versionerna.",
+        "unknownVersion": "Okänd",
+        "changes": "Ändringar",
+        "noReleaseNotes": "Inga versionsnoteringar för den här versionen."
     },
     "forgotPassword": {
         "title": "Reset password",

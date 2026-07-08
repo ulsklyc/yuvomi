@@ -72,6 +72,7 @@
         "sectionPlan": "计划",
         "sectionHome": "家庭",
         "help": "帮助",
+        "changelog": "更新日志",
         "sectionCustomModules": "自定义模块",
         "health": "健康",
         "rewards": "奖励"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "用右下角的 + 按钮创建新内容。",
         "mobileSearch": "通过“更多”→搜索打开搜索。",
         "mobileSettings": "设置在“更多”中。"
+    },
+    "changelog": {
+        "title": "更新日志",
+        "currentVersion": "当前版本",
+        "latestVersion": "最新版本",
+        "loadingShort": "...",
+        "loading": "正在加载更新日志...",
+        "loadError": "现在无法加载更新日志。",
+        "empty": "没有可用版本。",
+        "currentBadge": "当前",
+        "currentFound": "已安装版本出现在 GitHub 发布记录中。",
+        "currentMissing": "已安装版本未列在 GitHub 发布记录中。",
+        "unknownVersion": "未知",
+        "changes": "更改",
+        "noReleaseNotes": "此版本没有发布说明。"
     },
     "forgotPassword": {
         "title": "Reset password",

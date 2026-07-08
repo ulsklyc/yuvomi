@@ -130,6 +130,13 @@ function buildPaths() {
         description: 'Use `?download=1` to receive the OpenAPI document as a downloadable file.',
       }),
     },
+    '/api/v1/changelog': {
+      get: op({
+        summary: 'Get release changelog',
+        tag: 'System',
+        description: 'Returns the current installed version, latest upstream release version, and sanitized release notes from the Yuvomi GitHub releases feed.',
+      }),
+    },
     '/openapi.json': {
       get: op({
         summary: 'Get OpenAPI specification',

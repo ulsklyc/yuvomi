@@ -72,6 +72,7 @@
         "sectionPlan": "Pianifica",
         "sectionHome": "Casa",
         "help": "Aiuto",
+        "changelog": "Novità",
         "sectionCustomModules": "Moduli personalizzati",
         "health": "Salute",
         "rewards": "Ricompense"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "Usa il pulsante + in basso a destra per creare un nuovo elemento.",
         "mobileSearch": "Apri la ricerca da „Altro“ → Cerca.",
         "mobileSettings": "Trovi le impostazioni sotto la voce „Altro“."
+    },
+    "changelog": {
+        "title": "Novità",
+        "currentVersion": "Versione attuale",
+        "latestVersion": "Ultima versione",
+        "loadingShort": "...",
+        "loading": "Caricamento novità...",
+        "loadError": "Impossibile caricare le novità ora.",
+        "empty": "Nessuna versione disponibile.",
+        "currentBadge": "Attuale",
+        "currentFound": "La versione installata è presente nelle release GitHub.",
+        "currentMissing": "La versione installata non è presente nelle release GitHub.",
+        "unknownVersion": "Sconosciuta",
+        "changes": "Modifiche",
+        "noReleaseNotes": "Nessuna nota di rilascio per questa versione."
     },
     "forgotPassword": {
         "title": "Reimposta password",

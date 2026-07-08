@@ -72,6 +72,7 @@
         "sectionPlan": "계획",
         "sectionHome": "홈",
         "help": "도움말",
+        "changelog": "변경 내역",
         "sectionCustomModules": "사용자 지정 모듈",
         "health": "건강",
         "rewards": "보상"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "오른쪽 아래 + 버튼으로 새 항목을 만드세요.",
         "mobileSearch": "검색은 „더보기\" → 검색으로 엽니다.",
         "mobileSettings": "설정은 „더보기\"에서 찾을 수 있습니다."
+    },
+    "changelog": {
+        "title": "변경 내역",
+        "currentVersion": "현재 버전",
+        "latestVersion": "최신 버전",
+        "loadingShort": "...",
+        "loading": "변경 내역을 불러오는 중...",
+        "loadError": "지금 변경 내역을 불러올 수 없습니다.",
+        "empty": "사용 가능한 릴리스가 없습니다.",
+        "currentBadge": "현재",
+        "currentFound": "설치된 버전이 GitHub 릴리스에 있습니다.",
+        "currentMissing": "설치된 버전이 GitHub 릴리스에 없습니다.",
+        "unknownVersion": "알 수 없음",
+        "changes": "변경 사항",
+        "noReleaseNotes": "이 버전의 릴리스 노트가 없습니다."
     },
     "forgotPassword": {
         "title": "비밀번호 재설정",

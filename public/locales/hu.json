@@ -72,6 +72,7 @@
         "sectionPlan": "Tervezés",
         "sectionHome": "Kezdőlap",
         "help": "Súgó",
+        "changelog": "Változások",
         "sectionCustomModules": "Egyedi modulok",
         "health": "Egészség",
         "rewards": "Jutalmak"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "Új elemek létrehozása a jobb alsó sarokban található + gombbal.",
         "mobileSearch": "Keresés megnyitása a „Több” → Keresés menüpont alatt.",
         "mobileSettings": "A beállítások a „Több” menü alatt találhatók."
+    },
+    "changelog": {
+        "title": "Változások",
+        "currentVersion": "Aktuális verzió",
+        "latestVersion": "Legújabb verzió",
+        "loadingShort": "...",
+        "loading": "Változások betöltése...",
+        "loadError": "A változások most nem tölthetők be.",
+        "empty": "Nincs elérhető kiadás.",
+        "currentBadge": "Aktuális",
+        "currentFound": "A telepített verzió szerepel a GitHub kiadások között.",
+        "currentMissing": "A telepített verzió nem szerepel a GitHub kiadások között.",
+        "unknownVersion": "Ismeretlen",
+        "changes": "Változások",
+        "noReleaseNotes": "Ehhez a verzióhoz nincsenek kiadási megjegyzések."
     },
     "forgotPassword": {
         "title": "Jelszó visszaállítása",

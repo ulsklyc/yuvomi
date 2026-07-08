@@ -917,6 +917,13 @@ html.fab-anim-done .page-fab {
   }
   .nav-sidebar__items::-webkit-scrollbar { display: none; }
 
+  .nav-sidebar__footer-actions {
+    display: flex;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-2) 0;
+    flex-shrink: 0;
+  }
+
   /* ── Nav-Item: Sidebar ── */
   .nav-sidebar .nav-item {
     flex: 0 0 auto;
@@ -950,6 +957,15 @@ html.fab-anim-done .page-fab {
     font-weight: var(--font-weight-medium);
     white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .nav-sidebar__footer-actions .nav-item {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    padding: var(--space-2);
+    gap: var(--space-2);
   }
 
   /* ── Hover: dezente Hintergrundfarbe ── */
@@ -1033,6 +1049,11 @@ html.fab-anim-done .page-fab {
 
   html.sidebar-collapsed .nav-sidebar .nav-item__label {
     display: none;
+  }
+
+  html.sidebar-collapsed .nav-sidebar .nav-sidebar__footer-actions {
+    flex-direction: column;
+    padding-inline: var(--space-1);
   }
 
   html.sidebar-collapsed .nav-sidebar .nav-section-label {
@@ -1365,6 +1386,137 @@ html.fab-anim-done .page-fab {
   .modal-grid--2 {
     grid-template-columns: 1fr;
   }
+}
+
+/* Live-Changelog modal */
+.changelog-modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.changelog-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-2);
+}
+
+.changelog-summary__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  min-width: 0;
+}
+
+.changelog-summary__item span {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-tertiary);
+}
+
+.changelog-summary__item strong {
+  font-size: var(--text-lg);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.changelog-version-note {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.changelog-version-note--warning {
+  color: var(--color-warning, var(--color-text-secondary));
+}
+
+.changelog-status {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.changelog-status--muted {
+  color: var(--color-text-secondary);
+  background: var(--color-surface-2);
+}
+
+.changelog-status--error {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
+}
+
+.changelog-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.changelog-release {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.changelog-release--current {
+  border-color: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 55%, var(--color-border));
+  background: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 7%, var(--color-surface));
+}
+
+.changelog-release__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.changelog-release__version {
+  margin: 0;
+  font-size: var(--text-xl);
+  color: var(--color-text-primary);
+}
+
+.changelog-release__badge {
+  flex: 0 0 auto;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 14%, var(--color-surface));
+  color: var(--active-module-accent, var(--color-accent));
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.changelog-section + .changelog-section {
+  margin-top: var(--space-3);
+}
+
+.changelog-section__title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.changelog-section__list {
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--color-text-primary);
+}
+
+.changelog-section__list li + li {
+  margin-top: var(--space-1);
+}
+
+.changelog-release__empty {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
 }
 
 .form-stack {

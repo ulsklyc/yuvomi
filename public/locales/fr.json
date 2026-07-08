@@ -72,6 +72,7 @@
         "sectionPlan": "Planifier",
         "sectionHome": "Maison",
         "help": "Aide",
+        "changelog": "Changements",
         "sectionCustomModules": "Modules personnalisés",
         "health": "Santé",
         "rewards": "Récompenses"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "Créez de nouveaux éléments avec le bouton + en bas à droite.",
         "mobileSearch": "Ouvrez la recherche via « Plus » → Rechercher.",
         "mobileSettings": "Vous trouvez les paramètres sous « Plus »."
+    },
+    "changelog": {
+        "title": "Journal des changements",
+        "currentVersion": "Version actuelle",
+        "latestVersion": "Dernière version",
+        "loadingShort": "...",
+        "loading": "Chargement des changements...",
+        "loadError": "Le journal des changements ne peut pas être chargé.",
+        "empty": "Aucune version disponible.",
+        "currentBadge": "Actuelle",
+        "currentFound": "La version installée apparaît dans les versions GitHub.",
+        "currentMissing": "La version installée ne figure pas dans les versions GitHub.",
+        "unknownVersion": "Inconnue",
+        "changes": "Changements",
+        "noReleaseNotes": "Aucune note de version pour cette version."
     },
     "forgotPassword": {
         "title": "Reset password",

@@ -72,6 +72,7 @@
         "sectionPlan": "Plan",
         "sectionHome": "Home",
         "help": "Help",
+        "changelog": "Changelog",
         "sectionCustomModules": "Custom modules",
         "health": "Health",
         "rewards": "Rewards"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "Create new items with the + button at the bottom right.",
         "mobileSearch": "Open search via “More” → Search.",
         "mobileSettings": "Find settings under “More”."
+    },
+    "changelog": {
+        "title": "Changelog",
+        "currentVersion": "Current version",
+        "latestVersion": "Latest version",
+        "loadingShort": "...",
+        "loading": "Loading changelog...",
+        "loadError": "The changelog could not be loaded right now.",
+        "empty": "No releases are available.",
+        "currentBadge": "Current",
+        "currentFound": "This installed version appears in the GitHub releases.",
+        "currentMissing": "This installed version is not listed in the GitHub releases.",
+        "unknownVersion": "Unknown",
+        "changes": "Changes",
+        "noReleaseNotes": "No release notes for this version."
     },
     "forgotPassword": {
         "title": "Reset password",

@@ -72,6 +72,7 @@
         "sectionPlan": "Lập kế hoạch",
         "sectionHome": "Nhà",
         "help": "Trợ giúp",
+        "changelog": "Thay đổi",
         "sectionCustomModules": "Mô-đun tùy chỉnh",
         "health": "Sức khỏe",
         "rewards": "Phần thưởng"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "Tạo mục mới bằng nút + ở dưới cùng bên phải.",
         "mobileSearch": "Mở tìm kiếm qua “Thêm” → Tìm kiếm.",
         "mobileSettings": "Bạn tìm thấy cài đặt trong “Thêm”."
+    },
+    "changelog": {
+        "title": "Nhật ký thay đổi",
+        "currentVersion": "Phiên bản hiện tại",
+        "latestVersion": "Phiên bản mới nhất",
+        "loadingShort": "...",
+        "loading": "Đang tải thay đổi...",
+        "loadError": "Chưa thể tải thay đổi.",
+        "empty": "Không có bản phát hành nào.",
+        "currentBadge": "Hiện tại",
+        "currentFound": "Phiên bản đã cài có trong các bản phát hành GitHub.",
+        "currentMissing": "Phiên bản đã cài không có trong các bản phát hành GitHub.",
+        "unknownVersion": "Không rõ",
+        "changes": "Thay đổi",
+        "noReleaseNotes": "Không có ghi chú phát hành cho phiên bản này."
     },
     "forgotPassword": {
         "title": "Reset password",

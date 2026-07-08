@@ -72,6 +72,7 @@
         "sectionPlan": "Planen",
         "sectionHome": "Zuhause",
         "help": "Hilfe",
+        "changelog": "Änderungen",
         "sectionCustomModules": "Benutzerdefinierte Module",
         "health": "Gesundheit",
         "rewards": "Belohnungen"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "Mit dem +-Knopf unten rechts legst du Neues an.",
         "mobileSearch": "Suche öffnest du über „Mehr“ → Suchen.",
         "mobileSettings": "Einstellungen findest du unter „Mehr“."
+    },
+    "changelog": {
+        "title": "Änderungsverlauf",
+        "currentVersion": "Aktuelle Version",
+        "latestVersion": "Neueste Version",
+        "loadingShort": "...",
+        "loading": "Änderungsverlauf wird geladen...",
+        "loadError": "Der Änderungsverlauf konnte gerade nicht geladen werden.",
+        "empty": "Keine Releases verfügbar.",
+        "currentBadge": "Aktuell",
+        "currentFound": "Diese installierte Version ist in den GitHub-Releases enthalten.",
+        "currentMissing": "Diese installierte Version ist nicht in den GitHub-Releases enthalten.",
+        "unknownVersion": "Unbekannt",
+        "changes": "Änderungen",
+        "noReleaseNotes": "Für diese Version gibt es keine Versionshinweise."
     },
     "forgotPassword": {
         "title": "Passwort zurücksetzen",

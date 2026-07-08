@@ -72,6 +72,7 @@
         "sectionPlan": "予定",
         "sectionHome": "ホーム",
         "help": "ヘルプ",
+        "changelog": "変更履歴",
         "sectionCustomModules": "カスタムモジュール",
         "health": "健康",
         "rewards": "ごほうび"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "右下の＋ボタンで新規作成できます。",
         "mobileSearch": "検索は「その他」→「検索」で開きます。",
         "mobileSettings": "設定は「その他」にあります。"
+    },
+    "changelog": {
+        "title": "変更履歴",
+        "currentVersion": "現在のバージョン",
+        "latestVersion": "最新バージョン",
+        "loadingShort": "...",
+        "loading": "変更履歴を読み込み中...",
+        "loadError": "変更履歴を読み込めませんでした。",
+        "empty": "利用できるリリースはありません。",
+        "currentBadge": "現在",
+        "currentFound": "インストール済みバージョンは GitHub リリースにあります。",
+        "currentMissing": "インストール済みバージョンは GitHub リリースにありません。",
+        "unknownVersion": "不明",
+        "changes": "変更",
+        "noReleaseNotes": "このバージョンのリリースノートはありません。"
     },
     "forgotPassword": {
         "title": "Reset password",

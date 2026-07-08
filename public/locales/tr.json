@@ -72,6 +72,7 @@
         "sectionPlan": "Planla",
         "sectionHome": "Ev",
         "help": "Yardım",
+        "changelog": "Değişiklikler",
         "sectionCustomModules": "Özel modüller",
         "health": "Sağlık",
         "rewards": "Ödüller"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "Sağ alttaki + düğmesiyle yeni öğe oluşturun.",
         "mobileSearch": "Aramayı „Daha fazla” → Ara ile açın.",
         "mobileSettings": "Ayarları „Daha fazla” altında bulursunuz."
+    },
+    "changelog": {
+        "title": "Değişiklikler",
+        "currentVersion": "Geçerli sürüm",
+        "latestVersion": "En son sürüm",
+        "loadingShort": "...",
+        "loading": "Değişiklikler yükleniyor...",
+        "loadError": "Değişiklikler şu anda yüklenemedi.",
+        "empty": "Kullanılabilir sürüm yok.",
+        "currentBadge": "Geçerli",
+        "currentFound": "Yüklü sürüm GitHub sürümlerinde var.",
+        "currentMissing": "Yüklü sürüm GitHub sürümlerinde listelenmiyor.",
+        "unknownVersion": "Bilinmiyor",
+        "changes": "Değişiklikler",
+        "noReleaseNotes": "Bu sürüm için sürüm notu yok."
     },
     "forgotPassword": {
         "title": "Reset password",

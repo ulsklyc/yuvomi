@@ -72,6 +72,7 @@
         "sectionPlan": "Plán",
         "sectionHome": "Domov",
         "help": "Nápověda",
+        "changelog": "Změny",
         "sectionCustomModules": "Vlastní moduly",
         "health": "Zdraví",
         "rewards": "Odměny"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "Nové položky vytvoříš tlačítkem + vpravo dole.",
         "mobileSearch": "Vyhledávání otevřeš přes „Více“ → Hledat.",
         "mobileSettings": "Nastavení najdeš pod „Více“."
+    },
+    "changelog": {
+        "title": "Změny",
+        "currentVersion": "Aktuální verze",
+        "latestVersion": "Nejnovější verze",
+        "loadingShort": "...",
+        "loading": "Načítání změn...",
+        "loadError": "Změny se teď nepodařilo načíst.",
+        "empty": "Nejsou dostupné žádné verze.",
+        "currentBadge": "Aktuální",
+        "currentFound": "Aktuální verze je v seznamu vydání GitHubu.",
+        "currentMissing": "Aktuální verze není v seznamu vydání GitHubu.",
+        "unknownVersion": "Neznámá",
+        "changes": "Změny",
+        "noReleaseNotes": "Pro tuto verzi nejsou žádné poznámky k vydání."
     },
     "forgotPassword": {
         "title": "Reset password",

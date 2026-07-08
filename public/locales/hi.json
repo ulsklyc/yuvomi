@@ -72,6 +72,7 @@
         "sectionPlan": "योजना",
         "sectionHome": "घर",
         "help": "सहायता",
+        "changelog": "बदलाव",
         "sectionCustomModules": "कस्टम मॉड्यूल",
         "health": "स्वास्थ्य",
         "rewards": "पुरस्कार"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "नीचे दाईं ओर + बटन से नया बनाएँ।",
         "mobileSearch": "„अधिक” → खोज से खोज खोलें।",
         "mobileSettings": "सेटिंग्स „अधिक” के अंतर्गत मिलती हैं।"
+    },
+    "changelog": {
+        "title": "बदलाव",
+        "currentVersion": "वर्तमान संस्करण",
+        "latestVersion": "नवीनतम संस्करण",
+        "loadingShort": "...",
+        "loading": "बदलाव लोड हो रहे हैं...",
+        "loadError": "बदलाव अभी लोड नहीं हो सके।",
+        "empty": "कोई रिलीज उपलब्ध नहीं है।",
+        "currentBadge": "वर्तमान",
+        "currentFound": "इंस्टॉल किया गया संस्करण GitHub रिलीज़ में है।",
+        "currentMissing": "इंस्टॉल किया गया संस्करण GitHub रिलीज़ में सूचीबद्ध नहीं है।",
+        "unknownVersion": "अज्ञात",
+        "changes": "बदलाव",
+        "noReleaseNotes": "इस संस्करण के लिए कोई रिलीज नोट नहीं है।"
     },
     "forgotPassword": {
         "title": "Reset password",

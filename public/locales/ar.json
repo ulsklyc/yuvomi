@@ -72,6 +72,7 @@
         "sectionPlan": "التخطيط",
         "sectionHome": "المنزل",
         "help": "مساعدة",
+        "changelog": "سجل التغييرات",
         "sectionCustomModules": "الوحدات المخصصة",
         "health": "الصحة",
         "rewards": "المكافآت"
@@ -2207,6 +2208,21 @@
         "mobileCreate": "أنشئ عناصر جديدة بزر + أسفل اليمين.",
         "mobileSearch": "افتح البحث عبر «المزيد» ← بحث.",
         "mobileSettings": "تجد الإعدادات ضمن «المزيد»."
+    },
+    "changelog": {
+        "title": "سجل التغييرات",
+        "currentVersion": "الإصدار الحالي",
+        "latestVersion": "أحدث إصدار",
+        "loadingShort": "...",
+        "loading": "جارٍ تحميل سجل التغييرات...",
+        "loadError": "تعذر تحميل سجل التغييرات الآن.",
+        "empty": "لا توجد إصدارات متاحة.",
+        "currentBadge": "الإصدار الحالي",
+        "currentFound": "هذا الإصدار الحالي موجود في سجل إصدارات GitHub.",
+        "currentMissing": "الإصدار الحالي غير موجود في سجل إصدارات GitHub.",
+        "unknownVersion": "غير معروف",
+        "changes": "التغييرات",
+        "noReleaseNotes": "لا توجد ملاحظات إصدار لهذه النسخة."
     },
     "forgotPassword": {
         "title": "Reset password",
