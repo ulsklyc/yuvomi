@@ -862,6 +862,9 @@ function renderAppShell(container) {
     const nowCollapsed = !document.documentElement.classList.contains('sidebar-collapsed');
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, nowCollapsed ? '1' : '0');
     applySidebarCollapsed(nowCollapsed);
+    if (event.detail > 0) {
+      document.documentElement.classList.toggle('sidebar-collapse-pointer-lock', nowCollapsed);
+    }
     // Pointer clicks leave the toggle focused, which immediately re-expands the
     // collapsed rail via .nav-sidebar:focus-within. Blur only for pointer-driven
     // activation so keyboard users keep the expected focus behavior.
@@ -917,6 +920,9 @@ function renderAppShell(container) {
   sidebar.addEventListener('mouseleave', syncSidebarIndicator);
   sidebar.addEventListener('focusin', syncSidebarIndicator);
   sidebar.addEventListener('focusout', syncSidebarIndicator);
+  sidebar.addEventListener('mouseleave', () => {
+    document.documentElement.classList.remove('sidebar-collapse-pointer-lock');
+  });
 
   sidebar.appendChild(sidebarLogo);
   sidebar.appendChild(sidebarToggle);
@@ -1646,6 +1652,9 @@ function isModuleDisabled(moduleName) {
 
 function applySidebarCollapsed(collapsed) {
   document.documentElement.classList.toggle('sidebar-collapsed', collapsed);
+  if (!collapsed) {
+    document.documentElement.classList.remove('sidebar-collapse-pointer-lock');
+  }
 }
 
 function setDisabledModules(modules) {

@@ -1047,20 +1047,20 @@ html.fab-anim-done .page-fab {
    * fixed und überlagert Inhalt beim Aufklappen wie ein Flyout — --sidebar-width
    * (und damit der .app-content-Margin) bleibt 56px, also kein Reflow. Die
    * Breite animiert über die bestehende width-Transition. */
-  html.sidebar-collapsed .nav-sidebar:hover,
+  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover,
   html.sidebar-collapsed .nav-sidebar:focus-within {
     width: var(--sidebar-width-expanded);
     box-shadow: var(--shadow-lg);
   }
 
-  html.sidebar-collapsed .nav-sidebar:hover .nav-sidebar__brand-text,
+  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-sidebar__brand-text,
   html.sidebar-collapsed .nav-sidebar:focus-within .nav-sidebar__brand-text {
     display: flex;
   }
 
-  html.sidebar-collapsed .nav-sidebar:hover .nav-item__label,
+  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-item__label,
   html.sidebar-collapsed .nav-sidebar:focus-within .nav-item__label,
-  html.sidebar-collapsed .nav-sidebar:hover .nav-section-label,
+  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-section-label,
   html.sidebar-collapsed .nav-sidebar:focus-within .nav-section-label {
     display: block;
   }
