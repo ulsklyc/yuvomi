@@ -326,6 +326,9 @@
         "catHousehold": "Rumah tangga",
         "catDrugstore": "Perlengkapan mandi",
         "catMisc": "Lainnya",
+        "importMeals": "From meal plan",
+        "importMealsTitle": "Import from meal plan",
+        "importMealsAction": "Import",
         "manageCategories": "Kelola kategori"
     },
     "meals": {

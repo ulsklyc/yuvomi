@@ -320,6 +320,9 @@
         "catDrugstore": "Gyógyszertár",
         "catMisc": "Vegyes",
         "emptyAction": "Elem hozzáadása",
+        "importMeals": "From meal plan",
+        "importMealsTitle": "Import from meal plan",
+        "importMealsAction": "Import",
         "manageCategories": "Kategóriák kezelése"
     },
     "meals": {

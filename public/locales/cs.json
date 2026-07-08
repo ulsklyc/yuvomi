@@ -320,6 +320,9 @@
         "catDrugstore": "Drogerie",
         "catMisc": "Různé",
         "emptyAction": "Přidat položku",
+        "importMeals": "From meal plan",
+        "importMealsTitle": "Import from meal plan",
+        "importMealsAction": "Import",
         "manageCategories": "Spravovat kategorie"
     },
     "meals": {

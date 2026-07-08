@@ -320,6 +320,9 @@
         "catDrugstore": "Nhà thuốc",
         "catMisc": "Khác",
         "emptyAction": "Thêm mục",
+        "importMeals": "From meal plan",
+        "importMealsTitle": "Import from meal plan",
+        "importMealsAction": "Import",
         "manageCategories": "Quản lý danh mục"
     },
     "meals": {

@@ -320,6 +320,9 @@
         "catDrugstore": "Аптека",
         "catMisc": "Разное",
         "emptyAction": "Добавить товар",
+        "importMeals": "From meal plan",
+        "importMealsTitle": "Import from meal plan",
+        "importMealsAction": "Import",
         "manageCategories": "Управление категориями"
     },
     "meals": {

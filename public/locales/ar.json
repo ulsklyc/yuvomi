@@ -320,6 +320,9 @@
         "catDrugstore": "صيدلية",
         "catMisc": "متنوع",
         "emptyAction": "إضافة عنصر",
+        "importMeals": "From meal plan",
+        "importMealsTitle": "Import from meal plan",
+        "importMealsAction": "Import",
         "manageCategories": "إدارة الفئات"
     },
     "meals": {

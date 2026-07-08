@@ -161,6 +161,32 @@
   flex-shrink: 0;
 }
 
+.list-header__import-btn {
+  gap: var(--space-2);
+}
+
+.shopping-import-meals-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@media (max-width: 767px) {
+  .list-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .list-header__actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .list-header__import-btn span {
+    display: none;
+  }
+}
+
 /* --------------------------------------------------------
  * Quick-Add Eingabe
  * -------------------------------------------------------- */

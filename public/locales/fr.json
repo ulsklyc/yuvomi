@@ -320,6 +320,9 @@
         "catDrugstore": "Pharmacie",
         "catMisc": "Divers",
         "emptyAction": "Ajouter un article",
+        "importMeals": "From meal plan",
+        "importMealsTitle": "Import from meal plan",
+        "importMealsAction": "Import",
         "manageCategories": "Gérer les catégories"
     },
     "meals": {

@@ -320,6 +320,9 @@
         "catDrugstore": "Drogheria",
         "catMisc": "Varie",
         "emptyAction": "Aggiungi articolo",
+        "importMeals": "From meal plan",
+        "importMealsTitle": "Import from meal plan",
+        "importMealsAction": "Import",
         "manageCategories": "Gestisci categorie"
     },
     "meals": {

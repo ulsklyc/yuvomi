@@ -320,6 +320,9 @@
         "catDrugstore": "日化",
         "catMisc": "其他",
         "emptyAction": "添加商品",
+        "importMeals": "From meal plan",
+        "importMealsTitle": "Import from meal plan",
+        "importMealsAction": "Import",
         "manageCategories": "管理分类"
     },
     "meals": {

@@ -326,6 +326,9 @@
         "catHousehold": "Haushalt",
         "catDrugstore": "Drogerie",
         "catMisc": "Sonstiges",
+        "importMeals": "Aus Essensplan",
+        "importMealsTitle": "Essensplan importieren",
+        "importMealsAction": "Importieren",
         "manageCategories": "Kategorien verwalten"
     },
     "meals": {

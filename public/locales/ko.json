@@ -326,6 +326,9 @@
         "catHousehold": "생활용품",
         "catDrugstore": "생활잡화",
         "catMisc": "기타",
+        "importMeals": "From meal plan",
+        "importMealsTitle": "Import from meal plan",
+        "importMealsAction": "Import",
         "manageCategories": "카테고리 관리"
     },
     "meals": {

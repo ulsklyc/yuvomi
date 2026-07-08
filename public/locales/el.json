@@ -320,6 +320,9 @@
         "catDrugstore": "Φαρμακείο",
         "catMisc": "Διάφορα",
         "emptyAction": "Προσθήκη στοιχείου",
+        "importMeals": "From meal plan",
+        "importMealsTitle": "Import from meal plan",
+        "importMealsAction": "Import",
         "manageCategories": "Διαχείριση κατηγοριών"
     },
     "meals": {

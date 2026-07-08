@@ -320,6 +320,9 @@
         "catDrugstore": "दवाखाना",
         "catMisc": "विविध",
         "emptyAction": "आइटम जोड़ें",
+        "importMeals": "From meal plan",
+        "importMealsTitle": "Import from meal plan",
+        "importMealsAction": "Import",
         "manageCategories": "श्रेणियाँ प्रबंधित करें"
     },
     "meals": {

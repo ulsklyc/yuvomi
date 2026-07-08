@@ -320,6 +320,9 @@
         "catDrugstore": "Apotek",
         "catMisc": "Diverse",
         "emptyAction": "Lägg till artikel",
+        "importMeals": "From meal plan",
+        "importMealsTitle": "Import from meal plan",
+        "importMealsAction": "Import",
         "manageCategories": "Hantera kategorier"
     },
     "meals": {

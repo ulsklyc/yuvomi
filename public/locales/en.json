@@ -320,6 +320,9 @@
         "catDrugstore": "Drugstore",
         "catMisc": "Miscellaneous",
         "emptyAction": "Add item",
+        "importMeals": "From meal plan",
+        "importMealsTitle": "Import from meal plan",
+        "importMealsAction": "Import",
         "manageCategories": "Manage categories"
     },
     "meals": {

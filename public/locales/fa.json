@@ -326,6 +326,9 @@
         "catHousehold": "خانگی",
         "catDrugstore": "بهداشتی",
         "catMisc": "متفرقه",
+        "importMeals": "From meal plan",
+        "importMealsTitle": "Import from meal plan",
+        "importMealsAction": "Import",
         "manageCategories": "مدیریت دسته‌ها"
     },
     "meals": {

@@ -8,6 +8,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { url } from '../server/middleware/validate.js';
+import { aggregateMealIngredients } from '../server/services/shopping-import.js';
 
 let passed = 0;
 let failed = 0;
@@ -51,6 +52,16 @@ test('Shopping-Seite importiert den Category-Manager und öffnet ihn bei manage=
   assert(/manage.*===\s*'categories'|get\('manage'\)|manage=categories|'manage'/.test(source), 'shopping.js muss den manage-Query-Parameter auswerten');
   assert(/shopping\.manageCategories/.test(source), 'Eine übersetzte „Kategorien verwalten"-Aktion muss vorhanden sein');
   assert(/shopping-categories-changed/.test(source), 'shopping.js muss auf das shopping-categories-changed-Event reagieren');
+});
+
+test('Shopping-Seite bietet einen Essensplan-Import mit Datumsbereich an', () => {
+  const source = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
+  assert(/data-action="import-meals"/.test(source), 'Shopping-Header muss eine Import-Aktion aus dem Essensplan anbieten');
+  assert(/function openMealPlanImport/.test(source), 'Shopping-Seite muss einen Import-Dialog für den Essensplan besitzen');
+  assert(/api\.post\(`\/shopping\/\$\{state\.activeListId\}\/import-meal-plan`/.test(source), 'Import-Dialog muss die Shopping-Range-Import-Route aufrufen');
+  assert(/type="date" id="shopping-import-from"/.test(source), 'Import-Dialog muss ein Von-Datum anbieten');
+  assert(/type="date" id="shopping-import-to"/.test(source), 'Import-Dialog muss ein Bis-Datum anbieten');
+  assert(/addLocalDays\(today, 6\)/.test(source), 'Import-Dialog muss standardmäßig 7 Tage (heute + 6) vorauswählen');
 });
 
 test('Shopping-Category-Manager-Komponente erfüllt die Web-Component-Verträge', () => {
@@ -252,6 +263,45 @@ test('Autocomplete - kein Match gibt leeres Array', () => {
   assert(results.length === 0, 'Kein Match erwartet');
 });
 
+test('Essensplan-Import aggregiert gleiche Zutaten mit numerischen Mengen', () => {
+  const result = aggregateMealIngredients([
+    { id: 1, meal_id: 10, name: 'Tomaten', quantity: '2', category: 'Obst & Gemüse' },
+    { id: 2, meal_id: 11, name: 'Tomaten', quantity: '3', category: 'Obst & Gemüse' },
+  ]);
+  assert(result.length === 1, `Erwartet 1 aggregierten Eintrag, erhalten ${result.length}`);
+  assert(result[0].name === 'Tomaten', 'Name muss erhalten bleiben');
+  assert(result[0].quantity === '5', `Erwartet summierte Menge 5, erhalten ${result[0].quantity}`);
+  assert(result[0].added_from_meal === null, 'Bei mehreren Mahlzeiten darf kein einzelner meal-Verweis gesetzt werden');
+});
+
+test('Essensplan-Import aggregiert gleiche Zutaten mit Einheiten', () => {
+  const result = aggregateMealIngredients([
+    { id: 1, meal_id: 10, name: 'Reis', quantity: '100 g', category: 'Sonstiges' },
+    { id: 2, meal_id: 11, name: 'Reis', quantity: '50 g', category: 'Sonstiges' },
+  ]);
+  assert(result.length === 1, `Erwartet 1 aggregierten Eintrag, erhalten ${result.length}`);
+  assert(result[0].quantity === '150 g', `Erwartet summierte Menge 150 g, erhalten ${result[0].quantity}`);
+});
+
+test('Essensplan-Import summiert auch Mengen mit gleicher Einheit', () => {
+  const result = aggregateMealIngredients([
+    { id: 1, meal_id: 10, name: 'Eier', quantity: '1 pack', category: 'Milchprodukte' },
+    { id: 2, meal_id: 11, name: 'Eier', quantity: '1 pack', category: 'Milchprodukte' },
+    { id: 3, meal_id: 12, name: 'Eier', quantity: '2 pack', category: 'Milchprodukte' },
+  ]);
+  assert(result.length === 1, `Erwartet 1 aggregierten Eintrag, erhalten ${result.length}`);
+  assert(result[0].quantity === '4 pack', `Erwartet summierte Menge 4 pack, erhalten ${result[0].quantity}`);
+});
+
+test('Essensplan-Import zählt rein textuelle Mengen sichtbar zusammen', () => {
+  const result = aggregateMealIngredients([
+    { id: 1, meal_id: 10, name: 'Salz', quantity: 'nach Geschmack', category: 'Sonstiges' },
+    { id: 2, meal_id: 11, name: 'Salz', quantity: 'nach Geschmack', category: 'Sonstiges' },
+  ]);
+  assert(result.length === 1, `Erwartet 1 aggregierten Eintrag, erhalten ${result.length}`);
+  assert(result[0].quantity === '2 x nach Geschmack', `Erwartet 2 x nach Geschmack, erhalten ${result[0].quantity}`);
+});
+
 // --------------------------------------------------------
 // Zähler-Abfrage
 // --------------------------------------------------------
@@ -412,6 +462,14 @@ test('shopping-Route validiert und persistiert notes/url', () => {
   assert(/url\(req\.body\.url,\s*'URL'\)/.test(source), 'POST muss req.body.url über url() validieren');
   assert(/INSERT INTO shopping_items \(list_id, name, quantity, category, notes, url\)/.test(source), 'INSERT muss notes/url enthalten');
   assert(/SET is_checked = \?, name = \?, quantity = \?, category = \?, notes = \?, url = \?/.test(source), 'UPDATE muss notes/url enthalten');
+});
+
+test('shopping-Route bietet einen Datumsbereich-Import aus dem Essensplan an', () => {
+  const source = readFileSync(new URL('../server/routes/shopping.js', import.meta.url), 'utf8');
+  assert(/router\.post\('\/:listId\/import-meal-plan'/.test(source), 'Shopping-Route muss eine Import-Route für den Essensplan bereitstellen');
+  assert(/aggregateMealIngredients/.test(source), 'Import-Route muss aggregierte Zutaten verwenden');
+  assert(/m\.date BETWEEN \? AND \?/.test(source), 'Import-Route muss Mahlzeiten nach Datumsbereich filtern');
+  assert(/mi\.on_shopping_list = 0/.test(source), 'Bereits übertragene Zutaten dürfen nicht erneut importiert werden');
 });
 
 // --------------------------------------------------------

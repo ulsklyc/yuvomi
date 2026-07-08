@@ -10,6 +10,7 @@ import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { promptModal, openModal, closeModal } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
+import { addLocalDays, toLocalDateKey } from '/utils/date.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
 import '/components/shopping-category-manager.js';
 
@@ -169,6 +170,12 @@ function renderListContent(container) {
             <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
             ${t('shopping.clearChecked', { count: checkedCount })}
           </button>` : ''}
+        <button class="btn btn--ghost list-header__import-btn" data-action="import-meals"
+                aria-label="${t('shopping.importMeals')}" title="${t('shopping.importMeals')}"
+                style="color:var(--color-text-secondary)">
+          <i data-lucide="utensils" class="icon-md" aria-hidden="true"></i>
+          <span>${t('shopping.importMeals')}</span>
+        </button>
         <button class="btn btn--ghost btn--icon" data-action="manage-categories"
                 aria-label="${t('shopping.manageCategories')}" title="${t('shopping.manageCategories')}"
                 style="color:var(--color-text-secondary)">
@@ -775,6 +782,59 @@ function updateListCounter(listId, totalDelta, checkedDelta) {
   }
 }
 
+function openMealPlanImport(container) {
+  if (!state.activeListId) return;
+  const today = toLocalDateKey(new Date());
+  const defaultTo = addLocalDays(today, 6);
+
+  openModal({
+    title: t('shopping.importMealsTitle'),
+    size: 'sm',
+    content: `
+      <form id="shopping-import-meals-form" class="shopping-import-meals-form" novalidate autocomplete="off">
+        <div class="form-group">
+          <label class="form-label" for="shopping-import-from">${t('calendar.fromLabel')}</label>
+          <input class="form-input" type="date" id="shopping-import-from" value="${esc(today)}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="shopping-import-to">${t('calendar.toLabel')}</label>
+          <input class="form-input" type="date" id="shopping-import-to" value="${esc(defaultTo)}" required>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn--secondary" id="shopping-import-cancel">${t('common.cancel')}</button>
+          <button type="submit" class="btn btn--primary">${t('shopping.importMealsAction')}</button>
+        </div>
+      </form>`,
+    onSave: (panel) => {
+      const form = panel.querySelector('#shopping-import-meals-form');
+      const cancelBtn = panel.querySelector('#shopping-import-cancel');
+      cancelBtn?.addEventListener('click', () => closeModal());
+      form?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const from = panel.querySelector('#shopping-import-from')?.value || '';
+        const to = panel.querySelector('#shopping-import-to')?.value || '';
+        if (!from || !to) return;
+        try {
+          const data = await api.post(`/shopping/${state.activeListId}/import-meal-plan`, { from, to });
+          if (!data.data?.transferred) {
+            window.yuvomi.showToast(t('meals.transferAlreadyDone'), 'default');
+            return;
+          }
+          await Promise.all([loadLists(), loadItems(state.activeListId)]);
+          renderTabs(container);
+          renderListContent(container);
+          wireListContentEvents(container);
+          closeModal();
+          const count = Number(data.data.transferred) || 0;
+          window.yuvomi.showToast(count === 1 ? t('meals.transferSuccess', { count }) : t('meals.transferSuccessPlural', { count }), 'success');
+        } catch (err) {
+          window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+        }
+      });
+    },
+  });
+}
+
 // --------------------------------------------------------
 // API-Aktionen
 // --------------------------------------------------------
@@ -987,6 +1047,10 @@ function wireListContentEvents(container) {
     // ---- Kategorien verwalten ----
     if (action === 'manage-categories') {
       openCategoryManager(container);
+    }
+
+    if (action === 'import-meals') {
+      openMealPlanImport(container);
     }
 
     // ---- Liste umbenennen ----
