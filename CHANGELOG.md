@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-07-10
+
+### Changed
+- Contacts: each row now shows a single primary "Call" action plus a labelled "More" menu (Email, Route, Export, Delete) that is identical on desktop and mobile, replacing the row of up to five icon-only buttons and the hover-only actions.
+- Contacts: every category now has its own colour-tinted icon (doctor green, school amber, authority violet, insurance teal, tradesperson orange, emergency red, other neutral), person and family contacts show initials avatars, and the module now uses its own blue accent consistently instead of the global violet — so the list reads at a glance.
+- Contacts: a chevron on each row makes it clearer that tapping a contact opens it for editing, a long email address no longer truncates the phone number in the row summary, and the add/edit dialog shows a live category icon preview.
+
+### Fixed
+- Contacts: the bulk-selection bar is now correctly hidden until you enter selection mode; a missing style guard had left it permanently visible.
+
 ## [1.6.1] - 2026-07-09
 
 ### Fixed

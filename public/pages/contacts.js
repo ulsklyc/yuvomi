@@ -29,11 +29,41 @@ const CATEGORY_ICONS = {
   'Sonstiges':    'tag',
 };
 
+// Kategorie → CSS-Slug für den abgeleiteten Farbton (siehe .contact-group--* in
+// contacts.css). Kein neuer Modul-Akzent, nur eine dezente Tint-Schicht.
+const CATEGORY_SLUG = {
+  'Arzt':         'doctor',
+  'Schule/Kita':  'school',
+  'Behörde':      'authority',
+  'Versicherung': 'insurance',
+  'Handwerker':   'craftsman',
+  'Notfall':      'emergency',
+  'Sonstiges':    'misc',
+};
+
 // Liefert das Lucide-Placeholder-Markup für eine Kategorie; aria-hidden, da stets
 // von einem Text-Label begleitet. lucide.createIcons() ersetzt den Platzhalter.
 function categoryIcon(cat, size = 16) {
   const name = CATEGORY_ICONS[cat] || 'tag';
   return `<i data-lucide="${name}" class="contact-cat-icon" style="width:${size}px;height:${size}px;" aria-hidden="true"></i>`;
+}
+
+// Initialen aus dem Namen (max. 2 Buchstaben): Vorname + letzter Namensteil.
+function initials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  const first = parts[0][0] || '';
+  const last  = parts.length > 1 ? parts[parts.length - 1][0] : '';
+  return (first + last).toUpperCase();
+}
+
+// Avatar einer Zeile: Familien-/Personen-Kontakte zeigen Initialen im Modul-Ton,
+// alle anderen das Kategorie-Icon im Kategorie-Ton (--cat der Gruppe).
+function contactAvatar(c, size = 20) {
+  if (c.family_user_id) {
+    return `<span class="contact-item__icon contact-item__icon--initials" aria-hidden="true">${esc(initials(c.name))}</span>`;
+  }
+  return `<span class="contact-item__icon">${categoryIcon(c.category, size)}</span>`;
 }
 
 function CATEGORY_LABELS() {
@@ -349,7 +379,7 @@ function renderList({ animate = false } = {}) {
   container.insertAdjacentHTML('beforeend', Object.entries(groups)
     .sort(([a], [b]) => CATEGORIES.indexOf(a) - CATEGORIES.indexOf(b))
     .map(([cat, items]) => `
-      <div class="contact-group">
+      <div class="contact-group contact-group--${CATEGORY_SLUG[cat] || 'misc'}">
         <div class="contact-group__header">${categoryIcon(cat)} ${CATEGORY_LABELS()[cat] || esc(cat)}</div>
         ${items.map((c) => renderContactItem(c)).join('')}
       </div>
@@ -361,32 +391,17 @@ function renderList({ animate = false } = {}) {
   if (animate) stagger(container.querySelectorAll('.contact-item'));
 }
 
+// Meta-Zeile: Telefon (schrumpft nicht) · E-Mail (wird gekürzt), damit die
+// Telefonnummer auf schmalem Viewport nie verschwindet.
+function renderMeta(c) {
+  if (!c.phone && !c.email) return '';
+  const phone = c.phone ? `<span class="contact-item__meta-phone">${esc(c.phone)}</span>` : '';
+  const email = c.email ? `<span class="contact-item__meta-email">${esc(c.email)}</span>` : '';
+  const sep   = c.phone && c.email ? `<span class="contact-item__meta-sep" aria-hidden="true">·</span>` : '';
+  return `<span class="contact-item__meta">${phone}${sep}${email}</span>`;
+}
+
 function renderContactItem(c) {
-  const phone   = c.phone  ? `<a href="tel:${esc(c.phone)}"   class="contact-action-btn contact-action-btn--call"  aria-label="${t('contacts.callLabel')}"><i data-lucide="phone" style="width:16px;height:16px;" aria-hidden="true"></i></a>` : '';
-  const email   = c.email  ? `<a href="mailto:${esc(c.email)}" class="contact-action-btn contact-action-btn--mail contact-action-btn--desktop-extra" aria-label="${t('contacts.emailActionLabel')}"><i data-lucide="mail" style="width:16px;height:16px;" aria-hidden="true"></i></a>` : '';
-  const mobileEmail = c.email ? `<a href="mailto:${esc(c.email)}" class="contact-action-btn contact-action-btn--mail contact-action-btn--mobile-menu" aria-label="${t('contacts.emailActionLabel')}"><i data-lucide="mail" style="width:16px;height:16px;" aria-hidden="true"></i></a>` : '';
-  const mapsUrl = c.address ? `https://www.openstreetmap.org/search?query=${encodeURIComponent(c.address)}` : '';
-  const maps    = c.address ? `<a href="${mapsUrl}" target="_blank" rel="noopener" class="contact-action-btn contact-action-btn--maps contact-action-btn--desktop-extra contact-action-btn--reveal" aria-label="${t('contacts.mapsLabel')}"><i data-lucide="map-pin" style="width:16px;height:16px;" aria-hidden="true"></i></a>` : '';
-  const mobileMaps = c.address ? `<a href="${mapsUrl}" target="_blank" rel="noopener" class="contact-action-btn contact-action-btn--maps contact-action-btn--mobile-menu" aria-label="${t('contacts.mapsLabel')}"><i data-lucide="map-pin" style="width:16px;height:16px;" aria-hidden="true"></i></a>` : '';
-  const exportAction = `<a href="/api/v1/contacts/${c.id}/vcard" download="${esc(c.name)}.vcf"
-           class="contact-action-btn contact-action-btn--desktop-extra contact-action-btn--reveal" aria-label="${t('contacts.exportLabel')}" title="${t('contacts.exportTooltip')}">
-          <i data-lucide="download" style="width:16px;height:16px;" aria-hidden="true"></i>
-        </a>`;
-  const mobileExportAction = `<a href="/api/v1/contacts/${c.id}/vcard" download="${esc(c.name)}.vcf"
-           class="contact-action-btn contact-action-btn--mobile-menu" aria-label="${t('contacts.exportLabel')}" title="${t('contacts.exportTooltip')}">
-          <i data-lucide="download" style="width:16px;height:16px;" aria-hidden="true"></i>
-        </a>`;
-  const deleteAction = !c.family_user_id ? `
-          <button class="contact-action-btn contact-action-btn--delete contact-action-btn--desktop-extra contact-action-btn--reveal" data-action="delete" data-id="${c.id}" aria-label="${t('contacts.deleteLabel')}">
-            <i data-lucide="trash-2" style="width:16px;height:16px;" aria-hidden="true"></i>
-          </button>
-        ` : '';
-  const mobileDeleteAction = !c.family_user_id ? `
-          <button class="contact-action-btn contact-action-btn--delete contact-action-btn--mobile-menu" data-action="delete" data-id="${c.id}" aria-label="${t('contacts.deleteLabel')}">
-            <i data-lucide="trash-2" style="width:16px;height:16px;" aria-hidden="true"></i>
-          </button>
-        ` : '';
-  const meta    = [c.phone, c.email].filter(Boolean).join(' · ');
   const menuId  = `contact-more-${c.id}`;
 
   // Auswahl-Modus: Zeile wird zur Checkbox (Familien-Kontakte deaktiviert,
@@ -397,38 +412,59 @@ function renderContactItem(c) {
       <div class="contact-item contact-item--select${selected ? ' contact-item--selected' : ''}" data-id="${c.id}">
         <label class="contact-item__open contact-item__select">
           <input type="checkbox" class="contact-item__checkbox" data-select="${c.id}"${selected ? ' checked' : ''}${c.family_user_id ? ' disabled' : ''} aria-label="${esc(c.name)}">
-          <span class="contact-item__icon">${categoryIcon(c.category, 20)}</span>
+          ${contactAvatar(c)}
           <span class="contact-item__body">
             <span class="contact-item__name">${esc(c.name)}</span>
-            ${meta ? `<span class="contact-item__meta">${esc(meta)}</span>` : ''}
+            ${renderMeta(c)}
           </span>
         </label>
       </div>
     `;
   }
 
+  // Primäre, stets sichtbare Zeilenaktion: Anrufen (falls Telefon vorhanden).
+  const callBtn = c.phone
+    ? `<a href="tel:${esc(c.phone)}" class="contact-action-btn contact-action-btn--call" aria-label="${t('contacts.callLabel')}">
+         <i data-lucide="phone" style="width:16px;height:16px;" aria-hidden="true"></i>
+       </a>`
+    : '';
+
+  // Sekundäre Aktionen als beschriftetes Menü (Icon + Textlabel), identisch auf
+  // Desktop und Mobile. Export ist immer verfügbar → das Menü ist nie leer.
+  const mapsUrl = c.address ? `https://www.openstreetmap.org/search?query=${encodeURIComponent(c.address)}` : '';
+  const menuItems = [
+    c.email ? `<a href="mailto:${esc(c.email)}" class="contact-menu-item" role="menuitem">
+        <i data-lucide="mail" class="contact-menu-item__icon" aria-hidden="true"></i><span>${t('contacts.emailActionLabel')}</span>
+      </a>` : '',
+    c.address ? `<a href="${mapsUrl}" target="_blank" rel="noopener" class="contact-menu-item" role="menuitem">
+        <i data-lucide="map-pin" class="contact-menu-item__icon" aria-hidden="true"></i><span>${t('contacts.mapsLabel')}</span>
+      </a>` : '',
+    `<a href="/api/v1/contacts/${c.id}/vcard" download="${esc(c.name)}.vcf" class="contact-menu-item" role="menuitem">
+        <i data-lucide="download" class="contact-menu-item__icon" aria-hidden="true"></i><span>${t('contacts.exportLabel')}</span>
+      </a>`,
+    !c.family_user_id ? `<button type="button" class="contact-menu-item contact-menu-item--danger" data-action="delete" data-id="${c.id}" role="menuitem">
+        <i data-lucide="trash-2" class="contact-menu-item__icon" aria-hidden="true"></i><span>${t('common.delete')}</span>
+      </button>` : '',
+  ].join('');
+
   return `
     <div class="contact-item" data-id="${c.id}">
       <button type="button" class="contact-item__open" data-open="${c.id}">
-        <span class="contact-item__icon">${categoryIcon(c.category, 20)}</span>
+        ${contactAvatar(c)}
         <span class="contact-item__body">
           <span class="contact-item__name">${esc(c.name)}</span>
-          ${meta ? `<span class="contact-item__meta">${esc(meta)}</span>` : ''}
+          ${renderMeta(c)}
         </span>
+        <i data-lucide="chevron-right" class="contact-item__chevron" aria-hidden="true"></i>
       </button>
       <div class="contact-item__actions">
-        ${phone}${email}${maps}
-        ${exportAction}
-        ${deleteAction}
+        ${callBtn}
         <button type="button" class="contact-action-btn contact-more-menu__trigger"
                 popovertarget="${menuId}" aria-label="${t('contacts.moreActions')}">
           <i data-lucide="more-horizontal" style="width:16px;height:16px;" aria-hidden="true"></i>
         </button>
-        <div class="contact-more-menu__panel" id="${menuId}" popover>
-          ${mobileEmail}
-          ${mobileMaps}
-          ${mobileExportAction}
-          ${mobileDeleteAction}
+        <div class="contact-more-menu__panel" id="${menuId}" popover role="menu">
+          ${menuItems}
         </div>
       </div>
     </div>
@@ -496,7 +532,10 @@ function openContactModal({ mode, contact = null }) {
     </div>
     <div class="form-group">
       <label class="form-label" for="cm-category">${t('contacts.categoryLabel')}</label>
-      <select class="form-input" id="cm-category">${catOpts}</select>
+      <div class="contacts-cat-select">
+        <span class="contacts-cat-select__icon" id="cm-cat-icon" aria-hidden="true">${categoryIcon(isEdit && contact.category ? contact.category : CATEGORIES[0], 18)}</span>
+        <select class="form-input" id="cm-category">${catOpts}</select>
+      </div>
     </div>
     <div class="form-group">
       <label class="form-label" for="cm-phone">${t('contacts.phoneLabel')}</label>
@@ -509,11 +548,11 @@ function openContactModal({ mode, contact = null }) {
 
     ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
 
-    <div class="modal-panel__footer" style="border:none;padding:0;margin-top:var(--space-4)">
+    <div class="modal-panel__footer contact-modal__footer">
       ${isEdit && !contact.family_user_id ? `<button class="btn btn--danger btn--icon" id="cm-delete" aria-label="${t('contacts.deleteLabel')}">
         <i data-lucide="trash-2" style="width:16px;height:16px;" aria-hidden="true"></i>
       </button>` : '<div></div>'}
-      <div style="display:flex;gap:var(--space-3);">
+      <div class="contact-modal__footer-actions">
         <button class="btn btn--secondary" id="cm-cancel">${t('common.cancel')}</button>
         <button class="btn btn--primary" id="cm-save">${isEdit ? t('common.save') : t('common.create')}</button>
       </div>
@@ -525,6 +564,15 @@ function openContactModal({ mode, contact = null }) {
     size: 'md',
     onSave(panel) {
       panel.querySelector('#cm-cancel').addEventListener('click', closeModal);
+
+      // Kategorie-Vorschau live aktualisieren (Icon links neben dem Select).
+      const catSel  = panel.querySelector('#cm-category');
+      const catIcon = panel.querySelector('#cm-cat-icon');
+      catSel?.addEventListener('change', () => {
+        catIcon.replaceChildren();
+        catIcon.insertAdjacentHTML('beforeend', categoryIcon(catSel.value, 18));
+        if (window.lucide) lucide.createIcons({ el: catIcon });
+      });
 
       panel.querySelector('#cm-delete')?.addEventListener('click', async () => {
         closeModal({ force: true });

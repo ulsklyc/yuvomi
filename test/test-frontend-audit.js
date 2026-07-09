@@ -2379,22 +2379,21 @@ test('remaining audited mobile controls use 48px touch targets', () => {
   );
 });
 
-test('mobile contacts keep one primary action and disclose the rest through More', () => {
+test('contacts keep one primary call action and disclose the rest through a labeled More menu', () => {
   const contactsPage = read('../public/pages/contacts.js');
   const contactsCss = read('../public/styles/contacts.css');
 
-  assert.match(contactsPage, /contact-action-btn--mail contact-action-btn--desktop-extra/);
-  assert.match(contactsPage, /contact-action-btn--mail contact-action-btn--mobile-menu/);
-  assert.match(
-    contactsCss,
-    /@media \(max-width:\s*767px\)[\s\S]*\.contact-action-btn--desktop-extra\s*\{[\s\S]*display:\s*none/,
-  );
-  // Der „Mehr"-Trigger erscheint nur auf Mobile; das Panel ist ein Popover
-  // (Top-Layer) statt eines absolut positionierten Menüs im Scroll-Container.
-  assert.match(
-    contactsCss,
-    /@media \(max-width:\s*767px\)[\s\S]*\.contact-more-menu__trigger\s*\{[\s\S]*display:\s*flex/,
-  );
+  // Genau eine stets sichtbare Primäraktion pro Zeile: Anrufen (falls Telefon da).
+  assert.match(contactsPage, /contact-action-btn--call/);
+  // Sekundäraktionen leben im „Mehr"-Menü als BESCHRIFTETE Einträge (Icon + Text),
+  // identisch auf Desktop und Mobile — behebt das „nackte Icons"-Problem.
+  assert.match(contactsPage, /class="contact-menu-item"[\s\S]*contact-menu-item__icon[\s\S]*<span>/);
+  // Löschen ist ein abgesetzter Danger-Eintrag im selben Menü.
+  assert.match(contactsPage, /contact-menu-item contact-menu-item--danger[\s\S]*data-action="delete"/);
+  // Menü-Eintrag trägt Textlabel (kein reines Icon mehr).
+  assert.match(contactsCss, /\.contact-menu-item\s*\{[\s\S]*min-height:\s*var\(--target-md\)/);
+  // Das Panel ist ein Popover (Top-Layer) statt eines absolut positionierten
+  // Menüs im Scroll-Container.
   assert.match(contactsCss, /\.contact-more-menu__panel\s*\{[\s\S]*position:\s*fixed/);
   assert.match(contactsPage, /popovertarget="\$\{menuId\}"/);
   assert.match(contactsPage, /id="\$\{menuId\}" popover/);
@@ -2423,6 +2422,9 @@ test('contacts bulk selection is opt-in and hidden by default', () => {
   // Familien-Kontakte bleiben nicht wählbar (deaktivierte Checkbox)
   assert.match(contactsPage, /c\.family_user_id \? ' disabled' : ''/);
   assert.match(contactsCss, /\.contacts-selectbar\s*\{/);
+  // display:flex würde das hidden-Attribut schlagen — der [hidden]-Guard hält die
+  // Leiste im Default-Zustand wirklich unsichtbar.
+  assert.match(contactsCss, /\.contacts-selectbar\[hidden\]\s*\{[\s\S]*display:\s*none/);
 });
 
 test('documents and navigation settings use progressive disclosure instead of stacked control cards', () => {
