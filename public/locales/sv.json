@@ -1170,6 +1170,19 @@
             },
             "updatedToast": "Prenumeration uppdaterad."
         },
+        "calendarImport": {
+            "title": "Importera kalender",
+            "description": "Importera händelser från en .ics-fil eller en delad kalender en gång som dina egna, redigerbara händelser. Till skillnad från en prenumeration synkroniseras de inte efteråt.",
+            "fileLabel": "ICS-fil",
+            "urlLabel": "Eller flödes-URL",
+            "urlHint": "Adress till en delad kalender (https:// eller webcal://).",
+            "colorLabel": "Färg",
+            "submit": "Importera",
+            "errorNoSource": "Välj en fil eller ange en URL.",
+            "success": "{{count}} händelser importerade.",
+            "successWithSkipped": "{{count}} händelser importerade, {{skipped}} fanns redan.",
+            "allDuplicates": "Inga nya händelser – alla fanns redan."
+        },
         "memberPhoneLabel": "Telefonnummer (valfritt)",
         "memberEmailLabel": "E-post (valfritt)",
         "memberBirthDateLabel": "Födelsedatum (valfritt)",

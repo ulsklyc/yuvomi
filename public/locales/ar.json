@@ -1170,6 +1170,19 @@
             },
             "updatedToast": "تم تحديث الاشتراك."
         },
+        "calendarImport": {
+            "title": "استيراد التقويم",
+            "description": "استورد الأحداث من ملف ‎.ics أو تقويم مشترك مرة واحدة كأحداث خاصة بك قابلة للتحرير. بخلاف الاشتراك، لا تتم مزامنتها بعد ذلك.",
+            "fileLabel": "ملف ICS",
+            "urlLabel": "أو رابط الموجز",
+            "urlHint": "عنوان تقويم مشترك (‎https://‎ أو ‎webcal://‎).",
+            "colorLabel": "اللون",
+            "submit": "استيراد",
+            "errorNoSource": "يرجى اختيار ملف أو إدخال رابط.",
+            "success": "تم استيراد {{count}} حدثًا.",
+            "successWithSkipped": "تم استيراد {{count}} حدثًا، و{{skipped}} موجودة بالفعل.",
+            "allDuplicates": "لا توجد أحداث جديدة – كلها موجودة بالفعل."
+        },
         "memberPhoneLabel": "رقم الهاتف (اختياري)",
         "memberEmailLabel": "البريد الإلكتروني (اختياري)",
         "memberBirthDateLabel": "تاريخ الميلاد (اختياري)",

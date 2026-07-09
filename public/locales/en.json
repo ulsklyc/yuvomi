@@ -1176,6 +1176,19 @@
             },
             "updatedToast": "Subscription updated."
         },
+        "calendarImport": {
+            "title": "Import calendar",
+            "description": "Import events from an .ics file or a shared calendar once as your own, editable events. Unlike a subscription, they are not kept in sync afterwards.",
+            "fileLabel": "ICS file",
+            "urlLabel": "Or feed URL",
+            "urlHint": "Address of a shared calendar (https:// or webcal://).",
+            "colorLabel": "Color",
+            "submit": "Import",
+            "errorNoSource": "Please choose a file or enter a URL.",
+            "success": "{{count}} events imported.",
+            "successWithSkipped": "{{count}} events imported, {{skipped}} already existed.",
+            "allDuplicates": "No new events – all already existed."
+        },
         "memberPhoneLabel": "Phone number (optional)",
         "memberEmailLabel": "Email (optional)",
         "memberBirthDateLabel": "Birthday date (optional)",

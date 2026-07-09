@@ -1170,6 +1170,19 @@
             },
             "updatedToast": "सदस्यता अपडेट की गई।"
         },
+        "calendarImport": {
+            "title": "कैलेंडर आयात करें",
+            "description": "किसी .ics फ़ाइल या साझा कैलेंडर से ईवेंट एक बार अपने स्वयं के, संपादन-योग्य ईवेंट के रूप में आयात करें। सदस्यता के विपरीत, बाद में उन्हें सिंक नहीं किया जाता।",
+            "fileLabel": "ICS फ़ाइल",
+            "urlLabel": "या फ़ीड URL",
+            "urlHint": "किसी साझा कैलेंडर का पता (https:// या webcal://).",
+            "colorLabel": "रंग",
+            "submit": "आयात करें",
+            "errorNoSource": "कृपया कोई फ़ाइल चुनें या URL दर्ज करें।",
+            "success": "{{count}} ईवेंट आयात किए गए।",
+            "successWithSkipped": "{{count}} ईवेंट आयात किए गए, {{skipped}} पहले से मौजूद थे।",
+            "allDuplicates": "कोई नया ईवेंट नहीं – सभी पहले से मौजूद थे।"
+        },
         "memberPhoneLabel": "फ़ोन नंबर (वैकल्पिक)",
         "memberEmailLabel": "ईमेल (वैकल्पिक)",
         "memberBirthDateLabel": "जन्म तिथि (वैकल्पिक)",

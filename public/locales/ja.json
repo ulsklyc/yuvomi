@@ -1170,6 +1170,19 @@
             },
             "updatedToast": "サブスクリプションが更新されました。"
         },
+        "calendarImport": {
+            "title": "カレンダーをインポート",
+            "description": ".ics ファイルまたは共有カレンダーの予定を、編集可能な自分の予定として一度だけインポートします。購読とは異なり、その後は同期されません。",
+            "fileLabel": "ICS ファイル",
+            "urlLabel": "またはフィード URL",
+            "urlHint": "共有カレンダーのアドレス（https:// または webcal://）。",
+            "colorLabel": "色",
+            "submit": "インポート",
+            "errorNoSource": "ファイルを選択するか、URL を入力してください。",
+            "success": "{{count}} 件の予定をインポートしました。",
+            "successWithSkipped": "{{count}} 件をインポートしました（{{skipped}} 件は既存）。",
+            "allDuplicates": "新しい予定はありません。すべて既に存在します。"
+        },
         "memberPhoneLabel": "電話番号（任意）",
         "memberEmailLabel": "メールアドレス（任意）",
         "memberBirthDateLabel": "生年月日（任意）",

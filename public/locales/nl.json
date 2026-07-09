@@ -1176,6 +1176,19 @@
             },
             "updatedToast": "Abonnement bijgewerkt."
         },
+        "calendarImport": {
+            "title": "Agenda importeren",
+            "description": "Importeer afspraken uit een .ics-bestand of een gedeelde agenda eenmalig als je eigen, bewerkbare afspraken. Anders dan bij een abonnement worden ze daarna niet gesynchroniseerd.",
+            "fileLabel": "ICS-bestand",
+            "urlLabel": "Of feed-URL",
+            "urlHint": "Adres van een gedeelde agenda (https:// of webcal://).",
+            "colorLabel": "Kleur",
+            "submit": "Importeren",
+            "errorNoSource": "Kies een bestand of voer een URL in.",
+            "success": "{{count}} afspraken geïmporteerd.",
+            "successWithSkipped": "{{count}} afspraken geïmporteerd, {{skipped}} bestonden al.",
+            "allDuplicates": "Geen nieuwe afspraken – alle bestonden al."
+        },
         "memberPhoneLabel": "Telefoonnummer (optioneel)",
         "memberEmailLabel": "E-mail (optioneel)",
         "memberBirthDateLabel": "Geboortedatum (optioneel)",

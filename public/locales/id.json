@@ -1193,6 +1193,19 @@
             "deletedToast": "Langganan dihapus.",
             "updatedToast": "Langganan diperbarui."
         },
+        "calendarImport": {
+            "title": "Impor kalender",
+            "description": "Impor acara dari berkas .ics atau kalender bersama satu kali sebagai acara milik Anda sendiri yang dapat diedit. Tidak seperti langganan, acara tidak disinkronkan setelahnya.",
+            "fileLabel": "Berkas ICS",
+            "urlLabel": "Atau URL umpan",
+            "urlHint": "Alamat kalender bersama (https:// atau webcal://).",
+            "colorLabel": "Warna",
+            "submit": "Impor",
+            "errorNoSource": "Silakan pilih berkas atau masukkan URL.",
+            "success": "{{count}} acara diimpor.",
+            "successWithSkipped": "{{count}} acara diimpor, {{skipped}} sudah ada.",
+            "allDuplicates": "Tidak ada acara baru – semua sudah ada."
+        },
         "memberPhoneLabel": "Nomor telepon (opsional)",
         "memberEmailLabel": "Email (opsional)",
         "memberBirthDateLabel": "Ulang tahun (opsional)",

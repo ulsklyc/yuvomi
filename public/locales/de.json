@@ -1193,6 +1193,19 @@
             "deletedToast": "Abonnement gelöscht.",
             "updatedToast": "Abonnement aktualisiert."
         },
+        "calendarImport": {
+            "title": "Kalender importieren",
+            "description": "Importiere Termine aus einer .ics-Datei oder einem geteilten Kalender einmalig als eigene, bearbeitbare Termine. Anders als ein Abonnement werden sie danach nicht mehr synchronisiert.",
+            "fileLabel": "ICS-Datei",
+            "urlLabel": "Oder Feed-URL",
+            "urlHint": "Adresse eines geteilten Kalenders (https:// oder webcal://).",
+            "colorLabel": "Farbe",
+            "submit": "Importieren",
+            "errorNoSource": "Bitte eine Datei auswählen oder eine URL eingeben.",
+            "success": "{{count}} Termine importiert.",
+            "successWithSkipped": "{{count}} Termine importiert, {{skipped}} bereits vorhanden.",
+            "allDuplicates": "Keine neuen Termine – alle waren bereits vorhanden."
+        },
         "memberPhoneLabel": "Telefonnummer (optional)",
         "memberEmailLabel": "E-Mail (optional)",
         "memberBirthDateLabel": "Geburtstag (optional)",

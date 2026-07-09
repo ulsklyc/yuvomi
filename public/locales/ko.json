@@ -1193,6 +1193,19 @@
             "deletedToast": "구독이 삭제되었습니다.",
             "updatedToast": "구독이 업데이트되었습니다."
         },
+        "calendarImport": {
+            "title": "캘린더 가져오기",
+            "description": ".ics 파일이나 공유 캘린더의 일정을 편집 가능한 내 일정으로 한 번만 가져옵니다. 구독과 달리 이후에는 동기화되지 않습니다.",
+            "fileLabel": "ICS 파일",
+            "urlLabel": "또는 피드 URL",
+            "urlHint": "공유 캘린더 주소(https:// 또는 webcal://).",
+            "colorLabel": "색상",
+            "submit": "가져오기",
+            "errorNoSource": "파일을 선택하거나 URL을 입력하세요.",
+            "success": "일정 {{count}}개를 가져왔습니다.",
+            "successWithSkipped": "일정 {{count}}개를 가져왔고 {{skipped}}개는 이미 있습니다.",
+            "allDuplicates": "새 일정 없음 – 모두 이미 존재합니다."
+        },
         "memberPhoneLabel": "전화번호 (선택 사항)",
         "memberEmailLabel": "이메일 (선택 사항)",
         "memberBirthDateLabel": "생일 (선택 사항)",

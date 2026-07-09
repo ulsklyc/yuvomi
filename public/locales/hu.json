@@ -1176,6 +1176,19 @@
             },
             "updatedToast": "Feliratkozás frissítve."
         },
+        "calendarImport": {
+            "title": "Naptár importálása",
+            "description": "Importáld egy .ics-fájl vagy egy megosztott naptár eseményeit egyszeri alkalommal saját, szerkeszthető eseményekként. Előfizetéssel ellentétben ezek utána nem szinkronizálódnak.",
+            "fileLabel": "ICS-fájl",
+            "urlLabel": "Vagy hírcsatorna URL",
+            "urlHint": "Egy megosztott naptár címe (https:// vagy webcal://).",
+            "colorLabel": "Szín",
+            "submit": "Importálás",
+            "errorNoSource": "Válassz egy fájlt, vagy adj meg egy URL-t.",
+            "success": "{{count}} esemény importálva.",
+            "successWithSkipped": "{{count}} esemény importálva, {{skipped}} már létezett.",
+            "allDuplicates": "Nincs új esemény – mind már létezett."
+        },
         "feedExportTitle": "Naptár-feed exportálása",
         "feedExportDescription": "Iratkozzon fel a Yuvomi naptárára csak olvasható módban az Apple Naptárban, a Google Naptárban vagy a Thunderbirdben.",
         "feedExportInactive": "Az export feed ki van kapcsolva.",

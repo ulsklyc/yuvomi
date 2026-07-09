@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-07-09
+
+### Added
+- Calendar: one-time import of events from an `.ics` file or a shared calendar feed URL into editable local events, under Settings → Sync → Calendar → "Import calendar". Unlike an ICS subscription (which stays read-only and auto-synced), imported events become your own editable events and are not synced afterwards — the migration path when moving from another calendar. Recurring events are kept as a series (the recurrence rule is reduced to the supported daily/weekly/monthly/yearly subset), all-day and timed events are preserved, and re-importing the same feed skips events that were already imported. The URL path reuses the SSRF-protected fetch (10 MB / 15 s limits) used by subscriptions. (#437)
+
 ## [1.4.1] - 2026-07-09
 
 ### Changed

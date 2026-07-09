@@ -651,6 +651,41 @@ router.post('/subscriptions/:id/sync', async (req, res) => {
   }
 });
 
+// POST /api/v1/calendar/import → einmaliger Import aus ICS-Datei/Feed als
+// echte, bearbeitbare lokale Termine (Discussion #437, Kalender-Migration).
+router.post('/import', async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'Not authenticated.', code: 401 });
+
+    const ics = typeof req.body.ics === 'string' ? req.body.ics : null;
+    const url = typeof req.body.url === 'string' ? req.body.url.trim() : null;
+    if (!ics?.trim() && !url) {
+      return res.status(400).json({ error: 'Either an ICS file or a URL is required.', code: 400 });
+    }
+
+    let vColorValue = null;
+    if (req.body.color) {
+      const vColor = color(req.body.color, 'Farbe');
+      if (vColor.error) return res.status(400).json({ error: vColor.error, code: 400 });
+      vColorValue = vColor.value;
+    }
+
+    const result = await icsSubscription.importToLocal(userId, {
+      ics, url, color: vColorValue,
+    });
+    res.status(201).json({ data: result });
+  } catch (err) {
+    // Nutzerorientierte Fehler (SSRF-Block, ungültige URL, HTTP-Status,
+    // Größenlimit) direkt zurückgeben; Rest als generischer Serverfehler.
+    if (err instanceof TypeError || /URL|https?|private IP|ICS file|HTTP \d|required/i.test(err.message || '')) {
+      return res.status(400).json({ error: err.message, code: 400 });
+    }
+    log.error('POST /import:', err);
+    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+  }
+});
+
 // --------------------------------------------------------
 // Read-only ICS-Export-Feed (Discussion #387)
 // --------------------------------------------------------

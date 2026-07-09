@@ -1170,6 +1170,19 @@
             },
             "updatedToast": "Abbonamento aggiornato."
         },
+        "calendarImport": {
+            "title": "Importa calendario",
+            "description": "Importa gli eventi da un file .ics o da un calendario condiviso una sola volta come eventi tuoi e modificabili. A differenza di un abbonamento, in seguito non vengono sincronizzati.",
+            "fileLabel": "File ICS",
+            "urlLabel": "Oppure URL del feed",
+            "urlHint": "Indirizzo di un calendario condiviso (https:// o webcal://).",
+            "colorLabel": "Colore",
+            "submit": "Importa",
+            "errorNoSource": "Scegli un file o inserisci un URL.",
+            "success": "{{count}} eventi importati.",
+            "successWithSkipped": "{{count}} eventi importati, {{skipped}} già presenti.",
+            "allDuplicates": "Nessun nuovo evento: esistevano già tutti."
+        },
         "memberPhoneLabel": "Numero di telefono (opzionale)",
         "memberEmailLabel": "E-mail (opzionale)",
         "memberBirthDateLabel": "Data di nascita (opzionale)",

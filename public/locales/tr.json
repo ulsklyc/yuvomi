@@ -1170,6 +1170,19 @@
             },
             "updatedToast": "Abonelik güncellendi."
         },
+        "calendarImport": {
+            "title": "Takvimi içe aktar",
+            "description": "Bir .ics dosyasındaki veya paylaşılan bir takvimdeki etkinlikleri bir kez kendi düzenlenebilir etkinlikleriniz olarak içe aktarın. Bir abonelikten farklı olarak sonrasında eşitlenmezler.",
+            "fileLabel": "ICS dosyası",
+            "urlLabel": "Veya besleme URL'si",
+            "urlHint": "Paylaşılan bir takvimin adresi (https:// veya webcal://).",
+            "colorLabel": "Renk",
+            "submit": "İçe aktar",
+            "errorNoSource": "Lütfen bir dosya seçin veya bir URL girin.",
+            "success": "{{count}} etkinlik içe aktarıldı.",
+            "successWithSkipped": "{{count}} etkinlik içe aktarıldı, {{skipped}} zaten vardı.",
+            "allDuplicates": "Yeni etkinlik yok – hepsi zaten mevcuttu."
+        },
         "memberPhoneLabel": "Telefon numarası (isteğe bağlı)",
         "memberEmailLabel": "E-posta (isteğe bağlı)",
         "memberBirthDateLabel": "Doğum tarihi (isteğe bağlı)",

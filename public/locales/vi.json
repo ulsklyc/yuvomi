@@ -1176,6 +1176,19 @@
             },
             "updatedToast": "Đăng ký đã cập nhật."
         },
+        "calendarImport": {
+            "title": "Nhập lịch",
+            "description": "Nhập các sự kiện từ tệp .ics hoặc lịch được chia sẻ một lần dưới dạng sự kiện của riêng bạn, có thể chỉnh sửa. Không giống như đăng ký, sau đó chúng không được đồng bộ.",
+            "fileLabel": "Tệp ICS",
+            "urlLabel": "Hoặc URL nguồn cấp",
+            "urlHint": "Địa chỉ của lịch được chia sẻ (https:// hoặc webcal://).",
+            "colorLabel": "Màu",
+            "submit": "Nhập",
+            "errorNoSource": "Vui lòng chọn tệp hoặc nhập URL.",
+            "success": "Đã nhập {{count}} sự kiện.",
+            "successWithSkipped": "Đã nhập {{count}} sự kiện, {{skipped}} đã tồn tại.",
+            "allDuplicates": "Không có sự kiện mới – tất cả đã tồn tại."
+        },
         "memberPhoneLabel": "Số điện thoại (tùy chọn)",
         "memberEmailLabel": "Email (tùy chọn)",
         "memberBirthDateLabel": "Ngày sinh (tùy chọn)",

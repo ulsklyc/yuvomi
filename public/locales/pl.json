@@ -1193,6 +1193,19 @@
             "deletedToast": "Subskrypcja usunięta.",
             "updatedToast": "Subskrypcja zaktualizowana."
         },
+        "calendarImport": {
+            "title": "Importuj kalendarz",
+            "description": "Zaimportuj wydarzenia z pliku .ics lub udostępnionego kalendarza jednorazowo jako własne, edytowalne wydarzenia. W przeciwieństwie do subskrypcji nie są później synchronizowane.",
+            "fileLabel": "Plik ICS",
+            "urlLabel": "Albo adres URL kanału",
+            "urlHint": "Adres udostępnionego kalendarza (https:// lub webcal://).",
+            "colorLabel": "Kolor",
+            "submit": "Importuj",
+            "errorNoSource": "Wybierz plik lub wprowadź adres URL.",
+            "success": "Zaimportowano wydarzenia: {{count}}.",
+            "successWithSkipped": "Zaimportowano {{count}}, pominięto już istniejące: {{skipped}}.",
+            "allDuplicates": "Brak nowych wydarzeń – wszystkie już istniały."
+        },
         "memberPhoneLabel": "Numer telefonu (opcjonalnie)",
         "memberEmailLabel": "E-mail (opcjonalnie)",
         "memberBirthDateLabel": "Data urodzin (opcjonalnie)",

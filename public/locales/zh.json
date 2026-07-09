@@ -1170,6 +1170,19 @@
             },
             "updatedToast": "订阅已更新。"
         },
+        "calendarImport": {
+            "title": "导入日历",
+            "description": "从 .ics 文件或共享日历一次性导入活动，作为你自己的可编辑活动。与订阅不同，之后不会再同步。",
+            "fileLabel": "ICS 文件",
+            "urlLabel": "或订阅源网址",
+            "urlHint": "共享日历的地址（https:// 或 webcal://）。",
+            "colorLabel": "颜色",
+            "submit": "导入",
+            "errorNoSource": "请选择文件或输入网址。",
+            "success": "已导入 {{count}} 个活动。",
+            "successWithSkipped": "已导入 {{count}} 个活动，{{skipped}} 个已存在。",
+            "allDuplicates": "没有新活动——全部已存在。"
+        },
         "memberPhoneLabel": "电话号码（可选）",
         "memberEmailLabel": "电子邮件（可选）",
         "memberBirthDateLabel": "出生日期（可选）",

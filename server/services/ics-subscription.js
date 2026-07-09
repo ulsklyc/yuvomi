@@ -198,6 +198,101 @@ function getAll(userId) {
   `).all(userId);
 }
 
+/**
+ * Reduziert eine ICS-RRULE auf das lokal unterstützte Subset
+ * (FREQ / INTERVAL / BYDAY / UNTIL) und gibt sie ohne "RRULE:"-Präfix zurück –
+ * passend zum rrule()-Validator und zur Recurrence-Engine. Nicht abbildbare
+ * Regeln (reines COUNT, BYMONTHDAY, Ordinal-BYDAY …) ergeben null → Einzeltermin.
+ */
+function toLocalRRule(raw) {
+  if (!raw) return null;
+  const body  = String(raw).replace(/^RRULE:/i, '');
+  const parts = {};
+  for (const seg of body.split(';')) {
+    const eq = seg.indexOf('=');
+    if (eq === -1) continue;
+    parts[seg.slice(0, eq).toUpperCase()] = seg.slice(eq + 1).toUpperCase();
+  }
+  const freq = parts.FREQ;
+  if (!['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'].includes(freq)) return null;
+  let rule = `FREQ=${freq}`;
+  const interval = parseInt(parts.INTERVAL ?? '1', 10);
+  if (Number.isInteger(interval) && interval > 1 && interval < 100) rule += `;INTERVAL=${interval}`;
+  if (parts.BYDAY) {
+    const days = parts.BYDAY.split(',')
+      .map((d) => d.trim())
+      .filter((d) => /^(MO|TU|WE|TH|FR|SA|SU)$/.test(d));
+    if (days.length) rule += `;BYDAY=${days.join(',')}`;
+  }
+  if (parts.UNTIL) {
+    const m = /^(\d{8})(T\d{6}Z)?/.exec(parts.UNTIL);
+    if (m) rule += `;UNTIL=${m[1]}${m[2] || ''}`;
+  }
+  return rule;
+}
+
+/**
+ * Einmaliger Import von Terminen aus einer ICS-Datei (roher Text) oder einem
+ * geteilten Kalender-Feed (URL) in echte, bearbeitbare lokale Termine
+ * (external_source='local', subscription_id=NULL). Anders als ein Abonnement
+ * werden die Termine nicht periodisch synchronisiert und gehören danach dem
+ * Nutzer. Wiederholungsserien bleiben als Serie erhalten (RRULE, nicht
+ * expandiert); die Herkunfts-UID wird als external_calendar_id gespeichert, um
+ * versehentliche Doppelimporte desselben Feeds zu überspringen.
+ *
+ * @returns {Promise<{ imported:number, skipped:number, total:number }>}
+ */
+async function importToLocal(userId, { ics, url, color } = {}) {
+  let rawEvents;
+  if (typeof ics === 'string' && ics.trim()) {
+    rawEvents = parseICS(ics);
+  } else if (typeof url === 'string' && url.trim()) {
+    const result = await fetchAndParse(url, null, null);
+    rawEvents = result.events || [];
+  } else {
+    throw new Error('Either an ICS file or a URL is required.');
+  }
+
+  const fallbackColor = color || '#007AFF';
+  const insert = db.get().prepare(`
+    INSERT INTO calendar_events
+      (title, description, start_datetime, end_datetime, all_day, location,
+       color, external_calendar_id, external_source, subscription_id,
+       recurrence_rule, user_modified, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local', NULL, ?, 0, ?)
+  `);
+  const existsStmt = db.get().prepare(`
+    SELECT 1 FROM calendar_events
+    WHERE created_by = ? AND subscription_id IS NULL AND external_calendar_id = ?
+    LIMIT 1
+  `);
+
+  let imported = 0;
+  let skipped  = 0;
+  const total  = rawEvents.length;
+
+  db.get().transaction(() => {
+    for (const ev of rawEvents) {
+      if (!ev.dtstart) { skipped++; continue; }
+      if (ev.uid && existsStmt.get(userId, ev.uid)) { skipped++; continue; }
+      try {
+        insert.run(
+          ev.summary, ev.description, ev.dtstart, ev.dtend,
+          ev.allDay ? 1 : 0, ev.location, ev.color || fallbackColor,
+          ev.uid || null, toLocalRRule(ev.rrule), userId,
+        );
+        imported++;
+      } catch (err) {
+        log.error(`Import UID ${ev.uid}: ${err.message}`);
+        skipped++;
+      }
+    }
+  })();
+
+  log.info(`Imported ${imported}/${total} events for user ${userId} (${skipped} skipped).`);
+  return { imported, skipped, total };
+}
+
 async function create(userId, { name, url, color, shared }) {
   const normalizedUrl = normalizeUrl(url);
   await checkSSRF(normalizedUrl);
@@ -230,4 +325,4 @@ function remove(userId, subId, isAdmin) {
   return true;
 }
 
-export { sync, getAll, create, update, remove, fetchAndParse, normalizeUrl, checkSSRF, isPrivateNetworkAllowed };
+export { sync, getAll, create, update, remove, importToLocal, toLocalRRule, fetchAndParse, normalizeUrl, checkSSRF, isPrivateNetworkAllowed };

@@ -733,6 +733,9 @@ function buildPaths() {
     '/api/v1/calendar/subscriptions/{id}/sync': {
       post: op({ summary: 'Sync ICS subscription', tag: 'Calendar', params: [idParam()], stateChanging: true }),
     },
+    '/api/v1/calendar/import': {
+      post: op({ summary: 'Import events from an ICS file or shared calendar feed as editable local events', tag: 'Calendar', stateChanging: true, requestBody: jsonBody(null) }),
+    },
     '/api/v1/calendar/feed': {
       get: op({ summary: 'Get personal ICS export feed status', tag: 'Calendar' }),
       delete: op({ summary: 'Disable personal ICS export feed', tag: 'Calendar', stateChanging: true }),

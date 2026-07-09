@@ -1,6 +1,6 @@
 {
   "name": "yuvomi",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "Self-hosted family planner - calendar, tasks, shopping, meal planning, budget and more. Private, open-source, no subscription.",
   "main": "server/index.js",
   "type": "module",
@@ -68,6 +68,7 @@
     "test:ics-parser": "node test/test-ics-parser.js",
     "test:ics-sub": "node --experimental-sqlite test/test-ics-subscription.js",
     "test:ics-export": "node --experimental-sqlite test/test-ics-export.js",
+    "test:ics-import": "node --test test/test-ics-import.js",
     "test:backup-scheduler": "node --experimental-sqlite test/test-backup-scheduler.js",
     "test:backup-webdav": "node --experimental-sqlite test/test-backup-webdav.js",
     "test:caldav": "node --experimental-sqlite test/test-caldav-sync.js",

@@ -1187,6 +1187,19 @@
             "deletedToast": "Odběr smazán.",
             "updatedToast": "Odběr aktualizován."
         },
+        "calendarImport": {
+            "title": "Importovat kalendář",
+            "description": "Naimportujte události ze souboru .ics nebo ze sdíleného kalendáře jednorázově jako vlastní upravitelné události. Na rozdíl od odběru se poté nesynchronizují.",
+            "fileLabel": "Soubor ICS",
+            "urlLabel": "Nebo URL kanálu",
+            "urlHint": "Adresa sdíleného kalendáře (https:// nebo webcal://).",
+            "colorLabel": "Barva",
+            "submit": "Importovat",
+            "errorNoSource": "Vyberte soubor nebo zadejte URL.",
+            "success": "Naimportováno událostí: {{count}}.",
+            "successWithSkipped": "Naimportováno {{count}}, {{skipped}} již existovalo.",
+            "allDuplicates": "Žádné nové události – všechny už existovaly."
+        },
         "memberPhoneLabel": "Telefonní číslo (volitelné)",
         "memberEmailLabel": "E-mail (volitelné)",
         "memberBirthDateLabel": "Datum narození (volitelné)",

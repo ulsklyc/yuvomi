@@ -153,7 +153,7 @@ New home: **https://yuvomi.cloud/** · Questions? Open a [discussion](https://gi
           <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/calendar-light-web.png">
           <img src="docs/screenshots/calendar-light-web.png" alt="Calendar with Google OAuth and CalDAV sync">
         </picture>
-        <br><sub><b>Calendar</b> — Google OAuth, iCloud, CalDAV, ICS subscriptions</sub>
+        <br><sub><b>Calendar</b> — Google OAuth, iCloud, CalDAV, ICS subscriptions &amp; import</sub>
       </td>
     </tr>
     <tr>
@@ -216,7 +216,7 @@ New home: **https://yuvomi.cloud/** · Questions? Open a [discussion](https://gi
 | ![shopping](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/shopping.png) | **Shopping** | Collaborative lists grouped by aisle, with swipe gestures, per-item notes, and one-tap import from the meal plan. |
 | ![meals](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/meals.png) | **Meals** | Weekly planner with multiple items per slot, weekly repeats, a drag-and-drop recipe sidebar, a one-click week randomizer, and direct export to the shopping list. |
 | ![recipes](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/recipes.png) | **Recipes** | Create, duplicate, and scale recipes; pre-fill meal slots or save any planned meal as a recipe. |
-| ![calendar](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/calendar.png) | **Calendar** | Google (OAuth) and CalDAV sync (iCloud, Nextcloud, Radicale), ICS subscriptions, recurring events, attachments, holiday overlays, and a read-only `webcal://` export feed. |
+| ![calendar](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/calendar.png) | **Calendar** | Google (OAuth) and CalDAV sync (iCloud, Nextcloud, Radicale), ICS subscriptions, one-time import from an `.ics` file or shared feed into editable local events, recurring events, attachments, holiday overlays, and a read-only `webcal://` export feed. |
 | ![documents](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/documents.png) | **Documents** | Upload, tag, preview, and organize family files with per-document visibility. Optional WebDAV storage plus Paperless-ngx and Papra (DMS) linking. |
 | ![budget](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/budget.png) | **Budget** | Income, expenses, recurring entries, trend charts, a statistics tab, CSV export, loans, split expenses, and subscription tracking with renewals and currencies. |
 | ![housekeeping](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/housekeeping.png) | **Housekeeping** | Manage household staff — schedules, check-in/out, daily or hourly billing, chores, and supply requests. |
