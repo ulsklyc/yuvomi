@@ -821,6 +821,41 @@
   gap: var(--space-3);
 }
 
+.budget-scope-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.budget-scope-toggle__option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--target-lg);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  text-align: center;
+}
+
+.budget-scope-toggle__option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.budget-scope-toggle__option--active {
+  background: color-mix(in srgb, var(--module-budget) 14%, transparent);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.budget-assignment-editor__shared[hidden] {
+  display: none !important;
+}
+
 .budget-assignment-editor__heading {
   color: var(--color-text-primary);
   font-weight: var(--font-weight-semibold);
@@ -991,6 +1026,13 @@
  * -------------------------------------------------------- */
 
 /* Einnahme/Ausgabe-Toggle */
+.budget-modal {
+  display: grid;
+  gap: var(--space-4);
+  min-height: min(620px, 70dvh);
+  align-content: start;
+}
+
 .amount-type-toggle {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1089,6 +1131,12 @@
 
 .budget-inline-modal__footer {
   justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .budget-modal {
+    min-height: auto;
+  }
 }
 
 /* --------------------------------------------------------

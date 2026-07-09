@@ -53,7 +53,7 @@ export function renderAvatarStack(users, { size = 28, maxVisible = 3 } = {}) {
  * @param {string}   labelKey                                  i18n-Schlüssel für das Label
  * @returns {string} HTML-String
  */
-export function renderUserMultiSelect(allUsers, selectedIds, inputName, labelKey) {
+export function renderUserMultiSelect(allUsers, selectedIds, inputName, labelKey, { includeNone = true } = {}) {
   const selectedSet = new Set(selectedIds ?? []);
   const items = allUsers.map((u) => {
     const checked = selectedSet.has(u.id) ? 'checked' : '';
@@ -77,17 +77,16 @@ export function renderUserMultiSelect(allUsers, selectedIds, inputName, labelKey
       </label>`;
   });
 
-  const noneLabel = t('userMultiSelect.nobody');
   return `
     <div class="user-ms" data-ms-name="${esc(inputName)}">
       <label class="label">${t(labelKey)}</label>
       <div class="user-ms__options">
-        <label class="user-ms__option">
+        ${includeNone ? `<label class="user-ms__option">
           <input type="checkbox" class="user-ms__checkbox user-ms__none" value=""
                  data-ms-input="${esc(inputName)}" ${selectedSet.size === 0 ? 'checked' : ''}>
           <span class="user-ms__avatar user-ms__avatar--none">–</span>
-          <span class="user-ms__name">${noneLabel}</span>
-        </label>
+          <span class="user-ms__name">${t('userMultiSelect.nobody')}</span>
+        </label>` : ''}
         ${items.join('')}
       </div>
     </div>`;

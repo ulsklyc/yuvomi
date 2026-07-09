@@ -494,7 +494,6 @@ function renderBody() {
         <div>
           <span class="budget-list-header__title">${t('budget.transactions')}</span>
           ${state.budgetMode === 'personal' ? `<div class="budget-list-header__filter">${state.budgetView === 'household' ? t('budget.viewHousehold') : t('budget.viewMine')}</div>` : ''}
-          ${state.budgetMode === 'personal' ? `<div class="budget-list-header__hint">${t('budget.singleAssigneeHint')}</div>` : ''}
         </div>
         <div class="budget-list-header__actions">
         <button class="btn btn--icon btn--ghost" id="budget-manage-categories"
@@ -524,16 +523,6 @@ function renderBody() {
   _container.querySelector('#budget-list')?.addEventListener('click', async (e) => {
     const delBtn = e.target.closest('[data-action="delete"]');
     if (delBtn) { await deleteEntry(parseInt(delBtn.dataset.id, 10)); return; }
-
-    const parentBtn = e.target.closest('[data-action="open-parent"]');
-    if (parentBtn) {
-      state.budgetView = 'household';
-      await loadMonth(state.month);
-      renderBody();
-      const entry = state.entries.find((row) => row.id === parseInt(parentBtn.dataset.id, 10));
-      if (entry) openBudgetModal({ mode: 'edit', entry });
-      return;
-    }
 
     const item = e.target.closest('.budget-entry[data-id]');
     if (item && !e.target.closest('[data-action]')) {
@@ -655,16 +644,13 @@ function renderEntries() {
       && state.budgetView === 'mine'
       && e.assignee_count > 1
       && _user?.role === 'admin';
-    const parentAction = canOpenParent
-      ? ` <button class="budget-entry__meta-action" type="button" data-action="open-parent" data-id="${e.id}">${t('common.edit')} ${t('budget.viewHousehold')}</button>`
-      : '';
 
     return `
       <div class="budget-entry" data-id="${e.id}">
         <div class="budget-entry__indicator ${indClass}"></div>
         <div class="budget-entry__body">
           <div class="budget-entry__title">${esc(e.title)}</div>
-          <div class="budget-entry__meta">${date} · ${esc(categoryMeta)}${recurTag}${sourceMeta ? ` · ${esc(sourceMeta)}` : ''}${parentAction}</div>
+          <div class="budget-entry__meta">${date} · ${esc(categoryMeta)}${recurTag}${sourceMeta ? ` · ${esc(sourceMeta)}` : ''}</div>
         </div>
         <div class="budget-entry__amount ${amtClass}">${sign}${formatAmount(e.amount)}</div>
         ${(!e.is_readonly) ? `<div class="budget-entry__actions">
@@ -1043,7 +1029,15 @@ function openCategoryManager() {
   });
 }
 
-function renderBudgetAssignmentEditor(assignments = [], splitMethod = 'equal') {
+function currentBudgetUserId() {
+  return Number.isInteger(Number(_user?.id)) && Number(_user.id) > 0 ? Number(_user.id) : null;
+}
+
+function inferBudgetScope(assignments = []) {
+  return (assignments?.length || 0) > 1 ? 'shared' : 'personal';
+}
+
+function renderBudgetAssignmentEditor(assignments = [], splitMethod = 'equal', scope = 'personal') {
   const selectedIds = assignments.map((assignment) => assignment.user_id);
   const rows = assignments.map((assignment) => {
     const member = state.familyMembers.find((item) => item.id === assignment.user_id);
@@ -1057,32 +1051,64 @@ function renderBudgetAssignmentEditor(assignments = [], splitMethod = 'equal') {
   }).join('');
   return `
     <div class="budget-assignment-editor" id="budget-assignment-editor">
-      <div class="budget-assignment-editor__heading">${t('budget.assigneesLabel')}</div>
-      ${renderUserMultiSelect(state.familyMembers, selectedIds, 'budget-assignees', 'budget.assigneesLabel')}
-      <div class="form-hint">${selectedIds.length > 1 ? t('budget.multiAssigneeHint') : t('budget.singleAssigneeHint')}</div>
-      <div class="form-group">
-        <label class="form-label" for="budget-split-method">${t('budget.splitSectionLabel')}</label>
-        <select class="form-input" id="budget-split-method">
-          <option value="equal" ${splitMethod === 'equal' ? 'selected' : ''}>${t('splitExpenses.splitEqual')}</option>
-          <option value="exact" ${splitMethod === 'exact' ? 'selected' : ''}>${t('splitExpenses.splitExact')}</option>
-          <option value="percentage" ${splitMethod === 'percentage' ? 'selected' : ''}>${t('splitExpenses.splitPercentage')}</option>
-        </select>
+      <div class="budget-assignment-editor__heading">${t('settings.budgetModeLabel')}</div>
+      <div class="budget-scope-toggle" role="radiogroup" aria-label="${t('settings.budgetModeLabel')}">
+        <label class="budget-scope-toggle__option ${scope === 'personal' ? 'budget-scope-toggle__option--active' : ''}">
+          <input type="radio" name="budget-scope" value="personal" ${scope === 'personal' ? 'checked' : ''}>
+          <span>${t('budget.viewMine')}</span>
+        </label>
+        <label class="budget-scope-toggle__option ${scope === 'shared' ? 'budget-scope-toggle__option--active' : ''}">
+          <input type="radio" name="budget-scope" value="shared" ${scope === 'shared' ? 'checked' : ''}>
+          <span>${t('settings.budgetModeShared')}</span>
+        </label>
       </div>
-      <div class="budget-assignment-editor__rows" id="budget-assignment-rows">${rows}</div>
+      <div class="budget-assignment-editor__shared" id="budget-assignment-shared" ${scope === 'shared' ? '' : 'hidden'}>
+        <div class="budget-assignment-editor__heading">${t('budget.assigneesLabel')}</div>
+        ${renderUserMultiSelect(state.familyMembers, selectedIds, 'budget-assignees', 'budget.assigneesLabel', { includeNone: false })}
+        <div class="form-hint">${t('budget.multiAssigneeHint')}</div>
+        <div class="form-group" id="budget-split-method-group" ${selectedIds.length > 1 ? '' : 'hidden'}>
+          <label class="form-label" for="budget-split-method">${t('budget.splitSectionLabel')}</label>
+          <select class="form-input" id="budget-split-method">
+            <option value="equal" ${splitMethod === 'equal' ? 'selected' : ''}>${t('splitExpenses.splitEqual')}</option>
+            <option value="exact" ${splitMethod === 'exact' ? 'selected' : ''}>${t('splitExpenses.splitExact')}</option>
+            <option value="percentage" ${splitMethod === 'percentage' ? 'selected' : ''}>${t('splitExpenses.splitPercentage')}</option>
+          </select>
+        </div>
+        <div class="budget-assignment-editor__rows" id="budget-assignment-rows">${rows}</div>
+      </div>
     </div>`;
 }
 
-function bindBudgetAssignmentEditor(panel, initialAssignments = [], initialSplitMethod = 'equal') {
+function bindBudgetAssignmentEditor(panel, initialAssignments = [], initialSplitMethod = 'equal', initialScope = 'personal') {
   bindUserMultiSelect(panel, 'budget-assignees');
   const methodEl = panel.querySelector('#budget-split-method');
   const rowsEl = panel.querySelector('#budget-assignment-rows');
-  const hintEl = panel.querySelector('.budget-assignment-editor .form-hint');
+  const splitGroupEl = panel.querySelector('#budget-split-method-group');
+  const sharedEl = panel.querySelector('#budget-assignment-shared');
+  const scopeInputs = panel.querySelectorAll('input[name="budget-scope"]');
+  const currentScope = () => panel.querySelector('input[name="budget-scope"]:checked')?.value || initialScope;
+  const ensureSharedDefaults = () => {
+    if (currentScope() !== 'shared') return;
+    if (getSelectedUserIds(panel, 'budget-assignees').length) return;
+    const meId = currentBudgetUserId();
+    const mine = meId ? panel.querySelector(`.user-ms__checkbox[data-ms-input="budget-assignees"][value="${meId}"]`) : null;
+    if (mine) mine.checked = true;
+  };
   const renderRows = () => {
+    const scope = currentScope();
     const selectedIds = getSelectedUserIds(panel, 'budget-assignees');
     const existing = new Map(initialAssignments.map((assignment) => [assignment.user_id, assignment]));
     const splitMethod = methodEl?.value || initialSplitMethod;
-    if (hintEl) hintEl.textContent = selectedIds.length > 1 ? t('budget.multiAssigneeHint') : t('budget.singleAssigneeHint');
+    if (sharedEl) sharedEl.hidden = scope !== 'shared';
+    panel.querySelectorAll('.budget-scope-toggle__option').forEach((option) => {
+      option.classList.toggle('budget-scope-toggle__option--active', option.querySelector('input')?.checked);
+    });
     rowsEl.replaceChildren();
+    if (scope !== 'shared') {
+      if (splitGroupEl) splitGroupEl.hidden = true;
+      return;
+    }
+    if (splitGroupEl) splitGroupEl.hidden = selectedIds.length <= 1;
     if (splitMethod === 'equal' || selectedIds.length <= 1) return;
     rowsEl.insertAdjacentHTML('beforeend', selectedIds.map((userId) => {
       const member = state.familyMembers.find((item) => item.id === userId);
@@ -1097,15 +1123,22 @@ function bindBudgetAssignmentEditor(panel, initialAssignments = [], initialSplit
   };
   panel.querySelector('.user-ms[data-ms-name="budget-assignees"]')?.addEventListener('change', renderRows);
   methodEl?.addEventListener('change', renderRows);
+  scopeInputs.forEach((input) => input.addEventListener('change', () => {
+    ensureSharedDefaults();
+    renderRows();
+  }));
+  ensureSharedDefaults();
   renderRows();
 }
 
 function collectBudgetAssignments(panel) {
+  const scope = panel.querySelector('input[name="budget-scope"]:checked')?.value || 'personal';
   const selectedIds = getSelectedUserIds(panel, 'budget-assignees');
   const splitMethod = panel.querySelector('#budget-split-method')?.value || 'equal';
-  if (!selectedIds.length) return { split_method: splitMethod, assignments: [] };
+  if (scope !== 'shared') return { scope, split_method: 'equal', assignments: [] };
+  if (!selectedIds.length) return { scope, split_method: splitMethod, assignments: [] };
   if (splitMethod === 'equal' || selectedIds.length === 1) {
-    return { split_method: splitMethod, assignments: selectedIds.map((user_id) => ({ user_id })) };
+    return { scope, split_method: splitMethod, assignments: selectedIds.map((user_id) => ({ user_id })) };
   }
   const assignments = selectedIds.map((user_id) => {
     const row = panel.querySelector(`.budget-assignment-row[data-user-id="${user_id}"] .budget-assignment-row__value`);
@@ -1114,12 +1147,14 @@ function collectBudgetAssignments(panel) {
       ? { user_id, share_percentage: value }
       : { user_id, share_amount: value };
   });
-  return { split_method: splitMethod, assignments };
+  return { scope, split_method: splitMethod, assignments };
 }
 
 function validateBudgetAssignments(panel, amount) {
-  const { split_method, assignments } = collectBudgetAssignments(panel);
-  if (assignments.length <= 1 || split_method === 'equal') return null;
+  const { scope, split_method, assignments } = collectBudgetAssignments(panel);
+  if (scope !== 'shared') return null;
+  if (assignments.length <= 1) return t('budget.multiAssigneeHint');
+  if (split_method === 'equal') return null;
   if (split_method === 'percentage') {
     const total = assignments.reduce((sum, assignment) => sum + Number(assignment.share_percentage || 0), 0);
     if (Math.abs(total - 100) > 0.01) return t('splitExpenses.splitHint.percentage');
@@ -1152,15 +1187,16 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
   ).join('');
   const initialCategory = isEdit ? entry.category : initialCats[0]?.key;
   const initialSubcategory = isEdit ? entry.subcategory : defaultSubcategory(initialCategory);
+  const initialScope = state.budgetMode === 'personal' ? inferBudgetScope(isEdit ? (entry.assignments || []) : []) : 'personal';
   const subcatOpts = getSubcategories(initialCategory).map((s) =>
     `<option value="${esc(s.key)}" ${initialSubcategory === s.key ? 'selected' : ''}>${esc(subcategoryLabel(s))}</option>`
   ).join('');
   const assignmentSection = state.budgetMode === 'personal'
-    ? renderBudgetAssignmentEditor(isEdit ? (entry.assignments || []) : [], isEdit ? (entry.split_method || 'equal') : 'equal')
+    ? renderBudgetAssignmentEditor(isEdit ? (entry.assignments || []) : [], isEdit ? (entry.split_method || 'equal') : 'equal', initialScope)
     : '';
-  const viewHint = state.budgetMode === 'personal' ? `<div class="form-hint">${t('budget.viewMine')}</div>` : '';
 
   const content = `
+    <div class="budget-modal">
     <div class="amount-type-toggle ${isEdit ? 'amount-type-toggle--entry-only' : ''}">
       <button class="amount-type-btn amount-type-btn--expenses ${isExpense ? 'amount-type-btn--active' : ''}"
               id="type-expense" type="button">${t('budget.typeExpense')}</button>
@@ -1197,7 +1233,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
              value="${isEdit ? entry.date : today}">
     </div>
 
-    ${state.budgetMode === 'personal' ? `<div class="js-entry-field">${viewHint}${assignmentSection}</div>` : ''}
+    ${state.budgetMode === 'personal' ? `<div class="js-entry-field">${assignmentSection}</div>` : ''}
 
     <div class="js-entry-field">
       ${advancedSection(`
@@ -1273,12 +1309,13 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
         <button class="btn btn--secondary" id="bm-cancel">${t('common.cancel')}</button>
         <button class="btn btn--primary" id="bm-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>
+    </div>
     </div>`;
 
   openSharedModal({
     title: isEdit ? t('budget.editEntry') : t('budget.newEntry'),
     content,
-    size: 'sm',
+    size: 'lg',
     onSave(panel) {
       let currentType = !isEdit && initialType === 'loan' ? 'loan' : (isExpense ? 'expense' : 'income');
 
@@ -1389,7 +1426,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
       panel.querySelector('#bm-add-category').addEventListener('click', addCategory);
       panel.querySelector('#bm-add-subcategory').addEventListener('click', addSubcategory);
       panel.querySelector('#bm-cancel').addEventListener('click', closeModal);
-      if (state.budgetMode === 'personal') bindBudgetAssignmentEditor(panel, entry?.assignments || [], entry?.split_method || 'equal');
+      if (state.budgetMode === 'personal') bindBudgetAssignmentEditor(panel, entry?.assignments || [], entry?.split_method || 'equal', initialScope);
 
       panel.querySelector('#bm-delete')?.addEventListener('click', async () => {
         closeModal({ force: true });
