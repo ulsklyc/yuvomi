@@ -369,6 +369,13 @@
         "transferSuccess": "{{count}} ingrediënt overgezet",
         "transferSuccessPlural": "{{count}} ingrediënten overgezet",
         "transferAlreadyDone": "Alle ingrediënten zijn al overgezet",
+        "randomizePlan": "Plan willekeurig vullen",
+        "randomizeTitle": "Maaltijdplan willekeurig vullen",
+        "randomizeReplaceExisting": "Bestaande maaltijden vervangen",
+        "replaceExistingConfirm": "Bestaande maaltijden vervangen?",
+        "randomizeSuccess": "{{count}} maaltijden gepland.",
+        "randomizeWeekFull": "De zichtbare week is al volledig gevuld.",
+        "randomizeNoRecipes": "Er zijn geen passende recepten beschikbaar voor de huidige week.",
         "ingredientCount": "{{count}} ingrediënt",
         "ingredientCountPlural": "{{count}} ingrediënten",
         "titleRequired": "Titel is verplicht",
@@ -1756,6 +1763,7 @@
         "duplicate": "Dupliceren",
         "duplicated": "Recept gedupliceerd.",
         "copySuffix": "kopie",
+        "dragToMealsHint": "Sleep recepten naar maaltijdvakken om ze snel in te plannen.",
         "emptyAction": "Recept aanmaken"
     },
     "search": {

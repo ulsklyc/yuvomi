@@ -375,6 +375,13 @@
         "transferSuccess": "{{count}} bahan dipindahkan",
         "transferSuccessPlural": "{{count}} bahan dipindahkan",
         "transferAlreadyDone": "Semua bahan sudah dipindahkan",
+        "randomizePlan": "Isi rencana secara acak",
+        "randomizeTitle": "Acak rencana makan",
+        "randomizeReplaceExisting": "Ganti makanan yang ada",
+        "replaceExistingConfirm": "Ganti makanan yang sudah ada?",
+        "randomizeSuccess": "{{count}} makanan direncanakan.",
+        "randomizeWeekFull": "Minggu yang terlihat sudah penuh.",
+        "randomizeNoRecipes": "Tidak ada resep yang cocok untuk minggu ini.",
         "ingredientCount": "{{count}} bahan",
         "ingredientCountPlural": "{{count}} bahan",
         "titleRequired": "Judul wajib diisi",
@@ -1762,7 +1769,8 @@
         "titleRequired": "Judul wajib diisi.",
         "duplicate": "Duplikat",
         "duplicated": "Resep diduplikat.",
-        "copySuffix": "Salinan"
+        "copySuffix": "Salinan",
+        "dragToMealsHint": "Seret resep ke slot makan untuk merencanakannya dengan cepat."
     },
     "onboarding": {
         "step1Title": "Selamat datang di {{name}}",

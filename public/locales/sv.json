@@ -369,6 +369,13 @@
         "transferSuccess": "{{count}} ingrediens har överförts",
         "transferSuccessPlural": "{{count}} ingredienser har överförts",
         "transferAlreadyDone": "Alla ingredienser är redan överförda",
+        "randomizePlan": "Fyll planen slumpmässigt",
+        "randomizeTitle": "Fyll matplanen slumpmässigt",
+        "randomizeReplaceExisting": "Ersätt befintliga måltider",
+        "replaceExistingConfirm": "Ersätta befintliga måltider?",
+        "randomizeSuccess": "{{count}} måltider planerade.",
+        "randomizeWeekFull": "Den visade veckan är redan helt fylld.",
+        "randomizeNoRecipes": "Inga passande recept finns för den aktuella veckan.",
         "ingredientCount": "{{count}} ingrediens",
         "ingredientCountPlural": "{{count}} ingredienser",
         "titleRequired": "Titel krävs",
@@ -1694,6 +1701,7 @@
         "duplicate": "Duplicera",
         "duplicated": "Recept duplicerat.",
         "copySuffix": "kopia",
+        "dragToMealsHint": "Dra recept till måltidsfälten för att snabbt planera dem.",
         "emptyAction": "Skapa recept"
     },
     "search": {

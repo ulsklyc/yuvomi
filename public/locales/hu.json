@@ -369,6 +369,13 @@
         "transferSuccess": "{{count}} hozzávaló átvitele sikeres",
         "transferSuccessPlural": "{{count}} hozzávaló átvitele sikeres",
         "transferAlreadyDone": "Már minden hozzávaló átvitelre került.",
+        "randomizePlan": "Terv véletlenszerű kitöltése",
+        "randomizeTitle": "Étrend véletlenszerű kitöltése",
+        "randomizeReplaceExisting": "Meglévő ételek lecserélése",
+        "replaceExistingConfirm": "Lecseréljük a meglévő ételeket?",
+        "randomizeSuccess": "{{count}} étel megtervezve.",
+        "randomizeWeekFull": "A látható hét már teljesen tele van.",
+        "randomizeNoRecipes": "Nincs megfelelő recept az aktuális hétre.",
         "ingredientCount": "{{count}} hozzávaló",
         "ingredientCountPlural": "{{count}} hozzávaló",
         "titleRequired": "Cím megadása kötelező",
@@ -1756,6 +1763,7 @@
         "duplicate": "Másolat",
         "duplicated": "Recept másolva.",
         "copySuffix": "másolat",
+        "dragToMealsHint": "Húzza a recepteket az étkezési helyekre a gyors tervezéshez.",
         "emptyAction": "Recept létrehozása"
     },
     "search": {

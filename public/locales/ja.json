@@ -369,6 +369,13 @@
         "transferSuccess": "{{count}} 種の材料を追加しました",
         "transferSuccessPlural": "{{count}} 種の材料を追加しました",
         "transferAlreadyDone": "すべての材料が追加済みです",
+        "randomizePlan": "献立をランダムに埋める",
+        "randomizeTitle": "献立をランダムに作成",
+        "randomizeReplaceExisting": "既存の食事を置き換える",
+        "replaceExistingConfirm": "既存の食事を置き換えますか？",
+        "randomizeSuccess": "{{count}} 件の食事を計画しました。",
+        "randomizeWeekFull": "表示中の週はすでに埋まっています。",
+        "randomizeNoRecipes": "現在の週に使える適切なレシピがありません。",
         "ingredientCount": "材料 {{count}} 種",
         "ingredientCountPlural": "材料 {{count}} 種",
         "titleRequired": "タイトルは必須です",
@@ -1694,6 +1701,7 @@
         "duplicate": "複製",
         "duplicated": "レシピが複製されました。",
         "copySuffix": "コピー",
+        "dragToMealsHint": "レシピを食事スロットにドラッグして、すばやく献立を組めます。",
         "emptyAction": "レシピを作成"
     },
     "search": {

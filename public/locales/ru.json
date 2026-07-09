@@ -369,6 +369,13 @@
         "transferSuccess": "{{count}} ингредиент перенесён",
         "transferSuccessPlural": "{{count}} ингредиентов перенесено",
         "transferAlreadyDone": "Все ингредиенты уже перенесены",
+        "randomizePlan": "Заполнить план случайно",
+        "randomizeTitle": "Случайно заполнить план питания",
+        "randomizeReplaceExisting": "Заменить существующие блюда",
+        "replaceExistingConfirm": "Заменить существующие блюда?",
+        "randomizeSuccess": "Запланировано {{count}} блюд.",
+        "randomizeWeekFull": "Отображаемая неделя уже полностью заполнена.",
+        "randomizeNoRecipes": "Для текущей недели нет подходящих рецептов.",
         "ingredientCount": "{{count}} ингредиент",
         "ingredientCountPlural": "{{count}} ингредиентов",
         "titleRequired": "Название обязательно",
@@ -1694,6 +1701,7 @@
         "duplicate": "Дублировать",
         "duplicated": "Рецепт дублирован.",
         "copySuffix": "копия",
+        "dragToMealsHint": "Перетаскивайте рецепты в слоты приёмов пищи, чтобы быстро составить план.",
         "emptyAction": "Создать рецепт"
     },
     "search": {

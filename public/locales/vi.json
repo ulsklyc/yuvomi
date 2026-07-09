@@ -369,6 +369,13 @@
         "transferSuccess": "{{count}} nguyên liệu đã được chuyển",
         "transferSuccessPlural": "{{count}} nguyên liệu đã được chuyển",
         "transferAlreadyDone": "Tất cả các nguyên liệu đã được chuyển",
+        "randomizePlan": "Điền kế hoạch ngẫu nhiên",
+        "randomizeTitle": "Lập kế hoạch bữa ăn ngẫu nhiên",
+        "randomizeReplaceExisting": "Thay thế các bữa ăn hiện có",
+        "replaceExistingConfirm": "Thay thế các bữa ăn hiện có?",
+        "randomizeSuccess": "Đã lên kế hoạch {{count}} bữa ăn.",
+        "randomizeWeekFull": "Tuần đang hiển thị đã kín chỗ.",
+        "randomizeNoRecipes": "Không có công thức phù hợp cho tuần hiện tại.",
         "ingredientCount": "{{count}} nguyên liệu",
         "ingredientCountPlural": "{{count}} nguyên liệu",
         "titleRequired": "Tiêu đề là bắt buộc",
@@ -1756,6 +1763,7 @@
         "duplicate": "Nhân bản",
         "duplicated": "Công thức đã được nhân bản.",
         "copySuffix": "bản sao",
+        "dragToMealsHint": "Kéo công thức vào ô bữa ăn để lên kế hoạch nhanh hơn.",
         "emptyAction": "Tạo công thức"
     },
     "search": {

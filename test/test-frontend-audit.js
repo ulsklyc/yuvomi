@@ -842,6 +842,45 @@ test('Kitchen settings copy directs Recipes and Shopping content settings to the
   assert.match(german.settings.pageKitchenDescription, /Modulen/);
 });
 
+test('Recipes expose meal-type suitability controls for planner integrations', () => {
+  const recipesPage = read('../public/pages/recipes.js');
+  const recipesCss = read('../public/styles/recipes.css');
+
+  assert.match(recipesPage, /normalizeRecipeMealTypes/);
+  assertKeysExistInEveryLocale(['recipes.dragToMealsHint']);
+  assert.match(recipesPage, /id="recipe-meal-types"/);
+  assert.match(recipesPage, /input type="checkbox" value="\$\{option\.key\}" checked/);
+  assert.match(recipesPage, /meal_types/);
+  assert.match(recipesCss, /\.recipe-meal-types\s*\{/);
+  assert.match(recipesCss, /\.recipe-card__meal-types\s*\{/);
+});
+
+test('Meals page adds a recipe sidebar and randomize planner controls', () => {
+  const mealsPage = read('../public/pages/meals.js');
+  const mealsCss = read('../public/styles/meals.css');
+
+  assert.match(mealsPage, /id="week-randomize"/);
+  assert.match(mealsPage, /id="recipe-sidebar"/);
+  assert.match(mealsPage, /recipes\.dragToMealsHint/);
+  assert.match(mealsPage, /function renderRecipeSidebar/);
+  assert.match(mealsPage, /function openRandomizeModal/);
+  assert.match(mealsPage, /function wireRecipeSidebar/);
+  assert.match(mealsPage, /confirmModal\(t\('meals\.replaceExistingConfirm'\)/, 'dropping onto occupied slots should use a dedicated localized confirmation string');
+  assert.match(mealsPage, /recipeSupportsMealType/);
+  assert.match(mealsCss, /\.meals-layout\s*\{/);
+  assert.match(mealsCss, /\.recipe-sidebar\s*\{/);
+  assert.match(mealsCss, /\.week-nav__randomize\s*\{/);
+  assertKeysExistInEveryLocale([
+    'meals.randomizePlan',
+    'meals.randomizeTitle',
+    'meals.randomizeReplaceExisting',
+    'meals.replaceExistingConfirm',
+    'meals.randomizeSuccess',
+    'meals.randomizeWeekFull',
+    'meals.randomizeNoRecipes',
+  ]);
+});
+
 test('browser loader supports personal settings API and auth imports', () => {
   const source = read('./test-browser-loader.mjs');
 

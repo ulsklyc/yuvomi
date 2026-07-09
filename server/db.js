@@ -2856,6 +2856,13 @@ const MIGRATIONS = [
       ALTER TABLE api_tokens ADD COLUMN scopes TEXT DEFAULT NULL;
     `,
   },
+  {
+    version: 73,
+    description: 'recipe meal type suitability for planner integrations',
+    up: `
+      ALTER TABLE recipes ADD COLUMN meal_types TEXT NOT NULL DEFAULT 'breakfast,lunch,dinner,snack';
+    `,
+  },
 ];
 
 /**

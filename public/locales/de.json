@@ -375,6 +375,13 @@
         "transferSuccess": "{{count}} Zutat übertragen",
         "transferSuccessPlural": "{{count}} Zutaten übertragen",
         "transferAlreadyDone": "Alle Zutaten bereits übertragen",
+        "randomizePlan": "Plan zufällig füllen",
+        "randomizeTitle": "Essensplan zufällig füllen",
+        "randomizeReplaceExisting": "Vorhandene Mahlzeiten ersetzen",
+        "replaceExistingConfirm": "Vorhandene Mahlzeiten ersetzen?",
+        "randomizeSuccess": "{{count}} Mahlzeiten geplant.",
+        "randomizeWeekFull": "Die sichtbare Woche ist bereits vollständig belegt.",
+        "randomizeNoRecipes": "Für die aktuelle Woche sind keine passenden Rezepte verfügbar.",
         "ingredientCount": "{{count}} Zutat",
         "ingredientCountPlural": "{{count}} Zutaten",
         "titleRequired": "Titel ist erforderlich",
@@ -1762,7 +1769,8 @@
         "titleRequired": "Titel ist erforderlich.",
         "duplicate": "Duplizieren",
         "duplicated": "Rezept dupliziert.",
-        "copySuffix": "Kopie"
+        "copySuffix": "Kopie",
+        "dragToMealsHint": "Ziehe Rezepte auf Essens-Slots, um sie schnell einzuplanen."
     },
     "onboarding": {
         "step1Title": "Willkommen bei {{name}}",

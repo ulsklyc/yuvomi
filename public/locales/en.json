@@ -369,6 +369,13 @@
         "transferSuccess": "{{count}} ingredient transferred",
         "transferSuccessPlural": "{{count}} ingredients transferred",
         "transferAlreadyDone": "All ingredients already transferred",
+        "randomizePlan": "Randomize plan",
+        "randomizeTitle": "Randomize meal plan",
+        "randomizeReplaceExisting": "Replace existing meals",
+        "replaceExistingConfirm": "Replace existing meals?",
+        "randomizeSuccess": "{{count}} meals planned.",
+        "randomizeWeekFull": "The visible week is already full.",
+        "randomizeNoRecipes": "No compatible recipes are available for the current week.",
         "ingredientCount": "{{count}} ingredient",
         "ingredientCountPlural": "{{count}} ingredients",
         "titleRequired": "Title is required",
@@ -1756,6 +1763,7 @@
         "duplicate": "Duplicate",
         "duplicated": "Recipe duplicated.",
         "copySuffix": "copy",
+        "dragToMealsHint": "Drag recipes onto meal slots to plan them quickly.",
         "emptyAction": "Create recipe"
     },
     "search": {

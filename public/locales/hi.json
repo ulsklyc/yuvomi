@@ -369,6 +369,13 @@
         "transferSuccess": "{{count}} सामग्री जोड़ी गई",
         "transferSuccessPlural": "{{count}} सामग्रियां जोड़ी गईं",
         "transferAlreadyDone": "सभी सामग्रियां पहले से जोड़ी गई हैं",
+        "randomizePlan": "योजना को यादृच्छिक रूप से भरें",
+        "randomizeTitle": "भोजन योजना को यादृच्छिक रूप से भरें",
+        "randomizeReplaceExisting": "मौजूदा भोजन बदलें",
+        "replaceExistingConfirm": "मौजूदा भोजन बदलें?",
+        "randomizeSuccess": "{{count}} भोजन योजनाबद्ध किए गए।",
+        "randomizeWeekFull": "दिखाई जा रही सप्ताह पहले से पूरी भरी हुई है।",
+        "randomizeNoRecipes": "वर्तमान सप्ताह के लिए कोई उपयुक्त रेसिपी उपलब्ध नहीं है।",
         "ingredientCount": "{{count}} सामग्री",
         "ingredientCountPlural": "{{count}} सामग्रियां",
         "titleRequired": "शीर्षक आवश्यक है",
@@ -1694,6 +1701,7 @@
         "duplicate": "डुप्लिकेट",
         "duplicated": "रेसिपी डुप्लिकेट की गई।",
         "copySuffix": "कॉपी",
+        "dragToMealsHint": "रेसिपी को भोजन स्लॉट पर खींचकर जल्दी योजना बनाएं।",
         "emptyAction": "रेसिपी बनाएं"
     },
     "search": {

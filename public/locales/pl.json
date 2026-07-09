@@ -375,6 +375,13 @@
         "transferSuccess": "Przeniesiono {{count}} składnik",
         "transferSuccessPlural": "Przeniesiono {{count}} składniki",
         "transferAlreadyDone": "Wszystkie składniki już przeniesione",
+        "randomizePlan": "Wypełnij plan losowo",
+        "randomizeTitle": "Losowo wypełnij plan posiłków",
+        "randomizeReplaceExisting": "Zastąp istniejące posiłki",
+        "replaceExistingConfirm": "Zastąpić istniejące posiłki?",
+        "randomizeSuccess": "Zaplanowano {{count}} posiłków.",
+        "randomizeWeekFull": "Widoczny tydzień jest już w pełni zapełniony.",
+        "randomizeNoRecipes": "Brak pasujących przepisów na bieżący tydzień.",
         "ingredientCount": "{{count}} składnik",
         "ingredientCountPlural": "{{count}} składniki",
         "titleRequired": "Tytuł jest wymagany",
@@ -1762,7 +1769,8 @@
         "titleRequired": "Tytuł jest wymagany.",
         "duplicate": "Duplikuj",
         "duplicated": "Przepis zduplikowany.",
-        "copySuffix": "Kopia"
+        "copySuffix": "Kopia",
+        "dragToMealsHint": "Przeciągnij przepisy do pól posiłków, aby szybko je zaplanować."
     },
     "onboarding": {
         "step1Title": "Witaj w {{name}}",

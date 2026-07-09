@@ -369,6 +369,13 @@
         "transferSuccess": "已添加 {{count}} 种食材",
         "transferSuccessPlural": "已添加 {{count}} 种食材",
         "transferAlreadyDone": "所有食材已添加",
+        "randomizePlan": "随机填充计划",
+        "randomizeTitle": "随机生成餐食计划",
+        "randomizeReplaceExisting": "替换现有餐食",
+        "replaceExistingConfirm": "要替换现有餐食吗？",
+        "randomizeSuccess": "已规划 {{count}} 餐。",
+        "randomizeWeekFull": "当前显示的这一周已经排满了。",
+        "randomizeNoRecipes": "当前这一周没有可用的匹配食谱。",
         "ingredientCount": "{{count}} 种食材",
         "ingredientCountPlural": "{{count}} 种食材",
         "titleRequired": "标题为必填项",
@@ -1694,6 +1701,7 @@
         "duplicate": "复制",
         "duplicated": "食谱已复制。",
         "copySuffix": "副本",
+        "dragToMealsHint": "将食谱拖到餐次格中即可快速安排。",
         "emptyAction": "创建食谱"
     },
     "search": {

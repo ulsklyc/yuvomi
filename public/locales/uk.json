@@ -369,6 +369,13 @@
         "transferSuccess": "{{count}} інгредієнт перенесено",
         "transferSuccessPlural": "{{count}} інгредієнтів перенесено",
         "transferAlreadyDone": "Усі інгредієнти вже перенесено",
+        "randomizePlan": "Заповнити план навмання",
+        "randomizeTitle": "Випадково заповнити план харчування",
+        "randomizeReplaceExisting": "Замінити наявні страви",
+        "replaceExistingConfirm": "Замінити наявні страви?",
+        "randomizeSuccess": "Заплановано {{count}} страв.",
+        "randomizeWeekFull": "Видимий тиждень уже повністю заповнений.",
+        "randomizeNoRecipes": "Для поточного тижня немає відповідних рецептів.",
         "ingredientCount": "{{count}} інгредієнт",
         "ingredientCountPlural": "{{count}} інгредієнтів",
         "titleRequired": "Заголовок є обов'язковим",
@@ -1727,6 +1734,7 @@
         "duplicate": "Дублювати",
         "duplicated": "Рецепт продубльовано.",
         "copySuffix": "копія",
+        "dragToMealsHint": "Перетягуйте рецепти в слоти прийомів їжі, щоб швидко скласти план.",
         "emptyAction": "Створити рецепт"
     },
     "search": {

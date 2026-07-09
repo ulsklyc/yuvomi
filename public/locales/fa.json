@@ -375,6 +375,13 @@
         "transferSuccess": "{{count}} ماده منتقل شد",
         "transferSuccessPlural": "{{count}} ماده منتقل شد",
         "transferAlreadyDone": "همه مواد قبلاً منتقل شده‌اند",
+        "randomizePlan": "پر کردن تصادفی برنامه",
+        "randomizeTitle": "پر کردن تصادفی برنامه غذایی",
+        "randomizeReplaceExisting": "جایگزینی وعده‌های موجود",
+        "replaceExistingConfirm": "وعده‌های موجود جایگزین شوند؟",
+        "randomizeSuccess": "{{count}} وعده برنامه‌ریزی شد.",
+        "randomizeWeekFull": "هفتهٔ نمایش‌داده‌شده از قبل کامل است.",
+        "randomizeNoRecipes": "هیچ دستور مناسبی برای هفته فعلی در دسترس نیست.",
         "ingredientCount": "{{count}} ماده",
         "ingredientCountPlural": "{{count}} ماده",
         "titleRequired": "عنوان الزامی است",
@@ -1762,7 +1769,8 @@
         "titleRequired": "عنوان الزامی است.",
         "duplicate": "تکثیر",
         "duplicated": "دستور غذا تکثیر شد.",
-        "copySuffix": "کپی"
+        "copySuffix": "کپی",
+        "dragToMealsHint": "برای برنامه\u200cریزی سریع، دستورها را روی خانه\u200cهای وعده بکشید."
     },
     "onboarding": {
         "step1Title": "به {{name}} خوش آمدید",

@@ -369,6 +369,13 @@
         "transferSuccess": "{{count}} υλικό μεταφέρθηκε",
         "transferSuccessPlural": "{{count}} υλικά μεταφέρθηκαν",
         "transferAlreadyDone": "Όλα τα υλικά έχουν ήδη μεταφερθεί",
+        "randomizePlan": "Τυχαία συμπλήρωση πλάνου",
+        "randomizeTitle": "Τυχαία συμπλήρωση πλάνου γευμάτων",
+        "randomizeReplaceExisting": "Αντικατάσταση υπαρχόντων γευμάτων",
+        "replaceExistingConfirm": "Να αντικατασταθούν τα υπάρχοντα γεύματα;",
+        "randomizeSuccess": "Προγραμματίστηκαν {{count}} γεύματα.",
+        "randomizeWeekFull": "Η ορατή εβδομάδα είναι ήδη πλήρης.",
+        "randomizeNoRecipes": "Δεν υπάρχουν κατάλληλες συνταγές για την τρέχουσα εβδομάδα.",
         "ingredientCount": "{{count}} υλικό",
         "ingredientCountPlural": "{{count}} υλικά",
         "titleRequired": "Ο τίτλος είναι υποχρεωτικός",
@@ -1694,6 +1701,7 @@
         "duplicate": "Διπλότυπο",
         "duplicated": "Η συνταγή αντιγράφηκε.",
         "copySuffix": "αντίγραφο",
+        "dragToMealsHint": "Σύρετε συνταγές στα πλαίσια γευμάτων για γρήγορο προγραμματισμό.",
         "emptyAction": "Δημιουργία συνταγής"
     },
     "search": {
