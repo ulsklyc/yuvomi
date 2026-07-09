@@ -203,6 +203,16 @@ export const SETTINGS_LEAVES = freezeEntries([
     loader: () => import('/settings/pages/admin-family.js'),
   },
   {
+    id: 'admin-permissions',
+    domainId: 'admin',
+    path: '/settings/admin/permissions',
+    labelKey: 'settings.pagePermissions',
+    descriptionKey: 'settings.pagePermissionsDescription',
+    icon: 'shield-check',
+    adminOnly: true,
+    loader: () => import('/settings/pages/admin-permissions.js'),
+  },
+  {
     id: 'admin-api',
     domainId: 'admin',
     path: '/settings/admin/api',

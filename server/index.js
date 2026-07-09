@@ -54,6 +54,8 @@ import emailRouter from './routes/email.js';
 import notificationsRouter from './routes/notifications.js';
 import healthRouter from './routes/health.js';
 import rewardsRouter from './routes/rewards.js';
+import permissionsRouter from './routes/permissions.js';
+import changelogRouter from './routes/changelog.js';
 import mcpRouter from './mcp/server.js';
 import { moduleForPath, requiredAccess, tokenAllows } from './scopes.js';
 
@@ -337,6 +339,9 @@ app.use('/mcp', apiLimiter, requireAuth, mcpRouter);
 
 // Alle weiteren API-Routen erfordern Authentifizierung + CSRF-Schutz
 app.use('/api/v1', requireAuth);
+// System-Metadaten: authentifiziert, aber bewusst vor Guest-/Token-Scope-Gates
+// wie /version behandelt. Keine Haushaltsdaten, nur upstream Release Notes.
+app.use('/api/v1/changelog', changelogRouter);
 app.use('/api/v1', (req, res, next) => {
   try {
     const guest = db.get().prepare('SELECT 1 FROM split_expense_guest_users WHERE user_id = ?').get(req.authUserId);
@@ -355,13 +360,32 @@ app.use('/api/v1', (req, res, next) => {
 // darf ein Modul nur in der gewährten Zugriffsart (read/write) erreichen; jeder
 // nicht abgedeckte /api/v1-Pfad wird verweigert (Least Privilege). Deckt damit
 // zugleich die MCP-OpenAPI-Brücke ab, da diese per Loopback mit demselben Token
-// hier durchläuft. Interaktive Sessions (authScopes === null) sind unbetroffen.
+// hier durchläuft.
 app.use('/api/v1', (req, res, next) => {
   if (req.authMethod !== 'api_token' || req.authScopes == null) return next();
   const moduleKey = moduleForPath(req.path);
   const access = requiredAccess(req.method);
   if (tokenAllows(req.authScopes, moduleKey, access)) return next();
   return res.status(403).json({ error: 'Token scope does not permit this operation.', code: 403 });
+});
+// Rollen-/Mitglied-Rechte: Für eingeschränkte Mitglieds-Sessions (#467). Anders
+// als Token-Scopes ist dies eine DENY-Liste — nur konfigurierte Module werden
+// gesperrt, jeder unbekannte Pfad (/auth, /preferences, /settings-Daten …) bleibt
+// erreichbar, damit die App bedienbar bleibt. Admins haben sessionModuleAccess
+// === null (Bypass), ebenso unbeschränkte Mitglieder (Fast-Path).
+app.use('/api/v1', (req, res, next) => {
+  const access = req.sessionModuleAccess;
+  if (!access) return next();
+  const moduleKey = moduleForPath(req.path);
+  if (!moduleKey || !(moduleKey in access)) return next();
+  const level = access[moduleKey];
+  if (level === 'none') {
+    return res.status(403).json({ error: 'You do not have access to this module.', code: 403 });
+  }
+  if (level === 'read' && requiredAccess(req.method) === 'write') {
+    return res.status(403).json({ error: 'You have read-only access to this module.', code: 403 });
+  }
+  return next();
 });
 app.use('/api/v1', csrfMiddleware);
 app.use('/api/v1/dashboard', dashboardRouter);
@@ -392,6 +416,7 @@ app.use('/api/v1/email', emailRouter);
 app.use('/api/v1/notifications', notificationsRouter);
 app.use('/api/v1/health', healthRouter);
 app.use('/api/v1/rewards', rewardsRouter);
+app.use('/api/v1/permissions', permissionsRouter);
 
 // --------------------------------------------------------
 // Health-Check (für Docker)

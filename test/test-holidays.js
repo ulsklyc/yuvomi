@@ -71,8 +71,14 @@ function makeApiMock() {
         name: [{ language: 'DE', text: 'Neujahr' }, { language: 'EN', text: "New Year's Day" }] }]);
     }
     if (path === '/SchoolHolidays') {
-      return okJson([{ startDate: '2026-07-20', endDate: '2026-08-30',
-        name: [{ language: 'DE', text: 'Sommerferien' }, { language: 'EN', text: 'Summer break' }] }]);
+      return okJson([
+        { startDate: '2026-07-20', endDate: '2026-08-30',
+          name: [{ language: 'DE', text: 'Sommerferien' }, { language: 'EN', text: 'Summer break' }] },
+        // Sub-regionale Insel-Ausnahme (Sylt/Föhr/…): abweichendes Enddatum,
+        // von OpenHolidays mit "Exception" getaggt – muss verworfen werden (#434).
+        { startDate: '2026-07-20', endDate: '2026-08-23', tags: ['Exception'],
+          name: [{ language: 'DE', text: 'Sommerferien' }, { language: 'EN', text: 'Summer break' }] },
+      ]);
     }
     if (path === '/Countries') {
       return okJson([
@@ -243,6 +249,22 @@ test('sync: both layers enabled caches public and school entries', async () => {
   assert.equal(res.synced, SYNC_YEAR_SPAN * 2);
   assert.equal(db.prepare("SELECT COUNT(*) c FROM holiday_cache WHERE type='public'").get().c, SYNC_YEAR_SPAN);
   assert.equal(db.prepare("SELECT COUNT(*) c FROM holiday_cache WHERE type='school'").get().c, SYNC_YEAR_SPAN);
+});
+
+test('sync: drops "Exception"-tagged sub-regional holiday variants – no duplicate school breaks (#434)', async () => {
+  __setFetchImpl(makeApiMock());
+  // Schleswig-Holstein: OpenHolidays liefert neben den regulären Sommerferien
+  // eine zweite, "Exception"-getaggte Variante mit früherem Enddatum (Inseln).
+  setConfig({ holiday_country: 'DE', holiday_subdivision: 'DE-SH',
+    holiday_show_public: '0', holiday_show_school: '1' });
+
+  const res = await sync(true);
+
+  // Pro Jahr bleibt nur der reguläre Eintrag – die Insel-Ausnahme wird verworfen.
+  assert.equal(res.synced, SYNC_YEAR_SPAN);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM holiday_cache WHERE type='school'").get().c, SYNC_YEAR_SPAN);
+  const ends = db.prepare("SELECT DISTINCT end_date FROM holiday_cache WHERE type='school'").all().map((r) => r.end_date);
+  assert.deepEqual(ends, ['2026-08-30']); // nur das reguläre Enddatum, nicht 2026-08-23
 });
 
 test('sync: Brazil public holidays use PT and local fallback when OpenHolidays has no rows', async () => {

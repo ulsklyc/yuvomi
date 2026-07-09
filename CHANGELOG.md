@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-07-09
+
+### Changed
+- Localized the roles and permissions settings UI into all supported languages. The new strings shipped translated in German and English only in v1.4.0; the other 21 languages now have full translations instead of the English fallback.
+
+## [1.4.0] - 2026-07-09
+
+### Added
+- Roles and permissions: granular, server-enforced access control per family role and per member, configured under Settings → Administration → Roles and permissions. Each module can be set to No access, Read only, or Full, and each dashboard widget to Available or Blocked; widgets inherit their module's lock and can also be blocked on their own (for example, hiding the cycle widget for some members without disabling Health). Only deviations from the default (full access) are stored, so unset roles and members keep full access and existing installs are unchanged; administrators always keep full access and cannot be locked out. Blocked modules disappear from navigation and the dashboard, and a read-only module hides its create button and shows an explanatory banner. The settings page offers a role/member switch, an at-a-glance overview of a role's deviations, and per-module and per-widget access as icon controls with widgets nested under their module. (#467)
+
+## [1.3.1] - 2026-07-09
+
+### Added
+- Calendar: an opt-in `ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK` environment flag lets ICS calendar subscriptions use `http://` URLs and local/private-network feeds (e.g. a Sonarr, Radarr, or Home Assistant calendar in the same LAN). It lifts the built-in SSRF protection for ICS subscriptions only, and defaults to off — enable it only in controlled environments.
+
+## [1.3.0] - 2026-07-09
+
+### Added
+- Meals: a drag-and-drop recipe sidebar on the weekly planner — drag any saved recipe onto a day/slot to plan it, with title, notes, URL, and ingredients pre-filled. Slots only accept recipes whose meal-type suitability includes that slot; the existing per-slot add button remains as the keyboard/touch path. (#464)
+- Meals: a one-click "Randomize plan" action that fills the visible week's empty slots with randomly chosen suitable recipes, respecting each recipe's meal types and the household's visible meal types. (#464)
+- Recipes: per-recipe meal-type suitability (breakfast/lunch/dinner/snack, all on by default) chosen via checkboxes in the recipe editor; it gates which planner slots accept a recipe and scopes the week randomizer. (#464)
+- Shopping: bulk import ingredients from the meal plan by date range — a "From meal plan" action imports every planned meal's ingredients in the selected range (default: next 7 days), aggregating repeated ingredients and skipping already-transferred ones. (#462)
+- In-app changelog: a Help-adjacent "Changelog" action opens the release history, showing the installed version alongside the latest available release. Notes are fetched on demand from GitHub via the app's own backend and cached in memory for 30 minutes. (#463)
+
+### Fixed
+- Sidebar: fixed several desktop collapse issues — the rail now actually collapses on click, stays collapsed instead of re-expanding while the pointer rests on it, and the active-item indicator tracks the collapsed/expanded layout correctly. (#460)
+
+## [1.2.3] - 2026-07-09
+
+### Fixed
+- Holidays: school breaks and public holidays no longer show up twice in the calendar. OpenHolidays returns sub-regional deviations of a holiday (e.g. Schleswig-Holstein's separate summer/autumn breaks for the islands of Sylt, Föhr, Amrum, Helgoland and the Halligen) as extra `Exception`-tagged entries with different start/end dates, which read-side de-duplication could not collapse. These sub-regional exception variants are now dropped during sync, leaving one clean entry per holiday. Existing duplicates clear on the next sync (Settings → Holidays → Sync now).
+
+## [1.2.2] - 2026-07-09
+
+### Fixed
+- Dashboard: all-day calendar events (e.g. from Google Calendar) no longer appear one calendar day early in the dashboard's upcoming-events widget. Date-only values were parsed as UTC midnight and shifted back a day in timezones west of UTC; they are now parsed as local calendar dates, matching the full Calendar page.
+
 ## [1.2.1] - 2026-07-08
 
 ### Changed

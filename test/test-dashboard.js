@@ -187,6 +187,32 @@ test('Today-Highlights filtert Termine auf den heutigen Tag', async () => {
   assert(result.nextEvent.title === 'Termin Heute', 'Erwartet "Termin Heute" als nächsten Termin');
 });
 
+test('eventStartDate: ganztägige Termine (date-only) landen auf dem lokalen Kalendertag (Issue #466)', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  // Google speichert ganztägige Termine als reines Datum "2026-07-10". `new Date()`
+  // parst das als UTC-Mitternacht und verschiebt den Tag westlich von UTC um einen
+  // Tag zurück. eventStartDate muss stattdessen den lokalen Kalendertag liefern.
+  const d = __test.eventStartDate({ start_datetime: '2026-07-10', all_day: 1 });
+  assert(d.getFullYear() === 2026, `Erwartet Jahr 2026, erhalten ${d.getFullYear()}`);
+  assert(d.getMonth() === 6, `Erwartet Monat Juli (6), erhalten ${d.getMonth()}`);
+  assert(d.getDate() === 10, `Erwartet Tag 10, erhalten ${d.getDate()}`);
+  assert(d.getHours() === 0, `Erwartet lokale Mitternacht, erhalten ${d.getHours()}h`);
+});
+
+test('Today-Highlights zählt ganztägigen Termin von heute (date-only, Issue #466)', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const todayStr = toLocalDateKey(new Date());
+
+  const result = __test.buildTodayHighlights({
+    events: [
+      { id: 1, title: 'Ganztägig Heute', start_datetime: todayStr, all_day: 1 },
+    ],
+  });
+
+  assert(result.eventCount === 1, `Erwartet 1 ganztägigen Termin für heute, erhalten ${result.eventCount}`);
+  assert(result.nextEvent.title === 'Ganztägig Heute', 'Erwartet "Ganztägig Heute" als nächsten Termin');
+});
+
 test('Today-Meals-Widget rendert nur sichtbare Mahlzeit-Typen', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   const html = __test.renderTodayMeals([

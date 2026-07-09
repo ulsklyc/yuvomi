@@ -9,6 +9,7 @@ import { openModal as openSharedModal, closeModal as closeSharedModal, advancedS
 import { DEFAULT_CATEGORY_NAME } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
 import { ingredientRowHTML } from '/utils/ingredient-row.js';
+import { normalizeRecipeMealTypes, RECIPE_MEAL_TYPE_KEYS } from '/utils/recipe-meal-types.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 
 let _container = null;
@@ -20,6 +21,15 @@ const state = {
 
 function mealCategories() {
   return state.categories.filter((c) => c.name !== 'Haushalt' && c.name !== 'Drogerie');
+}
+
+function mealTypeOptions() {
+  return [
+    { key: 'breakfast', label: t('meals.typeBreakfast') },
+    { key: 'lunch', label: t('meals.typeLunch') },
+    { key: 'dinner', label: t('meals.typeDinner') },
+    { key: 'snack', label: t('meals.typeSnack') },
+  ];
 }
 
 async function loadRecipes() {
@@ -160,6 +170,19 @@ function renderRecipeList() {
       card.appendChild(notes);
     }
 
+    const mealTypes = normalizeRecipeMealTypes(recipe.meal_types);
+    const badges = document.createElement('div');
+    badges.className = 'recipe-card__meal-types';
+    badges.replaceChildren(...mealTypeOptions()
+      .filter((option) => mealTypes.includes(option.key))
+      .map((option) => {
+        const badge = document.createElement('span');
+        badge.className = `meal-type-badge meal-type-badge--${option.key}`;
+        badge.textContent = option.label;
+        return badge;
+      }));
+    card.appendChild(badges);
+
     if (recipe.recipe_url) {
       const link = document.createElement('a');
       link.className = 'btn btn--ghost recipe-card__link';
@@ -251,6 +274,17 @@ function openRecipeModal(mode, recipe = null) {
         <input id="recipe-title" class="form-input" type="text" placeholder="${t('recipes.titlePlaceholder')}">
       </div>
       <div class="form-group">
+        <label class="form-label">${t('meals.mealTypeLabel')}</label>
+        <div class="recipe-meal-types" id="recipe-meal-types">
+          ${mealTypeOptions().map((option) => `
+            <label class="recipe-meal-types__option">
+              <input type="checkbox" value="${option.key}" checked>
+              <span class="meal-type-badge meal-type-badge--${option.key}">${option.label}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+      <div class="form-group">
         <label class="form-label">${t('recipes.ingredientsLabel')}</label>
         <div class="recipe-ingredient-list" id="recipe-ingredient-list"></div>
         <button class="btn btn--secondary recipe-add-ingredient" type="button" id="recipe-add-ingredient">${t('meals.addIngredient')}</button>
@@ -274,6 +308,10 @@ function openRecipeModal(mode, recipe = null) {
       panel.querySelector('#recipe-title').value = isEdit ? recipe.title : '';
       panel.querySelector('#recipe-notes').value = isEdit && recipe.notes ? recipe.notes : '';
       panel.querySelector('#recipe-url').value = isEdit && recipe.recipe_url ? recipe.recipe_url : '';
+      const selectedMealTypes = normalizeRecipeMealTypes(isEdit ? recipe.meal_types : RECIPE_MEAL_TYPE_KEYS);
+      panel.querySelectorAll('#recipe-meal-types input[type="checkbox"]').forEach((input) => {
+        input.checked = selectedMealTypes.includes(input.value);
+      });
 
       const ingList = panel.querySelector('#recipe-ingredient-list');
       if (isEdit && recipe.ingredients?.length) {
@@ -313,6 +351,7 @@ async function saveRecipe(panel, mode, recipe) {
   const title = panel.querySelector('#recipe-title')?.value.trim() || '';
   const notes = panel.querySelector('#recipe-notes')?.value.trim() || null;
   const recipe_url = panel.querySelector('#recipe-url')?.value.trim() || null;
+  const meal_types = [...panel.querySelectorAll('#recipe-meal-types input[type="checkbox"]:checked')].map((input) => input.value);
 
   if (!title) {
     window.yuvomi?.showToast(t('recipes.titleRequired'), 'error');
@@ -331,10 +370,10 @@ async function saveRecipe(panel, mode, recipe) {
 
   try {
     if (mode === 'create') {
-      const res = await api.post('/recipes', { title, notes, recipe_url, ingredients });
+      const res = await api.post('/recipes', { title, notes, recipe_url, meal_types, ingredients });
       state.recipes.push(res.data);
     } else {
-      const res = await api.put(`/recipes/${recipe.id}`, { title, notes, recipe_url, ingredients });
+      const res = await api.put(`/recipes/${recipe.id}`, { title, notes, recipe_url, meal_types, ingredients });
       const idx = state.recipes.findIndex((r) => r.id === recipe.id);
       if (idx >= 0) state.recipes[idx] = res.data;
     }

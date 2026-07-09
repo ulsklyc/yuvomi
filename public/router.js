@@ -5,6 +5,7 @@
  */
 
 import { api, auth } from '/api.js';
+import { canAccessNavModule, navModuleAccess } from '/permissions.js';
 import { clearApiCache } from '/sw-register.js';
 import { initI18n, getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
@@ -14,6 +15,7 @@ import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
 import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
 import { activityType } from '/utils/health-activity.js';
 import { buildHelpRows } from '/utils/help.js';
+import { openModal } from '/components/modal.js';
 import { NAV_ICONS } from '/nav-icons.js';
 import { SETTINGS_LEAVES } from '/settings/registry.js';
 import {
@@ -213,6 +215,10 @@ function warmPrimaryRoutes() {
 // Globaler App-State
 // --------------------------------------------------------
 let currentUser = null;
+// Für welchen Nutzer wurde die Nav zuletzt gebaut? Bei Nutzerwechsel (Logout →
+// Login als anderes Konto im selben Tab) bleibt die alte Shell im DOM; die Nav
+// muss dann mit den Rechten des neuen Nutzers neu gefiltert werden (#467).
+let _navBuiltForUserId = null;
 let currentPath = null;
 let isNavigating = false;
 // Zuletzt erfolgreich gerendertes Seiten-Modul. Erlaubt Soft-Navigation
@@ -461,8 +467,11 @@ async function navigate(path, userOrPushState = true, pushState = true) {
       return;
     }
 
-    // Modul-Guard: deaktivierte Module leiten auf Dashboard um.
-    if (route.module && _disabledModules.has(route.module) && route.path !== '/') {
+    // Modul-Guard: deaktivierte ODER per Rechte gesperrte Module leiten auf das
+    // Dashboard um (Rechte-Guard #467; die verbindliche 403-Sperre liegt am Server).
+    if (route.module
+        && route.path !== '/'
+        && (_disabledModules.has(route.module) || !canAccessNavModule(route.module))) {
       currentPath = null;
       isNavigating = false;
       navigate('/');
@@ -501,6 +510,15 @@ async function navigate(path, userOrPushState = true, pushState = true) {
       currentPath = null;
       isNavigating = false;
       navigate('/budget');
+      return;
+    }
+
+    // Rechte-Guard nach frisch geladenen Rechten (Deep-Link auf ein für diese
+    // Rolle/dieses Mitglied gesperrtes Modul → Dashboard). #467
+    if (route.module && route.path !== '/' && !canAccessNavModule(route.module)) {
+      currentPath = null;
+      isNavigating = false;
+      navigate('/');
       return;
     }
 
@@ -665,6 +683,56 @@ function allRoutes() {
   return [...ROUTES, ...moduleRoutes];
 }
 
+function sidebarActionEl({ labelKey, icon, className, onClick }) {
+  const label = t(labelKey);
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `nav-item ${className}`;
+  button.setAttribute('aria-label', label);
+  button.setAttribute('title', label);
+  button.addEventListener('click', onClick);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'nav-item__icon-wrap';
+  const well = document.createElement('div');
+  well.className = 'nav-item__icon-well';
+  const iconEl = document.createElement('i');
+  iconEl.dataset.lucide = icon;
+  iconEl.className = 'nav-item__icon';
+  iconEl.setAttribute('aria-hidden', 'true');
+  well.appendChild(iconEl);
+  wrap.appendChild(well);
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'nav-item__label';
+  labelEl.textContent = label;
+  button.append(wrap, labelEl);
+  return button;
+}
+
+function moreActionEl({ labelKey, icon, className, onClick }) {
+  const label = t(labelKey);
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `more-item ${className}`;
+  button.setAttribute('aria-label', label);
+  button.addEventListener('click', onClick);
+
+  const well = document.createElement('div');
+  well.className = 'more-item__icon-well';
+  const iconEl = document.createElement('i');
+  iconEl.dataset.lucide = icon;
+  iconEl.className = 'more-item__icon';
+  iconEl.setAttribute('aria-hidden', 'true');
+  well.appendChild(iconEl);
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'more-item__label';
+  labelEl.textContent = label;
+  button.append(well, labelEl);
+  return button;
+}
+
 /**
  * Lädt und rendert eine Seite dynamisch.
  * @param {{ path: string, page: string }} route
@@ -693,6 +761,12 @@ async function renderPage(route, previousPath = null) {
     // in Seiten-Modulen funktioniert.
     if (!document.querySelector('.nav-bottom') && currentUser) {
       renderAppShell(app);
+      _navBuiltForUserId = currentUser.id;
+    } else if (currentUser && _navBuiltForUserId !== currentUser.id) {
+      // Shell besteht bereits, aber der Nutzer hat gewechselt → Nav mit den
+      // Modul-Rechten des aktuellen Nutzers neu aufbauen (#467).
+      rebuildNavigation();
+      _navBuiltForUserId = currentUser.id;
     }
 
     const content = document.getElementById('main-content') || app;
@@ -760,6 +834,12 @@ async function renderPage(route, previousPath = null) {
       }
       document.documentElement.classList.toggle('fab-anim-done', fabCount >= FAB_SEEN_MAX);
     }
+
+    // Read-only-Modus (#467): Bei „Nur lesen"-Modulen die Anlege-Affordance (FAB)
+    // ausblenden und einen erklärenden Hinweis einblenden — sonst führt jeder
+    // Anlege-/Speicherversuch nur in einen 403. Die verbindliche Sperre bleibt
+    // serverseitig; dies ist die ehrliche UI-Entsprechung.
+    applyModuleReadonly(route.module, pageWrapper);
 
     // Route-Announcer: Screenreader über Seitenwechsel informieren (gezielt, nicht gesamter Inhalt)
     const announcer = document.getElementById('route-announcer');
@@ -858,10 +938,19 @@ function renderAppShell(container) {
   _toggleIcon.dataset.lucide = _sidebarInitCollapsed ? 'panel-left-open' : 'panel-left-close';
   _toggleIcon.setAttribute('aria-hidden', 'true');
   sidebarToggle.appendChild(_toggleIcon);
-  sidebarToggle.addEventListener('click', () => {
+  sidebarToggle.addEventListener('click', (event) => {
     const nowCollapsed = !document.documentElement.classList.contains('sidebar-collapsed');
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, nowCollapsed ? '1' : '0');
     applySidebarCollapsed(nowCollapsed);
+    if (event.detail > 0) {
+      document.documentElement.classList.toggle('sidebar-collapse-pointer-lock', nowCollapsed);
+    }
+    // Pointer clicks leave the toggle focused, which immediately re-expands the
+    // collapsed rail via .nav-sidebar:focus-within. Blur only for pointer-driven
+    // activation so keyboard users keep the expected focus behavior.
+    if (nowCollapsed && event.detail > 0) {
+      requestAnimationFrame(() => sidebarToggle.blur());
+    }
     const lbl = nowCollapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse');
     sidebarToggle.setAttribute('aria-label', lbl);
     sidebarToggle.setAttribute('title', lbl);
@@ -901,34 +990,43 @@ function renderAppShell(container) {
     if (!sidebarItems.contains(ev.relatedTarget)) positionSidebarIndicator();
   });
 
+  const syncSidebarIndicator = () => {
+    requestAnimationFrame(() => positionSidebarIndicator());
+  };
+  // In collapsed mode the section headers are hidden. Expanding the rail on
+  // hover/focus puts them back into layout, which shifts the nav items down.
+  // Re-sync the active pill after those layout changes.
+  sidebar.addEventListener('mouseenter', syncSidebarIndicator);
+  sidebar.addEventListener('mouseleave', syncSidebarIndicator);
+  sidebar.addEventListener('focusin', syncSidebarIndicator);
+  sidebar.addEventListener('focusout', syncSidebarIndicator);
+  sidebar.addEventListener('mouseleave', () => {
+    document.documentElement.classList.remove('sidebar-collapse-pointer-lock');
+  });
+
   sidebar.appendChild(sidebarLogo);
   sidebar.appendChild(sidebarToggle);
   sidebar.appendChild(sidebarItems);
 
-  // Hilfe-Eintrag im Sidebar-Footer (Aktion, keine Route → kein data-route, damit
-  // Route-Delegation/Indikator ihn ignorieren).
-  const sidebarHelp = document.createElement('button');
-  sidebarHelp.type = 'button';
-  sidebarHelp.className = 'nav-item nav-item--help';
-  sidebarHelp.setAttribute('aria-label', t('nav.help'));
-  sidebarHelp.setAttribute('title', t('nav.help'));
-  sidebarHelp.addEventListener('click', () => showHelpModal());
-  const helpWrap = document.createElement('div');
-  helpWrap.className = 'nav-item__icon-wrap';
-  const helpWell = document.createElement('div');
-  helpWell.className = 'nav-item__icon-well';
-  const helpIcon = document.createElement('i');
-  helpIcon.dataset.lucide = 'circle-help';
-  helpIcon.className = 'nav-item__icon';
-  helpIcon.setAttribute('aria-hidden', 'true');
-  helpWell.appendChild(helpIcon);
-  helpWrap.appendChild(helpWell);
-  const helpLabel = document.createElement('span');
-  helpLabel.className = 'nav-item__label';
-  helpLabel.textContent = t('nav.help');
-  sidebarHelp.appendChild(helpWrap);
-  sidebarHelp.appendChild(helpLabel);
-  sidebar.appendChild(sidebarHelp);
+  // Footer-Aktionen (keine Routen → kein data-route, damit Delegation/Indikator
+  // sie ignorieren): Hilfe und Live-Changelog.
+  const sidebarFooter = document.createElement('div');
+  sidebarFooter.className = 'nav-sidebar__footer-actions';
+  sidebarFooter.append(
+    sidebarActionEl({
+      labelKey: 'nav.help',
+      icon: 'circle-help',
+      className: 'nav-item--help',
+      onClick: () => showHelpModal(),
+    }),
+    sidebarActionEl({
+      labelKey: 'nav.changelog',
+      icon: 'history',
+      className: 'nav-item--changelog',
+      onClick: () => showChangelogModal(),
+    }),
+  );
+  sidebar.appendChild(sidebarFooter);
 
   if (window.lucide) window.lucide.createIcons({ el: sidebar });
 
@@ -991,28 +1089,26 @@ function renderAppShell(container) {
 
     secondaryMobileItems().forEach((item) => moreSheet.appendChild(moreItemEl(item)));
 
-    // Hilfe-Zeile im „Mehr“-Sheet: schließt das Sheet und öffnet das Overlay.
-    const moreHelp = document.createElement('button');
-    moreHelp.type = 'button';
-    moreHelp.className = 'more-item more-item--help';
-    moreHelp.setAttribute('aria-label', t('nav.help'));
-    moreHelp.addEventListener('click', () => {
-      if (window._closeMoreSheet) window._closeMoreSheet({ restoreFocus: false });
-      showHelpModal();
-    });
-    const moreHelpWell = document.createElement('div');
-    moreHelpWell.className = 'more-item__icon-well';
-    const moreHelpIcon = document.createElement('i');
-    moreHelpIcon.dataset.lucide = 'circle-help';
-    moreHelpIcon.className = 'more-item__icon';
-    moreHelpIcon.setAttribute('aria-hidden', 'true');
-    moreHelpWell.appendChild(moreHelpIcon);
-    const moreHelpLabel = document.createElement('span');
-    moreHelpLabel.className = 'more-item__label';
-    moreHelpLabel.textContent = t('nav.help');
-    moreHelp.appendChild(moreHelpWell);
-    moreHelp.appendChild(moreHelpLabel);
-    moreSheet.appendChild(moreHelp);
+    // Hilfe-/Changelog-Zeilen im „Mehr“-Sheet: schließen das Sheet und öffnen
+    // das jeweilige Overlay.
+    moreSheet.appendChild(moreActionEl({
+      labelKey: 'nav.help',
+      icon: 'circle-help',
+      className: 'more-item--help',
+      onClick: () => {
+        if (window._closeMoreSheet) window._closeMoreSheet({ restoreFocus: false });
+        showHelpModal();
+      },
+    }));
+    moreSheet.appendChild(moreActionEl({
+      labelKey: 'nav.changelog',
+      icon: 'history',
+      className: 'more-item--changelog',
+      onClick: () => {
+        if (window._closeMoreSheet) window._closeMoreSheet({ restoreFocus: false });
+        showChangelogModal();
+      },
+    }));
   }
 
   bottomNav.appendChild(bottomItems);
@@ -1258,6 +1354,139 @@ function showHelpModal() {
   if (window.lucide) window.lucide.createIcons({ el: panel });
 }
 
+function versionText(value) {
+  return String(value || '').trim() || t('changelog.unknownVersion');
+}
+
+function versionKey(value) {
+  return String(value || '').trim().replace(/^v/i, '').toLowerCase();
+}
+
+function renderChangelogStatus(panel, message, tone = 'muted') {
+  const status = panel.querySelector('#changelog-status');
+  if (!status) return;
+  status.hidden = false;
+  status.className = `changelog-status changelog-status--${tone}`;
+  status.textContent = message;
+}
+
+function appendReleaseSection(parent, section) {
+  const block = document.createElement('section');
+  block.className = 'changelog-section';
+
+  const title = document.createElement('h4');
+  title.className = 'changelog-section__title';
+  title.textContent = section.title || t('changelog.changes');
+  block.appendChild(title);
+
+  const list = document.createElement('ul');
+  list.className = 'changelog-section__list';
+  for (const item of Array.isArray(section.items) ? section.items : []) {
+    const li = document.createElement('li');
+    li.textContent = String(item || '');
+    list.appendChild(li);
+  }
+  block.appendChild(list);
+  parent.appendChild(block);
+}
+
+function appendReleaseCard(parent, release, currentVersion) {
+  const isCurrent = Boolean(versionKey(release.version))
+    && versionKey(release.version) === versionKey(currentVersion);
+  const card = document.createElement('article');
+  card.className = `changelog-release${isCurrent ? ' changelog-release--current' : ''}`;
+
+  const header = document.createElement('div');
+  header.className = 'changelog-release__header';
+  const title = document.createElement('h3');
+  title.className = 'changelog-release__version';
+  title.textContent = versionText(release.version);
+  header.appendChild(title);
+
+  if (isCurrent) {
+    const badge = document.createElement('span');
+    badge.className = 'changelog-release__badge';
+    badge.textContent = t('changelog.currentBadge');
+    header.appendChild(badge);
+  }
+  card.appendChild(header);
+
+  const sections = Array.isArray(release.sections) ? release.sections : [];
+  if (sections.length) {
+    for (const section of sections) appendReleaseSection(card, section);
+  } else {
+    const empty = document.createElement('p');
+    empty.className = 'changelog-release__empty';
+    empty.textContent = t('changelog.noReleaseNotes');
+    card.appendChild(empty);
+  }
+  parent.appendChild(card);
+}
+
+function renderChangelog(panel, payload) {
+  const data = payload?.data ?? {};
+  const currentVersion = data.current_version;
+  const latestVersion = data.latest_version;
+  const releases = Array.isArray(data.releases) ? data.releases : [];
+
+  panel.querySelector('#changelog-current-version').textContent = versionText(currentVersion);
+  panel.querySelector('#changelog-latest-version').textContent = versionText(latestVersion);
+
+  const note = panel.querySelector('#changelog-version-note');
+  note.textContent = data.current_in_releases
+    ? t('changelog.currentFound')
+    : t('changelog.currentMissing');
+  note.classList.toggle('changelog-version-note--warning', !data.current_in_releases);
+
+  const status = panel.querySelector('#changelog-status');
+  if (status) status.hidden = true;
+
+  const list = panel.querySelector('#changelog-list');
+  list.replaceChildren();
+  if (!releases.length) {
+    renderChangelogStatus(panel, t('changelog.empty'), 'muted');
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  for (const release of releases) appendReleaseCard(fragment, release, currentVersion);
+  list.appendChild(fragment);
+}
+
+function showChangelogModal() {
+  openModal({
+    title: t('changelog.title'),
+    size: 'xl',
+    content: `
+      <div class="changelog-modal">
+        <div class="changelog-summary" aria-live="polite">
+          <div class="changelog-summary__item">
+            <span>${esc(t('changelog.currentVersion'))}</span>
+            <strong id="changelog-current-version">${esc(t('changelog.loadingShort'))}</strong>
+          </div>
+          <div class="changelog-summary__item">
+            <span>${esc(t('changelog.latestVersion'))}</span>
+            <strong id="changelog-latest-version">${esc(t('changelog.loadingShort'))}</strong>
+          </div>
+        </div>
+        <p class="changelog-version-note" id="changelog-version-note"></p>
+        <div class="changelog-status changelog-status--muted" id="changelog-status" role="status">
+          ${esc(t('changelog.loading'))}
+        </div>
+        <div class="changelog-list" id="changelog-list"></div>
+      </div>
+    `,
+    onSave(panel) {
+      api.get('/changelog')
+        .then((payload) => renderChangelog(panel, payload))
+        .catch(() => {
+          panel.querySelector('#changelog-list')?.replaceChildren();
+          renderChangelogStatus(panel, t('changelog.loadError'), 'error');
+        });
+    },
+  });
+}
+
 function loadReminderStyles() {
   if (document.querySelector('link[href="/styles/reminders.css"]')) return;
   const link = document.createElement('link');
@@ -1481,6 +1710,25 @@ function renderSearchResults(container, data, onClose) {
   makeSection('health.tabs.activity', activities, () => '/health/activity', activityLabel);
 }
 
+// Read-only-Modus für ein Modul anwenden (#467): FAB via <html data-module-readonly>
+// ausblenden (CSS) und einen erklärenden Banner oben in die Seite einfügen.
+// navModuleAccess liefert 'write' für nicht-gateable Module (Dashboard, Settings,
+// Third-Party), sodass diese nie fälschlich als read-only markiert werden.
+function applyModuleReadonly(moduleName, pageWrapper) {
+  const readOnly = navModuleAccess(moduleName) === 'read';
+  document.documentElement.toggleAttribute('data-module-readonly', readOnly);
+  if (!readOnly || !pageWrapper || pageWrapper.querySelector('.module-readonly-banner')) return;
+  const banner = document.createElement('div');
+  banner.className = 'module-readonly-banner';
+  banner.setAttribute('role', 'status');
+  banner.insertAdjacentHTML(
+    'afterbegin',
+    `<i data-lucide="eye" aria-hidden="true"></i><span>${esc(t('settings.permReadOnlyBanner'))}</span>`,
+  );
+  pageWrapper.insertBefore(banner, pageWrapper.firstChild);
+  window.lucide?.createIcons({ el: banner });
+}
+
 function navItems() {
   if (currentUser?.access_scope === 'split_guest') {
     return [
@@ -1523,7 +1771,10 @@ function navItems() {
     .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
   const settings = baseItems.find((item) => item.module === 'settings');
   const sortable = [
-    ...baseItems.filter((item) => item.module !== 'settings' && !_disabledModules.has(item.module)),
+    ...baseItems.filter((item) =>
+      item.module !== 'settings'
+      && !_disabledModules.has(item.module)
+      && canAccessNavModule(item.module)),
     ...thirdPartyItems,
   ];
   const ordered = sortNavigationItems(sortable, _moduleOrder);
@@ -1629,6 +1880,9 @@ function isModuleDisabled(moduleName) {
 
 function applySidebarCollapsed(collapsed) {
   document.documentElement.classList.toggle('sidebar-collapsed', collapsed);
+  if (!collapsed) {
+    document.documentElement.classList.remove('sidebar-collapse-pointer-lock');
+  }
 }
 
 function setDisabledModules(modules) {

@@ -746,6 +746,22 @@ const MIGRATIONS_SQL = {
     INSERT INTO search_index (entity, entity_id, title, body)
       SELECT 'activity', id, COALESCE(type, ''), COALESCE(note, '') FROM health_activities;
   `,
+  73: `
+    ALTER TABLE recipes ADD COLUMN meal_types TEXT NOT NULL DEFAULT 'breakfast,lunch,dinner,snack';
+  `,
+  74: `
+    CREATE TABLE IF NOT EXISTS access_permissions (
+      subject_type  TEXT NOT NULL CHECK(subject_type IN ('role', 'user')),
+      subject_id    TEXT NOT NULL,
+      resource_type TEXT NOT NULL CHECK(resource_type IN ('module', 'widget')),
+      resource_key  TEXT NOT NULL,
+      access        TEXT NOT NULL CHECK(access IN ('none', 'read', 'write', 'allow')),
+      updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      PRIMARY KEY (subject_type, subject_id, resource_type, resource_key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_access_permissions_subject
+      ON access_permissions(subject_type, subject_id);
+  `,
   75: `
     ALTER TABLE budget_entries ADD COLUMN owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
     ALTER TABLE budget_entries ADD COLUMN split_method TEXT NOT NULL DEFAULT 'equal';

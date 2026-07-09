@@ -6,8 +6,10 @@
  */
 
 import { DatabaseSync } from 'node:sqlite';
+import { readFileSync } from 'node:fs';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { datesForTemplateInRange, mealWeekday } from '../server/services/meal-recurrence.js';
+import { __test as mealsUi } from '../public/pages/meals.js';
 
 let passed = 0;
 let failed = 0;
@@ -27,6 +29,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
 db.exec(MIGRATIONS_SQL[1]);
 db.exec(MIGRATIONS_SQL[13]);
 db.exec(MIGRATIONS_SQL[64]);
+db.exec(MIGRATIONS_SQL[73]);
 
 // Test-Benutzer
 const u1 = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
@@ -408,6 +411,107 @@ test('added_from_meal FK auf meals(id) gesetzt', () => {
   `).all();
   assert(items.length > 0, 'Mindestens ein Artikel mit Mahlzeit-Referenz');
   assert(items[0].meal_title, 'meal_title verknüpft');
+});
+
+test('Rezepte speichern passende meal_types für Planer-Features', () => {
+  const recipeId = db.prepare(`
+    INSERT INTO recipes (title, meal_types, created_by)
+    VALUES ('Porridge', 'breakfast,snack', ?)
+  `).run(uid).lastInsertRowid;
+  const recipe = db.prepare('SELECT meal_types FROM recipes WHERE id = ?').get(recipeId);
+  assert(recipe.meal_types === 'breakfast,snack', `meal_types gespeichert: ${recipe.meal_types}`);
+});
+
+test('Randomize-Helfer plant nur kompatible Rezepte in freie Slots', () => {
+  const plan = mealsUi.buildRandomMealAssignments({
+    weekStart: '2026-03-23',
+    visibleMealTypes: ['breakfast', 'dinner'],
+    meals: [{ id: 99, date: '2026-03-23', meal_type: 'breakfast', title: 'Bestehend' }],
+    recipes: [
+      { id: 1, title: 'Porridge', meal_types: ['breakfast'], ingredients: [] },
+      { id: 2, title: 'Pasta', meal_types: ['dinner'], ingredients: [] },
+    ],
+    replaceExisting: false,
+    pick: () => 0,
+  });
+
+  assert(plan.assignments.every((item) => item.mealType === 'dinner' || item.date !== '2026-03-23'), 'belegte Slots bleiben ohne Replace unberührt');
+  assert(plan.assignments.some((item) => item.mealType === 'dinner' && item.recipe.id === 2), 'kompatibles Dinner-Rezept wird zugewiesen');
+  assert(plan.deleteMealIds.length === 0, 'ohne Replace werden keine Mahlzeiten gelöscht');
+});
+
+test('Randomize-Helfer markiert bestehende Mahlzeiten zum Ersetzen', () => {
+  const plan = mealsUi.buildRandomMealAssignments({
+    weekStart: '2026-03-23',
+    visibleMealTypes: ['breakfast'],
+    meals: [{ id: 42, date: '2026-03-23', meal_type: 'breakfast', title: 'Bestehend' }],
+    recipes: [{ id: 1, title: 'Porridge', meal_types: ['breakfast'], ingredients: [] }],
+    replaceExisting: true,
+    pick: () => 0,
+  });
+
+  assert(plan.assignments.some((item) => item.date === '2026-03-23' && item.mealType === 'breakfast'), 'belegte Slots werden bei Replace neu geplant');
+  assert(plan.deleteMealIds.includes(42), 'bestehende Mahlzeit wird zum Löschen markiert');
+});
+
+test('Randomize-Helfer meldet volle Wochen getrennt von Rezeptmangel', () => {
+  const plan = mealsUi.buildRandomMealAssignments({
+    weekStart: '2026-03-23',
+    visibleMealTypes: ['breakfast'],
+    meals: Array.from({ length: 7 }, (_, i) => ({ id: i + 1, date: `2026-03-${String(23 + i).padStart(2, '0')}`, meal_type: 'breakfast', title: 'Belegt' })),
+    recipes: [{ id: 1, title: 'Porridge', meal_types: ['breakfast'], ingredients: [] }],
+    replaceExisting: false,
+    pick: () => 0,
+  });
+
+  assert(plan.assignments.length === 0, 'bei voller Woche werden keine neuen Mahlzeiten geplant');
+  assert(plan.reason === 'week_full', `Erwarteter Grund week_full, erhalten ${plan.reason}`);
+});
+
+test('Randomize-Helfer vermeidet gleiche Rezepte in benachbarten Tages-Slots wenn Alternativen existieren', () => {
+  const plan = mealsUi.buildRandomMealAssignments({
+    weekStart: '2026-03-23',
+    visibleMealTypes: ['dinner'],
+    meals: [],
+    recipes: [
+      { id: 1, title: 'Pasta', meal_types: ['dinner'], ingredients: [] },
+      { id: 2, title: 'Soup', meal_types: ['dinner'], ingredients: [] },
+    ],
+    replaceExisting: false,
+    pick: () => 0,
+  });
+
+  const first = plan.assignments.find((item) => item.date === '2026-03-23' && item.mealType === 'dinner');
+  const second = plan.assignments.find((item) => item.date === '2026-03-24' && item.mealType === 'dinner');
+  assert(first && second, 'benachbarte Dinner-Slots müssen geplant sein');
+  assert(first.recipe.id !== second.recipe.id, 'aufeinanderfolgende Tage sollen unterschiedliche Rezepte nutzen');
+});
+
+test('Randomize-Helfer vermeidet gleiche Rezepte in benachbarten Mahlzeiten desselben Tages', () => {
+  const plan = mealsUi.buildRandomMealAssignments({
+    weekStart: '2026-03-23',
+    visibleMealTypes: ['breakfast', 'lunch'],
+    meals: [],
+    recipes: [
+      { id: 1, title: 'Wrap', meal_types: ['breakfast', 'lunch'], ingredients: [] },
+      { id: 2, title: 'Salad', meal_types: ['breakfast', 'lunch'], ingredients: [] },
+    ],
+    replaceExisting: false,
+    pick: () => 0,
+  });
+
+  const breakfast = plan.assignments.find((item) => item.date === '2026-03-23' && item.mealType === 'breakfast');
+  const lunch = plan.assignments.find((item) => item.date === '2026-03-23' && item.mealType === 'lunch');
+  assert(breakfast && lunch, 'benachbarte Mahlzeiten desselben Tages müssen geplant sein');
+  assert(breakfast.recipe.id !== lunch.recipe.id, 'benachbarte Mahlzeiten desselben Tages sollen unterschiedliche Rezepte nutzen');
+});
+
+test('Meals-Route bietet einen atomaren apply-plan Endpunkt für Replace-Flows', () => {
+  const source = readFileSync(new URL('../server/routes/meals.js', import.meta.url), 'utf8');
+  assert(/router\.post\('\/apply-plan'/.test(source), 'apply-plan Route muss existieren');
+  assert(/db\.transaction\(\(\) => \{[\s\S]*replaceExisting/.test(source), 'apply-plan muss als DB-Transaktion laufen');
+  assert(/deleteMealOccurrence/.test(source), 'apply-plan soll bestehende Mahlzeiten serverseitig mit Wiederholungs-Semantik ersetzen');
+  assert(!/const created = db\.transaction\([\s\S]*\}\)\(\);/.test(source), 'apply-plan darf das Ergebnis des DB-Transaction-Helfers nicht erneut aufrufen');
 });
 
 // --------------------------------------------------------

@@ -180,6 +180,17 @@ async function syncYearAndType(country, subdivision, year, type, langCode) {
   }
   if (!Array.isArray(holidays) || holidays.length === 0) return 0;
 
+  // OpenHolidays liefert für Sub-Regionen abweichende Varianten desselben
+  // Feiertags/derselben Ferien als eigene, mit "Exception" getaggte Einträge
+  // (z. B. Schleswig-Holstein: separate Sommer-/Herbstferien nur für die Inseln
+  // Sylt, Föhr, Amrum, Helgoland, Halligen). Diese haben abweichende Start-/
+  // Enddaten und lassen sich daher lesen-seitig nicht kollabieren – im Kalender
+  // erscheinen sie als zweiter, früher endender/startender Ferien-Eintrag.
+  // Für einen Familienkalender ist der reguläre Regions-Eintrag maßgeblich; die
+  // Insel-Ausnahmen werden verworfen. (#434)
+  holidays = holidays.filter((h) => !(Array.isArray(h.tags) && h.tags.includes('Exception')));
+  if (holidays.length === 0) return 0;
+
   const insert = db.get().prepare(`
     INSERT INTO holiday_cache (type, country, subdivision, start_date, end_date, name, year)
     VALUES (?, ?, ?, ?, ?, ?, ?)

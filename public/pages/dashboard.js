@@ -5,10 +5,11 @@
  */
 
 import { api } from '/api.js';
+import { canSeeWidget } from '/permissions.js';
 import { t, formatDate, formatTime, getLocale } from '/i18n.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { esc, fmtLocation, renderMarkdownLight } from '/utils/html.js';
-import { toLocalDateKey } from '/utils/date.js';
+import { toLocalDateKey, parseLocalDateKey } from '/utils/date.js';
 import { predictCycle, PHASE } from '/utils/health-cycle.js';
 import { openModal, closeModal, confirmModal } from '/components/modal.js';
 import { renderAvatarStack } from '/components/user-multi-select.js';
@@ -30,6 +31,17 @@ function eventOccurrenceDateKey(event) {
 
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value.slice(0, 10) : toLocalDateKey(date);
+}
+
+// All-day events store start_datetime as a date-only key ("2026-07-10"). Parsing
+// that with `new Date()` yields UTC midnight, which shifts the calendar day back
+// one day west of UTC. Parse date-only values as local calendar dates so all-day
+// events land on the correct day in the dashboard widget (issue #466).
+function eventStartDate(event) {
+  const value = String(event?.start_datetime || '');
+  if (!value) return null;
+  if (value.length <= 10) return parseLocalDateKey(value);
+  return new Date(value);
 }
 
 function calendarEventRoute(event) {
@@ -265,7 +277,12 @@ const MODULE_FOR_WIDGET = { tasks: 'tasks', calendar: 'calendar', shopping: 'sho
 
 function isWidgetModuleEnabled(id) {
   const mod = MODULE_FOR_WIDGET[id];
-  return !mod || !window.yuvomi?.isModuleDisabled(mod);
+  if (mod && window.yuvomi?.isModuleDisabled(mod)) return false;
+  // Rollen-/Mitglied-Rechte (#467): serverseitig gesperrtes Widget (bzw. Widget
+  // eines Moduls ohne Zugriff — die Modulsperre wird bereits serverseitig auf die
+  // Widget-Map durchgereicht) hier nicht anbieten.
+  if (!canSeeWidget(id)) return false;
+  return true;
 }
 
 function normalizeDashboardConfig(input) {
@@ -540,8 +557,8 @@ function buildTodayHighlights(data) {
   const today = new Date().toDateString();
   const todayEvents = events.filter((e) => {
     if (!e.start_datetime) return true;
-    const d = new Date(e.start_datetime);
-    return d.toDateString() === today;
+    const d = eventStartDate(e);
+    return d ? d.toDateString() === today : true;
   });
   const nextEvent = todayEvents[0] ?? null;
 
@@ -652,7 +669,7 @@ function renderUpcomingEvents(events) {
 
   const today = new Date().toDateString();
   const items = events.map((e) => {
-    const d = new Date(e.start_datetime);
+    const d = eventStartDate(e) ?? new Date(e.start_datetime);
     const isToday = d.toDateString() === today;
     const _suffix = t('calendar.timeSuffix');
     const timeStr = e.all_day ? t('dashboard.allDay') : `${formatTime(d)}${_suffix ? ' ' + _suffix : ''}`.trim();
@@ -662,7 +679,7 @@ function renderUpcomingEvents(events) {
         <div class="event-item__content">
           <div class="event-item__title">${esc(e.title)}</div>
           <div class="event-item__time">
-            <span class="event-time-badge ${isToday ? 'event-time-badge--today' : ''}">${isToday ? t('common.today') : relativeDateLabel(new Date(e.start_datetime))}</span>
+            <span class="event-time-badge ${isToday ? 'event-time-badge--today' : ''}">${isToday ? t('common.today') : relativeDateLabel(d)}</span>
             ${timeStr}
             ${e.location ? ` · ${esc(fmtLocation(e.location))}` : ''}
             ${e.cal_name ? `<span class="event-item__cal">${esc(e.cal_name)}</span>` : ''}
@@ -2079,7 +2096,7 @@ export async function render(container, { user }) {
   }
 }
 
-export const __test = { buildTodayHighlights, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey };
+export const __test = { buildTodayHighlights, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate };
 
 function wireWeatherRefresh(container, onUpdated = null) {
   const refreshBtn = container.querySelector('#weather-refresh-btn');

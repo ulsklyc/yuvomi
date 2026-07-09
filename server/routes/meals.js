@@ -63,6 +63,39 @@ function sanitizedIngredients(ingredients) {
     .filter((ing) => ing.name);
 }
 
+function loadMealWithIngredients(id) {
+  const meal = db.get().prepare(`
+    SELECT m.*, u.display_name AS creator_name, u.avatar_color AS creator_color
+    FROM meals m
+    LEFT JOIN users u ON u.id = m.created_by
+    WHERE m.id = ?
+  `).get(id);
+  if (!meal) return null;
+  const ingredients = db.get().prepare('SELECT * FROM meal_ingredients WHERE meal_id = ? ORDER BY id ASC').all(id);
+  return { ...meal, ingredients }; 
+}
+
+function deleteMealOccurrence(meal, actorId) {
+  if (!meal) return;
+  if (meal.recurrence_template_id) {
+    db.get().prepare(`
+      INSERT OR IGNORE INTO meal_recurrence_exceptions (template_id, date, created_by)
+      VALUES (?, ?, ?)
+    `).run(meal.recurrence_template_id, meal.date, actorId);
+  }
+  db.get().prepare('DELETE FROM meals WHERE id = ?').run(meal.id);
+}
+
+function createMealRecord({ date, meal_type, title, notes, recipe_url, recipe_id, ingredients = [] }, actorId) {
+  const cleanIngredients = sanitizedIngredients(ingredients);
+  const result = db.get().prepare(`
+    INSERT INTO meals (date, meal_type, title, notes, recipe_url, recipe_id, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(date, meal_type, title, notes, recipe_url, recipe_id, actorId);
+  insertMealIngredients(result.lastInsertRowid, cleanIngredients);
+  return loadMealWithIngredients(result.lastInsertRowid);
+}
+
 function materializeRecurringMeals(from, to) {
   const templates = db.get().prepare(`
     SELECT *
@@ -285,22 +318,71 @@ router.post('/', (req, res) => {
 
       insertMealIngredients(mealId, cleanIngredients);
 
-      return db.get().prepare(`
-        SELECT m.*, u.display_name AS creator_name, u.avatar_color AS creator_color
-        FROM meals m
-        LEFT JOIN users u ON u.id = m.created_by
-        WHERE m.id = ?
-      `).get(mealId);
+      return loadMealWithIngredients(mealId);
     });
 
-    // Zutaten anhängen
-    const ings = db.get().prepare(
-      'SELECT * FROM meal_ingredients WHERE meal_id = ? ORDER BY id ASC'
-    ).all(meal.id);
-
-    res.status(201).json({ data: { ...meal, ingredients: ings } });
+    res.status(201).json({ data: meal });
   } catch (err) {
     log.error('', err);
+    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+  }
+});
+
+router.post('/apply-plan', (req, res) => {
+  try {
+    const assignments = Array.isArray(req.body.assignments) ? req.body.assignments : [];
+    const replaceExisting = req.body.replace_existing === true;
+    if (!assignments.length) {
+      return res.status(400).json({ error: 'Mindestens eine Mahlzeit ist erforderlich.', code: 400 });
+    }
+
+    const prepared = [];
+    const recipeIds = new Set();
+    for (const assignment of assignments) {
+      const vDate = date(assignment.date, 'Datum', true);
+      const vType = oneOf(assignment.meal_type, VALID_MEAL_TYPES, 'Mahlzeit-Typ');
+      const vTitle = str(assignment.title, 'Titel', { max: MAX_TITLE });
+      const vNotes = str(assignment.notes, 'Notizen', { max: MAX_TEXT, required: false });
+      const vRecipeUrl = str(assignment.recipe_url, 'Rezept-URL', { max: MAX_TEXT, required: false });
+      const vRecipeId = num(assignment.recipe_id, 'Rezept-ID', { required: false });
+      const errors = collectErrors([vDate, vType, vTitle, vNotes, vRecipeUrl, vRecipeId]);
+      if (!assignment.meal_type) errors.push('Mahlzeit-Typ ist erforderlich.');
+      if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+      if (vRecipeId.value !== null) recipeIds.add(vRecipeId.value);
+      prepared.push({
+        date: vDate.value,
+        meal_type: vType.value,
+        title: vTitle.value,
+        notes: vNotes.value,
+        recipe_url: vRecipeUrl.value,
+        recipe_id: vRecipeId.value,
+        ingredients: assignment.ingredients || [],
+      });
+    }
+
+    for (const recipeId of recipeIds) {
+      const recipeExists = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(recipeId);
+      if (!recipeExists) return res.status(400).json({ error: 'Rezept nicht gefunden.', code: 400 });
+    }
+
+    const created = db.transaction(() => {
+      const actorId = req.authUserId || req.session.userId;
+      if (replaceExisting) {
+        const slots = [...new Set(prepared.map((assignment) => `${assignment.date}\u0000${assignment.meal_type}`))];
+        const selectMeals = db.get().prepare('SELECT * FROM meals WHERE date = ? AND meal_type = ? ORDER BY id ASC');
+        for (const slot of slots) {
+          const [slotDate, slotType] = slot.split('\u0000');
+          const existingMeals = selectMeals.all(slotDate, slotType);
+          for (const meal of existingMeals) deleteMealOccurrence(meal, actorId);
+        }
+      }
+
+      return prepared.map((assignment) => createMealRecord(assignment, actorId));
+    });
+
+    res.status(201).json({ data: created });
+  } catch (err) {
+    log.error('POST /apply-plan', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
   }
 });
@@ -379,16 +461,7 @@ router.put('/:id', (req, res) => {
         }
       });
 
-      const updated = db.get().prepare(`
-        SELECT m.*, u.display_name AS creator_name, u.avatar_color AS creator_color
-        FROM meals m LEFT JOIN users u ON u.id = m.created_by
-        WHERE m.id = ?
-      `).get(id);
-      const ings = db.get().prepare(
-        'SELECT * FROM meal_ingredients WHERE meal_id = ? ORDER BY id ASC'
-      ).all(id);
-
-      return res.json({ data: { ...updated, ingredients: ings } });
+      return res.json({ data: loadMealWithIngredients(id) });
     }
 
     if (meal.recurrence_template_id && req.body.date !== undefined && req.body.date !== meal.date) {
@@ -417,17 +490,7 @@ router.put('/:id', (req, res) => {
       id
     );
 
-    const updated = db.get().prepare(`
-      SELECT m.*, u.display_name AS creator_name, u.avatar_color AS creator_color
-      FROM meals m LEFT JOIN users u ON u.id = m.created_by
-      WHERE m.id = ?
-    `).get(id);
-
-    const ings = db.get().prepare(
-      'SELECT * FROM meal_ingredients WHERE meal_id = ? ORDER BY id ASC'
-    ).all(id);
-
-    res.json({ data: { ...updated, ingredients: ings } });
+    res.json({ data: loadMealWithIngredients(id) });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
@@ -458,14 +521,8 @@ router.delete('/:id', (req, res) => {
       return res.status(204).end();
     }
 
-    if (meal.recurrence_template_id) {
-      db.get().prepare(`
-        INSERT OR IGNORE INTO meal_recurrence_exceptions (template_id, date, created_by)
-        VALUES (?, ?, ?)
-      `).run(meal.recurrence_template_id, meal.date, req.authUserId || req.session.userId);
-    }
-
-    const result = db.get().prepare('DELETE FROM meals WHERE id = ?').run(id);
+    deleteMealOccurrence(meal, req.authUserId || req.session.userId);
+    const result = { changes: 1 };
     if (result.changes === 0)
       return res.status(404).json({ error: 'Mahlzeit nicht gefunden', code: 404 });
     res.status(204).end();

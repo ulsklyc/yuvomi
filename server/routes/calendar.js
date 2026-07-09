@@ -571,8 +571,10 @@ router.post('/subscriptions', async (req, res) => {
       return res.status(400).json({ error: 'name: Pflichtfeld, max. 100 Zeichen.', code: 400 });
     if (!url || typeof url !== 'string')
       return res.status(400).json({ error: 'url: Pflichtfeld.', code: 400 });
-    try { const u = new URL(url.replace(/^webcal:\/\//i, 'https://')); if (!['https:'].includes(u.protocol)) throw new Error(); }
-    catch { return res.status(400).json({ error: 'url: Nur https:// und webcal:// sind erlaubt.', code: 400 }); }
+    const allowPrivate = icsSubscription.isPrivateNetworkAllowed();
+    const allowedProtocols = allowPrivate ? ['https:', 'http:'] : ['https:'];
+    try { const u = new URL(url.replace(/^webcal:\/\//i, 'https://')); if (!allowedProtocols.includes(u.protocol)) throw new Error(); }
+    catch { return res.status(400).json({ error: allowPrivate ? 'url: Nur http://, https:// und webcal:// sind erlaubt.' : 'url: Nur https:// und webcal:// sind erlaubt.', code: 400 }); }
     if (!colorVal || !ICS_COLOR_RE.test(colorVal))
       return res.status(400).json({ error: 'color: Pflichtfeld, muss #RRGGBB sein.', code: 400 });
 

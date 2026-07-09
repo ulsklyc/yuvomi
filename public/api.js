@@ -5,6 +5,7 @@
  */
 
 import { clearApiCache } from '/sw-register.js';
+import { setPermissions, clearPermissions } from '/permissions.js';
 
 const API_BASE = '/api/v1';
 
@@ -154,11 +155,16 @@ const api = {
 // --------------------------------------------------------
 
 const auth = {
-  login: (username, password) => api.post('/auth/login', { username, password }),
+  login: async (username, password) => {
+    const res = await api.post('/auth/login', { username, password });
+    setPermissions(res?.permissions);
+    return res;
+  },
   logout: async () => {
     try {
       return await api.post('/auth/logout');
     } finally {
+      clearPermissions();
       // API-Cache IMMER leeren — auch wenn der Logout-Request offline oder bei
       // nicht erreichbarem Server fehlschlägt. Der Settings-Handler navigiert in
       // seinem finally trotzdem zu /login, daher darf hier kein offline gecachter
@@ -166,7 +172,11 @@ const auth = {
       clearApiCache();
     }
   },
-  me: () => api.get('/auth/me'),
+  me: async () => {
+    const res = await api.get('/auth/me');
+    setPermissions(res?.permissions);
+    return res;
+  },
   setup: (username, display_name, password) => api.post('/auth/setup', { username, display_name, password }),
   getUsers: () => api.get('/auth/users'),
   createUser: (data) => api.post('/auth/users', data),

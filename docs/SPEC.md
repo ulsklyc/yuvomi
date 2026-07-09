@@ -186,6 +186,7 @@ Reusable recipe cards that can be pre-filled into meal slots.
 | title | TEXT | NOT NULL |
 | notes | TEXT | |
 | recipe_url | TEXT | nullable |
+| meal_types | TEXT | NOT NULL, default `breakfast,lunch,dinner,snack` — comma-separated suitability list; drives which planner slots a recipe fits and the week randomizer's candidate pool (v1.3.0) |
 | created_by | INTEGER | FK → Users (CASCADE delete) |
 
 ### Recipe Ingredients
@@ -1129,6 +1130,29 @@ fans out via Web Push and Gotify/ntfy channels. Medications (`name`, `dosage_tex
 (`type`, `note`) are indexed in the FTS5 `search_index` (migration 66) with the same
 owner-or-`family` visibility scoping applied at query time.
 
+### Access Permissions (migration v74)
+
+Role- and member-based access control for interactive users (#467). Governs which modules a
+non-admin family member can see/read/edit and which dashboard widgets are available. **Sparse:** only
+deviations from the default are stored — a missing row means module `write` (full) and widget
+`allow`, so existing installs are unchanged after the migration. Admins bypass the whole system
+(always full access; no self-lockout). Resolution for a member: member override → role profile →
+default. Widgets inherit their module's lock (module `none` → its widgets blocked); a widget can
+also be blocked on its own (e.g. hiding the cycle widget for some members without disabling Health).
+Enforcement is **server-side** — the same scope layer that guards API tokens gates interactive
+sessions too; the settings UI only maintains the configuration.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| subject_type | TEXT | NOT NULL — `role` (a family_role) \| `user` (a specific member) |
+| subject_id | TEXT | NOT NULL — the family_role value or the user id |
+| resource_type | TEXT | NOT NULL — `module` \| `widget` |
+| resource_key | TEXT | NOT NULL — module key or dashboard widget id |
+| access | TEXT | NOT NULL — module: `none` \| `read` \| `write`; widget: `none` \| `allow` |
+| updated_at | TEXT | ISO 8601, default now |
+
+Primary key: `(subject_type, subject_id, resource_type, resource_key)`.
+
 ---
 
 ## Modules
@@ -1191,6 +1215,7 @@ Skeleton loading instead of spinners (the skeleton mirrors the default-visible w
 - Items: name, category, quantity, checkbox
 - Grouping by category (aisle logic)
 - Integration with meal plan: "Add ingredients to shopping list" transfers with source reference
+- **Bulk import from meal plan (v1.3.0):** a "From meal plan" action in the list header opens a date-range dialog (defaults to the next 7 days) and imports the ingredients of every planned meal in that range into the active list. Repeated ingredients are aggregated before insertion — numeric quantities with a matching unit are summed, purely textual quantities collapse to a `N × …` note. Already-transferred ingredients are skipped via the existing `on_shopping_list` flag (`POST /api/v1/shopping/:listId/import-meal-plan`).
 - Checked items shown with strikethrough + moved to bottom
 - "Clear list" = remove checked items only
 - Autocomplete from previous entries (local)
@@ -1206,6 +1231,8 @@ Skeleton loading instead of spinners (the skeleton mirrors the default-visible w
 - "→ Shopping list" button: transfer unchecked ingredients of the week to a selected list
 - Week navigation forward/back
 - Drag & drop between days/slots
+- **Recipe sidebar with drag & drop (v1.3.0):** a desktop recipe sidebar lists saved recipes; drag one onto any day/slot to plan it directly, with the recipe's title, notes, URL, and ingredients pre-filled. Slots only accept recipes whose `meal_types` suitability includes that slot. The existing per-slot `+`/add-button flow remains as the keyboard/touch path.
+- **Week plan randomizer (v1.3.0):** a "Randomize plan" action fills the visible week's empty (or, opt-in, all) slots with randomly chosen suitable recipes, respecting each recipe's `meal_types` and the household's visible meal types. Reports how many meals were planned; no-op with a notice when the week is already full or no compatible recipes exist.
 - Autocomplete from meal history
 - **Multiple items per slot:** each day/meal-type cell can hold any number of meals, displayed as stacked cards with a separator. A hover-visible `+` button lets you add another item to an already-filled slot without clearing the existing entry. (v0.63.3)
 - **Recipe integration:** Select a saved recipe from the meal modal to auto-fill title, notes, URL, and ingredients. Scale ingredient quantities by a numeric factor. Save the current meal as a new recipe with one click.
@@ -1217,9 +1244,10 @@ Skeleton loading instead of spinners (the skeleton mirrors the default-visible w
 Reusable recipe cards linked to meal slots.
 
 - CRUD: title, notes, recipe link, per-ingredient category
+- **Meal-type suitability (v1.3.0):** each recipe carries a `meal_types` list (breakfast / lunch / dinner / snack, all selected by default) chosen via checkboxes in the recipe editor. It gates which planner slots accept the recipe (sidebar drag & drop) and scopes the week randomizer's candidate pool.
 - Duplicate existing recipes
 - "Add to meal plan" navigates to `/meals` with the selected recipe pre-filled in the modal
-- REST API: `GET/POST /api/v1/recipes`, `PUT/DELETE /api/v1/recipes/:id` with ingredient sync
+- REST API: `GET/POST /api/v1/recipes`, `PUT/DELETE /api/v1/recipes/:id` with ingredient sync (`meal_types` included)
 
 ### Calendar (`/calendar`)
 
@@ -1348,6 +1376,7 @@ User management and app configuration. Logged-in users only.
 
 - **Profile:** change display name, avatar color, password
 - **User management (admin):** create new users, edit/delete existing users, assign roles (admin/member)
+- **Roles and permissions (admin, Settings → Administration → Roles and permissions, #467):** granular, backend-enforced access control per **family role** (the default) and per **member** (an override that wins over the role). Each module is set to `No access`, `Read only`, or `Full`, and each dashboard widget to `Available` or `Blocked`; widgets inherit their module's lock and can also be blocked on their own (e.g. hiding the cycle widget for some members without disabling Health). Configuration is **sparse** — only deviations from the default (full access) are stored, so unset roles/members keep full access and existing installs are unchanged. **Admins always bypass** the system (no self-lockout). Enforcement is **server-side** — the same scope layer that guards API tokens returns 403 on a disallowed module/method; the client mirrors it by hiding blocked modules from navigation and the dashboard, and a **read-only module** hides its create affordance (the FAB) and shows an explanatory banner. Stored in `access_permissions`. The settings page shows a role/member switch, a deviation overview, and per-module/-widget access as icon controls with widgets nested under their module. API: `GET /api/v1/permissions/catalog`, `GET/PUT /api/v1/permissions/role/:familyRole`, `GET/PUT /api/v1/permissions/user/:userId` (admin-only); the resolved permission map also ships on `GET /api/v1/auth/me`.
 - **Navigation and module controls (admin, Settings → Modules → Navigation):** individual modules (Tasks, Calendar, Shopping, Meals, Recipes, Birthdays, Notes, Contacts, Budget, Documents, Housekeeping) can be disabled to hide them from navigation. Data is preserved and reappears when re-enabled. Dashboard and Settings remain essential and cannot be disabled. Stored as `disabled_modules` in `sync_config`. **Kitchen grouping:** Meals, Recipes, and Shopping are presented as one global **Kitchen** destination with three individually toggleable children; local pages keep their individual routes. The web navigation is grouped into Overview, Plan, Home, and Custom modules, and `module_order:user:<id>` only changes order inside each group; Dashboard and Settings stay pinned. The Custom modules group is shown only when enabled third-party modules are loaded. The mobile bottom bar has five stable slots — Overview, three configurable favorites, and More. Favorites default to Calendar, Tasks, and Kitchen, are stored per user as `mobile_nav_order:user:<id>`, and automatically fall back to enabled destinations when a selected module becomes unavailable.
 - **Housekeeping (admin):** toggle for automatic payment task creation on work session check-in.
 - **Synchronization (Settings → Sync):** organized by data type into three dedicated pages — Calendar, Contacts, and Reminders — each opening with a status summary before any setup forms:
@@ -1366,12 +1395,13 @@ User management and app configuration. Logged-in users only.
   - **Modules** (admin): Navigation, Kitchen, Calendar, Budget, Housekeeping, Overview
   - **Sync** (admin): Calendar sync, Contact sync, Reminder sync
   - **Documents** (admin): Document storage, Document management (DMS)
-  - **Administration** (admin): Family and roles, API access, Backup and restore, Email (SMTP), System
+  - **Administration** (admin): Family and roles, Roles and permissions, API access, Backup and restore, Email (SMTP), System
 
   A central registry (`public/settings/registry.js`) is the single source of truth for domains, routes, roles, labels, icons, and legacy-tab mappings; each leaf is **lazy-loaded** and owns only its own API domain. Members see only Personal; deep links to admin pages redirect to Personal → Account with a localized notice. The shared responsive shell (`public/settings/shell.js`) renders a **sticky local navigation column** on desktop (≥ 1024px, with `aria-current="page"` and a focus-managed page heading) and a **history-aware drill-down** below 1024px (settings overview → domain overview → leaf, with breadcrumbs and Back traversal). Tablet overview pages use two columns from 768–1023px instead of leaving half the content area empty. Each leaf catches its own load/save errors with inline retry without dropping sibling sections. Legacy `oikos:settings:tab` values migrate once to the new paths; the former flat tab bar and `settings-nav.js`/`settings-nav.css` are removed.
 - **Family management (admin):** assign a `family_role` (Dad, Mom, Parent, Child, Grandparent, Relative, Other) to each user, and set per-member phone, email, and birthday — automatically synced to Contacts and Birthdays. Displayed in the family member list and profile views. The Edit member dialog has an optional "Reset password" field (min. 8 characters, left blank keeps the current password) so an admin can set a new password for a family member who forgot theirs or never got it working — no SMTP/`BASE_URL` setup required, unlike the self-service "Forgot password" flow. On change, all of that member's other sessions are invalidated. `PATCH /api/v1/auth/users/:id` (admin-only) accepts an optional `password` field.
 - **Profile picture:** users can upload a personal avatar (PNG/JPEG/WebP, ≤ 5 MB), stored as a Base64 JPEG data URL in `avatar_data` at 256 × 256 px. After selecting a file a **canvas crop dialog** opens: the user can drag the image and zoom (slider or mouse wheel) to choose the square crop region before confirming. Shown in all avatar circles throughout the app — task cards, calendar agenda, user assignment picker, dashboard task widget, dashboard calendar widget, and notes creator badge — with coloured initials as fallback when no photo is set. Housekeeping staff avatars use the same crop dialog.
 - **App info:** version, license
+- **In-app changelog (v1.3.0):** a Help-adjacent "Changelog" action (available to every logged-in user) opens a modal with the release history. The browser calls Yuvomi's own backend (`GET /api/v1/changelog`), which fetches the GitHub Releases of `ulsklyc/yuvomi` on demand, reduces each release body to plain text, and caches the result in memory for 30 minutes (no scheduler, no polling). The modal shows the installed version alongside the latest available release and highlights the installed version when it appears in the list; if GitHub is unreachable it degrades to a cached/error state (air-gapped installs simply see "could not be loaded"). Rendered entirely via DOM text nodes — no external content is injected as HTML.
 
 ### Budget (`/budget`)
 

@@ -64,6 +64,12 @@
   white-space: pre-wrap;
 }
 
+.recipe-card__meal-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
 /* Rezept-Link: natürliche Breite, links ausgerichtet — nicht als
  * vollbreiter Grid-Child strecken (sonst zentriert das btn-Label). */
 .recipe-card__link {
@@ -183,4 +189,17 @@
 
 .recipe-add-ingredient {
   align-self: flex-start;
+}
+
+.recipe-meal-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.recipe-meal-types__option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  cursor: pointer;
 }

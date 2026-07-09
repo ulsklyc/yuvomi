@@ -19,6 +19,7 @@ import { isOidcEnabled, getConfig as getOidcConfig } from './services/oidc.js';
 import { emailService as defaultEmailService } from './services/email.js';
 import { passwordResetService as defaultResetService } from './services/password-reset.js';
 import { parseScopes, serializeScopes, normalizeScopes } from './scopes.js';
+import { resolvePermissions, buildSessionModuleAccess, clientPermissions } from './permissions.js';
 
 const log = createLogger('Auth');
 const router = express.Router();
@@ -441,8 +442,21 @@ function requireAuth(req, res, next) {
     req.authMethod = 'session';
     req.authUserId = req.session.userId;
     req.authRole = req.session.role;
-    // Interaktive Sessions kennen kein Scoping — voller Zugriff.
+    // Interaktive Sessions kennen kein Token-Scoping.
     req.authScopes = null;
+    // Rollen-/Mitglied-basierte Modulrechte (#467). Admins: null = Vollzugriff.
+    // Nur für Nicht-Admins auflösen; die Modul→Access-Map wertet die
+    // /api/v1-Middleware in server/index.js aus. Fehlerfrei fail-open (nur bei
+    // Auflösungsfehlern — echte Denies stammen aus gesetzten Rechten).
+    req.sessionModuleAccess = null;
+    if (req.authRole !== 'admin') {
+      try {
+        const u = db.get().prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(req.authUserId);
+        if (u) req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db.get(), u));
+      } catch (err) {
+        log.error('Permission resolution failed:', err.message);
+      }
+    }
     return next();
   }
   res.status(401).json({ error: 'Not authenticated.', code: 401 });
@@ -613,6 +627,7 @@ router.post('/login', loginLimiter, async (req, res) => {
           family_role:  user.family_role,
           access_scope: db.get().prepare('SELECT 1 FROM split_expense_guest_users WHERE user_id = ?').get(user.id) ? 'split_guest' : 'family',
         },
+        permissions: clientPermissions(db.get(), user),
         csrfToken: req.session.csrfToken,
       });
     } catch (sessionErr) {
@@ -937,7 +952,7 @@ router.get('/me', requireAuth, (req, res) => {
     }
 
     if (req.authMethod === 'api_token') {
-      return res.json({ user: publicUser(user) });
+      return res.json({ user: publicUser(user), permissions: clientPermissions(db.get(), user) });
     }
 
     // CSRF-Token erneuern falls vorhanden (wichtig fuer iOS-PWA-Resume:
@@ -953,7 +968,7 @@ router.get('/me', requireAuth, (req, res) => {
       maxAge: 1000 * 60 * 60 * 24 * 7,
     });
 
-    res.json({ user: publicUser(user), csrfToken: req.session.csrfToken });
+    res.json({ user: publicUser(user), permissions: clientPermissions(db.get(), user), csrfToken: req.session.csrfToken });
   } catch (err) {
     log.error('/me error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

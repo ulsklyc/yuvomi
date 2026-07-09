@@ -10,7 +10,8 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
-import { str, oneOf, url, collectErrors, MAX_TITLE, MAX_SHORT, MAX_TEXT } from '../middleware/validate.js';
+import { str, oneOf, url, date, collectErrors, MAX_TITLE, MAX_SHORT, MAX_TEXT } from '../middleware/validate.js';
+import { aggregateMealIngredients } from '../services/shopping-import.js';
 
 const log = createLogger('Shopping');
 
@@ -438,6 +439,64 @@ router.post('/:listId/items', (req, res) => {
     res.status(201).json({ data: item });
   } catch (err) {
     log.error('POST /:listId/items error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// --------------------------------------------------------
+// POST /api/v1/shopping/:listId/import-meal-plan
+// Importiert Zutaten aus dem Essensplan eines Datumsbereichs in eine Liste.
+// Body: { from: YYYY-MM-DD, to: YYYY-MM-DD }
+// Response: { data: { transferred: number, added: number } }
+// --------------------------------------------------------
+router.post('/:listId/import-meal-plan', (req, res) => {
+  try {
+    const list = db.get()
+      .prepare('SELECT id FROM shopping_lists WHERE id = ?')
+      .get(req.params.listId);
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
+
+    const vFrom = date(req.body.from, 'From date', true);
+    const vTo = date(req.body.to, 'To date', true);
+    const errors = collectErrors([vFrom, vTo]);
+    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    if (vFrom.value > vTo.value) {
+      return res.status(400).json({ error: 'From date must be before or equal to end date.', code: 400 });
+    }
+
+    const ingredients = db.get().prepare(`
+      SELECT mi.id, mi.meal_id, mi.name, mi.quantity, mi.category
+      FROM meal_ingredients mi
+      JOIN meals m ON m.id = mi.meal_id
+      WHERE m.date BETWEEN ? AND ?
+        AND mi.on_shopping_list = 0
+      ORDER BY m.date ASC, mi.id ASC
+    `).all(vFrom.value, vTo.value);
+
+    if (!ingredients.length) {
+      return res.json({ data: { transferred: 0, added: 0 } });
+    }
+
+    const aggregated = aggregateMealIngredients(ingredients);
+    const added = db.get().transaction(() => {
+      const insertItem = db.get().prepare(`
+        INSERT INTO shopping_items (list_id, name, quantity, category, added_from_meal)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      const markDone = db.get().prepare('UPDATE meal_ingredients SET on_shopping_list = 1 WHERE id = ?');
+
+      for (const item of aggregated) {
+        insertItem.run(req.params.listId, item.name, item.quantity, item.category, item.added_from_meal);
+      }
+      for (const ingredient of ingredients) {
+        markDone.run(ingredient.id);
+      }
+      return aggregated.length;
+    })();
+
+    res.json({ data: { transferred: ingredients.length, added } });
+  } catch (err) {
+    log.error('POST /:listId/import-meal-plan error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

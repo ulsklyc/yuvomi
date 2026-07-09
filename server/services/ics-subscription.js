@@ -23,15 +23,35 @@ const PRIVATE_RANGES = [
   /^169\.254\./, /^::1$/, /^f[cd]/i, /^fe[89ab]/i,
 ];
 
+const ENV_ALLOW_PRIVATE_NETWORK = 'ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK';
+
 const syncingNow = new Set();
 
+/**
+ * Opt-in: erlaubt http:// sowie private/lokale Netzwerkziele (z. B. ein Sonarr-,
+ * Radarr- oder Home-Assistant-Feed im selben LAN). Hebt den SSRF-Schutz bewusst
+ * auf — nur in kontrollierten Umgebungen setzen. Wird zur Laufzeit gelesen, damit
+ * Tests process.env vor dem Aufruf setzen können.
+ */
+function isPrivateNetworkAllowed() {
+  const raw = process.env[ENV_ALLOW_PRIVATE_NETWORK];
+  return raw !== undefined && (raw.trim() === 'true' || raw.trim() === '1');
+}
+
 function normalizeUrl(raw) {
+  const allowPrivate = isPrivateNetworkAllowed();
   const url = new URL(raw.replace(/^webcal:\/\//i, 'https://'));
-  if (url.protocol !== 'https:') throw new Error('Only https:// and webcal:// URLs are allowed.');
+  const allowed = allowPrivate ? ['https:', 'http:'] : ['https:'];
+  if (!allowed.includes(url.protocol)) {
+    throw new Error(allowPrivate
+      ? 'Only http://, https:// and webcal:// URLs are allowed.'
+      : 'Only https:// and webcal:// URLs are allowed.');
+  }
   return url.href;
 }
 
 async function checkSSRF(urlStr) {
+  if (isPrivateNetworkAllowed()) return;
   const hostname = new URL(urlStr).hostname;
   const v4 = await dns.resolve4(hostname).catch(() => []);
   const v6 = await dns.resolve6(hostname).catch(() => []);
@@ -210,4 +230,4 @@ function remove(userId, subId, isAdmin) {
   return true;
 }
 
-export { sync, getAll, create, update, remove, fetchAndParse };
+export { sync, getAll, create, update, remove, fetchAndParse, normalizeUrl, checkSSRF, isPrivateNetworkAllowed };
