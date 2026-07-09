@@ -913,15 +913,15 @@
         "nextPeriod": "Periodo successivo",
         "recurringInstanceLabel": "Parte di una serie",
         "loanProgressLabel": "Avanzamento del rimborso",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "Vista del budget",
+        "viewMine": "Il mio budget",
+        "viewHousehold": "Budget familiare",
+        "sharedFromBudget": "Condiviso da {{owner}}",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "Assegnati",
+        "splitSectionLabel": "Ripartizione condivisa",
+        "singleAssigneeHint": "Assegna una persona per fare in modo che questo elemento sia suo.",
+        "multiAssigneeHint": "Assegna piu persone e scegli come dividere l'importo."
     },
     "settings": {
         "pageHealthModule": "Salute",
@@ -1641,12 +1641,12 @@
         "notificationChannelAdminOnlyHint": "Solo gli amministratori possono gestire i canali della famiglia.",
         "notificationChannelDeleteConfirm": "Eliminare questo canale di notifica?",
         "apiTokensMcpHint": "Questi token funzionano anche come token Bearer per l'endpoint MCP su /mcp (ad es. in Claude Desktop, per creare attività, articoli della spesa ed eventi tramite IA).",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
-        "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeTitle": "Modalita budget",
+        "budgetModeDescription": "Scegli tra un budget familiare condiviso e budget personali con ripartizione condivisa.",
+        "budgetModeLabel": "Modalita",
+        "budgetModeShared": "Budget familiare condiviso",
+        "budgetModePersonal": "Budget personali con ripartizione condivisa",
+        "budgetModeSaved": "Modalita budget salvata."
     },
     "login": {
         "tagline": "Pianificazione familiare. Sicura. Rispettosa della privacy. Open source.",

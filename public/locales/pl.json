@@ -919,15 +919,15 @@
         "nextPeriod": "Następny okres",
         "recurringInstanceLabel": "Część serii",
         "loanProgressLabel": "Postęp spłaty",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "Widok budzetu",
+        "viewMine": "Moj budzet",
+        "viewHousehold": "Budzet domowy",
+        "sharedFromBudget": "Udostepniono od {{owner}}",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "Przypisani",
+        "splitSectionLabel": "Wspolny podzial",
+        "singleAssigneeHint": "Przypisz jedna osobe, aby ten wpis byl jej.",
+        "multiAssigneeHint": "Przypisz kilka osob i wybierz, jak podzielic kwote."
     },
     "settings": {
         "pageHealthModule": "Zdrowie",
@@ -1647,12 +1647,12 @@
         "notificationChannelAdminOnlyHint": "Tylko administratorzy mogą zarządzać kanałami domowymi.",
         "notificationChannelDeleteConfirm": "Usunąć ten kanał powiadomień?",
         "apiTokensMcpHint": "Te tokeny działają również jako tokeny Bearer dla punktu końcowego MCP pod adresem /mcp (np. w Claude Desktop, aby tworzyć zadania, produkty na liście zakupów i wydarzenia za pomocą AI).",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
-        "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeTitle": "Tryb budzetu",
+        "budgetModeDescription": "Wybierz miedzy jednym wspolnym budzetem domowym a budzetami osobistymi ze wspolnym podzialem.",
+        "budgetModeLabel": "Tryb",
+        "budgetModeShared": "Wspolny budzet domowy",
+        "budgetModePersonal": "Budzety osobiste ze wspolnym podzialem",
+        "budgetModeSaved": "Tryb budzetu zapisany."
     },
     "login": {
         "tagline": "Planowanie rodziny. Bezpieczne. Chroniące prywatność. Open Source.",

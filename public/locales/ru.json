@@ -913,15 +913,15 @@
         "nextPeriod": "Следующий период",
         "recurringInstanceLabel": "Часть серии",
         "loanProgressLabel": "Ход погашения",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "Вид бюджета",
+        "viewMine": "Мой бюджет",
+        "viewHousehold": "Бюджет семьи",
+        "sharedFromBudget": "Поделено от {{owner}}",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "Назначенные",
+        "splitSectionLabel": "Общее распределение",
+        "singleAssigneeHint": "Назначьте одного человека, и эта запись станет его.",
+        "multiAssigneeHint": "Назначьте нескольких человек и выберите, как разделить сумму."
     },
     "settings": {
         "pageHealthModule": "Здоровье",
@@ -1641,12 +1641,12 @@
         "notificationChannelAdminOnlyHint": "Только администраторы могут управлять каналами семьи.",
         "notificationChannelDeleteConfirm": "Удалить этот канал уведомлений?",
         "apiTokensMcpHint": "Эти токены также работают как токены Bearer для конечной точки MCP по адресу /mcp (например, в Claude Desktop для создания задач, покупок и событий с помощью ИИ).",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
-        "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeTitle": "Режим бюджета",
+        "budgetModeDescription": "Выберите между общим семейным бюджетом и личными бюджетами с общим распределением.",
+        "budgetModeLabel": "Режим",
+        "budgetModeShared": "Общий семейный бюджет",
+        "budgetModePersonal": "Личные бюджеты с общим распределением",
+        "budgetModeSaved": "Режим бюджета сохранен."
     },
     "login": {
         "tagline": "Семейное планирование. Безопасно. С уважением к приватности. Открытый исходный код.",

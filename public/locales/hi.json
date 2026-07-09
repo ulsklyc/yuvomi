@@ -913,15 +913,15 @@
         "nextPeriod": "अगली अवधि",
         "recurringInstanceLabel": "एक शृंखला का हिस्सा",
         "loanProgressLabel": "चुकौती प्रगति",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "बजट दृश्य",
+        "viewMine": "मेरा बजट",
+        "viewHousehold": "परिवार का बजट",
+        "sharedFromBudget": "{{owner}} से साझा",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "असाइन किए गए सदस्य",
+        "splitSectionLabel": "साझा बंटवारा",
+        "singleAssigneeHint": "एक व्यक्ति को असाइन करें ताकि यह आइटम उसी का हो जाए।",
+        "multiAssigneeHint": "कई लोगों को असाइन करें और चुनें कि राशि कैसे बांटी जाए।"
     },
     "settings": {
         "pageHealthModule": "स्वास्थ्य",
@@ -1641,12 +1641,12 @@
         "notificationChannelAdminOnlyHint": "केवल एडमिन घर के चैनल प्रबंधित कर सकते हैं।",
         "notificationChannelDeleteConfirm": "यह सूचना चैनल हटाएँ?",
         "apiTokensMcpHint": "ये टोकन /mcp पर MCP एंडपॉइंट के लिए Bearer टोकन के रूप में भी काम करते हैं (उदा. Claude Desktop में, AI के ज़रिए कार्य, खरीदारी की वस्तुएँ और इवेंट बनाने के लिए)।",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
-        "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeTitle": "बजट मोड",
+        "budgetModeDescription": "एक साझा परिवार बजट और साझा बंटवारे वाले व्यक्तिगत बजटों के बीच चुनें।",
+        "budgetModeLabel": "मोड",
+        "budgetModeShared": "साझा परिवार बजट",
+        "budgetModePersonal": "साझा बंटवारे वाले व्यक्तिगत बजट",
+        "budgetModeSaved": "बजट मोड सहेज लिया गया।"
     },
     "login": {
         "tagline": "पारिवारिक योजना। सुरक्षित। गोपनीयता-अनुकूल। ओपन सोर्स।",

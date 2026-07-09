@@ -913,15 +913,15 @@
         "nextPeriod": "Nästa period",
         "recurringInstanceLabel": "Del av en serie",
         "loanProgressLabel": "Återbetalningsförlopp",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "Budgetvy",
+        "viewMine": "Min budget",
+        "viewHousehold": "Hushallsbudget",
+        "sharedFromBudget": "Delad fran {{owner}}",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "Tilldelade",
+        "splitSectionLabel": "Delad uppdelning",
+        "singleAssigneeHint": "Tilldela en person sa att posten blir deras.",
+        "multiAssigneeHint": "Tilldela flera personer och valj hur beloppet ska delas."
     },
     "settings": {
         "pageHealthModule": "Hälsa",
@@ -1641,12 +1641,12 @@
         "notificationChannelAdminOnlyHint": "Endast administratörer kan hantera hushållskanaler.",
         "notificationChannelDeleteConfirm": "Ta bort den här aviseringskanalen?",
         "apiTokensMcpHint": "Dessa token fungerar även som Bearer-token för MCP-slutpunkten på /mcp (t.ex. i Claude Desktop, för att skapa uppgifter, inköpsartiklar och händelser med AI).",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
-        "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeTitle": "Budgetlage",
+        "budgetModeDescription": "Valj mellan en gemensam hushallsbudget och personliga budgetar med delade fordelningar.",
+        "budgetModeLabel": "Lage",
+        "budgetModeShared": "Gemensam hushallsbudget",
+        "budgetModePersonal": "Personliga budgetar med delade fordelningar",
+        "budgetModeSaved": "Budgetlaget sparat."
     },
     "login": {
         "tagline": "Familjeplanering. Säker. Sekretessvänlig. Öppen källkod.",

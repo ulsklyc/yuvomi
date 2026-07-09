@@ -913,15 +913,15 @@
         "nextPeriod": "Επόμενη περίοδος",
         "recurringInstanceLabel": "Μέρος μιας σειράς",
         "loanProgressLabel": "Πρόοδος αποπληρωμής",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "Προβολή προϋπολογισμού",
+        "viewMine": "Ο προϋπολογισμός μου",
+        "viewHousehold": "Προϋπολογισμός νοικοκυριού",
+        "sharedFromBudget": "Κοινόχρηστο από {{owner}}",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "Ανατεθειμένοι",
+        "splitSectionLabel": "Κοινός επιμερισμός",
+        "singleAssigneeHint": "Αναθέστε ένα άτομο ώστε αυτό το στοιχείο να είναι δικό του.",
+        "multiAssigneeHint": "Αναθέστε πολλούς ανθρώπους και επιλέξτε πώς θα μοιραστεί το ποσό."
     },
     "settings": {
         "pageHealthModule": "Υγεία",
@@ -1641,12 +1641,12 @@
         "notificationChannelAdminOnlyHint": "Μόνο οι διαχειριστές μπορούν να διαχειρίζονται κανάλια νοικοκυριού.",
         "notificationChannelDeleteConfirm": "Να διαγραφεί αυτό το κανάλι ειδοποιήσεων;",
         "apiTokensMcpHint": "Αυτά τα διακριτικά λειτουργούν επίσης ως διακριτικά Bearer για το τελικό σημείο MCP στο /mcp (π.χ. στο Claude Desktop, για τη δημιουργία εργασιών, ειδών ψωνιών και εκδηλώσεων μέσω AI).",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
-        "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeTitle": "Λειτουργία προϋπολογισμού",
+        "budgetModeDescription": "Επιλέξτε ανάμεσα σε έναν κοινόχρηστο προϋπολογισμό νοικοκυριού και σε προσωπικούς προϋπολογισμούς με κοινό επιμερισμό.",
+        "budgetModeLabel": "Λειτουργία",
+        "budgetModeShared": "Κοινόχρηστος προϋπολογισμός νοικοκυριού",
+        "budgetModePersonal": "Προσωπικοί προϋπολογισμοί με κοινό επιμερισμό",
+        "budgetModeSaved": "Η λειτουργία προϋπολογισμού αποθηκεύτηκε."
     },
     "login": {
         "tagline": "Οικογενειακός προγραμματισμός. Ασφαλής. Φιλικός προς την ιδιωτικότητα. Ανοιχτός κώδικας.",

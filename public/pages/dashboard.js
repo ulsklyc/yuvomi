@@ -810,10 +810,17 @@ function renderBudgetWidget(budget, currency) {
   const savingsRate = income > 0 ? Math.round((balance / income) * 100) : 0;
   const balanceTone = balance >= 0 ? 'positive' : 'negative';
   const hasData = (budget?.entryCount || 0) > 0;
+  const viewToggle = budget?.showViewToggle
+    ? `<div class="budget-widget__view-toggle" role="group" aria-label="${t('budget.viewModeLabel')}">
+        <button type="button" class="budget-widget__view-btn ${budget.view === 'mine' ? 'budget-widget__view-btn--active' : ''}" data-budget-view="mine">${t('budget.viewMine')}</button>
+        <button type="button" class="budget-widget__view-btn ${budget.view === 'household' ? 'budget-widget__view-btn--active' : ''}" data-budget-view="household">${t('budget.viewHousehold')}</button>
+      </div>`
+    : '';
 
   if (!hasData) {
     return `<div class="widget widget--budget">
       ${widgetHeader('wallet', t('dashboard.budgetOverview'), null, '/budget')}
+      ${viewToggle}
       <div class="widget__empty">
         <i data-lucide="wallet" class="empty-state__icon" aria-hidden="true"></i>
         <div>${t('dashboard.noBudgetData')}</div>
@@ -824,6 +831,7 @@ function renderBudgetWidget(budget, currency) {
 
   return `<div class="widget widget--budget">
     ${widgetHeader('wallet', t('dashboard.budgetOverview'), null, '/budget')}
+    ${viewToggle}
     <div class="budget-widget">
       <div class="budget-widget__headline">
         <span>${t('dashboard.monthlyBalance')}</span>
@@ -1755,6 +1763,30 @@ export async function render(container, { user }) {
   let visibleMealTypes = MEAL_ORDER;
   let loadFailed   = false;
   let loadErrorStatus = null;
+  let budgetMode = 'shared';
+  let budgetWidgetView = 'household';
+  const currentBudgetMonth = toLocalDateKey(new Date()).slice(0, 7);
+
+  async function loadBudgetWidgetSlice(month, view) {
+    const [summary, entries] = await Promise.all([
+      api.get(`/budget/summary?month=${month}${view ? `&view=${view}` : ''}`),
+      api.get(`/budget?month=${month}${view ? `&view=${view}` : ''}`),
+    ]);
+    const byCategory = Array.isArray(summary.data?.byCategory) ? summary.data.byCategory : [];
+    const topExpense = byCategory
+      .filter((row) => Number(row.expenses || 0) < 0)
+      .sort((a, b) => Math.abs(Number(b.expenses || 0)) - Math.abs(Number(a.expenses || 0)))[0] || null;
+    return {
+      income: Number(summary.data?.income || 0),
+      expenses: Number(summary.data?.expenses || 0),
+      balance: Number(summary.data?.balance || 0),
+      entryCount: Array.isArray(entries.data) ? entries.data.length : 0,
+      topExpenseCategory: topExpense?.category || null,
+      topExpenseAmount: Math.abs(Number(topExpense?.expenses || 0)),
+      view,
+      showViewToggle: budgetMode === 'personal' && user?.role === 'admin',
+    };
+  }
   try {
     const [dashRes, weatherRes, prefsRes] = await Promise.all([
       api.get('/dashboard'),
@@ -1767,7 +1799,12 @@ export async function render(container, { user }) {
     widgetConfig = normalizeDashboardConfig(prefsRes.data?.dashboard_widgets ?? DEFAULT_WIDGET_CONFIG);
     savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
     currency     = prefsRes.data?.currency ?? 'EUR';
+    budgetMode = prefsRes.data?.budget_mode ?? 'shared';
+    budgetWidgetView = budgetMode === 'personal' ? 'mine' : 'household';
     visibleMealTypes = normalizeVisibleMealTypes(prefsRes.data?.visible_meal_types);
+    if (budgetMode === 'personal') {
+      data.budget = await loadBudgetWidgetSlice(currentBudgetMonth, user?.role === 'admin' ? budgetWidgetView : 'mine');
+    }
   } catch (err) {
     console.error('[Dashboard] Ladefehler:', err.message, 'Status:', err.status ?? 'network');
     loadFailed = true;
@@ -2033,6 +2070,19 @@ export async function render(container, { user }) {
     container.querySelector('#dashboard-customize-save')?.addEventListener('click', saveDashboardConfig, { signal: _fabController.signal });
     container.querySelector('#dashboard-customize-cancel')?.addEventListener('click', cancelDashboardConfig, { signal: _fabController.signal });
     container.querySelector('#dashboard-customize-reset')?.addEventListener('click', resetDashboardConfig, { signal: _fabController.signal });
+    container.querySelectorAll('[data-budget-view]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const nextView = btn.dataset.budgetView;
+        if (!nextView || nextView === budgetWidgetView) return;
+        budgetWidgetView = nextView;
+        try {
+          data.budget = await loadBudgetWidgetSlice(currentBudgetMonth, budgetWidgetView);
+          rebuildDashboard(cfg);
+        } catch {
+          window.yuvomi?.showToast(t('budget.loadError'), 'danger');
+        }
+      }, { signal: _fabController.signal });
+    });
     wireDashboardEditMode();
   }
 

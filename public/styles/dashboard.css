@@ -2497,6 +2497,29 @@ svg.weather-forecast__icon {
   padding: var(--space-4);
 }
 
+.budget-widget__view-toggle {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: 0 var(--space-4) var(--space-2);
+}
+
+.budget-widget__view-btn {
+  border: 1px solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-2);
+  min-height: var(--target-sm);
+  cursor: pointer;
+  font: inherit;
+}
+
+.budget-widget__view-btn--active {
+  background: color-mix(in srgb, var(--module-budget) 14%, transparent);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
 .budget-widget__headline {
   display: flex;
   align-items: baseline;

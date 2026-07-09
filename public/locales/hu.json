@@ -913,15 +913,15 @@
         "nextPeriod": "Következő időszak",
         "recurringInstanceLabel": "Egy sorozat része",
         "loanProgressLabel": "Törlesztés állása",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "Költségvetési nézet",
+        "viewMine": "Saját költségvetésem",
+        "viewHousehold": "Háztartási költségvetés",
+        "sharedFromBudget": "Megosztva innen: {{owner}}",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "Hozzárendeltek",
+        "splitSectionLabel": "Megosztott felosztás",
+        "singleAssigneeHint": "Rendelj hozzá egy személyt, hogy ez a tétel az övé legyen.",
+        "multiAssigneeHint": "Rendelj hozzá több személyt, és válaszd ki, hogyan oszlik meg az összeg."
     },
     "settings": {
         "pageHealthModule": "Egészség",
@@ -1641,12 +1641,12 @@
         "notificationChannelAdminOnlyHint": "Csak az adminisztrátorok kezelhetik a háztartási csatornákat.",
         "notificationChannelDeleteConfirm": "Törölni szeretné ezt a értesítési csatornát?",
         "apiTokensMcpHint": "Ezek a tokenek Bearer tokenként is működnek a /mcp címen elérhető MCP-végponthoz (pl. a Claude Desktopban, feladatok, bevásárlólista-tételek és események MI-vel történő létrehozásához).",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
-        "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeTitle": "Költségvetési mód",
+        "budgetModeDescription": "Válassz egy megosztott háztartási költségvetés és személyes költségvetések között közös felosztással.",
+        "budgetModeLabel": "Mód",
+        "budgetModeShared": "Megosztott háztartási költségvetés",
+        "budgetModePersonal": "Személyes költségvetések közös felosztással",
+        "budgetModeSaved": "A költségvetési mód mentve."
     },
     "login": {
         "tagline": "Family planning. Secure. Privacy-friendly. Open source.",

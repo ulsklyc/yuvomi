@@ -913,15 +913,15 @@
         "nextPeriod": "Próximo período",
         "recurringInstanceLabel": "Parte de uma série",
         "loanProgressLabel": "Progresso do reembolso",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "Visao do orcamento",
+        "viewMine": "Meu orcamento",
+        "viewHousehold": "Orcamento da casa",
+        "sharedFromBudget": "Compartilhado por {{owner}}",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "Responsaveis",
+        "splitSectionLabel": "Divisao compartilhada",
+        "singleAssigneeHint": "Atribua uma pessoa para que este item seja dela.",
+        "multiAssigneeHint": "Atribua varias pessoas e escolha como dividir o valor."
     },
     "settings": {
         "pageHealthModule": "Saúde",
@@ -1641,12 +1641,12 @@
         "notificationChannelAdminOnlyHint": "Somente administradores podem gerenciar canais da casa.",
         "notificationChannelDeleteConfirm": "Excluir este canal de notificações?",
         "apiTokensMcpHint": "Estes tokens também funcionam como tokens Bearer para o endpoint MCP em /mcp (por ex. no Claude Desktop, para criar tarefas, itens de compras e eventos através de IA).",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
-        "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeTitle": "Modo de orcamento",
+        "budgetModeDescription": "Escolha entre um orcamento domestico compartilhado e orcamentos pessoais com divisao compartilhada.",
+        "budgetModeLabel": "Modo",
+        "budgetModeShared": "Orcamento domestico compartilhado",
+        "budgetModePersonal": "Orcamentos pessoais com divisao compartilhada",
+        "budgetModeSaved": "Modo de orcamento salvo."
     },
     "login": {
         "tagline": "Planejamento familiar. Seguro. Privado. Código aberto.",

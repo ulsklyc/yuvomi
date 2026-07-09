@@ -651,7 +651,10 @@ function renderEntries() {
           ? `${t('budget.sharedFromBudget', { owner: t('budget.viewHousehold') })}`
           : `${t('budget.assigneesLabel')}: ${e.assignee_count} · ${t('budget.viewHousehold')}`)
       : '';
-    const canOpenParent = state.budgetMode === 'personal' && e.is_readonly && e.assignee_count > 1 && _user?.role === 'admin';
+    const canOpenParent = state.budgetMode === 'personal'
+      && state.budgetView === 'mine'
+      && e.assignee_count > 1
+      && _user?.role === 'admin';
     const parentAction = canOpenParent
       ? ` <button class="budget-entry__meta-action" type="button" data-action="open-parent" data-id="${e.id}">${t('common.edit')} ${t('budget.viewHousehold')}</button>`
       : '';

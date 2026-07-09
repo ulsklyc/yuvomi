@@ -913,15 +913,15 @@
         "nextPeriod": "次の期間",
         "recurringInstanceLabel": "シリーズの一部",
         "loanProgressLabel": "返済の進捗",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "予算表示",
+        "viewMine": "自分の予算",
+        "viewHousehold": "家計の予算",
+        "sharedFromBudget": "{{owner}} から共有",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "担当者",
+        "splitSectionLabel": "共有分割",
+        "singleAssigneeHint": "1人を割り当てると、この項目はその人のものになります。",
+        "multiAssigneeHint": "複数人を割り当てて、金額の分け方を選択します。"
     },
     "settings": {
         "pageHealthModule": "健康",
@@ -1641,12 +1641,12 @@
         "notificationChannelAdminOnlyHint": "世帯チャンネルを管理できるのは管理者のみです。",
         "notificationChannelDeleteConfirm": "この通知チャンネルを削除しますか？",
         "apiTokensMcpHint": "これらのトークンは、/mcp の MCP エンドポイント用の Bearer トークンとしても機能します（例: Claude Desktop で、AI によりタスク・買い物リスト・予定を作成）。",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
-        "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeTitle": "予算モード",
+        "budgetModeDescription": "1つの共有家計予算と、共有分割付きの個人予算のどちらかを選択します。",
+        "budgetModeLabel": "モード",
+        "budgetModeShared": "共有家計予算",
+        "budgetModePersonal": "共有分割付きの個人予算",
+        "budgetModeSaved": "予算モードを保存しました。"
     },
     "login": {
         "tagline": "家族計画。安全。プライバシー重視。オープンソース。",

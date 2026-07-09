@@ -913,15 +913,15 @@
         "nextPeriod": "Наступний період",
         "recurringInstanceLabel": "Частина серії",
         "loanProgressLabel": "Хід погашення",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "Перегляд бюджету",
+        "viewMine": "Мій бюджет",
+        "viewHousehold": "Бюджет домогосподарства",
+        "sharedFromBudget": "Спільне від {{owner}}",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "Призначені",
+        "splitSectionLabel": "Спільний розподіл",
+        "singleAssigneeHint": "Призначте одну людину, щоб цей запис належав їй.",
+        "multiAssigneeHint": "Призначте кількох людей і виберіть, як розподілити суму."
     },
     "settings": {
         "pageHealthModule": "Здоровʼя",
@@ -1641,12 +1641,12 @@
         "notificationChannelAdminOnlyHint": "Керувати каналами домогосподарства можуть лише адміністратори.",
         "notificationChannelDeleteConfirm": "Видалити цей канал сповіщень?",
         "apiTokensMcpHint": "Ці токени також працюють як токени Bearer для кінцевої точки MCP за адресою /mcp (наприклад, у Claude Desktop для створення завдань, покупок і подій за допомогою ШІ).",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
-        "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeTitle": "Режим бюджету",
+        "budgetModeDescription": "Виберіть між спільним бюджетом домогосподарства та особистими бюджетами зі спільним розподілом.",
+        "budgetModeLabel": "Режим",
+        "budgetModeShared": "Спільний бюджет домогосподарства",
+        "budgetModePersonal": "Особисті бюджети зі спільним розподілом",
+        "budgetModeSaved": "Режим бюджету збережено."
     },
     "login": {
         "tagline": "Планування для родини. Безпечно. Конфіденційно. Відкритий код.",

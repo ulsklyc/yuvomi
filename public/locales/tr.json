@@ -913,15 +913,15 @@
         "nextPeriod": "Sonraki dönem",
         "recurringInstanceLabel": "Bir serinin parçası",
         "loanProgressLabel": "Geri ödeme ilerlemesi",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "Butce gorunumu",
+        "viewMine": "Butcem",
+        "viewHousehold": "Hane butcesi",
+        "sharedFromBudget": "{{owner}} tarafindan paylasildi",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "Atananlar",
+        "splitSectionLabel": "Paylasilan bolusum",
+        "singleAssigneeHint": "Bu kalemin ona ait olmasi icin bir kisi atayin.",
+        "multiAssigneeHint": "Birden fazla kisi atayin ve tutarin nasil bolunecegini secin."
     },
     "settings": {
         "pageHealthModule": "Sağlık",
@@ -1641,12 +1641,12 @@
         "notificationChannelAdminOnlyHint": "Ev kanallarını yalnızca yöneticiler yönetebilir.",
         "notificationChannelDeleteConfirm": "Bu bildirim kanalı silinsin mi?",
         "apiTokensMcpHint": "Bu belirteçler /mcp adresindeki MCP uç noktası için Bearer belirteci olarak da çalışır (örn. Claude Desktop'ta yapay zekâ ile görev, alışveriş öğesi ve etkinlik oluşturmak için).",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
-        "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeTitle": "Butce modu",
+        "budgetModeDescription": "Tek bir paylasilan hane butcesi ile paylasilan bolusumlere sahip kisisel butceler arasindan secim yapin.",
+        "budgetModeLabel": "Mod",
+        "budgetModeShared": "Paylasilan hane butcesi",
+        "budgetModePersonal": "Paylasilan bolusumlere sahip kisisel butceler",
+        "budgetModeSaved": "Butce modu kaydedildi."
     },
     "login": {
         "tagline": "Aile planlaması. Güvenli. Gizlilik dostu. Açık kaynak.",

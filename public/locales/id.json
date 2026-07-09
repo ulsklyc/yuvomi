@@ -919,15 +919,15 @@
         "nextPeriod": "Periode berikutnya",
         "recurringInstanceLabel": "Bagian dari seri",
         "loanProgressLabel": "Progres pelunasan",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "Tampilan anggaran",
+        "viewMine": "Anggaran saya",
+        "viewHousehold": "Anggaran rumah tangga",
+        "sharedFromBudget": "Dibagikan dari {{owner}}",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "Ditugaskan kepada",
+        "splitSectionLabel": "Pembagian bersama",
+        "singleAssigneeHint": "Tetapkan satu orang agar item ini menjadi miliknya.",
+        "multiAssigneeHint": "Tetapkan beberapa orang dan pilih bagaimana jumlahnya dibagi."
     },
     "settings": {
         "pageHealthModule": "Kesehatan",
@@ -1647,12 +1647,12 @@
         "notificationChannelAdminOnlyHint": "Hanya admin yang dapat mengelola saluran rumah tangga.",
         "notificationChannelDeleteConfirm": "Hapus saluran notifikasi ini?",
         "apiTokensMcpHint": "Token ini juga berfungsi sebagai token Bearer untuk endpoint MCP di /mcp (mis. di Claude Desktop, untuk membuat tugas, item belanja, dan acara dengan AI).",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
+        "budgetModeTitle": "Mode anggaran",
+        "budgetModeDescription": "Pilih antara satu anggaran rumah tangga bersama dan anggaran pribadi dengan pembagian bersama.",
         "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeShared": "Anggaran rumah tangga bersama",
+        "budgetModePersonal": "Anggaran pribadi dengan pembagian bersama",
+        "budgetModeSaved": "Mode anggaran disimpan."
     },
     "login": {
         "tagline": "Perencanaan keluarga. Aman. Ramah privasi. Sumber terbuka.",

@@ -913,15 +913,15 @@
         "nextPeriod": "Volgende periode",
         "recurringInstanceLabel": "Onderdeel van een reeks",
         "loanProgressLabel": "Aflossingsvoortgang",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "Budgetweergave",
+        "viewMine": "Mijn budget",
+        "viewHousehold": "Huishoudbudget",
+        "sharedFromBudget": "Gedeeld door {{owner}}",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "Toegewezen aan",
+        "splitSectionLabel": "Gedeelde verdeling",
+        "singleAssigneeHint": "Wijs een persoon toe zodat dit item van die persoon wordt.",
+        "multiAssigneeHint": "Wijs meerdere personen toe en kies hoe het bedrag wordt verdeeld."
     },
     "settings": {
         "pageHealthModule": "Gezondheid",
@@ -1641,12 +1641,12 @@
         "notificationChannelAdminOnlyHint": "Alleen beheerders kunnen huishoudkanalen beheren.",
         "notificationChannelDeleteConfirm": "Dit meldingskanaal verwijderen?",
         "apiTokensMcpHint": "Deze tokens werken ook als Bearer-tokens voor het MCP-eindpunt op /mcp (bijv. in Claude Desktop, om taken, boodschappen en afspraken via AI aan te maken).",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
-        "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeTitle": "Budgetmodus",
+        "budgetModeDescription": "Kies tussen een gedeeld huishoudbudget en persoonlijke budgetten met gedeelde verdelingen.",
+        "budgetModeLabel": "Modus",
+        "budgetModeShared": "Gedeeld huishoudbudget",
+        "budgetModePersonal": "Persoonlijke budgetten met gedeelde verdelingen",
+        "budgetModeSaved": "Budgetmodus opgeslagen."
     },
     "login": {
         "tagline": "Gezinsplanning. Veilig. Privacyvriendelijk. Open source.",

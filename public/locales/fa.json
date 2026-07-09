@@ -919,15 +919,15 @@
         "nextPeriod": "بازه بعدی",
         "recurringInstanceLabel": "بخشی از یک سری",
         "loanProgressLabel": "پیشرفت بازپرداخت",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "نمای بودجه",
+        "viewMine": "بودجه من",
+        "viewHousehold": "بودجه خانوار",
+        "sharedFromBudget": "اشتراک‌گذاری‌شده از {{owner}}",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "مسئولان",
+        "splitSectionLabel": "تقسیم مشترک",
+        "singleAssigneeHint": "یک نفر را تعیین کنید تا این مورد متعلق به او باشد.",
+        "multiAssigneeHint": "چند نفر را تعیین کنید و انتخاب کنید مبلغ چگونه تقسیم شود."
     },
     "settings": {
         "pageHealthModule": "سلامت",
@@ -1647,12 +1647,12 @@
         "notificationChannelAdminOnlyHint": "فقط مدیران می‌توانند کانال‌های خانوار را مدیریت کنند.",
         "notificationChannelDeleteConfirm": "این کانال اعلان حذف شود؟",
         "apiTokensMcpHint": "این توکن‌ها به عنوان توکن Bearer برای نقطه پایانی MCP در /mcp نیز کار می‌کنند (مثلاً در Claude Desktop، برای ایجاد کارها، اقلام خرید و رویدادها با هوش مصنوعی).",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
-        "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeTitle": "حالت بودجه",
+        "budgetModeDescription": "بین یک بودجه مشترک خانوار و بودجه‌های شخصی با تقسیم‌های مشترک انتخاب کنید.",
+        "budgetModeLabel": "حالت",
+        "budgetModeShared": "بودجه مشترک خانوار",
+        "budgetModePersonal": "بودجه‌های شخصی با تقسیم‌های مشترک",
+        "budgetModeSaved": "حالت بودجه ذخیره شد."
     },
     "login": {
         "tagline": "برنامه‌ریزی خانواده. امن. حریم‌خصوصی‌محور. متن‌باز.",

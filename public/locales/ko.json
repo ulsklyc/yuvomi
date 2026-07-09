@@ -919,15 +919,15 @@
         "nextPeriod": "다음 기간",
         "recurringInstanceLabel": "시리즈의 일부",
         "loanProgressLabel": "상환 진행률",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "예산 보기",
+        "viewMine": "내 예산",
+        "viewHousehold": "가구 예산",
+        "sharedFromBudget": "{{owner}}에서 공유됨",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "담당자",
+        "splitSectionLabel": "공유 분할",
+        "singleAssigneeHint": "한 사람을 지정하면 이 항목은 그 사람의 것이 됩니다.",
+        "multiAssigneeHint": "여러 사람을 지정하고 금액을 어떻게 나눌지 선택하세요."
     },
     "settings": {
         "pageHealthModule": "건강",
@@ -1647,12 +1647,12 @@
         "notificationChannelAdminOnlyHint": "관리자만 가구 채널을 관리할 수 있습니다.",
         "notificationChannelDeleteConfirm": "이 알림 채널을 삭제할까요?",
         "apiTokensMcpHint": "이 토큰은 /mcp의 MCP 엔드포인트용 Bearer 토큰으로도 작동합니다(예: Claude Desktop에서 AI로 할 일, 장보기 항목, 일정을 만들 때).",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
-        "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeTitle": "예산 모드",
+        "budgetModeDescription": "하나의 공유 가구 예산과 공유 분할이 있는 개인 예산 중에서 선택하세요.",
+        "budgetModeLabel": "모드",
+        "budgetModeShared": "공유 가구 예산",
+        "budgetModePersonal": "공유 분할이 있는 개인 예산",
+        "budgetModeSaved": "예산 모드가 저장되었습니다."
     },
     "login": {
         "tagline": "가족 계획. 안전하게. 개인정보 보호. 오픈 소스.",

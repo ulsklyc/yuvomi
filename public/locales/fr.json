@@ -913,15 +913,15 @@
         "nextPeriod": "Période suivante",
         "recurringInstanceLabel": "Fait partie d'une série",
         "loanProgressLabel": "Progression du remboursement",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "Vue du budget",
+        "viewMine": "Mon budget",
+        "viewHousehold": "Budget du foyer",
+        "sharedFromBudget": "Partage depuis {{owner}}",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "Assignés",
+        "splitSectionLabel": "Répartition partagée",
+        "singleAssigneeHint": "Assignez une personne pour que cet élément lui appartienne.",
+        "multiAssigneeHint": "Assignez plusieurs personnes et choisissez comment répartir le montant."
     },
     "settings": {
         "pageHealthModule": "Santé",
@@ -1641,12 +1641,12 @@
         "notificationChannelAdminOnlyHint": "Seuls les administrateurs peuvent gérer les canaux du foyer.",
         "notificationChannelDeleteConfirm": "Supprimer ce canal de notification ?",
         "apiTokensMcpHint": "Ces jetons fonctionnent aussi comme jetons Bearer pour le point de terminaison MCP sur /mcp (p. ex. dans Claude Desktop, pour créer des tâches, des articles de courses et des événements via l'IA).",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
+        "budgetModeTitle": "Mode budgétaire",
+        "budgetModeDescription": "Choisissez entre un budget de foyer partagé et des budgets personnels avec répartition partagée.",
         "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeShared": "Budget de foyer partagé",
+        "budgetModePersonal": "Budgets personnels avec répartition partagée",
+        "budgetModeSaved": "Mode budgétaire enregistré."
     },
     "login": {
         "tagline": "Planification familiale. Sécurisée. Respectueuse de la vie privée. Open source.",

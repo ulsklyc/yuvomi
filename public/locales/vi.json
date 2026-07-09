@@ -913,15 +913,15 @@
         "nextPeriod": "Kỳ sau",
         "recurringInstanceLabel": "Một phần của chuỗi",
         "loanProgressLabel": "Tiến độ trả nợ",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "Che do xem ngan sach",
+        "viewMine": "Ngan sach cua toi",
+        "viewHousehold": "Ngan sach ho gia dinh",
+        "sharedFromBudget": "Chia se tu {{owner}}",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "Nguoi duoc giao",
+        "splitSectionLabel": "Phan chia chung",
+        "singleAssigneeHint": "Gan cho mot nguoi de muc nay thuoc ve ho.",
+        "multiAssigneeHint": "Gan cho nhieu nguoi va chon cach chia so tien."
     },
     "settings": {
         "pageHealthModule": "Sức khỏe",
@@ -1641,12 +1641,12 @@
         "notificationChannelAdminOnlyHint": "Chỉ quản trị viên mới có thể quản lý kênh gia đình.",
         "notificationChannelDeleteConfirm": "Xóa kênh thông báo này?",
         "apiTokensMcpHint": "Các token này cũng hoạt động như token Bearer cho điểm cuối MCP tại /mcp (ví dụ trong Claude Desktop, để tạo công việc, món hàng cần mua và sự kiện bằng AI).",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
-        "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeTitle": "Che do ngan sach",
+        "budgetModeDescription": "Chon giua mot ngan sach ho gia dinh dung chung va cac ngan sach ca nhan co phan chia chung.",
+        "budgetModeLabel": "Che do",
+        "budgetModeShared": "Ngan sach ho gia dinh dung chung",
+        "budgetModePersonal": "Ngan sach ca nhan co phan chia chung",
+        "budgetModeSaved": "Da luu che do ngan sach."
     },
     "login": {
         "tagline": "Kế hoạch gia đình. Bảo mật. Thân thiện với quyền riêng tư. Mã nguồn mở.",

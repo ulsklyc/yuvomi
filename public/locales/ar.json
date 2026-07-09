@@ -913,15 +913,15 @@
         "nextPeriod": "الفترة التالية",
         "recurringInstanceLabel": "جزء من سلسلة",
         "loanProgressLabel": "تقدّم السداد",
-        "viewModeLabel": "Budget view",
-        "viewMine": "My budget",
-        "viewHousehold": "Household budget",
-        "sharedFromBudget": "Shared from {{owner}}",
+        "viewModeLabel": "عرض الميزانية",
+        "viewMine": "ميزانيتي",
+        "viewHousehold": "ميزانية الأسرة",
+        "sharedFromBudget": "مُشترك من {{owner}}",
         "sharedFromSplit": "Split expense: {{group}}",
-        "assigneesLabel": "Assignees",
-        "splitSectionLabel": "Shared split",
-        "singleAssigneeHint": "Assign one person to make this item theirs.",
-        "multiAssigneeHint": "Assign multiple people and choose how to split the amount."
+        "assigneesLabel": "المكلّفون",
+        "splitSectionLabel": "تقسيم المشاركة",
+        "singleAssigneeHint": "عيّن شخصًا واحدًا ليصبح هذا البند خاصًا به.",
+        "multiAssigneeHint": "عيّن عدة أشخاص واختر كيفية تقسيم المبلغ."
     },
     "settings": {
         "pageHealthModule": "الصحة",
@@ -1641,12 +1641,12 @@
         "notificationChannelAdminOnlyHint": "يمكن للمشرفين فقط إدارة قنوات المنزل.",
         "notificationChannelDeleteConfirm": "هل تريد حذف قناة الإشعارات هذه؟",
         "apiTokensMcpHint": "تعمل هذه الرموز أيضًا كرموز Bearer لنقطة نهاية MCP على /mcp (على سبيل المثال في Claude Desktop، لإنشاء المهام وعناصر التسوق والمواعيد باستخدام الذكاء الاصطناعي).",
-        "budgetModeTitle": "Budget mode",
-        "budgetModeDescription": "Choose between one shared household budget and personal budgets with shared splits.",
-        "budgetModeLabel": "Mode",
-        "budgetModeShared": "Shared household budget",
-        "budgetModePersonal": "Personal budgets with shared splits",
-        "budgetModeSaved": "Budget mode saved."
+        "budgetModeTitle": "وضع الميزانية",
+        "budgetModeDescription": "اختر بين ميزانية أسرية مشتركة واحدة وميزانيات شخصية مع تقسيمات مشتركة.",
+        "budgetModeLabel": "الوضع",
+        "budgetModeShared": "ميزانية أسرية مشتركة",
+        "budgetModePersonal": "ميزانيات شخصية مع تقسيمات مشتركة",
+        "budgetModeSaved": "تم حفظ وضع الميزانية."
     },
     "login": {
         "tagline": "تخطيط عائلي. آمن. يحترم الخصوصية. مفتوح المصدر.",
