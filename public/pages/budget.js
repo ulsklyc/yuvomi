@@ -1328,6 +1328,8 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
     size: 'lg',
     onSave(panel) {
       panel.closest('.modal-overlay')?.classList.add('modal-overlay--budget');
+      panel.classList.add('modal-panel--budget');
+      panel.querySelector('.modal-panel__body')?.classList.add('modal-panel__body--budget');
       let currentType = !isEdit && initialType === 'loan' ? 'loan' : (isExpense ? 'expense' : 'income');
 
       const setType = (type) => {

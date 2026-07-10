@@ -1029,13 +1029,22 @@
 .budget-modal {
   display: grid;
   gap: var(--space-4);
-  min-height: min(620px, 70dvh);
+  min-height: 100%;
   align-content: start;
 }
 
 @media (min-width: 768px) {
   .modal-overlay--budget {
     align-items: flex-start;
+  }
+
+  .modal-panel.modal-panel--budget {
+    height: min(760px, calc(100dvh - (2 * var(--space-6))));
+  }
+
+  .modal-panel__body.modal-panel__body--budget {
+    overflow-y: scroll;
+    scrollbar-gutter: stable both-edges;
   }
 }
 
@@ -1141,7 +1150,7 @@
 
 @media (max-width: 640px) {
   .budget-modal {
-    min-height: auto;
+    min-height: 100%;
   }
 }
 
