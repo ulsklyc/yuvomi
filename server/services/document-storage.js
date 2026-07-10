@@ -10,6 +10,8 @@ import { Agent as HttpsAgent } from 'node:https';
 import { BlockList, isIP } from 'node:net';
 import fetch from 'node-fetch';
 import * as db from '../db.js';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
 const CONFIG_PREFIX = 'document_storage_webdav_';
 const DEFAULT_BASE_PATH = 'yuvomi-documents';
@@ -69,6 +71,35 @@ export class StorageError extends Error {
     this.name = 'StorageError';
     this.storageCode = storageCode;
   }
+}
+
+// Local storage helpers (optional folder-backed document storage)
+function parseEnvFlag(name) {
+  const raw = process.env[name];
+  if (raw === undefined) return false;
+  const normalized = String(raw).trim().toLowerCase();
+  return normalized === 'true' || normalized === '1';
+}
+
+function localStorageEnabledEnv() {
+  return parseEnvFlag('DOCUMENT_STORAGE_LOCAL_ENABLED');
+}
+
+function localStorageBasePathEnv() {
+  return String(process.env.DOCUMENT_STORAGE_LOCAL_PATH || '/documents');
+}
+
+function sanitizeStorageKeyForFs(key) {
+  if (!key) return null;
+  let k = String(key);
+  if (k.startsWith('/')) k = k.slice(1);
+  const parts = k.split('/').filter(Boolean);
+  for (const p of parts) {
+    if (p === '.' || p === '..' || p.includes('..') || p.includes('\\')) {
+      throw new StorageError('DOCUMENT_STORAGE_INVALID_CONFIG', 'The local storage key is invalid.');
+    }
+  }
+  return parts.join('/');
 }
 
 function cfgGet(field) {
@@ -662,15 +693,40 @@ export async function stageDocumentUpload({
   originalName,
 }) {
   const content = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+
+  // If local folder-backed storage is enabled via env, write file to that folder.
+  if (localStorageEnabledEnv()) {
+    const storageKey = buildStorageKey({ category, originalName });
+    const relKey = normalizeStorageKey(storageKey);
+    const basePath = localStorageBasePathEnv();
+    const safeRel = sanitizeStorageKeyForFs(relKey);
+    const destPath = path.join(basePath, safeRel);
+    try {
+      await fs.mkdir(path.dirname(destPath), { recursive: true });
+      await fs.writeFile(destPath, content);
+    } catch (error) {
+      throw toStorageError(
+        error,
+        'DOCUMENT_STORAGE_UPLOAD_FAILED',
+        'The document could not be written to local storage.'
+      );
+    }
+
+    return {
+      storage_backend: 'local',
+      storage_provider: 'local',
+      storage_key: relKey,
+      content_data: '',
+    };
+  }
+
   const config = getConfig();
   if (!config.enabled) {
     return {
       storage_backend: 'local',
       storage_provider: 'local',
       storage_key: null,
-      // Roh-Buffer: SQLite speichert ihn als binären BLOB (kein base64-Overhead,
-      // ~25 % weniger Speicher, kein En-/Decode beim Schreiben). Die TEXT-Affinität
-      // der Spalte lässt BLOB-Werte unverändert (nur Numerik würde zu Text konvertiert).
+      // Raw buffer stored in SQLite BLOB (legacy/default behaviour)
       content_data: content,
     };
   }
@@ -747,6 +803,27 @@ function toStoredBinary(value) {
 
 export async function readDocumentContent(document, { dmsResolver } = {}) {
   if (document.storage_backend === 'local') {
+    // Folder-backed local storage: storage_key points to a relative path under configured base
+    if (document.storage_key) {
+      try {
+        const basePath = localStorageBasePathEnv();
+        const rel = sanitizeStorageKeyForFs(document.storage_key);
+        const full = path.join(basePath, rel);
+        const buffer = await fs.readFile(full);
+        return {
+          buffer,
+          mime: document.mime_type || 'application/octet-stream',
+        };
+      } catch (error) {
+        throw toStorageError(
+          error,
+          'DOCUMENT_STORAGE_READ_FAILED',
+          'The local document could not be read.'
+        );
+      }
+    }
+
+    // Fallback: older rows stored as BLOB in DB
     return {
       buffer: toStoredBinary(document.content_data),
       mime: document.mime_type || 'application/octet-stream',
@@ -811,23 +888,48 @@ export async function readDocumentContent(document, { dmsResolver } = {}) {
 }
 
 export async function deleteDocumentContent(document) {
-  if (document.storage_backend !== 'webdav') return;
-  const config = requireWebdavConfig(getConfig());
-  try {
-    const response = await davFetch(config, 'DELETE', [
-      ...config.basePath.split('/'),
-      ...normalizeStorageKey(document.storage_key).split('/'),
-    ]);
-    if (!response.ok && response.status !== 404) {
-      throw new Error(`DELETE failed with status ${response.status}.`);
+  // WebDAV deletion
+  if (document.storage_backend === 'webdav') {
+    const config = requireWebdavConfig(getConfig());
+    try {
+      const response = await davFetch(config, 'DELETE', [
+        ...config.basePath.split('/'),
+        ...normalizeStorageKey(document.storage_key).split('/'),
+      ]);
+      if (!response.ok && response.status !== 404) {
+        throw new Error(`DELETE failed with status ${response.status}.`);
+      }
+    } catch (error) {
+      throw toStorageError(
+        error,
+        'DOCUMENT_STORAGE_DELETE_FAILED',
+        'The WebDAV document could not be deleted.'
+      );
     }
-  } catch (error) {
-    throw toStorageError(
-      error,
-      'DOCUMENT_STORAGE_DELETE_FAILED',
-      'The WebDAV document could not be deleted.'
-    );
+    return;
   }
+
+  // Local folder-backed deletion
+  if (document.storage_backend === 'local' && document.storage_key) {
+    try {
+      const basePath = localStorageBasePathEnv();
+      const rel = sanitizeStorageKeyForFs(document.storage_key);
+      const full = path.join(basePath, rel);
+      await fs.unlink(full);
+    } catch (error) {
+      // Ignore missing file, but surface other errors
+      if (error && error.code === 'ENOENT') return;
+      throw toStorageError(
+        error,
+        'DOCUMENT_STORAGE_DELETE_FAILED',
+        'The local document could not be deleted.'
+      );
+    }
+    return;
+  }
+
+  // Other backends: nothing to do
+  return;
 }
 
 export async function cleanupStagedUpload(staged) {
