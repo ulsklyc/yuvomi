@@ -704,20 +704,40 @@ export async function stageDocumentUpload({
     try {
       await fs.mkdir(path.dirname(destPath), { recursive: true });
       await fs.writeFile(destPath, content);
+      return {
+        storage_backend: 'local',
+        storage_provider: 'local',
+        storage_key: relKey,
+        content_data: '',
+      };
     } catch (error) {
-      throw toStorageError(
-        error,
-        'DOCUMENT_STORAGE_UPLOAD_FAILED',
-        'The document could not be written to local storage.'
-      );
+      // Attempt fallback into the application's data folder (/data/documents) so
+      // files end up on the writable data volume even if the configured mount is
+      // read-only or otherwise unavailable. Compute fallback path from DB_PATH
+      // (default: /data/yuvomi.db) -> /data/documents/<relKey>
+      try {
+        const dbPath = process.env.DB_PATH || '/data/yuvomi.db';
+        const fallbackBase = path.join(path.dirname(dbPath), 'documents');
+        const fallbackFull = path.join(fallbackBase, relKey);
+        await fs.mkdir(path.dirname(fallbackFull), { recursive: true });
+        await fs.writeFile(fallbackFull, content);
+        // Store an absolute-key marker so reads/deletes use this exact path.
+        const absKey = `__abs__:${fallbackFull}`;
+        return {
+          storage_backend: 'local',
+          storage_provider: 'local',
+          storage_key: absKey,
+          content_data: '',
+        };
+      } catch (fallbackError) {
+        // Original failure wins for diagnostics
+        throw toStorageError(
+          error,
+          'DOCUMENT_STORAGE_UPLOAD_FAILED',
+          'The document could not be written to local storage.'
+        );
+      }
     }
-
-    return {
-      storage_backend: 'local',
-      storage_provider: 'local',
-      storage_key: relKey,
-      content_data: '',
-    };
   }
 
   const config = getConfig();
@@ -806,6 +826,24 @@ export async function readDocumentContent(document, { dmsResolver } = {}) {
     // Folder-backed local storage: storage_key points to a relative path under configured base
     if (document.storage_key) {
       try {
+        // If the storage_key encodes an absolute path (from fallback), use it directly
+        if (typeof document.storage_key === 'string' && document.storage_key.startsWith('__abs__:')) {
+          const abs = document.storage_key.slice('__abs__:'.length);
+          try {
+            const buffer = await fs.readFile(abs);
+            return {
+              buffer,
+              mime: document.mime_type || 'application/octet-stream',
+            };
+          } catch (error) {
+            throw toStorageError(
+              error,
+              'DOCUMENT_STORAGE_READ_FAILED',
+              'The local document could not be read.'
+            );
+          }
+        }
+
         const basePath = localStorageBasePathEnv();
         const rel = sanitizeStorageKeyForFs(document.storage_key);
         const full = path.join(basePath, rel);
@@ -912,6 +950,12 @@ export async function deleteDocumentContent(document) {
   // Local folder-backed deletion
   if (document.storage_backend === 'local' && document.storage_key) {
     try {
+      // absolute-key marker
+      if (typeof document.storage_key === 'string' && document.storage_key.startsWith('__abs__:')) {
+        const abs = document.storage_key.slice('__abs__:'.length);
+        await fs.unlink(abs);
+        return;
+      }
       const basePath = localStorageBasePathEnv();
       const rel = sanitizeStorageKeyForFs(document.storage_key);
       const full = path.join(basePath, rel);
