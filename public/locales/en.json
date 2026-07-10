@@ -3059,5 +3059,13 @@
         "toastBonus": "Points booked",
         "toastSaved": "Saved",
         "toastRewardDeleted": "Reward deleted"
+    },
+    "datepicker": {
+        "openCalendar": "Open calendar",
+        "openTimePicker": "Open time picker",
+        "previousMonth": "Previous month",
+        "nextMonth": "Next month",
+        "today": "Today",
+        "clear": "Clear"
     }
 }

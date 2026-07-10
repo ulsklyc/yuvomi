@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-07-10
+
+### Added
+- Every date and time field across the app now offers a built-in picker: click the calendar or clock icon to open a themed month grid or time list — or the native OS picker on phones and tablets — while free-text entry keeps working as before with locale-aware shorthands (e.g. `0930`/`9h30` → `09:30`). The picker takes each module's accent color, marks today, enforces optional earliest/latest date limits, is fully keyboard-navigable, and mirrors for right-to-left languages.
+
+### Changed
+- Unified date and time input across all modules (calendar appointments, budget, health, birthdays, shopping, split expenses, housekeeping, subscriptions and settings) onto one shared picker, replacing the previous mix of native browser controls and plain text fields so every date field looks and behaves the same.
+
 ## [1.7.2] - 2026-07-10
 
 ### Fixed

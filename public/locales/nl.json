@@ -3059,5 +3059,13 @@
         "toastBonus": "Punten geboekt",
         "toastSaved": "Opgeslagen",
         "toastRewardDeleted": "Beloning verwijderd"
+    },
+    "datepicker": {
+        "openCalendar": "Kalender openen",
+        "openTimePicker": "Tijdkiezer openen",
+        "previousMonth": "Vorige maand",
+        "nextMonth": "Volgende maand",
+        "today": "Vandaag",
+        "clear": "Wissen"
     }
 }

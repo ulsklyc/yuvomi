@@ -834,7 +834,7 @@ function openVitalModal(opts = {}) {
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
             <label class="label" for="vital-measured-at">${esc(t('health.vitals.field.measuredAt'))}</label>
-            <input class="input" id="vital-measured-at" type="datetime-local" value="${esc(localDateTimeValue(now))}" required>
+            <yuvomi-datepicker id="vital-measured-at" type="datetime" value="${esc(localDateTimeValue(now))}"></yuvomi-datepicker>
           </div>
           <div class="form-field">
             <label class="label" for="vital-visibility">${esc(t('health.vitals.field.visibility'))}</label>
@@ -1459,7 +1459,7 @@ function renderSchedEditor(panel, med) {
       <div class="modal-grid modal-grid--2">
         <div class="form-field">
           <label class="label" for="sched-time">${esc(t('health.meds.schedule.time'))}</label>
-          <input class="input" id="sched-time" type="time" value="08:00">
+          <yuvomi-datepicker id="sched-time" type="time" value="08:00"></yuvomi-datepicker>
         </div>
         <div class="form-field">
           <label class="label" for="sched-dose">${esc(t('health.meds.schedule.dose'))}</label>
@@ -1984,7 +1984,7 @@ function openLabModal(report) {
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
             <label class="label" for="lab-date">${esc(t('health.labs.field.reportDate'))}</label>
-            <input class="input" id="lab-date" type="date" required value="${esc(dateValue)}">
+            <yuvomi-datepicker id="lab-date" type="date" value="${esc(dateValue)}"></yuvomi-datepicker>
           </div>
           <div class="form-field">
             <label class="label" for="lab-name">${esc(t('health.labs.field.labName'))}</label>
@@ -2553,7 +2553,7 @@ function openActivityModal(row, opts = {}) {
         </div>
         <div class="form-field">
           <label class="label" for="activity-performed-at">${esc(t('health.activity.field.performedAt'))}</label>
-          <input class="input" id="activity-performed-at" type="datetime-local" required value="${esc(dateValue)}">
+          <yuvomi-datepicker id="activity-performed-at" type="datetime" value="${esc(dateValue)}"></yuvomi-datepicker>
         </div>
         <div class="modal-grid modal-grid--3">
           <div class="form-field">
@@ -3103,11 +3103,11 @@ function overviewExportMarkup() {
       <div class="health-overview__export-range">
         <div class="form-field">
           <label class="label" for="ov-export-from">${esc(t('health.export.rangeFrom'))}</label>
-          <input class="input" id="ov-export-from" type="date" value="${esc(from || '')}">
+          <yuvomi-datepicker id="ov-export-from" type="date" value="${esc(from || '')}"></yuvomi-datepicker>
         </div>
         <div class="form-field">
           <label class="label" for="ov-export-to">${esc(t('health.export.rangeTo'))}</label>
-          <input class="input" id="ov-export-to" type="date" value="${esc(to || '')}">
+          <yuvomi-datepicker id="ov-export-to" type="date" value="${esc(to || '')}"></yuvomi-datepicker>
         </div>
       </div>
       <div class="health-overview__export-buttons" id="ov-export-buttons">${exportButtonsMarkup()}</div>
@@ -3690,11 +3690,11 @@ function openPeriodModal(period) {
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
             <label class="label" for="cycle-start">${esc(t('health.cycle.field.startDate'))}</label>
-            <input class="input" id="cycle-start" type="date" required value="${esc(startVal)}">
+            <yuvomi-datepicker id="cycle-start" type="date" value="${esc(startVal)}"></yuvomi-datepicker>
           </div>
           <div class="form-field">
             <label class="label" for="cycle-end">${esc(t('health.cycle.field.endDate'))}</label>
-            <input class="input" id="cycle-end" type="date" value="${esc(endVal)}">
+            <yuvomi-datepicker id="cycle-end" type="date" value="${esc(endVal)}"></yuvomi-datepicker>
           </div>
         </div>
         <div class="form-field">

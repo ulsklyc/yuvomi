@@ -3059,5 +3059,13 @@
         "toastBonus": "Бали нараховано",
         "toastSaved": "Збережено",
         "toastRewardDeleted": "Нагороду видалено"
+    },
+    "datepicker": {
+        "openCalendar": "Відкрити календар",
+        "openTimePicker": "Відкрити вибір часу",
+        "previousMonth": "Попередній місяць",
+        "nextMonth": "Наступний місяць",
+        "today": "Сьогодні",
+        "clear": "Очистити"
     }
 }

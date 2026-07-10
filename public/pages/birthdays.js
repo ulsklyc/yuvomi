@@ -301,7 +301,7 @@ function openBirthdayModal({ mode, birthday = null }) {
             </div>
             <div class="form-group">
               <label class="form-label" for="bd-birth-date">${t('birthdays.birthDateLabel')}</label>
-              <input class="form-input" id="bd-birth-date" type="date" max="${today}" value="${esc(birthday?.birth_date || '')}">
+              <yuvomi-datepicker id="bd-birth-date" type="date" max="${today}" value="${esc(birthday?.birth_date || '')}"></yuvomi-datepicker>
             </div>
           </div>
         </div>

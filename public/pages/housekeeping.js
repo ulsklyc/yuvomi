@@ -809,7 +809,7 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
       <form id="housekeeping-visit-form" class="housekeeping-worker-form">
         <label class="housekeeping-field">
           <span>${esc(t('housekeeping.visitDate'))}</span>
-          <input name="date" type="date" required value="${esc(visit.check_in.slice(0, 10))}">
+          <yuvomi-datepicker name="date" type="date" value="${esc(visit.check_in.slice(0, 10))}"></yuvomi-datepicker>
         </label>
         <div class="housekeeping-form-grid">
           ${visit.rate_type === 'hourly' ? `
@@ -972,7 +972,7 @@ function openStaffModal(worker, content, options = {}) {
           </label>
           <label class="housekeeping-field">
             <span>${esc(t('housekeeping.workerBirthDate'))}</span>
-            <input name="birth_date" type="date" value="${esc(item.birth_date || '')}">
+            <yuvomi-datepicker name="birth_date" type="date" value="${esc(item.birth_date || '')}"></yuvomi-datepicker>
           </label>
           <label class="housekeeping-field">
             <span>${esc(t('housekeeping.rateType'))}</span>

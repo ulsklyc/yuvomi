@@ -3059,5 +3059,13 @@
         "toastBonus": "Pontok könyvelve",
         "toastSaved": "Mentve",
         "toastRewardDeleted": "Jutalom törölve"
+    },
+    "datepicker": {
+        "openCalendar": "Naptár megnyitása",
+        "openTimePicker": "Időpontválasztó megnyitása",
+        "previousMonth": "Előző hónap",
+        "nextMonth": "Következő hónap",
+        "today": "Ma",
+        "clear": "Törlés"
     }
 }

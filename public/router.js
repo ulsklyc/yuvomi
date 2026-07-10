@@ -16,6 +16,7 @@ import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
 import { activityType } from '/utils/health-activity.js';
 import { buildHelpRows } from '/utils/help.js';
 import { openModal } from '/components/modal.js';
+import '/components/datepicker.js';
 import { NAV_ICONS } from '/nav-icons.js';
 import { SETTINGS_LEAVES } from '/settings/registry.js';
 import {

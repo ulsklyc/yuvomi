@@ -3059,5 +3059,13 @@
         "toastBonus": "Punkte gebucht",
         "toastSaved": "Gespeichert",
         "toastRewardDeleted": "Prämie gelöscht"
+    },
+    "datepicker": {
+        "openCalendar": "Kalender öffnen",
+        "openTimePicker": "Uhrzeit-Auswahl öffnen",
+        "previousMonth": "Vorheriger Monat",
+        "nextMonth": "Nächster Monat",
+        "today": "Heute",
+        "clear": "Löschen"
     }
 }

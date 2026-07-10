@@ -3059,5 +3059,13 @@
         "toastBonus": "Баллы начислены",
         "toastSaved": "Сохранено",
         "toastRewardDeleted": "Награда удалена"
+    },
+    "datepicker": {
+        "openCalendar": "Открыть календарь",
+        "openTimePicker": "Открыть выбор времени",
+        "previousMonth": "Предыдущий месяц",
+        "nextMonth": "Следующий месяц",
+        "today": "Сегодня",
+        "clear": "Очистить"
     }
 }

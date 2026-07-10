@@ -3059,5 +3059,13 @@
         "toastBonus": "Body zaúčtovány",
         "toastSaved": "Uloženo",
         "toastRewardDeleted": "Odměna smazána"
+    },
+    "datepicker": {
+        "openCalendar": "Otevřít kalendář",
+        "openTimePicker": "Otevřít výběr času",
+        "previousMonth": "Předchozí měsíc",
+        "nextMonth": "Další měsíc",
+        "today": "Dnes",
+        "clear": "Vymazat"
     }
 }

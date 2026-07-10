@@ -106,7 +106,7 @@ function renderPage(container) {
           </div>
           <div class="form-group">
             <label class="form-label" for="api-token-expires">${t('settings.apiTokenExpiresLabel')}</label>
-            <input class="form-input" type="datetime-local" id="api-token-expires" />
+            <yuvomi-datepicker type="datetime" id="api-token-expires"></yuvomi-datepicker>
             <p class="form-hint">${t('settings.apiTokenExpiresHint')}</p>
           </div>
           <div class="form-group">

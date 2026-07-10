@@ -1045,8 +1045,8 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
 
     <div class="form-group js-entry-field">
       <label class="form-label" for="bm-date">${t('budget.dateLabel')}</label>
-      <input type="date" class="form-input" id="bm-date"
-             value="${isEdit ? entry.date : today}">
+      <yuvomi-datepicker type="date" id="bm-date"
+             value="${isEdit ? entry.date : today}"></yuvomi-datepicker>
     </div>
 
     <div class="js-entry-field">

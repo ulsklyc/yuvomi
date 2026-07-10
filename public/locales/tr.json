@@ -3059,5 +3059,13 @@
         "toastBonus": "Puanlar işlendi",
         "toastSaved": "Kaydedildi",
         "toastRewardDeleted": "Ödül silindi"
+    },
+    "datepicker": {
+        "openCalendar": "Takvimi aç",
+        "openTimePicker": "Saat seçiciyi aç",
+        "previousMonth": "Önceki ay",
+        "nextMonth": "Sonraki ay",
+        "today": "Bugün",
+        "clear": "Temizle"
     }
 }

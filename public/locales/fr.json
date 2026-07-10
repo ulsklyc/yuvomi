@@ -3059,5 +3059,13 @@
         "toastBonus": "Points enregistrés",
         "toastSaved": "Enregistré",
         "toastRewardDeleted": "Récompense supprimée"
+    },
+    "datepicker": {
+        "openCalendar": "Ouvrir le calendrier",
+        "openTimePicker": "Ouvrir le sélecteur d'heure",
+        "previousMonth": "Mois précédent",
+        "nextMonth": "Mois suivant",
+        "today": "Aujourd'hui",
+        "clear": "Effacer"
     }
 }

@@ -3059,5 +3059,13 @@
         "toastBonus": "Poäng bokförda",
         "toastSaved": "Sparat",
         "toastRewardDeleted": "Belöning borttagen"
+    },
+    "datepicker": {
+        "openCalendar": "Öppna kalender",
+        "openTimePicker": "Öppna tidväljare",
+        "previousMonth": "Föregående månad",
+        "nextMonth": "Nästa månad",
+        "today": "Idag",
+        "clear": "Rensa"
     }
 }

@@ -3059,5 +3059,13 @@
         "toastBonus": "امتیازها ثبت شد",
         "toastSaved": "ذخیره شد",
         "toastRewardDeleted": "جایزه حذف شد"
+    },
+    "datepicker": {
+        "openCalendar": "باز کردن تقویم",
+        "openTimePicker": "باز کردن انتخاب زمان",
+        "previousMonth": "ماه قبل",
+        "nextMonth": "ماه بعد",
+        "today": "امروز",
+        "clear": "پاک کردن"
     }
 }

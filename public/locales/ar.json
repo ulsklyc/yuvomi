@@ -3059,5 +3059,13 @@
         "toastBonus": "تم تسجيل النقاط",
         "toastSaved": "تم الحفظ",
         "toastRewardDeleted": "تم حذف الجائزة"
+    },
+    "datepicker": {
+        "openCalendar": "فتح التقويم",
+        "openTimePicker": "فتح منتقي الوقت",
+        "previousMonth": "الشهر السابق",
+        "nextMonth": "الشهر التالي",
+        "today": "اليوم",
+        "clear": "مسح"
     }
 }

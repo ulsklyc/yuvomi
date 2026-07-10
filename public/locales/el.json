@@ -3059,5 +3059,13 @@
         "toastBonus": "Οι πόντοι καταχωρήθηκαν",
         "toastSaved": "Αποθηκεύτηκε",
         "toastRewardDeleted": "Το βραβείο διαγράφηκε"
+    },
+    "datepicker": {
+        "openCalendar": "Άνοιγμα ημερολογίου",
+        "openTimePicker": "Άνοιγμα επιλογής ώρας",
+        "previousMonth": "Προηγούμενος μήνας",
+        "nextMonth": "Επόμενος μήνας",
+        "today": "Σήμερα",
+        "clear": "Εκκαθάριση"
     }
 }

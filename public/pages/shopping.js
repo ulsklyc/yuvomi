@@ -794,11 +794,11 @@ function openMealPlanImport(container) {
       <form id="shopping-import-meals-form" class="shopping-import-meals-form" novalidate autocomplete="off">
         <div class="form-group">
           <label class="form-label" for="shopping-import-from">${t('calendar.fromLabel')}</label>
-          <input class="form-input" type="date" id="shopping-import-from" value="${esc(today)}" required>
+          <yuvomi-datepicker type="date" id="shopping-import-from" value="${esc(today)}"></yuvomi-datepicker>
         </div>
         <div class="form-group">
           <label class="form-label" for="shopping-import-to">${t('calendar.toLabel')}</label>
-          <input class="form-input" type="date" id="shopping-import-to" value="${esc(defaultTo)}" required>
+          <yuvomi-datepicker type="date" id="shopping-import-to" value="${esc(defaultTo)}"></yuvomi-datepicker>
         </div>
         <div class="modal-actions">
           <button type="button" class="btn btn--secondary" id="shopping-import-cancel">${t('common.cancel')}</button>

@@ -768,8 +768,8 @@ export function openSubscriptionModal(subscription = null) {
         <div class="form-grid-2">
           <div class="form-group">
             <label class="form-label" for="subscription-next-date">${t('subscriptions.nextPaymentLabel')}</label>
-            <input class="form-input" id="subscription-next-date" type="date"
-                   value="${esc(subscription?.next_payment_date || toLocalDateKey(new Date()))}" required>
+            <yuvomi-datepicker id="subscription-next-date" type="date"
+                   value="${esc(subscription?.next_payment_date || toLocalDateKey(new Date()))}"></yuvomi-datepicker>
           </div>
           <div class="form-group">
             <label class="form-label" for="subscription-reminder">${t('subscriptions.reminderDaysLabel')}</label>

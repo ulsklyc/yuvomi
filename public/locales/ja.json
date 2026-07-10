@@ -3059,5 +3059,13 @@
         "toastBonus": "ポイントを記録しました",
         "toastSaved": "保存しました",
         "toastRewardDeleted": "景品を削除しました"
+    },
+    "datepicker": {
+        "openCalendar": "カレンダーを開く",
+        "openTimePicker": "時刻の選択を開く",
+        "previousMonth": "前の月",
+        "nextMonth": "次の月",
+        "today": "今日",
+        "clear": "クリア"
     }
 }

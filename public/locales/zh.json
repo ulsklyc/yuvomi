@@ -3059,5 +3059,13 @@
         "toastBonus": "积分已记入",
         "toastSaved": "已保存",
         "toastRewardDeleted": "奖品已删除"
+    },
+    "datepicker": {
+        "openCalendar": "打开日历",
+        "openTimePicker": "打开时间选择器",
+        "previousMonth": "上个月",
+        "nextMonth": "下个月",
+        "today": "今天",
+        "clear": "清除"
     }
 }

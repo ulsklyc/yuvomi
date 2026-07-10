@@ -3059,5 +3059,13 @@
         "toastBonus": "Poin dicatat",
         "toastSaved": "Disimpan",
         "toastRewardDeleted": "Hadiah dihapus"
+    },
+    "datepicker": {
+        "openCalendar": "Buka kalender",
+        "openTimePicker": "Buka pemilih waktu",
+        "previousMonth": "Bulan sebelumnya",
+        "nextMonth": "Bulan berikutnya",
+        "today": "Hari ini",
+        "clear": "Hapus"
     }
 }

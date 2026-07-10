@@ -3059,5 +3059,13 @@
         "toastBonus": "포인트가 기록됨",
         "toastSaved": "저장됨",
         "toastRewardDeleted": "상품이 삭제됨"
+    },
+    "datepicker": {
+        "openCalendar": "캘린더 열기",
+        "openTimePicker": "시간 선택 열기",
+        "previousMonth": "이전 달",
+        "nextMonth": "다음 달",
+        "today": "오늘",
+        "clear": "지우기"
     }
 }

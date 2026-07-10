@@ -3059,5 +3059,13 @@
         "toastBonus": "अंक दर्ज किए गए",
         "toastSaved": "सहेजा गया",
         "toastRewardDeleted": "इनाम हटाया गया"
+    },
+    "datepicker": {
+        "openCalendar": "कैलेंडर खोलें",
+        "openTimePicker": "समय चयनकर्ता खोलें",
+        "previousMonth": "पिछला महीना",
+        "nextMonth": "अगला महीना",
+        "today": "आज",
+        "clear": "साफ़ करें"
     }
 }

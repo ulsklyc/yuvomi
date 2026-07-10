@@ -8,7 +8,7 @@ import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
 import { openModal as openSharedModal, closeModal, advancedSection } from '/components/modal.js';
 import { stagger } from '/utils/ux.js';
-import { t, formatDate as formatPreferredDate, formatTime, dateInputPlaceholder, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput, timeInputPlaceholder } from '/i18n.js';
+import { t, formatDate as formatPreferredDate, formatTime, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation } from '/utils/html.js';
 import { shiftEndDateKey, isEndBeforeStart } from '/utils/date.js';
 import { getReadableTextColor } from '/utils/color.js';
@@ -614,20 +614,6 @@ function attachmentPreviewHtml(event) {
 
 function selectedAttachmentLabel(name) {
   return t('documents.selectedFileLabel', { name: name || t('calendar.attachmentFallback') });
-}
-
-function bindDateInputs(root) {
-  root.querySelectorAll('.js-date-input').forEach((input) => {
-    input.addEventListener('keydown', (e) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.key.length !== 1) return;
-      if (!/[\d./\-]/.test(e.key)) e.preventDefault();
-    });
-    input.addEventListener('blur', () => {
-      const parsed = parseDateInput(input.value);
-      if (parsed) input.value = formatDateInput(parsed);
-    });
-  });
 }
 
 function readDateInput(root, selector) {
@@ -2003,20 +1989,6 @@ function wireReminderRows(panel) {
   syncAddState();
 }
 
-function bindTimeInputs(root) {
-  root.querySelectorAll('.js-time-input').forEach((input) => {
-    input.addEventListener('keydown', (e) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.key.length !== 1) return;
-      if (!/[\d:.,hH apmAPM]/.test(e.key)) e.preventDefault();
-    });
-    input.addEventListener('blur', () => {
-      const parsed = parseTimeInput(input.value);
-      if (parsed) input.value = formatTimeInput(parsed);
-    });
-  });
-}
-
 // --------------------------------------------------------
 // CalDAV Target Helpers
 // --------------------------------------------------------
@@ -2187,9 +2159,6 @@ function openEventModal({ mode, event = null, date = null, reminder = null, time
         else                      { timeFields.style.display = '';     alldayFields.style.display = 'none'; }
       });
       if (isEdit && event?.all_day) { timeFields.style.display = 'none'; alldayFields.style.display = ''; }
-
-      bindDateInputs(panel);
-      bindTimeInputs(panel);
 
       const iconInput = panel.querySelector('#modal-icon');
       const iconTrigger = panel.querySelector('#modal-icon-trigger');
@@ -2515,21 +2484,21 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       <div class="modal-grid modal-grid--2">
         <div class="form-group">
           <label class="form-label" for="modal-start-date">${t('calendar.startDateLabel')}</label>
-          <input type="text" class="form-input js-date-input" id="modal-start-date" value="${formatDateInput(startDate)}" placeholder="${dateInputPlaceholder()}" inputmode="text">
+          <yuvomi-datepicker type="date" id="modal-start-date" value="${esc(formatDateInput(startDate))}" label="${esc(t('calendar.startDateLabel'))}"></yuvomi-datepicker>
         </div>
         <div class="form-group">
           <label class="form-label" for="modal-start-time">${t('calendar.startTimeLabel')}</label>
-          <input type="text" class="form-input js-time-input" id="modal-start-time" value="${formatTimeInput(startTime)}" placeholder="${timeInputPlaceholder()}">
+          <yuvomi-datepicker type="time" id="modal-start-time" value="${esc(formatTimeInput(startTime))}" label="${esc(t('calendar.startTimeLabel'))}"></yuvomi-datepicker>
         </div>
       </div>
       <div class="modal-grid modal-grid--2">
         <div class="form-group">
           <label class="form-label" for="modal-end-date">${t('calendar.endDateLabel')}</label>
-          <input type="text" class="form-input js-date-input" id="modal-end-date" value="${formatDateInput(endDate)}" placeholder="${dateInputPlaceholder()}" inputmode="text">
+          <yuvomi-datepicker type="date" id="modal-end-date" value="${esc(formatDateInput(endDate))}" label="${esc(t('calendar.endDateLabel'))}"></yuvomi-datepicker>
         </div>
         <div class="form-group">
           <label class="form-label" for="modal-end-time">${t('calendar.endTimeLabel')}</label>
-          <input type="text" class="form-input js-time-input" id="modal-end-time" value="${formatTimeInput(endTime)}" placeholder="${timeInputPlaceholder()}">
+          <yuvomi-datepicker type="time" id="modal-end-time" value="${esc(formatTimeInput(endTime))}" label="${esc(t('calendar.endTimeLabel'))}"></yuvomi-datepicker>
         </div>
       </div>
     </div>
@@ -2538,11 +2507,11 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       <div class="modal-grid modal-grid--2">
         <div class="form-group">
           <label class="form-label" for="modal-allday-start">${t('calendar.fromLabel')}</label>
-          <input type="text" class="form-input js-date-input" id="modal-allday-start" value="${formatDateInput(startDate)}" placeholder="${dateInputPlaceholder()}" inputmode="text">
+          <yuvomi-datepicker type="date" id="modal-allday-start" value="${esc(formatDateInput(startDate))}" label="${esc(t('calendar.fromLabel'))}"></yuvomi-datepicker>
         </div>
         <div class="form-group">
           <label class="form-label" for="modal-allday-end">${t('calendar.toLabel')}</label>
-          <input type="text" class="form-input js-date-input" id="modal-allday-end" value="${formatDateInput(endDate)}" placeholder="${dateInputPlaceholder()}" inputmode="text">
+          <yuvomi-datepicker type="date" id="modal-allday-end" value="${esc(formatDateInput(endDate))}" label="${esc(t('calendar.toLabel'))}"></yuvomi-datepicker>
         </div>
       </div>
     </div>

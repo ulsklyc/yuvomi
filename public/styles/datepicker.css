@@ -1,0 +1,352 @@
+/**
+ * Modul: yuvomi-datepicker
+ * Zweck: Styling für das gemeinsame Datum-/Zeit-Auswahl-Component.
+ *        Feld = bestehendes .form-input (Tippen bleibt der schnelle Pfad),
+ *        Icon-Trigger öffnet auf Desktop ein Glass-Popover im Top-Layer,
+ *        auf Touch das native OS-Sheet.
+ * Abhängigkeiten: tokens.css (alle Werte via Token), layout.css (.form-input)
+ *
+ * Akzent: --active-module-accent (vom Router pro Modul gesetzt) mit Fallback
+ *         auf --color-accent — trägt die Modul-Identität ins Popover.
+ */
+
+yuvomi-datepicker {
+  display: block;
+}
+
+.ydp__fields {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ydp__sub {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* datetime: Datum trägt mehr Breite als die Zeit */
+.ydp--datetime .ydp__sub--date { flex: 1 1 58%; }
+.ydp--datetime .ydp__sub--time { flex: 1 1 42%; }
+
+/* Platz für den Trigger im Feld */
+.ydp__input {
+  padding-right: var(--space-10);
+}
+
+/* Verstecktes natives Input — nur als Träger für showPicker() auf Touch.
+   pointer-events:none, damit der sichtbare Trigger-Button den Tap bekommt. */
+.ydp__native {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--target-lg);
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ydp__trigger {
+  position: absolute;
+  top: 50%;
+  right: var(--space-1);
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--target-md);
+  height: var(--target-md);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.ydp__trigger:hover {
+  color: var(--active-module-accent, var(--color-accent));
+  background: var(--color-surface-hover);
+}
+
+.ydp__trigger:focus-visible {
+  outline: none;
+  color: var(--active-module-accent, var(--color-accent));
+  box-shadow: 0 0 0 3px var(--color-accent-light);
+}
+
+.ydp__trigger svg,
+.ydp__trigger [data-lucide] {
+  width: 18px;
+  height: 18px;
+}
+
+.ydp__sub.is-invalid .ydp__input {
+  border-color: var(--color-danger);
+}
+
+yuvomi-datepicker[disabled] .ydp__input {
+  background: var(--color-surface-2);
+  color: var(--color-text-disabled);
+}
+
+yuvomi-datepicker[disabled] .ydp__trigger {
+  color: var(--color-text-disabled);
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------
+ * Popover (native Popover-API → Top-Layer, entkommt dem
+ * Modal-Overflow; deshalb inset/margin zurücksetzen)
+ * -------------------------------------------------------- */
+.ydp-popover {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: max-content;
+  max-width: min(92vw, 340px);
+  padding: var(--space-3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: var(--glass-bg-elevated);
+  box-shadow: var(--shadow-xl);
+  color: var(--color-text-primary);
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+  transition:
+    opacity var(--transition-fast) var(--ease-out),
+    transform var(--transition-fast) var(--ease-out),
+    overlay var(--transition-fast) allow-discrete,
+    display var(--transition-fast) allow-discrete;
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  .ydp-popover {
+    backdrop-filter: var(--blur-lg) saturate(var(--lg-glass-saturate));
+  }
+}
+
+.ydp-popover:popover-open {
+  opacity: 1;
+  transform: none;
+}
+
+@starting-style {
+  .ydp-popover:popover-open {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ydp-popover {
+    transition: none;
+    transform: none;
+  }
+  .ydp-popover:popover-open { transform: none; }
+}
+
+/* --------------------------------------------------------
+ * Kalender-Raster (Montag-first, konsistent mit calendar.js)
+ * -------------------------------------------------------- */
+.ydp-cal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.ydp-cal__label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.ydp-cal__nav {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.ydp-navbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--target-md);
+  height: var(--target-md);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.ydp-navbtn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+
+.ydp-navbtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-light);
+}
+
+.ydp-navbtn svg,
+.ydp-navbtn [data-lucide] {
+  width: 18px;
+  height: 18px;
+}
+
+.ydp-cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.ydp-cal__wd {
+  padding: var(--space-1) 0;
+  text-align: center;
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+}
+
+.ydp-cal__day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  min-height: var(--target-md);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.ydp-cal__day:hover {
+  background: var(--color-surface-hover);
+}
+
+.ydp-cal__day.is-outside {
+  color: var(--color-text-tertiary);
+}
+
+.ydp-cal__day.is-today {
+  box-shadow: inset 0 0 0 1.5px var(--active-module-accent, var(--color-accent));
+  font-weight: var(--font-weight-semibold);
+}
+
+.ydp-cal__day[aria-selected="true"] {
+  background: var(--active-module-accent, var(--color-accent));
+  color: var(--color-text-on-accent);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ydp-cal__day:disabled {
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+.ydp-cal__day:disabled:hover {
+  background: transparent;
+}
+
+.ydp-cal__day:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-light);
+}
+
+.ydp-cal__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.ydp-textbtn {
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.ydp-textbtn--today {
+  color: var(--active-module-accent, var(--color-accent));
+}
+
+.ydp-textbtn--clear {
+  color: var(--color-text-tertiary);
+}
+
+.ydp-textbtn:hover {
+  background: var(--color-surface-hover);
+}
+
+.ydp-textbtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-light);
+}
+
+/* --------------------------------------------------------
+ * Zeit-Liste
+ * -------------------------------------------------------- */
+.ydp-time__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 15rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ydp-time__list { scroll-behavior: auto; }
+}
+
+.ydp-time__opt {
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  text-align: left;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.ydp-time__opt:hover {
+  background: var(--color-surface-hover);
+}
+
+.ydp-time__opt[aria-selected="true"] {
+  background: var(--active-module-accent, var(--color-accent));
+  color: var(--color-text-on-accent);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ydp-time__opt:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--active-module-accent, var(--color-accent));
+}

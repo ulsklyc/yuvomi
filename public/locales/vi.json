@@ -3059,5 +3059,13 @@
         "toastBonus": "Đã ghi điểm",
         "toastSaved": "Đã lưu",
         "toastRewardDeleted": "Đã xóa phần thưởng"
+    },
+    "datepicker": {
+        "openCalendar": "Mở lịch",
+        "openTimePicker": "Mở bộ chọn giờ",
+        "previousMonth": "Tháng trước",
+        "nextMonth": "Tháng sau",
+        "today": "Hôm nay",
+        "clear": "Xóa"
     }
 }
