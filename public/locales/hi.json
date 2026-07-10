@@ -58,6 +58,7 @@
         "recipes": "रेसिपी",
         "more": "और",
         "moreActiveLabel": "अधिक, {{section}} सक्रिय",
+        "moreCatalogHint": "सभी मॉड्यूल. पसंदीदा को सेटिंग में अनुकूलित करें।",
         "documents": "दस्तावेज़",
         "kitchen": "रसोई",
         "kitchenGoLabel": "रसोई, {{section}} खोलें",
@@ -175,7 +176,8 @@
         "housekeepingNoVisits": "अभी कोई विज़िट नहीं",
         "housekeepingVisitsMonth": "इस माह {{count}} विज़िट",
         "housekeepingUnpaid": "{{amount}} बकाया",
-        "widgetError": "लोड नहीं हो सका"
+        "widgetError": "लोड नहीं हो सका",
+        "savingsGoal": "बचत लक्ष्य"
     },
     "tasks": {
         "title": "कार्य",
@@ -922,6 +924,29 @@
         "splitSectionLabel": "साझा बंटवारा",
         "singleAssigneeHint": "एक व्यक्ति को असाइन करें ताकि यह आइटम उसी का हो जाए।",
         "multiAssigneeHint": "कई लोगों को असाइन करें और चुनें कि राशि कैसे बांटी जाए।"
+        "planTab": "योजना",
+        "planCategoryBudgets": "श्रेणी बजट",
+        "planAddBudget": "बजट तय करें",
+        "planSavingsSetTitle": "बचत लक्ष्य तय करें",
+        "planSavingsSetDesc": "मासिक बचत लक्ष्य तय करें और प्रगति देखें",
+        "planSetGoal": "लक्ष्य तय करें",
+        "planSavingsGoal": "बचत लक्ष्य",
+        "planSavingsMet": "लक्ष्य पूरा हुआ",
+        "planSavingsNegative": "इस माह घाटे में",
+        "planSavingsShort": "लक्ष्य तक {{amount}} शेष",
+        "planSavingsHint": "बचत लक्ष्य आपकी नियोजित बचत की तुलना इस माह की आय में से व्यय घटाकर करता है।",
+        "planEmptyTitle": "अभी कोई बजट नहीं",
+        "planEmptyDesc": "खर्च पर नियंत्रण के लिए हर श्रेणी का मासिक बजट तय करें।",
+        "planOverBy": "{{amount}} बजट से अधिक",
+        "planLeft": "{{amount}} शेष",
+        "planAllCategoriesBudgeted": "सभी श्रेणियों का बजट पहले से है।",
+        "planMonthlyAmount": "मासिक राशि",
+        "planSavedToast": "बजट सहेजा गया",
+        "planRemovedToast": "बजट हटाया गया",
+        "planTarget": "लक्ष्य: {{amount}}",
+        "planEditAction": "संपादित करें",
+        "planDeleteConfirm": "„{{category}}\" का बजट हटाएँ?",
+        "planSavingsDeleteConfirm": "बचत लक्ष्य हटाएँ?"
     },
     "settings": {
         "pageHealthModule": "स्वास्थ्य",
@@ -1178,6 +1203,19 @@
                 "shared": "साझा"
             },
             "updatedToast": "सदस्यता अपडेट की गई।"
+        },
+        "calendarImport": {
+            "title": "कैलेंडर आयात करें",
+            "description": "किसी .ics फ़ाइल या साझा कैलेंडर से ईवेंट एक बार अपने स्वयं के, संपादन-योग्य ईवेंट के रूप में आयात करें। सदस्यता के विपरीत, बाद में उन्हें सिंक नहीं किया जाता।",
+            "fileLabel": "ICS फ़ाइल",
+            "urlLabel": "या फ़ीड URL",
+            "urlHint": "किसी साझा कैलेंडर का पता (https:// या webcal://).",
+            "colorLabel": "रंग",
+            "submit": "आयात करें",
+            "errorNoSource": "कृपया कोई फ़ाइल चुनें या URL दर्ज करें।",
+            "success": "{{count}} ईवेंट आयात किए गए।",
+            "successWithSkipped": "{{count}} ईवेंट आयात किए गए, {{skipped}} पहले से मौजूद थे।",
+            "allDuplicates": "कोई नया ईवेंट नहीं – सभी पहले से मौजूद थे।"
         },
         "memberPhoneLabel": "फ़ोन नंबर (वैकल्पिक)",
         "memberEmailLabel": "ईमेल (वैकल्पिक)",
@@ -1758,9 +1796,12 @@
         "title": "खोज",
         "open": "खोज खोलें",
         "placeholder": "खोजें…",
-        "noResults": "कोई परिणाम नहीं मिला।"
+        "noResults": "कोई परिणाम नहीं मिला।",
+        "error": "खोज अभी उपलब्ध नहीं है।"
     },
     "birthdays": {
+        "inDays": "{{days}} दिनों में",
+        "turnsAge": "{{age}} का हो जाता है",
         "title": "जन्मदिन",
         "addButton": "जन्मदिन जोड़ें",
         "searchPlaceholder": "जन्मदिन खोजें…",
@@ -1846,7 +1887,7 @@
         "meals": "सप्ताह के लिए भोजन योजना बनाएं और व्यंजन जोड़ें।",
         "notes": "+ दबाएं नई नोट के लिए। नोट्स पूर्ण टेक्स्ट में खोजे जाते हैं।",
         "shopping": "आइटम जोड़ें और चिह्नित या हटाने के लिए स्वाइप करें।",
-        "tasks": "+ दबाएं अपना पहला कार्य बनाने के लिए। हटाने के लिए कार्ड को बाईं ओर स्वाइप करें।"
+        "tasks": "+ दबाएं अपना पहला कार्य बनाने के लिए। पूरा करने के लिए कार्ड को बाईं ओर, संपादित करने के लिए दाईं ओर स्वाइप करें।"
     },
     "documents": {
         "title": "दस्तावेज़",
@@ -2492,7 +2533,8 @@
                 "title": "सेवन अनुपालन",
                 "noData": "अभी तक कोई सेवन डेटा नहीं",
                 "period": "पिछले {{days}} दिन",
-                "streakLabel": "लगातार दिन"
+                "streakLabel": "लगातार दिन",
+                "notStarted": "अभी तक कुछ दर्ज नहीं"
             },
             "vitals": {
                 "title": "नवीनतम महत्वपूर्ण मान"
@@ -2591,7 +2633,8 @@
                 "title": "सेवन अनुपालन",
                 "period": "पिछले {{days}} दिन",
                 "noData": "इस अवधि में अभी तक कोई नियोजित खुराक नहीं।",
-                "summary": "{{planned}} में से {{taken}} ली गई"
+                "summary": "{{planned}} में से {{taken}} ली गई",
+                "notStarted": "अभी तक कोई खुराक दर्ज नहीं"
             },
             "status": {
                 "taken": "ली गई",

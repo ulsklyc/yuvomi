@@ -57,6 +57,7 @@
         "quickActions": "Schnellaktionen",
         "more": "Mehr",
         "moreActiveLabel": "Mehr, {{section}} aktiv",
+        "moreCatalogHint": "Alle Module. Favoriten passt du in den Einstellungen an.",
         "recipes": "Rezepte",
         "documents": "Dokumente",
         "kitchen": "Küche",
@@ -81,6 +82,7 @@
         "title": "Suche",
         "placeholder": "Suchen…",
         "noResults": "Keine Ergebnisse gefunden.",
+        "error": "Suche gerade nicht verfügbar.",
         "open": "Suche öffnen"
     },
     "dashboard": {
@@ -181,7 +183,8 @@
         "housekeepingNoVisits": "Noch keine Besuche",
         "housekeepingVisitsMonth": "{{count}} Besuche im Monat",
         "housekeepingUnpaid": "{{amount}} offen",
-        "widgetError": "Konnte nicht geladen werden"
+        "widgetError": "Konnte nicht geladen werden",
+        "savingsGoal": "Sparziel"
     },
     "tasks": {
         "title": "Aufgaben",
@@ -927,7 +930,30 @@
         "prevPeriod": "Vorheriger Zeitraum",
         "nextPeriod": "Nächster Zeitraum",
         "recurringInstanceLabel": "Teil einer Serie",
-        "loanProgressLabel": "Tilgungsfortschritt"
+        "loanProgressLabel": "Tilgungsfortschritt",
+        "planTab": "Plan",
+        "planCategoryBudgets": "Kategorie-Budgets",
+        "planAddBudget": "Budget festlegen",
+        "planSavingsSetTitle": "Sparziel festlegen",
+        "planSavingsSetDesc": "Monatliches Sparziel setzen und Fortschritt verfolgen",
+        "planSetGoal": "Ziel festlegen",
+        "planSavingsGoal": "Sparziel",
+        "planSavingsMet": "Ziel erreicht",
+        "planSavingsNegative": "Diesen Monat im Minus",
+        "planSavingsShort": "Noch {{amount}} bis zum Ziel",
+        "planSavingsHint": "Das Sparziel vergleicht die geplante Ersparnis mit Einnahmen minus Ausgaben dieses Monats.",
+        "planEmptyTitle": "Noch keine Budgets",
+        "planEmptyDesc": "Lege pro Kategorie ein monatliches Budget fest, um Ausgaben im Blick zu behalten.",
+        "planOverBy": "{{amount}} über Budget",
+        "planLeft": "{{amount}} übrig",
+        "planAllCategoriesBudgeted": "Alle Kategorien haben bereits ein Budget.",
+        "planMonthlyAmount": "Monatlicher Betrag",
+        "planSavedToast": "Budget gespeichert",
+        "planRemovedToast": "Budget entfernt",
+        "planTarget": "Ziel: {{amount}}",
+        "planEditAction": "Bearbeiten",
+        "planDeleteConfirm": "Budget für „{{category}}\" wirklich löschen?",
+        "planSavingsDeleteConfirm": "Sparziel wirklich löschen?"
     },
     "settings": {
         "pageHealthModule": "Gesundheit",
@@ -1207,6 +1233,19 @@
             "syncedToast": "Abonnement synchronisiert.",
             "deletedToast": "Abonnement gelöscht.",
             "updatedToast": "Abonnement aktualisiert."
+        },
+        "calendarImport": {
+            "title": "Kalender importieren",
+            "description": "Importiere Termine aus einer .ics-Datei oder einem geteilten Kalender einmalig als eigene, bearbeitbare Termine. Anders als ein Abonnement werden sie danach nicht mehr synchronisiert.",
+            "fileLabel": "ICS-Datei",
+            "urlLabel": "Oder Feed-URL",
+            "urlHint": "Adresse eines geteilten Kalenders (https:// oder webcal://).",
+            "colorLabel": "Farbe",
+            "submit": "Importieren",
+            "errorNoSource": "Bitte eine Datei auswählen oder eine URL eingeben.",
+            "success": "{{count}} Termine importiert.",
+            "successWithSkipped": "{{count}} Termine importiert, {{skipped}} bereits vorhanden.",
+            "allDuplicates": "Keine neuen Termine – alle waren bereits vorhanden."
         },
         "memberPhoneLabel": "Telefonnummer (optional)",
         "memberEmailLabel": "E-Mail (optional)",
@@ -1768,6 +1807,8 @@
         "customWeeks": "Wochen"
     },
     "birthdays": {
+        "inDays": "in {{days}} Tagen",
+        "turnsAge": "wird {{age}}",
         "title": "Geburtstage",
         "addButton": "Geburtstag hinzufügen",
         "searchPlaceholder": "Geburtstage suchen…",
@@ -1838,7 +1879,7 @@
         "staleData": "Offline – Stand: {{time}}"
     },
     "emptyHint": {
-        "tasks": "Tippe auf + um deine erste Aufgabe zu erstellen. Wische eine Karte nach links zum Löschen.",
+        "tasks": "Tippe auf + um deine erste Aufgabe zu erstellen. Wische eine Karte nach links zum Abhaken, nach rechts zum Bearbeiten.",
         "calendar": "Verbinde Google Kalender unter Einstellungen → Integrationen für automatische Synchronisation.",
         "shopping": "Füge Artikel hinzu und wische zum Abhaken oder Löschen.",
         "notes": "Tippe auf + für eine neue Notiz. Notizen werden im Volltext durchsucht.",
@@ -2492,7 +2533,8 @@
                 "title": "Einnahmetreue",
                 "noData": "Noch keine Einnahmedaten",
                 "period": "Letzte {{days}} Tage",
-                "streakLabel": "Tage in Folge"
+                "streakLabel": "Tage in Folge",
+                "notStarted": "Noch nichts protokolliert"
             },
             "vitals": {
                 "title": "Letzte Vitalwerte"
@@ -2591,7 +2633,8 @@
                 "title": "Einnahmetreue",
                 "period": "Letzte {{days}} Tage",
                 "noData": "Noch keine geplanten Dosen im Zeitraum.",
-                "summary": "{{taken}} von {{planned}} genommen"
+                "summary": "{{taken}} von {{planned}} genommen",
+                "notStarted": "Noch keine Einnahme protokolliert"
             },
             "status": {
                 "taken": "Genommen",

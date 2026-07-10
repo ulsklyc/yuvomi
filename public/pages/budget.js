@@ -14,6 +14,7 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { render as renderSplitExpenses } from '/pages/split-expenses.js';
 import { openSubscriptionModal, render as renderSubscriptions } from '/pages/subscriptions.js';
 import { renderStats } from '/pages/budget-stats.js';
+import { renderPlans } from '/pages/budget-plans.js';
 import { toLocalDateKey } from '/utils/date.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { renderUserMultiSelect, bindUserMultiSelect, getSelectedUserIds } from '/components/user-multi-select.js';
@@ -255,6 +256,9 @@ export async function render(container, { user }) {
             <button class="budget-tab" id="budget-tab-budget" type="button" role="tab" aria-selected="true" aria-controls="budget-body" tabindex="-1" data-tab="budget">
               ${t('budget.budgetTab')}
             </button>
+            <button class="budget-tab" id="budget-tab-plan" type="button" role="tab" aria-selected="false" aria-controls="budget-body" tabindex="-1" data-tab="plan">
+              ${t('budget.planTab')}
+            </button>
             <button class="budget-tab" id="budget-tab-subscriptions" type="button" role="tab" aria-selected="false" aria-controls="budget-body" tabindex="-1" data-tab="subscriptions">
               ${t('subscriptions.tabLabel')}
             </button>
@@ -330,6 +334,10 @@ function wireNav() {
     }
     if (state.activeTab === 'subscriptions') {
       openSubscriptionModal();
+      return;
+    }
+    if (state.activeTab === 'plan') {
+      _container.querySelector('#budget-plan-add')?.click();
       return;
     }
     openBudgetModal({ mode: 'create' });
@@ -429,6 +437,15 @@ function renderBody() {
       user: _user, currency: state.currency,
       formatAmount, categoryLabel, esc,
     }).catch((err) => console.error('[Budget] stats render error:', err));
+    return;
+  }
+  if (state.activeTab === 'plan') {
+    setHtml(body, '<div class="budget-tab-panel budget-tab-panel--plan" id="budget-plan-panel"></div>');
+    renderPlans(body.querySelector('#budget-plan-panel'), {
+      user: _user, currency: state.currency, month: state.month,
+      formatAmount, categoryLabel, esc,
+      expenseCategories: expenseCategories(),
+    }).catch((err) => console.error('[Budget] plans render error:', err));
     return;
   }
   if (state.activeTab === 'loans') {

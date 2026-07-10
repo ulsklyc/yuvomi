@@ -16,20 +16,26 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 // Konstanten
 // --------------------------------------------------------
 
+// Gedämpfte, paper-kompatible Sticker-Palette. Die frühere Material-Primär-
+// Palette (#FFEB3B/#80DEEA/#CE93D8 …) las gegen Warm-Paper, Violett-Akzent
+// und Plus Jakarta Sans wie eine billigere App (Critique P3). Diese Töne sind
+// hell + niedrig gesättigt, damit getReadableTextColor() dunklen Text wählt
+// und die Karten zur warmen Marken-Umgebung passen. Bestehende Notizen mit
+// alten Hex-Werten rendern weiterhin korrekt; die Palette gilt für neue Wahl.
 const NOTE_COLORS = [
-  '#FFEB3B', '#FFD54F', '#A5D6A7', '#80DEEA',
-  '#90CAF9', '#CE93D8', '#FFAB91', '#FFFFFF',
+  '#EFE3BE', '#E7D2A9', '#D2DEC6', '#C7DED9',
+  '#CAD8E4', '#D8D0E2', '#EBD1C2', '#FBFAF7',
 ];
 
 const NOTE_COLOR_NAMES = () => ({
-  '#FFEB3B': t('notes.colorYellow'),
-  '#FFD54F': t('notes.colorAmber'),
-  '#A5D6A7': t('notes.colorGreen'),
-  '#80DEEA': t('notes.colorTeal'),
-  '#90CAF9': t('notes.colorBlue'),
-  '#CE93D8': t('notes.colorPurple'),
-  '#FFAB91': t('notes.colorOrange'),
-  '#FFFFFF': t('notes.colorWhite'),
+  '#EFE3BE': t('notes.colorYellow'),
+  '#E7D2A9': t('notes.colorAmber'),
+  '#D2DEC6': t('notes.colorGreen'),
+  '#C7DED9': t('notes.colorTeal'),
+  '#CAD8E4': t('notes.colorBlue'),
+  '#D8D0E2': t('notes.colorPurple'),
+  '#EBD1C2': t('notes.colorOrange'),
+  '#FBFAF7': t('notes.colorWhite'),
 });
 
 // --------------------------------------------------------

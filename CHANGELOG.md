@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.6] - 2026-07-10
+
+### Changed
+- Mobile navigation: redesigned the "More" menu as a compact app launcher — solid full-color module icons in a dense four-column grid, with Settings, Help and Changelog grouped into a single quiet system row. The sheet now takes roughly 40% of the screen instead of ~70%.
+- Mobile navigation: bottom-bar inactive tabs now show bare icons with a single sliding pill marking the active tab, and the keyboard-focus ring sits outside the icon so it is clearly visible.
+
+### Fixed
+- Mobile navigation: opening Settings from the "More" menu now closes the sheet, and switching language or toggling a module no longer reverts the menu to an outdated layout.
+- The install prompt now steps aside for any open modal, the "More" menu, or search instead of overlapping their content.
+- Search: a failed query now shows a clear "search is currently unavailable" message instead of appearing empty.
+
+## [1.6.5] - 2026-07-10
+
+### Changed
+- Birthdays: the page is now a single list sorted by proximity (the nearest birthday first) with live search, replacing the separate "upcoming" panel and the search-suggestions dropdown that only filtered the list.
+- Birthdays: the day itself is now celebrated — the person whose birthday is today gets a highlighted card with a cake icon and a filled accent chip, and every row shows a consistent countdown (Today / Tomorrow / in N days) alongside a "date · turns N" line.
+- Birthdays: the page now uses the shared canonical page header (title + search) for a look consistent with the other modules, and the empty state welcomes new users with an icon and an "Add birthday" button.
+- Birthdays: a new birthday now defaults its reminder to "1 day before" instead of at the moment of the birthday, and the reminder menu is trimmed to the common offsets.
+
+### Fixed
+- Birthdays: avatar initials and countdown chips now meet WCAG AA contrast in both light and dark themes, fixing a bug where the fallback avatar became illegible in dark mode.
+- Birthdays: the birth-date picker no longer allows selecting a future date, and the edit/delete and photo controls now meet the minimum touch-target size.
+
+## [1.6.4] - 2026-07-10
+
+### Added
+- Health: the vitals and lab trend charts now have a labelled value axis, a dated time axis, exact values on hover, and a shaded area under single-value trends; each vital metric card also carries a mini sparkline of its recent trend.
+
+### Changed
+- Health: medication adherence now reads "Nothing logged yet" instead of a discouraging "0 %" until the first dose is logged, the streak counter only appears once a streak has actually started, and the percentage is shown in neutral ink rather than the module accent.
+- Health: the overview reflows as a masonry layout so short cards no longer leave an empty gap beside taller ones, the "due today" medication rows are more compact, and the low-stock refill chip wraps to its own line instead of breaking the stock text mid-line.
+
+## [1.6.3] - 2026-07-10
+
+### Fixed
+- Meals: on phone-width screens the weekly plan can now be scrolled through all seven days again. A broken flex height chain left the day grid unable to scroll, so only today and tomorrow were reachable and swiping did nothing.
+
+## [1.6.2] - 2026-07-10
+
+### Changed
+- Contacts: each row now shows a single primary "Call" action plus a labelled "More" menu (Email, Route, Export, Delete) that is identical on desktop and mobile, replacing the row of up to five icon-only buttons and the hover-only actions.
+- Contacts: every category now has its own colour-tinted icon (doctor green, school amber, authority violet, insurance teal, tradesperson orange, emergency red, other neutral), person and family contacts show initials avatars, and the module now uses its own blue accent consistently instead of the global violet — so the list reads at a glance.
+- Contacts: a chevron on each row makes it clearer that tapping a contact opens it for editing, a long email address no longer truncates the phone number in the row summary, and the add/edit dialog shows a live category icon preview.
+
+### Fixed
+- Contacts: the bulk-selection bar is now correctly hidden until you enter selection mode; a missing style guard had left it permanently visible.
+
+## [1.6.1] - 2026-07-09
+
+### Fixed
+- Tasks: the empty-state hint now matches the actual swipe gestures — swipe a card left to check it off, right to edit. It previously said "swipe left to delete", which instead toggled the task done.
+- Tasks: reminder settings are now validated before the task is saved, so choosing a reminder without a due date or offset no longer shows an error on top of an already-saved task.
+
+### Changed
+- Tasks: bulk-deleting selected tasks now uses the same optimistic 5-second undo as single delete, instead of a native browser confirmation dialog, so a bulk delete can be undone.
+- Tasks: task-group, board-column, and filter headings are now sentence-case instead of all-caps, matching the rest of the navigation.
+- Tasks: the group and board count badges use a higher-contrast text colour for readability.
+- Notes: the note colour palette was retuned to softer, paper-friendly tones; existing notes keep their current colours.
+
+## [1.6.0] - 2026-07-09
+
+### Added
+- Budget: a new **Plan** tab for planned/estimated budgets, so a household can see whether its spending and savings targets are being met. Set a monthly savings goal (shown as a progress ring comparing planned savings against the month's income minus expenses, with a reached/short/negative status) and a monthly budget per expense category (shown as planned-vs-actual progress bars that turn amber near the limit and red when over budget, each with a plain-text "X left"/"X over budget" label so status never relies on colour alone). Budgets and the goal are set, edited, and removed from a modal; deleting is confirmation-gated. The Statistics tab draws a target marker on each category bar at its planned amount (month range), and the dashboard Budget widget shows savings-goal progress when a goal is set. (#468)
+
+### Added
+- Calendar: one-time import of events from an `.ics` file or a shared calendar feed URL into editable local events, under Settings → Sync → Calendar → "Import calendar". Unlike an ICS subscription (which stays read-only and auto-synced), imported events become your own editable events and are not synced afterwards — the migration path when moving from another calendar. Recurring events are kept as a series (the recurrence rule is reduced to the supported daily/weekly/monthly/yearly subset), all-day and timed events are preserved, and re-importing the same feed skips events that were already imported. The URL path reuses the SSRF-protected fetch (10 MB / 15 s limits) used by subscriptions. (#437)
+
 ## [1.4.1] - 2026-07-09
 
 ### Changed

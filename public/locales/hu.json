@@ -58,6 +58,7 @@
         "recipes": "Receptek",
         "more": "Több",
         "moreActiveLabel": "Több, {{section}} aktív",
+        "moreCatalogHint": "Minden modul. A kedvenceket a beállításokban szabhatod testre.",
         "documents": "Dokumentumok",
         "kitchen": "Konyha",
         "kitchenGoLabel": "Konyha, {{section}} megnyitása",
@@ -175,7 +176,8 @@
         "housekeepingNoVisits": "Még nincs látogatás",
         "housekeepingVisitsMonth": "{{count}} látogatás e hónapban",
         "housekeepingUnpaid": "{{amount}} rendezendő",
-        "widgetError": "Nem sikerült betölteni"
+        "widgetError": "Nem sikerült betölteni",
+        "savingsGoal": "Megtakarítási cél"
     },
     "tasks": {
         "title": "Feladatok",
@@ -922,6 +924,29 @@
         "splitSectionLabel": "Megosztott felosztás",
         "singleAssigneeHint": "Rendelj hozzá egy személyt, hogy ez a tétel az övé legyen.",
         "multiAssigneeHint": "Rendelj hozzá több személyt, és válaszd ki, hogyan oszlik meg az összeg."
+        "planTab": "Terv",
+        "planCategoryBudgets": "Kategória-költségkeretek",
+        "planAddBudget": "Költségkeret megadása",
+        "planSavingsSetTitle": "Adjon meg megtakarítási célt",
+        "planSavingsSetDesc": "Állítson be havi megtakarítási célt, és kövesse a haladást",
+        "planSetGoal": "Cél megadása",
+        "planSavingsGoal": "Megtakarítási cél",
+        "planSavingsMet": "Cél elérve",
+        "planSavingsNegative": "Ebben a hónapban mínuszban",
+        "planSavingsShort": "Még {{amount}} a célig",
+        "planSavingsHint": "A megtakarítási cél a tervezett megtakarítást veti össze a havi bevétel és kiadás különbségével.",
+        "planEmptyTitle": "Még nincsenek költségkeretek",
+        "planEmptyDesc": "Adjon meg havi költségkeretet kategóriánként, hogy kézben tartsa a kiadásokat.",
+        "planOverBy": "{{amount}} túllépés",
+        "planLeft": "{{amount}} maradt",
+        "planAllCategoriesBudgeted": "Minden kategóriának már van költségkerete.",
+        "planMonthlyAmount": "Havi összeg",
+        "planSavedToast": "Költségkeret mentve",
+        "planRemovedToast": "Költségkeret törölve",
+        "planTarget": "Cél: {{amount}}",
+        "planEditAction": "Szerkesztés",
+        "planDeleteConfirm": "Törli a(z) „{{category}}” költségkeretét?",
+        "planSavingsDeleteConfirm": "Törli a megtakarítási célt?"
     },
     "settings": {
         "pageHealthModule": "Egészség",
@@ -1184,6 +1209,19 @@
                 "shared": "Megosztott"
             },
             "updatedToast": "Feliratkozás frissítve."
+        },
+        "calendarImport": {
+            "title": "Naptár importálása",
+            "description": "Importáld egy .ics-fájl vagy egy megosztott naptár eseményeit egyszeri alkalommal saját, szerkeszthető eseményekként. Előfizetéssel ellentétben ezek utána nem szinkronizálódnak.",
+            "fileLabel": "ICS-fájl",
+            "urlLabel": "Vagy hírcsatorna URL",
+            "urlHint": "Egy megosztott naptár címe (https:// vagy webcal://).",
+            "colorLabel": "Szín",
+            "submit": "Importálás",
+            "errorNoSource": "Válassz egy fájlt, vagy adj meg egy URL-t.",
+            "success": "{{count}} esemény importálva.",
+            "successWithSkipped": "{{count}} esemény importálva, {{skipped}} már létezett.",
+            "allDuplicates": "Nincs új esemény – mind már létezett."
         },
         "feedExportTitle": "Naptár-feed exportálása",
         "feedExportDescription": "Iratkozzon fel a Yuvomi naptárára csak olvasható módban az Apple Naptárban, a Google Naptárban vagy a Thunderbirdben.",
@@ -1762,6 +1800,8 @@
         "customWeeks": "Hét"
     },
     "birthdays": {
+        "inDays": "{{days}} nap múlva",
+        "turnsAge": "betölti a(z) {{age}}. évét",
         "title": "Születésnapok",
         "addButton": "Születésnap hozzáadása",
         "searchPlaceholder": "Születésnap keresése…",
@@ -1820,7 +1860,8 @@
         "title": "Keresés",
         "open": "Keresés megnyitása",
         "placeholder": "Keresés…",
-        "noResults": "Nincs találat."
+        "noResults": "Nincs találat.",
+        "error": "A keresés jelenleg nem érhető el."
     },
     "onboarding": {
         "step1Title": "Üdvözöljük a {{name}} alkalmazásban",
@@ -1850,7 +1891,7 @@
         "goHealth": "Egészség"
     },
     "emptyHint": {
-        "tasks": "Érintse meg a + gombot az első feladat létrehozásához. Húzza el a kártyát balra a törléshez.",
+        "tasks": "Érintse meg a + gombot az első feladat létrehozásához. Húzza a kártyát balra a kész állapothoz, jobbra a szerkesztéshez.",
         "calendar": "Csatlakoztassa a Google Naptárt a Beállítások → Integrációk alatt az automatikus szinkronizáláshoz.",
         "shopping": "Adjon hozzá tételeket, és húzza el a kipipáláshoz vagy törléshez.",
         "notes": "Érintse meg a + gombot egy új jegyzethez. A jegyzetek teljes szövege kereshető.",
@@ -2492,7 +2533,8 @@
                 "title": "Szedési fegyelem",
                 "noData": "Még nincsenek szedési adatok",
                 "period": "Utolsó {{days}} nap",
-                "streakLabel": "Nap egymás után"
+                "streakLabel": "Nap egymás után",
+                "notStarted": "Még nincs semmi rögzítve"
             },
             "vitals": {
                 "title": "Legutóbbi vitális értékek"
@@ -2591,7 +2633,8 @@
                 "title": "Szedési fegyelem",
                 "period": "Utolsó {{days}} nap",
                 "noData": "Az időszakban még nincsenek tervezett adagok.",
-                "summary": "{{planned}} adagból {{taken}} bevéve"
+                "summary": "{{planned}} adagból {{taken}} bevéve",
+                "notStarted": "Még nincs bevétel rögzítve"
             },
             "status": {
                 "taken": "Bevéve",

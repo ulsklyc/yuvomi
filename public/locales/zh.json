@@ -58,6 +58,7 @@
         "recipes": "食谱",
         "more": "更多",
         "moreActiveLabel": "更多，{{section}} 已激活",
+        "moreCatalogHint": "所有模块。在设置中自定义常用项。",
         "documents": "文档",
         "kitchen": "厨房",
         "kitchenGoLabel": "厨房，打开 {{section}}",
@@ -175,7 +176,8 @@
         "housekeepingNoVisits": "暂无到访",
         "housekeepingVisitsMonth": "本月 {{count}} 次到访",
         "housekeepingUnpaid": "{{amount}} 待付",
-        "widgetError": "无法加载"
+        "widgetError": "无法加载",
+        "savingsGoal": "储蓄目标"
     },
     "tasks": {
         "title": "任务",
@@ -922,6 +924,29 @@
         "splitSectionLabel": "共享分摊",
         "singleAssigneeHint": "分配给一个人后，该条目将归此人所有。",
         "multiAssigneeHint": "分配给多人，并选择如何分摊金额。"
+        "planTab": "预算计划",
+        "planCategoryBudgets": "分类预算",
+        "planAddBudget": "设置预算",
+        "planSavingsSetTitle": "设置储蓄目标",
+        "planSavingsSetDesc": "设置每月储蓄目标并跟踪进度",
+        "planSetGoal": "设置目标",
+        "planSavingsGoal": "储蓄目标",
+        "planSavingsMet": "已达成目标",
+        "planSavingsNegative": "本月为负",
+        "planSavingsShort": "距目标还差 {{amount}}",
+        "planSavingsHint": "储蓄目标将你计划的储蓄与本月收入减去支出进行比较。",
+        "planEmptyTitle": "尚无预算",
+        "planEmptyDesc": "为每个类别设置月度预算，以掌控支出。",
+        "planOverBy": "超支 {{amount}}",
+        "planLeft": "剩余 {{amount}}",
+        "planAllCategoriesBudgeted": "所有类别都已有预算。",
+        "planMonthlyAmount": "每月金额",
+        "planSavedToast": "预算已保存",
+        "planRemovedToast": "预算已删除",
+        "planTarget": "目标：{{amount}}",
+        "planEditAction": "编辑",
+        "planDeleteConfirm": "删除“{{category}}”的预算？",
+        "planSavingsDeleteConfirm": "删除储蓄目标？"
     },
     "settings": {
         "pageHealthModule": "健康",
@@ -1178,6 +1203,19 @@
                 "shared": "共享"
             },
             "updatedToast": "订阅已更新。"
+        },
+        "calendarImport": {
+            "title": "导入日历",
+            "description": "从 .ics 文件或共享日历一次性导入活动，作为你自己的可编辑活动。与订阅不同，之后不会再同步。",
+            "fileLabel": "ICS 文件",
+            "urlLabel": "或订阅源网址",
+            "urlHint": "共享日历的地址（https:// 或 webcal://）。",
+            "colorLabel": "颜色",
+            "submit": "导入",
+            "errorNoSource": "请选择文件或输入网址。",
+            "success": "已导入 {{count}} 个活动。",
+            "successWithSkipped": "已导入 {{count}} 个活动，{{skipped}} 个已存在。",
+            "allDuplicates": "没有新活动——全部已存在。"
         },
         "memberPhoneLabel": "电话号码（可选）",
         "memberEmailLabel": "电子邮件（可选）",
@@ -1758,9 +1796,12 @@
         "title": "搜索",
         "open": "打开搜索",
         "placeholder": "搜索…",
-        "noResults": "未找到结果。"
+        "noResults": "未找到结果。",
+        "error": "搜索暂时不可用。"
     },
     "birthdays": {
+        "inDays": "{{days}}天后",
+        "turnsAge": "即将{{age}}岁",
         "title": "生日",
         "addButton": "添加生日",
         "searchPlaceholder": "搜索生日…",
@@ -1846,7 +1887,7 @@
         "meals": "规划每周餐食并关联食谱。",
         "notes": "点击 + 创建新笔记。笔记支持全文搜索。",
         "shopping": "添加商品，滑动以标记或删除。",
-        "tasks": "点击 + 创建您的第一个任务。向左滑动卡片可删除。"
+        "tasks": "点击 + 创建您的第一个任务。向左滑动卡片可完成，向右可编辑。"
     },
     "documents": {
         "title": "文档",
@@ -2492,7 +2533,8 @@
                 "title": "服药依从性",
                 "noData": "暂无服药数据",
                 "period": "最近 {{days}} 天",
-                "streakLabel": "连续天数"
+                "streakLabel": "连续天数",
+                "notStarted": "尚无记录"
             },
             "vitals": {
                 "title": "最新生命体征"
@@ -2591,7 +2633,8 @@
                 "title": "服药依从性",
                 "period": "最近 {{days}} 天",
                 "noData": "该时段内暂无计划的剂量。",
-                "summary": "已服用 {{planned}} 次中的 {{taken}} 次"
+                "summary": "已服用 {{planned}} 次中的 {{taken}} 次",
+                "notStarted": "尚未记录任何服药"
             },
             "status": {
                 "taken": "已服用",

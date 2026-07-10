@@ -24,6 +24,13 @@
 .meals-layout {
   flex: 1;
   min-height: 0;
+  /* Flex-Container, damit .week-grid { flex:1; overflow-y:auto } eine begrenzte
+   * Höhe bekommt und selbst scrollt. Ohne das läuft das Wochengitter auf volle
+   * Inhaltshöhe auf, wird von .meals-page { overflow:hidden } abgeschnitten und
+   * die Tage unter „heute" sind auf Mobil unerreichbar. Desktop (≥1024px)
+   * überschreibt das unten mit display:grid. */
+  display: flex;
+  flex-direction: column;
 }
 
 @media (min-width: 1024px) {

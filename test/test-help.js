@@ -31,7 +31,7 @@ test('Touch (coarsePointer:true) liefert Klartext-Zeilen mit Icons', () => {
   // Die Mobile-Zeilen ziehen ihre Texte aus help.*-Keys
   assert.deepEqual(
     rows.map((r) => r.desc),
-    ['help.mobileNavigate', 'help.mobileCreate', 'help.mobileSearch', 'help.mobileSettings']
+    ['help.mobileNavigate', 'help.mobileCreate', 'help.mobileSearch', 'nav.moreCatalogHint', 'help.mobileSettings']
   );
 });
 
@@ -39,6 +39,6 @@ test('Touch-Zeilen verwenden vorhandene Lucide-Iconnamen', () => {
   const rows = buildHelpRows({ coarsePointer: true, shortcuts, t });
   assert.deepEqual(
     rows.map((r) => r.icon),
-    ['navigation', 'plus-circle', 'search', 'settings']
+    ['navigation', 'plus-circle', 'search', 'layout-grid', 'settings']
   );
 });

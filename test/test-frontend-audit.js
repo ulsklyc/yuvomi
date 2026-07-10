@@ -1018,6 +1018,7 @@ test('mobile navigation Quiet Precision keeps state feedback stable and accessib
   const glass = read('../public/styles/glass.css');
   const indicatorRule = cssRuleBody(layout, '.nav-bottom__indicator');
   const indicatorSurfaceRule = cssRuleBody(layout, '.nav-bottom__indicator::before');
+  const indicatorSurfaceGlass = cssRuleBody(glass, '.nav-bottom__indicator::before');
   const focusRule = cssRuleBody(layout, '.nav-bottom .nav-item:focus-visible');
   const pressedWellRule = cssRuleBody(layout, '.nav-bottom .nav-item:active .nav-item__icon-well');
 
@@ -1031,18 +1032,27 @@ test('mobile navigation Quiet Precision keeps state feedback stable and accessib
     layout,
     /\.nav-bottom \.nav-item\[aria-current="page"\] \.nav-item__label,\s*\.nav-bottom \.nav-item--active \.nav-item__label\s*\{[\s\S]*?font-weight:\s*var\(--font-weight-semibold\)/,
   );
-  assert.match(focusRule, /outline:/);
-  assert.match(focusRule, /outline-offset:\s*calc\(-1 \* var\(--space-px\)\)/);
+  // Fokusring liegt AUSSEN um die Icon-Well (nicht innen ins Item) — so ist er
+  // für Tastatur-/Sehbeeinträchtigte klar zu orten statt hinter Icon+Label zu
+  // verschwinden.
+  assert.match(focusRule, /outline:\s*none/);
+  const focusWellRule = cssRuleBody(layout, '.nav-bottom .nav-item:focus-visible .nav-item__icon-well');
+  assert.match(focusWellRule, /outline:\s*var\(--space-0h\)\s+solid/);
+  assert.match(focusWellRule, /outline-offset:\s*var\(--space-0h\)/);
   assert.match(pressedWellRule, /transform:\s*translateY\(var\(--space-px\)\) scale\(0\.96\)/);
   assert.doesNotMatch(layout, /(^|\n)\.nav-item:active\s*\{[\s\S]*?transform:/);
   assert.doesNotMatch(layout, /\.nav-bottom \.nav-item:active\s*\{[\s\S]*?transform:/);
+  // EINE Tint-Schicht: der Akzent-Fill sitzt am Indikator selbst; das ::before
+  // trägt nur noch den Specular-Highlight (kein zweiter Tint → keine matschige
+  // Kante der gleitenden Pille).
   assert.match(
     glass,
-    /\.nav-bottom__indicator::before\s*\{[\s\S]*?var\(--active-module-accent,\s*var\(--color-accent\)\)[\s\S]*?var\(--glass-bg\)/,
+    /\.nav-bottom__indicator\s*\{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--active-module-accent,\s*var\(--color-accent\)\)/,
   );
+  assert.doesNotMatch(indicatorSurfaceGlass, /background:/);
   assert.match(
     glass,
-    /@media \(prefers-reduced-transparency: reduce\)[\s\S]*?\.nav-bottom__indicator::before\s*\{[\s\S]*?background:/,
+    /@media \(prefers-reduced-transparency: reduce\)[\s\S]*?\.nav-bottom__indicator\s*\{[\s\S]*?background:/,
   );
   assert.match(
     layout,
@@ -1348,13 +1358,11 @@ test('responsive adaptation uses tablet space without crowding module toolbars',
   );
 });
 
-test('responsive adaptation removes duplicate Birthday creation action on phones', () => {
-  const birthdays = read('../public/styles/birthdays.css');
+test('Birthday page exposes a single creation action (FAB), no duplicate toolbar button', () => {
+  const birthdays = read('../public/pages/birthdays.js');
 
-  assert.match(
-    birthdays,
-    /@media \(max-width:\s*640px\)[\s\S]*\.birthdays-header__action\s*\{[\s\S]*display:\s*none/
-  );
+  assert.match(birthdays, /class="page-fab" id="fab-new-birthday"/);
+  assert.doesNotMatch(birthdays, /toolbar-new-btn/);
 });
 
 test('dashboard polish keeps one page heading and native quick-action controls', () => {
@@ -1420,22 +1428,14 @@ test('polished rounded cards use subtle full borders instead of thick accent cap
 test('hardening keeps Birthday cards bounded with extreme localized content', () => {
   const birthdays = read('../public/styles/birthdays.css');
 
-  assert.match(birthdays, /\.birthdays-panel\s*\{[\s\S]*min-width:\s*0/);
+  assert.match(birthdays, /\.birthday-item__body\s*\{[\s\S]*min-width:\s*0/);
+  assert.match(birthdays, /\.birthday-item__name\s*\{[\s\S]*overflow-wrap:\s*anywhere/);
+  assert.match(birthdays, /\.birthday-item__name\s*\{[\s\S]*unicode-bidi:\s*plaintext/);
+  assert.match(birthdays, /\.birthday-item__notes\s*\{[\s\S]*overflow-wrap:\s*anywhere/);
+  assert.match(birthdays, /\.birthday-item__notes\s*\{[\s\S]*unicode-bidi:\s*plaintext/);
   assert.match(
     birthdays,
-    /@media \(max-width:\s*1023px\)[\s\S]*\.birthdays-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/
-  );
-  assert.match(
-    birthdays,
-    /\.birthday-card__name,[\s\S]*\.birthday-item__notes\s*\{[\s\S]*overflow-wrap:\s*anywhere/
-  );
-  assert.match(
-    birthdays,
-    /\.birthday-card__name,[\s\S]*\.birthday-item__notes\s*\{[\s\S]*unicode-bidi:\s*plaintext/
-  );
-  assert.match(
-    birthdays,
-    /@media \(max-width:\s*640px\)[\s\S]*\.birthday-card__top,[\s\S]*\.birthday-item__row\s*\{[\s\S]*flex-wrap:\s*wrap/
+    /@media \(max-width:\s*640px\)[\s\S]*\.birthday-item__row\s*\{[\s\S]*flex-wrap:\s*wrap/
   );
 });
 
@@ -1455,7 +1455,6 @@ test('hardening uses logical alignment for RTL-sensitive adapted controls', () =
     /\[dir=['"]rtl['"]\] \.tasks-toolbar__secondary-panel\s*\{[\s\S]*inset-inline-start:\s*0;[\s\S]*inset-inline-end:\s*auto/
   );
   assert.match(birthdays, /\.birthdays-toolbar__search-icon\s*\{[\s\S]*inset-inline-start:/);
-  assert.match(birthdays, /\.birthdays-autocomplete\s*\{[\s\S]*inset-inline:\s*0/);
 });
 
 test('route failures expose a localized recoverable alert instead of raw technical errors', () => {
@@ -2352,7 +2351,7 @@ test('audited profile, birthday, navigation, and budget controls meet mobile tou
     /@media \(max-width:\s*640px\)[\s\S]*\.settings-avatar-action\s*\{[\s\S]*width:\s*var\(--target-lg\)[\s\S]*height:\s*var\(--target-lg\)/,
   );
   assert.match(settings, /\.settings-module-move\s*\{[\s\S]*width:\s*var\(--target-base\)[\s\S]*height:\s*var\(--target-base\)/);
-  assert.match(birthdays, /\.contact-action-btn\s*\{[\s\S]*width:\s*var\(--target-lg\)[\s\S]*height:\s*var\(--target-lg\)/);
+  assert.match(birthdays, /\.birthday-action-btn\s*\{[\s\S]*width:\s*var\(--target-lg\)[\s\S]*height:\s*var\(--target-lg\)/);
   assert.match(budget, /\.budget-tab\s*\{[\s\S]*min-height:\s*var\(--target-lg\)/);
   assert.match(budget, /\.budget-nav__today\s*\{[\s\S]*min-height:\s*var\(--target-lg\)/);
   assert.match(
@@ -2379,22 +2378,21 @@ test('remaining audited mobile controls use 48px touch targets', () => {
   );
 });
 
-test('mobile contacts keep one primary action and disclose the rest through More', () => {
+test('contacts keep one primary call action and disclose the rest through a labeled More menu', () => {
   const contactsPage = read('../public/pages/contacts.js');
   const contactsCss = read('../public/styles/contacts.css');
 
-  assert.match(contactsPage, /contact-action-btn--mail contact-action-btn--desktop-extra/);
-  assert.match(contactsPage, /contact-action-btn--mail contact-action-btn--mobile-menu/);
-  assert.match(
-    contactsCss,
-    /@media \(max-width:\s*767px\)[\s\S]*\.contact-action-btn--desktop-extra\s*\{[\s\S]*display:\s*none/,
-  );
-  // Der „Mehr"-Trigger erscheint nur auf Mobile; das Panel ist ein Popover
-  // (Top-Layer) statt eines absolut positionierten Menüs im Scroll-Container.
-  assert.match(
-    contactsCss,
-    /@media \(max-width:\s*767px\)[\s\S]*\.contact-more-menu__trigger\s*\{[\s\S]*display:\s*flex/,
-  );
+  // Genau eine stets sichtbare Primäraktion pro Zeile: Anrufen (falls Telefon da).
+  assert.match(contactsPage, /contact-action-btn--call/);
+  // Sekundäraktionen leben im „Mehr"-Menü als BESCHRIFTETE Einträge (Icon + Text),
+  // identisch auf Desktop und Mobile — behebt das „nackte Icons"-Problem.
+  assert.match(contactsPage, /class="contact-menu-item"[\s\S]*contact-menu-item__icon[\s\S]*<span>/);
+  // Löschen ist ein abgesetzter Danger-Eintrag im selben Menü.
+  assert.match(contactsPage, /contact-menu-item contact-menu-item--danger[\s\S]*data-action="delete"/);
+  // Menü-Eintrag trägt Textlabel (kein reines Icon mehr).
+  assert.match(contactsCss, /\.contact-menu-item\s*\{[\s\S]*min-height:\s*var\(--target-md\)/);
+  // Das Panel ist ein Popover (Top-Layer) statt eines absolut positionierten
+  // Menüs im Scroll-Container.
   assert.match(contactsCss, /\.contact-more-menu__panel\s*\{[\s\S]*position:\s*fixed/);
   assert.match(contactsPage, /popovertarget="\$\{menuId\}"/);
   assert.match(contactsPage, /id="\$\{menuId\}" popover/);
@@ -2423,6 +2421,9 @@ test('contacts bulk selection is opt-in and hidden by default', () => {
   // Familien-Kontakte bleiben nicht wählbar (deaktivierte Checkbox)
   assert.match(contactsPage, /c\.family_user_id \? ' disabled' : ''/);
   assert.match(contactsCss, /\.contacts-selectbar\s*\{/);
+  // display:flex würde das hidden-Attribut schlagen — der [hidden]-Guard hält die
+  // Leiste im Default-Zustand wirklich unsichtbar.
+  assert.match(contactsCss, /\.contacts-selectbar\[hidden\]\s*\{[\s\S]*display:\s*none/);
 });
 
 test('documents and navigation settings use progressive disclosure instead of stacked control cards', () => {
@@ -2458,7 +2459,7 @@ test('birthday and navigation headings keep a sequential hierarchy', () => {
   const birthdays = read('../public/pages/birthdays.js');
   const navigation = read('../public/settings/pages/modules-navigation.js');
 
-  assert.match(birthdays, /<h1 class="u-toolbar-title">/);
+  assert.match(birthdays, /<h1 class="page-toolbar__title">/);
   assert.doesNotMatch(birthdays, /<h3>/);
   assert.match(navigation, /<h2 class="settings-navigation-panel__title"/);
   assert.match(navigation, /<h3 class="settings-navigation-group__title"/);

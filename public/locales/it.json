@@ -58,6 +58,7 @@
         "recipes": "Ricette",
         "more": "Altro",
         "moreActiveLabel": "Altro, {{section}} attivo",
+        "moreCatalogHint": "Tutti i moduli. Personalizza i preferiti nelle impostazioni.",
         "documents": "Documenti",
         "kitchen": "Cucina",
         "kitchenGoLabel": "Cucina, apri {{section}}",
@@ -175,7 +176,8 @@
         "housekeepingNoVisits": "Ancora nessuna visita",
         "housekeepingVisitsMonth": "{{count}} visite questo mese",
         "housekeepingUnpaid": "{{amount}} da pagare",
-        "widgetError": "Impossibile caricare"
+        "widgetError": "Impossibile caricare",
+        "savingsGoal": "Obiettivo di risparmio"
     },
     "tasks": {
         "title": "Compiti",
@@ -922,6 +924,29 @@
         "splitSectionLabel": "Ripartizione condivisa",
         "singleAssigneeHint": "Assegna una persona per fare in modo che questo elemento sia suo.",
         "multiAssigneeHint": "Assegna piu persone e scegli come dividere l'importo."
+        "planTab": "Piano",
+        "planCategoryBudgets": "Budget per categoria",
+        "planAddBudget": "Imposta budget",
+        "planSavingsSetTitle": "Imposta un obiettivo di risparmio",
+        "planSavingsSetDesc": "Imposta un obiettivo di risparmio mensile e monitora i progressi",
+        "planSetGoal": "Imposta obiettivo",
+        "planSavingsGoal": "Obiettivo di risparmio",
+        "planSavingsMet": "Obiettivo raggiunto",
+        "planSavingsNegative": "In rosso questo mese",
+        "planSavingsShort": "Mancano {{amount}}",
+        "planSavingsHint": "L’obiettivo di risparmio confronta il risparmio pianificato con entrate meno spese del mese.",
+        "planEmptyTitle": "Nessun budget",
+        "planEmptyDesc": "Imposta un budget mensile per categoria per tenere sotto controllo le spese.",
+        "planOverBy": "{{amount}} oltre il budget",
+        "planLeft": "{{amount}} rimanenti",
+        "planAllCategoriesBudgeted": "Tutte le categorie hanno già un budget.",
+        "planMonthlyAmount": "Importo mensile",
+        "planSavedToast": "Budget salvato",
+        "planRemovedToast": "Budget rimosso",
+        "planTarget": "Obiettivo: {{amount}}",
+        "planEditAction": "Modifica",
+        "planDeleteConfirm": "Eliminare il budget di «{{category}}»?",
+        "planSavingsDeleteConfirm": "Eliminare l’obiettivo di risparmio?"
     },
     "settings": {
         "pageHealthModule": "Salute",
@@ -1178,6 +1203,19 @@
                 "shared": "Condiviso"
             },
             "updatedToast": "Abbonamento aggiornato."
+        },
+        "calendarImport": {
+            "title": "Importa calendario",
+            "description": "Importa gli eventi da un file .ics o da un calendario condiviso una sola volta come eventi tuoi e modificabili. A differenza di un abbonamento, in seguito non vengono sincronizzati.",
+            "fileLabel": "File ICS",
+            "urlLabel": "Oppure URL del feed",
+            "urlHint": "Indirizzo di un calendario condiviso (https:// o webcal://).",
+            "colorLabel": "Colore",
+            "submit": "Importa",
+            "errorNoSource": "Scegli un file o inserisci un URL.",
+            "success": "{{count}} eventi importati.",
+            "successWithSkipped": "{{count}} eventi importati, {{skipped}} già presenti.",
+            "allDuplicates": "Nessun nuovo evento: esistevano già tutti."
         },
         "memberPhoneLabel": "Numero di telefono (opzionale)",
         "memberEmailLabel": "E-mail (opzionale)",
@@ -1758,9 +1796,12 @@
         "title": "Ricerca",
         "open": "Apri ricerca",
         "placeholder": "Cerca…",
-        "noResults": "Nessun risultato trovato."
+        "noResults": "Nessun risultato trovato.",
+        "error": "Ricerca non disponibile al momento."
     },
     "birthdays": {
+        "inDays": "tra {{days}} giorni",
+        "turnsAge": "compie {{age}}",
         "title": "Compleanni",
         "addButton": "Aggiungi compleanno",
         "searchPlaceholder": "Cerca compleanni…",
@@ -1846,7 +1887,7 @@
         "meals": "Pianifica i pasti della settimana e collega le ricette.",
         "notes": "Tocca + per una nuova nota. Le note vengono cercate nel testo completo.",
         "shopping": "Aggiungi articoli e scorri per contrassegnare o eliminare.",
-        "tasks": "Tocca + per creare il tuo primo compito. Scorri una scheda a sinistra per eliminare."
+        "tasks": "Tocca + per creare il tuo primo compito. Scorri una scheda a sinistra per completare, a destra per modificare."
     },
     "documents": {
         "title": "Documenti",
@@ -2492,7 +2533,8 @@
                 "title": "Aderenza",
                 "noData": "Ancora nessun dato sulle assunzioni",
                 "period": "Ultimi {{days}} giorni",
-                "streakLabel": "Giorni consecutivi"
+                "streakLabel": "Giorni consecutivi",
+                "notStarted": "Ancora nessun dato registrato"
             },
             "vitals": {
                 "title": "Ultimi parametri vitali"
@@ -2591,7 +2633,8 @@
                 "title": "Aderenza",
                 "period": "Ultimi {{days}} giorni",
                 "noData": "Ancora nessuna dose pianificata nel periodo.",
-                "summary": "{{taken}} su {{planned}} assunte"
+                "summary": "{{taken}} su {{planned}} assunte",
+                "notStarted": "Nessuna assunzione registrata finora"
             },
             "status": {
                 "taken": "Assunto",

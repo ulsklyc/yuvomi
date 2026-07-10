@@ -57,6 +57,7 @@
         "quickActions": "빠른 작업",
         "more": "더보기",
         "moreActiveLabel": "더보기, {{section}} 활성",
+        "moreCatalogHint": "모든 모듈. 즐겨찾기는 설정에서 변경할 수 있습니다.",
         "recipes": "레시피",
         "documents": "문서",
         "kitchen": "주방",
@@ -81,6 +82,7 @@
         "title": "검색",
         "placeholder": "검색…",
         "noResults": "결과를 찾을 수 없습니다.",
+        "error": "검색을 현재 사용할 수 없습니다.",
         "open": "검색 열기"
     },
     "dashboard": {
@@ -181,7 +183,8 @@
         "housekeepingNoVisits": "아직 방문 없음",
         "housekeepingVisitsMonth": "이번 달 {{count}}회 방문",
         "housekeepingUnpaid": "{{amount}} 미결제",
-        "widgetError": "불러올 수 없습니다"
+        "widgetError": "불러올 수 없습니다",
+        "savingsGoal": "저축 목표"
     },
     "tasks": {
         "title": "할 일",
@@ -928,6 +931,29 @@
         "splitSectionLabel": "공유 분할",
         "singleAssigneeHint": "한 사람을 지정하면 이 항목은 그 사람의 것이 됩니다.",
         "multiAssigneeHint": "여러 사람을 지정하고 금액을 어떻게 나눌지 선택하세요."
+        "planTab": "계획",
+        "planCategoryBudgets": "카테고리 예산",
+        "planAddBudget": "예산 설정",
+        "planSavingsSetTitle": "저축 목표 설정",
+        "planSavingsSetDesc": "월별 저축 목표를 설정하고 진행 상황을 확인하세요",
+        "planSetGoal": "목표 설정",
+        "planSavingsGoal": "저축 목표",
+        "planSavingsMet": "목표 달성",
+        "planSavingsNegative": "이번 달 적자",
+        "planSavingsShort": "목표까지 {{amount}} 남음",
+        "planSavingsHint": "저축 목표는 계획한 저축액을 이번 달 수입에서 지출을 뺀 금액과 비교합니다.",
+        "planEmptyTitle": "아직 예산이 없습니다",
+        "planEmptyDesc": "지출을 관리하려면 카테고리별 월 예산을 설정하세요.",
+        "planOverBy": "예산 {{amount}} 초과",
+        "planLeft": "{{amount}} 남음",
+        "planAllCategoriesBudgeted": "모든 카테고리에 이미 예산이 있습니다.",
+        "planMonthlyAmount": "월 금액",
+        "planSavedToast": "예산이 저장되었습니다",
+        "planRemovedToast": "예산이 삭제되었습니다",
+        "planTarget": "목표: {{amount}}",
+        "planEditAction": "편집",
+        "planDeleteConfirm": "“{{category}}” 예산을 삭제할까요?",
+        "planSavingsDeleteConfirm": "저축 목표를 삭제할까요?"
     },
     "settings": {
         "pageHealthModule": "건강",
@@ -1201,6 +1227,19 @@
             "syncedToast": "구독이 동기화되었습니다.",
             "deletedToast": "구독이 삭제되었습니다.",
             "updatedToast": "구독이 업데이트되었습니다."
+        },
+        "calendarImport": {
+            "title": "캘린더 가져오기",
+            "description": ".ics 파일이나 공유 캘린더의 일정을 편집 가능한 내 일정으로 한 번만 가져옵니다. 구독과 달리 이후에는 동기화되지 않습니다.",
+            "fileLabel": "ICS 파일",
+            "urlLabel": "또는 피드 URL",
+            "urlHint": "공유 캘린더 주소(https:// 또는 webcal://).",
+            "colorLabel": "색상",
+            "submit": "가져오기",
+            "errorNoSource": "파일을 선택하거나 URL을 입력하세요.",
+            "success": "일정 {{count}}개를 가져왔습니다.",
+            "successWithSkipped": "일정 {{count}}개를 가져왔고 {{skipped}}개는 이미 있습니다.",
+            "allDuplicates": "새 일정 없음 – 모두 이미 존재합니다."
         },
         "memberPhoneLabel": "전화번호 (선택 사항)",
         "memberEmailLabel": "이메일 (선택 사항)",
@@ -1768,6 +1807,8 @@
         "customWeeks": "주"
     },
     "birthdays": {
+        "inDays": "{{days}}일 후",
+        "turnsAge": "{{age}}세가 됩니다",
         "title": "생일",
         "addButton": "생일 추가",
         "searchPlaceholder": "생일 검색…",
@@ -1838,7 +1879,7 @@
         "staleData": "오프라인 – 기준: {{time}}"
     },
     "emptyHint": {
-        "tasks": "+ 를 탭하여 첫 할 일을 만드세요. 카드를 왼쪽으로 밀면 삭제됩니다.",
+        "tasks": "+ 를 탭하여 첫 할 일을 만드세요. 카드를 왼쪽으로 밀면 완료, 오른쪽으로 밀면 편집됩니다.",
         "calendar": "자동 동기화를 위해 설정 → 통합에서 Google 캘린더를 연결하세요.",
         "shopping": "항목을 추가하고 밀어서 체크하거나 삭제하세요.",
         "notes": "+ 를 탭하여 새 메모를 만드세요. 메모는 전문 검색됩니다.",
@@ -2492,7 +2533,8 @@
                 "title": "복약 순응도",
                 "noData": "아직 복약 데이터 없음",
                 "period": "최근 {{days}}일",
-                "streakLabel": "연속 일수"
+                "streakLabel": "연속 일수",
+                "notStarted": "아직 기록된 내용이 없습니다"
             },
             "vitals": {
                 "title": "최근 생체 신호"
@@ -2591,7 +2633,8 @@
                 "title": "복약 순응도",
                 "period": "최근 {{days}}일",
                 "noData": "해당 기간에 아직 예정된 복용이 없습니다.",
-                "summary": "{{planned}}회 중 {{taken}}회 복용"
+                "summary": "{{planned}}회 중 {{taken}}회 복용",
+                "notStarted": "아직 복용 기록이 없습니다"
             },
             "status": {
                 "taken": "복용함",

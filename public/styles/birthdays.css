@@ -1,77 +1,23 @@
-.birthdays-page { --module-accent: var(--module-birthdays); }
-
 .birthdays-page {
+  --module-accent: var(--module-birthdays);
+  /* Kohärenter Modul-Ton für Fokus-Ringe (Router setzt --active-module-accent). */
+  --c-accent: var(--active-module-accent, var(--module-birthdays));
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  max-width: var(--content-max-width);
+  gap: var(--space-3);
+  max-width: var(--content-max-width-narrow);
   margin: 0 auto;
   padding-bottom: calc(var(--nav-bottom-height) + var(--space-6));
 }
 
-.birthdays-grid {
-  display: grid;
-  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
-  gap: var(--space-4);
-  padding: 0 var(--space-4);
-}
-
-.birthdays-panel {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: calc(var(--radius-md) + 4px);
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--module-accent) 10%, transparent), transparent 45%),
-    var(--color-surface);
-  box-shadow: var(--shadow-sm);
-}
-
-.birthdays-panel--upcoming {
-  position: sticky;
-  top: var(--space-4);
-  align-self: start;
-}
-
-.birthdays-panel--list {
-  min-width: 0;
-}
-
-.birthdays-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-border);
-  border-top: 3px solid var(--module-accent);
-  background: var(--color-surface);
-}
-
-.birthdays-toolbar__subtitle {
-  margin: 0 var(--space-4) var(--space-2);
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-}
-
-.birthdays-toolbar--embedded {
-  padding: 0;
-  border: none;
-  background: transparent;
-}
-
+/* --------------------------------------------------------
+ * Kopf: Struktur (Flex/Padding/Sticky/3px-Streifen) kommt aus .page-toolbar
+ * (Canonical Page Head) in layout.css — hier nur die Suche.
+ * -------------------------------------------------------- */
 .birthdays-toolbar__search {
-  flex: 1;
   display: grid;
   gap: var(--space-1);
-}
-
-.birthdays-toolbar__search-label {
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
+  min-width: 0;
 }
 
 .birthdays-toolbar__search-control {
@@ -86,144 +32,150 @@
   transform: translateY(-50%);
   width: 16px;
   height: 16px;
-  color: var(--color-text-disabled);
+  color: var(--color-text-secondary);
   pointer-events: none;
 }
 
 .birthdays-toolbar__search-input {
   width: 100%;
-  min-height: 40px;
+  min-height: var(--target-base);
   padding-block: var(--space-2);
   padding-inline: 36px var(--space-3);
   border-radius: var(--radius-glass-button);
   border: 1.5px solid var(--glass-border-subtle);
-  background: var(--color-surface-2);
+  background-color: var(--color-surface-2);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.birthdays-section {
-  padding: 0 var(--space-4);
+.birthdays-toolbar__search-input:focus {
+  outline: none;
+  border-color: var(--c-accent);
+  background-color: var(--color-surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-accent) 20%, transparent);
 }
 
-.birthdays-section__header h2 {
-  margin: 0;
-}
-
-.birthdays-section__header p {
-  margin: var(--space-1) 0 0;
+.birthdays-hint {
+  margin: 0 var(--space-4);
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
 }
 
-.birthday-cards {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-3);
+/* --------------------------------------------------------
+ * Liste (nach Nähe sortiert) — eine Elevation-Ebene: nur die Karten.
+ * -------------------------------------------------------- */
+.birthdays-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
 }
 
-.birthday-card,
 .birthday-item {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-}
-
-.birthday-card {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-4);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--module-accent) 6%, var(--color-surface)), var(--color-surface));
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
-.birthday-card__body,
+/* „Heute"-Höhepunkt: der einzige emotionale Peak des Moduls. */
+.birthday-item--today {
+  border-color: color-mix(in srgb, var(--module-accent) 45%, var(--color-border));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--module-accent) 9%, var(--color-surface)), var(--color-surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--module-accent) 24%, transparent), var(--shadow-md);
+}
+
 .birthday-item__body {
   min-width: 0;
   flex: 1;
 }
 
-.birthday-card__top {
+.birthday-item__row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
-.birthday-card__top > :first-child {
-  min-width: 0;
-}
-
-.birthday-card__name,
 .birthday-item__name {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   overflow-wrap: anywhere;
-}
-
-.birthday-card__date,
-.birthday-item__meta,
-.birthday-item__next {
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-}
-
-.birthday-card__note,
-.birthday-item__note,
-.birthday-item__notes {
-  margin-top: var(--space-1);
-  font-size: var(--text-sm);
-  overflow-wrap: anywhere;
-}
-
-.birthday-card__name,
-.birthday-item__name,
-.birthday-card__note,
-.birthday-item__note,
-.birthday-item__notes {
   unicode-bidi: plaintext;
 }
 
-.birthday-card__pill {
+.birthday-cake {
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
-  padding: 0.35rem 0.6rem;
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--module-accent) 12%, transparent);
   color: var(--module-accent);
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-semibold);
-  white-space: nowrap;
+}
+
+.birthday-item__meta {
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  unicode-bidi: plaintext;
 }
 
 .birthday-item__notes {
+  margin-top: var(--space-1);
   color: var(--color-text-secondary);
-}
-
-.birthdays-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.birthday-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4);
-}
-
-.birthday-item__row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+  unicode-bidi: plaintext;
 }
 
 .birthday-item__actions {
   display: flex;
   gap: var(--space-1);
+  flex-shrink: 0;
 }
 
+/* --------------------------------------------------------
+ * Countdown-Chip — einheitliches Wort-Register, kontrastgeprüft (AA).
+ * -------------------------------------------------------- */
+.birthday-chip {
+  flex-shrink: 0;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.birthday-chip--default {
+  background: color-mix(in srgb, var(--module-accent) 10%, transparent);
+  /* Text zur Ink-Seite gezogen → AA auf hellem Tint (statt reinem Akzent 3,9:1). */
+  color: color-mix(in srgb, var(--module-accent) 72%, var(--color-text-primary));
+}
+
+.birthday-chip--soon {
+  background: color-mix(in srgb, var(--module-accent) 16%, transparent);
+  color: color-mix(in srgb, var(--module-accent) 74%, var(--color-text-primary));
+}
+
+.birthday-chip--today {
+  /* Akzent zu Schwarz vertieft, damit weißer Text in BEIDEN Themes AA hält:
+   * der helle Dark-Mode-Akzent (#FB7185) trägt reines Weiß sonst nur ~2,7:1. */
+  background: color-mix(in srgb, var(--module-accent) 72%, black);
+  color: var(--color-text-on-accent);
+}
+
+/* --------------------------------------------------------
+ * Avatare
+ * -------------------------------------------------------- */
 .birthday-avatar {
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   border-radius: var(--radius-full);
   object-fit: cover;
   flex-shrink: 0;
@@ -233,71 +185,48 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--module-accent) 16%, white);
-  color: var(--module-accent);
+  /* Theme-aware: Surface statt hartcodiertem white → korrekt in Dark Mode. */
+  background: color-mix(in srgb, var(--module-accent) 18%, var(--color-surface));
+  color: color-mix(in srgb, var(--module-accent) 76%, var(--color-text-primary));
   font-weight: var(--font-weight-bold);
 }
 
-.birthday-avatar--xs {
-  width: 34px;
-  height: 34px;
-  font-size: var(--text-sm);
-}
-
-.birthdays-autocomplete {
-  position: absolute;
-  top: calc(100% + 6px);
-  inset-inline: 0;
-  z-index: var(--z-dropdown);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-elevated);
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-}
-
-.birthday-suggestion {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: none;
-  background: transparent;
-  text-align: start;
-  cursor: pointer;
-}
-
-.birthday-suggestion:hover {
-  background: var(--color-surface-hover);
-}
-
-.birthday-suggestion span {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.birthday-suggestion small {
-  color: var(--color-text-secondary);
-}
-
-.birthday-preview {
-  width: 84px;
-  height: 84px;
-  margin: 0 auto var(--space-3);
+/* --------------------------------------------------------
+ * Aktions-Buttons (Bearbeiten/Löschen) — 48px Touch-Target.
+ * -------------------------------------------------------- */
+.birthday-action-btn {
+  width: var(--target-lg);
+  height: var(--target-lg);
+  min-width: var(--target-lg);
+  min-height: var(--target-lg);
   border-radius: var(--radius-full);
-  overflow: hidden;
-  display: flex;
+  border: none;
+  background: var(--color-surface-2);
+  cursor: pointer;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--module-accent) 16%, white);
+  color: var(--color-text-secondary);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
+.birthday-action-btn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.birthday-action-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-accent) 30%, transparent);
+}
+
+/* --------------------------------------------------------
+ * Modal
+ * -------------------------------------------------------- */
 .birthday-avatar-editor {
   width: 84px;
   height: 84px;
-  margin: 0 auto var(--space-3);
+  margin: 0 auto var(--space-2);
   padding: 0;
   border: none;
   border-radius: var(--radius-full);
@@ -305,7 +234,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--module-accent) 16%, white);
+  /* Theme-aware statt hartcodiertem white. */
+  background: color-mix(in srgb, var(--module-accent) 16%, var(--color-surface));
   cursor: pointer;
 }
 
@@ -316,7 +246,7 @@
 }
 
 .birthday-preview__fallback {
-  color: var(--module-accent);
+  color: color-mix(in srgb, var(--module-accent) 76%, var(--color-text-primary));
   font-size: var(--text-xl);
   font-weight: var(--font-weight-bold);
 }
@@ -325,13 +255,11 @@
   display: flex;
   gap: var(--space-2);
   justify-content: center;
-  margin-top: calc(var(--space-1) * -1);
-  margin-bottom: var(--space-2);
 }
 
 .birthday-modal__photo-action {
-  width: 30px;
-  height: 30px;
+  width: var(--target-base);
+  height: var(--target-base);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -339,11 +267,16 @@
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.birthday-modal__photo-action:hover {
+  background: var(--color-surface-hover);
 }
 
 .birthday-modal__photo-action svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 
 .birthday-modal__photo-action--danger {
@@ -357,7 +290,6 @@
 }
 
 .birthday-modal__photo-wrap {
-  width: 84px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -369,55 +301,46 @@
   min-width: 0;
 }
 
+.birthday-modal__select {
+  min-height: var(--target-base);
+}
+
 .birthday-modal__hint {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
 }
 
-@media (max-width: 640px) {
-  .birthdays-header__action {
-    display: none;
-  }
+.birthday-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
 
-  .birthday-card__top,
+.birthday-modal__footer-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+/* --------------------------------------------------------
+ * Responsive
+ * -------------------------------------------------------- */
+@media (max-width: 640px) {
   .birthday-item__row {
     flex-wrap: wrap;
   }
 
-  .birthday-card__top > :first-child,
   .birthday-item__name {
     flex: 1 1 100%;
   }
 
   .birthday-modal__identity {
     flex-direction: column;
+    align-items: stretch;
   }
 
-  .birthday-modal__photo-actions {
-    justify-content: flex-start;
+  .birthday-modal__photo-wrap {
+    align-self: center;
   }
-}
-
-@media (max-width: 1023px) {
-  .birthdays-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .birthdays-panel--upcoming {
-    position: static;
-  }
-}
-
-.contact-action-btn {
-  width: var(--target-lg);
-  height: var(--target-lg);
-  min-width: var(--target-lg);
-  min-height: var(--target-lg);
-  border-radius: var(--radius-full);
-  border: none;
-  background: var(--color-surface-2);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-secondary);
 }

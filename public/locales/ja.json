@@ -58,6 +58,7 @@
         "recipes": "レシピ",
         "more": "もっと見る",
         "moreActiveLabel": "その他、{{section}} がアクティブ",
+        "moreCatalogHint": "すべてのモジュール。お気に入りは設定でカスタマイズできます。",
         "documents": "書類",
         "kitchen": "キッチン",
         "kitchenGoLabel": "キッチン、{{section}} を開く",
@@ -175,7 +176,8 @@
         "housekeepingNoVisits": "まだ訪問がありません",
         "housekeepingVisitsMonth": "今月 {{count}} 回訪問",
         "housekeepingUnpaid": "{{amount}} 未払い",
-        "widgetError": "読み込めませんでした"
+        "widgetError": "読み込めませんでした",
+        "savingsGoal": "貯蓄目標"
     },
     "tasks": {
         "title": "タスク",
@@ -922,6 +924,29 @@
         "splitSectionLabel": "共有分割",
         "singleAssigneeHint": "1人を割り当てると、この項目はその人のものになります。",
         "multiAssigneeHint": "複数人を割り当てて、金額の分け方を選択します。"
+        "planTab": "予算計画",
+        "planCategoryBudgets": "カテゴリ別予算",
+        "planAddBudget": "予算を設定",
+        "planSavingsSetTitle": "貯蓄目標を設定",
+        "planSavingsSetDesc": "毎月の貯蓄目標を設定して進捗を確認",
+        "planSetGoal": "目標を設定",
+        "planSavingsGoal": "貯蓄目標",
+        "planSavingsMet": "目標を達成",
+        "planSavingsNegative": "今月は赤字",
+        "planSavingsShort": "目標まであと {{amount}}",
+        "planSavingsHint": "貯蓄目標は、計画した貯蓄額と今月の収入から支出を引いた額を比較します。",
+        "planEmptyTitle": "予算がまだありません",
+        "planEmptyDesc": "支出を管理するため、カテゴリごとに月次予算を設定しましょう。",
+        "planOverBy": "予算超過 {{amount}}",
+        "planLeft": "残り {{amount}}",
+        "planAllCategoriesBudgeted": "すべてのカテゴリに予算が設定済みです。",
+        "planMonthlyAmount": "月額",
+        "planSavedToast": "予算を保存しました",
+        "planRemovedToast": "予算を削除しました",
+        "planTarget": "目標: {{amount}}",
+        "planEditAction": "編集",
+        "planDeleteConfirm": "「{{category}}」の予算を削除しますか？",
+        "planSavingsDeleteConfirm": "貯蓄目標を削除しますか？"
     },
     "settings": {
         "pageHealthModule": "健康",
@@ -1178,6 +1203,19 @@
                 "shared": "共有"
             },
             "updatedToast": "サブスクリプションが更新されました。"
+        },
+        "calendarImport": {
+            "title": "カレンダーをインポート",
+            "description": ".ics ファイルまたは共有カレンダーの予定を、編集可能な自分の予定として一度だけインポートします。購読とは異なり、その後は同期されません。",
+            "fileLabel": "ICS ファイル",
+            "urlLabel": "またはフィード URL",
+            "urlHint": "共有カレンダーのアドレス（https:// または webcal://）。",
+            "colorLabel": "色",
+            "submit": "インポート",
+            "errorNoSource": "ファイルを選択するか、URL を入力してください。",
+            "success": "{{count}} 件の予定をインポートしました。",
+            "successWithSkipped": "{{count}} 件をインポートしました（{{skipped}} 件は既存）。",
+            "allDuplicates": "新しい予定はありません。すべて既に存在します。"
         },
         "memberPhoneLabel": "電話番号（任意）",
         "memberEmailLabel": "メールアドレス（任意）",
@@ -1758,9 +1796,12 @@
         "title": "検索",
         "open": "検索を開く",
         "placeholder": "検索…",
-        "noResults": "結果が見つかりませんでした。"
+        "noResults": "結果が見つかりませんでした。",
+        "error": "検索は現在利用できません。"
     },
     "birthdays": {
+        "inDays": "あと{{days}}日",
+        "turnsAge": "{{age}}歳になります",
         "title": "誕生日",
         "addButton": "誕生日を追加",
         "searchPlaceholder": "誕生日を検索…",
@@ -1846,7 +1887,7 @@
         "meals": "週の食事を計画してレシピを紐づけましょう。",
         "notes": "+ をタップして新しいメモを作成。メモは全文検索されます。",
         "shopping": "アイテムを追加してスワイプでチェックや削除。",
-        "tasks": "+ をタップして最初のタスクを作成。カードを左にスワイプで削除。"
+        "tasks": "+ をタップして最初のタスクを作成。カードを左にスワイプで完了、右で編集。"
     },
     "documents": {
         "title": "書類",
@@ -2492,7 +2533,8 @@
                 "title": "服薬遵守",
                 "noData": "服薬データはまだありません",
                 "period": "過去{{days}}日間",
-                "streakLabel": "連続日数"
+                "streakLabel": "連続日数",
+                "notStarted": "まだ記録がありません"
             },
             "vitals": {
                 "title": "最新のバイタル"
@@ -2591,7 +2633,8 @@
                 "title": "服薬遵守",
                 "period": "過去{{days}}日間",
                 "noData": "この期間に予定された服用はまだありません。",
-                "summary": "{{planned}}回中{{taken}}回服用"
+                "summary": "{{planned}}回中{{taken}}回服用",
+                "notStarted": "服用の記録はまだありません"
             },
             "status": {
                 "taken": "服用済み",

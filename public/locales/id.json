@@ -57,6 +57,7 @@
         "quickActions": "Tindakan cepat",
         "more": "Lainnya",
         "moreActiveLabel": "Lainnya, {{section}} aktif",
+        "moreCatalogHint": "Semua modul. Sesuaikan favorit di pengaturan.",
         "recipes": "Resep",
         "documents": "Dokumen",
         "kitchen": "Dapur",
@@ -81,6 +82,7 @@
         "title": "Cari",
         "placeholder": "Cari…",
         "noResults": "Tidak ada hasil ditemukan.",
+        "error": "Pencarian sedang tidak tersedia.",
         "open": "Buka pencarian"
     },
     "dashboard": {
@@ -181,7 +183,8 @@
         "housekeepingNoVisits": "Belum ada kunjungan",
         "housekeepingVisitsMonth": "{{count}} kunjungan bulan ini",
         "housekeepingUnpaid": "{{amount}} belum dibayar",
-        "widgetError": "Tidak dapat dimuat"
+        "widgetError": "Tidak dapat dimuat",
+        "savingsGoal": "Target tabungan"
     },
     "tasks": {
         "title": "Tugas",
@@ -928,6 +931,29 @@
         "splitSectionLabel": "Pembagian bersama",
         "singleAssigneeHint": "Tetapkan satu orang agar item ini menjadi miliknya.",
         "multiAssigneeHint": "Tetapkan beberapa orang dan pilih bagaimana jumlahnya dibagi."
+        "planTab": "Rencana",
+        "planCategoryBudgets": "Anggaran kategori",
+        "planAddBudget": "Tetapkan anggaran",
+        "planSavingsSetTitle": "Tetapkan target tabungan",
+        "planSavingsSetDesc": "Tetapkan target tabungan bulanan dan pantau kemajuannya",
+        "planSetGoal": "Tetapkan target",
+        "planSavingsGoal": "Target tabungan",
+        "planSavingsMet": "Target tercapai",
+        "planSavingsNegative": "Minus bulan ini",
+        "planSavingsShort": "Kurang {{amount}} lagi",
+        "planSavingsHint": "Target tabungan membandingkan tabungan rencana dengan pemasukan dikurangi pengeluaran bulan ini.",
+        "planEmptyTitle": "Belum ada anggaran",
+        "planEmptyDesc": "Tetapkan anggaran bulanan per kategori untuk mengendalikan pengeluaran.",
+        "planOverBy": "{{amount}} melebihi anggaran",
+        "planLeft": "Sisa {{amount}}",
+        "planAllCategoriesBudgeted": "Semua kategori sudah memiliki anggaran.",
+        "planMonthlyAmount": "Jumlah bulanan",
+        "planSavedToast": "Anggaran disimpan",
+        "planRemovedToast": "Anggaran dihapus",
+        "planTarget": "Target: {{amount}}",
+        "planEditAction": "Edit",
+        "planDeleteConfirm": "Hapus anggaran untuk “{{category}}”?",
+        "planSavingsDeleteConfirm": "Hapus target tabungan?"
     },
     "settings": {
         "pageHealthModule": "Kesehatan",
@@ -1201,6 +1227,19 @@
             "syncedToast": "Langganan disinkronkan.",
             "deletedToast": "Langganan dihapus.",
             "updatedToast": "Langganan diperbarui."
+        },
+        "calendarImport": {
+            "title": "Impor kalender",
+            "description": "Impor acara dari berkas .ics atau kalender bersama satu kali sebagai acara milik Anda sendiri yang dapat diedit. Tidak seperti langganan, acara tidak disinkronkan setelahnya.",
+            "fileLabel": "Berkas ICS",
+            "urlLabel": "Atau URL umpan",
+            "urlHint": "Alamat kalender bersama (https:// atau webcal://).",
+            "colorLabel": "Warna",
+            "submit": "Impor",
+            "errorNoSource": "Silakan pilih berkas atau masukkan URL.",
+            "success": "{{count}} acara diimpor.",
+            "successWithSkipped": "{{count}} acara diimpor, {{skipped}} sudah ada.",
+            "allDuplicates": "Tidak ada acara baru – semua sudah ada."
         },
         "memberPhoneLabel": "Nomor telepon (opsional)",
         "memberEmailLabel": "Email (opsional)",
@@ -1768,6 +1807,8 @@
         "customWeeks": "Minggu"
     },
     "birthdays": {
+        "inDays": "dalam {{days}} hari",
+        "turnsAge": "berusia {{age}}",
         "title": "Ulang Tahun",
         "addButton": "Tambah ulang tahun",
         "searchPlaceholder": "Cari ulang tahun…",
@@ -1838,7 +1879,7 @@
         "staleData": "Offline – per: {{time}}"
     },
     "emptyHint": {
-        "tasks": "Ketuk + untuk membuat tugas pertama Anda. Geser kartu ke kiri untuk menghapus.",
+        "tasks": "Ketuk + untuk membuat tugas pertama Anda. Geser kartu ke kiri untuk menyelesaikan, ke kanan untuk mengedit.",
         "calendar": "Sambungkan Google Calendar di Pengaturan → Integrasi untuk sinkronisasi otomatis.",
         "shopping": "Tambahkan item dan geser untuk mencentang atau menghapus.",
         "notes": "Ketuk + untuk catatan baru. Catatan dicari secara teks lengkap.",
@@ -2492,7 +2533,8 @@
                 "title": "Kepatuhan minum obat",
                 "noData": "Belum ada data minum obat",
                 "period": "{{days}} hari terakhir",
-                "streakLabel": "Hari berturut-turut"
+                "streakLabel": "Hari berturut-turut",
+                "notStarted": "Belum ada yang dicatat"
             },
             "vitals": {
                 "title": "Tanda vital terakhir"
@@ -2591,7 +2633,8 @@
                 "title": "Kepatuhan minum obat",
                 "period": "{{days}} hari terakhir",
                 "noData": "Belum ada dosis terjadwal pada periode ini.",
-                "summary": "{{taken}} dari {{planned}} diminum"
+                "summary": "{{taken}} dari {{planned}} diminum",
+                "notStarted": "Belum ada konsumsi yang dicatat"
             },
             "status": {
                 "taken": "Diminum",

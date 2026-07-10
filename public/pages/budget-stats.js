@@ -146,15 +146,25 @@ function renderCatBars() {
   const cats = view.data.byCategory.filter((c) => c.total !== 0);
   if (!host || !cats.length) return;
   const maxAbs = Math.max(...cats.map((c) => Math.abs(c.total)), 1);
+  // Budgetplan-Ziele nur im Monatsbereich einblenden — dort deckt sich der
+  // Zeitraum exakt mit dem stetigen Monatsplan (kein irreführendes Hochskalieren).
+  const plans = view.data.range === 'month' ? (view.data.plans || {}) : {};
   const rows = cats.map((c) => {
     const isExp = c.total < 0;
     const pct = Math.round((Math.abs(c.total) / maxAbs) * 100);
+    const target = isExp ? plans[c.category] : undefined;
+    const targetPos = target != null ? Math.min(1, target / maxAbs) : null;
+    const targetMarker = targetPos != null
+      ? `<div class="budget-bar-row__target" style="--target-pos:${targetPos.toFixed(4)}"
+             title="${t('budget.planTarget', { amount: view.ctx.formatAmount(target) })}"></div>`
+      : '';
     return `
       <div class="budget-bar-row">
         <div class="budget-bar-row__label">${view.ctx.esc(view.ctx.categoryLabel(c.category))}</div>
         <div class="budget-bar-row__track">
           <div class="budget-bar-row__fill ${isExp ? 'budget-bar-row__fill--expenses' : 'budget-bar-row__fill--income'}"
                style="--bar-scale:${pct / 100}"></div>
+          ${targetMarker}
         </div>
         <div class="budget-bar-row__amount" style="color:${isExp ? 'var(--color-danger)' : 'var(--color-success)'};">
           ${isExp ? '' : '+'}${view.ctx.formatAmount(c.total)}

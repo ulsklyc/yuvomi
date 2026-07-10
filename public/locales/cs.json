@@ -58,6 +58,7 @@
         "recipes": "Recepty",
         "more": "Více",
         "moreActiveLabel": "Více, aktivní sekce {{section}}",
+        "moreCatalogHint": "Všechny moduly. Oblíbené upravíš v nastavení.",
         "documents": "Dokumenty",
         "kitchen": "Kuchyně",
         "kitchenGoLabel": "Kuchyně, otevřít {{section}}",
@@ -175,7 +176,8 @@
         "housekeepingNoVisits": "Zatím žádné návštěvy",
         "housekeepingVisitsMonth": "{{count}} návštěv tento měsíc",
         "housekeepingUnpaid": "{{amount}} k úhradě",
-        "widgetError": "Nepodařilo se načíst"
+        "widgetError": "Nepodařilo se načíst",
+        "savingsGoal": "Cíl úspor"
     },
     "tasks": {
         "title": "Úkoly",
@@ -922,6 +924,29 @@
         "splitSectionLabel": "Sdílené rozdělení",
         "singleAssigneeHint": "Přiřaďte jednu osobu, aby tato položka byla její.",
         "multiAssigneeHint": "Přiřaďte více lidí a zvolte, jak částku rozdělit."
+        "planTab": "Plán",
+        "planCategoryBudgets": "Rozpočty kategorií",
+        "planAddBudget": "Nastavit rozpočet",
+        "planSavingsSetTitle": "Nastavte cíl úspor",
+        "planSavingsSetDesc": "Nastavte měsíční cíl úspor a sledujte pokrok",
+        "planSetGoal": "Nastavit cíl",
+        "planSavingsGoal": "Cíl úspor",
+        "planSavingsMet": "Cíl splněn",
+        "planSavingsNegative": "Tento měsíc v mínusu",
+        "planSavingsShort": "Zbývá {{amount}}",
+        "planSavingsHint": "Cíl úspor porovnává plánované úspory s příjmy minus výdaje tohoto měsíce.",
+        "planEmptyTitle": "Zatím žádné rozpočty",
+        "planEmptyDesc": "Nastavte měsíční rozpočet na kategorii a mějte výdaje pod kontrolou.",
+        "planOverBy": "{{amount}} nad rozpočet",
+        "planLeft": "Zbývá {{amount}}",
+        "planAllCategoriesBudgeted": "Všechny kategorie už mají rozpočet.",
+        "planMonthlyAmount": "Měsíční částka",
+        "planSavedToast": "Rozpočet uložen",
+        "planRemovedToast": "Rozpočet odstraněn",
+        "planTarget": "Cíl: {{amount}}",
+        "planEditAction": "Upravit",
+        "planDeleteConfirm": "Odstranit rozpočet pro „{{category}}“?",
+        "planSavingsDeleteConfirm": "Odstranit cíl úspor?"
     },
     "settings": {
         "pageHealthModule": "Zdraví",
@@ -1195,6 +1220,19 @@
             "syncedToast": "Odběr synchronizován.",
             "deletedToast": "Odběr smazán.",
             "updatedToast": "Odběr aktualizován."
+        },
+        "calendarImport": {
+            "title": "Importovat kalendář",
+            "description": "Naimportujte události ze souboru .ics nebo ze sdíleného kalendáře jednorázově jako vlastní upravitelné události. Na rozdíl od odběru se poté nesynchronizují.",
+            "fileLabel": "Soubor ICS",
+            "urlLabel": "Nebo URL kanálu",
+            "urlHint": "Adresa sdíleného kalendáře (https:// nebo webcal://).",
+            "colorLabel": "Barva",
+            "submit": "Importovat",
+            "errorNoSource": "Vyberte soubor nebo zadejte URL.",
+            "success": "Naimportováno událostí: {{count}}.",
+            "successWithSkipped": "Naimportováno {{count}}, {{skipped}} již existovalo.",
+            "allDuplicates": "Žádné nové události – všechny už existovaly."
         },
         "memberPhoneLabel": "Telefonní číslo (volitelné)",
         "memberEmailLabel": "E-mail (volitelné)",
@@ -1706,6 +1744,7 @@
         "title": "Hledat",
         "placeholder": "Hledat…",
         "noResults": "Žádné výsledky nenalezeny.",
+        "error": "Vyhledávání je momentálně nedostupné.",
         "open": "Otevřít vyhledávání"
     },
     "shortcuts": {
@@ -1721,7 +1760,7 @@
         "goHealth": "Zdraví"
     },
     "emptyHint": {
-        "tasks": "Klepněte na + a vytvořte svůj první úkol. Přejetím karty doleva ji smažete.",
+        "tasks": "Klepněte na + a vytvořte svůj první úkol. Přejetím karty doleva ji označíte za hotovou, doprava upravíte.",
         "calendar": "Propojte Kalendář Google v Nastavení → Integrace pro automatickou synchronizaci.",
         "shopping": "Přidejte položky a přejetím je odškrtněte nebo smažte.",
         "notes": "Klepněte na + pro novou poznámku. Poznámky jsou prohledávány v plném textu.",
@@ -2158,6 +2197,8 @@
         "customWeeks": "Týdny"
     },
     "birthdays": {
+        "inDays": "za {{days}} dní",
+        "turnsAge": "oslaví {{age}}",
         "title": "Narozeniny",
         "addButton": "Přidat narozeniny",
         "searchPlaceholder": "Hledat narozeniny…",
@@ -2492,7 +2533,8 @@
                 "title": "Dodržování",
                 "noData": "Zatím žádné údaje o užívání",
                 "period": "Posledních {{days}} dní",
-                "streakLabel": "Dní v řadě"
+                "streakLabel": "Dní v řadě",
+                "notStarted": "Zatím nic nezaznamenáno"
             },
             "vitals": {
                 "title": "Poslední vitální hodnoty"
@@ -2591,7 +2633,8 @@
                 "title": "Dodržování",
                 "period": "Posledních {{days}} dní",
                 "noData": "V období zatím nejsou žádné plánované dávky.",
-                "summary": "Užito {{taken}} z {{planned}}"
+                "summary": "Užito {{taken}} z {{planned}}",
+                "notStarted": "Zatím nezaznamenáno žádné užití"
             },
             "status": {
                 "taken": "Užito",

@@ -58,6 +58,7 @@
         "recipes": "Recettes",
         "more": "Plus",
         "moreActiveLabel": "Plus, {{section}} actif",
+        "moreCatalogHint": "Tous les modules. Personnalisez vos favoris dans les réglages.",
         "documents": "Documents",
         "kitchen": "Cuisine",
         "kitchenGoLabel": "Cuisine, ouvrir {{section}}",
@@ -175,7 +176,8 @@
         "housekeepingNoVisits": "Aucune visite",
         "housekeepingVisitsMonth": "{{count}} visites ce mois-ci",
         "housekeepingUnpaid": "{{amount}} à payer",
-        "widgetError": "Impossible à charger"
+        "widgetError": "Impossible à charger",
+        "savingsGoal": "Objectif d’épargne"
     },
     "tasks": {
         "title": "Tâches",
@@ -922,6 +924,29 @@
         "splitSectionLabel": "Répartition partagée",
         "singleAssigneeHint": "Assignez une personne pour que cet élément lui appartienne.",
         "multiAssigneeHint": "Assignez plusieurs personnes et choisissez comment répartir le montant."
+        "planTab": "Plan",
+        "planCategoryBudgets": "Budgets par catégorie",
+        "planAddBudget": "Définir un budget",
+        "planSavingsSetTitle": "Définir un objectif d’épargne",
+        "planSavingsSetDesc": "Fixez un objectif d’épargne mensuel et suivez votre progression",
+        "planSetGoal": "Définir l’objectif",
+        "planSavingsGoal": "Objectif d’épargne",
+        "planSavingsMet": "Objectif atteint",
+        "planSavingsNegative": "Dans le rouge ce mois-ci",
+        "planSavingsShort": "Encore {{amount}}",
+        "planSavingsHint": "L’objectif d’épargne compare votre épargne prévue aux revenus moins les dépenses du mois.",
+        "planEmptyTitle": "Aucun budget pour l’instant",
+        "planEmptyDesc": "Définissez un budget mensuel par catégorie pour maîtriser les dépenses.",
+        "planOverBy": "{{amount}} de dépassement",
+        "planLeft": "{{amount}} restants",
+        "planAllCategoriesBudgeted": "Toutes les catégories ont déjà un budget.",
+        "planMonthlyAmount": "Montant mensuel",
+        "planSavedToast": "Budget enregistré",
+        "planRemovedToast": "Budget supprimé",
+        "planTarget": "Objectif : {{amount}}",
+        "planEditAction": "Modifier",
+        "planDeleteConfirm": "Supprimer le budget de « {{category}} » ?",
+        "planSavingsDeleteConfirm": "Supprimer l’objectif d’épargne ?"
     },
     "settings": {
         "pageHealthModule": "Santé",
@@ -1178,6 +1203,19 @@
                 "shared": "Partagé"
             },
             "updatedToast": "Abonnement mis à jour."
+        },
+        "calendarImport": {
+            "title": "Importer un calendrier",
+            "description": "Importez les événements d'un fichier .ics ou d'un calendrier partagé en une seule fois, comme vos propres événements modifiables. Contrairement à un abonnement, ils ne sont pas synchronisés ensuite.",
+            "fileLabel": "Fichier ICS",
+            "urlLabel": "Ou URL du flux",
+            "urlHint": "Adresse d'un calendrier partagé (https:// ou webcal://).",
+            "colorLabel": "Couleur",
+            "submit": "Importer",
+            "errorNoSource": "Veuillez choisir un fichier ou saisir une URL.",
+            "success": "{{count}} événements importés.",
+            "successWithSkipped": "{{count}} événements importés, {{skipped}} déjà présents.",
+            "allDuplicates": "Aucun nouvel événement – tous existaient déjà."
         },
         "memberPhoneLabel": "Numéro de téléphone (facultatif)",
         "memberEmailLabel": "E-mail (facultatif)",
@@ -1758,9 +1796,12 @@
         "title": "Recherche",
         "open": "Ouvrir la recherche",
         "placeholder": "Rechercher…",
-        "noResults": "Aucun résultat trouvé."
+        "noResults": "Aucun résultat trouvé.",
+        "error": "La recherche est momentanément indisponible."
     },
     "birthdays": {
+        "inDays": "dans {{days}} jours",
+        "turnsAge": "aura {{age}} ans",
         "title": "Anniversaires",
         "addButton": "Ajouter un anniversaire",
         "searchPlaceholder": "Rechercher des anniversaires…",
@@ -1846,7 +1887,7 @@
         "meals": "Planifiez les repas de la semaine et associez des recettes.",
         "notes": "Appuyez sur + pour une nouvelle note. Les notes sont indexées en texte intégral.",
         "shopping": "Ajoutez des articles et glissez pour cocher ou supprimer.",
-        "tasks": "Appuyez sur + pour créer votre première tâche. Glissez une carte à gauche pour supprimer."
+        "tasks": "Appuyez sur + pour créer votre première tâche. Glissez une carte à gauche pour cocher, à droite pour modifier."
     },
     "documents": {
         "title": "Documents",
@@ -2492,7 +2533,8 @@
                 "title": "Observance",
                 "noData": "Aucune donnée de prise pour l'instant",
                 "period": "{{days}} derniers jours",
-                "streakLabel": "Jours d'affilée"
+                "streakLabel": "Jours d'affilée",
+                "notStarted": "Rien enregistré pour l’instant"
             },
             "vitals": {
                 "title": "Dernières constantes"
@@ -2591,7 +2633,8 @@
                 "title": "Observance",
                 "period": "{{days}} derniers jours",
                 "noData": "Aucune dose planifiée sur la période.",
-                "summary": "{{taken}} sur {{planned}} pris"
+                "summary": "{{taken}} sur {{planned}} pris",
+                "notStarted": "Aucune prise enregistrée pour l’instant"
             },
             "status": {
                 "taken": "Pris",

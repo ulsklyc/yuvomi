@@ -803,6 +803,32 @@ function renderFamilyWidget(users) {
   </div>`;
 }
 
+// Sparziel-Fortschritt statt bloßer Sparquote, sobald ein Budgetplan-Sparziel
+// gesetzt ist (#468). Ohne Ziel bleibt die bekannte Sparquoten-Zeile.
+function renderBudgetSavings(budget, balance, income, savingsRate) {
+  const goal = budget?.savingsGoal;
+  if (goal && goal > 0) {
+    const pct = Math.max(0, Math.min(100, Math.round((balance / goal) * 100)));
+    const met = balance >= goal;
+    const tone = met ? 'positive' : (balance < 0 ? 'negative' : 'neutral');
+    return `
+      <div class="budget-widget__goal">
+        <div class="budget-widget__goal-head">
+          <span>${t('dashboard.savingsGoal')}</span>
+          <strong class="budget-widget__goal-pct budget-widget__goal-pct--${tone}">${Math.round((balance / goal) * 100)}%</strong>
+        </div>
+        <div class="budget-widget__goal-track">
+          <div class="budget-widget__goal-fill budget-widget__goal-fill--${tone}" style="--goal-scale:${pct / 100}"></div>
+        </div>
+      </div>`;
+  }
+  return `
+    <div class="budget-widget__savings">
+      <span>${t('dashboard.savingsRate')}</span>
+      <strong>${income > 0 ? `${savingsRate}%` : '–'}</strong>
+    </div>`;
+}
+
 function renderBudgetWidget(budget, currency) {
   const income = budget?.income || 0;
   const expenses = budget?.expenses || 0;
@@ -837,10 +863,7 @@ function renderBudgetWidget(budget, currency) {
         <span>${t('dashboard.monthlyBalance')}</span>
         <strong class="budget-widget__balance budget-widget__balance--${balanceTone}">${formatCurrency(balance, currency)}</strong>
       </div>
-      <div class="budget-widget__savings">
-        <span>${t('dashboard.savingsRate')}</span>
-        <strong>${income > 0 ? `${savingsRate}%` : '–'}</strong>
-      </div>
+      ${renderBudgetSavings(budget, balance, income, savingsRate)}
       <div class="budget-widget__flow">
         <span class="budget-widget__flow-item budget-widget__flow-item--income">
           <span>${t('dashboard.monthlyIncome')}</span>

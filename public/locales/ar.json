@@ -58,6 +58,7 @@
         "recipes": "الوصفات",
         "more": "المزيد",
         "moreActiveLabel": "المزيد، {{section}} نشط",
+        "moreCatalogHint": "كل الوحدات. خصّص مفضّلاتك من الإعدادات.",
         "documents": "المستندات",
         "kitchen": "المطبخ",
         "kitchenGoLabel": "المطبخ، فتح {{section}}",
@@ -175,7 +176,8 @@
         "housekeepingNoVisits": "لا زيارات بعد",
         "housekeepingVisitsMonth": "{{count}} زيارة هذا الشهر",
         "housekeepingUnpaid": "{{amount}} مستحقة",
-        "widgetError": "تعذّر التحميل"
+        "widgetError": "تعذّر التحميل",
+        "savingsGoal": "هدف الادخار"
     },
     "tasks": {
         "title": "المهام",
@@ -922,6 +924,29 @@
         "splitSectionLabel": "تقسيم المشاركة",
         "singleAssigneeHint": "عيّن شخصًا واحدًا ليصبح هذا البند خاصًا به.",
         "multiAssigneeHint": "عيّن عدة أشخاص واختر كيفية تقسيم المبلغ."
+        "planTab": "الخطة",
+        "planCategoryBudgets": "ميزانيات الفئات",
+        "planAddBudget": "تحديد ميزانية",
+        "planSavingsSetTitle": "حدّد هدف ادخار",
+        "planSavingsSetDesc": "حدّد هدف ادخار شهري وتابع تقدّمك",
+        "planSetGoal": "تحديد الهدف",
+        "planSavingsGoal": "هدف الادخار",
+        "planSavingsMet": "تم تحقيق الهدف",
+        "planSavingsNegative": "في العجز هذا الشهر",
+        "planSavingsShort": "يتبقّى {{amount}}",
+        "planSavingsHint": "يقارن هدف الادخار مدّخراتك المخطط لها بدخل هذا الشهر ناقص المصروفات.",
+        "planEmptyTitle": "لا توجد ميزانيات بعد",
+        "planEmptyDesc": "حدّد ميزانية شهرية لكل فئة للتحكم في الإنفاق.",
+        "planOverBy": "{{amount}} فوق الميزانية",
+        "planLeft": "يتبقّى {{amount}}",
+        "planAllCategoriesBudgeted": "كل الفئات لديها ميزانية بالفعل.",
+        "planMonthlyAmount": "المبلغ الشهري",
+        "planSavedToast": "تم حفظ الميزانية",
+        "planRemovedToast": "تمت إزالة الميزانية",
+        "planTarget": "الهدف: {{amount}}",
+        "planEditAction": "تحرير",
+        "planDeleteConfirm": "حذف ميزانية «{{category}}»؟",
+        "planSavingsDeleteConfirm": "حذف هدف الادخار؟"
     },
     "settings": {
         "pageHealthModule": "الصحة",
@@ -1178,6 +1203,19 @@
                 "shared": "مشترك"
             },
             "updatedToast": "تم تحديث الاشتراك."
+        },
+        "calendarImport": {
+            "title": "استيراد التقويم",
+            "description": "استورد الأحداث من ملف ‎.ics أو تقويم مشترك مرة واحدة كأحداث خاصة بك قابلة للتحرير. بخلاف الاشتراك، لا تتم مزامنتها بعد ذلك.",
+            "fileLabel": "ملف ICS",
+            "urlLabel": "أو رابط الموجز",
+            "urlHint": "عنوان تقويم مشترك (‎https://‎ أو ‎webcal://‎).",
+            "colorLabel": "اللون",
+            "submit": "استيراد",
+            "errorNoSource": "يرجى اختيار ملف أو إدخال رابط.",
+            "success": "تم استيراد {{count}} حدثًا.",
+            "successWithSkipped": "تم استيراد {{count}} حدثًا، و{{skipped}} موجودة بالفعل.",
+            "allDuplicates": "لا توجد أحداث جديدة – كلها موجودة بالفعل."
         },
         "memberPhoneLabel": "رقم الهاتف (اختياري)",
         "memberEmailLabel": "البريد الإلكتروني (اختياري)",
@@ -1758,9 +1796,12 @@
         "title": "بحث",
         "open": "فتح البحث",
         "placeholder": "بحث…",
-        "noResults": "لم يتم العثور على نتائج."
+        "noResults": "لم يتم العثور على نتائج.",
+        "error": "البحث غير متاح حاليًا."
     },
     "birthdays": {
+        "inDays": "خلال {{days}} أيام",
+        "turnsAge": "يبلغ {{age}}",
         "title": "أعياد الميلاد",
         "addButton": "إضافة عيد ميلاد",
         "searchPlaceholder": "ابحث عن أعياد الميلاد…",
@@ -1846,7 +1887,7 @@
         "meals": "خطط وجباتك للأسبوع واربط الوصفات.",
         "notes": "اضغط + لملاحظة جديدة. يتم البحث في الملاحظات بالنص الكامل.",
         "shopping": "أضف عناصر واسحب للتحديد أو الحذف.",
-        "tasks": "اضغط + لإنشاء أول مهمة. اسحب البطاقة يساراً للحذف."
+        "tasks": "اضغط + لإنشاء أول مهمة. اسحب البطاقة يساراً للإنجاز، ويميناً للتعديل."
     },
     "documents": {
         "title": "المستندات",
@@ -2492,7 +2533,8 @@
                 "title": "الالتزام بالتناول",
                 "noData": "لا توجد بيانات تناول بعد",
                 "period": "آخر {{days}} يوم",
-                "streakLabel": "أيام متتالية"
+                "streakLabel": "أيام متتالية",
+                "notStarted": "لم يُسجَّل شيء بعد"
             },
             "vitals": {
                 "title": "أحدث المؤشرات الحيوية"
@@ -2591,7 +2633,8 @@
                 "title": "الالتزام بالتناول",
                 "period": "آخر {{days}} يوم",
                 "noData": "لا توجد جرعات مجدولة في الفترة بعد.",
-                "summary": "تم تناول {{taken}} من {{planned}}"
+                "summary": "تم تناول {{taken}} من {{planned}}",
+                "notStarted": "لم يتم تسجيل أي جرعة بعد"
             },
             "status": {
                 "taken": "تم التناول",

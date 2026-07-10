@@ -1168,3 +1168,184 @@
 .budget-stats__donut-wrap { display:flex; gap:var(--space-4); align-items:center; flex-wrap:wrap; }
 .budget-stats__donut { width:160px; height:160px; }
 .budget-stats__export { margin-top:var(--space-4); }
+
+/* Ziel-Marker im Reports-Tab: kleine Tick-Linie auf dem Kategorie-Balken beim
+ * geplanten Monatswert (nur bei range='month'). */
+.budget-bar-row__track { position: relative; }
+.budget-bar-row__target {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 3px;
+  left: calc(var(--target-pos, 0) * 100%);
+  transform: translateX(-1px);
+  background-color: var(--color-text-primary);
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 1px var(--color-surface);
+  opacity: 0.75;
+}
+
+/* --------------------------------------------------------
+ * Budgetplan (geplantes/geschätztes Budget, #468)
+ * -------------------------------------------------------- */
+.budget-tab-panel--plan {
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-4) var(--budget-fab-clearance);
+}
+
+.budget-plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Sparziel-Karte */
+.budget-plan-savings {
+  --plan-tone-color: var(--module-budget);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-4);
+  text-align: left;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-glass-card);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: box-shadow var(--transition-base), transform var(--transition-base), border-color var(--transition-base);
+}
+.budget-plan-savings:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.budget-plan-savings:focus-visible {
+  outline: 2px solid var(--module-accent, var(--color-accent));
+  outline-offset: 2px;
+}
+.budget-plan-savings--tone-under { --plan-tone-color: var(--color-success); }
+.budget-plan-savings--tone-near  { --plan-tone-color: var(--color-warning); }
+.budget-plan-savings--tone-over  { --plan-tone-color: var(--color-danger);  }
+
+.budget-plan-savings__ring { position: relative; width: 88px; height: 88px; flex-shrink: 0; }
+.budget-plan-savings__ring svg { width: 100%; height: 100%; display: block; }
+.budget-plan-savings__ring-track { stroke: var(--color-surface-2); }
+.budget-plan-savings__ring-fill {
+  stroke: var(--plan-tone-color);
+  transition: stroke-dasharray var(--transition-slow);
+}
+.budget-plan-savings__ring-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+}
+
+.budget-plan-savings__detail { flex: 1; min-width: 0; }
+.budget-plan-savings__label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-1);
+}
+.budget-plan-savings__amounts {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+.budget-plan-savings__amounts strong { font-size: var(--text-2xl); color: var(--color-text-primary); }
+.budget-plan-savings__amounts span { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.budget-plan-savings__status { margin-top: var(--space-1); font-size: var(--text-sm); font-weight: var(--font-weight-medium); }
+.budget-plan-savings__status--under { color: var(--color-success); }
+.budget-plan-savings__status--near  { color: var(--color-warning); }
+.budget-plan-savings__status--over  { color: var(--color-danger);  }
+.budget-plan-savings__edit { width: 18px; height: 18px; color: var(--color-text-tertiary, var(--color-text-secondary)); flex-shrink: 0; align-self: flex-start; }
+
+/* Sparziel „noch nicht gesetzt" */
+.budget-plan-savings--empty { justify-content: space-between; }
+.budget-plan-savings__prompt { display: flex; align-items: center; gap: var(--space-3); }
+.budget-plan-savings__prompt > i { width: 32px; height: 32px; color: var(--module-budget); flex-shrink: 0; }
+.budget-plan-savings__prompt-title { font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }
+.budget-plan-savings__prompt-desc { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.budget-plan-savings__prompt-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--module-accent, var(--color-accent));
+  white-space: nowrap;
+}
+.budget-plan-savings__prompt-cta i { width: 16px; height: 16px; }
+
+/* Kategorie-Plan-Abschnitt */
+.budget-plan__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.budget-plan__section-title { font-size: var(--text-base); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }
+.budget-plan__section-head .btn i { width: 16px; height: 16px; }
+.budget-plan__empty { padding: var(--space-6) var(--space-4); }
+
+#budget-plan-rows { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* Kategorie-Plan-Zeile */
+.budget-plan-row {
+  --plan-tone-color: var(--color-success);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: box-shadow var(--transition-base), border-color var(--transition-base);
+}
+.budget-plan-row:hover { box-shadow: var(--shadow-sm); border-color: var(--color-border); }
+.budget-plan-row:focus-visible {
+  outline: 2px solid var(--module-accent, var(--color-accent));
+  outline-offset: 2px;
+}
+.budget-plan-row--tone-near { --plan-tone-color: var(--color-warning); }
+.budget-plan-row--tone-over { --plan-tone-color: var(--color-danger);  }
+
+.budget-plan-row__top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.budget-plan-row__label { font-weight: var(--font-weight-medium); color: var(--color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.budget-plan-row__amounts { font-size: var(--text-sm); color: var(--color-text-secondary); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.budget-plan-row__amounts strong { color: var(--color-text-primary); }
+
+.budget-plan-row__track {
+  height: var(--space-2);
+  background-color: var(--color-surface-2);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.budget-plan-row__fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background-color: var(--plan-tone-color);
+  transform: scaleX(var(--plan-scale, 0));
+  transform-origin: left center;
+  transition: transform var(--transition-slow);
+}
+.budget-plan-row__foot { font-size: var(--text-xs); color: var(--plan-tone-color); font-weight: var(--font-weight-medium); font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  .budget-plan-savings,
+  .budget-plan-savings__ring-fill,
+  .budget-plan-row,
+  .budget-plan-row__fill { transition: none; }
+  .budget-plan-savings:hover { transform: none; }
+}

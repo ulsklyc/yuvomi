@@ -237,6 +237,17 @@
   color: var(--color-text-secondary);
 }
 
+/* Mini-Trendlinie: gibt jeder Metrik-Karte einen eigenen Sub-Domänen-Charakter.
+ * preserveAspectRatio="none" streckt auf Kartenbreite; vector-effect hält die
+ * Strichstärke konstant. */
+.health-metric-card__spark {
+  width: 100%;
+  height: 22px;
+  display: block;
+  opacity: 0.9;
+  overflow: visible;
+}
+
 .health-metric-card__meta {
   display: flex;
   align-items: center;
@@ -315,6 +326,18 @@
 .health-chart__axis {
   font-size: var(--text-xs);
   fill: var(--color-text-secondary);
+}
+
+/* Y-Wert-Labels am linken Rand: dezenter als die X-Datumsachse, damit die
+ * Kurve die Hauptrolle behält. */
+.health-chart__axis--y {
+  fill: var(--color-text-tertiary);
+}
+
+/* Flächenfüllung unter der Trend-Kurve — dieselbe Materialsprache über alle
+ * Health-Charts. Bewusst sehr transparent, damit Gitter und Werte durchscheinen. */
+.health-chart__area {
+  fill: color-mix(in oklab, var(--module-health) 14%, transparent);
 }
 
 .health-chart__legend {
@@ -401,8 +424,10 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2) var(--space-3);
-  padding: var(--space-3);
+  gap: var(--space-1) var(--space-3);
+  /* Dichtere Zeile: geringeres vertikales Padding, damit mehr Dosen ohne Scrollen
+   * sichtbar sind (Kern-Interaktion des Tabs). */
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
@@ -480,7 +505,10 @@
 .health-adherence__value {
   font-size: var(--text-2xl);
   font-weight: var(--font-weight-semibold, 600);
-  color: var(--module-accent);
+  /* Neutrale Tinte statt Modul-Magenta: der Prozentwert soll informieren, nicht
+   * alarmieren. Der Fortschrittsbalken trägt den Akzent. Konsistent mit dem
+   * Übersichts-Stat-Wert (--color-text-primary). */
+  color: var(--color-text-primary);
 }
 
 .health-adherence__bar {
@@ -574,14 +602,17 @@ button.health-med-card:hover {
 }
 
 .health-med-card__stock {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1) var(--space-2);
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
 
-.health-med-card__stock i { width: 14px; height: 14px; }
+/* Der Nachfüll-Chip rutscht bei Enge sauber in eine eigene Zeile, statt die
+ * Bestandszeile mitten im Text umbrechen zu lassen. */
+.health-med-card__stock i { width: 14px; height: 14px; flex: 0 0 auto; }
 
 .health-med-card__stock.is-warn {
   color: var(--color-warning);
@@ -591,6 +622,7 @@ button.health-med-card:hover {
   display: inline-flex;
   align-items: center;
   gap: var(--space-0h);
+  margin-inline-start: auto;
   color: var(--color-warning);
   font-weight: var(--font-weight-medium, 500);
 }
@@ -1243,13 +1275,13 @@ button.health-med-card:hover {
   color: var(--color-text-secondary);
 }
 
-/* Karten-Raster: füllt die verfügbare Breite (1 Spalte Mobil, 2 Tablet, 3 auf
- * breitem Desktop), statt starr bei zwei Spalten mit rechter Leergasse zu bleiben. */
+/* Karten-Masonry: unterschiedlich hohe Karten (kurze „Einnahmetreue" neben hoher
+ * „Heute fällig") packen top-to-bottom ohne zeilengebundene Leerräume. Multicolumn
+ * mit break-inside statt Grid, dessen Zeilenhöhe sich am höchsten Nachbarn ausrichtet
+ * und darunter eine Void ließe. 1 Spalte Mobil → n Spalten je Breite. */
 .health-overview__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-  gap: var(--space-4);
-  align-items: start;
+  column-width: 320px;
+  column-gap: var(--space-4);
 }
 
 .health-overview__card {
@@ -1262,6 +1294,8 @@ button.health-med-card:hover {
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
   min-width: 0;
+  break-inside: avoid;
+  margin-bottom: var(--space-4);
 }
 
 .health-overview__card-head {

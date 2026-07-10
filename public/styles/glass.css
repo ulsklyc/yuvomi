@@ -33,18 +33,17 @@
   }
 }
 
-/* Active-State: eine eingezogene Glass-Kapsel im gleitenden Indikator */
+/* Active-State: EINE crispe Glass-Kapsel. Der Tint sitzt am Indikator selbst
+ * (siehe §39); das ::before trägt nur noch den inneren Specular-Highlight,
+ * damit sich nicht zwei Tint-Schichten überlagern (matschige Kante). */
 .nav-bottom__indicator::before {
-  background: color-mix(
-    in srgb,
-    var(--active-module-accent, var(--color-accent)) 16%,
-    var(--glass-bg)
-  );
   box-shadow: inset 0 var(--space-px) 0 var(--glass-highlight-subtle);
 }
 
+/* Bottom-Nav: inaktive Icons sitzen nackt in der Bar — kein gefülltes Well.
+ * Die Fläche gehört exklusiv dem aktiven Tab (gleitende Pille). */
 .nav-bottom .nav-item__icon-well {
-  background: color-mix(in srgb, var(--color-text-secondary) 7%, transparent);
+  background: transparent;
   box-shadow: none;
 }
 

@@ -75,6 +75,48 @@ const RANGE_LABELS = {
 // Kanal-Farben (Trend-Chart). Nur Tokens — keine Wertung, rein zur Unterscheidung.
 const CHANNEL_COLORS = ['var(--module-health)', 'var(--color-info)', 'var(--color-warning)'];
 
+// Gemeinsame Chart-Geometrie: linker Gutter für Y-Wert-Labels, unterer für
+// X-Datumslabels. Alle drei Health-Charts (Vitalwerte, Laborwerte, Aktivität)
+// teilen denselben 600×200-viewBox und dieselben Ränder, damit sie als EIN
+// lesbares System wirken statt als drei verschiedene Kurven-Kästen.
+const CHART = Object.freeze({ W: 600, H: 200, PAD_L: 40, PAD_R: 12, PAD_T: 14, PAD_B: 26 });
+
+function chartScales() {
+  const { W, H, PAD_L, PAD_R, PAD_T, PAD_B } = CHART;
+  return { left: PAD_L, right: W - PAD_R, top: PAD_T, bottom: H - PAD_B };
+}
+
+// Fünf horizontale Gitterlinien mit Y-Wert-Beschriftung am linken Rand — ersetzt
+// die früheren zwei frei schwebenden Min-/Max-Zahlen durch eine echte Werteachse.
+function chartGridMarkup(min, max) {
+  const { W, PAD_L, PAD_R } = CHART;
+  const { top, bottom } = chartScales();
+  const out = [];
+  for (let k = 0; k <= 4; k++) {
+    const gy = top + (k * (bottom - top)) / 4;
+    const val = max - (k * (max - min)) / 4;
+    out.push(`<line class="health-chart__grid" x1="${PAD_L}" y1="${gy.toFixed(1)}" x2="${W - PAD_R}" y2="${gy.toFixed(1)}" />`);
+    out.push(`<text x="${PAD_L - 6}" y="${(gy + 3.5).toFixed(1)}" class="health-chart__axis health-chart__axis--y" text-anchor="end">${esc(fmtNum(val))}</text>`);
+  }
+  return out.join('');
+}
+
+// X-Achsen-Datumslabels (erstes, mittleres, letztes Datum) unter dem Plot,
+// an den Plotgrenzen ausgerichtet (erstes linksbündig, letztes rechtsbündig).
+function chartXLabelsMarkup(dates) {
+  if (!dates.length) return '';
+  const { H, W, PAD_L, PAD_R } = CHART;
+  const y = H - 7;
+  const picks = dates.length <= 2
+    ? dates.map((d, i) => ({ d, i }))
+    : [dates[0], dates[Math.floor((dates.length - 1) / 2)], dates[dates.length - 1]].map((d, i) => ({ d, i }));
+  return picks.map(({ d }, idx) => {
+    const anchor = idx === 0 ? 'start' : idx === picks.length - 1 ? 'end' : 'middle';
+    const px = anchor === 'start' ? PAD_L : anchor === 'end' ? W - PAD_R : (PAD_L + (W - PAD_R)) / 2;
+    return `<text x="${px.toFixed(1)}" y="${y}" class="health-chart__axis" text-anchor="${anchor}">${esc(formatDate(d))}</text>`;
+  }).join('');
+}
+
 // Panel-Definitionen je Route. Icons folgen den Sub-Tab-Icons (health-tabs.js).
 const PANELS = () => [
   {
@@ -533,8 +575,37 @@ function cardMarkup(metric, series) {
         <span class="health-metric-card__label">${esc(label)}</span>
       </span>
       <span class="health-metric-card__body">${valueHtml}</span>
+      ${latest ? sparklineMarkup(series.points, 'value_num') : ''}
       ${metaHtml}
     </button>`;
+}
+
+// Mini-Trendlinie für die Metrik-Karte: gibt der Karte Sub-Domänen-Charakter, ohne
+// den vollen Chart zu wiederholen. Rein dekorativ (aria-hidden) — die exakten Werte
+// liefern Karte, Detail-Chart und Screenreader-Tabelle. Nur bei ≥2 Datenpunkten.
+function sparklineMarkup(points, key) {
+  const withVal = points
+    .map((p, i) => ({ v: p[key], i }))
+    .filter((o) => o.v !== null && o.v !== undefined);
+  if (withVal.length < 2) return '';
+  const W = 100;
+  const H = 26;
+  const PAD = 3;
+  const vals = withVal.map((o) => o.v);
+  let min = Math.min(...vals);
+  let max = Math.max(...vals);
+  if (min === max) { min -= 1; max += 1; }
+  const n = withVal.length;
+  const x = (idx) => PAD + (idx * (W - 2 * PAD)) / (n - 1);
+  const y = (v) => H - PAD - ((v - min) / (max - min)) * (H - 2 * PAD);
+  const pts = withVal.map((o, idx) => `${x(idx).toFixed(1)},${y(o.v).toFixed(1)}`).join(' ');
+  const lastX = x(n - 1).toFixed(1);
+  const lastY = y(withVal[n - 1].v).toFixed(1);
+  return `<svg class="health-metric-card__spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+      <polyline points="${pts}" fill="none" stroke="var(--module-accent)" stroke-width="1.5"
+        stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+      <circle cx="${lastX}" cy="${lastY}" r="2" fill="var(--module-accent)" vector-effect="non-scaling-stroke" />
+    </svg>`;
 }
 
 function deltaMarkup(delta) {
@@ -596,10 +667,6 @@ function stepAnchor(dir) {
 }
 
 function chartMarkup(metric, series) {
-  const W = 600;
-  const H = 200;
-  const PAD_X = 10;
-  const PAD_Y = 16;
   const pts = series.points;
 
   // Aktive Kanäle: die, die im Zeitraum mindestens einen Wert tragen.
@@ -628,15 +695,32 @@ function chartMarkup(metric, series) {
   const pad = span * 0.1;
   min -= pad; max += pad;
 
+  const { W, H } = CHART;
+  const { left, right, top, bottom } = chartScales();
   // X-Domäne an die tatsächliche Datenspanne klemmen (erster bis letzter Bucket mit
   // Wert), damit dünne Daten die volle Breite nutzen statt mittig zusammenzukleben.
   const firstIdx = dataIdx[0];
   const lastIdx = dataIdx[dataIdx.length - 1];
-  const x = (i) => PAD_X + ((i - firstIdx) * (W - 2 * PAD_X)) / (lastIdx - firstIdx);
-  const y = (v) => H - PAD_Y - ((v - min) / (max - min)) * (H - 2 * PAD_Y);
+  const x = (i) => left + ((i - firstIdx) * (right - left)) / (lastIdx - firstIdx);
+  const y = (v) => bottom - ((v - min) / (max - min)) * (bottom - top);
+
+  // Flächenfüllung nur bei Einzelkanal-Metriken (Gewicht, Glukose …). Bei Blutdruck
+  // (drei Kurven) würde ein Füllband die Linien verschlucken — dort bewusst keine.
+  let area = '';
+  if (channels.length === 1) {
+    const key = channels[0].key;
+    const vp = pts.map((p, i) => ({ p, i })).filter(({ p }) => p[key] !== null);
+    if (vp.length >= 2) {
+      const spine = vp.map(({ p, i }) => `${x(i).toFixed(1)},${y(p[key]).toFixed(1)}`).join(' ');
+      const x0 = x(vp[0].i).toFixed(1);
+      const x1 = x(vp[vp.length - 1].i).toFixed(1);
+      area = `<polygon class="health-chart__area" points="${x0},${bottom.toFixed(1)} ${spine} ${x1},${bottom.toFixed(1)}" />`;
+    }
+  }
 
   const seriesSvg = channels.map(({ key, idx }) => {
     const color = CHANNEL_COLORS[idx % CHANNEL_COLORS.length];
+    const chName = metric.channelLabelKeys?.[idx] ? t(metric.channelLabelKeys[idx]) : t(metric.labelKey);
     const linePts = [];
     const dots = [];
     pts.forEach((p, i) => {
@@ -644,7 +728,7 @@ function chartMarkup(metric, series) {
       const px = x(i).toFixed(1);
       const py = y(p[key]).toFixed(1);
       linePts.push(`${px},${py}`);
-      dots.push(`<circle cx="${px}" cy="${py}" r="3" fill="${color}" />`);
+      dots.push(`<circle cx="${px}" cy="${py}" r="3.5" fill="${color}"><title>${esc(`${chName} · ${formatDate(p.date)}: ${fmtNum(p[key])}`)}</title></circle>`);
     });
     return `
       <polyline fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"
@@ -660,27 +744,24 @@ function chartMarkup(metric, series) {
         </span>`).join('')}</div>`
     : '';
 
-  // Dezente horizontale Gitternetzlinien (drei Viertel-Linien) für Ablesbarkeit.
-  const grid = [1, 2, 3].map((k) => {
-    const gy = (PAD_Y + (k * (H - 2 * PAD_Y)) / 4).toFixed(1);
-    return `<line class="health-chart__grid" x1="${PAD_X}" y1="${gy}" x2="${W - PAD_X}" y2="${gy}" />`;
-  }).join('');
+  const grid = chartGridMarkup(min, max);
 
   // Screenreader-Datentabelle: nur Buckets mit mindestens einem Wert.
   const chLabel = (idx) => (metric.channelLabelKeys?.[idx] ? t(metric.channelLabelKeys[idx]) : t(metric.labelKey));
   const tableHeaders = [t('health.vitals.field.measuredAt'), ...channels.map(({ idx }) => chLabel(idx))];
-  const tableRows = pts
-    .filter((p) => channels.some(({ key }) => p[key] !== null))
+  const dataPoints = pts.filter((p) => channels.some(({ key }) => p[key] !== null));
+  const tableRows = dataPoints
     .map((p) => [formatDate(p.date), ...channels.map(({ key }) => (p[key] !== null ? fmtNum(p[key]) : '–'))]);
   const table = tableRows.length ? chartTableMarkup(t(metric.labelKey), tableHeaders, tableRows) : '';
+  const xLabels = chartXLabelsMarkup(dataPoints.map((p) => p.date));
 
   return `
     <svg class="health-chart" viewBox="0 0 ${W} ${H}" role="img"
          aria-label="${esc(t(metric.labelKey))}">
       ${grid}
-      <text x="${PAD_X}" y="12" class="health-chart__axis">${esc(fmtNum(max))}</text>
-      <text x="${PAD_X}" y="${H - 2}" class="health-chart__axis">${esc(fmtNum(min))}</text>
+      ${area}
       ${seriesSvg}
+      ${xLabels}
     </svg>
     ${table}
     ${legend}`;
@@ -1067,6 +1148,12 @@ function adherenceMarkup() {
   if (a.rate === null) {
     return `<div class="health-adherence">${head}
       <div class="health-adherence__empty">${esc(t('health.meds.adherence.noData'))}</div></div>`;
+  }
+  // Geplant, aber noch nichts protokolliert: KEIN großes rotes „0 %" — das liest
+  // sich als Vorwurf. Stattdessen ein neutraler Frühzustand (Adherence-Scham vermeiden).
+  if (a.taken === 0) {
+    return `<div class="health-adherence">${head}
+      <div class="health-adherence__empty">${esc(t('health.meds.adherence.notStarted'))}</div></div>`;
   }
   const pct = Math.round(a.rate * 100);
   return `
@@ -1732,10 +1819,8 @@ function labTrendMarkup() {
 }
 
 function labTrendChart(points, analyteName) {
-  const W = 600;
-  const H = 200;
-  const PAD_X = 10;
-  const PAD_Y = 16;
+  const { W, H } = CHART;
+  const { left, right, top: pTop, bottom: pBottom } = chartScales();
   const n = points.length;
 
   // Referenzbereich (Normalband). Erster nicht-leerer Wert je Grenze — in der
@@ -1753,8 +1838,8 @@ function labTrendChart(points, analyteName) {
   const pad = span * 0.1;
   min -= pad; max += pad;
 
-  const x = (i) => PAD_X + (n <= 1 ? 0 : (i * (W - 2 * PAD_X)) / (n - 1));
-  const y = (v) => H - PAD_Y - ((v - min) / (max - min)) * (H - 2 * PAD_Y);
+  const x = (i) => left + (n <= 1 ? 0 : (i * (right - left)) / (n - 1));
+  const y = (v) => pBottom - ((v - min) / (max - min)) * (pBottom - pTop);
 
   // Referenzband: gefülltes Rechteck zwischen ref_low und ref_high, sonst eine
   // einzelne gestrichelte Grenzlinie.
@@ -1765,22 +1850,23 @@ function labTrendChart(points, analyteName) {
     const top = Math.min(yHigh, yLow);
     const h = Math.abs(yLow - yHigh);
     band = `
-      <rect class="health-chart__band" x="${PAD_X}" y="${top.toFixed(1)}" width="${(W - 2 * PAD_X).toFixed(1)}" height="${h.toFixed(1)}" />
-      <line class="health-chart__band-line" x1="${PAD_X}" y1="${yHigh.toFixed(1)}" x2="${W - PAD_X}" y2="${yHigh.toFixed(1)}" />
-      <line class="health-chart__band-line" x1="${PAD_X}" y1="${yLow.toFixed(1)}" x2="${W - PAD_X}" y2="${yLow.toFixed(1)}" />`;
+      <rect class="health-chart__band" x="${left}" y="${top.toFixed(1)}" width="${(right - left).toFixed(1)}" height="${h.toFixed(1)}" />
+      <line class="health-chart__band-line" x1="${left}" y1="${yHigh.toFixed(1)}" x2="${right}" y2="${yHigh.toFixed(1)}" />
+      <line class="health-chart__band-line" x1="${left}" y1="${yLow.toFixed(1)}" x2="${right}" y2="${yLow.toFixed(1)}" />`;
   } else if (refLow != null || refHigh != null) {
     const yr = y(refLow != null ? refLow : refHigh);
-    band = `<line class="health-chart__band-line" x1="${PAD_X}" y1="${yr.toFixed(1)}" x2="${W - PAD_X}" y2="${yr.toFixed(1)}" />`;
+    band = `<line class="health-chart__band-line" x1="${left}" y1="${yr.toFixed(1)}" x2="${right}" y2="${yr.toFixed(1)}" />`;
   }
+
+  const unit = points.find((p) => p.unit)?.unit || '';
+  const ariaLabel = unit ? `${analyteName} (${unit})` : analyteName;
 
   const linePts = points.map((p, i) => `${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
   const dots = points.map((p, i) => {
     const color = FLAG_DOT_COLORS[p.flag] || 'var(--module-health)';
-    return `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" fill="${color}" />`;
+    const val = unit ? `${fmtNum(p.value)} ${unit}` : fmtNum(p.value);
+    return `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" fill="${color}"><title>${esc(`${formatDate(p.date)}: ${val}`)}</title></circle>`;
   }).join('');
-
-  const unit = points.find((p) => p.unit)?.unit || '';
-  const ariaLabel = unit ? `${analyteName} (${unit})` : analyteName;
 
   // Screenreader-Tabelle: Datum, Wert, Referenz, Einordnung — dieselben Daten wie
   // die Punkt-Farben, aber vorlesbar.
@@ -1802,20 +1888,17 @@ function labTrendChart(points, analyteName) {
     tableRows,
   );
 
-  const grid = [1, 2, 3].map((k) => {
-    const gy = (PAD_Y + (k * (H - 2 * PAD_Y)) / 4).toFixed(1);
-    return `<line class="health-chart__grid" x1="${PAD_X}" y1="${gy}" x2="${W - PAD_X}" y2="${gy}" />`;
-  }).join('');
+  const grid = chartGridMarkup(min, max);
+  const xLabels = chartXLabelsMarkup(points.map((p) => p.date));
 
   return `
     <svg class="health-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(ariaLabel)}">
       ${grid}
       ${band}
-      <text x="${PAD_X}" y="12" class="health-chart__axis">${esc(fmtNum(max))}</text>
-      <text x="${PAD_X}" y="${H - 2}" class="health-chart__axis">${esc(fmtNum(min))}</text>
       <polyline fill="none" stroke="var(--module-health)" stroke-width="2"
         stroke-linejoin="round" stroke-linecap="round" points="${linePts}" />
       ${dots}
+      ${xLabels}
     </svg>
     ${table}
     ${unit ? `<div class="health-lab-trend__unit">${esc(t('health.labs.trend.unit', { unit }))}</div>` : ''}`;
@@ -2313,27 +2396,26 @@ function activityChartMarkup(summary) {
     return `<div class="empty-state health-chart-empty"><div class="empty-state__title">${esc(t('health.activity.noData'))}</div></div>`;
   }
 
-  const W = 600;
-  const H = 200;
-  const PAD_X = 10;
-  const PAD_TOP = 16;
-  const PAD_BOTTOM = 28;
+  const { W, H } = CHART;
+  const { left, right, top, bottom } = chartScales();
   const n = buckets.length;
-  const chartH = H - PAD_TOP - PAD_BOTTOM;
-  const slot = (W - 2 * PAD_X) / n;
+  const chartH = bottom - top;
+  const slot = (right - left) / n;
   const barW = slot * 0.6;
 
   const bars = buckets.map((b, i) => {
     const h = (b.durationMin / max) * chartH;
-    const x = PAD_X + i * slot + (slot - barW) / 2;
-    const y = PAD_TOP + (chartH - h);
+    const x = left + i * slot + (slot - barW) / 2;
+    const y = bottom - h;
     const label = t(ACTIVITY_WEEKDAY_LABEL_KEYS[i]);
     const rect = b.durationMin > 0
-      ? `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="var(--module-health)" />`
+      ? `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="var(--module-health)"><title>${esc(`${label}: ${t('health.activity.unit.min', { value: fmtNum(b.durationMin) })}`)}</title></rect>`
       : '';
     return `${rect}
-      <text x="${(x + barW / 2).toFixed(1)}" y="${H - 10}" class="health-chart__axis" text-anchor="middle">${esc(label)}</text>`;
+      <text x="${(x + barW / 2).toFixed(1)}" y="${H - 8}" class="health-chart__axis" text-anchor="middle">${esc(label)}</text>`;
   }).join('');
+
+  const grid = chartGridMarkup(0, max);
 
   const tableRows = buckets.map((b, i) => [
     t(ACTIVITY_WEEKDAY_LABEL_KEYS[i]),
@@ -2348,7 +2430,7 @@ function activityChartMarkup(summary) {
   return `
     <svg class="health-chart health-activity-chart" viewBox="0 0 ${W} ${H}" role="img"
          aria-label="${esc(t('health.activity.chartTitle'))}">
-      <text x="${PAD_X}" y="12" class="health-chart__axis">${esc(t('health.activity.unit.min', { value: fmtNum(max) }))}</text>
+      ${grid}
       ${bars}
     </svg>
     ${table}`;
@@ -2885,7 +2967,21 @@ function overviewAdherenceMarkup() {
   if (a.rate === null) {
     return `<div class="health-adherence__empty">${esc(t('health.overview.adherence.noData'))}</div>`;
   }
+  // Frühzustand ohne Vorwurf: solange nichts protokolliert ist, kein „0 %".
+  if (a.taken === 0) {
+    return `<div class="health-adherence__empty">${esc(t('health.overview.adherence.notStarted'))}</div>`;
+  }
   const pct = Math.round(a.rate * 100);
+  // Die Streak-Kachel erscheint erst ab Tag 1 — eine „🔥 0"-Serie zu zeigen wäre
+  // demotivierend statt anspornend.
+  const streakStat = streak > 0
+    ? `<div class="health-overview__stat">
+        <span class="health-overview__stat-value">
+          <i data-lucide="flame" class="health-overview__streak-icon" aria-hidden="true"></i>${esc(fmtNum(streak))}
+        </span>
+        <span class="health-overview__stat-label">${esc(t('health.overview.adherence.streakLabel'))}</span>
+      </div>`
+    : '';
   return `
     <div class="health-overview__adherence">
       <div class="health-overview__stat">
@@ -2893,12 +2989,7 @@ function overviewAdherenceMarkup() {
         <span class="health-overview__stat-label">${esc(t('health.overview.adherence.period', { days: OVERVIEW_ADHERENCE_DAYS }))}</span>
         <div class="health-adherence__bar"><span style="width:${pct}%"></span></div>
       </div>
-      <div class="health-overview__stat">
-        <span class="health-overview__stat-value">
-          <i data-lucide="flame" class="health-overview__streak-icon" aria-hidden="true"></i>${esc(fmtNum(streak))}
-        </span>
-        <span class="health-overview__stat-label">${esc(t('health.overview.adherence.streakLabel'))}</span>
-      </div>
+      ${streakStat}
     </div>`;
 }
 

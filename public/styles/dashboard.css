@@ -2576,6 +2576,48 @@ svg.weather-forecast__icon {
   font-weight: var(--font-weight-bold);
 }
 
+/* Sparziel-Fortschritt im Budget-Widget (#468) */
+.budget-widget__goal { margin-top: var(--space-3); }
+.budget-widget__goal-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.budget-widget__goal-head span {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+}
+.budget-widget__goal-pct {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+.budget-widget__goal-pct--positive { color: var(--color-success); }
+.budget-widget__goal-pct--neutral  { color: var(--module-budget); }
+.budget-widget__goal-pct--negative { color: var(--color-danger); }
+.budget-widget__goal-track {
+  height: var(--space-2);
+  background-color: var(--color-surface-2);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.budget-widget__goal-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transform: scaleX(var(--goal-scale, 0));
+  transform-origin: left center;
+  transition: transform var(--transition-slow);
+}
+.budget-widget__goal-fill--positive { background-color: var(--color-success); }
+.budget-widget__goal-fill--neutral  { background-color: var(--module-budget); }
+.budget-widget__goal-fill--negative { background-color: var(--color-danger); }
+@media (prefers-reduced-motion: reduce) {
+  .budget-widget__goal-fill { transition: none; }
+}
+
 .budget-widget__flow {
   display: flex;
   gap: var(--space-4);

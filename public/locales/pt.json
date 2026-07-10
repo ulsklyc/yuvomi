@@ -58,6 +58,7 @@
         "recipes": "Receitas",
         "more": "Mais",
         "moreActiveLabel": "Mais, {{section}} ativo",
+        "moreCatalogHint": "Todos os módulos. Personalize os favoritos nas definições.",
         "documents": "Documentos",
         "kitchen": "Cozinha",
         "kitchenGoLabel": "Cozinha, abrir {{section}}",
@@ -175,7 +176,8 @@
         "housekeepingNoVisits": "Ainda sem visitas",
         "housekeepingVisitsMonth": "{{count}} visitas este mês",
         "housekeepingUnpaid": "{{amount}} em aberto",
-        "widgetError": "Não foi possível carregar"
+        "widgetError": "Não foi possível carregar",
+        "savingsGoal": "Meta de poupança"
     },
     "tasks": {
         "title": "Tarefas",
@@ -922,6 +924,29 @@
         "splitSectionLabel": "Divisao compartilhada",
         "singleAssigneeHint": "Atribua uma pessoa para que este item seja dela.",
         "multiAssigneeHint": "Atribua varias pessoas e escolha como dividir o valor."
+        "planTab": "Plano",
+        "planCategoryBudgets": "Orçamentos por categoria",
+        "planAddBudget": "Definir orçamento",
+        "planSavingsSetTitle": "Defina uma meta de poupança",
+        "planSavingsSetDesc": "Defina uma meta de poupança mensal e acompanhe o progresso",
+        "planSetGoal": "Definir meta",
+        "planSavingsGoal": "Meta de poupança",
+        "planSavingsMet": "Meta atingida",
+        "planSavingsNegative": "No vermelho este mês",
+        "planSavingsShort": "Faltam {{amount}}",
+        "planSavingsHint": "A meta de poupança compara a poupança planejada com as receitas menos as despesas do mês.",
+        "planEmptyTitle": "Ainda sem orçamentos",
+        "planEmptyDesc": "Defina um orçamento mensal por categoria para controlar os gastos.",
+        "planOverBy": "{{amount}} acima do orçamento",
+        "planLeft": "{{amount}} restantes",
+        "planAllCategoriesBudgeted": "Todas as categorias já têm um orçamento.",
+        "planMonthlyAmount": "Valor mensal",
+        "planSavedToast": "Orçamento salvo",
+        "planRemovedToast": "Orçamento removido",
+        "planTarget": "Meta: {{amount}}",
+        "planEditAction": "Editar",
+        "planDeleteConfirm": "Excluir o orçamento de “{{category}}”?",
+        "planSavingsDeleteConfirm": "Excluir a meta de poupança?"
     },
     "settings": {
         "pageHealthModule": "Saúde",
@@ -1178,6 +1203,19 @@
                 "shared": "Partilhado"
             },
             "updatedToast": "Subscrição atualizada."
+        },
+        "calendarImport": {
+            "title": "Importar calendário",
+            "description": "Importe eventos de um ficheiro .ics ou de um calendário partilhado uma única vez como os seus próprios eventos editáveis. Ao contrário de uma subscrição, depois não são sincronizados.",
+            "fileLabel": "Ficheiro ICS",
+            "urlLabel": "Ou URL do feed",
+            "urlHint": "Endereço de um calendário partilhado (https:// ou webcal://).",
+            "colorLabel": "Cor",
+            "submit": "Importar",
+            "errorNoSource": "Escolha um ficheiro ou introduza um URL.",
+            "success": "{{count}} eventos importados.",
+            "successWithSkipped": "{{count}} eventos importados, {{skipped}} já existiam.",
+            "allDuplicates": "Sem novos eventos – todos já existiam."
         },
         "memberPhoneLabel": "Telefone (opcional)",
         "memberEmailLabel": "E-mail (opcional)",
@@ -1758,9 +1796,12 @@
         "title": "Pesquisa",
         "open": "Abrir pesquisa",
         "placeholder": "Pesquisar…",
-        "noResults": "Nenhum resultado encontrado."
+        "noResults": "Nenhum resultado encontrado.",
+        "error": "A pesquisa está indisponível de momento."
     },
     "birthdays": {
+        "inDays": "em {{days}} dias",
+        "turnsAge": "faz {{age}}",
         "title": "Aniversários",
         "addButton": "Adicionar aniversário",
         "searchPlaceholder": "Buscar aniversários…",
@@ -1846,7 +1887,7 @@
         "meals": "Planeje as refeições da semana e vincule receitas.",
         "notes": "Toque em + para uma nova nota. As notas são pesquisadas em texto completo.",
         "shopping": "Adicione itens e deslize para marcar ou excluir.",
-        "tasks": "Toque em + para criar sua primeira tarefa. Deslize um cartão para a esquerda para excluir."
+        "tasks": "Toque em + para criar sua primeira tarefa. Deslize um cartão para a esquerda para concluir, para a direita para editar."
     },
     "documents": {
         "title": "Documentos",
@@ -2492,7 +2533,8 @@
                 "title": "Adesão",
                 "noData": "Ainda sem dados de tomas",
                 "period": "Últimos {{days}} dias",
-                "streakLabel": "Dias seguidos"
+                "streakLabel": "Dias seguidos",
+                "notStarted": "Nada registrado ainda"
             },
             "vitals": {
                 "title": "Últimos sinais vitais"
@@ -2591,7 +2633,8 @@
                 "title": "Adesão",
                 "period": "Últimos {{days}} dias",
                 "noData": "Ainda sem doses planeadas no período.",
-                "summary": "{{taken}} de {{planned}} tomadas"
+                "summary": "{{taken}} de {{planned}} tomadas",
+                "notStarted": "Nenhuma dose registrada ainda"
             },
             "status": {
                 "taken": "Tomado",

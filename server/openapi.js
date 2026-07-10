@@ -733,6 +733,9 @@ function buildPaths() {
     '/api/v1/calendar/subscriptions/{id}/sync': {
       post: op({ summary: 'Sync ICS subscription', tag: 'Calendar', params: [idParam()], stateChanging: true }),
     },
+    '/api/v1/calendar/import': {
+      post: op({ summary: 'Import events from an ICS file or shared calendar feed as editable local events', tag: 'Calendar', stateChanging: true, requestBody: jsonBody(null) }),
+    },
     '/api/v1/calendar/feed': {
       get: op({ summary: 'Get personal ICS export feed status', tag: 'Calendar' }),
       delete: op({ summary: 'Disable personal ICS export feed', tag: 'Calendar', stateChanging: true }),
@@ -865,6 +868,13 @@ function buildPaths() {
       delete: op({ summary: 'Delete birthday', tag: 'Birthdays', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/budget/summary': { get: op({ summary: 'Get budget summary', tag: 'Budget' }) },
+    '/api/v1/budget/plans': {
+      get: op({ summary: 'Get planned budget vs. actual for a month (category caps + savings goal)', tag: 'Budget' }),
+    },
+    '/api/v1/budget/plans/{category}': {
+      put: op({ summary: 'Set planned monthly amount for a category or the savings goal (__savings__)', tag: 'Budget', params: [stringPathParam('category', 'Expense category key or __savings__')], stateChanging: true, requestBody: jsonBody(null) }),
+      delete: op({ summary: 'Remove a category budget or the savings goal', tag: 'Budget', params: [stringPathParam('category', 'Expense category key or __savings__')], stateChanging: true }),
+    },
     '/api/v1/budget/export': { get: op({ summary: 'Export budget entries as CSV', tag: 'Budget' }) },
     '/api/v1/budget/meta': { get: op({ summary: 'Get budget categories and subcategories', tag: 'Budget' }) },
     '/api/v1/budget/categories': {

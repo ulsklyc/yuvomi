@@ -300,7 +300,7 @@
 }
 
 .filter-panel__label {
-  /* Typografie via .u-eyebrow */
+  /* Typografie via .nav-section-label-Schicht (Sentence-Case, Critique P2) */
   color: var(--color-text-secondary);
 }
 
@@ -342,13 +342,14 @@
 }
 
 .task-group__title {
-  /* Typografie via .u-eyebrow */
+  /* Typografie via .nav-section-label-Schicht (Sentence-Case, Critique P2) */
   color: var(--color-text-secondary);
 }
 
 .task-group__count {
   font-size: var(--text-xs);
-  color: var(--color-text-disabled);
+  /* AA-lesbar auf --color-surface-2 (disabled/neutral-300 fiel durch — Critique) */
+  color: var(--color-text-secondary);
   background-color: var(--color-surface-2);
   padding: 2px var(--space-2);
   border-radius: var(--radius-full);
@@ -761,11 +762,12 @@
   border-bottom: 1.5px solid var(--color-border);
 }
 
-/* .kanban-col__title — Typografie via .u-eyebrow; Farbe inline (Spalten-Accent) */
+/* .kanban-col__title — Typografie via .nav-section-label-Schicht (Sentence-Case, Critique P2); Farbe inline (Spalten-Accent) */
 
 .kanban-col__count {
+  /* AA-lesbar (disabled/neutral-300 fiel durch — Critique) */
   font-size: var(--text-xs);
-  color: var(--color-text-disabled);
+  color: var(--color-text-secondary);
   background-color: var(--color-surface);
   padding: 2px var(--space-2);
   border-radius: var(--radius-full);

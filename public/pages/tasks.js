@@ -297,7 +297,7 @@ function renderTaskGroups(tasks, groupMode) {
     return `
     <div class="task-group">
       <div class="task-group__header">
-        <span class="task-group__title u-eyebrow">${catLabelsMap[name] ?? name}</span>
+        <span class="task-group__title">${catLabelsMap[name] ?? name}</span>
         <span class="task-group__count">${groupTasks.length}</span>
       </div>
       ${sorted.map((t) => renderSwipeRow(t, renderTaskCard(t, {
@@ -658,15 +658,42 @@ async function handleFormSubmit(e, container) {
   };
   const dueTimeRaw = form.due_time?.value || '';
   const dueTime = parseTimeInput(dueTimeRaw);
-  if (dueTimeRaw && !dueTime) {
-    errorEl.textContent = t('calendar.invalidDate');
+  const resetSubmit = (msg) => {
+    errorEl.textContent = msg;
     errorEl.hidden = false;
     submitBtn.disabled = false;
     submitBtn.textContent = originalLabel;
-    return;
-  }
+  };
+  if (dueTimeRaw && !dueTime) { resetSubmit(t('calendar.invalidDate')); return; }
   body.due_time = dueTime || null;
   if (form.status) body.status = form.status.value;
+
+  // Erinnerungs-Vorbedingungen VOR dem Speichern prüfen — verhindert den
+  // widersprüchlichen Zustand "Aufgabe gespeichert (Erfolgs-Toast) + roter
+  // Fehler", wenn Reminder ohne Fälligkeit/Offset gesetzt wird (Critique P2).
+  const wantsReminder = !!reminderToggle?.checked;
+  let remindAt = null;
+  if (wantsReminder) {
+    if (!dueDate) { resetSubmit(t('tasks.reminderNeedsDueDate')); return; }
+    const offsetPreset = form.querySelector('#reminder-offset')?.value || 'offset_none';
+    if (offsetPreset === 'offset_none') { resetSubmit(t('tasks.reminderNeedsDueDate')); return; }
+    let offsetMs = 0;
+    if (offsetPreset === 'offset_15m') offsetMs = 15 * 60 * 1000;
+    else if (offsetPreset === 'offset_1h') offsetMs = 60 * 60 * 1000;
+    else if (offsetPreset === 'offset_1d') offsetMs = 24 * 60 * 60 * 1000;
+    else if (offsetPreset === 'offset_2d') offsetMs = 2 * 24 * 60 * 60 * 1000;
+    else if (offsetPreset === 'offset_1w') offsetMs = 7 * 24 * 60 * 60 * 1000;
+    else if (offsetPreset === 'offset_2w') offsetMs = 14 * 24 * 60 * 60 * 1000;
+    else if (offsetPreset === 'offset_custom') {
+      const customAmount = Number(form.querySelector('#reminder-custom-amount')?.value || 0);
+      const customUnit = form.querySelector('#reminder-custom-unit')?.value || 'days';
+      if (!Number.isFinite(customAmount) || customAmount <= 0) { resetSubmit(t('common.invalidInput')); return; }
+      const unitFactor = customUnit === 'minutes' ? 60000 : customUnit === 'hours' ? 3600000 : customUnit === 'days' ? 86400000 : 604800000;
+      offsetMs = customAmount * unitFactor;
+    }
+    const dueDateTime = body.due_time ? new Date(`${dueDate}T${body.due_time}`) : new Date(`${dueDate}T23:59:59`);
+    remindAt = new Date(dueDateTime.getTime() - offsetMs).toISOString().slice(0, 19);
+  }
 
   try {
     let savedTaskId = taskId;
@@ -679,32 +706,12 @@ async function handleFormSubmit(e, container) {
       window.yuvomi.showToast(t('tasks.createdToast'), 'success');
     }
 
-    // Erinnerung speichern oder löschen
+    // Erinnerung speichern oder löschen (Vorbedingungen bereits oben geprüft)
     if (savedTaskId) {
-      if (reminderToggle?.checked) {
-        if (!dueDate) throw new Error(t('tasks.reminderNeedsDueDate'));
-        const dueDateTime = body.due_time ? new Date(`${dueDate}T${body.due_time}`) : new Date(`${dueDate}T23:59:59`);
-        const offsetPreset = form.querySelector('#reminder-offset')?.value || 'offset_none';
-        if (offsetPreset === 'offset_none') throw new Error(t('tasks.reminderNeedsDueDate'));
-        let offsetMs = 0;
-        if (offsetPreset === 'offset_15m') offsetMs = 15 * 60 * 1000;
-        else if (offsetPreset === 'offset_1h') offsetMs = 60 * 60 * 1000;
-        else if (offsetPreset === 'offset_1d') offsetMs = 24 * 60 * 60 * 1000;
-        else if (offsetPreset === 'offset_2d') offsetMs = 2 * 24 * 60 * 60 * 1000;
-        else if (offsetPreset === 'offset_1w') offsetMs = 7 * 24 * 60 * 60 * 1000;
-        else if (offsetPreset === 'offset_2w') offsetMs = 14 * 24 * 60 * 60 * 1000;
-        else if (offsetPreset === 'offset_custom') {
-          const customAmount = Number(form.querySelector('#reminder-custom-amount')?.value || 0);
-          const customUnit = form.querySelector('#reminder-custom-unit')?.value || 'days';
-          if (!Number.isFinite(customAmount) || customAmount <= 0) throw new Error(t('common.invalidInput'));
-          const unitFactor = customUnit === 'minutes' ? 60000 : customUnit === 'hours' ? 3600000 : customUnit === 'days' ? 86400000 : 604800000;
-          offsetMs = customAmount * unitFactor;
-        }
-        const remindAtDate = new Date(dueDateTime.getTime() - offsetMs);
-        const remindAt = remindAtDate.toISOString().slice(0, 19);
+      if (wantsReminder) {
         await api.post('/reminders', { entity_type: 'task', entity_id: savedTaskId, remind_at: remindAt });
         refreshReminders();
-      } else if (!reminderToggle?.checked) {
+      } else {
         try {
           await api.delete(`/reminders?entity_type=task&entity_id=${savedTaskId}`);
           refreshReminders();
@@ -716,10 +723,7 @@ async function handleFormSubmit(e, container) {
     setTimeout(() => closeModal({ force: true }), 700);
     await loadTasks(container);
   } catch (err) {
-    errorEl.textContent = err.message;
-    errorEl.hidden = false;
-    submitBtn.disabled = false;
-    submitBtn.textContent = originalLabel;
+    resetSubmit(err.message);
     btnError(submitBtn);
   }
 }
@@ -827,7 +831,7 @@ function renderKanban(container) {
       ${cols.map((col) => `
         <div class="kanban-col" data-status="${col.status}">
           <div class="kanban-col__header">
-            <span class="kanban-col__title u-eyebrow" style="color:${col.colorVar.startsWith('--') ? `var(${col.colorVar})` : col.colorVar}">
+            <span class="kanban-col__title" style="color:${col.colorVar.startsWith('--') ? `var(${col.colorVar})` : col.colorVar}">
               ${col.label}
             </span>
             <span class="kanban-col__count">${grouped[col.status].length}</span>
@@ -1222,7 +1226,7 @@ function renderFilters(container) {
       section.className = 'filter-panel__group';
 
       const heading = document.createElement('div');
-      heading.className = 'filter-panel__label u-eyebrow';
+      heading.className = 'filter-panel__label';
       heading.textContent = group.label;
       section.appendChild(heading);
 
@@ -1659,11 +1663,13 @@ function wireBulkActions(container) {
     if (taskIds.length === 0) return;
 
     const action = btn.id;
-    let confirm = true;
+
+    // Löschen läuft über dasselbe Optimistic-Undo-Muster wie der Einzel-Delete
+    // (kein ungestylter window.confirm, immer rückgängig machbar — Critique P1).
     if (action === 'bulk-delete') {
-      confirm = window.confirm(t('tasks.bulkDeleteConfirm', { count: taskIds.length }));
+      handleBulkDelete(taskIds, container);
+      return;
     }
-    if (!confirm) return;
 
     try {
       if (action === 'bulk-mark-done' || action === 'bulk-mark-open') {
@@ -1673,9 +1679,6 @@ function wireBulkActions(container) {
       } else if (action === 'bulk-archive') {
         await Promise.all(taskIds.map(id => api.patch(`/tasks/${id}/status`, { status: 'archived' })));
         window.yuvomi.showToast(t('tasks.bulkArchived'), 'success');
-      } else if (action === 'bulk-delete') {
-        await Promise.all(taskIds.map(id => api.delete(`/tasks/${id}`)));
-        window.yuvomi.showToast(t('tasks.bulkDeleted'), 'success');
       }
 
       state.selectedTaskIds.clear();
@@ -1685,6 +1688,41 @@ function wireBulkActions(container) {
       window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
     }
   });
+}
+
+// Bulk-Delete mit Optimistic-Update + Undo-Toast — spiegelt handleDeleteTask
+// für mehrere Aufgaben: Karten sofort ausblenden, 5s Undo-Fenster, dann erst
+// die API-Aufrufe. Ersetzt den nativen window.confirm-Dialog (Critique P1).
+function handleBulkDelete(taskIds, container) {
+  const els = taskIds
+    .map(id => container.querySelector(`[data-task-id="${id}"]`))
+    .filter(Boolean);
+  const prevDisplay = new Map();
+  els.forEach(el => { prevDisplay.set(el, el.style.display); el.style.display = 'none'; });
+
+  state.selectedTaskIds.clear();
+  updateBulkActionsBar(container);
+
+  const restore = () => els.forEach(el => { el.style.display = prevDisplay.get(el) ?? ''; });
+
+  let undone = false;
+  window.yuvomi.showToast(t('tasks.bulkDeleted'), 'default', 5000, () => {
+    undone = true;
+    restore();
+  });
+
+  setTimeout(async () => {
+    if (undone) return;
+    try {
+      await Promise.all(taskIds.map(id => api.delete(`/tasks/${id}`)));
+      taskIds.forEach(id => api.delete(`/reminders?entity_type=task&entity_id=${id}`).catch(() => {}));
+      refreshReminders();
+      await loadTasks(container);
+    } catch (err) {
+      restore();
+      window.yuvomi.showToast(err.message ?? t('common.unknownError'), 'danger');
+    }
+  }, 5000);
 }
 
 function wireTaskList(container) {

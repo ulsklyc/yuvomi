@@ -58,6 +58,7 @@
         "recipes": "Recipes",
         "more": "More",
         "moreActiveLabel": "More, {{section}} active",
+        "moreCatalogHint": "All modules. Customize your favorites in settings.",
         "documents": "Documents",
         "kitchen": "Kitchen",
         "kitchenGoLabel": "Kitchen, open {{section}}",
@@ -175,7 +176,8 @@
         "housekeepingNoVisits": "No visits yet",
         "housekeepingVisitsMonth": "{{count}} visits this month",
         "housekeepingUnpaid": "{{amount}} outstanding",
-        "widgetError": "Couldn’t be loaded"
+        "widgetError": "Couldn’t be loaded",
+        "savingsGoal": "Savings goal"
     },
     "tasks": {
         "title": "Tasks",
@@ -921,7 +923,30 @@
         "prevPeriod": "Previous period",
         "nextPeriod": "Next period",
         "recurringInstanceLabel": "Part of a series",
-        "loanProgressLabel": "Repayment progress"
+        "loanProgressLabel": "Repayment progress",
+        "planTab": "Plan",
+        "planCategoryBudgets": "Category budgets",
+        "planAddBudget": "Set budget",
+        "planSavingsSetTitle": "Set a savings goal",
+        "planSavingsSetDesc": "Set a monthly savings goal and track your progress",
+        "planSetGoal": "Set goal",
+        "planSavingsGoal": "Savings goal",
+        "planSavingsMet": "Goal reached",
+        "planSavingsNegative": "In the red this month",
+        "planSavingsShort": "{{amount}} to go",
+        "planSavingsHint": "The savings goal compares your planned savings with this month’s income minus expenses.",
+        "planEmptyTitle": "No budgets yet",
+        "planEmptyDesc": "Set a monthly budget per category to keep spending in check.",
+        "planOverBy": "{{amount}} over budget",
+        "planLeft": "{{amount}} left",
+        "planAllCategoriesBudgeted": "Every category already has a budget.",
+        "planMonthlyAmount": "Monthly amount",
+        "planSavedToast": "Budget saved",
+        "planRemovedToast": "Budget removed",
+        "planTarget": "Target: {{amount}}",
+        "planEditAction": "Edit",
+        "planDeleteConfirm": "Delete the budget for “{{category}}”?",
+        "planSavingsDeleteConfirm": "Delete the savings goal?"
     },
     "settings": {
         "pageHealthModule": "Health",
@@ -1190,6 +1215,19 @@
                 "shared": "Shared"
             },
             "updatedToast": "Subscription updated."
+        },
+        "calendarImport": {
+            "title": "Import calendar",
+            "description": "Import events from an .ics file or a shared calendar once as your own, editable events. Unlike a subscription, they are not kept in sync afterwards.",
+            "fileLabel": "ICS file",
+            "urlLabel": "Or feed URL",
+            "urlHint": "Address of a shared calendar (https:// or webcal://).",
+            "colorLabel": "Color",
+            "submit": "Import",
+            "errorNoSource": "Please choose a file or enter a URL.",
+            "success": "{{count}} events imported.",
+            "successWithSkipped": "{{count}} events imported, {{skipped}} already existed.",
+            "allDuplicates": "No new events – all already existed."
         },
         "memberPhoneLabel": "Phone number (optional)",
         "memberEmailLabel": "Email (optional)",
@@ -1762,6 +1800,8 @@
         "customWeeks": "Weeks"
     },
     "birthdays": {
+        "inDays": "in {{days}} days",
+        "turnsAge": "turns {{age}}",
         "title": "Birthdays",
         "addButton": "Add birthday",
         "searchPlaceholder": "Search birthdays…",
@@ -1820,7 +1860,8 @@
         "title": "Search",
         "open": "Open search",
         "placeholder": "Search…",
-        "noResults": "No results found."
+        "noResults": "No results found.",
+        "error": "Search is currently unavailable."
     },
     "onboarding": {
         "step1Title": "Welcome to {{name}}",
@@ -1850,7 +1891,7 @@
         "goHealth": "Health"
     },
     "emptyHint": {
-        "tasks": "Tap + to create your first task. Swipe a card left to delete.",
+        "tasks": "Tap + to create your first task. Swipe a card left to check off, right to edit.",
         "calendar": "Connect Google Calendar under Settings → Integrations for automatic sync.",
         "shopping": "Add items and swipe to check off or delete.",
         "notes": "Tap + for a new note. Notes are full-text searchable.",
@@ -2492,7 +2533,8 @@
                 "title": "Adherence",
                 "noData": "No intake data yet",
                 "period": "Last {{days}} days",
-                "streakLabel": "day streak"
+                "streakLabel": "day streak",
+                "notStarted": "Nothing logged yet"
             },
             "vitals": {
                 "title": "Latest vitals"
@@ -2591,7 +2633,8 @@
                 "title": "Adherence",
                 "period": "Last {{days}} days",
                 "noData": "No planned doses in this period yet.",
-                "summary": "{{taken}} of {{planned}} taken"
+                "summary": "{{taken}} of {{planned}} taken",
+                "notStarted": "No dose logged yet"
             },
             "status": {
                 "taken": "Taken",

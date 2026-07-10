@@ -57,6 +57,7 @@
         "quickActions": "Szybkie akcje",
         "more": "Więcej",
         "moreActiveLabel": "Więcej, {{section}} aktywne",
+        "moreCatalogHint": "Wszystkie moduły. Ulubione dostosujesz w ustawieniach.",
         "recipes": "Przepisy",
         "documents": "Dokumenty",
         "kitchen": "Kuchnia",
@@ -81,6 +82,7 @@
         "title": "Szukaj",
         "placeholder": "Szukaj…",
         "noResults": "Nie znaleziono wyników.",
+        "error": "Wyszukiwanie jest chwilowo niedostępne.",
         "open": "Otwórz wyszukiwanie"
     },
     "dashboard": {
@@ -181,7 +183,8 @@
         "housekeepingNoVisits": "Brak wizyt",
         "housekeepingVisitsMonth": "{{count}} wizyt w tym miesiącu",
         "housekeepingUnpaid": "{{amount}} do zapłaty",
-        "widgetError": "Nie udało się załadować"
+        "widgetError": "Nie udało się załadować",
+        "savingsGoal": "Cel oszczędności"
     },
     "tasks": {
         "title": "Zadania",
@@ -928,6 +931,29 @@
         "splitSectionLabel": "Wspolny podzial",
         "singleAssigneeHint": "Przypisz jedna osobe, aby ten wpis byl jej.",
         "multiAssigneeHint": "Przypisz kilka osob i wybierz, jak podzielic kwote."
+        "planTab": "Plan",
+        "planCategoryBudgets": "Budżety kategorii",
+        "planAddBudget": "Ustaw budżet",
+        "planSavingsSetTitle": "Ustaw cel oszczędności",
+        "planSavingsSetDesc": "Ustaw miesięczny cel oszczędności i śledź postępy",
+        "planSetGoal": "Ustaw cel",
+        "planSavingsGoal": "Cel oszczędności",
+        "planSavingsMet": "Cel osiągnięty",
+        "planSavingsNegative": "Na minusie w tym miesiącu",
+        "planSavingsShort": "Jeszcze {{amount}}",
+        "planSavingsHint": "Cel oszczędności porównuje planowane oszczędności z przychodami minus wydatki w tym miesiącu.",
+        "planEmptyTitle": "Brak budżetów",
+        "planEmptyDesc": "Ustaw miesięczny budżet na kategorię, aby kontrolować wydatki.",
+        "planOverBy": "{{amount}} ponad budżet",
+        "planLeft": "Pozostało {{amount}}",
+        "planAllCategoriesBudgeted": "Wszystkie kategorie mają już budżet.",
+        "planMonthlyAmount": "Kwota miesięczna",
+        "planSavedToast": "Budżet zapisany",
+        "planRemovedToast": "Budżet usunięty",
+        "planTarget": "Cel: {{amount}}",
+        "planEditAction": "Edytuj",
+        "planDeleteConfirm": "Usunąć budżet dla „{{category}}”?",
+        "planSavingsDeleteConfirm": "Usunąć cel oszczędności?"
     },
     "settings": {
         "pageHealthModule": "Zdrowie",
@@ -1201,6 +1227,19 @@
             "syncedToast": "Subskrypcja zsynchronizowana.",
             "deletedToast": "Subskrypcja usunięta.",
             "updatedToast": "Subskrypcja zaktualizowana."
+        },
+        "calendarImport": {
+            "title": "Importuj kalendarz",
+            "description": "Zaimportuj wydarzenia z pliku .ics lub udostępnionego kalendarza jednorazowo jako własne, edytowalne wydarzenia. W przeciwieństwie do subskrypcji nie są później synchronizowane.",
+            "fileLabel": "Plik ICS",
+            "urlLabel": "Albo adres URL kanału",
+            "urlHint": "Adres udostępnionego kalendarza (https:// lub webcal://).",
+            "colorLabel": "Kolor",
+            "submit": "Importuj",
+            "errorNoSource": "Wybierz plik lub wprowadź adres URL.",
+            "success": "Zaimportowano wydarzenia: {{count}}.",
+            "successWithSkipped": "Zaimportowano {{count}}, pominięto już istniejące: {{skipped}}.",
+            "allDuplicates": "Brak nowych wydarzeń – wszystkie już istniały."
         },
         "memberPhoneLabel": "Numer telefonu (opcjonalnie)",
         "memberEmailLabel": "E-mail (opcjonalnie)",
@@ -1768,6 +1807,8 @@
         "customWeeks": "Tygodnie"
     },
     "birthdays": {
+        "inDays": "za {{days}} dni",
+        "turnsAge": "kończy {{age}}",
         "title": "Urodziny",
         "addButton": "Dodaj urodziny",
         "searchPlaceholder": "Szukaj urodzin…",
@@ -1838,7 +1879,7 @@
         "staleData": "Offline – stan z: {{time}}"
     },
     "emptyHint": {
-        "tasks": "Stuknij +, aby utworzyć pierwsze zadanie. Przesuń kartę w lewo, aby usunąć.",
+        "tasks": "Stuknij +, aby utworzyć pierwsze zadanie. Przesuń kartę w lewo, aby oznaczyć jako ukończone, w prawo, aby edytować.",
         "calendar": "Połącz Google Kalendarz w Ustawienia → Integracje, aby automatycznie synchronizować.",
         "shopping": "Dodaj artykuły i przesuń, aby odznaczać lub usuwać.",
         "notes": "Stuknij + dla nowej notatki. Notatki są przeszukiwane pełnotekstowo.",
@@ -2492,7 +2533,8 @@
                 "title": "Przestrzeganie zaleceń",
                 "noData": "Brak danych o przyjmowaniu",
                 "period": "Ostatnie {{days}} dni",
-                "streakLabel": "Dni z rzędu"
+                "streakLabel": "Dni z rzędu",
+                "notStarted": "Nic jeszcze nie zarejestrowano"
             },
             "vitals": {
                 "title": "Ostatnie parametry życiowe"
@@ -2591,7 +2633,8 @@
                 "title": "Przestrzeganie zaleceń",
                 "period": "Ostatnie {{days}} dni",
                 "noData": "Brak zaplanowanych dawek w tym okresie.",
-                "summary": "Przyjęto {{taken}} z {{planned}}"
+                "summary": "Przyjęto {{taken}} z {{planned}}",
+                "notStarted": "Nie zarejestrowano jeszcze przyjęcia"
             },
             "status": {
                 "taken": "Przyjęto",

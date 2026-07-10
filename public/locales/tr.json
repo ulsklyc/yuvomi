@@ -58,6 +58,7 @@
         "recipes": "Tarifler",
         "more": "Daha Fazla",
         "moreActiveLabel": "Daha fazla, {{section}} aktif",
+        "moreCatalogHint": "Tüm modüller. Favorilerini ayarlardan özelleştir.",
         "documents": "Belgeler",
         "kitchen": "Mutfak",
         "kitchenGoLabel": "Mutfak, {{section}} bölümünü aç",
@@ -175,7 +176,8 @@
         "housekeepingNoVisits": "Henüz ziyaret yok",
         "housekeepingVisitsMonth": "Bu ay {{count}} ziyaret",
         "housekeepingUnpaid": "{{amount}} ödenmemiş",
-        "widgetError": "Yüklenemedi"
+        "widgetError": "Yüklenemedi",
+        "savingsGoal": "Tasarruf hedefi"
     },
     "tasks": {
         "title": "Görevler",
@@ -922,6 +924,29 @@
         "splitSectionLabel": "Paylasilan bolusum",
         "singleAssigneeHint": "Bu kalemin ona ait olmasi icin bir kisi atayin.",
         "multiAssigneeHint": "Birden fazla kisi atayin ve tutarin nasil bolunecegini secin."
+        "planTab": "Plan",
+        "planCategoryBudgets": "Kategori bütçeleri",
+        "planAddBudget": "Bütçe belirle",
+        "planSavingsSetTitle": "Tasarruf hedefi belirle",
+        "planSavingsSetDesc": "Aylık tasarruf hedefi belirle ve ilerlemeni izle",
+        "planSetGoal": "Hedef belirle",
+        "planSavingsGoal": "Tasarruf hedefi",
+        "planSavingsMet": "Hedefe ulaşıldı",
+        "planSavingsNegative": "Bu ay ekside",
+        "planSavingsShort": "Hedefe {{amount}} kaldı",
+        "planSavingsHint": "Tasarruf hedefi, planlanan tasarrufu bu ayın gelir eksi giderleriyle karşılaştırır.",
+        "planEmptyTitle": "Henüz bütçe yok",
+        "planEmptyDesc": "Harcamaları kontrol altında tutmak için her kategoriye aylık bütçe belirleyin.",
+        "planOverBy": "{{amount}} bütçe aşımı",
+        "planLeft": "{{amount}} kaldı",
+        "planAllCategoriesBudgeted": "Tüm kategorilerin zaten bir bütçesi var.",
+        "planMonthlyAmount": "Aylık tutar",
+        "planSavedToast": "Bütçe kaydedildi",
+        "planRemovedToast": "Bütçe kaldırıldı",
+        "planTarget": "Hedef: {{amount}}",
+        "planEditAction": "Düzenle",
+        "planDeleteConfirm": "“{{category}}” bütçesi silinsin mi?",
+        "planSavingsDeleteConfirm": "Tasarruf hedefi silinsin mi?"
     },
     "settings": {
         "pageHealthModule": "Sağlık",
@@ -1178,6 +1203,19 @@
                 "shared": "Paylaşımlı"
             },
             "updatedToast": "Abonelik güncellendi."
+        },
+        "calendarImport": {
+            "title": "Takvimi içe aktar",
+            "description": "Bir .ics dosyasındaki veya paylaşılan bir takvimdeki etkinlikleri bir kez kendi düzenlenebilir etkinlikleriniz olarak içe aktarın. Bir abonelikten farklı olarak sonrasında eşitlenmezler.",
+            "fileLabel": "ICS dosyası",
+            "urlLabel": "Veya besleme URL'si",
+            "urlHint": "Paylaşılan bir takvimin adresi (https:// veya webcal://).",
+            "colorLabel": "Renk",
+            "submit": "İçe aktar",
+            "errorNoSource": "Lütfen bir dosya seçin veya bir URL girin.",
+            "success": "{{count}} etkinlik içe aktarıldı.",
+            "successWithSkipped": "{{count}} etkinlik içe aktarıldı, {{skipped}} zaten vardı.",
+            "allDuplicates": "Yeni etkinlik yok – hepsi zaten mevcuttu."
         },
         "memberPhoneLabel": "Telefon numarası (isteğe bağlı)",
         "memberEmailLabel": "E-posta (isteğe bağlı)",
@@ -1758,9 +1796,12 @@
         "title": "Arama",
         "open": "Aramayı aç",
         "placeholder": "Ara…",
-        "noResults": "Sonuç bulunamadı."
+        "noResults": "Sonuç bulunamadı.",
+        "error": "Arama şu anda kullanılamıyor."
     },
     "birthdays": {
+        "inDays": "{{days}} gün sonra",
+        "turnsAge": "{{age}} yaşına giriyor",
         "title": "Doğum Günleri",
         "addButton": "Doğum günü ekle",
         "searchPlaceholder": "Doğum günlerinde ara…",
@@ -1846,7 +1887,7 @@
         "meals": "Haftalık öğünleri planlayın ve tarifleri bağlayın.",
         "notes": "Yeni not için + tuşuna dokunun. Notlar tam metin olarak aranır.",
         "shopping": "Öğeleri ekleyin ve işaretlemek ya da silmek için kaydırın.",
-        "tasks": "İlk görevinizi oluşturmak için + tuşuna dokunun. Silmek için kartı sola kaydırın."
+        "tasks": "İlk görevinizi oluşturmak için + tuşuna dokunun. Tamamlamak için kartı sola, düzenlemek için sağa kaydırın."
     },
     "documents": {
         "title": "Belgeler",
@@ -2492,7 +2533,8 @@
                 "title": "Kullanım uyumu",
                 "noData": "Henüz kullanım verisi yok",
                 "period": "Son {{days}} gün",
-                "streakLabel": "Ardışık gün"
+                "streakLabel": "Ardışık gün",
+                "notStarted": "Henüz kayıt yok"
             },
             "vitals": {
                 "title": "Son yaşamsal değerler"
@@ -2591,7 +2633,8 @@
                 "title": "Kullanım uyumu",
                 "period": "Son {{days}} gün",
                 "noData": "Bu dönemde henüz planlanmış doz yok.",
-                "summary": "{{planned}} dozdan {{taken}} tanesi alındı"
+                "summary": "{{planned}} dozdan {{taken}} tanesi alındı",
+                "notStarted": "Henüz alım kaydı yok"
             },
             "status": {
                 "taken": "Alındı",

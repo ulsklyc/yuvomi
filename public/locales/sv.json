@@ -58,6 +58,7 @@
         "recipes": "Recept",
         "more": "Mer",
         "moreActiveLabel": "Mer, {{section}} aktivt",
+        "moreCatalogHint": "Alla moduler. Anpassa dina favoriter i inställningarna.",
         "documents": "Dokument",
         "kitchen": "Kök",
         "kitchenGoLabel": "Kök, öppna {{section}}",
@@ -175,7 +176,8 @@
         "housekeepingNoVisits": "Inga besök än",
         "housekeepingVisitsMonth": "{{count}} besök denna månad",
         "housekeepingUnpaid": "{{amount}} obetalt",
-        "widgetError": "Kunde inte laddas"
+        "widgetError": "Kunde inte laddas",
+        "savingsGoal": "Sparmål"
     },
     "tasks": {
         "title": "Uppgifter",
@@ -922,6 +924,29 @@
         "splitSectionLabel": "Delad uppdelning",
         "singleAssigneeHint": "Tilldela en person sa att posten blir deras.",
         "multiAssigneeHint": "Tilldela flera personer och valj hur beloppet ska delas."
+        "planTab": "Plan",
+        "planCategoryBudgets": "Kategoribudgetar",
+        "planAddBudget": "Ange budget",
+        "planSavingsSetTitle": "Ange ett sparmål",
+        "planSavingsSetDesc": "Ange ett månatligt sparmål och följ din utveckling",
+        "planSetGoal": "Ange mål",
+        "planSavingsGoal": "Sparmål",
+        "planSavingsMet": "Målet nått",
+        "planSavingsNegative": "Minus den här månaden",
+        "planSavingsShort": "{{amount}} kvar",
+        "planSavingsHint": "Sparmålet jämför ditt planerade sparande med månadens inkomster minus utgifter.",
+        "planEmptyTitle": "Inga budgetar ännu",
+        "planEmptyDesc": "Ange en månadsbudget per kategori för att hålla koll på utgifterna.",
+        "planOverBy": "{{amount}} över budget",
+        "planLeft": "{{amount}} kvar",
+        "planAllCategoriesBudgeted": "Alla kategorier har redan en budget.",
+        "planMonthlyAmount": "Månadsbelopp",
+        "planSavedToast": "Budget sparad",
+        "planRemovedToast": "Budget borttagen",
+        "planTarget": "Mål: {{amount}}",
+        "planEditAction": "Redigera",
+        "planDeleteConfirm": "Ta bort budgeten för ”{{category}}”?",
+        "planSavingsDeleteConfirm": "Ta bort sparmålet?"
     },
     "settings": {
         "pageHealthModule": "Hälsa",
@@ -1178,6 +1203,19 @@
                 "shared": "Delad"
             },
             "updatedToast": "Prenumeration uppdaterad."
+        },
+        "calendarImport": {
+            "title": "Importera kalender",
+            "description": "Importera händelser från en .ics-fil eller en delad kalender en gång som dina egna, redigerbara händelser. Till skillnad från en prenumeration synkroniseras de inte efteråt.",
+            "fileLabel": "ICS-fil",
+            "urlLabel": "Eller flödes-URL",
+            "urlHint": "Adress till en delad kalender (https:// eller webcal://).",
+            "colorLabel": "Färg",
+            "submit": "Importera",
+            "errorNoSource": "Välj en fil eller ange en URL.",
+            "success": "{{count}} händelser importerade.",
+            "successWithSkipped": "{{count}} händelser importerade, {{skipped}} fanns redan.",
+            "allDuplicates": "Inga nya händelser – alla fanns redan."
         },
         "memberPhoneLabel": "Telefonnummer (valfritt)",
         "memberEmailLabel": "E-post (valfritt)",
@@ -1758,9 +1796,12 @@
         "title": "Sök",
         "open": "Öppna sökning",
         "placeholder": "Sök…",
-        "noResults": "Inga resultat hittades."
+        "noResults": "Inga resultat hittades.",
+        "error": "Sökning är för närvarande inte tillgänglig."
     },
     "birthdays": {
+        "inDays": "om {{days}} dagar",
+        "turnsAge": "fyller {{age}}",
         "title": "Födelsedagar",
         "addButton": "Lägg till födelsedag",
         "searchPlaceholder": "Sök födelsedagar…",
@@ -1839,7 +1880,7 @@
     },
     "emptyHint": {
         "recipes": "Skapa recept och koppla dem till din måltidsplanering.",
-        "tasks": "Tryck på + för att skapa din första uppgift. Svep ett kort åt vänster för att ta bort.",
+        "tasks": "Tryck på + för att skapa din första uppgift. Svep ett kort åt vänster för att bocka av, åt höger för att redigera.",
         "calendar": "Koppla Google Kalender under Inställningar → Integrationer för automatisk synkronisering.",
         "shopping": "Lägg till artiklar och svep för att markera eller ta bort.",
         "notes": "Tryck på + för en ny anteckning. Anteckningar söks i fulltext.",
@@ -2492,7 +2533,8 @@
                 "title": "Följsamhet",
                 "noData": "Inga intagsdata ännu",
                 "period": "Senaste {{days}} dagarna",
-                "streakLabel": "Dagar i rad"
+                "streakLabel": "Dagar i rad",
+                "notStarted": "Inget loggat ännu"
             },
             "vitals": {
                 "title": "Senaste vitalvärden"
@@ -2591,7 +2633,8 @@
                 "title": "Följsamhet",
                 "period": "Senaste {{days}} dagarna",
                 "noData": "Inga planerade doser under perioden ännu.",
-                "summary": "{{taken}} av {{planned}} tagna"
+                "summary": "{{taken}} av {{planned}} tagna",
+                "notStarted": "Ingen dos loggad ännu"
             },
             "status": {
                 "taken": "Taget",

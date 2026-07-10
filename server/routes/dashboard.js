@@ -220,6 +220,14 @@ router.get('/', (req, res) => {
       LIMIT 1
     `).get(from, to);
 
+    // Monats-Sparziel (Budgetplan #468): eigener Guard, damit ältere/Minimal-DBs
+    // ohne budget_plans-Tabelle die Budget-Aggregation nicht scheitern lassen.
+    let savingsGoal = null;
+    try {
+      const goalRow = d.prepare("SELECT amount FROM budget_plans WHERE category = '__savings__'").get();
+      if (goalRow) savingsGoal = Math.round(goalRow.amount * 100) / 100;
+    } catch { /* Tabelle fehlt (Legacy/Test) → kein Sparziel */ }
+
     result.budget = {
       month: currentMonth,
       income: totals?.income || 0,
@@ -228,6 +236,7 @@ router.get('/', (req, res) => {
       entryCount: totals?.entry_count || 0,
       topExpenseCategory: topExpense?.category || null,
       topExpenseAmount: Math.abs(topExpense?.amount || 0),
+      savingsGoal,
     };
   } catch (err) {
     log.error('budget error:', err.message);

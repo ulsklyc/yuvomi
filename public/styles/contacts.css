@@ -6,8 +6,14 @@
 
 /* --------------------------------------------------------
  * Modul-Akzent
+ * --c-accent: der kohärente Modul-Ton (Blau). Der Router setzt
+ * --active-module-accent global; Fallback ist die Modul-Farbe selbst
+ * (NICHT --color-accent, sonst schlägt globales Violett durch — DESIGN §2).
  * -------------------------------------------------------- */
-.contacts-page { --module-accent: var(--module-contacts); }
+.contacts-page {
+  --module-accent: var(--module-contacts);
+  --c-accent: var(--active-module-accent, var(--module-contacts));
+}
 
 /* --------------------------------------------------------
  * Seiten-Layout
@@ -74,9 +80,9 @@
 
 .contacts-toolbar__search-input:focus {
   outline: none;
-  border-color: var(--color-accent);
+  border-color: var(--c-accent);
   background-color: var(--color-surface);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-accent) 20%, transparent);
 }
 
 /* --------------------------------------------------------
@@ -117,8 +123,8 @@
 }
 
 .contact-filter-chip--active {
-  background-color: var(--color-accent);
-  border-color: var(--color-accent);
+  background-color: var(--c-accent);
+  border-color: var(--c-accent);
   color: var(--color-ink-on-vivid);
 }
 
@@ -141,6 +147,17 @@
   margin-bottom: 0;
 }
 
+/* Pro Kategorie ein abgeleiteter Farbton (--cat). KEIN neuer Modul-Akzent
+ * (DESIGN §2), sondern dezente, aus bestehenden AA-verifizierten Tokens
+ * abgeleitete Flächen. --cat kaskadiert von der Gruppe auf Icon + Header. */
+.contact-group--doctor    { --cat: var(--color-success); }         /* Arzt → Grün (Fürsorge) */
+.contact-group--school    { --cat: var(--color-warning); }         /* Schule/Kita → Amber (Lernen) */
+.contact-group--authority { --cat: var(--color-accent); }          /* Behörde → Violett (amtlich, distinct vom Modul-Blau) */
+.contact-group--insurance { --cat: var(--module-budget); }         /* Versicherung → Teal (Absicherung) */
+.contact-group--craftsman { --cat: var(--module-meals); }          /* Handwerker → Orange (Werkstatt) */
+.contact-group--emergency { --cat: var(--color-danger); }          /* Notfall → Rot (semantisch) */
+.contact-group--misc      { --cat: var(--color-text-secondary); }  /* Sonstiges → neutral */
+
 .contact-group__header {
   display: flex;
   align-items: center;
@@ -154,7 +171,11 @@
   z-index: var(--z-sticky);
 }
 
-/* Kategorie-Icons (Lucide) erben die Akzent-/Sekundärfarbe ihres Containers */
+/* Kategorie-Icon im Gruppenkopf trägt den Kategorie-Ton (dezent). */
+.contact-group__header .contact-cat-icon {
+  color: var(--cat, var(--color-text-secondary));
+}
+
 .contact-cat-icon {
   flex-shrink: 0;
 }
@@ -186,6 +207,12 @@
   flex-shrink: 0;
 }
 
+/* Ohne diesen Guard schlägt display:flex das hidden-Attribut (reset.css erzwingt
+ * [hidden] nicht) → die Leiste bliebe dauerhaft sichtbar. */
+.contacts-selectbar[hidden] {
+  display: none;
+}
+
 .contacts-selectbar__count {
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
@@ -205,7 +232,7 @@
   width: 20px;
   height: 20px;
   flex-shrink: 0;
-  accent-color: var(--color-accent);
+  accent-color: var(--c-accent);
   cursor: pointer;
 }
 
@@ -215,7 +242,7 @@
 }
 
 .contact-item--selected {
-  background-color: var(--color-accent-light);
+  background-color: color-mix(in srgb, var(--c-accent) 12%, transparent);
 }
 
 .contacts-page.is-selecting .page-fab {
@@ -246,17 +273,49 @@
   border-radius: var(--radius-md);
 }
 
+/* Chevron: dezente „Zeile öffnet Detail"-Affordanz. Sichtbar (leise) für Touch,
+ * verstärkt bei Hover/Fokus der Zeile. */
+.contact-item__chevron {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--color-text-disabled);
+  opacity: 0.6;
+  transition: opacity var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+.contact-item:hover .contact-item__chevron,
+.contact-item__open:focus-visible .contact-item__chevron {
+  opacity: 1;
+  color: var(--c-accent);
+  transform: translateX(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contact-item__chevron { transition: opacity var(--transition-fast), color var(--transition-fast); }
+  .contact-item:hover .contact-item__chevron,
+  .contact-item__open:focus-visible .contact-item__chevron { transform: none; }
+}
+
 .contact-item__icon {
   width: var(--target-md);
   height: var(--target-md);
   border-radius: var(--radius-full);
-  background-color: var(--color-accent-light);
-  color: var(--color-accent);
+  background-color: color-mix(in srgb, var(--cat, var(--c-accent)) 15%, transparent);
+  color: var(--cat, var(--c-accent));
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   font-size: var(--text-lg);
+}
+
+/* Personen/Familien-Kontakte: Initialen statt Kategorie-Icon, im Modul-Ton.
+ * Überschreibt den Kategorie-Ton der Gruppe bewusst mit --c-accent. */
+.contact-item__icon--initials {
+  --cat: var(--c-accent);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
 }
 
 .contact-item__body {
@@ -273,14 +332,33 @@
   text-overflow: ellipsis;
 }
 
+/* Meta: Telefon zuerst, darf nicht schrumpfen; E-Mail füllt den Rest und wird
+ * bei Bedarf gekürzt — die Telefonnummer bleibt so immer vollständig sichtbar. */
 .contact-item__meta {
-  display: block;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
+  margin-top: 1px;
+  min-width: 0;
+}
+
+.contact-item__meta-phone {
+  flex-shrink: 0;
   white-space: nowrap;
+}
+
+.contact-item__meta-sep {
+  flex-shrink: 0;
+  color: var(--color-text-disabled);
+}
+
+.contact-item__meta-email {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: 1px;
+  white-space: nowrap;
 }
 
 .contact-item__actions {
@@ -308,43 +386,23 @@
 }
 
 .contact-action-btn:hover {
-  background-color: var(--color-accent-light);
-  color: var(--color-accent);
+  background-color: color-mix(in srgb, var(--c-accent) 14%, transparent);
+  color: var(--c-accent);
 }
 
-.contact-action-btn--call:hover  { background-color: var(--color-success-light); color: var(--color-success); }
-.contact-action-btn--mail:hover  { background-color: var(--color-accent-light);   color: var(--color-accent);  }
-.contact-action-btn--maps:hover  { background-color: var(--color-warning-light);  color: var(--color-warning); }
-.contact-action-btn--delete {
-  color: var(--color-danger);
-  background-color: var(--color-danger-light);
+/* Anrufen ist die primäre, stets sichtbare Zeilenaktion (grün, semantisch). */
+.contact-action-btn--call {
+  color: var(--color-success);
 }
 
-/* Desktop: sekundäre Aktionen (Karte/Export/Löschen) ruhen unsichtbar und
- * erscheinen erst bei Hover/Fokus der Zeile — reduziert die Grunddichte von
- * fünf auf zwei Buttons, ohne Layout-Sprünge (Platz bleibt reserviert).
- * Fokus per Tastatur enthüllt sie ebenfalls; Touch/Mobile ist nicht betroffen. */
-@media (min-width: 768px) {
-  .contact-action-btn--reveal {
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-  }
-
-  .contact-item:hover .contact-action-btn--reveal,
-  .contact-item:focus-within .contact-action-btn--reveal {
-    opacity: 1;
-  }
+.contact-action-btn--call:hover {
+  background-color: var(--color-success-light);
+  color: var(--color-success);
 }
 
-@media (min-width: 768px) and (prefers-reduced-motion: reduce) {
-  .contact-action-btn--reveal { transition: none; }
-}
-
-/* „Mehr"-Trigger nur auf Mobile; auf Desktop sind alle Aktionen inline sichtbar. */
-.contact-more-menu__trigger {
-  display: none;
-}
-
+/* --------------------------------------------------------
+ * „Mehr"-Menü (beschriftete Aktionsliste, beide Breakpoints)
+ * -------------------------------------------------------- */
 /* Panel als Popover: rendert im Top-Layer → kein Clipping durch den Scroll-
  * Container, freies Light-Dismiss + Esc. Position setzt JS (onPanelToggle);
  * inset/margin überschreiben die UA-Zentrierung. */
@@ -353,7 +411,10 @@
   margin: 0;
   inset: auto;
   z-index: var(--z-dropdown);
-  gap: var(--space-1);
+  min-width: 200px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
   padding: var(--space-1);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -367,6 +428,98 @@
   display: flex;
 }
 
+/* Menü-Eintrag: Icon + Textlabel (behebt das „nackte Icons"-Problem). */
+.contact-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  min-height: var(--target-md);
+  transition: background-color var(--transition-fast);
+}
+
+.contact-menu-item:hover,
+.contact-menu-item:focus-visible {
+  background-color: var(--color-surface-2);
+  outline: none;
+}
+
+.contact-menu-item__icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+
+/* Löschen abgesetzt: eigener Ton + dünner Trenner darüber (kein Seitenstreifen). */
+.contact-menu-item--danger {
+  color: var(--color-danger);
+  border-top: 1px solid var(--color-border-subtle);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  margin-top: 2px;
+  padding-top: var(--space-2);
+}
+
+.contact-menu-item--danger .contact-menu-item__icon {
+  color: var(--color-danger);
+}
+
+.contact-menu-item--danger:hover,
+.contact-menu-item--danger:focus-visible {
+  background-color: var(--color-danger-light);
+}
+
+/* --------------------------------------------------------
+ * Modal: Kategorie-Vorschau + Footer
+ * -------------------------------------------------------- */
+.contacts-cat-select {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.contacts-cat-select__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--target-md);
+  height: var(--target-md);
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background-color: color-mix(in srgb, var(--c-accent) 15%, transparent);
+  color: var(--c-accent);
+}
+
+.contacts-cat-select .form-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Modal-Footer (ersetzt Inline-Styles). */
+.contact-modal__footer {
+  border: none;
+  padding: 0;
+  margin-top: var(--space-4);
+}
+
+.contact-modal__footer-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+/* --------------------------------------------------------
+ * Mobile-Feinschliff
+ * -------------------------------------------------------- */
 @media (max-width: 767px) {
   .contact-item__open {
     gap: var(--space-2);
@@ -381,13 +534,5 @@
   .contact-item__icon {
     width: 36px;
     height: 36px;
-  }
-
-  .contact-action-btn--desktop-extra {
-    display: none;
-  }
-
-  .contact-more-menu__trigger {
-    display: flex;
   }
 }

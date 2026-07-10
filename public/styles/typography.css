@@ -115,10 +115,16 @@
  * ("Benutzerdefinierte Module") und würden in Versal + Tracking als
  * geschriene Eyebrow lesen — gegen den warmen Familien-Ton. Daher Sentence-
  * Case, ruhiges Tracking; Größe/Weight halten die Header-Hierarchie.
+ * Gleiches Prinzip für die Aufgaben-Sektionsköpfe (Gruppen-, Kanban-Spalten-
+ * und Filter-Labels): ganze Phrasen wie "Überfällig" oder Kategorienamen
+ * ("Haushalt", "Schule") lasen in Versal + Tracking geschrien (Critique P2).
  * ------------------------------------------------------------------------ */
 .nav-section-label,
 .settings-shell__navigation-heading,
-.settings-shell__navigation-toggle {
+.settings-shell__navigation-toggle,
+.task-group__title,
+.kanban-col__title,
+.filter-panel__label {
   font-size: var(--text-xs);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tight);

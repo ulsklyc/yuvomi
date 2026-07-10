@@ -114,6 +114,32 @@ function renderPage(container, user) {
     </section>
 
     <section class="settings-section">
+      <h2 class="settings-section__title">${t('settings.calendarImport.title')}</h2>
+      <div class="settings-card">
+        <p class="settings-card-description">${t('settings.calendarImport.description')}</p>
+        <form id="cal-import-form" class="settings-form settings-form--compact" novalidate autocomplete="off">
+          <div class="form-group">
+            <label class="form-label" for="cal-import-file">${t('settings.calendarImport.fileLabel')}</label>
+            <input class="form-input" type="file" id="cal-import-file" accept=".ics,text/calendar" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cal-import-url">${t('settings.calendarImport.urlLabel')}</label>
+            <input class="form-input" type="url" id="cal-import-url" placeholder="https://..." />
+            <small class="form-hint">${t('settings.calendarImport.urlHint')}</small>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cal-import-color">${t('settings.calendarImport.colorLabel')}</label>
+            <input class="form-input form-input--color" type="color" id="cal-import-color" value="#007AFF" />
+          </div>
+          <div id="cal-import-error" class="form-error" role="alert" hidden></div>
+          <div class="settings-form-actions">
+            <button type="submit" class="btn btn--primary" id="cal-import-submit">${t('settings.calendarImport.submit')}</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="settings-section">
       <div id="sync-more-providers-container"></div>
     </section>
 
@@ -621,6 +647,57 @@ function bindIcsEvents(container, subs, user) {
         showToast(`${t('settings.ics.status.syncError')}: ${res.syncError}`, 'danger');
       } else {
         showToast(t('settings.ics.addedToast'), 'success');
+      }
+    } catch (err) {
+      errorEl.textContent = err.message || t('common.errorGeneric');
+      errorEl.hidden = false;
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+}
+
+// --------------------------------------------------------------------------
+// One-time calendar import (ICS file or shared feed → editable local events)
+// --------------------------------------------------------------------------
+
+function bindCalendarImport(container) {
+  const form = container.querySelector('#cal-import-form');
+  if (!form) return;
+  const fileInput = container.querySelector('#cal-import-file');
+  const urlInput = container.querySelector('#cal-import-url');
+  const colorInput = container.querySelector('#cal-import-color');
+  const errorEl = container.querySelector('#cal-import-error');
+  const submitBtn = container.querySelector('#cal-import-submit');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorEl.hidden = true;
+
+    const file = fileInput.files?.[0];
+    const url = urlInput.value.trim();
+    if (!file && !url) {
+      errorEl.textContent = t('settings.calendarImport.errorNoSource');
+      errorEl.hidden = false;
+      return;
+    }
+
+    submitBtn.disabled = true;
+    try {
+      const payload = { color: colorInput.value };
+      if (file) payload.ics = await file.text();
+      else payload.url = url;
+
+      const res = await api.post('/calendar/import', payload);
+      const { imported = 0, skipped = 0 } = res.data || {};
+      form.reset();
+
+      if (imported === 0 && skipped > 0) {
+        showToast(t('settings.calendarImport.allDuplicates'), 'default');
+      } else if (skipped > 0) {
+        showToast(t('settings.calendarImport.successWithSkipped', { count: imported, skipped }), 'success');
+      } else {
+        showToast(t('settings.calendarImport.success', { count: imported }), 'success');
       }
     } catch (err) {
       errorEl.textContent = err.message || t('common.errorGeneric');
@@ -1147,6 +1224,7 @@ export async function render(container, { user, query } = {}) {
   if (icsRes.status === 'fulfilled') icsSubs = icsRes.value.data || [];
   renderIcsList(container, icsSubs, user);
   bindIcsEvents(container, icsSubs, user);
+  bindCalendarImport(container);
 
   await loadCalDAVAccounts(container, user);
   await renderMoreProviders(container, user);

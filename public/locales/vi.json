@@ -58,6 +58,7 @@
         "recipes": "Công thức nấu ăn",
         "more": "Thêm",
         "moreActiveLabel": "Thêm, {{section}} đang hoạt động",
+        "moreCatalogHint": "Tất cả mô-đun. Tùy chỉnh mục yêu thích trong cài đặt.",
         "documents": "Tài liệu",
         "kitchen": "Nhà bếp",
         "kitchenGoLabel": "Nhà bếp, mở {{section}}",
@@ -175,7 +176,8 @@
         "housekeepingNoVisits": "Chưa có lượt nào",
         "housekeepingVisitsMonth": "{{count}} lượt tháng này",
         "housekeepingUnpaid": "Còn nợ {{amount}}",
-        "widgetError": "Không thể tải"
+        "widgetError": "Không thể tải",
+        "savingsGoal": "Mục tiêu tiết kiệm"
     },
     "tasks": {
         "title": "Nhiệm vụ",
@@ -922,6 +924,29 @@
         "splitSectionLabel": "Phan chia chung",
         "singleAssigneeHint": "Gan cho mot nguoi de muc nay thuoc ve ho.",
         "multiAssigneeHint": "Gan cho nhieu nguoi va chon cach chia so tien."
+        "planTab": "Kế hoạch",
+        "planCategoryBudgets": "Ngân sách theo danh mục",
+        "planAddBudget": "Đặt ngân sách",
+        "planSavingsSetTitle": "Đặt mục tiêu tiết kiệm",
+        "planSavingsSetDesc": "Đặt mục tiêu tiết kiệm hằng tháng và theo dõi tiến độ",
+        "planSetGoal": "Đặt mục tiêu",
+        "planSavingsGoal": "Mục tiêu tiết kiệm",
+        "planSavingsMet": "Đã đạt mục tiêu",
+        "planSavingsNegative": "Âm trong tháng này",
+        "planSavingsShort": "Còn {{amount}} nữa",
+        "planSavingsHint": "Mục tiêu tiết kiệm so sánh khoản tiết kiệm dự kiến với thu nhập trừ chi phí trong tháng.",
+        "planEmptyTitle": "Chưa có ngân sách",
+        "planEmptyDesc": "Đặt ngân sách hằng tháng cho từng danh mục để kiểm soát chi tiêu.",
+        "planOverBy": "Vượt {{amount}}",
+        "planLeft": "Còn {{amount}}",
+        "planAllCategoriesBudgeted": "Mọi danh mục đều đã có ngân sách.",
+        "planMonthlyAmount": "Số tiền hằng tháng",
+        "planSavedToast": "Đã lưu ngân sách",
+        "planRemovedToast": "Đã xoá ngân sách",
+        "planTarget": "Mục tiêu: {{amount}}",
+        "planEditAction": "Chỉnh sửa",
+        "planDeleteConfirm": "Xoá ngân sách cho “{{category}}”?",
+        "planSavingsDeleteConfirm": "Xoá mục tiêu tiết kiệm?"
     },
     "settings": {
         "pageHealthModule": "Sức khỏe",
@@ -1184,6 +1209,19 @@
                 "shared": "Được chia sẻ"
             },
             "updatedToast": "Đăng ký đã cập nhật."
+        },
+        "calendarImport": {
+            "title": "Nhập lịch",
+            "description": "Nhập các sự kiện từ tệp .ics hoặc lịch được chia sẻ một lần dưới dạng sự kiện của riêng bạn, có thể chỉnh sửa. Không giống như đăng ký, sau đó chúng không được đồng bộ.",
+            "fileLabel": "Tệp ICS",
+            "urlLabel": "Hoặc URL nguồn cấp",
+            "urlHint": "Địa chỉ của lịch được chia sẻ (https:// hoặc webcal://).",
+            "colorLabel": "Màu",
+            "submit": "Nhập",
+            "errorNoSource": "Vui lòng chọn tệp hoặc nhập URL.",
+            "success": "Đã nhập {{count}} sự kiện.",
+            "successWithSkipped": "Đã nhập {{count}} sự kiện, {{skipped}} đã tồn tại.",
+            "allDuplicates": "Không có sự kiện mới – tất cả đã tồn tại."
         },
         "memberPhoneLabel": "Số điện thoại (tùy chọn)",
         "memberEmailLabel": "Email (tùy chọn)",
@@ -1762,6 +1800,8 @@
         "customWeeks": "Tuần"
     },
     "birthdays": {
+        "inDays": "trong {{days}} ngày",
+        "turnsAge": "tròn {{age}} tuổi",
         "title": "Sinh nhật",
         "addButton": "Thêm sinh nhật",
         "searchPlaceholder": "Tìm kiếm sinh nhật…",
@@ -1820,7 +1860,8 @@
         "title": "Tìm kiếm",
         "open": "Mở tìm kiếm",
         "placeholder": "Tìm kiếm…",
-        "noResults": "Không tìm thấy kết quả."
+        "noResults": "Không tìm thấy kết quả.",
+        "error": "Tìm kiếm hiện không khả dụng."
     },
     "onboarding": {
         "step1Title": "Chào mừng đến với {{name}}",
@@ -1850,7 +1891,7 @@
         "goHealth": "Sức khỏe"
     },
     "emptyHint": {
-        "tasks": "Chạm vào + để tạo nhiệm vụ đầu tiên của bạn. Vuốt một thẻ sang trái để xóa.",
+        "tasks": "Chạm vào + để tạo nhiệm vụ đầu tiên của bạn. Vuốt thẻ sang trái để hoàn thành, sang phải để chỉnh sửa.",
         "calendar": "Kết nối Google Calendar trong Cài đặt → Tích hợp để đồng bộ tự động.",
         "shopping": "Thêm mục và vuốt để đánh dấu hoàn thành hoặc xóa.",
         "notes": "Chạm vào + cho ghi chú mới. Ghi chú có thể tìm kiếm toàn văn.",
@@ -2492,7 +2533,8 @@
                 "title": "Tuân thủ dùng thuốc",
                 "noData": "Chưa có dữ liệu dùng thuốc",
                 "period": "{{days}} ngày qua",
-                "streakLabel": "Ngày liên tiếp"
+                "streakLabel": "Ngày liên tiếp",
+                "notStarted": "Chưa ghi nhận gì"
             },
             "vitals": {
                 "title": "Chỉ số sinh tồn gần nhất"
@@ -2591,7 +2633,8 @@
                 "title": "Tuân thủ dùng thuốc",
                 "period": "{{days}} ngày qua",
                 "noData": "Chưa có liều được lên lịch trong kỳ.",
-                "summary": "Đã dùng {{taken}} trong {{planned}}"
+                "summary": "Đã dùng {{taken}} trong {{planned}}",
+                "notStarted": "Chưa ghi nhận liều nào"
             },
             "status": {
                 "taken": "Đã dùng",

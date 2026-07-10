@@ -119,7 +119,7 @@ Neues Zuhause: **https://yuvomi.cloud/** · Fragen? Eröffne eine [Diskussion](h
           <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/calendar-light-web.png">
           <img src="docs/screenshots/calendar-light-web.png" alt="Kalender mit Google-OAuth und CalDAV-Sync">
         </picture>
-        <br><sub><b>Kalender</b> — Google-OAuth, iCloud, CalDAV, ICS-Abos</sub>
+        <br><sub><b>Kalender</b> — Google-OAuth, iCloud, CalDAV, ICS-Abos &amp; -Import</sub>
       </td>
     </tr>
     <tr>
@@ -172,9 +172,9 @@ Neues Zuhause: **https://yuvomi.cloud/** · Fragen? Eröffne eine [Diskussion](h
 | ![shopping](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/shopping.png) | **Einkauf** | Gemeinsame, nach Gang gruppierte Listen mit Wischgesten, Notizen je Artikel und Ein-Tipp-Import aus dem Mahlzeitenplan. |
 | ![meals](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/meals.png) | **Mahlzeiten** | Wochenplaner mit mehreren Einträgen pro Slot, wöchentlicher Wiederholung, einer Drag-and-drop-Rezept-Seitenleiste, einem Ein-Klick-Wochen-Zufallsgenerator und direktem Export in die Einkaufsliste. |
 | ![recipes](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/recipes.png) | **Rezepte** | Rezepte erstellen, duplizieren und skalieren; Mahlzeiten-Slots vorbefüllen oder jede geplante Mahlzeit als Rezept speichern. |
-| ![calendar](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/calendar.png) | **Kalender** | Google- (OAuth) und CalDAV-Sync (iCloud, Nextcloud, Radicale), ICS-Abos, wiederkehrende Termine, Anhänge, Feiertags-Overlays und ein schreibgeschützter `webcal://`-Export-Feed. |
+| ![calendar](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/calendar.png) | **Kalender** | Google- (OAuth) und CalDAV-Sync (iCloud, Nextcloud, Radicale), ICS-Abos, einmaliger Import aus einer `.ics`-Datei oder einem geteilten Feed als bearbeitbare lokale Termine, wiederkehrende Termine, Anhänge, Feiertags-Overlays und ein schreibgeschützter `webcal://`-Export-Feed. |
 | ![documents](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/documents.png) | **Dokumente** | Familiendateien hochladen, taggen, vorschauen und organisieren, mit Sichtbarkeit je Dokument. Optionaler WebDAV-Speicher sowie Paperless-ngx- und Papra-(DMS-)Anbindung. |
-| ![budget](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/budget.png) | **Budget** | Einnahmen, Ausgaben, wiederkehrende Buchungen, Trend-Charts, ein Statistik-Tab, CSV-Export, Kredite, geteilte Ausgaben und Abo-Tracking mit Verlängerungen und Währungen. |
+| ![budget](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/budget.png) | **Budget** | Einnahmen, Ausgaben, wiederkehrende Buchungen, Trend-Charts, ein Statistik-Tab, CSV-Export, Kredite, geteilte Ausgaben, Abo-Tracking mit Verlängerungen und Währungen sowie ein Plan-Tab mit monatlichen Kategorie-Budgets und einem Sparziel (Soll vs. Ist). |
 | ![housekeeping](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/housekeeping.png) | **Haushaltshilfe** | Personal verwalten — Dienstpläne, Ein-/Auschecken, Tages- oder Stundenabrechnung, Aufgaben und Materialanforderungen. |
 | ![rewards](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/rewards.png) | **Belohnungen** | Punktwerte auf Aufgaben schreiben zugewiesenen Mitgliedern gut; ein Belohnungskatalog mit elterlich freigegebenen Einlösungen, Opt-in je Mitglied und einem prüfbaren Punktekonto. |
 | ![health](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/health.png) | **Gesundheit** | Vitalwerte je Mitglied, Medikamente mit Nachfüll-Warnungen, Laborwerte, Aktivitätsprotokolle und Zyklus-Tracking (Perioden-Vorhersagen, fruchtbares Fenster, Zyklus-Ring) — mit Trend-Charts, CSV-Export und Sichtbarkeit je Eintrag. |

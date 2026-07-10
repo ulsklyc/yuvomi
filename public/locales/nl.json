@@ -58,6 +58,7 @@
         "recipes": "Recepten",
         "more": "Meer",
         "moreActiveLabel": "Meer, {{section}} actief",
+        "moreCatalogHint": "Alle modules. Pas je favorieten aan in de instellingen.",
         "documents": "Documenten",
         "kitchen": "Keuken",
         "kitchenGoLabel": "Keuken, {{section}} openen",
@@ -175,7 +176,8 @@
         "housekeepingNoVisits": "Nog geen bezoeken",
         "housekeepingVisitsMonth": "{{count}} bezoeken deze maand",
         "housekeepingUnpaid": "{{amount}} openstaand",
-        "widgetError": "Kon niet worden geladen"
+        "widgetError": "Kon niet worden geladen",
+        "savingsGoal": "Spaardoel"
     },
     "tasks": {
         "title": "Taken",
@@ -922,6 +924,29 @@
         "splitSectionLabel": "Gedeelde verdeling",
         "singleAssigneeHint": "Wijs een persoon toe zodat dit item van die persoon wordt.",
         "multiAssigneeHint": "Wijs meerdere personen toe en kies hoe het bedrag wordt verdeeld."
+        "planTab": "Plan",
+        "planCategoryBudgets": "Categoriebudgetten",
+        "planAddBudget": "Budget instellen",
+        "planSavingsSetTitle": "Stel een spaardoel in",
+        "planSavingsSetDesc": "Stel een maandelijks spaardoel in en volg je voortgang",
+        "planSetGoal": "Doel instellen",
+        "planSavingsGoal": "Spaardoel",
+        "planSavingsMet": "Doel bereikt",
+        "planSavingsNegative": "Deze maand in de min",
+        "planSavingsShort": "Nog {{amount}} te gaan",
+        "planSavingsHint": "Het spaardoel vergelijkt je geplande besparing met inkomsten minus uitgaven van deze maand.",
+        "planEmptyTitle": "Nog geen budgetten",
+        "planEmptyDesc": "Stel per categorie een maandbudget in om uitgaven in de hand te houden.",
+        "planOverBy": "{{amount}} over budget",
+        "planLeft": "{{amount}} over",
+        "planAllCategoriesBudgeted": "Alle categorieën hebben al een budget.",
+        "planMonthlyAmount": "Maandbedrag",
+        "planSavedToast": "Budget opgeslagen",
+        "planRemovedToast": "Budget verwijderd",
+        "planTarget": "Doel: {{amount}}",
+        "planEditAction": "Bewerken",
+        "planDeleteConfirm": "Budget voor ‘{{category}}’ verwijderen?",
+        "planSavingsDeleteConfirm": "Spaardoel verwijderen?"
     },
     "settings": {
         "pageHealthModule": "Gezondheid",
@@ -1184,6 +1209,19 @@
                 "shared": "Gedeeld"
             },
             "updatedToast": "Abonnement bijgewerkt."
+        },
+        "calendarImport": {
+            "title": "Agenda importeren",
+            "description": "Importeer afspraken uit een .ics-bestand of een gedeelde agenda eenmalig als je eigen, bewerkbare afspraken. Anders dan bij een abonnement worden ze daarna niet gesynchroniseerd.",
+            "fileLabel": "ICS-bestand",
+            "urlLabel": "Of feed-URL",
+            "urlHint": "Adres van een gedeelde agenda (https:// of webcal://).",
+            "colorLabel": "Kleur",
+            "submit": "Importeren",
+            "errorNoSource": "Kies een bestand of voer een URL in.",
+            "success": "{{count}} afspraken geïmporteerd.",
+            "successWithSkipped": "{{count}} afspraken geïmporteerd, {{skipped}} bestonden al.",
+            "allDuplicates": "Geen nieuwe afspraken – alle bestonden al."
         },
         "memberPhoneLabel": "Telefoonnummer (optioneel)",
         "memberEmailLabel": "E-mail (optioneel)",
@@ -1762,6 +1800,8 @@
         "customWeeks": "Weken"
     },
     "birthdays": {
+        "inDays": "over {{days}} dagen",
+        "turnsAge": "wordt {{age}}",
         "title": "Verjaardagen",
         "addButton": "Verjaardag toevoegen",
         "searchPlaceholder": "Verjaardagen zoeken…",
@@ -1820,7 +1860,8 @@
         "title": "Zoeken",
         "open": "Zoeken openen",
         "placeholder": "Zoeken…",
-        "noResults": "Geen resultaten gevonden."
+        "noResults": "Geen resultaten gevonden.",
+        "error": "Zoeken is momenteel niet beschikbaar."
     },
     "onboarding": {
         "step1Title": "Welkom bij {{name}}",
@@ -1850,7 +1891,7 @@
         "goHealth": "Gezondheid"
     },
     "emptyHint": {
-        "tasks": "Tik op + om je eerste taak aan te maken. Veeg een kaart naar links om te verwijderen.",
+        "tasks": "Tik op + om je eerste taak aan te maken. Veeg een kaart naar links om af te vinken, naar rechts om te bewerken.",
         "calendar": "Verbind Google Agenda via Instellingen → Integraties voor automatische synchronisatie.",
         "shopping": "Voeg items toe en veeg om af te vinken of te verwijderen.",
         "notes": "Tik op + voor een nieuwe notitie. Notities zijn doorzoekbaar op volledige tekst.",
@@ -2492,7 +2533,8 @@
                 "title": "Therapietrouw",
                 "noData": "Nog geen innamegegevens",
                 "period": "Afgelopen {{days}} dagen",
-                "streakLabel": "Dagen op rij"
+                "streakLabel": "Dagen op rij",
+                "notStarted": "Nog niets geregistreerd"
             },
             "vitals": {
                 "title": "Laatste vitale waarden"
@@ -2591,7 +2633,8 @@
                 "title": "Therapietrouw",
                 "period": "Afgelopen {{days}} dagen",
                 "noData": "Nog geen geplande doses in de periode.",
-                "summary": "{{taken}} van {{planned}} ingenomen"
+                "summary": "{{taken}} van {{planned}} ingenomen",
+                "notStarted": "Nog geen inname geregistreerd"
             },
             "status": {
                 "taken": "Ingenomen",

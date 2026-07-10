@@ -419,6 +419,11 @@ async function navigate(path, userOrPushState = true, pushState = true) {
   if (isNavigating) return;
   isNavigating = true;
 
+  // Offenes „Mehr“-Sheet beim Navigieren immer schließen — robust und
+  // unabhängig vom Klick-Bubbling (das reißt, wenn die Navigation
+  // zwischendurch rebuildNavigation() auslöst, z. B. beim Settings-Ziel).
+  if (window._closeMoreSheet) window._closeMoreSheet({ restoreFocus: false });
+
   try {
     // Überlastung: navigate(path, user) nach Login vs navigate(path, false) beim Init
     if (typeof userOrPushState === 'object' && userOrPushState !== null) {
@@ -710,27 +715,102 @@ function sidebarActionEl({ labelKey, icon, className, onClick }) {
   return button;
 }
 
-function moreActionEl({ labelKey, icon, className, onClick }) {
+// System-/Utility-Zeilen unter dem App-Launcher-Grid: Einstellungen (Route),
+// Hilfe und Änderungen (Overlays). Vollbreite Listenzeilen — der ruhige,
+// monochrome System-Cluster, klar abgesetzt vom farbigen Modul-Grid.
+// `route` → navigierender <a> (aria-current-fähig); sonst Overlay-<button>.
+function moreActionEl({ labelKey, icon, className = '', onClick, route, navHref }) {
   const label = t(labelKey);
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = `more-item ${className}`;
-  button.setAttribute('aria-label', label);
-  button.addEventListener('click', onClick);
+  const el = document.createElement(route ? 'a' : 'button');
+  if (route) {
+    el.href = navHref || route;
+    el.dataset.route = route;
+    if (navHref) el.dataset.navHref = navHref;
+  } else {
+    el.type = 'button';
+  }
+  el.className = `more-action ${className}`.trim();
+  el.setAttribute('aria-label', label);
+  if (onClick) el.addEventListener('click', onClick);
 
-  const well = document.createElement('div');
-  well.className = 'more-item__icon-well';
   const iconEl = document.createElement('i');
   iconEl.dataset.lucide = icon;
-  iconEl.className = 'more-item__icon';
+  iconEl.className = 'more-action__icon';
   iconEl.setAttribute('aria-hidden', 'true');
-  well.appendChild(iconEl);
 
   const labelEl = document.createElement('span');
-  labelEl.className = 'more-item__label';
+  labelEl.className = 'more-action__label';
   labelEl.textContent = label;
-  button.append(well, labelEl);
-  return button;
+  el.append(iconEl, labelEl);
+  return el;
+}
+
+/**
+ * Baut den dynamischen Body des „Mehr“-Sheets: Katalog-Hinweis, farbiges
+ * App-Launcher-Grid (Module) und den monochromen System-Cluster
+ * (Einstellungen · Hilfe · Änderungen) als 1×3-Reihe.
+ *
+ * EINE Quelle der Wahrheit für renderAppShell() UND rebuildNavigation() —
+ * beide Pfade müssen dieselbe Struktur erzeugen, sonst zerstört ein
+ * Sprachwechsel / Modul-Toggle / Settings-Besuch das Layout.
+ * Handle + Suchleiste bleiben davon unberührt (sie tragen Event-Wiring).
+ */
+function buildMoreSheetBody() {
+  const nodes = [];
+
+  // Der Katalog-Hinweis („Alle Module … in den Einstellungen") lebt jetzt in
+  // der Hilfe (buildHelpRows), nicht mehr als Dauer-Zeile über dem Grid — das
+  // hält das Sheet ruhig und kompakt.
+
+  // Einstellungen ist ein System-Ziel, kein Inhalts-Modul — es wandert aus dem
+  // farbigen Grid in den System-Cluster, damit das Grid sauber aufgeht (2×4).
+  const secondary = secondaryMobileItems();
+  const settingsItem = secondary.find((item) => item.module === 'settings');
+
+  const grid = document.createElement('div');
+  grid.className = 'more-sheet__grid';
+  secondary
+    .filter((item) => item.module !== 'settings')
+    .forEach((item) => grid.appendChild(moreItemEl(item)));
+  nodes.push(grid);
+
+  const divider = document.createElement('div');
+  divider.className = 'more-sheet__divider';
+  divider.setAttribute('aria-hidden', 'true');
+  nodes.push(divider);
+
+  // System-Cluster als kompakte 1×3-Reihe (Icon-über-Label, monochrom).
+  const system = document.createElement('div');
+  system.className = 'more-sheet__system';
+  if (settingsItem) {
+    system.appendChild(moreActionEl({
+      labelKey: 'nav.settings',
+      icon: settingsItem.icon || 'settings',
+      route: settingsItem.path,
+      navHref: settingsItem.navHref,
+    }));
+  }
+  system.appendChild(moreActionEl({
+    labelKey: 'nav.help',
+    icon: 'circle-help',
+    className: 'more-item--help',
+    onClick: () => {
+      if (window._closeMoreSheet) window._closeMoreSheet({ restoreFocus: false });
+      showHelpModal();
+    },
+  }));
+  system.appendChild(moreActionEl({
+    labelKey: 'nav.changelog',
+    icon: 'history',
+    className: 'more-item--changelog',
+    onClick: () => {
+      if (window._closeMoreSheet) window._closeMoreSheet({ restoreFocus: false });
+      showChangelogModal();
+    },
+  }));
+  nodes.push(system);
+
+  return nodes;
 }
 
 /**
@@ -1078,37 +1158,14 @@ function renderAppShell(container) {
     const moreSearchPlaceholder = document.createElement('span');
     moreSearchPlaceholder.className = 'more-sheet__search-placeholder';
     moreSearchPlaceholder.textContent = t('search.placeholder');
-    const moreSearchKbd = document.createElement('kbd');
-    moreSearchKbd.className = 'more-sheet__search-kbd';
-    moreSearchKbd.textContent = '/';
-    moreSearchKbd.setAttribute('aria-hidden', 'true');
     moreSearchBar.appendChild(moreSearchIcon);
     moreSearchBar.appendChild(moreSearchPlaceholder);
-    moreSearchBar.appendChild(moreSearchKbd);
     moreSheet.appendChild(moreSearchBar);
 
-    secondaryMobileItems().forEach((item) => moreSheet.appendChild(moreItemEl(item)));
-
-    // Hilfe-/Changelog-Zeilen im „Mehr“-Sheet: schließen das Sheet und öffnen
-    // das jeweilige Overlay.
-    moreSheet.appendChild(moreActionEl({
-      labelKey: 'nav.help',
-      icon: 'circle-help',
-      className: 'more-item--help',
-      onClick: () => {
-        if (window._closeMoreSheet) window._closeMoreSheet({ restoreFocus: false });
-        showHelpModal();
-      },
-    }));
-    moreSheet.appendChild(moreActionEl({
-      labelKey: 'nav.changelog',
-      icon: 'history',
-      className: 'more-item--changelog',
-      onClick: () => {
-        if (window._closeMoreSheet) window._closeMoreSheet({ restoreFocus: false });
-        showChangelogModal();
-      },
-    }));
+    // Hinweis + App-Launcher-Grid + System-Cluster. Geteilte Logik mit
+    // rebuildNavigation() (Sprachwechsel / Modul-Toggle) — sonst driften die
+    // zwei Render-Pfade auseinander.
+    moreSheet.append(...buildMoreSheetBody());
   }
 
   bottomNav.appendChild(bottomItems);
@@ -1213,9 +1270,6 @@ function renderAppShell(container) {
   initMoreSheet(container, openSearch);
   initOfflineBanner();
   initKeyboardShortcuts();
-  if (localStorage.getItem(SEARCH_KBD_KEY)) {
-    document.documentElement.classList.add('search-kbd-done');
-  }
 
   // Hauptnavigation im Leerlauf vorwärmen — die erste Modulnavigation soll
   // ohne Kaltstart-Wasserfall auskommen.
@@ -1224,15 +1278,10 @@ function renderAppShell(container) {
 
 const FAB_SEEN_KEY = (module) => `yuvomi:fabSeen:${module}`;
 const FAB_SEEN_MAX = 5;
-const SEARCH_KBD_KEY = 'yuvomi:searchKbdUsed';
 const SIDEBAR_COLLAPSED_KEY = 'yuvomi.sidebar.collapsed';
 
 const SHORTCUTS = [
   { key: '/',   description: () => t('shortcuts.search'),  action: () => {
-    if (!localStorage.getItem(SEARCH_KBD_KEY)) {
-      localStorage.setItem(SEARCH_KBD_KEY, '1');
-      document.documentElement.classList.add('search-kbd-done');
-    }
     document.getElementById('more-sheet-search')?.click();
   } },
   { key: 'n',   description: () => t('shortcuts.new'),     action: () => document.querySelector('.page-fab')?.click() },
@@ -1646,7 +1695,13 @@ function initSearch(container) {
         const data = await api.get(`/search?q=${encodeURIComponent(q)}`);
         renderSearchResults(results, data, closeSearch);
       } catch {
-        // Fehler still ignorieren - kein Overlay-Crash
+        // Fehler nicht verschlucken: sichtbare Meldung statt „wirkt wie 0 Treffer".
+        results.replaceChildren();
+        const err = document.createElement('p');
+        err.className = 'search-overlay__empty';
+        err.setAttribute('role', 'status');
+        err.textContent = t('search.error');
+        results.appendChild(err);
       }
     }, 300);
   });
@@ -2528,8 +2583,10 @@ function rebuildNavigation({ updateLabels = true } = {}) {
       if (placeholder) placeholder.textContent = t('search.placeholder');
       searchBar.setAttribute('aria-label', t('search.placeholder'));
     }
-    const newMoreItems = secondaryMobileItems().map(moreItemEl);
-    moreSheet.replaceChildren(handle, ...(searchBar ? [searchBar] : []), ...newMoreItems);
+    // Handle + Suchleiste bewahren (Event-Wiring); Body über die geteilte
+    // Funktion neu bauen — identisch zu renderAppShell().
+    moreSheet.replaceChildren(handle, ...(searchBar ? [searchBar] : []), ...buildMoreSheetBody());
+    if (window.lucide) window.lucide.createIcons({ el: moreSheet });
   }
 
   document.querySelectorAll('[data-route]').forEach((el) => {
