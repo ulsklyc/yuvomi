@@ -2,7 +2,7 @@
 #
 # ── Setup (rootless, empfohlen) ────────────────────────────────────────────────
 #   1. Datenverzeichnisse anlegen:
-#        mkdir -p ~/.local/share/oikos/{data,backups,modules} ~/.config/oikos
+#        mkdir -p ~/.local/share/oikos/{data,backups,modules,documents} ~/.config/oikos
 #   2. Generierte .env ablegen (z. B. aus dem Web-/CLI-Installer):
 #        cp /pfad/zu/oikos/.env ~/.config/oikos/.env
 #   3. Diese Unit installieren:
@@ -45,6 +45,8 @@ PublishPort=3000:3000
 Volume=%h/.local/share/oikos/data:/data:Z
 Volume=%h/.local/share/oikos/backups:/backups:Z
 Volume=%h/.local/share/oikos/modules:/app/modules:Z
+# Optionaler lokaler Dokumentspeicher (nur genutzt, wenn DOCUMENT_STORAGE_LOCAL_ENABLED=true in der .env).
+Volume=%h/.local/share/oikos/documents:/documents:Z
 
 # Healthcheck identisch zum Compose-Manifest.
 HealthCmd=node -e "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1))"
