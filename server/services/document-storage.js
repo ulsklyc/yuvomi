@@ -8,10 +8,10 @@ import { lookup as dnsLookup } from 'node:dns/promises';
 import { Agent as HttpAgent } from 'node:http';
 import { Agent as HttpsAgent } from 'node:https';
 import { BlockList, isIP } from 'node:net';
-import fetch from 'node-fetch';
-import * as db from '../db.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import fetch from 'node-fetch';
+import * as db from '../db.js';
 
 const CONFIG_PREFIX = 'document_storage_webdav_';
 const DEFAULT_BASE_PATH = 'yuvomi-documents';
@@ -73,7 +73,11 @@ export class StorageError extends Error {
   }
 }
 
-// Local storage helpers (optional folder-backed document storage)
+// Local storage helpers (optional folder-backed document storage).
+// Configured purely via env (a host mount, analogous to BACKUP_DIR). When
+// enabled it takes precedence over the WebDAV backend and over the in-DB BLOB
+// default. Folder-backed rows are stored with storage_backend='local' and a
+// non-null relative storage_key; legacy in-DB BLOB rows keep storage_key=null.
 function parseEnvFlag(name) {
   const raw = process.env[name];
   if (raw === undefined) return false;
@@ -81,25 +85,29 @@ function parseEnvFlag(name) {
   return normalized === 'true' || normalized === '1';
 }
 
-function localStorageEnabledEnv() {
-  return parseEnvFlag('DOCUMENT_STORAGE_LOCAL_ENABLED');
+export function getLocalStorageConfig() {
+  const basePath = String(process.env.DOCUMENT_STORAGE_LOCAL_PATH || '/documents').trim();
+  return {
+    enabled: parseEnvFlag('DOCUMENT_STORAGE_LOCAL_ENABLED'),
+    basePath: basePath || '/documents',
+  };
 }
 
-function localStorageBasePathEnv() {
-  return String(process.env.DOCUMENT_STORAGE_LOCAL_PATH || '/documents');
-}
-
-function sanitizeStorageKeyForFs(key) {
-  if (!key) return null;
-  let k = String(key);
-  if (k.startsWith('/')) k = k.slice(1);
-  const parts = k.split('/').filter(Boolean);
-  for (const p of parts) {
-    if (p === '.' || p === '..' || p.includes('..') || p.includes('\\')) {
-      throw new StorageError('DOCUMENT_STORAGE_INVALID_CONFIG', 'The local storage key is invalid.');
-    }
+// Resolve a validated storage key to an absolute path inside basePath.
+// normalizeStorageKey already rejects '..', backslashes, a leading '/' and
+// control characters; the containment check is defence in depth against any
+// future change to the key format.
+function resolveLocalPath(basePath, storageKey) {
+  const rel = normalizeStorageKey(storageKey);
+  const root = path.resolve(basePath);
+  const full = path.resolve(root, rel);
+  if (full !== root && !full.startsWith(root + path.sep)) {
+    throw new StorageError(
+      'DOCUMENT_STORAGE_INVALID_CONFIG',
+      'The local storage key escapes the configured storage path.'
+    );
   }
-  return parts.join('/');
+  return full;
 }
 
 function cfgGet(field) {
@@ -694,50 +702,30 @@ export async function stageDocumentUpload({
 }) {
   const content = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
 
-  // If local folder-backed storage is enabled via env, write file to that folder.
-  if (localStorageEnabledEnv()) {
-    const storageKey = buildStorageKey({ category, originalName });
-    const relKey = normalizeStorageKey(storageKey);
-    const basePath = localStorageBasePathEnv();
-    const safeRel = sanitizeStorageKeyForFs(relKey);
-    const destPath = path.join(basePath, safeRel);
+  // Folder-backed local storage (env opt-in) takes precedence over WebDAV and
+  // the in-DB BLOB default. Writes go to DOCUMENT_STORAGE_LOCAL_PATH/<storage_key>.
+  // A write failure surfaces loudly (e.g. read-only mount, wrong ownership) so
+  // the misconfiguration is fixed rather than silently masked.
+  const localCfg = getLocalStorageConfig();
+  if (localCfg.enabled) {
+    const relKey = normalizeStorageKey(buildStorageKey({ category, originalName }));
+    const destPath = resolveLocalPath(localCfg.basePath, relKey);
     try {
       await fs.mkdir(path.dirname(destPath), { recursive: true });
       await fs.writeFile(destPath, content);
-      return {
-        storage_backend: 'local',
-        storage_provider: 'local',
-        storage_key: relKey,
-        content_data: '',
-      };
     } catch (error) {
-      // Attempt fallback into the application's data folder (/data/documents) so
-      // files end up on the writable data volume even if the configured mount is
-      // read-only or otherwise unavailable. Compute fallback path from DB_PATH
-      // (default: /data/yuvomi.db) -> /data/documents/<relKey>
-      try {
-        const dbPath = process.env.DB_PATH || '/data/yuvomi.db';
-        const fallbackBase = path.join(path.dirname(dbPath), 'documents');
-        const fallbackFull = path.join(fallbackBase, relKey);
-        await fs.mkdir(path.dirname(fallbackFull), { recursive: true });
-        await fs.writeFile(fallbackFull, content);
-        // Store an absolute-key marker so reads/deletes use this exact path.
-        const absKey = `__abs__:${fallbackFull}`;
-        return {
-          storage_backend: 'local',
-          storage_provider: 'local',
-          storage_key: absKey,
-          content_data: '',
-        };
-      } catch (fallbackError) {
-        // Original failure wins for diagnostics
-        throw toStorageError(
-          error,
-          'DOCUMENT_STORAGE_UPLOAD_FAILED',
-          'The document could not be written to local storage.'
-        );
-      }
+      throw toStorageError(
+        error,
+        'DOCUMENT_STORAGE_UPLOAD_FAILED',
+        'The document could not be written to local storage.'
+      );
     }
+    return {
+      storage_backend: 'local',
+      storage_provider: 'local',
+      storage_key: relKey,
+      content_data: '',
+    };
   }
 
   const config = getConfig();
@@ -823,36 +811,26 @@ function toStoredBinary(value) {
 
 export async function readDocumentContent(document, { dmsResolver } = {}) {
   if (document.storage_backend === 'local') {
-    // Folder-backed local storage: storage_key points to a relative path under configured base
+    // Folder-backed local storage: a non-null storage_key points to a relative
+    // path under the configured base. Legacy rows keep storage_key=null and are
+    // read from the in-DB BLOB below.
     if (document.storage_key) {
+      const { basePath } = getLocalStorageConfig();
+      const full = resolveLocalPath(basePath, document.storage_key);
       try {
-        // If the storage_key encodes an absolute path (from fallback), use it directly
-        if (typeof document.storage_key === 'string' && document.storage_key.startsWith('__abs__:')) {
-          const abs = document.storage_key.slice('__abs__:'.length);
-          try {
-            const buffer = await fs.readFile(abs);
-            return {
-              buffer,
-              mime: document.mime_type || 'application/octet-stream',
-            };
-          } catch (error) {
-            throw toStorageError(
-              error,
-              'DOCUMENT_STORAGE_READ_FAILED',
-              'The local document could not be read.'
-            );
-          }
+        const stat = await fs.stat(full);
+        if (stat.size > MAX_READ_BYTES) {
+          throw new StorageError(
+            'DOCUMENT_STORAGE_READ_FAILED',
+            'The local document exceeds the maximum readable size.'
+          );
         }
-
-        const basePath = localStorageBasePathEnv();
-        const rel = sanitizeStorageKeyForFs(document.storage_key);
-        const full = path.join(basePath, rel);
-        const buffer = await fs.readFile(full);
         return {
-          buffer,
+          buffer: await fs.readFile(full),
           mime: document.mime_type || 'application/octet-stream',
         };
       } catch (error) {
+        if (error instanceof StorageError) throw error;
         throw toStorageError(
           error,
           'DOCUMENT_STORAGE_READ_FAILED',
@@ -861,7 +839,7 @@ export async function readDocumentContent(document, { dmsResolver } = {}) {
       }
     }
 
-    // Fallback: older rows stored as BLOB in DB
+    // Legacy rows stored as a binary BLOB in the DB.
     return {
       buffer: toStoredBinary(document.content_data),
       mime: document.mime_type || 'application/octet-stream',
@@ -947,21 +925,15 @@ export async function deleteDocumentContent(document) {
     return;
   }
 
-  // Local folder-backed deletion
+  // Local folder-backed deletion. Legacy BLOB rows have no storage_key and need
+  // no file removal (the DB row carries the bytes).
   if (document.storage_backend === 'local' && document.storage_key) {
+    const { basePath } = getLocalStorageConfig();
+    const full = resolveLocalPath(basePath, document.storage_key);
     try {
-      // absolute-key marker
-      if (typeof document.storage_key === 'string' && document.storage_key.startsWith('__abs__:')) {
-        const abs = document.storage_key.slice('__abs__:'.length);
-        await fs.unlink(abs);
-        return;
-      }
-      const basePath = localStorageBasePathEnv();
-      const rel = sanitizeStorageKeyForFs(document.storage_key);
-      const full = path.join(basePath, rel);
       await fs.unlink(full);
     } catch (error) {
-      // Ignore missing file, but surface other errors
+      // Ignore an already-missing file, but surface other errors.
       if (error && error.code === 'ENOENT') return;
       throw toStorageError(
         error,
@@ -973,7 +945,6 @@ export async function deleteDocumentContent(document) {
   }
 
   // Other backends: nothing to do
-  return;
 }
 
 export async function cleanupStagedUpload(staged) {

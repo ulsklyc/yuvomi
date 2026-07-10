@@ -65,6 +65,7 @@ After the container starts, open the WebUI — the first visit guides you throug
   <Config Name="Data" Target="/data" Default="/mnt/user/appdata/yuvomi/data" Mode="rw" Description="Database and stored app data (uploads, documents)." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/yuvomi/data</Config>
   <Config Name="Backups" Target="/backups" Default="/mnt/user/appdata/yuvomi/backups" Mode="rw" Description="Destination folder for scheduled and manual database backups." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/yuvomi/backups</Config>
   <Config Name="Modules (optional)" Target="/app/modules" Default="/mnt/user/appdata/yuvomi/modules" Mode="rw" Description="Optional: drop-in folder for additional Yuvomi modules. Leave default if unused." Type="Path" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/yuvomi/modules</Config>
+  <Config Name="Documents (optional)" Target="/documents" Default="/mnt/user/appdata/yuvomi/documents" Mode="rw" Description="Optional: host folder for local document storage. Only used when DOCUMENT_STORAGE_LOCAL_ENABLED=true. Leave default if unused." Type="Path" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/yuvomi/documents</Config>
 
   <!-- Required secret -->
   <Config Name="SESSION_SECRET" Target="SESSION_SECRET" Default="" Mode="" Description="REQUIRED. A long random string used to sign sessions. Generate with: openssl rand -base64 48" Type="Variable" Display="always" Required="true" Mask="true"/>
@@ -125,6 +126,10 @@ After the container starts, open the WebUI — the first visit guides you throug
   <Config Name="WEBDAV_BACKUP_PASSWORD" Target="WEBDAV_BACKUP_PASSWORD" Default="" Mode="" Description="Optional. WebDAV password for authentication." Type="Variable" Display="advanced" Required="false" Mask="true"/>
   <Config Name="WEBDAV_BACKUP_PATH" Target="WEBDAV_BACKUP_PATH" Default="/yuvomi/backups/" Mode="" Description="Optional. Remote directory path where backup files are stored (default: /yuvomi/backups/)." Type="Variable" Display="advanced" Required="false" Mask="false">/yuvomi/backups/</Config>
   <Config Name="WEBDAV_BACKUP_KEEP" Target="WEBDAV_BACKUP_KEEP" Default="7" Mode="" Description="Optional. Number of remote backup files to keep (default: 7)." Type="Variable" Display="advanced" Required="false" Mask="false">7</Config>
+
+  <!-- Local folder document storage (optional) — writes new uploads to the mounted /documents folder. -->
+  <Config Name="DOCUMENT_STORAGE_LOCAL_ENABLED" Target="DOCUMENT_STORAGE_LOCAL_ENABLED" Default="false" Mode="" Description="Optional. Store newly uploaded document files in the mounted /documents host folder instead of the database. Existing files are not migrated." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
+  <Config Name="DOCUMENT_STORAGE_LOCAL_PATH" Target="DOCUMENT_STORAGE_LOCAL_PATH" Default="/documents" Mode="" Description="Optional. Container path for local document files. Keep default unless you mounted the documents folder elsewhere." Type="Variable" Display="advanced" Required="false" Mask="false">/documents</Config>
 
   <!-- WebDAV document storage (optional) — non-empty values override the matching database settings. -->
   <Config Name="DOCUMENT_STORAGE_WEBDAV_ENABLED" Target="DOCUMENT_STORAGE_WEBDAV_ENABLED" Default="false" Mode="" Description="Optional. Store newly uploaded document files on WebDAV. Existing files are not migrated." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>

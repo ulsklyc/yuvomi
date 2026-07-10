@@ -78,7 +78,7 @@ Complete setup instructions for Yuvomi - from Docker installation to your first 
 
 ## Architecture Overview
 
-Yuvomi is a self-hosted family planner that runs as a single Docker container. The Express.js backend serves both the API and the static frontend files. Application data is stored in a SQLCipher-encrypted SQLite database inside a host-mounted data folder, and automated database backups are written to a separate host-mounted backup folder. Optionally, newly uploaded document files can be stored on a WebDAV server instead of inside SQLite.
+Yuvomi is a self-hosted family planner that runs as a single Docker container. The Express.js backend serves both the API and the static frontend files. Application data is stored in a SQLCipher-encrypted SQLite database inside a host-mounted data folder, and automated database backups are written to a separate host-mounted backup folder. Optionally, newly uploaded document files can be stored on a mounted host folder or on a WebDAV server instead of inside SQLite.
 
 ```
 Browser ──HTTP──▶ Docker Container (Express.js :3000) ──▶ SQLite/SQLCipher (/data/yuvomi.db)
@@ -172,7 +172,7 @@ Open your browser and navigate to **http://localhost:8090**. The wizard detects 
 
 - Basics — timezone (`TZ`) and HTTP host port (`OIKOS_HTTP_PORT`)
 - Security key generation (`SESSION_SECRET`, `DB_ENCRYPTION_KEY`)
-- Optional integrations (weather, Google Calendar, Apple CalDAV, WebDAV document storage)
+- Optional integrations (weather, Google Calendar, Apple CalDAV, local folder or WebDAV document storage)
 - Advanced settings — reverse-proxy/HTTPS (`SESSION_SECURE`, `TRUST_PROXY`), Single Sign-On (OIDC), and automatic backups
 - Writing your `.env` file (an existing `.env` is backed up to `.env.bak-<timestamp>` first)
 - Starting the container (via Docker or Podman, whichever was detected)
@@ -471,6 +471,36 @@ openssl rand -hex 32
 ```
 
 > **Warning**: If you lose this key, you cannot access your database. Keep a backup of your `.env` file in a safe place.
+
+### Local Folder Document Storage (Optional)
+
+Instead of storing document binaries inside SQLite (or on WebDAV), you can write newly uploaded
+document files to a plain host folder mounted into the container. This keeps the database small and
+lets other self-hosted tools share the same files directly. It is configured purely through the
+deployment environment (a mount, analogous to the data and backup folders) and, when enabled, takes
+precedence over WebDAV. Existing database/WebDAV documents are not migrated and remain readable; a
+write failure (e.g. a read-only mount) fails the upload loudly rather than silently falling back.
+
+Mount a host directory to the container path and enable the backend:
+
+```yaml
+# docker-compose.yml
+volumes:
+  - ${DOCUMENT_STORAGE_LOCAL_DIR:-./documents}:/documents
+environment:
+  - DOCUMENT_STORAGE_LOCAL_ENABLED=true
+  - DOCUMENT_STORAGE_LOCAL_PATH=/documents
+```
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `DOCUMENT_STORAGE_LOCAL_ENABLED` | Write new document files to the mounted folder (`true`/`false`) | `false` | No |
+| `DOCUMENT_STORAGE_LOCAL_PATH` | Container path for document files | `/documents` | No |
+| `DOCUMENT_STORAGE_LOCAL_DIR` | Compose-only: host folder mounted to `/documents` | `./documents` | No |
+
+> Ensure the mounted folder is writable by the container (adjust ownership/permissions as needed).
+> Files live on the host volume, so include that folder in your host-level backups — database
+> backups hold only document metadata, not these binaries.
 
 ### WebDAV Document Storage (Optional)
 
