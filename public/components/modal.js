@@ -85,10 +85,15 @@ function trapFocus(container) {
 
   // Virtual Keyboard: Focused Input in sichtbaren Bereich scrollen
   function onInputFocus(e) {
-    const tag = e.target.tagName;
+    const el = e.target;
+    const tag = el.tagName;
     if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return;
+    if (tag === 'INPUT') {
+      const type = String(el.type || '').toLowerCase();
+      if (['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'file', 'hidden'].includes(type)) return;
+    }
     setTimeout(() => {
-      e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 300);
   }
   container.addEventListener('focusin', onInputFocus);

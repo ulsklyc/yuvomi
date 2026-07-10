@@ -1029,23 +1029,8 @@
 .budget-modal {
   display: grid;
   gap: var(--space-4);
-  min-height: 100%;
+  min-height: min(620px, 70dvh);
   align-content: start;
-}
-
-@media (min-width: 768px) {
-  .modal-overlay--budget {
-    align-items: flex-start;
-  }
-
-  .modal-panel.modal-panel--budget {
-    height: min(760px, calc(100dvh - (2 * var(--space-6))));
-  }
-
-  .modal-panel__body.modal-panel__body--budget {
-    overflow-y: scroll;
-    scrollbar-gutter: stable both-edges;
-  }
 }
 
 .amount-type-toggle {
@@ -1106,6 +1091,17 @@
   margin-bottom: 0;
 }
 
+.budget-secondary-section {
+  display: grid;
+  gap: var(--space-4);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.budget-recurrence-block[aria-disabled="true"] {
+  opacity: 0.68;
+}
+
 .budget-inline-add {
   min-height: auto;
   padding: 2px var(--space-2);
@@ -1150,7 +1146,7 @@
 
 @media (max-width: 640px) {
   .budget-modal {
-    min-height: 100%;
+    min-height: auto;
   }
 }
 

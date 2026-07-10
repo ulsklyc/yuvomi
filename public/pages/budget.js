@@ -6,7 +6,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, confirmModal, advancedSection } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal } from '/components/modal.js';
 import { stagger, vibrate } from '/utils/ux.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { esc } from '/utils/html.js';
@@ -1047,6 +1047,16 @@ function inferBudgetScope(assignments = []) {
   return (assignments?.length || 0) > 1 ? 'shared' : 'personal';
 }
 
+function preserveBudgetModalScroll(panel, mutate) {
+  const body = panel.querySelector('.modal-panel__body');
+  const top = body?.scrollTop ?? 0;
+  mutate();
+  if (!body) return;
+  requestAnimationFrame(() => {
+    body.scrollTop = top;
+  });
+}
+
 function renderBudgetAssignmentEditor(assignments = [], splitMethod = 'equal', scope = 'personal') {
   const selectedIds = assignments.map((assignment) => assignment.user_id);
   const rows = assignments.map((assignment) => {
@@ -1135,7 +1145,7 @@ function bindBudgetAssignmentEditor(panel, initialAssignments = [], initialSplit
   methodEl?.addEventListener('change', renderRows);
   scopeInputs.forEach((input) => input.addEventListener('change', () => {
     ensureSharedDefaults();
-    renderRows();
+    preserveBudgetModalScroll(panel, renderRows);
   }));
   ensureSharedDefaults();
   renderRows();
@@ -1245,39 +1255,37 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
 
     ${state.budgetMode === 'personal' ? `<div class="js-entry-field">${assignmentSection}</div>` : ''}
 
-    <div class="js-entry-field">
-      ${advancedSection(`
-        <div class="form-group" id="bm-subcategory-group" ${isExpense ? '' : 'hidden'}>
-          <div class="budget-field-header">
-            <label class="form-label" for="bm-subcategory">${t('budget.subcategoryLabel')}</label>
-            <button class="btn btn--secondary budget-inline-add" type="button" id="bm-add-subcategory">${t('budget.addSubcategory')}</button>
-          </div>
-          <select class="form-input" id="bm-subcategory">${subcatOpts}</select>
+    <div class="js-entry-field budget-secondary-section">
+      <div class="form-group" id="bm-subcategory-group" ${isExpense ? '' : 'hidden'}>
+        <div class="budget-field-header">
+          <label class="form-label" for="bm-subcategory">${t('budget.subcategoryLabel')}</label>
+          <button class="btn btn--secondary budget-inline-add" type="button" id="bm-add-subcategory">${t('budget.addSubcategory')}</button>
         </div>
+        <select class="form-input" id="bm-subcategory">${subcatOpts}</select>
+      </div>
 
-        <div class="form-group">
-          <label class="toggle">
-            <input type="checkbox" id="bm-recurring" ${isEdit && entry.is_recurring ? 'checked' : ''}>
-            <span class="toggle__track"></span>
-            <span>${t('budget.recurringLabel')}</span>
-          </label>
-        </div>
+      <div class="form-group">
+        <label class="toggle">
+          <input type="checkbox" id="bm-recurring" ${isEdit && entry.is_recurring ? 'checked' : ''}>
+          <span class="toggle__track"></span>
+          <span>${t('budget.recurringLabel')}</span>
+        </label>
+      </div>
 
-        <div class="form-group" id="bm-recurrence-options" ${isEdit && entry.is_recurring ? '' : 'hidden'}>
-          <label class="form-label" for="bm-interval">${t('budget.recurringIntervalLabel')}</label>
-          <select class="form-input" id="bm-interval">
-            ${intervalOption('monthly', 'budget.intervalMonthly')}
-            ${intervalOption('half_year', 'budget.intervalHalfYear')}
-            ${intervalOption('yearly', 'budget.intervalYearly')}
-          </select>
-          <label class="toggle" style="margin-top:var(--space-3)">
-            <input type="checkbox" id="bm-virtual" ${isEdit && entry.recurrence_virtual ? 'checked' : ''}>
-            <span class="toggle__track"></span>
-            <span>${t('budget.virtualBudgetLabel')}</span>
-          </label>
-          <p style="color:var(--color-text-secondary);font-size:var(--text-sm);margin-top:var(--space-1)">${t('budget.virtualBudgetHint')}</p>
-        </div>`,
-        { open: isEdit && (entry.is_recurring || !!entry.subcategory) })}
+      <div class="form-group budget-recurrence-block" id="bm-recurrence-options" aria-disabled="${isEdit && entry.is_recurring ? 'false' : 'true'}">
+        <label class="form-label" for="bm-interval">${t('budget.recurringIntervalLabel')}</label>
+        <select class="form-input" id="bm-interval" ${isEdit && entry.is_recurring ? '' : 'disabled'}>
+          ${intervalOption('monthly', 'budget.intervalMonthly')}
+          ${intervalOption('half_year', 'budget.intervalHalfYear')}
+          ${intervalOption('yearly', 'budget.intervalYearly')}
+        </select>
+        <label class="toggle" style="margin-top:var(--space-3)">
+          <input type="checkbox" id="bm-virtual" ${isEdit && entry.recurrence_virtual ? 'checked' : ''} ${isEdit && entry.is_recurring ? '' : 'disabled'}>
+          <span class="toggle__track"></span>
+          <span>${t('budget.virtualBudgetLabel')}</span>
+        </label>
+        <p style="color:var(--color-text-secondary);font-size:var(--text-sm);margin-top:var(--space-1)">${t('budget.virtualBudgetHint')}</p>
+      </div>
     </div>
 
     <div id="bm-loan-fields" hidden>
@@ -1327,10 +1335,17 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
     content,
     size: 'lg',
     onSave(panel) {
-      panel.closest('.modal-overlay')?.classList.add('modal-overlay--budget');
-      panel.classList.add('modal-panel--budget');
-      panel.querySelector('.modal-panel__body')?.classList.add('modal-panel__body--budget');
       let currentType = !isEdit && initialType === 'loan' ? 'loan' : (isExpense ? 'expense' : 'income');
+
+      const syncRecurringOptions = () => {
+        const recurring = panel.querySelector('#bm-recurring')?.checked;
+        const recurrenceBlock = panel.querySelector('#bm-recurrence-options');
+        const interval = panel.querySelector('#bm-interval');
+        const virtual = panel.querySelector('#bm-virtual');
+        recurrenceBlock?.setAttribute('aria-disabled', recurring ? 'false' : 'true');
+        if (interval) interval.disabled = !recurring;
+        if (virtual) virtual.disabled = !recurring;
+      };
 
       const setType = (type) => {
         currentType = type;
@@ -1339,10 +1354,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
         panel.querySelector('#type-loan')?.classList.toggle('amount-type-btn--active', type === 'loan');
         panel.querySelectorAll('.js-entry-field').forEach((el) => { el.hidden = type === 'loan'; });
         panel.querySelector('#bm-loan-fields').hidden = type !== 'loan';
-        // Wiederkehrungs-Optionen nur zeigen, wenn "Wiederkehrend" aktiv ist.
-        if (type !== 'loan') {
-          panel.querySelector('#bm-recurrence-options').hidden = !panel.querySelector('#bm-recurring').checked;
-        }
+        if (type !== 'loan') syncRecurringOptions();
         panel.querySelector('#bm-save').textContent = type === 'loan'
           ? t('budget.createLoan')
           : (isEdit ? t('common.save') : t('common.add'));
@@ -1433,13 +1445,14 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
         setType('loan');
       });
       panel.querySelector('#bm-category').addEventListener('change', () => updateSubcategoryOptions());
-      panel.querySelector('#bm-recurring').addEventListener('change', (e) => {
-        panel.querySelector('#bm-recurrence-options').hidden = !e.target.checked;
+      panel.querySelector('#bm-recurring').addEventListener('change', () => {
+        preserveBudgetModalScroll(panel, syncRecurringOptions);
       });
       panel.querySelector('#bm-add-category').addEventListener('click', addCategory);
       panel.querySelector('#bm-add-subcategory').addEventListener('click', addSubcategory);
       panel.querySelector('#bm-cancel').addEventListener('click', closeModal);
       if (state.budgetMode === 'personal') bindBudgetAssignmentEditor(panel, entry?.assignments || [], entry?.split_method || 'equal', initialScope);
+      syncRecurringOptions();
 
       panel.querySelector('#bm-delete')?.addEventListener('click', async () => {
         closeModal({ force: true });
