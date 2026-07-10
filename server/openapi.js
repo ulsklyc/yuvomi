@@ -1876,8 +1876,8 @@ function buildOpenApiSpec(req, appVersion) {
                 },
                 active_upload_backend: {
                   type: 'string',
-                  enum: ['local', 'webdav'],
-                  description: 'Backend used for newly uploaded document files, including calendar attachments.',
+                  enum: ['local', 'local_folder', 'webdav'],
+                  description: 'Backend used for newly uploaded document files, including calendar attachments. "local" is the in-DB BLOB default, "local_folder" a mounted host folder, "webdav" a remote server.',
                 },
                 dms_accounts: {
                   type: 'array',
@@ -1945,8 +1945,13 @@ function buildOpenApiSpec(req, appVersion) {
           properties: {
             enabled: { type: 'boolean' },
             configured: { type: 'boolean' },
-            active_upload_backend: { type: 'string', enum: ['local', 'webdav'] },
-            effective_target: { type: ['string', 'null'], format: 'uri' },
+            active_upload_backend: { type: 'string', enum: ['local', 'local_folder', 'webdav'] },
+            effective_target: {
+              type: ['string', 'null'],
+              description: 'Active upload target: WebDAV URL, local folder path, or null for the in-DB default.',
+            },
+            local_enabled: { type: 'boolean', description: 'Whether the local folder backend is enabled via env.' },
+            local_path: { type: 'string', description: 'Container path for the local folder backend.' },
             webdav_document_count: { type: 'integer', minimum: 0 },
             last_test: { type: ['string', 'null'], format: 'date-time' },
             last_error: { type: ['string', 'null'] },
@@ -1971,6 +1976,8 @@ function buildOpenApiSpec(req, appVersion) {
             'configured',
             'active_upload_backend',
             'effective_target',
+            'local_enabled',
+            'local_path',
             'webdav_document_count',
             'last_test',
             'last_error',

@@ -1460,6 +1460,8 @@
         "documentStorageBackupWarning": "Az adatbázis biztonsági mentések nem tartalmazzák a WebDAV fájlokat.",
         "documentStorageNotConfigured": "Nincs konfigurálva",
         "documentStorageActive": "Aktív feltöltési cél",
+        "documentStorageDatabase": "Adatbázis",
+        "documentStorageLocalEnvManaged": "A környezeten keresztül konfigurálva (gazdamappa csatolása).",
         "documentStorageTarget": "Cél",
         "documentStorageCount": "Tárolt WebDAV dokumentumok",
         "documentStorageLastTest": "Utolsó teszt",
@@ -1885,6 +1887,7 @@
     "documents": {
         "title": "Dokumentumok",
         "storageLocal": "Helyi",
+        "storageLocalFolder": "Helyi mappa",
         "storageWebdav": "WebDAV",
         "storageDms": "DMS",
         "storageDmsUnavailable": "DMS nem elérhető",

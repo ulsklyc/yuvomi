@@ -565,6 +565,18 @@ function documentStorageBackend(doc) {
   return doc.storage_provider === 'external' ? 'dms' : 'local';
 }
 
+function uploadBackendLabel(backend) {
+  if (backend === 'webdav') return t('documents.storageWebdav');
+  if (backend === 'local_folder') return t('documents.storageLocalFolder');
+  return t('documents.storageLocal');
+}
+
+function uploadTargetIcon(backend) {
+  if (backend === 'webdav') return 'cloud';
+  if (backend === 'local_folder') return 'folder';
+  return 'database';
+}
+
 function storageBadgeHtml(doc) {
   const backend = documentStorageBackend(doc);
   if (backend === 'webdav') {
@@ -576,8 +588,12 @@ function storageBadgeHtml(doc) {
   if (backend === 'dms') {
     return `<span class="doc-badge doc-badge--dms">${t('documents.storageDms')}</span>`;
   }
-  // Lokal ist der Standardfall: kein Badge — nur abweichende Ziele (DMS/WebDAV/
-  // nicht verfügbar) tragen ein Badge, damit es ein bedeutungstragendes Signal bleibt.
+  // Folder-backed local documents carry a storage_key; they are a non-default
+  // target and earn a badge. The in-DB BLOB default (no key) stays badge-less so
+  // a badge remains a meaningful signal.
+  if (backend === 'local' && doc.storage_key) {
+    return `<span class="doc-badge doc-badge--folder">${t('documents.storageLocalFolder')}</span>`;
+  }
   return '';
 }
 
@@ -796,11 +812,9 @@ function openDocumentModal(doc = null) {
         <div class="form-group">
           <label class="label" for="document-file">${t('documents.fileLabel')}</label>
           <p class="document-storage-target">
-            <i data-lucide="${state.activeUploadBackend === 'webdav' ? 'cloud' : 'database'}" aria-hidden="true"></i>
+            <i data-lucide="${uploadTargetIcon(state.activeUploadBackend)}" aria-hidden="true"></i>
             <span>${t('documents.activeUploadTarget', {
-              target: state.activeUploadBackend === 'webdav'
-                ? t('documents.storageWebdav')
-                : t('documents.storageLocal'),
+              target: uploadBackendLabel(state.activeUploadBackend),
             })}</span>
           </p>
           <label class="document-dropzone" id="document-dropzone" for="document-file">

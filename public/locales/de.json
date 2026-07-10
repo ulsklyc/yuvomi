@@ -1466,6 +1466,8 @@
         "documentStorageBackupWarning": "Datenbank-Backups enthalten keine WebDAV-Dateien.",
         "documentStorageNotConfigured": "Nicht konfiguriert",
         "documentStorageActive": "Aktives Upload-Ziel",
+        "documentStorageDatabase": "Datenbank",
+        "documentStorageLocalEnvManaged": "Über die Umgebung konfiguriert (Host-Ordner-Mount).",
         "documentStorageTarget": "Ziel",
         "documentStorageCount": "Gespeicherte WebDAV-Dokumente",
         "documentStorageLastTest": "Letzter Test",
@@ -1885,6 +1887,7 @@
     "documents": {
         "title": "Dokumente",
         "storageLocal": "Lokal",
+        "storageLocalFolder": "Lokaler Ordner",
         "storageWebdav": "WebDAV",
         "storageDms": "DMS",
         "storageDmsUnavailable": "DMS nicht verfügbar",

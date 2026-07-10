@@ -1460,6 +1460,8 @@
         "documentStorageBackupWarning": "Databaseback-ups bevatten geen WebDAV-bestanden.",
         "documentStorageNotConfigured": "Niet geconfigureerd",
         "documentStorageActive": "Actieve uploadbestemming",
+        "documentStorageDatabase": "Database",
+        "documentStorageLocalEnvManaged": "Geconfigureerd via de omgeving (hostmap-koppeling).",
         "documentStorageTarget": "Bestemming",
         "documentStorageCount": "Opgeslagen WebDAV-documenten",
         "documentStorageLastTest": "Laatste test",
@@ -1885,6 +1887,7 @@
     "documents": {
         "title": "Documenten",
         "storageLocal": "Lokaal",
+        "storageLocalFolder": "Lokale map",
         "storageWebdav": "WebDAV",
         "storageDms": "DMS",
         "storageDmsUnavailable": "DMS niet beschikbaar",

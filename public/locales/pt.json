@@ -1460,6 +1460,8 @@
         "documentStorageBackupWarning": "Os backups do banco de dados não incluem arquivos WebDAV.",
         "documentStorageNotConfigured": "Não configurado",
         "documentStorageActive": "Destino de upload ativo",
+        "documentStorageDatabase": "Base de dados",
+        "documentStorageLocalEnvManaged": "Configurado através do ambiente (montagem de pasta do host).",
         "documentStorageTarget": "Destino",
         "documentStorageCount": "Documentos WebDAV armazenados",
         "documentStorageLastTest": "Último teste",
@@ -1873,6 +1875,7 @@
     "documents": {
         "title": "Documentos",
         "storageLocal": "Local",
+        "storageLocalFolder": "Pasta local",
         "storageWebdav": "WebDAV",
         "storageDms": "DMS",
         "storageDmsUnavailable": "DMS indisponível",

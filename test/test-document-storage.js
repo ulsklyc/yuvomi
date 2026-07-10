@@ -53,6 +53,8 @@ const STORAGE_ENV_KEYS = [
   'DOCUMENT_STORAGE_WEBDAV_PASSWORD',
   'DOCUMENT_STORAGE_WEBDAV_PATH',
   'DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK',
+  'DOCUMENT_STORAGE_LOCAL_ENABLED',
+  'DOCUMENT_STORAGE_LOCAL_PATH',
 ];
 
 function clearStorageConfig() {
@@ -1911,6 +1913,8 @@ test('document storage config status masks passwords and reports effective env c
     configured: true,
     active_upload_backend: 'webdav',
     effective_target: `${webdav.url}/env/documents`,
+    local_enabled: false,
+    local_path: '/documents',
     webdav_document_count: 1,
     last_test: '2026-06-10T12:00:00.000Z',
     last_error: 'previous failure',
@@ -2502,4 +2506,57 @@ test('legacy local rows without a storage_key still read from the DB BLOB', asyn
     mime_type: 'text/plain',
   });
   assert.deepEqual(read.buffer, Buffer.from('legacy blob'));
+});
+
+test('document routes: local folder upload lands on disk and status reports local_folder', async (t) => {
+  const dir = mkdtempSync(nodePath.join(tmpdir(), 'yuvomi-docs-route-'));
+  const previous = Object.fromEntries(LOCAL_ENV_KEYS.map((k) => [k, process.env[k]]));
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  process.env.DOCUMENT_STORAGE_LOCAL_PATH = dir;
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => {
+    harness.close();
+    for (const key of LOCAL_ENV_KEYS) {
+      if (previous[key] === undefined) delete process.env[key];
+      else process.env[key] = previous[key];
+    }
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  // Both status surfaces report the local folder as the active upload backend.
+  const meta = await routeCall(harness, 'GET', '/meta/options');
+  assert.equal(meta.body.data.active_upload_backend, 'local_folder');
+
+  const status = await routeCall(harness, 'GET', '/storage/config');
+  assert.equal(status.response.status, 200);
+  assert.equal(status.body.data.active_upload_backend, 'local_folder');
+  assert.equal(status.body.data.local_enabled, true);
+  assert.equal(status.body.data.local_path, dir);
+  assert.equal(status.body.data.effective_target, dir);
+
+  // The upload is written to the folder, not the in-DB BLOB.
+  const created = await routeCall(harness, 'POST', '/', uploadBody({
+    name: 'Folder route upload',
+    bytes: 'folder route bytes',
+  }));
+  assert.equal(created.response.status, 201);
+  assert.equal(created.body.data.storage_backend, 'local');
+
+  const row = get().prepare(
+    'SELECT storage_backend, storage_key, content_data FROM family_documents WHERE id = ?'
+  ).get(created.body.data.id);
+  assert.equal(row.storage_backend, 'local');
+  assert.ok(row.storage_key && !row.storage_key.startsWith('/'), 'relative storage_key stored');
+  assert.equal(Buffer.from(row.content_data ?? '').length, 0, 'no BLOB copy in the DB');
+
+  const onDisk = nodePath.join(dir, row.storage_key);
+  assert.ok(existsSync(onDisk), 'uploaded file exists in the configured folder');
+  assert.deepEqual(readFileSync(onDisk), Buffer.from('folder route bytes'));
+
+  // Download round-trips the bytes back from disk.
+  const baseUrl = await harness.listen();
+  const dl = await fetch(`${baseUrl}/api/v1/documents/${created.body.data.id}/download`);
+  assert.equal(dl.status, 200);
+  assert.deepEqual(Buffer.from(await dl.arrayBuffer()), Buffer.from('folder route bytes'));
 });

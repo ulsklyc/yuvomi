@@ -1466,6 +1466,8 @@
         "documentStorageBackupWarning": "데이터베이스 백업에는 WebDAV 파일이 포함되지 않습니다.",
         "documentStorageNotConfigured": "구성되지 않음",
         "documentStorageActive": "활성 업로드 대상",
+        "documentStorageDatabase": "데이터베이스",
+        "documentStorageLocalEnvManaged": "환경을 통해 구성됨(호스트 폴더 마운트).",
         "documentStorageTarget": "대상",
         "documentStorageCount": "저장된 WebDAV 문서",
         "documentStorageLastTest": "마지막 테스트",
@@ -1885,6 +1887,7 @@
     "documents": {
         "title": "문서",
         "storageLocal": "로컬",
+        "storageLocalFolder": "로컬 폴더",
         "storageWebdav": "WebDAV",
         "storageDms": "DMS",
         "storageDmsUnavailable": "DMS 사용 불가",

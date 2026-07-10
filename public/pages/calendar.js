@@ -2454,11 +2454,13 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
     <div class="form-group">
       <label class="form-label" for="modal-attachment">${t('calendar.attachmentLabel')}</label>
       <p class="document-storage-target">
-        <i data-lucide="${state.documentUploadBackend === 'webdav' ? 'cloud' : 'database'}" aria-hidden="true"></i>
+        <i data-lucide="${state.documentUploadBackend === 'webdav' ? 'cloud' : state.documentUploadBackend === 'local_folder' ? 'folder' : 'database'}" aria-hidden="true"></i>
         <span>${t('documents.activeUploadTarget', {
           target: state.documentUploadBackend === 'webdav'
             ? t('documents.storageWebdav')
-            : t('documents.storageLocal'),
+            : state.documentUploadBackend === 'local_folder'
+              ? t('documents.storageLocalFolder')
+              : t('documents.storageLocal'),
         })}</span>
       </p>
       <label class="document-dropzone" id="modal-attachment-dropzone" for="modal-attachment">

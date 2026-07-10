@@ -1460,6 +1460,8 @@
         "documentStorageBackupWarning": "Zálohy databáze neobsahují soubory WebDAV.",
         "documentStorageNotConfigured": "Nenakonfigurováno",
         "documentStorageActive": "Aktivní cíl nahrávání",
+        "documentStorageDatabase": "Databáze",
+        "documentStorageLocalEnvManaged": "Nakonfigurováno přes prostředí (připojení složky hostitele).",
         "documentStorageTarget": "Cíl",
         "documentStorageCount": "Uložené dokumenty WebDAV",
         "documentStorageLastTest": "Poslední test",
@@ -2053,6 +2055,7 @@
     "documents": {
         "title": "Dokumenty",
         "storageLocal": "Místní",
+        "storageLocalFolder": "Místní složka",
         "storageWebdav": "WebDAV",
         "storageDms": "DMS",
         "storageDmsUnavailable": "DMS není dostupné",

@@ -1460,6 +1460,8 @@
         "documentStorageBackupWarning": "Veritabanı yedekleri WebDAV dosyalarını içermez.",
         "documentStorageNotConfigured": "Yapılandırılmadı",
         "documentStorageActive": "Etkin yükleme hedefi",
+        "documentStorageDatabase": "Veritabanı",
+        "documentStorageLocalEnvManaged": "Ortam üzerinden yapılandırıldı (ana makine klasörü bağlama).",
         "documentStorageTarget": "Hedef",
         "documentStorageCount": "Saklanan WebDAV belgeleri",
         "documentStorageLastTest": "Son test",
@@ -1873,6 +1875,7 @@
     "documents": {
         "title": "Belgeler",
         "storageLocal": "Yerel",
+        "storageLocalFolder": "Yerel klasör",
         "storageWebdav": "WebDAV",
         "storageDms": "DMS",
         "storageDmsUnavailable": "DMS kullanılamıyor",

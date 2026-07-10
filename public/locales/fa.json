@@ -1466,6 +1466,8 @@
         "documentStorageBackupWarning": "پشتیبان‌های پایگاه داده شامل فایل‌های WebDAV نمی‌شوند.",
         "documentStorageNotConfigured": "پیکربندی نشده",
         "documentStorageActive": "مقصد بارگذاری فعال",
+        "documentStorageDatabase": "پایگاه داده",
+        "documentStorageLocalEnvManaged": "از طریق محیط پیکربندی شده است (اتصال پوشه میزبان).",
         "documentStorageTarget": "مقصد",
         "documentStorageCount": "اسناد WebDAV ذخیره‌شده",
         "documentStorageLastTest": "آخرین آزمایش",
@@ -1885,6 +1887,7 @@
     "documents": {
         "title": "اسناد",
         "storageLocal": "محلی",
+        "storageLocalFolder": "پوشه محلی",
         "storageWebdav": "WebDAV",
         "storageDms": "DMS",
         "storageDmsUnavailable": "DMS در دسترس نیست",

@@ -1460,6 +1460,8 @@
         "documentStorageBackupWarning": "Резервні копії бази даних не містять файлів WebDAV.",
         "documentStorageNotConfigured": "Не налаштовано",
         "documentStorageActive": "Активне місце завантаження",
+        "documentStorageDatabase": "База даних",
+        "documentStorageLocalEnvManaged": "Налаштовано через середовище (монтування папки хоста).",
         "documentStorageTarget": "Місце призначення",
         "documentStorageCount": "Збережені документи WebDAV",
         "documentStorageLastTest": "Остання перевірка",
@@ -1873,6 +1875,7 @@
     "documents": {
         "title": "Документи",
         "storageLocal": "Локально",
+        "storageLocalFolder": "Локальна папка",
         "storageWebdav": "WebDAV",
         "storageDms": "DMS",
         "storageDmsUnavailable": "DMS недоступна",

@@ -1460,6 +1460,8 @@
         "documentStorageBackupWarning": "数据库备份不包含 WebDAV 文件。",
         "documentStorageNotConfigured": "未配置",
         "documentStorageActive": "当前上传目标",
+        "documentStorageDatabase": "数据库",
+        "documentStorageLocalEnvManaged": "通过环境配置（挂载主机文件夹）。",
         "documentStorageTarget": "目标",
         "documentStorageCount": "已存储的 WebDAV 文档",
         "documentStorageLastTest": "上次测试",
@@ -1873,6 +1875,7 @@
     "documents": {
         "title": "文档",
         "storageLocal": "本地",
+        "storageLocalFolder": "本地文件夹",
         "storageWebdav": "WebDAV",
         "storageDms": "DMS",
         "storageDmsUnavailable": "DMS 不可用",

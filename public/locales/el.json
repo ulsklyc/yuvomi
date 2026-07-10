@@ -1460,6 +1460,8 @@
         "documentStorageBackupWarning": "Τα αντίγραφα ασφαλείας της βάσης δεδομένων δεν περιλαμβάνουν αρχεία WebDAV.",
         "documentStorageNotConfigured": "Δεν έχει ρυθμιστεί",
         "documentStorageActive": "Ενεργός προορισμός μεταφόρτωσης",
+        "documentStorageDatabase": "Βάση δεδομένων",
+        "documentStorageLocalEnvManaged": "Ρυθμίστηκε μέσω περιβάλλοντος (προσάρτηση φακέλου host).",
         "documentStorageTarget": "Προορισμός",
         "documentStorageCount": "Αποθηκευμένα έγγραφα WebDAV",
         "documentStorageLastTest": "Τελευταία δοκιμή",
@@ -1873,6 +1875,7 @@
     "documents": {
         "title": "Έγγραφα",
         "storageLocal": "Τοπικά",
+        "storageLocalFolder": "Τοπικός φάκελος",
         "storageWebdav": "WebDAV",
         "storageDms": "DMS",
         "storageDmsUnavailable": "Το DMS δεν είναι διαθέσιμο",

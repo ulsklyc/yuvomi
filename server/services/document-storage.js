@@ -78,11 +78,19 @@ export class StorageError extends Error {
 // enabled it takes precedence over the WebDAV backend and over the in-DB BLOB
 // default. Folder-backed rows are stored with storage_backend='local' and a
 // non-null relative storage_key; legacy in-DB BLOB rows keep storage_key=null.
+// Strict boolean env parsing, mirroring parseEnabled(): an unset/empty flag is
+// off, but a non-empty typo (e.g. "yes") fails loudly instead of silently
+// disabling the feature.
 function parseEnvFlag(name) {
   const raw = process.env[name];
-  if (raw === undefined) return false;
+  if (raw === undefined || String(raw).trim() === '') return false;
   const normalized = String(raw).trim().toLowerCase();
-  return normalized === 'true' || normalized === '1';
+  if (normalized === 'true' || normalized === '1') return true;
+  if (normalized === 'false' || normalized === '0') return false;
+  throw new StorageError(
+    'DOCUMENT_STORAGE_INVALID_CONFIG',
+    `${name} must be true, false, 1, or 0.`
+  );
 }
 
 export function getLocalStorageConfig() {
@@ -91,6 +99,14 @@ export function getLocalStorageConfig() {
     enabled: parseEnvFlag('DOCUMENT_STORAGE_LOCAL_ENABLED'),
     basePath: basePath || '/documents',
   };
+}
+
+// The upload backend that new documents will be written to, in precedence order:
+// a mounted local folder wins over WebDAV, which wins over the in-DB BLOB default.
+export function getActiveUploadBackend() {
+  if (getLocalStorageConfig().enabled) return 'local_folder';
+  if (getConfig().enabled) return 'webdav';
+  return 'local';
 }
 
 // Resolve a validated storage key to an absolute path inside basePath.

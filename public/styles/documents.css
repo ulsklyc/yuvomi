@@ -1013,6 +1013,12 @@
   color: var(--color-danger);
 }
 
+/* Local folder storage: neutral, distinct from the semantic-colored backends. */
+.doc-badge--folder {
+  background: var(--color-border-subtle);
+  color: var(--color-text-primary);
+}
+
 .document-storage-target {
   display: flex;
   align-items: center;

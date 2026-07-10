@@ -1460,6 +1460,8 @@
         "documentStorageBackupWarning": "डेटाबेस बैकअप में WebDAV फ़ाइलें शामिल नहीं होती हैं।",
         "documentStorageNotConfigured": "कॉन्फ़िगर नहीं किया गया",
         "documentStorageActive": "सक्रिय अपलोड लक्ष्य",
+        "documentStorageDatabase": "डेटाबेस",
+        "documentStorageLocalEnvManaged": "पर्यावरण के माध्यम से कॉन्फ़िगर किया गया (होस्ट फ़ोल्डर माउंट)।",
         "documentStorageTarget": "लक्ष्य",
         "documentStorageCount": "संग्रहीत WebDAV दस्तावेज़",
         "documentStorageLastTest": "अंतिम जाँच",
@@ -1873,6 +1875,7 @@
     "documents": {
         "title": "दस्तावेज़",
         "storageLocal": "स्थानीय",
+        "storageLocalFolder": "स्थानीय फ़ोल्डर",
         "storageWebdav": "WebDAV",
         "storageDms": "DMS",
         "storageDmsUnavailable": "DMS उपलब्ध नहीं",

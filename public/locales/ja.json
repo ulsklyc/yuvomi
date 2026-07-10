@@ -1460,6 +1460,8 @@
         "documentStorageBackupWarning": "データベースのバックアップには WebDAV ファイルは含まれません。",
         "documentStorageNotConfigured": "未設定",
         "documentStorageActive": "有効なアップロード先",
+        "documentStorageDatabase": "データベース",
+        "documentStorageLocalEnvManaged": "環境変数で構成（ホストフォルダーのマウント）。",
         "documentStorageTarget": "保存先",
         "documentStorageCount": "保存済み WebDAV 文書",
         "documentStorageLastTest": "最終テスト",
@@ -1873,6 +1875,7 @@
     "documents": {
         "title": "書類",
         "storageLocal": "ローカル",
+        "storageLocalFolder": "ローカルフォルダー",
         "storageWebdav": "WebDAV",
         "storageDms": "DMS",
         "storageDmsUnavailable": "DMS を利用できません",

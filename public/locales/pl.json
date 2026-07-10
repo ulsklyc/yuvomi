@@ -1466,6 +1466,8 @@
         "documentStorageBackupWarning": "Kopie zapasowe bazy danych nie zawierają plików WebDAV.",
         "documentStorageNotConfigured": "Nie skonfigurowano",
         "documentStorageActive": "Aktywne miejsce przesyłania",
+        "documentStorageDatabase": "Baza danych",
+        "documentStorageLocalEnvManaged": "Skonfigurowano przez środowisko (podłączenie folderu hosta).",
         "documentStorageTarget": "Miejsce docelowe",
         "documentStorageCount": "Zapisane dokumenty WebDAV",
         "documentStorageLastTest": "Ostatni test",
@@ -1885,6 +1887,7 @@
     "documents": {
         "title": "Dokumenty",
         "storageLocal": "Lokalnie",
+        "storageLocalFolder": "Folder lokalny",
         "storageWebdav": "WebDAV",
         "storageDms": "DMS",
         "storageDmsUnavailable": "DMS niedostępny",

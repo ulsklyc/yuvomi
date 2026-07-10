@@ -1460,6 +1460,8 @@
         "documentStorageBackupWarning": "Bản sao lưu cơ sở dữ liệu không bao gồm các tệp WebDAV.",
         "documentStorageNotConfigured": "Chưa cấu hình",
         "documentStorageActive": "Đích tải lên đang hoạt động",
+        "documentStorageDatabase": "Cơ sở dữ liệu",
+        "documentStorageLocalEnvManaged": "Được cấu hình qua môi trường (gắn kết thư mục host).",
         "documentStorageTarget": "Đích",
         "documentStorageCount": "Tài liệu WebDAV đã lưu",
         "documentStorageLastTest": "Lần kiểm tra gần nhất",
@@ -1885,6 +1887,7 @@
     "documents": {
         "title": "Tài liệu",
         "storageLocal": "Cục bộ",
+        "storageLocalFolder": "Thư mục cục bộ",
         "storageWebdav": "WebDAV",
         "storageDms": "DMS",
         "storageDmsUnavailable": "DMS không khả dụng",
