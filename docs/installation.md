@@ -178,6 +178,8 @@ Open your browser and navigate to **http://localhost:8090**. The wizard detects 
 - Starting the container (via Docker or Podman, whichever was detected)
 - Creating your admin account
 
+The final screen lets you **download a copy of your `.env`** — keep it safe, as it holds the encryption keys that cannot be recovered if lost.
+
 The installer server shuts down automatically after setup completes (or after 30 minutes of inactivity).
 
 ---

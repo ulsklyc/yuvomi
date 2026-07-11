@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-07-11
+
+### Added
+- **Laypeople-friendly web installer wizard.** The welcome screen now offers a **Simple setup** (auto-generated keys, safe localhost/HTTP defaults, straight to account creation) and an **Advanced setup** that walks every option step by step. A visible 23-language picker overrides browser detection and remembers your choice (right-to-left for Arabic and Persian), and navigation is flow-based rather than fixed step numbers.
+- **More can be configured from the web installer:** SMTP email for the "forgot password" flow (`EMAIL_SMTP_*`, `EMAIL_FROM_*`), off-site WebDAV backups (`WEBDAV_BACKUP_*`), live currency rates (`FIXER_API_KEY`), the Web-Push contact address (`VAPID_SUBJECT`), and an automatically derived `BASE_URL` for password-reset links. A review screen summarizes access, email, single sign-on, and backups before writing.
+- **Web installer: download your `.env`.** The final screen offers a one-click download of the generated `.env` file — the only backup of your encryption keys. In Simple setup, where the keys are never shown, the download leads until you've saved them.
+
+### Fixed
+- **Web installer no longer blocks non-SSO users.** The pre-filled OIDC redirect URI was counted in the "all four fields or none" check, blocking every Advanced user who didn't configure single sign-on; only the three manually entered core fields are counted now.
+- **Web installer stays legible if its stylesheet can't load.** Inline fallback design tokens (including a dark-mode variant) now precede the app stylesheet, so a misconfigured or missing `tokens.css` no longer renders the wizard as unstyled black-on-transparent text.
+- **Web installer: validation errors point at the offending field.** Invalid inputs are now flagged with a red border and `aria-invalid`, and focus moves to the field — not just a message at the bottom of the step.
+- **Web installer: passwords and values with special characters survive.** `.env` values containing spaces, `#`, `$`, or quotes are now quote-escaped so Docker Compose reads them back verbatim instead of truncating or misinterpreting them.
+- **Web installer no longer crashes if the container engine disappears mid-startup.** The status poll now handles a vanished Docker/Podman binary gracefully instead of exiting.
+
+### Security
+- **Web installer rejects cross-origin requests.** State-changing endpoints (writing `.env`, starting the container, creating the admin account) now require a loopback origin, guarding against DNS-rebinding/CSRF from a page visited while the installer is running.
+
 ## [1.12.0] - 2026-07-11
 
 ### Added

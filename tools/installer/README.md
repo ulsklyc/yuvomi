@@ -54,11 +54,15 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
      language and remembers your choice.
 3. Backs up any existing `.env` to `.env.bak-<ISO>` before writing
 4. Writes `.env` to the project root (keys are allowlisted against the shared
-   env schema; values containing line breaks are rejected)
+   env schema; values containing line breaks are rejected, and values with
+   whitespace, `#`, quotes or `$` are quote-escaped so Docker Compose reads
+   them back verbatim)
 5. Starts the container (`docker compose up -d`, or `podman compose -f
    podman-compose.yml up -d` / `podman-compose -f podman-compose.yml up -d`)
 6. Polls the health endpoint until the container is ready
 7. Creates your first admin account via `POST /api/v1/auth/setup`
+8. Offers to download a copy of the written `.env` on the final screen — the
+   only backup of the encryption keys, which cannot be recovered if lost
 
 The local-folder document-storage fields are optional. Setting `DOCUMENT_STORAGE_LOCAL_ENABLED=true`
 writes new document files (including calendar attachments) to `DOCUMENT_STORAGE_LOCAL_PATH` (default
@@ -95,17 +99,23 @@ enforced by `test-installer-cli-i18n.js`.
 The wizard reuses the app's design language: shared design tokens
 (`public/styles/tokens.css`) and the Plus Jakarta Sans variable font are served
 read-only from the repo, so the installer matches the app's violet accent,
-radii, shadows, and automatic dark mode. The wizard meets WCAG 2.1 AA
+radii, shadows, and automatic dark mode. An inline fallback token block (with a
+dark-mode variant) precedes the `tokens.css` link, so the wizard stays legible
+even if that stylesheet cannot be served. The wizard meets WCAG 2.1 AA
 (keyboard-operable accordions, ARIA live regions for Docker status, focus
-management, and labelled controls).
+management, labelled controls, a `<main>` landmark, and field-level error
+identification — `aria-invalid` plus focus moved to the offending input).
 
 ## Architecture
 
-- `install-server.js` — the temporary HTTP server (port 8090). Endpoints:
+- `install-server.js` — the temporary HTTP server (port 8090), bound to
+  loopback. State-changing `POST`s are rejected (403) unless the request's Host
+  and any Origin/Referer are loopback, guarding against DNS-rebinding/CSRF while
+  the installer runs. Endpoints:
   `GET /api/defaults` (serves `ENV_SCHEMA`), `GET /api/prereqs`,
   `GET /api/preflight` (existing `.env` / running container),
-  `POST /api/generate-secret`, `POST /api/save-env`, `POST /api/start`,
-  `GET /api/status`, `POST /api/create-admin`.
+  `POST /api/generate-secret`, `POST /api/save-env` (returns the written path),
+  `POST /api/start`, `GET /api/status`, `POST /api/create-admin`.
 - `env-schema.js` — the single source of truth (`ENV_SCHEMA`) for every
   configurable variable, its group, default, and whether it is written to `.env`.
 - `i18n-mini.js` + `locales/*.json` — web-wizard localization.
