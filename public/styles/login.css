@@ -46,8 +46,8 @@
   margin-bottom: var(--space-8);
 }
 
-/* Marken-Anker: App-Tile mit Home-Glyph. Selbstbewusst (gefülltes Tile,
- * weicher Schatten) und warm (gerundet, Home-Zeichen) – „Würde ohne Kälte". */
+/* Marken-Anker: App-Tile mit dem Yuvomi-Zeichen (drei transluzente Kreise).
+ * Selbstbewusst (gefülltes Tile, weicher Schatten) und warm – „Würde ohne Kälte". */
 .login-hero__mark {
   display: inline-flex;
   align-items: center;

@@ -34,10 +34,12 @@ export async function render(container) {
     <main class="login-page" id="main-content">
       <div class="login-hero">
         <span class="login-hero__mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 11 L12 4 L20 11" />
-            <path d="M6 10 V19 a1 1 0 0 0 1 1 H17 a1 1 0 0 0 1 -1 V10" />
-            <path d="M10 20 V15 a1 1 0 0 1 1 -1 H13 a1 1 0 0 1 1 1 V20" />
+          <svg viewBox="0 0 160 160" fill="currentColor">
+            <g fill-opacity="0.82">
+              <circle cx="64" cy="72" r="27" />
+              <circle cx="100" cy="78" r="25" />
+              <circle cx="80" cy="106" r="24" />
+            </g>
           </svg>
         </span>
         <h1 class="login-hero__title">${esc(storedAppName)}</h1>
