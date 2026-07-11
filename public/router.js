@@ -466,7 +466,16 @@ async function navigate(path, userOrPushState = true, pushState = true) {
 
     let route = allRoutes().find((r) => r.path === basePath) ?? ROUTES.find((r) => r.path === '/');
 
-    if (currentUser?.access_scope === 'split_guest' && route.path !== '/budget') {
+    // Split-Guest-Weiche: Gäste einer Ausgabenteilung sehen nur das Budget-Modul.
+    // ABER: hat der Nutzer zusätzlich eine Familienrolle OHNE Budget-Recht, würde
+    // ein bedingungsloses navigate('/budget') vom Modul-Guard (canAccessNavModule)
+    // sofort wieder auf '/' geworfen — und '/' schickt zurück auf '/budget':
+    // Endlosschleife bis Stack-Overflow (#480). Daher nur umleiten, wenn Budget
+    // tatsächlich zugänglich ist; sonst greift der reguläre Rechte-Guard und der
+    // Nutzer landet auf einer für ihn erlaubten Seite.
+    if (currentUser?.access_scope === 'split_guest'
+        && route.path !== '/budget'
+        && canAccessNavModule('budget')) {
       currentPath = null;
       isNavigating = false;
       navigate('/budget');
@@ -512,7 +521,16 @@ async function navigate(path, userOrPushState = true, pushState = true) {
 
     route = allRoutes().find((r) => r.path === basePath) ?? route;
 
-    if (currentUser?.access_scope === 'split_guest' && route.path !== '/budget') {
+    // Split-Guest-Weiche: Gäste einer Ausgabenteilung sehen nur das Budget-Modul.
+    // ABER: hat der Nutzer zusätzlich eine Familienrolle OHNE Budget-Recht, würde
+    // ein bedingungsloses navigate('/budget') vom Modul-Guard (canAccessNavModule)
+    // sofort wieder auf '/' geworfen — und '/' schickt zurück auf '/budget':
+    // Endlosschleife bis Stack-Overflow (#480). Daher nur umleiten, wenn Budget
+    // tatsächlich zugänglich ist; sonst greift der reguläre Rechte-Guard und der
+    // Nutzer landet auf einer für ihn erlaubten Seite.
+    if (currentUser?.access_scope === 'split_guest'
+        && route.path !== '/budget'
+        && canAccessNavModule('budget')) {
       currentPath = null;
       isNavigating = false;
       navigate('/budget');

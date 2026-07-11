@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.2] - 2026-07-11
+
+### Fixed
+- Family members who are both a shared-expense guest and hold a family role without Budget access no longer get stuck in an infinite redirect loop between the dashboard and the Budget module (which previously crashed the tab with a "Maximum call stack size exceeded" error). The guest→Budget redirect now defers to the permission check, so a user without Budget access lands on an accessible page instead. (#480)
+
 ## [1.10.1] - 2026-07-11
 
 ### Fixed
