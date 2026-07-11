@@ -18,33 +18,46 @@ const ICONS_DIR = join(__dirname, '..', 'public', 'icons');
 
 mkdirSync(ICONS_DIR, { recursive: true });
 
-/** Logo SVG (any): rounded corners, gradient background */
-function createLogoSvg(size) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 160 160" fill="none">
-  <defs>
+/**
+ * Drei transluzente, ineinander übergehende Kreise (Familie).
+ * Überlappungen verdichten sich zu helleren Linsen -> weicher Blend.
+ * Liegen innerhalb der maskable-Safe-Zone (Ø 80 %).
+ */
+const CIRCLES = `<g fill="#fff" fill-opacity="0.82">
+    <circle cx="64" cy="72" r="27"/>
+    <circle cx="100" cy="78" r="25"/>
+    <circle cx="80" cy="106" r="24"/>
+  </g>`;
+
+/** Gemeinsame Gradient-Defs: Marken-Violett + dezenter Top-Sheen (Glas-Charakter) */
+const DEFS = `<defs>
     <linearGradient id="bg" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#8b5cf6"/>
       <stop offset="100%" stop-color="#6c3aed"/>
     </linearGradient>
-  </defs>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="160" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.14"/>
+      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>`;
+
+/** Logo SVG (any): rounded corners, gradient background + sheen */
+function createLogoSvg(size) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 160 160" fill="none">
+  ${DEFS}
   <rect width="160" height="160" rx="36" fill="url(#bg)"/>
-  <path d="M80 36L36 72V120C36 122.2 37.8 124 40 124H68V96H92V124H120C122.2 124 124 122.2 124 120V72L80 36Z" fill="white"/>
-  <rect x="100" y="46" width="12" height="22" rx="2" fill="white"/>
+  <rect width="160" height="160" rx="36" fill="url(#sheen)"/>
+  ${CIRCLES}
 </svg>`;
 }
 
 /** Maskable logo SVG: full-bleed background (no rx), logo within safe zone */
 function createMaskableLogoSvg(size) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 160 160" fill="none">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#8b5cf6"/>
-      <stop offset="100%" stop-color="#6c3aed"/>
-    </linearGradient>
-  </defs>
+  ${DEFS}
   <rect width="160" height="160" fill="url(#bg)"/>
-  <path d="M80 36L36 72V120C36 122.2 37.8 124 40 124H68V96H92V124H120C122.2 124 124 122.2 124 120V72L80 36Z" fill="white"/>
-  <rect x="100" y="46" width="12" height="22" rx="2" fill="white"/>
+  <rect width="160" height="160" fill="url(#sheen)"/>
+  ${CIRCLES}
 </svg>`;
 }
 

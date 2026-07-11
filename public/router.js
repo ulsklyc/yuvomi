@@ -1046,15 +1046,16 @@ function renderAppShell(container) {
   bgRect.setAttribute('width', '160'); bgRect.setAttribute('height', '160');
   bgRect.setAttribute('rx', '36'); bgRect.setAttribute('fill', `url(#${gradId})`);
   logoSvg.appendChild(bgRect);
-  const housePath = document.createElementNS(SVG_NS, 'path');
-  housePath.setAttribute('d', 'M80 36L36 72V120C36 122.2 37.8 124 40 124H68V96H92V124H120C122.2 124 124 122.2 124 120V72L80 36Z');
-  housePath.setAttribute('fill', 'white');
-  logoSvg.appendChild(housePath);
-  const chimney = document.createElementNS(SVG_NS, 'rect');
-  chimney.setAttribute('x', '100'); chimney.setAttribute('y', '46');
-  chimney.setAttribute('width', '12'); chimney.setAttribute('height', '22');
-  chimney.setAttribute('rx', '2'); chimney.setAttribute('fill', 'white');
-  logoSvg.appendChild(chimney);
+  // Drei transluzente, ineinander übergehende Kreise (Familie); kein Sheen in der Sidebar
+  const marks = document.createElementNS(SVG_NS, 'g');
+  marks.setAttribute('fill', 'white');
+  marks.setAttribute('fill-opacity', '0.82');
+  for (const [cx, cy, r] of [[64, 72, 27], [100, 78, 25], [80, 106, 24]]) {
+    const c = document.createElementNS(SVG_NS, 'circle');
+    c.setAttribute('cx', String(cx)); c.setAttribute('cy', String(cy)); c.setAttribute('r', String(r));
+    marks.appendChild(c);
+  }
+  logoSvg.appendChild(marks);
   logomark.appendChild(logoSvg);
   sidebarLogo.appendChild(logomark);
 

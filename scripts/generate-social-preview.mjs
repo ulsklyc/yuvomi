@@ -222,8 +222,8 @@ body::after {
   <div class="brand">
     <div class="mark">
       <svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M80 36L36 72V120C36 122.2 37.8 124 40 124H68V96H92V124H120C122.2 124 124 122.2 124 120V72L80 36Z" fill="white"/>
-        <rect x="100" y="46" width="12" height="22" rx="2" fill="white"/>
+        <g fill="white" fill-opacity="0.82"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g>
+        
       </svg>
     </div>
     <div class="name">Yuvomi</div>
