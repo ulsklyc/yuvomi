@@ -9,6 +9,7 @@ import express from 'express';
 import * as db from '../db.js';
 import { nextOccurrenceAfter } from '../services/recurrence.js';
 import { syncTaskRewards } from '../services/rewards.js';
+import { normalizeVisibility, visibilityWhere } from '../services/visibility.js';
 import * as v from '../middleware/validate.js';
 
 const log = createLogger('Tasks');
@@ -153,6 +154,11 @@ router.get('/', (req, res) => {
     }
     if (category)    { sql += ' AND t.category = ?';    params.push(category); }
 
+    // Sichtbarkeit (#474): eigene + für alle sichtbare + zugewiesene-sichtbare.
+    const me = req.authUserId || req.session.userId;
+    sql += ` AND ${visibilityWhere('t', 'task_assignments', 'task_id')}`;
+    params.push(me, me);
+
     sql += `
       ORDER BY
         CASE t.status WHEN 'done' THEN 1 ELSE 0 END,
@@ -176,13 +182,15 @@ router.get('/', (req, res) => {
 // --------------------------------------------------------
 router.get('/:id', (req, res) => {
   try {
+    const me = req.authUserId || req.session.userId;
     const task = db.get().prepare(`
       SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color,
         u.avatar_data AS assigned_avatar, ${ASSIGNED_USERS_SQL}
       FROM tasks t
       LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.id = ? AND t.parent_task_id IS NULL
-    `).get(req.params.id);
+        AND ${visibilityWhere('t', 'task_assignments', 'task_id')}
+    `).get(req.params.id, me, me);
 
     if (!task) return res.status(404).json({ error: 'Task not found.', code: 404 });
 
@@ -220,6 +228,7 @@ router.post('/', (req, res) => {
       recurrence_rule = null,
     } = req.body;
     const points = clampPoints(req.body.points);
+    const visibility = normalizeVisibility(req.body.visibility);
 
     const userIds  = parseAssignedTo(req.body.assigned_to);
     const firstUid = userIds[0] ?? null;
@@ -237,12 +246,12 @@ router.post('/', (req, res) => {
       const result = db.get().prepare(`
         INSERT INTO tasks
           (title, description, category, priority, start_date, due_date, due_time,
-           assigned_to, created_by, parent_task_id, is_recurring, recurrence_rule, points)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           assigned_to, created_by, parent_task_id, is_recurring, recurrence_rule, points, visibility)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         title.trim(), description, category, priority,
         start_date, due_date, due_time, firstUid, req.authUserId || req.session.userId, parent_task_id,
-        is_recurring ? 1 : 0, recurrence_rule, points
+        is_recurring ? 1 : 0, recurrence_rule, points, visibility
       );
       setAssignments(db.get(), result.lastInsertRowid, userIds);
       return result.lastInsertRowid;
@@ -290,6 +299,9 @@ router.put('/:id', (req, res) => {
       recurrence_rule = task.recurrence_rule,
     } = req.body;
     const points = req.body.points !== undefined ? clampPoints(req.body.points) : task.points;
+    const visibility = req.body.visibility !== undefined
+      ? normalizeVisibility(req.body.visibility, task.visibility)
+      : task.visibility;
 
     const userIds  = req.body.assigned_to !== undefined
       ? parseAssignedTo(req.body.assigned_to)
@@ -302,11 +314,11 @@ router.put('/:id', (req, res) => {
         UPDATE tasks SET
           title = ?, description = ?, category = ?, priority = ?,
           status = ?, start_date = ?, due_date = ?, due_time = ?, assigned_to = ?,
-          is_recurring = ?, recurrence_rule = ?, points = ?
+          is_recurring = ?, recurrence_rule = ?, points = ?, visibility = ?
         WHERE id = ?
       `).run(title.trim(), description, category, priority,
              status, start_date, due_date, due_time, firstUid,
-             is_recurring ? 1 : 0, recurrence_rule, points, req.params.id);
+             is_recurring ? 1 : 0, recurrence_rule, points, visibility, req.params.id);
       setAssignments(db.get(), task.id, userIds);
       syncHousekeepingPaymentStatus(db.get(), req.params.id, status);
       // Punkte erst nach setAssignments: die Zuständigen werden daraus abgeleitet.
@@ -367,12 +379,12 @@ router.patch('/:id/status', (req, res) => {
           db.get().transaction(() => {
             const newTask = db.get().prepare(`
               INSERT INTO tasks (title, description, category, priority, status,
-                due_date, due_time, assigned_to, created_by, is_recurring, recurrence_rule, points)
-              VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, 1, ?, ?)
+                due_date, due_time, assigned_to, created_by, is_recurring, recurrence_rule, points, visibility)
+              VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, 1, ?, ?, ?)
             `).run(
               task.title, task.description, task.category, task.priority,
               nextDate, task.due_time, task.assigned_to, task.created_by,
-              task.recurrence_rule, task.points
+              task.recurrence_rule, task.points, task.visibility
             );
             setAssignments(db.get(), newTask.lastInsertRowid, existingAssignments);
           })();

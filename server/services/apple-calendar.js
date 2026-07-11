@@ -16,6 +16,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('Apple');
 
 import * as db from '../db.js';
+import { assignDefaultToEvent } from './sync-assignment.js';
 import { unfoldLines, parseICS, formatICSDate, tzLocalToUTC, applyDuration } from './ics-parser.js';
 import { decodeHtmlEntities } from '../utils/html-entities.js';
 
@@ -250,6 +251,10 @@ async function sync() {
     const calColor = normalizeCalColor(cal.calendarColor) || APPLE_COLOR;
     const calName  = cal.displayName || 'Apple Calendar';
     const calRefId = upsertExternalCalendar('apple', cal.url, calName, calColor);
+    // Standard-Zuweisung dieses Kalenders (#459) einmal auflösen, nicht pro Event.
+    const calDefaultAssignee = db.get()
+      .prepare('SELECT default_assignee_user_id FROM external_calendars WHERE id = ?')
+      .get(calRefId)?.default_assignee_user_id ?? null;
 
     // --------------------------------------------------------
     // Inbound: iCloud → lokal
@@ -280,7 +285,7 @@ async function sync() {
               ev.allDay ? 1 : 0, ev.location, ev.rrule, evColor, calRefId, existing.id
             );
           } else {
-            db.get().prepare(`
+            const inserted = db.get().prepare(`
               INSERT INTO calendar_events
                 (title, description, start_datetime, end_datetime, all_day,
                  location, color, external_calendar_id, external_source, recurrence_rule, calendar_ref_id, created_by)
@@ -289,6 +294,8 @@ async function sync() {
               ev.summary, ev.description, ev.dtstart, ev.dtend,
               ev.allDay ? 1 : 0, ev.location, evColor, ev.uid, ev.rrule, calRefId, createdBy
             );
+            // Standard-Zuweisung dieses Kalenders (#459) auf den neuen Termin.
+            assignDefaultToEvent(db.get(), inserted.lastInsertRowid, calDefaultAssignee);
           }
         } catch (err) {
           log.error(`Upsert error for UID ${ev.uid}:`, err.message);

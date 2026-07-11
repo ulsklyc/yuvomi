@@ -176,6 +176,35 @@ test('getForRange: collapses identical holidays left over from an old scope – 
   assert.equal(rows[0].name, 'Neujahr');
 });
 
+test('getForRange: collapses overlapping same-name school variants into one union span (#434, CH-BE)', () => {
+  // OpenHolidays liefert für Kanton Bern zwei "Sommerferien" mit abweichenden
+  // Terminen (deutsch- vs. französischsprachige Schulregion, groups CH-BE-VS/-EO).
+  // Kein "Exception"-Tag, unterschiedliche Daten → beide landen im Cache. Der
+  // Kalender darf trotzdem nur EINEN Balken zeigen: die Union-Spanne.
+  setConfig({ holiday_country: 'CH', holiday_subdivision: 'CH-BE', holiday_show_school: '1' });
+  seedHoliday({ type: 'school', country: 'CH', subdivision: 'CH-BE',
+    start: '2026-07-04', end: '2026-08-09', name: 'Sommerferien' });
+  seedHoliday({ type: 'school', country: 'CH', subdivision: 'CH-BE',
+    start: '2026-07-06', end: '2026-08-14', name: 'Sommerferien' });
+
+  const rows = getForRange('2026-07-01', '2026-08-31');
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].name, 'Sommerferien');
+  assert.equal(rows[0].start_date, '2026-07-04'); // frühester Start
+  assert.equal(rows[0].end_date, '2026-08-14');   // spätestes Ende
+});
+
+test('getForRange: keeps non-overlapping same-name entries separate (movable days)', () => {
+  // Gleichnamige, aber zeitlich getrennte Einträge (z. B. mehrere bewegliche
+  // Ferientage) dürfen NICHT zu einer Monatsspanne verschmolzen werden.
+  setConfig({ holiday_country: 'CH', holiday_show_school: '1' });
+  seedHoliday({ type: 'school', country: 'CH', start: '2026-03-02', end: '2026-03-02', name: 'Ferientag' });
+  seedHoliday({ type: 'school', country: 'CH', start: '2026-06-15', end: '2026-06-15', name: 'Ferientag' });
+  const rows = getForRange('2026-01-01', '2026-12-31');
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows.map((r) => r.start_date), ['2026-03-02', '2026-06-15']);
+});
+
 // ---- sync --------------------------------------------------------------------
 
 test('sync: no country → no fetch, synced 0', async () => {

@@ -14,10 +14,11 @@ import {
   assertWebdavTargetAllowed,
   cleanupStagedUpload,
   deleteDocumentContent,
+  getActiveUploadBackend,
   getConfig as getStorageConfig,
   getEffectiveTarget,
+  getLocalStorageConfig,
   getStatus as getStorageStatus,
-  isWebdavUploadEnabled,
   readDocumentContent,
   resolveConfig,
   saveConfig as saveStorageConfig,
@@ -203,16 +204,23 @@ function sendStorageError(res, error, fallbackMessage) {
 function storageConfigStatus() {
   const config = getStorageConfig();
   const status = getStorageStatus();
+  const local = getLocalStorageConfig();
+  const activeBackend = getActiveUploadBackend();
   const count = db.get().prepare(`
     SELECT COUNT(*) AS count
     FROM family_documents
     WHERE storage_backend = 'webdav'
   `).get().count;
+  const effectiveTarget = activeBackend === 'local_folder'
+    ? local.basePath
+    : (activeBackend === 'webdav' ? getEffectiveTarget(config) : null);
   return {
     enabled: status.enabled,
     configured: status.configured,
-    active_upload_backend: status.enabled ? 'webdav' : 'local',
-    effective_target: getEffectiveTarget(config),
+    active_upload_backend: activeBackend,
+    effective_target: effectiveTarget,
+    local_enabled: local.enabled,
+    local_path: local.basePath,
     webdav_document_count: count,
     last_test: status.lastTest,
     last_error: status.lastError,
@@ -373,7 +381,7 @@ router.get('/meta/options', (req, res) => {
         max_file_size: MAX_FILE_BYTES,
         allowed_mime_types: Array.from(ALLOWED_MIME),
         storage_providers: ['local', 'external'],
-        active_upload_backend: isWebdavUploadEnabled() ? 'webdav' : 'local',
+        active_upload_backend: getActiveUploadBackend(),
         dms_accounts: isAdmin(req) ? dmsAccounts : [],
       },
     });

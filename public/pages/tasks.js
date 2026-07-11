@@ -8,7 +8,7 @@ import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
 import { openModal as openSharedModal, closeModal, wireBlurValidation, validateAll, btnSuccess, btnError, promptModal, advancedSection } from '/components/modal.js';
 import { stagger, vibrate } from '/utils/ux.js';
-import { t, formatDate, formatTime, dateInputPlaceholder, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput, timeInputPlaceholder } from '/i18n.js';
+import { t, formatDate, formatTime, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
@@ -60,6 +60,19 @@ const STATUS_LABELS   = () => Object.fromEntries(STATUSES().map((s)  => [s.value
 
 function initials(name = '') {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
+// Sichtbarkeits-Indikator (#474): nur für eingeschränkte Elemente ein dezentes
+// Icon — „Alle" bleibt icon-los (keine visuelle Flut, „Kraft ohne Lärm").
+function renderVisibilityBadge(visibility) {
+  if (!visibility || visibility === 'all') return '';
+  const icon  = visibility === 'private' ? 'lock' : 'users';
+  const label = visibility === 'private'
+    ? t('common.visibility.private')
+    : t('common.visibility.assignees');
+  return `<span class="due-date task-card__visibility" title="${esc(label)}" aria-label="${esc(label)}">
+            <i data-lucide="${icon}" class="icon-sm" aria-hidden="true"></i>
+          </span>`;
 }
 
 function formatDueDate(dateStr, timeStr) {
@@ -213,6 +226,7 @@ function renderTaskCard(task, opts = {}) {
             ${renderStartDateBadge(task.start_date)}
             ${renderDueDate(task.due_date, task.due_time)}
             ${task.is_recurring ? `<span class="due-date" aria-label="${t('tasks.recurring')}"><i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i></span>` : ''}
+            ${renderVisibilityBadge(task.visibility)}
             ${task.category !== 'misc' ? `<span class="due-date task-card__category">${CATEGORY_LABELS()[task.category] ?? task.category}</span>` : ''}
           </div>
         </div>
@@ -316,6 +330,7 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
   const isEdit = !!task;
 
   const selectedIds = task?.assigned_users?.map((u) => u.id) ?? (task?.assigned_to ? [task.assigned_to] : []);
+  const visibility  = task?.visibility || 'all';
 
   const catLabels = CATEGORY_LABELS();
   const categoryOptions = CATEGORIES.map((c) =>
@@ -362,8 +377,8 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
       <div class="modal-grid modal-grid--2" style="margin-top:var(--space-4)">
         <div class="form-group">
           <label class="label" for="task-start-date">${t('tasks.startDateLabel')}</label>
-          <input class="input js-date-input" type="text" id="task-start-date" name="start_date"
-                 value="${formatDateInput(task?.start_date)}" placeholder="${dateInputPlaceholder()}" inputmode="text">
+          <yuvomi-datepicker type="date" id="task-start-date" name="start_date"
+                 value="${esc(formatDateInput(task?.start_date))}"></yuvomi-datepicker>
         </div>
         <div class="form-group">
           <label class="label" for="task-points">${t('tasks.pointsLabel')}</label>
@@ -397,19 +412,31 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
       <div class="modal-grid modal-grid--2">
         <div class="form-group">
           <label class="label" for="task-due-date">${t('tasks.dueDateLabel')}</label>
-          <input class="input js-date-input" type="text" id="task-due-date" name="due_date"
-                 value="${formatDateInput(task?.due_date)}" placeholder="${dateInputPlaceholder()}" inputmode="text">
+          <yuvomi-datepicker type="date" id="task-due-date" name="due_date"
+                 value="${esc(formatDateInput(task?.due_date))}"></yuvomi-datepicker>
         </div>
         <div class="form-group">
           <label class="label" for="task-due-time">${t('tasks.dueTimeLabel')}</label>
-          <input class="input js-time-input" type="text" id="task-due-time" name="due_time"
-                 value="${formatTimeInput(task?.due_time ?? '')}" placeholder="${timeInputPlaceholder()}">
+          <yuvomi-datepicker type="time" id="task-due-time" name="due_time"
+                 value="${esc(formatTimeInput(task?.due_time ?? ''))}"></yuvomi-datepicker>
         </div>
       </div>
 
       <div class="form-group" style="margin-top:var(--space-4)">
         ${renderUserMultiSelect(users, selectedIds, 'task_assigned', 'tasks.assignedLabel')}
       </div>
+
+      ${users.length > 1 ? `
+      <div class="form-group" style="margin-top:var(--space-4)">
+        <label class="label" for="task-visibility">${t('common.visibility.label')}</label>
+        <select class="input" id="task-visibility" name="visibility">
+          <option value="all"       ${visibility === 'all'       ? 'selected' : ''}>${t('common.visibility.all')}</option>
+          <option value="assignees" ${visibility === 'assignees' ? 'selected' : ''}>${t('common.visibility.assignees')}</option>
+          <option value="private"   ${visibility === 'private'   ? 'selected' : ''}>${t('common.visibility.private')}</option>
+        </select>
+        <p class="task-field-hint">${t('common.visibility.hint')}</p>
+        <p class="task-field-hint field-hint--warn" id="task-visibility-warning" role="status" hidden><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('common.visibility.assigneesNobodyHint')}</span></p>
+      </div>` : ''}
 
       ${advancedSection(advancedFieldsHtml, { open: advancedFieldsOpen })}
 
@@ -447,6 +474,7 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
 let state = {
   tasks:           [],
   users:           [],
+  currentUserId:   null,
   filters:         { status: 'open', priority: '', assigned_to: '' },
   groupMode:       'category',   // 'category' | 'due'
   viewMode:        'list',       // 'list' | 'kanban' (resolved at render time)
@@ -463,6 +491,7 @@ let state = {
 // --------------------------------------------------------
 
 async function loadTasks(container) {
+  persistAssignedToMe();
   const params = new URLSearchParams();
   if (state.filters.status)      params.set('status',      state.filters.status);
   if (state.filters.priority)    params.set('priority',    state.filters.priority);
@@ -551,6 +580,22 @@ function renderReminderSection(task = null, reminder = null) {
 // Modal-Verwaltung (delegiert an Shared Modal-System)
 // --------------------------------------------------------
 
+// Blendet einen Hinweis ein, wenn „Nur Zugewiesene" gewählt ist, aber niemand
+// zugewiesen wurde — dann sieht faktisch nur der Ersteller den Eintrag (#474 Guard).
+function wireVisibilityWarning(panel, selectSel, msName, warnSel) {
+  const select = panel.querySelector(selectSel);
+  const warn   = panel.querySelector(warnSel);
+  if (!select || !warn) return;
+  const ms = panel.querySelector(`.user-ms[data-ms-name="${msName}"]`);
+  const update = () => {
+    const count = getSelectedUserIds(panel, msName).length;
+    warn.hidden = !(select.value === 'assignees' && count === 0);
+  };
+  select.addEventListener('change', update);
+  ms?.addEventListener('click', () => setTimeout(update, 0));
+  update();
+}
+
 function openTaskModal({ task = null, users = [], reminder = null } = {}, container) {
   const isEdit = !!task;
   openSharedModal({
@@ -562,6 +607,7 @@ function openTaskModal({ task = null, users = [], reminder = null } = {}, contai
       // RRULE-Events binden
       bindRRuleEvents(document, 'task');
       bindUserMultiSelect(panel, 'task_assigned');
+      wireVisibilityWarning(panel, '#task-visibility', 'task_assigned', '#task-visibility-warning');
 
       // Blur-Validierung für required-Felder aktivieren
       wireBlurValidation(panel);
@@ -578,29 +624,6 @@ function openTaskModal({ task = null, users = [], reminder = null } = {}, contai
         if (!customFields) return;
         customFields.style.display = offset.value === 'offset_custom' ? '' : 'none';
       });
-      panel.querySelectorAll('.js-date-input').forEach((input) => {
-        input.addEventListener('keydown', (e) => {
-          if (e.ctrlKey || e.metaKey || e.altKey) return;
-          if (e.key.length !== 1) return;
-          if (!/[\d./\-]/.test(e.key)) e.preventDefault();
-        });
-        input.addEventListener('blur', () => {
-          const parsed = parseDateInput(input.value);
-          if (parsed) input.value = formatDateInput(parsed);
-        });
-      });
-      panel.querySelectorAll('.js-time-input').forEach((input) => {
-        input.addEventListener('keydown', (e) => {
-          if (e.ctrlKey || e.metaKey || e.altKey) return;
-          if (e.key.length !== 1) return;
-          if (!/[\d:.,hH apmAPM]/.test(e.key)) e.preventDefault();
-        });
-        input.addEventListener('blur', () => {
-          const parsed = parseTimeInput(input.value);
-          if (parsed) input.value = formatTimeInput(parsed);
-        });
-      });
-
       // Form-Events
       panel.querySelector('#task-form')
         ?.addEventListener('submit', (e) => handleFormSubmit(e, container));
@@ -652,6 +675,7 @@ async function handleFormSubmit(e, container) {
     start_date:      startDate || null,
     due_date:        dueDate || null,
     assigned_to:     getSelectedUserIds(form, 'task_assigned'),
+    visibility:      form.querySelector('#task-visibility')?.value || 'all',
     is_recurring:    rrule.is_recurring ? 1 : 0,
     recurrence_rule: rrule.recurrence_rule,
     points:          Math.max(0, Math.trunc(Number(form.points?.value)) || 0),
@@ -1129,7 +1153,9 @@ function renderFilters(container) {
     chip.appendChild(makeRemoveSpan());
     bar.appendChild(chip);
   }
-  if (state.filters.assigned_to) {
+  // Aktiver Personen-Filter — außer es ist die eigene ID, die deckt der
+  // dedizierte „Mir zugewiesen"-Chip ab (keine Doppel-Anzeige).
+  if (state.filters.assigned_to && !isAssignedToMe()) {
     const u = state.users.find((u) => u.id === Number(state.filters.assigned_to));
     const chip = document.createElement('span');
     chip.className = 'filter-chip filter-chip--active';
@@ -1139,11 +1165,35 @@ function renderFilters(container) {
     bar.appendChild(chip);
   }
 
-  // "Geplante anzeigen" Toggle-Chip
+  // "Mir zugewiesen" Schnellzugriff — nur sinnvoll bei mehreren Familienmitgliedern.
+  // Icon+Label bewusst identisch zum Kalender-Toggle (gleiche Fähigkeit, eine Gestalt).
+  if (state.users.length > 1 && state.currentUserId != null) {
+    const meChip = document.createElement('span');
+    const meActive = isAssignedToMe();
+    meChip.className = `filter-chip filter-chip--toggle${meActive ? ' filter-chip--active' : ''}`;
+    meChip.id = 'filter-assigned-me';
+    const meIcon = document.createElement('i');
+    meIcon.setAttribute('data-lucide', 'user');
+    meIcon.className = 'icon-sm';
+    meIcon.setAttribute('aria-hidden', 'true');
+    const meLabel = document.createElement('span');
+    meLabel.textContent = t('tasks.assignedToMe');
+    meChip.append(meIcon, meLabel);
+    if (meActive) meChip.appendChild(makeRemoveSpan());
+    bar.appendChild(meChip);
+  }
+
+  // "Geplante anzeigen" Toggle-Chip — Icon+Label wie „Mir zugewiesen" (beide Toggles).
   const futureChip = document.createElement('span');
-  futureChip.className = `filter-chip${state.showFuture ? ' filter-chip--active' : ''}`;
+  futureChip.className = `filter-chip filter-chip--toggle${state.showFuture ? ' filter-chip--active' : ''}`;
   futureChip.id = 'filter-show-future';
-  futureChip.textContent = t('tasks.showFuture');
+  const futureIcon = document.createElement('i');
+  futureIcon.setAttribute('data-lucide', 'calendar-clock');
+  futureIcon.className = 'icon-sm';
+  futureIcon.setAttribute('aria-hidden', 'true');
+  const futureLabel = document.createElement('span');
+  futureLabel.textContent = t('tasks.showFuture');
+  futureChip.append(futureIcon, futureLabel);
   if (state.showFuture) {
     futureChip.appendChild(makeRemoveSpan());
   }
@@ -1313,6 +1363,19 @@ const SWIPE_HINT_MAX  = 3;
 const RECENT_FILTERS_KEY = 'yuvomi:recentTaskFilters';
 const RECENT_FILTERS_MAX = 3;
 const SHOW_FUTURE_KEY = 'yuvomi:taskShowFuture';
+const ASSIGNED_TO_ME_KEY = 'yuvomi:taskAssignedToMe';
+
+// „Mir zugewiesen" ist ein Schnellzugriff auf den assigned_to-Filter mit der
+// eigenen User-ID. Wird pro Gerät gemerkt und beim Laden aus dem gespeicherten
+// assigned_to-Wert (== eigene ID) abgeleitet, damit Panel-Auswahl und Chip synchron bleiben.
+function isAssignedToMe() {
+  return state.currentUserId != null
+    && String(state.filters.assigned_to) === String(state.currentUserId);
+}
+
+function persistAssignedToMe() {
+  try { localStorage.setItem(ASSIGNED_TO_ME_KEY, isAssignedToMe() ? '1' : '0'); } catch {}
+}
 
 function getRecentFilters() {
   try { return JSON.parse(localStorage.getItem(RECENT_FILTERS_KEY) ?? '[]'); } catch { return []; }
@@ -1511,6 +1574,13 @@ function wireFilterChips(container) {
   container.querySelector('#filter-show-future')?.addEventListener('click', async () => {
     state.showFuture = !state.showFuture;
     try { localStorage.setItem(SHOW_FUTURE_KEY, state.showFuture ? '1' : '0'); } catch {}
+    renderFilters(container);
+    await loadTasks(container);
+  });
+
+  // "Mir zugewiesen" Toggle — schaltet assigned_to auf die eigene ID
+  container.querySelector('#filter-assigned-me')?.addEventListener('click', async () => {
+    state.filters.assigned_to = isAssignedToMe() ? '' : String(state.currentUserId);
     renderFilters(container);
     await loadTasks(container);
   });
@@ -1796,6 +1866,15 @@ function wireTaskList(container) {
 // --------------------------------------------------------
 
 export async function render(container, { user }) {
+  state.currentUserId = user?.id ?? null;
+
+  // „Mir zugewiesen" pro Gerät wiederherstellen (setzt assigned_to auf die eigene ID)
+  try {
+    if (state.currentUserId != null && localStorage.getItem(ASSIGNED_TO_ME_KEY) === '1') {
+      state.filters.assigned_to = String(state.currentUserId);
+    }
+  } catch {}
+
   // View-Mode: URL-Parameter > localStorage > Default 'list'
   const urlView = new URLSearchParams(window.location.search).get('view');
   const savedView = localStorage.getItem('yuvomi-tasks-view');

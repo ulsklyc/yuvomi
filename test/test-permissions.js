@@ -33,7 +33,7 @@ function freshDb() {
   const db = new DatabaseSync(':memory:');
   db.exec(MIGRATIONS_SQL[1]);   // users
   db.exec(MIGRATIONS_SQL[74]);  // access_permissions
-  db.exec(MIGRATIONS_SQL[77]);  // capabilities support
+  db.exec(MIGRATIONS_SQL[81]);  // capabilities support
   return db;
 }
 

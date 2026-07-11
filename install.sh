@@ -197,11 +197,23 @@ configure_calendar() {
 
 # ── Optional: WebDAV document storage ─────────────────────────────────────────
 configure_document_storage() {
+  DOCUMENT_STORAGE_LOCAL_ENABLED='false'
+  DOCUMENT_STORAGE_LOCAL_PATH=''
   DOCUMENT_STORAGE_WEBDAV_ENABLED='false'
   DOCUMENT_STORAGE_WEBDAV_URL=''
   DOCUMENT_STORAGE_WEBDAV_USERNAME=''
   DOCUMENT_STORAGE_WEBDAV_PASSWORD=''
   DOCUMENT_STORAGE_WEBDAV_PATH=''
+
+  step "$(t document_local.step)"
+  info "$(t document_local.hint)"
+  ask "$(t document_local.enable)"
+  read -r want_document_local
+  if [ "${want_document_local,,}" = "y" ]; then
+    DOCUMENT_STORAGE_LOCAL_ENABLED='true'
+    ask "$(t document_local.path)"; read -r DOCUMENT_STORAGE_LOCAL_PATH
+    DOCUMENT_STORAGE_LOCAL_PATH="${DOCUMENT_STORAGE_LOCAL_PATH:-/documents}"
+  fi
 
   step "$(t document_webdav.step)"
   info "$(t document_webdav.hint)"
@@ -229,6 +241,7 @@ review_and_confirm() {
   [ -n "$OPENWEATHER_API_KEY" ] && printf "  %-16s %s%s%s\n" "$(t review.weather)" "$GREEN" "$(t review.weather_value "$OPENWEATHER_CITY")" "$RESET"
   [ -n "$GOOGLE_CLIENT_ID" ]    && printf "  %-16s %s%s%s\n" "$(t review.google)"  "$GREEN" "$(t review.google_value)" "$RESET"
   [ -n "$APPLE_USERNAME" ]      && printf "  %-16s %s%s%s\n" "$(t review.apple)"   "$GREEN" "$APPLE_USERNAME" "$RESET"
+  [ "$DOCUMENT_STORAGE_LOCAL_ENABLED" = "true" ] && printf "  %-16s %s%s%s\n" "$(t review.document_local)" "$GREEN" "${DOCUMENT_STORAGE_LOCAL_PATH:-/documents}" "$RESET"
   [ "$DOCUMENT_STORAGE_WEBDAV_ENABLED" = "true" ] && printf "  %-16s %s%s%s\n" "$(t review.document_webdav)" "$GREEN" "$DOCUMENT_STORAGE_WEBDAV_URL" "$RESET"
   printf "\n"
   ask "$(t review.proceed)"
@@ -262,6 +275,8 @@ GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
 GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
 APPLE_USERNAME=${APPLE_USERNAME}
 APPLE_APP_SPECIFIC_PASSWORD=${APPLE_APP_SPECIFIC_PASSWORD}
+DOCUMENT_STORAGE_LOCAL_ENABLED=${DOCUMENT_STORAGE_LOCAL_ENABLED}
+DOCUMENT_STORAGE_LOCAL_PATH=${DOCUMENT_STORAGE_LOCAL_PATH}
 DOCUMENT_STORAGE_WEBDAV_ENABLED=${DOCUMENT_STORAGE_WEBDAV_ENABLED}
 DOCUMENT_STORAGE_WEBDAV_URL=${DOCUMENT_STORAGE_WEBDAV_URL}
 DOCUMENT_STORAGE_WEBDAV_USERNAME=${DOCUMENT_STORAGE_WEBDAV_USERNAME}

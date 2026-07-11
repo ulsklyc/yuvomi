@@ -15,7 +15,8 @@ import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
 import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
 import { activityType } from '/utils/health-activity.js';
 import { buildHelpRows } from '/utils/help.js';
-import { openModal } from '/components/modal.js';
+import { openModal, confirmModal } from '/components/modal.js';
+import '/components/datepicker.js';
 import { NAV_ICONS } from '/nav-icons.js';
 import { SETTINGS_LEAVES } from '/settings/registry.js';
 import {
@@ -465,7 +466,16 @@ async function navigate(path, userOrPushState = true, pushState = true) {
 
     let route = allRoutes().find((r) => r.path === basePath) ?? ROUTES.find((r) => r.path === '/');
 
-    if (currentUser?.access_scope === 'split_guest' && route.path !== '/budget') {
+    // Split-Guest-Weiche: Gäste einer Ausgabenteilung sehen nur das Budget-Modul.
+    // ABER: hat der Nutzer zusätzlich eine Familienrolle OHNE Budget-Recht, würde
+    // ein bedingungsloses navigate('/budget') vom Modul-Guard (canAccessNavModule)
+    // sofort wieder auf '/' geworfen — und '/' schickt zurück auf '/budget':
+    // Endlosschleife bis Stack-Overflow (#480). Daher nur umleiten, wenn Budget
+    // tatsächlich zugänglich ist; sonst greift der reguläre Rechte-Guard und der
+    // Nutzer landet auf einer für ihn erlaubten Seite.
+    if (currentUser?.access_scope === 'split_guest'
+        && route.path !== '/budget'
+        && canAccessNavModule('budget')) {
       currentPath = null;
       isNavigating = false;
       navigate('/budget');
@@ -511,7 +521,16 @@ async function navigate(path, userOrPushState = true, pushState = true) {
 
     route = allRoutes().find((r) => r.path === basePath) ?? route;
 
-    if (currentUser?.access_scope === 'split_guest' && route.path !== '/budget') {
+    // Split-Guest-Weiche: Gäste einer Ausgabenteilung sehen nur das Budget-Modul.
+    // ABER: hat der Nutzer zusätzlich eine Familienrolle OHNE Budget-Recht, würde
+    // ein bedingungsloses navigate('/budget') vom Modul-Guard (canAccessNavModule)
+    // sofort wieder auf '/' geworfen — und '/' schickt zurück auf '/budget':
+    // Endlosschleife bis Stack-Overflow (#480). Daher nur umleiten, wenn Budget
+    // tatsächlich zugänglich ist; sonst greift der reguläre Rechte-Guard und der
+    // Nutzer landet auf einer für ihn erlaubten Seite.
+    if (currentUser?.access_scope === 'split_guest'
+        && route.path !== '/budget'
+        && canAccessNavModule('budget')) {
       currentPath = null;
       isNavigating = false;
       navigate('/budget');
@@ -688,6 +707,27 @@ function allRoutes() {
   return [...ROUTES, ...moduleRoutes];
 }
 
+// Bestätigter Logout, überall aus der Navigation erreichbar (Sidebar-Footer +
+// Mehr-Sheet). Teilt den Server-Logout mit den Einstellungen; das finally räumt
+// die lokale Session auch bei Netzfehler, damit man nie „eingeloggt festhängt"
+// (siehe clearSession/#478). Danger-Confirm schützt vor versehentlichem Klick.
+async function confirmAndLogout() {
+  // Kein danger/Rot: Abmelden ist reversibel (wieder einloggen), nicht
+  // destruktiv — Rot bleibt echten Löschaktionen vorbehalten. Der Confirm-
+  // Schritt selbst ist die Absicherung gegen den Fehlklick.
+  const confirmed = await confirmModal(t('settings.logoutConfirm'), {
+    confirmLabel: t('settings.logout'),
+  });
+  if (!confirmed) return false;
+  try {
+    await auth.logout();
+  } finally {
+    window.yuvomi?.clearSession?.();
+    navigate('/login');
+  }
+  return true;
+}
+
 function sidebarActionEl({ labelKey, icon, className, onClick }) {
   const label = t(labelKey);
   const button = document.createElement('button');
@@ -808,6 +848,19 @@ function buildMoreSheetBody() {
       showChangelogModal();
     },
   }));
+  system.appendChild(moreActionEl({
+    labelKey: 'settings.logout',
+    icon: 'log-out',
+    className: 'more-item--logout',
+    onClick: () => {
+      if (window._closeMoreSheet) window._closeMoreSheet({ restoreFocus: false });
+      // #more-btn synchron fokussieren, BEVOR das Modal öffnet: openModal
+      // erfasst document.activeElement als previouslyFocused. Sonst landet der
+      // Fokus nach „Abbrechen" auf <body> (das Sheet-Item ist dann inert).
+      document.getElementById('more-btn')?.focus();
+      confirmAndLogout();
+    },
+  }));
   nodes.push(system);
 
   return nodes;
@@ -836,10 +889,20 @@ async function renderPage(route, previousPath = null) {
       throw new Error(`Seite ${route.page} exportiert keine render()-Funktion.`);
     }
 
+    // Vollflächige Auth-Seiten (Login, Setup, Passwort-vergessen/-zurücksetzen)
+    // rendern ohne App-Shell. Nach einem Logout kann noch eine Shell aus der
+    // vorigen Sitzung im DOM stehen — sie muss entfernt werden, sonst bleibt die
+    // Navigationsleiste neben dem Login-Formular sichtbar (#478).
+    if (!route.requiresAuth) {
+      if (document.querySelector('.nav-bottom')) {
+        app.replaceChildren();
+        _navBuiltForUserId = null;
+      }
+    }
     // App-Shell einmalig aufbauen BEVOR render() aufgerufen wird -
     // main-content muss im DOM existieren damit document.getElementById()
     // in Seiten-Modulen funktioniert.
-    if (!document.querySelector('.nav-bottom') && currentUser) {
+    else if (!document.querySelector('.nav-bottom') && currentUser) {
       renderAppShell(app);
       _navBuiltForUserId = currentUser.id;
     } else if (currentUser && _navBuiltForUserId !== currentUser.id) {
@@ -1105,6 +1168,15 @@ function renderAppShell(container) {
       className: 'nav-item--changelog',
       onClick: () => showChangelogModal(),
     }),
+    // Abmelden als terminale Aktion: bricht in eine eigene, volle Zeile unter
+    // Hilfe/Änderungen (CSS: flex-wrap + border-top). Monochrom wie die
+    // Geschwister — Danger-Rot erscheint erst im Confirm.
+    sidebarActionEl({
+      labelKey: 'settings.logout',
+      icon: 'log-out',
+      className: 'nav-item--logout',
+      onClick: () => confirmAndLogout(),
+    }),
   );
   sidebar.appendChild(sidebarFooter);
 
@@ -1285,6 +1357,9 @@ const SHORTCUTS = [
     document.getElementById('more-sheet-search')?.click();
   } },
   { key: 'n',   description: () => t('shortcuts.new'),     action: () => document.querySelector('.page-fab')?.click() },
+  { key: 'f',   description: () => t('shortcuts.searchCalendar'), action: () => {
+    if (location.pathname === '/calendar') document.querySelector('#cal-search')?.click();
+  } },
   { key: '?',   description: () => t('shortcuts.help'),    action: () => showHelpModal() },
   { key: 'g d', description: () => t('shortcuts.goDash'),  action: () => navigate('/') },
   { key: 'g t', description: () => t('shortcuts.goTasks'), action: () => navigate('/tasks') },
@@ -1307,6 +1382,9 @@ function initKeyboardShortcuts() {
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if (document.activeElement?.isContentEditable) return;
     if (document.querySelector('.modal-overlay') && e.key !== 'Escape') return;
+    // Modifikatoren durchlassen: Cmd/Ctrl/Alt-Kombis (z. B. Cmd+F „Im Browser
+    // suchen", Cmd+N) gehören dem Browser/OS, nicht den Bare-Key-Shortcuts.
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
 
     const key = e.key.toLowerCase();
 
@@ -2727,6 +2805,17 @@ window.yuvomi = {
   restoreThemeColor: () => {
     const route = allRoutes().find((r) => r.path === currentPath);
     updateThemeColorForRoute(route);
+  },
+  // Client-seitigen Sitzungszustand nach einem bewussten Logout zurücksetzen,
+  // damit die anschließende navigate('/login') nicht am currentUser-Guard
+  // hängenbleibt und kurz das Dashboard zeigt (#478). Der Server-Logout läuft
+  // separat über auth.logout().
+  clearSession: () => {
+    currentUser = null;
+    _navBuiltForUserId = null;
+    stopThirdPartyModulePolling();
+    stopReminders();
+    stopPush();
   },
 };
 

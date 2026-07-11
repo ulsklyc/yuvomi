@@ -1366,6 +1366,9 @@ router.delete('/users/:id', requireAuth, requireAdmin, csrfMiddleware, (req, res
     const result = db.transaction(() => {
       const birthday = db.get().prepare('SELECT * FROM birthdays WHERE family_user_id = ?').get(userId);
       if (birthday) deleteBirthdayArtifacts(db.get(), birthday);
+      // Standard-Zuweisungen von Sync-Zielen lösen (kein FK auf diesen Spalten, #459).
+      db.get().prepare('UPDATE ics_subscriptions SET default_assignee_user_id = NULL WHERE default_assignee_user_id = ?').run(userId);
+      db.get().prepare('UPDATE external_calendars SET default_assignee_user_id = NULL WHERE default_assignee_user_id = ?').run(userId);
       return db.get().prepare('DELETE FROM users WHERE id = ?').run(userId);
     });
 

@@ -20,6 +20,7 @@ import crypto from 'node:crypto';
 import * as db from '../db.js';
 import { decodeHtmlEntities } from '../utils/html-entities.js';
 import { nearestColorId } from '../utils/ical-color.js';
+import { assignDefaultToEvent } from './sync-assignment.js';
 
 const GOOGLE_COLOR = '#4285F4';
 
@@ -172,6 +173,11 @@ async function listCalendars() {
   const client   = loadAuthorizedClient();
   const calendar = google.calendar({ version: 'v3', auth: client });
   const enabledSet = new Set(enabledCalendarIds());
+  // Standard-Zuweisung je Kalender (#459) aus der geteilten external_calendars-Tabelle.
+  const assigneeMap = new Map(
+    db.get().prepare(`SELECT external_id, default_assignee_user_id FROM external_calendars WHERE source = 'google'`)
+      .all().map((r) => [r.external_id, r.default_assignee_user_id])
+  );
 
   const items = [];
   let pageToken;
@@ -186,6 +192,8 @@ async function listCalendars() {
         enabled:         enabledSet.has(cal.id),
         accessRole:      cal.accessRole ?? null,
         writable:        isWritableRole(cal.accessRole),
+        default_assignee_user_id: assigneeMap.get(cal.id) ?? null,
+        synced:          assigneeMap.has(cal.id),
       });
     }
     pageToken = res.data.nextPageToken;
@@ -469,6 +477,12 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR, col
     DELETE FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'google'
   `);
 
+  // Standard-Zuweisung dieses Kalenders (#459) — einmal auflösen.
+  const defaultAssignee = calRefId
+    ? db.get().prepare('SELECT default_assignee_user_id FROM external_calendars WHERE id = ?')
+        .get(calRefId)?.default_assignee_user_id ?? null
+    : null;
+
   const insertOrUpdate = db.get().transaction((item) => {
     if (item.status === 'cancelled') {
       del.run(item.id);
@@ -507,12 +521,13 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR, col
         WHERE id = ?
       `).run(title, description, startDt, endDt, allDay ? 1 : 0, location, rrule, evColor, calRefId, existing.id);
     } else {
-      db.get().prepare(`
+      const inserted = db.get().prepare(`
         INSERT INTO calendar_events
           (title, description, start_datetime, end_datetime, all_day,
            location, color, external_calendar_id, external_source, recurrence_rule, calendar_ref_id, created_by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'google', ?, ?, 1)
       `).run(title, description, startDt, endDt, allDay ? 1 : 0, location, evColor, item.id, rrule, calRefId);
+      assignDefaultToEvent(db.get(), inserted.lastInsertRowid, defaultAssignee);
     }
   });
 

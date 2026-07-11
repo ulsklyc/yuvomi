@@ -9,6 +9,7 @@ const log = createLogger('CalDAV');
 
 import * as db from '../db.js';
 import { decodeHtmlEntities } from '../utils/html-entities.js';
+import { assignDefaultToEvent } from './sync-assignment.js';
 
 // Reused functions from apple-calendar.js
 import {
@@ -309,11 +310,19 @@ async function getCalendars(accountId, { refresh = false } = {}) {
       ORDER BY calendar_name
     `).all(accountId);
 
+    // Standard-Zuweisung je Kalender (#459) aus der geteilten external_calendars-Tabelle.
+    const assigneeMap = new Map(
+      db.get().prepare(`SELECT external_id, default_assignee_user_id FROM external_calendars WHERE source = 'caldav'`)
+        .all().map((r) => [r.external_id, r.default_assignee_user_id])
+    );
+
     return calendars.map(cal => ({
       calendarUrl: cal.calendar_url,
       calendarName: cal.calendar_name,
       calendarColor: cal.calendar_color,
       enabled: cal.enabled === 1,
+      default_assignee_user_id: assigneeMap.get(cal.calendar_url) ?? null,
+      synced: assigneeMap.has(cal.calendar_url),
     }));
   }
 
@@ -439,6 +448,10 @@ async function sync() {
 
         // Upsert external calendar metadata
         const calRefId = upsertExternalCalendar('caldav', selCal.calendar_url, selCal.calendar_name, selCal.calendar_color);
+        // Standard-Zuweisung dieses Kalenders (#459) einmal auflösen, nicht pro Event.
+        const calDefaultAssignee = db.get()
+          .prepare('SELECT default_assignee_user_id FROM external_calendars WHERE id = ?')
+          .get(calRefId)?.default_assignee_user_id ?? null;
 
         // Parse and upsert events
         for (const obj of calObjects) {
@@ -472,7 +485,7 @@ async function sync() {
                 const owner = db.get().prepare('SELECT id FROM users ORDER BY id ASC LIMIT 1').get();
                 const createdBy = owner ? owner.id : 1;
 
-                db.get().prepare(`
+                const inserted = db.get().prepare(`
                   INSERT INTO calendar_events
                     (title, description, start_datetime, end_datetime, all_day,
                      location, color, external_calendar_id, external_source, recurrence_rule, calendar_ref_id, created_by)
@@ -481,6 +494,8 @@ async function sync() {
                   ev.summary, ev.description, ev.dtstart, ev.dtend,
                   ev.allDay ? 1 : 0, ev.location, evColor, ev.uid, ev.rrule, calRefId, createdBy
                 );
+                // Standard-Zuweisung dieses Kalenders (#459) auf den neuen Termin.
+                assignDefaultToEvent(db.get(), inserted.lastInsertRowid, calDefaultAssignee);
               }
 
               accountEventCount++;

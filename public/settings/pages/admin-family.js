@@ -183,7 +183,7 @@ function renderPage(container) {
           </div>
           <div class="form-group">
             <label class="form-label" for="new-member-birth-date">${t('settings.memberBirthDateLabel')}</label>
-            <input class="form-input" type="date" id="new-member-birth-date" />
+            <yuvomi-datepicker type="date" id="new-member-birth-date"></yuvomi-datepicker>
             <p class="form-hint">${t('settings.memberContactBirthdayHint')}</p>
           </div>
           <label class="toggle-row">
@@ -297,7 +297,7 @@ function openEditMemberModal(member, currentUser, users, container) {
         </div>
         <div class="form-group">
           <label class="form-label" for="edit-member-birth-date">${t('settings.memberBirthDateLabel')}</label>
-          <input class="form-input" type="date" id="edit-member-birth-date" value="${esc(member.birth_date || '')}" />
+          <yuvomi-datepicker type="date" id="edit-member-birth-date" value="${esc(member.birth_date || '')}"></yuvomi-datepicker>
           <p class="form-hint">${t('settings.memberContactBirthdayHint')}</p>
         </div>
         <div class="form-group">

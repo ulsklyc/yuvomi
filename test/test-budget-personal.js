@@ -17,7 +17,7 @@ function createBudgetTestDb() {
   );`);
   database.exec(MIGRATIONS_SQL[1]);
   database.exec(`CREATE TABLE IF NOT EXISTS expenses (id INTEGER PRIMARY KEY AUTOINCREMENT);`);
-  database.exec(MIGRATIONS_SQL[76]);
+  database.exec(MIGRATIONS_SQL[80]);
   return database;
 }
 

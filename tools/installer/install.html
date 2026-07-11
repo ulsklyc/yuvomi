@@ -435,6 +435,23 @@
         </div>
 
         <div class="toggle-card">
+          <button type="button" class="toggle-head" data-toggle="document-local-body" aria-expanded="false" aria-controls="document-local-body">
+            <span data-i18n="advanced.documentLocal">Local Document Storage</span>
+            <span class="toggle-badge" data-i18n="common.optional">Optional</span>
+          </button>
+          <div class="toggle-body" id="document-local-body">
+            <div class="field">
+              <label><input type="checkbox" id="adv-document-local-enable"> <span data-i18n="advanced.documentLocalEnable">Store new documents in a local folder</span></label>
+            </div>
+            <div class="field">
+              <label for="adv-document-local-path" data-i18n="advanced.documentLocalPathLabel">Folder path</label>
+              <input type="text" id="adv-document-local-path" placeholder="/documents">
+              <div class="hint" data-i18n="advanced.documentLocalPathHint">Path inside the container. Leave empty to use /documents.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="toggle-card">
           <button type="button" class="toggle-head" data-toggle="document-webdav-body" aria-expanded="false" aria-controls="document-webdav-body">
             <span data-i18n="advanced.documentWebdav">WebDAV Document Storage</span>
             <span class="toggle-badge" data-i18n="common.optional">Optional</span>
@@ -496,6 +513,7 @@
           <div class="review-key" data-i18n="review.weather">Weather</div>        <div id="rv-weather"></div>
           <div class="review-key" data-i18n="review.google">Google Calendar</div><div id="rv-google"></div>
           <div class="review-key" data-i18n="review.apple">Apple CalDAV</div>   <div id="rv-apple"></div>
+          <div class="review-key" data-i18n="review.documentLocal">Local documents</div><div id="rv-document-local"></div>
           <div class="review-key" data-i18n="review.documentWebdav">WebDAV documents</div><div id="rv-document-webdav"></div>
         </div>
         <div class="error-banner" id="rev-err" role="alert"></div>
@@ -639,6 +657,8 @@ const S = {
   SESSION_SECURE: '', TRUST_PROXY: '',
   OIDC_ISSUER: '', OIDC_CLIENT_ID: '', OIDC_CLIENT_SECRET: '', OIDC_REDIRECT_URI: '',
   BACKUP_ENABLED: '', BACKUP_SCHEDULE: '', BACKUP_KEEP: '',
+  DOCUMENT_STORAGE_LOCAL_ENABLED: '',
+  DOCUMENT_STORAGE_LOCAL_PATH: '',
   DOCUMENT_STORAGE_WEBDAV_ENABLED: '',
   DOCUMENT_STORAGE_WEBDAV_URL: '',
   DOCUMENT_STORAGE_WEBDAV_USERNAME: '',
@@ -872,6 +892,9 @@ $('adv-next').addEventListener('click', () => {
   S.BACKUP_SCHEDULE = schedule;
   S.BACKUP_KEEP = keep;
 
+  S.DOCUMENT_STORAGE_LOCAL_ENABLED = $('adv-document-local-enable').checked ? 'true' : 'false';
+  S.DOCUMENT_STORAGE_LOCAL_PATH = $('adv-document-local-path').value.trim();
+
   S.DOCUMENT_STORAGE_WEBDAV_ENABLED = $('adv-document-webdav-enable').checked ? 'true' : 'false';
   S.DOCUMENT_STORAGE_WEBDAV_URL = $('adv-document-webdav-url').value.trim();
   S.DOCUMENT_STORAGE_WEBDAV_USERNAME = $('adv-document-webdav-username').value.trim();
@@ -886,6 +909,9 @@ $('adv-next').addEventListener('click', () => {
     : '-';
   $('rv-google').textContent  = S.GOOGLE_CLIENT_ID ? t('review.configured') : '-';
   $('rv-apple').textContent   = S.APPLE_USERNAME || '-';
+  $('rv-document-local').textContent = S.DOCUMENT_STORAGE_LOCAL_ENABLED === 'true'
+    ? (S.DOCUMENT_STORAGE_LOCAL_PATH || '/documents')
+    : '-';
   $('rv-document-webdav').textContent = S.DOCUMENT_STORAGE_WEBDAV_ENABLED === 'true'
     ? (S.DOCUMENT_STORAGE_WEBDAV_URL || t('review.configured'))
     : '-';
@@ -920,6 +946,8 @@ $('rev-next').addEventListener('click', async () => {
     OIDC_ISSUER: S.OIDC_ISSUER, OIDC_CLIENT_ID: S.OIDC_CLIENT_ID,
     OIDC_CLIENT_SECRET: S.OIDC_CLIENT_SECRET, OIDC_REDIRECT_URI: S.OIDC_REDIRECT_URI,
     BACKUP_ENABLED: S.BACKUP_ENABLED, BACKUP_SCHEDULE: S.BACKUP_SCHEDULE, BACKUP_KEEP: S.BACKUP_KEEP,
+    DOCUMENT_STORAGE_LOCAL_ENABLED: S.DOCUMENT_STORAGE_LOCAL_ENABLED,
+    DOCUMENT_STORAGE_LOCAL_PATH: S.DOCUMENT_STORAGE_LOCAL_PATH,
     DOCUMENT_STORAGE_WEBDAV_ENABLED: S.DOCUMENT_STORAGE_WEBDAV_ENABLED,
     DOCUMENT_STORAGE_WEBDAV_URL: S.DOCUMENT_STORAGE_WEBDAV_URL,
     DOCUMENT_STORAGE_WEBDAV_USERNAME: S.DOCUMENT_STORAGE_WEBDAV_USERNAME,

@@ -181,7 +181,7 @@ function renderPage(container, user, refreshFailed, accessNotice) {
           </div>
           <div class="form-group">
             <label class="form-label" for="profile-birth-date">${t('settings.memberBirthDateLabel')}</label>
-            <input class="form-input" type="date" id="profile-birth-date" value="${esc(user?.birth_date || '')}" aria-describedby="profile-error">
+            <yuvomi-datepicker type="date" id="profile-birth-date" value="${esc(user?.birth_date || '')}" aria-describedby="profile-error"></yuvomi-datepicker>
             <p class="form-hint">${t('settings.memberContactBirthdayHint')}</p>
           </div>
           <div id="profile-error" class="form-error" role="alert" hidden></div>
@@ -329,6 +329,7 @@ function bindEvents(container, user, profileState) {
     try {
       await auth.logout();
     } finally {
+      window.yuvomi?.clearSession?.();
       window.yuvomi?.navigate('/login');
     }
   });

@@ -9,6 +9,7 @@ import express from 'express';
 import * as db from '../db.js';
 import { hydrateBirthday } from '../services/birthdays.js';
 import { getUpcomingEvents } from '../services/calendar-events.js';
+import { visibilityWhere } from '../services/visibility.js';
 
 const log = createLogger('Dashboard');
 
@@ -93,6 +94,7 @@ router.get('/', (req, res) => {
       FROM tasks t
       LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.status != 'done'
+        AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}
       ORDER BY
         CASE WHEN __due_sort IS NOT NULL AND __due_sort < @now THEN 0 ELSE 1 END ASC,
         __due_sort IS NULL ASC,
@@ -102,7 +104,7 @@ router.get('/', (req, res) => {
           WHEN 'low' THEN 3 ELSE 4
         END ASC
       LIMIT 5
-    `).all({ now: nowIso }).map(({ __due_sort, ...task }) => addAssignedUsers(task));
+    `).all({ now: nowIso, me: userId }).map(({ __due_sort, ...task }) => addAssignedUsers(task));
   } catch (err) {
     log.error('urgentTasks error:', err.message);
     result.urgentTasks = [];

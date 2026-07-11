@@ -1,6 +1,6 @@
 {
   "name": "yuvomi",
-  "version": "1.6.6",
+  "version": "1.11.0",
   "description": "Self-hosted family planner - calendar, tasks, shopping, meal planning, budget and more. Private, open-source, no subscription.",
   "main": "server/index.js",
   "type": "module",
@@ -15,6 +15,8 @@
     "test:rename-migration": "node --experimental-sqlite test/test-rename-migration.js",
     "test:dashboard": "node --experimental-sqlite test/test-dashboard.js",
     "test:multi-assignment": "node --experimental-sqlite test/test-multi-assignment.js",
+    "test:visibility": "node --experimental-sqlite test/test-visibility.js",
+    "test:sync-default-assignee": "node --experimental-sqlite test/test-sync-default-assignee.js",
     "test:tasks": "node --experimental-sqlite test/test-tasks.js",
     "test:tasks-recurrence": "node --test test/test-tasks-recurrence.js",
     "test:rewards": "node --experimental-sqlite test/test-rewards.js",
@@ -37,6 +39,7 @@
     "test:sw-api-cache": "node --test test/test-sw-api-cache.js",
     "test:modal-utils": "node --loader ./test/test-browser-loader.mjs test/test-modal-utils.js",
     "test:category-manager": "node --experimental-sqlite test/test-category-manager.js",
+    "test:datepicker": "node test/test-datepicker.js",
     "test:kitchen-tabs": "node --loader ./test/test-browser-loader.mjs test/test-kitchen-tabs.js",
     "test:health-nav": "node --loader ./test/test-browser-loader.mjs test/test-health-nav.js",
     "test:health-api": "node --test test/test-health-api.js",
@@ -57,6 +60,7 @@
     "test:mcp": "node --experimental-sqlite --test test/test-mcp.js",
     "test:token-scopes": "node --experimental-sqlite --test test/test-token-scopes.js",
     "test:permissions": "node --experimental-sqlite --test test/test-permissions.js",
+    "test:router-guest-guard": "node --test test/test-router-guest-guard.js",
     "test:email": "node --experimental-sqlite test/test-email.js",
     "test:password-reset": "node --experimental-sqlite test/test-password-reset.js",
     "test:reminders": "node --experimental-sqlite test/test-reminders.js",
@@ -79,6 +83,8 @@
     "test:carddav": "node --experimental-sqlite test/test-carddav.js",
     "test:split-expenses": "node --experimental-sqlite test/test-split-expenses.js",
     "test:search": "node --experimental-sqlite test/test-search.js",
+    "test:calendar-search": "node --experimental-sqlite test/test-calendar-search.js",
+    "test:search-diacritics": "node --experimental-sqlite test/test-search-diacritics.js",
     "test:oidc": "node --experimental-sqlite test/test-oidc.js",
     "test:family-contacts": "node --experimental-sqlite test/test-family-contacts.js",
     "test:google-calendar": "node test/test-google-calendar.js",
@@ -101,7 +107,7 @@
     "test:installer-prereq": "node --test test/test-installer-prereq.js",
     "test:installer-a11y": "node --test test/test-installer-a11y.js",
     "test:typography": "node --test test/test-typography.js",
-    "test": "node --experimental-sqlite test/test-db.js && npm run test:rename-migration && node --experimental-sqlite test/test-dashboard.js && node --experimental-sqlite test/test-tasks.js && npm run test:tasks-recurrence && npm run test:rewards && node --experimental-sqlite test/test-multi-assignment.js && node --experimental-sqlite test/test-shopping.js && npm run test:meals && npm run test:calendar && node --experimental-sqlite test/test-notes-contacts-budget.js && npm run test:budget-recurrence && npm run test:budget-plans && npm run test:subscriptions && npm run test:ux-utils && npm run test:skeleton-utils && npm run test:date-utils && npm run test:time-input && npm run test:html-entities && npm run test:help && npm run test:changelog && npm run test:lang-init && npm run test:sw-api-cache && npm run test:modal-utils && npm run test:category-manager && npm run test:reminders && npm run test:multi-reminders && npm run test:reminder-offset && npm run test:push && npm run test:notifications && npm run test:mcp && npm run test:token-scopes && npm run test:email && npm run test:password-reset && npm run test:api && npm run test:auth-userid && npm run test:admin-password-reset && npm run test:ics-parser && npm run test:ics-sub && npm run test:ics-export && npm run test:setup && npm run test:kitchen-tabs && npm run test:health-nav && npm run test:health-api && npm run test:health-vitals && npm run test:health-meds && npm run test:medication-scheduler && npm run test:health-labs && npm run test:health-activity && npm run test:health-overview && npm run test:health-cycle && npm run test:settings-navigation && npm run test:mobile-scroll-layout && npm run test:frontend-audit && npm run test:region-presets && npm run test:docker-publish && npm run test:backup-scheduler && npm run test:backup-webdav && npm run test:caldav && npm run test:caldav-reminders && npm run test:caldav-event-target && npm run test:carddav && npm run test:split-expenses && npm run test:oidc && npm run test:family-contacts && npm run test:google-calendar && npm run test:google-multi && npm run test:housekeeping && npm run test:documents && npm run test:document-storage && npm run test:dms-adapter && npm run test:dms-routes && npm run test:dms-papra-adapter && npm run test:weather && npm run test:holidays && npm run test:preferences-weather && npm run test:preferences-navigation && npm run test:installer-schema && npm run test:installer-env-write && npm run test:installer-static && npm run test:installer-i18n && npm run test:installer-cli-i18n && npm run test:installer-prereq && npm run test:installer-a11y && npm run test:typography"
+    "test": "node --experimental-sqlite test/test-db.js && npm run test:rename-migration && node --experimental-sqlite test/test-dashboard.js && node --experimental-sqlite test/test-tasks.js && npm run test:visibility && npm run test:sync-default-assignee && npm run test:tasks-recurrence && npm run test:rewards && node --experimental-sqlite test/test-multi-assignment.js && node --experimental-sqlite test/test-shopping.js && npm run test:meals && npm run test:calendar && node --experimental-sqlite test/test-notes-contacts-budget.js && npm run test:budget-recurrence && npm run test:budget-plans && npm run test:subscriptions && npm run test:ux-utils && npm run test:skeleton-utils && npm run test:date-utils && npm run test:time-input && npm run test:html-entities && npm run test:help && npm run test:changelog && npm run test:lang-init && npm run test:sw-api-cache && npm run test:modal-utils && npm run test:category-manager && npm run test:datepicker && npm run test:reminders && npm run test:multi-reminders && npm run test:reminder-offset && npm run test:push && npm run test:notifications && npm run test:mcp && npm run test:token-scopes && npm run test:email && npm run test:password-reset && npm run test:api && npm run test:calendar-search && npm run test:search-diacritics && npm run test:auth-userid && npm run test:admin-password-reset && npm run test:ics-parser && npm run test:ics-sub && npm run test:ics-export && npm run test:setup && npm run test:kitchen-tabs && npm run test:health-nav && npm run test:health-api && npm run test:health-vitals && npm run test:health-meds && npm run test:medication-scheduler && npm run test:health-labs && npm run test:health-activity && npm run test:health-overview && npm run test:health-cycle && npm run test:settings-navigation && npm run test:mobile-scroll-layout && npm run test:frontend-audit && npm run test:region-presets && npm run test:docker-publish && npm run test:backup-scheduler && npm run test:backup-webdav && npm run test:caldav && npm run test:caldav-reminders && npm run test:caldav-event-target && npm run test:carddav && npm run test:split-expenses && npm run test:oidc && npm run test:family-contacts && npm run test:google-calendar && npm run test:google-multi && npm run test:housekeeping && npm run test:documents && npm run test:document-storage && npm run test:dms-adapter && npm run test:dms-routes && npm run test:dms-papra-adapter && npm run test:weather && npm run test:holidays && npm run test:preferences-weather && npm run test:preferences-navigation && npm run test:installer-schema && npm run test:installer-env-write && npm run test:installer-static && npm run test:installer-i18n && npm run test:installer-cli-i18n && npm run test:installer-prereq && npm run test:installer-a11y && npm run test:typography"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -120,11 +126,16 @@
   },
   "optionalDependencies": {
     "googleapis": "^173.0.0",
-    "tsdav": "^2.3.0"
+    "tsdav": "^2.3.1"
   },
   "license": "MIT",
   "devDependencies": {
     "puppeteer": "^25.3.0",
     "sharp": "^0.35.3"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "bcrypt@6.0.0": true,
+    "puppeteer@25.3.0": true
   }
 }

@@ -24,6 +24,7 @@ import * as v from '../middleware/validate.js';
 import { readFileSync } from 'node:fs';
 import { buildOpenApiSpec } from '../openapi.js';
 import { tokenAllows } from '../scopes.js';
+import { visibilityWhere } from '../services/visibility.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
 
@@ -132,17 +133,19 @@ function addShoppingItem(db, actorId, args) {
   `).get(result.lastInsertRowid);
 }
 
-function listUpcomingEvents(db, args) {
+function listUpcomingEvents(db, actorId, args) {
   let limit = parseInt(args.limit, 10);
   if (!Number.isFinite(limit)) limit = 20;
   limit = Math.min(Math.max(limit, 1), 100);
+  // Sichtbarkeit (#474): kein Zugriff auf private/eingeschränkte Termine anderer.
   return db.prepare(`
-    SELECT id, title, start_datetime, end_datetime, all_day, location
-    FROM calendar_events
-    WHERE date(start_datetime) >= date('now')
-    ORDER BY start_datetime ASC
+    SELECT e.id, e.title, e.start_datetime, e.end_datetime, e.all_day, e.location
+    FROM calendar_events e
+    WHERE date(e.start_datetime) >= date('now')
+      AND ${visibilityWhere('e', 'event_assignments', 'event_id')}
+    ORDER BY e.start_datetime ASC
     LIMIT ?
-  `).all(limit);
+  `).all(actorId, actorId, limit);
 }
 
 function createEvent(db, actorId, args) {
@@ -496,7 +499,7 @@ const CORE_TOOLS = [
         limit: { type: 'integer', description: 'Max number of events (1-100, default 20).' },
       },
     },
-    handler: (ctx, args) => listUpcomingEvents(ctx.db, args),
+    handler: (ctx, args) => listUpcomingEvents(ctx.db, ctx.actor.id, args),
   },
   {
     name: 'create_event',

@@ -39,6 +39,7 @@ const MIGRATIONS_SQL = {
       is_recurring    INTEGER NOT NULL DEFAULT 0,
       recurrence_rule TEXT,
       parent_task_id  INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+      visibility      TEXT    NOT NULL DEFAULT 'all',
       created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
       updated_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     );
@@ -98,6 +99,7 @@ const MIGRATIONS_SQL = {
       external_source      TEXT    NOT NULL DEFAULT 'local'
                                    CHECK(external_source IN ('local', 'google', 'apple')),
       recurrence_rule      TEXT,
+      visibility           TEXT    NOT NULL DEFAULT 'all',
       created_at           TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
       updated_at           TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     );
@@ -771,6 +773,65 @@ const MIGRATIONS_SQL = {
     );
   `,
   76: `
+    DROP TRIGGER IF EXISTS trg_search_events_ai;
+    DROP TRIGGER IF EXISTS trg_search_events_au;
+
+    CREATE TRIGGER trg_search_events_ai AFTER INSERT ON calendar_events BEGIN
+      INSERT INTO search_index (entity, entity_id, title, body)
+      VALUES ('event', NEW.id,
+              COALESCE(NEW.title, ''),
+              TRIM(COALESCE(NEW.description, '') || ' ' || COALESCE(NEW.location, '')));
+    END;
+    CREATE TRIGGER trg_search_events_au AFTER UPDATE ON calendar_events BEGIN
+      DELETE FROM search_index WHERE entity = 'event' AND entity_id = OLD.id;
+      INSERT INTO search_index (entity, entity_id, title, body)
+      VALUES ('event', NEW.id,
+              COALESCE(NEW.title, ''),
+              TRIM(COALESCE(NEW.description, '') || ' ' || COALESCE(NEW.location, '')));
+    END;
+
+    DELETE FROM search_index WHERE entity = 'event';
+    INSERT INTO search_index (entity, entity_id, title, body)
+      SELECT 'event', id,
+             COALESCE(title, ''),
+             TRIM(COALESCE(description, '') || ' ' || COALESCE(location, ''))
+      FROM calendar_events;
+  `,
+  77: `
+    DROP TABLE IF EXISTS search_index;
+    CREATE VIRTUAL TABLE search_index USING fts5(
+      entity UNINDEXED,
+      entity_id UNINDEXED,
+      title,
+      body,
+      tokenize = 'unicode61 remove_diacritics 2'
+    );
+    INSERT INTO search_index (entity, entity_id, title, body)
+      SELECT 'task', id, COALESCE(title, ''), COALESCE(description, '') FROM tasks;
+    INSERT INTO search_index (entity, entity_id, title, body)
+      SELECT 'event', id, COALESCE(title, ''),
+             TRIM(COALESCE(description, '') || ' ' || COALESCE(location, '')) FROM calendar_events;
+    INSERT INTO search_index (entity, entity_id, title, body)
+      SELECT 'note', id, COALESCE(title, ''), COALESCE(content, '') FROM notes;
+    INSERT INTO search_index (entity, entity_id, title, body)
+      SELECT 'contact', id, COALESCE(name, ''),
+             COALESCE(phone, '') || ' ' || COALESCE(email, '') FROM contacts;
+    INSERT INTO search_index (entity, entity_id, title, body)
+      SELECT 'item', id, COALESCE(name, ''), COALESCE(notes, '') FROM shopping_items;
+    INSERT INTO search_index (entity, entity_id, title, body)
+      SELECT 'medication', id, COALESCE(name, ''), COALESCE(dosage_text, '') FROM medications;
+    INSERT INTO search_index (entity, entity_id, title, body)
+      SELECT 'activity', id, COALESCE(type, ''), COALESCE(note, '') FROM health_activities;
+  `,
+  78: `
+    ALTER TABLE tasks           ADD COLUMN visibility TEXT NOT NULL DEFAULT 'all';
+    ALTER TABLE calendar_events ADD COLUMN visibility TEXT NOT NULL DEFAULT 'all';
+  `,
+  79: `
+    ALTER TABLE external_calendars ADD COLUMN default_assignee_user_id INTEGER;
+    ALTER TABLE ics_subscriptions  ADD COLUMN default_assignee_user_id INTEGER;
+  `,
+  80: `
     ALTER TABLE budget_entries ADD COLUMN owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
     ALTER TABLE budget_entries ADD COLUMN split_method TEXT NOT NULL DEFAULT 'equal';
     ALTER TABLE budget_entries ADD COLUMN linked_expense_id INTEGER REFERENCES expenses(id) ON DELETE SET NULL;
@@ -786,7 +847,7 @@ const MIGRATIONS_SQL = {
       UNIQUE(budget_entry_id, user_id)
     );
   `,
-  77: `
+  81: `
     CREATE TABLE access_permissions_new (
       subject_type  TEXT NOT NULL CHECK(subject_type IN ('role', 'user')),
       subject_id    TEXT NOT NULL,
@@ -804,7 +865,7 @@ const MIGRATIONS_SQL = {
     CREATE INDEX IF NOT EXISTS idx_access_permissions_subject
       ON access_permissions(subject_type, subject_id);
   `,
-  78: `
+  82: `
     CREATE TABLE budget_plans_new (
       plan_scope  TEXT NOT NULL DEFAULT 'household' CHECK(plan_scope IN ('household', 'personal')),
       user_id     INTEGER NOT NULL DEFAULT 0,

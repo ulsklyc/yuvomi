@@ -154,6 +154,86 @@ function renderPage(container, user) {
 }
 
 // --------------------------------------------------------------------------
+// Standard-Zuweisung pro Kalender-Sync-Ziel (#459)
+// --------------------------------------------------------------------------
+
+// Familienmitglieder einmal je Seitenaufruf laden (für die Assignee-Selects).
+// Nur Erfolge cachen — ein transienter Fehler darf nicht die ganze Session mit
+// leeren Selects zementieren.
+let _familyUsers = null;
+async function loadFamilyUsers() {
+  if (_familyUsers) return _familyUsers;
+  try {
+    _familyUsers = (await api.get('/auth/users')).data ?? [];
+    return _familyUsers;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Kompaktes Auswahlfeld „Standard-Zuweisung" für eine synchronisierte
+ * Kalenderzeile (Google/Apple/CalDAV). Schreibt provider-übergreifend über
+ * PATCH /calendar/external-calendars. Options werden async nachgeladen, damit die
+ * Zeile sofort rendert; Interaktionen werden vom Zeilen-Label entkoppelt.
+ */
+function buildCalendarAssigneeSelect({ source, externalId, currentId }) {
+  const select = document.createElement('select');
+  select.className = 'caldav-calendar-assignee';
+  select.title = t('settings.sync.defaultAssignee');
+  select.setAttribute('aria-label', t('settings.sync.defaultAssignee'));
+
+  const none = document.createElement('option');
+  none.value = '';
+  none.textContent = t('settings.sync.defaultAssigneeNone');
+  select.appendChild(none);
+
+  // Kurzer Ladehinweis, bis die Nutzerliste aufgelöst ist.
+  const loadingOpt = document.createElement('option');
+  loadingOpt.value = '';
+  loadingOpt.disabled = true;
+  loadingOpt.textContent = t('common.loading');
+  select.appendChild(loadingOpt);
+
+  // Klicks/Änderungen nicht an das umschließende Label (Checkbox) weiterreichen.
+  ['click', 'mousedown', 'change'].forEach((ev) =>
+    select.addEventListener(ev, (e) => e.stopPropagation()));
+
+  loadFamilyUsers().then((users) => {
+    loadingOpt.remove();
+    for (const u of users) {
+      const opt = document.createElement('option');
+      opt.value = String(u.id);
+      opt.textContent = u.display_name;
+      if (Number(currentId) === u.id) opt.selected = true;
+      select.appendChild(opt);
+    }
+  });
+
+  let last = currentId ? String(currentId) : '';
+  select.addEventListener('change', async () => {
+    const value = select.value;
+    select.disabled = true;
+    try {
+      await api.patch('/calendar/external-calendars', {
+        source,
+        external_id: externalId,
+        default_assignee_user_id: value ? Number(value) : null,
+      });
+      last = value;
+      showToast(t('settings.ics.updatedToast'), 'success');
+    } catch (err) {
+      select.value = last;
+      showToast(err.message || t('common.errorGeneric'), 'danger');
+    } finally {
+      select.disabled = false;
+    }
+  });
+
+  return select;
+}
+
+// --------------------------------------------------------------------------
 // CalDAV calendar accounts
 // --------------------------------------------------------------------------
 
@@ -186,6 +266,15 @@ function buildCalendarList(account, calendars) {
     name.textContent = cal.calendarName || cal.calendarUrl;
 
     label.append(checkbox, color, name);
+    // Standard-Zuweisung nur für aktivierte UND bereits synchronisierte Kalender —
+    // erst dann existiert die external_calendars-Zeile, die der PATCH aktualisiert.
+    if (cal.enabled && cal.synced) {
+      label.appendChild(buildCalendarAssigneeSelect({
+        source: 'caldav',
+        externalId: cal.calendarUrl,
+        currentId: cal.default_assignee_user_id,
+      }));
+    }
     list.appendChild(label);
 
     checkbox.addEventListener('change', async () => {
@@ -571,6 +660,14 @@ function openIcsEditModal(container, sub, subs, user) {
             </label>
           </div>
         </div>
+        <div class="form-group">
+          <label class="form-label" for="ics-edit-assignee">${t('settings.sync.defaultAssignee')}</label>
+          <select class="form-input" id="ics-edit-assignee">
+            <option value="">${t('settings.sync.defaultAssigneeNone')}</option>
+            <option value="" disabled data-loading>${t('common.loading')}</option>
+          </select>
+          <p class="form-hint">${t('settings.sync.defaultAssigneeHint')}</p>
+        </div>
         <div id="ics-edit-error" class="form-error" role="alert" hidden></div>
         <div class="settings-form-actions">
           <button type="button" class="btn btn--secondary" id="ics-edit-cancel">${t('common.cancel')}</button>
@@ -579,6 +676,20 @@ function openIcsEditModal(container, sub, subs, user) {
       </form>
     `,
     onSave(panel) {
+      // Assignee-Optionen async nachladen — Modal öffnet sofort (kein Fetch-Block).
+      const assigneeSel = panel.querySelector('#ics-edit-assignee');
+      if (assigneeSel) {
+        loadFamilyUsers().then((users) => {
+          assigneeSel.querySelector('option[data-loading]')?.remove();
+          for (const u of users) {
+            const opt = document.createElement('option');
+            opt.value = String(u.id);
+            opt.textContent = u.display_name;
+            if (Number(sub.default_assignee_user_id) === u.id) opt.selected = true;
+            assigneeSel.appendChild(opt);
+          }
+        });
+      }
       panel.querySelector('#ics-edit-cancel')?.addEventListener('click', () => closeModal());
       panel.querySelector('#ics-edit-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -587,10 +698,12 @@ function openIcsEditModal(container, sub, subs, user) {
         const name = panel.querySelector('#ics-edit-name').value.trim();
         const color = panel.querySelector('#ics-edit-color').value;
         const shared = panel.querySelector('#ics-edit-shared').checked ? 1 : 0;
+        const assigneeVal = panel.querySelector('#ics-edit-assignee').value;
+        const default_assignee_user_id = assigneeVal ? Number(assigneeVal) : null;
         errEl.hidden = true;
         submitBtn.disabled = true;
         try {
-          const res = await api.patch(`/calendar/subscriptions/${sub.id}`, { name, color, shared });
+          const res = await api.patch(`/calendar/subscriptions/${sub.id}`, { name, color, shared, default_assignee_user_id });
           const idx = subs.findIndex((s) => s.id === sub.id);
           if (idx >= 0) subs[idx] = res.data;
           renderIcsList(container, subs, user);
@@ -848,6 +961,15 @@ function buildGoogleCalendarPicker() {
         name.textContent = cal.summary || cal.id;
 
         item.append(checkbox, dot, name);
+        // Standard-Zuweisung nur für aktivierte UND bereits synchronisierte Kalender —
+        // erst dann existiert die external_calendars-Zeile, die der PATCH aktualisiert.
+        if (cal.enabled && cal.synced) {
+          item.appendChild(buildCalendarAssigneeSelect({
+            source: 'google',
+            externalId: cal.id,
+            currentId: cal.default_assignee_user_id,
+          }));
+        }
         list.appendChild(item);
 
         checkbox.addEventListener('change', async () => {

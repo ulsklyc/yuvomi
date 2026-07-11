@@ -161,6 +161,22 @@ await (async () => {
     await checkSSRF('http://127.0.0.1/cal.ics');
   });
   delete process.env[ENV_FLAG];
+
+  // --- checkSSRF: literale private IPs werden ohne Flag geblockt (kein DNS nötig) ---
+  delete process.env[ENV_FLAG];
+  await atest('checkSSRF blockt literale IPv4-Loopback', () =>
+    assertThrows(() => checkSSRF('https://127.0.0.1/cal.ics')));
+  await atest('checkSSRF blockt literales privates IPv4-Netz', () =>
+    assertThrows(() => checkSSRF('https://192.168.0.1/cal.ics')));
+  await atest('checkSSRF blockt Link-Local/Cloud-Metadata 169.254.169.254', () =>
+    assertThrows(() => checkSSRF('https://169.254.169.254/latest/meta-data/')));
+  await atest('checkSSRF blockt literales IPv6-Loopback [::1]', () =>
+    assertThrows(() => checkSSRF('https://[::1]/cal.ics')));
+  await atest('checkSSRF blockt IPv4-mapped-IPv6 auf private IPv4', () =>
+    assertThrows(() => checkSSRF('https://[::ffff:192.168.0.1]/cal.ics')));
+  await atest('checkSSRF lässt literale öffentliche IP durch', async () => {
+    await checkSSRF('https://8.8.8.8/cal.ics');
+  });
 })();
 
 console.log(`\n${passed} passed, ${failed} failed`);

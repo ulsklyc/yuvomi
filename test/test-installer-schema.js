@@ -25,9 +25,16 @@ const DOCUMENT_STORAGE_KEYS = [
   'DOCUMENT_STORAGE_WEBDAV_PATH',
 ];
 
+const DOCUMENT_STORAGE_LOCAL_KEYS = [
+  'DOCUMENT_STORAGE_LOCAL_ENABLED',
+  'DOCUMENT_STORAGE_LOCAL_PATH',
+];
+
 const SUBSCRIPTION_KEYS = ['FIXER_API_KEY'];
 
-const TOTAL_KEYS = ORIGINAL_KEYS.length + 2 + P5_KEYS.length + DOCUMENT_STORAGE_KEYS.length + SUBSCRIPTION_KEYS.length; // + TZ + OIKOS_HTTP_PORT
+const TOTAL_KEYS = ORIGINAL_KEYS.length + 2 + P5_KEYS.length
+  + DOCUMENT_STORAGE_KEYS.length + DOCUMENT_STORAGE_LOCAL_KEYS.length
+  + SUBSCRIPTION_KEYS.length; // + TZ + OIKOS_HTTP_PORT
 
 test('ENV_SCHEMA enthält alle Original-Keys, TZ, OIKOS_HTTP_PORT, P5, Subscriptions und Dokument-WebDAV', () => {
   assert.equal(ENV_SCHEMA.length, TOTAL_KEYS);
@@ -45,6 +52,83 @@ test('ENV_SCHEMA enthält alle Original-Keys, TZ, OIKOS_HTTP_PORT, P5, Subscript
   }
   for (const k of DOCUMENT_STORAGE_KEYS) {
     assert.ok(keys.includes(k), `Dokument-WebDAV-Key fehlt: ${k}`);
+  }
+  for (const k of DOCUMENT_STORAGE_LOCAL_KEYS) {
+    assert.ok(keys.includes(k), `Dokument-Local-Key fehlt: ${k}`);
+  }
+});
+
+test('Lokaler Dokumentspeicher ist optional, standardmäßig deaktiviert und hat den Pfad-Default /documents', () => {
+  for (const key of DOCUMENT_STORAGE_LOCAL_KEYS) {
+    const entry = ENV_SCHEMA.find(e => e.key === key);
+    assert.ok(entry, `${key} nicht in ENV_SCHEMA`);
+    assert.equal(entry.required, false, `${key} muss optional sein`);
+    assert.equal(entry.type, 'default', `${key} muss type 'default' haben`);
+    assert.equal(entry.writeToEnv, true, `${key}.writeToEnv ist nicht true`);
+  }
+  const enabled = ENV_SCHEMA.find(e => e.key === 'DOCUMENT_STORAGE_LOCAL_ENABLED');
+  assert.equal(enabled.default, 'false');
+  const path = ENV_SCHEMA.find(e => e.key === 'DOCUMENT_STORAGE_LOCAL_PATH');
+  assert.equal(path.default, '/documents');
+});
+
+test('Web-Installer zeigt, sammelt und sendet die lokalen Dokumentspeicher-Werte', () => {
+  const src = readFileSync(new URL('../tools/installer/install.html', import.meta.url), 'utf8');
+  for (const id of ['adv-document-local-enable', 'adv-document-local-path']) {
+    assert.match(src, new RegExp(`id="${id}"`), `Web-Installer-Feld fehlt: ${id}`);
+  }
+  for (const key of DOCUMENT_STORAGE_LOCAL_KEYS) {
+    assert.match(src, new RegExp(`${key}:\\s*S\\.${key}`), `Web-Installer sendet ${key} nicht`);
+    assert.match(src, new RegExp(`${key}:\\s*''`), `Web-Installer-State fehlt ${key}`);
+  }
+});
+
+test('CLI-Installer sammelt und schreibt die lokalen Dokumentspeicher-Werte', () => {
+  const src = readFileSync(new URL('../install.sh', import.meta.url), 'utf8');
+  for (const key of DOCUMENT_STORAGE_LOCAL_KEYS) {
+    assert.match(src, new RegExp(`^${key}=`, 'm'), `CLI-Installer schreibt ${key} nicht in .env`);
+  }
+});
+
+test('.env.example dokumentiert die lokalen Dokumentspeicher-Werte', () => {
+  const src = readFileSync(new URL('../.env.example', import.meta.url), 'utf8');
+  for (const key of DOCUMENT_STORAGE_LOCAL_KEYS) {
+    assert.match(src, new RegExp(`^#?\\s*${key}=`, 'm'), `.env.example fehlt ${key}`);
+  }
+});
+
+test('Unraid deklariert die lokalen Dokumentspeicher-Werte advanced und optional', () => {
+  const src = readFileSync(new URL('../templates/yuvomi.xml', import.meta.url), 'utf8');
+  for (const key of DOCUMENT_STORAGE_LOCAL_KEYS) {
+    const config = src.match(new RegExp(`<Config[^>]+Target="${key}"[^>]*>`));
+    assert.ok(config, `Unraid fehlt ${key}`);
+    assert.match(config[0], /Display="advanced"/, `${key} muss advanced sein`);
+    assert.match(config[0], /Required="false"/, `${key} muss optional sein`);
+  }
+});
+
+test('Portainer Compose reicht die lokalen Dokumentspeicher-Werte durch', () => {
+  const src = readFileSync(new URL('../docs/docker-compose.portainer.yml', import.meta.url), 'utf8');
+  for (const key of DOCUMENT_STORAGE_LOCAL_KEYS) {
+    assert.match(
+      src,
+      new RegExp(`- ${key}=\\$\\{${key}:-`),
+      `Portainer Compose fehlt ${key}`
+    );
+  }
+});
+
+test('Lokale Dokumentspeicher-Werte erzeugen keine TrueNAS- oder Umbrel-Fragen', () => {
+  for (const path of [
+    '../deploy/truenas/questions.yaml',
+    '../deploy/truenas/templates/docker-compose.yaml',
+    '../deploy/umbrel/docker-compose.yml',
+    '../deploy/umbrel/umbrel-app.yml',
+  ]) {
+    const src = readFileSync(new URL(path, import.meta.url), 'utf8');
+    for (const key of DOCUMENT_STORAGE_LOCAL_KEYS) {
+      assert.doesNotMatch(src, new RegExp(key), `${path} darf ${key} nicht explizit deklarieren`);
+    }
   }
 });
 

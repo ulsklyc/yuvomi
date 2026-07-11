@@ -53,12 +53,16 @@ test('date inputs: accept hyphen separators for YMD dates', () => {
   assert.equal(parseDateInput('2026.05.06'), '2026-05-06');
 });
 
-test('task create date fields use a keyboard that allows separators', () => {
+test('task + recurrence date fields use the shared yuvomi-datepicker', () => {
   const tasksSource = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
   const rruleSource = readFileSync(new URL('../public/rrule-ui.js', import.meta.url), 'utf8');
-  assert.match(tasksSource, /name="start_date"[\s\S]*?inputmode="text"/);
-  assert.match(tasksSource, /name="due_date"[\s\S]*?inputmode="text"/);
-  assert.match(rruleSource, /id="\$\{prefix\}-rrule-until"[\s\S]*?inputmode="text"/);
+  // Freies Tippen (inkl. Trennzeichen, #442) lebt jetzt im Component; die
+  // Formulare binden nur noch das gemeinsame Element ein.
+  assert.match(tasksSource, /<yuvomi-datepicker type="date"[\s\S]*?name="start_date"/);
+  assert.match(tasksSource, /<yuvomi-datepicker type="date"[\s\S]*?name="due_date"/);
+  assert.match(tasksSource, /<yuvomi-datepicker type="time"[\s\S]*?name="due_time"/);
+  assert.match(rruleSource, /<yuvomi-datepicker type="date"[\s\S]*?id="\$\{prefix\}-rrule-until"/);
+  assert.doesNotMatch(tasksSource, /js-date-input|js-time-input/);
 });
 
 test('stagger: tut nichts bei prefers-reduced-motion', () => {

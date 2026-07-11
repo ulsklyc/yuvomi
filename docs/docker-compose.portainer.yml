@@ -25,6 +25,8 @@ services:
       - "3000:3000"
     volumes:
       - oikos_data:/data
+      # Optional: mount a host folder for storing uploaded documents locally
+      # - ./documents:/documents
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -54,6 +56,9 @@ services:
       - APPLE_CALDAV_URL=${APPLE_CALDAV_URL:-https://caldav.icloud.com}
       - APPLE_USERNAME=${APPLE_USERNAME:-}
       - APPLE_APP_SPECIFIC_PASSWORD=${APPLE_APP_SPECIFIC_PASSWORD:-}
+      # Local document storage (optional): set to true to store uploaded documents on the mounted /documents folder.
+      - DOCUMENT_STORAGE_LOCAL_ENABLED=${DOCUMENT_STORAGE_LOCAL_ENABLED:-false}
+      - DOCUMENT_STORAGE_LOCAL_PATH=${DOCUMENT_STORAGE_LOCAL_PATH:-/documents}
       # WebDAV document storage (optional)
       - DOCUMENT_STORAGE_WEBDAV_ENABLED=${DOCUMENT_STORAGE_WEBDAV_ENABLED:-false}
       - DOCUMENT_STORAGE_WEBDAV_URL=${DOCUMENT_STORAGE_WEBDAV_URL:-}

@@ -4,7 +4,7 @@
  * Abhängigkeiten: /i18n.js
  */
 
-import { t, dateInputPlaceholder, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
+import { t, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 
 const FREQ_OPTIONS = () => [
   { value: '',        label: t('rrule.freqNone') },
@@ -109,8 +109,8 @@ export function renderRRuleFields(prefix, existingRule) {
           </div>
           <div class="form-group rrule-until-field" style="margin-bottom:0">
             <label class="label form-label" for="${prefix}-rrule-until">${t('rrule.labelUntil')}</label>
-            <input class="input form-input js-date-input" type="text" id="${prefix}-rrule-until"
-                   value="${formatDateInput(parsed.until)}" placeholder="${dateInputPlaceholder()}" inputmode="text">
+            <yuvomi-datepicker type="date" id="${prefix}-rrule-until"
+                   value="${formatDateInput(parsed.until)}"></yuvomi-datepicker>
           </div>
         </div>
 
@@ -155,18 +155,6 @@ export function bindRRuleEvents(root, prefix) {
   });
 
   intervalEl?.addEventListener('input', updateUnit);
-
-  root.querySelectorAll('.js-date-input').forEach((input) => {
-    input.addEventListener('keydown', (e) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.key.length !== 1) return;
-      if (!/[\d./\-]/.test(e.key)) e.preventDefault();
-    });
-    input.addEventListener('blur', () => {
-      const parsed = parseDateInput(input.value);
-      if (parsed) input.value = formatDateInput(parsed);
-    });
-  });
 
   // Day-Toggle
   root.querySelectorAll(`#${prefix}-rrule-weekdays .rrule-day`).forEach(btn => {

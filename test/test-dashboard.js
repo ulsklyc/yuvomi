@@ -690,7 +690,8 @@ cdb.exec(`
     external_source TEXT NOT NULL DEFAULT 'local',
     recurrence_rule TEXT,
     subscription_id INTEGER REFERENCES ics_subscriptions(id) ON DELETE CASCADE,
-    calendar_ref_id INTEGER REFERENCES external_calendars(id) ON DELETE SET NULL
+    calendar_ref_id INTEGER REFERENCES external_calendars(id) ON DELETE SET NULL,
+    visibility TEXT NOT NULL DEFAULT 'all'
   );
   CREATE TABLE event_assignments (
     event_id INTEGER NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
@@ -865,7 +866,8 @@ test('getUpcomingEvents: private ICS-Termine fremder User werden ausgeblendet', 
       external_source TEXT NOT NULL DEFAULT 'local',
       recurrence_rule TEXT,
       subscription_id INTEGER,
-      calendar_ref_id INTEGER
+      calendar_ref_id INTEGER,
+      visibility TEXT NOT NULL DEFAULT 'all'
     );
     CREATE TABLE birthdays (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

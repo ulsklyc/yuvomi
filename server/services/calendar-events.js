@@ -6,6 +6,7 @@
  */
 
 import { nextOccurrence } from './recurrence.js';
+import { visibilityWhere } from './visibility.js';
 
 // Zugewiesene Personen eines Events als JSON-Array (Multi-Assignment).
 const ASSIGNED_USERS_SQL = `(
@@ -145,8 +146,9 @@ export function getUpcomingEvents(d, { userId = null, limit = 5, windowDays = 90
         SELECT id FROM ics_subscriptions WHERE shared = 1 OR created_by = ?
       )
     )
+    AND ${visibilityWhere('e', 'event_assignments', 'event_id')}
     ORDER BY e.start_datetime ASC
-  `).all(nowDate, future, future, userId);
+  `).all(nowDate, future, future, userId, userId, userId);
 
   return expandRecurringEvents(rawEvents, nowDate, future)
     .filter((e) => {

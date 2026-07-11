@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, advancedSection } from '/components/modal.js';
 import { stagger } from '/utils/ux.js';
-import { t, formatDate, dateInputPlaceholder, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
+import { t, formatDate, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { DEFAULT_CATEGORY_NAME } from '/utils/shopping-categories.js';
@@ -979,17 +979,6 @@ function openMealModal(opts) {
         recipeSelect.value = String(presetRecipeId);
         applyRecipe(presetRecipeId);
       }
-      panel.querySelectorAll('.js-date-input').forEach((input) => {
-        input.addEventListener('keydown', (e) => {
-          if (e.ctrlKey || e.metaKey || e.altKey) return;
-          if (e.key.length !== 1) return;
-          if (!/[\d./\-]/.test(e.key)) e.preventDefault();
-        });
-        input.addEventListener('blur', () => {
-          const parsed = parseDateInput(input.value);
-          if (parsed) input.value = formatDateInput(parsed);
-        });
-      });
 
       addIngBtn.addEventListener('click', () => {
         const tmp  = document.createElement('div');
@@ -1120,7 +1109,7 @@ function buildModalContent({ mode, date, mealType, meal, presetRecipeId = null }
     <div class="modal-grid modal-grid--2">
       <div class="form-group">
         <label class="form-label" for="modal-date">${t('meals.dateLabel')}</label>
-        <input type="text" class="form-input js-date-input" id="modal-date" value="${formatDateInput(date)}" placeholder="${dateInputPlaceholder()}" inputmode="numeric">
+        <yuvomi-datepicker type="date" id="modal-date" value="${formatDateInput(date)}"></yuvomi-datepicker>
       </div>
       <div class="form-group">
         <label class="form-label" for="modal-type">${t('meals.mealTypeLabel')}</label>

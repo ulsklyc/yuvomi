@@ -284,6 +284,42 @@ async function sync(force = false) {
 }
 
 /**
+ * Kollabiert überlappende, gleichnamige Einträge desselben Typs zu einer
+ * Union-Spanne (frühester Start, spätestes Ende). Verhindert doppelte Balken,
+ * wenn OpenHolidays für eine Subdivision mehrere Schulferien-Varianten mit
+ * abweichenden Terminen liefert (regionale Schulkalender, z. B. CH-Kantone).
+ * Nicht überlappende gleichnamige Einträge bleiben getrennt. (#434)
+ * @param {Array<{id, type, start_date, end_date, name}>} rows nach start_date sortiert
+ */
+function mergeOverlappingByName(rows) {
+  const byKey = new Map();
+  for (const r of rows) {
+    const key = `${r.type} ${r.name}`;
+    if (!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key).push(r);
+  }
+
+  const out = [];
+  for (const group of byKey.values()) {
+    group.sort((a, b) => (a.start_date < b.start_date ? -1 : a.start_date > b.start_date ? 1 : 0));
+    let cur = null;
+    for (const r of group) {
+      // Überlappung/Berührung (start des nächsten <= aktuelles Ende) → vereinen.
+      if (cur && r.start_date <= cur.end_date) {
+        if (r.end_date > cur.end_date) cur.end_date = r.end_date;
+        cur.id = Math.min(cur.id, r.id);
+      } else {
+        cur = { ...r };
+        out.push(cur);
+      }
+    }
+  }
+
+  out.sort((a, b) => (a.start_date < b.start_date ? -1 : a.start_date > b.start_date ? 1 : 0));
+  return out;
+}
+
+/**
  * Feiertage/Ferien für einen Datumsbereich aus dem Cache lesen.
  * @param {string} from YYYY-MM-DD
  * @param {string} to   YYYY-MM-DD
@@ -321,7 +357,19 @@ function getForRange(from, to) {
     ORDER BY start_date ASC
   `).all(country, subdivision ?? '', ...types, to, from);
 
-  return rows.map((r) => ({
+  // OpenHolidays modelliert innerhalb EINER Subdivision teils mehrere
+  // gleichnamige Schulferien-Varianten mit abweichenden Datumsbereichen –
+  // z. B. Kanton Bern: deutsch- vs. französischsprachige Schulregion
+  // (groups CH-BE-VS / CH-BE-EO). Diese tragen KEIN "Exception"-Tag und haben
+  // unterschiedliche Start-/Enddaten, daher greifen weder der sync-seitige
+  // Exception-Filter noch das exakte GROUP BY oben. Für den Familienkalender
+  // werden überlappende gleichnamige Einträge desselben Typs zu einer
+  // Union-Spanne kollabiert, sodass nie zwei Balken übereinanderliegen.
+  // Nicht überlappende gleichnamige Einträge (z. B. mehrere bewegliche
+  // Ferientage) bleiben bewusst getrennt. (#434)
+  const merged = mergeOverlappingByName(rows);
+
+  return merged.map((r) => ({
     ...r,
     color: r.type === 'public' ? pubColor : schColor,
   }));

@@ -5,7 +5,18 @@
  */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  truncateSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import nodePath from 'node:path';
 import http from 'node:http';
 import { Readable } from 'node:stream';
 import test from 'node:test';
@@ -42,6 +53,8 @@ const STORAGE_ENV_KEYS = [
   'DOCUMENT_STORAGE_WEBDAV_PASSWORD',
   'DOCUMENT_STORAGE_WEBDAV_PATH',
   'DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK',
+  'DOCUMENT_STORAGE_LOCAL_ENABLED',
+  'DOCUMENT_STORAGE_LOCAL_PATH',
 ];
 
 function clearStorageConfig() {
@@ -1900,6 +1913,8 @@ test('document storage config status masks passwords and reports effective env c
     configured: true,
     active_upload_backend: 'webdav',
     effective_target: `${webdav.url}/env/documents`,
+    local_enabled: false,
+    local_path: '/documents',
     webdav_document_count: 1,
     last_test: '2026-06-10T12:00:00.000Z',
     last_error: 'previous failure',
@@ -2329,4 +2344,219 @@ test('testConnection deletes its temporary file and persists a stable failure', 
   const status = storage.getStatus();
   assert.equal(status.lastTest, previousSuccessfulTest);
   assert.match(status.lastError, /verification/i);
+});
+
+// --- Folder-backed local storage (DOCUMENT_STORAGE_LOCAL_* env opt-in) -------
+
+const LOCAL_ENV_KEYS = [
+  'DOCUMENT_STORAGE_LOCAL_ENABLED',
+  'DOCUMENT_STORAGE_LOCAL_PATH',
+];
+
+function withLocalStorage(fn) {
+  const dir = mkdtempSync(nodePath.join(tmpdir(), 'yuvomi-docs-'));
+  const previous = Object.fromEntries(LOCAL_ENV_KEYS.map((k) => [k, process.env[k]]));
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  process.env.DOCUMENT_STORAGE_LOCAL_PATH = dir;
+  return {
+    dir,
+    async run() {
+      try {
+        await fn(dir);
+      } finally {
+        for (const key of LOCAL_ENV_KEYS) {
+          if (previous[key] === undefined) delete process.env[key];
+          else process.env[key] = previous[key];
+        }
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  };
+}
+
+test('getLocalStorageConfig is disabled with a default base path unless env opts in', () => {
+  for (const key of LOCAL_ENV_KEYS) delete process.env[key];
+  const off = storage.getLocalStorageConfig();
+  assert.equal(off.enabled, false);
+  assert.equal(off.basePath, '/documents');
+
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = '1';
+  process.env.DOCUMENT_STORAGE_LOCAL_PATH = '/srv/docs';
+  const on = storage.getLocalStorageConfig();
+  assert.equal(on.enabled, true);
+  assert.equal(on.basePath, '/srv/docs');
+  for (const key of LOCAL_ENV_KEYS) delete process.env[key];
+});
+
+test('local storage: upload writes to the folder and round-trips through read/delete', () =>
+  withLocalStorage(async (dir) => {
+    const content = Buffer.from('hello local folder');
+    const staged = await storage.stageDocumentUpload({
+      buffer: content,
+      mime: 'application/pdf',
+      category: 'invoices',
+      originalName: 'bill.pdf',
+    });
+
+    assert.equal(staged.storage_backend, 'local');
+    assert.equal(staged.storage_provider, 'local');
+    assert.equal(staged.content_data, '');
+    assert.ok(staged.storage_key && !staged.storage_key.startsWith('/'));
+    assert.ok(!staged.storage_key.includes('__abs__'), 'no absolute-path marker');
+
+    const onDisk = nodePath.join(dir, staged.storage_key);
+    assert.ok(existsSync(onDisk), 'file exists under the configured base path');
+    assert.deepEqual(readFileSync(onDisk), content);
+
+    const doc = {
+      storage_backend: 'local',
+      storage_key: staged.storage_key,
+      mime_type: 'application/pdf',
+    };
+    const read = await storage.readDocumentContent(doc);
+    assert.deepEqual(read.buffer, content);
+    assert.equal(read.mime, 'application/pdf');
+
+    await storage.deleteDocumentContent(doc);
+    assert.equal(existsSync(onDisk), false, 'file removed on delete');
+  }).run());
+
+test('local storage takes precedence over a configured WebDAV backend', () =>
+  withLocalStorage(async (dir) => {
+    setConfig({
+      enabled: 'true',
+      url: 'http://127.0.0.1:1/dav',
+      username: 'alice',
+      password: 'secret',
+      path: 'documents',
+    });
+    const staged = await storage.stageDocumentUpload({
+      buffer: Buffer.from('x'),
+      category: 'misc',
+      originalName: 'a.txt',
+    });
+    assert.equal(staged.storage_backend, 'local');
+    assert.ok(existsSync(nodePath.join(dir, staged.storage_key)));
+  }).run());
+
+test('local storage: a write failure surfaces loudly without a silent fallback', () =>
+  withLocalStorage(async (dir) => {
+    // Point the base path at a location whose parent is a regular file so the
+    // mkdir/writeFile fails; the old fallback to /data/documents is gone.
+    const blocker = nodePath.join(dir, 'blocker');
+    writeFileSync(blocker, '');
+    process.env.DOCUMENT_STORAGE_LOCAL_PATH = nodePath.join(blocker, 'nested');
+
+    await assert.rejects(
+      storage.stageDocumentUpload({
+        buffer: Buffer.from('x'),
+        category: 'misc',
+        originalName: 'a.txt',
+      }),
+      (error) => assertStorageError(error, 'DOCUMENT_STORAGE_UPLOAD_FAILED')
+    );
+  }).run());
+
+test('local storage: read rejects a traversal storage_key', () =>
+  withLocalStorage(async () => {
+    await assert.rejects(
+      storage.readDocumentContent({
+        storage_backend: 'local',
+        storage_key: '../../etc/passwd',
+        mime_type: 'text/plain',
+      }),
+      (error) => assertStorageError(error, 'DOCUMENT_STORAGE_INVALID_CONFIG')
+    );
+  }).run());
+
+test('local storage: read enforces the maximum readable size', () =>
+  withLocalStorage(async (dir) => {
+    const relKey = 'big/file.bin';
+    const full = nodePath.join(dir, relKey);
+    mkdirSync(nodePath.dirname(full), { recursive: true });
+    writeFileSync(full, '');
+    truncateSync(full, 5 * 1024 * 1024 + 1); // sparse file just over MAX_READ_BYTES
+
+    await assert.rejects(
+      storage.readDocumentContent({
+        storage_backend: 'local',
+        storage_key: relKey,
+        mime_type: 'application/octet-stream',
+      }),
+      (error) => assertStorageError(error, 'DOCUMENT_STORAGE_READ_FAILED')
+    );
+    assert.ok(statSync(full).size > 5 * 1024 * 1024);
+  }).run());
+
+test('local storage: delete ignores an already-missing file', () =>
+  withLocalStorage(async () => {
+    await storage.deleteDocumentContent({
+      storage_backend: 'local',
+      storage_key: 'gone/missing.bin',
+      mime_type: 'application/octet-stream',
+    });
+  }).run());
+
+test('legacy local rows without a storage_key still read from the DB BLOB', async () => {
+  for (const key of LOCAL_ENV_KEYS) delete process.env[key];
+  const read = await storage.readDocumentContent({
+    storage_backend: 'local',
+    storage_key: null,
+    content_data: Buffer.from('legacy blob'),
+    mime_type: 'text/plain',
+  });
+  assert.deepEqual(read.buffer, Buffer.from('legacy blob'));
+});
+
+test('document routes: local folder upload lands on disk and status reports local_folder', async (t) => {
+  const dir = mkdtempSync(nodePath.join(tmpdir(), 'yuvomi-docs-route-'));
+  const previous = Object.fromEntries(LOCAL_ENV_KEYS.map((k) => [k, process.env[k]]));
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  process.env.DOCUMENT_STORAGE_LOCAL_PATH = dir;
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => {
+    harness.close();
+    for (const key of LOCAL_ENV_KEYS) {
+      if (previous[key] === undefined) delete process.env[key];
+      else process.env[key] = previous[key];
+    }
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  // Both status surfaces report the local folder as the active upload backend.
+  const meta = await routeCall(harness, 'GET', '/meta/options');
+  assert.equal(meta.body.data.active_upload_backend, 'local_folder');
+
+  const status = await routeCall(harness, 'GET', '/storage/config');
+  assert.equal(status.response.status, 200);
+  assert.equal(status.body.data.active_upload_backend, 'local_folder');
+  assert.equal(status.body.data.local_enabled, true);
+  assert.equal(status.body.data.local_path, dir);
+  assert.equal(status.body.data.effective_target, dir);
+
+  // The upload is written to the folder, not the in-DB BLOB.
+  const created = await routeCall(harness, 'POST', '/', uploadBody({
+    name: 'Folder route upload',
+    bytes: 'folder route bytes',
+  }));
+  assert.equal(created.response.status, 201);
+  assert.equal(created.body.data.storage_backend, 'local');
+
+  const row = get().prepare(
+    'SELECT storage_backend, storage_key, content_data FROM family_documents WHERE id = ?'
+  ).get(created.body.data.id);
+  assert.equal(row.storage_backend, 'local');
+  assert.ok(row.storage_key && !row.storage_key.startsWith('/'), 'relative storage_key stored');
+  assert.equal(Buffer.from(row.content_data ?? '').length, 0, 'no BLOB copy in the DB');
+
+  const onDisk = nodePath.join(dir, row.storage_key);
+  assert.ok(existsSync(onDisk), 'uploaded file exists in the configured folder');
+  assert.deepEqual(readFileSync(onDisk), Buffer.from('folder route bytes'));
+
+  // Download round-trips the bytes back from disk.
+  const baseUrl = await harness.listen();
+  const dl = await fetch(`${baseUrl}/api/v1/documents/${created.body.data.id}/download`);
+  assert.equal(dl.status, 200);
+  assert.deepEqual(Buffer.from(await dl.arrayBuffer()), Buffer.from('folder route bytes'));
 });

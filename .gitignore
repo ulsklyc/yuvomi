@@ -44,6 +44,9 @@ AGENTS.md
 DESIGN.md
 PRODUCT.md
 
+# graphify knowledge graph — generated artifact, regenerated locally, never published
+graphify-out/
+
 # Git worktrees
 .worktrees/
 
@@ -55,6 +58,8 @@ PRODUCT.md
 # Claude Code work documents (internal plans/specs, not for contributors)
 docs/superpowers/
 docs/archive/superpowers/
+docs/plans/
+docs/integrations/
 REBRANDING.md
 
 # Audit reports (generated per-session, not for version control)

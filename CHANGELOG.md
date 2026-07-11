@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-07-11
+
+### Added
+- Per-item visibility for tasks and calendar events: choose "all family members" (default), "assignees only", or "private" (only you). Enforced server-side on every read path — list, detail, dashboard, search, and MCP — with no admin bypass, so a private item stays hidden even from a parent/admin (useful for preparing a surprise). Restricted items carry a lock/people icon in the list, and the event export feed is deliberately not filtered by it. (Discussion #474)
+- "Assigned to me" quick filter on the Tasks and Calendar views: one toggle limits the list to items assigned to you, remembered per device and shown only in multi-member households. (Discussion #472)
+- Default assignee per calendar sync target: give each synced Google/CalDAV calendar or ICS subscription an optional default person in Settings → Sync, and newly imported events of that target are automatically assigned to them (new events only, never retroactively). (Discussion #459)
+
+## [1.10.2] - 2026-07-11
+
+### Fixed
+- Family members who are both a shared-expense guest and hold a family role without Budget access no longer get stuck in an infinite redirect loop between the dashboard and the Budget module (which previously crashed the tab with a "Maximum call stack size exceeded" error). The guest→Budget redirect now defers to the permission check, so a user without Budget access lands on an accessible page instead. (#480)
+
+## [1.10.1] - 2026-07-11
+
+### Fixed
+- The **Log out** action in the desktop sidebar footer now spans its own full-width row below Help / Changelog, so it reads clearly as a distinct action. A CSS specificity conflict previously left it rendering as a narrow, easy-to-miss item. (#479)
+
+## [1.10.0] - 2026-07-11
+
+### Added
+- **Calendar search (#471):** a magnifier button in the calendar toolbar — or the new `f` keyboard shortcut — opens an in-context search that finds appointments across the whole timeline, past and future, even when you don't know the date. It matches by title, location, and notes, lists results grouped by date (anchored on the next upcoming hit), resolves recurring events to their next occurrence, and jumps straight to the day and opens the event when you pick a result. Result rows are fully keyboard-operable, and the count shows "N of M" when a very large result set is capped.
+
+### Changed
+- Global search now also finds calendar events by their **location**, and the whole search index is **accent-insensitive**: "muller" finds "Müller" and "strasse" finds "Straße". Calendar events in global search are now family-visible (matching the calendar list) rather than limited to the event's creator.
+
+### Fixed
+- Keyboard shortcuts no longer intercept Cmd/Ctrl/Alt key combinations, so browser and OS shortcuts such as Cmd+F ("find in page") keep working as expected.
+
+## [1.9.0] - 2026-07-11
+
+### Added
+- Logging out is now reachable directly from the navigation: a **Log out** action sits in the desktop sidebar footer and in the mobile "More" sheet, so you no longer have to dig through Settings → Personal → Account. A short confirmation guards against accidental logouts. (#479)
+
+## [1.8.2] - 2026-07-11
+
+### Fixed
+- Logout: the module navigation bar no longer stays visible after logging out. The app shell (sidebar and bottom navigation) is now torn down when navigating to a full-screen auth page, so only the login form is shown. The session state is also reset on logout so the login page appears immediately without briefly flashing the dashboard. (#478)
+
+## [1.8.1] - 2026-07-10
+
+### Changed
+- Extended the shared date and time picker to the last fields that still used plain text entry: the task start date, due date and due time, the meal-planner date, and the recurrence "until" date now open the same calendar or time picker (or the native OS picker on touch) as every other date field, completing the app-wide rollout.
+
+## [1.8.0] - 2026-07-10
+
+### Added
+- Every date and time field across the app now offers a built-in picker: click the calendar or clock icon to open a themed month grid or time list — or the native OS picker on phones and tablets — while free-text entry keeps working as before with locale-aware shorthands (e.g. `0930`/`9h30` → `09:30`). The picker takes each module's accent color, marks today, enforces optional earliest/latest date limits, is fully keyboard-navigable, and mirrors for right-to-left languages.
+
+### Changed
+- Unified date and time input across all modules (calendar appointments, budget, health, birthdays, shopping, split expenses, housekeeping, subscriptions and settings) onto one shared picker, replacing the previous mix of native browser controls and plain text fields so every date field looks and behaves the same.
+
+## [1.7.2] - 2026-07-10
+
+### Fixed
+- Holidays: school breaks no longer appear twice in the calendar for regions where the provider models several same-named holiday variants with differing dates for one subdivision (e.g. Swiss cantons such as Bern, whose German- and French-speaking school regions have different summer-break dates). Overlapping same-named entries of the same type are now merged into a single span on read, so the fix applies to already-cached entries without needing a re-sync. This is a distinct cause from the earlier #434 duplicates, which stemmed from stale cross-scope cache rows and "Exception"-tagged variants.
+
+## [1.7.1] - 2026-07-10
+
+### Security
+- ICS calendar subscriptions and one-off feed imports now validate the destination IP at the moment the connection is established, closing a DNS-rebinding hole where an attacker-controlled hostname could pass the pre-flight private-IP check but resolve to an internal address (e.g. cloud metadata) during the actual fetch. Literal private IPs — including IPv6 loopback and IPv4-mapped IPv6 in both decimal and hex form — are now rejected as well. The `ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK` opt-in continues to bypass both checks for trusted LAN feeds.
+
+### Changed
+- Bumped `tsdav` to 2.3.1 and pinned build-script permissions (`allowScripts`) for `better-sqlite3`, `bcrypt` and `puppeteer`.
+
+## [1.7.0] - 2026-07-10
+
+### Added
+- Documents: optional local folder storage backend. With `DOCUMENT_STORAGE_LOCAL_ENABLED=true`, new document files and calendar attachments are written to a mounted host folder (`DOCUMENT_STORAGE_LOCAL_PATH`, default `/documents`) instead of the SQLite database, keeping the database small and letting other self-hosted tools share the same files. When enabled it takes precedence over WebDAV; existing database and WebDAV documents are not migrated and stay readable. Configurable in the web and CLI installers.
+- Documents: the storage settings card and the upload and calendar-attachment dialogs now show the active upload target (local folder, WebDAV, or database), and folder-backed documents display a "Local folder" badge in the list.
+
+### Security
+- Documents: the local folder backend validates storage keys against path traversal and fails an upload loudly on an unwritable mount instead of silently falling back to another location.
+
 ## [1.6.6] - 2026-07-10
 
 ### Changed

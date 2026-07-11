@@ -418,10 +418,11 @@ html:has(.search-overlay--visible) yuvomi-install-prompt {
   margin: 0;
 }
 
-/* ── System-Cluster: kompakte 1×3-Reihe (Einstellungen | Hilfe | Änderungen) ── */
+/* ── System-Cluster: kompakte Reihe (Einstellungen | Hilfe | Änderungen |
+ * Abmelden) — Icon-über-Label, monochrom. ── */
 .more-sheet__system {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--space-2);
 }
 
@@ -1004,11 +1005,24 @@ html.fab-anim-done .page-fab {
 
   .nav-sidebar__footer-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: flex-start;
     gap: var(--space-0h);
     padding: var(--space-2) var(--space-1) 0;
     flex-shrink: 0;
+  }
+
+  /* Abmelden bricht in eine eigene, volle Zeile unter Hilfe/Änderungen und
+   * setzt sich mit einer Haarlinie als terminale Aktion ab. Doppelte
+   * Klassen-Spezifität (.nav-item.nav-item--logout) + volle flex-Shorthand
+   * schlagen die spätere `.nav-item { flex: 0 1 auto }`-Regel, die sonst
+   * flex-basis auf auto zurücksetzte → Zeile blieb schmal statt vollbreit. */
+  .nav-sidebar__footer-actions .nav-item.nav-item--logout {
+    flex: 1 1 100%;
+    margin-top: var(--space-1);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border-subtle);
   }
 
   /* ── Nav-Item: Sidebar ── */
@@ -1141,6 +1155,14 @@ html.fab-anim-done .page-fab {
   html.sidebar-collapsed .nav-sidebar .nav-sidebar__footer-actions {
     flex-direction: column;
     padding-inline: var(--space-1);
+  }
+
+  /* Eingeklappt stapelt der Footer bereits vertikal (icon-only) — der
+   * Vollzeilen-Umbruch entfällt (flex komplett zurücksetzen, sonst streckt
+   * flex-grow das Icon in der Spalte), die Haarlinie bleibt als Trenner. */
+  html.sidebar-collapsed .nav-sidebar__footer-actions .nav-item.nav-item--logout {
+    flex: 0 0 auto;
+    margin-top: var(--space-0h);
   }
 
   html.sidebar-collapsed .nav-sidebar .nav-section-label {
@@ -3290,5 +3312,23 @@ html[data-module-readonly] .page-fab {
   width: 16px;
   height: 16px;
   color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+/* Warn-Variante für Formular-Hinweise (#474 Sichtbarkeits-Guard): hebt einen
+   Hinweis mit überraschender Konsequenz von neutralem Hilfetext ab, ohne zu
+   schreien. Als Zusatzklasse neben .form-hint / .task-field-hint. Der p-Selektor
+   erhöht die Spezifität, damit die später geladene Page-CSS-Hint-Farbe nicht gewinnt. */
+p.field-hint--warn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-warning);
+}
+
+p.field-hint--warn i,
+p.field-hint--warn svg {
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
 }

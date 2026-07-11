@@ -2920,6 +2920,100 @@ const MIGRATIONS = [
   },
   {
     version: 76,
+    description: 'Kalender-Events: Ort (location) zusätzlich im FTS-Suchindex (#471)',
+    up: `
+      -- Termin-Suche: title bleibt der Titel, body nimmt jetzt neben der
+      -- Beschreibung auch den Ort auf, damit Termine bei unbekanntem Datum auch
+      -- über Adresse/Ortsstichwort gefunden werden (Discussion #471). Trigger sind
+      -- nicht ALTER-bar → ai/au neu aufbauen und Bestandstermine backfillen.
+      -- (trg_search_events_ad bleibt unverändert: löscht nur.)
+      DROP TRIGGER IF EXISTS trg_search_events_ai;
+      DROP TRIGGER IF EXISTS trg_search_events_au;
+
+      CREATE TRIGGER trg_search_events_ai AFTER INSERT ON calendar_events BEGIN
+        INSERT INTO search_index (entity, entity_id, title, body)
+        VALUES ('event', NEW.id,
+                COALESCE(NEW.title, ''),
+                TRIM(COALESCE(NEW.description, '') || ' ' || COALESCE(NEW.location, '')));
+      END;
+      CREATE TRIGGER trg_search_events_au AFTER UPDATE ON calendar_events BEGIN
+        DELETE FROM search_index WHERE entity = 'event' AND entity_id = OLD.id;
+        INSERT INTO search_index (entity, entity_id, title, body)
+        VALUES ('event', NEW.id,
+                COALESCE(NEW.title, ''),
+                TRIM(COALESCE(NEW.description, '') || ' ' || COALESCE(NEW.location, '')));
+      END;
+
+      DELETE FROM search_index WHERE entity = 'event';
+      INSERT INTO search_index (entity, entity_id, title, body)
+        SELECT 'event', id,
+               COALESCE(title, ''),
+               TRIM(COALESCE(description, '') || ' ' || COALESCE(location, ''))
+        FROM calendar_events;
+    `,
+  },
+  {
+    version: 77,
+    description: 'FTS-Suchindex diakritik-insensitiv neu aufbauen (unicode61 remove_diacritics 2, #471)',
+    up: `
+      -- „Muller" soll „Müller", „strasse" soll „Straße" finden — bei Orten/Namen
+      -- (Adressen, Personen) der Normalfall. Der FTS5-Tokenizer ist nicht ALTER-bar,
+      -- also die virtuelle Tabelle mit remove_diacritics neu anlegen. Die AFTER-Trigger
+      -- hängen an den Quelltabellen (nicht an search_index) und bleiben bestehen —
+      -- sie schreiben nach dem Neuaufbau unverändert weiter. Nur der Bestand wird
+      -- index-weit neu eingelesen (Reihenfolge = Trigger-Bodies der jeweiligen Module).
+      DROP TABLE IF EXISTS search_index;
+      CREATE VIRTUAL TABLE search_index USING fts5(
+        entity UNINDEXED,
+        entity_id UNINDEXED,
+        title,
+        body,
+        tokenize = 'unicode61 remove_diacritics 2'
+      );
+
+      INSERT INTO search_index (entity, entity_id, title, body)
+        SELECT 'task', id, COALESCE(title, ''), COALESCE(description, '') FROM tasks;
+      INSERT INTO search_index (entity, entity_id, title, body)
+        SELECT 'event', id, COALESCE(title, ''),
+               TRIM(COALESCE(description, '') || ' ' || COALESCE(location, '')) FROM calendar_events;
+      INSERT INTO search_index (entity, entity_id, title, body)
+        SELECT 'note', id, COALESCE(title, ''), COALESCE(content, '') FROM notes;
+      INSERT INTO search_index (entity, entity_id, title, body)
+        SELECT 'contact', id, COALESCE(name, ''),
+               COALESCE(phone, '') || ' ' || COALESCE(email, '') FROM contacts;
+      INSERT INTO search_index (entity, entity_id, title, body)
+        SELECT 'item', id, COALESCE(name, ''), COALESCE(notes, '') FROM shopping_items;
+      INSERT INTO search_index (entity, entity_id, title, body)
+        SELECT 'medication', id, COALESCE(name, ''), COALESCE(dosage_text, '') FROM medications;
+      INSERT INTO search_index (entity, entity_id, title, body)
+        SELECT 'activity', id, COALESCE(type, ''), COALESCE(note, '') FROM health_activities;
+    `,
+  },
+  {
+    version: 78,
+    description: 'Sichtbarkeit pro Aufgabe/Termin: all | assignees | private (#474)',
+    up: `
+      -- Standard 'all' = bisheriges Verhalten (für alle Familienmitglieder sichtbar);
+      -- Bestandsdaten bleiben damit unverändert sichtbar. Durchsetzung erfolgt
+      -- serverseitig auf allen Lesepfaden (Liste, Detail, Dashboard, Suche, Reminder).
+      ALTER TABLE tasks           ADD COLUMN visibility TEXT NOT NULL DEFAULT 'all';
+      ALTER TABLE calendar_events ADD COLUMN visibility TEXT NOT NULL DEFAULT 'all';
+    `,
+  },
+  {
+    version: 79,
+    description: 'Standard-Zuweisung pro Kalender-Sync-Ziel (#459)',
+    up: `
+      -- Optionale Standard-Person je Sync-Ziel: neu importierte Termine werden ihr
+      -- automatisch zugewiesen. NULL = keine Zuweisung (bisheriges Verhalten).
+      -- ON DELETE ist nicht per ALTER setzbar; Aufräumen bei Nutzer-Löschung
+      -- übernimmt server/services/sync-assignment.js beim nächsten Zugriff.
+      ALTER TABLE external_calendars ADD COLUMN default_assignee_user_id INTEGER;
+      ALTER TABLE ics_subscriptions  ADD COLUMN default_assignee_user_id INTEGER;
+    `,
+  },
+  {
+    version: 80,
     description: 'budget assignees and split metadata',
     up: `
       ALTER TABLE budget_entries ADD COLUMN owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
@@ -2946,7 +3040,7 @@ const MIGRATIONS = [
     `,
   },
   {
-    version: 77,
+    version: 81,
     description: 'capability-based access permissions for module sub-features',
     up(db) {
       db.exec(`
@@ -2972,7 +3066,7 @@ const MIGRATIONS = [
     },
   },
   {
-    version: 78,
+    version: 82,
     description: 'scope budget plans into household and personal targets',
     up(db) {
       db.exec(`

@@ -1,0 +1,6 @@
+# graphify: exclude high-churn / low-signal artifacts from the knowledge graph.
+# Syntax follows .gitignore. These files bump on every release and would otherwise
+# dominate god-node/community analysis with changelog structure instead of code.
+
+CHANGELOG.md
+docs/plans/

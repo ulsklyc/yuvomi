@@ -8,11 +8,26 @@
 export const SEARCH_LIMIT = 5;
 
 /**
+ * Erzeugt die ß↔ss-Schreibvarianten eines Tokens. Der FTS-Tokenizer faltet
+ * Akzente (unicode61 remove_diacritics 2, Migration 77), aber NICHT das Eszett —
+ * „strasse" fände „Straße" sonst nicht (und umgekehrt). Beide Richtungen werden
+ * als OR-Zweige gematcht: ss→ß ist mehrdeutig, die überzähligen Varianten treffen
+ * aber schlicht nichts (harmlos). Menge dedupliziert; ohne ß/ss bleibt es 1 Token.
+ */
+function eszettVariants(token) {
+  return new Set([
+    token,
+    token.replace(/ß/g, 'ss').replace(/ẞ/g, 'ss'),
+    token.replace(/ss/gi, 'ß'),
+  ]);
+}
+
+/**
  * Wandelt eine rohe Nutzereingabe in eine sichere FTS5-MATCH-Query um.
  * Jedes Token wird als Phrase in doppelte Anführungszeichen gesetzt (eingebettete
  * Anführungszeichen verdoppelt) und als Präfix (`*`) gematcht, damit Teiltreffer
- * wie bei der alten LIKE-Suche funktionieren. Tokens werden mit AND verknüpft.
- * Gibt null zurück, wenn nichts Suchbares übrig bleibt.
+ * wie bei der alten LIKE-Suche funktionieren. Tokens werden mit AND verknüpft;
+ * ß↔ss-Varianten je Token mit OR. Gibt null zurück, wenn nichts Suchbares bleibt.
  */
 export function buildMatchQuery(q) {
   const tokens = String(q || '')
@@ -20,7 +35,12 @@ export function buildMatchQuery(q) {
     .map((t) => t.replace(/[^\p{L}\p{N}_]+/gu, ''))
     .filter(Boolean);
   if (!tokens.length) return null;
-  return tokens.map((t) => `"${t.replace(/"/g, '""')}"*`).join(' AND ');
+  return tokens.map((t) => {
+    const clause = [...eszettVariants(t)]
+      .map((v) => `"${v.replace(/"/g, '""')}"*`)
+      .join(' OR ');
+    return clause.includes(' OR ') ? `(${clause})` : clause;
+  }).join(' AND ');
 }
 
 /**
@@ -50,15 +70,18 @@ export function runSearch(database, q, userId) {
     LIMIT @limit
   `).all({ match, userId, limit });
 
+  // Termine sind Familienbesitz (die Kalenderliste zeigt alle Termine, nicht nur
+  // eigene) — daher KEIN created_by-Filter, konsistent mit GET /calendar und der
+  // Kalender-Suche (#471). Sonst lieferten globale vs. Kalender-Suche unterschiedliche
+  // Treffer fürs gleiche Stichwort.
   const events = database.prepare(`
     SELECT e.id, e.title, e.start_datetime, e.all_day
     FROM search_index s
     JOIN calendar_events e ON e.id = s.entity_id
     WHERE s.entity = 'event' AND s.search_index MATCH @match
-      AND e.created_by = @userId
     ORDER BY e.start_datetime ASC
     LIMIT @limit
-  `).all({ match, userId, limit });
+  `).all({ match, limit });
 
   const notes = database.prepare(`
     SELECT n.id, n.title, n.content

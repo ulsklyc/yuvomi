@@ -27,27 +27,42 @@ function documentStorageTarget(data) {
     : data.url;
 }
 
+function backendLabel(activeBackend) {
+  if (activeBackend === 'webdav') return t('documents.storageWebdav');
+  if (activeBackend === 'local_folder') return t('documents.storageLocalFolder');
+  return t('documents.storageLocal');
+}
+
 function buildStatusSummary(data) {
   const activeBackend = data.active_upload_backend ?? (data.enabled ? 'webdav' : 'local');
-  const activeLabel = activeBackend === 'webdav'
-    ? t('documents.storageWebdav')
-    : t('documents.storageLocal');
+  const activeLabel = backendLabel(activeBackend);
   const lastTest = data.last_test ?? data.lastTest;
   const lastTestLabel = formatSyncTime(lastTest) ?? t('settings.documentStorageNeverTested');
   const lastError = data.last_error ?? data.lastError;
 
-  const details = [
-    `${t('settings.documentStorageActive')}: ${activeLabel}`,
-    `${t('settings.documentStorageCount')}: ${Number(data.webdav_document_count ?? 0)}`,
-    `${t('settings.documentStorageLastTest')}: ${lastTestLabel}`,
-  ];
+  // The status line is the concrete destination: a folder path, a WebDAV URL,
+  // or the database for the in-DB default.
+  const statusLine = activeBackend === 'local_folder'
+    ? (data.local_path || data.effective_target || '/documents')
+    : activeBackend === 'webdav'
+      ? documentStorageTarget(data)
+      : t('settings.documentStorageDatabase');
+
+  const details = [`${t('settings.documentStorageActive')}: ${activeLabel}`];
+  if (activeBackend === 'local_folder') {
+    // Env-only backend: no in-app connection fields, so state that plainly.
+    details.push(t('settings.documentStorageLocalEnvManaged'));
+  } else if (activeBackend === 'webdav') {
+    details.push(`${t('settings.documentStorageCount')}: ${Number(data.webdav_document_count ?? 0)}`);
+    details.push(`${t('settings.documentStorageLastTest')}: ${lastTestLabel}`);
+  }
   if (lastError) {
     details.push(`${t('settings.documentStorageLastError')}: ${lastError}`);
   }
 
   return createStatusSummary({
     title: activeLabel,
-    status: documentStorageTarget(data),
+    status: statusLine,
     details,
     tone: lastError ? 'warning' : 'neutral',
   });

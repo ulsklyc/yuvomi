@@ -142,7 +142,7 @@ test('OpenAPI dokumentiert aktive Upload-Backend-Option bei stabilem Legacy-Prov
   const options = responseSchema(openApi.paths['/api/v1/documents/meta/options'].get);
   const data = options.properties.data;
   assert.deepEqual(data.properties.storage_providers.items.enum, ['local', 'external']);
-  assert.deepEqual(data.properties.active_upload_backend.enum, ['local', 'webdav']);
+  assert.deepEqual(data.properties.active_upload_backend.enum, ['local', 'local_folder', 'webdav']);
 });
 
 test('OpenAPI dokumentiert admin-only WebDAV-Konfiguration ohne Passwortausgabe', () => {
