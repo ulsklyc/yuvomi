@@ -99,9 +99,8 @@ export async function render(container, { user }) {
           </span>
         </label>
         <div class="page-toolbar__actions">
-          <button class="btn btn--secondary" id="contacts-manage-cats" aria-label="${t('contacts.manageCategories')}" title="${t('contacts.manageCategories')}">
-            <i data-lucide="tags" style="width:16px;height:16px;margin-right:4px;" aria-hidden="true"></i>
-            ${t('contacts.manageCategories')}
+          <button class="btn btn--icon btn--ghost" id="contacts-manage-cats" aria-label="${t('contacts.manageCategories')}" title="${t('contacts.manageCategories')}">
+            <i data-lucide="tags" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
           <button class="btn btn--secondary" id="contacts-select-btn" aria-pressed="false">
             <i data-lucide="list-checks" style="width:16px;height:16px;margin-right:4px;" aria-hidden="true"></i>

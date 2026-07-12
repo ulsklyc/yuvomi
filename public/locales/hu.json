@@ -2430,6 +2430,12 @@
         "saved": "Beállítások mentve."
     },
     "category": {
+        "errorInUse": "Ez a kategória még használatban van ({{count}}).",
+        "errorLast": "Az utolsó kategória nem törölhető.",
+        "errorExists": "Ez a kategória már létezik.",
+        "errorSubInUse": "Ez az alkategória még használatban van ({{count}}).",
+        "errorSubLast": "Az utolsó alkategória nem törölhető.",
+        "errorSubExists": "Ez az alkategória már létezik.",
         "manageTitle": "Kategóriák kezelése",
         "manageHint": "Adjon hozzá, nevezzen át, rendezzen át vagy töröljön.",
         "addPlaceholder": "Új kategória",

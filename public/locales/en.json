@@ -2430,6 +2430,12 @@
         "saved": "Settings saved."
     },
     "category": {
+        "errorInUse": "This category is still in use ({{count}}).",
+        "errorLast": "The last category can't be deleted.",
+        "errorExists": "This category already exists.",
+        "errorSubInUse": "This subcategory is still in use ({{count}}).",
+        "errorSubLast": "The last subcategory can't be deleted.",
+        "errorSubExists": "This subcategory already exists.",
         "manageTitle": "Manage categories",
         "manageHint": "Add, rename, reorder or delete.",
         "addPlaceholder": "New category",

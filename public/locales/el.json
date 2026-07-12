@@ -2430,6 +2430,12 @@
         "saved": "Settings saved."
     },
     "category": {
+        "errorInUse": "Αυτή η κατηγορία χρησιμοποιείται ακόμα ({{count}}).",
+        "errorLast": "Δεν είναι δυνατή η διαγραφή της τελευταίας κατηγορίας.",
+        "errorExists": "Αυτή η κατηγορία υπάρχει ήδη.",
+        "errorSubInUse": "Αυτή η υποκατηγορία χρησιμοποιείται ακόμα ({{count}}).",
+        "errorSubLast": "Δεν είναι δυνατή η διαγραφή της τελευταίας υποκατηγορίας.",
+        "errorSubExists": "Αυτή η υποκατηγορία υπάρχει ήδη.",
         "manageTitle": "Manage categories",
         "manageHint": "Add, rename, reorder or delete.",
         "addPlaceholder": "New category",

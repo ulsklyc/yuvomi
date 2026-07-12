@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.18.2] - 2026-07-12
+
+### Changed
+- Category-manager error messages (category in use, last category, duplicate name) are now shown in your language instead of always in English, and the "in use" message includes how many entries still reference the category. Applies to the Tasks, Contacts, and Budget category managers.
+- The "Manage categories" action now sits directly in the Tasks and Contacts toolbars as a tags icon — consistent with Budget — instead of being hidden inside the Tasks overflow menu.
+
+### Fixed
+- Category names in the manager can now be renamed with the keyboard: they are proper buttons, closing a gap for keyboard and screen-reader users.
+
 ## [1.18.1] - 2026-07-12
 
 ### Fixed

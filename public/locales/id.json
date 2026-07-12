@@ -2430,6 +2430,12 @@
         "saved": "Pengaturan disimpan."
     },
     "category": {
+        "errorInUse": "Kategori ini masih digunakan ({{count}}).",
+        "errorLast": "Kategori terakhir tidak dapat dihapus.",
+        "errorExists": "Kategori ini sudah ada.",
+        "errorSubInUse": "Subkategori ini masih digunakan ({{count}}).",
+        "errorSubLast": "Subkategori terakhir tidak dapat dihapus.",
+        "errorSubExists": "Subkategori ini sudah ada.",
         "manageTitle": "Kelola kategori",
         "manageHint": "Tambah, ubah nama, urutkan, atau hapus.",
         "addPlaceholder": "Kategori baru",

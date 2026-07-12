@@ -1948,12 +1948,12 @@ export async function render(container, { user }) {
                       title="${t('tasks.bulkSelect')}" aria-label="${t('tasks.bulkSelect')}" aria-pressed="false">
                 <i data-lucide="list-checks" class="icon-lg" aria-hidden="true"></i>
               </button>
-              <button class="btn btn--ghost tasks-toolbar__manage-cats" id="btn-manage-categories">
-                <i data-lucide="tags" class="icon-md" aria-hidden="true"></i>
-                <span>${t('tasks.manageCategories')}</span>
-              </button>
             </div>
           </details>
+          <button class="btn btn--icon btn--ghost" id="btn-manage-categories"
+                  aria-label="${t('tasks.manageCategories')}" title="${t('tasks.manageCategories')}">
+            <i data-lucide="tags" class="icon-lg" aria-hidden="true"></i>
+          </button>
           <button class="btn btn--primary toolbar-new-btn" id="btn-new-task" style="gap:var(--space-1)">
             <i data-lucide="plus" class="icon-lg" aria-hidden="true"></i> ${t('tasks.newTask')}
           </button>

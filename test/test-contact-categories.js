@@ -133,6 +133,7 @@ try {
     const { status, body } = await jsend(`${base}/categories/${customKey}`, 'DELETE');
     assert(status === 409, `Status ${status}`);
     assert(body.count === 1, 'count meldet Referenzen');
+    assert(body.reason === 'category_in_use', 'stabiler reason-Code für Client-Lokalisierung');
   });
 
   await asyncTest('DELETE erlaubt, wenn frei → 204', async () => {

@@ -132,6 +132,7 @@ try {
     const { status, body } = await jsend(`${base}/categories/${customKey}`, 'DELETE');
     assert(status === 409, `Status ${status}`);
     assert(body.count === 1, 'count meldet die Anzahl der Referenzen');
+    assert(body.reason === 'category_in_use', 'stabiler reason-Code für Client-Lokalisierung');
   });
 
   await asyncTest('DELETE erlaubt, wenn Kategorie frei ist → 204', async () => {
@@ -146,8 +147,9 @@ try {
     database.prepare("DELETE FROM tasks").run();
     const keys = database.prepare('SELECT key FROM task_categories').all().map((r) => r.key);
     for (const k of keys.slice(1)) database.prepare('DELETE FROM task_categories WHERE key = ?').run(k);
-    const { status } = await jsend(`${base}/categories/${keys[0]}`, 'DELETE');
+    const { status, body } = await jsend(`${base}/categories/${keys[0]}`, 'DELETE');
     assert(status === 409, `Status ${status}`);
+    assert(body.reason === 'category_last', 'stabiler reason-Code category_last');
   });
 
   await asyncTest('Task-Create validiert category dynamisch gegen die DB', async () => {

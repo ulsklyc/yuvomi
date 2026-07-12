@@ -1603,7 +1603,16 @@
   color: var(--color-text-secondary);
 }
 
-.cat-row__name {
+.cat-row__name,
+.cat-subrow__name {
+  /* Als <button> gerendert (tastaturbedienbares Umbenennen) — auf Text zurücksetzen. */
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  text-align: start;
   flex: 1;
   min-width: 0;
   color: var(--color-text-primary);
@@ -1613,9 +1622,17 @@
   text-overflow: ellipsis;
 }
 
-.cat-row__name:hover {
+.cat-row__name:hover,
+.cat-subrow__name:hover {
   color: var(--color-accent);
   text-decoration: underline;
+}
+
+.cat-row__name:focus-visible,
+.cat-subrow__name:focus-visible {
+  outline: 2px solid var(--active-module-accent, var(--color-accent));
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
 }
 
 .cat-row__actions {
@@ -1673,16 +1690,6 @@
 
 .cat-subrow:hover {
   background: var(--glass-bg-card-hover);
-}
-
-.cat-subrow__name {
-  flex: 1;
-  min-width: 0;
-  color: var(--color-text-primary);
-  cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .cat-subadd-form {

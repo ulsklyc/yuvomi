@@ -43,8 +43,12 @@ test('Nutzt kein innerHTML', () => {
 test('Escaped Nutzerdaten via esc()', () => {
   assert(/import \{[^}]*esc[^}]*\} from '\/utils\/html\.js'/.test(comp), 'esc muss importiert werden');
 });
-test('Zeigt Server-Fehler (in-use/last) als Toast', () => {
-  assert(/showToast\(\s*err\.message/.test(comp), 'Fehlermeldung des Servers muss als Toast erscheinen');
+test('Zeigt lokalisierte Server-Guard-Fehler (reason → t()) mit Fallback', () => {
+  assert(/showToast\(\s*this\._errMsg\(err\)/.test(comp), 'Fehler müssen über _errMsg (lokalisiert) statt roher err.message angezeigt werden');
+  assert(/err\?\.data\?\.reason/.test(comp), '_errMsg muss den stabilen reason-Code aus err.data lesen');
+  assert(/'category_in_use'/.test(comp) && /'category_last'/.test(comp) && /'category_exists'/.test(comp), 'Kategorie-reason-Codes müssen gemappt werden');
+  assert(/t\('category\.errorInUse'/.test(comp), 'auf lokalisierte category.error*-Keys mappen');
+  assert(/err\?\.message/.test(comp), 'Fallback auf die Server-Meldung bei unbekanntem reason');
 });
 test('Unterstützt Subkategorien unter basePath/:key/subcategories', () => {
   assert(/subcategories/.test(comp), 'Subkategorie-Pfad muss vorkommen');

@@ -2430,6 +2430,12 @@
         "saved": "설정이 저장되었습니다."
     },
     "category": {
+        "errorInUse": "이 카테고리는 아직 사용 중입니다 ({{count}}).",
+        "errorLast": "마지막 카테고리는 삭제할 수 없습니다.",
+        "errorExists": "이 카테고리는 이미 존재합니다.",
+        "errorSubInUse": "이 하위 카테고리는 아직 사용 중입니다 ({{count}}).",
+        "errorSubLast": "마지막 하위 카테고리는 삭제할 수 없습니다.",
+        "errorSubExists": "이 하위 카테고리는 이미 존재합니다.",
         "manageTitle": "카테고리 관리",
         "manageHint": "추가, 이름 변경, 정렬 또는 삭제.",
         "addPlaceholder": "새 카테고리",

@@ -2430,6 +2430,12 @@
         "saved": "Settings saved."
     },
     "category": {
+        "errorInUse": "该类别仍在使用中（{{count}}）。",
+        "errorLast": "无法删除最后一个类别。",
+        "errorExists": "该类别已存在。",
+        "errorSubInUse": "该子类别仍在使用中（{{count}}）。",
+        "errorSubLast": "无法删除最后一个子类别。",
+        "errorSubExists": "该子类别已存在。",
         "manageTitle": "Manage categories",
         "manageHint": "Add, rename, reorder or delete.",
         "addPlaceholder": "New category",

@@ -1035,7 +1035,7 @@ router.post('/categories', (req, res) => {
     const conflict = db.get().prepare(`
       SELECT key FROM budget_categories WHERE type = ? AND name = ? COLLATE NOCASE
     `).get(vType.value, vName.value);
-    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409 });
+    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
 
     const maxOrder = db.get().prepare(`
       SELECT COALESCE(MAX(sort_order), -1) AS m FROM budget_categories WHERE type = ?
@@ -1065,7 +1065,7 @@ router.put('/categories/:key', (req, res) => {
     const conflict = db.get().prepare(`
       SELECT key FROM budget_categories WHERE type = ? AND name = ? COLLATE NOCASE AND key != ?
     `).get(cat.type, vName.value, cat.key);
-    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409 });
+    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
 
     db.get().prepare('UPDATE budget_categories SET name = ? WHERE key = ?').run(vName.value, cat.key);
     const updated = db.get().prepare('SELECT key, name, type, sort_order FROM budget_categories WHERE key = ?').get(cat.key);
@@ -1083,10 +1083,10 @@ router.delete('/categories/:key', (req, res) => {
 
     const inUse = categoryInUseCount(db.get(), cat.key);
     if (inUse > 0) {
-      return res.status(409).json({ error: `Category is in use by ${inUse} entr${inUse === 1 ? 'y' : 'ies'}.`, code: 409, count: inUse });
+      return res.status(409).json({ error: `Category is in use by ${inUse} entr${inUse === 1 ? 'y' : 'ies'}.`, code: 409, count: inUse, reason: 'category_in_use' });
     }
     if (categoryCountByType(db.get(), cat.type) <= 1) {
-      return res.status(409).json({ error: 'Cannot delete the last category.', code: 409 });
+      return res.status(409).json({ error: 'Cannot delete the last category.', code: 409, reason: 'category_last' });
     }
     db.get().prepare('DELETE FROM budget_categories WHERE key = ?').run(cat.key);
     res.status(204).end();
@@ -1127,7 +1127,7 @@ router.post('/categories/:categoryKey/subcategories', (req, res) => {
     const conflict = db.get().prepare(`
       SELECT key FROM budget_subcategories WHERE category_key = ? AND name = ? COLLATE NOCASE
     `).get(cat.key, vName.value);
-    if (conflict) return res.status(409).json({ error: 'Subcategory already exists.', code: 409 });
+    if (conflict) return res.status(409).json({ error: 'Subcategory already exists.', code: 409, reason: 'subcategory_exists' });
 
     const maxOrder = db.get().prepare(`
       SELECT COALESCE(MAX(sort_order), -1) AS m FROM budget_subcategories WHERE category_key = ?
@@ -1159,7 +1159,7 @@ router.put('/categories/:key/subcategories/:subKey', (req, res) => {
     const conflict = db.get().prepare(`
       SELECT key FROM budget_subcategories WHERE category_key = ? AND name = ? COLLATE NOCASE AND key != ?
     `).get(sub.category_key, vName.value, sub.key);
-    if (conflict) return res.status(409).json({ error: 'Subcategory already exists.', code: 409 });
+    if (conflict) return res.status(409).json({ error: 'Subcategory already exists.', code: 409, reason: 'subcategory_exists' });
 
     db.get().prepare('UPDATE budget_subcategories SET name = ? WHERE key = ?').run(vName.value, sub.key);
     const updated = db.get().prepare('SELECT key, category_key, name, sort_order FROM budget_subcategories WHERE key = ?').get(sub.key);
@@ -1177,10 +1177,10 @@ router.delete('/categories/:key/subcategories/:subKey', (req, res) => {
 
     const inUse = subcategoryInUseCount(db.get(), sub.key);
     if (inUse > 0) {
-      return res.status(409).json({ error: `Subcategory is in use by ${inUse} entr${inUse === 1 ? 'y' : 'ies'}.`, code: 409, count: inUse });
+      return res.status(409).json({ error: `Subcategory is in use by ${inUse} entr${inUse === 1 ? 'y' : 'ies'}.`, code: 409, count: inUse, reason: 'subcategory_in_use' });
     }
     if (subcategoryCountForCategory(db.get(), sub.category_key) <= 1) {
-      return res.status(409).json({ error: 'Cannot delete the last subcategory.', code: 409 });
+      return res.status(409).json({ error: 'Cannot delete the last subcategory.', code: 409, reason: 'subcategory_last' });
     }
     db.get().prepare('DELETE FROM budget_subcategories WHERE key = ?').run(sub.key);
     res.status(204).end();

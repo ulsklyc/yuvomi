@@ -191,7 +191,7 @@ router.post('/categories', (req, res) => {
     const conflict = db.get().prepare(`
       SELECT key FROM contact_categories WHERE COALESCE(name, key) = ? COLLATE NOCASE
     `).get(vName.value);
-    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409 });
+    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
 
     const maxOrder = db.get().prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM contact_categories').get().m;
     const key = uniqueKey(db.get(), 'contact_categories', vName.value);
@@ -232,7 +232,7 @@ router.put('/categories/:key', (req, res) => {
     const conflict = db.get().prepare(`
       SELECT key FROM contact_categories WHERE COALESCE(name, key) = ? COLLATE NOCASE AND key != ?
     `).get(vName.value, cat.key);
-    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409 });
+    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
 
     db.get().prepare('UPDATE contact_categories SET name = ?, label_key = NULL WHERE key = ?').run(vName.value, cat.key);
     const updated = db.get().prepare('SELECT key, name, label_key, icon, sort_order FROM contact_categories WHERE key = ?').get(cat.key);
@@ -251,10 +251,10 @@ router.delete('/categories/:key', (req, res) => {
 
     const inUse = contactCategoryInUseCount(cat.key);
     if (inUse > 0) {
-      return res.status(409).json({ error: `Category is in use by ${inUse} contact${inUse === 1 ? '' : 's'}.`, code: 409, count: inUse });
+      return res.status(409).json({ error: `Category is in use by ${inUse} contact${inUse === 1 ? '' : 's'}.`, code: 409, count: inUse, reason: 'category_in_use' });
     }
     const total = db.get().prepare('SELECT COUNT(*) AS n FROM contact_categories').get().n;
-    if (total <= 1) return res.status(409).json({ error: 'Cannot delete the last category.', code: 409 });
+    if (total <= 1) return res.status(409).json({ error: 'Cannot delete the last category.', code: 409, reason: 'category_last' });
 
     db.get().prepare('DELETE FROM contact_categories WHERE key = ?').run(cat.key);
     res.status(204).end();

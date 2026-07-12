@@ -2430,6 +2430,12 @@
         "saved": "Settings saved."
     },
     "category": {
+        "errorInUse": "このカテゴリーはまだ使用されています（{{count}}）。",
+        "errorLast": "最後のカテゴリーは削除できません。",
+        "errorExists": "このカテゴリーはすでに存在します。",
+        "errorSubInUse": "このサブカテゴリーはまだ使用されています（{{count}}）。",
+        "errorSubLast": "最後のサブカテゴリーは削除できません。",
+        "errorSubExists": "このサブカテゴリーはすでに存在します。",
         "manageTitle": "Manage categories",
         "manageHint": "Add, rename, reorder or delete.",
         "addPlaceholder": "New category",

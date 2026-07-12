@@ -2430,6 +2430,12 @@
         "saved": "Settings saved."
     },
     "category": {
+        "errorInUse": "Tato kategorie se stále používá ({{count}}).",
+        "errorLast": "Poslední kategorii nelze smazat.",
+        "errorExists": "Tato kategorie již existuje.",
+        "errorSubInUse": "Tato podkategorie se stále používá ({{count}}).",
+        "errorSubLast": "Poslední podkategorii nelze smazat.",
+        "errorSubExists": "Tato podkategorie již existuje.",
         "manageTitle": "Manage categories",
         "manageHint": "Add, rename, reorder or delete.",
         "addPlaceholder": "New category",

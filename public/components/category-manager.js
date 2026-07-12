@@ -65,7 +65,7 @@ class CategoryManagerElement extends HTMLElement {
       this._cats = res.data ?? [];
       this._render();
     } catch (err) {
-      window.yuvomi?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(this._errMsg(err), 'danger');
     }
   }
 
@@ -101,8 +101,8 @@ class CategoryManagerElement extends HTMLElement {
   _rowHtml(cat, group, isFirst, isLast) {
     return `
       <li class="cat-row" data-key="${esc(String(cat.key))}">
-        <span class="cat-row__name" data-action="rename"
-              title="${esc(t('category.renameHint'))}">${esc(this._labelResolver(cat))}</span>
+        <button type="button" class="cat-row__name" data-action="rename"
+              title="${esc(t('category.renameHint'))}">${esc(this._labelResolver(cat))}</button>
         <div class="cat-row__actions">
           <button class="btn btn--icon btn--ghost" data-action="up"
                   aria-label="${esc(t('category.moveUp'))}" ${isFirst ? 'disabled' : ''}>
@@ -128,7 +128,7 @@ class CategoryManagerElement extends HTMLElement {
       <ul class="cat-sublist" data-parent="${esc(String(cat.key))}">
         ${subs.map((s, j, arr) => `
           <li class="cat-subrow" data-subkey="${esc(String(s.key))}" data-parent="${esc(String(cat.key))}">
-            <span class="cat-subrow__name" data-action="sub-rename">${esc(this._labelResolver(s))}</span>
+            <button type="button" class="cat-subrow__name" data-action="sub-rename">${esc(this._labelResolver(s))}</button>
             <div class="cat-row__actions">
               <button class="btn btn--icon btn--ghost" data-action="sub-up" aria-label="${esc(t('category.moveUp'))}" ${j === 0 ? 'disabled' : ''}>
                 <i data-lucide="chevron-up" class="icon-sm" aria-hidden="true"></i></button>
@@ -147,6 +147,23 @@ class CategoryManagerElement extends HTMLElement {
 
   _notifyChanged() {
     this.dispatchEvent(new CustomEvent('category-manager-changed', { bubbles: true }));
+  }
+
+  // Server-Guard-Fehler in die UI-Sprache übersetzen: die Route liefert einen
+  // stabilen `reason`-Code (+ optional `count`) in err.data; unbekannte Fehler
+  // fallen auf die (englische) Server-Meldung zurück.
+  _errMsg(err) {
+    const reason = err?.data?.reason;
+    const count = err?.data?.count;
+    switch (reason) {
+      case 'category_in_use':    return t('category.errorInUse', { count });
+      case 'category_last':      return t('category.errorLast');
+      case 'category_exists':    return t('category.errorExists');
+      case 'subcategory_in_use': return t('category.errorSubInUse', { count });
+      case 'subcategory_last':   return t('category.errorSubLast');
+      case 'subcategory_exists': return t('category.errorSubExists');
+      default:                   return err?.message ?? '';
+    }
   }
 
   async _onSubmit(e) {
@@ -174,7 +191,7 @@ class CategoryManagerElement extends HTMLElement {
       window.yuvomi?.showToast(t('category.added'), 'success');
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(this._errMsg(err), 'danger');
     }
   }
 
@@ -217,7 +234,7 @@ class CategoryManagerElement extends HTMLElement {
       window.yuvomi?.showToast(t('category.renamed'), 'success');
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(this._errMsg(err), 'danger');
     }
   }
 
@@ -237,7 +254,7 @@ class CategoryManagerElement extends HTMLElement {
       await this._load();
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(this._errMsg(err), 'danger');
     }
   }
 
@@ -257,7 +274,7 @@ class CategoryManagerElement extends HTMLElement {
       window.yuvomi?.showToast(t('category.deleted'), 'default');
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(this._errMsg(err), 'danger');
     }
   }
 
@@ -279,7 +296,7 @@ class CategoryManagerElement extends HTMLElement {
       this._notifyChanged();
       return res;
     } catch (err) {
-      window.yuvomi?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(this._errMsg(err), 'danger');
     }
   }
 
@@ -299,7 +316,7 @@ class CategoryManagerElement extends HTMLElement {
       window.yuvomi?.showToast(t('category.renamed'), 'success');
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(this._errMsg(err), 'danger');
     }
   }
 
@@ -319,7 +336,7 @@ class CategoryManagerElement extends HTMLElement {
       await this._load();
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(this._errMsg(err), 'danger');
     }
   }
 
@@ -340,7 +357,7 @@ class CategoryManagerElement extends HTMLElement {
       window.yuvomi?.showToast(t('category.deleted'), 'default');
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(this._errMsg(err), 'danger');
     }
   }
 }

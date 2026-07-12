@@ -2430,6 +2430,12 @@
         "saved": "Settings saved."
     },
     "category": {
+        "errorInUse": "Danh mục này vẫn đang được sử dụng ({{count}}).",
+        "errorLast": "Không thể xóa danh mục cuối cùng.",
+        "errorExists": "Danh mục này đã tồn tại.",
+        "errorSubInUse": "Danh mục con này vẫn đang được sử dụng ({{count}}).",
+        "errorSubLast": "Không thể xóa danh mục con cuối cùng.",
+        "errorSubExists": "Danh mục con này đã tồn tại.",
         "manageTitle": "Manage categories",
         "manageHint": "Add, rename, reorder or delete.",
         "addPlaceholder": "New category",

@@ -2430,6 +2430,12 @@
         "saved": "Settings saved."
     },
     "category": {
+        "errorInUse": "Bu kategori hâlâ kullanımda ({{count}}).",
+        "errorLast": "Son kategori silinemez.",
+        "errorExists": "Bu kategori zaten var.",
+        "errorSubInUse": "Bu alt kategori hâlâ kullanımda ({{count}}).",
+        "errorSubLast": "Son alt kategori silinemez.",
+        "errorSubExists": "Bu alt kategori zaten var.",
         "manageTitle": "Manage categories",
         "manageHint": "Add, rename, reorder or delete.",
         "addPlaceholder": "New category",

@@ -2430,6 +2430,12 @@
         "saved": "Settings saved."
     },
     "category": {
+        "errorInUse": "यह श्रेणी अभी भी उपयोग में है ({{count}})।",
+        "errorLast": "अंतिम श्रेणी को हटाया नहीं जा सकता।",
+        "errorExists": "यह श्रेणी पहले से मौजूद है।",
+        "errorSubInUse": "यह उपश्रेणी अभी भी उपयोग में है ({{count}})।",
+        "errorSubLast": "अंतिम उपश्रेणी को हटाया नहीं जा सकता।",
+        "errorSubExists": "यह उपश्रेणी पहले से मौजूद है।",
         "manageTitle": "Manage categories",
         "manageHint": "Add, rename, reorder or delete.",
         "addPlaceholder": "New category",

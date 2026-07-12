@@ -2430,6 +2430,12 @@
         "saved": "Settings saved."
     },
     "category": {
+        "errorInUse": "Deze categorie is nog in gebruik ({{count}}).",
+        "errorLast": "De laatste categorie kan niet worden verwijderd.",
+        "errorExists": "Deze categorie bestaat al.",
+        "errorSubInUse": "Deze subcategorie is nog in gebruik ({{count}}).",
+        "errorSubLast": "De laatste subcategorie kan niet worden verwijderd.",
+        "errorSubExists": "Deze subcategorie bestaat al.",
         "manageTitle": "Manage categories",
         "manageHint": "Add, rename, reorder or delete.",
         "addPlaceholder": "New category",

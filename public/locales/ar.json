@@ -2430,6 +2430,12 @@
         "saved": "Settings saved."
     },
     "category": {
+        "errorInUse": "لا تزال هذه الفئة قيد الاستخدام ({{count}}).",
+        "errorLast": "لا يمكن حذف الفئة الأخيرة.",
+        "errorExists": "هذه الفئة موجودة بالفعل.",
+        "errorSubInUse": "لا تزال هذه الفئة الفرعية قيد الاستخدام ({{count}}).",
+        "errorSubLast": "لا يمكن حذف الفئة الفرعية الأخيرة.",
+        "errorSubExists": "هذه الفئة الفرعية موجودة بالفعل.",
         "manageTitle": "Manage categories",
         "manageHint": "Add, rename, reorder or delete.",
         "addPlaceholder": "New category",
