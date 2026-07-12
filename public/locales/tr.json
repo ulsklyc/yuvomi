@@ -2917,6 +2917,17 @@
             "deleteConfirm": "Bu kayıt gerçekten silinsin mi?",
             "invalid": "Lütfen geçerli değerler girin.",
             "fertilityDisclaimer": "Doğurgan pencere ve yumurtlama takvim yöntemiyle tahmin edilir. Bunlar bir doğum kontrol yöntemi değildir ve tıbbi tavsiyenin yerini tutmaz.",
+            "pregnancy": {
+                "title": "Gebelik",
+                "week": "{{weeks}}. hafta + {{days}} gün",
+                "trimester": "{{n}}. trimester",
+                "countdown": "{{days}} gün kaldı",
+                "overdue": "{{days}} gün gecikti",
+                "dueDate": "Tahmini doğum tarihi: {{date}}",
+                "progressLabel": "Gebelik ilerlemesi",
+                "noDate": "Gebelik etkin. Gebelik haftasını ve geri sayımı görmek için bir tahmini doğum tarihi belirleyin.",
+                "paused": "Döngü tahminleri duraklatıldı."
+            },
             "ring": {
                 "label": "Döngü halkası",
                 "cycleDay": "Döngü günü {{day}}",
@@ -3045,6 +3056,9 @@
                 "lutealLength": "Luteal faz uzunluğu",
                 "trackFertility": "Doğurgan pencereyi göster",
                 "autoHint": "Boş bırak = geçmişinden otomatik hesaplanır.",
+                "pregnancyMode": "Gebelik modu",
+                "dueDate": "Tahmini doğum tarihi",
+                "pregnancyHint": "Gebelik modunda regl ve yumurtlama tahminleri duraklatılır. Günlük kayıt kullanılmaya devam eder.",
                 "saved": "Settings saved."
             }
         }

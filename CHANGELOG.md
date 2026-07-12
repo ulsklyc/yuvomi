@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-07-12
+
+### Added
+- **Pregnancy mode for cycle tracking.** The Health module's Cycle settings gain a pregnancy toggle that pauses all cycle predictions — next period, ovulation, fertile window, the cycle ring, and the calendar projection — so nothing is forecast while you are pregnant. Add an optional estimated due date and the tab instead shows your gestational week, trimester, a countdown to the due date, and a progress bar. Daily logging of periods, symptoms, and mood stays fully available, and predictions resume automatically when you turn the mode off.
+
 ## [1.16.0] - 2026-07-12
 
 ### Added

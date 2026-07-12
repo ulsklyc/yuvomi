@@ -2917,6 +2917,17 @@
             "deleteConfirm": "Thực sự xoá mục này?",
             "invalid": "Vui lòng nhập giá trị hợp lệ.",
             "fertilityDisclaimer": "Cửa sổ dễ thụ thai và rụng trứng được ước tính bằng phương pháp lịch. Đây không phải biện pháp tránh thai và không thay thế tư vấn y tế.",
+            "pregnancy": {
+                "title": "Thai kỳ",
+                "week": "Tuần {{weeks}} + {{days}}",
+                "trimester": "Tam cá nguyệt {{n}}",
+                "countdown": "còn {{days}} ngày",
+                "overdue": "trễ {{days}} ngày",
+                "dueDate": "Ngày dự sinh: {{date}}",
+                "progressLabel": "Tiến trình thai kỳ",
+                "noDate": "Thai kỳ đang bật. Đặt ngày dự sinh để xem tuần thai và đếm ngược.",
+                "paused": "Dự đoán chu kỳ đã tạm dừng."
+            },
             "ring": {
                 "label": "Vòng chu kỳ",
                 "cycleDay": "Ngày chu kỳ {{day}}",
@@ -3045,6 +3056,9 @@
                 "lutealLength": "Độ dài giai đoạn hoàng thể",
                 "trackFertility": "Hiển thị cửa sổ dễ thụ thai",
                 "autoHint": "Để trống = tự động tính từ lịch sử của bạn.",
+                "pregnancyMode": "Chế độ thai kỳ",
+                "dueDate": "Ngày dự sinh",
+                "pregnancyHint": "Ở chế độ thai kỳ, dự đoán kinh nguyệt và rụng trứng được tạm dừng. Ghi nhật ký hằng ngày vẫn khả dụng.",
                 "saved": "Settings saved."
             }
         }

@@ -2917,6 +2917,17 @@
             "deleteConfirm": "Voulez-vous vraiment supprimer cette entrée ?",
             "invalid": "Veuillez saisir des valeurs valides.",
             "fertilityDisclaimer": "La fenêtre de fécondité et l’ovulation sont estimées par la méthode du calendrier. Elles ne constituent ni une contraception ni un avis médical.",
+            "pregnancy": {
+                "title": "Grossesse",
+                "week": "Semaine {{weeks}} + {{days}}",
+                "trimester": "Trimestre {{n}}",
+                "countdown": "encore {{days}} jours",
+                "overdue": "{{days}} jours de retard",
+                "dueDate": "Date prévue : {{date}}",
+                "progressLabel": "Progression de la grossesse",
+                "noDate": "Grossesse active. Définissez une date prévue pour voir la semaine de grossesse et le compte à rebours.",
+                "paused": "Les prévisions du cycle sont en pause."
+            },
             "ring": {
                 "label": "Anneau du cycle",
                 "cycleDay": "Jour de cycle {{day}}",
@@ -3045,6 +3056,9 @@
                 "lutealLength": "Durée de la phase lutéale",
                 "trackFertility": "Afficher la fenêtre de fécondité",
                 "autoHint": "Laisser vide = calculé automatiquement à partir de votre historique.",
+                "pregnancyMode": "Mode grossesse",
+                "dueDate": "Date prévue d'accouchement",
+                "pregnancyHint": "En mode grossesse, les prévisions de règles et d'ovulation sont en pause. Le suivi quotidien reste disponible.",
                 "saved": "Settings saved."
             }
         }

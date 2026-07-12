@@ -15,7 +15,7 @@ const {
   MOOD_TYPES, moodType,
   PHASE,
   daysBetween, sortPeriodsAsc, cycleGaps, periodLengths,
-  cycleStats, predictCycle, buildCycleCalendar, cycleRing,
+  cycleStats, predictCycle, buildCycleCalendar, cycleRing, pregnancyInfo,
 } = await import('../public/utils/health-cycle.js');
 
 // Baut eine Historie aus Startdaten mit fester Periodenlänge (Tage).
@@ -247,4 +247,87 @@ test('cycleRing: ohne Fruchtbarkeit nur Menstruations-Segment', () => {
 test('cycleRing: null bei fehlender Vorhersage', () => {
   assert.equal(cycleRing(predictCycle([], {}, '2026-06-01')), null);
   assert.equal(cycleRing(null), null);
+});
+
+// --------------------------------------------------------
+// Schwangerschafts-Modus (#450): Vorhersagen pausiert
+// --------------------------------------------------------
+
+test('pregnancyInfo: aus → active=false, keine Ableitungen', () => {
+  const info = pregnancyInfo({ pregnancy_mode: 0, pregnancy_due_date: '2026-12-01' }, '2026-06-01');
+  assert.equal(info.active, false);
+});
+
+test('pregnancyInfo: aktiv ohne Termin → active=true, hasDue=false', () => {
+  const info = pregnancyInfo({ pregnancy_mode: 1, pregnancy_due_date: null }, '2026-06-01');
+  assert.equal(info.active, true);
+  assert.equal(info.hasDue, false);
+  assert.equal(info.dueDate, null);
+});
+
+test('pregnancyInfo: SSW/Trimester/Countdown aus Termin (Naegele, 280 Tage)', () => {
+  // ET 2026-12-01; „heute" 2026-06-01 → 183 Tage bis Termin, 97 Tage schwanger.
+  const info = pregnancyInfo({ pregnancy_mode: 1, pregnancy_due_date: '2026-12-01' }, '2026-06-01');
+  assert.equal(info.active, true);
+  assert.equal(info.hasDue, true);
+  assert.equal(info.daysUntilDue, 183);
+  assert.equal(info.gestationalDays, 97);   // 280 − 183
+  assert.equal(info.gestWeeks, 13);         // floor(97/7)
+  assert.equal(info.gestDays, 6);           // 97 % 7
+  assert.equal(info.trimester, 1);          // < 14 Wochen
+  assert.equal(info.overdue, false);
+  assert.ok(Math.abs(info.progress - 97 / 280) < 1e-9);
+});
+
+test('pregnancyInfo: Trimester-Grenzen (2. ab SSW 14, 3. ab SSW 28)', () => {
+  const at = (weeks) => pregnancyInfo(
+    { pregnancy_mode: 1, pregnancy_due_date: '2026-12-01' },
+    // heute = ET − (280 − weeks*7) Tage
+    new Date(Date.parse('2026-12-01T00:00:00Z') - (280 - weeks * 7) * 86400000).toISOString().slice(0, 10),
+  );
+  assert.equal(at(13).trimester, 1);
+  assert.equal(at(14).trimester, 2);
+  assert.equal(at(27).trimester, 2);
+  assert.equal(at(28).trimester, 3);
+});
+
+test('pregnancyInfo: über Termin → overdue, gestationalDays gekappt bei 280', () => {
+  const info = pregnancyInfo({ pregnancy_mode: 1, pregnancy_due_date: '2026-06-01' }, '2026-06-10');
+  assert.equal(info.overdue, true);
+  assert.equal(info.daysUntilDue, -9);
+  assert.equal(info.gestationalDays, 280);  // geklemmt
+  assert.equal(info.progress, 1);
+});
+
+test('predictCycle: Schwangerschaft pausiert Vorhersagen (isPregnant, keine Prognose)', () => {
+  const hist = periods(['2026-05-01'], 5);
+  const p = predictCycle(hist, { pregnancy_mode: 1, pregnancy_due_date: '2027-01-01' }, '2026-06-01');
+  assert.equal(p.isPregnant, true);
+  assert.equal(p.trackFertility, false);
+  assert.equal(p.hasData, true);            // Historie bleibt erhalten
+  assert.equal(p.nextStart, undefined);     // keine Vorhersage-Felder
+  assert.equal(p.ovulationDate, undefined);
+  assert.ok(p.pregnancy.active);
+});
+
+test('predictCycle: Schwangerschaft aktiv auch ohne Historie', () => {
+  const p = predictCycle([], { pregnancy_mode: 1, pregnancy_due_date: '2027-01-01' }, '2026-06-01');
+  assert.equal(p.isPregnant, true);
+  assert.equal(p.hasData, false);
+  assert.ok(p.pregnancy.active);
+});
+
+test('buildCycleCalendar: keine Projektion im Schwangerschafts-Modus', () => {
+  const hist = periods(['2026-05-01'], 5);
+  const settings = { pregnancy_mode: 1, pregnancy_due_date: '2027-01-01' };
+  const cal = buildCycleCalendar('2026-07-15', { periods: hist, settings, todayKey: '2026-06-01' });
+  // Juli liegt nach der geloggten Periode → ohne Projektion darf keine Zelle
+  // eine (vorhergesagte) Phase tragen.
+  const anyPredicted = cal.weeks.flat().some((c) => c.predicted);
+  assert.equal(anyPredicted, false);
+});
+
+test('cycleRing: null im Schwangerschafts-Modus', () => {
+  const p = predictCycle(periods(['2026-05-01'], 5), { pregnancy_mode: 1, pregnancy_due_date: '2027-01-01' }, '2026-06-01');
+  assert.equal(cycleRing(p), null);
 });

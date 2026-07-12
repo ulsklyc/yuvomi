@@ -2917,6 +2917,17 @@
             "deleteConfirm": "Yakin ingin menghapus entri ini?",
             "invalid": "Harap masukkan nilai yang valid.",
             "fertilityDisclaimer": "Masa subur dan ovulasi diperkirakan dengan metode kalender. Ini bukan alat kontrasepsi dan bukan pengganti nasihat medis.",
+            "pregnancy": {
+                "title": "Kehamilan",
+                "week": "Minggu {{weeks}} + {{days}}",
+                "trimester": "Trimester {{n}}",
+                "countdown": "{{days}} hari lagi",
+                "overdue": "terlambat {{days}} hari",
+                "dueDate": "Perkiraan lahir: {{date}}",
+                "progressLabel": "Perkembangan kehamilan",
+                "noDate": "Kehamilan aktif. Atur perkiraan tanggal lahir untuk melihat usia kehamilan dan hitung mundur.",
+                "paused": "Prediksi siklus dijeda."
+            },
             "ring": {
                 "label": "Cincin siklus",
                 "cycleDay": "Hari siklus {{day}}",
@@ -3045,6 +3056,9 @@
                 "lutealLength": "Panjang fase luteal",
                 "trackFertility": "Tampilkan masa subur",
                 "autoHint": "Kosongkan = dihitung otomatis dari riwayatmu.",
+                "pregnancyMode": "Mode kehamilan",
+                "dueDate": "Perkiraan tanggal lahir",
+                "pregnancyHint": "Dalam mode kehamilan, prediksi menstruasi dan ovulasi dijeda. Pencatatan harian tetap tersedia.",
                 "saved": "Pengaturan disimpan."
             }
         }

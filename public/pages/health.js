@@ -3318,6 +3318,24 @@ function renderCycleShell() {
     </div>
     ${readOnlyBannerMarkup(cycle.members, cycle.personId, own)}`;
 
+  // Schwangerschafts-Modus: Vorhersagen sind pausiert — statt Ring/Prognose wird
+  // der Schwangerschafts-Status gezeigt. Logging, Kalender (ohne Projektion) und
+  // Historie bleiben verfügbar; ohne Perioden-Historie entfällt nur die Historie.
+  if (prediction.isPregnant) {
+    cycle.root.insertAdjacentHTML('beforeend', `
+      ${persons}
+      ${cyclePregnancyMarkup(prediction, own)}
+      ${own ? cycleTodayActionsMarkup(prediction) : ''}
+      ${cycleCalendarMarkup(own)}
+      ${prediction.hasData ? cycleHistoryMarkup(own) : ''}
+      ${cycleFooterMarkup(own)}
+    `);
+    if (window.lucide) window.lucide.createIcons({ el: cycle.root });
+    wireCycle();
+    refreshHealthFab();
+    return;
+  }
+
   if (!prediction.hasData) {
     cycle.root.insertAdjacentHTML('beforeend', `
       ${persons}
@@ -3351,6 +3369,46 @@ function renderCycleShell() {
   if (window.lucide) window.lucide.createIcons({ el: cycle.root });
   wireCycle();
   refreshHealthFab();
+}
+
+// --------------------------------------------------------
+// Hero: Schwangerschaft (Vorhersage pausiert)
+// --------------------------------------------------------
+
+function cyclePregnancyMarkup(prediction, own) {
+  const p = prediction.pregnancy || {};
+  const pct = Math.round((p.progress || 0) * 100);
+
+  let detail;
+  if (p.hasDue) {
+    const weekLine = t('health.cycle.pregnancy.week', { weeks: p.gestWeeks, days: p.gestDays });
+    const countdown = p.overdue
+      ? t('health.cycle.pregnancy.overdue', { days: Math.abs(p.daysUntilDue) })
+      : t('health.cycle.pregnancy.countdown', { days: p.daysUntilDue });
+    detail = `
+      <div class="cycle-preg__week">${esc(weekLine)}</div>
+      <div class="cycle-preg__meta">
+        <span class="cycle-preg__badge">${esc(t('health.cycle.pregnancy.trimester', { n: p.trimester }))}</span>
+        <span class="cycle-preg__countdown">${esc(countdown)}</span>
+      </div>
+      <div class="cycle-preg__bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="${esc(t('health.cycle.pregnancy.progressLabel'))}">
+        <span class="cycle-preg__bar-fill" style="width:${pct}%"></span>
+      </div>
+      <div class="cycle-preg__due">${esc(t('health.cycle.pregnancy.dueDate', { date: formatDate(p.dueDate) }))}</div>`;
+  } else {
+    detail = `<p class="cycle-preg__nodate">${esc(t('health.cycle.pregnancy.noDate'))}</p>`;
+  }
+
+  return `
+    <div class="cycle-preg">
+      <div class="cycle-preg__icon" aria-hidden="true"><i data-lucide="baby"></i></div>
+      <div class="cycle-preg__body">
+        <span class="cycle-preg__title">${esc(t('health.cycle.pregnancy.title'))}</span>
+        ${detail}
+        <p class="cycle-preg__paused">${esc(t('health.cycle.pregnancy.paused'))}</p>
+        ${own ? `<button class="btn btn--ghost btn--sm cycle-preg__edit" data-action="cycle-settings"><i data-lucide="settings-2" aria-hidden="true"></i>${esc(t('health.cycle.settings.open'))}</button>` : ''}
+      </div>
+    </div>`;
 }
 
 // --------------------------------------------------------
@@ -3909,6 +3967,16 @@ function openCycleSettingsModal() {
           <span>${esc(t('health.cycle.settings.trackFertility'))}</span>
         </label>
         <p class="cycle-hint">${esc(t('health.cycle.settings.autoHint'))}</p>
+        <hr class="cycle-settings__sep">
+        <label class="cycle-toggle">
+          <input type="checkbox" id="cs-pregnancy" ${s.pregnancy_mode ? 'checked' : ''}>
+          <span>${esc(t('health.cycle.settings.pregnancyMode'))}</span>
+        </label>
+        <div class="form-field" id="cs-due-field" ${s.pregnancy_mode ? '' : 'hidden'}>
+          <label class="label" for="cs-due">${esc(t('health.cycle.settings.dueDate'))}</label>
+          <yuvomi-datepicker id="cs-due" type="date" value="${esc(s.pregnancy_due_date || '')}"></yuvomi-datepicker>
+        </div>
+        <p class="cycle-hint">${esc(t('health.cycle.settings.pregnancyHint'))}</p>
         <div class="modal-actions">
           <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
@@ -3916,15 +3984,23 @@ function openCycleSettingsModal() {
       </form>`,
     onSave(panel) {
       panel.querySelector('[data-action="cancel"]')?.addEventListener('click', () => closeModal({ force: true }));
+      // Datumsfeld nur zeigen, wenn der Schwangerschafts-Modus aktiv ist.
+      const pregToggle = panel.querySelector('#cs-pregnancy');
+      const dueField = panel.querySelector('#cs-due-field');
+      pregToggle?.addEventListener('change', () => { dueField.hidden = !pregToggle.checked; });
       panel.querySelector('#cycle-settings-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = panel.querySelector('[type="submit"]');
         const numOr = (sel) => { const raw = panel.querySelector(sel).value.trim(); return raw === '' ? null : Number(raw); };
+        const pregnant = pregToggle.checked;
+        const due = (panel.querySelector('#cs-due').value || '').trim();
         const body = {
           cycle_length_avg: numOr('#cs-cycle'),
           period_length_avg: numOr('#cs-period'),
           luteal_length: numOr('#cs-luteal') ?? 14,
           track_fertility: panel.querySelector('#cs-fertility').checked,
+          pregnancy_mode: pregnant,
+          pregnancy_due_date: pregnant && due ? due : null,
         };
         submitBtn.disabled = true;
         try {

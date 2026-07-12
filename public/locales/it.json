@@ -2917,6 +2917,17 @@
             "deleteConfirm": "Eliminare davvero questa voce?",
             "invalid": "Inserisci valori validi.",
             "fertilityDisclaimer": "La finestra fertile e l’ovulazione sono stimate con il metodo del calendario. Non sono un metodo contraccettivo né sostituiscono il parere medico.",
+            "pregnancy": {
+                "title": "Gravidanza",
+                "week": "Settimana {{weeks}} + {{days}}",
+                "trimester": "Trimestre {{n}}",
+                "countdown": "ancora {{days}} giorni",
+                "overdue": "{{days}} giorni di ritardo",
+                "dueDate": "Data presunta: {{date}}",
+                "progressLabel": "Avanzamento della gravidanza",
+                "noDate": "Gravidanza attiva. Imposta una data presunta per vedere la settimana di gestazione e il conto alla rovescia.",
+                "paused": "Le previsioni del ciclo sono in pausa."
+            },
             "ring": {
                 "label": "Anello del ciclo",
                 "cycleDay": "Giorno del ciclo {{day}}",
@@ -3045,6 +3056,9 @@
                 "lutealLength": "Durata della fase luteale",
                 "trackFertility": "Mostra finestra fertile",
                 "autoHint": "Lascia vuoto = calcolato automaticamente dalla tua cronologia.",
+                "pregnancyMode": "Modalità gravidanza",
+                "dueDate": "Data presunta del parto",
+                "pregnancyHint": "In modalità gravidanza le previsioni di mestruazioni e ovulazione sono in pausa. Il diario giornaliero resta disponibile.",
                 "saved": "Impostazioni salvate."
             }
         }

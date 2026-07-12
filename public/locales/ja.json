@@ -2917,6 +2917,17 @@
             "deleteConfirm": "このエントリを削除しますか？",
             "invalid": "有効な値を入力してください。",
             "fertilityDisclaimer": "妊娠可能期間と排卵はカレンダー法による推定です。避妊法ではなく、医学的アドバイスの代わりにもなりません。",
+            "pregnancy": {
+                "title": "妊娠",
+                "week": "妊娠{{weeks}}週{{days}}日",
+                "trimester": "第{{n}}期",
+                "countdown": "あと{{days}}日",
+                "overdue": "予定日から{{days}}日超過",
+                "dueDate": "出産予定日：{{date}}",
+                "progressLabel": "妊娠の経過",
+                "noDate": "妊娠モードが有効です。出産予定日を設定すると妊娠週数とカウントダウンが表示されます。",
+                "paused": "周期の予測は一時停止中です。"
+            },
             "ring": {
                 "label": "周期リング",
                 "cycleDay": "周期{{day}}日目",
@@ -3045,6 +3056,9 @@
                 "lutealLength": "黄体期の長さ",
                 "trackFertility": "妊娠可能期間を表示",
                 "autoHint": "空欄のまま = 履歴から自動計算します。",
+                "pregnancyMode": "妊娠モード",
+                "dueDate": "出産予定日",
+                "pregnancyHint": "妊娠モードでは生理と排卵の予測が一時停止します。毎日の記録は引き続き利用できます。",
                 "saved": "Settings saved."
             }
         }

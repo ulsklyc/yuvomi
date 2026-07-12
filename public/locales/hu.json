@@ -2917,6 +2917,17 @@
             "deleteConfirm": "Biztosan törlöd ezt a bejegyzést?",
             "invalid": "Adj meg érvényes értékeket.",
             "fertilityDisclaimer": "A termékeny időszakot és az ovulációt a naptármódszer becsli. Ezek nem fogamzásgátlók és nem helyettesítik az orvosi tanácsadást.",
+            "pregnancy": {
+                "title": "Terhesség",
+                "week": "{{weeks}}. hét + {{days}} nap",
+                "trimester": "{{n}}. trimeszter",
+                "countdown": "még {{days}} nap",
+                "overdue": "{{days}} nap késés",
+                "dueDate": "Várható időpont: {{date}}",
+                "progressLabel": "Terhesség előrehaladása",
+                "noDate": "A terhesség aktív. Állíts be egy várható időpontot a terhességi hét és a visszaszámlálás megjelenítéséhez.",
+                "paused": "A ciklus-előrejelzések szüneteltetve vannak."
+            },
             "ring": {
                 "label": "Ciklusgyűrű",
                 "cycleDay": "{{day}}. ciklusnap",
@@ -3045,6 +3056,9 @@
                 "lutealLength": "Luteális fázis hossza",
                 "trackFertility": "Termékeny időszak megjelenítése",
                 "autoHint": "Hagyd üresen = automatikusan az előzményeidből számolódik.",
+                "pregnancyMode": "Terhesség mód",
+                "dueDate": "Várható szülési időpont",
+                "pregnancyHint": "Terhesség módban a menstruáció- és ovulációs előrejelzések szünetelnek. A napi naplózás továbbra is elérhető.",
                 "saved": "Beállítások mentve."
             }
         }

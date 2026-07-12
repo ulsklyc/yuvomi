@@ -547,6 +547,29 @@ test('Cycle-Settings: Werte außerhalb des Bereichs werden abgelehnt', async () 
   assert.equal(res.status, 400);
 });
 
+test('Cycle-Settings: Schwangerschafts-Modus + Entbindungstermin (#450)', async () => {
+  asB();
+  const def = await call('GET', '/cycle/settings');
+  assert.equal(def.body.data.pregnancy_mode, 0);
+  assert.equal(def.body.data.pregnancy_due_date, null);
+
+  const saved = await call('PUT', '/cycle/settings', { pregnancy_mode: true, pregnancy_due_date: '2027-01-15' });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.data.pregnancy_mode, 1);
+  assert.equal(saved.body.data.pregnancy_due_date, '2027-01-15');
+
+  // Modus aus → Entbindungstermin wird geleert.
+  const off = await call('PUT', '/cycle/settings', { pregnancy_mode: false, pregnancy_due_date: '2027-01-15' });
+  assert.equal(off.body.data.pregnancy_mode, 0);
+  assert.equal(off.body.data.pregnancy_due_date, null);
+});
+
+test('Cycle-Settings: ungültiges Entbindungsdatum wird abgelehnt', async () => {
+  asA();
+  const res = await call('PUT', '/cycle/settings', { pregnancy_mode: true, pregnancy_due_date: '15.01.2027' });
+  assert.equal(res.status, 400);
+});
+
 test('Export cycle: CSV mit Perioden- und Zykluslänge', async () => {
   asA();
   await call('POST', '/cycle/periods', { start_date: '2026-01-05', end_date: '2026-01-09', note: 'exp-cyc-1' });

@@ -90,6 +90,7 @@ const DEFAULT_PERIOD = 5;
 const DEFAULT_LUTEAL = 14;
 const FERTILE_WINDOW_DAYS = 6; // Eisprungtag + 5 Tage davor
 const MAX_HISTORY = 6;         // gleitender Mittelwert über bis zu 6 Zyklen
+const GESTATION_DAYS = 280;    // Naegele-Regel: 40 Wochen von der letzten Periode
 
 // --------------------------------------------------------
 // Datums-Helfer (YYYY-MM-DD, ohne UTC-Shift-Fallen)
@@ -204,6 +205,56 @@ export function cycleStats(periods, settings = {}) {
 }
 
 // --------------------------------------------------------
+// Schwangerschaft
+// --------------------------------------------------------
+
+/**
+ * Schwangerschafts-Status aus den Einstellungen. Ist der Schwangerschafts-Modus
+ * aktiv, werden alle Zyklus-Vorhersagen angehalten und stattdessen dieser Status
+ * angezeigt. Bei gesetztem Entbindungstermin (errechneter Termin, ET) werden SSW
+ * (Schwangerschaftswoche), Trimester und Countdown per Naegele-Regel abgeleitet:
+ * die letzte Periode (LMP) liegt 280 Tage vor dem ET.
+ *
+ * @param {Object} settings   - cycle_settings-Zeile.
+ * @param {string} [todayKey] - Referenz-„heute" (YYYY-MM-DD).
+ * @returns {{ active, dueDate, hasDue, ... }}
+ */
+export function pregnancyInfo(settings = {}, todayKey = toLocalDateKey(new Date())) {
+  const active = !!(settings.pregnancy_mode === 1 || settings.pregnancy_mode === true);
+  const dueRaw = settings.pregnancy_due_date ? dayKey(settings.pregnancy_due_date) : null;
+  const hasDue = !!dueRaw && !Number.isNaN(Date.parse(`${dueRaw}T00:00:00Z`));
+  const today = dayKey(todayKey);
+
+  if (!active || !hasDue) {
+    return { active, dueDate: hasDue ? dueRaw : null, hasDue };
+  }
+
+  const lmpDate = addLocalDays(dueRaw, -GESTATION_DAYS);
+  const daysUntilDue = daysBetween(today, dueRaw);
+  // Gestationsalter: Tage seit LMP (auf [0, GESTATION_DAYS] geklemmt für die Anzeige).
+  const gestationalDays = Math.max(0, Math.min(GESTATION_DAYS, GESTATION_DAYS - daysUntilDue));
+  const gestWeeks = Math.floor(gestationalDays / 7);
+  const gestDays = gestationalDays % 7;
+  // Trimester: 1 = SSW 0–13, 2 = SSW 14–27, 3 = ab SSW 28.
+  const trimester = gestWeeks < 14 ? 1 : (gestWeeks < 28 ? 2 : 3);
+  const overdue = daysUntilDue < 0;
+
+  return {
+    active,
+    dueDate: dueRaw,
+    hasDue,
+    lmpDate,
+    daysUntilDue,
+    gestationalDays,
+    gestWeeks,
+    gestDays,
+    trimester,
+    overdue,
+    progress: Math.max(0, Math.min(1, gestationalDays / GESTATION_DAYS)),
+  };
+}
+
+// --------------------------------------------------------
 // Vorhersage
 // --------------------------------------------------------
 
@@ -221,9 +272,18 @@ export function predictCycle(periods, settings = {}, todayKey = toLocalDateKey(n
   const asc = sortPeriodsAsc(periods);
   const stats = cycleStats(asc, settings);
   const today = dayKey(todayKey);
+  const pregnancy = pregnancyInfo(settings, today);
+
+  // Schwangerschafts-Modus hält alle Vorhersagen an — es gibt keinen „nächsten
+  // Periodenstart", keinen Eisprung und kein fruchtbares Fenster. Die Historie
+  // bleibt erhalten (hasData spiegelt vorhandene Perioden), damit das UI nach
+  // der Schwangerschaft nahtlos weiterrechnet.
+  if (pregnancy.active) {
+    return { hasData: !!asc.length, isPregnant: true, pregnancy, stats, trackFertility: false };
+  }
 
   if (!asc.length) {
-    return { hasData: false, stats, trackFertility: stats.trackFertility };
+    return { hasData: false, isPregnant: false, pregnancy, stats, trackFertility: stats.trackFertility };
   }
 
   // Jüngster Periodenstart, der nicht in der Zukunft liegt (sonst der jüngste).
@@ -266,6 +326,8 @@ export function predictCycle(periods, settings = {}, todayKey = toLocalDateKey(n
 
   return {
     hasData: true,
+    isPregnant: false,
+    pregnancy,
     stats,
     trackFertility,
     lastStart,
@@ -325,8 +387,11 @@ export function buildCycleCalendar(anchorKey, { periods = [], logs = [], setting
   }
 
   // Projizierte Zyklen (nur zukünftige, ab dem letzten geloggten Start).
+  // Im Schwangerschafts-Modus entfällt jede Projektion — geloggte Perioden
+  // bleiben sichtbar, aber es werden keine künftigen Phasen vorhergesagt.
+  const pregnant = pregnancyInfo(settings, today).active;
   const projected = [];
-  if (asc.length) {
+  if (asc.length && !pregnant) {
     const lastStart = dayKey(asc[asc.length - 1].start_date);
     for (let k = 1; k <= 3; k += 1) {
       const start = addLocalDays(lastStart, avgCycle * k);
@@ -401,6 +466,8 @@ export function buildCycleCalendar(anchorKey, { periods = [], logs = [], setting
  */
 export function cycleRing(prediction) {
   if (!prediction || !prediction.hasData) return null;
+  // Kein Zyklus-Ring während der Schwangerschaft (keine avgCycle-Basis).
+  if (prediction.isPregnant) return null;
   const total = prediction.avgCycle;
   const seg = (fromDay, toDay) => ({
     start: Math.max(0, (fromDay - 1) / total),

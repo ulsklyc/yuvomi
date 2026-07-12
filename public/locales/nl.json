@@ -2917,6 +2917,17 @@
             "deleteConfirm": "Dit item echt verwijderen?",
             "invalid": "Voer geldige waarden in.",
             "fertilityDisclaimer": "De vruchtbare periode en eisprong zijn geschat met de kalendermethode. Ze zijn geen voorbehoedsmiddel en geen vervanging voor medisch advies.",
+            "pregnancy": {
+                "title": "Zwangerschap",
+                "week": "Week {{weeks}} + {{days}}",
+                "trimester": "Trimester {{n}}",
+                "countdown": "nog {{days}} dagen",
+                "overdue": "{{days}} dagen over tijd",
+                "dueDate": "Uitgerekende datum: {{date}}",
+                "progressLabel": "Voortgang zwangerschap",
+                "noDate": "Zwangerschap actief. Stel een uitgerekende datum in om de zwangerschapsweek en aftelling te zien.",
+                "paused": "Cyclusvoorspellingen zijn gepauzeerd."
+            },
             "ring": {
                 "label": "Cyclusring",
                 "cycleDay": "Cyclusdag {{day}}",
@@ -3045,6 +3056,9 @@
                 "lutealLength": "Lengte luteale fase",
                 "trackFertility": "Vruchtbare periode tonen",
                 "autoHint": "Leeg laten = automatisch berekend uit je geschiedenis.",
+                "pregnancyMode": "Zwangerschapsmodus",
+                "dueDate": "Uitgerekende datum",
+                "pregnancyHint": "In de zwangerschapsmodus worden voorspellingen voor menstruatie en eisprong gepauzeerd. Dagelijks loggen blijft mogelijk.",
                 "saved": "Settings saved."
             }
         }

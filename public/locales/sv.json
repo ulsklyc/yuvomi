@@ -2917,6 +2917,17 @@
             "deleteConfirm": "Vill du verkligen ta bort den här posten?",
             "invalid": "Ange giltiga värden.",
             "fertilityDisclaimer": "Fertilt fönster och ägglossning uppskattas med kalendermetoden. De är inte ett preventivmedel och ersätter inte medicinsk rådgivning.",
+            "pregnancy": {
+                "title": "Graviditet",
+                "week": "Vecka {{weeks}} + {{days}}",
+                "trimester": "Trimester {{n}}",
+                "countdown": "{{days}} dagar kvar",
+                "overdue": "{{days}} dagar över tiden",
+                "dueDate": "Beräknat datum: {{date}}",
+                "progressLabel": "Graviditetens förlopp",
+                "noDate": "Graviditet aktiv. Ange ett beräknat datum för att se graviditetsvecka och nedräkning.",
+                "paused": "Cykelprognoser är pausade."
+            },
             "ring": {
                 "label": "Cykelring",
                 "cycleDay": "Cykeldag {{day}}",
@@ -3045,6 +3056,9 @@
                 "lutealLength": "Lutealfasens längd",
                 "trackFertility": "Visa fertilt fönster",
                 "autoHint": "Lämna tomt = beräknas automatiskt från din historik.",
+                "pregnancyMode": "Graviditetsläge",
+                "dueDate": "Beräknat förlossningsdatum",
+                "pregnancyHint": "I graviditetsläge pausas prognoser för mens och ägglossning. Daglig loggning är fortfarande tillgänglig.",
                 "saved": "Settings saved."
             }
         }

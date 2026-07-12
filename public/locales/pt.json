@@ -2917,6 +2917,17 @@
             "deleteConfirm": "Eliminar mesmo esta entrada?",
             "invalid": "Introduza valores válidos.",
             "fertilityDisclaimer": "A janela fértil e a ovulação são estimadas pelo método do calendário. Não são um contracetivo nem substituem o aconselhamento médico.",
+            "pregnancy": {
+                "title": "Gravidez",
+                "week": "Semana {{weeks}} + {{days}}",
+                "trimester": "Trimestre {{n}}",
+                "countdown": "faltam {{days}} dias",
+                "overdue": "{{days}} dias de atraso",
+                "dueDate": "Data prevista: {{date}}",
+                "progressLabel": "Progresso da gravidez",
+                "noDate": "Gravidez ativa. Defina uma data prevista para ver a semana de gestação e a contagem regressiva.",
+                "paused": "As previsões do ciclo estão pausadas."
+            },
             "ring": {
                 "label": "Anel do ciclo",
                 "cycleDay": "Dia do ciclo {{day}}",
@@ -3045,6 +3056,9 @@
                 "lutealLength": "Duração da fase lútea",
                 "trackFertility": "Mostrar janela fértil",
                 "autoHint": "Deixe vazio = calculado automaticamente a partir do seu histórico.",
+                "pregnancyMode": "Modo gravidez",
+                "dueDate": "Data provável do parto",
+                "pregnancyHint": "No modo gravidez, as previsões de menstruação e ovulação ficam pausadas. O registro diário continua disponível.",
                 "saved": "Settings saved."
             }
         }

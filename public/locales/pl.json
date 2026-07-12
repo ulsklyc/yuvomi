@@ -2917,6 +2917,17 @@
             "deleteConfirm": "Na pewno usunąć ten wpis?",
             "invalid": "Wprowadź prawidłowe wartości.",
             "fertilityDisclaimer": "Okno płodności i owulacja są szacowane metodą kalendarzową. Nie są antykoncepcją ani nie zastępują porady lekarskiej.",
+            "pregnancy": {
+                "title": "Ciąża",
+                "week": "Tydzień {{weeks}} + {{days}}",
+                "trimester": "Trymestr {{n}}",
+                "countdown": "pozostało {{days}} dni",
+                "overdue": "{{days}} dni po terminie",
+                "dueDate": "Termin porodu: {{date}}",
+                "progressLabel": "Postęp ciąży",
+                "noDate": "Ciąża aktywna. Ustaw termin porodu, aby zobaczyć tydzień ciąży i odliczanie.",
+                "paused": "Prognozy cyklu są wstrzymane."
+            },
             "ring": {
                 "label": "Pierścień cyklu",
                 "cycleDay": "Dzień cyklu {{day}}",
@@ -3045,6 +3056,9 @@
                 "lutealLength": "Długość fazy lutealnej",
                 "trackFertility": "Pokaż okno płodności",
                 "autoHint": "Pozostaw puste = obliczane automatycznie z historii.",
+                "pregnancyMode": "Tryb ciąży",
+                "dueDate": "Przewidywany termin porodu",
+                "pregnancyHint": "W trybie ciąży prognozy miesiączki i owulacji są wstrzymane. Codzienne zapisy pozostają dostępne.",
                 "saved": "Settings saved."
             }
         }

@@ -2917,6 +2917,17 @@
             "deleteConfirm": "确定要删除此记录吗？",
             "invalid": "请输入有效的数值。",
             "fertilityDisclaimer": "易孕期和排卵日基于日历法推算，不能作为避孕手段，也不能替代医疗建议。",
+            "pregnancy": {
+                "title": "怀孕",
+                "week": "孕{{weeks}}周{{days}}天",
+                "trimester": "第{{n}}孕期",
+                "countdown": "还有{{days}}天",
+                "overdue": "超过预产期{{days}}天",
+                "dueDate": "预产期：{{date}}",
+                "progressLabel": "怀孕进度",
+                "noDate": "怀孕模式已开启。设置预产期即可查看孕周和倒计时。",
+                "paused": "周期预测已暂停。"
+            },
             "ring": {
                 "label": "周期环",
                 "cycleDay": "周期第 {{day}} 天",
@@ -3045,6 +3056,9 @@
                 "lutealLength": "黄体期长度",
                 "trackFertility": "显示易孕期",
                 "autoHint": "留空 = 根据历史记录自动计算。",
+                "pregnancyMode": "怀孕模式",
+                "dueDate": "预产期",
+                "pregnancyHint": "在怀孕模式下，月经和排卵预测将暂停。每日记录仍可使用。",
                 "saved": "Settings saved."
             }
         }

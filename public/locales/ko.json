@@ -2917,6 +2917,17 @@
             "deleteConfirm": "이 항목을 정말 삭제할까요?",
             "invalid": "유효한 값을 입력하세요.",
             "fertilityDisclaimer": "가임기와 배란은 달력법으로 추정한 값입니다. 피임 수단이 아니며 의학적 상담을 대신하지 않습니다.",
+            "pregnancy": {
+                "title": "임신",
+                "week": "임신 {{weeks}}주 {{days}}일",
+                "trimester": "{{n}}기",
+                "countdown": "{{days}}일 남음",
+                "overdue": "예정일 {{days}}일 지남",
+                "dueDate": "출산 예정일: {{date}}",
+                "progressLabel": "임신 경과",
+                "noDate": "임신 모드가 켜져 있습니다. 임신 주수와 카운트다운을 보려면 출산 예정일을 설정하세요.",
+                "paused": "주기 예측이 일시 중지되었습니다."
+            },
             "ring": {
                 "label": "주기 링",
                 "cycleDay": "주기 {{day}}일차",
@@ -3045,6 +3056,9 @@
                 "lutealLength": "황체기 길이",
                 "trackFertility": "가임기 표시",
                 "autoHint": "비워 두면 기록에서 자동 계산됩니다.",
+                "pregnancyMode": "임신 모드",
+                "dueDate": "출산 예정일",
+                "pregnancyHint": "임신 모드에서는 생리와 배란 예측이 일시 중지됩니다. 매일 기록은 계속 사용할 수 있습니다.",
                 "saved": "설정이 저장되었습니다."
             }
         }

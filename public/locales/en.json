@@ -2917,6 +2917,17 @@
             "deleteConfirm": "Really delete this entry?",
             "invalid": "Please enter valid values.",
             "fertilityDisclaimer": "Fertile window and ovulation are estimated with the calendar method. They are not a form of contraception and no substitute for medical advice.",
+            "pregnancy": {
+                "title": "Pregnancy",
+                "week": "Week {{weeks}} + {{days}}",
+                "trimester": "Trimester {{n}}",
+                "countdown": "{{days}} days to go",
+                "overdue": "{{days}} days overdue",
+                "dueDate": "Due date: {{date}}",
+                "progressLabel": "Pregnancy progress",
+                "noDate": "Pregnancy active. Set a due date to see gestational week and countdown.",
+                "paused": "Cycle predictions are paused."
+            },
             "ring": {
                 "label": "Cycle ring",
                 "cycleDay": "Cycle day {{day}}",
@@ -3045,6 +3056,9 @@
                 "lutealLength": "Luteal phase length",
                 "trackFertility": "Show fertile window",
                 "autoHint": "Leave empty to calculate automatically from your history.",
+                "pregnancyMode": "Pregnancy mode",
+                "dueDate": "Estimated due date",
+                "pregnancyHint": "In pregnancy mode, period and ovulation predictions are paused. Daily logging stays available.",
                 "saved": "Settings saved."
             }
         }

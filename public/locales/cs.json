@@ -2917,6 +2917,17 @@
             "deleteConfirm": "Opravdu smazat tento záznam?",
             "invalid": "Zadejte platné hodnoty.",
             "fertilityDisclaimer": "Údaje o plodném období a ovulaci vycházejí z kalendářní metody. Nenahrazují antikoncepci ani lékařskou konzultaci.",
+            "pregnancy": {
+                "title": "Těhotenství",
+                "week": "Týden {{weeks}} + {{days}}",
+                "trimester": "Trimestr {{n}}",
+                "countdown": "zbývá {{days}} dní",
+                "overdue": "{{days}} dní po termínu",
+                "dueDate": "Termín porodu: {{date}}",
+                "progressLabel": "Průběh těhotenství",
+                "noDate": "Těhotenství je aktivní. Nastavte termín porodu, abyste viděli týden těhotenství a odpočet.",
+                "paused": "Předpovědi cyklu jsou pozastaveny."
+            },
             "ring": {
                 "label": "Prstenec cyklu",
                 "cycleDay": "Den cyklu {{day}}",
@@ -3045,6 +3056,9 @@
                 "lutealLength": "Délka luteální fáze",
                 "trackFertility": "Zobrazit plodné období",
                 "autoHint": "Ponech prázdné = vypočítá se automaticky z tvé historie.",
+                "pregnancyMode": "Režim těhotenství",
+                "dueDate": "Předpokládaný termín porodu",
+                "pregnancyHint": "V režimu těhotenství jsou předpovědi menstruace a ovulace pozastaveny. Denní záznamy zůstávají dostupné.",
                 "saved": "Settings saved."
             }
         }

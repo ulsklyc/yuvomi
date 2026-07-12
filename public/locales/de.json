@@ -2917,6 +2917,17 @@
             "deleteConfirm": "Diesen Eintrag wirklich löschen?",
             "invalid": "Bitte gültige Werte eingeben.",
             "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
+            "pregnancy": {
+                "title": "Schwangerschaft",
+                "week": "SSW {{weeks}} + {{days}}",
+                "trimester": "{{n}}. Trimester",
+                "countdown": "noch {{days}} Tage",
+                "overdue": "{{days}} Tage über Termin",
+                "dueDate": "Entbindungstermin: {{date}}",
+                "progressLabel": "Schwangerschaftsfortschritt",
+                "noDate": "Schwangerschaft aktiv. Lege einen Entbindungstermin fest, um SSW und Countdown zu sehen.",
+                "paused": "Zyklusvorhersagen sind pausiert."
+            },
             "ring": {
                 "label": "Zyklus-Ring",
                 "cycleDay": "Zyklustag {{day}}",
@@ -3045,6 +3056,9 @@
                 "lutealLength": "Länge der Lutealphase",
                 "trackFertility": "Fruchtbares Fenster anzeigen",
                 "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
+                "pregnancyMode": "Schwangerschafts-Modus",
+                "dueDate": "Errechneter Entbindungstermin",
+                "pregnancyHint": "Im Schwangerschafts-Modus werden Perioden- und Eisprung-Vorhersagen angehalten. Tages-Logging bleibt möglich.",
                 "saved": "Einstellungen gespeichert."
             }
         }

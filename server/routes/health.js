@@ -1192,7 +1192,7 @@ router.delete('/cycle/logs/:id', (req, res) => {
 
 /** Voreinstellungen, falls die Person noch keine Zeile hat. */
 function defaultCycleSettings(userId) {
-  return { user_id: userId, cycle_length_avg: null, period_length_avg: null, luteal_length: 14, track_fertility: 1 };
+  return { user_id: userId, cycle_length_avg: null, period_length_avg: null, luteal_length: 14, track_fertility: 1, pregnancy_mode: 0, pregnancy_due_date: null };
 }
 
 // GET /cycle/settings  (immer die eigenen; Vorhersagen sind persönlich)
@@ -1223,21 +1223,28 @@ router.put('/cycle/settings', (req, res) => {
     const periodLen = intInRange(b.period_length_avg, 'period_length_avg', 1, 15);
     const luteal    = intInRange(b.luteal_length, 'luteal_length', 8, 18);
     const track     = toBit(b.track_fertility);
+    const pregnancy = toBit(b.pregnancy_mode);
+    const dueDate   = v.date(b.pregnancy_due_date, 'pregnancy_due_date');
 
-    const errors = v.collectErrors([cycleLen, periodLen, luteal]);
+    const errors = v.collectErrors([cycleLen, periodLen, luteal, dueDate]);
     if (b.track_fertility !== undefined && track === undefined) errors.push('track_fertility must be a boolean.');
+    if (b.pregnancy_mode !== undefined && pregnancy === undefined) errors.push('pregnancy_mode must be a boolean.');
     if (errors.length) return badRequest(res, errors);
 
     db.get().prepare(`
-      INSERT INTO cycle_settings (user_id, cycle_length_avg, period_length_avg, luteal_length, track_fertility)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO cycle_settings (user_id, cycle_length_avg, period_length_avg, luteal_length, track_fertility, pregnancy_mode, pregnancy_due_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(user_id) DO UPDATE SET
         cycle_length_avg = excluded.cycle_length_avg,
         period_length_avg = excluded.period_length_avg,
         luteal_length = excluded.luteal_length,
-        track_fertility = excluded.track_fertility
+        track_fertility = excluded.track_fertility,
+        pregnancy_mode = excluded.pregnancy_mode,
+        pregnancy_due_date = excluded.pregnancy_due_date
     `).run(viewer, cycleLen.value, periodLen.value, luteal.value === null ? 14 : luteal.value,
-           track === undefined ? 1 : track);
+           track === undefined ? 1 : track,
+           pregnancy === undefined ? 0 : pregnancy,
+           pregnancy ? dueDate.value : null);
 
     res.json({ data: db.get().prepare('SELECT * FROM cycle_settings WHERE user_id = ?').get(viewer) });
   } catch (err) {
