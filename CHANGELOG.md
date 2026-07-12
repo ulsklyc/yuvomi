@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.1] - 2026-07-12
+
+### Fixed
+- **Reminder toggle no longer breaks the event dialog layout on mobile (#483).** The follow-up to the earlier #483 fix: the same blank-block bug still occurred when enabling reminders in the appointment dialog. The reminder toggle's visually hidden checkbox resolved its position against the scrollable dialog panel instead of its own label, so tapping it on a narrow viewport scrolled the panel and left a large empty gap that hid the reminder, visibility, and save controls. The toggle component is now its own positioning context, keeping every field reachable.
+
 ## [1.14.0] - 2026-07-12
 
 ### Added

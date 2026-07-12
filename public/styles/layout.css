@@ -2092,6 +2092,14 @@ html.fab-anim-done .page-fab {
  * Usage: <label class="toggle"><input type="checkbox"><span class="toggle__track"></span></label>
  * -------------------------------------------------------- */
 .toggle {
+  /* position:relative macht dieses Label zum Containing-Block der visuell
+   * versteckten, absolut positionierten .toggle-Checkbox. Ohne das positioniert
+   * sich die Checkbox relativ zum nächsten positionierten Vorfahren (dem
+   * overflow:hidden .modal-panel); beim Antippen scrollt der Browser dann das
+   * Panel statt des Modal-Bodys in die Checkbox — es entsteht ein großer leerer
+   * Block und die folgenden Felder werden unerreichbar (#483, nur mobil, hier
+   * beim Erinnerungs-Toggle im Termin-Modal). */
+  position: relative;
   display: inline-flex;
   align-items: center;
   cursor: pointer;
