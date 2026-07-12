@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-07-12
+
+### Added
+- **Show assigned members in the calendar export feed (#482).** A new opt-in toggle under Settings → Calendar sync → "Kalender-Feed exportieren" appends each event's assigned members to its title in the read-only ICS feed, e.g. `Poolparty (Mama, Papa)`. Names are ordered alphabetically and shown in every calendar app that subscribes to the feed (Apple Calendar, Google Calendar, Thunderbird). It is off by default, so existing subscribers' titles stay unchanged until enabled, and it takes effect immediately without regenerating the feed link.
+
 ## [1.13.3] - 2026-07-12
 
 ### Added

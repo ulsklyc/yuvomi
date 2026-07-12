@@ -739,6 +739,7 @@ function buildPaths() {
     },
     '/api/v1/calendar/feed': {
       get: op({ summary: 'Get personal ICS export feed status', tag: 'Calendar' }),
+      put: op({ summary: 'Set personal ICS export feed options (showAssignees)', tag: 'Calendar', stateChanging: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Disable personal ICS export feed', tag: 'Calendar', stateChanging: true }),
     },
     '/api/v1/calendar/feed/regenerate': {

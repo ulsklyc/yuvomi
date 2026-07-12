@@ -1213,6 +1213,13 @@ function renderFeedExportActive(body, data) {
       <input id="feed-url" class="form-input" type="text" readonly value="${esc(data.url)}">
       <p class="form-hint">${t('settings.feedExportHint')}</p>
     </div>
+    <div class="form-group">
+      <label class="settings-toggle">
+        <input type="checkbox" id="feed-show-assignees" aria-describedby="feed-show-assignees-hint" ${data.showAssignees ? 'checked' : ''}>
+        <span>${t('settings.feedExportShowAssignees')}</span>
+      </label>
+      <p class="form-hint" id="feed-show-assignees-hint">${t('settings.feedExportShowAssigneesHint')}</p>
+    </div>
     <div class="settings-form-actions">
       <button type="button" class="btn btn--secondary" id="feed-copy">${t('settings.feedExportCopy')}</button>
       <a class="btn btn--secondary" href="${esc(webcal)}">${t('settings.feedExportSubscribe')}</a>
@@ -1278,6 +1285,20 @@ async function loadFeedExport(container, user) {
       await reload();
     } catch (err) {
       showToast(err.message || t('common.errorGeneric'), 'danger');
+    }
+  });
+  body.querySelector('#feed-show-assignees')?.addEventListener('change', async (e) => {
+    const input = e.currentTarget;
+    const next = input.checked;
+    input.disabled = true;
+    try {
+      await api.put('/calendar/feed', { showAssignees: next });
+      showToast(t('settings.feedExportSaved'), 'success');
+    } catch (err) {
+      input.checked = !next; // Fehlschlag → visuellen Zustand zurücksetzen
+      showToast(err.message || t('common.errorGeneric'), 'danger');
+    } finally {
+      input.disabled = false;
     }
   });
 }

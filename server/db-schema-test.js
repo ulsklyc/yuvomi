@@ -815,6 +815,9 @@ const MIGRATIONS_SQL = {
     INSERT INTO search_index (entity, entity_id, title, body)
       SELECT 'activity', id, COALESCE(type, ''), COALESCE(note, '') FROM health_activities;
   `,
+  80: `
+    ALTER TABLE users ADD COLUMN calendar_feed_show_assignees INTEGER NOT NULL DEFAULT 0;
+  `,
 };
 
 export { MIGRATIONS_SQL };

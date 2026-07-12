@@ -83,7 +83,7 @@ function addDaysDateKey(dateKey, days) {
   return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
 }
 
-function buildVEvent(ev, dtstamp) {
+function buildVEvent(ev, dtstamp, showAssignees = false) {
   const lines = ['BEGIN:VEVENT'];
   lines.push(`UID:event-${ev.id}@yuvomi`);
   lines.push(`DTSTAMP:${dtstamp}`);
@@ -103,7 +103,15 @@ function buildVEvent(ev, dtstamp) {
       lines.push(`DTEND:${endFmt}`);
     }
   }
-  lines.push(`SUMMARY:${escapeICSText(ev.title)}`);
+  // Opt-in (#482): zugewiesene Personen als Titel-Suffix "(Name, Name)".
+  // Escaping erfolgt über den zusammengesetzten String, damit Kommata/Semikola
+  // in Namen wie im Titel RFC-konform maskiert werden.
+  let summary = ev.title || '';
+  if (showAssignees) {
+    const names = ev.assignee_names_json ? JSON.parse(ev.assignee_names_json) : [];
+    if (names.length) summary += ` (${names.join(', ')})`;
+  }
+  lines.push(`SUMMARY:${escapeICSText(summary)}`);
   if (ev.description) lines.push(`DESCRIPTION:${escapeICSText(ev.description)}`);
   if (ev.location) lines.push(`LOCATION:${escapeICSText(ev.location)}`);
   if (ev.recurrence_rule) lines.push(`RRULE:${ev.recurrence_rule}`);
@@ -117,9 +125,23 @@ function buildFeed(conn, userId, now = new Date()) {
 
   // Identische Sichtbarkeitslogik wie GET /api/v1/calendar:
   // alle Events außer fremden, nicht-geteilten ICS-Abos.
+  const showAssignees = !!conn.prepare(
+    `SELECT calendar_feed_show_assignees AS v FROM users WHERE id = ?`
+  ).get(userId)?.v;
+
+  // Namen nur laden, wenn der Feed-Eigentümer sie im Titel anzeigen will (#482);
+  // im Default-Fall (aus) spart das die korrelierte Subquery je Event.
+  const assigneeSelect = showAssignees ? `,
+           (SELECT json_group_array(name) FROM (
+              SELECT u.display_name AS name
+              FROM event_assignments ea JOIN users u ON u.id = ea.user_id
+              WHERE ea.event_id = e.id
+              ORDER BY u.display_name
+           )) AS assignee_names_json` : '';
+
   const rows = conn.prepare(`
     SELECT id, title, description, start_datetime, end_datetime, all_day,
-           location, recurrence_rule
+           location, recurrence_rule${assigneeSelect}
     FROM calendar_events e
     WHERE (
       e.external_source <> 'ics'
@@ -144,7 +166,7 @@ function buildFeed(conn, userId, now = new Date()) {
     'METHOD:PUBLISH',
     'X-WR-CALNAME:Yuvomi',
   ];
-  for (const ev of rows) out.push(...buildVEvent(ev, dtstamp));
+  for (const ev of rows) out.push(...buildVEvent(ev, dtstamp, showAssignees));
   out.push('END:VCALENDAR');
   return out.join('\r\n') + '\r\n';
 }
@@ -170,7 +192,21 @@ function findUserIdByFeedToken(conn, token) {
   return row?.id ?? null;
 }
 
+function getFeedShowAssignees(conn, userId) {
+  const row = conn.prepare(
+    `SELECT calendar_feed_show_assignees AS v FROM users WHERE id = ?`
+  ).get(userId);
+  return !!row?.v;
+}
+
+function setFeedShowAssignees(conn, userId, value) {
+  conn.prepare(`UPDATE users SET calendar_feed_show_assignees = ? WHERE id = ?`)
+    .run(value ? 1 : 0, userId);
+  return !!value;
+}
+
 export {
   escapeICSText, foldLine, buildFeed,
   getFeedToken, regenerateFeedToken, clearFeedToken, findUserIdByFeedToken,
+  getFeedShowAssignees, setFeedShowAssignees,
 };

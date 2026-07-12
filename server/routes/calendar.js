@@ -826,7 +826,24 @@ router.get('/feed', (req, res) => {
   try {
     const token = icsExport.getFeedToken(db.get(), getUserId(req));
     if (!token) return res.json({ data: null });
-    res.json({ data: { token, url: feedUrl(req, token) } });
+    const showAssignees = icsExport.getFeedShowAssignees(db.get(), getUserId(req));
+    res.json({ data: { token, url: feedUrl(req, token), showAssignees } });
+  } catch (err) {
+    log.error('', err);
+    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+  }
+});
+
+// PUT /api/v1/calendar/feed → Feed-Optionen setzen (showAssignees, #482)
+router.put('/feed', (req, res) => {
+  try {
+    if (typeof req.body?.showAssignees !== 'boolean') {
+      return res.status(400).json({ error: 'showAssignees (boolean) required.', code: 400 });
+    }
+    const showAssignees = icsExport.setFeedShowAssignees(
+      db.get(), getUserId(req), req.body.showAssignees
+    );
+    res.json({ data: { showAssignees } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });

@@ -43,6 +43,14 @@ test('Mehrere NULL-Token erlaubt (Partial-Index)', () => {
   assert(true);
 });
 
+test('Migration 80 fügt calendar_feed_show_assignees hinzu (Default 0)', () => {
+  db.exec(MIGRATIONS_SQL[80]);
+  const col = db.prepare(`PRAGMA table_info(users)`).all()
+    .find(c => c.name === 'calendar_feed_show_assignees');
+  assert(col, 'Spalte fehlt');
+  assert(Number(col.dflt_value) === 0, 'Default sollte 0 sein');
+});
+
 import { buildFeed, escapeICSText, foldLine } from '../server/services/ics-export.js';
 
 // Frische DB mit calendar_events + ics_subscriptions
@@ -56,6 +64,12 @@ d2.exec(`CREATE TABLE users (
 d2.exec(MIGRATIONS_SQL[10]);
 d2.exec(MIGRATIONS_SQL[11]);
 d2.exec(MIGRATIONS_SQL[61]);
+d2.exec(MIGRATIONS_SQL[80]);
+d2.exec(`CREATE TABLE IF NOT EXISTS event_assignments (
+  event_id INTEGER NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
+  user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY (event_id, user_id)
+);`);
 const u1 = d2.prepare(`INSERT INTO users (username,display_name,password_hash,role) VALUES ('admin','Admin','x','admin')`).run().lastInsertRowid;
 const u2 = d2.prepare(`INSERT INTO users (username,display_name,password_hash) VALUES ('maria','Maria','x')`).run().lastInsertRowid;
 
@@ -181,6 +195,67 @@ test('clearFeedToken deaktiviert Feed', () => {
   regenerateFeedToken(d2, u1);
   clearFeedToken(d2, u1);
   assert(getFeedToken(d2, u1) === null, 'Token nicht gelöscht');
+});
+
+// --------------------------------------------------------------------------
+// Zugewiesene Personen im Feed-Titel (#482)
+// --------------------------------------------------------------------------
+import { getFeedShowAssignees, setFeedShowAssignees }
+  from '../server/services/ics-export.js';
+
+const u3 = d2.prepare(`INSERT INTO users (username,display_name,password_hash) VALUES ('sam','Sam (Jr.), II','x')`).run().lastInsertRowid;
+
+const poolId = d2.prepare(`INSERT INTO calendar_events (title,start_datetime,all_day,external_source,created_by) VALUES ('Poolparty','2026-06-28',1,'local',?)`).run(u1).lastInsertRowid;
+d2.prepare(`INSERT INTO event_assignments (event_id,user_id) VALUES (?,?)`).run(poolId, u1); // Admin
+d2.prepare(`INSERT INTO event_assignments (event_id,user_id) VALUES (?,?)`).run(poolId, u2); // Maria
+
+const soloId = d2.prepare(`INSERT INTO calendar_events (title,start_datetime,all_day,external_source,created_by) VALUES ('Elternabend','2026-06-29',1,'local',?)`).run(u1).lastInsertRowid;
+d2.prepare(`INSERT INTO event_assignments (event_id,user_id) VALUES (?,?)`).run(soloId, u3); // Name mit , und ( )
+
+test('getFeedShowAssignees Default false, setFeedShowAssignees persistiert Bool', () => {
+  assert(getFeedShowAssignees(d2, u1) === false, 'Default sollte false sein');
+  assert(setFeedShowAssignees(d2, u1, true) === true, 'Rückgabe true');
+  assert(getFeedShowAssignees(d2, u1) === true, 'nicht persistiert');
+  setFeedShowAssignees(d2, u1, 1);
+  assert(getFeedShowAssignees(d2, u1) === true, 'truthy → 1');
+  setFeedShowAssignees(d2, u1, 0);
+  assert(getFeedShowAssignees(d2, u1) === false, 'falsy → 0');
+});
+
+test('buildFeed: Flag aus → Titel ohne Namen-Suffix', () => {
+  setFeedShowAssignees(d2, u1, false);
+  const ics = buildFeed(d2, u1, NOW);
+  assert(/SUMMARY:Poolparty\r\n/.test(ics), 'Titel sollte unverändert sein: ' + ics);
+  assert(!/Poolparty \(/.test(ics), 'Suffix trotz Flag aus');
+});
+
+test('buildFeed: Flag an → mehrere Zugewiesene alphabetisch als Suffix', () => {
+  setFeedShowAssignees(d2, u1, true);
+  const ics = buildFeed(d2, u1, NOW);
+  // display_name-Sortierung: "Admin" < "Maria"; Komma zwischen Namen RFC-escaped.
+  assert(ics.includes('SUMMARY:Poolparty (Admin\\, Maria)'), 'Suffix falsch: ' + ics);
+});
+
+test('buildFeed: Flag an aber Feed-Eigentümer eines anderen ohne Flag → kein Suffix', () => {
+  // u2 hat calendar_feed_show_assignees nicht gesetzt (Default 0): dessen Feed bleibt roh.
+  setFeedShowAssignees(d2, u1, true);
+  const ics = buildFeed(d2, u2, NOW);
+  assert(/SUMMARY:Poolparty\r\n/.test(ics), 'Fremd-Feed darf keinen Suffix haben: ' + ics);
+});
+
+test('buildFeed: Sonderzeichen im Namen werden im Suffix escaped', () => {
+  setFeedShowAssignees(d2, u1, true);
+  const ics = buildFeed(d2, u1, NOW);
+  // Name "Sam (Jr.), II" → Klammern bleiben, Komma wird zu \,
+  assert(ics.includes('SUMMARY:Elternabend (Sam (Jr.)\\, II)'), 'Escaping falsch: ' + ics);
+});
+
+test('buildFeed: Event ohne Zuweisung bekommt trotz Flag keine leeren Klammern', () => {
+  setFeedShowAssignees(d2, u1, true);
+  const noneId = d2.prepare(`INSERT INTO calendar_events (title,start_datetime,all_day,external_source,created_by) VALUES ('Solo','2026-06-30',1,'local',?)`).run(u1).lastInsertRowid;
+  const ics = buildFeed(d2, u1, NOW);
+  assert(/SUMMARY:Solo\r\n/.test(ics), 'leere Klammern angehängt: ' + ics);
+  d2.prepare(`DELETE FROM calendar_events WHERE id = ?`).run(noneId);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
