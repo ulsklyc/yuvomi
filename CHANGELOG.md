@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.18.3] - 2026-07-12
+
+### Fixed
+- The category manager no longer shows its title twice — the modal header already carries it, so the duplicate heading inside the dialog is gone.
+- Contact category color tints no longer break when a category name contains spaces (e.g. one imported via CardDAV): the group's CSS class is now always a single valid token.
+
 ## [1.18.2] - 2026-07-12
 
 ### Changed

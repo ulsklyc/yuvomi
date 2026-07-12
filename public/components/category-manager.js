@@ -47,9 +47,12 @@ class CategoryManagerElement extends HTMLElement {
 
   _renderShell() {
     this.replaceChildren();
+    // Der Titel wird bewusst NICHT gerendert: die Komponente lebt stets in einem
+    // Modal, dessen Kopfzeile denselben Titel (titleKey) bereits zeigt — ein
+    // eigenes <h3> wäre eine sicht- und vorlesbare Dopplung. titleKey bleibt in
+    // configure() akzeptiert (Aufrufer unverändert), steuert aber nur den Modal-Titel.
     this.insertAdjacentHTML('beforeend', `
       <div class="cat-manager">
-        <h3 class="cat-manager__title" tabindex="-1">${esc(t(this._titleKey))}</h3>
         <p class="cat-manager__hint">${esc(t(this._hintKey))}</p>
         <div class="cat-manager__groups" id="cat-manager-groups"></div>
       </div>`);

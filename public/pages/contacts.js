@@ -46,6 +46,16 @@ function categoryIcon(key, size = 16) {
   return `<i data-lucide="${esc(name)}" class="contact-cat-icon" style="width:${size}px;height:${size}px;" aria-hidden="true"></i>`;
 }
 
+// CSS-Farbton-Klasse aus dem Key. Seed-Keys sind bereits Slugs und matchen
+// .contact-group--<key>; migrierte Freitext-Keys (z. B. aus CardDAV, mit
+// Leerzeichen) werden auf ein EINZELNES gültiges class-Token normalisiert, damit
+// sie die class-Liste nicht spalten — unbekannte Slugs matchen keine Farb-Regel
+// und fallen neutral zurück.
+function catTintClass(key) {
+  const slug = String(key).toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
+  return slug ? `contact-group--${slug}` : '';
+}
+
 // Initialen aus dem Namen (max. 2 Buchstaben): Vorname + letzter Namensteil.
 function initials(name) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
@@ -419,7 +429,7 @@ function renderList({ animate = false } = {}) {
   container.insertAdjacentHTML('beforeend', Object.entries(groups)
     .sort(([a], [b]) => catSortIndex(a) - catSortIndex(b))
     .map(([cat, items]) => `
-      <div class="contact-group contact-group--${esc(cat)}">
+      <div class="contact-group ${catTintClass(cat)}">
         <div class="contact-group__header">${categoryIcon(cat)} ${esc(catLabel(cat))}</div>
         ${items.map((c) => renderContactItem(c)).join('')}
       </div>
