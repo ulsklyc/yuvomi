@@ -123,7 +123,7 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "express-session": "^1.19.0",
-    "helmet": "^8.2.0",
+    "helmet": "^8.3.0",
     "node-cron": "^4.6.0",
     "node-fetch": "^3.3.2",
     "nodemailer": "^9.0.3",
