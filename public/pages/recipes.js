@@ -189,7 +189,12 @@ function renderRecipeList() {
       link.href = recipe.recipe_url;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
-      link.textContent = t('recipes.openLink');
+      // Explizites Icon macht die Zeile als externen Link erkennbar, statt wie
+      // Fließtext zu wirken (Audit F10).
+      link.insertAdjacentHTML('beforeend', '<i data-lucide="external-link" class="icon-sm" aria-hidden="true"></i>');
+      const linkLabel = document.createElement('span');
+      linkLabel.textContent = t('recipes.openLink');
+      link.appendChild(linkLabel);
       card.appendChild(link);
     }
 
@@ -231,7 +236,7 @@ function renderRecipeList() {
     addToMeals.textContent = t('recipes.addToMeals');
 
     const iconActions = document.createElement('div');
-    iconActions.className = 'recipe-card__icon-actions';
+    iconActions.className = 'row-actions recipe-card__icon-actions';
     const secondaryActions = [
       { action: 'edit',      icon: 'pencil',  label: t('common.edit') },
       { action: 'duplicate', icon: 'copy',    label: t('recipes.duplicate') },
@@ -239,7 +244,7 @@ function renderRecipeList() {
     ];
     for (const a of secondaryActions) {
       const btn = document.createElement('button');
-      btn.className = `recipe-card__icon-btn${a.danger ? ' recipe-card__icon-btn--danger' : ''}`;
+      btn.className = `row-action${a.danger ? ' row-action--danger' : ''}`;
       btn.type = 'button';
       btn.dataset.action = a.action;
       btn.dataset.id = String(recipe.id);

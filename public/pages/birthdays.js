@@ -147,12 +147,12 @@ function birthdayItemHtml(birthday) {
         <div class="birthday-item__meta">${esc(ageMeta(birthday))}</div>
         ${birthday.notes ? `<div class="birthday-item__notes">${esc(birthday.notes)}</div>` : ''}
       </div>
-      <div class="birthday-item__actions">
-        <button class="birthday-action-btn" type="button" data-action="edit" data-id="${birthday.id}" aria-label="${t('common.edit')}">
-          <i data-lucide="pencil" style="width:18px;height:18px;" aria-hidden="true"></i>
+      <div class="row-actions birthday-item__actions">
+        <button class="row-action" type="button" data-action="edit" data-id="${birthday.id}" aria-label="${t('common.edit')}">
+          <i data-lucide="pencil" aria-hidden="true"></i>
         </button>
-        <button class="birthday-action-btn" type="button" data-action="delete" data-id="${birthday.id}" aria-label="${t('common.delete')}">
-          <i data-lucide="trash-2" style="width:18px;height:18px;" aria-hidden="true"></i>
+        <button class="row-action row-action--danger" type="button" data-action="delete" data-id="${birthday.id}" aria-label="${t('common.delete')}">
+          <i data-lucide="trash-2" aria-hidden="true"></i>
         </button>
       </div>
     </article>`;

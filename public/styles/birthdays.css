@@ -155,31 +155,8 @@
 /* --------------------------------------------------------
  * Aktions-Buttons (Bearbeiten/Löschen) — 48px Touch-Target.
  * -------------------------------------------------------- */
-.birthday-action-btn {
-  width: var(--target-lg);
-  height: var(--target-lg);
-  min-width: var(--target-lg);
-  min-height: var(--target-lg);
-  border-radius: var(--radius-full);
-  border: none;
-  background: var(--color-surface-2);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-secondary);
-  transition: background-color var(--transition-fast), color var(--transition-fast);
-}
-
-.birthday-action-btn:hover {
-  background: var(--color-surface-hover);
-  color: var(--color-text-primary);
-}
-
-.birthday-action-btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-accent) 30%, transparent);
-}
+/* Zeilen-Aktionen (Bearbeiten/Löschen) nutzen die geteilte .row-action-
+ * Grammatik aus layout.css (Audit F1). */
 
 /* --------------------------------------------------------
  * Modal

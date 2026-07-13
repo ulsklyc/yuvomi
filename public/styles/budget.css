@@ -963,8 +963,10 @@
 }
 
 .budget-recur-mark {
-  font-size: var(--text-xs);
-  vertical-align: baseline;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: -0.15em;
+  color: var(--color-text-tertiary);
 }
 
 .budget-list {
@@ -1054,60 +1056,9 @@
 .budget-entry__amount--income   { color: var(--color-success); }
 .budget-entry__amount--expenses { color: var(--color-danger);  }
 
-/* Neutrale Basis für alle Icon-Buttons einer Zeile (Löschen UND Bearbeiten).
- * Die Delete-Semantik (roter Hover) liegt separat auf .budget-entry__delete. */
-.budget-entry__action {
-  width: var(--target-base);
-  height: var(--target-base);
-  min-width: var(--target-base);
-  min-height: var(--target-base);
-  border-radius: var(--radius-sm);
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--color-text-disabled);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity var(--transition-fast), color var(--transition-fast);
-  position: relative;
-}
-
-.budget-entry__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex-shrink: 0;
-}
-
-.budget-entry__action::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-}
-
-.budget-entry:hover .budget-entry__action {
-  opacity: 1;
-}
-
-.budget-entry--loan .budget-entry__action {
-  opacity: 1;
-}
-
-@media (hover: none), (max-width: 640px) {
-  .budget-entry__action {
-    opacity: 1;
-  }
-}
-
-.budget-entry__action:hover {
-  color: var(--color-text-secondary);
-}
-
-.budget-entry__delete:hover {
-  color: var(--color-danger);
-}
+/* Zeilen-Aktionen (Bearbeiten/Löschen) nutzen die geteilte .row-action-
+ * Grammatik aus layout.css (Audit F1) — immer sichtbar (auch Desktop), 48px
+ * Touch-Fläche, Löschen als row-action--danger. */
 
 /* --------------------------------------------------------
  * Mobil-Reflow (≤640px)

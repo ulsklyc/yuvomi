@@ -15,6 +15,12 @@
   margin-bottom: var(--space-3);
 }
 
+/* Desktop: Wrapper ist transparent — die beiden Icon-Buttons bleiben direkte
+ * Grid-Items in den letzten zwei auto-Spalten. */
+.subscriptions-toolbar__actions {
+  display: contents;
+}
+
 .subscriptions-search {
   position: relative;
 }
@@ -797,9 +803,14 @@
   }
 
   .subscriptions-toolbar,
-  .subscriptions-summary,
   .subscriptions-metadata {
     grid-template-columns: 1fr;
+  }
+
+  /* Kennzahlen bleiben zweispaltig (kompakte Bento-Dichte statt vier
+   * vollbreiter Einzelwert-Karten, Audit F5). */
+  .subscriptions-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .subscriptions-notifications li {
@@ -810,8 +821,15 @@
     grid-column: span 1;
   }
 
-  .subscriptions-toolbar .btn--icon {
-    width: 100%;
+  /* Mobile: die beiden Aktions-Icons teilen sich eine kompakte Zeile statt je
+   * eine vollbreite leere Pille zu bilden (Audit F8). */
+  .subscriptions-toolbar__actions {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .subscriptions-toolbar__actions .btn--icon {
+    flex: 1;
   }
 
   .subscription-card {

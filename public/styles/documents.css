@@ -688,8 +688,13 @@
     flex-wrap: wrap;
   }
 
+  /* Titel + Sliders-Trigger teilen sich Zeile 1 (Trigger rechtsbündig), die
+   * Suche rutscht auf Zeile 2 — statt den Trigger allein linksbündig unter den
+   * Titel zu setzen (Audit F7). Folgt dem page-toolbar-Muster: Titel links,
+   * Aktion rechts. */
   .documents-toolbar .page-toolbar__title {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
   }
 
   .documents-toolbar__search {
@@ -700,6 +705,7 @@
   .documents-secondary-controls {
     order: 3;
     position: static;
+    margin-left: auto;
   }
 
   .documents-secondary-controls__trigger {

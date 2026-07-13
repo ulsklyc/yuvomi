@@ -153,12 +153,14 @@ export async function render(target, { user } = {}) {
           <option value="cost-asc">${t('subscriptions.sortCostAsc')}</option>
           <option value="name">${t('subscriptions.sortName')}</option>
         </select>
-        <button class="btn btn--secondary btn--icon" id="subscriptions-manage" aria-label="${t('subscriptions.manageMetadata')}">
-          <i data-lucide="tags" aria-hidden="true"></i>
-        </button>
-        <button class="btn btn--secondary btn--icon" id="subscriptions-settings" aria-label="${t('subscriptions.settingsTitle')}">
-          <i data-lucide="settings-2" aria-hidden="true"></i>
-        </button>
+        <div class="subscriptions-toolbar__actions">
+          <button class="btn btn--secondary btn--icon" id="subscriptions-manage" aria-label="${t('subscriptions.manageMetadata')}" title="${t('subscriptions.manageMetadata')}">
+            <i data-lucide="tags" aria-hidden="true"></i>
+          </button>
+          <button class="btn btn--secondary btn--icon" id="subscriptions-settings" aria-label="${t('subscriptions.settingsTitle')}" title="${t('subscriptions.settingsTitle')}">
+            <i data-lucide="settings-2" aria-hidden="true"></i>
+          </button>
+        </div>
       </div>
       <div id="subscriptions-content">${renderSkeletonList({ rows: 5, lines: 2 })}</div>
     </div>

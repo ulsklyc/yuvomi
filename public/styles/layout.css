@@ -1911,6 +1911,72 @@ html.fab-anim-done .page-fab {
   pointer-events: none;
 }
 
+/* ================================================================
+ * Zeilen-Aktionen — geteilte Grammatik (Audit F1)
+ *
+ * EIN Stil für Bearbeiten/Löschen/Mehr-Aktionen in allen Listen und Karten:
+ * nackter Icon-Button, ruhiger Grundzustand, klare 44px-Touch-Fläche, ohne
+ * Hover-Reveal lesbar (Touch). Ersetzt die zuvor pro Modul gestreuten Stile
+ * (mal Fill-Kreis, mal nacktes Icon, mal zu blass). Delete trägt --danger,
+ * semantische Sonderfälle (z.B. Anrufen) setzen nur die Farbe.
+ * ================================================================ */
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.row-action {
+  width: var(--target-lg);
+  height: var(--target-lg);
+  min-width: var(--target-lg);
+  min-height: var(--target-lg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.row-action:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.row-action:active {
+  transform: scale(0.94);
+}
+
+.row-action:focus-visible {
+  outline: 2px solid var(--active-module-accent, var(--color-accent));
+  outline-offset: 2px;
+}
+
+.row-action--danger:hover {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+.row-action--success {
+  color: var(--color-success);
+}
+
+.row-action--success:hover {
+  background: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.row-action svg {
+  width: 18px;
+  height: 18px;
+}
+
 .btn--icon {
   padding: var(--space-2);
   min-height: var(--target-lg);

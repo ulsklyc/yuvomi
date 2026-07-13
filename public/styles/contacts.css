@@ -324,36 +324,11 @@
   align-items: center;
 }
 
-.contact-action-btn {
-  width: var(--target-lg);
-  height: var(--target-lg);
-  border-radius: var(--radius-full);
-  border: none;
-  background: var(--color-surface-2);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-secondary);
-  transition: background-color var(--transition-fast), color var(--transition-fast);
-  min-height: var(--target-lg);
-  min-width: var(--target-lg);
+/* Zeilen-Aktionen (Anrufen/Mehr) nutzen die geteilte .row-action-Grammatik aus
+ * layout.css (Audit F1). Anrufen trägt row-action--success (grün, semantisch);
+ * der tel:-Link braucht nur noch text-decoration: none. */
+.contact-item__actions .row-action[href] {
   text-decoration: none;
-}
-
-.contact-action-btn:hover {
-  background-color: color-mix(in srgb, var(--c-accent) 14%, transparent);
-  color: var(--c-accent);
-}
-
-/* Anrufen ist die primäre, stets sichtbare Zeilenaktion (grün, semantisch). */
-.contact-action-btn--call {
-  color: var(--color-success);
-}
-
-.contact-action-btn--call:hover {
-  background-color: var(--color-success-light);
-  color: var(--color-success);
 }
 
 /* --------------------------------------------------------

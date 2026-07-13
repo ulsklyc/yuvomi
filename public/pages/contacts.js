@@ -466,8 +466,8 @@ function renderContactItem(c) {
 
   // Primäre, stets sichtbare Zeilenaktion: Anrufen (falls Telefon vorhanden).
   const callBtn = c.phone
-    ? `<a href="tel:${esc(c.phone)}" class="contact-action-btn contact-action-btn--call" aria-label="${t('contacts.callLabel')}">
-         <i data-lucide="phone" style="width:16px;height:16px;" aria-hidden="true"></i>
+    ? `<a href="tel:${esc(c.phone)}" class="row-action row-action--success" aria-label="${t('contacts.callLabel')}">
+         <i data-lucide="phone" aria-hidden="true"></i>
        </a>`
     : '';
 
@@ -499,11 +499,11 @@ function renderContactItem(c) {
         </span>
         <i data-lucide="chevron-right" class="contact-item__chevron" aria-hidden="true"></i>
       </button>
-      <div class="contact-item__actions">
+      <div class="row-actions contact-item__actions">
         ${callBtn}
-        <button type="button" class="contact-action-btn contact-more-menu__trigger"
+        <button type="button" class="row-action contact-more-menu__trigger"
                 popovertarget="${menuId}" aria-label="${t('contacts.moreActions')}">
-          <i data-lucide="more-horizontal" style="width:16px;height:16px;" aria-hidden="true"></i>
+          <i data-lucide="more-horizontal" aria-hidden="true"></i>
         </button>
         <div class="contact-more-menu__panel" id="${menuId}" popover role="menu">
           ${menuItems}

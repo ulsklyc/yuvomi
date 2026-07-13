@@ -605,6 +605,14 @@
   .item-delete {
     display: none;
   }
+
+  /* Der Bearbeiten-Button ist mobil die einzige sichtbare Inline-Aktion
+   * (Löschen per Swipe). Ohne Hover muss er voll sichtbar und lesbar sein,
+   * statt im Disabled-Grau bei opacity 0.55 zu verschwinden (Audit F10). */
+  .item-details {
+    opacity: 1;
+    color: var(--color-text-tertiary);
+  }
 }
 
 /* --------------------------------------------------------

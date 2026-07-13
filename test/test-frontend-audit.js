@@ -1540,14 +1540,17 @@ test('phase 6 touched UI files continue using design tokens for target sizes', (
   const tasks = read('../public/styles/tasks.css');
   const shopping = read('../public/styles/shopping.css');
   const notes = read('../public/styles/notes.css');
-  const contacts = read('../public/styles/contacts.css');
+  // Zeilen-Aktionen nutzen jetzt die geteilte .row-action-Grammatik in
+  // layout.css (Audit F1) statt pro Modul eigener Klassen (früher
+  // .contact-action-btn/.birthday-action-btn/.budget-entry__action).
+  const layout = read('../public/styles/layout.css');
   const targetRules = [
     ['../public/styles/tasks.css', tasks, '.task-status-btn'],
     ['../public/styles/shopping.css', shopping, '.quick-add__btn'],
     ['../public/styles/shopping.css', shopping, '.item-check'],
     ['../public/styles/notes.css', notes, '.note-card__pin'],
     ['../public/styles/notes.css', notes, '.note-card__delete'],
-    ['../public/styles/contacts.css', contacts, '.contact-action-btn'],
+    ['../public/styles/layout.css', layout, '.row-action'],
   ];
 
   for (const [file, source, selector] of targetRules) {
@@ -1565,11 +1568,11 @@ test('phase 6 touched UI files continue using design tokens for target sizes', (
     assertRuleUsesToken(shopping, '.item-check', property, '--target-base', '../public/styles/shopping.css');
     assertRuleUsesToken(notes, '.note-card__pin', property, '--target-base', '../public/styles/notes.css');
     assertRuleUsesToken(notes, '.note-card__delete', property, '--target-base', '../public/styles/notes.css');
-    assertRuleUsesToken(contacts, '.contact-action-btn', property, '--target-lg', '../public/styles/contacts.css');
+    assertRuleUsesToken(layout, '.row-action', property, '--target-lg', '../public/styles/layout.css');
   }
 
-  assertRuleUsesToken(contacts, '.contact-action-btn', 'min-height', '--target-lg', '../public/styles/contacts.css');
-  assertRuleUsesToken(contacts, '.contact-action-btn', 'min-width', '--target-lg', '../public/styles/contacts.css');
+  assertRuleUsesToken(layout, '.row-action', 'min-height', '--target-lg', '../public/styles/layout.css');
+  assertRuleUsesToken(layout, '.row-action', 'min-width', '--target-lg', '../public/styles/layout.css');
 });
 
 test('phase 4 keeps Kitchen navigation identity stable', () => {
@@ -1825,19 +1828,16 @@ test('phase 7 calendar inline polish keeps icons and all-day labels tokenized', 
 
 test('phase 7 Budget row actions stay touch-safe on mobile', () => {
   const source = read('../public/pages/budget.js');
-  const budget = read('../public/styles/budget.css');
-  // Row-Action-Buttons (Löschen UND Bearbeiten) teilen die touch-sichere
-  // Basisklasse .budget-entry__action; .budget-entry__delete trägt nur noch
-  // die Delete-Semantik (roter Hover).
-  const actionRule = cssRuleBody(budget, '.budget-entry__action');
+  const layout = read('../public/styles/layout.css');
+  // Zeilen-Aktionen (Löschen UND Bearbeiten) teilen die geteilte .row-action-
+  // Grammatik (layout.css, Audit F1): 48px-Touch-Fläche, immer sichtbar (kein
+  // Hover-Reveal → auch auf Touch nutzbar), Löschen trägt row-action--danger.
+  const actionRule = cssRuleBody(layout, '.row-action');
 
-  assert.match(actionRule, /width:\s*var\(--target-base\)/, 'Budget row action buttons should use the base touch target width');
-  assert.match(actionRule, /height:\s*var\(--target-base\)/, 'Budget row action buttons should use the base touch target height');
-  assert.match(
-    budget,
-    /@media \(hover:\s*none\), \(max-width:\s*640px\)[\s\S]*\.budget-entry__action\s*\{[\s\S]*opacity:\s*1/,
-    'Budget row actions should be visible on touch/mobile viewports',
-  );
+  assert.match(actionRule, /width:\s*var\(--target-lg\)/, 'Row action buttons should use the large touch target width');
+  assert.match(actionRule, /height:\s*var\(--target-lg\)/, 'Row action buttons should use the large touch target height');
+  assert.doesNotMatch(actionRule, /opacity:\s*0/, 'Row actions stay visible without hover (touch-safe)');
+  assert.match(source, /class="row-action row-action--danger"/, 'Budget delete uses the shared danger row action');
   assert.doesNotMatch(source, /data-lucide="(?:plus|trash-2|pencil)"\s+style=/, 'Budget Lucide actions should use icon utility classes');
 });
 
@@ -2386,7 +2386,7 @@ test('mobile meal actions remain visible and touch-safe after the full cascade',
 
 test('audited profile, birthday, navigation, and budget controls meet mobile touch targets', () => {
   const settings = read('../public/styles/settings.css');
-  const birthdays = read('../public/styles/birthdays.css');
+  const layout = read('../public/styles/layout.css');
   const budget = read('../public/styles/budget.css');
   const contacts = read('../public/styles/contacts.css');
   const housekeeping = read('../public/styles/housekeeping.css');
@@ -2398,7 +2398,9 @@ test('audited profile, birthday, navigation, and budget controls meet mobile tou
     /@media \(max-width:\s*640px\)[\s\S]*\.settings-avatar-action\s*\{[\s\S]*width:\s*var\(--target-lg\)[\s\S]*height:\s*var\(--target-lg\)/,
   );
   assert.match(settings, /\.settings-module-move\s*\{[\s\S]*width:\s*var\(--target-base\)[\s\S]*height:\s*var\(--target-base\)/);
-  assert.match(birthdays, /\.birthday-action-btn\s*\{[\s\S]*width:\s*var\(--target-lg\)[\s\S]*height:\s*var\(--target-lg\)/);
+  // Zeilen-Aktionen (Bearbeiten/Löschen in Geburtstags-/Budget-/Kontakt-Karten)
+  // teilen jetzt .row-action mit 48px-Touch-Fläche (Audit F1).
+  assert.match(layout, /\.row-action\s*\{[\s\S]*width:\s*var\(--target-lg\)[\s\S]*height:\s*var\(--target-lg\)/);
   // Budget-Tabs nutzen jetzt das geteilte .sub-tab (sub-tabs.css) statt eigener
   // .budget-tab-Buttons — Touch-Target dort prüfen (44px, iOS-Minimum, wie alle
   // Sub-Tab-Module: Belohnungen/Haushaltshilfe/Küche/Gesundheit).
@@ -2433,7 +2435,9 @@ test('contacts keep one primary call action and disclose the rest through a labe
   const contactsCss = read('../public/styles/contacts.css');
 
   // Genau eine stets sichtbare Primäraktion pro Zeile: Anrufen (falls Telefon da).
-  assert.match(contactsPage, /contact-action-btn--call/);
+  // Nutzt die geteilte .row-action-Grammatik mit semantischer Erfolgs-Färbung
+  // (grün) über row-action--success (Audit F1).
+  assert.match(contactsPage, /href="tel:[\s\S]*class="row-action row-action--success"/);
   // Sekundäraktionen leben im „Mehr"-Menü als BESCHRIFTETE Einträge (Icon + Text),
   // identisch auf Desktop und Mobile — behebt das „nackte Icons"-Problem.
   assert.match(contactsPage, /class="contact-menu-item"[\s\S]*contact-menu-item__icon[\s\S]*<span>/);

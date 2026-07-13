@@ -150,34 +150,9 @@
   }
 }
 
-.recipe-card__icon-btn {
-  width: var(--target-base);
-  height: var(--target-base);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
-}
-
-.recipe-card__icon-btn:hover {
-  background-color: var(--color-surface-hover);
-  color: var(--color-text-primary);
-}
-
-.recipe-card__icon-btn:focus-visible {
-  outline: 2px solid var(--module-accent);
-  outline-offset: 2px;
-}
-
-.recipe-card__icon-btn--danger:hover {
-  background-color: var(--color-danger-light);
-  color: var(--color-danger);
-}
+/* Die Karten-Aktions-Buttons (Bearbeiten/Duplizieren/Löschen) nutzen die
+ * geteilte .row-action-Grammatik aus layout.css (Audit F1). Der Container
+ * .recipe-card__icon-actions behält nur das Hover-Reveal-Layout. */
 
 .recipe-ingredient-list {
   display: grid;

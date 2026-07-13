@@ -19,11 +19,17 @@
   white-space: nowrap;
 }
 
+/* „Bereits erfasst" ist ein Status, kein deaktiviertes Steuerelement — daher
+ * lesbarer Sekundärton statt des kaum sichtbaren Disabled-Grau (Audit F9). */
 .housekeeping-check-small:disabled {
   background: var(--color-surface-3);
-  color: var(--color-text-disabled);
+  color: var(--color-text-secondary);
   border-color: var(--color-border);
-  cursor: not-allowed;
+  cursor: default;
+}
+
+.housekeeping-check-small:disabled i {
+  color: var(--color-success);
 }
 
 .housekeeping-tabs {
@@ -624,12 +630,17 @@
     justify-content: flex-start;
   }
 
-  .housekeeping-metrics,
-  .housekeeping-metrics--compact,
+  /* Stat-Kacheln bleiben mehrspaltig (kompakte Bento-Dichte statt vier
+   * vollbreiter Einzelwert-Karten, Audit F5). Nur die Formular-Raster fallen
+   * auf eine Spalte. */
   .housekeeping-form-grid,
   .housekeeping-form-grid--wide,
   .housekeeping-profile-editor {
     grid-template-columns: 1fr;
+  }
+
+  .housekeeping-metrics--compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .housekeeping-avatar--lg {
@@ -661,7 +672,9 @@
 }
 
 @media (max-width: 640px) {
-  .housekeeping-check-small span {
-    display: none;
+  /* Der Button ist mobil vollbreit (grid-column: 1 / -1) — das Label bleibt
+   * sichtbar, statt eine leere Pille mit nacktem Icon zu zeigen (Audit F9). */
+  .housekeeping-check-small {
+    gap: var(--space-2);
   }
 }

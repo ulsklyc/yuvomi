@@ -659,8 +659,8 @@ function renderEntries() {
     const sign      = isIncome ? '+' : '';
     const date      = formatEntryDate(e.date);
     const recurTag  = e.is_recurring
-      ? ` <span class="budget-recur-mark" role="img" aria-label="${t('budget.recurringLabel')}">🔁</span>${e.recurrence_virtual ? ' ' + t('budget.virtualBudgetBadge') : ''}`
-      : (e.recurrence_parent_id ? ` <span class="budget-recur-mark" role="img" aria-label="${t('budget.recurringInstanceLabel')}">↩</span>` : '');
+      ? ` <span class="budget-recur-mark" role="img" aria-label="${t('budget.recurringLabel')}"><i data-lucide="repeat" class="icon-xs" aria-hidden="true"></i></span>${e.recurrence_virtual ? ' ' + t('budget.virtualBudgetBadge') : ''}`
+      : (e.recurrence_parent_id ? ` <span class="budget-recur-mark" role="img" aria-label="${t('budget.recurringInstanceLabel')}"><i data-lucide="corner-down-left" class="icon-xs" aria-hidden="true"></i></span>` : '');
     const categoryMeta = isIncome || !e.subcategory
       ? categoryLabel(e.category)
       : `${categoryLabel(e.category)} · ${subcategoryLabel(e.subcategory)}`;
@@ -677,7 +677,7 @@ function renderEntries() {
           <div class="budget-entry__meta">${date} · ${esc(categoryMeta)}${acctMeta}${recurTag}</div>
         </div>
         <div class="budget-entry__amount ${amtClass}">${sign}${formatAmount(e.amount)}</div>
-        <button class="budget-entry__action budget-entry__delete" data-action="delete" data-id="${e.id}" aria-label="${t('budget.deleteLabel')}">
+        <button class="row-action row-action--danger" data-action="delete" data-id="${e.id}" aria-label="${t('budget.deleteLabel')}">
           <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
         </button>
       </div>
@@ -1038,12 +1038,12 @@ function renderLoanPaymentEntry(loan, payment) {
         <div class="budget-entry__meta">${meta}</div>
       </div>
       <div class="budget-entry__amount budget-entry__amount--income">+${formatAmount(payment.amount)}</div>
-      <div class="budget-entry__actions">
+      <div class="row-actions">
         ${entry ? `
-        <button class="budget-entry__action" data-action="loan-payment-edit" data-loan-id="${loan.id}" data-payment-id="${payment.id}" data-entry-id="${entry.id}" aria-label="${t('common.edit')}">
+        <button class="row-action" data-action="loan-payment-edit" data-loan-id="${loan.id}" data-payment-id="${payment.id}" data-entry-id="${entry.id}" aria-label="${t('common.edit')}">
           <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
         </button>` : ''}
-        <button class="budget-entry__action budget-entry__delete" data-action="loan-payment-delete" data-loan-id="${loan.id}" data-payment-id="${payment.id}" data-entry-id="${entry?.id ?? ''}" aria-label="${t('budget.deleteLabel')}">
+        <button class="row-action row-action--danger" data-action="loan-payment-delete" data-loan-id="${loan.id}" data-payment-id="${payment.id}" data-entry-id="${entry?.id ?? ''}" aria-label="${t('budget.deleteLabel')}">
           <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
         </button>
       </div>

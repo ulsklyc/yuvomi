@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.20.2] - 2026-07-13
+
+### Changed
+- Row actions (edit, delete, call, more) across all lists and cards now share one consistent style: bare icon buttons with a 48px touch target. This replaces the previous mix of filled circle buttons (Birthdays, Contacts) and bare icons of varying visibility elsewhere.
+- Statistics cards in Housekeeping and Subscriptions now use a compact two-column layout on mobile instead of four full-width stacked cards, so more information is visible without scrolling.
+
+### Fixed
+- Budget: the recurring-entry indicator now uses a monochrome icon consistent with the calendar, instead of a colored emoji.
+- Documents: on mobile, the filter button now sits beside the page title instead of alone below it.
+- Subscriptions: the two toolbar action buttons no longer stretch into full-width empty pills on mobile; they now share one compact row.
+- Housekeeping: the "recorded today" state now shows a readable label with a green check instead of a near-invisible checkmark.
+- Recipes: the "open recipe link" now carries an external-link icon so it reads as a link rather than plain text.
+- Shopping: the edit button on each item is now fully visible on touch devices instead of staying dimmed until hover.
+- Meals: the floating action button no longer overlaps the last "add meal" button at the end of the week.
+
 ## [1.20.1] - 2026-07-13
 
 ### Fixed

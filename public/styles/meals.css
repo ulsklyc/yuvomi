@@ -170,7 +170,10 @@
   }
 
   .week-grid {
-    padding-bottom: var(--space-8);
+    /* FAB-Clearance: genug Raum, damit der schwebende FAB nicht den letzten
+     * „+ Mahlzeit"-Button des Wochenscrolls verdeckt (Audit F3). Gleiche Formel
+     * wie --budget-fab-clearance für app-weite Konsistenz. */
+    padding-bottom: calc(var(--target-lg) + var(--space-6) + var(--space-4));
   }
 
   .day-header {
