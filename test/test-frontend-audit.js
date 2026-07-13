@@ -2523,6 +2523,50 @@ test('housekeeping exposes its page title as the primary heading', () => {
   assert.doesNotMatch(housekeeping, /<div class="page-toolbar__title" id="housekeeping-title">/);
 });
 
+// Modulkopf-Familien (R2/F4): Es gibt ZWEI bewusste, in utils/tablist.js
+// dokumentierte Kopf-Muster, kein Ausreißer:
+//   (1) In-Page-Tabs  — Tabs leben im kanonischen `.page-toolbar` mit sichtbarem
+//       `<h1 class="page-toolbar__title">`, verdrahtet via wireTablist. Der Tab-
+//       wechsel tauscht Inhalt INNERHALB einer Route (budget/housekeeping/rewards).
+//   (2) Routen-Cluster — geteilte sticky `.sub-tabs-bar` via renderSubTabs mit
+//       dekorativem Inline-Titel + separater `sr-only` <h1>; die Leiste NAVIGIERT
+//       zwischen Deep-Link-Routen (health, kitchen: meals/recipes/shopping).
+// Der Web-Audit flaggte health als Kopf-Ausreißer; tatsächlich teilt es exakt das
+// Muster von kitchen. health auf ein page-toolbar zu zwingen würde es von seinen
+// vier Geschwister-Modulen wegbrechen. Dieser Guard pinnt die Grenze, damit ein
+// künftiges „Köpfe vereinheitlichen"-Refactor die Routen-Cluster-Familie nicht
+// still zerlegt.
+test('module-head families stay split: in-page tabs vs route clusters', () => {
+  // Familie 1: page-toolbar-Kopf + wireTablist, keine sub-tabs-bar.
+  for (const mod of ['budget', 'housekeeping', 'rewards']) {
+    const src = read(`../public/pages/${mod}.js`);
+    assert.match(src, /wireTablist/, `${mod}: erwartet wireTablist (In-Page-Tab-Familie)`);
+    assert.match(src, /<h1 class="page-toolbar__title"/, `${mod}: erwartet sichtbares <h1 page-toolbar__title>`);
+    assert.match(src, /role="tablist"/, `${mod}: Tabs tragen role="tablist" im page-toolbar`);
+    assert.doesNotMatch(src, /renderSubTabs\b/, `${mod}: In-Page-Tab-Familie nutzt keine sub-tabs-bar`);
+  }
+
+  // Familie 2: geteilte sub-tabs-bar via renderSubTabs, sichtbarer Titel in der
+  // Leiste, separates sr-only <h1> als semantische Überschrift.
+  const healthTabs = read('../public/utils/health-tabs.js');
+  const kitchenTabs = read('../public/utils/kitchen-tabs.js');
+  assert.match(healthTabs, /renderSubTabs/, 'health-tabs.js: erwartet renderSubTabs');
+  assert.match(healthTabs, /title:\s*t\('nav\.health'\)/, 'health-tabs.js: sichtbarer Inline-Titel in der Leiste');
+  assert.match(kitchenTabs, /renderSubTabs/, 'kitchen-tabs.js: erwartet renderSubTabs');
+
+  const health = read('../public/pages/health.js');
+  assert.match(health, /renderHealthTabsBar/, 'health: erwartet renderHealthTabsBar');
+  assert.match(health, /<h1 class="sr-only">/, 'health: sr-only <h1> (die sub-tabs-bar trägt den sichtbaren Titel)');
+  // Präzise auf den Import des geteilten wireTablist-Utils prüfen — der lokale
+  // Helfer `wireTablistKeys` (Panel-interne Pfeiltasten) ist bewusst unberührt.
+  assert.doesNotMatch(health, /from '\/utils\/tablist\.js'/, 'health bleibt Routen-Cluster (kein wireTablist-Util-Import)');
+
+  // Der Interaktions-Baustein dokumentiert den bewussten Split (eine Grammatik,
+  // zwei Layout-Familien) — damit der Guard eine benannte Quelle hat.
+  const tablist = read('../public/utils/tablist.js');
+  assert.match(tablist, /renderSubTabs/, 'tablist.js dokumentiert die Abgrenzung zu renderSubTabs');
+});
+
 test('priority badges and meal labels meet WCAG AA contrast in both themes', () => {
   const tokens = read('../public/styles/tokens.css');
   const rootBlock = tokens.match(/:root\s*\{([\s\S]*?)\n\}/);
