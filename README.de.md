@@ -168,7 +168,7 @@ Neues Zuhause: **https://yuvomi.cloud/** · Fragen? Eröffne eine [Diskussion](h
 
 | | Modul | Was es macht |
 |:---:|---|---|
-| ![tasks](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/tasks.png) | **Aufgaben** | Fristen, Prioritäten, Teilaufgaben, wiederkehrende Termine, Zuweisung an mehrere Mitglieder, Sichtbarkeit je Aufgabe (nur ich / Zugewiesene / alle), anpassbare Kategorien, ein „Mir zugewiesen"-Filter und ein Kanban-Board. Optionaler CalDAV-Import von Apple Erinnerungen. |
+| ![tasks](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/tasks.png) | **Aufgaben** | Fristen, Prioritäten, Teilaufgaben, wiederkehrende Termine, Zuweisung an mehrere Mitglieder, Sichtbarkeit je Aufgabe (nur ich / Zugewiesene / alle), anpassbare Kategorien, verknüpfte Dokumente aus dem Dokumente-Modul, ein „Mir zugewiesen"-Filter und ein Kanban-Board. Optionaler CalDAV-Import von Apple Erinnerungen. |
 | ![shopping](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/shopping.png) | **Einkauf** | Gemeinsame, nach Gang gruppierte Listen mit Wischgesten, Notizen je Artikel und Ein-Tipp-Import aus dem Mahlzeitenplan. |
 | ![meals](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/meals.png) | **Mahlzeiten** | Wochenplaner mit mehreren Einträgen pro Slot, wöchentlicher Wiederholung, einer Drag-and-drop-Rezept-Seitenleiste, einem Ein-Klick-Wochen-Zufallsgenerator und direktem Export in die Einkaufsliste. |
 | ![recipes](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/recipes.png) | **Rezepte** | Rezepte erstellen, duplizieren und skalieren; Mahlzeiten-Slots vorbefüllen oder jede geplante Mahlzeit als Rezept speichern. |

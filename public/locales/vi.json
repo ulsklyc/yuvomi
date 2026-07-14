@@ -289,6 +289,13 @@
         "navLabelOverdue": "Nhiệm vụ, {{count}} quá hạn",
         "pointsLabel": "Điểm",
         "pointsHint": "Điểm được cộng khi hoàn thành.",
+        "documentsLabel": "Tài liệu",
+        "documentsHint": "Liên kết tài liệu từ mô-đun Tài liệu với công việc này.",
+        "documentAdd": "Liên kết tài liệu",
+        "documentAddPlaceholder": "Chọn một tài liệu…",
+        "documentRemove": "Gỡ liên kết",
+        "documentsEmpty": "Chưa có tài liệu nào được liên kết.",
+        "documentsCount": "{{count}} tài liệu",
         "assignedToMe": "Được giao cho tôi"
     },
     "shopping": {

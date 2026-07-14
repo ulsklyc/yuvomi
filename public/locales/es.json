@@ -289,6 +289,13 @@
         "selectTask": "Select task",
         "pointsLabel": "Puntos",
         "pointsHint": "Los puntos se acreditan al completar.",
+        "documentsLabel": "Documentos",
+        "documentsHint": "Vincula documentos del módulo Documentos a esta tarea.",
+        "documentAdd": "Vincular documento",
+        "documentAddPlaceholder": "Selecciona un documento…",
+        "documentRemove": "Quitar vínculo",
+        "documentsEmpty": "Aún no hay documentos vinculados.",
+        "documentsCount": "{{count}} documentos",
         "assignedToMe": "Asignado a mí"
     },
     "shopping": {

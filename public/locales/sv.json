@@ -289,6 +289,13 @@
         "selectTask": "Välj uppgift",
         "pointsLabel": "Poäng",
         "pointsHint": "Poäng krediteras när uppgiften slutförs.",
+        "documentsLabel": "Dokument",
+        "documentsHint": "Länka dokument från modulen Dokument till den här uppgiften.",
+        "documentAdd": "Länka dokument",
+        "documentAddPlaceholder": "Välj ett dokument…",
+        "documentRemove": "Ta bort länk",
+        "documentsEmpty": "Inga dokument länkade ännu.",
+        "documentsCount": "{{count}} dokument",
         "assignedToMe": "Tilldelade mig"
     },
     "shopping": {

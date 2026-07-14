@@ -69,6 +69,25 @@ function addAssignedUsers(task) {
   return task;
 }
 
+/**
+ * Hängt jedem Task die Anzahl der für die Person sichtbaren, verknüpften
+ * Dokumente an (document_count, #503). Eine einzige gruppierte Abfrage statt
+ * pro-Task, damit die Listen-Route günstig bleibt.
+ */
+function attachDocumentCounts(tasks, me) {
+  if (!tasks.length) return tasks;
+  const counts = db.get().prepare(`
+    SELECT td.task_id AS id, COUNT(*) AS n
+    FROM task_documents td
+    JOIN family_documents d ON d.id = td.document_id
+    WHERE d.status != 'archived' AND ${DOC_VISIBLE_SQL}
+    GROUP BY td.task_id
+  `).all({ me });
+  const map = new Map(counts.map((r) => [r.id, r.n]));
+  for (const task of tasks) task.document_count = map.get(task.id) ?? 0;
+  return tasks;
+}
+
 function parseAssignedTo(val) {
   if (Array.isArray(val)) return val.map(Number).filter(Boolean);
   if (val !== null && val !== undefined && val !== '') return [Number(val)].filter(Boolean);
@@ -284,7 +303,8 @@ router.get('/', (req, res) => {
         t.created_at DESC
     `;
 
-    res.json({ data: db.get().prepare(sql).all(...params).map(addAssignedUsers) });
+    const rows = db.get().prepare(sql).all(...params).map(addAssignedUsers);
+    res.json({ data: attachDocumentCounts(rows, me) });
   } catch (err) {
     log.error('GET / error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -312,6 +332,7 @@ router.get('/:id', (req, res) => {
 
     addAssignedUsers(task);
     task.subtasks = loadSubtasks(task.id);
+    attachDocumentCounts([task], me);
     res.json({ data: task });
   } catch (err) {
     log.error('GET /:id error:', err);
@@ -528,6 +549,92 @@ router.delete('/:id', (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     log.error('DELETE /:id error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// --------------------------------------------------------
+// Verknüpfte Dokumente (#503)
+// Dokumente aus dem Dokumente-Modul können optional mit einer Aufgabe
+// verbunden werden. Die Sichtbarkeit spiegelt documents.js: sichtbar ist ein
+// Dokument nur für Ersteller:in, bei visibility='family' oder über einen
+// expliziten Freigabe-Eintrag (family_document_access).
+// --------------------------------------------------------
+
+// Sichtbarkeits-Fragment für ein Dokument (Alias `d`, benannter Bind @me).
+const DOC_VISIBLE_SQL = `(
+  d.created_by = @me
+  OR d.visibility = 'family'
+  OR EXISTS (SELECT 1 FROM family_document_access a WHERE a.document_id = d.id AND a.user_id = @me)
+)`;
+
+/** Aufgabe nur zurückgeben, wenn sie für die betrachtende Person sichtbar ist. */
+function findVisibleTask(id, me) {
+  return db.get().prepare(`
+    SELECT t.id FROM tasks t
+    WHERE t.id = ? AND ${visibilityWhere('t', 'task_assignments', 'task_id')}
+  `).get(id, me, me);
+}
+
+/** Für die Person sichtbare, mit der Aufgabe verknüpfte Dokumente. */
+function loadTaskDocuments(taskId, me) {
+  return db.get().prepare(`
+    SELECT d.id, d.name, d.category, d.original_name, d.mime_type, d.file_size,
+           d.storage_backend, td.created_at AS linked_at
+    FROM task_documents td
+    JOIN family_documents d ON d.id = td.document_id
+    WHERE td.task_id = @taskId AND d.status != 'archived' AND ${DOC_VISIBLE_SQL}
+    ORDER BY d.name COLLATE NOCASE ASC
+  `).all({ taskId, me });
+}
+
+// GET /api/v1/tasks/:id/documents → { data: LinkedDocument[] }
+router.get('/:id/documents', (req, res) => {
+  try {
+    const me = req.authUserId || req.session.userId;
+    const task = findVisibleTask(req.params.id, me);
+    if (!task) return res.status(404).json({ error: 'Task not found.', code: 404 });
+    res.json({ data: loadTaskDocuments(task.id, me) });
+  } catch (err) {
+    log.error('GET /:id/documents error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// PUT /api/v1/tasks/:id/documents  Body: { document_ids: number[] }
+// Replace-Set: setzt die Verknüpfungen neu. Es werden nur für die Person
+// sichtbare Dokumente verknüpft; ebenso werden nur sichtbare Alt-Verknüpfungen
+// ersetzt — unsichtbare (z.B. private Dokumente anderer) bleiben unberührt.
+router.put('/:id/documents', (req, res) => {
+  try {
+    const me = req.authUserId || req.session.userId;
+    const task = findVisibleTask(req.params.id, me);
+    if (!task) return res.status(404).json({ error: 'Task not found.', code: 404 });
+
+    const requested = Array.isArray(req.body.document_ids)
+      ? [...new Set(req.body.document_ids.map(Number).filter((n) => Number.isInteger(n) && n > 0))]
+      : [];
+
+    const canSee = db.get().prepare(`SELECT 1 FROM family_documents d WHERE d.id = @id AND ${DOC_VISIBLE_SQL}`);
+    const visibleIds = requested.filter((id) => canSee.get({ id, me }));
+
+    db.get().transaction(() => {
+      // Nur die für diese Person sichtbaren Alt-Verknüpfungen entfernen.
+      db.get().prepare(`
+        DELETE FROM task_documents
+        WHERE task_id = @taskId AND document_id IN (
+          SELECT d.id FROM family_documents d WHERE ${DOC_VISIBLE_SQL}
+        )
+      `).run({ taskId: task.id, me });
+      const ins = db.get().prepare(
+        'INSERT OR IGNORE INTO task_documents (task_id, document_id, created_by) VALUES (?, ?, ?)'
+      );
+      for (const id of visibleIds) ins.run(task.id, id, me);
+    })();
+
+    res.json({ data: loadTaskDocuments(task.id, me) });
+  } catch (err) {
+    log.error('PUT /:id/documents error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

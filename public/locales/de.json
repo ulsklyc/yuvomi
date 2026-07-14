@@ -296,6 +296,13 @@
         "showFuture": "Geplante anzeigen",
         "pointsLabel": "Punkte",
         "pointsHint": "Punkte werden beim Erledigen gutgeschrieben.",
+        "documentsLabel": "Dokumente",
+        "documentsHint": "Verknüpfe Dokumente aus dem Dokumente-Modul mit dieser Aufgabe.",
+        "documentAdd": "Dokument verknüpfen",
+        "documentAddPlaceholder": "Dokument auswählen…",
+        "documentRemove": "Verknüpfung entfernen",
+        "documentsEmpty": "Noch keine Dokumente verknüpft.",
+        "documentsCount": "{{count}} Dokumente",
         "assignedToMe": "Mir zugewiesen"
     },
     "shopping": {

@@ -296,6 +296,13 @@
         "showFuture": "Pokaż zaplanowane",
         "pointsLabel": "Punkty",
         "pointsHint": "Punkty są przyznawane po ukończeniu.",
+        "documentsLabel": "Dokumenty",
+        "documentsHint": "Powiąż dokumenty z modułu Dokumenty z tym zadaniem.",
+        "documentAdd": "Powiąż dokument",
+        "documentAddPlaceholder": "Wybierz dokument…",
+        "documentRemove": "Usuń powiązanie",
+        "documentsEmpty": "Brak powiązanych dokumentów.",
+        "documentsCount": "Dokumenty: {{count}}",
         "assignedToMe": "Przypisane do mnie"
     },
     "shopping": {

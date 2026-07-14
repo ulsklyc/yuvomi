@@ -289,6 +289,13 @@
         "selectTask": "Select task",
         "pointsLabel": "ポイント",
         "pointsHint": "完了時にポイントが付与されます。",
+        "documentsLabel": "ドキュメント",
+        "documentsHint": "ドキュメントモジュールのドキュメントをこのタスクに関連付けます。",
+        "documentAdd": "ドキュメントを関連付け",
+        "documentAddPlaceholder": "ドキュメントを選択…",
+        "documentRemove": "関連付けを解除",
+        "documentsEmpty": "関連付けられたドキュメントはまだありません。",
+        "documentsCount": "{{count}} 件のドキュメント",
         "assignedToMe": "自分に割り当て"
     },
     "shopping": {

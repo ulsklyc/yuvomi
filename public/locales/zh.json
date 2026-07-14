@@ -289,6 +289,13 @@
         "selectTask": "Select task",
         "pointsLabel": "积分",
         "pointsHint": "完成后积分记入账户。",
+        "documentsLabel": "文档",
+        "documentsHint": "将文档模块中的文档关联到此任务。",
+        "documentAdd": "关联文档",
+        "documentAddPlaceholder": "选择文档…",
+        "documentRemove": "移除关联",
+        "documentsEmpty": "尚未关联任何文档。",
+        "documentsCount": "{{count}} 个文档",
         "assignedToMe": "分配给我"
     },
     "shopping": {

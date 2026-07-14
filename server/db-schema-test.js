@@ -890,6 +890,18 @@ const MIGRATIONS_SQL = {
       PRIMARY KEY (event_id, exception_date)
     );
   `,
+
+  // SQL-String für Migration v86 (gespiegelt aus db.js MIGRATIONS)
+  86: `
+    CREATE TABLE IF NOT EXISTS task_documents (
+      task_id     INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      document_id INTEGER NOT NULL REFERENCES family_documents(id) ON DELETE CASCADE,
+      created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      PRIMARY KEY (task_id, document_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_task_documents_document ON task_documents(document_id);
+  `,
 };
 
 export { MIGRATIONS_SQL };

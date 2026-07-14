@@ -296,6 +296,13 @@
         "showFuture": "Tampilkan yang terjadwal",
         "pointsLabel": "Poin",
         "pointsHint": "Poin dikreditkan saat selesai.",
+        "documentsLabel": "Dokumen",
+        "documentsHint": "Tautkan dokumen dari modul Dokumen ke tugas ini.",
+        "documentAdd": "Tautkan dokumen",
+        "documentAddPlaceholder": "Pilih dokumen…",
+        "documentRemove": "Hapus tautan",
+        "documentsEmpty": "Belum ada dokumen yang ditautkan.",
+        "documentsCount": "{{count}} dokumen",
         "assignedToMe": "Ditugaskan ke saya"
     },
     "shopping": {

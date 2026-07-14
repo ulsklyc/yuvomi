@@ -289,6 +289,13 @@
         "navLabelOverdue": "Úkoly, {{count}} po termínu",
         "pointsLabel": "Body",
         "pointsHint": "Body se připíší po splnění.",
+        "documentsLabel": "Dokumenty",
+        "documentsHint": "Propojte dokumenty z modulu Dokumenty s tímto úkolem.",
+        "documentAdd": "Propojit dokument",
+        "documentAddPlaceholder": "Vyberte dokument…",
+        "documentRemove": "Odebrat propojení",
+        "documentsEmpty": "Zatím nejsou propojeny žádné dokumenty.",
+        "documentsCount": "Dokumenty: {{count}}",
         "assignedToMe": "Přiřazeno mně"
     },
     "shopping": {

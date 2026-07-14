@@ -289,6 +289,13 @@
         "selectTask": "Виберіть завдання",
         "pointsLabel": "Бали",
         "pointsHint": "Бали нараховуються після виконання.",
+        "documentsLabel": "Документи",
+        "documentsHint": "Пов’яжіть документи з модуля «Документи» із цим завданням.",
+        "documentAdd": "Пов’язати документ",
+        "documentAddPlaceholder": "Виберіть документ…",
+        "documentRemove": "Видалити зв’язок",
+        "documentsEmpty": "Ще немає пов’язаних документів.",
+        "documentsCount": "Документів: {{count}}",
         "assignedToMe": "Призначені мені"
     },
     "shopping": {

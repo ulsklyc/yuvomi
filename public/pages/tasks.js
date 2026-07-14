@@ -53,6 +53,37 @@ const PRIORITY_LABELS = () => Object.fromEntries(PRIORITIES().map((p) => [p.valu
 const STATUS_LABELS   = () => Object.fromEntries(STATUSES().map((s)  => [s.value, s.label]));
 
 // --------------------------------------------------------
+// Verknüpfte Dokumente (#503)
+// Working-Set des aktuell offenen Modals: index = id → Dokument-Metadaten,
+// selected = geordnete Liste der verknüpften Dokument-IDs. Wird beim Öffnen
+// des Modals in wireDocumentSection() neu aufgebaut und beim Speichern
+// (handleFormSubmit) per PUT /tasks/:id/documents als Replace-Set übernommen.
+let modalDocuments = { index: new Map(), selected: [] };
+
+// MIME-Typen, die inline vorschaubar sind (spiegelt PREVIEWABLE_MIME im Server);
+// alles andere wird als Download verlinkt.
+const TASK_DOC_VIEWABLE = new Set([
+  'application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'text/plain', 'text/csv',
+]);
+
+function docMime(doc) {
+  return String(doc.mime_type || '').split(';')[0].trim().toLowerCase();
+}
+
+function docHref(doc) {
+  return TASK_DOC_VIEWABLE.has(docMime(doc))
+    ? `/api/v1/documents/${doc.id}/preview`
+    : `/api/v1/documents/${doc.id}/download`;
+}
+
+function docIcon(doc) {
+  const mime = docMime(doc);
+  if (mime.startsWith('image/')) return 'image';
+  if (mime === 'application/pdf') return 'file-text';
+  return 'file';
+}
+
+// --------------------------------------------------------
 // Hilfsfunktionen
 // --------------------------------------------------------
 
@@ -224,6 +255,7 @@ function renderTaskCard(task, opts = {}) {
             ${renderStartDateBadge(task.start_date)}
             ${renderDueDate(task.due_date, task.due_time)}
             ${task.is_recurring ? `<span class="due-date" aria-label="${t('tasks.recurring')}"><i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i></span>` : ''}
+            ${task.document_count > 0 ? `<span class="due-date task-card__docs" aria-label="${t('tasks.documentsCount', { count: task.document_count })}"><i data-lucide="paperclip" class="icon-sm" aria-hidden="true"></i>${task.document_count}</span>` : ''}
             ${renderVisibilityBadge(task.visibility)}
             ${task.category !== FALLBACK_CATEGORY ? `<span class="due-date task-card__category">${esc(catLabel(task.category))}</span>` : ''}
           </div>
@@ -451,6 +483,18 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
 
       ${renderReminderSection(task, reminder)}
 
+      <div class="form-group task-documents" id="task-documents-section" style="margin-top:var(--space-4)">
+        <label class="label">${t('tasks.documentsLabel')}</label>
+        <p class="task-field-hint">${t('tasks.documentsHint')}</p>
+        <div class="task-documents__list" id="task-documents-list" role="list"></div>
+        <div class="task-documents__add">
+          <label class="sr-only" for="task-document-add">${t('tasks.documentAdd')}</label>
+          <select class="input" id="task-document-add">
+            <option value="">${t('tasks.documentAddPlaceholder')}</option>
+          </select>
+        </div>
+      </div>
+
       <div id="task-form-error" class="login-error" hidden></div>
 
       <div class="modal-panel__footer" style="padding:0;border:none;margin-top:var(--space-6)">
@@ -594,6 +638,90 @@ function wireVisibilityWarning(panel, selectSel, msName, warnSel) {
   update();
 }
 
+// Chip für ein verknüpftes Dokument: Name öffnet Vorschau/Download, X entfernt.
+function renderTaskDocChip(doc) {
+  return `
+    <span class="task-doc-chip" role="listitem" data-doc-id="${doc.id}">
+      <i data-lucide="${docIcon(doc)}" class="task-doc-chip__icon icon-sm" aria-hidden="true"></i>
+      <a class="task-doc-chip__name" href="${docHref(doc)}" target="_blank" rel="noopener"
+         title="${esc(doc.name)}">${esc(doc.name)}</a>
+      <button type="button" class="task-doc-chip__remove" data-action="unlink-doc"
+              data-doc-id="${doc.id}" aria-label="${t('tasks.documentRemove')}">
+        <i data-lucide="x" class="icon-sm" aria-hidden="true"></i>
+      </button>
+    </span>`;
+}
+
+// Dokument-Sektion befüllen: verfügbare + bereits verknüpfte Dokumente laden,
+// das Working-Set (modalDocuments) aufbauen und Add/Remove-Interaktion binden.
+async function wireDocumentSection(panel, task) {
+  const section = panel.querySelector('#task-documents-section');
+  if (!section) return;
+  const listEl = panel.querySelector('#task-documents-list');
+  const addSel = panel.querySelector('#task-document-add');
+  modalDocuments = { index: new Map(), selected: [] };
+
+  const render = () => {
+    const chips = modalDocuments.selected
+      .map((id) => modalDocuments.index.get(id))
+      .filter(Boolean)
+      .map(renderTaskDocChip)
+      .join('');
+    listEl.replaceChildren();
+    listEl.insertAdjacentHTML('beforeend',
+      chips || `<p class="task-documents__empty">${t('tasks.documentsEmpty')}</p>`);
+
+    const available = [...modalDocuments.index.values()]
+      .filter((d) => d.selectable && !modalDocuments.selected.includes(d.id))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    addSel.replaceChildren();
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = t('tasks.documentAddPlaceholder');
+    addSel.appendChild(placeholder);
+    for (const d of available) {
+      const opt = document.createElement('option');
+      opt.value = String(d.id);
+      opt.textContent = d.name;
+      addSel.appendChild(opt);
+    }
+    addSel.disabled = available.length === 0;
+    window.lucide?.createIcons({ el: listEl });
+  };
+
+  try {
+    const [availRes, linkedRes] = await Promise.all([
+      api.get('/documents'),
+      task?.id ? api.get(`/tasks/${task.id}/documents`) : Promise.resolve({ data: [] }),
+    ]);
+    for (const d of (availRes.data ?? [])) {
+      modalDocuments.index.set(d.id, { id: d.id, name: d.name, mime_type: d.mime_type, selectable: true });
+    }
+    for (const d of (linkedRes.data ?? [])) {
+      const existing = modalDocuments.index.get(d.id);
+      if (existing) { existing.name = d.name; existing.mime_type = d.mime_type; }
+      else modalDocuments.index.set(d.id, { id: d.id, name: d.name, mime_type: d.mime_type, selectable: false });
+      if (!modalDocuments.selected.includes(d.id)) modalDocuments.selected.push(d.id);
+    }
+  } catch { /* Dokumente-Modul nicht erreichbar - Sektion bleibt leer/inaktiv */ }
+
+  render();
+
+  addSel.addEventListener('change', () => {
+    const id = Number(addSel.value);
+    if (id && !modalDocuments.selected.includes(id)) modalDocuments.selected.push(id);
+    addSel.value = '';
+    render();
+  });
+  listEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action="unlink-doc"]');
+    if (!btn) return;
+    const id = Number(btn.dataset.docId);
+    modalDocuments.selected = modalDocuments.selected.filter((x) => x !== id);
+    render();
+  });
+}
+
 function openTaskModal({ task = null, users = [], reminder = null } = {}, container) {
   const isEdit = !!task;
   openSharedModal({
@@ -606,6 +734,9 @@ function openTaskModal({ task = null, users = [], reminder = null } = {}, contai
       bindRRuleEvents(document, 'task');
       bindUserMultiSelect(panel, 'task_assigned');
       wireVisibilityWarning(panel, '#task-visibility', 'task_assigned', '#task-visibility-warning');
+
+      // Verknüpfte Dokumente laden + Add/Remove binden (#503)
+      wireDocumentSection(panel, task);
 
       // Blur-Validierung für required-Felder aktivieren
       wireBlurValidation(panel);
@@ -771,6 +902,11 @@ async function handleFormSubmit(e, container) {
           refreshReminders();
         } catch { /* kein Reminder vorhanden - ignorieren */ }
       }
+
+      // Dokument-Verknüpfungen als Replace-Set übernehmen (#503).
+      try {
+        await api.put(`/tasks/${savedTaskId}/documents`, { document_ids: modalDocuments.selected });
+      } catch { /* Verknüpfen fehlgeschlagen - nicht blockierend für den Task-Save */ }
     }
 
     btnSuccess(submitBtn, originalLabel);

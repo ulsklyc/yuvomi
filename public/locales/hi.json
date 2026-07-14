@@ -289,6 +289,13 @@
         "selectTask": "Select task",
         "pointsLabel": "अंक",
         "pointsHint": "कार्य पूरा होने पर अंक जमा होते हैं।",
+        "documentsLabel": "दस्तावेज़",
+        "documentsHint": "दस्तावेज़ मॉड्यूल से दस्तावेज़ इस कार्य से लिंक करें।",
+        "documentAdd": "दस्तावेज़ लिंक करें",
+        "documentAddPlaceholder": "एक दस्तावेज़ चुनें…",
+        "documentRemove": "लिंक हटाएँ",
+        "documentsEmpty": "अभी तक कोई दस्तावेज़ लिंक नहीं है।",
+        "documentsCount": "{{count}} दस्तावेज़",
         "assignedToMe": "मुझे सौंपे गए"
     },
     "shopping": {

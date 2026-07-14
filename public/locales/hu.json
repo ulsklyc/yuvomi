@@ -289,6 +289,13 @@
         "navLabelOverdue": "Feladatok, {{count}} lejárt",
         "pointsLabel": "Pontok",
         "pointsHint": "A pontok teljesítéskor jóváíródnak.",
+        "documentsLabel": "Dokumentumok",
+        "documentsHint": "Kapcsolj dokumentumokat a Dokumentumok modulból ehhez a feladathoz.",
+        "documentAdd": "Dokumentum csatolása",
+        "documentAddPlaceholder": "Válassz dokumentumot…",
+        "documentRemove": "Kapcsolat eltávolítása",
+        "documentsEmpty": "Még nincs csatolt dokumentum.",
+        "documentsCount": "{{count}} dokumentum",
         "assignedToMe": "Hozzám rendelve"
     },
     "shopping": {

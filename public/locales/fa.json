@@ -296,6 +296,13 @@
         "showFuture": "نمایش برنامه‌ریزی‌شده‌ها",
         "pointsLabel": "امتیاز",
         "pointsHint": "امتیازها هنگام تکمیل ثبت می‌شوند.",
+        "documentsLabel": "اسناد",
+        "documentsHint": "اسناد ماژول اسناد را به این وظیفه پیوند دهید.",
+        "documentAdd": "پیوند سند",
+        "documentAddPlaceholder": "یک سند انتخاب کنید…",
+        "documentRemove": "حذف پیوند",
+        "documentsEmpty": "هنوز سندی پیوند داده نشده است.",
+        "documentsCount": "{{count}} سند",
         "assignedToMe": "واگذارشده به من"
     },
     "shopping": {

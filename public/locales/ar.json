@@ -289,6 +289,13 @@
         "selectTask": "Select task",
         "pointsLabel": "النقاط",
         "pointsHint": "تُضاف النقاط عند الإكمال.",
+        "documentsLabel": "المستندات",
+        "documentsHint": "اربط مستندات من وحدة المستندات بهذه المهمة.",
+        "documentAdd": "ربط مستند",
+        "documentAddPlaceholder": "اختر مستندًا…",
+        "documentRemove": "إزالة الرابط",
+        "documentsEmpty": "لا توجد مستندات مرتبطة بعد.",
+        "documentsCount": "{{count}} مستندات",
         "assignedToMe": "المُسندة إليّ"
     },
     "shopping": {

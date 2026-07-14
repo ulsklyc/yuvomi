@@ -289,6 +289,13 @@
         "selectTask": "Select task",
         "pointsLabel": "Πόντοι",
         "pointsHint": "Οι πόντοι πιστώνονται με την ολοκλήρωση.",
+        "documentsLabel": "Έγγραφα",
+        "documentsHint": "Συνδέστε έγγραφα από τη μονάδα Έγγραφα με αυτή την εργασία.",
+        "documentAdd": "Σύνδεση εγγράφου",
+        "documentAddPlaceholder": "Επιλέξτε ένα έγγραφο…",
+        "documentRemove": "Κατάργηση σύνδεσης",
+        "documentsEmpty": "Δεν έχουν συνδεθεί έγγραφα ακόμη.",
+        "documentsCount": "{{count}} έγγραφα",
         "assignedToMe": "Ανατεθειμένα σε μένα"
     },
     "shopping": {

@@ -289,6 +289,13 @@
         "navLabelOverdue": "Taken, {{count}} verlopen",
         "pointsLabel": "Punten",
         "pointsHint": "Punten worden bij voltooiing bijgeschreven.",
+        "documentsLabel": "Documenten",
+        "documentsHint": "Koppel documenten uit de module Documenten aan deze taak.",
+        "documentAdd": "Document koppelen",
+        "documentAddPlaceholder": "Selecteer een document…",
+        "documentRemove": "Koppeling verwijderen",
+        "documentsEmpty": "Nog geen documenten gekoppeld.",
+        "documentsCount": "{{count}} documenten",
         "assignedToMe": "Aan mij toegewezen"
     },
     "shopping": {

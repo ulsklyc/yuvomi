@@ -289,6 +289,13 @@
         "selectTask": "Select task",
         "pointsLabel": "Puan",
         "pointsHint": "Puanlar tamamlandığında hesaba geçer.",
+        "documentsLabel": "Belgeler",
+        "documentsHint": "Belgeler modülündeki belgeleri bu göreve bağlayın.",
+        "documentAdd": "Belge bağla",
+        "documentAddPlaceholder": "Bir belge seçin…",
+        "documentRemove": "Bağlantıyı kaldır",
+        "documentsEmpty": "Henüz bağlı belge yok.",
+        "documentsCount": "{{count}} belge",
         "assignedToMe": "Bana atananlar"
     },
     "shopping": {

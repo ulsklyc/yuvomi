@@ -289,6 +289,13 @@
         "selectTask": "Select task",
         "pointsLabel": "Баллы",
         "pointsHint": "Баллы начисляются после выполнения.",
+        "documentsLabel": "Документы",
+        "documentsHint": "Свяжите документы из модуля «Документы» с этой задачей.",
+        "documentAdd": "Связать документ",
+        "documentAddPlaceholder": "Выберите документ…",
+        "documentRemove": "Удалить связь",
+        "documentsEmpty": "Пока нет связанных документов.",
+        "documentsCount": "Документов: {{count}}",
         "assignedToMe": "Назначенные мне"
     },
     "shopping": {

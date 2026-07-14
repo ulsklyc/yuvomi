@@ -289,6 +289,13 @@
         "selectTask": "Seleziona attività",
         "pointsLabel": "Punti",
         "pointsHint": "I punti vengono accreditati al completamento.",
+        "documentsLabel": "Documenti",
+        "documentsHint": "Collega documenti dal modulo Documenti a questa attività.",
+        "documentAdd": "Collega documento",
+        "documentAddPlaceholder": "Seleziona un documento…",
+        "documentRemove": "Rimuovi collegamento",
+        "documentsEmpty": "Nessun documento collegato.",
+        "documentsCount": "{{count}} documenti",
         "assignedToMe": "Assegnati a me"
     },
     "shopping": {

@@ -289,6 +289,13 @@
         "navLabelOverdue": "Tasks, {{count}} overdue",
         "pointsLabel": "Points",
         "pointsHint": "Points are credited on completion.",
+        "documentsLabel": "Documents",
+        "documentsHint": "Link documents from the Documents module to this task.",
+        "documentAdd": "Link document",
+        "documentAddPlaceholder": "Select a document…",
+        "documentRemove": "Remove link",
+        "documentsEmpty": "No documents linked yet.",
+        "documentsCount": "{{count}} documents",
         "assignedToMe": "Assigned to me"
     },
     "shopping": {

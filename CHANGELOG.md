@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-07-14
+
+### Added
+- Tasks: documents from the Documents module can now be linked to a task and opened directly from it. Linked documents appear as chips in the task dialog (opening the document preview or download), and the task card shows a paperclip badge with the count. Only documents you are allowed to see are listed or linkable.
+
 ## [1.20.4] - 2026-07-14
 
 ### Fixed

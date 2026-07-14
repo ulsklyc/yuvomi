@@ -296,6 +296,13 @@
         "showFuture": "예정된 항목 표시",
         "pointsLabel": "포인트",
         "pointsHint": "완료 시 포인트가 적립됩니다.",
+        "documentsLabel": "문서",
+        "documentsHint": "문서 모듈의 문서를 이 작업에 연결합니다.",
+        "documentAdd": "문서 연결",
+        "documentAddPlaceholder": "문서 선택…",
+        "documentRemove": "연결 해제",
+        "documentsEmpty": "아직 연결된 문서가 없습니다.",
+        "documentsCount": "문서 {{count}}개",
         "assignedToMe": "나에게 할당됨"
     },
     "shopping": {
