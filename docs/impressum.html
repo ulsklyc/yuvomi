@@ -38,7 +38,7 @@
       --border-strong: #D8D7D1;
       --text-1: #1C1C1A;
       --text-2: #56554F;
-      --text-3: #8B8A85;
+      --text-3: #6E6D67;
       --accent: #6c3aed;
       --accent-hover: #5b2fd4;
       --accent-soft: #EDE9FE;
@@ -48,8 +48,24 @@
       --maxw: 820px;
     }
 
+    /* Dark tokens — applied when the visitor explicitly chose dark on the main
+       pages (persisted in localStorage and read by the inline <head> script). */
+    [data-theme="dark"] {
+      --bg: #1A1A18;
+      --bg-alt: #141413;
+      --surface: #222220;
+      --border: #2A2A28;
+      --border-strong: #3A3A37;
+      --text-1: #F5F4F1;
+      --text-2: #B4B3B0;
+      --text-3: #8E8D89;
+      --accent: #a78bfa;
+      --accent-hover: #9066f5;
+      --accent-soft: #1E1040;
+    }
+    /* OS preference — but never override an explicit light choice. */
     @media (prefers-color-scheme: dark) {
-      :root {
+      :root:not([data-theme="light"]) {
         --bg: #1A1A18;
         --bg-alt: #141413;
         --surface: #222220;
@@ -101,6 +117,9 @@
     }
     .nav-logo svg { width: 28px; height: 28px; }
     .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
       color: var(--text-2);
       text-decoration: none;
       font-size: 14px;
@@ -201,8 +220,17 @@
     footer.bot a { color: var(--text-2); text-decoration: none; }
     footer.bot a:hover { color: var(--accent); }
     footer.bot nav { display: flex; gap: 14px; flex-wrap: wrap; }
-    footer.bot nav a { padding: 6px 2px; }
+    footer.bot nav a { padding: 6px 2px; min-height: 44px; display: inline-flex; align-items: center; }
   </style>
+  <script>
+    /* Honor the theme the visitor picked on the main pages (no toggle here). */
+    (function(){
+      try {
+        var t = localStorage.getItem('yuvomi-theme') || localStorage.getItem('oikos-theme');
+        if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
 

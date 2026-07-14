@@ -52,7 +52,7 @@
       --border-strong: #D8D7D1;
       --text-1: #1C1C1A;
       --text-2: #56554F;
-      --text-3: #8B8A85;
+      --text-3: #6E6D67;
 
       --accent: #6c3aed;
       --accent-hover: #5b2fd4;
@@ -304,7 +304,7 @@
       border-radius: 26px; border: 4px solid var(--surface); box-shadow: var(--shadow-xl);
       z-index: 2; overflow: hidden; background: var(--surface);
     }
-    .hero-float img { width: 100%; display: block; }
+    .hero-float img { width: 100%; display: block; aspect-ratio: 1320 / 2867; }
     .hero-chip {
       position: absolute; display: inline-flex; align-items: center; gap: 8px; z-index: 3;
       padding: 9px 14px; border-radius: var(--r-full); font-size: 0.82rem; font-weight: 600; color: var(--text-1);
@@ -367,13 +367,13 @@
     .feat-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 0.94rem; color: var(--text-2); }
     .feat-list svg { width: 18px; height: 18px; color: var(--m); flex-shrink: 0; margin-top: 2px; }
     .feat-visual { position: relative; }
-    .feat-visual .shot { border-radius: var(--r-lg); box-shadow: var(--shadow-lg); border: 1px solid var(--border); width: 100%; }
+    .feat-visual .shot { border-radius: var(--r-lg); box-shadow: var(--shadow-lg); border: 1px solid var(--border); width: 100%; aspect-ratio: 4 / 3; }
     .feat-visual::before {
       content: ''; position: absolute; inset: -8% -6% -12% -6%; z-index: -1; border-radius: var(--r-2xl);
       background: radial-gradient(60% 60% at 50% 40%, color-mix(in srgb, var(--m) 16%, transparent), transparent 75%);
       filter: blur(8px);
     }
-    .feat-mobile { width: 132px !important; border-radius: 20px !important; border: 4px solid var(--surface);
+    .feat-mobile { width: 132px !important; aspect-ratio: 1320 / 2867; border-radius: 20px !important; border: 4px solid var(--surface);
       box-shadow: var(--shadow-xl); position: absolute; bottom: -26px; right: -20px; z-index: 2; }
 
     /* ===== Feature grid ===== */
@@ -396,7 +396,7 @@
       -webkit-overflow-scrolling: touch; scrollbar-width: none; }
     .carousel-track::-webkit-scrollbar { display: none; }
     .carousel-item { flex: 0 0 auto; scroll-snap-align: center; text-align: center; }
-    .carousel-item img { height: 460px; width: auto; border-radius: 26px; box-shadow: var(--shadow-xl); border: 4px solid var(--surface); }
+    .carousel-item img { height: 460px; width: auto; aspect-ratio: 1320 / 2867; border-radius: 26px; box-shadow: var(--shadow-xl); border: 4px solid var(--surface); }
     .carousel-item span { display: block; margin-top: 14px; font-size: 0.82rem; font-weight: 600; color: var(--text-3); }
     .carousel-hint { text-align: center; font-size: 0.8rem; color: var(--text-3); margin-top: 4px; }
 
@@ -601,7 +601,7 @@
     <span class="sep dt">·</span>
     <span data-t="proof_mit">MIT licensed</span>
     <span class="sep">·</span>
-    <span><b>v1.22.0</b></span>
+    <span><b>v1.22.1</b></span>
   </div>
 </div>
 
@@ -811,7 +811,7 @@
 <section class="modules">
   <div class="wrap">
     <div class="sec-head center reveal">
-      <h2 class="sec-title" data-t="more_title">One app, sixteen modules</h2>
+      <h2 class="sec-title" data-t="more_title">Eight more modules</h2>
       <p class="sec-desc" data-t="more_desc">Each module is independent. Use what fits your family, skip what doesn't.</p>
     </div>
     <div class="mod-grid">
@@ -995,7 +995,7 @@ cp .env.example .env  <span class="c"># set SESSION_SECRET and DB_ENCRYPTION_KEY
       </div>
     </div>
     <div class="foot-bottom">
-      <span><span id="gh-stars-footer" data-gh-stars>★ 931 · </span><b>v1.22.0</b> · July 2026</span>
+      <span><span id="gh-stars-footer" data-gh-stars>★ 931 · </span><b>v1.22.1</b> · July 2026</span>
       <span data-t="foot_madewith">Self-hosted · Privacy-first · Open source</span>
     </div>
   </div>
@@ -1043,7 +1043,7 @@ cp .env.example .env  <span class="c"># set SESSION_SECRET and DB_ENCRYPTION_KEY
       f_rewards_l1:'Point values on any task, credited automatically', f_rewards_l2:'Reward catalog with parent-approved redemptions', f_rewards_l3:'Per-member opt-in and a full point ledger',
       f_split_k:'Split expenses', f_split_t:'Who owes whom, settled automatically.', f_split_d:'Track shared costs across the household, trips and events. Yuvomi simplifies the debts so everyone settles up with the fewest payments.',
       f_split_l1:'Groups for household, trips and events', f_split_l2:'Automatic debt simplification', f_split_l3:'Multiple currencies with live conversion',
-      more_label:"And there's more", more_title:'One app, sixteen modules', more_desc:"Each module is independent. Use what fits your family, skip what doesn't.",
+      more_label:"And there's more", more_title:'Eight more modules', more_desc:"Each module is independent. Use what fits your family, skip what doesn't.",
       m_docs_t:'Documents', m_docs_d:'Family files with previews, visibility controls and storage badges. New uploads and calendar attachments can use a local folder or WebDAV; Paperless-ngx and Papra DMS integration is optional.',
       m_notes_t:'Notes', m_notes_d:'Colored sticky notes with Markdown. Perfect for recipes, family memos and quick reminders.',
       m_contacts_t:'Contacts', m_contacts_d:'Shared family directory with CardDAV sync, vCard import/export and multi-account support.',
@@ -1119,7 +1119,7 @@ cp .env.example .env  <span class="c"># set SESSION_SECRET and DB_ENCRYPTION_KEY
       f_rewards_l1:'Punktwerte auf jeder Aufgabe, automatisch gutgeschrieben', f_rewards_l2:'Prämienkatalog mit Eltern-Freigabe beim Einlösen', f_rewards_l3:'Opt-in je Mitglied und vollständiges Punktekonto',
       f_split_k:'Geteilte Kosten', f_split_t:'Wer wem was schuldet — automatisch ausgeglichen.', f_split_d:'Erfasst gemeinsame Kosten für Haushalt, Reisen und Events. Yuvomi vereinfacht die Schulden, sodass alle mit möglichst wenigen Zahlungen quitt sind.',
       f_split_l1:'Gruppen für Haushalt, Reisen und Events', f_split_l2:'Automatische Schuldenvereinfachung', f_split_l3:'Mehrere Währungen mit Live-Umrechnung',
-      more_label:'Und da ist noch mehr', more_title:'Eine App, sechzehn Module', more_desc:'Jedes Modul ist eigenständig. Nutzt, was zu eurer Familie passt, lasst den Rest weg.',
+      more_label:'Und da ist noch mehr', more_title:'Acht weitere Module', more_desc:'Jedes Modul ist eigenständig. Nutzt, was zu eurer Familie passt, lasst den Rest weg.',
       m_docs_t:'Dokumente', m_docs_d:'Familiendateien mit Vorschau, Sichtbarkeitsregeln und Speicher-Badges. Neue Uploads und Kalenderanh\u00e4nge k\u00f6nnen einen lokalen Ordner oder WebDAV nutzen; Paperless-ngx und Papra als DMS sind optional.',
       m_notes_t:'Notizen', m_notes_d:'Farbige Haftnotizen mit Markdown. Perfekt für Rezepte, Familien-Memos und schnelle Erinnerungen.',
       m_contacts_t:'Kontakte', m_contacts_d:'Gemeinsames Familienverzeichnis mit CardDAV-Sync, vCard-Import/-Export und Multi-Account-Support.',

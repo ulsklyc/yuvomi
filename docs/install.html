@@ -9,6 +9,13 @@
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>Install Yuvomi — Self-Hosted Family Planner</title>
   <meta name="description" content="Step-by-step installation guide for Yuvomi. Docker, Podman, TrueNAS, Umbrel or Unraid — get your self-hosted family planner running in minutes.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Install Yuvomi — Self-Hosted Family Planner">
+  <meta property="og:description" content="Get Yuvomi running in minutes: guided web installer, Docker, Podman, TrueNAS, Umbrel or Unraid.">
+  <meta property="og:image" content="https://yuvomi.cloud/og-image.png">
+  <meta property="og:url" content="https://yuvomi.cloud/install.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://yuvomi.cloud/twitter-image.png">
   <meta name="theme-color" content="#fafaf8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#1a1a18" media="(prefers-color-scheme: dark)">
   <link rel="canonical" href="https://yuvomi.cloud/install.html">
@@ -40,7 +47,7 @@
       --border-strong: #D8D7D1;
       --text-1: #1C1C1A;
       --text-2: #56554F;
-      --text-3: #8B8A85;
+      --text-3: #6E6D67;
 
       --accent: #6c3aed;
       --accent-hover: #5b2fd4;
@@ -247,6 +254,7 @@
       padding: 7px 11px; min-height: 36px; border-radius: var(--r-sm); font-family: var(--ff); font-size: 0.75rem; font-weight: 600; transition: all .15s; }
     .copy-btn:hover { background: rgba(255,255,255,0.16); color: #fff; }
     .copy-btn.copied { background: var(--success); border-color: var(--success); color: #fff; }
+    .copy-btn.failed { background: var(--warning); border-color: var(--warning); color: #fff; }
     .copy-btn svg { width: 13px; height: 13px; }
 
     /* Success */
@@ -255,7 +263,8 @@
     .success-box::before { content: ''; position: absolute; top: -120px; left: 50%; transform: translateX(-50%); width: 520px; height: 360px;
       background: radial-gradient(50% 50% at 50% 50%, var(--accent-glow), transparent 70%); pointer-events: none; }
     .success-box > * { position: relative; }
-    .success-emoji { font-size: 2.6rem; margin-bottom: 12px; }
+    .success-emoji { margin-bottom: 12px; color: var(--success); line-height: 0; }
+    .success-emoji svg { width: 3rem; height: 3rem; }
     .success-box h2 { font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -0.03em; margin-bottom: 10px; }
     .success-box p { color: var(--text-2); margin-bottom: 18px; }
     .success-url { display: inline-block; font-family: var(--ff-mono); font-size: 1.05rem; font-weight: 600; color: var(--accent);
@@ -298,7 +307,7 @@
     footer { border-top: 1px solid var(--border); padding: 44px 0; text-align: center; }
     .footer-heart { font-size: 0.9rem; color: var(--text-2); margin-bottom: 14px; }
     .footer-links { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; font-size: 0.85rem; }
-    .footer-links a { color: var(--text-2); padding: 6px 4px; }
+    .footer-links a { color: var(--text-2); padding: 6px 4px; min-height: 44px; display: inline-flex; align-items: center; }
     .footer-links a:hover { color: var(--accent); }
 
     /* Reveal */
@@ -587,7 +596,7 @@ openssl rand -hex 32  <span class="comment"># run twice → SESSION_SECRET + DB_
   <section id="open">
     <div class="container">
       <div class="success-box reveal">
-        <div class="success-emoji" aria-hidden="true">🎉</div>
+        <div class="success-emoji" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg></div>
         <h2 data-t="success_title">You're all set</h2>
         <p data-t="success_desc">Open your browser and navigate to:</p>
         <div class="success-url">http://localhost:3000</div>
@@ -759,7 +768,7 @@ docker compose logs | grep "Server läuft"</div></div><p data-t="trouble_nginx_p
         trouble_nginx_title:'Nginx shows 502 Bad Gateway', trouble_nginx_desc:"Nginx can't reach the container. Check it's running and the port matches:",
         trouble_nginx_port:'Ensure the proxy_pass port in your Nginx config matches the host port in docker-compose.yml (default: 3000).',
         footer_home:'Home', footer_heart:'Built with care for families who value privacy and simplicity.', footer_contrib:'Contributing', footer_impressum:'Imprint', footer_privacy:'Privacy',
-        backLabel:'Overview', copy:'Copy', copied:'Copied!'
+        backLabel:'Overview', copy:'Copy', copied:'Copied!', copyfail:'Press Ctrl+C'
       },
       de: {
         hero_eyebrow:'Installation', hero_title_pre:'Yuvomi installieren', hero_title_em:'– euer Weg.',
@@ -828,7 +837,7 @@ docker compose logs | grep "Server läuft"</div></div><p data-t="trouble_nginx_p
         trouble_nginx_title:'Nginx zeigt 502 Bad Gateway', trouble_nginx_desc:'Nginx kann den Container nicht erreichen. Prüfen, ob er läuft und der Port stimmt:',
         trouble_nginx_port:'Sicherstellen, dass der proxy_pass-Port in der Nginx-Konfiguration mit dem Host-Port in docker-compose.yml übereinstimmt (Standard: 3000).',
         footer_home:'Startseite', footer_heart:'Mit Sorgfalt gebaut für Familien, die Privatsphäre und Einfachheit schätzen.', footer_contrib:'Mitmachen', footer_impressum:'Impressum', footer_privacy:'Datenschutz',
-        backLabel:'Übersicht', copy:'Kopieren', copied:'Kopiert!'
+        backLabel:'Übersicht', copy:'Kopieren', copied:'Kopiert!', copyfail:'Strg+C drücken'
       }
     };
 
@@ -861,26 +870,69 @@ docker compose logs | grep "Server läuft"</div></div><p data-t="trouble_nginx_p
     document.getElementById('langToggle').addEventListener('click', function(){ lang = lang === 'en' ? 'de' : 'en'; lsSet('lang', lang); applyLang(); });
     matchMedia('(prefers-color-scheme:dark)').addEventListener('change', function(){ if (!theme) applyTheme(); });
 
-    /* Tabs */
-    document.querySelectorAll('.tab-btn').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        var panelId = btn.getAttribute('aria-controls');
-        document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
+    /* Tabs — ARIA tabs pattern: roving tabindex + Arrow/Home/End keys with
+       automatic activation. Only the selected tab stays in the tab order. */
+    (function(){
+      var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab-btn'));
+      if (!tabs.length) return;
+      function activate(btn, setFocus){
+        tabs.forEach(function(b){
+          var on = b === btn;
+          b.classList.toggle('active', on);
+          b.setAttribute('aria-selected', on ? 'true' : 'false');
+          b.setAttribute('tabindex', on ? '0' : '-1');
+        });
         document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
-        btn.classList.add('active'); btn.setAttribute('aria-selected','true');
-        document.getElementById(panelId).classList.add('active');
+        var panel = document.getElementById(btn.getAttribute('aria-controls'));
+        if (panel) panel.classList.add('active');
+        if (setFocus) btn.focus();
+      }
+      tabs.forEach(function(btn, i){
+        btn.setAttribute('tabindex', btn.classList.contains('active') ? '0' : '-1');
+        btn.addEventListener('click', function(){ activate(btn, false); });
+        btn.addEventListener('keydown', function(e){
+          var idx = -1;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') idx = (i + 1) % tabs.length;
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') idx = (i - 1 + tabs.length) % tabs.length;
+          else if (e.key === 'Home') idx = 0;
+          else if (e.key === 'End') idx = tabs.length - 1;
+          else return;
+          e.preventDefault();
+          activate(tabs[idx], true);
+        });
       });
-    });
+    })();
 
-    /* Copy */
+    /* Copy — Clipboard API with a legacy execCommand fallback, plus a visible
+       failure state so it never fails silently (e.g. on insecure origins). */
+    function flashCopyBtn(btn, cls, msgKey){
+      var span = btn.querySelector('span');
+      btn.classList.add(cls);
+      if (span) span.textContent = i18n[lang][msgKey] || msgKey;
+      setTimeout(function(){
+        btn.classList.remove(cls);
+        if (span) span.textContent = i18n[lang].copy || 'Copy';
+      }, 2000);
+    }
+    function legacyCopy(text){
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed'; ta.style.top = '-9999px';
+        document.body.appendChild(ta); ta.select();
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+      } catch (e) { return false; }
+    }
     document.querySelectorAll('.copy-btn').forEach(function(btn){
       btn.addEventListener('click', function(){
         var text = btn.getAttribute('data-copy'); if (!text) return;
-        navigator.clipboard.writeText(text).then(function(){
-          var span = btn.querySelector('span');
-          btn.classList.add('copied'); span.textContent = i18n[lang].copied || 'Copied!';
-          setTimeout(function(){ btn.classList.remove('copied'); span.textContent = i18n[lang].copy || 'Copy'; }, 2000);
-        }).catch(function(){});
+        var onOk = function(){ flashCopyBtn(btn, 'copied', 'copied'); };
+        var onFail = function(){ if (legacyCopy(text)) onOk(); else flashCopyBtn(btn, 'failed', 'copyfail'); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(onOk).catch(onFail);
+        } else { onFail(); }
       });
     });
 
