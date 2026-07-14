@@ -1,8 +1,7 @@
 # Datenschutz-Hinweise für Selfhoster (Yuvomi)
 
-> **Stand: 09.06.2026** — Diese Hinweise sind eine technisch orientierte
-> Hilfestellung für Betreiber und ersetzen keine individuelle rechtliche
-> Beratung im Einzelfall. Prüfe die Aktualität von Angemessenheitsbeschlüssen
+> **Stand: 14.07.2026** - Diese Hinweise sind eine technisch orientierte
+> Hilfestellung für Betreiber. Prüfe die Aktualität von Angemessenheitsbeschlüssen
 > und DPF-Listungen selbst (siehe Abschnitt „Quellen").
 
 > Dieses Dokument richtet sich an **Betreiber, die Yuvomi in einer Umgebung
@@ -29,6 +28,7 @@
    - 2.5 [WebDAV-Backup](#25-webdav-backup)
    - 2.6 [WebDAV-Dokumentspeicher](#26-webdav-dokumentspeicher)
    - 2.7 [Abonnement-Integrationen](#27-abonnement-integrationen)
+   - 2.8 [MCP-Endpoint (KI-/Agent-Zugriff)](#28-mcp-endpoint-ki-agent-zugriff)
 3. [Logging und Speicherbegrenzung](#3-logging-und-speicherbegrenzung-art-5-abs-1-lit-e-dsgvo)
 4. [Haushaltsausnahme](#4-haushaltsausnahme-art-2-abs-2-lit-c-dsgvo)
 5. [Verarbeitungsverzeichnis-Vorlage (Art. 30 DSGVO)](#5-verarbeitungsverzeichnis-vorlage-art-30-dsgvo)
@@ -56,6 +56,13 @@ bedeutet u. a.:
   Voraussetzungen nach Art. 44 ff. DSGVO (Angemessenheitsbeschluss, SCCs +
   Transfer Impact Assessment).
 
+> **NIS2 (nur in bestimmten Sektoren):** Das NIS2UmsuCG ist seit 06.12.2025 in
+> Kraft (BSI-Registrierungsfrist lief am 06.03.2026 ab). Für den normalen
+> Familien-/Privatbetrieb ist es **nicht** einschlägig. Betreibst du die Instanz
+> dagegen in einer **Einrichtung eines besonders wichtigen oder wichtigen
+> Sektors** oberhalb der Größenschwellen, prüfe die NIS2-Registrierungs- und
+> Meldepflichten eigenständig.
+
 ---
 
 ## 2. Externe Dienste, die Yuvomi kontaktiert
@@ -73,6 +80,7 @@ Betreiber daraus resultieren.
 | WebDAV-Backup | `server/services/backup-webdav.js` | nur wenn konfiguriert | abhängig vom Provider | ja, bei kommerziellen Anbietern (siehe 2.5) |
 | WebDAV-Dokumentspeicher | `server/services/document-storage.js` | nur wenn konfiguriert | abhängig vom Provider | ja, bei kommerziellen Anbietern (siehe 2.6) |
 | Abonnement-Integrationen | `server/services/subscription-*` | nur wenn konfiguriert/ausgelöst | abhängig von Fixer, Benachrichtigungs- oder KI-Provider | abhängig vom Provider (siehe 2.7) |
+| MCP-Endpoint (KI-/Agent-Zugriff) | `server/index.js:338`, `server/mcp/*` | nur wenn Nutzer ein API-Token erstellt und einen MCP-Client anbindet | **lokaler Client: nein** · Cloud-Client: abhängig vom Anbieter | lokaler Client: nein · Cloud-Client: ggf. gegenüber dem Anbieter (siehe 2.8) |
 
 ### 2.1 Open-Meteo (Wetter-Standard)
 
@@ -227,6 +235,41 @@ Konfiguration so, dass du auf einen EU-Provider umstellen könntest.
   Fälligkeitsdatum eines Abonnements an SMTP, Discord, Telegram, Pushover,
   Gotify, Serverchan, Ntfy oder einen Webhook übertragen. Für private/LAN-Ziele
   ist eine ausdrückliche Deployment-Freigabe erforderlich.
+
+### 2.8 MCP-Endpoint (KI-/Agent-Zugriff)
+
+- **Code-Stellen:** `server/index.js:338` (Mount `/mcp`, nur mit
+  Authentifizierung), `server/mcp/server.js`, `server/mcp/protocol.js`,
+  `server/mcp/tools.js`; Token-Verwaltung `server/scopes.js`.
+- **Was ist das?** Yuvomi stellt einen **MCP-Endpoint** bereit, über den ein
+  **von dir angebundener** KI-/Agent-Client (MCP-Client) per API-Token auf
+  Instanzdaten zugreifen und Tools ausführen kann. Der Endpoint ist
+  **provider-neutral** - er funktioniert mit einem **lokal gehosteten LLM**
+  (z. B. Ollama, LM Studio, llama.cpp) genauso wie mit einem Cloud-Client
+  (z. B. Claude Desktop). Yuvomi selbst ruft **keinen** KI-Anbieter auf; der
+  Client verbindet sich mit dem Endpoint und zieht die Daten.
+- **Aktiv nur, wenn:** du in den Einstellungen ein **API-Token** erstellst und in
+  einem MCP-Client hinterlegst. Ohne angebundenen Client verlässt kein Datum die
+  Instanz.
+- **Datenschutz — hängt an deiner Client-Wahl:**
+  | Client | Datenfluss | Pflichten |
+  |---|---|---|
+  | **Lokales LLM / EU-gehostet** | Daten bleiben in der Instanz bzw. im EWR | **kein Drittland, kein AVV.** Datensparsamste Option. |
+  | **Cloud-Client (z. B. US-Anbieter)** | Token-freigegebene Daten fließen an den Anbieter | Wie bei jedem Auftragsverarbeiter: **AVV (Art. 28)**, bei Drittland zusätzlich **Art. 44 ff.** (DPF/SCCs + TIA), Aufnahme in die **Datenschutzerklärung** (Art. 13). |
+- **Empfehlungen:**
+  1. **Least Privilege:** Erstelle das Token **nur mit den Modulen und Rechten**,
+     die der Client wirklich braucht (die Token-UI bietet Modul- und
+     Lese-/Schreib-Scoping). Schließe sensible Module wie `health` oder
+     `housekeeping` aus, wenn nicht zwingend nötig.
+  2. **Lokal/EU bevorzugen:** Ein lokal laufendes oder in der EU gehostetes Modell
+     vermeidet den externen Transfer vollständig - dann entfallen AVV- und
+     Drittland-Fragen für diesen Kanal.
+  3. **Nur bei Cloud-Client:** Empfänger, Zweck, Rechtsgrundlage (i. d. R.
+     Art. 6 Abs. 1 lit. a oder lit. f), Drittland-Hinweis und freigegebene
+     Datenkategorien in die Datenschutzerklärung aufnehmen; AVV/DPF-Status prüfen.
+  4. **Token widerrufbar halten:** Tokens einzeln widerrufbar; dokumentiere,
+     welcher Client welches Token nutzt.
+
 ---
 
 ## 3. Logging und Speicherbegrenzung (Art. 5 Abs. 1 lit. e DSGVO)
@@ -345,6 +388,7 @@ konkrete Konfiguration ein und ergänze um eigene Verarbeitungen.
 | 5 | Backups | Datensicherung | Art. 6 Abs. 1 lit. f | Nutzer und alle Datensubjekte der App | Vollbackup der DB | <<WebDAV-Provider>> | <<Aufbewahrungs-Konzept, z. B. 30 Tage rollierend>> | Verschlüsselung vor Upload, AVV |
 | 6 | Dokumentablage | Gemeinsame Ablage und Kalenderanhänge | Art. 6 Abs. 1 lit. b/f | Nutzer und in Dokumenten genannte Personen | Dokumentdateien, Anhänge, Metadaten | <<WebDAV-Provider, falls aktiv>> | <<je nach Anbieter>> | bis Löschung durch Nutzer | TLS, eigener Pfad, AVV, separates Backup |
 | 7 | Sicherheits-/Betriebs-Logs | Missbrauchserkennung, Fehlersuche | Art. 6 Abs. 1 lit. f | Nutzer / Login-Versuchende | IP bei fehlgeschlagenen Logins, Fehler-Stacktraces | nur lokal | nein | **max. 30 Tage** | Rotation, Zugangsbeschränkung |
+| 8 | MCP-/KI-Anbindung (falls genutzt) | Zugriff eines angebundenen KI-/Agent-Clients auf Instanzdaten | Art. 6 Abs. 1 lit. a/f; bei Art.-9-Daten zusätzlich Art. 9 Abs. 2 lit. a | Nutzer und in den Daten genannte Personen | je nach Token-Scope: Aufgaben, Termine, Einkauf, ggf. health/housekeeping | lokaler Client: keiner · Cloud: <<Anbieter>> | lokaler Client: nein · Cloud: <<je nach Anbieter>> | bis Token-Widerruf | Token-Scoping (Least Privilege), TLS; bei Cloud: AVV, DPF/SCCs+TIA |
 
 ### 5.3 Auftragsverarbeiter (Art. 28)
 
