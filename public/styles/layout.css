@@ -1164,9 +1164,19 @@ html.fab-anim-done .page-fab {
     transition: opacity 0.12s ease;
   }
 
+  /* Eingeklappt stapelt der Footer vertikal. align-items:stretch dehnt die
+   * drei Items auf volle Rail-Breite (statt sie zentriert je nach verstecktem
+   * Label-Rest unterschiedlich breit zu lassen — sonst landeten ihre Icons an
+   * verschiedenen X-Positionen, #501). padding-inline:0 + padding-left:15px an
+   * den Items setzt die Icon-Flucht deckungsgleich mit den Body-Items. */
   html.sidebar-collapsed .nav-sidebar .nav-sidebar__footer-actions {
     flex-direction: column;
-    padding-inline: var(--space-1);
+    align-items: stretch;
+    padding-inline: 0;
+  }
+
+  html.sidebar-collapsed .nav-sidebar__footer-actions .nav-item {
+    padding-left: 15px;
   }
 
   /* Eingeklappt stapelt der Footer bereits vertikal (icon-only) — der
@@ -1177,8 +1187,16 @@ html.fab-anim-done .page-fab {
     margin-top: var(--space-0h);
   }
 
+  /* Eingeklappt: anders als die Nav-Item-Labels (die neben ihrem Icon in
+   * derselben Zeile sitzen und nur ausgeblendet werden müssen) belegt ein
+   * Sektionslabel eine eigene Zeile — bliebe es nur per opacity verborgen,
+   * klaffte zwischen den Icon-Gruppen eine leere Zeile (#501). Daher zusätzlich
+   * die Box auf null Höhe kollabieren; der Flyout (Hover/Fokus) stellt sie her. */
   html.sidebar-collapsed .nav-sidebar .nav-section-label {
     opacity: 0;
+    height: 0;
+    padding-block: 0;
+    overflow: hidden;
     transition: opacity 0.12s ease;
   }
 
@@ -1213,6 +1231,14 @@ html.fab-anim-done .page-fab {
     transition: opacity 0.18s ease 0.22s;
   }
 
+  /* Flyout: die eingeklappt auf null Höhe kollabierten Sektionslabels wieder
+   * als eigene Zeile aufspannen (Gegenstück zur Kollaps-Regel oben). */
+  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-section-label,
+  html.sidebar-collapsed .nav-sidebar:focus-within .nav-section-label {
+    height: auto;
+    padding-block: var(--space-3) var(--space-1);
+  }
+
   /* Beim Aufklappen (Hover/Fokus) muss der Footer das Expanded-Layout annehmen:
    * Zeile statt Spalte, Abmelden bricht als volle Zeile um. Ohne dies blieben
    * Hilfe/Änderungen/Abmelden in der eingeklappten, zentrierten Spalte stehen
@@ -1220,6 +1246,15 @@ html.fab-anim-done .page-fab {
   html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-sidebar__footer-actions,
   html.sidebar-collapsed .nav-sidebar:focus-within .nav-sidebar__footer-actions {
     flex-direction: row;
+    align-items: center;
+    padding-inline: var(--space-1);
+  }
+
+  /* Flyout: den 15px-Icon-Einzug der eingeklappten Spalte zurücknehmen, damit
+   * Hilfe/Änderungen wie im gepinnten Expanded-Zustand bündig stehen. */
+  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-sidebar__footer-actions .nav-item,
+  html.sidebar-collapsed .nav-sidebar:focus-within .nav-sidebar__footer-actions .nav-item {
+    padding-left: var(--space-1);
   }
 
   html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-sidebar__footer-actions .nav-item.nav-item--logout,

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.20.4] - 2026-07-14
+
+### Fixed
+- Navigation sidebar (collapsed): section titles no longer leave empty gaps between the icon groups, and the three footer icons (help, changes, logout) now line up on the same vertical rail as the navigation icons above instead of each sitting at a different horizontal position.
+
 ## [1.20.3] - 2026-07-14
 
 ### Fixed
