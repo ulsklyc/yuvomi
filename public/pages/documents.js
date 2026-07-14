@@ -1134,7 +1134,7 @@ function openDocumentViewer(doc) {
     : '';
 
   openSharedModal({
-    title: esc(doc.name),
+    title: doc.name,
     size: 'xl',
     content: `
       <div class="document-viewer">

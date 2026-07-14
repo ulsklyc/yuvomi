@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.20.3] - 2026-07-14
+
+### Fixed
+- Documents: the viewer modal now shows document names with special characters (such as `&`) correctly, instead of displaying HTML escape sequences. The title was being escaped twice.
+
 ## [1.20.2] - 2026-07-13
 
 ### Changed
