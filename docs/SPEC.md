@@ -311,6 +311,12 @@ by the auto-sync scheduler (covers previous, current, and next two years). Displ
 overlay in the calendar; layer visibility is toggled client-side. Outbound requests carry only the
 country/subdivision code — no household data leaves the server.
 
+Some multilingual subdivisions (e.g. the Swiss canton `CH-BE`) run more than one school-holiday
+regime with differing dates, distinguished only by an OpenHolidays *group* (`CH-BE-VS` German-speaking
+vs. `CH-BE-EO` French-speaking Bernese Jura). When such a subdivision is configured, the settings page
+offers an optional school-holiday-group picker; the chosen group filters the overlay to that regime so
+the calendar shows the correct dates instead of the union of both.
+
 | Column | Type | Constraint |
 |--------|------|-----------|
 | id | INTEGER | PRIMARY KEY AUTOINCREMENT |
@@ -321,9 +327,10 @@ country/subdivision code — no household data leaves the server.
 | end_date | TEXT | YYYY-MM-DD, NOT NULL |
 | name | TEXT | Localized holiday name, NOT NULL |
 | year | INTEGER | Source year (used for scoped re-sync), NOT NULL |
+| group_code | TEXT | School-holiday group (e.g. `CH-BE-VS`) for multilingual subdivisions; nullable (applies to the whole subdivision, e.g. public holidays) |
 
 Indexes: `idx_holiday_cache_dates (start_date, end_date)`, `idx_holiday_cache_lookup (type, country, subdivision, year)`.
-Configuration lives in `sync_config`: `holiday_country`, `holiday_subdivision`, `holiday_show_public`,
+Configuration lives in `sync_config`: `holiday_country`, `holiday_subdivision`, `holiday_group`, `holiday_show_public`,
 `holiday_show_school`, `holiday_public_color`, `holiday_school_color`, `holiday_last_sync` (all admin-only).
 
 ### CalDAV Accounts

@@ -281,6 +281,7 @@ router.get('/', (req, res) => {
         weather_user: weatherUserOverride(req.authUserId),
         holiday_country:       cfgGet('holiday_country')       ?? null,
         holiday_subdivision:   cfgGet('holiday_subdivision')   ?? null,
+        holiday_group:         cfgGet('holiday_group')         ?? null,
         holiday_show_public:   cfgGet('holiday_show_public')   === '1',
         holiday_show_school:   cfgGet('holiday_show_school')   === '1',
         holiday_public_color:  cfgGet('holiday_public_color')  ?? '#FF3B30',
@@ -303,7 +304,7 @@ router.get('/', (req, res) => {
 
 router.put('/', (req, res) => {
   try {
-    const { visible_meal_types, currency, date_format, time_format, week_start, region, app_name, dashboard_widgets, disabled_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, health_cycle_enabled, rewards_require_approval, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
+    const { visible_meal_types, currency, date_format, time_format, week_start, region, app_name, dashboard_widgets, disabled_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, health_cycle_enabled, rewards_require_approval, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
 
     if (visible_meal_types !== undefined) {
       if (!Array.isArray(visible_meal_types)) {
@@ -571,6 +572,7 @@ router.put('/', (req, res) => {
     if (
       holiday_country      !== undefined ||
       holiday_subdivision  !== undefined ||
+      holiday_group        !== undefined ||
       holiday_show_public  !== undefined ||
       holiday_show_school  !== undefined ||
       holiday_public_color !== undefined ||
@@ -586,6 +588,7 @@ router.put('/', (req, res) => {
         if (holiday_country === null) {
           cfgDelete('holiday_country');
           cfgDelete('holiday_subdivision');
+          cfgDelete('holiday_group');
         } else {
           cfgSet('holiday_country', holiday_country);
         }
@@ -594,8 +597,22 @@ router.put('/', (req, res) => {
         if (holiday_subdivision !== null && !SUBDIVISION_RE.test(holiday_subdivision)) {
           return res.status(400).json({ error: 'Ungültiger Regionscode (z. B. DE-BY).', code: 400 });
         }
-        if (holiday_subdivision === null) cfgDelete('holiday_subdivision');
-        else cfgSet('holiday_subdivision', holiday_subdivision);
+        // Ohne Subdivision gibt es keine Schulferien-Gruppe mehr → mit aufräumen.
+        if (holiday_subdivision === null) {
+          cfgDelete('holiday_subdivision');
+          cfgDelete('holiday_group');
+        } else {
+          cfgSet('holiday_subdivision', holiday_subdivision);
+        }
+      }
+      // Schulferien-Gruppe (z. B. CH-BE-VS) mehrsprachiger Kantone. Nutzt dieselbe
+      // Grammatik wie ein Regionscode. NULL/leer = keine Gruppe gewählt. (#434)
+      if (holiday_group !== undefined) {
+        if (holiday_group !== null && holiday_group !== '' && !SUBDIVISION_RE.test(holiday_group)) {
+          return res.status(400).json({ error: 'Ungültiger Gruppencode (z. B. CH-BE-VS).', code: 400 });
+        }
+        if (holiday_group === null || holiday_group === '') cfgDelete('holiday_group');
+        else cfgSet('holiday_group', holiday_group);
       }
       if (holiday_show_public !== undefined) {
         if (typeof holiday_show_public !== 'boolean') {
@@ -664,6 +681,7 @@ router.put('/', (req, res) => {
         weather_user: weatherUserOverride(req.authUserId),
         holiday_country:       cfgGet('holiday_country')       ?? null,
         holiday_subdivision:   cfgGet('holiday_subdivision')   ?? null,
+        holiday_group:         cfgGet('holiday_group')         ?? null,
         holiday_show_public:   cfgGet('holiday_show_public')   === '1',
         holiday_show_school:   cfgGet('holiday_show_school')   === '1',
         holiday_public_color:  cfgGet('holiday_public_color')  ?? '#FF3B30',
@@ -700,6 +718,26 @@ router.get('/holidays/subdivisions/:countryCode', async (req, res) => {
   } catch (err) {
     log.error('GET /holidays/subdivisions/:countryCode', err);
     res.status(502).json({ error: 'Fehler beim Abrufen der Regionsliste.', code: 502 });
+  }
+});
+
+// GET /api/v1/preferences/holidays/groups/:countryCode/:subdivisionCode
+// Schulferien-Gruppen einer Subdivision (mehrsprachige Kantone). Leere Liste,
+// wenn die Subdivision nur ein Ferien-Regime kennt. (#434)
+router.get('/holidays/groups/:countryCode/:subdivisionCode', async (req, res) => {
+  const { countryCode, subdivisionCode } = req.params;
+  if (!COUNTRY_ISO_RE.test(countryCode)) {
+    return res.status(400).json({ error: 'Ungültiger Ländercode.', code: 400 });
+  }
+  if (!SUBDIVISION_RE.test(subdivisionCode)) {
+    return res.status(400).json({ error: 'Ungültiger Regionscode.', code: 400 });
+  }
+  try {
+    const groups = await holidays.getGroups(countryCode, subdivisionCode);
+    res.json({ data: groups });
+  } catch (err) {
+    log.error('GET /holidays/groups/:countryCode/:subdivisionCode', err);
+    res.status(502).json({ error: 'Fehler beim Abrufen der Ferien-Gruppen.', code: 502 });
   }
 });
 

@@ -67,6 +67,31 @@ async function getSubdivisions(countryIsoCode) {
 }
 
 /**
+ * Schulferien-Gruppen einer Subdivision abrufen. Manche Subdivisionen (v. a.
+ * mehrsprachige Schweizer Kantone) teilen sich in mehrere Schulferien-Regime
+ * mit abweichenden Terminen, die OpenHolidays nur über das "groups"-Feld
+ * unterscheidet – z. B. CH-BE → CH-BE-VS (deutschsprachig) / CH-BE-EO (Berner
+ * Jura). Erst ab zwei Gruppen ist die Auswahl relevant; bei 0/1 Gruppe gibt es
+ * keine Mehrdeutigkeit und der Picker bleibt ausgeblendet. Die API liefert für
+ * diese Gruppen keinen lesbaren Namen, daher wird shortName als Label genutzt. (#434)
+ * @param {string} countryIsoCode  z.B. 'CH'
+ * @param {string} subdivisionCode z.B. 'CH-BE'
+ * @returns {Promise<Array<{code: string, name: string}>>}
+ */
+async function getGroups(countryIsoCode, subdivisionCode) {
+  const raw = await apiFetch(`/Subdivisions?countryIsoCode=${encodeURIComponent(countryIsoCode)}`);
+  const match = (raw ?? []).find((s) => (s.code ?? s.isoCode) === subdivisionCode);
+  const groups = Array.isArray(match?.groups) ? match.groups : [];
+  return groups
+    .map((g) => ({
+      code: g.code ?? g.isoCode,
+      name: resolveName(g.name) || g.shortName || g.code || g.isoCode,
+    }))
+    .filter((g) => g.code)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
  * Gibt den Anzeigenamen aus dem name-Array zurück (bevorzugt EN, sonst erstes).
  * @param {Array<{language, text}>} nameArr
  * @param {string} [preferLang='EN']
@@ -192,8 +217,8 @@ async function syncYearAndType(country, subdivision, year, type, langCode) {
   if (holidays.length === 0) return 0;
 
   const insert = db.get().prepare(`
-    INSERT INTO holiday_cache (type, country, subdivision, start_date, end_date, name, year)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO holiday_cache (type, country, subdivision, start_date, end_date, name, year, group_code)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertAll = db.get().transaction((rows) => {
@@ -201,7 +226,13 @@ async function syncYearAndType(country, subdivision, year, type, langCode) {
       const name = typeof h.name === 'string'
         ? h.name
         : resolveName(h.name, langCode.toUpperCase());
-      insert.run(type, country, subdivision ?? null, h.startDate, h.endDate, name, year);
+      // Schulferien-Gruppe (z. B. CH-BE-VS), falls die Subdivision mehrere
+      // Regime kennt. Öffentliche Feiertage tragen i. d. R. keine Gruppe → NULL,
+      // gilt dann für die gesamte Subdivision. (#434)
+      const groupCode = Array.isArray(h.groups) && h.groups.length > 0
+        ? (h.groups[0].code ?? h.groups[0].isoCode ?? null)
+        : null;
+      insert.run(type, country, subdivision ?? null, h.startDate, h.endDate, name, year, groupCode);
     }
   });
 
@@ -328,6 +359,7 @@ function mergeOverlappingByName(rows) {
 function getForRange(from, to) {
   const country     = db.get().prepare("SELECT value FROM sync_config WHERE key='holiday_country'").get()?.value;
   const subdivision = db.get().prepare("SELECT value FROM sync_config WHERE key='holiday_subdivision'").get()?.value ?? null;
+  const group       = db.get().prepare("SELECT value FROM sync_config WHERE key='holiday_group'").get()?.value || null;
   const showPublic  = db.get().prepare("SELECT value FROM sync_config WHERE key='holiday_show_public'").get()?.value === '1';
   const showSchool  = db.get().prepare("SELECT value FROM sync_config WHERE key='holiday_show_school'").get()?.value === '1';
   const pubColor    = db.get().prepare("SELECT value FROM sync_config WHERE key='holiday_public_color'").get()?.value ?? '#FF3B30';
@@ -341,6 +373,14 @@ function getForRange(from, to) {
 
   const placeholders = types.map(() => '?').join(', ');
 
+  // Ist eine Schulferien-Gruppe konfiguriert (mehrsprachiger Kanton), werden nur
+  // die Zeilen dieser Gruppe sowie gruppenlose Zeilen (group_code NULL, z. B.
+  // Feiertage) gezeigt. So bleibt genau EIN korrektes Ferien-Regime übrig und der
+  // Union-Merge unten wird zum No-op. Ohne Gruppen-Auswahl greift der Merge als
+  // Fallback und kollabiert überlappende Varianten wie bisher. (#434)
+  const groupClause = group ? 'AND (group_code IS NULL OR group_code = ?)' : '';
+  const groupArgs   = group ? [group] : [];
+
   // GROUP BY kollabiert identische Feiertage, die aus mehreren Scopes im Cache
   // liegen (z. B. länderweite NULL-Zeilen aus der Zeit vor #434 neben dem heutigen
   // Regions-Scope). So sieht der Kalender nie Duplikate, selbst wenn ein alter
@@ -350,12 +390,13 @@ function getForRange(from, to) {
     FROM holiday_cache
     WHERE country = ?
       AND (subdivision IS NULL OR subdivision = ? OR subdivision = '')
+      ${groupClause}
       AND type IN (${placeholders})
       AND start_date <= ?
       AND end_date   >= ?
     GROUP BY type, start_date, end_date, name
     ORDER BY start_date ASC
-  `).all(country, subdivision ?? '', ...types, to, from);
+  `).all(country, subdivision ?? '', ...groupArgs, ...types, to, from);
 
   // OpenHolidays modelliert innerhalb EINER Subdivision teils mehrere
   // gleichnamige Schulferien-Varianten mit abweichenden Datumsbereichen –
@@ -375,4 +416,4 @@ function getForRange(from, to) {
   }));
 }
 
-export { sync, getCountries, getSubdivisions, getForRange, __setFetchImpl };
+export { sync, getCountries, getSubdivisions, getGroups, getForRange, __setFetchImpl };

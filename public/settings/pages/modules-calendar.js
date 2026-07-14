@@ -159,6 +159,13 @@ function renderPage(container, preferences) {
               <option value="">${t('settings.holidaySubdivisionNone')}</option>
             </select>
           </div>
+          <div class="form-group" id="holiday-group-group" hidden>
+            <label class="form-label" for="holiday-group">${t('settings.holidayGroupLabel')}</label>
+            <select class="form-input" id="holiday-group" disabled>
+              <option value="">${t('settings.holidayGroupNone')}</option>
+            </select>
+            <p class="settings-card-description">${t('settings.holidayGroupHint')}</p>
+          </div>
           <div class="form-group">
             <label class="toggle-row">
               <input type="checkbox" id="holiday-show-public"${preferences.holiday_show_public ? ' checked' : ''}>
@@ -314,6 +321,53 @@ async function loadSubdivisions(
   }
 }
 
+/**
+ * Schulferien-Gruppen einer Subdivision laden und den Picker nur einblenden,
+ * wenn es mindestens zwei Regimes gibt (mehrsprachige Kantone, #434). Bei 0/1
+ * Gruppe bleibt er verborgen, weil keine Mehrdeutigkeit besteht.
+ */
+async function loadGroups(
+  select,
+  groupContainer,
+  countryCode,
+  subdivisionCode,
+  selectedCode,
+  requestState,
+) {
+  const requestId = ++requestState.latestRequestId;
+  const noneOption = document.createElement('option');
+  noneOption.value = '';
+  noneOption.textContent = t('settings.holidayGroupNone');
+  select.replaceChildren(noneOption);
+  select.disabled = true;
+  groupContainer.hidden = true;
+
+  if (!countryCode || !subdivisionCode) return;
+
+  try {
+    const response = await api.get(
+      `/preferences/holidays/groups/${countryCode}/${subdivisionCode}`,
+    );
+    // Zwischenzeitlich neu gewählt → verworfene Antwort ignorieren.
+    if (requestId !== requestState.latestRequestId) return;
+
+    const groups = Array.isArray(response?.data) ? response.data : [];
+    if (groups.length < 2) return;
+
+    for (const g of groups) {
+      const option = document.createElement('option');
+      option.value = g.code;
+      option.textContent = g.name;
+      option.selected = g.code === selectedCode;
+      select.appendChild(option);
+    }
+    select.disabled = false;
+    groupContainer.hidden = false;
+  } catch {
+    // Gruppen sind optional – Fehler still schlucken, Picker bleibt verborgen.
+  }
+}
+
 function holidayPreferenceData(container, discoveryState) {
   const location = resolveHolidayLocation({
     countryReady: discoveryState.countryReady,
@@ -324,9 +378,13 @@ function holidayPreferenceData(container, discoveryState) {
     persistedSubdivision: discoveryState.persistedSubdivision,
   });
 
+  const groupEl = container.querySelector('#holiday-group');
+
   return {
     holiday_country: location.country,
     holiday_subdivision: location.subdivision,
+    // Ohne Subdivision kann es keine Gruppe geben.
+    holiday_group: location.subdivision ? (groupEl?.value || null) : null,
     holiday_show_public: container.querySelector('#holiday-show-public')?.checked ?? false,
     holiday_show_school: container.querySelector('#holiday-show-school')?.checked ?? false,
     holiday_public_color: container.querySelector('#holiday-public-color').value,
@@ -464,6 +522,8 @@ async function bindEvents(container, preferences) {
   const form = container.querySelector('#holidays-form');
   const countrySelect = container.querySelector('#holiday-country');
   const subdivisionSelect = container.querySelector('#holiday-subdivision');
+  const groupSelect = container.querySelector('#holiday-group');
+  const groupGroup = container.querySelector('#holiday-group-group');
   const showPublic = container.querySelector('#holiday-show-public');
   const showSchool = container.querySelector('#holiday-show-school');
   const publicColorGroup = container.querySelector('#holiday-public-color-group');
@@ -471,11 +531,13 @@ async function bindEvents(container, preferences) {
   const syncButton = container.querySelector('#holiday-sync-btn');
   const errorElement = container.querySelector('#holidays-form-error');
   const subdivisionRequests = { latestRequestId: 0 };
+  const groupRequests = { latestRequestId: 0 };
   const discoveryState = {
     countryReady: false,
     subdivisionReady: false,
     persistedCountry: preferences.holiday_country || null,
     persistedSubdivision: preferences.holiday_subdivision || null,
+    persistedGroup: preferences.holiday_group || null,
   };
 
   const showDiscoveryError = (error) => {
@@ -516,11 +578,19 @@ async function bindEvents(container, preferences) {
     if (result.ok && result.value) {
       discoveryState.subdivisionReady = result.value.selectedResolved;
     }
+    // Land gewechselt → Subdivision zurückgesetzt → Gruppen-Picker leeren.
+    await loadGroups(groupSelect, groupGroup, countryCode, subdivisionSelect.value, '', groupRequests);
     updateSyncState();
   });
 
-  subdivisionSelect.addEventListener('change', () => {
+  subdivisionSelect.addEventListener('change', async () => {
     applyHolidaySubdivisionSelection(discoveryState);
+    updateSyncState();
+    // Subdivision gewechselt → passende Ferien-Gruppen neu laden, Auswahl zurück.
+    await loadGroups(groupSelect, groupGroup, countrySelect.value, subdivisionSelect.value, '', groupRequests);
+  });
+
+  groupSelect.addEventListener('change', () => {
     updateSyncState();
   });
 
@@ -539,6 +609,7 @@ async function bindEvents(container, preferences) {
       await api.put('/preferences', {
         holiday_country: preferenceData.holiday_country,
         holiday_subdivision: preferenceData.holiday_subdivision,
+        holiday_group: preferenceData.holiday_group,
         holiday_show_public: preferenceData.holiday_show_public,
         holiday_show_school: preferenceData.holiday_show_school,
         holiday_public_color: preferenceData.holiday_public_color,
@@ -546,6 +617,7 @@ async function bindEvents(container, preferences) {
       });
       discoveryState.persistedCountry = preferenceData.holiday_country;
       discoveryState.persistedSubdivision = preferenceData.holiday_subdivision;
+      discoveryState.persistedGroup = preferenceData.holiday_group;
       window.yuvomi?.showToast(t('settings.holidaySaved'), 'success');
     } catch (error) {
       errorElement.textContent = error.message || t('common.errorGeneric');
@@ -575,6 +647,7 @@ async function bindEvents(container, preferences) {
       await api.put('/preferences', {
         holiday_country: preferenceData.holiday_country,
         holiday_subdivision: preferenceData.holiday_subdivision,
+        holiday_group: preferenceData.holiday_group,
         holiday_show_public: preferenceData.holiday_show_public,
         holiday_show_school: preferenceData.holiday_show_school,
         holiday_public_color: preferenceData.holiday_public_color,
@@ -582,6 +655,7 @@ async function bindEvents(container, preferences) {
       });
       discoveryState.persistedCountry = preferenceData.holiday_country;
       discoveryState.persistedSubdivision = preferenceData.holiday_subdivision;
+      discoveryState.persistedGroup = preferenceData.holiday_group;
       const response = await api.post('/preferences/holidays/sync', {});
       const lastSyncLabel = container.querySelector('#holiday-last-sync-label');
       if (lastSyncLabel && response?.data?.last_sync) {
@@ -630,6 +704,16 @@ async function bindEvents(container, preferences) {
     );
     if (subdivisionsResult.ok && subdivisionsResult.value) {
       discoveryState.subdivisionReady = subdivisionsResult.value.selectedResolved;
+    }
+    if (preferences.holiday_subdivision) {
+      await loadGroups(
+        groupSelect,
+        groupGroup,
+        preferences.holiday_country,
+        preferences.holiday_subdivision,
+        preferences.holiday_group || '',
+        groupRequests,
+      );
     }
   }
   updateSyncState();

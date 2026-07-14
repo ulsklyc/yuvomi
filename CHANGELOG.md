@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-07-14
+
+### Added
+- Calendar holidays: multilingual regions with more than one school-holiday schedule (such as the Swiss canton Bern, split into a German-speaking and a French-speaking Bernese Jura schedule) can now be narrowed to the correct one. When such a region is selected in Settings → Modules → Calendar, an optional school-holiday-region picker appears; the chosen region filters the overlay to its own dates instead of merging both into one longer span.
+
+### Fixed
+- Calendar holidays: fixed school-holiday dates for multilingual Swiss cantons being shown too long. Previously the two language-region schedules were merged into their combined span (e.g. Bern ending 14 August instead of 9 August for the German-speaking part); with the new region picker each part now shows its real dates. Public holidays remain visible regardless of the selected region.
+
 ## [1.21.0] - 2026-07-14
 
 ### Added

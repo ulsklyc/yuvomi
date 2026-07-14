@@ -395,6 +395,7 @@ test('module-specific settings leaves only reference their owned preferences and
       endpoints: [
         '/preferences',
         '/preferences/holidays/countries',
+        '/preferences/holidays/groups/',
         '/preferences/holidays/subdivisions/',
         '/preferences/holidays/sync',
       ],
@@ -405,6 +406,7 @@ test('module-specific settings leaves only reference their owned preferences and
         'week_start',
         'holiday_country',
         'holiday_subdivision',
+        'holiday_group',
         'holiday_show_public',
         'holiday_show_school',
         'holiday_public_color',
