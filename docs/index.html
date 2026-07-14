@@ -7,13 +7,13 @@
        Note: X-Frame-Options / CSP frame-ancestors only take effect as HTTP headers, not via meta. -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
-  <title>Yuvomi — The Self-Hosted Family Planner</title>
-  <meta name="description" content="A privacy-first, self-hosted family planner. Tasks, shopping, meals, calendar sync, budget — one private home for everything your household runs on. No cloud, no subscriptions.">
+  <title>Yuvomi - The Self-Hosted Family Planner</title>
+  <meta name="description" content="A privacy-first, self-hosted family planner. Tasks, shopping, meals, calendar sync, budget - one private home for everything your household runs on. No cloud, no subscriptions.">
   <meta name="theme-color" content="#fafaf8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#1a1a18" media="(prefers-color-scheme: dark)">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Yuvomi — The Self-Hosted Family Planner">
-  <meta property="og:description" content="Tasks, shopping, meals, calendar, budget — all self-hosted, no cloud dependency.">
+  <meta property="og:title" content="Yuvomi - The Self-Hosted Family Planner">
+  <meta property="og:description" content="Tasks, shopping, meals, calendar, budget - all self-hosted, no cloud dependency.">
   <meta property="og:image" content="https://yuvomi.cloud/og-image.png">
   <meta property="og:url" content="https://yuvomi.cloud/">
   <meta name="twitter:card" content="summary_large_image">
@@ -23,7 +23,7 @@
 
   <style>
     /* ============================================================
-       Plus Jakarta Sans — self-hosted variable font (no CDN).
+       Plus Jakarta Sans - self-hosted variable font (no CDN).
        Matches the Yuvomi app exactly. Roman + italic for editorial accents.
        ============================================================ */
     @font-face {
@@ -43,7 +43,7 @@
       --ff: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       --ff-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', ui-monospace, monospace;
 
-      /* Warm neutral surfaces — mirrors the app's tokens.css */
+      /* Warm neutral surfaces - mirrors the app's tokens.css */
       --bg: #FAFAF8;
       --bg-alt: #F2F1ED;
       --surface: #FFFFFF;
@@ -326,7 +326,7 @@
     @media (max-width: 560px) { .proof .dt { display: none; } }
 
     /* ===== Problem ===== */
-    /* Problem section is deliberately NOT cards — flat columns under hairline rules,
+    /* Problem section is deliberately NOT cards - flat columns under hairline rules,
        so it reads differently from the surface-card grids elsewhere. */
     .problem { padding: 96px 0; }
     .problem-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px 48px; margin-top: 48px; }
@@ -417,7 +417,9 @@
     .plat-badge { position: absolute; top: 16px; right: 16px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em;
       text-transform: uppercase; color: var(--m-tasks); background: color-mix(in srgb, var(--m-tasks) 13%, transparent);
       padding: 4px 9px; border-radius: var(--r-full); }
-    .plat-go { margin-top: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 0.84rem; font-weight: 700; color: var(--pc, var(--accent)); }
+    /* Label uses the theme accent (AA-contrast on --surface in both themes); the
+       platform brand colour (--pc) stays on the logo tint only. */
+    .plat-go { margin-top: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 0.84rem; font-weight: 700; color: var(--accent); }
     .plat-go svg { width: 15px; height: 15px; transition: transform .2s var(--ease-spring); }
     .plat-card:hover .plat-go svg { transform: translateX(4px); }
 
@@ -459,6 +461,8 @@
     .cta-actions .btn-primary:hover { background: #fff; color: var(--accent-deep); opacity: 0.94; }
     .cta-actions .btn-secondary { background: rgba(255,255,255,0.12); color: #fff; border-color: rgba(255,255,255,0.30); box-shadow: none; }
     .cta-actions .btn-secondary:hover { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.5); }
+    /* Honest longevity line: MIT + self-host permanence, not a fabricated metric. */
+    .cta-note { color: rgba(255,255,255,0.82); font-size: 0.92rem; line-height: 1.55; max-width: 52ch; margin: 26px auto 0; }
 
     /* ===== Footer ===== */
     footer { border-top: 1px solid var(--border); padding: 56px 0 48px; }
@@ -510,7 +514,7 @@
       .cta-box { padding: 52px 24px; }
       .nav-gh span:not(#gh-stars-nav) { display: none; }
     }
-    /* Sticky Install button in the thumb zone on phones — always reachable past the hero. */
+    /* Sticky Install button in the thumb zone on phones - always reachable past the hero. */
     @media (max-width: 700px) {
       .mobile-cta {
         display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; width: max-content;
@@ -727,7 +731,6 @@
         <p data-t="f_budget_d">Track who spent what, split shared costs automatically, and see exactly where the money goes.</p>
         <ul class="feat-list">
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_budget_l1">23 currencies, recurring entries, weekly/monthly/yearly statistics, monthly budgets &amp; savings goals</span></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_budget_l2">Split expenses with automatic debt simplification</span></li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_budget_l3">Subscription tracker with renewals, budgets &amp; alerts</span></li>
         </ul>
       </div>
@@ -766,7 +769,7 @@
         </ul>
       </div>
       <div class="feat-visual">
-        <img class="sc shot" data-light="screenshots/health-cycle-light-web.png" data-dark="screenshots/health-cycle-dark-web.png" src="screenshots/health-cycle-light-web.png" alt="Health — menstrual cycle ring with period and fertile-window predictions" loading="lazy">
+        <img class="sc shot" data-light="screenshots/health-cycle-light-web.png" data-dark="screenshots/health-cycle-dark-web.png" src="screenshots/health-cycle-light-web.png" alt="Health - menstrual cycle ring with period and fertile-window predictions" loading="lazy">
         <img class="sc feat-mobile" data-light="screenshots/health-vitals-light-mobile.png" data-dark="screenshots/health-vitals-dark-mobile.png" src="screenshots/health-vitals-light-mobile.png" alt="Health vitals on mobile" loading="lazy" style="left:-20px;right:auto">
       </div>
     </div>
@@ -783,7 +786,7 @@
         </ul>
       </div>
       <div class="feat-visual">
-        <img class="sc shot" data-light="screenshots/rewards-light-web.png" data-dark="screenshots/rewards-dark-web.png" src="screenshots/rewards-light-web.png" alt="Rewards — point standings and a catalog of parent-approved rewards" loading="lazy">
+        <img class="sc shot" data-light="screenshots/rewards-light-web.png" data-dark="screenshots/rewards-dark-web.png" src="screenshots/rewards-light-web.png" alt="Rewards - point standings and a catalog of parent-approved rewards" loading="lazy">
         <img class="sc feat-mobile" data-light="screenshots/rewards-light-mobile.png" data-dark="screenshots/rewards-dark-mobile.png" src="screenshots/rewards-light-mobile.png" alt="Rewards on mobile" loading="lazy">
       </div>
     </div>
@@ -800,7 +803,7 @@
         </ul>
       </div>
       <div class="feat-visual">
-        <img class="sc shot" data-light="screenshots/split-expenses-light-web.png" data-dark="screenshots/split-expenses-dark-web.png" src="screenshots/split-expenses-light-web.png" alt="Split expenses — shared cost groups with balances and settle-up" loading="lazy">
+        <img class="sc shot" data-light="screenshots/split-expenses-light-web.png" data-dark="screenshots/split-expenses-dark-web.png" src="screenshots/split-expenses-light-web.png" alt="Split expenses - shared cost groups with balances and settle-up" loading="lazy">
         <img class="sc feat-mobile" data-light="screenshots/split-expenses-light-mobile.png" data-dark="screenshots/split-expenses-dark-mobile.png" src="screenshots/split-expenses-light-mobile.png" alt="Split expenses on mobile" loading="lazy" style="left:-20px;right:auto">
       </div>
     </div>
@@ -924,7 +927,7 @@
     </div>
 
     <div class="quick-docker reveal">
-      <div class="code-block"><span class="c"># Pre-built image — Docker</span>
+      <div class="code-block"><span class="c"># Pre-built image - Docker</span>
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example
 cp .env.example .env  <span class="c"># set SESSION_SECRET and DB_ENCRYPTION_KEY</span>
@@ -961,6 +964,7 @@ cp .env.example .env  <span class="c"># set SESSION_SECRET and DB_ENCRYPTION_KEY
         <a href="install.html" class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span data-t="cta_install">Get started</span></a>
         <a href="https://github.com/ulsklyc/yuvomi" class="btn btn-secondary" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg><span data-t="cta_gh">View on GitHub</span></a>
       </div>
+      <p class="cta-note" data-t="cta_longevity">MIT-licensed and self-hosted: even if the project stops, nothing phones home and your instance keeps running. The data lives on your server - yours to keep, back up, and move.</p>
     </div>
   </div>
 </section>
@@ -1034,7 +1038,7 @@ cp .env.example .env  <span class="c"># set SESSION_SECRET and DB_ENCRYPTION_KEY
       f_meals_k:'Meals & recipes', f_meals_t:'Dinner sorted before anyone asks.', f_meals_d:'A weekly drag-and-drop planner with repeating meals and ingredient lists that export straight to the shopping list in one click.',
       f_meals_l1:'Drag-and-drop weekly planner with repeats', f_meals_l2:'Reusable recipes you can scale & duplicate', f_meals_l3:'One-tap export to your shopping list',
       f_budget_k:'Budget', f_budget_t:'No surprise at the end of the month.', f_budget_d:'Track who spent what, split shared costs automatically, and see exactly where the money goes.',
-      f_budget_l1:'23 currencies, recurring entries, weekly/monthly/yearly statistics, monthly budgets & savings goals', f_budget_l2:'Split expenses with automatic debt simplification', f_budget_l3:'Subscription tracker with renewals, budgets & alerts',
+      f_budget_l1:'23 currencies, recurring entries, weekly/monthly/yearly statistics, monthly budgets & savings goals', f_budget_l3:'Subscription tracker with renewals, budgets & alerts',
       f_shop_k:'Shopping', f_shop_t:'The list everyone actually checks.', f_shop_d:'One shared shopping list for the whole family, organized by aisle and updating in real time.',
       f_shop_l1:'Aisle categories & swipe gestures', f_shop_l2:'Add a whole meal plan in one tap', f_shop_l3:'Touch-safe quick add on mobile',
       f_health_k:'Health', f_health_t:'Health that stays in the family.', f_health_d:'Vitals, medications, lab results, activity and cycles, tracked per member, private by default, and never leaving your server.',
@@ -1074,7 +1078,7 @@ cp .env.example .env  <span class="c"># set SESSION_SECRET and DB_ENCRYPTION_KEY
       setup_2_t:'Set up your account', setup_2_d:'Create an admin account and choose your preferences. Takes about two minutes.',
       setup_3_t:'Invite your family', setup_3_d:'Add family members, set roles, and start using Yuvomi together.',
       setup_link:'Step-by-step installation guide',
-      cta_title:"Take back control of your family's data.", cta_desc:'Free. Open source. Runs on your server. No subscriptions, ever.',
+      cta_title:"Take back control of your family's data.", cta_desc:'Free. Open source. Runs on your server. No subscriptions, ever.', cta_longevity:'MIT-licensed and self-hosted: even if the project stops, nothing phones home and your instance keeps running. The data lives on your server - yours to keep, back up, and move.',
       cta_install:'Get started', cta_gh:'View on GitHub',
       footer_heart:'Built with care for families who value privacy and simplicity.',
       foot_product:'Product', foot_screens:'Screenshots', foot_install:'Install', foot_docs:'Docs & spec',
@@ -1110,14 +1114,14 @@ cp .env.example .env  <span class="c"># set SESSION_SECRET and DB_ENCRYPTION_KEY
       f_meals_k:'Mahlzeiten & Rezepte', f_meals_t:'Das Abendessen steht, bevor jemand fragt.', f_meals_d:'Ein wöchentlicher Drag-and-Drop-Planer mit wiederkehrenden Mahlzeiten und Zutatenlisten, die per Klick direkt auf die Einkaufsliste wandern.',
       f_meals_l1:'Drag-and-Drop-Wochenplaner mit Wiederholungen', f_meals_l2:'Wiederverwendbare Rezepte zum Skalieren & Duplizieren', f_meals_l3:'Ein-Tipp-Export auf die Einkaufsliste',
       f_budget_k:'Budget', f_budget_t:'Keine böse Überraschung am Monatsende.', f_budget_d:'Verfolgt, wer was ausgegeben hat, teilt gemeinsame Kosten automatisch und seht genau, wohin das Geld fließt.',
-      f_budget_l1:'23 Währungen, wiederkehrende Einträge, Wochen-/Monats-/Jahresstatistik, Monatsbudgets & Sparziele', f_budget_l2:'Geteilte Ausgaben mit automatischer Schulden-Vereinfachung', f_budget_l3:'Abo-Tracker mit Verlängerungen, Budgets & Erinnerungen',
+      f_budget_l1:'23 Währungen, wiederkehrende Einträge, Wochen-/Monats-/Jahresstatistik, Monatsbudgets & Sparziele', f_budget_l3:'Abo-Tracker mit Verlängerungen, Budgets & Erinnerungen',
       f_shop_k:'Einkauf', f_shop_t:'Die Liste, die alle wirklich nutzen.', f_shop_d:'Eine gemeinsame Einkaufsliste für die ganze Familie, nach Gang sortiert und in Echtzeit aktualisiert.',
       f_shop_l1:'Gang-Kategorien & Wisch-Gesten', f_shop_l2:'Ganzen Mahlzeitenplan per Tipp hinzufügen', f_shop_l3:'Touch-sicheres Schnell-Hinzufügen mobil',
       f_health_k:'Gesundheit', f_health_t:'Gesundheit, die in der Familie bleibt.', f_health_d:'Vitalwerte, Medikamente, Laborwerte, Aktivität und Zyklen, pro Mitglied erfasst, standardmäßig privat und ohne euren Server zu verlassen.',
       f_health_l1:'Zyklus-Ring mit Perioden- & fruchtbare-Tage-Prognose', f_health_l2:'Medikamenten-Erinnerungen mit Nachfüll-Warnung', f_health_l3:'Sichtbarkeit pro Eintrag: privat oder geteilt',
       f_rewards_k:'Belohnungen', f_rewards_t:'Aufgaben, die sich endlich lohnen.', f_rewards_d:'Gib jeder Aufgabe einen Punktwert; wer sie erledigt, bekommt ihn gutgeschrieben. Punkte gegen echte Belohnungen aus einem selbst gepflegten Katalog einlösen, mit Freigabe der Eltern.',
       f_rewards_l1:'Punktwerte auf jeder Aufgabe, automatisch gutgeschrieben', f_rewards_l2:'Prämienkatalog mit Eltern-Freigabe beim Einlösen', f_rewards_l3:'Opt-in je Mitglied und vollständiges Punktekonto',
-      f_split_k:'Geteilte Kosten', f_split_t:'Wer wem was schuldet — automatisch ausgeglichen.', f_split_d:'Erfasst gemeinsame Kosten für Haushalt, Reisen und Events. Yuvomi vereinfacht die Schulden, sodass alle mit möglichst wenigen Zahlungen quitt sind.',
+      f_split_k:'Geteilte Kosten', f_split_t:'Wer wem was schuldet - automatisch ausgeglichen.', f_split_d:'Erfasst gemeinsame Kosten für Haushalt, Reisen und Events. Yuvomi vereinfacht die Schulden, sodass alle mit möglichst wenigen Zahlungen quitt sind.',
       f_split_l1:'Gruppen für Haushalt, Reisen und Events', f_split_l2:'Automatische Schuldenvereinfachung', f_split_l3:'Mehrere Währungen mit Live-Umrechnung',
       more_label:'Und da ist noch mehr', more_title:'Acht weitere Module', more_desc:'Jedes Modul ist eigenständig. Nutzt, was zu eurer Familie passt, lasst den Rest weg.',
       m_docs_t:'Dokumente', m_docs_d:'Familiendateien mit Vorschau, Sichtbarkeitsregeln und Speicher-Badges. Neue Uploads und Kalenderanh\u00e4nge k\u00f6nnen einen lokalen Ordner oder WebDAV nutzen; Paperless-ngx und Papra als DMS sind optional.',
@@ -1150,7 +1154,7 @@ cp .env.example .env  <span class="c"># set SESSION_SECRET and DB_ENCRYPTION_KEY
       setup_2_t:'Konto einrichten', setup_2_d:'Admin-Konto erstellen und Einstellungen wählen. Dauert etwa zwei Minuten.',
       setup_3_t:'Familie einladen', setup_3_d:'Familienmitglieder hinzufügen, Rollen vergeben und gemeinsam loslegen.',
       setup_link:'Schritt-für-Schritt-Installationsanleitung',
-      cta_title:'Holt euch die Kontrolle über eure Familiendaten zurück.', cta_desc:'Kostenlos. Open Source. Läuft auf eurem Server. Keine Abos, nie.',
+      cta_title:'Holt euch die Kontrolle über eure Familiendaten zurück.', cta_desc:'Kostenlos. Open Source. Läuft auf eurem Server. Keine Abos, nie.', cta_longevity:'MIT-lizenziert und selbstgehostet: Selbst wenn das Projekt endet, funkt nichts nach Hause und eure Instanz läuft weiter. Die Daten liegen auf eurem Server - eure, zum Behalten, Sichern und Umziehen.',
       cta_install:'Jetzt starten', cta_gh:'Auf GitHub ansehen',
       footer_heart:'Mit Sorgfalt gebaut für Familien, die Privatsphäre und Einfachheit schätzen.',
       foot_product:'Produkt', foot_screens:'Screenshots', foot_install:'Installieren', foot_docs:'Doku & Spec',
@@ -1168,12 +1172,30 @@ cp .env.example .env  <span class="c"># set SESSION_SECRET and DB_ENCRYPTION_KEY
   var theme = lsGet('theme');
 
   function isDark(){ if (theme==='dark') return true; if (theme==='light') return false; return matchMedia('(prefers-color-scheme:dark)').matches; }
+  /* Screenshots vary on two axes: theme (data-light/data-dark hold the English
+     base paths) and locale (localized sets live under screenshots/<lang>/ with
+     identical basenames). A non-English shot falls back to the English one if it
+     is missing, so a partial localized set never leaves a broken image. */
+  function applyShots(){
+    var d = isDark();
+    document.querySelectorAll('.sc').forEach(function(img){
+      var base = img.dataset[d ? 'dark' : 'light'];
+      if (!base) return;
+      if (lang !== 'en') {
+        img.onerror = function(){ img.onerror = null; if (img.getAttribute('src') !== base) img.src = base; };
+        img.src = base.replace('screenshots/', 'screenshots/' + lang + '/');
+      } else {
+        img.onerror = null;
+        img.src = base;
+      }
+    });
+  }
   function applyTheme(){
     var d = isDark();
     if (theme) document.documentElement.setAttribute('data-theme', theme); else document.documentElement.removeAttribute('data-theme');
     document.getElementById('sunIco').style.display = d ? 'none' : 'block';
     document.getElementById('moonIco').style.display = d ? 'block' : 'none';
-    document.querySelectorAll('.sc').forEach(function(img){ var v = d ? 'dark' : 'light'; if (img.dataset[v]) img.src = img.dataset[v]; });
+    applyShots();
   }
   function applyLang(){
     document.documentElement.lang = lang;
@@ -1183,7 +1205,8 @@ cp .env.example .env  <span class="c"># set SESSION_SECRET and DB_ENCRYPTION_KEY
     var lb = document.getElementById('langBtn');
     lb.setAttribute('aria-label', lang === 'en' ? 'Auf Deutsch umschalten' : 'Switch to English');
     lb.setAttribute('title', lang === 'en' ? 'Auf Deutsch umschalten' : 'Switch to English');
-    document.title = lang === 'en' ? 'Yuvomi — The Self-Hosted Family Planner' : 'Yuvomi — Der selbstgehostete Familienplaner';
+    document.title = lang === 'en' ? 'Yuvomi - The Self-Hosted Family Planner' : 'Yuvomi - Der selbstgehostete Familienplaner';
+    applyShots();
   }
 
   document.getElementById('themeBtn').onclick = function(){ theme = isDark() ? 'light' : 'dark'; lsSet('theme', theme); applyTheme(); };
@@ -1221,7 +1244,7 @@ cp .env.example .env  <span class="c"># set SESSION_SECRET and DB_ENCRYPTION_KEY
 
   // GitHub star count is injected at build time into [data-gh-stars] elements
   // (see scripts/update-gh-stars.mjs). No request to api.github.com is made in
-  // the visitor's browser — no visitor data is transmitted to any third party.
+  // the visitor's browser - no visitor data is transmitted to any third party.
 
   applyTheme(); applyLang();
 })();

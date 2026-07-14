@@ -20,12 +20,20 @@ import { spawn, spawnSync } from 'node:child_process';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT        = resolve(__dirname, '..');
 const SCREENSHOT_DIR = resolve(ROOT, 'docs', 'screenshots');
+// UI locale to render. `en` writes to docs/screenshots/ (the canonical set used by
+// the README and the GitHub Pages default). Any other locale writes to a
+// docs/screenshots/<locale>/ sub-folder with identical basenames, so the landing
+// page can derive the localized path by inserting the locale segment.
+const LOCALE      = (process.env.SHOT_LOCALE || 'en').toLowerCase();
+const OUT_DIR     = LOCALE === 'en' ? SCREENSHOT_DIR : resolve(SCREENSHOT_DIR, LOCALE);
+// BCP-47 tag for the browser context (drives Intl date/number/currency formatting).
+const CONTEXT_LOCALE = { en: 'en-US', de: 'de-DE' }[LOCALE] || 'en-US';
 const DEMO_DB     = '/tmp/yuvomi-screenshot.db';
 const PORT        = 3099;
 const BASE_URL    = `http://localhost:${PORT}`;
 const SESSION_SECRET = 'screenshots_secret_123';
 
-mkdirSync(SCREENSHOT_DIR, { recursive: true });
+mkdirSync(OUT_DIR, { recursive: true });
 
 // ── Device profiles ──────────────────────────────────────────────────────────
 
@@ -101,16 +109,17 @@ const MODULES = [
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function initFlags(theme) {
-  return (_t) => {
-    try {
-      localStorage.setItem('yuvomi-locale', 'en');
-      localStorage.setItem('yuvomi-onboarded', '1');
-      localStorage.setItem('yuvomi-install-dismissed', String(Date.now()));
-      localStorage.setItem('yuvomi-theme', theme);
-    } catch {}
-    window.addEventListener('beforeinstallprompt', (e) => e.preventDefault());
-  };
+// Runs in the browser before any app script. Playwright serializes this to a
+// string, so state must arrive via the `arg` parameter — closures over Node
+// variables do NOT survive. arg = { theme, locale }.
+function initFlags(arg) {
+  try {
+    localStorage.setItem('yuvomi-locale', arg.locale);
+    localStorage.setItem('yuvomi-onboarded', '1');
+    localStorage.setItem('yuvomi-install-dismissed', String(Date.now()));
+    localStorage.setItem('yuvomi-theme', arg.theme);
+  } catch {}
+  window.addEventListener('beforeinstallprompt', (e) => e.preventDefault());
 }
 
 async function dismissOverlays(page) {
@@ -123,14 +132,14 @@ async function dismissOverlays(page) {
   }
 }
 
-async function applyAppState(page, theme) {
-  await page.evaluate((t) => {
-    localStorage.setItem('yuvomi-locale', 'en');
+async function applyAppState(page, theme, locale) {
+  await page.evaluate((a) => {
+    localStorage.setItem('yuvomi-locale', a.locale);
     localStorage.setItem('yuvomi-onboarded', '1');
     localStorage.setItem('yuvomi-install-dismissed', String(Date.now()));
-    localStorage.setItem('yuvomi-theme', t);
-    document.documentElement.setAttribute('data-theme', t);
-  }, theme);
+    localStorage.setItem('yuvomi-theme', a.theme);
+    document.documentElement.setAttribute('data-theme', a.theme);
+  }, { theme, locale });
 }
 
 async function waitForPageLoad(page) {
@@ -187,14 +196,14 @@ async function captureModule(page, dev, theme, mod) {
     } catch {}
   }
 
-  await applyAppState(page, theme);
+  await applyAppState(page, theme, LOCALE);
   await dismissOverlays(page);
   await wait(600);
 
   const sig = await contentSignal(page);
   const empty = sig.len < 40 || sig.nodes < 25;
 
-  const filepath = `${SCREENSHOT_DIR}/${mod.name}-${theme}-${dev.name}.png`;
+  const filepath = `${OUT_DIR}/${mod.name}-${theme}-${dev.name}.png`;
   await page.screenshot({ path: filepath });
 
   const flag = empty ? '  ⚠️  LOOKS EMPTY' : '';
@@ -343,16 +352,16 @@ async function main() {
           userAgent:         dev.ua,
           isMobile:          dev.isMobile,
           hasTouch:          dev.hasTouch,
-          locale:            dev.locale,
+          locale:            CONTEXT_LOCALE,
           colorScheme:       theme === 'dark' ? 'dark' : 'light',
         });
-        await context.addInitScript(initFlags(theme), theme);
+        await context.addInitScript(initFlags, { theme, locale: LOCALE });
 
         const page = await context.newPage();
         try {
           await login(context, page);
-          await applyAppState(page, theme);
-          await page.evaluate(async () => { if (window.setLocale) await window.setLocale('en'); });
+          await applyAppState(page, theme, LOCALE);
+          await page.evaluate(async (loc) => { if (window.setLocale) await window.setLocale(loc); }, LOCALE);
           await wait(400);
 
           for (const mod of MODULES) {
