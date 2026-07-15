@@ -461,8 +461,27 @@ hand.
 | carddav_account_id | INTEGER | FK → CardDAV Accounts (SET NULL on delete), nullable |
 | carddav_uid | TEXT | CardDAV UID from server, nullable |
 | carddav_addressbook_url | TEXT | Source addressbook URL, nullable |
+| carddav_origin | TEXT | `remote` \| `merged`, nullable (migration v89) — how the CardDAV link came about; drives what a server-side deletion does |
 
 Index: UNIQUE on `(carddav_account_id, carddav_addressbook_url, carddav_uid)` WHERE `carddav_uid IS NOT NULL`
+
+**Server-side deletions (migration v89):** contacts sync automatically on the `SYNC_INTERVAL_MINUTES`
+schedule, and each run removes contacts the addressbook no longer returns — but not all of them the
+same way. The smart-merge logic adopts a pre-existing local contact when a vCard matches its email or
+phone, so a CardDAV-linked contact is not necessarily a pure mirror. `carddav_origin` records this:
+
+- `remote` — created solely from a vCard. Deleted when the server drops it (its phones, emails and
+  addresses follow via CASCADE).
+- `merged` — an already-existing local contact that was only adopted. It carries locally maintained
+  data that never existed on the server, so it is **decoupled** instead: the `carddav_*` columns are
+  nulled and it stays as a plain local contact. Re-appearing on the server re-adopts it.
+
+Contacts that predate v89 are backfilled to `merged`, deliberately: their origin is no longer
+recoverable, and the conservative assumption costs at most a leftover local contact, whereas the
+opposite would destroy user data on the first sync after the update. The same guards as the calendar
+prune apply: an addressbook that returns nothing at all, or whose fetch fails, or that contains a
+single unparsable vCard, suspends deletion entirely and logs a warning — an incomplete list of UIDs
+must never be read as "everything else was deleted".
 
 ### Contact Categories (migration v84)
 DB-backed, customizable category list for contacts. Replaces the old hardcoded German-named set. The seven predefined keys (`doctor`, `school`, `authority`, `insurance`, `craftsman`, `emergency`, `misc`) carry a stable slug key (which also drives the per-category color tint and, together with `icon`, the list grouping), a localizing `label_key`, and a Lucide `icon`; the pre-existing German category values (`Arzt`, `Behörde`, …) are migrated to these keys. User-added categories store their `name` and default to the `tag` icon. A "Manage categories" button in the contacts toolbar opens the shared `oikos-category-manager` modal to add, rename, reorder, and delete categories, with the same in-use / last-category deletion guards as Tasks and Budget.
@@ -1452,7 +1471,7 @@ Responsive grid with colored sticky notes. Phones use one readable column; wider
 - Rows are keyboard/screen-reader operable (each row is a focusable button); the mobile secondary-action menu uses the native Popover API (top-layer, no clipping)
 - vCard export: each contact downloadable as `.vcf` (`GET /api/v1/contacts/:id/vcard`)
 - vCard import: upload file → client-side parser (FN, TEL, EMAIL, ADR, NOTE, CATEGORIES) → create contact
-- **CardDAV multi-account sync:** connect multiple CardDAV servers (Nextcloud, iCloud, Radicale, Baikal); per-addressbook enable/disable via checkboxes; manual sync trigger; bidirectional sync. New API routes under `/api/v1/contacts/cardav/*`: create/delete accounts, test connections, discover/refresh addressbooks, toggle addressbook selection, sync contacts
+- **CardDAV multi-account sync:** connect multiple CardDAV servers (Nextcloud, iCloud, Radicale, Baikal); per-addressbook enable/disable via checkboxes; read-only inbound sync, automatic on the `SYNC_INTERVAL_MINUTES` schedule plus a manual trigger. New API routes under `/api/v1/contacts/cardav/*`: create/delete accounts, test connections, discover/refresh addressbooks, toggle addressbook selection, sync contacts
 
 ### Documents (`/documents`)
 
@@ -1535,7 +1554,7 @@ User management and app configuration. Logged-in users only.
 - **Housekeeping (admin):** toggle for automatic payment task creation on work session check-in.
 - **Synchronization (Settings → Sync):** organized by data type into three dedicated pages — Calendar, Contacts, and Reminders — each opening with a status summary before any setup forms:
   - **Calendar sync (`/settings/sync/calendar`):** CalDAV accounts and Webcal/ICS subscriptions are primary. Manage multiple CalDAV accounts (iCloud, Nextcloud, Radicale, Baikal) with per-account calendar selection via checkboxes, two-way sync, and a unified per-event sync-target picker; manage ICS URL subscriptions (add, delete, sync now, set color and visibility); configure sync interval. Google Calendar (OAuth 2.0, multi-calendar selection, read-only mode) and Apple/iCloud CalDAV live inside an accessible **"More providers"** disclosure that always shows current connection state; Apple carries a **legacy** badge directing new iCloud users to the generic CalDAV setup. OAuth callbacks (`sync_ok` / `sync_error`) render a localized banner, expand the matching provider disclosure, and are then stripped from the URL.
-  - **Contact sync (`/settings/sync/contacts`):** manage multiple CardDAV accounts (iCloud, Nextcloud, Radicale, Baikal); per-addressbook enable/disable; manual sync trigger; per-account last-sync and latest-error text; real-time status badges (success, error, syncing with animated spinner)
+  - **Contact sync (`/settings/sync/contacts`):** manage multiple CardDAV accounts (iCloud, Nextcloud, Radicale, Baikal); per-addressbook enable/disable; automatic sync on the `SYNC_INTERVAL_MINUTES` schedule plus a manual trigger; per-account last-sync and latest-error text; real-time status badges (success, error, syncing with animated spinner)
   - **Reminder sync (`/settings/sync/reminders`):** reuses the CalDAV accounts but exposes only reminder/task collections — per-list enablement, refresh, target mapping to Tasks or Shopping, and a read-only explanation; calendar collections do not appear here
 - **Weather:** Settings → Modules → Overview configures the household default Open-Meteo location (latitude/longitude, optional city label, units; no API key) — admin only; saving activates Open-Meteo and supersedes any OpenWeatherMap `.env` configuration. A **"Detect location"** button uses the browser's Geolocation API to auto-fill latitude and longitude (no reverse-geocoding — the optional city field stays whatever was last typed, or the widget falls back to showing raw coordinates). **Automatic location updates:** an opt-in checkbox re-requests the browser's location every 30 minutes while the dashboard is open, silently updating the saved coordinates (and clearing any stale city label) so a moved device's weather stays current without a manual re-detect; skipped silently on permission denial or once the dashboard is closed. **Per-user override (Settings → Personal → My Weather, all users):** any user — not just admins — can set their own latitude/longitude/city/units and their own automatic-location-updates toggle; this personal location is stored separately from the household default and only affects that user's own dashboard widget. A status indicator shows whether a personal location or the household default is currently active, and a **"Use household default"** action clears the override. When a user has no personal override, the household admin's location is used as before.
 - **Language:** System (follows `navigator.language`), German, English, Spanish, French, Italian, Swedish, Greek, Russian, Turkish, Chinese, Japanese, Arabic, Hindi, Portuguese, Ukrainian, Polish, Dutch, Czech, Vietnamese, Hungarian - via `oikos-locale-picker` web component; switch without page reload

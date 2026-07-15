@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.23.2] - 2026-07-15
+## [1.24.0] - 2026-07-15
+
+### Added
+- Contacts now sync automatically. CardDAV addressbooks only ever synced when "Sync now" was pressed in Settings → Synchronization; they now run on the same `SYNC_INTERVAL_MINUTES` schedule (default 15) as calendars, with the manual trigger still available. This was documented behaviour rather than a bug, but it meant a contact added on the phone did not appear in Yuvomi until someone remembered to press a button.
+- Contacts deleted on the CardDAV server are now removed from Yuvomi as well, instead of lingering forever. Contacts that Yuvomi imported purely from CardDAV are deleted. A contact that already existed locally and was only adopted by the smart-merge logic (matched via email or phone) is **kept**: it carries locally maintained data that never existed on the server, so only its CardDAV link is dropped and it stays as a plain local contact. Contacts from before this release are treated as adopted, since their origin cannot be reconstructed — they are never deleted automatically, only unlinked. Deletion is suspended entirely, with a warning, whenever the addressbook returns nothing, its fetch fails, or a single vCard cannot be parsed: an incomplete list of contacts must never be read as "everything else was deleted".
+
+### Changed
+- Migration v89 adds `contacts.carddav_origin` (`remote` / `merged`) to record how a contact's CardDAV link came about. Existing linked contacts are backfilled to `merged`. No data is removed.
 
 ### Fixed
 - CalDAV reminders: a single failed fetch could delete every mirrored reminder of an account. The sync mirrors Apple Reminders lists into Tasks or Shopping and prunes rows that vanished remotely, but it treated "the server returned nothing" as "everything was deleted remotely" — including when the fetch had just failed and the sync had already skipped that list. One transient iCloud error was therefore enough to wipe all imported tasks or shopping items of that account, taking their subtasks, assignments and document links with them via CASCADE; a re-import could not restore those, since it creates new rows. An empty result now never deletes anything and logs a warning instead, and a list that could not be fetched suspends deletion for its whole target module. Found while auditing the other sync providers for the issues fixed in #508.

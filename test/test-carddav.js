@@ -7,6 +7,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
 import { MIGRATIONS } from '../server/db.js';
+import { pruneRemovedContacts } from '../server/services/cardav-sync.js';
 
 const TEST_DB = ':memory:';
 
@@ -2652,5 +2653,122 @@ describe('Contacts API - Multi-Value Fields', () => {
       assert.strictEqual(updated.phones.length, 1);
       assert.strictEqual(updated.phones[0].value, '+49171111111');
     });
+  });
+});
+
+describe('pruneRemovedContacts: server-side contact deletions', () => {
+  let db;
+  const ABOOK = 'https://dav.example.com/abook/';
+
+  function setup() {
+    db = new Database(':memory:');
+    db.exec(`
+      CREATE TABLE contacts (
+        id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+        name                    TEXT NOT NULL,
+        notes                   TEXT,
+        carddav_account_id      INTEGER,
+        carddav_uid             TEXT,
+        carddav_addressbook_url TEXT,
+        carddav_origin          TEXT CHECK (carddav_origin IN ('remote', 'merged'))
+      );
+    `);
+  }
+
+  function addContact(name, uid, origin, accountId = 1, abook = ABOOK) {
+    db.prepare(`
+      INSERT INTO contacts (name, carddav_uid, carddav_origin, carddav_account_id, carddav_addressbook_url)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(name, uid, origin, accountId, abook);
+  }
+
+  const names = () => db.prepare('SELECT name FROM contacts ORDER BY id').all().map(r => r.name);
+
+  it('deletes a purely remote contact the server no longer returns', () => {
+    setup();
+    addContact('Bleibt', 'uid-1', 'remote');
+    addContact('Remote geloescht', 'uid-2', 'remote');
+
+    const result = pruneRemovedContacts(db, 1, ABOOK, new Set(['uid-1']));
+
+    assert.deepStrictEqual(result, { deleted: 1, decoupled: 0 });
+    assert.deepStrictEqual(names(), ['Bleibt']);
+  });
+
+  it('only decouples an adopted contact instead of deleting it (no data loss)', () => {
+    setup();
+    // Lokal angelegt, mit Notizen gepflegt, spaeter per Smart-Merge adoptiert.
+    addContact('Oma Erna', 'uid-2', 'merged');
+    db.prepare(`UPDATE contacts SET notes = 'Lieblingskuchen: Bienenstich' WHERE carddav_uid = 'uid-2'`).run();
+    addContact('Anker', 'uid-1', 'remote');
+
+    const result = pruneRemovedContacts(db, 1, ABOOK, new Set(['uid-1']));
+
+    assert.deepStrictEqual(result, { deleted: 0, decoupled: 1 });
+
+    const erna = db.prepare(`SELECT * FROM contacts WHERE name = 'Oma Erna'`).get();
+    assert.ok(erna, 'Der adoptierte Kontakt muss erhalten bleiben');
+    assert.strictEqual(erna.notes, 'Lieblingskuchen: Bienenstich', 'Lokale Daten bleiben erhalten');
+    assert.strictEqual(erna.carddav_uid, null, 'CardDAV-Verknuepfung ist geloest');
+    assert.strictEqual(erna.carddav_account_id, null);
+    assert.strictEqual(erna.carddav_addressbook_url, null);
+    assert.strictEqual(erna.carddav_origin, null);
+  });
+
+  it('treats pre-v89 contacts (origin merged) conservatively', () => {
+    setup();
+    // Bestand aus der Zeit vor der Migration: Herkunft unbekannt -> 'merged'.
+    addContact('Altkontakt', 'uid-old', 'merged');
+    addContact('Anker', 'uid-1', 'remote');
+
+    const result = pruneRemovedContacts(db, 1, ABOOK, new Set(['uid-1']));
+
+    assert.deepStrictEqual(result, { deleted: 0, decoupled: 1 });
+    assert.deepStrictEqual(names(), ['Altkontakt', 'Anker']);
+  });
+
+  it('does nothing when the addressbook returned no contacts (fetch-error guard)', () => {
+    setup();
+    addContact('A', 'uid-1', 'remote');
+    addContact('B', 'uid-2', 'remote');
+
+    const result = pruneRemovedContacts(db, 1, ABOOK, new Set());
+
+    assert.deepStrictEqual(result, { deleted: 0, decoupled: 0 });
+    assert.deepStrictEqual(names(), ['A', 'B']);
+  });
+
+  it('never touches purely local contacts', () => {
+    setup();
+    db.prepare(`INSERT INTO contacts (name) VALUES ('Nur lokal')`).run();
+    addContact('Remote geloescht', 'uid-2', 'remote');
+
+    const result = pruneRemovedContacts(db, 1, ABOOK, new Set(['uid-1']));
+
+    assert.deepStrictEqual(result, { deleted: 1, decoupled: 0 });
+    assert.deepStrictEqual(names(), ['Nur lokal']);
+  });
+
+  it('never touches contacts of another addressbook or account', () => {
+    setup();
+    addContact('Anderes Adressbuch', 'uid-x', 'remote', 1, 'https://dav.example.com/other/');
+    addContact('Anderer Account', 'uid-y', 'remote', 2, ABOOK);
+    addContact('Remote geloescht', 'uid-2', 'remote');
+
+    const result = pruneRemovedContacts(db, 1, ABOOK, new Set(['uid-1']));
+
+    assert.deepStrictEqual(result, { deleted: 1, decoupled: 0 });
+    assert.deepStrictEqual(names(), ['Anderes Adressbuch', 'Anderer Account']);
+  });
+
+  it('does nothing when the server still has every contact', () => {
+    setup();
+    addContact('A', 'uid-1', 'remote');
+    addContact('B', 'uid-2', 'merged');
+
+    const result = pruneRemovedContacts(db, 1, ABOOK, new Set(['uid-1', 'uid-2']));
+
+    assert.deepStrictEqual(result, { deleted: 0, decoupled: 0 });
+    assert.deepStrictEqual(names(), ['A', 'B']);
   });
 });

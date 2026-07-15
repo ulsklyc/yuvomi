@@ -580,7 +580,7 @@ The weather widget defaults to **Open-Meteo** — free, ECMWF-backed, and requir
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `SYNC_INTERVAL_MINUTES` | Calendar sync interval in minutes | `15` | No |
+| `SYNC_INTERVAL_MINUTES` | Sync interval in minutes for calendars and contacts | `15` | No |
 
 ### SSO / OpenID Connect (Optional)
 

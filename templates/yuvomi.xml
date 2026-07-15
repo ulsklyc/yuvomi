@@ -112,7 +112,7 @@ After the container starts, open the WebUI — the first visit guides you throug
   <Config Name="APPLE_APP_SPECIFIC_PASSWORD" Target="APPLE_APP_SPECIFIC_PASSWORD" Default="" Mode="" Description="Optional. Apple app-specific password for iCloud Calendar sync (generate at appleid.apple.com)." Type="Variable" Display="advanced" Required="false" Mask="true"/>
 
   <!-- Calendar sync interval -->
-  <Config Name="SYNC_INTERVAL_MINUTES" Target="SYNC_INTERVAL_MINUTES" Default="15" Mode="" Description="Interval in minutes for calendar sync (Google, Apple, CalDAV). Default: 15." Type="Variable" Display="advanced" Required="false" Mask="false">15</Config>
+  <Config Name="SYNC_INTERVAL_MINUTES" Target="SYNC_INTERVAL_MINUTES" Default="15" Mode="" Description="Interval in minutes for calendar and contact sync (Google, Apple, CalDAV, CardDAV). Default: 15." Type="Variable" Display="advanced" Required="false" Mask="false">15</Config>
 
   <!-- Backups (optional) -->
   <Config Name="BACKUP_ENABLED" Target="BACKUP_ENABLED" Default="true" Mode="" Description="Optional. Enable automated database backups (default: true)." Type="Variable" Display="advanced" Required="false" Mask="false">true</Config>

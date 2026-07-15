@@ -462,6 +462,107 @@ function toggleAddressbook(addressbookId, enabled) {
 // --------------------------------------------------------
 
 /**
+ * Synchronisiert alle konfigurierten CardDAV-Accounts. Einstiegspunkt des
+ * Auto-Sync-Schedulers; kehrt sofort zurück, wenn keine Accounts existieren.
+ *
+ * Ein fehlgeschlagener Account bricht die übrigen nicht ab.
+ *
+ * @returns {Promise<{ success: boolean, syncedAccounts: number, syncedContacts: number }>}
+ */
+async function sync() {
+  const accounts = getAllAccounts();
+
+  if (accounts.length === 0) {
+    log.info('No CardDAV accounts configured.');
+    return { success: true, syncedAccounts: 0, syncedContacts: 0 };
+  }
+
+  let syncedContacts = 0;
+  let successfulAccounts = 0;
+
+  for (const account of accounts) {
+    try {
+      const { synced } = await syncAccount(account.id);
+      syncedContacts += synced;
+      successfulAccounts++;
+    } catch (err) {
+      // syncAccount loggt bereits; hier nur weitermachen statt abbrechen.
+      log.error(`Sync failed for account ${account.id}:`, err.message);
+    }
+  }
+
+  log.info(`CardDAV sync complete: ${successfulAccounts}/${accounts.length} accounts, ${syncedContacts} contacts.`);
+
+  return { success: true, syncedAccounts: successfulAccounts, syncedContacts };
+}
+
+/**
+ * Entfernt lokal die Kontakte eines Adressbuchs, die der Server nicht mehr liefert.
+ *
+ * Kontakte sind keine Termine: die Smart-Merge-Logik adoptiert bestehende lokale
+ * Kontakte (Treffer über E-Mail/Telefon) und hängt ihnen eine `carddav_uid` an.
+ * Solche Kontakte (`carddav_origin = 'merged'`) tragen lokal gepflegte Daten, die
+ * remote nie existiert haben, und werden deshalb nur **entkoppelt** statt gelöscht —
+ * sie bleiben als rein lokale Kontakte bestehen. Nur rein aus CardDAV entstandene
+ * Kontakte (`'remote'`) werden wirklich gelöscht.
+ *
+ * Bestandskontakte aus der Zeit vor Migration v89 tragen 'merged' und werden damit
+ * bewusst konservativ behandelt: ihre Herkunft ist nicht mehr rekonstruierbar.
+ *
+ * Leer-Guard: Liefert ein Adressbuch keine einzige UID, obwohl lokal Kontakte daran
+ * hängen, passiert nichts. Ein leeres Ergebnis ist weit häufiger ein stiller Server-
+ * oder Auth-Fehler als ein tatsächlich geleertes Adressbuch.
+ *
+ * @param {object} database
+ * @param {number} accountId
+ * @param {string} addressbookUrl
+ * @param {Set}    seenUids  UIDs, die der Server geliefert hat
+ * @returns {{ deleted: number, decoupled: number }}
+ */
+export function pruneRemovedContacts(database, accountId, addressbookUrl, seenUids) {
+  const local = database.prepare(`
+    SELECT id, carddav_uid, carddav_origin FROM contacts
+    WHERE carddav_account_id = ? AND carddav_addressbook_url = ? AND carddav_uid IS NOT NULL
+  `).all(accountId, addressbookUrl);
+
+  const stale = local.filter(c => !seenUids.has(c.carddav_uid));
+  if (stale.length === 0) return { deleted: 0, decoupled: 0 };
+
+  if (seenUids.size === 0) {
+    log.warn(
+      `Addressbook ${addressbookUrl}: server returned no contacts, but ${stale.length} exist ` +
+      `locally. Skipping — assuming a fetch error rather than an emptied addressbook.`
+    );
+    return { deleted: 0, decoupled: 0 };
+  }
+
+  const del = database.prepare('DELETE FROM contacts WHERE id = ?');
+  const decouple = database.prepare(`
+    UPDATE contacts
+    SET carddav_account_id = NULL, carddav_uid = NULL,
+        carddav_addressbook_url = NULL, carddav_origin = NULL
+    WHERE id = ?
+  `);
+
+  let deleted = 0;
+  let decoupled = 0;
+
+  for (const contact of stale) {
+    // Alles außer einem nachweislich rein remote entstandenen Kontakt wird nur
+    // entkoppelt — im Zweifel lieber eine Karteileiche als verlorene Nutzerdaten.
+    if (contact.carddav_origin === 'remote') {
+      del.run(contact.id);
+      deleted++;
+    } else {
+      decouple.run(contact.id);
+      decoupled++;
+    }
+  }
+
+  return { deleted, decoupled };
+}
+
+/**
  * Sync all enabled addressbooks for an account
  * @param {number} accountId - Account ID
  * @returns {Promise<Object>} { synced, errors }
@@ -587,12 +688,18 @@ async function syncAddressbook(accountId, addressbookUrl, client = null, serverA
 
     let synced = 0;
     let errors = 0;
+    const seenUids = new Set();
 
     // Parse and merge each vCard
     for (const vcardObj of vcardObjects) {
       try {
         const vCardText = vcardObj.data || '';
         if (!vCardText.trim()) continue;
+
+        // UID vor dem Merge sammeln: ein fehlgeschlagener Merge darf nicht dazu
+        // führen, dass der Kontakt anschließend als remote gelöscht gilt.
+        const uid = parseVCard(vCardText).uid;
+        if (uid) seenUids.add(uid);
 
         await parseAndMergeContact(vCardText, accountId, addressbookUrl);
         synced++;
@@ -602,9 +709,26 @@ async function syncAddressbook(accountId, addressbookUrl, client = null, serverA
       }
     }
 
-    log.info(`Addressbook ${addressbookUrl}: ${synced} contacts synced, ${errors} errors.`);
+    // Löschphase (nur wenn jede vCard verstanden wurde): bei Fehlern ist `seenUids`
+    // unvollständig und ein Prune träfe Kontakte, die auf dem Server noch existieren.
+    let deleted = 0;
+    let decoupled = 0;
+    if (errors > 0) {
+      log.warn(
+        `Addressbook ${addressbookUrl}: ${errors} vCard(s) could not be processed, ` +
+        `skipping deletion to avoid removing contacts that still exist remotely.`
+      );
+    } else {
+      ({ deleted, decoupled } = pruneRemovedContacts(db.get(), accountId, addressbookUrl, seenUids));
+    }
 
-    return { synced, errors };
+    log.info(
+      `Addressbook ${addressbookUrl}: ${synced} contacts synced, ${errors} errors` +
+      `${deleted   > 0 ? `, ${deleted} deleted` : ''}` +
+      `${decoupled > 0 ? `, ${decoupled} kept as local contacts` : ''}.`
+    );
+
+    return { synced, errors, deleted, decoupled };
   } catch (err) {
     log.error(`Failed to sync addressbook ${addressbookUrl}:`, err.message);
     throw err;
@@ -652,10 +776,13 @@ async function parseAndMergeContact(vCardText, accountId, addressbookUrl) {
       // Update existing contact and establish CardDAV link
       updateContact(contact.id, vcard, true);
 
-      // Set CardDAV link
+      // Set CardDAV link. origin = 'merged': dieser Kontakt existierte lokal schon
+      // und wurde nur adoptiert — er darf beim Remote-Löschen nicht mitgehen,
+      // sondern wird nur entkoppelt (siehe pruneRemovedContacts).
       db.get().prepare(`
         UPDATE contacts
-        SET carddav_account_id = ?, carddav_uid = ?, carddav_addressbook_url = ?
+        SET carddav_account_id = ?, carddav_uid = ?, carddav_addressbook_url = ?,
+            carddav_origin = 'merged'
         WHERE id = ?
       `).run(accountId, vcard.uid, addressbookUrl, contact.id);
 
@@ -663,14 +790,16 @@ async function parseAndMergeContact(vCardText, accountId, addressbookUrl) {
       return contact.id;
     }
 
-    // Step 3: No match - insert new contact
+    // Step 3: No match - insert new contact.
+    // origin = 'remote': rein aus CardDAV entstanden, trägt keine lokal gepflegten
+    // Daten und darf beim Remote-Löschen entfernt werden.
     const result = db.get().prepare(`
       INSERT INTO contacts (
         name, category, organization, job_title, birthday, website,
         photo, nickname, notes,
-        carddav_account_id, carddav_uid, carddav_addressbook_url
+        carddav_account_id, carddav_uid, carddav_addressbook_url, carddav_origin
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'remote')
     `).run(
       vcard.name,
       vcard.categories || 'Sonstiges',
@@ -882,6 +1011,7 @@ export {
   toggleAddressbook,
 
   // Contact Sync
+  sync,
   syncAccount,
   syncAddressbook,
   parseAndMergeContact,

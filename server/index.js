@@ -21,6 +21,7 @@ import * as icsSubscription from './services/ics-subscription.js';
 import * as icsExport from './services/ics-export.js';
 import * as caldavReminders from './services/caldav-reminders-sync.js';
 import * as caldavSync from './services/caldav-sync.js';
+import * as carddavSync from './services/cardav-sync.js';
 import * as holidays from './services/holidays.js';
 import { startScheduler as startBackupScheduler } from './services/backup-scheduler.js';
 import { startScheduler as startSplitExpenseScheduler } from './services/split-expenses-scheduler.js';
@@ -487,6 +488,10 @@ async function runSync() {
   // CalDAV Reminders (VTODO → Tasks/Shopping): kein Guard nötig — sync() kehrt sofort
   // zurück, wenn keine aktivierten Reminder-Listen konfiguriert sind.
   caldavReminders.sync().catch((e) => logSync.error('CalDAV reminders error:', e.message));
+
+  // CardDAV Kontakte: kein Guard nötig — sync() kehrt sofort zurück, wenn keine
+  // Accounts konfiguriert sind.
+  carddavSync.sync().catch((e) => logSync.error('CardDAV error:', e.message));
 
   // Holidays: kein Guard nötig — sync() kehrt sofort zurück, wenn kein Land konfiguriert ist.
   holidays.sync().catch((e) => logSync.error('Holidays error:', e.message));

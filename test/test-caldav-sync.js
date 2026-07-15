@@ -204,6 +204,7 @@ describe('Auto-Sync-Scheduler-Verdrahtung (#508)', () => {
     'icsSubscription.sync()',
     'caldavSync.sync()',
     'caldavReminders.sync()',
+    'carddavSync.sync()',
     'holidays.sync()',
   ];
 
