@@ -216,19 +216,58 @@ function upsertShoppingItem(sel, todo, accountId) {
   }
 }
 
-function pruneRemoved(table, accountId, seenUids) {
-  if (seenUids.length === 0) {
-    db.get().prepare(
-      `DELETE FROM ${table} WHERE external_source = 'caldav' AND external_account_id = ?`
-    ).run(accountId);
-    return;
+// Nur diese Tabellen dürfen geprunt werden. `table` wird interpoliert (SQLite
+// erlaubt keine Bind-Parameter für Bezeichner), deshalb die harte Whitelist.
+const PRUNABLE_TABLES = new Set(['tasks', 'shopping_items']);
+
+/**
+ * Entfernt lokal die gespiegelten VTODO-Einträge, die der Server nicht mehr liefert.
+ *
+ * Leer-Guard (#508): eine leere UID-Liste bedeutet **nicht** "alles löschen". Ein
+ * leeres Ergebnis ist weit häufiger ein stiller Server- oder Auth-Fehler als eine
+ * tatsächlich geleerte Liste, und der Preis für die falsche Annahme wäre der
+ * Totalverlust aller gespiegelten Aufgaben des Accounts — samt Unteraufgaben,
+ * Zuweisungen und Dokument-Verknüpfungen, die per CASCADE mitgehen. Der Preis für
+ * den Guard: eine wirklich geleerte Liste behält ihre lokalen Einträge, bis sie von
+ * Hand entfernt werden.
+ *
+ * Der Aufrufer muss zusätzlich sicherstellen, dass **jede** Liste dieses Moduls
+ * erfolgreich abgerufen wurde: `tasks`/`shopping_items` tragen nur die Account-ID,
+ * nicht die Listen-URL, also lässt sich ein Prune nicht auf eine einzelne Liste
+ * eingrenzen.
+ *
+ * @returns {number} Anzahl gelöschter Einträge.
+ */
+export function pruneRemoved(database, table, accountId, seenUids) {
+  if (!PRUNABLE_TABLES.has(table)) {
+    throw new Error(`pruneRemoved: refusing to prune unknown table "${table}".`);
   }
-  const placeholders = seenUids.map(() => '?').join(',');
-  db.get().prepare(
+
+  const uids = [...new Set(seenUids)];
+
+  if (uids.length === 0) {
+    const remaining = database.prepare(
+      `SELECT COUNT(*) AS count FROM ${table}
+       WHERE external_source = 'caldav' AND external_account_id = ?`
+    ).get(accountId).count;
+
+    if (remaining > 0) {
+      log.warn(
+        `Account ${accountId}: server returned no reminders, but ${remaining} ${table} row(s) ` +
+        `exist locally. Skipping deletion — assuming a fetch error rather than an emptied list.`
+      );
+    }
+    return 0;
+  }
+
+  const placeholders = uids.map(() => '?').join(',');
+  const result = database.prepare(
     `DELETE FROM ${table}
      WHERE external_source = 'caldav' AND external_account_id = ?
        AND external_uid NOT IN (${placeholders})`
-  ).run(accountId, ...seenUids);
+  ).run(accountId, ...uids);
+
+  return result.changes;
 }
 
 // --------------------------------------------------------
@@ -258,12 +297,19 @@ async function sync() {
       const createdBy   = owner ? owner.id : 1;
 
       const seenByModule = { tasks: [], shopping: [] };
+      // #508: Module, bei denen mindestens eine Liste nicht abgerufen werden konnte,
+      // dürfen nicht geprunt werden. tasks/shopping_items tragen nur die Account-ID,
+      // nicht die Listen-URL — ein Prune träfe sonst auch die Einträge der Liste, die
+      // gerade nur wegen eines Server-Fehlers leer aussieht.
+      const incompleteModules = new Set();
 
       for (const sel of enabledLists) {
+        const module = sel.target_module === 'shopping' ? 'shopping' : 'tasks';
         const serverCal = serverCals.find(c => c.url === sel.list_url);
         if (!serverCal) {
           log.warn(`Reminder list ${sel.list_url} not found on server, disabling.`);
           db.get().prepare('UPDATE caldav_reminder_selection SET enabled = 0 WHERE id = ?').run(sel.id);
+          incompleteModules.add(module);
           continue;
         }
 
@@ -272,6 +318,7 @@ async function sync() {
           objects = await client.fetchCalendarObjects({ calendar: serverCal });
         } catch (err) {
           log.error(`Failed to fetch VTODOs from "${sel.list_name}":`, err.message);
+          incompleteModules.add(module);
           continue;
         }
 
@@ -294,11 +341,26 @@ async function sync() {
         }
       }
 
-      // Prune locally-stored caldav items that vanished remotely (read-only mirror)
+      // Prune locally-stored caldav items that vanished remotely (read-only mirror).
+      // Module mit einer nicht abgerufenen Liste werden übersprungen (#508).
       const hasTasks    = enabledLists.some(s => s.target_module === 'tasks');
       const hasShopping = enabledLists.some(s => s.target_module === 'shopping');
-      if (hasTasks)    pruneRemoved('tasks', account.id, seenByModule.tasks);
-      if (hasShopping) pruneRemoved('shopping_items', account.id, seenByModule.shopping);
+
+      if (hasTasks) {
+        if (incompleteModules.has('tasks')) {
+          log.warn(`Account ${account.id}: a reminder list could not be fetched, skipping task deletion.`);
+        } else {
+          pruneRemoved(db.get(), 'tasks', account.id, seenByModule.tasks);
+        }
+      }
+
+      if (hasShopping) {
+        if (incompleteModules.has('shopping')) {
+          log.warn(`Account ${account.id}: a reminder list could not be fetched, skipping shopping deletion.`);
+        } else {
+          pruneRemoved(db.get(), 'shopping_items', account.id, seenByModule.shopping);
+        }
+      }
 
       db.get().prepare('UPDATE caldav_accounts SET last_sync = ? WHERE id = ?')
         .run(new Date().toISOString(), account.id);

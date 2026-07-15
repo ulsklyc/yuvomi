@@ -17,6 +17,7 @@ const log = createLogger('Apple');
 
 import * as db from '../db.js';
 import { assignDefaultToEvent } from './sync-assignment.js';
+import { pruneDeletedEvents } from './calendar-prune.js';
 import { unfoldLines, parseICS, formatICSDate, tzLocalToUTC, applyDuration } from './ics-parser.js';
 import { decodeHtmlEntities } from '../utils/html-entities.js';
 
@@ -236,6 +237,11 @@ async function sync() {
 
   let totalObjects = 0;
 
+  // Für die Löschphase (#508): pro erfolgreich abgerufenem Kalender die gesehenen
+  // UIDs. Kalender, deren Fetch fehlschlägt, landen hier nicht und werden nie geprunt.
+  const fetchedCalendars = [];
+  const accountUids = new Set();
+
   for (const cal of syncCalendars) {
     let calObjects;
     try {
@@ -259,10 +265,15 @@ async function sync() {
     // --------------------------------------------------------
     // Inbound: iCloud → lokal
     // --------------------------------------------------------
+    const calendarUids = new Set();
+    fetchedCalendars.push({ calRefId, calendarName: calName, calendarUids });
+
     for (const obj of calObjects) {
       const parsed = parseICS(obj.data || '');
       for (const ev of parsed) {
         try {
+          calendarUids.add(ev.uid);
+          accountUids.add(ev.uid);
           // Event-Eigenfarbe (RFC 7986) hat Vorrang, sonst Kalenderfarbe.
           const evColor = ev.color || calColor;
 
@@ -305,6 +316,26 @@ async function sync() {
   }
 
   // --------------------------------------------------------
+  // Löschphase (#508): in iCloud gelöschte Termine lokal entfernen. Erst nach allen
+  // Kalendern, damit `accountUids` vollständig ist und ein zwischen Kalendern
+  // verschobener Termin nicht fälschlich verschwindet.
+  // --------------------------------------------------------
+  let deletedCount = 0;
+  for (const { calRefId, calendarName, calendarUids } of fetchedCalendars) {
+    try {
+      const removed = pruneDeletedEvents(db.get(), {
+        calRefId, calendarUids, accountUids, source: 'apple', calendarName,
+      });
+      if (removed > 0) {
+        log.info(`Calendar "${calendarName}": removed ${removed} event(s) deleted on the server.`);
+        deletedCount += removed;
+      }
+    } catch (err) {
+      log.error(`Failed to prune deleted events for calendar "${calendarName}":`, err.message);
+    }
+  }
+
+  // --------------------------------------------------------
   // Outbound: lokal → iCloud (erster verfügbarer Kalender)
   // --------------------------------------------------------
   const defaultCal = syncCalendars[0];
@@ -334,7 +365,10 @@ async function sync() {
   }
 
   cfgSet('apple_last_sync', new Date().toISOString());
-  log.info(`Sync completed - ${totalObjects} objects from ${syncCalendars.length} calendars inbound, ${localEvents.length} local → iCloud.`);
+  log.info(
+    `Sync completed - ${totalObjects} objects from ${syncCalendars.length} calendars inbound` +
+    `${deletedCount > 0 ? `, ${deletedCount} deleted` : ''}, ${localEvents.length} local → iCloud.`
+  );
 }
 
 export { sync, getStatus, saveCredentials, clearCredentials, testConnection };

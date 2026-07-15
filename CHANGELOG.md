@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.23.1] - 2026-07-15
+## [1.23.2] - 2026-07-15
+
+### Fixed
+- CalDAV reminders: a single failed fetch could delete every mirrored reminder of an account. The sync mirrors Apple Reminders lists into Tasks or Shopping and prunes rows that vanished remotely, but it treated "the server returned nothing" as "everything was deleted remotely" — including when the fetch had just failed and the sync had already skipped that list. One transient iCloud error was therefore enough to wipe all imported tasks or shopping items of that account, taking their subtasks, assignments and document links with them via CASCADE; a re-import could not restore those, since it creates new rows. An empty result now never deletes anything and logs a warning instead, and a list that could not be fetched suspends deletion for its whole target module. Found while auditing the other sync providers for the issues fixed in #508.
+- Apple Calendar (legacy single-account sync via `APPLE_*`): events deleted in iCloud stayed in Yuvomi forever, the same defect fixed for multi-account CalDAV in v1.23.1. The inbound sync only ever inserted and updated. It now runs the same deletion pass, with the same guards: only synced Apple events of that calendar are affected, calendars whose fetch failed are never pruned, and a calendar returning no events at all is left alone with a warning.
 
 ### Fixed
 - CalDAV calendars never synced automatically (#508). The auto-sync scheduler ran Google, Apple, ICS, CalDAV reminders and holidays, but the CalDAV calendar sync was never wired into it. Calendars therefore only updated when "Sync now" was pressed in Settings, even though the log announced "Auto-sync active every 15 minutes". CalDAV calendars now sync on the same `SYNC_INTERVAL_MINUTES` schedule (default 15) as every other provider.

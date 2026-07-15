@@ -371,7 +371,13 @@ to `external_source = 'caldav'` rows of that calendar: local events and outbound
 to be uploaded are never touched, and an event moved between two calendars of the same account is kept
 rather than deleted and re-created. If a calendar returns no events at all while local events still
 reference it, the deletion step is skipped and a warning is logged, since an empty response is far
-more often a transient server or auth error than a genuinely emptied calendar.
+more often a transient server or auth error than a genuinely emptied calendar. Calendars whose fetch
+fails are never pruned at all.
+
+The same deletion pass runs for the legacy single-account Apple sync (`external_source = 'apple'`);
+both providers share `server/services/calendar-prune.js`. Google needs no such pass: its sync-token
+delta reports deletions actively as `status: 'cancelled'`. ICS subscriptions prune per feed, guarded
+by `user_modified = 0`.
 
 ### Google Calendar Selection
 Per-calendar enable/disable state for the connected Google account (migration v47). Mirrors the
@@ -416,6 +422,16 @@ The `tasks` and `shopping_items` tables carry `external_uid`, `external_source` 
 set to `'caldav'` for imported reminders), and `external_account_id` columns for this linkage.
 Imported rows are keyed on `(external_source, external_account_id, external_uid)`; items that
 disappear from the remote list are pruned on the next sync.
+
+**Pruning guards (#508):** a reminder list that cannot be fetched suspends the deletion pass for its
+whole target module. `tasks` and `shopping_items` only carry the account ID, not the list URL, so a
+prune cannot be narrowed to a single list — pruning anyway would delete the rows of the list that
+merely looks empty because of a server error. Likewise, an empty result never means "delete
+everything": if the server returns no reminders while local rows still exist, nothing is deleted and
+a warning is logged. Deleting a mirrored task takes its subtasks, assignments and document links with
+it via CASCADE, and a re-import creates a new row, so a wrong deletion is not recoverable by syncing
+again. The trade-off is that a genuinely emptied list keeps its local rows until they are removed by
+hand.
 
 ### Notes
 | Column | Type | Constraint |

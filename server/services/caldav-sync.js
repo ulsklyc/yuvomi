@@ -10,6 +10,7 @@ const log = createLogger('CalDAV');
 import * as db from '../db.js';
 import { decodeHtmlEntities } from '../utils/html-entities.js';
 import { assignDefaultToEvent } from './sync-assignment.js';
+import { pruneDeletedEvents } from './calendar-prune.js';
 
 // Reused functions from apple-calendar.js
 import {
@@ -102,50 +103,6 @@ function upsertExternalCalendar(source, externalId, name, color) {
     RETURNING id
   `).get(source, externalId, decodeHtmlEntities(name), color);
   return row.id;
-}
-
-/**
- * Entfernt lokal die Termine eines externen Kalenders, die der Server nicht mehr
- * ausliefert (#508). Ohne diesen Schritt bleiben in iCloud gelöschte Termine für
- * immer in Yuvomi stehen, weil der Inbound-Sync sonst nur upsertet.
- *
- * Der Scope ist strikt `calendar_ref_id` + `external_source = 'caldav'`: lokale
- * Termine und noch nicht hochgeladene Outbound-Termine (`external_source = 'local'`)
- * bleiben unangetastet.
- *
- * `calendarUids` sind die UIDs, die genau dieser Kalender geliefert hat, und dienen
- * nur dem Leer-Guard. Verglichen wird gegen `accountUids` (alle UIDs des Accounts),
- * damit ein zwischen zwei Kalendern verschobener Termin nicht gelöscht und unter
- * neuer ID wieder angelegt wird — das würde seine Zuweisungen verlieren.
- *
- * Leer-Guard: Liefert ein Kalender keine einzige UID, obwohl lokal Termine an ihm
- * hängen, wird nicht gelöscht. Ein leeres Fetch-Ergebnis ist weit häufiger ein
- * stiller Server- oder Auth-Fehler als ein tatsächlich geleerter Kalender, und der
- * Preis für die falsche Annahme wäre der Totalverlust des Kalenders.
- *
- * @returns {number} Anzahl gelöschter Termine.
- */
-export function pruneDeletedEvents(database, calRefId, calendarUids, accountUids = calendarUids) {
-  const localEvents = database.prepare(`
-    SELECT id, external_calendar_id FROM calendar_events
-    WHERE calendar_ref_id = ? AND external_source = 'caldav'
-  `).all(calRefId);
-
-  const stale = localEvents.filter(ev => !accountUids.has(ev.external_calendar_id));
-  if (stale.length === 0) return 0;
-
-  if (calendarUids.size === 0) {
-    log.warn(
-      `Calendar ref ${calRefId}: server returned no events, but ${stale.length} exist locally. ` +
-      `Skipping deletion — assuming a fetch error rather than an emptied calendar.`
-    );
-    return 0;
-  }
-
-  const del = database.prepare('DELETE FROM calendar_events WHERE id = ?');
-  for (const ev of stale) del.run(ev.id);
-
-  return stale.length;
 }
 
 // --------------------------------------------------------
@@ -565,7 +522,9 @@ async function sync() {
       let deletedCount = 0;
       for (const { calRefId, calendarName, calendarUids } of fetchedCalendars) {
         try {
-          const removed = pruneDeletedEvents(db.get(), calRefId, calendarUids, accountUids);
+          const removed = pruneDeletedEvents(db.get(), {
+            calRefId, calendarUids, accountUids, source: 'caldav', calendarName,
+          });
           if (removed > 0) {
             log.info(`Calendar "${calendarName}": removed ${removed} event(s) deleted on the server.`);
             deletedCount += removed;

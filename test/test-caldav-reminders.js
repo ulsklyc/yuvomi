@@ -7,7 +7,7 @@ import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
-import { mapVtodoPriority, splitDue } from '../server/services/caldav-reminders-sync.js';
+import { mapVtodoPriority, splitDue, pruneRemoved } from '../server/services/caldav-reminders-sync.js';
 
 describe('VTODO field mapping', () => {
   it('maps RFC-5545 PRIORITY to task priority', () => {
@@ -29,6 +29,109 @@ describe('VTODO field mapping', () => {
 
   it('returns nulls for an empty DUE', () => {
     assert.deepStrictEqual(splitDue(null), { date: null, time: null });
+  });
+});
+
+describe('pruneRemoved (#508)', () => {
+  let db;
+
+  function setup() {
+    db = new DatabaseSync(':memory:');
+    db.exec(`
+      CREATE TABLE tasks (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        title               TEXT NOT NULL,
+        external_uid        TEXT,
+        external_source     TEXT,
+        external_account_id INTEGER
+      );
+      CREATE TABLE shopping_items (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        name                TEXT NOT NULL,
+        external_uid        TEXT,
+        external_source     TEXT,
+        external_account_id INTEGER
+      );
+    `);
+  }
+
+  function addTask(title, uid, source, accountId) {
+    db.prepare(`
+      INSERT INTO tasks (title, external_uid, external_source, external_account_id)
+      VALUES (?, ?, ?, ?)
+    `).run(title, uid, source, accountId);
+  }
+
+  function taskTitles() {
+    return db.prepare('SELECT title FROM tasks ORDER BY id').all().map(r => r.title);
+  }
+
+  it('deletes mirrored tasks the server no longer returns', () => {
+    setup();
+    addTask('Bleibt', 'uid-1', 'caldav', 1);
+    addTask('In iCloud geloescht', 'uid-2', 'caldav', 1);
+
+    const removed = pruneRemoved(db, 'tasks', 1, ['uid-1']);
+
+    assert.strictEqual(removed, 1);
+    assert.deepStrictEqual(taskTitles(), ['Bleibt']);
+  });
+
+  it('does NOT wipe every task when the server returns nothing (fetch-error guard)', () => {
+    setup();
+    addTask('A', 'uid-1', 'caldav', 1);
+    addTask('B', 'uid-2', 'caldav', 1);
+
+    const removed = pruneRemoved(db, 'tasks', 1, []);
+
+    assert.strictEqual(removed, 0, 'An empty reminder fetch must not wipe the account');
+    assert.deepStrictEqual(taskTitles(), ['A', 'B']);
+  });
+
+  it('never touches locally created tasks', () => {
+    setup();
+    addTask('Lokale Aufgabe', null, null, null);
+    addTask('Remote geloescht', 'uid-2', 'caldav', 1);
+
+    const removed = pruneRemoved(db, 'tasks', 1, ['uid-1']);
+
+    assert.strictEqual(removed, 1);
+    assert.deepStrictEqual(taskTitles(), ['Lokale Aufgabe']);
+  });
+
+  it('never touches tasks of another account', () => {
+    setup();
+    addTask('Anderer Account', 'uid-other', 'caldav', 2);
+    addTask('Remote geloescht', 'uid-2', 'caldav', 1);
+
+    const removed = pruneRemoved(db, 'tasks', 1, ['uid-1']);
+
+    assert.strictEqual(removed, 1);
+    assert.deepStrictEqual(taskTitles(), ['Anderer Account']);
+  });
+
+  it('prunes shopping_items the same way', () => {
+    setup();
+    db.prepare(`
+      INSERT INTO shopping_items (name, external_uid, external_source, external_account_id)
+      VALUES ('Bleibt', 'uid-1', 'caldav', 1), ('Weg', 'uid-2', 'caldav', 1)
+    `).run();
+
+    const removed = pruneRemoved(db, 'shopping_items', 1, ['uid-1']);
+
+    assert.strictEqual(removed, 1);
+    assert.deepStrictEqual(
+      db.prepare('SELECT name FROM shopping_items ORDER BY id').all().map(r => r.name),
+      ['Bleibt']
+    );
+  });
+
+  it('refuses to prune a table outside the whitelist', () => {
+    setup();
+    assert.throws(
+      () => pruneRemoved(db, 'users; DROP TABLE tasks', 1, ['uid-1']),
+      /refusing to prune unknown table/
+    );
   });
 });
 

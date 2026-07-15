@@ -7,7 +7,8 @@ import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import { toICSDatetime, pruneDeletedEvents } from '../server/services/caldav-sync.js';
+import { toICSDatetime } from '../server/services/caldav-sync.js';
+import { pruneDeletedEvents } from '../server/services/calendar-prune.js';
 
 const TEST_DB = ':memory:';
 
@@ -255,7 +256,7 @@ describe('pruneDeletedEvents (#508)', () => {
     addEvent('Bleibt', 'uid-1', 'caldav', 1);
     addEvent('In iCloud geloescht', 'uid-2', 'caldav', 1);
 
-    const removed = pruneDeletedEvents(db, 1, new Set(['uid-1']));
+    const removed = pruneDeletedEvents(db, { calRefId: 1, calendarUids: new Set(['uid-1']) });
 
     assert.strictEqual(removed, 1);
     assert.deepStrictEqual(titles(), ['Bleibt']);
@@ -266,7 +267,7 @@ describe('pruneDeletedEvents (#508)', () => {
     addEvent('A', 'uid-1', 'caldav', 1);
     addEvent('B', 'uid-2', 'caldav', 1);
 
-    const removed = pruneDeletedEvents(db, 1, new Set(['uid-1', 'uid-2']));
+    const removed = pruneDeletedEvents(db, { calRefId: 1, calendarUids: new Set(['uid-1', 'uid-2']) });
 
     assert.strictEqual(removed, 0);
     assert.deepStrictEqual(titles(), ['A', 'B']);
@@ -278,7 +279,7 @@ describe('pruneDeletedEvents (#508)', () => {
     addEvent('Outbound, noch nicht hochgeladen', null, 'local', 1);
     addEvent('Remote geloescht', 'uid-2', 'caldav', 1);
 
-    const removed = pruneDeletedEvents(db, 1, new Set(['uid-1']));
+    const removed = pruneDeletedEvents(db, { calRefId: 1, calendarUids: new Set(['uid-1']) });
 
     assert.strictEqual(removed, 1);
     assert.deepStrictEqual(titles(), ['Lokaler Termin', 'Outbound, noch nicht hochgeladen']);
@@ -289,7 +290,7 @@ describe('pruneDeletedEvents (#508)', () => {
     addEvent('Anderer Kalender', 'uid-other', 'caldav', 2);
     addEvent('Remote geloescht', 'uid-2', 'caldav', 1);
 
-    const removed = pruneDeletedEvents(db, 1, new Set(['uid-1']));
+    const removed = pruneDeletedEvents(db, { calRefId: 1, calendarUids: new Set(['uid-1']) });
 
     assert.strictEqual(removed, 1);
     assert.deepStrictEqual(titles(), ['Anderer Kalender']);
@@ -300,7 +301,7 @@ describe('pruneDeletedEvents (#508)', () => {
     addEvent('A', 'uid-1', 'caldav', 1);
     addEvent('B', 'uid-2', 'caldav', 1);
 
-    const removed = pruneDeletedEvents(db, 1, new Set());
+    const removed = pruneDeletedEvents(db, { calRefId: 1, calendarUids: new Set() });
 
     assert.strictEqual(removed, 0, 'An empty fetch must not wipe the calendar');
     assert.deepStrictEqual(titles(), ['A', 'B']);
@@ -312,10 +313,41 @@ describe('pruneDeletedEvents (#508)', () => {
     // die UID liefert aber Kalender 2 des Accounts.
     addEvent('Verschoben', 'uid-moved', 'caldav', 1);
 
-    const removed = pruneDeletedEvents(db, 1, new Set(['uid-1']), new Set(['uid-1', 'uid-moved']));
+    const removed = pruneDeletedEvents(db, {
+      calRefId: 1,
+      calendarUids: new Set(['uid-1']),
+      accountUids: new Set(['uid-1', 'uid-moved']),
+    });
 
     assert.strictEqual(removed, 0);
     assert.deepStrictEqual(titles(), ['Verschoben']);
+  });
+
+  it('only prunes the given source: apple events survive a caldav prune', () => {
+    setup();
+    addEvent('Apple-Termin', 'uid-apple', 'apple', 1);
+    addEvent('CalDAV, remote geloescht', 'uid-2', 'caldav', 1);
+
+    const removed = pruneDeletedEvents(db, {
+      calRefId: 1, calendarUids: new Set(['uid-1']), source: 'caldav',
+    });
+
+    assert.strictEqual(removed, 1);
+    assert.deepStrictEqual(titles(), ['Apple-Termin']);
+  });
+
+  it('prunes apple events when source is apple (#508 legacy sync)', () => {
+    setup();
+    addEvent('Bleibt', 'uid-1', 'apple', 1);
+    addEvent('In iCloud geloescht', 'uid-2', 'apple', 1);
+    addEvent('CalDAV bleibt', 'uid-caldav', 'caldav', 1);
+
+    const removed = pruneDeletedEvents(db, {
+      calRefId: 1, calendarUids: new Set(['uid-1']), source: 'apple',
+    });
+
+    assert.strictEqual(removed, 1);
+    assert.deepStrictEqual(titles(), ['Bleibt', 'CalDAV bleibt']);
   });
 });
 
