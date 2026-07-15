@@ -363,6 +363,16 @@ Per-account calendar enable/disable state for CalDAV accounts.
 
 Index: CREATE INDEX idx_caldav_selection_enabled ON caldav_calendar_selection(account_id, enabled)
 
+**Inbound sync and deletions (#508):** CalDAV calendars are synced by the auto-sync scheduler every
+`SYNC_INTERVAL_MINUTES` (default 15), alongside Google, ICS, CalDAV reminders and holidays. Each run
+upserts the events of every enabled calendar and then deletes local events whose UID the calendar no
+longer returns, so removing an event in iCloud/Nextcloud also removes it in Yuvomi. Deletion is scoped
+to `external_source = 'caldav'` rows of that calendar: local events and outbound events still waiting
+to be uploaded are never touched, and an event moved between two calendars of the same account is kept
+rather than deleted and re-created. If a calendar returns no events at all while local events still
+reference it, the deletion step is skipped and a warning is logged, since an empty response is far
+more often a transient server or auth error than a genuinely emptied calendar.
+
 ### Google Calendar Selection
 Per-calendar enable/disable state for the connected Google account (migration v47). Mirrors the
 CalDAV selection model so multiple Google calendars sync and display at once. Each row carries its

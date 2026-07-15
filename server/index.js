@@ -20,6 +20,7 @@ import * as appleCalendar from './services/apple-calendar.js';
 import * as icsSubscription from './services/ics-subscription.js';
 import * as icsExport from './services/ics-export.js';
 import * as caldavReminders from './services/caldav-reminders-sync.js';
+import * as caldavSync from './services/caldav-sync.js';
 import * as holidays from './services/holidays.js';
 import { startScheduler as startBackupScheduler } from './services/backup-scheduler.js';
 import { startScheduler as startSplitExpenseScheduler } from './services/split-expenses-scheduler.js';
@@ -478,6 +479,10 @@ async function runSync() {
 
   // ICS: kein Guard nötig — sync() fragt die DB ab und kehrt sofort zurück wenn keine Abonnements existieren
   icsSubscription.sync().catch((e) => logSync.error('ICS error:', e.message));
+
+  // CalDAV Kalender (VEVENT): kein Guard nötig — sync() kehrt sofort zurück, wenn
+  // keine Accounts konfiguriert sind.
+  caldavSync.sync().catch((e) => logSync.error('CalDAV error:', e.message));
 
   // CalDAV Reminders (VTODO → Tasks/Shopping): kein Guard nötig — sync() kehrt sofort
   // zurück, wenn keine aktivierten Reminder-Listen konfiguriert sind.

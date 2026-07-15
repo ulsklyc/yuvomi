@@ -6,7 +6,8 @@
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { toICSDatetime } from '../server/services/caldav-sync.js';
+import { readFileSync } from 'node:fs';
+import { toICSDatetime, pruneDeletedEvents } from '../server/services/caldav-sync.js';
 
 const TEST_DB = ':memory:';
 
@@ -189,6 +190,132 @@ describe('CalDAV Multi-Account Sync', () => {
 
     const migrated = db2.prepare(`SELECT external_source FROM calendar_events_new WHERE title = 'Migrated'`).get();
     assert.strictEqual(migrated.external_source, 'caldav');
+  });
+});
+
+describe('Auto-Sync-Scheduler-Verdrahtung (#508)', () => {
+  // #508: caldav-sync.js war nie im Scheduler verdrahtet — CalDAV-Kalender synchten
+  // ausschliesslich per Hand-Klick, obwohl das Log "Auto-sync active" meldete.
+  // Der Guard pinnt, dass jeder Sync-Service in runSync() tatsaechlich aufgerufen wird.
+  const SYNC_CALLS = [
+    'googleCalendar.sync()',
+    'appleCalendar.sync()',
+    'icsSubscription.sync()',
+    'caldavSync.sync()',
+    'caldavReminders.sync()',
+    'holidays.sync()',
+  ];
+
+  const source  = readFileSync(new URL('../server/index.js', import.meta.url), 'utf8');
+  const runSync = source.slice(
+    source.indexOf('async function runSync()'),
+    source.indexOf('// Server starten')
+  );
+
+  it('extracts the runSync body (guard stays meaningful if index.js is restructured)', () => {
+    assert.ok(runSync.length > 0, 'runSync() body not found in server/index.js');
+  });
+
+  for (const call of SYNC_CALLS) {
+    it(`calls ${call} in runSync()`, () => {
+      assert.ok(runSync.includes(call), `${call} is missing from runSync() — service will never auto-sync`);
+    });
+  }
+});
+
+describe('pruneDeletedEvents (#508)', () => {
+  let db;
+
+  function setup() {
+    db = new DatabaseSync(':memory:');
+    db.exec(`
+      CREATE TABLE calendar_events (
+        id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        title                TEXT NOT NULL,
+        external_calendar_id TEXT,
+        external_source      TEXT NOT NULL DEFAULT 'local',
+        calendar_ref_id      INTEGER
+      );
+    `);
+  }
+
+  function addEvent(title, uid, source, calRefId) {
+    db.prepare(`
+      INSERT INTO calendar_events (title, external_calendar_id, external_source, calendar_ref_id)
+      VALUES (?, ?, ?, ?)
+    `).run(title, uid, source, calRefId);
+  }
+
+  function titles() {
+    return db.prepare('SELECT title FROM calendar_events ORDER BY id').all().map(r => r.title);
+  }
+
+  it('deletes events the server no longer returns', () => {
+    setup();
+    addEvent('Bleibt', 'uid-1', 'caldav', 1);
+    addEvent('In iCloud geloescht', 'uid-2', 'caldav', 1);
+
+    const removed = pruneDeletedEvents(db, 1, new Set(['uid-1']));
+
+    assert.strictEqual(removed, 1);
+    assert.deepStrictEqual(titles(), ['Bleibt']);
+  });
+
+  it('returns 0 and deletes nothing when the server still has every event', () => {
+    setup();
+    addEvent('A', 'uid-1', 'caldav', 1);
+    addEvent('B', 'uid-2', 'caldav', 1);
+
+    const removed = pruneDeletedEvents(db, 1, new Set(['uid-1', 'uid-2']));
+
+    assert.strictEqual(removed, 0);
+    assert.deepStrictEqual(titles(), ['A', 'B']);
+  });
+
+  it('never touches local events, even with a matching calendar_ref_id', () => {
+    setup();
+    addEvent('Lokaler Termin', null, 'local', 1);
+    addEvent('Outbound, noch nicht hochgeladen', null, 'local', 1);
+    addEvent('Remote geloescht', 'uid-2', 'caldav', 1);
+
+    const removed = pruneDeletedEvents(db, 1, new Set(['uid-1']));
+
+    assert.strictEqual(removed, 1);
+    assert.deepStrictEqual(titles(), ['Lokaler Termin', 'Outbound, noch nicht hochgeladen']);
+  });
+
+  it('never touches events of another calendar', () => {
+    setup();
+    addEvent('Anderer Kalender', 'uid-other', 'caldav', 2);
+    addEvent('Remote geloescht', 'uid-2', 'caldav', 1);
+
+    const removed = pruneDeletedEvents(db, 1, new Set(['uid-1']));
+
+    assert.strictEqual(removed, 1);
+    assert.deepStrictEqual(titles(), ['Anderer Kalender']);
+  });
+
+  it('skips deletion when the calendar returned no events at all (fetch-error guard)', () => {
+    setup();
+    addEvent('A', 'uid-1', 'caldav', 1);
+    addEvent('B', 'uid-2', 'caldav', 1);
+
+    const removed = pruneDeletedEvents(db, 1, new Set());
+
+    assert.strictEqual(removed, 0, 'An empty fetch must not wipe the calendar');
+    assert.deepStrictEqual(titles(), ['A', 'B']);
+  });
+
+  it('keeps an event that moved to another calendar within the same account', () => {
+    setup();
+    // Termin wurde nach Kalender 2 verschoben: calendar_ref_id zeigt noch auf 1,
+    // die UID liefert aber Kalender 2 des Accounts.
+    addEvent('Verschoben', 'uid-moved', 'caldav', 1);
+
+    const removed = pruneDeletedEvents(db, 1, new Set(['uid-1']), new Set(['uid-1', 'uid-moved']));
+
+    assert.strictEqual(removed, 0);
+    assert.deepStrictEqual(titles(), ['Verschoben']);
   });
 });
 

@@ -104,6 +104,50 @@ function upsertExternalCalendar(source, externalId, name, color) {
   return row.id;
 }
 
+/**
+ * Entfernt lokal die Termine eines externen Kalenders, die der Server nicht mehr
+ * ausliefert (#508). Ohne diesen Schritt bleiben in iCloud gelöschte Termine für
+ * immer in Yuvomi stehen, weil der Inbound-Sync sonst nur upsertet.
+ *
+ * Der Scope ist strikt `calendar_ref_id` + `external_source = 'caldav'`: lokale
+ * Termine und noch nicht hochgeladene Outbound-Termine (`external_source = 'local'`)
+ * bleiben unangetastet.
+ *
+ * `calendarUids` sind die UIDs, die genau dieser Kalender geliefert hat, und dienen
+ * nur dem Leer-Guard. Verglichen wird gegen `accountUids` (alle UIDs des Accounts),
+ * damit ein zwischen zwei Kalendern verschobener Termin nicht gelöscht und unter
+ * neuer ID wieder angelegt wird — das würde seine Zuweisungen verlieren.
+ *
+ * Leer-Guard: Liefert ein Kalender keine einzige UID, obwohl lokal Termine an ihm
+ * hängen, wird nicht gelöscht. Ein leeres Fetch-Ergebnis ist weit häufiger ein
+ * stiller Server- oder Auth-Fehler als ein tatsächlich geleerter Kalender, und der
+ * Preis für die falsche Annahme wäre der Totalverlust des Kalenders.
+ *
+ * @returns {number} Anzahl gelöschter Termine.
+ */
+export function pruneDeletedEvents(database, calRefId, calendarUids, accountUids = calendarUids) {
+  const localEvents = database.prepare(`
+    SELECT id, external_calendar_id FROM calendar_events
+    WHERE calendar_ref_id = ? AND external_source = 'caldav'
+  `).all(calRefId);
+
+  const stale = localEvents.filter(ev => !accountUids.has(ev.external_calendar_id));
+  if (stale.length === 0) return 0;
+
+  if (calendarUids.size === 0) {
+    log.warn(
+      `Calendar ref ${calRefId}: server returned no events, but ${stale.length} exist locally. ` +
+      `Skipping deletion — assuming a fetch error rather than an emptied calendar.`
+    );
+    return 0;
+  }
+
+  const del = database.prepare('DELETE FROM calendar_events WHERE id = ?');
+  for (const ev of stale) del.run(ev.id);
+
+  return stale.length;
+}
+
 // --------------------------------------------------------
 // Credentials Helpers
 // --------------------------------------------------------
@@ -424,6 +468,11 @@ async function sync() {
       // Inbound sync: CalDAV → Yuvomi
       let accountEventCount = 0;
 
+      // Für die Löschphase: pro erfolgreich abgerufenem Kalender die gesehenen UIDs.
+      // Kalender, deren Fetch fehlschlägt, landen hier nicht und werden nie geprunt.
+      const fetchedCalendars = [];
+      const accountUids = new Set();
+
       for (const selCal of enabledCalendars) {
         // Find matching calendar from server
         const serverCal = serverCalendars.find(sc => sc.url === selCal.calendar_url);
@@ -454,11 +503,16 @@ async function sync() {
           .get(calRefId)?.default_assignee_user_id ?? null;
 
         // Parse and upsert events
+        const calendarUids = new Set();
+        fetchedCalendars.push({ calRefId, calendarName: selCal.calendar_name, calendarUids });
+
         for (const obj of calObjects) {
           const parsed = parseICS(obj.data || '');
 
           for (const ev of parsed) {
             try {
+              calendarUids.add(ev.uid);
+              accountUids.add(ev.uid);
               // Event-Eigenfarbe (RFC 7986) hat Vorrang, sonst Kalenderfarbe.
               const evColor = ev.color || selCal.calendar_color;
 
@@ -503,6 +557,21 @@ async function sync() {
               log.error(`Failed to upsert event UID ${ev.uid}:`, err.message);
             }
           }
+        }
+      }
+
+      // Löschphase: erst nach allen Kalendern, damit `accountUids` vollständig ist
+      // und ein zwischen Kalendern verschobener Termin nicht fälschlich verschwindet.
+      let deletedCount = 0;
+      for (const { calRefId, calendarName, calendarUids } of fetchedCalendars) {
+        try {
+          const removed = pruneDeletedEvents(db.get(), calRefId, calendarUids, accountUids);
+          if (removed > 0) {
+            log.info(`Calendar "${calendarName}": removed ${removed} event(s) deleted on the server.`);
+            deletedCount += removed;
+          }
+        } catch (err) {
+          log.error(`Failed to prune deleted events for calendar "${calendarName}":`, err.message);
         }
       }
 
@@ -553,7 +622,10 @@ async function sync() {
       totalSyncedEvents += accountEventCount;
       successfulAccounts++;
 
-      log.info(`Account ${account.id} sync complete: ${accountEventCount} events.`);
+      log.info(
+        `Account ${account.id} sync complete: ${accountEventCount} events` +
+        `${deletedCount > 0 ? `, ${deletedCount} deleted` : ''}.`
+      );
 
     } catch (err) {
       log.error(`Sync failed for account ${account.id}:`, err.message);

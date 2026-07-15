@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.1] - 2026-07-15
+
+### Fixed
+- CalDAV calendars never synced automatically (#508). The auto-sync scheduler ran Google, Apple, ICS, CalDAV reminders and holidays, but the CalDAV calendar sync was never wired into it. Calendars therefore only updated when "Sync now" was pressed in Settings, even though the log announced "Auto-sync active every 15 minutes". CalDAV calendars now sync on the same `SYNC_INTERVAL_MINUTES` schedule (default 15) as every other provider.
+- CalDAV: events deleted on the server stayed in Yuvomi forever (#508). The inbound sync only ever inserted and updated events, so deleting an event in iCloud or Nextcloud never reached Yuvomi. Each sync now also removes local events that the calendar no longer returns. Only synced CalDAV events of that calendar are affected: local events and events still waiting to be uploaded are never touched, and an event moved between two calendars of the same account keeps its assignments instead of being deleted and re-created. If a calendar returns no events at all while local events still reference it, nothing is deleted and a warning is logged, since an empty response is far more often a server or auth error than a genuinely emptied calendar.
+
 ## [1.23.0] - 2026-07-14
 
 ### Added
