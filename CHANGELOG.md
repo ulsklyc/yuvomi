@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.24.1] - 2026-07-16
+
+### Fixed
+- Calendar event date and time pickers did not open on mobile devices (#512). Tapping the calendar or clock icon in the event modal did nothing on iOS, while the same pickers worked on desktop. On touch devices the datepicker tried to open the native OS sheet via `showPicker()` on a hidden proxy input; on WebKit (iOS Safari and iOS Chrome) `showPicker()` on such a hidden input is a silent no-op that never throws, so the built-in fallback to the in-app popover never triggered and nothing appeared. The in-app calendar/time popover, which already works identically on desktop and touch, is now the primary path on every pointer type. The native OS sheet remains only as a fallback for touch browsers without the Popover API (older iOS).
+
 ## [1.24.0] - 2026-07-15
 
 ### Added

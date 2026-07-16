@@ -53,9 +53,14 @@ test('Öffnet Popover über die native Popover-API (Top-Layer)', () => {
   assert(/setAttribute\('popover'/.test(comp), 'Muss popover-Attribut setzen');
   assert(/showPopover\(\)/.test(comp) && /hidePopover\(\)/.test(comp), 'show/hidePopover nötig');
 });
-test('Nutzt auf Touch das native OS-Sheet (showPicker)', () => {
+test('Touch bevorzugt das DOM-Popover; natives OS-Sheet nur ohne Popover-API', () => {
   assert(/pointer:\s*coarse/.test(comp), 'Coarse-Pointer-Erkennung nötig');
-  assert(/showPicker\(\)/.test(comp), 'showPicker() für native Sheets nötig');
+  assert(/showPicker\(\)/.test(comp), 'showPicker() als natives Fallback nötig');
+  // Regression #512: auf iOS ist showPicker() bei versteckten Inputs ein stilles
+  // No-op → das native Sheet darf nur greifen, wenn die Popover-API fehlt.
+  assert(/_supportsPopover/.test(comp), 'Popover-API-Weiche (_supportsPopover) nötig');
+  assert(/coarse\s*&&\s*!this\._supportsPopover\(\)/.test(comp),
+    'Native nur auf Touch OHNE Popover-API als Fallback');
 });
 test('Kalenderraster ist Montag-first', () => {
   assert(/Montag\s*=\s*0/.test(comp) || /getDay\(\)\s*-\s*1/.test(comp), 'Montag-first-Offset nötig');

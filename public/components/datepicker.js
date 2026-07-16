@@ -254,11 +254,16 @@ class YuvomiDatepicker extends HTMLElement {
       this._emit();
     });
 
-    // Trigger: Touch → natives Sheet, Desktop → eigenes Popover
+    // Trigger: das DOM-Popover ist auf jedem Pointer-Typ der Primärpfad - es ist
+    // vollständig DOM-getrieben und öffnet auf Desktop wie Touch zuverlässig.
+    // Das native OS-Sheet (showPicker) bleibt nur Fallback für Touch-Browser
+    // ohne Popover-API (sehr altes iOS <17): auf iOS ist showPicker() bei einem
+    // versteckten Proxy-Input (opacity:0/aria-hidden) ein stilles No-op ohne
+    // Exception, weshalb es nicht als Primärpfad taugt.
     sub.trigger.addEventListener('click', () => {
       if (this.hasAttribute('disabled')) return;
       const coarse = window.matchMedia?.('(pointer: coarse)').matches;
-      if (coarse && this._openNative(sub)) return;
+      if (coarse && !this._supportsPopover() && this._openNative(sub)) return;
       this._openPopover(sub);
     });
 
@@ -266,6 +271,13 @@ class YuvomiDatepicker extends HTMLElement {
     sub.native.addEventListener('change', () => {
       if (sub.native.value) this._setSubIso(sub, sub.native.value, true);
     });
+  }
+
+  // Popover-API vorhanden? (Top-Layer-Popover ist der bevorzugte Pfad; nur ohne
+  // sie greift auf Touch das native OS-Sheet.)
+  _supportsPopover() {
+    return typeof HTMLElement !== 'undefined'
+      && typeof HTMLElement.prototype.showPopover === 'function';
   }
 
   _openNative(sub) {
