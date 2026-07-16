@@ -37,6 +37,15 @@ test('notes.js wires the read/edit toggle with both panes', async () => {
   assert.match(src, /function setView\(/, 'toggle handler must exist');
 });
 
+test('mode switch reuses the shared .sub-tab tablist grammar (consistency)', async () => {
+  const src = await notesSrc();
+  assert.match(src, /role="tablist"/, 'switch must be a tablist');
+  assert.match(src, /class="sub-tab/, 'toggle buttons must reuse the shared .sub-tab component');
+  assert.match(src, /role="tab"/, 'toggle buttons must be tabs');
+  assert.match(src, /role="tabpanel"/, 'panes must be tabpanels');
+  assert.match(src, /ArrowRight|ArrowLeft/, 'tablist must support arrow-key navigation');
+});
+
 test('existing notes default to the read view, new notes to the editor', async () => {
   const src = await notesSrc();
   assert.match(
@@ -49,9 +58,11 @@ test('existing notes default to the read view, new notes to the editor', async (
 test('notes.css defines switch and reader styles', async () => {
   const css = await notesCss();
   assert.match(css, /\.note-mode-switch\s*\{/);
-  assert.match(css, /\.note-mode-btn\[aria-pressed="true"\]/);
+  assert.match(css, /\.note-read-view\s*\{/, 'reader surface must be styled');
+  assert.match(css, /--note-color/, 'reader surface must tint with the note color');
   assert.match(css, /\.note-read__body\s*\{/);
   assert.match(css, /\.note-read__empty\s*\{/);
+  assert.match(css, /prefers-reduced-motion/, 'pane transition must have a reduced-motion fallback');
 });
 
 test('all locales define the new notes reader keys (non-empty)', async () => {

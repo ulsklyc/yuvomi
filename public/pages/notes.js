@@ -337,12 +337,13 @@ function applyFormat(textarea, format) {
 // --------------------------------------------------------
 
 // Gerenderte Markdown-Leseansicht (Reader-Modus, Discussion #507). Nutzt den
-// gemeinsamen renderMarkdownLight-Renderer; der Titel wird esc-sicher eingebettet.
-function renderNoteReadHtml(title, content) {
+// gemeinsamen renderMarkdownLight-Renderer. Der Notiztitel trägt der Modal-Header
+// (Recognition), daher hier nur der Inhalt.
+function renderNoteReadHtml(content) {
   const body = (content || '').trim()
     ? renderMarkdownLight(content)
     : `<p class="note-read__empty">${t('notes.readEmpty')}</p>`;
-  return `${title ? `<div class="note-read__title">${esc(title)}</div>` : ''}<div class="note-read__body">${body}</div>`;
+  return `<div class="note-read__body">${body}</div>`;
 }
 
 function openNoteModal({ mode, note = null }) {
@@ -352,25 +353,29 @@ function openNoteModal({ mode, note = null }) {
   const initialView = isEdit ? 'read' : 'edit';
 
   const content = `
-    <div class="note-modal" data-view="${initialView}">
-      <div class="note-mode-switch" role="group" aria-label="${t('notes.modeSwitchLabel')}">
-        <button type="button" class="note-mode-btn" data-view="read"
-                aria-pressed="${initialView === 'read' ? 'true' : 'false'}">
-          <i data-lucide="book-open" style="width:14px;height:14px;" aria-hidden="true"></i>
-          ${t('notes.modeRead')}
+    <div class="note-modal" data-view="${initialView}" style="--note-color:${esc(selColor)};">
+      <div class="note-mode-switch" role="tablist" aria-label="${t('notes.modeSwitchLabel')}">
+        <button type="button" id="note-tab-read" class="sub-tab${initialView === 'read' ? ' sub-tab--active' : ''}"
+                role="tab" aria-selected="${initialView === 'read' ? 'true' : 'false'}"
+                aria-controls="note-pane-read" tabindex="${initialView === 'read' ? '0' : '-1'}" data-view="read">
+          <i data-lucide="book-open" class="sub-tab__icon" aria-hidden="true"></i>
+          <span class="sub-tab__label">${t('notes.modeRead')}</span>
         </button>
-        <button type="button" class="note-mode-btn" data-view="edit"
-                aria-pressed="${initialView === 'edit' ? 'true' : 'false'}">
-          <i data-lucide="pencil" style="width:14px;height:14px;" aria-hidden="true"></i>
-          ${t('notes.modeEdit')}
+        <button type="button" id="note-tab-edit" class="sub-tab${initialView === 'edit' ? ' sub-tab--active' : ''}"
+                role="tab" aria-selected="${initialView === 'edit' ? 'true' : 'false'}"
+                aria-controls="note-pane-edit" tabindex="${initialView === 'edit' ? '0' : '-1'}" data-view="edit">
+          <i data-lucide="pencil" class="sub-tab__icon" aria-hidden="true"></i>
+          <span class="sub-tab__label">${t('notes.modeEdit')}</span>
         </button>
       </div>
 
-      <div class="note-read-view" data-pane="read"${initialView === 'read' ? '' : ' hidden'}>
-        ${isEdit ? renderNoteReadHtml(note.title, note.content) : ''}
+      <div class="note-read-view" id="note-pane-read" data-pane="read" role="tabpanel"
+           aria-labelledby="note-tab-read" tabindex="-1"${initialView === 'read' ? '' : ' hidden'}>
+        ${isEdit ? renderNoteReadHtml(note.content) : ''}
       </div>
 
-      <div class="note-edit-view" data-pane="edit"${initialView === 'edit' ? '' : ' hidden'}>
+      <div class="note-edit-view" id="note-pane-edit" data-pane="edit" role="tabpanel"
+           aria-labelledby="note-tab-edit"${initialView === 'edit' ? '' : ' hidden'}>
     <div class="form-group">
       <label class="form-label" for="note-title">${t('notes.titleLabel')}</label>
       <input type="text" class="form-input" id="note-title"
@@ -454,7 +459,7 @@ function openNoteModal({ mode, note = null }) {
     </div>`;
 
   openSharedModal({
-    title: isEdit ? t('notes.viewNote') : t('notes.newNote'),
+    title: isEdit && note.title && note.title.trim() ? note.title : (isEdit ? t('notes.viewNote') : t('notes.newNote')),
     content,
     size: 'md',
     onSave(panel) {
@@ -466,9 +471,27 @@ function openNoteModal({ mode, note = null }) {
       const readPane    = panel.querySelector('[data-pane="read"]');
       const editPane    = panel.querySelector('[data-pane="edit"]');
       const modalFooter = panel.querySelector('.modal-panel__footer');
+      const titleEl     = document.getElementById('shared-modal-title');
+      const modeTabs    = [...panel.querySelectorAll('.note-mode-switch .sub-tab')];
       const viewTitle   = panel.querySelector('#note-title');
       const viewContent = panel.querySelector('#note-content');
-      function setView(view) {
+      const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function animatePane(pane) {
+        if (reduceMotion) return;
+        pane.classList.remove('note-pane--enter');
+        void pane.offsetWidth; // Reflow: Animation bei jedem Wechsel neu starten
+        pane.classList.add('note-pane--enter');
+      }
+
+      // Header spiegelt den Titel live (deckt auch Create ab, wo der Header sonst
+      // bis zur ersten Vorschau „Neue Notiz" bliebe). Fallback je nach Modus.
+      function syncHeaderTitle() {
+        if (!titleEl) return;
+        titleEl.textContent = viewTitle.value.trim() || (isEdit ? t('notes.viewNote') : t('notes.newNote'));
+      }
+
+      function setView(view, { focusField = false } = {}) {
         noteModal.dataset.view = view;
         readPane.hidden = view !== 'read';
         editPane.hidden = view !== 'edit';
@@ -476,19 +499,59 @@ function openNoteModal({ mode, note = null }) {
         // schließt das Header-X bzw. Swipe-down (Bottom Sheet). style.display statt
         // [hidden], da .modal-panel__footer { display:flex } das Attribut schlägt.
         modalFooter.style.display = view === 'read' ? 'none' : '';
-        panel.querySelectorAll('.note-mode-btn').forEach((b) =>
-          b.setAttribute('aria-pressed', b.dataset.view === view ? 'true' : 'false'));
+        modeTabs.forEach((b) => {
+          const on = b.dataset.view === view;
+          b.classList.toggle('sub-tab--active', on);
+          b.setAttribute('aria-selected', on ? 'true' : 'false');
+          b.tabIndex = on ? 0 : -1;
+        });
         if (view === 'read') {
+          // Live-Spiegelung: Farbe aus dem aktiven Swatch, Inhalt frisch gerendert
+          // — Lesemodus zeigt ungespeicherte Änderungen.
+          const c = panel.querySelector('.note-color-swatch--active')?.dataset.color;
+          if (c) noteModal.style.setProperty('--note-color', c);
+          syncHeaderTitle();
           readPane.replaceChildren();
-          readPane.insertAdjacentHTML('beforeend', renderNoteReadHtml(viewTitle.value.trim(), viewContent.value));
+          readPane.insertAdjacentHTML('beforeend', renderNoteReadHtml(viewContent.value));
+          animatePane(readPane);
         } else {
-          setTimeout(() => viewContent.focus(), 30);
+          animatePane(editPane);
+          // Cursor nur bei bewusster Maus-Aktivierung ins Textfeld setzen; bei
+          // Pfeiltasten-Navigation bleibt der Fokus auf der Tab-Pille (roving),
+          // sonst würde der Textarea-Fokus das Tablist-Verhalten brechen.
+          if (focusField) setTimeout(() => viewContent.focus(), 30);
         }
       }
       // Initialen Footer-Zustand an die Startansicht angleichen.
       modalFooter.style.display = initialView === 'read' ? 'none' : '';
-      panel.querySelectorAll('.note-mode-btn').forEach((b) =>
-        b.addEventListener('click', () => setView(b.dataset.view)));
+      viewTitle.addEventListener('input', syncHeaderTitle);
+
+      // Umschalt-Buttons + WAI-ARIA-Tablist-Tastatur (Pfeile/Home/End), konsistent
+      // mit der geteilten .sub-tab-Grammatik (Budget-Scope, Kitchen-Tabs).
+      modeTabs.forEach((tab, i) => {
+        // Maus-Klick auf „Bearbeiten“ setzt den Cursor ins Textfeld (Produktivität);
+        // „Lesen“ nicht. Pfeiltasten (unten) halten den Fokus auf der Pille.
+        tab.addEventListener('click', () => setView(tab.dataset.view, { focusField: tab.dataset.view === 'edit' }));
+        tab.addEventListener('keydown', (e) => {
+          let ni = null;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') ni = (i + 1) % modeTabs.length;
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ni = (i - 1 + modeTabs.length) % modeTabs.length;
+          else if (e.key === 'Home') ni = 0;
+          else if (e.key === 'End') ni = modeTabs.length - 1;
+          if (ni === null) return;
+          e.preventDefault();
+          setView(modeTabs[ni].dataset.view);
+          modeTabs[ni].focus();
+        });
+      });
+
+      // Fokus beim Öffnen im Lese-Modus auf die aktive Umschalt-Pille (statt auf
+      // den Schließen-Button, wo openModal sonst landet). Ein Bedienelement ist
+      // der bessere erste Stopp als der große Lese-Container — kleiner Fokusring,
+      // sauberer SR-Einstieg in den Lese/Bearbeiten-Umschalter.
+      if (initialView === 'read') {
+        setTimeout(() => panel.querySelector('.note-mode-switch .sub-tab--active')?.focus(), 80);
+      }
 
       // Farb-Swatch: Auswahl + ARIA + Keyboard (Roving Tabindex)
       function selectSwatch(target) {

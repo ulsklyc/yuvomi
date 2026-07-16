@@ -267,47 +267,25 @@
  * Notes-Modal Content-Styles (Overlay/Panel via shared modal.js)
  * -------------------------------------------------------- */
 
-/* Reader/Editor-Umschalter (#507) */
+/* Reader/Editor-Umschalter (#507). Nutzt die geteilte .sub-tab-Grammatik
+ * (sub-tabs.css) — deren aktive Pille trägt bereits den Modul-Akzent. Hier nur
+ * der schlanke Wrapper, analog zu .budget-scope. */
 .note-mode-switch {
   display: inline-flex;
-  gap: 2px;
-  padding: 3px;
-  margin-bottom: var(--space-4);
-  background: var(--color-surface-hover);
-  border-radius: var(--radius-full);
-}
-
-.note-mode-btn {
-  display: inline-flex;
-  align-items: center;
   gap: var(--space-1);
-  padding: var(--space-1) var(--space-3);
-  border: none;
-  background: transparent;
-  color: var(--color-text-secondary);
-  font: inherit;
-  font-size: var(--type-secondary);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  transition: color var(--transition-fast), background-color var(--transition-fast);
+  margin-bottom: var(--space-4);
 }
 
-.note-mode-btn:hover { color: var(--color-text-primary); }
-
-.note-mode-btn[aria-pressed="true"] {
-  background: var(--color-surface-elevated);
-  color: var(--color-text-primary);
-  box-shadow: var(--shadow-xs);
-}
-
-/* Leseansicht: gerendertes Markdown (.note-md-* aus typography.css) */
-.note-read__title {
-  font-size: var(--type-card-title);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
-  margin-bottom: var(--space-2);
-  overflow-wrap: anywhere;
-  unicode-bidi: plaintext;
+/* Leseansicht: gerendertes Markdown (.note-md-* aus typography.css) auf einer
+ * dezent mit der Notizfarbe getönten Fläche (--note-color am .note-modal),
+ * damit der Reader als „dieselbe Notiz, vergrößert" lesbar ist. Der Tint liegt
+ * über transparent → theme-agnostisch; Text bleibt --color-text-primary für
+ * durchgehend ≥4.5:1. Weiße Notizen ergeben keinen sichtbaren Tint. */
+.note-read-view {
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--note-color, transparent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--note-color, transparent) 26%, transparent);
 }
 
 .note-read__body {
@@ -321,6 +299,20 @@
 .note-read__empty {
   color: var(--color-text-tertiary);
   font-style: italic;
+}
+
+/* Sanfter Moduswechsel (Product-Motion: 150–250 ms Zustandswechsel). */
+@keyframes notePaneEnter {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.note-pane--enter {
+  animation: notePaneEnter 160ms var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note-pane--enter { animation: none; }
 }
 
 /* Farb-Auswahl */

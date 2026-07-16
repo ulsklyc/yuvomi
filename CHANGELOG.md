@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.1] - 2026-07-16
+
+### Changed
+- Notes reader mode refinements (follow-up to #507). The Read/Edit switch now reuses the app's shared segmented-tab component instead of a bespoke one, so it looks and behaves like the toggles elsewhere (budget, kitchen) and gains full keyboard support: arrow keys and Home/End move between Read and Edit, with focus staying on the control. The reader surface now carries a subtle tint of the note's own colour, so an opened note reads as the same coloured card enlarged rather than a plain grey document, and the note's title now appears in the modal header (updating live as you type). Switching views cross-fades gently (respecting reduced-motion), and opening a note places focus on the mode switch rather than the close button.
+
 ## [1.25.0] - 2026-07-16
 
 ### Added
