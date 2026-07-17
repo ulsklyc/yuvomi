@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.27.5] - 2026-07-17
+
+### Changed
+- Internal quality hardening: added end-to-end test coverage for the previously untested route layers of shared expenses, access permissions, budget loans and housekeeping, and introduced a dependency-free code-coverage reporter (`npm run coverage`). This is tests and tooling only; no user-facing behaviour, configuration or upgrade steps change.
+
 ## [1.27.4] - 2026-07-17
 
 ### Changed
