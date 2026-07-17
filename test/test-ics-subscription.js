@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
-import { normalizeUrl, checkSSRF, isPrivateNetworkAllowed } from '../server/services/ics-subscription.js';
+import http from 'node:http';
+import { normalizeUrl, checkSSRF, isPrivateNetworkAllowed, fetchAndParse } from '../server/services/ics-subscription.js';
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -176,6 +177,64 @@ await (async () => {
     assertThrows(() => checkSSRF('https://[::ffff:192.168.0.1]/cal.ics')));
   await atest('checkSSRF lässt literale öffentliche IP durch', async () => {
     await checkSSRF('https://8.8.8.8/cal.ics');
+  });
+
+  // --- fetchAndParse: echter HTTP-Round-Trip über den neuen node-nativen Client ---
+  // Verifiziert, dass der Ersatz von node-fetch (server/utils/http.js) den ICS-Body,
+  // Status/ETag/Last-Modified und die 304-Kurzform verhaltensgleich liefert. Flag
+  // gesetzt, damit checkSSRF/Lookup das 127.0.0.1-Testziel zulassen (die Anti-Rebinding-
+  // Prüfung selbst ist in test:http und test:ssrf abgedeckt).
+  const SAMPLE_ICS = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Test//EN',
+    'BEGIN:VEVENT', 'UID:evt-1@test', 'DTSTART:20260714T090000Z',
+    'DTEND:20260714T100000Z', 'SUMMARY:Zahnarzt für M(ä)ria', 'END:VEVENT',
+    'END:VCALENDAR', '',
+  ].join('\r\n');
+
+  await atest('fetchAndParse: liefert Events + ETag/Last-Modified (Body korrekt dekodiert)', async () => {
+    process.env[ENV_FLAG] = '1';
+    const server = http.createServer((req, res) => {
+      res.writeHead(200, {
+        'Content-Type': 'text/calendar; charset=utf-8',
+        ETag: '"v1"',
+        'Last-Modified': 'Mon, 14 Jul 2026 08:00:00 GMT',
+      });
+      res.end(Buffer.from(SAMPLE_ICS, 'utf8'));
+    });
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    try {
+      const { port } = server.address();
+      const result = await fetchAndParse(`http://127.0.0.1:${port}/cal.ics`, null, null);
+      assert(result.notModified === false, 'notModified sollte false sein');
+      assert(result.newEtag === '"v1"', `ETag falsch: ${result.newEtag}`);
+      assert(result.newLastModified === 'Mon, 14 Jul 2026 08:00:00 GMT', 'Last-Modified falsch');
+      assert(Array.isArray(result.events) && result.events.length === 1, 'genau 1 Event erwartet');
+      // Umlaute im Body müssen als UTF-8-Text ankommen (kein Uint8Array.toString-Trap):
+      assert(result.events[0].summary === 'Zahnarzt für M(ä)ria', `Summary falsch: ${result.events[0].summary}`);
+    } finally {
+      await new Promise((r) => server.close(r));
+      delete process.env[ENV_FLAG];
+    }
+  });
+
+  await atest('fetchAndParse: 304 wird als notModified erkannt (If-None-Match gesendet)', async () => {
+    process.env[ENV_FLAG] = '1';
+    let seenIfNoneMatch = null;
+    const server = http.createServer((req, res) => {
+      seenIfNoneMatch = req.headers['if-none-match'] || null;
+      res.writeHead(304);
+      res.end();
+    });
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    try {
+      const { port } = server.address();
+      const result = await fetchAndParse(`http://127.0.0.1:${port}/cal.ics`, '"v1"', null);
+      assert(result.notModified === true, 'notModified sollte true sein');
+      assert(seenIfNoneMatch === '"v1"', `If-None-Match nicht gesendet: ${seenIfNoneMatch}`);
+    } finally {
+      await new Promise((r) => server.close(r));
+      delete process.env[ENV_FLAG];
+    }
   });
 })();
 

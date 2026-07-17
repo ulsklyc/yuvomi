@@ -2,19 +2,19 @@
  * Modul: ICS-Abonnements
  * Zweck: Fetch, Parsing, CRUD und periodischer Sync für ICS-URL-Kalenderabonnements.
  *        Enthält SSRF-Schutz, ETag-basiertes Conditional Fetching und RRULE-Expansion.
- * Abhängigkeiten: node-fetch, node:dns/promises, server/db.js, server/services/ics-parser.js
+ * Abhängigkeiten: node:dns/promises, server/db.js, server/services/ics-parser.js,
+ *                  server/utils/ssrf.js (zentraler SSRF-Schutz),
+ *                  server/utils/http.js (node-nativer Safe-HTTP-Client)
  */
 
 import dns from 'node:dns/promises';
-import { lookup as dnsLookup } from 'node:dns';
 import { isIP } from 'node:net';
-import http from 'node:http';
-import https from 'node:https';
-import fetch from 'node-fetch';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { assignDefaultToEvent } from './sync-assignment.js';
 import { parseICS, expandRRULE } from './ics-parser.js';
+import { isBlockedAddress, readPrivateNetworkOptIn, createGuardedLookup } from '../utils/ssrf.js';
+import { safeRequest } from '../utils/http.js';
 
 const log = createLogger('ICS');
 
@@ -22,30 +22,6 @@ const SYNC_WINDOW_PAST_MONTHS   = 6;
 const SYNC_WINDOW_FUTURE_MONTHS = 12;
 const MAX_RESPONSE_BYTES        = 10 * 1024 * 1024;
 const FETCH_TIMEOUT_MS          = 15_000;
-
-const PRIVATE_RANGES = [
-  /^127\./, /^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./,
-  /^169\.254\./, /^0\./, /^::1$/, /^::$/, /^f[cd]/i, /^fe[89ab]/i,
-];
-
-/**
- * Prüft eine rohe IP-Adresse gegen die privaten/lokalen Bereiche. Berücksichtigt
- * IPv4-mapped-IPv6 (`::ffff:a.b.c.d`), damit ein Angreifer eine private IPv4 nicht
- * über die IPv6-Schreibweise am Filter vorbeischmuggeln kann.
- */
-function ipIsPrivate(addr) {
-  let a = addr;
-  // IPv4-mapped IPv6 in dezimaler Schreibweise: ::ffff:192.168.0.1
-  const dec = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i.exec(a);
-  if (dec) a = dec[1];
-  // ... und in Hex-Schreibweise (so normalisiert die URL/DNS sie): ::ffff:c0a8:1
-  const hex = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i.exec(a);
-  if (hex) {
-    const hi = parseInt(hex[1], 16), lo = parseInt(hex[2], 16);
-    a = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
-  }
-  return PRIVATE_RANGES.some((re) => re.test(a));
-}
 
 const ENV_ALLOW_PRIVATE_NETWORK = 'ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK';
 
@@ -58,8 +34,7 @@ const syncingNow = new Set();
  * Tests process.env vor dem Aufruf setzen können.
  */
 function isPrivateNetworkAllowed() {
-  const raw = process.env[ENV_ALLOW_PRIVATE_NETWORK];
-  return raw !== undefined && (raw.trim() === 'true' || raw.trim() === '1');
+  return readPrivateNetworkOptIn(ENV_ALLOW_PRIVATE_NETWORK);
 }
 
 function normalizeUrl(raw) {
@@ -82,49 +57,16 @@ async function checkSSRF(urlStr) {
   // Literale IPs werden von dns.resolve4/6 nicht aufgelöst (liefert []), müssen
   // also direkt geprüft werden – sonst schlüpft https://192.168.0.1/ durch.
   if (isIP(host)) {
-    if (ipIsPrivate(host)) throw new Error(`URL resolves to a private IP address: ${host}`);
+    if (isBlockedAddress(host)) throw new Error(`URL resolves to a private IP address: ${host}`);
     return;
   }
   const v4 = await dns.resolve4(hostname).catch(() => []);
   const v6 = await dns.resolve6(hostname).catch(() => []);
   for (const addr of [...v4, ...v6]) {
-    if (ipIsPrivate(addr)) {
+    if (isBlockedAddress(addr)) {
       throw new Error(`URL resolves to a private IP address: ${addr}`);
     }
   }
-}
-
-/**
- * DNS-Lookup-Wrapper für den fetch-Agent: validiert JEDE aufgelöste Adresse zum
- * Zeitpunkt des Verbindungsaufbaus. Damit ist DNS-Rebinding ausgeschlossen – ein
- * Angreifer-DNS kann `checkSSRF` nicht mehr mit einer öffentlichen IP täuschen und
- * beim eigentlichen fetch auf eine private IP (z. B. 169.254.169.254) umschwenken,
- * weil hier die Adresse geprüft wird, mit der die Socket-Verbindung wirklich aufgebaut wird.
- */
-function guardedLookup(hostname, options, callback) {
-  if (typeof options === 'function') { callback = options; options = {}; }
-  const opts = typeof options === 'number' ? { family: options } : (options || {});
-  dnsLookup(hostname, { ...opts, all: true }, (err, addresses) => {
-    if (err) return callback(err);
-    for (const entry of addresses) {
-      if (ipIsPrivate(entry.address)) {
-        return callback(new Error(`URL resolves to a private IP address: ${entry.address}`));
-      }
-    }
-    if (opts.all) return callback(null, addresses);
-    const [first] = addresses;
-    return callback(null, first.address, first.family);
-  });
-}
-
-/**
- * Agent-Fabrik für node-fetch: erzwingt die Rebinding-sichere IP-Validierung über
- * guardedLookup. Literale IPs umgehen den Socket-Lookup (Node verbindet direkt),
- * werden aber bereits von checkSSRF abgefangen.
- */
-function ssrfSafeAgent(parsedUrl) {
-  const Agent = parsedUrl.protocol === 'https:' ? https.Agent : http.Agent;
-  return new Agent({ lookup: guardedLookup });
 }
 
 async function fetchAndParse(urlRaw, etag, lastModified) {
@@ -137,13 +79,14 @@ async function fetchAndParse(urlRaw, etag, lastModified) {
 
   const controller = new AbortController();
   const timer      = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  // Der Agent validiert die Ziel-IP zum Verbindungszeitpunkt (Anti-Rebinding).
-  // Bei aktivem Opt-in für private Netze entfällt er bewusst (Default-Agent).
-  const fetchOpts = { headers, signal: controller.signal };
-  if (!isPrivateNetworkAllowed()) fetchOpts.agent = ssrfSafeAgent;
+  // createGuardedLookup validiert die Ziel-IP JEDER Verbindung — auch die von
+  // Redirect-Zielen — zum Verbindungszeitpunkt (Anti-Rebinding). Bei aktivem Opt-in
+  // für private Netze entfällt er bewusst (Default-DNS).
+  const reqOpts = { headers, signal: controller.signal };
+  if (!isPrivateNetworkAllowed()) reqOpts.lookup = createGuardedLookup();
   let res;
   try {
-    res = await fetch(url, fetchOpts);
+    res = await safeRequest(url, reqOpts);
   } finally { clearTimeout(timer); }
 
   if (res.status === 304) return { notModified: true };

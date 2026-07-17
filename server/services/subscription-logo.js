@@ -1,7 +1,7 @@
 import dns from 'node:dns/promises';
 import https from 'node:https';
-import net from 'node:net';
 import { decodeHtmlEntities } from '../utils/html-entities.js';
+import { isBlockedAddress } from '../utils/ssrf.js';
 
 const MAX_HTML_BYTES = 5 * 1024 * 1024;
 const MAX_HTML_SCAN_BYTES = 2 * 1024 * 1024;
@@ -39,21 +39,11 @@ const REQUEST_HEADERS = {
   Accept: 'text/html,application/xhtml+xml,image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5',
 };
 
+// Delegiert an den zentralen SSRF-Klassifizierer (server/utils/ssrf.js). Früher eine
+// eigene, schwächere Prüfung ohne IPv4-mapped-IPv6-Behandlung — jetzt deckungsgleich mit
+// ICS-Abos und WebDAV-Dokumentspeicher. Name bleibt für die Testsuite (test:subscriptions).
 function privateAddress(address) {
-  if (net.isIPv4(address)) {
-    const parts = address.split('.').map(Number);
-    return parts[0] === 10
-      || parts[0] === 127
-      || (parts[0] === 169 && parts[1] === 254)
-      || (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31)
-      || (parts[0] === 192 && parts[1] === 168)
-      || parts[0] === 0;
-  }
-  const normalized = address.toLowerCase();
-  return normalized === '::1'
-    || normalized.startsWith('fc')
-    || normalized.startsWith('fd')
-    || /^fe[89ab]/.test(normalized);
+  return isBlockedAddress(address);
 }
 
 async function assertPublicHttps(url) {

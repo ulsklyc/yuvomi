@@ -3,7 +3,7 @@
  * Zweck: Serverseitiger Proxy für Open-Meteo (Default, kein API-Key) und
  *        OpenWeatherMap (Legacy, via .env). Provider-Auflösung: DB-Präferenzen
  *        zuerst, dann Env-Vars.
- * Abhängigkeiten: express, db (sync_config), node-fetch (nur Icon-Proxy)
+ * Abhängigkeiten: express, db (sync_config), natives global fetch (Node >=22)
  */
 
 import { createLogger } from '../logger.js';
@@ -71,8 +71,7 @@ export function buildRouter({ cfgGet: cfgGetFn = cfgGet, fetchFn = null } = {}) 
   }
 
   async function doFetch(url, opts) {
-    // Node 22+ ships a global fetch — no node-fetch import needed for JSON.
-    // (node-fetch is kept only in the /icon proxy below, which streams via body.pipe.)
+    // Node 22+ ships a global fetch — no node-fetch import needed.
     if (fetchFn) return fetchFn(url, opts);
     return fetch(url, opts);
   }
@@ -271,7 +270,6 @@ export function buildRouter({ cfgGet: cfgGetFn = cfgGet, fetchFn = null } = {}) 
       return res.status(400).json({ error: 'Ungültiger Icon-Code.', code: 400 });
     }
     try {
-      const { default: fetch } = await import('node-fetch');
       const url = `https://openweathermap.org/img/wn/${code}@2x.png`;
       const upstream = await fetch(url, { signal: AbortSignal.timeout(5000) });
       if (!upstream.ok) {
@@ -279,7 +277,9 @@ export function buildRouter({ cfgGet: cfgGetFn = cfgGet, fetchFn = null } = {}) 
       }
       res.setHeader('Content-Type', 'image/png');
       res.setHeader('Cache-Control', 'public, max-age=86400'); // 24 Stunden
-      upstream.body.pipe(res);
+      // Natives fetch liefert einen Web-Stream; einmalig puffern und senden (Icons
+      // sind wenige KB). Kein body.pipe wie bei node-fetch (dessen Node-Stream fehlt).
+      res.end(Buffer.from(await upstream.arrayBuffer()));
     } catch (err) {
       log.warn('Icon proxy error:', err.message);
       res.status(502).json({ error: 'Icon proxy failed.', code: 502 });

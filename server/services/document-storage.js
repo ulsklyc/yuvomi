@@ -5,13 +5,12 @@
 
 import { randomUUID } from 'node:crypto';
 import { lookup as dnsLookup } from 'node:dns/promises';
-import { Agent as HttpAgent } from 'node:http';
-import { Agent as HttpsAgent } from 'node:https';
-import { BlockList, isIP } from 'node:net';
+import { isIP } from 'node:net';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import fetch from 'node-fetch';
 import * as db from '../db.js';
+import { isBlockedAddress, isBlockedHostname, normalizeHostname } from '../utils/ssrf.js';
+import { safeRequest } from '../utils/http.js';
 
 const CONFIG_PREFIX = 'document_storage_webdav_';
 const DEFAULT_BASE_PATH = 'yuvomi-documents';
@@ -27,39 +26,6 @@ const ENV_FIELDS = {
 };
 const ENV_ALLOW_PRIVATE_NETWORK = 'DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK';
 const PASSWORD_MASK_RE = /^(?:\*|•){4,}$/;
-const BLOCKED_HOST_SUFFIXES = ['.localhost', '.local', '.internal', '.home.arpa'];
-const BLOCKED_NETWORKS = new BlockList();
-
-for (const [address, prefix, type] of [
-  ['0.0.0.0', 8, 'ipv4'],
-  ['10.0.0.0', 8, 'ipv4'],
-  ['100.64.0.0', 10, 'ipv4'],
-  ['127.0.0.0', 8, 'ipv4'],
-  ['169.254.0.0', 16, 'ipv4'],
-  ['172.16.0.0', 12, 'ipv4'],
-  ['192.0.0.0', 24, 'ipv4'],
-  ['192.0.2.0', 24, 'ipv4'],
-  ['192.168.0.0', 16, 'ipv4'],
-  ['198.18.0.0', 15, 'ipv4'],
-  ['198.51.100.0', 24, 'ipv4'],
-  ['203.0.113.0', 24, 'ipv4'],
-  ['224.0.0.0', 4, 'ipv4'],
-  ['240.0.0.0', 4, 'ipv4'],
-  ['::', 128, 'ipv6'],
-  ['::1', 128, 'ipv6'],
-  ['64:ff9b::', 96, 'ipv6'],
-  ['64:ff9b:1::', 48, 'ipv6'],
-  ['100::', 64, 'ipv6'],
-  ['2001::', 32, 'ipv6'],
-  ['2001:2::', 48, 'ipv6'],
-  ['2001:db8::', 32, 'ipv6'],
-  ['2002::', 16, 'ipv6'],
-  ['fc00::', 7, 'ipv6'],
-  ['fe80::', 10, 'ipv6'],
-  ['ff00::', 8, 'ipv6'],
-]) {
-  BLOCKED_NETWORKS.addSubnet(address, prefix, type);
-}
 
 let requestTimeoutMs = DEFAULT_TIMEOUT_MS;
 let hostnameLookup = dnsLookup;
@@ -292,13 +258,6 @@ function validateUrl(value) {
   return parsed;
 }
 
-function normalizedHostname(hostname) {
-  const value = String(hostname).toLowerCase();
-  return value.startsWith('[') && value.endsWith(']')
-    ? value.slice(1, -1)
-    : value;
-}
-
 function isPrivateNetworkEnvAllowed() {
   const raw = process.env[ENV_ALLOW_PRIVATE_NETWORK];
   return raw !== undefined && (raw.trim() === 'true' || raw.trim() === '1');
@@ -313,16 +272,8 @@ function privateNetworkAllowed(config) {
 }
 
 function assertHostnameAllowed(hostname, allowPrivate = false) {
-  const normalized = normalizedHostname(hostname);
-  if (
-    !allowPrivate
-    && (
-      normalized === 'localhost'
-      || BLOCKED_HOST_SUFFIXES.some((suffix) => (
-        normalized === suffix.slice(1) || normalized.endsWith(suffix)
-      ))
-    )
-  ) {
+  const normalized = normalizeHostname(hostname);
+  if (!allowPrivate && isBlockedHostname(normalized)) {
     throw new StorageError(
       'DOCUMENT_STORAGE_INVALID_CONFIG',
       'The WebDAV URL must not target a private network host.'
@@ -332,12 +283,7 @@ function assertHostnameAllowed(hostname, allowPrivate = false) {
 }
 
 function assertAddressAllowed(address) {
-  const normalized = normalizedHostname(address);
-  const detectedFamily = isIP(normalized);
-  if (
-    !detectedFamily
-    || BLOCKED_NETWORKS.check(normalized, detectedFamily === 6 ? 'ipv6' : 'ipv4')
-  ) {
+  if (isBlockedAddress(address)) {
     throw new StorageError(
       'DOCUMENT_STORAGE_INVALID_CONFIG',
       'The WebDAV URL must resolve only to public network addresses.'
@@ -401,15 +347,17 @@ function validatedLookup(allowPrivate) {
   };
 }
 
-function requestAgent(url, config) {
+// Pre-Flight-Prüfung (Hostname-Suffix + literale IP) plus der Rebinding-sichere
+// validatedLookup, der die Ziel-IP zur DNS-Zeit blockt. Wird als request-level
+// `lookup` an den node-nativen Client übergeben (kein http.Agent mehr nötig).
+function requestLookup(url, config) {
   const allowPrivate = privateNetworkAllowed(config);
   const hostname = assertHostnameAllowed(url.hostname, allowPrivate);
   const literalFamily = isIP(hostname);
   if (!allowPrivate && literalFamily) {
     assertAddressAllowed(hostname);
   }
-  const Agent = url.protocol === 'https:' ? HttpsAgent : HttpAgent;
-  return new Agent({ lookup: validatedLookup(allowPrivate) });
+  return validatedLookup(allowPrivate);
 }
 
 export async function assertWebdavTargetAllowed(config) {
@@ -456,22 +404,22 @@ function remoteUrl(config, relativeSegments) {
 
 async function davFetch(config, method, relativeSegments, { body, headers } = {}) {
   const url = remoteUrl(config, relativeSegments);
-  const agent = requestAgent(url, config);
-  // SSRF-Schutz: URL ist ausschliesslich admin-konfigurierbar; agent nutzt
-  // validatedLookup (blockiert private/loopback/link-local IPs zur DNS-Zeit)
-  // und assertWebdavTargetAllowed als Pre-Flight. CodeQL js/request-forgery
+  const lookup = requestLookup(url, config);
+  // SSRF-Schutz: URL ist ausschliesslich admin-konfigurierbar; der request-level
+  // lookup (validatedLookup) blockiert private/loopback/link-local IPs zur DNS-Zeit
+  // und assertWebdavTargetAllowed dient als Pre-Flight. CodeQL js/request-forgery
   // ist als False Positive dismissed (GitHub-Alert #19) — Inline-Suppression-
   // Kommentare werden von GitHub Code Scanning fuer CodeQL nicht ausgewertet.
-  return fetch(url, {
+  return safeRequest(url.href, {
     method,
     redirect: 'manual',
-    agent,
+    lookup,
     headers: {
       Authorization: basicAuth(config.username, config.password),
       ...headers,
     },
     signal: AbortSignal.timeout(requestTimeoutMs),
-    ...(body === undefined ? {} : { body }),
+    body,
   });
 }
 
