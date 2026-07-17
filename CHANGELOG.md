@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.27.6] - 2026-07-18
+
+### Changed
+- Internal quality hardening: added end-to-end test coverage for the previously untested route layers of the meal planner, shopping lists, notes and budget categories, and made one meal-planner test independent of the system clock. This is tests only; no user-facing behaviour, configuration or upgrade steps change.
+
 ## [1.27.5] - 2026-07-17
 
 ### Changed
