@@ -65,8 +65,27 @@ function parseICS(ics) {
       const durMatch = /^DURATION(?:;[^:]*)?:(.*)$/im.exec(block);
       if (durMatch) dtend = applyDuration(dtstart, durMatch[1].trim(), allDay);
     }
+    // EXDATE: ausgenommene Einzel-Vorkommen einer Serie (RFC 5545). Mehrere
+    // EXDATE-Zeilen und komma-separierte Werte sind erlaubt; TZID/VALUE=DATE
+    // werden wie DTSTART aufgelöst und auf das Instanz-Datum (YYYY-MM-DD)
+    // reduziert – so matcht die date-basierte Recurrence-Engine (#513/#489).
+    const exdates = [];
+    const exRe = /^EXDATE((?:;[^:;]*)*):(.*)$/gim;
+    let exMatch;
+    while ((exMatch = exRe.exec(block)) !== null) {
+      const params  = exMatch[1];
+      const tzMatch = params.match(/;TZID=([^;:]+)/i);
+      const exTz    = tzMatch ? tzMatch[1].trim() : null;
+      const isDate  = /;VALUE=DATE(?=[;:]|$)/i.test(params);
+      for (const rawVal of exMatch[2].split(',')) {
+        const v = rawVal.trim();
+        if (!v) continue;
+        const conv = formatICSDate(v, isDate, exTz);
+        if (conv) exdates.push(conv.slice(0, 10));
+      }
+    }
     if (!uid || !dtstart) continue;
-    events.push({ uid, summary, description, location, dtstart, dtend, rrule, allDay, color });
+    events.push({ uid, summary, description, location, dtstart, dtend, rrule, allDay, color, exdates });
   }
   return events;
 }
@@ -171,13 +190,16 @@ function expandRRULE(vevent, windowStart, windowEnd) {
   }
   const countMatch = /;COUNT=(\d+)/i.exec(vevent.rrule);
   const maxCount   = countMatch ? parseInt(countMatch[1], 10) : null;
+  // EXDATE zählt für COUNT mit (RFC 5545: COUNT vor Exclusion), erzeugt aber
+  // keine Instanz – daher innerhalb der Schleife filtern, nicht die Zählung (#513).
+  const exdateSet  = new Set(vevent.exdates || []);
   let current = startDate, iterations = 0;
   const MAX_ITER = 1500;
   while (current <= windowEnd && iterations < MAX_ITER) {
     iterations++;
     if (maxCount !== null && iterations > maxCount) break;
 
-    if (current >= windowStart) {
+    if (current >= windowStart && !exdateSet.has(current)) {
       const occStart = current + timeSuffix;
       let occEnd = null;
       if (durationMs !== null) {

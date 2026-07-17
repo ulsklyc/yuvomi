@@ -246,7 +246,7 @@ Reusable recipe cards that can be pre-filled into meal slots.
 | created_by | INTEGER | FK → Users, NOT NULL |
 | external_calendar_id | TEXT | ID from external calendar |
 | external_source | TEXT | local, google, apple, ics, caldav |
-| recurrence_rule | TEXT | iCal RRULE |
+| recurrence_rule | TEXT | iCal RRULE — supported subset `FREQ` (DAILY/WEEKLY/MONTHLY/YEARLY), `INTERVAL`, `BYDAY`, and a mutually-exclusive end condition `UNTIL` **or** `COUNT` |
 | subscription_id | INTEGER | FK → ICS Subscriptions (CASCADE delete) |
 | user_modified | INTEGER | 0/1 — prevents sync overwrite when 1 |
 | calendar_ref_id | INTEGER | FK → External Calendars (ON DELETE SET NULL) |
@@ -282,6 +282,8 @@ Excluded single occurrences of a recurring series (EXDATE, migration v85). One r
 | PRIMARY KEY | | (event_id, exception_date) |
 
 **Delete a single occurrence (migration v85):** deleting an event of a recurring series asks whether to remove *only this occurrence* or the *whole series*. "Only this occurrence" records an exception; the recurrence expansion then skips that date on every read path (list, upcoming/dashboard, search) while the series continues. Offered for **local series only** — externally synced series (Google/Apple/CalDAV via `calendar_ref_id`, ICS via `subscription_id`) keep whole-series deletion, since an EXDATE would return on the next sync. Exceptions are also emitted as `EXDATE` lines in the ICS export feed. `POST /api/v1/calendar/:id/exceptions { date }` records an exception; series deletion removes its exceptions via CASCADE.
+
+**Finite recurrences via `COUNT` (#513):** a series may end after a fixed number of occurrences (`COUNT=N`) instead of on a date (`UNTIL`) — the two are mutually exclusive. `COUNT` counts from the series start and **includes** excluded occurrences (RFC 5545: the limit applies to the recurrence set *before* `EXDATE` removal), so `COUNT=10` with one excluded date yields nine visible instances. The event dialog exposes this as an *Ends: Never / On date / After N occurrences* selector (calendar only — tasks are completion-driven and keep Never / On date). A one-time ICS import preserves `COUNT` on the stored rule and records the file's `EXDATE` lines as exceptions, so a finite Google/Apple export stays finite instead of becoming an endless series; ICS subscriptions honour `COUNT` and `EXDATE` the same way when expanding the feed.
 
 ### Calendar defaults for new events (per-user)
 Two per-user preferences prefill the new-event dialog (stored in `sync_config` under a per-user key, like `module_order`):

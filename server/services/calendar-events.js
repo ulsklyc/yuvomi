@@ -5,7 +5,7 @@
  * Abhängigkeiten: server/services/recurrence.js
  */
 
-import { nextOccurrence } from './recurrence.js';
+import { nextOccurrence, parseRRule } from './recurrence.js';
 import { visibilityWhere } from './visibility.js';
 
 // Zugewiesene Personen eines Events als JSON-Array (Multi-Assignment).
@@ -75,9 +75,16 @@ export function expandRecurringEvents(events, from, to, exceptionsByEvent = null
     let iterations  = 0;
     const MAX_ITER  = 1000; // Sicherheitsgrenze
     const exceptions = exceptionsByEvent?.get(event.id) ?? null; // ausgenommene Instanz-Daten (#489)
+    // COUNT=N begrenzt die Serie auf N Vorkommen ab DTSTART. Gezählt wird über
+    // die Instanzen der Serie (nicht das Anzeigefenster) und VOR EXDATE-Entfernung
+    // (RFC 5545): ausgenommene Vorkommen zählen mit, erzeugen aber keine Instanz (#513).
+    const maxCount   = parseRRule(event.recurrence_rule)?.count ?? null;
+    let   occurrence = 0;
 
     while (currentDate <= to && iterations < MAX_ITER) {
       iterations++;
+      if (maxCount !== null && occurrence >= maxCount) break;
+      occurrence++;
 
       // Ausgenommenes Vorkommen (EXDATE, #489): überspringen, aber Serie weiterlaufen lassen.
       if (exceptions?.has(currentDate)) {

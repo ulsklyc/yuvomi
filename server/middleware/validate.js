@@ -17,7 +17,8 @@ const TIME_RE     = /^\d{2}:\d{2}$/;
 const DATETIME_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
 const COLOR_RE    = /^#[0-9A-Fa-f]{6}$/;
 const MONTH_RE    = /^\d{4}-\d{2}$/;
-const RRULE_RE    = /^(FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)(;INTERVAL=\d{1,2})?(;BYDAY=[A-Z,]{2,}(,[A-Z]{2})*)?(;UNTIL=\d{8}(T\d{6}Z)?)?)?$/;
+// UNTIL und COUNT schließen sich laut RFC 5545 gegenseitig aus (#513).
+const RRULE_RE    = /^(FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)(;INTERVAL=\d{1,2})?(;BYDAY=[A-Z,]{2,}(,[A-Z]{2})*)?(;(UNTIL=\d{8}(T\d{6}Z)?|COUNT=\d{1,4}))?)?$/;
 
 /**
  * Bereinigt und validiert einen Pflicht-String.

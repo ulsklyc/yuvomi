@@ -9,9 +9,9 @@ const DAY_MAP = { MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 0 };
 
 /**
  * Parsed einen RRULE-String in ein Objekt.
- * Beispiel: "FREQ=WEEKLY;BYDAY=MO,TH;INTERVAL=1"
+ * Beispiel: "FREQ=WEEKLY;BYDAY=MO,TH;INTERVAL=1;COUNT=10"
  * @param {string} rule
- * @returns {{ freq, interval, byday, until }|null}
+ * @returns {{ freq, interval, byday, until, count }|null}
  */
 function parseRRule(rule) {
   if (!rule) return null;
@@ -30,10 +30,15 @@ function parseRRule(rule) {
     .map((d) => DAY_MAP[d.trim().toUpperCase()])
     .filter((d) => d !== undefined);
   const until    = parts.UNTIL ? parseUntilDate(parts.UNTIL) : null;
+  // COUNT begrenzt die Serie auf N Vorkommen (DTSTART = Vorkommen 1). Der
+  // stateless nextOccurrence() kann COUNT nicht selbst durchsetzen – das
+  // übernimmt die Expansion (expandRecurringEvents), die von DTSTART zählt.
+  const countRaw = parts.COUNT ? parseInt(parts.COUNT, 10) : null;
+  const count    = Number.isInteger(countRaw) && countRaw > 0 ? countRaw : null;
 
   if (!['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'].includes(freq)) return null;
 
-  return { freq, interval, byday, until };
+  return { freq, interval, byday, until, count };
 }
 
 function parseUntilDate(str) {

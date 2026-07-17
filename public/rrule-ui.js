@@ -26,11 +26,11 @@ const WEEKDAYS = () => [
 
 /**
  * Parsed einen RRULE-String in ein Objekt für die UI.
- * @param {string|null} rule - z.B. "FREQ=WEEKLY;BYDAY=MO,TH;INTERVAL=2"
- * @returns {{ freq: string, interval: number, byday: string[], until: string }}
+ * @param {string|null} rule - z.B. "FREQ=WEEKLY;BYDAY=MO,TH;INTERVAL=2;COUNT=10"
+ * @returns {{ freq: string, interval: number, byday: string[], until: string, count: number|null }}
  */
 export function parseRRule(rule) {
-  const result = { freq: '', interval: 1, byday: [], until: '' };
+  const result = { freq: '', interval: 1, byday: [], until: '', count: null };
   if (!rule) return result;
 
   for (const segment of rule.split(';')) {
@@ -47,16 +47,21 @@ export function parseRRule(rule) {
       const c = val.replace(/[TZ]/g, '');
       result.until = `${c.slice(0, 4)}-${c.slice(4, 6)}-${c.slice(6, 8)}`;
     }
+    if (key === 'COUNT') {
+      const n = parseInt(val, 10);
+      if (Number.isInteger(n) && n > 0) result.count = n;
+    }
   }
   return result;
 }
 
 /**
- * Baut einen RRULE-String aus den UI-Werten.
- * @param {{ freq: string, interval: number, byday: string[], until: string }} opts
+ * Baut einen RRULE-String aus den UI-Werten. UNTIL und COUNT schließen sich
+ * gegenseitig aus (RFC 5545); COUNT hat Vorrang, falls beide gesetzt sind (#513).
+ * @param {{ freq: string, interval: number, byday: string[], until: string, count?: number|null }} opts
  * @returns {string|null} - RRULE-String oder null (keine Wiederholung)
  */
-export function buildRRule({ freq, interval, byday, until }) {
+export function buildRRule({ freq, interval, byday, until, count = null }) {
   if (!freq) return null;
 
   const parts = [`FREQ=${freq}`];
@@ -64,7 +69,9 @@ export function buildRRule({ freq, interval, byday, until }) {
   if (freq === 'WEEKLY' && byday.length > 0) {
     parts.push(`BYDAY=${byday.join(',')}`);
   }
-  if (until) {
+  if (count && count > 0) {
+    parts.push(`COUNT=${count}`);
+  } else if (until) {
     parts.push(`UNTIL=${until.replace(/-/g, '')}T235959Z`);
   }
   return parts.join(';');
@@ -74,9 +81,14 @@ export function buildRRule({ freq, interval, byday, until }) {
  * Rendert das HTML für die Wiederholungs-Felder.
  * @param {string} prefix - ID-Prefix (z.B. "task" oder "event")
  * @param {string|null} existingRule - bestehende RRULE oder null
+ * @param {{ allowCount?: boolean }} [opts] - allowCount aktiviert die
+ *        "Nach N Terminen"-Endebedingung (COUNT). Nur für Kontexte mit
+ *        startverankerter Expansion (Kalender). Aufgaben sind
+ *        abschluss-getrieben und kennen keine COUNT-Semantik (#513).
  * @returns {string} HTML-String
  */
-export function renderRRuleFields(prefix, existingRule) {
+export function renderRRuleFields(prefix, existingRule, opts = {}) {
+  const allowCount = !!opts.allowCount;
   const parsed = parseRRule(existingRule);
 
   const freqOpts = FREQ_OPTIONS().map(o =>
@@ -87,6 +99,17 @@ export function renderRRuleFields(prefix, existingRule) {
     `<button type="button" class="rrule-day ${parsed.byday.includes(d.value) ? 'rrule-day--active' : ''}"
              data-day="${d.value}" aria-label="${d.label}" aria-pressed="${parsed.byday.includes(d.value)}">${d.label}</button>`
   ).join('');
+
+  // Endebedingung: Nie / Am Datum (UNTIL) / Nach N Terminen (COUNT). COUNT und
+  // UNTIL schließen sich aus (RFC 5545) – der Selektor blendet je Wahl ein Feld ein.
+  // COUNT nur wenn allowCount (Kalender); sonst wird ein bestehendes COUNT wie
+  // "kein Ende" behandelt (Aufgaben-Engine kennt COUNT ohnehin nicht).
+  const endType = (allowCount && parsed.count) ? 'count' : (parsed.until ? 'until' : 'never');
+  const endOpts = [
+    { value: 'never', label: t('rrule.endNever') },
+    { value: 'until', label: t('rrule.endOnDate') },
+    ...(allowCount ? [{ value: 'count', label: t('rrule.endAfter') }] : []),
+  ].map(o => `<option value="${o.value}" ${endType === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
 
   return `
     <div class="rrule-fields" id="${prefix}-rrule-fields">
@@ -107,11 +130,28 @@ export function renderRRuleFields(prefix, existingRule) {
               <span class="rrule-interval-unit" id="${prefix}-rrule-unit">${unitLabel(parsed.freq, parsed.interval)}</span>
             </div>
           </div>
-          <div class="form-group rrule-until-field" style="margin-bottom:0">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="label form-label" for="${prefix}-rrule-end">${t('rrule.labelEnds')}</label>
+            <select class="input form-input" id="${prefix}-rrule-end" style="min-height:44px">
+              ${endOpts}
+            </select>
+          </div>
+        </div>
+
+        <div class="rrule-row rrule-end-inputs">
+          <div class="form-group rrule-until-field" id="${prefix}-rrule-until-wrap" ${endType === 'until' ? '' : 'hidden'} style="margin-bottom:0">
             <label class="label form-label" for="${prefix}-rrule-until">${t('rrule.labelUntil')}</label>
             <yuvomi-datepicker type="date" id="${prefix}-rrule-until"
                    value="${formatDateInput(parsed.until)}"></yuvomi-datepicker>
           </div>
+          ${allowCount ? `<div class="form-group rrule-count-field" id="${prefix}-rrule-count-wrap" ${endType === 'count' ? '' : 'hidden'} style="margin-bottom:0">
+            <label class="label form-label" for="${prefix}-rrule-count">${t('rrule.labelCount')}</label>
+            <div class="rrule-interval-wrap">
+              <input class="input form-input" type="number" id="${prefix}-rrule-count"
+                     min="1" max="999" value="${parsed.count || 10}" inputmode="numeric" style="width:64px;text-align:center">
+              <span class="rrule-interval-unit">${t('rrule.unitOccurrences')}</span>
+            </div>
+          </div>` : ''}
         </div>
 
         <div class="rrule-weekdays" id="${prefix}-rrule-weekdays" ${parsed.freq === 'WEEKLY' ? '' : 'hidden'}>
@@ -144,6 +184,9 @@ export function bindRRuleEvents(root, prefix) {
   const weekdays    = root.querySelector(`#${prefix}-rrule-weekdays`);
   const unitEl      = root.querySelector(`#${prefix}-rrule-unit`);
   const intervalEl  = root.querySelector(`#${prefix}-rrule-interval`);
+  const endSelect   = root.querySelector(`#${prefix}-rrule-end`);
+  const untilWrap   = root.querySelector(`#${prefix}-rrule-until-wrap`);
+  const countWrap   = root.querySelector(`#${prefix}-rrule-count-wrap`);
 
   if (!freqSelect) return;
 
@@ -152,6 +195,12 @@ export function bindRRuleEvents(root, prefix) {
     if (details)  details.hidden  = !freq;
     if (weekdays) weekdays.hidden = freq !== 'WEEKLY';
     updateUnit();
+  });
+
+  endSelect?.addEventListener('change', () => {
+    const mode = endSelect.value;
+    if (untilWrap) untilWrap.hidden = mode !== 'until';
+    if (countWrap) countWrap.hidden = mode !== 'count';
   });
 
   intervalEl?.addEventListener('input', updateUnit);
@@ -180,19 +229,24 @@ export function bindRRuleEvents(root, prefix) {
 export function getRRuleValues(root, prefix) {
   const freq     = root.querySelector(`#${prefix}-rrule-freq`)?.value || '';
   const interval = parseInt(root.querySelector(`#${prefix}-rrule-interval`)?.value, 10) || 1;
+  const endMode  = root.querySelector(`#${prefix}-rrule-end`)?.value || 'never';
   const untilInput = root.querySelector(`#${prefix}-rrule-until`);
-  const untilRaw = untilInput?.value || '';
+  const untilRaw = endMode === 'until' ? (untilInput?.value || '') : '';
   const until = parseDateInput(untilRaw);
+  const count = endMode === 'count'
+    ? (parseInt(root.querySelector(`#${prefix}-rrule-count`)?.value, 10) || null)
+    : null;
 
   const byday = [];
   root.querySelectorAll(`#${prefix}-rrule-weekdays .rrule-day--active`).forEach(btn => {
     byday.push(btn.dataset.day);
   });
 
-  const rule = buildRRule({ freq, interval, byday, until });
+  const rule = buildRRule({ freq, interval, byday, until, count });
   return {
     is_recurring:    !!rule,
     recurrence_rule: rule,
-    valid_until:     isDateInputValid(untilRaw),
+    // UNTIL nur validieren, wenn "Am Datum" gewählt ist (sonst irrelevant).
+    valid_until:     endMode !== 'until' || isDateInputValid(untilRaw),
   };
 }

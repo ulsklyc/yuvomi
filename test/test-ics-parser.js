@@ -48,6 +48,29 @@ test('expandRRULE: WEEKLY 3-Wochen-Fenster', () => {
   assert(occ[0].rrule === null, 'expanded events have null rrule');
 });
 
+test('parseICS: EXDATE wird als Instanz-Datum geparst (TZID, #513)', () => {
+  const ics = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:ex@x\r\nSUMMARY:Turnen\r\nDTSTART;TZID=Europe/Vienna:20240930T170000\r\nRRULE:FREQ=WEEKLY;COUNT=10\r\nEXDATE;TZID=Europe/Vienna:20241125T170000\r\nEND:VEVENT\r\nEND:VCALENDAR';
+  const [ev] = parseICS(ics);
+  assert(JSON.stringify(ev.exdates) === JSON.stringify(['2024-11-25']), `exdates: ${JSON.stringify(ev.exdates)}`);
+});
+
+test('parseICS: mehrere/komma-separierte EXDATE-Werte (#513)', () => {
+  const ics = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:ex2@x\r\nSUMMARY:Multi\r\nDTSTART:20260101T090000Z\r\nRRULE:FREQ=DAILY;COUNT=5\r\nEXDATE:20260102T090000Z,20260103T090000Z\r\nEXDATE:20260104T090000Z\r\nEND:VEVENT\r\nEND:VCALENDAR';
+  const [ev] = parseICS(ics);
+  assert(JSON.stringify(ev.exdates) === JSON.stringify(['2026-01-02', '2026-01-03', '2026-01-04']), `exdates: ${JSON.stringify(ev.exdates)}`);
+});
+
+test('expandRRULE: COUNT zählt EXDATE-Vorkommen mit (#513)', () => {
+  const vevent = {
+    uid: 'exc@x', summary: 'X', description: null, location: null,
+    dtstart: '2026-01-01', dtend: '2026-01-01', rrule: 'RRULE:FREQ=DAILY;COUNT=3',
+    allDay: true, exdates: ['2026-01-02'],
+  };
+  const occ = expandRRULE(vevent, '2026-01-01', '2026-12-31');
+  // COUNT=3 → 3 Instanzen (01,02,03), 02 ausgenommen → 2 sichtbar, NICHT bis 04.
+  assert(JSON.stringify(occ.map((e) => e.dtstart)) === JSON.stringify(['2026-01-01', '2026-01-03']), `got: ${JSON.stringify(occ.map((e) => e.dtstart))}`);
+});
+
 test('unescapeICSText: unescapes special sequences', () => {
   assert(unescapeICSText('Main Street\\, London') === 'Main Street, London', 'comma');
   assert(unescapeICSText('Notes\\;Details') === 'Notes;Details', 'semicolon');

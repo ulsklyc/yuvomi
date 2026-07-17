@@ -2907,7 +2907,7 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
 
     ${advancedSection(advancedFieldsHtml, { open: advancedFieldsOpen })}
 
-    ${renderRRuleFields('event', isEdit ? event.recurrence_rule : null)}
+    ${renderRRuleFields('event', isEdit ? event.recurrence_rule : null, { allowCount: true })}
 
     ${renderCalendarReminderSection(reminder, event, isEdit ? [] : state.defaultReminders)}
 

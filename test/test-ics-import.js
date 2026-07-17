@@ -17,6 +17,7 @@ process.env.SESSION_SECRET ||= 'test-secret-ics-import';
 
 const { MIGRATIONS, _setTestDatabase } = await import('../server/db.js');
 const { importToLocal, toLocalRRule } = await import('../server/services/ics-subscription.js');
+const { expandRecurringEvents, loadEventExceptions } = await import('../server/services/calendar-events.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
 
 // --------------------------------------------------------
@@ -80,8 +81,16 @@ test('toLocalRRule: strips RRULE: prefix and keeps supported subset', () => {
   assert.equal(toLocalRRule('RRULE:FREQ=WEEKLY;BYDAY=MO,WE;INTERVAL=2'), 'FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE');
 });
 
-test('toLocalRRule: drops unsupported COUNT but keeps the series', () => {
-  assert.equal(toLocalRRule('RRULE:FREQ=WEEKLY;COUNT=5'), 'FREQ=WEEKLY');
+test('toLocalRRule: preserves COUNT so finite series stay finite (#513)', () => {
+  assert.equal(toLocalRRule('RRULE:FREQ=WEEKLY;COUNT=5'), 'FREQ=WEEKLY;COUNT=5');
+});
+
+test('toLocalRRule: COUNT wins over UNTIL when both present (RFC 5545, #513)', () => {
+  assert.equal(toLocalRRule('FREQ=WEEKLY;COUNT=5;UNTIL=20261231T235959Z'), 'FREQ=WEEKLY;COUNT=5');
+});
+
+test('toLocalRRule: rejects non-positive COUNT, falls back to open series', () => {
+  assert.equal(toLocalRRule('FREQ=WEEKLY;COUNT=0'), 'FREQ=WEEKLY');
 });
 
 test('toLocalRRule: keeps UNTIL', () => {
@@ -98,7 +107,7 @@ test('toLocalRRule: returns null for null / unsupported FREQ', () => {
 });
 
 test('toLocalRRule result is compatible with the rrule() validator regex', () => {
-  const RRULE_RE = /^(FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)(;INTERVAL=\d{1,2})?(;BYDAY=[A-Z,]{2,}(,[A-Z]{2})*)?(;UNTIL=\d{8}(T\d{6}Z)?)?)?$/;
+  const RRULE_RE = /^(FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)(;INTERVAL=\d{1,2})?(;BYDAY=[A-Z,]{2,}(,[A-Z]{2})*)?(;(UNTIL=\d{8}(T\d{6}Z)?|COUNT=\d{1,4}))?)?$/;
   for (const r of ['RRULE:FREQ=WEEKLY;BYDAY=MO,WE;INTERVAL=2', 'FREQ=WEEKLY;COUNT=5', 'FREQ=DAILY;UNTIL=20261231T235959Z']) {
     assert.ok(RRULE_RE.test(toLocalRRule(r)), `not validator-compatible: ${toLocalRRule(r)}`);
   }
@@ -130,7 +139,7 @@ test('importToLocal: keeps recurrence as a series without RRULE: prefix', () => 
   assert.equal(timed.all_day, 0);
 
   const count = db.prepare(`SELECT * FROM calendar_events WHERE external_calendar_id = 'evt-count@acme'`).get();
-  assert.equal(count.recurrence_rule, 'FREQ=WEEKLY');
+  assert.equal(count.recurrence_rule, 'FREQ=WEEKLY;COUNT=5');
 });
 
 test('importToLocal: all-day event is stored as date-only all_day', () => {
@@ -218,6 +227,59 @@ test('POST /import: 400 when neither ics nor url provided', async () => {
 test('POST /import: 400 on invalid color', async () => {
   const res = await request('POST', '/api/v1/calendar/import', { ics: SAMPLE_ICS, color: 'not-a-color' });
   assert.equal(res.status, 400);
+});
+
+// --------------------------------------------------------
+// #513: COUNT-begrenzte Serie mit EXDATE bleibt endlich
+// (Repro aus dem Issue: Google-Export FREQ=WEEKLY;COUNT=10 + EXDATE 25.11.)
+// --------------------------------------------------------
+const REPRO_ICS = [
+  'BEGIN:VCALENDAR',
+  'VERSION:2.0',
+  'PRODID:-//Yuvomi COUNT reproduction//EN',
+  'BEGIN:VEVENT',
+  'DTSTART;TZID=Europe/Vienna:20240930T170000',
+  'DTEND;TZID=Europe/Vienna:20240930T180000',
+  'RRULE:FREQ=WEEKLY;COUNT=10',
+  'EXDATE;TZID=Europe/Vienna:20241125T170000',
+  'UID:yuvomi-count-reproduction@example.invalid',
+  'SUMMARY:Kinderturnen',
+  'END:VEVENT',
+  'END:VCALENDAR',
+].join('\r\n');
+
+test('#513: COUNT+EXDATE import stays finite (10 instances, 9 visible, none after Dec 2)', async () => {
+  const reproUid = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
+    VALUES ('repro', 'Repro', '$2b$12$x', 'member')`).run().lastInsertRowid;
+
+  await importToLocal(reproUid, { ics: REPRO_ICS });
+  const master = db.prepare(
+    `SELECT * FROM calendar_events WHERE created_by = ? AND external_calendar_id = 'yuvomi-count-reproduction@example.invalid'`,
+  ).get(reproUid);
+  assert.ok(master, 'imported as a single series master');
+  assert.equal(master.recurrence_rule, 'FREQ=WEEKLY;COUNT=10', 'COUNT preserved on import');
+
+  // EXDATE 25.11. wurde als Instanz-Ausnahme gespeichert.
+  const exceptions = loadEventExceptions(db, [master.id]);
+  assert.deepEqual([...(exceptions.get(master.id) ?? [])], ['2024-11-25']);
+
+  // Expansion über ein weites Fenster: genau 9 sichtbare Vorkommen, keins nach 02.12.
+  const expanded = expandRecurringEvents([master], '2024-01-01', '2025-12-31', exceptions);
+  const dates = expanded.map((e) => e.start_datetime.slice(0, 10));
+  assert.deepEqual(dates, [
+    '2024-09-30', '2024-10-07', '2024-10-14', '2024-10-21', '2024-10-28',
+    '2024-11-04', '2024-11-11', '2024-11-18', '2024-12-02',
+  ], 'exactly nine occurrences, 25.11. excluded, none after 02.12.');
+});
+
+test('#513: COUNT counts excluded occurrences (EXDATE does not shift the limit)', () => {
+  // COUNT=3, mittleres Vorkommen ausgenommen → 2 sichtbar, NICHT 3.
+  const ev = { id: 999, start_datetime: '2024-09-30T15:00:00Z', end_datetime: null,
+    recurrence_rule: 'FREQ=WEEKLY;COUNT=3', all_day: 0 };
+  const exceptions = new Map([[999, new Set(['2024-10-07'])]]);
+  const dates = expandRecurringEvents([ev], '2024-01-01', '2025-12-31', exceptions)
+    .map((e) => e.start_datetime.slice(0, 10));
+  assert.deepEqual(dates, ['2024-09-30', '2024-10-14']);
 });
 
 test.after(() => server.close());

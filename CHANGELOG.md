@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.27.0] - 2026-07-17
+
+### Added
+- Recurring calendar events can now end after a fixed number of occurrences (`COUNT`). The event dialog offers an *Ends: Never / On date / After N occurrences* selector, and the limit is preserved through storage, rendering, editing and ICS export (#513).
+
+### Fixed
+- Importing an ICS file (e.g. a Google Calendar export) no longer turned a finite recurring event into an endless series. The one-time import and ICS subscriptions now keep the `RRULE` `COUNT` limit and apply `EXDATE` exclusions, so a `COUNT=10` series with one excluded date shows exactly nine occurrences and stops afterwards instead of repeating forever (#513).
+- Google and CalDAV synced recurring events that carry a `COUNT` limit are now correctly bounded on every calendar view; previously the count was ignored and they appeared to recur indefinitely (#513).
+
 ## [1.26.0] - 2026-07-16
 
 ### Added

@@ -289,9 +289,12 @@ function getAll(userId) {
 
 /**
  * Reduziert eine ICS-RRULE auf das lokal unterstützte Subset
- * (FREQ / INTERVAL / BYDAY / UNTIL) und gibt sie ohne "RRULE:"-Präfix zurück –
- * passend zum rrule()-Validator und zur Recurrence-Engine. Nicht abbildbare
- * Regeln (reines COUNT, BYMONTHDAY, Ordinal-BYDAY …) ergeben null → Einzeltermin.
+ * (FREQ / INTERVAL / BYDAY / UNTIL / COUNT) und gibt sie ohne "RRULE:"-Präfix
+ * zurück – passend zum rrule()-Validator und zur Recurrence-Engine. Nicht
+ * abbildbare Regeln (BYMONTHDAY, Ordinal-BYDAY …) ergeben null → Einzeltermin.
+ * COUNT begrenzt endliche Serien; ohne Erhalt würde aus einer 10-fachen
+ * Wiederholung eine unendliche Serie (#513). COUNT und UNTIL schließen sich
+ * laut RFC 5545 aus – bei beidem gewinnt COUNT (die konkrete Anzahl).
  */
 function toLocalRRule(raw) {
   if (!raw) return null;
@@ -313,7 +316,10 @@ function toLocalRRule(raw) {
       .filter((d) => /^(MO|TU|WE|TH|FR|SA|SU)$/.test(d));
     if (days.length) rule += `;BYDAY=${days.join(',')}`;
   }
-  if (parts.UNTIL) {
+  const count = parts.COUNT ? parseInt(parts.COUNT, 10) : null;
+  if (Number.isInteger(count) && count > 0) {
+    rule += `;COUNT=${count}`;
+  } else if (parts.UNTIL) {
     const m = /^(\d{8})(T\d{6}Z)?/.exec(parts.UNTIL);
     if (m) rule += `;UNTIL=${m[1]}${m[2] || ''}`;
   }
@@ -355,6 +361,11 @@ async function importToLocal(userId, { ics, url, color } = {}) {
     WHERE created_by = ? AND subscription_id IS NULL AND external_calendar_id = ?
     LIMIT 1
   `);
+  // EXDATE-Ausnahmen der importierten Serie (#513): dieselbe Tabelle wie
+  // lokal ausgenommene Einzeltermine (#489), matcht per Instanz-Datum.
+  const insertException = db.get().prepare(
+    'INSERT OR IGNORE INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)'
+  );
 
   let imported = 0;
   let skipped  = 0;
@@ -365,11 +376,17 @@ async function importToLocal(userId, { ics, url, color } = {}) {
       if (!ev.dtstart) { skipped++; continue; }
       if (ev.uid && existsStmt.get(userId, ev.uid)) { skipped++; continue; }
       try {
-        insert.run(
+        const localRule = toLocalRRule(ev.rrule);
+        const info = insert.run(
           ev.summary, ev.description, ev.dtstart, ev.dtend,
           ev.allDay ? 1 : 0, ev.location, ev.color || fallbackColor,
-          ev.uid || null, toLocalRRule(ev.rrule), userId,
+          ev.uid || null, localRule, userId,
         );
+        // EXDATE nur übernehmen, wenn die Serie erhalten blieb (localRule != null).
+        if (localRule && Array.isArray(ev.exdates) && ev.exdates.length) {
+          const eventId = Number(info.lastInsertRowid);
+          for (const exDate of ev.exdates) insertException.run(eventId, exDate);
+        }
         imported++;
       } catch (err) {
         log.error(`Import UID ${ev.uid}: ${err.message}`);
