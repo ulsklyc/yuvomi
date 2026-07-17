@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.27.3] - 2026-07-17
+
+### Changed
+- Internal code organisation: the large OpenAPI specification builder was split into per-module files behind a thin orchestrator. This is a refactor only; the generated API specification and every endpoint are byte-for-byte identical, and no configuration or upgrade steps are required.
+
 ## [1.27.2] - 2026-07-17
 
 ### Changed
