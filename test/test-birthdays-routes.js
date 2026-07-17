@@ -211,6 +211,27 @@ test('PUT /:id: notes leer → NULL; Name aktualisierbar', async () => {
   assert.equal(row.notes, null);
 });
 
+test('PUT /:id: ungültiges Foto → 400 (Bestand unverändert)', async () => {
+  const base = await call('POST', '/', { name: 'FotoPut', birth_date: '1994-02-02', photo_data: VALID_PHOTO });
+  const id = base.body.data.id;
+  const r = await call('PUT', `/${id}`, { photo_data: 'kein-data-url' });
+  assert.equal(r.status, 400);
+  assert.match(r.body.error, /valid image data URL/);
+  assert.equal(db.prepare('SELECT photo_data FROM birthdays WHERE id = ?').get(id).photo_data, VALID_PHOTO);
+});
+
+test('PUT /:id: gültiges Foto ersetzt Bestand; leeres Foto → NULL', async () => {
+  const base = await call('POST', '/', { name: 'FotoSwap', birth_date: '1995-03-03' });
+  const id = base.body.data.id;
+  const newPhoto = 'data:image/webp;base64,UklGRg==';
+  const put = await call('PUT', `/${id}`, { photo_data: newPhoto });
+  assert.equal(put.status, 200);
+  assert.equal(db.prepare('SELECT photo_data FROM birthdays WHERE id = ?').get(id).photo_data, newPhoto);
+  const cleared = await call('PUT', `/${id}`, { photo_data: '' });
+  assert.equal(cleared.status, 200);
+  assert.equal(db.prepare('SELECT photo_data FROM birthdays WHERE id = ?').get(id).photo_data, null);
+});
+
 // --------------------------------------------------------------------------
 // DELETE /:id (404, Artefakt-Aufräumen)
 // --------------------------------------------------------------------------

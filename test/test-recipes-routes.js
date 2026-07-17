@@ -127,8 +127,9 @@ test('GET /: Creator-Join, Zutaten aggregiert, NOCASE-Sortierung, meal_types nor
   const r = await call('GET', '/');
   assert.equal(r.status, 200);
   const titles = r.body.data.map((x) => x.title);
-  const sorted = [...titles].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-  assert.deepEqual(titles, sorted); // title COLLATE NOCASE ASC
+  // Zu diesem Zeitpunkt existieren exakt diese drei Rezepte; NOCASE-ASC ist
+  // deterministisch (kein JS-Kollations-Orakel, das von SQLite abweichen könnte).
+  assert.deepEqual(titles, ['Nudeln', 'Pfannkuchen', 'Zutatenprobe']);
   const probe = r.body.data.find((x) => x.title === 'Zutatenprobe');
   assert.equal(probe.creator_name, 'Owner');
   assert.equal(probe.creator_color, '#112233');
