@@ -7,7 +7,7 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
-import { str, oneOf, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
+import { str, oneOf, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
 import { uniqueKey } from '../utils/category-slug.js';
 
 const log = createLogger('Contacts');
@@ -312,7 +312,10 @@ router.post('/', (req, res) => {
     const vEmail   = str(req.body.email,   'E-Mail',  { max: MAX_TITLE, required: false });
     const vAddress = str(req.body.address, 'Adresse', { max: MAX_TEXT,  required: false });
     const vNotes   = str(req.body.notes,   'Notizen', { max: MAX_TEXT,  required: false });
-    const errors   = collectErrors([vName, vCat, vPhone, vEmail, vAddress, vNotes]);
+    // Geburtstag (ISO YYYY-MM-DD, optional) - u. a. aus vCard-BDAY beim Import.
+    // Speist den bestehenden #518-Geburtstags-Import (GET /birthdays/import/candidates).
+    const vBirthday = date(req.body.birthday, 'Geburtstag', false);
+    const errors   = collectErrors([vName, vCat, vPhone, vEmail, vAddress, vNotes, vBirthday]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     // Validate multi-value fields if provided
@@ -340,10 +343,10 @@ router.post('/', (req, res) => {
     // Insert contact and multi-value fields in a transaction
     const transaction = db.get().transaction(() => {
       const result = db.get().prepare(`
-        INSERT INTO contacts (name, category, phone, email, address, notes)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO contacts (name, category, phone, email, address, notes, birthday)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(vName.value, vCat.value || FALLBACK_CATEGORY, vPhone.value, vEmail.value,
-             vAddress.value, vNotes.value);
+             vAddress.value, vNotes.value, vBirthday.value);
 
       const contactId = result.lastInsertRowid;
 
@@ -631,6 +634,7 @@ router.get('/:id/vcard', (req, res) => {
     if (contact.email)   lines.push(`EMAIL:${esc(contact.email)}`);
     if (contact.address) lines.push(`ADR;TYPE=HOME:;;${esc(contact.address)};;;;`);
     if (contact.notes)   lines.push(`NOTE:${esc(contact.notes)}`);
+    if (contact.birthday) lines.push(`BDAY:${esc(contact.birthday)}`);
     if (contact.category) lines.push(`CATEGORIES:${esc(contact.category)}`);
     lines.push('END:VCARD');
 

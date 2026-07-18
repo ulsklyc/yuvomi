@@ -228,6 +228,31 @@ try {
   });
 
   // ------------------------------------------------------------------
+  // Geburtstag (birthday): POST speichert, GET liefert, vCard exportiert BDAY,
+  // ungültiges Format → 400. Speist den #518-Geburtstags-Import.
+  // ------------------------------------------------------------------
+  await asyncTest('POST / speichert birthday, GET liefert es, vCard exportiert BDAY', async () => {
+    const created = await jsend(`${base}`, 'POST', {
+      name: 'Geburtstagskind', category: 'misc', birthday: '1990-07-18',
+    });
+    assert(created.status === 201, `Status ${created.status}`);
+    assert(created.body.data.birthday === '1990-07-18', `birthday in Response, war ${created.body.data.birthday}`);
+    const bId = created.body.data.id;
+
+    const got = await jget(`${base}/${bId}`);
+    assert(got.body.data.birthday === '1990-07-18', 'birthday via GET');
+
+    const { text } = await tget(`${base}/${bId}/vcard`);
+    assert(text.includes('BDAY:1990-07-18'), 'vCard enthält BDAY');
+  });
+
+  await asyncTest('POST / mit ungültigem birthday-Format → 400', async () => {
+    const { status, body } = await jsend(`${base}`, 'POST', { name: 'Bad BDay', birthday: '18.07.1990' });
+    assert(status === 400, `Status ${status}`);
+    assert(/geburtstag|birthday|YYYY-MM-DD/i.test(body.error), 'Fehlermeldung nennt Datum/Format');
+  });
+
+  // ------------------------------------------------------------------
   // DELETE /:id - Familienmitglied-Schutz (403), Erfolg (204), 404
   // ------------------------------------------------------------------
   await asyncTest('DELETE /:id eines Familienmitglied-Kontakts → 403', async () => {
