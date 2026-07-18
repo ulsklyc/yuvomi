@@ -467,3 +467,133 @@
     height: 36px;
   }
 }
+
+/* ================================================================
+ * vCard-Import: Auswahl-Vorstufe (Modal). Spiegelt die bd-import-
+ * Grammatik der Geburtstage, aber contacts-scoped (Page-CSS lädt
+ * pro Seite nur ein Stylesheet) und mit dem Kontakte-Modulakzent.
+ * ================================================================ */
+.vcard-import__intro {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-3);
+}
+
+.vcard-import__bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: var(--space-1);
+}
+
+.vcard-import__toggle {
+  background: none;
+  border: none;
+  padding: var(--space-1) var(--space-2);
+  color: var(--module-accent);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.vcard-import__toggle:hover {
+  background: var(--color-surface-hover);
+}
+
+.vcard-import__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 48vh;
+  overflow-y: auto;
+  margin: 0 calc(-1 * var(--space-1));
+  padding: 0 var(--space-1);
+}
+
+.vcard-import-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--target-base);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.vcard-import-row:hover,
+.vcard-import-row:focus-within {
+  background: var(--color-surface-hover);
+}
+
+.vcard-import-row input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--module-accent);
+  cursor: pointer;
+}
+
+.vcard-import-row__name {
+  flex: 1 1 auto;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vcard-import-row__detail {
+  flex: none;
+  max-width: 40%;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vcard-import-row__bday {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--module-birthdays, var(--module-accent));
+}
+
+.vcard-import-row__bday i {
+  width: 16px;
+  height: 16px;
+}
+
+.vcard-import-row--exists {
+  opacity: 0.72;
+}
+
+.vcard-import-row__badge {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  background: var(--color-surface-2);
+  padding: var(--space-0h) var(--space-2);
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.vcard-import__skipped {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+}
+
+.vcard-import__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}

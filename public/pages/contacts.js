@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, advancedSection } from '/components/modal.js';
 import { stagger, vibrate } from '/utils/ux.js';
-import { t } from '/i18n.js';
+import { t, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
@@ -238,77 +238,27 @@ export async function render(container, { user }) {
     if (e.target.closest('[data-action="select-delete"]')) { deleteSelected(); return; }
   });
 
-  // vCard-Import (unterstützt Dateien mit mehreren Kontakten inkl. Geburtstag)
+  // vCard-Import: parsen, dann eine Auswahl-Vorstufe zeigen (nichts wird
+  // ungefragt angelegt). Die eigentliche Anlage passiert in openImportSelectionModal.
   _container.querySelector('#contacts-import-input').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     e.target.value = '';
-    // Kategorie-Auflösung schließt state.categories + catLabel ein (Util bleibt DOM-frei).
-    const resolveCategory = (rawCategories) => {
-      const lower = String(rawCategories || '').toLowerCase();
-      if (!lower) return null;
-      const matched = state.categories.find((c) =>
-        lower.includes(c.key.toLowerCase()) || lower.includes(catLabel(c.key).toLowerCase()));
-      return matched?.key || null;
-    };
+    let text;
     try {
-      const text    = await file.text();
-      const parsed  = parseVCards(text, { resolveCategory, fallbackCategory: FALLBACK_CATEGORY });
-      const named   = parsed.filter((c) => c.name);
-      const skipped = parsed.length - named.length;
-      if (named.length === 0) { window.yuvomi?.showToast(t('contacts.vcardNoName'), 'warning'); return; }
-
-      let imported = 0;
-      let failed   = 0;
-      let withBirthday = 0;
-      let lastName = null;
-      for (const contact of named) {
-        try {
-          const res = await api.post('/contacts', contact);
-          state.contacts.push(res.data);
-          imported++;
-          if (res.data.birthday) withBirthday++;
-          lastName = res.data.name;
-        } catch {
-          failed++;
-        }
-      }
-      renderList();
-
-      // Ein einziger zusammengesetzter Ergebnis-Toast (statt bis zu vier):
-      // vermeidet 3-Toast-Cap-Eviction und konkurrierende aria-live-Ansagen.
-      // Detail-Segmente im agreement-freien „phrase: n"-Muster (korrekt bei jeder Anzahl).
-      const details = [];
-      if (withBirthday > 0) details.push(t('contacts.importDetailBirthday', { count: withBirthday }));
-      if (skipped > 0)      details.push(t('contacts.importDetailSkipped',  { count: skipped }));
-      if (failed > 0)       details.push(t('contacts.importDetailFailed',   { count: failed }));
-
-      // Aktionspfad zum Geburtstagsmodul, wenn Geburtstage dabei sind (#518-Übernahme).
-      const action = withBirthday > 0
-        ? { label: t('contacts.importOpenBirthdays'), onClick: () => window.yuvomi?.navigate('/birthdays') }
-        : null;
-
-      let message;
-      let type;
-      if (imported === 0) {
-        // named.length > 0, aber keine Anlage gelang → ausschließlich Fehler.
-        message = details.join(' · ');
-        type = 'danger';
-      } else if (imported === 1 && details.length === 0) {
-        // Persönlicher Einzel-Import: Name statt Zähler (Prinzip „persönlich").
-        message = t('contacts.importedToast', { name: lastName });
-        type = 'success';
-      } else {
-        const base = imported === 1
-          ? t('contacts.importedCountToastSingular', { count: imported })
-          : t('contacts.importedCountToast', { count: imported });
-        message = [base, ...details].join(' · ');
-        type = failed > 0 ? 'warning' : 'success';
-      }
-      window.yuvomi?.showToast(message, type, action ? 6000 : 3000, action);
+      text = await file.text();
     } catch (err) {
       window.yuvomi?.showToast(t('contacts.importError', { error: err.message }), 'danger');
+      return;
     }
+    const parsed  = parseVCards(text, {
+      resolveCategory: resolveVCardCategory,
+      fallbackCategory: FALLBACK_CATEGORY,
+    });
+    const named   = parsed.filter((c) => c.name);
+    const skipped = parsed.length - named.length;
+    if (named.length === 0) { window.yuvomi?.showToast(t('contacts.vcardNoName'), 'warning'); return; }
+    openImportSelectionModal(named, skipped);
   });
 
   // Tastatur-Shortcuts (Power-User): „/" fokussiert die Suche, „n" legt neu an.
@@ -816,4 +766,154 @@ async function deleteContact(id) {
       window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     }
   }, 5000);
+}
+
+// --------------------------------------------------------
+// vCard-Import: Auswahl-Vorstufe (#518-Muster) + Anlage
+// --------------------------------------------------------
+
+/** Ordnet einen rohen vCard-CATEGORIES-Wert einer bestehenden Kategorie zu (sonst null). */
+function resolveVCardCategory(rawCategories) {
+  const lower = String(rawCategories || '').toLowerCase();
+  if (!lower) return null;
+  const matched = state.categories.find((c) =>
+    lower.includes(c.key.toLowerCase()) || lower.includes(catLabel(c.key).toLowerCase()));
+  return matched?.key || null;
+}
+
+/** Prüft, ob bereits ein Kontakt mit diesem Namen existiert (Dedup-Hinweis, NOCASE). */
+function contactExistsByName(name) {
+  const key = String(name || '').trim().toLowerCase();
+  return state.contacts.some((c) => String(c.name || '').trim().toLowerCase() === key);
+}
+
+/** Eine Auswahl-Zeile im Import-Modal. Bereits vorhandene Namen sind vorab abgewählt + markiert. */
+function importSelectionRowHtml(contact, index) {
+  const exists = contactExistsByName(contact.name);
+  const detail = contact.phone || contact.email || '';
+  return `
+    <label class="vcard-import-row${exists ? ' vcard-import-row--exists' : ''}">
+      <input type="checkbox" value="${index}"${exists ? '' : ' checked'}>
+      <span class="vcard-import-row__name">${esc(contact.name)}</span>
+      ${detail ? `<span class="vcard-import-row__detail">${esc(detail)}</span>` : ''}
+      ${contact.birthday
+        ? `<span class="vcard-import-row__bday" title="${esc(formatDate(contact.birthday))}"><i data-lucide="cake" aria-hidden="true"></i></span>`
+        : ''}
+      ${exists ? `<span class="vcard-import-row__badge">${t('contacts.importExistsBadge')}</span>` : ''}
+    </label>`;
+}
+
+/** Öffnet die Auswahl-Vorstufe: der Nutzer entscheidet, welche Kontakte angelegt werden. */
+function openImportSelectionModal(named, skipped) {
+  const skippedHtml = skipped > 0
+    ? `<p class="vcard-import__skipped">${t('contacts.importSkippedNote', { count: skipped })}</p>`
+    : '';
+
+  openSharedModal({
+    title: t('contacts.importTitle'),
+    size: 'md',
+    content: `
+      <div class="vcard-import">
+        <p class="vcard-import__intro">${t('contacts.importIntro')}</p>
+        <div class="vcard-import__bar">
+          <button type="button" class="vcard-import__toggle" id="vcard-import-toggle">${t('contacts.importDeselectAll')}</button>
+          <span class="sr-only" role="status" aria-live="polite" id="vcard-import-status"></span>
+        </div>
+        <div class="vcard-import__list">${named.map(importSelectionRowHtml).join('')}</div>
+        ${skippedHtml}
+        <div class="vcard-import__footer">
+          <button class="btn btn--secondary" type="button" id="vcard-import-cancel">${t('common.cancel')}</button>
+          <button class="btn btn--primary" type="button" id="vcard-import-submit">${t('contacts.importSubmit', { count: 0 })}</button>
+        </div>
+      </div>
+    `,
+    onSave(panel) {
+      const submitBtn = panel.querySelector('#vcard-import-submit');
+      const toggleBtn = panel.querySelector('#vcard-import-toggle');
+      const status    = panel.querySelector('#vcard-import-status');
+      const boxes     = [...panel.querySelectorAll('.vcard-import__list input[type="checkbox"]')];
+
+      const selectedIndices = () => boxes.filter((b) => b.checked).map((b) => Number(b.value));
+
+      const refresh = (announce = false) => {
+        const n = selectedIndices().length;
+        submitBtn.textContent = t('contacts.importSubmit', { count: n });
+        submitBtn.disabled = n === 0;
+        toggleBtn.textContent = boxes.every((b) => b.checked)
+          ? t('contacts.importDeselectAll')
+          : t('contacts.importSelectAll');
+        if (announce && status) status.textContent = t('contacts.importSelectedStatus', { count: n });
+      };
+      boxes.forEach((b) => b.addEventListener('change', () => refresh(true)));
+      refresh();
+
+      toggleBtn.addEventListener('click', () => {
+        const allChecked = boxes.every((b) => b.checked);
+        boxes.forEach((b) => { b.checked = !allChecked; });
+        refresh(true);
+      });
+
+      panel.querySelector('#vcard-import-cancel').addEventListener('click', closeModal);
+
+      submitBtn.addEventListener('click', async () => {
+        const chosen = selectedIndices().map((i) => named[i]);
+        if (chosen.length === 0) return;
+        submitBtn.disabled = true;
+        toggleBtn.disabled = true;
+        submitBtn.textContent = t('contacts.importImporting');
+        await importParsedContacts(chosen);
+        closeModal({ force: true });
+      });
+    },
+  });
+}
+
+/**
+ * Legt die ausgewählten Kontakte an und meldet das Ergebnis als einen
+ * zusammengesetzten Toast (mit optionalem Sprung ins Geburtstagsmodul).
+ */
+async function importParsedContacts(list) {
+  let imported = 0;
+  let failed   = 0;
+  let withBirthday = 0;
+  let lastName = null;
+  for (const contact of list) {
+    try {
+      const res = await api.post('/contacts', contact);
+      state.contacts.push(res.data);
+      imported++;
+      if (res.data.birthday) withBirthday++;
+      lastName = res.data.name;
+    } catch {
+      failed++;
+    }
+  }
+  renderList();
+
+  // Detail-Segmente im agreement-freien „phrase: n"-Muster (korrekt bei jeder Anzahl).
+  const details = [];
+  if (withBirthday > 0) details.push(t('contacts.importDetailBirthday', { count: withBirthday }));
+  if (failed > 0)       details.push(t('contacts.importDetailFailed',   { count: failed }));
+
+  const action = withBirthday > 0
+    ? { label: t('contacts.importOpenBirthdays'), onClick: () => window.yuvomi?.navigate('/birthdays') }
+    : null;
+
+  let message;
+  let type;
+  if (imported === 0) {
+    message = details.join(' · ') || t('contacts.importError', { error: '' });
+    type = 'danger';
+  } else if (imported === 1 && details.length === 0) {
+    // Persönlicher Einzel-Import: Name statt Zähler (Prinzip „persönlich").
+    message = t('contacts.importedToast', { name: lastName });
+    type = 'success';
+  } else {
+    const base = imported === 1
+      ? t('contacts.importedCountToastSingular', { count: imported })
+      : t('contacts.importedCountToast', { count: imported });
+    message = [base, ...details].join(' · ');
+    type = failed > 0 ? 'warning' : 'success';
+  }
+  window.yuvomi?.showToast(message, type, action ? 6000 : 3000, action);
 }
