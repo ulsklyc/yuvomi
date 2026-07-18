@@ -743,7 +743,9 @@ router.patch('/subscriptions/:id', (req, res) => {
     if (!updated) return res.status(404).json({ error: 'Abonnement nicht gefunden.', code: 404 });
     res.json({ data: updated });
   } catch (err) {
-    if (err.message === 'Nicht autorisiert.') return res.status(403).json({ error: err.message, code: 403 });
+    // icsSubscription wirft 'Not authorized.' (englisch) — ohne diese Angleichung
+    // schlägt der Vergleich fehl und ein Nicht-Owner erhielte 500 statt 403.
+    if (err.message === 'Not authorized.') return res.status(403).json({ error: 'Nicht autorisiert.', code: 403 });
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
   }
@@ -758,7 +760,9 @@ router.delete('/subscriptions/:id', (req, res) => {
     if (!ok) return res.status(404).json({ error: 'Abonnement nicht gefunden.', code: 404 });
     res.status(204).end();
   } catch (err) {
-    if (err.message === 'Nicht autorisiert.') return res.status(403).json({ error: err.message, code: 403 });
+    // icsSubscription wirft 'Not authorized.' (englisch) — Angleichung wie oben,
+    // sonst 500 statt 403 für Nicht-Owner.
+    if (err.message === 'Not authorized.') return res.status(403).json({ error: 'Nicht autorisiert.', code: 403 });
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
   }
