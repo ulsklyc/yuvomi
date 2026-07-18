@@ -1314,8 +1314,8 @@ function openMedModal(med) {
             <input class="input" id="med-dosage" type="text" maxlength="100" value="${esc(val(med?.dosage_text))}">
           </div>
           <div class="form-field">
-            <label class="label" for="med-form">${esc(t('health.meds.field.form'))}</label>
-            <input class="input" id="med-form" type="text" maxlength="30" value="${esc(val(med?.form))}">
+            <label class="label" for="med-form-field">${esc(t('health.meds.field.form'))}</label>
+            <input class="input" id="med-form-field" type="text" maxlength="30" value="${esc(val(med?.form))}">
           </div>
         </div>
         <div class="modal-grid modal-grid--3">
@@ -1405,12 +1405,12 @@ function collectMedBody(panel) {
     const raw = panel.querySelector(sel)?.value;
     return raw !== '' && raw != null ? Number(raw) : null;
   };
-  const str = (sel) => panel.querySelector(sel)?.value.trim() || undefined;
+  const str = (sel) => panel.querySelector(sel)?.value?.trim() || undefined;
 
   return {
     name,
     dosage_text: str('#med-dosage'),
-    form: str('#med-form'),
+    form: str('#med-form-field'),
     stock_qty: num('#med-stock'),
     stock_unit: str('#med-stock-unit'),
     refill_threshold: num('#med-refill'),

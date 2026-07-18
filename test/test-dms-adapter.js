@@ -132,11 +132,13 @@ test('fetchContent: lädt Binärdaten herunter, gibt buffer + mime zurück', asy
   assert.equal(out.buffer.toString(), '%PDF-1.4 fake');
 });
 
-test('testConnection: ok=true bei 200 auf /api/', async () => {
-  mockFetch(() => jsonResponse({ documents: 'https://dms.example.com/api/documents/' }));
+test('testConnection: testet echten JSON-Endpunkt /api/documents/ statt /api/ (#527)', async () => {
+  mockFetch(() => jsonResponse({ count: 1, results: [] }));
   const adapter = new PaperlessAdapter(account);
   const out = await adapter.testConnection();
-  assert.equal(calls[0].url, 'https://dms.example.com/api/');
+  // /api/ leitet hinter Traefik auf die Swagger-HTML-View um (406); ein echter
+  // JSON-Endpunkt vermeidet den Redirect und prüft zugleich den Token.
+  assert.equal(calls[0].url, 'https://dms.example.com/api/documents/?page_size=1');
   assert.equal(calls[0].opts.headers.Authorization, 'Token tok123');
   assert.equal(out.ok, true);
 });

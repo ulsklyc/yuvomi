@@ -7,7 +7,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
 import { MIGRATIONS } from '../server/db.js';
-import { pruneRemovedContacts } from '../server/services/cardav-sync.js';
+import { pruneRemovedContacts, fetchVCardsResilient } from '../server/services/cardav-sync.js';
 
 const TEST_DB = ':memory:';
 
@@ -2770,5 +2770,68 @@ describe('pruneRemovedContacts: server-side contact deletions', () => {
 
     assert.deepStrictEqual(result, { deleted: 0, decoupled: 0 });
     assert.deepStrictEqual(names(), ['A', 'B']);
+  });
+});
+
+// ========================================================
+// fetchVCardsResilient: FN-Filter-Fallback (Issue #529, mailbox.org)
+// ========================================================
+
+describe('fetchVCardsResilient (#529 mailbox.org FN-filter fallback)', () => {
+  const addressBook = { url: 'https://dav.example.com/carddav/abook/' };
+
+  it('gibt das Ergebnis der Standard-Abfrage zurück, wenn es nicht leer ist', async () => {
+    let propfindCalled = false;
+    const client = {
+      fetchVCards: async () => [{ url: 'c1', data: 'BEGIN:VCARD' }],
+      propfind: async () => { propfindCalled = true; return []; },
+    };
+    const out = await fetchVCardsResilient(client, addressBook);
+    assert.equal(out.length, 1);
+    assert.equal(propfindCalled, false, 'kein Fallback, wenn die Standard-Abfrage liefert');
+  });
+
+  it('fällt bei 0 Ergebnissen auf PROPFIND + Multiget zurück (mailbox.org)', async () => {
+    const calls = [];
+    const client = {
+      fetchVCards: async (params) => {
+        calls.push(params);
+        // Erster Aufruf (ohne objectUrls) = FN-gefilterte Query → leer.
+        if (!params.objectUrls) return [];
+        // Zweiter Aufruf (mit objectUrls) = Multiget → liefert die Karten.
+        return params.objectUrls.map((u) => ({ url: u, data: `BEGIN:VCARD\nUID:${u}` }));
+      },
+      propfind: async () => ([
+        // Die Kollektion selbst wird von PROPFIND depth:1 mitgeliefert und muss raus.
+        { href: '/carddav/abook/' },
+        { href: '/carddav/abook/1.vcf' },
+        { href: 'https://dav.example.com/carddav/abook/2.vcf' },
+      ]),
+    };
+    const out = await fetchVCardsResilient(client, addressBook);
+    assert.equal(out.length, 2, 'zwei Kontakte über den Fallback');
+    // Zweiter fetchVCards-Aufruf bekommt exakt die zwei Objekt-URLs (Kollektion gefiltert).
+    assert.deepStrictEqual(calls[1].objectUrls, [
+      'https://dav.example.com/carddav/abook/1.vcf',
+      'https://dav.example.com/carddav/abook/2.vcf',
+    ]);
+  });
+
+  it('bleibt leer, wenn PROPFIND nur die Kollektion selbst liefert', async () => {
+    const client = {
+      fetchVCards: async () => [],
+      propfind: async () => ([{ href: 'https://dav.example.com/carddav/abook/' }]),
+    };
+    const out = await fetchVCardsResilient(client, addressBook);
+    assert.deepStrictEqual(out, []);
+  });
+
+  it('gibt leer zurück, wenn der PROPFIND-Fallback fehlschlägt (kein Wurf)', async () => {
+    const client = {
+      fetchVCards: async () => [],
+      propfind: async () => { throw new Error('PROPFIND 500'); },
+    };
+    const out = await fetchVCardsResilient(client, addressBook);
+    assert.deepStrictEqual(out, []);
   });
 });

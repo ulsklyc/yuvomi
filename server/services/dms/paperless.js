@@ -131,7 +131,12 @@ export class PaperlessAdapter {
 
   async testConnection() {
     try {
-      const res = await this.#fetch('/api/');
+      // Einen echten JSON-Endpunkt testen statt `/api/` (Issue #527): der API-Root
+      // leitet auf manchen Instanzen/Reverse-Proxies (Traefik) auf die
+      // Swagger-HTML-View `/api/schema/view/` um, die einen JSON-`Accept`-Header
+      // mit 406 Not Acceptable ablehnt. `/api/documents/?page_size=1` vermeidet den
+      // Redirect und verifiziert zugleich Token und Dokumentzugriff.
+      const res = await this.#fetch('/api/documents/?page_size=1');
       return { ok: res.ok, status: res.status };
     } catch (err) {
       return { ok: false, status: 0, error: err.message };

@@ -641,6 +641,60 @@ async function syncAccount(accountId) {
   }
 }
 
+/** Vergleicht zwei URLs auf Pfad-Ebene (Trailing-Slash-tolerant). */
+function sameResource(a, b) {
+  const norm = (u) => {
+    try { return new URL(u).pathname.replace(/\/+$/, ''); }
+    catch { return String(u || '').replace(/\/+$/, ''); }
+  };
+  return norm(a) === norm(b);
+}
+
+/**
+ * Holt vCards aus einem Adressbuch und umgeht dabei einen leeren Multistatus,
+ * den manche Server (z. B. mailbox.org, Issue #529) auf die gefilterte
+ * Standard-Abfrage liefern: tsdav enumeriert vCards per `addressbook-query` mit
+ * `<card:prop-filter name="FN"/>`. Für diese exakt gefilterte Query antworten
+ * einige Server mit 0 Objekten, obwohl das Adressbuch gefüllt ist. Liefert die
+ * Standard-Abfrage nichts, enumerieren wir die Objekt-URLs stattdessen filterfrei
+ * per PROPFIND (depth:1) und holen die vCards per Multiget.
+ *
+ * @param {Object} client - tsdav DAVClient (Auth-Header bereits gebunden)
+ * @param {Object} addressBook - Adressbuch-Objekt mit `.url`
+ * @returns {Promise<Array>} vCard-Objekte ({ url, etag, data })
+ */
+async function fetchVCardsResilient(client, addressBook) {
+  const primary = await client.fetchVCards({ addressBook });
+  if (primary && primary.length > 0) return primary;
+
+  let members;
+  try {
+    members = await client.propfind({
+      url: addressBook.url,
+      props: { 'd:getetag': {} },
+      depth: '1',
+    });
+  } catch (err) {
+    log.warn(`PROPFIND fallback failed for ${addressBook.url}: ${err.message}`);
+    return primary || [];
+  }
+
+  const objectUrls = (members || [])
+    .map((m) => m?.href)
+    .filter(Boolean)
+    .map((href) => new URL(href, addressBook.url).href)
+    // Die Kollektion selbst (das Adressbuch) ist kein Kontakt.
+    .filter((href) => !sameResource(href, addressBook.url));
+
+  if (objectUrls.length === 0) return primary || [];
+
+  log.info(
+    `Addressbook ${addressBook.url}: FN-filtered query returned 0, ` +
+    `PROPFIND fallback found ${objectUrls.length} object(s) (#529).`
+  );
+  return client.fetchVCards({ addressBook, objectUrls });
+}
+
 /**
  * Sync a specific addressbook
  * @param {number} accountId - Account ID
@@ -677,10 +731,10 @@ async function syncAddressbook(accountId, addressbookUrl, client = null, serverA
       }
     }
 
-    // Fetch vCards from addressbook
+    // Fetch vCards from addressbook (mit FN-Filter-Fallback für mailbox.org etc., #529)
     let vcardObjects;
     try {
-      vcardObjects = await client.fetchVCards({ addressBook: serverAddressbook });
+      vcardObjects = await fetchVCardsResilient(client, serverAddressbook);
     } catch (err) {
       log.error(`Failed to fetch vCards from ${addressbookUrl}:`, err.message);
       return { synced: 0, errors: 1 };
@@ -1018,6 +1072,7 @@ export {
 
   // Helpers (exported for testing)
   parseVCard,
+  fetchVCardsResilient,
   _mockTestConnection,
   _mockSyncAccount,
 };

@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.31.2] - 2026-07-19
+## [1.31.3] - 2026-07-19
+
+### Fixed
+- Adding a medication failed with a generic "An unexpected error occurred" toast and never saved, even with a fully valid form. The medication form's `<form>` element and its "Form" input shared the same id, so reading the field value threw before the request was ever sent (no server-side log). The input now has a unique id and the value reader is null-safe. (#528)
+- Paperless connection test returned "406 Not Acceptable" behind reverse proxies such as Traefik. The test hit the API root `/api/`, which redirects to the Swagger HTML view and rejects the JSON `Accept` header. It now tests the real JSON endpoint `/api/documents/?page_size=1`, which avoids the redirect and also verifies the token and document access. (#527)
+- CardDAV sync reported "0 contacts synced" with servers such as mailbox.org. The default address-book query filters on `FN`, which some servers answer with an empty result even when the address book is full. When the filtered query returns nothing, sync now enumerates the contact URLs via a filter-free PROPFIND and fetches them by multiget. (#529)
 
 ### Fixed
 - Birthday calendar entries now show the birthday label in your own language (e.g. "Geburtstag: …" in German) instead of always "Birthday: …". The entry title and description are translated on display across the calendar (month, week, day, agenda), the event popup, the dashboard's upcoming-events widget, and search results, in all 23 supported languages. Existing birthdays are covered automatically; nothing needs re-importing.
