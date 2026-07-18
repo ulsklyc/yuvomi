@@ -125,18 +125,6 @@ function loadSubtasks(taskId) {
   `).all(taskId).map(addAssignedUsers);
 }
 
-/** Fortschritt der Subtasks berechnen (erledigte / gesamt). */
-function subtaskProgress(taskId) {
-  const row = db.get().prepare(`
-    SELECT
-      COUNT(*)                          AS total,
-      SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) AS done
-    FROM tasks
-    WHERE parent_task_id = ?
-  `).get(taskId);
-  return { total: row.total ?? 0, done: row.done ?? 0 };
-}
-
 /** Eingabe-Validierung für Task-Felder (zentralisiert über validate.js). */
 function validateTaskInput(body, isCreate = true) {
   return v.collectErrors([
