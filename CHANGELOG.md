@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.27.12] - 2026-07-18
+
+### Changed
+- Internal quality hardening: added end-to-end test coverage for three previously undertested route layers. Split expenses (group metadata, the personal dashboard with guest confinement, member candidates, the paginated expense list with search/category/recurring filters, comments, the activity log, cross-entity search, recurring-expense create/pause, and the guest/contact provisioning paths including collision-free username assignment and contact-to-guest adoption). Health (a 400 sweep for non-numeric ids across every id route, from/to range filters, the full partial-update field set for medications, schedules, labs, activities and cycle periods, dose-log schedule linkage, the activities CSV export with range and person filters, cycle-log deletion, and non-owner deletion guards). Tasks (the full task update endpoint with assignment replacement and point clamping, the filter options endpoint excluding housekeeping workers, category rename/delete with in-use and conflict guards, list filters, nesting-depth limits and status transitions). This is tests only; no user-facing behaviour, configuration or upgrade steps change.
+- Removed an unused internal helper (`subtaskProgress`) from the tasks route module; subtask progress is already computed inline in the list query. No behaviour change.
+
 ## [1.27.11] - 2026-07-18
 
 ### Changed
