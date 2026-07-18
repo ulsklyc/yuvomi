@@ -189,7 +189,9 @@ Neues Zuhause: **https://yuvomi.cloud/** · Fragen? Eröffne eine [Diskussion](h
 
 > **Gesundheit ist kein Medizinprodukt** — keine diagnostischen Aussagen. Gesundheitsdaten sind sensibel; aktiviere die Datenbankverschlüsselung (`DB_ENCRYPTION_KEY`, SQLCipher).
 
-> **WebDAV-Dokumentenspeicher braucht ein eigenes Backup.** Datenbank-Backups enthalten Metadaten und Verweise auf Dokumente, nicht die Binärdateien auf WebDAV — sichere dieses Ziel separat. WebDAV-Ziele aus der Admin-Oberfläche müssen zu öffentlichen Adressen auflösen; für ein vertrauenswürdiges LAN- oder Loopback-Ziel setze `DOCUMENT_STORAGE_WEBDAV_URL` über die Deployment-Umgebung.
+> **WebDAV-Dokumentenspeicher braucht ein eigenes Backup.** Datenbank-Backups enthalten Metadaten und Verweise auf Dokumente, nicht die Binärdateien auf WebDAV — sichere dieses Ziel separat. WebDAV-Ziele aus der Admin-Oberfläche müssen zu öffentlichen Adressen auflösen; für ein vertrauenswürdiges LAN- oder Loopback-Ziel setze `DOCUMENT_STORAGE_WEBDAV_URL` über die Deployment-Umgebung oder `DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK=true`, um private Ziele auch aus der UI zuzulassen.
+
+> **Interne Ziele (LAN / private IP) sind standardmäßig blockiert.** Der SSRF-Schutz weist private, Loopback-, Link-local- und interne-DNS-URLs für ICS-Kalenderabos und WebDAV-Dokumentenspeicher ab. Um eine intern auflösende URL zu nutzen, setze das passende Opt-in in deiner Deployment-Umgebung: `ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK=true` für Kalender-Feeds, `DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK=true` für den Dokumentenspeicher. Siehe die [Installationsanleitung](docs/installation.md#environment-variables).
 
 ---
 

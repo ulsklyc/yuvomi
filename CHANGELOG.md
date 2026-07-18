@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.27.18] - 2026-07-18
+
+### Changed
+- Documented the two existing SSRF opt-in environment variables that let internally-resolving (LAN / private IP / internal-DNS) URLs be used, which were previously only mentioned in `.env.example` and the Unraid template (#520). `ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK` (for ICS calendar subscriptions) and `DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK` (for WebDAV document storage) are now covered in the README (EN and DE) and the installation guide's environment-variable tables, including why the check exists and why it stays an environment-level rather than a web-UI setting. Documentation only; no behaviour, data model or configuration changes.
+
 ## [1.27.17] - 2026-07-18
 
 ### Fixed

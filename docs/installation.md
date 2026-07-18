@@ -518,8 +518,10 @@ UI. Empty values fall back to the database configuration.
 
 For SSRF protection, URLs entered through the admin UI must resolve only to public network
 addresses. Private, loopback, link-local, and internal DNS targets are rejected and rechecked when
-the connection is opened. To use a trusted WebDAV server on the local network, configure
-`DOCUMENT_STORAGE_WEBDAV_URL` through the deployment environment instead.
+the connection is opened. To use a trusted WebDAV server on the local network, either configure
+`DOCUMENT_STORAGE_WEBDAV_URL` through the deployment environment (env-provided URLs are trusted and
+may be private), or set `DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK=true` to lift the check for
+UI-managed URLs as well. Only enable the opt-in in controlled environments.
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
@@ -528,6 +530,7 @@ the connection is opened. To use a trusted WebDAV server on the local network, c
 | `DOCUMENT_STORAGE_WEBDAV_USERNAME` | Basic Auth username | — | No |
 | `DOCUMENT_STORAGE_WEBDAV_PASSWORD` | Basic Auth password or app password | — | No |
 | `DOCUMENT_STORAGE_WEBDAV_PATH` | Base folder for document objects | — | No |
+| `DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK` | Allow private/local network WebDAV targets (e.g. Nextcloud in the same Docker network); lifts SSRF protection (`true`/`false`) | `false` | No |
 
 When WebDAV documents already exist, changing the URL, username, password, or base path requires an
 explicit confirmation and a successful read test against an existing object. Required connection
@@ -557,6 +560,18 @@ The weather widget defaults to **Open-Meteo** — free, ECMWF-backed, and requir
 | `OPENWEATHER_CITY` | City name for weather display | `Berlin` | No |
 | `OPENWEATHER_UNITS` | Unit system (`metric` or `imperial`) | `metric` | No |
 | `OPENWEATHER_LANG` | Language for weather descriptions | `de` | No |
+
+### Calendar Subscriptions — ICS Feeds (Optional)
+
+ICS calendar subscriptions are added in the UI. For SSRF protection, feed URLs must use `https://`
+and resolve only to public network addresses; `http://`, private, loopback, link-local, and internal
+DNS targets are rejected. To subscribe to a feed on your local network (e.g. Sonarr/Radarr/Home
+Assistant, or a self-hosted calendar behind an internal DNS name), set the opt-in below. Only enable
+it in controlled environments.
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK` | Allow `http://` and private/local network ICS feeds; lifts SSRF protection (`true`/`false`) | `false` | No |
 
 ### Google Calendar Sync (Optional)
 

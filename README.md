@@ -233,7 +233,9 @@ New home: **https://yuvomi.cloud/** · Questions? Open a [discussion](https://gi
 
 > **Health is not a medical device** — no diagnostic claims. Health data is sensitive; enable database encryption (`DB_ENCRYPTION_KEY`, SQLCipher).
 
-> **WebDAV document storage needs its own backup.** Database backups hold document metadata and links, not the binaries on WebDAV — back up that target separately. Admin-UI WebDAV targets must resolve to public addresses; for a trusted LAN or loopback target, set `DOCUMENT_STORAGE_WEBDAV_URL` via the deployment environment.
+> **WebDAV document storage needs its own backup.** Database backups hold document metadata and links, not the binaries on WebDAV — back up that target separately. Admin-UI WebDAV targets must resolve to public addresses; for a trusted LAN or loopback target, set `DOCUMENT_STORAGE_WEBDAV_URL` via the deployment environment, or `DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK=true` to allow private targets from the UI too.
+
+> **Internal (LAN / private IP) targets are blocked by default.** SSRF protection rejects private, loopback, link-local, and internal-DNS URLs for ICS calendar subscriptions and WebDAV document storage. To use an internally-resolving URL, set the matching opt-in in your deployment environment: `ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK=true` for calendar feeds, `DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK=true` for document storage. See the [Installation Guide](docs/installation.md#environment-variables).
 
 ---
 
