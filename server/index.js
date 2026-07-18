@@ -204,6 +204,11 @@ app.use(express.static(path.join(import.meta.dirname, '..', 'public'), {
     if (filePath.endsWith('manifest.json')) {
       res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
     }
+    // .mjs (z. B. gevendorte pdf.js-Module + Worker) müssen als JS-Modul ausgeliefert
+    // werden; nicht jede `send`-Version mappt die Endung, sonst schlägt der Modul-Import fehl.
+    if (ext === '.mjs') {
+      res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+    }
   },
 }));
 

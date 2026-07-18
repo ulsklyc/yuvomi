@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-07-18
+
+### Added
+- Mobile PDF preview: PDFs now render inline in the document viewer on iOS Safari and other mobile browsers that leave `<iframe>`/`<embed>` blank, using a self-hosted pdf.js canvas renderer (no CDN). Pages render lazily with a memory cap, the modal body is the single scroller, and a sticky page indicator shows position. Desktop browsers keep their native inline PDF viewer.
+- PDF preview accessibility: a screen-reader note explains the graphical preview and points to the always-available "open in new tab" and download actions; load completion is announced, and a single unrenderable page shows an inline error instead of loading forever.
+
+### Changed
+- PDFs with non-embedded standard fonts (Helvetica/Times/Courier) now render correctly on mobile via self-hosted pdf.js standard font data.
+
 ## [1.30.0] - 2026-07-18
 
 ### Added

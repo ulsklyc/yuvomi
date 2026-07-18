@@ -1118,6 +1118,9 @@ function openDocumentViewer(doc) {
     ? doc.external_url
     : '';
 
+  // pdf.js-Viewer hält Worker + Dokument im Speicher; beim Schließen freigeben.
+  let pdfTeardown = null;
+
   openSharedModal({
     title: doc.name,
     size: 'xl',
@@ -1133,6 +1136,11 @@ function openDocumentViewer(doc) {
               <i data-lucide="external-link" class="icon-md" aria-hidden="true"></i>
               ${t('documents.dmsOpenExternal')}
             </a>` : ''}
+            ${doc.mime_type === 'application/pdf' ? `
+            <a class="btn btn--ghost btn--icon btn--icon-sm" href="${previewUrl}" target="_blank" rel="noopener noreferrer"
+               title="${t('documents.viewerOpenInTab')}" aria-label="${t('documents.viewerOpenInTab')}">
+              <i data-lucide="external-link" class="icon-md" aria-hidden="true"></i>
+            </a>` : ''}
             <a class="btn btn--primary btn--icon btn--icon-sm" href="${downloadUrl}" download
                title="${t('documents.downloadAction')}" aria-label="${t('documents.downloadAction')}">
               <i data-lucide="download" class="icon-md" aria-hidden="true"></i>
@@ -1144,8 +1152,16 @@ function openDocumentViewer(doc) {
         </div>
       </div>
     `,
+    onClose() {
+      if (typeof pdfTeardown === 'function') pdfTeardown();
+    },
     onSave(panel) {
       if (window.lucide) window.lucide.createIcons({ el: panel });
+      // PDFs ohne nativen Inline-Viewer (mobile Browser): mit pdf.js auf Canvas rendern
+      if (doc.mime_type === 'application/pdf' && !canRenderPdfNatively()) {
+        const container = panel.querySelector('[data-pdf-pages]');
+        pdfTeardown = renderPdfPages(container, previewUrl, doc, downloadUrl);
+      }
       // Text-Dokumente: Inhalt asynchron laden
       if (doc.mime_type === 'text/plain' || doc.mime_type === 'text/csv') {
         const body = panel.querySelector('#document-viewer-body');
@@ -1159,7 +1175,7 @@ function openDocumentViewer(doc) {
           .catch(() => {
             if (!body) return;
             body.replaceChildren();
-            body.insertAdjacentHTML('beforeend', renderViewerUnsupported(doc, downloadUrl));
+            body.insertAdjacentHTML('beforeend', renderViewerUnsupported(doc));
             if (window.lucide) window.lucide.createIcons({ el: body });
           });
       }
@@ -1169,11 +1185,30 @@ function openDocumentViewer(doc) {
 
 function renderViewerContent(doc, previewUrl, downloadUrl) {
   if (doc.mime_type === 'application/pdf') {
-    // Kein `sandbox` am PDF-iframe: Chromium verweigert die Initialisierung seines internen
-    // PDF-Viewers in sandboxed Frames und zeigt stattdessen "This page was blocked by Chrome".
-    // Die Auslieferung erfolgt same-origin als application/pdf mit nosniff, daher keine
-    // Skriptausführung im Frame.
-    return `<iframe class="document-viewer__pdf" src="${previewUrl}" title="${esc(doc.name)}"></iframe>`;
+    if (canRenderPdfNatively()) {
+      // Kein `sandbox` am PDF-iframe: Chromium verweigert die Initialisierung seines internen
+      // PDF-Viewers in sandboxed Frames und zeigt stattdessen "This page was blocked by Chrome".
+      // Die Auslieferung erfolgt same-origin als application/pdf mit nosniff, daher keine
+      // Skriptausführung im Frame.
+      return `<iframe class="document-viewer__pdf" src="${previewUrl}" title="${esc(doc.name)}"></iframe>`;
+    }
+    // Mobile Browser (iOS Safari, Android Chrome) rendern PDFs in <iframe>/<embed> nicht inline.
+    // Platzhalter; das eigentliche Rendern via pdf.js läuft asynchron im onSave-Hook.
+    // Fokussierbare Region (role=region + tabindex) macht den Seitenstapel per Tastatur scrollbar.
+    // Ehrliche Semantik: der Canvas-Render ist grafisch (keine Textebene) -> ein sr-only-Hinweis
+    // verweist auf den vorlesbaren Weg (Meta-Leiste: "In neuem Tab öffnen"/Download), die
+    // Seiten-Canvases selbst sind aria-hidden. data-pdf-live kündigt Ladeende/Fehler an.
+    return `<div class="document-viewer__pdf-pages" data-pdf-pages tabindex="0" role="region" aria-label="${esc(doc.name)}">
+      <p class="sr-only" data-pdf-note>${t('documents.viewerPdfA11yNote')}</p>
+      <span class="sr-only" role="status" aria-live="polite" data-pdf-live></span>
+      <div class="document-viewer__pdf-indicator" data-pdf-indicator aria-hidden="true" hidden></div>
+      <div class="document-viewer__pdf-content" data-pdf-content>
+        <div class="document-viewer__loading" role="status">
+          <i data-lucide="loader-circle" class="document-viewer__spinner" aria-hidden="true"></i>
+          <span data-pdf-loading-text>${t('documents.viewerPdfLoading')}</span>
+        </div>
+      </div>
+    </div>`;
   }
   if (doc.mime_type === 'image/png' || doc.mime_type === 'image/jpeg' || doc.mime_type === 'image/webp') {
     return `<img class="document-viewer__image" src="${previewUrl}" alt="${esc(doc.name)}"`
@@ -1181,27 +1216,236 @@ function renderViewerContent(doc, previewUrl, downloadUrl) {
   }
   if (doc.mime_type === 'text/plain' || doc.mime_type === 'text/csv') {
     // Inhalt wird asynchron in onSave geladen; Platzhalter anzeigen
-    return `<div class="document-viewer__loading">
+    return `<div class="document-viewer__loading" role="status">
       <i data-lucide="loader-circle" class="document-viewer__spinner" aria-hidden="true"></i>
       ${esc(doc.original_name)}
     </div>`;
   }
-  // Nicht darstellbare Typen: nur Download
-  return renderViewerUnsupported(doc, downloadUrl);
+  // Nicht darstellbare Typen: Aktionen liegen in der Meta-Leiste (Download immer vorhanden)
+  return renderViewerUnsupported(doc);
 }
 
-function renderViewerUnsupported(doc, downloadUrl) {
+// Gemeinsamer Empty-State: Icon + Titel + Hinweis. Deckt nicht darstellbare Typen und den
+// pdf.js-Renderfehler-Fallback ab. Die Aktionen (Download, für PDFs "In neuem Tab öffnen")
+// liegen in der Meta-Leiste des Viewers und sind immer sichtbar -> keine doppelten Buttons hier.
+// `alert` macht den Fehlerpfad als Live-Region für Screenreader hörbar.
+function renderViewerFallback(doc, { hint, icon = 'file-x', alert = false } = {}) {
   return `
-    <div class="document-viewer__unsupported">
+    <div class="document-viewer__unsupported"${alert ? ' role="alert"' : ''}>
       <span class="document-viewer__unsupported-icon">
-        <i data-lucide="file-x" aria-hidden="true"></i>
+        <i data-lucide="${icon}" aria-hidden="true"></i>
       </span>
       <div class="document-viewer__unsupported-title">${esc(doc.original_name)}</div>
-      <div class="document-viewer__unsupported-hint">${t('documents.viewerDownloadHint')}</div>
-      <a class="btn btn--primary" href="${downloadUrl}" download>
-        <i data-lucide="download" class="icon-md" aria-hidden="true"></i>
-        ${t('documents.downloadAction')}
-      </a>
+      <div class="document-viewer__unsupported-hint">${hint}</div>
     </div>
   `;
+}
+
+function renderViewerUnsupported(doc) {
+  return renderViewerFallback(doc, { hint: t('documents.viewerDownloadHint') });
+}
+
+// navigator.pdfViewerEnabled === true bedeutet, dass der Browser einen eingebauten
+// Inline-PDF-Viewer besitzt (Desktop Chrome/Firefox/Safari). Mobile Safari/Chrome melden
+// false; dort bleibt ein <iframe src=".pdf"> leer -> stattdessen pdf.js auf Canvas rendern.
+// Bei undefined (ältere Browser) konservativ pdf.js nutzen, das überall funktioniert.
+function canRenderPdfNatively() {
+  return navigator.pdfViewerEnabled === true;
+}
+
+// Maximal gleichzeitig gehaltene gerenderte Seiten-Canvases (LRU). Begrenzt den Speicher
+// auch bei sehr großen PDFs auf Mobilgeräten; nicht sichtbare Seiten fallen auf Platzhalter zurück.
+const PDF_MAX_RENDERED = 6;
+
+// Rendert ein PDF via gevendortem pdf.js seitenweise on demand (IntersectionObserver): nur
+// sichtbare/nahe Seiten werden auf Canvas gezeichnet, entfernte per LRU wieder freigegeben.
+// Gibt eine synchrone Teardown-Funktion zurück (Worker/Dokument freigeben, Observer trennen),
+// die beim Schließen des Modals aufgerufen wird. Fällt bei Fehlern auf Tab/Download zurück.
+function renderPdfPages(container, previewUrl, doc, downloadUrl) {
+  const state = { destroyed: false, pdf: null, observer: null, resizeObs: null, resizeTimer: null };
+  const teardown = () => {
+    state.destroyed = true;
+    if (state.observer) { state.observer.disconnect(); state.observer = null; }
+    if (state.resizeObs) { state.resizeObs.disconnect(); state.resizeObs = null; }
+    if (state.resizeTimer) { clearTimeout(state.resizeTimer); state.resizeTimer = null; }
+    if (state.pdf) { try { state.pdf.destroy(); } catch (e) { /* already gone */ } state.pdf = null; }
+  };
+  if (!container) return teardown;
+
+  // Live-Region + Slots aus der Markup-Vorlage (renderViewerContent).
+  const content = container.querySelector('[data-pdf-content]') || container;
+  const liveEl = container.querySelector('[data-pdf-live]');
+  const indicatorEl = container.querySelector('[data-pdf-indicator]');
+  const loadingTextEl = container.querySelector('[data-pdf-loading-text]');
+  // Nur der Modal-Body scrollt (kein verschachtelter Scroller): Observer misst gegen ihn.
+  const scrollRoot = container.closest('.modal-panel__body');
+
+  const showFallback = () => {
+    if (state.destroyed) return;
+    if (indicatorEl) indicatorEl.hidden = true;
+    content.replaceChildren();
+    content.insertAdjacentHTML('beforeend', renderViewerFallback(doc, {
+      hint: t('documents.viewerPdfFallbackHint'), icon: 'alert-triangle', alert: true,
+    }));
+    if (window.lucide) window.lucide.createIcons({ el: content });
+  };
+
+  (async () => {
+    try {
+      const pdfjs = await import('/vendor/pdfjs/pdf.min.mjs');
+      if (state.destroyed) return;
+      pdfjs.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.mjs';
+      const loadingTask = pdfjs.getDocument({
+        url: previewUrl,
+        withCredentials: true,
+        // Kein eval/WASM: hält die App-CSP (script-src 'self') unangetastet.
+        isEvalSupported: false,
+        // Ohne diese Daten rendern PDFs mit nicht-eingebetteten Standard-Fonts
+        // (Helvetica/Times/Courier) ohne Text.
+        standardFontDataUrl: '/vendor/pdfjs/standard_fonts/',
+      });
+      // Fortschritt in die Ladeanzeige spiegeln (große/langsame Dateien).
+      loadingTask.onProgress = (progress) => {
+        if (state.destroyed || !loadingTextEl) return;
+        const total = progress && progress.total;
+        if (!total) return;
+        const pct = Math.min(100, Math.round((progress.loaded / total) * 100));
+        loadingTextEl.textContent = `${t('documents.viewerPdfLoading')} ${pct} %`;
+      };
+      const pdf = await loadingTask.promise;
+      if (state.destroyed) { try { pdf.destroy(); } catch (e) { /* noop */ } return; }
+      state.pdf = pdf;
+
+      // Breite erst nach dem nächsten Frame messen (Modal-Einblendung braucht ein Layout).
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      if (state.destroyed) return;
+
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      let renderWidth = Math.max(240, container.clientWidth || 600);
+
+      // Aspektverhältnis der ersten Seite als Default für alle Platzhalter (reserviert Scrollhöhe,
+      // wird beim tatsächlichen Rendern je Seite auf den echten Wert korrigiert).
+      const firstPage = await pdf.getPage(1);
+      if (state.destroyed) return;
+      const firstUnit = firstPage.getViewport({ scale: 1 });
+      const defaultRatio = firstUnit.width / firstUnit.height;
+
+      const wrappers = new Map();
+      const rendered = new Map();
+      const inFlight = new Set();
+      const failed = new Set();
+      const visible = new Set();
+      const order = [];
+
+      content.replaceChildren();
+      for (let n = 1; n <= pdf.numPages; n += 1) {
+        const wrap = document.createElement('div');
+        wrap.className = 'document-viewer__pdf-page';
+        wrap.dataset.page = String(n);
+        wrap.style.aspectRatio = String(defaultRatio);
+        // Rein grafisch (kein Textlayer) -> aria-hidden; die vorlesbare Alternative liegt im
+        // sr-only-Hinweis + Meta-Leiste. Der sichtbare Seitenindikator übernimmt "n von total".
+        wrap.setAttribute('aria-hidden', 'true');
+        wrappers.set(n, wrap);
+        content.appendChild(wrap);
+      }
+
+      const updateIndicator = () => {
+        if (!indicatorEl || !visible.size) return;
+        indicatorEl.textContent = t('documents.viewerPdfPageLabel', {
+          n: Math.min(...visible), total: pdf.numPages,
+        });
+      };
+
+      const renderPage = async (n) => {
+        if (state.destroyed || rendered.has(n) || inFlight.has(n) || failed.has(n)) return;
+        inFlight.add(n);
+        try {
+          const page = await pdf.getPage(n);
+          if (state.destroyed) return;
+          const unit = page.getViewport({ scale: 1 });
+          const viewport = page.getViewport({ scale: (renderWidth / unit.width) * dpr });
+          const canvas = document.createElement('canvas');
+          canvas.className = 'document-viewer__pdf-canvas';
+          canvas.width = Math.floor(viewport.width);
+          canvas.height = Math.floor(viewport.height);
+          const ctx = canvas.getContext('2d');
+          await page.render({ canvasContext: ctx, viewport }).promise;
+          if (state.destroyed) return;
+          const wrap = wrappers.get(n);
+          if (!wrap) return;
+          wrap.style.aspectRatio = String(unit.width / unit.height);
+          wrap.replaceChildren(canvas);
+          rendered.set(n, canvas);
+          order.push(n);
+          // LRU: entfernte Seiten auf Platzhalter zurücksetzen, Speicher freigeben.
+          while (order.length > PDF_MAX_RENDERED) {
+            const old = order.shift();
+            if (old === n || !rendered.has(old)) continue;
+            const oldWrap = wrappers.get(old);
+            if (oldWrap) oldWrap.replaceChildren();
+            rendered.delete(old);
+          }
+        } catch (e) {
+          // Eine einzelne fehlerhafte Seite: Inline-Fehlerzustand statt endlosem Shimmer,
+          // als fehlgeschlagen markieren (kein Retry-Loop beim Wieder-in-den-Blick-Scrollen).
+          if (state.destroyed) return;
+          failed.add(n);
+          const wrap = wrappers.get(n);
+          if (wrap) {
+            wrap.style.aspectRatio = '';
+            wrap.replaceChildren();
+            wrap.insertAdjacentHTML('beforeend',
+              `<div class="document-viewer__pdf-page-error">`
+              + `<i data-lucide="alert-triangle" aria-hidden="true"></i>`
+              + `<span>${t('documents.viewerPdfPageError')}</span></div>`);
+            if (window.lucide) window.lucide.createIcons({ el: wrap });
+          }
+        } finally {
+          inFlight.delete(n);
+        }
+      };
+
+      state.observer = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          const n = Number(entry.target.dataset.page);
+          if (entry.isIntersecting) { visible.add(n); renderPage(n); } else { visible.delete(n); }
+        }
+        updateIndicator();
+      }, { root: scrollRoot || null, rootMargin: '300px 0px' });
+      wrappers.forEach((wrap) => state.observer.observe(wrap));
+      renderPage(1);
+
+      // Sichtbaren Seitenindikator freischalten + Ladeende für Screenreader ankündigen.
+      if (indicatorEl) {
+        indicatorEl.hidden = false;
+        indicatorEl.textContent = t('documents.viewerPdfPageLabel', { n: 1, total: pdf.numPages });
+      }
+      if (liveEl) liveEl.textContent = t('documents.viewerPdfReady', { total: pdf.numPages });
+
+      // Rotation/Größenänderung: bei relevanter Breitenänderung sichtbare Seiten neu rendern.
+      state.resizeObs = new ResizeObserver(() => {
+        if (state.resizeTimer) clearTimeout(state.resizeTimer);
+        state.resizeTimer = setTimeout(() => {
+          if (state.destroyed) return;
+          const width = Math.max(240, container.clientWidth || 600);
+          if (Math.abs(width - renderWidth) < 40) return;
+          renderWidth = width;
+          order.length = 0;
+          rendered.forEach((canvas, n) => { const wrap = wrappers.get(n); if (wrap) wrap.replaceChildren(); });
+          rendered.clear();
+          const bounds = (scrollRoot || container).getBoundingClientRect();
+          wrappers.forEach((wrap, n) => {
+            const r = wrap.getBoundingClientRect();
+            if (r.bottom > bounds.top - 300 && r.top < bounds.bottom + 300) renderPage(n);
+          });
+        }, 150);
+      });
+      state.resizeObs.observe(container);
+    } catch (err) {
+      showFallback();
+    }
+  })();
+
+  return teardown;
 }

@@ -845,6 +845,16 @@ bytes come from SQLite, WebDAV bytes are fetched from the configured remote obje
 documents are proxied through their adapter. The per-document visibility check applies before any
 content is read.
 
+PDF preview renders inline everywhere: browsers with a built-in PDF viewer (desktop) use a
+same-origin `<iframe>`, while browsers without one (iOS Safari and most mobile browsers, where an
+`<iframe>`/`<embed>` renders blank) fall back to a self-hosted pdf.js canvas viewer. Pages render
+lazily (IntersectionObserver, an LRU cap bounds memory on large PDFs), the modal body is the sole
+scroller, a sticky page indicator shows position, and a screen-reader note points to the
+always-available open-in-tab/download escape (the canvas is graphical, not text). pdf.js plus its
+worker and standard fonts ship self-hosted under `public/vendor/pdfjs/` (no CDN, per the no-external-
+frontend-dependencies constraint); `isEvalSupported` is disabled so the app CSP (`script-src 'self'`)
+is unchanged. (v1.31.0)
+
 ### Family Document Access
 Allowlist for `visibility = 'restricted'` documents — only listed users can see the document.
 

@@ -775,6 +775,13 @@
   padding-top: var(--space-4);
 }
 
+/* PDF-Canvas-Stapel scrollt über den Modal-Body (einziger Scroller); daher hier nicht
+   vertikal zentrieren, sondern von oben stapeln. */
+.document-viewer__body:has(.document-viewer__pdf-pages) {
+  display: block;
+  padding-top: var(--space-3);
+}
+
 .document-viewer__image {
   display: block;
   max-width: 100%;
@@ -790,6 +797,101 @@
   border: none;
   border-radius: var(--radius-glass-inner);
   background: var(--color-surface-2);
+}
+
+/* pdf.js-Canvas-Vorschau (mobile Browser ohne nativen Inline-PDF-Viewer): Seitenstapel, der
+   NICHT selbst scrollt (verschachtelte Scroller vermeiden) -> der Modal-Body ist der Scroller. */
+.document-viewer__pdf-pages {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-1);
+  border-radius: var(--radius-glass-inner);
+  background: var(--color-surface-2);
+}
+
+.document-viewer__pdf-pages:focus-visible {
+  outline: 2px solid var(--module-accent);
+  outline-offset: 2px;
+}
+
+/* Sichtbarer Seitenindikator ("n von total"), klebt beim Scrollen oben am Modal-Body.
+   Rein visuell (aria-hidden); die vorlesbare Info liegt in der Live-Region. */
+.document-viewer__pdf-indicator {
+  position: sticky;
+  top: var(--space-2);
+  z-index: 1;
+  align-self: center;
+  margin-bottom: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-surface-1) 88%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--glass-shadow-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.document-viewer__pdf-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+/* Seiten-Wrapper: reserviert Höhe via aspect-ratio (inline gesetzt), trägt Rahmen/Schatten,
+   zeigt bis zum Lazy-Render einen dezenten Platzhalter. */
+.document-viewer__pdf-page {
+  width: 100%;
+  line-height: 0;
+  border-radius: var(--radius-glass-inner);
+  box-shadow: var(--glass-shadow-md);
+  background: var(--color-surface-1);
+  overflow: hidden;
+}
+
+.document-viewer__pdf-page:empty {
+  background: var(--color-surface-2);
+  animation: documents-pdf-placeholder 1.4s ease-in-out infinite;
+}
+
+@keyframes documents-pdf-placeholder {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .document-viewer__pdf-page:empty {
+    animation: none;
+  }
+}
+
+.document-viewer__pdf-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Inline-Fehlerzustand einer einzelnen Seite (statt endlosem Platzhalter-Puls). */
+.document-viewer__pdf-page-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.document-viewer__pdf-page-error svg {
+  width: 22px;
+  height: 22px;
+  color: var(--color-warning);
 }
 
 .document-viewer__text {
