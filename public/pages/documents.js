@@ -174,14 +174,21 @@ function renderDmsHeaderBtn() {
   if (existing) existing.remove();
   if (!state.dmsAccounts.length) return;
   const btn = document.createElement('button');
-  btn.className = 'btn btn--secondary';
+  btn.className = 'btn btn--secondary documents-dms-link-btn';
   btn.id = 'documents-dms-link-btn';
+  // aria-label + title tragen den Text weiter, wenn das Label mobil zum
+  // Icon-Button zusammenfällt (#523).
+  btn.setAttribute('aria-label', t('documents.linkFromDms'));
+  btn.title = t('documents.linkFromDms');
   const icon = document.createElement('i');
   icon.dataset.lucide = 'link';
   icon.className = 'icon-md';
   icon.setAttribute('aria-hidden', 'true');
   btn.append(icon);
-  btn.append(document.createTextNode(t('documents.linkFromDms')));
+  const label = document.createElement('span');
+  label.className = 'documents-dms-link-btn__label';
+  label.textContent = t('documents.linkFromDms');
+  btn.append(label);
   btn.addEventListener('click', () => openDmsLinkModal());
   // In den Aktions-Slot des Kopfes hängen (vor die Ansicht-Umschaltung), damit die
   // Toolbar-Reihenfolge stimmt und der Button rechtsbündig neben der Ansicht steht.

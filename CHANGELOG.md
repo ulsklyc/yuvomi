@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.1] - 2026-07-19
+
+### Fixed
+- Documents page: the category filter chips could not be reached on desktop when they overflowed the row, because the horizontal scroll had no visible scrollbar and desktop has no swipe gesture. On desktop the filters now wrap onto multiple lines so every category stays reachable; touch devices keep the swipeable single-row strip.
+- Documents page: the "Link from DMS" button was oversized on mobile. It now collapses to a compact icon button next to the view toggle (its label is preserved as an accessible name and tooltip).
+
 ## [1.31.0] - 2026-07-18
 
 ### Added

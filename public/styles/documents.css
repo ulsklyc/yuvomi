@@ -62,6 +62,27 @@
 
 .documents-filters::-webkit-scrollbar { display: none; }
 
+/* Desktop (Maus, kein Swipe): Filterzeile umbrechen statt horizontal scrollen,
+ * damit alle Kategorien erreichbar bleiben. Auf Touch bleibt die swipebare
+ * Ein-Zeilen-Leiste erhalten (#525). Die Kategorie-Chips brauchen flex-basis:100%,
+ * damit sie auf eine eigene volle Zeile rücken und intern umbrechen statt in
+ * max-content-Breite über den Rand hinauszulaufen; der vertikale Trenner entfällt
+ * dabei (er säße sonst frei am linken Rand der Chip-Zeile). */
+@media (hover: hover) and (pointer: fine) {
+  .documents-filters {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .documents-filter-chips {
+    flex-wrap: wrap;
+    flex-basis: 100%;
+    min-width: 0;
+    padding-inline-start: 0;
+    border-inline-start: none;
+  }
+}
+
 .documents-filter-group {
   display: inline-flex;
   gap: var(--space-2);
@@ -654,6 +675,21 @@
 
   .documents-filter-chip {
     min-height: var(--target-lg);
+  }
+
+  /* „Aus DMS verknüpfen" fällt mobil zum kompakten Icon-Button zusammen
+   * (Text via aria-label/title erhalten), damit er die Kopfzeile nicht
+   * sprengt und neben der Ansicht-Umschaltung gleich groß sitzt (#523). */
+  .documents-dms-link-btn {
+    width: var(--target-base);
+    height: var(--target-base);
+    padding: 0;
+    flex-shrink: 0;
+    justify-content: center;
+  }
+
+  .documents-dms-link-btn__label {
+    display: none;
   }
 
   .document-row {
