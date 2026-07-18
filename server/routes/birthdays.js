@@ -2,7 +2,14 @@ import express from 'express';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { collectErrors, date as validateDate, str, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
-import { deleteBirthdayArtifacts, hydrateBirthday, syncBirthdayArtifacts, syncAllBirthdayReminders } from '../services/birthdays.js';
+import {
+  deleteBirthdayArtifacts,
+  hydrateBirthday,
+  syncBirthdayArtifacts,
+  syncAllBirthdayReminders,
+  listBirthdayImportCandidates,
+  importBirthdaysFromContacts,
+} from '../services/birthdays.js';
 
 const log = createLogger('Birthdays');
 const router = express.Router();
@@ -93,6 +100,35 @@ router.post('/', (req, res) => {
     res.status(201).json({ data: hydrateBirthday(loadBirthday(synced.id)) });
   } catch (err) {
     log.error('POST / error:', err);
+    res.status(500).json({ error: 'Internal error.', code: 500 });
+  }
+});
+
+router.get('/import/candidates', (req, res) => {
+  try {
+    const data = listBirthdayImportCandidates(db.get());
+    res.json({ data });
+  } catch (err) {
+    log.error('GET /import/candidates error:', err);
+    res.status(500).json({ error: 'Internal error.', code: 500 });
+  }
+});
+
+router.post('/import', (req, res) => {
+  try {
+    const userId = req.authUserId || req.session.userId;
+    const ids = Array.isArray(req.body.contact_ids) ? req.body.contact_ids : null;
+    if (!ids || ids.length === 0) {
+      return res.status(400).json({ error: 'contact_ids must be a non-empty array.', code: 400 });
+    }
+    if (ids.length > 500) {
+      return res.status(400).json({ error: 'Too many contacts selected.', code: 400 });
+    }
+
+    const result = db.transaction(() => importBirthdaysFromContacts(db.get(), ids, userId));
+    res.status(201).json({ data: result });
+  } catch (err) {
+    log.error('POST /import error:', err);
     res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });

@@ -209,6 +209,9 @@ function renderPage() {
       <div class="page-toolbar page-toolbar--wrap birthdays-toolbar">
         <h1 class="page-toolbar__title">${t('birthdays.title')}</h1>
         ${renderPageSearch({ id: 'birthdays-search', label: t('birthdays.searchPlaceholder'), placeholder: t('birthdays.searchPlaceholder'), value: state.query, clearLabel: t('common.searchClear'), className: 'birthdays-toolbar__search page-toolbar__center' })}
+        <button class="btn btn--secondary birthdays-toolbar__import" id="birthdays-import-btn" type="button" aria-label="${t('birthdays.importButton')}">
+          <i data-lucide="download" aria-hidden="true"></i><span>${t('birthdays.importButton')}</span>
+        </button>
       </div>
 
       <p class="birthdays-hint">${t('birthdays.calendarHint')}</p>
@@ -227,6 +230,7 @@ function renderPage() {
 
 function bindEvents() {
   _container.querySelector('#fab-new-birthday').addEventListener('click', () => openBirthdayModal({ mode: 'create' }));
+  _container.querySelector('#birthdays-import-btn')?.addEventListener('click', () => openImportModal());
 
   wirePageSearch(_container, {
     id: 'birthdays-search',
@@ -393,6 +397,109 @@ function openBirthdayModal({ mode, birthday = null }) {
         } catch (err) {
           window.yuvomi?.showToast(err.message, 'danger');
           saveBtn.disabled = false;
+        }
+      });
+    },
+  });
+}
+
+function importCandidateRowHtml(c) {
+  if (c.already_imported) {
+    return `
+      <div class="bd-import-row bd-import-row--done">
+        <span class="bd-import-row__check" aria-hidden="true"><i data-lucide="check"></i></span>
+        <span class="bd-import-row__name">${esc(c.name)}</span>
+        <span class="bd-import-row__date">${esc(formatDate(c.birthday))}</span>
+        <span class="bd-import-row__badge">${t('birthdays.importAlreadyAdded')}</span>
+      </div>`;
+  }
+  return `
+    <label class="bd-import-row">
+      <input type="checkbox" value="${c.id}">
+      <span class="bd-import-row__name">${esc(c.name)}</span>
+      <span class="bd-import-row__date">${esc(formatDate(c.birthday))}</span>
+    </label>`;
+}
+
+async function openImportModal() {
+  let candidates;
+  try {
+    const res = await api.get('/birthdays/import/candidates');
+    candidates = res.data;
+  } catch (err) {
+    window.yuvomi?.showToast(err.message, 'danger');
+    return;
+  }
+
+  const withBirthday = candidates.withBirthday ?? [];
+  const withoutBirthday = candidates.withoutBirthday ?? [];
+  const hasCandidates = withBirthday.length > 0;
+
+  const listHtml = hasCandidates
+    ? `<div class="bd-import__list">${withBirthday.map(importCandidateRowHtml).join('')}</div>`
+    : `<div class="bd-import__empty">${t('birthdays.importEmpty')}</div>`;
+
+  const withoutHtml = withoutBirthday.length
+    ? `<details class="bd-import__without">
+         <summary>${t('birthdays.importNoBirthdaySection')} (${withoutBirthday.length})</summary>
+         <p class="bd-import__without-hint">${t('birthdays.importNoBirthdayHint')}</p>
+         <div class="bd-import__without-list">
+           ${withoutBirthday.map((c) => `<span class="bd-import__without-name">${esc(c.name)}</span>`).join('')}
+         </div>
+       </details>`
+    : '';
+
+  openSharedModal({
+    title: t('birthdays.importTitle'),
+    size: 'md',
+    content: `
+      <div class="bd-import">
+        <p class="bd-import__intro">${t('birthdays.importIntro')}</p>
+        <span class="sr-only" role="status" aria-live="polite" id="bd-import-status"></span>
+        ${listHtml}
+        ${withoutHtml}
+        <div class="bd-import__footer">
+          <button class="btn btn--secondary" type="button" id="bd-import-cancel">${t('common.cancel')}</button>
+          <button class="btn btn--primary" type="button" id="bd-import-submit" disabled>${t('birthdays.importSubmit', { count: 0 })}</button>
+        </div>
+      </div>
+    `,
+    onSave(panel) {
+      const submitBtn = panel.querySelector('#bd-import-submit');
+      const status = panel.querySelector('#bd-import-status');
+      const selectable = [...panel.querySelectorAll('.bd-import__list input:not(:disabled)')];
+
+      const selectedIds = () =>
+        selectable.filter((cb) => cb.checked).map((cb) => Number(cb.value));
+
+      const refresh = (announce = false) => {
+        const n = selectedIds().length;
+        submitBtn.textContent = t('birthdays.importSubmit', { count: n });
+        submitBtn.disabled = n === 0;
+        // Nur bei echter Interaktion ansagen, nicht beim initialen Öffnen.
+        if (announce && status) status.textContent = t('birthdays.importSelected', { count: n });
+      };
+      selectable.forEach((cb) => cb.addEventListener('change', () => refresh(true)));
+      refresh();
+
+      panel.querySelector('#bd-import-cancel').addEventListener('click', closeModal);
+
+      submitBtn.addEventListener('click', async () => {
+        const ids = selectedIds();
+        if (ids.length === 0) {
+          window.yuvomi?.showToast(t('birthdays.importNothingSelected'), 'warning');
+          return;
+        }
+        submitBtn.disabled = true;
+        try {
+          const res = await api.post('/birthdays/import', { contact_ids: ids });
+          window.yuvomi?.showToast(t('birthdays.importSuccess', { count: res.data.imported }), 'success');
+          await loadData();
+          renderList();
+          closeModal({ force: true });
+        } catch (err) {
+          window.yuvomi?.showToast(err.message, 'danger');
+          submitBtn.disabled = false;
         }
       });
     },

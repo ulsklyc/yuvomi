@@ -1934,7 +1934,18 @@
         "ageNoteToday": "Compie {{age}} anni oggi.",
         "ageNoteTomorrow": "Compirà {{age}} anni domani.",
         "ageNoteDays": "Compirà {{age}} anni tra {{days}} giorni.",
-        "photoOptional": "Facoltativo: puoi salvare anche senza foto del profilo."
+        "photoOptional": "Facoltativo: puoi salvare anche senza foto del profilo.",
+        "importButton": "Importa dai contatti",
+        "importTitle": "Importa i compleanni dai contatti",
+        "importIntro": "Seleziona i contatti con una data di nascita salvata per aggiungerli.",
+        "importAlreadyAdded": "Già aggiunto",
+        "importNoBirthdaySection": "Contatti senza compleanno",
+        "importNoBirthdayHint": "Per questi contatti non è salvata una data di nascita - aggiungila manualmente.",
+        "importEmpty": "Nessun contatto con una data di nascita trovato. Sincronizza prima una rubrica CardDAV.",
+        "importSubmit": "Aggiungi {{count}}",
+        "importSuccess": "{{count}} compleanni aggiunti.",
+        "importNothingSelected": "Seleziona almeno un contatto.",
+        "importSelected": "{{count}} contatti selezionati"
     },
     "reminders": {
         "sectionTitle": "Promemoria",

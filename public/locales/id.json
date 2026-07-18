@@ -1941,7 +1941,18 @@
         "deleteConfirm": "Hapus ulang tahun \"{{name}}\"?",
         "ageNoteToday": "Berusia {{age}} tahun hari ini.",
         "ageNoteTomorrow": "Berusia {{age}} tahun besok.",
-        "ageNoteDays": "Berusia {{age}} tahun dalam {{days}} hari."
+        "ageNoteDays": "Berusia {{age}} tahun dalam {{days}} hari.",
+        "importButton": "Impor dari kontak",
+        "importTitle": "Impor ulang tahun dari kontak",
+        "importIntro": "Pilih kontak dengan tanggal ulang tahun tersimpan untuk menambahkannya.",
+        "importAlreadyAdded": "Sudah ditambahkan",
+        "importNoBirthdaySection": "Kontak tanpa ulang tahun",
+        "importNoBirthdayHint": "Kontak ini tidak memiliki tanggal ulang tahun tersimpan - tambahkan secara manual.",
+        "importEmpty": "Tidak ada kontak dengan ulang tahun ditemukan. Sinkronkan buku alamat CardDAV terlebih dahulu.",
+        "importSubmit": "Tambahkan {{count}}",
+        "importSuccess": "{{count}} ulang tahun ditambahkan.",
+        "importNothingSelected": "Pilih setidaknya satu kontak.",
+        "importSelected": "{{count}} kontak dipilih"
     },
     "recipes": {
         "title": "Resep",

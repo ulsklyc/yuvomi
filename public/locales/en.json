@@ -1934,7 +1934,18 @@
         "deleteConfirm": "Delete birthday for \"{{name}}\"?",
         "ageNoteToday": "Turns {{age}} today.",
         "ageNoteTomorrow": "Turns {{age}} tomorrow.",
-        "ageNoteDays": "Turns {{age}} in {{days}} days."
+        "ageNoteDays": "Turns {{age}} in {{days}} days.",
+        "importButton": "Import from contacts",
+        "importTitle": "Import birthdays from contacts",
+        "importIntro": "Select contacts with a stored birthday to add them.",
+        "importAlreadyAdded": "Already added",
+        "importNoBirthdaySection": "Contacts without a birthday",
+        "importNoBirthdayHint": "No birthday is stored for these contacts - please add it manually.",
+        "importEmpty": "No contacts with a birthday found. Sync a CardDAV address book first.",
+        "importSubmit": "Add {{count}}",
+        "importSuccess": "{{count}} birthdays added.",
+        "importNothingSelected": "Please select at least one contact.",
+        "importSelected": "{{count}} contacts selected"
     },
     "recipes": {
         "title": "Recipes",

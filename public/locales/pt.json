@@ -1934,7 +1934,18 @@
         "deleteConfirm": "Excluir o aniversário de \"{{name}}\"?",
         "ageNoteToday": "Completa {{age}} anos hoje.",
         "ageNoteTomorrow": "Completa {{age}} anos amanhã.",
-        "ageNoteDays": "Completa {{age}} anos em {{days}} dias."
+        "ageNoteDays": "Completa {{age}} anos em {{days}} dias.",
+        "importButton": "Importar dos contatos",
+        "importTitle": "Importar aniversários dos contatos",
+        "importIntro": "Selecione os contatos com uma data de aniversário guardada para adicioná-los.",
+        "importAlreadyAdded": "Já adicionado",
+        "importNoBirthdaySection": "Contatos sem aniversário",
+        "importNoBirthdayHint": "Estes contatos não têm aniversário guardado - adicione-o manualmente.",
+        "importEmpty": "Nenhum contato com aniversário encontrado. Sincronize primeiro uma agenda de endereços CardDAV.",
+        "importSubmit": "Adicionar {{count}}",
+        "importSuccess": "{{count}} aniversários adicionados.",
+        "importNothingSelected": "Selecione pelo menos um contato.",
+        "importSelected": "{{count}} contatos selecionados"
     },
     "reminders": {
         "sectionTitle": "Lembrete",

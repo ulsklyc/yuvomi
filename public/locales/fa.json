@@ -1941,7 +1941,18 @@
         "deleteConfirm": "تولد «{{name}}» حذف شود؟",
         "ageNoteToday": "امروز {{age}} ساله می‌شود.",
         "ageNoteTomorrow": "فردا {{age}} ساله می‌شود.",
-        "ageNoteDays": "در {{days}} روز {{age}} ساله می‌شود."
+        "ageNoteDays": "در {{days}} روز {{age}} ساله می‌شود.",
+        "importButton": "وارد کردن از مخاطبین",
+        "importTitle": "وارد کردن تولدها از مخاطبین",
+        "importIntro": "مخاطبینی را که تاریخ تولد ذخیره‌شده دارند برای افزودن انتخاب کنید.",
+        "importAlreadyAdded": "قبلاً افزوده شد",
+        "importNoBirthdaySection": "مخاطبین بدون تاریخ تولد",
+        "importNoBirthdayHint": "برای این مخاطبین تاریخ تولدی ذخیره نشده است - لطفاً به‌صورت دستی اضافه کنید.",
+        "importEmpty": "هیچ مخاطبی با تاریخ تولد یافت نشد. ابتدا یک دفترچه آدرس CardDAV را همگام‌سازی کنید.",
+        "importSubmit": "افزودن {{count}}",
+        "importSuccess": "{{count}} تولد افزوده شد.",
+        "importNothingSelected": "لطفاً حداقل یک مخاطب انتخاب کنید.",
+        "importSelected": "{{count}} مخاطب انتخاب شد"
     },
     "recipes": {
         "title": "دستورهای غذا",

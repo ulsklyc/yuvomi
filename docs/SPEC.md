@@ -765,6 +765,7 @@ Birthday records with optional profile photo and automatic calendar event + remi
 | photo_data | TEXT | Base64 data URL (≤ 5 MB), nullable |
 | calendar_event_id | INTEGER | FK → calendar_events (SET NULL on delete), nullable |
 | family_user_id | INTEGER | FK → Users (CASCADE delete), UNIQUE (one linked user per birthday), nullable |
+| contact_id | INTEGER | FK → Contacts (SET NULL on delete), UNIQUE partial (one birthday per source contact); set when imported from a contact, nullable |
 | created_by | INTEGER | FK → Users (CASCADE delete), NOT NULL |
 | reminder_offset | TEXT | Preset offset key (e.g. "1d", "1w") or "custom"; empty/null = no reminder |
 | reminder_custom_amount | INTEGER | Amount for custom offset, nullable |
@@ -1619,8 +1620,9 @@ Personal birthday tracker with automatic calendar integration.
 - **Mobile action hierarchy:** phones expose creation through the persistent FAB only; the duplicate header action is hidden so the title retains the available width.
 - **Calendar integration:** creating or updating a birthday automatically creates/updates a recurring annual all-day calendar event (title: "🎂 {Name}"); deleting a birthday removes the linked event
 - **Configurable reminder:** customizable reminder offset per birthday with preset options (none, at time, 15 min, 1 h, 1 d, 2 d, 1 w, 2 w) and a fully custom interval (amount + unit). Reminder time calculated from offset; auto-dismissed when the birthday passes
+- **Import from contacts:** a toolbar action opens a selection dialog listing contacts (from CardDAV sync or local entry) that carry a `BDAY`/birthday. The user picks individual contacts via checkboxes; each import creates a birthday linked to its source contact (`contact_id`). Idempotent — already-imported contacts are shown with a check mark and "already added" badge and cannot be re-selected. Contacts without a stored birthday are listed separately for manual completion. Manual entry stays available for anyone not in an address book. Photos are not carried over (contact photos are raw vCard base64, not the data-URL format birthdays expect)
 - Search filter by name
-- API: `GET /api/v1/birthdays`, `GET /api/v1/birthdays/upcoming`, `GET /api/v1/birthdays/:id`, `POST /api/v1/birthdays`, `PUT /api/v1/birthdays/:id`, `DELETE /api/v1/birthdays/:id`
+- API: `GET /api/v1/birthdays`, `GET /api/v1/birthdays/upcoming`, `GET /api/v1/birthdays/import/candidates`, `GET /api/v1/birthdays/:id`, `POST /api/v1/birthdays`, `POST /api/v1/birthdays/import`, `PUT /api/v1/birthdays/:id`, `DELETE /api/v1/birthdays/:id`
 
 ### Reminders (`/reminders`)
 

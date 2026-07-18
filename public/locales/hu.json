@@ -1934,7 +1934,18 @@
         "deleteConfirm": "Törli \"{{name}}\" születésnapját?",
         "ageNoteToday": "{{age}} éves lett ma.",
         "ageNoteTomorrow": "Holnap lesz {{age}} éves.",
-        "ageNoteDays": "{{days}} nap múlva lesz {{age}} éves."
+        "ageNoteDays": "{{days}} nap múlva lesz {{age}} éves.",
+        "importButton": "Importálás névjegyekből",
+        "importTitle": "Születésnapok importálása névjegyekből",
+        "importIntro": "Válaszd ki a mentett születésnappal rendelkező névjegyeket a hozzáadáshoz.",
+        "importAlreadyAdded": "Már hozzáadva",
+        "importNoBirthdaySection": "Névjegyek születésnap nélkül",
+        "importNoBirthdayHint": "Ezeknél a névjegyeknél nincs mentve születésnap - add meg kézzel.",
+        "importEmpty": "Nem található születésnappal rendelkező névjegy. Előbb szinkronizálj egy CardDAV-címjegyzéket.",
+        "importSubmit": "{{count}} hozzáadása",
+        "importSuccess": "{{count}} születésnap hozzáadva.",
+        "importNothingSelected": "Válassz ki legalább egy névjegyet.",
+        "importSelected": "{{count}} névjegy kiválasztva"
     },
     "recipes": {
         "title": "Receptek",

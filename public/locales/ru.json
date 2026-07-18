@@ -1934,7 +1934,18 @@
         "ageNoteToday": "Исполняется {{age}} сегодня.",
         "ageNoteTomorrow": "Исполнится {{age}} завтра.",
         "ageNoteDays": "Исполнится {{age}} через {{days}} дн.",
-        "photoOptional": "Необязательно: можно сохранить без фото профиля."
+        "photoOptional": "Необязательно: можно сохранить без фото профиля.",
+        "importButton": "Импорт из контактов",
+        "importTitle": "Импорт дней рождения из контактов",
+        "importIntro": "Выберите контакты с сохранённой датой рождения, чтобы добавить их.",
+        "importAlreadyAdded": "Уже добавлено",
+        "importNoBirthdaySection": "Контакты без даты рождения",
+        "importNoBirthdayHint": "Для этих контактов не сохранена дата рождения - добавьте её вручную.",
+        "importEmpty": "Контакты с датой рождения не найдены. Сначала синхронизируйте адресную книгу CardDAV.",
+        "importSubmit": "Добавить {{count}}",
+        "importSuccess": "Добавлено дней рождения: {{count}}.",
+        "importNothingSelected": "Выберите хотя бы один контакт.",
+        "importSelected": "Выбрано контактов: {{count}}"
     },
     "reminders": {
         "sectionTitle": "Напоминание",

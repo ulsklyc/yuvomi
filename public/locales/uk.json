@@ -1967,7 +1967,18 @@
         "ageNoteToday": "Сьогодні виповнюється {{age}}.",
         "ageNoteTomorrow": "Завтра виповниться {{age}}.",
         "ageNoteDays": "За {{days}} дн. виповниться {{age}}.",
-        "photoOptional": "Необов'язково: можна зберегти без фото профілю."
+        "photoOptional": "Необов'язково: можна зберегти без фото профілю.",
+        "importButton": "Імпорт із контактів",
+        "importTitle": "Імпорт днів народження з контактів",
+        "importIntro": "Виберіть контакти зі збереженою датою народження, щоб додати їх.",
+        "importAlreadyAdded": "Уже додано",
+        "importNoBirthdaySection": "Контакти без дати народження",
+        "importNoBirthdayHint": "Для цих контактів не збережено дату народження - додайте її вручну.",
+        "importEmpty": "Контактів із датою народження не знайдено. Спершу синхронізуйте адресну книгу CardDAV.",
+        "importSubmit": "Додати {{count}}",
+        "importSuccess": "Додано днів народження: {{count}}.",
+        "importNothingSelected": "Виберіть принаймні один контакт.",
+        "importSelected": "Вибрано контактів: {{count}}"
     },
     "onboarding": {
         "step1Title": "Ласкаво просимо до {{name}}",

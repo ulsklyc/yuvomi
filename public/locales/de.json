@@ -1941,7 +1941,18 @@
         "deleteConfirm": "Geburtstag von \"{{name}}\" löschen?",
         "ageNoteToday": "Wird heute {{age}} Jahre alt.",
         "ageNoteTomorrow": "Wird morgen {{age}} Jahre alt.",
-        "ageNoteDays": "Wird in {{days}} Tagen {{age}} Jahre alt."
+        "ageNoteDays": "Wird in {{days}} Tagen {{age}} Jahre alt.",
+        "importButton": "Aus Kontakten importieren",
+        "importTitle": "Geburtstage aus Kontakten importieren",
+        "importIntro": "Wähle Kontakte mit hinterlegtem Geburtstag aus, um sie zu übernehmen.",
+        "importAlreadyAdded": "Bereits übernommen",
+        "importNoBirthdaySection": "Kontakte ohne Geburtstag",
+        "importNoBirthdayHint": "Für diese Kontakte ist kein Geburtstag hinterlegt - bitte manuell ergänzen.",
+        "importEmpty": "Keine Kontakte mit Geburtstag gefunden. Synchronisiere zuerst ein CardDAV-Adressbuch.",
+        "importSubmit": "{{count}} übernehmen",
+        "importSuccess": "{{count}} Geburtstage übernommen.",
+        "importNothingSelected": "Bitte mindestens einen Kontakt auswählen.",
+        "importSelected": "{{count}} Kontakte ausgewählt"
     },
     "recipes": {
         "title": "Rezepte",

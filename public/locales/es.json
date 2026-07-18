@@ -1934,7 +1934,18 @@
         "ageNoteToday": "Cumple {{age}} años hoy.",
         "ageNoteTomorrow": "Cumple {{age}} años mañana.",
         "ageNoteDays": "Cumplirá {{age}} años en {{days}} días.",
-        "photoOptional": "Opcional: puedes guardar sin foto de perfil."
+        "photoOptional": "Opcional: puedes guardar sin foto de perfil.",
+        "importButton": "Importar desde contactos",
+        "importTitle": "Importar cumpleaños desde contactos",
+        "importIntro": "Selecciona los contactos con una fecha de cumpleaños guardada para añadirlos.",
+        "importAlreadyAdded": "Ya añadido",
+        "importNoBirthdaySection": "Contactos sin cumpleaños",
+        "importNoBirthdayHint": "Estos contactos no tienen cumpleaños guardado - añádelo manualmente.",
+        "importEmpty": "No se encontraron contactos con cumpleaños. Primero sincroniza una libreta de direcciones CardDAV.",
+        "importSubmit": "Añadir {{count}}",
+        "importSuccess": "{{count}} cumpleaños añadidos.",
+        "importNothingSelected": "Selecciona al menos un contacto.",
+        "importSelected": "{{count}} contactos seleccionados"
     },
     "reminders": {
         "sectionTitle": "Recordatorio",

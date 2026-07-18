@@ -1934,7 +1934,18 @@
         "deleteConfirm": "Verjaardag van \"{{name}}\" verwijderen?",
         "ageNoteToday": "Wordt vandaag {{age}}.",
         "ageNoteTomorrow": "Wordt morgen {{age}}.",
-        "ageNoteDays": "Wordt over {{days}} dagen {{age}}."
+        "ageNoteDays": "Wordt over {{days}} dagen {{age}}.",
+        "importButton": "Importeren uit contacten",
+        "importTitle": "Verjaardagen importeren uit contacten",
+        "importIntro": "Selecteer contacten met een opgeslagen verjaardag om ze toe te voegen.",
+        "importAlreadyAdded": "Al toegevoegd",
+        "importNoBirthdaySection": "Contacten zonder verjaardag",
+        "importNoBirthdayHint": "Voor deze contacten is geen verjaardag opgeslagen - voeg deze handmatig toe.",
+        "importEmpty": "Geen contacten met een verjaardag gevonden. Synchroniseer eerst een CardDAV-adresboek.",
+        "importSubmit": "{{count}} toevoegen",
+        "importSuccess": "{{count}} verjaardagen toegevoegd.",
+        "importNothingSelected": "Selecteer minstens één contact.",
+        "importSelected": "{{count}} contacten geselecteerd"
     },
     "recipes": {
         "title": "Recepten",

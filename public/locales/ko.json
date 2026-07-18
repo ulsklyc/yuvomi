@@ -1941,7 +1941,18 @@
         "deleteConfirm": "\"{{name}}\"의 생일을 삭제할까요?",
         "ageNoteToday": "오늘 {{age}}세가 됩니다.",
         "ageNoteTomorrow": "내일 {{age}}세가 됩니다.",
-        "ageNoteDays": "{{days}}일 후 {{age}}세가 됩니다."
+        "ageNoteDays": "{{days}}일 후 {{age}}세가 됩니다.",
+        "importButton": "연락처에서 가져오기",
+        "importTitle": "연락처에서 생일 가져오기",
+        "importIntro": "추가할 생일이 저장된 연락처를 선택하세요.",
+        "importAlreadyAdded": "이미 추가됨",
+        "importNoBirthdaySection": "생일이 없는 연락처",
+        "importNoBirthdayHint": "이 연락처에는 저장된 생일이 없습니다 - 직접 추가하세요.",
+        "importEmpty": "생일이 있는 연락처를 찾을 수 없습니다. 먼저 CardDAV 주소록을 동기화하세요.",
+        "importSubmit": "{{count}}개 추가",
+        "importSuccess": "생일 {{count}}개를 추가했습니다.",
+        "importNothingSelected": "연락처를 하나 이상 선택하세요.",
+        "importSelected": "연락처 {{count}}개 선택됨"
     },
     "recipes": {
         "title": "레시피",

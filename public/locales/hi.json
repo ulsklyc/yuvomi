@@ -1934,7 +1934,18 @@
         "ageNoteToday": "आज {{age}} वर्ष का/की होगा/होगी।",
         "ageNoteTomorrow": "कल {{age}} वर्ष का/की होगा/होगी।",
         "ageNoteDays": "{{days}} दिनों में {{age}} वर्ष का/की होगा/होगी।",
-        "photoOptional": "वैकल्पिक: आप प्रोफ़ाइल फ़ोटो के बिना भी सहेज सकते हैं।"
+        "photoOptional": "वैकल्पिक: आप प्रोफ़ाइल फ़ोटो के बिना भी सहेज सकते हैं।",
+        "importButton": "संपर्कों से आयात करें",
+        "importTitle": "संपर्कों से जन्मदिन आयात करें",
+        "importIntro": "जोड़ने के लिए सहेजी गई जन्मतिथि वाले संपर्क चुनें।",
+        "importAlreadyAdded": "पहले से जोड़ा गया",
+        "importNoBirthdaySection": "बिना जन्मदिन वाले संपर्क",
+        "importNoBirthdayHint": "इन संपर्कों के लिए कोई जन्मतिथि सहेजी नहीं गई है - कृपया मैन्युअल रूप से जोड़ें।",
+        "importEmpty": "जन्मदिन वाला कोई संपर्क नहीं मिला। पहले एक CardDAV पता पुस्तिका सिंक करें।",
+        "importSubmit": "{{count}} जोड़ें",
+        "importSuccess": "{{count}} जन्मदिन जोड़े गए।",
+        "importNothingSelected": "कृपया कम से कम एक संपर्क चुनें।",
+        "importSelected": "{{count}} संपर्क चुने गए"
     },
     "reminders": {
         "sectionTitle": "अनुस्मारक",

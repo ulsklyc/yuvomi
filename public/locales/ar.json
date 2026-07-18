@@ -1934,7 +1934,18 @@
         "ageNoteToday": "سيكمل {{age}} عامًا اليوم.",
         "ageNoteTomorrow": "سيكمل {{age}} عامًا غدًا.",
         "ageNoteDays": "سيكمل {{age}} عامًا بعد {{days}} يومًا.",
-        "photoOptional": "اختياري: يمكنك الحفظ بدون صورة ملف شخصي."
+        "photoOptional": "اختياري: يمكنك الحفظ بدون صورة ملف شخصي.",
+        "importButton": "استيراد من جهات الاتصال",
+        "importTitle": "استيراد أعياد الميلاد من جهات الاتصال",
+        "importIntro": "اختر جهات الاتصال التي لها تاريخ ميلاد محفوظ لإضافتها.",
+        "importAlreadyAdded": "تمت الإضافة",
+        "importNoBirthdaySection": "جهات اتصال بدون تاريخ ميلاد",
+        "importNoBirthdayHint": "لا يوجد تاريخ ميلاد محفوظ لهذه الجهات - يرجى إضافته يدويًا.",
+        "importEmpty": "لم يتم العثور على جهات اتصال بتاريخ ميلاد. زامن دفتر عناوين CardDAV أولاً.",
+        "importSubmit": "إضافة {{count}}",
+        "importSuccess": "تمت إضافة {{count}} عيد ميلاد.",
+        "importNothingSelected": "يرجى اختيار جهة اتصال واحدة على الأقل.",
+        "importSelected": "تم تحديد {{count}} جهة اتصال"
     },
     "reminders": {
         "sectionTitle": "تذكير",

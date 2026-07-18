@@ -1934,7 +1934,18 @@
         "ageNoteToday": "今日で{{age}}歳になります。",
         "ageNoteTomorrow": "明日で{{age}}歳になります。",
         "ageNoteDays": "{{days}}日後に{{age}}歳になります。",
-        "photoOptional": "任意: プロフィール写真なしでも保存できます。"
+        "photoOptional": "任意: プロフィール写真なしでも保存できます。",
+        "importButton": "連絡先から取り込む",
+        "importTitle": "連絡先から誕生日を取り込む",
+        "importIntro": "追加するには、誕生日が登録されている連絡先を選択してください。",
+        "importAlreadyAdded": "追加済み",
+        "importNoBirthdaySection": "誕生日のない連絡先",
+        "importNoBirthdayHint": "これらの連絡先には誕生日が登録されていません - 手動で追加してください。",
+        "importEmpty": "誕生日のある連絡先が見つかりません。先に CardDAV アドレス帳を同期してください。",
+        "importSubmit": "{{count}} 件を追加",
+        "importSuccess": "{{count}} 件の誕生日を追加しました。",
+        "importNothingSelected": "少なくとも 1 件の連絡先を選択してください。",
+        "importSelected": "{{count}} 件の連絡先を選択"
     },
     "reminders": {
         "sectionTitle": "リマインダー",

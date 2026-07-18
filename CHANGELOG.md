@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-07-18
+
+### Added
+- Import birthdays directly from your contacts instead of retyping them (#518). A new "Import from contacts" action on the Birthdays screen opens a selection dialog listing every contact - synced via CardDAV or entered locally - that already has a birthday stored. You tick the individual people you want and only those are added, so the rest of the address book stays out. Already-imported contacts are shown with a check mark and an "already added" label and cannot be added twice; contacts without a stored birthday are listed separately so you can fill them in by hand. Manual birthday entry stays fully available. Each imported birthday is linked to its source contact, and photos are intentionally not carried over.
+
 ## [1.27.18] - 2026-07-18
 
 ### Changed

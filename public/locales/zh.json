@@ -1934,7 +1934,18 @@
         "ageNoteToday": "今天满 {{age}} 岁。",
         "ageNoteTomorrow": "明天满 {{age}} 岁。",
         "ageNoteDays": "{{days}} 天后满 {{age}} 岁。",
-        "photoOptional": "可选：您也可以不上传头像直接保存。"
+        "photoOptional": "可选：您也可以不上传头像直接保存。",
+        "importButton": "从联系人导入",
+        "importTitle": "从联系人导入生日",
+        "importIntro": "选择已保存生日的联系人以添加。",
+        "importAlreadyAdded": "已添加",
+        "importNoBirthdaySection": "没有生日的联系人",
+        "importNoBirthdayHint": "这些联系人未保存生日 - 请手动添加。",
+        "importEmpty": "未找到有生日的联系人。请先同步 CardDAV 通讯录。",
+        "importSubmit": "添加 {{count}}",
+        "importSuccess": "已添加 {{count}} 个生日。",
+        "importNothingSelected": "请至少选择一个联系人。",
+        "importSelected": "已选择 {{count}} 个联系人"
     },
     "reminders": {
         "sectionTitle": "提醒",

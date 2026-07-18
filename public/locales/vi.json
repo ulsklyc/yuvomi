@@ -1934,7 +1934,18 @@
         "deleteConfirm": "Xóa sinh nhật của \"{{name}}\"?",
         "ageNoteToday": "Tròn {{age}} tuổi hôm nay.",
         "ageNoteTomorrow": "Tròn {{age}} tuổi ngày mai.",
-        "ageNoteDays": "Tròn {{age}} tuổi trong {{days}} ngày tới."
+        "ageNoteDays": "Tròn {{age}} tuổi trong {{days}} ngày tới.",
+        "importButton": "Nhập từ danh bạ",
+        "importTitle": "Nhập sinh nhật từ danh bạ",
+        "importIntro": "Chọn các liên hệ đã lưu ngày sinh để thêm vào.",
+        "importAlreadyAdded": "Đã thêm",
+        "importNoBirthdaySection": "Liên hệ không có ngày sinh",
+        "importNoBirthdayHint": "Các liên hệ này chưa lưu ngày sinh - vui lòng thêm thủ công.",
+        "importEmpty": "Không tìm thấy liên hệ nào có ngày sinh. Hãy đồng bộ sổ địa chỉ CardDAV trước.",
+        "importSubmit": "Thêm {{count}}",
+        "importSuccess": "Đã thêm {{count}} sinh nhật.",
+        "importNothingSelected": "Vui lòng chọn ít nhất một liên hệ.",
+        "importSelected": "Đã chọn {{count}} liên hệ"
     },
     "recipes": {
         "title": "Công thức nấu ăn",

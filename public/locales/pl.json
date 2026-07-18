@@ -1941,7 +1941,18 @@
         "deleteConfirm": "Usunąć urodziny \"{{name}}\"?",
         "ageNoteToday": "Kończy dzisiaj {{age}} lat.",
         "ageNoteTomorrow": "Kończy jutro {{age}} lat.",
-        "ageNoteDays": "Kończy {{age}} lat za {{days}} dni."
+        "ageNoteDays": "Kończy {{age}} lat za {{days}} dni.",
+        "importButton": "Importuj z kontaktów",
+        "importTitle": "Importuj urodziny z kontaktów",
+        "importIntro": "Wybierz kontakty z zapisaną datą urodzin, aby je dodać.",
+        "importAlreadyAdded": "Już dodano",
+        "importNoBirthdaySection": "Kontakty bez daty urodzin",
+        "importNoBirthdayHint": "Te kontakty nie mają zapisanej daty urodzin - dodaj ją ręcznie.",
+        "importEmpty": "Nie znaleziono kontaktów z datą urodzin. Najpierw zsynchronizuj książkę adresową CardDAV.",
+        "importSubmit": "Dodaj {{count}}",
+        "importSuccess": "Dodano urodziny: {{count}}.",
+        "importNothingSelected": "Wybierz co najmniej jeden kontakt.",
+        "importSelected": "Wybrano kontakty: {{count}}"
     },
     "recipes": {
         "title": "Przepisy",

@@ -1934,7 +1934,18 @@
         "ageNoteToday": "Bugün {{age}} yaşına giriyor.",
         "ageNoteTomorrow": "Yarın {{age}} yaşına giriyor.",
         "ageNoteDays": "{{days}} gün içinde {{age}} yaşına girecek.",
-        "photoOptional": "İsteğe bağlı: Profil fotoğrafı olmadan da kaydedebilirsiniz."
+        "photoOptional": "İsteğe bağlı: Profil fotoğrafı olmadan da kaydedebilirsiniz.",
+        "importButton": "Kişilerden içe aktar",
+        "importTitle": "Doğum günlerini kişilerden içe aktar",
+        "importIntro": "Eklemek için doğum günü kayıtlı kişileri seçin.",
+        "importAlreadyAdded": "Zaten eklendi",
+        "importNoBirthdaySection": "Doğum günü olmayan kişiler",
+        "importNoBirthdayHint": "Bu kişiler için doğum günü kayıtlı değil - lütfen elle ekleyin.",
+        "importEmpty": "Doğum günü olan kişi bulunamadı. Önce bir CardDAV adres defterini eşitleyin.",
+        "importSubmit": "{{count}} ekle",
+        "importSuccess": "{{count}} doğum günü eklendi.",
+        "importNothingSelected": "Lütfen en az bir kişi seçin.",
+        "importSelected": "{{count}} kişi seçildi"
     },
     "reminders": {
         "sectionTitle": "Hatırlatıcı",

@@ -1934,7 +1934,18 @@
         "ageNoteToday": "Fyller {{age}} år idag.",
         "ageNoteTomorrow": "Fyller {{age}} år i morgon.",
         "ageNoteDays": "Fyller {{age}} år om {{days}} dagar.",
-        "photoOptional": "Valfritt: Du kan spara utan profilbild."
+        "photoOptional": "Valfritt: Du kan spara utan profilbild.",
+        "importButton": "Importera från kontakter",
+        "importTitle": "Importera födelsedagar från kontakter",
+        "importIntro": "Välj kontakter med sparat födelsedatum för att lägga till dem.",
+        "importAlreadyAdded": "Redan tillagd",
+        "importNoBirthdaySection": "Kontakter utan födelsedag",
+        "importNoBirthdayHint": "Dessa kontakter saknar sparat födelsedatum - lägg till det manuellt.",
+        "importEmpty": "Inga kontakter med födelsedag hittades. Synkronisera en CardDAV-adressbok först.",
+        "importSubmit": "Lägg till {{count}}",
+        "importSuccess": "{{count}} födelsedagar tillagda.",
+        "importNothingSelected": "Välj minst en kontakt.",
+        "importSelected": "{{count}} kontakter valda"
     },
     "reminders": {
         "sectionTitle": "Påminnelse",

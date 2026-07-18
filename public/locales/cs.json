@@ -2328,7 +2328,18 @@
         "deleteConfirm": "Smazat narozeniny „{{name}}“?",
         "ageNoteToday": "Dnes slaví {{age}} let.",
         "ageNoteTomorrow": "Zítra slaví {{age}} let.",
-        "ageNoteDays": "Za {{days}} dní slaví {{age}} let."
+        "ageNoteDays": "Za {{days}} dní slaví {{age}} let.",
+        "importButton": "Importovat z kontaktů",
+        "importTitle": "Importovat narozeniny z kontaktů",
+        "importIntro": "Vyberte kontakty s uloženým datem narození, které chcete přidat.",
+        "importAlreadyAdded": "Již přidáno",
+        "importNoBirthdaySection": "Kontakty bez data narození",
+        "importNoBirthdayHint": "U těchto kontaktů není uloženo datum narození - přidejte ho ručně.",
+        "importEmpty": "Nenalezeny žádné kontakty s datem narození. Nejprve synchronizujte adresář CardDAV.",
+        "importSubmit": "Přidat {{count}}",
+        "importSuccess": "Přidáno narozenin: {{count}}.",
+        "importNothingSelected": "Vyberte alespoň jeden kontakt.",
+        "importSelected": "Vybráno kontaktů: {{count}}"
     },
     "rrule": {
         "freqNone": "Bez opakování",

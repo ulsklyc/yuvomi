@@ -1934,7 +1934,18 @@
         "ageNoteToday": "Fête ses {{age}} ans aujourd'hui.",
         "ageNoteTomorrow": "Fêtera ses {{age}} ans demain.",
         "ageNoteDays": "Fêtera ses {{age}} ans dans {{days}} jours.",
-        "photoOptional": "Optionnel : vous pouvez enregistrer sans photo de profil."
+        "photoOptional": "Optionnel : vous pouvez enregistrer sans photo de profil.",
+        "importButton": "Importer depuis les contacts",
+        "importTitle": "Importer les anniversaires depuis les contacts",
+        "importIntro": "Sélectionnez les contacts ayant une date de naissance enregistrée pour les ajouter.",
+        "importAlreadyAdded": "Déjà ajouté",
+        "importNoBirthdaySection": "Contacts sans anniversaire",
+        "importNoBirthdayHint": "Aucune date de naissance n'est enregistrée pour ces contacts - ajoutez-la manuellement.",
+        "importEmpty": "Aucun contact avec une date de naissance trouvé. Synchronisez d'abord un carnet d'adresses CardDAV.",
+        "importSubmit": "Ajouter {{count}}",
+        "importSuccess": "{{count}} anniversaires ajoutés.",
+        "importNothingSelected": "Sélectionnez au moins un contact.",
+        "importSelected": "{{count}} contacts sélectionnés"
     },
     "reminders": {
         "sectionTitle": "Rappel",

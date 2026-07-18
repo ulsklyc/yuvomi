@@ -214,6 +214,91 @@ function syncAllBirthdayReminders(database, userId, from = new Date()) {
   birthdays.forEach((birthday) => syncBirthdayArtifacts(database, birthday, from));
 }
 
+/**
+ * Liefert Kontakte als Import-Kandidaten für Geburtstage. Kontakte, die ein
+ * Haushaltsmitglied im Housekeeping repräsentieren, werden ausgeschlossen (wie
+ * GET /contacts). Kandidaten werden nach "mit Geburtstag" (importierbar) und
+ * "ohne Geburtstag" (nur zur Information, manuell zu ergänzen) getrennt.
+ *
+ * `already_imported` markiert Kontakte, die über birthdays.contact_id bereits an
+ * einen Geburtstag gekoppelt sind (haushaltsweit, nicht pro Nutzer).
+ *
+ * @param {object} database
+ * @returns {{ withBirthday: Array<{id:number,name:string,birthday:string,already_imported:boolean}>, withoutBirthday: Array<{id:number,name:string}> }}
+ */
+function listBirthdayImportCandidates(database) {
+  const rows = database.prepare(`
+    SELECT c.id, c.name, c.birthday,
+           EXISTS(SELECT 1 FROM birthdays b WHERE b.contact_id = c.id) AS already_imported
+    FROM contacts c
+    WHERE NOT EXISTS (
+      SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = c.family_user_id
+    )
+    ORDER BY c.name COLLATE NOCASE ASC
+  `).all();
+
+  const withBirthday = [];
+  const withoutBirthday = [];
+  for (const r of rows) {
+    if (r.birthday && String(r.birthday).trim()) {
+      withBirthday.push({
+        id: r.id,
+        name: r.name,
+        birthday: r.birthday,
+        already_imported: r.already_imported === 1,
+      });
+    } else {
+      withoutBirthday.push({ id: r.id, name: r.name });
+    }
+  }
+  return { withBirthday, withoutBirthday };
+}
+
+/**
+ * Importiert ausgewählte Kontakte als Geburtstage und erzeugt die zugehörigen
+ * Kalender-/Reminder-Artefakte über den bestehenden Sync-Pfad.
+ *
+ * Idempotent: Kontakte ohne verwertbares Geburtsdatum, unbekannte IDs und
+ * bereits gekoppelte Kontakte werden übersprungen. Der partielle Unique-Index
+ * auf birthdays.contact_id ist die DB-seitige Absicherung.
+ *
+ * Das Kontaktfoto wird bewusst NICHT übernommen: contacts.photo ist rohes
+ * vCard-Base64, birthdays.photo_data erwartet dagegen eine Data-URL.
+ *
+ * @param {object} database
+ * @param {Array<number|string>} contactIds
+ * @param {number} userId  created_by der neuen Geburtstage
+ * @param {Date}   from
+ * @returns {{ imported: number, skipped: number }}
+ */
+function importBirthdaysFromContacts(database, contactIds, userId, from = new Date()) {
+  let imported = 0;
+  let skipped = 0;
+
+  const getContact = database.prepare('SELECT id, name, birthday FROM contacts WHERE id = ?');
+  const alreadyLinked = database.prepare('SELECT 1 FROM birthdays WHERE contact_id = ?');
+  const insert = database.prepare(`
+    INSERT INTO birthdays (name, birth_date, created_by, contact_id, reminder_offset)
+    VALUES (?, ?, ?, ?, NULL)
+  `);
+  const load = database.prepare('SELECT * FROM birthdays WHERE id = ?');
+
+  for (const rawId of contactIds) {
+    const id = parseInt(rawId, 10);
+    if (!Number.isInteger(id)) { skipped++; continue; }
+
+    const contact = getContact.get(id);
+    if (!contact || !contact.birthday || !String(contact.birthday).trim()) { skipped++; continue; }
+    if (alreadyLinked.get(id)) { skipped++; continue; }
+
+    const newId = insert.run(contact.name, contact.birthday, userId, id).lastInsertRowid;
+    syncBirthdayArtifacts(database, load.get(newId), from);
+    imported++;
+  }
+
+  return { imported, skipped };
+}
+
 export {
   BIRTHDAY_COLOR,
   BIRTHDAY_RRULE,
@@ -223,6 +308,8 @@ export {
   eventDescription,
   eventTitle,
   hydrateBirthday,
+  importBirthdaysFromContacts,
+  listBirthdayImportCandidates,
   nextBirthdayAge,
   nextBirthdayDate,
   syncAllBirthdayReminders,
