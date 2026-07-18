@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.27.14] - 2026-07-18
+
+### Changed
+- Internal quality hardening: added end-to-end test coverage for two previously undertested route layers. Housekeeping (the dashboard aggregation, the monthly summary, the work-sessions and visits read handlers with their month and worker filters and validation, the decay-task urgency sorting, the payment-task coupling path - creating and updating the linked to-do and calendar event and marking it done on payment - and the hourly-billing branches for check-out and edit). Subscriptions (the metadata and settings endpoints, payment-method creation with its duplicate guard, the sort-order endpoint with its budget-subcategory cascade, the full payload-validation sweep, subscription deletion with reminder and budget-entry cleanup, the list filters, the budget-expense update branch, and the personal-mode authorization path that blocks editing another member's private subscription with no admin bypass). This is tests only; no user-facing behaviour, configuration or upgrade steps change.
+
 ## [1.27.13] - 2026-07-18
 
 ### Changed

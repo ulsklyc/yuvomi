@@ -1,6 +1,6 @@
 {
   "name": "yuvomi",
-  "version": "1.27.13",
+  "version": "1.27.14",
   "description": "Self-hosted family planner - calendar, tasks, shopping, meal planning, budget and more. Private, open-source, no subscription.",
   "main": "server/index.js",
   "type": "module",
