@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.4] - 2026-07-19
+
+### Fixed
+- Calendar day and week views: the hour labels in the left time gutter were clipped when using the 12-hour clock, dropping the leading digit (e.g. "8:00 AM" showed as ":00 AM"). The gutter was a fixed 48px, too narrow for right-aligned 12-hour labels like "10:00 AM"/"12:00 PM", so the overflow was cut off at the edge. The gutter now uses a shared `--cal-gutter-width` token wide enough to hold 12-hour labels; 24-hour clock is unaffected. (#526)
+
 ## [1.31.3] - 2026-07-19
 
 ### Fixed

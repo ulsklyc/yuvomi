@@ -447,6 +447,11 @@
    * Modul-Roots, statt gestreuter --space-3/4/5/6 pro Modul. */
   --page-gutter: var(--space-4);
   --cal-hour-height: 56px;
+  /* Breite der Zeitspalte in Wochen-/Tagesansicht. Muss 12-Stunden-Labels
+   * („12:00 PM") aufnehmen, nicht nur 24h („08:00"), sonst wird das rechts-
+   * bündige Label links abgeschnitten. Header-Gutter + Body-Zeitspalte teilen
+   * diesen Wert, damit die Spalten fluchten. */
+  --cal-gutter-width: 64px;
   --sub-tabs-height: 52px;
   --kitchen-tabs-height: 56px;
 

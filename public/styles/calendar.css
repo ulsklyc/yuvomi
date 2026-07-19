@@ -367,7 +367,7 @@
 }
 
 .week-view__time-gutter {
-  width: 48px;
+  width: var(--cal-gutter-width);
   flex-shrink: 0;
 }
 
@@ -423,7 +423,7 @@
 }
 
 .week-view__times {
-  width: 48px;
+  width: var(--cal-gutter-width);
   flex-shrink: 0;
   position: relative;
 }
@@ -655,7 +655,7 @@
 }
 
 .day-view__times {
-  width: 48px;
+  width: var(--cal-gutter-width);
   flex-shrink: 0;
 }
 
