@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.5] - 2026-07-19
+
+### Fixed
+- CardDAV contacts synced from servers such as mailbox.org were imported but displayed incorrectly (follow-up to #529). Three issues are fixed: (1) names and other fields kept literal vCard escapes such as `Surname\, Given` — values are now unescaped (`\,`, `\;`, `\\`, `\n`) and structured fields (N, ADR) are split only on unescaped separators; (2) phone numbers, email addresses and postal addresses were missing in the list and edit dialog because sync only populated the multi-value tables — the primary phone/email/address are now also written to the base contact fields the list reads; (3) contacts with no mapped category were stored under the localized fallback `Sonstiges` instead of the stable key `misc`, causing them to group under "Other" while the edit dialog fell back to its first option — unmapped categories now consistently resolve to `misc`. A migration heals already-synced contacts on upgrade (escaped names, `Sonstiges` → `misc`, missing primary phone/email); manually created contacts are left untouched. (#531)
+
 ## [1.31.4] - 2026-07-19
 
 ### Fixed

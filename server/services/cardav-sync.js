@@ -14,6 +14,47 @@ import * as db from '../db.js';
 // --------------------------------------------------------
 
 /**
+ * Hebt vCard-Escapes in einem Wert auf: `\,` `\;` `\\` sowie `\n`/`\N`
+ * (RFC 6350 / 2426). Manche Server (z. B. mailbox.org, Issue #531) liefern
+ * FN/N/ADR mit literalen Backslash-Sequenzen wie `Surname\, Given`.
+ * @param {string} value
+ * @returns {string}
+ */
+function unescapeVCardValue(value) {
+  if (typeof value !== 'string') return value;
+  return value.replace(/\\([\\,;nN])/g, (_, ch) =>
+    (ch === 'n' || ch === 'N') ? '\n' : ch
+  );
+}
+
+/**
+ * Zerlegt einen strukturierten vCard-Wert (N, ADR) an *unescapten*
+ * Trennzeichen. Ein maskiertes `\;`/`\,` innerhalb einer Komponente bleibt
+ * dabei erhalten und wird erst anschließend per unescapeVCardValue aufgelöst.
+ * @param {string} value
+ * @param {string} separator - Einzelzeichen (';' oder ',')
+ * @returns {Array<string>}
+ */
+function splitVCardValue(value, separator) {
+  const parts = [];
+  let current = '';
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+    if (ch === '\\' && i + 1 < value.length) {
+      current += ch + value[i + 1];
+      i++;
+    } else if (ch === separator) {
+      parts.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  parts.push(current);
+  return parts;
+}
+
+/**
  * Parse vCard text into structured object
  * @param {string} vCardText - Raw vCard data
  * @returns {Object} Parsed vCard object
@@ -61,31 +102,31 @@ function parseVCard(vCardText) {
         break;
 
       case 'FN':
-        if (!vcard.name) vcard.name = value;
+        if (!vcard.name) vcard.name = unescapeVCardValue(value);
         break;
 
       case 'N':
         // N is fallback if FN is not present
         // Format: Family;Given;Middle;Prefix;Suffix
         if (!vcard.name) {
-          const parts = value.split(';').filter(p => p);
+          const parts = splitVCardValue(value, ';').map(unescapeVCardValue).filter(p => p.trim());
           vcard.name = parts.join(' ').trim();
         }
         break;
 
       case 'TEL':
         const phoneType = extractType(params) || 'other';
-        vcard.phones.push({ label: phoneType, value: value });
+        vcard.phones.push({ label: phoneType, value: unescapeVCardValue(value) });
         break;
 
       case 'EMAIL':
         const emailType = extractType(params) || 'other';
-        vcard.emails.push({ label: emailType, value: value });
+        vcard.emails.push({ label: emailType, value: unescapeVCardValue(value) });
         break;
 
       case 'ADR':
         // Format: POBox;Extended;Street;City;State;Postal;Country
-        const adrParts = value.split(';');
+        const adrParts = splitVCardValue(value, ';').map(unescapeVCardValue);
         const adrType = extractType(params) || 'other';
         vcard.addresses.push({
           label: adrType,
@@ -98,11 +139,11 @@ function parseVCard(vCardText) {
         break;
 
       case 'ORG':
-        vcard.organization = value;
+        vcard.organization = unescapeVCardValue(value);
         break;
 
       case 'TITLE':
-        vcard.jobTitle = value;
+        vcard.jobTitle = unescapeVCardValue(value);
         break;
 
       case 'URL':
@@ -124,15 +165,15 @@ function parseVCard(vCardText) {
         break;
 
       case 'NICKNAME':
-        vcard.nickname = value;
+        vcard.nickname = unescapeVCardValue(value);
         break;
 
       case 'NOTE':
-        vcard.notes = value;
+        vcard.notes = unescapeVCardValue(value);
         break;
 
       case 'CATEGORIES':
-        vcard.categories = value;
+        vcard.categories = unescapeVCardValue(value);
         break;
     }
   }
@@ -198,6 +239,54 @@ function parseBirthday(value) {
   }
 
   return null;
+}
+
+/**
+ * Leitet die Legacy-Skalarfelder (phone/email/address) aus den Multi-Value-
+ * Listen einer vCard ab. Die Kontaktliste und der Bearbeiten-Dialog lesen diese
+ * Basisspalten direkt (Issue #531); ohne sie bleiben synchronisierte Kontakte
+ * ohne sichtbare Telefonnummer/E-Mail/Adresse.
+ * @param {Object} vcard - Geparste vCard
+ * @returns {{ phone: string|null, email: string|null, address: string|null }}
+ */
+function deriveScalarContactFields(vcard) {
+  const phone = vcard.phones?.[0]?.value || null;
+  const email = vcard.emails?.[0]?.value || null;
+
+  const a = vcard.addresses?.[0] || null;
+  let address = null;
+  if (a) {
+    const cityLine = [a.postalCode, a.city].filter(Boolean).join(' ');
+    address = [a.street, cityLine, a.state, a.country].filter(Boolean).join(', ') || null;
+  }
+
+  return { phone, email, address };
+}
+
+/**
+ * Bildet den vCard-CATEGORIES-Wert auf einen *stabilen* Kontakt-Kategorie-Key ab.
+ * Ein freier oder fehlender Wert (z. B. `Sonstiges`, `Friends`) fällt konsistent
+ * auf `misc` zurück, statt eine nicht existierende Kategorie zu speichern, die die
+ * UI dann als „Sonstiges" gruppiert, aber im Select auf den ersten Eintrag setzt
+ * (Issue #531). Nur der erste Wert einer Komma-Liste wird betrachtet.
+ * @param {string|null} rawCategories - vCard-CATEGORIES-Wert
+ * @param {Array<{key: string, name: string|null}>} categories - bekannte Kategorien
+ * @returns {string} Kategorie-Key
+ */
+function resolveContactCategory(rawCategories, categories) {
+  const fallback = 'misc';
+  if (!rawCategories) return fallback;
+
+  const first = String(rawCategories).split(',')[0]?.trim();
+  if (!first) return fallback;
+
+  const lower = first.toLowerCase();
+  const match = (categories || []).find((c) =>
+    c.key.toLowerCase() === lower ||
+    (c.name && c.name.toLowerCase() === lower)
+  );
+
+  return match ? match.key : fallback;
 }
 
 // --------------------------------------------------------
@@ -847,16 +936,21 @@ async function parseAndMergeContact(vCardText, accountId, addressbookUrl) {
     // Step 3: No match - insert new contact.
     // origin = 'remote': rein aus CardDAV entstanden, trägt keine lokal gepflegten
     // Daten und darf beim Remote-Löschen entfernt werden.
+    const knownCategories = db.get().prepare('SELECT key, name FROM contact_categories').all();
+    const scalar = deriveScalarContactFields(vcard);
     const result = db.get().prepare(`
       INSERT INTO contacts (
-        name, category, organization, job_title, birthday, website,
+        name, category, phone, email, address, organization, job_title, birthday, website,
         photo, nickname, notes,
         carddav_account_id, carddav_uid, carddav_addressbook_url, carddav_origin
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'remote')
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'remote')
     `).run(
       vcard.name,
-      vcard.categories || 'Sonstiges',
+      resolveContactCategory(vcard.categories, knownCategories),
+      scalar.phone,
+      scalar.email,
+      scalar.address,
       vcard.organization,
       vcard.jobTitle,
       vcard.birthday,
@@ -938,7 +1032,16 @@ function updateContact(contactId, vcard, fillAll = false) {
     }
   };
 
+  // Legacy-Skalarfelder aus den Multi-Value-Listen ableiten (siehe #531), damit
+  // Liste und Bearbeiten-Dialog sichtbare Werte haben. Bei bestehenden, vor diesem
+  // Fix synchronisierten Kontakten füllt fillAll=false die noch NULL-en Spalten nach.
+  const scalar = deriveScalarContactFields(vcard);
+  const knownCategories = db.get().prepare('SELECT key, name FROM contact_categories').all();
+
   maybeUpdate('name', 'name', vcard.name);
+  maybeUpdate('phone', 'phone', scalar.phone);
+  maybeUpdate('email', 'email', scalar.email);
+  maybeUpdate('address', 'address', scalar.address);
   maybeUpdate('organization', 'organization', vcard.organization);
   maybeUpdate('jobTitle', 'job_title', vcard.jobTitle);
   maybeUpdate('birthday', 'birthday', vcard.birthday);
@@ -946,7 +1049,8 @@ function updateContact(contactId, vcard, fillAll = false) {
   maybeUpdate('photo', 'photo', vcard.photo);
   maybeUpdate('nickname', 'nickname', vcard.nickname);
   maybeUpdate('notes', 'notes', vcard.notes);
-  maybeUpdate('categories', 'category', vcard.categories);
+  maybeUpdate('categories', 'category',
+    vcard.categories != null ? resolveContactCategory(vcard.categories, knownCategories) : null);
 
   if (updates.length === 0) return;
 
@@ -1072,6 +1176,10 @@ export {
 
   // Helpers (exported for testing)
   parseVCard,
+  unescapeVCardValue,
+  splitVCardValue,
+  deriveScalarContactFields,
+  resolveContactCategory,
   fetchVCardsResilient,
   _mockTestConnection,
   _mockSyncAccount,

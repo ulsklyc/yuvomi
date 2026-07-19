@@ -7,7 +7,14 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
 import { MIGRATIONS } from '../server/db.js';
-import { pruneRemovedContacts, fetchVCardsResilient } from '../server/services/cardav-sync.js';
+import {
+  pruneRemovedContacts,
+  fetchVCardsResilient,
+  unescapeVCardValue,
+  splitVCardValue,
+  deriveScalarContactFields,
+  resolveContactCategory,
+} from '../server/services/cardav-sync.js';
 
 const TEST_DB = ':memory:';
 
@@ -693,6 +700,105 @@ END:VCARD`;
       const workPhone = result.phones.find(p => p.label === 'work');
       assert.ok(workPhone);
     });
+
+    // #531: mailbox.org & Co. liefern FN/N/ADR mit literalen vCard-Escapes.
+    it('should unescape vCard sequences in FN', () => {
+      const vCardText = `BEGIN:VCARD
+VERSION:3.0
+UID:urn:uuid:esc
+FN:Surname\\, Given
+END:VCARD`;
+
+      const result = parseVCard(vCardText);
+      assert.strictEqual(result.name, 'Surname, Given');
+    });
+
+    it('should unescape and split N without breaking on escaped separators', () => {
+      const vCardText = `BEGIN:VCARD
+VERSION:3.0
+UID:urn:uuid:esc-n
+N:von M\\;ller;Anna\\,Marie;;;
+END:VCARD`;
+
+      const result = parseVCard(vCardText);
+      // Escaped ';' und ',' bleiben Teil der Komponente, echte ';' trennen.
+      assert.strictEqual(result.name, 'von M;ller Anna,Marie');
+    });
+
+    it('should unescape ADR components', () => {
+      const vCardText = `BEGIN:VCARD
+VERSION:3.0
+UID:urn:uuid:esc-adr
+FN:John Doe
+ADR;TYPE=HOME:;;Main St\\, 12;Spring\\;field;;62701;USA
+END:VCARD`;
+
+      const result = parseVCard(vCardText);
+      assert.strictEqual(result.addresses[0].street, 'Main St, 12');
+      assert.strictEqual(result.addresses[0].city, 'Spring;field');
+    });
+  });
+
+  // ========================================
+  // vCard Helper Functions (#531)
+  // ========================================
+
+  describe('unescapeVCardValue', () => {
+    it('should unescape comma, semicolon, backslash and newline', () => {
+      assert.strictEqual(unescapeVCardValue('a\\,b'), 'a,b');
+      assert.strictEqual(unescapeVCardValue('a\\;b'), 'a;b');
+      assert.strictEqual(unescapeVCardValue('a\\\\b'), 'a\\b');
+      assert.strictEqual(unescapeVCardValue('a\\nb'), 'a\nb');
+      assert.strictEqual(unescapeVCardValue('a\\Nb'), 'a\nb');
+    });
+
+    it('should leave unescaped text untouched and tolerate non-strings', () => {
+      assert.strictEqual(unescapeVCardValue('plain text'), 'plain text');
+      assert.strictEqual(unescapeVCardValue(null), null);
+    });
+  });
+
+  describe('splitVCardValue', () => {
+    it('should split on unescaped separators only', () => {
+      assert.deepStrictEqual(splitVCardValue('a;b;c', ';'), ['a', 'b', 'c']);
+      assert.deepStrictEqual(splitVCardValue('a\\;b;c', ';'), ['a\\;b', 'c']);
+      assert.deepStrictEqual(splitVCardValue('solo', ';'), ['solo']);
+    });
+  });
+
+  describe('deriveScalarContactFields', () => {
+    it('should pick primary phone/email and compose an address string', () => {
+      const scalar = deriveScalarContactFields({
+        phones: [{ value: '+49 111' }, { value: '+49 222' }],
+        emails: [{ value: 'a@example.com' }],
+        addresses: [{ street: 'Main St 1', city: 'Berlin', state: null, postalCode: '10115', country: 'DE' }],
+      });
+      assert.strictEqual(scalar.phone, '+49 111');
+      assert.strictEqual(scalar.email, 'a@example.com');
+      assert.strictEqual(scalar.address, 'Main St 1, 10115 Berlin, DE');
+    });
+
+    it('should return nulls when no multi-value data exists', () => {
+      const scalar = deriveScalarContactFields({ phones: [], emails: [], addresses: [] });
+      assert.deepStrictEqual(scalar, { phone: null, email: null, address: null });
+    });
+  });
+
+  describe('resolveContactCategory', () => {
+    const KNOWN = [{ key: 'doctor', name: null }, { key: 'misc', name: null }, { key: 'vip', name: 'Wichtig' }];
+
+    it('should fall back to misc for empty or unmapped values', () => {
+      assert.strictEqual(resolveContactCategory(null, KNOWN), 'misc');
+      assert.strictEqual(resolveContactCategory('', KNOWN), 'misc');
+      assert.strictEqual(resolveContactCategory('Sonstiges', KNOWN), 'misc');
+      assert.strictEqual(resolveContactCategory('Friends', KNOWN), 'misc');
+    });
+
+    it('should match a known key case-insensitively and use the first list entry', () => {
+      assert.strictEqual(resolveContactCategory('Doctor', KNOWN), 'doctor');
+      assert.strictEqual(resolveContactCategory('doctor,vip', KNOWN), 'doctor');
+      assert.strictEqual(resolveContactCategory('wichtig', KNOWN), 'vip');
+    });
   });
 
   // ========================================
@@ -1225,6 +1331,49 @@ END:VCARD`;
 
       // organization should remain unchanged
       assert.strictEqual(updated.organization, 'SyncCorp');
+    });
+  });
+
+  // ========================================
+  // Migration 91: heal contacts synced before the #531 fix
+  // ========================================
+
+  describe('Migration 91: heal broken CardDAV contacts (#531)', () => {
+    it('unescapes names, maps Sonstiges→misc and backfills primary phone/email', () => {
+      // Broken contact as produced before the fix: escaped name, localized
+      // fallback category, NULL scalar fields, but multi-value rows present.
+      const broken = testDb.prepare(`
+        INSERT INTO contacts (name, category, phone, email, carddav_uid)
+        VALUES (?, 'Sonstiges', NULL, NULL, ?)
+      `).run('Surname\\, Given', 'urn:uuid:heal-1');
+      const id = broken.lastInsertRowid;
+
+      testDb.prepare(`
+        INSERT INTO contact_phones (contact_id, label, value, is_primary)
+        VALUES (?, 'cell', '+49 30 111', 1), (?, 'work', '+49 30 222', 0)
+      `).run(id, id);
+      testDb.prepare(`
+        INSERT INTO contact_emails (contact_id, label, value, is_primary)
+        VALUES (?, 'home', 'heal@example.com', 1)
+      `).run(id);
+
+      // A manual (non-CardDAV) contact with the same category must stay untouched.
+      const manual = testDb.prepare(`
+        INSERT INTO contacts (name, category, carddav_uid) VALUES ('Manual', 'Sonstiges', NULL)
+      `).run();
+
+      const migration91 = MIGRATIONS.find(m => m.version === 91);
+      assert.ok(migration91, 'Migration 91 exists');
+      testDb.exec(migration91.up);
+
+      const healed = testDb.prepare('SELECT * FROM contacts WHERE id = ?').get(id);
+      assert.strictEqual(healed.name, 'Surname, Given');
+      assert.strictEqual(healed.category, 'misc');
+      assert.strictEqual(healed.phone, '+49 30 111');
+      assert.strictEqual(healed.email, 'heal@example.com');
+
+      const untouched = testDb.prepare('SELECT * FROM contacts WHERE id = ?').get(manual.lastInsertRowid);
+      assert.strictEqual(untouched.category, 'Sonstiges', 'manual contact category unchanged');
     });
   });
 });
