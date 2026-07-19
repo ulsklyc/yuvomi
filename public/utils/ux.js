@@ -63,6 +63,43 @@ export async function deleteWithUndo({ onDelete, onUndo, toastMessage, toastType
 }
 
 /**
+ * Scroll-Affordanz für überlaufende Leisten und Listen (Audit F-01/F-06):
+ * setzt `has-fade-start`/`has-fade-end` auf dem Element, solange in der
+ * jeweiligen Richtung verborgener Inhalt liegt. Die zugehörigen Masken liegen
+ * im CSS des Aufrufers (z. B. budget.css Tabs, layout.css Sidebar).
+ *
+ * Reagiert auf Scroll UND Größenänderungen (ResizeObserver deckt Viewport-
+ * Resize, Ein-/Ausklappen und Font-Nachladen ab; beobachtet werden Container
+ * und erstes Kind, damit auch Inhaltszuwachs triggert).
+ *
+ * @param {HTMLElement} el
+ * @param {Object} [opts]
+ * @param {'x'|'y'} [opts.axis='x']
+ * @returns {() => void} Aufräumfunktion (Listener/Observer lösen)
+ */
+export function wireScrollFade(el, { axis = 'x' } = {}) {
+  if (!el) return () => {};
+  const eps = 8; // Toleranz: kein Fade bei minimalem Sub-Pixel-Offset
+  const update = () => {
+    const pos = axis === 'y' ? el.scrollTop : el.scrollLeft;
+    const max = axis === 'y'
+      ? el.scrollHeight - el.clientHeight
+      : el.scrollWidth - el.clientWidth;
+    el.classList.toggle('has-fade-start', pos > eps);
+    el.classList.toggle('has-fade-end', pos < max - eps);
+  };
+  el.addEventListener('scroll', update, { passive: true });
+  const ro = new ResizeObserver(update);
+  ro.observe(el);
+  if (el.firstElementChild) ro.observe(el.firstElementChild);
+  update();
+  return () => {
+    el.removeEventListener('scroll', update);
+    ro.disconnect();
+  };
+}
+
+/**
  * Führt eine asynchrone Aktion aus und markiert das auslösende Control derweil
  * als beschäftigt: `disabled` gegen Doppelauslösung, `aria-busy` für Screenreader,
  * optional eine Lade-Klasse.

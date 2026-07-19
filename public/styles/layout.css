@@ -1016,6 +1016,25 @@ html.fab-anim-done .page-fab {
   }
   .nav-sidebar__items::-webkit-scrollbar { display: none; }
 
+  /* Scroll-Affordanz (Audit F-01): wireScrollFade (utils/ux.js) setzt
+   * has-fade-start/-end, sobald oberhalb/unterhalb Einträge verborgen sind.
+   * Der weiche Anriss ersetzt den bewusst versteckten Scrollbalken — ohne ihn
+   * waren Budget/Gesundheit/Einstellungen auf 800er-Laptops unauffindbar. */
+  .nav-sidebar__items.has-fade-end {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--space-8)), transparent);
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--space-8)), transparent);
+  }
+
+  .nav-sidebar__items.has-fade-start {
+    mask-image: linear-gradient(to bottom, transparent, #000 var(--space-8));
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--space-8));
+  }
+
+  .nav-sidebar__items.has-fade-start.has-fade-end {
+    mask-image: linear-gradient(to bottom, transparent, #000 var(--space-8), #000 calc(100% - var(--space-8)), transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--space-8), #000 calc(100% - var(--space-8)), transparent);
+  }
+
   /* Footer ist eine eigene, nicht-scrollende Region (flex-shrink:0) und setzt
    * sich mit einer Haarlinie vom scrollenden Nav-Bereich ab — so verschmilzt das
    * gepinnte Settings-Item nie mit Hilfe/Änderungen/Abmelden. */
@@ -1052,9 +1071,12 @@ html.fab-anim-done .page-fab {
     border-radius: var(--radius-sm);
     /* padding-left 15px zentriert das 26px-Icon-Well auf X=28 — fluchtet mit
      * dem Logomark. Krumm, weil exakte Zentrierung neben der 4px-Token-Skala liegt. */
-    padding: var(--space-2) var(--space-3) var(--space-2) 15px;
+    padding: var(--space-1) var(--space-3) var(--space-1) 15px;
     gap: var(--space-3);
-    min-height: var(--target-lg);
+    /* Desktop-Pointer-Target (40px) statt Touch-Target (48px): mit 13 Items +
+     * 4 Sektionslabels passt die Liste so bis ~800px Fensterhöhe ohne Scroll
+     * (Audit F-01). Die Bottom-Nav für Touch behält 48px. */
+    min-height: var(--target-md);
     font-size: var(--text-sm);
     color: var(--color-text-secondary);
     background: transparent;
@@ -1247,7 +1269,7 @@ html.fab-anim-done .page-fab {
   html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-section-label,
   html.sidebar-collapsed .nav-sidebar:focus-within .nav-section-label {
     height: auto;
-    padding-block: var(--space-3) var(--space-1);
+    padding-block: var(--space-2) var(--space-1);
   }
 
   /* Beim Aufklappen (Hover/Fokus) muss der Footer das Expanded-Layout annehmen:
@@ -3425,7 +3447,7 @@ textarea.input { resize: vertical; }
   left: var(--space-1);
   right: var(--space-1);
   top: 0;
-  height: var(--target-base); /* 44px */
+  height: var(--target-md); /* füllt das 40px-Sidebar-Item (Audit F-01) */
   border-radius: var(--radius-sm);
   pointer-events: none;
   transition:
@@ -3443,7 +3465,7 @@ textarea.input { resize: vertical; }
   left: var(--space-1);
   right: var(--space-1);
   top: 0;
-  height: var(--target-base); /* 44px */
+  height: var(--target-md); /* füllt das 40px-Sidebar-Item (Audit F-01) */
   border-radius: var(--radius-sm);
   background: var(--color-surface-3);
   opacity: 0;
@@ -3494,7 +3516,7 @@ textarea.input { resize: vertical; }
  * --sidebar-bg ≈ 5:1 (AA ✓). */
 .nav-section-label {
   color: var(--color-text-tertiary);
-  padding: var(--space-3) var(--space-3) var(--space-1);
+  padding: var(--space-2) var(--space-3) var(--space-1);
   user-select: none;
   pointer-events: none;
   position: relative;

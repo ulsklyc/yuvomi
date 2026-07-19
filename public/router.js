@@ -9,6 +9,7 @@ import { canAccessNavModule, navModuleAccess } from '/permissions.js';
 import { clearApiCache } from '/sw-register.js';
 import { initI18n, getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { wireScrollFade } from '/utils/ux.js';
 import { init as initReminders, stop as stopReminders } from '/reminders.js';
 import { initPush, stopPush } from '/push.js';
 import { numberLocaleFor } from '/settings/region-presets.js';
@@ -1128,6 +1129,11 @@ function renderAppShell(container) {
   // gepinnte Settings-Item, keine listitems. Die <nav>-Hülle trägt die
   // Navigations-Semantik, die Gruppen die Sektions-Struktur.
   sidebarNavItems().forEach((item) => sidebarItems.appendChild(item));
+
+  // Scroll-Affordanz (Audit F-01): weiche Fade-Anrisse oben/unten, sobald die
+  // Liste überläuft — der Scrollbalken ist bewusst versteckt, ohne Anriss waren
+  // Einträge unterhalb der Falte (Budget/Gesundheit/Einstellungen) unsichtbar.
+  wireScrollFade(sidebarItems, { axis: 'y' });
 
   // Zarte Hover-Vorschau — bewegt das separate `__hover`-Element (NICHT die
   // Aktiv-Pille) für Maus (hover) UND Tastatur (focus). Auf dem aktiven Item
@@ -2290,11 +2296,22 @@ function positionSidebarIndicator() {
     indicator.style.opacity = '0';
     return;
   }
-  const cr = container.getBoundingClientRect();
-  const ar = active.getBoundingClientRect();
-  // Pille (44px) vertikal im Item (48px) zentrieren — aus realen Höhen, token-unabhängig
-  const centerOffset = (ar.height - indicator.getBoundingClientRect().height) / 2;
-  indicator.style.transform = `translateY(${ar.top - cr.top + container.scrollTop + centerOffset}px)`;
+  // Aktives Item in den Sichtbereich holen (Audit F-01): bei überlaufender
+  // Liste lagen Item UND Pille sonst unsichtbar unterhalb der Falte — die
+  // Navigation verlor ihren „Du bist hier"-Anker. Manuelles Scrollen statt
+  // scrollIntoView, damit garantiert nur dieser Container scrollt.
+  const margin = 8;
+  const top = active.offsetTop;
+  const bottom = top + active.offsetHeight;
+  if (top < container.scrollTop + margin) {
+    container.scrollTop = Math.max(0, top - margin);
+  } else if (bottom > container.scrollTop + container.clientHeight - margin) {
+    container.scrollTop = bottom - container.clientHeight + margin;
+  }
+  // Pille vertikal im Item zentrieren — aus realen Höhen, token-unabhängig.
+  // offsetTop ist scroll-unabhängig relativ zum (position:relative) Container.
+  const centerOffset = (active.offsetHeight - indicator.getBoundingClientRect().height) / 2;
+  indicator.style.transform = `translateY(${top + centerOffset}px)`;
   indicator.style.opacity = '';
 }
 
