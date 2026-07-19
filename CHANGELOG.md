@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The month-comparison line under the summary cards is fully translated and uses icons rather than the ▲ and ▼ text characters, which fall outside the icon family and vary in width between fonts.
 - Opening an account statement keeps the keyboard focus in the page instead of dropping it to the top, and the inline "new category" dialog traps focus, closes on Escape and on a click outside, and returns focus to the control that opened it.
 
+## [1.36.0] - 2026-07-19
+
 ### Added
 - Tasks has a search field in the module head. It filters the list and the Kanban board instantly by title and description, on top of the existing status, priority and person filters. Tasks was the only list-heavy module without one. A search without hits names the query instead of claiming the module is empty and offering a "create task" button.
 - Notes can be filtered by author. A chip row below the module head narrows the board to one person's notes; it appears only once at least two people have written notes, and clicking the active chip clears the filter again.
