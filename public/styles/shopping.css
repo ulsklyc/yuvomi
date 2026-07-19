@@ -313,7 +313,9 @@
   width: var(--target-base);
   height: var(--target-base);
   border-radius: var(--radius-sm);
-  background-color: var(--color-accent);
+  /* Modul-Akzent wie FAB und Fokus-Ringe daneben (Audit F-05) — vorher stand
+   * der einzige violette App-Akzent-Button neben lauter Pink. */
+  background-color: var(--module-accent, var(--color-accent));
   color: var(--color-ink-on-vivid);
   display: flex;
   align-items: center;
@@ -325,7 +327,7 @@
   min-height: var(--target-lg);
 }
 
-.quick-add__btn:hover { background-color: var(--color-accent-hover); }
+.quick-add__btn:hover { background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) 85%, black); }
 
 /* Autocomplete-Dropdown */
 .autocomplete-dropdown {
