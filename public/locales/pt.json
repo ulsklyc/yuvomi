@@ -630,9 +630,13 @@
         "toggleSchool": "Férias escolares",
         "assignedToMe": "Atribuídos a mim",
         "deleteRecurringTitle": "Excluir evento recorrente",
-        "deleteRecurringHint": "Excluir apenas este evento ou toda a série?",
-        "deleteThisOccurrence": "Apenas este evento",
-        "deleteWholeSeries": "Toda a série"
+        "recurringScopeLabel": "Aplica-se a",
+        "recurringScopeThis": "Apenas este evento",
+        "recurringScopeFollowing": "Este e os seguintes",
+        "recurringScopeSeries": "Toda a série",
+        "recurringScopeHintThis": "Afeta apenas o evento de {{date}}.",
+        "recurringScopeHintFollowing": "Afeta o evento de {{date}} e todos os seguintes.",
+        "recurringScopeHintSeries": "Afeta toda a série."
     },
     "notes": {
         "title": "Quadro de notas",

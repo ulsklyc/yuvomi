@@ -637,9 +637,13 @@
         "toggleSchool": "Schulferien",
         "assignedToMe": "Mir zugewiesen",
         "deleteRecurringTitle": "Serientermin löschen",
-        "deleteRecurringHint": "Möchtest du nur diesen Termin oder die ganze Serie löschen?",
-        "deleteThisOccurrence": "Nur diesen Termin",
-        "deleteWholeSeries": "Ganze Serie"
+        "recurringScopeLabel": "Gilt für",
+        "recurringScopeThis": "Nur diesen Termin",
+        "recurringScopeFollowing": "Diesen und folgende",
+        "recurringScopeSeries": "Ganze Serie",
+        "recurringScopeHintThis": "Betrifft nur den Termin am {{date}}.",
+        "recurringScopeHintFollowing": "Betrifft den Termin am {{date}} und alle folgenden.",
+        "recurringScopeHintSeries": "Betrifft die gesamte Serie."
     },
     "notes": {
         "title": "Notizen",

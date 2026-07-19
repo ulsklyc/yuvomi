@@ -630,9 +630,13 @@
         "toggleSchool": "Kỳ nghỉ học",
         "assignedToMe": "Được giao cho tôi",
         "deleteRecurringTitle": "Xóa sự kiện lặp lại",
-        "deleteRecurringHint": "Chỉ xóa sự kiện này hay toàn bộ chuỗi?",
-        "deleteThisOccurrence": "Chỉ sự kiện này",
-        "deleteWholeSeries": "Toàn bộ chuỗi"
+        "recurringScopeLabel": "Áp dụng cho",
+        "recurringScopeThis": "Chỉ sự kiện này",
+        "recurringScopeFollowing": "Sự kiện này và các sự kiện sau",
+        "recurringScopeSeries": "Toàn bộ chuỗi",
+        "recurringScopeHintThis": "Chỉ ảnh hưởng đến sự kiện vào {{date}}.",
+        "recurringScopeHintFollowing": "Ảnh hưởng đến sự kiện vào {{date}} và tất cả sau đó.",
+        "recurringScopeHintSeries": "Ảnh hưởng đến toàn bộ chuỗi."
     },
     "notes": {
         "title": "Bảng ghi chú",

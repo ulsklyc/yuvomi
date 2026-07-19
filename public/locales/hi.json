@@ -630,9 +630,13 @@
         "toggleSchool": "स्कूल की छुट्टियाँ",
         "assignedToMe": "मुझे सौंपे गए",
         "deleteRecurringTitle": "आवर्ती इवेंट हटाएँ",
-        "deleteRecurringHint": "केवल यह इवेंट हटाएँ या पूरी शृंखला?",
-        "deleteThisOccurrence": "केवल यह इवेंट",
-        "deleteWholeSeries": "पूरी शृंखला"
+        "recurringScopeLabel": "इस पर लागू",
+        "recurringScopeThis": "केवल यह इवेंट",
+        "recurringScopeFollowing": "यह और आगे वाले",
+        "recurringScopeSeries": "पूरी शृंखला",
+        "recurringScopeHintThis": "केवल {{date}} की घटना को प्रभावित करता है।",
+        "recurringScopeHintFollowing": "{{date}} की घटना और सभी आगे वाली को प्रभावित करता है।",
+        "recurringScopeHintSeries": "पूरी शृंखला को प्रभावित करता है।"
     },
     "notes": {
         "title": "नोट बोर्ड",

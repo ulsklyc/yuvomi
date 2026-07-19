@@ -630,9 +630,13 @@
         "toggleSchool": "Skollov",
         "assignedToMe": "Tilldelade mig",
         "deleteRecurringTitle": "Ta bort återkommande händelse",
-        "deleteRecurringHint": "Ta bort bara denna händelse eller hela serien?",
-        "deleteThisOccurrence": "Bara denna händelse",
-        "deleteWholeSeries": "Hela serien"
+        "recurringScopeLabel": "Gäller",
+        "recurringScopeThis": "Bara denna händelse",
+        "recurringScopeFollowing": "Denna och följande",
+        "recurringScopeSeries": "Hela serien",
+        "recurringScopeHintThis": "Påverkar bara händelsen den {{date}}.",
+        "recurringScopeHintFollowing": "Påverkar händelsen den {{date}} och alla följande.",
+        "recurringScopeHintSeries": "Påverkar hela serien."
     },
     "notes": {
         "title": "Anteckningar",

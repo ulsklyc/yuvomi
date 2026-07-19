@@ -630,9 +630,13 @@
         "toggleSchool": "Okul tatilleri",
         "assignedToMe": "Bana atananlar",
         "deleteRecurringTitle": "Yinelenen etkinliği sil",
-        "deleteRecurringHint": "Yalnızca bu etkinlik mi yoksa tüm seri mi silinsin?",
-        "deleteThisOccurrence": "Yalnızca bu etkinlik",
-        "deleteWholeSeries": "Tüm seri"
+        "recurringScopeLabel": "Şunlara uygulanır",
+        "recurringScopeThis": "Yalnızca bu etkinlik",
+        "recurringScopeFollowing": "Bu ve sonrakiler",
+        "recurringScopeSeries": "Tüm seri",
+        "recurringScopeHintThis": "Yalnızca {{date}} tarihindeki etkinliği etkiler.",
+        "recurringScopeHintFollowing": "{{date}} tarihindeki etkinliği ve sonraki tümünü etkiler.",
+        "recurringScopeHintSeries": "Tüm seriyi etkiler."
     },
     "notes": {
         "title": "Notlar",

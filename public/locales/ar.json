@@ -630,9 +630,13 @@
         "toggleSchool": "العطلات المدرسية",
         "assignedToMe": "المُسندة إليّ",
         "deleteRecurringTitle": "حذف الحدث المتكرر",
-        "deleteRecurringHint": "حذف هذا الحدث فقط أم السلسلة بأكملها؟",
-        "deleteThisOccurrence": "هذا الحدث فقط",
-        "deleteWholeSeries": "السلسلة بأكملها"
+        "recurringScopeLabel": "ينطبق على",
+        "recurringScopeThis": "هذا الحدث فقط",
+        "recurringScopeFollowing": "هذا وما يليه",
+        "recurringScopeSeries": "السلسلة بأكملها",
+        "recurringScopeHintThis": "يؤثر فقط على الموعد في {{date}}.",
+        "recurringScopeHintFollowing": "يؤثر على الموعد في {{date}} وكل ما يليه.",
+        "recurringScopeHintSeries": "يؤثر على السلسلة بأكملها."
     },
     "notes": {
         "title": "لوحة الملاحظات",

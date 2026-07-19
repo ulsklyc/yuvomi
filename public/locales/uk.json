@@ -630,9 +630,13 @@
         "toggleSchool": "Шкільні канікули",
         "assignedToMe": "Призначені мені",
         "deleteRecurringTitle": "Видалити повторювану подію",
-        "deleteRecurringHint": "Видалити лише цю подію чи всю серію?",
-        "deleteThisOccurrence": "Лише цю подію",
-        "deleteWholeSeries": "Усю серію"
+        "recurringScopeLabel": "Стосується",
+        "recurringScopeThis": "Лише цю подію",
+        "recurringScopeFollowing": "Цю та наступні",
+        "recurringScopeSeries": "Усю серію",
+        "recurringScopeHintThis": "Стосується лише події {{date}}.",
+        "recurringScopeHintFollowing": "Стосується події {{date}} та всіх наступних.",
+        "recurringScopeHintSeries": "Стосується всієї серії."
     },
     "notes": {
         "title": "Нотатки",

@@ -630,9 +630,13 @@
         "toggleSchool": "Školní prázdniny",
         "assignedToMe": "Přiřazeno mně",
         "deleteRecurringTitle": "Odstranit opakovanou událost",
-        "deleteRecurringHint": "Odstranit jen tuto událost, nebo celou sérii?",
-        "deleteThisOccurrence": "Jen tuto událost",
-        "deleteWholeSeries": "Celou sérii"
+        "recurringScopeLabel": "Platí pro",
+        "recurringScopeThis": "Jen tuto událost",
+        "recurringScopeFollowing": "Tuto a následující",
+        "recurringScopeSeries": "Celou sérii",
+        "recurringScopeHintThis": "Ovlivní jen událost dne {{date}}.",
+        "recurringScopeHintFollowing": "Ovlivní událost dne {{date}} a všechny následující.",
+        "recurringScopeHintSeries": "Ovlivní celou sérii."
     },
     "notes": {
         "title": "Nástěnka",

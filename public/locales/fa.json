@@ -637,9 +637,13 @@
         "toggleSchool": "تعطیلات مدرسه",
         "assignedToMe": "واگذارشده به من",
         "deleteRecurringTitle": "حذف رویداد تکرارشونده",
-        "deleteRecurringHint": "فقط این رویداد حذف شود یا کل مجموعه؟",
-        "deleteThisOccurrence": "فقط این رویداد",
-        "deleteWholeSeries": "کل مجموعه"
+        "recurringScopeLabel": "اعمال بر",
+        "recurringScopeThis": "فقط این رویداد",
+        "recurringScopeFollowing": "این و موارد بعدی",
+        "recurringScopeSeries": "کل مجموعه",
+        "recurringScopeHintThis": "فقط رویداد {{date}} را تحت تأثیر قرار می‌دهد.",
+        "recurringScopeHintFollowing": "رویداد {{date}} و همه‌ی بعدی‌ها را تحت تأثیر قرار می‌دهد.",
+        "recurringScopeHintSeries": "کل مجموعه را تحت تأثیر قرار می‌دهد."
     },
     "notes": {
         "title": "یادداشت‌ها",

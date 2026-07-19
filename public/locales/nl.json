@@ -630,9 +630,13 @@
         "toggleSchool": "Schoolvakanties",
         "assignedToMe": "Aan mij toegewezen",
         "deleteRecurringTitle": "Terugkerende afspraak verwijderen",
-        "deleteRecurringHint": "Alleen deze afspraak of de hele reeks verwijderen?",
-        "deleteThisOccurrence": "Alleen deze afspraak",
-        "deleteWholeSeries": "Hele reeks"
+        "recurringScopeLabel": "Van toepassing op",
+        "recurringScopeThis": "Alleen deze afspraak",
+        "recurringScopeFollowing": "Deze en volgende",
+        "recurringScopeSeries": "Hele reeks",
+        "recurringScopeHintThis": "Heeft alleen invloed op de afspraak op {{date}}.",
+        "recurringScopeHintFollowing": "Heeft invloed op de afspraak op {{date}} en alle volgende.",
+        "recurringScopeHintSeries": "Heeft invloed op de hele reeks."
     },
     "notes": {
         "title": "Bord",

@@ -630,9 +630,13 @@
         "toggleSchool": "Школьные каникулы",
         "assignedToMe": "Назначенные мне",
         "deleteRecurringTitle": "Удалить повторяющееся событие",
-        "deleteRecurringHint": "Удалить только это событие или всю серию?",
-        "deleteThisOccurrence": "Только это событие",
-        "deleteWholeSeries": "Всю серию"
+        "recurringScopeLabel": "Применяется к",
+        "recurringScopeThis": "Только это событие",
+        "recurringScopeFollowing": "Это и последующие",
+        "recurringScopeSeries": "Всю серию",
+        "recurringScopeHintThis": "Затрагивает только событие {{date}}.",
+        "recurringScopeHintFollowing": "Затрагивает событие {{date}} и все последующие.",
+        "recurringScopeHintSeries": "Затрагивает всю серию."
     },
     "notes": {
         "title": "Заметки",

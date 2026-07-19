@@ -11,6 +11,7 @@ import { stagger } from '/utils/ux.js';
 import { t, formatDate as formatPreferredDate, formatTime, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation } from '/utils/html.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder } from '/utils/date.js';
+import { truncateRuleBefore, shiftSeriesStart, shiftEndForStart } from '/utils/recurrence-scope.js';
 import { getReadableTextColor } from '/utils/color.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { parseRemindAtAsUtc } from '/utils/reminder-offset.js';
@@ -863,6 +864,21 @@ async function loadRange(from, to) {
   }
   state.rangeFrom = from;
   state.rangeTo   = to;
+}
+
+/**
+ * Nur die Kalender-Events des aktuellen Bereichs neu laden (ohne Tasks/Feiertage).
+ * Für serienweite Bearbeitungen (#532), bei denen sich lediglich die Expansion
+ * ändert - vermeidet das Überholen unveränderter Tasks/Feiertage aus loadRange.
+ */
+async function reloadCalendarEventsOnly() {
+  if (!state.rangeFrom || !state.rangeTo) return;
+  try {
+    const res = await api.get(`/calendar?from=${state.rangeFrom}&to=${state.rangeTo}`);
+    state.events = (res.data ?? []).map(localizeBirthdayEvent);
+  } catch (err) {
+    console.error('[Calendar] reloadCalendarEventsOnly Fehler:', err);
+  }
 }
 
 /**
@@ -2462,6 +2478,7 @@ function openEventModal({ mode, event = null, date = null, reminder = null, time
     onSave(panel) {
       // RRULE-Events binden
       bindRRuleEvents(panel, 'event');
+      bindRecurringScopeChooser(panel, 'modal-edit');
       bindUserMultiSelect(panel, 'cal_assigned');
       wireVisibilityWarning(panel, '#modal-visibility', 'cal_assigned', '#modal-visibility-warning');
 
@@ -2681,7 +2698,7 @@ function openEventModal({ mode, event = null, date = null, reminder = null, time
         await requestDeleteEvent(event);
       });
 
-      panel.querySelector('#modal-save').addEventListener('click', () => saveEvent(panel, mode, event?.id, reminder, attachmentState));
+      panel.querySelector('#modal-save').addEventListener('click', () => saveEvent(panel, mode, event, reminder, attachmentState));
       if (window.lucide) lucide.createIcons({ el: panel });
     },
   });
@@ -2910,6 +2927,8 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
 
     ${renderRRuleFields('event', isEdit ? event.recurrence_rule : null, { allowCount: true })}
 
+    ${isEdit && isLocalRecurringSeries(event) ? renderRecurringScopeChooser('modal-edit', event.start_datetime.slice(0, 10)) : ''}
+
     ${renderCalendarReminderSection(reminder, event, isEdit ? [] : state.defaultReminders)}
 
     <div class="modal-panel__footer" style="border:none;padding:0;margin-top:var(--space-4)">
@@ -2923,7 +2942,8 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
     </div>`;
 }
 
-async function saveEvent(overlay, mode, eventId, existingReminder = null, attachmentState = null) {
+async function saveEvent(overlay, mode, event, existingReminder = null, attachmentState = null) {
+  const eventId = event?.id;
   const saveBtn = overlay.querySelector('#modal-save');
   const title   = overlay.querySelector('#modal-title').value.trim();
 
@@ -3039,21 +3059,66 @@ async function saveEvent(overlay, mode, eventId, existingReminder = null, attach
     }
 
     let savedEventId = eventId;
+    // Start, an dem die Erinnerungs-Offsets ausgerichtet werden. Für „ganze Serie"
+    // wird das auf den (evtl. verschobenen) Master-Start umgestellt (#532).
+    let reminderBaseStart = start_datetime;
+    // Serien-Scopes ändern die Expansion (Split/EXDATE): danach den sichtbaren
+    // Bereich neu laden, damit der Server korrekt expandiert (#532).
+    let reloadAfter = false;
+
     if (mode === 'create') {
       const res = await api.post('/calendar', body);
       state.events.push(res.data);
       savedEventId = res.data?.id;
     } else {
-      const res = await api.put(`/calendar/${eventId}`, body);
-      const idx = state.events.findIndex((e) => e.id === eventId);
-      if (idx !== -1) state.events[idx] = res.data;
+      // Scope-Auswahl greift nur für rein lokale Serien (#532); sonst normaler
+      // Master-Update wie bisher (Einzeltermine, externe Serien).
+      const scope = isLocalRecurringSeries(event)
+        ? getRecurringScope(overlay, 'modal-edit')
+        : 'series';
+      const occDate = event?.start_datetime?.slice(0, 10);
+      const truncated = scope === 'following' && event.is_recurring_instance
+        ? truncateRuleBefore(event.recurrence_rule, occDate)
+        : null;
+
+      if (scope === 'this') {
+        // Nur dieses Vorkommen: losgelösten Einzeltermin anlegen + Master-EXDATE.
+        const res = await api.post('/calendar', { ...body, recurrence_rule: null });
+        await api.post(`/calendar/${eventId}/exceptions`, { date: occDate });
+        savedEventId = res.data?.id;
+        reloadAfter = true;
+      } else if (truncated) {
+        // Dieser und folgende: Master per UNTIL kürzen, neue Serie ab hier anlegen.
+        // body trägt die (ggf. bearbeitete) recurrence_rule als Fortsetzungsregel.
+        await api.put(`/calendar/${eventId}`, { recurrence_rule: truncated });
+        const res = await api.post('/calendar', body);
+        savedEventId = res.data?.id;
+        reloadAfter = true;
+      } else {
+        // Ganze Serie (auch „folgende" beim ersten Vorkommen): Master aktualisieren.
+        // Bei lokalen Serien den DTSTART erhalten, indem die im Modal sichtbare
+        // Instanz-Verschiebung auf den Master-Start übertragen wird.
+        let seriesBody = body;
+        if (isLocalRecurringSeries(event)) {
+          const master  = (await api.get(`/calendar/${eventId}`)).data;
+          const allDay  = !!body.all_day;
+          const newStart = shiftSeriesStart(master.start_datetime, event.start_datetime, start_datetime, allDay);
+          const newEnd   = shiftEndForStart(newStart, start_datetime, end_datetime, allDay);
+          seriesBody = { ...body, start_datetime: newStart, end_datetime: newEnd };
+          reminderBaseStart = newStart;
+          reloadAfter = true;
+        }
+        const res = await api.put(`/calendar/${eventId}`, seriesBody);
+        const idx = state.events.findIndex((e) => e.id === eventId);
+        if (idx !== -1) state.events[idx] = res.data;
+      }
     }
 
     // Erinnerungen speichern oder löschen (mehrere je Termin möglich, #436).
     if (savedEventId) {
       const reminderOn = overlay.querySelector('#modal-reminder-toggle')?.checked;
       const rowsEl     = overlay.querySelector('#modal-reminder-rows');
-      const startMs    = new Date(reminderStartValue(start_datetime)).getTime();
+      const startMs    = new Date(reminderStartValue(reminderBaseStart)).getTime();
       let remindAts = [];
 
       if (reminderOn && rowsEl) {
@@ -3077,6 +3142,10 @@ async function saveEvent(overlay, mode, eventId, existingReminder = null, attach
         await api.delete(`/reminders?entity_type=event&entity_id=${savedEventId}`).catch(() => {});
       }
       refreshReminders();
+    }
+
+    if (reloadAfter) {
+      await reloadCalendarEventsOnly();
     }
 
     closeModal({ force: true });
@@ -3123,30 +3192,83 @@ async function deleteEvent(id) {
 }
 
 /**
- * Einstiegspunkt für das Löschen (#489). Lokale Serien fragen „nur dieser Termin"
- * vs. „ganze Serie"; alles andere (Einzeltermine, externe Serien) wird direkt gelöscht.
+ * True für rein lokale, nicht extern synchronisierte Serien. Nur diese erhalten die
+ * Scope-Auswahl (#489/#532); Google/Apple/CalDAV/ICS-Serien würden beim nächsten Sync
+ * wiederkehren und bleiben deshalb „ganze Serie".
  */
-async function requestDeleteEvent(event) {
-  // Nur rein lokale Serien bekommen die Einzeltermin-Option (#489); extern
-  // synchronisierte (Google/Apple/CalDAV/ICS) behalten „ganze Serie löschen".
-  const isLocalSeries = !!event?.recurrence_rule
+function isLocalRecurringSeries(event) {
+  return !!event?.recurrence_rule
     && (event.external_source ?? 'local') === 'local'
     && !event.calendar_ref_id && !event.subscription_id;
-  if (!isLocalSeries) {
+}
+
+/**
+ * Gemeinsame Scope-Auswahl für Serientermine (#532): identisches Control für
+ * „Bearbeiten" und „Löschen". Select (App-weites Formular-Vokabular) mit Default
+ * „Nur diesen Termin" (least-destructive) plus dynamischem Reichweiten-Hinweis,
+ * der das konkrete Vorkommensdatum nennt. `prefix` → Element-ID `${prefix}-scope`.
+ */
+function renderRecurringScopeChooser(prefix, occDateKey) {
+  return `
+    <div class="form-group">
+      <label class="form-label" for="${prefix}-scope">${t('calendar.recurringScopeLabel')}</label>
+      <select class="input" id="${prefix}-scope" name="${prefix}-scope" data-occ-date="${esc(occDateKey)}">
+        <option value="this" selected>${t('calendar.recurringScopeThis')}</option>
+        <option value="following">${t('calendar.recurringScopeFollowing')}</option>
+        <option value="series">${t('calendar.recurringScopeSeries')}</option>
+      </select>
+      <p class="form-hint" id="${prefix}-scope-hint" role="status"></p>
+    </div>`;
+}
+
+/** Reichweiten-Hinweistext für den gewählten Scope (mit formatiertem Datum). */
+function recurringScopeHint(value, occDateKey) {
+  if (value === 'series') return t('calendar.recurringScopeHintSeries');
+  const date = formatPreferredDate(occDateKey);
+  return value === 'following'
+    ? t('calendar.recurringScopeHintFollowing', { date })
+    : t('calendar.recurringScopeHintThis', { date });
+}
+
+/** Verdrahtet den dynamischen Hinweis der Scope-Auswahl. No-op ohne Chooser. */
+function bindRecurringScopeChooser(root, prefix) {
+  const sel  = root.querySelector(`#${prefix}-scope`);
+  const hint = root.querySelector(`#${prefix}-scope-hint`);
+  if (!sel || !hint) return;
+  const update = () => { hint.textContent = recurringScopeHint(sel.value, sel.dataset.occDate); };
+  sel.addEventListener('change', update);
+  update();
+}
+
+/** Liest den gewählten Scope; Default „this" (least-destructive). */
+function getRecurringScope(root, prefix) {
+  return root.querySelector(`#${prefix}-scope`)?.value || 'this';
+}
+
+/**
+ * Einstiegspunkt für das Löschen (#489/#532). Lokale Serien fragen „nur dieser
+ * Termin" / „dieser und folgende" / „ganze Serie"; alles andere (Einzeltermine,
+ * externe Serien) wird direkt gelöscht.
+ */
+async function requestDeleteEvent(event) {
+  if (!isLocalRecurringSeries(event)) {
     await deleteEvent(event.id);
     return;
   }
-  const choice = await recurringDeleteChoice();
+  const choice = await recurringDeleteChoice(event);
   if (choice === 'series') await deleteEvent(event.id);
+  else if (choice === 'following') await deleteThisAndFollowing(event);
   else if (choice === 'this') await deleteSingleOccurrence(event);
   // null → abgebrochen, nichts tun
 }
 
 /**
- * Auswahl-Dialog für das Löschen wiederkehrender Termine (Blaupause:
- * recurringChoiceModal in budget.js). Löst zu 'this' | 'series' | null auf.
+ * Auswahl-Dialog für das Löschen wiederkehrender Termine (#532). Nutzt dieselbe
+ * Scope-Komponente wie das Bearbeiten-Modal (Konsistenz) plus einen destruktiven
+ * „Löschen"-Bestätiger. Löst zu 'this' | 'following' | 'series' | null.
  */
-function recurringDeleteChoice() {
+function recurringDeleteChoice(event) {
+  const occDateKey = event.start_datetime.slice(0, 10);
   return new Promise((resolve) => {
     let resolved = false;
     const finish = (value) => {
@@ -3159,20 +3281,60 @@ function recurringDeleteChoice() {
       title: t('calendar.deleteRecurringTitle'),
       size: 'sm',
       content: `
-        <p class="form-hint modal-lead">${t('calendar.deleteRecurringHint')}</p>
+        ${renderRecurringScopeChooser('rds', occDateKey)}
         <div class="modal-actions modal-actions--stack">
-          <button type="button" class="btn btn--primary" id="rds-this">${t('calendar.deleteThisOccurrence')}</button>
-          <button type="button" class="btn btn--danger" id="rds-series">${t('calendar.deleteWholeSeries')}</button>
+          <button type="button" class="btn btn--danger" id="rds-confirm">${t('common.delete')}</button>
           <button type="button" class="btn btn--ghost" id="rds-cancel">${t('common.cancel')}</button>
         </div>`,
       onClose: () => finish(null),
       onSave(panel) {
-        panel.querySelector('#rds-this')?.addEventListener('click', () => finish('this'));
-        panel.querySelector('#rds-series')?.addEventListener('click', () => finish('series'));
+        bindRecurringScopeChooser(panel, 'rds');
+        panel.querySelector('#rds-confirm')?.addEventListener('click', () => finish(getRecurringScope(panel, 'rds')));
         panel.querySelector('#rds-cancel')?.addEventListener('click', () => finish(null));
       },
     });
   });
+}
+
+/**
+ * Löscht dieses und alle folgenden Vorkommen einer lokalen Serie (#532), indem die
+ * RRULE per UNTIL auf den Vortag gekürzt wird. Ist das geöffnete Vorkommen bereits
+ * das erste (Master-DTSTART), verschwindet die gesamte Serie. Optimistisch + Undo.
+ */
+async function deleteThisAndFollowing(event) {
+  // Erstes Vorkommen: „dieser und folgende" == ganze Serie.
+  if (!event.is_recurring_instance) {
+    await deleteEvent(event.id);
+    return;
+  }
+  const fromKey = event.start_datetime.slice(0, 10);
+  const newRule = truncateRuleBefore(event.recurrence_rule, fromKey);
+  if (!newRule) { await deleteEvent(event.id); return; }
+
+  const affects = (e) => e.id === event.id && e.start_datetime.slice(0, 10) >= fromKey;
+  const removed = state.events.filter(affects);
+  state.events  = state.events.filter((e) => !affects(e));
+  renderView();
+
+  let undone = false;
+  window.yuvomi?.showToast(t('calendar.deletedToast'), 'default', 5000, () => {
+    undone = true;
+    state.events = [...state.events, ...removed];
+    renderView();
+  });
+
+  setTimeout(async () => {
+    if (undone) return;
+    try {
+      await api.put(`/calendar/${event.id}`, { recurrence_rule: newRule });
+      // Verbleibende Instanzen tragen künftig die gekürzte Regel.
+      for (const e of state.events) if (e.id === event.id) e.recurrence_rule = newRule;
+    } catch (err) {
+      state.events = [...state.events, ...removed];
+      renderView();
+      window.yuvomi?.showToast(err.data?.error ?? t('calendar.deleteError'), 'danger');
+    }
+  }, 5000);
 }
 
 /**

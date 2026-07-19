@@ -1,6 +1,6 @@
 {
   "name": "yuvomi",
-  "version": "1.32.0",
+  "version": "1.33.0",
   "description": "Self-hosted family planner - calendar, tasks, shopping, meal planning, budget and more. Private, open-source, no subscription.",
   "main": "server/index.js",
   "type": "module",
@@ -117,6 +117,7 @@
     "test:search": "node --experimental-sqlite test/test-search.js",
     "test:calendar-search": "node --experimental-sqlite test/test-calendar-search.js",
     "test:calendar-exceptions": "node --experimental-sqlite --test test/test-calendar-exceptions.js",
+    "test:recurring-scope": "node --experimental-sqlite test/test-recurring-scope.js",
     "test:calendar-defaults": "node --experimental-sqlite --test test/test-calendar-defaults.js",
     "test:calendar-routes": "node --experimental-sqlite --test test/test-calendar-routes.js",
     "test:calendar-structure": "node --experimental-sqlite --test test/test-calendar-structure.js",

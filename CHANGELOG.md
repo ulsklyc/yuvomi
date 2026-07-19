@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-07-19
+
+### Added
+- Calendar recurring events now offer the standard scope choice when you edit or delete a single occurrence — this event, this and following, or the whole series (#532). Previously deleting an occurrence removed the entire series and editing always rewrote it. Both actions now use one shared control that defaults to "only this event" (the least-destructive option) and shows which occurrences the choice affects. "Only this event" edits create a detached single event and record an exception; "this and following" splits the series (truncating it with an `UNTIL` bound and starting a new series from the occurrence with the edited fields); "whole series" edits keep the series' original start instead of re-anchoring it to the edited instance. Offered for local series only — externally synced series (Google/Apple/CalDAV/ICS) keep whole-series behavior, since the change would return on the next sync.
+
 ## [1.32.0] - 2026-07-19
 
 ### Added

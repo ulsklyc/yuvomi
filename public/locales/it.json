@@ -630,9 +630,13 @@
         "toggleSchool": "Vacanze scolastiche",
         "assignedToMe": "Assegnati a me",
         "deleteRecurringTitle": "Elimina evento ricorrente",
-        "deleteRecurringHint": "Eliminare solo questo evento o l'intera serie?",
-        "deleteThisOccurrence": "Solo questo evento",
-        "deleteWholeSeries": "Intera serie"
+        "recurringScopeLabel": "Si applica a",
+        "recurringScopeThis": "Solo questo evento",
+        "recurringScopeFollowing": "Questo e i successivi",
+        "recurringScopeSeries": "Intera serie",
+        "recurringScopeHintThis": "Riguarda solo l'evento del {{date}}.",
+        "recurringScopeHintFollowing": "Riguarda l'evento del {{date}} e tutti i successivi.",
+        "recurringScopeHintSeries": "Riguarda l'intera serie."
     },
     "notes": {
         "title": "Bacheca",

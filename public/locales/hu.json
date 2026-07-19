@@ -630,9 +630,13 @@
         "toggleSchool": "Iskolai szünetek",
         "assignedToMe": "Hozzám rendelve",
         "deleteRecurringTitle": "Ismétlődő esemény törlése",
-        "deleteRecurringHint": "Csak ezt az eseményt vagy az egész sorozatot törli?",
-        "deleteThisOccurrence": "Csak ezt az eseményt",
-        "deleteWholeSeries": "Az egész sorozatot"
+        "recurringScopeLabel": "Erre vonatkozik",
+        "recurringScopeThis": "Csak ezt az eseményt",
+        "recurringScopeFollowing": "Ez és a következők",
+        "recurringScopeSeries": "Az egész sorozatot",
+        "recurringScopeHintThis": "Csak a(z) {{date}} eseményt érinti.",
+        "recurringScopeHintFollowing": "A(z) {{date}} eseményt és az összes következőt érinti.",
+        "recurringScopeHintSeries": "A teljes sorozatot érinti."
     },
     "notes": {
         "title": "Tábla",

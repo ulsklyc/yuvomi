@@ -630,9 +630,13 @@
         "toggleSchool": "学校假期",
         "assignedToMe": "分配给我",
         "deleteRecurringTitle": "删除重复事件",
-        "deleteRecurringHint": "只删除此事件还是整个系列？",
-        "deleteThisOccurrence": "仅此事件",
-        "deleteWholeSeries": "整个系列"
+        "recurringScopeLabel": "应用于",
+        "recurringScopeThis": "仅此事件",
+        "recurringScopeFollowing": "此事件及后续事件",
+        "recurringScopeSeries": "整个系列",
+        "recurringScopeHintThis": "仅影响 {{date}} 的事件。",
+        "recurringScopeHintFollowing": "影响 {{date}} 及后续的所有事件。",
+        "recurringScopeHintSeries": "影响整个系列。"
     },
     "notes": {
         "title": "便签板",

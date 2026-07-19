@@ -630,9 +630,13 @@
         "toggleSchool": "Σχολικές διακοπές",
         "assignedToMe": "Ανατεθειμένα σε μένα",
         "deleteRecurringTitle": "Διαγραφή επαναλαμβανόμενου συμβάντος",
-        "deleteRecurringHint": "Διαγραφή μόνο αυτού του συμβάντος ή ολόκληρης της σειράς;",
-        "deleteThisOccurrence": "Μόνο αυτό το συμβάν",
-        "deleteWholeSeries": "Ολόκληρη τη σειρά"
+        "recurringScopeLabel": "Ισχύει για",
+        "recurringScopeThis": "Μόνο αυτό το συμβάν",
+        "recurringScopeFollowing": "Αυτό και τα επόμενα",
+        "recurringScopeSeries": "Ολόκληρη τη σειρά",
+        "recurringScopeHintThis": "Επηρεάζει μόνο το συμβάν στις {{date}}.",
+        "recurringScopeHintFollowing": "Επηρεάζει το συμβάν στις {{date}} και όλα τα επόμενα.",
+        "recurringScopeHintSeries": "Επηρεάζει ολόκληρη τη σειρά."
     },
     "notes": {
         "title": "Σημειώσεις",

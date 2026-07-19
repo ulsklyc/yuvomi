@@ -630,9 +630,13 @@
         "toggleSchool": "学校の休暇",
         "assignedToMe": "自分に割り当て",
         "deleteRecurringTitle": "繰り返しの予定を削除",
-        "deleteRecurringHint": "この予定だけを削除しますか、それともシリーズ全体を削除しますか？",
-        "deleteThisOccurrence": "この予定だけ",
-        "deleteWholeSeries": "シリーズ全体"
+        "recurringScopeLabel": "適用範囲",
+        "recurringScopeThis": "この予定だけ",
+        "recurringScopeFollowing": "これ以降のすべて",
+        "recurringScopeSeries": "シリーズ全体",
+        "recurringScopeHintThis": "{{date}} の予定のみに影響します。",
+        "recurringScopeHintFollowing": "{{date}} 以降のすべての予定に影響します。",
+        "recurringScopeHintSeries": "シリーズ全体に影響します。"
     },
     "notes": {
         "title": "メモボード",

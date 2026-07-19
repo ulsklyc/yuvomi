@@ -630,9 +630,13 @@
         "toggleSchool": "School Holidays",
         "assignedToMe": "Assigned to me",
         "deleteRecurringTitle": "Delete recurring event",
-        "deleteRecurringHint": "Delete only this event or the whole series?",
-        "deleteThisOccurrence": "Only this event",
-        "deleteWholeSeries": "Whole series"
+        "recurringScopeLabel": "Applies to",
+        "recurringScopeThis": "Only this event",
+        "recurringScopeFollowing": "This and following",
+        "recurringScopeSeries": "Whole series",
+        "recurringScopeHintThis": "Affects only the event on {{date}}.",
+        "recurringScopeHintFollowing": "Affects the event on {{date}} and all following.",
+        "recurringScopeHintSeries": "Affects the entire series."
     },
     "notes": {
         "title": "Board",

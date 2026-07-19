@@ -637,9 +637,13 @@
         "toggleSchool": "Ferie szkolne",
         "assignedToMe": "Przypisane do mnie",
         "deleteRecurringTitle": "Usuń wydarzenie cykliczne",
-        "deleteRecurringHint": "Usunąć tylko to wydarzenie czy całą serię?",
-        "deleteThisOccurrence": "Tylko to wydarzenie",
-        "deleteWholeSeries": "Cała seria"
+        "recurringScopeLabel": "Dotyczy",
+        "recurringScopeThis": "Tylko to wydarzenie",
+        "recurringScopeFollowing": "Ten i następne",
+        "recurringScopeSeries": "Cała seria",
+        "recurringScopeHintThis": "Dotyczy tylko wydarzenia w dniu {{date}}.",
+        "recurringScopeHintFollowing": "Dotyczy wydarzenia w dniu {{date}} i wszystkich następnych.",
+        "recurringScopeHintSeries": "Dotyczy całej serii."
     },
     "notes": {
         "title": "Notatki",

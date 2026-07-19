@@ -637,9 +637,13 @@
         "toggleSchool": "Libur sekolah",
         "assignedToMe": "Ditugaskan ke saya",
         "deleteRecurringTitle": "Hapus acara berulang",
-        "deleteRecurringHint": "Hapus hanya acara ini atau seluruh rangkaian?",
-        "deleteThisOccurrence": "Hanya acara ini",
-        "deleteWholeSeries": "Seluruh rangkaian"
+        "recurringScopeLabel": "Berlaku untuk",
+        "recurringScopeThis": "Hanya acara ini",
+        "recurringScopeFollowing": "Ini dan berikutnya",
+        "recurringScopeSeries": "Seluruh rangkaian",
+        "recurringScopeHintThis": "Hanya memengaruhi acara pada {{date}}.",
+        "recurringScopeHintFollowing": "Memengaruhi acara pada {{date}} dan semua berikutnya.",
+        "recurringScopeHintSeries": "Memengaruhi seluruh seri."
     },
     "notes": {
         "title": "Catatan",

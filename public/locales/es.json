@@ -630,9 +630,13 @@
         "toggleSchool": "Vacaciones escolares",
         "assignedToMe": "Asignado a mí",
         "deleteRecurringTitle": "Eliminar evento recurrente",
-        "deleteRecurringHint": "¿Eliminar solo este evento o toda la serie?",
-        "deleteThisOccurrence": "Solo este evento",
-        "deleteWholeSeries": "Toda la serie"
+        "recurringScopeLabel": "Se aplica a",
+        "recurringScopeThis": "Solo este evento",
+        "recurringScopeFollowing": "Este y los siguientes",
+        "recurringScopeSeries": "Toda la serie",
+        "recurringScopeHintThis": "Afecta solo al evento del {{date}}.",
+        "recurringScopeHintFollowing": "Afecta al evento del {{date}} y a todos los siguientes.",
+        "recurringScopeHintSeries": "Afecta a toda la serie."
     },
     "notes": {
         "title": "Notas",

@@ -637,9 +637,13 @@
         "toggleSchool": "방학",
         "assignedToMe": "나에게 할당됨",
         "deleteRecurringTitle": "반복 일정 삭제",
-        "deleteRecurringHint": "이 일정만 삭제할까요, 아니면 전체 시리즈를 삭제할까요?",
-        "deleteThisOccurrence": "이 일정만",
-        "deleteWholeSeries": "전체 시리즈"
+        "recurringScopeLabel": "적용 대상",
+        "recurringScopeThis": "이 일정만",
+        "recurringScopeFollowing": "이 일정 및 이후 일정",
+        "recurringScopeSeries": "전체 시리즈",
+        "recurringScopeHintThis": "{{date}} 일정에만 적용됩니다.",
+        "recurringScopeHintFollowing": "{{date}} 일정과 이후 전체에 적용됩니다.",
+        "recurringScopeHintSeries": "시리즈 전체에 적용됩니다."
     },
     "notes": {
         "title": "메모",
