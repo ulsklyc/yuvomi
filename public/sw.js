@@ -117,7 +117,6 @@ const PAGE_MODULES = [
   '/pages/settings.js',
   '/pages/login.js',
   '/pages/recipes.js',
-  '/components/shopping-category-manager.js',
   '/components/category-manager.js',
   '/settings/registry.js',
   '/settings/shell.js',
@@ -304,7 +303,6 @@ function dispatchFetch(request, url) {
   if (
     url.pathname.startsWith('/pages/') ||
     url.pathname.startsWith('/settings/') ||
-    url.pathname === '/components/shopping-category-manager.js' ||
     url.pathname === '/components/category-manager.js'
   ) {
     return networkFirst(request, PAGES_CACHE);

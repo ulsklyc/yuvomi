@@ -77,6 +77,12 @@ class CategoryManagerElement extends HTMLElement {
     return this._cats.filter((c) => (c.type ?? c.group ?? '') === groupKey);
   }
 
+  /* Stabiler Zeilen-Schlüssel: Budget/Tasks/Kontakte liefern `key`,
+   * Einkauf numerische `id` (Audit F-15 — eine Komponente für alle vier). */
+  _keyOf(item) {
+    return String(item.key ?? item.id);
+  }
+
   _render() {
     if (!this._groupsEl) return;
     this._groupsEl.replaceChildren();
@@ -103,7 +109,8 @@ class CategoryManagerElement extends HTMLElement {
 
   _rowHtml(cat, group, isFirst, isLast) {
     return `
-      <li class="cat-row" data-key="${esc(String(cat.key))}">
+      <li class="cat-row" data-key="${esc(this._keyOf(cat))}">
+        ${cat.icon ? `<i data-lucide="${esc(cat.icon)}" class="cat-row__icon icon-md" aria-hidden="true"></i>` : ''}
         <button type="button" class="cat-row__name" data-action="rename"
               title="${esc(t('category.renameHint'))}">${esc(this._labelResolver(cat))}</button>
         <div class="cat-row__actions">
@@ -132,9 +139,9 @@ class CategoryManagerElement extends HTMLElement {
     if (!this._supportsSub || !group?.subcategories) return '';
     const subs = cat.subcategories || [];
     return `
-      <ul class="cat-sublist" data-parent="${esc(String(cat.key))}">
+      <ul class="cat-sublist" data-parent="${esc(this._keyOf(cat))}">
         ${subs.map((s, j, arr) => `
-          <li class="cat-subrow" data-subkey="${esc(String(s.key))}" data-parent="${esc(String(cat.key))}">
+          <li class="cat-subrow" data-subkey="${esc(this._keyOf(s))}" data-parent="${esc(this._keyOf(cat))}">
             <button type="button" class="cat-subrow__name" data-action="sub-rename">${esc(this._labelResolver(s))}</button>
             <div class="cat-row__actions">
               <button class="btn btn--icon btn--ghost" data-action="sub-rename" aria-label="${esc(t('category.renameHint'))}" title="${esc(t('category.renameHint'))}">
@@ -147,7 +154,7 @@ class CategoryManagerElement extends HTMLElement {
                 <i data-lucide="trash-2" class="icon-sm" aria-hidden="true"></i></button>
             </div>
           </li>`).join('')}
-        <li><form class="cat-subadd-form" data-parent="${esc(String(cat.key))}" novalidate autocomplete="off">
+        <li><form class="cat-subadd-form" data-parent="${esc(this._keyOf(cat))}" novalidate autocomplete="off">
           <input class="form-input" type="text" maxlength="60" placeholder="${esc(t('category.addSubPlaceholder'))}" aria-label="${esc(t('category.addSubPlaceholder'))}" />
           <button type="submit" class="btn btn--secondary">${esc(t('common.add'))}</button>
         </form></li>
@@ -229,7 +236,7 @@ class CategoryManagerElement extends HTMLElement {
   }
 
   async _rename(key) {
-    const cat = this._cats.find((c) => String(c.key) === key);
+    const cat = this._cats.find((c) => this._keyOf(c) === key);
     if (!cat) return;
     const { promptModal } = await import('/components/modal.js');
     const current = this._labelResolver(cat);
@@ -237,7 +244,7 @@ class CategoryManagerElement extends HTMLElement {
     if (!newName || newName === current) return;
     try {
       const res = await api.put(`${this._basePath}/${encodeURIComponent(key)}`, { name: newName });
-      const idx = this._cats.findIndex((c) => String(c.key) === key);
+      const idx = this._cats.findIndex((c) => this._keyOf(c) === key);
       if (idx >= 0) this._cats[idx] = res.data;
       this._render();
       window.yuvomi?.showToast(t('category.renamed'), 'success');
@@ -248,16 +255,16 @@ class CategoryManagerElement extends HTMLElement {
   }
 
   async _move(key, delta) {
-    const cat = this._cats.find((c) => String(c.key) === key);
+    const cat = this._cats.find((c) => this._keyOf(c) === key);
     if (!cat) return;
     const groupKey = cat.type ?? cat.group ?? '';
     const group = this._inGroup(groupKey);
-    const idx = group.findIndex((c) => String(c.key) === key);
+    const idx = group.findIndex((c) => this._keyOf(c) === key);
     const nextIdx = idx + delta;
     if (idx < 0 || nextIdx < 0 || nextIdx >= group.length) return;
     [group[idx], group[nextIdx]] = [group[nextIdx], group[idx]];
     try {
-      const body = { order: group.map((c) => c.key) };
+      const body = { order: group.map((c) => this._keyOf(c)) };
       if (groupKey) body.type = groupKey;
       await api.patch(`${this._basePath}/reorder`, body);
       await this._load();
@@ -268,7 +275,7 @@ class CategoryManagerElement extends HTMLElement {
   }
 
   async _delete(key) {
-    const cat = this._cats.find((c) => String(c.key) === key);
+    const cat = this._cats.find((c) => this._keyOf(c) === key);
     if (!cat) return;
     const { confirmModal } = await import('/components/modal.js');
     const confirmed = await confirmModal(
@@ -278,7 +285,7 @@ class CategoryManagerElement extends HTMLElement {
     if (!confirmed) return;
     try {
       await api.delete(`${this._basePath}/${encodeURIComponent(key)}`);
-      this._cats = this._cats.filter((c) => String(c.key) !== key);
+      this._cats = this._cats.filter((c) => this._keyOf(c) !== key);
       this._render();
       window.yuvomi?.showToast(t('category.deleted'), 'default');
       this._notifyChanged();
@@ -288,9 +295,9 @@ class CategoryManagerElement extends HTMLElement {
   }
 
   _findSub(parent, subKey) {
-    const cat = this._cats.find((c) => String(c.key) === parent);
+    const cat = this._cats.find((c) => this._keyOf(c) === parent);
     if (!cat) return null;
-    const sub = (cat.subcategories || []).find((s) => String(s.key) === subKey);
+    const sub = (cat.subcategories || []).find((s) => this._keyOf(s) === subKey);
     return sub ? { cat, sub } : null;
   }
 
@@ -330,17 +337,17 @@ class CategoryManagerElement extends HTMLElement {
   }
 
   async _subMove(parent, subKey, delta) {
-    const cat = this._cats.find((c) => String(c.key) === parent);
+    const cat = this._cats.find((c) => this._keyOf(c) === parent);
     if (!cat) return;
     const subs = (cat.subcategories || []).slice();
-    const idx = subs.findIndex((s) => String(s.key) === subKey);
+    const idx = subs.findIndex((s) => this._keyOf(s) === subKey);
     const nextIdx = idx + delta;
     if (idx < 0 || nextIdx < 0 || nextIdx >= subs.length) return;
     [subs[idx], subs[nextIdx]] = [subs[nextIdx], subs[idx]];
     try {
       await api.patch(
         `${this._basePath}/${encodeURIComponent(parent)}/subcategories/reorder`,
-        { order: subs.map((s) => s.key) }
+        { order: subs.map((s) => this._keyOf(s)) }
       );
       await this._load();
       this._notifyChanged();

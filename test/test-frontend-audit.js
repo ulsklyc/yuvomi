@@ -65,7 +65,7 @@ function assertRuleUsesToken(css, selector, property, token, file) {
 test('audited frontend files do not assign innerHTML', () => {
   const files = [
     '../public/components/yuvomi-install-prompt.js',
-    '../public/components/shopping-category-manager.js',
+    '../public/components/category-manager.js',
     '../public/pages/notes.js',
     '../public/pages/meals.js',
     '../public/pages/contacts.js',
@@ -881,35 +881,30 @@ test('admin-system leaf reads /version and renders safe translated rows only', (
   assert.doesNotMatch(source, /\/auth\/api-tokens/);
 });
 
-test('Shopping owns shopping category management via a dedicated web component', () => {
-  const component = read('../public/components/shopping-category-manager.js');
-  assert.match(component, /customElements\.define\(\s*'yuvomi-shopping-category-manager'/);
+test('Shopping uses the shared category manager component (Audit F-15)', () => {
+  const component = read('../public/components/category-manager.js');
+  assert.match(component, /customElements\.define\(\s*'yuvomi-category-manager'/);
   assert.match(component, /import \{ api \} from '\/api\.js'/);
   assert.match(component, /import \{ t \} from '\/i18n\.js'/);
   assert.match(component, /import \{ esc \} from '\/utils\/html\.js'/);
-  assert.match(component, /api\.get\('\/shopping\/categories'\)/);
-  assert.match(component, /api\.post\('\/shopping\/categories'/);
-  assert.match(component, /api\.patch\('\/shopping\/categories\/reorder'/);
-  assert.match(component, /shopping-categories-changed/);
+  // Schlüssel-Helper: Budget/Tasks/Kontakte liefern `key`, Einkauf numerische `id`.
+  assert.match(component, /item\.key \?\? item\.id/);
   assert.match(component, /disconnectedCallback\(\)/);
   assert.match(component, /removeEventListener/);
   assert.doesNotMatch(component, /#[0-9a-f]{6}/i);
 
-  // Optimistisches Reorder muss bei API-Fehler auf den Snapshot zurückrollen.
-  const moveFn = component.match(/async _move\([\s\S]*?\n  \}/)?.[0] ?? '';
-  assert.match(moveFn, /const snapshot = \[\.\.\.this\._cats\]/);
-  const moveCatch = moveFn.match(/catch \(err\) \{[\s\S]*?\n    \}/)?.[0] ?? '';
-  assert.match(moveCatch, /this\._cats = snapshot/);
-  assert.doesNotMatch(moveCatch, /this\._notifyChanged\(\)/);
-
   const shopping = read('../public/pages/shopping.js');
-  assert.match(shopping, /components\/shopping-category-manager\.js/);
-  assert.match(shopping, /<yuvomi-shopping-category-manager>/);
+  assert.match(shopping, /components\/category-manager\.js/);
+  assert.match(shopping, /<yuvomi-category-manager>/);
+  assert.match(shopping, /basePath: '\/shopping\/categories'/);
   assert.match(shopping, /shopping\.manageCategories/);
-  assert.match(shopping, /shopping-categories-changed/);
+  assert.match(shopping, /category-manager-changed/);
   // onClose muss den Listener wieder abräumen (kein Leak bei Modal-Reuse).
   const openMgr = shopping.match(/async function openCategoryManager[\s\S]*?\n\}/)?.[0] ?? '';
-  assert.match(openMgr, /manager\?\.removeEventListener\('shopping-categories-changed'/);
+  assert.match(openMgr, /manager\?\.removeEventListener\('category-manager-changed'/);
+
+  // Die frühere Shopping-Sonderkomponente ist entfernt — kein Duplikat mehr.
+  assert.equal(existsSync(new URL('../public/components/shopping-category-manager.js', import.meta.url)), false);
 });
 
 test('Kitchen settings copy directs Recipes and Shopping content settings to their modules', () => {

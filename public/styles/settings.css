@@ -1645,8 +1645,7 @@
    Generischer Category-Manager (.cat-*): siehe
    public/styles/category-manager.css — global verlinkt, damit die
    Component auch ausserhalb der Settings-Seite (Budget, Contacts,
-   Tasks) korrekt gestylt ist. Die Shopping-Kategorien nutzen die
-   eigene .shopping-cat-* Grammatik in shopping.css.
+   Tasks, Einkauf seit Audit F-15) korrekt gestylt ist.
    -------------------------------------------------------- */
 
 /* --------------------------------------------------------

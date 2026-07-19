@@ -12,7 +12,7 @@ import { promptModal, openModal, closeModal, confirmModal } from '/components/mo
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { addLocalDays, toLocalDateKey } from '/utils/date.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
-import '/components/shopping-category-manager.js';
+import '/components/category-manager.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -1083,7 +1083,7 @@ function wireRenameKeydown(content) {
 
 /**
  * Öffnet den Kategorie-Manager in einem Modal. Reagiert auf
- * `shopping-categories-changed`, um den lokalen State und die aktive Liste
+ * `category-manager-changed`, um den lokalen State und die aktive Liste
  * zu aktualisieren. Schließen navigiert zurück nach /shopping (Query entfernen).
  * @param {Element} container Seiten-Container
  * @param {object}  [opts]
@@ -1093,29 +1093,31 @@ async function openCategoryManager(container, { fromDeepLink = false } = {}) {
   const { openModal } = await import('/components/modal.js');
 
   let changed = false;
-  const onCategoriesChanged = async (e) => {
+  // Die geteilte Komponente (Audit F-15) dispatcht ohne Detail — der lokale
+  // State wird nach jeder Mutation frisch vom Server geladen.
+  const onCategoriesChanged = async () => {
     changed = true;
-    if (e.detail?.categories?.length) {
-      state.categories = e.detail.categories;
-    } else {
-      await loadCategories();
-    }
+    await loadCategories();
   };
 
   let manager = null;
   openModal({
     title: t('shopping.manageCategories'),
-    content: '<yuvomi-shopping-category-manager></yuvomi-shopping-category-manager>',
+    content: '<yuvomi-category-manager></yuvomi-category-manager>',
     onSave: (panel) => {
-      manager = panel.querySelector('yuvomi-shopping-category-manager');
+      manager = panel.querySelector('yuvomi-category-manager');
       if (!manager) return;
-      manager.addEventListener('shopping-categories-changed', onCategoriesChanged);
-      // Überschrift fokussieren, sobald die Komponente gerendert hat.
-      requestAnimationFrame(() => manager?.focusHeading?.());
+      manager.addEventListener('category-manager-changed', onCategoriesChanged);
+      manager.configure({
+        basePath: '/shopping/categories',
+        labelResolver: (item) => categoryLabel(item.name),
+        titleKey: 'shopping.manageCategories',
+        hintKey: 'settings.shoppingCategoriesHint',
+      });
     },
     onClose: () => {
       // Listener-Cleanup, damit beim Modal-Reuse kein Leak entsteht.
-      manager?.removeEventListener('shopping-categories-changed', onCategoriesChanged);
+      manager?.removeEventListener('category-manager-changed', onCategoriesChanged);
       manager = null;
       // Bei Mutationen die sichtbare Liste neu aufbauen (Gruppierung/Quick-Add-Select).
       if (changed && state.activeList) {
