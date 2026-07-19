@@ -409,7 +409,7 @@
 }
 
 .task-status-btn--done {
-  animation: check-pop 0.2s var(--ease-out);
+  animation: check-pop var(--duration-md) var(--ease-out);
 }
 
 /* Skalierungs-Pops unter reduzierter Bewegung abschalten (Audit F-07);
@@ -639,7 +639,7 @@
 .subtask-item__checkbox--done {
   background-color: var(--color-success);
   border-color: var(--color-success);
-  animation: check-pop 0.15s var(--ease-out);
+  animation: check-pop var(--duration-sm) var(--ease-out);
 }
 
 .subtask-item__checkbox-icon {

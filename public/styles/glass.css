@@ -424,7 +424,7 @@ textarea.form-input {
 
 .page-transition--out-left,
 .page-transition--out-right {
-  animation-duration: 0.12s;
+  animation-duration: var(--duration-xs);
   animation-timing-function: var(--ease-out);
 }
 
@@ -457,7 +457,7 @@ html.navigating .app-content *::after {
  * 20. List-Stagger — Spring Timing
  * ================================================================ */
 .list-stagger > * {
-  animation-duration: 0.28s;
+  animation-duration: 280ms;
   animation-timing-function: var(--ease-glass);
 }
 
@@ -497,8 +497,8 @@ html.navigating .app-content *::after {
 
 .fab {
   animation:
-    fab-in 0.42s var(--ease-out) backwards,
-    fab-ring-pulse 0.6s var(--ease-out) 0.45s 1 backwards;
+    fab-in 420ms var(--ease-out) backwards,
+    fab-ring-pulse 600ms var(--ease-out) 450ms 1 backwards;
 }
 
 /* ================================================================
@@ -955,7 +955,7 @@ html.navigating .app-content *::after {
   filter: blur(90px);
   opacity: var(--lg-blob-opacity);
   animation: lg-drift 26s ease-in-out infinite alternate;
-  transition: background 0.6s var(--ease-out);
+  transition: background 600ms var(--ease-out);
   /* Auf eigenen Compositor-Layer heben: die geblurrte Textur wird EINMAL
    * gerastert und pro Frame nur verschoben. Zusammen mit der translate-only-
    * Keyframe (kein scale → keine Blur-Neuberechnung) fällt die GPU-Dauerlast

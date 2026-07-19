@@ -467,7 +467,7 @@
 }
 
 .item-check--checked {
-  animation: check-pop 0.2s var(--ease-out);
+  animation: check-pop var(--duration-md) var(--ease-out);
 }
 
 /* Skalierungs-Pop unter reduzierter Bewegung abschalten (Audit F-07);

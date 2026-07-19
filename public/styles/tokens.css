@@ -493,9 +493,22 @@
    * 14. Übergänge
    *     fast=150ms, base=250ms, slow=400ms (laut Redesign-Spec)
    * -------------------------------------------------------- */
-  --transition-fast: 0.15s ease;
-  --transition-base: 0.25s ease;
-  --transition-slow: 0.4s ease;
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms ease;
+
+  /* Motion-Dauern (Audit F-14): kanonische Stufen für nackte Dauern in
+   * transition-/animation-Werten, wo die --transition-*-Shorthands (Dauer +
+   * Easing) nicht passen. Konvention: Zeiten in ms, nie in s. Bewusste
+   * Ausreißer (z. B. 1.5s Skeleton-Shimmer, 800ms Swipe-Nudge) bleiben
+   * literale ms-Werte — die Skala deckt die Interaktions-Mikrodauern ab. */
+  --duration-2xs: 80ms;    /* Press-Feedback (Toast-Undo u. ä.) */
+  --duration-xs:  120ms;   /* Icon-/Well-Presses, Label-Fades */
+  --duration-sm:  150ms;   /* = fast (Hover, Farben) */
+  --duration-md:  200ms;   /* Seiten-/Panel-Einblendungen */
+  --duration-lg:  250ms;   /* = base (Sheets, Overlays) */
+  --duration-xl:  300ms;   /* betonte Einblendungen */
+  --duration-2xl: 400ms;   /* = slow (Layout-Umbauten, Sidebar) */
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);

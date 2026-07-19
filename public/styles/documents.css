@@ -1147,7 +1147,7 @@
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  animation: documents-spin 0.8s linear infinite;
+  animation: documents-spin 800ms linear infinite;
 }
 
 @keyframes documents-spin {

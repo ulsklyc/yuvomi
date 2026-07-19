@@ -109,7 +109,7 @@
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
   cursor: pointer;
-  transition: border-color var(--transition-fast, 150ms), color var(--transition-fast, 150ms), background var(--transition-fast, 150ms);
+  transition: border-color var(--transition-fast, var(--duration-sm)), color var(--transition-fast, var(--duration-sm)), background var(--transition-fast, var(--duration-sm));
 }
 
 .health-person-chip:hover {
@@ -187,7 +187,7 @@
   background: var(--color-surface);
   text-align: start;
   cursor: pointer;
-  transition: border-color var(--transition-fast, 150ms), box-shadow var(--transition-fast, 150ms);
+  transition: border-color var(--transition-fast, var(--duration-sm)), box-shadow var(--transition-fast, var(--duration-sm));
 }
 
 .health-metric-card:hover {
@@ -558,7 +558,7 @@
   background: var(--color-surface);
   text-align: start;
   cursor: pointer;
-  transition: border-color var(--transition-fast, 150ms), box-shadow var(--transition-fast, 150ms);
+  transition: border-color var(--transition-fast, var(--duration-sm)), box-shadow var(--transition-fast, var(--duration-sm));
 }
 
 button.health-med-card:hover {
@@ -807,7 +807,7 @@ button.health-med-card:hover {
   background: var(--color-surface);
   text-align: start;
   cursor: pointer;
-  transition: border-color var(--transition-fast, 150ms), box-shadow var(--transition-fast, 150ms);
+  transition: border-color var(--transition-fast, var(--duration-sm)), box-shadow var(--transition-fast, var(--duration-sm));
 }
 
 .health-lab-card:hover {
@@ -1806,7 +1806,7 @@ button.health-med-card:hover {
   font-size: var(--text-sm);
   color: var(--color-text-primary);
   cursor: pointer;
-  transition: background 120ms ease;
+  transition: background var(--duration-xs) ease;
 }
 
 .cycle-cal__day:disabled { cursor: default; }
@@ -1976,7 +1976,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   font-size: var(--text-sm);
   cursor: pointer;
   min-height: var(--target-base);
-  transition: background 120ms ease, border-color 120ms ease;
+  transition: background var(--duration-xs) ease, border-color var(--duration-xs) ease;
 }
 
 .cycle-choice svg { width: 15px; height: 15px; }

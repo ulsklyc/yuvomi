@@ -92,22 +92,22 @@
 }
 
 .page-transition--in-right {
-  animation: page-slide-in-right 0.2s var(--ease-out);
+  animation: page-slide-in-right var(--duration-md) var(--ease-out);
 }
 .page-transition--in-left {
-  animation: page-slide-in-left 0.2s var(--ease-out);
+  animation: page-slide-in-left var(--duration-md) var(--ease-out);
 }
 .page-transition--out-left {
-  animation: page-out-left 0.12s ease forwards; /* ← out braucht forwards, wird ja eh entfernt */
+  animation: page-out-left var(--duration-xs) ease forwards; /* ← out braucht forwards, wird ja eh entfernt */
   pointer-events: none;
 }
 .page-transition--out-right {
-  animation: page-out-right 0.12s ease forwards;
+  animation: page-out-right var(--duration-xs) ease forwards;
   pointer-events: none;
 }
 
 .page-transition--crossfade {
-  animation: page-crossfade-in 0.18s var(--ease-out);
+  animation: page-crossfade-in 180ms var(--ease-out);
   opacity: 1;
 }
 
@@ -140,7 +140,7 @@
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
   padding-top: var(--offline-banner-height, 0px);
-  transition: padding-top 0.2s ease;
+  transition: padding-top var(--duration-md) ease;
   background-color: var(--color-bg);
 }
 
@@ -220,7 +220,7 @@
 
 .more-backdrop--visible {
   display: block;
-  animation: fade-in 0.15s ease;
+  animation: fade-in var(--duration-sm) ease;
 }
 
 @keyframes fade-in {
@@ -254,7 +254,7 @@ html:has(.search-overlay--visible) yuvomi-install-prompt {
   flex-direction: column;
   gap: var(--space-2);
   transform: translateY(100%);
-  transition: transform 0.25s var(--ease-out);
+  transition: transform var(--duration-lg) var(--ease-out);
 }
 
 /* App-Launcher-Raster: farbige Modul-Icons als Helden, kein Kasten drumherum.
@@ -299,7 +299,7 @@ html:has(.search-overlay--visible) yuvomi-install-prompt {
   text-align: left;
   margin-bottom: var(--space-1);
   -webkit-tap-highlight-color: transparent;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast), transform 0.1s ease;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast), transform 100ms ease;
   user-select: none;
 }
 
@@ -382,7 +382,7 @@ html:has(.search-overlay--visible) yuvomi-install-prompt {
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, white 30%, transparent),
     inset 0 -1px 0 color-mix(in srgb, black 12%, transparent);
-  transition: transform 0.12s var(--ease-out);
+  transition: transform var(--duration-xs) var(--ease-out);
 }
 
 /* Aktives Modul (Sheet auf dieser Route geöffnet): Akzent-Ring statt Tint. */
@@ -492,7 +492,7 @@ html:has(.search-overlay--visible) yuvomi-install-prompt {
   display: flex;
   flex-direction: column;
   transform: translateY(100%);
-  transition: transform 0.25s var(--ease-out);
+  transition: transform var(--duration-lg) var(--ease-out);
 }
 
 .search-overlay--visible {
@@ -669,8 +669,8 @@ html:has(.search-overlay--visible) yuvomi-install-prompt {
   transition:
     background-color var(--transition-fast),
     color var(--transition-fast),
-    transform 0.12s var(--ease-out),
-    opacity 0.12s var(--ease-out);
+    transform var(--duration-xs) var(--ease-out),
+    opacity var(--duration-xs) var(--ease-out);
 }
 
 .nav-sidebar .nav-item__icon-well {
@@ -779,7 +779,7 @@ html:has(.search-overlay--visible) yuvomi-install-prompt {
   z-index: calc(var(--z-nav) - 1);
   transition: transform var(--transition-base), background-color var(--transition-fast);
   -webkit-tap-highlight-color: transparent;
-  animation: fab-in 0.42s var(--ease-out) backwards;
+  animation: fab-in 420ms var(--ease-out) backwards;
 }
 
 .page-fab:hover {
@@ -1200,7 +1200,7 @@ html.fab-anim-done .page-fab {
    * und der Accessible Name des Items bleibt erhalten (besser für Screenreader). */
   html.sidebar-collapsed .nav-sidebar .nav-item__label {
     opacity: 0;
-    transition: opacity 0.12s ease;
+    transition: opacity var(--duration-xs) ease;
   }
 
   /* Eingeklappt stapelt der Footer vertikal. align-items:stretch dehnt die
@@ -1236,7 +1236,7 @@ html.fab-anim-done .page-fab {
     height: 0;
     padding-block: 0;
     overflow: hidden;
-    transition: opacity 0.12s ease;
+    transition: opacity var(--duration-xs) ease;
   }
 
   /* ── Eingeklappt: Rail expandiert bei Hover/Fokus und zeigt Labels ──
@@ -1267,7 +1267,7 @@ html.fab-anim-done .page-fab {
   html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-section-label,
   html.sidebar-collapsed .nav-sidebar:focus-within .nav-section-label {
     opacity: 1;
-    transition: opacity 0.18s ease 0.22s;
+    transition: opacity 180ms ease 220ms;
   }
 
   /* Flyout: die eingeklappt auf null Höhe kollabierten Sektionslabels wieder
@@ -1475,7 +1475,7 @@ html.fab-anim-done .page-fab {
            max(var(--space-3), env(safe-area-inset-right))
            max(var(--space-3), env(safe-area-inset-bottom))
            max(var(--space-3), env(safe-area-inset-left));
-  animation: modal-overlay-in 0.2s ease forwards;
+  animation: modal-overlay-in var(--duration-md) ease forwards;
   /* iOS Safari: click-Events auf non-interactive divs erfordern cursor:pointer */
   cursor: pointer;
 }
@@ -1501,7 +1501,7 @@ html.fab-anim-done .page-fab {
   box-shadow: var(--shadow-lg);
   /* Dezentes Einfahren: kurzer Hub + leichte Skalierung statt vollem
    * translateY(100%)-Vollhub. Wirkt leichter und weniger einnehmend. */
-  animation: modal-sheet-in 0.28s var(--ease-out) forwards;
+  animation: modal-sheet-in 280ms var(--ease-out) forwards;
   /* Cursor vom Overlay zurücksetzen */
   cursor: default;
 }
@@ -1511,7 +1511,7 @@ html.fab-anim-done .page-fab {
     max-width: 520px;
     max-height: calc(100dvh - (2 * var(--space-6)));
     border-radius: var(--radius-lg);
-    animation: modal-scale-in 0.2s var(--ease-out) forwards;
+    animation: modal-scale-in var(--duration-md) var(--ease-out) forwards;
   }
   .modal-panel--sm { max-width: 400px; }
   .modal-panel--lg { max-width: 680px; }
@@ -1892,7 +1892,7 @@ html.fab-anim-done .page-fab {
   }
 
   .modal-panel--closing {
-    animation: sheet-out 0.2s ease forwards;
+    animation: sheet-out var(--duration-md) ease forwards;
   }
 }
 
@@ -2361,7 +2361,7 @@ html.fab-anim-done .page-fab {
 }
 
 .toggle input:checked + .toggle__track::after {
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .toggle input:checked + .toggle__track::after {
@@ -2464,7 +2464,7 @@ html.fab-anim-done .page-fab {
   gap: var(--space-3);
   padding: var(--space-12) var(--space-6);
   text-align: center;
-  animation: empty-state-in 0.4s var(--ease-out) both;
+  animation: empty-state-in var(--duration-2xl) var(--ease-out) both;
 }
 
 @keyframes empty-state-in {
@@ -2510,7 +2510,7 @@ html.fab-anim-done .page-fab {
 
 .empty-state__cta {
   margin-top: var(--space-2);
-  animation: list-item-in 300ms var(--ease-out) 300ms both;
+  animation: list-item-in var(--duration-xl) var(--ease-out) var(--duration-xl) both;
 }
 
 /* Technische Fehlerdetails: zugeklappt unauffällig, aufgeklappt lesbar und
@@ -2786,7 +2786,7 @@ html.fab-anim-done .page-fab {
   font-size: var(--text-sm);
   box-shadow: var(--shadow-lg);
   pointer-events: auto;
-  animation: toast-in 0.25s var(--ease-out) forwards;
+  animation: toast-in var(--duration-lg) var(--ease-out) forwards;
 }
 
 .toast__icon {
@@ -2812,7 +2812,7 @@ html.fab-anim-done .page-fab {
 
 .toast__undo {
   -webkit-tap-highlight-color: transparent;
-  transition: opacity var(--transition-fast), transform 0.08s ease;
+  transition: opacity var(--transition-fast), transform var(--duration-2xs) ease;
 }
 
 .toast__undo:hover {
@@ -2834,7 +2834,7 @@ html.fab-anim-done .page-fab {
 }
 
 .toast--out {
-  animation: toast-out 0.2s ease forwards;
+  animation: toast-out var(--duration-md) ease forwards;
 }
 
 @keyframes toast-out {
@@ -2969,7 +2969,7 @@ html.fab-anim-done .page-fab {
 }
 
 .btn--shaking {
-  animation: btn-shake 0.3s ease;
+  animation: btn-shake var(--duration-xl) ease;
 }
 
 /* prefers-reduced-motion: kein Schütteln, nur Farb-Feedback */
@@ -3008,7 +3008,7 @@ html.fab-anim-done .page-fab {
   border: 2px solid var(--color-glass-hover);
   border-top-color: var(--color-text-on-accent);
   border-radius: var(--radius-full);
-  animation: btn-spin 0.55s linear infinite;
+  animation: btn-spin 550ms linear infinite;
 }
 
 /* For non-primary buttons (secondary, ghost) */
@@ -3048,7 +3048,7 @@ html.fab-anim-done .page-fab {
   opacity: 0;
   pointer-events: none;
   z-index: 0;
-  transition: opacity 0.05s linear;
+  transition: opacity 50ms linear;
 }
 
 /* --------------------------------------------------------
@@ -3062,7 +3062,7 @@ html.fab-anim-done .page-fab {
 }
 
 .list-stagger > * {
-  animation: list-item-in 0.2s var(--ease-out) both;
+  animation: list-item-in var(--duration-md) var(--ease-out) both;
 }
 
 .list-stagger > *:nth-child(1)   { animation-delay: 0ms; }
@@ -3091,7 +3091,7 @@ html.fab-anim-done .page-fab {
 }
 
 .swipe-row--hint > :first-child {
-  animation: swipe-nudge 0.8s var(--ease-out) 1.2s both;
+  animation: swipe-nudge 800ms var(--ease-out) 1200ms both;
 }
 
 /* Swipe-Affordanz: permanente Chevron-Hints an den Kartenrändern */
@@ -3235,7 +3235,7 @@ html.fab-anim-done .page-fab {
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
   border-bottom: 1px solid color-mix(in srgb, var(--color-warning) 20%, transparent);
-  animation: offline-banner-in 0.2s var(--ease-out);
+  animation: offline-banner-in var(--duration-md) var(--ease-out);
 }
 
 .offline-banner[hidden] {
@@ -3457,8 +3457,8 @@ textarea.input { resize: vertical; }
   border-radius: var(--radius-sm);
   pointer-events: none;
   transition:
-    transform 0.45s cubic-bezier(0.28, 1.25, 0.36, 1),
-    opacity 0.25s ease;
+    transform 450ms cubic-bezier(0.28, 1.25, 0.36, 1),
+    opacity var(--duration-lg) ease;
   will-change: transform;
   z-index: 0;
 }
@@ -3477,8 +3477,8 @@ textarea.input { resize: vertical; }
   opacity: 0;
   pointer-events: none;
   transition:
-    transform 0.28s cubic-bezier(0.28, 1.25, 0.36, 1),
-    opacity 0.18s ease;
+    transform 280ms cubic-bezier(0.28, 1.25, 0.36, 1),
+    opacity 180ms ease;
   will-change: transform, opacity;
   z-index: 0;
 }
@@ -3538,7 +3538,7 @@ textarea.input { resize: vertical; }
   border-radius: var(--radius-full);
   pointer-events: none;
   transition:
-    transform 0.2s var(--ease-out),
+    transform var(--duration-md) var(--ease-out),
     opacity var(--transition-fast);
   will-change: transform;
   z-index: 0;
