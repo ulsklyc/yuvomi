@@ -1578,7 +1578,7 @@
         "weatherSwitchHint": "Open-Meteo wird beim Speichern automatisch aktiviert und OWM ignoriert.",
         "weatherLocateBtn": "Standort ermitteln",
         "weatherLocateSuccess": "Standort erfolgreich ermittelt.",
-        "weatherLocateUnsupported": "Geolokalisierung wird von Ihrem Browser nicht unterstützt.",
+        "weatherLocateUnsupported": "Geolokalisierung wird von deinem Browser nicht unterstützt.",
         "cropDialogTitle": "Bild zuschneiden",
         "cropConfirm": "Zuschneiden",
         "cropZoomLabel": "Zoom",
