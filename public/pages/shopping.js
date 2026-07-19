@@ -165,25 +165,22 @@ function renderListContent(container) {
       </span>
       <div class="list-header__actions">
         ${checkedCount > 0 ? `
-          <button class="btn btn--ghost" data-action="clear-checked"
-                  style="font-size:var(--text-sm);color:var(--color-text-secondary)">
+          <button class="btn btn--ghost list-header__clear-btn" data-action="clear-checked">
             <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
-            ${t('shopping.clearChecked', { count: checkedCount })}
+            <span class="list-header__clear-label">${t('shopping.clearChecked', { count: checkedCount })}</span>
           </button>` : ''}
         <button class="btn btn--ghost list-header__import-btn" data-action="import-meals"
-                aria-label="${t('shopping.importMeals')}" title="${t('shopping.importMeals')}"
-                style="color:var(--color-text-secondary)">
+                aria-label="${t('shopping.importMeals')}" title="${t('shopping.importMeals')}">
           <i data-lucide="utensils" class="icon-md" aria-hidden="true"></i>
           <span>${t('shopping.importMeals')}</span>
         </button>
         <button class="btn btn--ghost btn--icon" data-action="manage-categories"
-                aria-label="${t('shopping.manageCategories')}" title="${t('shopping.manageCategories')}"
-                style="color:var(--color-text-secondary)">
+                aria-label="${t('shopping.manageCategories')}" title="${t('shopping.manageCategories')}">
           <i data-lucide="tags" class="icon-md" aria-hidden="true"></i>
         </button>
         <button class="btn btn--ghost btn--icon" data-action="delete-list"
                 data-id="${state.activeList.id}" aria-label="${t('shopping.deleteListLabel')}"
-                style="color:var(--color-text-secondary)">
+                title="${t('shopping.deleteListLabel')}">
           <i data-lucide="trash" class="icon-md" aria-hidden="true"></i>
         </button>
       </div>

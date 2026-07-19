@@ -161,6 +161,19 @@
   flex-shrink: 0;
 }
 
+/* Abgehakt-löschen: Textbutton, dessen Label bei Platznot ellipsiert statt die
+ * Zeile zu sprengen (Audit F-03). Ersetzt frühere Inline-Styles. */
+.list-header__clear-btn {
+  font-size: var(--text-sm);
+  min-width: 0;
+}
+
+.list-header__clear-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .list-header__import-btn {
   gap: var(--space-2);
 }
@@ -170,16 +183,31 @@
   gap: var(--space-3);
 }
 
+/* Mobile (Audit F-03): deterministische zwei Zeilen statt ausgefranstem Wrap.
+ * Zeile 1: Listenname (volle Breite). Zeile 2: EINE nicht umbrechende
+ * Aktionszeile — Abgehakt-löschen links (Label ellipsiert), Icon-Aktionen
+ * rechts. Kein Waisen-Icon, kein Totraum mehr. */
 @media (max-width: 767px) {
   .list-header {
-    align-items: flex-start;
     flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  .list-header__name {
+    flex: 1 1 100%;
   }
 
   .list-header__actions {
     width: 100%;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-end;
+    min-width: 0;
+  }
+
+  .list-header__clear-btn {
+    flex: 0 1 auto;
+    margin-right: auto;
+    padding-inline: var(--space-2);
   }
 
   .list-header__import-btn span {
