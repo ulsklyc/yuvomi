@@ -9,6 +9,20 @@
   margin: 0 auto;
 }
 
+/* Modale, Viewer und Popover rendern auf Body-Ebene — also AUSSERHALB von
+ * .documents-page. Dort war --module-accent leer, wodurch jede darauf gebaute
+ * Deklaration ungültig wurde: die Dropzone blieb grau, ihr Fokusring fiel ganz
+ * aus (ungültiges outline → outline-style: none), Icon-Flächen verloren ihre
+ * Tönung. Der Router hält den aktiven Akzent global auf :root vor; hier wird er
+ * für diese Flächen zurück auf den erwarteten Namen gelegt. */
+.document-form,
+.document-viewer,
+.dms-results,
+.dms-result,
+.documents-context-menu {
+  --module-accent: var(--active-module-accent, var(--module-documents));
+}
+
 /* Gerüst (Shell + Titel) jetzt geteilt via .page-toolbar in layout.css.
  * Damit wird der Documents-Kopf wie alle anderen sticky und nutzt --color-bg. */
 /* Layout only — control visual lives in page-search.css (shared). */
@@ -49,38 +63,17 @@
 /* Eigene Filterzeile unter dem Kopf (wie Kontakte): Status- + Kategorie-Chips
  * scrollen gemeinsam horizontal, statt in die Kopfzeile gequetscht zu werden.
  * Das behebt das Überlappen/Abschneiden auf Desktop (Issue #506). */
+/* Die Filterzeile selbst scrollt NICHT — nur ihre Kategorie-Facette tut das
+ * (siehe .documents-filter-chips). Ein einziger Scroller statt verschachtelter
+ * hält Status-Umschalter, Sortierung und Auswahl immer sichtbar. */
 .documents-filters {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--color-border);
-  overflow-x: auto;
-  scrollbar-width: none;
+  overflow: hidden;
   flex-shrink: 0;
-}
-
-.documents-filters::-webkit-scrollbar { display: none; }
-
-/* Desktop (Maus, kein Swipe): Filterzeile umbrechen statt horizontal scrollen,
- * damit alle Kategorien erreichbar bleiben. Auf Touch bleibt die swipebare
- * Ein-Zeilen-Leiste erhalten (#525). Die Kategorie-Chips brauchen flex-basis:100%,
- * damit sie auf eine eigene volle Zeile rücken und intern umbrechen statt in
- * max-content-Breite über den Rand hinauszulaufen; der vertikale Trenner entfällt
- * dabei (er säße sonst frei am linken Rand der Chip-Zeile). */
-@media (hover: hover) and (pointer: fine) {
-  .documents-filters {
-    flex-wrap: wrap;
-    overflow-x: visible;
-  }
-
-  .documents-filter-chips {
-    flex-wrap: wrap;
-    flex-basis: 100%;
-    min-width: 0;
-    padding-inline-start: 0;
-    border-inline-start: none;
-  }
 }
 
 .documents-filter-group {
@@ -89,40 +82,111 @@
   flex-shrink: 0;
 }
 
+/* Die Kategorie-Facette scrollt horizontal in EINER Zeile — auf jedem Gerät.
+ * Vorher brach sie auf Desktop um und wuchs unbegrenzt: bei schmalem Fenster
+ * stapelten sich 15 Chips auf 8 Zeilen (461px), das erste Dokument lag unter der
+ * Falz. Eine Zeile plus Rand-Fade hält die Kopfzone konstant hoch. */
 .documents-filter-chips {
   display: flex;
   gap: var(--space-2);
-  flex-shrink: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
   padding-inline-start: var(--space-3);
   border-inline-start: 1px solid var(--color-border);
 }
 
-.documents-filter-chip {
+.documents-filter-chips::-webkit-scrollbar { display: none; }
+
+.documents-filters__end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  padding-inline-start: var(--space-3);
+  border-inline-start: 1px solid var(--color-border);
+}
+
+.documents-sort {
+  width: auto;
+  min-height: var(--target-md);
+  font-size: var(--text-sm);
+}
+
+/* Rand-Fade für horizontal scrollende Leisten (Kategorie-Chips + Ordner-Chips).
+ * Klassen setzt updateFolderScrollHint(): nur wenn wirklich überlaufend, und am
+ * rechten Ende wieder weg. */
+.is-scrollable {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--space-6)), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - var(--space-6)), transparent);
+}
+
+.is-scrollable.is-at-end {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+/* --------------------------------------------------------
+ * Auswahl-Modus (Bulk)
+ * -------------------------------------------------------- */
+.documents-selectbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--module-accent) 8%, var(--color-bg));
+  flex-wrap: wrap;
+}
+
+/* `.btn`/`.documents-selectbar` setzen ein eigenes display und schlagen damit
+ * das UA-`[hidden] { display: none }`. Ohne diesen Guard blieb der DMS-Button
+ * sichtbar, obwohl gar kein DMS-Konto konfiguriert ist. */
+.documents-selectbar[hidden],
+.documents-dms-link-btn[hidden] {
+  display: none;
+}
+
+.documents-selectbar__count {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.documents-selectbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+  flex-wrap: wrap;
+}
+
+.document-select {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  white-space: nowrap;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: var(--radius-glass-inner);
+  background: color-mix(in srgb, var(--module-accent) 12%, transparent);
   cursor: pointer;
-  border: 1.5px solid var(--color-border);
-  background: transparent;
-  color: var(--color-text-secondary);
-  transition: all var(--transition-fast);
-  min-height: 30px;
 }
 
-.documents-filter-chip:hover:not(.documents-filter-chip--active) {
-  border-color: var(--color-text-secondary);
-  color: var(--color-text-primary);
+.document-select input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--module-accent);
+  cursor: pointer;
 }
 
-.documents-filter-chip--active {
-  background-color: var(--module-accent);
+.document-card.is-selected,
+.document-row.is-selected {
   border-color: var(--module-accent);
-  color: var(--color-ink-on-vivid);
+  box-shadow: 0 0 0 1px var(--module-accent), var(--glass-shadow-md);
 }
 
 .documents-browser-layout {
@@ -269,12 +333,15 @@
   }
 }
 
-/* Body-Level Popover für Ordner- & Dokument-Aktionen (entkommt overflow-Clipping). */
+/* Natives Popover für Ordner- & Dokument-Aktionen: rendert im Top-Layer, daher
+ * kein Clipping durch Chip-Leiste oder Sidebar. inset/margin überschreiben die
+ * UA-Zentrierung, die Position setzt JS (positionContextMenu). */
 .documents-context-menu {
   position: fixed;
+  margin: 0;
+  inset: auto;
   z-index: var(--z-dropdown);
   min-width: 184px;
-  display: flex;
   flex-direction: column;
   gap: var(--space-0h);
   padding: var(--space-1);
@@ -282,6 +349,10 @@
   border-radius: var(--radius-md);
   background: var(--color-surface);
   box-shadow: var(--shadow-lg);
+}
+
+.documents-context-menu:popover-open {
+  display: flex;
 }
 
 .documents-context-menu__item {
@@ -551,9 +622,12 @@
   border-top: 1px solid var(--color-border-subtle);
 }
 
+/* Vier Spalten: Icon, Titel/Meta, Datum+Größe, Aktionen. Die Stats-Spalte macht
+ * aus der Liste eine echte Liste — vorher trug sie weniger Information als die
+ * Rasterkarte (kein Datum) bei gleichzeitig viel totem Weißraum. */
 .document-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
@@ -561,6 +635,18 @@
 
 .document-row__body {
   min-width: 0;
+}
+
+.document-row__stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .documents-danger {
@@ -594,6 +680,16 @@
 .document-dropzone--active {
   border-color: var(--module-accent);
   background: color-mix(in srgb, var(--module-accent) 12%, var(--color-surface));
+}
+
+/* Der Datei-Input liegt sr-only (1x1px, geclippt) im Label und ist trotzdem
+ * tab-fokussierbar. Ohne diese Regel verschwand der Fokus beim Durchtabben
+ * spurlos — der Ring muss auf der sichtbaren Dropzone erscheinen. */
+.document-dropzone:focus-within {
+  border-color: var(--module-accent);
+  border-style: solid;
+  outline: 2px solid var(--module-accent);
+  outline-offset: 2px;
 }
 
 .document-dropzone--active {
@@ -686,18 +782,7 @@
     display: none;
   }
 
-  /* Rand-Fade nur, wenn tatsächlich überlaufend; am rechten Ende ausblenden
-   * (Klassen von updateFolderScrollHint() gesetzt). */
-  .documents-folder-browser__list--scrollable {
-    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--space-6)), transparent);
-    mask-image: linear-gradient(to right, #000 calc(100% - var(--space-6)), transparent);
-  }
-
-  .documents-folder-browser__list--scrollable.documents-folder-browser__list--at-end {
-    -webkit-mask-image: none;
-    mask-image: none;
-  }
-
+  /* Rand-Fade übernimmt die geteilte .is-scrollable/.is-at-end-Regel oben. */
   .documents-folder-item {
     min-width: 160px;
   }
@@ -712,8 +797,32 @@
     min-width: 0;
   }
 
-  .documents-filter-chip {
-    min-height: var(--target-lg);
+  /* Chip-Höhe kommt aus .filter-chip--sm (an `hover: none` gekoppelt, nicht an
+   * der Breite) — deckt damit auch Tablets zwischen 768 und 1023px ab. */
+
+  /* Sortierung und Auswahl rutschen mobil unter die Chips, statt die Zeile zu
+   * sprengen; die Filterzeile darf dafür als einzige umbrechen. */
+  .documents-filters {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+  }
+
+  .documents-filters__end {
+    margin-inline-start: 0;
+    padding-inline-start: 0;
+    border-inline-start: none;
+  }
+
+  .documents-filter-chips {
+    order: 3;
+    flex-basis: 100%;
+    padding-inline-start: 0;
+    border-inline-start: none;
+  }
+
+  .documents-selectbar__actions {
+    margin-inline-start: 0;
+    width: 100%;
   }
 
   /* „Aus DMS verknüpfen" fällt mobil zum kompakten Icon-Button zusammen
@@ -733,6 +842,15 @@
 
   .document-row {
     grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  /* Datum/Größe rücken neben den Titel-Block, die Aktionen in eine eigene Zeile. */
+  .document-row__stats {
+    grid-column: 2;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-2);
+    justify-content: flex-start;
   }
 
   .document-row__actions {
@@ -1226,8 +1344,31 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin: 0 0 var(--space-2);
+  margin: var(--space-2) 0 0;
   color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  flex-wrap: wrap;
+}
+
+/* Deep-Link in die (admin-only) Speicher-Einstellungen — bisher war das Ziel von
+ * der Dokumente-Seite aus überhaupt nicht verlinkt. */
+.document-storage-target__link {
+  color: var(--module-accent);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+}
+
+/* Fehlerzeile der DMS-Suche: eigener Zustand mit Retry, klar getrennt von
+ * „keine Treffer" (das ist eine Antwort, kein Fehler). */
+.dms-results__error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-light);
+  color: var(--color-danger);
   font-size: var(--text-sm);
 }
 

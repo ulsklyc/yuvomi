@@ -167,6 +167,10 @@ export const schemas = {
                   enum: ['local', 'local_folder', 'webdav'],
                   description: 'Backend used for newly uploaded document files, including calendar attachments. "local" is the in-DB BLOB default, "local_folder" a mounted host folder, "webdav" a remote server.',
                 },
+                is_admin: {
+                  type: 'boolean',
+                  description: 'Whether the current user is an admin. The client uses this to show deep links into the admin-only document settings only when they are actually reachable.',
+                },
                 dms_accounts: {
                   type: 'array',
                   items: {

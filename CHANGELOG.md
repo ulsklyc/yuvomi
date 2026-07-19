@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.0] - 2026-07-19
+
+### Added
+- Documents can be uploaded several at a time. Picking or dropping multiple files creates one document per file, each taking its file name as the title while sharing the chosen category, folder and visibility; the submit button reports which file is currently being uploaded.
+- The document list can be sorted by last modified, name or size. The choice is remembered per browser.
+- Documents has a bulk selection mode. A toolbar toggle turns cards and rows into checkboxes and reveals actions to move the selection into a folder, archive or restore it, or delete it — deletion with the same five-second undo as a single delete.
+- The list view now carries the modification date and file size as their own columns. Previously it showed neither, so switching from grid to list removed information instead of adding it.
+- The document overflow menu gained a "move" action, so a document can be filed into a folder without opening the edit dialog.
+- The upload dialog links to the document storage settings for admins. Those settings were not reachable from the Documents page at all.
+
+### Changed
+- Category filters are now facets over the actual data: only categories that hold documents appear, each with its hit count, and the category row scrolls horizontally in a single line. Fifteen permanently expanded filter chips previously consumed 461px of height on a narrow window and pushed the first document below the fold; the filter area is now 66% shorter there and 34% shorter on the desktop.
+- Category and folder counts are computed against each other but not against themselves, so no visible count leads to an empty result. Filtering by category no longer reloads from the server and takes effect immediately.
+- The upload dialog asks for the file first, since the file supplies the name. The name field is optional and falls back to the file name, the category defaults to "other" instead of "medical" (the first list entry), and the file picker is restricted to the accepted MIME types with the size limit taken from the server rather than a client-side copy.
+- Visibility moved out of the collapsed "more settings" section into the visible form. It is the module's central promise and was hidden behind a disclosure.
+- The document overflow action for editing is labelled "edit" rather than "settings", matching every other module and the pencil icon next to it.
+- Documents share the filter chip styling with Tasks instead of maintaining a fourth near-identical copy. The shared definition now lives in `public/styles/filter-chip.css`.
+- The document and folder context menus use the browser's native popover, which brings light dismiss, Escape handling and focus return without hand-written event management.
+- Linking a document from a DMS no longer silently inherits the currently active category filter; it is filed under "other" and can be changed afterwards.
+
+### Fixed
+- The empty state told the truth. A search without hits, an empty filter and an empty archive all showed "No documents yet" and offered an upload button, while the folder browser next to it counted six documents. There are now four distinguishable states, each naming its actual cause and offering the action that resolves it.
+- Document dialogs lost the module accent colour. They render outside the page root where `--module-accent` is undefined, which made every declaration built on it invalid: the drop zone stayed grey and its keyboard focus ring disappeared entirely.
+- The drop zone shows keyboard focus. Its file input is visually hidden but tabbable, so the focus vanished without a trace when tabbing through the dialog.
+- The "link from DMS" button was visible even without a configured DMS account, because the button's own `display` overrode the `hidden` attribute. It also no longer shifts the toolbar when the account list finishes loading.
+- Compact filter chips keep a 44px touch target on tablets. The rule was tied to viewport width rather than pointer accuracy, leaving 32px chips between 768 and 1023px.
+- A failed DMS search is no longer disguised as an empty result. An unreachable DMS reported "no matches"; it now shows an error with a retry, and the search field has a visible label instead of a placeholder alone.
+- Undoing a document deletion restores the sort order instead of forcing an alphabetical one, and a pending deletion no longer redraws a page that has since been left.
+
 ## [1.34.1] - 2026-07-19
 
 ### Fixed

@@ -1,0 +1,76 @@
+/**
+ * Module: Shared filter chips
+ * Purpose: One chip vocabulary for every module's filter row.
+ *
+ * Vorher definierten Tasks (.filter-chip), Kontakte (.contact-filter-chip) und
+ * Dokumente (.documents-filter-chip) drei nahezu identische Chips nebeneinander.
+ * Tasks und Dokumente teilen sich jetzt diese Datei; Kontakte bleiben bewusst
+ * eigenständig, weil ihr Aktiv-Zustand eine andere Füllung (--c-accent, deckend)
+ * fährt und eine Angleichung deren Erscheinungsbild ändern würde.
+ *
+ * Reihenfolge-Hinweis: global NACH glass.css eingebunden, damit die bestehende
+ * Tasks-Darstellung unverändert bleibt.
+ */
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1.5px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-text-secondary);
+  transition: all var(--transition-fast);
+  min-height: var(--target-lg);
+}
+
+.filter-chip:hover:not(.filter-chip--active) {
+  border-color: var(--color-text-secondary);
+  color: var(--color-text-primary);
+}
+
+.filter-chip--active {
+  background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) 14%, transparent);
+  border-color: var(--module-accent, var(--color-accent));
+  color: var(--module-accent, var(--color-accent));
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  .filter-chip--active {
+    background: color-mix(in srgb, var(--module-accent, var(--color-accent)) 18%, transparent);
+    backdrop-filter: var(--blur-xs);
+    -webkit-backdrop-filter: var(--blur-xs);
+    border-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) 50%, transparent);
+    box-shadow: var(--glass-inset-base);
+  }
+}
+
+/* Dichtere Variante für Filterzeilen mit vielen Chips (Dokumente). Das Touch-Maß
+ * hängt an (hover: none) statt an der Viewport-Breite: ein Tablet im Hochformat
+ * (768–1023px) ist Touch und bekam über eine reine max-width-Regel sonst
+ * 32px-Chips — unter dem 44pt-Minimum. */
+.filter-chip--sm {
+  min-height: var(--target-md);
+}
+
+@media (hover: none) {
+  .filter-chip--sm {
+    min-height: var(--target-base);
+  }
+}
+
+/* Trefferzahl im Chip: macht vor dem Klick sichtbar, ob sich der Filter lohnt. */
+.filter-chip__count {
+  min-width: 1.25em;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}

@@ -174,43 +174,9 @@
   padding-bottom: var(--space-1);
 }
 
-.filter-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  white-space: nowrap;
-  cursor: pointer;
-  border: 1.5px solid var(--color-border);
-  background-color: var(--color-surface);
-  color: var(--color-text-secondary);
-  transition: all var(--transition-fast);
-  min-height: var(--target-lg);
-}
-
-.filter-chip:hover:not(.filter-chip--active) {
-  border-color: var(--color-text-secondary);
-  color: var(--color-text-primary);
-}
-
-.filter-chip--active {
-  background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) 14%, transparent);
-  border-color: var(--module-accent, var(--color-accent));
-  color: var(--module-accent, var(--color-accent));
-}
-
-@supports (backdrop-filter: blur(1px)) {
-  .filter-chip--active {
-    background: color-mix(in srgb, var(--module-accent, var(--color-accent)) 18%, transparent);
-    backdrop-filter: var(--blur-xs);
-    -webkit-backdrop-filter: var(--blur-xs);
-    border-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) 50%, transparent);
-    box-shadow: var(--glass-inset-base);
-  }
-}
+/* Basis, Aktiv-Zustand und Glass-Variante von .filter-chip leben in der geteilten
+ * styles/filter-chip.css (global eingebunden). Hier bleiben nur die
+ * Tasks-spezifischen Erweiterungen. */
 
 .filter-chip--recent {
   border-style: dashed;

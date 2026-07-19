@@ -1517,7 +1517,7 @@ test('responsive adaptation uses tablet space without crowding module toolbars',
   assert.match(documentsPageSrc, /<div class="documents-filters">/);
   assert.match(
     documents,
-    /\.documents-filters\s*\{[\s\S]*overflow-x:\s*auto/
+    /\.documents-filter-chips\s*\{[^}]*overflow-x:\s*auto/
   );
   assert.match(
     settings,
@@ -2635,10 +2635,14 @@ test('documents and navigation settings use progressive disclosure instead of st
   assert.match(documentsPage, /<div class="documents-filters">/);
   assert.match(documentsPage, /class="documents-filter-group" id="documents-status"/);
   assert.match(documentsPage, /class="documents-filter-chips" id="documents-category"/);
+  // Nur die Kategorie-Facette scrollt; die Filterzeile selbst nicht. Das hält
+  // Status, Sortierung und Auswahl immer sichtbar und verhindert verschachtelte
+  // Scroller. Vorher brach die Facette um und wuchs unbegrenzt in die Höhe.
   assert.match(
     documentsCss,
-    /\.documents-filters\s*\{[\s\S]*overflow-x:\s*auto[\s\S]*\}/,
+    /\.documents-filter-chips\s*\{[^}]*overflow-x:\s*auto/,
   );
+  assert.match(documentsCss, /\.documents-filters\s*\{[^}]*overflow:\s*hidden/);
   assert.doesNotMatch(documentsCss, /documents-secondary-controls/);
   assert.match(navigationPage, /class="settings-navigation-panel"/);
   assert.doesNotMatch(navigationPage, /<div class="settings-card">/);

@@ -419,6 +419,9 @@ router.get('/meta/options', (req, res) => {
         allowed_mime_types: Array.from(ALLOWED_MIME),
         storage_providers: ['local', 'external'],
         active_upload_backend: getActiveUploadBackend(),
+        // Der Client blendet Deep-Links in die (admin-only) Dokument-Einstellungen
+        // nur ein, wenn sie auch erreichbar sind — kein toter Link für Mitglieder.
+        is_admin: isAdmin(req),
         dms_accounts: isAdmin(req) ? dmsAccounts : [],
       },
     });

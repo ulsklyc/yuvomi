@@ -1502,12 +1502,16 @@ Responsive grid with colored sticky notes. Phones use one readable column; wider
 
 Upload and manage family files with per-document access control.
 
-- CRUD: name, description, category, file upload (PDF, images, text, Office documents; ≤ 5 MB)
-- Drag-and-drop upload in the new-document modal
+- CRUD: name, description, category, file upload (PDF, images, text, Office documents; ≤ 5 MB per file)
+- **Upload dialog (v1.35.0):** the file comes first — it is the object of the action and supplies the name. The name field is optional and falls back to the file name; the category defaults to "other" rather than the first list entry. The file input carries the server's `allowed_mime_types` as `accept` and its `max_file_size` as the client-side limit, so hint text and actual acceptance cannot drift apart. Visibility sits openly in the form (it is the module's core promise), while description and status stay behind "more settings"
+- **Multi-file upload (v1.35.0):** several files can be picked or dropped at once. Each becomes its own document with its file name as the title, sharing the chosen category, folder, and visibility; the submit button reports "uploading n of m" while they are processed
 - **Folder browser:** documents can be organized into custom folders; a sidebar lists all folders plus "Alle Ordner" and "Kein Ordner". Custom folders can be created, renamed, and deleted (via a per-folder overflow menu); deleting a folder keeps its documents (their folder link is cleared). New uploads are pre-assigned to the currently selected folder. A "Hausreinigung" folder is auto-created when the first housekeeping worker is added
-- **Grid / list view** toggle; view mode persisted in localStorage
-- **Responsive toolbar:** at tablet widths (768–1023px), the search field moves to a full-width second row so the page title, filters, and view controls remain readable.
+- **Grid / list view** toggle; view mode persisted in localStorage. The list view carries date and file size as their own columns, so switching from grid to list adds information rather than dropping it
+- **Sorting (v1.35.0):** last modified (default, matching the server's `updated_at DESC`), name, or size; the choice is persisted in localStorage
 - **Category tags:** 14 predefined categories (medical, school, identity, insurance, finance, home, vehicle, legal, travel, pets, warranty, taxes, work, other)
+- **Faceted filtering (v1.35.0):** category and folder are client-side facets over the status-filtered set, so filtering is instant and both axes can carry honest hit counts. Only categories that actually hold documents appear as chips (plus the active one), each with its count; each axis counts under the *other* axis but not under itself, so no visible count leads to an empty result. The category row scrolls horizontally in a single line with an edge fade — it never stacks into an unbounded block that pushes content below the fold
+- **Empty states (v1.35.0):** four distinguishable states instead of one — no documents at all, no search hits (offers "clear search"), nothing matching the active filters (offers "reset filters"), and an empty archive (offers "show active documents"). Each names its actual cause and the action that resolves it
+- **Bulk selection (v1.35.0):** an opt-in selection mode (toolbar toggle) turns cards and rows into toggles and reveals a selection bar with move-to-folder, archive/restore, and delete. Deletion is optimistic with a 5-second undo; direction of the archive action follows the active status view
 - **Visibility:** family (all members see it), restricted (only selected members), private (only the uploader)
 - **Archive / restore** — archived documents hidden from the main view, accessible via the Archive filter
 - **Download** — original file downloaded with its original filename
