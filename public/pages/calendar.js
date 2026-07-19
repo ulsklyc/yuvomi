@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
 import { openModal as openSharedModal, closeModal, advancedSection } from '/components/modal.js';
-import { stagger } from '/utils/ux.js';
+import { stagger, wireScrollFade } from '/utils/ux.js';
 import { t, formatDate as formatPreferredDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation } from '/utils/html.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder } from '/utils/date.js';
@@ -1117,6 +1117,9 @@ function renderToolbar() {
     });
   });
 
+  // Ansichts-Umschalter scrollt auf Mobile horizontal (Scrollbalken versteckt):
+  // Rand-Fade als Affordanz (geteilte has-fade-*-Konvention, Audit F-06).
+  wireScrollFade(bar.querySelector('.cal-toolbar__views'));
   viewTabs = wireTablist(bar.querySelector('.cal-toolbar__views'), {
     activeId: state.view,
     activeClass: 'cal-toolbar__view-btn--active',

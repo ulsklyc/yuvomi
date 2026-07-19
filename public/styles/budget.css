@@ -131,23 +131,8 @@
   white-space: nowrap;
 }
 
-/* Scroll-Affordance: JS setzt has-fade-start/-end nur, wenn auf der jeweiligen
- * Seite weitere Tabs verborgen sind → Rand wird ausgeblendet als „mehr hier"-
- * Hinweis. Ohne Klasse (Desktop, alle Tabs sichtbar) keine Maske. */
-.budget-tabs.has-fade-end {
-  mask-image: linear-gradient(to right, #000 calc(100% - var(--space-6)), transparent);
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--space-6)), transparent);
-}
-
-.budget-tabs.has-fade-start {
-  mask-image: linear-gradient(to right, transparent, #000 var(--space-6));
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--space-6));
-}
-
-.budget-tabs.has-fade-start.has-fade-end {
-  mask-image: linear-gradient(to right, transparent, #000 var(--space-6), #000 calc(100% - var(--space-6)), transparent);
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--space-6), #000 calc(100% - var(--space-6)), transparent);
-}
+/* Scroll-Affordance der Tab-Leiste: geteilte has-fade-*-Masken aus
+ * filter-chip.css, verdrahtet via wireScrollFade (utils/ux.js, Audit F-06). */
 
 /* Tab-Buttons nutzen die geteilte .sub-tab-Pillen-Grammatik (sub-tabs.css) und
  * das wireTablist-Verhalten (utils/tablist.js) — wie Belohnungen/Haushaltshilfe.

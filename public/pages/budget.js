@@ -7,7 +7,7 @@
 
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, confirmModal, advancedSection } from '/components/modal.js';
-import { stagger, vibrate } from '/utils/ux.js';
+import { stagger, vibrate, wireScrollFade } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
 import { t, formatDate, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
@@ -446,11 +446,12 @@ function wireNav() {
       renderBody();
     },
   });
-  // Edge-Fade live nachführen, während der Nutzer die Tab-Leiste scrollt.
-  // (Re-Render ruft updateTabsFade ohnehin auf; daher kein window-resize-
-  // Listener, der bei Re-Navigation lecken würde.) Aktiven Tab in Sicht holen.
+  // Edge-Fade der Tab-Leiste über das geteilte Utility (Audit F-06): deckt
+  // Scroll UND Größenänderungen ab und setzt den Initialzustand — zuvor lief
+  // die Prüfung nur beim Scrollen, wodurch der Desktop-Überlauf ohne Fade
+  // geclippt wurde. Aktiven Tab in Sicht holen.
   const tabsEl = _container.querySelector('.budget-tabs');
-  tabsEl?.addEventListener('scroll', updateTabsFade, { passive: true });
+  if (tabsEl) wireScrollFade(tabsEl);
   _container.querySelector('.sub-tab--active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
   updateLabel();
 }
@@ -458,19 +459,6 @@ function wireNav() {
 function updateLabel() {
   const lbl = _container.querySelector('#budget-label');
   if (lbl) lbl.textContent = formatMonthLabel(state.month);
-}
-
-// Scroll-Affordance der Tab-Leiste: Rand ausblenden, solange auf der Seite
-// weitere Tabs verborgen sind (Mobil; auf Desktop passen alle → keine Maske).
-function updateTabsFade() {
-  const el = _container?.querySelector('.budget-tabs');
-  if (!el) return;
-  // Epsilon > Scroll-Snap/Padding-Ruhelage (~2px), sonst flackert der Rand-Fade
-  // schon bei minimalem Offset am Anfang/Ende.
-  const eps = 8;
-  const max = el.scrollWidth - el.clientWidth;
-  el.classList.toggle('has-fade-start', el.scrollLeft > eps);
-  el.classList.toggle('has-fade-end', el.scrollLeft < max - eps);
 }
 
 // --------------------------------------------------------
@@ -634,7 +622,7 @@ function updateTabs() {
   // wireTablist; hier bleiben nur Panel-Verknüpfung und Scroll-Fade.
   const panel = _container.querySelector('#budget-body');
   if (panel) panel.setAttribute('aria-labelledby', `budget-tab-${state.activeTab}`);
-  updateTabsFade();
+  // Scroll-Fade der Tab-Leiste hält wireScrollFade selbst aktuell (Audit F-06).
 
   // Monatsnavigation als Block: entweder der ganze Monats-Umschalter gehört zum
   // Tab oder keines seiner Teile. Kein sichtbares Monatslabel ohne Pfeile mehr.

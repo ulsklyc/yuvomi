@@ -8,7 +8,7 @@ import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal } from '/components/modal.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { stagger } from '/utils/ux.js';
+import { stagger, wireScrollFade } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 
@@ -274,8 +274,9 @@ function bindPageEvents() {
     applyFilters();
     renderAll();
   });
-  const categoryChips = _container.querySelector('#documents-category');
-  categoryChips?.addEventListener('scroll', () => updateFolderScrollHint(categoryChips), { passive: true });
+  // Rand-Fade der Kategorie-Chips: geteiltes Utility (Audit F-06) — deckt
+  // anders als der frühere Scroll-Listener auch Resize und Re-Render ab.
+  wireScrollFade(_container.querySelector('#documents-category'));
   _container.querySelector('#documents-sort')?.addEventListener('change', (e) => {
     state.sort = SORTS.includes(e.target.value) ? e.target.value : 'updated';
     localStorage.setItem('yuvomi-documents-sort', state.sort);
@@ -309,7 +310,7 @@ function bindPageEvents() {
   _container.querySelector('#documents-list')?.addEventListener('click', handleDocumentAction);
   const folderBrowser = _container.querySelector('#documents-folder-browser');
   // Horizontale Chip-Leiste (≤1023px): Rand-Fade signalisiert weitere Ordner.
-  folderBrowser?.addEventListener('scroll', () => updateFolderScrollHint(folderBrowser), { passive: true });
+  wireScrollFade(folderBrowser);
   folderBrowser?.addEventListener('click', (e) => {
     const menuBtn = e.target.closest('[data-folder-menu]');
     if (menuBtn) {
@@ -520,7 +521,6 @@ function renderCategoryChips() {
     </button>`).join('')}
   `);
   if (window.lucide) lucide.createIcons({ el: host });
-  updateFolderScrollHint(host);
 }
 
 function renderFolderBrowser() {
@@ -550,19 +550,11 @@ function renderFolderBrowser() {
     </div>`;
   }).join(''));
   if (window.lucide) lucide.createIcons({ el: browser });
-  updateFolderScrollHint(browser);
 }
 
-// Rand-Fade horizontal scrollender Leisten (Ordner-Chips, Kategorie-Chips): nur
-// zeigen, wenn tatsächlich überlaufend, und am rechten Ende ausblenden — ehrliche
-// Affordanz „hier gibt es mehr", statt einer abgeschnittenen letzten Kachel.
-function updateFolderScrollHint(el) {
-  if (!el) return;
-  const scrollable = el.scrollWidth - el.clientWidth > 1;
-  const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
-  el.classList.toggle('is-scrollable', scrollable);
-  el.classList.toggle('is-at-end', atEnd);
-}
+// Rand-Fade horizontal scrollender Leisten: geteilte has-fade-*-Konvention via
+// wireScrollFade (utils/ux.js, Audit F-06) — Re-Render triggert dessen
+// MutationObserver, daher hier keine manuellen Update-Aufrufe mehr.
 
 // --------------------------------------------------------
 // Kontext-Popover (Ordner- & Dokument-Aktionen)

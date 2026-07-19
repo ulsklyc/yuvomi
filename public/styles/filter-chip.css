@@ -74,3 +74,26 @@
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
+
+/* --------------------------------------------------------
+ * Scroll-Affordanz für horizontal scrollende Leisten (Audit F-06)
+ *
+ * Geteilte Konvention: wireScrollFade (utils/ux.js) setzt has-fade-start/-end,
+ * solange links/rechts Inhalt verborgen liegt — der weiche Anriss ersetzt den
+ * bewusst versteckten Scrollbalken (Chip-Zeilen, Tab-Leisten, Personen-Chips).
+ * Vertikale Sonderfälle (Sidebar) überschreiben die Maske spezifischer.
+ * -------------------------------------------------------- */
+.has-fade-end {
+  mask-image: linear-gradient(to right, #000 calc(100% - var(--space-6)), transparent);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--space-6)), transparent);
+}
+
+.has-fade-start {
+  mask-image: linear-gradient(to right, transparent, #000 var(--space-6));
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--space-6));
+}
+
+.has-fade-start.has-fade-end {
+  mask-image: linear-gradient(to right, transparent, #000 var(--space-6), #000 calc(100% - var(--space-6)), transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--space-6), #000 calc(100% - var(--space-6)), transparent);
+}

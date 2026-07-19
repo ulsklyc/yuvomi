@@ -68,17 +68,18 @@ export async function deleteWithUndo({ onDelete, onUndo, toastMessage, toastType
  * jeweiligen Richtung verborgener Inhalt liegt. Die zugehörigen Masken liegen
  * im CSS des Aufrufers (z. B. budget.css Tabs, layout.css Sidebar).
  *
- * Reagiert auf Scroll UND Größenänderungen (ResizeObserver deckt Viewport-
- * Resize, Ein-/Ausklappen und Font-Nachladen ab; beobachtet werden Container
- * und erstes Kind, damit auch Inhaltszuwachs triggert).
+ * Reagiert auf Scroll, Größenänderungen (ResizeObserver: Viewport-Resize,
+ * Ein-/Ausklappen, Font-Nachladen) UND Inhaltswechsel (MutationObserver:
+ * Re-Render via replaceChildren/insertAdjacentHTML ändert scrollWidth, ohne
+ * dass sich die Elementgröße ändert — der RO allein sähe das nicht).
  *
  * @param {HTMLElement} el
  * @param {Object} [opts]
  * @param {'x'|'y'} [opts.axis='x']
- * @returns {() => void} Aufräumfunktion (Listener/Observer lösen)
+ * @returns {{ update: () => void, destroy: () => void }}
  */
 export function wireScrollFade(el, { axis = 'x' } = {}) {
-  if (!el) return () => {};
+  if (!el) return { update: () => {}, destroy: () => {} };
   const eps = 8; // Toleranz: kein Fade bei minimalem Sub-Pixel-Offset
   const update = () => {
     const pos = axis === 'y' ? el.scrollTop : el.scrollLeft;
@@ -91,11 +92,16 @@ export function wireScrollFade(el, { axis = 'x' } = {}) {
   el.addEventListener('scroll', update, { passive: true });
   const ro = new ResizeObserver(update);
   ro.observe(el);
-  if (el.firstElementChild) ro.observe(el.firstElementChild);
+  const mo = new MutationObserver(update);
+  mo.observe(el, { childList: true, subtree: true });
   update();
-  return () => {
-    el.removeEventListener('scroll', update);
-    ro.disconnect();
+  return {
+    update,
+    destroy: () => {
+      el.removeEventListener('scroll', update);
+      ro.disconnect();
+      mo.disconnect();
+    },
   };
 }
 

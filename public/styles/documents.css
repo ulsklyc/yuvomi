@@ -116,18 +116,10 @@
   font-size: var(--text-sm);
 }
 
-/* Rand-Fade für horizontal scrollende Leisten (Kategorie-Chips + Ordner-Chips).
- * Klassen setzt updateFolderScrollHint(): nur wenn wirklich überlaufend, und am
- * rechten Ende wieder weg. */
-.is-scrollable {
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--space-6)), transparent);
-  mask-image: linear-gradient(to right, #000 calc(100% - var(--space-6)), transparent);
-}
-
-.is-scrollable.is-at-end {
-  -webkit-mask-image: none;
-  mask-image: none;
-}
+/* Rand-Fade für horizontal scrollende Leisten (Kategorie-Chips + Ordner-Chips):
+ * geteilte has-fade-*-Masken aus filter-chip.css, verdrahtet via wireScrollFade
+ * (utils/ux.js, Audit F-06) — die frühere lokale is-scrollable/is-at-end-
+ * Konvention ist darin aufgegangen. */
 
 /* --------------------------------------------------------
  * Auswahl-Modus (Bulk)
@@ -782,7 +774,7 @@
     display: none;
   }
 
-  /* Rand-Fade übernimmt die geteilte .is-scrollable/.is-at-end-Regel oben. */
+  /* Rand-Fade übernehmen die geteilten has-fade-*-Masken (filter-chip.css). */
   .documents-folder-item {
     min-width: 160px;
   }

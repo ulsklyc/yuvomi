@@ -14,6 +14,7 @@
 import { api } from '/api.js';
 import { t, formatDate, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { wireScrollFade } from '/utils/ux.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays } from '/utils/date.js';
 import { openModal, closeModal, confirmModal } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
@@ -462,6 +463,10 @@ function chartTableMarkup(caption, headers, rows) {
 // so löst nicht jeder Tastendruck einen Personen-Reload aus. Der Haupt-Tab-Balken
 // (.health-tabs-bar) liegt außerhalb der Panels und bringt eigene Tastatur mit.
 function wireTablistKeys(root) {
+  // Personen-Chipzeile: Rand-Fade-Affordanz beim Überlaufen (geteilte
+  // has-fade-*-Konvention, Audit F-06). Hier zentral, weil alle sechs Tabs
+  // diesen Helfer nach jedem Panel-Render aufrufen.
+  wireScrollFade(root.querySelector('.health-persons'));
   root.querySelectorAll('[role="tablist"]:not(.health-tabs-bar)').forEach((list) => {
     const tabs = () => [...list.querySelectorAll('[role="tab"]')];
     tabs().forEach((el) => { el.tabIndex = el.getAttribute('aria-selected') === 'true' ? 0 : -1; });

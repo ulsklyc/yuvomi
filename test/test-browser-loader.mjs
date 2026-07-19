@@ -63,6 +63,8 @@ const STUBS = {
   `,
   '/utils/ux.js': `
     export const stagger = () => {};
+    export const vibrate = () => {};
+    export const wireScrollFade = () => ({ update: () => {}, destroy: () => {} });
   `,
   '/utils/html.js': `
     export const esc = (value) => String(value ?? '')

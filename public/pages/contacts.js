@@ -6,7 +6,7 @@
 
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, advancedSection } from '/components/modal.js';
-import { stagger, vibrate } from '/utils/ux.js';
+import { stagger, vibrate, wireScrollFade } from '/utils/ux.js';
 import { t, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -222,7 +222,9 @@ export async function render(container, { user }) {
     },
   });
 
-  // Kategorie-Filter
+  // Kategorie-Filter: Rand-Fade-Affordanz für die scrollende Chipzeile
+  // (geteilte has-fade-*-Konvention, Audit F-06 — Scrollbalken ist versteckt).
+  wireScrollFade(_container.querySelector('#contacts-filters'));
   _container.querySelector('#contacts-filters').addEventListener('click', (e) => {
     const chip = e.target.closest('[data-cat]');
     if (!chip) return;
