@@ -412,6 +412,15 @@
   animation: check-pop 0.2s var(--ease-out);
 }
 
+/* Skalierungs-Pops unter reduzierter Bewegung abschalten (Audit F-07);
+ * der Farbwechsel trägt das Feedback allein. */
+@media (prefers-reduced-motion: reduce) {
+  .task-status-btn--done,
+  .subtask-item__checkbox--done {
+    animation: none;
+  }
+}
+
 .task-status-btn--done::after {
   border-color: var(--color-success);
   background-color: var(--color-success);

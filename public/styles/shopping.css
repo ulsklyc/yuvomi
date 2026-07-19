@@ -470,6 +470,14 @@
   animation: check-pop 0.2s var(--ease-out);
 }
 
+/* Skalierungs-Pop unter reduzierter Bewegung abschalten (Audit F-07);
+ * der Farbwechsel trägt das Feedback allein. */
+@media (prefers-reduced-motion: reduce) {
+  .item-check--checked {
+    animation: none;
+  }
+}
+
 .item-check--checked::before {
   background-color: var(--color-success);
   border-color: var(--color-success);
