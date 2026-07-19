@@ -65,6 +65,7 @@ const STUBS = {
     export const stagger = () => {};
     export const vibrate = () => {};
     export const wireScrollFade = () => ({ update: () => {}, destroy: () => {} });
+    export const scheduleUndoableDelete = () => {};
   `,
   '/utils/html.js': `
     export const esc = (value) => String(value ?? '')

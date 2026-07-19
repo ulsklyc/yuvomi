@@ -946,25 +946,21 @@ async function handleDeleteTask(id, container) {
   const itemEl = container.querySelector(`[data-task-id="${id}"]`);
   if (itemEl) itemEl.style.display = 'none';
 
-  let undone = false;
-  window.yuvomi.showToast(t('tasks.deletedToast'), 'default', 5000, () => {
-    undone = true;
-    if (itemEl) itemEl.style.display = '';
-  });
-
-  setTimeout(async () => {
-    if (undone) return;
-    try {
-      await api.delete(`/tasks/${id}`);
+  scheduleUndoableDelete({
+    message: t('tasks.deletedToast'),
+    commit: async ({ keepalive }) => {
+      await api.delete(`/tasks/${id}`, { keepalive });
       // Erinnerungen für diese Aufgabe ebenfalls entfernen
-      api.delete(`/reminders?entity_type=task&entity_id=${id}`).catch(() => {});
+      api.delete(`/reminders?entity_type=task&entity_id=${id}`, { keepalive }).catch(() => {});
+      if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       refreshReminders();
       await loadTasks(container);
-    } catch (err) {
+    },
+    restore: (err) => {
       if (itemEl) itemEl.style.display = '';
-      window.yuvomi.showToast(err.message ?? t('common.unknownError'), 'danger');
-    }
-  }, 5000);
+      if (err) window.yuvomi.showToast(err.message ?? t('common.unknownError'), 'danger');
+    },
+  });
 }
 
 async function handleAddSubtask(parentId, container) {
@@ -1981,24 +1977,20 @@ function handleBulkDelete(taskIds, container) {
 
   const restore = () => els.forEach(el => { el.style.display = prevDisplay.get(el) ?? ''; });
 
-  let undone = false;
-  window.yuvomi.showToast(t('tasks.bulkDeleted'), 'default', 5000, () => {
-    undone = true;
-    restore();
-  });
-
-  setTimeout(async () => {
-    if (undone) return;
-    try {
-      await Promise.all(taskIds.map(id => api.delete(`/tasks/${id}`)));
-      taskIds.forEach(id => api.delete(`/reminders?entity_type=task&entity_id=${id}`).catch(() => {}));
+  scheduleUndoableDelete({
+    message: t('tasks.bulkDeleted'),
+    commit: async ({ keepalive }) => {
+      await Promise.all(taskIds.map(id => api.delete(`/tasks/${id}`, { keepalive })));
+      taskIds.forEach(id => api.delete(`/reminders?entity_type=task&entity_id=${id}`, { keepalive }).catch(() => {}));
+      if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       refreshReminders();
       await loadTasks(container);
-    } catch (err) {
+    },
+    restore: (err) => {
       restore();
-      window.yuvomi.showToast(err.message ?? t('common.unknownError'), 'danger');
-    }
-  }, 5000);
+      if (err) window.yuvomi.showToast(err.message ?? t('common.unknownError'), 'danger');
+    },
+  });
 }
 
 function wireTaskList(container) {

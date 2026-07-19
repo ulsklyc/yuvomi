@@ -6,7 +6,7 @@
 
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, advancedSection } from '/components/modal.js';
-import { stagger } from '/utils/ux.js';
+import { stagger, scheduleUndoableDelete } from '/utils/ux.js';
 import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -1277,23 +1277,19 @@ async function deleteMeal(mealId) {
   const itemEl = _container.querySelector(`.meal-card[data-meal-id="${mealId}"]`);
   if (itemEl) itemEl.style.display = 'none';
 
-  let undone = false;
-  window.yuvomi?.showToast(t('meals.deletedToast'), 'default', 5000, () => {
-    undone = true;
-    if (itemEl) itemEl.style.display = '';
-  });
-
-  setTimeout(async () => {
-    if (undone) return;
-    try {
-      await api.delete(`/meals/${mealId}`);
+  scheduleUndoableDelete({
+    message: t('meals.deletedToast'),
+    commit: async ({ keepalive }) => {
+      await api.delete(`/meals/${mealId}`, { keepalive });
+      if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       state.meals = state.meals.filter((m) => m.id !== mealId);
       renderWeekGrid();
-    } catch (err) {
+    },
+    restore: (err) => {
       if (itemEl) itemEl.style.display = '';
-      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
-    }
-  }, 5000);
+      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    },
+  });
 }
 
 // --------------------------------------------------------

@@ -7,7 +7,7 @@
 
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, confirmModal, advancedSection } from '/components/modal.js';
-import { stagger, vibrate, wireScrollFade } from '/utils/ux.js';
+import { stagger, vibrate, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
 import { t, formatDate, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
@@ -1920,25 +1920,20 @@ async function deleteLoan(id) {
   state.loans.loans = state.loans.loans.filter((item) => item.id !== id);
   renderBody();
 
-  let undone = false;
-  window.yuvomi?.showToast(t('budget.loanDeletedToast'), 'default', 5000, () => {
-    undone = true;
-    state.loans.loans = [...state.loans.loans, loan];
-    renderBody();
-  });
-
-  setTimeout(async () => {
-    if (undone) return;
-    try {
-      await api.delete(`/budget/loans/${id}`);
+  scheduleUndoableDelete({
+    message: t('budget.loanDeletedToast'),
+    commit: async ({ keepalive }) => {
+      await api.delete(`/budget/loans/${id}`, { keepalive });
+      if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       await loadMonth(state.month);
       renderBody();
-    } catch (err) {
+    },
+    restore: (err) => {
       state.loans.loans = [...state.loans.loans, loan];
       renderBody();
-      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
-    }
-  }, 5000);
+      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    },
+  });
 }
 
 async function deleteLoanPayment(loanId, paymentId) {
@@ -1950,29 +1945,22 @@ async function deleteLoanPayment(loanId, paymentId) {
     renderBody();
   }
 
-  let undone = false;
-  window.yuvomi?.showToast(t('budget.deletedToast'), 'default', 5000, () => {
-    undone = true;
-    if (loan && payment) {
-      loan.payments = [...(loan.payments || []), payment];
-      renderBody();
-    }
-  });
-
-  setTimeout(async () => {
-    if (undone) return;
-    try {
-      await api.delete(`/budget/loans/${loanId}/payments/${paymentId}`);
+  scheduleUndoableDelete({
+    message: t('budget.deletedToast'),
+    commit: async ({ keepalive }) => {
+      await api.delete(`/budget/loans/${loanId}/payments/${paymentId}`, { keepalive });
+      if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       await loadMonth(state.month);
       renderBody();
-    } catch (err) {
+    },
+    restore: (err) => {
       if (loan && payment) {
         loan.payments = [...(loan.payments || []), payment];
         renderBody();
       }
-      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
-    }
-  }, 5000);
+      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    },
+  });
 }
 
 // --------------------------------------------------------
@@ -1997,29 +1985,22 @@ async function deleteEntry(id) {
   renderBody();
   vibrate([30, 50, 30]);
 
-  let undone = false;
-  window.yuvomi?.showToast(t('budget.deletedToast'), 'default', 5000, () => {
-    undone = true;
-    if (entry) {
-      state.entries = [...state.entries, entry].sort((a, b) => new Date(b.date) - new Date(a.date));
-      renderBody();
-    }
-  });
-
-  setTimeout(async () => {
-    if (undone) return;
-    try {
-      await api.delete(`/budget/${id}`);
+  scheduleUndoableDelete({
+    message: t('budget.deletedToast'),
+    commit: async ({ keepalive }) => {
+      await api.delete(`/budget/${id}`, { keepalive });
+      if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       await loadMonth(state.month);
       renderBody();
-    } catch (err) {
+    },
+    restore: (err) => {
       if (entry) {
         state.entries = [...state.entries, entry].sort((a, b) => new Date(b.date) - new Date(a.date));
         renderBody();
       }
-      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
-    }
-  }, 5000);
+      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    },
+  });
 }
 
 // --------------------------------------------------------
@@ -2065,19 +2046,21 @@ async function deleteEntrySeries(id) {
   renderBody();
   vibrate([30, 50, 30]);
 
-  let undone = false;
-  window.yuvomi?.showToast(t('budget.recurringSeriesDeleted'), 'default', 5000, () => { undone = true; });
-
-  setTimeout(async () => {
-    if (undone) return;
-    try {
-      await api.delete(`/budget/${id}/series`);
+  scheduleUndoableDelete({
+    message: t('budget.recurringSeriesDeleted'),
+    commit: async ({ keepalive }) => {
+      await api.delete(`/budget/${id}/series`, { keepalive });
+      if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       await loadMonth(state.month);
       renderBody();
-    } catch (err) {
+    },
+    // Undo stellte bisher nichts wieder her (Serie blieb bis zum nächsten
+    // Reload verschwunden) — jetzt lädt der Monat neu, der Server hat ja
+    // nie gelöscht.
+    restore: async (err) => {
       await loadMonth(state.month);
       renderBody();
-      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
-    }
-  }, 5000);
+      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    },
+  });
 }

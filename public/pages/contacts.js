@@ -6,7 +6,7 @@
 
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, advancedSection } from '/components/modal.js';
-import { stagger, vibrate, wireScrollFade } from '/utils/ux.js';
+import { stagger, vibrate, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { t, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -793,25 +793,15 @@ async function deleteSelected() {
   exitSelectMode();
   vibrate([30, 50, 30]);
 
-  let undone = false;
-  const restore = () => {
-    state.contacts = [...state.contacts, ...removed].sort(byName);
-    renderList();
-  };
-  window.yuvomi?.showToast(t('contacts.bulkDeletedToast', { count: ids.length }), 'default', 5000, () => {
-    undone = true;
-    restore();
+  scheduleUndoableDelete({
+    message: t('contacts.bulkDeletedToast', { count: ids.length }),
+    commit: ({ keepalive }) => Promise.all(ids.map((id) => api.delete(`/contacts/${id}`, { keepalive }))),
+    restore: (err) => {
+      state.contacts = [...state.contacts, ...removed].sort(byName);
+      renderList();
+      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    },
   });
-
-  setTimeout(async () => {
-    if (undone) return;
-    try {
-      await Promise.all(ids.map((id) => api.delete(`/contacts/${id}`)));
-    } catch (err) {
-      restore();
-      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
-    }
-  }, 5000);
 }
 
 async function deleteContact(id) {
@@ -820,27 +810,17 @@ async function deleteContact(id) {
   renderList();
   vibrate([30, 50, 30]);
 
-  let undone = false;
-  window.yuvomi?.showToast(t('contacts.deletedToast'), 'default', 5000, () => {
-    undone = true;
-    if (contact) {
-      state.contacts = [...state.contacts, contact].sort(byName);
-      renderList();
-    }
-  });
-
-  setTimeout(async () => {
-    if (undone) return;
-    try {
-      await api.delete(`/contacts/${id}`);
-    } catch (err) {
+  scheduleUndoableDelete({
+    message: t('contacts.deletedToast'),
+    commit: ({ keepalive }) => api.delete(`/contacts/${id}`, { keepalive }),
+    restore: (err) => {
       if (contact) {
         state.contacts = [...state.contacts, contact].sort(byName);
         renderList();
       }
-      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
-    }
-  }, 5000);
+      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    },
+  });
 }
 
 // --------------------------------------------------------

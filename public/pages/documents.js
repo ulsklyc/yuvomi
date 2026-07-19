@@ -8,7 +8,7 @@ import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal } from '/components/modal.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { stagger, wireScrollFade } from '/utils/ux.js';
+import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 
@@ -974,30 +974,25 @@ function deleteDocuments(docs) {
     renderAll();
   };
 
-  let undone = false;
   const message = docs.length === 1
     ? t('documents.deletedToast')
     : t('documents.bulkDeletedToast', { count: docs.length });
-  window.yuvomi?.showToast(message, 'default', 5000, () => {
-    undone = true;
-    restore();
-  });
-
-  setTimeout(async () => {
-    if (undone) return;
-    try {
-      await Promise.all(docs.map((doc) => api.delete(`/documents/${doc.id}`)));
+  scheduleUndoableDelete({
+    message,
+    commit: async ({ keepalive }) => {
+      await Promise.all(docs.map((doc) => api.delete(`/documents/${doc.id}`, { keepalive })));
       // Seite inzwischen verlassen: die Löschung ist durch, aber es gibt nichts
       // mehr zu zeichnen — kein Nachladen auf einen abgehängten Container.
-      if (_container !== owner) return;
+      if (keepalive || _container !== owner) return;
       await loadDocuments();
       renderAll();
-    } catch (err) {
+    },
+    restore: (err) => {
       if (_container !== owner) return;
       restore();
-      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
-    }
-  }, 5000);
+      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    },
+  });
 }
 
 // --------------------------------------------------------

@@ -960,14 +960,10 @@ function wireListContentEvents(container) {
       updateListCounter(state.activeListId, -1, snapshot?.is_checked ? -1 : 0);
       renderTabs(container);
 
-      let undone = false;
-      window.yuvomi.showToast(
-        t('shopping.itemDeletedToast', { name: snapshot?.name ?? '' }),
-        'default',
-        5000,
-        () => {
-          // Undo: Artikel wiederherstellen
-          undone = true;
+      scheduleUndoableDelete({
+        message: t('shopping.itemDeletedToast', { name: snapshot?.name ?? '' }),
+        commit: ({ keepalive }) => api.delete(`/shopping/items/${id}`, { keepalive }),
+        restore: (err) => {
           if (snapshot) {
             state.items.push(snapshot);
             state.items.sort((a, b) => a.id - b.id);
@@ -975,26 +971,9 @@ function wireListContentEvents(container) {
             updateListCounter(state.activeListId, 1, snapshot.is_checked ? 1 : 0);
             renderTabs(container);
           }
+          if (err) window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
         },
-      );
-
-      // Verzögert löschen — nur wenn kein Undo
-      setTimeout(async () => {
-        if (undone) return;
-        try {
-          await api.delete(`/shopping/items/${id}`);
-        } catch (err) {
-          // Rollback: Artikel war bereits aus UI entfernt, Fehler anzeigen
-          if (snapshot) {
-            state.items.push(snapshot);
-            state.items.sort((a, b) => a.id - b.id);
-            updateItemsList(container);
-            updateListCounter(state.activeListId, 1, snapshot.is_checked ? 1 : 0);
-            renderTabs(container);
-          }
-          window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
-        }
-      }, 5100);
+      });
     }
 
     // ---- Abgehakte löschen (mit Undo, 5s Fenster) ----
@@ -1011,34 +990,18 @@ function wireListContentEvents(container) {
       updateListCounter(state.activeListId, -count, -count);
       renderTabs(container);
 
-      let undone = false;
-      window.yuvomi.showToast(
-        t('shopping.itemsRemovedToast', { count }),
-        'default',
-        5000,
-        () => {
-          undone = true;
+      scheduleUndoableDelete({
+        message: t('shopping.itemsRemovedToast', { count }),
+        commit: ({ keepalive }) => api.delete(`/shopping/${state.activeListId}/items/checked`, { keepalive }),
+        restore: (err) => {
           snapshot.forEach((item) => state.items.push(item));
           state.items.sort((a, b) => a.id - b.id);
           updateItemsList(container);
           updateListCounter(state.activeListId, count, count);
           renderTabs(container);
+          if (err) window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
         },
-      );
-
-      setTimeout(async () => {
-        if (undone) return;
-        try {
-          await api.delete(`/shopping/${state.activeListId}/items/checked`);
-        } catch (err) {
-          snapshot.forEach((item) => state.items.push(item));
-          state.items.sort((a, b) => a.id - b.id);
-          updateItemsList(container);
-          updateListCounter(state.activeListId, count, count);
-          renderTabs(container);
-          window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
-        }
-      }, 5100);
+      });
     }
 
     // ---- Kategorien verwalten ----

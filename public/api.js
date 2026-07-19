@@ -123,9 +123,10 @@ class ApiError extends Error {
 const api = {
   get: (path) => apiFetch(path, { method: 'GET' }),
 
-  post: (path, body) => apiFetch(path, {
+  post: (path, body, opts = {}) => apiFetch(path, {
     method: 'POST',
     body: JSON.stringify(body),
+    ...opts,
   }),
 
   rawPost: (path, body, headers = {}) => apiFetch(path, {
@@ -137,9 +138,12 @@ const api = {
     body,
   }),
 
-  put: (path, body) => apiFetch(path, {
+  // opts (z. B. { keepalive: true }) siehe delete unten — auch Serien-Scope-
+  // Löschungen committen per PUT/POST (UNTIL-Kürzung, EXDATE).
+  put: (path, body, opts = {}) => apiFetch(path, {
     method: 'PUT',
     body: JSON.stringify(body),
+    ...opts,
   }),
 
   patch: (path, body) => apiFetch(path, {
@@ -147,7 +151,10 @@ const api = {
     body: JSON.stringify(body),
   }),
 
-  delete: (path) => apiFetch(path, { method: 'DELETE' }),
+  // opts erlaubt fetch-Optionen wie { keepalive: true } — genutzt vom
+  // pagehide-Flush des Undo-Löschmusters (utils/ux.js, Audit F-13), damit der
+  // Request auch beim Schließen/Neuladen des Tabs noch abgesetzt wird.
+  delete: (path, opts = {}) => apiFetch(path, { method: 'DELETE', ...opts }),
 };
 
 // --------------------------------------------------------

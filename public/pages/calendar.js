@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
 import { openModal as openSharedModal, closeModal, advancedSection } from '/components/modal.js';
-import { stagger, wireScrollFade } from '/utils/ux.js';
+import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { t, formatDate as formatPreferredDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation } from '/utils/html.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder } from '/utils/date.js';
@@ -3169,29 +3169,22 @@ async function deleteEvent(id) {
   state.events = state.events.filter((e) => e.id !== id);
   renderView();
 
-  let undone = false;
-  window.yuvomi?.showToast(t('calendar.deletedToast'), 'default', 5000, () => {
-    undone = true;
-    if (event) {
-      state.events = [...state.events, event];
-      renderView();
-    }
-  });
-
-  setTimeout(async () => {
-    if (undone) return;
-    try {
-      await api.delete(`/calendar/${id}`);
-      api.delete(`/reminders?entity_type=event&entity_id=${id}`).catch(() => {});
+  scheduleUndoableDelete({
+    message: t('calendar.deletedToast'),
+    commit: async ({ keepalive }) => {
+      await api.delete(`/calendar/${id}`, { keepalive });
+      api.delete(`/reminders?entity_type=event&entity_id=${id}`, { keepalive }).catch(() => {});
+      if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       refreshReminders();
-    } catch (err) {
+    },
+    restore: (err) => {
       if (event) {
         state.events = [...state.events, event];
         renderView();
       }
-      window.yuvomi?.showToast(err.data?.error ?? t('calendar.deleteError'), 'danger');
-    }
-  }, 5000);
+      if (err) window.yuvomi?.showToast(err.data?.error ?? t('calendar.deleteError'), 'danger');
+    },
+  });
 }
 
 /**
@@ -3319,25 +3312,20 @@ async function deleteThisAndFollowing(event) {
   state.events  = state.events.filter((e) => !affects(e));
   renderView();
 
-  let undone = false;
-  window.yuvomi?.showToast(t('calendar.deletedToast'), 'default', 5000, () => {
-    undone = true;
-    state.events = [...state.events, ...removed];
-    renderView();
-  });
-
-  setTimeout(async () => {
-    if (undone) return;
-    try {
-      await api.put(`/calendar/${event.id}`, { recurrence_rule: newRule });
+  scheduleUndoableDelete({
+    message: t('calendar.deletedToast'),
+    commit: async ({ keepalive }) => {
+      await api.put(`/calendar/${event.id}`, { recurrence_rule: newRule }, { keepalive });
+      if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       // Verbleibende Instanzen tragen künftig die gekürzte Regel.
       for (const e of state.events) if (e.id === event.id) e.recurrence_rule = newRule;
-    } catch (err) {
+    },
+    restore: (err) => {
       state.events = [...state.events, ...removed];
       renderView();
-      window.yuvomi?.showToast(err.data?.error ?? t('calendar.deleteError'), 'danger');
-    }
-  }, 5000);
+      if (err) window.yuvomi?.showToast(err.data?.error ?? t('calendar.deleteError'), 'danger');
+    },
+  });
 }
 
 /**
@@ -3351,21 +3339,13 @@ async function deleteSingleOccurrence(event) {
   state.events     = state.events.filter((e) => !matches(e));
   renderView();
 
-  let undone = false;
-  window.yuvomi?.showToast(t('calendar.deletedToast'), 'default', 5000, () => {
-    undone = true;
-    state.events = [...state.events, ...removed];
-    renderView();
-  });
-
-  setTimeout(async () => {
-    if (undone) return;
-    try {
-      await api.post(`/calendar/${event.id}/exceptions`, { date });
-    } catch (err) {
+  scheduleUndoableDelete({
+    message: t('calendar.deletedToast'),
+    commit: ({ keepalive }) => api.post(`/calendar/${event.id}/exceptions`, { date }, { keepalive }),
+    restore: (err) => {
       state.events = [...state.events, ...removed];
       renderView();
-      window.yuvomi?.showToast(err.data?.error ?? t('calendar.deleteError'), 'danger');
-    }
-  }, 5000);
+      if (err) window.yuvomi?.showToast(err.data?.error ?? t('calendar.deleteError'), 'danger');
+    },
+  });
 }

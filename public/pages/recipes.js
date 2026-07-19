@@ -9,6 +9,7 @@ import { openModal as openSharedModal, closeModal as closeSharedModal, advancedS
 import { DEFAULT_CATEGORY_NAME } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
 import { ingredientRowHTML } from '/utils/ingredient-row.js';
+import { scheduleUndoableDelete } from '/utils/ux.js';
 import { normalizeRecipeMealTypes, RECIPE_MEAL_TYPE_KEYS } from '/utils/recipe-meal-types.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 
@@ -396,23 +397,19 @@ async function removeRecipe(recipe) {
   const itemEl = _container.querySelector(`.recipe-card[data-id="${recipe.id}"]`);
   if (itemEl) itemEl.style.display = 'none';
 
-  let undone = false;
-  window.yuvomi?.showToast(t('recipes.deleted'), 'default', 5000, () => {
-    undone = true;
-    if (itemEl) itemEl.style.display = '';
-  });
-
-  setTimeout(async () => {
-    if (undone) return;
-    try {
-      await api.delete(`/recipes/${recipe.id}`);
+  scheduleUndoableDelete({
+    message: t('recipes.deleted'),
+    commit: async ({ keepalive }) => {
+      await api.delete(`/recipes/${recipe.id}`, { keepalive });
+      if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       state.recipes = state.recipes.filter((r) => r.id !== recipe.id);
       renderRecipeList();
-    } catch (err) {
+    },
+    restore: (err) => {
       if (itemEl) itemEl.style.display = '';
-      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
-    }
-  }, 5000);
+      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    },
+  });
 }
 
 async function duplicateRecipe(recipe) {

@@ -6,7 +6,7 @@
 
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, btnError, advancedSection } from '/components/modal.js';
-import { stagger, vibrate } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete } from '/utils/ux.js';
 import { t } from '/i18n.js';
 import { esc, renderMarkdownLight } from '/utils/html.js';
 import { getReadableTextColor } from '/utils/color.js';
@@ -743,25 +743,15 @@ async function deleteNote(id) {
   renderGrid();
   vibrate([30, 50, 30]);
 
-  let undone = false;
-  window.yuvomi?.showToast(t('notes.deletedToast'), 'default', 5000, () => {
-    undone = true;
-    if (note) {
-      state.notes = [...state.notes, note].sort((a, b) => b.pinned - a.pinned);
-      renderGrid();
-    }
-  });
-
-  setTimeout(async () => {
-    if (undone) return;
-    try {
-      await api.delete(`/notes/${id}`);
-    } catch (err) {
+  scheduleUndoableDelete({
+    message: t('notes.deletedToast'),
+    commit: ({ keepalive }) => api.delete(`/notes/${id}`, { keepalive }),
+    restore: (err) => {
       if (note) {
         state.notes = [...state.notes, note].sort((a, b) => b.pinned - a.pinned);
         renderGrid();
       }
-      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
-    }
-  }, 5000);
+      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    },
+  });
 }

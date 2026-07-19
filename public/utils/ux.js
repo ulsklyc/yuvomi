@@ -41,6 +41,67 @@ export function vibrate(pattern) {
   navigator.vibrate(pattern);
 }
 
+// --------------------------------------------------------
+// Verzögertes Löschen mit Undo-Fenster (kanonisches Muster, Audit F-13)
+// --------------------------------------------------------
+
+const _pendingDeletes = new Set();
+let _deleteFlushBound = false;
+
+function bindDeleteFlush() {
+  if (_deleteFlushBound) return;
+  _deleteFlushBound = true;
+  // Tab-Schließen/Reload innerhalb des Undo-Fensters: offene Löschungen sofort
+  // mit keepalive-Fetch abschicken, statt sie stillschweigend zu verlieren —
+  // sonst „kam der Eintrag zurück", obwohl die UI ihn längst entfernt hatte.
+  window.addEventListener('pagehide', () => {
+    for (const entry of [..._pendingDeletes]) entry.flush();
+  });
+}
+
+/**
+ * Kanonisches Undo-Löschmuster: UI sofort aktualisieren (macht der Aufrufer),
+ * Server-Delete erst nach Ablauf des Undo-Fensters. Deckt die Lücke des
+ * bisherigen Inline-Musters: bei Reload/Tab-Schließen im Fenster wird der
+ * Delete jetzt per keepalive nachgereicht statt verloren.
+ *
+ * @param {Object} opts
+ * @param {(ctx: { keepalive: boolean }) => Promise<void>} opts.commit
+ *        Führt den Server-Delete aus; ctx.keepalive an api.delete durchreichen.
+ * @param {(err?: Error) => void} [opts.restore]
+ *        Stellt die UI wieder her — bei Undo (ohne err) und bei fehl-
+ *        geschlagenem Commit (mit err; dort auch Fehlermeldung zeigen).
+ * @param {string} opts.message  - Toast-Text
+ * @param {number} [opts.duration=5000] - Undo-Fenster in ms
+ */
+export function scheduleUndoableDelete({ commit, restore, message, duration = 5000 }) {
+  bindDeleteFlush();
+  let settled = false;
+  const entry = {};
+  const finish = async ({ keepalive = false } = {}) => {
+    if (settled) return;
+    settled = true;
+    _pendingDeletes.delete(entry);
+    clearTimeout(entry.timer);
+    try {
+      await commit({ keepalive });
+    } catch (err) {
+      // Beim pagehide-Flush ist die Seite weg — kein UI-Restore mehr möglich.
+      if (!keepalive) restore?.(err);
+    }
+  };
+  entry.flush = () => { finish({ keepalive: true }); };
+  entry.timer = setTimeout(() => finish(), duration);
+  _pendingDeletes.add(entry);
+  window.yuvomi?.showToast(message, 'default', duration, () => {
+    if (settled) return;
+    settled = true;
+    _pendingDeletes.delete(entry);
+    clearTimeout(entry.timer);
+    restore?.();
+  });
+}
+
 /**
  * Führt eine DELETE-Aktion aus und zeigt einen Undo-Toast.
  *
