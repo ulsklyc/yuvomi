@@ -2177,6 +2177,7 @@
         "dmsLinkBtn": "Привязать",
         "dmsLinked": "Из DMS",
         "dmsOpenExternal": "Открыть в DMS",
+        "dmsPreviewOpen": "Увеличить предпросмотр",
         "pushToDms": "Загрузить в DMS",
         "pushToDmsQueued": "Документ добавлен в DMS и обрабатывается там.",
         "dmsAccountLabel": "Аккаунт DMS",

@@ -2190,6 +2190,7 @@
         "dmsLinkBtn": "연결",
         "dmsLinked": "DMS에서",
         "dmsOpenExternal": "DMS에서 열기",
+        "dmsPreviewOpen": "미리보기 확대",
         "pushToDms": "DMS에 업로드",
         "pushToDmsQueued": "문서가 DMS에 추가되어 처리 중입니다.",
         "dmsAccountLabel": "DMS 계정",

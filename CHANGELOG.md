@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.37.1] - 2026-07-19
+
+### Fixed
+- The document preview in the DMS link dialog is large enough to recognise a document by. At 40×40 it showed a grey smudge and the filename remained the only way to tell two documents apart; the tile is now page-shaped and cropped from the top, so the header of the page stays readable. Selecting it opens a full-size preview over the dialog, with "open in DMS" and "link" right there — Escape closes the preview first, not the whole dialog. Where no thumbnail exists (Papra, or a failed fetch), the tile falls back to the direct link into the DMS as before.
+
 ## [1.37.0] - 2026-07-19
 
 ### Added

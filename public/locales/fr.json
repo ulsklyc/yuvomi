@@ -2177,6 +2177,7 @@
         "dmsLinkBtn": "Lier",
         "dmsLinked": "Depuis DMS",
         "dmsOpenExternal": "Ouvrir dans le DMS",
+        "dmsPreviewOpen": "Agrandir l'aperçu",
         "pushToDms": "Envoyer vers le DMS",
         "pushToDmsQueued": "Le document a été ajouté au DMS et y est en cours de traitement.",
         "dmsAccountLabel": "Compte DMS",

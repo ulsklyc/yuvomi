@@ -2177,6 +2177,7 @@
         "dmsLinkBtn": "链接",
         "dmsLinked": "来自 DMS",
         "dmsOpenExternal": "在 DMS 中打开",
+        "dmsPreviewOpen": "放大预览",
         "pushToDms": "上传至 DMS",
         "pushToDmsQueued": "文档已添加到 DMS 并在那里处理中。",
         "dmsAccountLabel": "DMS 账户",

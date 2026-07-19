@@ -853,8 +853,14 @@ visibility-enforced) and the link picker previews DMS hits before linking
 (`GET /documents/dms/thumbnail`, admin-only, keyed by account + DMS document id). Both proxy the
 adapter's thumbnail (Paperless `/thumb/`; providers without one degrade to the category glyph),
 serve only a raster-image allowlist (`png/jpeg/webp/gif`, no SVG) with `nosniff` and a strict CSP,
-and the client falls back to the icon when no thumbnail can be generated. The picker preview links
-out to the original in the DMS. (v1.32.0)
+and the client falls back to the icon when no thumbnail can be generated. (v1.32.0)
+
+In the link picker the preview is rendered page-shaped (72×96, top-anchored crop) so the header of
+the document stays readable, and selecting it opens a full-size preview layered over the picker with
+"open in DMS" and "link" actions. The layer is not a second modal — the shared modal system holds
+exactly one overlay — so it captures Escape ahead of the modal handler and closes only itself. Where
+no thumbnail exists (Papra, or a failed fetch), the tile degrades to the previous direct link into
+the DMS. (v1.37.1)
 
 PDF preview renders inline everywhere: browsers with a built-in PDF viewer (desktop) use a
 same-origin `<iframe>`, while browsers without one (iOS Safari and most mobile browsers, where an

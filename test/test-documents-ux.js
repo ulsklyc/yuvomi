@@ -225,6 +225,28 @@ test('die DMS-Verknüpfung erbt nicht stillschweigend das aktive Filter-Chip', (
   assert.doesNotMatch(linkCall, /state\.category/);
 });
 
+test('die DMS-Vorschau ist groß genug zum Erkennen und lässt sich vergrößern (#536)', () => {
+  // 40x40 zeigte nur einen grauen Fleck: die Kachel steht jetzt im Seitenformat
+  // und der Seitenkopf bleibt sichtbar, statt mittig weggeschnitten zu werden.
+  const media = css.slice(css.indexOf('.dms-result__media {'), css.indexOf('.dms-result__media svg'));
+  assert.match(media, /width:\s*72px/);
+  assert.match(media, /height:\s*96px/);
+  assert.match(css, /\.dms-result__thumb\s*\{[^}]*object-position:\s*top/);
+
+  // Klick auf die Kachel öffnet die große Vorschau - kein zweites openModal,
+  // weil das Modal-System genau ein Overlay hält.
+  assert.match(page, /function openDmsPreview\(/);
+  assert.ok(page.includes("t('documents.dmsPreviewOpen')"));
+  const preview = page.slice(page.indexOf('function openDmsPreview('), page.indexOf('function readFileAsDataUrl'));
+  assert.doesNotMatch(preview, /openSharedModal|openModal\(/);
+  // Escape schließt zuerst nur die Vorschau (Capture-Phase vor dem Modal-Handler).
+  assert.match(preview, /addEventListener\('keydown', onKey, true\)/);
+  assert.match(preview, /e\.stopPropagation\(\)/);
+  // Verknüpfen ist direkt aus der Vorschau möglich und teilt sich den Pfad mit der Liste.
+  assert.ok(preview.includes("t('documents.dmsLinkBtn')"));
+  assert.match(page, /async function linkDmsDocument\(/);
+});
+
 test('Mehrfachauswahl ist opt-in und standardmäßig verborgen', () => {
   assert.match(page, /id="documents-selectbar"[^>]*hidden>/);
   // `.btn` und die Selectbar setzen ein eigenes display und schlagen sonst das

@@ -1213,40 +1213,60 @@
   background: var(--color-surface-2);
 }
 
+/* Seitenformat statt Briefmarke (Issue #536): 40px zeigten nur einen grauen
+   Fleck. 72x96 im Papierverhältnis macht Kopfzeile, Logo und Betreff erkennbar,
+   ohne die Trefferliste aufzublähen. */
 .dms-result__media {
   position: relative;
   flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
+  width: 72px;
+  height: 96px;
+  padding: 0;
+  border: 1px solid var(--color-border);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   overflow: hidden;
   background: color-mix(in srgb, var(--module-accent) 12%, transparent);
   color: var(--module-accent);
 }
 
 .dms-result__media svg {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
 }
 
+/* Dokumente werden von oben gelesen: der Kopf der Seite bleibt sichtbar,
+   abgeschnitten wird unten. */
 .dms-result__thumb {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: top center;
   background: var(--color-surface-2);
+}
+
+@media (max-width: 480px) {
+  .dms-result__media {
+    width: 56px;
+    height: 76px;
+  }
 }
 
 /* Ist die Vorschau ein Link ins DMS, taucht beim Hover/Fokus ein Öffnen-Symbol
    über der Kachel auf - eine kleine Belohnung dafür, dass die Vorschau mehr kann
    als nur zeigen (Issue #533). */
-.dms-result__media--link {
+.dms-result__media--link,
+.dms-result__media--action {
   cursor: pointer;
   text-decoration: none;
+}
+
+.dms-result__media--action:disabled {
+  cursor: default;
 }
 
 .dms-result__open {
@@ -1261,16 +1281,19 @@
 }
 
 .dms-result__open svg {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
 }
 
 .dms-result__media--link:hover .dms-result__open,
-.dms-result__media--link:focus-visible .dms-result__open {
+.dms-result__media--link:focus-visible .dms-result__open,
+.dms-result__media--action:not(:disabled):hover .dms-result__open,
+.dms-result__media--action:not(:disabled):focus-visible .dms-result__open {
   opacity: 1;
 }
 
-.dms-result__media--link:focus-visible {
+.dms-result__media--link:focus-visible,
+.dms-result__media--action:focus-visible {
   outline: 2px solid var(--color-focus-ring, var(--module-accent));
   outline-offset: 2px;
 }
@@ -1279,6 +1302,96 @@
   .dms-result__open {
     transition: none;
   }
+}
+
+/* --------------------------------------------------------
+   Große DMS-Vorschau über dem Auswahl-Modal (Issue #536)
+   -------------------------------------------------------- */
+
+.dms-preview {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-modal) + 1);
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: var(--color-overlay);
+}
+
+.dms-preview__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(560px, 100%);
+  max-height: 90vh;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.dms-preview__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.dms-preview__title {
+  margin: 0;
+  min-width: 0;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.dms-preview__close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.dms-preview__close:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text-primary);
+}
+
+.dms-preview__close svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Die Vorschau darf wachsen, aber nie über das Panel hinaus - deshalb scrollt
+   die Fläche selbst, statt das ganze Panel zu sprengen. */
+.dms-preview__figure {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.dms-preview__img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.dms-preview__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .dms-result__text {

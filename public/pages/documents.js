@@ -1530,18 +1530,35 @@ function renderDmsResults(container, items, accountId) {
     const li = document.createElement('li');
     li.className = 'dms-result';
 
-    // Kompakte Vorschau (Issue #533): Thumbnail der ersten Seite mit Glyph-Fallback.
-    // Ist eine gültige DMS-URL vorhanden, wird die Kachel zum Link, der das Original
-    // im DMS öffnet - so lässt sich vor dem Verknüpfen prüfen, ob es das richtige ist.
+    // Vorschau (Issue #533, vergrößert in #536): Thumbnail der ersten Seite im
+    // Seitenformat statt als Briefmarke, mit Glyph-Fallback. Ein Klick öffnet die
+    // große Vorschau im Modal - erst dort entscheidet man, ob es das richtige
+    // Dokument ist. Ohne Thumbnail bleibt es beim Direktlink ins DMS.
     const canOpen = /^https?:\/\//i.test(item.url || '');
-    const media = document.createElement(canOpen ? 'a' : 'span');
-    media.className = canOpen ? 'dms-result__media dms-result__media--link' : 'dms-result__media';
-    if (canOpen) {
+    let media;
+    if (supportsThumb) {
+      media = document.createElement('button');
+      media.type = 'button';
+      media.className = 'dms-result__media dms-result__media--action';
+      setMediaAffordance(media, t('documents.dmsPreviewOpen'));
+      media.addEventListener('click', () => {
+        const thumb = media.querySelector('img[data-thumb]');
+        if (thumb && !thumb.hidden) {
+          openDmsPreview({ item, src: thumb.src, canOpen, onLink: () => linkDmsDocument(item, accountId) });
+        } else if (canOpen) {
+          window.open(item.url, '_blank', 'noopener,noreferrer');
+        }
+      });
+    } else if (canOpen) {
+      media = document.createElement('a');
+      media.className = 'dms-result__media dms-result__media--link';
       media.href = item.url;
       media.target = '_blank';
       media.rel = 'noopener noreferrer';
-      media.title = t('documents.dmsOpenExternal');
-      media.setAttribute('aria-label', t('documents.dmsOpenExternal'));
+      setMediaAffordance(media, t('documents.dmsOpenExternal'));
+    } else {
+      media = document.createElement('span');
+      media.className = 'dms-result__media';
     }
     media.insertAdjacentHTML('beforeend', `<span class="dms-result__glyph" data-thumb-icon><i data-lucide="file-text" aria-hidden="true"></i></span>`);
     if (supportsThumb) {
@@ -1550,15 +1567,26 @@ function renderDmsResults(container, items, accountId) {
       img.dataset.thumb = '';
       img.loading = 'lazy';
       img.alt = '';
-      img.width = 40;
-      img.height = 40;
+      img.width = 72;
+      img.height = 96;
       img.hidden = true;
       img.src = `/api/v1/documents/dms/thumbnail?account_id=${encodeURIComponent(accountId)}&dms_document_id=${encodeURIComponent(item.id)}`;
+      // Ohne Thumbnail gibt es nichts zu vergrößern: die Kachel fällt auf den
+      // DMS-Direktlink zurück bzw. wird zur reinen Anzeige.
+      img.addEventListener('error', () => {
+        if (canOpen) setMediaAffordance(media, t('documents.dmsOpenExternal'));
+        else {
+          media.disabled = true;
+          media.removeAttribute('title');
+          media.removeAttribute('aria-label');
+        }
+      }, { once: true });
       media.appendChild(img);
     }
-    if (canOpen) {
-      // Hover-Verrät: ein Öffnen-Symbol taucht über der Vorschau auf.
-      media.insertAdjacentHTML('beforeend', `<span class="dms-result__open" aria-hidden="true"><i data-lucide="external-link"></i></span>`);
+    if (supportsThumb || canOpen) {
+      // Hover-Verrät: ein Lupen- bzw. Öffnen-Symbol taucht über der Vorschau auf.
+      const glyph = supportsThumb ? 'zoom-in' : 'external-link';
+      media.insertAdjacentHTML('beforeend', `<span class="dms-result__open" aria-hidden="true"><i data-lucide="${glyph}"></i></span>`);
     }
 
     const text = document.createElement('span');
@@ -1583,23 +1611,8 @@ function renderDmsResults(container, items, accountId) {
 
     btn.addEventListener('click', async () => {
       btn.disabled = true;
-      try {
-        // Feste, vorhersagbare Kategorie: früher erbte das verknüpfte Dokument
-        // stillschweigend das gerade aktive Filter-Chip, was nirgends stand.
-        // Anpassen geht danach über „Bearbeiten".
-        await api.post('/documents/dms/link', {
-          account_id: accountId,
-          dms_document_id: item.id,
-          category: 'other',
-          visibility: 'family',
-        });
-        closeModal({ force: true });
-        await loadDocuments();
-        renderAll();
-      } catch (err) {
-        btn.disabled = false;
-        window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
-      }
+      const ok = await linkDmsDocument(item, accountId);
+      if (!ok) btn.disabled = false;
     });
 
     li.append(media, text, btn);
@@ -1607,6 +1620,120 @@ function renderDmsResults(container, items, accountId) {
   }
   if (window.lucide) lucide.createIcons({ el: container });
   wireThumbnails(container);
+}
+
+// Titel und Screenreader-Label einer Vorschaukachel gemeinsam setzen - beide
+// beschreiben dieselbe Aktion und dürfen nie auseinanderlaufen.
+function setMediaAffordance(el, label) {
+  el.title = label;
+  el.setAttribute('aria-label', label);
+}
+
+// Verknüpft ein DMS-Dokument mit der Dokumentenliste. Gibt true bei Erfolg zurück,
+// damit der auslösende Button im Fehlerfall wieder bedienbar wird.
+async function linkDmsDocument(item, accountId) {
+  try {
+    // Feste, vorhersagbare Kategorie: früher erbte das verknüpfte Dokument
+    // stillschweigend das gerade aktive Filter-Chip, was nirgends stand.
+    // Anpassen geht danach über „Bearbeiten".
+    await api.post('/documents/dms/link', {
+      account_id: accountId,
+      dms_document_id: item.id,
+      category: 'other',
+      visibility: 'family',
+    });
+    closeModal({ force: true });
+    await loadDocuments();
+    renderAll();
+    return true;
+  } catch (err) {
+    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    return false;
+  }
+}
+
+// Große Vorschau über dem Auswahl-Modal (Issue #536): die Kachel in der Liste
+// bleibt kompakt, das Dokument wird trotzdem lesbar geprüft, bevor man verknüpft.
+// Bewusst kein zweites openModal - das Modal-System hält genau ein Overlay.
+function openDmsPreview({ item, src, canOpen, onLink }) {
+  const panel = document.querySelector('#shared-modal-overlay .modal-panel');
+  if (!panel) return;
+  const opener = document.activeElement;
+
+  const layer = document.createElement('div');
+  layer.className = 'dms-preview';
+  layer.setAttribute('role', 'dialog');
+  layer.setAttribute('aria-modal', 'true');
+  layer.setAttribute('aria-label', item.title);
+
+  const box = document.createElement('div');
+  box.className = 'dms-preview__panel';
+
+  const header = document.createElement('div');
+  header.className = 'dms-preview__header';
+  const heading = document.createElement('p');
+  heading.className = 'dms-preview__title';
+  heading.textContent = item.title;
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'dms-preview__close';
+  close.setAttribute('aria-label', t('common.close'));
+  close.insertAdjacentHTML('beforeend', '<i data-lucide="x" aria-hidden="true"></i>');
+  header.append(heading, close);
+
+  const figure = document.createElement('div');
+  figure.className = 'dms-preview__figure';
+  const img = document.createElement('img');
+  img.className = 'dms-preview__img';
+  img.src = src;
+  img.alt = '';
+  figure.appendChild(img);
+
+  const actions = document.createElement('div');
+  actions.className = 'dms-preview__actions';
+  if (canOpen) {
+    const open = document.createElement('a');
+    open.className = 'btn btn--secondary';
+    open.href = item.url;
+    open.target = '_blank';
+    open.rel = 'noopener noreferrer';
+    open.textContent = t('documents.dmsOpenExternal');
+    actions.appendChild(open);
+  }
+  const link = document.createElement('button');
+  link.type = 'button';
+  link.className = 'btn btn--primary';
+  link.textContent = t('documents.dmsLinkBtn');
+  link.addEventListener('click', async () => {
+    link.disabled = true;
+    const ok = await onLink();
+    if (!ok) link.disabled = false;
+  });
+  actions.appendChild(link);
+
+  box.append(header, figure, actions);
+  layer.appendChild(box);
+
+  const dismiss = () => {
+    document.removeEventListener('keydown', onKey, true);
+    layer.remove();
+    opener?.focus?.();
+  };
+  // Capture-Phase: das Modal schließt auf Escape über einen Listener am document.
+  // Hier wird das Ereignis abgefangen, damit Escape zuerst nur die Vorschau
+  // schließt und nicht gleich die ganze Auswahl wegräumt.
+  const onKey = (e) => {
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    dismiss();
+  };
+  document.addEventListener('keydown', onKey, true);
+  close.addEventListener('click', dismiss);
+  layer.addEventListener('click', (e) => { if (e.target === layer) dismiss(); });
+
+  panel.appendChild(layer);
+  if (window.lucide) lucide.createIcons({ el: layer });
+  close.focus();
 }
 
 function readFileAsDataUrl(file) {
