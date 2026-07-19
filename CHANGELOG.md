@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.39.0] - 2026-07-19
+
+App-wide UX/UI audit (all modules, light/dark, desktop/mobile). The findings, the priorities and what was deliberately left alone are documented in `docs/ux-audit/`.
+
+### Added
+- Every horizontally scrolling chip and tab row signals hidden content with a soft edge fade: budget tabs, document category chips, contact categories, the health person switcher and the mobile calendar view switcher share one mechanism that reacts to scrolling, resizing and content changes. The budget tab bar previously clipped its last tab on narrow desktops without any hint that more tabs existed.
+
+### Changed
+- The desktop sidebar keeps the active module in view: navigating to a module below the fold scrolls it into sight, soft fades at the top and bottom edges replace the hidden scrollbar as an overflow hint, and a tighter item height lets all modules fit on common laptop screens. Previously Budget, Health and Settings were simply invisible on a 1440x900 display, with nothing suggesting the list scrolls.
+- Deleting a whole shopping list now asks for confirmation, since it takes all its items with it; single items and the checked-items sweep keep the 5-second undo toast. This mirrors the Budget convention where confirmation is reserved for cascading deletions.
+- The shopping category dialog uses the same shared category manager as Tasks, Contacts and Budget, including the category icons in its rows and localized in-use/last-category error messages.
+- The add button in the shopping quick-add row follows the module color instead of the global accent, matching the floating action button on the same screen.
+
+### Fixed
+- The edit and delete actions on shopping items are visible again. They used the disabled text color with additional transparency (roughly 1.2:1 contrast) and were effectively invisible on phones, where the hover reveal never happens.
+- The shopping list header no longer collapses into ragged rows on phones: the list name gets its own line, all actions share a single row, and the "clear checked" label shortens with an ellipsis instead of pushing an orphaned icon onto a third row.
+- The meal plan week board is readable on smaller desktops (1024-1439px): day headers show a compact date without the year, meal type labels truncate with a real ellipsis, entry titles wrap to two hyphenated lines, and the recipe sidebar narrows so seven day columns keep usable width. Headers previously collided ("MO13.07.202") and entries were cut after a handful of characters.
+- Deleting something and closing or reloading the tab within the undo window no longer loses the deletion. The server call only ran after the 5-second undo period, so leaving early meant the entry quietly reappeared on the next visit; pending deletions are now flushed with a keepalive request when the page is left. Undoing the deletion of a recurring budget series also restores the view immediately instead of leaving it empty until the next reload.
+- Keyboard focus is clearly visible on the shopping quantity and category fields, the profile picture button in Settings, subscription provider suggestions and contact row menus. The checkbox "pop" animation respects the reduced-motion preference.
+- Module names in the mobile "More" sheet hyphenate at proper syllable boundaries with a visible hyphen instead of breaking mid-word at whatever character happened to hit the edge.
+- The "Sauerstoffsättigung" label no longer overflows its tile on the health overview.
+- The one remaining formal-address string in the German locale (geolocation not supported, "Ihrem Browser") now uses the informal address like the rest of the app.
+
 ## [1.38.0] - 2026-07-19
 
 ### Added
