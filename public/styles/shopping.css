@@ -478,7 +478,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Löschen-Button */
+/* Löschen-Button — folgt der geteilten .row-action-Grammatik (Audit F-02):
+ * ruhender Zustand dauerhaft sichtbar in Tertiär-Tinte (≥3:1, WCAG 1.4.11),
+ * kein Opacity-Reveal als einzige Sichtbarkeit. Geometrie bleibt --target-base
+ * (gepinnt in test-frontend-audit). Auf Mobile ersetzt Swipe den Button. */
 .item-delete {
   width: var(--target-base);
   height: var(--target-base);
@@ -486,13 +489,12 @@
   min-height: var(--target-base);
   border-radius: var(--radius-sm);
   background: none;
-  color: var(--color-text-disabled);
+  color: var(--color-text-tertiary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--transition-fast), color var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
   position: relative;
   border: none;
   flex-shrink: 0;
@@ -504,12 +506,10 @@
   inset: 0;
 }
 
-.shopping-item:hover .item-delete,
-.shopping-item:focus-within .item-delete {
-  opacity: 1;
+.item-delete:hover {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
 }
-
-.item-delete:hover { color: var(--color-danger); }
 
 /* Detail-Indikatoren (Link/Notiz) inline hinter dem Namen — dezent. */
 .item-meta {
@@ -530,8 +530,9 @@
   color: var(--color-text-disabled);
 }
 
-/* Details-Button (URL/Notiz bearbeiten). Anders als der Löschen-Button bleibt er
- * auf Touch erreichbar (kein Hover-Reveal), da es keine Swipe-Alternative gibt. */
+/* Details-Button (URL/Notiz bearbeiten). Muss auf Touch ohne Hover erkennbar
+ * sein (keine Swipe-Alternative) — daher wie .row-action dauerhaft sichtbar in
+ * Tertiär-Tinte statt Disabled-Farbe + Opacity (Audit F-02, WCAG 1.4.11). */
 .item-details {
   width: var(--target-base);
   height: var(--target-base);
@@ -539,23 +540,20 @@
   min-height: var(--target-base);
   border-radius: var(--radius-sm);
   background: none;
-  color: var(--color-text-disabled);
+  color: var(--color-text-tertiary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  opacity: 0.55;
-  transition: opacity var(--transition-fast), color var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
   border: none;
   flex-shrink: 0;
 }
 
-.shopping-item:hover .item-details,
-.shopping-item:focus-within .item-details {
-  opacity: 1;
+.item-details:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
 }
-
-.item-details:hover { color: var(--color-text-secondary); }
 
 /* Klickbare Link-Vorschau im Detail-Drawer. */
 .item-details__link-wrap:not(:empty) {
@@ -600,18 +598,12 @@
   box-shadow: var(--shadow-lg);
 }
 
-/* × Löschen-Button auf Mobile ausblenden - Swipe übernimmt */
+/* × Löschen-Button auf Mobile ausblenden - Swipe übernimmt.
+ * (Die frühere mobile Sichtbarkeits-Korrektur für .item-details ist seit der
+ * Basis-Regel oben — dauerhaft tertiär, ohne Opacity — überflüssig.) */
 @media (max-width: 1023px) {
   .item-delete {
     display: none;
-  }
-
-  /* Der Bearbeiten-Button ist mobil die einzige sichtbare Inline-Aktion
-   * (Löschen per Swipe). Ohne Hover muss er voll sichtbar und lesbar sein,
-   * statt im Disabled-Grau bei opacity 0.55 zu verschwinden (Audit F10). */
-  .item-details {
-    opacity: 1;
-    color: var(--color-text-tertiary);
   }
 }
 
