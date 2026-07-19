@@ -379,10 +379,15 @@
   transition: background-color var(--transition-fast);
 }
 
-.contact-menu-item:hover,
+.contact-menu-item:hover {
+  background-color: var(--color-surface-2);
+}
+
+/* Tastatur-Fokus mit Inset-Ring statt nur Flächenfarbe (Audit F-16). */
 .contact-menu-item:focus-visible {
   background-color: var(--color-surface-2);
-  outline: none;
+  outline: 2px solid var(--module-accent, var(--color-accent));
+  outline-offset: -2px;
 }
 
 .contact-menu-item__icon {
