@@ -8,7 +8,7 @@ import { api } from '/api.js';
 import { stagger, vibrate } from '/utils/ux.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { promptModal, openModal, closeModal } from '/components/modal.js';
+import { promptModal, openModal, closeModal, confirmModal } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { addLocalDays, toLocalDateKey } from '/utils/date.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
@@ -1068,35 +1068,35 @@ function wireListContentEvents(container) {
     }
 
     // ---- Liste löschen ----
+    // Container-Löschung (ganze Liste inkl. aller Artikel) bestätigt per Dialog
+    // statt nur Undo-Toast (Audit F-12): die Reibung folgt der Schwere — der
+    // 5s-Undo-Toast bleibt das Muster für Einzel-Artikel.
     if (action === 'delete-list') {
       const deletedListId = state.activeListId;
+      const confirmed = await confirmModal(
+        t('shopping.deleteListConfirm', { name: state.activeList?.name ?? '' }),
+        { danger: true, confirmLabel: t('common.delete') },
+      );
+      if (!confirmed) return;
 
-      let undone = false;
-      window.yuvomi.showToast(t('shopping.deletedListToast'), 'default', 5000, () => {
-        undone = true;
-        // Liste wurde nie optimistisch ausgeblendet → kein visuelles Restore nötig
-      });
-
-      setTimeout(async () => {
-        if (undone) return;
-        try {
-          await api.delete(`/shopping/${deletedListId}`);
-          await loadLists();
-          state.activeListId = state.lists[0]?.id ?? null;
-          if (state.activeListId) {
-            await switchList(state.activeListId, container);
-          } else {
-            state.items      = [];
-            state.activeList = null;
-            renderTabs(container);
-            renderListContent(container);
-          }
-        } catch (err) {
-          window.yuvomi.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
-          await loadLists();
+      try {
+        await api.delete(`/shopping/${deletedListId}`);
+        window.yuvomi.showToast(t('shopping.deletedListToast'), 'default');
+        await loadLists();
+        state.activeListId = state.lists[0]?.id ?? null;
+        if (state.activeListId) {
+          await switchList(state.activeListId, container);
+        } else {
+          state.items      = [];
+          state.activeList = null;
           renderTabs(container);
+          renderListContent(container);
         }
-      }, 5000);
+      } catch (err) {
+        window.yuvomi.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+        await loadLists();
+        renderTabs(container);
+      }
     }
   });
 
