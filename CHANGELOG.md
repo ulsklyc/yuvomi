@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.0] - 2026-07-19
+
+### Fixed
+- Unchecking an address book in Settings → Sync → Contact sync no longer fails with "HTTP 404" (#534). The page called an endpoint that never existed (`POST /accounts/:id/addressbooks/toggle`) while the API offers `PUT /contacts/cardav/addressbooks/:id` — the request was rejected before reaching any handler, which is why nothing appeared in the server log. Toggling now persists and affects only the selected address book.
+- Contact sync showed raw server URLs instead of address book names, and the account card left out the server URL and last-sync time. All three read fields the API does not send (`display_name`, `cardav_url`, `last_sync` instead of `name`, `cardavUrl`, `lastSync`). The same field-name bug also made Calendar sync and Reminder sync report "Not connected / Never synced" for every CalDAV account regardless of state.
+- Sync failures are no longer invisible. A failing address book (for example a server answering `501 Not Implemented`) previously left the account reporting "Connected"; the error only existed in the container log. The failure is now stored per account and per address book, outranks the success state, and is shown on the row that caused it with the list expanded.
+- Destructive actions in Settings had no danger styling: `.btn--danger-outline` was used in ten places but never defined, so "Disconnect", "Delete" and "Log out" fell back to the browser default — black text on a near-black surface in dark mode (1.3:1). The same audit found `.btn--active` (bulk-select in Tasks) equally undefined, leaving its active state invisible.
+- Contact sync was unusable on phones: a long account URL stretched the card to 582 px inside a 309 px column, pushing "Disconnect" out of the viewport with no way to scroll to it. Address book names are no longer truncated on narrow screens.
+- Toggling an address book or calendar no longer drops keyboard focus to the top of the page, and the sync button stays reachable by keyboard while it is inactive.
+- Server error messages reached the interface in German regardless of the selected language. Responses now carry a stable `errorCode` that the client translates.
+
+### Added
+- CardDAV accounts can be edited (name, server URL, username, password). A rotated password no longer means deleting the account and re-selecting every address book; leaving the password field empty keeps the stored one. A URL and username that already belong to another account are rejected with a clear message.
+- "Enable all" / "Disable all" for accounts with more than one address book — one bundled request instead of one click per entry. If a single request fails, only that row stays unchanged.
+- Sync status now distinguishes a real server error from an expected setup gap: an account without any enabled address book is shown neutrally and its sync action is disabled instead of reporting success for a non-event.
+
+### Changed
+- `t()` selects plural forms via `Intl.PluralRules`, so counted strings read correctly ("1 address book enabled" instead of "1 address books enabled"). Locales that need no distinction are unaffected.
+- Contact sync and Calendar sync now share one visual grammar: identical card structure, one disclosure component, one status vocabulary, and a three-step button hierarchy (sync, maintenance, destructive).
+- The confirmation for disconnecting an account names the account and states the consequence separately, and canceling the edit dialog now runs through the same unsaved-changes guard as pressing Escape.
+
 ## [1.33.0] - 2026-07-19
 
 ### Added

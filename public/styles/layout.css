@@ -1775,6 +1775,14 @@ html.fab-anim-done .page-fab {
   margin: 0 0 var(--space-4);
 }
 
+/* Folgen-Erklärung unter der Bestätigungsfrage (confirmModal detail-Slot). */
+.modal-confirm__detail {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  text-wrap: pretty;
+}
+
 .modal-actions--stack {
   flex-direction: column;
   align-items: stretch;
@@ -1930,6 +1938,25 @@ html.fab-anim-done .page-fab {
   background-color: var(--color-danger-hover);
 }
 
+/* Zerstörende Aktionen mit sekundärem Gewicht (Trennen, Widerrufen, Abmelden).
+   Ohne diese Regel fiel die Klasse auf die UA-Farbe `buttontext` zurück - im
+   Dark Mode schwarz auf Fast-Schwarz (1.32:1). */
+.btn--danger-outline {
+  background-color: transparent;
+  color: var(--color-danger);
+  border: 1.5px solid var(--color-danger);
+}
+
+.btn--danger-outline:hover {
+  background-color: var(--color-danger);
+  color: var(--color-ink-on-vivid);
+  border-color: var(--color-danger);
+}
+
+.btn--danger-outline:focus-visible {
+  outline-color: var(--color-danger);
+}
+
 .btn--ghost {
   background-color: transparent;
   color: var(--color-text-secondary);
@@ -1940,10 +1967,38 @@ html.fab-anim-done .page-fab {
   color: var(--color-text-primary);
 }
 
+/* Eingerasteter Zustand eines Umschalt-Buttons (z. B. Mehrfachauswahl in
+   Aufgaben). Trägt `aria-pressed="true"`; ohne diese Regel war der aktive
+   Zustand nur für Screenreader erkennbar, visuell aber identisch zum Ruhezustand.
+   Steht nach allen Varianten, damit es sie bei gleicher Spezifität überschreibt. */
+.btn--active {
+  background-color: var(--active-module-accent, var(--color-accent));
+  color: var(--color-ink-on-vivid);
+  border-color: transparent;
+}
+
 .btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   pointer-events: none;
+}
+
+/* Inaktiv, aber erreichbar. `disabled` nimmt einen Button aus der Tab-Ordnung -
+   wer per Tastatur navigiert, erfährt dann nie, dass es die Aktion gibt, und
+   der Grund für die Sperre bleibt ihm verborgen. `aria-disabled` meldet den
+   Zustand, ohne den Fokus zu verweigern; der Klick wird im Handler verworfen.
+   Statt Opazität (gemessen 1.9:1) eine echte gedeckte Farbe. */
+.btn[aria-disabled='true'] {
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+  background-color: transparent;
+  cursor: not-allowed;
+}
+
+.btn[aria-disabled='true']:hover {
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+  background-color: transparent;
 }
 
 /* ================================================================

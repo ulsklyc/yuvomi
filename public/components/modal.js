@@ -94,8 +94,13 @@ function trapFocus(container) {
   container.addEventListener('focusin', onInputFocus);
   container._onInputFocus = onInputFocus;
 
-  // Focus first focusable element
-  const first = container.querySelector(FOCUSABLE);
+  // Enthält das Modal ein Formular, gehört der Fokus in das erste Eingabefeld -
+  // nicht auf das Schließen-X. Sonst beginnt jede Dateneingabe mit einem Tab
+  // an der Aktion vorbei, die man gerade nicht will.
+  const firstField = container.querySelector(
+    'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled])',
+  );
+  const first = firstField ?? container.querySelector(FOCUSABLE);
   if (first) {
     setTimeout(() => first.focus(), 50);
   }
@@ -535,7 +540,13 @@ export function selectModal(label, options) {
 // confirmModal
 // --------------------------------------------------------
 
-export function confirmModal(message, { confirmLabel, danger = false } = {}) {
+/**
+ * Bestätigungsdialog. `message` ist die Frage (wird zum Titel), `detail` die
+ * optionale Folgen-Erklärung darunter. Die Trennung erlaubt es, das Objekt der
+ * Aktion in der Frage zu benennen („‚SOGo Familie' trennen?") und die Konsequenz
+ * separat zu erklären, ohne beides in einen Titel zu pressen.
+ */
+export function confirmModal(message, { confirmLabel, danger = false, detail = null } = {}) {
   return new Promise((resolve) => {
     let resolved = false;
 
@@ -550,6 +561,7 @@ export function confirmModal(message, { confirmLabel, danger = false } = {}) {
       title: message,
       size: 'sm',
       content: `
+        ${detail ? `<p class="modal-confirm__detail">${esc(detail)}</p>` : ''}
         <div class="modal-actions">
           <button type="button" class="btn btn--ghost" id="confirm-modal-cancel">${t('common.cancel')}</button>
           <button type="button" class="btn ${danger ? 'btn--danger' : 'btn--primary'}" id="confirm-modal-ok">
@@ -569,9 +581,45 @@ export function confirmModal(message, { confirmLabel, danger = false } = {}) {
 // Validation & Feedback
 // --------------------------------------------------------
 
+let _fieldErrorSeq = 0;
+
+/**
+ * Stellt sicher, dass die Feldgruppe eine Fehlermeldung besitzt und dass das
+ * Eingabefeld per `aria-describedby` darauf zeigt. Ohne diese Verknüpfung
+ * bekommen Screenreader die Meldung nie zu hören - ein Sammelbanner am
+ * Formularende erfüllt WCAG 3.3.1 nicht.
+ */
+function _ensureFieldError(group, input) {
+  // Defensiv: die Klassen-Umschaltung funktioniert auch auf schlanken
+  // Containern, das Anlegen einer Meldung braucht einen echten DOM-Knoten.
+  if (typeof group.querySelector !== 'function' || typeof group.appendChild !== 'function') return;
+
+  let el = group.querySelector('.form-field__error');
+  if (!el) {
+    el = document.createElement('p');
+    el.className = 'form-field__error';
+    el.textContent = t('common.required');
+    // Direkt hinter das Feld, nicht ans Gruppenende: liegen Hinweistexte
+    // dazwischen, rutscht die Meldung sonst weit weg (gemessen 86px beim
+    // Passwortfeld) und liest sich als Fehler des ganzen Formulars.
+    if (typeof input.insertAdjacentElement === 'function') {
+      input.insertAdjacentElement('afterend', el);
+    } else {
+      group.appendChild(el);
+    }
+  }
+  if (!el.id) el.id = `${input.id || `modal-field-${++_fieldErrorSeq}`}-error`;
+  const describedBy = (input.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+  if (!describedBy.includes(el.id)) {
+    describedBy.push(el.id);
+    input.setAttribute('aria-describedby', describedBy.join(' '));
+  }
+}
+
 function _validateField(input) {
   const group = input.closest('.form-field') ?? input.parentElement;
   const hasValue = input.value.trim().length > 0;
+  if (group) _ensureFieldError(group, input);
   group?.classList.toggle('form-field--error', !hasValue);
   group?.classList.toggle('form-field--valid', hasValue);
   input.setAttribute('aria-invalid', String(!hasValue));

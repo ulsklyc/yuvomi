@@ -8,6 +8,7 @@ import {
   createRetryState,
   createStatusSummary,
 } from '/settings/components.js';
+import { withBusy } from '/utils/ux.js';
 
 const MORE_PROVIDERS_ID = 'sync-more-providers';
 const GOOGLE_PROVIDER_ID = 'sync-provider-google';
@@ -237,15 +238,9 @@ function buildCalendarAssigneeSelect({ source, externalId, currentId }) {
 // CalDAV calendar accounts
 // --------------------------------------------------------------------------
 
+let calendarListSeq = 0;
+
 function buildCalendarList(account, calendars) {
-  const details = document.createElement('details');
-  details.className = 'caldav-calendars-details';
-
-  const summary = document.createElement('summary');
-  summary.className = 'caldav-calendars-summary';
-  summary.textContent = `${t('settings.caldavCalendarsToggle')} (${calendars.length})`;
-  details.appendChild(summary);
-
   const list = document.createElement('div');
   list.className = 'caldav-calendars-list';
   for (const cal of calendars) {
@@ -279,40 +274,51 @@ function buildCalendarList(account, calendars) {
 
     checkbox.addEventListener('change', async () => {
       const enabled = checkbox.checked;
-      checkbox.disabled = true;
-      try {
-        await api.patch(`/calendar/caldav/accounts/${account.id}/calendars`, {
-          calendarUrl: cal.calendarUrl,
-          enabled,
-        });
-        showToast(
-          enabled ? t('settings.calendarEnabled') : t('settings.calendarDisabled'),
-          'success',
-        );
-      } catch (err) {
-        checkbox.checked = !enabled;
-        showToast(err.message || t('common.errorGeneric'), 'danger');
-      } finally {
-        checkbox.disabled = false;
-      }
+      await withBusy(checkbox, async () => {
+        try {
+          await api.patch(`/calendar/caldav/accounts/${account.id}/calendars`, {
+            calendarUrl: cal.calendarUrl,
+            enabled,
+          });
+          showToast(
+            enabled ? t('settings.calendarEnabled') : t('settings.calendarDisabled'),
+            'success',
+          );
+        } catch (err) {
+          checkbox.checked = !enabled;
+          showToast(err.message || t('common.errorGeneric'), 'danger');
+        }
+      });
     });
   }
-  details.appendChild(list);
-  return details;
+
+  // Gleiche Aufklapp-Grammatik wie Kontakt-Sync und die Settings-Navigation:
+  // geteilte Komponente mit Chevron und ARIA statt rohem <details>.
+  // Eine Zahl statt zweier: „1 von 3 Kalendern" - gleiche Grammatik wie Kontakt-Sync.
+  return createDisclosure({
+    id: `caldav-calendars-${++calendarListSeq}`,
+    summary: t('settings.calendarsEnabledOfTotal', {
+      enabled: enabledCalendarCount(calendars),
+      total: calendars.length,
+      count: calendars.length,
+    }),
+    expanded: false,
+    content: list,
+  });
 }
 
 function renderCalDAVAccount(container, account, calendars, refresh, user) {
   const card = document.createElement('article');
   card.className = 'caldav-account-item';
 
-  const details = [
-    t('settings.enabledCalendarCount', { count: enabledCalendarCount(calendars) }),
-    lastSyncDetail(account.last_sync),
-  ];
-  if (account.caldav_url) details.unshift(account.caldav_url);
+  // listAccounts() liefert camelCase (caldavUrl/lastSync), nicht die Roh-Spalten.
+  // Zähler lebt im Aufklapp-Label; die URL ist Nachschlage-Information, ans Ende.
+  const details = [lastSyncDetail(account.lastSync)];
+  if (account.caldavUrl) details.push(account.caldavUrl);
 
   const syncBtn = document.createElement('button');
   syncBtn.type = 'button';
+  // Gleiche Rangfolge wie Kontakt-Sync: Sync akzentuiert, Wartung still.
   syncBtn.className = 'btn btn--secondary btn--sm';
   syncBtn.textContent = t('settings.syncNow');
   syncBtn.addEventListener('click', async () => {
@@ -329,10 +335,10 @@ function renderCalDAVAccount(container, account, calendars, refresh, user) {
 
   card.appendChild(createStatusSummary({
     title: account.name,
-    status: account.last_sync ? t('settings.connected') : t('settings.notConnected'),
+    status: account.lastSync ? t('settings.connected') : t('settings.notConnected'),
     details,
     action: syncBtn,
-    tone: account.last_sync ? 'success' : 'neutral',
+    tone: account.lastSync ? 'success' : 'neutral',
   }));
 
   card.appendChild(buildCalendarList(account, calendars));
@@ -342,7 +348,7 @@ function renderCalDAVAccount(container, account, calendars, refresh, user) {
 
   const refreshBtn = document.createElement('button');
   refreshBtn.type = 'button';
-  refreshBtn.className = 'btn btn--secondary btn--sm';
+  refreshBtn.className = 'btn btn--ghost btn--sm';
   refreshBtn.textContent = t('settings.caldavRefreshCalendars');
   refreshBtn.addEventListener('click', async () => {
     refreshBtn.disabled = true;
@@ -363,7 +369,16 @@ function renderCalDAVAccount(container, account, calendars, refresh, user) {
     deleteBtn.className = 'btn btn--danger-outline btn--sm';
     deleteBtn.textContent = t('common.delete');
     deleteBtn.addEventListener('click', async () => {
-      if (!await confirmModal(t('settings.deleteAccountConfirm'), { danger: true })) return;
+      // Frage nennt das Konto, Detail nennt die Folge (mehrere Konten möglich).
+      const confirmed = await confirmModal(
+        t('settings.disconnectAccountConfirmTitle', { name: account.name }),
+        {
+          detail: t('settings.deleteAccountConfirm'),
+          confirmLabel: t('common.delete'),
+          danger: true,
+        },
+      );
+      if (!confirmed) return;
       try {
         await api.delete(`/calendar/caldav/accounts/${account.id}`);
         showToast(t('settings.caldavAccountDeleted'), 'success');
@@ -417,7 +432,7 @@ async function loadCalDAVAccounts(container, user) {
       wrapper.appendChild(createStatusSummary({
         title: account.name,
         status: t('settings.notConnected'),
-        details: [lastSyncDetail(account.last_sync)],
+        details: [lastSyncDetail(account.lastSync)],
         tone: 'warning',
       }));
       wrapper.appendChild(createInlineError(err.message || t('common.errorGeneric')));
@@ -426,6 +441,9 @@ async function loadCalDAVAccounts(container, user) {
     }
     renderCalDAVAccount(listEl, account, calendars, reload, user);
   }
+  // Die Karten tragen Lucide-Platzhalter (Disclosure-Chevron) und entstehen bei
+  // jedem Reload neu.
+  window.lucide?.createIcons({ el: listEl });
 }
 
 function bindCalDAVAddButton(container, user) {
@@ -974,19 +992,18 @@ function buildGoogleCalendarPicker() {
 
         checkbox.addEventListener('change', async () => {
           const enabled = checkbox.checked;
-          checkbox.disabled = true;
-          try {
-            await api.patch('/calendar/google/calendars', { calendarId: cal.id, enabled });
-            showToast(
-              enabled ? t('settings.calendarEnabled') : t('settings.calendarDisabled'),
-              'success',
-            );
-          } catch (err) {
-            checkbox.checked = !enabled;
-            showToast(err.message || t('common.errorGeneric'), 'danger');
-          } finally {
-            checkbox.disabled = false;
-          }
+          await withBusy(checkbox, async () => {
+            try {
+              await api.patch('/calendar/google/calendars', { calendarId: cal.id, enabled });
+              showToast(
+                enabled ? t('settings.calendarEnabled') : t('settings.calendarDisabled'),
+                'success',
+              );
+            } catch (err) {
+              checkbox.checked = !enabled;
+              showToast(err.message || t('common.errorGeneric'), 'danger');
+            }
+          });
         });
       }
     } catch (err) {
@@ -1024,15 +1041,14 @@ function buildGoogleReadonlyToggle(googleStatus) {
 
   checkbox.addEventListener('change', async () => {
     const enabled = checkbox.checked;
-    checkbox.disabled = true;
-    try {
-      await api.put('/calendar/google/readonly', { readonly: enabled });
-    } catch (err) {
-      checkbox.checked = !enabled;
-      showToast(err.message || t('common.errorGeneric'), 'danger');
-    } finally {
-      checkbox.disabled = false;
-    }
+    await withBusy(checkbox, async () => {
+      try {
+        await api.put('/calendar/google/readonly', { readonly: enabled });
+      } catch (err) {
+        checkbox.checked = !enabled;
+        showToast(err.message || t('common.errorGeneric'), 'danger');
+      }
+    });
   });
 
   return group;

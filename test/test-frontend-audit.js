@@ -575,6 +575,20 @@ test('sync-calendar leaf loads CalDAV, ICS, Google, and Apple with independent s
   assert.match(source, /enabledCalendarCount/);
   assert.match(source, /neverSynced/);
 
+  // Konto-Felder kommen als camelCase aus listAccounts() - snake_case lieferte
+  // dauerhaft „Nie synchronisiert" und verschluckte die URL (#534-Nachlauf).
+  assert.match(source, /account\.lastSync/);
+  assert.match(source, /account\.caldavUrl/);
+  assert.doesNotMatch(source, /account\.last_sync|account\.caldav_url/);
+  // Checkbox-Toggles geben den Tastaturfokus zurück.
+  assert.match(source, /import \{ withBusy \} from '\/utils\/ux\.js'/);
+  assert.doesNotMatch(source, /checkbox\.disabled = true/);
+  // Gleiche Aufklapp-Grammatik wie Kontakt-Sync (createDisclosure, kein <details>),
+  // und die Löschbestätigung nennt das Konto beim Namen.
+  assert.match(source, /createDisclosure\(\{[\s\S]*?caldav-calendars-/);
+  assert.doesNotMatch(source, /createElement\('details'\)/);
+  assert.match(source, /disconnectAccountConfirmTitle', \{ name: account\.name \}/);
+
   // Webcal / ICS subscriptions.
   assert.match(source, /api\.get\('\/calendar\/subscriptions'\)/);
   assert.match(source, /api\.post\('\/calendar\/subscriptions'/);
@@ -623,10 +637,62 @@ test('sync-contacts leaf owns CardDAV account management', () => {
   assert.match(source, /api\.post\('\/contacts\/cardav\/accounts'/);
   assert.match(source, /api\.delete\(`\/contacts\/cardav\/accounts\/\$\{[^}]+\}`\)/);
   assert.match(source, /\/contacts\/cardav\/accounts\/\$\{[^}]+\}\/addressbooks/);
-  assert.match(source, /addressbooks\/toggle/);
+  // Toggle geht per PUT auf die Adressbuch-ID, nicht auf einen Konto-Unterpfad (#534).
+  assert.match(source, /api\.put\(`\/contacts\/cardav\/addressbooks\/\$\{[^}]+\}`/);
+  assert.doesNotMatch(source, /addressbooks\/toggle/);
   assert.match(source, /addressbooks\/refresh/);
   assert.match(source, /\/contacts\/cardav\/accounts\/\$\{[^}]+\}\/sync/);
-  assert.match(source, /last_sync/);
+  // Konto-Felder kommen als camelCase aus getAllAccounts (#534).
+  assert.match(source, /account\.lastSync/);
+  assert.doesNotMatch(source, /account\.last_sync|account\.cardav_url/);
+
+  // Audit-Nachlauf: Toggles und Aktionen laufen über withBusy (Fokus-Rückgabe,
+  // aria-busy), zerstörende Aktion ist als danger-outline ausgewiesen, und die
+  // Fehlerkarte bietet einen Ausweg statt einer Sackgasse.
+  assert.match(source, /import \{ withBusy \} from '\/utils\/ux\.js'/);
+  assert.match(source, /withBusy\(checkbox/);
+  assert.match(source, /loadingClass: 'btn--loading'/);
+  assert.match(source, /btn--danger-outline/);
+  assert.match(source, /function buildUnreachableAccount/);
+  assert.match(source, /t\('common\.retry'\)/);
+
+  // Critique-Nachlauf: Bestätigung nennt das Konto, Passwortfeld ist ein neues
+  // (nicht das App-Passwort), Formularfehler sind feldbezogen, und der Sync
+  // meldet keinen Erfolg ohne aktiviertes Adressbuch.
+  assert.match(source, /disconnectAccountConfirmTitle', \{ name: account\.name \}/);
+  // Fremdserver-Passwort: weder das App-Passwort anbieten (current-password)
+  // noch ein generiertes vorschlagen (new-password).
+  assert.match(source, /id="cardav-password"[^>]*autocomplete="off"/);
+  assert.doesNotMatch(source, /autocomplete="(current|new)-password"/);
+  assert.match(source, /cardavCredentialsTrustHint/);
+  assert.match(source, /wireBlurValidation\(form\)/);
+  assert.match(source, /if \(!validateAll\(form\)\) return;/);
+  assert.doesNotMatch(source, /t\('common\.allFieldsRequired'\)/);
+  // Inaktiver Sync-Button bleibt tabbar: aria-disabled statt disabled, Klick
+  // wird im Handler verworfen, Grund steht sichtbar in der Statuszeile.
+  assert.match(source, /syncBtn\.setAttribute\('aria-disabled'/);
+  assert.doesNotMatch(source, /syncBtn\.disabled = /);
+  assert.doesNotMatch(source, /syncBtn\.title = /);
+  assert.match(source, /aria-disabled'\) === 'true'\) return;/);
+  assert.match(source, /syncBtn\.setAttribute\('aria-describedby'/);
+  assert.match(source, /noAddressbookEnabled/);
+  assert.match(source, /notSyncedYet/);
+  // Genau eine Zahl je Karte: „N von M", kein zweiter Zähler als Aufzählungspunkt.
+  assert.match(source, /addressbooksEnabledOfTotal/);
+  assert.doesNotMatch(source, /key: 'addressbook-count'/);
+
+  // Konto bearbeiten (statt löschen + neu anlegen), Sammelschalter und
+  // sichtbare Sync-Teilfehler - die drei offenen Punkte aus dem Critique.
+  assert.match(source, /api\.put\(`\/contacts\/cardav\/accounts\/\$\{account\.id\}`/);
+  assert.match(source, /settings\.cardavEditAccount/);
+  assert.match(source, /settings\.enableAll/);
+  assert.match(source, /settings\.disableAll/);
+  assert.match(source, /account\.lastError/);
+  assert.match(source, /settings\.syncErrorDetail/);
+  // Geteilte Aufklapp-Komponente statt rohem <details>.
+  assert.match(source, /createDisclosure\(\{/);
+  assert.doesNotMatch(source, /createElement\('details'\)/);
+  assert.doesNotMatch(source, /details = \[t\('settings\.cardavTitle'\)\]/, 'Modultitel nicht als Detailzeile wiederholen');
 
   // Contacts leaf must not own calendar or reminder concerns.
   assert.doesNotMatch(source, /\/calendar\/caldav/);
@@ -646,6 +712,12 @@ test('sync-reminders leaf maps CalDAV reminder lists and syncs without calendars
   assert.match(source, /settings\.caldavReminderMapTasks/);
   assert.match(source, /settings\.caldavReminderMapShopping/);
   assert.match(source, /settings\.caldavRemindersHint/);
+
+  // Konto-Felder als camelCase, Toggle mit Fokus-Rückgabe (#534-Nachlauf).
+  assert.match(source, /account\.lastSync/);
+  assert.match(source, /account\.caldavUrl/);
+  assert.doesNotMatch(source, /account\.last_sync|account\.caldav_url/);
+  assert.match(source, /import \{ withBusy \} from '\/utils\/ux\.js'/);
 
   // Calendar collections must NOT appear in the reminders leaf.
   assert.doesNotMatch(source, /\/calendars\b/);
@@ -1025,6 +1097,69 @@ test('mobile navigation derives five stable destinations from three favorites', 
   assert.match(source, /resolveMobileNavOrder/);
   assert.match(source, /function\s+mobileFavoriteItems/);
   assert.match(source, /function\s+buildBottomNavItems/);
+});
+
+test('jede verwendete btn--Variante ist im Stylesheet definiert', () => {
+  // `btn--danger-outline` wurde an zehn Stellen verwendet, war aber nirgends
+  // definiert: der Button fiel auf die UA-Farbe `buttontext` zurück (im Dark
+  // Mode 1.32:1). Undefinierte Utility-Klassen sind unsichtbare Bugs.
+  const css = readdirSync(new URL('../public/styles/', import.meta.url))
+    .filter((file) => file.endsWith('.css'))
+    .map((file) => read(`../public/styles/${file}`))
+    .join('\n');
+  const defined = new Set([...css.matchAll(/\.(btn--[a-z0-9-]+)/g)].map((m) => m[1]));
+
+  const used = new Set();
+  for (const file of walkFrontendFiles('../public/')) {
+    if (file.includes('/vendor/') || file.includes('lucide')) continue;
+    // Lookbehind grenzt gegen fremde Blöcke ab: `task-status-btn--done` ist
+    // keine Variante von `.btn`.
+    for (const match of read(file).matchAll(/(?<![\w-])btn--[a-z0-9-]+/g)) used.add(match[0]);
+  }
+
+  const missing = [...used].filter((cls) => !defined.has(cls)).sort();
+  assert.deepEqual(missing, [], `btn-Varianten ohne CSS-Regel: ${missing.join(', ')}`);
+});
+
+test('Sync-Kontolisten decken die Grid-Spalte, damit mobil nichts abgeschnitten wird', () => {
+  const settings = read('../public/styles/settings.css');
+  // Ohne minmax(0, 1fr) wächst die implizite Spalte auf max-content: eine lange
+  // Konto-URL schob die Aktionsleiste bei 375px aus dem Viewport.
+  assert.match(
+    settings,
+    /\.settings-sync-accounts\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/,
+  );
+  assert.match(
+    settings,
+    /\.settings-status-summary__details li\s*\{[^}]*overflow-wrap:\s*anywhere/,
+  );
+  assert.match(
+    settings,
+    /\.caldav-calendars-summary\s*\{[^}]*min-height:\s*var\(--target-lg\)/,
+  );
+  // Genau EINE Rahmenebene, und zwar um das Konto: die Karte trägt den Rahmen,
+  // die Statuszeile darin ist Kopfzeile ohne eigene Fläche. Ohne diese Grenze
+  // verliert „Trennen" bei mehreren Konten seinen Besitzer.
+  // Rahmenfarbe aus der Tinte gemischt, nicht --color-border: das ist im Dark
+  // Mode dunkler als die Kartenfläche und damit unsichtbar (gemessen 1.06:1).
+  assert.match(
+    settings,
+    /\.caldav-account-item\s*\{[\s\S]*?border:\s*1px solid color-mix\(in srgb, var\(--color-text-primary\)/,
+  );
+  assert.match(
+    settings,
+    /\.caldav-account-item \.settings-status-summary\s*\{[^}]*border:\s*0/,
+  );
+  assert.match(
+    settings,
+    /\.caldav-account-item \.settings-disclosure\s*\{[^}]*border:\s*0/,
+  );
+  // Glas-Tokens sind weiß-transparent und auf der weißen Karte unsichtbar -
+  // deshalb Flächen-Tokens, oben positiv gepinnt.
+  assert.doesNotMatch(
+    settings,
+    /\.caldav-account-item\s*\{[^}]*border:\s*1px solid var\(--glass-border-subtle\)/,
+  );
 });
 
 test('mobile navigation uses neutral inactive wells and one active indicator', () => {

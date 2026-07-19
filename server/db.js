@@ -3312,6 +3312,29 @@ const MIGRATIONS = [
           AND EXISTS (SELECT 1 FROM contact_emails WHERE contact_id = contacts.id);
     `,
   },
+  {
+    version: 92,
+    description: 'Surface CardDAV sync errors in the UI instead of only the server log (#534)',
+    up: `
+      -- Bisher landete ein fehlgeschlagener Adressbuch-Abruf ausschließlich im
+      -- Server-Log ("501 Not Implemented" in #534). Das UI meldete weiterhin
+      -- "zuletzt synchronisiert", während die Hälfte der Kontakte fehlte.
+      -- Beide Spalten sind nullable: NULL heißt "letzter Lauf war sauber".
+      ALTER TABLE carddav_accounts ADD COLUMN last_error TEXT;
+      ALTER TABLE carddav_accounts ADD COLUMN last_error_at TEXT;
+    `,
+  },
+  {
+    version: 93,
+    description: 'Attach CardDAV sync errors to the failing address book, not just the account (#534)',
+    up: `
+      -- Der Konto-Fehler nennt zwar das Adressbuch im Text, aber als Fließtext:
+      -- die Liste kann die betroffene Zeile damit nicht markieren, und der Name
+      -- im Fehler muss nicht mit dem Namen in der Liste übereinstimmen.
+      -- NULL heißt "dieses Adressbuch lief zuletzt sauber durch".
+      ALTER TABLE carddav_addressbook_selection ADD COLUMN last_error TEXT;
+    `,
+  },
 ];
 
 /**

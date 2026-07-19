@@ -29,7 +29,11 @@ const _makeSvgEl = (tag) => {
     _children: children,
   };
 };
-global.document = { createElementNS: (_ns, tag) => _makeSvgEl(tag) };
+global.document = {
+  createElementNS: (_ns, tag) => _makeSvgEl(tag),
+  // _ensureFieldError legt die Fehlermeldung als <p> an.
+  createElement: (tag) => ({ tagName: tag.toUpperCase(), className: '', id: '', textContent: '' }),
+};
 
 const _origSetTimeout = setTimeout;
 
@@ -37,11 +41,16 @@ const _origSetTimeout = setTimeout;
 // DOM-Mocks
 // --------------------------------------------------------
 
-function makeField() {
+/**
+ * Feldgruppe. `withDom: false` liefert bewusst einen schlanken Container ohne
+ * querySelector/appendChild - die Klassen-Umschaltung muss auch damit laufen.
+ */
+function makeField({ withDom = true } = {}) {
   const classes = new Set();
   const listeners = {};
   const dataset = {};
-  return {
+  const children = [];
+  const field = {
     dataset,
     offsetWidth: 0,
     classList: {
@@ -53,7 +62,13 @@ function makeField() {
     addEventListener(event, fn) { listeners[event] = fn; },
     _classes: classes,
     _listeners: listeners,
+    _children: children,
   };
+  if (withDom) {
+    field.querySelector = (sel) => children.find((c) => `.${c.className}` === sel) ?? null;
+    field.appendChild = (node) => { children.push(node); return node; };
+  }
+  return field;
 }
 
 function makeInput({ value = '', required = true } = {}) {
@@ -70,6 +85,7 @@ function makeInput({ value = '', required = true } = {}) {
     closest() { return field; },
     parentElement: field,
     setAttribute(k, v) { attrs[k] = v; },
+    getAttribute(k) { return attrs[k] ?? null; },
     removeAttribute(k) { delete attrs[k]; },
   };
 }
@@ -147,6 +163,43 @@ test('wireBlurValidation: kein Fehler wenn closest() null zurückgibt', () => {
   input.parentElement = null;
   wireBlurValidation(makeContainer([input]));
   assert.doesNotThrow(() => input._listeners['blur']());
+});
+
+// Feldbezogene Fehlermeldung + aria-describedby (Critique-Nachlauf #534):
+// ein Sammelbanner am Formularende erfüllt WCAG 3.3.1 nicht, weil die Meldung
+// nie mit dem Feld verknüpft ist.
+test('wireBlurValidation: legt Fehlermeldung an und verknüpft sie per aria-describedby', () => {
+  const input = makeInput({ value: '' });
+  input.id = 'cardav-name';
+  wireBlurValidation(makeContainer([input]));
+  input._listeners['blur']();
+
+  const errorEl = input._field._children.find((c) => c.className === 'form-field__error');
+  assert.ok(errorEl, 'Fehlermeldung wurde angelegt');
+  assert.equal(errorEl.id, 'cardav-name-error');
+  assert.ok(errorEl.textContent.length > 0, 'Meldung hat Text');
+  assert.equal(input._attrs['aria-describedby'], 'cardav-name-error');
+});
+
+test('wireBlurValidation: legt die Meldung nur einmal an', () => {
+  const input = makeInput({ value: '' });
+  input.id = 'cardav-url';
+  wireBlurValidation(makeContainer([input]));
+  input._listeners['blur']();
+  input._listeners['blur']();
+  const errors = input._field._children.filter((c) => c.className === 'form-field__error');
+  assert.equal(errors.length, 1);
+  assert.equal(input._attrs['aria-describedby'], 'cardav-url-error');
+});
+
+test('wireBlurValidation: schlanker Container ohne DOM-API bleibt fehlerfrei', () => {
+  const input = makeInput({ value: '' });
+  input._field = makeField({ withDom: false });
+  input.closest = () => input._field;
+  input.parentElement = input._field;
+  wireBlurValidation(makeContainer([input]));
+  assert.doesNotThrow(() => input._listeners['blur']());
+  assert.ok(input._field._classes.has('form-field--error'));
 });
 
 // --------------------------------------------------------

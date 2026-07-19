@@ -1668,6 +1668,18 @@ describe('CardDAV API Routes', () => {
     }
     apiTestDb.exec(migration30.up);
 
+    // Spätere Migrationen, die die CardDAV-Tabellen erweitern, müssen hier
+    // mitlaufen - sonst testet die Routen-Schicht gegen ein Schema, das es nicht
+    // mehr gibt. 92: last_error/last_error_at am Konto, 93: last_error je
+    // Adressbuch (sichtbare Sync-Fehler, #534).
+    for (const version of [92, 93]) {
+      const migration = MIGRATIONS.find(m => m.version === version);
+      if (!migration) {
+        throw new Error(`Migration ${version} not found`);
+      }
+      apiTestDb.exec(migration.up);
+    }
+
     // Override db.get() to use our test database
     const dbModule = await import('../server/db.js');
     dbModule._setTestDatabase(apiTestDb);

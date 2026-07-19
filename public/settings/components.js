@@ -124,7 +124,15 @@ export function createStatusSummary({
     list.className = 'settings-status-summary__details';
     for (const detail of details) {
       const item = document.createElement('li');
-      item.textContent = String(detail);
+      // Details sind entweder ein String oder { text, key }. Der Key macht eine
+      // Zeile adressierbar, damit Aufrufer sie später gezielt aktualisieren
+      // können, ohne die Karte neu zu bauen.
+      if (detail && typeof detail === 'object') {
+        item.textContent = String(detail.text ?? '');
+        if (detail.key) item.dataset.key = detail.key;
+      } else {
+        item.textContent = String(detail);
+      }
       list.appendChild(item);
     }
     summary.appendChild(list);

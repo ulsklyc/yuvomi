@@ -6,6 +6,7 @@ import {
   createSettingRow,
   createStatusSummary,
 } from '/settings/components.js';
+import { withBusy } from '/utils/ux.js';
 
 function formatSyncTime(value) {
   if (!value) return null;
@@ -97,24 +98,23 @@ function buildReminderRow(account, list) {
 
   toggle.addEventListener('change', async () => {
     const enabled = toggle.checked;
-    toggle.disabled = true;
-    try {
-      await api.patch(`/calendar/caldav/accounts/${account.id}/reminder-lists`, {
-        listUrl: list.listUrl,
-        enabled,
-        targetModule: select.value,
-      });
-      list.enabled = enabled;
-      showToast(
-        enabled ? t('settings.reminderListEnabled') : t('settings.reminderListDisabled'),
-        'success',
-      );
-    } catch (err) {
-      toggle.checked = !enabled;
-      showToast(err.message || t('common.errorGeneric'), 'danger');
-    } finally {
-      toggle.disabled = false;
-    }
+    await withBusy(toggle, async () => {
+      try {
+        await api.patch(`/calendar/caldav/accounts/${account.id}/reminder-lists`, {
+          listUrl: list.listUrl,
+          enabled,
+          targetModule: select.value,
+        });
+        list.enabled = enabled;
+        showToast(
+          enabled ? t('settings.reminderListEnabled') : t('settings.reminderListDisabled'),
+          'success',
+        );
+      } catch (err) {
+        toggle.checked = !enabled;
+        showToast(err.message || t('common.errorGeneric'), 'danger');
+      }
+    });
   });
 
   const row = createSettingRow({
@@ -129,16 +129,19 @@ function renderAccount(container, account, reminderLists, refresh) {
   const card = document.createElement('article');
   card.className = 'caldav-account-item';
 
+  // listAccounts() liefert camelCase (caldavUrl/lastSync), nicht die Roh-Spalten.
   const details = [];
-  if (account.caldav_url) details.push(account.caldav_url);
-  details.push(lastSyncDetail(account.last_sync));
+  if (account.caldavUrl) details.push(account.caldavUrl);
+  details.push(t('settings.enabledReminderListCount', {
+    count: enabledReminderListCount(reminderLists),
+  }));
+  details.push(lastSyncDetail(account.lastSync));
 
   card.appendChild(createStatusSummary({
     title: account.name,
-    status: t('settings.enabledReminderListCount', {
-      count: enabledReminderListCount(reminderLists),
-    }),
+    status: account.lastSync ? t('settings.connected') : t('settings.notConnected'),
     details,
+    tone: account.lastSync ? 'success' : 'neutral',
   }));
 
   const list = document.createElement('div');
@@ -217,7 +220,7 @@ async function loadAccounts(container) {
       wrapper.appendChild(createStatusSummary({
         title: account.name,
         status: t('settings.notConnected'),
-        details: [lastSyncDetail(account.last_sync)],
+        details: [lastSyncDetail(account.lastSync)],
         tone: 'warning',
       }));
       wrapper.appendChild(createInlineError(err.message || t('common.errorGeneric')));

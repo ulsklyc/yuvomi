@@ -61,3 +61,37 @@ export async function deleteWithUndo({ onDelete, onUndo, toastMessage, toastType
     );
   }
 }
+
+/**
+ * Führt eine asynchrone Aktion aus und markiert das auslösende Control derweil
+ * als beschäftigt: `disabled` gegen Doppelauslösung, `aria-busy` für Screenreader,
+ * optional eine Lade-Klasse.
+ *
+ * Der eigentliche Zweck ist das `finally`: `disabled` entzieht dem fokussierten
+ * Element den Fokus (er fällt auf <body>), und ohne Rückgabe landet die Tastatur
+ * nach jeder Aktion wieder am Seitenanfang. Der Fokus wird nur zurückgegeben,
+ * wenn das Control ihn vorher hatte und noch im Dokument hängt - nach einem
+ * Re-Render ist es abgehängt und ein focus() ginge ins Leere.
+ *
+ * @param {HTMLElement} control                 - Button, Checkbox, Select …
+ * @param {() => Promise<any>} task             - Die auszuführende Aktion
+ * @param {Object} [opts]
+ * @param {string|null} [opts.loadingClass]     - Klasse während der Aktion, z. B. 'btn--loading'
+ * @returns {Promise<any>} Rückgabewert von task
+ */
+export async function withBusy(control, task, { loadingClass = null } = {}) {
+  const hadFocus = document.activeElement === control;
+  if (loadingClass) control.classList.add(loadingClass);
+  control.setAttribute('aria-busy', 'true');
+  control.disabled = true;
+  try {
+    return await task();
+  } finally {
+    control.disabled = false;
+    control.removeAttribute('aria-busy');
+    if (loadingClass) control.classList.remove(loadingClass);
+    if (hadFocus && control.isConnected && document.activeElement !== control) {
+      control.focus({ preventScroll: true });
+    }
+  }
+}

@@ -408,11 +408,12 @@ async function addAccount(name, cardavUrl, username, password) {
 function getAllAccounts() {
   try {
     const accounts = db.get().prepare(`
-      SELECT id, name, carddav_url, username, created_at, last_sync
+      SELECT id, name, carddav_url, username, created_at, last_sync, last_error, last_error_at
       FROM carddav_accounts
       ORDER BY created_at DESC
     `).all();
 
+    // Kein Passwort in der Antwort.
     return accounts.map(acc => ({
       id: acc.id,
       name: acc.name,
@@ -420,11 +421,68 @@ function getAllAccounts() {
       username: acc.username,
       createdAt: acc.created_at,
       lastSync: acc.last_sync,
+      lastError: acc.last_error ?? null,
+      lastErrorAt: acc.last_error_at ?? null,
     }));
   } catch (err) {
     log.error('Failed to get accounts:', err.message);
     throw err;
   }
+}
+
+/**
+ * Zugangsdaten eines Kontos ändern. Die Adressbuch-Auswahl bleibt erhalten -
+ * genau dafür existiert dieser Pfad: ein rotiertes Passwort soll nicht bedeuten,
+ * dass das Konto gelöscht und die Auswahl neu getroffen werden muss.
+ *
+ * Ein Wechsel von URL oder Benutzername kann mit einem anderen Konto kollidieren
+ * (UNIQUE(carddav_url, username)); der Fall wird als 'conflict' gemeldet statt
+ * als Ausnahme.
+ *
+ * @param {number} accountId
+ * @param {{name:string, cardavUrl:string, username:string, password:string|null}} fields
+ *        password === null lässt das gespeicherte Passwort unberührt.
+ * @returns {Object|'not-found'|'conflict'} Konto ohne Passwort
+ */
+function updateAccount(accountId, { name, cardavUrl, username, password }) {
+  const database = db.get();
+  const account = database.prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(accountId);
+  if (!account) return 'not-found';
+
+  const clash = database.prepare(`
+    SELECT id FROM carddav_accounts
+    WHERE carddav_url = ? AND username = ? AND id != ?
+  `).get(cardavUrl, username, accountId);
+  if (clash) return 'conflict';
+
+  database.prepare(`
+    UPDATE carddav_accounts
+    SET name = ?, carddav_url = ?, username = ?, password = COALESCE(?, password)
+    WHERE id = ?
+  `).run(name, cardavUrl, username, password, accountId);
+
+  // Geänderte Zugangsdaten machen einen alten Fehler gegenstandslos - er wird
+  // beim nächsten Lauf neu gesetzt, wenn er weiterbesteht.
+  if (password !== null || cardavUrl !== account.carddav_url || username !== account.username) {
+    database.prepare('UPDATE carddav_accounts SET last_error = NULL, last_error_at = NULL WHERE id = ?').run(accountId);
+  }
+
+  log.info(`Updated CardDAV account ${accountId} ("${name}").`);
+
+  const row = database.prepare(`
+    SELECT id, name, carddav_url, username, created_at, last_sync, last_error, last_error_at
+    FROM carddav_accounts WHERE id = ?
+  `).get(accountId);
+  return {
+    id: row.id,
+    name: row.name,
+    cardavUrl: row.carddav_url,
+    username: row.username,
+    createdAt: row.created_at,
+    lastSync: row.last_sync,
+    lastError: row.last_error ?? null,
+    lastErrorAt: row.last_error_at ?? null,
+  };
 }
 
 /**
@@ -696,6 +754,7 @@ async function syncAccount(accountId) {
 
     let totalSynced = 0;
     let totalErrors = 0;
+    const failures = [];
 
     // Fetch all addressbooks from server
     const serverAddressbooks = await client.fetchAddressBooks();
@@ -710,13 +769,20 @@ async function syncAccount(accountId) {
           UPDATE carddav_addressbook_selection SET enabled = 0
           WHERE id = ?
         `).run(selAbook.id);
+        const message = 'not found on server';
+        recordAddressbookOutcome(selAbook.id, message);
+        failures.push(`${selAbook.addressbook_name || selAbook.addressbook_url}: ${message}`);
         continue;
       }
 
       // Sync this addressbook
-      const { synced, errors } = await syncAddressbook(accountId, selAbook.addressbook_url, client, serverAbook);
+      const { synced, errors, errorMessage } = await syncAddressbook(accountId, selAbook.addressbook_url, client, serverAbook);
       totalSynced += synced;
       totalErrors += errors;
+      // Fehler an der Zeile festhalten, die ihn verursacht hat - der Konto-Text
+      // allein lässt sich in der Liste nicht zuordnen.
+      recordAddressbookOutcome(selAbook.id, errorMessage ?? null);
+      if (errorMessage) failures.push(errorMessage);
     }
 
     // Update last_sync for account
@@ -724,12 +790,58 @@ async function syncAccount(accountId) {
       UPDATE carddav_accounts SET last_sync = ? WHERE id = ?
     `).run(new Date().toISOString(), accountId);
 
+    // Teilfehler festhalten statt nur loggen: ein Adressbuch kann scheitern,
+    // während die übrigen sauber durchlaufen - das UI meldete bisher trotzdem
+    // uneingeschränkten Erfolg (#534).
+    recordSyncOutcome(accountId, failures);
+
     log.info(`Account ${accountId} sync complete: ${totalSynced} contacts synced, ${totalErrors} errors.`);
 
     return { synced: totalSynced, errors: totalErrors };
   } catch (err) {
     log.error(`Sync failed for account ${accountId}:`, err.message);
+    recordSyncOutcome(accountId, [err.message]);
     throw err;
+  }
+}
+
+/** Maximale Länge der gespeicherten Fehlermeldung - schützt vor Server-Stacktraces. */
+const MAX_SYNC_ERROR_LENGTH = 500;
+
+/**
+ * Schreibt das Ergebnis eines Sync-Laufs an das Konto: die gesammelten
+ * Fehlermeldungen oder NULL, wenn der Lauf sauber war. NULL ist die Aussage
+ * „zuletzt lief alles durch" und muss deshalb aktiv gesetzt werden.
+ *
+ * @param {number} accountId
+ * @param {string[]} failures - leere Liste = sauberer Lauf
+ */
+/**
+ * Schreibt das Ergebnis eines Adressbuch-Laufs an dessen Auswahlzeile.
+ * @param {number} selectionId
+ * @param {string|null} message - null = dieses Adressbuch lief sauber
+ */
+function recordAddressbookOutcome(selectionId, message) {
+  try {
+    db.get().prepare(`
+      UPDATE carddav_addressbook_selection SET last_error = ? WHERE id = ?
+    `).run(message ? String(message).slice(0, MAX_SYNC_ERROR_LENGTH) : null, selectionId);
+  } catch (err) {
+    log.error(`Failed to record addressbook outcome for ${selectionId}:`, err.message);
+  }
+}
+
+function recordSyncOutcome(accountId, failures = []) {
+  try {
+    const message = failures.length
+      ? failures.join(' · ').slice(0, MAX_SYNC_ERROR_LENGTH)
+      : null;
+    db.get().prepare(`
+      UPDATE carddav_accounts SET last_error = ?, last_error_at = ? WHERE id = ?
+    `).run(message, message ? new Date().toISOString() : null, accountId);
+  } catch (err) {
+    // Der Sync selbst darf daran nicht scheitern.
+    log.error(`Failed to record sync outcome for account ${accountId}:`, err.message);
   }
 }
 
@@ -829,7 +941,10 @@ async function syncAddressbook(accountId, addressbookUrl, client = null, serverA
       vcardObjects = await fetchVCardsResilient(client, serverAddressbook);
     } catch (err) {
       log.error(`Failed to fetch vCards from ${addressbookUrl}:`, err.message);
-      return { synced: 0, errors: 1 };
+      // Die Meldung wird mit zurückgegeben, damit sie der Aufrufer am Konto
+      // festhalten kann - im Log allein sieht sie niemand (#534).
+      const label = serverAddressbook?.displayName || addressbookUrl;
+      return { synced: 0, errors: 1, errorMessage: `${label}: ${err.message}` };
     }
 
     let synced = 0;
@@ -1173,6 +1288,7 @@ export {
   // Account Management
   addAccount,
   getAllAccounts,
+  updateAccount,
   deleteAccount,
   testConnection,
 

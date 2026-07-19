@@ -23,6 +23,7 @@ export function contactsPaths() {
       post: op({ summary: 'Add CardDAV account', tag: 'Contacts', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/contacts/cardav/accounts/{id}': {
+      put: op({ summary: 'Update CardDAV account credentials', tag: 'Contacts', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete CardDAV account', tag: 'Contacts', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/contacts/cardav/accounts/{id}/test': {

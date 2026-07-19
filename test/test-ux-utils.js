@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 
 // Minimales Window/Navigator-Mock für Node
-const { stagger, vibrate, deleteWithUndo } = await (async () => {
+const { stagger, vibrate, deleteWithUndo, withBusy } = await (async () => {
   global.window = {
     matchMedia: () => ({ matches: false }),
     yuvomi: { showToast: () => {} },
@@ -76,6 +76,91 @@ test('stagger: tut nichts bei prefers-reduced-motion', () => {
 test('vibrate: tut nichts wenn API nicht vorhanden', () => {
   Object.defineProperty(global, 'navigator', { value: { vibrate: null }, writable: true, configurable: true });
   assert.doesNotThrow(() => vibrate(10));
+});
+
+// ---------------------------------------------------------------------------
+// withBusy - Fokus-Rückgabe nach einer asynchronen Aktion (#534-Audit).
+// `disabled` entzieht dem fokussierten Element den Fokus; ohne Rückgabe landet
+// die Tastatur nach jedem Toggle wieder am Seitenanfang.
+// ---------------------------------------------------------------------------
+
+/** Minimales Control-Mock, das die relevanten DOM-Effekte nachbildet. */
+function makeControl({ connected = true } = {}) {
+  const classes = new Set();
+  const attrs = new Map();
+  const control = {
+    isConnected: connected,
+    classList: {
+      add: (c) => classes.add(c),
+      remove: (c) => classes.delete(c),
+      has: (c) => classes.has(c),
+    },
+    setAttribute: (k, v) => attrs.set(k, v),
+    removeAttribute: (k) => attrs.delete(k),
+    getAttribute: (k) => attrs.get(k) ?? null,
+    focus: () => { global.document.activeElement = control; },
+  };
+  // Wie im Browser: disabled = true nimmt dem fokussierten Element den Fokus.
+  let disabled = false;
+  Object.defineProperty(control, 'disabled', {
+    get: () => disabled,
+    set: (value) => {
+      disabled = value;
+      if (value && global.document.activeElement === control) {
+        global.document.activeElement = { tag: 'body' };
+      }
+    },
+  });
+  return control;
+}
+
+test('withBusy: gibt den Fokus nach der Aktion an das Control zurück', async () => {
+  global.document = { activeElement: null };
+  const control = makeControl();
+  global.document.activeElement = control;
+
+  await withBusy(control, async () => {
+    assert.equal(control.disabled, true, 'während der Aktion gesperrt');
+    assert.equal(control.getAttribute('aria-busy'), 'true', 'aria-busy gesetzt');
+    assert.notEqual(global.document.activeElement, control, 'disabled entzieht den Fokus');
+  });
+
+  assert.equal(control.disabled, false, 'danach wieder bedienbar');
+  assert.equal(control.getAttribute('aria-busy'), null, 'aria-busy entfernt');
+  assert.equal(global.document.activeElement, control, 'Fokus zurück auf dem Control');
+});
+
+test('withBusy: stiehlt keinen Fokus, wenn das Control ihn vorher nicht hatte', async () => {
+  global.document = { activeElement: { tag: 'other' } };
+  const control = makeControl();
+  await withBusy(control, async () => {});
+  assert.notEqual(global.document.activeElement, control);
+});
+
+test('withBusy: kein focus() auf abgehängten Controls (Re-Render)', async () => {
+  global.document = { activeElement: null };
+  const control = makeControl({ connected: false });
+  global.document.activeElement = control;
+  await withBusy(control, async () => {});
+  assert.notEqual(global.document.activeElement, control, 'abgehängtes Control bekommt keinen Fokus');
+});
+
+test('withBusy: räumt Lade-Klasse und Sperre auch im Fehlerfall auf', async () => {
+  global.document = { activeElement: null };
+  const control = makeControl();
+  await assert.rejects(
+    () => withBusy(control, async () => { throw new Error('boom'); }, { loadingClass: 'btn--loading' }),
+    /boom/,
+  );
+  assert.equal(control.disabled, false);
+  assert.equal(control.classList.has('btn--loading'), false);
+  assert.equal(control.getAttribute('aria-busy'), null);
+});
+
+test('withBusy: reicht den Rückgabewert der Aktion durch', async () => {
+  global.document = { activeElement: null };
+  const control = makeControl();
+  assert.equal(await withBusy(control, async () => 42), 42);
 });
 
 test('vibrate: ruft navigator.vibrate auf wenn vorhanden', () => {

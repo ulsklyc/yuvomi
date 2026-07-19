@@ -15,6 +15,19 @@ const MAX_URL = 500;
 const router = express.Router();
 
 /**
+ * Fehlerantwort mit stabilem, maschinenlesbarem Schlüssel. Der Client übersetzt
+ * über `errorCode`; `error` bleibt eine englische Entwickler-Notiz und wird nur
+ * als Fallback angezeigt.
+ *
+ * Vorher standen hier deutsche Klartexte („Konto mit dieser URL … existiert
+ * bereits"), die unübersetzt in 22 von 23 Locales landeten - ausgerechnet beim
+ * gescheiterten Speichern von Zugangsdaten.
+ */
+function fail(res, status, errorCode, devMessage) {
+  return res.status(status).json({ error: devMessage, errorCode, code: status });
+}
+
+/**
  * GET /api/v1/contacts/cardav/accounts
  * Liste aller CardDAV Accounts.
  * Response: { data: Account[] }
@@ -25,7 +38,7 @@ router.get('/accounts', async (req, res) => {
     res.json({ data: accounts });
   } catch (err) {
     log.error('Error fetching accounts:', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    fail(res, 500, 'internal', 'Internal error');
   }
 });
 
@@ -42,7 +55,7 @@ router.post('/accounts', async (req, res) => {
     const vUsername = str(req.body.username, 'Username', { max: MAX_TITLE });
     const vPassword = str(req.body.password, 'Password', { max: MAX_TITLE });
     const errors = collectErrors([vName, vUrl, vUsername, vPassword]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    if (errors.length) return fail(res, 400, 'validation', errors.join(' '));
 
     const result = await CardDAVSync.addAccount(
       vName.value,
@@ -54,7 +67,54 @@ router.post('/accounts', async (req, res) => {
     res.status(201).json({ data: result });
   } catch (err) {
     log.error('Error adding CardDAV account:', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    fail(res, 500, 'internal', 'Internal error');
+  }
+});
+
+/**
+ * PUT /api/v1/contacts/cardav/accounts/:id
+ * Zugangsdaten eines Kontos ändern. Ohne diesen Pfad blieb bei einem rotierten
+ * Passwort nur Löschen und Neuanlegen - samt Verlust der Adressbuch-Auswahl.
+ * Body: { name, cardavUrl, username, password? } - leeres Passwort = unverändert.
+ * Response: { data: Account }
+ */
+router.put('/accounts/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
+
+    const vName     = str(req.body.name, 'Name', { max: MAX_TITLE });
+    const vUrl      = str(req.body.cardavUrl, 'CardDAV URL', { max: MAX_URL });
+    const vUsername = str(req.body.username, 'Username', { max: MAX_TITLE });
+    const errors = collectErrors([vName, vUrl, vUsername]);
+    if (errors.length) return fail(res, 400, 'validation', errors.join(' '));
+
+    // Passwort ist optional: leer heißt „bestehendes behalten".
+    const rawPassword = typeof req.body.password === 'string' ? req.body.password : '';
+    let password = null;
+    if (rawPassword.trim().length > 0) {
+      const vPassword = str(rawPassword, 'Password', { max: MAX_TITLE });
+      const pwErrors = collectErrors([vPassword]);
+      if (pwErrors.length) return fail(res, 400, 'validation', pwErrors.join(' '));
+      password = vPassword.value;
+    }
+
+    const updated = CardDAVSync.updateAccount(id, {
+      name: vName.value,
+      cardavUrl: vUrl.value,
+      username: vUsername.value,
+      password,
+    });
+
+    if (updated === 'not-found') return fail(res, 404, 'account_not_found', 'Account not found');
+    if (updated === 'conflict') {
+      return fail(res, 409, 'account_duplicate', 'Account with this URL and username already exists');
+    }
+
+    res.json({ data: updated });
+  } catch (err) {
+    log.error('Error updating CardDAV account:', err);
+    fail(res, 500, 'internal', 'Internal error');
   }
 });
 
@@ -66,14 +126,14 @@ router.post('/accounts', async (req, res) => {
 router.delete('/accounts/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    if (!id || id < 1) return res.status(400).json({ error: 'Invalid ID', code: 400 });
+    if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
 
     await CardDAVSync.deleteAccount(id);
 
     res.json({ data: { deleted: true } });
   } catch (err) {
     log.error('Error deleting CardDAV account:', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    fail(res, 500, 'internal', 'Internal error');
   }
 });
 
@@ -85,10 +145,10 @@ router.delete('/accounts/:id', async (req, res) => {
 router.post('/accounts/:id/test', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    if (!id || id < 1) return res.status(400).json({ error: 'Invalid ID', code: 400 });
+    if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
 
     const account = db.get().prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(id);
-    if (!account) return res.status(404).json({ error: 'Account nicht gefunden', code: 404 });
+    if (!account) return fail(res, 404, 'account_not_found', 'Account not found');
 
     const result = await CardDAVSync.testConnection(
       account.carddav_url,
@@ -99,7 +159,7 @@ router.post('/accounts/:id/test', async (req, res) => {
     res.json({ data: result });
   } catch (err) {
     log.error('Error testing CardDAV connection:', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    fail(res, 500, 'internal', 'Internal error');
   }
 });
 
@@ -111,10 +171,11 @@ router.post('/accounts/:id/test', async (req, res) => {
 router.get('/accounts/:id/addressbooks', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    if (!id || id < 1) return res.status(400).json({ error: 'Invalid ID', code: 400 });
+    if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
 
     const addressbooks = db.get().prepare(`
-      SELECT id, addressbook_url as url, addressbook_name as name, enabled
+      SELECT id, addressbook_url as url, addressbook_name as name, enabled,
+             last_error as lastError
       FROM carddav_addressbook_selection
       WHERE account_id = ?
       ORDER BY addressbook_name
@@ -123,7 +184,7 @@ router.get('/accounts/:id/addressbooks', async (req, res) => {
     res.json({ data: addressbooks });
   } catch (err) {
     log.error('Error fetching addressbooks:', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    fail(res, 500, 'internal', 'Internal error');
   }
 });
 
@@ -135,15 +196,16 @@ router.get('/accounts/:id/addressbooks', async (req, res) => {
 router.post('/accounts/:id/addressbooks/refresh', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    if (!id || id < 1) return res.status(400).json({ error: 'Invalid ID', code: 400 });
+    if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
 
     const account = db.get().prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(id);
-    if (!account) return res.status(404).json({ error: 'Account nicht gefunden', code: 404 });
+    if (!account) return fail(res, 404, 'account_not_found', 'Account not found');
 
     await CardDAVSync.discoverAddressbooks(id);
 
     const addressbooks = db.get().prepare(`
-      SELECT id, addressbook_url as url, addressbook_name as name, enabled
+      SELECT id, addressbook_url as url, addressbook_name as name, enabled,
+             last_error as lastError
       FROM carddav_addressbook_selection
       WHERE account_id = ?
       ORDER BY addressbook_name
@@ -152,7 +214,7 @@ router.post('/accounts/:id/addressbooks/refresh', async (req, res) => {
     res.json({ data: addressbooks });
   } catch (err) {
     log.error('Error refreshing addressbooks:', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    fail(res, 500, 'internal', 'Internal error');
   }
 });
 
@@ -165,18 +227,23 @@ router.post('/accounts/:id/addressbooks/refresh', async (req, res) => {
 router.put('/addressbooks/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    if (!id || id < 1) return res.status(400).json({ error: 'Invalid ID', code: 400 });
+    if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
 
     const vEnabled = bool(req.body.enabled, 'enabled');
     const errors = collectErrors([vEnabled]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    if (errors.length) return fail(res, 400, 'validation', errors.join(' '));
+
+    const exists = db.get()
+      .prepare('SELECT id FROM carddav_addressbook_selection WHERE id = ?')
+      .get(id);
+    if (!exists) return fail(res, 404, 'addressbook_not_found', 'Addressbook not found');
 
     CardDAVSync.toggleAddressbook(id, vEnabled.value);
 
     res.json({ data: { updated: true, enabled: vEnabled.value } });
   } catch (err) {
     log.error('Error toggling addressbook:', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    fail(res, 500, 'internal', 'Internal error');
   }
 });
 
@@ -188,17 +255,17 @@ router.put('/addressbooks/:id', async (req, res) => {
 router.post('/accounts/:id/sync', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    if (!id || id < 1) return res.status(400).json({ error: 'Invalid ID', code: 400 });
+    if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
 
     const account = db.get().prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(id);
-    if (!account) return res.status(404).json({ error: 'Account nicht gefunden', code: 404 });
+    if (!account) return fail(res, 404, 'account_not_found', 'Account not found');
 
     const result = await CardDAVSync.syncAccount(id);
 
     res.json({ data: result });
   } catch (err) {
     log.error('Error syncing account:', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    fail(res, 500, 'internal', 'Internal error');
   }
 });
 
