@@ -707,7 +707,7 @@ function openExpenseModal(expense = null) {
 function openSettlementModal() {
   const group = state.groups.find((g) => g.id === state.activeGroupId);
   // Vorbefüllung aus der offenen Schuld: bevorzugt die, in der ich selbst der
-  // Schuldner bin — statt Zahler=Empfänger=erstes Mitglied und leerem Betrag.
+  // Schuldner bin - statt Zahler=Empfänger=erstes Mitglied und leerem Betrag.
   const debts = state.balances.simplified_debts || [];
   const debt = debts.find((d) => String(d.from_user_id) === String(state.user?.id)) || debts[0] || null;
   openSharedModal({

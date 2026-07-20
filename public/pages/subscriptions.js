@@ -296,7 +296,7 @@ function sortedSubscriptions() {
 function renderContent() {
   const content = container.querySelector('#subscriptions-content');
   const rows = sortedSubscriptions();
-  // Kurs-Status/-Aktion nur, wenn überhaupt ein Abo in Fremdwährung läuft —
+  // Kurs-Status/-Aktion nur, wenn überhaupt ein Abo in Fremdwährung läuft -
   // sonst ist „Wechselkurse nicht verfügbar" eine Dauerwarnung ohne Anlass.
   const baseCurrency = state.summary?.base_currency || state.settings.base_currency;
   const hasForeignCurrency = rows.some((s) => s.currency && s.currency !== baseCurrency);
