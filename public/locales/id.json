@@ -364,6 +364,11 @@
         "importMealsAction": "Impor",
         "importMealsPreview": "{{count}} bahan dari {{mealsText}} akan ditambahkan.",
         "importMealsPreviewMeals": "{{count}} hidangan",
+        "importMealsPreview_one": "{{count}} bahan dari {{mealsText}} akan ditambahkan.",
+        "importMealsPreview_few": "{{count}} bahan dari {{mealsText}} akan ditambahkan.",
+        "importMealsPreview_other": "{{count}} bahan dari {{mealsText}} akan ditambahkan.",
+        "importMealsPreviewMeals_one": "{{count}} hidangan",
+        "importMealsPreviewMeals_other": "{{count}} hidangan",
         "importMealsEmpty": "Tidak ada bahan makanan yang ditemukan dalam rentang yang dipilih.",
         "manageCategories": "Kelola kategori"
     },

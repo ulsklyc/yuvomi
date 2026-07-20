@@ -360,6 +360,7 @@
         "importMealsPreviewMeals": "{{count}} γεύματα",
         "importMealsPreviewMeals_one": "{{count}} γεύμα",
         "importMealsPreviewMeals_other": "{{count}} γεύματα",
+        "importMealsPreview_few": "Θα προστεθούν {{count}} υλικά από {{mealsText}}.",
         "importMealsEmpty": "Δεν βρέθηκαν υλικά γευμάτων στο επιλεγμένο εύρος.",
         "manageCategories": "Διαχείριση κατηγοριών"
     },

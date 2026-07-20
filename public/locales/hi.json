@@ -358,6 +358,9 @@
         "importMealsPreview_one": "{{mealsText}} से {{count}} सामग्री जोड़ी जाएगी।",
         "importMealsPreview_other": "{{mealsText}} से {{count}} सामग्री जोड़ी जाएँगी।",
         "importMealsPreviewMeals": "{{count}} भोजन",
+        "importMealsPreview_few": "{{mealsText}} से {{count}} सामग्री जोड़ी जाएँगी।",
+        "importMealsPreviewMeals_one": "{{count}} भोजन",
+        "importMealsPreviewMeals_other": "{{count}} भोजन",
         "importMealsEmpty": "चयनित अवधि में भोजन योजना की कोई सामग्री नहीं मिली।",
         "manageCategories": "श्रेणियाँ प्रबंधित करें"
     },

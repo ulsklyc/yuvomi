@@ -360,6 +360,7 @@
         "importMealsPreviewMeals": "{{count}} maaltijden",
         "importMealsPreviewMeals_one": "{{count}} maaltijd",
         "importMealsPreviewMeals_other": "{{count}} maaltijden",
+        "importMealsPreview_few": "{{count}} ingrediënten uit {{mealsText}} worden toegevoegd.",
         "importMealsEmpty": "Er zijn geen maaltijdingrediënten gevonden in de geselecteerde periode.",
         "manageCategories": "Categorieën beheren"
     },

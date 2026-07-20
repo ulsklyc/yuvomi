@@ -360,6 +360,7 @@
         "importMealsPreviewMeals": "{{count}} وجبات",
         "importMealsPreviewMeals_one": "{{count}} وجبة",
         "importMealsPreviewMeals_other": "{{count}} وجبات",
+        "importMealsPreview_few": "ستتم إضافة {{count}} مكونات من {{mealsText}}.",
         "importMealsEmpty": "لم يتم العثور على مكونات وجبات في النطاق المحدد.",
         "manageCategories": "إدارة الفئات"
     },

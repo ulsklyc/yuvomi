@@ -360,6 +360,7 @@
         "importMealsPreviewMeals": "{{count}} måltider",
         "importMealsPreviewMeals_one": "{{count}} måltid",
         "importMealsPreviewMeals_other": "{{count}} måltider",
+        "importMealsPreview_few": "{{count}} ingredienser från {{mealsText}} läggs till.",
         "importMealsEmpty": "Inga måltidsingredienser hittades i det valda intervallet.",
         "manageCategories": "Hantera kategorier"
     },

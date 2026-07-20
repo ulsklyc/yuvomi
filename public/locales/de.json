@@ -368,6 +368,7 @@
         "importMealsPreviewMeals": "{{count}} Mahlzeiten",
         "importMealsPreviewMeals_one": "{{count}} Mahlzeit",
         "importMealsPreviewMeals_other": "{{count}} Mahlzeiten",
+        "importMealsPreview_few": "{{count}} Zutaten aus {{mealsText}} werden übernommen.",
         "importMealsEmpty": "Im gewählten Zeitraum wurden keine Essensplan-Zutaten gefunden.",
         "manageCategories": "Kategorien verwalten"
     },

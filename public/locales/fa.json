@@ -364,6 +364,11 @@
         "importMealsAction": "درون‌ریزی",
         "importMealsPreview": "{{count}} ماده از {{mealsText}} افزوده می‌شود.",
         "importMealsPreviewMeals": "{{count}} وعده",
+        "importMealsPreview_one": "{{count}} ماده از {{mealsText}} افزوده می‌شود.",
+        "importMealsPreview_few": "{{count}} ماده از {{mealsText}} افزوده می‌شود.",
+        "importMealsPreview_other": "{{count}} ماده از {{mealsText}} افزوده می‌شود.",
+        "importMealsPreviewMeals_one": "{{count}} وعده",
+        "importMealsPreviewMeals_other": "{{count}} وعده",
         "importMealsEmpty": "هیچ ماده غذایی از برنامه غذایی در بازه انتخاب‌شده پیدا نشد.",
         "manageCategories": "مدیریت دسته‌ها"
     },

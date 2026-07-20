@@ -364,6 +364,11 @@
         "importMealsAction": "가져오기",
         "importMealsPreview": "{{mealsText}}에서 {{count}}개 재료를 추가합니다.",
         "importMealsPreviewMeals": "{{count}}개 식사",
+        "importMealsPreview_one": "{{mealsText}}에서 {{count}}개 재료를 추가합니다.",
+        "importMealsPreview_few": "{{mealsText}}에서 {{count}}개 재료를 추가합니다.",
+        "importMealsPreview_other": "{{mealsText}}에서 {{count}}개 재료를 추가합니다.",
+        "importMealsPreviewMeals_one": "{{count}}개 식사",
+        "importMealsPreviewMeals_other": "{{count}}개 식사",
         "importMealsEmpty": "선택한 기간에 식단 재료가 없습니다.",
         "manageCategories": "카테고리 관리"
     },

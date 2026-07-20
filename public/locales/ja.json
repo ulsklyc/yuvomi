@@ -356,6 +356,11 @@
         "importMealsAction": "インポート",
         "importMealsPreview": "{{mealsText}}から{{count}}件の材料を追加します。",
         "importMealsPreviewMeals": "{{count}}件の食事",
+        "importMealsPreview_one": "{{mealsText}}から{{count}}件の材料を追加します。",
+        "importMealsPreview_few": "{{mealsText}}から{{count}}件の材料を追加します。",
+        "importMealsPreview_other": "{{mealsText}}から{{count}}件の材料を追加します。",
+        "importMealsPreviewMeals_one": "{{count}}件の食事",
+        "importMealsPreviewMeals_other": "{{count}}件の食事",
         "importMealsEmpty": "選択した期間内に献立の材料が見つかりませんでした。",
         "manageCategories": "カテゴリを管理"
     },

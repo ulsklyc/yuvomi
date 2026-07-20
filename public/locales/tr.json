@@ -356,6 +356,11 @@
         "importMealsAction": "İçe aktar",
         "importMealsPreview": "{{mealsText}} {{count}} malzeme eklenecek.",
         "importMealsPreviewMeals": "{{count}} öğünden",
+        "importMealsPreview_one": "{{mealsText}} {{count}} malzeme eklenecek.",
+        "importMealsPreview_few": "{{mealsText}} {{count}} malzeme eklenecek.",
+        "importMealsPreview_other": "{{mealsText}} {{count}} malzeme eklenecek.",
+        "importMealsPreviewMeals_one": "{{count}} öğünden",
+        "importMealsPreviewMeals_other": "{{count}} öğünden",
         "importMealsEmpty": "Seçilen aralıkta yemek malzemesi bulunamadı.",
         "manageCategories": "Kategorileri yönet"
     },

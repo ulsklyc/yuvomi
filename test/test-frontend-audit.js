@@ -2228,10 +2228,17 @@ test('phase 2 dashboard FAB uses tokenized position and reserved mobile scroll r
 
   assert.match(fabRule, /bottom:\s*calc\(var\(--nav-bottom-height\)\s*\+\s*var\(--space-6\)\)/);
   assert.doesNotMatch(fabRule, /\b24px\b/, 'FAB position should use spacing tokens');
+  // Die Scroll-Reserve traegt .dashboard selbst (FAB-Clearance); eine zweite
+  // Reserve auf .dashboard-shell stapelte sich zu ~200px totem Raum (Audit A1-16).
   assert.match(
     dashboard,
-    /@media \(max-width:\s*640px\)[\s\S]*\.dashboard-shell\s*\{[\s\S]*padding-bottom:\s*calc\(var\(--target-lg\)\s*\+\s*var\(--space-8\)\)/,
+    /\.dashboard\s*\{[\s\S]*?padding-bottom:\s*calc\(52px \+ var\(--space-6\) \* 2 \+ var\(--space-4\)\)/,
     'mobile dashboard should reserve scroll room for the fixed FAB'
+  );
+  assert.doesNotMatch(
+    dashboard,
+    /@media \(max-width:\s*640px\)[\s\S]*\.dashboard-shell\s*\{[^}]*padding-bottom/,
+    'the mobile shell must not stack a second FAB clearance (Audit A1-16)'
   );
 });
 

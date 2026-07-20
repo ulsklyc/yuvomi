@@ -356,6 +356,11 @@
         "importMealsAction": "导入",
         "importMealsPreview": "将从 {{mealsText}}中导入 {{count}} 种食材。",
         "importMealsPreviewMeals": "{{count}} 餐",
+        "importMealsPreview_one": "将从 {{mealsText}}中导入 {{count}} 种食材。",
+        "importMealsPreview_few": "将从 {{mealsText}}中导入 {{count}} 种食材。",
+        "importMealsPreview_other": "将从 {{mealsText}}中导入 {{count}} 种食材。",
+        "importMealsPreviewMeals_one": "{{count}} 餐",
+        "importMealsPreviewMeals_other": "{{count}} 餐",
         "importMealsEmpty": "在所选范围内未找到餐食配料。",
         "manageCategories": "管理分类"
     },

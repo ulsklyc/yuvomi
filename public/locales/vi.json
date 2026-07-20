@@ -356,6 +356,11 @@
         "importMealsAction": "Nhập",
         "importMealsPreview": "{{count}} nguyên liệu từ {{mealsText}} sẽ được thêm.",
         "importMealsPreviewMeals": "{{count}} bữa ăn",
+        "importMealsPreview_one": "{{count}} nguyên liệu từ {{mealsText}} sẽ được thêm.",
+        "importMealsPreview_few": "{{count}} nguyên liệu từ {{mealsText}} sẽ được thêm.",
+        "importMealsPreview_other": "{{count}} nguyên liệu từ {{mealsText}} sẽ được thêm.",
+        "importMealsPreviewMeals_one": "{{count}} bữa ăn",
+        "importMealsPreviewMeals_other": "{{count}} bữa ăn",
         "importMealsEmpty": "Không tìm thấy nguyên liệu bữa ăn nào trong phạm vi đã chọn.",
         "manageCategories": "Quản lý danh mục"
     },

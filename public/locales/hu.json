@@ -356,6 +356,11 @@
         "importMealsAction": "Importálás",
         "importMealsPreview": "{{count}} hozzávaló kerül át {{mealsText}}.",
         "importMealsPreviewMeals": "{{count}} étkezésből",
+        "importMealsPreview_one": "{{count}} hozzávaló kerül át {{mealsText}}.",
+        "importMealsPreview_few": "{{count}} hozzávaló kerül át {{mealsText}}.",
+        "importMealsPreview_other": "{{count}} hozzávaló kerül át {{mealsText}}.",
+        "importMealsPreviewMeals_one": "{{count}} étkezésből",
+        "importMealsPreviewMeals_other": "{{count}} étkezésből",
         "importMealsEmpty": "A kiválasztott időszakban nem találhatók étkezési hozzávalók.",
         "manageCategories": "Kategóriák kezelése"
     },

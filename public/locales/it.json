@@ -360,6 +360,7 @@
         "importMealsPreviewMeals": "{{count}} pasti",
         "importMealsPreviewMeals_one": "{{count}} pasto",
         "importMealsPreviewMeals_other": "{{count}} pasti",
+        "importMealsPreview_few": "Verranno aggiunti {{count}} ingredienti da {{mealsText}}.",
         "importMealsEmpty": "Nell'intervallo selezionato non sono stati trovati ingredienti dei pasti.",
         "manageCategories": "Gestisci categorie"
     },

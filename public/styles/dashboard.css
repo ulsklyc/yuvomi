@@ -3057,9 +3057,9 @@ svg.weather-forecast__icon {
 
   .dashboard-shell {
     gap: var(--space-3);
-    /* Kein eigenes padding-bottom: die FAB-Clearance traegt bereits .dashboard
-     * (116px). Beide zusammen ergaben ~200px toten Raum vor der Bottom-Bar
-     * (Audit A1-16). */
+    /* Bewusst ohne eigene Bottom-Reserve: die FAB-Clearance traegt bereits
+     * .dashboard (116px). Beide zusammen ergaben ~200px toten Raum vor der
+     * Bottom-Bar (Audit A1-16). */
   }
 
   .dashboard-overview {

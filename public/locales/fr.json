@@ -360,6 +360,7 @@
         "importMealsPreviewMeals": "{{count}} repas",
         "importMealsPreviewMeals_one": "{{count}} repas",
         "importMealsPreviewMeals_other": "{{count}} repas",
+        "importMealsPreview_few": "{{count}} ingrédients de {{mealsText}} seront ajoutés.",
         "importMealsEmpty": "Aucun ingrédient de repas n'a été trouvé dans la période sélectionnée.",
         "manageCategories": "Gérer les catégories"
     },
