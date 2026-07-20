@@ -76,9 +76,17 @@ const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 const COUNTRY_ISO_RE = /^[A-Z]{2}$/;
 const SUBDIVISION_RE = /^[A-Z]{2}-[A-Z0-9-]{1,10}$/;
 
-// Order defines the default dashboard layout (weather first, then primary content).
-// Must stay in sync with WIDGET_IDS in public/pages/dashboard.js.
-const VALID_WIDGET_IDS = ['weather', 'tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'budget', 'family', 'notes'];
+// Order defines the default dashboard layout.
+// Must stay in sync with WIDGET_IDS in public/pages/dashboard.js: der Client
+// erkennt eine Nutzer-Umsortierung am Vergleich gegen SEINEN Default; weicht der
+// Server-Default ab, gilt jede frische Installation als "nutzergeordnet" und das
+// dichte Bento-Layout greift nie (Audit A1-03).
+const VALID_WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'budget', 'rewards', 'health', 'cycle', 'housekeeping', 'family', 'notes', 'weather'];
+
+// Opt-in-Widgets starten unsichtbar (Spiegel von DEFAULT_HIDDEN_WIDGETS im Client,
+// ohne die Cockpit-Teilmenge): sonst poppen sie bei Bestands-Configs, denen die
+// IDs noch fehlen, beim Normalisieren ungefragt auf.
+const DEFAULT_HIDDEN_WIDGET_IDS = new Set(['rewards', 'health', 'cycle', 'housekeeping']);
 const VALID_WIDGET_SIZES = ['1x1', '1x2', '1x3', '1x4', '2x1', '2x2', '2x3', '2x4', '3x1', '3x2', '3x3', '3x4', '4x1', '4x2', '4x3', '4x4'];
 
 // Modul-Slugs, die per Settings deaktiviert werden können.
@@ -94,13 +102,14 @@ const KITCHEN_NAV_IDS = new Set(['kitchen', 'meals', 'recipes', 'shopping']);
 
 function defaultWidgetSize(id) {
   if (['tasks', 'calendar'].includes(id)) return '2x2';
-  if (['weather', 'shopping', 'notes'].includes(id)) return '2x1';
+  if (['weather', 'shopping', 'notes', 'health', 'cycle'].includes(id)) return '2x1';
+  if (id === 'rewards') return '1x2';
   return '1x1';
 }
 
 const DEFAULT_WIDGET_CONFIG = JSON.stringify(VALID_WIDGET_IDS.map((id, order) => ({
   id,
-  visible: true,
+  visible: !DEFAULT_HIDDEN_WIDGET_IDS.has(id),
   order,
   size: defaultWidgetSize(id),
 })));
@@ -222,11 +231,11 @@ function normalizeWidgetConfig(input) {
       }))
     : [];
 
-  // Fehlende Widget-IDs am Ende ergänzen
+  // Fehlende Widget-IDs am Ende ergänzen; Opt-in-Widgets bleiben dabei unsichtbar
   const presentIds = new Set(valid.map((w) => w.id));
   for (const id of VALID_WIDGET_IDS) {
     if (!presentIds.has(id)) {
-      valid.push({ id, visible: true, order: valid.length, size: defaultWidgetSize(id) });
+      valid.push({ id, visible: !DEFAULT_HIDDEN_WIDGET_IDS.has(id), order: valid.length, size: defaultWidgetSize(id) });
     }
   }
   return valid

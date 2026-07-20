@@ -150,11 +150,22 @@ test('PUT dashboard_widgets: Teilmenge -> fehlende IDs werden ergänzt, order ne
   const { status, body } = await put({ dashboard_widgets: [{ id: 'notes', visible: false, size: '2x1' }] });
   assert.equal(status, 200);
   const widgets = body.data.dashboard_widgets;
-  // Alle 9 IDs vorhanden, notes zuerst und unsichtbar, order lückenlos 0..n.
-  assert.equal(widgets.length, 9);
+  // Alle 13 IDs vorhanden, notes zuerst und unsichtbar, order lückenlos 0..n.
+  assert.equal(widgets.length, 13);
   assert.equal(widgets[0].id, 'notes');
   assert.equal(widgets[0].visible, false);
-  assert.deepEqual(widgets.map((w) => w.order), [0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.deepEqual(widgets.map((w) => w.order), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  // Ergänzte Opt-in-Widgets starten unsichtbar, Kern-Widgets sichtbar.
+  const byId = Object.fromEntries(widgets.map((w) => [w.id, w]));
+  for (const id of ['rewards', 'health', 'cycle', 'housekeeping']) assert.equal(byId[id].visible, false, id);
+  for (const id of ['tasks', 'calendar', 'weather']) assert.equal(byId[id].visible, true, id);
+});
+test('PUT dashboard_widgets: Opt-in-Widget sichtbar geschaltet -> ueberlebt den Roundtrip', async () => {
+  const { status, body } = await put({ dashboard_widgets: [{ id: 'rewards', visible: true, size: '1x2' }] });
+  assert.equal(status, 200);
+  const rewards = body.data.dashboard_widgets.find((w) => w.id === 'rewards');
+  assert.ok(rewards, 'rewards bleibt in der gespeicherten Config');
+  assert.equal(rewards.visible, true);
 });
 
 // --------------------------------------------------------
@@ -381,7 +392,7 @@ test('POST /holidays/sync: Admin ohne konfiguriertes Land -> 200 (netz-freier Ea
 test('GET / verkraftet korrupte dashboard_widgets (Fallback auf Default)', async () => {
   cfgSet('dashboard_widgets', '{ kaputt');
   const widgets = (await get()).body.data.dashboard_widgets;
-  assert.equal(widgets.length, 9); // Default-Set
+  assert.equal(widgets.length, 13); // Default-Set
   cfgDelete('dashboard_widgets');
 });
 test('GET / verkraftet korrupte per-user calendar_default_reminders', async () => {
