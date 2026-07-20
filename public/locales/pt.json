@@ -2446,6 +2446,7 @@
         "registerPayment": "Registrar pagamento",
         "payer": "Pagador",
         "payee": "Recebedor",
+        "settlementSamePerson": "O pagador e o destinatário devem ser duas pessoas diferentes.",
         "member": "Membro",
         "role": "Função",
         "roleGuest": "Convidado",

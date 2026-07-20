@@ -904,7 +904,8 @@ html.fab-anim-done .page-fab {
  * und budget.css entschärft; hier steht sie einmal für alle geteilten
  * Bedienelemente. `hidden` heißt versteckt, ausnahmslos. */
 .page-fab[hidden],
-.btn[hidden] {
+.btn[hidden],
+p.field-hint--warn[hidden] {
   display: none !important;
 }
 

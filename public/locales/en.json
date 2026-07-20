@@ -2446,6 +2446,7 @@
         "registerPayment": "Register payment",
         "payer": "Payer",
         "payee": "Payee",
+        "settlementSamePerson": "Payer and recipient must be two different people.",
         "member": "Member",
         "role": "Role",
         "roleGuest": "Guest",

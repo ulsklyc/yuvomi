@@ -2446,6 +2446,7 @@
         "registerPayment": "登记付款",
         "payer": "付款人",
         "payee": "收款人",
+        "settlementSamePerson": "付款人和收款人必须是两个不同的人。",
         "member": "成员",
         "role": "角色",
         "roleGuest": "访客",

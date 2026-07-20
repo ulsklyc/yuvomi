@@ -105,7 +105,7 @@ function renderVisibilityBadge(visibility) {
           </span>`;
 }
 
-function formatDueDate(dateStr, timeStr) {
+function formatDueDate(dateStr, timeStr, isDone = false) {
   if (!dateStr) return null;
   const dueDate = timeStr ? new Date(`${dateStr}T${timeStr}`) : new Date(`${dateStr}T23:59:59`);
   if (isNaN(dueDate)) return null;
@@ -117,6 +117,11 @@ function formatDueDate(dateStr, timeStr) {
 
   const timeLabel = timeStr ? ` – ${formatTime(dueDate)}` : '';
   const fullLabel = timeStr ? `${formatDate(dueDate)}, ${formatTime(dueDate)}` : formatDate(dueDate);
+
+  // Erledigte/archivierte Aufgaben können nicht überfällig sein — neutrales Datum.
+  if (isDone) {
+    return { label: fullLabel, cls: '' };
+  }
 
   if (dueDate < now) {
     return { label: `${t('tasks.overdue')} – ${fullLabel}`, cls: 'due-date--overdue' };
@@ -179,8 +184,8 @@ function renderPriorityBadge(priority) {
   </span>`;
 }
 
-function renderDueDate(dateStr, timeStr) {
-  const d = formatDueDate(dateStr, timeStr);
+function renderDueDate(dateStr, timeStr, isDone = false) {
+  const d = formatDueDate(dateStr, timeStr, isDone);
   if (!d) return '';
   return `<span class="due-date ${d.cls}">
     <i data-lucide="clock" class="icon-sm" aria-hidden="true"></i> ${d.label}
@@ -254,7 +259,7 @@ function renderTaskCard(task, opts = {}) {
           <div class="task-card__meta">
             ${renderPriorityBadge(task.priority)}
             ${renderStartDateBadge(task.start_date)}
-            ${renderDueDate(task.due_date, task.due_time)}
+            ${renderDueDate(task.due_date, task.due_time, task.status === 'done' || task.status === 'archived')}
             ${task.is_recurring ? `<span class="due-date" aria-label="${t('tasks.recurring')}"><i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i></span>` : ''}
             ${task.document_count > 0 ? `<span class="due-date task-card__docs" aria-label="${t('tasks.documentsCount', { count: task.document_count })}"><i data-lucide="paperclip" class="icon-sm" aria-hidden="true"></i>${task.document_count}</span>` : ''}
             ${renderVisibilityBadge(task.visibility)}
@@ -992,7 +997,7 @@ function kanbanNextStatus(status) {
 }
 
 function renderKanbanCard(task) {
-  const due  = formatDueDate(task.due_date, task.due_time);
+  const due  = formatDueDate(task.due_date, task.due_time, task.status === 'done' || task.status === 'archived');
   const next = kanbanNextStatus(task.status);
   const icon = next === 'done' ? 'check' : next === 'in_progress' ? 'circle-play' : 'rotate-ccw';
   const nextLabel = next === 'done'

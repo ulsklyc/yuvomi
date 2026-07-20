@@ -2446,6 +2446,7 @@
         "registerPayment": "Zahlung eintragen",
         "payer": "Zahler",
         "payee": "Empfänger",
+        "settlementSamePerson": "Zahler und Empfänger müssen zwei verschiedene Personen sein.",
         "member": "Mitglied",
         "role": "Rolle",
         "roleGuest": "Gast",

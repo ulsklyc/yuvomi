@@ -2446,6 +2446,7 @@
         "registerPayment": "Registrera betalning",
         "payer": "Betalare",
         "payee": "Mottagare",
+        "settlementSamePerson": "Betalare och mottagare måste vara två olika personer.",
         "member": "Medlem",
         "role": "Roll",
         "roleGuest": "Gäst",

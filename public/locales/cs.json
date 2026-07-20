@@ -2172,6 +2172,7 @@
         "registerPayment": "Zaregistrovat platbu",
         "payer": "Plátce",
         "payee": "Příjemce",
+        "settlementSamePerson": "Plátce a příjemce musí být dvě různé osoby.",
         "member": "Člen",
         "role": "Role",
         "roleGuest": "Host",

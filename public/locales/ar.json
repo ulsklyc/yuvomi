@@ -2446,6 +2446,7 @@
         "registerPayment": "تسجيل دفعة",
         "payer": "الدافع",
         "payee": "المستلم",
+        "settlementSamePerson": "يجب أن يكون الدافع والمستلم شخصين مختلفين.",
         "member": "عضو",
         "role": "الدور",
         "roleGuest": "ضيف",

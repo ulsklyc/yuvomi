@@ -2446,6 +2446,7 @@
         "registerPayment": "결제 등록",
         "payer": "지불자",
         "payee": "수취인",
+        "settlementSamePerson": "지불하는 사람과 받는 사람은 서로 달라야 합니다.",
         "member": "구성원",
         "role": "역할",
         "roleGuest": "손님",

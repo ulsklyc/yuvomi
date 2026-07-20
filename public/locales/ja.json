@@ -2446,6 +2446,7 @@
         "registerPayment": "支払いを登録",
         "payer": "支払者",
         "payee": "受取人",
+        "settlementSamePerson": "支払う人と受け取る人は別の人にしてください。",
         "member": "メンバー",
         "role": "役割",
         "roleGuest": "ゲスト",

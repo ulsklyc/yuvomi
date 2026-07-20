@@ -2446,6 +2446,7 @@
         "registerPayment": "Catat pembayaran",
         "payer": "Pembayar",
         "payee": "Penerima",
+        "settlementSamePerson": "Pembayar dan penerima harus dua orang yang berbeda.",
         "member": "Anggota",
         "role": "Peran",
         "roleGuest": "Tamu",

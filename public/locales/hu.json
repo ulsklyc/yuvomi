@@ -2446,6 +2446,7 @@
         "registerPayment": "Fizetés rögzítése",
         "payer": "Fizető",
         "payee": "Kedvezményezett",
+        "settlementSamePerson": "A fizető és a kedvezményezett két különböző személy legyen.",
         "member": "Tag",
         "role": "Szerep",
         "roleGuest": "Vendég",

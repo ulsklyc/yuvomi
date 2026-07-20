@@ -706,17 +706,22 @@ function openExpenseModal(expense = null) {
 
 function openSettlementModal() {
   const group = state.groups.find((g) => g.id === state.activeGroupId);
+  // Vorbefüllung aus der offenen Schuld: bevorzugt die, in der ich selbst der
+  // Schuldner bin — statt Zahler=Empfänger=erstes Mitglied und leerem Betrag.
+  const debts = state.balances.simplified_debts || [];
+  const debt = debts.find((d) => String(d.from_user_id) === String(state.user?.id)) || debts[0] || null;
   openSharedModal({
     title: t('splitExpenses.registerPayment'),
     content: `
       <form id="split-settlement-form" class="split-form">
         <div class="split-form-row">
-          <label>${t('splitExpenses.payer')}<select class="input" name="payer_id">${memberOptions()}</select></label>
-          <label>${t('splitExpenses.payee')}<select class="input" name="payee_id">${memberOptions()}</select></label>
+          <label>${t('splitExpenses.payer')}<select class="input" name="payer_id">${memberOptions(debt?.from_user_id ?? state.user?.id)}</select></label>
+          <label>${t('splitExpenses.payee')}<select class="input" name="payee_id">${memberOptions(debt?.to_user_id)}</select></label>
         </div>
+        <p class="form-hint field-hint--warn" id="split-settlement-same" role="status" hidden><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('splitExpenses.settlementSamePerson')}</span></p>
         <div class="split-form-row">
-          <label>${t('splitExpenses.amount')}<input class="input" name="amount" inputmode="decimal" required></label>
-          <label>${t('splitExpenses.currency')}<select class="input" name="currency">${state.meta.currencies.map((c) => `<option value="${c}" ${c === group.default_currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+          <label>${t('splitExpenses.amount')}<input class="input" name="amount" inputmode="decimal" required value="${debt ? esc(String(debt.amount)) : ''}"></label>
+          <label>${t('splitExpenses.currency')}<select class="input" name="currency">${state.meta.currencies.map((c) => `<option value="${c}" ${c === (debt?.currency || group.default_currency) ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
         </div>
         <label>${t('splitExpenses.notes')}<textarea class="input" name="notes" rows="3" maxlength="5000"></textarea></label>
         <div class="modal-actions">
@@ -726,10 +731,32 @@ function openSettlementModal() {
       </form>
     `,
     onSave(panel) {
+      const form = panel.querySelector('#split-settlement-form');
+      const payerSel = form.querySelector('[name="payer_id"]');
+      const payeeSel = form.querySelector('[name="payee_id"]');
+      const sameHint = panel.querySelector('#split-settlement-same');
+      const samePerson = () => payerSel.value === payeeSel.value;
+      const syncSameHint = () => { sameHint.hidden = !samePerson(); };
+      // Zahlerwechsel: passende Schuld dieses Zahlers übernehmen, solange der
+      // Betrag noch unberührt ist; mindestens den Empfänger-Konflikt auflösen.
+      payerSel.addEventListener('change', () => {
+        const match = (state.balances.simplified_debts || []).find((d) => String(d.from_user_id) === payerSel.value);
+        if (match) {
+          payeeSel.value = String(match.to_user_id);
+          const amountInput = form.querySelector('[name="amount"]');
+          if (!amountInput.value || (debt && amountInput.value === String(debt.amount))) {
+            amountInput.value = String(match.amount);
+          }
+        }
+        syncSameHint();
+      });
+      payeeSel.addEventListener('change', syncSameHint);
+      syncSameHint();
       panel.querySelector('#split-cancel-settlement')?.addEventListener('click', () => closeModal());
-      panel.querySelector('#split-settlement-form')?.addEventListener('submit', async (e) => {
+      form?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const data = Object.fromEntries(new FormData(panel.querySelector('#split-settlement-form')));
+        if (samePerson()) { syncSameHint(); payeeSel.focus(); return; }
+        const data = Object.fromEntries(new FormData(form));
         await api.post(`/split-expenses/groups/${state.activeGroupId}/settlements`, data);
         closeModal({ force: true });
         await refreshDashboard();

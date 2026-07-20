@@ -2446,6 +2446,7 @@
         "registerPayment": "Ghi nhận thanh toán",
         "payer": "Người trả",
         "payee": "Người nhận",
+        "settlementSamePerson": "Người trả và người nhận phải là hai người khác nhau.",
         "member": "Thành viên",
         "role": "Vai trò",
         "roleGuest": "Khách",

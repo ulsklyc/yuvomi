@@ -296,6 +296,10 @@ function sortedSubscriptions() {
 function renderContent() {
   const content = container.querySelector('#subscriptions-content');
   const rows = sortedSubscriptions();
+  // Kurs-Status/-Aktion nur, wenn überhaupt ein Abo in Fremdwährung läuft —
+  // sonst ist „Wechselkurse nicht verfügbar" eine Dauerwarnung ohne Anlass.
+  const baseCurrency = state.summary?.base_currency || state.settings.base_currency;
+  const hasForeignCurrency = rows.some((s) => s.currency && s.currency !== baseCurrency);
   setHtml(content, `
     ${renderSummary()}
     ${renderAnalytics()}
@@ -305,9 +309,10 @@ function renderContent() {
           <h2>${t('subscriptions.listTitle')}</h2>
           <span>${t('subscriptions.listCount', { count: rows.length })}</span>
         </div>
-        ${state.rates?.source === 'unavailable'
-          ? `<span class="subscriptions-rate-status subscriptions-rate-status--warning">${t('subscriptions.ratesUnavailable')}</span>`
-          : `<button class="btn btn--secondary" id="subscriptions-refresh-rates">
+        ${!hasForeignCurrency ? ''
+          : state.rates?.source === 'unavailable'
+            ? `<span class="subscriptions-rate-status subscriptions-rate-status--warning">${t('subscriptions.ratesUnavailable')}</span>`
+            : `<button class="btn btn--secondary" id="subscriptions-refresh-rates">
               <i data-lucide="refresh-cw" aria-hidden="true"></i>${t('subscriptions.refreshRates')}
             </button>`}
       </div>
@@ -331,7 +336,9 @@ function renderSummary() {
   const budget = Number(summary.monthly_budget || 0);
   const used = Number(summary.monthly_total || 0);
   const hasBudget = budget > 0;
-  const percentage = hasBudget ? Math.min(100, Math.round((used / budget) * 100)) : 0;
+  // Balkenbreite ist bei 100% gecappt, das Label nennt die echte Auslastung (121% statt „100%").
+  const realPercentage = hasBudget ? Math.round((used / budget) * 100) : 0;
+  const percentage = Math.min(100, realPercentage);
   const isOverBudget = hasBudget && summary.remaining_budget < 0;
   return `
     <section class="subscriptions-summary">
@@ -343,14 +350,14 @@ function renderSummary() {
       <article class="subscriptions-summary-card">
         <span>${t('subscriptions.monthlyBudget')}</span>
         <strong>${money(budget)}</strong>
-        <div class="subscriptions-budget-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentage}">
+        <div class="subscriptions-budget-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentage}" aria-valuetext="${realPercentage}%">
           <span style="width:${percentage}%"></span>
         </div>
       </article>
       <article class="subscriptions-summary-card ${isOverBudget ? 'subscriptions-summary-card--danger' : ''}">
         <span>${hasBudget ? (isOverBudget ? t('subscriptions.overBudget') : t('subscriptions.remainingBudget')) : t('subscriptions.noBudgetLimit')}</span>
         <strong>${hasBudget ? money(Math.abs(summary.remaining_budget)) : t('subscriptions.unlimited')}</strong>
-        <small>${hasBudget ? `${percentage}% ${t('subscriptions.budgetUsed')}` : t('subscriptions.setBudgetHint')}</small>
+        <small>${hasBudget ? `${realPercentage}% ${t('subscriptions.budgetUsed')}` : t('subscriptions.setBudgetHint')}</small>
       </article>
       <article class="subscriptions-summary-card">
         <span>${t('subscriptions.yearlyProjection')}</span>

@@ -2446,6 +2446,7 @@
         "registerPayment": "Zarejestruj płatność",
         "payer": "Płatnik",
         "payee": "Odbiorca",
+        "settlementSamePerson": "Płacący i odbiorca muszą być dwiema różnymi osobami.",
         "member": "Członek",
         "role": "Rola",
         "roleGuest": "Gość",

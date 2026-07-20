@@ -2446,6 +2446,7 @@
         "registerPayment": "Betaling registreren",
         "payer": "Betaler",
         "payee": "Ontvanger",
+        "settlementSamePerson": "Betaler en ontvanger moeten twee verschillende personen zijn.",
         "member": "Lid",
         "role": "Rol",
         "roleGuest": "Gast",

@@ -2446,6 +2446,7 @@
         "registerPayment": "ثبت پرداخت",
         "payer": "پرداخت‌کننده",
         "payee": "گیرنده",
+        "settlementSamePerson": "پرداخت‌کننده و گیرنده باید دو نفر متفاوت باشند.",
         "member": "عضو",
         "role": "نقش",
         "roleGuest": "مهمان",

@@ -2446,6 +2446,7 @@
         "registerPayment": "Ödeme kaydet",
         "payer": "Ödeyen",
         "payee": "Alan",
+        "settlementSamePerson": "Ödeyen ve alıcı iki farklı kişi olmalıdır.",
         "member": "Üye",
         "role": "Rol",
         "roleGuest": "Misafir",
