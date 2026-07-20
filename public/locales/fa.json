@@ -1916,6 +1916,7 @@
         "closeLabel": "بستن",
         "overlayLabel": "پس‌زمینه گفت‌وگوی مودال",
         "unsavedChanges": "تغییرات نادیده گرفته شوند؟",
+        "unsavedChangesDetail": "ورودی‌های تو در این فرم از بین می‌روند.",
         "discardChanges": "نادیده گرفتن",
         "moreSettings": "تنظیمات بیشتر"
     },
@@ -2281,7 +2282,7 @@
         "taskNamePlaceholder": "مثال: نظافت حمام",
         "taskArea": "ناحیه",
         "taskAreaPlaceholder": "مثال: حمام",
-        "taskFrequency": "دفعات",
+        "taskFrequency": "دفعات (روز)",
         "createTask": "ایجاد کار",
         "taskCreatedToast": "کار نظافت خانه ایجاد شد.",
         "dashboard": "داشبورد",

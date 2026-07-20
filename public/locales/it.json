@@ -1909,6 +1909,7 @@
         "closeLabel": "Chiudi",
         "overlayLabel": "Sfondo del dialogo modale",
         "unsavedChanges": "Annullare le modifiche?",
+        "unsavedChangesDetail": "I dati inseriti in questo modulo andranno persi.",
         "discardChanges": "Annulla",
         "moreSettings": "Altre impostazioni"
     },
@@ -2277,7 +2278,7 @@
         "taskNamePlaceholder": "Esempio: pulire i bagni",
         "taskArea": "Area",
         "taskAreaPlaceholder": "Esempio: bagno",
-        "taskFrequency": "Frequenza",
+        "taskFrequency": "Frequenza (giorni)",
         "createTask": "Crea attività",
         "taskCreatedToast": "Attività di pulizia creata.",
         "dashboard": "Dashboard",

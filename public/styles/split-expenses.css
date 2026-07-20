@@ -1,4 +1,6 @@
 .split-page {
+  /* Eigenständige Gast-Route: Split-Blau. Eingebettet im Budget übernimmt der
+   * Parent-Akzent (Teal), siehe .budget-page-Override unten (Sub-Domain-Regel). */
   --module-accent: var(--module-split-expenses);
   min-height: 100%;
   padding: var(--page-gutter);
@@ -6,7 +8,7 @@
   flex-direction: column;
   gap: var(--space-4);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--module-split-expenses) 9%, transparent), transparent 280px),
+    linear-gradient(180deg, color-mix(in srgb, var(--module-accent) 9%, transparent), transparent 280px),
     var(--color-bg);
 }
 
@@ -33,7 +35,15 @@
   color: var(--color-text-primary);
 }
 
-.split-title {
+/* Eingebettet im Budget-Tab: Sub-Domain erbt den Parent-Akzent und der Kopf
+ * sinkt von Seitentitel- auf Sektionsebene - der Modulkopf ist bereits "Budget". */
+.budget-page .split-page {
+  --module-accent: var(--module-budget);
+}
+
+.budget-page .split-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
 }
 
 .split-subtitle,
@@ -184,8 +194,8 @@
 
 .split-group--active,
 .split-group:hover {
-  background: color-mix(in srgb, var(--module-split-expenses) 10%, var(--color-surface));
-  border-color: color-mix(in srgb, var(--module-split-expenses) 24%, var(--color-border));
+  background: color-mix(in srgb, var(--module-accent) 10%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--module-accent) 24%, var(--color-border));
 }
 
 .split-group__avatar,
@@ -196,8 +206,8 @@
   display: grid;
   place-items: center;
   border-radius: var(--radius-glass-inner);
-  background: color-mix(in srgb, var(--module-split-expenses) 14%, var(--color-surface-2));
-  color: var(--module-split-expenses);
+  background: color-mix(in srgb, var(--module-accent) 14%, var(--color-surface-2));
+  color: var(--module-accent);
 }
 
 .split-group__body,
@@ -242,7 +252,7 @@
 
 .split-kicker {
   margin-bottom: var(--space-1);
-  color: var(--module-split-expenses);
+  color: var(--module-accent);
   font-weight: 800;
   text-transform: uppercase;
   font-size: var(--text-xs);
@@ -319,7 +329,7 @@ button.split-expense {
 }
 
 button.split-expense:hover {
-  background: color-mix(in srgb, var(--module-split-expenses) 8%, transparent);
+  background: color-mix(in srgb, var(--module-accent) 8%, transparent);
 }
 
 .split-activity-dot {
@@ -327,7 +337,7 @@ button.split-expense:hover {
   height: 10px;
   flex: 0 0 10px;
   border-radius: 50%;
-  background: var(--module-split-expenses);
+  background: var(--module-accent);
 }
 
 .split-form {

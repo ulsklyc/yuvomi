@@ -1909,6 +1909,7 @@
         "closeLabel": "إغلاق",
         "overlayLabel": "خلفية مربع الحوار",
         "unsavedChanges": "تجاهل التغييرات؟",
+        "unsavedChangesDetail": "ستفقد إدخالاتك في هذا النموذج.",
         "discardChanges": "تجاهل",
         "moreSettings": "المزيد من الإعدادات"
     },
@@ -2277,7 +2278,7 @@
         "taskNamePlaceholder": "Example: Clean bathrooms",
         "taskArea": "Area",
         "taskAreaPlaceholder": "Example: Bathroom",
-        "taskFrequency": "Frequency",
+        "taskFrequency": "Frequency (days)",
         "createTask": "Create task",
         "taskCreatedToast": "Housekeeping task created.",
         "dashboard": "Dashboard",

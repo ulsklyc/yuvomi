@@ -325,9 +325,10 @@ export function openModal({ title, content, onSave, onDelete, onClose, size = 'm
     if (e.target === activeOverlay) closeModal();
   }, { passive: true });
 
-  // Close-Button
-  activeOverlay.querySelector('[data-action="close-modal"]')
-    ?.addEventListener('click', () => closeModal());
+  // Close-Buttons: Header-X und jedes Footer-„Abbrechen" mit data-action="close-modal"
+  // (kanonische Abbrechen-API der Modal-Fußzeilen, laeuft durch den Dirty-Guard).
+  activeOverlay.querySelectorAll('[data-action="close-modal"]')
+    .forEach((el) => el.addEventListener('click', () => closeModal()));
 
   // Escape (nur einmal binden)
   document.removeEventListener('keydown', onEscape);
@@ -376,6 +377,7 @@ export async function closeModal({ force = false } = {}) {
       const confirmed = await confirmModal(t('modal.unsavedChanges'), {
         danger: false,
         confirmLabel: t('modal.discardChanges'),
+        detail: t('modal.unsavedChangesDetail'),
       });
 
       if (!confirmed) {

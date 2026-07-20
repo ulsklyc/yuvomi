@@ -1909,6 +1909,7 @@
         "closeLabel": "閉じる",
         "overlayLabel": "モーダルダイアログの背景",
         "unsavedChanges": "変更を破棄しますか？",
+        "unsavedChangesDetail": "このフォームに入力した内容は失われます。",
         "discardChanges": "破棄",
         "moreSettings": "詳細設定"
     },
@@ -2277,7 +2278,7 @@
         "taskNamePlaceholder": "Example: Clean bathrooms",
         "taskArea": "Area",
         "taskAreaPlaceholder": "Example: Bathroom",
-        "taskFrequency": "Frequency",
+        "taskFrequency": "Frequency (days)",
         "createTask": "Create task",
         "taskCreatedToast": "Housekeeping task created.",
         "dashboard": "Dashboard",

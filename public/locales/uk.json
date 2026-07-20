@@ -1909,6 +1909,7 @@
         "closeLabel": "Закрити",
         "overlayLabel": "Фон модального вікна",
         "unsavedChanges": "Скасувати зміни?",
+        "unsavedChangesDetail": "Введені у форму дані буде втрачено.",
         "discardChanges": "Скасувати",
         "moreSettings": "Додаткові налаштування"
     },
@@ -2277,7 +2278,7 @@
         "taskNamePlaceholder": "Приклад: чисті ванні кімнати",
         "taskArea": "Площа",
         "taskAreaPlaceholder": "Приклад: Ванна кімната",
-        "taskFrequency": "Частота",
+        "taskFrequency": "Частота (дні)",
         "createTask": "Створити завдання",
         "taskCreatedToast": "Створено завдання з прибирання.",
         "dashboard": "Приладова панель",

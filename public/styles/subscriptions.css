@@ -1,9 +1,11 @@
 .subscriptions-page {
-  --module-accent: var(--color-accent);
+  /* Sub-Domain erbt den Parent-Akzent (DESIGN.md §2): Abos leben unter Budget
+   * und tragen Teal - nicht das globale Violett (Akzentregel „Modul-Akzent führt"). */
+  --module-accent: var(--module-budget);
   min-height: 100%;
   padding: var(--page-gutter);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 9%, transparent), transparent 280px),
+    linear-gradient(180deg, color-mix(in srgb, var(--module-accent) 9%, transparent), transparent 280px),
     var(--color-bg);
 }
 
@@ -137,7 +139,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--color-accent);
+  background: var(--module-accent);
 }
 
 .subscriptions-analytics {
@@ -177,12 +179,12 @@
 }
 
 .subscriptions-area-chart polygon {
-  fill: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  fill: color-mix(in srgb, var(--module-accent) 18%, transparent);
 }
 
 .subscriptions-area-chart polyline {
   fill: none;
-  stroke: var(--color-accent);
+  stroke: var(--module-accent);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 2.5;
@@ -262,7 +264,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--color-accent);
+  background: var(--module-accent);
 }
 
 .subscriptions-list-section {
@@ -603,14 +605,14 @@
 .subscriptions-combobox__options button:focus,
 .subscriptions-combobox__options button[aria-selected="true"] {
   outline: none;
-  background: var(--color-accent-light);
-  color: var(--color-accent);
+  background: color-mix(in srgb, var(--module-accent) 12%, transparent);
+  color: var(--module-accent);
 }
 
 /* Tastatur-Fokus zusätzlich mit Inset-Ring markieren (Audit F-16): die reine
  * Flächenfarbe unterscheidet Fokus nicht von Hover/aria-selected. */
 .subscriptions-combobox__options button:focus-visible {
-  outline: 2px solid var(--module-accent, var(--color-accent));
+  outline: 2px solid var(--module-accent);
   outline-offset: -2px;
 }
 
@@ -710,8 +712,8 @@
 .subscriptions-logo-option:hover,
 .subscriptions-logo-option:focus-visible {
   outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 18%, transparent);
+  border-color: var(--module-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--module-accent) 18%, transparent);
 }
 
 .subscriptions-logo-option img {

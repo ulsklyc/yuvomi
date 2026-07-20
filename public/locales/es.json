@@ -1909,6 +1909,7 @@
         "closeLabel": "Cerrar",
         "overlayLabel": "Fondo del cuadro de diálogo modal",
         "unsavedChanges": "¿Descartar cambios?",
+        "unsavedChangesDetail": "Tus datos introducidos en este formulario se perderán.",
         "discardChanges": "Descartar",
         "moreSettings": "Más ajustes"
     },
@@ -2277,7 +2278,7 @@
         "taskNamePlaceholder": "Ejemplo: limpiar baños",
         "taskArea": "Área",
         "taskAreaPlaceholder": "Ejemplo: baño",
-        "taskFrequency": "Frecuencia",
+        "taskFrequency": "Frecuencia (días)",
         "createTask": "Crear tarea",
         "taskCreatedToast": "Tarea de limpieza creada.",
         "dashboard": "Panel",

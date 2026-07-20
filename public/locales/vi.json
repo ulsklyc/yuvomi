@@ -1909,6 +1909,7 @@
         "closeLabel": "Đóng",
         "overlayLabel": "Nền hộp thoại",
         "unsavedChanges": "Bỏ qua các thay đổi?",
+        "unsavedChangesDetail": "Nội dung bạn đã nhập trong biểu mẫu này sẽ bị mất.",
         "discardChanges": "Bỏ qua",
         "moreSettings": "Cài đặt khác"
     },
@@ -2277,7 +2278,7 @@
         "taskNamePlaceholder": "Ví dụ: Lau phòng tắm",
         "taskArea": "Khu vực",
         "taskAreaPlaceholder": "Ví dụ: Phòng tắm",
-        "taskFrequency": "Tần suất",
+        "taskFrequency": "Tần suất (ngày)",
         "createTask": "Tạo nhiệm vụ",
         "taskCreatedToast": "Nhiệm vụ dọn dẹp đã tạo.",
         "dashboard": "Bảng điều khiển",

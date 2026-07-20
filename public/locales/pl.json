@@ -1916,6 +1916,7 @@
         "closeLabel": "Zamknij",
         "overlayLabel": "Tło dialogu modalnego",
         "unsavedChanges": "Odrzucić zmiany?",
+        "unsavedChangesDetail": "Twoje wpisy w tym formularzu zostaną utracone.",
         "discardChanges": "Odrzuć",
         "moreSettings": "Więcej ustawień"
     },
@@ -2281,7 +2282,7 @@
         "taskNamePlaceholder": "Przykład: Sprzątanie łazienki",
         "taskArea": "Obszar",
         "taskAreaPlaceholder": "Przykład: Łazienka",
-        "taskFrequency": "Częstotliwość",
+        "taskFrequency": "Częstotliwość (dni)",
         "createTask": "Utwórz zadanie",
         "taskCreatedToast": "Zadanie sprzątania utworzone.",
         "dashboard": "Pulpit",

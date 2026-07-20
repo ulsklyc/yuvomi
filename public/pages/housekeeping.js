@@ -383,17 +383,17 @@ function renderTasks(content) {
         <p>${esc(task.area)} · ${esc(t('housekeeping.everyDays', { days: task.frequency_days }))}</p>
         <span>${esc(urgencyLabel(task.urgency_status))}</span>
       </div>
-      <div class="housekeeping-task__actions">
+      <div class="housekeeping-task__actions row-actions">
         ${task.last_completed ? `
-          <button class="btn btn--secondary btn--icon" type="button" data-undo-task="${esc(task.id)}"
+          <button class="row-action" type="button" data-undo-task="${esc(task.id)}"
                   aria-label="${esc(t('housekeeping.undoTask'))}">
             <i data-lucide="rotate-ccw" aria-hidden="true"></i>
           </button>` : ''}
-        <button class="btn btn--secondary btn--icon" type="button" data-edit-task="${esc(task.id)}"
+        <button class="row-action" type="button" data-edit-task="${esc(task.id)}"
                 aria-label="${esc(t('housekeeping.editTask'))}">
           <i data-lucide="edit-2" aria-hidden="true"></i>
         </button>
-        <button class="btn btn--danger-outline btn--icon" type="button" data-delete-task="${esc(task.id)}"
+        <button class="row-action row-action--danger" type="button" data-delete-task="${esc(task.id)}"
                 aria-label="${esc(t('housekeeping.deleteTask'))}">
           <i data-lucide="trash-2" aria-hidden="true"></i>
         </button>

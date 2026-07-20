@@ -528,7 +528,7 @@ function openNoteModal({ mode, note = null }) {
       </div>
 
       <div class="modal-panel__footer note-modal__footer" style="border:none;padding:0;margin-top:var(--space-4)">
-        ${isEdit ? `<button type="button" class="btn btn--danger" id="note-modal-delete">${t('common.delete')}</button>` : ''}
+        ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="note-modal-delete" style="margin-right:auto">${t('common.delete')}</button>` : ''}
         <button type="button" class="btn btn--secondary" id="note-modal-cancel" data-editor-only>${t('common.cancel')}</button>
         <button type="button" class="btn btn--primary" id="note-modal-save" data-editor-only>${isEdit ? t('common.save') : t('common.create')}</button>
       </div>

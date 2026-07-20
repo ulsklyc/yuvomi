@@ -1909,6 +1909,7 @@
         "closeLabel": "Κλείσιμο",
         "overlayLabel": "Φόντο αναδυόμενου παραθύρου",
         "unsavedChanges": "Απόρριψη αλλαγών;",
+        "unsavedChangesDetail": "Οι καταχωρίσεις σου σε αυτή τη φόρμα θα χαθούν.",
         "discardChanges": "Απόρριψη",
         "moreSettings": "Περισσότερες ρυθμίσεις"
     },
@@ -2277,7 +2278,7 @@
         "taskNamePlaceholder": "Example: Clean bathrooms",
         "taskArea": "Area",
         "taskAreaPlaceholder": "Example: Bathroom",
-        "taskFrequency": "Frequency",
+        "taskFrequency": "Frequency (days)",
         "createTask": "Create task",
         "taskCreatedToast": "Housekeeping task created.",
         "dashboard": "Dashboard",

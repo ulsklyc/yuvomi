@@ -1947,26 +1947,30 @@ p.field-hint--warn[hidden] {
   outline-offset: 2px;
 }
 
+/* Akzentregel „Modul-Akzent führt": Primäraktionen tragen den Akzent des aktiven
+ * Moduls (wie FAB und Fokusringe); Violett bleibt Shell-Flächen und modul-losen
+ * Routen (Login/Setup) vorbehalten. Die 88%/76%-Abdunklung reproduziert die
+ * „Action"-Abstufung des bisherigen --color-btn-primary generisch je Akzent. */
 .btn--primary {
-  background-color: var(--color-btn-primary);
-  color: var(--color-text-on-accent);
+  background-color: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 88%, var(--neutral-950));
+  color: var(--color-ink-on-vivid);
   box-shadow: var(--shadow-sm);
 }
 
 .btn--primary:hover {
-  background-color: var(--color-btn-primary-hover);
+  background-color: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 76%, var(--neutral-950));
   box-shadow: var(--shadow-md);
 }
 
 .btn--secondary {
   background-color: transparent;
-  color: var(--color-accent);
+  color: var(--active-module-accent, var(--color-accent));
   border: 1.5px solid var(--color-border);
 }
 
 .btn--secondary:hover {
-  background-color: var(--color-accent-light);
-  border-color: var(--color-accent);
+  background-color: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 9%, transparent);
+  border-color: var(--active-module-accent, var(--color-accent));
 }
 
 .btn--danger {

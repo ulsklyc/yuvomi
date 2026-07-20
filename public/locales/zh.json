@@ -1909,6 +1909,7 @@
         "closeLabel": "关闭",
         "overlayLabel": "模态对话框背景",
         "unsavedChanges": "放弃更改？",
+        "unsavedChangesDetail": "你在此表单中的输入将丢失。",
         "discardChanges": "放弃",
         "moreSettings": "更多设置"
     },
@@ -2277,7 +2278,7 @@
         "taskNamePlaceholder": "Example: Clean bathrooms",
         "taskArea": "Area",
         "taskAreaPlaceholder": "Example: Bathroom",
-        "taskFrequency": "Frequency",
+        "taskFrequency": "Frequency (days)",
         "createTask": "Create task",
         "taskCreatedToast": "Housekeeping task created.",
         "dashboard": "Dashboard",

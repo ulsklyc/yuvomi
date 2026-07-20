@@ -1909,6 +1909,7 @@
         "closeLabel": "Zavřít",
         "overlayLabel": "Pozadí modálního dialogu",
         "unsavedChanges": "Zahodit změny?",
+        "unsavedChangesDetail": "Tvoje zadané údaje v tomto formuláři budou ztraceny.",
         "discardChanges": "Zahodit",
         "moreSettings": "Další nastavení"
     },
@@ -2007,7 +2008,7 @@
         "taskNamePlaceholder": "Příklad: Uklidit koupelnu",
         "taskArea": "Oblast",
         "taskAreaPlaceholder": "Příklad: Koupelna",
-        "taskFrequency": "Četnost",
+        "taskFrequency": "Četnost (dny)",
         "createTask": "Vytvořit úkol",
         "taskCreatedToast": "Úkol domácí péče vytvořen.",
         "dashboard": "Přehled",

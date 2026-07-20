@@ -1916,6 +1916,7 @@
         "closeLabel": "Tutup",
         "overlayLabel": "Latar dialog modal",
         "unsavedChanges": "Buang perubahan?",
+        "unsavedChangesDetail": "Isian kamu di formulir ini akan hilang.",
         "discardChanges": "Buang",
         "moreSettings": "Pengaturan lain"
     },
@@ -2281,7 +2282,7 @@
         "taskNamePlaceholder": "Contoh: Bersihkan kamar mandi",
         "taskArea": "Area",
         "taskAreaPlaceholder": "Contoh: Kamar mandi",
-        "taskFrequency": "Frekuensi",
+        "taskFrequency": "Frekuensi (hari)",
         "createTask": "Buat tugas",
         "taskCreatedToast": "Tugas asisten rumah tangga dibuat.",
         "dashboard": "Dasbor",

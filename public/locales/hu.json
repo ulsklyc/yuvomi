@@ -1909,6 +1909,7 @@
         "closeLabel": "Bezárás",
         "overlayLabel": "Felugró ablak háttere",
         "unsavedChanges": "Módosítások elvetése?",
+        "unsavedChangesDetail": "Az űrlapon megadott adataid elvesznek.",
         "discardChanges": "Elvetés",
         "moreSettings": "További beállítások"
     },
@@ -2277,7 +2278,7 @@
         "taskNamePlaceholder": "Példa: Fürdőszobák takarítása",
         "taskArea": "Terület",
         "taskAreaPlaceholder": "Példa: Fürdőszoba",
-        "taskFrequency": "Gyakoriság",
+        "taskFrequency": "Gyakoriság (nap)",
         "createTask": "Feladat létrehozása",
         "taskCreatedToast": "Háztartási feladat létrehozva.",
         "dashboard": "Irányítópult",

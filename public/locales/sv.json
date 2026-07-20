@@ -1909,6 +1909,7 @@
         "closeLabel": "Stäng",
         "overlayLabel": "Bakgrund för modal dialog",
         "unsavedChanges": "Ignorera ändringar?",
+        "unsavedChangesDetail": "Dina uppgifter i formuläret går förlorade.",
         "discardChanges": "Ignorera",
         "moreSettings": "Fler inställningar"
     },
@@ -2277,7 +2278,7 @@
         "taskNamePlaceholder": "Exempel: städa badrum",
         "taskArea": "Område",
         "taskAreaPlaceholder": "Exempel: badrum",
-        "taskFrequency": "Frekvens",
+        "taskFrequency": "Frekvens (dagar)",
         "createTask": "Skapa uppgift",
         "taskCreatedToast": "Städuppgift skapad.",
         "dashboard": "Översikt",

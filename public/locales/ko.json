@@ -1916,6 +1916,7 @@
         "closeLabel": "닫기",
         "overlayLabel": "모달 대화상자 배경",
         "unsavedChanges": "변경 사항을 취소할까요?",
+        "unsavedChangesDetail": "이 양식에 입력한 내용이 사라집니다.",
         "discardChanges": "취소",
         "moreSettings": "추가 설정"
     },
@@ -2281,7 +2282,7 @@
         "taskNamePlaceholder": "예: 욕실 청소",
         "taskArea": "구역",
         "taskAreaPlaceholder": "예: 욕실",
-        "taskFrequency": "빈도",
+        "taskFrequency": "빈도 (일)",
         "createTask": "작업 만들기",
         "taskCreatedToast": "가사 관리 작업이 생성되었습니다.",
         "dashboard": "대시보드",

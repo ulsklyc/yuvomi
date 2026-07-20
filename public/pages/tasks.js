@@ -118,7 +118,7 @@ function formatDueDate(dateStr, timeStr, isDone = false) {
   const timeLabel = timeStr ? ` – ${formatTime(dueDate)}` : '';
   const fullLabel = timeStr ? `${formatDate(dueDate)}, ${formatTime(dueDate)}` : formatDate(dueDate);
 
-  // Erledigte/archivierte Aufgaben können nicht überfällig sein — neutrales Datum.
+  // Erledigte/archivierte Aufgaben können nicht überfällig sein - neutrales Datum.
   if (isDone) {
     return { label: fullLabel, cls: '' };
   }
@@ -511,8 +511,9 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
 
       <div class="modal-panel__footer" style="padding:0;border:none;margin-top:var(--space-6)">
         ${isEdit ? `
-          <button type="button" class="btn btn--danger" data-action="delete-task"
-                  data-id="${task.id}">${t('common.delete')}</button>` : ''}
+          <button type="button" class="btn btn--danger-outline" data-action="delete-task"
+                  data-id="${task.id}" style="margin-right:auto">${t('common.delete')}</button>` : ''}
+        <button type="button" class="btn btn--ghost" data-action="close-modal">${t('common.cancel')}</button>
         <button type="submit" class="btn btn--primary" id="task-submit-btn">
           ${isEdit ? t('common.save') : t('common.create')}
         </button>

@@ -69,17 +69,24 @@
   text-align: center;
 }
 
+/* Aktion, keine Selektion: bewusst Outline-Grammatik statt getönter Pille, damit
+ * „Aktuell" neben der aktiven Tab-Pille nicht wie eine zweite Auswahl aussieht. */
 .budget-nav__today {
   min-height: var(--target-lg);
   font-size: var(--text-sm);
-  color: var(--color-accent);
+  color: var(--module-accent, var(--color-accent));
   font-weight: var(--font-weight-medium);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
-  background: var(--color-accent-light);
+  background: transparent;
   cursor: pointer;
-  border: none;
+  border: 1px solid var(--color-border);
   white-space: nowrap;
+}
+
+.budget-nav__today:hover {
+  background: color-mix(in srgb, var(--module-accent, var(--color-accent)) 9%, transparent);
+  border-color: var(--module-accent, var(--color-accent));
 }
 
 .budget-tabs {
@@ -142,14 +149,6 @@
  * die eine ANDERE Modul-Identität tragen, überschreiben den Tint. */
 .budget-tabs .sub-tab {
   scroll-snap-align: start;
-}
-
-.budget-tabs .sub-tab[data-tab-id="loans"].sub-tab--active {
-  background-color: color-mix(in srgb, var(--color-info) 14%, transparent);
-}
-
-.budget-tabs .sub-tab[data-tab-id="split-expenses"].sub-tab--active {
-  background-color: color-mix(in srgb, var(--module-split-expenses) 14%, transparent);
 }
 
 .budget-tab-panel {
@@ -649,8 +648,8 @@
 }
 
 .budget-loans__filter--active {
-  background: var(--color-info);
-  color: var(--color-text-on-accent);
+  background: var(--module-accent, var(--color-accent));
+  color: var(--color-ink-on-vivid);
 }
 
 .budget-loans__stats {
@@ -711,7 +710,7 @@
 }
 
 .budget-loan-card:hover {
-  border-color: var(--color-info);
+  border-color: var(--module-accent, var(--color-accent));
   background-color: var(--glass-bg-card-hover);
 }
 
@@ -752,9 +751,9 @@
 }
 
 .budget-loan-card__filter--active {
-  color: var(--color-text-on-accent);
-  border-color: var(--color-info);
-  background: var(--color-info);
+  color: var(--color-ink-on-vivid);
+  border-color: var(--module-accent, var(--color-accent));
+  background: var(--module-accent, var(--color-accent));
 }
 
 .budget-loan-card__filter i {

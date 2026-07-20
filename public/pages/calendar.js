@@ -2095,8 +2095,8 @@ function showEventPopup(ev, anchor) {
     </div>
     <div class="event-popup__actions">
       <button class="btn btn--secondary event-popup__edit" id="popup-edit">${t('calendar.popupEdit')}</button>
-      <button class="btn btn--danger"    id="popup-delete">
-        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
+      <button class="btn btn--danger-outline" id="popup-delete">
+        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
       </button>
     </div>
   `);
@@ -2935,11 +2935,11 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
     ${renderCalendarReminderSection(reminder, event, isEdit ? [] : state.defaultReminders)}
 
     <div class="modal-panel__footer" style="border:none;padding:0;margin-top:var(--space-4)">
-      ${isEdit ? `<button class="btn btn--danger btn--icon" id="modal-delete" aria-label="${t('calendar.deleteEvent')}">
-        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
+      ${isEdit ? `<button class="btn btn--danger-outline" id="modal-delete">
+        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
       </button>` : '<div></div>'}
       <div style="display:flex;gap:var(--space-3)">
-        <button class="btn btn--secondary" id="modal-cancel">${t('common.cancel')}</button>
+        <button class="btn btn--ghost" id="modal-cancel">${t('common.cancel')}</button>
         <button class="btn btn--primary" id="modal-save">${isEdit ? t('common.save') : t('common.create')}</button>
       </div>
     </div>`;

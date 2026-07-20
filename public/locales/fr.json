@@ -1909,6 +1909,7 @@
         "closeLabel": "Fermer",
         "overlayLabel": "Arrière-plan de la boîte de dialogue modale",
         "unsavedChanges": "Abandonner les modifications ?",
+        "unsavedChangesDetail": "Tes saisies dans ce formulaire seront perdues.",
         "discardChanges": "Abandonner",
         "moreSettings": "Plus de paramètres"
     },
@@ -2277,7 +2278,7 @@
         "taskNamePlaceholder": "Exemple : nettoyer les salles de bain",
         "taskArea": "Zone",
         "taskAreaPlaceholder": "Exemple : salle de bain",
-        "taskFrequency": "Fréquence",
+        "taskFrequency": "Fréquence (jours)",
         "createTask": "Créer la tâche",
         "taskCreatedToast": "Tâche de ménage créée.",
         "dashboard": "Tableau",

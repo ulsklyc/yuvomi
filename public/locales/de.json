@@ -1916,6 +1916,7 @@
         "closeLabel": "Schließen",
         "overlayLabel": "Modaler Dialog-Hintergrund",
         "unsavedChanges": "Änderungen verwerfen?",
+        "unsavedChangesDetail": "Deine Eingaben in diesem Formular gehen verloren.",
         "discardChanges": "Verwerfen",
         "moreSettings": "Weitere Einstellungen"
     },
@@ -2281,7 +2282,7 @@
         "taskNamePlaceholder": "Beispiel: Badezimmer reinigen",
         "taskArea": "Bereich",
         "taskAreaPlaceholder": "Beispiel: Bad",
-        "taskFrequency": "Häufigkeit",
+        "taskFrequency": "Häufigkeit (Tage)",
         "createTask": "Aufgabe erstellen",
         "taskCreatedToast": "Hauspflege-Aufgabe erstellt.",
         "dashboard": "Dashboard",

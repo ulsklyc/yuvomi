@@ -1909,6 +1909,7 @@
         "closeLabel": "Fechar",
         "overlayLabel": "Fundo do diálogo modal",
         "unsavedChanges": "Descartar alterações?",
+        "unsavedChangesDetail": "Os teus dados neste formulário serão perdidos.",
         "discardChanges": "Descartar",
         "moreSettings": "Mais definições"
     },
@@ -2277,7 +2278,7 @@
         "taskNamePlaceholder": "Ex: Limpar banheiros",
         "taskArea": "Área",
         "taskAreaPlaceholder": "Ex: Banheiro",
-        "taskFrequency": "Frequência",
+        "taskFrequency": "Frequência (dias)",
         "createTask": "Criar tarefa",
         "taskCreatedToast": "Tarefa de faxina criada.",
         "dashboard": "Painel",

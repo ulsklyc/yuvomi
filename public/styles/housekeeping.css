@@ -49,14 +49,10 @@
 
 .housekeeping-tabs::-webkit-scrollbar { display: none; }
 
+/* Aktiv-Optik kommt vollstaendig aus der geteilten sub-tab-Grammatik
+ * (.sub-tab--active: Akzent-Tint + Ink + semibold) - keine Sonderfarbe hier. */
 .housekeeping-tab {
-  --active-module-accent: var(--module-accent);
   flex-shrink: 0;
-}
-
-.housekeeping-tab[aria-current="page"] {
-  background-color: color-mix(in srgb, var(--module-accent) 14%, transparent);
-  color: var(--module-accent);
 }
 
 .housekeeping-content {

@@ -1909,6 +1909,7 @@
         "closeLabel": "Sluiten",
         "overlayLabel": "Achtergrond modaal dialoogvenster",
         "unsavedChanges": "Wijzigingen verwerpen?",
+        "unsavedChangesDetail": "Je invoer in dit formulier gaat verloren.",
         "discardChanges": "Verwerpen",
         "moreSettings": "Meer instellingen"
     },
@@ -2277,7 +2278,7 @@
         "taskNamePlaceholder": "Voorbeeld: Badkamers schoonmaken",
         "taskArea": "Ruimte",
         "taskAreaPlaceholder": "Voorbeeld: Badkamer",
-        "taskFrequency": "Frequentie",
+        "taskFrequency": "Frequentie (dagen)",
         "createTask": "Taak aanmaken",
         "taskCreatedToast": "Huishoudtaak aangemaakt.",
         "dashboard": "Dashboard",
