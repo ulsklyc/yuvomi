@@ -442,14 +442,6 @@
   flex-shrink: 0;
 }
 
-/* Kompaktzeile auf schmalen Containern: kleinere Beträge, Trend entfällt
- * (der Monatsvergleich bleibt über den Statistik-Tab erreichbar). */
-@container budget-page (max-width: 479px) {
-  .budget-summary-card { padding: var(--space-2); }
-  .budget-summary-card__amount { font-size: var(--text-base); }
-  .budget-summary-card__trend { display: none; }
-}
-
 @container budget-page (min-width: 480px) {
   .budget-summary {
     gap: var(--space-3);
@@ -518,6 +510,17 @@
 }
 
 .budget-summary-card__trend svg { flex-shrink: 0; }
+
+/* Kompaktzeile auf schmalen Containern: kleinere Beträge, Trend entfällt
+ * (der Monatsvergleich bleibt über den Statistik-Tab erreichbar).
+ * MUSS nach den Basisregeln der Karte stehen: Container-Queries erhöhen die
+ * Spezifität nicht, bei gleicher Spezifität gewinnt sonst die spätere
+ * Basisdeklaration und die Kompaktstufe bleibt wirkungslos (Audit A2-06). */
+@container budget-page (max-width: 479px) {
+  .budget-summary-card { padding: var(--space-2); }
+  .budget-summary-card__amount { font-size: var(--text-base); }
+  .budget-summary-card__trend { display: none; }
+}
 .budget-summary-card__trend--positive { color: var(--color-success); }
 .budget-summary-card__trend--negative { color: var(--color-danger);  }
 .budget-summary-card__trend--neutral  { color: var(--color-text-secondary); }
