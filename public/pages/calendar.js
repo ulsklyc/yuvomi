@@ -8,7 +8,7 @@ import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
 import { openModal as openSharedModal, closeModal, advancedSection } from '/components/modal.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
-import { t, formatDate as formatPreferredDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
+import { t, formatDate as formatPreferredDate, formatDayMonth, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation } from '/utils/html.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder } from '/utils/date.js';
 import { truncateRuleBefore, shiftSeriesStart, shiftEndForStart } from '/utils/recurrence-scope.js';
@@ -1142,7 +1142,14 @@ function updateLabel() {
   const mon  = MONTH_NAMES()[d.getMonth()];
 
   if (state.view === 'month')  lbl.textContent = `${mon} ${year}`;
-  if (state.view === 'week')   lbl.textContent = t('calendar.weekNumberLabel', { week: getWeekNumber(state.cursor), month: mon, year });
+  if (state.view === 'week') {
+    // Mobil zeigt die "Woche" ein 3-Tage-Fenster um den Cursor (renderWeekView);
+    // ein "KW 30"-Label würde dann einen Bereich behaupten, der nicht zu sehen
+    // ist (Audit A1-19). Das Label nennt stattdessen den sichtbaren Bereich.
+    lbl.textContent = window.matchMedia('(max-width: 639px)').matches
+      ? t('calendar.dayRangeLabel', { from: formatDayMonth(addDays(state.cursor, -1)), to: formatPreferredDate(addDays(state.cursor, 1)) })
+      : t('calendar.weekNumberLabel', { week: getWeekNumber(state.cursor), month: mon, year });
+  }
   if (state.view === 'day')    lbl.textContent = formatDate(state.cursor, { weekday: true, long: true });
   if (state.view === 'agenda') lbl.textContent = t('calendar.agendaFrom', { date: formatDate(state.cursor) });
 }
@@ -1328,9 +1335,17 @@ function renderMonthDay(date, inMonth) {
     isToday  ? 'month-day--today' : '',
   ].filter(Boolean).join(' ');
 
-  const MAX_SHOW = 3;
-  const shown    = evs.slice(0, MAX_SHOW);
-  const extra    = evs.length - MAX_SHOW;
+  // Ein gemeinsames Slot-Budget für alles, was in der Zelle eine Zeile belegt
+  // (Feiertagsband, Termine, Aufgaben). Zuvor kappten Termine und Aufgaben
+  // getrennt (3+2) und die Zelle clippte still per overflow:hidden; die
+  // "+N"-Zeile zählte nur Termine (Audit A1-04). Feiertage belegen ihre
+  // Slots zuerst, dann Termine, dann Aufgaben; N zählt alle Überzähligen.
+  const SLOT_BUDGET = 3;
+  const evSlots     = Math.max(1, SLOT_BUDGET - dayHols.length);
+  const shown       = evs.slice(0, evSlots);
+  const taskSlots   = Math.max(0, evSlots - shown.length);
+  const shownTasks  = dayTasks.slice(0, taskSlots);
+  const extra       = (evs.length - shown.length) + (dayTasks.length - shownTasks.length);
 
   const evHtml = shown.map((ev) => `
     <div class="month-day__event"
@@ -1340,8 +1355,7 @@ function renderMonthDay(date, inMonth) {
     >${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}<span>${esc(ev.title)}</span>${chipAssigneeStack(ev, { size: 15, maxVisible: 2 })}</div>
   `).join('');
 
-  const MAX_TASK_SHOW = 2;
-  const taskHtml = dayTasks.slice(0, MAX_TASK_SHOW).map(renderTaskChip).join('');
+  const taskHtml = shownTasks.map(renderTaskChip).join('');
 
   const holHtml = dayHols.map((h) => `
     <div class="month-day__holiday" style="--holi-color:${esc(h.color)};--holi-ink:${esc(getReadableTextColor(h.color))}" title="${esc(h.name)}">
@@ -1354,8 +1368,8 @@ function renderMonthDay(date, inMonth) {
       <div class="month-day__number">${new Date(date + 'T00:00:00').getDate()}</div>
       ${holHtml}
       ${evHtml}
-      ${extra > 0 ? `<div class="month-day__more">${t('calendar.moreEvents', { count: extra })}</div>` : ''}
       ${taskHtml}
+      ${extra > 0 ? `<div class="month-day__more">${t('calendar.moreEvents', { count: extra })}</div>` : ''}
     </div>
   `;
 }

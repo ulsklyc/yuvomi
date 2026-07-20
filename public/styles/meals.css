@@ -269,15 +269,15 @@
   flex-shrink: 0;
 }
 
-/* Label-Text ellipsiert in schmalen Board-Spalten mit Absicht, statt hart zu
- * clippen ("MITTAGES") — der Farb-Dot bleibt als Typ-Anker immer sichtbar
- * (Audit F-04). Eigener Span, weil text-overflow nicht auf anonyme
- * Flex-Textknoten wirkt. */
+/* Schmale Board-Spalten: Silbentrennung statt Ellipse. Die frühere
+ * Ellipsen-Lösung (F-04) kappte bei 1280 mit Rezept-Rail 14 von 21 Labels
+ * auf "MITTAGESS…" (Audit A1-09) - ein zweizeiliges "MITTAG-ESSEN" bleibt
+ * dagegen vollständig lesbar. Eigener Span, weil die Umbruch-Regeln nicht
+ * auf anonyme Flex-Textknoten wirken. */
 .meal-slot__type-text {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  hyphens: auto;
+  overflow-wrap: anywhere;
 }
 
 .meal-slot[data-type="breakfast"] .meal-slot__type-label { --meal-type-dot: var(--meal-breakfast); }

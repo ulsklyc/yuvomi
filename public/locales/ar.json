@@ -455,6 +455,7 @@
         "allDay": "طوال اليوم",
         "allDayShort": "اليوم كله",
         "moreEvents": "+{{count}} أخرى",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "الأسبوع {{week}} · {{month}} {{year}}",
         "agendaFrom": "من {{date}}",
         "titleLabel": "العنوان",

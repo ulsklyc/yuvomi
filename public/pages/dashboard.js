@@ -320,9 +320,18 @@ function normalizeDashboardConfig(input) {
 // „Nutzerabsicht", sondern nur, weil der Default-Satz nicht sauber tesselliert (Critique P2).
 function isUserOrderedConfig(cfg) {
   if (!Array.isArray(cfg)) return false;
-  const defaultOrder = DEFAULT_WIDGET_CONFIG.map((w) => w.id).join(',');
-  const currentOrder = [...cfg].sort((a, b) => a.order - b.order).map((w) => w.id).join(',');
-  return currentOrder !== defaultOrder;
+  // Nur sichtbare, beidseitig bekannte Widgets vergleichen: nachträglich
+  // angehängte neue Widget-IDs (Config-Merge älterer Stände) oder reine
+  // Sichtbarkeits-Toggles sind KEINE Nutzer-Umsortierung. Der strikte
+  // Voll-Vergleich schaltete sonst dauerhaft auf preserve-order und der
+  // dense-Bento füllte nie wieder Lücken (Audit A1-03).
+  const defaultIds = DEFAULT_WIDGET_CONFIG.map((w) => w.id);
+  const currentOrder = [...cfg]
+    .filter((w) => w.visible !== false && defaultIds.includes(w.id))
+    .sort((a, b) => a.order - b.order)
+    .map((w) => w.id);
+  const defaultOrder = defaultIds.filter((id) => currentOrder.includes(id));
+  return currentOrder.join(',') !== defaultOrder.join(',');
 }
 
 function sameWidgetConfig(a, b) {

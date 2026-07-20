@@ -782,6 +782,14 @@
   padding: var(--space-3) var(--space-4);
 }
 
+/* Schmale Viewports: eine Spalte. Zwei ~130px-Minikarten trunkierten Titel
+ * UND Inhalt gleichzeitig, es blieb nichts Lesbares übrig (Audit A1-16). */
+@media (max-width: 639px) {
+  .notes-grid-widget {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (min-width: 1024px) {
   .notes-grid-widget {
     grid-template-columns: repeat(3, minmax(0, 1fr));

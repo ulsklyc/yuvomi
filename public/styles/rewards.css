@@ -7,6 +7,8 @@
 
 .rewards-page {
   --module-accent: var(--module-rewards);
+  /* FAB-Freiraum wie im Budget: Listenende bleibt über dem FAB lesbar. */
+  --rw-fab-clearance: calc(var(--target-lg) + var(--space-6) + var(--space-4));
   max-width: var(--content-max-width);
   min-height: 100%;
   margin: 0 auto;
@@ -26,7 +28,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
-  padding: var(--space-6) 0 var(--space-12);
+  /* Horizontaler Innenabstand: Punktwerte klebten sonst an der
+   * Viewport-Kante; unten FAB-Freiraum statt fixem space-12 (Audit A2-15). */
+  padding: var(--space-6) var(--space-4) var(--rw-fab-clearance);
 }
 
 /* --------------------------------------------------------

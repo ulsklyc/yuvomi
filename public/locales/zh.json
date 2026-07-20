@@ -455,6 +455,7 @@
         "allDay": "全天",
         "allDayShort": "全天",
         "moreEvents": "+{{count}} 更多",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "第 {{week}} 周 · {{month}} {{year}}",
         "agendaFrom": "从 {{date}} 起",
         "titleLabel": "标题",

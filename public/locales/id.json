@@ -462,6 +462,7 @@
         "allDay": "Sepanjang hari",
         "allDayShort": "seharian",
         "moreEvents": "+{{count}} lagi",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "Minggu {{week}} · {{month}} {{year}}",
         "agendaFrom": "Mulai {{date}}",
         "titleLabel": "Judul",

@@ -455,6 +455,7 @@
         "allDay": "終日",
         "allDayShort": "終日",
         "moreEvents": "+{{count}} 件",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "第 {{week}} 週 · {{month}} {{year}}",
         "agendaFrom": "{{date}} から",
         "titleLabel": "タイトル",

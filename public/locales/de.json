@@ -462,6 +462,7 @@
         "allDay": "Ganztägig",
         "allDayShort": "ganztg.",
         "moreEvents": "+{{count}} weitere",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "KW {{week}} · {{month}} {{year}}",
         "agendaFrom": "Ab {{date}}",
         "titleLabel": "Titel",

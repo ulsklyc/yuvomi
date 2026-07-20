@@ -462,6 +462,7 @@
         "allDay": "تمام‌روز",
         "allDayShort": "تمام‌روز",
         "moreEvents": "+{{count}} بیشتر",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "هفته {{week}} · {{month}} {{year}}",
         "agendaFrom": "از {{date}}",
         "titleLabel": "عنوان",

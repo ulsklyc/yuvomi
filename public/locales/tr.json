@@ -455,6 +455,7 @@
         "allDay": "Tüm gün",
         "allDayShort": "tüm gün",
         "moreEvents": "+{{count}} daha",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "H{{week}} · {{month}} {{year}}",
         "agendaFrom": "{{date}} tarihinden itibaren",
         "titleLabel": "Başlık",

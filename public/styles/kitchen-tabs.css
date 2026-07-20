@@ -33,6 +33,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+
+  /* Der aktive Tab trägt die Wo-bin-ich-Information und behält deshalb
+   * seine natürliche Breite; nur inaktive Nachbarn ellipsieren bei Platznot
+   * (Audit A1-09). */
+  .kitchen-tabs-bar .sub-tab--active {
+    flex: 0 0 auto;
+  }
 }
 
 /* Mahlzeiten + Rezepte: Viewport-Höhe um Tab-Leiste reduzieren (Mobile).

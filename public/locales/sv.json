@@ -455,6 +455,7 @@
         "allDay": "Hela dagen",
         "allDayShort": "hela dagen",
         "moreEvents": "+{{count}} fler",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "V{{week}} · {{month}} {{year}}",
         "agendaFrom": "Från {{date}}",
         "titleLabel": "Titel",

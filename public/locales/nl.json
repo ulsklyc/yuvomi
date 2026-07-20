@@ -455,6 +455,7 @@
         "allDay": "Hele dag",
         "allDayShort": "hele dag",
         "moreEvents": "+{{count}} meer",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "W{{week}} · {{month}} {{year}}",
         "agendaFrom": "Vanaf {{date}}",
         "titleLabel": "Titel",

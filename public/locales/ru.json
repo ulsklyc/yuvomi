@@ -455,6 +455,7 @@
         "allDay": "Весь день",
         "allDayShort": "весь день",
         "moreEvents": "+{{count}} ещё",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "Н{{week}} · {{month}} {{year}}",
         "agendaFrom": "С {{date}}",
         "titleLabel": "Заголовок",

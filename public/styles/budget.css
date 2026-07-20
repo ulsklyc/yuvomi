@@ -434,15 +434,24 @@
  * -------------------------------------------------------- */
 .budget-summary {
   display: grid;
-  grid-template-columns: 1fr;
+  /* Immer eine Dreier-Zeile: der frühere Mobil-Stapel (3 volle Karten,
+   * ~600px) schob jeden Inhalt unter den Fold (Audit A2-06). */
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   flex-shrink: 0;
 }
 
+/* Kompaktzeile auf schmalen Containern: kleinere Beträge, Trend entfällt
+ * (der Monatsvergleich bleibt über den Statistik-Tab erreichbar). */
+@container budget-page (max-width: 479px) {
+  .budget-summary-card { padding: var(--space-2); }
+  .budget-summary-card__amount { font-size: var(--text-base); }
+  .budget-summary-card__trend { display: none; }
+}
+
 @container budget-page (min-width: 480px) {
   .budget-summary {
-    grid-template-columns: repeat(3, 1fr);
     gap: var(--space-3);
   }
 }

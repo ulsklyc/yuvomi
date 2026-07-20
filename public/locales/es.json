@@ -455,6 +455,7 @@
         "allDay": "Todo el día",
         "allDayShort": "todo el día",
         "moreEvents": "+{{count}} más",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "Sem. {{week}} · {{month}} {{year}}",
         "agendaFrom": "Desde {{date}}",
         "titleLabel": "Título",

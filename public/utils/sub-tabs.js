@@ -16,6 +16,8 @@
  * @param {InsertPosition} [opts.insertPosition='afterbegin']
  * @returns {HTMLElement} the rendered bar element
  */
+import { wireScrollFade } from '/utils/ux.js';
+
 let subTabsCounter = 0;
 
 export function renderSubTabs(anchorEl, {
@@ -89,6 +91,13 @@ export function renderSubTabs(anchorEl, {
     bar.appendChild(btn);
   }
 
+  // Auf schmalen Viewports überläuft die Leiste; der aktive Tab muss dann
+  // sichtbar sein, sonst wirkt die Seite tab-los (Audit A2-18). block:'nearest'
+  // hält den vertikalen Seiten-Scroll unangetastet.
+  const scrollActiveIntoView = () => {
+    bar.querySelector('.sub-tab--active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  };
+
   const activateTab = (tabId, { focus = false } = {}) => {
     if (!tabId || tabId === current) return;
 
@@ -105,6 +114,7 @@ export function renderSubTabs(anchorEl, {
       b.tabIndex = active ? 0 : -1;
       if (active && focus) b.focus();
     });
+    scrollActiveIntoView();
     syncTabPanels(anchorEl, bar, current);
 
     onChange(current);
@@ -138,6 +148,10 @@ export function renderSubTabs(anchorEl, {
 
   anchorEl.insertAdjacentElement(insertPosition, bar);
   syncTabPanels(anchorEl, bar, current);
+  // Scroll-Affordanz (geteilte has-fade-Masken, filter-chip.css) + der via
+  // storageKey restaurierte Tab kann jenseits des sichtbaren Bereichs liegen.
+  wireScrollFade(bar);
+  scrollActiveIntoView();
 
   if (window.lucide) window.lucide.createIcons({ el: bar });
 

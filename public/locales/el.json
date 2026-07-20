@@ -455,6 +455,7 @@
         "allDay": "Όλη μέρα",
         "allDayShort": "όλη μέρα",
         "moreEvents": "+{{count}} ακόμα",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "Εβδ{{week}} · {{month}} {{year}}",
         "agendaFrom": "Από {{date}}",
         "titleLabel": "Τίτλος",

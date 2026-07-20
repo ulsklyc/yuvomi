@@ -1,3 +1,5 @@
+import { wireScrollFade } from '/utils/ux.js';
+
 /**
  * Modul: Tablist-Verhalten — geteilte WAI-ARIA-Tab-Navigation
  *
@@ -32,13 +34,19 @@ export function wireTablist(container, { activeId, onChange, activeClass = 'sub-
   const buttons = () => [...container.querySelectorAll('[data-tab-id]')];
 
   const paint = () => {
+    let activeBtn = null;
     buttons().forEach((b) => {
       const on = b.dataset.tabId === current;
       b.classList.toggle(activeClass, on);
       b.setAttribute('aria-selected', String(on));
       if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
       b.tabIndex = on ? 0 : -1;
+      if (on) activeBtn = b;
     });
+    // Überlaufende Leisten (Mobil): der aktive Tab muss im sichtbaren
+    // Scroll-Bereich liegen (Audit A2-18). block:'nearest' lässt den
+    // vertikalen Seiten-Scroll in Ruhe.
+    activeBtn?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
   };
 
   const setActive = (id, { focus = false } = {}) => {
@@ -75,6 +83,10 @@ export function wireTablist(container, { activeId, onChange, activeClass = 'sub-
   // die NICHT über die Leiste ausgelöst werden (z. B. Kalender: Klick auf einen
   // Tag wechselt in die Tagesansicht).
   const sync = (id) => { current = id; paint(); };
+
+  // Scroll-Affordanz für überlaufende Leisten: geteilte has-fade-Masken
+  // (filter-chip.css) auf jeder wireTablist-Leiste, nicht nur im Budget.
+  wireScrollFade(container);
 
   paint(); // initiale Roving-Tabindex/ARIA-Zustände setzen
   return { setActive, sync };

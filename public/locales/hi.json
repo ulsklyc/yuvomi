@@ -455,6 +455,7 @@
         "allDay": "पूरे दिन",
         "allDayShort": "पूरा दिन",
         "moreEvents": "+{{count}} और",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "सप्ताह {{week}} · {{month}} {{year}}",
         "agendaFrom": "{{date}} से",
         "titleLabel": "शीर्षक",

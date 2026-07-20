@@ -299,6 +299,19 @@ export function openModal({ title, content, onSave, onDelete, onClose, size = 'm
 
   // Focus-Trap
   const panel = activeOverlay.querySelector('.modal-panel');
+
+  // Aufrufer rendern ihre Fußzeile historisch im content, also im scrollenden
+  // Body. Strukturell gehört sie ans Panel: sonst liegt die Primäraktion bei
+  // langen Formularen unter der Falz und ist mobil mit offener Tastatur
+  // unerreichbar (Audit A2-20). Die Inline-Styles des alten In-Body-Layouts
+  // (border:none, padding:0, margin-top) fallen mit dem Move weg, damit das
+  // kanonische Footer-CSS (.modal-panel > .modal-panel__footer) greift.
+  const bodyFooter = [...panel.querySelectorAll('.modal-panel__body .modal-panel__footer')].pop();
+  if (bodyFooter) {
+    bodyFooter.removeAttribute('style');
+    panel.appendChild(bodyFooter);
+  }
+
   trapFocus(panel);
 
   // Snapshot für Dirty-Check (kurzer Delay: Felder könnten noch per JS befüllt werden)

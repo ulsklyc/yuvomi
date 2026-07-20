@@ -455,6 +455,7 @@
         "allDay": "Cả ngày",
         "allDayShort": "cả ngày",
         "moreEvents": "+{{count}} sự kiện khác",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "Tuần {{week}} · Tháng {{month}} năm {{year}}",
         "agendaFrom": "Từ {{date}}",
         "titleLabel": "Tiêu đề",

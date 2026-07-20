@@ -455,6 +455,7 @@
         "allDay": "Celý den",
         "allDayShort": "celý den",
         "moreEvents": "+{{count}} dalších",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "T{{week}} · {{month}} {{year}}",
         "agendaFrom": "Od {{date}}",
         "titleLabel": "Název",

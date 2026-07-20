@@ -455,6 +455,7 @@
         "allDay": "Egész nap",
         "allDayShort": "egész nap",
         "moreEvents": "+{{count}} további",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "H{{week}} · {{month}} {{year}}",
         "agendaFrom": "Innentől: {{date}}",
         "titleLabel": "Cím",

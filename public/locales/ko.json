@@ -462,6 +462,7 @@
         "allDay": "종일",
         "allDayShort": "종일",
         "moreEvents": "+{{count}}개 더",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "{{week}}주 · {{month}} {{year}}",
         "agendaFrom": "{{date}}부터",
         "titleLabel": "제목",

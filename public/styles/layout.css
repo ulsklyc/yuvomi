@@ -1837,6 +1837,18 @@ p.field-hint--warn[hidden] {
   border-top: 1px solid var(--color-border-subtle);
 }
 
+/* Nach dem strukturellen Move (modal.js) liegt die Fußzeile direkt im Panel,
+ * außerhalb des scrollenden Bodys. Die höhere Spezifität (0,2,0) stellt das
+ * kanonische Layout auch gegen die alten In-Body-Neutralisierer der
+ * Modul-Klassen (contact-modal__footer, subscriptions-modal-footer) sicher. */
+.modal-panel > .modal-panel__footer {
+  border-top: 1px solid var(--color-border-subtle);
+  padding: var(--space-3) var(--space-4);
+  margin-top: 0;
+  background-color: var(--color-surface);
+  flex-shrink: 0;
+}
+
 @keyframes modal-overlay-in {
   from { opacity: 0; }
   to   { opacity: 1; }

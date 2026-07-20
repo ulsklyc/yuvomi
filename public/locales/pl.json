@@ -462,6 +462,7 @@
         "allDay": "Cały dzień",
         "allDayShort": "cały dz.",
         "moreEvents": "+{{count}} więcej",
+        "dayRangeLabel": "{{from}} - {{to}}",
         "weekNumberLabel": "Tydz. {{week}} · {{month}} {{year}}",
         "agendaFrom": "Od {{date}}",
         "titleLabel": "Tytuł",

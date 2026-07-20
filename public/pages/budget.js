@@ -7,7 +7,7 @@
 
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, confirmModal, advancedSection } from '/components/modal.js';
-import { stagger, vibrate, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
 import { t, formatDate, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
@@ -446,13 +446,8 @@ function wireNav() {
       renderBody();
     },
   });
-  // Edge-Fade der Tab-Leiste über das geteilte Utility (Audit F-06): deckt
-  // Scroll UND Größenänderungen ab und setzt den Initialzustand — zuvor lief
-  // die Prüfung nur beim Scrollen, wodurch der Desktop-Überlauf ohne Fade
-  // geclippt wurde. Aktiven Tab in Sicht holen.
-  const tabsEl = _container.querySelector('.budget-tabs');
-  if (tabsEl) wireScrollFade(tabsEl);
-  _container.querySelector('.sub-tab--active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  // Edge-Fade + Aktiver-Tab-in-Sicht übernimmt jetzt wireTablist zentral
+  // (Audit A2-18: gleiche Affordanz für Budget, Haushaltshilfe, Rewards).
   updateLabel();
 }
 
