@@ -7,7 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.39.0] - 2026-07-19
+## [1.40.0] - 2026-07-20
+
+Second app-wide UX/UI audit round (51 findings across all modules, desktop/mobile), fully verified in the browser. Alongside the polish, several existing features got the visible entry points they were missing.
+
+### Added
+- Recipes open in a read view when tapping the card - ingredients and notes formatted for cooking, with editing as a deliberate follow-up action - and the recipes page gained a search box that matches titles, notes and ingredients.
+- The shopping meal-plan import shows a live preview ("4 ingredients from 1 meal will be added") for the chosen date range before anything is written, and the import button keeps its label on phones.
+- Housekeeping reports can be marked as paid directly in the list; the open/paid totals update immediately.
+- The health module surfaces its data history: vitals show a "recent measurements" list with delete actions, and the medication tab carries a collapsible intake log, so the adherence percentage finally has visible evidence.
+- Every task row offers an inline subtask quick-add; the calendar day view greets an empty day with a hint at the current time and defaults new events to the next half hour.
+- The global search overlay explains itself before typing, shows result metadata (due dates, event times, medication dosages) and is fully arrow-key navigable; the close control no longer sits between the input and the results in tab order.
+
+### Changed
+- Enabling one of the opt-in dashboard widgets (rewards, health, cycle, housekeeping) now survives a reload: the server silently dropped unknown widget ids when saving. Fresh installations also get the dense bento layout again - the server's default widget order differed from the client's and made every household look "user-sorted".
+- One accent per module now leads consistently through shared components; the quick-capture button on the health overview is called "Einnahme" to match its singular siblings, and the import preview is grammatically correct for a single meal in all 23 languages.
+- On phones, the budget summary is a true compact row (the compact styles were shadowed by rule order and never applied - the balance card overflowed the viewport), and the dashboard no longer parks ~200px of dead space before the bottom bar.
+- Switching tasks to the kanban view clears the status filter instead of applying it invisibly; the kitchen keyboard chords list their concrete destinations (meal plan, recipes, shopping) in the help dialog.
+- Settings show a breadcrumb on desktop and a back link on phones, the WebDAV backup warning only appears while WebDAV is enabled, the family list uses the shared row-action grammar, the signed-in account carries no self-delete button, and housekeeping staff are labeled as such instead of as members.
+
+### Fixed
+- Documents no longer strand an unclosable ghost context menu over the grid after switching folders or opening a second row menu in quick succession (the popover close event races the new menu's registration).
+- Budget entry rows are keyboard-accessible: focusable, Enter opens editing, with a visible focus ring; notes with a color outside the palette preselect that color as a tabbable swatch instead of losing the keyboard entirely.
+- Month cells budget their space honestly: holidays, events and tasks share the slots and everything beyond shows as a "+N more" line at the end of the cell instead of being silently swallowed.
+- Modal footers stay pinned to the panel on phones across all six creation dialogs (including subscriptions, whose footer was trapped inside the metadata grid).
+- Mobile health tabs signal hidden siblings with an edge fade and scroll the active tab into view after a reload; the rewards history keeps its side padding and no longer hides its last row behind the floating button.
+- The budget statistics chart draws three gridlines with a labeled midpoint and starts its readout on the newest day that has data; the blood-pressure axis uses integer ticks; an empty activity week shows a single message instead of two stacked empty states.
+- Active filter chips tell screen readers how to remove them, and the task status chip announces its action.
 
 App-wide UX/UI audit (all modules, light/dark, desktop/mobile). The findings, the priorities and what was deliberately left alone are documented in `docs/ux-audit/`.
 
