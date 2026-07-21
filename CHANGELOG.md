@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.41.0] - 2026-07-21
+
+### Added
+- Categories can now be reordered by drag-and-drop in the "Manage categories" dialog (Tasks, Budget, Contacts, and Shopping), including Budget subcategories. Drag a row by its handle to move it; the up/down buttons stay as the keyboard-accessible path and each move is announced to screen readers. The new order is saved immediately and rolls back to the server order if the save fails.
+
 ### Fixed
 - Dashboard widget customisation now persists variable-length layouts and future widget IDs without a duplicated backend allow-list. The preferences API validates the safe storage shape instead of owning a fixed widget registry, so adding or removing dashboard widgets no longer requires a matching server change and malformed layouts return an error instead of being silently discarded.
 
