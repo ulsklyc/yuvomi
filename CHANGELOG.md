@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.40.2] - 2026-07-21
+
+Polish pass clearing the remaining P2/P3 findings from the design critique (design health 33 to 34), plus a Kanban board fix uncovered along the way.
+
+### Fixed
+- The Kanban board now shows tasks of every status. The default "open" filter was still being applied in Kanban, so the "In progress" and "Done" columns stayed empty even when tasks existed. The columns already are the status, so the filter no longer applies there, the view reloads all tasks on switch, and the filter badge counts only the filters shown as chips.
+- The month calendar no longer clips the last event mid-cell in short rows: visible capacity is measured from the real cell height (recomputed on resize) and the "+N more" row is always reserved, so nothing is cut off.
+- Empty Kanban columns show a "No tasks" hint that turns into a "Drag here" drop target while a card is being dragged, so empty columns read as valid destinations.
+- Budget tabs on narrow screens reveal the next tab (about a third peeking in) with a sharper edge fade, instead of ending flush and hiding three tabs behind an invisible one.
+- The active person chip in the Health module scrolls into view on mobile instead of sitting off-screen.
+- Recipe cards in the meal-planner sidebar show meal-type chips only for a real subset of meal types, not when a recipe fits every type (or none) where the chips carry no information.
+- Budget category bars keep a visible minimum width for non-zero amounts instead of rounding a tiny value down to an empty bar.
+- Accessibility: the mobile "More" button announces its popup (aria-haspopup), and the quick-actions FAB exposes its keyboard shortcut (aria-keyshortcuts "n" plus a tooltip); the sidebar active-pill easing moved to a single named token.
+
 ## [1.40.1] - 2026-07-21
 
 Follow-up to the audit round: the two remaining P1 findings from the design critique - broken word wrapping in primary surfaces and detached form errors - plus the resulting board redesign.
