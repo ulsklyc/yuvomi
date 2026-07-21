@@ -76,18 +76,12 @@ const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 const COUNTRY_ISO_RE = /^[A-Z]{2}$/;
 const SUBDIVISION_RE = /^[A-Z]{2}-[A-Z0-9-]{1,10}$/;
 
-// Order defines the default dashboard layout.
-// Must stay in sync with WIDGET_IDS in public/pages/dashboard.js: der Client
-// erkennt eine Nutzer-Umsortierung am Vergleich gegen SEINEN Default; weicht der
-// Server-Default ab, gilt jede frische Installation als "nutzergeordnet" und das
-// dichte Bento-Layout greift nie (Audit A1-03).
-const VALID_WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'budget', 'rewards', 'health', 'cycle', 'housekeeping', 'family', 'notes', 'weather'];
-
-// Opt-in-Widgets starten unsichtbar (Spiegel von DEFAULT_HIDDEN_WIDGETS im Client,
-// ohne die Cockpit-Teilmenge): sonst poppen sie bei Bestands-Configs, denen die
-// IDs noch fehlen, beim Normalisieren ungefragt auf.
-const DEFAULT_HIDDEN_WIDGET_IDS = new Set(['rewards', 'health', 'cycle', 'housekeeping']);
+// Widget identifiers are client-owned. The server validates only a safe storage shape,
+// so adding or removing dashboard widgets never requires a matching backend registry change.
+const WIDGET_ID_RE = /^[a-z][a-z0-9-]{0,63}$/;
+const MAX_DASHBOARD_WIDGETS = 64;
 const VALID_WIDGET_SIZES = ['1x1', '1x2', '1x3', '1x4', '2x1', '2x2', '2x3', '2x4', '3x1', '3x2', '3x3', '3x4', '4x1', '4x2', '4x3', '4x4'];
+const DEFAULT_WIDGET_CONFIG = '[]';
 
 // Modul-Slugs, die per Settings deaktiviert werden können.
 // Dashboard und Settings sind absichtlich nicht enthalten — sie sind essentiell.
@@ -99,20 +93,6 @@ const TOGGLEABLE_MODULES = [
 const MODULE_ORDER_RE = /^(dashboard|tasks|calendar|meals|recipes|shopping|birthdays|notes|contacts|budget|documents|housekeeping|rewards|health|third-party-[a-z0-9][a-z0-9-]{1,62}[a-z0-9])$/;
 const MOBILE_NAV_ORDER_RE = /^(tasks|calendar|kitchen|meals|recipes|shopping|birthdays|notes|contacts|budget|documents|housekeeping|rewards|health|third-party-[a-z0-9][a-z0-9-]{1,62}[a-z0-9])$/;
 const KITCHEN_NAV_IDS = new Set(['kitchen', 'meals', 'recipes', 'shopping']);
-
-function defaultWidgetSize(id) {
-  if (['tasks', 'calendar'].includes(id)) return '2x2';
-  if (['weather', 'shopping', 'notes', 'health', 'cycle'].includes(id)) return '2x1';
-  if (id === 'rewards') return '1x2';
-  return '1x1';
-}
-
-const DEFAULT_WIDGET_CONFIG = JSON.stringify(VALID_WIDGET_IDS.map((id, order) => ({
-  id,
-  visible: !DEFAULT_HIDDEN_WIDGET_IDS.has(id),
-  order,
-  size: defaultWidgetSize(id),
-})));
 
 // --------------------------------------------------------
 // Hilfsfunktionen
@@ -169,7 +149,7 @@ function weatherUserOverride(userId) {
 function parseWidgetConfig(raw) {
   try {
     const parsed = JSON.parse(raw ?? DEFAULT_WIDGET_CONFIG);
-    return normalizeWidgetConfig(parsed);
+    return normalizeWidgetConfig(parsed) ?? [];
   } catch {
     return JSON.parse(DEFAULT_WIDGET_CONFIG);
   }
@@ -220,27 +200,29 @@ function parseMobileNavOrder(raw) {
 }
 
 function normalizeWidgetConfig(input) {
-  const valid = Array.isArray(input)
-    ? input
-      .filter((w) => w && typeof w === 'object' && VALID_WIDGET_IDS.includes(w.id))
-      .map((w, order) => ({
-        id: w.id,
-        visible: w.visible !== false,
-        order: Number.isFinite(Number(w.order)) ? Number(w.order) : order,
-        size: VALID_WIDGET_SIZES.includes(w.size) ? w.size : defaultWidgetSize(w.id),
-      }))
-    : [];
+  if (!Array.isArray(input) || input.length > MAX_DASHBOARD_WIDGETS) return null;
 
-  // Fehlende Widget-IDs am Ende ergänzen; Opt-in-Widgets bleiben dabei unsichtbar
-  const presentIds = new Set(valid.map((w) => w.id));
-  for (const id of VALID_WIDGET_IDS) {
-    if (!presentIds.has(id)) {
-      valid.push({ id, visible: !DEFAULT_HIDDEN_WIDGET_IDS.has(id), order: valid.length, size: defaultWidgetSize(id) });
-    }
+  const seenIds = new Set();
+  const normalized = [];
+  for (const [index, widget] of input.entries()) {
+    if (!widget || typeof widget !== 'object' || Array.isArray(widget)) return null;
+    if (typeof widget.id !== 'string' || !WIDGET_ID_RE.test(widget.id) || seenIds.has(widget.id)) return null;
+    if (widget.visible !== undefined && typeof widget.visible !== 'boolean') return null;
+    if (widget.order !== undefined && !Number.isFinite(Number(widget.order))) return null;
+    if (widget.size !== undefined && !VALID_WIDGET_SIZES.includes(widget.size)) return null;
+
+    seenIds.add(widget.id);
+    normalized.push({
+      id: widget.id,
+      visible: widget.visible !== false,
+      order: widget.order === undefined ? index : Number(widget.order),
+      size: widget.size ?? '1x1',
+    });
   }
-  return valid
+
+  return normalized
     .sort((a, b) => a.order - b.order)
-    .map((w, order) => ({ ...w, order }));
+    .map((widget, order) => ({ ...widget, order }));
 }
 
 // --------------------------------------------------------
@@ -393,6 +375,9 @@ router.put('/', (req, res) => {
         return res.status(400).json({ error: 'dashboard_widgets muss ein Array sein', code: 400 });
       }
       const normalized = normalizeWidgetConfig(dashboard_widgets);
+      if (normalized === null) {
+        return res.status(400).json({ error: 'dashboard_widgets enthält ungültige Einträge', code: 400 });
+      }
       cfgSet('dashboard_widgets', JSON.stringify(normalized));
     }
 

@@ -146,26 +146,62 @@ test('PUT app_name: gültig -> persist, leer -> Rückfall auf Default', async ()
 test('PUT dashboard_widgets: Nicht-Array -> 400', async () => {
   assert.equal((await put({ dashboard_widgets: {} })).status, 400);
 });
-test('PUT dashboard_widgets: Teilmenge -> fehlende IDs werden ergänzt, order neu vergeben', async () => {
-  const { status, body } = await put({ dashboard_widgets: [{ id: 'notes', visible: false, size: '2x1' }] });
-  assert.equal(status, 200);
-  const widgets = body.data.dashboard_widgets;
-  // Alle 13 IDs vorhanden, notes zuerst und unsichtbar, order lückenlos 0..n.
-  assert.equal(widgets.length, 13);
-  assert.equal(widgets[0].id, 'notes');
-  assert.equal(widgets[0].visible, false);
-  assert.deepEqual(widgets.map((w) => w.order), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
-  // Ergänzte Opt-in-Widgets starten unsichtbar, Kern-Widgets sichtbar.
-  const byId = Object.fromEntries(widgets.map((w) => [w.id, w]));
-  for (const id of ['rewards', 'health', 'cycle', 'housekeeping']) assert.equal(byId[id].visible, false, id);
-  for (const id of ['tasks', 'calendar', 'weather']) assert.equal(byId[id].visible, true, id);
+test('PUT dashboard_widgets: ungültige Struktur, doppelte IDs oder zu viele Einträge -> 400', async () => {
+  assert.equal((await put({ dashboard_widgets: [{ id: '../weather', visible: true, order: 0, size: '1x1' }] })).status, 400);
+  assert.equal((await put({ dashboard_widgets: [{ id: 'weather', visible: 'yes', order: 0, size: '1x1' }] })).status, 400);
+  assert.equal((await put({ dashboard_widgets: [{ id: 'weather', visible: true, order: 'first', size: '1x1' }] })).status, 400);
+  assert.equal((await put({ dashboard_widgets: [{ id: 'weather', visible: true, order: 0, size: '5x5' }] })).status, 400);
+  assert.equal((await put({ dashboard_widgets: [
+    { id: 'weather', visible: true, order: 0, size: '1x1' },
+    { id: 'weather', visible: false, order: 1, size: '1x1' },
+  ] })).status, 400);
+  const tooMany = Array.from({ length: 65 }, (_, order) => ({
+    id: `widget-${order}`,
+    visible: true,
+    order,
+    size: '1x1',
+  }));
+  assert.equal((await put({ dashboard_widgets: tooMany })).status, 400);
 });
-test('PUT dashboard_widgets: Opt-in-Widget sichtbar geschaltet -> ueberlebt den Roundtrip', async () => {
-  const { status, body } = await put({ dashboard_widgets: [{ id: 'rewards', visible: true, size: '1x2' }] });
-  assert.equal(status, 200);
-  const rewards = body.data.dashboard_widgets.find((w) => w.id === 'rewards');
-  assert.ok(rewards, 'rewards bleibt in der gespeicherten Config');
-  assert.equal(rewards.visible, true);
+test('PUT dashboard_widgets: Teilmenge bleibt beim GET eine Teilmenge', async () => {
+  const requested = [{ id: 'notes', visible: false, order: 0, size: '2x1' }];
+  const saved = await put({ dashboard_widgets: requested });
+  assert.equal(saved.status, 200);
+  assert.deepEqual(saved.body.data.dashboard_widgets, requested);
+  assert.deepEqual((await get()).body.data.dashboard_widgets, requested);
+});
+test('PUT dashboard_widgets: zukünftige sichere Widget-ID wird unverändert persistiert', async () => {
+  const requested = [
+    { id: 'weather', visible: true, order: 0, size: '2x1' },
+    { id: 'solar-production', visible: true, order: 1, size: '2x1' },
+  ];
+
+  const saved = await put({ dashboard_widgets: requested });
+  assert.equal(saved.status, 200);
+  assert.deepEqual(saved.body.data.dashboard_widgets, requested);
+  assert.deepEqual((await get()).body.data.dashboard_widgets, requested);
+});
+test('PUT dashboard_widgets: aktuelle 13-Widget-Konfiguration bleibt beim GET erhalten', async () => {
+  const requested = [
+    { id: 'weather', visible: true, order: 0, size: '2x1' },
+    { id: 'tasks', visible: true, order: 1, size: '2x2' },
+    { id: 'calendar', visible: true, order: 2, size: '2x2' },
+    { id: 'notes', visible: true, order: 3, size: '2x1' },
+    { id: 'shopping', visible: true, order: 4, size: '2x1' },
+    { id: 'birthdays', visible: true, order: 5, size: '1x1' },
+    { id: 'family', visible: true, order: 6, size: '1x1' },
+    { id: 'meals', visible: true, order: 7, size: '1x1' },
+    { id: 'budget', visible: true, order: 8, size: '1x1' },
+    { id: 'rewards', visible: true, order: 9, size: '1x2' },
+    { id: 'health', visible: true, order: 10, size: '2x1' },
+    { id: 'cycle', visible: false, order: 11, size: '2x1' },
+    { id: 'housekeeping', visible: true, order: 12, size: '1x1' },
+  ];
+
+  const saved = await put({ dashboard_widgets: requested });
+  assert.equal(saved.status, 200);
+  assert.deepEqual(saved.body.data.dashboard_widgets, requested);
+  assert.deepEqual((await get()).body.data.dashboard_widgets, requested);
 });
 
 // --------------------------------------------------------
@@ -392,7 +428,7 @@ test('POST /holidays/sync: Admin ohne konfiguriertes Land -> 200 (netz-freier Ea
 test('GET / verkraftet korrupte dashboard_widgets (Fallback auf Default)', async () => {
   cfgSet('dashboard_widgets', '{ kaputt');
   const widgets = (await get()).body.data.dashboard_widgets;
-  assert.equal(widgets.length, 13); // Default-Set
+  assert.deepEqual(widgets, []); // Client erweitert leer auf seine aktuellen Defaults
   cfgDelete('dashboard_widgets');
 });
 test('GET / verkraftet korrupte per-user calendar_default_reminders', async () => {

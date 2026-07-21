@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Dashboard widget customisation now persists variable-length layouts and future widget IDs without a duplicated backend allow-list. The preferences API validates the safe storage shape instead of owning a fixed widget registry, so adding or removing dashboard widgets no longer requires a matching server change and malformed layouts return an error instead of being silently discarded.
+
 ## [1.40.7] - 2026-07-21
 
 ### Fixed
