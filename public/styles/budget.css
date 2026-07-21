@@ -1339,9 +1339,11 @@
 }
 .budget-stats__legend { display:flex; gap:var(--space-4); margin-top:var(--space-2); font-size:var(--text-sm); color:var(--color-text-secondary); }
 .budget-stats__legend--wrap { flex-wrap:wrap; gap:var(--space-2) var(--space-4); }
-.budget-stats__swatch { display:inline-block; width:10px; height:10px; border-radius:var(--radius-full); margin-right:var(--space-1); }
-.budget-stats__swatch--income { background:var(--color-success); }
-.budget-stats__swatch--expense { background:var(--color-danger); }
+/* Legenden-Swatches spiegeln den Zweitkanal des Trend-Charts (Critique P2):
+ * Einnahmen solide, Ausgaben gestrichelte Mini-Linie - nicht nur Farbe. */
+.budget-stats__swatch { display:inline-block; width:16px; height:0; border-top:2px solid transparent; margin-right:var(--space-1); vertical-align:middle; }
+.budget-stats__swatch--income { border-top-color:var(--color-success); }
+.budget-stats__swatch--expense { border-top-style:dashed; border-top-color:var(--color-danger); }
 .budget-stats__donut-wrap { display:flex; gap:var(--space-4); align-items:center; flex-wrap:wrap; }
 .budget-stats__donut { width:160px; height:160px; }
 .budget-stats__export { margin-top:var(--space-4); }

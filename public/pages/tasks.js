@@ -1052,6 +1052,39 @@ function renderKanban(container) {
     grouped[col.status].sort((a, b) => sortTasks(a, b, now));
   }
 
+  // Bei aktiver Suche ohne Treffer wäre ein Board aus lauter „Keine Aufgaben"-
+  // Spalten irreführend (wirkt wie ein leeres Modul statt wie ein leeres Such-
+  // ergebnis). Stattdessen ein board-weiter Treffer-Empty analog zur Liste,
+  // inkl. expliziter Zurücksetzen-Affordanz (Critique P3).
+  const isFiltered   = state.searchQuery.trim().length > 0;
+  const totalVisible = cols.reduce((n, c) => n + grouped[c.status].length, 0);
+  if (isFiltered && totalVisible === 0) {
+    listEl.replaceChildren();
+    listEl.insertAdjacentHTML('beforeend', `
+      <div class="empty-state">
+        <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+        <div class="empty-state__title">${t('tasks.noResultsTitle')}</div>
+        <div class="empty-state__description">${t('tasks.noResultsDescription', { query: esc(state.searchQuery) })}</div>
+        <button class="btn btn--secondary empty-state__cta" id="kanban-reset-search">
+          <i data-lucide="x" aria-hidden="true" class="icon-md"></i>
+          ${t('common.searchClear')}
+        </button>
+      </div>`);
+    if (window.lucide) window.lucide.createIcons({ el: listEl });
+    listEl.querySelector('#kanban-reset-search')?.addEventListener('click', () => {
+      state.searchQuery = '';
+      const input = container.querySelector('#tasks-search');
+      if (input) input.value = '';
+      container.querySelector('[data-page-search-clear]')?.setAttribute('hidden', '');
+      renderTaskList(container);
+    });
+    updateOverdueBadge();
+    return;
+  }
+
   const kanbanHtml = `
     <div class="kanban-board">
       ${cols.map((col) => `

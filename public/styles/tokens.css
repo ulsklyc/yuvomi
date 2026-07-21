@@ -289,7 +289,12 @@
   --color-priority-low:      var(--_color-priority-low);
   --_color-priority-medium:  #854D0E;
   --color-priority-medium:   var(--_color-priority-medium);
-  --_color-priority-high:    #9A3412;
+  /* „Hoch" heller/oranger als „Dringend" (#991B1B): der Priority-Punkt auf
+   * Dashboard/Mobil-Kalender kodiert Rang nur per Farbe - #9A3412 war von
+   * Urgent-Rot kaum zu trennen (Helligkeit ~1,2x). #B4400E hebt die Helligkeit
+   * auf ~1,8x Urgent (auch bei Rot-Grün-Schwäche wahrnehmbar) und hält 4.79:1
+   * Badge-Text auf dem getönten Priority-Badge-Grund (WCAG AA). P3. */
+  --_color-priority-high:    #B4400E;
   --color-priority-high:     var(--_color-priority-high);
   --_color-priority-urgent:  #991B1B;
   --color-priority-urgent:   var(--_color-priority-urgent);

@@ -817,16 +817,19 @@ function holidaysOnDay(dateStr) {
   });
 }
 
-/** Rendert einen read-only Task-Chip für Kalenderansichten. */
-function renderTaskChip(task) {
+/** Rendert einen read-only Task-Chip für Kalenderansichten. In der Monatsansicht
+ *  (interactive:false) ist die Tageszelle selbst der Drill-in-Button; die Chips
+ *  sind dort nur visuelles Signal und dürfen kein eigenes role/tabindex tragen -
+ *  sonst entsteht ein fokussierbarer Button im Zellen-Button (Audit P1). */
+function renderTaskChip(task, { interactive = true } = {}) {
   const priority = task.priority || 'none';
   const label    = esc(task.title);
-  const ariaLbl  = t('calendar.taskChipAriaLabel', { title: task.title });
   const timeStr  = task.due_time ? ` · ${task.due_time.slice(0, 5)}` : '';
+  const button   = interactive
+    ? ` role="button" tabindex="0" aria-label="${esc(t('calendar.taskChipAriaLabel', { title: task.title }))}"`
+    : '';
   return `<div class="cal-task-chip cal-task-chip--${priority}"
-               data-task-id="${task.id}"
-               role="button" tabindex="0"
-               aria-label="${esc(ariaLbl)}"
+               data-task-id="${task.id}"${button}
                title="${label}${esc(timeStr)}">
     <i data-lucide="check-square" class="icon-xs" aria-hidden="true"></i>
     <span>${label}${esc(timeStr)}</span>
@@ -1381,23 +1384,41 @@ function renderMonthView(container) {
 
   const grid = container.querySelector('#month-grid');
   grid.addEventListener('click', (e) => {
-    const taskChip = e.target.closest('.cal-task-chip');
-    if (taskChip) {
-      e.stopPropagation();
-      window.yuvomi.navigate(`/tasks?open=${taskChip.dataset.taskId}`);
-      return;
-    }
-    const evEl = e.target.closest('.month-day__event');
-    if (evEl) {
-      e.stopPropagation();
-      const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
-      if (ev) showEventPopup(ev, evEl);
-      return;
-    }
     const dayEl = e.target.closest('.month-day');
-    if (dayEl) {
-      switchToDayView(dayEl.dataset.date);
+    if (!dayEl) return;
+
+    // Mobil ist die ganze Zelle EIN Drill-in-Ziel: die Chips sind dort zu
+    // Punkten reduziert (reines "etwas ist los"-Signal), ein Tap darf nie in
+    // einem Event-Popup enden statt in der handlungsfähigen Tagesansicht (P1).
+    // Desktop behält die feinere Interaktion: Chip -> Ziel, Zelle -> Tag.
+    const isMobile = window.matchMedia('(max-width: 639px)').matches;
+    if (!isMobile) {
+      const taskChip = e.target.closest('.cal-task-chip');
+      if (taskChip) {
+        e.stopPropagation();
+        window.yuvomi.navigate(`/tasks?open=${taskChip.dataset.taskId}`);
+        return;
+      }
+      const evEl = e.target.closest('.month-day__event');
+      if (evEl) {
+        e.stopPropagation();
+        const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
+        if (ev) showEventPopup(ev, evEl);
+        return;
+      }
     }
+    switchToDayView(dayEl.dataset.date);
+  });
+
+  // Tastatur-Aktivierung der Tageszelle (role="button"): Enter/Space -> Tag.
+  // Nur wenn der Fokus auf der Zelle selbst liegt; innere Chips tragen desktop
+  // ihre eigene Semantik und werden hier nicht abgefangen (Audit P1).
+  grid.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const dayEl = e.target.closest('.month-day');
+    if (!dayEl || e.target !== dayEl) return;
+    e.preventDefault();
+    switchToDayView(dayEl.dataset.date);
   });
 
   // Sichtbare Kapazität je Zelle aus der realen Höhe ableiten und bei Viewport-
@@ -1445,10 +1466,12 @@ function renderMonthDay(date, inMonth) {
     >${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}<span>${esc(ev.title)}</span>${chipAssigneeStack(ev, { size: 15, maxVisible: 2 })}</div>
   `).join('');
 
-  const taskHtml = taskShown.map(renderTaskChip).join('');
+  const taskHtml = taskShown.map((tk) => renderTaskChip(tk, { interactive: false })).join('');
 
   return `
-    <div class="${classes}" data-date="${date}" data-total="${total}">
+    <div class="${classes}" data-date="${date}" data-total="${total}"
+         role="button" tabindex="0"
+         aria-label="${esc(monthDayAriaLabel(date, total))}"${isToday ? ' aria-current="date"' : ''}>
       <div class="month-day__number">${new Date(date + 'T00:00:00').getDate()}</div>
       ${holHtml}
       ${evHtml}
@@ -1456,6 +1479,14 @@ function renderMonthDay(date, inMonth) {
       <div class="month-day__more" hidden></div>
     </div>
   `;
+}
+
+// aria-label der Tageszelle: lokalisiertes Datum + (falls vorhanden) Zahl der
+// Einträge, damit Tastatur/Screenreader den Tag vor dem Drill-in einordnen
+// können. Leere Tage tragen nur das Datum (die role sagt "Schaltfläche"). P1.
+function monthDayAriaLabel(date, total) {
+  const d = formatPreferredDate(date);
+  return total > 0 ? `${d}, ${t('calendar.monthDayEntries', { count: total })}` : d;
 }
 
 // --------------------------------------------------------
@@ -2193,7 +2224,7 @@ function showEventPopup(ev, anchor) {
     </div>
     <div class="event-popup__actions">
       <button class="btn btn--secondary event-popup__edit" id="popup-edit">${t('calendar.popupEdit')}</button>
-      <button class="btn btn--danger-outline" id="popup-delete">
+      <button class="btn btn--danger-ghost" id="popup-delete">
         <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
       </button>
     </div>

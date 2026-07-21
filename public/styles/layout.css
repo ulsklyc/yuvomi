@@ -2068,6 +2068,23 @@ p.field-hint--warn[hidden] {
   color: var(--color-text-primary);
 }
 
+/* Zerstörende Aktion mit tertiärem Gewicht: roter Text, aber ohne Rahmen/Füllung,
+   damit „Löschen" im Event-Popover hinter „Bearbeiten" zurücktritt statt gleich
+   gewichtet daneben zu stehen (Critique-Minor). */
+.btn--danger-ghost {
+  background-color: transparent;
+  color: var(--color-danger);
+}
+
+.btn--danger-ghost:hover {
+  background-color: var(--color-surface-2);
+  color: var(--color-danger-hover);
+}
+
+.btn--danger-ghost:focus-visible {
+  outline-color: var(--color-danger);
+}
+
 /* Eingerasteter Zustand eines Umschalt-Buttons (z. B. Mehrfachauswahl in
    Aufgaben). Trägt `aria-pressed="true"`; ohne diese Regel war der aktive
    Zustand nur für Screenreader erkennbar, visuell aber identisch zum Ruhezustand.

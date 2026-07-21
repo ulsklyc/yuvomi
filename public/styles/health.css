@@ -227,6 +227,15 @@
   text-align: left;
 }
 
+/* Übersichts-Widget „Letzte Vitalwerte": das 2-Spalten-Raster (minmax(0,1fr))
+ * schrumpft die Karte mobil auf ~119px - zu schmal für „Sauerstoffsättigung".
+ * Hier trennt hyphens:auto sprachkorrekt an Silbengrenzen (<html lang> ist die
+ * Nutzer-Locale) statt overflow-wrap das Wort mittig zu zerhacken (Critique P2).
+ * Nur dieser Kontext; die breitere Vitalwerte-Tab-Karte bleibt bei manual. */
+.health-overview__vitals-grid .health-metric-card__label {
+  hyphens: auto;
+}
+
 .health-metric-card__icon {
   flex-shrink: 0;
   width: 18px;

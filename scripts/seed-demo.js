@@ -460,7 +460,7 @@ console.log('Inserting notes…');
 const insertNote = db.prepare('INSERT INTO notes (title, content, color, pinned, created_by) VALUES (?, ?, ?, ?, ?)');
 [
   ['Holiday Checklist 🌍', 'Passports (exp. 2028)\nTravel insurance — check!\nEuro cash — €300\nBook airport parking\nAsk Mike to water the plants\nPack sunscreen SPF 50', '#0EA5E9', 1, alexId],
-  ['WiFi & Smart Home',    'WiFi: Yuvomi_Home_5G\nPassword: sunshine2024!\nPhilips Hue: bridge 192.168.1.42\nThermostat: eco mode 18°C', '#F59E0B', 1, alexId],
+  ['WiFi & Smart Home',    'WiFi: Yuvomi_Home_5G (password in the router app)\nPhilips Hue: bridge 192.168.1.42\nThermostat: eco mode 18°C\nRouter admin: fritz.box', '#F59E0B', 1, alexId],
   ["Emma's School Info",   "Class: 3b — Mrs Bauer\nSchool starts: 08:10\nCollection: 13:30 (Tue/Thu 15:00)\nAllergy: mild lactose intolerance\nBest friends: Lena, Sophie, Tim", '#EC4899', 1, lindaId],
   ["Leo's Activities",     'Football: Tue & Sat 17:00 — SV West\nSwimming: Fri 16:00 — Westbad\nNeeds: boots size 35, goggles\nCoach: Herr Krüger', '#F97316', 1, lindaId],
   ['Emergency Numbers',    'Police: 110\nFire / Ambulance: 112\nPoison Control: 0800 192 11 10\nGP out-of-hours: 116 117\nNearest A&E: Klinikum Dortmund', '#EF4444', 1, alexId],

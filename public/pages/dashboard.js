@@ -649,7 +649,7 @@ function renderUrgentTasks(tasks) {
     const due = formatDueDate(t.due_date, t.due_time);
     return `
       <div class="task-item" data-task-id="${t.id}" data-task-title="${esc(t.title)}" role="button" tabindex="0">
-        ${t.priority !== 'none' ? `<div class="task-item__priority task-item__priority--${t.priority}" aria-hidden="true"></div>` : ''}
+        ${t.priority !== 'none' ? `<div class="task-item__priority task-item__priority--${t.priority}" title="${esc(PRIORITY_LABELS()[t.priority] ?? t.priority)}" aria-hidden="true"></div>` : ''}
         <span class="sr-only">${PRIORITY_LABELS()[t.priority] ?? t.priority}</span>
         <div class="task-item__content">
           <div class="task-item__title">${esc(t.title)}</div>

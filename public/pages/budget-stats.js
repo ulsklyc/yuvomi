@@ -187,9 +187,10 @@ function renderCatBars() {
       ? `<div class="budget-bar-row__target" style="--target-pos:${targetPos.toFixed(4)}"
              title="${t('budget.planTarget', { amount: view.ctx.formatAmount(target) })}"></div>`
       : '';
+    const catLabel = view.ctx.esc(view.ctx.categoryLabel(c.category));
     return `
       <div class="budget-bar-row">
-        <div class="budget-bar-row__label">${view.ctx.esc(view.ctx.categoryLabel(c.category))}</div>
+        <div class="budget-bar-row__label" title="${catLabel}">${catLabel}</div>
         <div class="budget-bar-row__track">
           <div class="budget-bar-row__fill ${isExp ? 'budget-bar-row__fill--expenses' : 'budget-bar-row__fill--income'}"
                style="--bar-scale:${pct / 100}"></div>
@@ -294,6 +295,10 @@ function renderTrendChart() {
   // Die Kurve trug bisher weder Skala noch Zeitachse: zwei farbige Linien ohne
   // jeden ablesbaren Wert. Achsenbeschriftung liegt als HTML außerhalb des SVG,
   // weil preserveAspectRatio="none" jeden Text im SVG verzerren würde.
+  // Zweiter Kanal neben der Farbe (Critique P2): Einnahmen solide, Ausgaben
+  // gestrichelt - so trennen sich die Serien auch bei Rot-Grün-Schwäche. Der
+  // Screenreader-Zugang liegt in der sr-only-Summary + den Punkt-Buttons; das
+  // rein visuelle SVG bleibt daher bewusst aria-hidden.
   const summary = t('budget.statsTrendSummary', {
     periods: s.length,
     income: fmtAmount(sum(incomes)),
@@ -334,7 +339,7 @@ function renderTrendChart() {
             }).join('')}
             <polyline fill="none" stroke="var(--color-success)" stroke-width="2"
                       vector-effect="non-scaling-stroke" points="${points(incomes)}" />
-            <polyline fill="none" stroke="var(--color-danger)" stroke-width="2"
+            <polyline fill="none" stroke="var(--color-danger)" stroke-width="2" stroke-dasharray="6 4"
                       vector-effect="non-scaling-stroke" points="${points(expenses)}" />
           </svg>
           <div class="budget-stats__points" role="group" aria-label="${t('budget.statsPointsLabel')}">${hotspots}</div>
