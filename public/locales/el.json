@@ -750,6 +750,8 @@
         "birthdayLabel": "Γενέθλια",
         "birthdayHint": "Εμφανίζεται και στο ημερολόγιο μέσω της εισαγωγής γενεθλίων.",
         "phonePlaceholder": "+30 …",
+        "phonePreview": "Προεπισκόπηση: {{value}}",
+        "phoneImplausible": "Αυτός ο αριθμός φαίνεται ελλιπής - θα αποθηκευτεί ούτως ή άλλως.",
         "emailLabel": "Email",
         "emailPlaceholder": "ονομα@παραδειγμα.gr",
         "addressLabel": "Διεύθυνση",

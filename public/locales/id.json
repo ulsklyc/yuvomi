@@ -759,6 +759,8 @@
         "birthdayLabel": "Ulang tahun",
         "birthdayHint": "Juga muncul di kalender lewat impor ulang tahun.",
         "phonePlaceholder": "+62 …",
+        "phonePreview": "Pratinjau: {{value}}",
+        "phoneImplausible": "Nomor ini tampak tidak lengkap - tetap akan disimpan.",
         "emailLabel": "Email",
         "emailPlaceholder": "nama@contoh.com",
         "addressLabel": "Alamat",

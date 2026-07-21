@@ -15,7 +15,7 @@
  *   → bypassCacheUntil (in-memory + Cache API für SW-Restart-Robustheit)
  */
 
-const APP_RELEASE   = '1.41.0';
+const APP_RELEASE   = '1.42.0';
 const SHELL_CACHE   = `yuvomi-shell-${APP_RELEASE}`;
 const PAGES_CACHE   = `yuvomi-pages-${APP_RELEASE}`;
 const LOCALES_CACHE = `yuvomi-locales-${APP_RELEASE}`;
@@ -120,6 +120,10 @@ const PAGE_MODULES = [
   '/components/category-manager.js',
   '/utils/sortable.js',
   '/vendor/sortablejs/sortable.esm.min.js',
+  // libphonenumber-js: lazy im Kontaktmodul, aber vorab gecacht → Telefon-
+  // Formatierung funktioniert auch offline (Kernmodul). Versions-gecacht.
+  '/vendor/libphonenumber/core.min.mjs',
+  '/vendor/libphonenumber/metadata.min.json',
   '/settings/registry.js',
   '/settings/shell.js',
   '/settings/components.js',
@@ -308,7 +312,8 @@ function dispatchFetch(request, url) {
     url.pathname.startsWith('/settings/') ||
     url.pathname === '/components/category-manager.js' ||
     url.pathname === '/utils/sortable.js' ||
-    url.pathname === '/vendor/sortablejs/sortable.esm.min.js'
+    url.pathname === '/vendor/sortablejs/sortable.esm.min.js' ||
+    url.pathname.startsWith('/vendor/libphonenumber/')
   ) {
     return networkFirst(request, PAGES_CACHE);
   }

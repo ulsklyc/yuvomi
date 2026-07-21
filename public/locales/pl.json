@@ -759,6 +759,8 @@
         "birthdayLabel": "Urodziny",
         "birthdayHint": "Dzięki importowi urodzin pojawia się też w kalendarzu.",
         "phonePlaceholder": "+48 …",
+        "phonePreview": "Podgląd: {{value}}",
+        "phoneImplausible": "Ten numer wygląda na niekompletny - i tak zostanie zapisany.",
         "emailLabel": "E-mail",
         "emailPlaceholder": "imie@przyklad.pl",
         "addressLabel": "Adres",

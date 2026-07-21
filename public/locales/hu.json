@@ -750,6 +750,8 @@
         "birthdayLabel": "Születésnap",
         "birthdayHint": "A születésnap-importtal a naptárban is megjelenik.",
         "phonePlaceholder": "+36 …",
+        "phonePreview": "Előnézet: {{value}}",
+        "phoneImplausible": "Ez a szám hiányosnak tűnik - ennek ellenére mentésre kerül.",
         "emailLabel": "Email",
         "emailPlaceholder": "nev@pelda.com",
         "addressLabel": "Cím",

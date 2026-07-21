@@ -750,6 +750,8 @@
         "birthdayLabel": "Narozeniny",
         "birthdayHint": "Přes import narozenin se zobrazí i v kalendáři.",
         "phonePlaceholder": "+420 …",
+        "phonePreview": "Náhled: {{value}}",
+        "phoneImplausible": "Toto číslo vypadá neúplně - přesto bude uloženo.",
         "emailLabel": "E-mail",
         "emailPlaceholder": "jmeno@example.com",
         "addressLabel": "Adresa",

@@ -750,6 +750,8 @@
         "birthdayLabel": "Compleanno",
         "birthdayHint": "Compare anche nel calendario tramite l’importazione dei compleanni.",
         "phonePlaceholder": "+39 …",
+        "phonePreview": "Anteprima: {{value}}",
+        "phoneImplausible": "Questo numero sembra incompleto - verrà comunque salvato.",
         "emailLabel": "Email",
         "emailPlaceholder": "nome@example.com",
         "addressLabel": "Indirizzo",

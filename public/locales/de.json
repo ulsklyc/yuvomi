@@ -759,6 +759,8 @@
         "birthdayLabel": "Geburtstag",
         "birthdayHint": "Erscheint über den Geburtstags-Import auch im Kalender.",
         "phonePlaceholder": "+49 …",
+        "phonePreview": "Vorschau: {{value}}",
+        "phoneImplausible": "Diese Nummer wirkt unvollständig - sie wird trotzdem gespeichert.",
         "emailLabel": "E-Mail",
         "emailPlaceholder": "name@beispiel.de",
         "addressLabel": "Adresse",

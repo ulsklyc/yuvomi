@@ -750,6 +750,8 @@
         "birthdayLabel": "誕生日",
         "birthdayHint": "誕生日のインポートでカレンダーにも表示されます。",
         "phonePlaceholder": "+81 …",
+        "phonePreview": "プレビュー: {{value}}",
+        "phoneImplausible": "この番号は不完全のようです - それでも保存されます。",
         "emailLabel": "メール",
         "emailPlaceholder": "name@example.com",
         "addressLabel": "住所",

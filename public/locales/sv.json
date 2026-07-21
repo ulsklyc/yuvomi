@@ -750,6 +750,8 @@
         "birthdayLabel": "Födelsedag",
         "birthdayHint": "Visas också i kalendern via födelsedagsimporten.",
         "phonePlaceholder": "+46 …",
+        "phonePreview": "Förhandsvisning: {{value}}",
+        "phoneImplausible": "Det här numret verkar ofullständigt - det sparas ändå.",
         "emailLabel": "E-post",
         "emailPlaceholder": "namn@exempel.se",
         "addressLabel": "Adress",

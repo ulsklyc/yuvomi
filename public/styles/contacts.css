@@ -303,6 +303,9 @@
 .contact-item__meta-phone {
   flex-shrink: 0;
   white-space: nowrap;
+  /* Stabile Ziffernbreite: mildert den Rohwert→formatiert-Reflow beim ersten
+     Paint (progressive enhancement), v. a. bei internationalen Nummern. */
+  font-variant-numeric: tabular-nums;
 }
 
 .contact-item__meta-sep {
@@ -652,8 +655,42 @@
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto;
   gap: var(--space-2);
   align-items: center;
+  /* Inline-Padding + negatives Margin: Platz für den Aktiv-Ton, ohne die
+     Spalten zu verschieben. */
+  padding-inline: var(--space-1);
+  margin-inline: calc(var(--space-1) * -1);
+  border-radius: var(--radius-sm);
+  transition: background-color 150ms ease;
+}
+
+/* Aktive Telefonzeile: dezenter Ton verankert den (geteilten) Hint an der Zeile,
+   auf die er sich bezieht. Kein Side-Stripe - flächiger Ton. */
+.contact-mv-row--active {
+  background: var(--color-surface-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contact-mv-row { transition: none; }
 }
 
 .contact-mv-add {
   margin-top: var(--space-2);
+}
+
+/* Telefon-Tipphilfe (AsYouType-Vorschau / Plausibilitäts-Hinweis). Rein visuell,
+   nie blockierend; leer, solange kein Telefonfeld aktiv ist. Selbst-gestylt, da
+   .form-hint page-scoped in settings.css liegt und hier nicht geladen wird. */
+.contact-phone-hint {
+  margin-top: var(--space-2);
+  min-height: 1.25em; /* kein Sprung, wenn der Hinweis erscheint/verschwindet */
+  font-size: var(--text-sm);
+}
+
+/* Vorschau gedämpft (Hinweis-Charakter), Warnung im Warnton. */
+.contact-phone-hint__preview {
+  color: var(--color-text-secondary);
+}
+
+.contact-phone-hint__warn {
+  color: var(--color-warning);
 }

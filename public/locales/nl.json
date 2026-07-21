@@ -750,6 +750,8 @@
         "birthdayLabel": "Verjaardag",
         "birthdayHint": "Verschijnt via de verjaardagsimport ook in de kalender.",
         "phonePlaceholder": "+31 …",
+        "phonePreview": "Voorbeeld: {{value}}",
+        "phoneImplausible": "Dit nummer lijkt onvolledig - het wordt toch opgeslagen.",
         "emailLabel": "E-mail",
         "emailPlaceholder": "naam@voorbeeld.nl",
         "addressLabel": "Adres",

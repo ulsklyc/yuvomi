@@ -750,6 +750,8 @@
         "birthdayLabel": "День рождения",
         "birthdayHint": "Через импорт дней рождения появляется и в календаре.",
         "phonePlaceholder": "+7 …",
+        "phonePreview": "Предпросмотр: {{value}}",
+        "phoneImplausible": "Этот номер выглядит неполным - он всё равно будет сохранён.",
         "emailLabel": "Email",
         "emailPlaceholder": "имя@пример.ру",
         "addressLabel": "Адрес",

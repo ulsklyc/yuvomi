@@ -750,6 +750,8 @@
         "birthdayLabel": "Cumpleaños",
         "birthdayHint": "También aparece en el calendario mediante la importación de cumpleaños.",
         "phonePlaceholder": "+34 …",
+        "phonePreview": "Vista previa: {{value}}",
+        "phoneImplausible": "Este número parece incompleto - se guardará igualmente.",
         "emailLabel": "Email",
         "emailPlaceholder": "nombre@ejemplo.es",
         "addressLabel": "Dirección",

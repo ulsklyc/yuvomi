@@ -9,6 +9,7 @@ const log = createLogger('CardDAV');
 
 import * as db from '../db.js';
 import { composeDisplayName, normalizeNameParts } from '../../public/utils/contact-name.js';
+import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
 
 // --------------------------------------------------------
 // Helper Functions
@@ -1198,14 +1199,22 @@ function findContactByEmailOrPhone(emails, phones) {
     if (contact) return contact;
   }
 
-  // Try phone match
+  // Try phone match. Erweitert (nicht ersetzt): zusätzlich zum exakten Rohwert-
+  // Vergleich matcht die zu E.164 normalisierte eingehende Nummer gegen die
+  // additive value_e164-Spalte - so verschmelzen Format-Varianten derselben Nummer
+  // ('030 12345678' vs. '+49 30 12345678') statt Duplikate zu erzeugen. Ist die
+  // eingehende Nummer nicht parsebar oder value_e164 NULL, bleibt der exakte
+  // Rohwert-Vergleich als Fallback wirksam (kein Regress).
+  const defaultCountry = defaultCountryFromConfig(db.get());
   for (const phone of phones) {
+    const e164 = toE164(phone.value, defaultCountry);
     const contact = db.get().prepare(`
       SELECT c.* FROM contacts c
       LEFT JOIN contact_phones cp ON c.id = cp.contact_id
       WHERE c.phone = ? OR cp.value = ?
+         OR (? IS NOT NULL AND cp.value_e164 IS NOT NULL AND cp.value_e164 = ?)
       LIMIT 1
-    `).get(phone.value, phone.value);
+    `).get(phone.value, phone.value, e164, e164);
 
     if (contact) return contact;
   }
@@ -1334,18 +1343,21 @@ function insertContactMultiValues(contactId, vcard) {
     'SELECT 1 FROM contact_addresses WHERE contact_id = ? AND is_primary = 1'
   ).get(contactId);
 
-  // Batch insert phones
+  // Batch insert phones. value_e164 additiv (Phase 2): der rohe value bleibt die
+  // Wahrheit; value_e164 nur wo parsebar, damit der Sync format-unabhängig matcht.
   if (vcard.phones && vcard.phones.length > 0) {
-    const placeholders = vcard.phones.map(() => '(?, ?, ?, ?)').join(', ');
+    const defaultCountry = defaultCountryFromConfig(db.get());
+    const placeholders = vcard.phones.map(() => '(?, ?, ?, ?, ?)').join(', ');
     const values = vcard.phones.flatMap((phone, i) => [
       contactId,
       phone.label || null,
       phone.value,
-      (!hasPrimaryPhone && i === 0) ? 1 : 0
+      (!hasPrimaryPhone && i === 0) ? 1 : 0,
+      toE164(phone.value, defaultCountry)
     ]);
 
     db.get().prepare(`
-      INSERT INTO contact_phones (contact_id, label, value, is_primary)
+      INSERT INTO contact_phones (contact_id, label, value, is_primary, value_e164)
       VALUES ${placeholders}
     `).run(...values);
   }

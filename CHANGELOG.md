@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.42.0] - 2026-07-21
+
+### Added
+- Phone numbers in Contacts are now shown formatted (national for your household's country, international otherwise), call links use the full international number, and the edit form offers a live formatting preview plus a non-blocking "looks incomplete" hint. Numbers you type are always saved and displayed exactly as entered; anything the formatter cannot parse falls back to the raw text. This is powered by a self-hosted libphonenumber-js bundle (no CDN, no new configuration).
+
+### Changed
+- CardDAV contact sync now matches existing contacts by normalized phone number, so the same number stored in different formats (for example "+49 30 12345678" and "030 12345678") no longer creates duplicate contacts. Stored numbers are never rewritten, and the previous exact-match comparison remains as a fallback.
+
 ## [1.41.0] - 2026-07-21
 
 ### Added

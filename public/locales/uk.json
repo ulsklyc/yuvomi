@@ -750,6 +750,8 @@
         "birthdayLabel": "День народження",
         "birthdayHint": "Через імпорт днів народження зʼявляється і в календарі.",
         "phonePlaceholder": "+380 …",
+        "phonePreview": "Попередній перегляд: {{value}}",
+        "phoneImplausible": "Цей номер виглядає неповним - його все одно буде збережено.",
         "emailLabel": "Електронна пошта",
         "emailPlaceholder": "ім'я@приклад.com",
         "addressLabel": "Адреса",

@@ -759,6 +759,8 @@
         "birthdayLabel": "생일",
         "birthdayHint": "생일 가져오기를 통해 캘린더에도 표시됩니다.",
         "phonePlaceholder": "+82 …",
+        "phonePreview": "미리보기: {{value}}",
+        "phoneImplausible": "이 번호는 불완전해 보입니다 - 그래도 저장됩니다.",
         "emailLabel": "이메일",
         "emailPlaceholder": "name@example.com",
         "addressLabel": "주소",

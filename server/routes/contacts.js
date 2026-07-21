@@ -10,6 +10,7 @@ import * as db from '../db.js';
 import { str, oneOf, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
 import { uniqueKey } from '../utils/category-slug.js';
 import { composeDisplayName, normalizeNameParts } from '../../public/utils/contact-name.js';
+import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
 
 const log = createLogger('Contacts');
 
@@ -389,14 +390,17 @@ router.post('/', (req, res) => {
 
       const contactId = result.lastInsertRowid;
 
-      // Insert phones
+      // Insert phones. value_e164 ist additiv (Phase 2): der rohe value bleibt die
+      // Wahrheit; value_e164 wird nur gesetzt, wo parsebar (sonst NULL).
       if (req.body.phones && Array.isArray(req.body.phones)) {
+        const defaultCountry = defaultCountryFromConfig(db.get());
         const insertPhone = db.get().prepare(`
-          INSERT INTO contact_phones (contact_id, label, value, is_primary)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO contact_phones (contact_id, label, value, is_primary, value_e164)
+          VALUES (?, ?, ?, ?, ?)
         `);
         for (const phone of req.body.phones) {
-          insertPhone.run(contactId, phone.label, phone.value, phone.isPrimary ? 1 : 0);
+          insertPhone.run(contactId, phone.label, phone.value, phone.isPrimary ? 1 : 0,
+                          toE164(phone.value, defaultCountry));
         }
       }
 
@@ -537,16 +541,19 @@ router.put('/:id', (req, res) => {
         id
       );
 
-      // Replace phones (delete all, insert new)
+      // Replace phones (delete all, insert new). value_e164 additiv mitberechnen
+      // (Phase 2), value bleibt der rohe Eingabewert.
       if (req.body.phones !== undefined && Array.isArray(req.body.phones)) {
         db.get().prepare('DELETE FROM contact_phones WHERE contact_id = ?').run(id);
 
+        const defaultCountry = defaultCountryFromConfig(db.get());
         const insertPhone = db.get().prepare(`
-          INSERT INTO contact_phones (contact_id, label, value, is_primary)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO contact_phones (contact_id, label, value, is_primary, value_e164)
+          VALUES (?, ?, ?, ?, ?)
         `);
         for (const phone of req.body.phones) {
-          insertPhone.run(id, phone.label, phone.value, phone.isPrimary ? 1 : 0);
+          insertPhone.run(id, phone.label, phone.value, phone.isPrimary ? 1 : 0,
+                          toE164(phone.value, defaultCountry));
         }
       }
 

@@ -59,6 +59,12 @@ describe('CardDAV Contacts Schema (Migration 30)', () => {
 
     // Apply Migration 30 (it's a string, not a function)
     db.exec(migration30.up);
+
+    // Additive value_e164-Spalte (#Phase 2 / Migration 95) nachziehen, damit die
+    // Sync-/Routen-Schreibpfade die Spalte finden. Nur die DDL (kein afterUp-Backfill
+    // nötig, da beim Setup noch keine Telefon-Zeilen existieren).
+    const migration95 = MIGRATIONS.find(m => m.version === 95);
+    if (migration95) db.exec(migration95.up);
   });
 
   // ========================================
@@ -2356,6 +2362,11 @@ describe('Contacts API - Multi-Value Fields', () => {
       throw new Error('Migration 30 not found');
     }
     contactsApiDb.exec(migration30.up);
+
+    // Additive value_e164-Spalte (#Phase 2 / Migration 95) nachziehen, damit die
+    // Contacts-Routen-Schreibpfade (POST/PUT phones) die Spalte finden.
+    const migration95ApiDb = MIGRATIONS.find(m => m.version === 95);
+    if (migration95ApiDb) contactsApiDb.exec(migration95ApiDb.up);
 
     // Override db.get() to use our test database
     const dbModule = await import('../server/db.js');

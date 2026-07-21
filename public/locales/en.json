@@ -750,6 +750,8 @@
         "birthdayLabel": "Birthday",
         "birthdayHint": "Also appears in the calendar via the birthday import.",
         "phonePlaceholder": "+1 …",
+        "phonePreview": "Preview: {{value}}",
+        "phoneImplausible": "This number looks incomplete - it will still be saved.",
         "emailLabel": "Email",
         "emailPlaceholder": "name@example.com",
         "addressLabel": "Address",

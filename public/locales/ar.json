@@ -750,6 +750,8 @@
         "birthdayLabel": "عيد الميلاد",
         "birthdayHint": "يظهر أيضًا في التقويم عبر استيراد أعياد الميلاد.",
         "phonePlaceholder": "+966 …",
+        "phonePreview": "معاينة: {{value}}",
+        "phoneImplausible": "يبدو هذا الرقم غير مكتمل - سيتم حفظه على أي حال.",
         "emailLabel": "البريد الإلكتروني",
         "emailPlaceholder": "name@example.com",
         "addressLabel": "العنوان",

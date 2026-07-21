@@ -750,6 +750,8 @@
         "birthdayLabel": "Sinh nhật",
         "birthdayHint": "Cũng xuất hiện trong lịch qua tính năng nhập sinh nhật.",
         "phonePlaceholder": "+84 …",
+        "phonePreview": "Xem trước: {{value}}",
+        "phoneImplausible": "Số này có vẻ chưa đầy đủ - nó vẫn sẽ được lưu.",
         "emailLabel": "Email",
         "emailPlaceholder": "name@example.com",
         "addressLabel": "Địa chỉ",

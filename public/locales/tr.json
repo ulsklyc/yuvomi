@@ -750,6 +750,8 @@
         "birthdayLabel": "Doğum günü",
         "birthdayHint": "Doğum günü içe aktarımıyla takvimde de görünür.",
         "phonePlaceholder": "+90 …",
+        "phonePreview": "Önizleme: {{value}}",
+        "phoneImplausible": "Bu numara eksik görünüyor - yine de kaydedilecek.",
         "emailLabel": "E-posta",
         "emailPlaceholder": "ad@ornek.com.tr",
         "addressLabel": "Adres",

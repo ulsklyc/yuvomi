@@ -750,6 +750,8 @@
         "birthdayLabel": "生日",
         "birthdayHint": "通过生日导入也会显示在日历中。",
         "phonePlaceholder": "+86 …",
+        "phonePreview": "预览：{{value}}",
+        "phoneImplausible": "此号码似乎不完整 - 仍会保存。",
         "emailLabel": "邮箱",
         "emailPlaceholder": "name@example.com",
         "addressLabel": "地址",

@@ -531,8 +531,24 @@ Multiple phone numbers per contact with label and primary flag.
 | id | INTEGER | PRIMARY KEY AUTOINCREMENT |
 | contact_id | INTEGER | FK → Contacts (CASCADE delete), NOT NULL |
 | label | TEXT | e.g. "mobile", "work", "home", nullable |
-| value | TEXT | NOT NULL |
+| value | TEXT | NOT NULL — the raw user-entered string, the source of truth; never normalized |
 | is_primary | INTEGER | 0/1, default 0 |
+| value_e164 | TEXT | nullable — E.164 normalization of `value`, additive (migration v95) |
+
+**Phone formatting & E.164 matching (v1.42.0).** Phone numbers are parsed and formatted with
+[libphonenumber-js](https://gitlab.com/catamphetamine/libphonenumber-js), shipped self-hosted under
+`public/vendor/libphonenumber/` (a single metadata-free `core.min.mjs` ESM bundle plus a separate
+`metadata.min.json`, lazy-loaded only in the contacts module — no CDN, per the no-external-frontend-
+dependencies constraint; the CSP `script-src 'self'` is unchanged). The stored `value` is **never**
+altered — formatting is a display/helper layer only: the contact list shows numbers formatted
+(national for the household's own country, international otherwise; non-parsable values fall back to
+the raw string 1:1), `tel:` links prefer a runtime-derived E.164, and the edit form offers a
+non-blocking AsYouType preview plus a plausibility hint. The household's default country is derived
+from the region preference. The additive `value_e164` column (nullable, backfilled where parsable)
+lets the CardDAV sync match contacts independent of format variance (`+49 30 12345678` vs.
+`030 12345678`), preventing duplicate contacts; the exact raw-value comparison remains as a fallback,
+so a NULL `value_e164` degrades gracefully. E.164 computation is server-side (npm `libphonenumber-js`),
+kept in sync wherever `contact_phones` is written (contact routes + sync upsert).
 
 ### Contact Emails
 Multiple email addresses per contact with label and primary flag.

@@ -759,6 +759,8 @@
         "birthdayLabel": "تولد",
         "birthdayHint": "از طریق واردکردن تولدها در تقویم هم نمایش داده می‌شود.",
         "phonePlaceholder": "+98 …",
+        "phonePreview": "پیش‌نمایش: {{value}}",
+        "phoneImplausible": "این شماره ناقص به نظر می‌رسد - با این حال ذخیره می‌شود.",
         "emailLabel": "ایمیل",
         "emailPlaceholder": "name@example.com",
         "addressLabel": "نشانی",

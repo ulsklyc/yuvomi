@@ -750,6 +750,8 @@
         "birthdayLabel": "जन्मदिन",
         "birthdayHint": "जन्मदिन आयात के ज़रिए कैलेंडर में भी दिखता है।",
         "phonePlaceholder": "+91 …",
+        "phonePreview": "पूर्वावलोकन: {{value}}",
+        "phoneImplausible": "यह नंबर अधूरा लगता है - फिर भी सहेजा जाएगा।",
         "emailLabel": "ईमेल",
         "emailPlaceholder": "name@example.com",
         "addressLabel": "पता",

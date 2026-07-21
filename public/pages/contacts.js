@@ -13,6 +13,7 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { parseVCards } from '/utils/vcard.js';
 import { composeDisplayName, contactSortKey, splitDisplayName } from '/utils/contact-name.js';
+import { getPhoneFormatter, createAsYouType, countryFromRegion } from '/utils/phone.js';
 import '/components/category-manager.js';
 
 // --------------------------------------------------------
@@ -93,6 +94,10 @@ let state = {
   searchQuery:    '',
   selectMode:     false,
   selected:       new Set(),
+  // Default-Land (ISO-3166-Alpha-2) für die Telefon-Anzeige/-Hilfe. Aus der
+  // haushaltweiten Region abgeleitet; null → libphonenumber-js nutzt nur
+  // explizite Ländervorwahlen (führendes +). Rein Anzeige, nie Speicher-Logik.
+  defaultCountry: null,
 };
 let _container = null;
 let contactsSearch = null;
@@ -188,10 +193,14 @@ export async function render(container, { user }) {
     updateSelectUI();
   });
 
-  const [res, catRes] = await Promise.all([
+  const [res, catRes, prefsRes] = await Promise.all([
     api.get('/contacts'),
     api.get('/contacts/categories'),
+    // Region → Default-Land für die Telefon-Anzeige. Fehlschlag ist unkritisch:
+    // ohne Default-Land werden nur +-Vorwahl-Nummern formatiert, Rest bleibt roh.
+    api.get('/preferences').catch(() => null),
   ]);
+  state.defaultCountry = countryFromRegion(prefsRes?.data?.region);
   state.categories = catRes.data ?? [];
   // Der Server sortiert mit SQLite-NOCASE (ASCII-only); nach jeder lokalen
   // Änderung sortiert die Seite dagegen mit localeCompare. Damit die Reihenfolge
@@ -451,13 +460,113 @@ function renderList({ animate = false } = {}) {
   // Entrance-Stagger nur beim echten Erst-Load — nicht bei jedem Such-/Filter-
   // Render (sonst flackert die Liste bei jeder Tastatureingabe).
   if (animate) stagger(container.querySelectorAll('.contact-item'));
+  enhancePhones(container);
+}
+
+// Progressive Enhancement der Telefon-Anzeige: formatiert sichtbare Nummern und
+// hebt tel:-Links auf E.164. Läuft NACH dem Rohwert-Render (der Rohwert bleibt bis
+// dahin sichtbar) und ist rein additiv - schlägt das Laden der Vendor-Lib fehl
+// (offline vor Erstbesuch), bleibt jede Nummer 1:1 als Rohwert stehen.
+async function enhancePhones(root) {
+  if (!root) return;
+  const els = root.querySelectorAll('[data-phone-raw]');
+  if (!els.length) return;
+  // Lib EINMAL laden, dann synchron über alle Elemente mappen (kein await pro
+  // Nummer). Offline/Ladefehler → Rohwerte bleiben unverändert stehen.
+  const fmt = await getPhoneFormatter();
+  if (!fmt) return;
+  const country = state.defaultCountry;
+  for (const el of els) {
+    const raw = el.dataset.phoneRaw;
+    if (el.tagName === 'A') {
+      // href aktualisieren; textContent (Icon) bleibt unangetastet.
+      el.href = fmt.tel(raw, country);
+    } else {
+      const display = fmt.display(raw, country);
+      // Nummer ist immer LTR - in RTL-Locales (ar/fa) sonst Bidi-Umbruch bei '+'.
+      el.setAttribute('dir', 'ltr');
+      // Nur den ANZEIGETEXT setzen - der Rohwert lebt weiter in data-phone-raw.
+      if (display !== raw) el.textContent = display;
+    }
+  }
+}
+
+// Telefon-Tipphilfe im Formular: unverbindliche AsYouType-Vorschau, sobald ein
+// Telefonfeld fokussiert/getippt wird, plus ein nicht-blockierender Hinweis, wenn
+// die Nummer unplausibel wirkt. Ein gemeinsamer Hinweis pro Telefon-Gruppe folgt
+// dem aktiven Feld. Die Felder selbst werden NIE umgeschrieben - gespeichert wird
+// ausschließlich der rohe Feldinhalt (kein Datenverlust, auch bei aktiver Eingabe).
+async function wirePhoneHints(panel) {
+  const group    = panel.querySelector('[data-mv-group="phone"]');
+  const previewEl = group?.querySelector('[data-mv-preview]');
+  const warnEl    = group?.querySelector('[data-mv-warn]');
+  if (!group || !previewEl || !warnEl) return;
+  const country = state.defaultCountry;
+  const [ay, fmt] = await Promise.all([createAsYouType(country), getPhoneFormatter()]);
+  if (!ay || !fmt) return; // Lib nicht ladbar → keine Hilfe (Feld bleibt nutzbar)
+
+  const HINT_ID = 'cm-phone-hint';
+  let activeInput = null;
+  // Aktives Feld ↔ Hint verknüpfen: aria-describedby (Screenreader-Bezug) + dezenter
+  // Zeilen-Anker, damit bei mehreren Telefonzeilen klar ist, worauf der Hint zielt.
+  const detach = (inp) => {
+    if (!inp) return;
+    inp.removeAttribute('aria-describedby');
+    inp.closest('[data-mv-row]')?.classList.remove('contact-mv-row--active');
+  };
+  const setActive = (inp) => {
+    if (activeInput !== inp) detach(activeInput);
+    activeInput = inp;
+    inp.setAttribute('aria-describedby', HINT_ID);
+    inp.closest('[data-mv-row]')?.classList.add('contact-mv-row--active');
+  };
+  const clear = () => { previewEl.replaceChildren(); warnEl.textContent = ''; };
+  // Vorschau RTL-sicher aufbauen: Label in Locale-Richtung, Nummer in <bdi>
+  // isoliert (sonst kippt '+'/Gruppen in ar/fa). Sentinel trennt Label vom Wert.
+  const PH = '\uE000'; // Private-Use-Sentinel, in keiner Locale-Beschriftung
+  const setPreview = (formatted) => {
+    previewEl.replaceChildren();
+    if (!formatted) return;
+    const [pre, post = ''] = t('contacts.phonePreview', { value: PH }).split(PH);
+    const bdi = document.createElement('bdi');
+    bdi.textContent = formatted;
+    previewEl.append(document.createTextNode(pre), bdi, document.createTextNode(post));
+  };
+  const update = () => {
+    const val = activeInput?.value.trim() || '';
+    if (!val) { clear(); return; }
+    ay.reset();
+    const preview = ay.input(val);
+    if (fmt.plausible(val, country)) {
+      warnEl.textContent = '';
+      setPreview(preview && preview !== val ? preview : '');
+    } else {
+      // Unplausibel: Vorschau raus, nur die Warnung (wird per aria-live angesagt).
+      previewEl.replaceChildren();
+      warnEl.textContent = t('contacts.phoneImplausible');
+    }
+  };
+
+  group.addEventListener('focusin', (e) => {
+    const inp = e.target.closest('[data-mv-value]');
+    if (inp) { setActive(inp); update(); }
+  });
+  group.addEventListener('input', (e) => {
+    const inp = e.target.closest('[data-mv-value]');
+    if (inp) { setActive(inp); update(); }
+  });
+  group.addEventListener('focusout', (e) => {
+    if (!group.contains(e.relatedTarget)) { detach(activeInput); activeInput = null; clear(); }
+  });
 }
 
 // Meta-Zeile: Telefon (schrumpft nicht) · E-Mail (wird gekürzt), damit die
 // Telefonnummer auf schmalem Viewport nie verschwindet.
 function renderMeta(c) {
   if (!c.phone && !c.email) return '';
-  const phone = c.phone ? `<span class="contact-item__meta-phone">${esc(c.phone)}</span>` : '';
+  // Rohwert steht im Markup UND in data-phone-raw: enhancePhones() ersetzt danach
+  // nur den Anzeigetext (textContent) - der gespeicherte Wert bleibt unberührt.
+  const phone = c.phone ? `<span class="contact-item__meta-phone" data-phone-raw="${esc(c.phone)}">${esc(c.phone)}</span>` : '';
   const email = c.email ? `<span class="contact-item__meta-email">${esc(c.email)}</span>` : '';
   const sep   = c.phone && c.email ? `<span class="contact-item__meta-sep" aria-hidden="true">·</span>` : '';
   return `<span class="contact-item__meta">${phone}${sep}${email}</span>`;
@@ -486,7 +595,7 @@ function renderContactItem(c) {
 
   // Primäre, stets sichtbare Zeilenaktion: Anrufen (falls Telefon vorhanden).
   const callBtn = c.phone
-    ? `<a href="tel:${esc(c.phone)}" class="row-action row-action--success" aria-label="${t('contacts.callLabel')}">
+    ? `<a href="tel:${esc(c.phone)}" data-phone-raw="${esc(c.phone)}" class="row-action row-action--success" aria-label="${t('contacts.callLabel')}">
          <i data-lucide="phone" aria-hidden="true"></i>
        </a>`
     : '';
@@ -610,6 +719,17 @@ async function openContactModal({ mode, contact = null }) {
       <button type="button" class="btn btn--ghost contact-mv-add" data-mv-add>
         <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i>${t(addKey)}
       </button>
+      ${kind === 'phone'
+        // Unverbindliche Tipphilfe (AsYouType-Vorschau) + Plausibilitäts-Hinweis.
+        // Rein visuell: die Eingabefelder werden NIE programmatisch umgeschrieben,
+        // gespeichert wird ausschließlich der rohe Feldinhalt.
+        // Zwei Zonen: Vorschau ist STILL (keine Live-Region, sonst würde jeder
+        // Tastendruck vorgelesen); nur die Warnung wird per aria-live angesagt.
+        ? `<p class="contact-phone-hint" id="cm-phone-hint" data-mv-hint>
+             <span class="contact-phone-hint__preview" data-mv-preview></span>
+             <span class="contact-phone-hint__warn" data-mv-warn aria-live="polite"></span>
+           </p>`
+        : ''}
     </div>`;
 
   const defaultCat = state.categories[0]?.key ?? FALLBACK_CATEGORY;
@@ -717,6 +837,11 @@ async function openContactModal({ mode, contact = null }) {
           if (btn) btn.closest('[data-mv-row]')?.remove();
         });
       });
+
+      // Telefon-Tipphilfe: unverbindliche AsYouType-Vorschau + Plausibilitäts-
+      // Hinweis. REIN VISUELL - die Eingabefelder werden nie umgeschrieben, es wird
+      // ausschließlich der rohe Feldinhalt gespeichert (kein Datenverlust).
+      wirePhoneHints(panel);
 
       // Kategorie-Vorschau live aktualisieren (Icon links neben dem Select).
       const catSel  = panel.querySelector('#cm-category');
