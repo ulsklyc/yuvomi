@@ -2648,7 +2648,9 @@
         "added": "Categoria aggiunta",
         "renamed": "Categoria rinominata",
         "deleted": "Categoria eliminata",
-        "deleteSubConfirm": "Eliminare la sottocategoria \"{{name}}\"?"
+        "deleteSubConfirm": "Eliminare la sottocategoria \"{{name}}\"?",
+        "dragHandle": "Trascina per riordinare",
+        "reorderAnnounce": "\"{{name}}\" è ora in posizione {{position}} di {{total}}."
     },
     "subscriptions": {
         "tabLabel": "Abbonamenti",

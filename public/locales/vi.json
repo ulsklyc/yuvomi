@@ -2648,7 +2648,9 @@
         "added": "Category added",
         "renamed": "Category renamed",
         "deleted": "Category deleted",
-        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?"
+        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?",
+        "dragHandle": "Kéo để sắp xếp lại",
+        "reorderAnnounce": "\"{{name}}\" hiện ở vị trí {{position}} trong tổng số {{total}}."
     },
     "subscriptions": {
         "tabLabel": "Gói đăng ký",

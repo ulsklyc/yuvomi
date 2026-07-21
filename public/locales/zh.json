@@ -2648,7 +2648,9 @@
         "added": "Category added",
         "renamed": "Category renamed",
         "deleted": "Category deleted",
-        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?"
+        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?",
+        "dragHandle": "拖动以重新排序",
+        "reorderAnnounce": "“{{name}}”现在位于第 {{position}} 位，共 {{total}} 项。"
     },
     "subscriptions": {
         "tabLabel": "订阅",

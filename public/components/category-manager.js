@@ -14,6 +14,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { makeSortable } from '/utils/sortable.js';
 
 class CategoryManagerElement extends HTMLElement {
   constructor() {
@@ -25,6 +26,7 @@ class CategoryManagerElement extends HTMLElement {
     this._titleKey = 'category.manageTitle';
     this._hintKey = 'category.manageHint';
     this._cats = [];
+    this._sortables = [];
     this._onClick = this._onClick.bind(this);
     this._onSubmit = this._onSubmit.bind(this);
   }
@@ -43,6 +45,7 @@ class CategoryManagerElement extends HTMLElement {
   disconnectedCallback() {
     this._root?.removeEventListener('click', this._onClick);
     this._root?.removeEventListener('submit', this._onSubmit);
+    this._destroySortables();
   }
 
   _renderShell() {
@@ -54,10 +57,12 @@ class CategoryManagerElement extends HTMLElement {
     this.insertAdjacentHTML('beforeend', `
       <div class="cat-manager">
         <p class="cat-manager__hint">${esc(t(this._hintKey))}</p>
+        <div class="sr-only" role="status" aria-live="polite" id="cat-manager-announce"></div>
         <div class="cat-manager__groups" id="cat-manager-groups"></div>
       </div>`);
     this._root = this.querySelector('.cat-manager');
     this._groupsEl = this.querySelector('#cat-manager-groups');
+    this._announceEl = this.querySelector('#cat-manager-announce');
     this._root.addEventListener('click', this._onClick);
     this._root.addEventListener('submit', this._onSubmit);
   }
@@ -85,6 +90,7 @@ class CategoryManagerElement extends HTMLElement {
 
   _render() {
     if (!this._groupsEl) return;
+    this._destroySortables();
     this._groupsEl.replaceChildren();
     this._groups.forEach((g) => {
       const items = this._inGroup(g.key);
@@ -105,11 +111,65 @@ class CategoryManagerElement extends HTMLElement {
       this._groupsEl.appendChild(tmp.firstElementChild);
     });
     if (window.lucide) window.lucide.createIcons({ el: this._groupsEl });
+    this._wireSortable();
+  }
+
+  /* Drag ist nie der einzige Weg: die Auf/Ab-Buttons in _rowHtml/_subListHtml
+   * bleiben der tastaturbedienbare Reorder-Pfad und rufen denselben
+   * _persistOrder/_persistSubOrder-Handler wie das Drag-Ende auf. */
+  _wireSortable() {
+    this._groupsEl.querySelectorAll('.cat-list').forEach((listEl) => {
+      const groupKey = listEl.closest('.cat-group')?.dataset.group ?? '';
+      makeSortable(listEl, {
+        handle: '.cat-row__handle',
+        onEnd: (evt) => {
+          const movedKey = evt.item?.dataset.key;
+          const orderedKeys = Array.from(listEl.children).map((el) => el.dataset.key);
+          this._persistOrder(groupKey, orderedKeys, movedKey);
+        },
+      }).then((instance) => this._trackSortable(instance, listEl));
+    });
+    if (!this._supportsSub) return;
+    this._groupsEl.querySelectorAll('.cat-sublist').forEach((subListEl) => {
+      const parentKey = subListEl.dataset.parent;
+      makeSortable(subListEl, {
+        handle: '.cat-subrow__handle',
+        draggable: '.cat-subrow',
+        onEnd: (evt) => {
+          const movedSubKey = evt.item?.dataset.subkey;
+          const orderedSubKeys = Array.from(subListEl.children)
+            .filter((el) => el.matches('.cat-subrow'))
+            .map((el) => el.dataset.subkey);
+          this._persistSubOrder(parentKey, orderedSubKeys, movedSubKey);
+        },
+      }).then((instance) => this._trackSortable(instance, subListEl));
+    });
+  }
+
+  // Instanzen einer inzwischen überholten _render()-Runde (Element schon aus
+  // dem DOM entfernt, bevor der lazy SortableJS-Import fertig war) sofort
+  // wieder freigeben statt sie in _sortables mitzuführen.
+  _trackSortable(instance, el) {
+    if (!instance) return;
+    if (el.isConnected) this._sortables.push(instance);
+    else instance.destroy();
+  }
+
+  _destroySortables() {
+    this._sortables.forEach((s) => s?.destroy?.());
+    this._sortables = [];
+  }
+
+  _announce(message) {
+    if (this._announceEl) this._announceEl.textContent = message;
   }
 
   _rowHtml(cat, group, isFirst, isLast) {
     return `
       <li class="cat-row" data-key="${esc(this._keyOf(cat))}">
+        <span class="cat-row__handle" role="img" aria-label="${esc(t('category.dragHandle'))}" title="${esc(t('category.dragHandle'))}">
+          <i data-lucide="grip-vertical" class="icon-sm" aria-hidden="true"></i>
+        </span>
         ${cat.icon ? `<i data-lucide="${esc(cat.icon)}" class="cat-row__icon icon-md" aria-hidden="true"></i>` : ''}
         <button type="button" class="cat-row__name" data-action="rename"
               title="${esc(t('category.renameHint'))}">${esc(this._labelResolver(cat))}</button>
@@ -142,6 +202,9 @@ class CategoryManagerElement extends HTMLElement {
       <ul class="cat-sublist" data-parent="${esc(this._keyOf(cat))}">
         ${subs.map((s, j, arr) => `
           <li class="cat-subrow" data-subkey="${esc(this._keyOf(s))}" data-parent="${esc(this._keyOf(cat))}">
+            <span class="cat-subrow__handle" role="img" aria-label="${esc(t('category.dragHandle'))}" title="${esc(t('category.dragHandle'))}">
+              <i data-lucide="grip-vertical" class="icon-sm" aria-hidden="true"></i>
+            </span>
             <button type="button" class="cat-subrow__name" data-action="sub-rename">${esc(this._labelResolver(s))}</button>
             <div class="cat-row__actions">
               <button class="btn btn--icon btn--ghost" data-action="sub-rename" aria-label="${esc(t('category.renameHint'))}" title="${esc(t('category.renameHint'))}">
@@ -263,15 +326,40 @@ class CategoryManagerElement extends HTMLElement {
     const nextIdx = idx + delta;
     if (idx < 0 || nextIdx < 0 || nextIdx >= group.length) return;
     [group[idx], group[nextIdx]] = [group[nextIdx], group[idx]];
+    await this._persistOrder(groupKey, group.map((c) => this._keyOf(c)), key);
+  }
+
+  // Gemeinsamer Persistenz-Pfad für Auf/Ab-Buttons UND Drag-Ende (_wireSortable):
+  // beide berechnen nur die neue Reihenfolge, dieser Handler übernimmt PATCH +
+  // Reload + Ansage. Bei Fehlern greift kein manuelles Rollback nötig - _cats
+  // wurde nie mutiert, _render() (aus dem Catch-Zweig aufgerufen) zeichnet die
+  // noch unveränderte, servergültige Reihenfolge einfach neu (verwirft damit
+  // auch die Drag-Vorschau, die SortableJS bereits optimistisch ins DOM gehängt hat).
+  async _persistOrder(groupKey, orderedKeys, movedKey) {
     try {
-      const body = { order: group.map((c) => this._keyOf(c)) };
+      const body = { order: orderedKeys };
       if (groupKey) body.type = groupKey;
       await api.patch(`${this._basePath}/reorder`, body);
       await this._load();
+      if (movedKey) this._announceMove(movedKey, orderedKeys);
       this._notifyChanged();
     } catch (err) {
       window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._render();
     }
+  }
+
+  _announceMove(key, orderedKeys, parentKey) {
+    const idx = orderedKeys.indexOf(key);
+    if (idx < 0) return;
+    const cat = parentKey
+      ? this._findSub(parentKey, key)?.sub
+      : this._cats.find((c) => this._keyOf(c) === key);
+    this._announce(t('category.reorderAnnounce', {
+      name: cat ? this._labelResolver(cat) : '',
+      position: idx + 1,
+      total: orderedKeys.length,
+    }));
   }
 
   async _delete(key) {
@@ -344,15 +432,23 @@ class CategoryManagerElement extends HTMLElement {
     const nextIdx = idx + delta;
     if (idx < 0 || nextIdx < 0 || nextIdx >= subs.length) return;
     [subs[idx], subs[nextIdx]] = [subs[nextIdx], subs[idx]];
+    await this._persistSubOrder(parent, subs.map((s) => this._keyOf(s)), subKey);
+  }
+
+  // Sub-Pendant zu _persistOrder, gleicher Vertrag (Auf/Ab-Buttons + Drag-Ende
+  // in _wireSortable rufen beide diesen Handler mit der neuen Reihenfolge auf).
+  async _persistSubOrder(parent, orderedSubKeys, movedSubKey) {
     try {
       await api.patch(
         `${this._basePath}/${encodeURIComponent(parent)}/subcategories/reorder`,
-        { order: subs.map((s) => this._keyOf(s)) }
+        { order: orderedSubKeys }
       );
       await this._load();
+      if (movedSubKey) this._announceMove(movedSubKey, orderedSubKeys, parent);
       this._notifyChanged();
     } catch (err) {
       window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._render();
     }
   }
 

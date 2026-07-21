@@ -2648,7 +2648,9 @@
         "added": "Category added",
         "renamed": "Category renamed",
         "deleted": "Category deleted",
-        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?"
+        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?",
+        "dragHandle": "اسحب للترتيب",
+        "reorderAnnounce": "أصبح \"{{name}}\" الآن في الموضع {{position}} من {{total}}."
     },
     "subscriptions": {
         "tabLabel": "الاشتراكات",

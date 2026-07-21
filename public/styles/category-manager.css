@@ -136,3 +136,62 @@
 .cat-subadd-form .form-input {
   flex: 1;
 }
+
+/* --------------------------------------------------------
+   Drag-and-Drop-Sortierung (SortableJS, /utils/sortable.js)
+   Drag ist nie der einzige Weg: die Auf/Ab-Buttons bleiben sichtbar und
+   tastaturbedienbar. Der Handle ist bewusst kein <button> (kein Tab-Stop,
+   keine Enter/Space-Aktion) - role="img" + aria-label machen ihn für
+   Screenreader-Nutzer:innen dennoch wahrnehmbar, ohne eine Aktion vorzutäuschen,
+   die Drag ohnehin nicht per Tastatur ausführen kann.
+   -------------------------------------------------------- */
+
+.cat-row__handle,
+.cat-subrow__handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: var(--space-1);
+  margin: calc(var(--space-1) * -1);
+  border-radius: var(--radius-xs);
+  color: var(--color-text-quaternary);
+  cursor: grab;
+  touch-action: none;
+}
+
+.cat-row__handle:hover,
+.cat-subrow__handle:hover {
+  color: var(--color-text-secondary);
+  background: var(--glass-bg-card-hover);
+}
+
+.cat-row.sortable-chosen .cat-row__handle,
+.cat-subrow.sortable-chosen .cat-subrow__handle {
+  cursor: grabbing;
+}
+
+.cat-row.sortable-ghost,
+.cat-subrow.sortable-ghost {
+  opacity: 0.4;
+  background: var(--glass-bg-card-hover);
+}
+
+.cat-row.sortable-chosen,
+.cat-subrow.sortable-chosen {
+  background: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 10%, var(--color-surface));
+}
+
+.cat-row.sortable-drag,
+.cat-subrow.sortable-drag {
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-glass-inner);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cat-row,
+  .cat-subrow {
+    transition: none;
+  }
+}

@@ -2648,7 +2648,9 @@
         "added": "دسته افزوده شد",
         "renamed": "نام دسته تغییر کرد",
         "deleted": "دسته حذف شد",
-        "deleteSubConfirm": "زیردسته «{{name}}» حذف شود؟"
+        "deleteSubConfirm": "زیردسته «{{name}}» حذف شود؟",
+        "dragHandle": "برای مرتب‌سازی بکشید",
+        "reorderAnnounce": "\"{{name}}\" اکنون در جایگاه {{position}} از {{total}} قرار دارد."
     },
     "subscriptions": {
         "tabLabel": "اشتراک‌ها",

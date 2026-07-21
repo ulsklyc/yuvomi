@@ -2648,7 +2648,9 @@
         "added": "Category added",
         "renamed": "Category renamed",
         "deleted": "Category deleted",
-        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?"
+        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?",
+        "dragHandle": "Σύρετε για ταξινόμηση",
+        "reorderAnnounce": "Το «{{name}}» βρίσκεται τώρα στη θέση {{position}} από {{total}}."
     },
     "subscriptions": {
         "tabLabel": "Συνδρομές",

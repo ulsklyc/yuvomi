@@ -2648,7 +2648,9 @@
         "added": "Category added",
         "renamed": "Category renamed",
         "deleted": "Category deleted",
-        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?"
+        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?",
+        "dragHandle": "क्रम बदलने के लिए खींचें",
+        "reorderAnnounce": "\"{{name}}\" अब स्थिति {{position}} में है, कुल {{total}} में से।"
     },
     "subscriptions": {
         "tabLabel": "सदस्यताएँ",

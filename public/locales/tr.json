@@ -2648,7 +2648,9 @@
         "added": "Category added",
         "renamed": "Category renamed",
         "deleted": "Category deleted",
-        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?"
+        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?",
+        "dragHandle": "Sıralamak için sürükleyin",
+        "reorderAnnounce": "\"{{name}}\" artık {{total}} öğeden {{position}}. sırada."
     },
     "subscriptions": {
         "tabLabel": "Abonelikler",

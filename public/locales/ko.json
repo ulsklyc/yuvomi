@@ -2648,7 +2648,9 @@
         "added": "카테고리가 추가되었습니다",
         "renamed": "카테고리 이름이 변경되었습니다",
         "deleted": "카테고리가 삭제되었습니다",
-        "deleteSubConfirm": "„{{name}}\" 하위 카테고리를 삭제할까요?"
+        "deleteSubConfirm": "„{{name}}\" 하위 카테고리를 삭제할까요?",
+        "dragHandle": "드래그하여 순서 변경",
+        "reorderAnnounce": "\"{{name}}\"이(가) 이제 {{total}}개 중 {{position}}번째 위치입니다."
     },
     "subscriptions": {
         "tabLabel": "구독",

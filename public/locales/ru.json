@@ -2648,7 +2648,9 @@
         "added": "Category added",
         "renamed": "Category renamed",
         "deleted": "Category deleted",
-        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?"
+        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?",
+        "dragHandle": "Перетащите для изменения порядка",
+        "reorderAnnounce": "«{{name}}» теперь на позиции {{position}} из {{total}}."
     },
     "subscriptions": {
         "tabLabel": "Подписки",

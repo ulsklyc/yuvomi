@@ -2648,7 +2648,9 @@
         "added": "Category added",
         "renamed": "Category renamed",
         "deleted": "Category deleted",
-        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?"
+        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?",
+        "dragHandle": "Dra för att ändra ordning",
+        "reorderAnnounce": "\"{{name}}\" är nu på plats {{position}} av {{total}}."
     },
     "subscriptions": {
         "tabLabel": "Prenumerationer",

@@ -2648,7 +2648,9 @@
         "added": "Category added",
         "renamed": "Category renamed",
         "deleted": "Category deleted",
-        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?"
+        "deleteSubConfirm": "Delete subcategory \"{{name}}\"?",
+        "dragHandle": "ドラッグして並べ替え",
+        "reorderAnnounce": "「{{name}}」は{{total}}件中{{position}}番目になりました。"
     },
     "subscriptions": {
         "tabLabel": "サブスクリプション",
