@@ -119,3 +119,42 @@ test('parseVCards traegt Geburtstag pro Karte separat', () => {
   assert.equal(list[0].birthday, '2000-01-02');
   assert.equal(list[1].birthday, null);
 });
+
+test('parseVCard dekodiert Quoted-Printable-Namen (vCard 2.1, tuerkische Zeichen)', () => {
+  // "ı" = U+0131 = UTF-8 C4 B1 ; "ş" = U+015F = UTF-8 C5 9F. Ohne QP-Dekodierung
+  // landete der ganze Name buchstaeblich als "Kalayc=C4=B1" im Kontakt.
+  const text = [
+    'BEGIN:VCARD', 'VERSION:2.1',
+    'N;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:Kalayc=C4=B1;Ula=C5=9F;;;',
+    'FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:Ula=C5=9F Kalayc=C4=B1',
+    'END:VCARD',
+  ].join('\r\n');
+  const c = parseVCard(text);
+  assert.equal(c.lastName, 'Kalaycı');
+  assert.equal(c.firstName, 'Ulaş');
+  assert.equal(c.name, 'Ulaş Kalaycı');
+});
+
+test('parseVCard zieht Quoted-Printable-Soft-Line-Breaks zusammen', () => {
+  // Der QP-Wert laeuft ueber zwei physische Zeilen; die erste endet mit '='.
+  const text = [
+    'BEGIN:VCARD', 'VERSION:2.1',
+    'N;ENCODING=QUOTED-PRINTABLE;CHARSET=UTF-8:Kalayc=C4=B1;Ula=C5=',
+    '=9F;;;',
+    'END:VCARD',
+  ].join('\r\n');
+  const c = parseVCard(text);
+  assert.equal(c.lastName, 'Kalaycı');
+  assert.equal(c.firstName, 'Ulaş');
+});
+
+test('parseVCard laesst literale "=" ohne QP-Deklaration unangetastet', () => {
+  // Regression: nur bei ENCODING=QUOTED-PRINTABLE dekodieren, sonst wuerden
+  // gewoehnliche Werte mit "=" (URLs, Notizen) zerstoert.
+  const text = [
+    'BEGIN:VCARD', 'VERSION:3.0', 'FN:Formula',
+    'NOTE:a=C4=B1 bleibt roh', 'END:VCARD',
+  ].join('\r\n');
+  const c = parseVCard(text);
+  assert.equal(c.notes, 'a=C4=B1 bleibt roh');
+});

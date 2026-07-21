@@ -56,6 +56,55 @@ function splitVCardValue(value, separator) {
 }
 
 /**
+ * Erkennt Quoted-Printable-Transfer-Encoding (vCard 2.1) in den Property-
+ * Parametern. Spiegelt public/utils/vcard.js#isQuotedPrintable.
+ * @param {Array<string>} params
+ */
+function isQuotedPrintableParams(params) {
+  return params.some(p => /^ENCODING=(?:QUOTED-PRINTABLE|QP)$/i.test(p.trim()));
+}
+
+/**
+ * Liest den CHARSET-Parameter (Default 'utf-8').
+ * Spiegelt public/utils/vcard.js#charsetOf.
+ * @param {Array<string>} params
+ */
+function charsetOfParams(params) {
+  const p = params.find(x => /^CHARSET=/i.test(x.trim()));
+  const raw = p ? p.trim().slice(p.trim().indexOf('=') + 1).trim() : '';
+  return raw || 'utf-8';
+}
+
+/**
+ * Dekodiert einen Quoted-Printable-Wert (RFC 2045, vCard 2.1) in Text. Sammelt
+ * `=XX`-Oktette (und literale Bytes) und dekodiert die Byte-Folge als `charset`
+ * - nur so werden Mehrbyte-Zeichen wie das tuerkische "ı" (UTF-8 C4 B1) oder
+ * "ş" (C5 9F) korrekt, statt buchstaeblich als "=C4=B1" zu erscheinen.
+ * Soft-Line-Breaks (`=` am Zeilenende) werden zuvor entfernt; unbekanntes
+ * Charset faellt auf UTF-8 zurueck. Spiegelt
+ * public/utils/vcard.js#decodeQuotedPrintable.
+ */
+function decodeQuotedPrintable(value, charset) {
+  const joined = String(value == null ? '' : value).replace(/=\r?\n/g, '');
+  const bytes = [];
+  for (let i = 0; i < joined.length; i++) {
+    const ch = joined[i];
+    if (ch === '=' && /^[0-9A-Fa-f]{2}$/.test(joined.substr(i + 1, 2))) {
+      bytes.push(parseInt(joined.substr(i + 1, 2), 16));
+      i += 2;
+    } else {
+      bytes.push(ch.charCodeAt(0) & 0xff);
+    }
+  }
+  const octets = Uint8Array.from(bytes);
+  try {
+    return new TextDecoder(charset || 'utf-8').decode(octets);
+  } catch {
+    return new TextDecoder('utf-8').decode(octets);
+  }
+}
+
+/**
  * Parse vCard text into structured object
  * @param {string} vCardText - Raw vCard data
  * @returns {Object} Parsed vCard object
@@ -99,11 +148,22 @@ function parseVCard(vCardText) {
     if (colonIndex === -1) continue;
 
     const fullKey = line.substring(0, colonIndex);
-    const value = line.substring(colonIndex + 1).trim();
-
     // Parse property and parameters
     const [prop, ...params] = fullKey.split(';');
     const property = prop.toUpperCase();
+
+    let value = line.substring(colonIndex + 1).trim();
+
+    // Quoted-Printable (vCard 2.1): erst Soft-Line-Breaks ('=' am Zeilenende)
+    // zusammenziehen, dann in Text dekodieren. Nur bei deklariertem ENCODING,
+    // damit literale '=' in normalen Werten (URLs, Notizen) unangetastet bleiben.
+    if (isQuotedPrintableParams(params)) {
+      while (/=[ \t]*$/.test(value) && i + 1 < lines.length) {
+        value = value.replace(/=[ \t]*$/, '') + lines[i + 1].trim();
+        i++;
+      }
+      value = decodeQuotedPrintable(value, charsetOfParams(params));
+    }
 
     switch (property) {
       case 'UID':

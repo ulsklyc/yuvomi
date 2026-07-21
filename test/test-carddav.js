@@ -538,6 +538,47 @@ END:VCARD`;
       assert.ok(result.name.includes('John'));
     });
 
+    it('should decode QUOTED-PRINTABLE names (vCard 2.1, Turkish chars)', () => {
+      // "ı" = U+0131 = UTF-8 C4 B1 ; "ş" = U+015F = UTF-8 C5 9F. Without QP
+      // decoding the whole name arrived literally as "Kalayc=C4=B1".
+      const vCardText = `BEGIN:VCARD
+VERSION:2.1
+N;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:Kalayc=C4=B1;Ula=C5=9F;;;
+FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:Ula=C5=9F Kalayc=C4=B1
+END:VCARD`;
+
+      const result = parseVCard(vCardText);
+      assert.strictEqual(result.lastName, 'Kalaycı');
+      assert.strictEqual(result.firstName, 'Ulaş');
+      assert.strictEqual(result.name, 'Ulaş Kalaycı');
+    });
+
+    it('should join QUOTED-PRINTABLE soft line breaks', () => {
+      // QP value spans two physical lines; the first ends with a soft '='.
+      const vCardText = `BEGIN:VCARD
+VERSION:2.1
+N;ENCODING=QUOTED-PRINTABLE;CHARSET=UTF-8:Kalayc=C4=B1;Ula=C5=
+=9F;;;
+END:VCARD`;
+
+      const result = parseVCard(vCardText);
+      assert.strictEqual(result.lastName, 'Kalaycı');
+      assert.strictEqual(result.firstName, 'Ulaş');
+    });
+
+    it('should leave literal "=" untouched without QP declaration', () => {
+      // Regression: only decode when ENCODING=QUOTED-PRINTABLE is declared,
+      // otherwise ordinary values containing "=" would be corrupted.
+      const vCardText = `BEGIN:VCARD
+VERSION:3.0
+FN:Formula
+NOTE:a=C4=B1 stays raw
+END:VCARD`;
+
+      const result = parseVCard(vCardText);
+      assert.strictEqual(result.notes, 'a=C4=B1 stays raw');
+    });
+
     it('should parse TEL fields with types', () => {
       const vCardText = `BEGIN:VCARD
 VERSION:3.0

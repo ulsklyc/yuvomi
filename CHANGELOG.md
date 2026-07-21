@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.40.5] - 2026-07-21
+
+Fix for contact-card import corrupting names that use non-ASCII letters.
+
+### Fixed
+- Importing a contact card (.vcf) whose name is QUOTED-PRINTABLE encoded (common in vCard 2.1 exports from phone and mail apps) now decodes non-ASCII letters correctly. A name such as "Kalaycı" with the Turkish "ı" was previously imported literally as "Kalayc=C4=B1"; it now imports as written. Soft line breaks and the declared charset are honored, and the CardDAV sync parser decodes the same encoding. Plain values containing "=" (without a QUOTED-PRINTABLE declaration) are left untouched.
+
 ## [1.40.4] - 2026-07-21
 
 Follow-up pass on the accessibility and interaction findings surfaced by the design critique.
