@@ -96,7 +96,11 @@
         "placeholder": "Cari…",
         "noResults": "Tidak ada hasil ditemukan.",
         "error": "Pencarian sedang tidak tersedia.",
-        "open": "Buka pencarian"
+        "open": "Buka pencarian",
+        "scopesLabel": "Buka langsung",
+        "loading": "Mencari…",
+        "resultCountOne": "{{count}} hasil",
+        "resultCountMany": "{{count}} hasil"
     },
     "dashboard": {
         "title": "Ringkasan",

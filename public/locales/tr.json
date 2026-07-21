@@ -2005,7 +2005,11 @@
         "open": "Aramayı aç",
         "placeholder": "Ara…",
         "noResults": "Sonuç bulunamadı.",
-        "error": "Arama şu anda kullanılamıyor."
+        "error": "Arama şu anda kullanılamıyor.",
+        "scopesLabel": "Doğrudan aç",
+        "loading": "Aranıyor…",
+        "resultCountOne": "{{count}} sonuç",
+        "resultCountMany": "{{count}} sonuç"
     },
     "birthdays": {
         "inDays": "{{days}} gün sonra",

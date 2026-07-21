@@ -1944,7 +1944,11 @@
         "placeholder": "Hledat…",
         "noResults": "Žádné výsledky nenalezeny.",
         "error": "Vyhledávání je momentálně nedostupné.",
-        "open": "Otevřít vyhledávání"
+        "open": "Otevřít vyhledávání",
+        "scopesLabel": "Přejít na",
+        "loading": "Vyhledávání…",
+        "resultCountOne": "{{count}} výsledek",
+        "resultCountMany": "{{count}} výsledků"
     },
     "shortcuts": {
         "search": "Otevřít vyhledávání",

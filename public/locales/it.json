@@ -2005,7 +2005,11 @@
         "open": "Apri ricerca",
         "placeholder": "Cerca…",
         "noResults": "Nessun risultato trovato.",
-        "error": "Ricerca non disponibile al momento."
+        "error": "Ricerca non disponibile al momento.",
+        "scopesLabel": "Vai a",
+        "loading": "Ricerca…",
+        "resultCountOne": "{{count}} risultato",
+        "resultCountMany": "{{count}} risultati"
     },
     "birthdays": {
         "inDays": "tra {{days}} giorni",

@@ -2083,7 +2083,11 @@
         "open": "Mở tìm kiếm",
         "placeholder": "Tìm kiếm…",
         "noResults": "Không tìm thấy kết quả.",
-        "error": "Tìm kiếm hiện không khả dụng."
+        "error": "Tìm kiếm hiện không khả dụng.",
+        "scopesLabel": "Mở nhanh",
+        "loading": "Đang tìm…",
+        "resultCountOne": "{{count}} kết quả",
+        "resultCountMany": "{{count}} kết quả"
     },
     "onboarding": {
         "step1Title": "Chào mừng đến với {{name}}",

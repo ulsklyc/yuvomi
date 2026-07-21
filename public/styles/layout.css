@@ -495,6 +495,10 @@ html:has(.search-overlay--visible) yuvomi-install-prompt {
 }
 
 /* ── Such-Overlay ── */
+/* Mobile: bildschirmfüllendes Sheet, das von unten einfährt (nativer Pattern
+ * für Touch). Am Desktop (≥768px, weiter unten) wird daraus eine zentrierte
+ * Command-Palette über einem geblurten Scrim — dort ist das Overlay nur noch
+ * die Scrim-Ebene und das .search-overlay__panel die Karte. */
 .search-overlay {
   position: fixed;
   inset: 0;
@@ -510,6 +514,17 @@ html:has(.search-overlay--visible) yuvomi-install-prompt {
 
 .search-overlay--visible {
   transform: translateY(0);
+}
+
+/* Gruppiert Kopf + Treffer + Schließen. Auf Mobile transparent und
+ * bildschirmfüllend (das Overlay trägt die Tönung), Bezugsrahmen für den
+ * absolut positionierten Schließen-Button. */
+.search-overlay__panel {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .search-overlay__header {
@@ -566,6 +581,10 @@ html:has(.search-overlay--visible) yuvomi-install-prompt {
 
 .search-overlay__results {
   flex: 1;
+  /* Verschachteltes Flex-Kind (overlay > panel > results): ohne min-height:0
+   * greift overflow-y nicht und lange Trefferlisten würden im höhen-gedeckelten
+   * Desktop-Panel abgeschnitten statt gescrollt. */
+  min-height: 0;
   overflow-y: auto;
   padding: var(--space-3) var(--space-4) calc(var(--space-4) + var(--safe-area-inset-bottom));
 }
@@ -613,6 +632,126 @@ html:has(.search-overlay--visible) yuvomi-install-prompt {
 
 .search-result:active {
   background-color: var(--color-surface-hover);
+}
+
+/* Scope-Launcher im Leerzustand: „Direkt öffnen"-Kacheln, die zugleich zeigen,
+ * was durchsucht wird, und ins jeweilige Modul springen (Critique P1). */
+.search-scopes {
+  margin-top: var(--space-5);
+}
+
+.search-scopes__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.search-scope {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* Grid-Item: ohne min-width:0 sprengen lange Labels (andere Locales) die
+   * Kachel statt umzubrechen. */
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  text-align: left;
+  overflow-wrap: break-word;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: hover) {
+  .search-scope:hover {
+    background-color: var(--color-surface-hover);
+    border-color: var(--color-border);
+  }
+}
+
+.search-scope:active {
+  background-color: var(--color-surface-hover);
+}
+
+.search-scope__icon {
+  width: var(--space-5);
+  height: var(--space-5);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+/* ── Such-Overlay: Desktop-Command-Palette (≥768px) ──
+ * Aus dem Mobile-Vollbild-Sheet wird eine zentrierte, oben verankerte Glas-
+ * Karte über einem geblurten Modul-Scrim — dieselbe Grammatik wie .modal-overlay
+ * (die App bleibt als weiches Bild sichtbar, statt durch eine flache Fläche
+ * ersetzt zu werden). Kein Bottom-Slide: Ein-/Ausblenden über opacity. */
+@media (min-width: 768px) {
+  .search-overlay {
+    /* Scrim statt Vollflächen-Tönung (gespiegelt aus .modal-overlay). */
+    background-color: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) 10%, var(--color-overlay-glass));
+    backdrop-filter: var(--blur-xs) saturate(120%);
+    -webkit-backdrop-filter: var(--blur-xs) saturate(120%);
+    align-items: center;          /* Panel horizontal zentriert */
+    justify-content: flex-start;  /* oben verankert */
+    padding: 12vh var(--space-6) var(--space-6);
+    /* Kein translateY-Vollhub am Desktop; über opacity/visibility togglen. */
+    transform: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--duration-md) var(--ease-out),
+                visibility 0s linear var(--duration-md);
+  }
+
+  .search-overlay--visible {
+    transform: none;
+    opacity: 1;
+    visibility: visible;
+    transition: opacity var(--duration-md) var(--ease-out);
+  }
+
+  .search-overlay__panel {
+    flex: 0 0 auto;
+    width: min(640px, 92vw);
+    max-height: calc(100dvh - 12vh - var(--space-6));
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    /* Auftakt gespiegelt aus @keyframes modal-scale-in: Fade + scale(0.95→1)
+     * mit ease-out-expo, statt eines vom Bildschirmrand hochfahrenden Sheets.
+     * Als Transition (nicht Keyframe), weil das Overlay persistent ist und nur
+     * per --visible getoggelt wird. */
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity var(--duration-md) var(--ease-out),
+                transform var(--duration-md) var(--ease-out);
+  }
+
+  .search-overlay--visible .search-overlay__panel {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Am Desktop sitzt das Panel frei im Raum — Notch-/Safe-Area-Reserven aus
+   * Kopf, Schließen-Button und Treffer-Boden entfallen. */
+  .search-overlay__header {
+    padding-top: var(--space-3);
+  }
+
+  .search-overlay__close {
+    top: var(--space-3);
+  }
+
+  .search-overlay__results {
+    padding-bottom: var(--space-4);
+  }
 }
 
 /* ── Nav-Item (Bottom-Bar): Basis-State ── */
@@ -3685,6 +3824,14 @@ textarea.input { resize: vertical; }
   }
 
   .search-overlay--visible {
+    opacity: 1;
+  }
+
+  /* Desktop-Palette: kein Scale-Auftakt — das Panel erscheint ohne Bewegung,
+   * der Scrim übernimmt den (reduzierten) Fade. */
+  .search-overlay__panel {
+    transition: none;
+    transform: none;
     opacity: 1;
   }
 }

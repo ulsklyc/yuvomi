@@ -2083,7 +2083,11 @@
         "open": "Keresés megnyitása",
         "placeholder": "Keresés…",
         "noResults": "Nincs találat.",
-        "error": "A keresés jelenleg nem érhető el."
+        "error": "A keresés jelenleg nem érhető el.",
+        "scopesLabel": "Ugrás ide",
+        "loading": "Keresés…",
+        "resultCountOne": "{{count}} találat",
+        "resultCountMany": "{{count}} találat"
     },
     "onboarding": {
         "step1Title": "Üdvözöljük a {{name}} alkalmazásban",

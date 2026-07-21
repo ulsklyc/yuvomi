@@ -2005,7 +2005,11 @@
         "open": "فتح البحث",
         "placeholder": "بحث…",
         "noResults": "لم يتم العثور على نتائج.",
-        "error": "البحث غير متاح حاليًا."
+        "error": "البحث غير متاح حاليًا.",
+        "scopesLabel": "الانتقال إلى",
+        "loading": "جارٍ البحث…",
+        "resultCountOne": "{{count}} نتيجة",
+        "resultCountMany": "{{count}} نتائج"
     },
     "birthdays": {
         "inDays": "خلال {{days}} أيام",

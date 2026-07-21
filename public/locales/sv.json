@@ -2005,7 +2005,11 @@
         "open": "Öppna sökning",
         "placeholder": "Sök…",
         "noResults": "Inga resultat hittades.",
-        "error": "Sökning är för närvarande inte tillgänglig."
+        "error": "Sökning är för närvarande inte tillgänglig.",
+        "scopesLabel": "Gå till",
+        "loading": "Söker…",
+        "resultCountOne": "{{count}} resultat",
+        "resultCountMany": "{{count}} resultat"
     },
     "birthdays": {
         "inDays": "om {{days}} dagar",

@@ -96,7 +96,11 @@
         "placeholder": "Suchen…",
         "noResults": "Keine Ergebnisse gefunden.",
         "error": "Suche gerade nicht verfügbar.",
-        "open": "Suche öffnen"
+        "open": "Suche öffnen",
+        "scopesLabel": "Direkt öffnen",
+        "loading": "Suche läuft…",
+        "resultCountOne": "{{count}} Ergebnis",
+        "resultCountMany": "{{count}} Ergebnisse"
     },
     "dashboard": {
         "title": "Übersicht",

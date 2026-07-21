@@ -2038,7 +2038,11 @@
         "open": "Відкрити пошук",
         "placeholder": "Пошук…",
         "noResults": "Результатів не знайдено.",
-        "error": "Пошук наразі недоступний."
+        "error": "Пошук наразі недоступний.",
+        "scopesLabel": "Перейти до",
+        "loading": "Пошук…",
+        "resultCountOne": "{{count}} результат",
+        "resultCountMany": "{{count}} результатів"
     },
     "birthdays": {
         "inDays": "через {{days}} дн.",

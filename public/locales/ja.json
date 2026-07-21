@@ -2005,7 +2005,11 @@
         "open": "検索を開く",
         "placeholder": "検索…",
         "noResults": "結果が見つかりませんでした。",
-        "error": "検索は現在利用できません。"
+        "error": "検索は現在利用できません。",
+        "scopesLabel": "直接開く",
+        "loading": "検索中…",
+        "resultCountOne": "{{count}} 件の結果",
+        "resultCountMany": "{{count}} 件の結果"
     },
     "birthdays": {
         "inDays": "あと{{days}}日",

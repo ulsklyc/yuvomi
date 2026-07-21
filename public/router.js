@@ -17,6 +17,7 @@ import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
 import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
 import { activityType } from '/utils/health-activity.js';
 import { buildHelpRows } from '/utils/help.js';
+import { renderSkeletonList } from '/utils/skeleton.js';
 import { openModal, confirmModal } from '/components/modal.js';
 import '/components/datepicker.js';
 import { NAV_ICONS } from '/nav-icons.js';
@@ -1337,12 +1338,27 @@ function renderAppShell(container) {
   const searchResults = document.createElement('div');
   searchResults.className = 'search-overlay__results';
   searchResults.id = 'search-results';
-  searchOverlay.appendChild(searchHeader);
-  searchOverlay.appendChild(searchResults);
+  // Panel-Wrapper: auf Mobile transparent + bildschirmfüllend (Sheet bleibt
+  // unverändert), am Desktop die zentrierte Command-Palette (~640px, Glas-Karte
+  // über geblurtem Scrim). Das Overlay selbst ist nur noch die Scrim-Ebene.
+  const searchPanel = document.createElement('div');
+  searchPanel.className = 'search-overlay__panel';
+  searchPanel.appendChild(searchHeader);
+  searchPanel.appendChild(searchResults);
+  // Sr-only Live-Region: sagt „Suche läuft…" und die Trefferzahl an, damit der
+  // debounced Fetch für Screenreader nicht als Stille verpufft (Critique P1).
+  // Die sichtbaren Skeletons tragen aria-hidden; die Semantik lebt hier.
+  const searchStatus = document.createElement('p');
+  searchStatus.className = 'sr-only';
+  searchStatus.id = 'search-status';
+  searchStatus.setAttribute('role', 'status');
+  searchStatus.setAttribute('aria-live', 'polite');
+  searchPanel.appendChild(searchStatus);
   // Schließen NACH den Treffern im DOM (visuell absolut oben rechts): Tab aus
   // dem Suchfeld erreicht so direkt das erste Ergebnis statt erst den
   // Schließen-Button (Audit A1-14); Esc bleibt der schnelle Ausstieg.
-  searchOverlay.appendChild(searchClose);
+  searchPanel.appendChild(searchClose);
+  searchOverlay.appendChild(searchPanel);
 
   const toastContainerPolite = document.createElement('div');
   toastContainerPolite.className = 'toast-container';
@@ -1784,12 +1800,29 @@ function initMoreSheet(container, openSearch) {
 /**
  * Initialisiert die Suchfunktion (Overlay + API-Calls).
  */
+// Durchsuchbare Domänen des /search-Endpunkts, in Anzeige-Reihenfolge. Dienen
+// im Leerzustand als Direktsprung-Kacheln (labelKey/icon gespiegelt aus der
+// Haupt-Navigation, damit Suche und Nav dieselbe Sprache sprechen).
+const SEARCH_SCOPES = [
+  { labelKey: 'nav.tasks',    icon: 'check-square',  route: '/tasks'    },
+  { labelKey: 'nav.calendar', icon: 'calendar',      route: '/calendar' },
+  { labelKey: 'nav.notes',    icon: 'sticky-note',   route: '/notes'    },
+  { labelKey: 'nav.contacts', icon: 'book-user',     route: '/contacts' },
+  { labelKey: 'nav.shopping', icon: 'shopping-cart', route: '/shopping' },
+  { labelKey: 'nav.health',   icon: 'heart-pulse',   route: '/health'   },
+];
+
 function initSearch(container) {
   const searchClose = container.querySelector('#search-close');
   const overlay      = container.querySelector('#search-overlay');
   const input        = container.querySelector('#search-input');
   const results      = container.querySelector('#search-results');
+  const status       = container.querySelector('#search-status');
   if (!overlay || !input || !results) return null;
+
+  function setStatus(text) {
+    if (status) status.textContent = text || '';
+  }
 
   // Leichtgewichtiger Focus Trap für das Search Overlay.
   // Eigenständig (kein modal.js), da modul-globale Variablen in modal.js
@@ -1797,14 +1830,49 @@ function initSearch(container) {
   let _searchTrapHandler = null;
   let lastFocusedBeforeSearch = null;
 
-  // Leerzustand mit Erwartungshilfe: das frisch geöffnete Overlay war zuvor
-  // eine leere weiße Fläche ohne Hinweis, was durchsucht wird (Audit A1-14).
+  // Leerzustand mit Erwartungshilfe + Direktsprung: statt einer leeren Fläche
+  // erklärt die Lead-Zeile, was ab 2 Zeichen durchsucht wird, und darunter
+  // führen Scope-Kacheln direkt ins jeweilige Modul (Critique P1: der leere
+  // Zustand war der wertvollste, aber ungenutzte Moment der Palette).
   function renderSearchHint() {
     results.replaceChildren();
+    results.removeAttribute('aria-busy');
+    setStatus('');
     const hint = document.createElement('p');
     hint.className = 'search-overlay__empty';
     hint.textContent = t('search.emptyHint');
     results.appendChild(hint);
+
+    const scopes = document.createElement('div');
+    scopes.className = 'search-scopes';
+    const scopesHeading = document.createElement('h3');
+    scopesHeading.className = 'search-section__heading';
+    scopesHeading.textContent = t('search.scopesLabel');
+    scopes.appendChild(scopesHeading);
+    const list = document.createElement('div');
+    list.className = 'search-scopes__list';
+    SEARCH_SCOPES.forEach((scope) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'search-scope';
+      const icon = document.createElement('i');
+      icon.dataset.lucide = scope.icon;
+      icon.className = 'search-scope__icon';
+      icon.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('span');
+      label.textContent = t(scope.labelKey);
+      btn.append(icon, label);
+      btn.addEventListener('click', () => {
+        closeSearch();
+        navigate(scope.route);
+      });
+      list.appendChild(btn);
+    });
+    scopes.appendChild(list);
+    results.appendChild(scopes);
+    // Auch aus dem input-Handler (< 2 Zeichen) aufgerufen, wo openSearch die
+    // Icons nicht nachzieht — daher hier selbst rendern.
+    window.lucide?.createIcons({ el: results });
   }
 
   function openSearch() {
@@ -1821,6 +1889,9 @@ function initSearch(container) {
   }
 
   function closeSearch({ restoreFocus = true } = {}) {
+    // Laufenden Debounce abbrechen: sonst feuert ein noch offener Timer nach dem
+    // Schließen ins versteckte Overlay und macht eine Phantom-Live-Ansage.
+    clearTimeout(searchTimer);
     setOverlayInteractive(overlay, false);
     overlay.classList.remove('search-overlay--visible');
     if (_searchTrapHandler) {
@@ -1829,6 +1900,8 @@ function initSearch(container) {
     }
     input.value = '';
     results.replaceChildren();
+    results.removeAttribute('aria-busy');
+    setStatus('');
     if (restoreFocus) returnFocus(lastFocusedBeforeSearch);
   }
 
@@ -1866,17 +1939,33 @@ function initSearch(container) {
       return;
     }
     searchTimer = setTimeout(async () => {
+      // Ladezustand erst wenn der Fetch wirklich startet (nach dem Debounce):
+      // Skeletons + „Suche läuft…" statt einer eingefroren wirkenden Fläche auf
+      // langsamem Home-Server (Critique P1). Kein Flackern bei schnellem Tippen.
+      results.replaceChildren();
+      results.setAttribute('aria-busy', 'true');
+      results.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 4, lines: 2 }));
+      setStatus(t('search.loading'));
       try {
         const data = await api.get(`/search?q=${encodeURIComponent(q)}`);
-        renderSearchResults(results, data, closeSearch);
+        const count = renderSearchResults(results, data, closeSearch);
+        results.setAttribute('aria-busy', 'false');
+        setStatus(
+          count === 0 ? t('search.noResults')
+            : count === 1 ? t('search.resultCountOne', { count })
+            : t('search.resultCountMany', { count }),
+        );
       } catch {
         // Fehler nicht verschlucken: sichtbare Meldung statt „wirkt wie 0 Treffer".
+        // Die Ansage besitzt jetzt #search-status; der sichtbare Text bleibt rein
+        // visuell (kein role=status), sonst läse der Screenreader ihn doppelt.
         results.replaceChildren();
+        results.setAttribute('aria-busy', 'false');
         const err = document.createElement('p');
         err.className = 'search-overlay__empty';
-        err.setAttribute('role', 'status');
         err.textContent = t('search.error');
         results.appendChild(err);
+        setStatus(t('search.error'));
       }
     }, 300);
   });
@@ -1898,7 +1987,7 @@ function renderSearchResults(container, data, onClose) {
     empty.className = 'search-overlay__empty';
     empty.textContent = t('search.noResults');
     container.appendChild(empty);
-    return;
+    return 0;
   }
 
   // Aktivitätstyp lokalisieren (Preset via labelKey, Freitext unverändert).
@@ -1951,6 +2040,8 @@ function renderSearchResults(container, data, onClose) {
     (i) => i.dosage_text || '');
   makeSection('health.tabs.activity', activities, () => '/health/activity', activityLabel,
     (i) => (i.performed_at ? formatDate(i.performed_at) : ''));
+
+  return total;
 }
 
 // Read-only-Modus für ein Modul anwenden (#467): FAB via <html data-module-readonly>

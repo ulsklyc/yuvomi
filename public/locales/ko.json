@@ -96,7 +96,11 @@
         "placeholder": "검색…",
         "noResults": "결과를 찾을 수 없습니다.",
         "error": "검색을 현재 사용할 수 없습니다.",
-        "open": "검색 열기"
+        "open": "검색 열기",
+        "scopesLabel": "바로 열기",
+        "loading": "검색 중…",
+        "resultCountOne": "결과 {{count}}개",
+        "resultCountMany": "결과 {{count}}개"
     },
     "dashboard": {
         "title": "개요",

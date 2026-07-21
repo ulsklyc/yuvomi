@@ -96,7 +96,11 @@
         "placeholder": "جستجو…",
         "noResults": "نتیجه‌ای یافت نشد.",
         "error": "جست‌وجو در حال حاضر در دسترس نیست.",
-        "open": "باز کردن جستجو"
+        "open": "باز کردن جستجو",
+        "scopesLabel": "رفتن به",
+        "loading": "در حال جستجو…",
+        "resultCountOne": "{{count}} نتیجه",
+        "resultCountMany": "{{count}} نتیجه"
     },
     "dashboard": {
         "title": "نمای کلی",

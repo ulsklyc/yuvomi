@@ -2083,7 +2083,11 @@
         "open": "Open search",
         "placeholder": "Search…",
         "noResults": "No results found.",
-        "error": "Search is currently unavailable."
+        "error": "Search is currently unavailable.",
+        "scopesLabel": "Jump to",
+        "loading": "Searching…",
+        "resultCountOne": "{{count}} result",
+        "resultCountMany": "{{count}} results"
     },
     "onboarding": {
         "step1Title": "Welcome to {{name}}",

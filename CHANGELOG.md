@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.43.0] - 2026-07-21
+
+### Added
+- Global search empty state now shows quick-launch tiles that jump straight to a module (tasks, calendar, notes, contacts, shopping, health).
+- Global search shows a loading skeleton while fetching and announces progress and the result count to screen readers.
+
+### Changed
+- On desktop, global search opens as a centred command palette over a blurred backdrop instead of taking over the whole screen; mobile keeps its full-screen sheet.
+
+### Fixed
+- Global search no longer fires a stale request or screen-reader announcement when it is closed mid-typing.
+- The global search error message is no longer announced twice by screen readers.
+
 ## [1.42.0] - 2026-07-21
 
 ### Added

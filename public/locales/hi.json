@@ -2005,7 +2005,11 @@
         "open": "खोज खोलें",
         "placeholder": "खोजें…",
         "noResults": "कोई परिणाम नहीं मिला।",
-        "error": "खोज अभी उपलब्ध नहीं है।"
+        "error": "खोज अभी उपलब्ध नहीं है।",
+        "scopesLabel": "यहाँ जाएँ",
+        "loading": "खोज जारी…",
+        "resultCountOne": "{{count}} परिणाम",
+        "resultCountMany": "{{count}} परिणाम"
     },
     "birthdays": {
         "inDays": "{{days}} दिनों में",

@@ -2005,7 +2005,11 @@
         "open": "Открыть поиск",
         "placeholder": "Поиск…",
         "noResults": "Результаты не найдены.",
-        "error": "Поиск сейчас недоступен."
+        "error": "Поиск сейчас недоступен.",
+        "scopesLabel": "Перейти к",
+        "loading": "Поиск…",
+        "resultCountOne": "{{count}} результат",
+        "resultCountMany": "{{count}} результатов"
     },
     "birthdays": {
         "inDays": "через {{days}} дн.",

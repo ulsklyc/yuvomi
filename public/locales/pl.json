@@ -96,7 +96,11 @@
         "placeholder": "Szukaj…",
         "noResults": "Nie znaleziono wyników.",
         "error": "Wyszukiwanie jest chwilowo niedostępne.",
-        "open": "Otwórz wyszukiwanie"
+        "open": "Otwórz wyszukiwanie",
+        "scopesLabel": "Przejdź do",
+        "loading": "Wyszukiwanie…",
+        "resultCountOne": "{{count}} wynik",
+        "resultCountMany": "{{count}} wyników"
     },
     "dashboard": {
         "title": "Pulpit",

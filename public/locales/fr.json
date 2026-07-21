@@ -2005,7 +2005,11 @@
         "open": "Ouvrir la recherche",
         "placeholder": "Rechercher…",
         "noResults": "Aucun résultat trouvé.",
-        "error": "La recherche est momentanément indisponible."
+        "error": "La recherche est momentanément indisponible.",
+        "scopesLabel": "Aller à",
+        "loading": "Recherche…",
+        "resultCountOne": "{{count}} résultat",
+        "resultCountMany": "{{count}} résultats"
     },
     "birthdays": {
         "inDays": "dans {{days}} jours",

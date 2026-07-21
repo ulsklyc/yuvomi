@@ -2005,7 +2005,11 @@
         "open": "打开搜索",
         "placeholder": "搜索…",
         "noResults": "未找到结果。",
-        "error": "搜索暂时不可用。"
+        "error": "搜索暂时不可用。",
+        "scopesLabel": "直接打开",
+        "loading": "搜索中…",
+        "resultCountOne": "{{count}} 个结果",
+        "resultCountMany": "{{count}} 个结果"
     },
     "birthdays": {
         "inDays": "{{days}}天后",

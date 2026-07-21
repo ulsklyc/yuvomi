@@ -2083,7 +2083,11 @@
         "open": "Zoeken openen",
         "placeholder": "Zoeken…",
         "noResults": "Geen resultaten gevonden.",
-        "error": "Zoeken is momenteel niet beschikbaar."
+        "error": "Zoeken is momenteel niet beschikbaar.",
+        "scopesLabel": "Ga naar",
+        "loading": "Zoeken…",
+        "resultCountOne": "{{count}} resultaat",
+        "resultCountMany": "{{count}} resultaten"
     },
     "onboarding": {
         "step1Title": "Welkom bij {{name}}",

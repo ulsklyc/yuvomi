@@ -2005,7 +2005,11 @@
         "open": "Abrir pesquisa",
         "placeholder": "Pesquisar…",
         "noResults": "Nenhum resultado encontrado.",
-        "error": "A pesquisa está indisponível de momento."
+        "error": "A pesquisa está indisponível de momento.",
+        "scopesLabel": "Ir para",
+        "loading": "Pesquisando…",
+        "resultCountOne": "{{count}} resultado",
+        "resultCountMany": "{{count}} resultados"
     },
     "birthdays": {
         "inDays": "em {{days}} dias",
