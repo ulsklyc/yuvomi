@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.44.1] - 2026-07-22
+
+### Fixed
+- Recurring weekday calendar events (for example a Monday to Friday school schedule) synced from CalDAV or an ICS subscription no longer disappear when the series contains individually edited occurrences. Such a modified occurrence (iCalendar `RECURRENCE-ID`) previously overwrote the whole series and collapsed it into a single stray event on an unexpected date; modified occurrences are now kept as their own entries, the original time slot is suppressed, and excluded dates (`EXDATE`, for example public holidays) are now honored on CalDAV calendars too. Affected calendars repair themselves on the next sync (#549).
+
 ## [1.44.0] - 2026-07-22
 
 ### Added

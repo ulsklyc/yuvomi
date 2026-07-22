@@ -2,7 +2,7 @@
 // Deckt den echten Live-Pfad ab: parseICS (Sync) -> DB-Event-Shape ->
 // expandRecurringEvents (Lesen). Asserts kodieren das KORREKTE Verhalten;
 // bestehende Bugs lassen die betroffenen Fälle fehlschlagen.
-import { parseICS } from '../server/services/ics-parser.js';
+import { parseICS, normalizeRecurrenceOverrides } from '../server/services/ics-parser.js';
 import { expandRecurringEvents } from '../server/services/calendar-events.js';
 
 let passed = 0, failed = 0;
@@ -78,6 +78,94 @@ test('WEEKLY;BYDAY=MO-FR mit DTSTART am Mo: 5 Werktage (Kontrolle)', () => {
   const days = occDays(ics, '2026-07-20', '2026-07-26');
   assert(days.join() === '2026-07-20,2026-07-21,2026-07-22,2026-07-23,2026-07-24',
     `erwartet Mo-Fr, bekam: ${days.join()}`);
+});
+
+// --------------------------------------------------------
+// #549 (Folge-Report Leon): Ein Kalenderobjekt enthält den Serien-Master PLUS
+// geänderte Einzel-Vorkommen als RECURRENCE-ID-VEVENTs (gleiche UID). Der
+// CalDAV/ICS-Inbound-Upsert schreibt per external_calendar_id — ohne
+// normalizeRecurrenceOverrides überschreibt das (RRULE-lose) Override die
+// Serie und die komplette Wochentags-Wiederholung verschwindet.
+// --------------------------------------------------------
+
+// Bildet den Inbound-Upsert EINES Kalenderobjekts nach: normalizeRecurrenceOverrides
+// -> je eindeutiger UID eine DB-Zeile -> exdates als Ausnahmen-Map. Liefert genau
+// das, was der Lese-Pfad (expandRecurringEvents + loadEventExceptions) konsumiert.
+function syncObject(ics) {
+  const normalized = normalizeRecurrenceOverrides(parseICS(ics));
+  const rows = new Map();       // external uid -> row
+  const exceptions = new Map(); // row.id -> Set<YYYY-MM-DD>
+  let nextId = 1;
+  for (const ev of normalized) {
+    let row = rows.get(ev.uid);
+    if (!row) { row = { id: nextId++ }; rows.set(ev.uid, row); }
+    row.start_datetime  = ev.dtstart;
+    row.end_datetime    = ev.dtend;
+    row.all_day         = ev.allDay ? 1 : 0;
+    row.recurrence_rule = ev.rrule;
+    if (ev.rrule && Array.isArray(ev.exdates) && ev.exdates.length) {
+      if (!exceptions.has(row.id)) exceptions.set(row.id, new Set());
+      for (const d of ev.exdates) exceptions.get(row.id).add(d);
+    }
+  }
+  return { events: [...rows.values()], exceptions };
+}
+
+function instancesMulti(ics, from, to) {
+  const { events, exceptions } = syncObject(ics);
+  return expandRecurringEvents(events, from, to, exceptions)
+    .sort((a, b) => a.start_datetime.localeCompare(b.start_datetime));
+}
+function occDaysMulti(ics, from, to) {
+  return instancesMulti(ics, from, to).map((e) => e.start_datetime.slice(0, 10));
+}
+
+// Master (MO,TU) + ein verlegtes Vorkommen (Di 21.07. → 10:00 Uhr).
+const MASTER_PLUS_OVERRIDE =
+  'BEGIN:VCALENDAR\r\n' +
+  'BEGIN:VEVENT\r\nUID:series@x\r\nSUMMARY:Schule\r\n' +
+  'DTSTART:20260720T080000Z\r\nDTEND:20260720T090000Z\r\n' +
+  'RRULE:FREQ=WEEKLY;BYDAY=MO,TU\r\nEND:VEVENT\r\n' +
+  'BEGIN:VEVENT\r\nUID:series@x\r\nSUMMARY:Schule (verlegt)\r\n' +
+  'RECURRENCE-ID:20260721T080000Z\r\n' +
+  'DTSTART:20260721T100000Z\r\nDTEND:20260721T110000Z\r\nEND:VEVENT\r\n' +
+  'END:VCALENDAR';
+
+test('Master+RECURRENCE-ID: Serie überlebt (kein Collapse zum Einzeltermin)', () => {
+  const { events } = syncObject(MASTER_PLUS_OVERRIDE);
+  const master = events.find((e) => e.recurrence_rule);
+  assert(master, 'Master-Zeile mit RRULE muss existieren (nicht überschrieben)');
+  assert(/BYDAY=MO,TU/.test(master.recurrence_rule), `RRULE erhalten: ${master.recurrence_rule}`);
+  assert(master.start_datetime.slice(0, 10) === '2026-07-20',
+    `Master-Start bleibt Mo 20.07.: ${master.start_datetime}`);
+});
+
+test('Master+RECURRENCE-ID: Serie läuft über Wochen weiter (nicht kollabiert)', () => {
+  const days = occDaysMulti(MASTER_PLUS_OVERRIDE, '2026-07-20', '2026-08-03');
+  // Mo/Di jede Woche: 20,21 · 27,28 · 03. (21. kommt vom Override, s.u.)
+  for (const d of ['2026-07-20', '2026-07-27', '2026-07-28', '2026-08-03']) {
+    assert(days.includes(d), `${d} muss vorkommen: ${days.join()}`);
+  }
+});
+
+test('RECURRENCE-ID: Original-Slot unterdrückt, verlegte Instanz sichtbar (kein Doppel)', () => {
+  const inst = instancesMulti(MASTER_PLUS_OVERRIDE, '2026-07-20', '2026-07-26');
+  const on21 = inst.filter((e) => e.start_datetime.slice(0, 10) === '2026-07-21');
+  assert(on21.length === 1, `genau eine Instanz am 21.07. (kein Original+Override-Doppel): ${on21.length}`);
+  assert(on21[0].start_datetime.includes('T10:00:00'),
+    `die sichtbare 21.07.-Instanz ist die verlegte (10:00): ${on21[0].start_datetime}`);
+});
+
+test('CalDAV-EXDATE wird als Ausnahme angewandt (Feiertag fällt aus)', () => {
+  const ics =
+    'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:exd@x\r\nSUMMARY:Schule\r\n' +
+    'DTSTART:20260720T080000Z\r\nDTEND:20260720T090000Z\r\n' +
+    'EXDATE:20260727T080000Z\r\n' +            // Mo 27.07. ausgenommen
+    'RRULE:FREQ=WEEKLY;BYDAY=MO,TU\r\nEND:VEVENT\r\nEND:VCALENDAR';
+  const days = occDaysMulti(ics, '2026-07-20', '2026-08-01');
+  assert(!days.includes('2026-07-27'), `Mo 27.07. muss ausfallen (EXDATE): ${days.join()}`);
+  assert(days.includes('2026-07-20') && days.includes('2026-07-28'),
+    `andere Werktage bleiben: ${days.join()}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

@@ -84,10 +84,70 @@ function parseICS(ics) {
         if (conv) exdates.push(conv.slice(0, 10));
       }
     }
+    // RECURRENCE-ID (RFC 5545 §3.8.4.4): markiert diesen VEVENT als geändertes
+    // Einzel-Vorkommen der Serie mit gleicher UID (nicht als eigene Serie). Auf
+    // das Instanz-Datum (YYYY-MM-DD) reduziert – wie EXDATE, damit die
+    // date-basierte Recurrence-Engine matcht (#549).
+    const recIdLine = parseDTLine('RECURRENCE-ID');
+    let recurrenceId = null;
+    if (recIdLine.value) {
+      const recIsDate = /^\d{8}$/.test(recIdLine.value);
+      const conv = formatICSDate(recIdLine.value, recIsDate, recIdLine.tzid);
+      recurrenceId = conv ? conv.slice(0, 10) : null;
+    }
     if (!uid || !dtstart) continue;
-    events.push({ uid, summary, description, location, dtstart, dtend, rrule, allDay, color, exdates });
+    events.push({ uid, summary, description, location, dtstart, dtend, rrule, allDay, color, exdates, recurrenceId });
   }
   return events;
+}
+
+/**
+ * Normalisiert die VEVENTs eines Kalenderobjekts/Feeds nach RFC 5545 §3.8.4.4.
+ * Ein VEVENT mit RECURRENCE-ID ist ein geändertes Einzel-Vorkommen der Serie mit
+ * gleicher UID – KEINE eigene Serie. Ohne Sonderbehandlung upserten alle VEVENTs
+ * derselben UID auf dieselbe DB-Zeile: das (RRULE-lose) Override überschreibt die
+ * Serie und macht aus der Wochentags-Wiederholung einen Einzeltermin (#549).
+ *
+ * Ergebnis:
+ *  - Master (VEVENT ohne RECURRENCE-ID) behält seine RRULE; sein `exdates`-Set
+ *    wird um die RECURRENCE-IDs seiner Overrides ergänzt, damit das ersetzte
+ *    Original-Vorkommen unterdrückt wird (sonst Doppel: Original + verschobenes).
+ *  - Jedes Override wird zu einem eigenständigen Termin mit eindeutiger
+ *    external-UID (`${uid}::${recurrenceId}`) und ohne RRULE – so kollidiert der
+ *    UID-basierte Upsert nicht mehr und die verschobene Instanz bleibt sichtbar.
+ *
+ * Overrides ohne Master (z. B. losgelöste Einzel-Instanz) bleiben als
+ * eigenständige Termine erhalten.
+ * @param {object[]} events  Ergebnis von parseICS()
+ * @returns {object[]}
+ */
+function normalizeRecurrenceOverrides(events) {
+  const groups = new Map();
+  const order  = [];
+  for (const ev of events) {
+    if (!groups.has(ev.uid)) { groups.set(ev.uid, { master: null, overrides: [] }); order.push(ev.uid); }
+    const g = groups.get(ev.uid);
+    if (ev.recurrenceId) g.overrides.push(ev);
+    else if (!g.master)  g.master = ev;
+    else                 g.overrides.push(ev); // zweiter Nicht-Override (unüblich) → wie Override behandeln
+  }
+  const out = [];
+  for (const uid of order) {
+    const { master, overrides } = groups.get(uid);
+    if (master) {
+      const exSet = new Set(master.exdates || []);
+      for (const ov of overrides) {
+        const key = ov.recurrenceId || ov.dtstart?.slice(0, 10);
+        if (key) exSet.add(key);
+      }
+      out.push({ ...master, exdates: [...exSet] });
+    }
+    for (const ov of overrides) {
+      const key = ov.recurrenceId || ov.dtstart?.slice(0, 10);
+      out.push({ ...ov, uid: `${uid}::${key}`, rrule: null, exdates: [] });
+    }
+  }
+  return out;
 }
 
 function parseVTODO(ics) {
@@ -227,4 +287,4 @@ function expandRRULE(vevent, windowStart, windowEnd) {
   return results;
 }
 
-export { unfoldLines, unescapeICSText, parseICS, parseVTODO, formatICSDate, tzLocalToUTC, applyDuration, expandRRULE };
+export { unfoldLines, unescapeICSText, parseICS, parseVTODO, formatICSDate, tzLocalToUTC, applyDuration, expandRRULE, normalizeRecurrenceOverrides };

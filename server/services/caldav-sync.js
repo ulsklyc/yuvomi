@@ -17,7 +17,8 @@ import {
   parseICS,
   formatICSDate,
   tzLocalToUTC,
-  applyDuration
+  applyDuration,
+  normalizeRecurrenceOverrides
 } from './ics-parser.js';
 
 function escapeICSText(str) {
@@ -431,6 +432,11 @@ async function sync({ createClient } = {}) {
        location, color, external_calendar_id, external_source, recurrence_rule, calendar_ref_id, created_by)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'caldav', ?, ?, ?)
   `);
+  // EXDATE-Ausnahmen der Serie (#489/#549). Additiv (INSERT OR IGNORE): entfernt
+  // keine lokal vom Nutzer ausgenommenen Einzeltermine.
+  const insException = conn.prepare(
+    'INSERT OR IGNORE INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)'
+  );
   // Besitzer (created_by-Fallback) einmal auflösen — konstant über den ganzen Sync.
   const ownerRow = conn.prepare('SELECT id FROM users ORDER BY id ASC LIMIT 1').get();
   const createdBy = ownerRow ? ownerRow.id : 1;
@@ -500,7 +506,9 @@ async function sync({ createClient } = {}) {
         fetchedCalendars.push({ calRefId, calendarName: selCal.calendar_name, calendarUids });
 
         for (const obj of calObjects) {
-          const parsed = parseICS(obj.data || '');
+          // RECURRENCE-ID-Overrides zusammenführen, sonst überschreibt ein
+          // geändertes Einzel-Vorkommen die Serie derselben UID (#549).
+          const parsed = normalizeRecurrenceOverrides(parseICS(obj.data || ''));
 
           for (const ev of parsed) {
             try {
@@ -511,6 +519,7 @@ async function sync({ createClient } = {}) {
 
               const existing = selExistingEvent.get(ev.uid);
 
+              let eventId;
               if (existing) {
                 // Update: color nur überschreiben, solange der Nutzer nicht lokal
                 // umgefärbt hat (user_modified = 0); Titel/Zeit bleiben remote-geführt.
@@ -518,14 +527,22 @@ async function sync({ createClient } = {}) {
                   ev.summary, ev.description, ev.dtstart, ev.dtend,
                   ev.allDay ? 1 : 0, ev.location, ev.rrule, evColor, calRefId, existing.id
                 );
+                eventId = existing.id;
               } else {
                 // Insert
                 const inserted = insEvent.run(
                   ev.summary, ev.description, ev.dtstart, ev.dtend,
                   ev.allDay ? 1 : 0, ev.location, evColor, ev.uid, ev.rrule, calRefId, createdBy
                 );
+                eventId = Number(inserted.lastInsertRowid);
                 // Standard-Zuweisung dieses Kalenders (#459) auf den neuen Termin.
-                assignDefaultToEvent(db.get(), inserted.lastInsertRowid, calDefaultAssignee);
+                assignDefaultToEvent(db.get(), eventId, calDefaultAssignee);
+              }
+
+              // EXDATE + ersetzte Override-Termine als Instanz-Ausnahmen ablegen,
+              // damit die Expansion diese Vorkommen überspringt (#489/#549).
+              if (ev.rrule && Array.isArray(ev.exdates)) {
+                for (const exDate of ev.exdates) insException.run(eventId, exDate);
               }
 
               accountEventCount++;

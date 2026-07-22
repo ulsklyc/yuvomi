@@ -12,7 +12,7 @@ import { isIP } from 'node:net';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { assignDefaultToEvent } from './sync-assignment.js';
-import { parseICS, expandRRULE } from './ics-parser.js';
+import { parseICS, expandRRULE, normalizeRecurrenceOverrides } from './ics-parser.js';
 import { isBlockedAddress, readPrivateNetworkOptIn, createGuardedLookup } from '../utils/ssrf.js';
 import { safeRequest } from '../utils/http.js';
 
@@ -143,8 +143,12 @@ async function syncOne(sub) {
     const createdBy = sub.created_by ?? owner?.id;
     if (!createdBy) { log.warn('No user found.'); return; }
 
+    // RECURRENCE-ID-Overrides zusammenführen: der Master behält die RRULE (sonst
+    // überschreibt ein geändertes Einzel-Vorkommen die Serie), verschobene
+    // Instanzen bleiben als eigenständige Termine erhalten (#549).
+    const normalized = normalizeRecurrenceOverrides(events);
     const flatEvents = [];
-    for (const ev of events) {
+    for (const ev of normalized) {
       if (ev.rrule) {
         flatEvents.push(...expandRRULE(ev, windowStart, windowEnd));
       } else if (ev.dtstart >= windowStart && ev.dtstart <= windowEnd) {
@@ -290,6 +294,9 @@ async function importToLocal(userId, { ics, url, color } = {}) {
   } else {
     throw new Error('Either an ICS file or a URL is required.');
   }
+  // RECURRENCE-ID-Overrides zusammenführen: Master behält die Serie, geänderte
+  // Einzel-Vorkommen werden eigenständige Termine statt die Serie zu killen (#549).
+  rawEvents = normalizeRecurrenceOverrides(rawEvents);
 
   const fallbackColor = color || '#007AFF';
   const insert = db.get().prepare(`

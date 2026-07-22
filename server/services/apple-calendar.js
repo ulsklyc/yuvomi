@@ -18,7 +18,7 @@ const log = createLogger('Apple');
 import * as db from '../db.js';
 import { assignDefaultToEvent } from './sync-assignment.js';
 import { pruneDeletedEvents } from './calendar-prune.js';
-import { unfoldLines, parseICS, formatICSDate, tzLocalToUTC, applyDuration } from './ics-parser.js';
+import { unfoldLines, parseICS, formatICSDate, tzLocalToUTC, applyDuration, normalizeRecurrenceOverrides } from './ics-parser.js';
 import { decodeHtmlEntities } from '../utils/html-entities.js';
 
 const APPLE_COLOR = '#FC3C44';
@@ -269,7 +269,9 @@ async function sync() {
     fetchedCalendars.push({ calRefId, calendarName: calName, calendarUids });
 
     for (const obj of calObjects) {
-      const parsed = parseICS(obj.data || '');
+      // RECURRENCE-ID-Overrides zusammenführen, sonst überschreibt ein geändertes
+      // Einzel-Vorkommen die Serie derselben UID (#549).
+      const parsed = normalizeRecurrenceOverrides(parseICS(obj.data || ''));
       for (const ev of parsed) {
         try {
           calendarUids.add(ev.uid);
@@ -281,6 +283,7 @@ async function sync() {
             `SELECT id FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'apple'`
           ).get(ev.uid);
 
+          let eventId;
           if (existing) {
             // color nur überschreiben, solange der Nutzer nicht lokal umgefärbt
             // hat (user_modified = 0); Titel/Zeit bleiben remote-geführt.
@@ -295,6 +298,7 @@ async function sync() {
               ev.summary, ev.description, ev.dtstart, ev.dtend,
               ev.allDay ? 1 : 0, ev.location, ev.rrule, evColor, calRefId, existing.id
             );
+            eventId = existing.id;
           } else {
             const inserted = db.get().prepare(`
               INSERT INTO calendar_events
@@ -305,8 +309,18 @@ async function sync() {
               ev.summary, ev.description, ev.dtstart, ev.dtend,
               ev.allDay ? 1 : 0, ev.location, evColor, ev.uid, ev.rrule, calRefId, createdBy
             );
+            eventId = Number(inserted.lastInsertRowid);
             // Standard-Zuweisung dieses Kalenders (#459) auf den neuen Termin.
-            assignDefaultToEvent(db.get(), inserted.lastInsertRowid, calDefaultAssignee);
+            assignDefaultToEvent(db.get(), eventId, calDefaultAssignee);
+          }
+
+          // EXDATE + ersetzte Override-Termine als Instanz-Ausnahmen ablegen,
+          // damit die Expansion diese Vorkommen überspringt (#489/#549). Additiv.
+          if (ev.rrule && Array.isArray(ev.exdates) && ev.exdates.length) {
+            const insEx = db.get().prepare(
+              'INSERT OR IGNORE INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)'
+            );
+            for (const exDate of ev.exdates) insEx.run(eventId, exDate);
           }
         } catch (err) {
           log.error(`Upsert error for UID ${ev.uid}:`, err.message);
