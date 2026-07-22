@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.44.0] - 2026-07-22
+
+### Added
+- Cycle tracking now has a per-member default-visibility setting: choose whether newly logged periods and day logs start Private or Family-visible, and the choice is pre-selected in every cycle entry dialog. The visibility of any single entry stays overridable (#550).
+- Cycle settings gained an "apply to all" action that bulk-updates every existing period and day log to the chosen visibility in one step, so switching a whole history between Private and Family no longer means editing each entry by hand (#550).
+
+### Fixed
+- The example cycle data in the demo seed is now Family-visible, so period predictions no longer appear broken when viewed from another family member's account (#550).
+
+### Accessibility
+- The cycle settings hints (auto-calculation, default visibility, pregnancy mode) are now linked to their controls via `aria-describedby`, and the "apply to all" confirmation moves focus to the confirm button and is announced to screen readers.
+
 ## [1.43.1] - 2026-07-22
 
 ### Fixed
