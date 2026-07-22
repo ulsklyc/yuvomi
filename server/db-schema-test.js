@@ -906,6 +906,12 @@ const MIGRATIONS_SQL = {
     );
     CREATE INDEX IF NOT EXISTS idx_task_documents_document ON task_documents(document_id);
   `,
+
+  // SQL-String für Migration v97 (gespiegelt aus db.js MIGRATIONS): tzid für
+  // DST-korrekte Recurrence-Expansion (#549).
+  97: `
+    ALTER TABLE calendar_events ADD COLUMN tzid TEXT;
+  `,
 };
 
 export { MIGRATIONS_SQL };

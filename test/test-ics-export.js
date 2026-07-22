@@ -66,6 +66,7 @@ d2.exec(MIGRATIONS_SQL[11]);
 d2.exec(MIGRATIONS_SQL[61]);
 d2.exec(MIGRATIONS_SQL[80]);
 d2.exec(MIGRATIONS_SQL[85]); // calendar_event_exceptions (EXDATE, #489)
+d2.exec(MIGRATIONS_SQL[97]); // calendar_events.tzid (DST-Export, #549)
 d2.exec(`CREATE TABLE IF NOT EXISTS event_assignments (
   event_id INTEGER NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
   user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -272,6 +273,68 @@ test('buildFeed: Event ohne Zuweisung bekommt trotz Flag keine leeren Klammern',
   const ics = buildFeed(d2, u1, NOW);
   assert(/SUMMARY:Solo\r\n/.test(ics), 'leere Klammern angehängt: ' + ics);
   d2.prepare(`DELETE FROM calendar_events WHERE id = ?`).run(noneId);
+});
+
+// --------------------------------------------------------
+// #549: TZID-Export für wiederkehrende Serien. Ohne TZID+VTIMEZONE expandiert die
+// App des Abonnenten die UTC-verankerte Serie mit fixem Suffix → DST-Drift im Feed.
+// --------------------------------------------------------
+setFeedShowAssignees(d2, u1, false); // Suffix-Flag aus, damit SUMMARY exakt bleibt
+
+test('buildFeed: TZID-Serie → DTSTART;TZID mit lokaler Wanduhrzeit (nicht UTC)', () => {
+  // Synchronisierte Serie: UTC gespeichert (05:25Z = 07:25 CEST), tzid Europe/Berlin.
+  d2.prepare(`INSERT INTO calendar_events (title,start_datetime,end_datetime,all_day,external_source,recurrence_rule,tzid,created_by) VALUES ('SchuleTZ','2025-09-24T05:25:00Z','2025-09-24T06:10:00Z',0,'apple','FREQ=WEEKLY',?, ?)`).run('Europe/Berlin', u1);
+  const ics = buildFeed(d2, u1, NOW);
+  assert(ics.includes('DTSTART;TZID=Europe/Berlin:20250924T072500'), 'DTSTART;TZID (lokal 07:25) fehlt: ' + ics);
+  assert(ics.includes('DTEND;TZID=Europe/Berlin:20250924T081000'), 'DTEND;TZID (lokal 08:10) fehlt: ' + ics);
+  assert(!/DTSTART;TZID=Europe\/Berlin:\d{8}T052500/.test(ics), 'DTSTART darf nicht die UTC-Zeit tragen: ' + ics);
+});
+
+test('buildFeed: referenzierte Zone bekommt ein korrektes VTIMEZONE (Europe/Berlin)', () => {
+  const ics = buildFeed(d2, u1, NOW);
+  assert(ics.includes('BEGIN:VTIMEZONE'), 'VTIMEZONE fehlt: ' + ics);
+  assert(ics.includes('\r\nTZID:Europe/Berlin'), 'VTIMEZONE TZID fehlt: ' + ics);
+  assert(ics.includes('BEGIN:DAYLIGHT') && ics.includes('BEGIN:STANDARD'), 'DST-Komponenten fehlen: ' + ics);
+  assert(ics.includes('TZOFFSETTO:+0200'), 'CEST-Offset fehlt: ' + ics);
+  assert(ics.includes('TZOFFSETTO:+0100'), 'CET-Offset fehlt: ' + ics);
+  assert(ics.includes('BYMONTH=3;BYDAY=-1SU'), 'Frühjahrs-Regel (letzter So März) fehlt: ' + ics);
+  assert(ics.includes('BYMONTH=10;BYDAY=-1SU'), 'Herbst-Regel (letzter So Okt) fehlt: ' + ics);
+  // VTIMEZONE steht vor dem ersten VEVENT (RFC 5545).
+  assert(ics.indexOf('BEGIN:VTIMEZONE') < ics.indexOf('BEGIN:VEVENT'), 'VTIMEZONE muss vor den VEVENTs stehen: ' + ics);
+});
+
+test('buildFeed: pro Zone genau ein VTIMEZONE (dedupliziert)', () => {
+  d2.prepare(`INSERT INTO calendar_events (title,start_datetime,all_day,external_source,recurrence_rule,tzid,created_by) VALUES ('SchuleTZ2','2025-09-25T05:25:00Z',0,'apple','FREQ=WEEKLY',?, ?)`).run('Europe/Berlin', u1);
+  const ics = buildFeed(d2, u1, NOW);
+  const count = (ics.match(/\r\nTZID:Europe\/Berlin/g) || []).length;
+  assert(count === 1, `genau ein VTIMEZONE je Zone erwartet, gefunden: ${count}`);
+});
+
+test('buildFeed: Zone ohne Sommerzeit → einzelne STANDARD-Komponente, kein DAYLIGHT', () => {
+  const id = d2.prepare(`INSERT INTO calendar_events (title,start_datetime,all_day,external_source,recurrence_rule,tzid,created_by) VALUES ('TokyoTZ','2026-01-06T23:00:00Z',0,'apple','FREQ=WEEKLY',?, ?)`).run('Asia/Tokyo', u1).lastInsertRowid;
+  const ics = buildFeed(d2, u1, NOW);
+  // Tokio: +09:00 ganzjährig, 23:00Z = 08:00 lokal (Folgetag).
+  assert(ics.includes('\r\nTZID:Asia/Tokyo'), 'Tokio-VTIMEZONE fehlt: ' + ics);
+  const tzBlock = ics.slice(ics.indexOf('TZID:Asia/Tokyo'), ics.indexOf('END:VTIMEZONE', ics.indexOf('TZID:Asia/Tokyo')));
+  assert(tzBlock.includes('TZOFFSETTO:+0900'), 'JST-Offset fehlt: ' + tzBlock);
+  assert(!tzBlock.includes('BEGIN:DAYLIGHT'), 'Zone ohne DST darf kein DAYLIGHT haben: ' + tzBlock);
+  d2.prepare(`DELETE FROM calendar_events WHERE id = ?`).run(id);
+});
+
+test('buildFeed: EXDATE einer TZID-Serie trägt TZID + lokale Zeit', () => {
+  const id = d2.prepare(`INSERT INTO calendar_events (title,start_datetime,all_day,external_source,recurrence_rule,tzid,created_by) VALUES ('SchuleTZEx','2025-09-26T05:25:00Z',0,'apple','FREQ=WEEKLY',?, ?)`).run('Europe/Berlin', u1).lastInsertRowid;
+  d2.prepare(`INSERT INTO calendar_event_exceptions (event_id,exception_date) VALUES (?, '2025-12-19')`).run(id);
+  const ics = buildFeed(d2, u1, NOW);
+  assert(ics.includes('EXDATE;TZID=Europe/Berlin:20251219T072500'), 'EXDATE;TZID (lokal) fehlt: ' + ics);
+  d2.prepare(`DELETE FROM calendar_events WHERE id = ?`).run(id);
+});
+
+test('buildFeed: EINZELtermin mit tzid bleibt UTC (nur Serien nutzen den TZID-Pfad)', () => {
+  const id = d2.prepare(`INSERT INTO calendar_events (title,start_datetime,end_datetime,all_day,external_source,tzid,created_by) VALUES ('EinzelTZ','2026-06-25T05:25:00Z','2026-06-25T06:10:00Z',0,'apple',?, ?)`).run('Europe/Berlin', u1).lastInsertRowid;
+  const ics = buildFeed(d2, u1, NOW);
+  assert(ics.includes('DTSTART:20260625T052500Z'), 'Einzeltermin sollte UTC bleiben: ' + ics);
+  assert(!/SchuleTZ[^\r]*\r\nDTSTART:20260625/.test(ics), 'kein TZID-Pfad für Einzeltermin');
+  d2.prepare(`DELETE FROM calendar_events WHERE id = ?`).run(id);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

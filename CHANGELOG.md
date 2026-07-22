@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.44.3] - 2026-07-22
+
+### Fixed
+- The read-only calendar export feed (webcal/ICS) now keeps the local start time of recurring events across daylight-saving changes. Series synced from CalDAV with a time zone are exported with that zone (`DTSTART;TZID` plus a generated `VTIMEZONE`) instead of a fixed UTC time, so calendar apps subscribing to the feed no longer show them an hour off in the opposite season (#549).
+
 ## [1.44.2] - 2026-07-22
 
 ### Fixed
