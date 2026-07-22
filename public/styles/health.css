@@ -2025,6 +2025,22 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 
 .cycle-hint { font-size: var(--text-xs); color: var(--color-text-secondary); margin: 0; }
 
+/* Bulk-Sichtbarkeit: Sekundär-Button plus ausklappbare Inline-Bestätigung. */
+.cycle-bulk { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+.cycle-bulk__confirm {
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  flex-direction: column;
+  gap: var(--space-3);
+}
+/* display erst wenn sichtbar - sonst überschreibt der Flex das UA-[hidden]. */
+.cycle-bulk__confirm:not([hidden]) { display: flex; }
+.cycle-bulk__question { color: var(--color-text-primary); }
+.cycle-bulk__actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+
 @media (max-width: 560px) {
   .cycle-hero { flex-direction: column; }
   .cycle-ring { width: 200px; height: 200px; }

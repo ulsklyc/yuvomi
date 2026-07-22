@@ -2,7 +2,7 @@
  * Health structure guard.
  *
  * Sichert die modulare Aufteilung von server/routes/health.js: der Orchestrator
- * muss dieselbe {Methode, Pfad}-Routentabelle wie vor dem Split ergeben (41
+ * muss dieselbe {Methode, Pfad}-Routentabelle wie vor dem Split ergeben (42
  * Routen), und die Tab-Cluster-Router müssen zusammen exakt diese Routen ergeben
  * (keine verlorene/doppelte Route). Fängt ab, dass ein Cluster-Router still nicht
  * gemountet wird oder eine Route beim Umbau verloren geht/umbenannt wird.
@@ -92,13 +92,14 @@ const EXPECTED = [
   'DELETE /cycle/logs/:id',
   'GET /cycle/settings',
   'PUT /cycle/settings',
+  'PATCH /cycle/visibility',
   'GET /export/cycle',
 ];
 
-test('Orchestrator ergibt exakt die erwartete Routentabelle (41 Routen)', () => {
+test('Orchestrator ergibt exakt die erwartete Routentabelle (42 Routen)', () => {
   const actual = collectRoutes(healthRouter).sort();
   assert.deepEqual(actual, [...EXPECTED].sort());
-  assert.equal(actual.length, 41);
+  assert.equal(actual.length, 42);
 });
 
 test('die Cluster-Router zusammen ergeben genau die Orchestrator-Routen (keine verlorene/doppelte Route)', () => {

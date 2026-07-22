@@ -571,6 +571,49 @@ test('Cycle-Settings: ungültiges Entbindungsdatum wird abgelehnt', async () => 
   assert.equal(res.status, 400);
 });
 
+test('Cycle-Settings: default_visibility – Default privat, Upsert, Validierung (#550)', async () => {
+  asB();
+  const def = await call('GET', '/cycle/settings');
+  assert.equal(def.body.data.default_visibility, 'private');
+
+  const saved = await call('PUT', '/cycle/settings', { default_visibility: 'family' });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.data.default_visibility, 'family');
+
+  const bad = await call('PUT', '/cycle/settings', { default_visibility: 'public' });
+  assert.equal(bad.status, 400);
+});
+
+test('Cycle: Bulk-Sichtbarkeit flippt eigene Einträge, fremde bleiben unberührt (#550)', async () => {
+  asA();
+  const foreign = await call('POST', '/cycle/periods', { start_date: '2026-09-01', note: 'bulk-foreign-A' });
+
+  asB();
+  const p = await call('POST', '/cycle/periods', { start_date: '2026-09-02', note: 'bulk-B-period' });
+  const l = await call('POST', '/cycle/logs', { log_date: '2026-09-02', flow: 'light' });
+  assert.equal(p.body.data.visibility, 'private');
+  assert.equal(l.body.data.visibility, 'private');
+
+  const bulk = await call('PATCH', '/cycle/visibility', { visibility: 'family' });
+  assert.equal(bulk.status, 200);
+  assert.ok(bulk.body.data.periods >= 1);
+  assert.ok(bulk.body.data.logs >= 1);
+
+  const periods = await call('GET', '/cycle/periods');
+  assert.equal(periods.body.data.find((x) => x.id === p.body.data.id).visibility, 'family');
+  const logs = await call('GET', '/cycle/logs');
+  assert.equal(logs.body.data.find((x) => x.id === l.body.data.id).visibility, 'family');
+
+  // Bulk ist strikt eigen-scoped: Alices Periode bleibt privat.
+  asA();
+  const aPeriods = await call('GET', '/cycle/periods');
+  assert.equal(aPeriods.body.data.find((x) => x.id === foreign.body.data.id).visibility, 'private');
+
+  // Ungültiger Wert wird abgelehnt.
+  const badVal = await call('PATCH', '/cycle/visibility', { visibility: 'public' });
+  assert.equal(badVal.status, 400);
+});
+
 test('Export cycle: CSV mit Perioden- und Zykluslänge', async () => {
   asA();
   await call('POST', '/cycle/periods', { start_date: '2026-01-05', end_date: '2026-01-09', note: 'exp-cyc-1' });

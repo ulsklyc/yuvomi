@@ -766,21 +766,25 @@ const labReportOld = insertLabReport.run(lindaId, daysFromNow(-200), 'City Pract
 // ── Health: Cycle ────────────────────────────────────────────────────────────
 
 console.log('Inserting cycle data…');
+// Demo-Zyklus familienweit sichtbar seeden: sonst sind die Perioden aus jeder
+// anderen Account-Perspektive unsichtbar und die Vorhersage rechnet auf Lücken
+// (Discussion #550). default_visibility bleibt 'private' - nur die Beispieldaten
+// selbst sind bewusst geteilt.
 db.prepare(`
   INSERT INTO cycle_settings (user_id, cycle_length_avg, period_length_avg, luteal_length, track_fertility)
   VALUES (?, 28, 5, 14, 1)
 `).run(lindaId);
-const insertPeriod = db.prepare('INSERT INTO cycle_periods (user_id, start_date, end_date, note) VALUES (?, ?, ?, ?)');
+const insertPeriod = db.prepare('INSERT INTO cycle_periods (user_id, start_date, end_date, note, visibility) VALUES (?, ?, ?, ?, ?)');
 [[-6, -2, 'Current cycle'], [-34, -30, null], [-62, -58, null], [-90, -86, null]]
-  .forEach(([s, e, note]) => insertPeriod.run(lindaId, daysFromNow(s), daysFromNow(e), note));
-const insertCycleLog = db.prepare('INSERT INTO cycle_day_logs (user_id, log_date, flow, symptoms, mood, note) VALUES (?, ?, ?, ?, ?, ?)');
+  .forEach(([s, e, note]) => insertPeriod.run(lindaId, daysFromNow(s), daysFromNow(e), note, 'family'));
+const insertCycleLog = db.prepare('INSERT INTO cycle_day_logs (user_id, log_date, flow, symptoms, mood, note, visibility) VALUES (?, ?, ?, ?, ?, ?, ?)');
 [
   [-6, 'heavy',    'cramps,fatigue',       'sensitive', null],
   [-5, 'heavy',    'cramps,backache',      'irritable', 'Tough day'],
   [-4, 'medium',   'headache',             'neutral',   null],
   [-3, 'light',    'fatigue',              'good',      null],
   [-2, 'spotting', '',                     'good',      null],
-].forEach(([d, flow, symptoms, mood, note]) => insertCycleLog.run(lindaId, daysFromNow(d), flow, symptoms, mood, note));
+].forEach(([d, flow, symptoms, mood, note]) => insertCycleLog.run(lindaId, daysFromNow(d), flow, symptoms, mood, note, 'family'));
 
 // ── Rewards ──────────────────────────────────────────────────────────────────
 

@@ -3841,6 +3841,13 @@ function wireCycle() {
   cycle.root.querySelector('[data-action="cycle-settings"]')?.addEventListener('click', () => openCycleSettingsModal());
 }
 
+// Sichtbarkeit für ein Zyklus-Event vorauswählen: bestehender Wert gewinnt,
+// sonst greift die persönliche Default-Preference aus den Cycle-Settings,
+// sonst 'private'. Pro Event bleibt die Auswahl im Modal überschreibbar.
+function cycleVisibilityFor(row) {
+  return row?.visibility || cycle.settings?.default_visibility || 'private';
+}
+
 // --------------------------------------------------------
 // Perioden-Modal (Anlegen/Bearbeiten inkl. Löschen)
 // --------------------------------------------------------
@@ -3868,8 +3875,8 @@ function openPeriodModal(period) {
         <div class="form-field">
           <label class="label" for="cycle-visibility">${esc(t('health.cycle.field.visibility'))}</label>
           <select class="input" id="cycle-visibility">
-            <option value="private" ${period?.visibility === 'family' ? '' : 'selected'}>${esc(t('health.cycle.visibility.private'))}</option>
-            <option value="family" ${period?.visibility === 'family' ? 'selected' : ''}>${esc(t('health.cycle.visibility.family'))}</option>
+            <option value="private" ${cycleVisibilityFor(period) === 'family' ? '' : 'selected'}>${esc(t('health.cycle.visibility.private'))}</option>
+            <option value="family" ${cycleVisibilityFor(period) === 'family' ? 'selected' : ''}>${esc(t('health.cycle.visibility.family'))}</option>
           </select>
         </div>
         <div class="form-field">
@@ -3971,8 +3978,8 @@ function openDayLogModal(dateKey) {
           <div class="form-field">
             <label class="label" for="cycle-log-visibility">${esc(t('health.cycle.field.visibility'))}</label>
             <select class="input" id="cycle-log-visibility">
-              <option value="private" ${existing?.visibility === 'family' ? '' : 'selected'}>${esc(t('health.cycle.visibility.private'))}</option>
-              <option value="family" ${existing?.visibility === 'family' ? 'selected' : ''}>${esc(t('health.cycle.visibility.family'))}</option>
+              <option value="private" ${cycleVisibilityFor(existing) === 'family' ? '' : 'selected'}>${esc(t('health.cycle.visibility.private'))}</option>
+              <option value="family" ${cycleVisibilityFor(existing) === 'family' ? 'selected' : ''}>${esc(t('health.cycle.visibility.family'))}</option>
             </select>
           </div>
         </div>
@@ -4066,33 +4073,56 @@ function openCycleSettingsModal() {
         <div class="form-field">
           <label class="label" for="cs-cycle">${esc(t('health.cycle.settings.cycleLength'))}</label>
           <input class="input" id="cs-cycle" type="number" inputmode="numeric" min="15" max="60" step="1"
+            aria-describedby="cs-auto-hint"
             placeholder="${esc(fmtNum(stats.avgCycle))}" value="${esc(val(s.cycle_length_avg))}">
         </div>
         <div class="form-field">
           <label class="label" for="cs-period">${esc(t('health.cycle.settings.periodLength'))}</label>
           <input class="input" id="cs-period" type="number" inputmode="numeric" min="1" max="15" step="1"
+            aria-describedby="cs-auto-hint"
             placeholder="${esc(fmtNum(stats.avgPeriod))}" value="${esc(val(s.period_length_avg))}">
         </div>
         <div class="form-field">
           <label class="label" for="cs-luteal">${esc(t('health.cycle.settings.lutealLength'))}</label>
           <input class="input" id="cs-luteal" type="number" inputmode="numeric" min="8" max="18" step="1"
+            aria-describedby="cs-auto-hint"
             value="${esc(val(s.luteal_length ?? 14))}">
         </div>
         <label class="cycle-toggle">
           <input type="checkbox" id="cs-fertility" ${s.track_fertility === 0 ? '' : 'checked'}>
           <span>${esc(t('health.cycle.settings.trackFertility'))}</span>
         </label>
-        <p class="cycle-hint">${esc(t('health.cycle.settings.autoHint'))}</p>
+        <p class="cycle-hint" id="cs-auto-hint">${esc(t('health.cycle.settings.autoHint'))}</p>
+        <div class="form-field">
+          <label class="label" for="cs-default-visibility">${esc(t('health.cycle.settings.defaultVisibility'))}</label>
+          <select class="input" id="cs-default-visibility" aria-describedby="cs-default-visibility-hint">
+            <option value="private" ${s.default_visibility === 'family' ? '' : 'selected'}>${esc(t('health.cycle.visibility.private'))}</option>
+            <option value="family" ${s.default_visibility === 'family' ? 'selected' : ''}>${esc(t('health.cycle.visibility.family'))}</option>
+          </select>
+          <p class="cycle-hint" id="cs-default-visibility-hint">${esc(t('health.cycle.settings.defaultVisibilityHint'))}</p>
+        </div>
+        <div class="form-field cycle-bulk">
+          <button type="button" class="btn btn--secondary" data-action="cycle-apply-visibility"
+            aria-describedby="cs-bulk-hint">${esc(t('health.cycle.settings.applyToAll'))}</button>
+          <p class="cycle-hint" id="cs-bulk-hint">${esc(t('health.cycle.settings.applyToAllHint'))}</p>
+          <div class="cycle-bulk__confirm" data-role="bulk-confirm" role="group" aria-labelledby="cs-bulk-question" hidden>
+            <p class="cycle-hint cycle-bulk__question" id="cs-bulk-question" data-role="bulk-confirm-text"></p>
+            <div class="cycle-bulk__actions">
+              <button type="button" class="btn btn--ghost" data-action="cycle-apply-cancel">${esc(t('common.cancel'))}</button>
+              <button type="button" class="btn btn--primary" data-action="cycle-apply-run" aria-describedby="cs-bulk-question">${esc(t('common.confirm'))}</button>
+            </div>
+          </div>
+        </div>
         <hr class="cycle-settings__sep">
         <label class="cycle-toggle">
-          <input type="checkbox" id="cs-pregnancy" ${s.pregnancy_mode ? 'checked' : ''}>
+          <input type="checkbox" id="cs-pregnancy" aria-describedby="cs-pregnancy-hint" ${s.pregnancy_mode ? 'checked' : ''}>
           <span>${esc(t('health.cycle.settings.pregnancyMode'))}</span>
         </label>
         <div class="form-field" id="cs-due-field" ${s.pregnancy_mode ? '' : 'hidden'}>
           <label class="label" for="cs-due">${esc(t('health.cycle.settings.dueDate'))}</label>
           <yuvomi-datepicker id="cs-due" type="date" value="${esc(s.pregnancy_due_date || '')}" min="${esc(dueMin)}" max="${esc(dueMax)}"></yuvomi-datepicker>
         </div>
-        <p class="cycle-hint">${esc(t('health.cycle.settings.pregnancyHint'))}</p>
+        <p class="cycle-hint" id="cs-pregnancy-hint">${esc(t('health.cycle.settings.pregnancyHint'))}</p>
         <div class="modal-actions">
           <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
@@ -4104,6 +4134,46 @@ function openCycleSettingsModal() {
       const pregToggle = panel.querySelector('#cs-pregnancy');
       const dueField = panel.querySelector('#cs-due-field');
       pregToggle?.addEventListener('change', () => { dueField.hidden = !pregToggle.checked; });
+
+      // Bulk-Sichtbarkeit: setzt alle bestehenden Einträge auf den oben gewählten
+      // Wert. Inline-Bestätigung statt confirmModal - das Modal-System stapelt
+      // nicht, ein verschachteltes confirmModal würde die Settings mitsamt noch
+      // ungespeicherter Eingaben schließen. Betrifft nur die eigenen Daten.
+      const bulkBtn     = panel.querySelector('[data-action="cycle-apply-visibility"]');
+      const bulkConfirm = panel.querySelector('[data-role="bulk-confirm"]');
+      const bulkText    = panel.querySelector('[data-role="bulk-confirm-text"]');
+      const bulkRun     = panel.querySelector('[data-action="cycle-apply-run"]');
+      const visSelect   = panel.querySelector('#cs-default-visibility');
+      const selectedVisibility = () => visSelect.value || 'private';
+      const visLabel = () => t(`health.cycle.visibility.${selectedVisibility()}`);
+      const showBulk = (confirming) => { bulkConfirm.hidden = !confirming; bulkBtn.hidden = confirming; };
+      // Button-Label nennt den Zielwert und folgt dem Dropdown - so ist vor dem
+      // Klick klar, worauf „alle" gesetzt werden.
+      const syncBulkLabel = () => { bulkBtn.textContent = t('health.cycle.settings.applyToAllValue', { visibility: visLabel() }); };
+      syncBulkLabel();
+      visSelect.addEventListener('change', syncBulkLabel);
+      bulkBtn?.addEventListener('click', () => {
+        bulkText.textContent = t('health.cycle.settings.applyToAllConfirm', { visibility: visLabel() });
+        showBulk(true);
+        bulkRun.focus(); // Fokus auf die Bestätigung; SR liest die Frage via aria-describedby
+      });
+      panel.querySelector('[data-action="cycle-apply-cancel"]')?.addEventListener('click', () => { showBulk(false); bulkBtn.focus(); });
+      bulkRun?.addEventListener('click', async () => {
+        bulkRun.disabled = true;
+        try {
+          const { data } = await api.patch('/health/cycle/visibility', { visibility: selectedVisibility() });
+          const count = (data?.periods || 0) + (data?.logs || 0);
+          showBulk(false);
+          window.yuvomi?.showToast(t('health.cycle.settings.applyToAllDone', { count }), 'success');
+          await reloadCycle();
+        } catch (err) {
+          console.error('[Health] cycle bulk visibility error:', err);
+          window.yuvomi?.showToast(err?.data?.error || t('health.cycle.saveError'), 'danger');
+        } finally {
+          bulkRun.disabled = false;
+        }
+      });
+
       panel.querySelector('#cycle-settings-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = panel.querySelector('[type="submit"]');
@@ -4115,6 +4185,7 @@ function openCycleSettingsModal() {
           period_length_avg: numOr('#cs-period'),
           luteal_length: numOr('#cs-luteal') ?? 14,
           track_fertility: panel.querySelector('#cs-fertility').checked,
+          default_visibility: panel.querySelector('#cs-default-visibility').value || 'private',
           pregnancy_mode: pregnant,
           // Termin auch beim Ausschalten behalten (nur im aktiven Modus genutzt) —
           // versehentliches Umschalten löscht die Eingabe dann nicht.

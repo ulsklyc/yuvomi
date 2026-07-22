@@ -206,7 +206,7 @@ router.delete('/cycle/logs/:id', (req, res) => {
 
 /** Voreinstellungen, falls die Person noch keine Zeile hat. */
 function defaultCycleSettings(userId) {
-  return { user_id: userId, cycle_length_avg: null, period_length_avg: null, luteal_length: 14, track_fertility: 1, pregnancy_mode: 0, pregnancy_due_date: null };
+  return { user_id: userId, cycle_length_avg: null, period_length_avg: null, luteal_length: 14, track_fertility: 1, pregnancy_mode: 0, pregnancy_due_date: null, default_visibility: 'private' };
 }
 
 // GET /cycle/settings  (immer die eigenen; Vorhersagen sind persönlich)
@@ -239,30 +239,56 @@ router.put('/cycle/settings', (req, res) => {
     const track     = toBit(b.track_fertility);
     const pregnancy = toBit(b.pregnancy_mode);
     const dueDate   = v.date(b.pregnancy_due_date, 'pregnancy_due_date');
+    const defVis    = v.oneOf(b.default_visibility, VISIBILITIES, 'default_visibility');
 
-    const errors = v.collectErrors([cycleLen, periodLen, luteal, dueDate]);
+    const errors = v.collectErrors([cycleLen, periodLen, luteal, dueDate, defVis]);
     if (b.track_fertility !== undefined && track === undefined) errors.push('track_fertility must be a boolean.');
     if (b.pregnancy_mode !== undefined && pregnancy === undefined) errors.push('pregnancy_mode must be a boolean.');
     if (errors.length) return badRequest(res, errors);
 
     db.get().prepare(`
-      INSERT INTO cycle_settings (user_id, cycle_length_avg, period_length_avg, luteal_length, track_fertility, pregnancy_mode, pregnancy_due_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO cycle_settings (user_id, cycle_length_avg, period_length_avg, luteal_length, track_fertility, pregnancy_mode, pregnancy_due_date, default_visibility)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(user_id) DO UPDATE SET
         cycle_length_avg = excluded.cycle_length_avg,
         period_length_avg = excluded.period_length_avg,
         luteal_length = excluded.luteal_length,
         track_fertility = excluded.track_fertility,
         pregnancy_mode = excluded.pregnancy_mode,
-        pregnancy_due_date = excluded.pregnancy_due_date
+        pregnancy_due_date = excluded.pregnancy_due_date,
+        default_visibility = excluded.default_visibility
     `).run(viewer, cycleLen.value, periodLen.value, luteal.value === null ? 14 : luteal.value,
            track === undefined ? 1 : track,
            pregnancy === undefined ? 0 : pregnancy,
-           dueDate.value);
+           dueDate.value,
+           defVis.value || 'private');
 
     res.json({ data: db.get().prepare('SELECT * FROM cycle_settings WHERE user_id = ?').get(viewer) });
   } catch (err) {
     log.error('Error saving cycle settings:', err.message);
+    res.status(500).json({ error: 'Internal error.', code: 500 });
+  }
+});
+
+// PATCH /cycle/visibility  — Bulk: setzt ALLE eigenen Zyklus-Einträge (Perioden +
+// Tageslogs) auf eine Sichtbarkeit. Betrifft ausschließlich user_id = viewer;
+// fremde Einträge bleiben unberührt. Ein Transaktions-Wrapper hält Perioden und
+// Logs konsistent (entweder beide oder keine).
+router.patch('/cycle/visibility', (req, res) => {
+  try {
+    const viewer = viewerId(req);
+    const vis = v.oneOf(req.body?.visibility, VISIBILITIES, 'visibility');
+    if (vis.error || !vis.value) return badRequest(res, [vis.error || 'visibility is required.']);
+
+    const database = db.get();
+    const applyBulk = database.transaction((value) => {
+      const p = database.prepare('UPDATE cycle_periods  SET visibility = ? WHERE user_id = ?').run(value, viewer);
+      const l = database.prepare('UPDATE cycle_day_logs SET visibility = ? WHERE user_id = ?').run(value, viewer);
+      return { periods: p.changes, logs: l.changes };
+    });
+    res.json({ data: applyBulk(vis.value) });
+  } catch (err) {
+    log.error('Error bulk-updating cycle visibility:', err.message);
     res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });
