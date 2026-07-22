@@ -5,7 +5,7 @@
  * Abhängigkeiten: server/services/recurrence.js
  */
 
-import { nextOccurrence, parseRRule } from './recurrence.js';
+import { nextOccurrence, parseRRule, matchesRRuleByday } from './recurrence.js';
 import { visibilityWhere } from './visibility.js';
 
 // Zugewiesene Personen eines Events als JSON-Array (Multi-Assignment).
@@ -86,8 +86,9 @@ export function expandRecurringEvents(events, from, to, exceptionsByEvent = null
       if (maxCount !== null && occurrence >= maxCount) break;
       occurrence++;
 
-      // Ausgenommenes Vorkommen (EXDATE, #489): überspringen, aber Serie weiterlaufen lassen.
-      if (exceptions?.has(currentDate)) {
+      // Ausgenommenes Vorkommen (EXDATE, #489) oder Tag außerhalb des BYDAY-Musters
+      // (#549: DTSTART am Wochenende bei BYDAY=MO..FR): überspringen, Serie weiterlaufen lassen.
+      if (exceptions?.has(currentDate) || !matchesRRuleByday(currentDate, event.recurrence_rule)) {
         const next = nextOccurrence(currentDate, event.recurrence_rule);
         if (!next || next <= currentDate) break;
         currentDate = next;

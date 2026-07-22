@@ -5,7 +5,7 @@
  * Abhängigkeiten: server/services/recurrence.js
  */
 
-import { nextOccurrence } from './recurrence.js';
+import { nextOccurrence, matchesRRuleByday } from './recurrence.js';
 import { resolveIcalColor } from '../utils/ical-color.js';
 
 function unfoldLines(ics) {
@@ -199,7 +199,8 @@ function expandRRULE(vevent, windowStart, windowEnd) {
     iterations++;
     if (maxCount !== null && iterations > maxCount) break;
 
-    if (current >= windowStart && !exdateSet.has(current)) {
+    if (current >= windowStart && !exdateSet.has(current)
+        && matchesRRuleByday(current, vevent.rrule)) {
       const occStart = current + timeSuffix;
       let occEnd = null;
       if (durationMs !== null) {

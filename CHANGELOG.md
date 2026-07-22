@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.43.1] - 2026-07-22
+
+### Fixed
+- Recurring calendar events that repeat on weekdays (for example Monday to Friday) synced from CalDAV or an ICS subscription now expand correctly. Apple and iOS serialize these as `FREQ=DAILY;BYDAY=...`, which was previously treated as a plain daily repeat and produced extra instances on Saturdays and Sundays.
+- A recurring series whose start date does not fall on one of the rule's weekdays (for example a series anchored on a weekend) no longer shows a phantom instance on that start date.
+
 ## [1.43.0] - 2026-07-21
 
 ### Added

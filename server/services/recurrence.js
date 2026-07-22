@@ -66,14 +66,18 @@ function nextOccurrence(baseDateStr, rrule) {
   const { freq, interval, byday, until } = parsed;
   const next = new Date(base);
 
-  if (freq === 'DAILY') {
+  if (freq === 'DAILY' && byday.length === 0) {
     next.setUTCDate(next.getUTCDate() + interval);
 
-  } else if (freq === 'WEEKLY') {
+  } else if (freq === 'WEEKLY' || (freq === 'DAILY' && byday.length > 0)) {
     if (byday.length === 0) {
       // Kein BYDAY → selber Wochentag, nächste Woche
       next.setUTCDate(next.getUTCDate() + 7 * interval);
     } else {
+      // FREQ=DAILY;BYDAY zählt Tage, nicht Wochen: das nächste Vorkommen ist
+      // schlicht der nächste passende Wochentag, ohne Wochen-Intervall-Sprung.
+      // Apple/iOS serialisiert "jeden Werktag" so (#549).
+      const weekInterval = freq === 'WEEKLY' ? interval : 1;
       // Finde den nächsten passenden Wochentag (nach heute)
       const currentDay = base.getUTCDay();
       const sorted = [...byday].sort((a, b) => {
@@ -85,10 +89,10 @@ function nextOccurrence(baseDateStr, rrule) {
       let daysUntil = (sorted[0] - currentDay + 7) % 7;
       if (daysUntil === 0) {
         // Selber Wochentag → ganzes Intervall überspringen
-        daysUntil = 7 * interval;
+        daysUntil = 7 * weekInterval;
       } else if ((sorted[0] + 6) % 7 < (currentDay + 6) % 7) {
         // Wochengrenze überschritten (ISO-Woche MO–SO) → interval-1 Wochen extra überspringen
-        daysUntil += 7 * (interval - 1);
+        daysUntil += 7 * (weekInterval - 1);
       }
       next.setUTCDate(next.getUTCDate() + daysUntil);
     }
@@ -135,4 +139,21 @@ function nextOccurrenceAfter(baseDateStr, rrule, notBeforeStr) {
   return current;
 }
 
-export { parseRRule, nextOccurrence, nextOccurrenceAfter };
+/**
+ * Prüft, ob ein Datum zum BYDAY-Wochentagsfilter der Regel passt.
+ * Ohne BYDAY (oder ohne parsebare Regel) gilt jedes Datum als passend – dann
+ * steuern allein DTSTART und nextOccurrence die Serie. Fängt Serien ab, deren
+ * DTSTART nicht auf einen Regeltag fällt (z.B. Anker am Wochenende, #549).
+ * @param {string} dateStr - YYYY-MM-DD
+ * @param {string} rrule   - RRULE-String
+ * @returns {boolean}
+ */
+function matchesRRuleByday(dateStr, rrule) {
+  const parsed = parseRRule(rrule);
+  if (!parsed || parsed.byday.length === 0) return true;
+  const day = new Date(dateStr + 'T00:00:00Z');
+  if (isNaN(day.getTime())) return true;
+  return parsed.byday.includes(day.getUTCDay());
+}
+
+export { parseRRule, nextOccurrence, nextOccurrenceAfter, matchesRRuleByday };
