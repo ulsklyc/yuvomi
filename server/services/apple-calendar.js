@@ -290,24 +290,24 @@ async function sync() {
             db.get().prepare(`
               UPDATE calendar_events
               SET title = ?, description = ?, start_datetime = ?, end_datetime = ?,
-                  all_day = ?, location = ?, recurrence_rule = ?,
+                  all_day = ?, location = ?, recurrence_rule = ?, tzid = ?,
                   color = CASE WHEN user_modified = 0 THEN ? ELSE color END,
                   calendar_ref_id = ?
               WHERE id = ?
             `).run(
               ev.summary, ev.description, ev.dtstart, ev.dtend,
-              ev.allDay ? 1 : 0, ev.location, ev.rrule, evColor, calRefId, existing.id
+              ev.allDay ? 1 : 0, ev.location, ev.rrule, ev.tzid ?? null, evColor, calRefId, existing.id
             );
             eventId = existing.id;
           } else {
             const inserted = db.get().prepare(`
               INSERT INTO calendar_events
                 (title, description, start_datetime, end_datetime, all_day,
-                 location, color, external_calendar_id, external_source, recurrence_rule, calendar_ref_id, created_by)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'apple', ?, ?, ?)
+                 location, color, external_calendar_id, external_source, recurrence_rule, tzid, calendar_ref_id, created_by)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'apple', ?, ?, ?, ?)
             `).run(
               ev.summary, ev.description, ev.dtstart, ev.dtend,
-              ev.allDay ? 1 : 0, ev.location, evColor, ev.uid, ev.rrule, calRefId, createdBy
+              ev.allDay ? 1 : 0, ev.location, evColor, ev.uid, ev.rrule, ev.tzid ?? null, calRefId, createdBy
             );
             eventId = Number(inserted.lastInsertRowid);
             // Standard-Zuweisung dieses Kalenders (#459) auf den neuen Termin.

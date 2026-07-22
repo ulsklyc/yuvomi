@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.44.2] - 2026-07-22
+
+### Fixed
+- Calendar events synced from CalDAV or an ICS subscription that start on the 24th of a month in a specific time zone no longer jump to a wrong date and weekday. A time-zone conversion helper mishandled the day value 24 and shifted such events by weeks (for example a Wednesday series showed up on Saturday) (#549).
+- Recurring calendar events synced with a time zone now keep their local start time across daylight-saving changes. Previously every occurrence reused the series' original UTC time, so the displayed time drifted by an hour in the opposite season (for example a 07:25 event appeared as 06:25 in winter). Affected calendars correct themselves on the next sync (#549).
+
 ## [1.44.1] - 2026-07-22
 
 ### Fixed

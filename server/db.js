@@ -3392,6 +3392,18 @@ const MIGRATIONS = [
         CHECK(default_visibility IN ('private', 'family'));
     `,
   },
+  {
+    version: 97,
+    description: 'Add tzid to calendar_events for DST-correct recurrence expansion (#549)',
+    up: `
+      -- IANA-Zeitzone (z.B. Europe/Berlin) des Serien-Starts. Nur für zeitgebundene
+      -- CalDAV/Apple-Wiederholungen relevant, die am Anzeige-Zeitpunkt expandiert
+      -- werden: ohne die Zone behält jede Instanz den festen UTC-Zeit-Suffix des
+      -- Masters, sodass die lokale Uhrzeit über die Sommer-/Winterzeit-Grenze um
+      -- eine Stunde driftet (#549). NULL = wie bisher (floating/UTC, kein DST-Bezug).
+      ALTER TABLE calendar_events ADD COLUMN tzid TEXT;
+    `,
+  },
 ];
 
 /**
@@ -3444,6 +3456,9 @@ const CRITICAL_COLUMNS = [
   // #538: v54 trägt reminders.pushed_at nach; ohne die Spalte scheitert der
   // Notification-/Push-Scheduler bei jedem Lauf still auf `no such column`.
   { table: 'reminders', column: 'pushed_at', type: 'TEXT' },
+  // #549: v97 trägt calendar_events.tzid nach; ohne die Spalte scheitert der
+  // Sync-Upsert (schreibt tzid) still und die Kalender-Expansion driftet über DST.
+  { table: 'calendar_events', column: 'tzid', type: 'TEXT' },
 ];
 
 /**

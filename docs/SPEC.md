@@ -247,6 +247,7 @@ Reusable recipe cards that can be pre-filled into meal slots.
 | external_calendar_id | TEXT | ID from external calendar |
 | external_source | TEXT | local, google, apple, ics, caldav |
 | recurrence_rule | TEXT | iCal RRULE — supported subset `FREQ` (DAILY/WEEKLY/MONTHLY/YEARLY), `INTERVAL`, `BYDAY`, and a mutually-exclusive end condition `UNTIL` **or** `COUNT` |
+| tzid | TEXT | IANA time zone of a synced recurring series (e.g. `Europe/Berlin`), nullable (migration v97). Lets the expansion keep the local wall-clock time across DST; NULL = floating/UTC |
 | subscription_id | INTEGER | FK → ICS Subscriptions (CASCADE delete) |
 | user_modified | INTEGER | 0/1 — prevents sync overwrite when 1 |
 | calendar_ref_id | INTEGER | FK → External Calendars (ON DELETE SET NULL) |

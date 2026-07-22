@@ -103,6 +103,7 @@ function syncObject(ics) {
     row.end_datetime    = ev.dtend;
     row.all_day         = ev.allDay ? 1 : 0;
     row.recurrence_rule = ev.rrule;
+    row.tzid            = ev.tzid ?? null;
     if (ev.rrule && Array.isArray(ev.exdates) && ev.exdates.length) {
       if (!exceptions.has(row.id)) exceptions.set(row.id, new Set());
       for (const d of ev.exdates) exceptions.get(row.id).add(d);
@@ -166,6 +167,39 @@ test('CalDAV-EXDATE wird als Ausnahme angewandt (Feiertag fällt aus)', () => {
   assert(!days.includes('2026-07-27'), `Mo 27.07. muss ausfallen (EXDATE): ${days.join()}`);
   assert(days.includes('2026-07-20') && days.includes('2026-07-28'),
     `andere Werktage bleiben: ${days.join()}`);
+});
+
+// --------------------------------------------------------
+// #549 (DST): Eine TZID-Serie muss über die Sommer-/Winterzeit-Grenze die LOKALE
+// Uhrzeit behalten. Zuvor übernahm die Expansion den festen UTC-Suffix des Masters,
+// sodass die Anzeige im Winter eine Stunde zu früh lag.
+// --------------------------------------------------------
+
+// Lokale Wanduhrzeit (HH:MM Europe/Berlin) einer Instanz.
+function localHM(iso) {
+  return new Intl.DateTimeFormat('de-DE', {
+    timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit',
+  }).format(new Date(iso));
+}
+
+// Master DTSTART im Sommer (CEST): Mi 24.09.2025, 07:25 Europe/Berlin, wöchentlich.
+const TZ_SERIES =
+  'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:tz@x\r\nSUMMARY:Schule\r\n' +
+  'DTSTART;TZID=Europe/Berlin:20250924T072500\r\n' +
+  'DTEND;TZID=Europe/Berlin:20250924T081000\r\n' +
+  'RRULE:FREQ=WEEKLY\r\nEND:VEVENT\r\nEND:VCALENDAR';
+
+test('TZID-Serie: gleiche Ortszeit im Sommer UND Winter (kein DST-Drift)', () => {
+  const summer = instancesMulti(TZ_SERIES, '2026-04-01', '2026-04-02'); // CEST
+  const winter = instancesMulti(TZ_SERIES, '2025-12-10', '2025-12-11'); // CET
+  assert(summer.length === 1 && winter.length === 1, `je 1 Instanz: ${summer.length}/${winter.length}`);
+  assert(localHM(summer[0].start_datetime) === '07:25', `Sommer 07:25: ${localHM(summer[0].start_datetime)}`);
+  assert(localHM(winter[0].start_datetime) === '07:25', `Winter 07:25 (nicht 06:25): ${localHM(winter[0].start_datetime)}`);
+});
+
+test('TZID-Serie: Instanz bleibt am korrekten Wochentag (Mi, Tag-24-Master)', () => {
+  const inst = instancesMulti(TZ_SERIES, '2025-12-10', '2025-12-11'); // Mi 10.12.
+  assert(inst[0].start_datetime.slice(0, 10) === '2025-12-10', `Datum: ${inst[0].start_datetime}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

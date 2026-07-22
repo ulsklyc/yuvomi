@@ -7,6 +7,7 @@
 
 import { nextOccurrence, matchesRRuleByday } from './recurrence.js';
 import { resolveIcalColor } from '../utils/ical-color.js';
+import { localToUTC, utcToWall } from '../utils/timezone.js';
 
 function unfoldLines(ics) {
   return ics.replace(/\r?\n[ \t]/g, '');
@@ -96,7 +97,10 @@ function parseICS(ics) {
       recurrenceId = conv ? conv.slice(0, 10) : null;
     }
     if (!uid || !dtstart) continue;
-    events.push({ uid, summary, description, location, dtstart, dtend, rrule, allDay, color, exdates, recurrenceId });
+    // TZID des Serien-Starts merken (nur zeitgebunden): erlaubt DST-korrekte
+    // Expansion, die die lokale Uhrzeit über die Sommer-/Winterzeit hält (#549).
+    const tzid = (!allDay && dtStartLine.tzid) ? dtStartLine.tzid : null;
+    events.push({ uid, summary, description, location, dtstart, dtend, rrule, allDay, color, exdates, recurrenceId, tzid });
   }
   return events;
 }
@@ -190,24 +194,9 @@ function parseVTODO(ics) {
   return todos;
 }
 
+// Beibehaltener Export: delegiert an den geteilten Zeitzonen-Helfer (utils/timezone.js).
 function tzLocalToUTC(localStr, tzid) {
-  try {
-    const fakeUTC = new Date(localStr + 'Z');
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: tzid, year: 'numeric', month: 'numeric', day: 'numeric',
-      hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false,
-    }).formatToParts(fakeUTC);
-    const get = (type) => {
-      const part = parts.find(p => p.type === type);
-      const v = part ? part.value : '0';
-      return v === '24' ? 0 : parseInt(v, 10);
-    };
-    const tzDisplayedAsUTC = Date.UTC(
-      get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second')
-    );
-    const offsetMs = fakeUTC.getTime() - tzDisplayedAsUTC;
-    return new Date(fakeUTC.getTime() + offsetMs).toISOString().replace('.000Z', 'Z');
-  } catch { return localStr; }
+  return localToUTC(localStr, tzid);
 }
 
 function formatICSDate(val, allDay, tzid) {
@@ -253,6 +242,12 @@ function expandRRULE(vevent, windowStart, windowEnd) {
   // EXDATE zählt für COUNT mit (RFC 5545: COUNT vor Exclusion), erzeugt aber
   // keine Instanz – daher innerhalb der Schleife filtern, nicht die Zählung (#513).
   const exdateSet  = new Set(vevent.exdates || []);
+  // DST-korrekte Expansion: bei bekannter TZID pro Vorkommen die lokale Wanduhrzeit
+  // des Masters neu nach UTC rechnen, statt den festen UTC-Suffix zu wiederholen
+  // (sonst driftet die Uhrzeit über die Sommer-/Winterzeit, #549). Nur für
+  // Tagtermine, deren lokales Datum == UTC-Datum ist (kein Mitternachts-Überlauf).
+  const wall = vevent.tzid ? utcToWall(vevent.dtstart, vevent.tzid) : null;
+  const tzAware = wall && wall.date === startDate;
   let current = startDate, iterations = 0;
   const MAX_ITER = 1500;
   while (current <= windowEnd && iterations < MAX_ITER) {
@@ -261,7 +256,7 @@ function expandRRULE(vevent, windowStart, windowEnd) {
 
     if (current >= windowStart && !exdateSet.has(current)
         && matchesRRuleByday(current, vevent.rrule)) {
-      const occStart = current + timeSuffix;
+      const occStart = tzAware ? localToUTC(`${current}T${wall.time}`, vevent.tzid) : current + timeSuffix;
       let occEnd = null;
       if (durationMs !== null) {
         if (vevent.allDay) {

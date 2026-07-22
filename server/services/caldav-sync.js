@@ -421,7 +421,7 @@ async function sync({ createClient } = {}) {
   const updEvent = conn.prepare(`
     UPDATE calendar_events
     SET title = ?, description = ?, start_datetime = ?, end_datetime = ?,
-        all_day = ?, location = ?, recurrence_rule = ?,
+        all_day = ?, location = ?, recurrence_rule = ?, tzid = ?,
         color = CASE WHEN user_modified = 0 THEN ? ELSE color END,
         calendar_ref_id = ?
     WHERE id = ?
@@ -429,8 +429,8 @@ async function sync({ createClient } = {}) {
   const insEvent = conn.prepare(`
     INSERT INTO calendar_events
       (title, description, start_datetime, end_datetime, all_day,
-       location, color, external_calendar_id, external_source, recurrence_rule, calendar_ref_id, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'caldav', ?, ?, ?)
+       location, color, external_calendar_id, external_source, recurrence_rule, tzid, calendar_ref_id, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'caldav', ?, ?, ?, ?)
   `);
   // EXDATE-Ausnahmen der Serie (#489/#549). Additiv (INSERT OR IGNORE): entfernt
   // keine lokal vom Nutzer ausgenommenen Einzeltermine.
@@ -525,14 +525,14 @@ async function sync({ createClient } = {}) {
                 // umgefärbt hat (user_modified = 0); Titel/Zeit bleiben remote-geführt.
                 updEvent.run(
                   ev.summary, ev.description, ev.dtstart, ev.dtend,
-                  ev.allDay ? 1 : 0, ev.location, ev.rrule, evColor, calRefId, existing.id
+                  ev.allDay ? 1 : 0, ev.location, ev.rrule, ev.tzid ?? null, evColor, calRefId, existing.id
                 );
                 eventId = existing.id;
               } else {
                 // Insert
                 const inserted = insEvent.run(
                   ev.summary, ev.description, ev.dtstart, ev.dtend,
-                  ev.allDay ? 1 : 0, ev.location, evColor, ev.uid, ev.rrule, calRefId, createdBy
+                  ev.allDay ? 1 : 0, ev.location, evColor, ev.uid, ev.rrule, ev.tzid ?? null, calRefId, createdBy
                 );
                 eventId = Number(inserted.lastInsertRowid);
                 // Standard-Zuweisung dieses Kalenders (#459) auf den neuen Termin.

@@ -7,6 +7,7 @@
 
 import { nextOccurrence, parseRRule, matchesRRuleByday } from './recurrence.js';
 import { visibilityWhere } from './visibility.js';
+import { localToUTC, utcToWall } from '../utils/timezone.js';
 
 // Zugewiesene Personen eines Events als JSON-Array (Multi-Assignment).
 const ASSIGNED_USERS_SQL = `(
@@ -71,6 +72,14 @@ export function expandRecurringEvents(events, from, to, exceptionsByEvent = null
     // Original-Zeit-Teil erhalten (z.B. 'T14:30:00' oder '' bei All-Day)
     const timeSuffix = event.start_datetime.slice(10);
 
+    // DST-korrekte Expansion: bei bekannter TZID (CalDAV/Apple-Serie) pro Vorkommen
+    // die lokale Wanduhrzeit des Masters neu nach UTC rechnen, statt den festen
+    // UTC-Suffix zu wiederholen (sonst driftet die Uhrzeit über die Sommer-/
+    // Winterzeit-Grenze, #549). Nur für Tagtermine, deren lokales Datum == UTC-Datum
+    // ist (kein Mitternachts-Überlauf) - sonst alte Fixe-Suffix-Logik.
+    const wall = (event.tzid && !isAllDay) ? utcToWall(event.start_datetime, event.tzid) : null;
+    const tzAware = wall && wall.date === event.start_datetime.slice(0, 10);
+
     let currentDate = event.start_datetime.slice(0, 10); // YYYY-MM-DD
     let iterations  = 0;
     const MAX_ITER  = 1000; // Sicherheitsgrenze
@@ -104,7 +113,7 @@ export function expandRecurringEvents(events, from, to, exceptionsByEvent = null
       }
 
       if (currentDate >= from || instanceEnd >= from) {
-        const newStart = currentDate + timeSuffix;
+        const newStart = tzAware ? localToUTC(`${currentDate}T${wall.time}`, event.tzid) : currentDate + timeSuffix;
         let newEnd = event.end_datetime;
         if (durationMs !== null) {
           if (isAllDay) {
