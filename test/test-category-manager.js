@@ -46,7 +46,7 @@ test('Escaped Nutzerdaten via esc()', () => {
 test('Zeigt lokalisierte Server-Guard-Fehler (reason → t()) mit Fallback', () => {
   assert(/showToast\(\s*this\._errMsg\(err\)/.test(comp), 'Fehler müssen über _errMsg (lokalisiert) statt roher err.message angezeigt werden');
   assert(/err\?\.data\?\.reason/.test(comp), '_errMsg muss den stabilen reason-Code aus err.data lesen');
-  assert(/'category_in_use'/.test(comp) && /'category_last'/.test(comp) && /'category_exists'/.test(comp), 'Kategorie-reason-Codes müssen gemappt werden');
+  assert(/'category_in_use'/.test(comp) && /'category_last'/.test(comp) && /'category_exists'/.test(comp) && /'category_has_subcategories'/.test(comp), 'Kategorie-reason-Codes müssen gemappt werden');
   assert(/t\('category\.errorInUse'/.test(comp), 'auf lokalisierte category.error*-Keys mappen');
   assert(/err\?\.message/.test(comp), 'Fallback auf die Server-Meldung bei unbekanntem reason');
 });
@@ -55,7 +55,12 @@ test('Unterstützt Subkategorien unter basePath/:key/subcategories', () => {
   assert(/this\._supportsSub/.test(comp), 'supportsSubcategories muss ausgewertet werden');
 });
 
+test('Bietet itemFilter in configure()', () => {
+  assert(/itemFilter/.test(comp), 'configure() muss itemFilter unterstützen');
+});
+
 const budgetPage = readFileSync(new URL('../public/pages/budget.js', import.meta.url), 'utf8');
+
 test('Budget importiert die generische Komponente', () => {
   assert(/components\/category-manager\.js/.test(budgetPage), 'budget.js muss die Komponente importieren');
   assert(/yuvomi-category-manager/.test(budgetPage), 'budget.js muss das Element verwenden');

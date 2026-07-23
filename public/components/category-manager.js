@@ -23,6 +23,7 @@ class CategoryManagerElement extends HTMLElement {
     this._groups = [{ key: '', labelKey: '', addLabelKey: 'common.add' }];
     this._supportsSub = false;
     this._labelResolver = (item) => item.label ?? item.name; // Server liefert lokalisiertes `label`
+    this._itemFilter = null;
     this._titleKey = 'category.manageTitle';
     this._hintKey = 'category.manageHint';
     this._cats = [];
@@ -36,6 +37,7 @@ class CategoryManagerElement extends HTMLElement {
     if (Array.isArray(opts.groups) && opts.groups.length) this._groups = opts.groups;
     this._supportsSub = !!opts.supportsSubcategories;
     if (typeof opts.labelResolver === 'function') this._labelResolver = opts.labelResolver;
+    if (typeof opts.itemFilter === 'function') this._itemFilter = opts.itemFilter;
     if (opts.titleKey) this._titleKey = opts.titleKey;
     if (opts.hintKey) this._hintKey = opts.hintKey;
     this._renderShell();
@@ -72,7 +74,8 @@ class CategoryManagerElement extends HTMLElement {
   // entscheidet, welchen Ausschnitt er danach neu zeichnet.
   async _fetch() {
     const res = await api.get(this._basePath);
-    this._cats = res.data ?? [];
+    const data = res.data ?? [];
+    this._cats = typeof this._itemFilter === 'function' ? data.filter(this._itemFilter) : data;
   }
 
   // Voll-Load: Erstbefüllung (configure) und generischer Refresh — lädt und
@@ -390,13 +393,14 @@ class CategoryManagerElement extends HTMLElement {
     const reason = err?.data?.reason;
     const count = err?.data?.count;
     switch (reason) {
-      case 'category_in_use':    return t('category.errorInUse', { count });
-      case 'category_last':      return t('category.errorLast');
-      case 'category_exists':    return t('category.errorExists');
-      case 'subcategory_in_use': return t('category.errorSubInUse', { count });
-      case 'subcategory_last':   return t('category.errorSubLast');
-      case 'subcategory_exists': return t('category.errorSubExists');
-      default:                   return err?.message ?? '';
+      case 'category_in_use':           return t('category.errorInUse', { count });
+      case 'category_last':             return t('category.errorLast');
+      case 'category_exists':           return t('category.errorExists');
+      case 'category_has_subcategories': return t('category.errorHasSubcategories');
+      case 'subcategory_in_use':        return t('category.errorSubInUse', { count });
+      case 'subcategory_last':          return t('category.errorSubLast');
+      case 'subcategory_exists':        return t('category.errorSubExists');
+      default:                          return err?.message ?? '';
     }
   }
 

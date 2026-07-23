@@ -147,6 +147,10 @@ router.delete('/categories/:key', (req, res) => {
     if (inUse > 0) {
       return res.status(409).json({ error: `Category is in use by ${inUse} entr${inUse === 1 ? 'y' : 'ies'}.`, code: 409, count: inUse, reason: 'category_in_use' });
     }
+    const subcategoryCount = subcategoryCountForCategory(db.get(), cat.key);
+    if (subcategoryCount > 0) {
+      return res.status(409).json({ error: 'Cannot delete a category that still has subcategories.', code: 409, reason: 'category_has_subcategories' });
+    }
     if (categoryCountByType(db.get(), cat.type) <= 1) {
       return res.status(409).json({ error: 'Cannot delete the last category.', code: 409, reason: 'category_last' });
     }

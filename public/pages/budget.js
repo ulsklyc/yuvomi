@@ -17,7 +17,7 @@ import { openSubscriptionModal, render as renderSubscriptions } from '/pages/sub
 import { renderStats } from '/pages/budget-stats.js';
 import { renderPlans } from '/pages/budget-plans.js';
 import { toLocalDateKey } from '/utils/date.js';
-import { budgetCategoryLabel } from '/utils/category-labels.js';
+import { budgetCategoryLabel, budgetCategoryLabelKey } from '/utils/category-labels.js';
 import '/components/category-manager.js';
 
 // --------------------------------------------------------
@@ -1372,6 +1372,7 @@ function openCategoryManager() {
         ],
         supportsSubcategories: true,
         labelResolver: (item) => item.label ?? budgetCategoryLabel(item.key, item.name, t),
+        itemFilter: (item) => !budgetCategoryLabelKey(item.key),
         titleKey: 'budget.manageCategories',
         hintKey: 'category.manageHint',
       });
@@ -1445,7 +1446,10 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
     <div class="form-group js-entry-field">
       <div class="budget-field-header">
         <label class="form-label" for="bm-category">${t('budget.categoryLabel')}</label>
-        <button class="btn btn--secondary budget-inline-add" type="button" id="bm-add-category">${t('budget.addCategory')}</button>
+        <div style="display:flex;gap:var(--space-2)">
+          <button class="btn btn--secondary budget-inline-add" type="button" id="bm-add-category">${t('budget.addCategory')}</button>
+          <button class="btn btn--ghost budget-inline-add" type="button" id="bm-manage-categories">${t('budget.manageCategories')}</button>
+        </div>
       </div>
       <select class="form-input" id="bm-category">${catOpts}</select>
     </div>
@@ -1655,6 +1659,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
         panel.querySelector('#bm-recurrence-options').hidden = !e.target.checked;
       });
       panel.querySelector('#bm-add-category').addEventListener('click', addCategory);
+      panel.querySelector('#bm-manage-categories')?.addEventListener('click', openCategoryManager);
       panel.querySelector('#bm-add-subcategory').addEventListener('click', addSubcategory);
       panel.querySelector('#bm-cancel').addEventListener('click', closeModal);
 

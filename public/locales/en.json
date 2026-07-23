@@ -2638,6 +2638,7 @@
         "errorInUse": "This category is still in use ({{count}}).",
         "errorLast": "The last category can't be deleted.",
         "errorExists": "This category already exists.",
+        "errorHasSubcategories": "This category can't be deleted while it still has subcategories.",
         "errorSubInUse": "This subcategory is still in use ({{count}}).",
         "errorSubLast": "The last subcategory can't be deleted.",
         "errorSubExists": "This subcategory already exists.",

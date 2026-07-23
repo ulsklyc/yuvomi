@@ -168,6 +168,14 @@ test('DELETE /categories/:key: in Benutzung → 409 (count)', async () => {
   assert.equal(r.body.count, 1);
 });
 
+test('DELETE /categories/:key: mit Subkategorien → 409', async () => {
+  const cat = await newCategory('HasSubsCat');
+  await call('POST', `/categories/${cat.key}/subcategories`, { name: 'Child' });
+  const r = await call('DELETE', `/categories/${cat.key}`);
+  assert.equal(r.status, 409);
+  assert.equal(r.body.reason, 'category_has_subcategories');
+});
+
 test('DELETE /categories/:key: löscht ungenutzte Kategorie (204)', async () => {
   const cat = await newCategory('DeleteMe');
   const r = await call('DELETE', `/categories/${cat.key}`);
