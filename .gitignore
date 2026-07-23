@@ -3,7 +3,6 @@ node_modules/
 
 # External/customized modules
 modules/*
-
 !modules/.gitkeep
 
 # Environment variables (NEVER commit)
