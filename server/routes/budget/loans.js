@@ -63,8 +63,8 @@ router.post('/loans', (req, res) => {
     const vNotes = str(req.body.notes, 'Notes', { max: 1000, required: false });
     const installmentCount = parseInt(req.body.installment_count, 10);
     const errors = collectErrors([vTitle, vBorrower, vAmount, vStartMonth, vNotes]);
-    if (!Number.isInteger(installmentCount) || installmentCount < 1 || installmentCount > 240) {
-      errors.push('Installment count must be between 1 and 240.');
+    if (!Number.isInteger(installmentCount) || installmentCount < 1 || installmentCount > 720) {
+      errors.push('Installment count must be between 1 and 720.');
     }
     if (vAmount.value !== null && vAmount.value <= 0) errors.push('Amount must be greater than zero.');
     if (!vStartMonth.value) errors.push('Start month is required.');
@@ -110,8 +110,8 @@ router.put('/loans/:id', (req, res) => {
     if (req.body.notes !== undefined) checks.push(str(req.body.notes, 'Notes', { max: 1000, required: false }));
     const errors = collectErrors(checks);
     const installmentCount = req.body.installment_count === undefined ? null : parseInt(req.body.installment_count, 10);
-    if (req.body.installment_count !== undefined && (!Number.isInteger(installmentCount) || installmentCount < 1 || installmentCount > 240)) {
-      errors.push('Installment count must be between 1 and 240.');
+    if (req.body.installment_count !== undefined && (!Number.isInteger(installmentCount) || installmentCount < 1 || installmentCount > 720)) {
+      errors.push('Installment count must be between 1 and 720.');
     }
     const paidCount = db.get().prepare('SELECT COUNT(*) AS c FROM budget_loan_payments WHERE loan_id = ?').get(id).c;
     if (installmentCount !== null && installmentCount < paidCount) {
