@@ -1898,7 +1898,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "Před odpojením vyberte jiný cíl a odstraňte dokumenty uložené na Google Drive.",
         "documentStorageGoogleDriveOAuthSuccess": "Google Drive byl připojen. Až budete připraveni, vyberte ho jako cíl nahrávání.",
         "documentStorageGoogleDriveOAuthError": "Připojení ke službě Google Drive se nezdařilo. Předchozí připojení, pokud existovalo, zůstalo zachováno.",
-        "documentStorageGoogleDrivePrivacy": "Pravidla viditelnosti v Yuvomi neomezují vlastníka služby Google Drive ani nikoho, komu byl udělen přístup ke složce na Google Drive."
+        "documentStorageGoogleDrivePrivacy": "Nastavení viditelnosti v Yuvomi řídí pouze přístup přes Yuvomi. Každý, kdo má přístup k připojené složce na Disku Google, může zobrazit všechny soubory, které jsou v ní uložené."
     },
     "login": {
         "tagline": "Vítejte zpět ve svém rodinném plánovači.",

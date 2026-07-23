@@ -1898,7 +1898,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "Bağlantıyı kesmeden önce başka bir hedef seçin ve Drive'da saklanan belgeleri kaldırın.",
         "documentStorageGoogleDriveOAuthSuccess": "Google Drive bağlantısı kuruldu. Hazır olduğunuzda yükleme hedefi olarak seçin.",
         "documentStorageGoogleDriveOAuthError": "Google Drive bağlantısı kurulamadı. Varsa önceki bağlantı korundu.",
-        "documentStorageGoogleDrivePrivacy": "Yuvomi görünürlük kuralları Drive sahibini veya Drive klasörüne erişim verilen kişileri kısıtlamaz."
+        "documentStorageGoogleDrivePrivacy": "Yuvomi görünürlük ayarları yalnızca Yuvomi üzerinden erişimi kontrol eder. Bağlı Google Drive klasörüne erişimi olan herkes, burada depolanan tüm dosyaları görüntüleyebilir."
     },
     "login": {
         "tagline": "Aile planlayıcına tekrar hoş geldin.",

@@ -1898,7 +1898,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "断开连接前，请选择其他目标并移除存储在 Drive 中的文档。",
         "documentStorageGoogleDriveOAuthSuccess": "Google Drive 已连接。准备好后，请将其选为上传目标。",
         "documentStorageGoogleDriveOAuthError": "Google Drive 连接失败。原有连接（如有）已保留。",
-        "documentStorageGoogleDrivePrivacy": "Yuvomi 的可见性规则不会限制 Drive 所有者或获准访问 Drive 文件夹的任何人。"
+        "documentStorageGoogleDrivePrivacy": "Yuvomi 的可见性设置仅控制通过 Yuvomi 进行的访问。任何有权访问已连接 Google Drive 文件夹的人都可以查看其中存储的所有文件。"
     },
     "login": {
         "tagline": "欢迎回到您的家庭计划工具。",

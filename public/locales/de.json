@@ -1910,7 +1910,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "Wähle ein anderes Ziel und entferne Drive-Dokumente vor dem Trennen.",
         "documentStorageGoogleDriveOAuthSuccess": "Google Drive ist verbunden. Wähle es als Upload-Ziel aus, wenn du bereit bist.",
         "documentStorageGoogleDriveOAuthError": "Die Google-Drive-Verbindung ist fehlgeschlagen. Eine bestehende Verbindung wurde beibehalten.",
-        "documentStorageGoogleDrivePrivacy": "Yuvomi-Sichtbarkeitsregeln beschränken weder den Drive-Eigentümer noch Personen mit Zugriff auf den Drive-Ordner."
+        "documentStorageGoogleDrivePrivacy": "Die Sichtbarkeitseinstellungen von Yuvomi steuern nur den Zugriff über Yuvomi. Jeder, der Zugriff auf den verbundenen Google-Drive-Ordner hat, kann alle dort gespeicherten Dateien sehen."
     },
     "login": {
         "tagline": "Willkommen zurück bei eurem Familienplaner.",

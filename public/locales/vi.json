@@ -1898,7 +1898,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "Hãy chọn một đích khác và xóa các tài liệu được lưu trên Drive trước khi ngắt kết nối.",
         "documentStorageGoogleDriveOAuthSuccess": "Đã kết nối Google Drive. Hãy chọn dịch vụ này làm đích tải lên khi bạn sẵn sàng.",
         "documentStorageGoogleDriveOAuthError": "Không thể kết nối Google Drive. Kết nối trước đó, nếu có, vẫn được giữ nguyên.",
-        "documentStorageGoogleDrivePrivacy": "Quy tắc về phạm vi hiển thị của Yuvomi không hạn chế chủ sở hữu Drive hoặc bất kỳ ai được cấp quyền truy cập vào thư mục Drive."
+        "documentStorageGoogleDrivePrivacy": "Cài đặt hiển thị của Yuvomi chỉ kiểm soát quyền truy cập thông qua Yuvomi. Bất kỳ ai có quyền truy cập vào thư mục Google Drive đã kết nối đều có thể xem tất cả tệp được lưu trữ trong đó."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại trình lập kế hoạch gia đình.",

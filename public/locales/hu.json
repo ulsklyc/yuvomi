@@ -1898,7 +1898,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "A leválasztás előtt válassz másik célt, és távolítsd el a Drive-ban tárolt dokumentumokat.",
         "documentStorageGoogleDriveOAuthSuccess": "A Google Drive csatlakoztatva. Amikor készen állsz, válaszd ki feltöltési célként.",
         "documentStorageGoogleDriveOAuthError": "Nem sikerült csatlakozni a Google Drive-hoz. A korábbi kapcsolat, ha volt, megmaradt.",
-        "documentStorageGoogleDrivePrivacy": "A Yuvomi láthatósági szabályai nem korlátozzák sem a Drive tulajdonosát, sem a Drive mappájához hozzáférő személyeket."
+        "documentStorageGoogleDrivePrivacy": "A Yuvomi láthatósági beállításai csak a Yuvomin keresztüli hozzáférést szabályozzák. A csatlakoztatott Google Drive-mappához hozzáférő személyek az ott tárolt összes fájlt megtekinthetik."
     },
     "login": {
         "tagline": "Üdv újra a családi tervezőben.",

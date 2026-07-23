@@ -1898,7 +1898,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "Select another destination and remove Drive-backed documents before disconnecting.",
         "documentStorageGoogleDriveOAuthSuccess": "Google Drive connected. Select it as the upload destination when you are ready.",
         "documentStorageGoogleDriveOAuthError": "Google Drive connection failed. The previous connection, if any, was kept.",
-        "documentStorageGoogleDrivePrivacy": "Yuvomi visibility rules do not restrict the Drive owner or anyone given access to the Drive folder."
+        "documentStorageGoogleDrivePrivacy": "Yuvomi visibility settings only control access through Yuvomi. Anyone with access to the connected Google Drive folder can view all files stored there."
     },
     "login": {
         "tagline": "Welcome back to your family planner.",

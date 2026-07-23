@@ -1898,7 +1898,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "Selecteer een andere bestemming en verwijder documenten die in Drive zijn opgeslagen voordat je de verbinding verbreekt.",
         "documentStorageGoogleDriveOAuthSuccess": "Google Drive is verbonden. Selecteer het als uploadbestemming wanneer je klaar bent.",
         "documentStorageGoogleDriveOAuthError": "Verbinding met Google Drive is mislukt. De vorige verbinding, indien aanwezig, is behouden.",
-        "documentStorageGoogleDrivePrivacy": "De zichtbaarheidsregels van Yuvomi beperken niet de toegang van de Drive-eigenaar of van personen met toegang tot de Drive-map."
+        "documentStorageGoogleDrivePrivacy": "De zichtbaarheidsinstellingen van Yuvomi regelen alleen de toegang via Yuvomi. Iedereen met toegang tot de gekoppelde Google Drive-map kan alle bestanden bekijken die daar zijn opgeslagen."
     },
     "login": {
         "tagline": "Welkom terug bij je gezinsplanner.",

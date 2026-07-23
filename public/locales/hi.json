@@ -1898,7 +1898,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "डिस्कनेक्ट करने से पहले कोई दूसरा गंतव्य चुनें और Drive में संग्रहीत दस्तावेज़ हटाएँ।",
         "documentStorageGoogleDriveOAuthSuccess": "Google Drive कनेक्ट हो गया। तैयार होने पर इसे अपलोड गंतव्य के रूप में चुनें।",
         "documentStorageGoogleDriveOAuthError": "Google Drive कनेक्शन विफल रहा। पिछला कनेक्शन, यदि कोई था, बनाए रखा गया।",
-        "documentStorageGoogleDrivePrivacy": "Yuvomi के दृश्यता नियम Drive के स्वामी या Drive फ़ोल्डर की पहुँच दिए गए किसी भी व्यक्ति को प्रतिबंधित नहीं करते।"
+        "documentStorageGoogleDrivePrivacy": "Yuvomi की दृश्यता सेटिंग केवल Yuvomi के ज़रिए होने वाली पहुँच को नियंत्रित करती हैं। कनेक्ट किए गए Google Drive फ़ोल्डर तक पहुँच रखने वाला कोई भी व्यक्ति उसमें संग्रहीत सभी फ़ाइलें देख सकता है।"
     },
     "login": {
         "tagline": "अपने पारिवारिक प्लानर में फिर से आपका स्वागत है।",

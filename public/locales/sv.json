@@ -1898,7 +1898,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "Välj ett annat mål och ta bort dokument som lagras på Drive innan du kopplar från.",
         "documentStorageGoogleDriveOAuthSuccess": "Google Drive har anslutits. Välj det som uppladdningsmål när du är redo.",
         "documentStorageGoogleDriveOAuthError": "Det gick inte att ansluta till Google Drive. Den tidigare anslutningen behölls, om det fanns någon.",
-        "documentStorageGoogleDrivePrivacy": "Yuvomis synlighetsregler begränsar inte Drive-ägaren eller någon som har fått åtkomst till Drive-mappen."
+        "documentStorageGoogleDrivePrivacy": "Yuvomis synlighetsinställningar styr endast åtkomsten via Yuvomi. Alla som har åtkomst till den anslutna Google Drive-mappen kan se alla filer som lagras där."
     },
     "login": {
         "tagline": "Välkommen tillbaka till din familjeplanerare.",

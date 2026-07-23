@@ -1898,7 +1898,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "Перед відключенням виберіть інше місце завантаження та видаліть документи, що зберігаються в Google Drive.",
         "documentStorageGoogleDriveOAuthSuccess": "Google Drive підключено. Коли будете готові, виберіть його як місце завантаження.",
         "documentStorageGoogleDriveOAuthError": "Не вдалося підключити Google Drive. Попереднє підключення, якщо воно було, збережено.",
-        "documentStorageGoogleDrivePrivacy": "Правила видимості Yuvomi не обмежують власника Google Drive і користувачів, яким надано доступ до папки Google Drive."
+        "documentStorageGoogleDrivePrivacy": "Налаштування видимості Yuvomi керують доступом лише через Yuvomi. Усі, хто має доступ до підключеної папки Google Диска, можуть переглядати всі файли, що зберігаються в ній."
     },
     "login": {
         "tagline": "З поверненням до вашого сімейного планувальника.",

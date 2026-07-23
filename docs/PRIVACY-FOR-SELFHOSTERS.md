@@ -234,9 +234,9 @@ Konfiguration so, dass du auf einen EU-Provider umstellen könntest.
   USA stattfinden. Prüfe aktuellen DPF-Status, schließe den Google-AVV/DPA ab und
   dokumentiere bei Bedarf SCCs und TIA. Für besonders sensible Dokumente ist ein
   EU-gehosteter WebDAV- oder lokaler Speicher die datensparsamere Alternative.
-- **Zugriffsgrenze:** Yuvomi-ACLs schützen Zugriffe über Yuvomi, beschränken aber
-  weder den Eigentümer des verbundenen Drive-Kontos noch Personen, denen Zugriff
-  auf `Yuvomi/Documents` gegeben wurde. Teile diesen Ordner nicht unnötig.
+- **Zugriffsgrenze:** Yuvomis Sichtbarkeitseinstellungen steuern nur den Zugriff
+  über Yuvomi. Alle Personen mit Zugriff auf den verbundenen Google-Drive-Ordner
+  `Yuvomi/Documents` können sämtliche dort gespeicherten Dateien sehen. Teile diesen Ordner nicht unnötig.
 - **Löschung und Aufbewahrung:** Das Löschen eines Drive-Dokuments in Yuvomi löscht
   die zugehörige Drive-Datei; ein bereits fehlendes Objekt gilt als gelöscht.
   Trennen entfernt nur lokale Token und widerruft keine gemeinsam genutzten

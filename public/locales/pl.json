@@ -1910,7 +1910,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "Przed odłączeniem wybierz inne miejsce i usuń dokumenty przechowywane w Google Drive.",
         "documentStorageGoogleDriveOAuthSuccess": "Połączono z Google Drive. Gdy wszystko będzie gotowe, wybierz Google Drive jako miejsce przesyłania.",
         "documentStorageGoogleDriveOAuthError": "Nie udało się połączyć z Google Drive. Poprzednie połączenie, jeśli istniało, zostało zachowane.",
-        "documentStorageGoogleDrivePrivacy": "Reguły widoczności Yuvomi nie ograniczają właściciela Google Drive ani osób, którym przyznano dostęp do folderu na Google Drive."
+        "documentStorageGoogleDrivePrivacy": "Ustawienia widoczności Yuvomi kontrolują dostęp tylko przez Yuvomi. Każda osoba mająca dostęp do połączonego folderu Dysku Google może wyświetlić wszystkie zapisane w nim pliki."
     },
     "login": {
         "tagline": "Witaj ponownie w swoim planerze rodzinnym.",

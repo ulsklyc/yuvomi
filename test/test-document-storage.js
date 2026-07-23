@@ -583,7 +583,7 @@ test('migration v51 rejects dms_account_id outside the dms backend on insert and
   );
 });
 
-test('migration v96 backfills calendar attachment ACLs and preserves linked rows safely', (t) => {
+test('migration v98 backfills calendar attachment ACLs and preserves linked rows safely', (t) => {
   const database = buildMigratedDatabase(MIGRATIONS.filter(({ version }) => version <= 95));
   t.after(() => database.close());
   const userId = database.prepare(`

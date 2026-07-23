@@ -567,8 +567,8 @@ the candidate account and an existing Drive-backed file before replacing working
 Disconnect is blocked while Drive is selected or Drive-backed rows exist, and it removes only local
 Drive token state without revoking shared Google credentials.
 
-> **Access and backup boundary:** Yuvomi visibility rules govern access through Yuvomi, but cannot
-> restrict the connected Drive owner or anyone given Drive-folder access. SQLite backups contain
+> **Access and backup boundary:** Yuvomi visibility settings only control access through Yuvomi.
+> Anyone with access to the connected Google Drive folder can view all files stored there. SQLite backups contain
 > metadata and Drive file IDs, not binaries. Back up or export the Drive folder separately and restore
 > it with the matching database.
 

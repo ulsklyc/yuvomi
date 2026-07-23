@@ -1898,7 +1898,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "حدد وجهة أخرى وأزل المستندات المخزنة في Drive قبل الفصل.",
         "documentStorageGoogleDriveOAuthSuccess": "تم ربط Google Drive. حدده كوجهة للرفع عندما تكون مستعدًا.",
         "documentStorageGoogleDriveOAuthError": "فشل ربط Google Drive. تم الاحتفاظ بالاتصال السابق إن وُجد.",
-        "documentStorageGoogleDrivePrivacy": "لا تقيّد قواعد الوصول في Yuvomi مالك Drive أو أي شخص مُنح حق الوصول إلى مجلد Drive."
+        "documentStorageGoogleDrivePrivacy": "تتحكم إعدادات الرؤية في Yuvomi فقط في الوصول عبر Yuvomi. يمكن لأي شخص لديه حق الوصول إلى مجلد Google Drive المتصل عرض جميع الملفات المخزنة فيه."
     },
     "login": {
         "tagline": "مرحبًا بعودتك إلى منظّم عائلتك.",

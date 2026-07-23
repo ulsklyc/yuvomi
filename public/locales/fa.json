@@ -1910,7 +1910,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "پیش از قطع اتصال، مقصد دیگری را انتخاب و اسناد ذخیره‌شده در Drive را حذف کنید.",
         "documentStorageGoogleDriveOAuthSuccess": "Google Drive متصل شد. هر زمان آماده بودید، آن را به‌عنوان مقصد بارگذاری انتخاب کنید.",
         "documentStorageGoogleDriveOAuthError": "اتصال Google Drive ناموفق بود. اتصال قبلی، در صورت وجود، حفظ شد.",
-        "documentStorageGoogleDrivePrivacy": "قواعد دسترسی Yuvomi مالک Drive یا افرادی را که به آن‌ها دسترسی به پوشهٔ Drive داده شده است محدود نمی‌کند."
+        "documentStorageGoogleDrivePrivacy": "تنظیمات مشاهده‌پذیری Yuvomi فقط دسترسی از طریق Yuvomi را کنترل می‌کنند. هر کسی که به پوشهٔ متصل Google Drive دسترسی داشته باشد، می‌تواند همهٔ فایل‌های ذخیره‌شده در آن را مشاهده کند."
     },
     "login": {
         "tagline": "دوباره به برنامه‌ریز خانوادگی‌تان خوش آمدید.",

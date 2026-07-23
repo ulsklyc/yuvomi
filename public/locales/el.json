@@ -1898,7 +1898,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "Επιλέξτε άλλον προορισμό και αφαιρέστε τα έγγραφα που είναι αποθηκευμένα στο Drive πριν από την αποσύνδεση.",
         "documentStorageGoogleDriveOAuthSuccess": "Το Google Drive συνδέθηκε. Όταν είστε έτοιμοι, επιλέξτε το ως προορισμό μεταφόρτωσης.",
         "documentStorageGoogleDriveOAuthError": "Η σύνδεση με το Google Drive απέτυχε. Η προηγούμενη σύνδεση, εάν υπήρχε, διατηρήθηκε.",
-        "documentStorageGoogleDrivePrivacy": "Οι κανόνες ορατότητας του Yuvomi δεν περιορίζουν τον κάτοχο του Drive ούτε όποιον έχει πρόσβαση στον φάκελο του Drive."
+        "documentStorageGoogleDrivePrivacy": "Οι ρυθμίσεις ορατότητας του Yuvomi ελέγχουν μόνο την πρόσβαση μέσω του Yuvomi. Όποιος έχει πρόσβαση στον συνδεδεμένο φάκελο του Google Drive μπορεί να δει όλα τα αρχεία που είναι αποθηκευμένα εκεί."
     },
     "login": {
         "tagline": "Καλώς ήρθατε ξανά στον οικογενειακό σας οργανωτή.",

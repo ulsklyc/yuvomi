@@ -1898,7 +1898,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "Selecciona otro destino y elimina los documentos almacenados en Drive antes de desconectarlo.",
         "documentStorageGoogleDriveOAuthSuccess": "Google Drive se ha conectado. Selecciónalo como destino de carga cuando quieras.",
         "documentStorageGoogleDriveOAuthError": "No se ha podido conectar con Google Drive. Se ha conservado la conexión anterior, si la había.",
-        "documentStorageGoogleDrivePrivacy": "Las reglas de visibilidad de Yuvomi no restringen el acceso del propietario de Drive ni de las personas con acceso a la carpeta de Drive."
+        "documentStorageGoogleDrivePrivacy": "La configuración de visibilidad de Yuvomi solo controla el acceso a través de Yuvomi. Cualquier persona con acceso a la carpeta de Google Drive conectada puede ver todos los archivos almacenados allí."
     },
     "login": {
         "tagline": "Bienvenido de nuevo a tu planificador familiar.",

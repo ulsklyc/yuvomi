@@ -1910,7 +1910,7 @@
         "documentStorageGoogleDriveDisconnectBlocked": "Pilih tujuan lain dan hapus dokumen yang disimpan di Drive sebelum memutuskan koneksi.",
         "documentStorageGoogleDriveOAuthSuccess": "Google Drive telah terhubung. Pilih Google Drive sebagai tujuan unggah saat Anda siap.",
         "documentStorageGoogleDriveOAuthError": "Koneksi Google Drive gagal. Koneksi sebelumnya, jika ada, tetap dipertahankan.",
-        "documentStorageGoogleDrivePrivacy": "Aturan visibilitas Yuvomi tidak membatasi pemilik Drive atau siapa pun yang diberi akses ke folder Drive."
+        "documentStorageGoogleDrivePrivacy": "Pengaturan visibilitas Yuvomi hanya mengontrol akses melalui Yuvomi. Siapa pun yang memiliki akses ke folder Google Drive yang terhubung dapat melihat semua file yang tersimpan di sana."
     },
     "login": {
         "tagline": "Selamat datang kembali di perencana keluarga Anda.",
