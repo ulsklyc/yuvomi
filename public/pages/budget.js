@@ -568,9 +568,9 @@ function renderBody() {
           </button>` : ''}
         </div>
         <div class="budget-list-header__actions">
-        <button class="btn btn--icon btn--ghost" id="budget-manage-categories"
-          aria-label="${t('budget.manageCategories')}" title="${t('budget.manageCategories')}">
-          <i data-lucide="tags" class="icon-md" aria-hidden="true"></i>
+        <button class="btn btn--secondary budget-manage-categories" id="budget-manage-categories"
+          title="${t('budget.manageCategories')}">
+          <i data-lucide="tags" class="icon-sm" aria-hidden="true"></i>${t('budget.manageCategories')}
         </button>
         ${state.entries.length ? `
         <a href="/api/v1/budget/export?month=${state.month}${state.budgetMode === 'personal' ? `&scope=${state.scope}` : ''}" class="btn btn--secondary budget-csv-export">

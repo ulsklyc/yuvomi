@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.44.4] - 2026-07-23
+
+### Fixed
+- Custom budget categories can now be found and managed on iPad and other touch devices. The entry point for renaming, reordering and deleting categories was a bare, unlabelled icon above the transaction list; it is now a clearly labelled "Manage categories" button. The rename and delete actions themselves already existed - only the way in was hard to discover (#551).
+- Deleting a task works again. A missing import in the previous release made every task deletion fail with an error; the import was restored (#556, #553).
+
 ## [1.44.3] - 2026-07-22
 
 ### Fixed

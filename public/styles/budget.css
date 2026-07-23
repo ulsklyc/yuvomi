@@ -1008,7 +1008,8 @@
   color: var(--color-text-secondary);
 }
 
-.budget-csv-export {
+.budget-csv-export,
+.budget-manage-categories {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
