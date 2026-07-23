@@ -46,6 +46,18 @@ test('sanitizeEnv akzeptiert alle Dokument-WebDAV-Schemawerte', () => {
   assert.deepEqual(r.env, values);
 });
 
+test('sanitizeEnv accepts Google Drive OAuth values including Compose-sensitive secrets', () => {
+  const values = {
+    GOOGLE_DRIVE_CLIENT_ID: 'drive-client.apps.googleusercontent.com',
+    GOOGLE_DRIVE_CLIENT_SECRET: 'secret # $value',
+    GOOGLE_DRIVE_REDIRECT_URI: 'https://example.test/api/v1/documents/storage/google-drive/callback',
+  };
+  const result = sanitizeEnv(values);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.env, values);
+  assert.match(renderEnvFile(result.env), /^GOOGLE_DRIVE_CLIENT_SECRET="secret # \$\$value"$/m);
+});
+
 test('sanitizeEnv akzeptiert FIXER_API_KEY aus dem Schema', () => {
   const values = { FIXER_API_KEY: 'fixer-test-key' };
   const r = sanitizeEnv(values);
@@ -160,6 +172,32 @@ test('POST /api/save-env schreibt alle Dokument-WebDAV-Werte', async () => {
       assert.match(content, /^DOCUMENT_STORAGE_WEBDAV_USERNAME=family$/m);
       assert.match(content, /^DOCUMENT_STORAGE_WEBDAV_PASSWORD=secret$/m);
       assert.match(content, /^DOCUMENT_STORAGE_WEBDAV_PATH=\/yuvomi\/documents$/m);
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('POST /api/save-env writes Google Drive OAuth values safely', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yuvomi-drive-env-'));
+  try {
+    await withServer(dir, async (base) => {
+      const response = await fetch(`${base}/api/save-env`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          env: {
+            GOOGLE_DRIVE_CLIENT_ID: 'drive-client',
+            GOOGLE_DRIVE_CLIENT_SECRET: 'secret # $value',
+            GOOGLE_DRIVE_REDIRECT_URI: 'https://example.test/api/v1/documents/storage/google-drive/callback',
+          },
+        }),
+      });
+      assert.equal(response.status, 200);
+      const content = readFileSync(join(dir, '.env'), 'utf8');
+      assert.match(content, /^GOOGLE_DRIVE_CLIENT_ID=drive-client$/m);
+      assert.match(content, /^GOOGLE_DRIVE_CLIENT_SECRET="secret # \$\$value"$/m);
+      assert.match(content, /^GOOGLE_DRIVE_REDIRECT_URI=https:\/\/example\.test\/api\/v1\/documents\/storage\/google-drive\/callback$/m);
     });
   } finally {
     rmSync(dir, { recursive: true, force: true });

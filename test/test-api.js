@@ -128,7 +128,7 @@ const openApi = buildOpenApiSpec({}, 'test');
 
 test('OpenAPI dokumentiert Dokument-Backend und Legacy-Provider', () => {
   const document = openApi.components.schemas.FamilyDocument;
-  assert.deepEqual(document.properties.storage_backend.enum, ['local', 'webdav', 'dms']);
+  assert.deepEqual(document.properties.storage_backend.enum, ['local', 'webdav', 'google_drive', 'dms']);
   assert.deepEqual(document.properties.storage_provider.enum, ['local', 'external']);
   assert.ok(document.required.includes('storage_backend'));
 
@@ -142,7 +142,7 @@ test('OpenAPI dokumentiert aktive Upload-Backend-Option bei stabilem Legacy-Prov
   const options = responseSchema(openApi.paths['/api/v1/documents/meta/options'].get);
   const data = options.properties.data;
   assert.deepEqual(data.properties.storage_providers.items.enum, ['local', 'external']);
-  assert.deepEqual(data.properties.active_upload_backend.enum, ['local', 'local_folder', 'webdav']);
+  assert.deepEqual(data.properties.active_upload_backend.enum, ['local', 'local_folder', 'webdav', 'google_drive']);
 });
 
 test('OpenAPI dokumentiert admin-only WebDAV-Konfiguration ohne Passwortausgabe', () => {
@@ -152,6 +152,7 @@ test('OpenAPI dokumentiert admin-only WebDAV-Konfiguration ohne Passwortausgabe'
 
   const request = openApi.components.schemas.DocumentStorageConfigRequest;
   for (const field of [
+    'selected_upload_backend',
     'enabled',
     'url',
     'username',
@@ -167,9 +168,12 @@ test('OpenAPI dokumentiert admin-only WebDAV-Konfiguration ohne Passwortausgabe'
   for (const field of [
     'enabled',
     'configured',
+    'selected_upload_backend',
     'active_upload_backend',
     'effective_target',
     'webdav_document_count',
+    'google_drive_document_count',
+    'google_drive',
     'last_test',
     'last_error',
     'env_controlled',
@@ -181,6 +185,10 @@ test('OpenAPI dokumentiert admin-only WebDAV-Konfiguration ohne Passwortausgabe'
     ['enabled', 'url', 'username', 'password', 'path']
   );
   assert.equal(Object.hasOwn(status.properties, 'password'), false);
+  const driveStatus = openApi.components.schemas.GoogleDriveStorageStatus;
+  for (const secret of ['access_token', 'refresh_token', 'folder_id', 'code', 'raw']) {
+    assert.equal(Object.hasOwn(driveStatus.properties, secret), false, `Drive status leaks ${secret}`);
+  }
   assert.equal(
     responseSchema(path.get).properties.data.$ref,
     '#/components/schemas/DocumentStorageStatus'
@@ -191,6 +199,22 @@ test('OpenAPI dokumentiert admin-only WebDAV-Konfiguration ohne Passwortausgabe'
   assert.equal(
     testPath.requestBody.content['application/json'].schema.$ref,
     '#/components/schemas/DocumentStorageTestRequest'
+  );
+});
+
+test('OpenAPI documents Google Drive OAuth, test and protected disconnect paths', () => {
+  for (const path of [
+    '/api/v1/documents/storage/google-drive/auth',
+    '/api/v1/documents/storage/google-drive/callback',
+    '/api/v1/documents/storage/google-drive/test',
+    '/api/v1/documents/storage/google-drive/disconnect',
+  ]) {
+    assert.ok(openApi.paths[path], `Drive path missing: ${path}`);
+  }
+  assert.ok(openApi.paths['/api/v1/documents/storage/google-drive/disconnect'].delete.responses[409]);
+  assert.match(
+    openApi.paths['/api/v1/documents/storage/google-drive/callback'].get.description,
+    /does not select Drive/i
   );
 });
 
@@ -229,9 +253,9 @@ test('OpenAPI dokumentiert stabile Storage-Fehlercodes', () => {
   );
 });
 
-test('OpenAPI erlaubt DMS-Push für local und webdav, aber nicht dms', () => {
+test('OpenAPI erlaubt DMS-Push für local, webdav und google_drive, aber nicht dms', () => {
   const push = openApi.paths['/api/v1/documents/dms/push'].post;
-  assert.match(push.description, /local.*webdav/i);
+  assert.match(push.description, /local.*webdav.*google_drive/i);
   assert.match(push.description, /storage_backend.*dms/i);
 
   const linked = openApi.components.schemas.DmsLinkResponse.properties.data;

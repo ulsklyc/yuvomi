@@ -3,7 +3,9 @@ import { formatDate, formatTime, t } from '/i18n.js';
 import { confirmModal } from '/components/modal.js';
 import {
   createDisclosure,
+  createInfoList,
   createRetryState,
+  createSettingRow,
   createStatusSummary,
 } from '/settings/components.js';
 
@@ -29,12 +31,14 @@ function documentStorageTarget(data) {
 
 function backendLabel(activeBackend) {
   if (activeBackend === 'webdav') return t('documents.storageWebdav');
+  if (activeBackend === 'google_drive') return t('documents.storageGoogleDrive');
   if (activeBackend === 'local_folder') return t('documents.storageLocalFolder');
   return t('documents.storageLocal');
 }
 
 function buildStatusSummary(data) {
-  const activeBackend = data.active_upload_backend ?? (data.enabled ? 'webdav' : 'local');
+  const selectedBackend = data.selected_upload_backend ?? (data.enabled ? 'webdav' : 'local');
+  const activeBackend = data.active_upload_backend ?? selectedBackend;
   const activeLabel = backendLabel(activeBackend);
   const lastTest = data.last_test ?? data.lastTest;
   const lastTestLabel = formatSyncTime(lastTest) ?? t('settings.documentStorageNeverTested');
@@ -46,15 +50,23 @@ function buildStatusSummary(data) {
     ? (data.local_path || data.effective_target || '/documents')
     : activeBackend === 'webdav'
       ? documentStorageTarget(data)
-      : t('settings.documentStorageDatabase');
+      : activeBackend === 'google_drive'
+        ? (data.google_drive?.folder_name || data.effective_target || t('settings.documentStorageNotConfigured'))
+        : t('settings.documentStorageDatabase');
 
-  const details = [`${t('settings.documentStorageActive')}: ${activeLabel}`];
+  const details = [
+    `${t('settings.documentStorageSelected')}: ${backendLabel(selectedBackend)}`,
+    `${t('settings.documentStorageEffective')}: ${activeLabel}`,
+  ];
   if (activeBackend === 'local_folder') {
     // Env-only backend: no in-app connection fields, so state that plainly.
     details.push(t('settings.documentStorageLocalEnvManaged'));
+    if (selectedBackend !== activeBackend) details.push(t('settings.documentStorageOverride'));
   } else if (activeBackend === 'webdav') {
     details.push(`${t('settings.documentStorageCount')}: ${Number(data.webdav_document_count ?? 0)}`);
     details.push(`${t('settings.documentStorageLastTest')}: ${lastTestLabel}`);
+  } else if (activeBackend === 'google_drive') {
+    details.push(`${t('settings.documentStorageGoogleDriveCount')}: ${Number(data.google_drive?.document_count ?? 0)}`);
   }
   if (lastError) {
     details.push(`${t('settings.documentStorageLastError')}: ${lastError}`);
@@ -109,6 +121,10 @@ function buildConnectionForm() {
       <span class="form-hint" data-env-hint="path" hidden>${t('settings.documentStorageEnvHint')}</span>
     </div>
     <div class="form-hint" data-env-hint="enabled" hidden>${t('settings.documentStorageEnvHint')}</div>
+    <p class="settings-document-storage-warning" id="document-storage-backup-warning" hidden>
+      <i data-lucide="triangle-alert" aria-hidden="true"></i>
+      <span>${t('settings.documentStorageBackupWarning')}</span>
+    </p>
     <div id="document-storage-test-result" class="form-hint" hidden></div>
     <div class="settings-form-actions">
       <button type="button" class="btn btn--secondary" id="document-storage-test-btn">
@@ -129,13 +145,11 @@ function renderPage(container) {
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.documentStorageTitle')}</h2>
       <div class="settings-card" id="document-storage-card">
+        <div id="document-storage-banner"></div>
         <p class="settings-card-description">${t('settings.documentStorageDescription')}</p>
         <div id="document-storage-status-host"></div>
-        <p class="settings-document-storage-warning" id="document-storage-backup-warning" hidden>
-          <i data-lucide="triangle-alert" aria-hidden="true"></i>
-          <span>${t('settings.documentStorageBackupWarning')}</span>
-        </p>
-        <div id="document-storage-disclosure-host"></div>
+        <div id="document-storage-destination-host"></div>
+        <div class="settings-providers" id="document-storage-providers-host"></div>
       </div>
     </section>
   `);
@@ -286,10 +300,184 @@ function bindConnectionForm(container, form, reload) {
   });
 }
 
+function buildDestinationForm(data, reload) {
+  const form = document.createElement('form');
+  form.className = 'settings-form settings-form--compact';
+  form.id = 'document-storage-destination-form';
+
+  const select = document.createElement('select');
+  select.className = 'form-select';
+  select.id = 'document-storage-destination';
+  for (const backend of ['local', 'webdav', 'google_drive']) {
+    const option = document.createElement('option');
+    option.value = backend;
+    option.textContent = backendLabel(backend);
+    select.appendChild(option);
+  }
+  select.value = data.selected_upload_backend ?? (data.enabled ? 'webdav' : 'local');
+  form.appendChild(createSettingRow({
+    label: t('settings.documentStorageDestination'),
+    description: t('settings.documentStorageDestinationHint'),
+    control: select,
+  }));
+
+  const actions = document.createElement('div');
+  actions.className = 'settings-form-actions';
+  const save = document.createElement('button');
+  save.type = 'submit';
+  save.className = 'btn btn--primary';
+  save.textContent = t('common.save');
+  actions.appendChild(save);
+  form.appendChild(actions);
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    save.disabled = true;
+    try {
+      await api.put('/documents/storage/config', { selected_upload_backend: select.value });
+      showToast(t('settings.documentStorageSaved'), 'success');
+      await reload();
+    } catch (error) {
+      showToast(error.message ?? t('common.errorGeneric'), 'danger');
+    } finally {
+      save.disabled = false;
+    }
+  });
+  return form;
+}
+
+function buildGoogleDriveProvider(data, reload) {
+  const drive = data.google_drive ?? {};
+  const provider = document.createElement('section');
+  provider.className = 'settings-provider';
+
+  const header = document.createElement('div');
+  header.className = 'settings-provider__header';
+  const heading = document.createElement('h3');
+  heading.className = 'settings-provider__name';
+  heading.textContent = t('settings.documentStorageGoogleDriveTitle');
+  const badge = document.createElement('span');
+  badge.className = 'settings-provider__badge';
+  badge.textContent = drive.connected
+    ? t('settings.connected')
+    : drive.configured
+      ? t('settings.notConnected')
+      : t('settings.notConfigured');
+  header.append(heading, badge);
+  provider.appendChild(header);
+
+  const description = document.createElement('p');
+  description.className = 'settings-card-description';
+  description.textContent = t('settings.documentStorageGoogleDriveDescription');
+  provider.appendChild(description);
+  provider.appendChild(createInfoList([
+    { label: t('settings.documentStorageGoogleDriveAccount'), value: drive.account_email || '–' },
+    { label: t('settings.documentStorageGoogleDriveFolder'), value: drive.folder_name || 'Yuvomi/Documents' },
+    { label: t('settings.documentStorageGoogleDriveCount'), value: String(Number(drive.document_count ?? 0)) },
+    { label: t('settings.documentStorageLastTest'), value: formatSyncTime(drive.last_test) ?? t('settings.documentStorageNeverTested') },
+    drive.last_error
+      ? { label: t('settings.documentStorageLastError'), value: drive.last_error, tone: 'danger' }
+      : null,
+  ]));
+
+  const warning = document.createElement('p');
+  warning.className = 'settings-document-storage-warning';
+  warning.textContent = t('settings.documentStorageBackupWarning');
+  provider.appendChild(warning);
+  const privacy = document.createElement('p');
+  privacy.className = 'settings-document-storage-warning';
+  privacy.textContent = t('settings.documentStorageGoogleDrivePrivacy');
+  provider.appendChild(privacy);
+
+  const actions = document.createElement('div');
+  actions.className = 'settings-form-actions';
+  const connect = document.createElement('a');
+  connect.className = 'btn btn--secondary';
+  connect.href = '/api/v1/documents/storage/google-drive/auth';
+  connect.textContent = drive.connected
+    ? t('settings.documentStorageGoogleDriveReconnect')
+    : t('settings.documentStorageGoogleDriveConnect');
+  if (!drive.configured) {
+    connect.removeAttribute('href');
+    connect.setAttribute('aria-disabled', 'true');
+  }
+  actions.appendChild(connect);
+
+  if (drive.connected) {
+    const testButton = document.createElement('button');
+    testButton.type = 'button';
+    testButton.className = 'btn btn--secondary';
+    testButton.textContent = t('settings.documentStorageTest');
+    testButton.addEventListener('click', async () => {
+      testButton.disabled = true;
+      try {
+        await api.post('/documents/storage/google-drive/test', {});
+        showToast(t('settings.documentStorageTestSuccess'), 'success');
+        await reload();
+      } catch (error) {
+        showToast(error.message ?? t('common.errorGeneric'), 'danger');
+      } finally {
+        testButton.disabled = false;
+      }
+    });
+    actions.appendChild(testButton);
+
+    const disconnect = document.createElement('button');
+    disconnect.type = 'button';
+    disconnect.className = 'btn btn--danger';
+    disconnect.textContent = t('settings.disconnect');
+    disconnect.disabled = !drive.can_disconnect;
+    if (!drive.can_disconnect) disconnect.title = t('settings.documentStorageGoogleDriveDisconnectBlocked');
+    disconnect.addEventListener('click', async () => {
+      const confirmed = await confirmModal(t('settings.documentStorageGoogleDriveDisconnectConfirm'), {
+        confirmLabel: t('settings.disconnect'),
+      });
+      if (!confirmed) return;
+      disconnect.disabled = true;
+      try {
+        await api.delete('/documents/storage/google-drive/disconnect');
+        showToast(t('settings.disconnectedToast', { provider: t('settings.documentStorageGoogleDriveTitle') }), 'success');
+        await reload();
+      } catch (error) {
+        showToast(error.message ?? t('common.errorGeneric'), 'danger');
+        disconnect.disabled = false;
+      }
+    });
+    actions.appendChild(disconnect);
+  }
+  provider.appendChild(actions);
+  return provider;
+}
+
+function handleDriveOAuthCallback(container, query) {
+  const params = query instanceof URLSearchParams
+    ? query
+    : new URLSearchParams(query || '');
+  const ok = params.get('drive_ok');
+  const error = params.get('drive_error');
+  if (!ok && !error) return;
+  const banner = document.createElement('div');
+  banner.className = `settings-banner ${ok ? 'settings-banner--success' : 'settings-banner--error'}`;
+  banner.setAttribute('role', ok ? 'status' : 'alert');
+  banner.textContent = ok
+    ? t('settings.documentStorageGoogleDriveOAuthSuccess')
+    : t('settings.documentStorageGoogleDriveOAuthError');
+  container.querySelector('#document-storage-banner')?.replaceChildren(banner);
+  try {
+    const url = new URL(location.href);
+    url.searchParams.delete('drive_ok');
+    url.searchParams.delete('drive_error');
+    history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+  } catch {
+    // Ignore unavailable location state in restricted contexts.
+  }
+}
+
 async function loadDocumentStorageConfig(container) {
   const statusHost = container.querySelector('#document-storage-status-host');
-  const disclosureHost = container.querySelector('#document-storage-disclosure-host');
-  if (!statusHost || !disclosureHost) return;
+  const destinationHost = container.querySelector('#document-storage-destination-host');
+  const providersHost = container.querySelector('#document-storage-providers-host');
+  if (!statusHost || !destinationHost || !providersHost) return;
 
   const reload = () => loadDocumentStorageConfig(container);
 
@@ -302,29 +490,35 @@ async function loadDocumentStorageConfig(container) {
       message: err.message || t('common.errorGeneric'),
       onRetry: reload,
     }));
-    disclosureHost.replaceChildren();
+    destinationHost.replaceChildren();
+    providersHost.replaceChildren();
     return;
   }
 
-  // Status-first: render the active backend + target before the connection fields.
   statusHost.replaceChildren(buildStatusSummary(data));
+  destinationHost.replaceChildren(buildDestinationForm(data, reload));
 
   const form = buildConnectionForm();
-  const disclosure = createDisclosure({
+  const webdav = createDisclosure({
     id: 'document-storage-connection',
-    summary: t('settings.documentStorageTitle'),
+    summary: t('settings.documentStorageWebdavTitle'),
     content: form,
   });
-  disclosureHost.replaceChildren(disclosure);
+  const drive = createDisclosure({
+    id: 'document-storage-google-drive',
+    summary: t('settings.documentStorageGoogleDriveTitle'),
+    content: buildGoogleDriveProvider(data, reload),
+  });
+  providersHost.replaceChildren(webdav, drive);
 
   applyConfigToForm(form, data);
   bindConnectionForm(container, form, reload);
-
   window.lucide?.createIcons({ el: container });
 }
 
-export async function render(container, { user } = {}) {
+export async function render(container, { query } = {}) {
   renderPage(container);
+  handleDriveOAuthCallback(container, query);
   await loadDocumentStorageConfig(container);
   window.lucide?.createIcons({ el: container });
 }

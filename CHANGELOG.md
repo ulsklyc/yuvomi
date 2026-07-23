@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add Google Drive as an explicitly selected storage destination for new Documents files and Calendar attachments, with least-privilege OAuth connection, testing, account safeguards, and provider status. Existing files stay on their recorded backend, and SQLite backups contain Drive metadata and file IDs rather than Drive-hosted binaries.
+
+### Fixed
+- Keep Calendar attachment access aligned with event visibility and assignees, including existing linked attachments, so private or restricted files cannot become household-visible through Documents.
+
 ## [1.44.5] - 2026-07-24
 
 ### Fixed

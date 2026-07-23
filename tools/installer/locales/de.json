@@ -114,7 +114,16 @@
     "fixerLabel": "Fixer-API-Schlüssel (Live-Währungskurse)",
     "fixerHint": "Optional. Rechnet Abo-Währungen mit Live-Kursen um. Abonnements funktionieren auch ohne.",
     "pushSubjectLabel": "Push-Kontaktadresse",
-    "pushSubjectHint": "Wird an Push-Dienste als Kontakt für deinen Server gesendet. Leer lassen für den Standard."
+    "pushSubjectHint": "Wird an Push-Dienste als Kontakt für deinen Server gesendet. Leer lassen für den Standard.",
+    "documentGoogleDrive": "Google-Drive-Dokumentenspeicher",
+    "documentGoogleDriveHint": "Konfiguriere hier die OAuth-Anmeldedaten. Verbinde Google Drive nach der Installation in den Dokumenteinstellungen und wähle es dort ausdrücklich aus.",
+    "documentGoogleDriveEnable": "Google Drive für Dokumente konfigurieren",
+    "documentGoogleDriveClientIdLabel": "Client-ID überschreiben",
+    "documentGoogleDriveClientSecretLabel": "Client-Secret überschreiben",
+    "documentGoogleDriveReuseHint": "Lasse beide Felder leer, um die OAuth-Anmeldedaten von Google Kalender wiederzuverwenden.",
+    "documentGoogleDriveRedirectLabel": "Redirect-URI",
+    "errDocumentGoogleDrivePair": "Google-Drive-Client-ID und -Client-Secret müssen entweder beide gesetzt oder beide leer sein.",
+    "errDocumentGoogleDriveCredentials": "Google Drive benötigt entweder eine eigene Client-ID und ein eigenes Client-Secret oder konfigurierte Anmeldedaten für Google Kalender."
   },
   "review": {
     "title": "Überprüfung",
@@ -142,7 +151,8 @@
     "backups": "Backups",
     "webdavBackup": "Externe Backups",
     "on": "aktiviert",
-    "off": "deaktiviert"
+    "off": "deaktiviert",
+    "documentGoogleDrive": "Google-Drive-Dokumente"
   },
   "docker": {
     "title": "Yuvomi wird gestartet",

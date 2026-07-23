@@ -93,7 +93,8 @@
     "backups": "Copias de seguridad",
     "webdavBackup": "Copias externas",
     "on": "activado",
-    "off": "desactivado"
+    "off": "desactivado",
+    "documentGoogleDrive": "Documentos de Google Drive"
   },
   "docker": {
     "title": "Iniciando Yuvomi",
@@ -178,7 +179,16 @@
     "fixerLabel": "Clave de API de Fixer (tipos de cambio en vivo)",
     "fixerHint": "Opcional. Convierte las monedas de las suscripciones con tipos en vivo. Las suscripciones funcionan sin ella.",
     "pushSubjectLabel": "Dirección de contacto para notificaciones",
-    "pushSubjectHint": "Se envía a los servicios de notificaciones como contacto de tu servidor. Déjalo vacío para el valor por defecto."
+    "pushSubjectHint": "Se envía a los servicios de notificaciones como contacto de tu servidor. Déjalo vacío para el valor por defecto.",
+    "documentGoogleDrive": "Almacenamiento de documentos en Google Drive",
+    "documentGoogleDriveHint": "Configura aquí las credenciales de OAuth. Después de la instalación, conecta Google Drive en la configuración de Documentos y selecciónalo explícitamente.",
+    "documentGoogleDriveEnable": "Configurar Google Drive para Documentos",
+    "documentGoogleDriveClientIdLabel": "Sobrescribir ID de cliente",
+    "documentGoogleDriveClientSecretLabel": "Sobrescribir secreto de cliente",
+    "documentGoogleDriveReuseHint": "Deja ambos campos vacíos para reutilizar las credenciales de OAuth de Google Calendar.",
+    "documentGoogleDriveRedirectLabel": "URI de redirección",
+    "errDocumentGoogleDrivePair": "El ID y el secreto de cliente de Google Drive deben estar ambos configurados o ambos vacíos.",
+    "errDocumentGoogleDriveCredentials": "Google Drive requiere su propio ID y secreto de cliente o unas credenciales de Google Calendar configuradas."
   },
   "welcome": {
     "title": "Te damos la bienvenida a Yuvomi",

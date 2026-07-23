@@ -792,11 +792,13 @@ function wireThumbnails(root) {
 
 function uploadBackendLabel(backend) {
   if (backend === 'webdav') return t('documents.storageWebdav');
+  if (backend === 'google_drive') return t('documents.storageGoogleDrive');
   if (backend === 'local_folder') return t('documents.storageLocalFolder');
   return t('documents.storageLocal');
 }
 
 function uploadTargetIcon(backend) {
+  if (backend === 'google_drive') return 'cloud-upload';
   if (backend === 'webdav') return 'cloud';
   if (backend === 'local_folder') return 'folder';
   return 'database';
@@ -806,6 +808,9 @@ function storageBadgeHtml(doc) {
   const backend = documentStorageBackend(doc);
   if (backend === 'webdav') {
     return `<span class="doc-badge doc-badge--webdav">${t('documents.storageWebdav')}</span>`;
+  }
+  if (backend === 'google_drive') {
+    return `<span class="doc-badge doc-badge--google-drive">${t('documents.storageGoogleDrive')}</span>`;
   }
   if (backend === 'dms' && !doc.dms_account_id) {
     return `<span class="doc-badge doc-badge--unavailable">${t('documents.storageDmsUnavailable')}</span>`;

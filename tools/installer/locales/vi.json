@@ -93,7 +93,8 @@
     "backups": "Sao lưu",
     "webdavBackup": "Sao lưu bên ngoài",
     "on": "bật",
-    "off": "tắt"
+    "off": "tắt",
+    "documentGoogleDrive": "Tài liệu Google Drive"
   },
   "docker": {
     "title": "Đang khởi động Yuvomi",
@@ -178,7 +179,16 @@
     "fixerLabel": "Khóa API Fixer (tỷ giá trực tiếp)",
     "fixerHint": "Tùy chọn. Quy đổi tiền tệ của gói đăng ký theo tỷ giá trực tiếp. Gói đăng ký vẫn hoạt động khi không có.",
     "pushSubjectLabel": "Địa chỉ liên hệ push",
-    "pushSubjectHint": "Gửi tới các dịch vụ push làm liên hệ cho máy chủ của bạn. Để trống để dùng mặc định."
+    "pushSubjectHint": "Gửi tới các dịch vụ push làm liên hệ cho máy chủ của bạn. Để trống để dùng mặc định.",
+    "documentGoogleDrive": "Kho lưu trữ tài liệu Google Drive",
+    "documentGoogleDriveHint": "Cấu hình thông tin xác thực OAuth tại đây, sau đó kết nối và chọn Google Drive làm nơi lưu trữ trong phần cài đặt Tài liệu sau khi cài đặt.",
+    "documentGoogleDriveEnable": "Cấu hình Google Drive cho Tài liệu",
+    "documentGoogleDriveClientIdLabel": "Ghi đè ID ứng dụng khách",
+    "documentGoogleDriveClientSecretLabel": "Ghi đè mã bí mật ứng dụng khách",
+    "documentGoogleDriveReuseHint": "Để trống cả hai trường để dùng lại thông tin xác thực OAuth của Google Calendar.",
+    "documentGoogleDriveRedirectLabel": "URI chuyển hướng",
+    "errDocumentGoogleDrivePair": "ID ứng dụng khách và mã bí mật Google Drive phải được đặt cùng nhau hoặc đều để trống.",
+    "errDocumentGoogleDriveCredentials": "Google Drive cần ID ứng dụng khách và mã bí mật riêng hoặc thông tin xác thực Google Calendar đã được cấu hình."
   },
   "welcome": {
     "title": "Chào mừng đến với Yuvomi",

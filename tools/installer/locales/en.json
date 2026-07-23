@@ -93,7 +93,8 @@
     "backups": "Backups",
     "webdavBackup": "Off-site backups",
     "on": "enabled",
-    "off": "disabled"
+    "off": "disabled",
+    "documentGoogleDrive": "Google Drive documents"
   },
   "docker": {
     "title": "Starting Yuvomi",
@@ -178,7 +179,16 @@
     "fixerLabel": "Fixer API key (live currency rates)",
     "fixerHint": "Optional. Converts subscription currencies with live rates. Subscriptions work without it.",
     "pushSubjectLabel": "Push contact address",
-    "pushSubjectHint": "Sent to push services as a contact for your server. Leave empty to use the default."
+    "pushSubjectHint": "Sent to push services as a contact for your server. Leave empty to use the default.",
+    "documentGoogleDrive": "Google Drive Document Storage",
+    "documentGoogleDriveHint": "Configure OAuth credentials here, then connect and explicitly select Google Drive in Document settings after installation.",
+    "documentGoogleDriveEnable": "Configure Google Drive for Documents",
+    "documentGoogleDriveClientIdLabel": "Override client ID",
+    "documentGoogleDriveClientSecretLabel": "Override client secret",
+    "documentGoogleDriveReuseHint": "Leave both overrides empty to reuse Google Calendar OAuth credentials.",
+    "documentGoogleDriveRedirectLabel": "Redirect URI",
+    "errDocumentGoogleDrivePair": "Google Drive client ID and secret must both be set or both be empty.",
+    "errDocumentGoogleDriveCredentials": "Google Drive requires either its own client ID and secret or configured Google Calendar credentials."
   },
   "welcome": {
     "title": "Welcome to Yuvomi",

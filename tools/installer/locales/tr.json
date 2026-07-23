@@ -93,7 +93,8 @@
     "backups": "Yedeklemeler",
     "webdavBackup": "Harici yedeklemeler",
     "on": "etkin",
-    "off": "devre dışı"
+    "off": "devre dışı",
+    "documentGoogleDrive": "Google Drive belgeleri"
   },
   "docker": {
     "title": "Yuvomi başlatılıyor",
@@ -178,7 +179,16 @@
     "fixerLabel": "Fixer API anahtarı (canlı döviz kurları)",
     "fixerHint": "İsteğe bağlı. Abonelik para birimlerini canlı kurlarla dönüştürür. Abonelikler bu olmadan da çalışır.",
     "pushSubjectLabel": "Push iletişim adresi",
-    "pushSubjectHint": "Push hizmetlerine sunucunuzun iletişim bilgisi olarak gönderilir. Varsayılan için boş bırakın."
+    "pushSubjectHint": "Push hizmetlerine sunucunuzun iletişim bilgisi olarak gönderilir. Varsayılan için boş bırakın.",
+    "documentGoogleDrive": "Google Drive'da belge depolama",
+    "documentGoogleDriveHint": "OAuth kimlik bilgilerini burada yapılandırın, ardından kurulumdan sonra Belge ayarlarında Google Drive'a bağlanıp açıkça seçin.",
+    "documentGoogleDriveEnable": "Belgeler için Google Drive'ı yapılandır",
+    "documentGoogleDriveClientIdLabel": "Özel istemci kimliği",
+    "documentGoogleDriveClientSecretLabel": "Özel istemci gizli anahtarı",
+    "documentGoogleDriveReuseHint": "Google Takvim OAuth kimlik bilgilerini yeniden kullanmak için iki özel alanı da boş bırakın.",
+    "documentGoogleDriveRedirectLabel": "Yönlendirme URI'si",
+    "errDocumentGoogleDrivePair": "Google Drive istemci kimliği ve gizli anahtarı birlikte ayarlanmalı veya ikisi de boş bırakılmalıdır.",
+    "errDocumentGoogleDriveCredentials": "Google Drive için kendi istemci kimliği ve gizli anahtarı ya da yapılandırılmış Google Takvim kimlik bilgileri gerekir."
   },
   "welcome": {
     "title": "Yuvomi’ye hoş geldiniz",

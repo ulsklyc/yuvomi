@@ -93,7 +93,8 @@
     "backups": "Резервные копии",
     "webdavBackup": "Внешние копии",
     "on": "включено",
-    "off": "отключено"
+    "off": "отключено",
+    "documentGoogleDrive": "Документы Google Drive"
   },
   "docker": {
     "title": "Запуск Yuvomi",
@@ -178,7 +179,16 @@
     "fixerLabel": "Ключ API Fixer (курсы валют в реальном времени)",
     "fixerHint": "Необязательно. Конвертирует валюты подписок по актуальным курсам. Подписки работают и без него.",
     "pushSubjectLabel": "Контактный адрес push",
-    "pushSubjectHint": "Отправляется push-сервисам как контакт вашего сервера. Оставьте пустым для значения по умолчанию."
+    "pushSubjectHint": "Отправляется push-сервисам как контакт вашего сервера. Оставьте пустым для значения по умолчанию.",
+    "documentGoogleDrive": "Хранилище документов Google Drive",
+    "documentGoogleDriveHint": "Настройте здесь учётные данные OAuth, а после установки подключите Google Drive в настройках документов и явно выберите его.",
+    "documentGoogleDriveEnable": "Настроить Google Drive для документов",
+    "documentGoogleDriveClientIdLabel": "Переопределить идентификатор клиента",
+    "documentGoogleDriveClientSecretLabel": "Переопределить секрет клиента",
+    "documentGoogleDriveReuseHint": "Оставьте оба поля переопределения пустыми, чтобы использовать учётные данные OAuth Google Календаря.",
+    "documentGoogleDriveRedirectLabel": "URI перенаправления",
+    "errDocumentGoogleDrivePair": "Идентификатор и секрет клиента Google Drive должны быть либо оба указаны, либо оба оставлены пустыми.",
+    "errDocumentGoogleDriveCredentials": "Для Google Drive нужны собственные идентификатор и секрет клиента либо настроенные учётные данные Google Календаря."
   },
   "welcome": {
     "title": "Добро пожаловать в Yuvomi",

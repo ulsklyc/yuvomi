@@ -66,8 +66,8 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
 
 The local-folder document-storage fields are optional. Setting `DOCUMENT_STORAGE_LOCAL_ENABLED=true`
 writes new document files (including calendar attachments) to `DOCUMENT_STORAGE_LOCAL_PATH` (default
-`/documents`, a mounted host folder) instead of the database, and takes precedence over WebDAV. Mount
-that folder into the container (see `docker-compose.yml`); existing files are not migrated.
+`/documents`, a mounted host folder) instead of the database, and takes precedence over every selected
+backend. Mount that folder into the container (see `docker-compose.yml`); existing files are not migrated.
 
 The WebDAV document-storage fields are optional. Non-empty
 `DOCUMENT_STORAGE_WEBDAV_ENABLED`, `_URL`, `_USERNAME`, `_PASSWORD`, and `_PATH` values override
@@ -76,8 +76,15 @@ including calendar attachments; existing local files are not migrated. Private o
 targets must be supplied through these deployment variables because URLs managed in the admin UI
 are restricted to public network addresses.
 
-> SQLite/database backups do not contain document binaries stored on WebDAV. Back up the WebDAV
-> target separately.
+The Google Drive Documents fields configure OAuth only. `GOOGLE_DRIVE_CLIENT_ID` and
+`GOOGLE_DRIVE_CLIENT_SECRET` are optional paired overrides; when both are empty, the runtime reuses
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. `GOOGLE_DRIVE_REDIRECT_URI` is always Drive-specific
+and must exactly match `/api/v1/documents/storage/google-drive/callback`. After installation, connect
+and test Drive in **Settings → Documents → Document storage**, then explicitly select it. OAuth
+success alone never changes the upload destination.
+
+> SQLite/database backups do not contain document binaries stored in a local folder, on WebDAV, or
+> in Google Drive. Back up the selected external target separately.
 
 ## Localization
 
@@ -91,7 +98,7 @@ The **CLI installer** (`install.sh` at the repo root) is localized into the same
 (`OIKOS_INSTALLER_LANG` > `LC_ALL` > `LC_MESSAGES` > `LANG`) and accepts a
 `--lang <code>` override. Its strings live in `tools/installer/locales/cli/<lang>.sh`
 — one sourced shell file per language that sets `MSG_*` variables; `en.sh` is the
-fallback base, the active language overlays it. Key parity across all 20 files is
+fallback base, the active language overlays it. Key parity across all 23 files is
 enforced by `test-installer-cli-i18n.js`.
 
 ## Design

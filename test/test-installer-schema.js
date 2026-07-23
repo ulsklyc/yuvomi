@@ -10,6 +10,12 @@ const ORIGINAL_KEYS = [
   'APPLE_USERNAME', 'APPLE_APP_SPECIFIC_PASSWORD', 'SYNC_INTERVAL_MINUTES',
 ];
 
+const GOOGLE_DRIVE_KEYS = [
+  'GOOGLE_DRIVE_CLIENT_ID',
+  'GOOGLE_DRIVE_CLIENT_SECRET',
+  'GOOGLE_DRIVE_REDIRECT_URI',
+];
+
 // Phase 5 ergänzt Reverse-Proxy-, OIDC- und Backup-Settings sowie APPLE_CALDAV_URL.
 const P5_KEYS = [
   'APPLE_CALDAV_URL', 'SESSION_SECURE', 'TRUST_PROXY',
@@ -46,7 +52,7 @@ const WEBDAV_BACKUP_KEYS = [
 
 const WIZARD_EXTRA_KEYS = ['BASE_URL', 'VAPID_SUBJECT'];
 
-const TOTAL_KEYS = ORIGINAL_KEYS.length + 2 + P5_KEYS.length
+const TOTAL_KEYS = ORIGINAL_KEYS.length + GOOGLE_DRIVE_KEYS.length + 2 + P5_KEYS.length
   + DOCUMENT_STORAGE_KEYS.length + DOCUMENT_STORAGE_LOCAL_KEYS.length
   + SUBSCRIPTION_KEYS.length + EMAIL_KEYS.length + WEBDAV_BACKUP_KEYS.length
   + WIZARD_EXTRA_KEYS.length; // + TZ + OIKOS_HTTP_PORT
@@ -56,6 +62,9 @@ test('ENV_SCHEMA enthält alle Original-Keys, TZ, OIKOS_HTTP_PORT, P5, Subscript
   const keys = ENV_SCHEMA.map(e => e.key);
   for (const k of ORIGINAL_KEYS) {
     assert.ok(keys.includes(k), `Key fehlt: ${k}`);
+  }
+  for (const k of GOOGLE_DRIVE_KEYS) {
+    assert.ok(keys.includes(k), `Google-Drive-Key fehlt: ${k}`);
   }
   assert.ok(keys.includes('TZ'), 'Key fehlt: TZ');
   assert.ok(keys.includes('OIKOS_HTTP_PORT'), 'Key fehlt: OIKOS_HTTP_PORT');
@@ -207,6 +216,63 @@ test('Dokument-WebDAV ist optional, standardmäßig deaktiviert und maskiert das
 
   const password = ENV_SCHEMA.find(e => e.key === 'DOCUMENT_STORAGE_WEBDAV_PASSWORD');
   assert.equal(password.secret, true, 'WebDAV-Passwort muss als Secret markiert sein');
+});
+
+test('Google Drive OAuth installer wiring is optional, masked, validated and deployed consistently', () => {
+  for (const key of GOOGLE_DRIVE_KEYS) {
+    const entry = ENV_SCHEMA.find((item) => item.key === key);
+    assert.ok(entry, `${key} missing from ENV_SCHEMA`);
+    assert.equal(entry.required, false);
+    assert.equal(entry.writeToEnv, true);
+    assert.equal(entry.group, 'googleDrive');
+  }
+  assert.equal(
+    ENV_SCHEMA.find((item) => item.key === 'GOOGLE_DRIVE_CLIENT_SECRET').secret,
+    true
+  );
+
+  const web = readFileSync(new URL('../tools/installer/install.html', import.meta.url), 'utf8');
+  for (const id of [
+    'adv-document-google-drive-enable',
+    'adv-document-google-drive-client-id',
+    'adv-document-google-drive-client-secret',
+    'document-google-drive-redirect-hint',
+    'rv-document-google-drive',
+  ]) assert.match(web, new RegExp(`id="${id}"`), `web installer missing ${id}`);
+  for (const key of GOOGLE_DRIVE_KEYS) {
+    assert.match(web, new RegExp(`${key}:\\s*S\\.${key}`));
+    assert.match(web, new RegExp(`${key}:\\s*''`));
+  }
+  assert.match(web, /errDocumentGoogleDrivePair/);
+  assert.match(web, /errDocumentGoogleDriveCredentials/);
+  assert.match(web, /\/api\/v1\/documents\/storage\/google-drive\/callback/);
+
+  const cli = readFileSync(new URL('../install.sh', import.meta.url), 'utf8');
+  for (const key of GOOGLE_DRIVE_KEYS) assert.match(cli, new RegExp(`^${key}=`, 'm'));
+  assert.match(cli, /read -rs GOOGLE_DRIVE_CLIENT_SECRET/);
+  assert.match(cli, /document_google_drive\.err_pair/);
+
+  const envExample = readFileSync(new URL('../.env.example', import.meta.url), 'utf8');
+  const portainer = readFileSync(new URL('../docs/docker-compose.portainer.yml', import.meta.url), 'utf8');
+  const unraid = readFileSync(new URL('../templates/yuvomi.xml', import.meta.url), 'utf8');
+  for (const key of GOOGLE_DRIVE_KEYS) {
+    assert.match(envExample, new RegExp(`^${key}=`, 'm'));
+    assert.match(portainer, new RegExp(`- ${key}=\\$\\{${key}:-`));
+    assert.match(unraid, new RegExp(`Target="${key}"`));
+  }
+  assert.match(
+    unraid.match(/<Config[^>]+Target="GOOGLE_DRIVE_CLIENT_SECRET"[^>]*>/)[0],
+    /Mask="true"/
+  );
+  for (const deployment of [
+    '../deploy/truenas/questions.yaml',
+    '../deploy/truenas/templates/docker-compose.yaml',
+    '../deploy/umbrel/docker-compose.yml',
+    '../deploy/umbrel/umbrel-app.yml',
+  ]) {
+    const source = readFileSync(new URL(deployment, import.meta.url), 'utf8');
+    for (const key of GOOGLE_DRIVE_KEYS) assert.doesNotMatch(source, new RegExp(key));
+  }
 });
 
 test('FIXER_API_KEY ist optional und als Secret markiert', () => {

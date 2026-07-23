@@ -204,6 +204,9 @@ configure_document_storage() {
   DOCUMENT_STORAGE_WEBDAV_USERNAME=''
   DOCUMENT_STORAGE_WEBDAV_PASSWORD=''
   DOCUMENT_STORAGE_WEBDAV_PATH=''
+  GOOGLE_DRIVE_CLIENT_ID=''
+  GOOGLE_DRIVE_CLIENT_SECRET=''
+  GOOGLE_DRIVE_REDIRECT_URI=''
 
   step "$(t document_local.step)"
   info "$(t document_local.hint)"
@@ -227,6 +230,23 @@ configure_document_storage() {
     ask "$(t document_webdav.path)"; read -r DOCUMENT_STORAGE_WEBDAV_PATH
     DOCUMENT_STORAGE_WEBDAV_PATH="${DOCUMENT_STORAGE_WEBDAV_PATH:-yuvomi-documents}"
   fi
+
+  step "$(t document_google_drive.step)"
+  info "$(t document_google_drive.hint)"
+  ask "$(t document_google_drive.enable)"
+  read -r want_document_google_drive
+  if [ "${want_document_google_drive,,}" = "y" ]; then
+    info "$(t document_google_drive.redirect_hint "http://${YUVOMI_HOST}:${YUVOMI_PORT}/api/v1/documents/storage/google-drive/callback")"
+    ask "$(t document_google_drive.client_id)"; read -r GOOGLE_DRIVE_CLIENT_ID
+    ask "$(t document_google_drive.client_secret)"; read -rs GOOGLE_DRIVE_CLIENT_SECRET; printf "\n"
+    if { [ -n "$GOOGLE_DRIVE_CLIENT_ID" ] && [ -z "$GOOGLE_DRIVE_CLIENT_SECRET" ]; } || { [ -z "$GOOGLE_DRIVE_CLIENT_ID" ] && [ -n "$GOOGLE_DRIVE_CLIENT_SECRET" ]; }; then
+      err "$(t document_google_drive.err_pair)"
+    fi
+    if [ -z "$GOOGLE_DRIVE_CLIENT_ID" ] && { [ -z "$GOOGLE_CLIENT_ID" ] || [ -z "$GOOGLE_CLIENT_SECRET" ]; }; then
+      err "$(t document_google_drive.err_credentials)"
+    fi
+    GOOGLE_DRIVE_REDIRECT_URI="http://${YUVOMI_HOST}:${YUVOMI_PORT}/api/v1/documents/storage/google-drive/callback"
+  fi
 }
 
 # ── Step 5: Review ─────────────────────────────────────────────────────────────
@@ -243,6 +263,7 @@ review_and_confirm() {
   [ -n "$APPLE_USERNAME" ]      && printf "  %-16s %s%s%s\n" "$(t review.apple)"   "$GREEN" "$APPLE_USERNAME" "$RESET"
   [ "$DOCUMENT_STORAGE_LOCAL_ENABLED" = "true" ] && printf "  %-16s %s%s%s\n" "$(t review.document_local)" "$GREEN" "${DOCUMENT_STORAGE_LOCAL_PATH:-/documents}" "$RESET"
   [ "$DOCUMENT_STORAGE_WEBDAV_ENABLED" = "true" ] && printf "  %-16s %s%s%s\n" "$(t review.document_webdav)" "$GREEN" "$DOCUMENT_STORAGE_WEBDAV_URL" "$RESET"
+  [ -n "$GOOGLE_DRIVE_REDIRECT_URI" ] && printf "  %-16s %s%s%s\n" "$(t review.document_google_drive)" "$GREEN" "$(t review.google_value)" "$RESET"
   printf "\n"
   ask "$(t review.proceed)"
   read -r confirm
@@ -273,6 +294,9 @@ OPENWEATHER_LANG=${OPENWEATHER_LANG}
 GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
 GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
 GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+GOOGLE_DRIVE_CLIENT_ID=${GOOGLE_DRIVE_CLIENT_ID}
+GOOGLE_DRIVE_CLIENT_SECRET=${GOOGLE_DRIVE_CLIENT_SECRET}
+GOOGLE_DRIVE_REDIRECT_URI=${GOOGLE_DRIVE_REDIRECT_URI}
 APPLE_USERNAME=${APPLE_USERNAME}
 APPLE_APP_SPECIFIC_PASSWORD=${APPLE_APP_SPECIFIC_PASSWORD}
 DOCUMENT_STORAGE_LOCAL_ENABLED=${DOCUMENT_STORAGE_LOCAL_ENABLED}

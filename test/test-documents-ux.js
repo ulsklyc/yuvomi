@@ -261,6 +261,14 @@ test('Mehrfachauswahl ist opt-in und standardmäßig verborgen', () => {
   }
 });
 
+test('Google Drive has a distinct upload label, icon and storage badge', () => {
+  assert.match(page, /backend === 'google_drive'\) return t\('documents\.storageGoogleDrive'\)/);
+  assert.match(page, /backend === 'google_drive'\) return 'cloud-upload'/);
+  assert.match(page, /doc-badge--google-drive/);
+  assert.match(css, /\.doc-badge--google-drive\s*\{/);
+  assert.doesNotMatch(css, /\.doc-badge--google-drive\s*\{[^}]*#[0-9a-f]{3,8}/i);
+});
+
 test('die Speicher-Einstellungen sind von der Seite aus verlinkt — nur für Admins', () => {
   assert.match(page, /state\.isAdmin \? `<a class="document-storage-target__link" href="\/settings\/documents\/storage"/);
   const routes = read('../server/routes/documents.js');

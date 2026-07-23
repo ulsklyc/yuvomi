@@ -93,7 +93,8 @@
     "backups": "बैकअप",
     "webdavBackup": "बाहरी बैकअप",
     "on": "सक्षम",
-    "off": "अक्षम"
+    "off": "अक्षम",
+    "documentGoogleDrive": "Google Drive दस्तावेज़"
   },
   "docker": {
     "title": "Yuvomi शुरू हो रहा है",
@@ -178,7 +179,16 @@
     "fixerLabel": "Fixer API कुंजी (लाइव मुद्रा दरें)",
     "fixerHint": "वैकल्पिक। सदस्यता मुद्राओं को लाइव दरों पर बदलता है। इसके बिना भी सदस्यताएँ काम करती हैं।",
     "pushSubjectLabel": "पुश संपर्क पता",
-    "pushSubjectHint": "आपके सर्वर के संपर्क के रूप में पुश सेवाओं को भेजा जाता है। डिफ़ॉल्ट के लिए खाली छोड़ें।"
+    "pushSubjectHint": "आपके सर्वर के संपर्क के रूप में पुश सेवाओं को भेजा जाता है। डिफ़ॉल्ट के लिए खाली छोड़ें।",
+    "documentGoogleDrive": "Google Drive दस्तावेज़ संग्रहण",
+    "documentGoogleDriveHint": "यहाँ OAuth क्रेडेंशियल कॉन्फ़िगर करें, फिर इंस्टॉलेशन के बाद दस्तावेज़ सेटिंग में Google Drive को कनेक्ट करके स्पष्ट रूप से चुनें।",
+    "documentGoogleDriveEnable": "दस्तावेज़ों के लिए Google Drive कॉन्फ़िगर करें",
+    "documentGoogleDriveClientIdLabel": "कस्टम क्लाइंट आईडी",
+    "documentGoogleDriveClientSecretLabel": "कस्टम क्लाइंट सीक्रेट",
+    "documentGoogleDriveReuseHint": "Google Calendar के OAuth क्रेडेंशियल दोबारा उपयोग करने के लिए दोनों कस्टम मान खाली छोड़ें।",
+    "documentGoogleDriveRedirectLabel": "रीडायरेक्ट URI",
+    "errDocumentGoogleDrivePair": "Google Drive क्लाइंट आईडी और सीक्रेट, दोनों सेट होने चाहिए या दोनों खाली होने चाहिए।",
+    "errDocumentGoogleDriveCredentials": "Google Drive के लिए या तो उसकी अपनी क्लाइंट आईडी और सीक्रेट, या कॉन्फ़िगर किए गए Google Calendar क्रेडेंशियल आवश्यक हैं।"
   },
   "welcome": {
     "title": "Yuvomi में आपका स्वागत है",

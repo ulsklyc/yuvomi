@@ -93,7 +93,8 @@
     "backups": "バックアップ",
     "webdavBackup": "外部バックアップ",
     "on": "有効",
-    "off": "無効"
+    "off": "無効",
+    "documentGoogleDrive": "Google Drive 文書"
   },
   "docker": {
     "title": "Yuvomi を起動しています",
@@ -178,7 +179,16 @@
     "fixerLabel": "Fixer API キー（リアルタイム為替レート）",
     "fixerHint": "任意です。サブスクの通貨をリアルタイムレートで換算します。これがなくてもサブスクは機能します。",
     "pushSubjectLabel": "プッシュ連絡先アドレス",
-    "pushSubjectHint": "サーバーの連絡先としてプッシュサービスに送信されます。既定値を使うには空欄のままにします。"
+    "pushSubjectHint": "サーバーの連絡先としてプッシュサービスに送信されます。既定値を使うには空欄のままにします。",
+    "documentGoogleDrive": "Google Drive 文書ストレージ",
+    "documentGoogleDriveHint": "ここで OAuth 認証情報を設定します。インストール後に文書設定で Google Drive に接続し、保存先として明示的に選択してください。",
+    "documentGoogleDriveEnable": "文書用に Google Drive を設定",
+    "documentGoogleDriveClientIdLabel": "クライアント ID を上書き",
+    "documentGoogleDriveClientSecretLabel": "クライアントシークレットを上書き",
+    "documentGoogleDriveReuseHint": "両方を空欄にすると、Google カレンダーの OAuth 認証情報を再利用します。",
+    "documentGoogleDriveRedirectLabel": "リダイレクト URI",
+    "errDocumentGoogleDrivePair": "Google Drive のクライアント ID とクライアントシークレットは、両方を設定するか、両方とも空欄にしてください。",
+    "errDocumentGoogleDriveCredentials": "Google Drive には、専用のクライアント ID とクライアントシークレット、または設定済みの Google カレンダー認証情報が必要です。"
   },
   "welcome": {
     "title": "Yuvomi へようこそ",

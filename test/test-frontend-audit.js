@@ -745,7 +745,7 @@ test('documents-domain leaves exist and export async render functions', () => {
   }
 });
 
-test('documents-storage leaf owns WebDAV document storage with a status-first layout', () => {
+test('documents-storage leaf owns hybrid document storage with a status-first layout', () => {
   const source = read('../public/settings/pages/documents-storage.js');
 
   // Storage config + test endpoints preserved unchanged.
@@ -756,8 +756,20 @@ test('documents-storage leaf owns WebDAV document storage with a status-first la
   // Status-first: render the active backend and target before the connection fields.
   assert.match(source, /createStatusSummary\(/);
   assert.match(source, /active_upload_backend/);
+  assert.match(source, /selected_upload_backend/);
   assert.match(source, /webdav_document_count/);
+  assert.match(source, /google_drive/);
   assert.match(source, /documentStorageTarget/);
+
+  // Drive uses the shared API client and a normal anchor for OAuth.
+  assert.match(source, /\/documents\/storage\/google-drive\/auth/);
+  assert.match(source, /api\.post\('\/documents\/storage\/google-drive\/test'/);
+  assert.match(source, /api\.delete\('\/documents\/storage\/google-drive\/disconnect'/);
+  assert.match(source, /createSettingRow\(/);
+  assert.match(source, /drive_ok/);
+  assert.match(source, /drive_error/);
+  assert.match(source, /history\.replaceState/);
+  assert.match(source, /settings\.documentStorageGoogleDrivePrivacy/);
 
   // Connection fields live behind an accessible disclosure.
   assert.match(source, /createDisclosure\(/);

@@ -541,6 +541,37 @@ PUT/GET/DELETE roundtrip in the target folder.
 > on WebDAV. Back up the WebDAV target separately and retain it together with the corresponding
 > database backup.
 
+### Google Drive Document Storage (Optional)
+
+Google Drive is a separate Documents OAuth connection, even when it reuses the same Cloud Console
+client ID and secret as Google Calendar. Enable the **Google Drive API**, add the exact redirect URI
+`https://<YOUR-DOMAIN>/api/v1/documents/storage/google-drive/callback`, and configure the variables
+below. Yuvomi requests only `https://www.googleapis.com/auth/drive.file`; it cannot browse arbitrary
+Drive files and never creates public permissions.
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `GOOGLE_DRIVE_CLIENT_ID` | Optional Drive-specific OAuth client ID; set together with the secret | Reuses `GOOGLE_CLIENT_ID` | No |
+| `GOOGLE_DRIVE_CLIENT_SECRET` | Optional Drive-specific OAuth client secret | Reuses `GOOGLE_CLIENT_SECRET` | No |
+| `GOOGLE_DRIVE_REDIRECT_URI` | Exact Drive Documents callback URL | — | Yes when Drive is configured |
+
+After deployment, open **Settings → Documents → Document storage**, connect Google Drive, test the
+connection, then explicitly select Google Drive as the upload destination. Connecting does not
+activate it. New files are placed in the visible private `Yuvomi/Documents` folder; the opaque Drive
+file ID is stored in SQLite. The environment-managed local-folder backend still takes precedence.
+
+Drive access and refresh tokens use Drive-specific database records and never the Calendar token
+keys. They are encrypted at rest only when `DB_ENCRYPTION_KEY` enables SQLCipher; otherwise they are
+stored as plaintext in SQLite, so database encryption is strongly recommended. Reconnection validates
+the candidate account and an existing Drive-backed file before replacing working credentials.
+Disconnect is blocked while Drive is selected or Drive-backed rows exist, and it removes only local
+Drive token state without revoking shared Google credentials.
+
+> **Access and backup boundary:** Yuvomi visibility rules govern access through Yuvomi, but cannot
+> restrict the connected Drive owner or anyone given Drive-folder access. SQLite backups contain
+> metadata and Drive file IDs, not binaries. Back up or export the Drive folder separately and restore
+> it with the matching database.
+
 ### Weather (Optional)
 
 The weather widget defaults to **Open-Meteo** — free, ECMWF-backed, and requiring **no API key**. Just set your coordinates (find them on [openstreetmap.org](https://www.openstreetmap.org) or Google Maps). You can also configure this in-app under **Settings → Modules → Overview** (admin only), which takes precedence over the environment variables and acts as the household default. Any user can additionally set their own personal location under **Settings → Personal → My Weather**, which overrides the household default just for their own dashboard widget.
