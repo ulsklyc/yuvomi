@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
 import { openModal as openSharedModal, closeModal, wireBlurValidation, validateAll, btnSuccess, btnError, promptModal, advancedSection } from '/components/modal.js';
-import { stagger, vibrate } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete } from '/utils/ux.js';
 import { t, formatDate, formatTime, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { refresh as refreshReminders } from '/reminders.js';
