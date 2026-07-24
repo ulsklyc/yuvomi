@@ -27,6 +27,22 @@ import { wireScrollFade } from '/utils/ux.js';
  * @param {string}      [opts.activeClass='sub-tab--active']
  * @returns {{ setActive: (id: string, opts?: { focus?: boolean }) => void }}
  */
+/**
+ * Holt einen Tab in den sichtbaren Bereich SEINER Leiste, indem nur deren
+ * scrollLeft angepasst wird — anders als Element.scrollIntoView werden
+ * scrollbare Vorfahren (inkl. overflow:hidden-Container) NICHT mitgescrollt.
+ * Auf nicht-überlaufenden Leisten (Desktop) ist es ein No-op.
+ */
+function scrollTabIntoView(container, btn) {
+  const c = container.getBoundingClientRect();
+  const b = btn.getBoundingClientRect();
+  if (b.left < c.left) {
+    container.scrollLeft -= c.left - b.left;
+  } else if (b.right > c.right) {
+    container.scrollLeft += b.right - c.right;
+  }
+}
+
 export function wireTablist(container, { activeId, onChange, activeClass = 'sub-tab--active' } = {}) {
   if (!container) return { setActive() {} };
   let current = activeId;
@@ -43,10 +59,14 @@ export function wireTablist(container, { activeId, onChange, activeClass = 'sub-
       b.tabIndex = on ? 0 : -1;
       if (on) activeBtn = b;
     });
-    // Überlaufende Leisten (Mobil): der aktive Tab muss im sichtbaren
-    // Scroll-Bereich liegen (Audit A2-18). block:'nearest' lässt den
-    // vertikalen Seiten-Scroll in Ruhe.
-    activeBtn?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    // Überlaufende Leisten (Mobil): den aktiven Tab in den sichtbaren
+    // Scroll-Bereich holen (Audit A2-18) — aber NUR die Leiste selbst scrollen.
+    // Element.scrollIntoView scrollt jeden scrollbaren Vorfahren mit, auch
+    // overflow:hidden-Container wie .calendar-page (die per JS scrollbar bleiben,
+    // aber weder Scrollbar noch Touch zum Zurückscrollen bieten). Auf schmalen
+    // Viewports kippte das die ganze Seite horizontal weg und ließ sich nur per
+    // Neu-Render zurückholen (#565).
+    if (activeBtn) scrollTabIntoView(container, activeBtn);
   };
 
   const setActive = (id, { focus = false } = {}) => {

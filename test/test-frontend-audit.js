@@ -2778,6 +2778,25 @@ test('module-head families stay split: in-page tabs vs route clusters', () => {
   assert.match(tablist, /renderSubTabs/, 'tablist.js dokumentiert die Abgrenzung zu renderSubTabs');
 });
 
+// #565: Element.scrollIntoView() beim aktiven Tab scrollt jeden scrollbaren
+// Vorfahren mit — auch overflow:hidden-Container wie .calendar-page, die per JS
+// scrollbar bleiben, aber weder Scrollbar noch Touch zum Zurückscrollen bieten.
+// Auf schmalen Viewports kippte das die ganze Kalenderseite horizontal weg.
+// Der Guard hält die Leiste beim reinen Container-Scroll (nur scrollLeft).
+test('wireTablist scrolls only its own bar, never via scrollIntoView (#565)', () => {
+  const tablist = read('../public/utils/tablist.js');
+  assert.doesNotMatch(
+    tablist,
+    /\.scrollIntoView\(/,
+    'tablist.js darf scrollIntoView() nicht nutzen — es scrollt overflow:hidden-Vorfahren mit (#565)',
+  );
+  assert.match(
+    tablist,
+    /container\.scrollLeft/,
+    'tablist.js muss den aktiven Tab durch container-eigenes scrollLeft ins Bild holen',
+  );
+});
+
 test('priority badges and meal labels meet WCAG AA contrast in both themes', () => {
   const tokens = read('../public/styles/tokens.css');
   const rootBlock = tokens.match(/:root\s*\{([\s\S]*?)\n\}/);

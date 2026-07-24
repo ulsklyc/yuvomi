@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.45.5] - 2026-07-24
+
+### Fixed
+- On mobile, tapping a calendar view tab (Agenda, Week, Day) when the toolbar was too wide to fit could shift the entire calendar page sideways off-screen, with no way to scroll it back except switching to Month view and restarting the app. The active tab is now brought into view by scrolling only its own tab bar, so the page no longer slides away (#565).
+
 ## [1.45.4] - 2026-07-24
 
 ### Fixed
