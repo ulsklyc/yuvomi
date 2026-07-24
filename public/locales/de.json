@@ -1905,6 +1905,8 @@
         "documentStorageGoogleDriveFolder": "Ordner",
         "documentStorageGoogleDriveCount": "Gespeicherte Google-Drive-Dokumente",
         "documentStorageGoogleDriveConnect": "Google Drive verbinden",
+        "documentStorageGoogleDriveSetupHint": "Zum Verbinden brauchst du zuerst OAuth-Zugangsdaten: setze GOOGLE_DRIVE_CLIENT_ID und GOOGLE_DRIVE_CLIENT_SECRET (Installer → Erweitert → Google Drive) oder in deiner Umgebung.",
+        "documentStorageGoogleDriveSetupLink": "Zur Anleitung",
         "documentStorageGoogleDriveReconnect": "Neu verbinden",
         "documentStorageGoogleDriveDisconnectConfirm": "Google-Drive-Dokumentenspeicher trennen?",
         "documentStorageGoogleDriveDisconnectBlocked": "Wähle ein anderes Ziel und entferne Drive-Dokumente vor dem Trennen.",

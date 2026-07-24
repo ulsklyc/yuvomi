@@ -1905,6 +1905,8 @@
         "documentStorageGoogleDriveFolder": "پوشه",
         "documentStorageGoogleDriveCount": "تعداد اسناد ذخیره‌شده در Google Drive",
         "documentStorageGoogleDriveConnect": "اتصال به Google Drive",
+        "documentStorageGoogleDriveSetupHint": "Zum Verbinden brauchst du zuerst OAuth-Zugangsdaten: setze GOOGLE_DRIVE_CLIENT_ID und GOOGLE_DRIVE_CLIENT_SECRET (Installer → Erweitert → Google Drive) oder in deiner Umgebung.",
+        "documentStorageGoogleDriveSetupLink": "Zur Anleitung",
         "documentStorageGoogleDriveReconnect": "اتصال مجدد",
         "documentStorageGoogleDriveDisconnectConfirm": "ذخیره‌سازی اسناد Google Drive قطع شود؟",
         "documentStorageGoogleDriveDisconnectBlocked": "پیش از قطع اتصال، مقصد دیگری را انتخاب و اسناد ذخیره‌شده در Drive را حذف کنید.",

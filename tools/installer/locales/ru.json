@@ -183,9 +183,9 @@
     "documentGoogleDrive": "Хранилище документов Google Drive",
     "documentGoogleDriveHint": "Настройте здесь учётные данные OAuth, а после установки подключите Google Drive в настройках документов и явно выберите его.",
     "documentGoogleDriveEnable": "Настроить Google Drive для документов",
-    "documentGoogleDriveClientIdLabel": "Переопределить идентификатор клиента",
-    "documentGoogleDriveClientSecretLabel": "Переопределить секрет клиента",
-    "documentGoogleDriveReuseHint": "Оставьте оба поля переопределения пустыми, чтобы использовать учётные данные OAuth Google Календаря.",
+    "documentGoogleDriveClientIdLabel": "Собственный идентификатор клиента (необязательно)",
+    "documentGoogleDriveClientSecretLabel": "Собственный секрет клиента (необязательно)",
+    "documentGoogleDriveReuseHint": "Оставьте оба поля пустыми, чтобы использовать учётные данные OAuth Google Календаря. Чтобы использовать отдельные, создайте их в Google Cloud Console (как на шаге «Календарь»).",
     "documentGoogleDriveRedirectLabel": "URI перенаправления",
     "errDocumentGoogleDrivePair": "Идентификатор и секрет клиента Google Drive должны быть либо оба указаны, либо оба оставлены пустыми.",
     "errDocumentGoogleDriveCredentials": "Для Google Drive нужны собственные идентификатор и секрет клиента либо настроенные учётные данные Google Календаря."

@@ -183,9 +183,9 @@
     "documentGoogleDrive": "Przechowywanie dokumentów w Google Drive",
     "documentGoogleDriveHint": "Skonfiguruj tutaj dane logowania OAuth, a po instalacji połącz Google Drive i wybierz go w ustawieniach Dokumentów.",
     "documentGoogleDriveEnable": "Skonfiguruj Google Drive dla Dokumentów",
-    "documentGoogleDriveClientIdLabel": "Własny identyfikator klienta",
-    "documentGoogleDriveClientSecretLabel": "Własny klucz tajny klienta",
-    "documentGoogleDriveReuseHint": "Pozostaw oba pola puste, aby ponownie użyć danych logowania OAuth Kalendarza Google.",
+    "documentGoogleDriveClientIdLabel": "Własny identyfikator klienta (opcjonalnie)",
+    "documentGoogleDriveClientSecretLabel": "Własny klucz tajny klienta (opcjonalnie)",
+    "documentGoogleDriveReuseHint": "Pozostaw oba pola puste, aby ponownie użyć danych logowania OAuth Kalendarza Google. Aby użyć własnych, utwórz je w Google Cloud Console (jak w kroku Kalendarz).",
     "documentGoogleDriveRedirectLabel": "Identyfikator URI przekierowania",
     "errDocumentGoogleDrivePair": "Identyfikator klienta i klucz tajny Google Drive muszą być ustawione razem albo oba pozostawione puste.",
     "errDocumentGoogleDriveCredentials": "Google Drive wymaga własnego identyfikatora klienta i klucza tajnego albo skonfigurowanych danych logowania Kalendarza Google."

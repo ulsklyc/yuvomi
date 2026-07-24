@@ -183,9 +183,9 @@
     "documentGoogleDrive": "Google Drive दस्तावेज़ संग्रहण",
     "documentGoogleDriveHint": "यहाँ OAuth क्रेडेंशियल कॉन्फ़िगर करें, फिर इंस्टॉलेशन के बाद दस्तावेज़ सेटिंग में Google Drive को कनेक्ट करके स्पष्ट रूप से चुनें।",
     "documentGoogleDriveEnable": "दस्तावेज़ों के लिए Google Drive कॉन्फ़िगर करें",
-    "documentGoogleDriveClientIdLabel": "कस्टम क्लाइंट आईडी",
-    "documentGoogleDriveClientSecretLabel": "कस्टम क्लाइंट सीक्रेट",
-    "documentGoogleDriveReuseHint": "Google Calendar के OAuth क्रेडेंशियल दोबारा उपयोग करने के लिए दोनों कस्टम मान खाली छोड़ें।",
+    "documentGoogleDriveClientIdLabel": "स्वयं की क्लाइंट आईडी (वैकल्पिक)",
+    "documentGoogleDriveClientSecretLabel": "स्वयं का क्लाइंट सीक्रेट (वैकल्पिक)",
+    "documentGoogleDriveReuseHint": "Google Calendar के OAuth क्रेडेंशियल दोबारा उपयोग करने के लिए दोनों फ़ील्ड खाली छोड़ें। अपने अलग क्रेडेंशियल के लिए, उन्हें Google Cloud Console में बनाएँ (Calendar चरण की तरह)।",
     "documentGoogleDriveRedirectLabel": "रीडायरेक्ट URI",
     "errDocumentGoogleDrivePair": "Google Drive क्लाइंट आईडी और सीक्रेट, दोनों सेट होने चाहिए या दोनों खाली होने चाहिए।",
     "errDocumentGoogleDriveCredentials": "Google Drive के लिए या तो उसकी अपनी क्लाइंट आईडी और सीक्रेट, या कॉन्फ़िगर किए गए Google Calendar क्रेडेंशियल आवश्यक हैं।"

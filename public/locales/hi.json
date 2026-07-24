@@ -1893,6 +1893,8 @@
         "documentStorageGoogleDriveFolder": "फ़ोल्डर",
         "documentStorageGoogleDriveCount": "Google Drive में संग्रहीत दस्तावेज़",
         "documentStorageGoogleDriveConnect": "Google Drive कनेक्ट करें",
+        "documentStorageGoogleDriveSetupHint": "Zum Verbinden brauchst du zuerst OAuth-Zugangsdaten: setze GOOGLE_DRIVE_CLIENT_ID und GOOGLE_DRIVE_CLIENT_SECRET (Installer → Erweitert → Google Drive) oder in deiner Umgebung.",
+        "documentStorageGoogleDriveSetupLink": "Zur Anleitung",
         "documentStorageGoogleDriveReconnect": "फिर से कनेक्ट करें",
         "documentStorageGoogleDriveDisconnectConfirm": "Google Drive दस्तावेज़ संग्रहण डिस्कनेक्ट करें?",
         "documentStorageGoogleDriveDisconnectBlocked": "डिस्कनेक्ट करने से पहले कोई दूसरा गंतव्य चुनें और Drive में संग्रहीत दस्तावेज़ हटाएँ।",

@@ -183,9 +183,9 @@
     "documentGoogleDrive": "Google Drive Document Storage",
     "documentGoogleDriveHint": "Configure OAuth credentials here, then connect and explicitly select Google Drive in Document settings after installation.",
     "documentGoogleDriveEnable": "Configure Google Drive for Documents",
-    "documentGoogleDriveClientIdLabel": "Override client ID",
-    "documentGoogleDriveClientSecretLabel": "Override client secret",
-    "documentGoogleDriveReuseHint": "Leave both overrides empty to reuse Google Calendar OAuth credentials.",
+    "documentGoogleDriveClientIdLabel": "Own client ID (optional)",
+    "documentGoogleDriveClientSecretLabel": "Own client secret (optional)",
+    "documentGoogleDriveReuseHint": "Leave both empty to reuse your Google Calendar OAuth credentials. To use dedicated ones, create them in the Google Cloud Console (as in the Calendar step).",
     "documentGoogleDriveRedirectLabel": "Redirect URI",
     "errDocumentGoogleDrivePair": "Google Drive client ID and secret must both be set or both be empty.",
     "errDocumentGoogleDriveCredentials": "Google Drive requires either its own client ID and secret or configured Google Calendar credentials."

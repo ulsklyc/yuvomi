@@ -118,9 +118,9 @@
     "documentGoogleDrive": "Google Drive 문서",
     "documentGoogleDriveHint": "여기에서 OAuth 자격 증명을 구성한 다음, 설치 후 문서 설정에서 Google Drive를 연결하고 저장 대상으로 직접 선택하세요.",
     "documentGoogleDriveEnable": "문서용 Google Drive 구성",
-    "documentGoogleDriveClientIdLabel": "클라이언트 ID 재정의",
-    "documentGoogleDriveClientSecretLabel": "클라이언트 시크릿 재정의",
-    "documentGoogleDriveReuseHint": "두 항목을 모두 비워 두면 Google 캘린더 OAuth 자격 증명을 재사용합니다.",
+    "documentGoogleDriveClientIdLabel": "자체 클라이언트 ID(선택)",
+    "documentGoogleDriveClientSecretLabel": "자체 클라이언트 시크릿(선택)",
+    "documentGoogleDriveReuseHint": "두 항목을 모두 비워 두면 Google 캘린더 OAuth 자격 증명을 재사용합니다. 전용 자격 증명을 사용하려면 Google Cloud Console에서 만드세요(캘린더 단계와 동일).",
     "documentGoogleDriveRedirectLabel": "리디렉션 URI",
     "errDocumentGoogleDrivePair": "Google Drive 클라이언트 ID와 시크릿은 둘 다 설정하거나 둘 다 비워 두어야 합니다.",
     "errDocumentGoogleDriveCredentials": "Google Drive에는 자체 클라이언트 ID와 시크릿 또는 구성된 Google 캘린더 자격 증명이 필요합니다."

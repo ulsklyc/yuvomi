@@ -183,9 +183,9 @@
     "documentGoogleDrive": "Google Drive 文書ストレージ",
     "documentGoogleDriveHint": "ここで OAuth 認証情報を設定します。インストール後に文書設定で Google Drive に接続し、保存先として明示的に選択してください。",
     "documentGoogleDriveEnable": "文書用に Google Drive を設定",
-    "documentGoogleDriveClientIdLabel": "クライアント ID を上書き",
-    "documentGoogleDriveClientSecretLabel": "クライアントシークレットを上書き",
-    "documentGoogleDriveReuseHint": "両方を空欄にすると、Google カレンダーの OAuth 認証情報を再利用します。",
+    "documentGoogleDriveClientIdLabel": "独自のクライアント ID（任意）",
+    "documentGoogleDriveClientSecretLabel": "独自のクライアントシークレット（任意）",
+    "documentGoogleDriveReuseHint": "両方を空欄にすると、Google カレンダーの OAuth 認証情報を再利用します。専用の認証情報を使う場合は、Google Cloud Console で作成してください（カレンダーの手順と同様）。",
     "documentGoogleDriveRedirectLabel": "リダイレクト URI",
     "errDocumentGoogleDrivePair": "Google Drive のクライアント ID とクライアントシークレットは、両方を設定するか、両方とも空欄にしてください。",
     "errDocumentGoogleDriveCredentials": "Google Drive には、専用のクライアント ID とクライアントシークレット、または設定済みの Google カレンダー認証情報が必要です。"

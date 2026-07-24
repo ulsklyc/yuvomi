@@ -183,9 +183,9 @@
     "documentGoogleDrive": "Kho lưu trữ tài liệu Google Drive",
     "documentGoogleDriveHint": "Cấu hình thông tin xác thực OAuth tại đây, sau đó kết nối và chọn Google Drive làm nơi lưu trữ trong phần cài đặt Tài liệu sau khi cài đặt.",
     "documentGoogleDriveEnable": "Cấu hình Google Drive cho Tài liệu",
-    "documentGoogleDriveClientIdLabel": "Ghi đè ID ứng dụng khách",
-    "documentGoogleDriveClientSecretLabel": "Ghi đè mã bí mật ứng dụng khách",
-    "documentGoogleDriveReuseHint": "Để trống cả hai trường để dùng lại thông tin xác thực OAuth của Google Calendar.",
+    "documentGoogleDriveClientIdLabel": "ID ứng dụng khách riêng (tùy chọn)",
+    "documentGoogleDriveClientSecretLabel": "Mã bí mật ứng dụng khách riêng (tùy chọn)",
+    "documentGoogleDriveReuseHint": "Để trống cả hai trường để dùng lại thông tin xác thực OAuth của Google Calendar. Để dùng thông tin riêng, hãy tạo trong Google Cloud Console (như ở bước Calendar).",
     "documentGoogleDriveRedirectLabel": "URI chuyển hướng",
     "errDocumentGoogleDrivePair": "ID ứng dụng khách và mã bí mật Google Drive phải được đặt cùng nhau hoặc đều để trống.",
     "errDocumentGoogleDriveCredentials": "Google Drive cần ID ứng dụng khách và mã bí mật riêng hoặc thông tin xác thực Google Calendar đã được cấu hình."

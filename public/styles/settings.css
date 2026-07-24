@@ -1095,6 +1095,46 @@
   color: var(--color-text-secondary);
 }
 
+/* "Verbunden" trägt einen Success-Ton; die neutralen Zustände ("Nicht verbunden",
+   "Nicht konfiguriert") bleiben grau - kein Fehler, nur noch nicht eingerichtet. */
+.settings-provider__badge--connected {
+  background: var(--color-success-light);
+  color: var(--color-success);
+}
+
+/* Eigenständige Statuszeile am Kopf eines Provider-Panels (ersetzt die zuvor
+   doppelte "Google Drive"-Überschrift; die Disclosure benennt den Anbieter). */
+.settings-provider__status {
+  display: flex;
+}
+
+/* Ruhiger Info-/Führungshinweis - bewusst KEINE amber Warnbox, damit Hinweise
+   nicht als zweite Warnung neben der echten Backup-Warnung stapeln. */
+.settings-provider-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--line-height-snug);
+}
+
+.settings-provider-note svg {
+  flex: 0 0 auto;
+}
+
+.settings-provider-note a {
+  color: var(--active-module-accent, var(--color-accent));
+  text-decoration: underline;
+}
+
+/* Der Aktivierungs-Hinweis darf etwas mehr Präsenz haben (primärer Text),
+   bleibt aber im ruhigen Ton der Note. */
+.settings-provider-note--hint {
+  color: var(--color-text-primary);
+}
+
 .settings-legacy-badge {
   background: var(--color-warning-light);
   color: var(--color-warning);

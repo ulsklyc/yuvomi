@@ -118,9 +118,9 @@
     "documentGoogleDrive": "Google-Drive-Dokumentenspeicher",
     "documentGoogleDriveHint": "Konfiguriere hier die OAuth-Anmeldedaten. Verbinde Google Drive nach der Installation in den Dokumenteinstellungen und wähle es dort ausdrücklich aus.",
     "documentGoogleDriveEnable": "Google Drive für Dokumente konfigurieren",
-    "documentGoogleDriveClientIdLabel": "Client-ID überschreiben",
-    "documentGoogleDriveClientSecretLabel": "Client-Secret überschreiben",
-    "documentGoogleDriveReuseHint": "Lasse beide Felder leer, um die OAuth-Anmeldedaten von Google Kalender wiederzuverwenden.",
+    "documentGoogleDriveClientIdLabel": "Eigene Client-ID (optional)",
+    "documentGoogleDriveClientSecretLabel": "Eigenes Client-Secret (optional)",
+    "documentGoogleDriveReuseHint": "Lasse beide Felder leer, um die OAuth-Anmeldedaten von Google Kalender wiederzuverwenden. Für eigene Zugangsdaten erstelle sie in der Google Cloud Console (wie im Kalender-Schritt).",
     "documentGoogleDriveRedirectLabel": "Redirect-URI",
     "errDocumentGoogleDrivePair": "Google-Drive-Client-ID und -Client-Secret müssen entweder beide gesetzt oder beide leer sein.",
     "errDocumentGoogleDriveCredentials": "Google Drive benötigt entweder eine eigene Client-ID und ein eigenes Client-Secret oder konfigurierte Anmeldedaten für Google Kalender."

@@ -183,9 +183,9 @@
     "documentGoogleDrive": "Armazenamento de documentos no Google Drive",
     "documentGoogleDriveHint": "Configura aqui as credenciais OAuth. Após a instalação, liga o Google Drive e seleciona-o explicitamente nas definições de Documentos.",
     "documentGoogleDriveEnable": "Configurar o Google Drive para Documentos",
-    "documentGoogleDriveClientIdLabel": "ID de cliente alternativo",
-    "documentGoogleDriveClientSecretLabel": "Segredo de cliente alternativo",
-    "documentGoogleDriveReuseHint": "Deixa os dois campos vazios para reutilizar as credenciais OAuth do Google Calendar.",
+    "documentGoogleDriveClientIdLabel": "ID de cliente próprio (opcional)",
+    "documentGoogleDriveClientSecretLabel": "Segredo de cliente próprio (opcional)",
+    "documentGoogleDriveReuseHint": "Deixa os dois campos vazios para reutilizar as credenciais OAuth do Google Calendar. Para usar credenciais próprias, cria-as na Google Cloud Console (como no passo do Calendar).",
     "documentGoogleDriveRedirectLabel": "URI de redirecionamento",
     "errDocumentGoogleDrivePair": "O ID e o segredo do cliente do Google Drive têm de ser ambos preenchidos ou ambos deixados vazios.",
     "errDocumentGoogleDriveCredentials": "O Google Drive requer um ID e segredo de cliente próprios ou credenciais configuradas do Google Calendar."

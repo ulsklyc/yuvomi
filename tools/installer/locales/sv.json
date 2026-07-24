@@ -183,9 +183,9 @@
     "documentGoogleDrive": "Dokumentlagring på Google Drive",
     "documentGoogleDriveHint": "Konfigurera OAuth-uppgifter här. Anslut sedan Google Drive och välj det uttryckligen i dokumentinställningarna efter installationen.",
     "documentGoogleDriveEnable": "Konfigurera Google Drive för dokument",
-    "documentGoogleDriveClientIdLabel": "Åsidosätt klient-ID",
-    "documentGoogleDriveClientSecretLabel": "Åsidosätt klienthemlighet",
-    "documentGoogleDriveReuseHint": "Lämna båda åsidosättningarna tomma för att återanvända OAuth-uppgifterna för Google Kalender.",
+    "documentGoogleDriveClientIdLabel": "Eget klient-ID (valfritt)",
+    "documentGoogleDriveClientSecretLabel": "Egen klienthemlighet (valfritt)",
+    "documentGoogleDriveReuseHint": "Lämna båda fälten tomma för att återanvända OAuth-uppgifterna för Google Kalender. För egna uppgifter skapar du dem i Google Cloud Console (som i Kalender-steget).",
     "documentGoogleDriveRedirectLabel": "Omdirigerings-URI",
     "errDocumentGoogleDrivePair": "Klient-ID och klienthemlighet för Google Drive måste antingen anges båda eller lämnas tomma.",
     "errDocumentGoogleDriveCredentials": "Google Drive kräver antingen ett eget klient-ID och en egen klienthemlighet eller konfigurerade uppgifter för Google Kalender."

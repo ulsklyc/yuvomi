@@ -118,9 +118,9 @@
     "documentGoogleDrive": "Google Drive-documentopslag",
     "documentGoogleDriveHint": "Configureer hier de OAuth-inloggegevens. Verbind Google Drive na de installatie in de documentinstellingen en selecteer het daar expliciet.",
     "documentGoogleDriveEnable": "Google Drive voor Documenten configureren",
-    "documentGoogleDriveClientIdLabel": "Client-ID overschrijven",
-    "documentGoogleDriveClientSecretLabel": "Client-secret overschrijven",
-    "documentGoogleDriveReuseHint": "Laat beide velden leeg om de OAuth-inloggegevens van Google Agenda te hergebruiken.",
+    "documentGoogleDriveClientIdLabel": "Eigen client-ID (optioneel)",
+    "documentGoogleDriveClientSecretLabel": "Eigen client-secret (optioneel)",
+    "documentGoogleDriveReuseHint": "Laat beide velden leeg om de OAuth-inloggegevens van Google Agenda te hergebruiken. Voor eigen gegevens maak je ze aan in de Google Cloud Console (zoals bij de stap Agenda).",
     "documentGoogleDriveRedirectLabel": "Redirect-URI",
     "errDocumentGoogleDrivePair": "De client-ID en het client-secret van Google Drive moeten beide zijn ingesteld of beide leeg zijn.",
     "errDocumentGoogleDriveCredentials": "Google Drive heeft een eigen client-ID en client-secret of geconfigureerde Google Agenda-inloggegevens nodig."

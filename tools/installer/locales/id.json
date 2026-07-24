@@ -118,9 +118,9 @@
     "documentGoogleDrive": "Dokumen Google Drive",
     "documentGoogleDriveHint": "Konfigurasikan kredensial OAuth di sini, lalu setelah instalasi hubungkan dan pilih Google Drive secara eksplisit di pengaturan Dokumen.",
     "documentGoogleDriveEnable": "Konfigurasikan Google Drive untuk Dokumen",
-    "documentGoogleDriveClientIdLabel": "Ganti ID klien",
-    "documentGoogleDriveClientSecretLabel": "Ganti rahasia klien",
-    "documentGoogleDriveReuseHint": "Biarkan kedua nilai kosong untuk menggunakan kembali kredensial OAuth Google Calendar.",
+    "documentGoogleDriveClientIdLabel": "ID klien sendiri (opsional)",
+    "documentGoogleDriveClientSecretLabel": "Rahasia klien sendiri (opsional)",
+    "documentGoogleDriveReuseHint": "Biarkan kedua kolom kosong untuk menggunakan kembali kredensial OAuth Google Calendar. Untuk kredensial khusus, buat di Google Cloud Console (seperti pada langkah Calendar).",
     "documentGoogleDriveRedirectLabel": "URI pengalihan",
     "errDocumentGoogleDrivePair": "ID klien dan rahasia klien Google Drive harus diisi keduanya atau dikosongkan keduanya.",
     "errDocumentGoogleDriveCredentials": "Google Drive memerlukan ID dan rahasia klien sendiri atau kredensial Google Calendar yang telah dikonfigurasi."

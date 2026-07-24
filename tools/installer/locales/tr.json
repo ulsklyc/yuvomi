@@ -183,9 +183,9 @@
     "documentGoogleDrive": "Google Drive'da belge depolama",
     "documentGoogleDriveHint": "OAuth kimlik bilgilerini burada yapılandırın, ardından kurulumdan sonra Belge ayarlarında Google Drive'a bağlanıp açıkça seçin.",
     "documentGoogleDriveEnable": "Belgeler için Google Drive'ı yapılandır",
-    "documentGoogleDriveClientIdLabel": "Özel istemci kimliği",
-    "documentGoogleDriveClientSecretLabel": "Özel istemci gizli anahtarı",
-    "documentGoogleDriveReuseHint": "Google Takvim OAuth kimlik bilgilerini yeniden kullanmak için iki özel alanı da boş bırakın.",
+    "documentGoogleDriveClientIdLabel": "Kendi istemci kimliğiniz (isteğe bağlı)",
+    "documentGoogleDriveClientSecretLabel": "Kendi istemci gizli anahtarınız (isteğe bağlı)",
+    "documentGoogleDriveReuseHint": "Google Takvim OAuth kimlik bilgilerini yeniden kullanmak için iki alanı da boş bırakın. Kendi kimlik bilgilerinizi kullanmak için bunları Google Cloud Console’da oluşturun (Takvim adımındaki gibi).",
     "documentGoogleDriveRedirectLabel": "Yönlendirme URI'si",
     "errDocumentGoogleDrivePair": "Google Drive istemci kimliği ve gizli anahtarı birlikte ayarlanmalı veya ikisi de boş bırakılmalıdır.",
     "errDocumentGoogleDriveCredentials": "Google Drive için kendi istemci kimliği ve gizli anahtarı ya da yapılandırılmış Google Takvim kimlik bilgileri gerekir."

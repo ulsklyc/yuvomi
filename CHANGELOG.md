@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.45.1] - 2026-07-24
+
+### Changed
+- The Documents storage settings page now reads top to bottom for first-time setup: provider setup (WebDAV, Google Drive) appears above the upload-destination selector, and the provider that needs attention expands automatically. When Google Drive OAuth credentials are not configured, the page now explains which environment variables to set and links to the guide, and Connect is the primary action while disconnected.
+- Google Drive documents now use their own badge color in the Documents list, distinct from the DMS badge.
+
+### Fixed
+- The landing page and the setup wizard now list Google Drive alongside local folder and WebDAV as a document storage option (previously omitted).
+
 ## [1.45.0] - 2026-07-24
 
 ### Added

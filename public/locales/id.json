@@ -1905,6 +1905,8 @@
         "documentStorageGoogleDriveFolder": "Folder",
         "documentStorageGoogleDriveCount": "Dokumen yang tersimpan di Google Drive",
         "documentStorageGoogleDriveConnect": "Hubungkan Google Drive",
+        "documentStorageGoogleDriveSetupHint": "Zum Verbinden brauchst du zuerst OAuth-Zugangsdaten: setze GOOGLE_DRIVE_CLIENT_ID und GOOGLE_DRIVE_CLIENT_SECRET (Installer → Erweitert → Google Drive) oder in deiner Umgebung.",
+        "documentStorageGoogleDriveSetupLink": "Zur Anleitung",
         "documentStorageGoogleDriveReconnect": "Hubungkan ulang",
         "documentStorageGoogleDriveDisconnectConfirm": "Putuskan koneksi penyimpanan dokumen Google Drive?",
         "documentStorageGoogleDriveDisconnectBlocked": "Pilih tujuan lain dan hapus dokumen yang disimpan di Drive sebelum memutuskan koneksi.",

@@ -1893,6 +1893,8 @@
         "documentStorageGoogleDriveFolder": "Mappa",
         "documentStorageGoogleDriveCount": "Google Drive-ban tárolt dokumentumok",
         "documentStorageGoogleDriveConnect": "Google Drive csatlakoztatása",
+        "documentStorageGoogleDriveSetupHint": "Zum Verbinden brauchst du zuerst OAuth-Zugangsdaten: setze GOOGLE_DRIVE_CLIENT_ID und GOOGLE_DRIVE_CLIENT_SECRET (Installer → Erweitert → Google Drive) oder in deiner Umgebung.",
+        "documentStorageGoogleDriveSetupLink": "Zur Anleitung",
         "documentStorageGoogleDriveReconnect": "Újracsatlakoztatás",
         "documentStorageGoogleDriveDisconnectConfirm": "Leválasztod a Google Drive-dokumentumtárolót?",
         "documentStorageGoogleDriveDisconnectBlocked": "A leválasztás előtt válassz másik célt, és távolítsd el a Drive-ban tárolt dokumentumokat.",

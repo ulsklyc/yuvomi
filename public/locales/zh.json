@@ -1893,6 +1893,8 @@
         "documentStorageGoogleDriveFolder": "文件夹",
         "documentStorageGoogleDriveCount": "已存储的 Google Drive 文档",
         "documentStorageGoogleDriveConnect": "连接 Google Drive",
+        "documentStorageGoogleDriveSetupHint": "Zum Verbinden brauchst du zuerst OAuth-Zugangsdaten: setze GOOGLE_DRIVE_CLIENT_ID und GOOGLE_DRIVE_CLIENT_SECRET (Installer → Erweitert → Google Drive) oder in deiner Umgebung.",
+        "documentStorageGoogleDriveSetupLink": "Zur Anleitung",
         "documentStorageGoogleDriveReconnect": "重新连接",
         "documentStorageGoogleDriveDisconnectConfirm": "要断开 Google Drive 文档存储连接吗？",
         "documentStorageGoogleDriveDisconnectBlocked": "断开连接前，请选择其他目标并移除存储在 Drive 中的文档。",

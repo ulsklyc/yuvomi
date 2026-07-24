@@ -183,9 +183,9 @@
     "documentGoogleDrive": "Dokumentumtárolás a Google Drive-ban",
     "documentGoogleDriveHint": "Itt állíthatod be az OAuth-hitelesítő adatokat, majd a telepítés után a Dokumentumok beállításaiban csatlakoztasd, és válaszd ki külön a Google Drive-ot.",
     "documentGoogleDriveEnable": "A Google Drive beállítása dokumentumokhoz",
-    "documentGoogleDriveClientIdLabel": "Kliensazonosító felülírása",
-    "documentGoogleDriveClientSecretLabel": "A kliens titkos kulcsának felülírása",
-    "documentGoogleDriveReuseHint": "Hagyd mindkét felülírást üresen a Google Naptár OAuth-hitelesítő adatainak újrafelhasználásához.",
+    "documentGoogleDriveClientIdLabel": "Saját kliensazonosító (opcionális)",
+    "documentGoogleDriveClientSecretLabel": "Saját kliens titkos kulcs (opcionális)",
+    "documentGoogleDriveReuseHint": "Hagyd mindkét mezőt üresen a Google Naptár OAuth-hitelesítő adatainak újrafelhasználásához. Saját adatokhoz hozd létre őket a Google Cloud Console-ban (mint a Naptár lépésben).",
     "documentGoogleDriveRedirectLabel": "Átirányítási URI",
     "errDocumentGoogleDrivePair": "A Google Drive kliensazonosítóját és titkos kulcsát vagy együtt kell megadni, vagy mindkettőt üresen kell hagyni.",
     "errDocumentGoogleDriveCredentials": "A Google Drive használatához saját kliensazonosító és titkos kulcs, vagy beállított Google Naptár-hitelesítő adatok szükségesek."

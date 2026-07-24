@@ -1893,6 +1893,8 @@
         "documentStorageGoogleDriveFolder": "Pasta",
         "documentStorageGoogleDriveCount": "Documentos armazenados no Google Drive",
         "documentStorageGoogleDriveConnect": "Ligar ao Google Drive",
+        "documentStorageGoogleDriveSetupHint": "Zum Verbinden brauchst du zuerst OAuth-Zugangsdaten: setze GOOGLE_DRIVE_CLIENT_ID und GOOGLE_DRIVE_CLIENT_SECRET (Installer → Erweitert → Google Drive) oder in deiner Umgebung.",
+        "documentStorageGoogleDriveSetupLink": "Zur Anleitung",
         "documentStorageGoogleDriveReconnect": "Voltar a ligar",
         "documentStorageGoogleDriveDisconnectConfirm": "Desligar o armazenamento de documentos do Google Drive?",
         "documentStorageGoogleDriveDisconnectBlocked": "Seleciona outro destino e remove os documentos armazenados no Drive antes de desligar.",

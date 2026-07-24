@@ -1893,6 +1893,8 @@
         "documentStorageGoogleDriveFolder": "Klasör",
         "documentStorageGoogleDriveCount": "Google Drive'da saklanan belgeler",
         "documentStorageGoogleDriveConnect": "Google Drive'a bağlan",
+        "documentStorageGoogleDriveSetupHint": "Zum Verbinden brauchst du zuerst OAuth-Zugangsdaten: setze GOOGLE_DRIVE_CLIENT_ID und GOOGLE_DRIVE_CLIENT_SECRET (Installer → Erweitert → Google Drive) oder in deiner Umgebung.",
+        "documentStorageGoogleDriveSetupLink": "Zur Anleitung",
         "documentStorageGoogleDriveReconnect": "Yeniden bağlan",
         "documentStorageGoogleDriveDisconnectConfirm": "Google Drive belge depolama bağlantısı kesilsin mi?",
         "documentStorageGoogleDriveDisconnectBlocked": "Bağlantıyı kesmeden önce başka bir hedef seçin ve Drive'da saklanan belgeleri kaldırın.",

@@ -1893,6 +1893,8 @@
         "documentStorageGoogleDriveFolder": "Složka",
         "documentStorageGoogleDriveCount": "Dokumenty uložené na Google Drive",
         "documentStorageGoogleDriveConnect": "Připojit Google Drive",
+        "documentStorageGoogleDriveSetupHint": "Zum Verbinden brauchst du zuerst OAuth-Zugangsdaten: setze GOOGLE_DRIVE_CLIENT_ID und GOOGLE_DRIVE_CLIENT_SECRET (Installer → Erweitert → Google Drive) oder in deiner Umgebung.",
+        "documentStorageGoogleDriveSetupLink": "Zur Anleitung",
         "documentStorageGoogleDriveReconnect": "Znovu připojit",
         "documentStorageGoogleDriveDisconnectConfirm": "Odpojit úložiště dokumentů Google Drive?",
         "documentStorageGoogleDriveDisconnectBlocked": "Před odpojením vyberte jiný cíl a odstraňte dokumenty uložené na Google Drive.",

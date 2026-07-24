@@ -183,9 +183,9 @@
     "documentGoogleDrive": "تخزين المستندات في Google Drive",
     "documentGoogleDriveHint": "هيّئ بيانات اعتماد OAuth هنا، ثم اربط Google Drive وحدده صراحةً في إعدادات المستندات بعد التثبيت.",
     "documentGoogleDriveEnable": "تهيئة Google Drive للمستندات",
-    "documentGoogleDriveClientIdLabel": "معرّف عميل مخصّص",
-    "documentGoogleDriveClientSecretLabel": "سر عميل مخصّص",
-    "documentGoogleDriveReuseHint": "اترك القيمتين المخصّصتين فارغتين لإعادة استخدام بيانات اعتماد OAuth لتقويم Google.",
+    "documentGoogleDriveClientIdLabel": "معرّف عميل خاص (اختياري)",
+    "documentGoogleDriveClientSecretLabel": "سر عميل خاص (اختياري)",
+    "documentGoogleDriveReuseHint": "اترك الحقلين فارغين لإعادة استخدام بيانات اعتماد OAuth الخاصة بتقويم Google. لاستخدام بيانات اعتماد مخصّصة، أنشئها في Google Cloud Console (كما في خطوة التقويم).",
     "documentGoogleDriveRedirectLabel": "عنوان URI لإعادة التوجيه",
     "errDocumentGoogleDrivePair": "يجب إدخال معرّف عميل Google Drive وسره معًا أو تركهما فارغين معًا.",
     "errDocumentGoogleDriveCredentials": "يتطلب Google Drive إما معرّف عميل وسرًا خاصين به أو بيانات اعتماد Google Calendar المهيأة."

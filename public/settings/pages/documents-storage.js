@@ -152,8 +152,8 @@ function renderPage(container) {
         <div id="document-storage-banner"></div>
         <p class="settings-card-description">${t("settings.documentStorageDescription")}</p>
         <div id="document-storage-status-host"></div>
-        <div id="document-storage-destination-host"></div>
         <div class="settings-providers" id="document-storage-providers-host"></div>
+        <div id="document-storage-destination-host"></div>
       </div>
     </section>
   `
@@ -358,25 +358,87 @@ function buildDestinationForm(data, reload) {
   return form;
 }
 
+// Genau einen Anbieter offen zeigen: den, der als Nächstes Aufmerksamkeit
+// braucht. Reihenfolge: Drive-Creds gesetzt aber noch nicht verbunden (der
+// OAuth-Klick fehlt) > der aktive externe Anbieter (Status offen halten) > gar
+// kein externes Ziel eingerichtet → Drive als beworbenes Standard-Ziel offen.
+// WebDAV klappt nur auf, wenn es das aktive Ziel ist; sonst bleibt alles zu.
+function pickExpandedProvider(data) {
+  const drive = data.google_drive ?? {};
+  const activeBackend = data.active_upload_backend ?? data.selected_upload_backend;
+  if (drive.configured && !drive.connected) return "drive";
+  if (activeBackend === "google_drive") return "drive";
+  if (activeBackend === "webdav") return "webdav";
+  const webdavReady = Boolean(data.enabled && data.configured);
+  if (!drive.connected && !webdavReady) return "drive";
+  return null;
+}
+
+function providerIcon(name) {
+  const icon = document.createElement("i");
+  icon.dataset.lucide = name;
+  icon.setAttribute("aria-hidden", "true");
+  return icon;
+}
+
+// Echte Warnung (amber): der Sachverhalt kann zu Datenverlust führen.
+function buildProviderWarning(text) {
+  const warning = document.createElement("p");
+  warning.className = "settings-document-storage-warning";
+  const label = document.createElement("span");
+  label.textContent = text;
+  warning.append(providerIcon("triangle-alert"), label);
+  return warning;
+}
+
+// Information, kein Alarm: ruhiger Ton, damit nicht zwei Warnboxen stapeln.
+function buildProviderNote(text, { icon = "info", hint = false } = {}) {
+  const note = document.createElement("p");
+  note.className = hint ? "settings-provider-note settings-provider-note--hint" : "settings-provider-note";
+  const label = document.createElement("span");
+  label.textContent = text;
+  note.append(providerIcon(icon), label);
+  return note;
+}
+
+// Führung, wenn die OAuth-Zugangsdaten fehlen: der Verbinden-Button ist dann
+// inaktiv - ohne diese Zeile bliebe unklar, wie man ihn aktiviert.
+function buildDriveSetupHint() {
+  const hint = buildProviderNote(t("settings.documentStorageGoogleDriveSetupHint") + " ", {
+    icon: "key-round",
+    hint: true
+  });
+  const link = document.createElement("a");
+  link.href =
+    "https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#google-drive-document-storage-optional";
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = t("settings.documentStorageGoogleDriveSetupLink");
+  hint.querySelector("span")?.appendChild(link);
+  return hint;
+}
+
 function buildGoogleDriveProvider(data, reload) {
   const drive = data.google_drive ?? {};
   const provider = document.createElement("section");
   provider.className = "settings-provider";
 
-  const header = document.createElement("div");
-  header.className = "settings-provider__header";
-  const heading = document.createElement("h3");
-  heading.className = "settings-provider__name";
-  heading.textContent = t("settings.documentStorageGoogleDriveTitle");
+  // Statuszeile statt wiederholter Überschrift: die Disclosure benennt bereits
+  // "Google Drive". Nur "Verbunden" trägt einen Success-Ton; die übrigen Zustände
+  // bleiben neutral - "noch nicht verbunden" ist kein Fehler.
+  const status = document.createElement("div");
+  status.className = "settings-provider__status";
   const badge = document.createElement("span");
-  badge.className = "settings-provider__badge";
+  badge.className = drive.connected
+    ? "settings-provider__badge settings-provider__badge--connected"
+    : "settings-provider__badge";
   badge.textContent = drive.connected
     ? t("settings.connected")
     : drive.configured
       ? t("settings.notConnected")
       : t("settings.notConfigured");
-  header.append(heading, badge);
-  provider.appendChild(header);
+  status.appendChild(badge);
+  provider.appendChild(status);
 
   const description = document.createElement("p");
   description.className = "settings-card-description";
@@ -397,24 +459,24 @@ function buildGoogleDriveProvider(data, reload) {
     ])
   );
 
-  const warning = document.createElement("p");
-  warning.className = "settings-document-storage-warning";
-  warning.textContent = t("settings.documentStorageBackupWarning");
-  provider.appendChild(warning);
-  const privacy = document.createElement("p");
-  privacy.className = "settings-document-storage-warning";
-  privacy.textContent = t("settings.documentStorageGoogleDrivePrivacy");
-  provider.appendChild(privacy);
+  // Backup-Hinweis bleibt eine echte Warnung (DB-Backups sichern Drive-Metadaten,
+  // nicht die Binärdateien). Der Datenschutz-Hinweis ist Information, kein Alarm.
+  provider.appendChild(buildProviderWarning(t("settings.documentStorageBackupWarning")));
+  provider.appendChild(buildProviderNote(t("settings.documentStorageGoogleDrivePrivacy")));
+  if (!drive.configured) provider.appendChild(buildDriveSetupHint());
 
   const actions = document.createElement("div");
   actions.className = "settings-form-actions";
+  // Verbinden ist die Kernaktion, solange nichts verbunden ist → Primary
+  // (Modul-Akzent). Nach Verbindung tritt "Neu verbinden" als Secondary zurück.
   const connect = document.createElement("a");
-  connect.className = "btn btn--secondary";
+  connect.className = drive.connected ? "btn btn--secondary" : "btn btn--primary";
   connect.href = "/api/v1/documents/storage/google-drive/auth";
   connect.textContent = drive.connected
     ? t("settings.documentStorageGoogleDriveReconnect")
     : t("settings.documentStorageGoogleDriveConnect");
   if (!drive.configured) {
+    connect.className = "btn btn--secondary";
     connect.removeAttribute("href");
     connect.setAttribute("aria-disabled", "true");
   }
@@ -516,20 +578,25 @@ async function loadDocumentStorageConfig(container) {
   }
 
   statusHost.replaceChildren(buildStatusSummary(data));
-  destinationHost.replaceChildren(buildDestinationForm(data, reload));
 
+  // Anbieter-Einrichtung steht über der Ziel-Wahl: erst einrichten, dann wählen.
+  // Der handlungsbedürftige Anbieter startet offen, der Rest bleibt eingeklappt.
+  const expanded = pickExpandedProvider(data);
   const form = buildConnectionForm();
   const webdav = createDisclosure({
     id: "document-storage-connection",
     summary: t("settings.documentStorageWebdavTitle"),
+    expanded: expanded === "webdav",
     content: form
   });
   const drive = createDisclosure({
     id: "document-storage-google-drive",
     summary: t("settings.documentStorageGoogleDriveTitle"),
+    expanded: expanded === "drive",
     content: buildGoogleDriveProvider(data, reload)
   });
   providersHost.replaceChildren(webdav, drive);
+  destinationHost.replaceChildren(buildDestinationForm(data, reload));
 
   applyConfigToForm(form, data);
   bindConnectionForm(container, form, reload);

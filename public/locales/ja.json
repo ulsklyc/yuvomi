@@ -1893,6 +1893,8 @@
         "documentStorageGoogleDriveFolder": "フォルダー",
         "documentStorageGoogleDriveCount": "Google Drive に保存された文書",
         "documentStorageGoogleDriveConnect": "Google Drive に接続",
+        "documentStorageGoogleDriveSetupHint": "Zum Verbinden brauchst du zuerst OAuth-Zugangsdaten: setze GOOGLE_DRIVE_CLIENT_ID und GOOGLE_DRIVE_CLIENT_SECRET (Installer → Erweitert → Google Drive) oder in deiner Umgebung.",
+        "documentStorageGoogleDriveSetupLink": "Zur Anleitung",
         "documentStorageGoogleDriveReconnect": "再接続",
         "documentStorageGoogleDriveDisconnectConfirm": "Google Drive の文書ストレージから切断しますか？",
         "documentStorageGoogleDriveDisconnectBlocked": "切断する前に、別の保存先を選択し、Google Drive に保存されている文書を削除してください。",

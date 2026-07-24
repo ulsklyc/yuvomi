@@ -183,9 +183,9 @@
     "documentGoogleDrive": "Сховище документів Google Drive",
     "documentGoogleDriveHint": "Налаштуйте тут облікові дані OAuth, а після встановлення підключіть Google Drive у налаштуваннях документів і виберіть його окремо.",
     "documentGoogleDriveEnable": "Налаштувати Google Drive для документів",
-    "documentGoogleDriveClientIdLabel": "Перевизначити ідентифікатор клієнта",
-    "documentGoogleDriveClientSecretLabel": "Перевизначити секрет клієнта",
-    "documentGoogleDriveReuseHint": "Залиште обидва поля перевизначення порожніми, щоб використовувати облікові дані OAuth Google Календаря.",
+    "documentGoogleDriveClientIdLabel": "Власний ідентифікатор клієнта (необов’язково)",
+    "documentGoogleDriveClientSecretLabel": "Власний секрет клієнта (необов’язково)",
+    "documentGoogleDriveReuseHint": "Залиште обидва поля порожніми, щоб використовувати облікові дані OAuth Google Календаря. Щоб використати власні, створіть їх у Google Cloud Console (як на кроці «Календар»).",
     "documentGoogleDriveRedirectLabel": "URI переспрямування",
     "errDocumentGoogleDrivePair": "Ідентифікатор і секрет клієнта Google Drive мають бути або обидва вказані, або обидва залишені порожніми.",
     "errDocumentGoogleDriveCredentials": "Для Google Drive потрібні власні ідентифікатор і секрет клієнта або налаштовані облікові дані Google Календаря."

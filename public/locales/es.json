@@ -1893,6 +1893,8 @@
         "documentStorageGoogleDriveFolder": "Carpeta",
         "documentStorageGoogleDriveCount": "Documentos almacenados en Google Drive",
         "documentStorageGoogleDriveConnect": "Conectar Google Drive",
+        "documentStorageGoogleDriveSetupHint": "Zum Verbinden brauchst du zuerst OAuth-Zugangsdaten: setze GOOGLE_DRIVE_CLIENT_ID und GOOGLE_DRIVE_CLIENT_SECRET (Installer → Erweitert → Google Drive) oder in deiner Umgebung.",
+        "documentStorageGoogleDriveSetupLink": "Zur Anleitung",
         "documentStorageGoogleDriveReconnect": "Volver a conectar",
         "documentStorageGoogleDriveDisconnectConfirm": "¿Desconectar el almacenamiento de documentos de Google Drive?",
         "documentStorageGoogleDriveDisconnectBlocked": "Selecciona otro destino y elimina los documentos almacenados en Drive antes de desconectarlo.",

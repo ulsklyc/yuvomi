@@ -172,7 +172,7 @@ Open your browser and navigate to **http://localhost:8090**. The wizard detects 
 
 - Basics — timezone (`TZ`) and HTTP host port (`OIKOS_HTTP_PORT`)
 - Security key generation (`SESSION_SECRET`, `DB_ENCRYPTION_KEY`)
-- Optional integrations (weather, Google Calendar, Apple CalDAV, local folder or WebDAV document storage)
+- Optional integrations (weather, Google Calendar, Apple CalDAV, local folder, WebDAV, or Google Drive document storage)
 - Advanced settings — reverse-proxy/HTTPS (`SESSION_SECURE`, `TRUST_PROXY`), Single Sign-On (OIDC), and automatic backups
 - Writing your `.env` file (an existing `.env` is backed up to `.env.bak-<timestamp>` first)
 - Starting the container (via Docker or Podman, whichever was detected)

@@ -183,9 +183,9 @@
     "documentGoogleDrive": "Αποθήκευση εγγράφων στο Google Drive",
     "documentGoogleDriveHint": "Ρυθμίστε εδώ τα διαπιστευτήρια OAuth και, μετά την εγκατάσταση, συνδέστε και επιλέξτε ρητά το Google Drive στις ρυθμίσεις Εγγράφων.",
     "documentGoogleDriveEnable": "Ρύθμιση του Google Drive για Έγγραφα",
-    "documentGoogleDriveClientIdLabel": "Παράκαμψη αναγνωριστικού πελάτη",
-    "documentGoogleDriveClientSecretLabel": "Παράκαμψη μυστικού πελάτη",
-    "documentGoogleDriveReuseHint": "Αφήστε κενές και τις δύο τιμές παράκαμψης για να επαναχρησιμοποιηθούν τα διαπιστευτήρια OAuth του Google Calendar.",
+    "documentGoogleDriveClientIdLabel": "Δικό σας αναγνωριστικό πελάτη (προαιρετικό)",
+    "documentGoogleDriveClientSecretLabel": "Δικό σας μυστικό πελάτη (προαιρετικό)",
+    "documentGoogleDriveReuseHint": "Αφήστε και τα δύο πεδία κενά για να επαναχρησιμοποιηθούν τα διαπιστευτήρια OAuth του Google Calendar. Για δικά σας, δημιουργήστε τα στο Google Cloud Console (όπως στο βήμα του Ημερολογίου).",
     "documentGoogleDriveRedirectLabel": "URI ανακατεύθυνσης",
     "errDocumentGoogleDrivePair": "Το αναγνωριστικό και το μυστικό πελάτη του Google Drive πρέπει είτε να οριστούν και τα δύο είτε να παραμείνουν και τα δύο κενά.",
     "errDocumentGoogleDriveCredentials": "Το Google Drive απαιτεί είτε δικό του αναγνωριστικό και μυστικό πελάτη είτε ρυθμισμένα διαπιστευτήρια Google Calendar."

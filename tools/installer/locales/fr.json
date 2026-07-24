@@ -183,9 +183,9 @@
     "documentGoogleDrive": "Stockage de documents sur Google Drive",
     "documentGoogleDriveHint": "Configurez ici les identifiants OAuth. Après l’installation, connectez Google Drive dans les paramètres des Documents et sélectionnez-le explicitement.",
     "documentGoogleDriveEnable": "Configurer Google Drive pour les Documents",
-    "documentGoogleDriveClientIdLabel": "Remplacer l’ID client",
-    "documentGoogleDriveClientSecretLabel": "Remplacer le secret client",
-    "documentGoogleDriveReuseHint": "Laissez les deux champs vides pour réutiliser les identifiants OAuth de Google Agenda.",
+    "documentGoogleDriveClientIdLabel": "Votre propre ID client (facultatif)",
+    "documentGoogleDriveClientSecretLabel": "Votre propre secret client (facultatif)",
+    "documentGoogleDriveReuseHint": "Laissez les deux champs vides pour réutiliser les identifiants OAuth de Google Agenda. Pour utiliser des identifiants dédiés, créez-les dans la console Google Cloud (comme à l’étape Agenda).",
     "documentGoogleDriveRedirectLabel": "URI de redirection",
     "errDocumentGoogleDrivePair": "L’ID client et le secret client de Google Drive doivent être tous deux renseignés ou tous deux vides.",
     "errDocumentGoogleDriveCredentials": "Google Drive nécessite son propre ID client et secret client ou des identifiants Google Agenda configurés."

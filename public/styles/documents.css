@@ -1434,9 +1434,11 @@
   color: var(--color-success);
 }
 
+/* Google Drive: eigener Violett-Tint, klar getrennt vom Info-Blau des DMS-Badges,
+   damit "wo liegt diese Datei" auf einen Blick lesbar bleibt. */
 .doc-badge--google-drive {
-  background: var(--color-info-light);
-  color: var(--color-info);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
 }
 
 .doc-badge--unavailable {

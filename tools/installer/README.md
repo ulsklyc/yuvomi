@@ -46,7 +46,7 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
        `EMAIL_FROM_*`); enables password-reset emails
      - **Advanced** — reverse-proxy/HTTPS (`SESSION_SECURE`, `TRUST_PROXY`),
        Single Sign-On (OIDC), automatic backups, off-site WebDAV backups
-       (`WEBDAV_BACKUP_*`), local-folder or WebDAV document storage, live
+       (`WEBDAV_BACKUP_*`), local-folder, WebDAV, or Google Drive document storage, live
        currency rates (`FIXER_API_KEY`), and the Web-Push contact (`VAPID_SUBJECT`)
    - Either path derives and writes `BASE_URL` from your host/port/scheme so
      password-reset links work out of the box.

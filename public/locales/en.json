@@ -1893,6 +1893,8 @@
         "documentStorageGoogleDriveFolder": "Folder",
         "documentStorageGoogleDriveCount": "Stored Google Drive documents",
         "documentStorageGoogleDriveConnect": "Connect Google Drive",
+        "documentStorageGoogleDriveSetupHint": "To connect, first add OAuth credentials: set GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_CLIENT_SECRET (Installer → Advanced → Google Drive) or in your environment.",
+        "documentStorageGoogleDriveSetupLink": "View the guide",
         "documentStorageGoogleDriveReconnect": "Reconnect",
         "documentStorageGoogleDriveDisconnectConfirm": "Disconnect Google Drive document storage?",
         "documentStorageGoogleDriveDisconnectBlocked": "Select another destination and remove Drive-backed documents before disconnecting.",

@@ -118,9 +118,9 @@
     "documentGoogleDrive": "ذخیره‌سازی اسناد در Google Drive",
     "documentGoogleDriveHint": "اعتبارنامه‌های OAuth را اینجا پیکربندی کنید، سپس پس از نصب در تنظیمات اسناد به Google Drive متصل شوید و آن را به‌طور صریح انتخاب کنید.",
     "documentGoogleDriveEnable": "پیکربندی Google Drive برای اسناد",
-    "documentGoogleDriveClientIdLabel": "شناسهٔ سرویس‌گیرندهٔ اختصاصی",
-    "documentGoogleDriveClientSecretLabel": "رمز سرویس‌گیرندهٔ اختصاصی",
-    "documentGoogleDriveReuseHint": "برای استفادهٔ مجدد از اعتبارنامه‌های OAuth تقویم Google، هر دو مقدار اختصاصی را خالی بگذارید.",
+    "documentGoogleDriveClientIdLabel": "شناسهٔ سرویس‌گیرندهٔ اختصاصی (اختیاری)",
+    "documentGoogleDriveClientSecretLabel": "رمز سرویس‌گیرندهٔ اختصاصی (اختیاری)",
+    "documentGoogleDriveReuseHint": "برای استفادهٔ مجدد از اعتبارنامه‌های OAuth تقویم Google، هر دو فیلد را خالی بگذارید. برای اعتبارنامه‌های اختصاصی، آن‌ها را در Google Cloud Console بسازید (مانند مرحلهٔ تقویم).",
     "documentGoogleDriveRedirectLabel": "URI تغییر مسیر",
     "errDocumentGoogleDrivePair": "شناسه و رمز سرویس‌گیرندهٔ Google Drive باید هر دو تنظیم شوند یا هر دو خالی باشند.",
     "errDocumentGoogleDriveCredentials": "Google Drive به شناسه و رمز سرویس‌گیرندهٔ اختصاصی خود یا اعتبارنامه‌های پیکربندی‌شدهٔ تقویم Google نیاز دارد."

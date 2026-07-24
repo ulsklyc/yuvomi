@@ -118,9 +118,9 @@
     "documentGoogleDrive": "Úložiště dokumentů Google Drive",
     "documentGoogleDriveHint": "Zde nastavte přihlašovací údaje OAuth. Po instalaci pak připojte Google Drive a výslovně ho vyberte v nastavení Dokumentů.",
     "documentGoogleDriveEnable": "Nastavit Google Drive pro Dokumenty",
-    "documentGoogleDriveClientIdLabel": "Vlastní ID klienta",
-    "documentGoogleDriveClientSecretLabel": "Vlastní tajný klíč klienta",
-    "documentGoogleDriveReuseHint": "Chcete-li znovu použít přihlašovací údaje OAuth Kalendáře Google, ponechte obě pole prázdná.",
+    "documentGoogleDriveClientIdLabel": "Vlastní ID klienta (volitelné)",
+    "documentGoogleDriveClientSecretLabel": "Vlastní tajný klíč klienta (volitelné)",
+    "documentGoogleDriveReuseHint": "Chcete-li znovu použít přihlašovací údaje OAuth Kalendáře Google, ponechte obě pole prázdná. Pro vlastní údaje je vytvořte v Google Cloud Console (jako v kroku Kalendář).",
     "documentGoogleDriveRedirectLabel": "URI přesměrování",
     "errDocumentGoogleDrivePair": "ID klienta a tajný klíč Google Drive musí být buď oba vyplněny, nebo oba prázdné.",
     "errDocumentGoogleDriveCredentials": "Google Drive vyžaduje vlastní ID klienta a tajný klíč nebo nastavené přihlašovací údaje Kalendáře Google."

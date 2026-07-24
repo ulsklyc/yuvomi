@@ -183,9 +183,9 @@
     "documentGoogleDrive": "Google Drive 文档存储",
     "documentGoogleDriveHint": "在此配置 OAuth 凭据。安装完成后，请在“文档”设置中连接 Google Drive 并明确将其选为存储目标。",
     "documentGoogleDriveEnable": "为文档配置 Google Drive",
-    "documentGoogleDriveClientIdLabel": "覆盖客户端 ID",
-    "documentGoogleDriveClientSecretLabel": "覆盖客户端密钥",
-    "documentGoogleDriveReuseHint": "两项均留空可复用 Google 日历 OAuth 凭据。",
+    "documentGoogleDriveClientIdLabel": "自有客户端 ID（可选）",
+    "documentGoogleDriveClientSecretLabel": "自有客户端密钥（可选）",
+    "documentGoogleDriveReuseHint": "两项均留空可复用 Google 日历 OAuth 凭据。若要使用专用凭据，请在 Google Cloud Console 中创建（与日历步骤相同）。",
     "documentGoogleDriveRedirectLabel": "重定向 URI",
     "errDocumentGoogleDrivePair": "Google Drive 客户端 ID 和密钥必须同时填写或同时留空。",
     "errDocumentGoogleDriveCredentials": "Google Drive 需要单独的客户端 ID 和密钥，或已配置的 Google 日历凭据。"
