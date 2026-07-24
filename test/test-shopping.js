@@ -42,6 +42,16 @@ test('Einkaufslisten-Zeilen toggeln nur außerhalb interaktiver Controls', () =>
   assert(/data-item-id/.test(source), 'Zeilen-Toggle muss die Artikel-ID aus data-item-id lesen');
 });
 
+test('Shopping-Löschaktionen importieren den gemeinsamen Undo-Helper', () => {
+  const source = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
+  assert(
+    /import\s*\{[^}]*\bscheduleUndoableDelete\b[^}]*\}\s*from\s*'\/utils\/ux\.js'/.test(source),
+    'scheduleUndoableDelete muss aus /utils/ux.js importiert werden',
+  );
+  const calls = source.match(/\bscheduleUndoableDelete\s*\(/g) ?? [];
+  assert(calls.length === 2, `Einzel- und Sammellöschung müssen den Undo-Helper nutzen, gefunden: ${calls.length}`);
+});
+
 // --------------------------------------------------------
 // Kategorie-Verwaltung wandert nach Shopping (Task 7)
 // --------------------------------------------------------
