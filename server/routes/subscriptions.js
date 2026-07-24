@@ -196,8 +196,16 @@ async function subscriptionsWithConversions(rows, baseCurrency, refresh = false)
 
 router.get('/meta', (_req, res) => {
   try {
-    const categories = db.get().prepare('SELECT * FROM subscription_categories ORDER BY sort_order, name COLLATE NOCASE').all();
-    const paymentMethods = db.get().prepare('SELECT * FROM subscription_payment_methods ORDER BY sort_order, name COLLATE NOCASE').all();
+    const categories = db.get().prepare(`
+      SELECT c.*, (SELECT COUNT(*) FROM budget_subscriptions s WHERE s.category_id = c.id) AS usage_count
+      FROM subscription_categories c
+      ORDER BY c.sort_order, c.name COLLATE NOCASE
+    `).all();
+    const paymentMethods = db.get().prepare(`
+      SELECT p.*, (SELECT COUNT(*) FROM budget_subscriptions s WHERE s.payment_method_id = p.id) AS usage_count
+      FROM subscription_payment_methods p
+      ORDER BY p.sort_order, p.name COLLATE NOCASE
+    `).all();
     res.json({ data: { categories, payment_methods: paymentMethods, billing_cycles: BILLING_CYCLES } });
   } catch (err) {
     log.error('GET /meta error:', err);
@@ -296,6 +304,90 @@ router.put('/meta/order', (req, res) => {
   } catch (err) {
     log.error('PUT /meta/order error:', err);
     res.status(500).json({ error: 'Subscription metadata order could not be saved.', code: 500 });
+  }
+});
+
+router.put('/categories/:id', (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const existing = db.get().prepare('SELECT * FROM subscription_categories WHERE id = ?').get(id);
+    if (!existing) return res.status(404).json({ error: 'Category not found.', code: 404 });
+    const name = str(req.body.name, 'Name', { max: MAX_SHORT });
+    const categoryColor = color(req.body.color ?? existing.color, 'Color');
+    const errors = collectErrors([name, categoryColor]);
+    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    const database = db.get();
+    database.transaction(() => {
+      database.prepare('UPDATE subscription_categories SET name = ?, color = ? WHERE id = ?')
+        .run(name.value, categoryColor.value, id);
+      // Die verknüpfte Budget-Subkategorie führt denselben Namen (POST-Invariante).
+      if (existing.budget_subcategory_key) {
+        database.prepare('UPDATE budget_subcategories SET name = ? WHERE key = ?')
+          .run(name.value, existing.budget_subcategory_key);
+      }
+    })();
+    res.json({ data: database.prepare('SELECT * FROM subscription_categories WHERE id = ?').get(id) });
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'Category already exists.', code: 409 });
+    log.error('PUT /categories/:id error:', err);
+    res.status(500).json({ error: 'Subscription category could not be saved.', code: 500 });
+  }
+});
+
+router.delete('/categories/:id', (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const existing = db.get().prepare('SELECT * FROM subscription_categories WHERE id = ?').get(id);
+    if (!existing) return res.status(404).json({ error: 'Category not found.', code: 404 });
+    const database = db.get();
+    const affected = database.transaction(() => {
+      const count = database.prepare('SELECT COUNT(*) AS n FROM budget_subscriptions WHERE category_id = ?').get(id).n;
+      if (existing.budget_subcategory_key) {
+        // Verknüpfte Ausgaben-Einträge lösen ihre - gleich mitentfernte - Subkategorie,
+        // statt auf einen toten Schlüssel zu zeigen.
+        database.prepare("UPDATE budget_entries SET subcategory = '' WHERE category = 'subscriptions' AND subcategory = ?")
+          .run(existing.budget_subcategory_key);
+        database.prepare('DELETE FROM budget_subcategories WHERE key = ?').run(existing.budget_subcategory_key);
+      }
+      // FK ON DELETE SET NULL setzt category_id der betroffenen Abos auf NULL.
+      database.prepare('DELETE FROM subscription_categories WHERE id = ?').run(id);
+      return count;
+    })();
+    res.json({ data: { deleted: true, affected } });
+  } catch (err) {
+    log.error('DELETE /categories/:id error:', err);
+    res.status(500).json({ error: 'Subscription category could not be deleted.', code: 500 });
+  }
+});
+
+router.put('/payment-methods/:id', (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const existing = db.get().prepare('SELECT * FROM subscription_payment_methods WHERE id = ?').get(id);
+    if (!existing) return res.status(404).json({ error: 'Payment method not found.', code: 404 });
+    const name = str(req.body.name, 'Name', { max: MAX_SHORT });
+    if (name.error) return res.status(400).json({ error: name.error, code: 400 });
+    db.get().prepare('UPDATE subscription_payment_methods SET name = ? WHERE id = ?').run(name.value, id);
+    res.json({ data: db.get().prepare('SELECT * FROM subscription_payment_methods WHERE id = ?').get(id) });
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'Payment method already exists.', code: 409 });
+    log.error('PUT /payment-methods/:id error:', err);
+    res.status(500).json({ error: 'Payment method could not be saved.', code: 500 });
+  }
+});
+
+router.delete('/payment-methods/:id', (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const existing = db.get().prepare('SELECT * FROM subscription_payment_methods WHERE id = ?').get(id);
+    if (!existing) return res.status(404).json({ error: 'Payment method not found.', code: 404 });
+    const affected = db.get().prepare('SELECT COUNT(*) AS n FROM budget_subscriptions WHERE payment_method_id = ?').get(id).n;
+    // FK ON DELETE SET NULL entkoppelt betroffene Abos von der Zahlungsart.
+    db.get().prepare('DELETE FROM subscription_payment_methods WHERE id = ?').run(id);
+    res.json({ data: { deleted: true, affected } });
+  } catch (err) {
+    log.error('DELETE /payment-methods/:id error:', err);
+    res.status(500).json({ error: 'Payment method could not be deleted.', code: 500 });
   }
 });
 

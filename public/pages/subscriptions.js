@@ -1127,16 +1127,41 @@ async function openSettingsModal() {
 }
 
 function metadataRows(items, kind) {
+  const isCat = kind === 'categories';
+  const editLabel = isCat ? t('subscriptions.editCategory') : t('subscriptions.editPaymentMethod');
+  const deleteLabel = isCat ? t('subscriptions.deleteCategory') : t('subscriptions.deletePaymentMethod');
   return items.map((item, index) => `
-    <li data-id="${item.id}">
-      ${kind === 'categories' ? `<i style="background:${esc(item.color)}"></i>` : '<i data-lucide="credit-card" aria-hidden="true"></i>'}
-      <span>${esc(kind === 'categories' ? categoryLabel(item) : item.name)}</span>
-      <button class="btn btn--icon" data-move="-1" ${index === 0 ? 'disabled' : ''} aria-label="${t('subscriptions.moveUp')}">
-        <i data-lucide="chevron-up" aria-hidden="true"></i>
-      </button>
-      <button class="btn btn--icon" data-move="1" ${index === items.length - 1 ? 'disabled' : ''} aria-label="${t('subscriptions.moveDown')}">
-        <i data-lucide="chevron-down" aria-hidden="true"></i>
-      </button>
+    <li data-id="${item.id}" data-kind="${kind}">
+      <div class="subscriptions-metadata-row__view">
+        ${isCat ? `<i style="background:${esc(item.color)}"></i>` : '<i data-lucide="credit-card" aria-hidden="true"></i>'}
+        <span>${esc(isCat ? categoryLabel(item) : item.name)}</span>
+        <div class="subscriptions-metadata-row__actions">
+          <button class="btn btn--icon" data-move="-1" ${index === 0 ? 'disabled' : ''} aria-label="${t('subscriptions.moveUp')}">
+            <i data-lucide="chevron-up" aria-hidden="true"></i>
+          </button>
+          <button class="btn btn--icon" data-move="1" ${index === items.length - 1 ? 'disabled' : ''} aria-label="${t('subscriptions.moveDown')}">
+            <i data-lucide="chevron-down" aria-hidden="true"></i>
+          </button>
+          <button class="btn btn--icon" data-act="edit" aria-label="${editLabel}">
+            <i data-lucide="pencil" aria-hidden="true"></i>
+          </button>
+          <button class="btn btn--icon" data-act="delete" aria-label="${deleteLabel}">
+            <i data-lucide="trash-2" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+      <div class="subscriptions-metadata-row__edit" hidden>
+        <input class="form-input subscriptions-metadata-edit-name" value="${esc(item.name)}" maxlength="100" aria-label="${editLabel}">
+        ${isCat ? `<input class="form-input form-input--color subscriptions-metadata-edit-color" type="color" value="${esc(item.color)}" aria-label="${t('subscriptions.brandColorLabel')}">` : ''}
+        <div class="subscriptions-metadata-row__actions">
+          <button class="btn btn--icon" data-act="save" aria-label="${t('common.save')}">
+            <i data-lucide="check" aria-hidden="true"></i>
+          </button>
+          <button class="btn btn--icon" data-act="cancel" aria-label="${t('common.cancel')}">
+            <i data-lucide="x" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
     </li>
   `).join('');
 }
@@ -1202,6 +1227,76 @@ function openMetadataModal() {
           await api.put('/budget/subscriptions/meta/order', { [key]: rows.map((row) => Number(row.dataset.id)) });
           await closeModal({ force: true });
           await reload();
+          openMetadataModal();
+        });
+      });
+
+      // Inline-Bearbeitung: die vorgerenderte Edit-Zeile ein-/ausblenden.
+      panel.querySelectorAll('[data-act="edit"]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const li = button.closest('li');
+          li.querySelector('.subscriptions-metadata-row__view').hidden = true;
+          const editRow = li.querySelector('.subscriptions-metadata-row__edit');
+          editRow.hidden = false;
+          editRow.querySelector('.subscriptions-metadata-edit-name').focus();
+        });
+      });
+      panel.querySelectorAll('[data-act="cancel"]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const li = button.closest('li');
+          const editRow = li.querySelector('.subscriptions-metadata-row__edit');
+          const nameInput = editRow.querySelector('.subscriptions-metadata-edit-name');
+          nameInput.value = nameInput.defaultValue;
+          const colorInput = editRow.querySelector('.subscriptions-metadata-edit-color');
+          if (colorInput) colorInput.value = colorInput.defaultValue;
+          editRow.hidden = true;
+          li.querySelector('.subscriptions-metadata-row__view').hidden = false;
+        });
+      });
+      panel.querySelectorAll('[data-act="save"]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const li = button.closest('li');
+          const id = Number(li.dataset.id);
+          const editRow = li.querySelector('.subscriptions-metadata-row__edit');
+          const nameInput = editRow.querySelector('.subscriptions-metadata-edit-name');
+          const name = nameInput.value.trim();
+          if (!name) { nameInput.focus(); return; }
+          const colorInput = editRow.querySelector('.subscriptions-metadata-edit-color');
+          try {
+            if (li.dataset.kind === 'categories') {
+              await api.put(`/budget/subscriptions/categories/${id}`, { name, color: colorInput.value });
+            } else {
+              await api.put(`/budget/subscriptions/payment-methods/${id}`, { name });
+            }
+            await closeModal({ force: true });
+            await reload();
+            openMetadataModal();
+          } catch (err) {
+            window.yuvomi?.showToast(err.data?.error || err.message || t('common.unknownError'), 'danger');
+          }
+        });
+      });
+      panel.querySelectorAll('[data-act="delete"]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const li = button.closest('li');
+          const id = Number(li.dataset.id);
+          const isCat = li.dataset.kind === 'categories';
+          const item = state.meta[isCat ? 'categories' : 'payment_methods'].find((row) => row.id === id);
+          const inUse = item?.usage_count || 0;
+          const name = item ? (isCat ? categoryLabel(item) : item.name) : '';
+          // confirmModal ersetzt (kein Stacking) das Verwalten-Modal; danach neu öffnen.
+          const confirmed = await confirmModal(
+            t(isCat ? 'subscriptions.deleteCategoryConfirm' : 'subscriptions.deletePaymentMethodConfirm', { name }),
+            { danger: true, detail: inUse ? t('subscriptions.metaInUseWarning', { count: inUse }) : null },
+          );
+          if (confirmed) {
+            try {
+              await api.delete(`/budget/subscriptions/${isCat ? 'categories' : 'payment-methods'}/${id}`);
+              await reload();
+            } catch (err) {
+              window.yuvomi?.showToast(err.data?.error || err.message || t('common.unknownError'), 'danger');
+            }
+          }
           openMetadataModal();
         });
       });

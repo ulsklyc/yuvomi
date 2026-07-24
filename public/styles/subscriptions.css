@@ -745,17 +745,50 @@
 }
 
 .subscriptions-metadata li {
-  display: grid;
-  grid-template-columns: auto 1fr auto auto;
-  gap: var(--space-2);
-  align-items: center;
   min-height: 44px;
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
 }
 
-.subscriptions-metadata li > i {
+.subscriptions-metadata-row__view {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 36px;
+}
+
+.subscriptions-metadata-row__edit {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 36px;
+}
+
+/* [hidden] hat gegenüber den display-Klassen zu geringe Spezifität - explizit übersteuern. */
+.subscriptions-metadata-row__view[hidden],
+.subscriptions-metadata-row__edit[hidden] {
+  display: none;
+}
+
+.subscriptions-metadata-edit-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.subscriptions-metadata-row__edit .form-input--color {
+  width: 44px;
+  flex: 0 0 44px;
+  padding: 2px;
+}
+
+.subscriptions-metadata-row__actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.subscriptions-metadata-row__view > i {
   width: 16px;
   height: 16px;
   border-radius: 50%;

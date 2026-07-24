@@ -307,6 +307,67 @@ try {
     assert.equal(database.prepare("SELECT COUNT(*) AS n FROM reminders WHERE entity_type = 'subscription' AND entity_id = ?").get(delId).n, 0);
     assert.equal(database.prepare('SELECT COUNT(*) AS n FROM budget_entries WHERE id = ?').get(delEntryId).n, 0);
 
+    // ------------------------------------------------------------------
+    // Meta-Bearbeitung/-Löschung (#551): Kategorien + Zahlungsarten editier-
+    // und entfernbar; verknüpfte Budget-Subkategorie + Abos ziehen korrekt mit.
+    // ------------------------------------------------------------------
+    // Kategorie umbenennen + neu färben -> Budget-Subkategorie erbt den Namen.
+    const catEdit = await jsonReq('PUT', `/categories/${category.id}`, { name: 'Dev tooling', color: '#111827' });
+    assert.equal(catEdit.status, 200);
+    assert.equal(catEdit.body.data.name, 'Dev tooling');
+    assert.equal(catEdit.body.data.color, '#111827');
+    assert.equal(
+      database.prepare('SELECT name FROM budget_subcategories WHERE key = ?').get(category.budget_subcategory_key).name,
+      'Dev tooling',
+    );
+    assert.equal((await jsonReq('PUT', '/categories/999999', { name: 'x' })).status, 404);
+    // Namensdublette gegen Default-Kategorie -> 409 (COLLATE NOCASE UNIQUE).
+    assert.equal((await jsonReq('PUT', `/categories/${category.id}`, { name: 'Entertainment' })).status, 409);
+
+    // GET /meta liefert usage_count je Eintrag.
+    const usageMeta = await jsonReq('GET', '/meta');
+    assert.equal(usageMeta.body.data.categories.find((c) => c.id === category.id).usage_count, 0);
+
+    // Weich löschen einer genutzten Kategorie: Abo -> uncategorized, Budget-
+    // Subkategorie entfernt, Ausgaben-Eintrag von der toten Subkategorie gelöst.
+    const linkCat = await jsonReq('POST', '/categories', { name: 'Streaming', color: '#7C3AED' });
+    const linkCatId = linkCat.body.data.id;
+    const linkCatKey = linkCat.body.data.budget_subcategory_key;
+    const linkedSub = await jsonReq('POST', '', {
+      name: 'Streamer', amount: 12, currency: 'EUR', billing_cycle: 'monthly',
+      next_payment_date: '2026-10-05', reminder_days: 3, category_id: linkCatId,
+    });
+    const linkedSubId = linkedSub.body.data.id;
+    const linkedEntryId = linkedSub.body.data.budget_entry_id;
+    assert.equal(database.prepare('SELECT subcategory FROM budget_entries WHERE id = ?').get(linkedEntryId).subcategory, linkCatKey);
+    assert.equal((await jsonReq('GET', '/meta')).body.data.categories.find((c) => c.id === linkCatId).usage_count, 1);
+    const catDel = await jsonReq('DELETE', `/categories/${linkCatId}`);
+    assert.equal(catDel.status, 200);
+    assert.equal(catDel.body.data.affected, 1);
+    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM subscription_categories WHERE id = ?').get(linkCatId).n, 0);
+    assert.equal(database.prepare('SELECT category_id FROM budget_subscriptions WHERE id = ?').get(linkedSubId).category_id, null);
+    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM budget_subcategories WHERE key = ?').get(linkCatKey).n, 0);
+    assert.equal(database.prepare('SELECT subcategory FROM budget_entries WHERE id = ?').get(linkedEntryId).subcategory, '');
+    assert.equal((await jsonReq('DELETE', '/categories/999999')).status, 404);
+
+    // Zahlungsart umbenennen (404/400-Pfade) + löschen entkoppelt Abos (FK SET NULL).
+    const pmEdit = await jsonReq('PUT', `/payment-methods/${methodId}`, { name: 'Kreditkarte Gold' });
+    assert.equal(pmEdit.status, 200);
+    assert.equal(pmEdit.body.data.name, 'Kreditkarte Gold');
+    assert.equal((await jsonReq('PUT', '/payment-methods/999999', { name: 'x' })).status, 404);
+    assert.equal((await jsonReq('PUT', `/payment-methods/${methodId}`, {})).status, 400);
+    const pmSub = await jsonReq('POST', '', {
+      name: 'Karten-Abo', amount: 7, currency: 'EUR', billing_cycle: 'monthly',
+      next_payment_date: '2026-10-06', reminder_days: 3, payment_method_id: methodId,
+    });
+    const pmSubId = pmSub.body.data.id;
+    const pmDel = await jsonReq('DELETE', `/payment-methods/${methodId}`);
+    assert.equal(pmDel.status, 200);
+    assert.equal(pmDel.body.data.affected, 1);
+    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM subscription_payment_methods WHERE id = ?').get(methodId).n, 0);
+    assert.equal(database.prepare('SELECT payment_method_id FROM budget_subscriptions WHERE id = ?').get(pmSubId).payment_method_id, null);
+    assert.equal((await jsonReq('DELETE', '/payment-methods/999999')).status, 404);
+
     // Personal-Modus: kein Admin-Bypass auf fremde private Abos (#476/#505).
     database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('other', 'Other', 'x', 'member')").run();
     const otherId = database.prepare("SELECT id FROM users WHERE username = 'other'").get().id;
