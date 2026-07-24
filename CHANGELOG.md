@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.45.0] - 2026-07-24
+
 ### Added
 - Add Google Drive as an explicitly selected storage destination for new Documents files and Calendar attachments, with least-privilege OAuth connection, testing, account safeguards, and provider status. Existing files stay on their recorded backend, and SQLite backups contain Drive metadata and file IDs rather than Drive-hosted binaries.
 
