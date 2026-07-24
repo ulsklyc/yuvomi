@@ -1151,7 +1151,7 @@ function metadataRows(items, kind) {
         </div>
       </div>
       <div class="subscriptions-metadata-row__edit" hidden>
-        <input class="form-input subscriptions-metadata-edit-name" value="${esc(item.name)}" maxlength="100" aria-label="${editLabel}">
+        <input class="form-input subscriptions-metadata-edit-name" value="${esc(isCat ? categoryLabel(item) : item.name)}" data-original-name="${esc(item.name)}" maxlength="100" aria-label="${editLabel}">
         ${isCat ? `<input class="form-input form-input--color subscriptions-metadata-edit-color" type="color" value="${esc(item.color)}" aria-label="${t('subscriptions.brandColorLabel')}">` : ''}
         <div class="subscriptions-metadata-row__actions">
           <button class="btn btn--icon" data-act="save" aria-label="${t('common.save')}">
@@ -1194,7 +1194,7 @@ function openMetadataModal() {
   openModal({
     title: t('subscriptions.manageMetadata'),
     content,
-    size: 'lg',
+    size: 'xl',
     onSave(panel) {
       panel.querySelector('#subscriptions-metadata-close').addEventListener('click', closeModal);
       panel.querySelector('#subscription-add-category').addEventListener('click', async () => {
@@ -1277,8 +1277,14 @@ function openMetadataModal() {
           const id = Number(li.dataset.id);
           const editRow = li.querySelector('.subscriptions-metadata-row__edit');
           const nameInput = editRow.querySelector('.subscriptions-metadata-edit-name');
-          const name = nameInput.value.trim();
-          if (!name) { nameInput.focus(); return; }
+          const typed = nameInput.value.trim();
+          if (!typed) { nameInput.focus(); return; }
+          // Das Feld zeigt bei Default-Kategorien den lokalisierten Namen ("Bildung").
+          // Bleibt er unverändert (z. B. nur Farbe geändert), den gespeicherten Kanon-
+          // Namen ("Education") behalten, damit die Lokalisierung nicht verloren geht.
+          const name = nameInput.value === nameInput.defaultValue
+            ? (nameInput.dataset.originalName ?? typed)
+            : typed;
           const colorInput = editRow.querySelector('.subscriptions-metadata-edit-color');
           try {
             if (li.dataset.kind === 'categories') {

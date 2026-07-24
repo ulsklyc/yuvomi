@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.45.4] - 2026-07-24
+
+### Fixed
+- In Budget → Subscriptions, the "Manage categories and payment methods" dialog no longer squishes its two columns on iPad and narrow screens: the categories and payment-methods lists now sit side by side only when there is room and stack into a single column otherwise, so each row's name and action buttons stay on one line instead of overlapping.
+- Renaming a default subscription category now pre-fills the edit field with the localized name shown in the list (for example "Bildung") instead of the internal English name ("Education"). Editing only the color of a default category keeps its localization intact.
+
 ## [1.45.3] - 2026-07-24
 
 ### Fixed

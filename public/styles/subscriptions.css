@@ -732,7 +732,10 @@
 
 .subscriptions-metadata {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* auto-fit: zwei Spalten nur, wenn jede breit genug für Name + vier Icon-Buttons
+   * ist (>= 24rem), sonst eine Spalte. Verhindert das Quetschen im schmalen Modal
+   * auf Tablet/Phone; min(100%, ...) schützt vor Overflow unter 24rem. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
   gap: var(--space-4);
 }
 
