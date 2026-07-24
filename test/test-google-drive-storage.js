@@ -378,3 +378,22 @@ test('disconnect is blocked by selection or rows and clears only Drive keys when
   assert.equal(cfg('document_storage_google_drive_refresh_token'), null);
   assert.equal(cfg('google_refresh_token'), 'calendar-refresh');
 });
+
+test('disconnect never sweeps sibling document_storage_* keys', async () => {
+  await driveStorage.handleCallback('code');
+  // Selecting another backend is what lets disconnect proceed.
+  setCfg('document_storage_selected_backend', 'webdav');
+  setCfg('document_storage_webdav_url', 'https://dav.example.test/remote.php/dav');
+  // Only matches the delete prefix if its underscores are read as LIKE
+  // wildcards - the guard against the sweep widening past the literal prefix.
+  setCfg('document_storage_google_driveX_wildcard_trap', 'must-survive');
+  assert.notEqual(cfg('document_storage_google_drive_refresh_token'), null);
+
+  driveStorage.disconnect();
+
+  assert.equal(cfg('document_storage_google_drive_refresh_token'), null);
+  assert.equal(cfg('document_storage_google_drive_account_id'), null);
+  assert.equal(cfg('document_storage_selected_backend'), 'webdav');
+  assert.equal(cfg('document_storage_webdav_url'), 'https://dav.example.test/remote.php/dav');
+  assert.equal(cfg('document_storage_google_driveX_wildcard_trap'), 'must-survive');
+});

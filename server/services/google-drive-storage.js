@@ -486,8 +486,11 @@ export function disconnect() {
       'Select another upload destination before disconnecting Google Drive.'
     );
   }
-  db.get().prepare('DELETE FROM sync_config WHERE key LIKE ?')
-    .run(`${CONFIG_PREFIX}%`);
+  // Escape LIKE wildcards in the prefix so each literal underscore stays literal;
+  // otherwise the sweep could widen to unrelated document_storage_* keys.
+  const escapedPrefix = CONFIG_PREFIX.replace(/[\\%_]/g, '\\$&');
+  db.get().prepare("DELETE FROM sync_config WHERE key LIKE ? ESCAPE '\\'")
+    .run(`${escapedPrefix}%`);
   log.info('Google Drive disconnected without revoking shared OAuth credentials.');
 }
 
