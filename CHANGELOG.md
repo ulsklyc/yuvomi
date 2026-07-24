@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Deleting an individual shopping item or using "Remove checked" now permanently removes the item instead of showing an error and restoring it on refresh. Both actions used the shared undo-delete helper without importing it, so the browser stopped before scheduling the server request (#558).
+
 ## [1.44.4] - 2026-07-23
 
 ### Fixed
