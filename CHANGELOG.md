@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.45.2] - 2026-07-24
+
+### Added
+- Subscription categories and payment methods can now be renamed, recolored (categories only), and removed from the "Manage categories and payment methods" dialog in Budget → Subscriptions, in addition to being added and reordered. Removing one detaches any subscriptions still using it (they fall back to uncategorized or unspecified) and the confirmation shows how many are affected; removing a category also cleans up its mirrored Budget subcategory and detaches the linked expense entries (#551).
+
 ## [1.45.1] - 2026-07-24
 
 ### Changed
