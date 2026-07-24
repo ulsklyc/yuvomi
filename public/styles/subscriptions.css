@@ -752,11 +752,22 @@
 }
 
 .subscriptions-metadata-row__view {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: var(--space-2);
   min-height: 36px;
+}
+
+/* Name behält Vorrang; die vier Icon-Buttons rutschen bei Enge (schmales
+ * Mobile) in die nächste Zeile, statt den Namen auf wenige Zeichen zu quetschen. */
+.subscriptions-metadata-row__view > span {
+  flex: 1 1 7rem;
+  min-width: 0;
+}
+
+.subscriptions-metadata-row__view .subscriptions-metadata-row__actions {
+  margin-left: auto;
 }
 
 .subscriptions-metadata-row__edit {

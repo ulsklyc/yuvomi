@@ -2788,6 +2788,8 @@
         "deleteCategoryConfirm": "Delete category \"{{name}}\"?",
         "deletePaymentMethodConfirm": "Delete payment method \"{{name}}\"?",
         "metaInUseWarning": "{{count}} subscription(s) will lose this assignment.",
+        "metaSavedToast": "Saved.",
+        "metaDeletedToast": "Removed.",
         "findLogo": "ロゴを検索",
         "findLogoHint": "Webサイトのアイコンと公開サイトメタデータを探します。",
         "logoFound": "ロゴが見つかりました。",

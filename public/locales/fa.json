@@ -2788,6 +2788,8 @@
         "deleteCategoryConfirm": "Delete category \"{{name}}\"?",
         "deletePaymentMethodConfirm": "Delete payment method \"{{name}}\"?",
         "metaInUseWarning": "{{count}} subscription(s) will lose this assignment.",
+        "metaSavedToast": "Saved.",
+        "metaDeletedToast": "Removed.",
         "findLogo": "یافتن لوگو",
         "findLogoHint": "نمادهای وب‌سایت و ابرداده‌های عمومی وب‌سایت را جستجو می‌کند.",
         "logoFound": "لوگو یافت شد.",

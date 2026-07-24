@@ -1136,10 +1136,10 @@ function metadataRows(items, kind) {
         ${isCat ? `<i style="background:${esc(item.color)}"></i>` : '<i data-lucide="credit-card" aria-hidden="true"></i>'}
         <span>${esc(isCat ? categoryLabel(item) : item.name)}</span>
         <div class="subscriptions-metadata-row__actions">
-          <button class="btn btn--icon" data-move="-1" ${index === 0 ? 'disabled' : ''} aria-label="${t('subscriptions.moveUp')}">
+          <button class="btn btn--icon" data-move="-1" ${index === 0 ? 'aria-disabled="true"' : ''} aria-label="${t('subscriptions.moveUp')}">
             <i data-lucide="chevron-up" aria-hidden="true"></i>
           </button>
-          <button class="btn btn--icon" data-move="1" ${index === items.length - 1 ? 'disabled' : ''} aria-label="${t('subscriptions.moveDown')}">
+          <button class="btn btn--icon" data-move="1" ${index === items.length - 1 ? 'aria-disabled="true"' : ''} aria-label="${t('subscriptions.moveDown')}">
             <i data-lucide="chevron-down" aria-hidden="true"></i>
           </button>
           <button class="btn btn--icon" data-act="edit" aria-label="${editLabel}">
@@ -1218,6 +1218,9 @@ function openMetadataModal() {
       });
       panel.querySelectorAll('[data-move]').forEach((button) => {
         button.addEventListener('click', async () => {
+          // aria-disabled statt disabled: der Button bleibt fokussierbar, der
+          // No-op-Klick am Listenrand wird hier verworfen (siehe layout.css).
+          if (button.getAttribute('aria-disabled') === 'true') return;
           const list = button.closest('ul');
           const rows = [...list.querySelectorAll('li')];
           const index = rows.indexOf(button.closest('li'));
@@ -1251,6 +1254,21 @@ function openMetadataModal() {
           if (colorInput) colorInput.value = colorInput.defaultValue;
           editRow.hidden = true;
           li.querySelector('.subscriptions-metadata-row__view').hidden = false;
+          // Fokus zurück auf den Auslöser, statt ins Leere (der Cancel-Button
+          // wird gerade versteckt) - sonst verliert die Tastatur die Position.
+          li.querySelector('[data-act="edit"]').focus();
+        });
+      });
+      // Tastatur im Inline-Edit: Enter speichert, Escape bricht ab. stopPropagation
+      // hält den globalen Modal-Handler (modal.js) davon ab, den ersten .btn--primary
+      // im Panel zu klicken bzw. das ganze Modal via Escape zu schließen.
+      panel.querySelectorAll('.subscriptions-metadata-row__edit input').forEach((input) => {
+        input.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter' && event.key !== 'Escape') return;
+          event.preventDefault();
+          event.stopPropagation();
+          const act = event.key === 'Enter' ? 'save' : 'cancel';
+          input.closest('li').querySelector(`[data-act="${act}"]`).click();
         });
       });
       panel.querySelectorAll('[data-act="save"]').forEach((button) => {
@@ -1271,6 +1289,7 @@ function openMetadataModal() {
             await closeModal({ force: true });
             await reload();
             openMetadataModal();
+            window.yuvomi?.showToast(t('subscriptions.metaSavedToast'), 'success');
           } catch (err) {
             window.yuvomi?.showToast(err.data?.error || err.message || t('common.unknownError'), 'danger');
           }
@@ -1293,6 +1312,7 @@ function openMetadataModal() {
             try {
               await api.delete(`/budget/subscriptions/${isCat ? 'categories' : 'payment-methods'}/${id}`);
               await reload();
+              window.yuvomi?.showToast(t('subscriptions.metaDeletedToast'), 'success');
             } catch (err) {
               window.yuvomi?.showToast(err.data?.error || err.message || t('common.unknownError'), 'danger');
             }

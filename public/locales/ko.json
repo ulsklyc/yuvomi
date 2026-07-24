@@ -2788,6 +2788,8 @@
         "deleteCategoryConfirm": "Delete category \"{{name}}\"?",
         "deletePaymentMethodConfirm": "Delete payment method \"{{name}}\"?",
         "metaInUseWarning": "{{count}} subscription(s) will lose this assignment.",
+        "metaSavedToast": "Saved.",
+        "metaDeletedToast": "Removed.",
         "findLogo": "로고 찾기",
         "findLogoHint": "웹사이트 아이콘과 공개 웹사이트 메타데이터를 검색합니다.",
         "logoFound": "로고를 찾았습니다.",

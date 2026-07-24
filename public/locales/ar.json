@@ -2788,6 +2788,8 @@
         "deleteCategoryConfirm": "Delete category \"{{name}}\"?",
         "deletePaymentMethodConfirm": "Delete payment method \"{{name}}\"?",
         "metaInUseWarning": "{{count}} subscription(s) will lose this assignment.",
+        "metaSavedToast": "Saved.",
+        "metaDeletedToast": "Removed.",
         "findLogo": "Find logo",
         "findLogoHint": "يبحث في أيقونات الموقع وبيانات الموقع الوصفية العامة.",
         "logoFound": "تم العثور على الشعار.",

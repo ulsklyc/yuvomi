@@ -2788,6 +2788,8 @@
         "deleteCategoryConfirm": "Delete category \"{{name}}\"?",
         "deletePaymentMethodConfirm": "Delete payment method \"{{name}}\"?",
         "metaInUseWarning": "{{count}} subscription(s) will lose this assignment.",
+        "metaSavedToast": "Saved.",
+        "metaDeletedToast": "Removed.",
         "findLogo": "Find logo",
         "findLogoHint": "वेबसाइट आइकन और सार्वजनिक साइट मेटाडेटा खोजता है।",
         "logoFound": "लोगो मिला।",

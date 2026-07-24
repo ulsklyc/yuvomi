@@ -2788,6 +2788,8 @@
         "deleteCategoryConfirm": "Kategorie \"{{name}}\" löschen?",
         "deletePaymentMethodConfirm": "Zahlungsart \"{{name}}\" löschen?",
         "metaInUseWarning": "{{count}} Abonnement(s) verlieren dadurch die Zuordnung.",
+        "metaSavedToast": "Gespeichert.",
+        "metaDeletedToast": "Entfernt.",
         "findLogo": "Logo finden",
         "findLogoHint": "Durchsucht Website-Icons und öffentliche Website-Metadaten.",
         "logoFound": "Logo gefunden.",

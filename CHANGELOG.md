@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.45.3] - 2026-07-24
+
+### Fixed
+- In Budget → Subscriptions, pressing Enter while renaming a category or payment method in the "Manage categories and payment methods" dialog now saves the change and Escape cancels it, instead of triggering an unrelated action or doing nothing. Keyboard focus also returns to the row after cancelling an inline edit.
+
+### Changed
+- Editing or removing a subscription category or payment method now shows a confirmation, and the manage dialog lays out its per-row actions more comfortably on narrow screens.
+
 ## [1.45.2] - 2026-07-24
 
 ### Added
