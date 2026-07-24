@@ -170,7 +170,7 @@ router.post('/', async (req, res) => {
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
     }
     log.error('', err);
-    if (stagedUpload?.storage_backend === 'webdav') {
+    if (stagedUpload) {
       try {
         await cleanupStagedUpload(stagedUpload);
       } catch (cleanupError) {
@@ -369,7 +369,7 @@ router.put('/:id', async (req, res) => {
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
     }
     log.error('', err);
-    if (stagedUpload?.storage_backend === 'webdav') {
+    if (stagedUpload) {
       try {
         await cleanupStagedUpload(stagedUpload);
       } catch (cleanupError) {

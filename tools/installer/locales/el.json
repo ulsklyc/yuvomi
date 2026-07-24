@@ -93,7 +93,8 @@
     "backups": "Αντίγραφα ασφαλείας",
     "webdavBackup": "Εξωτερικά αντίγραφα",
     "on": "ενεργό",
-    "off": "ανενεργό"
+    "off": "ανενεργό",
+    "documentGoogleDrive": "Έγγραφα Google Drive"
   },
   "docker": {
     "title": "Εκκίνηση του Yuvomi",
@@ -178,7 +179,16 @@
     "fixerLabel": "Κλειδί API Fixer (ζωντανές ισοτιμίες)",
     "fixerHint": "Προαιρετικό. Μετατρέπει τα νομίσματα των συνδρομών με ζωντανές ισοτιμίες. Οι συνδρομές λειτουργούν και χωρίς αυτό.",
     "pushSubjectLabel": "Διεύθυνση επικοινωνίας push",
-    "pushSubjectHint": "Αποστέλλεται στις υπηρεσίες push ως επικοινωνία του διακομιστή σας. Αφήστε το κενό για την προεπιλογή."
+    "pushSubjectHint": "Αποστέλλεται στις υπηρεσίες push ως επικοινωνία του διακομιστή σας. Αφήστε το κενό για την προεπιλογή.",
+    "documentGoogleDrive": "Αποθήκευση εγγράφων στο Google Drive",
+    "documentGoogleDriveHint": "Ρυθμίστε εδώ τα διαπιστευτήρια OAuth και, μετά την εγκατάσταση, συνδέστε και επιλέξτε ρητά το Google Drive στις ρυθμίσεις Εγγράφων.",
+    "documentGoogleDriveEnable": "Ρύθμιση του Google Drive για Έγγραφα",
+    "documentGoogleDriveClientIdLabel": "Παράκαμψη αναγνωριστικού πελάτη",
+    "documentGoogleDriveClientSecretLabel": "Παράκαμψη μυστικού πελάτη",
+    "documentGoogleDriveReuseHint": "Αφήστε κενές και τις δύο τιμές παράκαμψης για να επαναχρησιμοποιηθούν τα διαπιστευτήρια OAuth του Google Calendar.",
+    "documentGoogleDriveRedirectLabel": "URI ανακατεύθυνσης",
+    "errDocumentGoogleDrivePair": "Το αναγνωριστικό και το μυστικό πελάτη του Google Drive πρέπει είτε να οριστούν και τα δύο είτε να παραμείνουν και τα δύο κενά.",
+    "errDocumentGoogleDriveCredentials": "Το Google Drive απαιτεί είτε δικό του αναγνωριστικό και μυστικό πελάτη είτε ρυθμισμένα διαπιστευτήρια Google Calendar."
   },
   "welcome": {
     "title": "Καλώς ήρθατε στο Yuvomi",

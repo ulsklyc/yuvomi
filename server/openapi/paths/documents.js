@@ -19,10 +19,10 @@ export function documentsPaths() {
     },
     '/api/v1/documents/storage/config': {
       get: op({
-        summary: 'Get WebDAV document-storage configuration',
+        summary: 'Get document-storage configuration',
         tag: 'Documents',
         admin: true,
-        description: 'Returns the effective hybrid configuration and status. Environment-controlled fields are reported individually. The WebDAV password is never returned.',
+        description: 'Returns the selected and effective upload destinations, local-folder override, WebDAV configuration and secret-free Google Drive status. Environment-controlled WebDAV fields are reported individually. Passwords and OAuth tokens are never returned.',
         responses: {
           200: {
             description: 'Effective document-storage status',
@@ -33,11 +33,11 @@ export function documentsPaths() {
         },
       }),
       put: op({
-        summary: 'Update WebDAV document-storage configuration',
+        summary: 'Update document-storage configuration',
         tag: 'Documents',
         admin: true,
         stateChanging: true,
-        description: 'Updates DB-backed fields that are not controlled by environment variables. When WebDAV documents exist, connection changes require `confirm_existing_access: true` and a successful read check against an existing object. Use `clear_password: true` to explicitly remove a stored password.',
+        description: 'Updates the explicit upload destination and any DB-backed WebDAV fields not controlled by environment variables. Sending only `selected_upload_backend` leaves WebDAV fields unchanged. Google Drive must be connected before selection, and a successful OAuth callback never changes the selector. When WebDAV documents exist, connection changes require `confirm_existing_access: true` and a successful read check against an existing object. Use `clear_password: true` to explicitly remove a stored password.',
         requestBody: jsonBody('#/components/schemas/DocumentStorageConfigRequest'),
         responses: {
           200: {
@@ -68,6 +68,70 @@ export function documentsPaths() {
           401: { $ref: '#/components/responses/Unauthorized' },
           502: { description: 'Connection roundtrip failed', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
           500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
+    '/api/v1/documents/storage/google-drive/auth': {
+      get: op({
+        summary: 'Start Google Drive document-storage OAuth',
+        tag: 'Documents',
+        admin: true,
+        description: 'Creates a Drive-specific OAuth state value and redirects to Google with the least-privilege `drive.file` scope. Calendar OAuth state and tokens are not reused.',
+        responses: {
+          302: { description: 'Redirect to Google OAuth consent' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          502: { description: 'Google Drive OAuth is not configured' },
+        },
+      }),
+    },
+    '/api/v1/documents/storage/google-drive/callback': {
+      get: op({
+        summary: 'Complete Google Drive document-storage OAuth',
+        tag: 'Documents',
+        admin: true,
+        stateChanging: true,
+        description: 'Validates Drive-specific OAuth state and candidate credentials before replacing stored Drive tokens, then redirects to the Documents storage settings. A successful callback does not select Drive for uploads.',
+        responses: {
+          302: { description: 'Redirect to Documents storage settings with drive_ok or drive_error' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+        },
+      }),
+    },
+    '/api/v1/documents/storage/google-drive/test': {
+      post: op({
+        summary: 'Test Google Drive document storage',
+        tag: 'Documents',
+        admin: true,
+        stateChanging: true,
+        description: 'Runs a temporary create, read, verify and delete roundtrip in the private Yuvomi/Documents folder.',
+        responses: {
+          200: {
+            description: 'Connection roundtrip succeeded',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/DocumentStorageTestResponse' } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          502: { description: 'Connection roundtrip failed', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+        },
+      }),
+    },
+    '/api/v1/documents/storage/google-drive/disconnect': {
+      delete: op({
+        summary: 'Disconnect Google Drive document storage',
+        tag: 'Documents',
+        admin: true,
+        stateChanging: true,
+        description: 'Deletes only Yuvomi\'s local Drive token state. It does not revoke shared Google credentials. Disconnection is blocked while Drive is selected or Drive-backed documents exist.',
+        responses: {
+          200: {
+            description: 'Google Drive disconnected',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/GoogleDriveStorageStatusResponse' } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          409: { description: 'Drive is selected or Drive-backed documents still exist', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
         },
       }),
     },
@@ -113,7 +177,7 @@ export function documentsPaths() {
         summary: 'Upload family document',
         tag: 'Documents',
         stateChanging: true,
-        description: 'Stores a document using the active upload backend (`local` or `webdav`) with family, restricted, or private visibility. File content is sent as a base64 data URL in `content_data`.',
+        description: 'Stores a document using the active upload backend (`local`, `webdav`, or `google_drive`) with family, restricted, or private visibility. File content is sent as a base64 data URL in `content_data`. An environment-managed local folder may override the selected destination.',
         requestBody: jsonBody(null),
         responses: {
           201: {
@@ -345,7 +409,7 @@ export function documentsPaths() {
         tag: 'Documents',
         admin: true,
         stateChanging: true,
-        description: 'Uploads a document with storage_backend `local` or `webdav` to the specified DMS account. Only storage_backend `dms` means the document is already stored in the DMS. Returns a task ID for async tracking.',
+        description: 'Uploads a document with storage_backend `local`, `webdav`, or `google_drive` to the specified DMS account. Only storage_backend `dms` means the document is already stored in the DMS. Returns a task ID for async tracking.',
         requestBody: jsonBody('#/components/schemas/DmsPushRequest'),
         responses: {
           202: {

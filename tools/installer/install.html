@@ -809,6 +809,35 @@
           </div>
         </div>
 
+        <div class="toggle-card">
+          <button type="button" class="toggle-head" data-toggle="document-google-drive-body" aria-expanded="false" aria-controls="document-google-drive-body">
+            <span data-i18n="advanced.documentGoogleDrive">Google Drive Document Storage</span>
+            <span class="toggle-badge" data-i18n="common.optional">Optional</span>
+          </button>
+          <div class="toggle-body" id="document-google-drive-body">
+            <p class="hint" style="margin-bottom:12px" data-i18n="advanced.documentGoogleDriveHint">Configure OAuth credentials here, then connect and explicitly select Google Drive in Document settings after installation.</p>
+            <div class="field">
+              <label><input type="checkbox" id="adv-document-google-drive-enable"> <span data-i18n="advanced.documentGoogleDriveEnable">Configure Google Drive for Documents</span></label>
+            </div>
+            <div class="field">
+              <label for="adv-document-google-drive-client-id" data-i18n="advanced.documentGoogleDriveClientIdLabel">Override client ID</label>
+              <input type="text" id="adv-document-google-drive-client-id" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="adv-document-google-drive-client-secret" data-i18n="advanced.documentGoogleDriveClientSecretLabel">Override client secret</label>
+              <div class="secret-row">
+                <input type="password" id="adv-document-google-drive-client-secret" autocomplete="new-password">
+                <button type="button" class="btn btn-ghost btn-sm" data-eye="adv-document-google-drive-client-secret" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
+                  <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <svg class="icon-svg icon-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M6.61 6.61A18.5 18.5 0 0 0 2 12s3.5 7 10 7a9.12 9.12 0 0 0 5.4-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+                </button>
+              </div>
+              <div class="hint" data-i18n="advanced.documentGoogleDriveReuseHint">Leave both overrides empty to reuse Google Calendar OAuth credentials.</div>
+            </div>
+            <div class="hint"><span data-i18n="advanced.documentGoogleDriveRedirectLabel">Redirect URI</span>: <code id="document-google-drive-redirect-hint"></code></div>
+          </div>
+        </div>
+
         <div class="group-label" data-i18n="advanced.sectionMore">More options</div>
         <div class="field">
           <label for="adv-fixer" data-i18n="advanced.fixerLabel">Fixer API key (live currency rates)</label>
@@ -854,6 +883,7 @@
           <div class="review-key" data-i18n="review.webdavBackup">Off-site backups</div><div id="rv-webdav-backup"></div>
           <div class="review-key" data-i18n="review.documentLocal">Local documents</div><div id="rv-document-local"></div>
           <div class="review-key" data-i18n="review.documentWebdav">WebDAV documents</div><div id="rv-document-webdav"></div>
+          <div class="review-key" data-i18n="review.documentGoogleDrive">Google Drive documents</div><div id="rv-document-google-drive"></div>
         </div>
         <div class="error-banner" id="rev-err" role="alert"></div>
       </div>
@@ -1027,6 +1057,7 @@ const S = {
   SESSION_SECRET: '', DB_ENCRYPTION_KEY: '', BASE_URL: '',
   WEATHER_LAT: '', WEATHER_LON: '', WEATHER_CITY: '', WEATHER_UNITS: 'metric',
   GOOGLE_CLIENT_ID: '', GOOGLE_CLIENT_SECRET: '', GOOGLE_REDIRECT_URI: '',
+  GOOGLE_DRIVE_CLIENT_ID: '', GOOGLE_DRIVE_CLIENT_SECRET: '', GOOGLE_DRIVE_REDIRECT_URI: '',
   APPLE_USERNAME: '', APPLE_APP_SPECIFIC_PASSWORD: '', APPLE_CALDAV_URL: '',
   EMAIL_SMTP_HOST: '', EMAIL_SMTP_PORT: '', EMAIL_SMTP_SECURE: '',
   EMAIL_SMTP_USER: '', EMAIL_SMTP_PASS: '', EMAIL_FROM_ADDRESS: '', EMAIL_FROM_NAME: '',
@@ -1087,6 +1118,9 @@ function buildEnv() {
     WEATHER_CITY: S.WEATHER_CITY, WEATHER_UNITS: S.WEATHER_UNITS,
     GOOGLE_CLIENT_ID: S.GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET: S.GOOGLE_CLIENT_SECRET,
     GOOGLE_REDIRECT_URI: S.GOOGLE_REDIRECT_URI,
+    GOOGLE_DRIVE_CLIENT_ID: S.GOOGLE_DRIVE_CLIENT_ID,
+    GOOGLE_DRIVE_CLIENT_SECRET: S.GOOGLE_DRIVE_CLIENT_SECRET,
+    GOOGLE_DRIVE_REDIRECT_URI: S.GOOGLE_DRIVE_REDIRECT_URI,
     APPLE_USERNAME: S.APPLE_USERNAME, APPLE_APP_SPECIFIC_PASSWORD: S.APPLE_APP_SPECIFIC_PASSWORD,
     APPLE_CALDAV_URL: S.APPLE_CALDAV_URL,
     EMAIL_SMTP_HOST: S.EMAIL_SMTP_HOST, EMAIL_SMTP_PORT: S.EMAIL_SMTP_PORT,
@@ -1207,6 +1241,10 @@ function onEnterStep(name) {
   } else if (name === 'calendar') {
     // Vorläufige Redirect-URI (http); nach der Proxy-Wahl in adv-next verfeinert.
     gcalRedirectNode.textContent = `http://${S.host}:${S.port}/api/v1/calendar/google/callback`;
+  } else if (name === 'advanced') {
+    const scheme = $('adv-proxy').value === 'direct' ? 'http' : 'https';
+    $('document-google-drive-redirect-hint').textContent =
+      `${scheme}://${S.host}:${S.port}/api/v1/documents/storage/google-drive/callback`;
   } else if (name === 'done') {
     if (savedEnvPath) {
       const p = $('done-path');
@@ -1483,6 +1521,26 @@ $('adv-next').addEventListener('click', () => {
   S.scheme = S.SESSION_SECURE === 'true' ? 'https' : 'http';
   const origin = `${S.scheme}://${S.host}:${S.port}`;
   if (S.GOOGLE_CLIENT_ID) S.GOOGLE_REDIRECT_URI = `${origin}/api/v1/calendar/google/callback`;
+
+  const driveEnabled = $('adv-document-google-drive-enable').checked;
+  const driveClientId = $('adv-document-google-drive-client-id').value.trim();
+  const driveClientSecret = $('adv-document-google-drive-client-secret').value;
+  if (driveEnabled && Boolean(driveClientId) !== Boolean(driveClientSecret)) {
+    fail('adv-err', t('advanced.errDocumentGoogleDrivePair'),
+      driveClientId ? 'adv-document-google-drive-client-secret' : 'adv-document-google-drive-client-id');
+    return;
+  }
+  if (driveEnabled && !(driveClientId && driveClientSecret) && !(S.GOOGLE_CLIENT_ID && S.GOOGLE_CLIENT_SECRET)) {
+    fail('adv-err', t('advanced.errDocumentGoogleDriveCredentials'), 'adv-document-google-drive-client-id');
+    return;
+  }
+  S.GOOGLE_DRIVE_CLIENT_ID = driveEnabled ? driveClientId : '';
+  S.GOOGLE_DRIVE_CLIENT_SECRET = driveEnabled ? driveClientSecret : '';
+  S.GOOGLE_DRIVE_REDIRECT_URI = driveEnabled
+    ? `${origin}/api/v1/documents/storage/google-drive/callback`
+    : '';
+  $('document-google-drive-redirect-hint').textContent =
+    `${origin}/api/v1/documents/storage/google-drive/callback`;
   const oidcRedirectField = $('oidc-redirect');
   const redirectVal = oidcRedirectField.value.trim();
   if (!redirectVal || /\/api\/v1\/auth\/oidc\/callback$/.test(redirectVal)) {
@@ -1566,6 +1624,9 @@ $('adv-next').addEventListener('click', () => {
     : '-';
   $('rv-document-webdav').textContent = S.DOCUMENT_STORAGE_WEBDAV_ENABLED === 'true'
     ? (S.DOCUMENT_STORAGE_WEBDAV_URL || t('review.configured'))
+    : '-';
+  $('rv-document-google-drive').textContent = S.GOOGLE_DRIVE_REDIRECT_URI
+    ? t('review.configured')
     : '-';
 
   // Bestätigungszustand zurücksetzen, falls der Nutzer erneut hierher navigiert.

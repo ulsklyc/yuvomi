@@ -31,6 +31,7 @@ const {
   _setTestDatabase,
 } = await import('../server/db.js');
 const storage = await import('../server/services/document-storage.js');
+const googleDriveStorage = await import('../server/services/google-drive-storage.js');
 const {
   default: documentsRouter,
   _setDmsAdapterFactory,
@@ -59,7 +60,12 @@ const STORAGE_ENV_KEYS = [
 
 function clearStorageConfig() {
   get().prepare("DELETE FROM sync_config WHERE key LIKE 'document_storage_webdav_%'").run();
+  get().prepare("DELETE FROM sync_config WHERE key LIKE 'document_storage_google_drive_%'").run();
+  get().prepare("DELETE FROM sync_config WHERE key = 'document_storage_selected_backend'").run();
   for (const key of STORAGE_ENV_KEYS) delete process.env[key];
+  delete process.env.GOOGLE_DRIVE_CLIENT_ID;
+  delete process.env.GOOGLE_DRIVE_CLIENT_SECRET;
+  delete process.env.GOOGLE_DRIVE_REDIRECT_URI;
 }
 
 test.after(() => {
@@ -72,6 +78,7 @@ test.afterEach(() => {
   storage.__setRequestTimeoutForTests?.();
   storage.__setPrivateNetworkAccessForTests?.();
   storage.__setHostnameLookupForTests?.();
+  googleDriveStorage.__setGoogleApiFactoryForTests();
   _setDmsAdapterFactory();
 });
 
@@ -207,16 +214,27 @@ function insertRouteDocument(userId, overrides = {}) {
 }
 
 function applyMigration(db, migration) {
-  if (typeof migration.up === 'function') {
-    migration.up(db);
-  } else {
-    db.exec(migration.up);
+  if (migration.foreignKeysOff) db.pragma('foreign_keys = OFF');
+  try {
+    const run = db.transaction(() => {
+      if (typeof migration.up === 'function') {
+        migration.up(db);
+      } else {
+        db.exec(migration.up);
+      }
+      if (typeof migration.afterUp === 'function') {
+        migration.afterUp(db);
+      }
+      if (migration.foreignKeysOff) {
+        assert.deepEqual(db.pragma('foreign_key_check'), []);
+      }
+      db.prepare('INSERT INTO schema_migrations (version, description) VALUES (?, ?)')
+        .run(migration.version, migration.description);
+    });
+    run();
+  } finally {
+    if (migration.foreignKeysOff) db.pragma('foreign_keys = ON');
   }
-  if (typeof migration.afterUp === 'function') {
-    migration.afterUp(db);
-  }
-  db.prepare('INSERT INTO schema_migrations (version, description) VALUES (?, ?)')
-    .run(migration.version, migration.description);
 }
 
 function buildMigratedDatabase(migrations) {
@@ -297,6 +315,74 @@ function setConfig(values) {
   for (const [key, value] of Object.entries(values)) {
     statement.run(`document_storage_webdav_${key}`, String(value));
   }
+}
+
+function configureFakeDriveStorage() {
+  process.env.GOOGLE_DRIVE_CLIENT_ID = 'drive-client';
+  process.env.GOOGLE_DRIVE_CLIENT_SECRET = 'drive-secret';
+  process.env.GOOGLE_DRIVE_REDIRECT_URI = 'https://example.test/api/v1/documents/storage/google-drive/callback';
+  const statement = get().prepare(`
+    INSERT INTO sync_config (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `);
+  for (const [key, value] of Object.entries({
+    refresh_token: 'refresh',
+    account_id: 'account',
+    folder_id: 'drive-folder',
+    folder_name: 'Yuvomi/Documents',
+  })) statement.run(`document_storage_google_drive_${key}`, value);
+
+  const mediaReads = [];
+  const files = new Map([
+    ['drive-folder', {
+      id: 'drive-folder',
+      name: 'Documents',
+      mimeType: 'application/vnd.google-apps.folder',
+      trashed: false,
+    }],
+  ]);
+  googleDriveStorage.__setGoogleApiFactoryForTests({
+    createOAuth2: () => ({ setCredentials() {}, on() {} }),
+    createDrive: () => ({
+      files: {
+        async get({ fileId, alt }) {
+          const file = files.get(fileId);
+          if (!file) {
+            const error = new Error('not found');
+            error.code = 404;
+            throw error;
+          }
+          if (alt === 'media') {
+            mediaReads.push(fileId);
+            return { data: Readable.from(file.content) };
+          }
+          return { data: { ...file, content: undefined, size: file.content?.length ?? null } };
+        },
+        async create({ requestBody, media }) {
+          const chunks = [];
+          for await (const chunk of media.body) chunks.push(Buffer.from(chunk));
+          const id = `drive-${randomUUID()}`;
+          files.set(id, {
+            id,
+            name: requestBody.name,
+            parents: requestBody.parents,
+            mimeType: media.mimeType,
+            content: Buffer.concat(chunks),
+            trashed: false,
+          });
+          return { data: { id } };
+        },
+        async delete({ fileId }) {
+          if (!files.delete(fileId)) {
+            const error = new Error('not found');
+            error.code = 404;
+            throw error;
+          }
+        },
+      },
+    }),
+  });
+  return { files, mediaReads };
 }
 
 function clearWebdavDocuments() {
@@ -495,6 +581,189 @@ test('migration v51 rejects dms_account_id outside the dms backend on insert and
     `).run(dmsId),
     /dms_account_id requires dms storage backend/
   );
+});
+
+test('migration v98 backfills calendar attachment ACLs and preserves linked rows safely', (t) => {
+  const database = buildMigratedDatabase(MIGRATIONS.filter(({ version }) => version <= 95));
+  t.after(() => database.close());
+  const userId = database.prepare(`
+    INSERT INTO users (username, display_name, password_hash, role)
+    VALUES ('migration-admin', 'Migration Admin', 'hash', 'admin')
+  `).run().lastInsertRowid;
+  const memberId = database.prepare(`
+    INSERT INTO users (username, display_name, password_hash, role)
+    VALUES ('migration-member', 'Migration Member', 'hash', 'member')
+  `).run().lastInsertRowid;
+  const unrelatedId = database.prepare(`
+    INSERT INTO users (username, display_name, password_hash, role)
+    VALUES ('migration-unrelated', 'Migration Unrelated', 'hash', 'member')
+  `).run().lastInsertRowid;
+  const insertAttachmentDocument = database.prepare(`
+    INSERT INTO family_documents (
+      name, original_name, mime_type, file_size, content_data,
+      storage_provider, storage_backend, created_by
+    ) VALUES (?, ?, 'text/plain', 6, X'73746F726564', 'local', 'local', ?)
+  `);
+  const restrictedDocumentId = insertAttachmentDocument
+    .run('Restricted linked', 'restricted.txt', userId).lastInsertRowid;
+  const privateDocumentId = insertAttachmentDocument
+    .run('Private linked', 'private.txt', userId).lastInsertRowid;
+  const familyDocumentId = insertAttachmentDocument
+    .run('Family linked', 'family.txt', userId).lastInsertRowid;
+  const insertAccess = database.prepare(`
+    INSERT INTO family_document_access (document_id, user_id)
+    VALUES (?, ?)
+  `);
+  insertAccess.run(restrictedDocumentId, unrelatedId);
+  insertAccess.run(privateDocumentId, memberId);
+  insertAccess.run(familyDocumentId, unrelatedId);
+  const insertEvent = database.prepare(`
+    INSERT INTO calendar_events (
+      title, start_datetime, attachment_document_id, created_by, visibility
+    ) VALUES (?, '2026-07-22T10:00:00.000Z', ?, ?, ?)
+  `);
+  const restrictedEventId = insertEvent
+    .run('Restricted linked event', restrictedDocumentId, userId, 'assignees')
+    .lastInsertRowid;
+  const privateEventId = insertEvent
+    .run('Private linked event', privateDocumentId, userId, 'private')
+    .lastInsertRowid;
+  const familyEventId = insertEvent
+    .run('Family linked event', familyDocumentId, userId, 'all')
+    .lastInsertRowid;
+  database.prepare(`
+    INSERT INTO event_assignments (event_id, user_id)
+    VALUES (?, ?)
+  `).run(restrictedEventId, memberId);
+  const taskId = database.prepare(`
+    INSERT INTO tasks (title, category, priority, status, created_by, visibility)
+    VALUES ('Linked task', 'misc', 'none', 'open', ?, 'all')
+  `).run(userId).lastInsertRowid;
+  database.prepare(`
+    INSERT INTO task_documents (task_id, document_id, created_by)
+    VALUES (?, ?, ?)
+  `).run(taskId, restrictedDocumentId, userId);
+
+  const migration = MIGRATIONS.find(({ version }) => version === 98);
+  assert.equal(migration.foreignKeysOff, true);
+  applyMigration(database, migration);
+
+  assert.deepEqual(database.pragma('foreign_key_check'), []);
+  assert.equal(database.pragma('foreign_keys', { simple: true }), 1);
+  assert.deepEqual(
+    database.prepare(`
+      SELECT id, visibility
+      FROM family_documents
+      WHERE id IN (?, ?, ?)
+      ORDER BY id
+    `).all(restrictedDocumentId, privateDocumentId, familyDocumentId),
+    [
+      { id: restrictedDocumentId, visibility: 'restricted' },
+      { id: privateDocumentId, visibility: 'private' },
+      { id: familyDocumentId, visibility: 'family' },
+    ]
+  );
+  assert.deepEqual(
+    database.prepare(`
+      SELECT document_id, user_id
+      FROM family_document_access
+      WHERE document_id IN (?, ?, ?)
+      ORDER BY document_id, user_id
+    `).all(restrictedDocumentId, privateDocumentId, familyDocumentId),
+    [{ document_id: restrictedDocumentId, user_id: memberId }]
+  );
+  assert.deepEqual(
+    database.prepare(`
+      SELECT id, attachment_document_id
+      FROM calendar_events
+      WHERE id IN (?, ?, ?)
+      ORDER BY id
+    `).all(restrictedEventId, privateEventId, familyEventId),
+    [
+      { id: restrictedEventId, attachment_document_id: restrictedDocumentId },
+      { id: privateEventId, attachment_document_id: privateDocumentId },
+      { id: familyEventId, attachment_document_id: familyDocumentId },
+    ]
+  );
+  assert.equal(
+    database.prepare('SELECT document_id FROM task_documents WHERE task_id = ?')
+      .get(taskId).document_id,
+    restrictedDocumentId
+  );
+  assert.deepEqual(
+    database.prepare(`
+      SELECT name FROM sqlite_master
+      WHERE tbl_name = 'family_documents' AND type IN ('index', 'trigger')
+      ORDER BY name
+    `).all().map(({ name }) => name),
+    [
+      'idx_family_documents_category',
+      'idx_family_documents_created_by',
+      'idx_family_documents_dms',
+      'idx_family_documents_folder',
+      'idx_family_documents_status',
+      'trg_family_documents_storage_insert',
+      'trg_family_documents_storage_update',
+      'trg_family_documents_updated_at',
+    ]
+  );
+
+  assert.doesNotThrow(() => insertDocument(database, userId, {
+    storageProvider: 'external',
+    storageBackend: 'google_drive',
+  }));
+  for (const [storageProvider, storageBackend] of [
+    ['local', 'google_drive'],
+    ['external', 'local'],
+  ]) {
+    assert.throws(
+      () => insertDocument(database, userId, { storageProvider, storageBackend }),
+      /invalid document storage provider\/backend combination/
+    );
+  }
+  const nextId = insertDocument(database, userId).lastInsertRowid;
+  assert.ok(nextId > familyDocumentId);
+});
+
+test('Drive remains inactive until selected and shared storage dispatches opaque file IDs', async () => {
+  const { files } = configureFakeDriveStorage();
+  assert.equal(storage.getSelectedUploadBackend(), 'local');
+  assert.equal(storage.getActiveUploadBackend(), 'local');
+
+  storage.setSelectedUploadBackend('google_drive');
+  assert.equal(storage.getSelectedUploadBackend(), 'google_drive');
+  assert.equal(storage.getActiveUploadBackend(), 'google_drive');
+  const staged = await storage.stageDocumentUpload({
+    buffer: Buffer.from('shared Drive bytes'),
+    mime: 'text/plain',
+    category: 'other',
+    originalName: 'shared.txt',
+  });
+  assert.deepEqual(
+    {
+      storage_backend: staged.storage_backend,
+      storage_provider: staged.storage_provider,
+      content_data: staged.content_data,
+    },
+    { storage_backend: 'google_drive', storage_provider: 'external', content_data: '' }
+  );
+  assert.match(staged.storage_key, /^drive-/);
+  const read = await storage.readDocumentContent({
+    ...staged,
+    mime_type: 'text/plain',
+  });
+  assert.deepEqual(read.buffer, Buffer.from('shared Drive bytes'));
+  await storage.cleanupStagedUpload(staged);
+  assert.equal(files.has(staged.storage_key), false);
+});
+
+test('local folder remains the effective override when Google Drive is selected', () => {
+  configureFakeDriveStorage();
+  storage.setSelectedUploadBackend('google_drive');
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  process.env.DOCUMENT_STORAGE_LOCAL_PATH = '/tmp/yuvomi-drive-override';
+  assert.equal(storage.getSelectedUploadBackend(), 'google_drive');
+  assert.equal(storage.getActiveUploadBackend(), 'local_folder');
 });
 
 test('getConfig applies dynamic nonempty per-field env overrides and reports control', () => {
@@ -1911,11 +2180,24 @@ test('document storage config status masks passwords and reports effective env c
   assert.deepEqual(result.body.data, {
     enabled: true,
     configured: true,
+    selected_upload_backend: 'webdav',
     active_upload_backend: 'webdav',
     effective_target: `${webdav.url}/env/documents`,
     local_enabled: false,
     local_path: '/documents',
     webdav_document_count: 1,
+    google_drive_document_count: 0,
+    google_drive: {
+      configured: false,
+      connected: false,
+      account_email: null,
+      account_name: null,
+      folder_name: 'Yuvomi/Documents',
+      document_count: 0,
+      last_test: null,
+      last_error: null,
+      can_disconnect: true,
+    },
     last_test: '2026-06-10T12:00:00.000Z',
     last_error: 'previous failure',
     url: webdav.url,
@@ -2559,4 +2841,174 @@ test('document routes: local folder upload lands on disk and status reports loca
   const dl = await fetch(`${baseUrl}/api/v1/documents/${created.body.data.id}/download`);
   assert.equal(dl.status, 200);
   assert.deepEqual(Buffer.from(await dl.arrayBuffer()), Buffer.from('folder route bytes'));
+});
+
+
+test('document storage status handles partial Drive credentials without throwing', async (t) => {
+  process.env.GOOGLE_DRIVE_CLIENT_ID = 'partial-drive-client';
+  delete process.env.GOOGLE_DRIVE_CLIENT_SECRET;
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+
+  const result = await routeCall(harness, 'GET', '/storage/config');
+
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.data.google_drive.configured, false);
+  assert.equal(result.body.data.google_drive.connected, false);
+  assert.equal(
+    result.body.data.google_drive.last_error,
+    'GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_CLIENT_SECRET must both be set or both be empty.'
+  );
+});
+
+test('calendar attachment ACLs protect recorded Drive content and follow event updates', async (t) => {
+  const { mediaReads } = configureFakeDriveStorage();
+  storage.setSelectedUploadBackend('google_drive');
+  const ownerId = createRouteUser();
+  const assignedId = createRouteUser();
+  const unrelatedId = createRouteUser();
+  const harness = createRouteHarness({ userId: ownerId });
+  t.after(() => harness.close());
+  const baseUrl = await harness.listen();
+  const auth = (userId, role = 'member') => harness.setAuth({ userId, role });
+  const listIds = async (userId) => {
+    auth(userId);
+    const result = await routeCall(harness, 'GET', '/');
+    assert.equal(result.response.status, 200);
+    return result.body.data.map(({ id }) => id);
+  };
+  const fetchDocument = async (userId, documentId, endpoint) => {
+    auth(userId);
+    return fetch(`${baseUrl}/api/v1/documents/${documentId}/${endpoint}`);
+  };
+  const accessIds = (documentId) => get().prepare(`
+    SELECT user_id
+    FROM family_document_access
+    WHERE document_id = ?
+    ORDER BY user_id
+  `).all(documentId).map(({ user_id }) => user_id);
+  const documentAcl = (documentId) => get().prepare(`
+    SELECT visibility, storage_backend
+    FROM family_documents
+    WHERE id = ?
+  `).get(documentId);
+
+  auth(ownerId, 'admin');
+  const created = await calendarRouteCall(
+    harness,
+    'POST',
+    '/',
+    calendarEventBody({
+      attachmentBytes: 'private Drive attachment',
+      extra: { visibility: 'private', assigned_to: [assignedId] },
+    })
+  );
+  assert.equal(created.response.status, 201);
+  const eventId = created.body.data.id;
+  const originalDocumentId = created.body.data.attachment_document_id;
+  assert.deepEqual(documentAcl(originalDocumentId), {
+    visibility: 'private',
+    storage_backend: 'google_drive',
+  });
+  assert.deepEqual(accessIds(originalDocumentId), []);
+  assert.equal((await listIds(unrelatedId)).includes(originalDocumentId), false);
+  for (const endpoint of ['preview', 'download']) {
+    assert.equal(
+      (await fetchDocument(unrelatedId, originalDocumentId, endpoint)).status,
+      404
+    );
+  }
+  assert.deepEqual(mediaReads, [], 'denied requests never reach Google Drive');
+
+  auth(ownerId, 'admin');
+  const restricted = await calendarRouteCall(harness, 'PUT', `/${eventId}`, {
+    visibility: 'assignees',
+    assigned_to: [assignedId],
+  });
+  assert.equal(restricted.response.status, 200);
+  assert.equal(restricted.body.data.attachment_document_id, originalDocumentId);
+  assert.deepEqual(documentAcl(originalDocumentId), {
+    visibility: 'restricted',
+    storage_backend: 'google_drive',
+  });
+  assert.deepEqual(accessIds(originalDocumentId), [assignedId]);
+  assert.equal((await listIds(unrelatedId)).includes(originalDocumentId), false);
+  for (const endpoint of ['preview', 'download']) {
+    assert.equal(
+      (await fetchDocument(unrelatedId, originalDocumentId, endpoint)).status,
+      404
+    );
+  }
+  assert.deepEqual(mediaReads, [], 'restricted denial still avoids remote reads');
+  assert.equal((await listIds(assignedId)).includes(originalDocumentId), true);
+  for (const endpoint of ['preview', 'download']) {
+    const response = await fetchDocument(assignedId, originalDocumentId, endpoint);
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), 'private Drive attachment');
+  }
+  assert.equal(mediaReads.length, 2);
+
+  auth(ownerId, 'admin');
+  const reassigned = await calendarRouteCall(harness, 'PUT', `/${eventId}`, {
+    assigned_to: [unrelatedId],
+  });
+  assert.equal(reassigned.response.status, 200);
+  assert.equal(reassigned.body.data.attachment_document_id, originalDocumentId);
+  assert.deepEqual(accessIds(originalDocumentId), [unrelatedId]);
+  assert.equal((await listIds(assignedId)).includes(originalDocumentId), false);
+  for (const endpoint of ['preview', 'download']) {
+    assert.equal(
+      (await fetchDocument(assignedId, originalDocumentId, endpoint)).status,
+      404
+    );
+  }
+  assert.equal(mediaReads.length, 2, 'revoked users do not reach Google Drive');
+  assert.equal((await listIds(unrelatedId)).includes(originalDocumentId), true);
+  for (const endpoint of ['preview', 'download']) {
+    const response = await fetchDocument(unrelatedId, originalDocumentId, endpoint);
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), 'private Drive attachment');
+  }
+  assert.equal(mediaReads.length, 4);
+
+  auth(ownerId, 'admin');
+  const replaced = await calendarRouteCall(harness, 'PUT', `/${eventId}`, {
+    visibility: 'private',
+    attachment_name: 'replacement.txt',
+    attachment_data: `data:text/plain;base64,${Buffer.from('private replacement').toString('base64')}`,
+  });
+  assert.equal(replaced.response.status, 200);
+  const replacementDocumentId = replaced.body.data.attachment_document_id;
+  assert.notEqual(replacementDocumentId, originalDocumentId);
+  assert.deepEqual(documentAcl(replacementDocumentId), {
+    visibility: 'private',
+    storage_backend: 'google_drive',
+  });
+  assert.deepEqual(accessIds(replacementDocumentId), []);
+  assert.equal((await listIds(unrelatedId)).includes(replacementDocumentId), false);
+  for (const endpoint of ['preview', 'download']) {
+    assert.equal(
+      (await fetchDocument(unrelatedId, replacementDocumentId, endpoint)).status,
+      404
+    );
+  }
+  assert.equal(mediaReads.length, 4, 'private replacement denial avoids remote reads');
+
+  auth(ownerId, 'admin');
+  const shared = await calendarRouteCall(harness, 'PUT', `/${eventId}`, {
+    visibility: 'all',
+  });
+  assert.equal(shared.response.status, 200);
+  assert.equal(shared.body.data.attachment_document_id, replacementDocumentId);
+  assert.deepEqual(documentAcl(replacementDocumentId), {
+    visibility: 'family',
+    storage_backend: 'google_drive',
+  });
+  assert.deepEqual(accessIds(replacementDocumentId), []);
+  assert.equal((await listIds(unrelatedId)).includes(replacementDocumentId), true);
+  const sharedPreview = await fetchDocument(unrelatedId, replacementDocumentId, 'preview');
+  assert.equal(sharedPreview.status, 200);
+  assert.equal(await sharedPreview.text(), 'private replacement');
+  assert.equal(mediaReads.length, 5);
 });

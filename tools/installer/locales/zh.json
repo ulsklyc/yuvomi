@@ -93,7 +93,8 @@
     "backups": "备份",
     "webdavBackup": "异地备份",
     "on": "已启用",
-    "off": "已禁用"
+    "off": "已禁用",
+    "documentGoogleDrive": "Google Drive 文档"
   },
   "docker": {
     "title": "正在启动 Yuvomi",
@@ -178,7 +179,16 @@
     "fixerLabel": "Fixer API 密钥（实时汇率）",
     "fixerHint": "可选。用实时汇率换算订阅货币。没有它订阅也能正常使用。",
     "pushSubjectLabel": "推送联系地址",
-    "pushSubjectHint": "作为你服务器的联系方式发送给推送服务。留空则使用默认值。"
+    "pushSubjectHint": "作为你服务器的联系方式发送给推送服务。留空则使用默认值。",
+    "documentGoogleDrive": "Google Drive 文档存储",
+    "documentGoogleDriveHint": "在此配置 OAuth 凭据。安装完成后，请在“文档”设置中连接 Google Drive 并明确将其选为存储目标。",
+    "documentGoogleDriveEnable": "为文档配置 Google Drive",
+    "documentGoogleDriveClientIdLabel": "覆盖客户端 ID",
+    "documentGoogleDriveClientSecretLabel": "覆盖客户端密钥",
+    "documentGoogleDriveReuseHint": "两项均留空可复用 Google 日历 OAuth 凭据。",
+    "documentGoogleDriveRedirectLabel": "重定向 URI",
+    "errDocumentGoogleDrivePair": "Google Drive 客户端 ID 和密钥必须同时填写或同时留空。",
+    "errDocumentGoogleDriveCredentials": "Google Drive 需要单独的客户端 ID 和密钥，或已配置的 Google 日历凭据。"
   },
   "welcome": {
     "title": "欢迎使用 Yuvomi",

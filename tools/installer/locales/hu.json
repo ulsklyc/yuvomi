@@ -93,7 +93,8 @@
     "backups": "Biztonsági mentések",
     "webdavBackup": "Külső mentések",
     "on": "bekapcsolva",
-    "off": "kikapcsolva"
+    "off": "kikapcsolva",
+    "documentGoogleDrive": "Google Drive-dokumentumok"
   },
   "docker": {
     "title": "Yuvomi indítása",
@@ -178,7 +179,16 @@
     "fixerLabel": "Fixer API-kulcs (élő árfolyamok)",
     "fixerHint": "Nem kötelező. Élő árfolyamon váltja át az előfizetések pénznemeit. Az előfizetések enélkül is működnek.",
     "pushSubjectLabel": "Push kapcsolattartási cím",
-    "pushSubjectHint": "A push-szolgáltatásoknak küldjük a kiszolgálód elérhetőségeként. Hagyd üresen az alapértelmezetthez."
+    "pushSubjectHint": "A push-szolgáltatásoknak küldjük a kiszolgálód elérhetőségeként. Hagyd üresen az alapértelmezetthez.",
+    "documentGoogleDrive": "Dokumentumtárolás a Google Drive-ban",
+    "documentGoogleDriveHint": "Itt állíthatod be az OAuth-hitelesítő adatokat, majd a telepítés után a Dokumentumok beállításaiban csatlakoztasd, és válaszd ki külön a Google Drive-ot.",
+    "documentGoogleDriveEnable": "A Google Drive beállítása dokumentumokhoz",
+    "documentGoogleDriveClientIdLabel": "Kliensazonosító felülírása",
+    "documentGoogleDriveClientSecretLabel": "A kliens titkos kulcsának felülírása",
+    "documentGoogleDriveReuseHint": "Hagyd mindkét felülírást üresen a Google Naptár OAuth-hitelesítő adatainak újrafelhasználásához.",
+    "documentGoogleDriveRedirectLabel": "Átirányítási URI",
+    "errDocumentGoogleDrivePair": "A Google Drive kliensazonosítóját és titkos kulcsát vagy együtt kell megadni, vagy mindkettőt üresen kell hagyni.",
+    "errDocumentGoogleDriveCredentials": "A Google Drive használatához saját kliensazonosító és titkos kulcs, vagy beállított Google Naptár-hitelesítő adatok szükségesek."
   },
   "welcome": {
     "title": "Üdvözöl a Yuvomi",

@@ -114,7 +114,16 @@
     "fixerLabel": "کلید API Fixer (نرخ ارز زنده)",
     "fixerHint": "اختیاری. ارز اشتراک‌ها را با نرخ زنده تبدیل می‌کند. اشتراک‌ها بدون آن نیز کار می‌کنند.",
     "pushSubjectLabel": "نشانی تماس push",
-    "pushSubjectHint": "به سرویس‌های push به‌عنوان تماس سرور شما ارسال می‌شود. برای مقدار پیش‌فرض خالی بگذارید."
+    "pushSubjectHint": "به سرویس‌های push به‌عنوان تماس سرور شما ارسال می‌شود. برای مقدار پیش‌فرض خالی بگذارید.",
+    "documentGoogleDrive": "ذخیره‌سازی اسناد در Google Drive",
+    "documentGoogleDriveHint": "اعتبارنامه‌های OAuth را اینجا پیکربندی کنید، سپس پس از نصب در تنظیمات اسناد به Google Drive متصل شوید و آن را به‌طور صریح انتخاب کنید.",
+    "documentGoogleDriveEnable": "پیکربندی Google Drive برای اسناد",
+    "documentGoogleDriveClientIdLabel": "شناسهٔ سرویس‌گیرندهٔ اختصاصی",
+    "documentGoogleDriveClientSecretLabel": "رمز سرویس‌گیرندهٔ اختصاصی",
+    "documentGoogleDriveReuseHint": "برای استفادهٔ مجدد از اعتبارنامه‌های OAuth تقویم Google، هر دو مقدار اختصاصی را خالی بگذارید.",
+    "documentGoogleDriveRedirectLabel": "URI تغییر مسیر",
+    "errDocumentGoogleDrivePair": "شناسه و رمز سرویس‌گیرندهٔ Google Drive باید هر دو تنظیم شوند یا هر دو خالی باشند.",
+    "errDocumentGoogleDriveCredentials": "Google Drive به شناسه و رمز سرویس‌گیرندهٔ اختصاصی خود یا اعتبارنامه‌های پیکربندی‌شدهٔ تقویم Google نیاز دارد."
   },
   "review": {
     "title": "بازبینی",
@@ -142,7 +151,8 @@
     "backups": "پشتیبان‌گیری",
     "webdavBackup": "پشتیبان بیرونی",
     "on": "فعال",
-    "off": "غیرفعال"
+    "off": "غیرفعال",
+    "documentGoogleDrive": "اسناد Google Drive"
   },
   "docker": {
     "title": "Yuvomi در حال راه‌اندازی است",

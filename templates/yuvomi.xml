@@ -98,6 +98,9 @@ After the container starts, open the WebUI — the first visit guides you throug
   <Config Name="GOOGLE_CLIENT_ID" Target="GOOGLE_CLIENT_ID" Default="" Mode="" Description="Optional. Google OAuth 2.0 client ID for Google Calendar sync." Type="Variable" Display="advanced" Required="false" Mask="false"/>
   <Config Name="GOOGLE_CLIENT_SECRET" Target="GOOGLE_CLIENT_SECRET" Default="" Mode="" Description="Optional. Google OAuth 2.0 client secret for Google Calendar sync." Type="Variable" Display="advanced" Required="false" Mask="true"/>
   <Config Name="GOOGLE_REDIRECT_URI" Target="GOOGLE_REDIRECT_URI" Default="" Mode="" Description="Optional. OAuth callback URL, e.g. https://your-domain.com/api/v1/calendar/google/callback" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="GOOGLE_DRIVE_CLIENT_ID" Target="GOOGLE_DRIVE_CLIENT_ID" Default="" Mode="" Description="Optional Google Drive OAuth client ID override. Leave both Drive overrides empty to reuse Google Calendar credentials." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="GOOGLE_DRIVE_CLIENT_SECRET" Target="GOOGLE_DRIVE_CLIENT_SECRET" Default="" Mode="" Description="Optional Google Drive OAuth client secret override." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="GOOGLE_DRIVE_REDIRECT_URI" Target="GOOGLE_DRIVE_REDIRECT_URI" Default="" Mode="" Description="Google Drive Documents callback URL, e.g. https://your-domain.com/api/v1/documents/storage/google-drive/callback" Type="Variable" Display="advanced" Required="false" Mask="false"/>
 
   <!-- OIDC / SSO (optional — all four values required to enable SSO) -->
   <Config Name="OIDC_ISSUER" Target="OIDC_ISSUER" Default="" Mode="" Description="Optional. OIDC issuer URL, e.g. https://authentik.example.com/application/o/yuvomi/" Type="Variable" Display="advanced" Required="false" Mask="false"/>

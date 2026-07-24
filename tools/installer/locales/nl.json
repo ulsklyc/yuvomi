@@ -114,7 +114,16 @@
     "fixerLabel": "Fixer-API-sleutel (live wisselkoersen)",
     "fixerHint": "Optioneel. Zet abonnementsvaluta om met live koersen. Abonnementen werken ook zonder.",
     "pushSubjectLabel": "Push-contactadres",
-    "pushSubjectHint": "Wordt naar pushdiensten gestuurd als contact voor je server. Laat leeg voor de standaard."
+    "pushSubjectHint": "Wordt naar pushdiensten gestuurd als contact voor je server. Laat leeg voor de standaard.",
+    "documentGoogleDrive": "Google Drive-documentopslag",
+    "documentGoogleDriveHint": "Configureer hier de OAuth-inloggegevens. Verbind Google Drive na de installatie in de documentinstellingen en selecteer het daar expliciet.",
+    "documentGoogleDriveEnable": "Google Drive voor Documenten configureren",
+    "documentGoogleDriveClientIdLabel": "Client-ID overschrijven",
+    "documentGoogleDriveClientSecretLabel": "Client-secret overschrijven",
+    "documentGoogleDriveReuseHint": "Laat beide velden leeg om de OAuth-inloggegevens van Google Agenda te hergebruiken.",
+    "documentGoogleDriveRedirectLabel": "Redirect-URI",
+    "errDocumentGoogleDrivePair": "De client-ID en het client-secret van Google Drive moeten beide zijn ingesteld of beide leeg zijn.",
+    "errDocumentGoogleDriveCredentials": "Google Drive heeft een eigen client-ID en client-secret of geconfigureerde Google Agenda-inloggegevens nodig."
   },
   "review": {
     "title": "Controleren",
@@ -142,7 +151,8 @@
     "backups": "Back-ups",
     "webdavBackup": "Externe back-ups",
     "on": "ingeschakeld",
-    "off": "uitgeschakeld"
+    "off": "uitgeschakeld",
+    "documentGoogleDrive": "Google Drive-documenten"
   },
   "docker": {
     "title": "Yuvomi wordt gestart",

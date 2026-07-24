@@ -40,6 +40,9 @@ Vulnerabilities that require physical access to the host or root on the server a
 - Optional SQLCipher AES-256 database encryption (built into the official Docker image; enable by setting `DB_ENCRYPTION_KEY`. Bare-metal installs require a SQLCipher-enabled build of better-sqlite3.)
 - Existing WebDAV documents protect their connection configuration: changing the URL, username, password, or base path requires explicit admin confirmation and a successful read test against an existing object; required connection data cannot be removed while WebDAV documents exist
 - UI-managed WebDAV document-storage URLs are protected against SSRF: private, loopback, link-local, internal-DNS, and DNS-rebinding targets are rejected before persistence and during socket lookup. Trusted private-network targets require the deployment-controlled `DOCUMENT_STORAGE_WEBDAV_URL` override
+- Google Drive document storage requests only `drive.file`, creates no public permissions, and uses a Drive-specific redirect URI, session OAuth state and `document_storage_google_drive_*` token namespace. Calendar token and state records are never reused or broadened
+- Drive OAuth tokens, codes, folder IDs and raw Google responses are never returned by the API or intentionally logged. Disconnect deletes local Drive state without calling Google's revocation endpoint, so shared Calendar credentials are not revoked
+- Reconnection validates the candidate account and access to an existing Drive-backed file before atomically replacing working tokens. Disconnect is blocked while Drive is selected or referenced by documents; connecting Drive never activates it for uploads
 - Subscription logo discovery is SSRF-protected: only public HTTPS targets are fetched, every redirect is re-validated, and remote image responses are size/type constrained
 - No API endpoint accessible without session auth (except login)
 - `SESSION_SECRET` is mandatory - server refuses to start if unset

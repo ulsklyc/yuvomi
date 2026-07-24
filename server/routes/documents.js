@@ -9,6 +9,7 @@ import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { str, collectErrors, id as validateId, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { getAdapter as defaultGetDmsAdapter } from '../services/dms/index.js';
+import { getStatus as getGoogleDriveStatus } from '../services/google-drive-storage.js';
 import {
   StorageError,
   assertWebdavTargetAllowed,
@@ -18,10 +19,13 @@ import {
   getConfig as getStorageConfig,
   getEffectiveTarget,
   getLocalStorageConfig,
+  getSelectedUploadBackend,
   getStatus as getStorageStatus,
+  isUploadBackendSelectionExplicit,
   readDocumentContent,
   resolveConfig,
   saveConfig as saveStorageConfig,
+  setSelectedUploadBackend,
   stageDocumentUpload,
   testConnection as testStorageConnection,
   verifyExistingWebdavDocument,
@@ -242,23 +246,32 @@ function storageConfigStatus() {
   const config = getStorageConfig();
   const status = getStorageStatus();
   const local = getLocalStorageConfig();
+  const selectedBackend = getSelectedUploadBackend();
   const activeBackend = getActiveUploadBackend();
-  const count = db.get().prepare(`
+  const webdavCount = db.get().prepare(`
     SELECT COUNT(*) AS count
     FROM family_documents
     WHERE storage_backend = 'webdav'
   `).get().count;
+  const googleDrive = getGoogleDriveStatus();
   const effectiveTarget = activeBackend === 'local_folder'
     ? local.basePath
-    : (activeBackend === 'webdav' ? getEffectiveTarget(config) : null);
+    : activeBackend === 'webdav'
+      ? getEffectiveTarget(config)
+      : activeBackend === 'google_drive'
+        ? googleDrive.folder_name
+        : null;
   return {
     enabled: status.enabled,
     configured: status.configured,
+    selected_upload_backend: selectedBackend,
     active_upload_backend: activeBackend,
     effective_target: effectiveTarget,
     local_enabled: local.enabled,
     local_path: local.basePath,
-    webdav_document_count: count,
+    webdav_document_count: webdavCount,
+    google_drive_document_count: googleDrive.document_count,
+    google_drive: googleDrive,
     last_test: status.lastTest,
     last_error: status.lastError,
     url: status.url,
@@ -294,6 +307,15 @@ router.put('/storage/config', async (req, res) => {
   try {
     if (!isAdmin(req)) {
       return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    }
+    if (
+      req.body.selected_upload_backend !== undefined
+      && !['local', 'webdav', 'google_drive'].includes(req.body.selected_upload_backend)
+    ) {
+      return res.status(400).json({
+        error: 'selected_upload_backend must be local, webdav, or google_drive.',
+        code: 400,
+      });
     }
     if (
       req.body.confirm_existing_access !== undefined
@@ -383,7 +405,34 @@ router.put('/storage/config', async (req, res) => {
       }
     }
 
+    const selectorProvided = Object.hasOwn(req.body, 'selected_upload_backend');
+    const selectedBackend = selectorProvided
+      ? req.body.selected_upload_backend
+      : (isUploadBackendSelectionExplicit() ? getSelectedUploadBackend() : null);
+    if (selectedBackend === 'webdav' && (
+      !proposed.enabled
+      || !proposed.url
+      || !proposed.username
+      || !proposed.password
+      || !proposed.basePath
+    )) {
+      throw new StorageError(
+        'DOCUMENT_STORAGE_NOT_CONFIGURED',
+        'WebDAV must be enabled and fully configured while it is selected.'
+      );
+    }
+    if (selectedBackend === 'google_drive') {
+      const driveStatus = getGoogleDriveStatus();
+      if (!driveStatus.configured || !driveStatus.connected) {
+        throw new StorageError(
+          'DOCUMENT_STORAGE_NOT_CONFIGURED',
+          'Google Drive must be connected before it can be selected.'
+        );
+      }
+    }
+
     saveStorageConfig(req.body);
+    if (selectorProvided) setSelectedUploadBackend(req.body.selected_upload_backend);
     res.json({ data: storageConfigStatus() });
   } catch (err) {
     log.error('PUT /storage/config error:', err);
@@ -590,7 +639,7 @@ router.post('/', async (req, res) => {
       return sendStorageError(res, err, 'Document storage upload failed.');
     }
     log.error('POST / error:', err);
-    if (stagedUpload?.storage_backend === 'webdav') {
+    if (stagedUpload) {
       try {
         await cleanupStagedUpload(stagedUpload);
       } catch (cleanupError) {

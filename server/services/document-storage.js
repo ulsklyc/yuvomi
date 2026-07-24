@@ -9,10 +9,13 @@ import { isIP } from 'node:net';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as db from '../db.js';
+import * as googleDriveStorage from './google-drive-storage.js';
 import { isBlockedAddress, isBlockedHostname, normalizeHostname } from '../utils/ssrf.js';
 import { safeRequest } from '../utils/http.js';
 
 const CONFIG_PREFIX = 'document_storage_webdav_';
+const SELECTED_BACKEND_KEY = 'document_storage_selected_backend';
+const SELECTABLE_BACKENDS = new Set(['local', 'webdav', 'google_drive']);
 const DEFAULT_BASE_PATH = 'yuvomi-documents';
 const DEFAULT_TIMEOUT_MS = 8_000;
 const MAX_READ_BYTES = 5 * 1024 * 1024;
@@ -67,12 +70,63 @@ export function getLocalStorageConfig() {
   };
 }
 
-// The upload backend that new documents will be written to, in precedence order:
-// a mounted local folder wins over WebDAV, which wins over the in-DB BLOB default.
+function storedSelectedUploadBackend() {
+  const value = db.get().prepare('SELECT value FROM sync_config WHERE key = ?')
+    .get(SELECTED_BACKEND_KEY)?.value ?? null;
+  return SELECTABLE_BACKENDS.has(value) ? value : null;
+}
+
+export function isUploadBackendSelectionExplicit() {
+  return storedSelectedUploadBackend() !== null;
+}
+
+export function getSelectedUploadBackend() {
+  const selected = storedSelectedUploadBackend();
+  if (selected) return selected;
+  return getConfig().enabled ? 'webdav' : 'local';
+}
+
+export function setSelectedUploadBackend(backend) {
+  if (!SELECTABLE_BACKENDS.has(backend)) {
+    throw new StorageError(
+      'DOCUMENT_STORAGE_INVALID_CONFIG',
+      'selected_upload_backend must be local, webdav, or google_drive.'
+    );
+  }
+  if (backend === 'webdav') {
+    const status = getStatus();
+    if (!status.enabled || !status.configured) {
+      throw new StorageError(
+        'DOCUMENT_STORAGE_NOT_CONFIGURED',
+        'WebDAV must be enabled and fully configured before it can be selected.'
+      );
+    }
+  }
+  if (backend === 'google_drive') {
+    const status = googleDriveStorage.getStatus();
+    if (!status.configured || !status.connected) {
+      throw new StorageError(
+        'DOCUMENT_STORAGE_NOT_CONFIGURED',
+        'Google Drive must be connected before it can be selected.'
+      );
+    }
+  }
+  db.get().prepare(`
+    INSERT INTO sync_config (key, value)
+    VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET
+      value = excluded.value,
+      updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+  `).run(SELECTED_BACKEND_KEY, backend);
+  return backend;
+}
+
+// New uploads resolve in this order: an environment-managed local folder,
+// then the administrator's explicit destination, then the legacy default
+// (enabled WebDAV or the SQLite BLOB). Connecting Drive never selects it.
 export function getActiveUploadBackend() {
   if (getLocalStorageConfig().enabled) return 'local_folder';
-  if (getConfig().enabled) return 'webdav';
-  return 'local';
+  return getSelectedUploadBackend();
 }
 
 // Resolve a validated storage key to an absolute path inside basePath.
@@ -692,8 +746,8 @@ export async function stageDocumentUpload({
     };
   }
 
-  const config = getConfig();
-  if (!config.enabled) {
+  const activeBackend = getSelectedUploadBackend();
+  if (activeBackend === 'local') {
     return {
       storage_backend: 'local',
       storage_provider: 'local',
@@ -703,6 +757,35 @@ export async function stageDocumentUpload({
     };
   }
 
+  if (activeBackend === 'google_drive') {
+    try {
+      const fileId = await googleDriveStorage.uploadFile({
+        buffer: content,
+        mime,
+        originalName,
+      });
+      return {
+        storage_backend: 'google_drive',
+        storage_provider: 'external',
+        storage_key: fileId,
+        content_data: '',
+      };
+    } catch (error) {
+      throw toStorageError(
+        error,
+        'DOCUMENT_STORAGE_UPLOAD_FAILED',
+        'The document could not be uploaded to Google Drive.'
+      );
+    }
+  }
+
+  const config = getConfig();
+  if (!config.enabled) {
+    throw new StorageError(
+      'DOCUMENT_STORAGE_NOT_CONFIGURED',
+      'WebDAV is selected but is not enabled.'
+    );
+  }
   requireWebdavConfig(config);
   const storageKey = buildStorageKey({ category, originalName });
   const keySegments = normalizeStorageKey(storageKey).split('/');
@@ -809,6 +892,21 @@ export async function readDocumentContent(document, { dmsResolver } = {}) {
       mime: document.mime_type || 'application/octet-stream',
     };
   }
+  if (document.storage_backend === 'google_drive') {
+    try {
+      const resolved = await googleDriveStorage.readFile(document.storage_key);
+      return {
+        buffer: resolved.buffer,
+        mime: document.mime_type || resolved.mime || 'application/octet-stream',
+      };
+    } catch (error) {
+      throw toStorageError(
+        error,
+        'DOCUMENT_STORAGE_READ_FAILED',
+        'The Google Drive document could not be read.'
+      );
+    }
+  }
   if (document.storage_backend === 'dms') {
     if (!dmsResolver) {
       throw new StorageError(
@@ -868,6 +966,19 @@ export async function readDocumentContent(document, { dmsResolver } = {}) {
 }
 
 export async function deleteDocumentContent(document) {
+  if (document.storage_backend === 'google_drive') {
+    try {
+      await googleDriveStorage.deleteFile(document.storage_key);
+    } catch (error) {
+      throw toStorageError(
+        error,
+        'DOCUMENT_STORAGE_DELETE_FAILED',
+        'The Google Drive document could not be deleted.'
+      );
+    }
+    return;
+  }
+
   // WebDAV deletion
   if (document.storage_backend === 'webdav') {
     const config = requireWebdavConfig(getConfig());
@@ -917,7 +1028,7 @@ export async function cleanupStagedUpload(staged) {
   } catch (error) {
     throw new StorageError(
       'DOCUMENT_STORAGE_CLEANUP_FAILED',
-      'The staged WebDAV document could not be cleaned up.',
+      'The staged document could not be cleaned up.',
       { cause: error }
     );
   }

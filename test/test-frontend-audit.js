@@ -739,25 +739,37 @@ test('documents-domain leaves exist and export async render functions', () => {
     assert.doesNotMatch(source, /\brequire\(/, `${file} must use import, not require`);
     assert.match(
       source,
-      /import \{ api \} from '\/api\.js'/,
+      /import \{ api \} from (['"])\/api\.js\1/,
       `${file} must import the shared API client`,
     );
   }
 });
 
-test('documents-storage leaf owns WebDAV document storage with a status-first layout', () => {
+test('documents-storage leaf owns hybrid document storage with a status-first layout', () => {
   const source = read('../public/settings/pages/documents-storage.js');
 
   // Storage config + test endpoints preserved unchanged.
-  assert.match(source, /api\.get\('\/documents\/storage\/config'\)/);
-  assert.match(source, /api\.put\('\/documents\/storage\/config'/);
-  assert.match(source, /api\.post\('\/documents\/storage\/test'/);
+  assert.match(source, /api\.get\((['"])\/documents\/storage\/config\1\)/);
+  assert.match(source, /api\.put\((['"])\/documents\/storage\/config\1/);
+  assert.match(source, /api\.post\((['"])\/documents\/storage\/test\1/);
 
   // Status-first: render the active backend and target before the connection fields.
   assert.match(source, /createStatusSummary\(/);
   assert.match(source, /active_upload_backend/);
+  assert.match(source, /selected_upload_backend/);
   assert.match(source, /webdav_document_count/);
+  assert.match(source, /google_drive/);
   assert.match(source, /documentStorageTarget/);
+
+  // Drive uses the shared API client and a normal anchor for OAuth.
+  assert.match(source, /\/documents\/storage\/google-drive\/auth/);
+  assert.match(source, /api\.post\((['"])\/documents\/storage\/google-drive\/test\1/);
+  assert.match(source, /api\.delete\((['"])\/documents\/storage\/google-drive\/disconnect\1/);
+  assert.match(source, /createSettingRow\(/);
+  assert.match(source, /drive_ok/);
+  assert.match(source, /drive_error/);
+  assert.match(source, /history\.replaceState/);
+  assert.match(source, /settings\.documentStorageGoogleDrivePrivacy/);
 
   // Connection fields live behind an accessible disclosure.
   assert.match(source, /createDisclosure\(/);

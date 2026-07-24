@@ -168,10 +168,39 @@ export function parseAssignedTo(val) {
   return [];
 }
 
+export function syncAttachmentDocumentAccess(d, documentId, eventVisibility, userIds) {
+  if (!documentId) return;
+  const visibility = eventVisibility === 'private'
+    ? 'private'
+    : eventVisibility === 'assignees'
+      ? 'restricted'
+      : 'family';
+  d.prepare('UPDATE family_documents SET visibility = ? WHERE id = ?')
+    .run(visibility, documentId);
+  d.prepare('DELETE FROM family_document_access WHERE document_id = ?').run(documentId);
+  if (visibility !== 'restricted') return;
+  const insert = d.prepare(`
+    INSERT OR IGNORE INTO family_document_access (document_id, user_id)
+    VALUES (?, ?)
+  `);
+  for (const userId of userIds) insert.run(documentId, userId);
+}
+
 export function setEventAssignments(d, eventId, userIds) {
   d.prepare('DELETE FROM event_assignments WHERE event_id = ?').run(eventId);
   const ins = d.prepare('INSERT OR IGNORE INTO event_assignments (event_id, user_id) VALUES (?, ?)');
   for (const uid of userIds) ins.run(eventId, uid);
+  const event = d.prepare(`
+    SELECT attachment_document_id, visibility
+    FROM calendar_events
+    WHERE id = ?
+  `).get(eventId);
+  syncAttachmentDocumentAccess(
+    d,
+    event?.attachment_document_id,
+    event?.visibility,
+    userIds
+  );
 }
 
 export function serializeEvent(event) {
