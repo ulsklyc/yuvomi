@@ -484,7 +484,6 @@ export function defaultSubcategory(category) {
 }
 
 export function validateSubcategory(category, subcategory) {
-  if (!validExpenseCategoryKeys().includes(category)) return '';
   if (!subcategory) return defaultSubcategory(category);
   const row = db.get().prepare(`
     SELECT 1 FROM budget_subcategories WHERE category_key = ? AND key = ?

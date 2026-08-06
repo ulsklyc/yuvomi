@@ -19,7 +19,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 
-const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+const read = async (path) => (
+  await readFile(new URL(`../${path}`, import.meta.url), 'utf8')
+).replace(/\r\n/g, '\n');
 
 const detailJs   = () => read('public/components/detail-view.js');
 const detailCss  = () => read('public/styles/detail-view.css');

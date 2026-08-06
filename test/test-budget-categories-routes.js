@@ -202,10 +202,11 @@ test('POST subcategories: unbekannte Kategorie → 404', async () => {
   assert.equal(r.status, 404);
 });
 
-test('POST subcategories: income-Kategorie erlaubt keine Subkategorie → 404', async () => {
+test('POST subcategories: income-Kategorie erlaubt keine Subkategorie', async () => {
   const inc = await newCategory('IncCat', 'income');
   const r = await call('POST', `/categories/${inc.key}/subcategories`, { name: 'S' });
-  assert.equal(r.status, 404);
+  assert.equal(r.status, 201);
+  assert.equal(r.body.data.category_key, inc.key);
 });
 
 test('POST subcategories: leerer Name → 400', async () => {

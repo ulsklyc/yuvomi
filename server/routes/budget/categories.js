@@ -179,7 +179,7 @@ router.patch('/categories/reorder', (req, res) => {
 router.post('/categories/:categoryKey/subcategories', (req, res) => {
   try {
     const cat = db.get().prepare(`
-      SELECT * FROM budget_categories WHERE key = ? AND type = 'expense'
+      SELECT * FROM budget_categories WHERE key = ?
     `).get(req.params.categoryKey);
     if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404 });
 

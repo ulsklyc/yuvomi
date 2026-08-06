@@ -932,7 +932,7 @@ function renderEntries() {
     const recurTag  = e.is_recurring
       ? ` <span class="budget-recur-mark" role="img" aria-label="${t('budget.recurringLabel')}"><i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i></span>${e.recurrence_virtual ? ' ' + t('budget.virtualBudgetBadge') : ''}`
       : (e.recurrence_parent_id ? ` <span class="budget-recur-mark" role="img" aria-label="${t('budget.recurringInstanceLabel')}"><i data-lucide="corner-down-left" class="icon-sm" aria-hidden="true"></i></span>` : '');
-    const categoryMeta = isIncome || !e.subcategory
+    const categoryMeta = !e.subcategory
       ? categoryLabel(e.category)
       : `${categoryLabel(e.category)} · ${subcategoryLabel(e.subcategory)}`;
     const acctName = accountName(e.account_id);
@@ -1765,7 +1765,7 @@ function openCategoryManager() {
         basePath: '/budget/categories',
         groups: [
           { key: 'expense', labelKey: 'budget.expenses', addLabelKey: 'budget.addCategory', subcategories: true },
-          { key: 'income',  labelKey: 'budget.income',   addLabelKey: 'budget.addCategory' },
+          { key: 'income',  labelKey: 'budget.income',   addLabelKey: 'budget.addCategory', subcategories: true },
         ],
         supportsSubcategories: true,
         labelResolver: (item) => item.label ?? budgetCategoryLabel(item.key, item.name, t),
@@ -1859,6 +1859,14 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
       <select class="form-input" id="bm-category">${catOpts}</select>
     </div>
 
+    <div class="form-group js-entry-field" id="bm-subcategory-group">
+      <div class="budget-field-header">
+        <label class="form-label" for="bm-subcategory">${t('budget.subcategoryLabel')}</label>
+        <button class="btn btn--secondary budget-inline-add" type="button" id="bm-add-subcategory">${t('budget.addSubcategory')}</button>
+      </div>
+      <select class="form-input" id="bm-subcategory">${subcatOpts}</select>
+    </div>
+
     <div class="form-group js-entry-field">
       <label class="form-label" for="bm-date">${t('budget.dateLabel')}</label>
       <yuvomi-datepicker type="date" id="bm-date"
@@ -1878,14 +1886,6 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
     <div class="js-entry-field">
       ${advancedSection(`
         ${accountField}
-        <div class="form-group" id="bm-subcategory-group" ${isExpense ? '' : 'hidden'}>
-          <div class="budget-field-header">
-            <label class="form-label" for="bm-subcategory">${t('budget.subcategoryLabel')}</label>
-            <button class="btn btn--secondary budget-inline-add" type="button" id="bm-add-subcategory">${t('budget.addSubcategory')}</button>
-          </div>
-          <select class="form-input" id="bm-subcategory">${subcatOpts}</select>
-        </div>
-
         <div class="form-group">
           <label class="toggle">
             <input type="checkbox" id="bm-recurring" ${isEdit && entry.is_recurring ? 'checked' : ''}>
@@ -2012,10 +2012,10 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
         const catSelect = panel.querySelector('#bm-category');
         const subcatGroup = panel.querySelector('#bm-subcategory-group');
         const subcatSelect = panel.querySelector('#bm-subcategory');
-        const subcategories = currentType === 'expense' ? getSubcategories(catSelect.value) : [];
+        const subcategories = getSubcategories(catSelect.value);
         const currentValue = preferredSubcategory || subcatSelect.value;
 
-        subcatGroup.hidden = currentType !== 'expense';
+        subcatGroup.hidden = false;
         subcatSelect.replaceChildren(...subcategories.map((s) => {
           const opt = document.createElement('option');
           opt.value = s.key;
@@ -2046,7 +2046,6 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
       };
 
       const addSubcategory = async () => {
-        if (currentType !== 'expense') return;
         const category = panel.querySelector('#bm-category').value;
         if (!category) return;
         const name = await requestNameInPanel(panel, {
@@ -2125,7 +2124,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
         const title      = panel.querySelector('#bm-title').value.trim();
         const absVal     = parseFloat(panel.querySelector('#bm-amount').value);
         const category   = panel.querySelector('#bm-category').value;
-        const subcategory = currentType === 'expense' ? panel.querySelector('#bm-subcategory').value : '';
+        const subcategory = panel.querySelector('#bm-subcategory').value;
         const date       = panel.querySelector('#bm-date').value;
         const recurring  = panel.querySelector('#bm-recurring').checked ? 1 : 0;
         const interval   = panel.querySelector('#bm-interval').value;

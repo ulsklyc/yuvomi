@@ -468,7 +468,7 @@ test('Detail-Refresh aktualisiert die Zeile, ohne das .shopping-item zu ersetzen
   assert(/kitchen-row__meta/.test(fn), 'die Menge muss aktualisiert werden - sie kann auch wegfallen');
   // Ein Kategoriewechsel verschiebt die Zeile in eine andere Gruppe; das kann keine
   // Zeilen-Auffrischung leisten, dafür muss die Liste neu gruppiert werden.
-  const details = source.match(/function openItemDetails[\s\S]*?\n\}\n/)?.[0] ?? '';
+  const details = source.match(/function openItemDetails[\s\S]*?\r?\n\}\r?\n/)?.[0] ?? '';
   assert(/categoryChanged/.test(details), 'ein Kategoriewechsel muss die Gruppierung neu aufbauen');
 });
 
