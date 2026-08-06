@@ -2070,6 +2070,7 @@
         "notificationChannelNtfyToken": "Токен ntfy",
         "notificationChannelNtfyUsername": "Имя пользователя ntfy",
         "notificationChannelNtfyPassword": "Пароль ntfy",
+        "notificationChannelWebhookToken": "Bearer-токен (необязательно)",
         "notificationChannelSave": "Сохранить канал",
         "notificationChannelSaved": "Канал сохранён.",
         "notificationChannelTest": "Отправить тест",

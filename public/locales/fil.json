@@ -2103,6 +2103,7 @@
         "notificationChannelNtfyToken": "Token ng ntfy",
         "notificationChannelNtfyUsername": "Username ng ntfy",
         "notificationChannelNtfyPassword": "Password ng ntfy",
+        "notificationChannelWebhookToken": "Bearer token (opsyonal)",
         "notificationChannelSave": "I-save ang channel",
         "notificationChannelSaved": "Na-save ang channel.",
         "notificationChannelTest": "Magpadala ng pansubok",

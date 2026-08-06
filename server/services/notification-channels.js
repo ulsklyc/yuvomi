@@ -8,6 +8,7 @@ import * as dbModule from '../db.js';
 export const NOTIFICATION_PROVIDERS = [
   { id: 'gotify', name: 'Gotify' },
   { id: 'ntfy', name: 'ntfy' },
+  { id: 'webhook', name: 'Webhook' },
 ];
 
 const PROVIDER_IDS = new Set(NOTIFICATION_PROVIDERS.map((p) => p.id));
@@ -106,6 +107,14 @@ function validateNtfy({ config, secrets, requireSecrets }) {
   }
 }
 
+function normalizeWebhookConfig(input = {}) {
+  return { baseUrl: normalizeBaseUrl(input.baseUrl) };
+}
+
+function normalizeWebhookSecrets(input = {}) {
+  return { token: String(input.token ?? '').trim() };
+}
+
 export function normalizeChannelInput(input = {}, existing = null) {
   const provider = existing?.provider || normalizeProvider(input.provider);
   normalizeProvider(provider);
@@ -122,10 +131,13 @@ export function normalizeChannelInput(input = {}, existing = null) {
     config = normalizeGotifyConfig(mergedConfig);
     secrets = normalizeGotifySecrets(mergedSecrets);
     validateGotify({ secrets, requireSecrets: !existing });
-  } else {
+  } else if (provider === 'ntfy') {
     config = normalizeNtfyConfig(mergedConfig);
     secrets = normalizeNtfySecrets(mergedSecrets);
     validateNtfy({ config, secrets, requireSecrets: !existing || input.secrets !== undefined });
+  } else {
+    config = normalizeWebhookConfig(mergedConfig);
+    secrets = normalizeWebhookSecrets(mergedSecrets);
   }
 
   return {

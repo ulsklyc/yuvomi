@@ -9,6 +9,7 @@ import { pushService as defaultPushService } from './push.js';
 import { createNotificationChannelStore } from './notification-channels.js';
 import { gotifyProvider } from './notification-providers/gotify.js';
 import { ntfyProvider } from './notification-providers/ntfy.js';
+import { webhookProvider } from './notification-providers/webhook.js';
 import { syncAllBirthdayReminders } from './birthdays.js';
 
 const log = createLogger('Notifications');
@@ -23,6 +24,7 @@ const PROVIDER_TIMEOUT_MS = 8_000;
 export const defaultProviders = {
   gotify: gotifyProvider,
   ntfy: ntfyProvider,
+  webhook: webhookProvider,
 };
 
 function iso(value) {

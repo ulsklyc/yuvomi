@@ -2070,6 +2070,7 @@
         "notificationChannelNtfyToken": "Token ntfy",
         "notificationChannelNtfyUsername": "Όνομα χρήστη ntfy",
         "notificationChannelNtfyPassword": "Κωδικός ntfy",
+        "notificationChannelWebhookToken": "Διακριτικό Bearer (προαιρετικό)",
         "notificationChannelSave": "Αποθήκευση καναλιού",
         "notificationChannelSaved": "Το κανάλι αποθηκεύτηκε.",
         "notificationChannelTest": "Αποστολή δοκιμής",

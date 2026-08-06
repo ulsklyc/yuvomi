@@ -2082,6 +2082,7 @@
         "notificationChannelNtfyToken": "توکن ntfy",
         "notificationChannelNtfyUsername": "نام کاربری ntfy",
         "notificationChannelNtfyPassword": "رمز عبور ntfy",
+        "notificationChannelWebhookToken": "توکن Bearer (اختیاری)",
         "notificationChannelSave": "ذخیره کانال",
         "notificationChannelSaved": "کانال ذخیره شد.",
         "notificationChannelTest": "ارسال آزمایشی",

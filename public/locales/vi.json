@@ -2070,6 +2070,7 @@
         "notificationChannelNtfyToken": "Token ntfy",
         "notificationChannelNtfyUsername": "Tên người dùng ntfy",
         "notificationChannelNtfyPassword": "Mật khẩu ntfy",
+        "notificationChannelWebhookToken": "Mã Bearer (không bắt buộc)",
         "notificationChannelSave": "Lưu kênh",
         "notificationChannelSaved": "Đã lưu kênh.",
         "notificationChannelTest": "Gửi thử",

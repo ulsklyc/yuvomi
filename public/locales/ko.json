@@ -2082,6 +2082,7 @@
         "notificationChannelNtfyToken": "ntfy 토큰",
         "notificationChannelNtfyUsername": "ntfy 사용자 이름",
         "notificationChannelNtfyPassword": "ntfy 비밀번호",
+        "notificationChannelWebhookToken": "Bearer 토큰(선택 사항)",
         "notificationChannelSave": "채널 저장",
         "notificationChannelSaved": "채널이 저장되었습니다.",
         "notificationChannelTest": "테스트 보내기",

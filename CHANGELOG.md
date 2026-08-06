@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Administrators can now send reminders to generic HTTP webhooks alongside Web Push, Gotify, and ntfy. Each webhook receives a documented JSON payload through `POST`, may use an optional write-only Bearer token, can be verified from Notification settings, and participates in the existing per-channel retry and deduplication flow.
+
 ## [1.87.0] - 2026-08-06
 
 ### Added

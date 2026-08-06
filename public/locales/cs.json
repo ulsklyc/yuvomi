@@ -2070,6 +2070,7 @@
         "notificationChannelNtfyToken": "Token ntfy",
         "notificationChannelNtfyUsername": "Uživatelské jméno ntfy",
         "notificationChannelNtfyPassword": "Heslo ntfy",
+        "notificationChannelWebhookToken": "Bearer token (volitelný)",
         "notificationChannelSave": "Uložit kanál",
         "notificationChannelSaved": "Kanál uložen.",
         "notificationChannelTest": "Odeslat test",

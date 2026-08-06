@@ -265,7 +265,7 @@ Seventeen independent modules share one calm, consistent interface. Turn on what
 | ![notes](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/notes.png) | **Notes &amp; Contacts** | Colored Markdown sticky notes plus a contact directory with CardDAV sync and vCard import/export. |
 | ![birthdays](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/birthdays.png) | **Birthdays** | Birthday tracker with automatic calendar events, age display and reminders. |
 | ![family](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/family.png) | **Family** | Member profiles with roles, photos and contact details, synced to Contacts and Birthdays. New members join through an invite link and pick their own password. |
-| ![reminders](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/reminders.png) | **Reminders** | Task and calendar reminders via in-app badges, opt-in Web Push and household Gotify/ntfy channels. |
+| ![reminders](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/reminders.png) | **Reminders** | Task and calendar reminders via in-app badges, opt-in Web Push and household Gotify, ntfy or webhook channels. |
 | ![api-tokens](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/api-tokens.png) | **API Tokens** | Bearer / X-API-Key tokens with an OpenAPI 3.0 spec and a built-in MCP endpoint for AI agents. |
 | ![backup](https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docs/icons/backup.png) | **Backup** | Manual and scheduled database backup/restore with pre-restore rollback and optional WebDAV upload. |
 
@@ -288,7 +288,7 @@ Seventeen independent modules share one calm, consistent interface. Turn on what
 - **Notes &amp; Contacts** - Colored Markdown sticky notes that open in a rendered reader view (toggle to edit), with full-text search, a per-author filter and pinned notes grouped up front, plus a contact directory with CardDAV sync and multi-contact vCard import/export. Contacts follow the same grammar: tapping one shows it before it lets you change it, with every stored number, mail and address as its own tap target - the list only ever offered the first of each - and editing as a separate step.
 - **Birthdays** - Birthday tracker with automatic calendar events, age display, custom reminders, and selective import from synced contacts.
 - **Family** - Member profiles with roles, photos, and contact details, synced to Contacts and Birthdays.
-- **Reminders** - Task and calendar reminders via in-app badges, opt-in Web Push (HTTPS), and household Gotify/ntfy channels.
+- **Reminders** - Task and calendar reminders via in-app badges, opt-in Web Push (HTTPS), and household Gotify, ntfy or generic HTTP webhook channels. Webhooks send a JSON payload and support an optional write-only Bearer token; see the [notification webhook guide](docs/notification-webhooks.md).
 - **API Tokens** - Bearer / X-API-Key tokens with an OpenAPI 3.0 spec and a built-in MCP endpoint (`/mcp`) that lets AI agents like Claude Desktop drive the whole API in natural language. Optional per-module read/write scopes keep a token, for example one handed to an AI client, off sensitive areas.
 - **Backup** - Manual and scheduled database backup/restore with pre-restore rollback. Optional WebDAV upload (Nextcloud, ownCloud, etc.).
 
@@ -438,7 +438,7 @@ Nothing. Yuvomi is free and MIT-licensed. You provide the server; there is no su
 
 ## Documentation
 
-[Installation](docs/installation.md) &nbsp;·&nbsp; [Spec &amp; data model](docs/SPEC.md) &nbsp;·&nbsp; [Third-party modules](MODULES.md) &nbsp;·&nbsp; [Contributing](CONTRIBUTING.md) &nbsp;·&nbsp; [Security](SECURITY.md) &nbsp;·&nbsp; [Privacy for self-hosters](docs/PRIVACY-FOR-SELFHOSTERS.md) &nbsp;·&nbsp; [Changelog](CHANGELOG.md) &nbsp;·&nbsp; [Backlog](BACKLOG.md)
+[Installation](docs/installation.md) &nbsp;·&nbsp; [Notification webhooks](docs/notification-webhooks.md) &nbsp;·&nbsp; [Spec &amp; data model](docs/SPEC.md) &nbsp;·&nbsp; [Third-party modules](MODULES.md) &nbsp;·&nbsp; [Contributing](CONTRIBUTING.md) &nbsp;·&nbsp; [Security](SECURITY.md) &nbsp;·&nbsp; [Privacy for self-hosters](docs/PRIVACY-FOR-SELFHOSTERS.md) &nbsp;·&nbsp; [Changelog](CHANGELOG.md) &nbsp;·&nbsp; [Backlog](BACKLOG.md)
 
 If you self-host Yuvomi in a GDPR context (EU/EEA, processing other people's data), read [docs/PRIVACY-FOR-SELFHOSTERS.md](docs/PRIVACY-FOR-SELFHOSTERS.md) before going live. It covers third-country assessments for every external service (weather, CalDAV/CardDAV, OIDC, WebDAV backup and document storage), data-processing-agreement notes, log-retention guidance, and a records-of-processing template.
 

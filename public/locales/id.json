@@ -2082,6 +2082,7 @@
         "notificationChannelNtfyToken": "Token ntfy",
         "notificationChannelNtfyUsername": "Nama pengguna ntfy",
         "notificationChannelNtfyPassword": "Kata sandi ntfy",
+        "notificationChannelWebhookToken": "Token Bearer (opsional)",
         "notificationChannelSave": "Simpan saluran",
         "notificationChannelSaved": "Saluran disimpan.",
         "notificationChannelTest": "Kirim uji",

@@ -2070,6 +2070,7 @@
         "notificationChannelNtfyToken": "ntfy 令牌",
         "notificationChannelNtfyUsername": "ntfy 用户名",
         "notificationChannelNtfyPassword": "ntfy 密码",
+        "notificationChannelWebhookToken": "Bearer 令牌（可选）",
         "notificationChannelSave": "保存频道",
         "notificationChannelSaved": "频道已保存。",
         "notificationChannelTest": "发送测试",

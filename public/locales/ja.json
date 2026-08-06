@@ -2070,6 +2070,7 @@
         "notificationChannelNtfyToken": "ntfy トークン",
         "notificationChannelNtfyUsername": "ntfy ユーザー名",
         "notificationChannelNtfyPassword": "ntfy パスワード",
+        "notificationChannelWebhookToken": "Bearer トークン（任意）",
         "notificationChannelSave": "チャンネルを保存",
         "notificationChannelSaved": "チャンネルを保存しました。",
         "notificationChannelTest": "テストを送信",

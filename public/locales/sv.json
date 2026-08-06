@@ -2070,6 +2070,7 @@
         "notificationChannelNtfyToken": "ntfy-token",
         "notificationChannelNtfyUsername": "ntfy-användarnamn",
         "notificationChannelNtfyPassword": "ntfy-lösenord",
+        "notificationChannelWebhookToken": "Bearer-token (valfritt)",
         "notificationChannelSave": "Spara kanal",
         "notificationChannelSaved": "Kanal sparad.",
         "notificationChannelTest": "Skicka test",

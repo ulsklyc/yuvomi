@@ -12,6 +12,7 @@ import { toggleRowHtml } from '/settings/components.js';
 const DEFAULT_PROVIDERS = [
   { id: 'gotify', name: 'Gotify' },
   { id: 'ntfy', name: 'ntfy' },
+  { id: 'webhook', name: 'Webhook' },
 ];
 
 function selected(value, expected) {
@@ -19,21 +20,31 @@ function selected(value, expected) {
 }
 
 function channelDefaults(provider = 'gotify') {
-  return provider === 'ntfy'
-    ? {
-        provider: 'ntfy',
-        name: '',
-        enabled: false,
-        config: { baseUrl: '', topic: '', priority: 'default', authType: 'none' },
-        secretSet: false,
-      }
-    : {
-        provider: 'gotify',
-        name: '',
-        enabled: false,
-        config: { baseUrl: '', priority: 5 },
-        secretSet: false,
-      };
+  if (provider === 'ntfy') {
+    return {
+      provider: 'ntfy',
+      name: '',
+      enabled: false,
+      config: { baseUrl: '', topic: '', priority: 'default', authType: 'none' },
+      secretSet: false,
+    };
+  }
+  if (provider === 'webhook') {
+    return {
+      provider: 'webhook',
+      name: '',
+      enabled: false,
+      config: { baseUrl: '' },
+      secretSet: false,
+    };
+  }
+  return {
+    provider: 'gotify',
+    name: '',
+    enabled: false,
+    config: { baseUrl: '', priority: 5 },
+    secretSet: false,
+  };
 }
 
 function renderPage(container, user) {
@@ -111,6 +122,7 @@ function renderChannelList(container, channels, providers = DEFAULT_PROVIDERS) {
     const channel = { ...channelDefaults(rawChannel.provider), ...rawChannel, config: { ...channelDefaults(rawChannel.provider).config, ...(rawChannel.config || {}) } };
     const suffix = channel.id ? `existing-${channel.id}` : `new-${index}`;
     const isNtfy = channel.provider === 'ntfy';
+    const isWebhook = channel.provider === 'webhook';
     list.insertAdjacentHTML('beforeend', `
       <form class="settings-card settings-form notification-channel-form" data-channel-index="${index}" data-channel-id="${esc(channel.id ?? '')}">
         <h3 class="settings-card__title">${esc(channel.name || t('settings.notificationChannelAdd'))}</h3>
@@ -133,7 +145,7 @@ function renderChannelList(container, channels, providers = DEFAULT_PROVIDERS) {
           <label class="form-label" for="notification-base-url-${suffix}">${t('settings.notificationChannelBaseUrl')}</label>
           <input class="form-input" id="notification-base-url-${suffix}" name="baseUrl" value="${esc(channel.config.baseUrl)}" required>
         </div>
-        <div class="notification-provider-fields notification-provider-fields--gotify${isNtfy ? ' settings-card--hidden' : ''}">
+        <div class="notification-provider-fields notification-provider-fields--gotify${channel.provider === 'gotify' ? '' : ' settings-card--hidden'}">
           <div class="form-field">
             <label class="form-label" for="notification-gotify-token-${suffix}">${t('settings.notificationChannelGotifyToken')}</label>
             <input class="form-input" id="notification-gotify-token-${suffix}" name="gotifyToken" type="password" autocomplete="new-password" placeholder="${channel.secretSet ? esc(t('settings.notificationChannelSecretKeep')) : ''}">
@@ -141,6 +153,12 @@ function renderChannelList(container, channels, providers = DEFAULT_PROVIDERS) {
           <div class="form-field">
             <label class="form-label" for="notification-gotify-priority-${suffix}">${t('settings.notificationChannelGotifyPriority')}</label>
             <input class="form-input" id="notification-gotify-priority-${suffix}" name="gotifyPriority" type="number" min="1" max="10" value="${esc(channel.config.priority ?? 5)}">
+          </div>
+        </div>
+        <div class="notification-provider-fields notification-provider-fields--webhook${isWebhook ? '' : ' settings-card--hidden'}">
+          <div class="form-field">
+            <label class="form-label" for="notification-webhook-token-${suffix}">${t('settings.notificationChannelWebhookToken')}</label>
+            <input class="form-input" id="notification-webhook-token-${suffix}" name="webhookToken" type="password" autocomplete="new-password" placeholder="${channel.secretSet ? esc(t('settings.notificationChannelSecretKeep')) : ''}">
           </div>
         </div>
         <div class="notification-provider-fields notification-provider-fields--ntfy${isNtfy ? '' : ' settings-card--hidden'}">
@@ -208,6 +226,8 @@ function readChannelForm(form) {
       if (form.elements.ntfyUsername.value) body.secrets.username = form.elements.ntfyUsername.value;
       if (form.elements.ntfyPassword.value) body.secrets.password = form.elements.ntfyPassword.value;
     }
+  } else if (provider === 'webhook') {
+    if (form.elements.webhookToken.value) body.secrets.token = form.elements.webhookToken.value;
   } else {
     body.config.priority = Number(form.elements.gotifyPriority.value || 5);
     if (form.elements.gotifyToken.value) body.secrets.appToken = form.elements.gotifyToken.value;
@@ -220,6 +240,7 @@ function updateProviderVisibility(form) {
   const provider = form.elements.provider.value;
   form.querySelector('.notification-provider-fields--gotify')?.classList.toggle('settings-card--hidden', provider !== 'gotify');
   form.querySelector('.notification-provider-fields--ntfy')?.classList.toggle('settings-card--hidden', provider !== 'ntfy');
+  form.querySelector('.notification-provider-fields--webhook')?.classList.toggle('settings-card--hidden', provider !== 'webhook');
   const auth = form.elements.ntfyAuth?.value || 'none';
   form.querySelector('.notification-ntfy-token-field')?.classList.toggle('settings-card--hidden', auth !== 'token');
   form.querySelectorAll('.notification-ntfy-basic-field').forEach((field) => {

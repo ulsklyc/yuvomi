@@ -2070,6 +2070,7 @@
         "notificationChannelNtfyToken": "رمز ntfy",
         "notificationChannelNtfyUsername": "اسم مستخدم ntfy",
         "notificationChannelNtfyPassword": "كلمة مرور ntfy",
+        "notificationChannelWebhookToken": "رمز Bearer (اختياري)",
         "notificationChannelSave": "حفظ القناة",
         "notificationChannelSaved": "تم حفظ القناة.",
         "notificationChannelTest": "إرسال اختبار",

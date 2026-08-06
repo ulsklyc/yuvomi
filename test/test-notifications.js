@@ -134,6 +134,7 @@ test('channel store validates providers, URLs, and required secrets', async () =
   assert.throws(() => store.createChannel({ provider: 'ntfy', name: 'Bad', config: { baseUrl: 'https://ntfy.test' }, secrets: {} }), /topic/i);
   assert.throws(() => store.createChannel({ provider: 'ntfy', name: 'Bad', config: { baseUrl: 'https://ntfy.test', topic: 'family', authType: 'token' }, secrets: {} }), /token/i);
   assert.throws(() => store.createChannel({ provider: 'gotify', name: 'Bad', config: { baseUrl: 'file:///tmp/x' }, secrets: { appToken: 'x' } }), /scheme/i);
+  assert.throws(() => store.createChannel({ provider: 'webhook', name: 'Bad', config: { baseUrl: 'javascript:alert(1)' } }), /scheme/i);
   assert.throws(() => store.createChannel({ provider: 'smtp', name: 'Bad', config: {}, secrets: {} }), /provider/i);
 });
 
@@ -201,6 +202,30 @@ test('ntfy provider maps reminder payload with bearer auth', async () => {
   assert.equal(calls[0].options.headers.Click, '/reminders');
   assert.equal(calls[0].options.headers.Authorization, 'Bearer token-value');
   assert.equal(calls[0].options.body, 'Müll rausbringen');
+});
+
+test('webhook provider posts a JSON notification with optional bearer auth', async () => {
+  const { webhookProvider } = await import('../server/services/notification-providers/webhook.js');
+  const calls = [];
+  await webhookProvider.send({
+    channel: {
+      config: { baseUrl: 'https://hooks.example.test/yuvomi' },
+      secrets: { token: 'hook-secret' },
+    },
+    payload: { title: 'Yuvomi', body: 'Task', url: '/reminders', tag: 'reminder-1', priority: 'default' },
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      return { ok: true, status: 204 };
+    },
+  });
+  assert.equal(calls[0].url, 'https://hooks.example.test/yuvomi');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.headers.authorization, 'Bearer hook-secret');
+  assert.equal(calls[0].options.headers['content-type'], 'application/json');
+  const body = JSON.parse(calls[0].options.body);
+  assert.equal(body.event, 'notification');
+  assert.equal(body.notification.body, 'Task');
+  assert.match(body.sentAt, /^\d{4}-\d{2}-\d{2}T/);
 });
 
 test('providers throw sanitized HTTP errors', async () => {
@@ -383,6 +408,7 @@ test('admin notification routes manage channels and test sends', async () => {
   const routeProviders = {
     gotify: { id: 'gotify', send: async ({ payload }) => { sent.push(payload); return { ok: true, status: 200 }; } },
     ntfy: { id: 'ntfy', send: async () => ({ ok: true, status: 200 }) },
+    webhook: { id: 'webhook', send: async () => ({ ok: true, status: 204 }) },
   };
   const router = buildRouter({
     database: db,
@@ -406,7 +432,7 @@ test('admin notification routes manage channels and test sends', async () => {
 
   const providers = await call(makeApp(), 'GET', '/notifications/providers');
   assert.equal(providers.status, 200);
-  assert.deepEqual(providers.json.data.map((p) => p.id), ['gotify', 'ntfy']);
+  assert.deepEqual(providers.json.data.map((p) => p.id), ['gotify', 'ntfy', 'webhook']);
 
   const created = await call(makeApp(), 'POST', '/notifications/channels', {
     provider: 'gotify',

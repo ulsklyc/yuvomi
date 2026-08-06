@@ -62,6 +62,7 @@ npm run test:meals
 npm run test:calendar
 npm run test:ncb            # notes, contacts, budget
 npm run test:reminders
+npm run test:notifications    # Web Push and external notification channels
 npm run test:dashboard
 npm run test:api
 npm run test:ics-parser

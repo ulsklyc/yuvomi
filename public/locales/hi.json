@@ -2070,6 +2070,7 @@
         "notificationChannelNtfyToken": "ntfy टोकन",
         "notificationChannelNtfyUsername": "ntfy उपयोगकर्ता नाम",
         "notificationChannelNtfyPassword": "ntfy पासवर्ड",
+        "notificationChannelWebhookToken": "Bearer टोकन (वैकल्पिक)",
         "notificationChannelSave": "चैनल सहेजें",
         "notificationChannelSaved": "चैनल सहेजा गया।",
         "notificationChannelTest": "टेस्ट भेजें",
