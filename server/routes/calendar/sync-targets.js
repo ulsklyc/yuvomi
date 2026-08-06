@@ -21,6 +21,7 @@ import express from 'express';
 import { createLogger } from '../../logger.js';
 import * as googleCalendar from '../../services/google-calendar.js';
 import * as caldavSync from '../../services/caldav-sync.js';
+import * as outlookCalendar from '../../services/outlook-calendar.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
@@ -65,10 +66,33 @@ async function listCaldavTargets() {
 }
 
 /**
+ * Outlook-Ziele: alle aktivierten UND beschreibbaren Kalender je Konto, aus der
+ * DB (kein Netzzugriff). Konten im Reauth-Zustand bleiben wählbar - der Push
+ * holt nach dem Reconnect nach.
+ * @returns {Array<{accountId: number, accountName: string, calendarId: string, calendarName: string}>}
+ */
+function listOutlookTargets() {
+  const targets = [];
+  for (const account of outlookCalendar.listAccounts()) {
+    for (const cal of outlookCalendar.listCalendarSelection(account.id)) {
+      if (!cal.enabled || !cal.canEdit) continue;
+      targets.push({
+        accountId: account.id,
+        accountName: account.name,
+        calendarId: cal.calendarId,
+        calendarName: cal.calendarName || cal.calendarId,
+      });
+    }
+  }
+  return targets;
+}
+
+/**
  * GET /api/v1/calendar/sync-targets
  * Fuer alle angemeldeten Nutzer. Response:
  * { data: { google: [{ id, summary }],
- *           caldav: [{ accountId, accountName, calendarUrl, calendarName }] } }
+ *           caldav: [{ accountId, accountName, calendarUrl, calendarName }],
+ *           outlook: [{ accountId, accountName, calendarId, calendarName }] } }
  *
  * Jede Quelle faellt einzeln auf eine leere Liste zurueck: ein abgelaufenes
  * Google-Token darf die CalDAV-Ziele nicht verschlucken (und umgekehrt).
@@ -85,7 +109,13 @@ router.get('/sync-targets', async (req, res) => {
         return [];
       }),
     ]);
-    res.json({ data: { google, caldav } });
+    let outlook = [];
+    try {
+      outlook = listOutlookTargets();
+    } catch (err) {
+      log.warn('Sync targets: Outlook list failed:', err);
+    }
+    res.json({ data: { google, caldav, outlook } });
   } catch (err) {
     log.error('Sync target list failed:', err);
     res.status(500).json({ error: 'Failed to list sync targets.', code: 500 });

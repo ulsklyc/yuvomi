@@ -12,6 +12,7 @@
  *   ''                              lokal speichern
  *   'google:<calendarId>'           Google-Kalender
  *   'caldav:<accountId>|<url>'      CalDAV-Kalender eines Kontos
+ *   'outlook:<accountId>|<id>'      Outlook-Kalender eines Kontos (Graph-Id)
  */
 
 export const SYNC_TARGET_LOCAL = '';
@@ -26,6 +27,11 @@ export function caldavTargetValue(accountId, calendarUrl) {
   return `caldav:${accountId}|${calendarUrl}`;
 }
 
+/** @returns {string} Kennung eines Outlook-Kalenders. */
+export function outlookTargetValue(accountId, calendarId) {
+  return `outlook:${accountId}|${calendarId}`;
+}
+
 /**
  * Zerlegt eine Kennung in ihre Bestandteile.
  *
@@ -35,6 +41,7 @@ export function caldavTargetValue(accountId, calendarUrl) {
  * @returns {{kind: 'local'}
  *          |{kind: 'google', calendarId: string}
  *          |{kind: 'caldav', accountId: number, calendarUrl: string}
+ *          |{kind: 'outlook', accountId: number, calendarId: string}
  *          |null} null bei unbekanntem Format.
  */
 export function parseSyncTargetValue(value) {
@@ -56,6 +63,16 @@ export function parseSyncTargetValue(value) {
     return { kind: 'caldav', accountId, calendarUrl };
   }
 
+  if (raw.startsWith('outlook:')) {
+    const rest = raw.slice('outlook:'.length);
+    const separator = rest.indexOf('|');
+    if (separator < 1) return null;
+    const accountId = Number(rest.slice(0, separator));
+    const calendarId = rest.slice(separator + 1);
+    if (!Number.isInteger(accountId) || accountId < 1 || !calendarId) return null;
+    return { kind: 'outlook', accountId, calendarId };
+  }
+
   return null;
 }
 
@@ -67,8 +84,8 @@ export function parseSyncTargetValue(value) {
  * Option nach: sonst zeigte die Oberfläche "Lokal speichern" an, während in der
  * Datenbank etwas anderes steht.
  *
- * @param {{google?: Array, caldav?: Array}} targets
- * @param {{local: string, google: string, caldav: string, unavailable: string}} labels
+ * @param {{google?: Array, caldav?: Array, outlook?: Array}} targets
+ * @param {{local: string, google: string, caldav: string, outlook?: string, unavailable: string}} labels
  * @param {string} current
  * @returns {Array<{value: string, label: string, group: string|null}>}
  */
@@ -88,6 +105,14 @@ export function buildSyncTargetOptions(targets, labels, current = '') {
       value: caldavTargetValue(cal.accountId, cal.calendarUrl),
       label: cal.calendarName || cal.calendarUrl,
       group: `${labels.caldav} · ${cal.accountName}`,
+    });
+  }
+
+  for (const cal of targets?.outlook || []) {
+    options.push({
+      value: outlookTargetValue(cal.accountId, cal.calendarId),
+      label: cal.calendarName || cal.calendarId,
+      group: `${labels.outlook ?? 'Outlook'} · ${cal.accountName}`,
     });
   }
 

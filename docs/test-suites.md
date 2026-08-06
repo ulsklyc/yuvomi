@@ -124,6 +124,8 @@ npm run test:caldav-recurrence   # CalDAV/iOS-Serien mit Wochentags-Wiederholung
 npm run test:caldav-reminders   # VTODO-Inbound: Feld-Abbildung, Prune-Leerguard (#508), DUE als Wanduhrzeit statt UTC (#617; TZ=Europe/Berlin fixiert), RELATED-TO-Hierarchie inkl. Reihenfolge/Enkel/Zyklus (#671)
 npm run test:caldav-todo-outbound   # Rückrichtung VTODO (#617): Patcher lässt Alarme/Kategorien stehen, Erledigt = STATUS+COMPLETED+PERCENT-COMPLETE (und weg beim Wiederöffnen), bandtreue Priorität/Status halten urgent und in_progress, DUE-Roundtrip zonenrichtig, Inbound überschreibt keine wartende Bearbeitung und legt Gelöschtes nicht neu an, ein gelöschtes Konto entkoppelt seine Spiegelzeilen statt sie unlöschbar zu machen (v123)
 npm run test:caldav-event-target
+npm run test:outlook-calendar   # Outlook-Push (Graph): RRULE→pattern/range-Mapping, Ganztags-Konvertierung, Content-Hash-No-Ops, changeKey-Drift (remote editiert→Reassert, remote gelöscht→Neuanlage, Listing-Ausfall→PATCH-404-Fallback), Auto-Sync-Kandidaten (Sichtbarkeit, Titel-Suffix, Composite-Links über zwei Konten), Tombstone-Deletes, invalid_grant→needs_reauth
+npm run test:outlook-event-target   # POST/PUT /calendar persistieren/leeren target_outlook_*, 400 bei ungültigem Ziel
 npm run test:google-multi   # multiple Google calendars + per-event sync target
 npm run test:google-outbound   # Löschen + Ändern + Umziehen Yuvomi → Google (#593): Tombstones, Dirty-Marker, events.move, 404/410, Retry-Limit, Inbound-Konfliktschutz; dazu Serien als Master (EXDATE aus Absagen/Verschiebungen, Altbestand-Zusammenführung nur beim Full-Resync)
 npm run test:calendar-outbound-migration   # Migrationen v103-v106 gegen befüllte Bestands-DB: additiv, kein Rebuild, Marker starten neutral

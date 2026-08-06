@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Outlook calendar push (Microsoft Graph): events can be pushed one-way to Outlook.com calendars of personal Microsoft accounts (outlook.com / M365 Family — Outlook.com offers no CalDAV). Multiple family accounts connect via OAuth (free Entra ID app registration, `MS_CLIENT_ID`/`MS_CLIENT_SECRET`/`MS_REDIRECT_URI`). Each account can pick one dedicated auto-sync target calendar (recommended: a "Yuvomi" calendar created in Outlook) plus the family member it belongs to — all Yuvomi events visible to that person are then pushed automatically, with assigned members appended to the title (`Dinner (Anna, Ben)`); per-event targets in the unified sync-target picker override the auto-sync calendar. Yuvomi stays the source of truth: edits become updates, deletions remove the remote event, and manual changes or deletions in Outlook are detected via a per-calendar `changeKey` listing (one small request per calendar per run) and reverted to the Yuvomi state on the next sync. Externally synced events (Google/CalDAV/ICS) are excluded to avoid duplicates. Setup guide in `docs/installation.md`.
+
 ## [1.87.0] - 2026-08-06
 
 ### Added

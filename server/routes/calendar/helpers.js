@@ -97,6 +97,28 @@ export function caldavTarget(body) {
   return { value: { accountId, calendarUrl }, error: null };
 }
 
+// Outlook-Push-Ziel eines Events validieren (Muster caldavTarget). Leere/fehlende
+// account_id bedeutet "Lokal" (kein Push zu Outlook).
+export function outlookTarget(body) {
+  const rawId  = body.target_outlook_account_id;
+  const rawCal = body.target_outlook_calendar_id;
+  if (rawId === null || rawId === undefined || rawId === '') {
+    return { value: { accountId: null, calendarId: null }, error: null };
+  }
+  const accountId = typeof rawId === 'number' ? rawId : parseInt(rawId, 10);
+  if (!Number.isInteger(accountId) || accountId < 1) {
+    return { value: null, error: 'target_outlook_account_id: ungültige Konto-ID.' };
+  }
+  const calendarId = typeof rawCal === 'string' ? rawCal.trim() : '';
+  if (!calendarId) {
+    return { value: null, error: 'target_outlook_calendar_id: fehlt für Outlook-Ziel.' };
+  }
+  if (calendarId.length > 2048) {
+    return { value: null, error: 'target_outlook_calendar_id: zu lang.' };
+  }
+  return { value: { accountId, calendarId }, error: null };
+}
+
 // Google-Outbound-Ziel eines Events validieren (Issue #237). Leeres/fehlendes
 // Feld bedeutet "Lokal" (kein Outbound zu Google).
 export function googleTarget(body) {

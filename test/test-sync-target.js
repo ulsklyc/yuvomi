@@ -15,11 +15,12 @@ import {
   SYNC_TARGET_LOCAL,
   googleTargetValue,
   caldavTargetValue,
+  outlookTargetValue,
   parseSyncTargetValue,
   buildSyncTargetOptions,
 } from '../public/utils/sync-target.js';
 
-const LABELS = { local: 'Lokal', google: 'Google', caldav: 'CalDAV', unavailable: 'Nicht verfügbar' };
+const LABELS = { local: 'Lokal', google: 'Google', caldav: 'CalDAV', outlook: 'Outlook', unavailable: 'Nicht verfügbar' };
 
 test('bauen und zerlegen sind zueinander invers', () => {
   const google = googleTargetValue('family@group.calendar.google.com');
@@ -29,6 +30,10 @@ test('bauen und zerlegen sind zueinander invers', () => {
   const caldav = caldavTargetValue(4, 'https://dav.example.org/cal/family/');
   assert.deepEqual(parseSyncTargetValue(caldav),
     { kind: 'caldav', accountId: 4, calendarUrl: 'https://dav.example.org/cal/family/' });
+
+  const outlook = outlookTargetValue(2, 'AQMkADAwATZiZmYAZC00Zg==');
+  assert.deepEqual(parseSyncTargetValue(outlook),
+    { kind: 'outlook', accountId: 2, calendarId: 'AQMkADAwATZiZmYAZC00Zg==' });
 });
 
 test('leerer Wert ist "lokal speichern", kein Fehler', () => {
@@ -46,7 +51,7 @@ test('CalDAV-URL mit Pipe-Zeichen bleibt vollständig', () => {
 });
 
 test('kaputte Kennungen ergeben null statt eines halben Ziels', () => {
-  for (const bad of ['exchange:foo', 'google:', 'caldav:', 'caldav:abc|https://x/', 'caldav:|https://x/', 'caldav:3', 'caldav:0|https://x/', 'caldav:3|']) {
+  for (const bad of ['exchange:foo', 'google:', 'caldav:', 'caldav:abc|https://x/', 'caldav:|https://x/', 'caldav:3', 'caldav:0|https://x/', 'caldav:3|', 'outlook:', 'outlook:abc|id', 'outlook:2', 'outlook:2|', 'outlook:0|id']) {
     assert.equal(parseSyncTargetValue(bad), null, `"${bad}" muss null ergeben`);
   }
 });
@@ -55,6 +60,7 @@ test('Optionsliste beginnt mit "lokal" und gruppiert nach Quelle', () => {
   const options = buildSyncTargetOptions({
     google: [{ id: 'g1', summary: 'Familie' }],
     caldav: [{ accountId: 1, accountName: 'Nextcloud', calendarUrl: 'https://x/c1', calendarName: 'Privat' }],
+    outlook: [{ accountId: 2, accountName: 'Papa', calendarId: 'ol1', calendarName: 'Yuvomi' }],
   }, LABELS);
 
   assert.equal(options[0].value, SYNC_TARGET_LOCAL);
@@ -62,6 +68,9 @@ test('Optionsliste beginnt mit "lokal" und gruppiert nach Quelle', () => {
   assert.deepEqual(options[1], { value: 'google:g1', label: 'Familie', group: 'Google' });
   assert.deepEqual(options[2], {
     value: 'caldav:1|https://x/c1', label: 'Privat', group: 'CalDAV · Nextcloud',
+  });
+  assert.deepEqual(options[3], {
+    value: 'outlook:2|ol1', label: 'Yuvomi', group: 'Outlook · Papa',
   });
 });
 

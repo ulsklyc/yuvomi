@@ -1,6 +1,6 @@
 # Datenschutz-Hinweise für Selfhoster (Yuvomi)
 
-> **Stand: 05.08.2026** - Diese Hinweise sind eine technisch orientierte
+> **Stand: 06.08.2026** - Diese Hinweise sind eine technisch orientierte
 > Hilfestellung für Betreiber. Prüfe die Aktualität von Angemessenheitsbeschlüssen
 > und DPF-Listungen selbst (siehe Abschnitt „Quellen").
 
@@ -36,6 +36,7 @@
    - 2.13 [Mealie-Rezept-Sync](#213-mealie-rezept-sync)
    - 2.14 [DMS-Anbindung (Paperless-ngx / Papra)](#214-dms-anbindung-paperless-ngx--papra)
    - 2.15 [ICS-Kalender-Abos](#215-ics-kalender-abos)
+   - 2.16 [Outlook-Push (Microsoft Graph)](#216-outlook-push-microsoft-graph)
 3. [Logging und Speicherbegrenzung](#3-logging-und-speicherbegrenzung-art-5-abs-1-lit-e-dsgvo)
 4. [Haushaltsausnahme](#4-haushaltsausnahme-art-2-abs-2-lit-c-dsgvo)
 5. [Verarbeitungsverzeichnis-Vorlage (Art. 30 DSGVO)](#5-verarbeitungsverzeichnis-vorlage-art-30-dsgvo)
@@ -97,6 +98,7 @@ Betreiber daraus resultieren.
 | Mealie-Rezept-Sync | `server/services/mealie/` | nur wenn eine Mealie-Instanz verbunden ist | i. d. R. selbst gehostet | i. d. R. nein (siehe 2.13) |
 | DMS-Anbindung (Paperless-ngx/Papra) | `server/services/dms/` | nur wenn ein DMS verbunden ist | i. d. R. selbst gehostet | i. d. R. nein (siehe 2.14) |
 | ICS-Kalender-Abos | `server/services/ics-subscription.js` | nur wenn ein Nutzer einen Feed abonniert | abhängig vom Feed-Anbieter | nein (siehe 2.15) |
+| Outlook-Push (Microsoft Graph) | `server/services/outlook-calendar.js` | nur wenn alle `MS_*` gesetzt sind **und** ein Konto per OAuth verbunden wurde | USA/Microsoft; DPF-Status prüfen | für private Microsoft-Konten **nicht abschließbar** (siehe 2.16) |
 
 ### 2.1 Open-Meteo (Wetter-Standard)
 
@@ -153,6 +155,7 @@ Betreiber daraus resultieren.
   | Mailbox.org / Posteo / mailcow | DE | unkritisch |
   | Apple iCloud | USA (Apple Inc.) | DPF-zertifiziert; AVV via Apple Business |
   | Google Workspace | USA (Google LLC) | DPF-zertifiziert; AVV + DPF-Status prüfen |
+  | Outlook.com / Microsoft 365 | USA (Microsoft Corp.) | **kein CalDAV** — eigener Kanal, siehe Abschnitt 2.16 |
   | Mailbox-Provider Drittland (sonstige) | Einzelfall | individuelle TIA |
 - **AVV:** ja, bei kommerziellen Anbietern.
 - **Google-Kalender-Sync läuft nicht über CalDAV:** Yuvomi synchronisiert Google
@@ -163,6 +166,14 @@ Betreiber daraus resultieren.
   sind nur bei aktiviertem `DB_ENCRYPTION_KEY` verschlüsselt. Drittland- und
   AVV-Bewertung wie in der Tabelle oben für Google (USA/DPF-Status prüfen,
   Google-AVV/DPA abschließen) — analog zu Abschnitt 2.7.
+- **Outlook.com spricht kein CalDAV:** Microsoft hat den CalDAV-Zugang für
+  Outlook.com abgeschaltet; ein CalDAV-Konto lässt sich dort gar nicht erst
+  einrichten. Yuvomi schreibt stattdessen über die **Microsoft-Graph-API**
+  (`server/services/outlook-calendar.js`) — und zwar nur in eine Richtung,
+  Yuvomi → Outlook. Weil dabei Freitext-Inhalte an ein privates
+  Microsoft-Konto gehen und ein AVV für solche Konten nicht existiert, hat
+  dieser Kanal einen **eigenen Abschnitt 2.16**; die Bewertung in dieser
+  Tabelle greift für ihn nicht.
 - **Empfehlung:** Trage die konkret eingerichteten Sync-Endpoints in dein
   Verarbeitungsverzeichnis (Abschnitt 5) ein — Yuvomi kennt sie nicht zentral,
   jeder Nutzer kann andere konfigurieren.
@@ -421,6 +432,102 @@ Konfiguration so, dass du auf einen EU-Provider umstellen könntest.
   Personenbezug genügt der Transparenzhinweis. Feed-URLs mit eingebettetem
   Token wie Zugangsdaten behandeln (sie erlauben jedem den Kalenderabruf).
 
+### 2.16 Outlook-Push (Microsoft Graph)
+
+- **Code-Stellen:** `server/services/outlook-calendar.js`,
+  `server/routes/calendar/outlook.js`.
+- **Was ist das?** Ein **einseitiger Push Yuvomi → Outlook.com** für private
+  Microsoft-Konten (outlook.com, hotmail.com, M365 Family). Outlook.com bietet
+  kein CalDAV mehr (siehe Abschnitt 2.3), deshalb läuft dieser Weg über die
+  Microsoft-Graph-API. Yuvomi bleibt die führende Quelle: Änderungen in Outlook
+  werden beim nächsten Lauf auf den Yuvomi-Stand zurückgesetzt.
+- **Aktiv nur, wenn:** alle drei Variablen `MS_CLIENT_ID`, `MS_CLIENT_SECRET`
+  und `MS_REDIRECT_URI` gesetzt sind **und** ein Admin ein Microsoft-Konto per
+  OAuth verbunden hat. Fehlt eine der Variablen, ist der Kanal vollständig
+  inert — es gibt keinen Weg, ein Konto ohne den OAuth-Flow anzulegen.
+- **Endpunkte:** `login.microsoftonline.com/consumers/oauth2/v2.0`
+  (Authorize/Token) und `graph.microsoft.com/v1.0`. Der `/consumers`-Pfad
+  bedeutet: ausschließlich private Microsoft-Konten, keine Arbeits- oder
+  Schulkonten.
+- **Scopes:** `offline_access Calendars.ReadWrite User.Read` — kein Zugriff auf
+  Mail, Kontakte oder Dateien.
+
+**Was je Termin an Microsoft übertragen wird:**
+
+| Feld | Übertragen? |
+|---|---|
+| Titel — **einschließlich der Anzeigenamen zugewiesener Mitglieder** (`Abendessen (Anna, Ben)`) | ja |
+| Beschreibung/Notizen, als Klartext-Body | ja |
+| Ort | ja, wenn gesetzt |
+| Start/Ende, Ganztags-Kennzeichen, Zeitzone `Europe/Berlin` | ja |
+| Wiederholungsregel | ja, wenn gesetzt |
+| Teilnehmer, Erinnerungen, Anhänge, Farbe, Termin-Icon, Yuvomi-ID | **nein** |
+
+- **Hinweis zu Gesundheitsdaten (Art. 9 DSGVO):** Titel, Beschreibung und Ort
+  sind **Freitext**, und im Familienkalender steht dort typischerweise genau
+  das — Arzttermine, Therapiestunden, Medikamente. Das medizinische Termin-Icon
+  bleibt lokal, der Text nicht. Push-fähig sind auch automatisch erzeugte
+  Termine, denn sie sind gewöhnliche lokale Termine: Geburtstage
+  (`server/services/birthdays.js`) und Haushaltshilfe-Einsätze **samt Namen der
+  Beschäftigten** (`server/routes/housekeeping.js`). Wer das nicht möchte, hält
+  den Freitext knapp oder stellt den Termin auf `private` — er erreicht dann nur
+  noch das Konto der erstellenden Person und nicht das eines anderen
+  Familienmitglieds (siehe Sichtbarkeit).
+- **Offenlegung gegenüber dem Kontoinhaber:** Der Auto-Sync schiebt Termine in
+  das Postfach **einer** Person. Ist ein Termin anderen Familienmitgliedern
+  zugewiesen, stehen deren Klarnamen im Titel in einem fremden
+  Microsoft-Konto — eine Übermittlung an Microsoft **und** an den Kontoinhaber.
+- **Was hereinkommt und gespeichert wird:** einmalig beim Verbinden das
+  Graph-Profil (`id`, Anzeigename, `mail`/`userPrincipalName`), die Kalenderliste
+  (Id, Name, Farbe, Schreibrecht) und je Zielkalender eine Liste aus Event-Id
+  und `changeKey` zur Drift-Erkennung. **Inhalte fremder Outlook-Termine werden
+  nie abgerufen**, und es gibt keinen Inbound-Sync: nichts aus Outlook wird zu
+  Yuvomi-Termindaten.
+- **Sichtbarkeit:** Der **Auto-Sync** respektiert die In-App-Sichtbarkeit —
+  private Termine anderer Personen landen nicht im Postfach des Kontoinhabers.
+  Ein **ausdrücklich am einzelnen Termin gesetztes** Outlook-Ziel wird dagegen
+  nicht gefiltert; das entspricht dem Google-/CalDAV-Outbound und dem
+  ICS-Export-Feed, denn die Sichtbarkeit ist eine In-App-Kontrolle und keine
+  Ausleitungssperre.
+- **Tokens:** Zugriffs- und Refresh-Token liegen pro Konto-Zeile in der Tabelle
+  `outlook_accounts` — **im Klartext**, geschützt nur durch die optionale
+  Datenbank-Verschlüsselung `DB_ENCRYPTION_KEY` (dieselbe Lage wie bei den
+  Google-Tokens, Abschnitt 2.3). Über die API werden sie nie zurückgegeben. Bei
+  privaten Microsoft-Konten verfallen Refresh-Token nach rund 90 Tagen ohne
+  Nutzung; das Konto verlangt dann einen Reconnect.
+- **Drittland:** Microsoft Corp., USA — DPF-zertifiziert, Status selbst prüfen
+  (Abschnitt 6).
+- **AVV: für private Microsoft-Konten nicht abschließbar.** Für ein
+  outlook.com-Konto gilt der Microsoft-Servicevertrag: Microsoft tritt dort
+  gegenüber dem **Kontoinhaber** auf, nicht als dein Auftragsverarbeiter — ein
+  Vertrag nach Art. 28 DSGVO existiert für diese Konstellation schlicht nicht.
+  **Konsequenz:** Außerhalb der Haushaltsausnahme (Abschnitt 4) ist dieser Kanal
+  kaum rechtssicher zu betreiben. Im reinen Familienbetrieb greift Abschnitt 4
+  und die Frage stellt sich nicht; sobald du Daten Dritter verarbeitest, ist die
+  datenschutzkonforme Alternative ein CalDAV-Ziel (Abschnitt 2.3) statt Outlook.
+  Ein AVV-fähiger Microsoft-Weg wäre Microsoft 365 Business gegen ein
+  Arbeitskonto — den unterstützt Yuvomi wegen des `/consumers`-Endpunkts nicht.
+- **Löschung und Aufbewahrung:**
+  1. Ein in Yuvomi gelöschter Termin wird erst im **nächsten Sync-Lauf** in
+     Outlook gelöscht (bis zu `SYNC_INTERVAL_MINUTES` Verzug, Default 15 Minuten).
+     Dasselbe gilt, wenn ein Termin die Sichtbarkeit für den Kontoinhaber
+     verliert oder sein Ziel verliert.
+  2. **Beim Trennen eines Kontos bleiben bereits gepushte Termine in Outlook
+     stehen.** Wer sie loswerden will, löscht sie **vor** dem Trennen in Yuvomi
+     (oder anschließend von Hand in Outlook).
+  3. Die lokalen Tokens werden beim Trennen gelöscht, **ein Widerruf bei
+     Microsoft erfolgt aber nicht**. Entziehe die Freigabe zusätzlich unter
+     <https://account.live.com/consent/Manage>, sonst bleibt die erteilte
+     Berechtigung dort bestehen.
+- **Intervall:** der gemeinsame Sync-Lauf (`SYNC_INTERVAL_MINUTES`, Default
+  15 Minuten), zusätzlich einmal beim Serverstart, direkt nach dem
+  OAuth-Callback und über einen manuellen Admin-Trigger.
+- **Empfehlungen:** einen **dedizierten Kalender** in Outlook als Ziel wählen
+  (nicht den Hauptkalender), `DB_ENCRYPTION_KEY` setzen, damit die Tokens nicht
+  im Klartext auf der Platte liegen, und bei Gesundheitsbezug den Freitext knapp
+  halten. Das Client-Secret der Entra-App gehört wie ein Passwort behandelt und
+  läuft nach spätestens 24 Monaten ab.
+
 ---
 
 ## 3. Logging und Speicherbegrenzung (Art. 5 Abs. 1 lit. e DSGVO)
@@ -533,10 +640,10 @@ konkrete Konfiguration ein und ergänze um eigene Verarbeitungen.
 | # | Bezeichnung | Zweck | Rechtsgrundlage | Kategorien Betroffener | Kategorien Daten | Empfänger | Drittland | Löschfrist | TOMs |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | Nutzerkonten / Authentifizierung | Login, Identifizierung | Art. 6 Abs. 1 lit. b | Nutzer der Instanz | E-Mail, Username, Passwort-Hash | <<OIDC-Provider falls aktiv>> | <<EU/Drittland>> | bis Account-Löschung | bcrypt-Hash (Cost 12), HTTPS |
-| 2 | Kalender / Termine | Haushaltskoordination | Art. 6 Abs. 1 lit. b | Nutzer, ggf. Eingeladene | Termintitel, Teilnehmer, Ort | CalDAV-Server (falls Sync) | <<je nach Anbieter>> | bis Löschung durch Nutzer | TLS, AVV |
+| 2 | Kalender / Termine | Haushaltskoordination | Art. 6 Abs. 1 lit. b; bei Gesundheitsangaben im Freitext zusätzlich Art. 9 Abs. 2 lit. a | Nutzer, ggf. Eingeladene | Termintitel, Teilnehmer, Ort, Freitext-Notizen (ggf. Gesundheitsangaben) | CalDAV-Server, Google Calendar und/oder Outlook/Microsoft Graph (falls Sync) | <<je nach Anbieter; Google/Microsoft ggf. USA>> | bis Löschung durch Nutzer; Outlook-Push löscht erst im nächsten Sync-Lauf, beim Trennen gar nicht | TLS, AVV (für private Microsoft-Konten nicht abschließbar, siehe 2.16) |
 | 3 | Kontakte / CardDAV | Adressbuch | Art. 6 Abs. 1 lit. b/f | Nutzer, Kontakte | Name, Adresse, Telefon, E-Mail | CardDAV-Server (falls Sync) | <<je nach Anbieter>> | bis Löschung | TLS, AVV |
 | 4 | Wetter | Anzeige Vorhersage | Art. 6 Abs. 1 lit. b | Nutzer | Koordinaten/Ortsname | Open-Meteo (CH); ggf. OpenWeather (UK) | CH/UK Angemessenheit | sofort nach Anfrage | TLS |
-| 5 | Backups | Datensicherung | Art. 6 Abs. 1 lit. f | Nutzer und alle Datensubjekte der App | Vollbackup der DB | <<WebDAV-Provider>> | <<Aufbewahrungs-Konzept, z. B. 30 Tage rollierend>> | Verschlüsselung vor Upload, AVV |
+| 5 | Backups | Datensicherung | Art. 6 Abs. 1 lit. f | Nutzer und alle Datensubjekte der App | Vollbackup der DB | <<WebDAV-Provider>> | <<je nach Anbieter>> | <<Aufbewahrungs-Konzept, z. B. 30 Tage rollierend>> | Verschlüsselung vor Upload, AVV |
 | 6 | Dokumentablage | Gemeinsame Ablage und Kalenderanhänge | Art. 6 Abs. 1 lit. b/f | Nutzer und in Dokumenten genannte Personen | Dokumentdateien, Anhänge, Metadaten | <<lokaler Hoster, WebDAV-Provider oder Google Drive, falls aktiv>> | <<je nach Anbieter; Google ggf. USA>> | bis Löschung durch Nutzer, Provider-Papierkorb prüfen | TLS, eigener Pfad, AVV, Drive-ACL-Grenze, separates Backup |
 | 7 | Sicherheits-/Betriebs-Logs | Missbrauchserkennung, Fehlersuche | Art. 6 Abs. 1 lit. f | Nutzer / Login-Versuchende | IP bei fehlgeschlagenen Logins, Fehler-Stacktraces | nur lokal | nein | **max. 30 Tage** | Rotation, Zugangsbeschränkung |
 | 8 | MCP-/KI-Anbindung (falls genutzt) | Zugriff eines angebundenen KI-/Agent-Clients auf Instanzdaten | Art. 6 Abs. 1 lit. a/f; bei Art.-9-Daten zusätzlich Art. 9 Abs. 2 lit. a | Nutzer und in den Daten genannte Personen | je nach Token-Scope: Aufgaben, Termine, Einkauf, ggf. health/housekeeping | lokaler Client: keiner · Cloud: <<Anbieter>> | lokaler Client: nein · Cloud: <<je nach Anbieter>> | bis Token-Widerruf | Token-Scoping (Least Privilege), TLS; bei Cloud: AVV, DPF/SCCs+TIA |
@@ -551,6 +658,7 @@ konkrete Konfiguration ein und ergänze um eigene Verarbeitungen.
 | <<OIDC-Provider>> | Authentifizierung | <<Datum>> | <<EU/USA>> | <<AVV; ggf. DPF + SCCs>> |
 | <<WebDAV-Provider>> | Backup- und/oder Dokument-Storage | <<Datum>> | <<je nach Anbieter>> | <<AVV; Verschlüsselung für Backups; Zugriffsbeschränkung>> |
 | <<Google Ireland/Google LLC>> | Google-Drive-Dokumentspeicher (falls aktiv) | <<Datum>> | EU/USA | <<Google-DPA; DPF-Status; ggf. SCCs/TIA; drive.file>> |
+| <<Microsoft Corp.>> | Outlook-Kalender-Push (falls aktiv) | **entfällt — kein AVV für private Konten** | USA | <<DPF-Status; Microsoft-Servicevertrag statt AVV; außerhalb der Haushaltsausnahme CalDAV-Ziel bevorzugen — siehe 2.16>> |
 
 ---
 

@@ -107,6 +107,25 @@ export function calendarPaths() {
     '/api/v1/calendar/caldav/reminders/status': {
       get: op({ summary: 'Get CalDAV reminders sync status', tag: 'Calendar' }),
     },
+    '/api/v1/calendar/outlook/auth': { get: op({ summary: 'Start Outlook (Microsoft) OAuth', tag: 'Calendar', admin: true }) },
+    '/api/v1/calendar/outlook/callback': { get: op({ summary: 'Outlook OAuth callback', tag: 'Calendar' }) },
+    '/api/v1/calendar/outlook/accounts': {
+      get: op({ summary: 'List connected Outlook accounts', tag: 'Calendar', admin: true }),
+    },
+    '/api/v1/calendar/outlook/accounts/{id}': {
+      put: op({ summary: 'Update Outlook account (name, auto-sync calendar, owner)', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      delete: op({ summary: 'Disconnect and delete Outlook account', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true }),
+    },
+    '/api/v1/calendar/outlook/accounts/{id}/calendars': {
+      get: op({ summary: 'List calendars for an Outlook account', tag: 'Calendar', admin: true, params: [idParam()] }),
+      patch: op({ summary: 'Enable or disable an Outlook calendar as push target', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+    },
+    '/api/v1/calendar/outlook/sync': {
+      post: op({ summary: 'Run Outlook one-way push', tag: 'Calendar', admin: true, stateChanging: true }),
+    },
+    '/api/v1/calendar/outlook/status': {
+      get: op({ summary: 'Get Outlook push status', tag: 'Calendar' }),
+    },
     '/api/v1/calendar/{id}': {
       get: op({
         summary: 'Get calendar event',

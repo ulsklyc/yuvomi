@@ -49,6 +49,7 @@ export function collectDefaultReminders(box) {
  */
 function syncTargetOptions(targets, current = '') {
   return buildSyncTargetOptions(targets, {
+    outlook: t('calendar.syncTargetOutlookGroup'),
     local: t('calendar.syncTargetLocal'),
     google: t('calendar.syncTargetGoogleGroup'),
     caldav: t('calendar.syncTargetCaldavGroup'),
@@ -87,8 +88,8 @@ function renderPage(container, preferences, syncTargets = null) {
   );
   const assignMe = !!preferences.calendar_default_assign_me;
   // Das Ziel-Feld erscheint nur, wenn es etwas zu wählen gibt: ohne verbundenen
-  // Google- oder CalDAV-Kalender bliebe ein Dropdown mit der einzigen Option
-  // "Lokal speichern". Sobald ein Ziel gespeichert ist, trägt es
+  // Google-, CalDAV- oder Outlook-Kalender bliebe ein Dropdown mit der einzigen
+  // Option "Lokal speichern". Sobald ein Ziel gespeichert ist, trägt es
   // buildSyncTargetOptions als zweite Option nach und das Feld erscheint wieder -
   // sonst gäbe es keinen Weg, ein Ziel abzuwählen, dessen Konto entfernt wurde.
   // Nur wenn die Zielabfrage selbst scheitert (syncTargets === null), bleibt das

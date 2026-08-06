@@ -19,7 +19,7 @@ import { parseRemindAtAsUtc } from '/utils/reminder-offset.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 import { wireTablist } from '/utils/tablist.js';
 import { localizeBirthdayEvent } from '/utils/birthday-event.js';
-import { googleTargetValue, caldavTargetValue } from '/utils/sync-target.js';
+import { googleTargetValue, caldavTargetValue, outlookTargetValue } from '/utils/sync-target.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { findPageFab } from '/utils/fab.js';
 
@@ -2563,10 +2563,14 @@ async function loadSyncTargets(selectElement, currentEvent = null) {
   // sind admin-only und lieferten Familienmitgliedern nur 403 - übrig blieb
   // "Lokal speichern". /sync-targets liefert bereits gefiltert (aktiviert +
   // beschreibbar) und ohne Zugangsdaten.
-  let targets = { google: [], caldav: [] };
+  let targets = { google: [], caldav: [], outlook: [] };
   try {
     const res = await api.get('/calendar/sync-targets');
-    targets = { google: res.data?.google || [], caldav: res.data?.caldav || [] };
+    targets = {
+      google: res.data?.google || [],
+      caldav: res.data?.caldav || [],
+      outlook: res.data?.outlook || [],
+    };
   } catch (err) {
     console.warn('Failed to load sync targets:', err);
   }
@@ -2601,6 +2605,22 @@ async function loadSyncTargets(selectElement, currentEvent = null) {
     caldavGroup.appendChild(option);
   }
 
+  // Outlook-Kalender nach Konto gruppieren (gleiche Grammatik wie CalDAV).
+  let outlookGroup = null;
+  let outlookGroupAccountId = null;
+  for (const cal of targets.outlook) {
+    if (outlookGroupAccountId !== cal.accountId) {
+      outlookGroup = document.createElement('optgroup');
+      outlookGroup.label = `${t('calendar.syncTargetOutlookGroup')} · ${cal.accountName}`;
+      outlookGroupAccountId = cal.accountId;
+      selectElement.appendChild(outlookGroup);
+    }
+    const option = document.createElement('option');
+    option.value = outlookTargetValue(cal.accountId, cal.calendarId);
+    option.textContent = cal.calendarName || cal.calendarId;
+    outlookGroup.appendChild(option);
+  }
+
   // Pre-select the editing event's existing target
   if (currentEvent?.target_google_calendar_id) {
     const value = googleTargetValue(currentEvent.target_google_calendar_id);
@@ -2623,6 +2643,8 @@ async function loadSyncTargets(selectElement, currentEvent = null) {
     selectElement.value = value;
   } else if (currentEvent?.target_caldav_account_id && currentEvent?.target_caldav_calendar_url) {
     selectElement.value = caldavTargetValue(currentEvent.target_caldav_account_id, currentEvent.target_caldav_calendar_url);
+  } else if (currentEvent?.target_outlook_account_id && currentEvent?.target_outlook_calendar_id) {
+    selectElement.value = outlookTargetValue(currentEvent.target_outlook_account_id, currentEvent.target_outlook_calendar_id);
   } else if (!currentEvent) {
     // Nur für NEUE Termine (#620). Ein bestehender Termin behält sein Ziel, auch
     // wenn es "Lokal" ist - sonst würde das Öffnen und Speichern eines lokalen
@@ -3266,11 +3288,13 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       };
     }
 
-    // Extract sync target (unified Google + CalDAV picker)
+    // Extract sync target (unified Google + CalDAV + Outlook picker)
     const syncTargetValue = overlay.querySelector('#event-sync-target')?.value || '';
     let target_google_calendar_id = null;
     let target_caldav_account_id = null;
     let target_caldav_calendar_url = null;
+    let target_outlook_account_id = null;
+    let target_outlook_calendar_id = null;
 
     if (syncTargetValue.startsWith('google:')) {
       target_google_calendar_id = syncTargetValue.slice('google:'.length);
@@ -3279,6 +3303,12 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       if (accountId && calendarUrl) {
         target_caldav_account_id = parseInt(accountId, 10);
         target_caldav_calendar_url = calendarUrl;
+      }
+    } else if (syncTargetValue.startsWith('outlook:')) {
+      const [accountId, calendarId] = syncTargetValue.slice('outlook:'.length).split('|');
+      if (accountId && calendarId) {
+        target_outlook_account_id = parseInt(accountId, 10);
+        target_outlook_calendar_id = calendarId;
       }
     }
 
@@ -3291,6 +3321,8 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       target_google_calendar_id,
       target_caldav_account_id,
       target_caldav_calendar_url,
+      target_outlook_account_id,
+      target_outlook_calendar_id,
     };
     if (attachmentPayload) {
       Object.assign(body, {

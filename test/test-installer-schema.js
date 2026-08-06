@@ -102,6 +102,14 @@ const INTENTIONALLY_NOT_IN_INSTALLER = {
   OPENWEATHER_UNITS: 'Legacy-Wetterprovider.',
   OPENWEATHER_LANG: 'Legacy-Wetterprovider.',
 
+  // Outlook-Push (Microsoft Graph): braucht eine Entra-App-Registrierung, die
+  // typischerweise erst nach der Installation entsteht (Anleitung in
+  // docs/installation.md). Ein Wizard-Dialog dafür wäre bei der Erstinstallation
+  // immer leer; die Werte werden nachträglich in die .env eingetragen.
+  MS_CLIENT_ID: 'Outlook-Push: Entra-App entsteht erst nach der Installation (docs/installation.md).',
+  MS_CLIENT_SECRET: 'Outlook-Push: Entra-App entsteht erst nach der Installation.',
+  MS_REDIRECT_URI: 'Outlook-Push: Entra-App entsteht erst nach der Installation.',
+
   // Betriebs-Feinjustage, keine Installationsentscheidung.
   LOG_LEVEL: 'Betriebs-Feinjustage.',
   ENABLE_API_DOCS: 'Betriebs-Feinjustage.',

@@ -542,7 +542,7 @@ router.put('/', (req, res) => {
       // zuvor gesetzten Ziels. parseSyncTargetValue liefert dafür {kind:'local'},
       // also einen gültigen Wert, und null nur bei echtem Formfehler.
       if (parseSyncTargetValue(target) === null) {
-        return res.status(400).json({ error: 'calendar_default_target: erwartet "google:<id>" oder "caldav:<kontoId>|<url>"', code: 400 });
+        return res.status(400).json({ error: 'calendar_default_target: erwartet "google:<id>", "caldav:<kontoId>|<url>" oder "outlook:<kontoId>|<kalenderId>"', code: 400 });
       }
       cfgUserSet('calendar_default_target', req.authUserId, target);
     }
