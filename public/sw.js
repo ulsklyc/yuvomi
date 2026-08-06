@@ -64,6 +64,7 @@ const APP_SHELL = [
   '/styles/recipes.css',
   '/styles/pantry.css',
   '/styles/detail-view.css',
+  '/styles/screensaver.css',
   '/components/yuvomi-install-prompt.js',
   // Geteilte Module. Sie werden von Shell UND Seitenmodulen importiert und
   // müssen deshalb zusammen mit der Shell erneuert werden: der Browser bindet
@@ -75,6 +76,7 @@ const APP_SHELL = [
   '/components/detail-view.js',
   '/components/document-attach.js',
   '/components/modal.js',
+  '/components/photo-screensaver.js',
   '/components/user-multi-select.js',
   '/utils/birthday-event.js',
   '/utils/category-labels.js',
@@ -214,6 +216,7 @@ const PAGE_MODULES = [
   '/settings/pages/admin-api.js',
   '/settings/pages/admin-backup.js',
   '/settings/pages/admin-weather.js',
+  '/settings/pages/admin-immich.js',
   '/settings/pages/admin-system.js',
 ];
 

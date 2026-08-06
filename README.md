@@ -294,6 +294,11 @@ Seventeen independent modules share one calm, consistent interface. Turn on what
 
 </details>
 
+**Immich photo screensaver.** After five minutes without activity, Yuvomi can replace the static app
+view with rotating photos from a self-hosted Immich library or selected album. Configure and preview
+it under Settings → Administration → Immich; credentials remain on the Yuvomi server. See the
+[Immich screensaver guide](docs/immich-screensaver.md).
+
 <sub>Full data model and per-module details live in the <a href="docs/SPEC.md">Spec</a>; building third-party drop-in modules is covered in the <a href="MODULES.md">module developer guide</a>.</sub>
 
 <details>

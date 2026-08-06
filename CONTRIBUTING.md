@@ -63,6 +63,7 @@ npm run test:calendar
 npm run test:ncb            # notes, contacts, budget
 npm run test:reminders
 npm run test:dashboard
+npm run test:screensaver
 npm run test:api
 npm run test:ics-parser
 npm run test:ics-sub

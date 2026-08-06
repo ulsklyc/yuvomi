@@ -506,6 +506,25 @@ returned by the API once saved; it is stored in the database the same way as oth
 credentials (e.g. the Apple app-specific password), with encryption-at-rest available via the
 optional `DB_ENCRYPTION_KEY`.
 
+### Immich Photo Screensaver (Optional)
+
+Connect a self-hosted Immich server under **Settings → Administration → Immich** to show random
+photos after five minutes without activity. The administration page can test the connection and
+open an immediate preview. An optional album UUID limits the selection; otherwise Yuvomi uses the
+whole accessible library. The Immich API key needs `asset.read` and `asset.view` permissions.
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `IMMICH_URL` | Immich server root or URL ending in `/api` | — | No |
+| `IMMICH_API_KEY` | Immich API key with asset read/view permissions | — | No |
+| `IMMICH_SCREENSAVER_ALBUM_ID` | Optional album UUID used as the photo source | Entire accessible library | No |
+
+Non-empty environment values override their corresponding database values and make those fields
+read-only in Settings. The API key is never returned to the browser. Keys saved in Settings are
+encrypted at rest when `DB_ENCRYPTION_KEY` is enabled. See the dedicated
+[Immich screensaver guide](immich-screensaver.md) for setup, Docker networking, preview behavior,
+security, and troubleshooting.
+
 ### Database & Storage
 
 | Variable | Description | Default | Required |

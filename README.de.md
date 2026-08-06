@@ -294,6 +294,12 @@ Siebzehn eigenständige Module teilen sich eine ruhige, konsistente Oberfläche.
 
 </details>
 
+**Immich-Foto-Bildschirmschoner.** Nach fünf Minuten ohne Aktivität kann Yuvomi die statische
+App-Ansicht durch wechselnde Fotos aus einer selbst gehosteten Immich-Bibliothek oder einem
+ausgewählten Album ersetzen. Einrichtung und Vorschau liegen unter Einstellungen → Administration
+→ Immich; die Zugangsdaten bleiben auf dem Yuvomi-Server. Mehr dazu im
+[Immich-Leitfaden](docs/immich-screensaver.md).
+
 <sub>Vollständiges Datenmodell und Modul-Details in der <a href="docs/SPEC.md">Spec</a> und der <a href="MODULES.md">Modul-Referenz</a>.</sub>
 
 <details>

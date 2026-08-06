@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Immich can now turn an idle wall tablet into a photo screensaver instead of leaving the dashboard fixed on screen. An administrator connects the server under Settings → Administration → Immich, keeps the API key on Yuvomi's server, optionally limits the source to one album, tests the connection and opens the real screensaver as a preview. After five minutes without activity, photos rotate every 20 seconds until the next touch, pointer, keyboard or scroll input; metadata changes corners so the burn-in protection does not introduce its own fixed bright area. The same settings can be supplied through `IMMICH_URL`, `IMMICH_API_KEY` and `IMMICH_SCREENSAVER_ALBUM_ID`, with environment values taking precedence over the database (#686)
+
 ## [1.87.0] - 2026-08-06
 
 ### Added

@@ -94,6 +94,7 @@ npm run test:token-scopes   # API-/MCP-Token-Scopes: scopes.js-Modell + Enforcem
 npm run test:permissions    # Rollen & Rechte: Resolver (Admin-Bypass, Rolle/Mitglied-Override, Widget-Kaskade), Session-Enforcement-Map, Sparse-Speicherung (#467); dazu der Abgleich der drei Widget-Listen (WIDGET_IDS in dashboard.js, PERMISSION_WIDGETS serverseitig, WIDGET_LABEL_KEYS in der Rechte-UI) - ein neues Widget fehlt sonst still in den Rechten oder trägt dort seinen rohen Slug
 npm run test:permissions-routes   # Rechte-Routen: requireAdmin-Gate (kein Privilege-Escalation), Payload-Validierung, sparse-Persistenz/Round-Trip, Admin-Ziel-Sonderregel
 npm run test:dashboard      # Widgets + Endpunkt; darunter der Guard, dass abgelegte Aufgaben (archived_at, #688) nicht in "Heute auf einen Blick" landen - sie tragen weiter ihren echten Status und rutschten sonst als offen durch
+npm run test:screensaver    # Immich-Screensaver: URL-Normalisierung (/api nur einmal) und Aktivierung nur mit vollstaendiger Server-/API-Key-Konfiguration
 npm run test:ics-parser
 npm run test:ics-sub        # ICS-Abos: SSRF-Guards, ETag/304, und unveränderte Läufe schreiben nicht (kein Rowid-Verbrauch, kein info-Log)
 npm run test:ics-export     # ICS-Kalenderexport
