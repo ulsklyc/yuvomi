@@ -23,7 +23,7 @@
 const SCOPE_MODULES = [
   { key: 'tasks',        prefixes: ['tasks'] },
   { key: 'shopping',     prefixes: ['shopping'] },
-  { key: 'meals',        prefixes: ['meals', 'recipes', 'mealie'] },
+  { key: 'meals',        prefixes: ['meals', 'recipes', 'recipe-providers'] },
   { key: 'pantry',       prefixes: ['pantry'] },
   { key: 'calendar',     prefixes: ['calendar', 'reminders', 'birthdays'] },
   { key: 'notes',        prefixes: ['notes'] },

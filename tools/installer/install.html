@@ -989,6 +989,10 @@
           <div class="hint" data-i18n="advanced.icsPrivateNetworkHint">Needed for ICS feeds from devices on your own network. Lifts the SSRF protection for calendar subscriptions.</div>
         </div>
         <div class="field">
+          <label><input type="checkbox" id="adv-recipe-provider-private"> <span data-i18n="advanced.recipeProviderPrivateNetwork">Allow recipe provider mirrors on your home network</span></label>
+          <div class="hint" data-i18n="advanced.recipeProviderPrivateNetworkHint">Needed for a Mealie or Tandoor instance on your own network. Lifts the SSRF protection for recipe provider mirrors.</div>
+        </div>
+        <div class="field">
           <label for="adv-fixer" data-i18n="advanced.fixerLabel">Fixer API key (live currency rates)</label>
           <input type="password" id="adv-fixer" autocomplete="off">
           <div class="hint" data-i18n="advanced.fixerHint">Optional. Converts subscription currencies with live rates. Subscriptions work without it.</div>
@@ -1236,6 +1240,7 @@ const S = {
   FIXER_API_KEY: '', VAPID_SUBJECT: '',
   DATA_DIR: '',
   ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK: '',
+  RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK: '',
   DOCUMENT_STORAGE_LOCAL_ENABLED: '',
   DOCUMENT_STORAGE_LOCAL_PATH: '',
   DOCUMENT_STORAGE_LOCAL_DIR: '',
@@ -1319,6 +1324,7 @@ function buildEnv() {
     FIXER_API_KEY: S.FIXER_API_KEY, VAPID_SUBJECT: S.VAPID_SUBJECT,
     DATA_DIR: S.DATA_DIR,
     ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK: S.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK,
+    RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK: S.RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK,
     DOCUMENT_STORAGE_LOCAL_ENABLED: S.DOCUMENT_STORAGE_LOCAL_ENABLED,
     DOCUMENT_STORAGE_LOCAL_PATH: S.DOCUMENT_STORAGE_LOCAL_PATH,
     DOCUMENT_STORAGE_LOCAL_DIR: S.DOCUMENT_STORAGE_LOCAL_DIR,
@@ -1833,6 +1839,7 @@ $('adv-next').addEventListener('click', () => {
 
   S.DATA_DIR = $('adv-data-dir').value.trim();
   S.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK = $('adv-ics-private').checked ? 'true' : '';
+  S.RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK = $('adv-recipe-provider-private').checked ? 'true' : '';
   S.FIXER_API_KEY  = $('adv-fixer').value.trim();
   S.VAPID_SUBJECT  = $('adv-push-subject').value.trim();
 

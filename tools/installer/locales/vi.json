@@ -206,6 +206,8 @@
     "documentWebdavPrivateNetworkHint": "Cần cho Nextcloud trong mạng của bạn. Gỡ bảo vệ SSRF cho đích này.",
     "icsPrivateNetwork": "Cho phép đăng ký lịch từ mạng nội bộ",
     "icsPrivateNetworkHint": "Cần cho nguồn ICS từ thiết bị trong mạng của bạn. Gỡ bảo vệ SSRF cho đăng ký lịch.",
+    "recipeProviderPrivateNetwork": "Cho phép gương nhà cung cấp công thức trong mạng nội bộ",
+    "recipeProviderPrivateNetworkHint": "Cần cho phiên bản Mealie hoặc Tandoor trong mạng của bạn. Gỡ bảo vệ SSRF cho gương nhà cung cấp công thức.",
     "oidcTrustEmail": "Tin cậy email khi không có claim verified",
     "oidcTrustEmailHint": "Chỉ bật nếu nhà cung cấp không gửi email_verified và bạn tin tưởng họ."
   },

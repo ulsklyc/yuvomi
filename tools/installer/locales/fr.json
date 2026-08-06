@@ -205,7 +205,9 @@
     "documentWebdavPrivateNetwork": "Autoriser une cible WebDAV sur votre réseau local",
     "documentWebdavPrivateNetworkHint": "Nécessaire pour un Nextcloud sur votre propre réseau. Lève la protection SSRF pour cette cible.",
     "icsPrivateNetwork": "Autoriser les abonnements de calendrier depuis votre réseau local",
-    "icsPrivateNetworkHint": "Nécessaire pour les flux ICS d’appareils sur votre propre réseau. Lève la protection SSRF pour les abonnements de calendrier.",
+    "icsPrivateNetworkHint": "Nécessaire pour les flux ICS d'appareils sur votre propre réseau. Lève la protection SSRF pour les abonnements de calendrier.",
+    "recipeProviderPrivateNetwork": "Autoriser les miroirs de fournisseurs de recettes sur votre réseau local",
+    "recipeProviderPrivateNetworkHint": "Nécessaire pour une instance Mealie ou Tandoor sur votre propre réseau. Lève la protection SSRF pour les miroirs de fournisseurs de recettes.",
     "oidcTrustEmail": "Faire confiance à l’e-mail sans claim verified",
     "oidcTrustEmailHint": "À activer uniquement si votre fournisseur n’envoie pas email_verified et que vous lui faites confiance."
   },

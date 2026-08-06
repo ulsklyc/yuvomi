@@ -206,6 +206,8 @@
     "documentWebdavPrivateNetworkHint": "Kendi ağınızdaki bir Nextcloud için gerekli. Bu hedef için SSRF korumasını kaldırır.",
     "icsPrivateNetwork": "Ev ağından takvim aboneliklerine izin ver",
     "icsPrivateNetworkHint": "Kendi ağınızdaki cihazların ICS akışları için gerekli. Takvim abonelikleri için SSRF korumasını kaldırır.",
+    "recipeProviderPrivateNetwork": "Ev ağınızdaki tarif sağlayıcı aynalarına izin ver",
+    "recipeProviderPrivateNetworkHint": "Kendi ağınızdaki bir Mealie veya Tandoor örneği için gerekli. Tarif sağlayıcı aynalamaları için SSRF korumasını kaldırır.",
     "oidcTrustEmail": "verified claim olmadan e-postaya güven",
     "oidcTrustEmailHint": "Yalnızca sağlayıcınız email_verified göndermiyorsa ve ona güveniyorsanız etkinleştirin."
   },

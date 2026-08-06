@@ -1,17 +1,18 @@
 /**
- * Modul: Mealie-Zutaten-Kategorisierung
- * Zweck: Best-effort Zuordnung importierter Mealie-Zutaten zu den bestehenden
- *        shopping_categories-Namen (server/db.js Migration v5). Mealies eigenes
- *        Food-Label (vom Nutzer frei vergeben) wird zuerst versucht, dann eine
- *        Keyword-Liste auf dem Zutatennamen - beides ist Raten, kein Abgleich
- *        gegen eine feste Taxonomie. Fällt beides durch, landet die Zutat unter
- *        'Sonstiges', genau wie jede andere unkategorisierte Zutat im Haushalt.
+ * Modul: Zutaten-Kategorisierung für importierte Rezepte
+ * Zweck: Best-effort Zuordnung von Zutaten aus gespiegelten Rezepten (Mealie,
+ *        Tandoor, ...) zu den bestehenden shopping_categories-Namen (server/db.js
+ *        Migration v5). Ein vom Provider mitgeliefertes Zutaten-Label (vom Nutzer
+ *        dort frei vergeben) wird zuerst versucht, dann eine Keyword-Liste auf dem
+ *        Zutatennamen - beides ist Raten, kein Abgleich gegen eine feste Taxonomie.
+ *        Fällt beides durch, landet die Zutat unter 'Sonstiges', genau wie jede
+ *        andere unkategorisierte Zutat im Haushalt.
  * Dependencies: keine
  */
 
 const FALLBACK_CATEGORY = 'Sonstiges';
 
-// Deutsche und englische Stichworte, da Mealie-Instanzen in beiden Sprachen
+// Deutsche und englische Stichworte, da Provider-Instanzen in beiden Sprachen
 // befüllt sein können. Reihenfolge ist irrelevant, die erste Übereinstimmung zählt.
 const KEYWORDS = {
   'Obst & Gemüse': [

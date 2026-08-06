@@ -5461,6 +5461,36 @@ test('priority badges and meal labels meet WCAG AA contrast in both themes', () 
   }
 });
 
+/**
+ * Locks in the Tandoor badge contrast fix from the recipe-provider-adapter
+ * review (was 4.24:1, below WCAG AA). Discovers the provider list from the
+ * actual `.source-badge--<provider>` CSS rules in recipes.css instead of
+ * hardcoding 'mealie'/'tandoor' here — a future third provider's badge falls
+ * under this same check automatically, without this test needing an edit.
+ */
+test('recipe provider source badges meet WCAG AA contrast in both themes', () => {
+  const recipesCss = read('../public/styles/recipes.css');
+  const providers = [...recipesCss.matchAll(
+    /\.source-badge--([\w-]+)\s*\{\s*background:\s*var\(--source-\1-light\);\s*color:\s*var\(--source-\1\);\s*\}/g,
+  )].map((m) => m[1]);
+  assert.ok(providers.length >= 2, `expected at least the mealie/tandoor badge rules, found ${providers.length}`);
+
+  const { light, dark } = themeTokenMaps();
+  for (const [theme, map] of [['light', light], ['dark', dark]]) {
+    for (const provider of providers) {
+      const foreground = resolveColor(`--source-${provider}`, map);
+      const background = resolveColor(`--source-${provider}-light`, map);
+      assert.ok(foreground && background, `${theme}: --source-${provider}/-light must resolve to hex colors`);
+      const ratio = contrastRatio(foreground, background);
+      assert.ok(
+        ratio >= 4.5,
+        `${theme}: --source-${provider} (${foreground}) on --source-${provider}-light (${background}) ` +
+        `is ${ratio.toFixed(2)}:1, below WCAG AA 4.5:1`,
+      );
+    }
+  }
+});
+
 test('budget bars animate with transforms instead of layout-driving widths', () => {
   const budgetPage = read('../public/pages/budget.js');
   const budgetCss = read('../public/styles/budget.css');

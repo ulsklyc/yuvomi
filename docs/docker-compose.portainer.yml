@@ -142,6 +142,8 @@ services:
       - SYNC_INTERVAL_MINUTES=${SYNC_INTERVAL_MINUTES:-15}
       # Set true only for ICS calendar feeds on a private/local network.
       - ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK=${ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK:-false}
+      # Set true only for recipe provider (Mealie/Tandoor) mirrors on a private/local network.
+      - RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=${RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK:-false}
       # Rate limiting
       - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-60000}
       - RATE_LIMIT_MAX_ATTEMPTS=${RATE_LIMIT_MAX_ATTEMPTS:-5}

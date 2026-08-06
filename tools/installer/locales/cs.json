@@ -134,6 +134,8 @@
     "documentWebdavPrivateNetworkHint": "Potřeba pro Nextcloud ve vlastní síti. Ruší ochranu SSRF pro tento cíl.",
     "icsPrivateNetwork": "Povolit odběry kalendáře z domácí sítě",
     "icsPrivateNetworkHint": "Potřeba pro ICS kanály ze zařízení ve vlastní síti. Ruší ochranu SSRF pro odběry kalendáře.",
+    "recipeProviderPrivateNetwork": "Povolit zrcadla poskytovatelů receptů v domácí síti",
+    "recipeProviderPrivateNetworkHint": "Potřeba pro instanci Mealie nebo Tandoor v síti. Ruší ochranu SSRF pro zrcadla poskytovatelů receptů.",
     "oidcTrustEmail": "Důvěřovat e-mailu bez claimu verified",
     "oidcTrustEmailHint": "Zapněte jen tehdy, pokud váš poskytovatel neposílá email_verified a důvěřujete mu."
   },

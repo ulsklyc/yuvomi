@@ -10,6 +10,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   isBlockedAddress,
@@ -204,4 +205,37 @@ test('createGuardedLookup: allowPrivate überspringt die Validierung', (t, done)
     assert.deepEqual(addresses, [{ address: '192.168.1.50', family: 4 }]);
     done();
   });
+});
+
+/**
+ * Adoption, nicht nur Klassifikation: die Klassifikationslogik oben nuetzt
+ * nichts, wenn ein Modul sie gar nicht aufruft. Genau das geschah bei
+ * MealieAdapter (server/services/recipe-providers/mealie.js) - eine Version
+ * lang ging es per rohem fetch() direkt am Guard vorbei, admin-only und vom
+ * Betreiber bewusst zurueckgestellt (#614), bis die Generalisierung auf einen
+ * zweiten Adapter (TandoorAdapter) die Luecke verdoppelte und der Review
+ * einen echten SSRF+Token-Exfil-Pfad ueber Tandoors Thumbnail-Proxy fand.
+ *
+ * Diese Liste ist bewusst der bekannte, jetzige Bestand server-seitiger
+ * Module, die eine in der DB gespeicherte, von einem Nutzer/Admin gesetzte
+ * *_url-Spalte serverseitig abrufen - keine Behauptung ueber jedes kuenftige
+ * Modul der App. Ein neues sollte diese Liste erweitern, sobald es denselben
+ * Umstand hat (gespeicherte URL, serverseitiger Fetch).
+ */
+test('bekannte Module mit gespeicherter *_url-Spalte binden den SSRF-Schutz ein', () => {
+  const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+  const modules = [
+    '../server/services/document-storage.js',
+    '../server/services/ics-subscription.js',
+    '../server/services/subscription-logo.js',
+    '../server/services/recipe-providers/mealie.js',
+    '../server/services/recipe-providers/tandoor.js',
+  ];
+  for (const path of modules) {
+    const src = read(path);
+    assert.match(src, /from ['"](?:\.\.\/)*utils\/ssrf\.js['"]/,
+      `${path} ruft eine gespeicherte URL ab, importiert aber server/utils/ssrf.js nicht`);
+    assert.match(src, /isBlockedAddress|createGuardedLookup/,
+      `${path} importiert ssrf.js, ruft aber weder isBlockedAddress noch createGuardedLookup auf`);
+  }
 });

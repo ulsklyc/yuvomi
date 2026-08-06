@@ -24,7 +24,7 @@ const STUBS = {
       logout: async () => ({ ok: true }),
       updateProfile: async () => ({ user: null }),
     };
-    export const mealie = {
+    export const recipeProviders = {
       listAccounts: async () => ({ data: [] }),
       createAccount: async () => ({ data: null }),
       updateAccount: async () => ({ data: null }),

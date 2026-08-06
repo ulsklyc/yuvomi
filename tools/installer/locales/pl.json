@@ -206,6 +206,8 @@
     "documentWebdavPrivateNetworkHint": "Wymagane dla Nextcloud we własnej sieci. Znosi ochronę SSRF dla tego celu.",
     "icsPrivateNetwork": "Zezwól na subskrypcje kalendarza z sieci domowej",
     "icsPrivateNetworkHint": "Wymagane dla kanałów ICS z urządzeń we własnej sieci. Znosi ochronę SSRF dla subskrypcji kalendarza.",
+    "recipeProviderPrivateNetwork": "Zezwól na dubliny dostawcy przepisów w sieci domowej",
+    "recipeProviderPrivateNetworkHint": "Wymagane dla instancji Mealie lub Tandoor we własnej sieci. Znosi ochronę SSRF dla dublów dostawcy przepisów.",
     "oidcTrustEmail": "Ufaj adresowi e-mail bez claimu verified",
     "oidcTrustEmailHint": "Włącz tylko wtedy, gdy dostawca nie wysyła email_verified, a Ty mu ufasz."
   },

@@ -206,6 +206,8 @@
     "documentWebdavPrivateNetworkHint": "Necessário para um Nextcloud na tua rede. Remove a proteção SSRF para este destino.",
     "icsPrivateNetwork": "Permitir subscrições de calendário da rede local",
     "icsPrivateNetworkHint": "Necessário para feeds ICS de dispositivos na tua rede. Remove a proteção SSRF para subscrições de calendário.",
+    "recipeProviderPrivateNetwork": "Permitir espelhos de fornecedor de receitas na rede local",
+    "recipeProviderPrivateNetworkHint": "Necessário para uma instância Mealie ou Tandoor na tua rede. Remove a proteção SSRF para espelhos de fornecedor de receitas.",
     "oidcTrustEmail": "Confiar no e-mail sem o claim verified",
     "oidcTrustEmailHint": "Ativa apenas se o teu fornecedor não enviar email_verified e confiares nele."
   },

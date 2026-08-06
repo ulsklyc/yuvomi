@@ -206,6 +206,8 @@
     "documentWebdavPrivateNetworkHint": "Потрібно для Nextcloud у власній мережі. Знімає захист SSRF для цієї цілі.",
     "icsPrivateNetwork": "Дозволити підписки на календарі з домашньої мережі",
     "icsPrivateNetworkHint": "Потрібно для стрічок ICS із пристроїв у власній мережі. Знімає захист SSRF для підписок на календарі.",
+    "recipeProviderPrivateNetwork": "Дозволити дзеркала постачальника рецептів у домашній мережі",
+    "recipeProviderPrivateNetworkHint": "Потрібно для екземпляра Mealie або Tandoor у власній мережі. Знімає захист SSRF для дзеркал постачальника рецептів.",
     "oidcTrustEmail": "Довіряти адресі пошти без claim verified",
     "oidcTrustEmailHint": "Вмикайте лише якщо ваш постачальник не надсилає email_verified і ви йому довіряєте."
   },

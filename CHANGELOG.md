@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Credit-card accounts can now carry the issuing bank and the agreed credit limit. Both fields appear in the account dialog as soon as the type is set to credit card, and the account list shows the bank next to what is still available on the card - the limit minus what you currently owe on it. A balance in your favour does not raise that figure above the limit. The fields are specific to credit cards: switching an account to another type clears them again. Groundwork from #541; statements and installment purchases follow separately.
+- Tandoor as a second recipe mirror provider, alongside Mealie. Settings → Kitchen now offers a provider picker when adding a recipe mirror account; Tandoor recipes appear in the same list as Mealie and native ones, with their own source badge color and the same read-only mirroring, thumbnail proxy, and meal-plan integration Mealie recipes already had (#530)
+
+### Changed
+
+- The Mealie recipe mirror from v1.73.0 is now a provider-neutral adapter: `mealie_accounts` became `recipe_provider_accounts` with a `provider` column, and a shared adapter interface (mirroring the existing Paperless/Papra pattern in Document Storage) replaces the Mealie-only client, so a third provider needs only a new adapter, not new sync/route/frontend logic. No user-facing change for existing Mealie accounts — the migration renames tables/columns in place, no data moves
+
+### Fixed
+
+- Tandoor recipe sync no longer stalls past the first page when the Tandoor instance sits behind a reverse proxy that rewrites its own URLs
+
+### Security
+
+- Recipe provider sync (Mealie, Tandoor) now goes through the same SSRF-hardened HTTP client as calendar subscriptions and document storage, guarding against admin-supplied hosts that resolve to private/internal network addresses
+- Tandoor's thumbnail proxy no longer follows an image URL to a host outside the configured account, closing an SSRF and credential-exposure gap where any authenticated household member viewing a Tandoor-mirrored recipe's thumbnail could make the server attach its Bearer token to an arbitrary attacker-influenced host
 
 ## [1.85.0] - 2026-08-05
 

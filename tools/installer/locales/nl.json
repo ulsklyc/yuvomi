@@ -134,6 +134,8 @@
     "documentWebdavPrivateNetworkHint": "Nodig voor een Nextcloud in je eigen netwerk. Heft de SSRF-bescherming voor dit doel op.",
     "icsPrivateNetwork": "Agenda-abonnementen uit je thuisnetwerk toestaan",
     "icsPrivateNetworkHint": "Nodig voor ICS-feeds van apparaten in je eigen netwerk. Heft de SSRF-bescherming voor agenda-abonnementen op.",
+    "recipeProviderPrivateNetwork": "Recipe provider-spiegels in je thuisnetwerk toestaan",
+    "recipeProviderPrivateNetworkHint": "Nodig voor een Mealie- of Tandoor-exemplaar in je eigen netwerk. Heft de SSRF-bescherming voor recipe provider-spiegels op.",
     "oidcTrustEmail": "E-mail zonder verified-claim vertrouwen",
     "oidcTrustEmailHint": "Schakel dit alleen in als je provider geen email_verified stuurt en je die vertrouwt."
   },

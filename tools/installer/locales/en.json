@@ -206,6 +206,8 @@
     "documentWebdavPrivateNetworkHint": "Needed for a Nextcloud on your own network. Lifts the SSRF protection for this target.",
     "icsPrivateNetwork": "Allow calendar subscriptions from your home network",
     "icsPrivateNetworkHint": "Needed for ICS feeds from devices on your own network. Lifts the SSRF protection for calendar subscriptions.",
+    "recipeProviderPrivateNetwork": "Allow recipe provider mirrors on your home network",
+    "recipeProviderPrivateNetworkHint": "Needed for a Mealie or Tandoor instance on your own network. Lifts the SSRF protection for recipe provider mirrors.",
     "oidcTrustEmail": "Trust email without a verified claim",
     "oidcTrustEmailHint": "Only enable this if your provider does not send email_verified and you trust it."
   },

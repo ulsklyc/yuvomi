@@ -206,6 +206,8 @@
     "documentWebdavPrivateNetworkHint": "Krävs för ett Nextcloud i ditt eget nätverk. Upphäver SSRF-skyddet för detta mål.",
     "icsPrivateNetwork": "Tillåt kalenderprenumerationer från ditt hemnätverk",
     "icsPrivateNetworkHint": "Krävs för ICS-flöden från enheter i ditt eget nätverk. Upphäver SSRF-skyddet för kalenderprenumerationer.",
+    "recipeProviderPrivateNetwork": "Tillåt receptförmedlare på ditt hemnätverk",
+    "recipeProviderPrivateNetworkHint": "Krävs för en Mealie- eller Tandoor-instans i ditt eget nätverk. Upphäver SSRF-skyddet för receptförmedlare.",
     "oidcTrustEmail": "Lita på e-post utan verified-claim",
     "oidcTrustEmailHint": "Aktivera bara om din leverantör inte skickar email_verified och du litar på den."
   },

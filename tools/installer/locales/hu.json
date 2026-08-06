@@ -206,6 +206,8 @@
     "documentWebdavPrivateNetworkHint": "Saját hálózaton lévő Nextcloudhoz szükséges. Feloldja az SSRF védelmet ehhez a célhoz.",
     "icsPrivateNetwork": "Naptár-feliratkozások engedélyezése a helyi hálózatról",
     "icsPrivateNetworkHint": "Saját hálózaton lévő eszközök ICS hírcsatornáihoz szükséges. Feloldja az SSRF védelmet a naptár-feliratkozásokhoz.",
+    "recipeProviderPrivateNetwork": "Recept-provider tükrök engedélyezése a helyi hálózaton",
+    "recipeProviderPrivateNetworkHint": "Saját hálózaton lévő Mealie vagy Tandoor példányhoz szükséges. Feloldja az SSRF védelmet a recept-provider tükrökhez.",
     "oidcTrustEmail": "E-mail megbízhatónak tekintése verified claim nélkül",
     "oidcTrustEmailHint": "Csak akkor kapcsold be, ha a szolgáltatód nem küld email_verified értéket, és megbízol benne."
   },

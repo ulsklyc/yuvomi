@@ -1,10 +1,12 @@
 /**
- * Test: Mealie-Integrationsrouten (Account-CRUD admin-only, Test/Sync-Trigger)
- * Zweck: End-to-End über den echten Mealie-Router mit injiziertem Fake-Adapter -
- *        härtet Validierung (400/409), Admin-Gate (403), Token-Verstecken in
- *        Listenantworten, und dass Account-Löschung ihre gespiegelten Rezepte
- *        per FK-Kaskade mitnimmt.
- * Ausführen: node --experimental-sqlite --test test/test-mealie-routes.js
+ * Test: Recipe-Provider-Integrationsrouten (Account-CRUD admin-only, Test/Sync-Trigger)
+ * Zweck: End-to-End über den echten Router mit injiziertem Fake-Adapter - härtet
+ *        Validierung (400/409), Admin-Gate (403), Token-Verstecken in
+ *        Listenantworten, dass Account-Löschung ihre gespiegelten Rezepte per
+ *        FK-Kaskade mitnimmt, und dass POST /accounts einen fehlenden/ungültigen
+ *        provider-Wert auf 'mealie' zurückfallen lässt (SUPPORTED_PROVIDERS-Guard,
+ *        analog zu server/routes/dms.js).
+ * Ausführen: node --experimental-sqlite --test test/test-recipe-provider-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -15,8 +17,8 @@ import assert from 'node:assert/strict';
 import express from 'express';
 
 const dbmod = await import('../server/db.js');
-const { default: mealieRouter } = await import('../server/routes/mealie.js');
-const mealieSync = await import('../server/services/mealie-sync.js');
+const { default: recipeProvidersRouter } = await import('../server/routes/recipe-providers.js');
+const { _setAdapterFactory } = await import('../server/services/recipe-providers/index.js');
 const db = dbmod.get();
 
 const ADMIN = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')`).run().lastInsertRowid;
@@ -31,7 +33,7 @@ app.use((req, _res, next) => {
   req.session = { userId: actor.id, role: actor.role };
   next();
 });
-app.use('/', mealieRouter);
+app.use('/', recipeProvidersRouter);
 const server = app.listen(0);
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -49,14 +51,14 @@ async function call(method, path, body) {
 
 function fakeAdapter({ ok = true, groupSlug = 'home', recipes = [] } = {}) {
   return () => ({
-    testConnection: async () => (ok ? { ok: true, status: 200, groupSlug } : { ok: false, status: 401, error: 'bad token' }),
-    listRecipeSummaries: async () => recipes.map((r) => ({ id: r.id ?? r.slug, slug: r.slug, updatedAt: r.updatedAt })),
-    getRecipe: async (slug) => recipes.find((r) => r.slug === slug),
-    recipeUrl: (g, s) => `https://mealie.example.com/g/${g}/r/${s}`,
+    testConnection: async () => (ok ? { ok: true, status: 200, linkContext: { groupSlug } } : { ok: false, status: 401, error: 'bad token' }),
+    listRecipeSummaries: async () => recipes.map((r) => ({ id: r.id ?? r.ref, ref: r.ref, updatedAt: r.updatedAt })),
+    getRecipe: async (ref) => recipes.find((r) => r.ref === ref),
+    recipeUrl: (linkContext, { slug }) => `https://mealie.example.com/g/${linkContext?.groupSlug}/r/${slug}`,
   });
 }
 
-test.after(() => mealieSync._setAdapterFactory(null)); // Default-Factory wiederherstellen
+test.after(() => _setAdapterFactory(null)); // Default-Factory wiederherstellen
 
 // --------------------------------------------------------------------------
 // GET/POST /accounts (Admin-Gate, Validierung, Token-Versteckung)
@@ -81,22 +83,22 @@ test('POST /accounts: URL ohne http(s):// → 400', async () => {
 });
 
 test('POST /accounts: fehlgeschlagener Verbindungstest → 502, kein Account angelegt', async () => {
-  mealieSync._setAdapterFactory(fakeAdapter({ ok: false }));
-  const before = db.prepare('SELECT COUNT(*) AS n FROM mealie_accounts').get().n;
+  _setAdapterFactory(fakeAdapter({ ok: false }));
+  const before = db.prepare('SELECT COUNT(*) AS n FROM recipe_provider_accounts').get().n;
   const r = await call('POST', '/accounts', { name: 'Kaputt', base_url: 'https://bad.example.com', api_token: 't' });
   assert.equal(r.status, 502);
-  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM mealie_accounts').get().n, before);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM recipe_provider_accounts').get().n, before);
 });
 
 test('POST /accounts: erfolgreiche Anlage → 201, Token nie in der Antwort, has_token=true', async () => {
-  mealieSync._setAdapterFactory(fakeAdapter());
+  _setAdapterFactory(fakeAdapter());
   const r = await call('POST', '/accounts', { name: 'Zuhause', base_url: 'https://mealie.example.com/', api_token: 'super-secret' });
   assert.equal(r.status, 201);
   assert.equal(r.body.data.name, 'Zuhause');
   assert.equal(r.body.data.base_url, 'https://mealie.example.com'); // trailing slash entfernt
   assert.equal(r.body.data.has_token, true);
   assert.equal('api_token' in r.body.data, false);
-  const row = db.prepare('SELECT api_token FROM mealie_accounts WHERE id = ?').get(r.body.data.id);
+  const row = db.prepare('SELECT api_token FROM recipe_provider_accounts WHERE id = ?').get(r.body.data.id);
   assert.equal(row.api_token, 'super-secret'); // in der DB bleibt er, nur nie in der API-Antwort
 });
 
@@ -109,7 +111,7 @@ test('POST /accounts: external_url ohne http(s):// → 400', async () => {
 });
 
 test('POST /accounts: external_url wird getrimmt und gespeichert (base_url bleibt für Requests, external_url nur für Links)', async () => {
-  mealieSync._setAdapterFactory(fakeAdapter());
+  _setAdapterFactory(fakeAdapter());
   const r = await call('POST', '/accounts', {
     name: 'MitVanity', base_url: 'https://internal.mealie.local', external_url: 'https://recipes.example.com/', api_token: 't3',
   });
@@ -128,6 +130,19 @@ test('POST /accounts: Nicht-Admin → 403', async () => {
   const r = await call('POST', '/accounts', { name: 'X', base_url: 'https://x.example.com', api_token: 't' });
   actor = { id: ADMIN, role: 'admin' };
   assert.equal(r.status, 403);
+});
+
+test('POST /accounts: fehlendes oder ungültiges provider-Feld fällt auf \'mealie\' zurück', async () => {
+  _setAdapterFactory(fakeAdapter());
+
+  const missing = await call('POST', '/accounts', { name: 'OhneProvider', base_url: 'https://noprovider.example.com', api_token: 't' });
+  assert.equal(missing.status, 201);
+  assert.equal(missing.body.data.provider, 'mealie');
+  assert.equal(db.prepare('SELECT provider FROM recipe_provider_accounts WHERE id = ?').get(missing.body.data.id).provider, 'mealie');
+
+  const invalid = await call('POST', '/accounts', { name: 'UngueltigerProvider', base_url: 'https://invalidprovider.example.com', api_token: 't', provider: 'not-a-real-provider' });
+  assert.equal(invalid.status, 201);
+  assert.equal(invalid.body.data.provider, 'mealie');
 });
 
 test('GET /accounts: listet ohne Token, mit has_token', async () => {
@@ -183,10 +198,11 @@ test('POST /accounts/:id/sync: importiert Rezepte des Fake-Adapters', async () =
   const id = list.body.data.find((a) => a.name === 'Zuhause').id;
   await call('PATCH', `/accounts/${id}`, { enabled: true }); // von oben wieder aktivieren
 
-  mealieSync._setAdapterFactory(fakeAdapter({
+  _setAdapterFactory(fakeAdapter({
     recipes: [{
-      id: 'pfannkuchen', slug: 'pfannkuchen', name: 'Pfannkuchen', description: 'Lecker', updatedAt: '2026-01-01T00:00:00Z',
-      recipeIngredient: [{ quantity: 2, unit: { name: 'Tassen' }, food: { name: 'Mehl' } }],
+      id: 'pfannkuchen', ref: 'pfannkuchen', updatedAt: '2026-01-01T00:00:00Z', slug: 'pfannkuchen',
+      title: 'Pfannkuchen', notes: 'Lecker', hasImage: false,
+      ingredients: [{ name: 'Mehl', quantity: '2 Tassen', category: 'Backwaren' }],
     }],
   }));
 
@@ -194,7 +210,7 @@ test('POST /accounts/:id/sync: importiert Rezepte des Fake-Adapters', async () =
   assert.equal(r.status, 200);
   assert.equal(r.body.data.imported, 1);
 
-  const recipe = db.prepare('SELECT title, recipe_url FROM recipes WHERE mealie_account_id = ? AND mealie_recipe_id = ?').get(id, 'pfannkuchen');
+  const recipe = db.prepare('SELECT title, recipe_url FROM recipes WHERE provider_account_id = ? AND provider_recipe_id = ?').get(id, 'pfannkuchen');
   assert.equal(recipe.title, 'Pfannkuchen');
   assert.equal(recipe.recipe_url, 'https://mealie.example.com/g/home/r/pfannkuchen');
 });
@@ -228,12 +244,12 @@ test('GET /status: auch für Nicht-Admin lesbar, enthält nie den Token', async 
 test('DELETE /accounts/:id: löscht per Kaskade auch alle gespiegelten Rezepte', async () => {
   const list = await call('GET', '/accounts');
   const id = list.body.data.find((a) => a.name === 'Zuhause').id;
-  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM recipes WHERE mealie_account_id = ?').get(id).n, 1);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM recipes WHERE provider_account_id = ?').get(id).n, 1);
 
   const r = await call('DELETE', `/accounts/${id}`);
   assert.equal(r.status, 204);
-  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM recipes WHERE mealie_account_id = ?').get(id).n, 0);
-  assert.equal(db.prepare('SELECT id FROM mealie_accounts WHERE id = ?').get(id), undefined);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM recipes WHERE provider_account_id = ?').get(id).n, 0);
+  assert.equal(db.prepare('SELECT id FROM recipe_provider_accounts WHERE id = ?').get(id), undefined);
 });
 
 test('DELETE /accounts/:id: unbekannter Account → 404', async () => {

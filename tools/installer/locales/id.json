@@ -134,6 +134,8 @@
     "documentWebdavPrivateNetworkHint": "Diperlukan untuk Nextcloud di jaringan sendiri. Melepas perlindungan SSRF untuk tujuan ini.",
     "icsPrivateNetwork": "Izinkan langganan kalender dari jaringan rumah",
     "icsPrivateNetworkHint": "Diperlukan untuk umpan ICS dari perangkat di jaringan sendiri. Melepas perlindungan SSRF untuk langganan kalender.",
+    "recipeProviderPrivateNetwork": "Izinkan salinan penyedia resep di jaringan rumah",
+    "recipeProviderPrivateNetworkHint": "Diperlukan untuk contoh Mealie atau Tandoor di jaringan Anda. Melepas perlindungan SSRF untuk salinan penyedia resep.",
     "oidcTrustEmail": "Percayai email tanpa klaim verified",
     "oidcTrustEmailHint": "Aktifkan hanya jika penyedia Anda tidak mengirim email_verified dan Anda memercayainya."
   },

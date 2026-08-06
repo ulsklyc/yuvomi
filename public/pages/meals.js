@@ -537,12 +537,12 @@ function renderRecipeSidebar() {
     titleEl.textContent = recipe.title;
     card.appendChild(titleEl);
 
-    if (recipe.source === 'mealie') {
-      const sourceBadge = document.createElement('span');
-      sourceBadge.className = 'source-badge source-badge--mealie';
-      sourceBadge.textContent = t('recipes.sourceMealie');
-      if (recipe.mealie_account_name) sourceBadge.title = recipe.mealie_account_name;
-      card.appendChild(sourceBadge);
+    if (recipe.source !== 'native') {
+      const sourceBadgeEl = document.createElement('span');
+      sourceBadgeEl.className = `source-badge source-badge--${recipe.source}`;
+      sourceBadgeEl.textContent = t(`recipes.source${recipe.source[0].toUpperCase()}${recipe.source.slice(1)}`);
+      if (recipe.provider_account_name) sourceBadgeEl.title = recipe.provider_account_name;
+      card.appendChild(sourceBadgeEl);
     }
 
     // Mahlzeiten-Chips nur bei echter Teilmenge: ein Rezept, das zu allen (oder
@@ -1321,14 +1321,15 @@ function buildModalContent({ mode, date, mealType, meal }) {
   const hasIngOpen = isEdit && meal.ingredients?.some((i) => !i.on_shopping_list);
 
   const recipeOptionHtml = (r) => `<option value="${r.id}" ${isEdit && meal.recipe_id === r.id ? 'selected' : ''}>${esc(r.title)}</option>`;
-  // Optgroups nur, sobald Mealie-Rezepte wirklich vorkommen: ohne Mirror-
+  // Optgroups nur, sobald gespiegelte Rezepte wirklich vorkommen: ohne Mirror-
   // Account bleibt die flache Liste von vorher unverändert (kein UI-Rauschen).
-  const hasMirroredRecipes = state.recipes.some((r) => r.source === 'mealie');
+  const hasMirroredRecipes = state.recipes.some((r) => r.source !== 'native');
+  const mirroredSources = [...new Set(state.recipes.map((r) => r.source).filter((s) => s !== 'native'))].sort();
   const recipeOptions = hasMirroredRecipes
     ? [
       `<option value="">${t('meals.savedRecipePlaceholder')}</option>`,
-      `<optgroup label="${esc(t('recipes.sourceNative'))}">${state.recipes.filter((r) => r.source !== 'mealie').map(recipeOptionHtml).join('')}</optgroup>`,
-      `<optgroup label="${esc(t('recipes.sourceMealie'))}">${state.recipes.filter((r) => r.source === 'mealie').map(recipeOptionHtml).join('')}</optgroup>`,
+      `<optgroup label="${esc(t('recipes.sourceNative'))}">${state.recipes.filter((r) => r.source === 'native').map(recipeOptionHtml).join('')}</optgroup>`,
+      ...mirroredSources.map((s) => `<optgroup label="${esc(t(`recipes.source${s[0].toUpperCase()}${s.slice(1)}`))}">${state.recipes.filter((r) => r.source === s).map(recipeOptionHtml).join('')}</optgroup>`),
     ].join('')
     : [
       `<option value="">${t('meals.savedRecipePlaceholder')}</option>`,

@@ -244,6 +244,7 @@ single commit.
 - API responses: `{ data: ... }` on success, `{ error: string, code: number }` on failure
 - Database migrations: append to the `MIGRATIONS` array in `server/db.js` - **never modify existing entries**
 - New entity tables: `id INTEGER PRIMARY KEY`, `created_at TEXT`, `updated_at TEXT` (ISO 8601). Key/value and join tables (`sync_config`, `task_tags`, …) deviate deliberately
+- Any server-side fetch of a URL stored from user/admin input (WebDAV targets, ICS feed URLs, subscription logos, recipe provider `base_url`s, ...) goes through `server/utils/ssrf.js` (`isBlockedAddress`/`createGuardedLookup`), not a bare `fetch()`. This is one classifier so DNS-rebinding and private-network edge cases aren't reimplemented per subsystem; `npm run test:ssrf` pins both the classification logic and which known modules actually call it, and runs as part of `npm test`.
 
 ### Testing
 

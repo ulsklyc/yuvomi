@@ -134,6 +134,8 @@
     "documentWebdavPrivateNetworkHint": "برای Nextcloud در شبکه خودتان لازم است. حفاظت SSRF را برای این مقصد برمی‌دارد.",
     "icsPrivateNetwork": "اجازه اشتراک تقویم از شبکه خانگی",
     "icsPrivateNetworkHint": "برای فیدهای ICS از دستگاه‌های شبکه خودتان لازم است. حفاظت SSRF را برای اشتراک‌های تقویم برمی‌دارد.",
+    "recipeProviderPrivateNetwork": "اجازه آینه‌های مزودی دستور‌العمل در شبکه خانگی",
+    "recipeProviderPrivateNetworkHint": "برای یک نسخه Mealie یا Tandoor در شبکه خودتان لازم است. حفاظت SSRF را برای آینه‌های مزودی دستور‌العمل برمی‌دارد.",
     "oidcTrustEmail": "اعتماد به ایمیل بدون ادعای verified",
     "oidcTrustEmailHint": "فقط زمانی فعال کنید که ارائه‌دهنده شما email_verified نمی‌فرستد و به آن اعتماد دارید."
   },

@@ -206,6 +206,8 @@
     "documentWebdavPrivateNetworkHint": "अपने नेटवर्क के Nextcloud के लिए ज़रूरी। इस लक्ष्य के लिए SSRF सुरक्षा हटा देता है।",
     "icsPrivateNetwork": "अपने होम नेटवर्क से कैलेंडर सदस्यताओं की अनुमति दें",
     "icsPrivateNetworkHint": "अपने नेटवर्क के उपकरणों की ICS फ़ीड के लिए ज़रूरी। कैलेंडर सदस्यताओं के लिए SSRF सुरक्षा हटा देता है।",
+    "recipeProviderPrivateNetwork": "अपने होम नेटवर्क में रेसिपी प्रदाता मिरर की अनुमति दें",
+    "recipeProviderPrivateNetworkHint": "अपने नेटवर्क में Mealie या Tandoor इंस्टेंस के लिए ज़रूरी। रेसिपी प्रदाता मिरर के लिए SSRF सुरक्षा हटा देता है।",
     "oidcTrustEmail": "verified क्लेम के बिना ईमेल पर भरोसा करें",
     "oidcTrustEmailHint": "इसे तभी चालू करें जब आपका प्रदाता email_verified नहीं भेजता और आप उस पर भरोसा करते हैं।"
   },

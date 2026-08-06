@@ -134,6 +134,8 @@
     "documentWebdavPrivateNetworkHint": "Kailangan para sa Nextcloud sa sarili mong network. Inaalis nito ang proteksyong SSRF para sa target na ito.",
     "icsPrivateNetwork": "Payagan ang mga subscription sa kalendaryo mula sa iyong home network",
     "icsPrivateNetworkHint": "Kailangan para sa mga ICS feed mula sa mga device sa sarili mong network. Inaalis nito ang proteksyong SSRF para sa mga subscription sa kalendaryo.",
+    "recipeProviderPrivateNetwork": "Payagan ang mga mirror ng mga recipe provider sa iyong home network",
+    "recipeProviderPrivateNetworkHint": "Kailangan para sa isang Mealie o Tandoor instance sa sarili mong network. Inaalis nito ang proteksyong SSRF para sa mga mirror ng mga recipe provider.",
     "oidcTrustEmail": "Pagkatiwalaan ang email nang walang na-verify na claim",
     "oidcTrustEmailHint": "I-enable lamang ito kung hindi nagpapadala ng email_verified ang iyong provider at pinagkakatiwalaan mo ito."
   },

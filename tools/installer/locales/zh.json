@@ -206,6 +206,8 @@
     "documentWebdavPrivateNetworkHint": "连接自有网络中的 Nextcloud 时需要。会解除该目标的 SSRF 保护。",
     "icsPrivateNetwork": "允许来自家庭网络的日历订阅",
     "icsPrivateNetworkHint": "订阅自有网络设备的 ICS 源时需要。会解除日历订阅的 SSRF 保护。",
+    "recipeProviderPrivateNetwork": "允许家庭网络中的食谱提供者镜像",
+    "recipeProviderPrivateNetworkHint": "连接自有网络中的 Mealie 或 Tandoor 实例时需要。会解除食谱提供者镜像的 SSRF 保护。",
     "oidcTrustEmail": "在没有 verified 声明时信任邮箱",
     "oidcTrustEmailHint": "仅当你的提供方不发送 email_verified 且你信任它时才启用。"
   },

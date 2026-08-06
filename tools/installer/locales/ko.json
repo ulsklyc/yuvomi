@@ -134,6 +134,8 @@
     "documentWebdavPrivateNetworkHint": "자체 네트워크의 Nextcloud에 필요합니다. 이 대상에 대한 SSRF 보호를 해제합니다.",
     "icsPrivateNetwork": "가정 네트워크의 캘린더 구독 허용",
     "icsPrivateNetworkHint": "자체 네트워크 기기의 ICS 피드에 필요합니다. 캘린더 구독에 대한 SSRF 보호를 해제합니다.",
+    "recipeProviderPrivateNetwork": "가정 네트워크의 레시피 공급자 미러 허용",
+    "recipeProviderPrivateNetworkHint": "자체 네트워크의 Mealie 또는 Tandoor 인스턴스에 필요합니다. 레시피 공급자 미러에 대한 SSRF 보호를 해제합니다.",
     "oidcTrustEmail": "verified 클레임 없이 이메일 신뢰",
     "oidcTrustEmailHint": "제공자가 email_verified를 보내지 않고 이를 신뢰하는 경우에만 사용하세요."
   },

@@ -33,8 +33,9 @@ const state = {
   query: '',
   /** Gefangener Fehler des letzten Rezept-Ladevorgangs, sonst null. */
   loadError: null,
-  // 'all' | 'native' | 'mealie' - Filter-Pille ist nur sichtbar, sobald
-  // mindestens ein gespiegeltes Rezept existiert (siehe renderSourceFilter).
+  // 'all' | 'native' | 'mealie' | 'tandoor' | ... - Filter-Pille ist nur
+  // sichtbar, sobald mindestens ein gespiegeltes Rezept existiert (siehe
+  // renderSourceFilter).
   sourceFilter: 'all',
 };
 
@@ -55,18 +56,19 @@ function mealCategories() {
   return state.categories.filter((c) => c.name !== 'Haushalt' && c.name !== 'Drogerie');
 }
 
-// Kleines Badge für aus Mealie gespiegelte Rezepte (source: 'mealie'). Der
-// Account-Name als Tooltip hilft bei mehreren Mealie-Accounts zu unterscheiden.
-function mealieSourceBadge(recipe) {
+// Kleines Badge für gespiegelte Rezepte (source: 'mealie'/'tandoor'/...). Der
+// Account-Name als Tooltip hilft bei mehreren Accounts desselben Providers zu
+// unterscheiden.
+function sourceBadge(recipe) {
   const badge = document.createElement('span');
-  badge.className = 'source-badge source-badge--mealie';
-  badge.textContent = t('recipes.sourceMealie');
-  if (recipe.mealie_account_name) badge.title = recipe.mealie_account_name;
+  badge.className = `source-badge source-badge--${recipe.source}`;
+  badge.textContent = t(`recipes.source${recipe.source[0].toUpperCase()}${recipe.source.slice(1)}`);
+  if (recipe.provider_account_name) badge.title = recipe.provider_account_name;
   return badge;
 }
 
 // Vorschaubild für ein gespiegeltes Rezept. Ohne Bild in Mealie (kein
-// mealie_has_image aus dem letzten Sync) direkt der Platzhalter - kein
+// provider_has_image aus dem letzten Sync) direkt der Platzhalter - kein
 // Thumbnail-Request, der ohnehin nur in einem 404 endet (bekannter Mealie-
 // eigener Logspam, siehe mealie-recipes/mealie#4804). Mit Bild wird echt
 // geladen, fällt aber per onerror auf denselben Platzhalter zurück, falls das
@@ -75,14 +77,14 @@ function mealieSourceBadge(recipe) {
 function recipeThumb(recipe) {
   const slot = document.createElement('span');
   slot.className = 'recipe-row__thumb';
-  if (!recipe.mealie_has_image) {
+  if (!recipe.provider_has_image) {
     slot.classList.add('recipe-row__thumb--placeholder');
     slot.insertAdjacentHTML('beforeend', '<i data-lucide="utensils" class="icon-sm" aria-hidden="true"></i>');
     return slot;
   }
   const img = document.createElement('img');
   img.className = 'recipe-row__thumb-img';
-  img.src = `/api/v1/recipes/${recipe.id}/mealie-thumbnail`;
+  img.src = `/api/v1/recipes/${recipe.id}/provider-thumbnail`;
   img.alt = '';
   img.loading = 'lazy';
   img.addEventListener('error', () => {
@@ -305,17 +307,17 @@ export async function render(container) {
   // Bedienelementen darin war.
 }
 
-// Drei-Wege-Filter (Alle/Nativ/Mealie) als Trigger + Popover-Menü im
+// Mehrwege-Filter (Alle/Nativ/pro Provider) als Trigger + Popover-Menü im
 // __actions-Slot, dieselbe Behandlung wie „Lagerorte verwalten" im Vorrat -
 // ein btn--icon im Kopf statt einer eigenen Zeile, die auf schmalen
-// Bildschirmen für drei Optionen (fast immer "Alle" aktiv) eine ganze
-// Kopf-Zeile kostete. Bleibt versteckt, solange kein Mealie-Account
+// Bildschirmen für wenige Optionen (fast immer "Alle" aktiv) eine ganze
+// Kopf-Zeile kostete. Bleibt versteckt, solange kein Provider-Account
 // gespiegelte Rezepte liefert - der Filter wäre sonst leere Ornamentik.
 function renderSourceFilter() {
   const el = _container.querySelector('#recipes-source-filter');
   if (!el) return;
 
-  const hasMirrored = state.recipes.some((r) => r.source === 'mealie');
+  const hasMirrored = state.recipes.some((r) => r.source !== 'native');
   if (!hasMirrored) {
     el.hidden = true;
     state.sourceFilter = 'all';
@@ -326,7 +328,9 @@ function renderSourceFilter() {
   const options = [
     { value: 'all', label: t('recipes.sourceAll') },
     { value: 'native', label: t('recipes.sourceNative') },
-    { value: 'mealie', label: t('recipes.sourceMealie') },
+    ...[...new Set(state.recipes.map((r) => r.source).filter((s) => s !== 'native'))].sort().map((s) => ({
+      value: s, label: t(`recipes.source${s[0].toUpperCase()}${s.slice(1)}`),
+    })),
   ];
   const activeLabel = options.find((o) => o.value === state.sourceFilter)?.label ?? '';
 
@@ -444,9 +448,9 @@ function renderRecipeList() {
   rows.className = 'kitchen-rows';
 
   for (const recipe of visible) {
-    // Mirror-Rezepte sind read-only (Mealie bleibt Quelle der Wahrheit); steuert
+    // Mirror-Rezepte sind read-only (der Provider bleibt Quelle der Wahrheit); steuert
     // weiter unten sowohl die Zeilenaktionen als auch das Aufklapp-Detail.
-    const isMirrored = recipe.source === 'mealie';
+    const isMirrored = recipe.source !== 'native';
     const ingredients = recipe.ingredients ?? [];
     const detailId = `recipe-detail-${recipe.id}`;
     const hasDetail = Boolean(ingredients.length || recipe.notes || recipe.recipe_url);
@@ -473,7 +477,7 @@ function renderRecipeList() {
 
     // Herkunft ist Teil der Identität der Zeile, nicht erst ein Detail: wer
     // durch eine gemischte Liste scrollt, muss vor dem Aufklappen sehen können,
-    // welche Rezepte aus Mealie kommen (und schreibgeschützt sind), nicht erst
+    // welche Rezepte gespiegelt (und schreibgeschützt) sind, nicht erst
     // danach.
     if (isMirrored) toggle.appendChild(recipeThumb(recipe));
 
@@ -492,7 +496,7 @@ function renderRecipeList() {
       // ihrer Inhaltsbreite treu.
       const badgeSlot = document.createElement('span');
       badgeSlot.className = 'recipe-row__badge-slot';
-      badgeSlot.appendChild(mealieSourceBadge(recipe));
+      badgeSlot.appendChild(sourceBadge(recipe));
       toggle.appendChild(badgeSlot);
     }
 
@@ -501,12 +505,16 @@ function renderRecipeList() {
     // Klick nachweislich nichts tat (Kartenhöhe 408 → 408px an sechs Karten
     // gemessen, Critique 2026-07-30). Jetzt ist die Zahl die Beschriftung
     // dessen, was das Aufklappen zeigt.
-    if (ingredients.length) {
-      const meta = document.createElement('span');
-      meta.className = 'kitchen-row__meta';
-      meta.textContent = t('meals.ingredientCount', { count: ingredients.length });
-      toggle.appendChild(meta);
-    }
+    //
+    // IMMER gerendert, auch bei 0: die Mindestbreite von .kitchen-row__meta
+    // (15ch, siehe recipes.css) hält alles davor - das Mealie/Tandoor-Badge -
+    // an derselben Stelle. Fehlte das Element ganz, würde der Name per
+    // flex-grow den freiwerdenden Platz schlucken und das Badge nach rechts
+    // schieben, sobald ein Rezept ganz ohne Zutaten in der Liste steht.
+    const meta = document.createElement('span');
+    meta.className = 'kitchen-row__meta';
+    meta.textContent = t('meals.ingredientCount', { count: ingredients.length });
+    toggle.appendChild(meta);
 
     if (hasDetail) {
       toggle.setAttribute('aria-expanded', 'false');
@@ -524,16 +532,22 @@ function renderRecipeList() {
       // bliebe sonst interaktiv aussehend, ohne dass ein Klick etwas täte -
       // oder schlimmer, er würde über den generischen edit-Handler ein
       // Bearbeitungsformular öffnen, dessen Speichern serverseitig ohnehin
-      // mit 403 abgewiesen wird (mealie_account_id-Guard, routes/recipes.js).
+      // mit 403 abgewiesen wird (provider_account_id-Guard, routes/recipes.js).
       delete toggle.dataset.action;
       toggle.classList.remove('kitchen-row__main--interactive');
       toggle.tabIndex = -1;
+      // Trotzdem einen (unsichtbaren) Chevron-Platzhalter einfügen: sonst
+      // wächst der Name per flex-grow um genau dessen Breite, und das Badge
+      // vor ihm rutscht gegenüber jeder anderen gespiegelten Zeile nach
+      // rechts - derselbe Mechanismus wie bei der Zutatenzahl oben.
+      toggle.insertAdjacentHTML('beforeend',
+        '<i data-lucide="chevron-down" class="icon-sm recipe-row__chevron recipe-row__chevron--placeholder" aria-hidden="true"></i>');
     }
 
     heading.appendChild(toggle);
     row.appendChild(heading);
 
-    // Mirror-Rezepte sind read-only (Mealie bleibt Quelle der Wahrheit) - Edit
+    // Mirror-Rezepte sind read-only (der Provider bleibt Quelle der Wahrheit) - Edit
     // und Delete entfallen, Duplizieren bleibt: das legt eine eigenständige,
     // frei bearbeitbare Kopie an (duplicateRecipe() postet immer als natives
     // Rezept, unabhängig von der Quelle des Originals). Eine Liste speist
@@ -596,7 +610,7 @@ function renderRecipeList() {
       const mealTypes = normalizeRecipeMealTypes(recipe.meal_types);
       // Chips nur, wenn sie unterscheiden: gilt ein Rezept für alle Mahlzeiten,
       // ist die volle Chip-Reihe reine Ornamentik (Audit A1-21). Das
-      // Mealie-Badge sitzt jetzt schon in der Zeilenüberschrift (immer sichtbar,
+      // Herkunfts-Badge sitzt jetzt schon in der Zeilenüberschrift (immer sichtbar,
       // nicht erst nach dem Aufklappen) und wird hier nicht noch einmal gezeigt.
       const showMealTypeBadges = mealTypes.length && mealTypes.length < mealTypeOptions().length;
       if (showMealTypeBadges) {
@@ -698,8 +712,8 @@ function renderRecipeList() {
  * eine Karte mit role="button", die Buttons enthielt.
  *
  * Der Zweck bleibt erfüllt: Lesen erzwingt weiter kein Bearbeiten-Formular. Das
- * Mealie-Badge, das hier stand, sitzt jetzt in der Zeilenüberschrift selbst -
- * sichtbar, bevor man überhaupt aufklappt (siehe mealieSourceBadge() weiter oben).
+ * Herkunfts-Badge, das hier stand, sitzt jetzt in der Zeilenüberschrift selbst -
+ * sichtbar, bevor man überhaupt aufklappt (siehe sourceBadge() weiter oben).
  */
 
 function openRecipeModal(mode, recipe = null) {

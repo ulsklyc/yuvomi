@@ -206,6 +206,8 @@
     "documentWebdavPrivateNetworkHint": "Necesario para un Nextcloud en tu propia red. Levanta la protección SSRF para este destino.",
     "icsPrivateNetwork": "Permitir suscripciones de calendario desde tu red local",
     "icsPrivateNetworkHint": "Necesario para feeds ICS de dispositivos en tu propia red. Levanta la protección SSRF para las suscripciones de calendario.",
+    "recipeProviderPrivateNetwork": "Permitir espejos de proveedores de recetas en tu red local",
+    "recipeProviderPrivateNetworkHint": "Necesario para una instancia de Mealie o Tandoor en tu propia red. Levanta la protección SSRF para espejos de proveedores de recetas.",
     "oidcTrustEmail": "Confiar en el correo sin el claim verified",
     "oidcTrustEmailHint": "Actívalo solo si tu proveedor no envía email_verified y confías en él."
   },

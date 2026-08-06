@@ -134,6 +134,8 @@
     "documentWebdavPrivateNetworkHint": "Nötig für ein Nextcloud im eigenen Netz. Hebt den SSRF-Schutz für dieses Ziel auf.",
     "icsPrivateNetwork": "Kalender-Abos aus dem Heimnetz erlauben",
     "icsPrivateNetworkHint": "Nötig für ICS-Feeds von Geräten im eigenen Netz. Hebt den SSRF-Schutz für Kalender-Abos auf.",
+    "recipeProviderPrivateNetwork": "Rezept-Provider-Spiegel im Heimnetz erlauben",
+    "recipeProviderPrivateNetworkHint": "Nötig für eine Mealie- oder Tandoor-Instanz im eigenen Netz. Hebt den SSRF-Schutz für Rezept-Provider-Spiegel auf.",
     "oidcTrustEmail": "E-Mail ohne verified-Claim vertrauen",
     "oidcTrustEmailHint": "Nur aktivieren, wenn dein Anbieter kein email_verified sendet und du ihm vertraust."
   },

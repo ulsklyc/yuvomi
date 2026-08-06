@@ -206,6 +206,8 @@
     "documentWebdavPrivateNetworkHint": "Απαραίτητο για Nextcloud στο δικό σου δίκτυο. Αίρει την προστασία SSRF για αυτόν τον προορισμό.",
     "icsPrivateNetwork": "Να επιτρέπονται συνδρομές ημερολογίου από το τοπικό σου δίκτυο",
     "icsPrivateNetworkHint": "Απαραίτητο για ροές ICS από συσκευές στο δικό σου δίκτυο. Αίρει την προστασία SSRF για τις συνδρομές ημερολογίου.",
+    "recipeProviderPrivateNetwork": "Να επιτρέπονται καθρέπτες προμηθευτών συνταγών στο τοπικό σου δίκτυο",
+    "recipeProviderPrivateNetworkHint": "Απαραίτητο για μια παρουσία Mealie ή Tandoor στο δικό σου δίκτυο. Αίρει την προστασία SSRF για τους καθρέπτες προμηθευτών συνταγών.",
     "oidcTrustEmail": "Εμπιστοσύνη στο email χωρίς claim verified",
     "oidcTrustEmailHint": "Ενεργοποίησέ το μόνο αν ο πάροχός σου δεν στέλνει email_verified και τον εμπιστεύεσαι."
   },

@@ -28,6 +28,9 @@ export const ENV_SCHEMA = [
   // ICS-Abos: der SSRF-Guard blockt Feeds im eigenen LAN (Home Assistant, *arr).
   // Ohne diesen Schalter scheitert genau der häufigste Self-Hoster-Fall stumm.
   { key: 'ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK', type: 'default', label: 'Allow ICS Feeds from Private Network', default: 'false', required: false, group: 'sync', writeToEnv: true },
+  // Rezept-Provider-Spiegel (Mealie/Tandoor): derselbe SSRF-Guard, derselbe
+  // häufigste Self-Hoster-Fall wie bei den ICS-Abos oben.
+  { key: 'RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK', type: 'default', label: 'Allow Private Network Recipe Provider Target', default: 'false', required: false, group: 'sync', writeToEnv: true },
   { key: 'TZ',                          type: 'default', label: 'Timezone',                 default: 'UTC',  group: 'system',  writeToEnv: true },
   { key: 'OIKOS_HTTP_PORT',             type: 'default', label: 'HTTP Port',                default: '3000', group: 'system',  writeToEnv: true },
   // Host-Ordner für Datenbank und App-Daten. Der Container-Pfad steht fest, der

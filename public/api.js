@@ -225,17 +225,17 @@ const notifications = {
 };
 
 // --------------------------------------------------------
-// Mealie – Rezept-Mirror-Sync
+// Recipe Providers – Rezept-Mirror-Sync (Mealie, Tandoor, ...)
 // --------------------------------------------------------
 
-const mealie = {
-  listAccounts: () => api.get('/mealie/accounts'),
-  createAccount: (body) => api.post('/mealie/accounts', body),
-  updateAccount: (id, body) => api.patch(`/mealie/accounts/${id}`, body),
-  deleteAccount: (id) => api.delete(`/mealie/accounts/${id}`),
-  testAccount: (id) => api.post(`/mealie/accounts/${id}/test`, {}),
-  syncAccount: (id) => api.post(`/mealie/accounts/${id}/sync`, {}),
-  getStatus: () => api.get('/mealie/status'),
+const recipeProviders = {
+  listAccounts: () => api.get('/recipe-providers/accounts'),
+  createAccount: (body) => api.post('/recipe-providers/accounts', body),
+  updateAccount: (id, body) => api.patch(`/recipe-providers/accounts/${id}`, body),
+  deleteAccount: (id) => api.delete(`/recipe-providers/accounts/${id}`),
+  testAccount: (id) => api.post(`/recipe-providers/accounts/${id}/test`, {}),
+  syncAccount: (id) => api.post(`/recipe-providers/accounts/${id}/sync`, {}),
+  getStatus: () => api.get('/recipe-providers/status'),
 };
 
-export { api, auth, email, notifications, mealie, ApiError };
+export { api, auth, email, notifications, recipeProviders, ApiError };

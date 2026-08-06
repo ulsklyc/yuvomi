@@ -206,6 +206,8 @@
     "documentWebdavPrivateNetworkHint": "ضروري لخادم Nextcloud في شبكتك الخاصة. يرفع حماية SSRF لهذه الوجهة.",
     "icsPrivateNetwork": "السماح باشتراكات التقويم من شبكتك المنزلية",
     "icsPrivateNetworkHint": "ضروري لتغذيات ICS من أجهزة في شبكتك الخاصة. يرفع حماية SSRF لاشتراكات التقويم.",
+    "recipeProviderPrivateNetwork": "السماح بمرايا مزودي الوصفات في شبكتك المنزلية",
+    "recipeProviderPrivateNetworkHint": "ضروري لنسخة Mealie أو Tandoor في شبكتك الخاصة. يرفع حماية SSRF لمرايا مزودي الوصفات.",
     "oidcTrustEmail": "الثقة بالبريد الإلكتروني بدون مطالبة verified",
     "oidcTrustEmailHint": "فعّله فقط إذا كان مزوّدك لا يرسل email_verified وكنت تثق به."
   },

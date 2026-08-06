@@ -139,9 +139,10 @@ npm run test:task-tags          # Aufgaben-Tags (#586): v114-Rebuild lässt Indi
 npm run test:dms-adapter        # DMS-Adapter: Paperless-ngx
 npm run test:dms-routes         # DMS-Routen: account management, search, link, push
 npm run test:dms-papra-adapter  # DMS-Adapter: Papra
-npm run test:mealie-client      # Mealie-Adapter (#530): Bearer-Auth, Paginierung, Zutaten-Flattening (quantity 0 = Mealies "keine Menge"), Deep-Link aus external_url, Thumbnail-Abruf
-npm run test:mealie-sync        # Mealie-Sync (#530): Upsert statt Neuanlage (Mahlzeitenplan-Verknüpfungen überleben ein Rename), unveränderte Rezepte werden übersprungen, ein fehlgeschlagener/leerer Abruf löscht NIE bestehende Spiegel, recipe_url wird aus dem Slug neu gebaut
-npm run test:mealie-routes      # Mealie-Routen (#530): Konto-CRUD admin-only, Token nie in der Antwort, /status für alle Angemeldeten, manueller Sync, Verbindungstest
+npm run test:recipe-provider-adapter   # Recipe-Provider-Adapter: Mealie (#530): Bearer-Auth, Paginierung, Zutaten-Flattening (quantity 0 = Mealies "keine Menge"), Deep-Link aus external_url, Thumbnail-Abruf
+npm run test:recipe-provider-tandoor-adapter   # Recipe-Provider-Adapter: Tandoor (#530): Bearer-Auth, next-Link-Paginierung, is_header-Zeilen werden übersprungen, no_amount unterdrückt die Menge, Deep-Link über id (kein linkContext nötig), Thumbnail 404 bei fehlendem Bildpfad
+npm run test:recipe-provider-sync   # Recipe-Provider-Sync (#530): Upsert statt Neuanlage über recipe_provider_accounts (Mahlzeitenplan-Verknüpfungen überleben ein Rename), unveränderte Rezepte werden übersprungen, ein fehlgeschlagener/leerer Abruf löscht NIE bestehende Spiegel, recipe_url wird providerübergreifend aus id/slug neu gebaut
+npm run test:recipe-provider-routes   # Recipe-Provider-Routen (#530): Konto-CRUD admin-only inkl. provider-Auswahl (Fallback 'mealie' bei ungültigem Wert), Token nie in der Antwort, /status für alle Angemeldeten, manueller Sync, Verbindungstest
 npm run test:weather            # Open-Meteo + OWM-Legacy provider resolution
 npm run test:preferences-routes    # Preferences-Routen: HTTP-Schicht von server/routes/preferences.js gegen den echten Router
 npm run test:preferences-budget-mode   # Budget-Modus in der Preferences-API (#476/#505): GET-Default 'shared', PUT shared/personal

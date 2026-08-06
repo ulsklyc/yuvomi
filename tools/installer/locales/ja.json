@@ -206,6 +206,8 @@
     "documentWebdavPrivateNetworkHint": "自宅ネットワークの Nextcloud に必要です。この保存先の SSRF 保護を解除します。",
     "icsPrivateNetwork": "家庭内ネットワークからのカレンダー購読を許可する",
     "icsPrivateNetworkHint": "自宅ネットワークの機器の ICS フィードに必要です。カレンダー購読の SSRF 保護を解除します。",
+    "recipeProviderPrivateNetwork": "家庭内ネットワークのレシピプロバイダーミラーを許可する",
+    "recipeProviderPrivateNetworkHint": "自宅ネットワークの Mealie または Tandoor インスタンスに必要です。レシピプロバイダーミラーの SSRF 保護を解除します。",
     "oidcTrustEmail": "verified クレームなしでメールアドレスを信頼する",
     "oidcTrustEmailHint": "プロバイダーが email_verified を送らず、かつ信頼できる場合のみ有効にしてください。"
   },

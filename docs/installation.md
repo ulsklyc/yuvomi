@@ -654,6 +654,7 @@ it in controlled environments.
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
 | `ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK` | Allow `http://` and private/local network ICS feeds; lifts SSRF protection (`true`/`false`) | `false` | No |
+| `RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK` | Allow `http://` and private/local network recipe provider (Mealie/Tandoor) targets; lifts SSRF protection (`true`/`false`) | `false` | No |
 
 ### Google Calendar Sync (Optional)
 

@@ -9,7 +9,7 @@ import express from 'express';
 import * as db from '../db.js';
 import { str, num, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
 import { normalizeRecipeMealTypes } from '../../public/utils/recipe-meal-types.js';
-import { getAdapter } from '../services/mealie-sync.js';
+import { getAdapter } from '../services/recipe-providers/index.js';
 
 const log = createLogger('Recipes');
 const router = express.Router();
@@ -20,20 +20,22 @@ const router = express.Router();
 const THUMBNAIL_MIME = new Set(['image/webp', 'image/jpeg', 'image/png']);
 function normalizeMime(value) { return String(value || '').split(';')[0].trim().toLowerCase(); }
 
-// Mirror-Rezepte (source: 'mealie') tragen mealie_account_id; native Rezepte
-// haben diese Spalte NULL. Das ist der einzige Unterschied, den Frontend und
-// Zugriffsschutz brauchen, um ein Rezept korrekt zu behandeln.
+// Mirror-Rezepte tragen provider_account_id; native Rezepte haben diese Spalte
+// NULL. `source` liest den tatsaechlichen Provider-Namen (mealie/tandoor/...)
+// vom verknuepften Account statt ihn hart zu verdrahten - das ist der einzige
+// Unterschied, den Frontend und Zugriffsschutz brauchen, um ein Rezept korrekt
+// zu behandeln, und er erweitert sich automatisch um jeden neuen Provider.
 function withSource(recipe) {
-  return { ...recipe, source: recipe.mealie_account_id ? 'mealie' : 'native' };
+  return { ...recipe, source: recipe.provider_account_id ? recipe.provider_type : 'native' };
 }
 
 function loadRecipeWithIngredients(id) {
   const recipe = db.get().prepare(`
     SELECT r.*, u.display_name AS creator_name, u.avatar_color AS creator_color,
-           m.name AS mealie_account_name
+           p.name AS provider_account_name, p.provider AS provider_type
     FROM recipes r
     LEFT JOIN users u ON u.id = r.created_by
-    LEFT JOIN mealie_accounts m ON m.id = r.mealie_account_id
+    LEFT JOIN recipe_provider_accounts p ON p.id = r.provider_account_id
     WHERE r.id = ?
   `).get(id);
 
@@ -52,10 +54,10 @@ router.get('/', (_req, res) => {
   try {
     const recipes = db.get().prepare(`
       SELECT r.*, u.display_name AS creator_name, u.avatar_color AS creator_color,
-             m.name AS mealie_account_name
+             p.name AS provider_account_name, p.provider AS provider_type
       FROM recipes r
       LEFT JOIN users u ON u.id = r.created_by
-      LEFT JOIN mealie_accounts m ON m.id = r.mealie_account_id
+      LEFT JOIN recipe_provider_accounts p ON p.id = r.provider_account_id
       ORDER BY r.title COLLATE NOCASE ASC, r.id DESC
     `).all();
 
@@ -134,13 +136,13 @@ router.put('/:id', (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Ungueltige Rezept-ID', code: 400 });
 
-    const existing = db.get().prepare('SELECT id, created_by, mealie_account_id FROM recipes WHERE id = ?').get(id);
+    const existing = db.get().prepare('SELECT id, created_by, provider_account_id FROM recipes WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ error: 'Recipe not found', code: 404 });
-    // Mirror-Rezepte sind read-only: Mealie bleibt Quelle der Wahrheit für ihren
-    // Inhalt. Der Check steht vor der created_by-Prüfung, weil sonst genau der
-    // Nutzer, der den Mealie-Account angelegt hat (und damit als created_by
-    // dieser Rezepte gilt), sie über die API editieren könnte.
-    if (existing.mealie_account_id) return res.status(403).json({ error: 'Mirrored recipes are managed in Mealie and cannot be edited here.', code: 403 });
+    // Mirror-Rezepte sind read-only: der Quell-Provider bleibt Quelle der
+    // Wahrheit für ihren Inhalt. Der Check steht vor der created_by-Prüfung,
+    // weil sonst genau der Nutzer, der den Provider-Account angelegt hat (und
+    // damit als created_by dieser Rezepte gilt), sie über die API editieren könnte.
+    if (existing.provider_account_id) return res.status(403).json({ error: 'Mirrored recipes are managed by their source provider and cannot be edited here.', code: 403 });
     if (existing.created_by !== (req.authUserId || req.session.userId)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
 
     const { ingredients = [] } = req.body;
@@ -187,11 +189,12 @@ router.delete('/:id', (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid recipe ID.', code: 400 });
 
-    const existing = db.get().prepare('SELECT id, created_by, mealie_account_id FROM recipes WHERE id = ?').get(id);
+    const existing = db.get().prepare('SELECT id, created_by, provider_account_id FROM recipes WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ error: 'Recipe not found.', code: 404 });
-    // Siehe PUT /:id: Mirror-Rezepte lassen sich nur durch Löschen des Mealie-
-    // Accounts entfernen (POST /mealie/accounts/:id), nicht einzeln hier.
-    if (existing.mealie_account_id) return res.status(403).json({ error: 'Mirrored recipes are managed in Mealie and cannot be deleted here.', code: 403 });
+    // Siehe PUT /:id: Mirror-Rezepte lassen sich nur durch Löschen des
+    // Provider-Accounts entfernen (DELETE /recipe-providers/accounts/:id), nicht
+    // einzeln hier.
+    if (existing.provider_account_id) return res.status(403).json({ error: 'Mirrored recipes are managed by their source provider and cannot be deleted here.', code: 403 });
     if (existing.created_by !== (req.authUserId || req.session.userId)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
 
     const result = db.get().prepare('DELETE FROM recipes WHERE id = ?').run(id);
@@ -205,29 +208,30 @@ router.delete('/:id', (req, res) => {
 });
 
 /**
- * GET /api/v1/recipes/:id/mealie-thumbnail
- * Proxied Mealies Rezeptbild (min-original.webp). Kein direkter <img src> auf
- * Mealie möglich: die Medien-Route dort verlangt denselben Bearer-Token wie
- * jeder andere Endpunkt, und der darf den Client nie erreichen (siehe
- * publicAccount() in routes/mealie.js) - also holt der Server die Bytes und
- * reicht sie durch, wie der DMS-Vorschau-Proxy es für Paperless/Papra tut.
+ * GET /api/v1/recipes/:id/provider-thumbnail
+ * Proxied das Rezeptbild eines Recipe-Providers (Mealie, Tandoor, ...). Kein
+ * direkter <img src> auf den Provider möglich: dessen Medien-Route verlangt
+ * denselben Bearer-Token wie jeder andere Endpunkt, und der darf den Client nie
+ * erreichen (siehe publicAccount() in routes/recipe-providers.js) - also holt
+ * der Server die Bytes und reicht sie durch, wie der DMS-Vorschau-Proxy es für
+ * Paperless/Papra tut.
  */
-router.get('/:id/mealie-thumbnail', async (req, res) => {
+router.get('/:id/provider-thumbnail', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid recipe ID.', code: 400 });
 
     const recipe = db.get().prepare(
-      'SELECT mealie_account_id, mealie_recipe_id, mealie_has_image FROM recipes WHERE id = ?'
+      'SELECT provider_account_id, provider_recipe_id, provider_slug, provider_has_image FROM recipes WHERE id = ?'
     ).get(id);
-    if (!recipe?.mealie_account_id || !recipe.mealie_has_image) {
+    if (!recipe?.provider_account_id || !recipe.provider_has_image) {
       return res.status(404).json({ error: 'No thumbnail available.', code: 404 });
     }
 
-    const account = db.get().prepare('SELECT * FROM mealie_accounts WHERE id = ?').get(recipe.mealie_account_id);
+    const account = db.get().prepare('SELECT * FROM recipe_provider_accounts WHERE id = ?').get(recipe.provider_account_id);
     if (!account) return res.status(404).json({ error: 'No thumbnail available.', code: 404 });
 
-    const thumb = await getAdapter(account).fetchThumbnail(recipe.mealie_recipe_id);
+    const thumb = await getAdapter(account).fetchThumbnail({ id: recipe.provider_recipe_id, slug: recipe.provider_slug });
     const mime = normalizeMime(thumb?.mime);
     if (!thumb?.buffer?.length || !THUMBNAIL_MIME.has(mime)) {
       return res.status(415).json({ error: 'Thumbnail not available.', code: 415 });
@@ -240,8 +244,8 @@ router.get('/:id/mealie-thumbnail', async (req, res) => {
     res.end(thumb.buffer);
   } catch (err) {
     if (err.status === 404) return res.status(404).json({ error: 'No thumbnail available.', code: 404 });
-    log.error('GET /:id/mealie-thumbnail error:', err);
-    res.status(502).json({ error: 'Mealie thumbnail proxy failed.', code: 502 });
+    log.error('GET /:id/provider-thumbnail error:', err);
+    res.status(502).json({ error: 'Recipe provider thumbnail proxy failed.', code: 502 });
   }
 });
 
