@@ -46,6 +46,7 @@ function apiTokenHtml(token) {
     ? t('settings.apiTokenScopeSummary', { count: token.scopes.length })
     : t('settings.apiTokenScopeFull');
   const meta = [
+    token.subject_name,
     `${t('settings.apiTokenPrefix')}: ${token.token_prefix}...`,
     scopeSummary,
     token.expires_at
@@ -105,6 +106,10 @@ function renderPage(container) {
             <input class="form-input" type="text" id="api-token-name" maxlength="100" required />
           </div>
           <div class="form-group">
+            <label class="form-label" for="api-token-subject">${t('settings.familyRoleOther')}</label>
+            <select class="form-select" id="api-token-subject" required></select>
+          </div>
+          <div class="form-group">
             <label class="form-label" for="api-token-expires">${t('settings.apiTokenExpiresLabel')}</label>
             <yuvomi-datepicker type="datetime" id="api-token-expires"></yuvomi-datepicker>
             <p class="form-hint">${t('settings.apiTokenExpiresHint')}</p>
@@ -150,12 +155,21 @@ function renderPage(container) {
   `);
 }
 
-function bindEvents(container, initialTokens) {
+function bindEvents(container, initialTokens, users, currentUserId) {
   const form = container.querySelector('#api-token-form');
   const list = container.querySelector('#api-token-list');
   if (!form || !list) return;
 
   let tokens = [...initialTokens];
+
+  const subject = container.querySelector('#api-token-subject');
+  for (const member of users) {
+    const option = document.createElement('option');
+    option.value = String(member.id);
+    option.textContent = member.display_name || member.username;
+    option.selected = Number(member.id) === Number(currentUserId);
+    subject.appendChild(option);
+  }
 
   const scopeLimit = container.querySelector('#api-token-scope-limit');
   const scopeGrid = container.querySelector('#api-token-scope-grid');
@@ -190,7 +204,7 @@ function bindEvents(container, initialTokens) {
     }
 
     // scopes: nur senden, wenn „auf Module beschränken" aktiv ist. Sonst voller Zugriff.
-    const payload = { name, expires_at };
+    const payload = { name, expires_at, subject_user_id: Number(subject.value) };
     if (scopeLimit && scopeLimit.checked) {
       const scopes = [...scopeGrid.querySelectorAll('input[data-scope]:checked')]
         .map((box) => box.dataset.scope);
@@ -263,16 +277,18 @@ function bindEvents(container, initialTokens) {
   });
 }
 
-async function loadTokens(container) {
+async function loadTokens(container, currentUserId) {
   const list = container.querySelector('#api-token-list');
   if (!list) return;
 
-  const reload = () => loadTokens(container);
+  const reload = () => loadTokens(container, currentUserId);
 
   let tokens;
+  let users;
   try {
-    const res = await api.get('/auth/api-tokens');
-    tokens = res.data ?? [];
+    const tokenResponse = await api.get('/auth/api-tokens');
+    tokens = tokenResponse.data ?? [];
+    users = tokenResponse.subjects ?? [];
   } catch (err) {
     list.replaceChildren(createRetryState({
       message: err.message || t('common.errorGeneric'),
@@ -282,12 +298,12 @@ async function loadTokens(container) {
   }
 
   renderApiTokenList(container, tokens);
-  bindEvents(container, tokens);
+  bindEvents(container, tokens, users, currentUserId);
   window.lucide?.createIcons({ el: container });
 }
 
 export async function render(container, { user } = {}) {
   renderPage(container);
-  await loadTokens(container);
+  await loadTokens(container, user?.id);
   window.lucide?.createIcons({ el: container });
 }

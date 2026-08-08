@@ -203,6 +203,7 @@ const MIGRATIONS_SQL = {
       token_hash   TEXT    NOT NULL UNIQUE,
       token_prefix TEXT    NOT NULL,
       created_by   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      subject_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       expires_at   TEXT,
       revoked_at   TEXT,
       last_used_at TEXT,

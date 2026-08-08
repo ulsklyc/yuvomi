@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- API integration tokens can target an administrator-selected family member. The token keeps its administrator creator for audit, authenticates with the selected member's role and ownership, rejects split-expense guests, and is removed if its subject is deleted. Existing tokens keep their creator-as-subject behaviour.
+
 ## [1.87.0] - 2026-08-06
 
 ### Added
