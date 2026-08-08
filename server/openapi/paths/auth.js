@@ -274,6 +274,7 @@ export function authPaths() {
       get: op({ summary: 'List API tokens', tag: 'Auth', admin: true }),
       post: op({
         summary: 'Create API token',
+        description: 'Creates a credential whose creator remains the audit owner. An administrator may select a non-guest family member as its subject; token requests then use that member identity and permissions.',
         tag: 'Auth',
         admin: true,
         stateChanging: true,
