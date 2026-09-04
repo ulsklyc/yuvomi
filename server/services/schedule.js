@@ -36,9 +36,21 @@ export function resolveEntries({ from, to, userId, patterns, patternDays, overri
     if (matches.length > 1) warnings.push({ user_id: userId, date_key, pattern_ids: matches.map((p) => p.id) });
     const pattern = matches[0];
     const position = cyclePosition(pattern.anchor_date, pattern.cycle_length, date_key);
-    const day = patternDays.get(`${pattern.id}:${position}`);
-    entries.push({ user_id: userId, date_key, source: 'pattern', pattern_id: pattern.id, position,
-      shift_type_id: day?.shift_type_id ?? null, note: null, is_free: day?.shift_type_id == null });
+    const configuredDays = patternDays.get(`${pattern.id}:${position}`);
+    const days = configuredDays ? (Array.isArray(configuredDays) ? configuredDays : [configuredDays]) : [];
+    if (!days.length) {
+      entries.push({ user_id: userId, date_key, source: 'pattern', pattern_id: pattern.id, position,
+        shift_type_id: null, note: null, is_free: true });
+      continue;
+    }
+    for (const day of days) {
+      entries.push({ user_id: userId, date_key, source: 'pattern', pattern_id: pattern.id, position,
+        shift_type_id: day.shift_type_id ?? null, subject: day.subject ?? null, room: day.room ?? null,
+        instructor: day.instructor ?? null, category: day.category ?? null, color: day.color ?? null,
+        period_number: day.period_number ?? null, notes: day.notes ?? null,
+        start_time: day.start_time ?? null, end_time: day.end_time ?? null,
+        is_free: day.shift_type_id == null });
+    }
   }
   return { entries, warnings };
 }

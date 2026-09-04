@@ -2560,8 +2560,11 @@ formally closed.
 | Column | Type | Constraint |
 |--------|------|-----------|
 | pattern_id | INTEGER | NOT NULL, FK → Schedule Patterns (CASCADE) |
-| position | INTEGER | NOT NULL, `CHECK >= 0`, `UNIQUE (pattern_id, position)` — 0 … cycle_length-1 |
-| shift_type_id | INTEGER | FK → Schedule Shift Types (RESTRICT) — NULL is a free day within the cycle |
+| position | INTEGER | NOT NULL, `CHECK >= 0` — 0 … cycle_length-1; multiple blocks may share a position |
+| shift_type_id | INTEGER | FK → Schedule Shift Types (RESTRICT) — NULL is a free block within the cycle |
+| subject / room / instructor | TEXT | Optional timetable details |
+| category | TEXT | `school`, `work`, `activity`, or `other` |
+| color / period_number / notes | TEXT / INTEGER / TEXT | Optional block color, lesson period, and notes |
 
 Shortening a pattern is refused while days sit beyond the new length, rather than silently dropping
 them.

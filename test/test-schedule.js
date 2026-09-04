@@ -119,6 +119,32 @@ test('members may write only themselves while admins may write any household sch
   assert.equal(foreign.status, 403);
 });
 
+test('one cycle position can resolve multiple timetable blocks with details', async () => {
+  const pattern = await call('POST', '/patterns', {
+    as: ALICE,
+    body: { user_id: ALICE.id, name: 'School day', anchor_date: '2026-12-01', cycle_length: 1 },
+  });
+  assert.equal(pattern.status, 201);
+  const firstType = await call('POST', '/shift-types', { as: ALICE, body: { name: 'Lesson one', start_time: '08:00', end_time: '08:45', color: '#123456' } });
+  const secondType = await call('POST', '/shift-types', { as: ALICE, body: { name: 'Lesson two', start_time: '09:00', end_time: '09:45', color: '#654321' } });
+  const saved = await call('PUT', `/patterns/${pattern.body.data.id}/days`, {
+    as: ALICE,
+    body: {
+      days: [
+        { position: 0, shift_type_id: firstType.body.data.id, subject: 'Mathematics', room: '101', instructor: 'Ms Gauss', period_number: 1 },
+        { position: 0, shift_type_id: secondType.body.data.id, subject: 'Physics', room: 'Lab', instructor: 'Mr Newton', period_number: 2 },
+      ],
+    },
+  });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.data.length, 2);
+  const resolved = await call('GET', '/entries?from=2026-12-01&to=2026-12-01&user_id=1', { as: BOB });
+  assert.equal(resolved.status, 200);
+  assert.deepEqual(resolved.body.data.entries.map((entry) => entry.subject), ['Mathematics', 'Physics']);
+  assert.equal(resolved.body.data.entries[0].room, '101');
+  assert.equal(resolved.body.data.entries[1].period_number, 2);
+});
+
 // A shift type belongs to the household, not to a person: it shows up in every
 // member's pattern. Anyone may add one - that takes nothing away from anybody -
 // but renaming or deleting one is the owner's call, or an admin's. Without this

@@ -1952,7 +1952,7 @@ function renderMonthDay(date, inMonth) {
   const evs      = eventsOnDay(date);
   const dayTasks = tasksOnDay(date);
   const dayHols  = holidaysOnDay(date);
-  const daySchedule = state.layerSchedule ? state.scheduleEntries.filter((entry) => entry.date_key === date && entry.shift_type) : [];
+  const daySchedule = state.layerSchedule ? scheduleDayGroups(state.scheduleEntries.filter((entry) => entry.date_key === date && entry.shift_type)) : [];
   const isToday  = date === state.today;
   const classes  = monthDayClasses(date, inMonth);
 
@@ -2008,8 +2008,17 @@ function renderMonthDay(date, inMonth) {
 // können. Leere Tage tragen nur das Datum (die role sagt "Schaltfläche"). P1.
 function scheduleEntriesOnDay(date) {
   return state.layerSchedule
-    ? state.scheduleEntries.filter((entry) => entry.date_key === date && entry.shift_type)
+    ? scheduleDayGroups(state.scheduleEntries.filter((entry) => entry.date_key === date && entry.shift_type))
     : [];
+}
+
+function scheduleDayGroups(entries) {
+  const groups = new Map();
+  for (const entry of entries) {
+    const key = `${entry.date_key}:${entry.user_id}`;
+    if (!groups.has(key)) groups.set(key, entry);
+  }
+  return [...groups.values()];
 }
 
 /**

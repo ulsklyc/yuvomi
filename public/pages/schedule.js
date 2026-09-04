@@ -1,11 +1,12 @@
 import { api } from '/api.js';
 import { t, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { todayKey, addLocalDays } from '/utils/date.js';
+import { todayKey, addLocalDays, startOfLocalWeekKey } from '/utils/date.js';
 import { openModal, closeModal, confirmModal } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
 import { wireScrollFade } from '/utils/ux.js';
+import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 
 // ZWEISPALTIG: Schedule is a full-width responsive library and statistics view;
 // constraining its row lists to the narrow reading measure would recreate the
@@ -15,8 +16,14 @@ let root;
 let scheduleFab = null;
 let currentUserId = null;
 let canManageOthers = false;
-let activeView = 'patterns';
-let state = { users: [], types: [], patterns: [], overrides: [], entries: [], warnings: [] };
+let activeView = 'timetable';
+let timetableView = 'week';
+let timetableUserId = 'all';
+let timetableDayIndex = 0;
+let timetableWeekStart = startOfLocalWeekKey(todayKey(), 1);
+let timetableLoading = false;
+let holidayLoading = false;
+let state = { users: [], types: [], patterns: [], overrides: [], entries: [], warnings: [], holidayCountries: [], holidaySubdivisions: [], holidays: [], holidayCountry: '', holidaySubdivision: '', holidayFrom: todayKey(), holidayTo: addLocalDays(todayKey(), 1095), holidayUserId: '', holidayShiftTypeId: '' };
 let statistics = { userId: null, range: 'current', monthFrom: '', monthTo: '', from: '', to: '', entries: [], bounds: null, loading: false };
 // Schichtfarben sind NUTZERFARBEN (freier Waehler im Formular); die Presets
 // sind nur Startwerte. Eine Grenze gilt trotzdem: keine davon darf die STIMME
@@ -68,12 +75,16 @@ const clockLabel = (shiftType) => {
 
 async function load() {
   const day = todayKey();
-  const [users, types, patternResult, overrides, entries] = await Promise.all([
+  const weekStart = timetableWeekStart || startOfLocalWeekKey(day, 1);
+  const weekEnd = addLocalDays(weekStart, 6);
+  const [users, types, patternResult, overrides, entries, preferences, countries] = await Promise.all([
     api.get('/auth/users'),
     api.get('/schedule/shift-types'),
     api.get('/schedule/patterns'),
     api.get('/schedule/overrides'),
-    api.get(`/schedule/entries?from=${day}&to=${day}`),
+    api.get(`/schedule/entries?from=${weekStart}&to=${weekEnd}`),
+    getPreferences().catch(() => ({})),
+    api.get('/preferences/holidays/countries').catch(() => ({ data: [] })),
   ]);
   const patterns = patternResult.data ?? [];
   const days = await Promise.all(patterns.map((pattern) => api.get(`/schedule/patterns/${pattern.id}/days`)));
@@ -84,7 +95,23 @@ async function load() {
     overrides: overrides.data ?? [],
     entries: entries.data?.entries ?? [],
     warnings: entries.data?.warnings ?? [],
+    holidayCountries: Array.isArray(countries.data) ? countries.data : [],
+    holidaySubdivisions: [],
+    holidays: [],
+    holidayCountry: preferences?.holiday_country ?? '',
+    holidaySubdivision: preferences?.holiday_subdivision ?? '',
   };
+  if (state.holidayCountry) {
+    const subdivisions = await api.get(`/preferences/holidays/subdivisions/${state.holidayCountry}`).catch(() => ({ data: [] }));
+    state.holidaySubdivisions = subdivisions.data ?? [];
+  }
+}
+
+async function loadTimetableWeek() {
+  const weekEnd = addLocalDays(timetableWeekStart, 6);
+  const entries = await api.get(`/schedule/entries?from=${timetableWeekStart}&to=${weekEnd}`);
+  state.entries = entries.data?.entries ?? [];
+  state.warnings = entries.data?.warnings ?? [];
 }
 
 function monthKey(dateKey = todayKey()) { return dateKey.slice(0, 7); }
@@ -263,10 +290,38 @@ function shiftTypeCard(type) {
   </details>`;
 }
 
+function timetableBlockFields(position, block = {}) {
+  const blockColor = block.color || '#6C3AED';
+  return '<div class="schedule-day-block" data-day="' + position + '">'
+    + '<label class="schedule-day-block__field"><span>' + esc(t('schedule.subject')) + '</span><input class="input" data-field="subject" maxlength="200" value="' + esc(block.subject ?? '') + '"></label>'
+    + '<label class="schedule-day-block__field"><span>' + esc(t('schedule.startTime')) + '</span><input class="input" data-field="start_time" type="time" value="' + esc(block.start_time ?? '') + '"></label>'
+    + '<label class="schedule-day-block__field"><span>' + esc(t('schedule.endTime')) + '</span><input class="input" data-field="end_time" type="time" value="' + esc(block.end_time ?? '') + '"></label>'
+    + '<label class="schedule-day-block__field"><span>' + esc(t('schedule.instructor')) + '</span><input class="input" data-field="instructor" maxlength="100" value="' + esc(block.instructor ?? '') + '"></label>'
+    + '<label class="schedule-day-block__field"><span>' + esc(t('schedule.room')) + '</span><input class="input" data-field="room" maxlength="100" value="' + esc(block.room ?? '') + '"></label>'
+    + '<label class="schedule-day-block__field"><span>' + esc(t('schedule.period')) + '</span><input class="input" data-field="period_number" type="number" min="1" max="30" value="' + esc(block.period_number ?? '') + '"></label>'
+    + '<label class="schedule-day-block__field schedule-day-block__color"><span>' + esc(t('schedule.color')) + '</span><span class="schedule-day-block__color-control"><input class="input" data-field="color" type="color" value="' + esc(blockColor) + '"' + (block.color ? '' : ' data-color-null="true"') + '><button type="button" class="btn btn--secondary btn--sm" data-action="clear-block-color">' + esc(t('schedule.clearColor')) + '</button></span></label>'
+    + '<label class="schedule-day-block__field schedule-day-block__notes"><span>' + esc(t('schedule.notes')) + '</span><textarea class="input" data-field="notes" rows="1" maxlength="5000">' + esc(block.notes ?? '') + '</textarea></label>'
+    + '<select class="input schedule-day-block__type" data-field="shift_type_id" aria-label="' + esc(t('schedule.shiftType')) + '">' + typeOptions(block.shift_type_id) + '</select>'
+    + '<button type="button" class="btn btn--danger btn--sm" data-action="remove-block" title="' + esc(t('common.delete')) + '">' + esc(t('common.delete')) + '</button>'
+    + '</div>';
+}
+
 function patternCard(pattern) {
   const writable = canWrite(pattern.user_id);
-  const assigned = new Map(pattern.days.map((day) => [Number(day.position), day.shift_type_id]));
-  const days = Array.from({ length: pattern.cycle_length }, (_, position) => '<div class="form-field"><label class="label">' + (position + 1) + '</label><select class="input" data-day="' + position + '">' + typeOptions(assigned.get(position)) + '</select></div>').join('');
+  const daysByPosition = new Map();
+  pattern.days.forEach((day) => {
+    const blocks = daysByPosition.get(Number(day.position)) || [];
+    blocks.push(day);
+    daysByPosition.set(Number(day.position), blocks);
+  });
+  const days = Array.from({ length: pattern.cycle_length }, (_, position) => {
+    const blocks = daysByPosition.get(position) || [{}];
+    return '<section class="schedule-cycle-day" data-cycle-day="' + position + '">'
+      + '<div class="schedule-cycle-day__header"><h4>' + esc(t('schedule.cycleDay')) + ' ' + (position + 1) + '</h4>'
+      + '<button type="button" class="btn btn--secondary btn--sm" data-action="add-block" data-position="' + position + '">' + esc(t('schedule.addLesson')) + '</button></div>'
+      + '<div class="schedule-cycle-day__blocks">' + blocks.map((block) => timetableBlockFields(position, block)).join('') + '</div>'
+      + '</section>';
+  }).join('');
   return `<details class="card schedule-details" data-pattern="${pattern.id}"><summary><span class="u-card-title u-compact">${esc(pattern.name)}</span> <small>· ${esc(userName(pattern.user_id))}</small></summary>
     ${writable ? `<form class="schedule-form" data-form="pattern-update" data-id="${pattern.id}">${patternFields(pattern)}<button class="btn btn--secondary">${esc(t('schedule.save'))}</button></form>` : ''}
     <h3 class="u-card-title">${esc(t('schedule.cycleDays'))}</h3><div class="schedule-days">${days}</div>
@@ -336,8 +391,7 @@ function emptyOverrideState() {
 
 function overrideRows() {
   const groups = overrideGroups();
-  if (!groups.length) return emptyOverrideState();
-  return '<div class="list-rows">' + groups.map((group) => {
+  const rows = groups.length ? '<div class="list-rows">' + groups.map((group) => {
     const type = state.types.find((item) => Number(item.id) === Number(group.shift_type_id));
     const swatchColor = type ? type.color : 'var(--color-border)';
     const typeLabel = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : t('schedule.freeDay');
@@ -347,7 +401,18 @@ function overrideRows() {
       ? '<span class="schedule-override-actions"><button type="button" class="btn btn--secondary" data-action="edit-override" data-from="' + esc(group.from) + '" data-user-id="' + group.user_id + '">' + esc(t('common.edit')) + '</button><button type="button" class="btn btn--danger" data-action="delete-override-range" data-from="' + esc(group.from) + '" data-to="' + esc(group.to) + '" data-user-id="' + group.user_id + '">' + esc(t('schedule.delete')) + '</button></span>'
       : '';
     return '<div class="list-row schedule-override"><span class="schedule-swatch" style="--schedule-color:' + esc(swatchColor) + '"></span><div class="list-row__main"><span class="list-row__name">' + esc(label) + '</span><span class="list-row__meta">' + esc(meta) + '</span></div>' + actions + '</div>';
-  }).join('') + '</div>';
+  }).join('') + '</div>' : emptyOverrideState();
+  return renderSchoolHolidayPicker() + rows;
+}
+
+function renderSchoolHolidayPicker() {
+  const countryOptions = '<option value="">' + esc(t('schedule.selectCountry')) + '</option>'
+    + state.holidayCountries.map((country) => '<option value="' + esc(country.isoCode) + '"' + (country.isoCode === state.holidayCountry ? ' selected' : '') + '>' + esc(country.name) + '</option>').join('');
+  const subdivisionOptions = '<option value="">' + esc(t('schedule.selectSubdivision')) + '</option>'
+    + state.holidaySubdivisions.map((subdivision) => '<option value="' + esc(subdivision.isoCode) + '"' + (subdivision.isoCode === state.holidaySubdivision ? ' selected' : '') + '>' + esc(subdivision.name) + '</option>').join('');
+  const memberOptions = state.users.map((user) => option(user.id, userName(user.id), Number(user.id) === Number(state.holidayUserId || selectedOwner()))).join('');
+  const holidays = state.holidays.map((holiday) => '<div class="list-row schedule-holiday-row"><div class="list-row__main"><span class="list-row__name">' + esc(holiday.name) + '</span><span class="list-row__meta">' + esc(formatDate(holiday.start_date) + ' – ' + formatDate(holiday.end_date)) + '</span></div><button type="button" class="btn btn--secondary btn--sm" data-action="apply-holiday" data-from="' + esc(holiday.start_date) + '" data-to="' + esc(holiday.end_date) + '">' + esc(t('schedule.addHoliday')) + '</button></div>').join('');
+  return '<section class="schedule-holidays card card--padded"><h3 class="u-card-title">' + esc(t('schedule.schoolHolidays')) + '</h3><div class="schedule-holiday-location"><label class="schedule-timetable-filter"><span>' + esc(t('schedule.country')) + '</span><select class="input" data-holiday-country>' + countryOptions + '</select></label><label class="schedule-timetable-filter"><span>' + esc(t('schedule.subdivision')) + '</span><select class="input" data-holiday-subdivision' + (state.holidayCountry ? '' : ' disabled') + '>' + subdivisionOptions + '</select></label><label class="schedule-timetable-filter"><span>' + esc(t('schedule.rangeFrom')) + '</span><input class="input" type="date" data-holiday-from value="' + esc(state.holidayFrom) + '"></label><label class="schedule-timetable-filter"><span>' + esc(t('schedule.rangeTo')) + '</span><input class="input" type="date" data-holiday-to value="' + esc(state.holidayTo) + '"></label><button type="button" class="btn btn--secondary" data-action="load-holidays"' + (state.holidayCountry && !holidayLoading ? '' : ' disabled') + '>' + esc(t('schedule.loadHolidays')) + '</button></div><div class="schedule-holiday-defaults"><label class="schedule-timetable-filter"><span>' + esc(t('schedule.member')) + '</span><select class="input" data-holiday-user>' + memberOptions + '</select></label><label class="schedule-timetable-filter"><span>' + esc(t('schedule.shiftType')) + '</span><select class="input" data-holiday-type>' + typeOptions(state.holidayShiftTypeId) + '</select></label></div>' + (holidays ? '<div class="schedule-holiday-list">' + holidays + '<button type="button" class="btn btn--primary" data-action="apply-all-holidays">' + esc(t('schedule.applyAllHolidays')) + '</button></div>' : '') + '</section>';
 }
 
 function renderStatistics() {
@@ -420,14 +485,88 @@ function emptyShiftTypesState() {
 }
 
 function renderToday() {
-  if (!state.entries.length) return `<p>${esc(t('schedule.empty'))}</p>`;
-  return `<div class="list-rows">${state.entries.map((entry) => {
+  const entries = state.entries.filter((entry) => entry.date_key === todayKey());
+  if (!entries.length) {
+    return state.entries.length
+      ? `<p>${esc(t('schedule.emptyToday'))}</p>`
+      : `<p>${esc(t('schedule.empty'))}</p>`;
+  }
+  return `<div class="list-rows">${entries.map((entry) => {
     const type = entry.shift_type;
     const swatchColor = type ? type.color : 'var(--color-border)';
-    const name = type ? esc(type.short_code ? `${type.short_code} · ${type.name}` : type.name) : esc(t('schedule.freeDay'));
-    const meta = type ? `${esc(userName(entry.user_id))} · ${esc(clockLabel(type))}` : esc(userName(entry.user_id));
+    const name = esc(entry.subject || type?.name || t('schedule.freeDay'));
+    const time = entry.start_time || type?.start_time;
+    const end = entry.end_time || type?.end_time;
+    const details = [
+      userName(entry.user_id),
+      entry.period_number ? `${entry.period_number}.` : '',
+      time && end ? `${time}–${end}` : type ? clockLabel(type) : '',
+      entry.instructor,
+      entry.room,
+        entry.notes,
+      ].filter(Boolean).join(' · ');
+    const meta = esc(details);
     return `<div class="list-row schedule-entry-row"><span class="schedule-swatch" style="--schedule-color:${esc(swatchColor)}"></span><div class="list-row__main"><span class="list-row__name">${name}</span><span class="list-row__meta">${meta}</span></div></div>`;
   }).join('')}</div>`;
+}
+
+function renderTimetable() {
+  const startTime = (entry) => entry.start_time || entry.shift_type?.start_time;
+  const endTime = (entry) => entry.end_time || entry.shift_type?.end_time;
+  const weekdayLabels = [
+    t('calendar.dayLongMonday'), t('calendar.dayLongTuesday'),
+    t('calendar.dayLongWednesday'), t('calendar.dayLongThursday'),
+    t('calendar.dayLongFriday'), t('calendar.dayLongSaturday'),
+    t('calendar.dayLongSunday'),
+  ];
+  const allDays = Array.from({ length: 7 }, (_, index) => {
+    const dateKey = addLocalDays(timetableWeekStart, index);
+    const entries = state.entries.filter((entry) => entry.date_key === dateKey && startTime(entry));
+    const times = [...new Set(entries.map(startTime))].sort();
+    return { dateKey, entries, times };
+  });
+  const selectedEntries = (entries) => timetableUserId === 'all'
+    ? entries
+    : entries.filter((entry) => Number(entry.user_id) === Number(timetableUserId));
+  const days = allDays.map((day) => ({ ...day, entries: selectedEntries(day.entries), times: selectedEntries(day.entries).map(startTime) }));
+  const visibleDays = timetableView === 'day' ? [days[timetableDayIndex]] : days;
+  const weekLabel = formatDate(timetableWeekStart) + ' – ' + formatDate(addLocalDays(timetableWeekStart, 6));
+  const controls = '<div class="schedule-timetable-controls"><div class="schedule-timetable-navigation"><button type="button" class="icon-btn" data-timetable-nav="-7" title="' + esc(t('schedule.previousWeek')) + '"' + (timetableLoading ? ' disabled' : '') + '><i data-lucide="chevron-left"></i></button><strong>' + esc(weekLabel) + '</strong><button type="button" class="icon-btn" data-timetable-nav="7" title="' + esc(t('schedule.nextWeek')) + '"' + (timetableLoading ? ' disabled' : '') + '><i data-lucide="chevron-right"></i></button><button type="button" class="btn btn--secondary btn--sm" data-timetable-today' + (timetableLoading ? ' disabled' : '') + '>' + esc(t('schedule.today')) + '</button></div><label class="schedule-timetable-filter"><span>' + esc(t('schedule.member')) + '</span><select class="input" data-timetable-user><option value="all"' + (timetableUserId === 'all' ? ' selected' : '') + '>' + esc(t('schedule.allMembers')) + '</option>' + state.users.map((user) => '<option value="' + user.id + '"' + (Number(timetableUserId) === Number(user.id) ? ' selected' : '') + '>' + esc(userName(user.id)) + '</option>').join('') + '</select></label><div class="segmented" role="group" aria-label="' + esc(t('schedule.viewMode')) + '">' + [['week', 'schedule.viewWeek'], ['day', 'schedule.viewDay'], ['list', 'schedule.viewList']].map(([view, label]) => '<button type="button" class="segmented__item' + (timetableView === view ? ' is-active' : '') + '" data-timetable-view="' + view + '">' + esc(t(label)) + '</button>').join('') + '</div>' + (timetableView === 'day' ? '<div class="segmented" role="group" aria-label="' + esc(t('schedule.day')) + '">' + days.map((day, index) => '<button type="button" class="segmented__item' + (timetableDayIndex === index ? ' is-active' : '') + '" data-timetable-day="' + index + '">' + esc(formatDate(day.dateKey)) + '</button>').join('') + '</div>' : '') + '</div>';
+  const toMinutes = (value) => {
+    const [hours, minutes] = value.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+  const visibleEntries = visibleDays.flatMap((day) => day.entries);
+  if (!visibleEntries.length) return controls + '<section class="schedule-timetable-empty-state"><p>' + esc(t('schedule.emptyToday')) + '</p></section>';
+  const firstHour = Math.floor(Math.min(...visibleEntries.map((entry) => toMinutes(startTime(entry)))) / 60);
+  const lastEndHour = Math.ceil(Math.max(...visibleEntries.map((entry) => toMinutes(endTime(entry)))) / 60);
+  const times = Array.from({ length: Math.max(1, lastEndHour - firstHour) }, (_, index) => String(firstHour + index).padStart(2, '0') + ':00');
+  const cell = (day, memberId, slotStartTime) => day.entries.filter((entry) => Number(entry.user_id) === Number(memberId) && startTime(entry)?.slice(0, 2) === slotStartTime.slice(0, 2)).map((entry) => {
+      const type = entry.shift_type;
+      const title = entry.subject || type?.name || t('schedule.freeDay');
+      const detail = [entry.instructor, entry.room].filter(Boolean).join(' · ');
+      const period = entry.period_number ? entry.period_number + '. ' : '';
+      return '<div class="schedule-timetable-block" style="--schedule-color:' + esc(entry.color || type?.color || 'var(--module-schedule)') + '"><strong>' + esc(period + title) + '</strong><span>' + esc((startTime(entry) || '') + '–' + (endTime(entry) || '')) + '</span>' + (entry.instructor ? '<small><i data-lucide="user"></i>' + esc(entry.instructor) + '</small>' : '') + (entry.room ? '<small><i data-lucide="map-pin"></i>' + esc(entry.room) + '</small>' : '') + (entry.notes ? '<small class="schedule-timetable-block__note">' + esc(entry.notes) + '</small>' : '') + '</div>';
+    }).join('') || '<span class="schedule-timetable-empty">&nbsp;</span>';
+  const dayLabels = visibleDays.map((day) => {
+    const dayIndex = days.findIndex((item) => item.dateKey === day.dateKey);
+    const isToday = day.dateKey === todayKey();
+    return '<div class="schedule-timetable__day-header' + (isToday ? ' is-today' : '') + '"><strong>' + esc(weekdayLabels[dayIndex]) + '</strong><span>' + esc(formatDate(day.dateKey)) + '</span>' + (isToday ? '<small>' + esc(t('schedule.today')) + '</small>' : '') + '</div>';
+  }).join('');
+  const memberIds = timetableUserId === 'all' ? state.users.map((user) => user.id) : [Number(timetableUserId)];
+  const currentMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  const showNow = currentMinutes >= firstHour * 60 && currentMinutes <= lastEndHour * 60;
+  const rows = times.map((time) => '<div class="schedule-timetable__time-row"><span>' + esc(time) + '</span>' + visibleDays.map((day) => '<div>' + memberIds.map((userId) => cell(day, userId, time)).join('') + (day.dateKey === todayKey() && time === times[0] && showNow ? '<span class="schedule-timetable-now" style="top:' + (((currentMinutes - firstHour * 60) / 60) * 6) + 'rem"></span>' : '') + '</div>').join('') + '</div>').join('');
+  if (timetableView === 'list') {
+    const rows = allDays.map((day) => {
+      const dayEntries = selectedEntries(day.entries).sort((a, b) => startTime(a).localeCompare(startTime(b)));
+      if (!dayEntries.length) return '';
+      return '<section class="schedule-timetable-list-day"><h3>' + esc(formatDate(day.dateKey)) + '</h3><div class="list-rows">' + dayEntries.map((entry) => '<div class="list-row"><div class="list-row__main"><span class="list-row__name">' + esc(entry.period_number ? entry.period_number + '. ' + (entry.subject || entry.shift_type?.name || t('schedule.freeDay')) : (entry.subject || entry.shift_type?.name || t('schedule.freeDay'))) + '</span><span class="list-row__meta">' + esc(startTime(entry) + '–' + endTime(entry) + ' · ' + userName(entry.user_id) + (entry.instructor ? ' · ' + entry.instructor : '') + (entry.room ? ' · ' + entry.room : '')) + '</span></div></div>').join('') + '</div></section>';
+    }).join('');
+    return controls + (rows || '<p>' + esc(t('schedule.empty')) + '</p>');
+  }
+  const hasEntries = visibleDays.some((day) => day.entries.length);
+  return controls + (hasEntries ? '<div class="schedule-timetable-week" role="table"><div class="schedule-timetable-week__header"><strong>' + esc(t('reminders.timeLabel')) + '</strong>' + dayLabels + '</div><div class="schedule-timetable-week__body">' + rows + '</div></div>' : '<section class="schedule-timetable-empty-state"><p>' + esc(t('schedule.empty')) + '</p><button type="button" class="btn btn--primary" data-action="open-patterns">' + esc(t('schedule.addPattern')) + '</button></section>') + '<p class="schedule-timetable-edit-hint"><button type="button" class="btn btn--secondary" data-action="open-patterns">' + esc(t('schedule.addPattern')) + '</button></p>';
 }
 
 function renderScheduleWarnings() {
@@ -445,6 +584,7 @@ function renderShell() {
   const tabs = [
     ['shifts', t('schedule.shiftTypes')],
     ['patterns', t('schedule.patterns')],
+    ['timetable', t('schedule.timetable')],
     ['overrides', t('schedule.overrides')],
     ['statistics', t('schedule.statistics')],
   ];
@@ -465,8 +605,44 @@ function renderShell() {
   root.addEventListener('click', (event) => {
     const tabButton = event.target.closest('[data-tab]');
     if (tabButton) { activateView(tabButton.dataset.tab); return; }
+    const timetableButton = event.target.closest('[data-timetable-view]');
+    if (timetableButton) { action({ currentTarget: timetableButton }); return; }
+    const timetableDayButton = event.target.closest('[data-timetable-day]');
+    if (timetableDayButton) { timetableDayIndex = Number(timetableDayButton.dataset.timetableDay); renderPage(); return; }
+    const timetableNavButton = event.target.closest('[data-timetable-nav]');
+    if (timetableNavButton) { action({ currentTarget: timetableNavButton }); return; }
+    const timetableTodayButton = event.target.closest('[data-timetable-today]');
+    if (timetableTodayButton) { action({ currentTarget: timetableTodayButton }); return; }
     const actionButton = event.target.closest('[data-action]');
     if (actionButton) action({ currentTarget: actionButton });
+  });
+  root.addEventListener('change', (event) => {
+    if (event.target.matches('[data-field="color"]')) {
+      delete event.target.dataset.colorNull;
+    }
+    if (event.target.matches('[data-timetable-user]')) {
+      timetableUserId = event.target.value;
+      renderPage();
+    }
+    if (event.target.matches('[data-holiday-country]')) {
+      state.holidayCountry = event.target.value;
+      state.holidaySubdivision = '';
+      state.holidaySubdivisions = [];
+      state.holidays = [];
+      if (state.holidayCountry) {
+        api.get(`/preferences/holidays/subdivisions/${state.holidayCountry}`).then((response) => {
+          state.holidaySubdivisions = response.data ?? [];
+          renderPage();
+        });
+      }
+      savePreferences({ holiday_country: state.holidayCountry, holiday_subdivision: null, holiday_show_school: true }).catch(() => {});
+      renderPage();
+    }
+    if (event.target.matches('[data-holiday-subdivision]')) {
+      state.holidaySubdivision = event.target.value;
+      savePreferences({ holiday_country: state.holidayCountry, holiday_subdivision: state.holidaySubdivision || null, holiday_show_school: true }).catch(() => {});
+      renderPage();
+    }
   });
 }
 
@@ -480,6 +656,8 @@ function renderPage() {
     ? '<section class="schedule-library schedule-library--shifts"><h2 class="u-section-title">' + esc(t('schedule.shiftTypes')) + '</h2>' + (state.types.length ? state.types.map(shiftTypeCard).join('') : emptyShiftTypesState()) + '</section>'
     : activeView === 'patterns'
       ? '<section class="schedule-library schedule-library--patterns"><h2 class="u-section-title">' + esc(t('schedule.patterns')) + '</h2>' + (state.patterns.length ? state.patterns.map(patternCard).join('') : emptyPatternState()) + '</section>'
+      : activeView === 'timetable'
+        ? '<section class="schedule-library schedule-library--timetable"><h2 class="u-section-title">' + esc(t('schedule.timetable')) + '</h2>' + renderTimetable() + '</section>'
       : activeView === 'overrides'
         ? '<section class="schedule-library schedule-library--overrides"><h2 class="u-section-title">' + esc(t('schedule.overrides')) + '</h2>' + overrideRows() + '</section>'
         : renderStatistics();
@@ -493,7 +671,7 @@ function renderPage() {
   const inUse = state.types.length || state.patterns.length
     || state.overrides.length || state.entries.length;
   body.insertAdjacentHTML('beforeend',
-    (activeView === 'statistics' || !inUse ? '' : '<section class="card card--padded schedule-today"><h2 class="u-section-title">' + esc(t('schedule.today')) + '</h2>' + renderToday() + renderScheduleWarnings() + '</section>')
+    (activeView === 'statistics' || activeView === 'timetable' || !inUse ? '' : '<section class="card card--padded schedule-today"><h2 class="u-section-title">' + esc(t('schedule.today')) + '</h2>' + renderToday() + renderScheduleWarnings() + '</section>')
     + `<div class="schedule-content">${panel}</div>`);
   updateScheduleFab();
   window.lucide?.createIcons({ el: body });
@@ -765,6 +943,101 @@ async function action(event) {
       if (group) openOverrideEditModal(group);
       return;
     }
+    if (button.dataset.action === 'add-block') {
+      const day = button.closest('.schedule-cycle-day');
+      const template = day?.querySelector('.schedule-day-block');
+      if (day && template) {
+        const clone = template.cloneNode(true);
+        clone.querySelectorAll('[data-field]').forEach((field) => { field.value = ''; delete field.dataset.colorNull; });
+        day.querySelector('.schedule-cycle-day__blocks')?.appendChild(clone);
+      }
+      return;
+    }
+    if (button.dataset.action === 'remove-block') {
+      const block = button.closest('.schedule-day-block');
+      const day = button.closest('.schedule-cycle-day');
+      if (block && day) {
+        const blocks = day.querySelectorAll('.schedule-day-block');
+        if (blocks.length > 1) block.remove();
+        else block.querySelectorAll('[data-field]').forEach((field) => { field.value = ''; });
+      }
+      return;
+    }
+    if (button.dataset.action === 'open-patterns') {
+      activeView = 'patterns';
+      renderPage();
+      return;
+    }
+    if (button.dataset.action === 'clear-block-color') {
+      const color = button.closest('.schedule-day-block')?.querySelector('[data-field="color"]');
+      if (color) color.dataset.colorNull = 'true';
+      return;
+    }
+    if (button.dataset.timetableNav || button.dataset.timetableToday !== undefined) {
+      if (timetableLoading) return;
+      timetableLoading = true;
+      timetableWeekStart = button.dataset.timetableToday !== undefined
+        ? startOfLocalWeekKey(todayKey(), 1)
+        : addLocalDays(timetableWeekStart, Number(button.dataset.timetableNav));
+      timetableDayIndex = 0;
+      try {
+        await loadTimetableWeek();
+      } finally {
+        timetableLoading = false;
+        renderPage();
+      }
+      return;
+    }
+    if (button.dataset.action === 'load-holidays') {
+      if (holidayLoading) return;
+      holidayLoading = true;
+      state.holidayFrom = root.querySelector('[data-holiday-from]')?.value || state.holidayFrom;
+      state.holidayTo = root.querySelector('[data-holiday-to]')?.value || state.holidayTo;
+      renderPage();
+      try {
+        await savePreferences({ holiday_country: state.holidayCountry, holiday_subdivision: state.holidaySubdivision || null, holiday_show_school: true });
+        await api.post('/preferences/holidays/sync');
+        const response = await api.get(`/calendar/holidays?from=${encodeURIComponent(state.holidayFrom)}&to=${encodeURIComponent(state.holidayTo)}`);
+        state.holidays = (response.data ?? []).filter((holiday) => holiday.type === 'school');
+        window.yuvomi?.showToast(state.holidays.length ? t('schedule.holidaysLoaded') : t('schedule.noHolidaysFound'), state.holidays.length ? 'success' : 'warning');
+      } finally {
+        holidayLoading = false;
+        renderPage();
+      }
+      return;
+    }
+    if (button.dataset.action === 'apply-all-holidays') {
+      const rows = [...root.querySelectorAll('.schedule-holiday-row')];
+      const userId = Number(root.querySelector('[data-holiday-user]')?.value);
+      const shiftTypeId = root.querySelector('[data-holiday-type]')?.value;
+      await Promise.all(rows.map((row) => {
+        const applyButton = row.querySelector('[data-action="apply-holiday"]');
+        return api.post('/schedule/overrides/fill', {
+          user_id: userId,
+          from: applyButton?.dataset.from,
+          to: applyButton?.dataset.to,
+          shift_type_id: shiftTypeId ? Number(shiftTypeId) : null,
+          note: row.querySelector('.list-row__name')?.textContent || '',
+        });
+      }));
+      await load();
+      renderPage();
+      return;
+    }
+    if (button.dataset.action === 'apply-holiday') {
+      const row = button.closest('.schedule-holiday-row');
+      const userId = Number(root.querySelector('[data-holiday-user]')?.value);
+      const shiftTypeId = root.querySelector('[data-holiday-type]')?.value;
+      await api.post('/schedule/overrides/fill', { user_id: userId, from: button.dataset.from, to: button.dataset.to, shift_type_id: shiftTypeId ? Number(shiftTypeId) : null, note: row?.querySelector('.list-row__name')?.textContent || '' });
+      await load();
+      renderPage();
+      return;
+    }
+    if (button.dataset.timetableView) {
+      timetableView = button.dataset.timetableView;
+      renderPage();
+      return;
+    }
     if (button.dataset.action === 'delete-shift') await api.delete(`/schedule/shift-types/${button.dataset.id}`);
     // Ein Muster loeschen nimmt seine Zyklustage mit (ON DELETE CASCADE): eine
     // Achttage-Rotation ist mit einem Fingertipp weg, und es gibt keinen Weg
@@ -798,10 +1071,11 @@ async function action(event) {
     }
     if (button.dataset.action === 'save-days') {
       const details = button.closest('[data-pattern]');
-      const days = [...details.querySelectorAll('[data-day]')].map((select) => ({
-        position: Number(select.dataset.day),
-        shift_type_id: select.value ? Number(select.value) : null,
-      }));
+      const days = [...details.querySelectorAll('.schedule-day-block')].map((block) => {
+        const value = (field) => block.querySelector(`[data-field="${field}"]`)?.value?.trim() || null;
+        const color = block.querySelector('[data-field="color"]');
+        return { position: Number(block.dataset.day), shift_type_id: value('shift_type_id') ? Number(value('shift_type_id')) : null, start_time: value('start_time'), end_time: value('end_time'), subject: value('subject'), room: value('room'), instructor: value('instructor'), period_number: value('period_number') ? Number(value('period_number')) : null, color: color?.dataset.colorNull ? null : color?.value || null, notes: value('notes') };
+      });
       await api.put(`/schedule/patterns/${button.dataset.id}/days`, { days });
     }
     await load();
@@ -814,6 +1088,7 @@ async function action(event) {
 
 export async function render(container, { user } = {}) {
   root = container;
+  activeView = 'timetable';
   currentUserId = user?.id ?? null;
   canManageOthers = user?.role === 'admin';
   await load();

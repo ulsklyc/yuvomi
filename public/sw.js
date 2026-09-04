@@ -233,6 +233,7 @@ const PAGE_MODULES = [
   '/pages/shopping.js',
   '/pages/meals.js',
   '/pages/calendar.js',
+  '/pages/schedule.js',
   '/pages/notes.js',
   '/pages/contacts.js',
   '/pages/birthdays.js',

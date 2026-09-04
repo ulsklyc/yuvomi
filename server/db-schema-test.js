@@ -1067,6 +1067,31 @@ const MIGRATIONS_SQL = {
     CREATE INDEX IF NOT EXISTS idx_access_permissions_subject
       ON access_permissions(subject_type, subject_id);
   `,
+
+  // SQL for migration v176 (mirrored from db.js MIGRATIONS):
+  // Multiple timetable blocks and their metadata per cycle position.
+  176: `
+    CREATE TABLE schedule_pattern_days_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pattern_id INTEGER NOT NULL REFERENCES schedule_patterns(id) ON DELETE CASCADE,
+      position INTEGER NOT NULL CHECK (position >= 0),
+      shift_type_id INTEGER REFERENCES schedule_shift_types(id) ON DELETE RESTRICT,
+      subject TEXT, room TEXT, instructor TEXT,
+      category TEXT NOT NULL DEFAULT 'work' CHECK(category IN ('school', 'work', 'activity', 'other')),
+      color TEXT, period_number INTEGER, notes TEXT
+    );
+    INSERT INTO schedule_pattern_days_new (id, pattern_id, position, shift_type_id)
+      SELECT id, pattern_id, position, shift_type_id FROM schedule_pattern_days;
+    DROP TABLE schedule_pattern_days;
+    ALTER TABLE schedule_pattern_days_new RENAME TO schedule_pattern_days;
+  `,
+
+  // SQL for migration v177 (mirrored from db.js MIGRATIONS):
+  // Direct start/end times for timetable blocks.
+  177: `
+    ALTER TABLE schedule_pattern_days ADD COLUMN start_time TEXT;
+    ALTER TABLE schedule_pattern_days ADD COLUMN end_time TEXT;
+  `,
 };
 
 export { MIGRATIONS_SQL };

@@ -1,7 +1,7 @@
 /** Schedule API: patterns are computed into entries, never calendar events. */
 import express from 'express';
 import * as db from '../db.js';
-import { bool, color, collectErrors, date, id, num, str, time } from '../middleware/validate.js';
+import { bool, color, collectErrors, date, id, num, oneOf, str, time } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import { resolveEntries, dateKeysInRange } from '../services/schedule.js';
 import { daysBetweenDateKeys } from '../utils/timezone.js';
@@ -67,6 +67,50 @@ const MAX_RANGE_DAYS = 731;
 // sie keine Schatten-Rotation traegt.
 const MAX_FILL_DAYS = 100;
 
+const BLOCK_CATEGORIES = ['school', 'work', 'activity', 'other'];
+
+function patternBlock(body = {}) {
+  const shiftType = body.shift_type_id == null ? { value: null, error: null } : id(body.shift_type_id, 'shift_type_id');
+  const subject = str(body.subject, 'subject', { required: false, max: 200 });
+  const room = str(body.room, 'room', { required: false, max: 100 });
+  const instructor = str(body.instructor, 'instructor', { required: false, max: 100 });
+  const category = oneOf(body.category || 'work', BLOCK_CATEGORIES, 'category');
+  const shade = color(body.color, 'color', false);
+  const notes = str(body.notes, 'notes', { required: false, max: 5000 });
+  const start = time(body.start_time, 'start_time');
+  const end = time(body.end_time, 'end_time');
+  const period = body.period_number == null || body.period_number === ''
+    ? { value: null, error: null }
+    : num(body.period_number, 'period_number', { required: true });
+  const errors = collectErrors([shiftType, subject, room, instructor, category, shade, notes, period, start, end]);
+  if ((start.value == null) !== (end.value == null)) errors.push('start_time and end_time must be provided together.');
+  if (start.value && end.value && start.value >= end.value) errors.push('end_time must be after start_time.');
+  if (period.value !== null && (!Number.isInteger(period.value) || period.value < 1 || period.value > 30)) errors.push('period_number must be between 1 and 30.');
+  if (shiftType.value != null && !typeExists(shiftType.value)) errors.push('shift_type_id does not exist.');
+  return {
+    value: {
+      shift_type_id: shiftType.value,
+      subject: subject.value || null,
+      room: room.value || null,
+      instructor: instructor.value || null,
+      category: category.value || 'work',
+      color: shade.value || null,
+      period_number: period.value,
+      notes: notes.value || null,
+      start_time: start.value || null,
+      end_time: end.value || null,
+    },
+    errors,
+  };
+}
+
+function insertPatternBlocks(patternId, blocks) {
+  const insert = db.get().prepare(`INSERT INTO schedule_pattern_days
+    (pattern_id, position, shift_type_id, subject, room, instructor, category, color, period_number, notes, start_time, end_time)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  for (const block of blocks) insert.run(patternId, block.position, block.shift_type_id, block.subject, block.room, block.instructor, block.category, block.color, block.period_number, block.notes, block.start_time, block.end_time);
+}
+
 function scheduleData(from, to, userId) {
   const database = db.get();
   const condition = userId ? 'AND user_id = ?' : '';
@@ -76,7 +120,12 @@ function scheduleData(from, to, userId) {
   const patternDays = new Map();
   if (patterns.length) {
     const ids = patterns.map((p) => p.id);
-    for (const row of database.prepare(`SELECT * FROM schedule_pattern_days WHERE pattern_id IN (${ids.map(() => '?').join(',')})`).all(...ids)) patternDays.set(`${row.pattern_id}:${row.position}`, row);
+    for (const row of database.prepare(`SELECT * FROM schedule_pattern_days WHERE pattern_id IN (${ids.map(() => '?').join(',')}) ORDER BY position, id`).all(...ids)) {
+      const key = `${row.pattern_id}:${row.position}`;
+      const blocks = patternDays.get(key) || [];
+      blocks.push(row);
+      patternDays.set(key, blocks);
+    }
   }
   const users = userId ? [userId] : database.prepare('SELECT id FROM users ORDER BY id').all().map((row) => row.id);
   const entries = []; const warnings = [];
@@ -88,7 +137,16 @@ function scheduleData(from, to, userId) {
   const typeIds = [...new Set(entries.map((entry) => entry.shift_type_id).filter(Boolean))];
   const types = new Map();
   if (typeIds.length) for (const row of database.prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id IN (${typeIds.map(() => '?').join(',')})`).all(...typeIds)) types.set(row.id, row);
-  return { entries: entries.map((entry) => ({ ...entry, shift_type: entry.shift_type_id ? types.get(entry.shift_type_id) || null : null, crosses_midnight: Boolean(types.get(entry.shift_type_id)?.start_time && types.get(entry.shift_type_id)?.end_time && types.get(entry.shift_type_id).end_time <= types.get(entry.shift_type_id).start_time) })), warnings };
+  return { entries: entries.map((entry) => {
+    const type = entry.shift_type_id ? types.get(entry.shift_type_id) || null : null;
+    const startTime = entry.start_time || type?.start_time || null;
+    const endTime = entry.end_time || type?.end_time || null;
+    return {
+      ...entry,
+      shift_type: type ? { ...type, start_time: startTime, end_time: endTime, color: entry.color || type.color } : null,
+      crosses_midnight: Boolean(startTime && endTime && endTime <= startTime),
+    };
+  }), warnings };
 }
 
 router.get('/entries', (req, res) => {
@@ -156,13 +214,15 @@ router.post('/patterns', (req, res) => {
 });
 router.put('/patterns/:id/days/:position', (req, res) => {
   const patternId = id(req.params.id, 'pattern_id'); const position = num(req.params.position, 'position', { required: true });
-  const typeId = req.body?.shift_type_id == null ? null : id(req.body.shift_type_id, 'shift_type_id');
   const pattern = patternId.value && db.get().prepare('SELECT * FROM schedule_patterns WHERE id = ?').get(patternId.value);
   if (!pattern) return res.status(404).json({ error: 'Pattern not found.', code: 404 }); if (!mineOrAdmin(req, pattern.user_id)) return res.status(403).json({ error: 'Forbidden.', code: 403 });
-  if (patternId.error || !Number.isInteger(position.value) || position.value < 0 || position.value >= pattern.cycle_length || typeId?.error) return res.status(400).json({ error: 'Invalid pattern day.', code: 400 });
-  if (typeId && !typeExists(typeId.value)) return fail(res, 400, 'shift_type_id does not exist.');
-  db.get().prepare('INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, ?, ?) ON CONFLICT(pattern_id, position) DO UPDATE SET shift_type_id = excluded.shift_type_id').run(pattern.id, position.value, typeId?.value ?? null);
-  res.json({ data: db.get().prepare('SELECT * FROM schedule_pattern_days WHERE pattern_id = ? AND position = ?').get(pattern.id, position.value) });
+  const parsed = patternBlock(req.body);
+  if (patternId.error || position.error || !Number.isInteger(position.value) || position.value < 0 || position.value >= pattern.cycle_length || parsed.errors.length) return res.status(400).json({ error: parsed.errors.join(' ') || 'Invalid pattern day.', code: 400 });
+  db.get().transaction(() => {
+    db.get().prepare('DELETE FROM schedule_pattern_days WHERE pattern_id = ? AND position = ?').run(pattern.id, position.value);
+    insertPatternBlocks(pattern.id, [{ ...parsed.value, position: position.value }]);
+  })();
+  res.json({ data: db.get().prepare('SELECT * FROM schedule_pattern_days WHERE pattern_id = ? AND position = ? ORDER BY id').all(pattern.id, position.value) });
 });
 router.put('/overrides/:dateKey', (req, res) => {
   const key = date(req.params.dateKey, 'date_key', true); const user = id(req.body?.user_id ?? actorId(req), 'user_id'); const typeId = req.body?.shift_type_id == null ? null : id(req.body.shift_type_id, 'shift_type_id'); const note = str(req.body?.note, 'note', { required: false, max: 5000 });
@@ -227,14 +287,14 @@ router.put('/patterns/:id/days', (req, res) => {
   const old = db.get().prepare('SELECT * FROM schedule_patterns WHERE id=?').get(key.value);
   if (!old) return fail(res, 404, 'Pattern not found.'); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
   if (!Array.isArray(req.body?.days)) return fail(res, 400, 'days must be an array.');
-  const seen = new Set(); const days = [];
+  const days = [];
   for (const row of req.body.days) {
-    const position = num(row?.position, 'position', { required: true }); const shiftType = row?.shift_type_id == null ? null : id(row.shift_type_id, 'shift_type_id');
-    if (position.error || !Number.isInteger(position.value) || position.value < 0 || position.value >= old.cycle_length || shiftType?.error || seen.has(position.value)) return fail(res, 400, 'Invalid pattern day.');
-    if (shiftType && !typeExists(shiftType.value)) return fail(res, 400, 'shift_type_id does not exist.');
-    seen.add(position.value); days.push([position.value, shiftType?.value ?? null]);
+    const position = num(row?.position, 'position', { required: true });
+    const parsed = patternBlock(row);
+    if (position.error || !Number.isInteger(position.value) || position.value < 0 || position.value >= old.cycle_length || parsed.errors.length) return fail(res, 400, parsed.errors.join(' ') || 'Invalid pattern day.');
+    days.push({ position: position.value, ...parsed.value });
   }
-  db.get().transaction(() => { db.get().prepare('DELETE FROM schedule_pattern_days WHERE pattern_id=?').run(old.id); const add = db.get().prepare('INSERT INTO schedule_pattern_days (pattern_id,position,shift_type_id) VALUES (?,?,?)'); days.forEach((day) => add.run(old.id, ...day)); })();
+  db.get().transaction(() => { db.get().prepare('DELETE FROM schedule_pattern_days WHERE pattern_id=?').run(old.id); insertPatternBlocks(old.id, days); })();
   return res.json({ data: db.get().prepare('SELECT * FROM schedule_pattern_days WHERE pattern_id=? ORDER BY position').all(old.id) });
 });
 router.get('/overrides', (req, res) => {
