@@ -171,6 +171,12 @@ covers engine setup, HTTPS, backups and troubleshooting step by step.
 
 ---
 
+## ☁️ One-Click Deploy
+
+[![Deploy on RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploylobe.svg)](https://repocloud.io/details/yuvomi/)
+
+---
+
 ## Before you commit
 
 **What if this project stops?** Nothing changes on your machine. It is MIT-licensed and
