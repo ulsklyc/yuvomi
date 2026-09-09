@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { datesForTemplateInRange, mealWeekday } from '../server/services/meal-recurrence.js';
 import { __test as mealsUi } from '../public/pages/meals.js';
+import { toDecimalString } from '../public/utils/money.js';
 
 let passed = 0;
 let failed = 0;
@@ -653,6 +654,10 @@ test('Skalieren: eine gruppierte Menge wird abgewiesen, nicht geraten', () => {
   // die nichts erfindet.
   scaled('en-US', '1,000 g', 2, '1,000 g');
   scaled('de', '1.000 g', 2, '1.000 g');
+  // Auch in oestlichen Ziffern - die Gruppierungspruefung muss sie sehen. Die
+  // fuehrende Ziffer ist bewusst nicht die 1, sonst waere der abgeschnittene
+  // Anfang vom richtigen Ergebnis nicht zu unterscheiden.
+  scaled('ar-EG', '٢٬٠٠٠ g', 2, '٢٬٠٠٠ g');
   // Gegenprobe zur Regel selbst: in de trennt das Komma, "1,000" IST dort eins.
   scaled('de', '1,000 g', 2, '2 g');
   scaled('en-US', '1.000 g', 2, '2 g');
@@ -667,6 +672,38 @@ test('Skalieren: oestliche Ziffern kommen ueberhaupt an', () => {
   // Ein anderes Ziffernsystem als das der Region bleibt unangetastet: fa
   // schreibt ۱, nicht ١.
   scaled('fa', '١٫٥ kg', 2, '١٫٥ kg');
+});
+
+test('Skalieren: der Rest der Zeile behaelt seine eigenen Ziffern', () => {
+  // Umgeschrieben wird nur, was auch gerechnet wird. Steht hinter der fuehrenden
+  // Zahl ein zweiter Zahlenteil, kam er vorher aus der umgeschriebenen Fassung
+  // zurueck und verlor dabei seine Ziffern: unter fa wurde „۲ x ۵۰۰ g" zu
+  // „۴ x 500 g", also eine Zeile in zwei Schriften.
+  scaled('fa', '۲ x ۵۰۰ g', 2, '۴ x ۵۰۰ g');
+  scaled('fa', '۲ x ۱٫۵ kg', 2, '۴ x ۱٫۵ kg');
+  scaled('fa', '۱ ۱/۲ Tassen', 2, '۳ Tassen');
+  // Umgekehrt darf der Rest auch nichts DAZUgewinnen: die ASCII-Zeile bleibt ASCII.
+  scaled('de', '2 x 500 g', 2, '4 x 500 g');
+  // Umschliessender Leerraum faellt weg, statt die Zahl zu verschieben.
+  scaled('de', '  250 g  ', 2, '500 g');
+});
+
+test('Skalieren: die Umschrift ist positionstreu - darauf baut der Rest der Zeile', () => {
+  // scaleQuantityText schneidet den Rest per Offset aus dem ORIGINAL. Das geht
+  // nur, solange toDecimalString ein Zeichen gegen genau ein Zeichen tauscht.
+  // Faellt die Zusicherung, verrutscht hier still der Schnitt - deshalb steht sie
+  // als eigener Test da und nicht nur als Kommentar in money.js.
+  const proben = ['۲ x ۵۰۰ g', '٢٬٠٠٠ g', '1,5 kg', 'eine Prise', '🍎 2 kg', '1.000', '1 1/2 Tassen'];
+  for (const locale of ['de', 'en-US', 'fa', 'ar-EG']) {
+    withFormatLocale(locale, () => {
+      for (const probe of proben) {
+        const um = toDecimalString(probe);
+        // Leer heisst abgewiesen (gruppiert) - dann gibt es keinen Offset zu halten.
+        assert(um === '' || um.length === probe.trim().length,
+          `${locale}: "${probe}" (${probe.trim().length}) -> "${um}" (${um.length})`);
+      }
+    });
+  }
 });
 
 test('Skalieren: eine mitten im Trenner abgeschnittene Zahl bleibt stehen', () => {

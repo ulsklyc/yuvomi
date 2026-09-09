@@ -1617,6 +1617,17 @@ function parseShoppingQuantity(raw) {
   const match = decimal.match(/^(\d+(?:\.\d+)?)\s*(?:(kg|g|ml|l)\b)?/i);
   if (!match) return fallback;
 
+  // Bricht die Zahl mitten in einem Trennzeichen ab, ist sie nicht gelesen,
+  // sondern abgeschnitten. Die Umschrift weist zwar eine erkannte Gruppierung
+  // ab, aber nicht jede: „٢٬٥٠" hat nur zwei Stellen hinter dem Trenner, ist
+  // also kein Gruppierungsmuster - und ein Trenner, den die Region nicht kennt,
+  // steht ohnehin einfach da (unter fa trennt das ASCII-Komma nichts). Diese
+  // Regex liest nur den ANFANG, sie nähme daraus wortlos die 2. Geprüft wird die
+  // STELLE (ein Zeichen zwischen zwei Ziffern, das kein Leerraum ist), nicht eine
+  // Liste von Trennern - welche Zeichen trennen, weiss die Region, nicht diese
+  // Funktion. Dieselbe Prüfung steht in pages/meals.js.
+  if (/^[^\s\d]\d/.test(decimal.slice(match[1].length))) return fallback;
+
   const quantity = Number(match[1]);
   if (!Number.isFinite(quantity) || quantity <= 0) return fallback;
 

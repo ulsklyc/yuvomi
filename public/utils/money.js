@@ -198,6 +198,13 @@ export function amountMin(currency, currentValue) {
  * jemand daneben eine zweite Fassung schreibt. Wer eine dritte Stelle mit
  * eingetippten Zahlen baut, ruft diese hier auf, statt `replace(',', '.')` neu
  * zu erfinden.
+ *
+ * ZUGESICHERT: die Umschrift ist positionstreu - ein Zeichen hinein, dasselbe
+ * eine Zeichen hinaus, `toDecimalString(x).length === x.trim().length`. Wer nur
+ * die fuehrende Zahl eines Freitextes umrechnet, darf den Rest deshalb per
+ * Offset aus dem ORIGINAL schneiden, statt die umgeschriebene Fassung
+ * anzuhaengen: pages/meals.js skaliert so „۲ x ۵۰۰ g" zu „۴ x ۵۰۰ g" und nicht
+ * zu „۴ x 500 g". Ein Verhaltenstest in test-meals.js haelt die Zusicherung.
  */
 export function toDecimalString(value) {
   const raw = String(value ?? '').trim();
@@ -215,23 +222,34 @@ export function toDecimalString(value) {
   const groupSep = getNumberFormat({ useGrouping: true, maximumFractionDigits: 0 })
     .formatToParts(1234).find((part) => part.type === 'group')?.value;
 
-  // Gruppierungsmuster: der Trenner, gefolgt von genau drei Ziffern, auf die
-  // keine weitere folgt. "1.000" in de-DE trifft zu, "12.50" nicht.
+  // Schritt 1: nur die ZIFFERN nach ASCII, die Trenner bleiben, wie sie sind.
+  let normalized = '';
+  for (const char of raw) normalized += digits.has(char) ? digits.get(char) : char;
+
+  // Schritt 2: Gruppierungsmuster - der Trenner, gefolgt von genau drei Ziffern,
+  // auf die keine weitere folgt. "1.000" in de-DE trifft zu, "12.50" nicht.
+  //
+  // Die Reihenfolge ist der ganze Punkt, und sie hat auf beiden Seiten eine
+  // Kante. Vor Schritt 1 sieht `\d` (ASCII) die östlichen Ziffern hinter dem
+  // Trenner nicht: ar-EG „٢٬٠٠٠" kam unerkannt durch und wurde zu „2٬000" - für
+  // einen Betrag folgenlos, weil die Vollprüfung des Aufrufers am stehen
+  // gebliebenen Trenner scheitert, aber eine Mengenangabe liest nur den ANFANG
+  // und machte daraus die 2. Nach Schritt 3 wäre es genau andersherum falsch:
+  // dort ist der Dezimaltrenner schon ein Punkt, und in de-DE IST der Punkt das
+  // Gruppierungszeichen - „1,000" (also eins) flöge als vermeintlich gruppiert
+  // raus. Zwischen den beiden Schritten stimmt beides.
   if (groupSep && groupSep !== decimalSep) {
     const escaped = groupSep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    if (new RegExp(`${escaped}\\d{3}(?!\\d)`).test(raw)) return '';
+    if (new RegExp(`${escaped}\\d{3}(?!\\d)`).test(normalized)) return '';
   }
 
+  // Schritt 3: nur der Trenner der eingestellten Region wird zum Punkt. Das
+  // ASCII-Komma pauschal mitzunehmen wäre gefährlich: unter en-US gruppiert es
+  // Tausender, aus "1,000" würde dann "1.000" und daraus die Zahl 1 - ein
+  // Anteil, der um den Faktor tausend danebenliegt, ohne dass irgendwo ein
+  // Fehler erscheint.
   let out = '';
-  for (const char of raw) {
-    if (digits.has(char)) { out += digits.get(char); continue; }
-    // Nur der Trenner der eingestellten Region wird zum Punkt. Das ASCII-Komma
-    // pauschal mitzunehmen wäre gefährlich: unter en-US gruppiert es Tausender,
-    // aus "1,000" würde dann "1.000" und daraus die Zahl 1 - ein Anteil, der um
-    // den Faktor tausend danebenliegt, ohne dass irgendwo ein Fehler erscheint.
-    if (char === decimalSep) { out += '.'; continue; }
-    out += char;
-  }
+  for (const char of normalized) out += char === decimalSep ? '.' : char;
   return out;
 }
 

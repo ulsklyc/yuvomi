@@ -715,6 +715,26 @@ test('nur der Trenner der Region wird zum Dezimalpunkt', () => {
   // falsche liegt bei Geld um den Faktor tausend daneben.
   assert.match(impl, /groupSep/, 'die Gruppierung muss erkannt werden');
   assert.match(impl, /\\\\d\{3\}/, 'erkannt wird das Muster (drei Ziffern), nicht das blosse Zeichen');
+
+  // Die Gruppierungspruefung steht ZWISCHEN den beiden Umschrift-Schritten, und
+  // sie hat auf beiden Seiten eine Kante:
+  //   - davor sieht `\d` (ASCII) die oestlichen Ziffern hinter dem Trenner nicht,
+  //     ar-EG "٢٬٠٠٠" kaeme unerkannt durch (gemessen: als "2٬000", woraus eine
+  //     Mengenangabe die 2 las);
+  //   - danach ist der Dezimaltrenner schon ein Punkt, und in de-DE IST der Punkt
+  //     das Gruppierungszeichen - "1,000" (also eins) floege raus.
+  // Beide Faelle sind in test-shopping-ux.js verhaltensgetrieben gepinnt; hier
+  // steht die Reihenfolge selbst, weil ein Textguard sie zeigt und ein
+  // Verhaltenstest nur ihre Folgen.
+  const ziffernSchritt = impl.search(/digits\.has\(char\)/);
+  const gruppenSchritt = impl.search(/groupSep &&/);
+  const trennerSchritt = impl.search(/char === decimalSep/);
+  assert.ok(ziffernSchritt >= 0 && gruppenSchritt >= 0 && trennerSchritt >= 0,
+    'die drei Schritte von toDecimalString sind nicht mehr erkennbar');
+  assert.ok(ziffernSchritt < gruppenSchritt,
+    'die Ziffern muessen VOR der Gruppierungspruefung nach ASCII - sonst sieht `\\d` sie nicht');
+  assert.ok(gruppenSchritt < trennerSchritt,
+    'die Gruppierung muss VOR dem Ersetzen des Dezimaltrenners geprueft werden - sonst ist der Trenner in de-DE ununterscheidbar vom Gruppierungszeichen');
 });
 
 test('keine Seite schreibt einen Dezimaltrenner von Hand um', () => {

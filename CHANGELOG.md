@@ -42,7 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rather than guessed - "1,000 g" could mean one gram or a thousand, both readings are defensible,
   and the wrong one is off by a factor of a thousand. Refused means the row falls back to "1 piece",
   which says visibly that nothing was understood, in a dialog where the quantity sits in a field you
-  can correct before it is saved. "1,5 kg", "250 g" and "6 x 1 l" keep reading exactly as they did.
+  can correct before it is saved. The same applies to a number that breaks off mid-separator, which a
+  grouping check cannot catch: "٢٬٥٠" has only two digits after the separator, and under Persian the
+  ASCII comma separates nothing at all. "1,5 kg", "250 g" and "6 x 1 l" keep reading exactly as they
+  did.
 
 - **Paying extra on a loan now shortens the remaining term, not only the balance** (#964). Since
   #954 the remaining principal follows the money you actually paid, but the remaining term beside it

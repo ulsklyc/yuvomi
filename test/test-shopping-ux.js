@@ -503,7 +503,46 @@ test('parseShoppingQuantity: oestliche Ziffern kommen ueberhaupt an', () => {
   });
   withFormatLocale('ar-EG', () => {
     assert.deepEqual(__test.parseShoppingQuantity('٢٥٠ g'), { quantity: 250, unit: 'g' });
-    // Auch hier gilt die Gruppierung der Region (٬), nicht die von en-US.
-    assert.deepEqual(__test.parseShoppingQuantity('١٬٠٠٠ g'), { quantity: 1, unit: 'pcs' });
+    // Auch hier gilt die Gruppierung der Region (٬), nicht die von en-US. Die
+    // fuehrende Ziffer ist bewusst NICHT die 1: mit „١٬٠٠٠ g" war dieser Test
+    // gruen, obwohl die Umschrift die Gruppierung gar nicht erkannte - der
+    // abgeschnittene Anfang „1" traf zufaellig denselben Wert wie der Standard.
+    // Ein Guard, dessen Erwartung auf zwei Wegen erreichbar ist, misst nichts.
+    assert.deepEqual(__test.parseShoppingQuantity('٢٬٠٠٠ g'), { quantity: 1, unit: 'pcs' });
+  });
+});
+
+test('parseShoppingQuantity: eine mitten im Trenner abgeschnittene Menge wird abgewiesen', () => {
+  // Die Gruppierungspruefung greift am MUSTER: drei Ziffern hinter dem Trenner.
+  // „٢٬٥٠" hat zwei, ist also keine erkannte Gruppierung - und ein Zeichen, das
+  // die Region ueberhaupt nicht als Trenner kennt, steht sowieso einfach da.
+  // Diese Regex liest nur den ANFANG und naehme daraus wortlos die 2.
+  withFormatLocale('ar-EG', () => {
+    assert.deepEqual(__test.parseShoppingQuantity('٢٬٥٠ g'), { quantity: 1, unit: 'pcs' });
+  });
+  // Unter fa trennt das ASCII-Komma nichts.
+  withFormatLocale('fa', () => {
+    assert.deepEqual(__test.parseShoppingQuantity('1,5 kg'), { quantity: 1, unit: 'pcs' });
+  });
+  // Der Schweizer Gruppierungsapostroph, den weder de noch en-US kennt.
+  withFormatLocale('de', () => {
+    assert.deepEqual(__test.parseShoppingQuantity("1'000 g"), { quantity: 1, unit: 'pcs' });
+  });
+  // Ein Leerzeichen trennt dagegen zwei Angaben und schneidet nichts ab.
+  withFormatLocale('de', () => {
+    assert.deepEqual(__test.parseShoppingQuantity('6 × 1 l'), { quantity: 6, unit: 'pcs' });
+  });
+});
+
+test('parseShoppingQuantity: der Trenner der Region bleibt der Trenner, auch nach der Gruppierungspruefung', () => {
+  // Gegenprobe zur REIHENFOLGE in toDecimalString. Wuerde die Gruppierung erst
+  // nach dem Ersetzen des Dezimaltrenners geprueft, waere „1,000" in de schon ein
+  // „1.000" - und der Punkt IST dort das Gruppierungszeichen. Eine gueltige
+  // Menge von einem Gramm floege dann als vermeintlich gruppiert raus.
+  withFormatLocale('de', () => {
+    assert.deepEqual(__test.parseShoppingQuantity('1,000 g'), { quantity: 1, unit: 'g' });
+  });
+  withFormatLocale('en-US', () => {
+    assert.deepEqual(__test.parseShoppingQuantity('1.000 g'), { quantity: 1, unit: 'g' });
   });
 });

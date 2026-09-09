@@ -1125,22 +1125,31 @@ function scaleQuantityText(quantity, factor) {
 
   // Erst umschreiben, dann lesen: sonst sieht die ASCII-Regex unter fa/ar-EG
   // ueberhaupt keine Ziffer, und zwar auch nicht in einem Bruch wie „1 1/2".
-  const text = toDecimalString(quantity);
+  const original = String(quantity).trim();
+  const text = toDecimalString(original);
   if (!text) return quantity;
+
+  // Der Rest der Zeile kommt aus dem ORIGINAL, nicht aus der umgeschriebenen
+  // Fassung: umgeschrieben wird nur, was auch gerechnet wird. Sonst verloere ein
+  // zweiter Zahlenteil im Text seine Ziffern - unter fa wurde „۲ x ۵۰۰ g" zu
+  // „۴ x 500 g", also zu einer Zeile in zwei Schriften. Der Offset stimmt, weil
+  // toDecimalString positionstreu ist (ein Zeichen hinein, ein Zeichen hinaus);
+  // die Zusicherung steht dort im Kopf und haengt an einem Guard.
+  const restOf = (match, tailGroup) => original.slice(match[0].length - match[tailGroup].length);
 
   const mixed = text.match(/^(\d+)\s+(\d+)\/(\d+)(.*)$/);
   if (mixed) {
     const whole = Number(mixed[1]);
     const num = Number(mixed[2]);
     const den = Number(mixed[3]);
-    if (den > 0) return `${formatScaledQuantity((whole + (num / den)) * factor)}${mixed[4]}`;
+    if (den > 0) return `${formatScaledQuantity((whole + (num / den)) * factor)}${restOf(mixed, 4)}`;
   }
 
   const frac = text.match(/^(\d+)\/(\d+)(.*)$/);
   if (frac) {
     const num = Number(frac[1]);
     const den = Number(frac[2]);
-    if (den > 0) return `${formatScaledQuantity((num / den) * factor)}${frac[3]}`;
+    if (den > 0) return `${formatScaledQuantity((num / den) * factor)}${restOf(frac, 3)}`;
   }
 
   const dec = text.match(/^(\d+(?:\.\d+)?)(.*)$/);
@@ -1155,7 +1164,7 @@ function scaleQuantityText(quantity, factor) {
     const abgeschnitten = /^[^\s\d]\d/.test(dec[2]);
     const base = Number(dec[1]);
     if (!abgeschnitten && Number.isFinite(base)) {
-      return `${formatScaledQuantity(base * factor)}${dec[2]}`;
+      return `${formatScaledQuantity(base * factor)}${restOf(dec, 2)}`;
     }
   }
 
