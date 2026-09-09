@@ -2173,9 +2173,10 @@ test('Shopping uses the shared category manager component (Audit F-15)', () => {
   assert.match(shopping, /basePath: '\/shopping\/categories'/);
   assert.match(shopping, /shopping\.manageCategories/);
   assert.match(shopping, /category-manager-changed/);
-  // onClose muss den Listener wieder abräumen (kein Leak bei Modal-Reuse).
+  // Die Auffrischung steht im Ereignis-Handler, nicht in onClose - warum, sagt
+  // die Schwesterregel weiter unten („kein Nutzer ... meldet sich ab").
   const openMgr = shopping.match(/async function openCategoryManager[\s\S]*?\n\}/)?.[0] ?? '';
-  assert.match(openMgr, /manager\?\.removeEventListener\('category-manager-changed'/);
+  assert.match(openMgr, /const onCategoriesChanged = async \(\) => \{[\s\S]*?loadCategories\(\)/);
 
   // Die frühere Shopping-Sonderkomponente ist entfernt — kein Duplikat mehr.
   assert.equal(existsSync(new URL('../public/components/shopping-category-manager.js', import.meta.url)), false);
@@ -10127,6 +10128,165 @@ test('jeder Nutzer des Category-Managers liefert seinen eigenen Folgentext', () 
   assertKeysExistInEveryLocale([...keys]);
   const zuKnapp = [...keys].filter((key) => laenge(key) < 80);
   assert.deepEqual(zuKnapp, [], 'zu knapp fuer eine Folgenbeschreibung');
+});
+
+// Schwesterregel zur Delegation oben: derselbe Kreis von Aufrufern, dieselbe
+// Bauart des Guards (Bestand suchen, nicht Namen kennen) - nur geht es hier
+// nicht um den Text, sondern um den Zeitpunkt.
+//
+// Gemessen am 08.09.2026 im laufenden Browser: beim Loeschen fragt die
+// Komponente ueber `confirmOverModal`, und das schliesst nach einem Ja das Modal
+// darunter gleich mit ab (`closeModal({ force: true })`), BEVOR es zurueckkehrt.
+// `api.delete` laeuft erst danach, das `category-manager-changed` kommt also,
+// wenn das Element schon aus dem Dokument ist (`document.contains(el)` false).
+//
+// Wer sich in onClose abmeldet, verpasst damit ausgerechnet die Loeschung - die
+// einzige Mutation, nach der ein veralteter lokaler Stand dem Nutzer etwas
+// anbietet, das der Server nicht mehr kennt. Sieben Aufrufer taten das, bis auf
+// den Laden-Manager im Einkauf. Ein Leck droht durch das Weglassen nicht: das
+// Element entsteht je Oeffnen neu und wird mit dem Overlay verworfen.
+test('kein Nutzer des Category-Managers meldet sich vom Aenderungs-Ereignis ab', () => {
+  const nutzer = walkJsFiles('../public/').filter((file) => (
+    file !== '../public/components/category-manager.js' && read(file).includes('yuvomi-category-manager')
+  ));
+
+  // Faellt die Erkennung aus, soll der Test das sagen und nicht still bestehen.
+  assert.ok(nutzer.length >= 5, `nur ${nutzer.length} Nutzer des Category-Managers gefunden`);
+
+  for (const file of nutzer) {
+    const src = withoutBlockComments(read(file)).replace(/^\s*\/\/.*$/gm, '');
+    const label = file.slice('../public/'.length);
+    // Erst der Gegen-Nachweis, dass ueberhaupt noch jemand zuhoert: ein Aufrufer,
+    // der An- UND Abmeldung streicht, kaeme sonst gruen durch.
+    assert.match(src, /addEventListener\(\s*'category-manager-changed'/,
+      `${label}: bindet den Category-Manager ein, hoert aber nicht auf seine Aenderungen`);
+    assert.doesNotMatch(src, /removeEventListener\(\s*'category-manager-changed'/,
+      `${label}: meldet sich vom Aenderungs-Ereignis ab und verpasst damit das Loeschen - `
+      + 'die Auffrischung gehoert in den Ereignis-Handler, siehe `_notifyChanged` in der Komponente');
+  }
+});
+
+// Zwei Folgen davon, dass die Auffrischung jetzt WAEHREND des offenen Managers
+// laeuft statt nach dem Schliessen. Beide traf der Review zu #1066, beide sind
+// je Seite verschieden zu loesen - darum zwei benannte Sonden statt einer Regel.
+
+// Loeschbar ist genau die UNBENUTZTE Kategorie, also gerade die, nach der jemand
+// gefiltert haben kann. Bleibt `activeCategory` danach auf ihrem Key stehen,
+// findet die Chipleiste keinen Chip zum Hervorheben - auch „Alle" nicht - und
+// die Liste filtert weiter jeden Kontakt weg: eine leere Seite ohne sichtbaren
+// Grund.
+test('der Kontakte-Filter loest sich von einer Kategorie, die geloescht wurde', () => {
+  const fn = read('../public/pages/contacts.js').match(/function openContactCategoryManager[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.ok(fn, 'openContactCategoryManager nicht gefunden');
+  assert.match(fn, /state\.activeCategory[\s\S]*?state\.categories\.some\([\s\S]*?state\.activeCategory\s*=\s*null/,
+    'der Handler muss den aktiven Filter loesen, wenn seine Kategorie nicht mehr in der frischen Liste steht');
+});
+
+// Loeschbar ist die UNBENUTZTE Kategorie - dieselbe Falle wie bei den Kontakten,
+// nur haelt Aufgaben ihre Auswahl als Liste von Keys, die in die Server-Abfrage
+// wandert. Bleibt ein geloeschter Key darin, fragt die Seite dauerhaft nach
+// einer Kategorie, die es nicht mehr gibt.
+test('der Aufgaben-Filter loest sich von einer Kategorie, die geloescht wurde', () => {
+  const fn = read('../public/pages/tasks.js').match(/function openTaskCategoryManager[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.ok(fn, 'openTaskCategoryManager nicht gefunden');
+  assert.match(fn, /state\.filters\.category\.filter\([\s\S]*?state\.filters\.category = /,
+    'der Handler muss geloeschte Keys aus state.filters.category werfen');
+  // Die Leiste UNBEDINGT, das Nachladen nur bei geaenderter Abfrage: ein hinter
+  // dem Manager offenes Panel boete sonst die geloeschte Kategorie weiter an.
+  assert.match(fn, /renderFilters\(container\);\n\s*if \(filterBereinigt\) \{/,
+    'renderFilters gehoert VOR die Bedingung - das offene Panel veraltet sonst');
+  assert.match(fn, /if \(filterBereinigt\) \{[\s\S]*?loadTasks\(container\)/,
+    'nur die geaenderte Abfrage rechtfertigt ein Nachladen');
+});
+
+// Zwei Fallen des Einkaufs-Handlers, beide erst dadurch erreichbar, dass er
+// jetzt NACH dem Schliessen des Modals laeuft.
+test('der Einkaufs-Handler schreibt nicht in einen abgehaengten Container', () => {
+  const fn = read('../public/pages/shopping.js').match(/async function openCategoryManager[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.ok(fn, 'openCategoryManager nicht gefunden');
+  // Der Deep-Link `?manage=categories` navigiert in onClose sofort weg, und der
+  // Router baut die Seite neu auf - beim Loeschen laeuft dieser Handler danach.
+  assert.match(fn, /if \(!container\.isConnected\) return;/,
+    'der Handler muss aufgeben, wenn der Router die Seite schon ausgetauscht hat');
+  // `_notifyChanged()` dispatcht synchron und sieht die Promise dieses Listeners
+  // nie: ein Fehler beim Nachladen waere eine unbeobachtete Rejection.
+  assert.match(fn, /loadItems\(listId\)[\s\S]*?catch[\s\S]*?state\.itemsError = err/,
+    'ein Fehler beim Nachladen der Artikel gehoert in state.itemsError, nicht in eine stille Rejection');
+});
+
+// Ein Rundlauf kann von einem Listenwechsel ueberholt werden, und die Antworten
+// kommen in beliebiger Reihenfolge. Die Wache gehoert in `loadItems` selbst -
+// alle Aufrufer laden die GERADE aktive Liste, also deckt eine Stelle sie alle
+// ab (auch `switchList` und den Laden-Manager, die aelter sind als #1066).
+test('shopping: eine ueberholte Artikel-Antwort fasst den Stand nicht mehr an', () => {
+  const src = read('../public/pages/shopping.js');
+  const fn  = src.match(/async function loadItems\(listId\)[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.ok(fn, 'loadItems nicht gefunden');
+  // Vor JEDER Zuweisung an den geteilten Stand, nicht irgendwo in der Funktion.
+  const wache = fn.indexOf('if (state.activeListId !== listId) return;');
+  assert.notEqual(wache, -1, 'loadItems braucht die Wache gegen eine ueberholte Antwort');
+  assert.ok(wache < fn.indexOf('state.items'),
+    'die Wache muss VOR dem Schreiben stehen - danach ist der Stand schon zerstoert');
+
+  // Und der Handler des Kategorie-Managers darf den Fehlerfall nicht der
+  // falschen Liste anhaengen.
+  const mgr = src.match(/async function openCategoryManager[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.equal((mgr.match(/state\.activeListId !== listId/g) ?? []).length, 2,
+    'Erfolg UND Fehler muessen pruefen, ob die Liste noch dieselbe ist');
+});
+
+// Der Manager quittiert nur seine EIGENE Mutation: `_notifyChanged()` kommt erst
+// nach deren Erfolg. Was im Handler eines Aufrufers ankommt, ist deshalb immer
+// ein Fehler der AUFFRISCHUNG - und der erklaert als einziger, warum die Seite
+// den alten Stand behaelt, obwohl der Server schon umgeschrieben hat.
+//
+// Als allgemeine Regel und nicht je Seite: die erste Fassung nannte nur
+// inventory, und genau daneben blieben pantry, tasks und contacts mit demselben
+// leeren catch stehen (Review-Runde 6). Ein `catch {` ohne Bindung wirft das
+// Fehlerobjekt weg und kann per Konstruktion nichts melden; `catch (err)` mit
+// Toast besteht, ebenso ein Handler ganz ohne catch, dessen Lader selbst melden
+// (so macht es budget).
+test('kein Nutzer des Category-Managers verschluckt den Fehler seiner Auffrischung', () => {
+  const nutzer = walkJsFiles('../public/').filter((file) => (
+    file !== '../public/components/category-manager.js' && read(file).includes('yuvomi-category-manager')
+  ));
+  assert.ok(nutzer.length >= 5, `nur ${nutzer.length} Nutzer des Category-Managers gefunden`);
+
+  let geprueft = 0;
+  for (const file of nutzer) {
+    const src = read(file);
+    const label = file.slice('../public/'.length);
+    // Jede Stelle, nicht die erste: inventory mountet zwei Manager.
+    const re = /addEventListener\(\s*'category-manager-changed'/g;
+    let treffer;
+    while ((treffer = re.exec(src)) !== null) {
+      // Die umschliessende Funktion: rueckwaerts bis zur naechsten Deklaration
+      // auf Spaltenposition 0, vorwaerts bis zu ihrer schliessenden Klammer.
+      const kopf = src.lastIndexOf('\nfunction ', treffer.index);
+      const akopf = src.lastIndexOf('\nasync function ', treffer.index);
+      const von = Math.max(kopf, akopf);
+      assert.notEqual(von, -1, `${label}: umschliessende Funktion nicht gefunden`);
+      const bis = src.indexOf('\n}', treffer.index);
+      const fn = src.slice(von, bis);
+      geprueft += 1;
+      assert.doesNotMatch(fn, /catch\s*\{/,
+        `${label}: ein bindungsloses \`catch {\` wirft das Fehlerobjekt weg und kann den `
+        + 'Fehler der Auffrischung nicht melden - `catch (err)` mit Toast oder Fehlerzustand');
+    }
+  }
+  // Faellt die Erkennung der Funktionen aus, soll der Test das sagen.
+  assert.ok(geprueft >= 7, `nur ${geprueft} Handler gefunden`);
+});
+
+// Der Knopf, der den Manager oeffnet, liegt in `#budget-body` - genau dem
+// Bereich, den `renderBody()` austauscht. Nach dem Loeschen hat
+// `confirmOverModal` den Fokus schon dorthin zurueckgegeben, bevor der Handler
+// laeuft; ohne Nachfassen faellt er auf `document.body`.
+test('der Budget-Manager haelt den Fokus auf dem Knopf, den er austauscht', () => {
+  const fn = read('../public/pages/budget.js').match(/function openCategoryManager\(\)[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.ok(fn, 'openCategoryManager nicht gefunden');
+  assert.match(fn, /document\.activeElement[\s\S]*?renderBody\(\)[\s\S]*?#budget-manage-categories'\)\?\.focus\(\)/,
+    'nach renderBody() muss der Fokus auf den neuen #budget-manage-categories nachgezogen werden');
 });
 
 // Die fuenf Dialoge aus dem urspruenglichen Befund bleiben namentlich verankert:

@@ -11,6 +11,10 @@
  *   - Dispatcht nach jeder Mutation `category-manager-changed`
  *   - Zeigt Server-Guard-Fehler (in-use/last) als Toast
  *   - Räumt Listener in disconnectedCallback() auf
+ *
+ * VERTRAG FUER AUFRUFER: die Auffrischung gehoert in den Ereignis-Handler, nicht
+ * in ein onClose des Modals, und niemand meldet sich beim Schliessen ab. Grund
+ * steht bei `_notifyChanged()`.
  */
 import { api } from '/api.js';
 import { t } from '/i18n.js';
@@ -485,6 +489,24 @@ class CategoryManagerElement extends HTMLElement {
       </ul>`;
   }
 
+  /**
+   * BEIM LOESCHEN KOMMT DIESES EREIGNIS, WENN DAS ELEMENT SCHON AUS DEM DOKUMENT
+   * IST (gemessen 08.09.2026 im laufenden Browser: `document.contains(el)` ist
+   * dann false).
+   *
+   * `_delete()` fragt ueber `confirmOverModal`, und das schliesst nach einem Ja
+   * das Modal darunter gleich mit ab (`closeModal({ force: true })`), BEVOR es
+   * zurueckkehrt - `api.delete` laeuft also erst danach. Fuer die Aufrufer folgen
+   * daraus zwei Dinge, und beide gelten fuer JEDEN von ihnen:
+   *
+   *   - Kein `removeEventListener` in onClose. Wer beim Schliessen abmeldet,
+   *     verpasst genau die Loeschung - und behaelt einen lokalen Stand, der eine
+   *     Kategorie anbietet, die der Server nicht mehr kennt. Ein Leck entsteht
+   *     dadurch nicht: das Element entsteht je Oeffnen neu und wird mit dem
+   *     Overlay verworfen, der Listener geht mit ihm.
+   *   - Kein `changed`-Merker, der in onClose ausgewertet wird. Er stuende beim
+   *     Loeschen auf false. Die Auffrischung gehoert in den Handler selbst.
+   */
   _notifyChanged() {
     this.dispatchEvent(new CustomEvent('category-manager-changed', { bubbles: true }));
   }

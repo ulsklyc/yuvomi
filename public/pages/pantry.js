@@ -1170,20 +1170,31 @@ async function removeItem(item) {
 async function openLocationManager() {
   await import('/components/category-manager.js');
 
-  let changed = false;
+  // Die Auffrischung haengt am Ereignis, nicht am Schliessen: beim Loeschen
+  // raeumt `confirmOverModal` das Modal darunter ab, bevor `api.delete` laeuft
+  // (siehe `_notifyChanged` in components/category-manager.js). Ein in onClose
+  // ausgewerteter Merker stuende hier auf false, und die Filterleiste boete
+  // weiter einen Lagerort an, den es nicht mehr gibt.
   const onChanged = async () => {
-    changed = true;
     try {
       await loadPantry();
-    } catch { /* Fehler meldet der Manager selbst */ }
+      renderFilters();
+      renderList();
+    } catch (err) {
+      // NICHT „meldet der Manager selbst": der quittiert nur seine eigene
+      // Mutation, und `_notifyChanged()` kommt erst nach deren Erfolg. Was hier
+      // ankommt, ist immer ein Fehler DIESER Auffrischung - und der erklaert als
+      // einziger, warum die Seite den alten Stand behaelt.
+      console.error('[Pantry] Auffrischen nach Ort-Aenderung fehlgeschlagen:', err);
+      window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    }
   };
 
-  let manager = null;
   openSharedModal({
     title: t('pantry.manageLocations'),
     content: '<yuvomi-category-manager></yuvomi-category-manager>',
     onSave: (panel) => {
-      manager = panel.querySelector('yuvomi-category-manager');
+      const manager = panel.querySelector('yuvomi-category-manager');
       if (!manager) return;
       manager.addEventListener('category-manager-changed', onChanged);
       // Dieselbe geteilte Komponente wie Einkaufskategorien: die Lagerort-API
@@ -1201,13 +1212,7 @@ async function openLocationManager() {
         groups: [{ key: '', labelKey: '', addLabelKey: 'common.add' }],
       });
     },
-    onClose: () => {
-      manager?.removeEventListener('category-manager-changed', onChanged);
-      manager = null;
-      if (changed) {
-        renderFilters();
-        renderList();
-      }
-    },
+    // Bewusst KEIN onClose, das den Listener abmeldet - es liefe vor dem
+    // Loeschen. Das Element entsteht je Oeffnen neu und geht mit dem Overlay.
   });
 }

@@ -1513,20 +1513,47 @@ function openBulkTagDialog(taskIds, mode, container) {
 // --------------------------------------------------------
 
 function openTaskCategoryManager(container) {
-  let manager = null;
+  // Die Auffrischung haengt am Ereignis, nicht am Schliessen: beim Loeschen
+  // raeumt `confirmOverModal` das Modal darunter ab, bevor `api.delete` laeuft
+  // (siehe `_notifyChanged` in components/category-manager.js).
   const onChanged = async () => {
     try {
       const res = await api.get('/tasks/categories');
       state.categories = res.data ?? [];
+      // Loeschbar ist die UNBENUTZTE Kategorie, also gerade die, nach der jemand
+      // gefiltert haben kann. Bliebe ihr Key in `state.filters.category`, fragte
+      // die Seite den Server weiter nach einer Kategorie, die es nicht mehr
+      // gibt: dauerhaft leere Liste, dazu ein Chip, der sie weiter benennt.
+      const bekannt = new Set(state.categories.map((c) => c.key));
+      const behalten = state.filters.category.filter((key) => bekannt.has(key));
+      const filterBereinigt = behalten.length !== state.filters.category.length;
+      state.filters.category = behalten;
+      // Die Leiste IMMER neu bauen, nicht nur beim Bereinigen: das Filter-Panel
+      // kann hinter dem Manager offen stehen. Es boete sonst weiter die eben
+      // geloeschte Kategorie zur Auswahl an - ein Klick darauf installierte den
+      // toten Key erneut -, und nach Umbenennen oder Anlegen stuenden dort die
+      // alten Namen.
+      renderFilters(container);
+      if (filterBereinigt) {
+        await loadTasks(container); // die Abfrage hat sich geaendert; laedt und rendert
+        return;
+      }
       renderTaskList(container);
-    } catch { /* Fehler wurde bereits vom Manager als Toast angezeigt */ }
+    } catch (err) {
+      // NICHT „meldet der Manager selbst": der quittiert nur seine eigene
+      // Mutation, und `_notifyChanged()` kommt erst nach deren Erfolg. Was hier
+      // ankommt, ist immer ein Fehler DIESER Auffrischung - und der erklaert als
+      // einziger, warum die Seite den alten Stand behaelt.
+      console.error('[Tasks] Auffrischen nach Kategorie-Aenderung fehlgeschlagen:', err);
+      window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    }
   };
   openSharedModal({
     title: t('tasks.manageCategories'),
     content: '<yuvomi-category-manager></yuvomi-category-manager>',
     size: 'lg',
     onSave: (panel) => {
-      manager = panel.querySelector('yuvomi-category-manager');
+      const manager = panel.querySelector('yuvomi-category-manager');
       manager.addEventListener('category-manager-changed', onChanged);
       manager.configure({
         basePath: '/tasks/categories',
@@ -1537,7 +1564,8 @@ function openTaskCategoryManager(container) {
         deleteDetailKey: 'category.deleteConfirmDetail',
       });
     },
-    onClose: () => manager?.removeEventListener('category-manager-changed', onChanged),
+    // Bewusst KEIN onClose, das den Listener abmeldet - es liefe vor dem
+    // Loeschen. Das Element entsteht je Oeffnen neu und geht mit dem Overlay.
   });
 }
 

@@ -61,16 +61,37 @@ async function loadCategories() {
 async function openLocationManager() {
   await import('/components/category-manager.js');
 
-  let changed = false;
-  const onChanged = async () => { changed = true; try { await loadLocations(); } catch { /* Fehler meldet der Manager selbst */ } };
+  // Die Auffrischung haengt am Ereignis, nicht am Schliessen: beim Loeschen
+  // raeumt `confirmOverModal` das Modal darunter ab, bevor `api.delete` laeuft
+  // (siehe `_notifyChanged` in components/category-manager.js). Ein in onClose
+  // ausgewerteter Merker stuende hier auf false - und genau das Loeschen ist
+  // der Fall, der die Liste veralten laesst.
+  const onChanged = async () => {
+    try {
+      await loadLocations();
+      // Loeschen einer Location NULLt location_id betroffener Items
+      // server-seitig - die Liste muss neu geladen werden, sonst zeigt sie
+      // veraltete location_path-Werte bis zum naechsten vollen Reload.
+      await loadItems();
+      renderList();
+      updateAttentionBadge();
+    } catch (err) {
+      // NICHT „meldet der Manager selbst": der meldet nur seine eigene
+      // Mutation, und die ist hier schon durch - `_notifyChanged()` kommt erst
+      // nach ihrem Erfolg. Was hier ankommt, ist ein Fehler DIESER
+      // Auffrischung, und ohne Meldung zeigte die Seite den alten Stand
+      // weiter, obwohl der Server die Gegenstaende bereits umgehaengt hat.
+      console.error('[Inventory] Auffrischen nach Ort-Aenderung fehlgeschlagen:', err);
+      window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    }
+  };
 
-  let manager = null;
   openSharedModal({
     title: t('inventory.manageLocations'),
     size: 'lg',
     content: '<yuvomi-category-manager></yuvomi-category-manager>',
     onSave: (panel) => {
-      manager = panel.querySelector('yuvomi-category-manager');
+      const manager = panel.querySelector('yuvomi-category-manager');
       manager.addEventListener('category-manager-changed', onChanged);
       manager.configure({
         basePath: '/inventory/locations',
@@ -83,18 +104,8 @@ async function openLocationManager() {
         subDeleteDetailKey: 'inventory.locationDeleteConfirmDetail',
       });
     },
-    onClose: async () => {
-      manager?.removeEventListener('category-manager-changed', onChanged);
-      manager = null;
-      if (changed) {
-        // Loeschen einer Location NULLt location_id betroffener Items
-        // server-seitig - die Liste muss neu geladen werden, sonst zeigt sie
-        // veraltete location_path-Werte bis zum naechsten vollen Reload.
-        await loadItems();
-        renderList();
-        updateAttentionBadge();
-      }
-    },
+    // Bewusst KEIN onClose, das den Listener abmeldet - es liefe vor dem
+    // Loeschen. Das Element entsteht je Oeffnen neu und geht mit dem Overlay.
   });
 }
 
@@ -104,15 +115,30 @@ async function openLocationManager() {
 async function openCategoryManager() {
   await import('/components/category-manager.js');
 
-  let changed = false;
-  const onChanged = async () => { changed = true; try { await loadCategories(); } catch { /* Fehler meldet der Manager selbst */ } };
+  // Wie bei den Orten: das Ereignis traegt die Auffrischung, nicht das
+  // Schliessen (siehe `_notifyChanged` in components/category-manager.js).
+  const onChanged = async () => {
+    try {
+      await loadCategories();
+      // Loeschen einer Kategorie weist betroffene Items server-seitig
+      // 'other' zu - die Liste muss neu geladen werden, sonst zeigt sie
+      // veraltete category_name-Werte bis zum naechsten vollen Reload.
+      await loadItems();
+      renderList();
+      updateAttentionBadge();
+    } catch (err) {
+      // Wie beim Ort-Manager: hier landet nur ein Fehler der Auffrischung,
+      // nie einer der Mutation - die hat der Manager schon quittiert.
+      console.error('[Inventory] Auffrischen nach Kategorie-Aenderung fehlgeschlagen:', err);
+      window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    }
+  };
 
-  let manager = null;
   openSharedModal({
     title: t('inventory.manageCategories'),
     content: '<yuvomi-category-manager></yuvomi-category-manager>',
     onSave: (panel) => {
-      manager = panel.querySelector('yuvomi-category-manager');
+      const manager = panel.querySelector('yuvomi-category-manager');
       manager.addEventListener('category-manager-changed', onChanged);
       manager.configure({
         basePath: '/inventory/categories',
@@ -124,18 +150,8 @@ async function openCategoryManager() {
         deleteDetailKey: 'inventory.categoryDeleteConfirmDetail',
       });
     },
-    onClose: async () => {
-      manager?.removeEventListener('category-manager-changed', onChanged);
-      manager = null;
-      if (changed) {
-        // Loeschen einer Kategorie weist betroffene Items server-seitig
-        // 'other' zu - die Liste muss neu geladen werden, sonst zeigt sie
-        // veraltete category_name-Werte bis zum naechsten vollen Reload.
-        await loadItems();
-        renderList();
-        updateAttentionBadge();
-      }
-    },
+    // Bewusst KEIN onClose, das den Listener abmeldet - es liefe vor dem
+    // Loeschen. Das Element entsteht je Oeffnen neu und geht mit dem Overlay.
   });
 }
 

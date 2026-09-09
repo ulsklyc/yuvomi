@@ -2052,6 +2052,16 @@ async function loadStores() {
 
 async function loadItems(listId) {
   const data       = await api.get(`/shopping/${listId}/items`);
+  // Ein Rundlauf kann von einem Listenwechsel ueberholt werden. Alle sechs
+  // Aufrufer laden die GERADE aktive Liste - `switchList` setzt
+  // `state.activeListId` sogar vor dem Warten -, die Antworten kommen aber in
+  // beliebiger Reihenfolge zurueck. Wer nicht mehr die aktive Liste ist, darf
+  // den globalen Stand nicht mehr anfassen: sonst stuenden die Artikel der
+  // alten Liste unter dem neuen Reiter, und die naechste Bearbeitung traefe
+  // die falschen. Das Fenster ist seit #1066 breiter geworden, weil die
+  // Auffrischung des Kategorie-Managers laeuft, waehrend die Seite wieder
+  // bedienbar ist.
+  if (state.activeListId !== listId) return;
   state.items      = data.data ?? [];
   state.activeList = data.list ?? null;
   // Kategorien aus API-Antwort übernehmen wenn vorhanden (immer aktuell)
@@ -2359,20 +2369,66 @@ function openStoreManager(container) {
 async function openCategoryManager(container, { fromDeepLink = false } = {}) {
   const { openModal } = await import('/components/modal.js');
 
-  let changed = false;
   // Die geteilte Komponente (Audit F-15) dispatcht ohne Detail — der lokale
   // State wird nach jeder Mutation frisch vom Server geladen.
+  //
+  // Und wie beim Laden-Manager oben haengt die Auffrischung am Ereignis, nicht
+  // am Schliessen: beim Loeschen raeumt `confirmOverModal` das Modal darunter
+  // ab, bevor `api.delete` laeuft. Ein in onClose ausgewerteter `changed`-Merker
+  // stuende genau dann auf false, und die sichtbare Liste behielte ihre
+  // Gruppierung nach einer Kategorie, die es nicht mehr gibt.
+  //
+  // Und es reichen NICHT die Kategorien allein. Anders als Aufgaben, Kontakte
+  // und Budget, die ueber einen stabilen `key` zeigen, steht die Kategorie im
+  // Einkauf als NAME in `shopping_items.category` - der Server schreibt also in
+  // die Artikelzeilen: Umbenennen per `UPDATE shopping_items SET category = ?`,
+  // Loeschen weist sie der naechsten Kategorie zu. `loadCategories()` fasst
+  // `state.items` nicht an, und `groupItemsByCategory` liest den Namen von dort;
+  // die Zeilen landeten sonst unter der alten Ueberschrift am Listenende.
   const onCategoriesChanged = async () => {
-    changed = true;
+    // Die Seite kann unter diesem Handler weggezogen sein. Kommt der Manager
+    // aus dem Deep-Link `?manage=categories`, navigiert onClose sofort auf
+    // /shopping - und weil diese Seite kein `update()` anbietet, baut der Router
+    // sie ganz neu auf (`content.replaceChildren(...)` plus frisches
+    // `render()`). Beim Loeschen laeuft dieser Handler erst DANACH: `container`
+    // waere ein abgehaengter Knoten, und der neue Aufbau hat ohnehin schon
+    // frisch geladen. Dieselbe Regel wie bei der Sammelaktions-Pille (#1039).
+    if (!container.isConnected) return;
     await loadCategories();
+    const listId = state.activeListId;
+    if (listId) {
+      try {
+        await loadItems(listId);
+        // Hat der Nutzer waehrenddessen die Liste gewechselt, gehoert das
+        // Rendern `switchList` - `loadItems` hat den Stand oben schon
+        // unangetastet gelassen.
+        if (state.activeListId !== listId) return;
+        state.itemsError = null;
+      } catch (err) {
+        // Ohne dieses catch bliebe eine unbeobachtete Rejection zurueck:
+        // `_notifyChanged()` dispatcht synchron und sieht die Promise dieses
+        // Listeners nie. Der Server hat die Artikel dann schon umgeschrieben,
+        // und die Liste zeigte stillschweigend den alten Stand weiter - hier
+        // stattdessen die Fehlerkarte mit Wiederholung, wie bei `switchList`.
+        console.error('[Shopping] loadItems Fehler:', err);
+        // Auch der Fehlerfall gehoert der Liste, fuer die geladen wurde: sonst
+        // leerte ein Fehler der alten Liste die Artikel der neuen.
+        if (state.activeListId !== listId) return;
+        state.items      = [];
+        state.itemsError = err;
+      }
+    }
+    if (state.activeList) {
+      renderListContent(container);
+      wireListContentEvents(container);
+    }
   };
 
-  let manager = null;
   openModal({
     title: t('shopping.manageCategories'),
     content: '<yuvomi-category-manager></yuvomi-category-manager>',
     onSave: (panel) => {
-      manager = panel.querySelector('yuvomi-category-manager');
+      const manager = panel.querySelector('yuvomi-category-manager');
       if (!manager) return;
       manager.addEventListener('category-manager-changed', onCategoriesChanged);
       manager.configure({
@@ -2385,15 +2441,10 @@ async function openCategoryManager(container, { fromDeepLink = false } = {}) {
         deleteDetailKey: 'shopping.categoryDeleteConfirmDetail',
       });
     },
+    // onClose traegt nur noch, was wirklich am Schliessen haengt. Kein
+    // Listener-Abmelden: das liefe vor dem Loeschen, und das Element entsteht
+    // je Oeffnen neu und geht mit dem Overlay.
     onClose: () => {
-      // Listener-Cleanup, damit beim Modal-Reuse kein Leak entsteht.
-      manager?.removeEventListener('category-manager-changed', onCategoriesChanged);
-      manager = null;
-      // Bei Mutationen die sichtbare Liste neu aufbauen (Gruppierung/Quick-Add-Select).
-      if (changed && state.activeList) {
-        renderListContent(container);
-        wireListContentEvents(container);
-      }
       // Deep-Link-Query entfernen, wenn der Manager über die URL geöffnet wurde.
       if (fromDeepLink && new URLSearchParams(window.location.search).has('manage')) {
         window.yuvomi?.navigate?.('/shopping');

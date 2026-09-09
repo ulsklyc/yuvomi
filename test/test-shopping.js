@@ -109,16 +109,33 @@ test('Geteilter Category-Manager erfüllt die Web-Component-Verträge (Einkauf, 
   assert(/removeEventListener/.test(disconnectFn), 'disconnectedCallback muss Listener entfernen');
 });
 
-test('Shopping-Seite räumt den category-manager-changed-Listener in onClose ab', () => {
+test('Der Kategorie-Manager frischt im Ereignis auf, nicht beim Schliessen', () => {
   const source = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
   const fn = source.match(/async function openCategoryManager[\s\S]*?\n\}/)?.[0] ?? '';
   assert(fn, 'openCategoryManager muss auffindbar sein');
-  // Manager-Referenz im äußeren Scope, damit onClose ihn abräumen kann (kein Leak bei Modal-Reuse).
-  assert(/let manager = null/.test(fn), 'Manager-Referenz muss im äußeren Scope gehalten werden');
   assert(/manager\.addEventListener\('category-manager-changed'/.test(fn), 'onSave muss den Listener registrieren');
   assert(/manager\.configure\(\{/.test(fn), 'onSave muss die geteilte Komponente konfigurieren');
   assert(/labelResolver:\s*\(item\) => categoryLabel\(item\.name\)/.test(fn), 'labelResolver muss Default-Kategorien lokalisieren');
-  assert(/manager\?\.removeEventListener\('category-manager-changed'/.test(fn), 'onClose muss den Listener wieder entfernen');
+  // Frueher stand hier die Umkehrung: onClose MUSSTE abmelden. Gemessen am
+  // 08.09.2026 kommt das Ereignis beim Loeschen erst, wenn das Element schon
+  // aus dem Dokument ist (`confirmOverModal` raeumt das Modal darunter ab,
+  // `api.delete` laeuft danach) - die Abmeldung verpasste also genau die
+  // Loeschung, und der gleichfalls in onClose ausgewertete `changed`-Merker
+  // stand dabei auf false. Beides ist jetzt gesperrt.
+  assert(!/removeEventListener\('category-manager-changed'/.test(fn), 'onClose darf sich nicht abmelden - das liefe vor dem Loeschen');
+  assert(/const onCategoriesChanged = async \(\) => \{[\s\S]*?loadCategories\(\)[\s\S]*?renderListContent\(container\)/.test(fn),
+    'die Auffrischung der sichtbaren Liste gehoert in den Ereignis-Handler');
+  // Und die Artikel muessen mit: der Einkauf haelt die Kategorie als NAME in
+  // `shopping_items.category`, also schreibt der Server beim Umbenennen und
+  // beim Loeschen in die Artikelzeilen (`UPDATE shopping_items SET category`).
+  // `loadCategories()` fasst `state.items` nicht an, und `groupItemsByCategory`
+  // liest den Namen von dort - ohne Nachladen stehen die Zeilen unter der alten
+  // Ueberschrift am Listenende.
+  // `listId` statt `state.activeListId`: der Nutzer kann waehrend des Rundlaufs
+  // die Liste wechseln, und dann gehoert weder das Schreiben noch das Rendern
+  // mehr diesem Handler.
+  assert(/const onCategoriesChanged = async \(\) => \{[\s\S]*?const listId = state\.activeListId;[\s\S]*?loadItems\(listId\)[\s\S]*?renderListContent\(container\)/.test(fn),
+    'der Handler muss auch die Artikel nachladen - der Server weist sie beim Loeschen um');
 });
 
 let listId, list2Id, itemId1, itemId2, itemId3;

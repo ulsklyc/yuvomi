@@ -357,21 +357,39 @@ function renderCategoryFilters() {
 }
 
 function openContactCategoryManager() {
-  let manager = null;
+  // Die Auffrischung haengt am Ereignis, nicht am Schliessen: beim Loeschen
+  // raeumt `confirmOverModal` das Modal darunter ab, bevor `api.delete` laeuft
+  // (siehe `_notifyChanged` in components/category-manager.js).
   const onChanged = async () => {
     try {
       const res = await api.get('/contacts/categories');
       state.categories = res.data ?? [];
+      // Der aktive Filter kann auf die eben geloeschte Kategorie zeigen -
+      // loeschbar ist genau die UNBENUTZTE, also gerade die, nach der jemand
+      // gefiltert haben kann. `renderCategoryFilters` faende dann keinen Chip
+      // zum Hervorheben (auch „Alle" nicht, denn `activeCategory` ist gesetzt),
+      // waehrend `filterContacts` weiter jeden Kontakt wegfiltert: eine leere
+      // Seite, der man nicht ansieht, warum sie leer ist.
+      if (state.activeCategory && !state.categories.some((c) => c.key === state.activeCategory)) {
+        state.activeCategory = null;
+      }
       renderCategoryFilters();
       renderList();
-    } catch { /* Fehler wurde bereits vom Manager als Toast angezeigt */ }
+    } catch (err) {
+      // NICHT „meldet der Manager selbst": der quittiert nur seine eigene
+      // Mutation, und `_notifyChanged()` kommt erst nach deren Erfolg. Was hier
+      // ankommt, ist immer ein Fehler DIESER Auffrischung - und der erklaert als
+      // einziger, warum die Seite den alten Stand behaelt.
+      console.error('[Contacts] Auffrischen nach Kategorie-Aenderung fehlgeschlagen:', err);
+      window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    }
   };
   openSharedModal({
     title: t('contacts.manageCategories'),
     content: '<yuvomi-category-manager></yuvomi-category-manager>',
     size: 'lg',
     onSave: (panel) => {
-      manager = panel.querySelector('yuvomi-category-manager');
+      const manager = panel.querySelector('yuvomi-category-manager');
       manager.addEventListener('category-manager-changed', onChanged);
       manager.configure({
         basePath: '/contacts/categories',
@@ -383,7 +401,8 @@ function openContactCategoryManager() {
         colors: state.categoryColors,
       });
     },
-    onClose: () => manager?.removeEventListener('category-manager-changed', onChanged),
+    // Bewusst KEIN onClose, das den Listener abmeldet - es liefe vor dem
+    // Loeschen. Das Element entsteht je Oeffnen neu und geht mit dem Overlay.
   });
 }
 
