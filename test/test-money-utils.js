@@ -198,7 +198,7 @@ test('breaksOffAtSeparator: nur echte Trennzeichen zaehlen, kein Multiplikator',
   assert.equal(breaksOffAtSeparator('\u202F000 g'), false);
 });
 
-test('toStoredNumber: Trenner aus der Region, Ziffern in ASCII', () => {
+test('toStoredNumber: Ziffern immer ASCII, Trenner der Region soweit serverlesbar', () => {
   // Der geschriebene Wert wird gespeichert und serverseitig mit einer ASCII-Regex
   // wieder gelesen (parseQuantity in server/services/shopping-import.js). Die
   // Ziffern sind damit Datenformat, der Trenner bleibt Anzeige.
@@ -216,8 +216,24 @@ test('toStoredNumber: Trenner aus der Region, Ziffern in ASCII', () => {
   // Der Trenner folgt der Region, die Ziffern nicht.
   withFormatLocale('de', () => { assert.equal(toStoredNumber(4.5), '4,5'); });
   withFormatLocale('fr', () => { assert.equal(toStoredNumber(4.5), '4,5'); });
+  withFormatLocale('cs', () => { assert.equal(toStoredNumber(4.5), '4,5'); });
   withFormatLocale('en-US', () => { assert.equal(toStoredNumber(4.5), '4.5'); });
+  withFormatLocale('de-CH', () => { assert.equal(toStoredNumber(4.5), '4.5'); });
   withFormatLocale('fa', () => { assert.equal(toStoredNumber(2000), '2000'); });
+
+  // Die GRENZE der Zusicherung, ausdruecklich gemessen: fa, ar-EG und ar-SA
+  // fuehren mit `٫` einen dritten Dezimaltrenner, den `parseQuantity` nicht
+  // kennt. Dort gewinnt die Lesbarkeit und es wird der Punkt. Vorher stand nur
+  // „Trenner aus der Region" in der Doku und im Test - gemessen waren aber
+  // ausschliesslich Regionen, in denen das zufaellig stimmt.
+  for (const locale of ['fa', 'ar-EG', 'ar-SA']) {
+    const regionsTrenner = new Intl.NumberFormat(locale, { minimumFractionDigits: 1 })
+      .formatToParts(1.5).find((part) => part.type === 'decimal').value;
+    assert.equal(regionsTrenner, '٫', `${locale} sollte ٫ fuehren`);
+    withFormatLocale(locale, () => {
+      assert.equal(toStoredNumber(0.5), '0.5', `${locale}: der Trenner muss serverlesbar sein`);
+    });
+  }
   // Ohne Gruppierung, sonst laese toDecimalString den Wert nicht wieder ein.
   withFormatLocale('de', () => { assert.equal(toStoredNumber(2000), '2000'); });
 });

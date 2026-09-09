@@ -1175,8 +1175,8 @@ function scaleQuantityText(quantity, factor) {
 }
 
 /**
- * Die skalierte Zahl als Text: hoechstens zwei Nachkommastellen, Trenner aus der
- * Region, Ziffern in ASCII, ohne Tausendergruppierung.
+ * Die skalierte Zahl als Text: hoechstens zwei Nachkommastellen, Ziffern in
+ * ASCII, Trenner aus der Region soweit serverlesbar, ohne Gruppierung.
  *
  * Warum die Ziffern NICHT der Region folgen, obwohl der Trenner es tut: dieser
  * Text wird in die Zutatenzeile geschrieben und gespeichert, und beim Uebertrag

@@ -24,7 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   notation the household reads, and the app can read its own output again the next time. The digits
   of a scaled amount stay ASCII on purpose: the text is saved into the ingredient row and read back
   when the meal moves to the shopping list, and a quantity in native digits would not arrive there
-  and would drop out of the totals. The separator is presentation; the digits are data.
+  and would drop out of the totals. The separator is presentation and follows the region wherever
+  the region uses one the server reads - a comma in German, French or Czech, a dot in US English or
+  Swiss German. Persian and Arabic use a third one, and there readability wins and the dot is
+  written.
 
   A grouped quantity is refused rather than guessed, and refusing here means the line is left exactly
   as it was: the quantity is the ingredient's own text, and the original is the only answer that

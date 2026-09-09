@@ -801,7 +801,10 @@ test('keine Seite schreibt einen Dezimaltrenner von Hand um', () => {
   //  - `numberingSystem: 'latn'` haelt die ZIFFERN in ASCII, weil dieser Text
   //    gespeichert und von parseQuantity (server/services/shopping-import.js)
   //    mit einer ASCII-Regex wieder gelesen wird - "۲۰۰۰ g" kaeme dort nicht an
-  //    und fiele aus der Summierung der Einkaufsliste;
+  //    und fiele aus der Summierung der Einkaufsliste. Es stellt Ziffern UND
+  //    Symbole gemeinsam um, und genau das ist hier richtig: fa/ar fuehren mit
+  //    `٫` einen Trenner, den parseQuantity ebenfalls nicht kennt. Die Grenze
+  //    der Zusicherung ist in test-money-utils.js gemessen;
   //  - ohne `useGrouping: false` schriebe sie einen Wert, den toDecimalString
   //    beim naechsten Skalieren abweist.
   const gespeichert = clean.match(/export function toStoredNumber[\s\S]*?\n\}/);
