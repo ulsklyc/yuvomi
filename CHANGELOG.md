@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Scaling a recipe now reads and writes ingredient quantities in the region that is actually
+  set.** Applying a recipe to a meal and changing the servings factor rescales every ingredient, and
+  that step parsed the number itself with the comma hard-wired as a decimal point. Under a region
+  that groups thousands with a comma, "1,000 g" was therefore scaled up from **1**, putting an
+  ingredient in the recipe a thousandfold too small with nothing to show for it. Under Persian or
+  Egyptian Arabic the number was not recognised at all, so that line stayed at its original amount
+  between correctly scaled siblings - the recipe was simply wrong.
+
+  The result was written the same way it was read: the separator was copied off the input, so a "1.5"
+  mirrored in from Mealie or Tandoor stayed "1.5" in a German kitchen. Both directions now follow the
+  set region - the reading side through the same transliteration as prices and shopping quantities,
+  the writing side through the same number format - so a scaled quantity comes back out in the
+  notation the household reads, and the app can read its own output again the next time.
+
+  A grouped quantity is refused rather than guessed, and refusing here means the line is left exactly
+  as it was: the quantity is the ingredient's own text, and the original is the only answer that
+  invents nothing. The same applies to a number that breaks off mid-separator - "1,5 kg" under a
+  region where the comma separates nothing would otherwise have been read as 1. Fractions ("1 1/2
+  cups"), plain amounts and free text like "a pinch" keep behaving as they did.
+
 - **A quantity like "1,000 g" on the shopping list is no longer read as 1 before it goes into the
   pantry.** Taking a checked item over to the pantry pre-fills the quantity field from the free text
   on the row, and that step parsed the number itself, with the comma hard-wired as a decimal point.

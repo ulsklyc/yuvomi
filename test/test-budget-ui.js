@@ -717,7 +717,7 @@ test('nur der Trenner der Region wird zum Dezimalpunkt', () => {
   assert.match(impl, /\\\\d\{3\}/, 'erkannt wird das Muster (drei Ziffern), nicht das blosse Zeichen');
 });
 
-test('jede eingetippte Zahl im Einkauf nutzt dieselbe Umschrift wie die Betragsfelder', () => {
+test('keine Seite schreibt einen Dezimaltrenner von Hand um', () => {
   // Der Einkauf speichert Preise als ganze Cent (#1003) und brauchte dafuer
   // zwei Umrechnungen. Als sie in pages/shopping.js standen, war die eine ein
   // `replace(',', '.')`: unter en-US wird "1,000" damit zur Zahl 1, unter ar/fa
@@ -750,11 +750,6 @@ test('jede eingetippte Zahl im Einkauf nutzt dieselbe Umschrift wie die Betragsf
   assert.match(einkauf, /amountInputToCents\(priceRoh/,
     'der Preis muss durch amountInputToCents laufen');
 
-  // Keine handgeschriebene Umschrift mehr, an keiner Zahl der Datei: weder
-  // `replace(',', '.')` noch `replace(/,/g, '.')`.
-  assert.doesNotMatch(einkauf, /\.replace\(\s*(?:'[,.]'|"[,.]"|\/[,.]\/[a-z]*)\s*,/,
-    'shopping.js schreibt einen Trenner wieder von Hand um - toDecimalString aus utils/money.js nutzen');
-
   // Und die Mengenangabe laeuft positiv durch dieselbe Umschrift. Das Verhalten
   // dahinter (de "1.000 g", en-US "1,000 g", fa/ar-EG in oestlichen Ziffern) misst
   // test-shopping-ux.js an der echten Funktion - hier steht nur die Sperre gegen
@@ -763,6 +758,38 @@ test('jede eingetippte Zahl im Einkauf nutzt dieselbe Umschrift wie die Betragsf
   assert.ok(menge, 'parseShoppingQuantity nicht gefunden');
   assert.match(menge[0], /toDecimalString\(/,
     'die Mengenangabe muss durch dieselbe Umschrift laufen wie der Preis');
+
+  // Dasselbe fuer das Skalieren einer Zutatenmenge (pages/meals.js): es LIEST eine
+  // Zahl und SCHREIBT sie wieder, und beide Richtungen haengen an der Region. Die
+  // Ausgabe schaute sich den Trenner vorher aus der Eingabe ab (`useComma`) - eine
+  // aus Mealie gespiegelte "1.5" blieb damit auch in einer deutschen Oberflaeche
+  // eine "1.5". Verhalten in test-meals.js.
+  const rezept = withoutComments(read('../public/pages/meals.js'));
+  const skalieren = rezept.match(/function scaleQuantityText[\s\S]*?\n\}/);
+  assert.ok(skalieren, 'scaleQuantityText nicht gefunden');
+  assert.match(skalieren[0], /toDecimalString\(/,
+    'die gelesene Menge muss durch dieselbe Umschrift laufen');
+  assert.doesNotMatch(skalieren[0], /useComma/,
+    'der Trenner der Ausgabe darf nicht aus der Eingabe abgeschaut werden - getNumberFormat nutzen');
+  assert.match(rezept, /function formatScaledQuantity[\s\S]*?getNumberFormat\(/,
+    'die skalierte Menge muss im Zahlformat der Region geschrieben werden');
+  // Ohne useGrouping:false schriebe die Funktion einen Wert, den toDecimalString
+  // beim naechsten Skalieren abweist - die Zeile liest ihre eigene Ausgabe wieder ein.
+  assert.match(rezept, /function formatScaledQuantity[\s\S]*?useGrouping:\s*false/,
+    'die skalierte Menge darf nicht gruppiert sein');
+
+  // Und die Regel gilt fuer JEDE Seite, nicht fuer die drei, die bisher aufgefallen
+  // sind: weder `replace(',', '.')` noch `replace(/,/g, '.')`. Genau das Auslassen
+  // einer bekannten Fundstelle hat die Mengenzeile des Einkaufs offengehalten.
+  const seiten = readdirSync(new URL('../public/pages/', import.meta.url)).filter((f) => f.endsWith('.js'));
+  assert.ok(seiten.length > 10, `zu wenige Seiten gefunden (${seiten.length})`);
+  for (const datei of seiten) {
+    assert.doesNotMatch(
+      withoutComments(read(`../public/pages/${datei}`)),
+      /\.replace\(\s*(?:'[,.]'|"[,.]"|\/[,.]\/[a-z]*)\s*,\s*(?:'[,.]'|"[,.]")\s*\)/,
+      `pages/${datei} schreibt einen Trenner von Hand um - toDecimalString aus utils/money.js nutzen`,
+    );
+  }
 });
 
 test('ein Abo darf null kosten', () => {

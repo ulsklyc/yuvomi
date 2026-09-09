@@ -594,6 +594,94 @@ test('Wochenberechnung: Montag der aktuellen Woche', () => {
 });
 
 // --------------------------------------------------------
+// Rezept skalieren: Zutatenmengen (Umschrift nach Region)
+// --------------------------------------------------------
+
+/**
+ * Fuehrt `fn` unter einer anderen Format-Locale aus. Die Locale ist im Browser
+ * eine Haushalts-Einstellung und entscheidet ueber Ziffernsystem, Trenner und
+ * Gruppierung; der Browser-Loader dieser Suite liest sie aus
+ * `globalThis.__formatLocale` (Standard 'de').
+ */
+function withFormatLocale(locale, fn) {
+  const vorher = globalThis.__formatLocale;
+  globalThis.__formatLocale = locale;
+  try { fn(); } finally { globalThis.__formatLocale = vorher; }
+}
+
+/** Kurzform fuer die Erwartung einer skalierten Menge. */
+function scaled(locale, quantity, factor, erwartet) {
+  let ist;
+  withFormatLocale(locale, () => { ist = mealsUi.scaleQuantityText(quantity, factor); });
+  assert(ist === erwartet, `${locale}: "${quantity}" x${factor} -> "${ist}", erwartet "${erwartet}"`);
+}
+
+test('Skalieren: die gewoehnlichen Zutatenmengen rechnen wie bisher', () => {
+  scaled('de', '250 g', 2, '500 g');
+  scaled('de', '1 kg', 2, '2 kg');
+  scaled('de', '3 EL', 0.5, '1,5 EL');
+  scaled('de', '1 Zwiebel', 3, '3 Zwiebel');
+  // Brueche: gemischt und einfach, beide weiter erkannt.
+  scaled('de', '1 1/2 Tassen', 2, '3 Tassen');
+  scaled('de', '1/2 TL', 3, '1,5 TL');
+  // Ohne Zahl gibt es nichts zu rechnen - die Zeile bleibt, wie sie dasteht.
+  scaled('de', 'eine Prise', 2, 'eine Prise');
+  // Faktor 1 fasst nichts an, auch keine Schreibweise.
+  scaled('de', '1.5 kg', 1, '1.5 kg');
+});
+
+test('Skalieren: Trenner und Ziffern der Ausgabe folgen der Region, nicht der Eingabe', () => {
+  // Vorher schaute sich die Funktion den Trenner aus der Eingabe ab (`useComma`).
+  // Eine aus Mealie gespiegelte "1.5" blieb damit in einer deutschen Oberflaeche
+  // eine "1.5" - die Anzeige richtete sich nach der Herkunft der Zutat statt nach
+  // dem Haushalt, der sie liest.
+  scaled('de', '1.5 kg', 3, '4,5 kg');
+  scaled('en-US', '1,5 kg', 3, '1,5 kg');   // in en-US ist das Komma kein Trenner
+  scaled('en-US', '1.5 kg', 3, '4.5 kg');
+  // Und die Eingabe wird in derselben Region gelesen: in de trennt das Komma.
+  scaled('de', '1,5 kg', 2, '3 kg');
+});
+
+test('Skalieren: eine gruppierte Menge wird abgewiesen, nicht geraten', () => {
+  // Der Kern des Fehlers. Unter en-US gruppiert das Komma Tausender: "1,000 g"
+  // heisst tausend Gramm. Die alte Fassung las daraus die Basis 1 und
+  // multiplizierte die - eine Zutat, die um den Faktor 1000 zu klein im Rezept
+  // stand, ohne dass irgendwo etwas erschien.
+  //
+  // Abgewiesen heisst hier UNVERAENDERT, nicht "1 Stueck" wie im Einkauf: die
+  // Menge IST der Text der Zutat, und der Originaltext ist die einzige Antwort,
+  // die nichts erfindet.
+  scaled('en-US', '1,000 g', 2, '1,000 g');
+  scaled('de', '1.000 g', 2, '1.000 g');
+  // Gegenprobe zur Regel selbst: in de trennt das Komma, "1,000" IST dort eins.
+  scaled('de', '1,000 g', 2, '2 g');
+  scaled('en-US', '1.000 g', 2, '2 g');
+});
+
+test('Skalieren: oestliche Ziffern kommen ueberhaupt an', () => {
+  // `\d` ist in JavaScript ASCII. Unter fa oder ar-EG traf die alte Regex die
+  // Ziffern der eigenen Oberflaeche nicht - die Zeile blieb ungeskaliert zwischen
+  // skalierten Geschwistern stehen, was ein falsches Rezept ergibt.
+  scaled('fa', '۲۵۰ g', 2, '۵۰۰ g');
+  scaled('ar-EG', '١٫٥ kg', 2, '٣ kg');
+  // Ein anderes Ziffernsystem als das der Region bleibt unangetastet: fa
+  // schreibt ۱, nicht ١.
+  scaled('fa', '١٫٥ kg', 2, '١٫٥ kg');
+});
+
+test('Skalieren: eine mitten im Trenner abgeschnittene Zahl bleibt stehen', () => {
+  // Unter fa ist das ASCII-Komma weder Dezimal- noch Gruppierungszeichen. Ohne
+  // diese Pruefung laese die Regex nur die "1" und schriebe "۲,5 kg" - eine
+  // halbierte Zutat in einer Schreibweise, die es in keiner Region gibt.
+  scaled('fa', '1,5 kg', 2, '1,5 kg');
+  scaled('ar-EG', '1,5 kg', 2, '1,5 kg');
+  // Auch der Schweizer Gruppierungsapostroph, den keine der beiden Regionen kennt.
+  scaled('de', "1'000 g", 2, "1'000 g");
+  // Ein Leerzeichen trennt dagegen zwei Angaben und schneidet nichts ab.
+  scaled('de', '2 x 500 g', 2, '4 x 500 g');
+});
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 console.log(`\n[Meals-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);
