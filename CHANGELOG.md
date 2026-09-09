@@ -230,6 +230,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unreadable. "1,5 kg", "250 g" and "6 x 1 l" keep reading exactly as they
   did.
 
+- **Closing a dialog no longer drops keyboard focus when the button that opened it was re-rendered
+  meanwhile**. The shared modal layer remembers the element that opened it and hands focus back on
+  close. If the page had swapped that button out in the meantime - the category manager re-renders
+  its section after every rename, reorder or new entry, while the dialog is still open - the
+  remembered pointer referred to a node no longer in the document. Calling `focus()` on it does
+  nothing at all, silently: focus fell to `document.body`, and anyone working by keyboard or screen
+  reader lost their place in the page and had to tab in from the top.
+
+  The layer now checks whether the remembered element is still connected, and falls back in two
+  steps: it looks for a live element under the same id, which finds the button that was rebuilt in
+  the same spot, and otherwise puts focus on the page root - the same target the skip link uses. Not
+  a good place, but a place inside the page, which `document.body` is not. The root is made
+  focusable first: the app shell gives it `tabindex="-1"`, but the five auth pages render their own
+  `<main id="main-content">` without one, and focusing an element that cannot take focus is the very
+  no-op this entry is about.
+
+  Measured across the seven callers of the category manager, exactly one - the budget page - puts
+  its button inside the very section it re-renders. The other six keep theirs in a toolbar their
+  handler does not touch, so they were never affected, and the shopping menu turned out to be a
+  non-case: the popover hands focus back to its trigger before the page handler even runs. The fix
+  sits in the shared layer regardless, because the same break arises anywhere a handler re-renders
+  the region an open dialog was opened from - and it fails silently when it does.
+
 - **Paying extra on a loan now shortens the remaining term, not only the balance** (#964). Since
   #954 the remaining principal follows the money you actually paid, but the remaining term beside it
   stayed plan-based and still said 100 installments after you had doubled a payment - the exact

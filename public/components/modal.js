@@ -150,6 +150,12 @@ async function _closeFromBackNavigation({ force = false } = {}) {
 // Overlay-Dimming: theme-color abdunkeln im Standalone-Modus
 const OVERLAY_THEME_COLOR = '#1A1A1A';
 
+// Die Seitenwurzel - letzter Halt fuer den Fokus, wenn der Ausloeser weg ist.
+// `renderAppShell()` in router.js vergibt die id und setzt `tabIndex = -1`; sie
+// ist ausserdem das Ziel des Skip-Links, also per Design die Stelle „hier
+// beginnt der Seiteninhalt".
+const PAGE_ROOT_ID = 'main-content';
+
 const FOCUSABLE = [
   'a[href]',
   'button:not([disabled])',
@@ -529,6 +535,85 @@ function _discardSuspendedModal({ overlay, restoreFocus }) {
 // _doClose - gemeinsame Cleanup-Logik
 // --------------------------------------------------------
 
+/**
+ * WOHIN DER FOKUS BEIM SCHLIESSEN GEHT - der gemerkte Ausloeser kann weg sein.
+ *
+ * Ein Handler, der waehrend des offenen Modals einen Seitenbereich neu rendert,
+ * tauscht den Knopf aus, der das Modal geoeffnet hat. Der gemerkte Zeiger zeigt
+ * danach auf einen abgehaengten Knoten, und `.focus()` darauf ist ein No-op:
+ * der Fokus faellt auf `document.body`, und wer mit Tastatur oder Screenreader
+ * bedient, verliert seine Position in der Seite.
+ *
+ * Zwei Stufen, weil die erste nicht ueberall greift. Die id-Suche trifft den
+ * Knopf, der an derselben Stelle wieder aufgebaut wurde; nur 3 der 7 Nutzer des
+ * Kategorie-Managers geben ihrem Ausloeser aber ueberhaupt eine id (inventory
+ * 2x und pantry haengen den Handler an `data-action`, shopping an einem
+ * Popover-Trigger). Fuer sie ist die Seitenwurzel der Halt - kein guter Platz,
+ * aber ein Platz IN der Seite, von dem aus Tab weiterlaeuft. `document.body`
+ * ist dagegen kein Fokusziel, sondern das Fehlen eines Fokus.
+ *
+ * DIE ZWEITE STUFE IST VORSORGE, nicht Reparatur: gemessen liegt heute genau
+ * bei EINEM der sieben - dem Budget - der Ausloeser im Bereich, den der Handler
+ * austauscht, und der hat eine id. Die Wurzel faengt den naechsten id-losen
+ * Ausloeser, der dazukommt. Ohne sie waere das wieder ein stiller Ausfall, und
+ * genau das war der Befund.
+ *
+ * EIN VERSTECKTER POPOVER-EINTRAG IST KEIN FALL DAVON, obwohl er danach
+ * aussieht: `utils/popover-menu.js` blendet sein Menue nur aus, ein Eintrag
+ * meldet also weiter `isConnected === true`. Gemessen (Chrome 152, Maus wie
+ * Tastatur) gibt `hidePopover()` den Fokus aber an den TRIGGER zurueck, und
+ * zwar in der Capture-Phase des Klicks - also bevor der Seiten-Handler das
+ * Modal oeffnet. `previouslyFocused` ist damit nie der Menueintrag, sondern der
+ * Trigger, und der ist sichtbar und fokussierbar. Eine Sichtbarkeitspruefung
+ * hier waere ein Layout-Read auf jedem Schliessen ohne einen Fall, der ihn
+ * braucht.
+ *
+ * Eine Seite, die es genauer will, gibt ihrem Ausloeser eine id. Das ist
+ * billiger als eine Option, die jede aufrufende Stelle einzeln pflegen muesste.
+ *
+ * Exportiert fuer die Sonde in `test/test-modal-utils.js`: das Fokusziel laesst
+ * sich so ohne den vollen Oeffnen-Schliessen-Pfad messen, der ein echtes DOM
+ * braeuchte.
+ */
+/**
+ * Ein Fokusziel, das den Fokus auch ANNIMMT.
+ *
+ * Betrifft genau ein Element: die Seitenwurzel. Alles andere, was diese Weiche
+ * zurueckgibt, ist ein Knopf oder eine Zeile und damit von Natur aus
+ * fokussierbar.
+ *
+ * `renderAppShell()` in router.js setzt `tabIndex = -1` - aber nur fuer die
+ * Routen mit App-Shell. Die fuenf Auth-Seiten (login, setup, join,
+ * forgot-password, reset-password) rendern ihr eigenes
+ * `<main id="main-content">` ohne das Attribut, und dort ist `.focus()` ein
+ * No-op: gemessen faellt der Fokus auf `document.body` - genau der stille
+ * Ausfall, den diese Weiche verhindern soll, nur eine Route weiter.
+ *
+ * Erreichbar ist das ueber ein Sitzungsende bei offenem Dialog:
+ * `closeAllOverlays()` schliesst mit `force`, und auf Mobil haengt `_doClose`
+ * an `animationend` beziehungsweise einem 400-ms-Timer - es kann also laufen,
+ * nachdem `/login` schon gerendert hat.
+ *
+ * `hasAttribute` und nicht `el.tabIndex`: das Property liest auch ohne Attribut
+ * `-1` und kann die beiden Faelle gar nicht unterscheiden (gemessen).
+ */
+function _focusable(el) {
+  if (el && el.id === PAGE_ROOT_ID && !el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
+  return el;
+}
+
+export function focusRestoreTarget(remembered) {
+  if (!remembered) return null;
+  if (remembered.isConnected) return remembered;
+  // getElementById und kein Selektor: eine id darf Zeichen enthalten, an denen
+  // querySelector scheitert.
+  const replacement = remembered.id ? document.getElementById(remembered.id) : null;
+  // Durch `_focusable` MUESSEN beide Wege: war der Ausloeser selbst die
+  // Seitenwurzel, liefert die id-Suche sie direkt zurueck, und ein Rueckgabewert
+  // an `_pageRoot()` vorbei haette wieder kein tabindex (Review zu #1069).
+  return _focusable(replacement ?? document.getElementById(PAGE_ROOT_ID));
+}
+
 function _doClose(overlayEl) {
   const target = overlayEl ?? activeOverlay;
   if (!target) return;
@@ -548,10 +633,15 @@ function _doClose(overlayEl) {
     document.body.style.overflow = '';
 
     // Focus-Restore
-    if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
-      previouslyFocused.focus();
-      previouslyFocused = null;
+    const restoreTarget = focusRestoreTarget(previouslyFocused);
+    if (restoreTarget && typeof restoreTarget.focus === 'function') {
+      // Nur die Seitenwurzel bekommt `preventScroll`: sie IST der Scrollport
+      // (#main-content == .app-content), ein Fokus mit Scroll risse die
+      // wiederhergestellte Position nach oben. Ein Ersatzknopf steht dagegen
+      // an der Stelle, an der der Nutzer ohnehin war.
+      restoreTarget.focus(restoreTarget.id === PAGE_ROOT_ID ? { preventScroll: true } : undefined);
     }
+    previouslyFocused = null;
 
     // Standalone: Statusbar-Farbe zur aktuellen Route wiederherstellen
     if (window.yuvomi?.restoreThemeColor) {
