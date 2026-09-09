@@ -50,8 +50,13 @@ const STUBS = {
     export const initI18n = async () => {};
     export const setLocale = async () => {};
     export const getLocale = () => 'de';
-    export const getFormatLocale = () => 'de';
-    export const getNumberFormat = (options = {}) => new Intl.NumberFormat('de', options);
+    // Die Format-Locale ist im Browser eine Einstellung des Haushalts und
+    // entscheidet ueber Ziffernsystem, Dezimaltrenner und Gruppierung. Tests, die
+    // genau das pruefen (utils/money.js und alles, was dessen Umschrift nutzt),
+    // setzen globalThis.__formatLocale; ohne das bleibt es bei 'de' wie bisher.
+    export const getFormatLocale = () => globalThis.__formatLocale ?? 'de';
+    export const getNumberFormat = (options = {}) =>
+      new Intl.NumberFormat(globalThis.__formatLocale ?? 'de', options);
     export const getSupportedLocales = () => ['de', 'en'];
     export const formatDate = (d) => String(d);
     export const formatDayMonth = (d) => String(d);

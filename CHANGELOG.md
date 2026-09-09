@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A quantity like "1,000 g" on the shopping list is no longer read as 1 before it goes into the
+  pantry.** Taking a checked item over to the pantry pre-fills the quantity field from the free text
+  on the row, and that step parsed the number itself, with the comma hard-wired as a decimal point.
+  Under a region that groups thousands with a comma - en-US among them - "1,000 g" therefore arrived
+  as **1 g**, off by a factor of a thousand, and nothing said so. Under Persian or Egyptian Arabic
+  the number was not recognised at all: the field shows the region's own digits, and a quantity typed
+  in them fell back to "1 piece" no matter what it said.
+
+  The number now goes through the same transliteration as the price fields (#1003): the digits and
+  the decimal separator come from the region that is actually set, and a grouped number is refused
+  rather than guessed - "1,000 g" could mean one gram or a thousand, both readings are defensible,
+  and the wrong one is off by a factor of a thousand. Refused means the row falls back to "1 piece",
+  which says visibly that nothing was understood, in a dialog where the quantity sits in a field you
+  can correct before it is saved. "1,5 kg", "250 g" and "6 x 1 l" keep reading exactly as they did.
+
 - **Paying extra on a loan now shortens the remaining term, not only the balance** (#964). Since
   #954 the remaining principal follows the money you actually paid, but the remaining term beside it
   stayed plan-based and still said 100 installments after you had doubled a payment - the exact

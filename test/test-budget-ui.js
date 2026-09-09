@@ -717,7 +717,7 @@ test('nur der Trenner der Region wird zum Dezimalpunkt', () => {
   assert.match(impl, /\\\\d\{3\}/, 'erkannt wird das Muster (drei Ziffern), nicht das blosse Zeichen');
 });
 
-test('die Cent-Umrechnung nutzt dieselbe Umschrift wie die Betragsfelder', () => {
+test('jede eingetippte Zahl im Einkauf nutzt dieselbe Umschrift wie die Betragsfelder', () => {
   // Der Einkauf speichert Preise als ganze Cent (#1003) und brauchte dafuer
   // zwei Umrechnungen. Als sie in pages/shopping.js standen, war die eine ein
   // `replace(',', '.')`: unter en-US wird "1,000" damit zur Zahl 1, unter ar/fa
@@ -737,13 +737,32 @@ test('die Cent-Umrechnung nutzt dieselbe Umschrift wie die Betragsfelder', () =>
   const raus = clean.match(/export function centsToAmountInput[\s\S]*?\n\}/)[0];
   assert.match(raus, /useGrouping:\s*false/, 'der Ausgabewert darf nicht gruppiert sein');
 
-  // Gemessen wird der Preispfad, nicht jedes Komma der Datei: shopping.js
-  // zerlegt auch Mengenangaben ("1,5 kg"), und das ist kein Geldbetrag.
+  // Gemessen wird die GANZE Datei, nicht mehr nur der Preispfad. Die Einschraenkung
+  // stand bis 09.09.2026 hier, weil shopping.js daneben Mengenangaben zerlegt
+  // ("1,5 kg") und das kein Geldbetrag ist - aber der Trenner haengt an der Region
+  // und nicht daran, wofuer die Zahl steht. Die Mengenzeile hatte denselben Fehler,
+  // nur ungesehen: unter en-US wurde "1,000 g" zur Menge 1 (Faktor 1000), unter ar-EG
+  // oder fa kam eine Eingabe in oestlichen Ziffern gar nicht erst an, weil `\d` ASCII
+  // ist. Ein Guard, der eine bekannte Fundstelle ausnimmt, haelt genau sie offen.
   const einkauf = withoutComments(read('../public/pages/shopping.js'));
   assert.doesNotMatch(einkauf, /function (centsToInput|inputToCents)\b/,
     'shopping.js rechnet Preise wieder selbst um');
   assert.match(einkauf, /amountInputToCents\(priceRoh/,
     'der Preis muss durch amountInputToCents laufen');
+
+  // Keine handgeschriebene Umschrift mehr, an keiner Zahl der Datei: weder
+  // `replace(',', '.')` noch `replace(/,/g, '.')`.
+  assert.doesNotMatch(einkauf, /\.replace\(\s*(?:'[,.]'|"[,.]"|\/[,.]\/[a-z]*)\s*,/,
+    'shopping.js schreibt einen Trenner wieder von Hand um - toDecimalString aus utils/money.js nutzen');
+
+  // Und die Mengenangabe laeuft positiv durch dieselbe Umschrift. Das Verhalten
+  // dahinter (de "1.000 g", en-US "1,000 g", fa/ar-EG in oestlichen Ziffern) misst
+  // test-shopping-ux.js an der echten Funktion - hier steht nur die Sperre gegen
+  // den Rueckfall.
+  const menge = einkauf.match(/function parseShoppingQuantity[\s\S]*?\n\}/);
+  assert.ok(menge, 'parseShoppingQuantity nicht gefunden');
+  assert.match(menge[0], /toDecimalString\(/,
+    'die Mengenangabe muss durch dieselbe Umschrift laufen wie der Preis');
 });
 
 test('ein Abo darf null kosten', () => {

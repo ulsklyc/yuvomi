@@ -19,7 +19,7 @@ import '/components/category-manager.js';
 import { findPageFab } from '/utils/fab.js';
 import { setBulkPill, clearBulkPill, bulkPillLayer } from '/utils/bulk-pill.js';
 import { makeSortable } from '/utils/sortable.js';
-import { amountPlaceholder, centsToAmountInput, amountInputToCents } from '/utils/money.js';
+import { amountPlaceholder, centsToAmountInput, amountInputToCents, toDecimalString } from '/utils/money.js';
 
 
 // --------------------------------------------------------
@@ -1595,12 +1595,29 @@ function parseShoppingQuantity(raw) {
   const text = String(raw ?? '').trim();
   if (!text) return fallback;
 
+  // Dieselbe Umschrift wie die Betragsfelder (utils/money.js): sie leitet Ziffern
+  // und Dezimaltrenner aus der eingestellten Region ab. Ein eigenes
+  // `replace(',', '.')` stand hier und war in beide Richtungen falsch - unter
+  // en-US gruppiert das Komma Tausender, aus „1,000 g" wurde die Menge 1, und
+  // unter ar oder fa kam eine Eingabe in östlichen Ziffern gar nicht erst an
+  // (`\d` ist ASCII). Beides ohne Fehlermeldung: die Zeile im Übernahme-Dialog
+  // stand einfach auf 1.
+  //
+  // Eine gruppierte Zahl weist die Umschrift ab und liefert einen leeren String.
+  // Dann bleibt es beim Standard, statt zwischen 1 und 1000 zu raten - dieselbe
+  // Entscheidung wie beim Preis, hier aber mit dem sanfteren Ausgang: der Dialog
+  // zeigt die Menge in einem Feld, das sich korrigieren lässt.
+  const decimal = toDecimalString(text);
+  if (!decimal) return fallback;
+
   // Die Einheit braucht eine Wortgrenze davor, sonst schluckt `\b` sie bei
   // Schreibweisen wie „3x" nicht und die Menge fiele auf 1 zurück.
-  const match = text.match(/^(\d+(?:[.,]\d+)?)\s*(?:(kg|g|ml|l)\b)?/i);
+  // Der Trenner ist hier immer der Punkt - die Umschrift oben hat den der Region
+  // bereits übersetzt.
+  const match = decimal.match(/^(\d+(?:\.\d+)?)\s*(?:(kg|g|ml|l)\b)?/i);
   if (!match) return fallback;
 
-  const quantity = Number(match[1].replace(',', '.'));
+  const quantity = Number(match[1]);
   if (!Number.isFinite(quantity) || quantity <= 0) return fallback;
 
   return { quantity, unit: match[2] ? match[2].toLowerCase() : 'pcs' };
@@ -2495,6 +2512,9 @@ export async function render(container, { user }) {
 
 export const __test = {
   shouldIgnoreShoppingRowToggle,
+  // Mengen-Zerlegung fuer den Vorrats-Uebertrag: haengt an der Format-Locale,
+  // ist also nur verhaltensgetrieben pruefbar (siehe test-shopping-ux.js).
+  parseShoppingQuantity,
   // Kategorie-Einklappen (#1039): reine Schluessel-/Speicherfunktionen, ohne
   // DOM. `state` bleibt bewusst ERREICHBAR, nicht ERSETZBAR - Tests lesen und
   // schreiben ihre Felder direkt, wie beim Muster in test-health-meds.js.

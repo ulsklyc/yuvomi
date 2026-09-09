@@ -190,6 +190,14 @@ export function amountMin(currency, currentValue) {
  * den Faktor tausend daneben. Erkannt wird die Gruppierung am Muster, nicht am
  * blossen Zeichen: drei Ziffern hinter dem Trenner sind mehrdeutig, zwei
  * ("12.50") sind es nicht und gelten weiter als Dezimalangabe.
+ *
+ * Bewusst NICHT geldspezifisch, obwohl die Funktion hier wohnt: sie kennt
+ * Ziffern und Trenner, keine Währung. Der Einkauf liest damit auch die
+ * Mengenangabe eines Artikels („1,5 kg"), die vor dem Vorrats-Übertrag zerlegt
+ * wird - ein anderes Feld, aber dieselbe Region und damit dieselbe Falle, sobald
+ * jemand daneben eine zweite Fassung schreibt. Wer eine dritte Stelle mit
+ * eingetippten Zahlen baut, ruft diese hier auf, statt `replace(',', '.')` neu
+ * zu erfinden.
  */
 export function toDecimalString(value) {
   const raw = String(value ?? '').trim();
