@@ -104,3 +104,28 @@ test('toAsciiDigits: auch Ziffern ausserhalb der BMP kommen an', () => {
   assert.equal(toAsciiDigits('𑜲𑜵𑜰'), '250', 'ahom (Ahom)');
   assert.equal(toAsciiDigits('𞥐𞥑'), '01');
 });
+
+test('toAsciiDigits: ohne Intl.supportedValuesOf faellt die Faehigkeit aus, nicht die App', async () => {
+  // ES2022, auf dem Server garantiert (Node >= 22) - im BROWSER nicht, und dort
+  // laeuft diese Datei seit v2.66 auch. Ein ungeschuetzter Aufruf reichte einen
+  // TypeError durch `toDecimalString` nach oben und legte damit jedes Betrags-
+  // und Mengenfeld lahm, statt nur diese eine Faehigkeit zu verlieren.
+  //
+  // Gemessen an einem FRISCHEN Modul, nicht am geladenen: die Zuordnung wird
+  // gecacht, ein Test am bereits gebauten Cache saehe den Ausfall nie.
+  const original = Intl.supportedValuesOf;
+  let modul;
+  try {
+    delete Intl.supportedValuesOf;
+    // AWAIT vor dem finally: ohne das stellt der Wiederherstell-Zweig die API
+    // zurueck, bevor das Modul ueberhaupt geladen ist - der Test lief dann gegen
+    // die vorhandene API und war gruen, obwohl er nichts geprueft hatte.
+    modul = await import('../public/utils/digits.js?ohne-intl=1');
+    assert.equal(modul.digitMapSize(), 0, 'ohne die API bleibt die Zuordnung leer');
+    // Und die Umschrift laesst den Text unangetastet, statt zu werfen.
+    assert.equal(modul.toAsciiDigits('۲۵۰ g'), '۲۵۰ g');
+    assert.equal(modul.toAsciiDigits('250 g'), '250 g');
+  } finally {
+    Intl.supportedValuesOf = original;
+  }
+});

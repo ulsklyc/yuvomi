@@ -307,7 +307,16 @@ export function toDecimalString(value, { freeText = false } = {}) {
   // „۴٫۵ kg" bliebe unter de beim Skalieren einfach liegen. Der Server liest sie
   // laengst, mit derselben Datei.
   let normalized = '';
-  for (const char of raw) normalized += digits.get(char) ?? asciiDigit(char) ?? char;
+  //
+  // `asciiDigit` erst, wenn das Zeichen ueberhaupt eine Ziffer IST: die Zuordnung
+  // dahinter wird beim ersten Zugriff aus 77 Zahlensystemen gebaut (gemessen
+  // 19,5 ms), und ohne diese Schranke stiesse schon der erste Buchstabe eines
+  // Freitextes den Aufbau an. So zahlt ihn nur, wer wirklich fremde Ziffern
+  // eintippt - in de oder en-US also niemand.
+  for (const char of raw) {
+    normalized += digits.get(char)
+      ?? (/\p{Nd}/u.test(char) ? asciiDigit(char) ?? char : char);
+  }
 
   // Schritt 2: Gruppierungsmuster - der Trenner, gefolgt von genau drei Ziffern,
   // auf die keine weitere folgt. "1.000" in de-DE trifft zu, "12.50" nicht.

@@ -44,7 +44,27 @@ let digitMap = null;
 
 function buildDigitMap() {
   const map = new Map();
-  for (const system of Intl.supportedValuesOf('numberingSystem')) {
+  // `Intl.supportedValuesOf` ist ES2022. Auf dem Server ist es garantiert (Node
+  // >= 22), im BROWSER nicht - und seit diese Datei auch dort laeuft, haette ein
+  // ungeschuetzter Aufruf einen TypeError durch `toDecimalString` nach oben
+  // gereicht und damit jedes Betrags- und Mengenfeld der App lahmgelegt, statt
+  // nur diese eine Faehigkeit zu verlieren. Gemessen: „is not a function".
+  //
+  // Leere Liste als Rueckfall ist hier die richtige Degradation und nicht die
+  // uebliche Luege („es gibt keine"): der Aufrufer im Client fragt diese Zuordnung
+  // erst, wenn die Ziffern der eingestellten Region nicht greifen. Faellt sie aus,
+  // bleibt genau das Verhalten von vor v2.66 - fremde Ziffern werden nicht
+  // gelesen, alles andere laeuft.
+  //
+  // Dieselbe Absicherung wie bei `Intl.supportedValuesOf('timeZone')` in
+  // settings/pages/personal-appearance.js.
+  let systems = [];
+  try {
+    systems = Intl.supportedValuesOf('numberingSystem');
+  } catch {
+    return map;
+  }
+  for (const system of systems) {
     let digits;
     try {
       const format = new Intl.NumberFormat('en', { numberingSystem: system, useGrouping: false });
