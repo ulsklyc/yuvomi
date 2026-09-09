@@ -1139,8 +1139,14 @@ function scaleQuantityText(quantity, factor) {
   // die Zusicherung steht dort im Kopf und haengt an einem Guard.
   const restOf = (match, tailGroup) => original.slice(match[0].length - match[tailGroup].length);
 
+  // Der Abbruch-im-Trenner gilt fuer ALLE drei Formen, nicht nur fuer die
+  // Dezimalzahl unten. Bricht ein Nenner in einem Trenner ab, ist der Bruch nicht
+  // gelesen, sondern abgeschnitten: aus „1/2,5 cup" wurde 1/2, mal Faktor, und der
+  // Rest „,5 cup" dahinter - also „1,5 cup", eine plausible und falsche Menge.
+  // Dann lieber gar nichts anfassen, wie bei „eine Prise".
   const mixed = text.match(/^(\d+)\s+(\d+)\/(\d+)(.*)$/);
   if (mixed) {
+    if (breaksOffAtSeparator(mixed[4])) return quantity;
     const whole = Number(mixed[1]);
     const num = Number(mixed[2]);
     const den = Number(mixed[3]);
@@ -1149,6 +1155,7 @@ function scaleQuantityText(quantity, factor) {
 
   const frac = text.match(/^(\d+)\/(\d+)(.*)$/);
   if (frac) {
+    if (breaksOffAtSeparator(frac[3])) return quantity;
     const num = Number(frac[1]);
     const den = Number(frac[2]);
     if (den > 0) return `${formatScaledQuantity((num / den) * factor)}${restOf(frac, 3)}`;

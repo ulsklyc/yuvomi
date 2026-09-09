@@ -761,6 +761,18 @@ test('Skalieren: eine mitten im Trenner abgeschnittene Zahl bleibt stehen', () =
   scaled('ar-EG', '1,5 kg', 2, '1,5 kg');
   // Auch der Schweizer Gruppierungsapostroph, den keine der beiden Regionen kennt.
   scaled('de', "1'000 g", 2, "1'000 g");
+  // Und in den BRUCH-Zweigen, nicht nur bei der Dezimalzahl: bricht ein Nenner im
+  // Trenner ab, wurde aus „1/2,5 cup" die Rechnung 1/2 mal Faktor plus dem Rest
+  // „,5 cup" - also „1,5 cup", eine plausible und falsche Menge. Der Fehler traf
+  // JEDE Region, nicht nur die mit eigenen Ziffern.
+  scaled('de', '1/2,5 cup', 2, '1/2,5 cup');
+  scaled('de', '1 1/2,5 Tassen', 2, '1 1/2,5 Tassen');
+  scaled('en-US', '1/2.5 cup', 2, '1/2.5 cup');
+  scaled('ar-EG', '١/٢٫٥ cup', 2, '١/٢٫٥ cup');
+  scaled('ar-EG', '١ ١/٢٫٥ cup', 2, '١ ١/٢٫٥ cup');
+  // Gegenprobe: der gewoehnliche Bruch rechnet unveraendert weiter.
+  scaled('de', '1/2 cup', 2, '1 cup');
+  scaled('ar-EG', '١ ١/٢ cup', 2, '3 cup');
   // Ein Leerzeichen trennt dagegen zwei Angaben und schneidet nichts ab.
   scaled('de', '2 x 500 g', 2, '4 x 500 g');
 });
