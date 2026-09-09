@@ -540,6 +540,8 @@ test('parseShoppingQuantity: eine mitten im Trenner abgeschnittene Menge wird ab
     assert.deepEqual(__test.parseShoppingQuantity('2x500 g'), { quantity: 2, unit: 'pcs' });
     assert.deepEqual(__test.parseShoppingQuantity('3x'), { quantity: 3, unit: 'pcs' });
     assert.deepEqual(__test.parseShoppingQuantity('4er-Pack'), { quantity: 4, unit: 'pcs' });
+    // Die kompakte Form auch mit dem typografischen Kreuz.
+    assert.deepEqual(__test.parseShoppingQuantity('2×500 ml'), { quantity: 2, unit: 'pcs' });
   });
 });
 

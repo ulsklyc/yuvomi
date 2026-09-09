@@ -189,7 +189,7 @@ test('breaksOffAtSeparator: nur echte Trennzeichen zaehlen, kein Multiplikator',
   for (const rest of [',5 kg', '.5 kg', "'000 g", '٫٥ kg', '٬٠٠٠ g']) {
     assert.equal(breaksOffAtSeparator(rest), true, `"${rest}" bricht im Trenner ab`);
   }
-  for (const rest of ['x500 g', ' x 500 g', 'er-Pack', ' kg', '', 'x', ',', ' 5 g', '× 1 l']) {
+  for (const rest of ['x500 g', '×500 ml', '*500 g', ' x 500 g', 'er-Pack', ' kg', '', 'x', ',', ' 5 g', '× 1 l']) {
     assert.equal(breaksOffAtSeparator(rest), false, `"${rest}" ist kein Abbruch im Trenner`);
   }
   // Ein Whitespace-Gruppierungstrenner (fr nutzt U+202F) zaehlt bewusst NICHT:

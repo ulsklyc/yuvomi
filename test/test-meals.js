@@ -748,6 +748,9 @@ test('Skalieren: die Multiplikator-Schreibweise bleibt lesbar', () => {
   scaled('de', '2x500 g', 2, '4x500 g');
   scaled('de', '3x Dose', 2, '6x Dose');
   scaled('de', '2 x 500 g', 2, '4 x 500 g');
+  // Auch das typografische Kreuz und der Stern - keins davon trennt eine Zahl.
+  scaled('de', '2×500 ml', 2, '4×500 ml');
+  scaled('de', '2 × 500 ml', 2, '4 × 500 ml');
 });
 
 test('Skalieren: eine mitten im Trenner abgeschnittene Zahl bleibt stehen', () => {
