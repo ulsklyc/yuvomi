@@ -10,6 +10,16 @@ on:
     #   - "src/**/*.js"
     #   - "src/**/*.jsx"
 
+# EIN LAUF JE PR, UND ZWAR DER ZUM NEUESTEN STAND. Seit die Review jeden Push
+# prueft (siehe die Aufhebung der Abbruchbedingung im Prompt), stehen sonst
+# mehrere echte Laeufe gleichzeitig in der Luft: an #1066 lief einer 16m55s und
+# lieferte seinen Befund zu einem Commit, der da schon zwei Pushes alt war. Ein
+# abgebrochener Lauf endet als `cancelled`, nicht als gruener Haken - und der
+# Nachweis-Schritt laesst ihn deshalb in Ruhe (er verlangt `outcome == success`).
+concurrency:
+  group: claude-review-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   claude-review:
     if: github.event.pull_request.head.repo.full_name == github.repository
@@ -42,6 +52,141 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
+
+      # WELCHER STAND STEHT ZUR PRUEFUNG? Der Schritt haelt den Laufbeginn fest.
+      # Ab dieser Zeit gilt eine Aeusserung als moegliche Antwort DIESES Laufs -
+      # und die Commit-SHA daneben entscheidet, ob sie es beweisbar ist.
+      #
+      # Vorher zaehlte der Nachweis ueber die ganze Lebensdauer des PR, und ein
+      # einziger alter Kommentar faerbte damit jeden spaeteren Abbruch gruen. An
+      # #1066 (09.09.2026) gingen so drei Pushes hintereinander ungeprueft durch:
+      # Laeufe von 1m18s, 1m18s und 1m46s, jeder mit `num_turns: 3`, NULL
+      # Verweigerungen und dem result-Text "Claude has already left a comment on
+      # this PR ... I should stop here" - waehrend der Haken gruen stand.
+      #
+      # HIER STAND EINMAL EINE ABKUERZUNG FUER DEN RERUN-FALL: haengt am Head
+      # schon eine claude-Aeusserung, spare die Review. Sie ist wieder draussen.
+      # Ein Lauf, der EINE Inline-Anmerkung gepostet hat und dann in den Timeout
+      # oder in den Abbruch lief, hinterlaesst genau diese eine Anmerkung - und
+      # die Abkuerzung haette sie als Beweis genommen, dass der ganze Commit
+      # geprueft sei. Der Rerun waere uebersprungen worden, der Nachweis mit ihm
+      # (`outcome: skipped`), und der Haken gruen ueber einer abgebrochenen
+      # Pruefung. Ein Rerun kostet jetzt eine zweite Review. Das ist der
+      # billigere Fehler.
+      - name: Welcher Stand steht zur Pruefung?
+        id: stand
+        if: env.CLAUDE_CODE_OAUTH_TOKEN != ''
+        run: |
+          set -euo pipefail
+          # DER ANKER IST DER LAUFBEGINN, NICHT DIE COMMIT-ZEIT. Die Commit-Zeit
+          # waere die naheliegende Wahl und ist die falsche: ein Commit entsteht
+          # oft lange vor seinem Push. Wer B um 10:02 committet, um 10:08 die
+          # Review zu A bekommt und B erst um 10:09 pusht, haette einen Kommentar
+          # von 10:08 "nach" B liegen - und der Nachweis haette B fuer geprueft
+          # gehalten. Genau diese Sorte stiller Verwechslung wird hier
+          # abgeschafft und nicht in neuer Form wieder eingebaut.
+          echo "seit=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      # DER EIGENTLICHE FEHLER WAR NICHT DIE SPERRE, SONDERN DIE STILLE.
+      #
+      # Die Action endet mit Erfolg, wenn sie ohne Ausnahme durchläuft - ob die
+      # Review dabei etwas gesagt hat, prüft niemand. So stand fünf PRs lang ein
+      # grüner Haken für eine Prüfung, die nie stattgefunden hat, und ein grüner
+      # Haken, der nichts misst, ist schlimmer als gar keiner: er lädt dazu ein,
+      # sich auf ihn zu verlassen.
+      #
+      # Geprüft wird der WIRKUNG nach, nicht dem Ablauf: hat claude etwas
+      # hinterlassen - Zusammenfassung, Review oder Inline-Anmerkung?
+      #
+      # ABER ZU WELCHEM STAND. Genau daran ist dieser Schritt bis zum 09.09.2026
+      # blind gewesen: er zaehlte ueber die ganze Lebensdauer des PR und war
+      # gruen, sobald irgendein claude-Kommentar existierte. Der Satz, der hier
+      # stand - "der Lauf auf synchronize bleibt gruen, wenn schon ein Kommentar
+      # von einem frueheren Lauf steht" - beschrieb die Luecke als Absicht. Sie
+      # war keine: das Plugin brach ab, WEIL schon ein Kommentar stand, und
+      # dieser selbe Kommentar faerbte den Abbruch dann gruen. Beide Seiten der
+      # Zange hingen am selben Nagel.
+      #
+      # Jetzt zaehlt er nur, was NACH dem Beginn DIESES Laufs gesagt wurde, und
+      # das Urteil faellt `.github/scripts/review-verdict.mjs` - ausserhalb des
+      # Workflows, weil eine Urteilslogik, die nur hier lebt, nicht gegengeprobt
+      # werden kann. `npm run test:review-proof` faehrt sie gegen die echten
+      # Nutzdaten aus #1066 und #1029.
+      #
+      # AUSGENOMMEN: ein PR, der DIESE Datei aendert. Die Action prueft, ob der
+      # Workflow im PR zeichengleich mit dem auf dem Default-Branch ist, und
+      # ueberspringt sich sonst selbst - sonst koennte ein PR sich per
+      # `claude_args` beliebige Werkzeuge freischalten und die Review gegen sich
+      # selbst laufen lassen. Sie tut das mit `outcome=success`, also mit
+      # demselben stillen Gruen, das dieser Schritt aufdeckt.
+      #
+      # Die Ausnahme hat ein Verfallsdatum: sie greift nur, solange die Fassung
+      # im Branch von der auf dem Default-Branch abweicht. Sobald der PR gemergt
+      # oder der Branch rebast ist, prueft die Review wieder scharf. Ohne sie
+      # waere jede kuenftige Workflow-Aenderung automatisch rot, und eine
+      # Ausnahme, die man wegklickt, ist bald keine mehr.
+      #
+      # ZWEI FAELLE, EIN KRITERIUM. Nicht nur ein PR, der diese Datei aendert,
+      # weicht ab - auch ein Branch, der sie gar nicht anfasst, aber aelter ist
+      # als die letzte Aenderung daran. Nach jedem Zug an dieser Datei ist das
+      # schlagartig jeder offene Branch. Der Schritt prueft deshalb dasselbe wie
+      # die Action, naemlich Zeichengleichheit, und sagt in der Notiz, welcher
+      # der beiden Faelle vorliegt.
+      - name: Prueft die Review-Datei sich selbst?
+        id: self-edit
+        if: env.CLAUDE_CODE_OAUTH_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASIS: ${{ github.event.pull_request.base.sha }}
+          BASIS_NAME: ${{ github.event.repository.default_branch }}
+          DATEI: .github/workflows/claude-code-review.yml
+        run: |
+          set -euo pipefail
+          # GEPRUEFT WIRD ZEICHENGLEICHHEIT, NICHT "der PR fasst die Datei an".
+          # Hier stand vorher eine `gh api .../files | grep`-Probe, und die kannte
+          # nur den einen Fall. Die Action selbst vergleicht aber den Inhalt gegen
+          # den Default-Branch - und ein Branch, der diese Datei gar nicht anfasst,
+          # aber VERALTET ist, faellt genauso hinein. Nach jeder Aenderung an dieser
+          # Datei ist das schlagartig JEDER offene Branch: die Action uebersprang
+          # sich, der Nachweis fand kein result-Objekt und waere rot geworden,
+          # obwohl niemand etwas falsch gemacht hat. Blob-SHAs vergleichen ist
+          # genau das Kriterium der Action, in einer Zeile.
+          # DIESE AUSNAHME SCHLIESST ZU. Ein Ersatzwert bei Fehlschlag waere
+          # bequem und genau falsch herum: zwei ungleiche Platzhalter haetten
+          # `self=true` gesetzt, den Nachweis ausgesetzt und den Job gruen
+          # gelassen - wegen eines 403 oder 5xx in einer DIAGNOSE-Abfrage. Wer
+          # nicht beweisen kann, dass er ausgenommen ist, ist nicht ausgenommen.
+          kopf=""; basis=""
+          kopf=$(gh api "repos/$REPO/contents/$DATEI?ref=$HEAD_SHA" --jq '.sha') || kopf=""
+          basis=$(gh api "repos/$REPO/contents/$DATEI?ref=$BASIS" --jq '.sha') || basis=""
+          if [ -z "$kopf" ] || [ -z "$basis" ]; then
+            echo "self=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Die Fassung des Review-Workflows liess sich nicht auf" \
+                 "beiden Seiten lesen (Kopf: '${kopf:-Fehler}', Basis: '${basis:-Fehler}')." \
+                 "Die Selbst-Uebersprung-Ausnahme gilt deshalb NICHT - sie braucht" \
+                 "zwei gelesene, wirklich verschiedene Fassungen. Der Nachweis laeuft."
+          elif [ "$kopf" = "$basis" ]; then
+            echo "self=false" >> "$GITHUB_OUTPUT"
+            echo "Der Review-Workflow ist zeichengleich mit der Basis $BASIS ($kopf)."
+          else
+            echo "self=true" >> "$GITHUB_OUTPUT"
+            if gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename' \
+               | grep -qx "$DATEI"; then
+              echo "::notice::Dieser PR aendert den Review-Workflow selbst." \
+                   "Die Action ueberspringt sich dann aus Sicherheitsgruenden" \
+                   "(Workflow-Validierung), also kann hier keine Review entstehen." \
+                   "Der Nachweis ist ausgesetzt und greift ab dem naechsten PR wieder."
+            else
+              echo "::notice::Dieser Branch traegt eine andere Fassung des" \
+                   "Review-Workflows als die Basis dieses PR, ohne sie selbst zu" \
+                   "aendern - er ist also veraltet. Die Action ueberspringt sich" \
+                   "deshalb, und der Nachweis ist ausgesetzt. Auf $BASIS_NAME rebasen," \
+                   "dann prueft sie wieder scharf."
+            fi
+          fi
 
       - name: Run Claude Code Review
         if: env.CLAUDE_CODE_OAUTH_TOKEN != ''
@@ -124,6 +269,18 @@ jobs:
             Hintergrund-Agenten trifft auf keinen Turn mehr und erreicht dich
             nie. Sobald du "ich warte auf die Agenten" denkst und nichts weiter
             tust, endet der Lauf, und die Pruefung hinterlaesst nichts.
+
+            DIE ABBRUCHBEDINGUNG "Claude hat diesen PR schon kommentiert" GILT
+            HIER NICHT. Sie ist fuer Repos gedacht, die eine Review je PR wollen;
+            dieses will eine je Push. Zu pruefen ist der Stand
+            ${{ github.event.pull_request.head.sha }}, und an genau diesem Commit
+            haengt noch keine Review und keine Inline-Anmerkung von dir - der
+            Schritt davor hat das gezaehlt, sonst liefst du gar nicht. Kommentare
+            an FRUEHEREN Commits desselben PR sind also kein Grund aufzuhoeren,
+            und eine aeltere Zusammenfassung ohne Commit-Bindung ("No issues
+            found") ebenso wenig; sag stattdessen, was seither dazugekommen ist.
+            Alle uebrigen Bedingungen aus Schritt 1 (geschlossen, Entwurf,
+            automatisiert, trivial) bleiben unveraendert.
           allowed_bots: 'dependabot[bot]'
           # DIESE LISTE ERSETZT, SIE ERGÄNZT NICHT. Das war die Annahme, die den
           # zweiten Anlauf gekostet hat: `--allowed-tools` verdrängt die acht
@@ -177,89 +334,73 @@ jobs:
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
 
-      # DER EIGENTLICHE FEHLER WAR NICHT DIE SPERRE, SONDERN DIE STILLE.
-      #
-      # Die Action endet mit Erfolg, wenn sie ohne Ausnahme durchläuft - ob die
-      # Review dabei etwas gesagt hat, prüft niemand. So stand fünf PRs lang ein
-      # grüner Haken für eine Prüfung, die nie stattgefunden hat, und ein grüner
-      # Haken, der nichts misst, ist schlimmer als gar keiner: er lädt dazu ein,
-      # sich auf ihn zu verlassen.
-      #
-      # Geprüft wird der WIRKUNG nach, nicht dem Ablauf: hat claude irgendwo an
-      # diesem PR etwas hinterlassen - Zusammenfassung, Review oder Inline-
-      # Anmerkung? Der Lauf auf `synchronize` bleibt grün, wenn schon ein
-      # Kommentar von einem früheren Lauf steht; das Plugin sucht danach und
-      # schreibt bewusst nicht zweimal dasselbe.
-      # AUSGENOMMEN: ein PR, der DIESE Datei aendert. Die Action prueft, ob der
-      # Workflow im PR zeichengleich mit dem auf dem Default-Branch ist, und
-      # ueberspringt sich sonst selbst - sonst koennte ein PR sich per
-      # `claude_args` beliebige Werkzeuge freischalten und die Review gegen sich
-      # selbst laufen lassen. Sie tut das mit `outcome=success`, also mit
-      # demselben stillen Gruen, das dieser Schritt aufdeckt.
-      #
-      # Die Ausnahme hat ein Verfallsdatum: sie greift NUR, solange der PR den
-      # Workflow anfasst. Sobald er gemergt ist, prueft der naechste PR wieder
-      # scharf. Ohne sie waere jede kuenftige Workflow-Aenderung automatisch rot,
-      # und eine Ausnahme, die man wegklickt, ist bald keine mehr.
-      - name: Prueft die Review-Datei sich selbst?
-        id: self-edit
-        if: env.CLAUDE_CODE_OAUTH_TOKEN != ''
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-        run: |
-          set -euo pipefail
-          if gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename' \
-             | grep -qx '.github/workflows/claude-code-review.yml'; then
-            echo "self=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::Dieser PR aendert den Review-Workflow selbst." \
-                 "Die Action ueberspringt sich dann aus Sicherheitsgruenden" \
-                 "(Workflow-Validierung), also kann hier keine Review entstehen." \
-                 "Der Nachweis-Schritt ist ausgesetzt und greift ab dem naechsten PR wieder."
-          else
-            echo "self=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Die Review muss gesprochen haben
-        if: env.CLAUDE_CODE_OAUTH_TOKEN != '' && steps.claude-review.outcome == 'success' && steps.self-edit.outputs.self != 'true'
+        # Entwurf und Bot-PR sind ausgenommen, weil das Plugin bei beiden
+        # zugesichert abbricht - das ist "nichts zu pruefen" und kein Schweigen.
+        # Sie stehen hier und nicht im Urteil, weil der Workflow sie sicher weiss,
+        # waehrend das Urteil sie nur aus dem result-Text raten koennte.
+        if: >-
+          env.CLAUDE_CODE_OAUTH_TOKEN != ''
+          && steps.claude-review.outcome == 'success'
+          && steps.self-edit.outputs.self != 'true'
+          && github.event.pull_request.draft != true
+          && github.event.pull_request.user.type != 'Bot'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
+          SEIT: ${{ steps.stand.outputs.seit }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASIS: ${{ github.event.pull_request.base.sha }}
+          URTEIL: .github/scripts/review-verdict.mjs
+          EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
         run: |
           set -euo pipefail
-          # `--paginate` mit einem jq, das ein Array baut, druckt EINE Zahl JE
-          # SEITE - `$((a + b))` stirbt daran, sobald ein PR über 30 Kommentare
-          # kommt. Deshalb ein Treffer je Zeile und `wc -l` als Zähler.
-          zaehle() {
-            gh api "$1" --paginate \
-              --jq '.[] | select(.user.login | ascii_downcase | contains("claude")) | .id' \
-              | wc -l | tr -d ' '
-          }
-          issue=$(zaehle "repos/$REPO/issues/$PR/comments")
-          review=$(zaehle "repos/$REPO/pulls/$PR/reviews")
-          inline=$(zaehle "repos/$REPO/pulls/$PR/comments")
-          echo "Zusammenfassungen: $issue · Reviews: $review · Inline-Anmerkungen: $inline"
-          if [ "$((issue + review + inline))" -eq 0 ]; then
-            echo "::error::Die Review ist durchgelaufen, hat aber nichts hinterlassen." \
-                 "Drei Ursachen sind bekannt, in dieser Reihenfolge pruefen." \
-                 "(0) SIEH ZUERST AUF num_turns IM result-OBJEKT. Unter etwa zehn" \
-                 "Turns bei NULL Verweigerungen hat die Review gar nicht erst" \
-                 "angefangen: Schritt 1 des Plugins bricht bei geschlossenen," \
-                 "Entwurfs-, automatisierten und trivialen PRs ab, ebenso wenn" \
-                 "claude hier schon kommentiert hat - 'stop and do not proceed'." \
-                 "Das ist kein Fehler des Plugins, sondern eine Zusicherung, die" \
-                 "es nie gegeben hat. Viele Turns MIT Verweigerungen heissen" \
-                 "dagegen: sie hat gearbeitet und ist am Abliefern gescheitert." \
-                 "(1) FEHLT --comment IM PROMPT? Ohne das Argument prueft das Plugin" \
-                 "vollstaendig und schweigt danach absichtlich - das war die Ursache," \
-                 "als dieser Schritt entstand, und sie sieht einer Sperre zum Verwechseln" \
-                 "aehnlich: is_error false, zwanzig Turns, kein Kommentar." \
-                 "(2) EINE WERKZEUG-SPERRE: im result-Objekt des Job-Logs steht" \
-                 "\"permission_denials_count\". Mit show_full_output: true erneut laufen" \
-                 "lassen, um zu sehen, WELCHES Werkzeug verweigert wurde, und es in" \
-                 "claude_args nachtragen - die Liste dort ERSETZT die des Plugins." \
-                 "Ein gruener Haken ohne Befund ist keiner."
+          # Hier wird nur noch geholt. `--paginate` mit einem jq, das ein Array
+          # baut, druckt EINE Zeile JE SEITE - `$((a + b))` stirbt daran, sobald
+          # ein PR ueber 30 Kommentare kommt. Deshalb ein Objekt je Zeile.
+          # `commit` ist der Unterschied zwischen "jemand hat geredet" und
+          # "zu DIESEM Commit wurde geredet". Reviews und Inline-Anmerkungen
+          # tragen ihn, eine Zusammenfassung nicht - die bekommt `null`, und das
+          # Urteil weiss dann, dass sie nur zaehlt, wenn das result-Objekt des
+          # Laufs keinen Abbruch zeigt.
+          gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq '.[] | {login: .user.login, zeit: .created_at, commit: null}' \
+            > "$RUNNER_TEMP/zusammenfassungen.jsonl"
+          gh api "repos/$REPO/pulls/$PR/reviews" --paginate \
+            --jq '.[] | {login: .user.login, zeit: (.submitted_at // ""), commit: .commit_id}' \
+            > "$RUNNER_TEMP/reviews.jsonl"
+          gh api "repos/$REPO/pulls/$PR/comments" --paginate \
+            --jq '.[] | {login: .user.login, zeit: .created_at, commit: (.original_commit_id // .commit_id)}' \
+            > "$RUNNER_TEMP/inline.jsonl"
+          # DAS URTEIL KOMMT VOM DEFAULT-BRANCH, NICHT AUS DEM PR. Hier stand
+          # `node .github/scripts/review-verdict.mjs` aus dem Checkout - also
+          # Code, den der PR selbst schreibt, ausgefuehrt in einem Job, der
+          # CLAUDE_CODE_OAUTH_TOKEN, ein GH_TOKEN mit Schreibrecht auf Pull
+          # Requests und OIDC im Ruecken hat. Ein PR haette damit beliebiges
+          # JavaScript mit diesen Rechten laufen lassen koennen - und ganz
+          # nebenbei sein eigenes Urteil auf gruen stellen. Die Ausnahme oben
+          # vergleicht nur die Workflow-Datei und faengt das nicht.
+          #
+          # Der Schritt holt die Fassung vom Default-Branch und fuehrt DIE aus.
+          # Ein PR, der das Urteil verbessert, wird also noch von der alten
+          # Fassung beurteilt - genau so, wie die Action es mit dem Workflow
+          # haelt. Faellt der Abruf aus, wird nicht geurteilt und nicht gruen
+          # getan: ohne vertrauenswuerdigen Richter gibt es kein Urteil.
+          BASIS_URTEIL="$RUNNER_TEMP/review-verdict-basis.mjs"
+          if ! gh api "repos/$REPO/contents/$URTEIL?ref=$BASIS" \
+               -H "Accept: application/vnd.github.raw" > "$BASIS_URTEIL" 2>/dev/null \
+             || [ ! -s "$BASIS_URTEIL" ]; then
+            echo "::error::Das Urteilsmodul liess sich nicht von $BASIS holen" \
+                 "($URTEIL). Es aus dem PR-Checkout auszufuehren kommt nicht in Frage" \
+                 "- das waere PR-eigener Code mit den Rechten dieses Jobs. Ohne" \
+                 "vertrauenswuerdige Fassung gibt es kein Urteil und kein Gruen."
             exit 1
           fi
+          node "$BASIS_URTEIL" \
+            --seit "$SEIT" \
+            --kopf "$HEAD_SHA" \
+            --ergebnis "$EXECUTION_FILE" \
+            --aeusserungen "$RUNNER_TEMP/zusammenfassungen.jsonl" \
+            --aeusserungen "$RUNNER_TEMP/reviews.jsonl" \
+            --aeusserungen "$RUNNER_TEMP/inline.jsonl"
