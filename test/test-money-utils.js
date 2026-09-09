@@ -130,23 +130,36 @@ test('toDecimalString: der Dezimaltrenner wird erst NACH der Gruppierungspruefun
   um('fa', '۱٫۰۰۰', '1.000');
 });
 
-test('toDecimalString: die Umschrift ist positionstreu (ein Zeichen gegen eines)', () => {
+test('toDecimalString: positionstreu in CODEPOINTS, nicht in UTF-16-Einheiten', () => {
   // ZUGESICHERTE Eigenschaft, kein Zufall: pages/meals.js skaliert nur die
   // fuehrende Zahl eines Freitextes und schneidet den Rest per Offset aus dem
   // ORIGINAL, damit "۲ x ۵۰۰ g" nicht zu "۴ x 500 g" wird. Faellt die
-  // Positionstreue, verrutscht dort still der Schnitt.
-  const proben = ['۲ x ۵۰۰ g', '٢٬٥٠ g', '1,5 kg', 'eine Prise', '🍎 2 kg', '1 1/2 Tassen', '12,50 EUR'];
+  // Zusicherung, verrutscht dort still der Schnitt.
+  //
+  // In Codepoints, und ausdruecklich NICHT in `.length`: seit die Umschrift auf
+  // fremde Systeme zurueckfaellt, kommen astrale Ziffern vor (40 der 77 Systeme),
+  // die zwei UTF-16-Einheiten belegen, waehrend ihr ASCII-Ergebnis eine belegt.
+  // Der Test hat hier vorher `.length` verglichen und die Luecke nicht gesehen.
+  const proben = [
+    '۲ x ۵۰۰ g', '٢٬٥٠ g', '1,5 kg', 'eine Prise', '🍎 2 kg', '1 1/2 Tassen',
+    '12,50 EUR', '𞥒 x 500 g', '𑜲𑜵𑜰 g',
+  ];
   for (const locale of ['de', 'en-US', 'fa', 'ar-EG', 'de-CH']) {
     withFormatLocale(locale, () => {
       for (const probe of proben) {
         const ergebnis = toDecimalString(probe);
         // Leer heisst abgewiesen - dann gibt es keinen Offset zu halten.
         if (ergebnis === '') continue;
-        assert.equal(ergebnis.length, probe.trim().length,
-          `${locale}: "${probe}" (${probe.trim().length}) -> "${ergebnis}" (${ergebnis.length})`);
+        assert.equal([...ergebnis].length, [...probe.trim()].length,
+          `${locale}: "${probe}" -> "${ergebnis}"`);
       }
     });
   }
+  // Die Gegenprobe zur Formulierung: in UTF-16 stimmt es bei einer astralen
+  // Ziffer eben NICHT, und das ist der Grund fuer die Codepoint-Zaehlung.
+  withFormatLocale('de', () => {
+    assert.notEqual(toDecimalString('𞥒 kg').length, '𞥒 kg'.length);
+  });
 });
 
 test('amountInputToCents: Rundreise durch die Region, gruppierte Eingabe abgelehnt', () => {

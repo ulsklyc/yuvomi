@@ -208,12 +208,19 @@ export function amountMin(currency, currentValue) {
  * ml" auf die Menge 1 zurueck, obwohl die 6 eindeutig ist und die 1.000
  * unveraendert im Rest der Zeile stehen bleibt.
  *
- * ZUGESICHERT: die Umschrift ist positionstreu - ein Zeichen hinein, dasselbe
- * eine Zeichen hinaus, `toDecimalString(x).length === x.trim().length`. Wer nur
- * die fuehrende Zahl eines Freitextes umrechnet, darf den Rest deshalb per
- * Offset aus dem ORIGINAL schneiden, statt die umgeschriebene Fassung
- * anzuhaengen: pages/meals.js skaliert so „۲ x ۵۰۰ g" zu „۴ x ۵۰۰ g" und nicht
- * zu „۴ x 500 g". Ein Verhaltenstest in test-meals.js haelt die Zusicherung.
+ * ZUGESICHERT: die Umschrift ist positionstreu IN CODEPOINTS - ein Codepoint
+ * hinein, ein Codepoint hinaus. Wer nur die fuehrende Zahl eines Freitextes
+ * umrechnet, darf den Rest deshalb per Codepoint-Offset aus dem ORIGINAL
+ * schneiden (`[...text]` zaehlen, nicht `.length`): pages/meals.js skaliert so
+ * „۲ x ۵۰۰ g" zu „۴ x ۵۰۰ g" und nicht zu „۴ x 500 g".
+ *
+ * In UTF-16 gilt sie NICHT, seit die Umschrift auf fremde Ziffernsysteme
+ * zurueckfaellt: 40 der 77 Systeme liegen ausserhalb der BMP, ihre Ziffern
+ * belegen zwei Einheiten, das ASCII-Ergebnis eine. Ein `.length`-Offset schnitt
+ * damit mitten in ein Zeichen - gemessen wurde aus „𞥒 x 500 g" ein
+ * „4\uDD52 x 500 g" mit halber Ersatzzeichen-Paarung, geschrieben in die
+ * gespeicherte Zutatenzeile. Verhaltenstests in test-money-utils.js und
+ * test-meals.js halten beide Enden.
  */
 /**
  * Zeichen, die IRGENDEINE waehlbare Region als Dezimal- oder Gruppierungstrenner
@@ -358,27 +365,23 @@ export function toDecimalString(value, { freeText = false } = {}) {
 /**
  * Eine Zahl als TEXT, der gespeichert und spaeter wieder gelesen wird.
  *
- * Die Zusicherung, genau: **die Ziffern sind IMMER ASCII, und der Trenner folgt
- * der Region, solange sie einen serverlesbaren fuehrt.** Das ist `.` und `,` -
- * mehr kennt `parseQuantity` in server/services/shopping-import.js nicht. de, fr,
- * cs, pl bekommen ihr Komma, en-US und de-CH ihren Punkt. Wo eine Region einen
- * DRITTEN Trenner fuehrt (fa, ar-EG und ar-SA schreiben `٫`), gewinnt die
- * Lesbarkeit und es wird der Punkt: `toStoredNumber(0.5)` ist dort „0.5", nicht
- * „0٫5". Das ist keine Unachtsamkeit, sondern die einzige Wahl, solange der
- * Server nur zwei Zeichen kennt - und `numberingSystem: 'latn'` trifft sie von
- * selbst, weil es Ziffern und Symbole gemeinsam umstellt.
+ * Die Zusicherung, genau: **Ziffern UND Trenner folgen der eingestellten
+ * Region.** Unter fa ist `toStoredNumber(0.5)` also „۰٫۵", nicht „0.5".
  *
- * Warum die Ziffern nicht der Region folgen duerfen: pages/meals.js schreibt die
- * skalierte Zutatenmenge zurueck in die Zutatenzeile, und beim Uebertrag in die
- * Einkaufsliste liest der Server sie wieder ein. Eine Menge in nativen Ziffern
- * („۲۰۰۰ g") kaeme dort nicht an und liesse sich nicht mehr mit anderen
- * zusammenzaehlen - aus einer Anzeigefrage waere ein Funktionsverlust geworden.
+ * Bis v2.65 stand hier ein `numberingSystem: 'latn'` und mit ihm die Ausnahme
+ * fuer fa, ar-EG und ar-SA: der Server las Mengen mit einer ASCII-Regex, und eine
+ * Menge in nativen Ziffern kam dort nicht an - die Zutat fiel beim Uebertrag in
+ * die Einkaufsliste aus der Summierung, aus einer Anzeigefrage wurde ein
+ * Funktionsverlust. Seit `parseQuantity` dieselbe Umschrift benutzt
+ * (utils/digits.js, geteilt), ist der Grund entfallen, und eine skalierte
+ * Zutatenzeile mischt nicht laenger zwei Schriften.
+ *
+ * Gelesen wird der Wert von zwei Stellen: hier ueber `toDecimalString` und auf
+ * dem Server. Beide kommen auch mit einem Wert zurecht, der unter einer ANDEREN
+ * Region geschrieben wurde - sonst haette diese Umstellung Altdaten erzeugt, die
+ * die eigene Oberflaeche nach einem Regionswechsel nicht mehr liest.
  *
  * Ohne Gruppierung, damit `toDecimalString` den Wert wieder einliest.
- *
- * Der saubere Endzustand waere eine Ziffern- und Trenner-Umschrift auf dem
- * Server; dann duerfte hier auch `٫` stehen. Solange es sie nicht gibt, ist die
- * Schreibweise hier der Vertrag zwischen beiden Seiten.
  */
 export function toStoredNumber(value, { maximumFractionDigits = 2 } = {}) {
   return getNumberFormat({ useGrouping: false, maximumFractionDigits }).format(value);

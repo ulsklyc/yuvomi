@@ -1137,7 +1137,14 @@ function scaleQuantityText(quantity, factor) {
   // „۴ x 500 g", also zu einer Zeile in zwei Schriften. Der Offset stimmt, weil
   // toDecimalString positionstreu ist (ein Zeichen hinein, ein Zeichen hinaus);
   // die Zusicherung steht dort im Kopf und haengt an einem Guard.
-  const restOf = (match, tailGroup) => original.slice(match[0].length - match[tailGroup].length);
+  // In CODEPOINTS, nicht in UTF-16-Einheiten: die Ziffern von 40 der 77 Systeme
+  // liegen ausserhalb der BMP und belegen zwei Einheiten, ihr ASCII-Ergebnis nur
+  // eine. Mit `.length` verrutschte der Schnitt genau dort und schnitt mitten in
+  // ein Zeichen - gemessen ergab „𞥒 x 500 g" ein „4\uDD52 x 500 g" mit einer
+  // halben Ersatzzeichen-Paarung, und dieser kaputte Text wurde in die
+  // Zutatenzeile geschrieben.
+  const zeichen = [...original];
+  const restOf = (match, tailGroup) => zeichen.slice([...match[0]].length - [...match[tailGroup]].length).join('');
 
   // Der Abbruch-im-Trenner gilt fuer ALLE drei Formen, nicht nur fuer die
   // Dezimalzahl unten. Bricht ein Nenner in einem Trenner ab, ist der Bruch nicht

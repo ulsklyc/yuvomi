@@ -703,6 +703,21 @@ test('Skalieren: der Rest der Zeile behaelt seine eigenen Ziffern', () => {
   scaled('de', '3 Glaeser à 250 ml', 2, '6 Glaeser à 250 ml');
   // Umschliessender Leerraum faellt weg, statt die Zahl zu verschieben.
   scaled('de', '  250 g  ', 2, '500 g');
+  // Astrale Ziffern (40 der 77 Systeme): sie belegen zwei UTF-16-Einheiten, ihr
+  // ASCII-Ergebnis eine. Mit einem `.length`-Offset schnitt `restOf` mitten in
+  // ein Zeichen - gemessen kam „4\uDD52 x 500 g" heraus, eine halbe
+  // Ersatzzeichen-Paarung, und dieser kaputte Text ging in die Zutatenzeile.
+  scaled('de', '𞥒 x 500 g', 2, '4 x 500 g');
+  scaled('de', '𞥒 kg', 2, '4 kg');
+  scaled('de', '𑜲𑜵𑜰 g', 2, '500 g');
+  // Kein halbes Ersatzzeichen im Ergebnis - die Zeile wird gespeichert.
+  const unpaired = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+  for (const probe of ['𞥒 x 500 g', '𞥒 kg', '𑜲𑜵𑜰 g', '۲ x ۵۰۰ g']) {
+    withFormatLocale('de', () => {
+      const ergebnis = mealsUi.scaleQuantityText(probe, 2);
+      assert(!unpaired.test(ergebnis), `"${probe}" ergab kaputtes "${ergebnis}"`);
+    });
+  }
 });
 
 test('Skalieren: die Umschrift ist positionstreu - darauf baut der Rest der Zeile', () => {
