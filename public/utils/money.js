@@ -25,6 +25,7 @@
  */
 
 import { getNumberFormat } from '/i18n.js';
+import { REGION_CODES } from '/settings/region-presets.js';
 
 /** Erlaubte Rollen. Wird vom Guard in test-budget-ui.js gegen die Aufrufe geprüft. */
 export const MONEY_ROLES = ['flow', 'total', 'balance', 'plain'];
@@ -213,6 +214,60 @@ export function amountMin(currency, currentValue) {
  * anzuhaengen: pages/meals.js skaliert so „۲ x ۵۰۰ g" zu „۴ x ۵۰۰ g" und nicht
  * zu „۴ x 500 g". Ein Verhaltenstest in test-meals.js haelt die Zusicherung.
  */
+/**
+ * Zeichen, die IRGENDEINE waehlbare Region als Dezimal- oder Gruppierungstrenner
+ * fuehrt - gemessen ueber REGION_CODES, nicht geraten. Aktuell: , . ' ٫ ٬
+ *
+ * Whitespace-Trenner (fr gruppiert mit U+202F) fehlen bewusst: ein Leerzeichen
+ * trennt im Freitext zwei Angaben („2 x 500 g") und ist deshalb kein Hinweis auf
+ * eine abgeschnittene Zahl - die echte Gruppierung dahinter faengt ohnehin die
+ * Musterpruefung oben.
+ *
+ * Wofuer: ein Freitext-Aufrufer liest nur die fuehrende Zahl und muss merken,
+ * wenn sie mitten in einem Trenner ABBRICHT. Die Regel dafuer war erst
+ * „irgendein Zeichen zwischen zwei Ziffern" - das traf auch „2x500 g", also die
+ * Multiplikator-Schreibweise, die parseShoppingQuantity ausdruecklich lesen
+ * koennen soll, und lieferte dort 1 statt 2. Ein `x` ist kein Trenner: nach ihm
+ * ist die 2 vollstaendig gelesen.
+ */
+let _separators = null;
+function numberSeparators() {
+  if (_separators) return _separators;
+  const found = new Set();
+  for (const code of REGION_CODES) {
+    try {
+      const dec = new Intl.NumberFormat(code, { minimumFractionDigits: 1 })
+        .formatToParts(1.5).find((part) => part.type === 'decimal')?.value;
+      const grp = new Intl.NumberFormat(code, { useGrouping: true })
+        .formatToParts(1234).find((part) => part.type === 'group')?.value;
+      for (const sep of [dec, grp]) if (sep && !/\s/.test(sep)) found.add(sep);
+    } catch { /* ungueltiger Regionscode: uebergehen, die Liste bleibt gueltig */ }
+  }
+  _separators = found;
+  return _separators;
+}
+
+/**
+ * Bricht der Rest hinter einer gelesenen Zahl mitten in einem Trenner ab?
+ *
+ * „2,5 kg" unter fa: das ASCII-Komma trennt dort nichts, die Zahl waere bei der 2
+ * abgeschnitten und die ,5 verloren - dann lieber gar nicht lesen. „2x500 g"
+ * dagegen ist vollstaendig gelesen, `x` ist kein Trenner.
+ *
+ * Geteilt zwischen pages/shopping.js und pages/meals.js: beide lesen eine
+ * fuehrende Zahl aus einem Freitext und brauchen exakt dieselbe Antwort.
+ */
+export function breaksOffAtSeparator(rest) {
+  // Codepunkt-weise und `\p{Nd}` statt `\d`: Letzteres ist in JavaScript ASCII,
+  // und die Funktion darf ihre Antwort nicht davon abhaengig machen, ob der
+  // Aufrufer schon umgeschrieben hat. „٫٥" ist ein Abbruch im Trenner, auch wenn
+  // die 5 noch arabisch-indisch geschrieben ist. (Dieselbe Falle, gegen die die
+  // ganze Datei angelegt ist - sie kam beim Schreiben dieser Zeile zurueck.)
+  const [erstes, zweites] = [...String(rest ?? '')];
+  if (!erstes || !zweites) return false;
+  return numberSeparators().has(erstes) && /\p{Nd}/u.test(zweites);
+}
+
 /** Ein Trennzeichen als Regex-Literal. */
 function escapeForRegExp(text) {
   return String(text ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -284,6 +339,30 @@ export function toDecimalString(value, { freeText = false } = {}) {
  * Ohne Tausendergruppierung, denn `toDecimalString` weist gruppierte Eingaben
  * ab - ein Wert, der so nicht wieder hereinkäme, darf auch nicht hinaus.
  */
+/**
+ * Eine Zahl als TEXT, der gespeichert und spaeter wieder gelesen wird: Trenner
+ * aus der Region, Ziffern aber in ASCII.
+ *
+ * Die Trennung ist der Punkt. Der Trenner ist Anzeige und gehoert der Region -
+ * ein deutscher Haushalt liest „4,5", kein „4.5". Die ZIFFERN sind hier dagegen
+ * Datenformat: pages/meals.js schreibt die skalierte Zutatenmenge zurueck in die
+ * Zutatenzeile, und `parseQuantity` in server/services/shopping-import.js liest
+ * sie beim Uebertrag in die Einkaufsliste mit einer ASCII-Regex wieder ein. Eine
+ * in nativen Ziffern geschriebene Menge („۲۰۰۰ g") kaeme dort nicht an, und die
+ * Zeile liesse sich nicht mehr mit anderen zusammenzaehlen - aus einer Anzeige-
+ * Feinheit waere ein Funktionsverlust geworden.
+ *
+ * Ohne Gruppierung, damit `toDecimalString` den Wert wieder einliest.
+ *
+ * Der saubere Endzustand waere eine Umschrift auf dem Server; solange es sie
+ * nicht gibt, ist die Schreibweise hier der Vertrag zwischen beiden Seiten.
+ */
+export function toStoredNumber(value, { maximumFractionDigits = 2 } = {}) {
+  return getNumberFormat({
+    useGrouping: false, maximumFractionDigits, numberingSystem: 'latn',
+  }).format(value);
+}
+
 export function centsToAmountInput(cents, currency) {
   const digits = currencyFractionDigits(currency);
   return getNumberFormat({

@@ -791,12 +791,44 @@ test('keine Seite schreibt einen Dezimaltrenner von Hand um', () => {
     'die gelesene Menge muss durch dieselbe Umschrift laufen');
   assert.doesNotMatch(skalieren[0], /useComma/,
     'der Trenner der Ausgabe darf nicht aus der Eingabe abgeschaut werden - getNumberFormat nutzen');
-  assert.match(rezept, /function formatScaledQuantity[\s\S]*?getNumberFormat\(/,
-    'die skalierte Menge muss im Zahlformat der Region geschrieben werden');
-  // Ohne useGrouping:false schriebe die Funktion einen Wert, den toDecimalString
-  // beim naechsten Skalieren abweist - die Zeile liest ihre eigene Ausgabe wieder ein.
-  assert.match(rezept, /function formatScaledQuantity[\s\S]*?useGrouping:\s*false/,
-    'die skalierte Menge darf nicht gruppiert sein');
+  assert.match(rezept, /function formatScaledQuantity[\s\S]*?toStoredNumber\(/,
+    'die skalierte Menge muss ueber toStoredNumber geschrieben werden');
+
+  // toStoredNumber selbst: Trenner aus der Region, Ziffern in ASCII, ohne
+  // Gruppierung. Die drei haengen zusammen und stehen deshalb hier beieinander:
+  //  - `getNumberFormat` liefert den Trenner der Region (sonst zeigte eine
+  //    deutsche Oberflaeche "4.5");
+  //  - `numberingSystem: 'latn'` haelt die ZIFFERN in ASCII, weil dieser Text
+  //    gespeichert und von parseQuantity (server/services/shopping-import.js)
+  //    mit einer ASCII-Regex wieder gelesen wird - "۲۰۰۰ g" kaeme dort nicht an
+  //    und fiele aus der Summierung der Einkaufsliste;
+  //  - ohne `useGrouping: false` schriebe sie einen Wert, den toDecimalString
+  //    beim naechsten Skalieren abweist.
+  const gespeichert = clean.match(/export function toStoredNumber[\s\S]*?\n\}/);
+  assert.ok(gespeichert, 'toStoredNumber fehlt in utils/money.js');
+  assert.match(gespeichert[0], /getNumberFormat\(/, 'der Trenner muss aus der Region kommen');
+  assert.match(gespeichert[0], /numberingSystem:\s*'latn'/,
+    'die Ziffern muessen ASCII bleiben - der Server liest den Wert mit einer ASCII-Regex');
+  assert.match(gespeichert[0], /useGrouping:\s*false/, 'der gespeicherte Wert darf nicht gruppiert sein');
+
+  // Die Abschneide-Pruefung liegt geteilt in money.js und kennt die Trennzeichen
+  // der waehlbaren Regionen. Eine Zeichenklasse „alles ausser Leerraum und
+  // Ziffer" war zu breit und traf die Multiplikator-Schreibweise „2x500 g" mit.
+  const abbruch = clean.match(/export function breaksOffAtSeparator[\s\S]*?\n\}/);
+  assert.ok(abbruch, 'breaksOffAtSeparator fehlt in utils/money.js');
+  assert.doesNotMatch(abbruch[0], /\[\^\\s\\d\]/,
+    'die Trennzeichen duerfen nicht als „alles ausser Leerraum und Ziffer" geraten werden');
+  assert.match(clean, /function numberSeparators[\s\S]*?REGION_CODES/,
+    'die Trennzeichen muessen aus den waehlbaren Regionen abgeleitet werden');
+  // `\d` waere hier ASCII - genau die Falle, gegen die diese Datei angelegt ist.
+  assert.match(abbruch[0], /\\p\{Nd\}/u,
+    'die Ziffernpruefung muss Unicode-Ziffern kennen, nicht nur ASCII');
+  for (const [datei, quelle] of [['shopping.js', einkauf], ['meals.js', rezept]]) {
+    assert.match(quelle, /breaksOffAtSeparator\(/,
+      `pages/${datei} muss die geteilte Abschneide-Pruefung nutzen`);
+    assert.doesNotMatch(quelle, /\[\^\\s\\d\]\\d/,
+      `pages/${datei} hat wieder eine eigene, zu breite Trennerpruefung`);
+  }
 
   // Und die Regel gilt fuer JEDE Seite, nicht fuer die drei, die bisher aufgefallen
   // sind: weder `replace(',', '.')` noch `replace(/,/g, '.')`. Genau das Auslassen

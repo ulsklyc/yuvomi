@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, advancedSection, wireBlurValidation, reportFieldError } from '/components/modal.js';
 import { stagger, scheduleUndoableDelete, wireScrollFade } from '/utils/ux.js';
-import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid, getNumberFormat } from '/i18n.js';
+import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { DEFAULT_CATEGORY_NAME } from '/utils/shopping-categories.js';
@@ -22,7 +22,7 @@ import { findPageFab } from '/utils/fab.js';
 import { zonedWeekday } from '/utils/timezone.js';
 import { mealTypeList, primeMealTypeNames } from '/utils/meal-types.js';
 import { recipeThumbHtml, wireRecipeThumbs } from '/utils/recipe-thumb.js';
-import { toDecimalString } from '/utils/money.js';
+import { toDecimalString, breaksOffAtSeparator, toStoredNumber } from '/utils/money.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -1108,7 +1108,7 @@ async function moveMeal(mealId, targetDate, targetType) {
  * Mealie gespiegelte „1.5" blieb in einer deutschen Oberflaeche „1.5".
  *
  * Die Umschrift ist dieselbe wie bei Preis und Einkaufsmenge
- * (`toDecimalString`), die Ausgabe geht durch dasselbe `getNumberFormat`. Damit
+ * (`toDecimalString`), die Ausgabe geht durch `toStoredNumber`. Damit
  * liest die Funktion ihre eigene Ausgabe wieder ein, was sie muss: der
  * gerenderte Wert landet in einer Zutatenzeile, wird gespeichert und beim
  * naechsten Anwenden des Rezepts erneut skaliert. Deshalb auch ohne
@@ -1160,10 +1160,10 @@ function scaleQuantityText(quantity, factor) {
     // sondern abgeschnitten. Unter fa ist das ASCII-Komma kein Dezimaltrenner:
     // aus „1,5 kg" waere sonst die Basis 1 geworden und die Ausgabe „۲,5 kg",
     // also eine halbierte Zutat in einer Schreibweise, die es nicht gibt.
-    // Geprueft wird die STELLE (ein Zeichen zwischen zwei Ziffern, das kein
-    // Leerraum ist), nicht eine Liste von Trennern - die haengt an der Region,
-    // und genau die kennt diese Funktion absichtlich nicht selbst.
-    const abgeschnitten = /^[^\s\d]\d/.test(dec[2]);
+    // Ueber dieselbe geteilte Pruefung wie im Einkauf: sie kennt die Trennzeichen
+    // der waehlbaren Regionen. „Irgendein Zeichen zwischen zwei Ziffern" war zu
+    // breit und liess „2x500 g" ungeskaliert stehen - ein `x` trennt nichts.
+    const abgeschnitten = breaksOffAtSeparator(dec[2]);
     const base = Number(dec[1]);
     if (!abgeschnitten && Number.isFinite(base)) {
       return `${formatScaledQuantity(base * factor)}${restOf(dec, 2)}`;
@@ -1175,12 +1175,19 @@ function scaleQuantityText(quantity, factor) {
 }
 
 /**
- * Die skalierte Zahl als Text: hoechstens zwei Nachkommastellen, Trenner und
- * Ziffern aus der Region, ohne Tausendergruppierung (sonst laese
- * `toDecimalString` den Wert beim naechsten Skalieren nicht mehr ein).
+ * Die skalierte Zahl als Text: hoechstens zwei Nachkommastellen, Trenner aus der
+ * Region, Ziffern in ASCII, ohne Tausendergruppierung.
+ *
+ * Warum die Ziffern NICHT der Region folgen, obwohl der Trenner es tut: dieser
+ * Text wird in die Zutatenzeile geschrieben und gespeichert, und beim Uebertrag
+ * in die Einkaufsliste liest ihn `parseQuantity` in
+ * server/services/shopping-import.js mit einer ASCII-Regex wieder ein. Eine in
+ * nativen Ziffern geschriebene Menge („۲۰۰۰ g") kaeme dort nicht an - die Zutat
+ * liesse sich nicht mehr mit anderen zusammenzaehlen. Begruendung und der Weg zu
+ * einem saubereren Endzustand stehen bei `toStoredNumber` in utils/money.js.
  */
 function formatScaledQuantity(value) {
-  return getNumberFormat({ useGrouping: false, maximumFractionDigits: 2 }).format(value);
+  return toStoredNumber(value);
 }
 
 function openMealModal(opts) {

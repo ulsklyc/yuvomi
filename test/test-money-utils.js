@@ -15,7 +15,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toDecimalString, amountInputToCents, centsToAmountInput } from '../public/utils/money.js';
+import { toDecimalString, amountInputToCents, centsToAmountInput, breaksOffAtSeparator, toStoredNumber } from '../public/utils/money.js';
 
 /**
  * Fuehrt `fn` unter einer anderen Format-Locale aus. Die Locale ist im Browser
@@ -176,4 +176,48 @@ test('centsToAmountInput: der ausgegebene Wert kommt wieder herein', () => {
       }
     });
   }
+});
+
+test('breaksOffAtSeparator: nur echte Trennzeichen zaehlen, kein Multiplikator', () => {
+  // Die Regel war erst „irgendein Zeichen zwischen zwei Ziffern, das kein
+  // Leerraum ist". Das traf auch „2x500 g" - und ein `x` ist kein Trenner: nach
+  // ihm ist die 2 vollstaendig gelesen. Beide Freitext-Aufrufer fielen dadurch auf
+  // ihren Standard zurueck, statt die Multiplikator-Schreibweise zu lesen.
+  //
+  // Die Zeichenmenge kommt aus REGION_CODES, ist also gemessen und nicht geraten:
+  // sie waechst mit, wenn eine Region dazukommt.
+  for (const rest of [',5 kg', '.5 kg', "'000 g", '٫٥ kg', '٬٠٠٠ g']) {
+    assert.equal(breaksOffAtSeparator(rest), true, `"${rest}" bricht im Trenner ab`);
+  }
+  for (const rest of ['x500 g', ' x 500 g', 'er-Pack', ' kg', '', 'x', ',', ' 5 g', '× 1 l']) {
+    assert.equal(breaksOffAtSeparator(rest), false, `"${rest}" ist kein Abbruch im Trenner`);
+  }
+  // Ein Whitespace-Gruppierungstrenner (fr nutzt U+202F) zaehlt bewusst NICHT:
+  // ein Leerzeichen trennt im Freitext zwei Angaben. Die echte Gruppierung dahinter
+  // faengt die Musterpruefung in toDecimalString.
+  assert.equal(breaksOffAtSeparator('\u202F000 g'), false);
+});
+
+test('toStoredNumber: Trenner aus der Region, Ziffern in ASCII', () => {
+  // Der geschriebene Wert wird gespeichert und serverseitig mit einer ASCII-Regex
+  // wieder gelesen (parseQuantity in server/services/shopping-import.js). Die
+  // Ziffern sind damit Datenformat, der Trenner bleibt Anzeige.
+  const serverRegex = /^([+-]?\d+(?:[.,]\d+)?)$/;
+  for (const locale of ['de', 'en-US', 'fa', 'ar-EG', 'fr', 'de-CH']) {
+    withFormatLocale(locale, () => {
+      for (const wert of [2000, 4.5, 0.25, 1]) {
+        const text = toStoredNumber(wert);
+        assert.match(text, serverRegex, `${locale}: "${text}" ist fuer den Server unlesbar`);
+        // Und der Client liest ihn auch wieder ein.
+        assert.equal(Number(toDecimalString(text)), wert, `${locale}: Rundreise fuer ${wert}`);
+      }
+    });
+  }
+  // Der Trenner folgt der Region, die Ziffern nicht.
+  withFormatLocale('de', () => { assert.equal(toStoredNumber(4.5), '4,5'); });
+  withFormatLocale('fr', () => { assert.equal(toStoredNumber(4.5), '4,5'); });
+  withFormatLocale('en-US', () => { assert.equal(toStoredNumber(4.5), '4.5'); });
+  withFormatLocale('fa', () => { assert.equal(toStoredNumber(2000), '2000'); });
+  // Ohne Gruppierung, sonst laese toDecimalString den Wert nicht wieder ein.
+  withFormatLocale('de', () => { assert.equal(toStoredNumber(2000), '2000'); });
 });

@@ -19,7 +19,7 @@ import '/components/category-manager.js';
 import { findPageFab } from '/utils/fab.js';
 import { setBulkPill, clearBulkPill, bulkPillLayer } from '/utils/bulk-pill.js';
 import { makeSortable } from '/utils/sortable.js';
-import { amountPlaceholder, centsToAmountInput, amountInputToCents, toDecimalString } from '/utils/money.js';
+import { amountPlaceholder, centsToAmountInput, amountInputToCents, toDecimalString, breaksOffAtSeparator } from '/utils/money.js';
 
 
 // --------------------------------------------------------
@@ -1626,11 +1626,13 @@ function parseShoppingQuantity(raw) {
   // ab, aber nicht jede: „٢٬٥٠" hat nur zwei Stellen hinter dem Trenner, ist
   // also kein Gruppierungsmuster - und ein Trenner, den die Region nicht kennt,
   // steht ohnehin einfach da (unter fa trennt das ASCII-Komma nichts). Diese
-  // Regex liest nur den ANFANG, sie nähme daraus wortlos die 2. Geprüft wird die
-  // STELLE (ein Zeichen zwischen zwei Ziffern, das kein Leerraum ist), nicht eine
-  // Liste von Trennern - welche Zeichen trennen, weiss die Region, nicht diese
-  // Funktion. Dieselbe Prüfung steht in pages/meals.js.
-  if (/^[^\s\d]\d/.test(decimal.slice(match[1].length))) return fallback;
+  // Regex liest nur den ANFANG und nähme daraus wortlos die 2.
+  //
+  // Über die geteilte Prüfung aus utils/money.js, die genau die Trennzeichen der
+  // wählbaren Regionen kennt: „irgendein Zeichen zwischen zwei Ziffern" war zu
+  // breit und traf „2x500 g" mit, also die Multiplikator-Schreibweise, die zwei
+  // Zeilen weiter oben ausdrücklich lesbar bleiben soll.
+  if (breaksOffAtSeparator(decimal.slice(match[1].length))) return fallback;
 
   const quantity = Number(match[1]);
   if (!Number.isFinite(quantity) || quantity <= 0) return fallback;

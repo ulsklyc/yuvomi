@@ -21,7 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mirrored in from Mealie or Tandoor stayed "1.5" in a German kitchen. Both directions now follow the
   set region - the reading side through the same transliteration as prices and shopping quantities,
   the writing side through the same number format - so a scaled quantity comes back out in the
-  notation the household reads, and the app can read its own output again the next time.
+  notation the household reads, and the app can read its own output again the next time. The digits
+  of a scaled amount stay ASCII on purpose: the text is saved into the ingredient row and read back
+  when the meal moves to the shopping list, and a quantity in native digits would not arrive there
+  and would drop out of the totals. The separator is presentation; the digits are data.
 
   A grouped quantity is refused rather than guessed, and refusing here means the line is left exactly
   as it was: the quantity is the ingredient's own text, and the original is the only answer that

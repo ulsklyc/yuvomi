@@ -671,8 +671,8 @@ test('Skalieren: oestliche Ziffern kommen ueberhaupt an', () => {
   // `\d` ist in JavaScript ASCII. Unter fa oder ar-EG traf die alte Regex die
   // Ziffern der eigenen Oberflaeche nicht - die Zeile blieb ungeskaliert zwischen
   // skalierten Geschwistern stehen, was ein falsches Rezept ergibt.
-  scaled('fa', '۲۵۰ g', 2, '۵۰۰ g');
-  scaled('ar-EG', '١٫٥ kg', 2, '٣ kg');
+  scaled('fa', '۲۵۰ g', 2, '500 g');
+  scaled('ar-EG', '١٫٥ kg', 2, '3 kg');
   // Ein anderes Ziffernsystem als das der Region bleibt unangetastet: fa
   // schreibt ۱, nicht ١.
   scaled('fa', '١٫٥ kg', 2, '١٫٥ kg');
@@ -683,9 +683,16 @@ test('Skalieren: der Rest der Zeile behaelt seine eigenen Ziffern', () => {
   // Zahl ein zweiter Zahlenteil, kam er vorher aus der umgeschriebenen Fassung
   // zurueck und verlor dabei seine Ziffern: unter fa wurde „۲ x ۵۰۰ g" zu
   // „۴ x 500 g", also eine Zeile in zwei Schriften.
-  scaled('fa', '۲ x ۵۰۰ g', 2, '۴ x ۵۰۰ g');
-  scaled('fa', '۲ x ۱٫۵ kg', 2, '۴ x ۱٫۵ kg');
-  scaled('fa', '۱ ۱/۲ Tassen', 2, '۳ Tassen');
+  // Die GESCHRIEBENE Zahl steht in ASCII, der unveraenderte Rest in seinen eigenen
+  // Ziffern - unter fa ergibt das eine gemischte Zeile, und das ist eine bewusste
+  // Entscheidung, keine Nachlaessigkeit: dieser Text wird gespeichert und beim
+  // Uebertrag in die Einkaufsliste von `parseQuantity` (ASCII-Regex) wieder
+  // gelesen. Eine Menge in persischen Ziffern kaeme dort nicht an und liesse sich
+  // nicht mehr zusammenzaehlen. Der Trenner folgt weiter der Region, nur die
+  // Ziffern sind Datenformat. Siehe `toStoredNumber` in utils/money.js.
+  scaled('fa', '۲ x ۵۰۰ g', 2, '4 x ۵۰۰ g');
+  scaled('fa', '۲ x ۱٫۵ kg', 2, '4 x ۱٫۵ kg');
+  scaled('fa', '۱ ۱/۲ Tassen', 2, '3 Tassen');
   // Umgekehrt darf der Rest auch nichts DAZUgewinnen: die ASCII-Zeile bleibt ASCII.
   scaled('de', '2 x 500 g', 2, '4 x 500 g');
   // Der realistischste Fall, und er braucht keine fremde Region: in de ist das
@@ -714,6 +721,33 @@ test('Skalieren: die Umschrift ist positionstreu - darauf baut der Rest der Zeil
       }
     });
   }
+});
+
+test('Skalieren: die geschriebene Zahl bleibt serverlesbar', () => {
+  // `parseQuantity` in server/services/shopping-import.js liest die gespeicherte
+  // Zutatenmenge beim Uebertrag in die Einkaufsliste mit einer ASCII-Regex. Wird
+  // hier in nativen Ziffern geschrieben, kommt die Zutat dort nicht an und faellt
+  // aus der Summierung - aus einer Anzeigefrage wuerde ein Funktionsverlust.
+  const serverRegex = /^([+-]?\d+(?:[.,]\d+)?)\s*(.*)$/;
+  for (const locale of ['de', 'en-US', 'fa', 'ar-EG', 'fr']) {
+    let ergebnis;
+    withFormatLocale(locale, () => { ergebnis = mealsUi.scaleQuantityText('1000 g', 2); });
+    assert(serverRegex.test(ergebnis), `${locale}: "${ergebnis}" ist fuer den Server unlesbar`);
+  }
+  // Der TRENNER folgt trotzdem der Region - nur die Ziffern sind Datenformat.
+  scaled('de', '1,5 kg', 3, '4,5 kg');
+  scaled('fr', '1,5 kg', 3, '4,5 kg');
+  scaled('en-US', '1.5 kg', 3, '4.5 kg');
+});
+
+test('Skalieren: die Multiplikator-Schreibweise bleibt lesbar', () => {
+  // Die Abschneide-Pruefung war erst „irgendein Zeichen zwischen zwei Ziffern".
+  // Das traf auch „2x500 g" - ein `x` ist aber kein Trenner, nach ihm ist die 2
+  // vollstaendig gelesen. Die Zeile blieb dadurch ungeskaliert stehen, also genau
+  // der Fehler, gegen den diese Funktion angetreten ist.
+  scaled('de', '2x500 g', 2, '4x500 g');
+  scaled('de', '3x Dose', 2, '6x Dose');
+  scaled('de', '2 x 500 g', 2, '4 x 500 g');
 });
 
 test('Skalieren: eine mitten im Trenner abgeschnittene Zahl bleibt stehen', () => {

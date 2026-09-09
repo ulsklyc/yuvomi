@@ -532,6 +532,15 @@ test('parseShoppingQuantity: eine mitten im Trenner abgeschnittene Menge wird ab
   withFormatLocale('de', () => {
     assert.deepEqual(__test.parseShoppingQuantity('6 × 1 l'), { quantity: 6, unit: 'pcs' });
   });
+  // Und ein `x` ist kein Trenner: nach ihm ist die Zahl vollstaendig gelesen. Die
+  // Pruefung war erst „irgendein Zeichen zwischen zwei Ziffern" und traf damit
+  // die Multiplikator-Schreibweise mit, die der Kommentar an der Regex
+  // ausdruecklich lesbar halten will.
+  withFormatLocale('de', () => {
+    assert.deepEqual(__test.parseShoppingQuantity('2x500 g'), { quantity: 2, unit: 'pcs' });
+    assert.deepEqual(__test.parseShoppingQuantity('3x'), { quantity: 3, unit: 'pcs' });
+    assert.deepEqual(__test.parseShoppingQuantity('4er-Pack'), { quantity: 4, unit: 'pcs' });
+  });
 });
 
 test('parseShoppingQuantity: eine Gruppierung im REST laesst die fuehrende Menge stehen', () => {
