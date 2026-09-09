@@ -134,6 +134,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   systems is not something anyone would keep current by hand. Only real digits count: the one system
   whose "five" is an ordinary Chinese character is left out, so a `五` in an ingredient stays a word.
 
+  Two details follow from what a character actually means. The Arabic thousands separator says so
+  unambiguously, unlike a comma, so "١٬٠٠٠ g" now reads as a thousand grams; a plain "1,000 g" is
+  left as it was, because there the server cannot tell grouping from a decimal point. And a fraction
+  stays on the text path rather than being read as its numerator - "١/٢ kg" was never a quantity of
+  one, and neither was "1/2 kg", which had been getting that wrong unnoticed.
+
 
 - **Deleting a category now updates the page behind the dialog**. Every module that offers
   "manage categories" kept showing the category you had just deleted: the filter chips in Contacts,
