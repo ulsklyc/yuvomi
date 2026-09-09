@@ -43,6 +43,13 @@ const SHARED_ISOMORPHIC = new Set([
   'public/utils/recipe-meal-types.js',
   'public/utils/contact-name.js',
   'public/utils/pantry-units.js',
+  // #1074: Ziffern fremder Systeme nach ASCII. Client und Server lesen dieselben
+  // Mengentexte („۲۵۰ g") - der Client, um eine Zutat zu skalieren, der Server,
+  // um sie beim Uebertrag in die Einkaufsliste zusammenzuzaehlen. Zwei Fassungen
+  // wuerden hier nicht bei einem Randfall auseinanderlaufen, sondern bei jedem
+  // Haushalt, der seine eigenen Ziffern schreibt: die eine Seite rechnete, die
+  // andere nicht. Rein aus Intl abgeleitet, ohne DOM und ohne Node.
+  'public/utils/digits.js',
   // #620: Das Format der Sync-Ziel-Kennung. Der Server validiert genau das,
   // was Event-Modal und Einstellungen bauen - zwei Definitionen desselben
   // Formats würden sich unbemerkt auseinanderentwickeln.

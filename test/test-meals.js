@@ -11,6 +11,7 @@ import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { datesForTemplateInRange, mealWeekday } from '../server/services/meal-recurrence.js';
 import { __test as mealsUi } from '../public/pages/meals.js';
 import { toDecimalString } from '../public/utils/money.js';
+import { parseQuantity } from '../server/services/shopping-import.js';
 
 let passed = 0;
 let failed = 0;
@@ -671,11 +672,14 @@ test('Skalieren: oestliche Ziffern kommen ueberhaupt an', () => {
   // `\d` ist in JavaScript ASCII. Unter fa oder ar-EG traf die alte Regex die
   // Ziffern der eigenen Oberflaeche nicht - die Zeile blieb ungeskaliert zwischen
   // skalierten Geschwistern stehen, was ein falsches Rezept ergibt.
-  scaled('fa', '۲۵۰ g', 2, '500 g');
-  scaled('ar-EG', '١٫٥ kg', 2, '3 kg');
-  // Ein anderes Ziffernsystem als das der Region bleibt unangetastet: fa
-  // schreibt ۱, nicht ١.
-  scaled('fa', '١٫٥ kg', 2, '١٫٥ kg');
+  scaled('fa', '۲۵۰ g', 2, '۵۰۰ g');
+  scaled('ar-EG', '١٫٥ kg', 2, '٣ kg');
+  // Auch ein ANDERES System als das der Region wird gelesen - seit die Umschrift
+  // aus utils/digits.js dahintersteht, dieselbe, die der Server benutzt. Vorher
+  // blieb so eine Zeile liegen; jetzt wird sie gerechnet und in den Ziffern der
+  // eingestellten Region ausgegeben. Das traegt auch den Regionswechsel: eine
+  // unter ar-EG gespeicherte Menge bleibt unter fa lesbar.
+  scaled('fa', '١٫٥ kg', 2, '۳ kg');
 });
 
 test('Skalieren: der Rest der Zeile behaelt seine eigenen Ziffern', () => {
@@ -683,16 +687,12 @@ test('Skalieren: der Rest der Zeile behaelt seine eigenen Ziffern', () => {
   // Zahl ein zweiter Zahlenteil, kam er vorher aus der umgeschriebenen Fassung
   // zurueck und verlor dabei seine Ziffern: unter fa wurde „۲ x ۵۰۰ g" zu
   // „۴ x 500 g", also eine Zeile in zwei Schriften.
-  // Die GESCHRIEBENE Zahl steht in ASCII, der unveraenderte Rest in seinen eigenen
-  // Ziffern - unter fa ergibt das eine gemischte Zeile, und das ist eine bewusste
-  // Entscheidung, keine Nachlaessigkeit: dieser Text wird gespeichert und beim
-  // Uebertrag in die Einkaufsliste von `parseQuantity` (ASCII-Regex) wieder
-  // gelesen. Eine Menge in persischen Ziffern kaeme dort nicht an und liesse sich
-  // nicht mehr zusammenzaehlen. Der Trenner folgt weiter der Region, nur die
-  // Ziffern sind Datenformat. Siehe `toStoredNumber` in utils/money.js.
-  scaled('fa', '۲ x ۵۰۰ g', 2, '4 x ۵۰۰ g');
-  scaled('fa', '۲ x ۱٫۵ kg', 2, '4 x ۱٫۵ kg');
-  scaled('fa', '۱ ۱/۲ Tassen', 2, '3 Tassen');
+  // Die geschriebene Zahl steht in den Ziffern der Region, genau wie der Rest -
+  // eine Zeile, eine Schrift. Bis v2.65 stand sie in ASCII, weil der Server nichts
+  // anderes lesen konnte; seit er dieselbe Umschrift benutzt, ist der Grund weg.
+  scaled('fa', '۲ x ۵۰۰ g', 2, '۴ x ۵۰۰ g');
+  scaled('fa', '۲ x ۱٫۵ kg', 2, '۴ x ۱٫۵ kg');
+  scaled('fa', '۱ ۱/۲ Tassen', 2, '۳ Tassen');
   // Umgekehrt darf der Rest auch nichts DAZUgewinnen: die ASCII-Zeile bleibt ASCII.
   scaled('de', '2 x 500 g', 2, '4 x 500 g');
   // Der realistischste Fall, und er braucht keine fremde Region: in de ist das
@@ -725,14 +725,18 @@ test('Skalieren: die Umschrift ist positionstreu - darauf baut der Rest der Zeil
 
 test('Skalieren: die geschriebene Zahl bleibt serverlesbar', () => {
   // `parseQuantity` in server/services/shopping-import.js liest die gespeicherte
-  // Zutatenmenge beim Uebertrag in die Einkaufsliste mit einer ASCII-Regex. Wird
-  // hier in nativen Ziffern geschrieben, kommt die Zutat dort nicht an und faellt
-  // aus der Summierung - aus einer Anzeigefrage wuerde ein Funktionsverlust.
-  const serverRegex = /^([+-]?\d+(?:[.,]\d+)?)\s*(.*)$/;
+  // Zutatenmenge beim Uebertrag in die Einkaufsliste. Kommt sie dort nicht an,
+  // faellt die Zutat aus der Summierung - aus einer Anzeigefrage wuerde ein
+  // Funktionsverlust.
+  // Gegen den ECHTEN parseQuantity, nicht gegen einen Nachbau seiner Regex: der
+  // Nachbau, der hier stand, haette die Umstellung auf regionseigene Ziffern fuer
+  // unlesbar erklaert, obwohl der Server sie laengst liest. Ein Test, der eine
+  // fremde Regel KOPIERT, misst die Kopie.
   for (const locale of ['de', 'en-US', 'fa', 'ar-EG', 'fr']) {
     let ergebnis;
     withFormatLocale(locale, () => { ergebnis = mealsUi.scaleQuantityText('1000 g', 2); });
-    assert(serverRegex.test(ergebnis), `${locale}: "${ergebnis}" ist fuer den Server unlesbar`);
+    assert(parseQuantity(ergebnis)?.amount === 2000,
+      `${locale}: "${ergebnis}" ist fuer den Server unlesbar`);
   }
   // Der TRENNER folgt trotzdem der Region - nur die Ziffern sind Datenformat.
   scaled('de', '1,5 kg', 3, '4,5 kg');
@@ -772,7 +776,7 @@ test('Skalieren: eine mitten im Trenner abgeschnittene Zahl bleibt stehen', () =
   scaled('ar-EG', '١ ١/٢٫٥ cup', 2, '١ ١/٢٫٥ cup');
   // Gegenprobe: der gewoehnliche Bruch rechnet unveraendert weiter.
   scaled('de', '1/2 cup', 2, '1 cup');
-  scaled('ar-EG', '١ ١/٢ cup', 2, '3 cup');
+  scaled('ar-EG', '١ ١/٢ cup', 2, '٣ cup');
   // Ein Leerzeichen trennt dagegen zwei Angaben und schneidet nichts ab.
   scaled('de', '2 x 500 g', 2, '4 x 500 g');
 });

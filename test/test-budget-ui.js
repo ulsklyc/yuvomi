@@ -726,7 +726,7 @@ test('nur der Trenner der Region wird zum Dezimalpunkt', () => {
   // Beide Faelle sind in test-shopping-ux.js verhaltensgetrieben gepinnt; hier
   // steht die Reihenfolge selbst, weil ein Textguard sie zeigt und ein
   // Verhaltenstest nur ihre Folgen.
-  const ziffernSchritt = impl.search(/digits\.has\(char\)/);
+  const ziffernSchritt = impl.search(/digits\.get\(char\)/);
   const gruppenSchritt = impl.search(/groupSep &&/);
   const trennerSchritt = impl.search(/char === decimalSep/);
   assert.ok(ziffernSchritt >= 0 && gruppenSchritt >= 0 && trennerSchritt >= 0,
@@ -798,20 +798,19 @@ test('keine Seite schreibt einen Dezimaltrenner von Hand um', () => {
   // Gruppierung. Die drei haengen zusammen und stehen deshalb hier beieinander:
   //  - `getNumberFormat` liefert den Trenner der Region (sonst zeigte eine
   //    deutsche Oberflaeche "4.5");
-  //  - `numberingSystem: 'latn'` haelt die ZIFFERN in ASCII, weil dieser Text
-  //    gespeichert und von parseQuantity (server/services/shopping-import.js)
-  //    mit einer ASCII-Regex wieder gelesen wird - "۲۰۰۰ g" kaeme dort nicht an
-  //    und fiele aus der Summierung der Einkaufsliste. Es stellt Ziffern UND
-  //    Symbole gemeinsam um, und genau das ist hier richtig: fa/ar fuehren mit
-  //    `٫` einen Trenner, den parseQuantity ebenfalls nicht kennt. Die Grenze
-  //    der Zusicherung ist in test-money-utils.js gemessen;
+  //  - KEIN `numberingSystem`-Zwang mehr: bis v2.65 stand hier `latn`, weil der
+  //    Server nur ASCII lesen konnte und eine Menge in persischen Ziffern aus der
+  //    Summierung fiel. Seit er dieselbe Umschrift benutzt (utils/digits.js), ist
+  //    der Grund entfallen - und eine skalierte Zeile mischt nicht mehr zwei
+  //    Schriften. Gemessen wird das in test-money-utils.js gegen den ECHTEN
+  //    parseQuantity statt gegen einen Nachbau seiner Regex;
   //  - ohne `useGrouping: false` schriebe sie einen Wert, den toDecimalString
   //    beim naechsten Skalieren abweist.
   const gespeichert = clean.match(/export function toStoredNumber[\s\S]*?\n\}/);
   assert.ok(gespeichert, 'toStoredNumber fehlt in utils/money.js');
   assert.match(gespeichert[0], /getNumberFormat\(/, 'der Trenner muss aus der Region kommen');
-  assert.match(gespeichert[0], /numberingSystem:\s*'latn'/,
-    'die Ziffern muessen ASCII bleiben - der Server liest den Wert mit einer ASCII-Regex');
+  assert.doesNotMatch(gespeichert[0], /numberingSystem/,
+    'der gespeicherte Wert folgt der Region - der Server liest sie inzwischen mit');
   assert.match(gespeichert[0], /useGrouping:\s*false/, 'der gespeicherte Wert darf nicht gruppiert sein');
 
   // Die Abschneide-Pruefung liegt geteilt in money.js und kennt die Trennzeichen

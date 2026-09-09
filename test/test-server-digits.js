@@ -1,5 +1,5 @@
 /**
- * Modul: server/utils/digits.js - Ziffern fremder Systeme nach ASCII
+ * Modul: public/utils/digits.js - Ziffern fremder Systeme nach ASCII
  * Zweck: Die Umschrift selbst, ihre Vollstaendigkeit und ihre Positionstreue.
  * Ausfuehren: node --test test/test-server-digits.js
  *
@@ -12,7 +12,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toAsciiDigits, digitMapSize } from '../server/utils/digits.js';
+import { toAsciiDigits, digitMapSize } from '../public/utils/digits.js';
 
 test('toAsciiDigits: ASCII bleibt, wie es ist', () => {
   assert.equal(toAsciiDigits('250 g'), '250 g');

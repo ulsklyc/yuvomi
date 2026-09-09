@@ -26,6 +26,7 @@
 
 import { getNumberFormat } from '/i18n.js';
 import { REGION_CODES } from '/settings/region-presets.js';
+import { asciiDigit, asciiSeparator } from '/utils/digits.js';
 
 /** Erlaubte Rollen. Wird vom Guard in test-budget-ui.js gegen die Aufrufe geprüft. */
 export const MONEY_ROLES = ['flow', 'total', 'balance', 'plain'];
@@ -290,8 +291,16 @@ export function toDecimalString(value, { freeText = false } = {}) {
     .formatToParts(1234).find((part) => part.type === 'group')?.value;
 
   // Schritt 1: nur die ZIFFERN nach ASCII, die Trenner bleiben, wie sie sind.
+  //
+  // Die Ziffern der eingestellten Region haben den Vortritt; erst danach greift
+  // die regionslose Zuordnung aus utils/digits.js. Das ist kein Luxus, sondern
+  // die Kehrseite davon, dass gespeicherte Mengen seit v2.66 in den Ziffern ihrer
+  // Region stehen: wer die Region spaeter wechselt, haette sonst Werte in der
+  // Datenbank, die seine eigene Oberflaeche nicht mehr lesen kann - eine Zutat
+  // „۴٫۵ kg" bliebe unter de beim Skalieren einfach liegen. Der Server liest sie
+  // laengst, mit derselben Datei.
   let normalized = '';
-  for (const char of raw) normalized += digits.has(char) ? digits.get(char) : char;
+  for (const char of raw) normalized += digits.get(char) ?? asciiDigit(char) ?? char;
 
   // Schritt 2: Gruppierungsmuster - der Trenner, gefolgt von genau drei Ziffern,
   // auf die keine weitere folgt. "1.000" in de-DE trifft zu, "12.50" nicht.
@@ -322,8 +331,15 @@ export function toDecimalString(value, { freeText = false } = {}) {
   // Tausender, aus "1,000" würde dann "1.000" und daraus die Zahl 1 - ein
   // Anteil, der um den Faktor tausend danebenliegt, ohne dass irgendwo ein
   // Fehler erscheint.
+  //
+  // Fremde TRENNER erst hier, nicht in Schritt 1: sonst waere ein U+066C schon ein
+  // Komma, bevor die Pruefung oben nach dem Gruppierungszeichen der Region sucht -
+  // gemessen fiel ar-EG „٢٬٠٠٠" damit durch, obwohl es eindeutig gruppiert ist.
+  // Die ZIFFERN muessen dagegen vorher fallen, damit `\d{3}` sie zaehlen kann.
   let out = '';
-  for (const char of normalized) out += char === decimalSep ? '.' : char;
+  for (const char of normalized) {
+    out += char === decimalSep ? '.' : (asciiSeparator(char) ?? char);
+  }
   return out;
 }
 
@@ -365,9 +381,7 @@ export function toDecimalString(value, { freeText = false } = {}) {
  * Schreibweise hier der Vertrag zwischen beiden Seiten.
  */
 export function toStoredNumber(value, { maximumFractionDigits = 2 } = {}) {
-  return getNumberFormat({
-    useGrouping: false, maximumFractionDigits, numberingSystem: 'latn',
-  }).format(value);
+  return getNumberFormat({ useGrouping: false, maximumFractionDigits }).format(value);
 }
 
 export function centsToAmountInput(cents, currency) {

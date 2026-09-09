@@ -111,6 +111,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A scaled ingredient quantity is now written in the household's own digits.** Scaling a recipe
+  wrote the number in Latin digits even where the rest of the line used Persian or Arabic ones, so a
+  doubled "۲ x ۵۰۰ g" came back as "4 x ۵۰۰ g" - one line in two scripts. That was deliberate at the
+  time: the server could only read Latin digits, and a quantity it could not read dropped out of the
+  shopping list totals. Now that both sides share the same transliteration, the reason is gone.
+
+  Quantities already stored stay readable, and so do quantities written before a household changes
+  its region: reading gives the configured region's digits precedence and falls back to every other
+  system, the same way the server does. Without that, this change would have produced data the app
+  itself could no longer read.
+
+
 - **The recurring-payment dialog now says that editing a series also rewrites its first booking**
   (#1035). A series original is two things at once: the template every future occurrence is built
   from, and the first hand-entered booking. `PUT /budget/:id/series` writes title, amount, category

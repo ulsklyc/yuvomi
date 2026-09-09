@@ -16,6 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { toDecimalString, amountInputToCents, centsToAmountInput, breaksOffAtSeparator, toStoredNumber } from '../public/utils/money.js';
+import { parseQuantity } from '../server/services/shopping-import.js';
 
 /**
  * Fuehrt `fn` unter einer anderen Format-Locale aus. Die Locale ist im Browser
@@ -43,12 +44,13 @@ test('toDecimalString: Ziffern und Trenner kommen aus der eingestellten Region',
   // die Zuordnung wird aus Intl abgeleitet.
   um('fa', '۱۲٫۵۰', '12.50');
   um('ar-EG', '١٢٫٥٠', '12.50');
-  // Ziffern eines ANDEREN Systems bleiben stehen: fa schreibt ۱, nicht ١. Der
-  // Trenner wird trotzdem uebersetzt - fa und ar-EG teilen sich U+066B, und die
-  // Umschrift entscheidet je Zeichen, nicht je Zeile.
-  um('fa', '١٢٫٥٠', '١٢.٥٠');
-  // Und ein Trenner, den die Region nicht kennt, bleibt ebenfalls stehen.
-  um('de', '١٢٫٥٠', '١٢٫٥٠');
+  // Ziffern eines ANDEREN Systems werden ebenfalls gelesen - seit v2.66 stehen
+  // gespeicherte Mengen in den Ziffern IHRER Region, und wer die Region wechselt,
+  // muss seine eigenen Altdaten weiter lesen koennen. Die Zuordnung dafuer kommt
+  // aus utils/digits.js, derselben Datei, die der Server benutzt.
+  um('fa', '١٢٫٥٠', '12.50');
+  um('de', '١٢٫٥٠', '12.50');
+  um('en-US', '۴٫۵', '4.5');
   // Unbekannte Zeichen bleiben stehen, statt still zu verschwinden - ein
   // Tippfehler soll als Tippfehler auffallen.
   um('de', '12,50 EUR', '12.50 EUR');
@@ -107,7 +109,10 @@ test('toDecimalString: bei Freitext zaehlt nur der fuehrende Zahlenbereich', () 
   });
   withFormatLocale('ar-EG', () => {
     assert.equal(toDecimalString('٢٬٠٠٠ g', { freeText: true }), '', 'auch in oestlichen Ziffern');
-    assert.equal(toDecimalString('٦ × ١٬٠٠٠ ml', { freeText: true }), '6 × 1٬000 ml');
+    // Der Trenner im REST wird ebenfalls umgeschrieben - die Zuordnung gilt je
+    // Zeichen und regionsunabhaengig. Fuer die Aufrufer ist das folgenlos: sie
+    // schneiden den Rest aus dem Original (siehe Positionstreue).
+    assert.equal(toDecimalString('٦ × ١٬٠٠٠ ml', { freeText: true }), '6 × 1,000 ml');
   });
   // Der Dezimaltrenner im fuehrenden Token bleibt eine Dezimalangabe.
   withFormatLocale('de', () => {
@@ -198,42 +203,46 @@ test('breaksOffAtSeparator: nur echte Trennzeichen zaehlen, kein Multiplikator',
   assert.equal(breaksOffAtSeparator('\u202F000 g'), false);
 });
 
-test('toStoredNumber: Ziffern immer ASCII, Trenner der Region soweit serverlesbar', () => {
-  // Der geschriebene Wert wird gespeichert und serverseitig mit einer ASCII-Regex
-  // wieder gelesen (parseQuantity in server/services/shopping-import.js). Die
-  // Ziffern sind damit Datenformat, der Trenner bleibt Anzeige.
-  const serverRegex = /^([+-]?\d+(?:[.,]\d+)?)$/;
-  for (const locale of ['de', 'en-US', 'fa', 'ar-EG', 'fr', 'de-CH']) {
+test('toStoredNumber: Ziffern UND Trenner der Region, von beiden Seiten lesbar', () => {
+  // Der geschriebene Wert wird gespeichert und spaeter von zwei Stellen wieder
+  // gelesen: hier und von `parseQuantity` auf dem Server. Bis v2.65 stand er
+  // deshalb in ASCII-Ziffern - der Server konnte nichts anderes. Seit der Server
+  // dieselbe Umschrift benutzt (utils/digits.js), gibt es den Grund nicht mehr,
+  // und eine skalierte Zutat mischt unter fa nicht laenger zwei Schriften.
+  //
+  // Gemessen wird gegen den ECHTEN parseQuantity, nicht gegen einen Nachbau
+  // seiner Regex: der Nachbau, der hier stand, haette diese Aenderung fuer
+  // unlesbar erklaert, obwohl der Server sie laengst liest.
+  for (const locale of ['de', 'en-US', 'fa', 'ar-EG', 'fr', 'de-CH', 'bn']) {
     withFormatLocale(locale, () => {
       for (const wert of [2000, 4.5, 0.25, 1]) {
         const text = toStoredNumber(wert);
-        assert.match(text, serverRegex, `${locale}: "${text}" ist fuer den Server unlesbar`);
-        // Und der Client liest ihn auch wieder ein.
-        assert.equal(Number(toDecimalString(text)), wert, `${locale}: Rundreise fuer ${wert}`);
+        assert.equal(parseQuantity(`${text} kg`)?.amount, wert,
+          `${locale}: "${text}" ist fuer den Server unlesbar`);
+        assert.equal(Number(toDecimalString(text)), wert, `${locale}: Rundreise im Client fuer ${wert}`);
       }
     });
   }
-  // Der Trenner folgt der Region, die Ziffern nicht.
-  withFormatLocale('de', () => { assert.equal(toStoredNumber(4.5), '4,5'); });
-  withFormatLocale('fr', () => { assert.equal(toStoredNumber(4.5), '4,5'); });
-  withFormatLocale('cs', () => { assert.equal(toStoredNumber(4.5), '4,5'); });
-  withFormatLocale('en-US', () => { assert.equal(toStoredNumber(4.5), '4.5'); });
-  withFormatLocale('de-CH', () => { assert.equal(toStoredNumber(4.5), '4.5'); });
-  withFormatLocale('fa', () => { assert.equal(toStoredNumber(2000), '2000'); });
 
-  // Die GRENZE der Zusicherung, ausdruecklich gemessen: fa, ar-EG und ar-SA
-  // fuehren mit `٫` einen dritten Dezimaltrenner, den `parseQuantity` nicht
-  // kennt. Dort gewinnt die Lesbarkeit und es wird der Punkt. Vorher stand nur
-  // „Trenner aus der Region" in der Doku und im Test - gemessen waren aber
-  // ausschliesslich Regionen, in denen das zufaellig stimmt.
-  for (const locale of ['fa', 'ar-EG', 'ar-SA']) {
-    const regionsTrenner = new Intl.NumberFormat(locale, { minimumFractionDigits: 1 })
-      .formatToParts(1.5).find((part) => part.type === 'decimal').value;
-    assert.equal(regionsTrenner, '٫', `${locale} sollte ٫ fuehren`);
+  // Und ueber einen REGIONSWECHSEL hinweg: ein unter fa gespeicherter Wert muss
+  // unter de weiter lesbar sein, sonst haette diese Aenderung Altdaten erzeugt,
+  // die die eigene Oberflaeche nicht mehr versteht.
+  let unterFa;
+  withFormatLocale('fa', () => { unterFa = toStoredNumber(4.5); });
+  for (const locale of ['de', 'en-US', 'ar-EG']) {
     withFormatLocale(locale, () => {
-      assert.equal(toStoredNumber(0.5), '0.5', `${locale}: der Trenner muss serverlesbar sein`);
+      assert.equal(Number(toDecimalString(unterFa)), 4.5, `${locale} liest den fa-Wert "${unterFa}" nicht`);
     });
   }
+  // Trenner UND Ziffern folgen jetzt der Region - die frueher noetige Ausnahme
+  // fuer fa/ar-EG/ar-SA (dort stand `0.5` statt `0٫5`, weil ihr `٫` fuer den
+  // Server unlesbar war) ist mit der geteilten Umschrift entfallen.
+  withFormatLocale('de', () => { assert.equal(toStoredNumber(4.5), '4,5'); });
+  withFormatLocale('fr', () => { assert.equal(toStoredNumber(4.5), '4,5'); });
+  withFormatLocale('en-US', () => { assert.equal(toStoredNumber(4.5), '4.5'); });
+  withFormatLocale('fa', () => { assert.equal(toStoredNumber(0.5), '۰٫۵'); });
+  withFormatLocale('ar-EG', () => { assert.equal(toStoredNumber(0.5), '٠٫٥'); });
+  withFormatLocale('fa', () => { assert.equal(toStoredNumber(2000), '۲۰۰۰'); });
   // Ohne Gruppierung, sonst laese toDecimalString den Wert nicht wieder ein.
   withFormatLocale('de', () => { assert.equal(toStoredNumber(2000), '2000'); });
 });

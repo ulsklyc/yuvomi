@@ -8,11 +8,15 @@
 // Uebertrag Mahlzeit -> Einkaufsliste zum Beispiel aus der Summierung, sodass
 // dieselbe Zutat zweimal untereinander stand statt einmal zusammengezaehlt.
 //
-// Der Client hat dieselbe Aufgabe in public/utils/money.js (`toDecimalString`)
-// und loest sie mit der EINGESTELLTEN Region. Hier geht das nicht - also wird
-// jedes bekannte Ziffernsystem akzeptiert. Das ist keine Unschaerfe, sondern die
-// richtige Haltung fuer eine Leseoperation: was ein Mensch als Zahl geschrieben
-// hat, soll als Zahl ankommen, egal welches System.
+// GETEILT zwischen Client und Server, wie utils/date.js und utils/folder-tree.js:
+// beide Seiten lesen dieselben Mengentexte, und eine zweite Fassung daneben ist
+// genau die Dopplung, gegen die dieses Umfeld schon zweimal angetreten ist.
+//
+// `toDecimalString` in utils/money.js liest mit der EINGESTELLTEN Region, weil
+// eine Eingabe im Zweifel deren Schreibweise folgt. Diese Datei kennt gar keine
+// Region und akzeptiert jedes bekannte System - das ist die richtige Haltung fuer
+// eine Leseoperation: was ein Mensch als Zahl geschrieben hat, soll als Zahl
+// ankommen, egal welches System, und egal ob die Region seither gewechselt hat.
 //
 // Die Zuordnung wird aus Intl ABGELEITET, nicht als Tabelle gepflegt. 770
 // Ziffernzeichen aus 77 Ziffernsystemen (gemessen 09.09.2026) haette niemand
@@ -97,6 +101,21 @@ export function toAsciiDigits(value) {
     out += digitMap.get(char) ?? SEPARATORS.get(char) ?? char;
   }
   return out;
+}
+
+/**
+ * Ein einzelnes Zeichen als ASCII-Ziffer, oder null. Fuer Aufrufer, die je
+ * Zeichen entscheiden - utils/money.js gibt den Ziffern der eingestellten Region
+ * den Vortritt und faellt nur hier herein zurueck.
+ */
+export function asciiDigit(char) {
+  if (!digitMap) digitMap = buildDigitMap();
+  return digitMap.get(char) ?? null;
+}
+
+/** Die ASCII-Entsprechung eines fremden Trennzeichens, oder null. */
+export function asciiSeparator(char) {
+  return SEPARATORS.get(char) ?? null;
 }
 
 /** Nur fuer Tests: die Groesse der abgeleiteten Zuordnung. */

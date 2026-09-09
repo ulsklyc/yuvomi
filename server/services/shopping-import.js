@@ -1,4 +1,4 @@
-import { toAsciiDigits } from '../utils/digits.js';
+import { toAsciiDigits } from '../../public/utils/digits.js';
 
 /**
  * Zerlegt eine Mengenangabe in Zahl und Einheit. Liefert null, wenn vorne keine
