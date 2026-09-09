@@ -390,6 +390,55 @@ test('parseQuantity loest das oestliche Tausenderzeichen auf', () => {
   assert(parseQuantity('١٢٫٥ kg').amount === 12.5, `erhalten ${parseQuantity('١٢٫٥ kg').amount}`);
 });
 
+test('parseQuantity prueft eine Gruppierung, statt den Trenner nur wegzuwerfen', () => {
+  // Die Aufloesung war erst bedingungslos: „٢٬٥٠ g" wurde 250, „٢٬٠٠٠٠ g" wurde
+  // 20000. Beides sind KEINE gueltigen Gruppierungen - zwei bzw. vier Stellen
+  // hinter dem Zeichen -, sondern vermutlich Tippfehler. Eine Zahl, die nur zur
+  // Haelfte einem Muster folgt, ist keine Zahl.
+  assert(parseQuantity('٢٬٥٠ g') === null, 'zwei Stellen sind keine Gruppierung');
+  assert(parseQuantity('٢٬٥ g') === null, 'eine Stelle auch nicht');
+  assert(parseQuantity('٢٬٠٠٠٠ g') === null, 'vier Stellen auch nicht');
+  assert(parseQuantity('٢٬٥٠٠ g').amount === 2500, 'die gueltige Form bleibt lesbar');
+  // Mehrere Gruppen in voller Laenge: vorher wurde nur die erste gelesen und der
+  // Rest zur Einheit („١٬٠٠٠٬٠٠٠ g" ergab 1000 mit Einheit „٬٠٠٠ g").
+  assert(parseQuantity('١٬٠٠٠٬٠٠٠ g').amount === 1000000,
+    `erhalten ${JSON.stringify(parseQuantity('١٬٠٠٠٬٠٠٠ g'))}`);
+  // Und mit Dezimalteil dahinter.
+  assert(parseQuantity('١٬٠٠٠٫٥ g').amount === 1000.5,
+    `erhalten ${JSON.stringify(parseQuantity('١٬٠٠٠٫٥ g'))}`);
+});
+
+test('parseQuantity weist ein mehrdeutiges Komma in fremden Ziffern ab', () => {
+  // bn, hi und th gruppieren mit dem ASCII-Komma. „১,০০০ g" heisst dort tausend
+  // Gramm - die naive ASCII-Deutung machte daraus ein Gramm, also den Faktor 1000
+  // daneben. Der Server kann die richtige Deutung nicht sicher wissen, und diese
+  // Eingaben hatten vor der Umschrift GAR KEIN Verhalten: sie nachtraeglich einer
+  // Deutung zu unterwerfen, die fuer sie nie gedacht war, waere die schlechtere
+  // von zwei Antworten.
+  for (const eingabe of ['১,০০০ g', '१,००० g', '๑,๐๐๐ g']) {
+    assert(parseQuantity(eingabe) === null, `"${eingabe}" darf nicht als 1 gelten`);
+  }
+  // Ein Punkt an derselben Stelle ist dort dagegen der Dezimaltrenner.
+  assert(parseQuantity('১.৫ kg').amount === 1.5, 'bn: Punkt trennt dezimal');
+  assert(parseQuantity('१.५ kg').amount === 1.5, 'hi: Punkt trennt dezimal');
+});
+
+test('parseQuantity laesst den ASCII-Pfad vollstaendig unberuehrt', () => {
+  // Eine reine ASCII-Zahl deutet dieser Server seit jeher naiv. Das zu aendern
+  // waere eine eigene Entscheidung mit Folgen fuer bestehende Daten - die
+  // strengere Regel gilt deshalb NUR fuer Zahlen mit fremden Zeichen, die vorher
+  // ohnehin kein Verhalten hatten.
+  for (const [eingabe, erwartet] of [
+    ['1,000 g', { amount: 1, unit: 'g' }],
+    ['1,000,000 g', { amount: 1, unit: ',000 g' }],
+    ['2x500 g', { amount: 2, unit: 'x500 g' }],
+    ['1.5 kg', { amount: 1.5, unit: 'kg' }],
+  ]) {
+    assert(JSON.stringify(parseQuantity(eingabe)) === JSON.stringify(erwartet),
+      `"${eingabe}": ${JSON.stringify(parseQuantity(eingabe))} statt ${JSON.stringify(erwartet)}`);
+  }
+});
+
 test('parseQuantity laesst einen Bruch dem Rohtext-Pfad', () => {
   // „١/٢ kg" ergaebe sonst Betrag 1 mit Einheit „/٢ kg", und zwei halbe Kilo
   // stuenden als „2 /٢ kg" auf der Liste. Ohne Umschrift traf die Regex solche

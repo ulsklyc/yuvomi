@@ -140,6 +140,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stays on the text path rather than being read as its numerator - "١/٢ kg" was never a quantity of
   one, and neither was "1/2 kg", which had been getting that wrong unnoticed.
 
+  Quantities written with foreign characters go through a stricter reading than plain ASCII ones,
+  because they had no behaviour at all before: a grouping has to look like one along its whole
+  length, several groups are read as one number, and a comma inside Bengali or Devanagari digits is
+  refused rather than guessed - it groups there, so reading it as a decimal point would be off by a
+  thousand, and the server cannot know which was meant. Plain ASCII quantities keep reading exactly
+  as they always have; changing that is a decision of its own.
+
 
 - **Deleting a category now updates the page behind the dialog**. Every module that offers
   "manage categories" kept showing the category you had just deleted: the filter chips in Contacts,
