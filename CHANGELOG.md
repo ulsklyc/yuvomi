@@ -122,6 +122,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An ingredient written in the household's own digits now counts towards the shopping list.**
+  Moving a meal plan to the shopping list adds up the same ingredient across meals. The server read
+  the quantity with an ASCII-only pattern, so a Persian, Arabic, Hindi or Thai amount - "۲۵۰ g" -
+  matched nothing at all, and the ingredient dropped out of the totals: the list showed it twice
+  underneath itself instead of once with the sum. A household using its own digits quietly got a
+  worse shopping list than one using Latin ones.
+
+  The server has no locale, so it now accepts every digit system rather than one region's. The
+  mapping is derived from `Intl` rather than kept as a table - 770 digit characters across 77
+  systems is not something anyone would keep current by hand. Only real digits count: the one system
+  whose "five" is an ordinary Chinese character is left out, so a `五` in an ingredient stays a word.
+
+
 - **Deleting a category now updates the page behind the dialog**. Every module that offers
   "manage categories" kept showing the category you had just deleted: the filter chips in Contacts,
   the grouping in Shopping, the storage locations in Pantry, the places and categories in Inventory,

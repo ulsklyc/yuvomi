@@ -8,7 +8,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { url } from '../server/middleware/validate.js';
-import { aggregateMealIngredients } from '../server/services/shopping-import.js';
+import { aggregateMealIngredients, parseQuantity } from '../server/services/shopping-import.js';
 
 let passed = 0;
 let failed = 0;
@@ -325,6 +325,65 @@ test('Essensplan-Import summiert auch Mengen mit gleicher Einheit', () => {
   ]);
   assert(result.length === 1, `Erwartet 1 aggregierten Eintrag, erhalten ${result.length}`);
   assert(result[0].quantity === '4 pack', `Erwartet summierte Menge 4 pack, erhalten ${result[0].quantity}`);
+});
+
+test('parseQuantity liest eine Menge in fremden Ziffern', () => {
+  // `\d` ist in JavaScript ASCII. Vorher traf die Regex „۲۵۰ g" ueberhaupt nicht,
+  // die Zutat fiel wortlos aus der Summierung und stand danach zweimal
+  // untereinander auf der Liste - ein Haushalt, der seine eigenen Ziffern
+  // benutzt, bekam stillschweigend eine schlechtere Einkaufsliste.
+  for (const [eingabe, betrag, einheit] of [
+    ['۲۵۰ g', 250, 'g'],   // fa
+    ['٢٥٠ g', 250, 'g'],   // ar
+    ['२५० g', 250, 'g'],   // hi
+    ['๒๕๐ g', 250, 'g'],   // th
+    ['۱٫۵ kg', 1.5, 'kg'], // oestlicher Dezimaltrenner
+    ['١٬٠٠٠ g', 1, 'g'],   // oestliches Tausenderzeichen, gedeutet wie „1,000 g"
+  ]) {
+    const ergebnis = parseQuantity(eingabe);
+    assert(ergebnis !== null, `"${eingabe}" wurde gar nicht gelesen`);
+    assert(ergebnis.amount === betrag, `"${eingabe}": ${ergebnis.amount} statt ${betrag}`);
+    assert(ergebnis.unit === einheit, `"${eingabe}": Einheit "${ergebnis.unit}" statt "${einheit}"`);
+  }
+});
+
+test('parseQuantity laesst das bestehende Verhalten unveraendert', () => {
+  // Die Umschrift darf nur HINZUFUEGEN. Jeder dieser Faelle lief vorher schon so.
+  for (const [eingabe, erwartet] of [
+    ['250 g', { amount: 250, unit: 'g' }],
+    ['1,5 kg', { amount: 1.5, unit: 'kg' }],
+    ['1.5 kg', { amount: 1.5, unit: 'kg' }],
+    ['12', { amount: 12, unit: '' }],
+    ['-3 EL', { amount: -3, unit: 'el' }],
+    ['1,000 g', { amount: 1, unit: 'g' }],
+    ['eine Prise', null],
+    ['', null],
+  ]) {
+    const ergebnis = parseQuantity(eingabe);
+    assert(JSON.stringify(ergebnis) === JSON.stringify(erwartet),
+      `"${eingabe}": ${JSON.stringify(ergebnis)} statt ${JSON.stringify(erwartet)}`);
+  }
+});
+
+test('parseQuantity schneidet die Einheit aus dem Original, nicht aus der Umschrift', () => {
+  // Umgeschrieben wird nur, was gerechnet wird. Sonst verloere ein zweiter
+  // Zahlenteil seine Ziffern und die gespeicherte Einheit saehe anders aus als
+  // die, die dasteht.
+  assert(parseQuantity('۲ x ۵۰۰ g').unit === 'x ۵۰۰ g',
+    `Einheit war "${parseQuantity('۲ x ۵۰۰ g').unit}"`);
+  assert(parseQuantity('۲۵۰ گرم').unit === 'گرم',
+    `Einheit war "${parseQuantity('۲۵۰ گرم').unit}"`);
+});
+
+test('Essensplan-Import summiert dieselbe Zutat ueber Schreibweisen hinweg', () => {
+  // Der eigentliche Nutzen: zwei Mahlzeiten, dieselbe Zutat, verschieden
+  // geschrieben. Vorher ergaben sie zwei Zeilen, weil die eine als Text galt.
+  const result = aggregateMealIngredients([
+    { id: 1, meal_id: 10, name: 'Mehl', quantity: '۲۵۰ g', category: 'Sonstiges' },
+    { id: 2, meal_id: 11, name: 'Mehl', quantity: '250 g', category: 'Sonstiges' },
+  ]);
+  assert(result.length === 1, `Erwartet 1 aggregierten Eintrag, erhalten ${result.length}`);
+  assert(result[0].quantity === '500 g', `Erwartet 500 g, erhalten ${result[0].quantity}`);
 });
 
 test('Essensplan-Import zählt rein textuelle Mengen sichtbar zusammen', () => {

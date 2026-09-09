@@ -1,11 +1,36 @@
+import { toAsciiDigits } from '../utils/digits.js';
+
+/**
+ * Zerlegt eine Mengenangabe in Zahl und Einheit. Liefert null, wenn vorne keine
+ * Zahl steht („eine Prise") - dann wird die Zutat nicht zusammengezaehlt,
+ * sondern bleibt als eigene Zeile stehen.
+ *
+ * Die Ziffern werden vorher umgeschrieben (utils/digits.js). Ohne das traf die
+ * ASCII-Regex eine Menge wie „۲۵۰ g" oder „٢٥٠ g" ueberhaupt nicht: die Zutat
+ * fiel wortlos aus der Summierung und stand danach zweimal untereinander auf der
+ * Liste, statt einmal mit der Summe. Ein Haushalt, der seine eigenen Ziffern
+ * benutzt, bekam damit stillschweigend eine schlechtere Einkaufsliste.
+ *
+ * Die EINHEIT wird bewusst aus dem ORIGINAL geschnitten, nicht aus der
+ * umgeschriebenen Fassung: umgeschrieben wird nur, was gerechnet wird. „۲ x ۵۰۰
+ * g" behaelt so seinen Rest, statt zu „2 x 500 g" zu werden. Der Offset stimmt,
+ * weil toAsciiDigits positionstreu ist - die Zusicherung steht dort im Kopf und
+ * haengt an einem Test.
+ */
 function parseQuantity(value) {
   const raw = String(value || '').trim();
   if (!raw) return null;
-  const match = raw.match(/^([+-]?\d+(?:[.,]\d+)?)\s*(.*)$/);
+  const match = toAsciiDigits(raw).match(/^([+-]?\d+(?:[.,]\d+)?)\s*(.*)$/);
   if (!match) return null;
   const amount = Number(match[1].replace(',', '.'));
   if (!Number.isFinite(amount)) return null;
-  const unit = match[2].trim().replace(/\s+/g, ' ').toLowerCase();
+  // In CODEPOINTS geschnitten, nicht in UTF-16-Einheiten: die Ziffern von 40 der
+  // 77 Systeme liegen ausserhalb der BMP und belegen zwei Einheiten, ihr
+  // ASCII-Ergebnis nur eine. Ein `.length`-Offset verruetschte damit genau bei
+  // den Schreibweisen, fuer die diese Umschrift ueberhaupt da ist.
+  const zeichen = [...raw];
+  const rest = [...match[2]].length;
+  const unit = zeichen.slice(zeichen.length - rest).join('').trim().replace(/\s+/g, ' ').toLowerCase();
   return { amount, unit };
 }
 
