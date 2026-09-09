@@ -7,6 +7,119 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A shopping item can carry a price and the shop it was bought at** (#1003, first cut). Both sit
+  in the item dialog, where the item is already open - the checkbox stays the fastest gesture in the
+  app and gains no second step. The price is stored in whole minor units (cents, yen, fils) rather
+  than as a decimal: the purchase history this is groundwork for adds these numbers up, and money in
+  a floating point sums visibly wrong.
+
+  The shop is a **managed list**, not free text on the row: two spellings of the same shop would
+  split that history in half. The field is a combobox - choose an existing shop or type a new one,
+  which is created on save - so the first shop in a fresh household has a place to come from without
+  a second dialog over the first. Renaming and deleting live under "Manage shops" in the list menu,
+  the same component that manages the categories. Deleting a shop keeps the prices and only clears
+  the assignment: what was once paid stays true.
+
+  What is not here yet is the matching of an item to its earlier purchases - whether the same list
+  text is enough or something more stable is needed. Until that is decided, a price is a note on the
+  item, and no history is derived from it.
+
+- **A budget entry can name who is responsible for it** (#1057, first cut). One or more household
+  members marked as looking after an entry - "who handles the water bill" - picked in the entry
+  dialog and shown as avatars on the row. **It moves no money.** Marking someone responsible
+  creates nothing they owe; settling up between people stays in Split Expenses, and the hint under
+  the picker says so.
+
+  It is deliberately **not** `owner_id`. That column is the privacy axis: it is fixed to the
+  creating person and not editable, because the visibility of private entries hangs off it.
+  Reusing it would have handed the responsible member the private-entry semantics of the row - a
+  permissions bug that looks like a feature. Responsibility is a second axis, in its own table, so
+  several people can share one entry.
+
+  On a recurring series the label belongs to the series: newly materialised instances inherit it,
+  and editing the series moves it on every instance from today onwards while already-booked months
+  keep whoever was responsible then. Unlike the account, a virtual series inherits it too - the
+  label cannot distort a balance. In a one-person household the picker does not appear at all.
+
+  The overview can be **filtered and grouped** by responsible member: clicking the avatars on a row
+  filters to that person, a chip clears it again, and a toggle groups the list. The groups are
+  deliberately **not** disjoint - an entry two people share appears under both - so each group head
+  carries a count rather than a sum; a per-group total would invite adding them up, and the total
+  would be wrong.
+
+  A **handover to Split Expenses** sits under the picker: it switches to that tab and opens a new
+  expense with the title, amount and date filled in and the responsible members pre-selected as
+  participants. The dialog is not skipped - the split method, the currency and the group are
+  decisions Budget cannot make, and the claim only comes into existence once it is confirmed there.
+  Responsible members who are not in the group are dropped from the pre-selection; if none are left,
+  it falls back to the group's default split rather than an expense with no participants.
+
+- **Inventory items and subscriptions can record the account they are registered under** (#1004).
+  One field per module: the e-mail address or username a device or a service runs on. It is
+  deliberately **not** a password field and never will be - a username without its password is a
+  phone-book entry, which is why it can live unencrypted in the normal database and be searched
+  like any other text. The permanent boundary is in `docs/SCOPE.md`, section 2, and the field's own
+  hint says so where it is filled in.
+
+  On inventory the field is household-wide, and that is a decision rather than an oversight:
+  `inventory_items` carries neither an owner nor a visibility, access is decided once per member at
+  module level (#467), and an owner-scoped field would have meant inventing an ownership model for
+  the whole module just to hold one column. The reporter chose that himself - account names are
+  usually e-mail addresses, and anyone already trusted on the network has seen those. On
+  subscriptions the column sits in a row that already has `owner_id` and `visibility`, so it
+  follows both without extra work. Inventory's own search matches on it too, since "where is the
+  device that runs on this address" is the question the field exists for.
+
+- **Planned meals show their recipe's picture, for recipes mirrored from Mealie or Tandoor**
+  (#1059, step one). The thumbnail proxy has existed since the provider sync landed, but only the
+  recipe list used it; the meal planner and the "today's meals" tile rendered text. Both now show
+  the picture where the recipe has one, so a household running a recipe manager gets a visual
+  planner with no new field and no upload. Recipes typed into Yuvomi still have no image - that is
+  step two, and it is the storage work.
+
+  A card **without** a picture is untouched: no placeholder, no indent, the same title width it had
+  before. The first cut gave every card an image slot so all of them would line up, which turned
+  out to be exactly the layout change the issue rules out - measured in the week view, the slot
+  cost 32px plus spacing out of a roughly 100px column, in every cell, and a household without a
+  recipe manager would have paid a third of its title width for a meaningless cutlery icon. Row
+  height is what stays equal: the same card measures 121px with a picture and 121px without.
+
+- **A recipe typed into Yuvomi can carry its own picture** (#1059, step two - the part most
+  households need, since most do not run a recipe manager). One image per recipe, chosen and cropped
+  in the recipe dialog the same way an inventory photo is, and shown wherever the provider thumbnail
+  already appeared: the planner and the "today's meals" tile. Where a recipe has both, **its own
+  image wins** - someone who uploads one has chosen that picture.
+
+  The image is served from `GET /api/v1/recipes/{id}/image` rather than travelling with the recipe.
+  The column holds a data URL of up to 5 MB; shipping that with every row of a recipe list, or with
+  a week of meals, would have dwarfed the rest of the response for a 32-pixel preview. Lists carry a
+  `has_own_image` flag instead, and the stored data URL never leaves the server as part of a record.
+  Saving a recipe without touching the image leaves it alone; only an explicit clear removes it.
+
+- **A household can name the four meal slots itself** (#1058). Breakfast, lunch, dinner and snack
+  are now shown under whatever your household calls them - set in Settings → Modules → Kitchen,
+  next to the switch that decides which slots appear at all, because which slots and what they are
+  called is one setting. The name is not a translation: it shows in every language exactly as it
+  was typed, which is the point - `fr`, `fr-CA` and `fr-BE` do not agree on what the evening meal
+  is called, and no locale file can settle that per household. An empty field means the built-in
+  word, so nothing changes for anyone who does not rename. The slot **keys** are untouched: recipe
+  suitability, the Mealie and Tandoor mapping and the planner rows all keep working, and nothing
+  migrates. The four slots now come from one place in the client rather than five copies, so the
+  planner, the overview tile and the recipe form always say the same word.
+
+### Changed
+
+- **The recurring-payment dialog now says that editing a series also rewrites its first booking**
+  (#1035). A series original is two things at once: the template every future occurrence is built
+  from, and the first hand-entered booking. `PUT /budget/:id/series` writes title, amount, category
+  and account to that one row with no date predicate, so raising the rent for all future months
+  also rewrites what the very first month says - a booking that may be years old. Separating the
+  two meanings of that row needs a migration and a decision about what `recurrence_parent_id IS
+  NULL` should mean afterwards; until then the dialog where the choice is made states what happens.
+  The delete dialog is unchanged: "Delete entire series" already says it.
+
 ### Fixed
 
 - **Scaling a recipe now reads and writes ingredient quantities in the region that is actually
@@ -109,123 +222,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on a round trip. And a `BYDAY` rule is left alone (#549), where a start on a weekend is a
   deliberate, older decision. The transformation is read-only at the point of serialization: the
   stored value never changes, which is what made the write-time attempt in #984 unworkable.
-
-### Added
-
-- **A shopping item can carry a price and the shop it was bought at** (#1003, first cut). Both sit
-  in the item dialog, where the item is already open - the checkbox stays the fastest gesture in the
-  app and gains no second step. The price is stored in whole minor units (cents, yen, fils) rather
-  than as a decimal: the purchase history this is groundwork for adds these numbers up, and money in
-  a floating point sums visibly wrong.
-
-  The shop is a **managed list**, not free text on the row: two spellings of the same shop would
-  split that history in half. The field is a combobox - choose an existing shop or type a new one,
-  which is created on save - so the first shop in a fresh household has a place to come from without
-  a second dialog over the first. Renaming and deleting live under "Manage shops" in the list menu,
-  the same component that manages the categories. Deleting a shop keeps the prices and only clears
-  the assignment: what was once paid stays true.
-
-  What is not here yet is the matching of an item to its earlier purchases - whether the same list
-  text is enough or something more stable is needed. Until that is decided, a price is a note on the
-  item, and no history is derived from it.
-
-- **A budget entry can name who is responsible for it** (#1057, first cut). One or more household
-  members marked as looking after an entry - "who handles the water bill" - picked in the entry
-  dialog and shown as avatars on the row. **It moves no money.** Marking someone responsible
-  creates nothing they owe; settling up between people stays in Split Expenses, and the hint under
-  the picker says so.
-
-  It is deliberately **not** `owner_id`. That column is the privacy axis: it is fixed to the
-  creating person and not editable, because the visibility of private entries hangs off it.
-  Reusing it would have handed the responsible member the private-entry semantics of the row - a
-  permissions bug that looks like a feature. Responsibility is a second axis, in its own table, so
-  several people can share one entry.
-
-  On a recurring series the label belongs to the series: newly materialised instances inherit it,
-  and editing the series moves it on every instance from today onwards while already-booked months
-  keep whoever was responsible then. Unlike the account, a virtual series inherits it too - the
-  label cannot distort a balance. In a one-person household the picker does not appear at all.
-
-  The overview can be **filtered and grouped** by responsible member: clicking the avatars on a row
-  filters to that person, a chip clears it again, and a toggle groups the list. The groups are
-  deliberately **not** disjoint - an entry two people share appears under both - so each group head
-  carries a count rather than a sum; a per-group total would invite adding them up, and the total
-  would be wrong.
-
-  A **handover to Split Expenses** sits under the picker: it switches to that tab and opens a new
-  expense with the title, amount and date filled in and the responsible members pre-selected as
-  participants. The dialog is not skipped - the split method, the currency and the group are
-  decisions Budget cannot make, and the claim only comes into existence once it is confirmed there.
-  Responsible members who are not in the group are dropped from the pre-selection; if none are left,
-  it falls back to the group's default split rather than an expense with no participants.
-
-
-- **Inventory items and subscriptions can record the account they are registered under** (#1004).
-  One field per module: the e-mail address or username a device or a service runs on. It is
-  deliberately **not** a password field and never will be - a username without its password is a
-  phone-book entry, which is why it can live unencrypted in the normal database and be searched
-  like any other text. The permanent boundary is in `docs/SCOPE.md`, section 2, and the field's own
-  hint says so where it is filled in.
-
-  On inventory the field is household-wide, and that is a decision rather than an oversight:
-  `inventory_items` carries neither an owner nor a visibility, access is decided once per member at
-  module level (#467), and an owner-scoped field would have meant inventing an ownership model for
-  the whole module just to hold one column. The reporter chose that himself - account names are
-  usually e-mail addresses, and anyone already trusted on the network has seen those. On
-  subscriptions the column sits in a row that already has `owner_id` and `visibility`, so it
-  follows both without extra work. Inventory's own search matches on it too, since "where is the
-  device that runs on this address" is the question the field exists for.
-
-
-- **Planned meals show their recipe's picture, for recipes mirrored from Mealie or Tandoor**
-  (#1059, step one). The thumbnail proxy has existed since the provider sync landed, but only the
-  recipe list used it; the meal planner and the "today's meals" tile rendered text. Both now show
-  the picture where the recipe has one, so a household running a recipe manager gets a visual
-  planner with no new field and no upload. Recipes typed into Yuvomi still have no image - that is
-  step two, and it is the storage work.
-
-  A card **without** a picture is untouched: no placeholder, no indent, the same title width it had
-  before. The first cut gave every card an image slot so all of them would line up, which turned
-  out to be exactly the layout change the issue rules out - measured in the week view, the slot
-  cost 32px plus spacing out of a roughly 100px column, in every cell, and a household without a
-  recipe manager would have paid a third of its title width for a meaningless cutlery icon. Row
-  height is what stays equal: the same card measures 121px with a picture and 121px without.
-
-- **A recipe typed into Yuvomi can carry its own picture** (#1059, step two - the part most
-  households need, since most do not run a recipe manager). One image per recipe, chosen and cropped
-  in the recipe dialog the same way an inventory photo is, and shown wherever the provider thumbnail
-  already appeared: the planner and the "today's meals" tile. Where a recipe has both, **its own
-  image wins** - someone who uploads one has chosen that picture.
-
-  The image is served from `GET /api/v1/recipes/{id}/image` rather than travelling with the recipe.
-  The column holds a data URL of up to 5 MB; shipping that with every row of a recipe list, or with
-  a week of meals, would have dwarfed the rest of the response for a 32-pixel preview. Lists carry a
-  `has_own_image` flag instead, and the stored data URL never leaves the server as part of a record.
-  Saving a recipe without touching the image leaves it alone; only an explicit clear removes it.
-
-- **A household can name the four meal slots itself** (#1058). Breakfast, lunch, dinner and snack
-  are now shown under whatever your household calls them - set in Settings → Modules → Kitchen,
-  next to the switch that decides which slots appear at all, because which slots and what they are
-  called is one setting. The name is not a translation: it shows in every language exactly as it
-  was typed, which is the point - `fr`, `fr-CA` and `fr-BE` do not agree on what the evening meal
-  is called, and no locale file can settle that per household. An empty field means the built-in
-  word, so nothing changes for anyone who does not rename. The slot **keys** are untouched: recipe
-  suitability, the Mealie and Tandoor mapping and the planner rows all keep working, and nothing
-  migrates. The four slots now come from one place in the client rather than five copies, so the
-  planner, the overview tile and the recipe form always say the same word.
-
-### Changed
-
-- **The recurring-payment dialog now says that editing a series also rewrites its first booking**
-  (#1035). A series original is two things at once: the template every future occurrence is built
-  from, and the first hand-entered booking. `PUT /budget/:id/series` writes title, amount, category
-  and account to that one row with no date predicate, so raising the rent for all future months
-  also rewrites what the very first month says - a booking that may be years old. Separating the
-  two meanings of that row needs a migration and a decision about what `recurrence_parent_id IS
-  NULL` should mean afterwards; until then the dialog where the choice is made states what happens.
-  The delete dialog is unchanged: "Delete entire series" already says it.
-
-### Fixed
 
 - **An event from a subscribed calendar now names its source everywhere an event is read**
   (groundwork for #1064). A subscribed event already inherited its subscription's colour, but the
