@@ -338,7 +338,8 @@ test('parseQuantity liest eine Menge in fremden Ziffern', () => {
     ['२५० g', 250, 'g'],   // hi
     ['๒๕๐ g', 250, 'g'],   // th
     ['۱٫۵ kg', 1.5, 'kg'], // oestlicher Dezimaltrenner
-    ['١٬٠٠٠ g', 1, 'g'],   // oestliches Tausenderzeichen, gedeutet wie „1,000 g"
+    // Das oestliche Tausenderzeichen hat einen eigenen Test - es wird
+    // aufgeloest, nicht wie ein ASCII-Komma gedeutet.
   ]) {
     const ergebnis = parseQuantity(eingabe);
     assert(ergebnis !== null, `"${eingabe}" wurde gar nicht gelesen`);
@@ -373,6 +374,46 @@ test('parseQuantity schneidet die Einheit aus dem Original, nicht aus der Umschr
     `Einheit war "${parseQuantity('۲ x ۵۰۰ g').unit}"`);
   assert(parseQuantity('۲۵۰ گرم').unit === 'گرم',
     `Einheit war "${parseQuantity('۲۵۰ گرم').unit}"`);
+});
+
+test('parseQuantity loest das oestliche Tausenderzeichen auf', () => {
+  // U+066C ist per Unicode EINDEUTIG ein Tausenderzeichen - anders als das
+  // ASCII-Komma, dem der Server ohne Region nicht ansieht, ob es gruppiert oder
+  // trennt. „١٬٠٠٠ g" heisst tausend Gramm. Es auf ein Komma abzubilden und dem
+  // bestehenden Pfad zu ueberlassen las daraus 1: der Faktor tausend daneben,
+  // mit Information, die man selbst weggeworfen hatte.
+  assert(parseQuantity('١٬٠٠٠ g').amount === 1000, `erhalten ${parseQuantity('١٬٠٠٠ g').amount}`);
+  assert(parseQuantity('٢٬٥٠٠ g').amount === 2500, `erhalten ${parseQuantity('٢٬٥٠٠ g').amount}`);
+  // Das ASCII-Komma bleibt unangetastet - dort fehlt genau diese Eindeutigkeit.
+  assert(parseQuantity('1,000 g').amount === 1, 'ASCII-Verhalten darf sich nicht aendern');
+  // Und der oestliche DEZIMALtrenner (U+066B) bleibt ein Dezimaltrenner.
+  assert(parseQuantity('١٢٫٥ kg').amount === 12.5, `erhalten ${parseQuantity('١٢٫٥ kg').amount}`);
+});
+
+test('parseQuantity laesst einen Bruch dem Rohtext-Pfad', () => {
+  // „١/٢ kg" ergaebe sonst Betrag 1 mit Einheit „/٢ kg", und zwei halbe Kilo
+  // stuenden als „2 /٢ kg" auf der Liste. Ohne Umschrift traf die Regex solche
+  // Mengen gar nicht - dort gehoeren sie weiter hin, bis jemand Brueche rechnet.
+  assert(parseQuantity('١/٢ kg') === null, 'oestlicher Bruch darf nicht als 1 gelten');
+  // Derselbe Fehler stand fuer ASCII schon vorher da, nur unbemerkt.
+  assert(parseQuantity('1/2 kg') === null, 'ASCII-Bruch darf nicht als 1 gelten');
+  const summe = aggregateMealIngredients([
+    { id: 1, meal_id: 10, name: 'Butter', quantity: '١/٢ kg', category: 'Sonstiges' },
+    { id: 2, meal_id: 11, name: 'Butter', quantity: '١/٢ kg', category: 'Sonstiges' },
+  ]);
+  assert(summe[0].quantity === '2 x ١/٢ kg', `erhalten ${summe[0].quantity}`);
+});
+
+test('Essensplan-Import fasst gleiche Mengen mit Zahlen IM Rest zusammen', () => {
+  // Die Einheit bleibt fuer die Anzeige im Original, aber der Schluessel nutzt
+  // ihre umgeschriebene Fassung: „۲ x ۵۰۰ g" und „2 x 500 g" sind dieselbe Menge
+  // und gehoerten sonst in zwei Zeilen.
+  const result = aggregateMealIngredients([
+    { id: 1, meal_id: 10, name: 'Milch', quantity: '۲ x ۵۰۰ g', category: 'Sonstiges' },
+    { id: 2, meal_id: 11, name: 'Milch', quantity: '2 x 500 g', category: 'Sonstiges' },
+  ]);
+  assert(result.length === 1, `Erwartet 1 Eintrag, erhalten ${result.length}`);
+  assert(result[0].quantity === '4 x ۵۰۰ g', `erhalten ${result[0].quantity}`);
 });
 
 test('Essensplan-Import summiert dieselbe Zutat ueber Schreibweisen hinweg', () => {
