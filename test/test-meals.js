@@ -684,6 +684,12 @@ test('Skalieren: der Rest der Zeile behaelt seine eigenen Ziffern', () => {
   scaled('fa', '۱ ۱/۲ Tassen', 2, '۳ Tassen');
   // Umgekehrt darf der Rest auch nichts DAZUgewinnen: die ASCII-Zeile bleibt ASCII.
   scaled('de', '2 x 500 g', 2, '4 x 500 g');
+  // Der realistischste Fall, und er braucht keine fremde Region: in de ist das
+  // Komma der Dezimaltrenner, die Umschrift ersetzt es also im GANZEN Text. Kam
+  // der Rest von dort, wurde aus einer Gebindegroesse „0,5 l" ein „0.5 l" - und
+  // dieser Text wird in der Zutatenzeile gespeichert.
+  scaled('de', '2 Dosen à 0,5 l', 2, '4 Dosen à 0,5 l');
+  scaled('de', '3 Glaeser à 250 ml', 2, '6 Glaeser à 250 ml');
   // Umschliessender Leerraum faellt weg, statt die Zahl zu verschieben.
   scaled('de', '  250 g  ', 2, '500 g');
 });
