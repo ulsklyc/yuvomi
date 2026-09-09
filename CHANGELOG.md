@@ -44,7 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which says visibly that nothing was understood, in a dialog where the quantity sits in a field you
   can correct before it is saved. The same applies to a number that breaks off mid-separator, which a
   grouping check cannot catch: "٢٬٥٠" has only two digits after the separator, and under Persian the
-  ASCII comma separates nothing at all. "1,5 kg", "250 g" and "6 x 1 l" keep reading exactly as they
+  ASCII comma separates nothing at all. Only the leading number decides: "6 x 1.000 ml" is six bottles
+  of a litre each, and the 1.000 further along - which is never read - does not make the line
+  unreadable. "1,5 kg", "250 g" and "6 x 1 l" keep reading exactly as they
   did.
 
 - **Paying extra on a loan now shortens the remaining term, not only the balance** (#964). Since

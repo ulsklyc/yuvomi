@@ -534,6 +534,25 @@ test('parseShoppingQuantity: eine mitten im Trenner abgeschnittene Menge wird ab
   });
 });
 
+test('parseShoppingQuantity: eine Gruppierung im REST laesst die fuehrende Menge stehen', () => {
+  // „6 × 1.000 ml" ist eine ganz gewoehnliche Einkaufszeile: sechs Flaschen zu
+  // je einem Liter. Gelesen wird nur die 6, die 1.000 wird gar nicht angefasst -
+  // sie darf die Zeile deshalb auch nicht abweisen. Vorher fiel sie auf 1 Stueck.
+  withFormatLocale('de', () => {
+    assert.deepEqual(__test.parseShoppingQuantity('6 × 1.000 ml'), { quantity: 6, unit: 'pcs' });
+  });
+  withFormatLocale('en-US', () => {
+    assert.deepEqual(__test.parseShoppingQuantity('6 × 1,000 ml'), { quantity: 6, unit: 'pcs' });
+  });
+  withFormatLocale('ar-EG', () => {
+    assert.deepEqual(__test.parseShoppingQuantity('٦ × ١٬٠٠٠ ml'), { quantity: 6, unit: 'pcs' });
+  });
+  // Im fuehrenden Token wird weiter abgewiesen - die Eingrenzung ist kein Freibrief.
+  withFormatLocale('de', () => {
+    assert.deepEqual(__test.parseShoppingQuantity('1.000 g'), { quantity: 1, unit: 'pcs' });
+  });
+});
+
 test('parseShoppingQuantity: der Trenner der Region bleibt der Trenner, auch nach der Gruppierungspruefung', () => {
   // Gegenprobe zur REIHENFOLGE in toDecimalString. Wuerde die Gruppierung erst
   // nach dem Ersetzen des Dezimaltrenners geprueft, waere „1,000" in de schon ein

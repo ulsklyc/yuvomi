@@ -658,6 +658,10 @@ test('Skalieren: eine gruppierte Menge wird abgewiesen, nicht geraten', () => {
   // fuehrende Ziffer ist bewusst nicht die 1, sonst waere der abgeschnittene
   // Anfang vom richtigen Ergebnis nicht zu unterscheiden.
   scaled('ar-EG', '٢٬٠٠٠ g', 2, '٢٬٠٠٠ g');
+  // Aber NUR im fuehrenden Token: eine Gruppierung im Rest wird gar nicht
+  // gelesen und darf die Zeile nicht ungeskaliert stehen lassen.
+  scaled('de', '2 Dosen à 1.000 ml', 2, '4 Dosen à 1.000 ml');
+  scaled('en-US', '2 cans à 1,000 ml', 2, '4 cans à 1,000 ml');
   // Gegenprobe zur Regel selbst: in de trennt das Komma, "1,000" IST dort eins.
   scaled('de', '1,000 g', 2, '2 g');
   scaled('en-US', '1.000 g', 2, '2 g');

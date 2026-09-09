@@ -1603,11 +1603,15 @@ function parseShoppingQuantity(raw) {
   // (`\d` ist ASCII). Beides ohne Fehlermeldung: die Zeile im Übernahme-Dialog
   // stand einfach auf 1.
   //
+  // `freeText`, weil hier nur der ANFANG gelesen wird: eine Gruppierung weiter
+  // hinten geht diese Zerlegung nichts an. Ohne das fiel „6 × 1.000 ml" auf die
+  // Menge 1 zurueck, obwohl die 6 eindeutig ist.
+  //
   // Eine gruppierte Zahl weist die Umschrift ab und liefert einen leeren String.
   // Dann bleibt es beim Standard, statt zwischen 1 und 1000 zu raten - dieselbe
   // Entscheidung wie beim Preis, hier aber mit dem sanfteren Ausgang: der Dialog
   // zeigt die Menge in einem Feld, das sich korrigieren lässt.
-  const decimal = toDecimalString(text);
+  const decimal = toDecimalString(text, { freeText: true });
   if (!decimal) return fallback;
 
   // Die Einheit braucht eine Wortgrenze davor, sonst schluckt `\b` sie bei

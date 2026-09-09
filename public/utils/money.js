@@ -199,6 +199,13 @@ export function amountMin(currency, currentValue) {
  * eingetippten Zahlen baut, ruft diese hier auf, statt `replace(',', '.')` neu
  * zu erfinden.
  *
+ * `freeText` ist fuer genau diese Aufrufer da. Ein Betragsfeld enthaelt NUR eine
+ * Zahl, dort ist es richtig, den ganzen Wert abzuweisen. Ein Freitext enthaelt
+ * eine Zahl und dann noch etwas, und der Aufrufer liest nur den Anfang - eine
+ * Gruppierung weiter hinten geht ihn nichts an. Ohne die Option fiel „6 × 1.000
+ * ml" auf die Menge 1 zurueck, obwohl die 6 eindeutig ist und die 1.000
+ * unveraendert im Rest der Zeile stehen bleibt.
+ *
  * ZUGESICHERT: die Umschrift ist positionstreu - ein Zeichen hinein, dasselbe
  * eine Zeichen hinaus, `toDecimalString(x).length === x.trim().length`. Wer nur
  * die fuehrende Zahl eines Freitextes umrechnet, darf den Rest deshalb per
@@ -206,7 +213,12 @@ export function amountMin(currency, currentValue) {
  * anzuhaengen: pages/meals.js skaliert so „۲ x ۵۰۰ g" zu „۴ x ۵۰۰ g" und nicht
  * zu „۴ x 500 g". Ein Verhaltenstest in test-meals.js haelt die Zusicherung.
  */
-export function toDecimalString(value) {
+/** Ein Trennzeichen als Regex-Literal. */
+function escapeForRegExp(text) {
+  return String(text ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function toDecimalString(value, { freeText = false } = {}) {
   const raw = String(value ?? '').trim();
   if (!raw) return '';
 
@@ -239,8 +251,15 @@ export function toDecimalString(value) {
   // Gruppierungszeichen - „1,000" (also eins) flöge als vermeintlich gruppiert
   // raus. Zwischen den beiden Schritten stimmt beides.
   if (groupSep && groupSep !== decimalSep) {
-    const escaped = groupSep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    if (new RegExp(`${escaped}\\d{3}(?!\\d)`).test(normalized)) return '';
+    const escaped = escapeForRegExp(groupSep);
+    // Bei Freitext zaehlt nur der fuehrende Zahlenbereich, denn der Aufrufer
+    // liest auch nur den. Sonst wies eine Gruppierung IRGENDWO im Text die ganze
+    // Zeile ab: „6 × 1.000 ml" fiel auf die Menge 1 zurueck, obwohl die 6 am
+    // Anfang voellig eindeutig ist und die 1.000 im Rest gar nicht gelesen wird.
+    const bereich = freeText
+      ? (normalized.match(new RegExp(`^\\d+(?:[${escaped}${escapeForRegExp(decimalSep)}]\\d+)*`))?.[0] ?? '')
+      : normalized;
+    if (new RegExp(`${escaped}\\d{3}(?!\\d)`).test(bereich)) return '';
   }
 
   // Schritt 3: nur der Trenner der eingestellten Region wird zum Punkt. Das

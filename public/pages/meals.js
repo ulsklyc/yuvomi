@@ -1125,8 +1125,10 @@ function scaleQuantityText(quantity, factor) {
 
   // Erst umschreiben, dann lesen: sonst sieht die ASCII-Regex unter fa/ar-EG
   // ueberhaupt keine Ziffer, und zwar auch nicht in einem Bruch wie „1 1/2".
+  // `freeText`, weil nur die fuehrende Zahl gerechnet wird: eine Gruppierung im
+  // Rest („2 Dosen à 1.000 ml") darf die Zeile nicht ungeskaliert stehen lassen.
   const original = String(quantity).trim();
-  const text = toDecimalString(original);
+  const text = toDecimalString(original, { freeText: true });
   if (!text) return quantity;
 
   // Der Rest der Zeile kommt aus dem ORIGINAL, nicht aus der umgeschriebenen

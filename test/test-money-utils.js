@@ -82,6 +82,39 @@ test('toDecimalString: eine gruppierte Zahl wird abgewiesen, auch in oestlichen 
   um('fa', '۲۰۰۰', '2000');
 });
 
+test('toDecimalString: bei Freitext zaehlt nur der fuehrende Zahlenbereich', () => {
+  // Ein Betragsfeld enthaelt NUR eine Zahl - dort ist es richtig, den ganzen Wert
+  // abzuweisen. Ein Freitext enthaelt eine Zahl und dann noch etwas, und der
+  // Aufrufer liest nur den Anfang. Ohne `freeText` wies eine Gruppierung
+  // IRGENDWO die ganze Zeile ab: „6 × 1.000 ml" fiel auf die Menge 1 zurueck,
+  // obwohl die 6 eindeutig ist und die 1.000 unveraendert stehen bleibt.
+  withFormatLocale('de', () => {
+    assert.equal(toDecimalString('6 × 1.000 ml'), '', 'ohne freeText weist die Gruppierung im Rest ab');
+    assert.equal(toDecimalString('6 × 1.000 ml', { freeText: true }), '6 × 1.000 ml');
+  });
+  withFormatLocale('en-US', () => {
+    assert.equal(toDecimalString('6 × 1,000 ml', { freeText: true }), '6 × 1,000 ml');
+    assert.equal(toDecimalString('2 cans à 1,000 ml', { freeText: true }), '2 cans à 1,000 ml');
+  });
+  // Im FUEHRENDEN Token wird weiter abgewiesen - sonst waere die Option ein
+  // Freibrief statt einer Eingrenzung.
+  um('de', '1.000 g', '');
+  withFormatLocale('de', () => {
+    assert.equal(toDecimalString('1.000 g', { freeText: true }), '', 'der fuehrende Token zaehlt weiter');
+  });
+  withFormatLocale('en-US', () => {
+    assert.equal(toDecimalString('1,000 g', { freeText: true }), '');
+  });
+  withFormatLocale('ar-EG', () => {
+    assert.equal(toDecimalString('٢٬٠٠٠ g', { freeText: true }), '', 'auch in oestlichen Ziffern');
+    assert.equal(toDecimalString('٦ × ١٬٠٠٠ ml', { freeText: true }), '6 × 1٬000 ml');
+  });
+  // Der Dezimaltrenner im fuehrenden Token bleibt eine Dezimalangabe.
+  withFormatLocale('de', () => {
+    assert.equal(toDecimalString('1,5 kg', { freeText: true }), '1.5 kg');
+  });
+});
+
 test('toDecimalString: der Dezimaltrenner wird erst NACH der Gruppierungspruefung ersetzt', () => {
   // Die andere Kante derselben Reihenfolge. Liefe die Pruefung nach dem
   // Ersetzen, waere "1,000" in de laengst ein "1.000" - und in de-DE IST der
