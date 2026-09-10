@@ -20,7 +20,7 @@ import { findPageFab } from '/utils/fab.js';
 import { setBulkPill, clearBulkPill, bulkPillLayer } from '/utils/bulk-pill.js';
 import { makeSortable } from '/utils/sortable.js';
 import { amountPlaceholder, centsToAmountInput, amountInputToCents, toDecimalString, breaksOffAtSeparator } from '/utils/money.js';
-import { connectLiveFeed } from '/utils/live-feed.js';
+import { startLiveFeed } from '/utils/live-feed.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 
 
@@ -431,7 +431,7 @@ async function toggleShoppingItem(id, checked, container) {
   }
 
   try {
-    await api.patch(`/shopping/items/${id}`, { is_checked: newVal });
+    acknowledgeOwnChange(await api.patch(`/shopping/items/${id}`, { is_checked: newVal }));
     // BEWUSST OHNE AUFRAEUMEN. Die Absicht faellt erst, wenn eine Ladeantwort
     // den Wert traegt (`settleIntents`) - der Erfolg allein beweist der Zeile
     // nichts gegen eine Antwort, die gleich danach mit dem alten Stand kommt.
@@ -533,7 +533,7 @@ function deleteItemUndoable(id, container) {
   scheduleUndoableDelete({
     message: t('shopping.itemDeletedToast', { name: snapshot?.name ?? '' }),
     commit: async ({ keepalive }) => {
-      await api.delete(`/shopping/items/${id}`, { keepalive });
+      acknowledgeOwnChange(await api.delete(`/shopping/items/${id}`, { keepalive }));
       // Endgueltig weg: die Absicht kann von keiner Antwort mehr erfuellt oder
       // ueberholt werden und laege sonst tot in der Karte. Bis hierher bleibt
       // sie liegen - ein Zuruecknehmen im Undo-Fenster braucht sie, damit die
@@ -1208,6 +1208,7 @@ function wireQuickAdd(container) {
 
     try {
       const data = await api.post(`/shopping/${state.activeListId}/items`, { name, quantity, category });
+      acknowledgeOwnChange(data);
       state.items.push(data.data);
       // Einfügen in DOM ohne komplettes Re-Render
       updateItemsList(container);
@@ -1322,6 +1323,7 @@ async function sendItemOrder(groupEl, container, listId) {
 
   try {
     const data = await api.patch(`/shopping/${listId}/items/reorder`, { category, order });
+    acknowledgeOwnChange(data);
     // Nur den State nachziehen, nicht neu zeichnen: das DOM steht bereits
     // richtig, und ein Re-Render würde den Fokus vom Griff nehmen - mitten in
     // einer Tastaturbedienung wäre das das Ende der Bedienkette.
@@ -1758,6 +1760,7 @@ function openItemDetails(itemId, container) {
             store_id: storeId,
           };
           const data = await api.patch(`/shopping/items/${item.id}`, payload);
+          acknowledgeOwnChange(data);
           const categoryChanged = data.data.category !== item.category;
           Object.assign(item, data.data);
           // force: der Dirty-Guard vergleicht gegen den Snapshot vom Öffnen und
@@ -2102,7 +2105,9 @@ function clearCheckedUndoable(container) {
 
   scheduleUndoableDelete({
     message: t('shopping.itemsRemovedToast', { count }),
-    commit: ({ keepalive }) => api.delete(`/shopping/${listId}/items/checked`, { keepalive }),
+    commit: async ({ keepalive }) => {
+      acknowledgeOwnChange(await api.delete(`/shopping/${listId}/items/checked`, { keepalive }));
+    },
     restore: (err) => {
       if (state.activeListId === listId) {
         snapshot.forEach((item) => state.items.push(item));
@@ -2352,15 +2357,34 @@ async function switchList(listId, container) {
 // Live-Aktualisierung
 // --------------------------------------------------------
 
-/** Der Versions-Feed des Servers (Server-Sent Events, server/routes/shopping.js). */
-const LIVE_FEED_URL = '/api/v1/shopping/feed';
-/** Takt des Rueckfallwegs, solange der Strom nicht traegt. */
-const LIVE_FALLBACK_MS = 30_000;
+/**
+ * Takt der Laufnummern-Abfrage (GET /shopping/versions), solange der Tab
+ * sichtbar ist. Zehn Sekunden sind der Tausch zwischen "es hat sich
+ * aktualisiert" neben jemandem im Laden und einem Server, der von jedem
+ * offenen Zettel eine kleine Anfrage je Takt bekommt - und einem Haushalt
+ * hinter EINER Adresse, der sich den Limiter (300/min) teilt.
+ */
+const LIVE_POLL_MS = 10_000;
 
 /** Controller der laufenden Live-Verdrahtung: faellt mit dem Router-Signal und beim naechsten render(). */
 let _liveController = null;
+/** Der laufende Feed - fuer die Quittung eigener Schreibvorgaenge. */
+let _liveFeed = null;
 /** Das Router-Signal des letzten Aufbaus - der Retry-Knopf reicht es an sein render() weiter. */
 let _routeSignal = null;
+
+/**
+ * Die Quittung eines eigenen Schreibvorgangs an den Feed reichen.
+ *
+ * Die Artikel-Routen antworten mit `list_change: { list_id, before, after }`.
+ * Ist `before` der Stand, den der Feed zuletzt gesehen hat, ist alles bis
+ * `after` das eigene Werk, und die naechste Abfrage laedt die Liste nicht
+ * umsonst nach - das waeren sonst zwei Anfragen je Tab und Haken, auch fuer
+ * den Tab, der den Haken gesetzt hat.
+ */
+function acknowledgeOwnChange(response) {
+  _liveFeed?.acknowledge(response?.list_change);
+}
 
 /**
  * Was ein frischer Stand an der Zeilen-Ansicht aendert.
@@ -2432,6 +2456,21 @@ async function refreshFromFeed(container, listId, signal) {
     return;
   }
   if (failed || signal.aborted) return;
+  // Die aktive Liste ist weg - jemand anderes hat sie geloescht. Der Zettel
+  // wechselt auf die erste verbliebene oder zeigt den Leerzustand, statt eine
+  // Liste zu zeigen, die es nicht mehr gibt.
+  if (state.activeListId != null && !state.lists.some((l) => l.id === state.activeListId)) {
+    if (state.lists.length) {
+      await switchList(state.lists[0].id, container);
+      return;
+    }
+    state.activeListId = null;
+    state.activeList = null;
+    clearItems();
+    renderTabs(container);
+    renderListContent(container);
+    return;
+  }
   renderTabs(container);
   // Inzwischen umgeschaltet: switchList zeichnet die neue Liste selbst.
   if (!active || state.activeListId !== listId) return;
@@ -2455,15 +2494,11 @@ async function refreshFromFeed(container, listId, signal) {
  * Signal DIESES Aufbaus (#976-Muster): der naechste Aufbau bricht den vorigen
  * ab, und das Router-Signal reisst beide beim Verlassen der Seite mit.
  *
- * Drei Wege, ein Ziel:
- *   - der Strom (EventSource) - Sekunden nach der fremden Aenderung;
- *   - das Sichtbarwerden des Tabs, wenn der Strom nicht traegt;
- *   - ein langsamer Takt, wenn der Strom nicht traegt.
- * Die beiden Rueckfallwege schweigen, solange der Strom lebt. Ein Proxy, der
- * puffert, oder ein Browser ohne EventSource bekommt so trotzdem einen Zettel,
- * der nachzieht - in halben Minuten statt in Sekunden.
+ * Der Feed fragt die Laufnummern im Takt ab, solange der Tab sichtbar ist,
+ * und sofort, wenn er sichtbar wird oder den Fokus bekommt - das ist der
+ * Moment, in dem jemand aufs Telefon schaut und den aktuellen Stand erwartet.
  *
- * Meldungen laufen durch EINE Warteschlange: zwei Haken kurz nacheinander
+ * Meldungen laufen durch EINE Warteschlange: zwei Listen in einer Antwort
  * ergeben ein Nachladen nach dem anderen, nicht zwei, die sich ueberholen.
  */
 function wireLiveUpdates(container, routeSignal) {
@@ -2494,13 +2529,20 @@ function wireLiveUpdates(container, routeSignal) {
     drain();
   };
 
-  const feed = connectLiveFeed({ url: LIVE_FEED_URL, signal, onChange: request });
-  const catchUp = () => {
-    if (!document.hidden && !feed.isLive()) request(state.activeListId);
-  };
-  document.addEventListener('visibilitychange', catchUp, { signal });
-  const fallbackTimer = setInterval(catchUp, LIVE_FALLBACK_MS);
-  signal.addEventListener('abort', () => clearInterval(fallbackTimer));
+  const feed = startLiveFeed({
+    fetchVersions: async () => (await api.get('/shopping/versions')).data ?? [],
+    onChange: request,
+    signal,
+    intervalMs: LIVE_POLL_MS,
+  });
+  _liveFeed = feed;
+  signal.addEventListener('abort', () => { if (_liveFeed === feed) _liveFeed = null; });
+
+  // Die erste Abfrage setzt die Marken; sie laeuft neben dem Laden der Seite.
+  feed.poll();
+  const wake = () => { if (!document.hidden) feed.poll(); };
+  document.addEventListener('visibilitychange', wake, { signal });
+  window.addEventListener('focus', wake, { signal });
 }
 
 // --------------------------------------------------------
@@ -3042,10 +3084,11 @@ export const __test = {
   clearItems,
   resetLoadOrderForTest: () => { _appliedLoad.clear(); settledAt.clear(); _itemsListId = null; },
   // Live-Aktualisierung: der Plan ist reine Logik (Serverstand vorher/nachher),
-  // das Nachladen und die Verdrahtung laufen ueber den api-Stub und eine
-  // EventSource-Attrappe.
+  // das Nachladen und die Verdrahtung laufen ueber den api-Stub.
   liveRefreshPlan,
   refreshFromFeed,
   wireLiveUpdates,
-  abortLiveUpdatesForTest: () => { _liveController?.abort(); _liveController = null; },
+  acknowledgeOwnChange,
+  getLiveFeedForTest: () => _liveFeed,
+  abortLiveUpdatesForTest: () => { _liveController?.abort(); _liveController = null; _liveFeed = null; },
 };

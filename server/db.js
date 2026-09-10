@@ -7603,16 +7603,15 @@ const MIGRATIONS = [
   },
   {
     version: 194,
-    description: 'change counter per shopping list, fed by triggers, for the live feed',
+    description: 'change counter per shopping list, fed by triggers, for live updates',
     up: `
       -- WER GEAENDERT HAT, IST EGAL - DASS SICH ETWAS GEAENDERT HAT, ZAEHLT.
       --
-      -- Eine Laufnummer je Liste, die bei jeder Aenderung an ihren Artikeln
-      -- steigt. Der Live-Feed (GET /shopping/feed) liest nur diese Tabelle und
-      -- sagt jedem offenen Einkaufszettel, dass seine Nummer sich bewegt hat;
-      -- was sich geaendert hat, laedt der Zettel dann selbst nach. Zwei Leute
-      -- im selben Laden sahen bis dahin zwei verschiedene Listen, bis einer
-      -- die Seite neu lud.
+      -- Eine Laufnummer je Liste, die bei jeder Aenderung an der Liste oder
+      -- ihren Artikeln steigt. GET /shopping/versions liest nur diese Tabelle;
+      -- ein offener Einkaufszettel fragt sie im Takt und laedt eine Liste nach,
+      -- deren Nummer sich bewegt hat. Zwei Leute im selben Laden sahen bis
+      -- dahin zwei verschiedene Listen, bis einer die Seite neu lud.
       --
       -- ALS TRIGGER, NICHT ALS AUFRUF IN DEN ROUTEN: shopping_items wird aus
       -- sechs Modulen beschrieben (Einkauf, Essensplan, Rezepte, Haushaltshilfe,
@@ -7624,12 +7623,33 @@ const MIGRATIONS = [
         list_id INTEGER PRIMARY KEY,
         version INTEGER NOT NULL DEFAULT 0
       );
+      -- JEDE LISTE HAT VON ANFANG AN EINE ZEILE. Der Client merkt sich die
+      -- Nummer, die er zuerst sieht, als Ausgangsstand - eine Liste ohne Zeile
+      -- taucht erst mit ihrer ersten Aenderung auf, und genau die ginge dann
+      -- als "Ausgangsstand" verloren. Bestand hier, Neuanlage per Trigger.
+      INSERT INTO shopping_list_changes (list_id, version) SELECT id, 0 FROM shopping_lists;
+      CREATE TRIGGER trg_shopping_lists_change_ai AFTER INSERT ON shopping_lists BEGIN
+        INSERT OR IGNORE INTO shopping_list_changes (list_id, version) VALUES (NEW.id, 0);
+      END;
+      -- Umbenennen ist eine Aenderung, die die anderen Geraete sehen sollen.
+      CREATE TRIGGER trg_shopping_lists_change_au AFTER UPDATE ON shopping_lists BEGIN
+        INSERT INTO shopping_list_changes (list_id, version) VALUES (NEW.id, 1)
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
       CREATE TRIGGER trg_shopping_items_change_ai AFTER INSERT ON shopping_items BEGIN
         INSERT INTO shopping_list_changes (list_id, version) VALUES (NEW.list_id, 1)
           ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
       END;
       CREATE TRIGGER trg_shopping_items_change_au AFTER UPDATE ON shopping_items BEGIN
         INSERT INTO shopping_list_changes (list_id, version) VALUES (NEW.list_id, 1)
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
+      -- Ein Artikel, der die Liste wechselt (der CalDAV-Sync schreibt list_id
+      -- um, wenn die Zielliste einer Auswahl wechselt), ist auch fuer die
+      -- Liste eine Aenderung, die er VERLAESST.
+      CREATE TRIGGER trg_shopping_items_change_au_moved AFTER UPDATE OF list_id ON shopping_items
+        WHEN OLD.list_id <> NEW.list_id BEGIN
+        INSERT INTO shopping_list_changes (list_id, version) VALUES (OLD.list_id, 1)
           ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
       END;
       CREATE TRIGGER trg_shopping_items_change_ad AFTER DELETE ON shopping_items BEGIN
@@ -7639,7 +7659,8 @@ const MIGRATIONS = [
       -- KEIN FREMDSCHLUESSEL auf shopping_lists: der Loesch-Trigger der Artikel
       -- feuert waehrend der Kaskade einer Listenloeschung, und ein Fremdschluessel
       -- liesse genau dieses Einfuegen scheitern. Aufgeraeumt wird stattdessen
-      -- hinter der Liste her.
+      -- hinter der Liste her - und dass die Zeile fehlt, ist fuer den Client
+      -- die Nachricht, dass die Liste weg ist.
       CREATE TRIGGER trg_shopping_lists_change_ad AFTER DELETE ON shopping_lists BEGIN
         DELETE FROM shopping_list_changes WHERE list_id = OLD.id;
       END;

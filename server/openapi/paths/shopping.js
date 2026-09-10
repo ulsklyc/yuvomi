@@ -26,22 +26,16 @@ export function shoppingPaths() {
       patch: op({ summary: 'Reorder shopping categories', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/shopping/suggestions': { get: op({ summary: 'Get shopping suggestions', tag: 'Shopping' }) },
-    '/api/v1/shopping/feed': {
+    '/api/v1/shopping/versions': {
       get: op({
-        summary: 'Live feed of list changes (Server-Sent Events)',
-        description: 'A `text/event-stream` that stays open. It says *that* a list changed, never *what*: '
-          + 'the client reloads the list through the same GET it used to open it, so there is one read path. '
-          + 'Events: `versions` on connect (`{ lists: [{ listId, version }] }`), `change` (`{ listId, version }`) '
-          + 'whenever a list\'s items were inserted, updated or deleted by anyone - a household member, '
-          + 'a meal-plan import, the CalDAV sync - and `ping` every 25 seconds so the client can tell a live '
-          + 'stream from one a proxy is buffering. The counter behind it is kept by database triggers, so no '
-          + 'writer has to remember to announce itself.',
+        summary: 'Change counter of every shopping list',
+        description: 'One `{ list_id, version }` per list. The counter says *that* a list changed, never *what*: '
+          + 'it moves whenever the list was renamed or its items were inserted, updated, moved or deleted by anyone '
+          + '- a household member, a meal-plan import, the CalDAV sync - and the row disappears with the list. '
+          + 'Database triggers keep it, so no writer has to announce itself. A client polls this while a list is '
+          + 'open and reloads a list through the same items request it used to open it; the write routes on items '
+          + 'return `list_change: { list_id, before, after }` so the writer can tell its own change apart.',
         tag: 'Shopping',
-        responses: {
-          200: { description: 'Event stream (`text/event-stream`)', content: { 'text/event-stream': { schema: { type: 'string' } } } },
-          401: { $ref: '#/components/responses/Unauthorized' },
-          500: { $ref: '#/components/responses/InternalServerError' },
-        },
       }),
     },
     '/api/v1/shopping/items/undo-transfer': {

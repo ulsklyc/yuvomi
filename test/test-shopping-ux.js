@@ -1168,28 +1168,6 @@ test('nach einem Fehlschlag derselben Liste wird die gecachte Antwort angenommen
 // Live-Aktualisierung: fremde Aenderungen erreichen den Zettel
 // --------------------------------------------------------
 
-/** EventSource-Attrappe fuer wireLiveUpdates - wie in test-live-feed.js, aufs Noetige gekuerzt. */
-class FakeEventSource {
-  static instances = [];
-  constructor(url) {
-    this.url = url;
-    this.readyState = 0;
-    this.closed = false;
-    this.listeners = new Map();
-    FakeEventSource.instances.push(this);
-  }
-  addEventListener(type, fn) {
-    if (!this.listeners.has(type)) this.listeners.set(type, []);
-    this.listeners.get(type).push(fn);
-  }
-  close() { this.closed = true; this.readyState = 2; }
-  open() { this.readyState = 1; this.fire('open'); }
-  fire(type, data) {
-    const evt = data === undefined ? {} : { data: JSON.stringify(data) };
-    for (const fn of this.listeners.get(type) ?? []) fn(evt);
-  }
-}
-
 const bread = (isChecked = 0) => ({ id: 11, name: 'Brot', is_checked: isChecked, category: 'Backwaren', sort_order: 0 });
 const listRow = (checked) => ({ id: 1, name: 'Einkauf', item_total: 2, item_checked: checked });
 
@@ -1329,47 +1307,81 @@ test('refreshFromFeed: ein abgebrochener Aufbau zeichnet nichts mehr', async () 
   delete globalThis.__apiStub;
 });
 
-test('wireLiveUpdates: der Strom haengt am Router-Signal, eine Meldung laedt nach, der naechste Aufbau schliesst den vorigen', async () => {
+test('refreshFromFeed: ist die aktive Liste weg, wechselt der Zettel auf die erste verbliebene', async () => {
+  resetShoppingState();
+  __test.state.activeListId = 1;
+  __test.state.lists = [listRow(0), { id: 2, name: 'Baumarkt', item_total: 0, item_checked: 0 }];
+  __test.state.items = [milk(0)];
+  const calls = [];
+  globalThis.__apiStub = {
+    // Liste 1 hat jemand anderes geloescht: die Antwort kennt nur noch Liste 2.
+    get: async (path) => { calls.push(path); return { data: [{ id: 2, name: 'Baumarkt', item_total: 1, item_checked: 0 }] }; },
+    getWithSource: async (path) => { calls.push(path); return { data: { data: [bread(0)], list: { id: 2, name: 'Baumarkt' } }, fromCache: false }; },
+  };
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  assert.equal(__test.state.activeListId, 2, 'die erste verbliebene Liste wird aktiv');
+  assert.ok(calls.includes('/shopping/2/items'), 'und geladen');
+  assert.deepEqual(__test.state.items.map((i) => i.id), [11]);
+  delete globalThis.__apiStub;
+});
+
+/** Zwei Makrotasks reichen, damit die Warteschlange Stub-Antworten verarbeitet hat. */
+const settle = async () => { for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0)); };
+
+test('wireLiveUpdates: die Abfrage haengt am Router-Signal, eine bewegte Nummer laedt nach, die eigene Quittung erspart das Nachladen', async () => {
   resetShoppingState();
   __test.state.lists = [listRow(0)];
   __test.state.items = [milk(0)];
-  global.EventSource = FakeEventSource;
-  FakeEventSource.instances.length = 0;
 
+  let versions = [{ list_id: 1, version: 4 }];
   const calls = [];
   globalThis.__apiStub = {
-    get: async (path) => { calls.push(path); return { data: [listRow(1)] }; },
+    get: async (path) => {
+      calls.push(path);
+      if (path === '/shopping/versions') return { data: versions };
+      return { data: [listRow(1)] };
+    },
     getWithSource: async (path) => { calls.push(path); return { data: { data: [milk(1)] }, fromCache: false }; },
+    patch: async () => ({ data: null, list_change: { list_id: 1, before: 4, after: 6 } }),
   };
 
   const route = new AbortController();
   try {
     __test.wireLiveUpdates(makeNullContainer(), route.signal);
-    const [first] = FakeEventSource.instances;
-    assert.equal(first.url, '/api/v1/shopping/feed');
+    await settle();
+    assert.deepEqual(calls, ['/shopping/versions'], 'die erste Abfrage setzt nur die Marken');
 
-    first.open();
-    first.fire('versions', { lists: [{ listId: 1, version: 1 }] });
-    first.fire('change', { listId: 1, version: 2 });
-    // Die Warteschlange arbeitet asynchron: zwei Makrotasks reichen fuer Stub-Antworten.
-    await new Promise((r) => setTimeout(r, 0));
-    await new Promise((r) => setTimeout(r, 0));
-    assert.ok(calls.includes('/shopping/1/items'), 'die Meldung laedt die aktive Liste nach');
-    assert.equal(__test.state.items[0].is_checked, 1);
+    // Der eigene Haken: die Quittung rueckt die Marke auf 6 - die naechste
+    // Abfrage sieht 6 und laedt NICHT nach.
+    await __test.toggleShoppingItem(10, 0, makeNullContainer());
+    versions = [{ list_id: 1, version: 6 }];
+    calls.length = 0;
+    await __test.getLiveFeedForTest().poll();
+    await settle();
+    assert.deepEqual(calls, ['/shopping/versions'], 'das eigene Werk loest kein Nachladen aus');
 
+    // Jemand anderes: die Nummer steigt ueber die Quittung hinaus.
+    versions = [{ list_id: 1, version: 7 }];
+    calls.length = 0;
+    await __test.getLiveFeedForTest().poll();
+    await settle();
+    assert.ok(calls.includes('/shopping/1/items'), 'eine fremde Bewegung laedt die aktive Liste nach');
+
+    const first = __test.getLiveFeedForTest();
     __test.wireLiveUpdates(makeNullContainer(), route.signal);
-    assert.equal(first.closed, true, 'der naechste Aufbau derselben Seite schliesst den Strom des vorigen');
-    const second = FakeEventSource.instances[1];
-    assert.equal(second.closed, false);
+    assert.notEqual(__test.getLiveFeedForTest(), first, 'der naechste Aufbau derselben Seite hat seinen eigenen Feed');
+    await settle(); // die erste Abfrage des NEUEN Feeds ist durch
+    calls.length = 0;
+    await first.poll();
+    assert.deepEqual(calls, [], 'der Feed des vorigen Aufbaus fragt nicht mehr');
 
     route.abort();
-    assert.equal(second.closed, true, 'die Seite verlassen schliesst den Strom');
+    assert.equal(__test.getLiveFeedForTest(), null, 'die Seite verlassen beendet den Feed');
   } finally {
-    // Der Rueckfall-Takt (30 s) hinge sonst am Prozess, wenn eine Zusicherung
-    // oben scheitert - die Suite endete dann nie.
+    // Der Takt hinge sonst am Prozess, wenn eine Zusicherung oben scheitert -
+    // die Suite endete dann nie.
     route.abort();
     __test.abortLiveUpdatesForTest();
-    delete global.EventSource;
     delete globalThis.__apiStub;
   }
 });
