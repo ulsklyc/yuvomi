@@ -72,6 +72,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   follows both without extra work. Inventory's own search matches on it too, since "where is the
   device that runs on this address" is the question the field exists for.
 
+- **New optional module: Waste collection** (#1063). Define your household's waste types
+  (recycling, organic, general, or your own, each with an icon and color) and a weekly or
+  fixed-day-of-month pickup schedule for each. A single calculated pickup can be moved to a
+  different date or skipped without touching the rest of the schedule, and moving one origin never
+  hides another - a manual one-off pickup recorded on the same day a schedule occurrence moved away
+  from still shows. One-off pickups cover irregular or special collections that are not part of any
+  recurring schedule. A type with schedules or pickups cannot be deleted (archive it instead), so a
+  season's history is never lost by accident. Off by default; a household turns it on in
+  Settings → Modules. A municipality's ICS calendar file can also be imported: preview its pickups,
+  map each label to a waste type (or create one on the spot, or ignore it), and commit - the file is
+  re-parsed on commit so nothing is trusted from the preview alone, and re-importing next year's file
+  diffs cleanly into additions/changes/removals without duplicating or losing manual data. A source
+  with no future mapped pickup is flagged for a refresh. An optional Dashboard widget shows the next
+  pickup per active type, soonest first, and carries the same "needs a refresh" flag as the module
+  page; hidden by default, like the module itself. A device-local Calendar layer, off by default,
+  shows every type's pickups in month, week, day, and agenda view; a pickup carries its type's icon
+  and color and opens the module directly, never the ordinary event editor. Beyond a one-time file
+  import, a source can also subscribe to an ICS URL: it refreshes itself automatically on a
+  configurable schedule (hourly to monthly), applying an update only once every label already has a
+  confirmed mapping - unrecognized content is flagged for review instead of guessed at, and a manual
+  "check now" is always available alongside the automatic schedule. Each household member can also opt
+  into their own pickup reminders per waste type, choosing how many days ahead and what time of day
+  (household-local) to be notified - personal, so a reminder never goes to someone who didn't ask for
+  it. A monthly schedule can now also follow an ordinal weekday - "the second Monday" or "the last
+  Friday" of every month - alongside the existing weekly and fixed-day-of-month rhythms; the
+  underlying shared recurrence engine gained this once and every existing recurring feature (Tasks,
+  Calendar, CalDAV/ICS import) benefits from it, not just Waste. A revocable, personal read-only ICS
+  feed of upcoming pickups is now available too (Settings → Feeds), with an optional per-type
+  selection; a source's label-to-type mapping decisions can be exported as a portable profile and
+  re-applied to another source or household, without the app ever shipping a municipal/provider
+  catalog. Waste types are now searchable from the global search bar, and the Calendar layer's filter
+  sheet gained a per-type visibility list nested under the one Waste toggle, so a rare collection is
+  never silently hidden while a noisy one can be tucked away.
+
 - **Planned meals show their recipe's picture, for recipes mirrored from Mealie or Tandoor**
   (#1059, step one). The thumbnail proxy has existed since the provider sync landed, but only the
   recipe list used it; the meal planner and the "today's meals" tile rendered text. Both now show
@@ -133,6 +167,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The delete dialog is unchanged: "Delete entire series" already says it.
 
 ### Fixed
+
+- **A full audit of the Schedule module, fixed in one sweep.** The override editor no longer
+  destroys typed input when its "fill the whole range?" confirmation is cancelled — the confirm now
+  parks and resumes the open form instead of force-closing it. A member with read-only access to the
+  module sees an honest page: the banner was always there, but every create/edit/delete control
+  rendered anyway and failed only on save; they are now gone, matching what the API has always
+  enforced. Statistics and Overview refetch when the page is revisited (previously they re-labelled
+  another user's cached numbers as your own after a tab switch), show real loading and error states
+  instead of zeros that looked like data, and rapid week-flipping can no longer let a slow older
+  response overwrite a newer one. The dashboard "who's working today" widget refreshes with the
+  15-minute cycle instead of showing the morning state all day, and a failed load renders the error
+  tile with a retry button instead of the "create a shift type" onboarding. Shift-start reminders
+  fire at the DST-correct minute around clock changes, enabling them defaults to a 15-minute lead
+  instead of "at shift start", and a reminder can no longer keep firing for a shift type deleted in
+  the sync's blind window. On the server, a pattern save is capped at 500 cycle-day rows (each
+  stored row is re-emitted on every resolved read — an uncapped save was stored read amplification
+  any member could create), deleting a pattern or a user no longer leaks its custom-field values,
+  duplicate field ids in one payload are rejected instead of half-committing and answering 500, and
+  omitting `field_values` from an override save now preserves stored values, as the extras route
+  always did. The statistics hint text in all 24 languages finally describes the rolling
+  7-day-window rule the overtime flag actually applies, the printed statistics sheet no longer leads
+  with the personal reminder settings card, and a member with no schedule access no longer gets a
+  dead "Schedule" calendar layer plus a guaranteed-403 request on every calendar load.
+
+  A second pass, this time on the module's comprehension and everyday polish, followed. Deleting a
+  shift type now asks first, naming what it removes, like every other destructive action in the
+  module already did. Two raw server strings that used to reach the toast ("shift_type_id must be a
+  positive number.", "cycle_length cannot exclude existing pattern days.") are now plain sentences
+  that say what to do next, and an Extra with no shift types yet shows a hint instead of an empty,
+  submittable dropdown. Editing a pattern's cycle days and leaving the tab (or the card) without
+  saving now prompts to discard, matching the confirm every other unsaved-changes flow in the app
+  already has; merely switching the Add-entry modal's Pattern/Override/Extra segment no longer
+  counts as a change worth asking about. Each cycle-day position shows the actual next date it falls
+  on, with a one-line explanation of the repeating cycle; creating or reactivating a pattern that
+  overlaps another one now asks first and names the consequence, and the pattern currently in effect
+  carries a small marker. A household with no shift types yet opens on that tab instead of the
+  planning tab it would immediately dead-end on. Every schedule tab now has its own address
+  (`/schedule/patterns`, `/schedule/statistics`, ...), so reloading keeps the tab, the back button
+  walks between tabs instead of leaving the page, and the dashboard widget and a shift reminder both
+  link straight to the relevant tab instead of the bare module. Clicking a shift anywhere it appears
+  (the Today card, the Compare view, a week/day calendar block) now opens a small read-only detail
+  view instead of doing nothing; week/day calendar chips show the full time range instead of just
+  the start; and the "Free today" hero and the per-member status row on the dashboard no longer
+  contradict a schedule entry sitting right next to them. The Statistics owner picker is self-only
+  for non-admin members now — statistics remain a read-only summary of data everyone can already see
+  via the Today card and calendar, but the convenience of pulling up someone else's totals was never
+  meant to be open to everyone. Shift-type presets are grouped by template (Work/School/University)
+  instead of one flat list of fifteen, the reminder lead time accepts any custom value up to the
+  server's own 24-hour cap instead of the seven fixed presets, and an expanded shift-type card spans
+  the full row instead of leaving a gap beside it. Tracking overtime at all is now its own switch
+  next to the weekly-hours target, instead of that number being the only way to affect whether the
+  Statistics tab flags anything - turning it off removes the overtime card entirely rather than
+  requiring a number nobody's schedule will ever cross. All of the above is translated into all 24
+  languages.
 
 - **The person filter in the task history is no longer a row of blank buttons on a phone** (#1068).
   Below 640px the label-loss rule removes every `.group-toggle__label`; it is built on the

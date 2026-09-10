@@ -227,10 +227,10 @@ const SCHEDULE_TEMPLATE_KEYS = ['work', 'school', 'university'];
 const TOGGLEABLE_MODULES = [
   'tasks', 'calendar', 'meals', 'recipes', 'shopping', 'pantry', 'inventory',
   'birthdays', 'notes', 'contacts', 'budget', 'documents',
-  'housekeeping', 'rewards', 'health', 'schedule',
+  'housekeeping', 'waste', 'rewards', 'health', 'schedule',
 ];
-const MODULE_ORDER_RE = /^(dashboard|tasks|calendar|meals|recipes|shopping|pantry|inventory|birthdays|notes|contacts|budget|documents|housekeeping|rewards|health|schedule|third-party-[a-z0-9][a-z0-9-]{1,62}[a-z0-9])$/;
-const MOBILE_NAV_ORDER_RE = /^(tasks|calendar|kitchen|meals|recipes|shopping|pantry|inventory|birthdays|notes|contacts|budget|documents|housekeeping|rewards|health|schedule|third-party-[a-z0-9][a-z0-9-]{1,62}[a-z0-9])$/;
+const MODULE_ORDER_RE = /^(dashboard|tasks|calendar|meals|recipes|shopping|pantry|inventory|birthdays|notes|contacts|budget|documents|housekeeping|waste|rewards|health|schedule|third-party-[a-z0-9][a-z0-9-]{1,62}[a-z0-9])$/;
+const MOBILE_NAV_ORDER_RE = /^(tasks|calendar|kitchen|meals|recipes|shopping|pantry|inventory|birthdays|notes|contacts|budget|documents|housekeeping|waste|rewards|health|schedule|third-party-[a-z0-9][a-z0-9-]{1,62}[a-z0-9])$/;
 const KITCHEN_NAV_IDS = new Set(['kitchen', 'meals', 'recipes', 'shopping', 'pantry']);
 
 // --------------------------------------------------------
@@ -455,8 +455,10 @@ function parseMobileNavOrder(raw) {
  * nur, dass hier unbegrenzt viel Fremdinhalt in `sync_config` landet.
  *
  * Erlaubt sind Boolean, endliche Zahlen, kurze Strings und Listen kurzer
- * Strings. Verschachtelte Objekte nicht: sie hätten keine Tiefengrenze, und
- * kein Widget braucht sie.
+ * Strings ODER endlicher Zahlen (#1063 Phase 10: die Waste-Kachel filtert
+ * nach Typ-Ids, keine Kategorie-Schlüsseln - eine Liste darf deshalb nicht
+ * mehr nur Strings tragen). Verschachtelte Objekte nicht: sie hätten keine
+ * Tiefengrenze, und kein Widget braucht sie.
  *
  * @returns {object|null} normalisierte Optionen, oder null wenn die Form nicht stimmt
  */
@@ -481,7 +483,8 @@ function normalizeWidgetOptions(input) {
     }
     if (Array.isArray(value)) {
       if (value.length > MAX_WIDGET_OPTION_VALUES) return null;
-      if (!value.every((v) => typeof v === 'string' && v.length <= MAX_WIDGET_OPTION_LENGTH)) return null;
+      if (!value.every((v) => (typeof v === 'string' && v.length <= MAX_WIDGET_OPTION_LENGTH)
+        || (typeof v === 'number' && Number.isFinite(v)))) return null;
       out[key] = [...value];
       continue;
     }
@@ -623,6 +626,22 @@ router.get('/', (req, res) => {
 router.put('/', (req, res) => {
   try {
     const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
+
+    // Welche Quickstart-Vorlagen der Schichtplan-Schnellstart zeigt - wie
+    // disabled_modules haushaltweit und admin-only, nicht wie hidden_modules
+    // pro Nutzer: die Vorlagen legen geteilte Schichtarten an. Der Check steht
+    // hier ganz vorne, vor jedem Schreiben in diesem Request: er sass frueher
+    // erst mitten im Handler, nachdem laengst schon andere Haushaltsfelder
+    // geschrieben waren - ein gemischtes Payload eines Nicht-Admins wandte sich
+    // dann teilweise an, bevor der 403 kam.
+    if (schedule_hidden_templates !== undefined) {
+      if (req.authRole !== 'admin') {
+        return res.status(403).json({ error: 'Admin access required.', code: 403 });
+      }
+      if (!Array.isArray(schedule_hidden_templates)) {
+        return res.status(400).json({ error: 'schedule_hidden_templates muss ein Array sein', code: 400 });
+      }
+    }
 
     if (visible_meal_types !== undefined) {
       if (!Array.isArray(visible_meal_types)) {
@@ -971,16 +990,9 @@ router.put('/', (req, res) => {
       cfgUserSet('tasks_default_target', req.authUserId, target);
     }
 
-    // Welche Quickstart-Vorlagen der Schichtplan-Schnellstart zeigt - wie
-    // disabled_modules haushaltweit und admin-only, nicht wie hidden_modules
-    // pro Nutzer: die Vorlagen legen geteilte Schichtarten an.
+    // Validiert (Admin-Rolle, Array-Form) bereits ganz oben, vor jedem anderen
+    // Schreiben in diesem Request - hier nur noch der eigentliche Schreibvorgang.
     if (schedule_hidden_templates !== undefined) {
-      if (req.authRole !== 'admin') {
-        return res.status(403).json({ error: 'Admin access required.', code: 403 });
-      }
-      if (!Array.isArray(schedule_hidden_templates)) {
-        return res.status(400).json({ error: 'schedule_hidden_templates muss ein Array sein', code: 400 });
-      }
       const unique = [...new Set(
         schedule_hidden_templates.filter((key) => typeof key === 'string' && SCHEDULE_TEMPLATE_KEYS.includes(key)),
       )];

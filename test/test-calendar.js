@@ -1825,6 +1825,26 @@ test('renderDayView: zwei ueberlappende Schichten am selben Tag bekommen untersc
 });
 
 // --------------------------------------------------------
+// scheduleEnabled(): Modul-Abschaltung UND Leserechte
+// ANLASS: ein Mitglied mit Schedule-Recht 'none' sah trotzdem die Ebenen-Zeile
+// im Filter-Blatt UND loeste bei jedem Kalender-Laden ein garantiertes 403 auf
+// GET /schedule/entries aus. scheduleEnabled() ist (anders als wasteEnabled(),
+// s. test-waste-calendar.js) nicht in __test exportiert, also kein direkter
+// Aufruf hier moeglich - Quelltext-Pruefung, wie fuer andere Funktionen ohne
+// eigenen Export in dieser Datei bereits ueblich (s. z.B. die
+// calendarRepeatIconHtml-Region-Pruefung oben).
+// --------------------------------------------------------
+test('scheduleEnabled() verlangt zusaetzlich moduleAccess(\'schedule\') !== \'none\', wie wasteEnabled() es fuer waste tut', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(/import \{ moduleAccess \} from '\/permissions\.js';/.test(src), 'moduleAccess muss importiert sein');
+  const fnBody = src.slice(src.indexOf('function scheduleEnabled()'), src.indexOf('function wasteEnabled()'));
+  assert(/isModuleDisabled\?\.\('schedule'\)/.test(fnBody), 'die bestehende Abschaltungs-Pruefung darf nicht verschwinden');
+  assert(/moduleAccess\('schedule'\) !== 'none'/.test(fnBody),
+    'scheduleEnabled() muss wie wasteEnabled() auch die Leserechte pruefen, nicht nur die Abschaltung - '
+    + 'sonst sieht ein Mitglied ohne Schedule-Recht weiter die Ebenen-Zeile und loest bei jedem Laden ein 403 aus');
+});
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 console.log(`\n[Calendar-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

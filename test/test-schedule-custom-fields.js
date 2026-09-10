@@ -7,7 +7,15 @@
  *        Schichttyp-Zuordnung UND bereits erfasste Werte (Migration 189,
  *        ON DELETE CASCADE) - direkt per SQL nachgewiesen, nicht nur ueber den
  *        Statuscode der Loeschung selbst.
- * Ausführen: node --test test/test-schedule-custom-fields.js
+ * Ausführen: npm run test:schedule-custom-fields
+ *            (NICHT nackt `node --test test/test-schedule-custom-fields.js` -
+ *            DB_PATH wird unten zwar vor jedem eigenen Top-Level-Code gesetzt,
+ *            aber statische Imports werten VOR dem Rest dieser Datei aus, in
+ *            Abhaengigkeits-Reihenfolge; server/db.js oeffnet die Datenbank
+ *            beim eigenen Modul-Laden anhand von process.env.DB_PATH zu genau
+ *            diesem fruehen Zeitpunkt. Ohne den Shell-Prefix des npm-Skripts
+ *            (schon gesetzt, bevor der Node-Prozess ueberhaupt startet) laeuft
+ *            das gegen die echte yuvomi.db im Repo.
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -132,4 +140,63 @@ test('schedule_custom_field_values rejects an empty or overlong value at the sch
   assert.throws(() => database.prepare("INSERT INTO schedule_custom_field_values (entry_type, entry_id, custom_field_id, value) VALUES ('override', 1, ?, ?)").run(fieldId, 'x'.repeat(501)));
   database.prepare("INSERT INTO schedule_custom_field_values (entry_type, entry_id, custom_field_id, value) VALUES ('override', 1, ?, 'ok')").run(fieldId);
   database.prepare('DELETE FROM schedule_custom_fields WHERE id = ?').run(fieldId);
+});
+
+// --------------------------------------------------------
+// User deletion cascade (server/auth.js DELETE /users/:id, audit finding):
+// schedule_patterns/schedule_overrides/schedule_extra_shifts all cascade away
+// with the user (FK CASCADE on user_id), but schedule_custom_field_values is
+// polymorphic (entry_type/entry_id, no real FK - same compromise
+// reminders.entity_id makes) and does NOT ride that cascade. Exercised against
+// the REAL route (not a re-implementation of its cleanup SQL), the same way
+// this file already goes through the real schedule router for every other
+// cascade above.
+// --------------------------------------------------------
+const { router: authRouter } = await import('../server/auth.js');
+let deleteActor = ADMIN;
+const CSRF = 'a'.repeat(64);
+const authApp = express();
+authApp.use(express.json());
+authApp.use((req, _res, next) => {
+  req.session = { userId: deleteActor.id, role: deleteActor.role, csrfToken: CSRF };
+  next();
+});
+authApp.use('/auth', authRouter);
+const authServer = authApp.listen(0);
+const authBaseUrl = await new Promise((r) => authServer.on('listening', () => r(`http://127.0.0.1:${authServer.address().port}`)));
+test.after(() => authServer.close());
+
+test('deleting a user cleans up schedule_custom_field_values left behind by their pattern days, overrides, and extra shifts', async () => {
+  const doomed = database.prepare(
+    "INSERT INTO users (username, display_name, password_hash, role) VALUES ('cf-doomed', 'Doomed', 'x', 'member')"
+  ).run().lastInsertRowid;
+  const field = database.prepare("INSERT INTO schedule_custom_fields (name) VALUES ('Doomed field')").run().lastInsertRowid;
+
+  const patternId = database.prepare(
+    "INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length) VALUES (?, 'Doomed pattern', '2027-01-01', 1)"
+  ).run(doomed).lastInsertRowid;
+  const dayId = database.prepare('INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, 0, ?)').run(patternId, typeId).lastInsertRowid;
+  database.prepare("INSERT INTO schedule_custom_field_values (entry_type, entry_id, custom_field_id, value) VALUES ('pattern_day', ?, ?, 'p')").run(dayId, field);
+
+  database.prepare('INSERT INTO schedule_overrides (user_id, date_key, shift_type_id) VALUES (?, ?, ?)').run(doomed, '2027-01-05', typeId);
+  const overrideId = database.prepare('SELECT id FROM schedule_overrides WHERE user_id = ? AND date_key = ?').get(doomed, '2027-01-05').id;
+  database.prepare("INSERT INTO schedule_custom_field_values (entry_type, entry_id, custom_field_id, value) VALUES ('override', ?, ?, 'o')").run(overrideId, field);
+
+  database.prepare('INSERT INTO schedule_extra_shifts (user_id, date_key, shift_type_id) VALUES (?, ?, ?)').run(doomed, '2027-01-06', typeId);
+  const extraId = database.prepare('SELECT id FROM schedule_extra_shifts WHERE user_id = ? AND date_key = ?').get(doomed, '2027-01-06').id;
+  database.prepare("INSERT INTO schedule_custom_field_values (entry_type, entry_id, custom_field_id, value) VALUES ('extra_shift', ?, ?, 'e')").run(extraId, field);
+
+  assert.equal(database.prepare('SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE custom_field_id = ?').get(field).c, 3,
+    'sanity: all three per-occurrence values exist before deletion');
+
+  deleteActor = ADMIN;
+  const res = await fetch(`${authBaseUrl}/auth/users/${doomed}`, { method: 'DELETE', headers: { 'X-CSRF-Token': CSRF } });
+  assert.equal(res.status, 200, JSON.stringify(await res.json().catch(() => null)));
+
+  assert.equal(database.prepare('SELECT 1 FROM users WHERE id = ?').get(doomed), undefined, 'the user itself is gone');
+  assert.equal(database.prepare('SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE custom_field_id = ?').get(field).c, 0,
+    'pattern_day/override/extra_shift custom field values must not survive the deletion of the user whose rows they were attached to - '
+    + 'entry_id carries no real foreign key for a schema-level cascade to ride on');
+
+  database.prepare('DELETE FROM schedule_custom_fields WHERE id = ?').run(field);
 });

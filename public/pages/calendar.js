@@ -37,6 +37,7 @@ import { findPageFab } from '/utils/fab.js';
 import { nowFields, todayKey, zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
+import { moduleAccess } from '/permissions.js';
 import {
   applyPendingCalendarDeleteOverlay,
   createCalendarLoadCoordinator,
@@ -333,6 +334,12 @@ const LAYER_HOLIDAYS_KEY = 'yuvomi:calendar:layer:holidays';
 const LAYER_SCHOOL_KEY    = 'yuvomi:calendar:layer:school';
 const LAYER_BIRTHDAYS_KEY = 'yuvomi:calendar:layer:birthdays';
 const LAYER_SCHEDULE_KEY = 'yuvomi:calendar:layer:schedule';
+const LAYER_WASTE_KEY = 'yuvomi:calendar:layer:waste';
+// Per-Typ-Sichtbarkeit unter der EINEN Waste-Ebene (#1063 Phase 10) - eigener
+// Schluessel, eigenes Set, gleiche "leeres Set = alle" Lesart wie state.people.
+// Client-only wie jede andere Ebene hier: kein Modul in dieser Datei hat
+// serverseitig gespeicherten Filterzustand.
+const WASTE_VISIBLE_TYPES_KEY = 'yuvomi:calendar:waste:visibleTypes';
 const SCHEDULE_DISPLAY_KEY = 'yuvomi:calendar:schedule-display';
 // Monatszelle am Telefon: Titelzeilen statt Punkte. GERAETEWEIT, nicht pro
 // Haushalt - die Frage, die der Schalter beantwortet ("passt ein Titel auf
@@ -591,6 +598,15 @@ let state = {
   layerSchool:   true,     // toggle for school holiday layer
   layerBirthdays: true,    // toggle for the birthday layer (#778)
   layerSchedule: true,     // computed schedule overlay
+  // Anders als holidays/school/schedule/birthdays (Vorgabe AN, Filter nimmt weg):
+  // PLAN.md Phase 0 legt ausdruecklich fest, dass die Waste-Ebene AUS startet,
+  // wie das Dashboard-Widget selbst (DEFAULT_HIDDEN_WIDGETS) - ein bestehender
+  // Haushalt bekommt beim Rebase auf diese Phase keinen ungefragt vollen
+  // Kalender voller Muelltermine.
+  layerWaste:    false,    // computed Waste occurrence overlay (#1063 Phase 5) - opt-in
+  wasteVisibleTypeIds: new Set(), // per-type visibility nested under the waste layer (#1063 Phase 10); empty = all
+  wasteOccurrences: [],
+  wasteLoadError: null,    // independent from loadError - a Waste fetch failure never blanks ordinary content
   // AUS ist die Vorgabe, und das ist eine Zusage an den Bestand: die Punkte
   // sind die gemessene Fassung (siehe den Block in calendar.css), und ein
   // Update, das die Monatsansicht jedes Telefons ungefragt umbaut, waere die
@@ -623,6 +639,11 @@ let state = {
 };
 let _container = null;
 const calendarLoads = createCalendarLoadCoordinator();
+// Eigener Koordinator statt calendarLoads: ein Waste-Fetchfehler darf den
+// Ladezustand von Terminen/Aufgaben/Feiertagen/Schichtplan nicht anfassen
+// (PLAN.md Phase 5, "ohne gewoehnlichen Kalenderinhalt zu brechen") - beide
+// teilen sich dieselbe Generation-Logik, aber jede Generation zaehlt fuer sich.
+const wasteLoads = createCalendarLoadCoordinator();
 
 // Termin-Suche (#471): datumsunabhängiges Finden über den FTS-Index. Der
 // Suchmodus blendet eine Leiste unter der Toolbar ein und ersetzt den Ansichts-
@@ -1054,6 +1075,8 @@ function activeFilterCount() {
   if (hp.holiday_show_school && !state.layerSchool) n += 1;
   if (!state.layerBirthdays) n += 1;
   if (scheduleEnabled() && !state.layerSchedule) n += 1;
+  if (wasteEnabled() && !state.layerWaste) n += 1;
+  if (wasteEnabled() && state.layerWaste && state.wasteVisibleTypeIds.size > 0) n += 1;
   return n;
 }
 
@@ -1226,10 +1249,59 @@ function fetchWindow(from, to) {
   return { from: addLocalDays(from, -1), to: addLocalDays(to, 1) };
 }
 
+/**
+ * Waste-Vorkommen fuer den sichtbaren Bereich, UNABHAENGIG von loadRange().
+ *
+ * Zwei Grunde fuer den eigenen Weg statt eines fuenften Eintrags im
+ * Promise.all von loadRange(): erstens soll ein Ladefehler HIER sichtbar
+ * bleiben (state.wasteLoadError), waehrend die anderen drei Nebenquellen
+ * (Aufgaben/Feiertage/Schichtplan) ihren Fehler traditionell in eine leere
+ * Liste uebersetzen und ihn damit von "keine Eintraege" ununterscheidbar
+ * machen. Zweitens: ein abgeschaltetes oder ungelesenes Waste-Modul loest
+ * ueberhaupt keinen Request aus (wasteEnabled()), waehrend der Schichtplan-Weg
+ * nur die Modul-Abschaltung, nicht die Leserechte prueft (PLAN.md Phase 5
+ * verlangt ausdruecklich "enabled and readable").
+ */
+async function loadWasteRange(from, to) {
+  if (!wasteEnabled()) {
+    state.wasteOccurrences = [];
+    state.wasteLoadError = null;
+    return;
+  }
+  const win = fetchWindow(from, to);
+  const selection = { view: state.view, cursor: state.cursor, from, to };
+  await wasteLoads.run(
+    () => api.get(`/waste/occurrences?from=${win.from}&to=${win.to}`),
+    {
+      isCurrent: () => {
+        const selected = getRangeForView(state.view, state.cursor);
+        return state.view === selection.view
+          && state.cursor === selection.cursor
+          && selected.from === selection.from
+          && selected.to === selection.to;
+      },
+      apply: (res) => {
+        state.wasteOccurrences = res.data ?? [];
+        state.wasteLoadError = null;
+      },
+      applyError: (err) => {
+        console.error('[Calendar] loadWasteRange Fehler:', err);
+        state.wasteOccurrences = [];
+        state.wasteLoadError = err;
+      },
+    },
+  );
+}
+
 async function loadRange(from, to) {
   const win     = fetchWindow(from, to);
   const calPath = `/calendar?from=${win.from}&to=${win.to}`;
   const selection = { view: state.view, cursor: state.cursor, from, to };
+  // Parallel, aber ABSICHTLICH nicht Teil desselben Promise.all/Koordinators
+  // weiter unten: loadWasteRange() traegt ihren eigenen Fehlerzustand
+  // (state.wasteLoadError) und darf events/tasks/holidays/scheduleEntries bei
+  // einem Fehlschlag nicht mit in den Fehlerzustand reissen.
+  const wastePromise = loadWasteRange(from, to);
   await calendarLoads.run(
     async () => {
       const [evRes, taskRes, holRes, scheduleRes] = await Promise.all([
@@ -1282,6 +1354,7 @@ async function loadRange(from, to) {
       },
     },
   );
+  await wastePromise;
 }
 
 /**
@@ -1468,6 +1541,10 @@ export async function render(container, { user }) {
   state.layerSchool   = localStorage.getItem(LAYER_SCHOOL_KEY)   !== 'false';
   state.layerBirthdays = localStorage.getItem(LAYER_BIRTHDAYS_KEY) !== 'false';
   state.layerSchedule = localStorage.getItem(LAYER_SCHEDULE_KEY) !== 'false';
+  // Opt-in statt Opt-out (siehe state.layerWaste): AN nur, wenn der Haushalt
+  // die Ebene selbst schon einmal eingeschaltet hat.
+  state.layerWaste     = localStorage.getItem(LAYER_WASTE_KEY)     === 'true';
+  state.wasteVisibleTypeIds = restoreWasteTypeFilter();
   state.scheduleDisplay = localStorage.getItem(SCHEDULE_DISPLAY_KEY) === 'blocks' ? 'blocks' : 'compact';
   // Gegen 'true' geprueft, nicht gegen 'false' wie die Ebenen darueber: die
   // Ebenen sind AN, solange nichts anderes dasteht, dieser Schalter ist AUS.
@@ -1526,7 +1603,7 @@ function renderToolbar() {
   // versteckt, und eine Warnung, die man erst oeffnen muss, ist keine.
   const scheduleWarningHtml = (scheduleEnabled() && state.scheduleWarnings.length) ? `
     <span class="cal-toolbar__schedule-warning" role="status"
-          title="${esc(t('schedule.overlapWarning', { date: state.scheduleWarnings[0].date_key, user: scheduleOwnerName(state.scheduleWarnings[0]) }))}">
+          title="${esc(t('schedule.overlapWarning', { date: formatPreferredDate(state.scheduleWarnings[0].date_key), user: scheduleOwnerName(state.scheduleWarnings[0]) }))}">
       <i data-lucide="triangle-alert" class="icon-sm" aria-hidden="true"></i>
       <span>${t('schedule.overlapWarningShort')}</span>
     </span>
@@ -2050,6 +2127,12 @@ function renderMonthView(container) {
         if (ev) openEventDetail(ev, evEl);
         return;
       }
+      const wasteEl = e.target.closest('.waste-occurrence-chip');
+      if (wasteEl) {
+        e.stopPropagation();
+        navigateToWasteOccurrence(wasteEl.dataset.deepLink);
+        return;
+      }
     }
     switchToDayView(dayEl.dataset.date);
   });
@@ -2109,6 +2192,7 @@ function renderMonthDay(date, inMonth) {
   const dayTasks = tasksOnDay(date);
   const dayHols  = holidaysOnDay(date);
   const daySchedule = scheduleEntriesOnDay(date);
+  const dayWaste = wasteOccurrencesOnDay(date);
   const isToday  = date === state.today;
   const classes  = monthDayClasses(date, inMonth);
 
@@ -2118,8 +2202,9 @@ function renderMonthDay(date, inMonth) {
   // ein festes Budget=3 blind: bei niedriger Zellhöhe schnitt die Zelle den letzten
   // Chip mittig ab, ohne "+N" (Audit A1-04 / P2). data-total trägt die Gesamtzahl,
   // damit "+N" auch die nicht gerenderten Überzähligen mitzählt. Reihenfolge
-  // Feiertag -> Termin -> Aufgabe.
-  const total     = dayHols.length + daySchedule.length + evs.length + dayTasks.length;
+  // Feiertag -> Schichtplan -> Waste -> Termin -> Aufgabe. Waste bleibt wie der
+  // Schichtplan ungekappt (typischerweise 0-2 Abholungen je Tag).
+  const total     = dayHols.length + daySchedule.length + dayWaste.length + evs.length + dayTasks.length;
   const holShown  = dayHols.slice(0, MONTH_DAY_MAX_CHIPS);
   const evShown   = evs.slice(0, Math.max(0, MONTH_DAY_MAX_CHIPS - holShown.length));
   const taskShown = dayTasks.slice(0, Math.max(0, MONTH_DAY_MAX_CHIPS - holShown.length - evShown.length));
@@ -2131,6 +2216,8 @@ function renderMonthDay(date, inMonth) {
   `).join('');
 
   const scheduleHtml = daySchedule.map((entry) => `<div class="month-day__holiday schedule-entry" style="--holi-color:${esc(entry.shift_type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span>${esc(scheduleEntryLabel(entry))}</span></div>`).join("");
+
+  const wasteHtml = dayWaste.map((occ) => renderWasteChip(occ, { className: 'month-day__holiday', icon: false })).join('');
 
   // Monatsgrid-Kanon (Apple Kalender / Fantastical): flache getönte Bar mit nur
   // dem Titel. Icon und Avatar-Stack leben in der Tages-/Detailansicht; die
@@ -2152,6 +2239,7 @@ function renderMonthDay(date, inMonth) {
       <div class="month-day__number">${new Date(date + 'T00:00:00').getDate()}</div>
       ${holHtml}
       ${scheduleHtml}
+      ${wasteHtml}
       ${evHtml}
       ${taskHtml}
       <div class="month-day__more" hidden></div>
@@ -2178,15 +2266,87 @@ function scheduleEntriesOnDay(date) {
 }
 
 /**
- * Ist der Schichtplan im Haushalt ueberhaupt eingeschaltet?
+ * Ist der Schichtplan im Haushalt ueberhaupt eingeschaltet UND lesbar?
  *
  * `disabled_modules` heisst "dieses Modul gibt es hier nicht". Der Routen-Guard
  * schuetzt `/schedule` - der Kalender ist aber eine MISCHSTELLE: sein Pfad nennt
  * ein Modul, sein Inhalt kommt aus mehreren. Ohne diese Frage laedt und zeigt er
  * die Schichten eines abgeschalteten Moduls weiter, samt Ebenen-Knopf. Dasselbe
  * Muster wie in dashboard.js und recipes.js.
+ *
+ * Zusaetzlich `moduleAccess`, wie wasteEnabled() gleich daneben: ein Mitglied
+ * mit Schedule-Recht 'none' sah trotzdem die Ebenen-Zeile im Filter-Blatt UND
+ * loeste bei jedem Kalender-Laden ein garantiertes 403 auf
+ * GET /schedule/entries aus (Konsolenrauschen, live verifiziert).
  */
-function scheduleEnabled() { return !window.yuvomi?.isModuleDisabled?.('schedule'); }
+function scheduleEnabled() {
+  return !window.yuvomi?.isModuleDisabled?.('schedule') && moduleAccess('schedule') !== 'none';
+}
+
+/**
+ * Ist Waste ueberhaupt eingeschaltet UND lesbar? Anders als scheduleEnabled()
+ * prueft dies zusaetzlich die Modulrechte (moduleAccess), weil PLAN.md Phase 5
+ * ausdruecklich "enabled and readable" verlangt - eine Rolle mit read:none auf
+ * Waste soll nicht einmal den Fetch ausloesen. Die verbindliche Durchsetzung
+ * bleibt serverseitig (moduleAccessVerdict); dies ist reine UX, wie ueberall in
+ * permissions.js dokumentiert.
+ */
+function wasteEnabled() {
+  return !window.yuvomi?.isModuleDisabled?.('waste') && moduleAccess('waste') !== 'none';
+}
+
+/**
+ * Waste-Termine eines Tages - EXPLIZIT OHNE Personenfilter (#1054-Muster wie
+ * bei Feiertagen): Waste ist haushaltsweit, eine Abholung gehoert niemandem
+ * einzeln. Allein die Ebene (layerWaste) entscheidet die Sichtbarkeit.
+ */
+function wasteOccurrencesOnDay(date) {
+  return state.layerWaste
+    ? state.wasteOccurrences.filter((occ) => occ.date_key === date && passesWasteTypeFilter(occ))
+    : [];
+}
+
+/** Leeres Set heisst ALLE - dieselbe Lesart wie state.people (#1063 Phase 10). */
+function passesWasteTypeFilter(occ) {
+  return state.wasteVisibleTypeIds.size === 0 || state.wasteVisibleTypeIds.has(occ.type_id);
+}
+
+/**
+ * Die Typen, die es je Sub-Zeile unter der Waste-Ebene ueberhaupt zu waehlen
+ * gibt - aus den geladenen Vorkommen selbst abgeleitet (type_id/type_name/
+ * type_color liefert coalesceOccurrences bereits mit, waste-domain.js), statt
+ * einer zweiten eigenen Typenliste vom Server. Ein Typ ohne Vorkommen im
+ * geladenen Fenster hat hier keine Zeile - seine Termine bleiben trotzdem
+ * sichtbar (leeres Set = alle), nur abwaehlbar wird er erst, sobald er einmal
+ * ein Vorkommen im Fenster hat.
+ */
+function wasteTypeOptions() {
+  const seen = new Map();
+  for (const occ of state.wasteOccurrences) {
+    if (!seen.has(occ.type_id)) {
+      seen.set(occ.type_id, { id: occ.type_id, name: occ.type_name, color: occ.type_color });
+    }
+  }
+  return [...seen.values()].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+}
+
+/** Wie restorePeopleFilter, aber ohne Abgleich gegen eine geladene Liste - die
+ * Typen sind zu diesem Zeitpunkt (Seitenaufbau) noch nicht geladen. Eine
+ * inzwischen geloeschte Typ-Id im gespeicherten Set matcht schlicht kein
+ * Vorkommen mehr und tut nichts. */
+function restoreWasteTypeFilter() {
+  let stored;
+  try { stored = JSON.parse(localStorage.getItem(WASTE_VISIBLE_TYPES_KEY) ?? '[]'); } catch { stored = []; }
+  if (!Array.isArray(stored)) return new Set();
+  return new Set(stored.map(Number).filter((id) => Number.isInteger(id)));
+}
+
+function persistWasteTypeFilter() {
+  try {
+    if (state.wasteVisibleTypeIds.size === 0) localStorage.removeItem(WASTE_VISIBLE_TYPES_KEY);
+    else localStorage.setItem(WASTE_VISIBLE_TYPES_KEY, JSON.stringify([...state.wasteVisibleTypeIds]));
+  } catch {}
+}
 
 function scheduleHasTimes(entry) { return Boolean(entry.shift_type?.start_time && entry.shift_type?.end_time); }
 
@@ -2239,11 +2399,121 @@ function scheduleEntryExtraBadge(entry) {
   return entry.source === 'extra' ? `<i data-lucide="layers" class="schedule-entry__extra-badge" aria-label="${esc(t('schedule.extraBadgeLabel'))}"></i>` : '';
 }
 
-function renderScheduleChip(entry, className = 'allday-holiday') {
+// S-17: Eintraege selbst tragen keine einzelne durchgehende Id - welche Spalte
+// zaehlt (pattern_day_id/override_id/extra_id), haengt von `source` ab. Eine
+// eigenstaendige Kopie von schedule.js' gleichnamiger Funktion (dieselbe
+// Begruendung wie scheduleEntryLabel()/scheduleTimeLabel() oben: diese Datei
+// haelt fuer jede Schichtplan-Anzeigeformel eine eigene, unabhaengige Kopie
+// statt schedule.js komplett zu importieren) - reicht, um einen Klick auf
+// einen gerenderten Chip/Block wieder auf genau dieses Objekt zurueckzufuehren.
+function scheduleEntryMatchKey(entry) {
+  const sourceId = entry.source === 'pattern' ? (entry.pattern_day_id ?? `p${entry.pattern_id}`)
+    : entry.source === 'override' ? entry.override_id : entry.extra_id;
+  return [entry.date_key, entry.user_id, entry.source, sourceId].join(':');
+}
+
+// S-16: `showFullRange` zeigt die volle Spanne ("06:00-14:00") statt nur des
+// Starts - nur Woche/Tag haben dafuer Platz (renderWeekView()/renderDayView()
+// setzen es explizit); Monat und Agenda bleiben bei der kurzen Form. S-17:
+// `clickable` haengt die Detail-Modal-Ausloesung an (role=button + Schluessel) -
+// nur Woche/Tag, Monat behaelt sein Navigieren-zum-Tag, Agenda bleibt inert
+// (ausserhalb des Umfangs dieser Aenderung).
+function renderScheduleChip(entry, className = 'allday-holiday', { showFullRange = false, clickable = false } = {}) {
   const type = entry.shift_type;
   const label = scheduleEntryLabel(entry);
-  const start = type.start_time ? '<small class="schedule-entry__start">' + esc(type.start_time) + '</small>' : '';
-  return `<div class="${className} schedule-entry" style="--holi-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span>${esc(label)}</span>${scheduleEntryExtraBadge(entry)}${start}</div>`;
+  const start = type.start_time
+    ? '<small class="schedule-entry__start">' + esc(showFullRange ? scheduleTimeLabel(type) : type.start_time) + '</small>'
+    : '';
+  const detailAttrs = clickable
+    ? ` role="button" tabindex="0" data-action="view-schedule-entry" data-schedule-key="${esc(scheduleEntryMatchKey(entry))}"`
+    : '';
+  return `<div class="${className} schedule-entry" style="--holi-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"${detailAttrs}><span>${esc(label)}</span>${scheduleEntryExtraBadge(entry)}${start}</div>`;
+}
+
+/**
+ * S-17: read-only Detailinhalt fuer EIN Schichtplan-Vorkommen - ein
+ * eigenstaendiger, ABSICHTLICH schmalerer Nachbau von schedule.js'
+ * renderScheduleEntryDetailContent() (dieselbe Begruendung wie
+ * scheduleEntryMatchKey() oben: diese Datei importiert schedule.js nicht).
+ * Zeigt die HerkunftsART (Muster/Ausnahme/Extra), aber KEINEN Musternamen -
+ * diese Seite laedt `/schedule/patterns` nicht (nur `/schedule/entries`), ein
+ * Musternamen-Nachschlag waere ein zusaetzlicher, hier nicht vorhandener
+ * Server-Aufruf nur fuer diese eine Zeile.
+ */
+function scheduleEntryOriginLabel(entry) {
+  if (entry.source === 'pattern') return t('schedule.pattern');
+  if (entry.source === 'override') return t('schedule.override');
+  return t('schedule.extraBadgeLabel');
+}
+
+function renderScheduleEntryDetailContent(entry) {
+  const type = entry.shift_type;
+  const label = esc(type.short_code ? `${type.short_code} · ${type.name}` : type.name);
+  const time = esc(scheduleTimeLabel(type));
+  const owner = scheduleOwnerName(entry);
+  const overlayFields = (type.fields ?? []).filter((field) => entry.field_values?.[field.id]);
+  const fieldRows = overlayFields
+    .map((field) => '<div class="schedule-entry-detail__row"><dt>' + esc(field.name) + '</dt><dd>' + esc(entry.field_values[field.id]) + '</dd></div>')
+    .join('');
+  return '<div class="schedule-entry-detail">'
+    + '<div class="schedule-entry-detail__head"><span class="agenda-holiday__dot" style="--holi-color:' + esc(type.color) + '"></span><span class="u-card-title u-compact">' + label + '</span>' + (time ? '<small>' + time + '</small>' : '') + '</div>'
+    + '<dl class="schedule-entry-detail__rows">'
+    + (owner ? '<div class="schedule-entry-detail__row"><dt>' + esc(t('schedule.owner')) + '</dt><dd>' + esc(owner) + '</dd></div>' : '')
+    + (entry.note ? '<div class="schedule-entry-detail__row"><dt>' + esc(t('schedule.note')) + '</dt><dd>' + esc(entry.note) + '</dd></div>' : '')
+    + fieldRows
+    + '<div class="schedule-entry-detail__row"><dt>' + esc(t('schedule.origin')) + '</dt><dd>' + esc(scheduleEntryOriginLabel(entry)) + '</dd></div>'
+    + '</dl></div>';
+}
+
+function findScheduleEntryByKey(key) {
+  return state.scheduleEntries.find((entry) => scheduleEntryMatchKey(entry) === key);
+}
+
+function openScheduleEntryDetailModal(entry) {
+  openSharedModal({ title: t('schedule.entryDetailTitle'), size: 'sm', content: renderScheduleEntryDetailContent(entry), dirtyGuard: false });
+}
+
+/**
+ * Ein Waste-Vorkommen als flache Ebenen-Bar - dieselbe Form wie Feiertag/
+ * Schichtplan (--holi-color/--holi-ink, siehe calendar.css), aber ANDERS ALS
+ * DIESE eigenstaendig klickbar: ein Klick fuehrt direkt in die Waste-Seite,
+ * nie in den gewoehnlichen Termin-Editor (PLAN.md Phase 5). Icon + Typname
+ * stehen immer zusammen im Text - Farbe ist Dekoration, nie der einzige
+ * Traeger der Identitaet (Skalen-Regel). moved/coalesced spiegeln exakt die
+ * Dashboard-Kachel (renderWasteWidget, pages/dashboard.js), damit dieselbe
+ * Herkunft ueberall gleich aussieht.
+ */
+function renderWasteChip(occurrence, { className = 'allday-holiday', icon = true, interactive = false } = {}) {
+  const color = occurrence.type_color || '';
+  const movedOriginal = occurrence.moved
+    ? occurrence.origins?.find((o) => o.kind === 'schedule' && o.original_date)?.original_date
+    : null;
+  const moved = occurrence.moved
+    ? `<i data-lucide="move" class="waste-occurrence-chip__flag" aria-label="${esc(t('waste.movedFromBadge', { date: movedOriginal ? formatPreferredDate(movedOriginal) : '' }))}"></i>`
+    : '';
+  const coalesced = occurrence.coalesced
+    ? `<i data-lucide="layers" class="waste-occurrence-chip__flag" aria-label="${esc(t('waste.coalescedHint'))}"></i>`
+    : '';
+  // interactive: true fuegt role/tabindex/aria-label an (Agenda, wo jede Zeile
+  // - Termin wie Waste - ihre eigene Tastatur-Aktivierung traegt, wie
+  // renderAgendaEvent()). In Monat/Woche/Tag bleibt der Chip ein reines
+  // Klickziel ohne eigenen Tab-Stopp, wie .month-day__event/.schedule-entry.
+  const button = interactive
+    ? ` role="button" tabindex="0" aria-label="${esc(occurrence.type_name)}, ${esc(formatPreferredDate(occurrence.date_key))}"`
+    : '';
+  return `<div class="${className} waste-occurrence-chip" style="--holi-color:${esc(color)};--holi-ink:${esc(getReadableTextColor(color))}"
+       data-deep-link="${esc(occurrence.deep_link)}"${button}
+       title="${esc(occurrence.type_name)}">
+    ${icon ? `<i data-lucide="${esc(occurrence.type_icon || 'trash-2')}" class="icon-sm" aria-hidden="true"></i>` : ''}
+    <span>${esc(occurrence.type_name)}</span>${moved}${coalesced}
+  </div>`;
+}
+
+/** Ein Klick/Enter auf eine Waste-Bar fuehrt direkt in die Waste-Seite, nie in
+ *  den Termin-Editor (PLAN.md Phase 5) - derselbe Mechanismus wie ein
+ *  Haushaltshilfe-Besuch aus openEventDetail() heraus. */
+function navigateToWasteOccurrence(deepLink) {
+  window.yuvomi.navigate(`/waste${deepLink}`);
 }
 /**
  * Zeit-Fenster eines Schichtplan-Blocks in Minuten seit Mitternacht - dieselbe
@@ -2297,7 +2567,14 @@ function renderScheduleTimeBlock(entry, className, layout = null) {
   const overlay = scheduleOverlayMeta(entry);
   const time = esc(scheduleTimeLabel(type));
   const timeLine = overlay ? `${time} · ${esc(overlay)}` : time;
-  return `<div class="${className} schedule-time-block" style="top:${hourOffset(start)};height:calc(${hourOffset(duration)} - 4px);left:${left};width:${width};--ev-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span class="schedule-time-block__title">${esc(scheduleEntryLabel(entry))}${scheduleEntryExtraBadge(entry)}</span><small class="schedule-time-block__time">${timeLine}</small></div>`;
+  // S-17: der Block selbst bleibt `pointer-events:none` (calendar.css) - die
+  // Spalte darunter muss weiter fuer "neuen Termin anlegen" klickbar bleiben.
+  // NUR die sichtbaren Titel-/Uhrzeit-Zeilen bekommen `pointer-events:auto`
+  // zurueck (calendar.css), sodass ein Klick GENAU auf den Text die
+  // Detailansicht oeffnet, waehrend der Rest der Spalte unveraendert bleibt.
+  // role="button"/tabindex traegt trotzdem der AEUSSERE Block: pointer-events
+  // wirkt nur auf Zeiger-Eingabe, Tastaturfokus/Enter/Space bleiben unberuehrt.
+  return `<div class="${className} schedule-time-block" style="top:${hourOffset(start)};height:calc(${hourOffset(duration)} - 4px);left:${left};width:${width};--ev-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}" role="button" tabindex="0" data-action="view-schedule-entry" data-schedule-key="${esc(scheduleEntryMatchKey(entry))}"><span class="schedule-time-block__title">${esc(scheduleEntryLabel(entry))}${scheduleEntryExtraBadge(entry)}</span><small class="schedule-time-block__time">${timeLine}</small></div>`;
 }
 
 // aria-label der Tageszelle: lokalisiertes Datum + (falls vorhanden) Zahl der
@@ -2343,6 +2620,7 @@ function renderWeekView(container) {
   const scheduleChips = schedule.map((items) => state.scheduleDisplay === 'compact' ? items : items.filter((entry) => !scheduleHasTimes(entry) || scheduleIsFullDayShift(entry)));
   const scheduleBlocks = schedule.map((items) => state.scheduleDisplay === 'blocks' ? items.filter((entry) => scheduleHasTimes(entry) && !scheduleIsFullDayShift(entry)) : []);
   const scheduleLayouts = scheduleBlocks.map((items) => layoutScheduleBlocks(items));
+  const waste = days.map((d) => wasteOccurrencesOnDay(d));
 
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
@@ -2368,7 +2646,8 @@ function renderWeekView(container) {
                 <span>${esc(h.name)}</span>
               </div>
             `).join('')}
-            ${scheduleChips[i].map((entry) => renderScheduleChip(entry)).join('')}
+            ${scheduleChips[i].map((entry) => renderScheduleChip(entry, 'allday-holiday', { showFullRange: true, clickable: true })).join('')}
+            ${waste[i].map((occ) => renderWasteChip(occ)).join('')}
             ${alldayEvs[i].map((ev) => `
               <div class="allday-event" data-id="${ev.id}"
                    style="${eventSurfaceStyle(ev)}"
@@ -2412,7 +2691,16 @@ function renderWeekView(container) {
   });
 
   container.querySelector('#week-cols').addEventListener('click', (e) => {
-    if (e.target.closest('.schedule-time-block')) return;
+    // S-17: ein Klick GENAU auf den sichtbaren Text eines Schichtblocks
+    // (pointer-events:auto, siehe calendar.css) oeffnet die Detailansicht;
+    // der Rest der Spalte (pointer-events:none auf dem Block selbst) bleibt
+    // unveraendert klickbar fuer "neuen Termin anlegen".
+    const blockEl = e.target.closest('.schedule-time-block');
+    if (blockEl) {
+      const entry = findScheduleEntryByKey(blockEl.dataset.scheduleKey);
+      if (entry) openScheduleEntryDetailModal(entry);
+      return;
+    }
     const evEl = e.target.closest('.week-event');
     if (evEl) {
       const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
@@ -2432,11 +2720,36 @@ function renderWeekView(container) {
       openTaskFromCalendar(taskChip.dataset.taskId);
       return;
     }
+    const wasteEl = e.target.closest('.waste-occurrence-chip');
+    if (wasteEl) {
+      navigateToWasteOccurrence(wasteEl.dataset.deepLink);
+      return;
+    }
+    // S-17: ein Schichtplan-Chip in Woche/Tag oeffnet jetzt dieselbe
+    // Detailansicht, statt (wie bisher) nichts zu tun.
+    const scheduleEl = e.target.closest('.schedule-entry');
+    if (scheduleEl) {
+      const entry = findScheduleEntryByKey(scheduleEl.dataset.scheduleKey);
+      if (entry) openScheduleEntryDetailModal(entry);
+      return;
+    }
     const evEl = e.target.closest('.allday-event');
     if (evEl) {
       const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
       if (ev) openEventDetail(ev, evEl);
     }
+  });
+
+  // S-17: Tastaturaktivierung der als role="button" ausgezeichneten
+  // Schichtplan-Chips/-Bloecke (Enter/Space) - dasselbe Muster wie die
+  // Agenda-Ansicht weiter unten fuer ihre eigenen role="button"-Zeilen.
+  container.querySelector('.week-view').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target.closest('[data-action="view-schedule-entry"]');
+    if (!target) return;
+    e.preventDefault();
+    const entry = findScheduleEntryByKey(target.dataset.scheduleKey);
+    if (entry) openScheduleEntryDetailModal(entry);
   });
 
   // Scrollen zu aktueller Zeit
@@ -2615,13 +2928,14 @@ function renderDayView(container) {
   const scheduleChips = state.scheduleDisplay === 'compact' ? schedule : schedule.filter((entry) => !scheduleHasTimes(entry) || scheduleIsFullDayShift(entry));
   const scheduleBlocks = state.scheduleDisplay === 'blocks' ? schedule.filter((entry) => scheduleHasTimes(entry) && !scheduleIsFullDayShift(entry)) : [];
   const scheduleLayout = layoutScheduleBlocks(scheduleBlocks);
+  const dayWaste = wasteOccurrencesOnDay(state.cursor);
 
   container.replaceChildren();
   // Kein eigener Datums-Header mehr: die Toolbar zeigt exakt dasselbe Datum
   // bereits als Ansichts-Label (Audit A1-18).
   container.insertAdjacentHTML('beforeend', `
     <div class="day-view">
-      ${(allday.length || scheduleChips.length || tasksOnDay(state.cursor).length || holidaysOnDay(state.cursor).length) ? `
+      ${(allday.length || scheduleChips.length || dayWaste.length || tasksOnDay(state.cursor).length || holidaysOnDay(state.cursor).length) ? `
       <div class="allday-row" style="display:grid;grid-template-columns:var(--cal-gutter-width) 1fr;">
         <div class="calendar-all-day-label">${t('calendar.allDayShort')}</div>
         <div class="allday-cell">
@@ -2630,7 +2944,8 @@ function renderDayView(container) {
               <span>${esc(h.name)}</span>
             </div>
           `).join('')}
-          ${scheduleChips.map((entry) => renderScheduleChip(entry)).join('')}
+          ${scheduleChips.map((entry) => renderScheduleChip(entry, 'allday-holiday', { showFullRange: true, clickable: true })).join('')}
+          ${dayWaste.map((occ) => renderWasteChip(occ)).join('')}
           ${allday.map((ev) => `
             <div class="allday-event" data-id="${ev.id}"
                  style="${eventSurfaceStyle(ev)}"
@@ -2670,6 +2985,19 @@ function renderDayView(container) {
       openTaskFromCalendar(taskChip.dataset.taskId);
       return;
     }
+    const wasteEl = e.target.closest('.waste-occurrence-chip');
+    if (wasteEl) {
+      navigateToWasteOccurrence(wasteEl.dataset.deepLink);
+      return;
+    }
+    // S-17: ein Schichtplan-Chip oeffnet jetzt dieselbe Detailansicht, statt
+    // (wie bisher) nichts zu tun.
+    const scheduleEl = e.target.closest('.schedule-entry');
+    if (scheduleEl) {
+      const entry = findScheduleEntryByKey(scheduleEl.dataset.scheduleKey);
+      if (entry) openScheduleEntryDetailModal(entry);
+      return;
+    }
     const evEl = e.target.closest('.allday-event');
     if (evEl) {
       const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
@@ -2678,7 +3006,14 @@ function renderDayView(container) {
   });
 
   container.querySelector('#day-col').addEventListener('click', (e) => {
-    if (e.target.closest('.schedule-time-block')) return;
+    // S-17: ein Klick GENAU auf den sichtbaren Text eines Schichtblocks
+    // oeffnet die Detailansicht - siehe der gleiche Kommentar in renderWeekView().
+    const blockEl = e.target.closest('.schedule-time-block');
+    if (blockEl) {
+      const entry = findScheduleEntryByKey(blockEl.dataset.scheduleKey);
+      if (entry) openScheduleEntryDetailModal(entry);
+      return;
+    }
     const evEl = e.target.closest('.day-event');
     if (evEl) {
       const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
@@ -2687,6 +3022,17 @@ function renderDayView(container) {
     }
     const time = clickedTime(e, e.currentTarget);
     openEventModal({ mode: 'create', date: state.cursor, time });
+  });
+
+  // S-17: Tastaturaktivierung der als role="button" ausgezeichneten
+  // Schichtplan-Chips/-Bloecke (Enter/Space).
+  container.querySelector('.day-view').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target.closest('[data-action="view-schedule-entry"]');
+    if (!target) return;
+    e.preventDefault();
+    const entry = findScheduleEntryByKey(target.dataset.scheduleKey);
+    if (entry) openScheduleEntryDetailModal(entry);
   });
 
   scrollToHour(container.querySelector('#day-scroll'), container.querySelector('.day-view__body'));
@@ -2759,8 +3105,8 @@ function renderAgendaView(container) {
   const todayInRange = state.today >= from && state.today <= to;
 
   const groups = days
-    .map((d) => ({ date: d, events: eventsOnDay(d), tasks: tasksOnDay(d), holidays: holidaysOnDay(d), schedule: scheduleEntriesOnDay(d) }))
-    .filter((g) => g.events.length > 0 || g.tasks.length > 0 || g.holidays.length > 0 || g.schedule.length > 0
+    .map((d) => ({ date: d, events: eventsOnDay(d), tasks: tasksOnDay(d), holidays: holidaysOnDay(d), schedule: scheduleEntriesOnDay(d), waste: wasteOccurrencesOnDay(d) }))
+    .filter((g) => g.events.length > 0 || g.tasks.length > 0 || g.holidays.length > 0 || g.schedule.length > 0 || g.waste.length > 0
       || (todayInRange && g.date === state.today));
 
   container.replaceChildren();
@@ -2772,7 +3118,7 @@ function renderAgendaView(container) {
           title: t('calendar.agendaEmpty'),
           action: { label: t('calendar.newEvent'), attrs: { id: 'agenda-empty-cta' } },
         })
-        : groups.map(({ date, events, tasks, holidays, schedule }) => `
+        : groups.map(({ date, events, tasks, holidays, schedule, waste }) => `
           <div class="agenda-day">
             <!-- Tageskopf als echte Ueberschrift (Critique 2026-08-10):
                  /calendar hatte genau EIN h-Element im ganzen Dokument. -->
@@ -2786,9 +3132,10 @@ function renderAgendaView(container) {
                 <span>${esc(h.name)}</span>
               </div>`).join('')}</div>` : ''}
             ${schedule.length ? `<div class="agenda-holidays">${schedule.map((entry) => renderScheduleChip(entry, 'agenda-holiday')).join('')}</div>` : ''}
+            ${waste.length ? `<div class="agenda-holidays">${waste.map((occ) => renderWasteChip(occ, { className: 'agenda-holiday', interactive: true })).join('')}</div>` : ''}
             ${events.length ? `<div class="list-rows">${events.map((ev) => renderAgendaEvent(ev, date)).join('')}</div>` : ''}
             ${tasks.length ? `<div class="agenda-tasks">${tasks.map(renderTaskChip).join('')}</div>` : ''}
-            ${(!events.length && !tasks.length && !holidays.length && !schedule.length)
+            ${(!events.length && !tasks.length && !holidays.length && !schedule.length && !waste.length)
               ? `<p class="agenda-day__empty">${t('calendar.agendaDayEmpty')}</p>` : ''}
           </div>
         `).join('')
@@ -2808,6 +3155,11 @@ function renderAgendaView(container) {
       openTaskFromCalendar(taskChip.dataset.taskId);
       return;
     }
+    const wasteEl = e.target.closest('.waste-occurrence-chip');
+    if (wasteEl) {
+      navigateToWasteOccurrence(wasteEl.dataset.deepLink);
+      return;
+    }
     const evEl = e.target.closest('.agenda-event');
     if (evEl) {
       const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
@@ -2818,6 +3170,12 @@ function renderAgendaView(container) {
   // Tastaturaktivierung der als role="button" ausgezeichneten Zeilen (Enter/Space).
   container.querySelector('#agenda-view').addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
+    const wasteEl = e.target.closest('.waste-occurrence-chip');
+    if (wasteEl) {
+      e.preventDefault();
+      navigateToWasteOccurrence(wasteEl.dataset.deepLink);
+      return;
+    }
     const evEl = e.target.closest('.agenda-event');
     if (!evEl) return;
     e.preventDefault();
@@ -2881,6 +3239,12 @@ function availableLayers() {
       checked: state.layerSchedule, color: null,
     });
   }
+  if (wasteEnabled()) {
+    rows.push({
+      key: 'waste', label: t('waste.overlay'),
+      checked: state.layerWaste, color: null,
+    });
+  }
   // Der Geburtstags-Schalter braucht hier keine „gibt es welche?"-Bedingung
   // mehr: im Blatt kostet eine Zeile keine Kopfzeile, und ein Schalter, der
   // je nach Datenlage verschwindet, ist im Blatt schwerer zu finden als eine
@@ -2902,16 +3266,38 @@ function personInitials(name) {
     .slice(0, 2);
 }
 
+/**
+ * Rows für das Ebenen-Blatt. Die Waste-Zeile bekommt, solange ihre Ebene AN
+ * ist, eine eingerueckte Unterliste ihrer eigenen Typen direkt darunter - die
+ * einzige Stelle in diesem Blatt mit echter Verschachtelung (sonst stehen
+ * Ebenen/Personen als flache Geschwisterzeilen nebeneinander). Eigene
+ * Funktion statt Inline-Map, weil dieselbe Regeneration nach dem Ein-/
+ * Ausschalten der Waste-Ebene noch einmal gebraucht wird (siehe unten).
+ */
+function buildLayerRowsHtml(layers) {
+  return layers.map((row) => {
+    const rowHtml = toggleRowHtml({
+      label: row.label,
+      checked: row.checked,
+      swatchColor: row.color,
+      attrs: { 'data-filter-layer': row.key },
+    });
+    if (row.key !== 'waste' || !state.layerWaste) return rowHtml;
+    const typeRows = wasteTypeOptions().map((wt) => toggleRowHtml({
+      label: wt.name ?? '',
+      checked: state.wasteVisibleTypeIds.size === 0 || state.wasteVisibleTypeIds.has(wt.id),
+      swatchColor: wt.color,
+      attrs: { 'data-filter-waste-type': String(wt.id) },
+    })).join('');
+    return typeRows ? `${rowHtml}<div class="cal-filters__nested">${typeRows}</div>` : rowHtml;
+  }).join('');
+}
+
 function openCalendarFilters() {
   const layers = availableLayers();
   const people = state.users ?? [];
 
-  const layerRows = layers.map((row) => toggleRowHtml({
-    label: row.label,
-    checked: row.checked,
-    swatchColor: row.color,
-    attrs: { 'data-filter-layer': row.key },
-  })).join('');
+  const layerRows = buildLayerRowsHtml(layers);
 
   // Der Anzeigemodus des Schichtplans ist KEIN Filter - er nimmt nichts weg,
   // er zeigt dasselbe anders. Er steht trotzdem hier, weil er im Kopf als
@@ -2919,11 +3305,21 @@ function openCalendarFilters() {
   // hat er als beschrifteter Schalter zum ersten Mal einen Zustand, den man
   // ablesen kann statt ihn aus der Knopfbeschriftung zu erschliessen (der
   // Chip hiess „Volle Bloecke", wenn er sie NICHT zeigte).
-  const scheduleDisplayRow = scheduleEnabled() ? toggleRowHtml({
-    label: t('schedule.fullBlocks'),
-    checked: state.scheduleDisplay === 'blocks',
-    attrs: { 'data-filter-schedule-display': 'true' },
-  }) : '';
+  // S-16: die EN-Beschriftung wurde von "Full blocks" (Insider-Jargon,
+  // erklaerte sich nur ueber den vorherigen Chip-Text) auf eine Beschreibung
+  // der WIRKUNG umbenannt; eine eigene Hinweiszeile darunter nennt zusaetzlich
+  // den AUS-Zustand explizit (das ist der Vorgabewert - S-16 aendert ihn
+  // nicht), damit der Schalter vorhersagbar ist, ohne ihn erst umzulegen.
+  // `.cal-field-hint` statt `.form-hint`: die Regel dafuer lebt in settings.css,
+  // der Router laedt auf /calendar nur calendar.css (siehe die Begruendung an
+  // `.cal-field-hint` selbst weiter oben in dieser Datei).
+  const scheduleDisplayRow = scheduleEnabled()
+    ? toggleRowHtml({
+      label: t('schedule.fullBlocks'),
+      checked: state.scheduleDisplay === 'blocks',
+      attrs: { 'data-filter-schedule-display': 'true' },
+    }) + `<p class="cal-field-hint">${t('schedule.fullBlocksHint')}</p>`
+    : '';
 
   // NUR AM TELEFON, denn nur dort gibt es die zweite Fassung: ab 640px zeigt
   // die Monatszelle ohnehin Titel, und der Schalter waere ein Bedienelement
@@ -2967,7 +3363,7 @@ function openCalendarFilters() {
       ${layerRows ? `
         <section class="cal-filters__group">
           <h3 class="cal-filters__heading">${t('calendar.filtersLayers')}</h3>
-          ${layerRows}
+          <div id="cal-filters-layers">${layerRows}</div>
         </section>
       ` : ''}
       ${(meRow || personRows) ? `
@@ -2990,7 +3386,14 @@ function openCalendarFilters() {
     </div>
   `;
 
-  openSharedModal({ title: t('calendar.filters'), content, size: 'sm', initialFocus: 'none' });
+  // `dirtyGuard: false`, weil dieses Blatt ein ANSICHTSBLATT ist und kein
+  // Formular: jeder Schalter darin wirkt beim Umlegen sofort und ist im selben
+  // Moment gespeichert (die `change`-Handler unten schreiben Zustand und
+  // Speicher direkt). Es gibt hier keinen Speichern-Knopf - und damit auch
+  // nichts, was ein „Aenderungen verwerfen?" beim Schliessen verwerfen koennte.
+  // Der Standard-Waechter fragte trotzdem, sobald man eine Ebene ein- oder
+  // ausblendete, und sein „Verwerfen" nahm die Ebene dann nicht zurueck.
+  openSharedModal({ title: t('calendar.filters'), content, size: 'sm', initialFocus: 'none', dirtyGuard: false });
 
   const panel = document.querySelector('#shared-modal-overlay .modal-panel');
   if (!panel) return;
@@ -2999,6 +3402,7 @@ function openCalendarFilters() {
     holidays:  ['layerHolidays',  LAYER_HOLIDAYS_KEY],
     school:    ['layerSchool',    LAYER_SCHOOL_KEY],
     schedule:  ['layerSchedule',  LAYER_SCHEDULE_KEY],
+    waste:     ['layerWaste',     LAYER_WASTE_KEY],
     birthdays: ['layerBirthdays', LAYER_BIRTHDAYS_KEY],
   };
 
@@ -3011,6 +3415,28 @@ function openCalendarFilters() {
       const [field, storageKey] = LAYER_STATE[layerKey];
       state[field] = input.checked;
       try { localStorage.setItem(storageKey, input.checked ? 'true' : 'false'); } catch {}
+      // Die Typ-Unterliste haengt an state.layerWaste (buildLayerRowsHtml) -
+      // sie muss beim Ein-/Ausschalten der Ebene live erscheinen/verschwinden,
+      // nicht erst beim naechsten Oeffnen des Blatts.
+      if (layerKey === 'waste') {
+        const host = panel.querySelector('#cal-filters-layers');
+        if (host) {
+          host.replaceChildren();
+          host.insertAdjacentHTML('beforeend', buildLayerRowsHtml(availableLayers()));
+          window.lucide?.createIcons({ el: host });
+        }
+      }
+    } else if (input.dataset.filterWasteType) {
+      const id = Number(input.dataset.filterWasteType);
+      const options = wasteTypeOptions();
+      // Derselbe Sprung aus „alle" heraus wie beim Personenfilter oben.
+      if (state.wasteVisibleTypeIds.size === 0) {
+        for (const wt of options) state.wasteVisibleTypeIds.add(wt.id);
+      }
+      if (input.checked) state.wasteVisibleTypeIds.add(id);
+      else state.wasteVisibleTypeIds.delete(id);
+      if (state.wasteVisibleTypeIds.size === options.length) state.wasteVisibleTypeIds.clear();
+      persistWasteTypeFilter();
     } else if (input.dataset.filterScheduleDisplay) {
       state.scheduleDisplay = input.checked ? 'blocks' : 'compact';
       try { localStorage.setItem(SCHEDULE_DISPLAY_KEY, state.scheduleDisplay); } catch {}
@@ -3046,6 +3472,10 @@ function openCalendarFilters() {
     state.layerHolidays = true;
     state.layerSchool = true;
     state.layerSchedule = true;
+    // Reset heisst "auf die Vorgabe zurueck", nicht "alles an" - und Waste'
+    // eigene Vorgabe ist AUS (siehe state.layerWaste weiter oben).
+    state.layerWaste = false;
+    state.wasteVisibleTypeIds.clear();
     state.layerBirthdays = true;
     state.assignedToMe = false;
     state.people.clear();
@@ -3053,6 +3483,8 @@ function openCalendarFilters() {
       localStorage.setItem(LAYER_HOLIDAYS_KEY, 'true');
       localStorage.setItem(LAYER_SCHOOL_KEY, 'true');
       localStorage.setItem(LAYER_SCHEDULE_KEY, 'true');
+      localStorage.setItem(LAYER_WASTE_KEY, 'false');
+      localStorage.removeItem(WASTE_VISIBLE_TYPES_KEY);
       localStorage.setItem(LAYER_BIRTHDAYS_KEY, 'true');
       localStorage.setItem(ASSIGNED_TO_ME_KEY, '0');
     } catch {}
@@ -3364,6 +3796,17 @@ export const __test = {
   renderScheduleTimeBlock,
   renderWeekView,
   renderDayView,
+  wasteEnabled,
+  wasteOccurrencesOnDay,
+  renderWasteChip,
+  activeFilterCount,
+  availableLayers,
+  renderAgendaView,
+  renderMonthView,
+  passesWasteTypeFilter,
+  wasteTypeOptions,
+  restoreWasteTypeFilter,
+  buildLayerRowsHtml,
 };
 
 function renderAgendaEvent(ev, dayStr) {

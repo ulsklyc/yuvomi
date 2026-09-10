@@ -1,0 +1,377 @@
+.waste-page {
+  --module-accent: var(--module-waste);
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.waste-section-title {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  /* Dieselbe Not, dieselbe Antwort wie bei `.modal-panel__footer` und
+     `.modal-actions` (layout.css, #872): eine Knopfzeile ohne Umbruch laeuft
+     ueber ihren Container hinaus, und im Modal ist hinter dem Rand nichts -
+     kein Scrollbalken holt sie zurueck. Siehe die Begruendung am
+     `__actions`-Block darunter. */
+  flex-wrap: wrap;
+}
+
+/* Mapping-profile export/import (#1063 Phase 10) - two secondary actions
+   sharing the mappings section's own heading row instead of a third row of
+   their own.
+   DIE ANNAHME „der Abschnitt hat im Modal ohnehin Platz uebrig" STIMMTE NIE.
+   Das Modal ist `size: 'md'`, also feste 520px, unabhaengig vom Fenster: die
+   beiden Knoepfe messen 239 und 240 Pixel, der Textkasten daneben 472 - die
+   Zeile lief also SCHON AM GROSSEN BILDSCHIRM um 102 Pixel ueber den Rand, nur
+   ohne dass es jemandem auffiel. Am Telefon (Panel 366px) waren es 256: von
+   „Zuordnungsprofil exportieren" blieb ein abgeschnittener Rest stehen und
+   „...importieren" lag vollstaendig ausserhalb des Kastens, unerreichbar.
+   `flex-shrink: 0` war dabei genau die falsche Ansage - es verbot dem Block,
+   sich dem Platz anzupassen, statt ihn zu erzwingen. Jetzt darf die Gruppe
+   schrumpfen UND umbrechen; `white-space: normal` laesst die langen deutschen
+   Beschriftungen zweizeilig werden, statt die Knoepfe breit zu halten. */
+.waste-section-title__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.waste-section-title__actions .btn {
+  white-space: normal;
+}
+
+.waste-mapping-profile-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.waste-mapping-profile-row:last-child { border-bottom: none; }
+.waste-mapping-profile-row__pattern,
+.waste-mapping-profile-row__type {
+  font-size: var(--text-sm);
+}
+.waste-mapping-profile-row__pattern { color: var(--color-text-secondary); }
+.waste-mapping-profile-row__type { font-weight: var(--font-weight-medium); flex: 1; }
+
+.waste-upcoming-section + .waste-types-section {
+  margin-top: var(--space-6);
+}
+
+/* -------------------------------------------------------------------- */
+/* Occurrence rows (upcoming list)                                       */
+/* -------------------------------------------------------------------- */
+
+.waste-occurrence-row__icon {
+  flex: none;
+}
+
+.waste-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+  background: var(--color-surface-3);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* Status message, not a rank marker or an assignment - tone goes in the text
+ * only (DESIGN.md Colors: die Skalen-Regel). The neutral fill stays from the
+ * base .waste-badge rule.
+ *
+ * MEASURED, NOT EYEBALLED (audit finding M-12): tokens.css documents
+ * --color-warning/--color-danger against WHITE (4.9:1 / 5.4:1), but this
+ * badge sits on --color-surface-3 - a warm grey fill, not white. Against
+ * that actual background the badge held only 4.13:1 (warning) / 4.48:1
+ * (danger) at this 10px (--text-2xs) size, both under the 4.5:1 AA text
+ * floor. A local color-mix darkens just enough to clear it without moving
+ * the shared token (used elsewhere against white or at larger sizes, where
+ * it already passes): 94%/black -> 4.58:1, 99%/black -> 4.55:1. */
+.waste-badge--moved, .waste-badge--needs-refresh, .waste-badge--needs-mapping,
+.waste-badge--unmatched_pattern, .waste-badge--unmatched_type, .waste-badge--ambiguous_type {
+  color: color-mix(in srgb, var(--color-warning) 94%, black);
+}
+/* Mapping-profile preview statuses (#1063 Phase 10) - same neutral-fill,
+ * tone-in-text convention as the badges above. --applicable shares its tone
+ * with --coalesced on purpose (both are a "this changes something" signal). */
+.waste-badge--coalesced, .waste-badge--applicable { color: var(--module-accent); }
+
+/* Das Zeilenmenue der Abfuhrtermine hatte hier eine eigene .waste-occurrence-menu
+ * mit unbedingtem `display: flex`. Das schlug das `[popover]:not(:popover-open)
+ * { display: none }` des UA-Blatts (Autoren-Spezifitaet gewinnt), also standen
+ * ALLE Menues gleichzeitig sichtbar und ungerechnet bei (0,0) - und fingen dort
+ * die Klicks der darunterliegenden Zeilen ab. Das Markup nutzt jetzt das
+ * geteilte .popover-menu aus layout.css; hier bleibt bewusst nichts zurueck. */
+
+.waste-upcoming-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1h);
+  width: 100%;
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-2h);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.waste-upcoming-toggle:hover { background: var(--color-surface-2); }
+
+.waste-upcoming-toggle__icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  transition: transform var(--transition-fast);
+}
+
+.waste-upcoming-toggle[aria-expanded="true"] .waste-upcoming-toggle__icon { transform: rotate(180deg); }
+
+/* -------------------------------------------------------------------- */
+/* Types & schedules                                                     */
+/* -------------------------------------------------------------------- */
+
+.waste-type-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-3);
+  overflow: hidden;
+  transition: background var(--transition-fast), outline-color var(--transition-fast);
+}
+
+.waste-type-card--archived { opacity: 0.62; }
+
+.waste-schedule-list {
+  padding: 0 var(--space-4) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.waste-schedule-list__empty {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  margin: 0;
+  padding: var(--space-2) 0;
+}
+
+.waste-schedule-row--paused { opacity: 0.62; }
+
+/* -------------------------------------------------------------------- */
+/* Recurrence form                                                       */
+/* -------------------------------------------------------------------- */
+
+.waste-weekday-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.waste-weekday-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+
+.waste-icon-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* -------------------------------------------------------------------- */
+/* Import sources (#1063 Phase 3)                                       */
+/* -------------------------------------------------------------------- */
+
+.waste-types-section + .waste-sources-section {
+  margin-top: var(--space-6);
+}
+
+/* Same M-12 measurement as the warning badges above: 4.48:1 on
+ * --color-surface-3 in light theme, corrected to 4.55:1. Dark theme's
+ * --color-warning already holds 6.10:1 on the dark surface fill unmodified
+ * (no override needed there - only the warning classes above needed one);
+ * --color-danger measured 4.44:1 in dark and needed its own small lighten. */
+.waste-badge--error { color: color-mix(in srgb, var(--color-danger) 99%, black); }
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .waste-badge--error {
+    color: color-mix(in srgb, var(--color-danger) 98%, white);
+  }
+}
+[data-theme="dark"] .waste-badge--error {
+  color: color-mix(in srgb, var(--color-danger) 98%, white);
+}
+
+.waste-source-detail__meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-4);
+}
+
+.waste-source-detail__error { color: var(--color-danger); }
+
+.waste-source-mapping-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.waste-source-mapping-row:last-child { border-bottom: none; }
+
+.waste-source-mapping-row__label {
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.waste-source-mapping-row select {
+  max-width: 55%;
+}
+
+/* -------------------------------------------------------------------- */
+/* Import wizard (preview + label mapping)                              */
+/* -------------------------------------------------------------------- */
+
+.waste-import-summary {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: var(--space-3) 0;
+}
+
+.waste-import-diagnostics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.waste-import-diagnostic {
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.waste-import-diagnostic--info { color: var(--color-text-secondary); }
+
+.waste-import-diagnostic--blocking {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--color-danger);
+  cursor: pointer;
+}
+
+.waste-import-labels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.waste-import-label-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.waste-import-label-row:last-child { border-bottom: none; }
+
+.waste-import-label-row__name {
+  flex: 1 1 auto;
+  min-width: 120px;
+  font-size: var(--text-sm);
+}
+
+.waste-import-label-row__count {
+  color: var(--color-text-secondary);
+  font-size: var(--text-2xs);
+}
+
+.waste-import-label-row select {
+  flex: 1 1 160px;
+}
+
+.waste-import-new-type-name {
+  flex: 1 1 160px;
+}
+
+/* -------------------------------------------------------------------- */
+/* Reminder settings (#1063 Phase 8)                                     */
+/* -------------------------------------------------------------------- */
+
+.waste-reminder-setting-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.waste-reminder-setting-row:last-child {
+  border-bottom: none;
+}
+
+.waste-reminder-setting-row__enable {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--font-weight-medium);
+}
+
+.waste-reminder-setting-row__fields {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding-left: var(--space-6);
+}
+
+/* `display: flex` schlaegt das UA-`[hidden] { display: none }` bei gleicher
+ * Spezifitaet - dieselbe wiederkehrende Falle wie .cat-row__colors[hidden]
+ * (category-manager.css) und .budget-nav__month [hidden] (budget.css), jedes
+ * Mal wenn ein Aufklapper eine Flex-Zeile ist. Ohne diese Regel blieben die
+ * Vorlauftage/Uhrzeit-Felder sichtbar, auch wenn die Checkbox unmarkiert war. */
+.waste-reminder-setting-row__fields[hidden] {
+  display: none;
+}
+
+.waste-reminder-setting-row__fields .form-input {
+  width: 90px;
+}
+
+/* -------------------------------------------------------------------- */
+/* Deep-link highlight (?type=<id>&date=<YYYY-MM-DD>)                    */
+/* -------------------------------------------------------------------- */
+
+.waste-deep-link-highlight {
+  outline: 2px solid var(--module-accent);
+  outline-offset: 2px;
+}

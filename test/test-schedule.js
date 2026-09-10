@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { register } from 'node:module';
 import express from 'express';
 import { get } from '../server/db.js';
-import scheduleRouter, { isStillReferenced } from '../server/routes/schedule.js';
+import scheduleRouter, { isStillReferenced, validateFieldValues, fieldValuesFor } from '../server/routes/schedule.js';
 import { cyclePosition, resolveEntries } from '../server/services/schedule.js';
 
 // Fuer die Verhaltenstests von overrideGroups()/rangeDifference() unten - laedt
@@ -199,6 +199,37 @@ test('GET /entries embeds field_values (keyed correctly per source) and each shi
   assert.deepEqual(byDate['2026-11-01:pattern'].shift_type.fields, [{ id: room, name: 'Room', position: 0, show_in_overlay: true }]);
 });
 
+// fieldValuesFor() chunks its IN(...) lookup at FIELD_VALUES_CHUNK_SIZE (500,
+// see the comment above it in schedule.js) instead of binding every id in one
+// statement - SQLite caps bound placeholders per statement (historically 999,
+// some builds up to ~32766), and a household with enough overrides/extras
+// would eventually hit it, taking down GET /overrides and GET /extras with a
+// throwing prepare(). 600 rows (500 + 100) exercises exactly two chunks
+// without needing tens of thousands of rows to prove chunking works at all.
+test('fieldValuesFor() resolves an entry-id list larger than one chunk without throwing', () => {
+  const type = database.prepare("INSERT INTO schedule_shift_types (name, start_time, end_time, color) VALUES ('Chunk type', '08:00', '09:00', '#080808')").run().lastInsertRowid;
+  const field = database.prepare("INSERT INTO schedule_custom_fields (name) VALUES ('Chunk field')").run().lastInsertRowid;
+  const COUNT = 600;
+  const insertOverride = database.prepare('INSERT INTO schedule_overrides (user_id, date_key, shift_type_id) VALUES (?, ?, ?)');
+  const insertValue = database.prepare("INSERT INTO schedule_custom_field_values (entry_type, entry_id, custom_field_id, value) VALUES ('override', ?, ?, ?)");
+  const ids = [];
+  for (let i = 0; i < COUNT; i += 1) {
+    // Plain UTC day arithmetic, independent of the code under test - 2028 is
+    // otherwise unused by ALICE elsewhere in this file.
+    const dateKey = new Date(Date.UTC(2028, 0, 1) + i * 86400000).toISOString().slice(0, 10);
+    const overrideId = insertOverride.run(ALICE.id, dateKey, type).lastInsertRowid;
+    insertValue.run(overrideId, field, `Value ${i}`);
+    ids.push(overrideId);
+  }
+
+  const values = fieldValuesFor('override', ids);
+  assert.equal(values.size, COUNT, 'every one of the 600 rows must resolve, across both chunks (500 + 100)');
+  assert.equal(values.get(ids[0])[field], 'Value 0', 'the first row (first chunk) resolves correctly');
+  assert.equal(values.get(ids[499])[field], 'Value 499', 'the 500th row (last of the first chunk) resolves correctly');
+  assert.equal(values.get(ids[500])[field], 'Value 500', 'the 501st row (first of the second chunk) resolves correctly');
+  assert.equal(values.get(ids[599])[field], 'Value 599', 'the last row (second chunk) resolves correctly');
+});
+
 test('members may write only themselves while admins may write any household schedule', async () => {
   const body = { user_id: BOB.id, name: 'Blocked', anchor_date: '2026-11-01', cycle_length: 7, is_active: true };
   const denied = await call('POST', '/patterns', { as: ALICE, body });
@@ -337,6 +368,138 @@ test('an override\'s field_values round-trip, fill shares one set across the ran
   for (const row of filledRows) {
     assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id=?").get(row.id).c, 0, 'a range delete cleans up every affected row\'s values');
   }
+});
+
+// validateFieldValues() normalizes a field_values key via id()'s parseInt
+// (see the comment above the function in schedule.js) - "1" and "01" name the
+// SAME custom_field_id. Rejected up front, before either key reaches
+// replaceFieldValues(): previously only the SECOND identical insert failed
+// (UNIQUE(entry_type,entry_id,custom_field_id)), as a raw 500 AFTER the first
+// had already committed inside the write's own transaction... except the
+// override upsert and replaceFieldValues() now share ONE transaction (this
+// audit's fix), so proving "no partial state" here also re-proves that fix:
+// a pre-existing override's stored value must come back completely
+// untouched, not half-overwritten by whichever of the two duplicate keys the
+// validator would otherwise have accepted first.
+test('validateFieldValues() rejects a field_values key duplicated by normalization ("1" vs "01"), and the override is left completely untouched', async () => {
+  const type = (await call('POST', '/shift-types', { as: ALICE, body: { name: 'Dup-key type' } })).body.data.id;
+  const field = (await call('POST', '/custom-fields', { as: ALICE, body: { name: 'Dup-key field' } })).body.data.id;
+  await call('PUT', `/shift-types/${type}/fields`, { as: ALICE, body: { fields: [{ custom_field_id: field, position: 0 }] } });
+
+  const baseline = await call('PUT', '/overrides/2027-06-20', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, note: 'Original', field_values: { [field]: 'Original value' } } });
+  assert.equal(baseline.status, 200);
+  const overrideId = baseline.body.data.id;
+
+  const paddedKey = '0' + String(field); // parseInt(paddedKey, 10) === field: the same custom_field_id under a second spelling.
+  const duplicated = await call('PUT', '/overrides/2027-06-20', {
+    as: ALICE,
+    body: { user_id: ALICE.id, shift_type_id: type, note: 'Attempted overwrite', field_values: { [field]: 'A', [paddedKey]: 'B' } },
+  });
+  assert.equal(duplicated.status, 400);
+  assert.match(duplicated.body.error, /must not repeat/);
+
+  // No partial state: neither the field value NOR the rest of the row (note)
+  // moved - the whole request must have been rejected before the transaction
+  // that would have written either.
+  const row = database.prepare('SELECT note FROM schedule_overrides WHERE id = ?').get(overrideId);
+  assert.equal(row.note, 'Original', 'the note from the rejected request must not have been applied');
+  const values = database.prepare("SELECT value FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id=? AND custom_field_id=?").get(overrideId, field);
+  assert.equal(values?.value, 'Original value', 'the field value must still be the pre-existing one, not A, not B, not gone');
+  assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id=?").get(overrideId).c, 1,
+    'exactly the one pre-existing value row, no partial extra row from either half of the rejected duplicate');
+});
+
+// The direct-call counterpart of the same rule, pinning validateFieldValues()
+// itself rather than only its effect through the HTTP layer above.
+test('validateFieldValues() rejects normalized-duplicate keys directly', () => {
+  const type = database.prepare("INSERT INTO schedule_shift_types (name, start_time, end_time, color) VALUES ('Dup-key direct', '08:00', '09:00', '#101010')").run().lastInsertRowid;
+  const field = database.prepare("INSERT INTO schedule_custom_fields (name) VALUES ('Dup-key direct field')").run().lastInsertRowid;
+  database.prepare('INSERT INTO schedule_shift_type_fields (shift_type_id, custom_field_id, position, show_in_overlay) VALUES (?, ?, 0, 1)').run(type, field);
+
+  const result = validateFieldValues({ [field]: 'A', ['0' + field]: 'B' }, type);
+  assert.deepEqual(result.values, []);
+  assert.match(result.error, /must not repeat/);
+});
+
+// PUT /overrides/:dateKey's field_values contract (Migration 189, matching
+// what /extras already does): OMITTING field_values from the body means
+// "leave whatever is stored alone", but an EXPLICIT {} means "clear it" -
+// these must not collapse into the same behaviour, or a caller that only
+// meant to touch `note` would silently wipe out field values it never
+// mentioned.
+test('PUT /overrides/:dateKey: omitting field_values preserves stored values, an explicit {} clears them', async () => {
+  const type = (await call('POST', '/shift-types', { as: ALICE, body: { name: 'Omit-vs-clear type' } })).body.data.id;
+  const field = (await call('POST', '/custom-fields', { as: ALICE, body: { name: 'Omit-vs-clear field' } })).body.data.id;
+  await call('PUT', `/shift-types/${type}/fields`, { as: ALICE, body: { fields: [{ custom_field_id: field, position: 0 }] } });
+
+  const set = await call('PUT', '/overrides/2027-06-21', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, field_values: { [field]: 'Kept' } } });
+  assert.equal(set.status, 200);
+  assert.deepEqual(set.body.data.field_values, { [field]: 'Kept' });
+  const overrideId = set.body.data.id;
+
+  const omitted = await call('PUT', '/overrides/2027-06-21', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, note: 'Just a note change' } });
+  assert.equal(omitted.status, 200);
+  assert.deepEqual(omitted.body.data.field_values, { [field]: 'Kept' }, 'field_values omitted from the body must leave the stored values alone');
+  assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id=?").get(overrideId).c, 1);
+
+  const cleared = await call('PUT', '/overrides/2027-06-21', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, field_values: {} } });
+  assert.equal(cleared.status, 200);
+  assert.deepEqual(cleared.body.data.field_values, {}, 'an explicit empty object must clear the stored values');
+  assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id=?").get(overrideId).c, 0);
+});
+
+// PUT /overrides/:dateKey now calls syncScheduleRemindersForUser() right
+// after the write (this audit's fix) - an anchor/reminder for a change inside
+// the 7-day reminder window must exist IMMEDIATELY, not only after the next
+// periodic pass. The resync is wrapped in its own try/catch (schedule.js) so
+// that a throwing resync can never turn an otherwise-successful write into an
+// error response - simulated here by making the shared db connection throw
+// specifically for the resync's own queries (matched by table name), which
+// leaves the override write's own queries (a different table) untouched.
+test('PUT /overrides/:dateKey resyncs reminders immediately, and a throwing resync does not fail the write', async () => {
+  database.prepare("INSERT INTO sync_config (key, value) VALUES ('household_timezone', 'UTC') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run();
+  // The Schedule module ships disabled by default (SPEC.md, "same as
+  // Inventory") - syncScheduleRemindersForUser() itself checks this and drops
+  // everything if so, even though the plain CRUD routes exercised elsewhere in
+  // this file don't gate on it at all (that's a different middleware layer,
+  // not mounted in this minimal test app).
+  database.prepare("INSERT INTO sync_config (key, value) VALUES ('disabled_modules', '[]') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run();
+  database.prepare('UPDATE users SET schedule_reminder_offset_minutes = 30 WHERE id = ?').run(ALICE.id);
+
+  const timedType = database.prepare("INSERT INTO schedule_shift_types (name, start_time, end_time, color) VALUES ('Resync type', '09:00', '17:00', '#0a0a0a')").run().lastInsertRowid;
+  // "Tomorrow" (real wall-clock time) is guaranteed inside the 7-day rolling
+  // reminder window regardless of when this suite runs.
+  const tomorrow = new Date();
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const dateKey = tomorrow.toISOString().slice(0, 10);
+
+  const put = await call('PUT', `/overrides/${dateKey}`, { as: ALICE, body: { user_id: ALICE.id, shift_type_id: timedType } });
+  assert.equal(put.status, 200);
+
+  const anchor = database.prepare('SELECT * FROM schedule_reminder_entries WHERE user_id = ? AND date_key = ?').get(ALICE.id, dateKey);
+  assert.ok(anchor, 'the write must resync immediately, without waiting for the periodic pass');
+  const reminder = database.prepare(`SELECT * FROM reminders WHERE entity_type = 'schedule_entry' AND entity_id = ?`).get(anchor.id);
+  assert.ok(reminder, 'a reminder must exist for the just-created anchor');
+
+  // Force the resync itself to throw, and confirm the write still commits and
+  // still answers successfully.
+  const originalPrepare = database.prepare.bind(database);
+  database.prepare = (sql, ...rest) => {
+    if (typeof sql === 'string' && sql.includes('schedule_reminder_entries')) throw new Error('injected resync failure');
+    return originalPrepare(sql, ...rest);
+  };
+  let throwing;
+  try {
+    throwing = await call('PUT', `/overrides/${dateKey}`, { as: ALICE, body: { user_id: ALICE.id, shift_type_id: timedType, note: 'still saved' } });
+  } finally {
+    database.prepare = originalPrepare;
+  }
+  assert.equal(throwing.status, 200, 'a throwing resync must not turn an otherwise-successful write into an error response');
+  assert.equal(throwing.body.data.note, 'still saved', 'the write itself must be committed despite the resync throwing');
+  assert.equal(database.prepare('SELECT note FROM schedule_overrides WHERE user_id = ? AND date_key = ?').get(ALICE.id, dateKey).note, 'still saved');
+
+  database.prepare('UPDATE users SET schedule_reminder_offset_minutes = NULL WHERE id = ?').run(ALICE.id);
+  database.prepare('DELETE FROM schedule_overrides WHERE user_id = ? AND date_key = ?').run(ALICE.id, dateKey);
 });
 
 test('a shift type may be added by anyone but only changed by its creator or an admin', async () => {
@@ -538,6 +701,154 @@ test('a multi-class winning pattern still fully replaces an older overlapping on
   assert.deepEqual(response.body.data.warnings, [{ user_id: Number(dana), date_key: '2027-02-22', pattern_ids: [Number(timetable), Number(oldJob)] }]);
 });
 
+// Both scheduleData()'s pattern query (GET /entries) and the standalone
+// "overlapping patterns" ranking above sort `ORDER BY valid_from DESC, id
+// DESC` - and SQLite's DESC ordering puts NULL LAST, not first (NULL sorts as
+// the smallest value in ASC, so DESC reverses that to the end). A dated,
+// open-ended-at-the-top pattern therefore outranks a fully open-ended
+// (`valid_from IS NULL`) one that also matches the same day, which is the
+// documented "the newest valid_from wins" rule extended to the NULL case.
+test('a dated pattern outranks a NULL-valid_from (fully open-ended) overlapping pattern - SQLite sorts NULL last on DESC', async () => {
+  const erin = database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('schedule-erin', 'Erin', 'x', 'member')").run().lastInsertRowid;
+  const openType = database.prepare("INSERT INTO schedule_shift_types (name, start_time, end_time, color) VALUES ('Open-ended', '07:00', '15:00', '#333333')").run().lastInsertRowid;
+  const datedType = database.prepare("INSERT INTO schedule_shift_types (name, start_time, end_time, color) VALUES ('Dated', '15:00', '23:00', '#444444')").run().lastInsertRowid;
+  // Fully open-ended: no valid_from AND no valid_until at all.
+  const openPattern = database.prepare("INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length, valid_from, valid_until) VALUES (?, 'Open-ended', '2027-09-01', 1, NULL, NULL)").run(erin).lastInsertRowid;
+  const datedPattern = database.prepare("INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length, valid_from) VALUES (?, 'Dated', '2027-09-10', 1, '2027-09-10')").run(erin).lastInsertRowid;
+  database.prepare('INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, 0, ?)').run(openPattern, openType);
+  database.prepare('INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, 0, ?)').run(datedPattern, datedType);
+
+  const response = await call('GET', '/entries?from=2027-09-10&to=2027-09-10&user_id=' + erin, { as: ALICE });
+  assert.equal(response.status, 200);
+  assert.equal(response.body.data.entries[0].shift_type_id, Number(datedType), 'the dated pattern must win over the fully open-ended one');
+  assert.deepEqual(response.body.data.warnings, [{ user_id: Number(erin), date_key: '2027-09-10', pattern_ids: [Number(datedPattern), Number(openPattern)] }]);
+});
+
+// is_active=0 must contribute NOTHING to /entries - not "lose the ranking", but
+// be invisible to it entirely, the same as if the row did not exist. The SQL
+// filters `WHERE is_active = 1` before the ranking ever runs.
+test('an is_active=0 pattern contributes nothing to /entries, even with no competing pattern for that day', async () => {
+  const frank = database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('schedule-frank', 'Frank', 'x', 'member')").run().lastInsertRowid;
+  const inactiveType = database.prepare("INSERT INTO schedule_shift_types (name, start_time, end_time, color) VALUES ('Inactive', '06:00', '14:00', '#555555')").run().lastInsertRowid;
+  const inactivePattern = database.prepare("INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length, is_active) VALUES (?, 'Inactive', '2027-09-15', 1, 0)").run(frank).lastInsertRowid;
+  database.prepare('INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, 0, ?)').run(inactivePattern, inactiveType);
+
+  const response = await call('GET', '/entries?from=2027-09-15&to=2027-09-15&user_id=' + frank, { as: ALICE });
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body.data.entries, [], 'a disabled pattern must resolve to nothing, not a free day and not a warning');
+  assert.deepEqual(response.body.data.warnings, []);
+});
+
+// PUT /patterns/:id: no coverage existed for this route at all before this
+// audit - only its /days sub-route was tested. Bounds, refusals, and
+// ownership all in one pass, each a distinct branch in the handler.
+test('PUT /patterns/:id validates cycle_length bounds, valid_from/until ordering, refuses to shorten past existing days, and is ownership-guarded', async () => {
+  const patchPatternId = database.prepare("INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length) VALUES (1, 'Patchable', '2027-10-01', 10)").run().lastInsertRowid;
+  database.prepare('INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, 7, ?)').run(patchPatternId, typeId);
+
+  const tooShort = await call('PUT', `/patterns/${patchPatternId}`, { as: ALICE, body: { cycle_length: 0 } });
+  assert.equal(tooShort.status, 400);
+  assert.match(tooShort.body.error, /between 1 and 366/);
+
+  const tooLong = await call('PUT', `/patterns/${patchPatternId}`, { as: ALICE, body: { cycle_length: 367 } });
+  assert.equal(tooLong.status, 400);
+  assert.match(tooLong.body.error, /between 1 and 366/);
+
+  const invertedDates = await call('PUT', `/patterns/${patchPatternId}`, { as: ALICE, body: { valid_from: '2027-12-01', valid_until: '2027-01-01' } });
+  assert.equal(invertedDates.status, 400);
+  assert.match(invertedDates.body.error, /valid_from must be before valid_until/);
+
+  // A pattern day sits at position 7 - shrinking below 8 would strand it.
+  const shortensPastDays = await call('PUT', `/patterns/${patchPatternId}`, { as: ALICE, body: { cycle_length: 5 } });
+  assert.equal(shortensPastDays.status, 400);
+  assert.match(shortensPastDays.body.error, /cannot exclude existing pattern days/);
+  assert.equal(database.prepare('SELECT cycle_length FROM schedule_patterns WHERE id = ?').get(patchPatternId).cycle_length, 10, 'the refused shrink must not have applied');
+
+  const foreign = await call('PUT', `/patterns/${patchPatternId}`, { as: BOB, body: { name: 'Hijacked' } });
+  assert.equal(foreign.status, 403);
+  assert.notEqual(database.prepare('SELECT name FROM schedule_patterns WHERE id = ?').get(patchPatternId).name, 'Hijacked', 'a foreign-user 403 must not have written anything');
+
+  const missing = await call('PUT', '/patterns/999999', { as: ADMIN, body: { name: 'Nothing' } });
+  assert.equal(missing.status, 404);
+
+  const ok = await call('PUT', `/patterns/${patchPatternId}`, { as: ALICE, body: { cycle_length: 8, name: 'Patched' } });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.data.cycle_length, 8);
+  assert.equal(ok.body.data.name, 'Patched');
+});
+
+// DELETE /patterns/:id: ownership guard, cascade of the pattern's own days
+// (FK CASCADE), AND - the specific leak this audit found - the pattern days'
+// schedule_custom_field_values rows, which do NOT ride that FK cascade
+// (entry_id is polymorphic, no real foreign key for schema-level CASCADE to
+// act on). Counted directly, not just inferred from the days being gone.
+test('DELETE /patterns/:id is ownership-guarded and cascades both its days and their custom-field values', async () => {
+  const mathType = (await call('POST', '/shift-types', { as: ALICE, body: { name: 'Delete-cascade type' } })).body.data.id;
+  const field = (await call('POST', '/custom-fields', { as: ALICE, body: { name: 'Delete-cascade field' } })).body.data.id;
+  await call('PUT', `/shift-types/${mathType}/fields`, { as: ALICE, body: { fields: [{ custom_field_id: field, position: 0 }] } });
+
+  const doomedPatternId = database.prepare("INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length) VALUES (1, 'Doomed pattern', '2027-10-15', 7)").run().lastInsertRowid;
+  const saved = await call('PUT', `/patterns/${doomedPatternId}/days`, {
+    as: ALICE,
+    body: { days: [{ position: 0, shift_type_id: mathType, field_values: { [field]: 'Room 9' } } ] },
+  });
+  assert.equal(saved.status, 200);
+  const dayId = saved.body.data[0].id;
+  assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id=?").get(dayId).c, 1,
+    'sanity: the value exists before deletion');
+
+  const foreignDelete = await call('DELETE', `/patterns/${doomedPatternId}`, { as: BOB });
+  assert.equal(foreignDelete.status, 403);
+  assert.equal(database.prepare('SELECT 1 FROM schedule_patterns WHERE id = ?').get(doomedPatternId) !== undefined, true,
+    'a foreign-user 403 must not have deleted the pattern');
+
+  const missing = await call('DELETE', '/patterns/999999', { as: ADMIN });
+  assert.equal(missing.status, 404);
+
+  const deleted = await call('DELETE', `/patterns/${doomedPatternId}`, { as: ALICE });
+  assert.equal(deleted.status, 204);
+  assert.equal(database.prepare('SELECT COUNT(*) AS c FROM schedule_pattern_days WHERE pattern_id = ?').get(doomedPatternId).c, 0, 'the pattern days cascade away with the pattern (FK CASCADE)');
+  assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id=?").get(dayId).c, 0,
+    'the deleted pattern day\'s custom-field values must not survive - entry_id is polymorphic, no FK cascade covers it automatically');
+});
+
+// C.6: foreign-user 403s on the write paths that had never been asserted to
+// leave the row untouched (as opposed to merely returning 403).
+test('PUT /patterns/:id/days: a foreign user is refused with 403 and writes nothing', async () => {
+  const guardedPatternId = database.prepare("INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length) VALUES (1, 'Guarded pattern', '2027-10-20', 7)").run().lastInsertRowid;
+  const before = database.prepare('SELECT COUNT(*) AS c FROM schedule_pattern_days WHERE pattern_id = ?').get(guardedPatternId).c;
+
+  const foreign = await call('PUT', `/patterns/${guardedPatternId}/days`, { as: BOB, body: { days: [{ position: 0, shift_type_id: typeId }] } });
+  assert.equal(foreign.status, 403);
+  assert.equal(database.prepare('SELECT COUNT(*) AS c FROM schedule_pattern_days WHERE pattern_id = ?').get(guardedPatternId).c, before,
+    'a foreign-user 403 must not have written any pattern day');
+});
+
+test('DELETE /overrides/:dateKey: a foreign user is refused with 403 and the override survives', async () => {
+  await call('PUT', '/overrides/2027-10-25', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: typeId, note: 'Must survive' } });
+
+  const foreign = await call('DELETE', '/overrides/2027-10-25?user_id=' + ALICE.id, { as: BOB });
+  assert.equal(foreign.status, 403);
+
+  const survivor = database.prepare('SELECT note FROM schedule_overrides WHERE user_id = ? AND date_key = ?').get(ALICE.id, '2027-10-25');
+  assert.equal(survivor?.note, 'Must survive', 'a foreign-user 403 must not have deleted the override');
+});
+
+// C.7: DELETE /overrides (range) shares MAX_RANGE_DAYS with GET /entries
+// (documented in the comment above the route), not MAX_FILL_DAYS - the same
+// 731-day boundary, both sides.
+test('DELETE /overrides (range) is capped at 731 days, inclusive on the accepted side', async () => {
+  // 2027-11-01 .. 2029-10-31 is 731 inclusive days (730-day difference) - the
+  // same boundary math as "the entries range is capped" above, one calendar
+  // day short of the rejected span.
+  const atCap = await call('DELETE', '/overrides?user_id=' + ALICE.id + '&from=2027-11-01&to=2029-10-31', { as: ALICE });
+  assert.equal(atCap.status, 200, '731 days must still be allowed');
+
+  const overCap = await call('DELETE', '/overrides?user_id=' + ALICE.id + '&from=2027-11-01&to=2029-11-01', { as: ALICE });
+  assert.equal(overCap.status, 400, '732 days must not');
+  assert.match(overCap.body.error, /731 days/);
+});
+
 // First HTTP-level coverage for the bulk days route accepting the SAME
 // position more than once - the whole point of this feature. It used to
 // reject that with 400 (a `seen` Set guarded against it); replacing every
@@ -560,6 +871,30 @@ test('PUT /patterns/:id/days accepts several classes at the same position, and a
   assert.equal(shrunk.status, 200);
   assert.equal(shrunk.body.data.length, 1, 'a save with fewer rows for the position must remove what is no longer sent, not add to it');
   assert.equal(shrunk.body.data[0].shift_type_id, Number(mathType));
+});
+
+// MAX_PATTERN_DAY_ROWS (500): a rejected save must name itself, exactly like
+// MAX_RANGE_DAYS/MAX_FILL_DAYS elsewhere in this file, and the boundary is
+// inclusive on the accepted side - 500 rows must still go through, only 501
+// must not. cycle_length 1 (position 0 only) is deliberate: a timetable's
+// multiple-classes-per-position feature (tested above) is exactly what makes
+// hitting 500 rows at a single position possible without exhausting the
+// separate 1-366 cycle_length range.
+test('PUT /patterns/:id/days rejects more than MAX_PATTERN_DAY_ROWS (500) rows, and accepts exactly 500', async () => {
+  const bulkPatternId = database.prepare("INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length) VALUES (1, 'Bulk pattern', '2027-08-01', 1)").run().lastInsertRowid;
+
+  const overLimit = { days: Array.from({ length: 501 }, () => ({ position: 0, shift_type_id: typeId })) };
+  const rejected = await call('PUT', `/patterns/${bulkPatternId}/days`, { as: ALICE, body: overLimit });
+  assert.equal(rejected.status, 400);
+  assert.match(rejected.body.error, /500 rows/);
+  assert.equal(database.prepare('SELECT COUNT(*) AS c FROM schedule_pattern_days WHERE pattern_id = ?').get(bulkPatternId).c, 0,
+    'a rejected over-limit save must not partially apply');
+
+  const atLimit = { days: Array.from({ length: 500 }, () => ({ position: 0, shift_type_id: typeId })) };
+  const accepted = await call('PUT', `/patterns/${bulkPatternId}/days`, { as: ALICE, body: atLimit });
+  assert.equal(accepted.status, 200, 'exactly 500 rows must still be allowed');
+  assert.equal(accepted.body.data.length, 500);
+  assert.equal(database.prepare('SELECT COUNT(*) AS c FROM schedule_pattern_days WHERE pattern_id = ?').get(bulkPatternId).c, 500);
 });
 
 // Migration 189 (custom fields): a pattern day's field_values ride inside the
@@ -606,6 +941,48 @@ test('a pattern day carries field_values, validated against its shift type\'s at
   assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id=?").get(secondDayId).c, 1);
 });
 
+// B9: PUT /api/v1/preferences moved its admin/array-shape check for
+// schedule_hidden_templates to the very top of the handler, before any other
+// household field is written (server/routes/preferences.js) - it used to sit
+// mid-handler, so a non-admin's mixed payload (schedule_hidden_templates plus
+// an otherwise-valid field) partially applied the other field before the 403
+// arrived. test-preferences-schedule-templates.js already covers the plain
+// 403 in isolation, but not this mixed-payload, no-partial-application case,
+// and is not in this audit's allowed file list - covered here instead, with
+// its own small self-contained app for server/routes/preferences.js (this
+// file's own scheduleRouter app is unrelated).
+test('PUT /api/v1/preferences: a non-admin payload mixing schedule_hidden_templates with another valid field is rejected 403 with no partial application', async () => {
+  const prefsApp = express();
+  prefsApp.use(express.json());
+  let prefsRole = 'admin';
+  prefsApp.use((req, _res, next) => { req.authUserId = ALICE.id; req.authRole = prefsRole; next(); });
+  const { default: preferencesRouter } = await import('../server/routes/preferences.js');
+  prefsApp.use('/', preferencesRouter);
+  const prefsServer = prefsApp.listen(0);
+  const prefsBaseUrl = await new Promise((r) => prefsServer.on('listening', () => r(`http://127.0.0.1:${prefsServer.address().port}`)));
+  try {
+    // Baseline, set as admin, so the "must not have changed" assertion below
+    // has a known-different value to check against.
+    prefsRole = 'admin';
+    const baseline = await fetch(`${prefsBaseUrl}/`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currency: 'USD' }) });
+    assert.equal(baseline.status, 200);
+
+    prefsRole = 'member';
+    const mixed = await fetch(`${prefsBaseUrl}/`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ schedule_hidden_templates: ['school'], currency: 'EUR' }),
+    });
+    assert.equal(mixed.status, 403);
+
+    const after = await (await fetch(`${prefsBaseUrl}/`)).json();
+    assert.equal(after.data.currency, 'USD', 'the other field in the same rejected payload must not have been applied');
+    assert.deepEqual(after.data.schedule_hidden_templates, [], 'schedule_hidden_templates itself must not have been applied either');
+  } finally {
+    prefsServer.close();
+  }
+});
+
 // The date arithmetic itself (rangeDifference) is exercised end-to-end by the
 // server test above - deleting the middle of a filled range and asserting the
 // exact remaining days IS the same computation the client runs locally before
@@ -622,7 +999,15 @@ test('the Overrides section groups consecutive same-type days and edits/deletes 
   assert.match(schedulePage, /data-action="delete-override-range"/);
   assert.match(schedulePage, /overrideGroups\(\)\.find\(/);
   const editBranch = schedulePage.slice(schedulePage.indexOf("form.dataset.form === 'override-edit'"), schedulePage.indexOf("await load();\n    renderPage();"));
-  assert.match(editBranch, /confirmModal\(/, 'saving an edited range confirms before writing and deleting');
+  // confirmOverModal(), not confirmModal(): the create/edit form is still open
+  // behind this confirm, and confirmModal() force-closes whatever modal is
+  // already open (no stacking) before opening its own - it would have silently
+  // destroyed every typed field on "Cancel", the only reason to ask at all
+  // (see the confirmOverModal comment a few lines above this branch in
+  // schedule.js). A loose confirm(Over)?Modal( alternation would stay green
+  // even if this regressed back to the destructive variant.
+  assert.match(editBranch, /confirmOverModal\(/, 'saving an edited range confirms before writing and deleting, via the non-destructive confirmOverModal (confirmModal would force-close the open form)');
+  assert.doesNotMatch(editBranch, /confirmModal\(/, 'must not regress to the destructive confirmModal, which force-closes the still-open form ("confirmOverModal(" itself does not match this literal, so this is a real, separate check)');
   assert.match(editBranch, /rangeDifference\(/, 'shrinking a range removes what fell outside it, not just fills the new span');
   const deleteBranch = schedulePage.slice(schedulePage.indexOf("'delete-override-range'"), schedulePage.indexOf("'save-days'"));
   assert.match(deleteBranch, /confirmModal\(/, 'deleting a range confirms first, unlike the old single-day delete');
@@ -906,7 +1291,7 @@ test('rangeDifference() finds exactly what fell outside a shrunk range, and noth
 // step leaves a duplicate rather than losing data.
 test('the Extra shifts section groups consecutive same-type days and edits/deletes them as a range', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
-  assert.match(schedulePage, /function extraGroups\(\)/);
+  assert.match(schedulePage, /function extraGroups\(extras = state\.extras\)/);
   assert.match(schedulePage, /data-form="extra-edit-range"/);
   assert.match(schedulePage, /data-action="edit-extra-range"/);
   assert.match(schedulePage, /data-action="delete-extra-range"/);
@@ -914,7 +1299,7 @@ test('the Extra shifts section groups consecutive same-type days and edits/delet
   assert.doesNotMatch(schedulePage, /function openExtraEditModal\(/, 'the single-row edit modal is fully replaced by the group modal');
   assert.doesNotMatch(schedulePage, /data-action="edit-extra"/, 'no single-row edit action should remain');
 
-  const groupsFn = schedulePage.slice(schedulePage.indexOf('function extraGroups()'), schedulePage.indexOf('function extraRows()'));
+  const groupsFn = schedulePage.slice(schedulePage.indexOf('function extraGroups('), schedulePage.indexOf('function extraRows()'));
   assert.match(groupsFn, /reminder_offset_minutes/, 'grouping must not merge extras with different reminder offsets into one row');
 
   const editBranch = schedulePage.slice(schedulePage.indexOf("form.dataset.form === 'extra-edit-range'"), schedulePage.indexOf('await load();'));
@@ -927,6 +1312,33 @@ test('the Extra shifts section groups consecutive same-type days and edits/delet
 
   const deleteBranch = schedulePage.slice(schedulePage.indexOf("'delete-extra-range'"), schedulePage.indexOf("'save-days'"));
   assert.match(deleteBranch, /confirmModal\(/, 'deleting a range confirms first, matching the override range delete');
+});
+
+// extraGroups() was only ever pinned by source-text greps; now that it takes
+// its rows as a parameter (default state.extras, same move overrideGroups()
+// already made for the same reason), its merge rules get behavioral coverage:
+// consecutive same-everything days become one range, a same-day duplicate is
+// never merged (a genuine split shift), and a differing per-extra reminder
+// offset or field_values splits the series even when type and note match.
+test('extraGroups() merges consecutive identical days but never same-day duplicates, offset or field-value changes', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const row = (id, dateKey, patch = {}) => ({ id, user_id: 7, date_key: dateKey, shift_type_id: 3, note: 'Bereitschaft', reminder_offset_minutes: 60, field_values: { 1: 'R101' }, ...patch });
+
+  const consecutive = __test.extraGroups([row(1, '2027-03-01'), row(2, '2027-03-02'), row(3, '2027-03-03')]);
+  assert.equal(consecutive.length, 1);
+  assert.deepEqual({ from: consecutive[0].from, to: consecutive[0].to, ids: consecutive[0].ids }, { from: '2027-03-01', to: '2027-03-03', ids: [1, 2, 3] });
+
+  const sameDayTwice = __test.extraGroups([row(1, '2027-03-01'), row(2, '2027-03-01')]);
+  assert.equal(sameDayTwice.length, 2, 'two extras on one day are two rows (split shift), never one range');
+
+  const offsetChange = __test.extraGroups([row(1, '2027-03-01'), row(2, '2027-03-02', { reminder_offset_minutes: 15 })]);
+  assert.equal(offsetChange.length, 2, 'a differing per-extra reminder offset splits the series');
+
+  const fieldChange = __test.extraGroups([row(1, '2027-03-01'), row(2, '2027-03-02', { field_values: { 1: 'R202' } })]);
+  assert.equal(fieldChange.length, 2, 'differing field_values split the series');
+
+  const gap = __test.extraGroups([row(1, '2027-03-01'), row(2, '2027-03-03')]);
+  assert.equal(gap.length, 2, 'a one-day gap splits the series');
 });
 
 // The three library tabs (shift types, patterns, overrides) are one module,
@@ -1174,6 +1586,35 @@ test('overtimeInfo() never flags when no 7-day window crossed the target', async
   assert.equal(result.excessMinutes, 0);
 });
 
+// shiftMinutes() (schedule.js, not itself __test-exported) adds 24h whenever
+// end <= start, so 22:00-06:00 is 8h (480 min: 22:00-24:00 is 2h, 00:00-06:00
+// is 6h), not a negative/zero wraparound. overtimeInfo() is the only exported
+// surface that exercises it - these two cases isolate the exact 480-minute
+// contribution of a single overnight shift by bracketing the 40h/week target
+// with six vs. five of them (2880 vs. 2400 minutes), so a duration bug
+// (undercounting, or a raw negative from a naive end-start) would show up as
+// a wrong excess or a wrongly-absent "over", not just a plausible-looking number.
+test('overtimeInfo() counts a 22:00-06:00 shift as a full 8 hours (480 min), not zero or a negative wraparound', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const overnight = { start_time: '22:00', end_time: '06:00' };
+  const sixNights = ['2026-09-07', '2026-09-08', '2026-09-09', '2026-09-10', '2026-09-11', '2026-09-12']
+    .map((date_key) => ({ date_key, shift_type: overnight }));
+
+  // Six consecutive overnight shifts: 6 * 480 = 2880 min = 48h. 8h (480 min)
+  // over a 40h/week target - a figure only reachable if each shift really
+  // contributed 480 minutes.
+  const overResult = __test.overtimeInfo(sixNights, 40);
+  assert.equal(overResult.over, true);
+  assert.equal(overResult.excessMinutes, 480, 'six 8h overnight shifts total 48h; only the 8h (480 min) above the 40h/week target counts');
+
+  // Five is exactly the 40h target (5 * 8h = 40h) - not over. A bug that
+  // undercounted the after-midnight half (or wrapped to something smaller)
+  // would instead show these five as comfortably under, not exactly at the line.
+  const atTarget = __test.overtimeInfo(sixNights.slice(0, 5), 40);
+  assert.equal(atTarget.over, false);
+  assert.equal(atTarget.excessMinutes, 0);
+});
+
 test('the weekly-hours target is a per-user preference, fetched and saved through /schedule/preferences', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   assert.match(schedulePage, /api\.get\('\/schedule\/preferences'\)/);
@@ -1231,4 +1672,387 @@ test('Schedule uses the full desktop module shell and responsive library/statist
   assert.match(scheduleCss, /@container schedule-page \(min-width: 720px\)/);
   assert.match(scheduleCss, /@container schedule-page \(min-width: 900px\)/);
   assert.match(scheduleCss, /schedule-stat-dates/);
+});
+
+// UX audit batch 2 (safety): S-01 delete confirm, S-02 humanized validation
+// errors, S-03 unsaved cycle-day edits, S-06 statistics range, S-14 dirty
+// false positive.
+
+test('patternDaysExceedingCycleLength() flags exactly the positions a shorter cycle would drop, 1-indexed', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  // Kein Tag ausserhalb der neuen Laenge -> kein Konflikt.
+  assert.equal(__test.patternDaysExceedingCycleLength([{ position: 0 }, { position: 3 }], 8), null);
+  // Position 7 (achter Zyklustag) faellt aus einer auf 5 verkuerzten Rotation heraus.
+  assert.deepEqual(__test.patternDaysExceedingCycleLength([{ position: 0 }, { position: 7 }], 5), { from: 8, to: 8 });
+  // Mehrere betroffene Positionen -> von/bis spannt den ganzen betroffenen Bereich auf.
+  assert.deepEqual(__test.patternDaysExceedingCycleLength([{ position: 4 }, { position: 5 }, { position: 6 }], 4), { from: 5, to: 7 });
+  // Leere/ fehlende Tage duerfen nie werfen.
+  assert.equal(__test.patternDaysExceedingCycleLength([], 3), null);
+  assert.equal(__test.patternDaysExceedingCycleLength(undefined, 3), null);
+});
+
+test('the pattern-update submit path prechecks cycle_length against pattern.days before PUTting, field-level not toast', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const branch = schedulePage.slice(
+    schedulePage.indexOf("if (form.dataset.form === 'pattern-update')"),
+    schedulePage.indexOf("await load();", schedulePage.indexOf("if (form.dataset.form === 'pattern-update')")),
+  );
+  assert.match(branch, /patternDaysExceedingCycleLength\(pattern\?\.days, data\.cycle_length\)/);
+  assert.match(branch, /reportFieldError\(form\.querySelector\('\[name="cycle_length"\]'\), t\('schedule\.cycleLengthTooShort', conflict\)\)/);
+  assert.match(branch, /if \(conflict\) \{[\s\S]*return;\s*\}/, 'a detected conflict must bail out before the PUT');
+  assert.doesNotMatch(branch.slice(0, branch.indexOf('return;')), /api\.put\(`\/schedule\/patterns\/\$\{form\.dataset\.id\}`/, 'the PUT must not fire before the precheck has passed');
+});
+
+test('scheduleErrorMessage() maps the three known raw server strings to humanized keys, and passes through anything unknown', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  // Der Test-Loader stubt t() als Identitaet (siehe test-browser-loader.mjs)
+  // - hier zaehlt nur, dass ein bekannter Rohtext ueberhaupt auf EINEN
+  // uebersetzten Schluessel abgebildet wird (echte Uebersetzungstexte prueft
+  // bereits test:i18n/-translated), nicht dass er 1:1 durchgereicht wird.
+  assert.equal(__test.scheduleErrorMessage({ data: { error: 'shift_type_id must be a positive number.' } }), 'schedule.shiftTypeRequiredError');
+  assert.equal(__test.scheduleErrorMessage({ data: { error: 'cycle_length cannot exclude existing pattern days.' } }), 'schedule.cycleLengthConflictGeneric');
+  assert.equal(__test.scheduleErrorMessage({ data: { error: 'Shift type is in use.' } }), 'schedule.typeInUse');
+  // Ein unbekannter Rohtext faellt unveraendert durch statt auf den generischen Fehler.
+  assert.equal(__test.scheduleErrorMessage({ data: { error: 'Something else entirely.' } }), 'Something else entirely.');
+  // Weder data.error noch message -> der generische Fallback.
+  assert.equal(__test.scheduleErrorMessage({}), 'common.errorGeneric');
+});
+
+test('delete-shift now confirms before deleting, naming the type, like the other destructive actions', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const branch = schedulePage.slice(
+    schedulePage.indexOf("if (button.dataset.action === 'delete-shift')"),
+    schedulePage.indexOf("if (button.dataset.action === 'open-create-custom-field')"),
+  );
+  assert.match(branch, /confirmModal\(/, 'must gate through the shared confirm dialog like delete-pattern/delete-custom-field');
+  assert.match(branch, /danger:\s*true/);
+  assert.match(branch, /detail:\s*t\('schedule\.deleteShiftTypeDetail'/);
+  assert.match(branch, /if \(!confirmed\) return;/);
+  // Die api.delete() darf erst NACH der Rueckfrage stehen.
+  assert.ok(branch.indexOf('if (!confirmed) return;') < branch.indexOf('await api.delete(`/schedule/shift-types/'));
+});
+
+test('a mode-only switch in the Add-entry modal is excluded from the dirty comparison (S-14)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /name="mode" value="'\s*\+\s*esc\(mode\)\s*\+\s*'" data-dirty-ignore>/,
+    'the mode hidden field must opt out of the dirty comparison, otherwise a bare segment switch reads as unsaved input');
+
+  const modalPage = readFileSync(new URL('../public/components/modal.js', import.meta.url), 'utf8');
+  const serializeFn = modalPage.slice(modalPage.indexOf('function serializeForm'), modalPage.indexOf('function isFormDirty'));
+  assert.match(serializeFn, /:not\(\[data-dirty-ignore\]\)/, 'serializeForm must exclude opted-out fields from the dirty snapshot/comparison');
+});
+
+test('an inverted or incomplete custom statistics range never fetches and never sets the generic error state (S-06)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const fn = schedulePage.slice(schedulePage.indexOf('async function refreshStatistics'), schedulePage.indexOf('async function activateView'));
+  assert.match(fn, /if \(!bounds\) \{[\s\S]*?return;\s*\}/, 'an invalid range must return early, not throw');
+  assert.doesNotMatch(fn.slice(0, fn.indexOf('const userId')), /api\.get/, 'no fetch must happen before the bounds check passes');
+  assert.doesNotMatch(fn, /throw new Error/, 'an invalid range is no longer reported as a thrown error (that surfaced as the generic connection-error tile)');
+
+  assert.match(schedulePage, /formField\(t\('schedule\.rangeFrom'\), '<yuvomi-datepicker required name="from"/, 'the custom-range field must use rangeFrom/rangeTo, not the pattern-vocabulary validFrom/validUntil');
+  assert.match(schedulePage, /formField\(t\('schedule\.rangeTo'\), '<yuvomi-datepicker required name="to"/);
+});
+
+test('switching Planning sub-tabs while a pattern editor is dirty asks before discarding, and clears on save (S-03)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /async function guardedActivateView\(id\)/);
+  const guardFn = schedulePage.slice(schedulePage.indexOf('async function guardedActivateView'), schedulePage.indexOf('function renderShell'));
+  assert.match(guardFn, /dirtyPatternIds\.size/);
+  assert.match(guardFn, /confirmModal\(/);
+  assert.match(guardFn, /scheduleTablist\?\.sync\(activeView\)/, 'cancelling must revert the tab bar without ever calling activateView()');
+
+  // Beide Speicherpfade, die eine Musterkarte betreffen, muessen ihre id wieder freigeben.
+  assert.match(schedulePage, /await api\.put\(`\/schedule\/patterns\/\$\{button\.dataset\.id\}\/days`, \{ days \}\);\s*\n\s*dirtyPatternIds\.delete\(String\(button\.dataset\.id\)\)/);
+  assert.match(schedulePage, /await api\.put\(`\/schedule\/patterns\/\$\{form\.dataset\.id\}`, data\);\s*\n\s*dirtyPatternIds\.delete\(String\(form\.dataset\.id\)\)/);
+
+  assert.match(schedulePage, /onChange: \(id\) => \{ guardedActivateView\(id\); \}/, 'the tablist must route through the guard, not call activateView() directly');
+});
+
+// UX audit batch 3 (comprehension): S-04 cycle positions get real dates,
+// S-05 overlapping-pattern guard + "wins" badge, S-07 first-visit sequencing,
+// S-17 entry detail lookup key.
+
+test('cycleDayNextDate() finds the next occurrence of a cycle position on or after today, wrapping backward before the anchor too (S-04)', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  // Anchor 2026-09-01 (Tue), cycle of 4: position 1 lands on the anchor, then
+  // every 4 days after (09-05, 09-09, 09-13, ...). "Today" 09-10 sits between
+  // 09-09 and 09-13, so the NEXT occurrence on/after today is 09-13.
+  assert.equal(__test.cycleDayNextDate('2026-09-01', 4, 1, '2026-09-10'), '2026-09-13');
+  // Today falls exactly on an occurrence -> that day itself, not the next one.
+  assert.equal(__test.cycleDayNextDate('2026-09-01', 7, 1, '2026-09-01'), '2026-09-01');
+  // Wrap-backward: the anchor is AFTER "today" - position 3 (0-indexed offset
+  // 2) still resolves to a date before the anchor by walking the cycle
+  // backwards, exactly the behaviour S-04's hint line documents.
+  assert.equal(__test.cycleDayNextDate('2026-09-10', 5, 3, '2026-09-01'), '2026-09-02');
+  // A second full cycle later must land on the same weekday/date pattern.
+  assert.equal(__test.cycleDayNextDate('2026-09-01', 4, 1, '2026-09-14'), '2026-09-17');
+});
+
+test('cycleDayHeaderLabel() shows the next occurrence normally, but falls back to the first cycle when that occurrence falls outside the pattern\'s validity window (S-04)', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  // No bounds: the next occurrence, formatted "<position> · <weekday> <date>"
+  // via the same calendar.dayShort<Weekday> + formatDayMonth() combination
+  // renderOverview() already uses (test-browser-loader.mjs stubs t() as the
+  // key itself and formatDayMonth() as String(d)).
+  assert.equal(
+    __test.cycleDayHeaderLabel('2026-09-01', 4, null, null, 1, '2026-09-10'),
+    '1 · calendar.dayShortSunday 2026-09-13',
+  );
+  // The next occurrence (09-13) falls after a valid_until of 09-05 - the
+  // header must fall back to the FIRST cycle (anchor + position - 1 = the
+  // anchor itself for position 1), never a date the pattern would not show.
+  assert.equal(
+    __test.cycleDayHeaderLabel('2026-09-01', 4, null, '2026-09-05', 1, '2026-09-10'),
+    '1 · calendar.dayShortTuesday 2026-09-01',
+  );
+  // Same fallback, this time excluded by a valid_from that starts later than
+  // the computed next occurrence.
+  assert.equal(
+    __test.cycleDayHeaderLabel('2026-09-01', 4, '2026-09-20', null, 1, '2026-09-10'),
+    '1 · calendar.dayShortTuesday 2026-09-01',
+  );
+});
+
+test('windowsOverlap() treats an empty valid_from/valid_until as unbounded on either side (S-05)', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  // Two fully unbounded windows always overlap.
+  assert.equal(__test.windowsOverlap(null, null, null, null), true);
+  // Disjoint bounded ranges never overlap.
+  assert.equal(__test.windowsOverlap('2026-01-01', '2026-01-31', '2026-02-01', '2026-02-28'), false);
+  // Overlapping bounded ranges.
+  assert.equal(__test.windowsOverlap('2026-01-01', '2026-03-31', '2026-03-01', '2026-06-30'), true);
+  // An unbounded end on one side still overlaps a bounded window that starts before it ends.
+  assert.equal(__test.windowsOverlap('2026-01-01', null, '2026-06-01', '2026-06-30'), true);
+  assert.equal(__test.windowsOverlap(null, '2026-01-31', '2026-02-01', null), false);
+});
+
+test('findOverlappingActivePattern() only matches another ACTIVE pattern of the SAME owner with an overlapping window (S-05)', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const patterns = [
+    { id: 1, user_id: 10, is_active: true, valid_from: null, valid_until: null },
+    { id: 2, user_id: 10, is_active: false, valid_from: null, valid_until: null },
+    { id: 3, user_id: 20, is_active: true, valid_from: null, valid_until: null },
+  ];
+  // Same owner, active, overlapping -> found.
+  assert.equal(__test.findOverlappingActivePattern(patterns, 10, null, null)?.id, 1);
+  // Excluding the match itself (the pattern being re-activated) -> nothing left.
+  assert.equal(__test.findOverlappingActivePattern(patterns, 10, null, null, 1), undefined);
+  // A different owner's active pattern never counts.
+  assert.equal(__test.findOverlappingActivePattern(patterns, 30, null, null), undefined);
+  // An inactive pattern of the same owner never counts either.
+  assert.equal(__test.findOverlappingActivePattern([patterns[1]], 10, null, null), undefined);
+  // Non-overlapping windows -> no match even for the same active owner.
+  const bounded = [{ id: 4, user_id: 10, is_active: true, valid_from: '2026-01-01', valid_until: '2026-01-31' }];
+  assert.equal(__test.findOverlappingActivePattern(bounded, 10, '2026-02-01', '2026-02-28'), undefined);
+});
+
+test('resolveWinningPatternId() mirrors the server\'s "valid_from DESC, id DESC" resolution order, and stays null without a real overlap (S-05)', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  // A single active pattern never needs a "wins" badge.
+  assert.equal(__test.resolveWinningPatternId([{ id: 1, user_id: 10, is_active: true, valid_from: null, valid_until: null }], 10, '2026-06-01'), null);
+  // A bounded valid_from beats an unbounded one (SQLite sorts NULL last in DESC).
+  const patterns = [
+    { id: 1, user_id: 10, is_active: true, valid_from: null, valid_until: null },
+    { id: 2, user_id: 10, is_active: true, valid_from: '2026-01-01', valid_until: null },
+  ];
+  assert.equal(__test.resolveWinningPatternId(patterns, 10, '2026-06-01'), 2);
+  // Same valid_from -> the higher id (the more recently created pattern) wins.
+  const tie = [
+    { id: 5, user_id: 10, is_active: true, valid_from: '2026-01-01', valid_until: null },
+    { id: 9, user_id: 10, is_active: true, valid_from: '2026-01-01', valid_until: null },
+  ];
+  assert.equal(__test.resolveWinningPatternId(tie, 10, '2026-06-01'), 9);
+  // A pattern whose window does not cover the given date is not a candidate at all.
+  const outOfRange = [
+    { id: 1, user_id: 10, is_active: true, valid_from: null, valid_until: '2026-01-31' },
+    { id: 2, user_id: 10, is_active: true, valid_from: '2026-02-01', valid_until: null },
+  ];
+  assert.equal(__test.resolveWinningPatternId(outOfRange, 10, '2026-01-15'), null);
+});
+
+test('a new ACTIVE pattern creation and re-activating one via the Active toggle both guard against silently outranking an existing active pattern (S-05)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const createBranch = schedulePage.slice(
+    schedulePage.indexOf("if (data.mode === 'pattern') {"),
+    schedulePage.indexOf("} else if (data.mode === 'replace') {"),
+  );
+  assert.match(createBranch, /findOverlappingActivePattern\(state\.patterns, data\.user_id, data\.valid_from \|\| null, data\.valid_until \|\| null\)/);
+  assert.match(createBranch, /confirmOverModal\(/, 'the Add-entry modal is still open, so the guard must park it (confirmOverModal), not destroy it');
+  assert.ok(createBranch.indexOf('if (!confirmed) return;') < createBranch.indexOf("await api.post('/schedule/patterns', data);"));
+
+  const updateBranch = schedulePage.slice(
+    schedulePage.indexOf("if (form.dataset.form === 'pattern-update')"),
+    schedulePage.indexOf('await load();', schedulePage.indexOf("if (form.dataset.form === 'pattern-update')")),
+  );
+  assert.match(updateBranch, /data\.is_active && !pattern\?\.is_active/, 'the guard must only fire on an off -> on transition, not on every save');
+  assert.match(updateBranch, /findOverlappingActivePattern\(state\.patterns, pattern\?\.user_id, data\.valid_from \|\| null, data\.valid_until \|\| null, pattern\?\.id\)/);
+  assert.match(updateBranch, /confirmModal\(/, 'this form is inline (no modal open), so the plain confirmModal is correct here');
+});
+
+test('the initial tab lands on Shift types when the household has no shift types yet, otherwise stays on Planning (S-07)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const renderFn = schedulePage.slice(schedulePage.indexOf('export async function render'), schedulePage.indexOf('export async function update'));
+  const branchStart = renderFn.indexOf('} else if (!initialViewDecided) {');
+  assert.ok(branchStart !== -1, 'the fallback branch must exist for a bare-root visit with no explicit deep link');
+  const fallbackBranch = renderFn.slice(branchStart, branchStart + 700);
+  assert.match(fallbackBranch, /activeView = state\.types\.length \? 'patterns' : 'shifts';/);
+  assert.match(fallbackBranch, /initialViewDecided = true;/);
+  // The decision must happen strictly after load() populated state.types, not before.
+  assert.ok(renderFn.indexOf('await load();') < branchStart);
+});
+
+test('an explicit tab deep link (URL path) always wins over the remembered tab, but the bare root still falls back to it (S-10)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const renderFn = schedulePage.slice(schedulePage.indexOf('export async function render'), schedulePage.indexOf('export async function update'));
+  assert.match(renderFn, /const requestedView = scheduleViewFromPath\(window\.location\.pathname\);\s*\n\s*if \(requestedView\) \{\s*\n\s*activeView = requestedView;\s*\n\s*initialViewDecided = true;\s*\n\s*\} else if \(!initialViewDecided\)/);
+  // The address bar is normalized to the resolved tab's own route afterwards,
+  // so a bare '/schedule' visit becomes a reloadable, back-button-able link.
+  assert.match(renderFn, /history\.replaceState\(\{ path: resolvedRoute \}, '', resolvedRoute\)/);
+});
+
+test('switching tabs navigates through the router (URL + history entry), and the router registers one exact route per tab (S-10)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const guardedFn = schedulePage.slice(schedulePage.indexOf('async function guardedActivateView'), schedulePage.indexOf('/**\n * Builds the toolbar'));
+  assert.match(guardedFn, /window\.yuvomi\?\.navigate\(scheduleRouteForView\(id\)\)/, 'a tab click must go through navigate(), not a bare activateView() call, or the URL never updates');
+
+  const routerJs = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.match(routerJs, /import \{ SCHEDULE_ROUTES \} from '\/utils\/schedule-tabs\.js';/);
+  assert.match(routerJs, /const SCHEDULE_PAGE_ROUTES = SCHEDULE_ROUTES\.map\(\(path\) => \(\{\s*\n\s*path, page: '\/pages\/schedule\.js', requiresAuth: true, module: 'schedule', titleKey: 'nav\.schedule',\s*\n\s*\}\)\);/);
+  assert.match(routerJs, /ROUTES\.push\(\.\.\.SCHEDULE_PAGE_ROUTES\);/);
+  // The single literal '/schedule' entry must be gone from the base ROUTES array -
+  // it would shadow SCHEDULE_PAGE_ROUTES's own '/schedule' entry and, worse, register
+  // the module without its four sub-tab routes.
+  assert.ok(!/\{ path: '\/schedule', page: '\/pages\/schedule\.js'/.test(routerJs));
+});
+
+test('the schedule-tabs helper resolves a path to exactly one of the four known tab ids, and back again (S-10)', async () => {
+  const { scheduleViewFromPath, scheduleRouteForView, SCHEDULE_ROUTES } = await import('../public/utils/schedule-tabs.js');
+  assert.strictEqual(scheduleViewFromPath('/schedule'), null, 'the bare root has no specific tab - the caller decides the default');
+  assert.strictEqual(scheduleViewFromPath('/schedule/shifts'), 'shifts');
+  assert.strictEqual(scheduleViewFromPath('/schedule/patterns'), 'patterns');
+  assert.strictEqual(scheduleViewFromPath('/schedule/statistics'), 'statistics');
+  assert.strictEqual(scheduleViewFromPath('/schedule/overview'), 'overview');
+  assert.strictEqual(scheduleViewFromPath('/schedule/nonsense'), null, 'an unknown sub-path is not a known tab');
+  assert.strictEqual(scheduleViewFromPath('/other'), null);
+  assert.strictEqual(scheduleViewFromPath(null), null);
+  assert.strictEqual(scheduleRouteForView('statistics'), '/schedule/statistics');
+  for (const route of SCHEDULE_ROUTES.filter((r) => r !== '/schedule')) {
+    assert.strictEqual(scheduleRouteForView(scheduleViewFromPath(route)), route, `${route} must round-trip through scheduleViewFromPath/scheduleRouteForView`);
+  }
+});
+
+test('a shift reminder deep-links into the Planning tab, not the bare module root (S-10)', () => {
+  const notifications = readFileSync(new URL('../server/services/notifications.js', import.meta.url), 'utf8');
+  assert.match(notifications, /schedule_entry:\s*\{ titleKey: 'nav\.schedule',\s*url: '\/schedule\/patterns' \}/);
+  assert.match(notifications, /schedule_extra_entry:\s*\{ titleKey: 'nav\.schedule',\s*url: '\/schedule\/patterns' \}/);
+});
+
+test('the empty Planning state points to creating shift types first when the household has none, reusing the existing hint key (S-07)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const start = schedulePage.indexOf('function emptyPatternState');
+  const body = schedulePage.slice(start, schedulePage.indexOf('\n}\n', start));
+  assert.match(body, /state\.types\.length/);
+  assert.match(body, /t\('schedule\.noShiftTypesHint'\)/, 'must reuse the existing key, not introduce a new one');
+});
+
+test('scheduleEntryMatchKey() builds a stable, source-aware key so a click can find the exact entry again (S-17)', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const patternEntry = { date_key: '2026-09-10', user_id: 1, source: 'pattern', pattern_id: 7, pattern_day_id: 42 };
+  const overrideEntry = { date_key: '2026-09-10', user_id: 1, source: 'override', override_id: 5 };
+  const extraEntry = { date_key: '2026-09-10', user_id: 1, source: 'extra', extra_id: 9 };
+  assert.equal(__test.scheduleEntryMatchKey(patternEntry), '2026-09-10:1:pattern:42');
+  assert.equal(__test.scheduleEntryMatchKey(overrideEntry), '2026-09-10:1:override:5');
+  assert.equal(__test.scheduleEntryMatchKey(extraEntry), '2026-09-10:1:extra:9');
+  // A free pattern day (no pattern_day_id, no explicit row) still gets a
+  // unique-enough key via the pattern id itself.
+  const freePatternEntry = { date_key: '2026-09-11', user_id: 1, source: 'pattern', pattern_id: 7, pattern_day_id: null };
+  assert.equal(__test.scheduleEntryMatchKey(freePatternEntry), '2026-09-11:1:pattern:p7');
+  // Two different sources on the same day/user never collide.
+  assert.notEqual(__test.scheduleEntryMatchKey(patternEntry), __test.scheduleEntryMatchKey(overrideEntry));
+});
+
+test('view-schedule-entry is a read action, reachable by a read-only member (S-17)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const setStart = schedulePage.indexOf('const READ_SAFE_ACTIONS = new Set([');
+  const setBody = schedulePage.slice(setStart, schedulePage.indexOf(']);', setStart));
+  assert.match(setBody, /'view-schedule-entry'/);
+  assert.match(schedulePage, /openModal\(\{ title: t\('schedule\.entryDetailTitle'\), size: 'sm', content: renderScheduleEntryDetailContent\(entry\), dirtyGuard: false \}\)/);
+});
+
+test('a read-only Schedule member can still save their own reminder offset and weekly hours (S-12)', () => {
+  // Client side: "My settings" must no longer disable the toggle/select/input
+  // based on readOnly() - this is a personal preference (own reminder lead
+  // time / own overtime target), not a write to shared schedule data.
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const fnStart = schedulePage.indexOf('function renderReminderSettings() {');
+  const fnBody = schedulePage.slice(fnStart, schedulePage.indexOf('\n}\n', fnStart));
+  assert.ok(!fnBody.includes('readOnly()'), 'renderReminderSettings() must not call the module read-only check anymore');
+  assert.ok(!fnBody.includes('const locked'), 'the old client-side lock variable must be fully removed, not just unused');
+  assert.match(fnBody, /toggleRowHtml\(\{ label: t\('schedule\.reminderToggle'\), checked: active, attrs: \{ id: 'schedule-reminder-toggle' \} \}\)/, 'the toggle must no longer pass a disabled flag');
+
+  // Server side: the blanket module read-only/denied gate must exempt exactly
+  // this path, computing a null module key so moduleAccessVerdict() falls
+  // through to its own "unlisted path -> allow" rule - the API-token scope
+  // check above it (still keyed on moduleForPath(), unchanged) is untouched.
+  const serverIndex = readFileSync(new URL('../server/index.js', import.meta.url), 'utf8');
+  assert.match(serverIndex, /const scopedModuleKey = req\.path\.startsWith\('\/schedule\/preferences'\) \? null : moduleForPath\(req\.path\);/);
+  assert.match(serverIndex, /moduleAccessVerdict\(\s*\n\s*req\.sessionModuleAccess,\s*\n\s*scopedModuleKey,/);
+});
+
+test('the Statistics owner select is self-only for non-admins, full list for admins (S-13)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /formField\(t\('schedule\.owner'\), '<select class="input" required name="user_id">' \+ userOptions\(canManageOthers \? selectedUser : currentUserId\) \+ '<\/select>'\)/);
+  // Must NOT be the raw, unfiltered state.users list anymore (the original finding).
+  assert.ok(!schedulePage.includes("formField(t('schedule.owner'), '<select class=\"input\" required name=\"user_id\">' + state.users.map"));
+});
+
+test('the shift-type preset picker groups presets by template, respecting the household template toggles (S-22)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /function shiftPresetOptgroups\(\)/);
+  const fnBody = schedulePage.slice(schedulePage.indexOf('function shiftPresetOptgroups()'), schedulePage.indexOf('function shiftPresetOptions()'));
+  assert.match(fnBody, /visibleQuickstartTemplates\(\)/, 'must respect the same household toggle as the quick-start buttons');
+  assert.match(fnBody, /shared\.add\('exam'\)/, 'exam is identical across School/University and belongs in one shared group, not two');
+  const optionsFn = schedulePage.slice(schedulePage.indexOf('function shiftPresetOptions()'), schedulePage.indexOf('function setShiftIconButtonIcon'));
+  assert.match(optionsFn, /<optgroup label="/, 'the select must actually render optgroups, not a flat list');
+});
+
+test('the reminder-offset select accepts a custom value beyond the fixed presets, matching the server\'s 0-1440 range (S-23)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /async function pickCustomReminderOffset\(select, onResolved\)/);
+  const fnBody = schedulePage.slice(schedulePage.indexOf('async function pickCustomReminderOffset'), schedulePage.indexOf('async function pickCustomReminderOffset') + 1200);
+  assert.match(fnBody, /minutes < 0 \|\| minutes > 1440/, 'must mirror the server\'s own MAX_OFFSET_MINUTES range, not invent a narrower one');
+  assert.match(fnBody, /select\.value = previous;/, 'cancelling or an invalid value must revert the select, not leave "custom" selected');
+  // The options builder must offer the escape hatch and must render an already-
+  // stored out-of-preset value as a real selected option, not silently as nothing selected.
+  const optionsFn = schedulePage.slice(schedulePage.indexOf('function reminderOffsetOptions('), schedulePage.indexOf('/**\n * S-23: "Custom...'));
+  assert.match(optionsFn, /!REMINDER_OFFSET_PRESETS\.includes\(effective\)/);
+  assert.match(optionsFn, /<option value="custom">/);
+});
+
+test('an overnight shift\'s continuation fragment in Overview names its end time, not the full origin-day range (S-30)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const fnBody = schedulePage.slice(schedulePage.indexOf('function overviewEntryBlock('), schedulePage.indexOf('function scheduleOverviewEntryTitle('));
+  assert.match(fnBody, /entry\.__continuation\s*\n\s*\? t\('schedule\.continuesUntil', \{ time: type\.end_time \}\)/, 'a continuation block must use a distinct label naming only the end time, not clockLabel()\'s full origin-day range');
+});
+
+test('an "overtime tracking" toggle exists separate from the weekly-hours number, and turning it off suppresses the overtime card entirely (S-24)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+
+  const settingsFn = schedulePage.slice(schedulePage.indexOf('function renderReminderSettings()'), schedulePage.indexOf('async function savePreference'));
+  assert.match(settingsFn, /toggleRowHtml\(\{ label: t\('schedule\.overtimeTrackingToggle'\), checked: state\.overtimeEnabled, attrs: \{ id: 'schedule-overtime-toggle' \} \}\)/);
+  assert.match(settingsFn, /id="schedule-weekly-hours" value="' \+ esc\(String\(weeklyHours\)\) \+ '"' \+ \(state\.overtimeEnabled \? '' : ' disabled'\)/, 'the weekly-hours input must disable itself when overtime tracking is off, not just visually decorate around it');
+
+  const statsFn = schedulePage.slice(schedulePage.indexOf('function renderStatistics()'), schedulePage.indexOf('function renderStatistics()') + 800);
+  assert.match(statsFn, /const overtime = state\.overtimeEnabled \? overtimeInfo\(statistics\.entries, weeklyHours\) : null;/, 'the overtime card must not just hide visually - it must not compute at all when the toggle is off');
+
+  // The toggle change handler must save overtimeEnabled and immediately (dis)able the hours input,
+  // the same immediate-lock pattern the reminder toggle (S-25) already established.
+  assert.match(schedulePage, /event\.target\.id === 'schedule-overtime-toggle'/);
+  assert.match(schedulePage, /savePreference\(\{ overtimeEnabled: event\.target\.checked \}\)/);
+});
+
+test('weeklyHours: 0 stays rejected server-side - S-24 was answered with a separate toggle, not a repurposed sentinel (D-C)', () => {
+  const prefsRoute = readFileSync(new URL('../server/routes/schedule-preferences.js', import.meta.url), 'utf8');
+  assert.match(prefsRoute, /n < 1 \|\| n > MAX_WEEKLY_HOURS/, 'weeklyHours must still reject 0 - overtimeEnabled is the real answer to "disable overtime", not a reinterpreted 0');
+  assert.match(prefsRoute, /typeof raw !== 'boolean'/, 'overtimeEnabled must be validated as a real boolean, not loosely coerced');
 });

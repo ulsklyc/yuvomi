@@ -9,7 +9,7 @@ import { moduleDisplayLabel } from '/utils/extension-i18n.js';
 // Core scope keys — extension modules are appended from /permissions/catalog at render time.
 const CORE_SCOPE_MODULE_KEYS = [
   'tasks', 'shopping', 'meals', 'pantry', 'inventory', 'calendar', 'schedule', 'notes', 'contacts', 'budget',
-  'documents', 'health', 'rewards', 'housekeeping', 'weather', 'family',
+  'documents', 'health', 'rewards', 'housekeeping', 'waste', 'weather', 'family',
   'dashboard', 'search',
 ];
 

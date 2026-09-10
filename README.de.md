@@ -34,7 +34,7 @@
     <img src="docs/screenshots/de/dashboard-light-web.webp" alt="Das Yuvomi-Dashboard: Aufgaben, Termine, Mahlzeiten und Einkaufsliste des Tages auf einem Bildschirm" width="820">
   </picture>
 
-  <sub><b>19</b> Module &nbsp;·&nbsp; <b>24</b> Sprachen &nbsp;·&nbsp; <b>0</b> Tracker &nbsp;·&nbsp; optionale <b>AES-256</b>-Datenbankverschlüsselung &nbsp;·&nbsp; <b>MIT</b></sub>
+  <sub><b>20</b> Module &nbsp;·&nbsp; <b>24</b> Sprachen &nbsp;·&nbsp; <b>0</b> Tracker &nbsp;·&nbsp; optionale <b>AES-256</b>-Datenbankverschlüsselung &nbsp;·&nbsp; <b>MIT</b></sub>
 </div>
 
 Die meisten Haushalte kleben ihren Alltag aus einem Dutzend Bezahl-Apps zusammen, jede mit eigenem
@@ -68,7 +68,7 @@ Das ist der Teil, den ein Ordner voller Einzel-Apps nicht kann:
 - **Eine erledigte Aufgabe zahlt aus.** Punkte auf einer Aufgabe landen auf dem Konto der zugewiesenen Person, und der Belohnungskatalog gibt sie aus.
 - **Ein abgelegter Beleg hängt an der Buchung.** Einmal hochgeladen, gehört er gleichzeitig zur Buchung, zur geteilten Ausgabe und zum Inventargegenstand.
 
-## Die neunzehn Module
+## Die zwanzig Module
 
 Schalte an, was dein Haushalt braucht; der Rest bleibt aus dem Weg.
 
@@ -84,6 +84,7 @@ Schalte an, was dein Haushalt braucht; der Rest bleibt aus dem Weg.
 | **Inventar** | Was dir gehört: Kaufpreis, Garantie, Zustand und Lagerort, mit verknüpften Belegen und Erinnerungen vor Fristablauf. Standardmäßig aus; Haushalte schalten es an. |
 | **Budget** | Einnahmen, Ausgaben, Konten, Darlehen, Abos und Planung je Kategorie, mit persönlichem Modus. Ein Eintrag kann seinen Betrag teilen und Titel und Kategorie für sich behalten, damit der Stand eines geteilten Kontos stimmt. |
 | **Hauswirtschaft** | Haushaltshilfen: Dienstpläne, Ein- und Ausstempeln, Tages- oder Stundenabrechnung, Aufgaben und Materialwünsche. |
+| **Entsorgung** | Wöchentliche oder feste monatliche Abholtermine je Abfallart, mit Einzelterminen und Verschieben oder Ausfallenlassen je Termin. Standardmäßig aus. |
 | **Belohnungen** | Punkte auf Aufgaben schreiben der zugewiesenen Person gut, mit elterlich freigegebenem Katalog und nachvollziehbarem Konto. |
 | **Gesundheit** | Vitalwerte, Medikamente, Laborwerte, Aktivität und Zyklus je Mitglied, mit Verlaufsdiagrammen. |
 | **Schichtplan** | Rotierende Schichtmuster und feste Wochenpläne aus einem Zyklusmodell, mit Ausnahmen je Tag und einem ausdrücklichen freien Tag. Der Kalender zeigt sie als schreibgeschützte Ebene, beim Lesen berechnet - eine Musteränderung lässt keine veralteten Termine zurück. Standardmäßig aus. |

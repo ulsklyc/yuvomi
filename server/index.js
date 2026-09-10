@@ -23,6 +23,7 @@ import * as icsExport from './services/ics-export.js';
 import * as inventoryDeadlinesIcs from './services/inventory-deadlines-ics.js';
 import * as cycleIcs from './services/cycle-ics.js';
 import * as scheduleIcs from './services/schedule-ics.js';
+import * as wasteIcs from './services/waste-ics.js';
 import * as caldavReminders from './services/caldav-reminders-sync.js';
 import * as caldavSync from './services/caldav-sync.js';
 import * as outlookCalendar from './services/outlook-calendar.js';
@@ -33,6 +34,7 @@ import { startScheduler as startSplitExpenseScheduler } from './services/split-e
 import { startScheduler as startPushScheduler } from './services/push-scheduler.js';
 import { startScheduler as startMedicationScheduler } from './services/medication-scheduler.js';
 import { startScheduler as startRecipeProviderScheduler } from './services/recipe-provider-sync.js';
+import { startWasteSourceScheduler } from './services/waste-source-scheduler.js';
 import { emailService } from './services/email.js';
 import { passwordLoginWarning, OIDC_PASSWORD_SENTINEL } from './services/oidc.js';
 import dashboardRouter from './routes/dashboard.js';
@@ -65,6 +67,7 @@ import searchRouter from './routes/search.js';
 import familyRouter from './routes/family.js';
 import backupRouter from './routes/backup.js';
 import housekeepingRouter from './routes/housekeeping.js';
+import wasteRouter from './routes/waste/index.js';
 import modulesRouter from './routes/modules.js';
 import { listModules } from './services/modules.js';
 import pushRouter from './routes/push.js';
@@ -473,6 +476,24 @@ app.get('/feed/schedule/:token.ics', feedLimiter, (req, res) => {
   }
 });
 
+// Eigenständiger Feed für Abfuhrtermine (Waste, Stufe 10) - anders als beim
+// Schichtplan-Feed oben steckt hier keine Nutzer-Id im INHALT (Abfuhrtermine
+// sind Haushaltseigentum ohne Sichtbarkeitsachse, wie beim Inventar-Feed);
+// nur das optionale Typ-Filter je Nutzer, siehe server/services/waste-ics.js.
+app.get('/feed/waste/:token.ics', feedLimiter, (req, res) => {
+  try {
+    const userId = wasteIcs.findUserIdByFeedToken(db.get(), req.params.token);
+    if (!userId) return res.status(404).type('text/plain').send('Not found');
+    const ics = wasteIcs.buildWasteFeed(db.get(), userId);
+    res.set('Cache-Control', 'private, no-store');
+    res.set('Content-Disposition', 'inline; filename="yuvomi-waste.ics"');
+    res.type('text/calendar; charset=utf-8').send(ics);
+  } catch (err) {
+    log.error('', err);
+    res.status(500).type('text/plain').send('Internal error');
+  }
+});
+
 // MCP-Endpoint (Streamable HTTP, stateless): Auth über bestehende Bearer-API-Tokens.
 // Eigener Namespace außerhalb von /api/v1 → kein CSRF, kein Guest-Guard.
 app.use('/mcp', apiLimiter, requireAuth, mcpRouter);
@@ -516,9 +537,21 @@ app.use('/api/v1', (req, res, next) => {
 app.use('/api/v1', (req, res, next) => {
   // Die Regel selbst steht in permissions.js — dieselbe Funktion prüft den
   // MCP-Endpoint (#823), damit beide Oberflächen nicht auseinanderlaufen.
+  //
+  // AUSNAHME /schedule/preferences (S-12, UX-Audit): der Vorlauf/die
+  // Wochenstunden hängen an der EIGENEN users-Zeile (siehe
+  // routes/schedule-preferences.js' eigener Kommentar, "keine Admin-Gate") -
+  // ein Mitglied mit `schedule: read` darf nur FREMDE Schichtplan-Daten nicht
+  // schreiben, seine eigene Erinnerungsvorlaufzeit ist keine davon. `null`
+  // statt des sonstigen Modulschlüssels zwingt moduleAccessVerdict() auf
+  // "erlaubt" (dieselbe Deny-Listen-Regel, unter der jeder NICHT gelistete
+  // Pfad ohnehin durchgeht) - ausdrücklich nur für diesen Session-Pfad, die
+  // API-Token-Scope-Prüfung oben bleibt unveraendert an `schedule:write`
+  // gebunden.
+  const scopedModuleKey = req.path.startsWith('/schedule/preferences') ? null : moduleForPath(req.path);
   const verdict = moduleAccessVerdict(
     req.sessionModuleAccess,
-    moduleForPath(req.path),
+    scopedModuleKey,
     requiredAccess(req.method),
   );
   if (verdict === MODULE_ACCESS_DENIED) {
@@ -564,6 +597,7 @@ app.use('/api/v1/search', searchRouter);
 app.use('/api/v1/family', familyRouter);
 app.use('/api/v1/backup', backupRouter);
 app.use('/api/v1/housekeeping', housekeepingRouter);
+app.use('/api/v1/waste', wasteRouter);
 app.use('/api/v1/modules', modulesRouter);
 app.use('/api/v1/push', pushRouter);
 app.use('/api/v1/email', emailRouter);
@@ -722,6 +756,7 @@ const server = app.listen(PORT, () => {
   startPushScheduler();
   startMedicationScheduler();
   startRecipeProviderScheduler();
+  startWasteSourceScheduler();
 });
 
 export default app;

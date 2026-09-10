@@ -25,10 +25,10 @@
  * Meldung mehr" statt eines Rettungsversuchs fuer eine kurze Frischware-Frist.
  */
 
-import { localToUTC, householdTimeZone, todayKey, shiftDateKey } from '../utils/timezone.js';
+import { localToUTC, householdTimeZone, todayKey, shiftDateKey, utcToWall } from '../utils/timezone.js';
 import { resolvePermissions } from '../permissions.js';
 import { createLogger } from '../logger.js';
-import { scheduleData } from '../routes/schedule.js';
+import { scheduleData } from './schedule.js';
 
 const log = createLogger('ScheduleReminders');
 
@@ -55,11 +55,82 @@ function subtractMinutes(naiveUTC, minutes) {
 }
 
 /**
+ * Zonen-Offset (Minuten, Wanduhr minus UTC) an einem gegebenen UTC-Zeitpunkt,
+ * ueber utcToWall gelesen - dieselbe Intl-Quelle wie ueberall sonst in diesem
+ * Baum, nur zurueckgerechnet in eine Zahl statt Datumsteilen.
+ */
+function offsetMinutesAt(utcMs, tzid) {
+  const wall = utcToWall(new Date(utcMs).toISOString(), tzid);
+  if (!wall) return null;
+  return (Date.parse(`${wall.date}T${wall.time}Z`) - utcMs) / 60000;
+}
+
+/**
+ * Lokale Wanduhrzeit -> UTC, DST-korrekt per Fixpunkt-Iteration.
+ *
+ * server/utils/timezone.js#localToUTC macht nur EINEN Durchgang: die lokalen
+ * Ziffern werden als UTC gelesen, der Zonen-Offset AN DIESEM (falschen) Punkt
+ * bestimmt und einmal angewandt. Das stimmt, solange der Offset an der
+ * falschen und der richtigen Stelle gleich ist - rund um eine DST-Grenze aber
+ * nicht (bis zu einer Offset-Breite daneben), und eine wegen des Frühjahrs-
+ * sprungs gar nicht existierende Wanduhrzeit wird gar nicht erst erkannt.
+ * Dieser Sync braucht die tatsaechliche Minute (eine Erinnerung, die eine
+ * Stunde zu frueh oder spaet feuert, ist keine Erinnerung mehr) - deshalb hier
+ * eine eigene, lokale Zweitfassung statt den geteilten Helfer anzufassen:
+ * andere Aufrufer verlassen sich auf dessen exaktes (Ein-Durchgang-)Verhalten.
+ *
+ * Verfahren (der uebliche Zwei-Pass-Fixpunkt): Startschaetzung wie localToUTC,
+ * daraus den Offset ablesen, die Schaetzung damit korrigieren, den Offset an
+ * DIESER korrigierten Stelle erneut ablesen. Bleibt er gleich, ist das
+ * Ergebnis exakt (der Rundlauf-Test, den ein einzelner Durchgang nie macht).
+ * Weicht er ab, liegt localStr auf/um eine DST-Grenze:
+ * - Zweiter Durchgang stabilisiert sich (Herbst/Fold, die Wanduhrzeit gab es
+ *   zweimal): das Ergebnis des zweiten Durchgangs gilt - eine der beiden
+ *   gueltigen Antworten, deterministisch statt zufaellig.
+ * - Kein Fixpunkt nach zwei Durchgaengen (Fruehling/Luecke, die Wanduhrzeit
+ *   gab es GAR NICHT): um die Luecke vorschieben, deren Breite die Differenz
+ *   der beiden gesehenen Offsets ist - dokumentierter Ausweichweg, keine
+ *   perfekte Antwort, weil es keine gibt.
+ *
+ * Ground-truth manuell geprueft (Europe/Berlin, siehe PR-Notizen): 06:00 lokal
+ * am 2026-03-29 (schon CEST, +02:00) -> 04:00Z; 06:00 lokal am 2026-10-25
+ * (schon wieder CET, +01:00) -> 05:00Z; beide Tage liegen fuer 06:00 bereits
+ * auf der jeweils richtigen Seite der Grenze, single-pass und diese Funktion
+ * stimmen dort ueberein - der Unterschied zeigt sich erst innerhalb der
+ * Sprung-/Fold-Stunde selbst.
+ *
+ * @param {string} localStr  'YYYY-MM-DDTHH:mm:ss' ohne Offset
+ * @param {string} tzid      IANA-Zone
+ * @returns {string} UTC-ISO mit 'Z'
+ */
+function localToUTCPrecise(localStr, tzid) {
+  const naiveMs = Date.parse(`${localStr}Z`);
+  if (Number.isNaN(naiveMs)) return localToUTC(localStr, tzid);
+
+  const o1 = offsetMinutesAt(naiveMs, tzid);
+  if (o1 == null) return localToUTC(localStr, tzid);
+  const guessA = naiveMs - o1 * 60000;
+
+  const o2 = offsetMinutesAt(guessA, tzid);
+  if (o2 == null) return localToUTC(localStr, tzid);
+  if (o2 === o1) return new Date(guessA).toISOString().replace('.000Z', 'Z');
+
+  const guessB = naiveMs - o2 * 60000;
+  const o3 = offsetMinutesAt(guessB, tzid);
+  if (o3 === o2) return new Date(guessB).toISOString().replace('.000Z', 'Z');
+
+  // Kein Fixpunkt in zwei Durchgaengen: Fruehjahrsluecke. Um die Luecke
+  // vorschieben statt eine Antwort vorzutaeuschen, die es nicht gibt.
+  const gapMinutes = Math.abs(o2 - o1);
+  return new Date(guessA + gapMinutes * 60000).toISOString().replace('.000Z', 'Z');
+}
+
+/**
  * Erinnerungszeitpunkt fuer eine Schicht: Datum+Startzeit in der
  * Haushaltszone, minus Vorlaufminuten, als naiv-UTC.
  */
 function shiftReminderAt(dateKey, startTime, offsetMinutes, tz) {
-  const utc = toNaiveUTC(localToUTC(`${dateKey}T${startTime}:00`, tz));
+  const utc = toNaiveUTC(localToUTCPrecise(`${dateKey}T${startTime}:00`, tz));
   return subtractMinutes(utc, offsetMinutes);
 }
 
@@ -116,10 +187,53 @@ function dropExtraReminders(database, userId) {
 }
 
 /**
+ * STRANDIERTE ERINNERUNGEN OHNE ANKER einsammeln: `schedule_reminder_entries.
+ * shift_type_id` ist bewusst ON DELETE CASCADE (Migration 184's Kommentar),
+ * anders als jeder andere lebende Bezug auf `schedule_shift_types` (Overrides,
+ * Musterzyklus-Tage, Extras haengen alle mit RESTRICT daran). Loescht jemand
+ * eine Ausnahme, ohne dass dieser Sync sofort danach laeuft, und wird der nun
+ * unbenutzte Schichttyp geloescht, BEVOR der naechste Lauf den Anker selbst
+ * als gegenstandslos erkennt, reisst die Kaskade den Anker weg - die
+ * `reminders`-Zeile (entity_type 'schedule_entry') bleibt zurueck und zeigt
+ * auf eine Anker-Id, die es nicht mehr gibt. Weder dropPrimary() (gleich
+ * unten, geht ueber vorhandene Anker-Ids) noch die Abraeum-Schleife im
+ * Hauptpfad (geht ebenfalls ueber vorhandene Anker-Ids) findet so eine Zeile -
+ * beide muessten den Anker noch sehen, um ihn abzuraeumen. Deshalb hier ein
+ * Abgleich, der NICHT ueber Anker-Ids geht: eine indizierte NOT EXISTS statt
+ * einer Schleife je Zeile (reminders.entity_id traegt keinen echten
+ * Fremdschluessel, dasselbe polymorphe Muster wie ueberall sonst hier).
+ *
+ * Extras (entity_type 'schedule_extra_entry') haengen mit RESTRICT an
+ * schedule_shift_types, koennen also nicht auf demselben Weg verwaisen - aber
+ * eine schedule_extra_shifts-Zeile kann verschwinden (Loeschen ueber
+ * routes/schedule-extras.js), waehrend syncExtraRemindersForUser() aus
+ * irgendeinem Grund genau diesen Lauf nicht sieht (z.B. eine Ausnahme weiter
+ * oben in diesem Lauf, siehe syncAllScheduleReminders()'s try/catch je
+ * Nutzer). Gleiche Absicherung, gleicher Grund.
+ */
+function sweepStrandedReminders(database, userId) {
+  database.prepare(`
+    DELETE FROM reminders WHERE entity_type = 'schedule_entry' AND created_by = ?
+      AND NOT EXISTS (SELECT 1 FROM schedule_reminder_entries e WHERE e.id = reminders.entity_id)
+  `).run(userId);
+  database.prepare(`
+    DELETE FROM reminders WHERE entity_type = 'schedule_extra_entry' AND created_by = ?
+      AND NOT EXISTS (SELECT 1 FROM schedule_extra_shifts s WHERE s.id = reminders.entity_id)
+  `).run(userId);
+}
+
+/**
  * Soll-Zustand fuer EINEN Nutzer herstellen: Anker anlegen/abraeumen und die
  * zugehoerigen `reminders`-Zeilen nachziehen.
  */
 function syncScheduleRemindersForUser(database, userId, now = new Date()) {
+  // ZUERST das, was gar keinen Anker mehr hat (siehe sweepStrandedReminders
+  // oben) - unabhaengig davon, ob der Rest dieser Funktion gleich abschaltet
+  // (scheduleDisabled/lacksSchedule unten) oder normal durchlaeuft: beide
+  // Pfade darunter gehen ueber vorhandene Anker-Ids und wuerden eine bereits
+  // verwaiste Zeile nie finden.
+  sweepStrandedReminders(database, userId);
+
   const dropPrimary = () => {
     // Anker zuerst abfragen, dann beides loeschen - reminders.entity_id
     // traegt keinen echten Fremdschluessel auf schedule_reminder_entries

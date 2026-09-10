@@ -2846,6 +2846,18 @@ router.delete('/users/:id', requireAuth, requireAdmin, csrfMiddleware, (req, res
       // Standard-Zuweisungen von Sync-Zielen lösen (kein FK auf diesen Spalten, #459).
       db.get().prepare('UPDATE ics_subscriptions SET default_assignee_user_id = NULL WHERE default_assignee_user_id = ?').run(userId);
       db.get().prepare('UPDATE external_calendars SET default_assignee_user_id = NULL WHERE default_assignee_user_id = ?').run(userId);
+      // Schichtplan (Migration 189): schedule_patterns→pattern_days, schedule_overrides
+      // und schedule_extra_shifts kaskadieren gleich mit weg (FK CASCADE auf user_id),
+      // ihre schedule_custom_field_values-Zeilen nicht - polymorph, kein echter
+      // Fremdschluessel. Deshalb hier vorab entfernt, solange die Ids noch auffindbar
+      // sind, sonst blieben sie als verwaiste Zeilen unter fremder Bedeutung liegen.
+      const patternIds = db.get().prepare('SELECT id FROM schedule_patterns WHERE user_id = ?').all(userId).map((row) => row.id);
+      if (patternIds.length) {
+        const dayIds = db.get().prepare(`SELECT id FROM schedule_pattern_days WHERE pattern_id IN (${patternIds.map(() => '?').join(',')})`).all(...patternIds).map((row) => row.id);
+        if (dayIds.length) db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id IN (${dayIds.map(() => '?').join(',')})`).run(...dayIds);
+      }
+      db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id IN (SELECT id FROM schedule_overrides WHERE user_id=?)`).run(userId);
+      db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='extra_shift' AND entry_id IN (SELECT id FROM schedule_extra_shifts WHERE user_id=?)`).run(userId);
       return db.get().prepare('DELETE FROM users WHERE id = ?').run(userId);
     });
 

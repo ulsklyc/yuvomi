@@ -599,6 +599,31 @@ test('Cockpit-Coda nennt die morgen fällige Aufgabe statt falscher Entwarnung',
   }
 });
 
+test('"Heute frei"/"Fuer heute alles erledigt" entfaellt neben einer sichtbaren Schichtplan-Kachel (S-18)', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const prevWindow = global.window;
+  global.window = { yuvomi: null };
+  try {
+    // Ohne Schedule-Kachel (Vorgabe): der leere Tag darf "Heute frei" sagen.
+    const withoutWidget = __test.renderTodayCockpit({}, []);
+    nodeAssert.match(withoutWidget, /todayFree/, 'ohne sichtbare Schichtplan-Kachel bleibt die alte Zustandszeile');
+    // Mit sichtbarer Schedule-Kachel: dieselbe leere Aufgaben/Termin-Lage darf
+    // NICHT mehr "Heute frei" behaupten - die Kachel daneben koennte etwas
+    // ganz anderes zeigen (der urspruengliche Befund: eine echte Schicht).
+    const withWidget = __test.renderTodayCockpit({}, [{ id: 'schedule', visible: true }]);
+    nodeAssert.ok(!/todayFree/.test(withWidget), 'eine sichtbare Schichtplan-Kachel darf nicht neben "Heute frei" widersprochen werden');
+    // Dieselbe Regel fuer die "alles erledigt"-Variante (erledigte Aufgaben,
+    // sonst nichts): auch sie ist neben der Kachel eine unvollstaendige Story.
+    const allDoneWithWidget = __test.renderTodayCockpit(
+      { urgentTasks: [{ id: 1, title: 'x', due_date: toLocalDateKey(new Date()), status: 'done' }] },
+      [{ id: 'schedule', visible: true }],
+    );
+    nodeAssert.ok(!/todayAllDone/.test(allDoneWithWidget), '"alles erledigt" entfaellt ebenso neben einer sichtbaren Schichtplan-Kachel');
+  } finally {
+    global.window = prevWindow;
+  }
+});
+
 test('Notiz-Widget: nur der Auszug landet im DOM, nie der Volltext (Paket 3)', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   // line-clamp kürzt rein visuell - Screenreader lasen die komplette Notiz vor.
@@ -2024,9 +2049,9 @@ test('Widget-Merge: eine fehlende Id landet an ihrer Default-Position, nicht hin
   // Die Zahl steht hier fest und wird bei jedem neuen Widget von Hand
   // nachgezogen - das ist der Zweck: ein Selektor, der aus derselben Liste
   // abgeleitet waere, koennte nie melden, dass die Liste sich geaendert hat.
-  // Zuletzt nachgezogen fuer `schedule` (Schedule v2).
+  // Zuletzt nachgezogen fuer `waste` (#1063 Phase 4).
   const geprueft = widgets.WIDGET_IDS.length;
-  assert(geprueft === 18, `Reichweite: ${geprueft} Ids geprueft, nicht die erwarteten 18`);
+  assert(geprueft === 19, `Reichweite: ${geprueft} Ids geprueft, nicht die erwarteten 19`);
   const falsch = widgets.WIDGET_IDS.filter((id) => {
     const merged = widgets.normalizeDashboardConfig(layoutOhne(id));
     return merged.map((w) => w.id).join(',') !== widgets.WIDGET_IDS.join(',');
@@ -2257,15 +2282,46 @@ test('Kennzahlreihe wiederholt nicht, was ein sichtbares Widget schon sagt', asy
 // Owner-Beschraenkung braucht) und denselben Zweiteiler.
 // --------------------------------------------------------
 
-test('das Schedule-Widget ist an beiden Refresh-Stellen verdrahtet, an denen cycle es auch ist', () => {
+// M-6a/M-6b: a plain `fresh.schedule = data.schedule;` carry-over is still
+// present TWICE in the file (once per refresh site) - a bare count-of-two
+// guard stays green even if refreshDashboardData() regressed back to pure
+// carry-over, since the literal line still exists there too, just preceded by
+// nothing. This guard instead pins WHICH mechanism each site uses:
+// reloadIfQueryChanged() (fires only on a filter change) still carries the
+// slice over unchanged like cycle, but refreshDashboardData() (the 15-minute
+// silent/background tick) must reset-and-reload it first - "who's on duty
+// today" is a moving target across both a 15-minute tick and a midnight
+// rollover on a wall-mounted tablet, unlike the owner-only, privacy-gated
+// cycle slice.
+test('das Schedule-Widget wird an der periodischen Refresh-Stelle zurueckgesetzt und neu geladen, nicht nur uebernommen wie an der query-getriebenen Stelle', () => {
   const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
   assert(/schedule:\s*'schedule'/.test(src), 'MODULE_FOR_WIDGET kennt das Modul hinter dem Widget nicht');
   assert(/schedule:\s*\(size\)\s*=>\s*renderScheduleWidget/.test(src), 'widgetById hat keinen Eintrag fuer schedule, oder er reicht die Groesse nicht durch (PR #930 review)');
-  const carryOvers = [...src.matchAll(/fresh\.schedule\s*=\s*data\.schedule;/g)];
-  assert(carryOvers.length === 2,
-    'fresh.schedule = data.schedule; muss an beiden Refresh-Stellen stehen (reloadIfQueryChanged UND '
-    + `refreshDashboardData), sonst faellt die Kachel bei einem stillen Refresh auf ihren Leerzustand `
-    + `zurueck - gefunden: ${carryOvers.length}`);
+
+  // reloadIfQueryChanged(): only fires on a filter change, no staleness
+  // concern - the slice still just rides along, exactly like cycle.
+  const reloadFn = src.slice(src.indexOf('async function reloadIfQueryChanged'), src.indexOf('async function persistWidgetConfig'));
+  nodeAssert.match(reloadFn, /fresh\.cycle = data\.cycle;/);
+  nodeAssert.match(reloadFn, /fresh\.schedule = data\.schedule;/, 'reloadIfQueryChanged must still carry the old slice over unchanged - it has no reason to refetch on every filter change');
+
+  // refreshDashboardData(): the 15-minute silent/background refresh. Must
+  // reset the memoized slice to undefined (so ensureScheduleSlice()'s own
+  // `if (data.schedule !== undefined) return;` early-out does not skip the
+  // refetch) and re-await it with a freshly computed "today" BEFORE folding
+  // it into `fresh` - in that order, or a stale/failed slice survives another
+  // 15 minutes.
+  const refreshFn = src.slice(src.indexOf('async function refreshDashboardData'), src.indexOf('const refreshTimerId'));
+  nodeAssert.match(refreshFn, /data\.schedule = undefined;/, 'must reset the memoized slice, or ensureScheduleSlice() short-circuits on its own "already loaded" memo and nothing is refetched');
+  nodeAssert.match(refreshFn, /await ensureScheduleSlice\(\);/, 'must re-await the slice, not just remember the previous result');
+  const resetIndex = refreshFn.indexOf('data.schedule = undefined;');
+  const reEnsureIndex = refreshFn.indexOf('await ensureScheduleSlice();');
+  const carryOverIndex = refreshFn.indexOf('fresh.schedule = data.schedule;');
+  assert(
+    resetIndex > -1 && reEnsureIndex > resetIndex && carryOverIndex > reEnsureIndex,
+    'the reset must precede the re-fetch, which must precede folding the (now newly loaded) slice into `fresh` - '
+    + 'a regression back to a bare carry-over would still satisfy a loose "the line appears twice in the file" '
+    + 'grep but fails this ordering check',
+  );
 });
 
 test('das Schedule-Widget ist in der Anpassen-Standardliste als Opt-in eingetragen', async () => {
@@ -2680,6 +2736,23 @@ test('Wetter: ohne Tageswerte bleibt die Hoch/Tief-Zeile weg statt leer zu stehe
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
+test('das Familienmitglieder-Widget kennt die eigene Schicht statt "Heute frei" zu behaupten (S-18)', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const users = [{ id: 1, display_name: 'Anna', avatar_color: '#6C3AED' }];
+  // Ohne data.schedule (Schedule-Kachel nicht sichtbar): unveraendertes Verhalten.
+  const withoutSchedule = __test.renderFamilyWidget(users, {});
+  nodeAssert.match(withoutSchedule, /todayFree/, 'ohne geladene Schichtplan-Daten bleibt die alte "Heute frei"-Zeile');
+  // Mit einer echten Schicht heute: die Zeile nennt die Schicht, nicht "frei".
+  const withShift = __test.renderFamilyWidget(users, {
+    schedule: { entries: [{ user_id: 1, shift_type: { short_code: 'E', name: 'Early shift' } }] },
+  });
+  nodeAssert.match(withShift, /E · Early shift/, 'die eigene Schicht ersetzt die "frei"-Behauptung');
+  nodeAssert.ok(!/todayFree/.test(withShift), 'kein Widerspruch zur Schedule-Kachel mehr');
+  // Ein freier Tag (Schedule geladen, aber kein Eintrag fuer diese Person) sagt weiterhin "frei".
+  const stillFree = __test.renderFamilyWidget(users, { schedule: { entries: [] } });
+  nodeAssert.match(stillFree, /todayFree/, 'ein wirklich freier Tag darf weiterhin "Heute frei" sagen');
+});
+
 await Promise.all(pendingTests);
 
 console.log(`\n[Dashboard-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

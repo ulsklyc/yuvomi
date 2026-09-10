@@ -35,6 +35,7 @@ const SCOPE_MODULES = [
   { key: 'health',       prefixes: ['health'] },
   { key: 'rewards',      prefixes: ['rewards'] },
   { key: 'housekeeping', prefixes: ['housekeeping'] },
+  { key: 'waste',        prefixes: ['waste'] },
   { key: 'weather',      prefixes: ['weather'] },
   { key: 'family',       prefixes: ['family'] },
   // `quick-links` teilt sich den Schluessel mit `dashboard`: die Kachelreihe ist

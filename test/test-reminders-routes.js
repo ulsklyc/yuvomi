@@ -418,15 +418,18 @@ test('ein entzogenes Modul verschwindet auch aus /pending', async () => {
   const owner = freshUser();
   currentUid = owner;
   insertReminder(owner, 'pantry_item', 1, PAST);
+  insertReminder(owner, 'waste_pickup', 1, PAST);
   insertReminder(owner, 'task', makeTask(owner, 'Kehrwoche'), PAST);
 
   // access_permissions-Achse: dieselbe Frage, andere Herkunft der Antwort.
-  currentModuleAccess = { pantry: 'none' };
+  currentModuleAccess = { pantry: 'none', waste: 'none' };
   try {
     const res = await call('GET', '/pending');
     assert.equal(res.status, 200);
     assert.ok(!res.body.data.some((r) => r.entity_type === 'pantry_item'),
       'der Pfad-Guard fragt nach `calendar` und laesst pantry durch - die Route muss selbst filtern');
+    assert.ok(!res.body.data.some((r) => r.entity_type === 'waste_pickup'),
+      'dieselbe Filterung gilt fuer waste_pickup (#1063 Phase 8)');
     assert.ok(res.body.data.some((r) => r.entity_type === 'task'), 'und nichts anderes wegnehmen');
   } finally {
     currentModuleAccess = null;

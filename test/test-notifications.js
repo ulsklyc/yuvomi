@@ -105,7 +105,7 @@ function makeDb({ withNotificationTables = true } = {}) {
     );
     CREATE TABLE reminders (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      entity_type TEXT NOT NULL CHECK(entity_type IN ('task','event','subscription','inventory_item','inventory_tracked_date','pantry_item','cycle_period','cycle_log_nudge','schedule_entry','schedule_extra_entry')),
+      entity_type TEXT NOT NULL CHECK(entity_type IN ('task','event','subscription','inventory_item','inventory_tracked_date','pantry_item','cycle_period','cycle_log_nudge','schedule_entry','schedule_extra_entry','waste_pickup')),
       entity_id INTEGER NOT NULL,
       remind_at TEXT NOT NULL,
       dismissed INTEGER NOT NULL DEFAULT 0,
@@ -122,6 +122,19 @@ function makeDb({ withNotificationTables = true } = {}) {
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       anchor_date TEXT NOT NULL,
       kind TEXT NOT NULL
+    );
+    -- Same reasoning as cycle_reminder_anchors above: minimal, just enough for
+    -- the waste_pickup CASE branches (entity_title/waste_type_id/waste_date_key)
+    -- to prepare.
+    CREATE TABLE waste_types (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL
+    );
+    CREATE TABLE waste_reminder_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type_id INTEGER NOT NULL REFERENCES waste_types(id) ON DELETE CASCADE,
+      date_key TEXT NOT NULL
     );
     CREATE TABLE push_subscriptions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -7601,6 +7601,500 @@ const MIGRATIONS = [
       CREATE INDEX idx_shopping_items_store ON shopping_items(store_id);
     `,
   },
+  {
+    version: 194,
+    description: 'Waste collection: types, manual schedules, per-occurrence overrides, and one-off pickups (#1063)',
+    up: `
+      CREATE TABLE waste_types (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        name        TEXT    NOT NULL,
+        icon        TEXT    NOT NULL DEFAULT 'trash-2',
+        color       TEXT    NOT NULL,
+        archived    INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1)),
+        sort_order  INTEGER NOT NULL DEFAULT 0,
+        created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      CREATE TRIGGER trg_waste_types_updated_at AFTER UPDATE ON waste_types FOR EACH ROW BEGIN
+        UPDATE waste_types SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+      CREATE INDEX idx_waste_types_sort ON waste_types(archived, sort_order);
+
+      -- recurrence_kind picks which of weekdays / month_day is authoritative for a
+      -- schedule; the trailing CHECK keeps the other one NULL so a row can never
+      -- carry both or neither. month_day=-1 means "last day of the month" (mirrors
+      -- recurrence.js's own BYMONTHDAY=-1 convention); 1..31 means a fixed day, and
+      -- anchor_date's own day-of-month must equal it (enforced in waste-domain.js,
+      -- not here, since SQLite CHECK can't read a substring of another column
+      -- portably across the two representations the codebase already has).
+      CREATE TABLE waste_schedules (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        type_id          INTEGER NOT NULL REFERENCES waste_types(id),
+        recurrence_kind  TEXT    NOT NULL CHECK (recurrence_kind IN ('weekly', 'monthly_fixed_day')),
+        anchor_date      TEXT    NOT NULL,
+        interval         INTEGER NOT NULL DEFAULT 1 CHECK (interval BETWEEN 1 AND 52),
+        weekdays         TEXT,
+        month_day        INTEGER CHECK (month_day IS NULL OR month_day = -1 OR month_day BETWEEN 1 AND 31),
+        valid_until      TEXT,
+        active           INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+        created_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at       TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at       TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        CHECK (
+          (recurrence_kind = 'weekly' AND weekdays IS NOT NULL AND month_day IS NULL)
+          OR (recurrence_kind = 'monthly_fixed_day' AND month_day IS NOT NULL AND weekdays IS NULL)
+        )
+      );
+      CREATE TRIGGER trg_waste_schedules_updated_at AFTER UPDATE ON waste_schedules FOR EACH ROW BEGIN
+        UPDATE waste_schedules SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+      CREATE INDEX idx_waste_schedules_type_active ON waste_schedules(type_id, active);
+
+      -- One row per exception to a schedule's calculated occurrences.
+      -- replacement_date NULL = explicit skip; a date = moved. UNIQUE(schedule_id,
+      -- original_date) keeps a single calculated occurrence from carrying two
+      -- contradictory overrides.
+      CREATE TABLE waste_schedule_overrides (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        schedule_id       INTEGER NOT NULL REFERENCES waste_schedules(id) ON DELETE CASCADE,
+        original_date     TEXT    NOT NULL,
+        replacement_date  TEXT,
+        note              TEXT,
+        created_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        UNIQUE (schedule_id, original_date),
+        CHECK (replacement_date IS NULL OR replacement_date <> original_date)
+      );
+      CREATE TRIGGER trg_waste_schedule_overrides_updated_at AFTER UPDATE ON waste_schedule_overrides FOR EACH ROW BEGIN
+        UPDATE waste_schedule_overrides SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+      CREATE INDEX idx_waste_schedule_overrides_schedule ON waste_schedule_overrides(schedule_id);
+
+      -- A one-off is a domain fact (irregular/special collection), not a schedule
+      -- with a fake recurrence. UNIQUE(type_id, date) keeps re-adding the same
+      -- manual fact from silently duplicating an occurrence.
+      CREATE TABLE waste_one_off_pickups (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        type_id     INTEGER NOT NULL REFERENCES waste_types(id),
+        date        TEXT    NOT NULL,
+        note        TEXT,
+        created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        UNIQUE (type_id, date)
+      );
+      CREATE TRIGGER trg_waste_one_off_pickups_updated_at AFTER UPDATE ON waste_one_off_pickups FOR EACH ROW BEGIN
+        UPDATE waste_one_off_pickups SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+      CREATE INDEX idx_waste_one_off_pickups_type_date ON waste_one_off_pickups(type_id, date);
+    `,
+  },
+  {
+    version: 195,
+    description: 'ship the Waste collection module disabled by default (households opt in, #1063)',
+    up(db) {
+      // Same merge-not-replace pattern as migration 145 (Inventory) and 166
+      // (Schedule): a household may already have disabled other modules, and a
+      // blind INSERT OR REPLACE would silently re-enable them.
+      const row = db.prepare("SELECT value FROM sync_config WHERE key = 'disabled_modules'").get();
+
+      let disabled = [];
+      if (row?.value) {
+        try {
+          const parsed = JSON.parse(row.value);
+          if (Array.isArray(parsed)) disabled = parsed.filter((m) => typeof m === 'string');
+        } catch { /* a broken value is replaced, not honored */ }
+      }
+
+      if (disabled.includes('waste')) return;
+      disabled.push('waste');
+
+      db.prepare(`
+        INSERT INTO sync_config (key, value) VALUES ('disabled_modules', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+                                       updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+      `).run(JSON.stringify(disabled));
+    },
+  },
+  {
+    version: 196,
+    description: 'Waste collection: ICS import sources with health tracking (#1063 Phase 3)',
+    up: `
+      -- One row per imported file. version starts at 1 and is bumped on every
+      -- committed (re)import; content_hash is the sha256 of the raw ICS text
+      -- that produced the current committed snapshot, so a re-import preview
+      -- can tell "nothing changed" from "this differs" without diffing rows.
+      -- last_success_at is only touched on a successful commit (never cleared
+      -- by a later failed attempt), so "needs refresh" reads as
+      -- last_success_at stale/absent while last_error is set - never merely
+      -- from file age (invariant #6).
+      CREATE TABLE waste_sources (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind             TEXT    NOT NULL DEFAULT 'file' CHECK (kind IN ('file')),
+        name             TEXT    NOT NULL,
+        content_hash     TEXT    NOT NULL,
+        version          INTEGER NOT NULL DEFAULT 1,
+        coverage_start   TEXT,
+        coverage_end     TEXT,
+        last_import_at   TEXT,
+        last_success_at  TEXT,
+        last_error       TEXT,
+        created_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at       TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at       TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      CREATE TRIGGER trg_waste_sources_updated_at AFTER UPDATE ON waste_sources FOR EACH ROW BEGIN
+        UPDATE waste_sources SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+      CREATE INDEX idx_waste_sources_name ON waste_sources(name);
+    `,
+  },
+  {
+    version: 197,
+    description: 'Waste collection: ICS source label-to-type mappings (#1063 Phase 3)',
+    up: `
+      -- One row per distinct label (CATEGORIES tag, or SUMMARY when a feed
+      -- carries no categories) seen for a source. Exactly one of
+      -- (type_id set) / (ignored=1) is valid - a label is always either
+      -- mapped or explicitly excluded, never left ambiguous. Rows persist
+      -- across re-imports (UNIQUE on source_id+normalized_label) so a
+      -- reviewed decision is remembered and only resurfaced for review, not
+      -- re-asked, unless the label itself is new.
+      CREATE TABLE waste_source_mappings (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_id         INTEGER NOT NULL REFERENCES waste_sources(id) ON DELETE CASCADE,
+        original_label    TEXT    NOT NULL,
+        normalized_label  TEXT    NOT NULL,
+        type_id           INTEGER REFERENCES waste_types(id),
+        ignored           INTEGER NOT NULL DEFAULT 0 CHECK (ignored IN (0, 1)),
+        created_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        UNIQUE (source_id, normalized_label),
+        CHECK (
+          (ignored = 1 AND type_id IS NULL) OR (ignored = 0 AND type_id IS NOT NULL)
+        )
+      );
+      CREATE TRIGGER trg_waste_source_mappings_updated_at AFTER UPDATE ON waste_source_mappings FOR EACH ROW BEGIN
+        UPDATE waste_source_mappings SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+      CREATE INDEX idx_waste_source_mappings_source ON waste_source_mappings(source_id);
+    `,
+  },
+  {
+    version: 198,
+    description: 'Waste collection: committed imported pickups (#1063 Phase 3)',
+    up: `
+      -- One row per concrete pickup fact accepted by a committed import.
+      -- identity_key is the stable cross-reimport identity used to diff a
+      -- re-import into additions/changes/removals: the ICS UID (optionally
+      -- suffixed with the concrete date, for a recurring or overridden
+      -- VEVENT) when present, otherwise a deterministic fingerprint over the
+      -- label and date (opt-in allowMissingUid mode - see waste-import.js).
+      -- external_uid is kept separately, nullable, purely for display/
+      -- diagnostics. type_id carries no cascade: an imported pickup is a
+      -- reference that blocks type deletion exactly like a schedule or
+      -- one-off (invariant #5); only source_id cascades, so deleting a
+      -- source never touches another source's or manual data.
+      CREATE TABLE waste_imported_pickups (
+        id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_id          INTEGER NOT NULL REFERENCES waste_sources(id) ON DELETE CASCADE,
+        type_id            INTEGER NOT NULL REFERENCES waste_types(id),
+        identity_key       TEXT    NOT NULL,
+        external_uid       TEXT,
+        original_summary   TEXT,
+        date_key           TEXT    NOT NULL,
+        tz_note            TEXT,
+        created_at         TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at         TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        UNIQUE (source_id, identity_key)
+      );
+      CREATE TRIGGER trg_waste_imported_pickups_updated_at AFTER UPDATE ON waste_imported_pickups FOR EACH ROW BEGIN
+        UPDATE waste_imported_pickups SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+      CREATE INDEX idx_waste_imported_pickups_source ON waste_imported_pickups(source_id);
+      CREATE INDEX idx_waste_imported_pickups_type_date ON waste_imported_pickups(type_id, date_key);
+    `,
+  },
+  {
+    version: 199,
+    description: 'Waste collection: automatic ICS URL sources (#1063 Phase 7)',
+    // kind's CHECK only allowed 'file' (migration 196); widening it to add
+    // 'url' needs the CREATE+COPY+DROP+RENAME rebuild pattern used elsewhere
+    // in this file, since SQLite cannot ALTER an existing CHECK. The DROP
+    // TABLE step would otherwise cascade-delete every waste_source_mappings/
+    // waste_imported_pickups row through their ON DELETE CASCADE (the same
+    // hazard noted at migration 52's dms_accounts rebuild) - foreignKeysOff
+    // suspends FK enforcement for this migration only, and the framework's
+    // own foreign_key_check afterward fails the migration if anything was
+    // actually left dangling.
+    foreignKeysOff: true,
+    up(db) {
+      db.exec(`
+        CREATE TABLE waste_sources_new (
+          id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+          kind                     TEXT    NOT NULL DEFAULT 'file' CHECK (kind IN ('file', 'url')),
+          name                     TEXT    NOT NULL,
+          content_hash             TEXT    NOT NULL,
+          version                  INTEGER NOT NULL DEFAULT 1,
+          coverage_start           TEXT,
+          coverage_end             TEXT,
+          last_import_at           TEXT,
+          last_success_at          TEXT,
+          last_error               TEXT,
+          -- URL-only fields (NULL for kind='file'). url is the subscription
+          -- credential (invariant: never expose it to a user without write
+          -- access) - server/routes/waste/sources.js redacts it on read for
+          -- read-only callers, the same way caldav-sync.js keeps a password
+          -- out of its own list responses.
+          url                      TEXT,
+          etag                     TEXT,
+          last_modified            TEXT,
+          refresh_interval_minutes INTEGER NOT NULL DEFAULT 1440,
+          next_attempt_at          TEXT,
+          consecutive_failures     INTEGER NOT NULL DEFAULT 0,
+          -- Set when an auto-refresh fetched new content but could not
+          -- auto-commit (an unmapped label, or an unresolved blocking
+          -- diagnostic - neither may be decided automatically). The
+          -- scheduler skips a source while this is set; only a reviewed
+          -- manual refresh (same mapping wizard as file re-import) clears it.
+          needs_mapping            INTEGER NOT NULL DEFAULT 0 CHECK (needs_mapping IN (0, 1)),
+          created_by               INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          created_at               TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+          updated_at               TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+        );
+        INSERT INTO waste_sources_new (
+          id, kind, name, content_hash, version, coverage_start, coverage_end,
+          last_import_at, last_success_at, last_error, created_by, created_at, updated_at
+        )
+        SELECT id, kind, name, content_hash, version, coverage_start, coverage_end,
+               last_import_at, last_success_at, last_error, created_by, created_at, updated_at
+        FROM waste_sources;
+        DROP TABLE waste_sources;
+        ALTER TABLE waste_sources_new RENAME TO waste_sources;
+        CREATE TRIGGER trg_waste_sources_updated_at AFTER UPDATE ON waste_sources FOR EACH ROW BEGIN
+          UPDATE waste_sources SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+        CREATE INDEX idx_waste_sources_name ON waste_sources(name);
+        -- The scheduler's own "which sources are due" query (kind='url',
+        -- needs_mapping=0, next_attempt_at due).
+        CREATE INDEX idx_waste_sources_due ON waste_sources(kind, needs_mapping, next_attempt_at);
+      `);
+    },
+  },
+  {
+    version: 200,
+    description: 'Waste collection: per-user, per-type pickup reminders (#1063 Phase 8)',
+    // Same reminders-table rebuild pattern as migrations 137/141/148/162/177/
+    // 184/187 (widening entity_type's CHECK, which SQLite cannot ALTER) - this
+    // is the eighth. foreignKeysOff IS load-bearing here (audit finding M-11
+    // corrected this comment, which previously claimed otherwise):
+    // notification_deliveries.reminder_id REFERENCES reminders(id) ON DELETE
+    // CASCADE (see line ~2614) - without foreignKeysOff, this rebuild's own
+    // `DROP TABLE reminders` would cascade-delete every row in
+    // notification_deliveries, wiping delivery history for every reminder
+    // that had ever actually been pushed, not just the ones this migration
+    // touches.
+    foreignKeysOff: true,
+    up(db) {
+      db.exec(`
+        CREATE TABLE reminders_new (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          entity_type TEXT    NOT NULL CHECK(entity_type IN ('task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup')),
+          entity_id   INTEGER NOT NULL,
+          remind_at   TEXT    NOT NULL,
+          dismissed   INTEGER NOT NULL DEFAULT 0,
+          created_by  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+          pushed_at   TEXT,
+          assigned_from INTEGER REFERENCES users(id) ON DELETE SET NULL
+        );
+        INSERT INTO reminders_new (id, entity_type, entity_id, remind_at, dismissed, created_by, created_at, pushed_at, assigned_from)
+          SELECT id, entity_type, entity_id, remind_at, dismissed, created_by, created_at, pushed_at, assigned_from FROM reminders;
+        DROP TABLE reminders;
+        ALTER TABLE reminders_new RENAME TO reminders;
+        CREATE INDEX idx_reminders_entity ON reminders(entity_type, entity_id);
+        CREATE INDEX idx_reminders_remind ON reminders(remind_at);
+        CREATE INDEX idx_reminders_user ON reminders(created_by);
+        CREATE INDEX idx_reminders_assigned_from ON reminders(assigned_from);
+
+        -- Per (user, waste type) opt-in: enabled defaults on once a row
+        -- exists, but a row only exists once a user has touched this type's
+        -- settings at all (GET .../reminder-settings synthesizes an
+        -- all-disabled default for every type without a row - no household-
+        -- wide default-on that would silently start pushing to someone).
+        -- offset_days/delivery_time are this preference's own lead-time and
+        -- household-local delivery time, independent of any other module's
+        -- reminder settings (Schedule's users.schedule_reminder_offset_minutes
+        -- is a single household-wide-shaped scalar; Waste needs one lead time
+        -- PER TYPE PER USER, so it gets its own table instead of widening
+        -- that column's meaning).
+        CREATE TABLE waste_reminder_settings (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          type_id       INTEGER NOT NULL REFERENCES waste_types(id) ON DELETE CASCADE,
+          enabled       INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+          offset_days   INTEGER NOT NULL DEFAULT 1,
+          delivery_time TEXT    NOT NULL DEFAULT '08:00',
+          created_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+          updated_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+          UNIQUE (user_id, type_id)
+        );
+        CREATE TRIGGER trg_waste_reminder_settings_updated_at AFTER UPDATE ON waste_reminder_settings FOR EACH ROW BEGIN
+          UPDATE waste_reminder_settings SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+
+        -- Anchor table (same purpose as schedule_reminder_entries/
+        -- cycle_reminder_anchors): a Waste occurrence is computed on read,
+        -- not a stored row, so reminders.entity_id has nothing stable to
+        -- point at without this. One anchor per (user, type, date_key) -
+        -- exactly the coalesced occurrence identity waste-domain.js already
+        -- uses, so a moved/skipped/coalesced occurrence maps onto the same
+        -- or a cleanly different anchor, never a duplicate.
+        CREATE TABLE waste_reminder_entries (
+          id         INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          type_id    INTEGER NOT NULL REFERENCES waste_types(id) ON DELETE CASCADE,
+          date_key   TEXT    NOT NULL,
+          created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+          UNIQUE (user_id, type_id, date_key)
+        );
+        CREATE INDEX idx_waste_reminder_entries_user ON waste_reminder_entries(user_id);
+      `);
+    },
+  },
+  {
+    version: 201,
+    description: 'Waste collection: ordinal-weekday monthly schedules (#1063 Phase 9)',
+    // recurrence_kind's CHECK only allowed 'weekly'/'monthly_fixed_day' -
+    // widening it (and the compound CHECK below it) to add
+    // 'monthly_ordinal_weekday' needs the same CREATE+COPY+DROP+RENAME rebuild
+    // as every other CHECK-widening in this file. foreignKeysOff avoids the
+    // DROP TABLE step cascade-deleting every waste_schedule_overrides row
+    // through its own ON DELETE CASCADE (same hazard as migrations 52/199/200).
+    //
+    // NO NEW COLUMNS: an ordinal-weekday schedule reuses `weekdays` (exactly
+    // one code, e.g. 'MO' - not the CSV list a weekly schedule stores) and
+    // `month_day` (the ordinal position: -1 for "last", 1-4 for "nth" - its
+    // own CHECK already allows exactly this range, since 1-4 sits inside the
+    // existing "1 BETWEEN 1 AND 31" bound). `server/services/waste-domain.js`
+    // is what gives these two columns their new, kind-dependent meaning;
+    // `server/services/recurrence.js`'s own `bydayOrdinal` shape (added
+    // earlier in this same phase) is what actually computes the date.
+    foreignKeysOff: true,
+    up(db) {
+      db.exec(`
+        CREATE TABLE waste_schedules_new (
+          id               INTEGER PRIMARY KEY AUTOINCREMENT,
+          type_id          INTEGER NOT NULL REFERENCES waste_types(id),
+          recurrence_kind  TEXT    NOT NULL CHECK (recurrence_kind IN ('weekly', 'monthly_fixed_day', 'monthly_ordinal_weekday')),
+          anchor_date      TEXT    NOT NULL,
+          interval         INTEGER NOT NULL DEFAULT 1 CHECK (interval BETWEEN 1 AND 52),
+          weekdays         TEXT,
+          month_day        INTEGER CHECK (month_day IS NULL OR month_day = -1 OR month_day BETWEEN 1 AND 31),
+          valid_until      TEXT,
+          active           INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+          created_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          created_at       TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+          updated_at       TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+          CHECK (
+            (recurrence_kind = 'weekly' AND weekdays IS NOT NULL AND month_day IS NULL)
+            OR (recurrence_kind = 'monthly_fixed_day' AND month_day IS NOT NULL AND weekdays IS NULL)
+            OR (recurrence_kind = 'monthly_ordinal_weekday' AND month_day IS NOT NULL AND weekdays IS NOT NULL)
+          )
+        );
+        INSERT INTO waste_schedules_new SELECT * FROM waste_schedules;
+        DROP TABLE waste_schedules;
+        ALTER TABLE waste_schedules_new RENAME TO waste_schedules;
+        CREATE TRIGGER trg_waste_schedules_updated_at AFTER UPDATE ON waste_schedules FOR EACH ROW BEGIN
+          UPDATE waste_schedules SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+        CREATE INDEX idx_waste_schedules_type_active ON waste_schedules(type_id, active);
+      `);
+    },
+  },
+  {
+    version: 202,
+    description: 'Waste collection: revocable read-only ICS feed (#1063 Phase 10)',
+    // Same personal-token-over-household-content pattern as migrations 61
+    // (calendar_feed_token), 144 (inventory_deadlines_feed_token) and 176
+    // (schedule_feed_token): Waste types/schedules/pickups have no owner or
+    // visibility column, so the FEED CONTENT stays household-wide, but the
+    // TOKEN is per-user - a revoke costs exactly one subscription, not every
+    // subscriber's.
+    //
+    // waste_feed_type_ids is a nullable JSON array of waste_types.id, stored
+    // alongside the token (not as a query-string parameter on the public feed
+    // URL): a subscription URL is meant to stay stable across edits, and
+    // putting mutable selection state in the URL would force a new URL - and
+    // therefore a broken existing subscription - every time the selection
+    // changes. NULL means "every active type", mirroring the reminder
+    // settings default (no row = not yet touched = show everything).
+    up: `
+      ALTER TABLE users ADD COLUMN waste_feed_token TEXT;
+      ALTER TABLE users ADD COLUMN waste_feed_type_ids TEXT;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_waste_feed_token
+        ON users(waste_feed_token)
+        WHERE waste_feed_token IS NOT NULL;
+    `,
+  },
+  {
+    version: 203,
+    description: 'Waste collection: index waste types in the global FTS5 search_index (#1063 Phase 10)',
+    // Same trigger shape as migration 66 (medications/health_activities) and
+    // 68 (shopping_items). Deliberately indexes ONLY waste_types (the finite,
+    // stored catalog) - never anything waste-domain.js's expandSchedule()/
+    // resolveOccurrences() computes at read time. Those occurrences are
+    // unbounded (a weekly schedule has no last date until valid_until) and
+    // never materialize as rows; indexing them would mean either truncating
+    // the index at an arbitrary horizon or growing it forever. A concrete,
+    // dated pickup (waste_one_off_pickups/waste_imported_pickups) is the one
+    // other kind of stored, searchable Waste fact, but it has no independent
+    // title of its own (its "title" IS the type name) and Phase 10 asks for
+    // stable deep links to "types, sources, and concrete pickups" via the
+    // existing occurrence list, not a second index entity - so only the type
+    // catalog gets indexed here; concrete pickups are still reachable by
+    // searching their type's name and confirmed present in the Upcoming list.
+    up: `
+      CREATE TRIGGER trg_search_waste_types_ai AFTER INSERT ON waste_types BEGIN
+        INSERT INTO search_index (entity, entity_id, title, body)
+        VALUES ('waste_type', NEW.id, COALESCE(NEW.name, ''), '');
+      END;
+      CREATE TRIGGER trg_search_waste_types_ad AFTER DELETE ON waste_types BEGIN
+        DELETE FROM search_index WHERE entity = 'waste_type' AND entity_id = OLD.id;
+      END;
+      CREATE TRIGGER trg_search_waste_types_au AFTER UPDATE ON waste_types BEGIN
+        DELETE FROM search_index WHERE entity = 'waste_type' AND entity_id = OLD.id;
+        INSERT INTO search_index (entity, entity_id, title, body)
+        VALUES ('waste_type', NEW.id, COALESCE(NEW.name, ''), '');
+      END;
+
+      INSERT INTO search_index (entity, entity_id, title, body)
+        SELECT 'waste_type', id, COALESCE(name, ''), '' FROM waste_types;
+    `,
+  },
+  {
+    version: 204,
+    description: 'Waste collection: covering index for per-source pickup-health lookups (audit finding, no data change)',
+    // waste-store.js#decorateSourceHealth/listSources both run
+    // `WHERE source_id = ? AND date_key >= ?` (single source) or
+    // `WHERE date_key >= ? GROUP BY source_id` (every source) against
+    // waste_imported_pickups - neither existing index covers that:
+    // idx_waste_imported_pickups_source is source_id alone (no date_key), and
+    // idx_waste_imported_pickups_type_date (migration 198) is keyed on
+    // type_id, not source_id. Both queries fell back to the source-only
+    // index plus a per-row filter - fine at today's row counts (measured
+    // 18-36ms, see the audit report), a table scan by source count that grows
+    // with import history otherwise. A new index alongside the old ones
+    // (not a replacement - idx_waste_imported_pickups_source still serves
+    // deleteSource's un-filtered "does this source have any rows" shape).
+    up: `
+      CREATE INDEX idx_waste_imported_pickups_source_date ON waste_imported_pickups(source_id, date_key);
+    `,
+  },
+  {
+    version: 205,
+    description: 'Schedule: an explicit toggle to turn overtime tracking off entirely (UX audit S-24)',
+    up: `
+      -- NULL/1 = an (Vorgabe, kein stiller Verhaltenswechsel fuer Bestandshaushalte),
+      -- 0 = aus. Ein eigener Schalter statt schedule_weekly_hours selbst auf 0 zu
+      -- erlauben: 0 als "aus" gelesen zwingt jede lesende Stelle, sich diese
+      -- Sonderbedeutung zu merken, und ein Sollwert von 0 Stunden ist ohnehin keine
+      -- gueltige Vollzeit-/Teilzeit-Angabe (der Server weist 0 seit jeher als
+      -- ungueltig zurueck - das bewusst NICHT umgedeutet, siehe PLAN.md D-C).
+      ALTER TABLE users ADD COLUMN schedule_overtime_enabled INTEGER;
+    `,
+  },
 ];
 
 /**

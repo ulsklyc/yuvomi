@@ -3,9 +3,16 @@ import express from 'express';
 import * as db from '../db.js';
 import { bool, color, collectErrors, date, id, num, str, time } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
-import { resolveEntries, dateKeysInRange } from '../services/schedule.js';
+import { dateKeysInRange, scheduleData, fieldsForShiftTypes, fieldValuesFor, typeColumns } from '../services/schedule.js';
+// Re-Export fuer bestehende Importe (routes/schedule-extras.js, Tests): die
+// Definitionen liegen seit dem Zyklus-Bruch in services/schedule.js - dieser
+// Router importiert den Reminder-Sync, der Sync braucht scheduleData(), und
+// beides aus DIESER Datei waere genau der Rueckimport-Zyklus, den
+// routes/schedule-extras.js' eigener Kopfkommentar seit jeher vermeidet.
+export { scheduleData, fieldValuesFor } from '../services/schedule.js';
 import { daysBetweenDateKeys } from '../utils/timezone.js';
 import { isHouseholdMember } from '../services/member-email.js';
+import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js';
 
 const router = express.Router();
 const log = createLogger('Schedule');
@@ -72,7 +79,6 @@ const ownTypeOrAdmin = (req, type) => isAdmin(req) || (type.created_by != null &
 export function isStillReferenced(err) {
   return String(err?.code || '').startsWith('SQLITE_CONSTRAINT');
 }
-const typeColumns = 'id, name, short_code, start_time, end_time, color, icon, created_by, created_at, updated_at';
 
 // Der Zeitraum von `/entries` muss eine Obergrenze haben: `dateKeysInRange()`
 // baut EINEN String je Tag, und `resolveEntries()` laeuft ihn je Haushaltsmitglied
@@ -96,76 +102,17 @@ const MAX_RANGE_DAYS = 731;
 // sie keine Schatten-Rotation traegt.
 const MAX_FILL_DAYS = 100;
 
-// Exportiert fuer server/services/schedule-ics.js: derselbe Ausloese-Weg
-// (Muster + Ausnahmen zum Lesezeitpunkt aufgeloest, Schichttyp eingebettet)
-// statt einer zweiten Fassung, die bei der naechsten Aenderung hier
-// auseinanderlaeuft.
-export function scheduleData(from, to, userId) {
-  const database = db.get();
-  const condition = userId ? 'AND user_id = ?' : '';
-  const patterns = database.prepare(`SELECT * FROM schedule_patterns WHERE is_active = 1
-    AND (valid_from IS NULL OR valid_from <= ?) AND (valid_until IS NULL OR valid_until >= ?) ${condition}
-    ORDER BY user_id, valid_from DESC, id DESC`).all(...(userId ? [to, from, userId] : [to, from]));
-  // Ein Zyklustag kann mehrere Zeilen tragen (Stundenplan, mehrere Klassen am
-  // selben Tag) - deshalb ein Array je Schluessel, nicht die letzte Zeile
-  // gewinnt wie frueher.
-  const patternDays = new Map();
-  if (patterns.length) {
-    const ids = patterns.map((p) => p.id);
-    for (const row of database.prepare(`SELECT * FROM schedule_pattern_days WHERE pattern_id IN (${ids.map(() => '?').join(',')})`).all(...ids)) {
-      const key = `${row.pattern_id}:${row.position}`;
-      if (patternDays.has(key)) patternDays.get(key).push(row);
-      else patternDays.set(key, [row]);
-    }
-  }
-  const users = userId ? [userId] : database.prepare('SELECT id FROM users ORDER BY id').all().map((row) => row.id);
-  const entries = []; const warnings = [];
-  for (const memberId of users) {
-    const overrides = database.prepare('SELECT * FROM schedule_overrides WHERE user_id = ? AND date_key BETWEEN ? AND ?').all(memberId, from, to);
-    const resolved = resolveEntries({ from, to, userId: memberId, patterns: patterns.filter((p) => p.user_id === memberId), patternDays, overrides });
-    entries.push(...resolved.entries); warnings.push(...resolved.warnings);
-    // Additiv zum Ergebnis von resolveEntries(), nie ein Ersatz dafuer: ein
-    // Extra (Bereitschaft neben einer regulaeren Schicht) zaehlt unabhaengig
-    // davon, ob der Tag ueberhaupt eine primaere Schicht hat. Deshalb kein
-    // Umweg ueber resolveEntries()'s Tag-fuer-Tag-Schleife - eine
-    // schedule_extra_shifts-Zeile ist schon eine fertige Tatsache fuer genau
-    // dieses Datum, es gibt nichts an ihr aufzuloesen.
-    const extras = database.prepare('SELECT * FROM schedule_extra_shifts WHERE user_id = ? AND date_key BETWEEN ? AND ?').all(memberId, from, to);
-    for (const row of extras) {
-      entries.push({ user_id: memberId, date_key: row.date_key, source: 'extra', extra_id: row.id,
-        shift_type_id: row.shift_type_id, note: row.note ?? null, reminder_offset_minutes: row.reminder_offset_minutes, is_free: false });
-    }
-  }
-  const typeIds = [...new Set(entries.map((entry) => entry.shift_type_id).filter(Boolean))];
-  const types = new Map();
-  if (typeIds.length) for (const row of database.prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id IN (${typeIds.map(() => '?').join(',')})`).all(...typeIds)) types.set(row.id, row);
-  // Ein zweiter, unabhaengiger Aufruf gegenueber GET /shift-types - diese
-  // Funktion baut ihre eigene types-Map fuer nur die Typen, die im Zeitraum
-  // TATSAECHLICH aufgeloest wurden, nicht fuer alle Typen des Haushalts.
-  const typeFields = fieldsForShiftTypes(typeIds);
-  // Werte je Herkunftsart getrennt nachgeschlagen (ein Aufruf je Art statt
-  // N+1 je Eintrag) - welche Id-Spalte zaehlt, haengt von entry.source ab.
-  const patternDayValues = fieldValuesFor('pattern_day', entries.filter((e) => e.source === 'pattern' && e.pattern_day_id != null).map((e) => e.pattern_day_id));
-  const overrideValues = fieldValuesFor('override', entries.filter((e) => e.source === 'override').map((e) => e.override_id));
-  const extraValues = fieldValuesFor('extra_shift', entries.filter((e) => e.source === 'extra').map((e) => e.extra_id));
-  const fieldValuesForEntry = (entry) => {
-    if (entry.source === 'pattern') return patternDayValues.get(entry.pattern_day_id) ?? {};
-    if (entry.source === 'override') return overrideValues.get(entry.override_id) ?? {};
-    return extraValues.get(entry.extra_id) ?? {};
-  };
-  return {
-    entries: entries.map((entry) => {
-      const type = entry.shift_type_id ? types.get(entry.shift_type_id) : null;
-      return {
-        ...entry,
-        shift_type: type ? { ...type, fields: typeFields.get(type.id) ?? [] } : null,
-        crosses_midnight: Boolean(type?.start_time && type?.end_time && type.end_time <= type.start_time),
-        field_values: fieldValuesForEntry(entry),
-      };
-    }),
-    warnings,
-  };
-}
+// `PUT /patterns/:id/days` ersetzt IMMER das ganze Muster in einem Rutsch, und
+// `scheduleData()` (services/schedule.js) loest jede Zeile fuer jeden passenden Zyklustag zu
+// einem eigenen Entry auf - das trifft GET /entries, den ICS-Feed, den
+// Kalender-Overlay und das Dashboard gleichermassen. Ein Stundenplan (der
+// Grund fuer "mehrere Zeilen je Position", siehe unten) hat hoechstens rund
+// zehn Zeilen je Tag ueber hoechstens rund vierzehn Positionen (zwei Wochen,
+// A/B) - einige hundert Zeilen decken das grosszuegig, ohne eine Zeile je
+// Position ueber den vollen 366-Tage-Zyklus zuzulassen, was keine echte
+// Zeitplanung mehr waere, sondern gespeicherte Lese-Verstaerkung.
+const MAX_PATTERN_DAY_ROWS = 500;
+
 
 router.get('/entries', (req, res) => {
   const from = date(req.query.from, 'from', true); const to = date(req.query.to, 'to', true);
@@ -184,25 +131,6 @@ router.get('/entries', (req, res) => {
   }
 });
 
-// Liefert je Schichttyp-Id die an ihm haengenden Felder (Migration 189), sortiert nach ihrer
-// gespeicherten Anzeige-Reihenfolge. Eine Map statt einer flachen Liste, weil der Aufrufer sie
-// je Schichttyp-Zeile braucht.
-function fieldsForShiftTypes(typeIds) {
-  const map = new Map();
-  if (!typeIds.length) return map;
-  const rows = db.get().prepare(`
-    SELECT stf.shift_type_id, cf.id, cf.name, stf.position, stf.show_in_overlay
-    FROM schedule_shift_type_fields stf
-    JOIN schedule_custom_fields cf ON cf.id = stf.custom_field_id
-    WHERE stf.shift_type_id IN (${typeIds.map(() => '?').join(',')})
-    ORDER BY stf.shift_type_id, stf.position
-  `).all(...typeIds);
-  for (const row of rows) {
-    if (!map.has(row.shift_type_id)) map.set(row.shift_type_id, []);
-    map.get(row.shift_type_id).push({ id: row.id, name: row.name, position: row.position, show_in_overlay: Boolean(row.show_in_overlay) });
-  }
-  return map;
-}
 // Bettet die eigenen Felder in EINE Schichttyp-Zeile ein - dasselbe fieldsForShiftTypes(), nur fuer
 // den Ein-Zeilen-Fall (create/update), damit eine Antwort nach POST/PUT dieselbe Form traegt wie
 // eine Zeile aus der Liste, statt "fields" nur dort zu zeigen, wo ohnehin schon gelistet wird.
@@ -233,9 +161,17 @@ export function validateFieldValues(raw, shiftTypeId) {
   if (shiftTypeId == null) return { values: [], error: 'field_values requires a shift_type_id.' };
   const attached = new Set(db.get().prepare('SELECT custom_field_id FROM schedule_shift_type_fields WHERE shift_type_id = ?').all(shiftTypeId).map((r) => r.custom_field_id));
   const values = [];
+  // `id()` normalisiert per parseInt - "1" und "01" liefern denselben
+  // Schluessel. Ungeprueft wuerden beide Zeilen bis zum insert kommen und dort
+  // an UNIQUE(entry_type,entry_id,custom_field_id) scheitern, als roher 500er,
+  // nachdem der Aufrufer schon einen Teil geschrieben hat - deshalb hier
+  // vorher abgewiesen, wie das Anheften bei shift-types/:id/fields es auch tut.
+  const seen = new Set();
   for (const key of keys) {
     const fieldId = id(key, 'field_values key');
     if (fieldId.error) return { values: [], error: fieldId.error };
+    if (seen.has(fieldId.value)) return { values: [], error: `field ${key} must not repeat.` };
+    seen.add(fieldId.value);
     if (!attached.has(fieldId.value)) return { values: [], error: `field ${key} is not attached to this shift type.` };
     const parsed = fieldValue(raw[key]);
     if (parsed.error) return { values: [], error: parsed.error };
@@ -253,17 +189,6 @@ export function replaceFieldValues(entryType, entryId, values) {
   if (!values.length) return;
   const insert = db.get().prepare('INSERT INTO schedule_custom_field_values (entry_type, entry_id, custom_field_id, value) VALUES (?, ?, ?, ?)');
   for (const [fieldId, value] of values) insert.run(entryType, entryId, fieldId, value);
-}
-/** Batch-Nachschlag ueber mehrere Vorkommen derselben Art, ohne N+1. */
-export function fieldValuesFor(entryType, entryIds) {
-  const map = new Map();
-  if (!entryIds.length) return map;
-  const rows = db.get().prepare(`SELECT entry_id, custom_field_id, value FROM schedule_custom_field_values WHERE entry_type = ? AND entry_id IN (${entryIds.map(() => '?').join(',')})`).all(entryType, ...entryIds);
-  for (const row of rows) {
-    if (!map.has(row.entry_id)) map.set(row.entry_id, {});
-    map.get(row.entry_id)[row.custom_field_id] = row.value;
-  }
-  return map;
 }
 router.get('/shift-types', (_req, res) => {
   const types = db.get().prepare(`SELECT ${typeColumns} FROM schedule_shift_types ORDER BY name COLLATE NOCASE`).all();
@@ -355,8 +280,20 @@ router.put('/overrides/:dateKey', (req, res) => {
   const errors = collectErrors([key, user, typeId, note].filter(Boolean)); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); if (typeId && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.'); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.');
   const fields = validateFieldValues(req.body?.field_values, typeId?.value ?? null); if (fields.error) errors.push(fields.error);
   if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });
-  const row = db.get().prepare('INSERT INTO schedule_overrides (user_id, date_key, shift_type_id, note) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, date_key) DO UPDATE SET shift_type_id = excluded.shift_type_id, note = excluded.note RETURNING *').get(user.value, key.value, typeId?.value ?? null, note.value);
-  replaceFieldValues('override', row.id, fields.values);
+  // Upsert und replaceFieldValues() in EINER Transaktion: ohne sie stand der
+  // Override schon geschrieben, bevor replaceFieldValues() ueberhaupt lief -
+  // ein Wurf dazwischen (z.B. eine spaeter doch noch durchrutschende doppelte
+  // Feld-Id) liess die erste Zeile committed und den Aufruf trotzdem mit einem
+  // 500er scheitern. `field_values` fehlt im Body ganz = gespeicherte Werte
+  // bleiben unangetastet (wie PUT /extras/:id); nur ein ausdruecklich
+  // mitgeschicktes Objekt, auch `{}`, ersetzt sie.
+  const row = db.get().transaction(() => {
+    const upserted = db.get().prepare('INSERT INTO schedule_overrides (user_id, date_key, shift_type_id, note) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, date_key) DO UPDATE SET shift_type_id = excluded.shift_type_id, note = excluded.note RETURNING *').get(user.value, key.value, typeId?.value ?? null, note.value);
+    if (req.body?.field_values !== undefined) replaceFieldValues('override', upserted.id, fields.values);
+    return upserted;
+  })();
+  try { syncScheduleRemindersForUser(db.get(), user.value); }
+  catch (err) { log.error('Error resyncing schedule reminders after override write:', err.message); }
   res.json({ data: { ...row, field_values: fieldValuesFor('override', [row.id]).get(row.id) ?? {} } });
 });
 
@@ -433,7 +370,17 @@ router.delete('/patterns/:id', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare('SELECT * FROM schedule_patterns WHERE id=?').get(key.value);
   if (!old) return fail(res, 404, 'Pattern not found.'); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
-  db.get().prepare('DELETE FROM schedule_patterns WHERE id=?').run(old.id); return res.status(204).end();
+  // Die Zyklustage kaskadieren mit dem Muster weg (FK CASCADE), ihre
+  // schedule_custom_field_values-Zeilen nicht (polymorph, kein echter
+  // Fremdschluessel, siehe Migration 189) - deshalb hier dieselbe Reihenfolge
+  // wie PUT /patterns/:id/days: Werte ueber die NOCH bekannten Tag-Ids zuerst
+  // weg, dann das Muster (das die Tage mitreisst), alles in einer Transaktion.
+  db.get().transaction(() => {
+    const dayIds = db.get().prepare('SELECT id FROM schedule_pattern_days WHERE pattern_id=?').all(old.id).map((row) => row.id);
+    if (dayIds.length) db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id IN (${dayIds.map(() => '?').join(',')})`).run(...dayIds);
+    db.get().prepare('DELETE FROM schedule_patterns WHERE id=?').run(old.id);
+  })();
+  return res.status(204).end();
 });
 router.get('/patterns/:id/days', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
@@ -457,6 +404,7 @@ router.put('/patterns/:id/days', (req, res) => {
   const old = db.get().prepare('SELECT * FROM schedule_patterns WHERE id=?').get(key.value);
   if (!old) return fail(res, 404, 'Pattern not found.'); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
   if (!Array.isArray(req.body?.days)) return fail(res, 400, 'days must be an array.');
+  if (req.body.days.length > MAX_PATTERN_DAY_ROWS) return fail(res, 400, `days must not exceed ${MAX_PATTERN_DAY_ROWS} rows.`);
   const days = [];
   for (const row of req.body.days) {
     const position = num(row?.position, 'position', { required: true }); const shiftType = row?.shift_type_id == null ? null : id(row.shift_type_id, 'shift_type_id');
@@ -538,6 +486,8 @@ router.post('/overrides/fill', (req, res) => {
       replaceFieldValues('override', row.id, fields.values);
     }
   })();
+  try { syncScheduleRemindersForUser(db.get(), user.value); }
+  catch (err) { log.error('Error resyncing schedule reminders after override fill:', err.message); }
   res.json({ data: { updated: keys.length } });
 });
 
@@ -569,6 +519,10 @@ router.delete('/overrides', (req, res) => {
     db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id IN (SELECT id FROM schedule_overrides WHERE user_id=? AND date_key BETWEEN ? AND ?)`).run(user.value, from.value, to.value);
     return db.get().prepare('DELETE FROM schedule_overrides WHERE user_id=? AND date_key BETWEEN ? AND ?').run(user.value, from.value, to.value);
   })();
+  if (result.changes) {
+    try { syncScheduleRemindersForUser(db.get(), user.value); }
+    catch (err) { log.error('Error resyncing schedule reminders after override range delete:', err.message); }
+  }
   res.json({ data: { deleted: result.changes } });
 });
 
@@ -579,7 +533,10 @@ router.delete('/overrides/:dateKey', (req, res) => {
     db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id IN (SELECT id FROM schedule_overrides WHERE user_id=? AND date_key=?)`).run(user.value, key.value);
     return db.get().prepare('DELETE FROM schedule_overrides WHERE user_id=? AND date_key=?').run(user.value, key.value);
   })();
-  return result.changes ? res.status(204).end() : fail(res, 404, 'Override not found.');
+  if (!result.changes) return fail(res, 404, 'Override not found.');
+  try { syncScheduleRemindersForUser(db.get(), user.value); }
+  catch (err) { log.error('Error resyncing schedule reminders after override delete:', err.message); }
+  return res.status(204).end();
 });
 
 export default router;

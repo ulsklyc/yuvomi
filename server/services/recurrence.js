@@ -7,11 +7,26 @@
 
 const DAY_MAP = { MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 0 };
 
+// Ein BYDAY-Token trägt optional eine Ordinalzahl voran ("2MO" = zweiter
+// Montag, "-1FR" = letzter Freitag). Nur bei FREQ=MONTHLY sinnvoll (RFC 5545
+// erlaubt es auch bei YEARLY, das bleibt hier bewusst aussen vor - #960s
+// eigene Regel: nur lesen, was sich vollstaendig und ohne Klemmen/Ausfallen
+// ausrechnen laesst).
+const BYDAY_TOKEN_RE = /^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$/;
+// NUR 1 BIS 4 UND -1. Jeder Monat hat MINDESTENS vier Vorkommen jedes
+// Wochentags (der laengste Abstand zwischen Monatsanfang und dem ersten
+// Treffer ist sechs Tage, plus drei weitere Wochen sind es hoechstens 28) -
+// das vierte und das letzte liegen deshalb IMMER innerhalb des Monats. Ein
+// "5." nicht: der existiert nur in manchen Monaten, und das waere wieder das
+// Klemmen-oder-Ausfallen-Problem, das dieser Datei schon bei BYMONTHDAY=31
+// den Verzicht wert war.
+const ORDINAL_BYDAY_VALUES = new Set([-1, 1, 2, 3, 4]);
+
 /**
  * Parsed einen RRULE-String in ein Objekt.
  * Beispiel: "FREQ=WEEKLY;BYDAY=MO,TH;INTERVAL=1;COUNT=10"
  * @param {string} rule
- * @returns {{ freq, interval, byday, until, count }|null}
+ * @returns {{ freq, interval, byday, until, count, bymonthday, bydayOrdinal }|null}
  */
 function parseRRule(rule) {
   if (!rule) return null;
@@ -27,9 +42,30 @@ function parseRRule(rule) {
   const freq     = parts.FREQ ?? null;
   const freqRaw  = String(freq ?? '').toUpperCase();
   const interval = parseInt(parts.INTERVAL ?? '1', 10) || 1;
-  const byday    = (parts.BYDAY ?? '').split(',')
-    .map((d) => DAY_MAP[d.trim().toUpperCase()])
-    .filter((d) => d !== undefined);
+  // Jedes Token einzeln lesen: ein waagerechtes Ordinal-Praefix ("2MO") faellt
+  // beim reinen DAY_MAP-Zugriff still durch (unveraendertes Verhalten fuer
+  // jede Regel, die dieses Modul nicht als vollstaendig ordinal erkennt -
+  // siehe bydayOrdinal unten). `byday` bleibt deshalb genau die Menge der
+  // NICHT-ordinalen Tage, wie bisher.
+  const byDayEntries = (parts.BYDAY ?? '').split(',')
+    .map((d) => d.trim().toUpperCase())
+    .filter(Boolean)
+    .map((tok) => {
+      const m = BYDAY_TOKEN_RE.exec(tok);
+      if (!m) return null;
+      return { ordinal: m[1] ? parseInt(m[1], 10) : null, weekday: DAY_MAP[m[2]] };
+    })
+    .filter((e) => e !== null);
+  const byday = byDayEntries.filter((e) => e.ordinal === null).map((e) => e.weekday);
+  // NUR EIN EINZELNES ORDINAL-TOKEN, UND NUR BEI MONTHLY. Mehrere ordinale
+  // Tage ("2MO,2TU") oder ein ordinales Token neben einem einfachen sind
+  // Kombinationen, die dieses Modul nicht rechnet - dieselbe Zurueckhaltung
+  // wie bei BYMONTHDAY: lieber gar nicht lesen als falsch rechnen.
+  let bydayOrdinal = null;
+  if (freqRaw === 'MONTHLY' && byDayEntries.length === 1 && byDayEntries[0].ordinal !== null
+    && ORDINAL_BYDAY_VALUES.has(byDayEntries[0].ordinal)) {
+    bydayOrdinal = { ordinal: byDayEntries[0].ordinal, weekday: byDayEntries[0].weekday };
+  }
   const until    = parts.UNTIL ? parseUntilDate(parts.UNTIL) : null;
   // COUNT begrenzt die Serie auf N Vorkommen (DTSTART = Vorkommen 1). Der
   // stateless nextOccurrence() kann COUNT nicht selbst durchsetzen – das
@@ -54,7 +90,35 @@ function parseRRule(rule) {
 
   if (!['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'].includes(freq)) return null;
 
-  return { freq, interval, byday, until, count, bymonthday };
+  return { freq, interval, byday, until, count, bymonthday, bydayOrdinal };
+}
+
+/**
+ * Der Tag im Zielmonat fuer eine ordinale BYDAY-Regel ("2MO", "-1FR").
+ * `ordinal` ist -1 (letzter) oder 1-4 (n-ter) - beide Faelle liegen laut
+ * `ORDINAL_BYDAY_VALUES`s eigener Begruendung IMMER innerhalb des Monats,
+ * keine Klemmung noetig.
+ * @param {number} year
+ * @param {number} month  0-basiert, darf > 11 sein (Date.UTC normalisiert)
+ * @param {number} weekday 0 (So) - 6 (Sa)
+ * @param {number} ordinal -1 oder 1-4
+ * @returns {number} Tag im Monat (1-28)
+ */
+function nthWeekdayOfMonth(year, month, weekday, ordinal) {
+  if (ordinal === -1) {
+    const lastDate = new Date(Date.UTC(year, month + 1, 0));
+    const diff = (lastDate.getUTCDay() - weekday + 7) % 7;
+    return lastDate.getUTCDate() - diff;
+  }
+  const firstDate = new Date(Date.UTC(year, month, 1));
+  const diff = (weekday - firstDate.getUTCDay() + 7) % 7;
+  return 1 + diff + (ordinal - 1) * 7;
+}
+
+/** Ist `day` (ein Date in UTC-Tagesgranularitaet) das n-te/letzte `weekday` seines eigenen Monats? */
+function isNthWeekdayOfMonth(day, weekday, ordinal) {
+  if (day.getUTCDay() !== weekday) return false;
+  return day.getUTCDate() === nthWeekdayOfMonth(day.getUTCFullYear(), day.getUTCMonth(), weekday, ordinal);
 }
 
 /**
@@ -193,27 +257,45 @@ function nextOccurrence(baseDateStr, rrule, {
     // Monate, erledigt am 10. Maerz" den 31. Maerz machen statt des 30. Juni.
     const year  = base.getUTCFullYear();
     let   month = base.getUTCMonth() + interval;
-    if (parsed.bymonthday === -1 && !fromArbitraryDate && !utcDiffersFromLocal) {
-      const letzterImBasismonat = new Date(Date.UTC(year, base.getUTCMonth() + 1, 0)).getUTCDate();
-      if (base.getUTCDate() < letzterImBasismonat) month = base.getUTCMonth();
+    let targetDay;
+    if (parsed.bydayOrdinal) {
+      // ORDINALE BYDAY-REGEL ("2MO", "-1FR"): derselbe "kann im selben Monat
+      // liegen"-Fall wie BYMONTHDAY=-1 unten, aus demselben Grund - eine am
+      // 1. angelegte "zweiter Montag"-Serie soll den zweiten Montag DIESES
+      // Monats liefern, nicht den des Folgemonats.
+      const { weekday, ordinal } = parsed.bydayOrdinal;
+      if (!fromArbitraryDate && !utcDiffersFromLocal) {
+        const targetInBaseMonth = nthWeekdayOfMonth(year, base.getUTCMonth(), weekday, ordinal);
+        if (base.getUTCDate() < targetInBaseMonth) month = base.getUTCMonth();
+      }
+      targetDay = nthWeekdayOfMonth(year, month, weekday, ordinal);
+    } else {
+      // DAS NAECHSTE VORKOMMEN KANN IM SELBEN MONAT LIEGEN. Bei `BYMONTHDAY=-1`
+      // und einem Basisdatum vor dem Monatsletzten ist der naechste Termin
+      // dieser Monatsletzte, nicht der des Folgemonats - sonst faellt er ganz
+      // aus (siehe Modulkopf-Kommentar oben fuer das volle Beispiel).
+      if (parsed.bymonthday === -1 && !fromArbitraryDate && !utcDiffersFromLocal) {
+        const letzterImBasismonat = new Date(Date.UTC(year, base.getUTCMonth() + 1, 0)).getUTCDate();
+        if (base.getUTCDate() < letzterImBasismonat) month = base.getUTCMonth();
+      }
+      const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+      // BEI EINER SERIE MIT EIGENER ZONE WIRD DIE ANGABE GAR NICHT ANGEWANDT.
+      // Sie meint einen LOKALEN Monatsletzten, gerechnet wird hier aber auf
+      // UTC-Tagen - ein Termin am 31. Januar um 20:00 New Yorker Zeit liegt in
+      // UTC am 1. Februar, und die Rechnung machte daraus den 27. Februar lokal.
+      // Ohne sie laeuft die Serie auf ihrem festen UTC-Tag weiter, und der
+      // gleichbleibende Versatz trifft den lokalen Monatsletzten von selbst.
+      // Yuvomis eigene Termine sind davon nicht betroffen: sie tragen keine
+      // fremde Zone, also stimmt ihr UTC-Tag mit dem lokalen ueberein.
+      //
+      // WAS DAS NICHT LOEST: ueber eine Sommerzeitumstellung hinweg trifft der
+      // feste UTC-Tag den lokalen Monatsletzten NICHT mehr - eine New Yorker
+      // Serie am 31.01. 23:30 landet nach der Umstellung auf dem 1. April statt
+      // dem 31. Maerz. Dafuer muesste die Expansion in der Ereigniszone rechnen
+      // und je Vorkommen zurueckrechnen; das ist ein eigener Vorgang.
+      const wirksam = utcDiffersFromLocal ? null : parsed.bymonthday;
+      targetDay = monthDayFor(wirksam, lastDay, anchorDay ?? base.getUTCDate());
     }
-    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-    // BEI EINER SERIE MIT EIGENER ZONE WIRD DIE ANGABE GAR NICHT ANGEWANDT.
-    // Sie meint einen LOKALEN Monatsletzten, gerechnet wird hier aber auf
-    // UTC-Tagen - ein Termin am 31. Januar um 20:00 New Yorker Zeit liegt in
-    // UTC am 1. Februar, und die Rechnung machte daraus den 27. Februar lokal.
-    // Ohne sie laeuft die Serie auf ihrem festen UTC-Tag weiter, und der
-    // gleichbleibende Versatz trifft den lokalen Monatsletzten von selbst.
-    // Yuvomis eigene Termine sind davon nicht betroffen: sie tragen keine
-    // fremde Zone, also stimmt ihr UTC-Tag mit dem lokalen ueberein.
-    //
-    // WAS DAS NICHT LOEST: ueber eine Sommerzeitumstellung hinweg trifft der
-    // feste UTC-Tag den lokalen Monatsletzten NICHT mehr - eine New Yorker
-    // Serie am 31.01. 23:30 landet nach der Umstellung auf dem 1. April statt
-    // dem 31. Maerz. Dafuer muesste die Expansion in der Ereigniszone rechnen
-    // und je Vorkommen zurueckrechnen; das ist ein eigener Vorgang.
-    const wirksam = utcDiffersFromLocal ? null : parsed.bymonthday;
-    const targetDay = monthDayFor(wirksam, lastDay, anchorDay ?? base.getUTCDate());
     next.setTime(Date.UTC(year, month, targetDay));
 
   } else if (freq === 'YEARLY') {
@@ -284,8 +366,11 @@ const CATCH_UP_STEPS = 2000;
  * @returns {string} das Datum, ab dem weitergezählt wird (nie hinter notBefore)
  */
 function fastForward(fromKey, parsed, notBeforeKey) {
-  const { freq, interval, byday } = parsed;
-  if (byday.length) return fromKey;
+  const { freq, interval, byday, bydayOrdinal } = parsed;
+  // Eine ordinale BYDAY-Regel laeuft so wenig auf einem festen Kalenderraster
+  // wie eine mit BYDAY-Wochentagsfilter (Kommentar unten) - "zweiter Montag"
+  // ist nicht "plus ein Monat" auf einem festen Tag.
+  if (byday.length || bydayOrdinal) return fromKey;
 
   const from = new Date(`${fromKey}T00:00:00Z`);
   const to   = new Date(`${notBeforeKey}T00:00:00Z`);
@@ -390,8 +475,12 @@ function nextOccurrenceAfter(baseDateStr, rrule, notBeforeStr, { seriesStart = n
  * @returns {string|null} YYYY-MM-DD
  */
 function lastOccurrenceOf(seriesStart, parsed) {
-  const { freq, interval, byday, count, bymonthday } = parsed;
-  if (!count || byday.length) return null;
+  const { freq, interval, byday, count, bymonthday, bydayOrdinal } = parsed;
+  // Dieselbe Zurueckhaltung wie bei BYDAY: das n-te Vorkommen einer ordinalen
+  // Regel ab dem Serienstart zu zaehlen ist keine feste Intervall-Multiplikation
+  // (ein "zweiter Montag" verschiebt sich pro Monat um einen anderen Betrag) -
+  // lieber unbegrenzt als falsch begrenzt.
+  if (!count || byday.length || bydayOrdinal) return null;
 
   const start = new Date(`${String(seriesStart).slice(0, 10)}T00:00:00Z`);
   if (isNaN(start.getTime())) return null;
@@ -505,6 +594,13 @@ function matchesRRuleByday(dateStr, rrule, { utcDiffersFromLocal = false } = {})
     if (day.getUTCDate() !== letzter) return false;
   }
 
+  // Dieselbe Begruendung wie beim BYMONTHDAY-Zweig darueber, fuer eine
+  // ordinale BYDAY-Regel ("2MO", "-1FR"): ein DTSTART, das nicht der zweite
+  // Montag seines Monats ist, ist kein Vorkommen.
+  if (parsed.bydayOrdinal && !utcDiffersFromLocal) {
+    if (!isNthWeekdayOfMonth(day, parsed.bydayOrdinal.weekday, parsed.bydayOrdinal.ordinal)) return false;
+  }
+
   if (parsed.byday.length === 0) return true;
   return parsed.byday.includes(day.getUTCDay());
 }
@@ -546,7 +642,11 @@ function hasAnyOccurrence(dateKey, rrule, { utcDiffersFromLocal = false } = {}) 
   if (!dateKey || !rrule) return true;
   const tag = String(dateKey).slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(tag)) return true;
-  if (parseRRule(rrule)?.bymonthday !== -1) return true;
+  const parsed = parseRRule(rrule);
+  // Dieselbe Frage gilt fuer eine ordinale BYDAY-Regel wie fuer BYMONTHDAY=-1:
+  // ein DTSTART vor dem UNTIL kann trotzdem hinter dem einzigen "zweiten
+  // Montag" der Serie liegen.
+  if (parsed?.bymonthday !== -1 && !parsed?.bydayOrdinal) return true;
   return seriesStartFor(tag, rrule, { utcDiffersFromLocal }) !== tag
     || matchesRRuleByday(tag, rrule, { utcDiffersFromLocal });
 }
@@ -578,13 +678,14 @@ function seriesStartFor(dateKey, rrule, { utcDiffersFromLocal = false } = {}) {
   const tag = String(dateKey).slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(tag)) return dateKey;
 
-  // NUR FUER BYMONTHDAY. Ein DTSTART, das ein BYDAY-Muster nicht trifft, bleibt
-  // ausdruecklich stehen: Apple serialisiert "jeden Werktag" als Serie, deren
-  // Start auf ein Wochenende fallen kann, und die Expansion ueberspringt ihn
-  // (#549). Diese Entscheidung ist aelter und gilt weiter - hier geht es allein
-  // um die Angabe, die Yuvomi selbst erzeugt und die sonst nach draussen
-  // uneindeutig waere.
-  if (parseRRule(rrule)?.bymonthday !== -1) return dateKey;
+  // NUR FUER BYMONTHDAY UND ORDINALE BYDAY-REGELN. Ein DTSTART, das ein
+  // einfaches BYDAY-Muster nicht trifft, bleibt ausdruecklich stehen: Apple
+  // serialisiert "jeden Werktag" als Serie, deren Start auf ein Wochenende
+  // fallen kann, und die Expansion ueberspringt ihn (#549). Diese Entscheidung
+  // ist aelter und gilt weiter - hier geht es allein um die Angaben, die
+  // Yuvomi selbst erzeugt und die sonst nach draussen uneindeutig waeren.
+  const parsedForStart = parseRRule(rrule);
+  if (parsedForStart?.bymonthday !== -1 && !parsedForStart?.bydayOrdinal) return dateKey;
   if (matchesRRuleByday(tag, rrule, { utcDiffersFromLocal })) return dateKey;
 
   // BIS ALLE FILTER PASSEN, NICHT NUR EINEN SCHRITT WEIT. `BYMONTHDAY=-1`

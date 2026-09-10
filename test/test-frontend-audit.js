@@ -11811,6 +11811,20 @@ test('ob ein Seitentitel ueber einer Leiste steht, entscheidet der module:-Wert 
   };
 
   const TABLIST = /role="tablist"|setAttribute\(\s*'role'\s*,\s*'tablist'\s*\)|\bwireTablist\(|\brenderSubTabs\(/;
+
+  // KOMMENTARE SIND KEIN MARKUP. `TABLIST` sucht nach einer gebauten Leiste,
+  // trifft aber genauso den blossen Erwaehnungstext in einem Kommentar - und
+  // `utils/popover-menu.js` erwaehnt in seiner Begruendung woertlich
+  // `role="tablist"` (der Personen-Umschalter der Gesundheit, der bis
+  // 2026-08-31 einer war). Jede Seite, die dieses geteilte Ueberlaufmenue
+  // importiert, galt dadurch als Seite MIT Leiste und wurde gegen eine Regel
+  // geprueft, die fuer sie gar nicht gilt: die Entsorgung hat keine Tab-Leiste
+  // und fiel trotzdem durch, sobald sie das Menue benutzte. Der Guard misst
+  // jetzt den Code, nicht die Prosa darueber.
+  const stripComments = (src) => src
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
   const classAttrs = (src, needle) =>
     [...src.matchAll(/(?:class="|className\s*=\s*')([^"']*)/g)]
       .map((m) => m[1])
@@ -11824,7 +11838,7 @@ test('ob ein Seitentitel ueber einer Leiste steht, entscheidet der module:-Wert 
     // Die Regel spricht ueber Module MIT Leiste. Eine Sektion mit eigener Shell
     // hat immer eine (ihre Blatt-Navigation), auch ohne role="tablist".
     const isSection = sectionModules.has(mod);
-    if (!isSection && !sources.some((src) => TABLIST.test(src))) continue;
+    if (!isSection && !sources.some((src) => TABLIST.test(stripComments(src)))) continue;
 
     // Ein sichtbarer Seitentitel ist ein `page-toolbar__title` OHNE `sr-only`
     // in einem KANONISCHEN Kopf. Die Gruppen-Variante zaehlt nicht: ihr Titel
@@ -13686,6 +13700,17 @@ test('jedes Push-Ziel zeigt auf eine Route, die es gibt', () => {
   // entwertet die Benachrichtigung und lehrt, sie zu ignorieren.
   const routerSrc = read('../public/router.js');
   const known = new Set([...routerSrc.matchAll(/path:\s*'([^']+)'/g)].map((m) => m[1]));
+  // Sub-Tab-Sektionen (Gesundheit, Schedule S-10) registrieren ihre Routen
+  // ueber ein `.map(path => ({ path, ... }))` aus einem importierten Array,
+  // nicht als literales `path: '...'` in router.js selbst - das obige Regex
+  // sieht sie deshalb nicht. Reiner Text-Read statt eines echten Imports:
+  // beide Util-Dateien importieren selbst wieder `/i18n.js` (ein
+  // Browser-Pfadalias), das unter Node nicht aufloest.
+  for (const file of ['../public/utils/health-tabs.js', '../public/utils/schedule-tabs.js']) {
+    const src = read(file);
+    const arrayBody = src.slice(src.indexOf('Object.freeze(['), src.indexOf('])', src.indexOf('Object.freeze([')));
+    for (const match of arrayBody.matchAll(/'([^']+)'/g)) known.add(match[1]);
+  }
   // Die Settings-Blätter kommen aus der Registry, nicht aus einem `path:`.
   const settingsLeaf = /^\/settings(\/|$)/;
   assert.ok(known.size >= 15, `nur ${known.size} Routen aus router.js gelesen - Regex tot?`);

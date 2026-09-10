@@ -13,7 +13,7 @@
 import { randomBytes } from 'node:crypto';
 import { createLogger } from '../logger.js';
 import { escapeICSText, foldLine, resolveFeedZone, stampProp } from './ics-export.js';
-import { scheduleData } from '../routes/schedule.js';
+import { scheduleData } from './schedule.js';
 import { todayKey, shiftDateKey, householdTimeZone } from '../utils/timezone.js';
 import { vtimezoneFor } from '../utils/vtimezone.js';
 
@@ -65,7 +65,7 @@ function buildVEvent(entry, dtstamp, feedZone) {
   ];
   // Ein Schichttyp ohne Zeiten (z.B. Urlaub, Krank) ist ein GANZTAGS-Eintrag,
   // dieselbe Regel wie clockLabel() im Client (public/pages/schedule.js) fuer
-  // "ganztaegig" liest. `crosses_midnight` (server/routes/schedule.js,
+  // "ganztaegig" liest. `crosses_midnight` (server/services/schedule.js,
   // scheduleData) sagt bereits, ob eine Nachtschicht ueber Mitternacht reicht;
   // die endet dann am naechsten Tag, nicht am selben.
   if (!type.start_time || !type.end_time) {

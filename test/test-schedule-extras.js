@@ -5,7 +5,15 @@
  *        auch zwei Extras mit demselben shift_type_id am selben Tag.
  *        (2) Der Verwaltungs-Router (/schedule/extras) end-to-end: erstellen,
  *        Zeitraum fuellen, aendern, loeschen, self-oder-admin.
- * Ausführen: node --experimental-sqlite --test test/test-schedule-extras.js
+ * Ausführen: npm run test:schedule-extras
+ *            (NICHT nackt `node --test test/test-schedule-extras.js` - DB_PATH
+ *            wird unten zwar vor jedem eigenen Top-Level-Code gesetzt, aber
+ *            statische Imports werten VOR dem Rest dieser Datei aus, in
+ *            Abhaengigkeits-Reihenfolge; server/db.js oeffnet die Datenbank
+ *            beim eigenen Modul-Laden anhand von process.env.DB_PATH zu genau
+ *            diesem fruehen Zeitpunkt. Ohne den Shell-Prefix des npm-Skripts
+ *            (schon gesetzt, bevor der Node-Prozess ueberhaupt startet) laeuft
+ *            das gegen die echte yuvomi.db im Repo.
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -109,6 +117,13 @@ test('extras CRUD: create, fill, update, and delete are addressed by the extra\'
   const deleted = await call('DELETE', `/extras/${extraId}`, { as: ALICE });
   assert.equal(deleted.status, 204);
   assert.equal(database.prepare('SELECT 1 FROM schedule_extra_shifts WHERE id = ?').get(extraId), undefined);
+
+  // C.6 (audit): foreign-user 403 on /fill had never been asserted to leave
+  // no rows behind, unlike the single-day POST /extras case above.
+  const foreignFill = await call('POST', '/extras/fill', { as: ALICE, body: { user_id: BOB.id, from: '2027-07-20', to: '2027-07-22', shift_type_id: typeId } });
+  assert.equal(foreignFill.status, 403, 'a member cannot fill an extra range on someone else\'s schedule');
+  assert.equal(database.prepare('SELECT COUNT(*) AS c FROM schedule_extra_shifts WHERE user_id = ? AND date_key BETWEEN ? AND ?').get(BOB.id, '2027-07-20', '2027-07-22').c, 0,
+    'a foreign-user 403 must not have written any row');
 
   const filled = await call('POST', '/extras/fill', { as: ALICE, body: { user_id: ALICE.id, from: '2027-07-10', to: '2027-07-12', shift_type_id: typeId, note: 'On-call week' } });
   assert.equal(filled.status, 200);

@@ -54,6 +54,20 @@ function buildDatabase(upTo = Infinity) {
     db.prepare('INSERT INTO schema_migrations (version, description) VALUES (?, ?)')
       .run(migration.version, migration.description);
   }
+  // runSearch() (unten) fragt seit #1063 Phase 10 immer auch waste_types ab
+  // (Migration 194, Trigger aus Migration 203) - unabhaengig von `upTo`, denn
+  // der Umfang dieser Suite (der Dublettenfix aus Migration 151) hat mit der
+  // Frage, ob Waste zu diesem historischen Stand schon existierte, nichts zu
+  // tun. Ohne das schlaegt jeder runSearch()-Aufruf hier mit "no such table"
+  // fehl, sobald `upTo` (wie meistens) unter 190 liegt.
+  for (const version of [194, 203]) {
+    if (upTo >= version) continue;
+    const migration = MIGRATIONS.find((m) => m.version === version);
+    if (typeof migration.up === 'function') migration.up(db);
+    else db.exec(migration.up);
+    db.prepare('INSERT INTO schema_migrations (version, description) VALUES (?, ?)')
+      .run(migration.version, migration.description);
+  }
   return db;
 }
 

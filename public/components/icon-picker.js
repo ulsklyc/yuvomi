@@ -53,6 +53,12 @@ const MAX_RESULTS = 120;
  *
  * Die Namen sind bewusst hier und nicht in einer Locale-Datei: es sind
  * Bezeichner aus einer Fremdbibliothek, keine Oberflächentexte.
+ *
+ * DIESE REIHE IST DIE ALLGEMEINE - sie stammt aus dem ersten Aufrufer
+ * (Schnellzugriffe: selbstgehostete Dienste) und passt überall dort, wo ein
+ * Symbol für „irgendetwas" gesucht wird. Ein Aufrufer mit engerem Thema gibt
+ * über `openIconPicker(current, { suggestions })` seine eigene Starthilfe mit;
+ * die Suche dahinter bleibt in jedem Fall der volle Vorrat.
  */
 const SUGGESTIONS = [
   'clapperboard', 'film', 'tv', 'music', 'headphones', 'radio',
@@ -75,13 +81,13 @@ const SUGGESTIONS = [
  * Exportiert, weil die Reihenfolge das Einzige an diesem Dialog ist, was man
  * ohne Browser prüfen kann (test/test-quick-link-icons.js).
  */
-export function searchIcons(term, vocabulary = iconNames()) {
+export function searchIcons(term, vocabulary = iconNames(), suggestions = SUGGESTIONS) {
   const needle = String(term ?? '').trim().toLowerCase().replace(/\s+/g, '-');
   if (!needle) {
     // Nur Vorschläge, die es auch wirklich gibt: ein umbenanntes Symbol soll
     // eine Kachel weniger ergeben, nicht eine leere Lücke in der Reihe.
     const known = new Set(vocabulary);
-    return SUGGESTIONS.filter((name) => known.has(name));
+    return suggestions.filter((name) => known.has(name));
   }
 
   const starts = [];
@@ -116,7 +122,7 @@ function tile(name, isCurrent) {
   return btn;
 }
 
-function buildDialog(current, resolve) {
+function buildDialog(current, resolve, suggestions) {
   const dialog = document.createElement('dialog');
   dialog.className = 'icon-picker';
   dialog.setAttribute('aria-label', t('iconPicker.title'));
@@ -161,7 +167,7 @@ function buildDialog(current, resolve) {
    * Kacheln nachzuführen hiesse, die Reihenfolge zweimal zu kennen - einmal in
    * `searchIcons()` und einmal im Abgleich. */
   const paint = (term) => {
-    const names = searchIcons(term);
+    const names = searchIcons(term, iconNames(), suggestions);
     results.replaceChildren(...names.map((n) => tile(n, n === current)));
     empty.hidden = names.length > 0;
   };
@@ -210,11 +216,15 @@ function buildDialog(current, resolve) {
  * Öffnet die Symbolauswahl.
  *
  * @param {string|null} [current] der bisher gewählte Name, wird hervorgehoben
+ * @param {Object} [opts]
+ * @param {string[]} [opts.suggestions] eigene Starthilfe statt der allgemeinen
+ *   Reihe (siehe SUGGESTIONS). Ändert NUR, was ohne Suchbegriff im Raster
+ *   steht - gesucht wird weiterhin im ganzen Vorrat.
  * @returns {Promise<string|null|undefined>} Name, `null` für „kein Symbol",
  *   `undefined` bei Abbruch - drei Ausgänge, weil „entfernen" und „nichts
  *   ändern" verschiedene Dinge sind.
  */
-export function openIconPicker(current = null) {
+export function openIconPicker(current = null, { suggestions = SUGGESTIONS } = {}) {
   return new Promise((resolve) => {
     if (!iconNames().length) {
       // Lucide ist noch nicht da (oder ausgefallen): ein leerer Dialog wäre die
@@ -224,7 +234,7 @@ export function openIconPicker(current = null) {
       return;
     }
 
-    const picker = buildDialog(current, resolve);
+    const picker = buildDialog(current, resolve, suggestions);
     document.body.appendChild(picker.dialog);
     picker.dialog.showModal();
     picker.register();

@@ -60,9 +60,13 @@ export function renderAvatarStack(users, { size = 28, maxVisible = 3 } = {}) {
  * @param {number[]} selectedIds                               Bereits ausgewählte IDs
  * @param {string}   inputName                                 Name-Attribut des Widgets
  * @param {string}   labelKey                                  i18n-Schlüssel für das Label
+ * @param {string}   [noneLabelKey]                            i18n-Schlüssel für die "Niemand"-Zeile;
+ *   Vorgabe passt für "wem zugewiesen" (Tasks/Kalender/Budget). Ein Aufrufer, dessen Auswahl kein
+ *   Zuweisen ist - z. B. der Schedule-Vergleich, wo "Niemand" nur die Auswahl leert - übergibt
+ *   seinen eigenen Schlüssel (S-19).
  * @returns {string} HTML-String
  */
-export function renderUserMultiSelect(allUsers, selectedIds, inputName, labelKey) {
+export function renderUserMultiSelect(allUsers, selectedIds, inputName, labelKey, noneLabelKey = 'userMultiSelect.nobody') {
   const selectedSet = new Set(selectedIds ?? []);
   const items = allUsers.map((u) => {
     const checked = selectedSet.has(u.id) ? 'checked' : '';
@@ -86,7 +90,7 @@ export function renderUserMultiSelect(allUsers, selectedIds, inputName, labelKey
       </label>`;
   });
 
-  const noneLabel = t('userMultiSelect.nobody');
+  const noneLabel = t(noneLabelKey);
   return `
     <div class="user-ms" data-ms-name="${esc(inputName)}">
       <label class="label">${t(labelKey)}</label>

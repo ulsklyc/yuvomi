@@ -18,6 +18,7 @@ import { warrantyEndDate } from './inventory-deadlines.js';
 import { syncAllPantryExpiryReminders } from './pantry-reminders.js';
 import { syncAllCycleReminders } from './cycle-reminders.js';
 import { syncAllScheduleReminders } from './schedule-reminders.js';
+import { syncAllWasteReminders } from './waste-reminders.js';
 
 const log = createLogger('Notifications');
 const APP_NAME = 'Yuvomi';
@@ -110,8 +111,18 @@ const REMINDER_ORIGINS = {
   // entity_type fuer zwei Sync-Quellen, eine Modul-Beschriftung.
   cycle_period:           { titleKey: 'health.cycle.title',     url: '/health' },
   cycle_log_nudge:        { titleKey: 'health.cycle.title',     url: '/health' },
-  schedule_entry:         { titleKey: 'nav.schedule',           url: '/schedule' },
-  schedule_extra_entry:   { titleKey: 'nav.schedule',           url: '/schedule' },
+  // '/schedule/patterns', nicht bloss '/schedule' (S-10, UX-Audit): Schedule
+  // hat inzwischen einen Tab-Deep-Link (public/utils/schedule-tabs.js), anders
+  // als die obige Budget-Begruendung das fuer Abonnements noch feststellt -
+  // die Planung ist der Tab, auf dem sowohl die eigene Schicht (Heute-Karte)
+  // als auch ihre Ausnahmen/Zusatzschichten stehen.
+  schedule_entry:         { titleKey: 'nav.schedule',           url: '/schedule/patterns' },
+  schedule_extra_entry:   { titleKey: 'nav.schedule',           url: '/schedule/patterns' },
+  // url here is only the fallback used when waste_type_id/waste_date_key are
+  // unavailable (entity deleted between sync and delivery) - the normal path
+  // overrides it in reminderPayload() with the stable ?type=&date= deep link
+  // contract every other Waste projection already uses.
+  waste_pickup:           { titleKey: 'nav.waste',              url: '/waste' },
 };
 
 /**
@@ -172,6 +183,17 @@ function scheduleEntryBody(reminder) {
   return `${reminder.entity_title} - ${reminder.schedule_start_time}`;
 }
 
+/**
+ * Body of a Waste pickup reminder: the type name and its raw YYYY-MM-DD
+ * pickup date - same reasoning as warrantyBody/trackedDateBody/
+ * pantryExpiryBody above (plain data, no sentence, the server doesn't know
+ * the recipient's date-format locale).
+ */
+function wastePickupBody(reminder) {
+  if (!reminder.waste_date_key) return reminder.entity_title;
+  return `${reminder.entity_title} - ${reminder.waste_date_key}`;
+}
+
 function reminderPayload(reminder, locale) {
   const title = reminder.entity_title || FALLBACK_BODY;
   const origin = REMINDER_ORIGINS[reminder.entity_type];
@@ -188,7 +210,17 @@ function reminderPayload(reminder, locale) {
     body = cycleBody(reminder, locale);
   } else if ((reminder.entity_type === 'schedule_entry' || reminder.entity_type === 'schedule_extra_entry') && reminder.entity_title) {
     body = scheduleEntryBody(reminder);
+  } else if (reminder.entity_type === 'waste_pickup' && reminder.entity_title) {
+    body = wastePickupBody(reminder);
   }
+  // Waste is the one entity_type with a real per-occurrence deep link
+  // (?type=<id>&date=<date_key>, the same contract every other Waste
+  // projection - Dashboard widget, Calendar chip - already uses); every other
+  // origin's url is a static page. Falls back to the origin's plain /waste
+  // only if the anchor/type vanished between sync and delivery.
+  const url = (reminder.entity_type === 'waste_pickup' && reminder.waste_type_id && reminder.waste_date_key)
+    ? `/waste?type=${reminder.waste_type_id}&date=${reminder.waste_date_key}`
+    : (origin ? origin.url : '/');
   return {
     // Ohne bekannte Herkunft bleibt der App-Name: er ist nichtssagend, aber nie
     // falsch - und ein roher `entity_type` im Titel waere beides. Das Ziel
@@ -196,7 +228,7 @@ function reminderPayload(reminder, locale) {
     // die es mit Sicherheit gibt.
     title: origin ? translate(locale, origin.titleKey) : APP_NAME,
     body,
-    url: origin ? origin.url : '/',
+    url,
     tag: `reminder-${reminder.id}`,
     priority: 'default',
   };
@@ -354,6 +386,14 @@ export async function processDueNotifications({
   } catch (err) {
     log.error('Schedule reminder sync failed:', err?.message || err);
   }
+  // Gleiche Stelle, gleiche Bauart: je Nutzer, weil eine Waste-Erinnerung eine
+  // persoenliche Typ-Auswahl ist (waste_reminder_settings), nicht haushaltweit
+  // wie der Vorrat.
+  try {
+    syncAllWasteReminders(activeDb, now);
+  } catch (err) {
+    log.error('Waste reminder sync failed:', err?.message || err);
+  }
 
   const due = activeDb.prepare(`
     SELECT r.id, r.created_by, r.entity_type,
@@ -378,6 +418,10 @@ export async function processDueNotifications({
           SELECT t.name FROM schedule_extra_shifts e JOIN schedule_shift_types t ON t.id = e.shift_type_id
           WHERE e.id = r.entity_id
         )
+        WHEN 'waste_pickup' THEN (
+          SELECT t.name FROM waste_reminder_entries e JOIN waste_types t ON t.id = e.type_id
+          WHERE e.id = r.entity_id
+        )
       END AS entity_title,
       CASE WHEN r.entity_type = 'inventory_item'
         THEN (SELECT purchase_date FROM inventory_items WHERE id = r.entity_id) END AS inv_purchase_date,
@@ -397,6 +441,10 @@ export async function processDueNotifications({
           WHERE e.id = r.entity_id
         )
       END AS schedule_start_time,
+      CASE WHEN r.entity_type = 'waste_pickup'
+        THEN (SELECT type_id FROM waste_reminder_entries WHERE id = r.entity_id) END AS waste_type_id,
+      CASE WHEN r.entity_type = 'waste_pickup'
+        THEN (SELECT date_key FROM waste_reminder_entries WHERE id = r.entity_id) END AS waste_date_key,
       CASE WHEN r.entity_type = 'subscription'
         THEN (SELECT amount FROM budget_subscriptions WHERE id = r.entity_id) END AS sub_amount,
       CASE WHEN r.entity_type = 'subscription'

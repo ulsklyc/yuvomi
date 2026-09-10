@@ -34,6 +34,7 @@ const MODULE_ACCENT = {
   inventory: 'var(--module-inventory)',
   documents: 'var(--module-documents)',
   housekeeping: 'var(--module-housekeeping)',
+  waste: 'var(--module-waste)',
   rewards: 'var(--module-rewards)',
   health: 'var(--module-health)',
 };
@@ -50,6 +51,7 @@ const WIDGET_LABEL_KEYS = {
   cycle: 'settings.permWidgetCycle',
   housekeeping: 'nav.housekeeping',
   schedule: 'nav.schedule',
+  waste: 'nav.waste',
   notes: 'nav.notes',
   family: 'settings.permWidgetFamily',
   weather: 'settings.permWidgetWeather',

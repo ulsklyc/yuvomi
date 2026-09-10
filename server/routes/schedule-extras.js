@@ -1,16 +1,18 @@
 /**
  * Modul: Schichtplan — Extras (zusaetzliche Schichten)
- * Zweck: Additiv zu Muster/Override (server/routes/schedule.js#scheduleData),
+ * Zweck: Additiv zu Muster/Override (server/services/schedule.js#scheduleData),
  *        nie ein Ersatz - beliebig viele Zeilen je Nutzer und Tag, auch mit
  *        demselben shift_type_id (z.B. Bereitschaft NEBEN einer regulaeren
  *        Schicht). Adressiert ueber die eigene id, nie ueber
  *        (user_id, date_key) wie bei den Overrides - es gibt nichts, worauf
  *        eine zweite Zeile fuer denselben Tag treffen koennte.
  *
- * Eigene Datei statt in routes/schedule.js: server/services/schedule-reminders.js
- * importiert scheduleData aus routes/schedule.js für den Sync - ein
- * Rückimport hier hätte einen Zyklus ergeben (gleicher Grund wie
- * routes/schedule-feed.js und routes/schedule-preferences.js).
+ * Eigene Datei statt in routes/schedule.js: historisch, weil der Reminder-Sync
+ * scheduleData damals aus routes/schedule.js importierte und ein Rückimport
+ * dort einen Zyklus ergeben hätte (gleicher Grund wie routes/schedule-feed.js
+ * und routes/schedule-preferences.js). scheduleData lebt inzwischen in
+ * services/schedule.js; die Datei-Trennung bleibt, sie hält den Hauptrouter
+ * lesbar.
  */
 
 import express from 'express';
@@ -20,13 +22,24 @@ import { dateKeysInRange } from '../services/schedule.js';
 import { daysBetweenDateKeys } from '../utils/timezone.js';
 import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js';
 import { validateFieldValues, replaceFieldValues, fieldValuesFor, isAdmin } from './schedule.js';
+import { createLogger } from '../logger.js';
 
 const router = express.Router();
+const log = createLogger('Schedule');
 const actorId = (req) => req.authUserId || req.session?.userId;
 const fail = (res, code, error) => res.status(code).json({ error, code });
 const userExists = (value) => !!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(value);
 const typeExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_shift_types WHERE id = ?').get(value);
 const mineOrAdmin = (req, userId) => isAdmin(req) || actorId(req) === userId;
+// Ein committeter Schreibvorgang darf nicht an einem werfenden Resync
+// scheitern - der Aufrufer hat sein Extra bereits, ein 500er hier wuerde ihm
+// das Gegenteil vorspiegeln und einen idempotenten Retry zur Dublette machen.
+// Deshalb protokolliert dieser Wrapper nur und laesst die Antwort in Ruhe -
+// derselbe Schutz, den PUT/DELETE /overrides in schedule.js jetzt auch haben.
+function resyncQuietly(userId) {
+  try { syncScheduleRemindersForUser(db.get(), userId); }
+  catch (err) { log.error('Error resyncing schedule reminders after extra shift write:', err.message); }
+}
 
 // Gleiche Grenze wie schedule-preferences.js's MAX_OFFSET_MINUTES: NULL heisst
 // "kein eigener Vorlauf fuer dieses Extra" (siehe schedule-reminders.js).
@@ -57,10 +70,17 @@ router.post('/', (req, res) => {
   const key = date(req.body?.date_key, 'date_key', true); const user = id(req.body?.user_id ?? actorId(req), 'user_id'); const typeId = id(req.body?.shift_type_id, 'shift_type_id'); const note = str(req.body?.note, 'note', { required: false, max: 5000 }); const offset = reminderOffset(req.body?.reminder_offset_minutes);
   const fields = validateFieldValues(req.body?.field_values, typeId.value ?? null);
   const errors = collectErrors([key, user, typeId, note, offset].filter(Boolean)); if (fields.error) errors.push(fields.error); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); if (typeId.value && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.'); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.'); if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });
-  const result = db.get().prepare('INSERT INTO schedule_extra_shifts (user_id, date_key, shift_type_id, note, reminder_offset_minutes, created_by) VALUES (?, ?, ?, ?, ?, ?)').run(user.value, key.value, typeId.value, note.value, offset.value, actorId(req));
-  replaceFieldValues('extra_shift', result.lastInsertRowid, fields.values);
-  syncScheduleRemindersForUser(db.get(), user.value);
-  const row = db.get().prepare('SELECT * FROM schedule_extra_shifts WHERE id = ?').get(result.lastInsertRowid);
+  // Anlegen und replaceFieldValues() in EINER Transaktion: sonst stand die
+  // Zeile schon committed, bevor ihre Werte geschrieben waren, und ein Wurf
+  // dazwischen liess einen 500er auf eine bereits vorhandene Zeile antworten -
+  // ein idempotenter Retry (siehe idempotency-keys) haette sie dann verdoppelt.
+  const insertedId = db.get().transaction(() => {
+    const result = db.get().prepare('INSERT INTO schedule_extra_shifts (user_id, date_key, shift_type_id, note, reminder_offset_minutes, created_by) VALUES (?, ?, ?, ?, ?, ?)').run(user.value, key.value, typeId.value, note.value, offset.value, actorId(req));
+    replaceFieldValues('extra_shift', result.lastInsertRowid, fields.values);
+    return result.lastInsertRowid;
+  })();
+  resyncQuietly(user.value);
+  const row = db.get().prepare('SELECT * FROM schedule_extra_shifts WHERE id = ?').get(insertedId);
   res.status(201).json({ data: { ...row, field_values: fieldValuesFor('extra_shift', [row.id]).get(row.id) ?? {} } });
 });
 
@@ -95,7 +115,7 @@ router.post('/fill', (req, res) => {
       replaceFieldValues('extra_shift', row.id, fields.values);
     }
   })();
-  syncScheduleRemindersForUser(db.get(), user.value);
+  resyncQuietly(user.value);
   res.json({ data: { created: keys.length } });
 });
 
@@ -117,7 +137,7 @@ router.put('/:id', (req, res) => {
   if (errors.length) return fail(res, 400, errors.join(' '));
   db.get().prepare('UPDATE schedule_extra_shifts SET date_key=?, shift_type_id=?, note=?, reminder_offset_minutes=? WHERE id=?').run(dateKey.value, typeId.value, note.value, offset.value, old.id);
   if (req.body?.field_values !== undefined) replaceFieldValues('extra_shift', old.id, fields.values);
-  syncScheduleRemindersForUser(db.get(), old.user_id);
+  resyncQuietly(old.user_id);
   const row = db.get().prepare('SELECT * FROM schedule_extra_shifts WHERE id=?').get(old.id);
   return res.json({ data: { ...row, field_values: fieldValuesFor('extra_shift', [row.id]).get(row.id) ?? {} } });
 });
@@ -130,7 +150,7 @@ router.delete('/:id', (req, res) => {
     db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='extra_shift' AND entry_id=?`).run(old.id);
     db.get().prepare('DELETE FROM schedule_extra_shifts WHERE id=?').run(old.id);
   })();
-  syncScheduleRemindersForUser(db.get(), old.user_id);
+  resyncQuietly(old.user_id);
   return res.status(204).end();
 });
 

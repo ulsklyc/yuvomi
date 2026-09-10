@@ -24,6 +24,7 @@ import { setDisplayTimeZone } from '/utils/timezone.js';
 import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
 import { moduleAccentToken, moduleAccentVar } from '/utils/module-accent.js';
 import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
+import { SCHEDULE_ROUTES } from '/utils/schedule-tabs.js';
 import { activityType } from '/utils/health-activity.js';
 import { buildHelpRows } from '/utils/help.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -86,11 +87,11 @@ const ROUTES = [
   { path: '/recipes',  page: '/pages/recipes.js',   requiresAuth: true, module: 'recipes',   titleKey: 'nav.recipes' },
   { path: '/pantry',   page: '/pages/pantry.js',    requiresAuth: true, module: 'pantry',    titleKey: 'nav.pantry' },
   { path: '/inventory', page: '/pages/inventory.js', requiresAuth: true, module: 'inventory', titleKey: 'nav.inventory' },
-  { path: '/schedule', page: '/pages/schedule.js', requiresAuth: true, module: 'schedule', titleKey: 'nav.schedule' },
   { path: '/contacts', page: '/pages/contacts.js',  requiresAuth: true, module: 'contacts',  titleKey: 'nav.contacts' },
   { path: '/budget',   page: '/pages/budget.js',    requiresAuth: true, module: 'budget',    titleKey: 'nav.budget' },
   { path: '/documents', page: '/pages/documents.js', requiresAuth: true, module: 'documents', titleKey: 'nav.documents' },
   { path: '/housekeeping', page: '/pages/housekeeping.js', requiresAuth: true, module: 'housekeeping', titleKey: 'nav.housekeeping' },
+  { path: '/waste', page: '/pages/waste.js', requiresAuth: true, module: 'waste', titleKey: 'nav.waste' },
   { path: '/rewards',  page: '/pages/rewards.js',    requiresAuth: true, module: 'rewards',   titleKey: 'nav.rewards' },
 ];
 
@@ -118,6 +119,16 @@ const HEALTH_PAGE_ROUTES = HEALTH_ROUTES.map((path) => ({
 }));
 
 ROUTES.push(...HEALTH_PAGE_ROUTES);
+
+// Schedule ist - wie Gesundheit - eine Sektion mit einer Wurzel (/schedule) und
+// je einer exakten Route pro Sub-Tab (S-10). Alle Routen laden dasselbe
+// Seitenmodul; die Soft-Navigation zwischen den Tabs laeuft ueber dessen
+// update()-Funktion.
+const SCHEDULE_PAGE_ROUTES = SCHEDULE_ROUTES.map((path) => ({
+  path, page: '/pages/schedule.js', requiresAuth: true, module: 'schedule', titleKey: 'nav.schedule',
+}));
+
+ROUTES.push(...SCHEDULE_PAGE_ROUTES);
 
 // --------------------------------------------------------
 // Standalone-Modus: Dynamische theme-color Anpassung
@@ -433,7 +444,7 @@ let _setupRequired = false;
 // --------------------------------------------------------
 
 const ROUTE_ORDER = ['/', '/calendar', '/schedule', '/tasks', '/meals', '/recipes', '/shopping', '/pantry',
-                     '/birthdays', '/notes', '/contacts', '/budget', '/inventory', '/documents', '/housekeeping', '/health', '/settings'];
+                     '/birthdays', '/notes', '/contacts', '/budget', '/inventory', '/documents', '/housekeeping', '/waste', '/health', '/settings'];
 
 const MOBILE_FAVORITE_COUNT = 3;
 
@@ -461,6 +472,8 @@ function topLevelSection(path) {
   // /health/* Sub-Tabs teilen sich eine Sektion (Soft-Nav zwischen Tabs, keine
   // seitliche Seitentransition) — analog zu den Settings-Blättern.
   if (typeof path === 'string' && path.startsWith('/health')) return '/health';
+  // /schedule/* Sub-Tabs ebenso (S-10) — derselbe Grund wie bei /health.
+  if (typeof path === 'string' && path.startsWith('/schedule')) return '/schedule';
   return path ?? '/';
 }
 
@@ -3279,9 +3292,9 @@ function initSearch(container) {
  */
 function renderSearchResults(container, data, onClose) {
   container.replaceChildren();
-  const { tasks = [], events = [], notes = [], contacts = [], items = [], meds = [], activities = [] } = data;
+  const { tasks = [], events = [], notes = [], contacts = [], items = [], meds = [], activities = [], waste = [] } = data;
   const total = tasks.length + events.length + notes.length + contacts.length + items.length
-    + meds.length + activities.length;
+    + meds.length + activities.length + waste.length;
 
   if (total === 0) {
     container.appendChild(emptyHintEl(t('search.noResults')));
@@ -3354,6 +3367,7 @@ function renderSearchResults(container, data, onClose) {
     (i) => i.dosage_text || '');
   makeSection('health.tabs.activity', 'health', activities, () => '/health/activity', activityLabel,
     (i) => (i.performed_at ? formatDate(i.performed_at) : ''));
+  makeSection('nav.waste', 'waste', waste, (i) => `/waste?type=${i.id}`);
 
   // Die Siegel-Icons kommen als data-lucide-Platzhalter; der Treffer-Pfad
   // rendert sie selbst (der Leerzustands-Pfad tut es bereits genauso).
@@ -3431,6 +3445,7 @@ function navItems({ catalog = false } = {}) {
     { path: '/shopping',  label: t('nav.shopping'),  module: 'shopping', section: NAV_SECTION.household, kitchenGroup: true },
     { path: '/pantry',    label: t('nav.pantry'),    module: 'pantry',   section: NAV_SECTION.household, kitchenGroup: true },
     { path: '/housekeeping', label: t('nav.housekeeping'), module: 'housekeeping', section: NAV_SECTION.household },
+    { path: '/waste',     label: t('nav.waste'),     module: 'waste',    section: NAV_SECTION.household },
     { path: '/documents', label: t('nav.documents'), module: 'documents',   section: NAV_SECTION.household },
     { path: '/inventory', label: t('nav.inventory'), module: 'inventory',   section: NAV_SECTION.household },
     { path: '/rewards',   label: t('nav.rewards'),   module: 'rewards',     section: NAV_SECTION.household },

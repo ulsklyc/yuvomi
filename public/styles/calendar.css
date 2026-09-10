@@ -2016,6 +2016,35 @@
 }
 
 /* --------------------------------------------------------
+ * Waste-Ebene (#1063 Phase 5)
+ *
+ * Der Chip erbt die Balkenform seiner Basisklasse (.month-day__holiday /
+ * .allday-holiday / .agenda-holiday), MUSS aber anders als Feiertag und
+ * Schichtplan tatsaechlich klickbar sein - er fuehrt direkt in die
+ * Waste-Seite. Die Basisklassen setzen `pointer-events: none` (sie sind
+ * dekorative Baender, deren Klick zur Zelle/Spalte durchfallen soll), diese
+ * Regel nimmt das fuer die Waste-Bar gezielt zurueck.
+ * -------------------------------------------------------- */
+.waste-occurrence-chip {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.waste-occurrence-chip:hover,
+.waste-occurrence-chip:focus-visible {
+  filter: brightness(0.92);
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.waste-occurrence-chip__flag {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  opacity: .82;
+}
+
+/* --------------------------------------------------------
  * Filter-Knopf und Filter-Blatt
  *
  * HIER STANDEN BIS ZU FUENF EBENEN-CHIPS, und sie sind aus drei gemessenen
@@ -2090,6 +2119,17 @@
   width: 100%;
 }
 
+/* Per-Typ-Unterliste unter der Waste-Ebene (#1063 Phase 10) - die einzige
+   echte Verschachtelung in diesem Blatt, siehe buildLayerRowsHtml. Einrueckung
+   traegt die Beziehung, keine eigene Umrandung - sonst saehe es aus wie eine
+   zweite eigene Gruppe statt einer Unterliste EINER Zeile. */
+.cal-filters__nested {
+  margin-left: var(--space-5);
+  margin-top: var(--space-1);
+  display: flex;
+  flex-direction: column;
+}
+
 /* Die Feiertags- und Schul-Layer tragen eine NUTZERFARBE und bekommen sie
    deshalb als Inline-Style aus den Einstellungen. Der Schichtplan hat keine -
    seine Farbe ist eine Designentscheidung und gehoert damit hierher und nicht
@@ -2120,6 +2160,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* S-17: der Block selbst bleibt pointer-events:none (siehe oben - die Spalte
+   * muss klickbar bleiben, um dort einen neuen Termin anzulegen), aber ein
+   * Klick GENAU auf den sichtbaren Text soll die Detailansicht oeffnen -
+   * deshalb hier gezielt zurueckgeholt, nur fuer diese beiden Zeilen. */
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .schedule-time-block__time {
@@ -2147,4 +2193,48 @@
   height: 12px;
   flex: 0 0 auto;
   opacity: .82;
+}
+
+/* S-17: Woche/Tag machen den Chip zu einem Detail-Ausloeser (role="button",
+ * siehe renderScheduleChip()) - der Zeiger zeigt das an, der Fokusring kommt
+ * bereits app-weit aus reset.css. Monat/Agenda tragen die Rolle nicht und
+ * bleiben unveraendert. */
+.schedule-entry[role='button'] {
+  cursor: pointer;
+}
+
+/* S-17: read-only Detail-Modal-Inhalt (renderScheduleEntryDetailContent) -
+ * dieselbe Kopfzeile wie ein Termin-Chip (Farbpunkt + Titel + kleine
+ * Uhrzeit), darunter Label/Wert-Zeilen. Eigenstaendige Kopie der Klassen aus
+ * schedule.css (dieselbe Begruendung wie scheduleEntryMatchKey() oben). */
+.schedule-entry-detail__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.schedule-entry-detail__rows {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.schedule-entry-detail__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.schedule-entry-detail__row dt {
+  color: var(--color-text-secondary);
+  flex: 0 0 auto;
+}
+
+.schedule-entry-detail__row dd {
+  margin: 0;
+  min-width: 0;
+  text-align: end;
 }

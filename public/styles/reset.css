@@ -10,6 +10,28 @@
   padding: 0;
 }
 
+/* DIE EINE AUSNAHME VOM `margin: 0` DARUEBER - und sie muss hier stehen.
+ *
+ * Ein modales `<dialog>` zentriert der Browser NICHT ueber `position`, sondern
+ * allein ueber den Aussenabstand: sein UA-Blatt setzt `inset: 0` (alle vier
+ * Kanten) und ueberlaesst `margin: auto` die Mitte. Der Stern oben ist eine
+ * Autoren-Regel und schlaegt das UA-Blatt - `margin: 0` liess damit JEDEN
+ * nativen Dialog in der linken oberen Ecke kleben, festgenagelt an `inset: 0`.
+ *
+ * Betroffen war nicht eine Stelle, sondern jede: die Symbolauswahl
+ * (components/icon-picker.js - Schnellzugriffe, Kalender, Schichtplan,
+ * Abfallarten) und der Zuschnitt-Dialog fuers Profilbild (utils/avatar-crop.js).
+ * Beide bringen eigene Regeln mit, keine der beiden setzte einen Abstand, und
+ * beide erbten deshalb dieselbe Ecke. Genau deshalb wird das hier zurueckgeholt
+ * und nicht in den zwei Stylesheets einzeln nachgetragen: die naechste
+ * `<dialog>`-Verwendung braucht dann keinen dritten Nachtrag.
+ *
+ * `auto` ist woertlich der UA-Wert, den der Reset entfernt hat - das stellt das
+ * Standardverhalten wieder her, statt eine eigene Zentrierung zu erfinden. */
+dialog {
+  margin: auto;
+}
+
 html {
   font-family: var(--font-sans);
   /* 100% statt 16px: die rem-Skala folgt damit der Schriftgrößen-EINSTELLUNG

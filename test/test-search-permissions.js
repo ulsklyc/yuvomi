@@ -68,9 +68,10 @@ const PARENT = seedUser('parent', 'admin', 'parent');
 const KID = seedUser('kid', 'member', 'child');
 
 // --------------------------------------------------------------------------
-// EIN Suchwort trifft ALLE sieben Trefferarten. Das ist der Punkt: die Antwort
-// der Suche ist ein Objekt aus sieben Listen, und die Frage lautet nicht „findet
-// er etwas", sondern „welche der sieben bleiben ihm".
+// EIN Suchwort trifft ALLE acht Trefferarten (seit #1063 Phase 10: Waste kam
+// als achte dazu). Das ist der Punkt: die Antwort der Suche ist ein Objekt aus
+// acht Listen, und die Frage lautet nicht „findet er etwas", sondern „welche
+// der acht bleiben ihm".
 //
 // Alles gehört dem KIND bzw. ist familiensichtbar, damit die Zeilen-Achse
 // nichts wegnimmt - sonst prüfte der Test die falsche Achse.
@@ -106,6 +107,9 @@ db.prepare(`
   INSERT INTO health_activities (user_id, type, performed_at, note, visibility)
   VALUES (?, ?, '2030-01-01T08:00:00Z', 'Notiz', 'private')
 `).run(KID, `${MARKER}lauf`);
+
+db.prepare('INSERT INTO waste_types (name, color) VALUES (?, ?)')
+  .run(`${MARKER}-Tonne`, '#22C55E');
 
 // --------------------------------------------------------------------------
 // Server: Auth-Schicht nachgestellt wie in server/auth.js
@@ -161,6 +165,7 @@ const BUCKET_MODULE = {
   items: 'shopping',
   meds: 'health',
   activities: 'health',
+  waste: 'waste',
 };
 const BUCKETS = Object.keys(BUCKET_MODULE);
 const ALL_DENIED = PERMISSION_MODULES.map((m) => m.key);
@@ -175,7 +180,7 @@ const ALL_DENIED = PERMISSION_MODULES.map((m) => m.key);
 // Seit Migration 151 ist er behoben, und damit ist die genaue Zahl wieder die
 // schärfere Zusicherung: sie fiele auch auf, wenn eine Sperre eine Trefferart
 // nur halbierte statt sie zu leeren.
-test('Vorbedingung: ungesperrt findet das Mitglied in JEDER der sieben Trefferarten etwas', async () => {
+test('Vorbedingung: ungesperrt findet das Mitglied in JEDER der acht Trefferarten etwas', async () => {
   clearModuleDenials(KID);
   const body = await searchAs(KID);
 
@@ -272,7 +277,7 @@ test('Guard: bei voller Sperre bleibt keine Trefferart übrig', async () => {
   clearModuleDenials(KID);
   const offen = await searchAs(KID);
   const belegt = Object.entries(offen).filter(([, v]) => Array.isArray(v) && v.length > 0);
-  assert.ok(belegt.length >= 7, `Vorbedingung: ungesperrt sind mindestens 7 Listen belegt (${belegt.length})`);
+  assert.ok(belegt.length >= 8, `Vorbedingung: ungesperrt sind mindestens 8 Listen belegt (${belegt.length})`);
 
   denyModules(KID, ALL_DENIED);
   const zu = await searchAs(KID);

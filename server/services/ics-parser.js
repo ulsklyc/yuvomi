@@ -112,12 +112,20 @@ function parseRelations(block) {
 
 /**
  * @param {string} ics
- * @param {{onSkip?: (info: {uid: string|null, reason: string, summary: string|null}) => void}} [opts]
+ * @param {{onSkip?: (info: {uid: string|null, reason: string, summary: string|null}) => void, allowMissingUid?: boolean}} [opts]
  *   `onSkip` meldet jeden VEVENT, den der Parser verwirft. Ohne den Haken war ein
  *   übersprungener Termin von einem nie gelieferten nicht zu unterscheiden: er
  *   fehlte einfach, und der Sync meldete Erfolg (#883).
+ *   `allowMissingUid` (Default false, strikt für alle bestehenden Aufrufer):
+ *   manche Anbieter-Feeds - insbesondere die kommunaler Entsorgungskalender,
+ *   die Waste importiert (#1063) - liefern VEVENTs ganz ohne UID. Mit dieser
+ *   Option wird ein fehlendes UID allein NICHT mehr verworfen (DTSTART bleibt
+ *   Pflicht); der Aufrufer erhält `uid: null` und ist dafür verantwortlich,
+ *   eine eigene deterministische Ersatz-Identität zu bilden - dieser Parser
+ *   tut das bewusst nicht, weil eine sinnvolle Ersatz-Identität vom Label
+ *   abhängt, das erst der jeweilige Aufrufer kennt.
  */
-function parseICS(ics, { onSkip } = {}) {
+function parseICS(ics, { onSkip, allowMissingUid = false } = {}) {
   const unfolded = unfoldLines(ics);
   const events   = [];
   const vEventRe = /BEGIN:VEVENT([\s\S]*?)END:VEVENT/g;
@@ -191,14 +199,27 @@ function parseICS(ics, { onSkip } = {}) {
       const conv = formatICSDate(recIdLine.value, recIsDate, recIdLine.tzid);
       recurrenceId = conv ? conv.slice(0, 10) : null;
     }
-    if (!uid || !dtstart) {
+    if ((!uid && !allowMissingUid) || !dtstart) {
       onSkip?.({ uid, summary: uid ? summary : null, reason: !uid ? 'missing UID' : 'missing or unparsable DTSTART' });
       continue;
     }
     // TZID des Serien-Starts merken (nur zeitgebunden): erlaubt DST-korrekte
     // Expansion, die die lokale Uhrzeit über die Sommer-/Winterzeit hält (#549).
     const tzid = (!allDay && dtStartLine.tzid) ? dtStartLine.tzid : null;
-    events.push({ uid, summary, description, location, dtstart, dtend, rrule, allDay, color, exdates, recurrenceId, tzid });
+    // CATEGORIES (#1063 Waste): dient Waste als primäres Label für die
+    // Import-Zuordnung, wenn der Feed sie führt; sonst fällt der Aufrufer auf
+    // SUMMARY zurück. Bestehende Aufrufer ignorieren dieses Feld einfach.
+    const categories = parseCategories(block);
+    // STATUS:CANCELLED (RFC 5545 §3.8.1.11): ein abgesagtes Vorkommen. Ohne
+    // diese Markierung würde Waste eine Absage wie ein normales Vorkommen
+    // importieren; der Aufrufer entscheidet, ob/wie er sie ausschließt.
+    const status = (/^STATUS(?:;[^:]*)?:(.*)$/im.exec(block)?.[1] || '').trim().toUpperCase() || null;
+    // RDATE (RFC 5545 §3.8.5.2) wird von diesem Parser nicht expandiert - nur
+    // erkannt. Ein Feed, der zusätzliche Einzeltermine über RDATE statt über
+    // eigene VEVENTs einträgt, würde sonst still unvollständig importiert;
+    // der Aufrufer entscheidet, ob das den Import blockiert.
+    const hasRDate = /^RDATE(?:;[^:]*)?:/im.test(block);
+    events.push({ uid, summary, description, location, dtstart, dtend, rrule, allDay, color, exdates, recurrenceId, tzid, categories, status, hasRDate });
   }
   return events;
 }

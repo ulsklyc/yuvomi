@@ -67,7 +67,7 @@ export function schedulePaths() {
       get: op({ summary: 'List the cycle days of a pattern', tag: 'Schedule', params: [idParam()] }),
       put: op({
         summary: 'Replace all cycle days of a pattern',
-        description: 'Deletes and re-inserts every day of the cycle in one transaction. A position may repeat - a cycle day can carry several classes at different times (a timetable), each its own shift type; an omitted position is a free day.',
+        description: 'Deletes and re-inserts every day of the cycle in one transaction. A position may repeat - a cycle day can carry several classes at different times (a timetable), each its own shift type; an omitted position is a free day. The days array is capped at 500 rows.',
         tag: 'Schedule',
         params: [idParam()],
         stateChanging: true,
@@ -81,7 +81,7 @@ export function schedulePaths() {
         description: 'The counterpart to /overrides/fill - a single indexed delete, so it carries the read-side range cap (731 days) rather than the smaller one on fill.',
         tag: 'Schedule',
         params: [
-          { name: 'user_id', in: 'query', required: true, description: 'Household member', schema: { type: 'integer' } },
+          { name: 'user_id', in: 'query', required: false, description: 'Household member; defaults to the caller', schema: { type: 'integer' } },
           { name: 'from', in: 'query', required: true, description: 'Start date (YYYY-MM-DD)', schema: { type: 'string', format: 'date' } },
           { name: 'to', in: 'query', required: true, description: 'End date (YYYY-MM-DD), inclusive', schema: { type: 'string', format: 'date' } },
         ],

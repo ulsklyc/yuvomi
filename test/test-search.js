@@ -31,6 +31,10 @@ db.exec(MIGRATIONS_SQL[44]);
 db.exec(MIGRATIONS_SQL[65]);
 // Migration 66: FTS triggers + backfill for medications and health activities.
 db.exec(MIGRATIONS_SQL[66]);
+// Migration 194: waste_types (only the table search reads from).
+db.exec(MIGRATIONS_SQL[194]);
+// Migration 203: FTS triggers + backfill for waste_types.
+db.exec(MIGRATIONS_SQL[203]);
 
 console.log('\n[Search-Test] FTS5-Volltextsuche\n');
 
@@ -97,11 +101,15 @@ db.prepare(`INSERT INTO health_activities (user_id, type, performed_at, note, vi
 db.prepare(`INSERT INTO health_activities (user_id, type, performed_at, note, visibility)
   VALUES (?, 'boxing', '2030-01-03T08:00:00Z', 'private spar', 'private')`).run(otherUid);
 
+// Waste types: household-owned catalog, no owner filter (like contacts); archived excluded at query time.
+db.prepare(`INSERT INTO waste_types (name, color) VALUES ('Cake-day recycling', '#22C55E')`).run();
+db.prepare(`INSERT INTO waste_types (name, color, archived) VALUES ('Cake-day organic (retired)', '#A16207', 1)`).run();
+
 test('Migration 44 legt FTS5-Tabelle und Trigger an, Backfill leer (Seed danach)', () => {
   const tbl = db.prepare(`SELECT name FROM sqlite_master WHERE name = 'search_index'`).get();
   assert(tbl, 'search_index sollte existieren');
   const triggers = db.prepare(`SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_search_%'`).get();
-  assert(triggers.n === 21, `Erwartet 21 Trigger (15 aus Mig. 44 + 6 aus Mig. 66), erhalten ${triggers.n}`);
+  assert(triggers.n === 24, `Erwartet 24 Trigger (15 aus Mig. 44 + 6 aus Mig. 66 + 3 aus Mig. 199), erhalten ${triggers.n}`);
 });
 
 test('buildMatchQuery erzeugt sichere Präfix-Phrasen, ignoriert Sonderzeichen', () => {
@@ -130,6 +138,24 @@ test('Suche deckt alle Entitäten ab', () => {
   assert(r.notes.some((n) => n.content.includes('cake')), 'Notiz gefunden');
   assert(r.contacts.some((c) => c.title === 'Cake Bakery'), 'Kontakt gefunden');
   assert(r.events.some((e) => e.title === 'Cake tasting'), 'Termin gefunden');
+  assert(r.waste.some((w) => w.title === 'Cake-day recycling'), 'Abfall-Typ gefunden');
+});
+
+test('Suche findet Abfall-Typ über Namen, verbirgt archivierte Typen', () => {
+  const r = runSearch(db, 'recycling', uid);
+  const titles = r.waste.map((w) => w.title);
+  assert(titles.includes('Cake-day recycling'), 'Aktiver Typ gefunden');
+  assert(!titles.includes('Cake-day organic (retired)'), 'Archivierter Typ ausgeschlossen');
+});
+
+test('Abfall-Suchtrigger halten den Index synchron (UPDATE/DELETE)', () => {
+  const t = db.prepare(`INSERT INTO waste_types (name, color) VALUES ('Renamewaste', '#000000')`).run();
+  assert(runSearch(db, 'Renamewaste', uid).waste.length === 1, 'Neu angelegt gefunden');
+  db.prepare(`UPDATE waste_types SET name = 'Renamedwaste' WHERE id = ?`).run(t.lastInsertRowid);
+  assert(runSearch(db, 'Renamewaste', uid).waste.length === 0, 'Alter Name weg');
+  assert(runSearch(db, 'Renamedwaste', uid).waste.length === 1, 'Neuer Name im Index');
+  db.prepare(`DELETE FROM waste_types WHERE id = ?`).run(t.lastInsertRowid);
+  assert(runSearch(db, 'Renamedwaste', uid).waste.length === 0, 'Nach DELETE nicht mehr im Index');
 });
 
 test('Präfix-Treffer funktionieren (Teilwort)', () => {
@@ -232,7 +258,7 @@ test('Leere/kurze Query liefert leere Ergebnisse', () => {
   const r = runSearch(db, '', uid);
   assert(r.tasks.length === 0 && r.events.length === 0 && r.notes.length === 0
     && r.contacts.length === 0 && r.items.length === 0
-    && r.meds.length === 0 && r.activities.length === 0, 'Alles leer');
+    && r.meds.length === 0 && r.activities.length === 0 && r.waste.length === 0, 'Alles leer');
 });
 
 console.log(`\n[Search-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);
