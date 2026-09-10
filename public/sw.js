@@ -147,6 +147,7 @@ const APP_SHELL = [
   '/utils/inventory-warranty.js',
   '/utils/kitchen-tabs.js',
   '/utils/kitchen-transfer.js',
+  '/utils/live-feed.js',
   '/utils/markdown-checklist.js',
   '/utils/markdown-toolbar.js',
   '/utils/meal-types.js',
@@ -410,6 +411,11 @@ self.addEventListener('fetch', (event) => {
   // API-Requests: nur GET-Whitelist read-only offline-cachen. Alles andere
   // (Mutationen, /auth/*, Nicht-Whitelist) unangetastet ans Netz durchreichen.
   if (url.pathname.startsWith('/api/')) {
+    // Ein Ereignisstrom (EventSource, Accept: text/event-stream) endet nie.
+    // networkFirstApi wartete mit `blob()` auf sein Ende und hielte den Klon im
+    // Speicher, solange die Seite offen ist - und /shopping/feed liegt unter
+    // einem Whitelist-Praefix. Ein Strom geht unangetastet ans Netz.
+    if (request.headers?.get('accept') === 'text/event-stream') return;
     if (request.method === 'GET' && isCacheableApiGet(url.pathname)) {
       event.respondWith(
         (_bypassInitDone ? Promise.resolve() : _bypassInit).then(() => {

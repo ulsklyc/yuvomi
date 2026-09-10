@@ -1112,6 +1112,31 @@ const MIGRATIONS_SQL = {
         WHERE id = NEW.id;
       END;
     `,
+
+  // Migration v194: Aenderungszaehler je Einkaufsliste fuer den Live-Feed.
+  // Die Trigger sind der ganze Inhalt - eine Suite, die sie faehrt, prueft
+  // genau, dass jeder Schreibweg an shopping_items die Nummer bewegt.
+  194: `
+      CREATE TABLE shopping_list_changes (
+        list_id INTEGER PRIMARY KEY,
+        version INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TRIGGER trg_shopping_items_change_ai AFTER INSERT ON shopping_items BEGIN
+        INSERT INTO shopping_list_changes (list_id, version) VALUES (NEW.list_id, 1)
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
+      CREATE TRIGGER trg_shopping_items_change_au AFTER UPDATE ON shopping_items BEGIN
+        INSERT INTO shopping_list_changes (list_id, version) VALUES (NEW.list_id, 1)
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
+      CREATE TRIGGER trg_shopping_items_change_ad AFTER DELETE ON shopping_items BEGIN
+        INSERT INTO shopping_list_changes (list_id, version) VALUES (OLD.list_id, 1)
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
+      CREATE TRIGGER trg_shopping_lists_change_ad AFTER DELETE ON shopping_lists BEGIN
+        DELETE FROM shopping_list_changes WHERE list_id = OLD.id;
+      END;
+    `,
 };
 
 export { MIGRATIONS_SQL };

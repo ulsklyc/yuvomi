@@ -430,6 +430,21 @@ not become two shops.
 | created_by | INTEGER | FK → Users (**SET NULL**) |
 | created_at | TEXT | NOT NULL, ISO 8601 |
 
+### Shopping List Changes (migration v194)
+One row per list, a counter that says *that* the list's items changed, never what. Three triggers
+on `shopping_items` (after insert, update, delete) bump it, so every writer - the shopping routes,
+the meal-plan and recipe imports, housekeeping, MCP, the CalDAV to-do sync - counts without knowing
+about it; the live feed (`GET /api/v1/shopping/feed`) reads this table and nothing else.
+Deliberately no foreign key to Shopping Lists: the item triggers fire during the cascade of a list
+deletion and a foreign key would make exactly that insert fail; a trigger on `shopping_lists`
+removes the row after the list instead. Deviates from the entity-table rule (no `id`, no
+timestamps) as a key/value table.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| list_id | INTEGER | PRIMARY KEY |
+| version | INTEGER | NOT NULL, DEFAULT 0 |
+
 The price is stored in whole minor units rather than as a decimal because the purchase history this
 is groundwork for adds these numbers up, and money in a floating point sums visibly wrong. The
 number of minor units follows the household currency (`currencyFractionDigits`), so JPY has none and
@@ -3439,6 +3454,23 @@ The surface carries four things, in this order: **the time**, large (this is whe
 - Integration with meal plan: "Add ingredients to shopping list" transfers with source reference
 - **Bulk import from meal plan (v1.3.0):** a "From meal plan" action (in the list header until v2.2.3, since then in the chip row's overflow menu) opens a date-range dialog (defaults to the next 7 days) and imports the ingredients of every planned meal in that range into the active list. Repeated ingredients are aggregated before insertion — numeric quantities with a matching unit are summed, purely textual quantities collapse to a `N × …` note. Already-transferred ingredients are skipped via the existing `on_shopping_list` flag (`POST /api/v1/shopping/:listId/import-meal-plan`).
 - Checked items shown with strikethrough + moved to bottom
+- **Live updates while the list is open (migration v194):** an open list hears within about a
+  second that another member (or a meal-plan import, or the CalDAV sync) changed its items, and
+  redraws the affected rows in place - a check from another phone looks exactly like a check on
+  this one, no rebuild, no scroll jump. A row is rebuilt only when an item was added, removed or
+  renamed. The mechanism is deliberately two-layered: a per-list change counter
+  (`shopping_list_changes`) that database triggers bump on every insert/update/delete of
+  `shopping_items`, so no writer has to announce itself; and `GET /api/v1/shopping/feed`, a
+  Server-Sent Events stream the page keeps open for the duration of the route (closed via the
+  router's abort signal, #976) that reads that counter once a second while anyone listens and only
+  says *which* list moved. The page then reloads through the same items request it used to open
+  the list, so there is still one read path. The stream is marked `no-transform` (keeps the gzip
+  middleware out) and `X-Accel-Buffering: no` (keeps nginx from buffering), and pings every 25 s
+  so the client can tell a live stream from a buffered one; when it cannot tell for 60 s, or the
+  browser has no EventSource, the page catches up on `visibilitychange` and every 30 s instead.
+  Own edits survive the refresh: the intent overlay (see the check-intent rules in
+  `public/pages/shopping.js`) keeps a pending tap on top of an older server answer, and the
+  feed's report of one's own change is exactly the answer that settles the intent.
 - **Manual item order within an aisle (v1.87.0, #678):** every row carries a drag handle next to its edit and delete actions. Dragging reorders within the category group only — a drag across groups would be a category change, which the item dialog already does, and ranks are per category anyway. The handle is a real button and takes ArrowUp/ArrowDown once focused, sharing one persistence path with the drag; that keyboard route is required of every `makeSortable` caller (see the header of `public/utils/sortable.js`) and is guarded in `test:frontend-audit`. Its `aria-label` carries the position, and a `role="status"` live region announces each move, reusing `category.reorderAnnounce`. Checked rows are filtered out of the drag and their handle is disabled — they sort last in their group regardless of rank. A category holding a single row hides its handle via `:only-child`. `PATCH /api/v1/shopping/:listId/items/reorder` takes `{ category, order }` and requires the **complete** group: a partial list would leave the omitted ranks colliding with the newly assigned ones. Requests are serialised per category with at most one follow-up queued, so rapid moves settle in the order they were made instead of letting the arrival order at the server decide; the follow-up reads the DOM when it starts, so any number of moves costs two requests. The list id is captured when a move is queued, so switching lists mid-flight neither misroutes the write nor overwrites the new list's state.
 - **Send the list to a member by email (#944):** an entry in the overflow menu mails the list's open
   items to one household member, grouped by category in the same shop order the screen shows.

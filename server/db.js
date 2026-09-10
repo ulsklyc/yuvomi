@@ -7601,6 +7601,50 @@ const MIGRATIONS = [
       CREATE INDEX idx_shopping_items_store ON shopping_items(store_id);
     `,
   },
+  {
+    version: 194,
+    description: 'change counter per shopping list, fed by triggers, for the live feed',
+    up: `
+      -- WER GEAENDERT HAT, IST EGAL - DASS SICH ETWAS GEAENDERT HAT, ZAEHLT.
+      --
+      -- Eine Laufnummer je Liste, die bei jeder Aenderung an ihren Artikeln
+      -- steigt. Der Live-Feed (GET /shopping/feed) liest nur diese Tabelle und
+      -- sagt jedem offenen Einkaufszettel, dass seine Nummer sich bewegt hat;
+      -- was sich geaendert hat, laedt der Zettel dann selbst nach. Zwei Leute
+      -- im selben Laden sahen bis dahin zwei verschiedene Listen, bis einer
+      -- die Seite neu lud.
+      --
+      -- ALS TRIGGER, NICHT ALS AUFRUF IN DEN ROUTEN: shopping_items wird aus
+      -- sechs Modulen beschrieben (Einkauf, Essensplan, Rezepte, Haushaltshilfe,
+      -- MCP, CalDAV-Sync). Ein Vermerk an jeder Schreibstelle waere sechs
+      -- Gelegenheiten, ihn zu vergessen, und die siebte Stelle vergaesse ihn
+      -- sicher. Hier steht die Regel einmal, und wer immer schreibt, loest sie
+      -- aus (docs/DECISIONS.md, Eintrag 2).
+      CREATE TABLE shopping_list_changes (
+        list_id INTEGER PRIMARY KEY,
+        version INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TRIGGER trg_shopping_items_change_ai AFTER INSERT ON shopping_items BEGIN
+        INSERT INTO shopping_list_changes (list_id, version) VALUES (NEW.list_id, 1)
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
+      CREATE TRIGGER trg_shopping_items_change_au AFTER UPDATE ON shopping_items BEGIN
+        INSERT INTO shopping_list_changes (list_id, version) VALUES (NEW.list_id, 1)
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
+      CREATE TRIGGER trg_shopping_items_change_ad AFTER DELETE ON shopping_items BEGIN
+        INSERT INTO shopping_list_changes (list_id, version) VALUES (OLD.list_id, 1)
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
+      -- KEIN FREMDSCHLUESSEL auf shopping_lists: der Loesch-Trigger der Artikel
+      -- feuert waehrend der Kaskade einer Listenloeschung, und ein Fremdschluessel
+      -- liesse genau dieses Einfuegen scheitern. Aufgeraeumt wird stattdessen
+      -- hinter der Liste her.
+      CREATE TRIGGER trg_shopping_lists_change_ad AFTER DELETE ON shopping_lists BEGIN
+        DELETE FROM shopping_list_changes WHERE list_id = OLD.id;
+      END;
+    `,
+  },
 ];
 
 /**

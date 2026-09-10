@@ -78,6 +78,10 @@ function resetShoppingState() {
   __test.resetLoadOrderForTest();
   __test.state.items = [];
   __test.state.categories = [];
+  // Ein Fehlerbild aus einem frueheren Fall (loadLists faengt selbst und
+  // vermerkt es) liesse die Live-Aktualisierung des naechsten stumm bleiben.
+  __test.state.listsError = null;
+  __test.state.itemsError = null;
   __test.state.activeListId = 1;
   __test.state.currentUserId = 7;
   __test.state.collapsedCategories = new Set();
@@ -1158,4 +1162,214 @@ test('nach einem Fehlschlag derselben Liste wird die gecachte Antwort angenommen
   assert.equal(__test.state.items.length, 1,
     'ist der Bestand verworfen, ist die gecachte Antwort das Beste, was es gibt');
   delete globalThis.__apiStub;
+});
+
+// --------------------------------------------------------
+// Live-Aktualisierung: fremde Aenderungen erreichen den Zettel
+// --------------------------------------------------------
+
+/** EventSource-Attrappe fuer wireLiveUpdates - wie in test-live-feed.js, aufs Noetige gekuerzt. */
+class FakeEventSource {
+  static instances = [];
+  constructor(url) {
+    this.url = url;
+    this.readyState = 0;
+    this.closed = false;
+    this.listeners = new Map();
+    FakeEventSource.instances.push(this);
+  }
+  addEventListener(type, fn) {
+    if (!this.listeners.has(type)) this.listeners.set(type, []);
+    this.listeners.get(type).push(fn);
+  }
+  close() { this.closed = true; this.readyState = 2; }
+  open() { this.readyState = 1; this.fire('open'); }
+  fire(type, data) {
+    const evt = data === undefined ? {} : { data: JSON.stringify(data) };
+    for (const fn of this.listeners.get(type) ?? []) fn(evt);
+  }
+}
+
+const bread = (isChecked = 0) => ({ id: 11, name: 'Brot', is_checked: isChecked, category: 'Backwaren', sort_order: 0 });
+const listRow = (checked) => ({ id: 1, name: 'Einkauf', item_total: 2, item_checked: checked });
+
+test('liveRefreshPlan: bewegt sich nur der Haken, bleiben die Zeilen stehen - auch in anderer Reihenfolge', () => {
+  const previous = [milk(0), bread(0)];
+  // Der Server sortiert Abgehaktes ans Ende: die Antwort kommt in anderer Reihenfolge.
+  const fresh = [bread(0), milk(1)];
+  const plan = __test.liveRefreshPlan(previous, fresh);
+  assert.equal(plan.rebuild, false, 'dieselben Artikel, dieselben Namen: kein Neuaufbau, keine Animation, kein Sprung');
+  assert.deepEqual(plan.changed.map((i) => i.id), [10], 'nur die Zeile mit dem neuen Haken wird umgefaerbt');
+});
+
+test('liveRefreshPlan: ein neuer, fehlender, umbenannter oder umsortierter Artikel baut die Liste neu', () => {
+  const previous = [milk(0), bread(0)];
+  const rebuilds = {
+    'dazugekommen':      [milk(0), bread(0), { id: 12, name: 'Eier', is_checked: 0, category: 'Sonstiges' }],
+    'verschwunden':      [milk(0)],
+    'umbenannt':         [{ ...milk(0), name: 'Hafermilch' }, bread(0)],
+    'andere Kategorie':  [{ ...milk(0), category: 'Kuehlregal' }, bread(0)],
+    'andere Menge':      [{ ...milk(0), quantity: '2 l' }, bread(0)],
+  };
+  for (const [why, fresh] of Object.entries(rebuilds)) {
+    assert.equal(__test.liveRefreshPlan(previous, fresh).rebuild, true, why);
+  }
+  assert.equal(__test.liveRefreshPlan([], []).rebuild, false, 'leer zu leer ist keine Bewegung');
+});
+
+test('refreshFromFeed: die aktive Liste laedt Listen UND Artikel, eine andere nur die Listenzeile', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0), { id: 2, name: 'Baumarkt', item_total: 0, item_checked: 0 }];
+  __test.state.items = [milk(0), bread(0)];
+
+  const calls = [];
+  globalThis.__apiStub = {
+    get: async (path) => { calls.push(path); return { data: [listRow(1), { id: 2, name: 'Baumarkt', item_total: 3, item_checked: 0 }] }; },
+    getWithSource: async (path) => { calls.push(path); return { data: { data: [bread(0), milk(1)] }, fromCache: false }; },
+  };
+  const signal = new AbortController().signal;
+
+  await __test.refreshFromFeed(makeNullContainer(), 1, signal);
+  assert.deepEqual([...calls].sort(), ['/shopping', '/shopping/1/items']);
+  assert.equal(__test.state.items.find((i) => i.id === 10).is_checked, 1, 'der fremde Haken steht im Serverstand');
+  assert.equal(__test.state.lists[0].item_checked, 1, 'der Zaehler im Reiter folgt');
+
+  calls.length = 0;
+  await __test.refreshFromFeed(makeNullContainer(), 2, signal);
+  assert.deepEqual(calls, ['/shopping'], 'fuer eine andere Liste reicht der Zaehler - switchList laedt ohnehin frisch');
+  assert.equal(__test.state.lists[1].item_total, 3);
+  delete globalThis.__apiStub;
+});
+
+test('refreshFromFeed: ein Fehler beim Nachladen bleibt still und laesst den letzten Stand stehen', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0)];
+  globalThis.__apiStub = {
+    get: async () => { throw Object.assign(new Error('500'), { data: { error: 'kaputt' } }); },
+    getWithSource: async () => { throw Object.assign(new Error('500'), { data: { error: 'kaputt' } }); },
+  };
+  const warnings = [];
+  const origWarn = console.warn;
+  console.warn = (...args) => warnings.push(args);
+  await assert.doesNotReject(() => __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal));
+  console.warn = origWarn;
+  assert.equal(__test.state.items.length, 1, 'der Bestand bleibt');
+  assert.equal(__test.state.itemsError, null, 'kein Fehlerbild fuer eine stille Auffrischung');
+  // loadLists() faengt selbst und leert die Listen - eine stille Auffrischung
+  // darf daraus weder leere Reiter noch einen Merker machen, der jede weitere
+  // Meldung abweist.
+  assert.equal(__test.state.lists.length, 1, 'die Reiter bleiben stehen');
+  assert.equal(__test.state.listsError, null, 'kein Merker, der die naechste Meldung stumm schaltet');
+  delete globalThis.__apiStub;
+});
+
+test('refreshFromFeed: die eigene, noch unbestaetigte Bearbeitung ueberlebt die Meldung des Feeds', async () => {
+  resetShoppingState();
+  __test.intents.clear();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0)];
+
+  const gate = deferred();
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    // Die Antwort kennt den Haken noch nicht: der eigene PATCH ist unterwegs.
+    getWithSource: async () => ({ data: { data: [milk(0)] }, fromCache: false }),
+    patch: () => gate.promise,
+  };
+
+  const toggling = __test.toggleShoppingItem(10, 0, makeNullContainer());
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  assert.equal(__test.checkedOf(__test.state.items[0]), 1,
+    'die Absicht ueberlagert den alten Serverstand - die Zeile springt nicht zurueck');
+  assert.equal(__test.intents.size, 1, 'die Absicht steht, bis eine Antwort sie traegt');
+
+  gate.resolve({ data: null });
+  await toggling;
+  delete globalThis.__apiStub;
+});
+
+test('refreshFromFeed: die Meldung der EIGENEN Aenderung erfuellt die Absicht, statt sie zurueckzudrehen', async () => {
+  resetShoppingState();
+  __test.intents.clear();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0)];
+
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(1)] }),
+    getWithSource: async () => ({ data: { data: [milk(1)] }, fromCache: false }),
+    patch: async () => ({ data: null }),
+  };
+  await __test.toggleShoppingItem(10, 0, makeNullContainer());
+  assert.equal(__test.intents.size, 1);
+
+  // Der Trigger meldet auch den eigenen Haken; die Antwort darauf traegt ihn.
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  assert.equal(__test.intents.size, 0, 'die Antwort traegt den gewollten Wert - die Absicht ist erfuellt');
+  assert.equal(__test.checkedOf(__test.state.items[0]), 1);
+  delete globalThis.__apiStub;
+});
+
+test('refreshFromFeed: ein abgebrochener Aufbau zeichnet nichts mehr', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0)];
+  const gate = deferred();
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(1)] }),
+    getWithSource: () => gate.promise,
+  };
+  const ac = new AbortController();
+  const refreshing = __test.refreshFromFeed(makeNullContainer(), 1, ac.signal);
+  ac.abort(); // die Seite wird verlassen, waehrend die Antwort unterwegs ist
+  gate.resolve({ data: { data: [milk(1)] }, fromCache: false });
+  await refreshing;
+  assert.equal(__test.state.lists[0].item_checked, 1,
+    'der Serverstand kommt an - er ist die Wahrheit, gleich wer sie noch anschaut');
+  delete globalThis.__apiStub;
+});
+
+test('wireLiveUpdates: der Strom haengt am Router-Signal, eine Meldung laedt nach, der naechste Aufbau schliesst den vorigen', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0)];
+  global.EventSource = FakeEventSource;
+  FakeEventSource.instances.length = 0;
+
+  const calls = [];
+  globalThis.__apiStub = {
+    get: async (path) => { calls.push(path); return { data: [listRow(1)] }; },
+    getWithSource: async (path) => { calls.push(path); return { data: { data: [milk(1)] }, fromCache: false }; },
+  };
+
+  const route = new AbortController();
+  try {
+    __test.wireLiveUpdates(makeNullContainer(), route.signal);
+    const [first] = FakeEventSource.instances;
+    assert.equal(first.url, '/api/v1/shopping/feed');
+
+    first.open();
+    first.fire('versions', { lists: [{ listId: 1, version: 1 }] });
+    first.fire('change', { listId: 1, version: 2 });
+    // Die Warteschlange arbeitet asynchron: zwei Makrotasks reichen fuer Stub-Antworten.
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    assert.ok(calls.includes('/shopping/1/items'), 'die Meldung laedt die aktive Liste nach');
+    assert.equal(__test.state.items[0].is_checked, 1);
+
+    __test.wireLiveUpdates(makeNullContainer(), route.signal);
+    assert.equal(first.closed, true, 'der naechste Aufbau derselben Seite schliesst den Strom des vorigen');
+    const second = FakeEventSource.instances[1];
+    assert.equal(second.closed, false);
+
+    route.abort();
+    assert.equal(second.closed, true, 'die Seite verlassen schliesst den Strom');
+  } finally {
+    // Der Rueckfall-Takt (30 s) hinge sonst am Prozess, wenn eine Zusicherung
+    // oben scheitert - die Suite endete dann nie.
+    route.abort();
+    __test.abortLiveUpdatesForTest();
+    delete global.EventSource;
+    delete globalThis.__apiStub;
+  }
 });

@@ -20,6 +20,8 @@ import { findPageFab } from '/utils/fab.js';
 import { setBulkPill, clearBulkPill, bulkPillLayer } from '/utils/bulk-pill.js';
 import { makeSortable } from '/utils/sortable.js';
 import { amountPlaceholder, centsToAmountInput, amountInputToCents, toDecimalString, breaksOffAtSeparator } from '/utils/money.js';
+import { connectLiveFeed } from '/utils/live-feed.js';
+import { createPageController } from '/utils/page-lifecycle.js';
 
 
 // --------------------------------------------------------
@@ -752,7 +754,9 @@ function renderListContent(container) {
       description: t('common.loadErrorDescription'),
       error: state.listsError,
       retryLabel: t('common.retry'),
-      onRetry: () => render(container, {}),
+      // Das Router-Signal reist mit: ein Aufbau aus dem Retry-Knopf gehoert
+      // zur selben Route und muss mit ihr fallen (#976).
+      onRetry: () => render(container, { user: { id: state.currentUserId }, signal: _routeSignal }),
     });
     return;
   }
@@ -2345,6 +2349,161 @@ async function switchList(listId, container) {
 }
 
 // --------------------------------------------------------
+// Live-Aktualisierung
+// --------------------------------------------------------
+
+/** Der Versions-Feed des Servers (Server-Sent Events, server/routes/shopping.js). */
+const LIVE_FEED_URL = '/api/v1/shopping/feed';
+/** Takt des Rueckfallwegs, solange der Strom nicht traegt. */
+const LIVE_FALLBACK_MS = 30_000;
+
+/** Controller der laufenden Live-Verdrahtung: faellt mit dem Router-Signal und beim naechsten render(). */
+let _liveController = null;
+/** Das Router-Signal des letzten Aufbaus - der Retry-Knopf reicht es an sein render() weiter. */
+let _routeSignal = null;
+
+/**
+ * Was ein frischer Stand an der Zeilen-Ansicht aendert.
+ *
+ * Zwei Faelle, und sie sind mit Absicht verschieden gross. Hat sich nur der
+ * Abgehakt-Zustand bewegt - der haeufige Fall, zwei Leute im selben Laden -,
+ * wird die Zeile an Ort und Stelle umgefaerbt, wie beim eigenen Antippen: kein
+ * Neuaufbau, keine Einblend-Animation, die Scroll-Position bleibt (#276), und
+ * die Reihenfolge auch - Abgehaktes sortiert sich beim naechsten Aufbau ans
+ * Ende, nicht unter dem Finger weg. Ist ein Artikel dazugekommen, verschwunden
+ * oder umbenannt, wird die Liste neu gebaut; das ist der Fall, den die
+ * Animation meint.
+ *
+ * Verglichen wird der SERVERSTAND vor und nach dem Laden, nicht das DOM: die
+ * Seite haelt beides ohnehin deckungsgleich, und `updateItemRow` zeichnet die
+ * Ueberlagerung mit der eigenen Absicht selbst (`checkedOf`).
+ */
+function liveRefreshPlan(previous, fresh) {
+  const shape = (i) => JSON.stringify([
+    i.id, i.category, i.name, i.quantity ?? '', i.notes ? 1 : 0, i.url ? 1 : 0,
+    i.price_cents ?? '', i.store_id ?? '', i.tags ?? [],
+  ]);
+  const before = previous.map(shape).sort();
+  const after  = fresh.map(shape).sort();
+  if (before.length !== after.length || before.some((s, idx) => s !== after[idx])) {
+    return { rebuild: true, changed: [] };
+  }
+  const checkedBefore = new Map(previous.map((i) => [i.id, i.is_checked]));
+  return {
+    rebuild: false,
+    changed: fresh.filter((i) => checkedBefore.get(i.id) !== i.is_checked),
+  };
+}
+
+/**
+ * Eine Liste nachladen, weil der Feed sie gemeldet hat.
+ *
+ * Still bei Fehlern, wie der stille Refresh des Dashboards: der Zettel zeigt
+ * weiter den letzten bekannten Stand, und die naechste Meldung versucht es
+ * wieder. Nur die AKTIVE Liste laedt ihre Artikel; fuer jede andere reicht die
+ * Listenzeile mit ihrem Zaehler, und `switchList` laedt ohnehin frisch.
+ *
+ * Die eigene Bearbeitung ueberlebt das Nachladen: `loadItems` traegt nur den
+ * Serverstand ein, die Absicht liegt daneben und faellt erst, wenn die Antwort
+ * sie traegt (`settleIntents`). Deshalb darf der Feed auch die eigene
+ * Aenderung melden - die Antwort darauf ist genau die, die die Absicht erfuellt.
+ */
+async function refreshFromFeed(container, listId, signal) {
+  if (state.listsError) return;
+  const active        = listId === state.activeListId;
+  const previous      = state.items;
+  const previousLists = state.lists;
+  let failed = false;
+  try {
+    if (active) await Promise.all([loadLists(), loadItems(listId)]);
+    else await loadLists();
+  } catch (err) {
+    console.warn('[Shopping] Live-Aktualisierung fehlgeschlagen:', err);
+    failed = true;
+  }
+  // loadLists() faengt selbst und vermerkt den Fehler fuer den Seitenaufbau,
+  // wo er ein Fehlerbild mit Wiederholung ergibt. Fuer eine STILLE
+  // Auffrischung ist derselbe Vermerk das Gegenteil von still: leere Reiter
+  // und ein Merker, der jede weitere Meldung abwiese. Also zurueck auf den
+  // letzten Stand, und die naechste Meldung versucht es wieder.
+  if (state.listsError) {
+    state.listsError = null;
+    state.lists = previousLists;
+    return;
+  }
+  if (failed || signal.aborted) return;
+  renderTabs(container);
+  // Inzwischen umgeschaltet: switchList zeichnet die neue Liste selbst.
+  if (!active || state.activeListId !== listId) return;
+  if (state.itemsError) {
+    // Der Fehlerzustand von vorhin ist ueberholt - die Antwort ist da.
+    state.itemsError = null;
+    updateItemsList(container);
+    return;
+  }
+  const plan = liveRefreshPlan(previous, state.items);
+  if (plan.rebuild) {
+    updateItemsList(container);
+    return;
+  }
+  for (const item of plan.changed) updateItemRow(container, item);
+  if (plan.changed.length) updateCheckedActions(container);
+}
+
+/**
+ * Die Live-Aktualisierung eines Seitenaufbaus verdrahten. Alles haengt am
+ * Signal DIESES Aufbaus (#976-Muster): der naechste Aufbau bricht den vorigen
+ * ab, und das Router-Signal reisst beide beim Verlassen der Seite mit.
+ *
+ * Drei Wege, ein Ziel:
+ *   - der Strom (EventSource) - Sekunden nach der fremden Aenderung;
+ *   - das Sichtbarwerden des Tabs, wenn der Strom nicht traegt;
+ *   - ein langsamer Takt, wenn der Strom nicht traegt.
+ * Die beiden Rueckfallwege schweigen, solange der Strom lebt. Ein Proxy, der
+ * puffert, oder ein Browser ohne EventSource bekommt so trotzdem einen Zettel,
+ * der nachzieht - in halben Minuten statt in Sekunden.
+ *
+ * Meldungen laufen durch EINE Warteschlange: zwei Haken kurz nacheinander
+ * ergeben ein Nachladen nach dem anderen, nicht zwei, die sich ueberholen.
+ */
+function wireLiveUpdates(container, routeSignal) {
+  _liveController?.abort();
+  const controller = createPageController(routeSignal);
+  _liveController = controller;
+  const { signal } = controller;
+  if (signal.aborted) return;
+
+  const queue = new Set();
+  let draining = false;
+  const drain = async () => {
+    if (draining) return;
+    draining = true;
+    try {
+      while (queue.size && !signal.aborted) {
+        const [listId] = queue;
+        queue.delete(listId);
+        await refreshFromFeed(container, listId, signal);
+      }
+    } finally {
+      draining = false;
+    }
+  };
+  const request = (listId) => {
+    if (signal.aborted || listId == null) return;
+    queue.add(listId);
+    drain();
+  };
+
+  const feed = connectLiveFeed({ url: LIVE_FEED_URL, signal, onChange: request });
+  const catchUp = () => {
+    if (!document.hidden && !feed.isLive()) request(state.activeListId);
+  };
+  document.addEventListener('visibilitychange', catchUp, { signal });
+  const fallbackTimer = setInterval(catchUp, LIVE_FALLBACK_MS);
+  signal.addEventListener('abort', () => clearInterval(fallbackTimer));
+}
+
+// --------------------------------------------------------
 // Event-Verdrahtung
 // --------------------------------------------------------
 
@@ -2712,11 +2871,19 @@ async function openCategoryManager(container, { fromDeepLink = false } = {}) {
 // Haupt-Render
 // --------------------------------------------------------
 
-export async function render(container, { user }) {
+export async function render(container, { user, signal: routeSignal = null } = {}) {
   state.currentUserId = user?.id ?? null;
+  _routeSignal = routeSignal;
   // Ein Seitenaufbau ist immer ein neuer Batch fuer die Sammelaktions-Pille -
   // eine Frist der vorherigen Seite darf diese hier nicht treffen (#1039).
   resetPillMachine();
+  // VOR dem Laden, nicht danach: der Feed setzt seine Marken mit der ersten
+  // Antwort, und was sich ab da bewegt, wird gemeldet. Verdrahtet erst nach
+  // dem Laden, fiele eine Aenderung zwischen Artikel-Antwort und erster
+  // Feed-Antwort durch - bis zur uebernaechsten. Eine Meldung, die noch in
+  // den Aufbau faellt, laedt hoechstens einmal umsonst; die Ladeordnung
+  // (`_loadSeq`) haelt die Antworten auseinander.
+  wireLiveUpdates(container, routeSignal);
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="shopping-page page-measure--narrow">
@@ -2874,4 +3041,11 @@ export const __test = {
   // Auffrischung des naechsten. Aufraeumen gehoert an den ANFANG jedes Falls.
   clearItems,
   resetLoadOrderForTest: () => { _appliedLoad.clear(); settledAt.clear(); _itemsListId = null; },
+  // Live-Aktualisierung: der Plan ist reine Logik (Serverstand vorher/nachher),
+  // das Nachladen und die Verdrahtung laufen ueber den api-Stub und eine
+  // EventSource-Attrappe.
+  liveRefreshPlan,
+  refreshFromFeed,
+  wireLiveUpdates,
+  abortLiveUpdatesForTest: () => { _liveController?.abort(); _liveController = null; },
 };

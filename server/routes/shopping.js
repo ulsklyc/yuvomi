@@ -21,6 +21,7 @@ import { emailService as defaultEmailService } from '../services/email.js';
 import { memberEmail, isHouseholdMember, listEmailableMembers } from '../services/member-email.js';
 import { buildShoppingListMail } from '../services/shopping-mail.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
+import { readVersions, subscribe as subscribeToChanges } from '../services/shopping-feed.js';
 
 const log = createLogger('Shopping');
 
@@ -104,6 +105,58 @@ function loadListItems(listId, categories) {
   for (const item of items) item.tags = tagMap.get(item.id) ?? [];
   return items;
 }
+
+// --------------------------------------------------------
+// GET /api/v1/shopping/feed
+// Live-Feed als Server-Sent Events: meldet, wenn sich die Artikel einer Liste
+// geaendert haben - nicht was, nur dass. Der Zettel laedt dann selbst nach.
+// Ereignisse:
+//   versions  { lists: [{ listId, version }] }  Stand beim Verbinden
+//   change    { listId, version }               eine Liste hat sich bewegt
+//   ping      {}                                alle 25 s, haelt Proxies wach
+//
+// Statisch vor /:listId, wie /categories und /suggestions.
+//
+// `no-transform` haelt die Kompressionsschicht heraus - gzip sammelt, und ein
+// Strom, der gesammelt wird, kommt nie an. `X-Accel-Buffering: no` sagt
+// nginx dasselbe (nginx.conf.example puffert Antworten, wie nginx es ab Werk
+// tut). Der Ping ist ein echtes Ereignis und kein Kommentar, weil der Client
+// an ihm misst, ob der Strom noch lebt - ein Kommentar erreicht sein Skript
+// nicht.
+// --------------------------------------------------------
+const FEED_PING_MS = 25_000;
+
+router.get('/feed', (req, res) => {
+  try {
+    res.status(200);
+    res.set({
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-store, no-transform',
+      'X-Accel-Buffering': 'no',
+    });
+    res.flushHeaders();
+
+    const send = (event, payload) => {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+      if (typeof res.flush === 'function') res.flush();
+    };
+
+    send('versions', {
+      lists: [...readVersions()].map(([listId, version]) => ({ listId, version })),
+    });
+    const unsubscribe = subscribeToChanges((change) => send('change', change));
+    const ping = setInterval(() => send('ping', {}), FEED_PING_MS);
+
+    req.on('close', () => {
+      clearInterval(ping);
+      unsubscribe();
+    });
+  } catch (err) {
+    log.error('GET /feed error:', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Internal server error.', code: 500 });
+    else res.end();
+  }
+});
 
 // --------------------------------------------------------
 // GET /api/v1/shopping/categories

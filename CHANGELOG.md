@@ -36,6 +36,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and used only when tapped - no geocoding, nothing looked up in advance. An address imported over
   CalDAV with escaped line breaks is searched as one line.
 
+- **A shopping list follows what the rest of the household does, while it is open.** Two people
+  in the same shop used to see two different lists: what one ticked off stayed unticked on the
+  other's phone until that page was reloaded. The open list now hears about changes within about
+  a second and redraws the affected rows in place - the same gesture as your own tap, no jump, no
+  animation - and rebuilds only when an item was added, removed or renamed.
+
+  The server keeps a change counter per list, maintained by database triggers rather than by the
+  routes: shopping items are written from six modules (the list itself, meal-plan and recipe
+  imports, the housekeeping module, MCP, the CalDAV to-do sync), and a counter that every writer
+  has to remember is a counter one of them forgets. A browser opens one long-lived
+  `GET /api/v1/shopping/feed` (Server-Sent Events) that only ever says *which* list moved; the
+  page reloads that list through the same request it used to open it, so there is still one read
+  path. Nothing polls while nothing changes. Where the stream cannot get through - a reverse proxy
+  that buffers responses, a browser without EventSource - the page falls back to catching up when
+  it becomes visible and every half minute. The stream itself sends `X-Accel-Buffering: no`, so
+  the nginx example configuration needs no change.
+
 - **A shopping item can carry a price and the shop it was bought at** (#1003, first cut). Both sit
   in the item dialog, where the item is already open - the checkbox stays the fastest gesture in the
   app and gains no second step. The price is stored in whole minor units (cents, yen, fils) rather
