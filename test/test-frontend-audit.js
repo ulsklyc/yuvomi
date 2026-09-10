@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { SETTINGS_DOMAINS, SETTINGS_LEAVES } from '../public/settings/registry.js';
 import { eachRule } from './css-rules.js';
 import { withoutHtmlComments, withoutBlockComments, withoutCommentsKeepingLines } from './source-text.js';
@@ -1118,7 +1119,7 @@ test('jede JS-Datei unter public/ ist syntaktisch gueltiges ESM', () => {
     try {
       // `node --check` liest den Modultyp aus package.json ("type": "module"),
       // parst also als ESM - `import`/`export` auf oberster Ebene sind erlaubt.
-      execFileSync(process.execPath, ['--check', new URL(file, import.meta.url).pathname], { stdio: 'pipe' });
+      execFileSync(process.execPath, ['--check', fileURLToPath(new URL(file, import.meta.url))], { stdio: 'pipe' });
     } catch (err) {
       const detail = String(err.stderr || err.message).split('\n').find((l) => /SyntaxError/.test(l)) || String(err.message).slice(0, 120);
       offenders.push(`${file.replace('../public/', '')}: ${detail.trim()}`);
