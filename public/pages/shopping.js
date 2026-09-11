@@ -313,6 +313,31 @@ const intents = new Map();
 /** Monotone Folgenummer, damit ein zweites Antippen das erste ueberstimmt. */
 let _checkSeq = 0;
 /**
+ * Artikel, die lokal schon weg sind, deren DELETE aber noch nicht gesendet ist:
+ * Id -> { listId, checked } fuer das Undo-Fenster (`deleteItemUndoable`,
+ * `clearCheckedUndoable`).
+ *
+ * Dasselbe Muster wie `intents`, nur fuer das Loeschen: `state.items` traegt
+ * den Serverstand, und der Server hat den Artikel im Undo-Fenster noch. Landet
+ * in diesen fuenf Sekunden eine Live-Auffrischung (jemand anderes hat die
+ * Liste bewegt), ersetzt `loadItems` den Bestand mit der Serverantwort - und
+ * die Zeile stuende wieder da, unter dem Toast, der sie als geloescht meldet.
+ * Schlimmer: die Quittung des DELETE traegt danach als `before` genau die
+ * Marke, die die Auffrischung gesetzt hat, der Feed rueckt vor, und die
+ * naechste Abfrage laedt NICHT nach. Die Zeile bliebe stehen, bis sich die
+ * Liste das naechste Mal bewegt. Und ein Zuruecknehmen im Fenster legte den
+ * Schnappschuss neben die schon wieder vorhandene Zeile: zweimal Milch.
+ *
+ * Deshalb filtert `loadItems` diese Ids aus jeder Antwort: der Bestand nach
+ * der Auffrischung ist der Serverstand OHNE die schwebenden Loeschungen, und
+ * genau das ist der Stand, den die Quittung des DELETE dann meint. Die Menge
+ * leert sich mit dem Ende des Fensters - gesendet oder zurueckgenommen, auch
+ * nach einem fehlgeschlagenen DELETE. `loadLists` zieht die Eintraege vom
+ * Zaehler im Reiter ab, aus demselben Grund: der Server zaehlt den Artikel
+ * noch mit, die Anzeige nicht mehr.
+ */
+const pendingRemovals = new Map();
+/**
  * Wann der Server einen Artikel zuletzt BESTAETIGT hat: id -> Ladenummer.
  *
  * Sie haengt am Artikel, nicht an der Absicht - denn sie ueberlebt diese. Wer
@@ -524,7 +549,9 @@ function deleteItemUndoable(id, container) {
   // treffen.
   const listId = state.activeListId;
 
-  // Optimistisch entfernen
+  // Optimistisch entfernen - und als schwebend vermerken, damit eine
+  // Live-Auffrischung im Undo-Fenster die Zeile nicht zurueckbringt.
+  pendingRemovals.set(id, { listId, checked: gebucht });
   state.items = state.items.filter((i) => i.id !== id);
   updateItemsList(container);
   updateListCounter(listId, -1, gebucht ? -1 : 0);
@@ -533,7 +560,14 @@ function deleteItemUndoable(id, container) {
   scheduleUndoableDelete({
     message: t('shopping.itemDeletedToast', { name: snapshot?.name ?? '' }),
     commit: async ({ keepalive }) => {
-      acknowledgeOwnChange(await api.delete(`/shopping/items/${id}`, { keepalive }));
+      try {
+        acknowledgeOwnChange(await api.delete(`/shopping/items/${id}`, { keepalive }));
+      } finally {
+        // Das Fenster ist zu, gleich wie es ausging: schlaegt das DELETE fehl,
+        // bringt `restore` die Zeile zurueck, und die naechste Antwort darf sie
+        // wieder tragen.
+        pendingRemovals.delete(id);
+      }
       // Endgueltig weg: die Absicht kann von keiner Antwort mehr erfuellt oder
       // ueberholt werden und laege sonst tot in der Karte. Bis hierher bleibt
       // sie liegen - ein Zuruecknehmen im Undo-Fenster braucht sie, damit die
@@ -541,12 +575,14 @@ function deleteItemUndoable(id, container) {
       intents.delete(id);
     },
     restore: (err) => {
+      pendingRemovals.delete(id);
       if (snapshot) {
         // Der sichtbare Zustand nur, wenn die Liste noch die gezeigte ist -
         // sonst gehoert `state.items` bereits einer anderen. Der Server hat
         // nichts geloescht, also bringt `switchList` den Artikel beim
-        // Zurueckwechseln ohnehin mit.
-        if (state.activeListId === listId) {
+        // Zurueckwechseln ohnehin mit. Und nur, wenn die Zeile nicht schon
+        // wieder da ist - sonst stuende sie zweimal.
+        if (state.activeListId === listId && !state.items.some((i) => i.id === id)) {
           state.items.push(snapshot);
           state.items.sort((a, b) => a.id - b.id);
           updateItemsList(container);
@@ -1761,8 +1797,23 @@ function openItemDetails(itemId, container) {
           };
           const data = await api.patch(`/shopping/items/${item.id}`, payload);
           acknowledgeOwnChange(data);
-          const categoryChanged = data.data.category !== item.category;
-          Object.assign(item, data.data);
+          // DER ARTIKEL WIRD BEIM SPEICHERN NACHGESCHLAGEN, nicht beim Oeffnen
+          // festgehalten: waehrend der Dialog offen war, kann eine
+          // Live-Auffrischung `state.items` ersetzt haben - dann ist `item` ein
+          // Objekt, das nirgends mehr haengt, und die Bearbeitung landete dort
+          // statt in der Liste. Die Zeile zeigte weiter den alten Namen, und
+          // weil die Quittung die Marke vorrueckt, holte auch keine Abfrage
+          // das nach. Fehlt der Artikel ganz (jemand hat ihn inzwischen
+          // geloescht, oder er ist noch nicht wieder geladen), bleibt der
+          // Neuaufbau aus dem Bestand.
+          const aktuell = state.items.find((i) => i.id === item.id);
+          if (!aktuell) {
+            closeModal({ force: true });
+            updateItemsList(container);
+            return;
+          }
+          const categoryChanged = data.data.category !== aktuell.category;
+          Object.assign(aktuell, data.data);
           // force: der Dirty-Guard vergleicht gegen den Snapshot vom Öffnen und
           // sähe die gerade gespeicherten Felder als ungespeicherte Änderungen.
           // Ohne das fragte Speichern „Änderungen verwerfen?" (Issue #625).
@@ -1774,8 +1825,8 @@ function openItemDetails(itemId, container) {
           if (categoryChanged) {
             updateItemsList(container);
           } else {
-            updateItemRow(container, item);
-            refreshItemName(container, item);
+            updateItemRow(container, aktuell);
+            refreshItemName(container, aktuell);
           }
         } catch (err) {
           window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
@@ -2097,7 +2148,9 @@ function clearCheckedUndoable(container) {
   // Snapshot zur alten gehoerte und sie also nicht zurueckholen konnte.
   const listId = state.activeListId;
 
-  // Optimistisch entfernen
+  // Optimistisch entfernen - und als schwebend vermerken, damit eine
+  // Live-Auffrischung im Undo-Fenster die Zeilen nicht zurueckbringt.
+  for (const item of checked) pendingRemovals.set(item.id, { listId, checked: true });
   state.items = state.items.filter((i) => !checkedOf(i));
   updateItemsList(container);
   updateListCounter(listId, -count, -count);
@@ -2106,11 +2159,18 @@ function clearCheckedUndoable(container) {
   scheduleUndoableDelete({
     message: t('shopping.itemsRemovedToast', { count }),
     commit: async ({ keepalive }) => {
-      acknowledgeOwnChange(await api.delete(`/shopping/${listId}/items/checked`, { keepalive }));
+      try {
+        acknowledgeOwnChange(await api.delete(`/shopping/${listId}/items/checked`, { keepalive }));
+      } finally {
+        for (const item of checked) pendingRemovals.delete(item.id);
+      }
     },
     restore: (err) => {
+      for (const item of checked) pendingRemovals.delete(item.id);
       if (state.activeListId === listId) {
-        snapshot.forEach((item) => state.items.push(item));
+        // Nur, was nicht schon wieder da ist - sonst stuende es zweimal.
+        const vorhanden = new Set(state.items.map((i) => i.id));
+        snapshot.forEach((item) => { if (!vorhanden.has(item.id)) state.items.push(item); });
         state.items.sort((a, b) => a.id - b.id);
         updateItemsList(container);
       }
@@ -2232,6 +2292,13 @@ async function loadLists() {
   try {
     const data   = await api.get('/shopping');
     state.lists  = data.data ?? [];
+    // Der Zaehler im Reiter zeigt, was die Zeilen zeigen: ein Artikel im
+    // Undo-Fenster ist fuer den Server noch da, fuer die Anzeige nicht mehr
+    // (`pendingRemovals`) - sonst zaehlte die Auffrischung ihn wieder mit, und
+    // das Zuruecknehmen buchte ihn ein zweites Mal dazu.
+    for (const { listId, checked } of pendingRemovals.values()) {
+      updateListCounter(listId, -1, checked ? -1 : 0);
+    }
     state.listsError = null;
   } catch (err) {
     console.error('[Shopping] loadLists Fehler:', err);
@@ -2312,7 +2379,11 @@ async function loadItems(listId) {
   // die Liste und die Kategorien werden gebraucht -, nur der eine Wert, von
   // dem wir sicher wissen, dass er juenger ist, bleibt stehen.
   const vorherige = new Map(state.items.map((i) => [i.id, i]));
-  const frisch = data.data ?? [];
+  // EIN LOKAL GELOESCHTER ARTIKEL KOMMT NICHT ZURUECK, solange sein Undo-Fenster
+  // laeuft: der Server hat ihn noch, die Anzeige nicht mehr (`pendingRemovals`).
+  // Nur so ist der Bestand nach einer Auffrischung "Serverstand ohne die
+  // schwebenden Loeschungen" - und die Quittung des spaeteren DELETE stimmt.
+  const frisch = (data.data ?? []).filter((i) => !pendingRemovals.has(i.id));
   for (const item of frisch) {
     const bestaetigt = settledAt.get(item.id);
     if (bestaetigt != null && bestaetigt >= startedAt) {
@@ -3073,6 +3144,13 @@ export const __test = {
   toggleShoppingItem,
   loadItems,
   deleteItemUndoable,
+  clearCheckedUndoable,
+  // Der Dialog rendert ueber den Modal-Stub des Loaders; die Tests greifen
+  // sein onSave ab und loesen das Speichern nach einer Auffrischung aus.
+  openItemDetails,
+  // Die schwebenden Loeschungen: geprueft wird, dass eine Auffrischung im
+  // Undo-Fenster sie nicht zurueckbringt und das Fenster sie wieder raeumt.
+  pendingRemovals,
   // Die Absichten-Karte und ihre Lesefunktion: die Tests pruefen an ihnen die
   // Trennung selbst - dass `state.items` den Serverstand behaelt und die Zeile
   // die Ueberlagerung zeigt.

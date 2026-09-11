@@ -33,6 +33,8 @@ const ALL_CACHES    = [SHELL_CACHE, PAGES_CACHE, LOCALES_CACHE, ASSETS_CACHE];
 // GET-API-Pfade (nach /api/v1), die für Read-only-Offline gecacht werden dürfen.
 // NUR Lese-Endpunkte — niemals /auth/* oder Mutationen. Prefix-Match.
 const API_CACHE_WHITELIST = ['/calendar', '/tasks', '/shopping', '/contacts', '/dashboard'];
+// Pfade UNTER einem Whitelist-Prefix, die trotzdem nie gecacht werden.
+const API_CACHE_EXCLUDE = ['/shopping/versions'];
 
 // App-Shell: sofort benötigt für ersten Render
 const APP_SHELL = [
@@ -592,6 +594,11 @@ function isMutableAppResource(pathname) {
 function isCacheableApiGet(pathname) {
   if (!pathname.startsWith('/api/v1')) return false;
   const rest = pathname.slice('/api/v1'.length);
+  // Die Laufnummern-Abfrage der Einkaufslisten faellt unter das Prefix
+  // /shopping, gehoert aber nicht in den Cache: sie kommt alle 10 s je offenem
+  // Tab, und offline hat ein alter Stand der Nummern keinen Wert - die Seite
+  // bekaeme ihn als normale 200 zurueck und hielte ihn fuer frisch.
+  if (API_CACHE_EXCLUDE.includes(rest)) return false;
   return API_CACHE_WHITELIST.some((p) => rest === p || rest.startsWith(`${p}/`));
 }
 

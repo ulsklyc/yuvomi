@@ -75,6 +75,7 @@ function resetShoppingState() {
   // Wasserstandsmarke aus einem frueheren Fall verwirft sonst die Auffrischung
   // des naechsten - der Fall ist dann isoliert gruen und in der Suite rot.
   __test.intents.clear();
+  __test.pendingRemovals.clear();
   __test.resetLoadOrderForTest();
   __test.state.items = [];
   __test.state.categories = [];
@@ -1323,6 +1324,235 @@ test('refreshFromFeed: ist die aktive Liste weg, wechselt der Zettel auf die ers
   assert.ok(calls.includes('/shopping/2/items'), 'und geladen');
   assert.deepEqual(__test.state.items.map((i) => i.id), [11]);
   delete globalThis.__apiStub;
+});
+
+// --------------------------------------------------------
+// Undo-Fenster gegen eine Live-Auffrischung (Review zu PR #1109, Punkt 1 und 2)
+//
+// Der DELETE geht erst, wenn das Fenster zu ist. Landet in den fuenf Sekunden
+// eine Auffrischung, hat der Server den Artikel noch - und `loadItems` brachte
+// ihn zurueck, unter dem Toast, der ihn als geloescht meldet. Die Quittung des
+// DELETE rueckte die Marke danach vor, und keine Abfrage holte das nach.
+// --------------------------------------------------------
+
+/** Faengt das Undo-Fenster ab: der Test schliesst es selbst oder nimmt zurueck. */
+function captureUndo() {
+  const box = { last: null };
+  globalThis.__undoStub = (opts) => { box.last = opts; };
+  return box;
+}
+
+test('eine Auffrischung im Undo-Fenster bringt den geloeschten Artikel NICHT zurueck', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  const deletes = [];
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    // Der Server hat die Milch noch - der DELETE ist ja noch nicht raus.
+    getWithSource: async () => ({ data: { data: [milk(0), bread(1)] }, fromCache: false }),
+    delete: async (path) => { deletes.push(path); return { data: null, list_change: { list_id: 1, before: 5, after: 6 } }; },
+  };
+
+  __test.deleteItemUndoable(10, makeNullContainer());
+  assert.deepEqual(__test.state.items.map((i) => i.id), [11], 'die Zeile ist sofort weg');
+  assert.ok(__test.pendingRemovals.has(10), 'und als schwebend vermerkt');
+
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  assert.deepEqual(__test.state.items.map((i) => i.id), [11], 'die Auffrischung laesst die Milch draussen');
+  assert.equal(__test.state.items[0].is_checked, 1, 'traegt aber den fremden Haken am Brot ein');
+  assert.equal(__test.state.lists[0].item_total, 1, 'der Zaehler zaehlt die Milch nicht wieder mit');
+
+  await undo.last.commit({ keepalive: false });
+  assert.deepEqual(deletes, ['/shopping/items/10']);
+  assert.equal(__test.pendingRemovals.size, 0, 'mit dem DELETE ist nichts mehr schwebend');
+  assert.deepEqual(__test.state.items.map((i) => i.id), [11], 'und der Bestand ist der Serverstand nach dem DELETE');
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+test('Zuruecknehmen nach einer Auffrischung im Fenster bringt den Artikel genau EINMAL zurueck', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    getWithSource: async () => ({ data: { data: [milk(0), bread(0)] }, fromCache: false }),
+  };
+
+  __test.deleteItemUndoable(10, makeNullContainer());
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  undo.last.restore();
+
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 11], 'einmal Milch, nicht zweimal');
+  assert.equal(__test.pendingRemovals.size, 0, 'nichts mehr schwebend');
+  assert.equal(__test.state.lists[0].item_total, 2, 'der Zaehler steht wieder auf dem Serverstand');
+
+  // Die naechste Auffrischung traegt die Milch wieder - sie ist nicht mehr schwebend.
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 11]);
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+test('ein fehlgeschlagener DELETE raeumt die Schwebe und bringt die Zeile zurueck', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  globalThis.__apiStub = {
+    delete: async () => { throw Object.assign(new Error('500'), { data: { error: 'kaputt' } }); },
+  };
+
+  __test.deleteItemUndoable(10, makeNullContainer());
+  await assert.rejects(() => undo.last.commit({ keepalive: false }));
+  assert.equal(__test.pendingRemovals.size, 0, 'der Fehlschlag laesst nichts schwebend zurueck');
+  // scheduleUndoableDelete ruft bei einem Fehlschlag restore - hier von Hand.
+  undo.last.restore(new Error('500'));
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 11]);
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+test('Abgehakte loeschen: die Auffrischung im Fenster bringt sie nicht zurueck, das Zuruecknehmen nicht doppelt', async () => {
+  resetShoppingState();
+  const eier = () => ({ id: 12, name: 'Eier', is_checked: 0, category: 'Sonstiges', sort_order: 0 });
+  __test.state.lists = [{ ...listRow(2), item_total: 3 }];
+  __test.state.items = [milk(1), bread(1), eier()];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  const deletes = [];
+  globalThis.__apiStub = {
+    get: async () => ({ data: [{ ...listRow(2), item_total: 3 }] }),
+    getWithSource: async () => ({ data: { data: [milk(1), bread(1), eier()] }, fromCache: false }),
+    delete: async (path) => { deletes.push(path); return { data: null, list_change: { list_id: 1, before: 5, after: 6 } }; },
+  };
+
+  __test.clearCheckedUndoable(makeNullContainer());
+  assert.deepEqual(__test.state.items.map((i) => i.id), [12]);
+  assert.equal(__test.pendingRemovals.size, 2);
+
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  assert.deepEqual(__test.state.items.map((i) => i.id), [12], 'die Abgehakten bleiben draussen');
+  assert.equal(__test.state.lists[0].item_total, 1, 'der Zaehler ohne die Abgehakten');
+  assert.equal(__test.state.lists[0].item_checked, 0);
+
+  undo.last.restore();
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 11, 12], 'jede genau einmal zurueck');
+  assert.equal(__test.pendingRemovals.size, 0);
+  assert.equal(__test.state.lists[0].item_total, 3);
+  assert.equal(__test.state.lists[0].item_checked, 2);
+  assert.deepEqual(deletes, [], 'zurueckgenommen - kein DELETE');
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+test('Abgehakte loeschen: das Schliessen des Fensters raeumt die Schwebe', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(1)];
+  __test.state.items = [milk(1), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  globalThis.__apiStub = {
+    delete: async () => ({ data: null, list_change: { list_id: 1, before: 5, after: 6 } }),
+  };
+  __test.clearCheckedUndoable(makeNullContainer());
+  await undo.last.commit({ keepalive: false });
+  assert.equal(__test.pendingRemovals.size, 0);
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+/** Kleinstes Panel fuer den Artikeldialog: Felder mit Wert, ein Formular mit submit-Handler. */
+function makeDialogPanel(values) {
+  const fields = {};
+  for (const [id, value] of Object.entries(values)) fields[`#${id}`] = { value, addEventListener() {} };
+  const handlers = {};
+  const form = { addEventListener(type, fn) { handlers[type] = fn; } };
+  return {
+    querySelector(sel) {
+      if (sel === '#item-details-form') return form;
+      return fields[sel] ?? null;
+    },
+    submit: () => handlers.submit({ preventDefault() {} }),
+  };
+}
+
+const dialogFields = (name, qty = '') => ({
+  'item-details-name': name, 'item-details-qty': qty, 'item-details-cat': 'Sonstiges',
+  'item-details-url': '', 'item-details-notes': '', 'item-details-price': '', 'item-details-store': '',
+  'item-details-link': '', 'item-details-cancel': '',
+});
+
+test('Speichern im Artikeldialog nach einer Auffrischung trifft die Zeile im BESTAND, nicht das alte Objekt', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0), bread(0)];
+  __test.state.categories = [{ id: 1, name: 'Sonstiges' }, { id: 2, name: 'Backwaren' }];
+  let onSave = null;
+  globalThis.__modalStub = (opts) => { onSave = opts.onSave; };
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    // Die Auffrischung ersetzt den Bestand durch NEUE Objekte (fremder Haken am Brot).
+    getWithSource: async () => ({ data: { data: [milk(0), bread(1)] }, fromCache: false }),
+    patch: async (path, payload) => ({
+      data: { ...milk(0), ...payload },
+      list_change: { list_id: 1, before: 6, after: 7 },
+    }),
+  };
+
+  __test.openItemDetails(10, makeNullContainer());
+  assert.equal(typeof onSave, 'function', 'der Dialog ist offen');
+  const panel = makeDialogPanel(dialogFields('Hafermilch', '2'));
+  onSave(panel);
+
+  // Waehrend der Dialog offen ist, meldet der Feed die Liste.
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await panel.submit();
+
+  const zeile = __test.state.items.find((i) => i.id === 10);
+  assert.equal(zeile.name, 'Hafermilch', 'die Bearbeitung steht im Bestand, aus dem die Liste zeichnet');
+  assert.equal(zeile.quantity, '2');
+  assert.equal(__test.state.items.find((i) => i.id === 11).is_checked, 1, 'der fremde Haken bleibt');
+
+  delete globalThis.__apiStub;
+  delete globalThis.__modalStub;
+});
+
+test('Speichern im Artikeldialog: ist der Artikel inzwischen weg, wirft das Speichern nicht', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0)];
+  __test.state.categories = [{ id: 1, name: 'Sonstiges' }];
+  let onSave = null;
+  globalThis.__modalStub = (opts) => { onSave = opts.onSave; };
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    getWithSource: async () => ({ data: { data: [] }, fromCache: false }),
+    patch: async (path, payload) => ({ data: { ...milk(0), ...payload }, list_change: { list_id: 1, before: 6, after: 7 } }),
+  };
+  __test.openItemDetails(10, makeNullContainer());
+  const panel = makeDialogPanel(dialogFields('Hafermilch'));
+  onSave(panel);
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await assert.doesNotReject(() => panel.submit());
+  assert.deepEqual(__test.state.items, [], 'kein Geisterobjekt im Bestand');
+  delete globalThis.__apiStub;
+  delete globalThis.__modalStub;
 });
 
 /** Zwei Makrotasks reichen, damit die Warteschlange Stub-Antworten verarbeitet hat. */

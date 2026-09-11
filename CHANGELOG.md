@@ -38,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **A shopping list follows what the rest of the household does, while it is open.** Two people
   in the same shop used to see two different lists: what one ticked off stayed unticked on the
-  other's phone until that page was reloaded. The open list now hears about changes within a few
+  other's phone until that page was reloaded. The open list now hears about changes within about ten
   seconds and redraws the affected rows in place - the same gesture as your own tap, no jump, no
   animation - and rebuilds only when an item was added, removed or renamed.
 

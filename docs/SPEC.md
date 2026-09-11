@@ -430,13 +430,24 @@ not become two shops.
 | created_by | INTEGER | FK → Users (**SET NULL**) |
 | created_at | TEXT | NOT NULL, ISO 8601 |
 
+The price is stored in whole minor units rather than as a decimal because the purchase history this
+is groundwork for adds these numbers up, and money in a floating point sums visibly wrong. The
+number of minor units follows the household currency (`currencyFractionDigits`), so JPY has none and
+KWD has three; the conversion between input field and column lives in `public/utils/money.js` and
+goes through `toDecimalString`, which applies the region's own separator and digit system and
+rejects a grouped "1.000" instead of silently reading it as one.
+
+`store_id` is `ON DELETE SET NULL`, not `RESTRICT`: deleting a shop keeps every price and only
+clears the assignment. What was once paid stays true.
+
 ### Shopping List Changes (migration v194)
 One row per list, a counter that says *that* the list or its items changed, never what. Every
 list has a row from the start (backfilled with 0 for existing lists, an insert trigger on
 `shopping_lists` for new ones), because a client takes the first version it sees as its baseline
 and a list without a row would lose its first change to that baseline. Triggers on
 `shopping_items` (after insert, update, delete, plus one for an item whose `list_id` changed,
-which bumps the list it left) and on a `shopping_lists` update bump it, so every writer - the
+which bumps the list it left), on `shopping_item_tags` (after insert and delete, resolved to the
+list through the item) and on a `shopping_lists` update bump it, so every writer - the
 shopping routes, the meal-plan and recipe imports, housekeeping, MCP, the CalDAV to-do sync -
 counts without knowing about it; `GET /api/v1/shopping/versions` reads this table and nothing
 else. Deliberately no foreign key to Shopping Lists: the item triggers fire during the cascade of a
@@ -448,16 +459,6 @@ gone. Deviates from the entity-table rule (no `id`, no timestamps) as a key/valu
 |--------|------|-----------|
 | list_id | INTEGER | PRIMARY KEY |
 | version | INTEGER | NOT NULL, DEFAULT 0 |
-
-The price is stored in whole minor units rather than as a decimal because the purchase history this
-is groundwork for adds these numbers up, and money in a floating point sums visibly wrong. The
-number of minor units follows the household currency (`currencyFractionDigits`), so JPY has none and
-KWD has three; the conversion between input field and column lives in `public/utils/money.js` and
-goes through `toDecimalString`, which applies the region's own separator and digit system and
-rejects a grouped "1.000" instead of silently reading it as one.
-
-`store_id` is `ON DELETE SET NULL`, not `RESTRICT`: deleting a shop keeps every price and only
-clears the assignment. What was once paid stays true.
 
 ### Meals
 | Column | Type | Constraint |

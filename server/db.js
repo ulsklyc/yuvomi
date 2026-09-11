@@ -7656,6 +7656,26 @@ const MIGRATIONS = [
         INSERT INTO shopping_list_changes (list_id, version) VALUES (OLD.list_id, 1)
           ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
       END;
+      -- AUCH DIE TAGS EINES ARTIKELS ZAEHLEN. Der Client vergleicht sie beim
+      -- Nachladen (liveRefreshPlan), und ihr einziger Schreiber heute - der
+      -- CalDAV-To-do-Sync ueber setItemTags() - schreibt zwar gleich nach einem
+      -- UPDATE desselben Artikels, aber ein Trigger jetzt kostet weniger als
+      -- eine Migration spaeter, wenn der zweite Schreiber kommt. Die Tabelle
+      -- traegt keine list_id; die kommt vom Artikel. Faellt der Artikel selbst
+      -- (Kaskade), ist seine Zeile schon weg, das SELECT liefert nichts, und
+      -- die Loeschung zaehlt nur einmal - ueber den Trigger des Artikels.
+      -- Das WHERE im SELECT ist Pflicht: ohne eines liest SQLite das ON
+      -- CONFLICT als Teil des SELECT (Parser-Mehrdeutigkeit der Upsert-Syntax).
+      CREATE TRIGGER trg_shopping_item_tags_change_ai AFTER INSERT ON shopping_item_tags BEGIN
+        INSERT INTO shopping_list_changes (list_id, version)
+          SELECT list_id, 1 FROM shopping_items WHERE id = NEW.item_id
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
+      CREATE TRIGGER trg_shopping_item_tags_change_ad AFTER DELETE ON shopping_item_tags BEGIN
+        INSERT INTO shopping_list_changes (list_id, version)
+          SELECT list_id, 1 FROM shopping_items WHERE id = OLD.item_id
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
       -- KEIN FREMDSCHLUESSEL auf shopping_lists: der Loesch-Trigger der Artikel
       -- feuert waehrend der Kaskade einer Listenloeschung, und ein Fremdschluessel
       -- liesse genau dieses Einfuegen scheitern. Aufgeraeumt wird stattdessen

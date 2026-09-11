@@ -1147,6 +1147,16 @@ const MIGRATIONS_SQL = {
         INSERT INTO shopping_list_changes (list_id, version) VALUES (OLD.list_id, 1)
           ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
       END;
+      CREATE TRIGGER trg_shopping_item_tags_change_ai AFTER INSERT ON shopping_item_tags BEGIN
+        INSERT INTO shopping_list_changes (list_id, version)
+          SELECT list_id, 1 FROM shopping_items WHERE id = NEW.item_id
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
+      CREATE TRIGGER trg_shopping_item_tags_change_ad AFTER DELETE ON shopping_item_tags BEGIN
+        INSERT INTO shopping_list_changes (list_id, version)
+          SELECT list_id, 1 FROM shopping_items WHERE id = OLD.item_id
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
       CREATE TRIGGER trg_shopping_lists_change_ad AFTER DELETE ON shopping_lists BEGIN
         DELETE FROM shopping_list_changes WHERE list_id = OLD.id;
       END;

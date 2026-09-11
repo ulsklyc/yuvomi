@@ -10,8 +10,9 @@
  *        2. Der Zaehler: jede Liste hat von Anfang an eine Zeile (die erste
  *           Aenderung darf nicht als Ausgangsstand verloren gehen), jeder
  *           Schreibweg bewegt sie - auch einer an der Route vorbei -, ein
- *           Artikel, der die Liste wechselt, bewegt BEIDE Listen, Umbenennen
- *           bewegt, Loeschen nimmt die Zeile mit.
+ *           Artikel, der die Liste wechselt, bewegt BEIDE Listen, ein Tag
+ *           bewegt die Liste seines Artikels (ohne die Kaskade doppelt zu
+ *           zaehlen), Umbenennen bewegt, Loeschen nimmt die Zeile mit.
  *        3. Die Quittung: die Artikel-Routen antworten mit
  *           `list_change: { list_id, before, after }`.
  *        Dazu der Backfill der Migration gegen eine Vor-v194-Datenbank.
@@ -161,6 +162,32 @@ test('ein Artikel, der die Liste wechselt, bewegt BEIDE Listen - auch die, die e
   assert.ok(versionOf(to) > toBefore, 'die neue Liste erfaehrt es');
 });
 
+test('ein Tag, der kommt oder geht, bewegt die Liste seines Artikels', async () => {
+  const list = await newList('Tags');
+  const { data: item } = await addItem(list);
+  const before = versionOf(list);
+  // So schreibt setItemTags() (utils/task-tags.js) fuer den CalDAV-To-do-Sync:
+  // erst DELETE, dann INSERT je Tag - beides ohne Umweg ueber eine Route.
+  db.prepare('INSERT INTO shopping_item_tags (item_id, tag, tag_key) VALUES (?, ?, ?)').run(item.id, 'Bio', 'bio');
+  const afterInsert = versionOf(list);
+  assert.ok(afterInsert > before, 'ein neuer Tag bewegt die Nummer');
+  db.prepare('DELETE FROM shopping_item_tags WHERE item_id = ?').run(item.id);
+  assert.ok(versionOf(list) > afterInsert, 'ein entfernter Tag bewegt die Nummer');
+});
+
+test('die Tag-Kaskade eines geloeschten Artikels zaehlt nicht doppelt', async () => {
+  const list = await newList('Kaskade');
+  const { data: item } = await addItem(list);
+  db.prepare('INSERT INTO shopping_item_tags (item_id, tag, tag_key) VALUES (?, ?, ?)').run(item.id, 'Bio', 'bio');
+  const before = versionOf(list);
+  // Die Kaskade raeumt den Tag, aber der Artikel ist da schon weg: das SELECT
+  // im Tag-Trigger findet keine list_id mehr, gezaehlt wird nur der Artikel.
+  const r = await call('DELETE', `/shopping/items/${item.id}`);
+  assert.equal(r.status, 200);
+  assert.equal(db.prepare('SELECT count(*) AS n FROM shopping_item_tags WHERE item_id = ?').get(item.id).n, 0, 'der Tag ist mit dem Artikel gegangen');
+  assert.equal(versionOf(list), before + 1, 'genau ein Schritt fuer das Loeschen');
+});
+
 test('Umbenennen einer Liste bewegt ihre Nummer; Loeschen nimmt die Zeile mit', async () => {
   const list = await newList('Alt');
   const before = versionOf(list);
@@ -232,6 +259,10 @@ test('v194: bestehende Listen bekommen beim Update ihre Zeile mit 0', () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       list_id INTEGER NOT NULL REFERENCES shopping_lists(id) ON DELETE CASCADE,
       name TEXT NOT NULL
+    );
+    CREATE TABLE shopping_item_tags (
+      item_id INTEGER NOT NULL REFERENCES shopping_items(id) ON DELETE CASCADE,
+      tag TEXT NOT NULL, tag_key TEXT NOT NULL, PRIMARY KEY (item_id, tag_key)
     );
     INSERT INTO shopping_lists (name) VALUES ('Supermarkt'), ('Baumarkt');
     INSERT INTO shopping_items (list_id, name) VALUES (1, 'Milch');
