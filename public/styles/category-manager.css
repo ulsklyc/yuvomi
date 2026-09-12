@@ -175,6 +175,64 @@
   flex: 1;
 }
 
+.cat-add-form--unified {
+  flex-wrap: wrap;
+  padding-top: var(--space-3);
+  border-top: var(--space-px) solid var(--color-border-subtle);
+}
+
+.cat-add-form--unified > .form-input { min-width: min(260px, 100%); }
+
+.cat-add-form__scope {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.category-scope-help {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--target-base);
+  height: var(--target-base);
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: help;
+}
+
+.category-scope-help:hover,
+.category-scope-help:focus-visible { color: var(--color-text-primary); background: var(--color-surface-hover); }
+.category-scope-help:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: var(--focus-ring-offset); }
+.category-scope-help > svg { width: var(--icon-lg); height: var(--icon-lg); }
+
+.category-scope-help__tooltip {
+  position: absolute;
+  z-index: var(--z-dropdown);
+  inset-block: auto 100%;
+  inset-inline-end: 0;
+  width: min(300px, calc(100vw - var(--space-6)));
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-text-primary);
+  color: var(--color-bg);
+  text-align: start;
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(var(--space-1));
+  transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
+}
+
+.category-scope-help[aria-expanded="true"] .category-scope-help__tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
 .cat-manager__title {
   margin: 0 0 var(--space-1);
 }
@@ -296,4 +354,12 @@
   .cat-subrow {
     transition: none;
   }
+  .category-scope-help__tooltip { transition: none; }
+}
+
+@media (max-width: 639px) {
+  .cat-add-form--unified > .form-input,
+  .cat-add-form__scope,
+  .cat-add-form__scope .form-input,
+  .cat-add-form--unified > .btn { width: 100%; }
 }

@@ -145,6 +145,17 @@ db.prepare(`INSERT INTO budget_entries (title, amount, category, subcategory, da
 
 console.log('\n[Dashboard-Test] API-Abfragen\n');
 
+test('Notes widget options stay unchanged when the category catalog cannot load', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const current = { categories: [7, 8] };
+
+  const result = await __test.openWidgetOptions('notes', current, {
+    loadNotes: async () => null,
+  });
+
+  assert(result === null, 'ein Katalogfehler muss den Dialog abbrechen statt den gespeicherten Filter zu leeren');
+});
+
 test('Today-Highlights priorisieren dringende Aufgaben und nächsten Termin', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   const result = __test.buildTodayHighlights({
@@ -2292,6 +2303,9 @@ test('dashboardQuery uebersetzt Optionen in Parameter, die die Route versteht (#
     `Kategorien falsch: ${zwei}`);
   assert(widgets.dashboardQuery(mit('tasks', { categories: [] })) === '/dashboard',
     'eine leere Auswahl ist keine Einschraenkung');
+  const notes = widgets.dashboardQuery(mit('notes', { categories: [12, 34] }));
+  assert(notes === '/dashboard?notes_category=12&notes_category=34',
+    `Notiz-Kategorien falsch: ${notes}`);
   // Ein Layout, in dem es das Widget gar nicht gibt, darf nicht werfen.
   assert(widgets.dashboardQuery([]) === '/dashboard');
   assert(widgets.dashboardQuery(null) === '/dashboard');

@@ -412,7 +412,10 @@ export async function openPage(harness, { device = 'mobile', theme = 'light', lo
   // Die Interception bleibt eingeschaltet, obwohl sie den Service Worker nicht
   // abschaltet: eine Sonde kann darueber einzelne Anfragen anhalten.
   await page.setRequestInterception(true);
-  page.on('request', (req) => req.continue());
+  page.on('request', (req) => {
+    if (page.__yuvomiRequestInterceptor?.(req)) return;
+    req.continue();
+  });
 
   await page.setCookie(...harness.cookies);
   // Nicht ueber `/login`: die angemeldete App leitet von dort sofort weiter, und

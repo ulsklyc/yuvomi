@@ -49,9 +49,15 @@ import { openQuickLinksManager } from '/components/quick-links-manager.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { mealTypeList, primeMealTypeNames } from '/utils/meal-types.js';
 import { recipeThumbHtml, wireRecipeThumbs } from '/utils/recipe-thumb.js';
+import { wireNoteCategoryOverflow } from '/utils/note-category-overflow.js';
 
 // Hält den AbortController des aktuellen FAB-Listeners - wird bei jedem render() erneuert.
 let _fabController = null;
+
+const noteCategoryName = (category) => String(category?.name || '');
+const noteCategoryScope = (category) => t(
+  category?.scope === 'personal' ? 'noteCategories.personal' : 'noteCategories.household',
+);
 
 
 // ── Onboarding ──────────────────────────────────────────────────────────────
@@ -282,7 +288,7 @@ function maybeHintCustomize(container) {
 // Wieder-Einblenden-Leiste dieselbe Sichtbarkeitsregel teilen.
 const MODULE_FOR_WIDGET = { tasks: 'tasks', calendar: 'calendar', shopping: 'shopping', meals: 'meals', notes: 'notes', birthdays: 'birthdays', budget: 'budget', rewards: 'rewards', health: 'health', cycle: 'health', housekeeping: 'housekeeping', schedule: 'schedule' };
 
-const WIDGETS_WITH_OPTIONS = new Set(['calendar', 'tasks']);
+const WIDGETS_WITH_OPTIONS = new Set(['calendar', 'tasks', 'notes']);
 
 const _extensionWidgetModules = new Map();
 
@@ -1290,10 +1296,16 @@ function renderPinnedNotes(allNotes, size) {
   // Traegergrund: drei graubeige Kaesten, die wie deaktiviert aussahen. Ohne die
   // Deklaration greift der Fallback im Stylesheet (der Notizen-Ton).
   const items = notes.map((n) => `
-    <div class="note-item" data-route="/notes" role="button" tabindex="0"
+    <div class="note-item" data-route="/notes"
          ${n.color ? `style="--note-color:${esc(n.color)};"` : ''}>
+      <div class="note-item__body" role="link" tabindex="0">
       ${n.title ? `<div class="note-item__title">${esc(n.title)}</div>` : ''}
       <div class="note-item__content">${renderMarkdownLight(excerpt(n.content))}</div>
+      </div>
+      ${(n.categories || []).length ? `<div class="note-item__categories" role="group" aria-label="${esc(t('noteCategories.categories'))}">
+        ${n.categories.map((category) => `<span class="note-item__category u-badge">${esc(noteCategoryName(category))}<span class="sr-only"> (${esc(noteCategoryScope(category))})</span></span>`).join('')}
+        <button type="button" class="note-item__categories-more u-badge" aria-label="${esc(t('noteCategories.categories'))}" hidden></button>
+      </div>` : ''}
     </div>
   `).join('');
 
@@ -2562,6 +2574,15 @@ async function loadTaskCategories() {
   return taskCategoriesCache;
 }
 
+async function loadNoteCategories(getCategories = (path) => api.get(path)) {
+  try {
+    const res = await getCategories('/notes/categories');
+    return Array.isArray(res?.data) ? res.data : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Generic options dialog for extension widgets (optionsSchema from module.json). */
 async function openExtensionWidgetOptions(id, meta, current = {}) {
   const schema = meta.optionsSchema || {};
@@ -2635,12 +2656,21 @@ async function openExtensionWidgetOptions(id, meta, current = {}) {
 }
 
 /** Der Optionen-Dialog eines Widgets. Aufloesen mit den neuen Optionen oder null. */
-async function openWidgetOptions(id, current = {}) {
+async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategories } = {}) {
   const extMeta = getExtensionWidgetMeta(id);
   if (extMeta?.optionsSchema) return openExtensionWidgetOptions(id, extMeta, current);
 
   const options = { ...current };
-  const categories = id === 'tasks' ? await loadTaskCategories() : [];
+  const categories = id === 'tasks'
+    ? await loadTaskCategories()
+    : id === 'notes' ? await loadNotes() : [];
+  // A missing catalog is different from a valid empty catalog. Closing with
+  // null makes the caller preserve current options instead of saving `{}` and
+  // silently erasing an existing category filter after a transient failure.
+  if (id === 'notes' && categories === null) {
+    window.yuvomi?.showToast(t('dashboard.loadError'), 'danger');
+    return null;
+  }
 
   const body = id === 'calendar'
     ? `
@@ -2663,7 +2693,7 @@ async function openWidgetOptions(id, current = {}) {
           <span>${t('calendar.toggleBirthdays')}</span>
         </label>
       </fieldset>`
-    : `
+    : id === 'tasks' ? `
       <fieldset class="form-group widget-options__group">
         <legend class="form-label">${t('dashboard.optionTaskCategories')}</legend>
         <p class="widget-options__hint">${t('dashboard.optionTaskCategoriesHint')}</p>
@@ -2673,6 +2703,17 @@ async function openWidgetOptions(id, current = {}) {
                  ${(options.categories ?? []).includes(c.key) ? 'checked' : ''}>
           <span>${esc(taskCategoryLabel(c))}</span>
         </label>`).join('') : `<p class="widget-options__hint">${t('dashboard.optionTaskCategoriesEmpty')}</p>`}
+      </fieldset>`
+    : `
+      <fieldset class="form-group widget-options__group">
+        <legend class="form-label">${t('noteCategories.categories')}</legend>
+        <p class="widget-options__hint">${t('noteCategories.widgetHint')}</p>
+        ${categories.length ? categories.map((category) => `
+        <label class="widget-options__choice">
+          <input type="checkbox" name="note-category" value="${category.id}"
+                 ${(options.categories ?? []).map(Number).includes(Number(category.id)) ? 'checked' : ''}>
+          <span><i data-lucide="${category.scope === 'personal' ? 'user' : 'home'}" aria-hidden="true"></i>${esc(noteCategoryName(category))}<span class="sr-only"> (${esc(noteCategoryScope(category))})</span></span>
+        </label>`).join('') : `<p class="widget-options__hint">${t('noteCategories.empty')}</p>`}
       </fieldset>`;
 
   return new Promise((resolve) => {
@@ -2708,10 +2749,14 @@ async function openWidgetOptions(id, current = {}) {
             // Dasselbe eine Zeile tiefer, nur andersherum notiert: gespeichert
             // wird das ABWAEHLEN, nicht das Haekchen (#927).
             if (!panel.querySelector('input[name="cal-birthdays"]')?.checked) next.birthdays = 'hide';
-          } else {
+          } else if (id === 'tasks') {
             const picked = [...panel.querySelectorAll('input[name="task-category"]:checked')].map((el) => el.value);
             // Keine Auswahl heisst „alle" - eine leere Liste als Filter waere
             // ein leeres Dashboard fuer jemanden, der nur den Dialog geoeffnet hat.
+            if (picked.length) next.categories = picked;
+          } else {
+            const picked = [...panel.querySelectorAll('input[name="note-category"]:checked')]
+              .map((el) => el.value);
             if (picked.length) next.categories = picked;
           }
           finish(next);
@@ -4552,12 +4597,15 @@ export async function render(container, { user, signal: routeSignal = null } = {
     });
   }
 
+  let disposeNoteCategories = () => {};
+  signal.addEventListener('abort', () => disposeNoteCategories(), { once: true });
   function rebuildDashboard(cfg) {
     // Der eine Engpass fuer jeden verspaeteten Neuaufbau (#977): eine Antwort,
     // die nach dem Verlassen der Seite oder nach dem naechsten render()
     // eintrifft, darf die Flaeche nicht mehr anfassen - sonst ueberschreibt der
     // aeltere Stand den neueren.
     if (signal.aborted) return;
+    disposeNoteCategories();
     const shell = container.querySelector('#dashboard-shell');
     if (!shell) return;
     if (wallMode) {
@@ -4602,6 +4650,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // Vorschaubilder der Mahlzeitenkachel: Ruecksturz auf den Platzhalter per
     // Listener, weil ein `onerror` im Markup gegen die CSP liefe (#1059).
     wireRecipeThumbs(shell);
+    disposeNoteCategories = wireNoteCategoryOverflow(
+      shell,
+      (count) => getNumberFormat().format(count),
+      (count) => t('noteCategories.moreAction', { count }),
+    );
     wireWeatherRefresh(container, (updatedWeather) => {
       weather = updatedWeather;
       rebuildDashboard(cfg);
@@ -4764,7 +4817,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   }
 }
 
-export const __test = { buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel };
+export const __test = { buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, openWidgetOptions };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

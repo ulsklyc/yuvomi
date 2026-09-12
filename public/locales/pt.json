@@ -965,7 +965,25 @@
         "filterUnassigned": "Não atribuídos"
     },
     "noteCategories": {
-        "permissionLabel": "Gerir categorias de notas do agregado familiar"
+        "categories": "Categorias",
+        "filterLabel": "Filtrar por categorias",
+        "empty": "Ainda não há categorias.",
+        "personal": "Pessoal",
+        "household": "Casa",
+        "noResults": "Nenhuma nota pertence a todas as categorias selecionadas.",
+        "deleteDetail": "A categoria é removida de todas as notas e filtros do painel. As notas permanecem inalteradas.",
+        "widgetHint": "Ao selecionar várias categorias, só aparecem notas que pertencem a todas. Sem seleção, aparecem todas as notas.",
+        "permissionLabel": "Gerir categorias de notas do agregado familiar",
+        "searchPlaceholder": "Pesquisar ou criar uma categoria...",
+        "searchResultsLabel": "Sugestões de categorias",
+        "removeAction": "Remover a categoria {{name}}",
+        "createAction": "Criar e atribuir “{{name}}”",
+        "scopeLabel": "Tipo de categoria",
+        "scopeHelp": "Só você pode ver e gerir categorias pessoais. Todos os membros do agregado podem usar categorias do agregado; as permissões controlam quem pode geri-las.",
+        "moreAction": "{{count}} categorias adicionais",
+        "moreAction_one": "{{count}} categoria adicional",
+        "moreAction_few": "{{count}} categorias adicionais",
+        "personalManagementHint": "Pode gerir aqui as suas categorias pessoais. As categorias do agregado continuam disponíveis no editor de notas, mas não tem permissão para as gerir."
     },
     "notes": {
         "title": "Quadro de notas",
@@ -2307,6 +2325,9 @@
         "permAccessWrite": "Completo",
         "permWidgetBlocked": "Bloqueado",
         "permWidgetAllowed": "Disponível",
+        "permCapabilitiesHeading": "Permissões adicionais",
+        "permCapabilityBlocked": "Não permitido",
+        "permCapabilityAllowed": "Permitido",
         "permInherit": "Herdar",
         "permInheritedHint": "Herdado: {{value}}",
         "permModuleLockedHint": "Módulo bloqueado",

@@ -287,6 +287,7 @@ export function dashboardQuery(config) {
   // Anfrage - dieselbe Regel, nach der `scope: 'all'` nicht gespeichert wird.
   if (optionsOf('calendar').birthdays === 'hide') params.set('events_birthdays', 'hide');
   for (const key of optionsOf('tasks').categories ?? []) params.append('tasks_category', key);
+  for (const id of optionsOf('notes').categories ?? []) params.append('notes_category', String(id));
   const query = params.toString();
   return query ? `/dashboard?${query}` : '/dashboard';
 }

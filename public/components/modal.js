@@ -33,6 +33,11 @@ let focusTrapHandler = null;
 let _initialFormSnapshot = null;
 let _initialFormTimeout = null;
 let _modalFormSeq = 0;
+// Monotone Kennung des zuletzt tatsaechlich eingesetzten Shared-Modals. Ein
+// asynchroner Ablauf kann damit erkennen, dass inzwischen ein anderer Dialog
+// den einzigen Slot besessen hat - auch wenn dieser schon wieder geschlossen
+// wurde und im DOM deshalb keine Spur mehr hinterlaesst.
+let _modalGeneration = 0;
 
 // Modal-Lebenszyklus als explizite Zustandsmaschine (Audit 1.5). Ersetzt die
 // frühere ad-hoc-Jonglage aus einem Boolean-Schließ-Flag plus temporär
@@ -42,6 +47,28 @@ let _modalFormSeq = 0;
 //   confirming - „Änderungen verwerfen?"-Dialog liegt über einem dirty Modal
 //   closing    - Schließ-Animation/Cleanup läuft (blockt erneutes Schließen)
 let modalState = 'idle';
+
+/**
+ * Merkt den UI-Kontext, in dem ein asynchroner Modal-Ablauf gestartet wurde.
+ * Neben dem Shared-Slot gehoert die konkrete Seiteninstanz dazu: Pfadvergleich
+ * allein erkennt Navigation weg und wieder zurueck nicht, der alte Page-Wrapper
+ * bleibt danach aber dauerhaft getrennt.
+ */
+export function captureModalContext() {
+  return {
+    generation: _modalGeneration,
+    route: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+    pageRoot: document.getElementById('main-content')?.firstElementChild ?? null,
+  };
+}
+
+/** Ob seit captureModalContext() weder Dialog noch Seiteninstanz wechselte. */
+export function isModalContextCurrent(context) {
+  if (!context || context.generation !== _modalGeneration) return false;
+  const route = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (context.route !== route) return false;
+  return !context.pageRoot || context.pageRoot.isConnected;
+}
 
 /**
  * DAS MODAL-SYSTEM HAELT GENAU EINEN EINTRAG IN DER ZURUECK-GESTE (#871),
@@ -1104,6 +1131,7 @@ export function openModal({
       </div>
     </div>`;
 
+  _modalGeneration += 1;
   document.body.insertAdjacentHTML('beforeend', html);
   activeOverlay = document.getElementById('shared-modal-overlay');
   activeOverlay._onCloseCallback = onClose;

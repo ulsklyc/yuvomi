@@ -965,7 +965,25 @@
         "filterUnassigned": "割り当てなし"
     },
     "noteCategories": {
-        "permissionLabel": "世帯のメモカテゴリーを管理"
+        "categories": "カテゴリー",
+        "filterLabel": "カテゴリーで絞り込む",
+        "empty": "カテゴリーはまだありません。",
+        "personal": "個人",
+        "household": "世帯",
+        "noResults": "選択したすべてのカテゴリーに属するメモはありません。",
+        "deleteDetail": "このカテゴリーはすべてのメモとダッシュボードのフィルターから削除されます。メモ自体は変更されません。",
+        "widgetHint": "複数のカテゴリーを選ぶと、そのすべてに属するメモだけが表示されます。未選択の場合はすべて表示されます。",
+        "permissionLabel": "世帯のメモカテゴリーを管理",
+        "searchPlaceholder": "カテゴリーを検索または作成...",
+        "searchResultsLabel": "カテゴリー候補",
+        "removeAction": "カテゴリー「{{name}}」を外す",
+        "createAction": "「{{name}}」を作成して割り当てる",
+        "scopeLabel": "カテゴリーの種類",
+        "scopeHelp": "個人カテゴリーを表示・管理できるのは自分だけです。世帯カテゴリーは全員が利用でき、管理できる人は権限で決まります。",
+        "moreAction": "さらに{{count}}件のカテゴリー",
+        "moreAction_one": "さらに{{count}}件のカテゴリー",
+        "moreAction_few": "さらに{{count}}件のカテゴリー",
+        "personalManagementHint": "ここでは個人カテゴリーを管理できます。世帯カテゴリーは引き続きノートエディターで使用できますが、管理する権限はありません。"
     },
     "notes": {
         "title": "メモボード",
@@ -2307,6 +2325,9 @@
         "permAccessWrite": "フル",
         "permWidgetBlocked": "ブロック",
         "permWidgetAllowed": "利用可能",
+        "permCapabilitiesHeading": "追加の権限",
+        "permCapabilityBlocked": "許可しない",
+        "permCapabilityAllowed": "許可する",
         "permInherit": "継承",
         "permInheritedHint": "継承: {{value}}",
         "permModuleLockedHint": "モジュールはロック中",

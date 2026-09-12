@@ -80,16 +80,46 @@
  * display:flex dieser Zeile gewinnt. */
 .notes-filters {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--space-2);
   padding-block: var(--space-2);
   padding-inline: var(--page-inline-pad);
   border-bottom: 1px solid var(--color-border-subtle);
   flex-shrink: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--module-accent) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.notes-filters::-webkit-scrollbar { height: 10px; }
+.notes-filters::-webkit-scrollbar-track { background: transparent; }
+.notes-filters::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--module-accent) var(--tint-hint), transparent);
+  border: 3px solid transparent;
+  border-radius: var(--radius-full);
+  background-clip: padding-box;
 }
 
 .notes-filters[hidden] {
   display: none;
+}
+
+.notes-filter-group {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Both groups keep their width; the outer row owns scrolling. An independently
+ * shrinking category scroller becomes zero-width beside a long creator group. */
+
+.notes-filter-group + .notes-filter-group {
+  padding-inline-start: var(--space-2);
+  border-inline-start: var(--space-px) solid var(--color-border-subtle);
 }
 
 .notes-grid {
@@ -268,6 +298,35 @@
   unicode-bidi: plaintext;
 }
 
+.note-card__categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.note-category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  padding: var(--space-0h) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-fill-well);
+  color: var(--color-text-secondary);
+}
+
+.note-category-badge__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.note-category-badge svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex: 0 0 auto;
+}
+
 .note-card__content {
   font-size: var(--type-body);
   line-height: var(--line-height-relaxed);
@@ -292,7 +351,149 @@
   justify-content: space-between;
   margin-top: var(--space-2);
   padding-top: var(--space-2);
-  border-top: 1px solid var(--color-border-subtle);
+  border-top: var(--space-px) solid var(--color-border-subtle);
+}
+
+.note-category-editor__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.note-read__categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.note-category-selection {
+  min-height: var(--target-base);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  padding-block: 0;
+  padding-inline: var(--space-2) var(--space-0h);
+  border: var(--space-px) solid var(--color-border);
+  border-radius: var(--radius-full);
+  border-color: var(--module-notes);
+  background: color-mix(in srgb, var(--module-notes) var(--tint-state), transparent);
+  color: var(--color-text-primary);
+}
+
+.note-category-selection > svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex-shrink: 0;
+}
+
+.note-category-selection__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-category-selection__remove {
+  display: grid;
+  place-items: center;
+  width: var(--target-md);
+  height: var(--target-md);
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.note-category-selection__remove:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
+.note-category-selection__remove:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+.note-category-selection__remove svg { width: var(--icon-md); height: var(--icon-md); }
+
+.note-category-picker { position: relative; }
+.note-category-picker__combobox { position: relative; }
+
+.note-category-picker__list {
+  position: absolute;
+  z-index: var(--z-dropdown);
+  inset: calc(100% + var(--space-1)) 0 auto;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: var(--space-1);
+  border: var(--space-px) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-md);
+}
+
+.note-category-picker__list[hidden] { display: none; }
+
+.note-category-picker__option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--target-base);
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-primary);
+  text-align: start;
+  cursor: pointer;
+}
+
+.note-category-picker__option:hover,
+.note-category-picker__option.is-active { background: var(--color-surface-hover); }
+.note-category-picker__option svg { width: var(--icon-md); height: var(--icon-md); color: var(--color-text-secondary); }
+.note-category-picker__scope { color: var(--color-text-tertiary); font-size: var(--text-xs); }
+
+.note-category-editor__scope {
+  display: flex;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.note-category-editor__scope .form-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
+.note-category-editor__create {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.note-category-editor__create[hidden] { display: none; }
+
+@media (max-width: 639px) {
+  .notes-manage-categories {
+    width: var(--target-base);
+    height: var(--target-base);
+  }
+  .notes-manage-categories span { display: none; }
+  .notes-filter-group + .notes-filter-group {
+    padding-inline-start: 0;
+    border-inline-start: 0;
+  }
+  .note-category-editor__create { align-items: stretch; }
+  .note-category-editor__scope { flex: 1 1 100%; }
+  .note-category-editor__scope .form-input { flex: 1; }
+  .note-category-editor__create > .btn { width: 100%; }
 }
 
 .note-card__creator {
@@ -475,5 +676,3 @@
 
 .note-color-swatch:hover       { transform: scale(1.15); }
 .note-color-swatch--active     { border-color: var(--color-text-primary); transform: scale(1.1); }
-
-

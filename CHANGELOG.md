@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Notes gain category management, a category picker and an AND filter.** Manage personal
+  categories and, when permitted, household categories on the Notes board, then select several
+  categories to show notes that belong to every selection. Household categories remain assignable
+  for members who cannot manage them. The dashboard Notes widget supports the same filter. Category
+  badges stay on one line; a +N control reveals and correctly announces the remaining categories on
+  hover, focus or tap, and category icons remain intact after switching between reading and editing.
+
 - **A new event goes to the calendar of the person it is assigned to** (#1060). A Google or CalDAV
   calendar that names a default assignee in the sync settings now works in both directions: events
   imported from it get that person, and a new event assigned to exactly that person gets that
@@ -386,6 +393,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   database-isolation guard had to learn the same rule one file further out: it looked for `DB_PATH`
   in the suite itself and would otherwise have reported all three for setting it through the shared
   helper - which sets it earlier and more strictly than the form the guard knew.
+
+- **Late Notes saves no longer close a replacement dialog or hide a failed save.** A save response
+  now belongs to the editor that started it. If that editor has already closed or is waiting behind
+  a discard confirmation, the current dialog and its unsaved fields stay intact; network failures
+  remain visible in the global error toast. A late category-name conflict follows the same ownership
+  rule: it offers the rejected name again only while the page and dialog flow that requested the
+  rename are still current, and otherwise reports the conflict without replacing newer work.
 
 - **An ingredient written in the household's own digits now counts towards the shopping list.**
   Moving a meal plan to the shopping list adds up the same ingredient across meals. The server read

@@ -7077,7 +7077,8 @@ textarea.input { resize: vertical; }
  * #467 auf einem Weg, und dieser Branch hat den zweiten von einem Modul auf
  * fuenf verbreitert (Codex-Review zu PR #754). */
 html[data-module-readonly] .page-fab,
-html[data-module-readonly] .toolbar-new-btn {
+html[data-module-readonly] .toolbar-new-btn,
+html[data-module-readonly] .notes-manage-categories {
   display: none !important;
 }
 

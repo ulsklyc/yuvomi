@@ -967,6 +967,77 @@
   overflow: hidden;
 }
 
+.note-item__categories {
+  display: flex;
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+
+.note-item__category,
+.note-item__categories-more {
+  flex: 0 0 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-fill-well);
+  color: var(--color-text-secondary);
+}
+
+.note-item__category[hidden],
+.note-item__categories-more[hidden] { display: none; }
+
+.note-item__categories-more {
+  border: 0;
+  min-height: var(--space-6);
+  min-width: var(--target-base);
+  cursor: pointer;
+}
+
+.note-item__categories-more:focus-visible,
+.note-item__body:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
+.note-category-overflow-tooltip {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  max-width: min(var(--content-max-width-narrow), 100vw);
+  max-height: 50vh;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: var(--space-px) solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.note-category-overflow-tooltip ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.note-category-overflow-tooltip li + li { margin-top: var(--space-1); }
+
+.widget-size--1x1 .note-item__categories,
+.widget-size--1x2 .note-item__categories,
+.widget-size--1x3 .note-item__categories,
+.widget-size--1x4 .note-item__categories,
+.widget-size--2x1 .note-item__categories,
+.widget-size--3x1 .note-item__categories,
+.widget-size--4x1 .note-item__categories {
+  display: none;
+}
+
 /* Die Notiz-Vorschau ist eine 2-Zeilen-Zusammenfassung: Markdown-Blöcke auf
  * kompakte Inline-Darstellung reduzieren, damit Überschriften/Listen/Zitate
  * den geklammerten Preview nicht sprengen. */

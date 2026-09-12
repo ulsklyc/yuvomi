@@ -2897,11 +2897,33 @@
 .perm-modgroup + .perm-modgroup { border-top: var(--space-px) solid var(--color-border); }
 
 .perm-modgroup__widgets {
-  padding-left: var(--space-8);
+  padding-inline-start: var(--space-8);
   padding-bottom: var(--space-1);
 }
 
 .perm-modgroup__widgets .perm-row--widget { border-top: var(--space-px) solid var(--color-border-subtle); }
+
+.perm-modgroup__capabilities {
+  margin-block: 0 var(--space-3);
+  margin-inline: var(--space-8) var(--space-3);
+  border-block: var(--space-px) solid var(--color-border-subtle);
+}
+
+.perm-modgroup__capabilities-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--space-px) solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.perm-modgroup__capabilities-title svg { width: var(--icon-md); height: var(--icon-md); }
+.perm-row--capability { padding: var(--space-3); }
+.perm-row--capability .perm-seg__opt { display: inline-flex; gap: var(--space-1); padding-inline: var(--space-3); }
+.perm-row--capability .perm-seg__label { display: inline; font-size: var(--text-xs); }
 
 .perm-modgroup--general .perm-modgroup__general-title {
   padding: var(--space-3) var(--space-4) 0;
@@ -3083,7 +3105,8 @@
    `pointer: coarse` deckt zusätzlich das Tablet im Querformat, wo der
    Viewport breiter als Desktop ist, der Finger aber derselbe bleibt. */
 @media (max-width: 1023px), (pointer: coarse) {
-  .perm-modgroup__widgets { padding-left: var(--space-4); }
+  .perm-modgroup__widgets { padding-inline-start: var(--space-4); }
+  .perm-modgroup__capabilities { margin-inline-start: var(--space-4); }
 
   .perm-modeswitch__btn,
   .perm-chip { min-height: var(--target-base); }

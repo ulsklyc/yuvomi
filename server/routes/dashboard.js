@@ -6,6 +6,7 @@
 
 import { createLogger } from '../logger.js';
 import express from 'express';
+import { hydrateNotesWithCategories } from '../services/note-categories.js';
 import * as db from '../db.js';
 import { hydrateBirthdayOccurrences } from '../services/birthdays.js';
 import { getUpcomingEvents } from '../services/calendar-event-reader.js';
@@ -156,6 +157,25 @@ router.get('/', (req, res) => {
   const taskCategoryFragment = taskCategoryWhere('t', taskCategories, { named: 'cat' });
   const taskCategoryAnd = taskCategoryFragment ? ` AND ${taskCategoryFragment}` : '';
   const taskCategoryBinds = categoryBindings(taskCategories, 'cat');
+  const noteCategories = [...new Set(
+    (Array.isArray(req.query.notes_category) ? req.query.notes_category : [req.query.notes_category])
+      .map(Number)
+      .filter((id) => Number.isInteger(id) && id > 0),
+  )].slice(0, 50);
+  const noteCategoryBinds = Object.fromEntries(noteCategories.map((id, index) => [`note_category_${index}`, id]));
+  // Ein EXISTS je Auswahl ist absichtlich AND. Die Sichtbarkeitsbedingung im
+  // Unterselect verhindert, dass erratene IDs fremder persoenlicher Kategorien
+  // verraten, an welchen geteilten Notizen sie haengen.
+  const noteCategoryAnd = noteCategories.map((_id, index) => `
+    AND EXISTS (
+      SELECT 1
+      FROM note_category_assignments nca
+      JOIN note_categories nc ON nc.id = nca.category_id
+      WHERE nca.note_id = n.id
+        AND nc.id = @note_category_${index}
+        AND (nc.scope = 'household' OR nc.owner_user_id = @me)
+    )
+  `).join('');
   // `mine` ist die Auslegung des Kalendermoduls: zugewiesen an mich.
   const eventsAssignedTo = req.query.events_scope === 'mine' ? userId : null;
   /* GEBURTSTAGE IM TERMIN-WIDGET (#927). Wer sie auf der Uebersicht schon als
@@ -357,6 +377,7 @@ router.get('/', (req, res) => {
       SELECT n.*, u.display_name AS author_name, u.avatar_color AS author_color
       FROM notes n
       LEFT JOIN users u ON n.created_by = u.id
+      WHERE 1 = 1 ${noteCategoryAnd}
       ORDER BY n.pinned DESC, n.updated_at DESC
       -- FUENF, WEIL DIE KACHEL ZWEI HOCH SEIN DARF - dieselbe Korrektur, die
       -- die Geburtstage oben schon bekommen haben und bei der die Notizen
@@ -367,14 +388,18 @@ router.get('/', (req, res) => {
       -- (listRowCap in public/pages/dashboard.js) - der Server liefert nur
       -- den Vorrat fuer die groesste Fassung.
       LIMIT 5
-    `).all();
+    `).all({ me: userId, ...noteCategoryBinds });
+    result.pinnedNotes = hydrateNotesWithCategories(d, result.pinnedNotes, userId);
     /* `pinnedNotes` HEISST SO, IST ES ABER NICHT: die Liste sortiert Gepinntes
      * nach vorn und schneidet bei drei ab - sie filtert nicht. Fuer die Vorschau
      * ist das richtig (sie zeigt, was oben liegt), als ZAHL war es zweimal
      * falsch: ein Haushalt ohne einen einzigen Pin las "3 angepinnt", einer mit
      * fuenf Pins ebenfalls "3" (Codex-Review zu PR #754). Die Kennzahlkachel
      * braucht deshalb eine eigene, echte Zahl. */
-    result.pinnedNotesCount = d.prepare('SELECT COUNT(*) AS n FROM notes WHERE pinned = 1').get().n;
+    result.pinnedNotesCount = d.prepare(`
+      SELECT COUNT(*) AS n FROM notes n
+      WHERE n.pinned = 1 ${noteCategoryAnd}
+    `).get({ me: userId, ...noteCategoryBinds }).n;
   } catch (err) {
     log.error('pinnedNotes error:', err.message);
     result.pinnedNotes = [];

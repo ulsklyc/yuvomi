@@ -965,7 +965,25 @@
         "filterUnassigned": "Ej tilldelade"
     },
     "noteCategories": {
-        "permissionLabel": "Hantera hushållets anteckningskategorier"
+        "categories": "Kategorier",
+        "filterLabel": "Filtrera efter kategorier",
+        "empty": "Inga kategorier ännu.",
+        "personal": "Personlig",
+        "household": "Hushåll",
+        "noResults": "Ingen anteckning tillhör alla valda kategorier.",
+        "deleteDetail": "Kategorin tas bort från alla anteckningar och instrumentpanelsfilter. Anteckningarna ändras inte.",
+        "widgetHint": "När flera kategorier väljs visas bara anteckningar som tillhör dem alla. Utan val visas alla anteckningar.",
+        "permissionLabel": "Hantera hushållets anteckningskategorier",
+        "searchPlaceholder": "Sök eller skapa en kategori...",
+        "searchResultsLabel": "Kategoriförslag",
+        "removeAction": "Ta bort kategorin {{name}}",
+        "createAction": "Skapa och tilldela ”{{name}}”",
+        "scopeLabel": "Kategorityp",
+        "scopeHelp": "Bara du kan se och hantera personliga kategorier. Alla hushållsmedlemmar kan använda hushållskategorier; behörigheter styr vem som får hantera dem.",
+        "moreAction": "{{count}} kategorier till",
+        "moreAction_one": "{{count}} kategori till",
+        "moreAction_few": "{{count}} kategorier till",
+        "personalManagementHint": "Här kan du hantera dina personliga kategorier. Hushållskategorierna är fortfarande tillgängliga i anteckningsredigeraren, men du har inte behörighet att hantera dem."
     },
     "notes": {
         "title": "Anteckningar",
@@ -2307,6 +2325,9 @@
         "permAccessWrite": "Full",
         "permWidgetBlocked": "Blockerad",
         "permWidgetAllowed": "Tillgänglig",
+        "permCapabilitiesHeading": "Ytterligare behörigheter",
+        "permCapabilityBlocked": "Inte tillåtet",
+        "permCapabilityAllowed": "Tillåtet",
         "permInherit": "Ärv",
         "permInheritedHint": "Ärvt: {{value}}",
         "permModuleLockedHint": "Modul låst",

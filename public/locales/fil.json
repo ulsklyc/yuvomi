@@ -977,7 +977,25 @@
         "filterUnassigned": "Walang nakatalaga"
     },
     "noteCategories": {
-        "permissionLabel": "Pamahalaan ang mga kategorya ng tala ng sambahayan"
+        "categories": "Mga kategorya",
+        "filterLabel": "I-filter ayon sa kategorya",
+        "empty": "Wala pang mga kategorya.",
+        "personal": "Personal",
+        "household": "Sambahayan",
+        "noResults": "Walang tala na kabilang sa lahat ng napiling kategorya.",
+        "deleteDetail": "Aalisin ang kategorya sa lahat ng tala at filter sa dashboard. Hindi mababago ang mga tala.",
+        "widgetHint": "Kapag maraming kategorya ang pinili, mga talang kabilang sa lahat ng ito lamang ang ipapakita. Kapag walang pinili, ipapakita ang lahat.",
+        "permissionLabel": "Pamahalaan ang mga kategorya ng tala ng sambahayan",
+        "searchPlaceholder": "Maghanap o gumawa ng kategorya...",
+        "searchResultsLabel": "Mga mungkahing kategorya",
+        "removeAction": "Alisin ang kategoryang {{name}}",
+        "createAction": "Gawin at italaga ang “{{name}}”",
+        "scopeLabel": "Uri ng kategorya",
+        "scopeHelp": "Ikaw lamang ang nakakakita at namamahala ng mga personal na kategorya. Magagamit ng lahat ng kasambahay ang mga kategorya ng sambahayan; mga pahintulot ang kumokontrol kung sino ang makapamamahala sa mga ito.",
+        "moreAction": "{{count}} pang kategorya",
+        "moreAction_one": "{{count}} pang kategorya",
+        "moreAction_few": "{{count}} pang kategorya",
+        "personalManagementHint": "Maaari mong pamahalaan dito ang iyong mga personal na kategorya. Magagamit pa rin ang mga kategorya ng sambahayan sa editor ng tala, ngunit wala kang pahintulot na pamahalaan ang mga ito."
     },
     "notes": {
         "title": "Board",
@@ -2342,6 +2360,9 @@
         "permAccessWrite": "Buo",
         "permWidgetBlocked": "Naka-block",
         "permWidgetAllowed": "Available",
+        "permCapabilitiesHeading": "Karagdagang pahintulot",
+        "permCapabilityBlocked": "Hindi pinapayagan",
+        "permCapabilityAllowed": "Pinapayagan",
         "permInherit": "Manahin",
         "permInheritedHint": "Minana: {{value}}",
         "permModuleLockedHint": "Naka-lock ang modyul",

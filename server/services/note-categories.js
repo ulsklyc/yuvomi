@@ -4,6 +4,9 @@
  *        haushaltsweite Kategorien an einer zentralen Stelle erzwingen.
  */
 
+import { categoryNameKey } from '../../public/utils/note-category-name.js';
+export { categoryNameKey };
+
 export class NoteCategoryInputError extends Error {
   constructor(message, status = 400) {
     super(message);
@@ -20,21 +23,6 @@ function normalizedIds(value) {
     throw new NoteCategoryInputError('Invalid category id');
   }
   return [...new Set(ids)];
-}
-
-/**
- * Stabiler, laufzeit-eigener Namensschluessel. NFKC vereinheitlicht kanonisch
- * aequivalente Schreibweisen. Die locale-unabhaengige Gross-/Kleinschreibung
- * der JavaScript-Laufzeit deckt auch Expansionen wie „ß“ -> „SS“ ab und bleibt
- * auf Server und Browser identisch, ohne Produktionsabhaengigkeit oder
- * vendorte Browser-Kopie.
- */
-export function categoryNameKey(name) {
-  return String(name)
-    .normalize('NFKC')
-    .toUpperCase().toLowerCase()
-    .toUpperCase().toLowerCase()
-    .normalize('NFKC');
 }
 
 export function listVisibleCategories(database, userId) {

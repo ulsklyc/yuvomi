@@ -86,8 +86,8 @@ const state = {
   catalog: null,       // { modules, widgets, roles, members, defaults }
   mode: 'role',        // 'role' | 'user'
   subjectId: null,     // familyRole (role) | userId (user)
-  draft: { modules: {}, widgets: {} },     // aktuell editierte Werte
-  inherited: { modules: {}, widgets: {} }, // Rollen-Effektivwerte (nur user-Modus)
+  draft: { modules: {}, widgets: {}, capabilities: {} },
+  inherited: { modules: {}, widgets: {}, capabilities: {} },
   dirty: false,
 };
 
@@ -101,6 +101,8 @@ const moduleLabel = (key) => {
 
 const widgetsForModule = (moduleKey) => state.catalog.widgets.filter((w) => w.module === moduleKey);
 const generalWidgets = () => state.catalog.widgets.filter((w) => !w.module);
+const capabilitiesForModule = (moduleKey) => (state.catalog.capabilities || []).filter((item) => item.module === moduleKey);
+const capabilityLabel = (item) => t(item.labelKey);
 
 // Effektiver Modul-Zugriff (Draft ?? geerbt ?? Standard 'write').
 function effectiveModuleAccess(moduleKey) {
@@ -119,6 +121,13 @@ function effectiveWidgetAccess(w) {
   return 'allow';
 }
 
+function effectiveCapabilityAccess(item) {
+  const draft = state.draft.capabilities[item.key];
+  if (draft && draft !== 'inherit') return draft;
+  if (state.mode === 'user') return state.inherited.capabilities[item.key] ?? 'none';
+  return 'none';
+}
+
 // ── Zugriffs-Optionen ────────────────────────────────────────────────────────
 
 function moduleOptions() {
@@ -135,6 +144,15 @@ function widgetOptions() {
   const base = [
     { value: 'none', label: t('settings.permWidgetBlocked'), icon: WIDGET_OPT_ICONS.none },
     { value: 'allow', label: t('settings.permWidgetAllowed'), icon: WIDGET_OPT_ICONS.allow },
+  ];
+  if (state.mode === 'user') return [{ value: 'inherit', label: t('settings.permInherit'), icon: WIDGET_OPT_ICONS.inherit }, ...base];
+  return base;
+}
+
+function capabilityOptions() {
+  const base = [
+    { value: 'none', label: t('settings.permCapabilityBlocked'), icon: WIDGET_OPT_ICONS.none },
+    { value: 'allow', label: t('settings.permCapabilityAllowed'), icon: WIDGET_OPT_ICONS.allow },
   ];
   if (state.mode === 'user') return [{ value: 'inherit', label: t('settings.permInherit'), icon: WIDGET_OPT_ICONS.inherit }, ...base];
   return base;
@@ -229,13 +247,35 @@ function widgetRowHtml(w) {
   `;
 }
 
+function capabilityRowHtml(item) {
+  const current = state.draft.capabilities[item.key] ?? (state.mode === 'user' ? 'inherit' : 'none');
+  return `
+    <div class="perm-row perm-row--capability" data-capability="${esc(item.key)}">
+      <div class="perm-row__label">
+        <i data-lucide="tags" class="perm-row__wicon" aria-hidden="true"></i>
+        <span class="perm-row__name">${esc(capabilityLabel(item))}</span>
+      </div>
+      ${segControl({ group: `capability:${item.key}`, label: capabilityLabel(item), current, options: capabilityOptions() })}
+    </div>
+  `;
+}
+
 // Ein Modul mit seinen Widgets (genestet) — die Beziehung wird strukturell sichtbar.
 function moduleGroupHtml(mod) {
   const widgets = widgetsForModule(mod.key);
+  const capabilities = capabilitiesForModule(mod.key);
   const widgetsHtml = widgets.length
     ? `<div class="perm-modgroup__widgets">${widgets.map(widgetRowHtml).join('')}</div>`
     : '';
-  return `<div class="perm-modgroup" data-module="${esc(mod.key)}">${moduleRowHtml(mod)}${widgetsHtml}</div>`;
+  const capabilitiesHtml = capabilities.length
+    ? `<div class="perm-modgroup__capabilities">
+        <div class="perm-modgroup__capabilities-title">
+          <i data-lucide="shield-check" aria-hidden="true"></i>${esc(t('settings.permCapabilitiesHeading'))}
+        </div>
+        ${capabilities.map(capabilityRowHtml).join('')}
+      </div>`
+    : '';
+  return `<div class="perm-modgroup" data-module="${esc(mod.key)}">${moduleRowHtml(mod)}${widgetsHtml}${capabilitiesHtml}</div>`;
 }
 
 // ── Abweichungs-Überblick (auf einen Blick) ────────────────────────────────────
@@ -253,6 +293,11 @@ function deviationChips() {
     if (w.module && effectiveModuleAccess(w.module) === 'none') continue;
     if (effectiveWidgetAccess(w) === 'none') {
       chips.push(`<span class="perm-summary__chip perm-summary__chip--widget"><i data-lucide="eye-off" aria-hidden="true"></i>${esc(widgetLabel(w.id))}</span>`);
+    }
+  }
+  for (const item of state.catalog.capabilities || []) {
+    if (effectiveCapabilityAccess(item) === 'allow') {
+      chips.push(`<span class="perm-summary__chip perm-summary__chip--widget"><i data-lucide="tags" aria-hidden="true"></i>${esc(capabilityLabel(item))}</span>`);
     }
   }
   return chips;
@@ -356,12 +401,25 @@ function updateSaveState(panel) {
 
 // Widgets eines Moduls neu rendern (nach Modul-Änderung: Sperr-Zustände hängen daran).
 function rebuildModuleWidgets(container, moduleKey) {
-  const group = container.querySelector(`.perm-modgroup[data-module="${moduleKey}"] .perm-modgroup__widgets`);
-  if (!group) return;
+  const moduleGroup = container.querySelector(`.perm-modgroup[data-module="${moduleKey}"]`);
+  if (!moduleGroup) return;
   const widgets = widgetsForModule(moduleKey);
-  group.replaceChildren();
-  group.insertAdjacentHTML('beforeend', widgets.map(widgetRowHtml).join(''));
-  window.lucide?.createIcons({ el: group });
+  const capabilities = capabilitiesForModule(moduleKey);
+  const widgetsGroup = moduleGroup.querySelector('.perm-modgroup__widgets');
+  if (widgetsGroup) {
+    widgetsGroup.replaceChildren();
+    widgetsGroup.insertAdjacentHTML('beforeend', widgets.map(widgetRowHtml).join(''));
+  }
+  const capabilityGroup = moduleGroup.querySelector('.perm-modgroup__capabilities');
+  if (capabilityGroup) {
+    capabilityGroup.replaceChildren();
+    capabilityGroup.insertAdjacentHTML('beforeend', `
+      <div class="perm-modgroup__capabilities-title">
+        <i data-lucide="shield-check" aria-hidden="true"></i>${esc(t('settings.permCapabilitiesHeading'))}
+      </div>
+      ${capabilities.map(capabilityRowHtml).join('')}`);
+  }
+  window.lucide?.createIcons({ el: moduleGroup });
 }
 
 // Verwerfen-Schutz (#467-Critique P1): warnt vor Datenverlust, bevor ein anderes
@@ -418,24 +476,24 @@ async function selectSubject(container, mode, id) {
   state.mode = mode;
   state.subjectId = id;
   state.dirty = false;
-  state.draft = { modules: {}, widgets: {} };
-  state.inherited = { modules: {}, widgets: {} };
+  state.draft = { modules: {}, widgets: {}, capabilities: {} };
+  state.inherited = { modules: {}, widgets: {}, capabilities: {} };
 
   if (id != null) {
     try {
       if (mode === 'role') {
         const res = await api.get(`/permissions/role/${encodeURIComponent(id)}`);
-        state.draft = { modules: { ...res.data.modules }, widgets: { ...res.data.widgets } };
+        state.draft = { modules: { ...res.data.modules }, widgets: { ...res.data.widgets }, capabilities: { ...res.data.capabilities } };
       } else {
         const member = state.catalog.members.find((m) => String(m.id) === String(id));
         const [ov, roleRes] = await Promise.all([
           api.get(`/permissions/user/${encodeURIComponent(id)}`),
           member && member.role !== 'admin'
             ? api.get(`/permissions/role/${encodeURIComponent(member.family_role)}`)
-            : Promise.resolve({ data: { modules: {}, widgets: {} } }),
+            : Promise.resolve({ data: { modules: {}, widgets: {}, capabilities: {} } }),
         ]);
-        state.draft = { modules: { ...ov.data.modules }, widgets: { ...ov.data.widgets } };
-        state.inherited = { modules: { ...roleRes.data.modules }, widgets: { ...roleRes.data.widgets } };
+        state.draft = { modules: { ...ov.data.modules }, widgets: { ...ov.data.widgets }, capabilities: { ...ov.data.capabilities } };
+        state.inherited = { modules: { ...roleRes.data.modules }, widgets: { ...roleRes.data.widgets }, capabilities: { ...roleRes.data.capabilities } };
       }
     } catch (err) {
       window.yuvomi?.showToast(err.message || t('common.errorGeneric'), 'danger');
@@ -447,9 +505,10 @@ async function selectSubject(container, mode, id) {
 }
 
 async function save(container) {
-  const payload = { modules: {}, widgets: {} };
+  const payload = { modules: {}, widgets: {}, capabilities: {} };
   for (const [k, v] of Object.entries(state.draft.modules)) if (v && v !== 'inherit') payload.modules[k] = v;
   for (const [k, v] of Object.entries(state.draft.widgets)) if (v && v !== 'inherit') payload.widgets[k] = v;
+  for (const [k, v] of Object.entries(state.draft.capabilities)) if (v && v !== 'inherit') payload.capabilities[k] = v;
 
   const url = state.mode === 'role'
     ? `/permissions/role/${encodeURIComponent(state.subjectId)}`
@@ -459,7 +518,7 @@ async function save(container) {
   if (saveBtn) saveBtn.disabled = true;
   try {
     const res = await api.put(url, payload);
-    state.draft = { modules: { ...res.data.modules }, widgets: { ...res.data.widgets } };
+    state.draft = { modules: { ...res.data.modules }, widgets: { ...res.data.widgets }, capabilities: { ...res.data.capabilities } };
     state.dirty = false;
     renderMatrix(container);
     window.yuvomi?.showToast(t('settings.permSaved', { name: subjectTitle() }), 'success');
@@ -533,7 +592,8 @@ function applySegment(container, opt) {
   if (!key) return;
   const value = opt.dataset.value;
   if (type === 'module') state.draft.modules[key] = value;
-  else state.draft.widgets[key] = value;
+  else if (type === 'widget') state.draft.widgets[key] = value;
+  else state.draft.capabilities[key] = value;
   state.dirty = true;
 
   // Segment in-place aktualisieren (Slide bleibt erhalten).
@@ -555,7 +615,7 @@ async function resetSubject(container) {
     detail: t('settings.permResetConfirmDetail'),
   });
   if (!ok) return;
-  state.draft = { modules: {}, widgets: {} };
+  state.draft = { modules: {}, widgets: {}, capabilities: {} };
   state.dirty = true;
   renderMatrix(container);
 }
@@ -603,8 +663,8 @@ export async function render(container, { user } = {}) {
   state.catalog = catalog;
   state.mode = 'role';
   state.subjectId = null;
-  state.draft = { modules: {}, widgets: {} };
-  state.inherited = { modules: {}, widgets: {} };
+  state.draft = { modules: {}, widgets: {}, capabilities: {} };
+  state.inherited = { modules: {}, widgets: {}, capabilities: {} };
   state.dirty = false;
 
   renderSubjectSelector(container);

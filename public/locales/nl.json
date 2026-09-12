@@ -965,7 +965,25 @@
         "filterUnassigned": "Niet toegewezen"
     },
     "noteCategories": {
-        "permissionLabel": "Notitiecategorieën voor het huishouden beheren"
+        "categories": "Categorieën",
+        "filterLabel": "Filteren op categorieën",
+        "empty": "Nog geen categorieën.",
+        "personal": "Persoonlijk",
+        "household": "Huishouden",
+        "noResults": "Geen enkele notitie hoort bij alle geselecteerde categorieën.",
+        "deleteDetail": "De categorie wordt uit alle notities en dashboardfilters verwijderd. De notities zelf blijven ongewijzigd.",
+        "widgetHint": "Bij meerdere categorieën worden alleen notities getoond die bij alle categorieën horen. Zonder selectie worden alle notities getoond.",
+        "permissionLabel": "Notitiecategorieën voor het huishouden beheren",
+        "searchPlaceholder": "Categorie zoeken of maken...",
+        "searchResultsLabel": "Categoriesuggesties",
+        "removeAction": "Categorie {{name}} verwijderen",
+        "createAction": "‘{{name}}’ maken en toewijzen",
+        "scopeLabel": "Categorietype",
+        "scopeHelp": "Alleen jij kunt persoonlijke categorieën zien en beheren. Alle huishoudleden kunnen huishoudcategorieën gebruiken; rechten bepalen wie ze mag beheren.",
+        "moreAction": "{{count}} extra categorieën",
+        "moreAction_one": "{{count}} extra categorie",
+        "moreAction_few": "{{count}} extra categorieën",
+        "personalManagementHint": "Hier kun je je persoonlijke categorieën beheren. Huishoudcategorieën blijven beschikbaar in de notitie-editor, maar je hebt geen toestemming om ze te beheren."
     },
     "notes": {
         "title": "Bord",
@@ -2307,6 +2325,9 @@
         "permAccessWrite": "Volledig",
         "permWidgetBlocked": "Geblokkeerd",
         "permWidgetAllowed": "Beschikbaar",
+        "permCapabilitiesHeading": "Aanvullende rechten",
+        "permCapabilityBlocked": "Niet toegestaan",
+        "permCapabilityAllowed": "Toegestaan",
         "permInherit": "Overnemen",
         "permInheritedHint": "Overgenomen: {{value}}",
         "permModuleLockedHint": "Module vergrendeld",

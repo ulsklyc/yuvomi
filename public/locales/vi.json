@@ -965,7 +965,25 @@
         "filterUnassigned": "Chưa được giao"
     },
     "noteCategories": {
-        "permissionLabel": "Quản lý danh mục ghi chú gia đình"
+        "categories": "Danh mục",
+        "filterLabel": "Lọc theo danh mục",
+        "empty": "Chưa có danh mục.",
+        "personal": "Cá nhân",
+        "household": "Gia đình",
+        "noResults": "Không có ghi chú nào thuộc tất cả danh mục đã chọn.",
+        "deleteDetail": "Danh mục bị xóa khỏi mọi ghi chú và bộ lọc bảng điều khiển. Nội dung ghi chú không thay đổi.",
+        "widgetHint": "Khi chọn nhiều danh mục, chỉ các ghi chú thuộc tất cả danh mục đó được hiển thị. Nếu không chọn, mọi ghi chú đều hiển thị.",
+        "permissionLabel": "Quản lý danh mục ghi chú gia đình",
+        "searchPlaceholder": "Tìm hoặc tạo danh mục...",
+        "searchResultsLabel": "Gợi ý danh mục",
+        "removeAction": "Gỡ danh mục {{name}}",
+        "createAction": "Tạo và gán “{{name}}”",
+        "scopeLabel": "Loại danh mục",
+        "scopeHelp": "Chỉ bạn có thể xem và quản lý danh mục cá nhân. Mọi thành viên đều có thể dùng danh mục gia đình; quyền truy cập quyết định ai được quản lý chúng.",
+        "moreAction": "Thêm {{count}} danh mục",
+        "moreAction_one": "Thêm {{count}} danh mục",
+        "moreAction_few": "Thêm {{count}} danh mục",
+        "personalManagementHint": "Bạn có thể quản lý các danh mục cá nhân tại đây. Danh mục gia đình vẫn có trong trình sửa ghi chú, nhưng bạn không có quyền quản lý chúng."
     },
     "notes": {
         "title": "Bảng ghi chú",
@@ -2307,6 +2325,9 @@
         "permAccessWrite": "Đầy đủ",
         "permWidgetBlocked": "Bị chặn",
         "permWidgetAllowed": "Khả dụng",
+        "permCapabilitiesHeading": "Quyền bổ sung",
+        "permCapabilityBlocked": "Không cho phép",
+        "permCapabilityAllowed": "Cho phép",
         "permInherit": "Kế thừa",
         "permInheritedHint": "Kế thừa: {{value}}",
         "permModuleLockedHint": "Mô-đun bị khóa",

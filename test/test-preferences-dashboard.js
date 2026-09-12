@@ -89,6 +89,36 @@ test.beforeEach(() => {
   currentRole = 'admin';
 });
 
+test('category visibility is loaded lazily and at most once per preferences read', async () => {
+  const { baseUrl, close } = await startApp();
+  const database = get();
+  const originalPrepare = database.prepare;
+  let reads = 0;
+  database.prepare = function (sql, ...args) {
+    if (/FROM note_categories\s+WHERE scope/.test(sql)) reads++;
+    return originalPrepare.call(this, sql, ...args);
+  };
+  try {
+    await read(baseUrl);
+    assert.equal(reads, 0, 'no widget category filter needs no catalog');
+    seedHouseholdValue('dashboard_widgets_default', JSON.stringify([
+      { id: 'notes', visible: true, order: 0, size: '2x2', options: { categories: [] } },
+    ]));
+    await read(baseUrl);
+    assert.equal(reads, 0, 'empty filters need no catalog either');
+    seedHouseholdValue('dashboard_widgets_default', JSON.stringify([
+      { id: 'notes', visible: true, order: 0, size: '2x2', options: { categories: ['999999'] } },
+    ]));
+    const data = await read(baseUrl);
+    assert.equal(reads, 1, 'effective widgets and household defaults share one catalog');
+    assert.equal(data.dashboard_widgets[0].options?.categories, undefined);
+    assert.equal(data.dashboard_widgets_default[0].options?.categories, undefined);
+  } finally {
+    database.prepare = originalPrepare;
+    await close();
+  }
+});
+
 test('ohne jede Einstellung bleibt es beim Standard', async () => {
   const { baseUrl, close } = await startApp();
   try {
@@ -206,6 +236,28 @@ test('der Admin hinterlegt eine Vorgabe, und wer nichts Eigenes hat, bekommt sie
       assert.equal(data.dashboard_today_glance, false);
       assert.equal(data.dashboard_follows_default, true);
     }
+  } finally {
+    await close();
+  }
+});
+
+test('eine geerbte persönliche Notiz-Kategorie wird für andere Nutzer aus der Vorgabe entfernt', async () => {
+  const { baseUrl, close } = await startApp();
+  try {
+    get().prepare("INSERT OR IGNORE INTO users (id, username, display_name, password_hash) VALUES (101, 'pref-a', 'A', 'x')").run();
+    get().prepare("INSERT OR IGNORE INTO users (id, username, display_name, password_hash) VALUES (102, 'pref-b', 'B', 'x')").run();
+    const categoryId = Number(get().prepare(`
+      INSERT INTO note_categories (name, name_key, scope, owner_user_id, created_by)
+      VALUES ('Jen A', 'jen a', 'personal', 101, 101)
+    `).run().lastInsertRowid);
+    seedHouseholdValue('dashboard_widgets_default', JSON.stringify([
+      { id: 'notes', visible: true, order: 0, size: '2x1', options: { categories: [String(categoryId)], keep: 'yes' } },
+    ]));
+
+    currentUserId = 102;
+    const data = await read(baseUrl);
+    assert.deepEqual(data.dashboard_widgets[0].options, { keep: 'yes' });
+    assert.deepEqual(data.dashboard_widgets_default[0].options, { keep: 'yes' });
   } finally {
     await close();
   }

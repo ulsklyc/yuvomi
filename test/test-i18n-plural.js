@@ -438,3 +438,17 @@ test('Zahlen und Pluralformen ersetzen weiterhin normal', async () => {
   assert.equal(t('settings.enabledReminderListCount', { count: 1 }), '1 Erinnerungsliste aktiviert');
   assert.equal(t('settings.enabledReminderListCount', { count: 7 }), '7 Erinnerungslisten aktiviert');
 });
+
+// Deliberately kept at the existing end-of-file boundary: #1055 adds its own
+// plural regression after the English baseline, so this placement avoids an
+// otherwise content-free merge conflict between the independent changes.
+test('Notiz-Kategorieueberlauf benennt eine und mehrere weitere Kategorien', async () => {
+  await setLocale('en');
+  assert.equal(t('noteCategories.moreAction', { count: 1 }), '1 more category');
+  assert.equal(t('noteCategories.moreAction', { count: 2 }), '2 more categories');
+
+  await setLocale('cs');
+  assert.equal(t('noteCategories.moreAction', { count: 1 }), '1 další kategorie');
+  assert.equal(t('noteCategories.moreAction', { count: 3 }), '3 další kategorie');
+  assert.equal(t('noteCategories.moreAction', { count: 5 }), '5 dalších kategorií');
+});

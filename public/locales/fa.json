@@ -977,7 +977,25 @@
         "filterUnassigned": "واگذارنشده"
     },
     "noteCategories": {
-        "permissionLabel": "مدیریت دسته‌بندی‌های یادداشت خانوادگی"
+        "categories": "دسته‌بندی‌ها",
+        "filterLabel": "فیلتر بر اساس دسته‌بندی",
+        "empty": "هنوز دسته‌بندی‌ای وجود ندارد.",
+        "personal": "شخصی",
+        "household": "خانه",
+        "noResults": "هیچ یادداشتی در همهٔ دسته‌بندی‌های انتخاب‌شده نیست.",
+        "deleteDetail": "این دسته‌بندی از همهٔ یادداشت‌ها و فیلترهای داشبورد حذف می‌شود. خود یادداشت‌ها بدون تغییر می‌مانند.",
+        "widgetHint": "با انتخاب چند دسته‌بندی فقط یادداشت‌هایی نمایش داده می‌شوند که در همهٔ آن‌ها باشند. بدون انتخاب، همهٔ یادداشت‌ها نمایش داده می‌شوند.",
+        "permissionLabel": "مدیریت دسته‌بندی‌های یادداشت خانوادگی",
+        "searchPlaceholder": "جست‌وجو یا ایجاد دسته...",
+        "searchResultsLabel": "پیشنهادهای دسته",
+        "removeAction": "حذف دستهٔ {{name}}",
+        "createAction": "ایجاد و تخصیص «{{name}}»",
+        "scopeLabel": "نوع دسته",
+        "scopeHelp": "دسته‌های شخصی را فقط شما می‌بینید و مدیریت می‌کنید. همهٔ اعضای خانوار می‌توانند از دسته‌های خانوار استفاده کنند؛ مجوزها تعیین می‌کنند چه کسی آن‌ها را مدیریت کند.",
+        "moreAction": "{{count}} دستهٔ دیگر",
+        "moreAction_one": "{{count}} دستهٔ دیگر",
+        "moreAction_few": "{{count}} دستهٔ دیگر",
+        "personalManagementHint": "اینجا می‌توانید دسته‌های شخصی خود را مدیریت کنید. دسته‌های خانوار همچنان در ویرایشگر یادداشت در دسترس‌اند، اما اجازهٔ مدیریت آن‌ها را ندارید."
     },
     "notes": {
         "title": "یادداشت‌ها",
@@ -2319,6 +2337,9 @@
         "permAccessWrite": "کامل",
         "permWidgetBlocked": "مسدود",
         "permWidgetAllowed": "در دسترس",
+        "permCapabilitiesHeading": "مجوزهای بیشتر",
+        "permCapabilityBlocked": "مجاز نیست",
+        "permCapabilityAllowed": "مجاز",
         "permInherit": "ارث‌بری",
         "permInheritedHint": "ارث‌بری‌شده: {{value}}",
         "permModuleLockedHint": "ماژول قفل است",

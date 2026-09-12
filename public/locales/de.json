@@ -977,7 +977,25 @@
         "filterUnassigned": "Nicht zugewiesen"
     },
     "noteCategories": {
-        "permissionLabel": "Gemeinsame Notizkategorien verwalten"
+        "categories": "Kategorien",
+        "filterLabel": "Nach Kategorien filtern",
+        "empty": "Noch keine Kategorien.",
+        "personal": "Persönlich",
+        "household": "Haushalt",
+        "noResults": "Keine Notiz gehört zu allen ausgewählten Kategorien.",
+        "deleteDetail": "Die Kategorie wird aus allen Notizen und Dashboard-Filtern entfernt. Die Notizen selbst bleiben unverändert.",
+        "widgetHint": "Bei mehreren Kategorien werden nur Notizen angezeigt, die zu allen gehören. Ohne Auswahl erscheinen alle Notizen.",
+        "permissionLabel": "Gemeinsame Notizkategorien verwalten",
+        "searchPlaceholder": "Kategorie suchen oder erstellen...",
+        "searchResultsLabel": "Kategorievorschläge",
+        "removeAction": "Kategorie {{name}} entfernen",
+        "createAction": "„{{name}}“ erstellen und zuweisen",
+        "scopeLabel": "Kategorietyp",
+        "scopeHelp": "Persönliche Kategorien siehst und verwaltest nur du. Haushaltskategorien können alle Mitglieder verwenden; ihre Verwaltung wird über Berechtigungen gesteuert.",
+        "moreAction": "{{count}} weitere Kategorien",
+        "moreAction_one": "{{count}} weitere Kategorie",
+        "moreAction_few": "{{count}} weitere Kategorien",
+        "personalManagementHint": "Hier kannst du deine persönlichen Kategorien verwalten. Haushaltskategorien bleiben im Notizeditor verfügbar, aber du darfst sie nicht verwalten."
     },
     "notes": {
         "title": "Notizen",
@@ -2342,6 +2360,9 @@
         "permAccessWrite": "Voll",
         "permWidgetBlocked": "Gesperrt",
         "permWidgetAllowed": "Verfügbar",
+        "permCapabilitiesHeading": "Weitere Berechtigungen",
+        "permCapabilityBlocked": "Nicht erlaubt",
+        "permCapabilityAllowed": "Erlaubt",
         "permInherit": "Erben",
         "permInheritedHint": "Geerbt: {{value}}",
         "permModuleLockedHint": "Modul gesperrt",

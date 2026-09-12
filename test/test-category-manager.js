@@ -4,6 +4,7 @@
  * Ausführen: node --experimental-sqlite test/test-category-manager.js
  */
 import { readFileSync } from 'node:fs';
+import { eachRule } from './css-rules.js';
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -15,6 +16,9 @@ function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion fehlge
 console.log('\n[Category-Manager-Test]\n');
 
 const comp = readFileSync(new URL('../public/components/category-manager.js', import.meta.url), 'utf8');
+const compCss = readFileSync(new URL('../public/styles/category-manager.css', import.meta.url), 'utf8');
+const settingsCss = readFileSync(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+const notesPage = readFileSync(new URL('../public/pages/notes.js', import.meta.url), 'utf8');
 
 test('Definiert das Custom Element yuvomi-category-manager', () => {
   assert(/customElements\.define\(\s*'yuvomi-category-manager'/.test(comp), 'Tag-Name muss yuvomi-category-manager sein');
@@ -33,6 +37,19 @@ test('Mutiert über post/put/patch/delete relativ zu basePath', () => {
 });
 test('Dispatcht category-manager-changed nach Mutationen', () => {
   assert(/category-manager-changed/.test(comp), 'Event muss dispatcht werden');
+});
+test('Notizen aktualisieren sich nach Manager-Mutationen über das Aenderungs-Ereignis', () => {
+  // Ein Weg, nicht zwei: die Notizen haengen wie die sechs uebrigen Aufrufer am
+  // Ereignis. Das `detail` traegt dabei, was der Refresh fuer sein optimistisches
+  // Entfernen braucht - `_notifyChanged({ action: 'delete', key })` beim Loeschen,
+  // sonst `{}`, worauf `refresh` auf den vollen Nachladen faellt.
+  const managerFn = notesPage.match(/function openNoteCategoryManager\(\)[\s\S]*?\n\}/)?.[0] || '';
+  assert(/addEventListener\('category-manager-changed', \(e\) => refresh\(e\.detail\)\)/.test(managerFn),
+    'Notizen muessen ihren Refresh an das Ereignis haengen und das detail durchreichen');
+  // Der Grund, aus dem #1066 dieselbe Regel als Wachhund ueber ALLE Aufrufer
+  // gelegt hat: der Loeschdialog schliesst das Modal vor dem DELETE.
+  assert(!/removeEventListener\('category-manager-changed'/.test(managerFn),
+    'der Notes-Refresh darf nicht mit dem vor DELETE laufenden Modal-Cleanup verschwinden');
 });
 test('Räumt Listener in disconnectedCallback auf', () => {
   assert(/disconnectedCallback\s*\(\)\s*\{[\s\S]*removeEventListener/.test(comp), 'Listener-Cleanup nötig');
@@ -59,6 +76,28 @@ const budgetPage = readFileSync(new URL('../public/pages/budget.js', import.meta
 test('Budget importiert die generische Komponente', () => {
   assert(/components\/category-manager\.js/.test(budgetPage), 'budget.js muss die Komponente importieren');
   assert(/yuvomi-category-manager/.test(budgetPage), 'budget.js muss das Element verwenden');
+});
+test('Notizen importieren die generische Komponente auch beim direkten Seitenaufruf', () => {
+  assert(/components\/category-manager\.js/.test(notesPage), 'notes.js muss die Komponente importieren');
+  assert(/yuvomi-category-manager/.test(notesPage), 'notes.js muss das Element verwenden');
+});
+test('Notiz-Kategorien nutzen eine gemeinsame scope-fähige Eingabe und Scope-Icons', () => {
+  assert(/unifiedAdd:\s*true/.test(notesPage), 'Notizen müssen genau eine gemeinsame Add-Eingabe konfigurieren');
+  assert(/addMaxLength:\s*80/.test(notesPage), 'Die Manager-Eingabe muss denselben 80-Zeichen-Vertrag wie die Notes-API nutzen');
+  assert(/groupField:\s*'scope'/.test(notesPage), 'Notizen müssen scope als Gruppen- und Request-Feld konfigurieren');
+  assert(/rowIconResolver/.test(notesPage), 'Notizen müssen persönliche und Haushaltskategorien per Icon unterscheiden');
+  assert(/addScopeHelpKey/.test(notesPage), 'Die Scope-Wahl braucht einen erklärenden Tooltip');
+  assert(/this\._unifiedAdd/.test(comp), 'Category Manager muss den gemeinsamen Add-Modus unterstützen');
+  assert(/this\._rowIconResolver/.test(comp), 'Category Manager muss opt-in Scope-Icons unterstützen');
+});
+test('Scope-Tooltip und Berechtigungs-Einzüge funktionieren auch in RTL-Sprachen', () => {
+  assert(/inset-inline-end:\s*0/.test(compCss), 'Tooltip muss logisch am Inline-Ende verankert sein');
+  const rules = [...eachRule(settingsCss)];
+  const widgets = rules.find((rule) => rule.selector === '.perm-modgroup__widgets' && !rule.at.length)?.body || '';
+  const capabilities = rules.find((rule) => rule.selector === '.perm-modgroup__capabilities' && !rule.at.length)?.body || '';
+  assert(/padding-inline-start:\s*var\(--space-8\)/.test(widgets), 'Widget-Einzug muss logisch sein');
+  assert(!/padding-left\s*:/.test(widgets), 'Widget-Einzug darf kein physisches padding-left nutzen');
+  assert(/margin-inline:\s*var\(--space-8\)/.test(capabilities), 'Capability-Einzug muss logisch sein');
 });
 test('Budget konfiguriert basePath /budget/categories und Gruppen', () => {
   assert(/configure\(/.test(budgetPage), 'configure() muss aufgerufen werden');

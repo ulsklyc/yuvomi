@@ -965,7 +965,25 @@
         "filterUnassigned": "Unassigned"
     },
     "noteCategories": {
-        "permissionLabel": "Manage household note categories"
+        "categories": "Categories",
+        "filterLabel": "Filter by categories",
+        "empty": "No categories yet.",
+        "personal": "Personal",
+        "household": "Household",
+        "noResults": "No notes match all selected categories.",
+        "deleteDetail": "This category is removed from every note and dashboard filter. The notes themselves stay unchanged.",
+        "widgetHint": "Select multiple categories to show only notes that have all of them. With none selected, all notes are shown.",
+        "permissionLabel": "Manage household note categories",
+        "searchPlaceholder": "Search or create a category...",
+        "searchResultsLabel": "Category suggestions",
+        "removeAction": "Remove category {{name}}",
+        "createAction": "Create and assign “{{name}}”",
+        "scopeLabel": "Category type",
+        "scopeHelp": "Only you can see and manage personal categories. Every household member can use household categories; permissions control who can manage them.",
+        "moreAction": "{{count}} more categories",
+        "moreAction_one": "{{count}} more category",
+        "moreAction_few": "{{count}} more categories",
+        "personalManagementHint": "You can manage your personal categories here. Household categories remain available in the note editor, but you do not have permission to manage them."
     },
     "notes": {
         "title": "Board",
@@ -2330,6 +2348,9 @@
         "permAccessWrite": "Full",
         "permWidgetBlocked": "Blocked",
         "permWidgetAllowed": "Available",
+        "permCapabilitiesHeading": "Additional permissions",
+        "permCapabilityBlocked": "Not allowed",
+        "permCapabilityAllowed": "Allowed",
         "permInherit": "Inherit",
         "permInheritedHint": "Inherited: {{value}}",
         "permModuleLockedHint": "Module locked",

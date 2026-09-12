@@ -965,7 +965,25 @@
         "filterUnassigned": "Sin asignar"
     },
     "noteCategories": {
-        "permissionLabel": "Gestionar categorías de notas del hogar"
+        "categories": "Categorías",
+        "filterLabel": "Filtrar por categorías",
+        "empty": "Todavía no hay categorías.",
+        "personal": "Personal",
+        "household": "Hogar",
+        "noResults": "Ninguna nota pertenece a todas las categorías seleccionadas.",
+        "deleteDetail": "La categoría se elimina de todas las notas y filtros del panel. Las notas no se modifican.",
+        "widgetHint": "Si eliges varias categorías, solo se muestran las notas que pertenecen a todas. Sin selección se muestran todas.",
+        "permissionLabel": "Gestionar categorías de notas del hogar",
+        "searchPlaceholder": "Buscar o crear una categoría...",
+        "searchResultsLabel": "Sugerencias de categorías",
+        "removeAction": "Quitar la categoría {{name}}",
+        "createAction": "Crear y asignar «{{name}}»",
+        "scopeLabel": "Tipo de categoría",
+        "scopeHelp": "Solo tú puedes ver y gestionar las categorías personales. Todos los miembros del hogar pueden usar las categorías del hogar; los permisos controlan quién puede gestionarlas.",
+        "moreAction": "{{count}} categorías más",
+        "moreAction_one": "{{count}} categoría más",
+        "moreAction_few": "{{count}} categorías más",
+        "personalManagementHint": "Aquí puedes gestionar tus categorías personales. Las categorías del hogar siguen disponibles en el editor de notas, pero no tienes permiso para gestionarlas."
     },
     "notes": {
         "title": "Notas",
@@ -2307,6 +2325,9 @@
         "permAccessWrite": "Completo",
         "permWidgetBlocked": "Bloqueado",
         "permWidgetAllowed": "Disponible",
+        "permCapabilitiesHeading": "Permisos adicionales",
+        "permCapabilityBlocked": "No permitido",
+        "permCapabilityAllowed": "Permitido",
         "permInherit": "Heredar",
         "permInheritedHint": "Heredado: {{value}}",
         "permModuleLockedHint": "Módulo bloqueado",

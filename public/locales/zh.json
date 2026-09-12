@@ -965,7 +965,25 @@
         "filterUnassigned": "未分配"
     },
     "noteCategories": {
-        "permissionLabel": "管理家庭笔记分类"
+        "categories": "分类",
+        "filterLabel": "按分类筛选",
+        "empty": "暂无分类。",
+        "personal": "个人",
+        "household": "家庭",
+        "noResults": "没有同时属于所有所选分类的便笺。",
+        "deleteDetail": "该分类会从所有便笺和仪表板筛选器中移除，便笺本身不会改变。",
+        "widgetHint": "选择多个分类时，只显示同时属于所有分类的便笺；未选择时显示全部便笺。",
+        "permissionLabel": "管理家庭笔记分类",
+        "searchPlaceholder": "搜索或创建类别...",
+        "searchResultsLabel": "类别建议",
+        "removeAction": "移除类别 {{name}}",
+        "createAction": "创建并分配“{{name}}”",
+        "scopeLabel": "类别类型",
+        "scopeHelp": "个人类别仅由您查看和管理。所有家庭成员都可使用家庭类别；权限决定谁可以管理它们。",
+        "moreAction": "另外 {{count}} 个类别",
+        "moreAction_one": "另外 {{count}} 个类别",
+        "moreAction_few": "另外 {{count}} 个类别",
+        "personalManagementHint": "您可以在此管理个人类别。家庭类别仍可在笔记编辑器中使用，但您没有管理这些类别的权限。"
     },
     "notes": {
         "title": "便签板",
@@ -2307,6 +2325,9 @@
         "permAccessWrite": "完全",
         "permWidgetBlocked": "已屏蔽",
         "permWidgetAllowed": "可用",
+        "permCapabilitiesHeading": "其他权限",
+        "permCapabilityBlocked": "不允许",
+        "permCapabilityAllowed": "允许",
         "permInherit": "继承",
         "permInheritedHint": "继承：{{value}}",
         "permModuleLockedHint": "模块已锁定",

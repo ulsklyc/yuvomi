@@ -977,7 +977,25 @@
         "filterUnassigned": "할당되지 않음"
     },
     "noteCategories": {
-        "permissionLabel": "가정 메모 카테고리 관리"
+        "categories": "카테고리",
+        "filterLabel": "카테고리로 필터링",
+        "empty": "아직 카테고리가 없습니다.",
+        "personal": "개인",
+        "household": "가정",
+        "noResults": "선택한 모든 카테고리에 속하는 메모가 없습니다.",
+        "deleteDetail": "이 카테고리는 모든 메모와 대시보드 필터에서 제거됩니다. 메모 자체는 변경되지 않습니다.",
+        "widgetHint": "여러 카테고리를 선택하면 모든 카테고리에 속하는 메모만 표시됩니다. 선택하지 않으면 모든 메모가 표시됩니다.",
+        "permissionLabel": "가정 메모 카테고리 관리",
+        "searchPlaceholder": "카테고리 검색 또는 만들기...",
+        "searchResultsLabel": "카테고리 제안",
+        "removeAction": "{{name}} 카테고리 제거",
+        "createAction": "“{{name}}” 만들고 지정",
+        "scopeLabel": "카테고리 유형",
+        "scopeHelp": "개인 카테고리는 본인만 보고 관리할 수 있습니다. 가구 카테고리는 모든 구성원이 사용할 수 있으며, 관리 권한은 권한 설정으로 제어됩니다.",
+        "moreAction": "카테고리 {{count}}개 더",
+        "moreAction_one": "카테고리 {{count}}개 더",
+        "moreAction_few": "카테고리 {{count}}개 더",
+        "personalManagementHint": "여기에서 개인 카테고리를 관리할 수 있습니다. 가구 카테고리는 메모 편집기에서 계속 사용할 수 있지만 관리할 권한은 없습니다."
     },
     "notes": {
         "title": "메모",
@@ -2319,6 +2337,9 @@
         "permAccessWrite": "전체",
         "permWidgetBlocked": "차단됨",
         "permWidgetAllowed": "사용 가능",
+        "permCapabilitiesHeading": "추가 권한",
+        "permCapabilityBlocked": "허용 안 함",
+        "permCapabilityAllowed": "허용",
         "permInherit": "상속",
         "permInheritedHint": "상속됨: {{value}}",
         "permModuleLockedHint": "모듈 잠김",

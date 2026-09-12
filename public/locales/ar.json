@@ -965,7 +965,25 @@
         "filterUnassigned": "غير مُسندة"
     },
     "noteCategories": {
-        "permissionLabel": "إدارة فئات ملاحظات الأسرة"
+        "categories": "الفئات",
+        "filterLabel": "التصفية حسب الفئات",
+        "empty": "لا توجد فئات بعد.",
+        "personal": "شخصية",
+        "household": "المنزل",
+        "noResults": "لا توجد ملاحظة تنتمي إلى جميع الفئات المحددة.",
+        "deleteDetail": "تُزال الفئة من جميع الملاحظات وعوامل تصفية لوحة المعلومات. تبقى الملاحظات نفسها دون تغيير.",
+        "widgetHint": "عند تحديد عدة فئات، تظهر فقط الملاحظات التي تنتمي إليها جميعًا. وبدون تحديد تظهر كل الملاحظات.",
+        "permissionLabel": "إدارة فئات ملاحظات الأسرة",
+        "searchPlaceholder": "ابحث عن فئة أو أنشئ واحدة...",
+        "searchResultsLabel": "اقتراحات الفئات",
+        "removeAction": "إزالة الفئة {{name}}",
+        "createAction": "إنشاء «{{name}}» وإسنادها",
+        "scopeLabel": "نطاق الفئة",
+        "scopeHelp": "الفئات الشخصية لك وحدك. يمكن لجميع أفراد المنزل استخدام الفئات المنزلية، وتتحكم الأذونات في إدارتها.",
+        "moreAction": "الفئات الإضافية: {{count}}",
+        "moreAction_one": "{{count}} فئة إضافية",
+        "moreAction_few": "{{count}} فئات إضافية",
+        "personalManagementHint": "يمكنك إدارة فئاتك الشخصية هنا. تظل فئات المنزل متاحة في محرر الملاحظات، لكنك لا تملك إذنًا لإدارتها."
     },
     "notes": {
         "title": "لوحة الملاحظات",
@@ -2307,6 +2325,9 @@
         "permAccessWrite": "كامل",
         "permWidgetBlocked": "محظور",
         "permWidgetAllowed": "متاح",
+        "permCapabilitiesHeading": "أذونات إضافية",
+        "permCapabilityBlocked": "غير مسموح",
+        "permCapabilityAllowed": "مسموح",
         "permInherit": "توريث",
         "permInheritedHint": "موروث: {{value}}",
         "permModuleLockedHint": "الوحدة مقفلة",

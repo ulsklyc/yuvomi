@@ -104,17 +104,23 @@ const STUBS = {
     export const openModal = () => {};
     export const closeModal = () => {};
     export const confirmModal = async () => true;
-    export const confirmOverModal = async () => true;
+    export const confirmOverModal = async (...args) => globalThis.__confirmOverModal?.(...args) ?? true;
     export const selectModal = async () => null;
     export const advancedSection = (inner = '') => String(inner);
     export const wireBlurValidation = () => {};
     export const reportFieldError = () => false;
     export const mountFooter = () => null;
     export const refreshDirtySnapshot = () => {};
+    export const captureModalContext = () => globalThis.__modalContextId?.() ?? 'test-modal-context';
+    export const isModalContextCurrent = (context) => (
+      globalThis.__modalContextId?.() === undefined
+        ? true
+        : globalThis.__modalContextId() === context
+    );
     export const focusFirstField = () => null;
     export const updateHeaderAction = () => null;
     export const validateAll = () => true;
-    export const promptModal = async () => null;
+    export const promptModal = async (...args) => globalThis.__promptModal?.(...args) ?? null;
     export const btnLoading = () => {};
     export const btnSuccess = () => {};
     export const btnError = () => {};

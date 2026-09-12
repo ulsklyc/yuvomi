@@ -965,7 +965,25 @@
         "filterUnassigned": "किसी को नहीं सौंपे गए"
     },
     "noteCategories": {
-        "permissionLabel": "घर की नोट श्रेणियाँ प्रबंधित करें"
+        "categories": "श्रेणियाँ",
+        "filterLabel": "श्रेणियों के अनुसार फ़िल्टर करें",
+        "empty": "अभी कोई श्रेणी नहीं है।",
+        "personal": "व्यक्तिगत",
+        "household": "परिवार",
+        "noResults": "कोई भी नोट सभी चुनी गई श्रेणियों में नहीं है।",
+        "deleteDetail": "यह श्रेणी सभी नोट और डैशबोर्ड फ़िल्टर से हट जाएगी। नोट में कोई बदलाव नहीं होगा।",
+        "widgetHint": "कई श्रेणियाँ चुनने पर केवल वे नोट दिखेंगे जो उन सभी में हैं। कुछ न चुनने पर सभी नोट दिखेंगे।",
+        "permissionLabel": "घर की नोट श्रेणियाँ प्रबंधित करें",
+        "searchPlaceholder": "श्रेणी खोजें या बनाएँ...",
+        "searchResultsLabel": "श्रेणी सुझाव",
+        "removeAction": "{{name}} श्रेणी हटाएँ",
+        "createAction": "“{{name}}” बनाएँ और जोड़ें",
+        "scopeLabel": "श्रेणी का प्रकार",
+        "scopeHelp": "व्यक्तिगत श्रेणियाँ केवल आप देख और प्रबंधित कर सकते हैं। घर की श्रेणियाँ सभी सदस्य उपयोग कर सकते हैं; अनुमतियाँ तय करती हैं कि उन्हें कौन प्रबंधित कर सकता है।",
+        "moreAction": "{{count}} और श्रेणियाँ",
+        "moreAction_one": "{{count}} और श्रेणी",
+        "moreAction_few": "{{count}} और श्रेणियाँ",
+        "personalManagementHint": "आप यहाँ अपनी व्यक्तिगत श्रेणियाँ प्रबंधित कर सकते हैं। घर की श्रेणियाँ नोट संपादक में उपलब्ध रहती हैं, लेकिन आपको उन्हें प्रबंधित करने की अनुमति नहीं है।"
     },
     "notes": {
         "title": "नोट बोर्ड",
@@ -2307,6 +2325,9 @@
         "permAccessWrite": "पूर्ण",
         "permWidgetBlocked": "अवरुद्ध",
         "permWidgetAllowed": "उपलब्ध",
+        "permCapabilitiesHeading": "अतिरिक्त अनुमतियाँ",
+        "permCapabilityBlocked": "अनुमति नहीं",
+        "permCapabilityAllowed": "अनुमति है",
         "permInherit": "इनहेरिट",
         "permInheritedHint": "इनहेरिट किया गया: {{value}}",
         "permModuleLockedHint": "मॉड्यूल लॉक है",

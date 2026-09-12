@@ -6,8 +6,17 @@ export function dashboardPaths() {
       get: op({
         summary: 'Get dashboard data',
         tag: 'Dashboard',
-        description: 'Aggregated data for every overview tile. The two query parameters narrow what the page talks about, and they narrow the queries themselves - the task list caps at five while the metric tiles count without a limit, so filtering the response afterwards would disagree with itself. They apply to every task slice (`urgentTasks`, `openTaskCount`, `overdueTaskCount`, `memberTodayTasks`, `tasksDoneToday`) and to `upcomingEvents` respectively. Both are optional; the browser derives them from the per-widget `options` stored in `dashboard_widgets` (#814).',
+        description: 'Aggregated data for every overview tile. Optional query parameters filter tasks, upcoming events and pinned notes before row limits and counts are computed. Task filters apply to every task slice (`urgentTasks`, `openTaskCount`, `overdueTaskCount`, `memberTodayTasks`, `tasksDoneToday`); note filters apply to both `pinnedNotes` and `pinnedNotesCount`. The browser derives these filters from per-widget `options` stored in `dashboard_widgets`.',
         params: [
+          {
+            name: 'notes_category',
+            in: 'query',
+            required: false,
+            description: 'Limit pinned notes to those carrying every selected category (AND). Repeatable positive category IDs, deduplicated and capped at 50. Omitted or empty means all visible pinned notes. Only household categories and the caller\'s own personal categories may match; another user\'s personal category cannot reveal notes.',
+            schema: { type: 'array', items: { type: 'integer', minimum: 1 }, maxItems: 50 },
+            style: 'form',
+            explode: true,
+          },
           {
             name: 'tasks_category',
             in: 'query',

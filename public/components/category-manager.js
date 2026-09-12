@@ -5,7 +5,8 @@
  * Abhängigkeiten: /api.js, /i18n.js, /utils/html.js
  *
  * Verhalten:
- *   - configure({ basePath, groups, supportsSubcategories, labelResolver, titleKey, hintKey,
+ *   - configure({ basePath, groups, groupField, supportsSubcategories, labelResolver, titleKey, hintKey,
+ *                 addMaxLength,
  *                 deleteConfirmKey, deleteDetailKey, subDeleteDetailKey })
  *   - Lädt via api.get(basePath); mutiert über post/put/patch/delete relativ zu basePath
  *   - Dispatcht nach jeder Mutation `category-manager-changed`
@@ -41,11 +42,44 @@ const COLOR_LABEL_KEYS = [
   'category.colorGrey',
 ];
 
+/** Shared by the manager and the Notes editor; listeners belong to their root. */
+export function wireCategoryScopeHelp(root) {
+  const button = root.querySelector('.category-scope-help');
+  if (!button) return () => {};
+  const controller = new AbortController();
+  const { signal } = controller;
+  let pinned = false;
+  const setOpen = (open) => button.setAttribute('aria-expanded', String(open));
+  setOpen(false);
+  button.addEventListener('mouseenter', () => setOpen(true), { signal });
+  button.addEventListener('focus', () => setOpen(true), { signal });
+  button.addEventListener('mouseleave', () => {
+    if (!pinned && document.activeElement !== button) setOpen(false);
+  }, { signal });
+  button.addEventListener('blur', () => { pinned = false; setOpen(false); }, { signal });
+  button.addEventListener('click', () => { pinned = !pinned; setOpen(pinned); }, { signal });
+  button.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
+  }, { signal });
+  // Hover does not move focus: Escape can originate in a different form field.
+  root.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && button.getAttribute('aria-expanded') === 'true') {
+      event.stopPropagation();
+      pinned = false;
+      setOpen(false);
+    }
+  }, { signal, capture: true });
+  return () => controller.abort();
+}
+
 class CategoryManagerElement extends HTMLElement {
   constructor() {
     super();
     this._basePath = '';
     this._groups = [{ key: '', labelKey: '', addLabelKey: 'common.add' }];
+    // Existing category APIs use `type`; callers with another canonical field
+    // (Notes uses `scope`) opt in without changing the legacy contract.
+    this._groupField = 'type';
     this._supportsSub = false;
     this._labelResolver = (item) => item.label ?? item.name; // Server liefert lokalisiertes `label`
     this._titleKey = 'category.manageTitle';
@@ -71,6 +105,13 @@ class CategoryManagerElement extends HTMLElement {
     // sechs Aufrufer zeigen ihre Kategorien nirgends als farbige Marke - dort
     // waere ein Farbknopf eine Einstellung ohne Wirkung.
     this._colors = [];
+    // Optional note-category presentation: one shared name+scope form instead
+    // of one add form per group, plus a caller-provided row glyph.
+    this._unifiedAdd = false;
+    this._rowIconResolver = null;
+    this._addScopeLabelKey = 'noteCategories.scopeLabel';
+    this._addScopeHelpKey = '';
+    this._addMaxLength = 60;
     this._cats = [];
     this._sortables = [];
     this._onClick = this._onClick.bind(this);
@@ -80,12 +121,20 @@ class CategoryManagerElement extends HTMLElement {
   configure(opts) {
     this._basePath = opts.basePath;
     if (Array.isArray(opts.groups) && opts.groups.length) this._groups = opts.groups;
+    if (typeof opts.groupField === 'string' && opts.groupField) this._groupField = opts.groupField;
     this._supportsSub = !!opts.supportsSubcategories;
     if (typeof opts.labelResolver === 'function') this._labelResolver = opts.labelResolver;
     if (opts.titleKey) this._titleKey = opts.titleKey;
     if (opts.hintKey) this._hintKey = opts.hintKey;
     if (opts.addPlaceholderKey) this._addPlaceholderKey = opts.addPlaceholderKey;
     if (Array.isArray(opts.colors)) this._colors = opts.colors;
+    this._unifiedAdd = !!opts.unifiedAdd;
+    this._rowIconResolver = typeof opts.rowIconResolver === 'function' ? opts.rowIconResolver : null;
+    if (opts.addScopeLabelKey) this._addScopeLabelKey = opts.addScopeLabelKey;
+    if (opts.addScopeHelpKey) this._addScopeHelpKey = opts.addScopeHelpKey;
+    if (Number.isInteger(opts.addMaxLength) && opts.addMaxLength > 0) {
+      this._addMaxLength = opts.addMaxLength;
+    }
     if (opts.deleteConfirmKey) this._deleteConfirmKey = opts.deleteConfirmKey;
     if (opts.deleteDetailKey) this._deleteDetailKey = opts.deleteDetailKey;
     if (opts.subDeleteDetailKey) this._subDeleteDetailKey = opts.subDeleteDetailKey;
@@ -94,6 +143,7 @@ class CategoryManagerElement extends HTMLElement {
   }
 
   disconnectedCallback() {
+    this._disposeScopeHelp?.();
     this._root?.removeEventListener('click', this._onClick);
     this._root?.removeEventListener('submit', this._onSubmit);
     this._destroySortables();
@@ -139,7 +189,11 @@ class CategoryManagerElement extends HTMLElement {
 
   _inGroup(groupKey) {
     if (!groupKey) return this._cats;
-    return this._cats.filter((c) => (c.type ?? c.group ?? '') === groupKey);
+    return this._cats.filter((c) => this._groupOf(c) === groupKey);
+  }
+
+  _groupOf(item) {
+    return item?.[this._groupField] ?? item?.type ?? item?.group ?? '';
   }
 
   /* Stabiler Zeilen-Schlüssel: Budget/Tasks/Kontakte liefern `key`,
@@ -158,13 +212,37 @@ class CategoryManagerElement extends HTMLElement {
         <ul class="cat-list">
           ${items.map((c, i) => this._rowHtml(c, g, i === 0, i === items.length - 1)).join('')}
         </ul>
-        <form class="cat-add-form" data-group="${esc(g.key)}" novalidate autocomplete="off">
-          <input class="form-input" type="text" maxlength="60"
+        ${this._unifiedAdd ? '' : `<form class="cat-add-form" data-group="${esc(g.key)}" novalidate autocomplete="off">
+          <input class="form-input" type="text" maxlength="${this._addMaxLength}"
                  placeholder="${esc(t(this._addPlaceholderKey))}"
                  aria-label="${esc(t(this._addPlaceholderKey))}" />
           <button type="submit" class="btn btn--primary">${esc(t(g.addLabelKey || 'common.add'))}</button>
-        </form>
+        </form>`}
       </section>`;
+  }
+
+  _unifiedAddFormHtml() {
+    if (!this._unifiedAdd) return '';
+    const hasScopeChoice = this._groups.length > 1;
+    const help = hasScopeChoice && this._addScopeHelpKey
+      ? `<button type="button" class="category-scope-help" aria-expanded="false" aria-label="${esc(t(this._addScopeHelpKey))}">
+          <i data-lucide="info" aria-hidden="true"></i>
+          <span class="category-scope-help__tooltip u-meta" id="cat-manager-scope-help" role="tooltip">${esc(t(this._addScopeHelpKey))}</span>
+        </button>`
+      : '';
+    return `<form class="cat-add-form cat-add-form--unified" data-group="${esc(this._groups[0]?.key ?? '')}"
+                  novalidate autocomplete="off">
+      <input class="form-input" type="text" maxlength="${this._addMaxLength}"
+             placeholder="${esc(t(this._addPlaceholderKey))}"
+             aria-label="${esc(t(this._addPlaceholderKey))}" />
+      ${hasScopeChoice ? `<div class="cat-add-form__scope">
+        <select class="form-input" name="category-scope" aria-label="${esc(t(this._addScopeLabelKey))}"
+                ${help ? 'aria-describedby="cat-manager-scope-help"' : ''}>
+          ${this._groups.map((group) => `<option value="${esc(group.key)}">${esc(t(group.labelKey))}</option>`).join('')}
+        </select>${help}
+      </div>` : ''}
+      <button type="submit" class="btn btn--primary">${esc(t(this._groups[0]?.addLabelKey || 'common.add'))}</button>
+    </form>`;
   }
 
   // Läuft irgendwo ein Drag (z. B. eine zweite Zeile, die gezogen wird, während
@@ -193,8 +271,15 @@ class CategoryManagerElement extends HTMLElement {
       tmp.insertAdjacentHTML('beforeend', this._groupSectionHtml(g));
       this._groupsEl.appendChild(tmp.firstElementChild);
     });
+    this._groupsEl.insertAdjacentHTML('beforeend', this._unifiedAddFormHtml());
+    this._wireScopeHelp();
     if (window.lucide) window.lucide.createIcons({ el: this._groupsEl });
     this._wireSortableIn(this._groupsEl);
+  }
+
+  _wireScopeHelp() {
+    this._disposeScopeHelp?.();
+    this._disposeScopeHelp = wireCategoryScopeHelp(this.closest?.('.modal-panel') || this._groupsEl);
   }
 
   // Teil-Render einer einzelnen Gruppe: baut nur deren Sektion (cat-list +
@@ -224,7 +309,7 @@ class CategoryManagerElement extends HTMLElement {
     if (!this._groupsEl || !this._supportsSub) return;
     if (this._deferForDrag()) return;
     const cat = this._cats.find((c) => this._keyOf(c) === parentKey);
-    const groupKey = cat ? (cat.type ?? cat.group ?? '') : '';
+    const groupKey = cat ? this._groupOf(cat) : '';
     const g = this._groups.find((gr) => gr.key === groupKey);
     const row = this._groupsEl.querySelector(`.cat-row[data-key="${CSS.escape(parentKey ?? '')}"]`);
     if (!cat || !g || !row) { this._render(); return; }
@@ -411,15 +496,16 @@ class CategoryManagerElement extends HTMLElement {
    * Fehlen.
    */
   _markHtml(cat) {
+    const icon = this._rowIconResolver?.(cat) || cat.icon;
     // Ohne Palette bleibt es beim nackten Zeichen - fuenf der sechs Aufrufer
     // zeigen ihre Kategorien nirgends als farbige Marke.
     if (!this._colors.length) {
-      return cat.icon
-        ? `<i data-lucide="${esc(cat.icon)}" class="cat-row__icon icon-md" aria-hidden="true"></i>`
+      return icon
+        ? `<i data-lucide="${esc(icon)}" class="cat-row__icon icon-md" aria-hidden="true"></i>`
         : '';
     }
-    const glyph = cat.icon
-      ? `<i data-lucide="${esc(cat.icon)}" class="icon-md" aria-hidden="true"></i>`
+    const glyph = icon
+      ? `<i data-lucide="${esc(icon)}" class="icon-md" aria-hidden="true"></i>`
       : '';
     const vivid = cat.color ? ' vivid-mark' : '';
     const style = cat.color ? ` style="--seal-accent:${esc(cat.color)}"` : '';
@@ -507,8 +593,8 @@ class CategoryManagerElement extends HTMLElement {
    *   - Kein `changed`-Merker, der in onClose ausgewertet wird. Er stuende beim
    *     Loeschen auf false. Die Auffrischung gehoert in den Handler selbst.
    */
-  _notifyChanged() {
-    this.dispatchEvent(new CustomEvent('category-manager-changed', { bubbles: true }));
+  _notifyChanged(detail = {}) {
+    this.dispatchEvent(new CustomEvent('category-manager-changed', { bubbles: true, detail }));
   }
 
   // Server-Guard-Fehler in die UI-Sprache übersetzen: die Route liefert einen
@@ -543,13 +629,14 @@ class CategoryManagerElement extends HTMLElement {
     const input = form.querySelector('input');
     const name = input.value.trim();
     if (!name) return;
-    const group = form.dataset.group;
+    const group = form.querySelector('[name="category-scope"]')?.value || form.dataset.group;
     try {
       const body = { name };
-      if (group) body.type = group;
+      if (group) body[this._groupField] = group;
       const res = await api.post(this._basePath, body);
       this._cats.push(res.data);
       this._renderGroup(group ?? '');
+      if (this._unifiedAdd) input.value = '';
       window.yuvomi?.showToast(t('category.added'), 'success');
       this._notifyChanged();
     } catch (err) {
@@ -643,26 +730,38 @@ class CategoryManagerElement extends HTMLElement {
   async _rename(key) {
     const cat = this._cats.find((c) => this._keyOf(c) === key);
     if (!cat) return;
-    const { promptModal } = await import('/components/modal.js');
+    const { promptModal, captureModalContext, isModalContextCurrent } = await import('/components/modal.js');
     const current = this._labelResolver(cat);
-    const newName = await promptModal(t('category.renamePrompt'), current);
-    if (!newName || newName === current) return;
-    try {
-      const res = await api.put(`${this._basePath}/${encodeURIComponent(key)}`, { name: newName });
-      const idx = this._cats.findIndex((c) => this._keyOf(c) === key);
-      if (idx >= 0) this._cats[idx] = res.data;
-      this._renderGroup(cat.type ?? cat.group ?? '');
-      window.yuvomi?.showToast(t('category.renamed'), 'success');
-      this._notifyChanged();
-    } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+    let promptValue = current;
+    while (true) {
+      const newName = await promptModal(t('category.renamePrompt'), promptValue);
+      if (!newName || newName === current) return;
+      const modalContext = captureModalContext();
+      try {
+        const res = await api.put(`${this._basePath}/${encodeURIComponent(key)}`, { name: newName });
+        const idx = this._cats.findIndex((c) => this._keyOf(c) === key);
+        if (idx >= 0) this._cats[idx] = res.data;
+        this._renderGroup(this._groupOf(cat));
+        window.yuvomi?.showToast(t('category.renamed'), 'success');
+        this._notifyChanged();
+        return;
+      } catch (err) {
+        window.yuvomi?.showToast(this._errMsg(err), 'danger');
+        if (err?.status !== 409) return;
+        // Der 409 darf nur den Prompt wiederholen, aus dem diese Anfrage kam.
+        // Ein inzwischen geoeffnetes (selbst schon wieder geschlossenes)
+        // Modal oder eine neue Seiteninstanz besitzt den Shared-Slot; dort
+        // wuerde promptModal() den fremden Dialog sonst mit force wegraeumen.
+        if (!isModalContextCurrent(modalContext)) return;
+        promptValue = newName;
+      }
     }
   }
 
   async _move(key, delta) {
     const cat = this._cats.find((c) => this._keyOf(c) === key);
     if (!cat) return;
-    const groupKey = cat.type ?? cat.group ?? '';
+    const groupKey = this._groupOf(cat);
     // Auf einer Kopie arbeiten: _inGroup('') liefert bei gruppenlosen Modulen
     // (z. B. Kontakte) die LIVE-this._cats-Referenz zurück. Ein In-place-Swap
     // würde den State schon vor der Persistenz optimistisch umstellen — bei einem
@@ -695,7 +794,7 @@ class CategoryManagerElement extends HTMLElement {
   async _persistOrder(groupKey, orderedKeys, movedKey, { rollbackRender = false, focusKey = null, focusDir = null } = {}) {
     try {
       const body = { order: orderedKeys };
-      if (groupKey) body.type = groupKey;
+      if (groupKey) body[this._groupField] = groupKey;
       const res = await api.patch(`${this._basePath}/reorder`, body);
       if (Array.isArray(res?.data)) this._cats = res.data;
       else await this._fetch();
@@ -750,9 +849,9 @@ class CategoryManagerElement extends HTMLElement {
     try {
       await api.delete(`${this._basePath}/${encodeURIComponent(key)}`);
       this._cats = this._cats.filter((c) => this._keyOf(c) !== key);
-      this._renderGroup(cat.type ?? cat.group ?? '');
+      this._renderGroup(this._groupOf(cat));
       window.yuvomi?.showToast(t('category.deleted'), 'default');
-      this._notifyChanged();
+      this._notifyChanged({ action: 'delete', key, item: cat });
     } catch (err) {
       window.yuvomi?.showToast(this._errMsg(err), 'danger');
     }
