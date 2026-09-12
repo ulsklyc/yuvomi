@@ -166,7 +166,7 @@ function syncGuestArtifacts(database, userId, { displayName, phone, email, birth
   const contact = database.prepare('SELECT id, name FROM contacts WHERE family_user_id = ?').get(userId);
   if (contact) {
     database.prepare(`
-      UPDATE contacts SET name = ?, category = COALESCE(category, 'Sonstiges'), phone = ?, email = ?
+      UPDATE contacts SET name = ?, category = COALESCE(category, 'misc'), phone = ?, email = ?
       WHERE id = ?
     `).run(displayName, phone || null, email || null, contact.id);
 
@@ -183,7 +183,7 @@ function syncGuestArtifacts(database, userId, { displayName, phone, email, birth
   } else {
     database.prepare(`
       INSERT INTO contacts (name, category, phone, email, family_user_id)
-      VALUES (?, 'Sonstiges', ?, ?, ?)
+      VALUES (?, 'misc', ?, ?, ?)
     `).run(displayName, phone || null, email || null, userId);
   }
 

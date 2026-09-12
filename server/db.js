@@ -7601,6 +7601,19 @@ const MIGRATIONS = [
       CREATE INDEX idx_shopping_items_store ON shopping_items(store_id);
     `,
   },
+  {
+    version: 194,
+    description: 'heal contacts auto-created for family/guest members with the legacy Sonstiges category (#1140)',
+    up: `
+      -- Migration 91 heilte das schon fuer CardDAV-Import-Kontakte, aber die
+      -- Kontakte, die beim Anlegen eines Haushaltsmitglieds oder Gasts
+      -- gespiegelt werden (server/auth.js, server/routes/split-expenses.js),
+      -- schrieben weiterhin die alte, deutsche Kategorie 'Sonstiges' statt des
+      -- stabilen Keys 'misc'. Da 'Sonstiges' kein Key in contact_categories
+      -- ist, gab die UI ihn ungeuebersetzt aus (#1140).
+      UPDATE contacts SET category = 'misc' WHERE category = 'Sonstiges';
+    `,
+  },
 ];
 
 /**
