@@ -201,11 +201,25 @@ function assertRuleUsesToken(css, selector, property, token, file) {
 // ueberall - die Liste war also nie eine Ausnahmegenehmigung, nur ein zu enger
 // Suchbereich. Vendor-Code ist ausgenommen: der wird von Hand kopiert und nicht
 // nach unseren Regeln geschrieben.
+//
+// `outerHTML =` gehoert dazu: es parst denselben String als Markup, nur ersetzt
+// es das Element selbst statt seines Inhalts. Die zwei Stellen, die es gab
+// (schedule.js), laufen seitdem ueber insertAdjacentHTML('afterend') + remove().
+//
+// Verbundzuweisungen (`+=`, `||=`, `??=` ...) und die Klammerschreibweise
+// (`el['outerHTML'] =`) rufen denselben Setter auf und zaehlen deshalb mit.
+// Die Grenze eines Text-Guards: einen Namen aus einer Variablen,
+// `Object.assign(el, { innerHTML })` oder `Reflect.set` sieht er nicht - das
+// bleibt beim Review. Lucide ist Vendor-Code, liegt aber aus historischen
+// Gruenden als public/lucide.min.js ausserhalb von vendor/ (siehe
+// public/vendor/lucide/README.md) und ist deshalb einzeln ausgenommen.
 const VENDOR_PREFIX = '../public/vendor/';
+const VENDOR_FILES = new Set(['../public/lucide.min.js']);
+const HTML_STRING_WRITE = /(?:\.(?:innerHTML|outerHTML)|\[\s*(['"`])(?:innerHTML|outerHTML)\1\s*\])\s*(?:[-+*/%&|^]|\*\*|<<|>>>?|&&|\|\||\?\?)?=(?!=)/;
 
-test('kein innerHTML-Schreibzugriff irgendwo unter public/ (ausser vendor/)', () => {
-  const files = walkJsFiles('../public/').filter((f) => !f.startsWith(VENDOR_PREFIX));
-  const offenders = files.filter((file) => /\.innerHTML\s*=[^=]/.test(read(file)));
+test('kein innerHTML- oder outerHTML-Schreibzugriff irgendwo unter public/ (ausser vendor/)', () => {
+  const files = walkJsFiles('../public/').filter((f) => !f.startsWith(VENDOR_PREFIX) && !VENDOR_FILES.has(f));
+  const offenders = files.filter((file) => HTML_STRING_WRITE.test(read(file)));
   assert.deepEqual(offenders, [],
     'anhaengen mit insertAdjacentHTML oder ueber die DOM-API, User-Daten durch esc()');
 
@@ -215,10 +229,19 @@ test('kein innerHTML-Schreibzugriff irgendwo unter public/ (ausser vendor/)', ()
 });
 
 test('der innerHTML-Guard erkennt das Muster, das er verbietet', () => {
-  const pattern = /\.innerHTML\s*=[^=]/;
+  const pattern = HTML_STRING_WRITE;
   assert.ok(pattern.test('root.innerHTML = `<div>`;'), 'Zuweisung wird nicht erkannt');
   assert.ok(pattern.test('el.innerHTML=""'), 'Zuweisung ohne Leerzeichen wird nicht erkannt');
+  assert.ok(pattern.test('existing.outerHTML = html;'), 'outerHTML-Zuweisung wird nicht erkannt');
+  assert.ok(pattern.test('list.innerHTML += row;'), 'Verbundzuweisung += wird nicht erkannt');
+  assert.ok(pattern.test('el.outerHTML ||= html;'), 'logische Zuweisung ||= wird nicht erkannt');
+  assert.ok(pattern.test('el.innerHTML ??= html;'), 'logische Zuweisung ??= wird nicht erkannt');
+  assert.ok(pattern.test("el['outerHTML'] = html;"), 'Klammerschreibweise wird nicht erkannt');
+  assert.ok(pattern.test('el["innerHTML"] += row;'), 'Klammerschreibweise mit += wird nicht erkannt');
+  assert.ok(!pattern.test("const html = el['outerHTML'];"), 'ein Lesezugriff in Klammern wird faelschlich beanstandet');
   assert.ok(!pattern.test('if (el.innerHTML === x)'), 'ein Vergleich wird faelschlich beanstandet');
+  assert.ok(!pattern.test('if (el.innerHTML !== x)'), 'eine Ungleichheit wird faelschlich beanstandet');
+  assert.ok(!pattern.test('return emptyStateEl(opts).outerHTML;'), 'ein Lesezugriff wird faelschlich beanstandet');
 });
 
 /**
@@ -8150,7 +8173,6 @@ test('German housekeeping visit copy contains no English fallback strings', () =
   const expected = {
     reports: 'Berichte',
     visitRecordedAt: 'Einsatz erfasst um',
-    checkedInToday: 'Heute erfasst',
     editVisit: 'Einsatz bearbeiten',
     paymentPaid: 'Bezahlt',
     paymentPending: 'Ausstehend',
@@ -8167,6 +8189,71 @@ test('German housekeeping visit copy contains no English fallback strings', () =
     /\.housekeeping-worker-strip__identity\s*\{[\s\S]*gap:\s*var\(--space-1\)/,
     'housekeeper name and status need an explicit visual gap',
   );
+});
+
+test('der Housekeeping-Check-Knopf bleibt in beide Richtungen bedienbar (#1133)', () => {
+  const page = read('../public/pages/housekeeping.js');
+
+  // `toggleSession()` kann ein- UND auschecken, und `[data-worker-check]` ist
+  // sein EINZIGER Ausloeser (eine zweite Fundstelle waere hier ein Signal,
+  // dass diese Zusicherung nicht mehr die ganze Wahrheit ist).
+  const ausloeser = page.match(/data-worker-check/g) ?? [];
+  assert.equal(ausloeser.length, 2,
+    'Knopf-Markup und Handler-Selektor - mehr Stellen heben diesen Guard aus');
+
+  // Der Knopf trug im eingecheckten Zustand `disabled`. Damit war der
+  // Auscheck-Zweig von toggleSession() unerreichbar: toter Code hinter einem
+  // toten Knopf, und die Suiten blieben gruen.
+  const knopf = page.slice(page.indexOf('<button class="btn ${checkedIn'), page.indexOf('</button>', page.indexOf('<button class="btn ${checkedIn')));
+  assert.ok(knopf, 'der Check-Knopf muss auffindbar bleiben');
+  assert.doesNotMatch(knopf, /disabled/,
+    'ein disabled Check-Knopf macht das Auschecken unerreichbar (#1133)');
+  assert.match(knopf, /checkedIn \? t\('housekeeping\.checkOut'\)/,
+    'im eingecheckten Zustand muss der Knopf das Auschecken anbieten');
+
+  // Und er haengt an der OFFENEN Session, nicht an "war heute da" - sonst
+  // bliebe er nach dem Auschecken auf "Auschecken" stehen.
+  assert.match(page, /const checkedIn = !!worker\.current_session;/,
+    'der Zustand kommt aus current_session, nicht aus today_session');
+  assert.match(page, /const current = worker\?\.current_session;/,
+    'toggleSession entscheidet an der offenen Session');
+});
+
+test('Housekeeping: Bezahlen laeuft durch EINE Funktion, die vorher bestaetigt (#1136)', () => {
+  // Ohne Kommentare: ein Kommentar, der die Route nennt, ist kein Post.
+  const page = withoutCommentsKeepingLines(read('../public/pages/housekeeping.js'));
+  const lines = page.split('\n');
+
+  // Genau EIN Post auf die Bezahl-Route. Vor #1136 buchten drei Ausloeser je
+  // selbst, mit einem Klick und ohne Rueckfrage; ein zweiter Post waere wieder
+  // ein Weg an der Bestaetigung vorbei.
+  const posts = [];
+  lines.forEach((l, i) => { if (/\/visits\/\$\{[^}]+\}\/pay`/.test(l)) posts.push(i); });
+  assert.equal(posts.length, 1,
+    `die Bezahl-Route darf nur an einer Stelle gepostet werden, gefunden in Zeile ${posts.map((i) => i + 1).join(', ')}`);
+
+  // Die Funktion um diesen Post muss VOR ihm fragen und bei Nein abbrechen.
+  const kopf = [...lines.keys()].slice(0, posts[0]).reverse()
+    .find((i) => /^(?:export )?(?:async )?function /.test(lines[i]));
+  assert.equal(lines[kopf].match(/function (\w+)/)?.[1], 'payVisit', 'der Post gehoert in payVisit()');
+  const bisZumPost = lines.slice(kopf, posts[0]).join('\n');
+  assert.match(bisZumPost, /const confirmed = await confirmOverModal\(t\('housekeeping\.markPaidConfirm'\)/,
+    'payVisit fragt vor dem Post - ueber confirmOverModal, damit der Besuchsbericht darunter ueberlebt');
+  assert.match(bisZumPost, /if \(!confirmed\) return;/, 'ein Nein bucht nichts');
+  assert.match(bisZumPost, /visit\.payment_task_id\s*\?\s*t\('housekeeping\.markPaidConfirmDetailTask'\)\s*:\s*t\('housekeeping\.markPaidConfirmDetail'\)/,
+    'die Rueckfrage nennt die Zahlungsaufgabe, wenn es eine gibt');
+
+  // Und alle drei Ausloeser gehen durch sie hindurch.
+  for (const selektor of ["'[data-pay-report]'", "'#visit-report-pay'", "'[data-pay-visit]'"]) {
+    const at = page.indexOf(selektor);
+    assert.notEqual(at, -1, `Ausloeser ${selektor} fehlt`);
+    assert.match(page.slice(at, at + 300), /payVisit\(visit, async \(\) => \{/,
+      `${selektor} muss payVisit() rufen, statt selbst zu buchen`);
+  }
+
+  // Die Ruecknahme haengt am Serverfeld; die Seite baut die Admin-Regel nicht nach.
+  assert.match(page, /visit\.can_mark_unpaid/, 'der Ruecknahme-Knopf haengt an can_mark_unpaid');
+  assert.doesNotMatch(page, /authRole|role\s*===\s*'admin'/, 'housekeeping.js entscheidet keine Rolle selbst');
 });
 
 test('holiday chips derive readable ink from each configured color', () => {
@@ -11441,6 +11528,58 @@ test('wer sein Label verliert, bleibt ein volles Ziel', () => {
   assert.deepEqual(offenders, [],
     'Ein Label zu verlieren darf ein Ziel nie verkleinern: wer ein Label '
     + 'ausblendet, gibt seinem Traeger im selben At-Block --target-base.');
+});
+
+/**
+ * DIE ANDERE HAELFTE DER LABEL-VERLUST-REGEL: WER SEIN LABEL VERLIEREN KANN,
+ * TRAEGT SEINEN NAMEN AM KNOPF (#1068).
+ *
+ * Der Guard darueber prueft, was ein Element beim Label-Verlust an GROESSE
+ * behaelt. Was es an NAMEN behaelt, stand nirgends - und genau das ging
+ * verloren: die Personenauswahl im Aufgaben-Verlauf bestand nur aus
+ * `<span class="group-toggle__label">Name</span>`, und unter 640px nimmt die
+ * Regel dieses Kind weg. Auf dem Telefon stand dort eine Reihe leerer Flaechen.
+ *
+ * `display: none` nimmt den Text auch aus dem Accessibility-Tree. Der Knopf war
+ * also nicht nur fuers Auge namenlos, sondern ebenso fuer eine Vorlesehilfe -
+ * der Verlust sah nach einem reinen Anzeigefehler aus und war keiner.
+ *
+ * Deshalb die Zusage: der Name gehoert an den TRAEGER, nicht in ein Kind, das
+ * eine Media-Query entfernen darf. Geprueft wird `.group-toggle__btn`, weil
+ * genau dessen Label die beiden Regeln in tasks.css ausblenden. Der Guard bleibt
+ * bewusst bei dieser einen Familie statt jedes `__label` im Haus zu verfolgen:
+ * dafuer muesste er CSS und Markup verbinden und raet, sobald eine Klasse
+ * dynamisch zusammengesetzt wird. Eine enge Zusage, die haelt, ist mehr wert als
+ * eine weite, die auf Vermutungen steht.
+ */
+test('ein Umschalt-Knopf traegt seinen Namen selbst, nicht in einem Kind', () => {
+  const dateien = [];
+  const sammle = (verzeichnis) => {
+    for (const eintrag of readdirSync(verzeichnis, { withFileTypes: true })) {
+      const pfad = new URL(`${eintrag.name}${eintrag.isDirectory() ? '/' : ''}`, verzeichnis);
+      if (eintrag.isDirectory()) {
+        if (eintrag.name === 'vendor') continue;
+        sammle(pfad);
+      } else if (/\.(?:js|html)$/.test(eintrag.name)) {
+        dateien.push(pfad);
+      }
+    }
+  };
+  sammle(new URL('../public/', import.meta.url));
+
+  const namenlos = [];
+  for (const datei of dateien) {
+    const quelle = readFileSync(datei, 'utf8');
+    for (const treffer of quelle.matchAll(/<button\b[^>]*group-toggle__btn[^>]*>/g)) {
+      const tag = treffer[0];
+      if (/aria-label(?:ledby)?[=\s]/.test(tag)) continue;
+      const zeile = quelle.slice(0, treffer.index).split('\n').length;
+      namenlos.push(`${datei.pathname.split('/public/')[1]}:${zeile}`);
+    }
+  }
+
+  assert.deepEqual(namenlos, [],
+    `Umschalt-Knopf ohne eigenen Namen - unter 640px faellt sein Label und mit ihm die Beschriftung: ${namenlos.join(', ')}`);
 });
 
 /**
@@ -15983,19 +16122,45 @@ test('dashboard: Timer und Listener haengen am Signal des eigenen Aufbaus, nicht
  */
 const SCHLIESS_FASSADEN = ['closeDetailView'];
 
+/**
+ * Dialoge, die ihr Ergebnis erst NACH dem Schliessen liefern (#1083).
+ *
+ * `promptModal`, `confirmModal` und `selectModal` rufen in `finish()` zuerst
+ * `closeModal({ force: true })` und loesen dann auf; `confirmOverModal` schliesst
+ * das geparkte Formular, bevor es `true` zurueckgibt. Wer danach etwas abwartet
+ * und neu baut, reisst den Fokus weg wie nach jedem anderen Schliessen - fuer den
+ * Guard sah das bis hierher nach gar keinem Schliessen aus: der Unterteil-Umbenennen-
+ * Weg in tasks.js und das Ablehnen einer Einloesung in rewards.js (Review zu
+ * #1070).
+ */
+const ERGEBNIS_DIALOGE = ['promptModal', 'confirmModal', 'selectModal', 'confirmOverModal'];
+
 function schliessNamen(lines) {
-  const namen = new Set(['closeModal', ...SCHLIESS_FASSADEN]);
+  const namen = new Set(['closeModal', ...SCHLIESS_FASSADEN, ...ERGEBNIS_DIALOGE]);
   const quelle = lines.join('\n');
   const block = quelle.match(/import\s*\{([\s\S]*?)\}\s*from\s*'\/components\/modal\.js'/);
   if (block) {
     for (const m of block[1].matchAll(/closeModal\s+as\s+([A-Za-z_]\w*)/g)) namen.add(m[1]);
   }
+  // DAS `close` EINER DETAILANSICHT-AKTION (#1083). detail-view.js reicht jeder
+  // Aktion `closeDetailView` als `close` herein: `onClick: async ({ close }) => {
+  // await close({ force: true }); await removeItem(item); }`. Unter diesem Namen
+  // war es fuer den Guard kein Schliessen. Gezaehlt wird nur, was aus einem
+  // Parameterobjekt kommt - ein beliebiges `close` gehoert nicht dazu.
+  for (const m of quelle.matchAll(/\(\s*\{([^}]*)\}\s*\)\s*=>/g)) {
+    for (const p of m[1].matchAll(/\bclose\b(?:\s*:\s*([A-Za-z_]\w*))?/g)) namen.add(p[1] ?? 'close');
+  }
   return namen;
 }
 
-/** Schliesst diese Zeile den Dialog - unter welchem Namen auch immer? */
+/**
+ * Schliesst diese Zeile den Dialog - unter welchem Namen auch immer?
+ *
+ * Kein Methodenaufruf: seit `close` dazugehoert, waere `dialog.close()` oder
+ * `source.close()` sonst ein Schliessen dieser Schicht.
+ */
 function istSchliessen(zeile, namen) {
-  for (const n of namen) if (new RegExp(`\\b${n}\\s*\\(`).test(zeile)) return true;
+  for (const n of namen) if (new RegExp(`(?<![.\\w$])${n}\\s*\\(`).test(zeile)) return true;
   return false;
 }
 
@@ -16043,7 +16208,31 @@ function rendererIn(lines) {
     }
     if (!gewachsen) break;
   }
+  for (const p of abgewarteteParameter(lines)) namen.add(p);
   return namen;
+}
+
+/**
+ * Rueckrufe, die als PARAMETER hereinkommen und abgewartet werden (#1083).
+ *
+ * `renderProviderAccount(container, account, refresh)` in modules-kitchen.js
+ * bekommt `loadProviderAccounts` unter dem Namen `refresh`, und der Link-Dialog
+ * schliesst und wartet dann `await refresh()` ab - das leert die Kontenliste und
+ * baut sie neu. `AWAIT_RUECKRUF` kennt nur `on…`-Namen und `opts.…`, ein
+ * gewoehnlicher Name fiel durch (Review zu #1070).
+ *
+ * Dieselbe Begruendung wie dort: wer einen hereingereichten Rueckruf abwartet,
+ * weiss nicht, was er umbaut. Gesammelt werden die Namen aus den Parameterlisten
+ * von Deklarationen und Pfeilfunktionen, die irgendwo in der Datei abgewartet
+ * aufgerufen werden.
+ */
+function abgewarteteParameter(lines) {
+  const quelle = lines.join('\n');
+  const params = new Set();
+  for (const m of quelle.matchAll(/function\s*\w*\s*\(([^)]*)\)|\(([^()]*)\)\s*=>/g)) {
+    for (const id of (m[1] ?? m[2] ?? '').matchAll(/[A-Za-z_]\w*/g)) params.add(id[0]);
+  }
+  return [...params].filter((p) => new RegExp(`\\bawait\\s+${p}\\s*\\(`).test(quelle));
 }
 
 /**
@@ -16091,6 +16280,96 @@ function blockAb(lines, i, grenze = 40) {
   return out;
 }
 
+/**
+ * Oeffnet diese Zeile den Rumpf einer Funktion - Pfeil oder `function`?
+ *
+ * Die Parameterliste darf selbst Klammern tragen: `export async function
+ * render(container, { user } = {}) {` und `function addSubtask(parentId, {
+ * onChanged = () => {} } = {}) {` sind im Projekt verbreitet. `[^{]*` hielt am
+ * ersten `{` der Signatur an und erkannte beide nicht; die Suche lief dann ueber
+ * die Funktion hinaus in die davor (Review zu #1123). `\([^)]*\)` scheitert am
+ * `()` eines Vorgabewerts. Deshalb bis zur LETZTEN schliessenden Klammer vor
+ * dem `{` am Zeilenende. `typeof x === 'function') {` trifft das nicht: nach
+ * `function` muss eine Klammer auf folgen.
+ */
+const OEFFNET_FUNKTION = /=>\s*\{\s*$|\bfunction\s*\w*\s*\(.*\)\s*\{\s*$/;
+
+/**
+ * Die Zeilen, die nach dem Anker auf DEMSELBEN Weg folgen (#1083).
+ *
+ * `blockAb` endet am Ende des Blocks - und das ist zu frueh, sobald das Schliessen
+ * selbst in einem `if` steht: `if (action === 'reject') { const ok = await
+ * confirmModal(…); if (!ok) return; }` und DANACH `await refreshActiveTab()` in
+ * rewards.js. Bis zum Ende der Funktion zu lesen ist dagegen zu weit: in
+ * shopping.js folgt auf den Umbenennen-Zweig `if (action === 'rename-list') {…}`
+ * der Loeschen-Zweig, und dessen Neuaufbau gehoert nicht zum Umbenennen.
+ *
+ * Deshalb waechst das Fenster von innen nach aussen: erst der eigene Block. Endet
+ * er, OHNE dass darin neu gebaut wurde, geht es im umgebenden Block weiter - bis
+ * zur Funktion um den Anker (eine Deklaration oder ein Rueckruf `=> {`). Hat es
+ * einen Neuaufbau gesehen, ist an der naechsten schliessenden Klammer auf der
+ * Ebene des Fensters Schluss; das faengt auch `} catch (err) {` und `} else {`,
+ * deren Zweige ein anderer Weg sind.
+ *
+ * Was in einem verschachtelten Rueckruf steht, sortiert der Aufrufer ueber
+ * `inVerschachtelterFunktion` aus - und `baut` entscheidet, was ein Neuaufbau ist.
+ * Mit Zeilennummer, weil genau diese Pruefung sie braucht.
+ *
+ * Die Grenze ist ein Notanker, kein Fenster (Review zu #1123). Bei 120 Zeilen
+ * brach der Klick-Handler in schedule.js ab, bevor er sein gemeinsames
+ * `renderPage()` erreichte: die ersten beiden Loeschrueckfragen darin waren
+ * ungeprueft, ihr `refocusAfterRender()` liess sich streichen, ohne dass etwas
+ * rot wurde. Wo das Fenster endet, entscheidet die Funktion um den Anker.
+ */
+function rumpfAb(lines, i, baut, grenze = 2000) {
+  // EIN RUECKRUF IN EINER ZEILE ENDET IN DIESER ZEILE (Review zu #1123).
+  // `onClick: async ({ close }) => { await close({ force: true }); await
+  // requestDeleteEvent(ev); },` in calendar.js: was darunter steht, gehoert nicht
+  // mehr zu diesem Weg - das Fenster las dort `view.update(renderEventDetail(…))`
+  // mit und verlangte einen Aufruf fuer einen Neuaufbau, den der Knopf nie ausloest.
+  const einzeiler = lines[i].match(/=>\s*\{(.*)\}[\s,;)]*$/);
+  if (einzeiler) return [{ x: einzeiler[1], j: i }];
+  const einzug = (j) => lines[j].match(/^\s*/)[0].length;
+  let tiefe = einzug(i);
+  let oeffner = -1;
+  for (let j = i - 1; j >= 0; j--) {
+    if (lines[j].trim() === '' || einzug(j) >= tiefe) continue;
+    if (OEFFNET_FUNKTION.test(lines[j])) { oeffner = j; break; }
+  }
+  const ende = oeffner === -1 ? -1 : einzug(oeffner);
+  const out = [];
+  // Einrueckung des ersten Neuaufbaus; -1 heisst: noch keiner gesehen.
+  let gebautBei = -1;
+  for (let j = i + 1; j < lines.length && out.length < grenze; j++) {
+    const l = lines[j];
+    if (l.trim() === '') { out.push({ x: l, j }); continue; }
+    const t = einzug(j);
+    if (t <= ende) break;
+    if (/^\s*\}/.test(l)) {
+      if (t < tiefe) {
+        // Der Block, in dem das Fenster gerade liest, endet hier.
+        if (gebautBei !== -1) break;
+        // Endet er mit `return` oder `throw`, geht es danach auf diesem Weg
+        // nicht weiter: in documents.js kehrt der DMS-Zweig nach seiner Auswahl
+        // zurueck, und das `deleteDocuments()` darunter ist ein anderer Weg ohne
+        // jeden Dialog - ein Aufruf dort griffe ins Leere.
+        const davor = out.map(({ x }) => x).filter((x) => x.trim() !== '').pop() ?? lines[i];
+        if (/^\s*(?:return|throw)\b/.test(davor)) break;
+        tiefe = t;
+      } else if (/^\s*\}\s*(?:else|catch|finally)\b/.test(l) && gebautBei > t) {
+        // Im Zweig darueber wurde neu gebaut; was jetzt kommt, ist ein anderer
+        // Weg durch dasselbe `if`/`try`. Ein `} else {` einer Verzweigung, die
+        // erst NACH dem Anker aufging und in der noch nichts gebaut wurde, ist
+        // dagegen keine Grenze - so steht es in `openBudgetModal()` in budget.js.
+        break;
+      }
+    }
+    out.push({ x: l, j });
+    if (gebautBei === -1 && baut(l) && !inVerschachtelterFunktion(lines, i, j)) gebautBei = t;
+  }
+  return out;
+}
+
 /* WER NACH DEM SCHLIESSEN RENDERT, MUSS DEN FOKUS NACHZIEHEN.
  *
  * `closeModal()` gibt den Fokus an den Ausloeser zurueck. Rendert der Handler
@@ -16123,37 +16402,7 @@ test('jede Seite, die nach einem await neu rendert, zieht den Fokus nach', () =>
     for (const datei of readdirSync(basis).filter((f) => f.endsWith('.js'))) {
       // Neutralisieren, sonst zaehlt ein auskommentierter Aufruf als vorhanden.
       const lines = withoutCommentsKeepingLines(read(`${dir}/${datei}`)).split('\n');
-      const wrapper = rendererIn(lines);
-      const schliesst = schliessNamen(lines);
-      lines.forEach((zeile, i) => {
-        if (!istSchliessen(zeile, schliesst)) return;
-        // EIN VERZOEGERTES SCHLIESSEN IST HIER KEINES. `setTimeout(() =>
-        // closeModal(...), 700)` in tasks.js laeuft erst, wenn der Block
-        // laengst durch ist - der Merker, auf den `refocusAfterRender()`
-        // zurueckgreift, entsteht aber erst IN `_doClose`. Ein Aufruf im Block
-        // koennte dort also nichts bewirken, und ihn zu verlangen hiesse, toten
-        // Code zu fordern (Review zu #1070).
-        if (/\bsetTimeout\s*\(/.test(zeile)) return;
-        // NUR DIE EIGENE EBENE. Alles Tiefere steht in einem Callback, der auf
-        // diesem Weg gar nicht laeuft - der Undo-Zweig eines Toasts etwa. Wer
-        // ihn mitzaehlt, haelt `deletePlan()` in budget-plans.js fuer gedeckt,
-        // weil im Undo-Callback ein Aufruf steht, waehrend der Hauptpfad ohne
-        // blieb (Review zu #1070).
-        const ankerTiefe = zeile.match(/^\s*/)[0].length;
-        const fenster = blockAb(lines, i)
-          .filter((x) => x.trim() === '' || x.match(/^\s*/)[0].length <= ankerTiefe);
-        let letzte = -1;
-        fenster.forEach((x, k) => { if (istNeuaufbau(x, wrapper)) letzte = k; });
-        if (letzte === -1) return;
-        // Ohne `await` davor rendert die Seite synchron - das deckt der Frame ab.
-        if (!fenster.slice(0, letzte + 1).some((x) => /\bawait\b/.test(x))) return;
-        // Der Aufruf muss auf der EBENE des Neuaufbaus liegen. Ein
-        // `refocusAfterRender()` tief in einem Undo-Callback deckt den Weg
-        // darueber nicht ab - genau so sah `deletePlan()` in budget-plans.js
-        // gedeckt aus, waehrend der Hauptpfad ohne Aufruf blieb (Review zu #1070).
-        if (fenster.some((x) => /refocusAfterRender\s*\(/.test(x))) return;
-        fehlend.push(`${datei}:${i + 1} (${fenster[letzte].trim().slice(0, 48)})`);
-      });
+      fehlend.push(...fokusLuecken(datei, lines));
     }
   }
   assert.deepEqual(fehlend, [],
@@ -16161,6 +16410,108 @@ test('jede Seite, die nach einem await neu rendert, zieht den Fokus nach', () =>
     + 'der Focus-Restore aus closeModal() wird dort weggerendert und landet auf document.body. '
     + `Nach dem Rendern refocusAfterRender() rufen:\n  ${fehlend.join('\n  ')}`);
 });
+
+/**
+ * Funktionen, die nach ihrem Neuaufbau selbst `refocusAfterRender()` rufen (#1083).
+ *
+ * `removeItem()` in inventory.js fragt per `confirmModal()`, loescht, baut die
+ * Liste neu und zieht den Fokus nach. Die Detailansicht ruft sie nach ihrem
+ * eigenen Schliessen: `await close({ force: true }); await removeItem(item);`.
+ * Ein zweiter Aufruf dahinter taete nichts, was der erste nicht getan hat - beide
+ * greifen auf den Merker des Dialogs, der zuletzt schloss. Gezaehlt wird nur ein
+ * Aufruf auf der Ebene der Funktion; einer in einem Undo-Rueckruf deckt ihren
+ * Hauptweg nicht, dieselbe Regel wie im Guard selbst.
+ */
+function selbstNachziehend(lines) {
+  const namen = [];
+  let start = -1;
+  let name = null;
+  lines.forEach((l, j) => {
+    const m = l.match(/^(?:export )?(?:async )?function ([A-Za-z_]\w*)/);
+    if (m) { start = j; name = m[1]; return; }
+    if (name && !namen.includes(name) && /refocusAfterRender\s*\(/.test(l)
+      && !inVerschachtelterFunktion(lines, start, j)) namen.push(name);
+  });
+  return namen;
+}
+
+/**
+ * Die Stellen einer Datei, die nach dem Schliessen und einem `await` neu bauen,
+ * ohne den Fokus nachzuziehen. Eine eigene Funktion, damit die Sonden weiter
+ * unten dieselbe Pruefung an kuenstlichen Quellen fahren wie der Guard am Repo.
+ */
+const DEKLARATIONS_KOPF = /^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s*[A-Za-z_$][\w$]*\s*\(/;
+
+function fokusLuecken(datei, lines) {
+  const fehlend = [];
+  const wrapper = rendererIn(lines);
+  const schliesst = schliessNamen(lines);
+  // Ein Schliessen ist kein Neuaufbau. `abgewarteteParameter` sammelt das
+  // `close` einer Detailansicht-Aktion als abgewarteten Rueckruf ein - im
+  // Einzeiler `async ({ close }) => { await close(…); … }` hielte der Guard das
+  // Schliessen selbst sonst fuer den Neuaufbau danach.
+  for (const n of schliesst) wrapper.delete(n);
+  const nachziehend = selbstNachziehend(lines);
+  lines.forEach((zeile, i) => {
+    // EINE DEKLARATION SCHLIESST NICHTS. `export function confirmModal(` in
+    // modal.js traf den Namen aus ERGEBNIS_DIALOGE und wurde zum Anker - in
+    // Spalte 0, also ohne umschliessende Funktion, und das Fenster las damit
+    // bis weit in die Datei. Beim Merge von #1055 fand es dort das abgewartete
+    // `close` einer Hilfsfunktion und verlangte `refocusAfterRender()`, das die
+    // Wache darunter als tot gemeldet haette.
+    // Weg faellt nur der KOPF, nicht die Zeile: `async function save() {
+    // closeModal();` in einer Zeile bleibt ein Anker (Codex-Review zu #1131).
+    if (!istSchliessen(zeile.replace(DEKLARATIONS_KOPF, ''), schliesst)) return;
+    // EIN VERZOEGERTES SCHLIESSEN IST HIER KEINES. `setTimeout(() =>
+    // closeModal(...), 700)` in tasks.js laeuft erst, wenn der Block
+    // laengst durch ist - der Merker, auf den `refocusAfterRender()`
+    // zurueckgreift, entsteht aber erst IN `_doClose`. Ein Aufruf im Block
+    // koennte dort also nichts bewirken, und ihn zu verlangen hiesse, toten
+    // Code zu fordern (Review zu #1070).
+    if (/\bsetTimeout\s*\(/.test(zeile)) return;
+    // NICHTS AUS EINEM VERSCHACHTELTEN RUECKRUF. Der steht auf diesem Weg gar
+    // nicht an - der Undo-Zweig eines Toasts etwa. Wer ihn mitzaehlt, haelt
+    // `deletePlan()` in budget-plans.js fuer gedeckt, weil im Undo-Callback ein
+    // Aufruf steht, waehrend der Hauptpfad ohne blieb (Review zu #1070).
+    //
+    // VERSCHACHTELUNG, NICHT EINRUECKUNG (#1083). Die fruehere Fassung las nur
+    // Zeilen auf der Ebene des Ankers und hielt damit jeden `try`- und
+    // `if`-Rumpf fuer einen Rueckruf: `const title = await promptModal(…);
+    // try { await api.put(…); await loadTasks(container); }` in tasks.js war
+    // unsichtbar. Dieselbe Unterscheidung wie im Guard darunter (#1087).
+    const fenster = rumpfAb(lines, i, (x) => istNeuaufbau(x, wrapper))
+      .filter(({ j }) => !inVerschachtelterFunktion(lines, i, j))
+      .map(({ x }) => x);
+    let letzte = -1;
+    fenster.forEach((x, k) => { if (istNeuaufbau(x, wrapper)) letzte = k; });
+    if (letzte === -1) return;
+    // Folgt dem Neuaufbau noch ein Schliessen, setzt DESSEN Restore den Fokus
+    // auf den frisch gebauten Knopf - so rendert `saveCreatedSchedule()` in
+    // schedule.js vor seinem `closeModal()`. Ein Aufruf davor waere tot, und
+    // der Guard darunter meldet ihn als solchen.
+    //
+    // NUR EIN DIALOG, DER SCHON VOR DEM NEUAUFBAU OFFEN WAR (Review zu #1123).
+    // Sein Merker entstand vor dem Neuaufbau und findet den neuen Knopf wieder.
+    // Ein `confirmModal()` danach OEFFNET erst nach dem Neuaufbau - der Fokus
+    // liegt dann schon auf `body`, `rememberFocus()` merkt sich nichts, und sein
+    // Schliessen landet auf der Seitenwurzel. Als Anker bleiben die
+    // Ergebnis-Dialoge gezaehlt, als Entlastung hier nicht.
+    const schliesstOffenen = [...schliesst].filter((n) => !ERGEBNIS_DIALOGE.includes(n));
+    if (fenster.slice(letzte + 1).some((x) => istSchliessen(x, schliesstOffenen))) return;
+    // Ohne `await` davor rendert die Seite synchron - das deckt der Frame ab.
+    if (!fenster.slice(0, letzte + 1).some((x) => /\bawait\b/.test(x))) return;
+    // Der Aufruf muss auf der EBENE des Neuaufbaus liegen. Ein
+    // `refocusAfterRender()` tief in einem Undo-Callback deckt den Weg
+    // darueber nicht ab - genau so sah `deletePlan()` in budget-plans.js
+    // gedeckt aus, waehrend der Hauptpfad ohne Aufruf blieb (Review zu #1070).
+    if (fenster.some((x) => /refocusAfterRender\s*\(/.test(x))) return;
+    // EIN WRAPPER, DER SELBST NACHZIEHT, deckt seinen Neuaufbau: `await
+    // removeItem(item)` in inventory.js, siehe selbstNachziehend() (#1083).
+    if (nachziehend.some((n) => new RegExp(`(?<![.\\w$])${n}\\s*\\(`).test(fenster[letzte]))) return;
+    fehlend.push(`${datei}:${i + 1} (${fenster[letzte].trim().slice(0, 48)})`);
+  });
+  return fehlend;
+}
 
 /**
  * Steht `zeile` in einem Funktionsausdruck INNERHALB der Funktion ab `start`?
@@ -16179,7 +16530,7 @@ function inVerschachtelterFunktion(lines, start, zeile) {
     const t = l.match(/^\s*/)[0].length;
     if (t >= tiefe) continue;
     // Eine flachere Zeile: oeffnet sie einen Rueckruf?
-    if (/=>\s*\{\s*$|\bfunction\s*\w*\s*\([^)]*\)\s*\{\s*$/.test(l)) return true;
+    if (OEFFNET_FUNKTION.test(l)) return true;
     // Eine flachere Zeile, die keinen Rueckruf oeffnet (`try {`, `if (…) {`):
     // weitersuchen, aber ab jetzt auf ihrer Ebene.
   }
@@ -16502,6 +16853,289 @@ test('wer refocusAfterRender importiert, ruft es auch', () => {
     `Diese Dateien importieren refocusAfterRender, ohne es zu rufen:\n  ${tot.join('\n  ')}`);
 });
 
+
+/* DAS FENSTER NACH DEM SCHLIESSEN FOLGT DEM WEG, NICHT DER EINRUECKUNG (#1083).
+ *
+ * An kuenstlichen Quellen, eine je Form, die im Repo vorkommt. So faellt die
+ * Sonde auch dann, wenn die echte Stelle umgebaut wird.
+ */
+test('rumpfAb liest bis zum Neuaufbau auf demselben Weg (#1083)', () => {
+  const baut = (x) => /\brender[A-Z]\w*\s*\(|\bawait\s+load[A-Z]\w*\s*\(/.test(x);
+  const zeilen = (quelle, anker) => {
+    const i = quelle.findIndex((l) => l.includes(anker));
+    assert.ok(i !== -1, `Anker ${anker} fehlt in der Probe`);
+    return rumpfAb(quelle, i, baut)
+      .filter(({ j }) => !inVerschachtelterFunktion(quelle, i, j))
+      .map(({ x }) => x.trim());
+  };
+
+  // tasks.js: der Neuaufbau steht im try-Rumpf, der catch-Zweig ist ein anderer Weg.
+  const imTry = zeilen([
+    'async function umbenennen(id) {',
+    '  const titel = await promptModal(label);',
+    '  if (!titel) return;',
+    '  try {',
+    '    await api.put(url, { titel });',
+    '    await loadTasks(container);',
+    '  } catch (err) {',
+    '    renderFehler(err);',
+    '  }',
+    '}',
+  ], 'promptModal');
+  assert.ok(imTry.includes('await loadTasks(container);'), 'ein try-Rumpf ist kein Rueckruf');
+  assert.ok(!imTry.includes('renderFehler(err);'), 'der catch-Zweig gehoert nicht zum Weg nach dem Speichern');
+
+  // rewards.js: das Schliessen steht in einem if, der Neuaufbau danach.
+  const nachDemIf = zeilen([
+    'async function entscheiden(action) {',
+    '  if (action === "reject") {',
+    '    const ok = await confirmModal(frage);',
+    '    if (!ok) return;',
+    '  }',
+    '  try {',
+    '    await api.patch(url, { action });',
+    '    renderTab();',
+    '  } catch (err) {',
+    '    zeige(err);',
+    '  }',
+    '}',
+  ], 'confirmModal');
+  assert.ok(nachDemIf.includes('renderTab();'), 'nach dem if geht derselbe Weg weiter');
+
+  // shopping.js: der naechste if-Zweig ist ein anderer Weg.
+  const geschwister = zeilen([
+    'function verdrahten() {',
+    '  root.addEventListener("click", async () => {',
+    '    if (action === "rename") {',
+    '      const name = await promptModal(label);',
+    '      if (!name) return;',
+    '      renderTabs(container);',
+    '    }',
+    '    if (action === "delete") {',
+    '      renderLeer(container);',
+    '    }',
+    '  });',
+    '}',
+  ], 'promptModal');
+  assert.ok(geschwister.includes('renderTabs(container);'));
+  assert.ok(!geschwister.includes('renderLeer(container);'), 'der Loeschen-Zweig gehoert nicht zum Umbenennen');
+
+  // documents.js: ein Zweig, der mit return endet, fuehrt nicht weiter.
+  const mitReturn = zeilen([
+    'async function aktion(action) {',
+    '  if (action === "push") {',
+    '    const konto = await selectModal(label, optionen);',
+    '    if (!konto) return;',
+    '    await api.post(url, { konto });',
+    '    return;',
+    '  }',
+    '  if (action === "delete") renderListe();',
+    '}',
+  ], 'selectModal');
+  assert.ok(!mitReturn.includes('if (action === "delete") renderListe();'), 'nach return endet der Weg');
+
+  // budget.js: ein if/else, das erst nach dem Anker aufgeht, beendet das Fenster nicht.
+  const elseDanach = zeilen([
+    'async function speichern() {',
+    '  if (serie) {',
+    '    closeModal({ force: true });',
+    '    const scope = await frageScope();',
+    '    if (scope === "series") {',
+    '      await api.put(serienUrl, body);',
+    '    } else {',
+    '      await api.put(url, body);',
+    '    }',
+    '    await loadMonth(monat);',
+    '    renderBody();',
+    '    refocusAfterRender();',
+    '  } else {',
+    '    renderAnders();',
+    '  }',
+    '}',
+  ], 'closeModal');
+  assert.ok(elseDanach.includes('refocusAfterRender();'), 'das else der Scope-Frage ist keine Grenze');
+  assert.ok(!elseDanach.includes('renderAnders();'), 'das else des aeusseren if schon');
+
+  // Ein verschachtelter Rueckruf nach dem Schliessen steht auf diesem Weg nicht an.
+  const rueckruf = zeilen([
+    'async function loeschen() {',
+    '  if (!await confirmModal(frage)) return;',
+    '  zeigeToast({',
+    '    undo: async () => {',
+    '      renderUndo();',
+    '    },',
+    '  });',
+    '}',
+  ], 'confirmModal');
+  assert.ok(!rueckruf.includes('renderUndo();'), 'der Undo-Rueckruf ist ein anderer Weg');
+});
+
+test('Ergebnis-Dialoge zaehlen als Schliessen, abgewartete Parameter als Neuaufbau (#1083)', () => {
+  const namen = schliessNamen(['import { promptModal } from \'/components/modal.js\';']);
+  for (const n of ['promptModal', 'confirmModal', 'selectModal', 'confirmOverModal']) {
+    assert.ok(namen.has(n), `${n} schliesst den Dialog, bevor es aufloest`);
+  }
+  assert.ok(istSchliessen('  if (!await confirmModal(frage)) return;', namen));
+
+  const quelle = [
+    'function renderKonto(container, konto, refresh) {',
+    '  knopf.addEventListener("click", async () => {',
+    '    closeModal({ force: true });',
+    '    await refresh();',
+    '  });',
+    '}',
+    'function speichern(save) {',
+    '  return save;',
+    '}',
+  ];
+  const param = abgewarteteParameter(quelle);
+  assert.ok(param.includes('refresh'), 'ein abgewarteter Parameter baut Unbekanntes um');
+  assert.ok(!param.includes('save'), 'ein Parameter, der nie abgewartet aufgerufen wird, zaehlt nicht');
+  assert.ok(istNeuaufbau('    await refresh();', rendererIn(quelle)));
+});
+
+/* DIE REGELN AUS DER REVIEW ZU #1123, AN KUENSTLICHEN QUELLEN.
+ *
+ * Am Repo hat keine davon gerade einen eigenen Treffer: die einzeilige Aktion in
+ * calendar.js ist inzwischen mehrzeilig, eine Signatur mit `{` fiel nur auf, wenn
+ * davor ein Rueckruf offen stand, und kein Ergebnis-Dialog folgt heute einem
+ * Neuaufbau. Ohne diese Sonden blieben die Regeln gruen, auch wenn jemand sie
+ * zuruecknaehme.
+ */
+test('Fokus-Guard: close-Parameter, Einzeiler, Signaturen, Dialog nach dem Neuaufbau, Wrapper (Review zu #1123)', () => {
+  const stellen = (datei, quelle) => fokusLuecken(datei, quelle).map((s) => s.split(' ')[0]);
+
+  // Das close einer Detailansicht-Aktion schliesst; ein Methodenaufruf close() nicht.
+  const detail = [
+    'function oeffne(item) {',
+    '  openDetailView({',
+    '    actions: [{',
+    '      onClick: async ({ close }) => {',
+    '        await close({ force: true });',
+    '        await api.delete(url);',
+    '        renderListe();',
+    '      },',
+    '    }],',
+    '  });',
+    '}',
+  ];
+  assert.deepEqual(stellen('detail.js', detail), ['detail.js:5'], 'das close einer Aktion ist ein Schliessen');
+  const methode = detail.map((l) => l.replace('await close({ force: true });', 'dialog.close();'));
+  assert.deepEqual(stellen('detail.js', methode), [], 'dialog.close() ist keines');
+
+  // Ein Rueckruf in einer Zeile endet in dieser Zeile.
+  const einzeiler = [
+    'function oeffne(ev) {',
+    '  const actions = [{',
+    '    onClick: async ({ close }) => { await close({ force: true }); await weg(ev); },',
+    '  }];',
+    '  if (spaeter) await nachladen();',
+    '  renderDetail();',
+    '}',
+  ];
+  assert.deepEqual(stellen('einzeiler.js', einzeiler), [],
+    'renderDetail() unter der Aktion loest der Knopf nie aus');
+
+  // Eine Signatur mit Klammern ist die Grenze - sonst endet das Fenster am if.
+  const signatur = [
+    'function vorher() {',
+    '  knopf.addEventListener("click", async () => {',
+    '    tu();',
+    '  });',
+    '}',
+    'export async function render(container, { user } = {}) {',
+    '  if (user) {',
+    '    closeModal();',
+    '    await api.put(url);',
+    '  }',
+    '  await laden();',
+    '  renderSeite();',
+    '}',
+  ];
+  assert.deepEqual(stellen('signatur.js', signatur), ['signatur.js:8'],
+    'das Fenster liest bis zum Neuaufbau nach dem if, nicht bis zum Rueckruf der Funktion davor');
+  for (const zeile of [
+    'export async function render(container, { user } = {}) {',
+    'async function addSubtask(parentId, { onChanged = () => {} } = {}) {',
+    '  el.addEventListener("click", async function (event) {',
+    '  const x = async () => {',
+  ]) assert.ok(OEFFNET_FUNKTION.test(zeile), `oeffnet eine Funktion: ${zeile}`);
+  assert.ok(!OEFFNET_FUNKTION.test("  if (typeof cb === 'function') {"), 'ein typeof-Vergleich oeffnet keine');
+
+  // Ein Ergebnis-Dialog NACH dem Neuaufbau oeffnet erst danach und entlastet nicht.
+  const danach = [
+    'async function loeschen() {',
+    '  closeModal({ force: true });',
+    '  await api.delete(url);',
+    '  renderListe();',
+    '  if (await confirmModal(frage)) tuNochWas();',
+    '}',
+  ];
+  assert.deepEqual(stellen('danach.js', danach), ['danach.js:2'], 'confirmModal danach findet den Knopf nicht wieder');
+  const offen = danach.map((l) => l.replace('if (await confirmModal(frage)) tuNochWas();', 'closeModal();'));
+  assert.deepEqual(stellen('danach.js', offen), [], 'ein Dialog, der schon offen war, setzt den Fokus beim Schliessen selbst');
+
+  // Eine Deklaration ist kein Schliessen (Merge von #1055): `confirmModal(` in
+  // der eigenen Signatur liess das Fenster ohne umschliessende Funktion bis in
+  // die naechste lesen, und dort galt das abgewartete `close` als Neuaufbau.
+  const deklaration = [
+    'export function confirmModal(frage) {',
+    '  return new Promise((resolve) => {',
+    '    resolve(true);',
+    '  });',
+    '}',
+    'async function beenden(',
+    '  bestaetigt,',
+    '  { close = closeModal } = {},',
+    ') {',
+    '  if (bestaetigt) await close({ force: true });',
+    '  return bestaetigt;',
+    '}',
+  ];
+  assert.deepEqual(stellen('deklaration.js', deklaration), [],
+    'die Signatur von confirmModal ist kein Anker');
+  const standard = deklaration.map((l, k) => (k === 0 ? 'export default function confirmModal(frage) {' : l));
+  assert.deepEqual(stellen('standard.js', standard), [],
+    'auch nicht als Default-Export (Codex-Review zu #1131)');
+  const gleichzeile = [
+    'async function speichern() { closeModal({ force: true });',
+    '  await api.put(url);',
+    '  renderListe();',
+    '}',
+  ];
+  assert.deepEqual(stellen('gleichzeile.js', gleichzeile), ['gleichzeile.js:1'],
+    'ein Schliessen hinter dem Kopf in derselben Zeile bleibt ein Anker');
+
+  // Ein Wrapper, der auf seiner eigenen Ebene nachzieht, deckt seinen Neuaufbau.
+  const wrapper = [
+    'async function entfernen(item) {',
+    '  if (!await confirmModal(frage)) return;',
+    '  await api.delete(url);',
+    '  renderListe();',
+    '  refocusAfterRender();',
+    '}',
+    'function oeffne(item) {',
+    '  openDetailView({ actions: [{',
+    '    onClick: async ({ close }) => {',
+    '      await close({ force: true });',
+    '      await entfernen(item);',
+    '    },',
+    '  }] });',
+    '}',
+  ];
+  assert.deepEqual(stellen('wrapper.js', wrapper), [], 'entfernen() zieht selbst nach');
+  const imUndo = [
+    ...wrapper.slice(0, 4),
+    '  zeigeToast({',
+    '    undo: () => {',
+    '      refocusAfterRender();',
+    '    },',
+    '  });',
+    ...wrapper.slice(5),
+  ];
+  assert.deepEqual(stellen('wrapper.js', imUndo), ['wrapper.js:2', 'wrapper.js:14'],
+    'ein Aufruf im Undo-Rueckruf deckt weder den Wrapper noch seinen Aufrufer');
+});
 
 /* VERSCHACHTELUNG, NICHT REIHENFOLGE - direkt geprueft.
  *

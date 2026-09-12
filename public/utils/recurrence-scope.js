@@ -1,10 +1,12 @@
 /**
  * Reine Hilfslogik für scope-basiertes Bearbeiten/Löschen von Serienterminen (#532).
  *
- * „nur dieser Termin", „dieser und folgende", „ganze Serie" werden clientseitig
- * über die bestehenden Kalender-Endpunkte (PUT/POST/DELETE + /exceptions)
- * orchestriert. Diese Datei kapselt nur die datums-/regel-arithmetischen Teile,
- * damit sie ohne DOM getestet werden können. Bewusst frei von Framework-/DOM-Bezug.
+ * „nur dieser Termin", „dieser und folgende", „ganze Serie" nutzen für lokale
+ * verknüpfte Ausnahmen atomare Endpunkte. Lokal verwaltete Serien, die keine
+ * verknüpften Ausnahmen nutzen können - einschließlich ausgehend synchronisierter
+ * und generierter Serien - behalten den bisherigen mehrstufigen Ablauf
+ * (Einzeltermin + EXDATE bzw. Kürzen + Folgeserie). Datumsarithmetik und
+ * Request-Auswahl bleiben DOM-frei testbar.
  */
 
 import { parseLocalDateKey, addLocalDays } from './date.js';
@@ -24,9 +26,21 @@ const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}/;
  * fängt eine Antwort ab, die die Spalte gar nicht mitliefert.
  */
 export function isLocalRecurringSeries(event) {
-  return !!event?.recurrence_rule
-    && (event.external_source ?? 'local') === 'local'
-    && !event.calendar_ref_id && !event.subscription_id;
+  return event?.is_local_recurring_series === true;
+}
+
+/** Whether this actor may use the occurrence-only mutation endpoints. */
+export function canOverrideCalendarOccurrence(event) {
+  return event?.can_override_occurrence === true;
+}
+
+export function canEditCalendarOccurrence(event) {
+  return canOverrideCalendarOccurrence(event) || event?.can_detach_occurrence === true;
+}
+
+/** Whether this actor must acknowledge that only whole-series actions are available. */
+export function requiresWholeSeriesConfirmation(event) {
+  return isLocalRecurringSeries(event) && !canEditCalendarOccurrence(event);
 }
 
 /**
@@ -36,6 +50,155 @@ export function isLocalRecurringSeries(event) {
  */
 export function isExternalRecurringSeries(event) {
   return !!event?.recurrence_rule && !isLocalRecurringSeries(event);
+}
+
+function serverSeriesId(event) {
+  const seriesId = Number(event?.series_id);
+  if (!Number.isInteger(seriesId) || seriesId < 1) {
+    throw new TypeError('A server-provided calendar series_id is required.');
+  }
+  return seriesId;
+}
+
+function serverRecurrenceId(event) {
+  const recurrenceId = event?.recurrence_id;
+  if (typeof recurrenceId !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(recurrenceId)) {
+    throw new TypeError('A server-provided calendar recurrence_id is required.');
+  }
+  return recurrenceId;
+}
+
+/** Selects the one server mutation used by each recurring edit scope. */
+export function calendarOccurrenceMutationTarget(event, scope) {
+  const seriesId = serverSeriesId(event);
+  if (scope === 'series') {
+    return { method: 'put', path: `/calendar/${seriesId}`, carriesReminderOffsets: false };
+  }
+  const recurrenceId = encodeURIComponent(serverRecurrenceId(event));
+  if (scope === 'this') {
+    return {
+      method: 'put',
+      path: `/calendar/${seriesId}/occurrences/${recurrenceId}`,
+      carriesReminderOffsets: true,
+    };
+  }
+  if (scope === 'following') {
+    return {
+      method: 'put',
+      path: `/calendar/${seriesId}/occurrences/${recurrenceId}/following`,
+      carriesReminderOffsets: true,
+    };
+  }
+  throw new TypeError(`Unknown recurring calendar scope: ${scope}`);
+}
+
+/** Selects the atomic server delete used by each recurring delete scope. */
+export function calendarOccurrenceDeleteTarget(event, scope) {
+  const seriesId = serverSeriesId(event);
+  if (scope === 'series') return { method: 'delete', path: `/calendar/${seriesId}` };
+  const recurrenceId = encodeURIComponent(serverRecurrenceId(event));
+  if (scope === 'this') {
+    return { method: 'delete', path: `/calendar/${seriesId}/occurrences/${recurrenceId}` };
+  }
+  if (scope === 'following') {
+    return {
+      method: 'delete',
+      path: `/calendar/${seriesId}/occurrences/${recurrenceId}/following`,
+    };
+  }
+  throw new TypeError(`Unknown recurring calendar scope: ${scope}`);
+}
+
+function orphanConflictCount(error) {
+  const data = error?.data;
+  const count = data?.orphaned_override_count;
+  if (error?.status !== 409
+      || data?.conflict !== 'calendar_override_orphans'
+      || !Number.isInteger(count)
+      || count < 0) return null;
+  return count;
+}
+
+/** Retries a series mutation only for the exact orphan count the user saw. */
+export async function withCalendarOrphanConfirmation(request, confirmCount) {
+  let confirmedCount;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await request(confirmedCount);
+    } catch (error) {
+      const currentCount = orphanConflictCount(error);
+      if (currentCount === null || currentCount === confirmedCount) throw error;
+      if (!await confirmCount(currentCount)) return null;
+      confirmedCount = currentCount;
+    }
+  }
+  throw new Error('Calendar override conflict changed too many times; reload and try again.');
+}
+
+/** Selects linked deletion or the fallback for locally owned series without linked overrides. */
+export function requestCalendarOccurrenceDelete({ api, event, scope, keepalive = false }) {
+  const target = calendarOccurrenceDeleteTarget(event, scope);
+  if (event?.can_detach_occurrence && !canOverrideCalendarOccurrence(event)) {
+    const path = `/calendar/${serverSeriesId(event)}`;
+    if (scope === 'this') {
+      return api.post(`${path}/exceptions`, { date: serverRecurrenceId(event) }, { keepalive });
+    }
+    if (scope === 'following' && !followingMeansWholeSeries(event)) {
+      return api.put(path, {
+        recurrence_rule: truncateRuleBefore(event.recurrence_rule, serverRecurrenceId(event)),
+      }, { keepalive });
+    }
+    return api.delete(path, { keepalive });
+  }
+  return api.delete(target.path, { keepalive });
+}
+
+/** Linked edits are atomic; locally owned fallback edits retain their legacy request sequence. */
+export async function requestCalendarOccurrenceMutation({
+  api,
+  event,
+  scope,
+  body,
+  reminderOffsets = [],
+  confirmCount,
+}) {
+  // Locally owned series that cannot use linked overrides retain the pre-#975 workflow (#532).
+  // These separate requests intentionally retain its existing atomicity limits.
+  if (event?.can_detach_occurrence && !canOverrideCalendarOccurrence(event) && scope !== 'series') {
+    const path = `/calendar/${serverSeriesId(event)}`;
+    const date = serverRecurrenceId(event);
+    if (scope === 'this') {
+      const response = await api.post('/calendar', { ...body, recurrence_rule: null });
+      await api.post(`${path}/exceptions`, { date });
+      return response;
+    }
+    if (scope === 'following' && !followingMeansWholeSeries(event)) {
+      await api.put(path, { recurrence_rule: truncateRuleBefore(event.recurrence_rule, date) });
+      return api.post('/calendar', body);
+    }
+    throw new TypeError('The first following occurrence must use the whole-series edit path.');
+  }
+  const target = calendarOccurrenceMutationTarget(event, scope);
+  const payload = { ...body };
+  if (target.carriesReminderOffsets) {
+    if (scope === 'this') {
+      for (const seriesOwnedField of [
+        'target_google_calendar_id',
+        'target_caldav_account_id',
+        'target_caldav_calendar_url',
+        'target_outlook_account_id',
+        'target_outlook_calendar_id',
+      ]) delete payload[seriesOwnedField];
+      delete payload.recurrence_rule;
+    }
+    payload.reminder_offsets = reminderOffsets;
+  }
+  return withCalendarOrphanConfirmation(
+    (confirmedCount) => api.put(target.path, confirmedCount === undefined
+      ? payload
+      : { ...payload, confirmed_orphan_count: confirmedCount }),
+    confirmCount,
+  );
 }
 
 /**

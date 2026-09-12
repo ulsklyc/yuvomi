@@ -1,10 +1,8 @@
-<!-- version: 2.65.1 -->
-A small update with one fix you should know about: the search box at the top of the app could show a household member the title and date of another member's private calendar appointment, and of events from a subscribed calendar that was never shared. The calendar itself never showed them; the search did. Search now applies the same visibility rules as the calendar, so the two return the same hits for the same word. This update runs no database migration and starts as quickly as any other; a backup before updating is still a good habit.
+<!-- version: 2.65.3 -->
+This is a security release for the Housekeeping module, and it changes nothing about how Yuvomi looks day to day. Once a visit is marked paid, only an admin can change or delete it. A household member could get around that by unchecking the visit's payment task in Tasks, which marked the visit as unpaid again and opened it up for changes. Unchecking the payment task of a paid visit now needs an admin as well. Checking the task off stays open to everyone who could do so before.
 
-Leaving the dashboard now really leaves it. Its clock, its quiet refresh, the weather timer and the wall kitchen timer used to keep running in the background after you moved to another page, and could redraw or even chime there. They stop the moment you navigate away, and a dashboard refresh that was overtaken by another one no longer paints an older state over a newer one.
+One thing to know after updating: if members of your household used to correct an accidental payment by unchecking its task, an admin now has to do that.
 
-In the calendar, birthdays stay visible while you filter by person. They used to disappear with any selection, because a birthday belongs to a contact rather than to a household member. The "Birthdays" switch in the filter sheet remains the way to hide them.
+Nothing changes in the database with this update, so it is a plain container swap with no migration to wait for.
 
-If your Mealie or Tandoor runs on a private address such as 192.168.x.x, the app now tells you which setting to enable instead of blaming your credentials: RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true. That switch has been required for such addresses since 2.64.1 closed a gap in the network guard; the message has caught up with it. The mail library moved to nodemailer 10; password-reset and invitation mails work as before, and the SMTP settings are unchanged.
-
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.65.1
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.65.3

@@ -3,13 +3,14 @@
  * Zweck: VAPID-Auflösung, Subscribe/Unsubscribe-Routen, Versand, Scheduler.
  * Ausführen: node --experimental-sqlite test/test-push.js
  */
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import express from 'express';
 import { buildRouter } from '../server/routes/push.js';
 import { processDuePushes } from '../server/services/push-scheduler.js';
 import { MIGRATIONS } from '../server/db.js';
+import { fetchRetry } from './fetch-retry.js';
 
 // --- Minimal-Schema -------------------------------------------------------
 function makeDb() {
@@ -241,6 +242,19 @@ test('sendPushToUser keeps sub on transient (500) error', async () => {
   assert.equal(db.prepare('SELECT COUNT(*) c FROM push_subscriptions').get().c, 1);
 });
 
+/**
+ * Startet die Push-Routen hinter einem echten Listener und meldet die Basis-URL.
+ *
+ * Der Abbau haengt NICHT am Testende (gemessen am 09.09.2026): frueher schloss
+ * jeder Test den Server in seiner letzten Zeile. Warf eine Assertion davor, war
+ * diese Zeile unerreichbar, der Socket blieb offen - und der Prozess endete
+ * nicht mehr. Im Log stand der `✖`, das Suiten-Ende fehlte, und `npm test` hing
+ * unbegrenzt statt rot zu werden. Betroffen war jeder Test dieser Datei.
+ *
+ * Deshalb raeumt `after()` auf, wie in `test/server-ready.js` (PR #1088).
+ * Innerhalb eines `test()`-Callbacks bindet der Hook an genau diesen Test und
+ * laeuft direkt danach - auch nach einer geworfenen Assertion.
+ */
 async function startApp(db, webpush, userId = 1) {
   const app = express();
   app.use(express.json());
@@ -249,49 +263,53 @@ async function startApp(db, webpush, userId = 1) {
   const pushService = createPushService({ db, webpush });
   app.use('/', buildRouter({ pushService, database: db }));
   const server = await new Promise((r) => { const s = app.listen(0, () => r(s)); });
-  return { baseUrl: `http://127.0.0.1:${server.address().port}`, close: () => new Promise((r) => server.close(r)) };
+
+  after(async () => {
+    // Erst die Keep-Alive-Verbindungen von `fetch`: `close()` wartet sonst auf
+    // einen Socket, den niemand mehr schliesst.
+    server.closeAllConnections?.();
+    await new Promise((r) => server.close(r));
+  });
+
+  return { baseUrl: `http://127.0.0.1:${server.address().port}` };
 }
 
 test('GET /vapid-public-key returns the key', async () => {
   const db = makeDb();
   const app = await startApp(db, makeWebpushMock());
-  const res = await fetch(`${app.baseUrl}/vapid-public-key`);
+  const res = await fetchRetry(`${app.baseUrl}/vapid-public-key`);
   const json = await res.json();
   assert.equal(res.status, 200);
   assert.equal(json.data.key, 'PUB_GEN');
-  await app.close();
 });
 
 test('POST /subscribe inserts then upserts the subscription', async () => {
   const db = makeDb();
   const app = await startApp(db, makeWebpushMock());
   const body = { endpoint: 'https://push/x', keys: { p256dh: 'PP', auth: 'AA' } };
-  let res = await fetch(`${app.baseUrl}/subscribe`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  let res = await fetchRetry(`${app.baseUrl}/subscribe`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   assert.equal(res.status, 201);
-  res = await fetch(`${app.baseUrl}/subscribe`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...body, keys: { p256dh: 'PP2', auth: 'AA2' } }) });
+  res = await fetchRetry(`${app.baseUrl}/subscribe`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...body, keys: { p256dh: 'PP2', auth: 'AA2' } }) });
   assert.equal(res.status, 201);
   const rows = db.prepare('SELECT p256dh FROM push_subscriptions WHERE endpoint = ?').all('https://push/x');
   assert.equal(rows.length, 1);
   assert.equal(rows[0].p256dh, 'PP2');
-  await app.close();
 });
 
 test('POST /subscribe rejects missing keys', async () => {
   const db = makeDb();
   const app = await startApp(db, makeWebpushMock());
-  const res = await fetch(`${app.baseUrl}/subscribe`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ endpoint: 'https://push/x' }) });
+  const res = await fetchRetry(`${app.baseUrl}/subscribe`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ endpoint: 'https://push/x' }) });
   assert.equal(res.status, 400);
-  await app.close();
 });
 
 test('POST /unsubscribe removes the subscription', async () => {
   const db = makeDb();
   db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth) VALUES (1,'https://push/x','p','a')").run();
   const app = await startApp(db, makeWebpushMock());
-  const res = await fetch(`${app.baseUrl}/unsubscribe`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ endpoint: 'https://push/x' }) });
+  const res = await fetchRetry(`${app.baseUrl}/unsubscribe`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ endpoint: 'https://push/x' }) });
   assert.equal(res.status, 204);
   assert.equal(db.prepare('SELECT COUNT(*) c FROM push_subscriptions').get().c, 0);
-  await app.close();
 });
 
 test('POST /test forwards client-provided localized text', async () => {
@@ -299,48 +317,44 @@ test('POST /test forwards client-provided localized text', async () => {
   const webpush = makeWebpushMock();
   db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth) VALUES (1,'https://push/x','p','a')").run();
   const app = await startApp(db, webpush);
-  const res = await fetch(`${app.baseUrl}/test`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Titel', body: 'Inhalt' }) });
+  const res = await fetchRetry(`${app.baseUrl}/test`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Titel', body: 'Inhalt' }) });
   const json = await res.json();
   assert.equal(res.status, 200);
   assert.equal(json.data.sent, 1);
   assert.equal(json.data.devices, 1);
   assert.match(webpush.calls[0].payload, /Titel/);
-  await app.close();
 });
 
 test('POST /test reports sent 0 / devices 0 when nothing is registered', async () => {
   const db = makeDb();
   const app = await startApp(db, makeWebpushMock());
-  const res = await fetch(`${app.baseUrl}/test`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) });
+  const res = await fetchRetry(`${app.baseUrl}/test`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) });
   const json = await res.json();
   assert.equal(res.status, 200);
   assert.equal(json.data.sent, 0);
   assert.equal(json.data.devices, 0);
-  await app.close();
 });
 
 test('POST /test reports sent 0 but devices 1 when the subscription is gone', async () => {
   const db = makeDb();
   db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth) VALUES (1,'https://push/gone','p','a')").run();
   const app = await startApp(db, makeWebpushMock());
-  const res = await fetch(`${app.baseUrl}/test`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) });
+  const res = await fetchRetry(`${app.baseUrl}/test`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) });
   const json = await res.json();
   assert.equal(res.status, 200);
   assert.equal(json.data.sent, 0);
   // Vor dem Senden gezaehlt: der Client kann "abgelaufen" von "nie registriert" trennen.
   assert.equal(json.data.devices, 1);
   assert.equal(db.prepare('SELECT COUNT(*) c FROM push_subscriptions').get().c, 0);
-  await app.close();
 });
 
 test('POST /test only counts the current user devices', async () => {
   const db = makeDb();
   db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth) VALUES (2,'https://push/bob','p','a')").run();
   const app = await startApp(db, makeWebpushMock(), 1);
-  const res = await fetch(`${app.baseUrl}/test`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) });
+  const res = await fetchRetry(`${app.baseUrl}/test`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) });
   const json = await res.json();
   assert.equal(json.data.devices, 0);
-  await app.close();
 });
 
 function pastIso() { return new Date(Date.now() - 60_000).toISOString(); }

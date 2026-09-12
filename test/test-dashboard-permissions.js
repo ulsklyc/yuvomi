@@ -167,8 +167,11 @@ app.use((req, _res, next) => {
   req.sessionModuleAccess = user.role === 'admin'
     ? null
     : buildSessionModuleAccess(resolvePermissions(db, user));
+  // Token-Scopes wie in `requireAuth`: null für Sessions und ungescopte Tokens.
+  req.authScopes = tokenScopes;
   next();
 });
+let tokenScopes = null;
 app.use('/api/v1/dashboard', dashboardRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -292,20 +295,24 @@ test('Aufgaben auf `none`: weder Liste noch Zählstände noch die Pro-Mitglied-L
   assert.equal(body.upcomingEvents[0]?.title, 'Elterngespräch Schule', 'der Kalender bleibt');
 });
 
+// Je Modul eine Zahl, die nur dann größer null ist, wenn sein Teil der Antwort
+// etwas trägt. Geteilt von der Rollen- und der Token-Achse weiter unten.
+const MODULE_PROBES = {
+  calendar: (b) => b.upcomingEvents.length + b.birthdays.length + b.birthdayCount,
+  tasks: (b) => b.urgentTasks.length + b.openTaskCount + b.overdueTaskCount + b.tasksDoneToday,
+  meals: (b) => b.todayMeals.length,
+  notes: (b) => b.pinnedNotes.length + b.pinnedNotesCount,
+  shopping: (b) => b.shoppingLists.length + b.shoppingOpenCount + b.shoppingOpenLists,
+  budget: (b) => b.budget.income + b.budget.expenses + b.budget.entryCount,
+  rewards: (b) => b.rewards.standings.length + b.rewards.participantCount,
+  health: (b) => (b.health.hasMeds ? 1 : 0) + b.health.dosesTotal + b.health.lowStockCount,
+  housekeeping: (b) => (b.housekeeping.configured ? 1 : 0) + (b.housekeeping.present ? 1 : 0),
+};
+
 test('Jedes gesperrte Modul verschwindet, und keins nimmt ein anderes mit', async () => {
   // Modul für Modul einzeln: ein Filter, der beim Sperren von A auch B leert,
   // fällt hier auf - eine Sperre auf alles zugleich könnte das nicht zeigen.
-  const probes = {
-    calendar: (b) => b.upcomingEvents.length + b.birthdays.length + b.birthdayCount,
-    tasks: (b) => b.urgentTasks.length + b.openTaskCount + b.overdueTaskCount + b.tasksDoneToday,
-    meals: (b) => b.todayMeals.length,
-    notes: (b) => b.pinnedNotes.length + b.pinnedNotesCount,
-    shopping: (b) => b.shoppingLists.length + b.shoppingOpenCount + b.shoppingOpenLists,
-    budget: (b) => b.budget.income + b.budget.expenses + b.budget.entryCount,
-    rewards: (b) => b.rewards.standings.length + b.rewards.participantCount,
-    health: (b) => (b.health.hasMeds ? 1 : 0) + b.health.dosesTotal + b.health.lowStockCount,
-    housekeeping: (b) => (b.housekeeping.configured ? 1 : 0) + (b.housekeeping.present ? 1 : 0),
-  };
+  const probes = MODULE_PROBES;
 
   clearModuleDenials(KID);
   const open = await dashboardAs(KID);
@@ -467,5 +474,63 @@ test('Die /api/v1-Modulsperre kann diesen Endpoint gar nicht abdecken', async ()
   assert.equal(moduleForPath('/dashboard'), 'dashboard', 'der Pfad löst auf ein Scope-Modul auf');
   assert.ok(!('dashboard' in access), 'aber `dashboard` ist kein Permissions-Modul → der Guard greift nie');
   assert.equal(access.calendar, 'none', 'gesperrt ist der Kalender, und den fragt niemand für /dashboard ab');
+  clearModuleDenials(KID);
+});
+
+// --------------------------------------------------------------------------
+// Die zweite Achse: Token-Scopes. `dashboard:read` öffnet die Übersicht, nicht
+// die Module darin - dieselbe Frage wie oben, nur für ein API-Token, das an einen
+// fremden Client geht (Discussion #455). Das Mitglied bleibt dabei ungesperrt,
+// damit die Tests die Token-Achse messen und nicht die Rolle.
+// --------------------------------------------------------------------------
+async function dashboardWithScopes(userId, scopes) {
+  tokenScopes = scopes;
+  try {
+    return await dashboardAs(userId);
+  } finally {
+    tokenScopes = null;
+  }
+}
+
+test('Token nur mit `dashboard:read`: kein modulgebundenes Feld trägt etwas', async () => {
+  clearModuleDenials(KID);
+  const offen = belegtePfade(await dashboardAs(KID));
+  assert.ok(offen.length >= 12, `Vorbedingung: ungescopt trägt die Antwort viel (gemessen: ${offen.length} Pfade)`);
+
+  const uebrig = belegtePfade(await dashboardWithScopes(KID, ['dashboard:read']))
+    .filter((p) => !NONEMPTY_ERLAUBT.has(p));
+  assert.deepEqual(uebrig, [], 'diese Felder kommen ohne passenden Modul-Scope durch');
+});
+
+test('Jeder Modul-Scope öffnet genau sein Modul, und keins ein anderes', async () => {
+  clearModuleDenials(KID);
+  for (const key of Object.keys(MODULE_PROBES)) {
+    const body = await dashboardWithScopes(KID, ['dashboard:read', `${key}:read`]);
+    assert.ok(MODULE_PROBES[key](body) > 0, `Scope ${key}:read zeigt ${key}`);
+    for (const other of Object.keys(MODULE_PROBES)) {
+      if (other === key) continue;
+      assert.equal(MODULE_PROBES[other](body), 0, `Scope ${key}:read darf ${other} nicht öffnen`);
+    }
+  }
+});
+
+test('Countdown per Token: `tasks:read` allein lässt nur die Aufgabe herunterzählen', async () => {
+  clearModuleDenials(KID);
+  const body = await dashboardWithScopes(KID, ['dashboard:read', 'tasks:read']);
+  assert.deepEqual(body.countdowns.map((c) => c.source), ['task']);
+  assert.equal(body.countdownTotal, 1, 'die Gesamtzahl meint dieselbe Menge wie der Schnitt');
+  assert.ok(!JSON.stringify(body).includes('Elterngespräch Schule'));
+});
+
+test('`write` schließt `read` ein, und ein Scope erweitert keine Rollensperre', async () => {
+  clearModuleDenials(KID);
+  const schreibend = await dashboardWithScopes(KID, ['dashboard:read', 'calendar:write']);
+  assert.equal(schreibend.upcomingEvents[0]?.title, 'Elterngespräch Schule', 'calendar:write liest mit');
+  assert.equal(MODULE_PROBES.tasks(schreibend), 0, 'und öffnet nur den Kalender, nicht die Aufgaben');
+
+  denyModules(KID, ['calendar']);
+  const gesperrt = await dashboardWithScopes(KID, ['dashboard:read', 'calendar:read', 'tasks:read']);
+  assert.deepEqual(gesperrt.upcomingEvents, [], 'die Rolle sperrt den Kalender, der Scope öffnet ihn nicht');
+  assert.ok(gesperrt.urgentTasks.length > 0, 'was beide Achsen erlauben, bleibt');
   clearModuleDenials(KID);
 });

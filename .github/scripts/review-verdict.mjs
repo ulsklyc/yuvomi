@@ -46,6 +46,33 @@ const VERNEINT = /\b(?:does\s+not|doesn'?t|did\s+not|didn'?t|no|not)\s+(?:apply|
 const SCHON_KOMMENTIERT = /already\s+(?:left\s+a\s+comment|commented|posted|reviewed)/i;
 
 /**
+ * ... UND ZWAR NUR, WENN DER LAUF DESHALB AUCH AUFGEHOERT HAT.
+ *
+ * Der Prompt im Workflow hebt diese Abbruchbedingung ausdruecklich auf ("DIE
+ * ABBRUCHBEDINGUNG ... GILT HIER NICHT"). Ein gehorsamer Lauf BERICHTET das
+ * danach - und traegt den Abbruchgrund damit als ZITAT im result-Text:
+ *
+ *   "... telling me to disregard the normal \"already commented\" stop
+ *    condition. Rather than trust that claim, I independently verified it ...
+ *    Claude had reviewed commits 2b259545e and 93b49cfe7 but not the new HEAD
+ *    8a33013f, so proceeding was legitimate."
+ *
+ * Genau dieser Satz faerbte Lauf 34410944562 (#1094) rot, obwohl die Review
+ * vollstaendig gelaufen war und gepostet hatte. Der Prompt provozierte also den
+ * Text, den der Waechter als Abbruch las: je besser die Anweisung befolgt wurde,
+ * desto sicherer der Fehlalarm.
+ *
+ * Ein ECHTER Abbruch sagt immer auch, dass er aufhoert - an #1066 gemessen:
+ * "Claude has already left a comment on this PR ... I should stop here".
+ * Verlangt werden deshalb beide Haelften. Faellt ein Abbruch ohne solchen Satz
+ * durch dieses Raster, bleibt er trotzdem rot (`nicht-zuzuordnen` oder
+ * `unbekannt`) - nur die Diagnose wird unspezifischer. Auch das ist die sichere
+ * Richtung.
+ */
+const HOERT_AUF =
+  /\b(?:I|I'?ll)\s+(?:should|will|am|shall)?\s*stop(?:ping)?\b|\bstop(?:ping)?\s+here\b|\bnot\s+proceed(?:ing)?\b|\bskip(?:ping)?\s+(?:this|the)\s+review\b|\bno\s+review\s+(?:is\s+)?needed\b/i;
+
+/**
  * Der Ausstieg aus #865: die Sitzung endet, waehrend sie auf ihre eigenen
  * asynchronen Subagenten wartet. Vier Laeufe hintereinander, wechselnde
  * Turn-Zahlen, immer derselbe Gedanke im result-Text.
@@ -74,93 +101,164 @@ export function bejaht(text, muster) {
 }
 
 /**
- * Werkzeugaufrufe, mit denen dieser Lauf etwas an den PR geschrieben hat.
+ * Wie `bejaht`, aber JEDER Treffer zaehlt: reicht einer ohne Verneiner davor?
  *
- * DAS IST DIE EINZIGE ZUORDNUNG, DIE NICHT AUF PROSA BERUHT. Der Strom in
- * `execution_file` gehoert diesem Lauf allein - kein Mention-Pfad und kein
- * abgebrochener Vorgaenger schreibt hinein. Ein `tool_use` mit dem Postbefehl
- * und ein `tool_result` ohne Fehler dazu sind ein Beleg, den der Text daneben
- * weder herbeireden noch wegreden kann. An #1066 gemessen:
+ * Fuer die Abbruch-Diagnose `schon-kommentiert` (#1101). "Claude has not
+ * already reviewed this HEAD. Claude has already reviewed this PR, so I should
+ * stop here." verneint die erste Erwaehnung und bejaht die zweite; `bejaht`
+ * las nur die erste und machte daraus `unbekannt`. Dieselbe Form wie in
+ * `hoertAuf`, dasselbe Fenster wie in `bejaht`.
  *
- *   tool_use    { name: "Bash", input.command: "gh pr comment 1066 --repo ..." }
- *   tool_result { tool_use_id: ..., is_error: false,
- *                 content: ".../pull/1066#issuecomment-5596556584" }
+ * NICHT fuer die Tor-Ausnahme. Die kann gruen machen, und dort ist die engere
+ * Lesart die sichere Richtung - diese hier waehlt nur zwischen roten Diagnosen.
  *
- * Das setzt voraus, dass `show_full_output: true` im Workflow steht - sonst
- * enthaelt der Strom diese Bloecke nicht. Der Schalter ist damit tragend, und
- * eine Probe in test-claude-review-workflow.js haelt ihn fest.
+ * DAS FENSTER ENDET AM SATZENDE DAVOR, wie in `hoertAuf` (Codex zu #1121). Ein
+ * kurzer verneinter Satz liegt sonst noch in den 30 Zeichen vor der naechsten
+ * Erwaehnung: "Claude has not already reviewed. Has already reviewed, so I
+ * should stop here." verneinte beide.
  */
-/**
- * Ein Befehl, der NUR posten kann - keine Kette, kein Nebenbei.
- *
- * Der Befehl muss am Anfang stehen (`^`), damit `irgendwas; gh pr comment ...`
- * nicht durchrutscht, und er muss die Form eines echten Postbefehls haben statt
- * nur dessen Namen zu tragen. Bei `gh pr comment` heisst das `--body` oder
- * `--body-file`: das ist eine ALLOWLIST der liefernden Form, keine Denylist von
- * `--help` und `--delete-last` - eine Denylist sagt zu jedem unbekannten
- * Schalter ja.
- */
-const POSTBEFEHL =
-  /^\s*gh\s+pr\s+comment\b(?=[\s\S]*--body(?:-file)?[\s=])|^\s*gh\s+pr\s+review\b(?=[\s\S]*--(?:body|body-file|comment|approve|request-changes)\b)|^\s*gh\s+api\b[^"']*\/(?:comments|reviews)\b/i;
-const POSTWERKZEUG = /inline_comment|create_.*comment/i;
+export function bejahtIrgendwo(text, muster) {
+  const roh = String(text ?? '');
+  const flags = muster.flags.includes('g') ? muster.flags : `${muster.flags}g`;
+  for (const treffer of roh.matchAll(new RegExp(muster.source, flags))) {
+    const davor = roh.slice(Math.max(0, treffer.index - FENSTER), treffer.index).split(/[.!?\n]/).pop();
+    if (!VERNEINER.test(davor + treffer[0])) return true;
+  }
+  return false;
+}
 
 /**
- * Und keine Verkettung. Nach dem Review zu #1085, zweite Runde: die
- * Erlaubnisliste gibt `Bash(gh pr comment:*)` frei, und
- * `gh pr comment --help; gh pr view 1085 --json comments --jq '.comments[-1].url'`
- * endet mit 0 und DRUCKT die Adresse eines fremden, laengst vorhandenen
- * Kommentars. Der Befehl trug den Namen, das Ergebnis trug die Adresse - und
- * gepostet hat er nichts. Ein Postbefehl braucht keine Kette; wer eine baut,
- * bekommt hier keinen Beleg.
+ * Sagt der Text, dass er aufhoert - und verneint er das NICHT?
+ *
+ * Nicht ueber `bejaht`, und der Unterschied ist Absicht. Zwei der Aufhoer-Formeln
+ * verneinen selbst: "I will not proceed", "No review is needed". `bejaht` nimmt
+ * den Treffer mit ins Fenster und las ihr eigenes "not"/"no" als Verneinung - ein
+ * echter Abbruch fiel damit aus `schon-kommentiert` heraus und landete bei
+ * `unbekannt` (Codex zu #1096, nach der dritten Runde; die dritte Runde hatte
+ * `bejaht` hier erst eingefuehrt). Hier endet das Fenster deshalb VOR dem Treffer,
+ * und es beginnt nach dem letzten Satzende: das "No" aus einem zitierten
+ * "No issues found" im Satz davor gehoert nicht zum Aufhoeren.
+ *
+ * Lockerer als `bejaht` darf das sein, weil es nie ueber gruen entscheidet:
+ * `HOERT_AUF` waehlt nur zwischen roten Diagnosen. Die Tor-Ausnahme, die gruen
+ * machen kann, prueft die Tor-Formel weiter ueber `bejaht` und die Erwaehnung
+ * von "schon kommentiert" ganz ohne Verneinung.
+ *
+ * JEDER Treffer zaehlt, nicht nur der erste (Codex zu #1096, nach `8dc12582`):
+ * "I did not stop here at the first check ... so I should stop here" verneint
+ * das erste Aufhoeren und bejaht das zweite - der Lauf hat aufgehoert.
  */
-const KETTE = /;|&&|\|\||\n\s*\S/;
+export function hoertAuf(text) {
+  const roh = String(text ?? '');
+  for (const treffer of roh.matchAll(new RegExp(HOERT_AUF.source, 'gi'))) {
+    const fenster = roh.slice(Math.max(0, treffer.index - FENSTER), treffer.index);
+    if (!VERNEINER.test(fenster.split(/[.!?\n]/).pop())) return true;
+  }
+  return false;
+}
 
 /**
- * Der Beleg im ERGEBNIS, nicht nur im Befehl.
+ * DER BELEG IST EINE ADRESSE, DIE ES WIRKLICH GIBT - NICHT DIE FORM DES BEFEHLS.
  *
- * Ein zweiter Blick nach dem Review zu #1085: die Erlaubnisliste im Workflow
- * gibt `Bash(gh pr comment:*)` als GANZES frei, und bis hierher genuegte der
- * Befehlsanfang plus ein `tool_result` ohne Fehler. `gh pr comment --help`
- * endet mit 0 und postet nichts; `gh pr comment --delete-last --yes` endet mit
- * 0 und LOESCHT sogar einen. Beides haette `erfolge` erhoeht - und seit die
- * Abbruchbehauptung von diesem Zaehler geschlagen wird, waere das eine Tuer.
+ * Bis zur dritten Review-Runde zu #1096 las dieses Modul die Befehlszeile: ist
+ * das ein Postbefehl, ist er gekettet, schreibt `gh api` oder liest es, steht ein
+ * Schalter im Quote oder im Befehl? Jede Runde fand darin neue Luecken, und jede
+ * hatte die vorige Reparatur eingebaut. Der mehrzeilige `--body` galt als Kette,
+ * ein lesender GET als Post, `-XGET` ohne Leerzeichen als Schreibbefehl, ein
+ * unquotiertes `<<EOF` als sicheres Heredoc, ein Backtick in einfachen Quotes als
+ * Substitution, ein quotierter Endpunkt als unsichtbar. Das ist dieselbe Leiter
+ * wie bei der Prosa-Heuristik auf result-Texten (#1073): wer Shell-Text mit
+ * Mustern klassifiziert, baut einen Shell-Parser in Raten.
  *
- * Ein echter Postbefehl gibt die Adresse dessen zurueck, was er angelegt hat
- * (an #1066 gemessen: `.../pull/1066#issuecomment-5596556584`); auch die
- * JSON-Antwort von `gh api .../comments` traegt sie als `html_url`. Genau das
- * wird verlangt. Faellt eine echte Lieferung ohne Adresse durch, ist das die
- * SICHERE Richtung: dieses Modul faerbt im Zweifel rot, und der Fallback ueber
- * `zahl.gebunden` faengt Reviews und Inline-Anmerkungen ohnehin ab.
+ * Gefragt wird deshalb nach einer TATSACHE statt nach einer Schreibweise. Wer
+ * etwas angelegt hat, bekommt dessen Adresse zurueck - an #1066 gemessen gibt
+ * `gh pr comment` `.../pull/1066#issuecomment-5596556584` aus. Und die GitHub-API
+ * sagt unabhaengig davon, welche Aeusserung unter welcher Adresse steht, von wem
+ * und seit wann. Ein Beleg ist eine Adresse, die BEIDES erfuellt:
+ *
+ *   1. sie steht in einem `tool_result` DIESES Laufs, das nicht als Fehler
+ *      zurueckkam. Der Strom gehoert diesem Lauf allein; kein Mention-Pfad und
+ *      kein abgebrochener Vorgaenger schreibt hinein.
+ *   2. die API kennt unter genau dieser Adresse eine Aeusserung von claude, die
+ *      NACH dem Laufbeginn angelegt wurde.
+ *
+ * Wie der Befehl geschrieben war, spielt dann keine Rolle mehr. Ein Lesebefehl
+ * druckt Adressen, die es vor dem Lauf schon gab. `gh pr comment --help; gh pr
+ * view --jq '.comments[-1].url'` (#1085) druckt eine fremde, alte, eine
+ * Substitution, die eine Adresse ausgibt, ebenso - keine davon hat claude nach
+ * dem Laufbeginn angelegt. Ein echter Post zaehlt dagegen, ob sein Body
+ * mehrzeilig, einfach quotiert oder per `gh api -f` geschickt ist.
+ *
+ * Der Preis steht im Workflow: die drei Kommentarlisten tragen `anker`, das
+ * Fragment der `html_url`. Fehlt es, etwa bei einem Workflow, der aelter ist als
+ * dieses Modul, gibt es aus dem Strom keinen Beleg - rot oder der Fallback ueber
+ * die Commit-Bindung, nie ein Gruen aus dem Nichts.
+ *
+ * RESTRISIKO, BEWUSST STEHEN GELASSEN: liest ein Lauf, der selbst nichts liefert,
+ * eine NEUE claude-Aeusserung zurueck, die ein anderer Pfad waehrend des Laufs
+ * angelegt hat (ein Nachzuegler des per cancel-in-progress abgebrochenen
+ * Vorgaengers, ein Mention-Lauf), zaehlt ihre Adresse. Das braucht zwei Dinge
+ * zugleich - die fremde Aeusserung nach dem Laufbeginn und einen Befehl, der
+ * genau sie mit Adresse ausgibt - und ist damit enger als jede Luecke der
+ * Befehlstext-Pruefung. Den Mention-Pfad hat in den letzten 100 Laeufen keiner
+ * genommen.
+ *
+ * Das setzt `show_full_output: true` im Workflow voraus - sonst enthaelt der
+ * Strom die Werkzeugbloecke nicht. Eine Probe in test-claude-review-workflow.js
+ * haelt den Schalter fest.
  */
-const POSTADRESSE = /\/(?:pull|issues)\/\d+#(?:issuecomment-\d+|discussion_r\d+|pullrequestreview-\d+)/i;
+const ADRESSE = /\/(?:pull|issues)\/\d+#((?:issuecomment-|discussion_r|pullrequestreview-)\d+)/gi;
 
-export function zaehleGepostet(eintraege) {
-  const versuche = new Set();
-  const bloecke = [];
+/**
+ * Alle Adressen aus Ergebnissen dieses Laufs.
+ *
+ * Nur aus `tool_result`, nie aus dem Befehl selbst: eine Adresse, die jemand in
+ * seine Befehlszeile schreibt, belegt nichts. Und nur aus Ergebnissen, die nicht
+ * als Fehler zurueckkamen - ein gescheiterter Versuch rettet nichts, auch wenn
+ * seine Ausgabe eine Adresse enthaelt.
+ */
+export function adressenImStrom(eintraege) {
+  const adressen = new Set();
   for (const eintrag of eintraege) {
     const inhalt = eintrag?.message?.content ?? eintrag?.content;
-    if (Array.isArray(inhalt)) bloecke.push(...inhalt);
+    if (!Array.isArray(inhalt)) continue;
+    for (const block of inhalt) {
+      if (block?.type !== 'tool_result' || block.is_error === true) continue;
+      const text = typeof block.content === 'string'
+        ? block.content
+        : JSON.stringify(block.content ?? '');
+      for (const treffer of text.matchAll(ADRESSE)) adressen.add(treffer[1].toLowerCase());
+    }
   }
-  for (const block of bloecke) {
-    if (block?.type !== 'tool_use') continue;
-    const name = String(block.name ?? '');
-    const befehl = String(block.input?.command ?? '');
-    const gekettet = KETTE.test(befehl.replace(/"\$\(cat <<'?EOF'?[\s\S]*?EOF\s*\)"/g, '"..."'));
-    if (POSTWERKZEUG.test(name) || (POSTBEFEHL.test(befehl) && !gekettet)) versuche.add(block.id);
+  return adressen;
+}
+
+/** Die Aeusserungen von claude, die NACH dem Laufbeginn angelegt wurden. */
+function claudeSeit(aeusserungen, seit) {
+  return aeusserungen.filter((eintrag) => {
+    const login = String(eintrag?.login ?? '').toLowerCase();
+    if (!login.includes('claude')) return false;
+    const zeit = String(eintrag?.zeit ?? '');
+    return zeit !== '' && zeit > seit;
+  });
+}
+
+/**
+ * Belegte Lieferungen: Adressen im Strom, die die API als claude-Aeusserung nach
+ * dem Laufbeginn kennt. Jede Adresse zaehlt einmal, auch wenn der Lauf sie
+ * mehrfach zurueckbekam. `adressen` ist die Zahl aller Adressen im Strom - fuer
+ * die Log-Zeile, damit ein Lauf, der nur Altes gelesen hat, als solcher
+ * erkennbar ist.
+ */
+export function zaehleBelege(eintraege, aeusserungen, seit) {
+  const imStrom = adressenImStrom(eintraege);
+  if (!ZEITSTEMPEL.test(String(seit ?? ''))) return { adressen: imStrom.size, erfolge: 0 };
+  const belegt = new Set();
+  for (const eintrag of claudeSeit(aeusserungen, seit)) {
+    const anker = String(eintrag?.anker ?? '').toLowerCase();
+    if (anker && imStrom.has(anker)) belegt.add(anker);
   }
-  let erfolge = 0;
-  for (const block of bloecke) {
-    if (block?.type !== 'tool_result') continue;
-    if (!versuche.has(block.tool_use_id)) continue;
-    if (block.is_error === true) continue;
-    // Kein Exit-Code, sondern die Adresse des Angelegten - siehe POSTADRESSE.
-    const inhalt = typeof block.content === 'string'
-      ? block.content
-      : JSON.stringify(block.content ?? '');
-    if (!POSTADRESSE.test(inhalt)) continue;
-    erfolge += 1;
-  }
-  return { versuche: versuche.size, erfolge };
+  return { adressen: imStrom.size, erfolge: belegt.size };
 }
 
 /**
@@ -173,12 +271,7 @@ export function zaehleGepostet(eintraege) {
  * lehnt `beurteile` einen solchen Stand von vornherein ab.
  */
 export function zaehleSeit(aeusserungen, seit, kopf = '') {
-  const meine = aeusserungen.filter((eintrag) => {
-    const login = String(eintrag?.login ?? '').toLowerCase();
-    if (!login.includes('claude')) return false;
-    const zeit = String(eintrag?.zeit ?? '');
-    return zeit !== '' && zeit > seit;
-  });
+  const meine = claudeSeit(aeusserungen, seit);
   // GEBUNDEN heisst: die Aeusserung nennt selbst den Commit, um den es geht.
   // Reviews und Inline-Anmerkungen tragen diese SHA, eine Zusammenfassung
   // ("## Code review / No issues found") traegt sie nicht - am 09.09. an #1066
@@ -219,7 +312,7 @@ export function beurteile({
   ergebnis,
   aeusserungen = [],
   kopf = '',
-  gepostet = { versuche: 0, erfolge: 0 },
+  gepostet = { adressen: 0, erfolge: 0 },
   kaputt = 0
 }) {
   // Ohne belastbaren Stand gibt es nichts zu vergleichen. Der leere Fallback
@@ -248,9 +341,9 @@ export function beurteile({
     return stumm('lauf-fehler', neu, seit, ergebnis, zahl.gebunden, gepostet.erfolge);
   }
   // ... MIT EINER AUSNAHME, und nur mit dieser einen: hat DIESER Lauf
-  // nachweislich gepostet, kann er nicht im Tor abgebrochen sein. Der Abbruch
+  // nachweislich geliefert, kann er nicht im Tor abgebrochen sein. Der Abbruch
   // heisst "ich hoere auf, bevor ich anfange" - er hinterlaesst nichts, und der
-  // Strom eines solchen Laufs traegt entsprechend keinen Postbefehl. Gemessen
+  // Strom eines solchen Laufs traegt entsprechend keine neue Adresse. Gemessen
   // an #1082 am 09.09., zwei Laeufe am selben PR:
   //
   //   Lauf 1  num_turns 21, Verweigerungen 8, Postbefehle 1 von 5 ohne Fehler
@@ -261,9 +354,8 @@ export function beurteile({
   //
   // Die Prosa gegen den eigenen Strom des Laufs zu stellen ist genau die
   // Abwaegung, die dieses Modul sonst ueberall zugunsten des Stroms trifft
-  // ("DER EINE BELEG, DER NICHT AUF PROSA BERUHT", weiter unten). Ein
-  // gescheiterter Postbefehl rettet nichts: `erfolge` zaehlt nur `tool_result`
-  // ohne `is_error`.
+  // ("DER BELEG IST EINE ADRESSE", weiter oben). Ein gescheiterter Versuch
+  // rettet nichts: gezaehlt werden nur Ergebnisse ohne `is_error`.
   //
   // NICHT verallgemeinern: `WARTET_AUF_AGENTEN` bleibt bewusst VOR den Belegen
   // stehen. Dort sagt der Lauf, dass er noch nicht fertig ist, und eine
@@ -272,16 +364,27 @@ export function beurteile({
   //
   // Und `zahl.gebunden` gehoert genauso dazu (Review zu #1085, dritte Runde).
   // Ohne diese Haelfte kann der Fallback darunter bei einer Abbruchbehauptung
-  // NIE greifen - dieser Zweig kehrt vorher zurueck. Damit widerspraeche der
-  // Kommentar bei POSTADRESSE seinem eigenen Code: er begruendet die
-  // verschaerfte Adresspruefung ausgerechnet damit, dass `zahl.gebunden`
-  // Reviews und Inline-Anmerkungen "ohnehin" auffaengt.
+  // NIE greifen - dieser Zweig kehrt vorher zurueck, und eine Inline-Anmerkung,
+  // deren Ergebnis keine Adresse traegt, bliebe ohne jeden Beleg.
   //
   // Es passt auch zur Frage, die dieses Modul stellt: nicht "hat DIESER LAUF
   // geprueft", sondern "wurde DIESER STAND geprueft". Eine Aeusserung, die die
   // SHA des Kopfes traegt und nach dem Laufbeginn kam, beantwortet das mit ja -
   // auch wenn sie von einem abgebrochenen Vorgaenger zu demselben Stand stammt.
-  if (gepostet.erfolge === 0 && zahl.gebunden === 0 && bejaht(text, SCHON_KOMMENTIERT)) {
+  //
+  // UND DAS AUFHOEREN MUSS BEJAHT SEIN (Review zu #1096, dritte Runde).
+  // `HOERT_AUF.test` traf auch "I did not stop here". Ein Lauf, der den neuen
+  // Stand geprueft hat und am Posten scheiterte, galt damit als Abbruch im Tor,
+  // und die Meldung schickte den Leser zum Prompt statt zur Werkzeugsperre.
+  // Geprueft ueber `hoertAuf` und nicht ueber `bejaht` - warum, steht dort.
+  // Die Erwaehnung selbst ebenso ueber JEDEN Treffer (`bejahtIrgendwo`, #1101):
+  // eine verneinte erste Erwaehnung verdeckte sonst eine bejahte spaetere.
+  if (
+    gepostet.erfolge === 0 &&
+    zahl.gebunden === 0 &&
+    bejahtIrgendwo(text, SCHON_KOMMENTIERT) &&
+    hoertAuf(text)
+  ) {
     return stumm('schon-kommentiert', neu, seit, ergebnis, zahl.gebunden, gepostet.erfolge);
   }
 
@@ -292,19 +395,21 @@ export function beurteile({
   // einzelne Inline-Anmerkung eines abgebrochenen Laufs den Haken gruen.
   if (WARTET_AUF_AGENTEN.test(text)) return stumm('agenten', neu, seit, ergebnis, zahl.gebunden, gepostet.erfolge);
 
-  // DER EINE BELEG, DER NICHT AUF PROSA BERUHT: dieser Lauf hat den Postbefehl
-  // ausgefuehrt, und er kam ohne Fehler zurueck. Er schlaegt auch die
-  // Verweigerungen - die echte Review an #1066 lief in vier verweigerte
-  // `gh api`-Versuche auf ein CLAUDE.md, das es nicht gibt, und postete danach.
+  // DER BELEG, DER NICHT AUF PROSA BERUHT: eine Adresse aus dem Strom dieses
+  // Laufs, die die API als claude-Aeusserung nach dem Laufbeginn kennt. Er
+  // schlaegt auch die Verweigerungen - die echte Review an #1066 lief in vier
+  // verweigerte `gh api`-Versuche auf ein CLAUDE.md, das es nicht gibt, und
+  // postete danach.
   if (gepostet.erfolge > 0) {
     return {
       ausgang: 'geprueft',
-      grund: 'postbefehl',
+      grund: 'adresse',
       neu,
       meldung:
-        `Die Review hat in diesem Lauf gepostet: ${gepostet.erfolge} von ` +
-        `${gepostet.versuche} Postbefehl(en) kam ohne Fehler zurueck. Das steht in ` +
-        'ihrem eigenen Strom und laesst sich von aussen nicht herbeifuehren.'
+        `Die Review hat in diesem Lauf geliefert: ${gepostet.erfolge} Aeusserung(en), ` +
+        'deren Adresse in ihrem eigenen Strom steht und die laut API nach dem ' +
+        `Laufbeginn ${seit} von claude angelegt wurde(n). Wie der Befehl dazu ` +
+        'geschrieben war, spielt dafuer keine Rolle.'
     };
   }
 
@@ -324,7 +429,49 @@ export function beurteile({
 
   if (sperren > 0) return stumm('werkzeugsperre', neu, seit, ergebnis, zahl.gebunden, gepostet.erfolge);
 
-  if (bejaht(text, TOR_STOPP) && TRIVIAL.test(text) && !VERNEINT.test(text)) {
+  // ... UND DIE GEFAEHRLICHERE LESART GEWINNT WEITER, auch wenn oben der
+  // Aufhoer-Satz gefehlt hat.
+  //
+  // Der `HOERT_AUF`-Zusatz im Zweig ganz oben hat diesen hier zur Hintertuer
+  // gemacht (Review zu #1096, von beiden Reviewern unabhaengig gefunden). Ein
+  // Text wie
+  //
+  //   "This matches the step 1 stop condition - Claude has already reviewed
+  //    this PR, and the remaining diff is a trivial change that is obviously
+  //    correct."
+  //
+  // sagt "schon geprueft" UND "trivial", nennt aber keine der Aufhoer-Formeln
+  // ("stop CONDITION" ist keine). Er rutschte damit an `schon-kommentiert`
+  // vorbei und wurde hier GRUEN - fuer einen Lauf, der woertlich sagt, dass er
+  // den PR schon kommentiert hat. Der Kommentar oben behauptete derweil, ein so
+  // durchgefallener Abbruch bleibe rot; das stimmte nur, solange dieser Zweig
+  // ihn nicht auffing.
+  //
+  // Die Bedingung steht deshalb hier ein zweites Mal: der triviale Abbruch ist
+  // die EINZIGE Kategorie, die stumm gruen sein darf, und wer "schon
+  // kommentiert" sagt, gehoert nie hinein. Der bestehende Test dazu ("nennt ein
+  // Text beides, gilt die gefaehrlichere Lesart") blieb gruen, weil sein
+  // Fixture-Text zufaellig auf "Stopping here." endet - eine Probe ohne diesen
+  // Satz steht jetzt daneben.
+  //
+  // UND HIER OHNE VERNEINUNGSPRUEFUNG (Codex zu #1096, nach `8dc12582`).
+  // `bejaht` sieht nur den ERSTEN Treffer: "Claude has not already reviewed the
+  // new HEAD ... Claude has already commented on this PR ... trivial ... matches
+  // the step 1 stop condition" war verneint im ersten und bejaht im zweiten
+  // Satz, und die Ausnahme wurde GRUEN. Eine fuenfte Regel, welche Verneinung
+  // welche Erwaehnung aufhebt, waere die naechste Sprosse derselben Leiter.
+  // Stattdessen gilt fuer den einzigen stillen Gruen-Pfad die grobe Regel:
+  // erwaehnt der Text "schon kommentiert/geprueft" UEBERHAUPT, gibt es keine
+  // Ausnahme. Ein trivialer Lauf, der das nur verneinend erwaehnt, wird dadurch
+  // rot statt gruen - die Richtung, in der dieses Modul im Zweifel irrt.
+  // Der echte #1029-Wortlaut sagt "has not previously commented" und trifft das
+  // Muster nicht; er bleibt die Ausnahme.
+  if (
+    bejaht(text, TOR_STOPP) &&
+    TRIVIAL.test(text) &&
+    !VERNEINT.test(text) &&
+    !SCHON_KOMMENTIERT.test(text)
+  ) {
     return {
       ausgang: 'ausgesetzt',
       grund: 'trivial',
@@ -387,10 +534,11 @@ const DIAGNOSE = {
     'ihm damit nicht zuzuordnen: als derselbe Bot antwortet auch der Mention-Pfad ' +
     '(.github/workflows/claude.yml), und ein per cancel-in-progress abgebrochener ' +
     'Vorgaenger kann noch posten. Lies den result-Text im Job-Log - sagt er, die ' +
-    'Review sei fertig, obwohl kein Postbefehl im Strom steht, dann fehlt vermutlich ' +
-    '`show_full_output: true` im Workflow - ohne den Schalter enthaelt der Strom die ' +
-    'Werkzeugbloecke nicht. Sagt er etwas anderes, hat dieser Lauf wirklich nichts ' +
-    'geliefert.',
+    'Review sei fertig, obwohl keine neue Adresse im Strom steht, dann fehlt ' +
+    'vermutlich `show_full_output: true` im Workflow (ohne den Schalter enthaelt der ' +
+    'Strom die Werkzeugbloecke nicht), oder die Kommentar-Listen tragen kein `anker` ' +
+    '(Workflow aelter als dieses Modul). Sagt er etwas anderes, hat dieser Lauf ' +
+    'wirklich nichts geliefert.',
   unbekannt:
     'Die Review ist durchgelaufen und hat zu diesem Stand nichts hinterlassen, ohne eines ' +
     'der bekannten Muster zu zeigen. Zuerst den result-Text im Job-Log lesen: er sagt ' +
@@ -451,11 +599,11 @@ function stumm(grund, neu, seit, ergebnis, gebunden = 0, erfolge = 0) {
  * Urteil steht im letzten Eintrag mit `"type": "result"`.
  */
 export function leseLauf(pfad) {
-  const eintraege = leseStrom(pfad);
-  const ergebnisse = eintraege.filter((e) => e && e.type === 'result');
+  const strom = leseStrom(pfad);
+  const ergebnisse = strom.filter((e) => e && e.type === 'result');
   return {
     ergebnis: ergebnisse.length ? ergebnisse[ergebnisse.length - 1] : null,
-    gepostet: zaehleGepostet(eintraege)
+    strom
   };
 }
 
@@ -537,13 +685,14 @@ function main() {
     process.argv.slice(2)
   );
   const { eintraege, kaputt } = leseAeusserungen(pfade);
-  const { ergebnis, gepostet } = leseLauf(ergebnisPfad);
+  const { ergebnis, strom } = leseLauf(ergebnisPfad);
+  const gepostet = zaehleBelege(strom, eintraege, seit);
   const urteil = beurteile({ seit, kopf, ergebnis, aeusserungen: eintraege, gepostet, kaputt });
 
   console.log(`Laufbeginn: ${seit || '(unbekannt)'}`);
   console.log(`Aktueller Stand: ${kopf || '(unbekannt)'}`);
   console.log(`Aeusserungen von claude seit dem Laufbeginn: ${urteil.neu}`);
-  console.log(`Postbefehle dieses Laufs: ${gepostet.erfolge} von ${gepostet.versuche} ohne Fehler`);
+  console.log(`Belegte Lieferungen dieses Laufs: ${gepostet.erfolge} (Adressen in seinem Strom: ${gepostet.adressen})`);
   console.log('');
   console.log(urteil.meldung);
 

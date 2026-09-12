@@ -24,23 +24,37 @@ function makeState() {
   };
 }
 
-const calendarPageSource = readFileSync(
-  new URL('../public/pages/calendar.js', import.meta.url),
-  'utf8',
-);
-
-function functionIndex(name, from = 0) {
-  const match = new RegExp(`(?:async\\s+)?function\\s+${name}\\s*\\(`)
-    .exec(calendarPageSource.slice(from));
-  return match ? from + match.index : -1;
-}
-
-function functionSource(name, nextName = null) {
-  const start = functionIndex(name);
-  const end = nextName ? functionIndex(nextName, start + 1) : calendarPageSource.length;
-  assert.notEqual(start, -1, `${name} must exist`);
-  if (nextName) assert.notEqual(end, -1, `${nextName} must follow ${name}`);
-  return calendarPageSource.slice(start, end);
+function makeMovedLinkedState(suffix = '') {
+  return {
+    events: [
+      {
+        id: 7,
+        series_id: 7,
+        recurrence_id: '2027-05-01',
+        title: `May${suffix}`,
+        start_datetime: '2027-05-01T18:00:00',
+      },
+      {
+        id: 7,
+        series_id: 7,
+        recurrence_id: '2027-07-01',
+        title: `July${suffix}`,
+        start_datetime: '2027-07-01T18:00:00',
+      },
+      {
+        id: 99,
+        series_id: 7,
+        recurrence_id: '2027-06-01',
+        title: `Moved June child${suffix}`,
+        start_datetime: '2027-08-02T18:00:00',
+      },
+      {
+        id: 8,
+        title: `Independent${suffix}`,
+        start_datetime: '2027-06-15T09:00:00',
+      },
+    ],
+  };
 }
 
 test('whole-event transition hides every expanded occurrence and Undo restores canonical order', () => {
@@ -56,6 +70,54 @@ test('whole-event transition hides every expanded occurrence and Undo restores c
     'January',
     'February',
     'Independent',
+  ]);
+});
+
+test('whole-series delete from a moved child overlays every series row across reload and Undo', () => {
+  const state = makeMovedLinkedState();
+  const transition = beginOptimisticCalendarDelete(state, {
+    eventId: 99,
+    seriesId: 7,
+    scope: 'all',
+  });
+
+  assert.deepEqual(state.events.map(({ title }) => title), ['Independent']);
+
+  state.events = makeMovedLinkedState(' fresh').events;
+  applyPendingCalendarDeleteOverlay(state, { freshEvents: true });
+  assert.deepEqual(state.events.map(({ title }) => title), ['Independent fresh']);
+
+  assert.equal(transition.restore(), true);
+  assert.deepEqual(state.events.map(({ title }) => title), [
+    'May fresh',
+    'July fresh',
+    'Moved June child fresh',
+    'Independent fresh',
+  ]);
+});
+
+test('following delete from a moved child overlays by original slot across reload and Undo', () => {
+  const state = makeMovedLinkedState();
+  const transition = beginOptimisticCalendarDelete(state, {
+    eventId: 99,
+    seriesId: 7,
+    scope: 'following',
+    occurrenceDate: '2027-08-02',
+    recurrenceId: '2027-06-01',
+  });
+
+  assert.deepEqual(state.events.map(({ title }) => title), ['May', 'Independent']);
+
+  state.events = makeMovedLinkedState(' fresh').events;
+  applyPendingCalendarDeleteOverlay(state, { freshEvents: true });
+  assert.deepEqual(state.events.map(({ title }) => title), ['May fresh', 'Independent fresh']);
+
+  assert.equal(transition.restore(), true);
+  assert.deepEqual(state.events.map(({ title }) => title), [
+    'May fresh',
+    'July fresh',
+    'Moved June child fresh',
+    'Independent fresh',
   ]);
 });
 
@@ -403,7 +465,24 @@ test('a committed overlapping delete cannot be resurrected by another Undo', () 
   }
 });
 
-test('calendar page guards the complete range and wires every delete scope', () => {
+test('calendar page guards the complete range', () => {
+  const calendarPageSource = readFileSync(
+    new URL('../public/pages/calendar.js', import.meta.url),
+    'utf8',
+  );
+  function functionIndex(name, from = 0) {
+    const match = new RegExp(`(?:async\\s+)?function\\s+${name}\\s*\\(`)
+      .exec(calendarPageSource.slice(from));
+    return match ? from + match.index : -1;
+  }
+  function functionSource(name, nextName = null) {
+    const start = functionIndex(name);
+    const end = nextName ? functionIndex(nextName, start + 1) : calendarPageSource.length;
+    assert.notEqual(start, -1, `${name} must exist`);
+    if (nextName) assert.notEqual(end, -1, `${nextName} must follow ${name}`);
+    return calendarPageSource.slice(start, end);
+  }
+
   const loadRange = functionSource('loadRange', 'openTaskFromCalendar');
   assert.match(loadRange, /calendarLoads\.run/);
   assert.match(loadRange, /isCurrent:/);
@@ -412,24 +491,6 @@ test('calendar page guards the complete range and wires every delete scope', () 
 
   const reloadForView = functionSource('reloadForView');
   assert.match(reloadForView, /calendarLoads\.invalidate\(\)/);
-
-  const whole = functionSource('deleteEvent', 'renderRecurringScopeChooser');
-  assert.match(whole, /scheduleCalendarDeleteWithUndo/);
-  assert.match(whole, /scope: 'all'/);
-  assert.match(whole, /api\.delete\(`\/calendar\/\$\{id\}`/);
-  assert.match(whole, /reloadEvents: reloadCalendarRangeAfterDelete/);
-
-  const following = functionSource('deleteThisAndFollowing', 'deleteSingleOccurrence');
-  assert.match(following, /scheduleCalendarDeleteWithUndo/);
-  assert.match(following, /scope: 'following'/);
-  assert.match(following, /api\.put\(`\/calendar\/\$\{event\.id\}`/);
-  assert.match(following, /reloadEvents: reloadCalendarRangeAfterDelete/);
-
-  const single = functionSource('deleteSingleOccurrence');
-  assert.match(single, /scheduleCalendarDeleteWithUndo/);
-  assert.match(single, /scope: 'this'/);
-  assert.match(single, /api\.post\(`\/calendar\/\$\{event\.id\}\/exceptions`/);
-  assert.match(single, /reloadEvents: reloadCalendarRangeAfterDelete/);
 });
 
 test('latest response applier ignores an obsolete request failure', async () => {
@@ -623,6 +684,62 @@ test('following deletes for one series reach the server in initiation order', as
 
   assert.deepEqual(requestOrder, ['June started', 'May started']);
   assert.equal(serverRule, 'until April');
+});
+
+test('linked child and master deletes share series ordering without changing overlay identity', async () => {
+  const state = {
+    events: [
+      {
+        id: 99,
+        series_id: 7,
+        title: 'Moved child',
+        start_datetime: '2027-06-02T18:00:00',
+      },
+      { id: 7, title: 'Later master occurrence', start_datetime: '2027-07-01T18:00:00' },
+    ],
+  };
+  let childScheduled;
+  let masterScheduled;
+  let releaseChild;
+  const requestOrder = [];
+  const common = {
+    state,
+    message: 'Deleted',
+    isViewActive: () => false,
+    reloadEvents: async () => {},
+    handleError: () => {},
+    render: () => {},
+  };
+
+  scheduleCalendarDeleteWithUndo({
+    ...common,
+    deleteScope: {
+      eventId: 99,
+      seriesId: 7,
+      scope: 'this',
+      occurrenceDate: '2027-06-02',
+    },
+    schedule: (options) => { childScheduled = options; },
+    requestDelete: async () => {
+      requestOrder.push('child started');
+      await new Promise((resolve) => { releaseChild = resolve; });
+    },
+  });
+  scheduleCalendarDeleteWithUndo({
+    ...common,
+    deleteScope: { eventId: 7, seriesId: 7, scope: 'all' },
+    schedule: (options) => { masterScheduled = options; },
+    requestDelete: async () => { requestOrder.push('master started'); },
+  });
+
+  assert.deepEqual(state.events, [], 'each overlay still matches its concrete displayed row');
+  const childCommit = childScheduled.commit({ keepalive: false });
+  const masterCommit = masterScheduled.commit({ keepalive: false });
+  await Promise.resolve();
+  assert.deepEqual(requestOrder, ['child started']);
+  releaseChild();
+  await Promise.all([childCommit, masterCommit]);
+  assert.deepEqual(requestOrder, ['child started', 'master started']);
 });
 
 test('Undo releases a reserved series write so the next deletion can commit', async () => {

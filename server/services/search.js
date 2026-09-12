@@ -7,6 +7,11 @@
  */
 import { visibilityWhere } from './visibility.js';
 
+import {
+  expandRecurringEvents, loadEventExceptions,
+} from './calendar-events.js';
+import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
+
 export const SEARCH_LIMIT = 5;
 
 /**
@@ -72,6 +77,9 @@ const BUCKET_MODULE = Object.freeze({
   activities: 'health',
 });
 
+/** Die Module, aus denen die Suche liest - die Menge, gegen die Token-Scopes geprüft werden. */
+export const SEARCH_MODULES = Object.freeze([...new Set(Object.values(BUCKET_MODULE))]);
+
 /**
  * Die leere Antwort - eine Trefferart je Schlüssel, Form bleibt stabil.
  * Exportiert, damit die Route für „Suchbegriff zu kurz" dieselbe Form schreibt
@@ -79,6 +87,29 @@ const BUCKET_MODULE = Object.freeze({
  */
 export function emptySearchResults() {
   return Object.fromEntries(Object.keys(BUCKET_MODULE).map((k) => [k, []]));
+}
+
+/**
+ * Resolves event search hits through the same linked-occurrence contract as
+ * calendar reads. When a display window is supplied, recurring master hits are
+ * represented by their first occurrence in that window, preserving the
+ * calendar-search behavior without expanding one FTS hit into many results.
+ */
+export function resolveEventSearchRows(database, rows, from = null, to = null, options = {}) {
+  const recurringIds = rows.filter((row) => row.recurrence_rule).map((row) => row.id);
+  const exceptions = loadEventExceptions(database, recurringIds);
+  const displayRows = rows.map((row) => {
+    if (!row.recurrence_rule || !from || !to) return row;
+    return expandRecurringEvents(
+      [row],
+      from,
+      to,
+      exceptions,
+      { includeRecurrenceIdentity: true },
+    )[0] || row;
+  });
+  return resolveProjectedEventRows(database, displayRows, options)
+    .sort((a, b) => String(a.start_datetime).localeCompare(String(b.start_datetime)));
 }
 
 /**
@@ -94,9 +125,11 @@ export function emptySearchResults() {
  * @param {number} userId
  * @param {object} [opts]
  * @param {Set<string>|null} [opts.hiddenModules] Module, die dem Betrachter
- *        entzogen sind (`access_permissions`, #467). Nur `'none'` gehört
- *        hinein - `'read'` ist eine Leseberechtigung, keine Sperre. Ihre
- *        Trefferart wird gar nicht erst abgefragt und bleibt leer.
+ *        entzogen sind (`access_permissions`, #467) oder die sein API-Token
+ *        nicht lesen darf (`hiddenModulesFor` in permissions.js). Aus der
+ *        Rollenachse gehört nur `'none'` hinein - `'read'` ist eine
+ *        Leseberechtigung, keine Sperre. Ihre Trefferart wird gar nicht erst
+ *        abgefragt und bleibt leer.
  */
 export function runSearch(database, q, userId, { hiddenModules = null } = {}) {
   const match = buildMatchQuery(q);
@@ -129,22 +162,44 @@ export function runSearch(database, q, userId, { hiddenModules = null } = {}) {
   // Abos). Ohne beides fand jedes Mitglied Titel und Datum fremder PRIVATER
   // Termine ueber ein Stichwort. Es sind dieselben zwei Klauseln wie in
   // routes/calendar/read.js, damit globale und Kalender-Suche fuers gleiche
-  // Stichwort dieselben Treffer liefern - das war der Sinn von #471.
-  if (allows('events')) results.events = database.prepare(`
-    SELECT e.id, e.title, e.start_datetime, e.all_day
-    FROM search_index s
-    JOIN calendar_events e ON e.id = s.entity_id
-    WHERE s.entity = 'event' AND s.search_index MATCH @match
-      AND (
-        e.external_source <> 'ics'
-        OR e.subscription_id IN (
-          SELECT id FROM ics_subscriptions WHERE shared = 1 OR created_by = @userId
+  // Stichwort dieselben Treffer liefern - das war der Sinn von #471. Beide
+  // Filter müssen vor ORDER/LIMIT greifen, damit verborgene Treffer sichtbare
+  // nicht aus dem Ergebnisfenster verdrängen.
+  if (allows('events')) {
+    const eventRows = resolveEventSearchRows(database, database.prepare(`
+      SELECT ${eventProjectionSql(database)}
+      FROM search_index s
+      JOIN calendar_events e ON e.id = s.entity_id
+      WHERE s.entity = 'event' AND s.search_index MATCH @match
+        AND (
+          e.external_source <> 'ics'
+          OR e.subscription_id IN (
+            SELECT id FROM ics_subscriptions WHERE shared = 1 OR created_by = @userId
+          )
         )
-      )
-      AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}
-    ORDER BY e.start_datetime ASC
-    LIMIT @limit
-  `).all({ match, userId, limit });
+        AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}
+      ORDER BY e.start_datetime ASC
+      LIMIT @limit
+    `).all({ match, userId, limit }), null, null, { lightweight: true });
+    // Preserve the compact global-search payload. The resolver-capable
+    // projection supplies linked inheritance without loading attachment bodies
+    // or unrelated sync metadata into this result bucket.
+    results.events = eventRows.map((event) => ({
+      id: event.id,
+      title: event.title,
+      start_datetime: event.start_datetime,
+      all_day: event.all_day,
+      ...(event.is_occurrence_override ? {
+        series_id: event.series_id,
+        recurrence_id: event.recurrence_id,
+        is_occurrence_override: true,
+        assignment_owner_id: event.assignment_owner_id,
+        attachment_owner_id: event.attachment_owner_id,
+        reminder_owner_id: event.reminder_owner_id,
+        reminder_anchor_start: event.reminder_anchor_start,
+      } : {}),
+    }));
+  }
 
   if (allows('notes')) results.notes = database.prepare(`
     SELECT n.id, n.title, n.content

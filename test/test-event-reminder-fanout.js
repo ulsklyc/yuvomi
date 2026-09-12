@@ -25,6 +25,7 @@ import express from 'express';
 const dbmod = await import('../server/db.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
 const { setEventAssignments } = await import('../server/routes/calendar/helpers.js');
+const { fanOutEventReminders } = await import('../server/services/event-reminder-fanout.js');
 const database = dbmod.get();
 
 const mkUser = (name) => database
@@ -134,6 +135,27 @@ test('eine selbst gesetzte Erinnerung wird nicht ueberschrieben', async () => {
   assert.equal(bens.length, 1, 'seine bleibt die einzige');
   assert.equal(bens[0].remind_at, '2026-08-30T06:00:00', 'und behaelt seine Uhrzeit');
   assert.equal(bens[0].assigned_from, null, 'sie ist seine, nicht geerbt');
+});
+
+test('allgemeiner fan-out lässt alte geerbte Zeilen neben einer eigenen unangetastet', () => {
+  const id = newEvent([ANNA, BEN]);
+  database.prepare(`
+    INSERT INTO reminders (entity_type, entity_id, remind_at, created_by, assigned_from)
+    VALUES ('event', ?, '2026-08-31T10:00:00', ?, NULL)
+  `).run(id, ANNA);
+  fanOutEventReminders(database, id, ANNA);
+  database.prepare(`
+    INSERT INTO reminders (entity_type, entity_id, remind_at, created_by, assigned_from)
+    VALUES ('event', ?, '2026-08-30T06:00:00', ?, NULL)
+  `).run(id, BEN);
+
+  fanOutEventReminders(database, id, ANNA);
+  assert.equal(remindersOf(id, BEN).length, 2, 'obecný caller nesmí měnit historické chování');
+
+  fanOutEventReminders(database, id, ANNA, { dropDerivedWhenOwn: true });
+  const scoped = remindersOf(id, BEN);
+  assert.equal(scoped.length, 1, 'occurrence reconciliation smí odstranit odvozenou duplicitu');
+  assert.equal(scoped[0].assigned_from, null);
 });
 
 test('eine verworfene Erinnerung kommt nicht zurueck', async () => {

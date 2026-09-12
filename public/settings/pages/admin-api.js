@@ -1,7 +1,7 @@
 import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { confirmModal } from '/components/modal.js';
+import { confirmModal, refocusAfterRender } from '/components/modal.js';
 import { createRetryState, toggleRowHtml } from '/settings/components.js';
 import { getExtensionModules } from '/utils/extension-widgets.js';
 import { moduleDisplayLabel } from '/utils/extension-i18n.js';
@@ -287,6 +287,7 @@ function bindEvents(container, initialTokens, users, currentUserId) {
         token.id === id ? { ...token, revoked_at: new Date().toISOString() } : token
       ));
       renderApiTokenList(container, tokens);
+      refocusAfterRender();
       window.yuvomi?.showToast(t('settings.apiTokenRevokedToast'), 'default');
     } catch (err) {
       window.yuvomi?.showToast(err.message, 'danger');

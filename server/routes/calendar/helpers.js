@@ -11,6 +11,10 @@ import { contentMatchesMime } from '../../utils/file-signature.js';
 import {
   fanOutEventReminders, dropInheritedEventReminders, eventAuthorId,
 } from '../../services/event-reminder-fanout.js';
+import {
+  buildRecurrenceCapabilityMap, isLinkedOccurrence,
+  parseOverrideFields, recurrenceIdFor, seriesIdFor,
+} from '../../services/calendar-occurrence-overrides.js';
 
 export const VALID_SOURCES  = ['local', 'google', 'apple', 'ics'];
 // Ein Termin-Anhang ist ein Upload wie jeder andere und teilt deshalb die
@@ -181,6 +185,32 @@ export function createAttachmentDocument(database, attachment, staged, body, act
   return result.lastInsertRowid;
 }
 
+export function cloneAttachmentDocument(database, source, staged, actorId) {
+  if (!source || !staged) return null;
+  return database.prepare(`
+    INSERT INTO family_documents
+      (name, description, category, status, visibility, folder_id, original_name,
+       mime_type, file_size, content_data, storage_provider, storage_backend,
+       storage_key, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    source.name,
+    source.description ?? null,
+    source.category,
+    source.status,
+    source.visibility,
+    source.folder_id ?? null,
+    source.original_name,
+    source.mime_type,
+    source.file_size,
+    staged.content_data,
+    staged.storage_provider,
+    staged.storage_backend,
+    staged.storage_key,
+    actorId,
+  ).lastInsertRowid;
+}
+
 export function attachmentDataUrl(event) {
   if (!event?.attachment_data) return event?.attachment_data ?? null;
   if (String(event.attachment_data).startsWith('data:')) return event.attachment_data;
@@ -261,7 +291,65 @@ export function setEventAssignments(d, eventId, userIds) {
   );
 }
 
-export function serializeEvent(event) {
+function recurrenceMetadata(event, context) {
+  const linked = event.is_occurrence_override === true || isLinkedOccurrence(event);
+  const recurring = linked || Boolean(event.recurrence_rule);
+  const hasResolvedMetadata = event.series_id != null || event.assignment_owner_id != null;
+  if (!recurring || (!context && !hasResolvedMetadata)) return null;
+
+  const seriesId = Number(event.series_id ?? seriesIdFor(event));
+  const capability = context?.capabilitiesBySeriesId?.get(seriesId) ?? null;
+  let master = context?.master ?? capability?.master ?? null;
+  if (!master && linked && context?.database) {
+    master = context.database.prepare('SELECT * FROM calendar_events WHERE id = ?').get(seriesId);
+  }
+  if (!master && !linked) master = event;
+
+  let canOverride = Boolean(event.can_override_occurrence);
+  let canDetach = Boolean(event.can_detach_occurrence);
+  let isLocalRecurringSeries = Boolean(event.is_local_recurring_series);
+  if (capability) {
+    isLocalRecurringSeries = capability.isLocalRecurringSeries;
+    canOverride = capability.canOverrideOccurrence;
+    canDetach = capability.canDetachOccurrence;
+  } else if (context?.database && master) {
+    const derived = buildRecurrenceCapabilityMap(context.database, [master], {
+      actorId: context.actorId,
+    }).get(Number(master.id));
+    isLocalRecurringSeries = derived?.isLocalRecurringSeries ?? false;
+    // Same visibility rights as a whole-series edit, without a creator-only tier.
+    canOverride = derived?.canOverrideOccurrence ?? false;
+    canDetach = derived?.canDetachOccurrence ?? false;
+  }
+
+  let fields = [];
+  if (linked && typeof event.overridden_fields === 'string') {
+    fields = parseOverrideFields(event.overridden_fields);
+  }
+  const assignmentOwnerId = event.assignment_owner_id
+    ?? (fields.includes('assignments') ? Number(event.id) : seriesId);
+  const attachmentOwnerId = event.attachment_owner_id
+    ?? (fields.includes('attachment') ? Number(event.id) : seriesId);
+  const reminderOwnerId = event.reminder_owner_id
+    ?? (fields.includes('reminders') ? Number(event.id) : seriesId);
+  const reminderAnchorStart = event.reminder_anchor_start
+    ?? (fields.includes('reminders') ? event.start_datetime : master?.start_datetime ?? event.start_datetime);
+
+  return {
+    series_id: seriesId,
+    recurrence_id: event.recurrence_id ?? recurrenceIdFor(event),
+    is_occurrence_override: linked,
+    is_local_recurring_series: isLocalRecurringSeries,
+    can_override_occurrence: canOverride,
+    can_detach_occurrence: canDetach,
+    assignment_owner_id: Number(assignmentOwnerId),
+    attachment_owner_id: Number(attachmentOwnerId),
+    reminder_owner_id: Number(reminderOwnerId),
+    reminder_anchor_start: reminderAnchorStart,
+  };
+}
+
+export function serializeEvent(event, context = null) {
   if (!event) return event;
   const assigned_users = event.assigned_users_json ? JSON.parse(event.assigned_users_json) : [];
   // birthday_name/birthday_date stammen aus dem LEFT JOIN auf birthdays und sind
@@ -274,9 +362,14 @@ export function serializeEvent(event) {
     birthday_date,
     birthday_event_kind,
     name_day,
+    recurrence_parent_id,
+    recurrence_id,
+    recurrence_identity,
+    overridden_fields,
     ...rest
   } = event;
   const documentId = event.attachment_document_id ?? null;
+  const metadata = recurrenceMetadata(event, context);
   return {
     ...rest,
     ...(birthday_name ? {
@@ -295,7 +388,21 @@ export function serializeEvent(event) {
       ? `/api/v1/documents/${documentId}/download`
       : null,
     housekeeping_visit_id: event.housekeeping_visit_id ?? null,
+    ...(metadata ?? {}),
   };
+}
+
+/** Serializes a result set with one capability classification per master. */
+export function serializeEvents(events, context) {
+  if (!Array.isArray(events) || events.length === 0) return [];
+  if (!context?.database) return events.map((event) => serializeEvent(event, context));
+  const capabilitiesBySeriesId = buildRecurrenceCapabilityMap(
+    context.database,
+    events,
+    { actorId: context.actorId ?? null },
+  );
+  const bulkContext = { ...context, capabilitiesBySeriesId };
+  return events.map((event) => serializeEvent(event, bulkContext));
 }
 
 export function sendStorageError(res, error, fallbackMessage) {

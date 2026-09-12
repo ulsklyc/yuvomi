@@ -3341,7 +3341,7 @@ function renderWeatherWidget(weather) {
 
   return `
     <div class="widget widget--weather weather-widget" id="weather-widget"${weatherToneAttr(current.icon)}${weatherMotionAttr(current.icon)}>
-      <h3 class="sr-only">${esc(t('dashboard.weather'))}</h3>
+      ${widgetHeader('weather', t('dashboard.weather'), null, null, null, 'dashboard')}
       <button class="weather-widget__refresh" id="weather-refresh-btn" aria-label="${t('dashboard.weatherRefresh')}" title="${t('dashboard.weatherRefreshTitle')}">
         <i data-lucide="refresh-cw" class="icon-md" aria-hidden="true"></i>
       </button>
@@ -3398,10 +3398,21 @@ function clockWidgetParts(now = new Date()) {
 function renderClockWidget({ wall = false } = {}) {
   const { time, date, machineTime } = clockWidgetParts();
   const cls = wall ? 'clock-widget clock-widget--wall' : 'widget widget--clock clock-widget';
+  const body = `
+    <time class="clock-widget__time" id="clock-widget-time" datetime="${esc(machineTime)}">${esc(time)}</time>
+    <p class="clock-widget__date" id="clock-widget-date">${esc(date)}</p>`;
+  // Kachel-Form bekommt seit dem Polish-Batch (PLAN.md #7) denselben
+  // Siegel+Titel-Kopf wie ihre 15 Geschwister-Widgets - vorher eines von zwei
+  // Widgets ganz ohne Kopf (das andere war das Wetter). Die Wand-Form bleibt
+  // unveraendert kopflos: dort ist die Uhr der Anker der Flaeche, keine
+  // Kachel unter anderen, und ihre Kinder bleiben deshalb ungewrappt.
+  if (wall) {
+    return `<div class="${cls}" id="clock-widget">${body}</div>`;
+  }
   return `
     <div class="${cls}" id="clock-widget">
-      <time class="clock-widget__time" id="clock-widget-time" datetime="${esc(machineTime)}">${esc(time)}</time>
-      <p class="clock-widget__date" id="clock-widget-date">${esc(date)}</p>
+      ${widgetHeader('clock', t('dashboard.clock'), null, null, null, 'dashboard')}
+      <div class="widget__body clock-widget__body">${body}</div>
     </div>`;
 }
 

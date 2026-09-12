@@ -1555,6 +1555,35 @@ svg.weather-forecast__icon {
   text-align: center;
 }
 
+/* Die Kachel-Form (.widget--clock, NIE die Wand-Form - die traegt keine
+ * .widget-Klasse) bekam mit dem Polish-Batch einen Kopf (PLAN.md #7) und
+ * braucht deshalb zwei Abweichungen von der Basisregel oben: der Kopf pinnt
+ * an die Oberkante statt mit der Uhr als Gruppe zu zentrieren, und das
+ * Aussenpolster wandert vom Wrapper zu Kopf/Body, damit keiner die
+ * Standard-Kopfmasse (.widget__header) duppelt. Die Wand-Form bleibt exakt
+ * die Basisregel, ungewrappt. */
+.widget--clock.clock-widget {
+  padding: 0;
+  justify-content: flex-start;
+}
+
+.widget--clock.clock-widget > .widget__header {
+  align-self: stretch;
+  text-align: left;
+}
+
+.clock-widget__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  text-align: center;
+  min-height: 0;
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}
+
 .widget-size--1x2 > .clock-widget,
 .widget-size--2x2 > .clock-widget,
 .widget-size--1x3 > .clock-widget,

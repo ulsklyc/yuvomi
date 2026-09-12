@@ -502,6 +502,7 @@ async function archiveGroup(groupId) {
   await loadGroups();
   await loadGroupData();
   renderAll();
+  refocusAfterRender();
 }
 
 /**
@@ -536,6 +537,7 @@ async function deleteGroup(groupId) {
   await loadGroups();
   await loadGroupData();
   renderAll();
+  refocusAfterRender();
 }
 
 function memberOptions(selectedId = '', source = state.groupMembers.length ? state.groupMembers : state.members) {

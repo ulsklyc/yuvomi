@@ -346,6 +346,7 @@ function openQuickLinkForm(link, onDone) {
           await api.delete(`/quick-links/${link.id}`);
           window.yuvomi?.showToast(t('quickLinks.deleted'), 'success');
           await onDone();
+          refocusAfterRender();
         } catch (err) {
           window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
         }

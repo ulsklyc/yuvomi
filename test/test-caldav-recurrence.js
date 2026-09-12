@@ -392,5 +392,71 @@ test('eine Ausnahme greift auch bei einer Serie, die lokal gerechnet wird', () =
   assert(tage.includes('2026-04-30'), 'die uebrigen Vorkommen muessen bleiben');
 });
 
+/* DAS ENDE EINER INSTANZ TRAEGT DIE SPEICHERFORM IHRES STARTS (#1089).
+ *
+ * `calendar_events` fuehrt zwei Formen in einer Spalte: zonenlose Wanduhrzeit
+ * (lokal angelegt) und Instants mit eigener Zone (extern synchronisiert). Der
+ * Browser rechnet nur die zweite um. Stehen in EINER Zeile beide Formen, zeigt
+ * er zwei verschiedene Uhren nebeneinander - und zwar genau um den Offset
+ * zwischen Server- und Anzeigezone daneben.
+ *
+ * Gemeldet an einem Google-Termin: 15:25-15:30 in New York angelegt, auf einem
+ * UTC-Server als 15:25-19:30 angezeigt. Der Fall kommt hier bei den
+ * CalDAV-Serien unter, weil er dieselbe Expansion trifft; die Herkunft des
+ * Termins spielt keine Rolle, nur die Form seines Starts.
+ *
+ * Die Zusicherungen sind bewusst ZONENUNABHAENGIG formuliert (gleiche Form,
+ * gleicher Abstand). Ein Test, der eine feste Uhrzeit erwartet, misst sonst die
+ * Zone des Rechners mit und ist auf dem Rechner gruen, der ihn geschrieben hat.
+ */
+const traegtZone = (wert) => /(?:Z|[+-]\d{2}:?\d{2})$/.test(String(wert ?? ''));
+
+test('Serie mit Offset-Start: das Ende traegt ebenfalls seine Zone (#1089)', () => {
+  const ev = {
+    id: 1089,
+    // So legt der Google-Sync einen Termin aus New York ab: Wanduhrzeit mit
+    // Offset, dazu die IANA-Zone in tzid.
+    start_datetime: '2026-09-09T15:25:00-04:00',
+    end_datetime:   '2026-09-09T15:30:00-04:00',
+    all_day: 0,
+    tzid: 'America/New_York',
+    recurrence_rule: 'FREQ=WEEKLY',
+  };
+  const inst = expandRecurringEvents([ev], '2026-09-09', '2026-09-24');
+  assert(inst.length >= 2, `zu wenige Vorkommen: ${inst.length}`);
+
+  for (const e of inst) {
+    assert(traegtZone(e.start_datetime), `Start ohne Zone: ${e.start_datetime}`);
+    // Der eigentliche Befund. Vor dem Fix stand hier '2026-09-09T19:30', also
+    // die Serverzone als Wanduhrzeit - der Browser liess sie stehen.
+    assert(traegtZone(e.end_datetime),
+      `das Ende hat seine Zone verloren und wird darum nicht umgerechnet: ${e.end_datetime}`);
+    // Und es ist derselbe Termin geblieben: fuenf Minuten, nicht vier Stunden.
+    const dauer = (new Date(e.end_datetime) - new Date(e.start_datetime)) / 60000;
+    assert(dauer === 5, `Dauer verschoben: ${dauer} Minuten statt 5 (${e.start_datetime} bis ${e.end_datetime})`);
+  }
+});
+
+test('Serie ohne Zone behaelt ihre Wanduhrzeit an BEIDEN Enden (Gegenprobe zu #1089)', () => {
+  // Der Wanduhr-Zweig bleibt richtig: hier lesen `new Date()` und `getHours()`
+  // dieselbe Serverzone, die Umrechnung hebt sich auf. Wer das Ende pauschal
+  // auf UTC umstellte, verschoebe jeden lokal angelegten Serientermin.
+  const ev = {
+    id: 1090,
+    start_datetime: '2026-09-09T15:25',
+    end_datetime:   '2026-09-09T15:30',
+    all_day: 0,
+    tzid: null,
+    recurrence_rule: 'FREQ=WEEKLY',
+  };
+  const inst = expandRecurringEvents([ev], '2026-09-09', '2026-09-24');
+  assert(inst.length >= 2, `zu wenige Vorkommen: ${inst.length}`);
+  for (const e of inst) {
+    assert(!traegtZone(e.start_datetime), `Start unerwartet zonentragend: ${e.start_datetime}`);
+    assert(!traegtZone(e.end_datetime), `Ende unerwartet zonentragend: ${e.end_datetime}`);
+    assert(e.end_datetime.endsWith('T15:30'), `Wanduhrzeit verschoben: ${e.end_datetime}`);
+  }
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);

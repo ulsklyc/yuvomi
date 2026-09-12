@@ -21,7 +21,8 @@ import { withoutBlockComments } from './source-text.js';
 // oben, sodass db.js eine echte yuvomi.db im Repo anlegen würde
 // (`test:db-isolation` wacht darüber).
 const { hydrateBirthday, syncBirthdayArtifacts } = await import('../server/services/birthdays.js');
-const { getUpcomingEvents } = await import('../server/services/calendar-events.js');
+const { getUpcomingEvents } = await import('../server/services/calendar-event-reader.js');
+const { expandRecurringEvents } = await import('../server/services/calendar-events.js');
 
 register('./test-browser-loader.mjs', import.meta.url);
 
@@ -1446,12 +1447,15 @@ cdb.exec(`
   );
   CREATE TABLE external_calendars (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT NOT NULL DEFAULT 'google', external_id TEXT,
     name TEXT NOT NULL, color TEXT
   );
   -- color gehoert dazu: sie ist die GEERBTE Farbe eines Abos und wird seit #891
   -- als cal_color mitgelesen, weil ein Abo-Termin keinen external_calendars-
   -- Eintrag hat. Fehlt sie hier, misst dieses verkuerzte Schema an der echten
-  -- Abfrage vorbei.
+  -- Abfrage vorbei. Dasselbe gilt fuer source/external_id und die beiden
+  -- target_*-Spalten unten: SOURCE_CALENDAR_JOIN loest darueber die Quelle
+  -- eines noch nicht hochgeladenen Termins auf (#1064).
   CREATE TABLE ics_subscriptions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL, color TEXT, shared INTEGER NOT NULL DEFAULT 0,
@@ -1469,7 +1473,12 @@ cdb.exec(`
     recurrence_rule TEXT,
     subscription_id INTEGER REFERENCES ics_subscriptions(id) ON DELETE CASCADE,
     calendar_ref_id INTEGER REFERENCES external_calendars(id) ON DELETE SET NULL,
-    visibility TEXT NOT NULL DEFAULT 'all'
+    target_google_calendar_id TEXT, target_caldav_calendar_url TEXT, outbound_move_to TEXT,
+    visibility TEXT NOT NULL DEFAULT 'all',
+    recurrence_parent_id INTEGER REFERENCES calendar_events(id) ON DELETE CASCADE,
+    recurrence_id TEXT,
+    overridden_fields TEXT,
+    attachment_data TEXT
   );
   CREATE TABLE event_assignments (
     event_id INTEGER NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
@@ -1553,6 +1562,74 @@ const soccerId = insertEvent({ title: 'Theodore Soccer Game', start_datetime: is
 cdb.prepare(`INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)`).run(soccerId, cuTheo);
 cdb.prepare(`INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)`).run(soccerId, cuSofia);
 
+test('upcoming expansion stops after eligible occurrences, without counting EXDATE or expired slots', () => {
+  const events = expandRecurringEvents([{
+    id: 1, start_datetime: '2090-01-01T09:00:00Z', recurrence_rule: 'FREQ=DAILY',
+  }], '2090-01-01', '9999-12-31', new Map([[1, new Set(['2090-01-03'])]]), {
+    maxOccurrencesPerSeries: 2,
+    occurrenceFilter: (event) => event.start_datetime >= '2090-01-02T12:00:00Z',
+  });
+  nodeAssert.deepEqual(events.map((event) => event.start_datetime), [
+    '2090-01-04T09:00:00Z', '2090-01-05T09:00:00Z',
+  ]);
+});
+
+test('getUpcomingEvents reaches an old daily series and fills the limit after expired slots', () => {
+  cdb.exec('SAVEPOINT old_upcoming');
+  try {
+    const id = insertEvent({
+      title: 'Old daily series', start_datetime: '2080-01-01T09:00:00Z',
+      recurrence_rule: 'FREQ=DAILY', created_by: cuTheo,
+    });
+    cdb.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(id, cuTheo);
+    cdb.prepare('INSERT INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)')
+      .run(id, '2090-01-02');
+    const events = getUpcomingEvents(cdb, {
+      userId: cuTheo, assignedTo: cuTheo, limit: 2, windowDays: null,
+      now: new Date('2090-01-01T12:00:00Z'),
+    });
+    nodeAssert.deepEqual(events.map((event) => event.start_datetime), [
+      '2090-01-03T09:00:00Z', '2090-01-04T09:00:00Z',
+    ]);
+  } finally {
+    cdb.exec('ROLLBACK TO old_upcoming; RELEASE old_upcoming');
+  }
+});
+
+test('getUpcomingEvents limits by effective instant after merging moved occurrences and filters', () => {
+  cdb.exec('SAVEPOINT limited_upcoming');
+  try {
+    const series = insertEvent({
+      title: 'Late UTC series', start_datetime: '2090-01-01T11:00:00Z',
+      recurrence_rule: 'FREQ=DAILY', created_by: cuTheo,
+    });
+    const moved = insertEvent({
+      title: 'Moved earlier', start_datetime: '2090-01-01T12:00:00+02:00',
+      recurrence_parent_id: series, recurrence_id: '2090-01-03',
+      overridden_fields: '["title","start_datetime"]', created_by: cuTheo,
+    });
+    cdb.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(series, cuTheo);
+    const birthday = insertEvent({
+      title: 'Birthday before everything', start_datetime: '2090-01-01T08:00:00Z',
+      recurrence_rule: 'FREQ=YEARLY', created_by: cuTheo,
+    });
+    cdb.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(birthday, cuTheo);
+    cdb.prepare('INSERT INTO birthdays (name, birth_date, calendar_event_id) VALUES (?, ?, ?)')
+      .run('Birthday fixture', '2000-01-01', birthday);
+    insertEvent({
+      title: 'Unassigned before everything', start_datetime: '2090-01-01T07:00:00Z',
+      recurrence_rule: 'FREQ=DAILY', created_by: cuTheo,
+    });
+    const events = getUpcomingEvents(cdb, {
+      userId: cuTheo, assignedTo: cuTheo, includeBirthdays: false,
+      limit: 2, now: new Date('2090-01-01T06:00:00Z'),
+    });
+    nodeAssert.deepEqual(events.map((event) => Number(event.id)), [Number(moved), Number(series)]);
+  } finally {
+    cdb.exec('ROLLBACK TO limited_upcoming; RELEASE limited_upcoming');
+  }
+});
+
 test('getUpcomingEvents: wiederkehrender Termin mit Vergangenheits-Start erscheint (Issue #224)', () => {
   const events = getUpcomingEvents(cdb, { userId: cuTheo, limit: 10 });
   const sofia = events.find((e) => e.title === 'Sofia Field Trip');
@@ -1630,6 +1707,90 @@ test('getUpcomingEvents: Event ohne Assignments hat leeres assigned_users_json A
   const users = JSON.parse(mm.assigned_users_json ?? '[]');
   assert(Array.isArray(users) && users.length === 0,
     'Event ohne Zuweisung hat leeres assigned_users_json Array');
+});
+
+test('getUpcomingEvents resolves a moved linked occurrence with inherited projections and owners', () => {
+  const dateKey = (days) => {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return localDateKey(date);
+  };
+  const originalDate = dateKey(4);
+  const movedDate = dateKey(7);
+  const masterId = Number(insertEvent({
+    title: 'Upcoming master',
+    description: 'Current upcoming description',
+    start_datetime: `${originalDate}T09:00:00`,
+    end_datetime: `${originalDate}T10:00:00`,
+    recurrence_rule: 'FREQ=DAILY;COUNT=4',
+    assigned_to: cuTheo,
+    created_by: cuTheo,
+  }));
+  cdb.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)')
+    .run(masterId, cuTheo);
+  const childId = Number(insertEvent({
+    title: 'Upcoming linked override',
+    description: 'Stale upcoming description',
+    start_datetime: `${movedDate}T11:00:00`,
+    end_datetime: `${movedDate}T12:00:00`,
+    assigned_to: cuSofia,
+    created_by: cuTheo,
+    visibility: 'assignees',
+    recurrence_parent_id: masterId,
+    recurrence_id: originalDate,
+    overridden_fields: '["title","start_datetime","end_datetime","assignments","visibility","attachment","reminders"]',
+  }));
+  cdb.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)')
+    .run(childId, cuSofia);
+  cdb.prepare(`
+    INSERT INTO calendar_event_exceptions (event_id, exception_date)
+    VALUES (?, ?)
+  `).run(masterId, originalDate);
+
+  const events = getUpcomingEvents(cdb, {
+    userId: cuSofia,
+    limit: 20,
+    fromToday: true,
+  });
+  const linked = events.find((event) => Number(event.id) === childId);
+
+  assert(linked, 'the moved linked occurrence must be loaded by displayed date');
+  assert(linked.description === 'Current upcoming description', 'unmarked description must inherit');
+  assert(linked.start_datetime === `${movedDate}T11:00:00`, 'moved start must stay resolved');
+  assert(linked.series_id === masterId, 'series identity must point to the master');
+  assert(linked.recurrence_id === originalDate, 'recurrence identity must stay on the original slot');
+  assert(linked.assignment_owner_id === childId, 'assignment owner must stay on the child');
+  assert(linked.attachment_owner_id === childId, 'attachment owner must stay on the child');
+  assert(linked.reminder_owner_id === childId, 'reminder owner must stay on the child');
+  assert(!events.some((event) => Number(event.id) === masterId
+    && event.recurrence_identity === originalDate), 'the original EXDATE slot must stay suppressed');
+});
+
+test('getUpcomingEvents liest keine großen attachment_data-Bodies', () => {
+  const eventId = insertEvent({
+    title: 'Upcoming large attachment',
+    start_datetime: isoIn(5 * DAY),
+    created_by: cuTheo,
+    attachment_data: 'A'.repeat(1024 * 1024),
+  });
+  const originalPrepare = cdb.prepare.bind(cdb);
+  const statements = [];
+  cdb.prepare = (sql) => {
+    statements.push(String(sql));
+    return originalPrepare(sql);
+  };
+  let events;
+  try {
+    events = getUpcomingEvents(cdb, { userId: cuTheo, limit: 100 });
+  } finally {
+    delete cdb.prepare;
+  }
+
+  assert(events.some((event) => Number(event.id) === Number(eventId)), 'Termin fehlt');
+  const calendarReads = statements.filter((sql) => /\b(?:FROM|JOIN)\s+calendar_events\b/i.test(sql));
+  assert(calendarReads.length > 0, 'keine Kalenderabfrage aufgezeichnet');
+  assert(calendarReads.every((sql) => !/\be\.\*|\battachment_data\b/i.test(sql)),
+    `Attachment-Body in kompakter Kalenderabfrage: ${calendarReads.join('\n---\n')}`);
 });
 
 test('getUpcomingEvents: private ICS-Termine fremder User werden ausgeblendet', () => {
@@ -2689,6 +2850,59 @@ test('Wetter: ohne Tageswerte bleibt die Hoch/Tief-Zeile weg statt leer zu stehe
     !__test.renderWeatherWidget({ ...WEATHER_FIXTURE, today: null }).includes('weather-widget__range'),
     'ohne today darf die Zeile nicht erscheinen',
   );
+});
+
+test('Dashboard serialisiert linked occurrences ohne rohe Persistenzfelder', async () => {
+  const { get } = await import('../server/db.js');
+  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const routeDb = get();
+  const owner = routeDb.prepare(`
+    INSERT INTO users (username, display_name, password_hash, avatar_color, role)
+    VALUES ('dashboard-occurrence-review', 'Occurrence Reviewer', 'x', '#007AFF', 'member')
+  `).run().lastInsertRowid;
+  const slot = addLocalDays(today, 1);
+  const moved = addLocalDays(today, 2);
+  const masterId = routeDb.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, recurrence_rule, created_by, visibility)
+    VALUES ('Dashboard review master', ?, ?, 'FREQ=DAILY;COUNT=3', ?, 'all')
+  `).run(`${slot}T09:00:00`, `${slot}T10:00:00`, owner).lastInsertRowid;
+  const childId = routeDb.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, created_by, visibility,
+       recurrence_parent_id, recurrence_id, overridden_fields)
+    VALUES ('Dashboard review child', ?, ?, ?, 'all', ?, ?,
+            '["title","start_datetime","end_datetime","assignments"]')
+  `).run(`${moved}T11:00:00`, `${moved}T12:00:00`, owner, masterId, slot).lastInsertRowid;
+  routeDb.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)')
+    .run(childId, owner);
+  routeDb.prepare('INSERT INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)')
+    .run(masterId, slot);
+
+  const app = express();
+  app.use((req, _res, next) => {
+    req.authUserId = owner;
+    req.session = { userId: owner, role: 'member' };
+    next();
+  });
+  app.use('/', dashboardRouter);
+  const server = app.listen(0);
+  await new Promise((resolve) => server.once('listening', resolve));
+  try {
+    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/?events_scope=mine`)).json();
+    const child = body.upcomingEvents.find((event) => Number(event.id) === Number(childId));
+    nodeAssert.ok(child, 'linked occurrence musí být v dashboard odpovědi');
+    nodeAssert.equal(child.series_id, Number(masterId));
+    nodeAssert.equal(child.recurrence_id, slot);
+    nodeAssert.equal(child.is_occurrence_override, true);
+    nodeAssert.equal(child.can_override_occurrence, true);
+    for (const key of ['recurrence_parent_id', 'recurrence_identity', 'overridden_fields']) {
+      nodeAssert.equal(Object.hasOwn(child, key), false, `${key} nesmí uniknout z API`);
+    }
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    routeDb.prepare('DELETE FROM users WHERE id = ?').run(owner);
+  }
 });
 
 // --------------------------------------------------------

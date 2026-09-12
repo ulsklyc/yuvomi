@@ -812,7 +812,7 @@ function renderBody() {
     <!-- Kategorie-Balken -->
     ${s.byCategory.length ? `
     <div class="budget-chart-section">
-      <div class="budget-chart-section__title">${t('budget.byCategory')}</div>
+      <div class="budget-chart-section__title u-section-title">${t('budget.byCategory')}</div>
       <p class="sr-only">${esc(chartSummary(s.byCategory))}</p>
       <div class="budget-chart">
         ${renderCategoryBars(s.byCategory)}
@@ -823,7 +823,7 @@ function renderBody() {
     <div class="budget-list-section">
       <div class="budget-list-header">
         <div>
-          <span class="budget-list-header__title">${t('budget.transactions')}</span>
+          <span class="budget-list-header__title u-section-title">${t('budget.transactions')}</span>
           ${state.accountFilterId ? `
           <button class="budget-account-chip" id="budget-clear-account-filter" type="button"
                   aria-label="${t('budget.clearAccountFilter')}">

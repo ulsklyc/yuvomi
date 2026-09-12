@@ -92,13 +92,34 @@ function reserveSeriesWrite(state, eventId) {
   };
 }
 
-function matchesDelete(event, { eventId, scope, occurrenceDate }) {
-  if (Number(event.id) !== Number(eventId)) return false;
-  if (scope === 'this') {
-    return String(event.start_datetime ?? '').slice(0, 10) === occurrenceDate;
+function overlayRecurrenceId(event) {
+  for (const identity of [event.recurrence_id, event.recurrence_identity]) {
+    if (typeof identity === 'string' && /^\d{4}-\d{2}-\d{2}/.test(identity)) {
+      return identity.slice(0, 10);
+    }
   }
+  // Legacy expanded master rows predate explicit recurrence metadata. A linked
+  // row always carries series_id + recurrence_id, so its moved display date
+  // must never become the original-slot boundary.
+  if (event.series_id != null) return null;
+  return String(event.start_datetime ?? '').slice(0, 10);
+}
+
+function matchesDelete(event, {
+  eventId,
+  seriesId = eventId,
+  scope,
+  occurrenceDate,
+  recurrenceId = occurrenceDate,
+}) {
+  if (scope === 'this') {
+    return Number(event.id) === Number(eventId)
+      && String(event.start_datetime ?? '').slice(0, 10) === occurrenceDate;
+  }
+  if (Number(event.series_id ?? event.id) !== Number(seriesId)) return false;
   if (scope === 'following') {
-    return String(event.start_datetime ?? '').slice(0, 10) >= occurrenceDate;
+    const identity = overlayRecurrenceId(event);
+    return identity !== null && identity >= recurrenceId;
   }
   return true;
 }
@@ -206,7 +227,7 @@ export function scheduleCalendarDeleteWithUndo({
   render,
 }) {
   const transition = beginOptimisticCalendarDelete(state, deleteScope);
-  const write = reserveSeriesWrite(state, deleteScope.eventId);
+  const write = reserveSeriesWrite(state, deleteScope.seriesId ?? deleteScope.eventId);
   render();
   schedule({
     message,

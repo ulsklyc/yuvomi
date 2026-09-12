@@ -2364,6 +2364,7 @@ function wireTabBar(container) {
         const data = await api.post('/shopping', { name });
         state.lists.push({ ...data.data, item_total: 0, item_checked: 0 });
         await switchList(data.data.id, container);
+        refocusAfterRender();
       } catch (err) {
         window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
       }
@@ -2462,6 +2463,7 @@ function wireListContentEvents(container) {
         renderTabs(container);
         renderListContent(container);
         wireListContentEvents(container);
+        refocusAfterRender();
       } catch (err) {
         window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
       }
@@ -2503,6 +2505,7 @@ function wireListContentEvents(container) {
       state.activeListId = state.lists[0]?.id ?? null;
       if (state.activeListId) {
         await switchList(state.activeListId, container);
+        refocusAfterRender();
       } else {
         clearItems();
         state.activeList = null;

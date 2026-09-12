@@ -239,9 +239,9 @@ docker compose up -d
 Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no Node.js installation needed.
 
 > **Pinning a version.** Every release is also published under immutable tags:
-> `2.65.1` (exact version), `2.65` (latest patch of that minor), plus a moving `main`
+> `2.65.3` (exact version), `2.65` (latest patch of that minor), plus a moving `main`
 > tag for the current development state. To pin production to a known-good release,
-> set `image: ghcr.io/ulsklyc/yuvomi:2.65.1` in your compose file and bump it
+> set `image: ghcr.io/ulsklyc/yuvomi:2.65.3` in your compose file and bump it
 > deliberately; `latest` always points at the newest release.
 
 > **Verifying what you pull.** Every image the publish workflow builds is signed at build
@@ -250,7 +250,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > image you are about to run is one GitHub built from a release tag of this repository:
 >
 > ```bash
-> cosign verify ghcr.io/ulsklyc/yuvomi:2.65.1 \
+> cosign verify ghcr.io/ulsklyc/yuvomi:2.65.3 \
 >   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
 >   --certificate-identity-regexp '^https://github.com/ulsklyc/yuvomi/.github/workflows/docker-publish.yml@refs/tags/v'
 > ```
@@ -259,7 +259,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > anything else means the image is not one this repository released. The `main` tag is
 > signed too, under `refs/heads/main`, which the pattern above deliberately excludes. Tags
 > published before September 2026 carry no signature. Provenance and SBOM travel inside the
-> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.65.1 --format '{{ json .Provenance }}'`.
+> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.65.3 --format '{{ json .Provenance }}'`.
 
 Continue with [Step 4 — Verify](#4-verify-the-container-is-running).
 
@@ -304,7 +304,7 @@ docker compose logs -f
 You should see output like:
 
 ```
-yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.65.1
+yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.65.3
 yuvomi  | [Yuvomi] Environment: production
 yuvomi  | [Sync] Auto-sync active every 15 minutes.
 ```

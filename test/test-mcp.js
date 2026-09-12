@@ -30,6 +30,27 @@ db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
   applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );`);
 db.exec(MIGRATIONS_SQL[1]);
+db.exec(MIGRATIONS_SQL[27]);  // legacy calendar attachment body
+db.exec(MIGRATIONS_SQL[2]);   // sync_config for the shared calendar reader
+db.exec(MIGRATIONS_SQL[10]);  // ics_subscriptions used by calendar visibility
+db.exec(`
+  ALTER TABLE calendar_events ADD COLUMN subscription_id INTEGER;
+  ALTER TABLE calendar_events ADD COLUMN calendar_ref_id INTEGER;
+  ALTER TABLE calendar_events ADD COLUMN target_google_calendar_id TEXT;
+  ALTER TABLE calendar_events ADD COLUMN target_caldav_calendar_url TEXT;
+  ALTER TABLE calendar_events ADD COLUMN outbound_move_to TEXT;
+  CREATE TABLE external_calendars (
+    id INTEGER PRIMARY KEY,
+    source TEXT,
+    external_id TEXT,
+    name TEXT NOT NULL,
+    color TEXT
+  );
+`);
+db.exec(MIGRATIONS_SQL[85]);  // calendar_event_exceptions
+db.exec(MIGRATIONS_SQL[174]); // generated birthday/name-day joins
+db.exec(MIGRATIONS_SQL[44]); // search index rebuilt by migration 194
+db.exec(MIGRATIONS_SQL[194]); // linked occurrence overrides
 db.exec(MIGRATIONS_SQL[41]);  // tasks.start_date (geplante Aufgaben)
 db.exec(MIGRATIONS_SQL[74]);  // access_permissions (Modulrechte, #467)
 // DIESE DREI SIND EINE AUSWAHL, KEIN SCHEMA: Migration 1 legt `tasks` in der
@@ -325,6 +346,108 @@ test('tools/call create_event: fehlender Start → isError', async () => {
 test('tools/call list_upcoming_events: enthält das neue Event', async () => {
   const events = parseContent(await toolCall('list_upcoming_events', { limit: 10 }));
   assert.ok(events.some((e) => e.title === 'Zahnarzt'));
+});
+
+test('tools/call list_upcoming_events: enthält auch Termine nach mehr als zwei Jahren', async () => {
+  const beyondDashboardWindow = new Date();
+  beyondDashboardWindow.setUTCDate(beyondDashboardWindow.getUTCDate() + 120);
+  const dateKey = beyondDashboardWindow.toISOString().slice(0, 10);
+  const id = db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, created_by, external_source, visibility)
+    VALUES ('MCP langfristig', ?, ?, 0, ?, 'local', 'all')
+  `).run(`${dateKey}T09:00:00`, `${dateKey}T10:00:00`, uid).lastInsertRowid;
+
+  const events = parseContent(await toolCall('list_upcoming_events', { limit: 100 }));
+  assert.ok(events.some((event) => Number(event.id) === Number(id)), 'Termin nach 120 Tagen fehlt');
+
+  const beyondBound = new Date();
+  beyondBound.setUTCDate(beyondBound.getUTCDate() + 800);
+  const beyondKey = beyondBound.toISOString().slice(0, 10);
+  const farId = db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, created_by, external_source, visibility)
+    VALUES ('MCP außerhalb horizontu', ?, ?, 0, ?, 'local', 'all')
+  `).run(`${beyondKey}T09:00:00`, `${beyondKey}T10:00:00`, uid).lastInsertRowid;
+  const upcoming = parseContent(await toolCall('list_upcoming_events', { limit: 100 }));
+  assert.ok(upcoming.some((event) => Number(event.id) === Number(farId)),
+    'Termin nach 800 Tagen fehlt');
+});
+
+test('tools/call list_upcoming_events liest keine großen attachment_data-Bodies', async () => {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + 5);
+  const dateKey = date.toISOString().slice(0, 10);
+  const id = db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, created_by, external_source,
+       visibility, attachment_data)
+    VALUES ('MCP großer Anhang', ?, ?, 0, ?, 'local', 'all', ?)
+  `).run(`${dateKey}T13:00:00`, `${dateKey}T14:00:00`, uid, 'A'.repeat(1024 * 1024))
+    .lastInsertRowid;
+
+  const originalPrepare = db.prepare.bind(db);
+  const statements = [];
+  db.prepare = (sql) => {
+    statements.push(String(sql));
+    return originalPrepare(sql);
+  };
+  let events;
+  try {
+    events = parseContent(await toolCall('list_upcoming_events', { limit: 100 }));
+  } finally {
+    delete db.prepare;
+  }
+
+  assert.ok(events.some((event) => Number(event.id) === Number(id)), 'Termin fehlt');
+  const calendarReads = statements.filter((sql) => /\b(?:FROM|JOIN)\s+calendar_events\b/i.test(sql));
+  assert.ok(calendarReads.length > 0, 'keine Kalenderabfrage aufgezeichnet');
+  assert.ok(calendarReads.every((sql) => !/\be\.\*|\battachment_data\b/i.test(sql)),
+    `Attachment-Body in kompakter Kalenderabfrage: ${calendarReads.join('\n---\n')}`);
+});
+
+test('tools/call list_upcoming_events reuses linked occurrence resolution', async () => {
+  const dateKey = (days) => {
+    const date = new Date();
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  };
+  const originalDate = dateKey(4);
+  const movedDate = dateKey(7);
+  const masterId = db.prepare(`
+    INSERT INTO calendar_events
+      (title, description, location, start_datetime, end_datetime, all_day, recurrence_rule,
+       created_by, external_source, visibility)
+    VALUES ('MCP master', 'Current MCP description', 'Current MCP location', ?, ?, 0,
+            'FREQ=DAILY;COUNT=4', ?, 'local', 'all')
+  `).run(`${originalDate}T09:00:00`, `${originalDate}T10:00:00`, uid).lastInsertRowid;
+  const childId = db.prepare(`
+    INSERT INTO calendar_events
+      (title, description, location, start_datetime, end_datetime, all_day, created_by,
+       external_source, visibility, recurrence_parent_id, recurrence_id, overridden_fields)
+    VALUES ('MCP moved override', 'Stale MCP description', 'Stale MCP location', ?, ?, 0, ?, 'local',
+            'all', ?, ?, '["title","start_datetime","end_datetime","attachment","reminders"]')
+  `).run(`${movedDate}T11:00:00`, `${movedDate}T12:00:00`, uid, masterId, originalDate)
+    .lastInsertRowid;
+  db.prepare(`
+    INSERT INTO calendar_event_exceptions (event_id, exception_date)
+    VALUES (?, ?)
+  `).run(masterId, originalDate);
+
+  const events = parseContent(await toolCall('list_upcoming_events', { limit: 100 }));
+  const linked = events.find((event) => Number(event.id) === Number(childId));
+
+  assert.ok(linked, 'moved linked occurrence missing from MCP upcoming output');
+  assert.equal(linked.title, 'MCP moved override');
+  assert.equal(linked.location, 'Current MCP location');
+  assert.equal(linked.start_datetime, `${movedDate}T11:00:00`);
+  assert.equal(linked.series_id, Number(masterId));
+  assert.equal(linked.recurrence_id, originalDate);
+  assert.equal(linked.is_occurrence_override, true);
+  assert.equal(linked.attachment_owner_id, Number(childId));
+  assert.equal(linked.reminder_owner_id, Number(childId));
+  assert.equal(events.some((event) => Number(event.id) === Number(masterId)
+    && event.recurrence_id === originalDate), false, 'original EXDATE slot must stay suppressed');
 });
 
 // ── OpenAPI-Brücke: Metadaten (list/get) ─────────────────────────────────────

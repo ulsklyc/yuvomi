@@ -8,12 +8,13 @@ import { createLogger } from '../logger.js';
 const log = createLogger('CalDAV');
 
 import * as db from '../db.js';
-import { decodeHtmlEntities } from '../utils/html-entities.js';
+import { upsertExternalCalendar } from './external-calendars.js';
 import { assignDefaultToEvent } from './sync-assignment.js';
 import { pruneDeletedEvents, countMirroredEvents, deleteMirroredEvents } from './calendar-prune.js';
 import * as outbound from './calendar-outbound.js';
 import { processPendingDeletions, processPendingUpdates, flushAccount } from './caldav-outbound.js';
 import { detachAccountRows } from './caldav-todo-outbound.js';
+import { runSerialized } from '../utils/sync-lock.js';
 import { toICSDatetime, escapeICSText } from '../utils/ics-format.js';
 import { eventDateTimeFields } from '../utils/ics-datetime.js';
 import { vtimezoneFor } from '../utils/vtimezone.js';
@@ -86,20 +87,6 @@ function normalizeCalColor(c) {
   if (/^#[0-9a-fA-F]{8}$/.test(c)) return c.slice(0, 7); // strip alpha
   if (/^#[0-9a-fA-F]{6}$/.test(c)) return c;
   return null;
-}
-
-function upsertExternalCalendar(source, externalId, name, color) {
-  // Provider-Namen können HTML-entity-encoded sein — zu Klartext normalisieren,
-  // sonst escaped die UI doppelt (z. B. literales "&amp;").
-  const row = db.get().prepare(`
-    INSERT INTO external_calendars (source, external_id, name, color)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(source, external_id) DO UPDATE SET
-      name  = excluded.name,
-      color = excluded.color
-    RETURNING id
-  `).get(source, externalId, decodeHtmlEntities(name), color);
-  return row.id;
 }
 
 // --------------------------------------------------------
@@ -488,7 +475,16 @@ const YIELD_EVERY = 50;
 /** Echter tsdav-Client für einen Account; in Tests durch eine Factory ersetzbar. */
 const defaultClientFactory = createCalDAVClient;
 
-async function sync({ createClient } = {}) {
+/**
+ * Ein Sync-Lauf, serialisiert gegen den Sofortversuch und gegen sich selbst
+ * (#593): beide führen dieselbe ausgehende Buchhaltung, und ein Tick, der in
+ * einen laufenden Durchgang hineinliefe, läse deren Zwischenstand.
+ */
+async function sync(opts = {}) {
+  return runSerialized('caldav', 'sync', () => runSync(opts));
+}
+
+async function runSync({ createClient } = {}) {
   const accounts = getAllAccounts();
 
   if (accounts.length === 0) {
@@ -887,7 +883,11 @@ async function sync({ createClient } = {}) {
  * Migration v106) bleiben vorgemerkt und laufen im nächsten Sync mit.
  * @returns {Promise<{deleted:number,updated:number}>}
  */
-async function flushOutbound({ createClient } = {}) {
+async function flushOutbound(opts = {}) {
+  return runSerialized('caldav', 'flush', () => runFlushOutbound(opts));
+}
+
+async function runFlushOutbound({ createClient } = {}) {
   const idle = { deleted: 0, updated: 0 };
   const deletions = outbound.pendingDeletions('caldav');
   const updates   = outbound.pendingUpdates('caldav');

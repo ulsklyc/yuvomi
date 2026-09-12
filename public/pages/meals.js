@@ -823,6 +823,9 @@ function wireGrid(grid) {
       if (!confirmed) return;
     }
     await addRecipeToSlot(recipe, slot.dataset.date, slot.dataset.type, { replaceMeals: slotMeals });
+    // Nur nach der Rueckfrage: in einen leeren Platz gezogen schliesst kein
+    // Dialog, und das Nachfassen griffe auf den Merker eines frueheren zurueck (#1083).
+    if (slotMeals.length) refocusAfterRender();
   });
 
   wireDragDrop(grid);
@@ -1721,6 +1724,7 @@ async function deleteMeal(mealId) {
         await api.delete(`/meals/${mealId}?scope=${choice}`);
         await loadWeek(state.currentWeek);
         renderWeekGrid();
+        refocusAfterRender();
         window.yuvomi?.showToast(
           choice === 'future' ? t('meals.seriesEndedToast') : t('meals.seriesDeletedToast'),
           'success',

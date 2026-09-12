@@ -10,7 +10,15 @@ import { readFileSync } from 'node:fs';
 import { eachRule } from './css-rules.js';
 
 // /i18n.js wird durch test-browser-loader.mjs gemockt (--loader Flag)
-const { wireBlurValidation, btnSuccess, btnError, focusRestoreTarget, rememberFocus } = await import('../public/components/modal.js');
+const {
+  wireBlurValidation,
+  btnSuccess,
+  btnError,
+  focusRestoreTarget,
+  rememberFocus,
+  __test: modalTest,
+  restoreFocusAfterClose, refocusAfterRender, forgetRestore,
+} = await import('../public/components/modal.js');
 
 // matchMedia und document.createElementNS werden von btnSuccess/btnError benötigt
 global.matchMedia = () => ({ matches: false });
@@ -130,6 +138,69 @@ function makeBtn({ textContent = 'Speichern' } = {}) {
 // --------------------------------------------------------
 // wireBlurValidation
 // --------------------------------------------------------
+
+test('confirmOverModal finalisiert das geparkte Modal gemäß closeOnConfirm', async () => {
+  const suspended = { id: 'editor' };
+  const resumed = [];
+  const closed = [];
+  const dependencies = {
+    resume: (token) => resumed.push(token),
+    close: async (options) => closed.push(options),
+  };
+
+  assert.equal(await modalTest.finishSuspendedConfirmation(
+    false, true, suspended, dependencies
+  ), false);
+  assert.deepEqual(resumed, [suspended]);
+  assert.deepEqual(closed, []);
+
+  assert.equal(await modalTest.finishSuspendedConfirmation(
+    true, false, suspended, dependencies
+  ), true);
+  assert.deepEqual(resumed, [suspended, suspended]);
+  assert.deepEqual(closed, []);
+
+  assert.equal(await modalTest.finishSuspendedConfirmation(
+    true, true, suspended, dependencies
+  ), true);
+  assert.deepEqual(resumed, [suspended, suspended, suspended]);
+  assert.deepEqual(closed, [{ force: true }]);
+});
+
+test('confirmOverModal orchestration passes closeOnConfirm through the real suspended path', async () => {
+  const suspended = { id: 'editor' };
+  const confirmations = [];
+  const resumed = [];
+  const closed = [];
+  const confirmOverModal = modalTest.createConfirmOverModal({
+    getActiveOverlay: () => ({ id: 'active-overlay' }),
+    getModalState: () => 'open',
+    showConfirmation: async () => assert.fail('the fallback confirmation must not run'),
+    suspend: () => suspended,
+    confirmSuspended: async (message, options, token) => {
+      confirmations.push({ message, options, token });
+      return true;
+    },
+    resume: (token) => resumed.push(token),
+    close: async (options) => closed.push(options),
+  });
+
+  assert.equal(await confirmOverModal('Continue saving?', {
+    closeOnConfirm: false,
+    danger: true,
+  }), true);
+  assert.deepEqual(confirmations, [{
+    message: 'Continue saving?',
+    options: { danger: true },
+    token: suspended,
+  }]);
+  assert.deepEqual(resumed, [suspended]);
+  assert.deepEqual(closed, []);
+
+  assert.equal(await confirmOverModal('Delete this event?'), true);
+  assert.deepEqual(resumed, [suspended, suspended]);
+  assert.deepEqual(closed, [{ force: true }]);
+});
 
 test('wireBlurValidation: registriert blur-Listener auf required inputs', () => {
   const input = makeInput();
@@ -776,6 +847,58 @@ test('closeDetailView verwirft den Merker, wenn es am Modal vorbei schliesst', (
     + 'des vorigen Dialogs stehen');
 });
 
+/* DAS POPOVER GIBT DEN FOKUS UEBER DENSELBEN MERKER ZURUECK WIE EIN MODAL (#1083).
+ *
+ * Bis hierher verwarf `closeDetailView()` im Popover-Zweig nur den fremden
+ * Merker. Der Fokus fiel mit dem entfernten Popover auf `body`, und ein
+ * `refocusAfterRender()` nach dem Neuaufbau - etwa nach dem Zuruecksetzen eines
+ * ICS-Termins, der das Raster neu zeichnet - hatte nichts, worauf es sich
+ * beziehen konnte. Gemessen am ERGEBNIS, nicht an der Schreibweise.
+ */
+test('der Merker aus dem Popover traegt auch den Neuaufbau danach (#1083)', () => {
+  const vorher = { active: global.document.activeElement, body: global.document.body };
+  global.document.body = makeNode('body');
+  const fokussierbar = (n) => { n.focus = () => { global.document.activeElement = n; }; return n; };
+  const wurzel = fokussierbar(makeNode('main', { id: 'main-content' }));
+  const anker = fokussierbar(makeNode('div', { cls: 'calendar-chip', data: { eventId: '7' } }));
+  try {
+    const merker = rememberFocus(anker);
+    withDom({ byId: { 'main-content': wurzel } }, () => {
+      global.document.activeElement = global.document.body;
+      assert.equal(restoreFocusAfterClose(merker), anker,
+        'haengt der Ausloeser noch, bekommt er den Fokus selbst');
+      assert.equal(global.document.activeElement, anker);
+    });
+
+    // Die Seite zeichnet das Raster neu: der alte Chip ist weg, ein gleicher steht da.
+    anker.isConnected = false;
+    const neu = fokussierbar(makeNode('div', { cls: 'calendar-chip', data: { eventId: '7' } }));
+    withDom({ byTag: { DIV: [neu] }, byId: { 'main-content': wurzel } }, () => {
+      global.document.activeElement = global.document.body;
+      refocusAfterRender();
+      assert.equal(global.document.activeElement, neu,
+        'ohne den Merker aus dem Popover bliebe der Fokus nach dem Neuaufbau auf body');
+    });
+
+    assert.equal(restoreFocusAfterClose(null), null, 'ohne Merker gibt es nichts zurueckzugeben');
+  } finally {
+    forgetRestore();
+    global.document.activeElement = vorher.active;
+    global.document.body = vorher.body;
+  }
+});
+
+test('das Popover gibt den Fokus nur zurueck, wo niemand woanders hin wollte (#1083)', () => {
+  const src = readFileSync(new URL('../public/components/detail-view.js', import.meta.url), 'utf8');
+  const fn = src.match(/export function closeDetailView\([\s\S]*?\n\}/)?.[0] ?? '';
+  assert.match(fn, /if \(fokus && merker\) restoreFocusAfterClose\(merker\);\s*else forgetRestore\(\);/,
+    'Rueckgabe mit eigenem Merker, sonst verwerfen - nie einen fremden stehen lassen');
+  assert.match(src, /!popover\.contains\(e\.target\)\) closeDetailView\(\{ fokus: false \}\)/,
+    'ein Klick daneben wollte woanders hin - der Fokus springt nicht zurueck');
+  assert.match(src, /if \(activePopover\) closeDetailView\(\{ fokus: false \}\)/,
+    'eine neue Ansicht nimmt den Fokus selbst');
+});
+
 /* REVIEW ZU #1070: die Klasse ist Darstellung, keine Identitaet.
  *
  * Eine Mahlzeitenkarte traegt `meal-card__open--with-thumb`, sobald ihr Rezept
@@ -829,4 +952,78 @@ test('_tryRefocus schreibt das tatsaechlich gesetzte Ziel in den Merker zurueck'
     'der Rueckgabewert traegt, WO der Fokus wirklich gelandet ist - er darf nicht verfallen');
   assert.match(fn, /_lastRestore\.ziel = gesetzt/,
     'ohne das Zurueckschreiben urteilt der naechste Lauf ueber ein Ziel, das es nicht mehr gibt');
+});
+
+// --------------------------------------------------------
+// Sheet-Swipe (#981): eine Aufwaertsbewegung, bevor das Sheet gezogen wurde, ist
+// Scrollen des Inhalts. Die Geste darf das Panel dann nicht anfassen - vorher
+// schrieb sie bei jedem Aufwaerts-Frame `translateY(0)`, und ein frisch
+// geoeffneter Dialog steht immer oben, also begann jede Wischgeste so.
+// --------------------------------------------------------
+const { __test: modalInternals } = await import('../public/components/modal.js');
+
+function fakeSheet() {
+  const handlers = {};
+  const writes = [];
+  let transform = '';
+  const panel = {
+    addEventListener: (type, fn) => { handlers[type] = fn; },
+    querySelector: () => ({ scrollTop: 0 }),
+    getBoundingClientRect: () => ({ top: 100 }),
+    style: {
+      get transform() { return transform; },
+      set transform(v) { writes.push(v); transform = v; },
+    },
+  };
+  modalInternals.wireSheetSwipe(panel);
+  const at = (y) => ({ touches: [{ clientY: y }], changedTouches: [{ clientY: y }] });
+  return {
+    writes,
+    get transform() { return transform; },
+    start: (y) => handlers.touchstart(at(y)),
+    move: (y) => handlers.touchmove(at(y)),
+    end: (y) => handlers.touchend(at(y)),
+  };
+}
+
+test('Sheet-Swipe: aufwaerts im Inhalt schreibt nichts ans Panel (#981)', () => {
+  const sheet = fakeSheet();
+  sheet.start(600); // Inhalt steht oben, der Finger weit unter der Griffzone
+  for (const y of [590, 560, 500, 420, 330]) sheet.move(y);
+  sheet.end(330);
+  assert.deepEqual(sheet.writes, [], 'kein Stil-Schreibzugriff, waehrend eine Aufwaertsgeste den Inhalt scrollt');
+});
+
+test('Sheet-Swipe: ein Zittern nach oben verwirft eine Schliessgeste nicht', () => {
+  // Die erste Fassung der Sperre griff beim ersten Pixel nach oben: eine
+  // gewollte Abwaertsgeste mit unruhigem Aufsetzen blieb danach tot. Nach oben
+  // gilt dieselbe Schwelle wie nach unten.
+  const sheet = fakeSheet();
+  sheet.start(600);
+  sheet.move(598);
+  sheet.move(592); // 8px nach oben: innerhalb der Schwelle
+  assert.deepEqual(sheet.writes, [], 'innerhalb der Schwelle kein Schreibzugriff');
+  sheet.move(650);
+  assert.equal(sheet.transform, 'translateY(24px)', 'die Geste zieht das Sheet trotz des Zitterns');
+});
+
+test('Sheet-Swipe: ein begonnener Zug bleibt verfolgt und setzt das Panel einmal zurueck', () => {
+  global.requestAnimationFrame = (fn) => fn();
+  try {
+    const sheet = fakeSheet();
+    sheet.start(600);
+    sheet.move(650); // 50px nach unten: das Sheet folgt
+    assert.equal(sheet.transform, 'translateY(24px)');
+    sheet.move(590); // der Finger kehrt ueber den Start zurueck
+    assert.equal(sheet.transform, '', 'zurueckgesetzt, sobald der Finger ueber dem Start steht (b7c0312c)');
+    const writesAfterReset = sheet.writes.length;
+    sheet.move(570);
+    sheet.move(550);
+    assert.equal(sheet.writes.length, writesAfterReset, 'zurueckgesetzt wird einmal, nicht in jedem Frame');
+    sheet.move(640);
+    sheet.end(640); // 40px: kein Schliessen, zurueck in die Ruhelage
+    assert.equal(sheet.transform, '', 'touchend raeumt den Zug ab');
+  } finally {
+    delete global.requestAnimationFrame;
+  }
 });

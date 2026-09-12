@@ -307,6 +307,14 @@ function renderCalDAVAccount(container, account, calendars, refresh, user) {
 
   card.appendChild(buildCalendarList(account, calendars));
 
+  // Wie beim Google-Picker (#1060): die Standard-Zuweisung waehlt auch das Ziel neuer Termine.
+  if (calendars.length) {
+    const routingHint = document.createElement('p');
+    routingHint.className = 'form-hint';
+    routingHint.textContent = t('settings.sync.defaultAssigneeRoutingHint');
+    card.appendChild(routingHint);
+  }
+
   const actions = document.createElement('div');
   actions.className = 'caldav-account-actions';
 
@@ -373,6 +381,7 @@ function renderCalDAVAccount(container, account, calendars, refresh, user) {
           'success',
         );
         await refresh();
+        refocusAfterRender();
       } catch (err) {
         showToast(err.message || t('common.errorGeneric'), 'danger');
       }
@@ -759,6 +768,13 @@ function buildGoogleCalendarPicker() {
   hint.textContent = t('settings.googleCalendarsSelectHint');
   group.appendChild(hint);
 
+  // Die Standard-Zuweisung wirkt seit #1060 in zwei Richtungen - das steht dort,
+  // wo sie gesetzt wird, samt der Kalender, fuer die die zweite nicht gilt.
+  const routingHint = document.createElement('p');
+  routingHint.className = 'form-hint';
+  routingHint.textContent = t('settings.sync.defaultAssigneeRoutingHint');
+  group.appendChild(routingHint);
+
   (async () => {
     try {
       const { data } = await api.get('/calendar/google/calendars');
@@ -1093,6 +1109,7 @@ function buildOutlookAccountCard(account, refresh, user) {
         await api.delete(`/calendar/outlook/accounts/${account.id}`);
         showToast(t('settings.disconnectedToast', { provider: 'Outlook' }), 'default');
         await refresh();
+        refocusAfterRender();
       } catch (err) {
         showToast(err.message || t('common.errorGeneric'), 'danger');
       }

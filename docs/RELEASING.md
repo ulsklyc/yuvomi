@@ -22,8 +22,8 @@ visible to every household on the next start.
 
 Releases run on two tracks, described in [CONTRIBUTING.md](../CONTRIBUTING.md#release-cadence):
 anything under `public/pages`, `public/styles`, `public/utils`, `public/components` or
-`public/settings` ships on Tuesdays only; everything else ships any day, at most once per calendar
-day. `npm run check:release-cadence` decides, and it runs **before the tag**, because it compares
+`public/settings` ships on Wednesdays and Sundays only; everything else ships any day, at most once
+per calendar day. `npm run check:release-cadence` decides, and it runs **before the tag**, because it compares
 `git describe --tags` with `HEAD` and an already-set tag makes that diff empty. It judges the whole
 release, not the last commit: a server-only fix on a `main` that also carries interface work since
 the last tag is an interface release.
@@ -64,8 +64,8 @@ the last tag is an interface release.
    `<!-- version: X.Y.Z -->` marker. The publish workflow takes the text verbatim and aborts if the
    marker does not match the release, which is deliberate: a stale note describes an update a
    household is not getting. The rules for the text are in the head of the file.
-7. **Cadence.** `npm run check:release-cadence`. Red is an answer, not an obstacle: wait for
-   Tuesday, take the interface change out, or - for a security or data-loss fix that cannot be
+7. **Cadence.** `npm run check:release-cadence`. Red is an answer, not an obstacle: wait for the
+   next Wednesday or Sunday, take the interface change out, or - for a security or data-loss fix that cannot be
    separated from `main` - pass `--hotfix "<reason>"`; the reason is mandatory and printed.
 8. **Handrail, interface releases only.** If the diff since the last tag touches the interface
    paths above, run the browser suite once, and read its exit code from a file rather than a

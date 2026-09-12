@@ -17,6 +17,7 @@ import { createCalDAVClient, supportsComponent } from '../utils/caldav-client.js
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { setItemTags, setTags } from '../utils/task-tags.js';
 import * as todoOutbound from './caldav-todo-outbound.js';
+import { runSerialized } from '../utils/sync-lock.js';
 
 // --------------------------------------------------------
 // Pure Mapping Helpers
@@ -420,7 +421,16 @@ export function pruneRemoved(database, table, accountId, seenUids) {
 // Sync (inbound + Rückrichtung, #617)
 // --------------------------------------------------------
 
-async function sync({ createClient: makeClient } = {}) {
+/**
+ * Ein Sync-Lauf, serialisiert gegen den Sofortversuch der VTODO-Rückrichtung und
+ * gegen sich selbst (#593) - dieselbe Regel wie beim Kalender, eigener
+ * Schlüssel: Aufgaben und Einkauf führen ihre Buchhaltung in eigenen Tabellen.
+ */
+async function sync(opts = {}) {
+  return runSerialized('caldav-todo', 'sync', () => runSync(opts));
+}
+
+async function runSync({ createClient: makeClient } = {}) {
   const accounts = getAllAccounts();
   if (accounts.length === 0) {
     return { success: true, syncedAccounts: 0, syncedItems: 0 };

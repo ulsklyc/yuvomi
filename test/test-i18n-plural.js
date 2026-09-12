@@ -61,6 +61,27 @@ test('Englisch: Singular und Plural je nach count', async () => {
   assert.equal(t('settings.calendarImport.success', { count: 4 }), '4 events imported.');
 });
 
+test('Kalender-Override-Bestätigung lokalisiert genau den bestätigten count', async () => {
+  await setLocale('de');
+  assert.equal(
+    t('calendar.overrideOrphanConfirmTitle', { count: 1 }),
+    '1 bearbeiteten Termin beibehalten?',
+  );
+  assert.equal(
+    t('calendar.overrideOrphanConfirmTitle', { count: 3 }),
+    '3 bearbeitete Termine beibehalten?',
+  );
+  await setLocale('en');
+  assert.equal(
+    t('calendar.overrideOrphanConfirmTitle', { count: 1 }),
+    'Keep 1 edited occurrence?',
+  );
+  assert.equal(
+    t('calendar.overrideOrphanConfirmTitle', { count: 3 }),
+    'Keep 3 edited occurrences?',
+  );
+});
+
 test('Sprachen ohne Zahlflexion liefern für jede Anzahl denselben Satz', async () => {
   await setLocale('ja');
   const one = t('settings.enabledReminderListCount', { count: 1 });

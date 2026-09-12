@@ -362,9 +362,16 @@ function onEscape(e) {
 // Swipe-to-Close (Mobile)
 // --------------------------------------------------------
 
+// Beruehrungs-Schlupf der Wischgeste, in BEIDE Richtungen derselbe: unterhalb
+// davon entscheidet sie weder "Sheet ziehen" noch "Inhalt scrollen".
+const SHEET_SWIPE_SLOP_PX = 10;
+
 function _wireSheetSwipe(panel) {
   let startY = 0;
   let dragging = false;
+  // Hat dieser Finger das Sheet schon nach unten gezogen? Erst dann gehört eine
+  // Aufwärtsbewegung zum Zug; davor ist sie Scrollen des Inhalts (#981).
+  let pulled = false;
 
   // Scroll position is now on the body, not the panel itself
   const scrollBody = panel.querySelector('.modal-panel__body');
@@ -378,15 +385,43 @@ function _wireSheetSwipe(panel) {
     if (!isHandleZone && !isScrolledToTop) return;
     startY = touchY;
     dragging = true;
+    pulled = false;
   }, { passive: true });
 
   panel.addEventListener('touchmove', (e) => {
     if (!dragging) return;
     const dy = e.touches[0].clientY - startY;
-    if (dy < 0) { panel.style.transform = 'translateY(0)'; return; } // Aufwärts: Panel zurücksetzen, dragging bleibt aktiv
-    // Erst ab 10px Bewegung animieren: Verhindert winzige Transforms durch
+    if (dy < 0) {
+      // RICHTUNGSSPERRE (#981). Ein frisch geöffneter Dialog steht oben, also
+      // begann JEDE Wischgeste im Inhalt als verfolgter Zug, und der schrieb
+      // bei jedem Aufwärts-Frame `translateY(0)` ans Panel. Solange die
+      // Einfahranimation das Panel hält (`forwards`), aendert das nichts; mit
+      // "Bewegung reduzieren" gibt es keine Animation, das Inline-transform
+      // wirkt, und iOS bricht das Scrollen des Inhalts ab - gemessen im
+      // Simulator: 0 bis 30 px statt 500 bis 675 px fuer dieselbe Geste.
+      // Aufwärts, bevor das Sheet gezogen wurde, ist deshalb kein Zug: die
+      // Geste gibt ab und fasst das Panel nicht an.
+      //
+      // Aber erst jenseits derselben Schwelle, die abwärts gilt: ein Finger
+      // zittert beim Aufsetzen, und ein einzelner Pixel nach oben durfte eine
+      // gewollte Schliessgeste nicht verwerfen. Innerhalb der Schwelle
+      // passiert nichts - kein Abbruch, kein Schreibzugriff.
+      if (!pulled) {
+        if (dy < -SHEET_SWIPE_SLOP_PX) dragging = false;
+        return;
+      }
+      // Ein begonnener Zug bleibt verfolgt, wenn der Finger zurückkehrt - sonst
+      // endete touchend ohne Rücksetzen und das Panel stünde verschoben
+      // (b7c0312c). Zurückgesetzt wird einmal, nicht in jedem Frame.
+      if (panel.style.transform) panel.style.transform = '';
+      return;
+    }
+    // Erst ab der Schwelle animieren: Verhindert winzige Transforms durch
     // normale Taps, die danach zurückgesetzt werden müssten.
-    if (dy > 10) panel.style.transform = `translateY(${(dy - 10) * 0.6}px)`;
+    if (dy > SHEET_SWIPE_SLOP_PX) {
+      pulled = true;
+      panel.style.transform = `translateY(${(dy - SHEET_SWIPE_SLOP_PX) * 0.6}px)`;
+    }
   }, { passive: true });
 
   panel.addEventListener('touchend', (e) => {
@@ -899,6 +934,31 @@ export function forgetRestore() {
   _lastRestore = null;
 }
 
+/**
+ * Den Fokus nach einem Schliessen AN dieser Schicht vorbei zurueckgeben - mit
+ * demselben Merker wie `_doClose` (#1083).
+ *
+ * Das Popover der Detailansicht schliesst ohne `closeModal()`. Bisher verwarf es
+ * dabei nur den fremden Merker: der Fokus fiel mit dem entfernten Popover auf
+ * `body`, und ein `refocusAfterRender()` nach dem Neuaufbau hatte nichts, worauf
+ * es sich beziehen konnte. Hier laeuft derselbe Weg wie beim Modal - Ziel
+ * bestimmen, mit Rueckfall fokussieren, Merker setzen, einen Frame spaeter
+ * nachfassen.
+ *
+ * @param {ReturnType<typeof rememberFocus>} memo  der beim Oeffnen gemerkte Ausloeser
+ * @returns {HTMLElement|null} das Element, das den Fokus tatsaechlich bekam
+ */
+export function restoreFocusAfterClose(memo) {
+  _lastRestore = null;
+  if (!memo) return null;
+  const gesetzt = _fokussiereMitRueckfall(focusRestoreTarget(memo));
+  if (gesetzt) {
+    _lastRestore = { memo, ziel: gesetzt };
+    _refocusIfDropped(memo, gesetzt);
+  }
+  return gesetzt;
+}
+
 function _doClose(overlayEl) {
   const target = overlayEl ?? activeOverlay;
   if (!target) return;
@@ -1399,6 +1459,17 @@ export function confirmModal(message, { confirmLabel, cancelLabel, danger = fals
   });
 }
 
+async function finishSuspendedConfirmation(
+  confirmed,
+  closeOnConfirm,
+  suspended,
+  { resume = _resumeSuspendedModal, close = closeModal } = {},
+) {
+  resume(suspended);
+  if (confirmed && closeOnConfirm) await close({ force: true });
+  return confirmed;
+}
+
 /**
  * Bestätigung ÜBER einem offenen Modal, ohne es zu verdrängen.
  *
@@ -1412,30 +1483,54 @@ export function confirmModal(message, { confirmLabel, cancelLabel, danger = fals
  *
  * Bestätigt der Nutzer, schließt das geparkte Modal mit `force: true`: die
  * Entscheidung nimmt die Eingaben ohnehin mit, eine zweite Rückfrage wäre
- * falsch (#625).
+ * falsch (#625). Mit `closeOnConfirm: false` kehrt das Formular auch nach
+ * Bestätigung zurück: ein Speichern darf anschließend noch validieren,
+ * weitere Entscheidungen erfragen oder einen Serverfehler anzeigen.
  *
  * Ohne offenes Modal identisch mit `confirmModal` - eine Löschfunktion, die aus
  * Liste und Modal gleichermaßen aufgerufen wird, braucht keine Fallunterscheidung.
  *
  * @param {string} message - die Frage (wird zum Titel), wie bei confirmModal
- * @param {Object} [opts]  - identisch zu confirmModal ({ confirmLabel, danger, detail })
+ * @param {Object} [opts] - confirmModal-Optionen plus closeOnConfirm (Default true)
  * @returns {Promise<boolean>}
  */
-export async function confirmOverModal(message, opts = {}) {
-  // Nur ein regulär offenes Modal lässt sich parken: läuft gerade eine
-  // Schließ-Animation oder liegt schon ein Dialog im Slot, gibt es nichts zu
-  // schützen, und ein Suspend würde den laufenden Übergang zerlegen.
-  if (!activeOverlay || modalState !== 'open') return confirmModal(message, opts);
+function createConfirmOverModal({
+  getActiveOverlay = () => activeOverlay,
+  getModalState = () => modalState,
+  showConfirmation = confirmModal,
+  suspend = _suspendActiveModal,
+  confirmSuspended = _confirmOverSuspended,
+  resume = _resumeSuspendedModal,
+  close = closeModal,
+} = {}) {
+  return async function confirmOverModal(message, { closeOnConfirm = true, ...opts } = {}) {
+    // Nur ein regulär offenes Modal lässt sich parken: läuft gerade eine
+    // Schließ-Animation oder liegt schon ein Dialog im Slot, gibt es nichts zu
+    // schützen, und ein Suspend würde den laufenden Übergang zerlegen.
+    if (!getActiveOverlay() || getModalState() !== 'open') return showConfirmation(message, opts);
 
-  const suspended = _suspendActiveModal();
-  const confirmed = await _confirmOverSuspended(message, opts, suspended);
-  // Erst zurückholen, dann ggf. schließen: das Abräumen soll durch die reguläre
-  // Schließ-Logik laufen, nicht an ihrem 'closing'-Wächter vorbei. Der Fokus
-  // kehrt dabei auf den auslösenden Knopf zurück (siehe _resumeSuspendedModal).
-  _resumeSuspendedModal(suspended);
-  if (confirmed) await closeModal({ force: true });
-  return confirmed;
+    const suspended = suspend();
+    const confirmed = await confirmSuspended(message, opts, suspended);
+    // Erst zurückholen, dann ggf. schließen: das Abräumen soll durch die reguläre
+    // Schließ-Logik laufen, nicht an ihrem 'closing'-Wächter vorbei. Der Fokus
+    // kehrt dabei auf den auslösenden Knopf zurück (siehe _resumeSuspendedModal).
+    return finishSuspendedConfirmation(
+      confirmed,
+      closeOnConfirm,
+      suspended,
+      { resume, close },
+    );
+  };
 }
+
+export const confirmOverModal = createConfirmOverModal();
+
+/** Nur fuer Tests: Gesten und Bestaetigungen ohne echtes Panel treiben. */
+export const __test = {
+  wireSheetSwipe: _wireSheetSwipe,
+  createConfirmOverModal,
+  finishSuspendedConfirmation,
+};
 
 // --------------------------------------------------------
 // Validation & Feedback

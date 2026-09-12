@@ -49,13 +49,16 @@
   flex-wrap: wrap;
 }
 
+/* Groesse/Gewicht kommen seit dem Polish-Batch (PLAN.md #7) aus der
+ * geteilten .u-section-title-Rolle (typography.css) statt aus einer eigenen
+ * 18px-Deklaration hier - vier Sektionskoepfe (Setup, Anfragen, Punktestand,
+ * Katalog), die schon vorher eine Bereichs-Ueberschrift waren, nur 2px unter
+ * der kanonischen Section-Title-Stufe. */
 .rw-section__title {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   margin: 0;
-  font-size: var(--text-lg);
-  font-weight: 600;
   color: var(--color-text-primary);
 }
 .rw-section__title i { width: 18px; height: 18px; color: var(--module-accent); }

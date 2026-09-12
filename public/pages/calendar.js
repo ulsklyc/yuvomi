@@ -6,7 +6,7 @@
 
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues, recurrenceRow } from '/rrule-ui.js';
-import { openModal as openSharedModal, closeModal, confirmModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
@@ -15,8 +15,20 @@ import { esc, fmtLocation } from '/utils/html.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder,
          monthPeriodKeys, startOfLocalWeekKey, addLocalDays, defaultDateInPeriod,
          isWeekendKey } from '/utils/date.js';
-import { truncateRuleBefore, shiftSeriesStart, shiftEndForStart, followingMeansWholeSeries,
-         isLocalRecurringSeries, isExternalRecurringSeries } from '/utils/recurrence-scope.js';
+import {
+  calendarOccurrenceDeleteTarget,
+  calendarOccurrenceMutationTarget,
+  canOverrideCalendarOccurrence,
+  canEditCalendarOccurrence,
+  followingMeansWholeSeries,
+  isExternalRecurringSeries,
+  isLocalRecurringSeries,
+  requestCalendarOccurrenceMutation,
+  requestCalendarOccurrenceDelete,
+  requiresWholeSeriesConfirmation,
+  shiftEndForStart,
+  shiftSeriesStart,
+} from '/utils/recurrence-scope.js';
 import { getReadableTextColor } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
 import { refresh as refreshReminders } from '/reminders.js';
@@ -31,7 +43,7 @@ import { wireTablist } from '/utils/tablist.js';
 // in eine eigene Runde. Der Import benennt die Schuld, statt sie zu umgehen.
 import { toggleRowHtml } from '/settings/components.js';
 import { localizeBirthdayEvent } from '/utils/birthday-event.js';
-import { googleTargetValue, caldavTargetValue, outlookTargetValue } from '/utils/sync-target.js';
+import { googleTargetValue, caldavTargetValue, outlookTargetValue, assigneeSyncTarget } from '/utils/sync-target.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { findPageFab } from '/utils/fab.js';
 import { nowFields, todayKey, zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
@@ -342,6 +354,16 @@ const SCHEDULE_DISPLAY_KEY = 'yuvomi:calendar:schedule-display';
 const MONTH_TITLES_KEY = 'yuvomi:calendar:month-titles';
 const ASSIGNED_TO_ME_KEY  = 'yuvomi:calendar:assignedToMe';
 const PEOPLE_FILTER_KEY   = 'yuvomi:calendar:people';
+// Ausgeblendete Kalender und Abos (#1064), auf dem Geraet und je Nutzer. Mit Name
+// und Farbe gemerkt: eine ausgeblendete Quelle muss im Blatt auch dann wieder
+// einzuschalten sein, wenn im geladenen Zeitraum kein Termin von ihr liegt. Genau
+// deshalb nicht geraeteweit wie die Ebenen: ein privates Abo sieht nur, wer es
+// angelegt hat, und ein geteilter Browser zeigte seinen Namen sonst dem naechsten
+// Konto (Codex-Review zu #1124). Schluessel siehe hiddenSourcesKey().
+const HIDDEN_SOURCES_KEY  = 'yuvomi:calendar:sources-hidden';
+// Der Eintrag „Nicht zugewiesen" auf der Personenachse (#1064). Ein String,
+// damit er mit keiner Nutzer-ID zusammenfallen kann.
+const UNASSIGNED = 'none';
 
 /* DIE FEIERTAGSFARBEN, WENN DER HAUSHALT KEINE GEWAEHLT HAT.
  *
@@ -620,6 +642,7 @@ let state = {
   // `assigned_users`, ihre Farbe gehoert ihr, und in einem FAMILIENplaner ist
   // „wessen Termin ist das" die Frage, die der Filter beantworten soll.
   people:        new Set(),
+  hiddenSources: new Map(), // Quellschluessel -> { name, color }, siehe calendarSources()
 };
 let _container = null;
 const calendarLoads = createCalendarLoadCoordinator();
@@ -1020,13 +1043,17 @@ function belongsToMe(item) {
  * herausfuehrt: wer alle Haekchen entfernt, saehe nichts mehr und haette
  * ausserhalb des Blatts keinen Hinweis darauf, warum.
  *
- * Termine OHNE Zuweisung fallen bei aktivem Filter heraus. Das ist Absicht:
- * der Filter beantwortet „wessen Termin", und ein Termin ohne Person ist
- * keine Antwort darauf. Der Rueckweg steht im Blatt.
+ * Termine OHNE Zuweisung haben seit #1064 einen eigenen Eintrag auf dieser
+ * Achse: `UNASSIGNED`, die Antwort „niemandes" auf „wessen Termin". Steht er in
+ * der Auswahl, bleiben sie stehen; allein gewaehlt zeigt er nur sie. Ein Filter,
+ * der VOR #1064 gespeichert wurde, kennt den Eintrag nicht und behaelt damit
+ * sein Verhalten: ein Termin ohne Person faellt heraus.
  */
 function matchesPeopleFilter(item) {
   if (state.people.size === 0) return true;
-  return (item.assigned_users ?? []).some((u) => state.people.has(u.id));
+  const zugewiesen = item.assigned_users ?? [];
+  if (zugewiesen.length === 0) return state.people.has(UNASSIGNED);
+  return zugewiesen.some((u) => state.people.has(u.id));
 }
 
 /**
@@ -1044,11 +1071,77 @@ function passesPersonFilters(item) {
   return belongsToMe(item) && matchesPeopleFilter(item);
 }
 
+/**
+ * Die Quelle eines Termins als Schluessel, oder null fuer einen eigenen (#1064).
+ *
+ * CalDAV-, Google- und Apple-Kalender haengen ueber `calendar_ref_id` an
+ * `external_calendars`, ICS-Abos ueber `subscription_id`. Outlook schreibt nur
+ * hinaus und bringt keine Termine mit, die eine Quelle haetten.
+ *
+ * `source_calendar_ref_id` loest der Server auf: `calendar_ref_id`, sonst der
+ * gewaehlte Zielkalender. Ein neuer Termin fuer einen ausgeblendeten Kalender
+ * traegt `calendar_ref_id` erst nach dem Hochladen - ohne das Ziel bliebe er
+ * bis dahin stehen, bei scheiterndem Sync auf Dauer.
+ */
+function eventSourceKey(ev) {
+  if (ev?.subscription_id) return `sub:${ev.subscription_id}`;
+  const ref = ev?.source_calendar_ref_id ?? ev?.calendar_ref_id;
+  if (ref) return `cal:${ref}`;
+  return null;
+}
+
+/** True, solange die Quelle des Termins nicht ausgeblendet ist. Eigene Termine haben keine. */
+function passesSourceFilter(item) {
+  const key = eventSourceKey(item);
+  return !key || !state.hiddenSources?.has(key);
+}
+
+/**
+ * Die Kalender und Abos fuer das Filterblatt (#1064).
+ *
+ * Aus den geladenen Terminen, dazu jede ausgeblendete Quelle, auch ohne Termin
+ * im Zeitraum - sonst liesse sich nur zurueckholen, was gerade zu sehen waere.
+ * Keine eigene Route: Name und Farbe liefert der Server an jedem Termin
+ * (`cal_name`, `cal_color`), und die Verwaltungsrouten der Quellen sind
+ * `requireAdmin` - ein Mitglied kaeme dort nicht durch.
+ */
+function calendarSources() {
+  const quellen = new Map();
+  for (const ev of state.events ?? []) {
+    const key = eventSourceKey(ev);
+    if (!key) continue;
+    const bekannt = quellen.get(key);
+    // Name und Farbe der QUELLE: `source_calendar_*` loest der Server auch fuer
+    // einen noch nicht hochgeladenen Termin ueber sein Ziel auf, `cal_name` und
+    // `cal_color` folgen nur `calendar_ref_id` - und tragen bei Abos die Werte
+    // des Abos. Fehlt beides, fuellt ein anderer Termin oder der Merker nach.
+    const name = ev.source_calendar_name || ev.cal_name || '';
+    const color = ev.source_calendar_color || ev.cal_color || null;
+    if (bekannt) {
+      bekannt.name ||= name;
+      bekannt.color ||= color;
+      continue;
+    }
+    quellen.set(key, { key, name, color });
+  }
+  for (const [key, merk] of state.hiddenSources ?? []) {
+    const bekannt = quellen.get(key);
+    if (!bekannt) {
+      quellen.set(key, { key, name: merk.name || '', color: merk.color || null });
+    } else {
+      bekannt.name ||= merk.name || '';
+      bekannt.color ||= merk.color || null;
+    }
+  }
+  return [...quellen.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Wie viele Filter gerade etwas wegnehmen - die Zahl am Filterknopf. */
 function activeFilterCount() {
   let n = 0;
   if (state.assignedToMe) n += 1;
   if (state.people.size > 0) n += 1;
+  if (state.hiddenSources?.size > 0) n += 1;
   const hp = state.holidayPrefs ?? {};
   if (hp.holiday_show_public && !state.layerHolidays) n += 1;
   if (hp.holiday_show_school && !state.layerSchool) n += 1;
@@ -1087,7 +1180,9 @@ function eventsOnDay(dateStr) {
         return start <= dateStr && end >= dateStr;
       });
   const layered = state.layerBirthdays ? list : list.filter(isVisibleLayer);
-  return layered.filter(passesPersonFilters);
+  // Quelle UND Person (#1064), wie Ebenen und Personen schon zusammenwirken.
+  // Hier und nicht in passesPersonFilters: Aufgaben und Schichten haben keine Quelle.
+  return layered.filter((e) => passesSourceFilter(e) && passesPersonFilters(e));
 }
 
 /**
@@ -1476,6 +1571,7 @@ export async function render(container, { user }) {
   state.user          = user ?? null;
   state.assignedToMe  = localStorage.getItem(ASSIGNED_TO_ME_KEY) === '1';
   state.people = restorePeopleFilter(state.users);
+  state.hiddenSources = restoreHiddenSources(state.user?.id);
 
   renderToolbar();
   renderView();
@@ -2905,12 +3001,23 @@ function personInitials(name) {
 function openCalendarFilters() {
   const layers = availableLayers();
   const people = state.users ?? [];
+  const sources = calendarSources();
 
   const layerRows = layers.map((row) => toggleRowHtml({
     label: row.label,
     checked: row.checked,
     swatchColor: row.color,
     attrs: { 'data-filter-layer': row.key },
+  })).join('');
+
+  // Je Kalender und Abo ein Schalter (#1064), mit der Farbe, die seine Termine
+  // tragen. Neben den Ebenen, nicht in ihnen: eine Ebene ist eine Sorte Eintrag,
+  // eine Quelle ist, woher ein gewoehnlicher Termin kommt.
+  const sourceRows = sources.map((s) => toggleRowHtml({
+    label: s.name || t('calendar.detailCalendar'),
+    checked: !state.hiddenSources.has(s.key),
+    swatchColor: s.color,
+    attrs: { 'data-filter-source': s.key },
   })).join('');
 
   // Der Anzeigemodus des Schichtplans ist KEIN Filter - er nimmt nichts weg,
@@ -2962,6 +3069,14 @@ function openCalendarFilters() {
     attrs: { 'data-filter-person': String(u.id) },
   })).join('');
 
+  // „Nicht zugewiesen" als Eintrag der Personenachse (#1064): dieselbe Lesart
+  // wie eine Person - leeres Set heisst alle, also steht er dann auf „an".
+  const unassignedRow = people.length ? toggleRowHtml({
+    label: t('calendar.filterUnassigned'),
+    checked: state.people.size === 0 || state.people.has(UNASSIGNED),
+    attrs: { 'data-filter-person': UNASSIGNED },
+  }) : '';
+
   const content = `
     <div class="cal-filters">
       ${layerRows ? `
@@ -2970,11 +3085,18 @@ function openCalendarFilters() {
           ${layerRows}
         </section>
       ` : ''}
+      ${sourceRows ? `
+        <section class="cal-filters__group">
+          <h3 class="cal-filters__heading">${t('calendar.filtersSources')}</h3>
+          ${sourceRows}
+        </section>
+      ` : ''}
       ${(meRow || personRows) ? `
         <section class="cal-filters__group">
           <h3 class="cal-filters__heading">${t('calendar.filtersPeople')}</h3>
           ${meRow}
           ${personRows}
+          ${unassignedRow}
         </section>
       ` : ''}
       ${(scheduleDisplayRow || monthTitlesRow) ? `
@@ -3020,19 +3142,31 @@ function openCalendarFilters() {
     } else if (input.dataset.filterMine) {
       state.assignedToMe = input.checked;
       try { localStorage.setItem(ASSIGNED_TO_ME_KEY, input.checked ? '1' : '0'); } catch {}
+    } else if (input.dataset.filterSource) {
+      const key = input.dataset.filterSource;
+      if (input.checked) {
+        state.hiddenSources.delete(key);
+      } else {
+        const quelle = sources.find((s) => s.key === key);
+        state.hiddenSources.set(key, { name: quelle?.name ?? '', color: quelle?.color ?? null });
+      }
+      persistHiddenSources();
     } else if (input.dataset.filterPerson) {
-      const id = Number(input.dataset.filterPerson);
+      const raw = input.dataset.filterPerson;
+      const id = raw === UNASSIGNED ? UNASSIGNED : Number(raw);
       // Der Sprung aus „alle" heraus: das erste Abwaehlen macht aus dem leeren
       // Set die Menge der UEBRIGEN. Ohne diesen Schritt haette ein Klick auf
-      // ein Haekchen, das „alle" bedeutet, gar nichts getan.
+      // ein Haekchen, das „alle" bedeutet, gar nichts getan. „Nicht zugewiesen"
+      // gehoert zu den uebrigen (#1064).
       if (state.people.size === 0) {
         for (const u of state.users ?? []) state.people.add(u.id);
+        state.people.add(UNASSIGNED);
       }
       if (input.checked) state.people.add(id);
       else state.people.delete(id);
       // Wieder ALLE gewaehlt heisst wieder „kein Filter" - sonst bliebe ein
       // Filter aktiv, der nichts wegnimmt, und der Zaehler am Knopf loege.
-      if (state.people.size === (state.users ?? []).length) state.people.clear();
+      if (state.people.size === (state.users ?? []).length + 1) state.people.clear();
       persistPeopleFilter();
     } else {
       return;
@@ -3049,6 +3183,8 @@ function openCalendarFilters() {
     state.layerBirthdays = true;
     state.assignedToMe = false;
     state.people.clear();
+    state.hiddenSources.clear();
+    persistHiddenSources();
     try {
       localStorage.setItem(LAYER_HOLIDAYS_KEY, 'true');
       localStorage.setItem(LAYER_SCHOOL_KEY, 'true');
@@ -3075,10 +3211,13 @@ function openCalendarFilters() {
  */
 function restorePeopleFilter(users) {
   const known = new Set((users ?? []).map((u) => u.id));
+  // „Nicht zugewiesen" gehoert zur Achse (#1064) - ohne diesen Eintrag fiele er
+  // beim Laden als unbekannte ID weg.
+  known.add(UNASSIGNED);
   let stored;
   try { stored = JSON.parse(localStorage.getItem(PEOPLE_FILTER_KEY) ?? '[]'); } catch { stored = []; }
   if (!Array.isArray(stored)) return new Set();
-  const valid = stored.map(Number).filter((id) => known.has(id));
+  const valid = stored.map((id) => (id === UNASSIGNED ? id : Number(id))).filter((id) => known.has(id));
   if (valid.length === 0 || valid.length === known.size) return new Set();
   return new Set(valid);
 }
@@ -3087,6 +3226,45 @@ function persistPeopleFilter() {
   try {
     if (state.people.size === 0) localStorage.removeItem(PEOPLE_FILTER_KEY);
     else localStorage.setItem(PEOPLE_FILTER_KEY, JSON.stringify([...state.people]));
+  } catch {}
+}
+
+/** Der Speicherschluessel je Nutzer; ohne angemeldeten Nutzer wird nichts gemerkt. */
+function hiddenSourcesKey(userId) {
+  return userId == null ? null : `${HIDDEN_SOURCES_KEY}:${userId}`;
+}
+
+/**
+ * Die ausgeblendeten Quellen dieses Nutzers aus dem Geraet (#1064).
+ *
+ * Anders als beim Personenfilter gibt es hier keine Liste, gegen die sich
+ * pruefen liesse: die Quellen kennt die Seite nur ueber die geladenen Termine.
+ * Eine inzwischen geloeschte Quelle bleibt deshalb unter ihrem gemerkten Namen
+ * im Blatt stehen, bis jemand sie wieder einschaltet oder alle Filter aufhebt -
+ * sichtbar und mit Rueckweg, statt still weiter zu filtern.
+ */
+function restoreHiddenSources(userId) {
+  const quellen = new Map();
+  const schluessel = hiddenSourcesKey(userId);
+  if (!schluessel) return quellen;
+  let stored;
+  try { stored = JSON.parse(localStorage.getItem(schluessel) ?? '[]'); } catch { stored = []; }
+  if (!Array.isArray(stored)) return quellen;
+  for (const eintrag of stored) {
+    if (!eintrag || !/^(?:cal|sub):\d+$/.test(String(eintrag.key))) continue;
+    // Die Farbe landet als Scheibe im Blatt; aus dem Speicher nur, was eine Farbe ist.
+    const color = /^#[0-9a-f]{3,8}$/i.test(String(eintrag.color ?? '')) ? eintrag.color : null;
+    quellen.set(eintrag.key, { name: String(eintrag.name ?? ''), color });
+  }
+  return quellen;
+}
+
+function persistHiddenSources() {
+  const schluessel = hiddenSourcesKey(state.user?.id);
+  if (!schluessel) return;
+  try {
+    if (state.hiddenSources.size === 0) localStorage.removeItem(schluessel);
+    else localStorage.setItem(schluessel, JSON.stringify([...state.hiddenSources].map(([key, merk]) => ({ key, ...merk }))));
   } catch {}
 }
 
@@ -3331,8 +3509,18 @@ export const __test = {
   tasksOnDay,
   eventsOnDay,
   passesPersonFilters,
+  eventMapUrl,
+  eventSourceKey,
+  passesSourceFilter,
+  calendarSources,
+  restorePeopleFilter,
+  restoreHiddenSources,
+  persistHiddenSources,
+  activeFilterCount,
+  UNASSIGNED,
   eventEndDate,
   isMultiDayEvent,
+  eventWhenText,
   isAllDayLike,
   agendaSegmentKind,
   deepLinkTargetDate,
@@ -3353,6 +3541,9 @@ export const __test = {
   eventIconName,
   eventIconHtml,
   sameColor,
+  canonicalReminderOffsets,
+  reminderOffsetFromEvent,
+  reminderOwnerId,
   EVENT_COLORS,
   renderScheduleChip,
   scheduleEntryTitle,
@@ -3492,6 +3683,54 @@ function reminderSummary(ev, reminders) {
 }
 
 /**
+ * Die „Wann"-Zeile der Detailansicht (#1102).
+ *
+ * Sie nannte das Startdatum und vom Ende nur die Uhrzeit. Ein Termin vom 10.
+ * 14:00 bis zum 12. 11:00 las sich dadurch als „14:00 - 11:00" an einem Tag,
+ * der endet, bevor er beginnt, und ein Ganztags-Termin über drei Tage nannte
+ * nur den ersten. Endet der Termin an einem anderen Tag, steht dieser Tag jetzt
+ * mit da.
+ *
+ * „Anderer Tag" ist die Regel des Rasters, keine zweite: `isMultiDayEvent` über
+ * `eventEndDate`. Ein Zeit-Termin bis 00:00 gehört dem Abend, an dem er begann
+ * (#804), und das Ende eines Ganztags-Termins ist inklusiv. Der Trenner kommt
+ * aus demselben Locale-Key wie der Zeitraum im Tageskopf.
+ */
+function eventWhenText(ev) {
+  const multiDay = isMultiDayEvent(ev);
+  if (ev.all_day) {
+    const startDate = formatPreferredDate(localDate(ev.start_datetime));
+    const dates = multiDay
+      ? t('calendar.dayRangeLabel', { from: startDate, to: formatPreferredDate(eventEndDate(ev)) })
+      : startDate;
+    return `${dates} · ${t('calendar.allDay')}`;
+  }
+  const start = formatDateTime(ev.start_datetime);
+  if (!ev.end_datetime) return start;
+  // Das Ende ist der ZEITPUNKT, nicht der letzte Rastertag. Ein Termin vom 1.
+  // 14:00 bis zum 3. 00:00 steht im Raster am 1. und 2., endet aber am 3. um
+  // 00:00 - und genau das steht hier. Das Datum aus `eventEndDate` mit der
+  // rohen Uhrzeit ergaebe "2. 00:00", einen Tag zu frueh; rastertreu waere nur
+  // "2. 24:00", und das kann keine Locale formatieren (Review auf #1114).
+  const end = multiDay
+    ? formatDateTime(ev.end_datetime)
+    : `${formatTime(ev.end_datetime)} ${timeSuffix()}`.trimEnd();
+  return t('calendar.dayRangeLabel', { from: start, to: end });
+}
+
+/**
+ * Die Kartensuche zu einem Ortstext, oder '' wenn es nichts zu suchen gibt.
+ *
+ * Über `fmtLocation`, damit eine ICS-escapte, mehrzeilige Adresse als eine
+ * Zeile gesucht wird. Gebaut wird lokal; nichts verlässt das Gerät, bevor
+ * jemand die Aktion antippt (#1110).
+ */
+function eventMapUrl(location) {
+  const query = fmtLocation(location ?? '').trim();
+  return query ? `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}` : '';
+}
+
+/**
  * Die Leseinformationen eines Termins.
  *
  * Wiederholung, Erinnerungen und Sichtbarkeit standen bisher nur im
@@ -3499,14 +3738,9 @@ function reminderSummary(ev, reminders) {
  * wiederkehrt, musste ihn zum Bearbeiten öffnen.
  */
 function renderEventDetail(ev, reminders = []) {
-  const timeStr = ev.all_day
-    ? `${formatPreferredDate(localDate(ev.start_datetime))} · ${t('calendar.allDay')}`
-    : formatDateTime(ev.start_datetime)
-      + (ev.end_datetime ? ` – ${formatTime(ev.end_datetime)} ${timeSuffix()}`.trimEnd() : '');
-
   return [
     { icon: 'calendar', label: t('calendar.detailCalendar'), node: calendarChipNode(ev) },
-    { icon: 'clock', label: t('calendar.detailWhen'), value: timeStr },
+    { icon: 'clock', label: t('calendar.detailWhen'), value: eventWhenText(ev) },
     recurrenceRow(ev.recurrence_rule),
     { icon: 'map-pin', label: t('calendar.locationLabel'), value: ev.location ? fmtLocation(ev.location) : '' },
     assignedRow(ev.assigned_users, t('calendar.assignedLabel'), ev.assigned_name || ''),
@@ -3548,7 +3782,7 @@ async function openEventDetail(ev, anchor = null) {
   // stumm. Jetzt läuft der Aufruf neben dem Öffnen her und die Zeile kommt
   // nach. Die Sync-Ziele braucht nur das Formular, die lädt erst dessen mount().
   let reminders = [];
-  const remindersReady = loadReminderForEvent(ev.id).then((r) => { reminders = r; });
+  const remindersReady = loadReminderForEvent(reminderOwnerId(ev)).then((r) => { reminders = r; });
 
   const actions = [{
     id: 'detail-delete',
@@ -3561,8 +3795,30 @@ async function openEventDetail(ev, anchor = null) {
     // Entscheidung. Der await hält das Löschen zurück, bis der Overlay-Slot
     // wirklich frei ist - requestDeleteEvent öffnet bei Serien selbst einen
     // Dialog, und das Shared-Modal kennt kein Stacking.
-    onClick: async ({ close }) => { await close({ force: true }); await requestDeleteEvent(ev); },
+    onClick: async ({ close }) => {
+      await close({ force: true });
+      await requestDeleteEvent(ev);
+      // Mit dem Termin ist sein Chip weg, von dem aus die Ansicht aufging. Bei
+      // einer Serie fragt requestDeleteEvent erst nach; der Dialog verwirft den
+      // Merker beim Oeffnen, und der Aufruf tut dann nichts (#1083).
+      refocusAfterRender();
+    },
   }];
+
+  // Ort in einer Karte öffnen (#1110) - als ausdrückliche Aktion, nicht als Link
+  // auf dem Ortstext: `location` ist Freitext, und "Zoom" oder "Raum 3B" sind
+  // keine Adresse. Die Aktion behauptet das nie, der Link wird erst beim Antippen
+  // benutzt. Dieselbe Suche wie die Adresse in Kontakte.
+  const mapUrl = eventMapUrl(ev.location);
+  if (mapUrl) {
+    actions.push({
+      id: 'detail-open-map',
+      label: t('calendar.openInMap'),
+      variant: 'ghost',
+      icon: 'map-pin',
+      onClick: () => window.open(mapUrl, '_blank', 'noopener'),
+    });
+  }
 
   // ICS-Abos: Ein lokal geänderter Termin lässt sich auf das Original
   // zurücksetzen. Die Aktion gehört zum Objekt, also in die Fußzeile.
@@ -3636,6 +3892,10 @@ async function loadReminderForEvent(eventId) {
   }
 }
 
+function reminderOwnerId(event) {
+  return Number(event?.reminder_owner_id ?? event?.id);
+}
+
 // Obergrenze für mehrere Erinnerungen je Termin — muss mit dem Server-Cap
 // (MAX_REMINDERS_PER_ENTITY in server/routes/reminders.js) übereinstimmen.
 const MAX_CALENDAR_REMINDERS = 5;
@@ -3653,9 +3913,10 @@ const REMINDER_OFFSETS = () => [
 ];
 
 function reminderOffsetFromEvent(event, reminder) {
-  if (!reminder || !event?.start_datetime) return '';
+  const anchor = event?.reminder_anchor_start ?? event?.start_datetime;
+  if (!reminder || !anchor) return '';
   const remindMs = parseRemindAtAsUtc(reminder.remind_at).getTime();
-  const startMs  = new Date(reminderStartValue(event.start_datetime)).getTime();
+  const startMs  = new Date(reminderStartValue(anchor)).getTime();
   const diffMin  = Math.round((startMs - remindMs) / 60000);
   const opts = [0, 15, 60, 1440, 2880, 10080, 20160];
   const match = opts.find((o) => o === diffMin);
@@ -3664,9 +3925,10 @@ function reminderOffsetFromEvent(event, reminder) {
 
 function customReminderFromEvent(event, reminder) {
   const fallback = { amount: 1, unit: 'days' };
-  if (!reminder || !event?.start_datetime) return fallback;
+  const anchor = event?.reminder_anchor_start ?? event?.start_datetime;
+  if (!reminder || !anchor) return fallback;
   const diffMin = Math.max(0, Math.round(
-    (new Date(reminderStartValue(event.start_datetime)).getTime() - parseRemindAtAsUtc(reminder.remind_at).getTime()) / 60000
+    (new Date(reminderStartValue(anchor)).getTime() - parseRemindAtAsUtc(reminder.remind_at).getTime()) / 60000
   ));
   if (diffMin % 10080 === 0 && diffMin >= 10080) return { amount: diffMin / 10080, unit: 'weeks' };
   if (diffMin % 1440 === 0 && diffMin >= 1440) return { amount: diffMin / 1440, unit: 'days' };
@@ -3684,6 +3946,38 @@ function customReminderMinutes(amount, unit) {
 
 function reminderStartValue(startDatetime) {
   return startDatetime?.includes('T') ? startDatetime : `${startDatetime}T09:00`;
+}
+
+function canonicalReminderOffsets(rows, enabled = true) {
+  if (!enabled) return [];
+  const offsets = [];
+  for (const row of rows) {
+    if (row.offset == null || row.offset === '') continue;
+    const offset = row.offset === 'custom'
+      ? customReminderMinutes(row.amount, row.unit)
+      : Number(row.offset);
+    if (!Number.isInteger(offset) || offset < 0 || offsets.includes(offset)) continue;
+    offsets.push(offset);
+    if (offsets.length === MAX_CALENDAR_REMINDERS) break;
+  }
+  return offsets;
+}
+
+function reminderOffsetsFromForm(overlay) {
+  const enabled = overlay.querySelector('#modal-reminder-toggle')?.checked === true;
+  const rows = [...(overlay.querySelector('#modal-reminder-rows')
+    ?.querySelectorAll('[data-reminder-row]') ?? [])].map((row) => ({
+    offset: row.querySelector('.js-reminder-offset')?.value,
+    amount: row.querySelector('.js-reminder-custom-amount')?.value,
+    unit: row.querySelector('.js-reminder-custom-unit')?.value,
+  }));
+  return canonicalReminderOffsets(rows, enabled);
+}
+
+function reminderTimesFromOffsets(offsets, anchorStart) {
+  const startMs = new Date(reminderStartValue(anchorStart)).getTime();
+  return offsets.map((offset) =>
+    new Date(startMs - offset * 60000).toISOString().slice(0, 19));
 }
 
 /**
@@ -3922,6 +4216,10 @@ async function loadSyncTargets(selectElement, currentEvent = null) {
     // Termins ihn stillschweigend in einen Kalender schieben.
     applyDefaultSyncTarget(selectElement);
   }
+
+  // Die Ziele samt Standard-Zuweisung: das Formular waehlt daraus den Kalender
+  // der zugewiesenen Person (#1060).
+  return targets;
 }
 
 /**
@@ -4181,8 +4479,51 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
     const syncOutlookHint = () => {
       if (outlookHint) outlookHint.hidden = !syncTargetSelect.value.startsWith('outlook:');
     };
-    syncTargetSelect.addEventListener('change', syncOutlookHint);
-    loadSyncTargets(syncTargetSelect, event).then(syncOutlookHint);
+
+    // DAS ZIEL FOLGT DER ZUWEISUNG (#1060) - nur beim Anlegen, und nur bis jemand
+    // selbst ein Ziel waehlt. Rangfolge: die eigene Wahl im Dialog, dann der
+    // Kalender, der die EINE zugewiesene Person als Standard nennt, dann der
+    // eigene Standard des Autors (#620). Ein bestehender Termin zieht nie von
+    // selbst um: das Verschieben zwischen Kalendern ist ein Vorgang
+    // (`outbound_move_to`, #593), keine Feldaenderung.
+    const mehrdeutigHint = panel.querySelector('#event-sync-target-assignee-hint');
+    let zielVonHand = false;
+    let ziele = null;
+    const zielNachZuweisung = () => {
+      if (mode !== 'create' || zielVonHand || !ziele) return;
+      const { value, ambiguous } = assigneeSyncTarget(ziele, getSelectedUserIds(panel, 'cal_assigned'));
+      if (mehrdeutigHint) {
+        mehrdeutigHint.hidden = !ambiguous;
+        // Die Zielwahl steht unter „Weitere Einstellungen", und das ist beim
+        // Anlegen zu. Ein Hinweis in einem geschlossenen <details> sagt
+        // niemandem etwas - dabei ist er die ganze Antwort darauf, warum hier
+        // nicht geraten wird (Review zu #1125). Aufklappen, nie zuklappen: was
+        // jemand selbst geoeffnet hat, bleibt offen.
+        if (ambiguous) mehrdeutigHint.closest('details')?.setAttribute('open', '');
+      }
+      const angeboten = Boolean(value) && Array.from(syncTargetSelect.options).some((o) => o.value === value);
+      if (angeboten) {
+        syncTargetSelect.value = value;
+      } else {
+        syncTargetSelect.value = '';
+        applyDefaultSyncTarget(syncTargetSelect);
+      }
+      syncOutlookHint();
+    };
+    syncTargetSelect.addEventListener('change', () => {
+      // Ein programmatisch gesetzter Wert feuert kein change - das hier ist die Hand.
+      zielVonHand = true;
+      if (mehrdeutigHint) mehrdeutigHint.hidden = true;
+      syncOutlookHint();
+    });
+    // Einen Tick spaeter lesen: bindUserMultiSelect raeumt "Niemand" im selben change ab.
+    panel.querySelector('.user-ms[data-ms-name="cal_assigned"]')
+      ?.addEventListener('change', () => setTimeout(zielNachZuweisung, 0));
+    loadSyncTargets(syncTargetSelect, event).then((geladen) => {
+      ziele = geladen ?? null;
+      zielNachZuweisung();
+      syncOutlookHint();
+    });
   }
 
   // Enddatum dem Startdatum nachführen, damit das Verschieben des Starts
@@ -4349,6 +4690,7 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       </select>
       <small class="form-hint">${t('calendar.syncTargetHint')}</small>
       <small class="form-hint" id="event-sync-target-outlook-hint" hidden>${t('settings.outlookPushHint')}</small>
+      <small class="form-hint" id="event-sync-target-assignee-hint" hidden>${t('calendar.syncTargetAssigneeAmbiguous')}</small>
     </div>
 
     <div class="form-group">
@@ -4508,7 +4850,15 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       startDate,
     })}
 
-    ${isEdit && isLocalRecurringSeries(event) ? renderRecurringScopeChooser('modal-edit', event.start_datetime.slice(0, 10)) : ''}
+    ${isEdit && isLocalRecurringSeries(event) && canEditCalendarOccurrence(event)
+      ? renderRecurringScopeChooser('modal-edit', event.start_datetime.slice(0, 10))
+      : ''}
+
+    ${isEdit && requiresWholeSeriesConfirmation(event) ? `
+      <p class="cal-field-hint field-hint--warn" id="modal-whole-series-only" role="status">
+        <i data-lucide="alert-triangle" aria-hidden="true"></i>
+        <span>${t('calendar.wholeSeriesOnlyNotice')}</span>
+      </p>` : ''}
 
     ${renderCalendarReminderSection(reminder, event, isEdit ? [] : state.defaultReminders)}
 
@@ -4521,6 +4871,30 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
         <button class="btn btn--primary" id="modal-save">${isEdit ? t('common.save') : t('common.create')}</button>
       </div>
     </div>`;
+}
+
+function confirmCalendarOverrideOrphans(count) {
+  return confirmOverModal(t('calendar.overrideOrphanConfirmTitle', { count }), {
+    closeOnConfirm: false,
+    detail: t('calendar.overrideOrphanConfirmDetail'),
+    confirmLabel: t('calendar.overrideOrphanConfirmAction'),
+  });
+}
+
+function confirmLocalWholeSeriesEdit(event) {
+  return confirmOverModal(t('calendar.editWholeSeriesOnlyTitle'), {
+    closeOnConfirm: false,
+    detail: t('calendar.editWholeSeriesOnlyDetail', { title: event.title }),
+    confirmLabel: t('calendar.editWholeSeriesOnlyConfirm'),
+  });
+}
+
+function confirmLocalWholeSeriesDelete(event) {
+  return confirmModal(t('calendar.deleteWholeSeriesOnlyTitle'), {
+    detail: t('calendar.deleteWholeSeriesOnlyDetail', { title: event.title }),
+    confirmLabel: t('calendar.deleteWholeSeriesOnlyConfirm'),
+    danger: true,
+  });
 }
 
 async function saveEvent(overlay, mode, event, existingReminder = null, attachmentState = null) {
@@ -4592,6 +4966,10 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     return;
   }
 
+  if (mode === 'edit'
+      && requiresWholeSeriesConfirmation(event)
+      && !await confirmLocalWholeSeriesEdit(event)) return;
+
   saveBtn.disabled    = true;
   saveBtn.textContent = '…';
 
@@ -4641,10 +5019,10 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
 
     const body = {
       title, description, start_datetime, end_datetime,
-      all_day: allday ? 1 : 0,
+      all_day: !!allday,
       location, color, icon, assigned_to,
       visibility: overlay.querySelector('#modal-visibility')?.value || 'all',
-      countdown: overlay.querySelector('#modal-countdown')?.checked ? 1 : 0,
+      countdown: !!overlay.querySelector('#modal-countdown')?.checked,
       recurrence_rule: rrule.recurrence_rule,
       target_google_calendar_id,
       target_caldav_account_id,
@@ -4666,7 +5044,9 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       body.remove_attachment = true;
     }
 
+    const reminderOffsets = reminderOffsetsFromForm(overlay);
     let savedEventId = eventId;
+    let remindersHandledAtomically = false;
     // Start, an dem die Erinnerungs-Offsets ausgerichtet werden. Für „ganze Serie"
     // wird das auf den (evtl. verschobenen) Master-Start umgestellt (#532).
     let reminderBaseStart = start_datetime;
@@ -4679,81 +5059,76 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       state.events.push(res.data);
       savedEventId = res.data?.id;
     } else {
-      // Scope-Auswahl greift nur für rein lokale Serien (#532); sonst normaler
-      // Master-Update wie bisher (Einzeltermine, externe Serien).
-      const scope = isLocalRecurringSeries(event)
+      const localRecurring = isLocalRecurringSeries(event);
+      const canOverrideOccurrence = canOverrideCalendarOccurrence(event);
+      let scope = localRecurring && canEditCalendarOccurrence(event)
         ? getRecurringScope(overlay, 'modal-edit')
         : 'series';
-      const occDate = event?.start_datetime?.slice(0, 10);
-      // Am Anfang der Serie wird der Master aktualisiert statt geschnitten -
-      // warum das nicht an `is_recurring_instance` allein haengt, steht bei der
-      // Funktion.
-      const truncated = scope === 'following' && !followingMeansWholeSeries(event)
-        ? truncateRuleBefore(event.recurrence_rule, occDate)
-        : null;
-
-      if (scope === 'this') {
-        // Nur dieses Vorkommen: losgelösten Einzeltermin anlegen + Master-EXDATE.
-        const res = await api.post('/calendar', { ...body, recurrence_rule: null });
-        await api.post(`/calendar/${eventId}/exceptions`, { date: occDate });
+      if (!canOverrideOccurrence && scope === 'following' && followingMeansWholeSeries(event)) scope = 'series';
+      if (localRecurring && canEditCalendarOccurrence(event) && (scope === 'this' || scope === 'following')) {
+        const target = calendarOccurrenceMutationTarget(event, scope);
+        const res = await requestCalendarOccurrenceMutation({
+          api,
+          event,
+          scope,
+          body,
+          reminderOffsets,
+          confirmCount: confirmCalendarOverrideOrphans,
+        });
+        if (!res) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = t('common.save');
+          return;
+        }
         savedEventId = res.data?.id;
-        reloadAfter = true;
-      } else if (truncated) {
-        // Dieser und folgende: Master per UNTIL kürzen, neue Serie ab hier anlegen.
-        // body trägt die (ggf. bearbeitete) recurrence_rule als Fortsetzungsregel.
-        await api.put(`/calendar/${eventId}`, { recurrence_rule: truncated });
-        const res = await api.post('/calendar', body);
-        savedEventId = res.data?.id;
+        remindersHandledAtomically = canOverrideOccurrence && target.carriesReminderOffsets;
         reloadAfter = true;
       } else {
-        // Ganze Serie (auch „folgende" beim ersten Vorkommen): Master aktualisieren.
-        // Bei lokalen Serien den DTSTART erhalten, indem die im Modal sichtbare
-        // Instanz-Verschiebung auf den Master-Start übertragen wird.
         let seriesBody = body;
-        if (isLocalRecurringSeries(event)) {
-          const master  = (await api.get(`/calendar/${eventId}`)).data;
+        let savePath = `/calendar/${eventId}`;
+        if (localRecurring) {
+          const target = calendarOccurrenceMutationTarget(event, 'series');
+          const master  = (await api.get(target.path)).data;
           const allDay  = !!body.all_day;
           const newStart = shiftSeriesStart(master.start_datetime, event.start_datetime, start_datetime, allDay);
           const newEnd   = shiftEndForStart(newStart, start_datetime, end_datetime, allDay);
           seriesBody = { ...body, start_datetime: newStart, end_datetime: newEnd };
+          savePath = target.path;
           reminderBaseStart = newStart;
           reloadAfter = true;
         }
-        const res = await api.put(`/calendar/${eventId}`, seriesBody);
+        const res = localRecurring
+          ? await requestCalendarOccurrenceMutation({
+              api,
+              event,
+              scope: 'series',
+              body: seriesBody,
+              confirmCount: confirmCalendarOverrideOrphans,
+            })
+          : await api.put(savePath, seriesBody);
+        if (!res) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = t('common.save');
+          return;
+        }
+        savedEventId = res.data?.id;
         const idx = state.events.findIndex((e) => e.id === eventId);
         if (idx !== -1) state.events[idx] = res.data;
       }
     }
 
-    // Erinnerungen speichern oder löschen (mehrere je Termin möglich, #436).
-    if (savedEventId) {
-      const reminderOn = overlay.querySelector('#modal-reminder-toggle')?.checked;
-      const rowsEl     = overlay.querySelector('#modal-reminder-rows');
-      const startMs    = new Date(reminderStartValue(reminderBaseStart)).getTime();
-      let remindAts = [];
-
-      if (reminderOn && rowsEl) {
-        for (const row of rowsEl.querySelectorAll('[data-reminder-row]')) {
-          const offsetVal = row.querySelector('.js-reminder-offset')?.value;
-          if (offsetVal == null || offsetVal === '') continue;
-          const offsetMinutes = offsetVal === 'custom'
-            ? customReminderMinutes(
-                row.querySelector('.js-reminder-custom-amount')?.value,
-                row.querySelector('.js-reminder-custom-unit')?.value
-              )
-            : parseInt(offsetVal, 10);
-          remindAts.push(new Date(startMs - offsetMinutes * 60000).toISOString().slice(0, 19));
-        }
-        remindAts = [...new Set(remindAts)].slice(0, MAX_CALENDAR_REMINDERS);
-      }
-
+    // Einzeltermine und ganze Serien behalten ihren etablierten Reminder-Pfad.
+    // Occurrence- und Split-Endpunkte schreiben die Offsets in derselben
+    // Transaktion wie Ersatzzeile, EXDATE und Reparenting.
+    if (savedEventId && !remindersHandledAtomically) {
+      const remindAts = reminderTimesFromOffsets(reminderOffsets, reminderBaseStart);
       if (remindAts.length) {
         await api.put(`/reminders?entity_type=event&entity_id=${savedEventId}`, { remind_ats: remindAts });
       } else {
         await api.delete(`/reminders?entity_type=event&entity_id=${savedEventId}`).catch(() => {});
       }
-      refreshReminders();
     }
+    if (savedEventId) refreshReminders();
 
     if (reloadAfter) {
       await reloadCalendarEventsOnly();
@@ -4772,15 +5147,23 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
   }
 }
 
-async function deleteEvent(id) {
+async function deleteEvent(event) {
+  const target = event?.series_id
+    ? calendarOccurrenceDeleteTarget(event, 'series')
+    : { method: 'delete', path: `/calendar/${event.id}` };
+  const reminderEntityId = event?.series_id ?? event.id;
   scheduleCalendarDeleteWithUndo({
     state,
-    deleteScope: { eventId: id, scope: 'all' },
+    deleteScope: {
+      eventId: event.id,
+      seriesId: event?.series_id ?? event.id,
+      scope: 'all',
+    },
     message: t('calendar.deletedToast'),
     schedule: scheduleUndoableDelete,
     requestDelete: async ({ keepalive }) => {
-      await api.delete(`/calendar/${id}`, { keepalive });
-      api.delete(`/reminders?entity_type=event&entity_id=${id}`, { keepalive }).catch(() => {});
+      await api.delete(target.path, { keepalive });
+      api.delete(`/reminders?entity_type=event&entity_id=${reminderEntityId}`, { keepalive }).catch(() => {});
       if (!keepalive) refreshReminders();
     },
     isViewActive: () => Boolean(_container?.isConnected),
@@ -4913,15 +5296,19 @@ function confirmExternalSeriesDelete(event) {
 
 async function requestDeleteEvent(event) {
   if (isExternalRecurringSeries(event)) {
-    if (await confirmExternalSeriesDelete(event)) await deleteEvent(event.id);
+    if (await confirmExternalSeriesDelete(event)) await deleteEvent(event);
     return;
   }
   if (!isLocalRecurringSeries(event)) {
-    await deleteEvent(event.id);
+    await deleteEvent(event);
+    return;
+  }
+  if (!canEditCalendarOccurrence(event)) {
+    if (await confirmLocalWholeSeriesDelete(event)) await deleteEvent(event);
     return;
   }
   const choice = await recurringDeleteChoice(event);
-  if (choice === 'series') await deleteEvent(event.id);
+  if (choice === 'series') await deleteEvent(event);
   else if (choice === 'following') await deleteThisAndFollowing(event);
   else if (choice === 'this') await deleteSingleOccurrence(event);
   // null → abgebrochen, nichts tun
@@ -4967,27 +5354,19 @@ function recurringDeleteChoice(event) {
  * das erste der Serie, verschwindet sie ganz. Optimistisch + Undo.
  */
 async function deleteThisAndFollowing(event) {
-  // Am Anfang der Serie ist "dieser und folgende" die ganze Serie - warum das
-  // nicht an `is_recurring_instance` allein haengt, steht bei der Funktion.
-  if (followingMeansWholeSeries(event)) {
-    await deleteEvent(event.id);
-    return;
-  }
-  const fromKey = event.start_datetime.slice(0, 10);
-  const newRule = truncateRuleBefore(event.recurrence_rule, fromKey);
-  if (!newRule) { await deleteEvent(event.id); return; }
-
   scheduleCalendarDeleteWithUndo({
     state,
-    deleteScope: { eventId: event.id, scope: 'following', occurrenceDate: fromKey },
+    deleteScope: {
+      eventId: event.id,
+      seriesId: event.series_id,
+      scope: 'following',
+      recurrenceId: event.recurrence_id,
+    },
     message: t('calendar.deletedToast'),
     schedule: scheduleUndoableDelete,
-    requestDelete: async ({ keepalive }) => {
-      await api.put(`/calendar/${event.id}`, { recurrence_rule: newRule }, { keepalive });
-      // The former client-side loop patched recurrence_rule on the remaining
-      // expanded rows. The authoritative range reload below now obtains the
-      // truncated rule from the server instead of guessing that response.
-    },
+    requestDelete: ({ keepalive }) => requestCalendarOccurrenceDelete({
+      api, event, scope: 'following', keepalive,
+    }),
     isViewActive: () => Boolean(_container?.isConnected),
     reloadEvents: reloadCalendarRangeAfterDelete,
     handleError: (err) => window.yuvomi?.showToast(
@@ -5003,15 +5382,19 @@ async function deleteThisAndFollowing(event) {
  * Entfernung und Undo-Toast wie beim regulären Löschen.
  */
 async function deleteSingleOccurrence(event) {
-  const date = event.start_datetime.slice(0, 10);
   scheduleCalendarDeleteWithUndo({
     state,
-    deleteScope: { eventId: event.id, scope: 'this', occurrenceDate: date },
+    deleteScope: {
+      eventId: event.id,
+      seriesId: event.series_id,
+      scope: 'this',
+      occurrenceDate: event.start_datetime.slice(0, 10),
+    },
     message: t('calendar.deletedToast'),
     schedule: scheduleUndoableDelete,
-    requestDelete: ({ keepalive }) => (
-      api.post(`/calendar/${event.id}/exceptions`, { date }, { keepalive })
-    ),
+    requestDelete: ({ keepalive }) => requestCalendarOccurrenceDelete({
+      api, event, scope: 'this', keepalive,
+    }),
     isViewActive: () => Boolean(_container?.isConnected),
     reloadEvents: reloadCalendarRangeAfterDelete,
     handleError: (err) => window.yuvomi?.showToast(

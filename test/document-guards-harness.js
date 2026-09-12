@@ -30,12 +30,14 @@
  *
  * Aufruf ueber test/test-document-guards.js. Waehrend der Entwicklung kann
  * `DOCUMENT_GUARDS_BASE_URL` auf einen bereits laufenden Preview-Server
- * zeigen; dann entfaellt das Hochfahren samt Seed.
+ * zeigen; dann entfaellt das Hochfahren samt Seed - und mit ihm die Isolation
+ * der Sonden (#1104), weil es keinen Server gibt, den `reset()` neu starten
+ * koennte. Ein solcher Lauf taugt deshalb nicht als Beleg.
  */
 
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -189,15 +191,32 @@ function startServer(dbPath, port) {
 }
 
 async function stopServer(child) {
-  if (!child || child.exitCode !== null) return;
-  await new Promise((res) => {
-    child.once('exit', res);
-    child.kill('SIGTERM');
-    setTimeout(() => {
-      child.kill('SIGKILL');
-      res();
-    }, 5000).unref?.();
-  });
+  // `signalCode` zaehlt mit: ein per Signal beendeter Prozess hat keinen
+  // `exitCode`, und auf sein `exit` zu warten hiesse ewig warten.
+  if (!child || child.exitCode !== null || child.signalCode !== null) return;
+  // ERST NACH DEM EXIT ZURUECK, auch nach SIGKILL. Seit `reset()` folgt auf
+  // jedes Stoppen ein Kopieren der Datenbank und ein Neustart auf demselben
+  // Port - ein Server, der noch stirbt, schreibt dann in die Kopie oder haelt
+  // den Port.
+  const exited = new Promise((res) => child.once('exit', res));
+  child.kill('SIGTERM');
+  const hard = setTimeout(() => child.kill('SIGKILL'), 5000);
+  await exited;
+  clearTimeout(hard);
+}
+
+/**
+ * Kopiert eine SQLite-Datenbank samt `-wal` und `-shm` - nur bei gestopptem
+ * Server. Die drei gehoeren zusammen: eine Hauptdatei ohne ihre WAL ist ein
+ * aelterer Stand, und eine liegengebliebene WAL neben einer fremden
+ * Hauptdatei spielt SQLite beim naechsten Oeffnen auf die falsche Datei.
+ * Deshalb wird am Ziel zuerst alles entfernt.
+ */
+function copyDatabase(from, to) {
+  for (const suffix of ['-wal', '-shm', '']) rmSync(`${to}${suffix}`, { force: true });
+  for (const suffix of ['', '-wal', '-shm']) {
+    if (existsSync(`${from}${suffix}`)) copyFileSync(`${from}${suffix}`, `${to}${suffix}`);
+  }
 }
 
 /** Meldet sich einmal an und liefert die Session-Cookies als puppeteer-Objekte. */
@@ -237,18 +256,27 @@ async function loginCookies(baseUrl) {
 
 /**
  * Faehrt Server (falls noetig) und Browser hoch.
- * @returns {Promise<{baseUrl: string, browser: import('puppeteer').Browser, close: () => Promise<void>}>}
+ *
+ * `reset()` stellt vor jeder Sonde den Ausgangsstand wieder her (#1104): der
+ * Server startet neu auf dem Stand nach Seed und Anmeldung, und die Sonde
+ * bekommt einen frischen Browser-Kontext. Gegen `DOCUMENT_GUARDS_BASE_URL`
+ * gibt es keinen Server zum Neustarten - dort erneuert `reset()` nur den
+ * Kontext, und Limit wie Daten laufen weiter von Sonde zu Sonde.
+ *
+ * @returns {Promise<{baseUrl: string, browser: import('puppeteer').Browser, context: import('puppeteer').BrowserContext, reset: () => Promise<void>, close: () => Promise<void>}>}
  */
 export async function startHarness() {
   const external = process.env.DOCUMENT_GUARDS_BASE_URL;
   let server = null;
   let tmpDir = null;
+  let dbPath = null;
+  let port = null;
   let baseUrl = external;
 
   if (!external) {
     tmpDir = mkdtempSync(join(tmpdir(), 'yuvomi-document-guards-'));
-    const dbPath = join(tmpDir, 'guards.db');
-    const port = await freePort();
+    dbPath = join(tmpDir, 'guards.db');
+    port = await freePort();
     baseUrl = `http://127.0.0.1:${port}`;
 
     // Erster Start migriert das leere Schema. Der Seed laeuft danach als
@@ -277,16 +305,97 @@ export async function startHarness() {
   // ihn hinein - und der Fehler sieht dann aus wie ein fehlender Seed.
   const cookies = await loginCookies(baseUrl);
 
-  return {
+  // DER STAND NACH SEED UND ANMELDUNG IST DER AUSGANGSPUNKT JEDER SONDE (#1104).
+  // Die Anmeldung gehoert in den Snapshot, weil die Sitzung in der Datenbank
+  // liegt (`sessions`): nach dem Zuruecksetzen ist das Cookie oben wieder gueltig,
+  // und der Login-Limiter sieht keinen zweiten Versuch.
+  let snapshotPath = null;
+  if (!external) {
+    await stopServer(server);
+    mkdirSync(join(tmpDir, 'snapshot'));
+    snapshotPath = join(tmpDir, 'snapshot', 'guards.db');
+    copyDatabase(dbPath, snapshotPath);
+    server = startServer(dbPath, port);
+    await waitForHttp(baseUrl);
+  }
+
+  const harness = {
     baseUrl,
     browser,
     cookies,
+    context: await browser.createBrowserContext(),
+    // Hat seit dem letzten Zuruecksetzen eine Seite den Server erreicht? Eine
+    // Sonde ohne Browser (etwa der Abgleich zweier Listen) laesst ihn
+    // unberuehrt, und dafuer den Server neu zu starten kostet nur Zeit.
+    touched: false,
+
+    /**
+     * Stellt den Ausgangsstand wieder her: zuerst ein frischer Browser-Kontext,
+     * damit keine Seite der vorigen Sonde weiter anfragt (Cookies, localStorage
+     * und Cache gehen mit), dann ein Neustart auf dem Snapshot. Der Neustart
+     * leert das Limit, weil es im Speicher des Prozesses liegt, und die Kopie
+     * nimmt jede Zeile zurueck, die eine Sonde angelegt und nicht wieder
+     * geloescht hat.
+     */
+    async reset() {
+      await harness.context.close();
+      harness.context = await browser.createBrowserContext();
+      if (external || !harness.touched) return;
+      await stopServer(server);
+      copyDatabase(snapshotPath, dbPath);
+      server = startServer(dbPath, port);
+      await waitForHttp(baseUrl);
+      harness.touched = false;
+    },
+
     async close() {
       await browser.close();
       await stopServer(server);
       if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
     },
   };
+  return harness;
+}
+
+/**
+ * Schaltet den Service Worker einer Seite ab, bevor eines ihrer Skripte laeuft.
+ *
+ * Der Service Worker cacht die Shell. Ohne diese Abschaltung misst der Guard
+ * den Stand des letzten Laufs statt den der Arbeitskopie (Handoff §6).
+ *
+ * DER ABBRUCH VON `/sw.js` HAT IHN NIE ERREICHT (gemessen fuer #1104). Den
+ * Skriptabruf von `navigator.serviceWorker.register()` sieht die
+ * Request-Interception der Seite nicht: der Abbruch griff kein einziges Mal,
+ * und nach dem ersten Laden war `navigator.serviceWorker.controller` gesetzt.
+ * Solange alle Sonden einen Browser-Kontext teilten, installierte er sich
+ * einmal pro Lauf. Mit einem frischen Kontext je Sonde installiert er sich je
+ * Sonde, `sw-register.js` laedt beim `controllerchange` die Seite nach 200 ms
+ * neu, und in Sonde 10 zerstoerte das den Ausfuehrungskontext mitten in der
+ * Messung.
+ *
+ * ABGELEHNT, NICHT WEGDEFINIERT: ein `navigator.serviceWorker`, das
+ * `undefined` liefert, laesst die App beim Aufbau abstuerzen (sie haengt
+ * Listener daran) - die Seite blieb dann leer und die Sonden massen ein
+ * Dokument ohne Modul. Hier bleibt der Container, nur `register()` lehnt ab,
+ * und `sw-register.js` faengt das selbst.
+ *
+ * `ready` LEHNT EBENFALLS AB, SONST HAENGT ES. Laut Spezifikation erfuellt
+ * sich `ready` erst mit einer aktiven Registrierung - lehnt `register()` ab,
+ * bliebe es fuer immer offen, und kein `try/catch` hilft gegen ein Promise,
+ * das sich nie entscheidet. `pushStatus()` in push.js wartet darauf, das
+ * Benachrichtigungs-Blatt blieb dann auf "wird geprueft" mit gesperrten
+ * Knoepfen stehen, und die Sonden massen diesen Zwischenstand. Als der Worker
+ * noch wirklich installierte, erreichte das Blatt "nicht abonniert"; ein
+ * abgelehntes `ready` landet in genau diesem catch. Die uebrigen Leser in
+ * push.js laufen nur nach einem Klick oder mit erteilter Berechtigung.
+ */
+async function disableServiceWorker(page) {
+  await page.evaluateOnNewDocument(() => {
+    if (typeof ServiceWorkerContainer === 'undefined') return;
+    const abgeschaltet = () => Promise.reject(new Error('document-guards: Service Worker abgeschaltet'));
+    ServiceWorkerContainer.prototype.register = abgeschaltet;
+    Object.defineProperty(ServiceWorkerContainer.prototype, 'ready', { configurable: true, get: abgeschaltet });
+  });
 }
 
 /**
@@ -294,23 +403,18 @@ export async function startHarness() {
  * und Farbwelt.
  */
 export async function openPage(harness, { device = 'mobile', theme = 'light', locale = 'de' } = {}) {
-  const page = await harness.browser.newPage();
+  harness.touched = true;
+  const page = await harness.context.newPage();
   await page.setViewport(DEVICES[device]);
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: theme }]);
+  await disableServiceWorker(page);
 
-  // Der Service Worker cacht die Shell. Ohne diese Abschaltung misst der Guard
-  // den Stand des letzten Laufs statt den der Arbeitskopie (Handoff §6).
-  //
-  // ABGESCHNITTEN, NICHT WEGDEFINIERT: ein `navigator.serviceWorker`, das
-  // `undefined` liefert, laesst die App beim Aufbau abstuerzen (sie haengt
-  // Listener daran) - die Seite blieb dann leer und die Sonden massen ein
-  // Dokument ohne Modul. Hier wird stattdessen die Datei nicht ausgeliefert;
-  // `register()` scheitert, und die App faengt das selbst ab.
+  // Die Interception bleibt eingeschaltet, obwohl sie den Service Worker nicht
+  // abschaltet: eine Sonde kann darueber einzelne Anfragen anhalten.
   await page.setRequestInterception(true);
   page.on('request', (req) => {
-    if (new URL(req.url()).pathname === '/sw.js') req.abort();
-    else if (page.__yuvomiRequestInterceptor?.(req)) return;
-    else req.continue();
+    if (page.__yuvomiRequestInterceptor?.(req)) return;
+    req.continue();
   });
 
   await page.setCookie(...harness.cookies);
@@ -407,15 +511,24 @@ export async function gotoRoute(page, path) {
  * Grund - es wartet auf `#main-content` mit Kindern, und `offline.html` ist
  * kein SPA-Dokument. Stattdessen wird auf den ersten stabilen Aufbau gewartet.
  */
-export async function openAnonPage(harness, { device = 'mobile', theme = 'light' } = {}) {
-  const page = await harness.browser.newPage();
+export async function openAnonPage(harness, { device = 'mobile', theme = 'light', locale = 'de' } = {}) {
+  harness.touched = true;
+  const page = await harness.context.newPage();
   await page.setViewport(DEVICES[device]);
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: theme }]);
+  await disableServiceWorker(page);
+  // DIE SPRACHE STEHT FEST, BEVOR EIN SKRIPT DER SEITE LAEUFT. Ohne
+  // `yuvomi-locale` greifen lang-init.js und i18n.js auf `navigator.languages`
+  // zurueck, und das ist im headless Chrome Englisch. Solange alle Sonden einen
+  // Kontext teilten, hatte ein frueheres `openPage()` den Schluessel schon
+  // gesetzt; mit einem frischen Kontext je Sonde ist er weg, und Sonde 10 mass
+  // die Seiten vor der Anmeldung auf Englisch - bei Ueberlauf und Zielgroessen,
+  // die an der Textlaenge haengen.
+  await page.evaluateOnNewDocument((l) => {
+    try { localStorage.setItem('yuvomi-locale', l); } catch { /* undurchsichtiger Ursprung */ }
+  }, locale);
   await page.setRequestInterception(true);
-  page.on('request', (req) => {
-    if (new URL(req.url()).pathname === '/sw.js') req.abort();
-    else req.continue();
-  });
+  page.on('request', (req) => req.continue());
   page.__yuvomiBase = harness.baseUrl;
   page.__yuvomiTheme = theme;
   return page;

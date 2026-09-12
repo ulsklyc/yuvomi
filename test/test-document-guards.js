@@ -17,7 +17,7 @@
  * laufenden Preview-Server und spart Migration + Seed.
  */
 
-import { test, before, after, describe } from 'node:test';
+import { test, before, beforeEach, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -278,8 +278,251 @@ before(async () => {
   harness = await startHarness();
 });
 
+// JEDE SONDE BEGINNT AUF DEMSELBEN STAND (#1104). Die Sonden teilen einen
+// Server, und bis hierher trug jede drei Dinge an die naechste weiter: das
+// API-Limit (300 Anfragen pro Minute je IP, und jede Sonde ist 127.0.0.1), ihre
+// liegengebliebenen Daten und - ueber einen 429 auf /auth/me - eine Seite, die
+// auf /login steht. Eine Sonde fiel dann fuer die Sonde vor ihr: in #1044 war
+// derselbe Probe-Code einmal gruen und einmal rot. `reset()` startet den Server
+// auf dem Stand nach Seed und Anmeldung neu und gibt jeder Sonde einen frischen
+// Browser-Kontext; eine Sonde ohne Seite kostet nur den Kontext. Damit misst ein
+// gezielter Lauf (`--test-name-pattern`) dieselben Vorbedingungen wie der volle.
+beforeEach(async () => {
+  await harness.reset();
+});
+
 after(async () => {
   await harness?.close();
+});
+
+test('save confirmations preserve the same editor across repeated gates and keep legacy delete closing', async () => {
+  const page = await openPage(harness, { device: 'desktop', locale: 'de' });
+  try {
+    await page.evaluate(async () => {
+      const modal = await import('/components/modal.js');
+      let closeCount = 0;
+      modal.openModal({
+        title: 'Unsaved editor',
+        content: '<form><input id="gate-title" value="Original title"><textarea id="gate-description">Original notes</textarea><button type="button" id="gate-save">Save</button></form>',
+        onClose: () => { closeCount += 1; },
+      });
+      window.saveGateTest = {
+        modal,
+        editor: document.getElementById('shared-modal-overlay'),
+        title: document.getElementById('gate-title'),
+        description: document.getElementById('gate-description'),
+        closeCount: () => closeCount,
+      };
+      modal.refreshDirtySnapshot();
+      window.saveGateTest.title.value = 'Unsaved title';
+      window.saveGateTest.description.value = 'Unsaved multiline\nnotes';
+    });
+
+    for (const confirmed of [false, true, true, false]) {
+      await page.evaluate(() => {
+        document.getElementById('gate-save').focus();
+        const state = window.saveGateTest;
+        state.pending = state.modal.confirmOverModal('Continue saving?', { closeOnConfirm: false });
+      });
+      await page.click(confirmed ? '#confirm-modal-ok' : '#confirm-modal-cancel');
+      const state = await page.evaluate(async () => {
+        const state = window.saveGateTest;
+        const confirmed = await state.pending;
+        return {
+          confirmed,
+          sameEditor: document.getElementById('shared-modal-overlay') === state.editor,
+          sameTitle: document.getElementById('gate-title') === state.title,
+          sameDescription: document.getElementById('gate-description') === state.description,
+          title: document.getElementById('gate-title')?.value,
+          description: document.getElementById('gate-description')?.value,
+          interactive: state.editor.isConnected && !state.editor.inert,
+          closeCount: state.closeCount(),
+          focus: document.activeElement?.id,
+          overlayCount: document.querySelectorAll('.modal-overlay').length,
+        };
+      });
+      assert.deepEqual(state, {
+        confirmed,
+        sameEditor: true,
+        sameTitle: true,
+        sameDescription: true,
+        title: 'Unsaved title',
+        description: 'Unsaved multiline\nnotes',
+        interactive: true,
+        closeCount: 0,
+        focus: 'gate-save',
+        overlayCount: 1,
+      });
+    }
+
+    // Resuming a save gate must preserve the editor's original dirty baseline.
+    await page.evaluate(() => { window.saveGateTest.pending = window.saveGateTest.modal.closeModal(); });
+    await page.waitForSelector('#confirm-modal-cancel');
+    await page.click('#confirm-modal-cancel');
+    assert.equal(await page.evaluate(async () => {
+      await window.saveGateTest.pending;
+      return document.getElementById('shared-modal-overlay') === window.saveGateTest.editor;
+    }), true);
+
+    // Delete callers omit the new option and still close on confirmation.
+    await page.evaluate(() => {
+      window.saveGateTest.pending = window.saveGateTest.modal.confirmOverModal('Delete this event?');
+    });
+    await page.click('#confirm-modal-ok');
+    assert.deepEqual(await page.evaluate(async () => {
+      const confirmed = await window.saveGateTest.pending;
+      return { confirmed, closeCount: window.saveGateTest.closeCount(), editorConnected: window.saveGateTest.editor.isConnected };
+    }), { confirmed: true, closeCount: 1, editorConnected: false });
+  } finally {
+    await page.close();
+  }
+});
+
+async function openCalendarSaveGateEditor(page, { wholeSeriesOnly = false } = {}) {
+  const seriesId = await page.evaluate(async (wholeSeriesOnly) => {
+    const { api } = await import('/api.js');
+    const { data: event } = await api.post('/calendar', {
+      title: 'Calendar save gate original',
+      start_datetime: '2048-04-03T09:00:00',
+      end_datetime: '2048-04-03T10:00:00',
+      recurrence_rule: 'FREQ=DAILY;COUNT=3',
+    });
+    await api.put(`/calendar/${event.id}/occurrences/2048-04-04`, { title: 'Linked second occurrence' });
+    if (wholeSeriesOnly) {
+      // Preserve the real response shape while exercising the server capability
+      // contract for local series that cannot offer occurrence edits.
+      const get = api.get.bind(api);
+      api.get = async (...args) => {
+        const response = await get(...args);
+        for (const row of Array.isArray(response.data) ? response.data : [response.data]) {
+          if (row?.id === event.id) {
+            row.can_override_occurrence = false;
+            row.can_detach_occurrence = false;
+          }
+        }
+        return response;
+      };
+    }
+    return event.id;
+  }, wholeSeriesOnly);
+  await page.evaluate((path) => window.yuvomi.navigate(path), `/calendar?open=${seriesId}&date=2048-04-03`);
+  await page.waitForSelector('#detail-popover-edit, #detail-view-edit');
+  await page.click('#detail-popover-edit, #detail-view-edit');
+  await page.waitForSelector('#modal-title');
+  await page.evaluate(() => {
+    window.calendarGateTest = {
+      editor: document.getElementById('shared-modal-overlay'),
+      title: document.getElementById('modal-title'),
+      description: document.getElementById('modal-description'),
+    };
+    window.calendarGateTest.title.value = 'Calendar save gate unsaved';
+    window.calendarGateTest.description.value = 'Typed notes must survive';
+  });
+  return seriesId;
+}
+
+async function assertCalendarSaveGateEditor(page) {
+  assert.deepEqual(await page.evaluate(() => {
+    const state = window.calendarGateTest;
+    return {
+      sameEditor: document.getElementById('shared-modal-overlay') === state.editor,
+      sameTitle: document.getElementById('modal-title') === state.title,
+      sameDescription: document.getElementById('modal-description') === state.description,
+      title: document.getElementById('modal-title')?.value,
+      description: document.getElementById('modal-description')?.value,
+      interactive: state.editor.isConnected && !state.editor.inert,
+      saveEnabled: document.getElementById('modal-save')?.disabled === false,
+    };
+  }), {
+    sameEditor: true,
+    sameTitle: true,
+    sameDescription: true,
+    title: 'Calendar save gate unsaved',
+    description: 'Typed notes must survive',
+    interactive: true,
+    saveEnabled: true,
+  });
+}
+
+test('calendar save gates retain unsaved fields after orphan confirmation, server failure and canceled retry', async () => {
+  const page = await openPage(harness, { device: 'desktop', locale: 'de' });
+  try {
+    const seriesId = await openCalendarSaveGateEditor(page);
+    const attempts = [];
+    page.removeAllListeners('request');
+    page.on('request', (request) => {
+      const pathname = new URL(request.url()).pathname;
+      if (pathname === '/sw.js') return void request.abort();
+      if (pathname === `/api/v1/calendar/${seriesId}` && request.method() === 'PUT') {
+        const body = JSON.parse(request.postData());
+        attempts.push(body);
+        if (body.confirmed_orphan_count === 1) {
+          return void request.respond({
+            status: 500,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: 'Save gate test server failure', code: 500 }),
+          });
+        }
+      }
+      void request.continue();
+    });
+    await page.select('#modal-edit-scope', 'series');
+    await page.evaluate(() => { document.getElementById('event-rrule-count').value = '1'; });
+    await page.click('#modal-save');
+    await page.waitForSelector('#confirm-modal-ok');
+    assert.equal(attempts.length, 1, 'the real server must reject the rule that orphans its linked child');
+    await page.click('#confirm-modal-ok');
+    await page.waitForFunction(() => [...document.querySelectorAll('[role="alert"], .toast')]
+      .some((element) => element.textContent.includes('Save gate test server failure')));
+    await assertCalendarSaveGateEditor(page);
+    assert.equal(attempts.length, 2);
+    assert.equal(attempts[1].confirmed_orphan_count, 1);
+    assert.equal(attempts[1].title, 'Calendar save gate unsaved');
+
+    await page.waitForFunction(() => ![...document.querySelectorAll('.toast')]
+      .some((element) => element.textContent.includes('Save gate test server failure')));
+    await page.click('#modal-save');
+    await page.waitForSelector('#confirm-modal-cancel');
+    await page.click('#confirm-modal-cancel');
+    await page.waitForFunction(() => !document.getElementById('confirm-modal-cancel')
+      && document.getElementById('modal-save')?.disabled === false);
+    await assertCalendarSaveGateEditor(page);
+    assert.equal(attempts.length, 3, 'canceling the repeated gate must not send a confirmed write');
+    const persisted = await page.evaluate(async (id) => {
+      const { api } = await import('/api.js');
+      return (await api.get(`/calendar/${id}`)).data;
+    }, seriesId);
+    assert.equal(persisted.title, 'Calendar save gate original');
+    assert.equal(persisted.recurrence_rule, 'FREQ=DAILY;COUNT=3');
+  } finally {
+    await page.close();
+  }
+});
+
+test('calendar whole-series save confirmation leaves invalid UNTIL editable', async () => {
+  const page = await openPage(harness, { device: 'desktop', locale: 'de' });
+  try {
+    await openCalendarSaveGateEditor(page, { wholeSeriesOnly: true });
+    assert.equal(await page.$('#modal-edit-scope'), null, 'the fixture must use the whole-series-only capability');
+    await page.select('#event-rrule-end', 'until');
+    await page.evaluate(() => {
+      const picker = document.getElementById('event-rrule-until');
+      const input = picker.querySelector('input');
+      input.value = '31.02.2048';
+      // The picker currently exposes invalid text as an empty canonical value.
+      // Supply its raw-value boundary explicitly to exercise saveEvent's real
+      // valid_until=false branch without changing datepicker behavior here.
+      Object.defineProperty(picker, 'value', { get: () => input.value, configurable: true });
+    });
+    await page.click('#modal-save');
+    await page.waitForSelector('#confirm-modal-ok');
+    await page.click('#confirm-modal-ok');
+    await page.waitForFunction(() => document.getElementById('event-rrule-until')?.getAttribute('aria-invalid') === 'true');
+    await assertCalendarSaveGateEditor(page);
+    assert.equal(await page.$eval('#event-rrule-until', (input) => input.value), '31.02.2048');
+  } finally {
+    await page.close();
+  }
 });
 
 test('PR2 #975 - das zusammengesetzte Kalenderformular und seine Seriennamen bleiben wahr', async () => {
@@ -3992,6 +4235,19 @@ async function openReadyNoteModal(page) {
   await new Promise((resolve) => setTimeout(resolve, 300));
 }
 
+async function activateNoteSave(page) {
+  // These probes exercise save ownership and request ordering, not toast
+  // geometry. A due reminder can legitimately cover the button's screen
+  // coordinates depending on the wall-clock date. HTMLElement.click() still
+  // drives the real control, respects its disabled state, and keeps the probe
+  // independent of unrelated seed reminders.
+  assert.equal(await page.$eval('#note-modal-save', (button) => {
+    if (button.disabled) return false;
+    button.click();
+    return true;
+  }), true, 'the note save button must be enabled before activation');
+}
+
 async function typeExactly(page, selector, value) {
   await page.type(selector, value);
   assert.equal(await page.$eval(selector, (field) => field.value), value);
@@ -4319,7 +4575,7 @@ test('Sonde 22 - Anlegen einer Kategorie blockiert Speichern und beruehrt keinen
     heldRequest = null;
     await page.waitForSelector(`[data-selected-category-id] .note-category-selection__name`);
     await page.waitForFunction(() => !document.querySelector('#note-modal-save')?.disabled);
-    await page.click('#note-modal-save');
+    await activateNoteSave(page);
     await page.waitForSelector('#shared-modal-overlay', { hidden: true });
 
     const persisted = await page.evaluate(async ({ title, categoryName }) => {
@@ -4495,7 +4751,7 @@ test('Sonde 23 - spaete Notizantworten respektieren Ersatz- und Bestaetigungsdia
     await typeExactly(page, '#note-content', successContent);
     await clearMatchingToast(page, { tone: 'success', text: 'Note created' });
     heldRequest = holdNextNoteSave(page);
-    await page.click('#note-modal-save');
+    await activateNoteSave(page);
     await heldRequest.seen;
     await discardOpenNoteEditor(page);
     await openReadyNoteModal(page);
@@ -4542,7 +4798,7 @@ test('Sonde 23 - spaete Notizantworten respektieren Ersatz- und Bestaetigungsdia
     await replaceExactly(page, '#note-content', 'This PUT is expected to fail after its editor closes.');
     await clearMatchingToast(page, { tone: 'danger', text: 'PUT note save delayed failure' });
     heldRequest = holdNextNoteSave(page, { method: 'PUT', noteId: failureFixture.id });
-    await page.click('#note-modal-save');
+    await activateNoteSave(page);
     await heldRequest.seen;
     await discardOpenNoteEditor(page);
     await openReadyNoteModal(page);
@@ -4587,7 +4843,7 @@ test('Sonde 23 - spaete Notizantworten respektieren Ersatz- und Bestaetigungsdia
     await replaceExactly(page, '#note-content', retryContent);
     await clearMatchingToast(page, { tone: 'danger', text: 'PUT note save delayed failure' });
     heldRequest = holdNextNoteSave(page, { method: 'PUT', noteId: failureFixture.id });
-    await page.click('#note-modal-save');
+    await activateNoteSave(page);
     await heldRequest.seen;
     await heldRequest.reject();
     heldRequest = null;
@@ -4601,7 +4857,7 @@ test('Sonde 23 - spaete Notizantworten respektieren Ersatz- und Bestaetigungsdia
 
     await clearMatchingToast(page, { tone: 'success', text: 'Note saved' });
     heldRequest = holdNextNoteSave(page, { method: 'PUT', noteId: failureFixture.id });
-    await page.click('#note-modal-save');
+    await activateNoteSave(page);
     await heldRequest.seen;
     await heldRequest.release();
     heldRequest = null;
@@ -4623,7 +4879,7 @@ test('Sonde 23 - spaete Notizantworten respektieren Ersatz- und Bestaetigungsdia
     await typeExactly(page, '#note-content', confirmationContent);
     await clearMatchingToast(page, { tone: 'success', text: 'Note created' });
     heldRequest = holdNextNoteSave(page);
-    await page.click('#note-modal-save');
+    await activateNoteSave(page);
     await heldRequest.seen;
     await page.keyboard.press('Escape');
     await page.waitForSelector('#confirm-modal-cancel');

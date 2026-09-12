@@ -184,19 +184,30 @@ export function handleDeletionError(err, row, provider) {
 
 /**
  * Markiert ein Event für den Push und/oder den Umzug.
+ *
+ * Ein Umzug überlebt bewusst jede Vormerkung, die keinen kennt: COALESCE lässt die
+ * bestehende Absicht stehen, damit eine Feldänderung einen wartenden Umzug nicht
+ * verschluckt. Zurücknehmen lässt er sich deshalb nur ausdrücklich über
+ * `cancelMove` - ein `moveTo: null` kommt gegen das COALESCE nicht an.
+ *
  * @param {number} eventId
- * @param {{dirty?: boolean, moveTo?: string|null}} what
+ * @param {{dirty?: boolean, moveTo?: string|null, cancelMove?: boolean}} what
+ * @returns {boolean} true, wenn danach ausgehende Arbeit ansteht - nicht nur die
+ *   dieses Aufrufs: nimmt er einen Umzug zurück, kann aus einem früheren,
+ *   gescheiterten Versuch noch ein Push offen sein, und der Aufrufer entscheidet
+ *   daran über seinen Sofortversuch.
  */
-export function markOutbound(eventId, { dirty = false, moveTo = null } = {}) {
-  if (!dirty && !moveTo) return false;
-  db.get().prepare(`
+export function markOutbound(eventId, { dirty = false, moveTo = null, cancelMove = false } = {}) {
+  if (!dirty && !moveTo && !cancelMove) return false;
+  const row = db.get().prepare(`
     UPDATE calendar_events
     SET outbound_dirty    = CASE WHEN ? THEN 1 ELSE outbound_dirty END,
-        outbound_move_to  = COALESCE(?, outbound_move_to),
+        outbound_move_to  = CASE WHEN ? THEN NULL ELSE COALESCE(?, outbound_move_to) END,
         outbound_attempts = 0
     WHERE id = ?
-  `).run(dirty ? 1 : 0, moveTo, eventId);
-  return true;
+    RETURNING outbound_dirty, outbound_move_to
+  `).get(dirty ? 1 : 0, cancelMove ? 1 : 0, moveTo, eventId);
+  return !!(row && (row.outbound_dirty || row.outbound_move_to));
 }
 
 export function pendingUpdates(source) {
@@ -264,9 +275,76 @@ export function handleUpdateError(err, event, what, provider, giveUp = clearOutb
   log.warn(`[${provider}] Outbound ${what} failed for event ${event.id} (attempt ${attempts}):`, err.message);
 }
 
+/**
+ * Spalte mit dem gewählten Zielkalender eines Providers. Umzug kennt nur, wer ein
+ * wählbares Ziel hat: der Apple-Legacy-Sync lädt in den ersten verfügbaren
+ * Kalender, dort gibt es nichts zu wechseln.
+ */
+function targetFieldFor(source) {
+  if (source === 'google') return 'target_google_calendar_id';
+  if (source === 'caldav') return 'target_caldav_calendar_url';
+  return null;
+}
+
+/** Externe Kennung des Kalenders, in dem der Termin laut calendar_ref_id liegt. */
+function currentCalendarId(event) {
+  if (!event.calendar_ref_id) return null;
+  return db.get().prepare('SELECT external_id FROM external_calendars WHERE id = ? AND source = ?')
+    .get(event.calendar_ref_id, event.external_source)?.external_id ?? null;
+}
+
 /** Der Event-Stand unmittelbar vor dem Provider-Aufruf; null, wenn parallel gelöscht. */
 export function reloadEvent(eventId) {
   return db.get().prepare('SELECT * FROM calendar_events WHERE id = ?').get(eventId) ?? null;
+}
+
+/**
+ * Schliesst die ausgehende Arbeit eines Termins nach dem Provider-Aufruf ab.
+ *
+ * Zwischen dem Nachladen vor dem Aufruf und hier liegt mindestens ein await. Trifft
+ * in dieser Zeit eine Bearbeitung ein, setzt die Route outbound_dirty erneut, und
+ * ein pauschales clearOutbound löschte genau diese Markierung: beim Provider läge
+ * der ältere Stand, und der nächste Inbound überschriebe die neuere lokale
+ * Änderung. Ein in dieser Zeit vorgemerkter Umzug fiele genauso weg. Erledigt ist
+ * deshalb nur, was hinausging - verglichen an den gespiegelten Feldern und an dem
+ * Umzug, den dieser Aufruf ausgeführt hat.
+ *
+ * @param {object}      sent           die Zeile, aus der der Aufruf gebaut wurde
+ * @param {string|null} handledMoveTo  der Umzug, den dieser Aufruf erledigt hat
+ * @param {object}      requested      die Zeile, auf deren Ziel der Umzug beruhte.
+ *   Gleich `sent`, wenn Umzug und Änderung ein Aufruf sind (CalDAV); älter, wenn
+ *   ein Provider erst verschiebt und danach getrennt patcht (Google).
+ */
+export function settleOutbound(sent, handledMoveTo = null, requested = sent) {
+  const now = reloadEvent(sent.id);
+  if (!now) return;
+  const edited = mirroredFieldsChanged(sent, now);
+  let nextMove = (now.outbound_move_to ?? null) !== handledMoveTo ? now.outbound_move_to : null;
+  // Einen Zielwechsel während eines Umzugs hat die Route noch gegen die QUELLE
+  // gerechnet: calendar_ref_id wandert erst nach dem Umzug. Ein Rückweg dorthin
+  // sah wie "kein Umzug" aus und liess die alte Vormerkung stehen, die hier als
+  // erledigt gälte. Massgeblich ist dann das Ziel der Anfrage, gegen den Kalender,
+  // in dem der Termin jetzt liegt. Dasselbe gilt für jeden während des Aufrufs
+  // vorgemerkten Umzug, auch ohne Umzug in diesem Aufruf: er stammt aus einem
+  // Zielwechsel, und ein späterer Wechsel zurück auf den Kalender, in dem der
+  // Termin liegt, kann ihn in der Route nicht mehr zurücknehmen - das aktuelle
+  // Ziel ist der letzte Wunsch.
+  const targetField = targetFieldFor(now.external_source);
+  const retargeted  = handledMoveTo && now[targetField] !== requested[targetField];
+  if (targetField && (nextMove || retargeted)) {
+    const target  = now[targetField] || null;
+    const current = currentCalendarId(now) ?? handledMoveTo;
+    nextMove = target && target !== current ? target : null;
+  }
+  if (!edited && !nextMove) {
+    clearOutbound(sent.id);
+    return;
+  }
+  db.get().prepare(`
+    UPDATE calendar_events
+    SET outbound_dirty = ?, outbound_move_to = ?, outbound_attempts = 0
+    WHERE id = ?
+  `).run(edited ? 1 : 0, nextMove, sent.id);
 }
 
 export function recordObjectUrl(eventId, objectUrl) {
@@ -341,36 +419,46 @@ export function queueEventDeletion(event, database = null) {
  * Der Umzug hängt bewusst an der *Änderung im Request*, nicht am Zustand:
  * Bestandsdaten können ein Ziel tragen, das vom tatsächlichen Kalender abweicht
  * (die target_*-Felder waren für gespiegelte Termine folgenlos setzbar), und das
- * darf nicht nachträglich als Umzugswunsch gelesen werden.
+ * darf nicht nachträglich als Umzugswunsch gelesen werden. Aus demselben Grund
+ * nimmt nur eine Zielwahl im Request einen vorgemerkten Umzug zurück.
  * @returns {boolean} true, wenn etwas aussteht
  */
 export function markEventOutbound(before, after) {
   if (!after || !OUTBOUND_SOURCES.includes(after.external_source)) return false;
   if (!after.external_calendar_id) return false;
-  if (!acceptsOutbound(after.external_source)) return false;
 
   const dirty = mirroredFieldsChanged(before, after);
 
-  // Umzug kennt nur, wer ein wählbares Ziel hat. Der Apple-Legacy-Sync lädt in den
-  // ersten verfügbaren Kalender, dort gibt es nichts zu wechseln.
-  const targetField = after.external_source === 'google'
-    ? 'target_google_calendar_id'
-    : after.external_source === 'caldav' ? 'target_caldav_calendar_url' : null;
+  const targetField = targetFieldFor(after.external_source);
 
-  let moveTo = null;
+  let moveTo     = null;
+  let cancelMove = false;
   if (targetField) {
-    const target  = after[targetField] || null;
-    const current = after.calendar_ref_id
-      ? db.get().prepare('SELECT external_id FROM external_calendars WHERE id = ? AND source = ?')
-          .get(after.calendar_ref_id, after.external_source)?.external_id ?? null
-      : null;
-    if (target && target !== before?.[targetField] && current && target !== current) {
-      moveTo = target;
+    const target   = after[targetField] || null;
+    const previous = before?.[targetField] || null;
+    const current  = currentCalendarId(after);
+    if (target && target !== previous && current) {
+      // Zurück auf den Kalender, in dem der Termin liegt: ein noch nicht
+      // ausgeführter Umzug ist damit widerrufen und muss fallen. Ohne das bliebe
+      // er stehen (COALESCE) und der nächste Sync schöbe den Termin in einen
+      // Kalender, den niemand mehr gewählt hat.
+      if (target === current) cancelMove = true;
+      else moveTo = target;
     }
   }
 
-  if (!dirty && !moveTo) return false;
-  return markOutbound(after.id, { dirty, moveTo });
+  // Vormerken kann nur, wer überhaupt hinausschreiben darf. Das Zurücknehmen
+  // nicht: es ist eine rein lokale Buchung, und genau in einer Nur-Lesen-Phase
+  // muss sie durchkommen - sonst steht nach dem Abschalten des Nur-Lesen-Modus
+  // noch ein Umzug an, den der Nutzer längst widerrufen hat. Ein Sofortversuch
+  // lohnt dann trotzdem nicht, deshalb false.
+  if (!acceptsOutbound(after.external_source)) {
+    if (cancelMove) markOutbound(after.id, { cancelMove });
+    return false;
+  }
+
+  if (!dirty && !moveTo && !cancelMove) return false;
+  return markOutbound(after.id, { dirty, moveTo, cancelMove });
 }
 
 /**

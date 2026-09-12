@@ -34,6 +34,23 @@ test('die Subagenten laufen synchron', () => {
     'die Anweisung, Subagenten synchron zu fahren, fehlt im Prompt');
 });
 
+test('der Prompt traegt keine Werkzeug-Anweisungen, nur den Verweis auf CONTRIBUTING.md', () => {
+  // 11.09.2026: ein Absatz ueber offene und gesperrte `gh api`- und git-Wege liess
+  // die Review den ganzen Prompt als eingeschleust verwerfen (#1116, #1114; von
+  // den 18 Laeufen davor keiner). Was erlaubt ist, setzt `claude_args` durch. Der
+  // Verweis auf CONTRIBUTING.md bleibt - dort kann die Review die Regel "jeder
+  // Push" selbst nachlesen, und genau das vermisste sie.
+  const prompt = workflow.match(/prompt: \|\n((?:[ ]{12}.*\n|\n)+)/)?.[1] ?? '';
+  assert.ok(prompt.includes('/code-review:code-review'), 'der Prompt liess sich nicht lesen');
+  assert.doesNotMatch(prompt, /gh api|--allowed-tools|gesperrt|WERKZEUGE/i,
+    'Werkzeug-Anweisungen gehoeren in claude_args, nicht in den Prompt');
+  assert.match(prompt, /CONTRIBUTING\.md/, 'der Verweis auf die nachlesbare Regel fehlt');
+  // Der Checkout traegt die Fassung des PR - ein PR koennte den Widerspruch sonst
+  // selbst wieder einbauen (Review auf #1119). Massgeblich ist der Default-Branch.
+  assert.match(prompt, /github\.event\.repository\.default_branch/,
+    'der Prompt muss die Fassung auf dem Default-Branch fuer massgeblich erklaeren');
+});
+
 test('Skill und Task stehen in den erlaubten Werkzeugen', () => {
   // `--allowed-tools` ERSETZT die Liste des Plugins. Ohne `Skill` kann die
   // Review ihr eigenes Kommando nicht ausfuehren, ohne `Task` keinen einzigen
@@ -42,6 +59,79 @@ test('Skill und Task stehen in den erlaubten Werkzeugen', () => {
   assert.ok(tools.includes('Skill'), '`Skill` fehlt - das Plugin-Kommando ist dann gesperrt');
   assert.ok(tools.includes('Task'), '`Task` fehlt - die Subagenten sind dann gesperrt');
   assert.ok(tools.includes('Bash(gh pr comment:*)'), 'ohne diesen Weg kann sie ihr Ergebnis nicht abliefern');
+});
+
+/**
+ * Die Werte je Flag in `claude_args`, so zerlegt wie die Action es tut: shell-quote
+ * sammelt hinter einem Flag alle Werte bis zum naechsten `--`, und jeder Wert ist
+ * eine Komma-Liste (base-action/src/parse-sdk-options.ts). Ein Flag steht nie in
+ * Anfuehrungszeichen - `--method` innerhalb einer Deny-Regel ist deshalb Wert, kein
+ * neues Flag.
+ */
+function claudeArgs() {
+  const block = workflow.match(/claude_args:\s*>-\n((?:[ ]{12}\S.*\n)+)/)?.[1] ?? '';
+  const values = {};
+  let flag = null;
+  for (const [token] of block.matchAll(/"[^"]*"|'[^']*'|\S+/g)) {
+    if (token.startsWith('--')) {
+      flag = token.slice(2);
+      values[flag] ??= [];
+      continue;
+    }
+    if (!flag) continue;
+    const inhalt = /^["']/.test(token) ? token.slice(1, -1) : token;
+    values[flag].push(...inhalt.split(',').map((s) => s.trim()).filter(Boolean));
+  }
+  return values;
+}
+
+test('gh api ist nur lesend frei: Allow auf den Repo-Pfad, Deny auf jede Schreibform', () => {
+  // Gemessen am 11.09.2026 (#1116): eine Allow-Regel auf den Pfad laesst `-f` und
+  // `-X POST` mit durch, weil `*` auch das trifft. Erst die Deny-Liste sperrt sie -
+  // fehlt ein Eintrag dort, schreibt die Review mit dem Token des Jobs.
+  const { 'allowed-tools': allow = [], 'disallowed-tools': deny = [] } = claudeArgs();
+  const ghApi = allow.filter((t) => t.startsWith('Bash(gh api')).sort();
+  assert.deepEqual(ghApi, [
+    'Bash(gh api "repos/${{ github.repository }}/*)',
+    'Bash(gh api repos/${{ github.repository }}/*)',
+  ], 'gh api darf nur unter dem eigenen Repo-Pfad frei sein, nie als blosses Praefix');
+  // `-i` schliesst die gebuendelten Kurzflags (`-if`, `-iX POST`), `--hostname`
+  // den fremden Host (Review auf #1117, beides am Werkzeug gemessen).
+  for (const flag of ['-X', '--method', '-f', '-F', '--field', '--raw-field', '--input', '-i', '--hostname']) {
+    assert.ok(deny.includes(`Bash(gh api * ${flag}*)`),
+      `${flag} fehlt fuer gh api in --disallowed-tools`);
+  }
+  // git nimmt die Abkuerzung `--upl=` an; `--upload-pack*` allein liesse sie durch.
+  assert.ok(deny.includes('Bash(git fetch * --upl*)'),
+    '`git fetch origin` darf das Programm der Gegenseite nicht waehlen, auch nicht abgekuerzt');
+});
+
+test('kein erlaubter git-Befehl schreibt per --output eine Datei', () => {
+  // `git show --output=$GITHUB_ENV` schreibt ins Umgebungsfile des Runners, und ein
+  // `BASH_ENV` darin laeuft im naechsten Schritt mit dessen Tokens. show, log, diff
+  // und rev-list nehmen `--output` an (gemessen); alle vier sind erlaubt, also
+  // muessen fuer jeden BEIDE Stellungen gesperrt sein.
+  const { 'allowed-tools': allow = [], 'disallowed-tools': deny = [] } = claudeArgs();
+  for (const befehl of ['show', 'log', 'diff', 'rev-list']) {
+    assert.ok(allow.includes(`Bash(git ${befehl}:*)`), `git ${befehl} ist nicht mehr erlaubt - Test anpassen`);
+    assert.ok(deny.includes(`Bash(git ${befehl} --output*)`),
+      `git ${befehl} --output direkt nach dem Befehl ist nicht gesperrt`);
+    assert.ok(deny.includes(`Bash(git ${befehl} * --output*)`),
+      `git ${befehl} ... --output weiter hinten ist nicht gesperrt`);
+  }
+});
+
+test('Code aus dem Checkout laeuft in der Review nicht', () => {
+  // Der Job traegt OAuth-Token, Schreibrecht auf Pull Requests und OIDC, der
+  // Checkout ist Code des PR. Die Laeufe haben `node --test`, `npm run` und
+  // `node -e` versucht - das bleibt gesperrt, die Tests laufen in ci.yml.
+  const { 'allowed-tools': allow = [] } = claudeArgs();
+  assert.ok(allow.length > 0, 'die Liste liess sich nicht lesen - der Test wuerde sonst nichts messen');
+  const zuBreit = allow.filter((t) =>
+    /^(Write|Edit|MultiEdit|NotebookEdit|WebFetch)\b/.test(t)
+    || /^Bash\((node|npm|npx|bash|sh|python3?|make|curl|wget)\b/.test(t)
+    || /^Bash(\(\*?\))?$/.test(t));
+  assert.deepEqual(zuBreit, [], `ausfuehrende oder schreibende Werkzeuge in der Liste: ${zuBreit.join(', ')}`);
 });
 
 test('der Job darf schreiben, sonst kommt die Review nicht zu Wort', () => {
@@ -151,6 +241,19 @@ test('der Nachweis bindet Aeusserungen an die Commit-SHA', () => {
   assert.match(workflow, /commit: \.commit_id/);
   assert.match(workflow, /commit: \(\.original_commit_id \/\/ \.commit_id\)/);
   assert.match(workflow, /commit: null/);
+});
+
+test('jede Kommentarliste traegt die Adresse ihrer Aeusserungen', () => {
+  // Der Beleg aus dem Strom zaehlt nur, wenn die API seine Adresse als
+  // claude-Aeusserung nach dem Laufbeginn kennt (#1096, dritte Runde). Fehlt
+  // `anker` in einer der drei Listen, gibt es aus ihr keinen Beleg: nie gruen,
+  // aber eine Lieferung ueber genau diesen Weg sieht der Nachweis dann nicht
+  // mehr, und der Haken wird rot, obwohl die Review gesprochen hat.
+  const holer = [...workflow.matchAll(/--jq '\.\[\] \| \{login: \.user\.login,[^']*\}'/g)].map((m) => m[0]);
+  assert.equal(holer.length, 3, 'drei Listen: Zusammenfassungen, Reviews, Inline-Anmerkungen');
+  for (const jq of holer) {
+    assert.match(jq, /anker: \(\.html_url \/\/ "" \| split\("#"\) \| \.\[1\] \/\/ null\)/, jq);
+  }
 });
 
 test('das Urteil laeuft aus einer vertrauenswuerdigen Fassung', () => {

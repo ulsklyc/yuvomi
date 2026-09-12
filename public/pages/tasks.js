@@ -1786,6 +1786,7 @@ async function handleRenameSubtask(id, currentTitle, container) {
   try {
     await api.put(`/tasks/${id}`, { title: title.trim() });
     await loadTasks(container);
+    refocusAfterRender();
   } catch (err) {
     window.yuvomi.showToast(err.message, 'danger');
   }
@@ -1803,6 +1804,7 @@ async function handleDeleteSubtask(id, title, container) {
   try {
     await api.delete(`/tasks/${id}`);
     await loadTasks(container);
+    refocusAfterRender();
   } catch (err) {
     window.yuvomi.showToast(err.message, 'danger');
   }
@@ -2175,23 +2177,67 @@ function renderHistoryEntry(entry) {
     </button>`;
 }
 
-/** Die Personenauswahl - „Alle" plus je ein Mitglied. */
+/** Die Personenauswahl - „Alle" plus je ein Mitglied.
+ *
+ * JEDER CHIP BRAUCHT ETWAS, DAS BLEIBT, WENN SEIN LABEL FAELLT (#1068).
+ *
+ * Unter 640px entfernt die Label-Verlust-Regel (tasks.css) jedes
+ * `.group-toggle__label`. Sie ist dafuer gebaut, dass ein Icon zurueckbleibt -
+ * beim Ansichts-Umschalter daneben steht es schon immer neben dem Text. Diese
+ * Chips hatten keins, also blieb der Knopf LEER: eine Reihe namenloser Flaechen,
+ * bei der nur die getoente Flaeche verriet, welche gerade gewaehlt ist.
+ *
+ * Und der Verlust war nicht nur ein sichtbarer. `display: none` nimmt den Text
+ * auch aus dem Accessibility-Tree; ohne eigenen Namen am Knopf war der Filter
+ * auf dem Telefon fuer eine Vorlesehilfe ebenso namenlos wie fuers Auge. Der
+ * Name gehoert deshalb an den KNOPF (`aria-label`), nicht in ein Kind, das eine
+ * Media-Query wegnehmen darf.
+ *
+ * Was bleibt: fuer die Mitglieder ihr Avatar - dieselbe Scheibe, die die
+ * Verlaufszeilen darunter schon tragen, also kein neues Zeichen, sondern ein
+ * bekanntes. `renderAvatarStack` bringt Bild oder Initialen samt
+ * Kontrastrechnung mit; sie hier ein zweites Mal zu bauen war schon einmal
+ * falsch (siehe renderHistoryEntry). Fuer „Alle" ein Icon aus derselben
+ * Familie wie die Umschalter daneben. */
 function renderHistoryPeople() {
-  const chip = (id, label) => {
+  const chip = (id, label, mark) => {
     const on = state.history.userId === id;
     return `<button type="button" class="group-toggle__btn${on ? ' group-toggle__btn--active' : ''}"
-            data-history-user="${id === null ? '' : id}" aria-pressed="${on}">
+            data-history-user="${id === null ? '' : id}" aria-pressed="${on}"
+            title="${esc(label)}" aria-label="${esc(label)}">
+      ${mark}
       <span class="group-toggle__label">${esc(label)}</span>
     </button>`;
   };
+  /* Die Marke ist Schmuck fuer die Vorlesehilfe: den Namen traegt der Knopf.
+   * Ohne `aria-hidden` kaeme er zweimal - einmal als `aria-label`, einmal aus
+   * dem `alt` des Avatarbildes.
+   *
+   * ZWEI RENDERER, ZWEI FELDNAMEN FUER DIESELBE FARBE. `state.users` kommt aus
+   * `/tasks/meta/options` und heisst dort `avatar_color`, so wie es in der
+   * Tabelle steht; `renderAvatarStack` liest `color`, weil es sonst aus
+   * `ASSIGNED_USERS_SQL` gefuettert wird, das genau dafuer umbenennt
+   * (`'color', u.avatar_color`). Beide Seiten sind fuer sich richtig - wer sie
+   * ungefiltert zusammensteckt, bekommt lautlos die Fallback-Farbe fuer JEDEN,
+   * und damit sind zwei Mitglieder mit gleichen Initialen auf dem Telefon nicht
+   * mehr zu unterscheiden. Deshalb hier die Uebersetzung.
+   *
+   * Ein Foto traegt `/meta/options` nicht, also bleiben es Initialen auf der
+   * Nutzerfarbe. Das ist kein Verlust gegenueber dem Nachbarn: `renderUserMulti
+   * Select` wird aus derselben Liste bedient und zeigt aus demselben Grund
+   * ebenfalls keins. Die Farbe ist ohnehin das Identitaetssignal (User-Farben-
+   * Regel), das Bild die Zugabe. */
+  const personMark = (u) => `<span class="history-people__mark" aria-hidden="true">${
+    renderAvatarStack([{ ...u, color: u.avatar_color }], { size: 22, maxVisible: 1 })}</span>`;
   // Nur wer wirklich etwas beisteuern kann: die Housekeeping-Konten sind aus
   // /meta/options schon heraus, und ein Haushalt aus einer Person braucht die
   // Auswahl gar nicht.
   if (isSoloHousehold()) return '';
   return `
     <div class="group-toggle history-people" role="group" aria-label="${t('tasks.historyPersonFilter')}">
-      ${chip(null, t('common.all'))}
-      ${state.users.map((u) => chip(u.id, u.display_name)).join('')}
+      ${chip(null, t('common.all'),
+        '<i data-lucide="users" class="icon-md group-toggle__icon" aria-hidden="true"></i>')}
+      ${state.users.map((u) => chip(u.id, u.display_name, personMark(u))).join('')}
     </div>`;
 }
 
@@ -2856,8 +2902,31 @@ function getRecentFilters() {
  * Achse dazukommt - und dann still.
  */
 function recentFilterKey(f) {
-  const axis = (values) => [...values].map((v) => String(v).toLowerCase()).sort().join(',');
-  return [f.status, f.priority, f.assigned_to, f.category, f.tags].map(axis).join('|');
+  // STRUKTURELL KODIERT, NICHT MIT TRENNZEICHEN VERKETTET.
+  //
+  // Hier stand `join(',')` INNERHALB einer Achse, und das Komma darf in einem
+  // Wert vorkommen: `normalizeTags` splittet nur eine STRING-Eingabe an
+  // Kommas, ein Array-Element behaelt seines (`normalizeTags(['a,b'])` ->
+  // `['a,b']`), und die Route nimmt Arrays. Damit ergaben der eine Tag `a,b`
+  // und die zwei Tags `a` und `b` denselben Schluessel: `getRecentFilters`
+  // verbarg den einen Chip als Dublette, und `saveRecentFilter` verdraengte
+  // beim Speichern den jeweils anderen.
+  //
+  // Das `join('|')` DARUEBER war dagegen in Ordnung, auch wenn ein Tag ein
+  // `|` tragen darf: die Achsenzahl ist fest, also bleibt jede Position
+  // eindeutig. Eine Probe dafuer stand hier kurz und wurde wieder entfernt -
+  // sie blieb gruen, wenn man den alten Trenner zuruecknahm, und maass damit
+  // nichts. Ersetzt wird er trotzdem mit, weil eine Formel mit zwei Regeln
+  // schwerer zu halten ist als eine ohne.
+  //
+  // Der Server hat dieselbe Frage schon beantwortet und begruendet
+  // (`tagsKey` in server/utils/task-tags.js trennt mit U+0000, "weil ein Tag
+  // Leerzeichen enthalten darf"). JSON braucht die Frage gar nicht erst zu
+  // stellen: es kodiert die Achsen als Struktur, also kann kein Wert seinen
+  // eigenen Trenner tragen. Der Schluessel wird bei jedem Aufruf neu gerechnet
+  // und nirgends gespeichert - die geaenderte Form braucht keine Migration.
+  const axis = (values) => [...values].map((v) => String(v).toLowerCase()).sort();
+  return JSON.stringify([f.status, f.priority, f.assigned_to, f.category, f.tags].map(axis));
 }
 
 function saveRecentFilter(filters) {

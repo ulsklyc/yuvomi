@@ -2,7 +2,7 @@
  * Calendar structure guard.
  *
  * Sichert die modulare Aufteilung von server/routes/calendar.js: der Orchestrator
- * muss dieselbe {Methode, Pfad}-Routentabelle wie vor dem Split ergeben (57
+ * muss die festgelegte {Methode, Pfad}-Routentabelle ergeben (61
  * Routen), und die Cluster-Router müssen zusammen exakt diese Routen ergeben
  * (keine verlorene/doppelte Route). Zusätzlich wird die extern konsumierte
  * Re-Export-Fläche (__test.googleTarget, genutzt von test:google-multi) gepinnt.
@@ -101,9 +101,13 @@ const EXPECTED = [
   'GET /:id',
   'POST /',
   'PUT /:id',
+  'PUT /:seriesId/occurrences/:recurrenceId',
+  'PUT /:seriesId/occurrences/:recurrenceId/following',
   'POST /:id/reset',
   'POST /:id/exceptions',
   'DELETE /:id',
+  'DELETE /:seriesId/occurrences/:recurrenceId',
+  'DELETE /:seriesId/occurrences/:recurrenceId/following',
   // caldav (events + reminders)
   'POST /caldav/accounts',
   'GET /caldav/accounts',
@@ -129,10 +133,10 @@ const EXPECTED = [
   'GET /outlook/status',
 ];
 
-test('Orchestrator ergibt exakt die erwartete Routentabelle (57 Routen)', () => {
+test('Orchestrator ergibt exakt die erwartete Routentabelle (61 Routen)', () => {
   const actual = collectRoutes(calendarRouter).sort();
   assert.deepEqual(actual, [...EXPECTED].sort());
-  assert.equal(actual.length, 57);
+  assert.equal(actual.length, 61);
 });
 
 test('die Cluster-Router zusammen ergeben genau die Orchestrator-Routen (keine verlorene/doppelte Route)', () => {

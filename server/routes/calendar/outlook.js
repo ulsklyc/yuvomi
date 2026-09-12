@@ -93,6 +93,14 @@ router.put('/outlook/accounts/:id', requireAdmin, (req, res) => {
     res.json({ data: result });
   } catch (err) {
     log.error('Outlook account update failed:', err);
+    if (err.code === 'outlook_auto_sync_overrides') {
+      return res.status(409).json({
+        error: err.message,
+        code: 409,
+        conflict: err.code,
+        linked_override_count: err.linkedOverrideCount,
+      });
+    }
     res.status(500).json({ error: err.message || 'Failed to update Outlook account.', code: 500 });
   }
 });
@@ -150,6 +158,14 @@ router.patch('/outlook/accounts/:id/calendars', requireAdmin, (req, res) => {
     res.json({ data: result });
   } catch (err) {
     log.error('Outlook calendar selection update failed:', err);
+    if (err.code === 'outlook_auto_sync_overrides') {
+      return res.status(409).json({
+        error: err.message,
+        code: 409,
+        conflict: err.code,
+        linked_override_count: err.linkedOverrideCount,
+      });
+    }
     res.status(500).json({ error: err.message || 'Failed to update calendar selection.', code: 500 });
   }
 });

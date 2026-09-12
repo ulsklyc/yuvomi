@@ -423,7 +423,7 @@ function renderGrid() {
   // nur, wenn es tatsächlich beide Gruppen gibt.
   const pinned = visible.filter((n) => n.pinned);
   const rest   = visible.filter((n) => !n.pinned);
-  const heading = (label) => `<h2 class="notes-group__title">${label}</h2>`;
+  const heading = (label) => `<h2 class="notes-group__title u-section-title">${label}</h2>`;
 
   const html = (pinned.length && rest.length)
     ? heading(t('notes.groupPinned')) + pinned.map(renderNoteCard).join('')

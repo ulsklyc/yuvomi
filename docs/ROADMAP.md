@@ -4,7 +4,7 @@ This page is direction, not a queue. It names the few themes that keep coming ba
 open discussions, says for each what has been decided and what is still open, and lists the
 things the maintainer has called worth doing without giving them a ticket yet. It carries no
 dates and no versions: with several releases a week, a date written here would be wrong the
-next morning, and a version number the next afternoon. It is touched on the Tuesday train, when
+next morning, and a version number the next afternoon. It is touched on the interface train, when
 the interface release goes out, and it is edited rather than appended to, so that what is done
 disappears from it.
 

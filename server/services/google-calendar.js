@@ -30,6 +30,7 @@ import { assignDefaultToEvent } from './sync-assignment.js';
 import { countSourceEvents, deleteSourceEvents } from './calendar-prune.js';
 import { readSyncOutcome, withSyncOutcome } from './sync-outcome.js';
 import { rruleValue } from './recurrence.js';
+import { runSerialized } from '../utils/sync-lock.js';
 
 const GOOGLE_COLOR = '#4285F4';
 
@@ -216,10 +217,15 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
   const clearMove = outbound.clearOutboundMove;
   // Nach dem Umzug zeigt die Zeile auf den Zielkalender. Ohne das ginge ein
   // späteres Löschen an den alten Kalender und liefe dort ins Leere, während der
-  // Termin in Google stehen bliebe.
+  // Termin in Google stehen bliebe. Die Vormerkung dieses Umzugs fällt gleich mit,
+  // eine während des Aufrufs neu vorgemerkte bleibt stehen (über sie entscheidet
+  // settleOutbound). Bliebe die erledigte bis nach dem Patch liegen, räumte sie
+  // bei einem scheiternden Patch erst der nächste Lauf per clearOutboundMove ab -
+  // und der setzt dabei den Fehlversuchszähler des Patches zurück.
   const applyMove = db.get().prepare(`
     UPDATE calendar_events
-    SET calendar_ref_id = ?, external_calendar_id = ?, outbound_move_to = NULL
+    SET calendar_ref_id = ?, external_calendar_id = ?,
+        outbound_move_to = CASE WHEN outbound_move_to = ? THEN NULL ELSE outbound_move_to END
     WHERE id = ?
   `);
 
@@ -244,6 +250,8 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
     }
     // Zeigt nach einem Umzug auf den Zielkalender - dessen Zone gilt für den Patch.
     let activeMeta = meta;
+    // Der Umzug, den dieser Lauf bei Google ausgeführt hat.
+    let movedTo = null;
 
     // ── Umzug in einen anderen Kalender (events.move) ────────────────────────
     const moveTo = event.outbound_move_to;
@@ -264,8 +272,8 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
           eventId    = moved?.data?.id || event.external_calendar_id;
           calendarId = moveTo;
           activeMeta = destMeta;
-          applyMove.run(destMeta.refId, eventId, event.id);
-          if (!event.outbound_dirty) done++;
+          applyMove.run(destMeta.refId, eventId, moveTo, event.id);
+          movedTo = moveTo;
         } catch (err) {
           // Der Umzug ist die Voraussetzung für den Patch im Zielkalender -
           // hier abbrechen, statt im alten Kalender zu patchen. Wird der Umzug
@@ -280,23 +288,35 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
       clearMove(event.id);
     }
 
-    if (!event.outbound_dirty) continue;
-
     // ── Geänderte Felder pushen (events.patch) ───────────────────────────────
     // Frisch nachladen: zwischen der Auswahl oben und hier liegt mindestens ein
     // await, in dem eine weitere Bearbeitung eingetroffen sein kann. Sonst ginge
-    // der ältere Stand raus und das anschließende clear würde die neue
-    // Vormerkung mitlöschen - Google bliebe dauerhaft hinterher.
+    // der ältere Stand raus. Auch ob überhaupt gepatcht wird, entscheidet dieser
+    // Stand: eine Bearbeitung während des Umzugs geht so noch im Zielkalender
+    // hinaus, statt auf den nächsten Lauf zu warten.
     const fresh = outbound.reloadEvent(event.id);
     if (!fresh) continue; // parallel gelöscht - der Tombstone-Pfad übernimmt
+
+    // Das Ziel, auf dem der Umzug beruhte, steht in der Auswahl: `fresh` kommt erst
+    // nach events.move und kennt einen Zielwechsel währenddessen schon.
+    if (!fresh.outbound_dirty) {
+      if (movedTo) {
+        outbound.settleOutbound(fresh, movedTo, event);
+        done++;
+      }
+      continue;
+    }
 
     try {
       const gEvent = localEventToGoogle(fresh, colorMap, activeMeta?.timeZone || householdTimeZone(db.get()));
       await calendar.events.patch({ calendarId, eventId, requestBody: gEvent });
-      clear(event.id);
+      // Während des Patches Eingetroffenes bleibt vorgemerkt.
+      outbound.settleOutbound(fresh, movedTo, event);
       done++;
     } catch (err) {
-      handleError(err, event, 'update', clear);
+      // Mit dem Zähler des nachgeladenen Stands: eine Bearbeitung seit der Auswahl
+      // hat ihn zurückgesetzt und bekommt ihre eigenen Versuche.
+      handleError(err, fresh, 'update', clear);
     }
   }
   return done;
@@ -309,6 +329,10 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
  * @returns {Promise<{deleted:number,updated:number}>}
  */
 async function flushOutbound() {
+  return runSerialized('google', 'flush', runFlushOutbound);
+}
+
+async function runFlushOutbound() {
   const idle = { deleted: 0, updated: 0 };
   if (!isConnected() || isReadonly()) return idle;
 
@@ -576,7 +600,7 @@ function disconnect({ deleteEvents = false } = {}) {
  * Werfen bei fehlendem Token, das ohne Verbindung der wahrscheinlichste Fall ist.
  */
 async function sync() {
-  return withSyncOutcome(db.get(), 'google', runSync);
+  return runSerialized('google', 'sync', () => withSyncOutcome(db.get(), 'google', runSync));
 }
 
 async function runSync() {

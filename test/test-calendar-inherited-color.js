@@ -446,7 +446,7 @@ test('der Lesepfad speist cal_color aus beiden Toepfen', async () => {
   const LESEPFADE = [
     'server/routes/calendar/read.js',
     'server/routes/calendar/crud.js',
-    'server/services/calendar-events.js',
+    'server/services/calendar-event-reader.js',
   ];
   for (const datei of LESEPFADE) {
     const quelle = await readFile(new URL(`../${datei}`, import.meta.url), 'utf8');

@@ -214,3 +214,38 @@ test('eine stale Achse beschneidet nicht, die frischen schon', () => {
   assert.deepEqual(set.tags, [], 'die frische Tag-Liste beschneidet');
   assert.deepEqual(set.assigned_to, [], 'die frische Mitgliederliste ebenso');
 });
+
+test('ein Tag mit Komma kollidiert nicht mit zwei Tags', () => {
+  // Codex-Befund P2 zu PR #1072, am Code nachgemessen: `normalizeTags`
+  // splittet nur eine STRING-Eingabe an Kommas, ein Array-Element behaelt
+  // seines (`normalizeTags(['a,b'])` -> `['a,b']`), und die Route nimmt
+  // Arrays. Der Schluessel verband die Achse aber mit `,` - der eine Tag
+  // `a,b` und die zwei Tags `a` und `b` ergaben denselben.
+  //
+  // Zwei Schaeden aus einer Ursache, und beide werden hier gemessen: die
+  // Ansicht verbarg den einen Chip als Dublette, und `saveRecentFilter`
+  // verdraengte beim Speichern den jeweils anderen.
+  withKnown({ tags: ['a,b', 'a', 'b'] });
+  put({ tags: ['a,b'] }, { tags: ['a', 'b'] });
+
+  assert.equal(tasks.getRecentFilters().length, 2,
+    'zwei verschiedene Filter, zwei Chips');
+
+  // Und die Speicherseite: das eine Set darf das andere nicht verdraengen.
+  store.clear();
+  tasks.saveRecentFilter({ ...emptySet, tags: ['a,b'] });
+  tasks.saveRecentFilter({ ...emptySet, tags: ['a', 'b'] });
+  assert.equal(raw().length, 2, 'beide Sets stehen im Speicher');
+});
+
+test('derselbe Filter verdraengt sich weiterhin selbst', () => {
+  // Die Gegenrichtung, ohne die der Fix nur "alles ist verschieden" hiesse:
+  // dieselben Werte in anderer Reihenfolge und Schreibweise bleiben EIN Set.
+  withKnown({ tags: ['garten', 'urlaub'] });
+  store.clear();
+  tasks.saveRecentFilter({ ...emptySet, tags: ['garten', 'urlaub'] });
+  tasks.saveRecentFilter({ ...emptySet, tags: ['Urlaub', 'Garten'] });
+
+  assert.equal(raw().length, 1, 'Reihenfolge und Schreibweise machen kein neues Set');
+  assert.equal(tasks.getRecentFilters().length, 1);
+});

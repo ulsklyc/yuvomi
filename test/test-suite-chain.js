@@ -5,7 +5,10 @@
  *        und liefen damit monatelang weder lokal (npm test) noch in CI - eine
  *        davon war still verrottet. Dieser Guard schließt genau dieses Loch:
  *        (1) jedes test:*-Script hängt in der test-Kette, (2) jede
- *        test/test-*.js-Datei wird von einem Script referenziert.
+ *        test/test-*.{js,mjs}-Datei wird von einem Script referenziert.
+ *        Beide Richtungen vergleichen an der WORTGRENZE: ein Teilstring-
+ *        Vergleich hielt `test:search` drei Monate lang für eingehängt,
+ *        weil `npm run test:search-index-duplicates` in der Kette stand.
  * Ausführen: node --test test/test-suite-chain.js
  */
 
@@ -52,10 +55,29 @@ function needsBrowser(name) {
   return imports.some((spec) => spec === 'puppeteer' || spec.includes('document-guards-harness'));
 }
 
+/**
+ * Hängt `name` in `script`? An der WORTGRENZE, nicht als Teilstring.
+ *
+ * `script.includes('npm run test:search')` ist wahr, sobald irgendwo
+ * `npm run test:search-diacritics` steht - der Präfix genügt. Genau so ist
+ * `test:search` durch diesen Guard gerutscht: die Suite hing nirgends, lief
+ * seit ihrer Entstehung weder lokal noch in CI, und der Guard meldete sie
+ * grün, weil eine SCHWESTERSUITE mit längerem Namen in der Kette stand
+ * (gemessen 2026-09-09, verdeckt durch `test:search-index-duplicates`).
+ *
+ * Das ist die teuerste Sorte Blindheit: nicht eine fehlende Regel, sondern
+ * eine vorhandene, die die falsche Frage stellt. Ein Guard, der Namen
+ * vergleicht, muss dort aufhoeren, wo der Name aufhoert - deshalb die
+ * Lookaheads statt `includes()`.
+ */
+const nameEnd = '(?![\\w:.-])';
+const fileEnd = '(?![\\w.-])';
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const runsIn = (script, name) => {
-  if (script.includes(`npm run ${name}`)) return true;
+  if (new RegExp(`npm run ${escapeRe(name)}${nameEnd}`).test(script)) return true;
   const file = suiteFile(name);
-  return Boolean(file && script.includes(file));
+  return Boolean(file && new RegExp(`${escapeRe(file)}${fileEnd}`).test(script));
 };
 
 test('jedes test:*-Script hängt in genau einer Kette', () => {
@@ -98,12 +120,25 @@ test('die Browser-Suiten laufen unter test:document-guards', () => {
   );
 });
 
-test('jede test/test-*.js-Datei hat ein npm-Script', () => {
+/* `.mjs` ZAEHLT MIT - aber nur HIER, nicht in suiteFile().
+ *
+ * `.endsWith('.js')` ist auf `test-browser-loader.mjs` falsch: die letzten drei
+ * Zeichen sind `mjs`. Eine kuenftige Suite als `.mjs` wäre damit unsichtbar,
+ * und zwar lautlos - der Guard meldete sie nie an.
+ *
+ * Das Muster gehört trotzdem NICHT in `suiteFile()`. Einunddreißig Scripts
+ * fahren ihre Suite über `--loader ./test/test-browser-loader.mjs`; ein
+ * gemeinsames `\.m?js` träfe dort den LOADER statt der Testdatei und schickte
+ * `needsBrowser()` in die falsche Datei. Deshalb ein eigenes Muster an genau
+ * der Stelle, die es braucht. */
+const TEST_FILE = /test\/[\w.-]+\.m?js/g;
+
+test('jede test/test-*.{js,mjs}-Datei hat ein npm-Script', () => {
   const referenced = new Set(
-    Object.values(pkg.scripts).flatMap((v) => [...v.matchAll(/test\/[\w.-]+\.js/g)].map((m) => m[0])),
+    Object.values(pkg.scripts).flatMap((v) => [...v.matchAll(TEST_FILE)].map((m) => m[0])),
   );
   const orphans = readdirSync(new URL('../test', import.meta.url))
-    .filter((f) => f.startsWith('test-') && f.endsWith('.js'))
+    .filter((f) => /^test-.*\.m?js$/.test(f))
     .filter((f) => !referenced.has(`test/${f}`));
   assert.deepEqual(
     orphans,

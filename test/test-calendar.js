@@ -20,6 +20,22 @@ function test(name, fn) {
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion fehlgeschlagen'); }
 
+test('Kalender-Speicherbestätigungen halten beide Editor-Save-Gates offen', () => {
+  const source = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  for (const [name, nextName] of [
+    ['confirmCalendarOverrideOrphans', 'confirmLocalWholeSeriesEdit'],
+    ['confirmLocalWholeSeriesEdit', 'confirmLocalWholeSeriesDelete'],
+  ]) {
+    const start = source.indexOf(`function ${name}(`);
+    assert(start >= 0, `${name} muss auffindbar bleiben`);
+    const end = source.indexOf(`function ${nextName}(`, start);
+    assert(end > start, `${name} muss vor ${nextName} stehen`);
+    const body = source.slice(start, end);
+    assert(/confirmOverModal\([\s\S]*closeOnConfirm:\s*false/.test(body),
+      `${name} darf das Editor-Modal vor dem Save-Lauf nicht schließen`);
+  }
+});
+
 test('Kalenderanhänge verwenden Dokument-Endpunkte und behalten Legacy-Data-URLs lesbar', () => {
   const linked = {
     attachment_document_id: 42,
@@ -50,6 +66,48 @@ test('Kalenderanhänge verwenden Dokument-Endpunkte und behalten Legacy-Data-URL
     'Legacy-Blob bleibt als Data URL lesbar'
   );
   assert(calendarHelpers.hasAttachment({}) === false, 'Leeres Event hat keinen Anhang');
+});
+
+test('Vererbte Serientermin-Erinnerungen verwenden den Server-Anker statt des verschobenen Datums', () => {
+  const movedLinkedOccurrence = {
+    id: 99,
+    start_datetime: '2026-11-02T11:00:00Z',
+    reminder_owner_id: 41,
+    reminder_anchor_start: '2026-10-01T09:00:00Z',
+  };
+  const inheritedReminder = { remind_at: '2026-10-01T08:00:00' };
+
+  assert(calendarHelpers.reminderOwnerId(movedLinkedOccurrence) === 41,
+    'die Leseroute muss Erinnerungen beim vom Server genannten Owner laden');
+  assert(calendarHelpers.reminderOffsetFromEvent(movedLinkedOccurrence, inheritedReminder) === '60',
+    'der Offset muss eine Stunde bleiben und darf nicht vom verschobenen 2. November abgeleitet werden');
+});
+
+test('Eigene Serientermin-Erinnerungen verwenden den vom Server gelieferten Child-Anker', () => {
+  const movedLinkedOccurrence = {
+    id: 99,
+    start_datetime: '2026-11-02T11:00:00Z',
+    reminder_owner_id: 99,
+    reminder_anchor_start: '2026-11-02T11:00:00Z',
+  };
+  const ownedReminder = { remind_at: '2026-11-02T10:45:00' };
+
+  assert(calendarHelpers.reminderOwnerId(movedLinkedOccurrence) === 99);
+  assert(calendarHelpers.reminderOffsetFromEvent(movedLinkedOccurrence, ownedReminder) === '15');
+});
+
+test('Serientermin-Speichern legt kanonische Reminder-Offsets in den atomaren Body', () => {
+  assert(
+    JSON.stringify(calendarHelpers.canonicalReminderOffsets([
+      { offset: '' },
+      { offset: '60' },
+      { offset: 'custom', amount: '2', unit: 'days' },
+      { offset: '60' },
+    ])) === JSON.stringify([60, 2880]),
+    'Offsets müssen numerisch, dedupliziert und in Formularreihenfolge an den Occurrence-Endpunkt gehen',
+  );
+  assert(JSON.stringify(calendarHelpers.canonicalReminderOffsets([], false)) === '[]',
+    'ein ausgeschalteter Reminder muss als explizit leeres Offset-Set gesendet werden');
 });
 
 const db = new DatabaseSync(':memory:');
@@ -530,6 +588,58 @@ test('eventEndDate: datums-only Ende bleibt unangetastet', () => {
 test('eventEndDate: ohne Enddatum gilt der Starttag', () => {
   const ev = { start_datetime: '2026-06-14T09:00', end_datetime: null, all_day: 0 };
   assert(eventEndDate(ev) === '2026-06-14', 'Kein Ende → Starttag');
+});
+
+// --------------------------------------------------------
+// eventWhenText (#1102): die „Wann"-Zeile der Detailansicht nennt den Endtag,
+// sobald er ein anderer ist - nach derselben Regel wie das Raster.
+//
+// Der i18n-Stub gibt Datum und Uhrzeit unverändert zurück (formatTime also den
+// ganzen Zeitstempel) und hängt die Werte als JSON an den Key. Ein Ende OHNE
+// Datum ist deshalb der blanke Zeitstempel, ein Ende MIT Datum trägt das
+// Datum davor: "2026-09-12 2026-09-12T11:00".
+// --------------------------------------------------------
+const { eventWhenText } = calendarHelpers;
+const whenRange = (text) => JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
+
+test('eventWhenText: eintägiges Zeit-Event nennt vom Ende nur die Uhrzeit', () => {
+  const text = eventWhenText({ start_datetime: '2026-09-10T14:00', end_datetime: '2026-09-10T15:30', all_day: 0 });
+  assert(text.startsWith('calendar.dayRangeLabel'), `Zeitraum über den Locale-Key: ${text}`);
+  assert(whenRange(text).to === '2026-09-10T15:30', `Ende ohne vorangestelltes Datum: ${text}`);
+});
+
+test('eventWhenText: mehrtägiges Zeit-Event nennt Enddatum und Enduhrzeit', () => {
+  const text = eventWhenText({ start_datetime: '2026-09-10T14:00', end_datetime: '2026-09-12T11:00', all_day: 0 });
+  assert(whenRange(text).from === '2026-09-10 2026-09-10T14:00', `Start mit Datum: ${text}`);
+  assert(whenRange(text).to === '2026-09-12 2026-09-12T11:00', `Enddatum steht vor der Uhrzeit: ${text}`);
+});
+
+test('eventWhenText: Zeit-Event bis 00:00 des Folgetags bleibt eintägig', () => {
+  const text = eventWhenText({ start_datetime: '2026-09-10T21:00', end_datetime: '2026-09-11T00:00', all_day: 0 });
+  assert(whenRange(text).to === '2026-09-11T00:00', `21:00-24:00 gehört dem Abend (#804): ${text}`);
+});
+
+test('eventWhenText: mehrtägiges Zeit-Event bis 00:00 nennt den echten Endzeitpunkt, nicht den letzten Rastertag', () => {
+  // Review auf #1114, entschieden: das Raster fuehrt den Termin am 1. und 2.,
+  // die Zeile nennt aber, WANN er endet - am 3. um 00:00. Das Datum aus
+  // eventEndDate() mit der rohen Uhrzeit hiesse "2. 00:00", einen Tag zu frueh.
+  const ev = { start_datetime: '2026-01-01T14:00', end_datetime: '2026-01-03T00:00', all_day: 0 };
+  assert(eventEndDate(ev) === '2026-01-02', 'das Raster endet am 2. (#804)');
+  const text = eventWhenText(ev);
+  assert(whenRange(text).to === '2026-01-03 2026-01-03T00:00', `Ende ist der 3. um 00:00: ${text}`);
+});
+
+test('eventWhenText: mehrtägiges Ganztags-Event nennt beide Tage', () => {
+  const text = eventWhenText({ start_datetime: '2026-09-10T00:00', end_datetime: '2026-09-12T00:00', all_day: 1 });
+  assert(text === 'calendar.dayRangeLabel{"from":"2026-09-10","to":"2026-09-12"} · calendar.allDay',
+    `Ende inklusiv, beide Tage genannt: ${text}`);
+});
+
+test('eventWhenText: eintägiges Ganztags-Event und Termin ohne Ende bleiben unverändert', () => {
+  const allDay = eventWhenText({ start_datetime: '2026-09-10T00:00', end_datetime: '2026-09-10T00:00', all_day: 1 });
+  assert(allDay === '2026-09-10 · calendar.allDay', `Ein Tag, kein Zeitraum: ${allDay}`);
+  const open = eventWhenText({ start_datetime: '2026-09-10T14:00', end_datetime: null, all_day: 0 });
+  assert(open === '2026-09-10 2026-09-10T14:00', `Ohne Ende nur der Start: ${open}`);
 });
 
 test('eventEndDate: Ende vor dem Start fällt auf den Starttag zurück', () => {
@@ -1822,6 +1932,228 @@ test('renderDayView: zwei ueberlappende Schichten am selben Tag bekommen untersc
       `renderDayView() muss das berechnete Layout an renderScheduleTimeBlock() weiterreichen, sonst liegen `
       + `beide Bloecke deckungsgleich uebereinander (#1043): ${lefts}`);
   });
+});
+
+test('eventMapUrl: eine Kartensuche nur, wo ein Ortstext uebrig bleibt (#1110)', () => {
+  const { eventMapUrl } = calendarHelpers;
+  assert(typeof eventMapUrl === 'function', 'eventMapUrl muss ueber __test erreichbar sein');
+  const gleich = (ist, soll, was) => assert(ist === soll, `${was}: ${JSON.stringify(ist)} statt ${JSON.stringify(soll)}`);
+  gleich(
+    eventMapUrl('Hauptstraße 5, Berlin'),
+    'https://www.openstreetmap.org/search?query=Hauptstra%C3%9Fe%205%2C%20Berlin',
+    'Adresse als Suchtext',
+  );
+  // Zeichen, die eine URL zerlegen koennten, bleiben im Suchtext.
+  gleich(
+    eventMapUrl('A&B?x=1#2'),
+    'https://www.openstreetmap.org/search?query=A%26B%3Fx%3D1%232',
+    'URL-Sonderzeichen',
+  );
+  // Ohne Ort: keine Aktion.
+  for (const leer of [null, undefined, '', '   ']) {
+    gleich(eventMapUrl(leer), '', `kein Link fuer ${JSON.stringify(leer)}`);
+  }
+  // NICHT HIER: die ICS-escapte Adresse. Der Browser-Loader ersetzt
+  // `/utils/html.js` durch einen Stub, dessen `fmtLocation` die Identitaet ist -
+  // ein Fall, der das Aufraeumen braucht, waere hier rot aus dem falschen Grund.
+  // Er steht in test:detail-view gegen das echte fmtLocation.
+});
+
+// --------------------------------------------------------
+// #1064: Filter nach Kalender/Abo und die Achse "Nicht zugewiesen"
+// --------------------------------------------------------
+
+/** Den Filterzustand fuer einen Fall setzen und danach zuruecklegen. */
+function mitFilterzustand(felder, fn) {
+  const { state } = calendarHelpers;
+  const vorher = {};
+  for (const k of Object.keys(felder)) vorher[k] = state[k];
+  Object.assign(state, felder);
+  try { return fn(); } finally { Object.assign(state, vorher); }
+}
+
+/** localStorage fuer einen Fall - der Browser-Loader stellt keinen bereit. */
+function mitSpeicher(eintraege, fn) {
+  const vorher = globalThis.localStorage;
+  const daten = new Map(Object.entries(eintraege));
+  globalThis.localStorage = {
+    getItem: (k) => (daten.has(k) ? daten.get(k) : null),
+    setItem: (k, v) => daten.set(k, String(v)),
+    removeItem: (k) => daten.delete(k),
+  };
+  try { return fn(daten); } finally { globalThis.localStorage = vorher; }
+}
+
+const FILTER_TAG = '2026-09-10';
+const FILTER_TERMINE = [
+  { id: 1, title: 'Zahnarzt', start_datetime: `${FILTER_TAG}T09:00:00`, assigned_users: [{ id: 1 }] },
+  { id: 2, title: 'Training', start_datetime: `${FILTER_TAG}T17:00:00`, assigned_users: [{ id: 2 }],
+    calendar_ref_id: 5, cal_name: 'Arbeit', cal_color: '#3366cc' },
+  { id: 3, title: 'Muellabfuhr', start_datetime: `${FILTER_TAG}T07:00:00`, assigned_users: [],
+    subscription_id: 7, cal_name: 'Abfallkalender', cal_color: '#228844' },
+  { id: 4, title: 'Elternabend', start_datetime: `${FILTER_TAG}T19:00:00`, assigned_users: [] },
+];
+const NUTZER = [{ id: 1 }, { id: 2 }];
+const tagesIds = () => calendarHelpers.eventsOnDay(FILTER_TAG).map((e) => e.id).sort((a, b) => a - b).join(',');
+
+test('#1064: "Nicht zugewiesen" ist ein Eintrag der Personenachse', () => {
+  const { UNASSIGNED } = calendarHelpers;
+  const basis = { events: FILTER_TERMINE, users: NUTZER, assignedToMe: false, hiddenSources: new Map(), layerBirthdays: true };
+  mitFilterzustand({ ...basis, people: new Set() }, () => {
+    assert(tagesIds() === '1,2,3,4', `ohne Filter alle vier, war ${tagesIds()}`);
+  });
+  mitFilterzustand({ ...basis, people: new Set([UNASSIGNED]) }, () => {
+    assert(tagesIds() === '3,4', `allein gewaehlt zeigt der Eintrag nur die Termine ohne Person, war ${tagesIds()}`);
+  });
+  mitFilterzustand({ ...basis, people: new Set([1, UNASSIGNED]) }, () => {
+    assert(tagesIds() === '1,3,4', `mit einer Person zusammen die Vereinigung, war ${tagesIds()}`);
+  });
+  mitFilterzustand({ ...basis, people: new Set([1]) }, () => {
+    assert(tagesIds() === '1',
+      `ein Filter ohne den Eintrag - etwa einer von vor #1064 - laesst Termine ohne Person weiter heraus, war ${tagesIds()}`);
+  });
+});
+
+test('#1064: eine ausgeblendete Quelle fehlt in jeder Ansicht, und Quelle UND Person wirken zusammen', () => {
+  const { passesSourceFilter, eventSourceKey } = calendarHelpers;
+  assert(eventSourceKey(FILTER_TERMINE[1]) === 'cal:5', 'CalDAV/Google/Apple ueber calendar_ref_id');
+  assert(eventSourceKey(FILTER_TERMINE[2]) === 'sub:7', 'ICS-Abos ueber subscription_id');
+  assert(eventSourceKey(FILTER_TERMINE[0]) === null, 'ein eigener Termin hat keine Quelle');
+
+  const basis = { events: FILTER_TERMINE, users: NUTZER, assignedToMe: false, layerBirthdays: true };
+  mitFilterzustand({ ...basis, people: new Set(), hiddenSources: new Map([['sub:7', { name: 'Abfallkalender', color: null }]]) }, () => {
+    assert(tagesIds() === '1,2,4', `das Abo ist ausgeblendet, der Rest bleibt, war ${tagesIds()}`);
+    assert(passesSourceFilter(FILTER_TERMINE[0]) === true, 'ein eigener Termin laesst sich nicht wegschalten');
+  });
+  mitFilterzustand({ ...basis, people: new Set([calendarHelpers.UNASSIGNED]), hiddenSources: new Map([['sub:7', { name: '', color: null }]]) }, () => {
+    assert(tagesIds() === '4', `Quelle UND Person: vom Unzugewiesenen bleibt nur, was nicht aus dem Abo kommt, war ${tagesIds()}`);
+  });
+});
+
+// Codex-Befund auf PR #1124: ein neuer Termin fuer einen Google- oder
+// CalDAV-Kalender traegt `calendar_ref_id` erst nach dem Hochladen. Der Server
+// loest die Quelle deshalb ueber das Ziel auf (`source_calendar_ref_id`, siehe
+// test-calendar-routes.js), und der Filter muss genau dieses Feld lesen.
+test('#1064: ein Termin fuer einen ausgeblendeten Kalender fehlt schon vor dem Hochladen', () => {
+  const { eventSourceKey, calendarSources } = calendarHelpers;
+  const unterwegs = {
+    id: 5, title: 'Neu im Arbeitskalender', start_datetime: `${FILTER_TAG}T12:00:00`, assigned_users: [{ id: 1 }],
+    calendar_ref_id: null, source_calendar_ref_id: 5, cal_name: null, cal_color: null,
+  };
+  assert(eventSourceKey(unterwegs) === 'cal:5', 'die aufgeloeste Quelle zaehlt, auch ohne calendar_ref_id');
+  const termine = [unterwegs, ...FILTER_TERMINE];
+  const basis = { events: termine, users: NUTZER, assignedToMe: false, people: new Set(), layerBirthdays: true };
+  mitFilterzustand({ ...basis, hiddenSources: new Map([['cal:5', { name: 'Arbeit', color: '#3366cc' }]]) }, () => {
+    assert(tagesIds() === '1,3,4', `der neue Termin geht mit seinem Kalender, war ${tagesIds()}`);
+  });
+  mitFilterzustand({ ...basis, hiddenSources: new Map() }, () => {
+    const arbeit = calendarSources().find((q) => q.key === 'cal:5');
+    assert(arbeit.name === 'Arbeit' && arbeit.color === '#3366cc',
+      `Name und Farbe kommen vom synchronisierten Termin derselben Quelle, auch wenn der neue zuerst steht, war ${JSON.stringify(arbeit)}`);
+  });
+  mitFilterzustand({ ...basis, events: [unterwegs], hiddenSources: new Map([['cal:5', { name: 'Arbeit', color: '#3366cc' }]]) }, () => {
+    const arbeit = calendarSources().find((q) => q.key === 'cal:5');
+    assert(arbeit.name === 'Arbeit', `steht nur der neue im Zeitraum, nennt der Merker den Kalender, war ${JSON.stringify(arbeit)}`);
+  });
+  // Codex-Review zu PR #1124: ohne Merker und ohne synchronisierten Nachbarn
+  // stand der Kalender als namenloses „Kalender" im Blatt. Der Server liefert
+  // Name und Farbe der aufgeloesten Quelle mit.
+  const mitQuelle = { ...unterwegs, source_calendar_name: 'Arbeit', source_calendar_color: '#3366cc' };
+  mitFilterzustand({ ...basis, events: [mitQuelle], hiddenSources: new Map() }, () => {
+    const arbeit = calendarSources().find((q) => q.key === 'cal:5');
+    assert(arbeit.name === 'Arbeit' && arbeit.color === '#3366cc',
+      `ein neuer Termin allein nennt seinen Kalender, war ${JSON.stringify(arbeit)}`);
+  });
+});
+
+test('#1064: das Blatt kennt jede Quelle aus den Terminen und jede ausgeblendete, auch ohne Termin', () => {
+  const { calendarSources } = calendarHelpers;
+  mitFilterzustand({ events: FILTER_TERMINE, hiddenSources: new Map([['cal:9', { name: 'Urlaub', color: '#aa5500' }]]) }, () => {
+    const quellen = calendarSources();
+    assert(quellen.map((q) => q.key).join(',') === 'sub:7,cal:5,cal:9',
+      `nach Namen sortiert, die ausgeblendete ohne Termin dabei, war ${quellen.map((q) => q.key)}`);
+    assert(quellen.find((q) => q.key === 'cal:5').color === '#3366cc', 'die Farbe kommt vom Termin');
+    assert(quellen.find((q) => q.key === 'cal:9').name === 'Urlaub', 'der Name der ausgeblendeten aus dem Merker');
+  });
+});
+
+test('#1064: beide Filter kommen gegen den Speicher geprueft zurueck', () => {
+  const { restorePeopleFilter, restoreHiddenSources, UNASSIGNED } = calendarHelpers;
+  mitSpeicher({ 'yuvomi:calendar:people': JSON.stringify([1, UNASSIGNED, 99]) }, () => {
+    const set = restorePeopleFilter(NUTZER);
+    assert(set.has(1) && set.has(UNASSIGNED) && !set.has(99) && set.size === 2,
+      'der Eintrag ueberlebt das Laden, eine unbekannte ID nicht');
+  });
+  mitSpeicher({ 'yuvomi:calendar:people': JSON.stringify([1, 2, UNASSIGNED]) }, () => {
+    assert(restorePeopleFilter(NUTZER).size === 0, 'alle Personen und der Eintrag heisst alle - also kein Filter');
+  });
+  mitSpeicher({ 'yuvomi:calendar:people': JSON.stringify([1]) }, () => {
+    const set = restorePeopleFilter(NUTZER);
+    assert(set.size === 1 && !set.has(UNASSIGNED), 'ein alter Filter bekommt den Eintrag nicht untergeschoben');
+  });
+  mitSpeicher({
+    'yuvomi:calendar:sources-hidden:1': JSON.stringify([
+      { key: 'sub:7', name: 'Abfallkalender', color: '#228844' },
+      { key: 'cal:5', name: 'Arbeit', color: 'red;background:url(x)' },
+      { key: 'fremd:1', name: 'x' },
+      null,
+    ]),
+  }, () => {
+    const quellen = restoreHiddenSources(1);
+    assert(quellen.size === 2 && quellen.has('sub:7') && quellen.has('cal:5'), 'nur gueltige Schluessel');
+    assert(quellen.get('cal:5').color === null, 'aus dem Speicher nur, was eine Farbe ist');
+  });
+  mitSpeicher({ 'yuvomi:calendar:sources-hidden:1': '{kaputt' }, () => {
+    assert(restoreHiddenSources(1).size === 0, 'ein kaputter Eintrag ist kein Filter');
+  });
+});
+
+// Codex-Review zu PR #1124: der Merker traegt Namen und Farben. Ein privates Abo
+// sieht nur, wer es angelegt hat - auf einem geteilten Browser stand sein Name
+// sonst im Filterblatt des naechsten Kontos.
+test('#1064: die ausgeblendeten Quellen gehoeren dem Nutzer, nicht dem Geraet', () => {
+  const { restoreHiddenSources, persistHiddenSources } = calendarHelpers;
+  mitSpeicher({ 'yuvomi:calendar:sources-hidden:1': JSON.stringify([{ key: 'sub:7', name: 'Privat', color: null }]) }, () => {
+    assert(restoreHiddenSources(1).get('sub:7')?.name === 'Privat', 'der eigene Merker kommt zurueck');
+    assert(restoreHiddenSources(2).size === 0, 'ein anderes Konto auf demselben Geraet sieht ihn nicht');
+    assert(restoreHiddenSources(null).size === 0, 'ohne angemeldeten Nutzer gibt es keinen');
+  });
+  mitSpeicher({ 'yuvomi:calendar:sources-hidden': JSON.stringify([{ key: 'sub:7', name: 'Alt', color: null }]) }, () => {
+    assert(restoreHiddenSources(1).size === 0, 'ein geraeteweiter Eintrag gehoert niemandem');
+  });
+  mitSpeicher({}, (daten) => {
+    mitFilterzustand({ user: { id: 3 }, hiddenSources: new Map([['sub:7', { name: 'Privat', color: null }]]) }, () => {
+      persistHiddenSources();
+    });
+    assert([...daten.keys()].join(',') === 'yuvomi:calendar:sources-hidden:3', `geschrieben unter dem Nutzer, war ${[...daten.keys()]}`);
+    mitFilterzustand({ user: null, hiddenSources: new Map([['cal:5', { name: 'Arbeit', color: null }]]) }, () => {
+      persistHiddenSources();
+    });
+    assert(daten.size === 1, 'ohne Nutzer wird nichts geschrieben');
+  });
+  // Die Funktion kann stimmen und der Aufrufer trotzdem keine ID uebergeben -
+  // dann kaeme nach jedem Laden ein leerer Filter heraus, und alles oben bliebe gruen.
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(/state\.hiddenSources = restoreHiddenSources\(state\.user\?\.id\);/.test(src),
+    'render() liest den Merker des angemeldeten Nutzers');
+});
+
+test('#1064: eine ausgeblendete Quelle zaehlt am Filterknopf als ein Filter', () => {
+  const { activeFilterCount } = calendarHelpers;
+  const basis = { assignedToMe: false, people: new Set(), holidayPrefs: {}, layerBirthdays: true, layerSchedule: true };
+  // scheduleEnabled() fragt window.yuvomi - ohne Modul-Registry gilt der Schichtplan als an.
+  const previousWindow = globalThis.window;
+  globalThis.window = {};
+  try {
+    mitFilterzustand({ ...basis, hiddenSources: new Map() }, () => {
+      assert(activeFilterCount() === 0, `ohne ausgeblendete Quelle kein Filter, war ${activeFilterCount()}`);
+    });
+    mitFilterzustand({ ...basis, hiddenSources: new Map([['cal:5', {}], ['sub:7', {}]]) }, () => {
+      assert(activeFilterCount() === 1, `zwei ausgeblendete Quellen sind EINE Achse, war ${activeFilterCount()}`);
+    });
+  } finally {
+    globalThis.window = previousWindow;
+  }
 });
 
 // --------------------------------------------------------

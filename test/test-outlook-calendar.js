@@ -13,7 +13,7 @@ process.env.MS_CLIENT_ID = 'test-client';
 process.env.MS_CLIENT_SECRET = 'test-secret';
 process.env.MS_REDIRECT_URI = 'http://localhost/api/v1/calendar/outlook/callback';
 
-import { describe, it, before } from 'node:test';
+import { describe, it, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 const db = (await import('../server/db.js')).get();
@@ -545,12 +545,116 @@ describe('Outlook auto-sync', () => {
     outlook.updateAccount(accountA, { autoSyncCalendarId: 'yuvomi-cal-A' });
   });
 
+  it('updateAccount participates in an existing transaction', () => {
+    db.transaction(() => {
+      outlook.updateAccount(accountA, { ownerUserId: anna });
+    })();
+    assert.equal(
+      db.prepare('SELECT owner_user_id FROM outlook_accounts WHERE id = ?').get(accountA).owner_user_id,
+      Number(anna),
+    );
+  });
+
+  it('updateAccount lehnt Auto-Sync-Aktivierung bei sichtbaren verknüpften Ausnahmen atomar ab', () => {
+    const accountId = db.prepare(`
+      INSERT INTO outlook_accounts
+        (name, ms_user_id, email, access_token, refresh_token, token_expiry, owner_user_id)
+      VALUES ('Activation guard', 'ms-activation-guard', 'guard@example.com', 'tok', 'ref', ?, ?)
+    `).run(futureExpiry, anna).lastInsertRowid;
+    db.prepare(`
+      INSERT INTO outlook_calendar_selection
+        (account_id, calendar_id, calendar_name, can_edit, enabled)
+      VALUES (?, 'guard-cal', 'Guard', 1, 0)
+    `).run(accountId);
+    const masterId = insertEvent({ title: 'Guarded series', createdBy: anna });
+    const childId = insertEvent({ title: 'Guarded occurrence', createdBy: anna });
+    db.prepare("UPDATE calendar_events SET recurrence_rule = 'FREQ=DAILY' WHERE id = ?").run(masterId);
+    db.prepare(`
+      UPDATE calendar_events
+      SET recurrence_parent_id = ?, recurrence_id = '2026-09-02', overridden_fields = '["title"]'
+      WHERE id = ?
+    `).run(masterId, childId);
+
+    assert.throws(
+      () => outlook.updateAccount(accountId, { autoSyncCalendarId: 'guard-cal' }),
+      (err) => err.code === 'outlook_auto_sync_overrides' && err.linkedOverrideCount === 1
+    );
+    assert.equal(db.prepare(
+      'SELECT auto_sync_calendar_id FROM outlook_accounts WHERE id = ?'
+    ).get(accountId).auto_sync_calendar_id, null);
+    assert.equal(db.prepare(`
+      SELECT enabled FROM outlook_calendar_selection WHERE account_id = ? AND calendar_id = 'guard-cal'
+    `).get(accountId).enabled, 0);
+
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(masterId);
+    db.prepare('DELETE FROM outlook_accounts WHERE id = ?').run(accountId);
+  });
+
+  it('handleCallback erneuert Tokens trotz verknüpfter Ausnahmen und löscht needs_reauth', async () => {
+    const accountId = db.prepare(`
+      INSERT INTO outlook_accounts
+        (name, ms_user_id, email, access_token, refresh_token, token_expiry,
+         needs_reauth, auto_sync_calendar_id, owner_user_id)
+      VALUES ('Reauth guard', 'ms-reauth-guard', 'old@example.com', 'old-access', 'old-refresh', ?,
+              1, 'reauth-cal', ?)
+    `).run(futureExpiry, anna).lastInsertRowid;
+    const masterId = insertEvent({ title: 'Reauth guarded series', createdBy: anna });
+    const childId = insertEvent({ title: 'Reauth guarded occurrence', createdBy: anna });
+    db.prepare("UPDATE calendar_events SET recurrence_rule = 'FREQ=DAILY' WHERE id = ?").run(masterId);
+    db.prepare(`
+      UPDATE calendar_events
+      SET recurrence_parent_id = ?, recurrence_id = '2026-09-02', overridden_fields = '["title"]'
+      WHERE id = ?
+    `).run(masterId, childId);
+    const fetchImpl = makeFetch((call) => {
+      if (call.method === 'POST' && call.url.includes('/oauth2/v2.0/token')) {
+        return jsonRes(200, {
+          access_token: 'new-access',
+          refresh_token: 'new-refresh',
+          expires_in: 3600,
+        });
+      }
+      if (call.method === 'GET' && call.url.includes('/me?$select=')) {
+        return jsonRes(200, {
+          id: 'ms-reauth-guard',
+          displayName: 'Reauth guard',
+          mail: 'new@example.com',
+        });
+      }
+      if (call.method === 'GET' && call.url.includes('/me/calendars?')) {
+        return jsonRes(200, { value: [{ id: 'reauth-cal', name: 'Reauth', canEdit: true }] });
+      }
+      throw new Error(`Unexpected request: ${call.method} ${call.url}`);
+    });
+
+    await outlook.handleCallback('reauth-code', fetchImpl);
+    const stored = db.prepare(`
+      SELECT needs_reauth, access_token, refresh_token FROM outlook_accounts WHERE id = ?
+    `).get(accountId);
+    assert.deepEqual(stored, { needs_reauth: 0, access_token: 'new-access', refresh_token: 'new-refresh' });
+    assert.equal(fetchImpl.calls.length, 3, 'po obnovení tokenů se znovu načte výběr kalendářů');
+
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(masterId);
+    db.prepare('DELETE FROM outlook_accounts WHERE id = ?').run(accountId);
+  });
+
   it('collectCandidates: sichtbar-für-Owner, keine externen Events, explizites Ziel gewinnt', () => {
     const familyEvent  = insertEvent({ title: 'Familienessen', createdBy: anna, assignees: [anna, ben] });
     const plainEvent   = insertEvent({ title: 'Testtermin', createdBy: ben });
     const privateEvent = insertEvent({ title: 'Geheim', createdBy: stranger, visibility: 'private' });
     const icsEvent     = insertEvent({ title: 'Feiertag', createdBy: anna, source: 'ics' });
     const explicitEvent = insertEvent({ title: 'Explizit', createdBy: anna });
+    const recurringMaster = insertEvent({ title: 'Lokale Serie', createdBy: anna });
+    const linkedChild = insertEvent({ title: 'Lokale Ausnahme', createdBy: anna });
+    db.prepare('UPDATE calendar_events SET recurrence_rule = ? WHERE id = ?')
+      .run('FREQ=DAILY', recurringMaster);
+    db.prepare(`
+      UPDATE calendar_events
+      SET recurrence_parent_id = ?, recurrence_id = '2026-09-02',
+          overridden_fields = '["title"]', target_outlook_account_id = ?,
+          target_outlook_calendar_id = 'extra-cal'
+      WHERE id = ?
+    `).run(recurringMaster, accountA, linkedChild);
     db.prepare(
       'UPDATE calendar_events SET target_outlook_account_id = ?, target_outlook_calendar_id = ? WHERE id = ?'
     ).run(accountA, 'extra-cal', explicitEvent);
@@ -562,6 +666,8 @@ describe('Outlook auto-sync', () => {
     assert.ok(candidates.has(plainEvent), 'Event ohne Zuweisung ist Kandidat');
     assert.ok(!candidates.has(privateEvent), 'privates Event einer anderen Person ist KEIN Kandidat');
     assert.ok(!candidates.has(icsEvent), 'extern synchronisiertes Event ist KEIN Kandidat');
+    assert.ok(candidates.has(recurringMaster), 'lokaler Serien-Master bleibt Kandidat');
+    assert.ok(!candidates.has(linkedChild), 'verknüpfte Ausnahme ist nie ein eigener Outlook-Kandidat');
     assert.equal(candidates.get(familyEvent).calendarId, 'yuvomi-cal-A');
     assert.equal(candidates.get(explicitEvent).calendarId, 'extra-cal', 'explizites Ziel gewinnt');
 
@@ -569,7 +675,8 @@ describe('Outlook auto-sync', () => {
     assert.deepEqual(names, ['Anna', 'Ben'], 'Zuweisungs-Namen alphabetisch');
 
     // Aufräumen für die Sync-Tests: nur familyEvent + plainEvent behalten.
-    db.prepare('DELETE FROM calendar_events WHERE id IN (?, ?, ?)').run(privateEvent, icsEvent, explicitEvent);
+    db.prepare('DELETE FROM calendar_events WHERE id IN (?, ?, ?, ?)')
+      .run(privateEvent, icsEvent, explicitEvent, recurringMaster);
   });
 
   it('pusht in beide Konten mit Titel-Suffix (Composite-PK) bzw. ohne Suffix', async () => {
@@ -673,6 +780,118 @@ describe('Outlook auto-sync', () => {
 // --------------------------------------------------------
 // Konfigurations-Guard (Parität zum Google-Verhalten)
 // --------------------------------------------------------
+
+describe('Outlook occurrence override target guards', () => {
+  let owner;
+  let otherOwner;
+  let accountId;
+  let masterId;
+
+  before(() => {
+    owner = db.prepare("INSERT INTO users (username, display_name, password_hash) VALUES ('guard-owner', 'Owner', 'x')").run().lastInsertRowid;
+    otherOwner = db.prepare("INSERT INTO users (username, display_name, password_hash) VALUES ('guard-other', 'Other', 'x')").run().lastInsertRowid;
+  });
+
+  beforeEach(() => {
+    db.prepare('DELETE FROM calendar_events').run();
+    db.prepare('DELETE FROM outlook_accounts').run();
+    accountId = db.prepare(`
+      INSERT INTO outlook_accounts (name, access_token, refresh_token, token_expiry, owner_user_id)
+      VALUES ('Guard targets', 'tok', 'ref', ?, ?)
+    `).run(new Date(Date.now() + 3600000).toISOString(), owner).lastInsertRowid;
+    db.prepare(`
+      INSERT INTO outlook_calendar_selection (account_id, calendar_id, calendar_name, can_edit, enabled)
+      VALUES (?, 'auto', 'Auto', 1, 0), (?, 'explicit', 'Explicit', 1, 0)
+    `).run(accountId, accountId);
+    masterId = db.prepare(`
+      INSERT INTO calendar_events (title, start_datetime, recurrence_rule, created_by)
+      VALUES ('Series', '2026-09-01T10:00', 'FREQ=DAILY', ?)
+    `).run(owner).lastInsertRowid;
+    db.prepare(`
+      INSERT INTO calendar_events
+        (title, start_datetime, created_by, recurrence_parent_id, recurrence_id, overridden_fields)
+      VALUES ('Override', '2026-09-02T10:00', ?, ?, '2026-09-02', '["title"]')
+    `).run(owner, masterId);
+  });
+
+  for (const target of [
+    { name: 'disabled', canEdit: 1, enabled: 0 },
+    { name: 'read-only', canEdit: 0, enabled: 1 },
+    { name: 'missing', missing: true },
+  ]) {
+    it(`allows auto-sync when the effective explicit target is ${target.name}`, async () => {
+      db.prepare('UPDATE calendar_events SET target_outlook_account_id = ?, target_outlook_calendar_id = ? WHERE id = ?')
+        .run(accountId, 'explicit', masterId);
+      if (target.missing) {
+        db.prepare("DELETE FROM outlook_calendar_selection WHERE calendar_id = 'explicit'").run();
+      } else {
+        db.prepare("UPDATE outlook_calendar_selection SET can_edit = ?, enabled = ? WHERE calendar_id = 'explicit'")
+          .run(target.canEdit, target.enabled);
+      }
+      outlook.updateAccount(accountId, { autoSyncCalendarId: 'auto' });
+      assert.equal(db.prepare('SELECT auto_sync_calendar_id FROM outlook_accounts WHERE id = ?').get(accountId).auto_sync_calendar_id, 'auto');
+      assert.equal(db.prepare("SELECT enabled FROM outlook_calendar_selection WHERE calendar_id = 'auto'").get().enabled, 1);
+      const ordinaryId = db.prepare(`
+        INSERT INTO calendar_events (title, start_datetime, created_by)
+        VALUES ('Ordinary event', '2026-09-03T10:00', ?)
+      `).run(owner).lastInsertRowid;
+      const fetchImpl = makeFetch((call) => {
+        if (call.method === 'POST' && call.url.endsWith('/calendars/auto/events')) {
+          return jsonRes(201, { id: 'ordinary-remote', changeKey: 'ck' });
+        }
+        throw new Error(`Unexpected request: ${call.method} ${call.url}`);
+      });
+      const result = await outlook.sync({ fetchImpl });
+      assert.equal(result.pushed, 1, 'an unpushable linked series must not block unrelated candidates');
+      const links = db.prepare('SELECT event_id FROM outlook_event_links').all();
+      assert.deepEqual(links.map((link) => link.event_id), [Number(ordinaryId)]);
+      assert.equal(fetchImpl.calls[0].body.subject, 'Ordinary event');
+    });
+  }
+
+  it('allows an owner change while the effective auto calendar is disabled, then rejects enabling it', () => {
+    db.prepare("UPDATE outlook_accounts SET auto_sync_calendar_id = 'auto', owner_user_id = NULL WHERE id = ?").run(accountId);
+    outlook.updateAccount(accountId, { ownerUserId: owner });
+    assert.equal(db.prepare('SELECT owner_user_id FROM outlook_accounts WHERE id = ?').get(accountId).owner_user_id, Number(owner));
+    assert.throws(() => outlook.setCalendarEnabled(accountId, 'auto', true),
+      (err) => err.status === 409 && err.linkedOverrideCount === 1);
+    assert.equal(db.prepare("SELECT enabled FROM outlook_calendar_selection WHERE calendar_id = 'auto'").get().enabled, 0);
+  });
+
+  it('rejects enabling an explicit writable target even with auto-sync disabled', () => {
+    db.prepare("UPDATE calendar_events SET target_outlook_account_id = ?, target_outlook_calendar_id = 'explicit' WHERE id = ?")
+      .run(accountId, masterId);
+    assert.throws(() => outlook.setCalendarEnabled(accountId, 'explicit', true),
+      (err) => err.status === 409 && err.linkedOverrideCount === 1);
+    assert.equal(db.prepare("SELECT enabled FROM outlook_calendar_selection WHERE calendar_id = 'explicit'").get().enabled, 0);
+  });
+
+  it('rejects changing the owner when a private series becomes a writable auto-sync candidate', () => {
+    db.prepare("UPDATE calendar_events SET visibility = 'private' WHERE id = ?").run(masterId);
+    outlook.updateAccount(accountId, { autoSyncCalendarId: 'auto', ownerUserId: otherOwner });
+    assert.throws(() => outlook.updateAccount(accountId, { ownerUserId: owner }),
+      (err) => err.status === 409 && err.linkedOverrideCount === 1);
+    assert.equal(db.prepare('SELECT owner_user_id FROM outlook_accounts WHERE id = ?').get(accountId).owner_user_id, Number(otherOwner));
+  });
+
+  it('does not push a linked master when refresh restores write access to its selected calendar', async () => {
+    db.prepare("UPDATE outlook_accounts SET auto_sync_calendar_id = 'auto' WHERE id = ?").run(accountId);
+    db.prepare("UPDATE outlook_calendar_selection SET enabled = 1, can_edit = 0 WHERE calendar_id = 'auto'").run();
+    const fetchImpl = makeFetch((call) => {
+      if (call.method === 'GET' && call.url.includes('/me/calendars')) {
+        return jsonRes(200, { value: [{ id: 'auto', name: 'Auto', canEdit: true }] });
+      }
+      if (call.method === 'POST') return jsonRes(201, { id: 'incorrect-master-push', changeKey: 'ck' });
+      throw new Error(`Unexpected request: ${call.method} ${call.url}`);
+    });
+    await outlook.__test.refreshCalendarSelection(accountId, 'tok', fetchImpl);
+    const result = await outlook.sync({ fetchImpl });
+    assert.equal(result.pushed, 0, 'linked series must not be pushed without its occurrence overrides');
+    assert.equal(fetchImpl.calls.filter((call) => call.method !== 'GET').length, 0);
+    assert.equal(db.prepare('SELECT COUNT(*) AS count FROM outlook_event_links').get().count, 0);
+    assert.ok(db.prepare('SELECT last_error FROM outlook_accounts WHERE id = ?').get(accountId).last_error);
+  });
+});
 
 describe('assertConfigured', () => {
   it('wirft ohne MS_*-Env denselben lauten Konfigurationsfehler wie Google', () => {

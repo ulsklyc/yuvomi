@@ -9,7 +9,7 @@ import { t, formatDate, formatTime, getLocale, getNumberFormat } from '/i18n.js'
 import { esc } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
-import { openModal, closeModal, confirmModal, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { wireTablist } from '/utils/tablist.js';
 import { wireScrollFade } from '/utils/ux.js';
@@ -208,7 +208,9 @@ function renderCurrentTab(container) {
 
 async function toggleSession(container, workerId) {
   const worker = state.workers.find((item) => String(item.id) === String(workerId));
-  const current = worker?.today_session;
+  // `current_session` ist die noch offene Sitzung. `today_session` traegt auch
+  // eine abgeschlossene und haette hier ein zweites Auschecken ausgeloest.
+  const current = worker?.current_session;
   if (!state.workers.length) {
     window.yuvomi?.showToast(t('housekeeping.checkInDisabled'), 'warning');
     return;
@@ -250,8 +252,16 @@ function renderWorkerSummary() {
     });
   }
   const rows = state.workers.map((worker) => {
-    const checkedIn = !!worker.today_session;
-    const session = worker.today_session;
+    // Derselbe Knopf fuehrt beide Richtungen: toggleSession() liest die offene
+    // Sitzung und checkt aus, sonst ein. Er trug im eingecheckten Zustand ein
+    // disabled-Attribut - und weil er der EINZIGE Ausloeser ist, war der
+    // Auscheck-Zweig damit unerreichbar (#1133).
+    const checkedIn = !!worker.current_session;
+    // Zwei verschiedene Fragen: `checkedIn` traegt den Knopf ("arbeitet
+    // gerade"), `session` die Zeile darunter ("war heute da"). Haengt die
+    // Zeile am Knopf, verliert sie nach dem Auschecken den Besuch von heute
+    // und faellt auf den Tarif zurueck.
+    const session = worker.current_session ?? worker.today_session;
     return `
     <section class="housekeeping-worker-strip">
       <div class="housekeeping-avatar" style="background:${esc(worker.avatar_color) || 'var(--module-housekeeping)'}">
@@ -259,12 +269,12 @@ function renderWorkerSummary() {
       </div>
       <div class="housekeeping-worker-strip__identity">
         <strong>${esc(worker.display_name)}</strong>
-        <span>${esc(checkedIn ? `${t('housekeeping.visitRecordedAt')} ${formatTime(session.check_in)}` : (worker.rate_type === 'hourly' ? `${money(worker.hourly_rate)}/${t('housekeeping.rateHourly')}` : `${money(worker.daily_rate)} · ${scheduleLabel(worker.payment_schedule)}`))}</span>
+        <span>${esc(session ? `${t('housekeeping.visitRecordedAt')} ${formatTime(session.check_in)}` : (worker.rate_type === 'hourly' ? `${money(worker.hourly_rate)}/${t('housekeeping.rateHourly')}` : `${money(worker.daily_rate)} · ${scheduleLabel(worker.payment_schedule)}`))}</span>
       </div>
       <button class="btn ${checkedIn ? 'btn--secondary' : 'btn--primary'} housekeeping-check-small" type="button"
-              data-worker-check="${worker.id}" ${checkedIn ? 'disabled' : ''}>
-        <i data-lucide="${checkedIn ? 'check' : 'log-in'}" aria-hidden="true"></i>
-        <span>${esc(checkedIn ? t('housekeeping.checkedInToday') : t('housekeeping.checkIn'))}</span>
+              data-worker-check="${worker.id}">
+        <i data-lucide="${checkedIn ? 'log-out' : 'log-in'}" aria-hidden="true"></i>
+        <span>${esc(checkedIn ? t('housekeeping.checkOut') : t('housekeeping.checkIn'))}</span>
       </button>
     </section>
   `;
@@ -528,6 +538,7 @@ function renderTasks(content) {
         window.yuvomi?.showToast(t('housekeeping.taskDeletedToast'), 'success');
         await loadData();
         renderTasks(content);
+        refocusAfterRender();
       } catch (err) {
         window.yuvomi?.showToast(err.message, 'danger');
       }
@@ -540,6 +551,57 @@ function renderTasks(content) {
       if (task) openTaskEditModal(task, content);
     });
   });
+}
+
+/* BEZAHLEN WIRD BESTAETIGT (#1136). Die Buchung hat Folgen, die ein Klick nicht
+ * zeigt: sie hakt die verknuepfte Zahlungsaufgabe ab, und ab da ist der Besuch
+ * abgerechnet - aendern, loeschen oder zuruecknehmen kann ihn nur noch ein
+ * Admin. Alle drei Ausloeser (Berichtsliste, Besuchsbericht, Personal-Protokoll)
+ * laufen deshalb durch diese eine Funktion; test-frontend-audit.js haelt, dass
+ * es keinen Weg daran vorbei gibt.
+ *
+ * `confirmOverModal` statt `confirmModal`: aus dem Besuchsbericht heraus
+ * gefragt, verdraengte `confirmModal` den Bericht, und Abbrechen liesse ihn
+ * verschwunden zurueck. `closeOnConfirm: false` holt ihn auch nach dem Ja
+ * zurueck - scheitert die Buchung, steht der Bericht noch da; geschlossen wird
+ * erst in `onPaid`. Ohne offenes Modal verhaelt es sich wie `confirmModal`. */
+async function payVisit(visit, onPaid) {
+  const confirmed = await confirmOverModal(t('housekeeping.markPaidConfirm'), {
+    closeOnConfirm: false,
+    confirmLabel: t('housekeeping.markPaid'),
+    detail: visit.payment_task_id
+      ? t('housekeeping.markPaidConfirmDetailTask')
+      : t('housekeeping.markPaidConfirmDetail'),
+  });
+  if (!confirmed) return;
+  try {
+    await api.post(`/housekeeping/visits/${visit.id}/pay`, {});
+    window.yuvomi?.showToast(t('housekeeping.visitPaidToast'), 'success');
+    await onPaid();
+    refocusAfterRender();
+  } catch (err) {
+    window.yuvomi?.showToast(err.message, 'danger');
+  }
+}
+
+/* Der Rueckweg (#1136). Ob er angeboten wird, entscheidet der Server je Besuch
+ * (`can_mark_unpaid`); die Route prueft die Rolle beim Schreiben selbst. Dieselbe
+ * Form wie `payVisit`, damit der Bericht auch hier einen Fehler ueberlebt. */
+async function unpayVisit(visit, onUnpaid) {
+  const confirmed = await confirmOverModal(t('housekeeping.markUnpaidConfirm'), {
+    closeOnConfirm: false,
+    confirmLabel: t('housekeeping.markUnpaid'),
+    detail: t('housekeeping.markUnpaidConfirmDetail'),
+  });
+  if (!confirmed) return;
+  try {
+    await api.post(`/housekeeping/visits/${visit.id}/unpay`, {});
+    window.yuvomi?.showToast(t('housekeeping.visitUnpaidToast'), 'success');
+    await onUnpaid();
+    refocusAfterRender();
+  } catch (err) {
+    window.yuvomi?.showToast(err.message, 'danger');
+  }
 }
 
 function renderReports(content) {
@@ -605,23 +667,33 @@ function renderReports(content) {
   // Bezahlen direkt an der Ausstehend-Zeile (Audit R2, A2-14): derselbe Flow
   // wie im Personal-Einsatzlog, hier gegen die Berichtsliste.
   content.querySelectorAll('[data-pay-report]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', () => {
       const visit = visits.find((item) => String(item.id) === btn.dataset.payReport);
       if (!visit) return;
-      try {
-        await api.post(`/housekeeping/visits/${visit.id}/pay`, {});
-        window.yuvomi?.showToast(t('housekeeping.visitPaidToast'), 'success');
+      payVisit(visit, async () => {
         await loadData();
         renderReports(content);
-      } catch (err) {
-        window.yuvomi?.showToast(err.message, 'danger');
-      }
+      });
     });
   });
 }
 
 function openVisitReportModal(visit, content = null) {
   const paid = !!visit.paid_at;
+  // Die Ruecknahme bietet nur an, wem der Server sie zugesteht
+  // (`can_mark_unpaid`, #1136) - die Admin-Regel wird hier nicht nachgebaut.
+  let footerAction = '';
+  if (!paid) {
+    footerAction = `
+          <button class="btn btn--primary" type="button" id="visit-report-pay">
+            <i data-lucide="check" class="icon-sm" aria-hidden="true"></i>${esc(t('housekeeping.markPaid'))}
+          </button>`;
+  } else if (visit.can_mark_unpaid) {
+    footerAction = `
+          <button class="btn btn--secondary" type="button" id="visit-report-unpay">
+            <i data-lucide="rotate-ccw" class="icon-sm" aria-hidden="true"></i>${esc(t('housekeeping.markUnpaid'))}
+          </button>`;
+  }
   openModal({
     title: t('housekeeping.visitReportDetails'),
     size: 'md',
@@ -645,28 +717,26 @@ function openVisitReportModal(visit, content = null) {
           ${visit.payment_task_id ? `<div><dt>${esc(t('housekeeping.paymentTask'))}</dt><dd>#${esc(visit.payment_task_id)}</dd></div>` : ''}
           ${visit.calendar_event_id ? `<div><dt>${esc(t('housekeeping.calendarEvent'))}</dt><dd>#${esc(visit.calendar_event_id)}</dd></div>` : ''}
         </dl>
-        ${paid ? '' : `
+        ${footerAction ? `
         <div class="modal-panel__footer modal-panel__footer--plain">
           <button class="btn btn--ghost" type="button" data-action="close-modal">${esc(t('common.cancel'))}</button>
-          <button class="btn btn--primary" type="button" id="visit-report-pay">
-            <i data-lucide="check" class="icon-sm" aria-hidden="true"></i>${esc(t('housekeeping.markPaid'))}
-          </button>
-        </div>`}
+          ${footerAction}
+        </div>` : ''}
       </div>
     `,
     onSave(panel) {
-      panel.querySelector('#visit-report-pay')?.addEventListener('click', async () => {
-        try {
-          await api.post(`/housekeeping/visits/${visit.id}/pay`, {});
-          window.yuvomi?.showToast(t('housekeeping.visitPaidToast'), 'success');
-          closeModal({ force: true });
-          await loadData();
-          if (content?.isConnected) renderReports(content);
-          refocusAfterRender();
-        } catch (err) {
-          window.yuvomi?.showToast(err.message, 'danger');
-        }
-      });
+      panel.querySelector('#visit-report-pay')?.addEventListener('click', () => payVisit(visit, async () => {
+        closeModal({ force: true });
+        await loadData();
+        if (content?.isConnected) renderReports(content);
+        refocusAfterRender();
+      }));
+      panel.querySelector('#visit-report-unpay')?.addEventListener('click', () => unpayVisit(visit, async () => {
+        closeModal({ force: true });
+        await loadData();
+        if (content?.isConnected) renderReports(content);
+        refocusAfterRender();
+      }));
     },
   });
 }
@@ -744,18 +814,14 @@ function renderStaff(content) {
     });
   });
   content.querySelectorAll('[data-pay-visit]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', () => {
       const visit = state.staffVisits.find((item) => String(item.id) === btn.dataset.payVisit);
       if (!visit) return;
-      try {
-        await api.post(`/housekeeping/visits/${visit.id}/pay`, {});
-        window.yuvomi?.showToast(t('housekeeping.visitPaidToast'), 'success');
+      payVisit(visit, async () => {
         await loadData();
         await loadStaffVisits();
         renderStaff(content);
-      } catch (err) {
-        window.yuvomi?.showToast(err.message, 'danger');
-      }
+      });
     });
   });
   content.querySelectorAll('[data-delete-visit]').forEach((btn) => {
@@ -770,6 +836,7 @@ function renderStaff(content) {
         await loadData();
         await loadStaffVisits();
         renderStaff(content);
+        refocusAfterRender();
       } catch (err) {
         window.yuvomi?.showToast(err.message, 'danger');
       }

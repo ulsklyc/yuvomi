@@ -2,7 +2,7 @@ import { api } from '/api.js';
 import { t, formatDate, formatDayMonth } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { todayKey, addLocalDays, parseLocalDateKey, weekStartIndex, startOfLocalWeekKey } from '/utils/date.js';
-import { openModal, closeModal, confirmModal, advancedSection } from '/components/modal.js';
+import { openModal, closeModal, confirmModal, advancedSection, refocusAfterRender } from '/components/modal.js';
 import { makeSortable } from '/utils/sortable.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
@@ -1258,8 +1258,10 @@ function renderShell() {
       const row = event.target.closest('[data-day-row]');
       const existing = row?.querySelector('[data-day-row-fields]');
       const html = dayRowFieldsHtml(event.target.value);
-      if (existing) existing.outerHTML = html;
-      else if (html) row.insertAdjacentHTML('beforeend', html);
+      if (existing) {
+        existing.insertAdjacentHTML('afterend', html);
+        existing.remove();
+      } else if (html) row.insertAdjacentHTML('beforeend', html);
       window.lucide?.createIcons({ el: row });
     }
   });
@@ -1402,8 +1404,10 @@ function wireOccurrenceFieldReactivity(scope) {
       const container = select.closest('fieldset') ?? select.closest('form');
       const existing = container?.querySelector('[data-day-row-fields]');
       const html = dayRowFieldsHtml(select.value);
-      if (existing) existing.outerHTML = html;
-      else if (html) select.closest('.form-field')?.insertAdjacentHTML('afterend', html);
+      if (existing) {
+        existing.insertAdjacentHTML('afterend', html);
+        existing.remove();
+      } else if (html) select.closest('.form-field')?.insertAdjacentHTML('afterend', html);
       window.lucide?.createIcons({ el: container });
     });
   });
@@ -1815,6 +1819,10 @@ async function action(event) {
       if (group) openOverrideEditModal(group);
       return;
     }
+    // Ob auf diesem Weg eine Rueckfrage geschlossen wurde. Das gemeinsame
+    // `renderPage()` am Ende erreichen auch Zweige ohne Dialog - dort griffe
+    // `refocusAfterRender()` auf den Merker eines frueheren zurueck (#1083).
+    let gefragt = false;
     if (button.dataset.action === 'delete-shift') await api.delete(`/schedule/shift-types/${button.dataset.id}`);
     if (button.dataset.action === 'open-create-custom-field') {
       openCustomFieldModal();
@@ -1838,6 +1846,7 @@ async function action(event) {
         { danger: true, confirmLabel: t('schedule.delete'), detail: t('schedule.deleteCustomFieldDetail', { count: affected }) },
       );
       if (!confirmed) return;
+      gefragt = true;
       await api.delete(`/schedule/custom-fields/${button.dataset.id}`);
     }
     // Ein Muster loeschen nimmt seine Zyklustage mit (ON DELETE CASCADE): eine
@@ -1855,6 +1864,7 @@ async function action(event) {
         },
       );
       if (!confirmed) return;
+      gefragt = true;
       await api.delete(`/schedule/patterns/${button.dataset.id}`);
     }
     // Ein Bereich kann viele Tage tragen, darum fragt das Loeschen hier nach,
@@ -1868,6 +1878,7 @@ async function action(event) {
         { danger: true, confirmLabel: t('schedule.delete'), detail: t('schedule.deleteOverrideRangeDetail', { from: formatDate(from), to: formatDate(to), user: userName(userId) }) },
       );
       if (!confirmed) return;
+      gefragt = true;
       await api.delete(`/schedule/overrides?user_id=${userId}&from=${from}&to=${to}`);
     }
     if (button.dataset.action === 'open-create-extra') {
@@ -1893,6 +1904,7 @@ async function action(event) {
         { danger: true, confirmLabel: t('schedule.delete'), detail: t('schedule.deleteOverrideRangeDetail', { from: formatDate(from), to: formatDate(to), user: userName(userId) }) },
       );
       if (!confirmed) return;
+      gefragt = true;
       for (const id of button.dataset.ids.split(',')) {
         await api.delete(`/schedule/extras/${id}`);
       }
@@ -1966,6 +1978,7 @@ async function action(event) {
     }
     await load();
     renderPage();
+    if (gefragt) refocusAfterRender();
     window.yuvomi?.showToast(button.dataset.action.startsWith('delete') ? t('schedule.deleted') : t('schedule.saved'), 'success');
   } catch (error) {
     window.yuvomi?.showToast(error.data?.error ?? t('common.errorGeneric'), 'danger');

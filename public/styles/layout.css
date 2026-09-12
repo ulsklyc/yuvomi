@@ -5072,6 +5072,14 @@ p.field-hint--warn[hidden] {
 
 /* --------------------------------------------------------
  * Form-Elemente
+ *
+ * `.input` und `.form-input` sind derselbe Alias auf dieselbe Regel (~308 vs.
+ * ~155 Fundstellen, Polish-Audit PLAN.md #7) - ohne dass bisher irgendwo
+ * stand, welcher Name fuer NEUEN Code gilt. Kanonisch ist `.form-input`: es
+ * ist der Name, den DESIGN.md ("Inputs / Fields") und `.form-group`/
+ * `.form-field`/`.form-label` schon fuehren. Bestehende `.input`-Stellen
+ * bleiben unangetastet (Umbenennen aller ~308 Fundstellen kostet mehr Review
+ * als es traegt) - neuer Code schreibt `.form-input`.
  * -------------------------------------------------------- */
 .input,
 .form-input {

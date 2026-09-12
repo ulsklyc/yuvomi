@@ -895,6 +895,10 @@ function openContactDetail(contact) {
       onClick: async ({ close }) => {
         await close({ force: true });
         await deleteContact(contact.id);
+        // Mit dem Kontakt ist seine Zeile weg, von der aus die Ansicht aufging.
+        // Hier und nicht in deleteContact(): das laeuft auch ohne Dialog, und
+        // dort griffe der Aufruf auf den Merker eines frueheren zurueck (#1083).
+        refocusAfterRender();
       },
     });
   }

@@ -122,8 +122,11 @@ app.use((req, _res, next) => {
   req.sessionModuleAccess = user.role === 'admin'
     ? null
     : buildSessionModuleAccess(resolvePermissions(db, user));
+  // Token-Scopes wie in `requireAuth`: null für Sessions und ungescopte Tokens.
+  req.authScopes = tokenScopes;
   next();
 });
+let tokenScopes = null;
 app.use('/api/v1/search', searchRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -305,5 +308,58 @@ test('Die /api/v1-Modulsperre kann diesen Endpoint gar nicht abdecken', async ()
   assert.equal(moduleForPath('/search'), 'search', 'der Pfad löst auf ein Scope-Modul auf');
   assert.ok(!('search' in access), 'aber `search` ist kein Permissions-Modul → der Guard greift nie');
   assert.equal(access.contacts, 'none', 'gesperrt sind die Module, die die Suche DURCHSUCHT');
+  clearModuleDenials(KID);
+});
+
+// --------------------------------------------------------------------------
+// Die zweite Achse: Token-Scopes. `search:read` öffnet die Suche, nicht die
+// Module dahinter - dieselbe Frage wie oben, nur für ein API-Token, das an einen
+// fremden Client geht (Discussion #455). Das Mitglied bleibt dabei ungesperrt,
+// damit die Tests die Token-Achse messen und nicht die Rolle.
+// --------------------------------------------------------------------------
+async function searchWithScopes(userId, scopes) {
+  tokenScopes = scopes;
+  try {
+    return await searchAs(userId);
+  } finally {
+    tokenScopes = null;
+  }
+}
+
+test('Token nur mit `search:read`: keine Trefferart kommt durch', async () => {
+  clearModuleDenials(KID);
+  const offen = await searchAs(KID);
+  for (const bucket of BUCKETS) {
+    assert.equal(offen[bucket].length, 1, `Vorbedingung: ${bucket} ist ungescopt belegt`);
+  }
+
+  const body = await searchWithScopes(KID, ['search:read']);
+  for (const bucket of BUCKETS) {
+    assert.deepEqual(body[bucket], [], `${bucket}: das Token nennt ${BUCKET_MODULE[bucket]} nicht`);
+  }
+  assert.ok(!JSON.stringify(body).includes(MARKER), 'kein Treffertext auf der Leitung');
+});
+
+test('Jeder Modul-Scope öffnet genau seine Trefferarten, und keine fremde', async () => {
+  clearModuleDenials(KID);
+  for (const moduleKey of [...new Set(Object.values(BUCKET_MODULE))]) {
+    const body = await searchWithScopes(KID, ['search:read', `${moduleKey}:read`]);
+    for (const bucket of BUCKETS) {
+      const erwartet = BUCKET_MODULE[bucket] === moduleKey ? 1 : 0;
+      assert.equal(body[bucket].length, erwartet, `Scope ${moduleKey}:read, Trefferart ${bucket}`);
+    }
+  }
+});
+
+test('`write` schließt `read` ein, und ein Scope erweitert keine Rollensperre', async () => {
+  clearModuleDenials(KID);
+  const schreibend = await searchWithScopes(KID, ['search:read', 'calendar:write']);
+  assert.equal(schreibend.events.length, 1, 'calendar:write liest mit');
+  assert.deepEqual(schreibend.tasks, []);
+
+  denyModules(KID, ['notes']);
+  const gesperrt = await searchWithScopes(KID, ['search:read', 'notes:read', 'tasks:read']);
+  assert.deepEqual(gesperrt.notes, [], 'die Rolle sperrt Notizen, der Scope öffnet sie nicht');
+  assert.equal(gesperrt.tasks.length, 1, 'was beide Achsen erlauben, bleibt');
   clearModuleDenials(KID);
 });

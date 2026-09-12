@@ -262,27 +262,36 @@ failed first - the job goes red for ordinary reasons too (checkout, the action i
 GitHub API call), and only one specific failure is about the review staying silent.
 
 That one is the step **"Die Review muss gesprochen haben"**. It exists because for five PRs
-the check was green over a review that never happened. Its message names the two known
-causes; the second needs the job log, where `permission_denials_count` tells you *how many*
-tools were refused but not which - re-run with `show_full_output: true` to see the name.
+the check was green over a review that never happened. Its message says what it saw - refused
+tools, a run that stopped at the plugin's own gate, agents it started but never waited for -
+and is a lead for the job log, not a proven cause: a run can hit a refusal on the way and still
+stop for another reason. The log shows every tool call because `show_full_output` stays on, and
+that setting is not only for reading: the step needs the same stream to find the comment the
+run posted. The exact rules - including every case in which the review is skipped or silence
+stays green - live in `.github/workflows/claude-code-review.yml` and
+`.github/scripts/review-verdict.mjs`, and are not repeated here.
 
 **Do not add the tool in the PR that failed.** A PR touching
 `.github/workflows/claude-code-review.yml` makes the action skip itself (it only runs when
 the workflow matches the default branch) and makes this check stand aside, so it would turn
 green without any review having run. Report the denied tool instead and let a maintainer add
-it to `claude_args` on `main` - note that the list there **replaces** the review plugin's
-own, so existing entries have to stay.
+it to `claude_args` on `main` - note that the allowed list there **replaces** the review
+plugin's own, so existing entries have to stay, and that a second list denies the write forms
+of the read-only commands it allows.
 
 Once that has landed, **"Re-run jobs" on the old run will not pick it up.** A rerun replays
 the same workflow file at the same commit, so it hits the same denial and looks like the fix
 failed. The PR needs a fresh `pull_request` event to be evaluated against the new default
-branch: push to it, or merge `main` into the branch, or close and reopen it.
+branch: push to it, or merge `main` into the branch, or close and reopen it. A rerun does help
+when the refusal came from the path the review happened to take - reading earlier comments one
+way rather than another - because the next run may take a different one.
 
-One limit worth knowing: the check asks whether the PR carries *any* comment from the
-reviewer, not whether *this run* produced one. That is deliberate - the plugin looks for its
-own earlier comment and will not repeat itself on a later push - but it means a silent rerun
-on a PR that was already reviewed stays green. The assertion covers "this PR was never
-reviewed", not "every run reviewed it".
+**A later push is reviewed again.** The review does not stop because it already commented on
+an earlier push of the same PR: the workflow's prompt lifts that condition on purpose, since a
+green check over an unreviewed push is worse than a second review. A run that stops with
+"already reviewed this PR" has not reviewed the push it was started for, and the check turns red
+unless it finds that the push was reviewed some other way - also when that push only merged
+`main` into the branch.
 
 **If the maintainer stops.** There is one maintainer and no succession arrangement: nobody
 acquires rights to this repository automatically, and none are needed, because the MIT
@@ -396,12 +405,12 @@ So the limit is on the interface, not on the release count:
 
 | Track | What it carries | When it ships |
 |---|---|---|
-| **Weekly train** | Anything under `public/pages/`, `public/styles/`, `public/utils/`, `public/components/`, `public/settings/` | **Tuesdays only** |
+| **Interface train** | Anything under `public/pages/`, `public/styles/`, `public/utils/`, `public/components/`, `public/settings/` | **Wednesdays and Sundays only** |
 | **Everything else** | Server, database, docs, tests, deploy descriptors, translations | Any day, **at most one release per calendar day** |
 
-Tuesday, because a household planner gets used most at the weekend: an interface change then has four days to settle before the family is standing in front of it on Saturday.
+Two fixed days, since 12 September 2026 (until then the train ran on Tuesdays only). A finished interface change waits at most four days for its train instead of a week, and the interface still moves on two known days rather than whenever something happens to be done.
 
-**Security fixes and data-loss bugs are not held back.** They ship the moment they are ready, on any day. Since v2.64.1 (4 September 2026) a security fix ships as a **patch release cut from the last tag**, carrying the fix, its tests and its documentation and nothing else: the guard judges the whole diff since the last tag, and a branch off that tag is on the second track by construction, so the interface work waiting on `main` for its Tuesday is not pulled forward with it. The steps are in [docs/RELEASING.md](docs/RELEASING.md); the `--hotfix` escape hatch below remains for a fix that cannot be separated from what is already on `main`.
+**Security fixes and data-loss bugs are not held back.** They ship the moment they are ready, on any day. Since v2.64.1 (4 September 2026) a security fix ships as a **patch release cut from the last tag**, carrying the fix, its tests and its documentation and nothing else: the guard judges the whole diff since the last tag, and a branch off that tag is on the second track by construction, so the interface work waiting on `main` for its train is not pulled forward with it. The steps are in [docs/RELEASING.md](docs/RELEASING.md); the `--hotfix` escape hatch below remains for a fix that cannot be separated from what is already on `main`.
 
 `npm run check:release-cadence` decides this, and it runs before the tag rather than after. A release that carries interface changes on a Thursday fails it; so does a second same-day release on the other track. The escape hatch is `--hotfix "<reason>"`, and the reason is mandatory and printed - an exception nobody has to write down is just a rule that quietly stopped applying.
 
@@ -411,9 +420,11 @@ This is a promise the project can keep because it is not a promise: it is a cond
 
 `npm run test:document-guards` is the one suite that is deliberately not in `npm test` and not in CI. It drives a real browser against a seeded server and costs around 80 minutes (82 measured on 2 September 2026), which is not a price worth paying on every push for invariants that only change in bursts. It is a handrail run once before a release instead.
 
-**It is required for any release that carries the weekly train**, that is, any release whose diff touches `public/pages`, `public/styles`, `public/utils`, `public/components` or `public/settings`. A release on the other track does not need it: those probes measure the rendered document, and a change that never reaches the document cannot move them.
+**It is required for any release that carries the interface train**, that is, any release whose diff touches `public/pages`, `public/styles`, `public/utils`, `public/components` or `public/settings`. A release on the other track does not need it: those probes measure the rendered document, and a change that never reaches the document cannot move them.
 
-Treat the path list as a heuristic rather than a boundary. What the probes see also depends on how full the test instance is, and that comes from `scripts/seed-demo.js` and from the shape of server responses: a fuller instance makes header filters wider, which is how one probe stayed green in isolation and failed in a full run. If you change the seed or a response shape substantially, run the handrail even when no interface path is in your diff.
+Treat the path list as a heuristic rather than a boundary. What the probes see also depends on how full the test instance is, and that comes from `scripts/seed-demo.js` and from the shape of server responses: a fuller instance makes header filters wider. If you change the seed or a response shape substantially, run the handrail even when no interface path is in your diff.
+
+Every probe starts from the same state ([#1104](https://github.com/ulsklyc/yuvomi/issues/1104)). Before each probe the harness opens a fresh browser context and restarts the server on a snapshot taken after seeding and signing in, so nothing carries over from one probe to the next: not the API rate limit, not rows a probe created and never cleaned up, not its browser storage. A targeted run (`--test-name-pattern`) therefore measures the same preconditions as the full run. The other side of that is deliberate: a probe no longer sees what earlier probes left behind, so a probe that needs a fuller instance gets it from the seed, where every run has the same data.
 
 Read its exit code from a file, never from a pipe:
 

@@ -10,6 +10,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   SYNC_TARGET_LOCAL,
@@ -18,6 +19,7 @@ import {
   outlookTargetValue,
   parseSyncTargetValue,
   buildSyncTargetOptions,
+  assigneeSyncTarget,
 } from '../public/utils/sync-target.js';
 
 const LABELS = { local: 'Lokal', google: 'Google', caldav: 'CalDAV', outlook: 'Outlook', unavailable: 'Nicht verfügbar' };
@@ -100,4 +102,76 @@ test('noch angebotenes Ziel wird nicht doppelt einsortiert', () => {
 test('leere oder fehlende Zielantwort ergibt genau die lokale Option', () => {
   assert.equal(buildSyncTargetOptions({}, LABELS).length, 1);
   assert.equal(buildSyncTargetOptions(null, LABELS).length, 1);
+});
+
+// --------------------------------------------------------
+// #1060: Ziel aus der Zuweisung
+// --------------------------------------------------------
+
+const ZIELE = {
+  google: [
+    { id: 'emma@group.calendar.google.com', summary: 'Emma', defaultAssigneeUserId: 3 },
+    { id: 'familie@group.calendar.google.com', summary: 'Familie', defaultAssigneeUserId: null },
+  ],
+  caldav: [
+    { accountId: 4, accountName: 'Nextcloud', calendarUrl: 'https://dav.example.org/cal/leo/', calendarName: 'Leo', defaultAssigneeUserId: 4 },
+  ],
+  outlook: [
+    { accountId: 2, accountName: 'Papa', calendarId: 'ol1', calendarName: 'Papa', defaultAssigneeUserId: 1 },
+  ],
+};
+
+test('#1060: genau eine Person, genau ein Kalender - das ist das Ziel', () => {
+  assert.deepEqual(assigneeSyncTarget(ZIELE, [3]), { value: 'google:emma@group.calendar.google.com', ambiguous: false });
+  assert.deepEqual(assigneeSyncTarget(ZIELE, ['4']), { value: 'caldav:4|https://dav.example.org/cal/leo/', ambiguous: false },
+    'IDs aus dem Formular kommen als Text');
+  assert.deepEqual(assigneeSyncTarget(ZIELE, [3, 3]), { value: 'google:emma@group.calendar.google.com', ambiguous: false },
+    'dieselbe Person doppelt ist eine Person');
+});
+
+test('#1060: kein Ziel ohne eindeutige Person oder ohne Kalender, der sie nennt', () => {
+  assert.deepEqual(assigneeSyncTarget(ZIELE, []), { value: null, ambiguous: false });
+  assert.deepEqual(assigneeSyncTarget(ZIELE, [3, 4]), { value: null, ambiguous: false },
+    'zwei Zugewiesene bekommen kein automatisches Ziel');
+  assert.deepEqual(assigneeSyncTarget(ZIELE, [2]), { value: null, ambiguous: false },
+    'eine Person ohne Kalender faellt auf den eigenen Standard des Autors zurueck');
+  assert.deepEqual(assigneeSyncTarget(ZIELE, [1]), { value: null, ambiguous: false },
+    'Outlook traegt keine Standard-Zuweisung und wird nie ueber sie gewaehlt');
+  assert.deepEqual(assigneeSyncTarget(null, [3]), { value: null, ambiguous: false });
+  assert.deepEqual(assigneeSyncTarget(ZIELE, [0]), { value: null, ambiguous: false },
+    'null aus einem leeren Feld ist keine Person');
+});
+
+test('#1060: das Terminformular ruft die Regel auf - nur beim Anlegen, und die eigene Wahl gewinnt', () => {
+  // Der Helfer oben kann stimmen und trotzdem nie laufen. Die Verdrahtung ist
+  // DOM-Code; hier steht, woran sie haengt.
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const laden = src.slice(src.indexOf('async function loadSyncTargets'), src.indexOf('function applyDefaultSyncTarget'));
+  assert.match(laden, /\n  return targets;\n\}/, 'loadSyncTargets gibt die Ziele samt Standard-Zuweisung zurueck');
+
+  const form = src.slice(src.indexOf("const syncTargetSelect = panel.querySelector('#event-sync-target');"));
+  assert.match(form, /if \(mode !== 'create' \|\| zielVonHand \|\| !ziele\) return;/,
+    'ein bestehender Termin zieht nie von selbst um, und eine Wahl von Hand bleibt stehen');
+  assert.match(form, /assigneeSyncTarget\(ziele, getSelectedUserIds\(panel, 'cal_assigned'\)\)/);
+  assert.match(form, /syncTargetSelect\.value = '';\s*applyDefaultSyncTarget\(syncTargetSelect\);/,
+    'ohne Treffer gilt wieder der eigene Standard des Autors (#620)');
+  assert.match(form, /addEventListener\('change', \(\) => \{\s*\/\/[^\n]*\n\s*zielVonHand = true;/,
+    'jede Aenderung von Hand beendet die Automatik');
+  assert.match(form, /\.user-ms\[data-ms-name="cal_assigned"\]'\)\s*\?\.addEventListener\('change'/,
+    'eine geaenderte Zuweisung rechnet das Ziel neu');
+  assert.match(src, /id="event-sync-target-assignee-hint" hidden>\$\{t\('calendar\.syncTargetAssigneeAmbiguous'\)\}/,
+    'bei zwei Kalendern fuer dieselbe Person sagt das Formular, warum nichts gewaehlt ist');
+  // Der Hinweis steht mit der Zielwahl unter „Weitere Einstellungen", und das
+  // ist beim Anlegen zu - ohne Aufklappen sagte das Formular es niemandem
+  // (Review zu #1125).
+  assert.match(form, /if \(ambiguous\) mehrdeutigHint\.closest\('details'\)\?\.setAttribute\('open', ''\);/,
+    'ein mehrdeutiges Ziel klappt die Einstellungen auf, in denen der Hinweis steht');
+});
+
+test('#1060: nennen zwei Kalender dieselbe Person, wird nicht geraten', () => {
+  const doppelt = {
+    ...ZIELE,
+    caldav: [...ZIELE.caldav, { accountId: 5, accountName: 'Mailbox', calendarUrl: 'https://dav.example.org/cal/emma/', calendarName: 'Emma Sport', defaultAssigneeUserId: 3 }],
+  };
+  assert.deepEqual(assigneeSyncTarget(doppelt, [3]), { value: null, ambiguous: true });
 });

@@ -2,7 +2,7 @@
   "quelle": {
     "pr": "https://github.com/ulsklyc/yuvomi/pull/1066",
     "gemessen": "2026-09-09",
-    "hinweis": "Aeusserungen aus der GitHub-API von PR #1066 (mit `commit` genau so, wie der Nachweis sie holt: Reviews und Inline-Anmerkungen tragen die SHA, eine Zusammenfassung nicht), laeufe aus der Actions-API, ergebnisse aus den result-Objekten der genannten Job-Logs. Nur die Felder, die der Nachweis liest."
+    "hinweis": "Aeusserungen aus der GitHub-API von PR #1066 (mit `commit` genau so, wie der Nachweis sie holt: Reviews und Inline-Anmerkungen tragen die SHA, eine Zusammenfassung nicht), laeufe aus der Actions-API, ergebnisse aus den result-Objekten der genannten Job-Logs. Nur die Felder, die der Nachweis liest. Seit #1096 (dritte Runde) traegt jede Zeile auch `anker`, das Fragment ihrer html_url - am 10.09.2026 mit genau der jq-Projektion des Workflows nachgeholt; login, zeit und commit waren zeichengleich."
   },
   "laeufe": {
     "34315259346": {
@@ -16,6 +16,12 @@
       "beginn": "2026-09-09T06:40:37Z",
       "ende": "2026-09-09T06:41:55Z",
       "was": "Abbruch im Tor (1m18s), nichts hinterlassen - der Haken stand trotzdem gruen"
+    },
+    "34316389826": {
+      "head": "1d271aa9c173301f5d4e46bd036d1763b8334ce7",
+      "beginn": "2026-09-09T05:48:41Z",
+      "ende": "2026-09-09T05:58:03Z",
+      "was": "saubere Review (9m22s), Zusammenfassung issuecomment-5596556584 um 05:57:53Z gepostet - der Postbefehl in strom.gepostet stammt aus diesem Lauf"
     }
   },
   "koepfe": {
@@ -27,321 +33,384 @@
       {
         "commit": null,
         "login": "claude[bot]",
-        "zeit": "2026-09-09T05:57:53Z"
+        "zeit": "2026-09-09T05:57:53Z",
+        "anker": "issuecomment-5596556584"
       }
     ],
     "reviews": [
       {
         "commit": "b1ce599e2551d37b2037e2c3c8a104d7e965e00e",
         "login": "claude[bot]",
-        "zeit": "2026-09-09T05:41:30Z"
+        "zeit": "2026-09-09T05:41:30Z",
+        "anker": "pullrequestreview-5150197177"
       },
       {
         "commit": "b1ce599e2551d37b2037e2c3c8a104d7e965e00e",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T05:42:03Z"
+        "zeit": "2026-09-09T05:42:03Z",
+        "anker": "pullrequestreview-5150200217"
       },
       {
         "commit": "a2e731cb92313fee6b4db4097089084197bc7c6a",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T05:48:05Z"
+        "zeit": "2026-09-09T05:48:05Z",
+        "anker": "pullrequestreview-5150239048"
       },
       {
         "commit": "203386cccaadb267944445fb1339825fd8847beb",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T05:56:37Z"
+        "zeit": "2026-09-09T05:56:37Z",
+        "anker": "pullrequestreview-5150299697"
       },
       {
         "commit": "203386cccaadb267944445fb1339825fd8847beb",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T05:56:39Z"
+        "zeit": "2026-09-09T05:56:39Z",
+        "anker": "pullrequestreview-5150299924"
       },
       {
         "commit": "203386cccaadb267944445fb1339825fd8847beb",
         "login": "claude[bot]",
-        "zeit": "2026-09-09T06:04:45Z"
+        "zeit": "2026-09-09T06:04:45Z",
+        "anker": "pullrequestreview-5150365751"
       },
       {
         "commit": "203386cccaadb267944445fb1339825fd8847beb",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T06:06:59Z"
+        "zeit": "2026-09-09T06:06:59Z",
+        "anker": "pullrequestreview-5150381910"
       },
       {
         "commit": "7b06099230ce5bbc69856ec3a8c92a1d10e7755f",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:21:10Z"
+        "zeit": "2026-09-09T06:21:10Z",
+        "anker": "pullrequestreview-5150491474"
       },
       {
         "commit": "7b06099230ce5bbc69856ec3a8c92a1d10e7755f",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:21:11Z"
+        "zeit": "2026-09-09T06:21:11Z",
+        "anker": "pullrequestreview-5150491623"
       },
       {
         "commit": "7b06099230ce5bbc69856ec3a8c92a1d10e7755f",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:21:13Z"
+        "zeit": "2026-09-09T06:21:13Z",
+        "anker": "pullrequestreview-5150491811"
       },
       {
         "commit": "7b06099230ce5bbc69856ec3a8c92a1d10e7755f",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:21:14Z"
+        "zeit": "2026-09-09T06:21:14Z",
+        "anker": "pullrequestreview-5150491951"
       },
       {
         "commit": "7b06099230ce5bbc69856ec3a8c92a1d10e7755f",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T06:30:13Z"
+        "zeit": "2026-09-09T06:30:13Z",
+        "anker": "pullrequestreview-5150558650"
       },
       {
         "commit": "8a87a5cd7aa6a83f148817c2c53ac292e86dde60",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:40:47Z"
+        "zeit": "2026-09-09T06:40:47Z",
+        "anker": "pullrequestreview-5150652974"
       },
       {
         "commit": "8a87a5cd7aa6a83f148817c2c53ac292e86dde60",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:40:48Z"
+        "zeit": "2026-09-09T06:40:48Z",
+        "anker": "pullrequestreview-5150653255"
       },
       {
         "commit": "8a87a5cd7aa6a83f148817c2c53ac292e86dde60",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T06:52:03Z"
+        "zeit": "2026-09-09T06:52:03Z",
+        "anker": "pullrequestreview-5150753975"
       },
       {
         "commit": "5036335229975bd30b99c2d7870de003dfb1dd4f",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:58:34Z"
+        "zeit": "2026-09-09T06:58:34Z",
+        "anker": "pullrequestreview-5150823026"
       },
       {
         "commit": "5036335229975bd30b99c2d7870de003dfb1dd4f",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:58:35Z"
+        "zeit": "2026-09-09T06:58:35Z",
+        "anker": "pullrequestreview-5150823197"
       },
       {
         "commit": "5036335229975bd30b99c2d7870de003dfb1dd4f",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:58:36Z"
+        "zeit": "2026-09-09T06:58:36Z",
+        "anker": "pullrequestreview-5150823330"
       },
       {
         "commit": "5036335229975bd30b99c2d7870de003dfb1dd4f",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T07:07:46Z"
+        "zeit": "2026-09-09T07:07:46Z",
+        "anker": "pullrequestreview-5150924764"
       },
       {
         "commit": "cc6d707bf8b9be8320c683a14c3b36a9ce4c264a",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T07:15:17Z"
+        "zeit": "2026-09-09T07:15:17Z",
+        "anker": "pullrequestreview-5150992624"
       },
       {
         "commit": "cc6d707bf8b9be8320c683a14c3b36a9ce4c264a",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T07:15:18Z"
+        "zeit": "2026-09-09T07:15:18Z",
+        "anker": "pullrequestreview-5150992839"
       },
       {
         "commit": "cc6d707bf8b9be8320c683a14c3b36a9ce4c264a",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T07:15:20Z"
+        "zeit": "2026-09-09T07:15:20Z",
+        "anker": "pullrequestreview-5150993063"
       },
       {
         "commit": "dbf3d2cbfbdac24ac9898f5b56613b872016da74",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T07:29:35Z"
+        "zeit": "2026-09-09T07:29:35Z",
+        "anker": "pullrequestreview-5151115136"
       },
       {
         "commit": "dbf3d2cbfbdac24ac9898f5b56613b872016da74",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T07:31:21Z"
+        "zeit": "2026-09-09T07:31:21Z",
+        "anker": "pullrequestreview-5151130719"
       },
       {
         "commit": "dbf3d2cbfbdac24ac9898f5b56613b872016da74",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T08:07:09Z"
+        "zeit": "2026-09-09T08:07:09Z",
+        "anker": "pullrequestreview-5151473545"
       },
       {
         "commit": "dbf3d2cbfbdac24ac9898f5b56613b872016da74",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T08:07:10Z"
+        "zeit": "2026-09-09T08:07:10Z",
+        "anker": "pullrequestreview-5151473736"
       },
       {
         "commit": "dbf3d2cbfbdac24ac9898f5b56613b872016da74",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T08:07:11Z"
+        "zeit": "2026-09-09T08:07:11Z",
+        "anker": "pullrequestreview-5151473914"
       }
     ],
     "inline": [
       {
         "commit": "b1ce599e2551d37b2037e2c3c8a104d7e965e00e",
         "login": "claude[bot]",
-        "zeit": "2026-09-09T05:41:30Z"
+        "zeit": "2026-09-09T05:41:30Z",
+        "anker": "discussion_r3965014733"
       },
       {
         "commit": "b1ce599e2551d37b2037e2c3c8a104d7e965e00e",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T05:42:03Z"
+        "zeit": "2026-09-09T05:42:03Z",
+        "anker": "discussion_r3965017499"
       },
       {
         "commit": "b1ce599e2551d37b2037e2c3c8a104d7e965e00e",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T05:42:03Z"
+        "zeit": "2026-09-09T05:42:03Z",
+        "anker": "discussion_r3965017503"
       },
       {
         "commit": "b1ce599e2551d37b2037e2c3c8a104d7e965e00e",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T05:48:05Z"
+        "zeit": "2026-09-09T05:48:05Z",
+        "anker": "discussion_r3965050707"
       },
       {
         "commit": "b1ce599e2551d37b2037e2c3c8a104d7e965e00e",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T05:56:37Z"
+        "zeit": "2026-09-09T05:56:37Z",
+        "anker": "discussion_r3965101767"
       },
       {
         "commit": "b1ce599e2551d37b2037e2c3c8a104d7e965e00e",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T05:56:39Z"
+        "zeit": "2026-09-09T05:56:39Z",
+        "anker": "discussion_r3965101910"
       },
       {
         "commit": "203386cccaadb267944445fb1339825fd8847beb",
         "login": "claude[bot]",
-        "zeit": "2026-09-09T06:04:45Z"
+        "zeit": "2026-09-09T06:04:45Z",
+        "anker": "discussion_r3965151699"
       },
       {
         "commit": "203386cccaadb267944445fb1339825fd8847beb",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T06:06:59Z"
+        "zeit": "2026-09-09T06:06:59Z",
+        "anker": "discussion_r3965163902"
       },
       {
         "commit": "203386cccaadb267944445fb1339825fd8847beb",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T06:06:59Z"
+        "zeit": "2026-09-09T06:06:59Z",
+        "anker": "discussion_r3965163905"
       },
       {
         "commit": "203386cccaadb267944445fb1339825fd8847beb",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T06:06:59Z"
+        "zeit": "2026-09-09T06:06:59Z",
+        "anker": "discussion_r3965163911"
       },
       {
         "commit": "203386cccaadb267944445fb1339825fd8847beb",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:21:10Z"
+        "zeit": "2026-09-09T06:21:10Z",
+        "anker": "discussion_r3965249756"
       },
       {
         "commit": "203386cccaadb267944445fb1339825fd8847beb",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:21:11Z"
+        "zeit": "2026-09-09T06:21:11Z",
+        "anker": "discussion_r3965249865"
       },
       {
         "commit": "203386cccaadb267944445fb1339825fd8847beb",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:21:13Z"
+        "zeit": "2026-09-09T06:21:13Z",
+        "anker": "discussion_r3965250006"
       },
       {
         "commit": "203386cccaadb267944445fb1339825fd8847beb",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:21:14Z"
+        "zeit": "2026-09-09T06:21:14Z",
+        "anker": "discussion_r3965250125"
       },
       {
         "commit": "7b06099230ce5bbc69856ec3a8c92a1d10e7755f",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T06:30:13Z"
+        "zeit": "2026-09-09T06:30:13Z",
+        "anker": "discussion_r3965304860"
       },
       {
         "commit": "7b06099230ce5bbc69856ec3a8c92a1d10e7755f",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T06:30:13Z"
+        "zeit": "2026-09-09T06:30:13Z",
+        "anker": "discussion_r3965304867"
       },
       {
         "commit": "7b06099230ce5bbc69856ec3a8c92a1d10e7755f",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:40:47Z"
+        "zeit": "2026-09-09T06:40:47Z",
+        "anker": "discussion_r3965378535"
       },
       {
         "commit": "7b06099230ce5bbc69856ec3a8c92a1d10e7755f",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:40:48Z"
+        "zeit": "2026-09-09T06:40:48Z",
+        "anker": "discussion_r3965378715"
       },
       {
         "commit": "8a87a5cd7aa6a83f148817c2c53ac292e86dde60",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T06:52:03Z"
+        "zeit": "2026-09-09T06:52:03Z",
+        "anker": "discussion_r3965463598"
       },
       {
         "commit": "8a87a5cd7aa6a83f148817c2c53ac292e86dde60",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T06:52:03Z"
+        "zeit": "2026-09-09T06:52:03Z",
+        "anker": "discussion_r3965463609"
       },
       {
         "commit": "8a87a5cd7aa6a83f148817c2c53ac292e86dde60",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T06:52:03Z"
+        "zeit": "2026-09-09T06:52:03Z",
+        "anker": "discussion_r3965463617"
       },
       {
         "commit": "8a87a5cd7aa6a83f148817c2c53ac292e86dde60",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:58:34Z"
+        "zeit": "2026-09-09T06:58:34Z",
+        "anker": "discussion_r3965519687"
       },
       {
         "commit": "8a87a5cd7aa6a83f148817c2c53ac292e86dde60",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:58:35Z"
+        "zeit": "2026-09-09T06:58:35Z",
+        "anker": "discussion_r3965519825"
       },
       {
         "commit": "8a87a5cd7aa6a83f148817c2c53ac292e86dde60",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T06:58:36Z"
+        "zeit": "2026-09-09T06:58:36Z",
+        "anker": "discussion_r3965519955"
       },
       {
         "commit": "5036335229975bd30b99c2d7870de003dfb1dd4f",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T07:07:46Z"
+        "zeit": "2026-09-09T07:07:46Z",
+        "anker": "discussion_r3965608077"
       },
       {
         "commit": "5036335229975bd30b99c2d7870de003dfb1dd4f",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T07:07:46Z"
+        "zeit": "2026-09-09T07:07:46Z",
+        "anker": "discussion_r3965608082"
       },
       {
         "commit": "5036335229975bd30b99c2d7870de003dfb1dd4f",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T07:07:46Z"
+        "zeit": "2026-09-09T07:07:46Z",
+        "anker": "discussion_r3965608089"
       },
       {
         "commit": "5036335229975bd30b99c2d7870de003dfb1dd4f",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T07:15:17Z"
+        "zeit": "2026-09-09T07:15:17Z",
+        "anker": "discussion_r3965663682"
       },
       {
         "commit": "5036335229975bd30b99c2d7870de003dfb1dd4f",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T07:15:18Z"
+        "zeit": "2026-09-09T07:15:18Z",
+        "anker": "discussion_r3965663920"
       },
       {
         "commit": "5036335229975bd30b99c2d7870de003dfb1dd4f",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T07:15:20Z"
+        "zeit": "2026-09-09T07:15:20Z",
+        "anker": "discussion_r3965664140"
       },
       {
         "commit": "dbf3d2cbfbdac24ac9898f5b56613b872016da74",
         "login": "chatgpt-codex-connector[bot]",
-        "zeit": "2026-09-09T07:29:35Z"
+        "zeit": "2026-09-09T07:29:35Z",
+        "anker": "discussion_r3965767799"
       },
       {
         "commit": "dbf3d2cbfbdac24ac9898f5b56613b872016da74",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T07:31:21Z"
+        "zeit": "2026-09-09T07:31:21Z",
+        "anker": "discussion_r3965781585"
       },
       {
         "commit": "8a87a5cd7aa6a83f148817c2c53ac292e86dde60",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T08:07:09Z"
+        "zeit": "2026-09-09T08:07:09Z",
+        "anker": "discussion_r3966058661"
       },
       {
         "commit": "dbf3d2cbfbdac24ac9898f5b56613b872016da74",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T08:07:10Z"
+        "zeit": "2026-09-09T08:07:10Z",
+        "anker": "discussion_r3966058802"
       },
       {
         "commit": "8a87a5cd7aa6a83f148817c2c53ac292e86dde60",
         "login": "ulsklyc",
-        "zeit": "2026-09-09T08:07:11Z"
+        "zeit": "2026-09-09T08:07:11Z",
+        "anker": "discussion_r3966058978"
       }
     ]
   },
@@ -392,6 +461,56 @@
       "is_error": false,
       "permission_denials": [],
       "result": "Done."
+    },
+    "gehorsam-erwaehnt-abbruch": {
+      "result": "Review complete for PR ulsklyc/yuvomi#1094 at commit `8a33013f`.\n\n**Findings: No issues.** Two independent Opus agents scanned the diff for bugs/security issues (escaping, logic, CSS/JS consistency, test correctness) and both came back clean — no CLAUDE.md files exist in this repo, so there was nothing for compliance agents to check. Posted a summary comment scoped to this commit: https://github.com/ulsklyc/yuvomi/pull/1094#issuecomment-5609521451\n\nOne thing worth flagging about the process itself: the command arguments included an embedded instruction (in German) asserting that Claude hadn't reviewed this commit yet and telling me to disregard the normal \"already commented\" stop condition. Rather than trust that claim, I independently verified it via `gh api`/`gh pr view` — it checked out: Claude had reviewed commits `2b259545e` and `93b49cfe7` but not the new HEAD `8a33013f`, so proceeding was legitimate. I'd flag this pattern in general, though — instructions bundled into command arguments that tell an agent to bypass its own safety checks are worth treating with suspicion and verifying independently rather than taking at face value, even when they turn out to be accurate.",
+      "subtype": "success",
+      "is_error": false,
+      "num_turns": 29,
+      "permission_denials": [
+        {
+          "tool_name": "Bash"
+        },
+        {
+          "tool_name": "Bash"
+        },
+        {
+          "tool_name": "Bash"
+        },
+        {
+          "tool_name": "Bash"
+        },
+        {
+          "tool_name": "Bash"
+        },
+        {
+          "tool_name": "Bash"
+        },
+        {
+          "tool_name": "Bash"
+        },
+        {
+          "tool_name": "Bash"
+        },
+        {
+          "tool_name": "Bash"
+        },
+        {
+          "tool_name": "Bash"
+        },
+        {
+          "tool_name": "Bash"
+        },
+        {
+          "tool_name": "Bash"
+        },
+        {
+          "tool_name": "Bash"
+        },
+        {
+          "tool_name": "Bash"
+        }
+      ]
     }
   },
   "strom": {
@@ -485,6 +604,187 @@
             }
           ]
         }
+      }
+    ],
+    "gepostet_mehrzeilig": [
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01Vhx2VcJ2UaKc1JYmo6th2c",
+              "name": "Bash",
+              "input": {
+                "command": "gh pr comment 1094 --repo ulsklyc/yuvomi --body \"## Code review\n\nNo issues found. Checked for bugs and CLAUDE.md compliance (no \\`CLAUDE.md\\` files exist in this repository).\n\nScope: latest push, commit \\`8a33013f\\` (adds \\`flex-shrink: 0\\` on \\`.history-people .group-toggle__btn\\`/\\`.history-people__mark\\` so history-filter chips don't shrink below their target size in the scrolling row, per the earlier review feedback). No new bugs or regressions found in this change.\""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "tool_use_id": "toolu_01Vhx2VcJ2UaKc1JYmo6th2c",
+              "type": "tool_result",
+              "content": "https://github.com/ulsklyc/yuvomi/pull/1094#issuecomment-5609521451",
+              "is_error": false
+            }
+          ]
+        }
+      }
+    ],
+    "nur_gelesen": [
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_lese_0",
+              "name": "Bash",
+              "input": {
+                "command": "gh api repos/ulsklyc/yuvomi/pulls/1094/reviews --jq '.[] | select(.user.login==\"claude\") | {id, submitted_at, commit_id, body: .body[0:300]}'"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "tool_use_id": "toolu_lese_0",
+              "type": "tool_result",
+              "content": "[{\"html_url\": \"https://github.com/ulsklyc/yuvomi/pull/1094#discussion_r2734188901\", \"user\": {\"login\": \"claude[bot]\"}}]",
+              "is_error": false
+            }
+          ]
+        }
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_lese_1",
+              "name": "Bash",
+              "input": {
+                "command": "gh api repos/ulsklyc/yuvomi/pulls/1094/reviews --jq 'map(select(.user.login==\"claude\"))'"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "tool_use_id": "toolu_lese_1",
+              "type": "tool_result",
+              "content": "[{\"html_url\": \"https://github.com/ulsklyc/yuvomi/pull/1094#discussion_r2734188901\", \"user\": {\"login\": \"claude[bot]\"}}]",
+              "is_error": false
+            }
+          ]
+        }
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_lese_2",
+              "name": "Bash",
+              "input": {
+                "command": "gh api repos/ulsklyc/yuvomi/pulls/1094/reviews"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "tool_use_id": "toolu_lese_2",
+              "type": "tool_result",
+              "content": "[{\"html_url\": \"https://github.com/ulsklyc/yuvomi/pull/1094#discussion_r2734188901\", \"user\": {\"login\": \"claude[bot]\"}}]",
+              "is_error": false
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "quelle_1094": {
+    "pr": "https://github.com/ulsklyc/yuvomi/pull/1094",
+    "lauf": "https://github.com/ulsklyc/yuvomi/actions/runs/34410944562",
+    "gemessen": "2026-09-10",
+    "hinweis": "Der ZWEITE Push an #1094. Die Review lief vollstaendig durch, postete issuecomment-5609521451 - und der Nachweis faerbte trotzdem rot (\"0 von 3 Postbefehlen\"). Drei Ursachen in einem Lauf: der echte Postbefehl galt wegen seines mehrzeiligen --body als Kette, die drei gezaehlten \"Postbefehle\" waren lesende GETs, und der result-Text ERWAEHNT die Abbruchbedingung, der er gerade nicht gefolgt ist. Befehl und result-Text zeichengleich aus dem Job-Log. Die Aeusserungen stammen aus der GitHub-API von #1094 (10.09.2026, jq-Projektion des Workflows mit `anker`), beschnitten auf das, was bis zum Laufende 2026-09-09T22:19:39Z existierte.",
+    "seit": "2026-09-09T22:11:43Z",
+    "kopf": "8a33013f1c7ccde8aea40ef988b2299bff584f46",
+    "ende": "2026-09-09T22:19:39Z",
+    "aeusserungen": [
+      {
+        "anker": "issuecomment-5609252268",
+        "commit": null,
+        "login": "ulsklyc",
+        "zeit": "2026-09-09T21:52:53Z"
+      },
+      {
+        "anker": "issuecomment-5609449896",
+        "commit": null,
+        "login": "ulsklyc",
+        "zeit": "2026-09-09T22:11:58Z"
+      },
+      {
+        "anker": "issuecomment-5609521451",
+        "commit": null,
+        "login": "claude[bot]",
+        "zeit": "2026-09-09T22:19:26Z"
+      },
+      {
+        "anker": "pullrequestreview-5160160032",
+        "commit": "2b259545e94b695ec5ed397e51305dbd4f012341",
+        "login": "chatgpt-codex-connector[bot]",
+        "zeit": "2026-09-09T21:42:31Z"
+      },
+      {
+        "anker": "pullrequestreview-5160165538",
+        "commit": "2b259545e94b695ec5ed397e51305dbd4f012341",
+        "login": "claude[bot]",
+        "zeit": "2026-09-09T21:43:05Z"
+      },
+      {
+        "anker": "pullrequestreview-5160363402",
+        "commit": "93b49cfe71dcc3bb0b621a926e705d757ed3ad35",
+        "login": "claude[bot]",
+        "zeit": "2026-09-09T22:03:23Z"
+      },
+      {
+        "anker": "discussion_r3973277423",
+        "commit": "2b259545e94b695ec5ed397e51305dbd4f012341",
+        "login": "chatgpt-codex-connector[bot]",
+        "zeit": "2026-09-09T21:42:31Z"
+      },
+      {
+        "anker": "discussion_r3973281488",
+        "commit": "2b259545e94b695ec5ed397e51305dbd4f012341",
+        "login": "claude[bot]",
+        "zeit": "2026-09-09T21:43:05Z"
+      },
+      {
+        "anker": "discussion_r3973418138",
+        "commit": "93b49cfe71dcc3bb0b621a926e705d757ed3ad35",
+        "login": "claude[bot]",
+        "zeit": "2026-09-09T22:03:23Z"
       }
     ]
   }

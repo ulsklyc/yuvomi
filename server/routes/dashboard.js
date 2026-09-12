@@ -9,14 +9,15 @@ import express from 'express';
 import { hydrateNotesWithCategories } from '../services/note-categories.js';
 import * as db from '../db.js';
 import { hydrateBirthdayOccurrences } from '../services/birthdays.js';
-import { getUpcomingEvents } from '../services/calendar-events.js';
+import { getUpcomingEvents } from '../services/calendar-event-reader.js';
 import { taskScopeWhere, taskCategoryWhere, categoryBindings, normalizeCategoryFilter } from '../services/task-scope.js';
 import { getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
 import { visibilityWhere } from '../services/visibility.js';
 import { resolveBudgetMode } from '../services/budget-visibility.js';
-import { deniedModules } from '../permissions.js';
+import { hiddenModulesFor } from '../permissions.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
+import { isAdminUser, serializeEvents } from './calendar/helpers.js';
 
 const log = createLogger('Dashboard');
 
@@ -228,7 +229,11 @@ router.get('/', (req, res) => {
   // unbeschränkte Mitglieder. Was gesperrt ist, steht vor der ersten Abfrage
   // fest und wird gar nicht erst geholt - ein nachgelagerter Filter hätte die
   // Daten erst gelesen und dann weggeworfen.
-  const denied = deniedModules(req.sessionModuleAccess);
+  //
+  // Dazu die Scopes eines API-Tokens: `dashboard:read` öffnet die Übersicht,
+  // nicht die Module darin. Eine Kachel, deren Modul das Token nicht lesen darf,
+  // kommt in derselben leeren Fassung wie bei einer Rollensperre.
+  const denied = hiddenModulesFor(req, Object.keys(DENIED_PAYLOAD));
   for (const key of denied) Object.assign(result, DENIED_PAYLOAD[key]?.({ month: currentMonth }));
   const allows = (moduleKey) => !denied.has(moduleKey);
 
@@ -236,13 +241,9 @@ router.get('/', (req, res) => {
   // Geteilte Logik mit /calendar/upcoming: expandiert wiederkehrende Serien,
   // sodass auch Termine erscheinen, deren Master-Start in der Vergangenheit liegt.
   if (allows('calendar')) try {
-    result.upcomingEvents = getUpcomingEvents(d, {
+    result.upcomingEvents = serializeEvents(getUpcomingEvents(d, {
       userId, limit: 5, fromToday: true, assignedTo: eventsAssignedTo, includeBirthdays,
-    })
-      .map(({ assigned_users_json, ...event }) => {
-        event.assigned_users = assigned_users_json ? JSON.parse(assigned_users_json) : [];
-        return event;
-      });
+    }), { database: d, actorId: userId, isAdmin: isAdminUser(req) });
   } catch (err) {
     log.error('upcomingEvents error:', err.message);
     result.upcomingEvents = [];

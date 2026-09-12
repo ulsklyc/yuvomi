@@ -1031,6 +1031,7 @@ async function moveFolder(folder) {
     persistExpandedFolders();
     await Promise.all([loadFolders(), loadDocuments()]);
     renderAll();
+    refocusAfterRender();
   } catch (err) {
     window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
   }
@@ -1072,6 +1073,7 @@ async function renameFolder(folder) {
     // auf den Karten weiter mit dem alten Namen.
     await Promise.all([loadFolders(), loadDocuments()]);
     renderAll();
+    refocusAfterRender();
   } catch (err) {
     window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
   }
@@ -1200,6 +1202,7 @@ async function deleteFolder(folder) {
   try {
     const result = await commitFolderDeletion(folder, impact, choice);
     await applyFolderDeleteResult(result, choice, selectedSubtree);
+    refocusAfterRender();
   } catch (err) {
     await handleFolderDeleteError(err, folder);
   }
@@ -1639,6 +1642,7 @@ async function moveSelected() {
     window.yuvomi?.showToast(t('documents.bulkMovedToast', { count: docs.length }), 'success');
     await loadDocuments();
     renderAll();
+    refocusAfterRender();
   } catch (err) {
     window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
   }

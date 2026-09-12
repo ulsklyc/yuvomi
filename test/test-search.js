@@ -18,6 +18,13 @@ function test(name, fn) {
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion fehlgeschlagen'); }
 
+function assertCompactCalendarQueries(statements) {
+  const calendarReads = statements.filter((sql) => /\b(?:FROM|JOIN)\s+calendar_events\b/i.test(sql));
+  assert(calendarReads.length > 0, 'keine Kalenderabfrage aufgezeichnet');
+  assert(calendarReads.every((sql) => !/\be\.\*|\battachment_data\b/i.test(sql)),
+    `Attachment-Body in kompakter Kalenderabfrage: ${calendarReads.join('\n---\n')}`);
+}
+
 const db = new DatabaseSync(':memory:');
 db.exec('PRAGMA foreign_keys = ON;');
 db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -27,6 +34,9 @@ db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
 db.exec(MIGRATIONS_SQL[1]);
 // Migration 44: FTS5 index + sync triggers. Must apply cleanly.
 db.exec(MIGRATIONS_SQL[44]);
+db.exec(MIGRATIONS_SQL[85]); // calendar_event_exceptions
+db.exec(MIGRATIONS_SQL[27]); // legacy calendar attachment body
+db.exec(MIGRATIONS_SQL[194]); // linked occurrence overrides
 // Migration 65: health tables (medications, health_activities) the search reads from.
 db.exec(MIGRATIONS_SQL[65]);
 // Migration 66: FTS triggers + backfill for medications and health activities.
@@ -130,6 +140,82 @@ test('Suche deckt alle Entitäten ab', () => {
   assert(r.notes.some((n) => n.content.includes('cake')), 'Notiz gefunden');
   assert(r.contacts.some((c) => c.title === 'Cake Bakery'), 'Kontakt gefunden');
   assert(r.events.some((e) => e.title === 'Cake tasting'), 'Termin gefunden');
+});
+
+test('globale Suche liefert den aufgelösten verschobenen Termin mit Originalidentität', () => {
+  const masterId = db.prepare(`
+    INSERT INTO calendar_events
+      (title, description, start_datetime, end_datetime, all_day, recurrence_rule, created_by)
+    VALUES ('Global master', 'Current global description', '2030-07-01T09:00:00',
+            '2030-07-01T10:00:00', 0, 'FREQ=DAILY;COUNT=3', ?)
+  `).run(uid).lastInsertRowid;
+  const childId = db.prepare(`
+    INSERT INTO calendar_events
+      (title, description, start_datetime, end_datetime, all_day, recurrence_parent_id,
+       recurrence_id, overridden_fields, created_by)
+    VALUES ('Global override Qzxglobal', 'Stale global description',
+            '2030-07-10T11:00:00', '2030-07-10T12:00:00', 1, ?, '2030-07-01',
+            '["title","start_datetime","end_datetime"]', ?)
+  `).run(masterId, uid).lastInsertRowid;
+  db.prepare(`
+    INSERT INTO calendar_event_exceptions (event_id, exception_date)
+    VALUES (?, '2030-07-01')
+  `).run(masterId);
+
+  const result = runSearch(db, 'Qzxglobal', uid).events;
+  assert(result.length === 1, 'genau ein Treffer erwartet');
+  assert(result[0].id === Number(childId), 'Child-ID fehlt');
+  assert(result[0].all_day === 0, 'nicht überschriebenes all_day muss vom Master kommen');
+  assert(result[0].start_datetime === '2030-07-10T11:00:00', 'verschobener Start fehlt');
+  assert(result[0].series_id === Number(masterId), 'series_id fehlt');
+  assert(result[0].recurrence_id === '2030-07-01', 'originale recurrence_id fehlt');
+  assert(result[0].is_occurrence_override === true, 'Override-Kennzeichen fehlt');
+});
+
+test('globale Suche löst große Anhänge auf, ohne attachment_data zu lesen', () => {
+  const largeAttachment = 'A'.repeat(1024 * 1024);
+  const masterId = db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, recurrence_rule, created_by, attachment_data)
+    VALUES ('Attachment master', '2030-08-01T09:00:00', '2030-08-01T10:00:00',
+            'FREQ=DAILY;COUNT=2', ?, ?)
+  `).run(uid, largeAttachment).lastInsertRowid;
+  const childId = db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, recurrence_parent_id, recurrence_id,
+       overridden_fields, created_by, attachment_data)
+    VALUES ('Qzxlargeattachment override', '2030-08-05T11:00:00', '2030-08-05T12:00:00',
+            ?, '2030-08-01', '["title","start_datetime","end_datetime"]', ?, ?)
+  `).run(masterId, uid, largeAttachment).lastInsertRowid;
+
+  const originalPrepare = db.prepare.bind(db);
+  const statements = [];
+  db.prepare = (sql) => {
+    statements.push(String(sql));
+    return originalPrepare(sql);
+  };
+  let result;
+  try {
+    result = runSearch(db, 'Qzxlargeattachment', uid).events;
+  } finally {
+    delete db.prepare;
+  }
+
+  assert(result.some((event) => Number(event.id) === Number(childId)), 'linked Treffer fehlt');
+  assertCompactCalendarQueries(statements);
+});
+
+test('SQL guard erkennt e.* auch hinter einem calendar_events-JOIN', () => {
+  let error;
+  try {
+    assertCompactCalendarQueries([
+      'SELECT e.* FROM search_index si JOIN calendar_events e ON e.id = si.entity_id',
+    ]);
+  } catch (caught) {
+    error = caught;
+  }
+  assert(error?.message.startsWith('Attachment-Body in kompakter Kalenderabfrage:'),
+    `JOIN-Wildcard wurde nicht als Attachment-Body erkannt: ${error?.message || 'kein Fehler'}`);
 });
 
 test('Präfix-Treffer funktionieren (Teilwort)', () => {

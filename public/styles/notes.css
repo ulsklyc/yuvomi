@@ -138,12 +138,12 @@
 }
 
 /* Abschnittsköpfe („Angepinnt" / „Weitere Notizen") spannen über alle Spalten,
- * wie der Leerzustand. */
+ * wie der Leerzustand. Groesse/Gewicht kamen hier als eigene Kopie derselben
+ * Section-Title-Rolle, die u-section-title zentral fuehrt (Polish-Batch,
+ * PLAN.md #7) - jetzt im Markup, hier bleibt nur Layout/Farbe. */
 .notes-group__title {
   grid-column: 1 / -1;
   margin: 0;
-  font-size: var(--type-section-title);
-  font-weight: var(--font-weight-semibold);
   color: var(--color-text-secondary);
 }
 

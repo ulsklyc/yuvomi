@@ -212,6 +212,7 @@ function renderProviderAccount(container, account, refresh) {
       await recipeProviders.deleteAccount(account.id);
       showToast(t('settings.recipeProviderAccountDeleted'), 'success');
       await refresh();
+      refocusAfterRender();
     } catch (err) {
       showToast(err.message || t('common.errorGeneric'), 'danger');
     }
@@ -254,6 +255,7 @@ function openProviderLinkModal(account, refresh) {
           closeModal({ force: true });
           showToast(t('settings.recipeProviderAccountUpdated'), 'success');
           await refresh();
+          refocusAfterRender();
         } catch (err) {
           errorEl.textContent = err.message || t('common.errorGeneric');
           errorEl.hidden = false;

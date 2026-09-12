@@ -1,6 +1,6 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
-import { confirmModal } from '/components/modal.js';
+import { confirmModal, refocusAfterRender } from '/components/modal.js';
 import {
   createDisclosure,
   createInlineError,
@@ -118,6 +118,7 @@ function renderAccount(listEl, account, reload) {
     try {
       await api.delete(`/documents/dms/accounts/${account.id}`);
       await reload();
+      refocusAfterRender();
     } catch (err) {
       showToast(err.message ?? t('common.errorGeneric'), 'danger');
     }

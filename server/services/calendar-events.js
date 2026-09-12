@@ -1,18 +1,17 @@
 /**
  * Modul: Kalender-Events (geteilte Abfrage-Logik)
- * Zweck: Wiederholungs-Expansion und "anstehende Termine" zentral bereitstellen,
- *        damit Kalender-Route und Dashboard exakt dieselbe Logik nutzen.
+ * Zweck: Wiederholungs-Expansion als unabhängige Kalender-Grundlage bereitstellen.
  * Abhängigkeiten: server/services/recurrence.js
  */
 
 import { nextOccurrence, parseRRule, matchesRRuleByday } from './recurrence.js';
-import { visibilityWhere } from './visibility.js';
-import {
-  householdTimeZone, localToUTC, shiftDateKey, storedToInstantMs, todayKey, utcToWall,
-} from '../utils/timezone.js';
+import { hasExplicitZone, localToUTC, utcToWall } from '../utils/timezone.js';
+
+const DEFAULT_EXPANSION_ITERATIONS = 1000;
+export const MAX_EXPANSION_ITERATIONS = 100000;
 
 // Zugewiesene Personen eines Events als JSON-Array (Multi-Assignment).
-const ASSIGNED_USERS_SQL = `(
+export const ASSIGNED_USERS_SQL = `(
   SELECT json_group_array(json_object(
     'id', u.id, 'display_name', u.display_name, 'color', u.avatar_color,
     'avatar_data', u.avatar_data
@@ -20,6 +19,43 @@ const ASSIGNED_USERS_SQL = `(
   FROM event_assignments ea JOIN users u ON u.id = ea.user_id
   WHERE ea.event_id = e.id
 ) AS assigned_users_json`;
+
+/**
+ * Die Quelle eines Termins fuer den Kalenderfilter (#1064), als ID in
+ * `external_calendars`. Ein synchronisierter Termin haengt ueber
+ * `calendar_ref_id` daran. Ein frisch angelegter mit Google- oder CalDAV-Ziel
+ * bekommt diese Spalte erst, wenn der Ausgang ihn hochgeladen hat - bis dahin,
+ * und bei scheiterndem Sync auf Dauer, sagt nur das Ziel, wohin er gehoert.
+ * Ohne diesen Rueckfall bliebe er stehen, obwohl sein Kalender ausgeblendet ist.
+ *
+ * Bewusst nicht im Join fuer `cal_name`/`cal_color`: die geerbte Farbe folgt
+ * weiter dem, was der Sync bestaetigt hat. Name und Farbe der QUELLE kommen
+ * trotzdem mit (`source_calendar_name`/`_color`): ohne sie stand ein Kalender,
+ * von dem nur ein neuer Termin im Zeitraum liegt, im Filterblatt als
+ * namenloses „Kalender" - zwei davon waren nicht zu unterscheiden (Codex-Review
+ * zu #1124). Jeder Lesepfad, der Termine an die Kalenderseite liefert, nimmt
+ * den Join und die Spalten mit.
+ *
+ * Ein vorgemerkter Umzug (`outbound_move_to`, #593) geht vor: er ist der
+ * ausdrueckliche Wunsch, und bis der Ausgang ihn ausgefuehrt hat, zeigt
+ * `calendar_ref_id` noch auf den alten Kalender (Codex-Review zu #1124). Die
+ * blosse Abweichung zwischen Ziel und `calendar_ref_id` zaehlt dagegen nicht:
+ * Bestandsdaten tragen sie folgenlos, siehe Migration 105.
+ */
+export const SOURCE_CALENDAR_JOIN = `LEFT JOIN external_calendars src ON src.id = COALESCE(
+  (SELECT tm.id FROM external_calendars tm
+    WHERE tm.source = e.external_source AND tm.external_id = e.outbound_move_to),
+  e.calendar_ref_id,
+  (SELECT tg.id FROM external_calendars tg
+    WHERE tg.source = 'google' AND tg.external_id = e.target_google_calendar_id),
+  (SELECT tc.id FROM external_calendars tc
+    WHERE tc.source = 'caldav' AND tc.external_id = e.target_caldav_calendar_url)
+)`;
+
+/** Die Spalten zu SOURCE_CALENDAR_JOIN: ID, Name und Farbe der aufgeloesten Quelle. */
+export const SOURCE_CALENDAR_COLUMNS = `src.id    AS source_calendar_ref_id,
+  src.name  AS source_calendar_name,
+  src.color AS source_calendar_color`;
 
 /**
  * Lädt die Instanz-Ausnahmen (EXDATE, #489) für die gegebenen Event-IDs als Map.
@@ -52,10 +88,27 @@ export function loadEventExceptions(d, eventIds) {
  * @param {string}   to      YYYY-MM-DD
  * @param {Map<number, Set<string>>?} exceptionsByEvent  event.id → Set ausgenommener
  *        Instanz-Daten (YYYY-MM-DD); diese Vorkommen werden übersprungen (EXDATE, #489)
+ * @param {{includeRecurrenceIdentity?: boolean, maxIterations?: number,
+ *   maxOccurrencesPerSeries?: number, occurrenceFilter?: function}} [options]
  * @returns {object[]}  Expandiertes, sortiertes Array
  */
-export function expandRecurringEvents(events, from, to, exceptionsByEvent = null) {
+export function expandRecurringEvents(
+  events,
+  from,
+  to,
+  exceptionsByEvent = null,
+  {
+    includeRecurrenceIdentity = false, maxIterations = DEFAULT_EXPANSION_ITERATIONS,
+    maxOccurrencesPerSeries = null, occurrenceFilter = null,
+  } = {},
+) {
   const result = [];
+  const iterationLimit = Number.isInteger(maxIterations) && maxIterations > 0
+    ? Math.min(maxIterations, MAX_EXPANSION_ITERATIONS)
+    : DEFAULT_EXPANSION_ITERATIONS;
+  const occurrenceLimit = Number.isInteger(maxOccurrencesPerSeries) && maxOccurrencesPerSeries > 0
+    ? Math.min(maxOccurrencesPerSeries, iterationLimit)
+    : Infinity;
 
   for (const event of events) {
     if (!event.recurrence_rule) {
@@ -125,15 +178,15 @@ export function expandRecurringEvents(events, from, to, exceptionsByEvent = null
 
     let currentDate = seriesStart; // YYYY-MM-DD, lokal oder UTC je nach Modus
     let iterations  = 0;
-    const MAX_ITER  = 1000; // Sicherheitsgrenze
     const exceptions = exceptionsByEvent?.get(event.id) ?? null; // ausgenommene Instanz-Daten (#489)
     // COUNT=N begrenzt die Serie auf N Vorkommen ab DTSTART. Gezählt wird über
     // die Instanzen der Serie (nicht das Anzeigefenster) und VOR EXDATE-Entfernung
     // (RFC 5545): ausgenommene Vorkommen zählen mit, erzeugen aber keine Instanz (#513).
     const maxCount   = parseRRule(event.recurrence_rule)?.count ?? null;
     let   occurrence = 0;
+    let accepted = 0;
 
-    while (currentDate <= to && iterations < MAX_ITER) {
+    while (currentDate <= to && iterations < iterationLimit) {
       iterations++;
 
       // BYDAY-FILTER VOR DEM ZAEHLEN, EXDATE DANACH - die beiden sehen gleich
@@ -189,7 +242,31 @@ export function expandRecurringEvents(events, from, to, exceptionsByEvent = null
             newEnd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
           } else {
             const endDate = new Date(new Date(newStart).getTime() + durationMs);
-            if (timeSuffix.includes('Z')) {
+            /* DAS ENDE MUSS DIE SPEICHERFORM DES STARTS TRAGEN, DEN ES BEGLEITET.
+             *
+             * Gefragt wird `newStart`, nicht `timeSuffix`: der Suffix beschreibt
+             * den Start des MASTERS, `newStart` ist der dieses Vorkommens - und
+             * die beiden haben nicht dieselbe Form. Bei bekannter TZID baut
+             * `instantFuer()` den Start ueber `localToUTC()`, also mit `Z`,
+             * waehrend der Master seinen urspruenglichen Offset traegt
+             * (`T15:25:00-04:00` aus Google). Die alte Frage traf auf beides
+             * nicht zu und schickte das Ende in den Wanduhr-Zweig darunter, der
+             * mit `getHours()` in der SERVERZONE formatiert.
+             *
+             * Ergebnis war eine Zeile mit ZWEI Speicherformen: der Start ein
+             * Instant, das Ende zonenlose Wanduhrzeit. Der Browser rechnet nur
+             * den Instant um (`hasExplicitZone`, siehe utils/timezone.js) und
+             * liess das Ende stehen, also standen dort zwei Uhren nebeneinander.
+             * Auf einem UTC-Server sah ein Nutzer in New York aus 15:25-15:30
+             * ein 15:25-19:30 (#1089) - der Fehler ist genau der Offset zwischen
+             * Server- und Anzeigezone und faellt deshalb nur auf, wo die beiden
+             * auseinandergehen.
+             *
+             * Der Wanduhr-Zweig bleibt fuer zonenlose Starts richtig: dort lesen
+             * `new Date()` und `getHours()` DIESELBE Serverzone, die Umrechnung
+             * hebt sich auf. Falsch wird es erst, wenn nur eine Seite eine Zone
+             * traegt. */
+            if (hasExplicitZone(newStart)) {
               newEnd = endDate.toISOString().replace('.000Z', 'Z');
             } else {
               const p = n => String(n).padStart(2, '0');
@@ -198,10 +275,30 @@ export function expandRecurringEvents(events, from, to, exceptionsByEvent = null
           }
         }
 
-        result.push({
+        const instance = {
           ...event,
           start_datetime:       newStart,
           end_datetime:         newEnd,
+          // DIE IDENTITAET EINES VORKOMMENS IST SEIN UTC-TAG - und das ist keine
+          // Aenderung an #975, sondern dessen Uebersetzung auf den Stand nach #985.
+          //
+          // #975 schrieb hier `currentDate`. Auf seinem Zweig WAR das der UTC-Tag: die
+          // Schleife lief durchgehend auf UTC-Tagen, `lokalRechnen` gab es noch nicht.
+          // Seit #985 laeuft sie bei einer zonenunsicheren Serie auf dem LOKALEN Datum
+          // (Begruendung im Kopf dieser Funktion), und derselbe Ausdruck bedeutete
+          // dann etwas anderes. `utcTagFuer(currentDate)` haelt die urspruengliche
+          // Bedeutung fest.
+          //
+          // Nachgerechnet an der Tokio-Probe in test-ics-export.js: Master 07.01. 08:00
+          // Tokio = 06.01. 23:00 UTC, taeglich. Der Override traegt `2026-01-07` und
+          // meint damit das ZWEITE Vorkommen (lokal der 08.01.) - die Probe verlangt
+          // `RECURRENCE-ID;TZID=Asia/Tokyo:20260108T080000`. Als lokaler Tag gelesen
+          // traefe derselbe Wert das erste Vorkommen.
+          //
+          // Dazu passt der Rest der Kette: die Ausnahme, die ein Override ablegt, wird
+          // oben ebenfalls im UTC-Raum nachgeschlagen
+          // (`exceptions?.has(utcTagFuer(currentDate))`).
+          ...(includeRecurrenceIdentity ? { recurrence_identity: utcTagFuer(currentDate) } : {}),
           is_recurring_instance: utcTagFuer(currentDate) !== seriesStartUtc ? 1 : 0,
           // "IST DAS DER ERSTE TERMIN DER SERIE?" IST NICHT "WEICHT ER VOM
           // GESPEICHERTEN DATUM AB?" - seit ein Start auf der Regel liegen darf,
@@ -215,7 +312,14 @@ export function expandRecurringEvents(events, from, to, exceptionsByEvent = null
           // Vorkommen - eine leere Serie, die der Server zu Recht abwies. Der
           // Zaehler steht hier ohnehin, weil COUNT ihn braucht.
           is_series_start: occurrence === 1 ? 1 : 0,
-        });
+        };
+        // Upcoming readers count only eligible results. Historical instances,
+        // EXDATEs and instances rejected by the reader must not fill the cap.
+        if (!occurrenceFilter || occurrenceFilter(instance)) {
+          result.push(instance);
+          accepted++;
+          if (accepted >= occurrenceLimit) break;
+        }
       }
 
       const next = nextOccurrence(currentDate, event.recurrence_rule, { anchor: seriesStart, utcDiffersFromLocal: lokalRechnen ? false : zonenUnsicher });
@@ -225,128 +329,4 @@ export function expandRecurringEvents(events, from, to, exceptionsByEvent = null
   }
 
   return result.sort((a, b) => a.start_datetime.localeCompare(b.start_datetime));
-}
-
-// --------------------------------------------------------
-// Anstehende Termine ab jetzt (für Dashboard-Widget & Kalender-Upcoming).
-// Berücksichtigt Wiederholungen, indem das Master-Event innerhalb eines
-// Fensters [heute, heute+windowDays] expandiert wird. Dadurch erscheinen
-// auch wiederkehrende Serien, deren Master-Start in der Vergangenheit liegt.
-// --------------------------------------------------------
-
-/**
- * @param {import('node:sqlite').DatabaseSync} d  Geöffnete DB-Verbindung
- * @param {object}  opts
- * @param {number?} opts.userId      Aktueller User (für ICS-Sichtbarkeit)
- * @param {number}  opts.limit       Maximale Anzahl Termine (default 5)
- * @param {number}  opts.windowDays  Vorausschau-Fenster in Tagen (default 90)
- * @param {boolean} opts.fromToday   true = ab Tagesbeginn (Dashboard); false = ab jetzt (default)
- * @param {number?} opts.assignedTo  Nur Termine, die dieser Person zugewiesen sind (#814)
- * @param {boolean} opts.includeBirthdays  false = Geburtstagstermine aussortieren (#927)
- * @param {Date}    [opts.now]        Ersetzbar für Tests - die Tagesgrenze ist genau
- *        das, was hier schiefgehen kann, und ohne festen Zeitpunkt liesse sie sich
- *        nur an dem einen Abend im Jahr pruefen, an dem die Suite zufaellig laeuft.
- * @returns {object[]}  Rohe, expandierte Event-Zeilen (inkl. assigned_users_json)
- */
-export function getUpcomingEvents(d, {
-  userId = null, limit = 5, windowDays = 90, fromToday = false, assignedTo = null,
-  includeBirthdays = true, now = new Date(),
-} = {}) {
-  const tz      = householdTimeZone(d);
-  const nowDate = todayKey(d, now);
-  // fromToday: ganztägige Sichtbarkeit heutiger Termine (Dashboard-Widget) -
-  // gerechnet wird ab Mitternacht der Haushaltszone, nicht ab Mitternacht UTC.
-  const filterFromMs = fromToday
-    ? new Date(localToUTC(`${nowDate}T00:00:00`, tz)).getTime()
-    : now.getTime();
-  // Fenster: heute bis +windowDays voraus (für Wiederholungs-Expansion)
-  const future  = shiftDateKey(nowDate, windowDays);
-  // Untere SQL-Grenze einen Tag früher als das Ergebnisfenster (#824): `DATE()`
-  // liest einen Instant als UTC-Kalendertag, und westlich von UTC liegt ein
-  // Abendtermin von heute dort schon auf morgen - er fiele aus einer Grenze
-  // heraus, die exakt auf `nowDate` sitzt. Geklammert wird danach exakt, über
-  // den Instant-Vergleich unten, deshalb blendet der Rand nichts Zusätzliches ein.
-  const sqlFrom = shiftDateKey(nowDate, -1);
-
-  const rawEvents = d.prepare(`
-    SELECT e.*,
-           u_assigned.display_name AS assigned_name,
-           u_assigned.avatar_color AS assigned_color,
-           -- Zwei Toepfe fuer denselben Namen und dieselbe geerbte Farbe:
-           -- CalDAV/Google ueber calendar_ref_id, ICS-Abos ueber
-           -- subscription_id (#891). Der Name las erst nur ec.name und blieb
-           -- am Abo-Termin NULL, obwohl dessen Farbe schon herauskam (#1064).
-           COALESCE(ec.name, isub.name)   AS cal_name,
-           COALESCE(ec.color, isub.color) AS cal_color,
-           COALESCE(bd.name, nd.name) AS birthday_name,
-           bd.birth_date AS birthday_date,
-           nd.name_day   AS name_day,
-           CASE WHEN nd.id IS NOT NULL THEN 'name_day'
-                WHEN bd.id IS NOT NULL THEN 'birthday' END AS birthday_event_kind,
-           ${ASSIGNED_USERS_SQL}
-    FROM calendar_events e
-    LEFT JOIN users u_assigned ON u_assigned.id = e.assigned_to
-    LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
-    LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
-    LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
-    LEFT JOIN birthdays nd ON nd.name_day_calendar_event_id = e.id
-    WHERE (
-      (e.recurrence_rule IS NULL AND DATE(e.start_datetime) BETWEEN ? AND ?)
-      OR
-      (e.recurrence_rule IS NOT NULL AND DATE(e.start_datetime) <= ?)
-    )
-    AND (
-      e.external_source <> 'ics'
-      OR e.subscription_id IN (
-        SELECT id FROM ics_subscriptions WHERE shared = 1 OR created_by = ?
-      )
-    )
-    AND ${visibilityWhere('e', 'event_assignments', 'event_id')}
-    ORDER BY e.start_datetime ASC
-  `).all(sqlFrom, future, future, userId, userId, userId);
-
-  const recurringIds = rawEvents.filter((e) => e.recurrence_rule).map((e) => e.id);
-  const exceptions   = loadEventExceptions(d, recurringIds);
-
-  return expandRecurringEvents(rawEvents, sqlFrom, future, exceptions)
-    .filter((e) => {
-      // Verglichen werden ZEITPUNKTE, nicht Strings. In start_datetime liegen
-      // zwei Formen nebeneinander - zonenlose Wanduhrzeit (lokal angelegt) und
-      // Instants mit Offset oder 'Z' (synchronisiert) -, und lexikografisch ist
-      // '2026-08-21T21:00' kleiner als '2026-08-22T00:00:00.000Z', obwohl der
-      // Termin noch eine Stunde vor uns liegt. Genau so verschwanden westlich
-      // von UTC die Abendtermine aus dem Übersichts-Widget (#829).
-      // Ganztägige Termine beginnen um Mitternacht der Haushaltszone.
-      const startMs = storedToInstantMs(
-        e.all_day ? e.start_datetime.slice(0, 10) : e.start_datetime, tz
-      );
-      return startMs !== null && startMs >= filterFromMs;
-    })
-    // „NUR MEINE" HEISST HIER DASSELBE WIE IM KALENDERMODUL (#814): zugewiesen,
-    // nicht etwa „unzugewiesen zählt auch mit". Das Modul filtert clientseitig
-    // über `assigned_users.some(u => u.id === me)` (public/pages/calendar.js,
-    // `belongsToMe`), und zwei Auslegungen desselben Satzes an zwei Orten wären
-    // schlimmer als der eine Fall, über den man streiten kann.
-    //
-    // VOR der Deckelung, nicht danach: gefiltert würde sonst innerhalb der
-    // fünf, die ohnehin schon feststehen, und ein Widget mit „nur meine" zeigte
-    // je nach Fremdterminen mal fünf und mal keinen (dieselbe Lehre wie #647).
-    .filter((e) => {
-      if (!assignedTo) return true;
-      const assigned = e.assigned_users_json ? JSON.parse(e.assigned_users_json) : [];
-      return assigned.some((u) => Number(u.id) === Number(assignedTo));
-    })
-    /* GEBURTSTAGE ABWAEHLEN (#927) - und zwar hier, VOR der Deckelung, aus
-     * demselben Grund wie „nur meine" eine Zeile darueber: gefiltert wuerde
-     * sonst innerhalb der fuenf, die ohnehin schon feststehen, und wer die
-     * Geburtstage abwaehlt, saehe im August drei Termine statt fuenf.
-     *
-     * ERKANNT WIRD DER GEBURTSTAG AM JOIN, NICHT AM TITEL: `birthday_name`
-     * kommt aus dem LEFT JOIN auf `birthdays` und ist genau dann gesetzt, wenn
-     * der Termin aus dem Geburtstagsmodul stammt. Der Titel ist in der
-     * Datensprache des Haushalts gespeichert (#524) - ein Vergleich auf
-     * „Geburtstag: " haette in jedem anderssprachigen Haushalt nichts
-     * gefunden. Dieselbe Bedingung wie `isVisibleLayer` im Kalendermodul. */
-    .filter((e) => includeBirthdays || !e.birthday_name)
-    .slice(0, limit);
 }

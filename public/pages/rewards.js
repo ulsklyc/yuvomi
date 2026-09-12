@@ -348,7 +348,7 @@ function renderSetupHints() {
     </li>`).join('');
   return `
     <section class="rw-section rw-setup" aria-labelledby="rw-setup-title">
-      <h2 class="rw-section__title" id="rw-setup-title"><i data-lucide="sparkles" aria-hidden="true"></i>${esc(t('rewards.setupTitle'))}</h2>
+      <h2 class="rw-section__title u-section-title" id="rw-setup-title"><i data-lucide="sparkles" aria-hidden="true"></i>${esc(t('rewards.setupTitle'))}</h2>
       <ol class="rw-setup-list">${items}</ol>
     </section>`;
 }
@@ -380,7 +380,7 @@ function renderPendingPanel() {
    * dasselbe Vokabular, das die Zeilengruppen schon fuehren. */
   return `
     <section class="rw-section">
-      <h2 class="rw-section__title"><i data-lucide="hourglass" aria-hidden="true"></i>${esc(heading)}<span class="list-group__count">${state.redemptions.length}</span></h2>
+      <h2 class="rw-section__title u-section-title"><i data-lucide="hourglass" aria-hidden="true"></i>${esc(heading)}<span class="list-group__count">${state.redemptions.length}</span></h2>
       <ul class="rw-pending-list rw-pending-panel">${rows}</ul>
     </section>`;
 }
@@ -406,7 +406,7 @@ function renderOverview(el) {
       ${renderPendingPanel()}
       <section class="rw-section">
         <div class="rw-section__head">
-          <h2 class="rw-section__title">${esc(t('rewards.standings'))}</h2>
+          <h2 class="rw-section__title u-section-title">${esc(t('rewards.standings'))}</h2>
           ${adminBar}
         </div>
         <ul class="row-carrier rw-standings">${list.map(renderStandingRow).join('')}</ul>
@@ -482,7 +482,7 @@ function renderCatalog(el) {
   const items = state.catalog || [];
   const header = isAdmin() ? `
     <div class="rw-section__head">
-      <h2 class="rw-section__title"><i data-lucide="gift" aria-hidden="true"></i>${esc(t('rewards.tabCatalog'))}</h2>
+      <h2 class="rw-section__title u-section-title"><i data-lucide="gift" aria-hidden="true"></i>${esc(t('rewards.tabCatalog'))}</h2>
     </div>` : '';
   if (!items.length) {
     const action = isAdmin()
@@ -662,7 +662,8 @@ async function openRedeemModal(memberId, presetItemId = null) {
 }
 
 async function decideRedemption(id, action, btn) {
-  if (action === 'reject' || action === 'cancel') {
+  const gefragt = action === 'reject' || action === 'cancel';
+  if (gefragt) {
     // Kein `danger`: der Server bucht die reservierten Punkte per `reversal`
     // zurück (routes/rewards.js), es geht also kein Guthaben verloren. Die
     // Anfrage bleibt als entschieden stehen und lässt sich neu stellen, solange
@@ -684,6 +685,9 @@ async function decideRedemption(id, action, btn) {
       : action === 'reject' ? t('rewards.toastRejected') : t('rewards.toastCancelled');
     toast(msg, action === 'fulfill' ? 'success' : 'default');
     await refreshActiveTab();
+    // Nur nach der Rueckfrage: "Einloesen" fragt nicht, schliesst also keinen
+    // Dialog, und das Nachfassen griffe auf den Merker eines frueheren zurueck (#1083).
+    if (gefragt) refocusAfterRender();
   } catch (err) {
     if (btn) btn.disabled = false;
     await confirmModal(err?.message || t('common.error'), { confirmLabel: t('rewards.gotIt') });
@@ -790,6 +794,7 @@ function openRewardModal(item) {
         await api.delete(`/rewards/catalog/${item.id}`);
         toast(t('rewards.toastRewardDeleted'), 'default');
         await refreshActiveTab();
+        refocusAfterRender();
       });
       panel.querySelector('#rw-reward-form').addEventListener('submit', async (e) => {
         e.preventDefault();

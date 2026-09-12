@@ -8,7 +8,7 @@ import {
 import { esc } from '/utils/html.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { AVATAR_COLORS } from '/utils/color.js';
-import { openModal, closeModal, confirmModal } from '/components/modal.js';
+import { openModal, closeModal, confirmModal, refocusAfterRender } from '/components/modal.js';
 import { createRetryState, toggleRowHtml } from '/settings/components.js';
 import {
   renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect,
@@ -541,6 +541,7 @@ function bindInviteEvents(container, initialInvites) {
       await auth.revokeInvite(id);
       invites = invites.filter((i) => i.id !== id);
       renderInviteList(container, invites);
+      refocusAfterRender();
       window.yuvomi?.showToast(t('settings.invites.revoked'), 'default');
     } catch (err) {
       window.yuvomi?.showToast(err.message || t('common.errorGeneric'), 'danger');

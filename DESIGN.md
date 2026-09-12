@@ -209,6 +209,15 @@ components:
     backgroundColor: "color-mix(in srgb, var(--module-accent) var(--tint-hint), transparent)"
     rounded: "{rounded.full}"
     size: "10px Spur, Daumen per 3px transparenter Border + background-clip: padding-box"
+  # Der Rahmen eines Vorschaubilds (#1059). Die Groesse folgt der Flaeche: 40px in
+  # der Rezeptliste (--target-md), 32px im Planer (--target-sm), 20px in der
+  # Kachel (--icon-lg, dort --radius-xs). Der Bild-Editor im Formular ist ein
+  # KNOPF und deshalb rund (84px, siehe „Das Vorschaubild"). Die Farbe gilt nur
+  # dem Platzhalter; das Bild fuellt den Rahmen per object-fit: cover.
+  media-thumb:
+    backgroundColor: "var(--color-surface-2)"
+    rounded: "{rounded.sm}"
+    size: "40px Rezeptliste / 32px Planer / 20px Kachel"
   input:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.label}"
@@ -1528,6 +1537,10 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   app-weiter Kanon, kein Modul-Detail.
 - **Focus:** Akzentkante plus 3px Glow in `--color-accent-light`; interaktive Nicht-Felder
   tragen den app-weiten 2px-Ring.
+- **Klassenname:** `.input` und `.form-input` sind ein Alias auf dieselbe Regel (layout.css).
+  Kanonisch fuer neuen Code ist `.form-input` - der Name, den `.form-group`/`.form-field`/
+  `.form-label` schon fuehren. Bestand bleibt unangetastet, Umbenennen aller Fundstellen ist
+  keine Migration wert.
 
 ### Navigation
 - **Mobil:** schwebende Glas-Kapsel (`--glass-bg-elevated` + `--blur-md` + saturate,
@@ -1944,6 +1957,79 @@ versteckte Pseudo-Element und besteht auf `scrollbar-color` aus Tokens statt als
 `Der Listen-Scroller traegt einen duennen, getoenten Scrollbalken (#1039)`
 (test-shopping.js) haelt beide Engine-Fassungen und den Hover fest. Das Vorbild in
 budget.css hat keinen - der Guard haengt an der Kopie, nicht am Original.
+
+### Das Vorschaubild (#1059)
+
+**Ein fremdes Bild bekommt einen festen Rahmen, nie die Hoehe seiner Zeile.** Mealie und Tandoor
+liefern ihre Rezeptbilder in jedem Seitenverhaeltnis, ein selbst hochgeladenes Bild ebenso.
+Jedes Vorschaubild steht deshalb in einem quadratischen Rahmen fester Groesse mit
+`overflow: hidden`, und das Bild darin traegt `width: 100%`, `height: 100%` und
+`object-fit: cover`: **schneiden statt verzerren.** Eine bebilderte Karte ist damit genauso
+hoch wie ihre textige Nachbarin (laut Kommentar in meals.css gemessen 121px zu 121px an
+derselben Karte).
+
+**Die Rezeptur ist ein JS-Baustein und drei Rahmen.** `public/utils/recipe-thumb.js` baut den
+Rahmen fuer alle drei Anzeigeflaechen (Rezeptliste, Essensplaner, Kachel „Mahlzeiten heute"),
+damit der Ruecksturz auf den Platzhalter nicht an drei Orten einzeln richtig sein muss. Der
+Baustein waehlt die Quelle - **das eigene Bild gewinnt** (`/recipes/:id/image` vor
+`/recipes/:id/provider-thumbnail`), weil sich, wer eines hochlaedt, fuer genau dieses
+entschieden hat - und setzt `alt=""` (der Titel daneben sagt dasselbe) und `loading="lazy"`.
+Auf denselben Platzhalter (`utensils`-Symbol, Klasse `<rahmen>--placeholder`) faellt er in
+zwei Faellen: kein Bild laut letztem Sync, dann **ohne Request**, weil Mealie jeden 404 als
+Fehlerzeile in sein eigenes Log schreibt (mealie-recipes/mealie#4804); oder Bild seit dem Sync
+verschwunden, dann ueber den `error`-Listener. Die String-Form `recipeThumbHtml()` fuer Planer
+und Kachel braucht nach dem Einfuegen `wireRecipeThumbs(root)`: ein `onerror` im Markup waere
+ein Inline-Handler und scheitert an der CSP. Ein Bild, das beim Verdrahten schon fertig und
+ohne Abmessungen ist (`complete` mit `naturalWidth === 0`), gilt dabei als Fehlerfall, sonst
+waere ein schneller 404 vorbei, bevor jemand zuhoert.
+
+**Die Groesse folgt der Flaeche, und nur der Ausloeser ist rund:**
+
+- `.recipe-row__thumb` (recipes.css) ist das Vorbild aus der Mealie-Anbindung: `--target-md`
+  (40px), `--radius-sm`, Platzhalter auf `--color-surface-2` mit Tertiaertinte. Die
+  Rezeptliste zeigt den Rahmen IMMER, notfalls als Platzhalter.
+- `.meal-card__thumb` (meals.css): `--target-sm` (32px), `--radius-sm`, derselbe Platzhalter.
+  **Nur die bebilderte Karte wird zum Grid** (`.meal-card__open--with-thumb`), jede andere
+  bleibt die Spalten-Flex, die sie war. Die erste Fassung gab jeder Karte einen Bildslot und
+  bezahlte das mit 32px plus Abstand von einer rund 100px breiten Wochenspalte, in jeder Zelle.
+  Das Ticket schliesst genau das aus: „a missing picture is a quiet gap, not a layout change".
+- `.meal-slot__thumb` (dashboard.css): `--icon-lg` (20px), `--radius-xs`, **nur mit Bild** und
+  IN der Titelzeile, so hoch wie sie. Der Slot traegt oben rechts schon das Symbol seiner
+  Mahlzeitenart; ein zweites Besteck-Symbol daneben waere Unruhe ohne Aussage.
+- Der Bild-Editor im Rezeptformular (`.recipe-image-preview`, recipes.css) ist dieselbe Bauart
+  wie `.inventory-photo-editor` (inventory.css): 84px, `--radius-full`, Grund aus
+  `--module-accent` auf `--tint-surface`, die Vorschau ist selbst der Ausloeser, daneben zwei
+  Knoepfe. **Rund ist hier keine Geschmacksfrage:** der Editor ist ein quadratischer KNOPF,
+  und die Ausnahmen der Kreis-Regel sind Zustandsschalter, Rasterzellen und Felder mit eigener
+  Kante. Die drei Vorschau-Rahmen darueber loesen nichts aus, fallen deshalb nicht unter die
+  Regel und tragen das abgerundete Quadrat.
+
+Planer und Kachel rufen den Baustein nur, wenn eines der beiden Bild-Flags gesetzt ist; der
+Platzhalter aus dem ersten Fall erscheint dort also nie, nur der Ruecksturz aus dem zweiten.
+
+**Zwei Abweichungen stehen hier ungeglaettet.** Erstens teilen die beiden Editoren Form und
+Groesse, aber nicht die Tinte ihres Platzhalter-Symbols: `.inventory-photo-preview__fallback`
+mischt den Modulton auf `--tint-ink`, `.recipe-image-preview` steht auf
+`--color-text-tertiary`. Zweitens liegt der Platzhalter von Zeile und Karte auf
+`--color-surface-2`, der der Editoren auf der Modultoenung: das eine ist ein ruhiger
+Leerplatz in einer Liste, das andere ein Bedienelement, das zum Hochladen einlaedt.
+
+**Offen, aus dem Code gelesen und nicht im Browser nachgestellt:** die Kachel hat keinen
+Platzhalter-Stil. Faellt ihr Bild im zweiten Fall weg, haengt `wireRecipeThumbs()` trotzdem
+`meal-slot__thumb--placeholder` samt `utensils`-Symbol an, und dashboard.css kennt die Klasse
+nicht. Dann stuende neben dem Symbol der Mahlzeitenart ein zweites Besteck-Symbol, also genau
+die Doppelung, die der Kommentar in `renderTodayMeals()` vermeiden will. Ob der Rahmen dort im
+Fehlerfall wegfallen oder einen eigenen Platzhalter bekommen soll, ist nicht entschieden.
+
+Pruefebene: **keine Struktur-Guards fuer den Rahmen selbst.** Kein Test haelt
+`object-fit: cover`, die festen Abmessungen oder den Ruecksturz in `recipe-thumb.js` fest.
+Gesichert sind drei Randbedingungen: `ein quadratischer Icon-Knopf ist ein Kreis`
+(test-frontend-audit.js) erzwingt die runde Editor-Form; `eine geaenderte Modifier-Klasse
+verhindert das Wiederfinden nicht` (test-modal-utils.js) haelt fest, dass
+`meal-card__open--with-thumb` Darstellung ist und keine Identitaet, denn wer beim Bearbeiten
+ein Bild hinzufuegt, aendert die Klasse des Knopfes, zu dem der Fokus zurueck muss; und
+test-recipes-routes.js prueft, dass die Rezeptliste nur das Flag `has_own_image` traegt, nie
+die Bilddaten.
 
 ### Wischbedienung (Signature Component)
 Listenzeilen tragen ihre Aktionen auf Touch in zwei Wischrichtungen; auf Zeigergeraeten
@@ -2537,3 +2623,7 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   `scrollbar-width: none` gehoert ans Telefon, wo die Geste zieht, nie in eine
   Desktop-Query. Der Fade darunter ist kein Ersatz - er sagt, DASS mehr da ist, der Balken
   sagt, WO man ist, und laesst einen hin (siehe „Der getoente Scrollbalken").
+- **Don't** einem fremden Bild die Hoehe seiner Zeile ueberlassen oder einem engen Raster
+  vorsorglich in jeder Zelle einen Bildslot geben. Ein Vorschaubild steht in einem festen
+  Rahmen mit `object-fit: cover`, und im Wochenplaner wird nur die bebilderte Karte zum Grid;
+  ein fehlendes Bild ist eine ruhige Luecke, keine Layout-Aenderung (siehe „Das Vorschaubild").

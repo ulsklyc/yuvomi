@@ -179,7 +179,7 @@ test('storedToInstantMs: der Stringvergleich, den er ersetzt, war falsch', () =>
 // Der Fehler, der das ausgeloest hat: Abendtermine im Uebersichts-Widget
 // --------------------------------------------------------
 
-const { getUpcomingEvents } = await import('../server/services/calendar-events.js');
+const { getUpcomingEvents } = await import('../server/services/calendar-event-reader.js');
 
 db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
             VALUES ('admin','Admin','x','admin')`).run();

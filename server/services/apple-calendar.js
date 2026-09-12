@@ -21,6 +21,7 @@ import * as db from '../db.js';
 import { assignDefaultToEvent } from './sync-assignment.js';
 import { pruneDeletedEvents, countSourceEvents, deleteSourceEvents } from './calendar-prune.js';
 import { readSyncOutcome, withSyncOutcome } from './sync-outcome.js';
+import { runSerialized } from '../utils/sync-lock.js';
 import { unfoldLines, parseICS, formatICSDate, tzLocalToUTC, applyDuration, normalizeRecurrenceOverrides } from './ics-parser.js';
 import { decodeHtmlEntities } from '../utils/html-entities.js';
 import * as outbound from './calendar-outbound.js';
@@ -34,6 +35,18 @@ import { nearestIcalColorName } from '../utils/ical-color.js';
 import { outboundEvent } from './outbound-dtstart.js';
 
 const APPLE_COLOR = '#FC3C44';
+
+function collectLocalOutboundEvents(database) {
+  return database.prepare(`
+    SELECT e.* FROM calendar_events e
+    WHERE e.external_source = 'local' AND e.external_calendar_id IS NULL
+      AND e.recurrence_parent_id IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM calendar_events child
+        WHERE child.recurrence_parent_id = e.id
+      )
+  `).all();
+}
 
 // --------------------------------------------------------
 // Externe Kalender-Metadaten upserten
@@ -260,7 +273,11 @@ async function createClient(creds) {
  * bleibt vorgemerkt und läuft im nächsten Sync mit.
  * @returns {Promise<{deleted:number,updated:number}>}
  */
-async function flushOutbound({ makeClient } = {}) {
+async function flushOutbound(opts = {}) {
+  return runSerialized('apple', 'flush', () => runFlushOutbound(opts));
+}
+
+async function runFlushOutbound({ makeClient } = {}) {
   const idle = { deleted: 0, updated: 0 };
   const deletions = outbound.pendingDeletions('apple').filter((r) => r.object_url);
   const updates   = outbound.pendingUpdates('apple').filter((e) => e.external_object_url);
@@ -293,7 +310,7 @@ async function flushOutbound({ makeClient } = {}) {
  * damit auch der frühe Ausstieg bei fehlenden Zugangsdaten erfasst wird.
  */
 async function sync() {
-  return withSyncOutcome(db.get(), 'apple', runSync);
+  return runSerialized('apple', 'sync', () => withSyncOutcome(db.get(), 'apple', runSync));
 }
 
 async function runSync() {
@@ -493,10 +510,7 @@ async function runSync() {
   // Outbound: lokal → iCloud (erster verfügbarer Kalender)
   // --------------------------------------------------------
   const defaultCal = syncCalendars[0];
-  const localEvents = db.get().prepare(`
-    SELECT * FROM calendar_events
-    WHERE external_source = 'local' AND external_calendar_id IS NULL
-  `).all();
+  const localEvents = collectLocalOutboundEvents(db.get());
 
   // Einmal je Lauf: die Zone, an der naive Zeiten haengen (#938).
   const householdZone = householdTimeZone(db.get());
@@ -550,4 +564,4 @@ export { sync, flushOutbound, getStatus, saveCredentials, clearCredentials,
 // Nur fuer Tests: der ICS-Builder ist der einzige Weg, auf dem ein rein lokaler
 // Termin zum Anbieter kommt, und der Sync-Pfad drumherum ist zu gross, um ihn
 // dafuer nachzustellen.
-export const __test = { buildICS };
+export const __test = { buildICS, collectLocalOutboundEvents };

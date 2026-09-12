@@ -122,3 +122,38 @@ export function buildSyncTargetOptions(targets, labels, current = '') {
 
   return options;
 }
+
+/**
+ * Das Ziel, das ein neuer Termin ueber seine Zuweisung bekommt (#1060).
+ *
+ * Die Standard-Zuweisung eines Kalenders (#459) wird hier rueckwaerts gelesen:
+ * ist der Termin GENAU EINER Person zugewiesen und nennt GENAU EIN Kalender sie
+ * als Standard, ist das sein Ziel.
+ *
+ * - Mehrere Zugewiesene: kein Ziel. "Beide -> gemeinsamer Kalender" waere eine
+ *   zweite Regel ohne Daten dahinter.
+ * - Mehrere Kalender nennen dieselbe Person: kein Ziel, aber `ambiguous`. Den
+ *   ersten zu nehmen hiesse raten, und ein Termin im falschen Kalender faellt
+ *   erst auf, wenn ihn jemand dort vermisst.
+ * - Nur Google und CalDAV: Apple kennt kein Zielformat, Outlook keine
+ *   Standard-Zuweisung.
+ *
+ * @param {{google?: Array, caldav?: Array}} targets  Antwort von /calendar/sync-targets
+ * @param {Array<number|string>} assigneeIds
+ * @returns {{value: string|null, ambiguous: boolean}}
+ */
+export function assigneeSyncTarget(targets, assigneeIds) {
+  const ids = [...new Set((assigneeIds ?? []).map(Number))];
+  if (ids.length !== 1 || !Number.isInteger(ids[0]) || ids[0] < 1) return { value: null, ambiguous: false };
+  const [id] = ids;
+  const treffer = [
+    ...(targets?.google ?? [])
+      .filter((cal) => Number(cal.defaultAssigneeUserId) === id)
+      .map((cal) => googleTargetValue(cal.id)),
+    ...(targets?.caldav ?? [])
+      .filter((cal) => Number(cal.defaultAssigneeUserId) === id)
+      .map((cal) => caldavTargetValue(cal.accountId, cal.calendarUrl)),
+  ];
+  if (treffer.length === 1) return { value: treffer[0], ambiguous: false };
+  return { value: null, ambiguous: treffer.length > 1 };
+}

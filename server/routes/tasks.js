@@ -257,6 +257,21 @@ function syncHousekeepingPaymentStatus(d, taskId, status) {
   `).run(status, taskId);
 }
 
+// Ein bezahlter Besuch der Haushaltshilfe ist abgerechnet: aendern, loeschen
+// oder erneut bezahlen darf ihn nur ein Admin (GHSA-4p5w-5346-8598,
+// `assertMayTouchSettled` in routes/housekeeping.js). Die Zahlungsaufgabe ist
+// ein zweiter Weg an dieselbe Zeile: verlaesst sie 'done', setzt
+// syncHousekeepingPaymentStatus den Besuch auf unbezahlt, und danach sind
+// Aendern und Loeschen wieder Mitgliedssache. Deshalb gilt hier dieselbe Grenze.
+function reopensSettledVisit(d, taskId, fromStatus, toStatus) {
+  if (fromStatus !== 'done' || toStatus === 'done') return false;
+  const table = d.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'housekeeping_work_sessions'").get();
+  if (!table) return false;
+  return !!d.prepare(
+    'SELECT 1 FROM housekeeping_work_sessions WHERE payment_task_id = ? AND paid_at IS NOT NULL'
+  ).get(taskId);
+}
+
 /** Alle Subtasks einer Aufgabe laden (eine Ebene tief). */
 /**
  * Darf `me` diese Aufgabe ueberhaupt sehen? Genau die Bedingung, die jede
@@ -1119,6 +1134,9 @@ router.put('/:id', (req, res) => {
     const status = (req.body.status === undefined || archiveRequested)
       ? task.status
       : req.body.status;
+    if (reopensSettledVisit(db.get(), task.id, task.status, status) && req.authRole !== 'admin') {
+      return res.status(403).json({ error: 'Permission denied.', code: 403 });
+    }
 
     const assignedBefore = db.get().prepare('SELECT user_id FROM task_assignments WHERE task_id = ?')
       .all(task.id).map((r) => r.user_id);
@@ -1507,6 +1525,10 @@ router.patch('/:id/status', (req, res) => {
     if (status === ARCHIVE_STATUS) {
       const archivedAt = setArchived(req.params.id, true);
       return res.json({ data: { id: Number(req.params.id), status: prev.status, archived_at: archivedAt } });
+    }
+
+    if (reopensSettledVisit(db.get(), prev.id, prev.status, status) && req.authRole !== 'admin') {
+      return res.status(403).json({ error: 'Permission denied.', code: 403 });
     }
 
     // Statuswechsel und die Serien-Bewegung, die daraus folgt, sind eine Einheit:

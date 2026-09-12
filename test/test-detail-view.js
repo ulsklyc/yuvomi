@@ -46,7 +46,7 @@ const rruleJs    = () => read('public/rrule-ui.js');
 // `common` steht bewusst nicht dabei: Der Kopf-Button nutzt mit `common.back`
 // einen Bestandskey, die Ansicht braucht dort nichts Neues.
 const NEW_KEYS = {
-  calendar:  ['detailWhen', 'detailCalendar'],
+  calendar:  ['detailWhen', 'detailCalendar', 'openInMap'],
   reminders: ['sectionTitlePlural'],
   rrule:     ['summaryUntil', 'summaryCount', 'summaryCount_one'],
   tasks:     ['statusLabel', 'detailStart', 'detailFinish', 'detailReopen', 'subtasksLabel', 'swipeView'],
@@ -92,6 +92,21 @@ test('der Wechsel ins Formular löst die drei Fallen in fester Reihenfolge', asy
   assert.match(form, /mountFooter\(/, 'Falle 2: die Formular-Fußzeile muss ans Panel');
   assert.match(form, /refreshDirtySnapshot\(/, 'Falle 1: die Dirty-Basis muss nachgezogen werden');
   assert.match(form, /focusFirstField\(/, 'Falle 3: der Fokus muss bewusst gesetzt werden');
+});
+
+test('das nachgeladene Formular bekommt seine Lucide-Icons (#1141)', async () => {
+  const src = await detailJs();
+  const form = src.slice(src.indexOf('function switchToForm'), src.indexOf('function switchToDetail'));
+  // edit.mount() fuegt sein Markup erst beim Wechsel ein - der createIcons-Lauf
+  // beim urspruenglichen Oeffnen der Leseansicht (renderIcons(panel) in
+  // onSave()) kommt dafuer zu frueh und erreicht dieses Formular nie. Ohne
+  // einen zweiten Lauf bleiben `data-lucide`-Platzhalter im Formular leer -
+  // z. B. alle 13 Knoepfe der Markdown-Formatierungsleiste ueber der
+  // Aufgaben-Notiz.
+  const mountIdx = form.indexOf('opts.edit.mount(');
+  const iconsIdx = form.indexOf('renderIcons(pane)');
+  assert.ok(mountIdx > -1 && iconsIdx > -1, 'renderIcons(pane) muss nach dem Mount stehen');
+  assert.ok(iconsIdx > mountIdx, 'die Icons muessen NACH dem Einfuegen des Formular-Markups erzeugt werden');
 });
 
 test('„Abbrechen" wirkt auch in einem nachträglich gebauten Formular (#738)', async () => {
@@ -159,7 +174,7 @@ test('nachgereichte Zeilen landen nie in einer fremden Ansicht', async () => {
   assert.doesNotMatch(popoverHead, /closeDetailView\(\)/, 'openAsPopover darf sich nicht selbst die Nummer löschen');
 
   const api = src.slice(src.indexOf('export function openDetailView'));
-  const close = api.indexOf('closeDetailView()');
+  const close = api.indexOf('closeDetailView(');
   const assign = api.indexOf('activeViewToken = token');
   assert.ok(close > -1 && assign > close, 'erst die alte Ansicht schließen, dann nummerieren');
 });
@@ -196,7 +211,10 @@ test('das Popover ist bedienbar ohne Maus und gibt den Fokus zurück', async () 
   assert.match(popover, /aria-labelledby/, 'mit dem Titel verknüpft');
   assert.match(popover, /'Escape'/, 'Escape schließt');
   assert.match(popover, /e\.key !== 'Tab'|'Tab'/, 'Tab bleibt im Popover');
-  assert.match(popover, /opts\.anchor\?\.focus\?\.\(\)/, 'Fokus kehrt zum Auslöser zurück');
+  // Der Fokus kehrt zum Auslöser zurück - über den Merker der Modal-Schicht, damit
+  // er auch nach einem Neuaufbau wiedergefunden wird (#1083).
+  assert.match(popover, /merker: rememberFocus\(opts\.anchor\)/, 'der Auslöser wird beim Öffnen gemerkt');
+  assert.match(popover, /restoreFocusAfterClose\(merker\)/, 'und beim Schließen zurückgegeben');
 });
 
 test('die Detailansicht öffnet ohne Autofokus', async () => {
@@ -315,6 +333,41 @@ test('die Termin-Detailansicht zeigt, was das alte Popup verschwieg', async () =
   assert.match(fn, /reminderSummary\(/, 'Erinnerungen im Klartext');
   assert.match(fn, /visibilityRow\(ev\.visibility\)/, 'Sichtbarkeit');
   assert.match(fn, /assignedRow\(ev\.assigned_users/, 'Zugewiesene über die geteilte Zeile');
+});
+
+test('der Ort öffnet sich als ausdrückliche Aktion in einer Karte, nicht als Link auf dem Text (#1110)', async () => {
+  const src = await calendarJs();
+  const fn = src.slice(src.indexOf('async function openEventDetail'), src.indexOf('async function loadReminderForEvent'));
+  // Die Aktion hängt an der Karten-URL, und die entsteht nur aus einem Ortstext,
+  // der nach fmtLocation etwas übrig lässt. Kodierung und Leerfall misst
+  // test:calendar, das Aufräumen der Test gleich darunter.
+  assert.match(fn, /const mapUrl = eventMapUrl\(ev\.location\);\s*if \(mapUrl\) \{\s*actions\.push\(\{/,
+    'nur mit Ort gibt es die Aktion');
+  assert.match(fn, /id: 'detail-open-map'/);
+  assert.match(fn, /label: t\('calendar\.openInMap'\)/);
+  assert.match(fn, /window\.open\(mapUrl, '_blank', 'noopener'\)/,
+    'neuer Tab ohne Zugriff zurück auf die App - wie der vCard-Export in Kontakte');
+
+  // Die Zeile "Ort" bleibt reiner Text: Freitext wie "Zoom" ist keine Adresse.
+  const detail = src.slice(src.indexOf('function renderEventDetail'), src.indexOf('async function openEventDetail'));
+  assert.match(detail, /\{ icon: 'map-pin', label: t\('calendar\.locationLabel'\), value: ev\.location \? fmtLocation\(ev\.location\) : '' \}/);
+});
+
+test('die Kartensuche räumt den Ortstext über das ECHTE fmtLocation auf (#1110)', async () => {
+  // test:calendar läuft mit dem Browser-Loader, und der ersetzt `/utils/html.js`
+  // durch einen Stub mit `fmtLocation = Identität`. Was das Aufräumen braucht,
+  // lässt sich dort nicht messen - hier ohne Loader, gegen die echte Funktion.
+  const { fmtLocation } = await import('../public/utils/html.js');
+  assert.equal(fmtLocation('Rathaus\\nMarktplatz 1\\, 12345 Musterstadt'), 'Rathaus, Marktplatz 1, 12345 Musterstadt',
+    'eine ICS-escapte, mehrzeilige Adresse wird EINE Suchzeile');
+  assert.equal(fmtLocation('\\n'), '', 'nur ein escapter Umbruch: nichts zu suchen, also keine Aktion');
+  assert.equal(fmtLocation(' , ; '), '', 'nur Trenner: ebenso');
+
+  // Und eventMapUrl benutzt genau diese Funktion, bevor es kodiert.
+  const src = await calendarJs();
+  const fn = src.slice(src.indexOf('function eventMapUrl'), src.indexOf('function renderEventDetail'));
+  assert.match(fn, /const query = fmtLocation\(location \?\? ''\)\.trim\(\);/);
+  assert.match(fn, /return query \? `https:\/\/www\.openstreetmap\.org\/search\?query=\$\{encodeURIComponent\(query\)\}` : '';/);
 });
 
 test('die Weiterleitung für Haushaltshilfe-Besuche greift vor der Detailansicht', async () => {

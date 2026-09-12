@@ -57,6 +57,24 @@ test('die Referenz-Locale trägt Schlüssel', () => {
   assert.ok(referenceKeys.length > 1000, `de.json hat nur ${referenceKeys.length} Schlüssel`);
 });
 
+test('jede Locale trägt die vollständige Bestätigung für verwaiste Kalender-Overrides', () => {
+  const keys = [
+    'calendar.overrideOrphanConfirmTitle',
+    'calendar.overrideOrphanConfirmTitle_one',
+    'calendar.overrideOrphanConfirmDetail',
+    'calendar.overrideOrphanConfirmAction',
+  ];
+  for (const locale of LOCALES) {
+    const values = flatten(JSON.parse(readLocale(locale)));
+    for (const key of keys) {
+      assert.ok(typeof values.get(key) === 'string' && values.get(key).trim(),
+        `${locale}.json: ${key} fehlt oder ist leer`);
+    }
+    assert.ok(values.get(keys[0]).includes('{{count}}'), `${locale}.json: der Plural nennt count nicht`);
+    assert.ok(values.get(keys[1]).includes('{{count}}'), `${locale}.json: der Singular nennt count nicht`);
+  }
+});
+
 // Jede Locale trägt denselben Schlüsselsatz wie de.json - auch Pluralvarianten
 // für CLDR-Kategorien, die die Sprache gar nicht kennt (`_few` im Englischen,
 // `_one` im Japanischen). Das ist Absicht und kein toter Ballast, den man

@@ -11,13 +11,15 @@
  * nicht auf die Release-Zahl:
  *
  *   Spur 1 (Oberflaeche): alles unter public/pages, public/styles, public/utils,
- *     public/components, public/settings faehrt nur im Wochen-Release, dienstags.
+ *     public/components, public/settings faehrt nur im Oberflaechen-Zug,
+ *     mittwochs und sonntags.
  *   Spur 2 (alles andere): Server, Doku, Tests, Deploy - jederzeit, aber
  *     hoechstens ein Release pro Kalendertag.
  *
- * Dienstag, weil ein Haushaltsplaner am Wochenende am meisten benutzt wird: eine
- * Aenderung an der Oberflaeche hat dann vier Tage Zeit, sich zu setzen, bevor die
- * Familie am Samstag davorsteht.
+ * Bis zum 12.09.2026 fuhr der Zug nur dienstags. Seitdem zwei feste Tage statt
+ * einem: eine fertige Oberflaechen-Aenderung wartet hoechstens vier Tage statt
+ * einer Woche, und die Oberflaeche bewegt sich trotzdem nur an zwei bekannten
+ * Tagen statt immer dann, wenn gerade etwas fertig ist.
  *
  * Ausstieg: `--hotfix "<Grund>"` laesst ein Release jederzeit durch. Ein Guard
  * ohne Ausstieg wird beim ersten echten Notfall umgangen oder geloescht, und
@@ -34,7 +36,7 @@
 
 import { execFileSync } from 'node:child_process';
 
-const TRAIN_DAY = 2; // ISO-8601: 1 = Montag, 2 = Dienstag
+const TRAIN_DAYS = [3, 7]; // ISO-8601: 3 = Mittwoch, 7 = Sonntag
 
 const UI_PREFIXES = [
   'public/pages/',
@@ -126,10 +128,11 @@ if (args.hotfix !== null) {
   process.exit(0);
 }
 
-if (uiFiles.length > 0 && weekday !== TRAIN_DAY) {
+if (uiFiles.length > 0 && !TRAIN_DAYS.includes(weekday)) {
   const sample = uiFiles.slice(0, 8).map((f) => `  ${f}`).join('\n');
   const more = uiFiles.length > 8 ? `\n  ... und ${uiFiles.length - 8} weitere` : '';
-  fail(`Dieses Release fasst die Oberflaeche an und faehrt deshalb nur ${DAY_NAMES[TRAIN_DAY]}s.\n`
+  const trainDays = TRAIN_DAYS.map((d) => `${DAY_NAMES[d].toLowerCase()}s`).join(' und ');
+  fail(`Dieses Release fasst die Oberflaeche an und faehrt deshalb nur ${trainDays}.\n`
     + `Heute ist ${DAY_NAMES[weekday]}.\n\n${sample}${more}\n\n`
     + 'Wege von hier: bis zum naechsten Zug warten, die Oberflaechen-Aenderung aus\n'
     + 'diesem Release herausnehmen, oder - wenn es Sicherheit oder Datenverlust\n'
@@ -143,5 +146,5 @@ if (uiFiles.length === 0 && tagsToday.length > 0) {
 }
 
 console.log(uiFiles.length > 0
-  ? `Release-Kadenz: in Ordnung - Wochen-Release, ${uiFiles.length} Oberflaechen-Datei(en).`
+  ? `Release-Kadenz: in Ordnung - Oberflaechen-Zug, ${uiFiles.length} Oberflaechen-Datei(en).`
   : 'Release-Kadenz: in Ordnung - Spur 2 ohne Oberflaeche, erstes Release heute.');

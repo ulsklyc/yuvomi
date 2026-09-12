@@ -132,6 +132,7 @@ export async function addSubtask(parentId, { onChanged = () => {} } = {}) {
     // Wie beim Abhaken daneben: die Umgebung trägt den Fortschrittsbalken der
     // Elternkarte, aber sie muss nichts davon zeigen.
     await onChanged();
+    refocusAfterRender();
     return res.data ?? null;
   } catch (err) {
     window.yuvomi.showToast(err.message, 'danger');

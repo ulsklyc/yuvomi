@@ -248,6 +248,19 @@ test('OpenAPI dokumentiert Kalender-Dokumentlinks und Legacy-Anhangsdaten', () =
   assert.equal(list.properties.data.items.$ref, '#/components/schemas/CalendarEvent');
 });
 
+test('OpenAPI dokumentiert die Ausschluss-Semantik der Serienoperationen', () => {
+  const occurrence = openApi.paths['/api/v1/calendar/{seriesId}/occurrences/{recurrenceId}'];
+  const following = openApi.paths[
+    '/api/v1/calendar/{seriesId}/occurrences/{recurrenceId}/following'
+  ];
+
+  assert.match(occurrence.put.description, /linked replacement existed/i);
+  assert.match(occurrence.put.description, /remains excluded/i);
+  assert.match(following.put.description, /every later exclusion except the selected slot/i);
+  assert.match(following.delete.description, /preserves later exclusions/i);
+  assert.doesNotMatch(following.delete.description, /removes .*deletion exceptions/i);
+});
+
 test('OpenAPI dokumentiert stabile Storage-Fehlercodes', () => {
   const codes = openApi.components.schemas.DocumentStorageErrorCode.enum;
   for (const suffix of [

@@ -29,6 +29,7 @@ import { moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
 import { toLocalDateKey } from '../../public/utils/date.js';
 import { taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
 import { visibilityWhere } from '../services/visibility.js';
+import { getUpcomingEvents } from '../services/calendar-event-reader.js';
 import { loadTagsFor, normalizeTags, setTags, tagKey } from '../utils/task-tags.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
@@ -192,15 +193,32 @@ function listUpcomingEvents(db, actorId, args) {
   let limit = parseInt(args.limit, 10);
   if (!Number.isFinite(limit)) limit = 20;
   limit = Math.min(Math.max(limit, 1), 100);
-  // Sichtbarkeit (#474): kein Zugriff auf private/eingeschränkte Termine anderer.
-  return db.prepare(`
-    SELECT e.id, e.title, e.start_datetime, e.end_datetime, e.all_day, e.location
-    FROM calendar_events e
-    WHERE date(e.start_datetime) >= date('now')
-      AND ${visibilityWhere('e', 'event_assignments', 'event_id')}
-    ORDER BY e.start_datetime ASC
-    LIMIT ?
-  `).all(actorId, actorId, limit);
+  // Reuse the calendar/dashboard service so recurrence expansion, EXDATEs,
+  // displayed moved children and visibility stay one contract across REST and
+  // MCP. fromToday preserves this tool's existing calendar-day boundary.
+  return getUpcomingEvents(db, {
+    userId: actorId,
+    limit,
+    // The shared reader bounds eligible occurrences per series by limit.
+    windowDays: null,
+    fromToday: true,
+  }).map((event) => ({
+    id: event.id,
+    title: event.title,
+    start_datetime: event.start_datetime,
+    end_datetime: event.end_datetime,
+    all_day: event.all_day,
+    location: event.location,
+    ...(event.is_occurrence_override ? {
+      series_id: event.series_id,
+      recurrence_id: event.recurrence_id,
+      is_occurrence_override: true,
+      assignment_owner_id: event.assignment_owner_id,
+      attachment_owner_id: event.attachment_owner_id,
+      reminder_owner_id: event.reminder_owner_id,
+      reminder_anchor_start: event.reminder_anchor_start,
+    } : {}),
+  }));
 }
 
 function createEvent(db, actorId, args) {

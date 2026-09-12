@@ -114,9 +114,11 @@
   flex: 0 0 auto;
 }
 
-/* Groesse/Rolle kommt vom semantischen <h2> selbst (feste Rollenwerte,
- * DESIGN.md Typografie) - hier nur Abstand/Farbe, gleiches Muster wie
- * .settings-leaf-header__title. */
+/* Der Kommentar hier behauptete "Groesse/Rolle kommt vom semantischen <h2>
+ * selbst" - falsch: reset.css setzt fuer h1-h6 nur font-weight/line-height
+ * zurueck, nie font-size, also rendierte dieser Kopf am UA-Default (~24px),
+ * keiner Design-Stufe (Polish-Audit, PLAN.md #7). Traegt jetzt u-section-title
+ * im Markup, hier bleibt nur Abstand/Farbe. */
 .inventory-category-title {
   margin: 0 0 var(--space-3);
   color: var(--color-text-primary);

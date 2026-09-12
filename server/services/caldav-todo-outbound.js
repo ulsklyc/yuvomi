@@ -39,6 +39,7 @@ import { patchICSTodo } from '../utils/ics-patch.js';
 import { createCalDAVClient, collectionUrlOf } from '../utils/caldav-client.js';
 import { householdTimeZone, localToUTC } from '../utils/timezone.js';
 import { loadTags } from '../utils/task-tags.js';
+import { runSerialized } from '../utils/sync-lock.js';
 
 const log = createLogger('CalDAV-Todo-Outbound');
 
@@ -875,7 +876,11 @@ async function fetchObjectsByUrl(client, wanted) {
  * @param {{createClient?: Function}} [opts] Client-Factory (Tests)
  * @returns {Promise<{deleted:number,updated:number}>}
  */
-export async function flushOutbound({ createClient } = {}) {
+export async function flushOutbound(opts = {}) {
+  return runSerialized('caldav-todo', 'flush', () => runFlushOutbound(opts));
+}
+
+async function runFlushOutbound({ createClient } = {}) {
   const total  = { deleted: 0, updated: 0, created: 0 };
   const work   = accountsWithPendingWork();
   if (work.size === 0) return total;

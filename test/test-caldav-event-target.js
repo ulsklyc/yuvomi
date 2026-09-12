@@ -173,11 +173,29 @@ describe('CalDAV-Ziel an Events (Issue #241)', () => {
 
       assert.deepStrictEqual(
         data.caldav,
-        [{ accountId, accountName: 'mailbox', calendarUrl: calUrl, calendarName: 'Familie' }],
+        [{ accountId, accountName: 'mailbox', calendarUrl: calUrl, calendarName: 'Familie', defaultAssigneeUserId: null }],
         'Nicht-Admins müssen die aktivierten CalDAV-Ziele sehen'
       );
       // Ohne Google-Verbindung bleibt die Gruppe leer statt die Antwort zu kippen.
       assert.deepStrictEqual(data.google, [], 'Google-Gruppe ohne Verbindung leer');
+    });
+
+    it('trägt die Standard-Zuweisung des Kalenders mit (#1060)', async () => {
+      // Das Formular liest sie rückwärts: ein neuer Termin für diese Person
+      // bekommt diesen Kalender als Ziel. Sie hängt an der Kalender-URL.
+      const d = db.get();
+      d.prepare(
+        `INSERT INTO external_calendars (source, external_id, name, color, default_assignee_user_id)
+         VALUES ('caldav', ?, 'Familie', '#4A90E2', ?)`
+      ).run(calUrl, userId);
+      try {
+        const res = await fetch(`${baseUrl}/calendar/sync-targets`);
+        const { data } = await res.json();
+        assert.strictEqual(data.caldav[0].defaultAssigneeUserId, userId,
+          'ohne das Feld kann das Formular den Kalender der Person nicht finden');
+      } finally {
+        d.prepare(`DELETE FROM external_calendars WHERE source = 'caldav' AND external_id = ?`).run(calUrl);
+      }
     });
 
     it('gibt keine Zugangsdaten oder Server-URLs preis', async () => {

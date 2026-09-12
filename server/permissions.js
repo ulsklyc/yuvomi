@@ -34,7 +34,7 @@
  * Routen und Tests.
  */
 
-import { MODULE_KEYS, getModuleKeys } from './scopes.js';
+import { MODULE_KEYS, getModuleKeys, tokenAllows } from './scopes.js';
 
 // Familienrollen (Subjekt-Achse „role"). Spiegelt den CHECK-Constraint der
 // users.family_role-Spalte (Migration, db.js).
@@ -300,6 +300,34 @@ export function deniedModules(sessionModuleAccess) {
     if (level === 'none') out.add(key);
   }
   return out;
+}
+
+/**
+ * Was ein aggregierender Endpunkt für DIESE Anfrage auslassen muss — beide
+ * Achsen in einem Aufruf.
+ *
+ * `deniedModules` kennt nur die Rollenachse. Ein API-Token trägt eine zweite
+ * Grenze, seine Scopes (`req.authScopes`), und die prüft die Pfad-Middleware
+ * ebenfalls nur am ersten Pfadsegment: ein Token mit `search:read` oder
+ * `dashboard:read` kam dort durch und bekam Treffer und Kacheln aus Modulen,
+ * die seine Scopes gar nicht nennen. Über die Rechte seines Subjekts kam es nie
+ * hinaus, über die eigene Allow-Liste schon — und die ist genau für Tokens da,
+ * die an einen fremden Client gehen (Discussion #455).
+ *
+ * `moduleKeys` sind die Module, aus denen der Endpunkt liest: eine Allow-Liste
+ * braucht die Menge, gegen die sie prüft. Lesen verlangt `read` (`write`
+ * schließt es ein); `authScopes === null` ist ungescopt und nimmt nichts weg.
+ *
+ * @param {{ sessionModuleAccess?: object|null, authScopes?: string[]|null }} req
+ * @param {Iterable<string>} moduleKeys
+ * @returns {Set<string>}
+ */
+export function hiddenModulesFor(req, moduleKeys) {
+  const hidden = deniedModules(req.sessionModuleAccess);
+  for (const key of moduleKeys) {
+    if (!tokenAllows(req.authScopes, key, 'read')) hidden.add(key);
+  }
+  return hidden;
 }
 
 // Urteil der Modulrechte-Prüfung. 'allow' = durchlassen, 'none' = Modul ganz

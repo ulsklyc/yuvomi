@@ -24,7 +24,7 @@
 import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { closeModal, confirmModal, openModal } from '/components/modal.js';
+import { closeModal, confirmModal, openModal, refocusAfterRender } from '/components/modal.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { loadFamilyUsers } from '/settings/family-users.js';
 
@@ -247,6 +247,7 @@ function buildIcsActions(container, sub, subs, user) {
       const idx = subs.findIndex((s) => s.id === sub.id);
       if (idx >= 0) subs.splice(idx, 1);
       renderIcsList(container, subs, user);
+      refocusAfterRender();
       showToast(t('settings.ics.deletedToast'), 'default');
     } catch (err) {
       showToast(err.message || t('common.errorGeneric'), 'danger');

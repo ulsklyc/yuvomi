@@ -131,7 +131,12 @@ function publicWorker(row, context = localDayContext()) {
     hourly_rate: Number(row.hourly_rate || 0),
     payment_schedule: row.payment_schedule,
     calendar_color: row.calendar_color || DEFAULT_CALENDAR_COLOR,
-    current_session: publicSession(todaySession),
+    // Zwei verschiedene Fragen, die vorher dieselbe Zeile beantworteten:
+    // `current_session` heisst "arbeitet gerade" und traegt den Auscheck-Knopf,
+    // `today_session` heisst "war heute da" und traegt die Zeitangabe darunter.
+    // Solange beide die letzte Sitzung des Tages lieferten, blieb ein Arbeiter
+    // nach dem Auschecken "eingecheckt" (#1133).
+    current_session: publicSession(loadOpenSession(row.id)),
     today_session: publicSession(todaySession),
     notes: row.notes ?? null,
     created_at: row.created_at,
@@ -509,6 +514,14 @@ function assertMayTouchSettled(existing, req, res) {
   return assertAdmin(req, res);
 }
 
+// Praesentationsfeld je Besuch (#1136): die Seite zeigt "Zahlung zuruecknehmen"
+// nur, wenn der Server es anbietet, statt die Admin-Regel selbst nachzubauen.
+// POST /visits/:id/unpay prueft beim Schreiben trotzdem selbst - das Feld ist
+// ein Hinweis fuer die Oberflaeche, keine Berechtigung.
+function canMarkUnpaid(row, req) {
+  return Boolean(row.paid_at) && req.authRole === 'admin';
+}
+
 async function createWorkerUser({ username, displayName, avatarColor, avatarData, actorUserId }) {
   const finalUsername = username || `housekeeper_${Date.now()}`;
   const password = crypto.randomBytes(24).toString('base64url');
@@ -752,6 +765,7 @@ router.get('/visits', (req, res) => {
       payment_task_title: row.payment_task_title ?? null,
       receipt_document_name: row.receipt_document_name ?? null,
       total_amount: Number(row.daily_rate || 0) + Number(row.extras || 0),
+      can_mark_unpaid: canMarkUnpaid(row, req),
     }));
     const totals = visits.reduce((acc, visit) => {
       acc.total += visit.total_amount;
@@ -778,7 +792,11 @@ router.post('/work-sessions/check-in', (req, res) => {
     const workerRateType = worker.rate_type || 'daily';
     const workerHourlyRate = worker.hourly_rate ?? 0;
     const context = localDayContext(req.body);
-    if (loadTodaySession(worker.id, context)) return res.status(409).json({ error: 'A visit is already recorded today for this housekeeper.', code: 409 });
+    // Nur eine OFFENE Sitzung sperrt. Vorher sperrte jede Sitzung des Tages,
+    // auch eine laengst abgeschlossene - geteilte Schichten, eine Pause mit
+    // Wiederaufnahme und zwei getrennte Besuche am selben Tag waren damit
+    // unmoeglich (#1138).
+    if (loadOpenSession(worker.id)) return res.status(409).json({ error: 'This housekeeper is already checked in.', code: 409 });
 
     const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: true });
     const vExtras = num(req.body.extras, 'extras');
@@ -843,6 +861,7 @@ router.get('/visits/:id', (req, res) => {
       payment_task_title: row.payment_task_title ?? null,
       receipt_document_name: row.receipt_document_name ?? null,
       total_amount: Number(row.daily_rate || 0) + Number(row.extras || 0),
+      can_mark_unpaid: canMarkUnpaid(row, req),
     };
     res.json({ data: visit });
   } catch (err) {
@@ -947,6 +966,36 @@ router.post('/visits/:id/pay', (req, res) => {
     res.json({ data: publicSession(row), summary: monthlySummary(row.check_in.slice(0, 7)) });
   } catch (err) {
     log.error('POST /visits/:id/pay error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// Der Rueckweg zu /pay (#1136), nur fuer Admins: ein bezahlter Besuch ist
+// abgerechnet (assertMayTouchSettled), und wer die Zahlung zuruecknimmt, gibt
+// ihn wieder fuer jedes Mitglied frei. Spiegelbildlich zu /pay wird die
+// verknuepfte Zahlungsaufgabe direkt wieder geoeffnet, ohne Punkte- oder
+// Verlaufsbuchung - sie spiegelt einen Zahlungsstand, niemand hat dort etwas
+// abgehakt (services/task-completions.js). Bliebe sie 'done', setzte
+// reconcilePaymentTasks() beim naechsten GET /visits paid_at sofort wieder.
+router.post('/visits/:id/unpay', (req, res) => {
+  try {
+    const vId = validateId(req.params.id, 'id');
+    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+    const existing = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(vId.value);
+    if (!existing) return res.status(404).json({ error: 'Visit not found.', code: 404 });
+    if (!assertAdmin(req, res)) return;
+    if (existing.paid_at) {
+      db.get().transaction(() => {
+        db.get().prepare('UPDATE housekeeping_work_sessions SET paid_at = NULL WHERE id = ?').run(existing.id);
+        if (existing.payment_task_id) {
+          db.get().prepare('UPDATE tasks SET status = ? WHERE id = ? AND status = ?').run('open', existing.payment_task_id, 'done');
+        }
+      })();
+    }
+    const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
+    res.json({ data: publicSession(row), summary: monthlySummary(row.check_in.slice(0, 7)) });
+  } catch (err) {
+    log.error('POST /visits/:id/unpay error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

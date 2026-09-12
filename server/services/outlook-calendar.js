@@ -45,6 +45,16 @@ class ReauthRequiredError extends Error {
   }
 }
 
+class OutlookAutoSyncOverrideError extends Error {
+  constructor(linkedOverrideCount) {
+    super('Outlook kann Serien mit verknüpften Einzelausnahmen nicht synchronisieren. Deaktiviere ihren Zielkalender, damit sie lokal bearbeitbar bleiben. Du musst keine Einzelausnahmen löschen.');
+    this.name = 'OutlookAutoSyncOverrideError';
+    this.code = 'outlook_auto_sync_overrides';
+    this.status = 409;
+    this.linkedOverrideCount = linkedOverrideCount;
+  }
+}
+
 function envConfig() {
   return {
     clientId:     process.env.MS_CLIENT_ID,
@@ -108,6 +118,24 @@ function listAccounts() {
   }));
 }
 
+function assertSyncTargetsSafe(conn, account, candidates = collectCandidates(conn, account)) {
+  // Dieselbe Kandidatenmenge wie beim Push: ein explizites Ziel dieses Kontos
+  // gewinnt vor Auto-Sync, und nur aktivierte, beschreibbare Ziele werden gepusht.
+  const writableCalendars = new Set(conn.prepare(`
+    SELECT calendar_id FROM outlook_calendar_selection
+    WHERE account_id = ? AND enabled = 1 AND can_edit = 1
+  `).all(account.id).map((row) => row.calendar_id));
+  const overrideParents = new Set(conn.prepare(`
+    SELECT DISTINCT recurrence_parent_id FROM calendar_events
+    WHERE recurrence_parent_id IS NOT NULL
+  `).all().map((row) => row.recurrence_parent_id));
+  let linkedOverrideCount = 0;
+  for (const { event, calendarId } of candidates.values()) {
+    if (writableCalendars.has(calendarId) && overrideParents.has(event.id)) linkedOverrideCount++;
+  }
+  if (linkedOverrideCount > 0) throw new OutlookAutoSyncOverrideError(linkedOverrideCount);
+}
+
 /**
  * Partial-Update eines Kontos. Nur übergebene Felder werden geändert;
  * autoSyncCalendarId/ownerUserId akzeptieren null zum Deaktivieren.
@@ -115,11 +143,15 @@ function listAccounts() {
  * automatisch als Push-Ziel aktiviert (enabled=1).
  */
 function updateAccount(accountId, { name, autoSyncCalendarId, ownerUserId } = {}) {
+  const conn = db.get();
   const account = getAccountById(accountId);
   if (!account) throw new Error(`Account ${accountId} not found.`);
 
   const updates = [];
   const values = [];
+  let calendarToEnable = null;
+  let proposedAutoSyncCalendarId = account.auto_sync_calendar_id;
+  let proposedOwnerUserId = account.owner_user_id;
 
   if (name !== undefined) {
     const trimmed = typeof name === 'string' ? name.trim() : '';
@@ -131,21 +163,19 @@ function updateAccount(accountId, { name, autoSyncCalendarId, ownerUserId } = {}
   if (autoSyncCalendarId !== undefined) {
     if (autoSyncCalendarId === null || autoSyncCalendarId === '') {
       updates.push('auto_sync_calendar_id = NULL');
+      proposedAutoSyncCalendarId = null;
     } else {
       if (typeof autoSyncCalendarId !== 'string') {
         throw new Error('autoSyncCalendarId must be a string or null.');
       }
-      const cal = db.get().prepare(`
+      const cal = conn.prepare(`
         SELECT can_edit FROM outlook_calendar_selection
         WHERE account_id = ? AND calendar_id = ?
       `).get(accountId, autoSyncCalendarId);
       if (!cal) throw new Error('Calendar not found for this account.');
       if (cal.can_edit !== 1) throw new Error('Calendar is read-only.');
-      // Der Auto-Sync-Kalender ist implizit auch als Ziel aktiv.
-      db.get().prepare(`
-        UPDATE outlook_calendar_selection SET enabled = 1
-        WHERE account_id = ? AND calendar_id = ?
-      `).run(accountId, autoSyncCalendarId);
+      calendarToEnable = autoSyncCalendarId;
+      proposedAutoSyncCalendarId = autoSyncCalendarId;
       updates.push('auto_sync_calendar_id = ?');
       values.push(autoSyncCalendarId);
     }
@@ -154,19 +184,33 @@ function updateAccount(accountId, { name, autoSyncCalendarId, ownerUserId } = {}
   if (ownerUserId !== undefined) {
     if (ownerUserId === null || ownerUserId === '') {
       updates.push('owner_user_id = NULL');
+      proposedOwnerUserId = null;
     } else {
       const userId = Number(ownerUserId);
-      if (!Number.isInteger(userId) || !db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(userId)) {
+      if (!Number.isInteger(userId) || !conn.prepare('SELECT 1 FROM users WHERE id = ?').get(userId)) {
         throw new Error('Unknown owner user id.');
       }
       updates.push('owner_user_id = ?');
       values.push(userId);
+      proposedOwnerUserId = userId;
     }
   }
 
   if (updates.length === 0) throw new Error('No fields to update.');
   values.push(accountId);
-  db.get().prepare(`UPDATE outlook_accounts SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  conn.transaction(() => {
+    if (calendarToEnable) {
+      conn.prepare(`
+        UPDATE outlook_calendar_selection SET enabled = 1
+        WHERE account_id = ? AND calendar_id = ?
+      `).run(accountId, calendarToEnable);
+    }
+    conn.prepare(`UPDATE outlook_accounts SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+    if ((autoSyncCalendarId !== undefined || ownerUserId !== undefined)
+        && proposedAutoSyncCalendarId && proposedOwnerUserId) {
+      assertSyncTargetsSafe(conn, getAccountById(accountId));
+    }
+  })();
   return { success: true };
 }
 
@@ -298,7 +342,11 @@ async function handleCallback(code, fetchImpl = fetch) {
   const name  = me.displayName || email || 'Outlook';
 
   const existing = me.id
-    ? db.get().prepare('SELECT id FROM outlook_accounts WHERE ms_user_id = ?').get(me.id)
+    ? db.get().prepare(`
+        SELECT id
+        FROM outlook_accounts
+        WHERE ms_user_id = ?
+      `).get(me.id)
     : null;
 
   let accountId;
@@ -430,13 +478,17 @@ async function listCalendars(accountId, { refresh = false } = {}, fetchImpl = fe
 }
 
 function setCalendarEnabled(accountId, calendarId, enabled) {
-  const result = db.get().prepare(`
-    UPDATE outlook_calendar_selection SET enabled = ?
-    WHERE account_id = ? AND calendar_id = ?
-  `).run(enabled ? 1 : 0, accountId, calendarId);
-  if (result.changes === 0) {
-    throw new Error(`Calendar not found for account ${accountId}.`);
-  }
+  const conn = db.get();
+  conn.transaction(() => {
+    const result = conn.prepare(`
+      UPDATE outlook_calendar_selection SET enabled = ?
+      WHERE account_id = ? AND calendar_id = ?
+    `).run(enabled ? 1 : 0, accountId, calendarId);
+    if (result.changes === 0) {
+      throw new Error(`Calendar not found for account ${accountId}.`);
+    }
+    if (enabled) assertSyncTargetsSafe(conn, getAccountById(accountId));
+  })();
   return { success: true };
 }
 
@@ -619,6 +671,7 @@ function collectCandidates(conn, account) {
       SELECT e.*, ${ASSIGNEE_NAMES_SQL}
       FROM calendar_events e
       WHERE e.external_source = 'local'
+        AND e.recurrence_parent_id IS NULL
         AND ${visibilityWhere('e', 'event_assignments', 'event_id')}
     `).all(account.owner_user_id, account.owner_user_id);
     for (const event of rows) {
@@ -629,7 +682,9 @@ function collectCandidates(conn, account) {
   const explicit = conn.prepare(`
     SELECT e.*, ${ASSIGNEE_NAMES_SQL}
     FROM calendar_events e
-    WHERE e.external_source = 'local' AND e.target_outlook_account_id = ?
+    WHERE e.external_source = 'local'
+      AND e.recurrence_parent_id IS NULL
+      AND e.target_outlook_account_id = ?
   `).all(account.id);
   for (const event of explicit) {
     candidates.set(event.id, { event, calendarId: event.target_outlook_calendar_id });
@@ -710,8 +765,11 @@ async function sync({ fetchImpl = fetch } = {}) {
       continue;
     }
     try {
-      const accessToken = await ensureAccessToken(account, fetchImpl);
       const candidates = collectCandidates(conn, account);
+      // Sichtbarkeit und Graph-Schreibrechte können sich nach der Aktivierung
+      // ändern. Vor jedem Remote-Schreibzugriff erneut prüfen.
+      assertSyncTargetsSafe(conn, account, candidates);
+      const accessToken = await ensureAccessToken(account, fetchImpl);
       const linkRows = conn.prepare(
         'SELECT * FROM outlook_event_links WHERE account_id = ?'
       ).all(account.id);

@@ -1855,6 +1855,35 @@
   overflow-x: auto;
 }
 
+/* WER IN EINER SCROLLENDEN REIHE STEHT, MUSS SICH SELBST GEGEN DAS SCHRUMPFEN
+ * WEHREN - UND ZWAR ALS DIREKTES KIND (#1068).
+ *
+ * `overflow-x: auto` an der Reihe greift erst, wenn die Flex-Items nicht mehr
+ * nachgeben. Solange sie duerfen, schrumpfen sie ZUERST und die Reihe scrollt
+ * gar nicht: gemessen bei 375px mit neun Mitgliedern fiel der schmalste Chip auf
+ * 40px - unter die Zielgroesse, die dieser Chip als Traeger des Label-Verlusts
+ * gerade zusichern soll. Mit der Regel bleiben alle neun bei 48px und die Reihe
+ * scrollt. Dasselbe Muster steht in dieser Datei schon einmal, an der
+ * Filterzeile: `.tasks-filters-row .tasks-filters > * { flex-shrink: 0 }`.
+ *
+ * Das Flex-Item ist der KNOPF. `.history-people__mark` liegt eine Ebene tiefer
+ * und ist fuer die Reihe unsichtbar - eine Regel dort haette diesen Schutz nie
+ * geleistet, so plausibel sie sich auch liest. */
+.history-people .group-toggle__btn {
+  flex-shrink: 0;
+}
+
+/* Die Marke, die bleibt, wenn das Label faellt.
+ *
+ * Ihr eigenes `flex-shrink: 0` gilt IM KNOPF, nicht in der Reihe: der Knopf ist
+ * selbst eine Flexbox, und ein langes Label neben der Scheibe wuerde sie sonst
+ * zusammendruecken. Die Groesse bringt der Avatar inline mit
+ * (`renderAvatarStack`), hier steht nur, dass sie ihm bleibt. */
+.history-people__mark {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
 /* „Mehr anzeigen" schliesst die Liste ab, mittig unter ihr. */
 .history-more {
   display: flex;

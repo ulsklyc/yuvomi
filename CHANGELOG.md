@@ -16,6 +16,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   badges stay on one line; a +N control reveals and correctly announces the remaining categories on
   hover, focus or tap, and category icons remain intact after switching between reading and editing.
 
+- **A new event goes to the calendar of the person it is assigned to** (#1060). A Google or CalDAV
+  calendar that names a default assignee in the sync settings now works in both directions: events
+  imported from it get that person, and a new event assigned to exactly that person gets that
+  calendar as its target in the event dialog. Your own choice in the dialog always wins, and
+  without a match the personal default target from Settings applies as before. Nothing is picked
+  when two people are assigned, or when two calendars name the same person - the dialog says so
+  instead of guessing. Existing events are never moved on their own, and Apple and Outlook
+  calendars are not chosen this way; the sync settings say both where the default assignee is set.
+
+- **The calendar filter can hide a connected calendar or subscription, and show the events nobody
+  is assigned to** (#1064). The filter sheet lists every calendar and ICS subscription with events
+  in the loaded range, each with its colour and a switch. Hiding one removes its events from all
+  four views and the agenda, remembered on the device for each account. A hidden calendar stays in
+  the list under its name even when none of its events is on screen, so it can always be switched
+  back on. A new event created for a hidden calendar stays out right away, not only once it has
+  synced. The person axis gains "Unassigned": on its own it shows only the events and tasks nobody
+  is assigned to, together with people it adds them. A person filter saved before this update keeps
+  its behaviour - it does not contain the new entry, so unassigned events stay out, as they did.
+
+- **An event's location opens in a map** (#1110, from discussion #1047). The event detail carries
+  an "Open in Maps" action whenever the event has a location; it opens an OpenStreetMap search for
+  that text in a new tab, the same search Contacts already uses for an address. It is an explicit
+  action rather than a link on the location itself, because the field is free text: "Zoom" or
+  "Room 3B" is not an address, and the action never claims it is. The link is built on the device
+  and used only when tapped - no geocoding, nothing looked up in advance. An address imported over
+  CalDAV with escaped line breaks is searched as one line.
+
 - **A shopping item can carry a price and the shop it was bought at** (#1003, first cut). Both sit
   in the item dialog, where the item is already open - the checkbox stays the fastest gesture in the
   app and gains no second step. The price is stored in whole minor units (cents, yen, fils) rather
@@ -116,7 +143,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   migrates. The four slots now come from one place in the client rather than five copies, so the
   planner, the overview tile and the recipe form always say the same word.
 
+- **Marking a housekeeping visit as paid asks first, and an admin can take a payment back**
+  (#1136). "Mark paid" settled a visit with a single tap - in the report list, in the visit report
+  and in the staff log alike - and checked off the visit's payment task on the way. A paid visit is
+  settled: from then on only an admin can edit or delete it, so a stray tap was not a small thing.
+  All three buttons now open the same confirmation, and it names what happens: the linked payment
+  task is checked off, and only an admin can undo it afterwards. Cancelling from the visit report
+  leaves the report open. The way back sits in the visit report: on a paid visit an admin sees
+  "Undo payment", which marks the visit as pending again and reopens a linked payment task. Whether
+  that button appears is decided by the server for each visit, and the server checks the role again
+  when the payment is taken back.
+
 ### Changed
+
+- **Dashboard widgets share one header grammar, and more section headings adopt the shared title
+  style.** Three widget header treatments coexisted on the dashboard: most widgets carried a
+  module seal, a title and an optional "view all" link, but Weather and Clock opened straight into
+  their content with no header at all. Both now open with the same seal+title header as their 15
+  neighbours - the large temperature and the clock face stay exactly as prominent as before, they
+  just get a name above them like everywhere else. The metrics tile row is deliberately left alone:
+  each tile already names a different module with its own seal and label, and forcing one title
+  over several modules would misrepresent it, not fix it.
+
+  Separately, Rewards' four section headings and a genuinely unstyled Inventory category heading
+  now use the shared `u-section-title` role instead of a private declaration that had drifted a
+  few pixels off it (Inventory's had no declared size at all - it inherited the browser default,
+  not any design token). Notes' and Budget's section headings, already the right size through their
+  own container rule, now say so directly in markup as well, growing `u-section-title`'s adoption
+  beyond the two files it was previously confined to.
+
+  `.input` and `.form-input` stay aliased to the same rule - renaming roughly 300 existing uses
+  is not worth the review cost - but the alias site and DESIGN.md's Inputs/Fields section now say
+  which one is canonical for new code: `.form-input`, the name `.form-group`/`.form-field`/
+  `.form-label` already use.
 
 - **A scaled ingredient quantity is now written in the household's own digits.** Scaling a recipe
   wrote the number in Latin digits even where the rest of the line used Persian or Arabic ones, so a
@@ -140,6 +199,169 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The delete dialog is unchanged: "Delete entire series" already says it.
 
 ### Fixed
+
+- **A housekeeper can check out again, and work a second session on the same day** (#1133, #1138).
+  The one button that carries both directions was disabled while someone was checked in, and it is
+  the only thing that triggers the check-out path - so that path was unreachable: a household could
+  check a housekeeper in and never close the session from the app. The button now offers "Check
+  out" in that state. Behind it, two answers had collapsed into one: a worker's "currently working"
+  and "was here today" both reported the last session of the day, so someone stayed "checked in"
+  after checking out. They are separate again. The check-in route matched the same mistake and
+  refused a second check-in for the rest of the day, which made split shifts, a break with resumed
+  work, and two separate visits impossible; it now only refuses while a session is actually open.
+  Overlapping sessions stay blocked, and each session keeps its own rate, calendar event and
+  payment task. The line under the name still shows today's visit once it is closed.
+
+- **The formatting toolbar over a task's note shows its icons again** (#1141). Switching a task's
+  detail view into edit mode builds that form only then, but the icon-replacing pass over the whole
+  overlay had already run before the form existed, so the 13 buttons of the markdown toolbar (bold,
+  list, link, and so on) stayed blank. The edit form now gets its own icon pass right after it is
+  built.
+
+- **An event moved to another CalDAV calendar can be deleted or edited right away** (#593). A move
+  creates the event in the new calendar and removes it from the old one, but until the next sync
+  Yuvomi kept pointing at the old copy. Deleting the event in that window went to an address that
+  no longer existed, counted as done, and the next sync brought the event back from the new
+  calendar. An edit was dropped the same way, and moving the event back to where it came from was
+  not recognised as a move. The event now points at the new calendar and its new copy as soon as
+  the move succeeds, as moves to Google calendars already did. An event deleted while its move is
+  still under way has its new copy deleted as well, and an edit or a move made while a change is
+  still being sent to the server stays queued instead of being dropped.
+
+- **A change to a synced calendar no longer collides with a sync that is already running**
+  (#593). Every create, edit and delete tries to reach the server right away, and the scheduler
+  runs its own sync every few minutes. Both did the same bookkeeping at the same time, so one
+  could clear the other's notes between two network calls: an event deleted while its move to
+  another calendar was still under way left its new copy behind, and the next sync brought the
+  deleted event back. A provider now runs one pass at a time - the immediate attempt, the
+  scheduled sync and a second scheduled tick wait for each other instead of overlapping, and a
+  burst of edits during a slow pass is followed by one catch-up pass rather than one per edit.
+  This covers Google, CalDAV, iCloud and the CalDAV reminder lists behind Tasks and Shopping.
+
+- **Keyboard focus comes back after a confirmation, an input dialog or the calendar's detail
+  popover** (#1083). Confirm a delete, rename a list or a subtask, pick a folder to move to, and
+  the page reloads its list - which rebuilds the very button you came from. Focus fell to the page
+  body, so keyboard and screen-reader users started over at the top. These paths now put focus back
+  on the rebuilt control, or on the page itself when that control is gone: in Tasks, Shopping,
+  Documents, Health, Subscriptions, Housekeeping, Inventory, Meals, Rewards, the Schedule, Split
+  Expenses, the quick links and several Settings pages (API tokens, invitations, document storage,
+  recipe providers, calendar subscriptions and accounts). On desktop, the calendar's detail popover
+  now returns focus to the event it was opened from when it closes through Escape or one of its
+  actions; a click elsewhere still leaves focus where it went. Deleting a contact or an event from
+  its detail view puts focus back on the page as well.
+
+  Where a dialog appears on only some paths - rejecting a reward redemption asks, fulfilling it does
+  not - focus is pulled back only on the path that asked. Otherwise it would land on the trigger of
+  some earlier, unrelated dialog. The guard that holds all of this learned three shapes it could not
+  see: dialogs that deliver their answer after closing (`confirmModal`, `promptModal`, `selectModal`,
+  `confirmOverModal`), a reload inside a `try` block or after an `if`, and a callback handed in as a
+  parameter.
+
+- **An edit or a move made while a change is still on its way to Google is no longer dropped**
+  (#593). A change to a synced Google event is sent in the background. If the event was edited
+  again, or moved to another calendar, while that request was still under way, finishing it cleared
+  the note that more was waiting: Google kept the older version, and the next sync could write it
+  back over the newer edit. A second move made during a move was lost the same way, and moving the
+  event back to its old calendar while the first move was running was not recognised at all. Only
+  what actually reached Google now counts as done, and anything newer stays queued for the next
+  attempt. An edit made while the event is being moved goes to its new calendar in the same run
+  instead of waiting for the next sync.
+
+- **Choosing the calendar an event already sits in withdraws a move that has not gone out yet**
+  (#593). A move to another calendar is queued and carried out by the sync, and that attempt can
+  fail - the server may be unreachable right then. Choosing the original calendar again in that
+  window looked like no change at all, so the queued move stayed: the next sync moved the event into
+  a calendar nobody had chosen any more, while the dialog showed the one that was. A target pointing
+  back at the calendar the event sits in now withdraws the queued move, and a target pointing at a
+  third calendar replaces it. Only the choice made in that edit counts: an edit that leaves the
+  target alone keeps a queued move, and a target stored on an older event that differs from its
+  actual calendar is still never read as a wish to move. Withdrawing also works while the sync is
+  set to read-only or its account is gone - it changes nothing at the provider, and a move the user
+  took back must not come back to life once writing is allowed again. Google and CalDAV alike.
+
+- **A review run that stopped at its gate is named as such, even when it first denied having
+  reviewed** (#1101). The check behind the automated review reads the run's closing text to say
+  why a silent run went red. It only looked at the first mention of "already reviewed", so a text
+  that negated it once and then affirmed it ("has not already reviewed this HEAD ... has already
+  reviewed this PR, so I should stop here") was diagnosed as unknown, pointing at a missing post
+  instead of the gate. Every mention now counts, the way every "stop" already did. The check was
+  red either way; only its message changes. The one exception that can turn it green still reads
+  the narrower way.
+
+- **The event detail names the day a multi-day event ends** (#1102). The "When" row showed the
+  start date and, of the end, only the time: an event from 10 September 14:00 to 12 September 11:00
+  read as "14:00 - 11:00" on a single day that ends before it begins, and an all-day event across
+  three days named only the first. When an event ends on another day, the row now carries that day
+  as well - start date and time to end date and time, or first to last day for an all-day event.
+  "Another day" is the rule the calendar grid already uses rather than a second one: a timed event
+  that ends at 00:00 still belongs to the evening it started in (#804), and the end of an all-day
+  event stays inclusive. The range separator now comes from the same locale string as the day
+  view's date range, a hyphen where the time range used to carry an en dash.
+
+- **Dialog content on a phone scrolls again with Reduce Motion turned on** (#981). A freshly opened
+  dialog stands at the top, so every swipe inside it began as a tracked swipe-to-close gesture, and
+  on every upward frame that gesture wrote `translateY(0)` to the panel. Normally the sheet's
+  entrance animation holds its end state and outranks that inline style, so the write changed
+  nothing. With Reduce Motion the animation is switched off, the write turned the panel's transform
+  from `none` into a matrix on every swipe, and iOS dropped the scroll. Measured in the iOS simulator
+  with the setting on: the same upward swipe left the content 0 to 30 px down in three runs. An
+  upward movement of more than 10 px before the sheet has been pulled is now content scrolling -
+  the gesture lets go and never touches the panel's style. Below that, the same threshold that
+  already applied downwards, nothing is decided, so a finger that wobbles upward as it lands can
+  still pull the sheet closed. A pull that has already started stays tracked when the finger
+  reverses, so the panel still returns to rest. Under the same setting the swipe now ends
+  500 to 675 px down.
+
+- **The automated review no longer loses its result on a later push.** On a pull request's second
+  push the review first reads what has already been said, and the tools it reached for - `gh api` on
+  the pull request's reviews and comments, `git show`, `git fetch` of a commit - were not in its
+  allowed list. The run on #1116 did the review, collected seven refusals and posted nothing, which
+  the evidence step rightly turned red; 17 of the last 40 runs carried refusals like these. The list
+  now lets it read the repository through `gh api` and through read-only git commands.
+
+  Writing through `gh api` stays blocked by a second list that denies every write form (`-X`,
+  `--method`, `-f`, `-F`, `--field`, `--raw-field`, `--input`), bundled short flags such as `-if`,
+  and `--hostname`, which would send the request - headers included - to another host. That list is
+  load-bearing, measured with the CLI: a rule on the path alone let a POST through. The same list
+  keeps the read-only git commands read-only: `git show`, `git log`, `git diff` and `git rev-list`
+  write a file with `--output`, and on a runner that file can be the environment of the next step. Running code from the checkout
+  (`node`, `npm`, the test suites), writing files and fetching web pages stay out, because the job
+  holds a token that can write to pull requests and the checkout is the pull request's own code. A
+  guard in `test:claude-review-workflow` holds both lists.
+
+  Worth knowing: a pull request that touches the review workflow makes the action skip itself, so
+  this one is not reviewed by it, and after the merge an older branch skips the review until it is
+  rebased.
+
+- **The Module options settings page describes what it actually contains.** Its description named
+  only Budget, Health and Housekeeping - accurate when it was written, but Tasks and Schedule have
+  since grown their own sections on the same page without the sentence ever being updated. Reworded
+  to describe the page's purpose instead of enumerating its sections, so it can't go stale the same
+  way again the next time a module gains a section here.
+
+- **The person filter in the task history is no longer a row of blank buttons on a phone** (#1068).
+  Below 640px the label-loss rule removes every `.group-toggle__label`; it is built on the
+  assumption that an icon stays behind, which is true for the view switcher next to it. These chips
+  had none, so nothing remained but the tinted surface of the active one. The loss was not only
+  visual: `display: none` takes the text out of the accessibility tree as well, so the buttons were
+  just as nameless to a screen reader. Each chip now carries what the rest of the module already
+  uses to identify a person - their avatar, the same disc the history rows below it show - and
+  "All" gets an icon from the same family as the switchers. The name itself moved onto the button
+  as `aria-label`, where no media query can take it away.
+
+- **A recurring event synced from Google no longer shows an end time hours after its start**
+  (#1089). Every occurrence of a series is generated from the master, and its end was derived by
+  adding the duration to the new start. Which format that end was written in depended on a test
+  that asked the wrong value: it looked for a `Z` in the master's start, while the occurrence's own
+  start may well carry a numeric offset (`15:25:00-04:00`, as Google sends it) or be rebuilt as UTC
+  from the series timezone. Neither matched, so the end went down the wall-clock branch and was
+  formatted with the SERVER's local getters. The row then held two storage formats at once: an
+  instant for the start, a zoneless wall-clock time for the end. The browser converts only the
+  first, so the two stood side by side on different clocks - off by exactly the offset between the
+  server and the viewer, which is why it stayed invisible wherever the two agree. Reported from a
+  UTC server viewed in New York: 3:25pm to 3:30pm was displayed as 3:25pm to 7:30pm. The end now
+  follows the storage format of the start it belongs to. Locally created series are unaffected:
+  there both sides read the same server zone and the conversion cancels out.
 
 - **A failing test in the three suites that start the server now turns the run red.** Those suites
   import `server/index.js` as a program rather than reading it as a file, which opens a real HTTP
@@ -467,6 +689,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   direction. Putting the custom field on a third line of its own, as the report asked, would need
   about 51px per block and therefore a taller hour scale - that is a change to the scale, not to
   the block, and is not part of this fix.
+
+- **Editing one occurrence of a local recurring event now keeps it linked to its series** (#975).
+  The edited occurrence keeps all three series scopes when reopened, follows later series changes
+  for fields that were not deliberately changed, and keeps its original recurrence slot even when
+  moved to another date. The replacement and its skipped original slot are saved atomically, and
+  the read-only ICS feed now exports the replacement with standard `RECURRENCE-ID` semantics.
+  Imported series keep their existing whole-series behavior. Generated local series and local
+  series targeted for outbound sync retain their previous standalone-edit and deletion scopes.
+  Historic detached edits are left unchanged rather than guessed back into a series. iCloud auto-sync excludes
+  linked replacements and their masters, without excluding ordinary deletion-only exceptions.
+  Detaching a linked replacement retains its original-slot exception, so outbound targeting or a
+  recurrence-rule round trip cannot resurrect a duplicate master occurrence. Changing a whole-series
+  recurrence rule no longer forgets previously deleted occurrences. Truncating a series likewise
+  retains later exclusions, and splitting a linked series transfers every later exclusion except the
+  new anchor even when the successor rule cannot currently reach it, so a later extension cannot
+  resurrect a deleted slot or duplicate a detached replacement. A no-difference only-this save
+  removes an exclusion only when it also removes the linked replacement that owned that exclusion.
+  Save confirmations preserve entered values on validation or server errors. Outlook checks actual
+  writable push targets before accepting linked-series auto-sync, and MCP upcoming results retain
+  their unrestricted future horizon while recurrence generation stops at the requested result count.
+  ICS deletion exceptions keep the series' local time across daylight-saving changes even when
+  the stored UTC day differs; each exception needs at most three local-date candidates, not a series scan.
+
+## [2.65.3] - 2026-09-12
+
+### Security
+
+- **A household member can no longer take back a paid housekeeping visit through its payment
+  task (GHSA-82jf-c39w-vh8c).** Since v2.64.1 a paid visit can only be changed, deleted or paid
+  again by an admin (GHSA-4p5w-5346-8598). That boundary covered the visit but not the payment
+  task linked to it: reopening the task in Tasks marked the visit unpaid again, and from there a
+  member could change its amount or delete it. Moving the payment task of a paid visit out of
+  done now needs an admin as well, whether from the task form, the checkbox, a swipe or a bulk
+  action. Ticking the task off stays open to members, as paying the visit does. A member who used
+  to correct an accidental tick by unticking the payment task now gets "Permission denied" and has
+  to ask an admin.
+
+## [2.65.2] - 2026-09-11
+
+### Security
+
+- **A scoped API token no longer reads other modules through global search or the dashboard
+  (GHSA-g4f2-x2jf-4mwx).** A token can be limited to single modules, which matters most for one
+  handed to an AI or MCP client. The search and the dashboard only checked their own scope: a
+  token allowed `search:read` got matching notes, contacts and medications back, and one allowed
+  `dashboard:read` got the data of every tile, although neither named those modules. Both now
+  leave out every part whose module the token cannot read, the same way they already left out a
+  module a member has no access to - `search:read` opens the search, and the modules behind it
+  need their own scopes. Tokens without scopes and browser sessions see no change; a token set up
+  with only `search` or `dashboard` returns empty results until its modules are added.
 
 ## [2.65.1] - 2026-09-08
 

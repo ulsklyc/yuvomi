@@ -19,10 +19,68 @@ import { householdTimeZone } from '../utils/timezone.js';
 import * as db from '../db.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
 import { outboundEvent } from './outbound-dtstart.js';
+import { upsertExternalCalendar } from './external-calendars.js';
 
 const log = createLogger('CalDAVOutbound');
 
 const label = (source) => (source === 'apple' ? 'Apple' : 'CalDAV');
+
+/**
+ * Zieht die Zeile nach einem Umzug auf den Zielkalender und das dort angelegte
+ * Objekt nach - wie `applyMove` bei Google.
+ *
+ * Ohne das zeigen calendar_ref_id und external_object_url bis zum nächsten
+ * Inbound-Lauf auf die Quelle, deren Objekt gerade gelöscht wurde. Ein Löschen in
+ * diesem Fenster ginge per DELETE an die tote URL, deren 404 den Tombstone als
+ * erledigt verwirft, und der nächste Lauf importierte den Termin aus dem Ziel neu;
+ * eine Bearbeitung liefe ebenso ins 404 und fiele weg.
+ *
+ * Name und Farbe kommen aus der Kontoauswahl, also dieselben Werte, die der
+ * Inbound schreibt: der Helfer überschreibt beide, und ein null hätte die Farbe
+ * einer bestehenden Kalenderzeile bis dahin gelöscht.
+ */
+function applyMove(eventId, source, calendarUrl, destCal, objectUrl) {
+  const conn = db.get();
+  const selected = conn.prepare(
+    'SELECT calendar_name, calendar_color FROM caldav_calendar_selection WHERE calendar_url = ? LIMIT 1'
+  ).get(calendarUrl);
+  const known = selected ? null : conn.prepare(
+    'SELECT name, color FROM external_calendars WHERE source = ? AND external_id = ?'
+  ).get(source, calendarUrl);
+
+  const calRefId = upsertExternalCalendar(
+    source, calendarUrl,
+    selected?.calendar_name || known?.name || destCal.displayName || calendarUrl,
+    selected ? selected.calendar_color : (known?.color ?? null),
+  );
+  conn.prepare(
+    'UPDATE calendar_events SET calendar_ref_id = ?, external_object_url = ? WHERE id = ?'
+  ).run(calRefId, objectUrl, eventId);
+}
+
+/**
+ * Hat der Nutzer den Termin gelöscht, während sein Umzug lief? Dann steht der
+ * Tombstone der Löschroute für genau das Objekt in der Quelle - über dessen URL,
+ * bei Altbestand ohne gespeicherte URL über den Quellkalender.
+ *
+ * Eine fehlende Zeile allein sagt das nicht. Das Aufräumen eines abgewählten
+ * Kalenders, das Trennen eines Kontos und der Prune löschen ebenfalls lokal, und
+ * zwar ausdrücklich, ohne den Anbieter anzufassen (calendar-prune.js). Ein
+ * Tombstone für die Kopie im Ziel löschte dort einen Termin, den andere Clients
+ * derselben Familie weiter sehen sollen.
+ *
+ * Dass der Tombstone hier überhaupt noch steht, hält die Serialisierung in
+ * `server/utils/sync-lock.js`: ein paralleler Durchgang räumte ihn sonst ab,
+ * bevor der Umzug hier ankommt, und die Kopie im Ziel bliebe stehen, bis der
+ * nächste Inbound-Lauf den gelöschten Termin von dort neu importiert.
+ */
+function deletedByUser(source, uid, sourceObjectUrl, sourceCalendarUrl) {
+  return !!db.get().prepare(`
+    SELECT 1 FROM calendar_pending_deletions
+    WHERE source = ? AND event_external_id = ?
+      AND (object_url = ? OR (object_url IS NULL AND calendar_external_id = ?))
+  `).get(source, uid, sourceObjectUrl, sourceCalendarUrl);
+}
 
 /**
  * Kalender-Properties eines lokalen Termins für patchICSEvent.
@@ -275,9 +333,15 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
         outbound.clearOutboundMove(event.id);
       } else {
         try {
+          const filename = filenameFromUrl(url, event.external_calendar_id);
+          // tsdav löst den Dateinamen relativ zur Kalender-URL auf. Ohne Schrägstrich
+          // am Ende ersetzte er deren letztes Segment, und das Objekt landete neben
+          // der Collection statt darin - wie der Upload-Pfad als Collection behandeln.
+          const collectionUrl = String(destCal.url).replace(/\/?$/, '/');
+          const objectUrl = new URL(filename, collectionUrl).href;
           await client.createCalendarObject({
-            calendar:   destCal,
-            filename:   filenameFromUrl(url, event.external_calendar_id),
+            calendar:   { ...destCal, url: collectionUrl },
+            filename,
             iCalString: patched,
           });
           // Erst nach erfolgreichem Anlegen löschen: scheitert das Löschen, steht
@@ -287,7 +351,21 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
           } catch (err) {
             log.error(`[${label(source)}] Event ${event.id} was copied to ${moveTo} but could not be removed from its old calendar:`, err.message);
           }
-          outbound.clearOutbound(event.id);
+          // Während der beiden awaits lokal entfernt. Hat der Nutzer gelöscht, gilt
+          // der Tombstone der Route nur der Quelle; die Kopie im Ziel bliebe stehen,
+          // und der nächste Lauf importierte den Termin von dort neu. Ein Aufräumen
+          // dagegen soll den Anbieter nicht anfassen - siehe deletedByUser.
+          if (!outbound.reloadEvent(event.id)) {
+            if (deletedByUser(source, event.external_calendar_id, url, known.calendarUrl)) {
+              outbound.queueDeletion({
+                source, calendarExternalId: moveTo, eventExternalId: event.external_calendar_id, objectUrl,
+              });
+              log.warn(`[${label(source)}] Event ${event.id} was deleted during its move, queued the deletion of its copy in ${moveTo}.`);
+            }
+            continue;
+          }
+          applyMove(event.id, source, moveTo, destCal, objectUrl);
+          outbound.settleOutbound(fresh, moveTo);
           done++;
           continue; // der Patch ist mit dem Anlegen bereits geschrieben
         } catch (err) {
@@ -305,7 +383,7 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
       await client.updateCalendarObject({
         calendarObject: { url, etag: known.etag, data: patched },
       });
-      outbound.clearOutbound(event.id);
+      outbound.settleOutbound(fresh);
       done++;
     } catch (err) {
       outbound.handleUpdateError(err, event, 'update', label(source));

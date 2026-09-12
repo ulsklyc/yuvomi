@@ -1,6 +1,6 @@
 import { api } from "/api.js";
 import { formatDate, formatTime, t } from "/i18n.js";
-import { confirmModal } from "/components/modal.js";
+import { confirmModal, refocusAfterRender } from "/components/modal.js";
 import {
   createDisclosure,
   createInfoList,
@@ -280,7 +280,8 @@ function bindConnectionForm(container, form, reload) {
     event.preventDefault();
     const saveBtn = form.querySelector("#document-storage-save-btn");
     const payload = documentStoragePayload(form);
-    if (hasProtectedDocumentStorageChange(form, payload)) {
+    const gefragt = hasProtectedDocumentStorageChange(form, payload);
+    if (gefragt) {
       const confirmed = await confirmModal(t("settings.documentStorageConfirmExisting"), {
         confirmLabel: t("common.confirm")
       });
@@ -295,6 +296,9 @@ function bindConnectionForm(container, form, reload) {
       await api.put("/documents/storage/config", payload);
       showToast(t("settings.documentStorageSaved"), "success");
       await reload();
+      // Nur nach der Rueckfrage: ohne sie schliesst auf diesem Weg kein Dialog,
+      // und das Nachfassen griffe auf den Merker eines frueheren zurueck (#1083).
+      if (gefragt) refocusAfterRender();
     } catch (err) {
       showToast(err.message ?? t("common.errorGeneric"), "danger");
     } finally {
@@ -523,6 +527,7 @@ function buildGoogleDriveProvider(data, reload) {
           "success"
         );
         await reload();
+        refocusAfterRender();
       } catch (error) {
         showToast(error.message ?? t("common.errorGeneric"), "danger");
         disconnect.disabled = false;

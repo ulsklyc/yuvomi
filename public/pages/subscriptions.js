@@ -1340,6 +1340,7 @@ async function renewSubscription(subscription) {
   try {
     const response = await api.post(`/budget/subscriptions/${subscription.id}/renew`, {});
     await reload();
+    refocusAfterRender();
     const completed = response.data?.status === 'completed';
     window.yuvomi?.showToast(t(completed ? 'subscriptions.completedToast' : 'subscriptions.renewedToast'), 'success');
   } catch (err) {
@@ -1354,6 +1355,7 @@ async function deleteSubscription(subscription) {
   try {
     await api.delete(`/budget/subscriptions/${subscription.id}`);
     await reload();
+    refocusAfterRender();
     window.yuvomi?.showToast(t('subscriptions.deletedToast'), 'success');
   } catch (err) {
     window.yuvomi?.showToast(err.data?.error || t('common.unknownError'), 'danger');
@@ -1642,6 +1644,7 @@ function openMetadataModal() {
           try {
             await api.delete(`/budget/subscriptions/${isCat ? 'categories' : 'payment-methods'}/${id}`);
             await reload();
+            refocusAfterRender();
             window.yuvomi?.showToast(t('subscriptions.metaDeletedToast'), 'success');
           } catch (err) {
             window.yuvomi?.showToast(err.data?.error || err.message || t('common.unknownError'), 'danger');
