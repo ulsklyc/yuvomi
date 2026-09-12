@@ -1,5 +1,8 @@
 import { op, jsonBody, idParam } from '../helpers.js';
 
+const VISIT_CAPABILITY_NOTE = 'Each visit carries `can_mark_unpaid`: true when the visit is paid and the caller is an admin. '
+  + 'It is a hint for the interface; `POST /api/v1/housekeeping/visits/{id}/unpay` checks the role itself.';
+
 export function housekeepingPaths() {
   return {
     '/api/v1/housekeeping/dashboard': {
@@ -28,15 +31,25 @@ export function housekeepingPaths() {
       post: op({ summary: 'Check out a housekeeper', tag: 'Housekeeping', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/housekeeping/visits': {
-      get: op({ summary: 'List housekeeping visits for a month', tag: 'Housekeeping' }),
+      get: op({ summary: 'List housekeeping visits for a month', tag: 'Housekeeping', description: VISIT_CAPABILITY_NOTE }),
     },
     '/api/v1/housekeeping/visits/{id}': {
-      get: op({ summary: 'Get housekeeping visit', tag: 'Housekeeping', params: [idParam()] }),
+      get: op({ summary: 'Get housekeeping visit', tag: 'Housekeeping', params: [idParam()], description: VISIT_CAPABILITY_NOTE }),
       put: op({ summary: 'Update housekeeping visit', tag: 'Housekeeping', params: [idParam()], stateChanging: true, documentDeleteConflict: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete housekeeping visit', tag: 'Housekeeping', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/housekeeping/visits/{id}/pay': {
       post: op({ summary: 'Mark housekeeping visit as paid', tag: 'Housekeeping', params: [idParam()], stateChanging: true }),
+    },
+    '/api/v1/housekeeping/visits/{id}/unpay': {
+      post: op({
+        summary: 'Take back the payment of a housekeeping visit',
+        description: 'Clears `paid_at` and reopens a linked payment task that is done. A visit that is not paid is returned unchanged.',
+        tag: 'Housekeeping',
+        admin: true,
+        params: [idParam()],
+        stateChanging: true,
+      }),
     },
     '/api/v1/housekeeping/decay-tasks': {
       get: op({ summary: 'List housekeeping decay tasks', tag: 'Housekeeping' }),

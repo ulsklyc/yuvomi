@@ -430,6 +430,90 @@ test('POST /visits/:id/pay: markiert verknüpfte Aufgabe als done', async () => 
   assert.equal(task.status, 'done', 'Bezahl-Aufgabe abgeschlossen');
 });
 
+// --------------------------------------------------------------------------
+// Zahlung zuruecknehmen (#1136): nur ein Admin, spiegelbildlich zu /pay. Beide
+// Rollen im Test - sonst waere ein Total-Admin-Gate ebenso gruen wie ein
+// fehlendes. Fixture: PAY_SESSION_ID ist bezahlt (April 2025), die Aufgabe done.
+// --------------------------------------------------------------------------
+const sessionRow = (id) => db.prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(id);
+const taskRow = (id) => db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+
+test('can_mark_unpaid: nur fuer den Admin und nur bei bezahltem Besuch (#1136)', async () => {
+  const unpaidId = db.prepare(`
+    INSERT INTO housekeeping_work_sessions (worker_id, check_in, check_out, daily_rate, extras, created_by, rate_type)
+    VALUES (?, '2025-04-11T09:00:00.000Z', '2025-04-11T12:00:00.000Z', 30, 0, ?, 'daily')
+  `).run(WORKER_ID, ADMIN).lastInsertRowid;
+  try {
+    const pick = (res, id) => res.body.data.visits.find((v) => v.id === id);
+
+    const adm = await call('GET', '/visits?month=2025-04', { as: ADM });
+    assert.equal(pick(adm, PAY_SESSION_ID).can_mark_unpaid, true, 'Admin, bezahlter Besuch');
+    assert.equal(pick(adm, unpaidId).can_mark_unpaid, false, 'Admin, unbezahlter Besuch: nichts zurueckzunehmen');
+
+    const mem = await call('GET', '/visits?month=2025-04', { as: MEM });
+    assert.equal(pick(mem, PAY_SESSION_ID).can_mark_unpaid, false, 'Mitglied, bezahlter Besuch');
+    assert.equal(pick(mem, unpaidId).can_mark_unpaid, false, 'Mitglied, unbezahlter Besuch');
+
+    const oneAdm = await call('GET', `/visits/${PAY_SESSION_ID}`, { as: ADM });
+    assert.equal(oneAdm.body.data.can_mark_unpaid, true, 'GET /visits/:id traegt das Feld ebenso');
+    const oneMem = await call('GET', `/visits/${PAY_SESSION_ID}`, { as: MEM });
+    assert.equal(oneMem.body.data.can_mark_unpaid, false);
+  } finally {
+    db.prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(unpaidId);
+  }
+});
+
+test('POST /visits/:id/unpay: Mitglied -> 403, Besuch UND Zahlungsaufgabe unveraendert (#1136)', async () => {
+  const before = sessionRow(PAY_SESSION_ID);
+  const taskBefore = taskRow(PAYMENT_TASK_ID);
+  assert.ok(before.paid_at, 'Fixture: der Besuch ist bezahlt');
+  assert.equal(taskBefore.status, 'done', 'Fixture: die Zahlungsaufgabe ist abgehakt');
+
+  const r = await call('POST', `/visits/${PAY_SESSION_ID}/unpay`, { as: MEM });
+  assert.equal(r.status, 403, `erwartet 403, bekommen ${r.status}`);
+
+  assert.deepEqual(sessionRow(PAY_SESSION_ID), before, 'die abgerechnete Zeile ist unveraendert');
+  assert.deepEqual(taskRow(PAYMENT_TASK_ID), taskBefore, 'die Zahlungsaufgabe bleibt abgehakt');
+});
+
+test('POST /visits/:id/unpay: Admin setzt paid_at zurueck und oeffnet die Zahlungsaufgabe wieder (#1136)', async () => {
+  const r = await call('POST', `/visits/${PAY_SESSION_ID}/unpay`, { as: ADM });
+  assert.equal(r.status, 200, `erwartet 200, bekommen ${r.status} ${JSON.stringify(r.body)}`);
+  assert.equal(r.body.data.paid_at, null, 'Antwort: nicht mehr bezahlt');
+  assert.ok(r.body.summary, 'Antwort traegt die Monatssumme wie /pay');
+
+  assert.equal(sessionRow(PAY_SESSION_ID).paid_at, null, 'paid_at in der Zeile zurueckgesetzt');
+  assert.equal(taskRow(PAYMENT_TASK_ID).status, 'open', 'die Zahlungsaufgabe ist wieder offen');
+
+  // reconcilePaymentTasks() laeuft in GET /visits und bucht jede Zeile mit einer
+  // abgehakten Aufgabe als bezahlt. Bliebe die Aufgabe done, kaeme die Zahlung
+  // hier sofort zurueck.
+  const list = await call('GET', '/visits?month=2025-04', { as: ADM });
+  const visit = list.body.data.visits.find((v) => v.id === PAY_SESSION_ID);
+  assert.equal(visit.paid_at, null, 'der naechste Lesezugriff bucht die Zahlung nicht zurueck');
+  assert.equal(visit.payment_task_status, 'open');
+  assert.equal(visit.can_mark_unpaid, false, 'unbezahlt gibt es nichts mehr zurueckzunehmen');
+});
+
+test('POST /visits/:id/unpay: unbezahlter Besuch -> 200, nichts geaendert (#1136)', async () => {
+  const before = sessionRow(PAY_SESSION_ID);
+  const taskBefore = taskRow(PAYMENT_TASK_ID);
+  assert.equal(before.paid_at, null, 'Fixture: der Besuch ist unbezahlt');
+
+  const r = await call('POST', `/visits/${PAY_SESSION_ID}/unpay`, { as: ADM });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.paid_at, null);
+  assert.deepEqual(sessionRow(PAY_SESSION_ID), before, 'Zeile unveraendert');
+  assert.deepEqual(taskRow(PAYMENT_TASK_ID), taskBefore, 'Aufgabe unveraendert');
+});
+
+test('POST /visits/:id/unpay: unbekannte id -> 404, ungueltige id -> 400 (#1136)', async () => {
+  const missing = await call('POST', '/visits/999999/unpay', { as: ADM });
+  assert.equal(missing.status, 404);
+  const invalid = await call('POST', '/visits/abc/unpay', { as: ADM });
+  assert.equal(invalid.status, 400);
+});
+
 test('teardown: Payment-Tasks-Einstellung zurücksetzen', () => {
   db.prepare(`UPDATE sync_config SET value = '0' WHERE key = 'housekeeping_payment_tasks'`).run();
 });

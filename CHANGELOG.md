@@ -136,6 +136,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   migrates. The four slots now come from one place in the client rather than five copies, so the
   planner, the overview tile and the recipe form always say the same word.
 
+- **Marking a housekeeping visit as paid asks first, and an admin can take a payment back**
+  (#1136). "Mark paid" settled a visit with a single tap - in the report list, in the visit report
+  and in the staff log alike - and checked off the visit's payment task on the way. A paid visit is
+  settled: from then on only an admin can edit or delete it, so a stray tap was not a small thing.
+  All three buttons now open the same confirmation, and it names what happens: the linked payment
+  task is checked off, and only an admin can undo it afterwards. Cancelling from the visit report
+  leaves the report open. The way back sits in the visit report: on a paid visit an admin sees
+  "Undo payment", which marks the visit as pending again and reopens a linked payment task. Whether
+  that button appears is decided by the server for each visit, and the server checks the role again
+  when the payment is taken back.
+
 ### Changed
 
 - **Dashboard widgets share one header grammar, and more section headings adopt the shared title

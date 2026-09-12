@@ -8219,6 +8219,43 @@ test('der Housekeeping-Check-Knopf bleibt in beide Richtungen bedienbar (#1133)'
     'toggleSession entscheidet an der offenen Session');
 });
 
+test('Housekeeping: Bezahlen laeuft durch EINE Funktion, die vorher bestaetigt (#1136)', () => {
+  // Ohne Kommentare: ein Kommentar, der die Route nennt, ist kein Post.
+  const page = withoutCommentsKeepingLines(read('../public/pages/housekeeping.js'));
+  const lines = page.split('\n');
+
+  // Genau EIN Post auf die Bezahl-Route. Vor #1136 buchten drei Ausloeser je
+  // selbst, mit einem Klick und ohne Rueckfrage; ein zweiter Post waere wieder
+  // ein Weg an der Bestaetigung vorbei.
+  const posts = [];
+  lines.forEach((l, i) => { if (/\/visits\/\$\{[^}]+\}\/pay`/.test(l)) posts.push(i); });
+  assert.equal(posts.length, 1,
+    `die Bezahl-Route darf nur an einer Stelle gepostet werden, gefunden in Zeile ${posts.map((i) => i + 1).join(', ')}`);
+
+  // Die Funktion um diesen Post muss VOR ihm fragen und bei Nein abbrechen.
+  const kopf = [...lines.keys()].slice(0, posts[0]).reverse()
+    .find((i) => /^(?:export )?(?:async )?function /.test(lines[i]));
+  assert.equal(lines[kopf].match(/function (\w+)/)?.[1], 'payVisit', 'der Post gehoert in payVisit()');
+  const bisZumPost = lines.slice(kopf, posts[0]).join('\n');
+  assert.match(bisZumPost, /const confirmed = await confirmOverModal\(t\('housekeeping\.markPaidConfirm'\)/,
+    'payVisit fragt vor dem Post - ueber confirmOverModal, damit der Besuchsbericht darunter ueberlebt');
+  assert.match(bisZumPost, /if \(!confirmed\) return;/, 'ein Nein bucht nichts');
+  assert.match(bisZumPost, /visit\.payment_task_id\s*\?\s*t\('housekeeping\.markPaidConfirmDetailTask'\)\s*:\s*t\('housekeeping\.markPaidConfirmDetail'\)/,
+    'die Rueckfrage nennt die Zahlungsaufgabe, wenn es eine gibt');
+
+  // Und alle drei Ausloeser gehen durch sie hindurch.
+  for (const selektor of ["'[data-pay-report]'", "'#visit-report-pay'", "'[data-pay-visit]'"]) {
+    const at = page.indexOf(selektor);
+    assert.notEqual(at, -1, `Ausloeser ${selektor} fehlt`);
+    assert.match(page.slice(at, at + 300), /payVisit\(visit, async \(\) => \{/,
+      `${selektor} muss payVisit() rufen, statt selbst zu buchen`);
+  }
+
+  // Die Ruecknahme haengt am Serverfeld; die Seite baut die Admin-Regel nicht nach.
+  assert.match(page, /visit\.can_mark_unpaid/, 'der Ruecknahme-Knopf haengt an can_mark_unpaid');
+  assert.doesNotMatch(page, /authRole|role\s*===\s*'admin'/, 'housekeeping.js entscheidet keine Rolle selbst');
+});
+
 test('holiday chips derive readable ink from each configured color', () => {
   const calendarPage = read('../public/pages/calendar.js');
   const calendarCss = read('../public/styles/calendar.css');
