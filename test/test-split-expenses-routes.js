@@ -321,6 +321,20 @@ test('Gast-Anlage mit bereits vergebenem Username -> 409', async () => {
   assert.equal(r.status, 409);
 });
 
+test('Gast-Anlage: gespiegelter Kontakt traegt den Kategorie-Key misc (#1140)', async () => {
+  const r = await call('POST', `/groups/${GUEST_GROUP}/guests`, {
+    actor: { id: OWNER, role: 'member' },
+    body: { display_name: 'Gast Milo', password: 'supersecret' },
+  });
+  assert.equal(r.status, 201);
+  // syncGuestArtifacts schrieb frueher das deutsche Literal 'Sonstiges' - kein
+  // Key in contact_categories, die UI zeigte es unuebersetzt an (#1140). Der
+  // Spiegel-Kontakt muss den stabilen Key 'misc' tragen.
+  const contact = db.prepare('SELECT category FROM contacts WHERE family_user_id = ?').get(r.body.data.id);
+  assert.ok(contact, 'Kontakt-Artefakt angelegt');
+  assert.equal(contact.category, 'misc', 'gespiegelter Gast-Kontakt nutzt den stabilen Key misc');
+});
+
 // --------------------------------------------------------------------------
 // Betriebsgruppe OPS: Liste, Filter, Kommentare, Aktivität, Suche, Dashboard
 // --------------------------------------------------------------------------

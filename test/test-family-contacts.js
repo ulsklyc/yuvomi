@@ -57,5 +57,36 @@ test('Family contact should NOT be deleted if we apply the logic from the route'
   assert(deleted === false, 'Should not have been deleted');
 });
 
+// ── Realer Schreibpfad: syncFamilyMemberArtifacts (server/auth.js) ──────────
+// Der Mock oben prueft nur die Loeschsperre. Hier laeuft der echte Sync gegen
+// eine frisch migrierte Datenbank: der beim Anlegen eines Haushaltsmitglieds
+// gespiegelte Kontakt muss den stabilen Kategorie-Key 'misc' tragen, nicht das
+// alte deutsche Literal 'Sonstiges' - das ist kein Key in contact_categories,
+// die UI zeigte es unuebersetzt an (#1140).
+const { freshTestDbPath } = await import('./tmp-db.js');
+freshTestDbPath('family-contacts');
+process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'family-contacts-test-secret-32byte';
+
+const real = await import('../server/db.js');
+const { syncFamilyMemberArtifacts } = await import('../server/auth.js');
+real.init();
+const realDb = real.get();
+
+console.log('\n[Family-Contacts-Test] Gespiegelter Mitglieds-Kontakt (#1140)\n');
+
+test('syncFamilyMemberArtifacts legt den Mitglieds-Kontakt mit category = misc an', () => {
+  const memberId = realDb.prepare(`
+    INSERT INTO users (username, display_name, password_hash, avatar_color, role)
+    VALUES ('misc-mirror', 'Mia Misc', 'x', '#007AFF', 'member')
+  `).run().lastInsertRowid;
+
+  syncFamilyMemberArtifacts(realDb, memberId, { displayName: 'Mia Misc', actorUserId: 1 });
+
+  const contact = realDb.prepare('SELECT category FROM contacts WHERE family_user_id = ?').get(memberId);
+  assert(contact, 'Kontakt-Artefakt wurde angelegt');
+  assert(contact.category === 'misc',
+    `category ist '${contact && contact.category}', erwartet den stabilen Key 'misc' (#1140)`);
+});
+
 console.log(`\nResults: ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

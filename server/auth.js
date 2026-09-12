@@ -464,7 +464,7 @@ function syncFamilyMemberArtifacts(database, userId, {
     database.prepare(`
       UPDATE contacts
       SET name = ?,
-          category = COALESCE(category, 'Sonstiges'),
+          category = COALESCE(category, 'misc'),
           phone = ?,
           email = ?
       WHERE id = ?
@@ -490,7 +490,7 @@ function syncFamilyMemberArtifacts(database, userId, {
   } else {
     database.prepare(`
       INSERT INTO contacts (name, category, phone, email, family_user_id)
-      VALUES (?, 'Sonstiges', ?, ?, ?)
+      VALUES (?, 'misc', ?, ?, ?)
     `).run(name, phone ?? null, email ?? null, userId);
   }
 
