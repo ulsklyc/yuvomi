@@ -30,6 +30,7 @@ import { assignDefaultToEvent } from './sync-assignment.js';
 import { countSourceEvents, deleteSourceEvents } from './calendar-prune.js';
 import { readSyncOutcome, withSyncOutcome } from './sync-outcome.js';
 import { rruleValue } from './recurrence.js';
+import { runSerialized } from '../utils/sync-lock.js';
 
 const GOOGLE_COLOR = '#4285F4';
 
@@ -328,6 +329,10 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
  * @returns {Promise<{deleted:number,updated:number}>}
  */
 async function flushOutbound() {
+  return runSerialized('google', 'flush', runFlushOutbound);
+}
+
+async function runFlushOutbound() {
   const idle = { deleted: 0, updated: 0 };
   if (!isConnected() || isReadonly()) return idle;
 
@@ -595,7 +600,7 @@ function disconnect({ deleteEvents = false } = {}) {
  * Werfen bei fehlendem Token, das ohne Verbindung der wahrscheinlichste Fall ist.
  */
 async function sync() {
-  return withSyncOutcome(db.get(), 'google', runSync);
+  return runSerialized('google', 'sync', () => withSyncOutcome(db.get(), 'google', runSync));
 }
 
 async function runSync() {

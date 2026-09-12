@@ -171,6 +171,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still under way has its new copy deleted as well, and an edit or a move made while a change is
   still being sent to the server stays queued instead of being dropped.
 
+- **A change to a synced calendar no longer collides with a sync that is already running**
+  (#593). Every create, edit and delete tries to reach the server right away, and the scheduler
+  runs its own sync every few minutes. Both did the same bookkeeping at the same time, so one
+  could clear the other's notes between two network calls: an event deleted while its move to
+  another calendar was still under way left its new copy behind, and the next sync brought the
+  deleted event back. A provider now runs one pass at a time - the immediate attempt, the
+  scheduled sync and a second scheduled tick wait for each other instead of overlapping, and a
+  burst of edits during a slow pass is followed by one catch-up pass rather than one per edit.
+  This covers Google, CalDAV, iCloud and the CalDAV reminder lists behind Tasks and Shopping.
+
 - **Keyboard focus comes back after a confirmation, an input dialog or the calendar's detail
   popover** (#1083). Confirm a delete, rename a list or a subtask, pick a folder to move to, and
   the page reloads its list - which rebuilds the very button you came from. Focus fell to the page

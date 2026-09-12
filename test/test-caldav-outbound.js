@@ -1533,3 +1533,191 @@ test('patchICSEvent setzt genau ein RRULE-Präfix, egal welche Schreibweise anko
     assert.deepEqual(lines, ['RRULE:FREQ=DAILY;INTERVAL=2'], `Eingabe: ${rule}`);
   }
 });
+
+// ── Zwei Durchgänge auf einmal ──────────────────────────────────────────────────
+//
+// Der Sofortversuch läuft ohne await hinter der HTTP-Antwort, und der Scheduler
+// startet seinen Sync unabhängig davon. Beide führen dieselbe Buchhaltung, beide
+// hängen an Netzaufrufen: ohne Serialisierung (server/utils/sync-lock.js) liest
+// der eine zwischen zwei awaits des anderen. Diese Tests treiben genau das - das
+// Gegenstück zu den Wachen weiter oben, die je einen Einzelfall abfangen.
+
+/** Ein Promise, dessen Ende der Test bestimmt - der Ersatz für den Netzaufruf. */
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+/** Dem Event-Loop mehrfach Luft geben, damit ein zweiter Durchgang wirklich liefe. */
+async function settle(times = 5) {
+  for (let i = 0; i < times; i++) await new Promise((resolve) => setImmediate(resolve));
+}
+
+test('ein zweiter Sofortversuch räumt den Tombstone eines laufenden Umzugs nicht ab', async () => {
+  // Der Fall, den keine weitere Wache in processPendingUpdates schliessen konnte:
+  // Der Nutzer löscht den Termin, während sein Umzug zwischen createCalendarObject
+  // und deleteCalendarObject hängt. Die Löschroute legt den Tombstone der QUELLE an
+  // und stösst ihren eigenen Sofortversuch an. Arbeitet der den Tombstone ab, bevor
+  // der Umzug zurückkehrt, fehlt dem Umzug das Signal "der Nutzer war das": die
+  // Kopie im Ziel bliebe stehen und käme mit dem nächsten Inbound-Lauf zurück.
+  reset();
+  db.prepare('DELETE FROM caldav_calendar_selection').run();
+  seedAccountCalendar(CAL_URL);
+  seedAccountCalendar(CAL2_URL);
+  const event = seedMoved('race1@t');
+
+  const { flushOutbound } = await import('../server/services/caldav-sync.js');
+  const gate = deferred();
+  const second = { started: false, client: fakeImmediateClient() };
+
+  const client = fakeImmediateClient({
+    objects: { [`${CAL_URL}race1@t.ics`]: serverObject('race1@t') },
+    onCreate: async () => {
+      // DELETE-Route: Tombstone der Quelle, lokales Löschen, Sofortversuch.
+      outbound.queueEventDeletion(reload(event.id));
+      db.prepare('DELETE FROM calendar_events WHERE id = ?').run(event.id);
+      second.started = true;
+      second.promise = flushOutbound({ createClient: async () => second.client });
+      await settle();
+      await gate.promise;
+    },
+  });
+
+  const running = flushOutbound({ createClient: async () => client });
+  gate.resolve();
+  await running;
+  await second.promise;
+
+  assert.equal(second.started, true, 'der zweite Sofortversuch wurde angestossen');
+  // Er kommt erst nach dem Umzug zum Zug - und findet dann beides vor: den
+  // Tombstone der Quelle und den, den der Umzug für seine Kopie im Ziel angelegt
+  // hat. Ohne die Serialisierung entstünde der zweite nie.
+  assert.ok(second.client.deletes.some((d) => d.calendarObject.url === `${CAL2_URL}race1@t.ics`),
+    'die Kopie im Ziel wird abgeräumt');
+  assert.equal(tombstones().length, 0, 'nichts bleibt offen');
+});
+
+test('ein Sofortversuch wartet auf einen laufenden Sync-Lauf', async () => {
+  // Der zweite Fall aus der Review von #1127: der geplante Lauf importiert die
+  // gerade angelegte Kopie im Ziel, während der Umzug noch auf das DELETE in der
+  // Quelle wartet. Beide Richtungen teilen deshalb denselben Schlüssel.
+  reset();
+  db.prepare('DELETE FROM caldav_calendar_selection').run();
+  seedAccountCalendar(CAL_URL);
+  const calRefId = upsertCalendar(CAL_URL);
+  outbound.queueEventDeletion(insertSyncedEvent({
+    uid: 'race2@t', calRefId, objectUrl: `${CAL_URL}race2@t.ics`,
+  }));
+
+  const { sync, flushOutbound } = await import('../server/services/caldav-sync.js');
+  const gate = deferred();
+  const syncClient = { fetchCalendars: async () => { await gate.promise; return []; } };
+  const flushClient = fakeImmediateClient();
+
+  const syncing = sync({ createClient: async () => syncClient });
+  await settle();
+  const flushing = flushOutbound({ createClient: async () => flushClient });
+  await settle();
+
+  try {
+    assert.equal(flushClient.deletes.length, 0, 'solange der Sync läuft, passiert nichts');
+  } finally {
+    // Auch wenn die Zusicherung fällt: der hängende Abruf muss enden, sonst
+    // wartet die Suite auf einen Lauf, der nie zurückkehrt.
+    gate.resolve();
+    await Promise.allSettled([syncing, flushing]);
+  }
+
+  assert.equal(flushClient.deletes.length, 1, 'danach holt der Sofortversuch es nach');
+  assert.equal(tombstones().length, 0);
+});
+
+test('mehrere Bearbeitungen während eines Laufs ergeben einen Nachlauf, nicht drei', async () => {
+  // Hinter jeder Schreibroute steht ein Sofortversuch. Ohne Zusammenfassung
+  // stapelte eine Bearbeitungsserie während eines langsamen Laufs für jede
+  // einzelne einen eigenen Durchgang samt eigener Verbindung.
+  reset();
+  db.prepare('DELETE FROM caldav_calendar_selection').run();
+  seedAccountCalendar(CAL_URL);
+  const calRefId = upsertCalendar(CAL_URL);
+  outbound.queueEventDeletion(insertSyncedEvent({
+    uid: 'race3@t', calRefId, objectUrl: `${CAL_URL}race3@t.ics`,
+  }));
+
+  const { flushOutbound } = await import('../server/services/caldav-sync.js');
+  const gate = deferred();
+  let clients = 0;
+  const makeClient = async () => { clients++; return fakeImmediateClient(); };
+  const waiting = [];
+
+  const running = flushOutbound({
+    createClient: async () => {
+      clients++;
+      return fakeImmediateClient({
+        onDelete: async () => {
+          // Drei weitere Löschungen, während dieser Durchgang noch hängt.
+          for (const uid of ['race4@t', 'race5@t', 'race6@t']) {
+            outbound.queueEventDeletion(insertSyncedEvent({
+              uid, calRefId, objectUrl: `${CAL_URL}${uid}.ics`,
+            }));
+            waiting.push(flushOutbound({ createClient: makeClient }));
+          }
+          await gate.promise;
+        },
+      });
+    },
+  });
+  await settle();
+
+  gate.resolve();
+  await running;
+  await Promise.all(waiting);
+
+  assert.equal(clients, 2, 'ein laufender und genau ein nachlaufender Durchgang');
+  assert.equal(tombstones().length, 0, 'der Nachlauf arbeitet alle drei zusammen ab');
+});
+
+test('auch der Apple-Legacy-Sync serialisiert seine Sofortversuche', async () => {
+  // Apple teilt sich caldav-outbound.js mit dem Multi-Account-Sync, hat aber
+  // seinen eigenen Einstieg - und damit seinen eigenen Schlüssel. Ohne den liefe
+  // dort weiter, was hier gerade geschlossen wird.
+  reset();
+  const set = db.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
+  set.run('apple_caldav_url', 'https://caldav.icloud.com/');
+  set.run('apple_username', 'jemand@example.com');
+  set.run('apple_app_password', 'abcd-efgh');
+  const calRefId = db.prepare(`
+    INSERT INTO external_calendars (source, external_id, name, color)
+    VALUES ('apple', ?, 'iCloud', '#FC3C44')
+    ON CONFLICT(source, external_id) DO UPDATE SET name = excluded.name
+    RETURNING id
+  `).get(CAL_URL).id;
+  outbound.queueEventDeletion(insertSyncedEvent({
+    uid: 'apple-race@t', calRefId, source: 'apple', objectUrl: `${CAL_URL}apple-race@t.ics`,
+  }));
+
+  const appleCalendar = await import('../server/services/apple-calendar.js');
+  const gate = deferred();
+  let clients = 0;
+
+  const running = appleCalendar.flushOutbound({
+    makeClient: async () => {
+      clients++;
+      return fakeClient({ onDelete: async () => { await gate.promise; } });
+    },
+  });
+  await settle();
+  const waiting = appleCalendar.flushOutbound({
+    makeClient: async () => { clients++; return fakeClient(); },
+  });
+
+  gate.resolve();
+  await running;
+  await waiting;
+
+  assert.equal(clients, 1, 'der Nachlauf findet nichts mehr offen');
+  assert.equal(tombstones().length, 0);
+
+  db.prepare("DELETE FROM sync_config WHERE key LIKE 'apple_%'").run();
+});

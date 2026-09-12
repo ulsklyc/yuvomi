@@ -69,9 +69,10 @@ function applyMove(eventId, source, calendarUrl, destCal, objectUrl) {
  * Tombstone für die Kopie im Ziel löschte dort einen Termin, den andere Clients
  * derselben Familie weiter sehen sollen.
  *
- * Offen bleibt: räumt ein paralleler Durchgang den Tombstone der Quelle ab, bevor
- * der Umzug hier ankommt, fehlt das Signal, und die Kopie im Ziel bleibt stehen.
- * Das schliesst erst eine Serialisierung der ausgehenden Arbeit.
+ * Dass der Tombstone hier überhaupt noch steht, hält die Serialisierung in
+ * `server/utils/sync-lock.js`: ein paralleler Durchgang räumte ihn sonst ab,
+ * bevor der Umzug hier ankommt, und die Kopie im Ziel bliebe stehen, bis der
+ * nächste Inbound-Lauf den gelöschten Termin von dort neu importiert.
  */
 function deletedByUser(source, uid, sourceObjectUrl, sourceCalendarUrl) {
   return !!db.get().prepare(`

@@ -21,6 +21,7 @@ import * as db from '../db.js';
 import { assignDefaultToEvent } from './sync-assignment.js';
 import { pruneDeletedEvents, countSourceEvents, deleteSourceEvents } from './calendar-prune.js';
 import { readSyncOutcome, withSyncOutcome } from './sync-outcome.js';
+import { runSerialized } from '../utils/sync-lock.js';
 import { unfoldLines, parseICS, formatICSDate, tzLocalToUTC, applyDuration, normalizeRecurrenceOverrides } from './ics-parser.js';
 import { decodeHtmlEntities } from '../utils/html-entities.js';
 import * as outbound from './calendar-outbound.js';
@@ -260,7 +261,11 @@ async function createClient(creds) {
  * bleibt vorgemerkt und läuft im nächsten Sync mit.
  * @returns {Promise<{deleted:number,updated:number}>}
  */
-async function flushOutbound({ makeClient } = {}) {
+async function flushOutbound(opts = {}) {
+  return runSerialized('apple', 'flush', () => runFlushOutbound(opts));
+}
+
+async function runFlushOutbound({ makeClient } = {}) {
   const idle = { deleted: 0, updated: 0 };
   const deletions = outbound.pendingDeletions('apple').filter((r) => r.object_url);
   const updates   = outbound.pendingUpdates('apple').filter((e) => e.external_object_url);
@@ -293,7 +298,7 @@ async function flushOutbound({ makeClient } = {}) {
  * damit auch der frühe Ausstieg bei fehlenden Zugangsdaten erfasst wird.
  */
 async function sync() {
-  return withSyncOutcome(db.get(), 'apple', runSync);
+  return runSerialized('apple', 'sync', () => withSyncOutcome(db.get(), 'apple', runSync));
 }
 
 async function runSync() {

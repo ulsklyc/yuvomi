@@ -662,6 +662,77 @@ test('flushOutbound holt die Objekte aus der abgeleiteten Collection', async () 
   assert.strictEqual(reloadTask(task.id).outbound_dirty, 0);
 });
 
+test('Zwei Sofortversuche laufen nicht ineinander (#593)', async () => {
+  // Aufgaben und Einkauf teilen die Buchhaltung derselben Konten. Hinter jeder
+  // Schreibroute steht ein Sofortversuch, und zwei davon gleichzeitig laesen
+  // einander den Stand zwischen zwei Netzaufrufen weg - dieselbe Regel wie beim
+  // Kalender, mit eigenem Schlüssel: server/utils/sync-lock.js.
+  const accountId = reset();
+  const first  = insertTask({ accountId, title: 'Erste' });
+  db.prepare('UPDATE tasks SET outbound_dirty = 1 WHERE id = ?').run(first.id);
+
+  let gateResolve;
+  const gate = new Promise((resolve) => { gateResolve = resolve; });
+  let clients = 0;
+  const objects = [{ url: OBJ_URL, etag: 'e9', data: serverTodo() }];
+
+  const running = flushOutbound({
+    createClient: async () => {
+      clients++;
+      const client = fakeClient({ objects });
+      const update = client.updateCalendarObject;
+      client.updateCalendarObject = async (args) => { await gate; return update(args); };
+      return client;
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const waiting = [
+    flushOutbound({ createClient: async () => { clients++; return fakeClient({ objects }); } }),
+    flushOutbound({ createClient: async () => { clients++; return fakeClient({ objects }); } }),
+  ];
+
+  gateResolve();
+  await running;
+  await Promise.all(waiting);
+
+  assert.strictEqual(clients, 1,
+    'der Nachlauf findet nichts mehr offen und baut gar keine Verbindung auf');
+  assert.strictEqual(reloadTask(first.id).outbound_dirty, 0);
+});
+
+test('Ein Sofortversuch wartet auf den laufenden VTODO-Sync (#593)', async () => {
+  // Der Sync arbeitet dieselbe Rückrichtung ab wie der Sofortversuch. Beide
+  // gleichzeitig hiesse: der eine zählt die Fehlversuche des anderen hoch und
+  // verwirft am Ende dessen Arbeit.
+  const accountId = reset();
+  enableList(accountId);
+  const task = insertTask({ accountId, title: 'Wartet' });
+  db.prepare('UPDATE tasks SET outbound_dirty = 1 WHERE id = ?').run(task.id);
+
+  let gateResolve;
+  const gate = new Promise((resolve) => { gateResolve = resolve; });
+  const syncClient = { fetchCalendars: async () => { await gate; return []; } };
+  let flushed = 0;
+
+  const syncing = sync({ createClient: async () => syncClient });
+  await new Promise((resolve) => setImmediate(resolve));
+  const flushing = flushOutbound({
+    createClient: async () => { flushed++; return fakeClient({ objects: [] }); },
+  });
+  for (let i = 0; i < 5; i++) await new Promise((resolve) => setImmediate(resolve));
+
+  try {
+    assert.strictEqual(flushed, 0, 'solange der Sync läuft, baut der Sofortversuch nichts auf');
+  } finally {
+    // Auch wenn die Zusicherung fällt: der hängende Abruf muss enden, sonst
+    // wartet die Suite auf einen Lauf, der nie zurückkehrt.
+    gateResolve();
+    await Promise.allSettled([syncing, flushing]);
+  }
+  assert.strictEqual(flushed, 1, 'danach holt er es nach');
+});
+
 test('Ohne offene Arbeit baut flushOutbound keinen Client auf', async () => {
   reset();
   let built = 0;

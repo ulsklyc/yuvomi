@@ -14,6 +14,7 @@ import { pruneDeletedEvents, countMirroredEvents, deleteMirroredEvents } from '.
 import * as outbound from './calendar-outbound.js';
 import { processPendingDeletions, processPendingUpdates, flushAccount } from './caldav-outbound.js';
 import { detachAccountRows } from './caldav-todo-outbound.js';
+import { runSerialized } from '../utils/sync-lock.js';
 import { toICSDatetime, escapeICSText } from '../utils/ics-format.js';
 import { eventDateTimeFields } from '../utils/ics-datetime.js';
 import { vtimezoneFor } from '../utils/vtimezone.js';
@@ -474,7 +475,16 @@ const YIELD_EVERY = 50;
 /** Echter tsdav-Client für einen Account; in Tests durch eine Factory ersetzbar. */
 const defaultClientFactory = createCalDAVClient;
 
-async function sync({ createClient } = {}) {
+/**
+ * Ein Sync-Lauf, serialisiert gegen den Sofortversuch und gegen sich selbst
+ * (#593): beide führen dieselbe ausgehende Buchhaltung, und ein Tick, der in
+ * einen laufenden Durchgang hineinliefe, läse deren Zwischenstand.
+ */
+async function sync(opts = {}) {
+  return runSerialized('caldav', 'sync', () => runSync(opts));
+}
+
+async function runSync({ createClient } = {}) {
   const accounts = getAllAccounts();
 
   if (accounts.length === 0) {
@@ -873,7 +883,11 @@ async function sync({ createClient } = {}) {
  * Migration v106) bleiben vorgemerkt und laufen im nächsten Sync mit.
  * @returns {Promise<{deleted:number,updated:number}>}
  */
-async function flushOutbound({ createClient } = {}) {
+async function flushOutbound(opts = {}) {
+  return runSerialized('caldav', 'flush', () => runFlushOutbound(opts));
+}
+
+async function runFlushOutbound({ createClient } = {}) {
   const idle = { deleted: 0, updated: 0 };
   const deletions = outbound.pendingDeletions('caldav');
   const updates   = outbound.pendingUpdates('caldav');
