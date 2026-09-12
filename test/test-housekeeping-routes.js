@@ -97,7 +97,10 @@ test('check-in: öffnet Session -> 201', async () => {
   assert.ok(SESSION_ID);
 });
 
-test('check-in: zweiter Check-in am selben Tag -> 409', async () => {
+test('check-in: zweiter Check-in bei OFFENER Session -> 409', async () => {
+  // Der Name hiess bis #1138 "am selben Tag" und beschrieb damit die alte,
+  // zu weite Sperre. Gemessen hat er immer diesen Fall hier: die Session aus
+  // dem Test davor ist noch offen. Ueberlappende Sessions bleiben gesperrt.
   const r = await call('POST', '/work-sessions/check-in', { as: ADM, body: { worker_id: WORKER_ID, daily_rate: 50 } });
   assert.equal(r.status, 409);
 });
@@ -120,6 +123,46 @@ test('check-out: schließt offene Session, Besuch erscheint mit total_amount = r
 test('check-out: keine offene Session mehr -> 404', async () => {
   const r = await call('POST', '/work-sessions/check-out', { as: ADM, body: { worker_id: WORKER_ID } });
   assert.equal(r.status, 404);
+});
+
+test('check-in: nach dem Auschecken ist am selben Tag eine zweite Session erlaubt (#1138)', async () => {
+  // Geteilte Schicht, Pause mit Wiederaufnahme, zwei getrennte Besuche: die
+  // Sperre las vorher JEDE Session des Tages (`loadTodaySession`) und lehnte
+  // deshalb auch nach einem sauberen Auschecken mit 409 ab.
+  const r = await call('POST', '/work-sessions/check-in', { as: ADM, body: { worker_id: WORKER_ID, daily_rate: 40, extras: 0 } });
+  assert.equal(r.status, 201, 'die zweite Session des Tages wird angelegt');
+  const second = r.body.data.id;
+  assert.notEqual(second, SESSION_ID, 'es ist eine eigene Session, nicht die alte');
+
+  // Beide Sessions liegen am selben lokalen Tag und tragen ihre eigenen Daten.
+  const rows = db.prepare(
+    'SELECT id, check_in, check_out, daily_rate FROM housekeeping_work_sessions WHERE worker_id = ? ORDER BY id',
+  ).all(WORKER_ID);
+  assert.equal(rows.length, 2, 'zwei Sessions am selben Tag');
+  assert.equal(rows[0].check_in.slice(0, 10), rows[1].check_in.slice(0, 10), 'derselbe Tag');
+  assert.ok(rows[0].check_out, 'die erste ist abgeschlossen');
+  assert.equal(rows[1].check_out, null, 'die zweite ist offen');
+  assert.equal(rows[0].daily_rate, 50, 'die erste behaelt ihren eigenen Satz');
+  assert.equal(rows[1].daily_rate, 40, 'die zweite ihren');
+});
+
+test('current_session traegt nur die OFFENE Session, today_session auch die geschlossene (#1133)', async () => {
+  // Solange beide Felder dieselbe Zeile lieferten, blieb ein Arbeiter nach dem
+  // Auschecken "eingecheckt" - und der Auscheck-Knopf im Frontend, der an
+  // current_session haengt, war dauerhaft tot.
+  const open = await call('GET', '/workers', { as: ADM });
+  const w = open.body.data.find((item) => item.id === WORKER_ID);
+  assert.ok(w.current_session, 'die zweite Session ist offen');
+  assert.equal(w.current_session.check_out, null);
+
+  const out = await call('POST', '/work-sessions/check-out', { as: ADM, body: { worker_id: WORKER_ID } });
+  assert.equal(out.status, 200);
+
+  const after = await call('GET', '/workers', { as: ADM });
+  const w2 = after.body.data.find((item) => item.id === WORKER_ID);
+  assert.equal(w2.current_session, null, 'ausgecheckt heisst: keine laufende Session');
+  assert.ok(w2.today_session, 'der Besuch von heute steht weiterhin');
+  assert.ok(w2.today_session.check_out, 'und zwar als abgeschlossener');
 });
 
 // --------------------------------------------------------------------------

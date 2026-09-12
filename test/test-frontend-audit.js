@@ -8192,6 +8192,34 @@ test('German housekeeping visit copy contains no English fallback strings', () =
   );
 });
 
+test('der Housekeeping-Check-Knopf bleibt in beide Richtungen bedienbar (#1133)', () => {
+  const page = read('../public/pages/housekeeping.js');
+
+  // `toggleSession()` kann ein- UND auschecken, und `[data-worker-check]` ist
+  // sein EINZIGER Ausloeser (eine zweite Fundstelle waere hier ein Signal,
+  // dass diese Zusicherung nicht mehr die ganze Wahrheit ist).
+  const ausloeser = page.match(/data-worker-check/g) ?? [];
+  assert.equal(ausloeser.length, 2,
+    'Knopf-Markup und Handler-Selektor - mehr Stellen heben diesen Guard aus');
+
+  // Der Knopf trug im eingecheckten Zustand `disabled`. Damit war der
+  // Auscheck-Zweig von toggleSession() unerreichbar: toter Code hinter einem
+  // toten Knopf, und die Suiten blieben gruen.
+  const knopf = page.slice(page.indexOf('<button class="btn ${checkedIn'), page.indexOf('</button>', page.indexOf('<button class="btn ${checkedIn')));
+  assert.ok(knopf, 'der Check-Knopf muss auffindbar bleiben');
+  assert.doesNotMatch(knopf, /disabled/,
+    'ein disabled Check-Knopf macht das Auschecken unerreichbar (#1133)');
+  assert.match(knopf, /checkedIn \? t\('housekeeping\.checkOut'\)/,
+    'im eingecheckten Zustand muss der Knopf das Auschecken anbieten');
+
+  // Und er haengt an der OFFENEN Session, nicht an "war heute da" - sonst
+  // bliebe er nach dem Auschecken auf "Auschecken" stehen.
+  assert.match(page, /const checkedIn = !!worker\.current_session;/,
+    'der Zustand kommt aus current_session, nicht aus today_session');
+  assert.match(page, /const current = worker\?\.current_session;/,
+    'toggleSession entscheidet an der offenen Session');
+});
+
 test('holiday chips derive readable ink from each configured color', () => {
   const calendarPage = read('../public/pages/calendar.js');
   const calendarCss = read('../public/styles/calendar.css');

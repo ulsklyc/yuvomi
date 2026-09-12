@@ -208,7 +208,9 @@ function renderCurrentTab(container) {
 
 async function toggleSession(container, workerId) {
   const worker = state.workers.find((item) => String(item.id) === String(workerId));
-  const current = worker?.today_session;
+  // `current_session` ist die noch offene Sitzung. `today_session` traegt auch
+  // eine abgeschlossene und haette hier ein zweites Auschecken ausgeloest.
+  const current = worker?.current_session;
   if (!state.workers.length) {
     window.yuvomi?.showToast(t('housekeeping.checkInDisabled'), 'warning');
     return;
@@ -250,8 +252,16 @@ function renderWorkerSummary() {
     });
   }
   const rows = state.workers.map((worker) => {
-    const checkedIn = !!worker.today_session;
-    const session = worker.today_session;
+    // Derselbe Knopf fuehrt beide Richtungen: toggleSession() liest die offene
+    // Sitzung und checkt aus, sonst ein. Er trug im eingecheckten Zustand ein
+    // disabled-Attribut - und weil er der EINZIGE Ausloeser ist, war der
+    // Auscheck-Zweig damit unerreichbar (#1133).
+    const checkedIn = !!worker.current_session;
+    // Zwei verschiedene Fragen: `checkedIn` traegt den Knopf ("arbeitet
+    // gerade"), `session` die Zeile darunter ("war heute da"). Haengt die
+    // Zeile am Knopf, verliert sie nach dem Auschecken den Besuch von heute
+    // und faellt auf den Tarif zurueck.
+    const session = worker.current_session ?? worker.today_session;
     return `
     <section class="housekeeping-worker-strip">
       <div class="housekeeping-avatar" style="background:${esc(worker.avatar_color) || 'var(--module-housekeeping)'}">
@@ -259,12 +269,12 @@ function renderWorkerSummary() {
       </div>
       <div class="housekeeping-worker-strip__identity">
         <strong>${esc(worker.display_name)}</strong>
-        <span>${esc(checkedIn ? `${t('housekeeping.visitRecordedAt')} ${formatTime(session.check_in)}` : (worker.rate_type === 'hourly' ? `${money(worker.hourly_rate)}/${t('housekeeping.rateHourly')}` : `${money(worker.daily_rate)} · ${scheduleLabel(worker.payment_schedule)}`))}</span>
+        <span>${esc(session ? `${t('housekeeping.visitRecordedAt')} ${formatTime(session.check_in)}` : (worker.rate_type === 'hourly' ? `${money(worker.hourly_rate)}/${t('housekeeping.rateHourly')}` : `${money(worker.daily_rate)} · ${scheduleLabel(worker.payment_schedule)}`))}</span>
       </div>
       <button class="btn ${checkedIn ? 'btn--secondary' : 'btn--primary'} housekeeping-check-small" type="button"
-              data-worker-check="${worker.id}" ${checkedIn ? 'disabled' : ''}>
-        <i data-lucide="${checkedIn ? 'check' : 'log-in'}" aria-hidden="true"></i>
-        <span>${esc(checkedIn ? t('housekeeping.checkedInToday') : t('housekeeping.checkIn'))}</span>
+              data-worker-check="${worker.id}">
+        <i data-lucide="${checkedIn ? 'log-out' : 'log-in'}" aria-hidden="true"></i>
+        <span>${esc(checkedIn ? t('housekeeping.checkOut') : t('housekeeping.checkIn'))}</span>
       </button>
     </section>
   `;

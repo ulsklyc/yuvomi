@@ -131,7 +131,12 @@ function publicWorker(row, context = localDayContext()) {
     hourly_rate: Number(row.hourly_rate || 0),
     payment_schedule: row.payment_schedule,
     calendar_color: row.calendar_color || DEFAULT_CALENDAR_COLOR,
-    current_session: publicSession(todaySession),
+    // Zwei verschiedene Fragen, die vorher dieselbe Zeile beantworteten:
+    // `current_session` heisst "arbeitet gerade" und traegt den Auscheck-Knopf,
+    // `today_session` heisst "war heute da" und traegt die Zeitangabe darunter.
+    // Solange beide die letzte Sitzung des Tages lieferten, blieb ein Arbeiter
+    // nach dem Auschecken "eingecheckt" (#1133).
+    current_session: publicSession(loadOpenSession(row.id)),
     today_session: publicSession(todaySession),
     notes: row.notes ?? null,
     created_at: row.created_at,
@@ -778,7 +783,11 @@ router.post('/work-sessions/check-in', (req, res) => {
     const workerRateType = worker.rate_type || 'daily';
     const workerHourlyRate = worker.hourly_rate ?? 0;
     const context = localDayContext(req.body);
-    if (loadTodaySession(worker.id, context)) return res.status(409).json({ error: 'A visit is already recorded today for this housekeeper.', code: 409 });
+    // Nur eine OFFENE Sitzung sperrt. Vorher sperrte jede Sitzung des Tages,
+    // auch eine laengst abgeschlossene - geteilte Schichten, eine Pause mit
+    // Wiederaufnahme und zwei getrennte Besuche am selben Tag waren damit
+    // unmoeglich (#1138).
+    if (loadOpenSession(worker.id)) return res.status(409).json({ error: 'This housekeeper is already checked in.', code: 409 });
 
     const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: true });
     const vExtras = num(req.body.extras, 'extras');
