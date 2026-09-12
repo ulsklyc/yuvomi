@@ -1877,6 +1877,7 @@
         },
         "ics": {
             "title": "Mga ICS Subscription",
+            "holidayHint": "Tip: gumagana rin ito nang maayos para sa mga pista opisyal ng isang bansa na hindi pa saklaw ng pag-sync ng mga holiday sa mga setting ng kalendaryo.",
             "add": "Magdagdag ng subscription",
             "form": {
                 "url": "URL ng ICS",
@@ -2224,6 +2225,8 @@
         "holidayGroupHint": "May ilang kantong maraming wika na may magkakaibang petsa ng bakasyon sa paaralan depende sa rehiyon ng wika. Piliin ang tugmang rehiyon para sa tamang petsa.",
         "holidayPublicLabel": "Ipakita ang mga pistang opisyal",
         "holidaySchoolLabel": "Ipakita ang bakasyon sa paaralan",
+        "holidaySchoolUnavailable": "Walang available na datos ng bakasyon sa paaralan para sa bansang ito.",
+        "holidayAustraliaObservanceHint": "Para sa Australia, ipinapakita ang mga pista opisyal sa aktuwal nilang petsa – iba-iba bawat estado ang mga kapalit na araw para sa mga pistang tumatapat sa Sabado o Linggo at hindi ipinapakita ang mga ito.",
         "holidayPublicColor": "Kulay ng pistang opisyal",
         "holidaySchoolColor": "Kulay ng bakasyon sa paaralan",
         "holidaySaveBtn": "I-save",

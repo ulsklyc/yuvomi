@@ -1854,6 +1854,7 @@
         },
         "ics": {
             "title": "Subskrypcje ICS",
+            "holidayHint": "Wskazówka: to rozwiązanie sprawdza się też w przypadku świąt kraju, którego jeszcze nie obejmuje synchronizacja świąt w ustawieniach kalendarza.",
             "add": "Dodaj subskrypcję",
             "form": {
                 "url": "URL ICS",
@@ -2201,6 +2202,8 @@
         "holidayGroupHint": "Niektóre wielojęzyczne kantony mają różne terminy ferii szkolnych w zależności od regionu językowego. Wybierz odpowiedni region, aby zobaczyć poprawne daty.",
         "holidayPublicLabel": "Pokaż święta",
         "holidaySchoolLabel": "Pokaż ferie szkolne",
+        "holidaySchoolUnavailable": "Dla tego kraju nie są dostępne dane o feriach szkolnych.",
+        "holidayAustraliaObservanceHint": "W przypadku Australii święta pokazywane są w rzeczywistym terminie – dni zastępcze za święta wypadające w weekend różnią się w zależności od stanu i nie są wyświetlane.",
         "holidayPublicColor": "Kolor świąt",
         "holidaySchoolColor": "Kolor ferii szkolnych",
         "holidaySaveBtn": "Zapisz",

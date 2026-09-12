@@ -1877,6 +1877,7 @@
         },
         "ics": {
             "title": "ICS-Abonnements",
+            "holidayHint": "Tipp: Das eignet sich auch für die Feiertage eines Landes, das die Feiertags-Synchronisierung unter den Kalendereinstellungen noch nicht abdeckt.",
             "add": "Abonnement hinzufügen",
             "form": {
                 "url": "ICS-URL",
@@ -2224,6 +2225,8 @@
         "holidayGroupHint": "Einige mehrsprachige Kantone haben je nach Sprachregion unterschiedliche Schulferien-Termine. Wähle die passende Region für korrekte Daten.",
         "holidayPublicLabel": "Feiertage anzeigen",
         "holidaySchoolLabel": "Schulferien anzeigen",
+        "holidaySchoolUnavailable": "Für dieses Land liegen keine Schulferien-Daten vor.",
+        "holidayAustraliaObservanceHint": "Für Australien erscheinen Feiertage an ihrem tatsächlichen Datum – Ersatztage für Feiertage am Wochenende regelt jeder Bundesstaat anders, sie werden nicht angezeigt.",
         "holidayPublicColor": "Farbe Feiertage",
         "holidaySchoolColor": "Farbe Schulferien",
         "holidaySaveBtn": "Speichern",

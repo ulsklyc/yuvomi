@@ -1799,6 +1799,7 @@
         },
         "ics": {
             "title": "ICS Abonelikleri",
+            "holidayHint": "İpucu: bu yöntem, takvim ayarlarındaki resmi tatil senkronizasyonunun henüz kapsamadığı bir ülkenin resmi tatilleri için de işe yarar.",
             "add": "Abonelik ekle",
             "addedToast": "Abonelik eklendi.",
             "deletedToast": "Abonelik silindi.",
@@ -2189,6 +2190,8 @@
         "holidayGroupHint": "Bazı çok dilli kantonlarda okul tatili tarihleri dil bölgesine göre değişir. Doğru tarihler için uygun bölgeyi seç.",
         "holidayPublicLabel": "Resmi tatilleri göster",
         "holidaySchoolLabel": "Okul tatillerini göster",
+        "holidaySchoolUnavailable": "Bu ülke için okul tatili verisi mevcut değil.",
+        "holidayAustraliaObservanceHint": "Avustralya için tatiller gerçek tarihlerinde gösterilir – hafta sonuna denk gelen tatillerin telafi günleri eyalete göre değişir ve gösterilmez.",
         "holidayPublicColor": "Resmi tatil rengi",
         "holidaySchoolColor": "Okul tatili rengi",
         "holidaySaveBtn": "Kaydet",

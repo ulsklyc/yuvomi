@@ -1854,6 +1854,7 @@
         },
         "ics": {
             "title": "Langganan ICS",
+            "holidayHint": "Tips: ini juga cocok untuk hari libur nasional suatu negara yang belum tercakup oleh sinkronisasi hari libur di pengaturan kalender.",
             "add": "Tambah langganan",
             "form": {
                 "url": "URL ICS",
@@ -2201,6 +2202,8 @@
         "holidayGroupHint": "Beberapa kanton multibahasa memiliki tanggal libur sekolah yang berbeda tergantung wilayah bahasa. Pilih wilayah yang sesuai untuk tanggal yang benar.",
         "holidayPublicLabel": "Tampilkan hari libur",
         "holidaySchoolLabel": "Tampilkan libur sekolah",
+        "holidaySchoolUnavailable": "Tidak ada data libur sekolah yang tersedia untuk negara ini.",
+        "holidayAustraliaObservanceHint": "Untuk Australia, hari libur ditampilkan pada tanggal sebenarnya – hari pengganti untuk libur yang jatuh di akhir pekan berbeda di tiap negara bagian dan tidak ditampilkan.",
         "holidayPublicColor": "Warna hari libur",
         "holidaySchoolColor": "Warna libur sekolah",
         "holidaySaveBtn": "Simpan",

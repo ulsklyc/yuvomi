@@ -1816,6 +1816,7 @@
         },
         "ics": {
             "title": "Đăng ký ICS",
+            "holidayHint": "Mẹo: cách này cũng phù hợp với ngày lễ của một quốc gia chưa được đồng bộ ngày lễ trong cài đặt lịch hỗ trợ.",
             "add": "Thêm đăng ký",
             "addedToast": "Đăng ký đã thêm.",
             "deletedToast": "Đăng ký đã xóa.",
@@ -2189,6 +2190,8 @@
         "holidayGroupHint": "Một số bang đa ngôn ngữ có ngày nghỉ học khác nhau tùy theo vùng ngôn ngữ. Hãy chọn khu vực phù hợp để có ngày chính xác.",
         "holidayPublicLabel": "Hiển thị ngày lễ",
         "holidaySchoolLabel": "Hiển thị kỳ nghỉ học",
+        "holidaySchoolUnavailable": "Không có dữ liệu nghỉ học cho quốc gia này.",
+        "holidayAustraliaObservanceHint": "Đối với Úc, các ngày lễ được hiển thị theo ngày thực tế – ngày nghỉ bù cho các ngày lễ rơi vào cuối tuần khác nhau tùy bang và không được hiển thị.",
         "holidayPublicColor": "Màu ngày lễ",
         "holidaySchoolColor": "Màu kỳ nghỉ học",
         "holidaySaveBtn": "Lưu",

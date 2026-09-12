@@ -1816,6 +1816,7 @@
         },
         "ics": {
             "title": "ICS Feliratkozások",
+            "holidayHint": "Tipp: ez jól működik egy olyan ország ünnepnapjaihoz is, amelyet a naptárbeállítások ünnepszinkronizálása még nem fed le.",
             "add": "Feliratkozás hozzáadása",
             "addedToast": "Feliratkozás hozzáadva.",
             "deletedToast": "Feliratkozás törölve.",
@@ -2189,6 +2190,8 @@
         "holidayGroupHint": "Egyes többnyelvű kantonokban az iskolai szünetek időpontjai a nyelvi régiótól függően eltérnek. Válaszd ki a megfelelő régiót a pontos dátumokért.",
         "holidayPublicLabel": "Nyilvános ünnepek megjelenítése",
         "holidaySchoolLabel": "Iskolai szünetek megjelenítése",
+        "holidaySchoolUnavailable": "Ehhez az országhoz nem érhetők el iskolai szünet adatok.",
+        "holidayAustraliaObservanceHint": "Ausztrália esetében az ünnepnapok a tényleges dátumukon jelennek meg – a hétvégére eső ünnepek pótnapjai államonként eltérnek, és nem jelennek meg.",
         "holidayPublicColor": "Nyilvános ünnepek színe",
         "holidaySchoolColor": "Iskolai szünetek színe",
         "holidaySaveBtn": "Mentés",

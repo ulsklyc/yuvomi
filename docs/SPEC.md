@@ -769,6 +769,52 @@ vs. `CH-BE-EO` French-speaking Bernese Jura). When such a subdivision is configu
 offers an optional school-holiday-group picker; the chosen group filters the overlay to that regime so
 the calendar shows the correct dates instead of the union of both.
 
+**Locally computed countries (#965): United States, Canada, United Kingdom, Australia, New Zealand.**
+OpenHolidays' own `/Countries` endpoint lists 36 countries, mostly Europe plus Brazil/Mexico/South
+Africa — the United States (the reported gap) is not among them. Rather than add a second live
+provider for one missing country (a second dependency that can be down or rate-limit independently of
+the first), `server/services/holidays.js` computes five further countries' public holidays locally,
+in the same shape Brazil's existing local fallback already used (`localHolidayFallback()`, previously
+Brazil-only, now a small declarative rule table shared by all six: `fixed`/`nth-weekday`/`last-weekday`/
+`easter-offset`/`table` rule kinds, plus a weekend-observance policy per entry). `getCountries()` appends
+a synthetic entry for each of these five when OpenHolidays doesn't already list it (an API-listed
+country always wins over the local entry, never duplicated); each synthetic entry carries
+`schoolHolidays: false`, since none of them has a school-holiday data source — Settings disables and
+explains that toggle for such a country instead of silently syncing nothing. The United Kingdom is
+modelled as three complete, independent subdivisions (`GB-ENG`/`GB-SCT`/`GB-NIR`) rather than a
+national baseline plus regional overlay, because the nations' own holiday sets genuinely diverge
+(Scotland has no Easter Monday and its own August date; Northern Ireland adds two holidays) rather
+than merely adding to a shared list.
+
+Deliberately **not** attempted: countries whose holidays are moon-sighting or year-by-year decreed
+(no formula exists), and state/province-level holidays anywhere (US states, Australian states) — a
+national-only list stays correct without guessing at a subdivision. New Zealand's Matariki date is the
+one exception that looks like a formula but isn't: it is set by a government advisory committee and
+published as a fixed table through 2052, not derived — the code carries that table verbatim and
+returns no date at all outside it, rather than estimate one. Each country's weekend-observance rule
+was verified against its own primary source rather than assumed from another country's pattern: the
+United States shifts a Saturday holiday back to Friday and a Sunday holiday forward to Monday; Canada
+shifts only Sunday forward (and only for five specifically legislated holidays; Saturday is
+deliberately left unshifted since no uniform national rule covers it, unlike the specific
+carve-out that already exists for the Brazil entries above); the United Kingdom and New Zealand
+"Mondayise" (weekend → next Monday) and additionally use a shared same-weekday lookup table for
+adjacent-day pairs (Christmas/Boxing Day; New Year's Day/2nd January in Scotland and New Zealand) so the
+two never collide on one substitute date; Australia has no national substitute-day rule at all (each
+state legislates its own), so its list always shows the plain calendar date, including on Anzac Day
+falling on a weekend. Also a known, accepted boundary: one-off holidays created by proclamation
+rather than statute (the UK's royal-proclamation bank holidays — VE Day 2020, the 2022 Platinum
+Jubilee and State Funeral, the 2023 Coronation, the Scotland-only World Cup bank holiday on Monday
+15 June 2026 — and New Zealand's equivalents) cannot come from a static rule table and will be
+missing from the computed list; the ICS-subscription path below is the intended answer for them.
+
+For every country and region this doesn't cover, the household can still track a public-holiday
+calendar via an ordinary ICS subscription (Settings → Personal → Calendar subscriptions) — those
+events render as read-only calendar entries rather than the holiday overlay's own colored bar, but the
+dates are there. The subscriptions page says so directly, since the admin-facing holiday settings page
+is deliberately scoped away from any mention of ICS subscriptions or synced accounts (a pre-existing
+boundary the frontend audit enforces, keeping household-wide holiday configuration and per-user
+external-calendar connections as two separate concerns).
+
 | Column | Type | Constraint |
 |--------|------|-----------|
 | id | INTEGER | PRIMARY KEY AUTOINCREMENT |

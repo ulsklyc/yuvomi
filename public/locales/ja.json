@@ -1799,6 +1799,7 @@
         },
         "ics": {
             "title": "ICSサブスクリプション",
+            "holidayHint": "ヒント: カレンダー設定の祝日同期がまだ対応していない国の祝日にもこの方法が使えます。",
             "add": "サブスクリプションを追加",
             "addedToast": "サブスクリプションが追加されました。",
             "deletedToast": "サブスクリプションが削除されました。",
@@ -2189,6 +2190,8 @@
         "holidayGroupHint": "多言語のカントンでは、言語地域によって学校休暇の日程が異なる場合があります。正しい日程を表示するには該当する地域を選択してください。",
         "holidayPublicLabel": "祝日を表示",
         "holidaySchoolLabel": "学校の休暇を表示",
+        "holidaySchoolUnavailable": "この国の学校休暇データはありません。",
+        "holidayAustraliaObservanceHint": "オーストラリアでは祝日は実際の日付で表示されます。週末に当たる祝日の振替日は州ごとに異なるため表示されません。",
         "holidayPublicColor": "祝日の色",
         "holidaySchoolColor": "学校の休暇の色",
         "holidaySaveBtn": "保存",

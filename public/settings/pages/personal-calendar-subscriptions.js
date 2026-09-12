@@ -49,6 +49,7 @@ function renderPage(container) {
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.ics.title')}</h2>
       <div class="settings-card">
+        <p class="settings-card-description">${t('settings.ics.holidayHint')}</p>
         <div id="ics-accounts" class="settings-sync-accounts"></div>
         <div id="ics-add-form-wrapper" hidden>
           <form id="ics-add-form" class="settings-form settings-form--compact" novalidate autocomplete="off">

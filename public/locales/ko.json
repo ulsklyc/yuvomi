@@ -1854,6 +1854,7 @@
         },
         "ics": {
             "title": "ICS 구독",
+            "holidayHint": "팁: 캘린더 설정의 공휴일 동기화가 아직 지원하지 않는 국가의 공휴일에도 이 기능을 활용할 수 있습니다.",
             "add": "구독 추가",
             "form": {
                 "url": "ICS URL",
@@ -2201,6 +2202,8 @@
         "holidayGroupHint": "일부 다국어 주에서는 언어 지역에 따라 학교 방학 날짜가 다릅니다. 올바른 날짜를 보려면 해당 지역을 선택하세요.",
         "holidayPublicLabel": "공휴일 표시",
         "holidaySchoolLabel": "방학 표시",
+        "holidaySchoolUnavailable": "이 국가에 대한 학교 방학 데이터가 없습니다.",
+        "holidayAustraliaObservanceHint": "호주의 공휴일은 실제 날짜에 표시됩니다. 주말과 겹치는 공휴일의 대체 휴일은 주마다 달라 표시되지 않습니다.",
         "holidayPublicColor": "공휴일 색상",
         "holidaySchoolColor": "방학 색상",
         "holidaySaveBtn": "저장",

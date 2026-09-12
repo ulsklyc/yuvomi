@@ -1799,6 +1799,7 @@
         },
         "ics": {
             "title": "Assinaturas ICS",
+            "holidayHint": "Dica: isto também funciona bem para os feriados de um país ainda não abrangido pela sincronização de feriados nas definições do calendário.",
             "add": "Adicionar assinatura",
             "addedToast": "Assinatura adicionada.",
             "deletedToast": "Assinatura excluída.",
@@ -2189,6 +2190,8 @@
         "holidayGroupHint": "Alguns cantões plurilingues têm datas de férias escolares diferentes consoante a região linguística. Escolha a região correspondente para datas corretas.",
         "holidayPublicLabel": "Mostrar feriados",
         "holidaySchoolLabel": "Mostrar férias escolares",
+        "holidaySchoolUnavailable": "Não há dados de férias escolares disponíveis para este país.",
+        "holidayAustraliaObservanceHint": "Para a Austrália, os feriados aparecem na sua data real – os dias substitutos de feriados que caem no fim de semana variam por estado e não são exibidos.",
         "holidayPublicColor": "Cor dos feriados",
         "holidaySchoolColor": "Cor das férias escolares",
         "holidaySaveBtn": "Salvar",

@@ -1799,6 +1799,7 @@
         },
         "ics": {
             "title": "Suscripciones ICS",
+            "holidayHint": "Consejo: esto también funciona bien para los festivos de un país que aún no cubre la sincronización de festivos en los ajustes del calendario.",
             "add": "Añadir suscripción",
             "addedToast": "Suscripción añadida.",
             "deletedToast": "Suscripción eliminada.",
@@ -2189,6 +2190,8 @@
         "holidayGroupHint": "Algunos cantones plurilingües tienen fechas de vacaciones escolares distintas según la región lingüística. Elige la región correspondiente para ver las fechas correctas.",
         "holidayPublicLabel": "Mostrar días festivos",
         "holidaySchoolLabel": "Mostrar vacaciones escolares",
+        "holidaySchoolUnavailable": "No hay datos de vacaciones escolares disponibles para este país.",
+        "holidayAustraliaObservanceHint": "Para Australia, los días festivos se muestran en su fecha real: los días sustitutivos de los festivos que caen en fin de semana varían según el estado y no se muestran.",
         "holidayPublicColor": "Color de días festivos",
         "holidaySchoolColor": "Color de vacaciones escolares",
         "holidaySaveBtn": "Guardar",

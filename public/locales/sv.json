@@ -1799,6 +1799,7 @@
         },
         "ics": {
             "title": "ICS-prenumerationer",
+            "holidayHint": "Tips: detta fungerar även bra för ett lands helgdagar som ännu inte täcks av helgdagssynkroniseringen i kalenderinställningarna.",
             "add": "Lägg till prenumeration",
             "addedToast": "Prenumeration tillagd.",
             "deletedToast": "Prenumeration borttagen.",
@@ -2189,6 +2190,8 @@
         "holidayGroupHint": "Vissa flerspråkiga kantoner har olika skollovsdatum beroende på språkregion. Välj rätt region för korrekta datum.",
         "holidayPublicLabel": "Visa helgdagar",
         "holidaySchoolLabel": "Visa skollov",
+        "holidaySchoolUnavailable": "Det finns inga skollovsdata tillgängliga för detta land.",
+        "holidayAustraliaObservanceHint": "För Australien visas helgdagar på sitt faktiska datum – ersättningsdagar för helgdagar som infaller på en helg skiljer sig mellan delstaterna och visas inte.",
         "holidayPublicColor": "Färg för helgdagar",
         "holidaySchoolColor": "Färg för skollov",
         "holidaySaveBtn": "Spara",

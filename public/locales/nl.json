@@ -1816,6 +1816,7 @@
         },
         "ics": {
             "title": "ICS-abonnementen",
+            "holidayHint": "Tip: dit werkt ook goed voor de feestdagen van een land dat nog niet wordt gedekt door de feestdagen-synchronisatie in de kalenderinstellingen.",
             "add": "Abonnement toevoegen",
             "addedToast": "Abonnement toegevoegd.",
             "deletedToast": "Abonnement verwijderd.",
@@ -2189,6 +2190,8 @@
         "holidayGroupHint": "Sommige meertalige kantons hebben verschillende schoolvakantiedata afhankelijk van de taalregio. Kies de juiste regio voor correcte datums.",
         "holidayPublicLabel": "Feestdagen weergeven",
         "holidaySchoolLabel": "Schoolvakanties weergeven",
+        "holidaySchoolUnavailable": "Voor dit land zijn geen schoolvakantiegegevens beschikbaar.",
+        "holidayAustraliaObservanceHint": "Voor Australië worden feestdagen op hun werkelijke datum getoond – vervangende dagen voor feestdagen in het weekend verschillen per staat en worden niet weergegeven.",
         "holidayPublicColor": "Kleur feestdagen",
         "holidaySchoolColor": "Kleur schoolvakanties",
         "holidaySaveBtn": "Opslaan",

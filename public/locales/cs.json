@@ -1842,6 +1842,7 @@
         },
         "ics": {
             "title": "ICS odběry",
+            "holidayHint": "Tip: tohle se hodí i pro státní svátky země, kterou synchronizace svátků v nastavení kalendáře ještě nepokrývá.",
             "add": "Přidat odběr",
             "form": {
                 "url": "ICS URL",
@@ -2189,6 +2190,8 @@
         "holidayGroupHint": "Některé vícejazyčné kantony mají různá data školních prázdnin podle jazykové oblasti. Vyberte odpovídající region pro správná data.",
         "holidayPublicLabel": "Zobrazit státní svátky",
         "holidaySchoolLabel": "Zobrazit školní prázdniny",
+        "holidaySchoolUnavailable": "Pro tuto zemi nejsou k dispozici žádné údaje o školních prázdninách.",
+        "holidayAustraliaObservanceHint": "U Austrálie se svátky zobrazují ve svém skutečném datu – náhradní dny za svátky připadající na víkend se v jednotlivých státech liší a nezobrazují se.",
         "holidayPublicColor": "Barva státních svátků",
         "holidaySchoolColor": "Barva školních prázdnin",
         "holidaySaveBtn": "Uložit",
