@@ -280,9 +280,9 @@ function maybeHintCustomize(container) {
 // Widget → Modul-Slug für die „Modul deaktiviert?"-Prüfung. Widgets ohne Eintrag
 // (family, weather) sind immer verfügbar. Modulweit, damit Grid-Filter und
 // Wieder-Einblenden-Leiste dieselbe Sichtbarkeitsregel teilen.
-const MODULE_FOR_WIDGET = { tasks: 'tasks', calendar: 'calendar', shopping: 'shopping', meals: 'meals', notes: 'notes', birthdays: 'birthdays', budget: 'budget', rewards: 'rewards', health: 'health', cycle: 'health', housekeeping: 'housekeeping', schedule: 'schedule' };
+const MODULE_FOR_WIDGET = { tasks: 'tasks', calendar: 'calendar', shopping: 'shopping', meals: 'meals', notes: 'notes', birthdays: 'birthdays', budget: 'budget', rewards: 'rewards', health: 'health', cycle: 'health', housekeeping: 'housekeeping', schedule: 'schedule', waste: 'waste' };
 
-const WIDGETS_WITH_OPTIONS = new Set(['calendar', 'tasks']);
+const WIDGETS_WITH_OPTIONS = new Set(['calendar', 'tasks', 'waste']);
 
 const _extensionWidgetModules = new Map();
 
@@ -416,6 +416,7 @@ function widgetLabel(id) {
     cycle:    () => t('health.cycle.title'),
     housekeeping: () => t('nav.housekeeping'),
     schedule: () => t('nav.schedule'),
+    waste:    () => t('nav.waste'),
     family:   () => t('dashboard.familyMembers'),
     clock:    () => t('dashboard.clock'),
     metrics:  () => t('dashboard.metrics'),
@@ -2125,6 +2126,108 @@ function renderScheduleWidget(schedule, users, size) {
 }
 
 // --------------------------------------------------------
+// Waste-Widget (naechste Abholung je aktivem Typ)
+// --------------------------------------------------------
+
+/**
+ * waste: { items: WasteNextPerTypeEntry[], needsRefresh } (haushaltsweit,
+ * /waste/occurrences/next liefert schon ein Eintrag je aktivem Typ, sortiert
+ * nach Typ-Reihenfolge - die Kachel sortiert selbst nach Datum um, das ist
+ * eine Praesentationsfrage, keine API-Vertragsfrage) | null (Ladefehler,
+ * rendert die geteilte Fehlerkachel ueber den bestehenden try/catch in
+ * renderDashboardLayout) | undefined (Kachel versteckt, kein Request gelaufen).
+ */
+function renderWasteWidget(waste, size) {
+  if (waste === null) throw new Error('waste widget slice failed to load');
+  const items = waste?.items ?? [];
+
+  if (!items.length) {
+    return `<div class="widget widget--waste">
+      ${widgetHeader('waste', t('nav.waste'), null, '/waste')}
+      <div class="widget__empty">
+        <i data-lucide="trash-2" class="empty-state__icon" aria-hidden="true"></i>
+        <div>${t('waste.emptyTypesTitle')}</div>
+        ${emptyStateCta('/waste', t('waste.addType'))}
+      </div>
+    </div>`;
+  }
+
+  // Datum zuerst, Typ-Reihenfolge nur als Tie-Breaker - anders als die
+  // API-Grundsortierung (Typ-Reihenfolge), die fuer andere Aufrufer (Token/MCP)
+  // die richtige Vorgabe bleibt.
+  const sorted = [...items].sort((a, b) => {
+    const ad = a.next?.date_key ?? null;
+    const bd = b.next?.date_key ?? null;
+    if (ad && bd && ad !== bd) return ad < bd ? -1 : 1;
+    if (ad && !bd) return -1;
+    if (!ad && bd) return 1;
+    return (a.type.sort_order - b.type.sort_order) || (a.type.id - b.type.id);
+  });
+  const earliestDate = sorted.find((e) => e.next)?.next.date_key ?? null;
+  const upcomingCount = items.filter((e) => e.next).length;
+
+  const capped = sorted.slice(0, listRowCap(size));
+  const rows = capped.map((entry) => {
+    const type = entry.type;
+    const next = entry.next;
+    const accent = type.color || 'var(--color-border)';
+    const icon = type.icon ? `<i data-lucide="${esc(type.icon)}" class="waste-widget-row__icon" aria-hidden="true"></i>` : '';
+
+    if (!next) {
+      return `
+        <div class="waste-widget-row" data-route="/waste" role="button" tabindex="0">
+          <span class="waste-widget-row__dot" style="--waste-color:${esc(accent)}"></span>
+          <span class="waste-widget-row__name">${icon}${esc(type.name)}</span>
+          <span class="waste-widget-row__date waste-widget-row__date--none">${esc(t('waste.noUpcomingPickup'))}</span>
+        </div>`;
+    }
+
+    // Dieselbe Herkunfts-Extraktion wie originBadges() (pages/waste.js): der
+    // Beleg fuer "verschoben" ist der Ursprungstermin des Schedule-Origins, nicht
+    // ein eigenes Feld auf der Occurrence.
+    const movedOriginal = next.moved
+      ? next.origins.find((o) => o.kind === 'schedule' && o.original_date)?.original_date
+      : null;
+    const moved = next.moved
+      ? `<i data-lucide="move" class="waste-widget-row__flag" aria-label="${esc(t('waste.movedFromBadge', { date: movedOriginal ? formatDate(movedOriginal) : '' }))}"></i>`
+      : '';
+    const coalesced = next.coalesced
+      ? `<i data-lucide="layers" class="waste-widget-row__flag" aria-label="${esc(t('waste.coalescedHint'))}"></i>`
+      : '';
+    const emphasize = next.date_key === earliestDate ? ' waste-widget-row__date--next' : '';
+
+    return `
+      <div class="waste-widget-row" data-route="${esc(`/waste${next.deep_link}`)}" role="button" tabindex="0">
+        <span class="waste-widget-row__dot" style="--waste-color:${esc(accent)}"></span>
+        <span class="waste-widget-row__name">${icon}${esc(type.name)}${moved}${coalesced}</span>
+        <span class="waste-widget-row__date${emphasize}">${esc(relativeDateLabel(next.date_key))}</span>
+      </div>`;
+  }).join('');
+
+  const rest = Math.max(0, sorted.length - capped.length);
+  const more = rest > 0
+    ? `<p class="waste-widget-more">${esc(t('dashboard.wasteMore', { count: rest }))}</p>`
+    : '';
+  // Quelle-braucht-Auffrischung (invariant #6) ist ein Source-, kein
+  // Occurrence-Feld - eigener Fetch auf /waste/sources in ensureWasteSlice(),
+  // dieselbe Badge-Bedeutung wie auf der Waste-Seite selbst (sourceHealthBadgeInfo).
+  const refreshWarning = waste?.needsRefresh
+    ? `<div class="waste-widget__refresh-warning">
+        <i data-lucide="alert-triangle" aria-hidden="true"></i>
+        <span>${esc(t('waste.sourceNeedsRefreshBadge'))}</span>
+      </div>`
+    : '';
+
+  return `<div class="widget widget--waste">
+    ${widgetHeader('waste', t('nav.waste'), upcomingCount, '/waste')}
+    <div class="widget__body">
+      <div class="waste-widget">${rows}${more}</div>
+      ${refreshWarning}
+    </div>
+  </div>`;
+}
+
+// --------------------------------------------------------
 // Haushaltshilfe-Widget (Anwesenheit + offene Zahlung)
 // --------------------------------------------------------
 
@@ -2562,6 +2665,19 @@ async function loadTaskCategories() {
   return taskCategoriesCache;
 }
 
+/** Waste-Typen fuer den Optionen-Dialog - nur wenn er sie braucht, und nur einmal. Wie loadTaskCategories(). */
+let wasteTypesCache = null;
+async function loadWasteTypes() {
+  if (wasteTypesCache) return wasteTypesCache;
+  try {
+    const res = await api.get('/waste/types');
+    wasteTypesCache = Array.isArray(res?.data) ? res.data : [];
+  } catch {
+    wasteTypesCache = [];
+  }
+  return wasteTypesCache;
+}
+
 /** Generic options dialog for extension widgets (optionsSchema from module.json). */
 async function openExtensionWidgetOptions(id, meta, current = {}) {
   const schema = meta.optionsSchema || {};
@@ -2641,6 +2757,7 @@ async function openWidgetOptions(id, current = {}) {
 
   const options = { ...current };
   const categories = id === 'tasks' ? await loadTaskCategories() : [];
+  const wasteTypes = id === 'waste' ? await loadWasteTypes() : [];
 
   const body = id === 'calendar'
     ? `
@@ -2662,6 +2779,18 @@ async function openWidgetOptions(id, current = {}) {
           <input type="checkbox" name="cal-birthdays" ${options.birthdays === 'hide' ? '' : 'checked'}>
           <span>${t('calendar.toggleBirthdays')}</span>
         </label>
+      </fieldset>`
+    : id === 'waste'
+    ? `
+      <fieldset class="form-group widget-options__group">
+        <legend class="form-label">${t('dashboard.optionWasteTypes')}</legend>
+        <p class="widget-options__hint">${t('dashboard.optionWasteTypesHint')}</p>
+        ${wasteTypes.length ? wasteTypes.map((wt) => `
+        <label class="widget-options__choice">
+          <input type="checkbox" name="waste-type" value="${wt.id}"
+                 ${(options.types ?? []).includes(wt.id) ? 'checked' : ''}>
+          <span>${esc(wt.name)}</span>
+        </label>`).join('') : `<p class="widget-options__hint">${t('dashboard.optionWasteTypesEmpty')}</p>`}
       </fieldset>`
     : `
       <fieldset class="form-group widget-options__group">
@@ -2708,6 +2837,12 @@ async function openWidgetOptions(id, current = {}) {
             // Dasselbe eine Zeile tiefer, nur andersherum notiert: gespeichert
             // wird das ABWAEHLEN, nicht das Haekchen (#927).
             if (!panel.querySelector('input[name="cal-birthdays"]')?.checked) next.birthdays = 'hide';
+          } else if (id === 'waste') {
+            const picked = [...panel.querySelectorAll('input[name="waste-type"]:checked')].map((el) => Number(el.value));
+            // Dieselbe Regel wie bei den Aufgaben-Kategorien: keine Auswahl
+            // heisst „alle" - eine seltene Abholung darf nie stillschweigend
+            // verschwinden, nur weil niemand den Dialog geoeffnet hat.
+            if (picked.length) next.types = picked;
           } else {
             const picked = [...panel.querySelectorAll('input[name="task-category"]:checked')].map((el) => el.value);
             // Keine Auswahl heisst „alle" - eine leere Liste als Filter waere
@@ -2830,6 +2965,7 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     cycle: () => renderCycleWidget(data.cycle),
     housekeeping: () => renderHousekeepingWidget(data.housekeeping ?? {}, currency),
     schedule: (size) => renderScheduleWidget(data.schedule, data.users ?? [], size),
+    waste: (size) => renderWasteWidget(data.waste, size),
     family: () => renderFamilyWidget(data.users ?? [], data),
     meals: () => renderTodayMeals(data.todayMeals ?? [], visibleMealTypes),
     notes: (size) => renderPinnedNotes(data.pinnedNotes ?? [], size),
@@ -4209,6 +4345,35 @@ export async function render(container, { user, signal: routeSignal = null } = {
     }
   }
 
+  // Eigener Slice aus demselben Grund wie Schedule: /dashboard fuehrt Waste
+  // nicht mit. Zwei parallele Aufrufe wie beim Schedule-Slice (Entries + Typen) -
+  // hier "naechste Abholung je Typ" UND die Quellen-Liste, weil "braucht
+  // Auffrischung" (invariant #6) ein Source-Feld ist, kein Feld der Occurrence
+  // selbst (siehe Kommentar an renderWasteWidget).
+  async function ensureWasteSlice() {
+    if (data.waste !== undefined) return;
+    if (window.yuvomi?.isModuleDisabled('waste')) return;
+    try {
+      const [nextRes, sourcesRes] = await Promise.all([
+        api.get('/waste/occurrences/next'),
+        api.get('/waste/sources'),
+      ]);
+      // Per-type widget option (#1063 Phase 10), same shape as tasks' own
+      // category filter: no selection (or every type selected) means "all" -
+      // an empty picked list would otherwise be an empty widget for anyone
+      // who only ever opened the options dialog.
+      const selectedTypes = widgetConfig.find((w) => w.id === 'waste')?.options?.types;
+      const items = nextRes.data ?? [];
+      data.waste = {
+        items: (selectedTypes?.length ? items.filter((i) => selectedTypes.includes(i.type.id)) : items),
+        needsRefresh: (sourcesRes.data ?? []).some((s) => s.needs_refresh),
+      };
+    } catch (err) {
+      console.error('[Dashboard] Waste-Slice Ladefehler:', err?.message);
+      data.waste = null;
+    }
+  }
+
   // Nur wenn die opt-in-Kachel sichtbar ist — die Mehrheit ohne aktivierte Kachel
   // löst keinen Request aus.
   if (!loadFailed && widgetConfig.some((w) => w.id === 'cycle' && w.visible)) {
@@ -4216,6 +4381,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
   }
   if (!loadFailed && widgetConfig.some((w) => w.id === 'schedule' && w.visible)) {
     await ensureScheduleSlice();
+  }
+  if (!loadFailed && widgetConfig.some((w) => w.id === 'waste' && w.visible)) {
+    await ensureWasteSlice();
   }
   // Auch die Nachlade-Runden koennen von einem Verlassen oder Neuaufbau
   // ueberholt worden sein (#977).
@@ -4235,6 +4403,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       }
       fresh.cycle = data.cycle;
       fresh.schedule = data.schedule;
+      fresh.waste = data.waste;
       data = fresh;
       setCountdownAvailability(data?.countdowns);
       lastLoadedAt = new Date();
@@ -4258,6 +4427,16 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // nachladen — sonst zeigte sie fälschlich den Empty-State bis zum Reload.
     if (widgetConfig.some((w) => w.id === 'cycle' && w.visible)) await ensureCycleSlice();
     if (widgetConfig.some((w) => w.id === 'schedule' && w.visible)) await ensureScheduleSlice();
+    // Waste's Typ-Option (#1063 Phase 10) reist nicht in dashboardQuery() mit
+    // (der Slice ist ein eigenstaendiger Client-Fetch, siehe ensureWasteSlice) -
+    // reloadIfQueryChanged() wuerde den alten, ungefilterten Stand also
+    // stillschweigend behalten. Ein geaenderter Typ-Filter verwirft ihn
+    // deshalb hier gezielt, statt bis zum naechsten vollen Seitenaufbau zu
+    // warten (dieselbe Sofort-Zusage wie bei Kalender/Aufgaben-Optionen).
+    const wasteOptionsChanged = JSON.stringify(previousConfig.find((w) => w.id === 'waste')?.options ?? null)
+      !== JSON.stringify(widgetConfig.find((w) => w.id === 'waste')?.options ?? null);
+    if (wasteOptionsChanged) data.waste = undefined;
+    if (widgetConfig.some((w) => w.id === 'waste' && w.visible)) await ensureWasteSlice();
     await reloadIfQueryChanged(previousQuery);
     rebuildDashboard(widgetConfig);
 
@@ -4265,6 +4444,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     const onUndo = changed
       ? async () => {
           const queryBeforeUndo = dashboardQuery(widgetConfig);
+          const wasteOptionsBeforeUndo = JSON.stringify(widgetConfig.find((w) => w.id === 'waste')?.options ?? null);
           try {
             widgetConfig = previousConfig.map((w) => ({ ...w }));
             glanceVisible = previousGlance;
@@ -4272,6 +4452,8 @@ export async function render(container, { user, signal: routeSignal = null } = {
             savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
             savedGlanceVisible = glanceVisible;
             rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig));
+            if (wasteOptionsBeforeUndo !== JSON.stringify(widgetConfig.find((w) => w.id === 'waste')?.options ?? null)) data.waste = undefined;
+            if (widgetConfig.some((w) => w.id === 'waste' && w.visible)) await ensureWasteSlice();
             await reloadIfQueryChanged(queryBeforeUndo);
           } catch {
             window.yuvomi?.showToast(t('common.errorGeneric'), 'danger');
@@ -4334,6 +4516,13 @@ export async function render(container, { user, signal: routeSignal = null } = {
     isCustomizing = false;
     if (widgetConfig.some((w) => w.id === 'cycle' && w.visible)) await ensureCycleSlice();
     if (widgetConfig.some((w) => w.id === 'schedule' && w.visible)) await ensureScheduleSlice();
+    // Siehe die Notiz an derselben Zeile in persistWidgetConfig() - der Reset
+    // kann eine eigene Typ-Auswahl verwerfen, und dashboardQuery() traegt sie
+    // nicht mit.
+    const wasteOptionsChanged = JSON.stringify(previousConfig.find((w) => w.id === 'waste')?.options ?? null)
+      !== JSON.stringify(widgetConfig.find((w) => w.id === 'waste')?.options ?? null);
+    if (wasteOptionsChanged) data.waste = undefined;
+    if (widgetConfig.some((w) => w.id === 'waste' && w.visible)) await ensureWasteSlice();
     // Die Vorgabe kann andere Filter tragen als mein geloeschter Stand (#814).
     await reloadIfQueryChanged(previousQuery);
     rebuildDashboard(widgetConfig);
@@ -4342,6 +4531,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     window.yuvomi?.showToast(t('dashboard.customizeResetDone'), 'success', 6000, async () => {
       // Der Stand, fuer den die aktuell angezeigten Daten geholt wurden.
       const queryBeforeUndo = dashboardQuery(widgetConfig);
+      const wasteOptionsBeforeUndo = JSON.stringify(widgetConfig.find((w) => w.id === 'waste')?.options ?? null);
       try {
         widgetConfig = previousConfig.map((w) => ({ ...w }));
         glanceVisible = previousGlance;
@@ -4350,6 +4540,8 @@ export async function render(container, { user, signal: routeSignal = null } = {
         savedGlanceVisible = glanceVisible;
         followsDefault = false;
         rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig));
+        if (wasteOptionsBeforeUndo !== JSON.stringify(widgetConfig.find((w) => w.id === 'waste')?.options ?? null)) data.waste = undefined;
+        if (widgetConfig.some((w) => w.id === 'waste' && w.visible)) await ensureWasteSlice();
         await reloadIfQueryChanged(queryBeforeUndo);
       } catch {
         window.yuvomi?.showToast(t('common.errorGeneric'), 'danger');
@@ -4680,6 +4872,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       // Owner-Beschraenkung - /dashboard liefert auch ihn nie.
       fresh.cycle = data.cycle;
       fresh.schedule = data.schedule;
+      fresh.waste = data.waste;
       data = fresh;
       lastLoadedAt = new Date();
       rebuildDashboard(widgetConfig);
@@ -4764,7 +4957,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   }
 }
 
-export const __test = { buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel };
+export const __test = { buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

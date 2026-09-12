@@ -1187,4 +1187,502 @@ export const schemas = {
           },
           required: ['enabled'],
         },
+        WasteType: {
+          type: 'object',
+          required: ['id', 'name', 'icon', 'color', 'archived', 'sort_order'],
+          properties: {
+            id: { type: 'integer' },
+            name: { type: 'string' },
+            icon: { type: 'string' },
+            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+            archived: { type: 'integer', enum: [0, 1] },
+            sort_order: { type: 'integer' },
+            created_by: { type: ['integer', 'null'] },
+            created_at: { type: 'string' },
+            updated_at: { type: 'string' },
+          },
+        },
+        WasteTypeInput: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', maxLength: 100 },
+            icon: { type: 'string', maxLength: 60 },
+            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+            archived: { type: 'boolean' },
+            sort_order: { type: 'integer' },
+          },
+        },
+        WasteSchedule: {
+          type: 'object',
+          required: ['id', 'type_id', 'recurrence_kind', 'anchor_date', 'interval', 'active'],
+          properties: {
+            id: { type: 'integer' },
+            type_id: { type: 'integer' },
+            recurrence_kind: { type: 'string', enum: ['weekly', 'monthly_fixed_day', 'monthly_ordinal_weekday'] },
+            anchor_date: { type: 'string', format: 'date' },
+            interval: { type: 'integer', minimum: 1 },
+            weekdays: {
+              type: ['string', 'null'],
+              description: 'Comma-separated RRULE BYDAY codes (e.g. "MO,TH") for recurrence_kind=weekly; exactly ONE code (e.g. "MO") for recurrence_kind=monthly_ordinal_weekday. Null for monthly_fixed_day.',
+            },
+            month_day: {
+              type: ['integer', 'null'],
+              description: 'recurrence_kind=monthly_fixed_day: a day-of-month (1-31), or -1 for the last day. recurrence_kind=monthly_ordinal_weekday: the ORDINAL POSITION of the chosen weekday - -1 (last) or 1-4 (nth), reusing this same column for a different meaning (#1063 Phase 9). Null for weekly.',
+            },
+            valid_until: { type: ['string', 'null'], format: 'date' },
+            active: { type: 'integer', enum: [0, 1], description: '0 = paused; contributes no occurrences until reactivated.' },
+            created_by: { type: ['integer', 'null'] },
+            created_at: { type: 'string' },
+            updated_at: { type: 'string' },
+          },
+        },
+        WasteScheduleInput: {
+          type: 'object',
+          properties: {
+            type_id: { type: 'integer' },
+            recurrence_kind: { type: 'string', enum: ['weekly', 'monthly_fixed_day', 'monthly_ordinal_weekday'] },
+            anchor_date: { type: 'string', format: 'date' },
+            interval: { type: 'integer', minimum: 1 },
+            weekdays: {
+              description: 'weekly: an array of BYDAY codes, e.g. ["MO","TH"]. monthly_ordinal_weekday: a single code string, e.g. "MO".',
+              oneOf: [
+                { type: 'array', items: { type: 'string', enum: ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] } },
+                { type: 'string', enum: ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] },
+              ],
+            },
+            month_day: {
+              type: 'integer',
+              description: 'monthly_fixed_day: 1-31 or -1. monthly_ordinal_weekday: the ordinal position, -1 (last) or 1-4 (nth).',
+            },
+            valid_until: { type: ['string', 'null'], format: 'date' },
+            active: { type: 'boolean' },
+          },
+        },
+        WasteScheduleOverride: {
+          type: 'object',
+          required: ['id', 'schedule_id', 'original_date'],
+          properties: {
+            id: { type: 'integer' },
+            schedule_id: { type: 'integer' },
+            original_date: { type: 'string', format: 'date' },
+            replacement_date: { type: ['string', 'null'], format: 'date', description: 'null means this occurrence is explicitly skipped.' },
+            note: { type: ['string', 'null'] },
+            created_at: { type: 'string' },
+            updated_at: { type: 'string' },
+          },
+        },
+        WasteScheduleOverrideInput: {
+          type: 'object',
+          properties: {
+            replacement_date: { type: ['string', 'null'], format: 'date', description: 'A date to move this occurrence to, or null to skip it.' },
+            note: { type: ['string', 'null'] },
+          },
+        },
+        WasteOneOffPickup: {
+          type: 'object',
+          required: ['id', 'type_id', 'date'],
+          properties: {
+            id: { type: 'integer' },
+            type_id: { type: 'integer' },
+            date: { type: 'string', format: 'date' },
+            note: { type: ['string', 'null'] },
+            created_by: { type: ['integer', 'null'] },
+            created_at: { type: 'string' },
+            updated_at: { type: 'string' },
+          },
+        },
+        WasteOneOffPickupInput: {
+          type: 'object',
+          properties: {
+            type_id: { type: 'integer' },
+            date: { type: 'string', format: 'date' },
+            note: { type: ['string', 'null'] },
+          },
+        },
+        WasteOccurrenceOrigin: {
+          type: 'object',
+          required: ['kind', 'moved'],
+          properties: {
+            kind: { type: 'string', enum: ['schedule', 'one_off', 'import'] },
+            schedule_id: { type: 'integer' },
+            one_off_id: { type: 'integer' },
+            source_id: { type: 'integer', description: 'Present when kind is "import".' },
+            source_name: { type: ['string', 'null'], description: 'Present when kind is "import".' },
+            original_summary: { type: ['string', 'null'], description: 'The imported event\'s own SUMMARY text; present when kind is "import".' },
+            original_date: { type: ['string', 'null'], format: 'date' },
+            moved: { type: 'boolean' },
+          },
+        },
+        WasteOccurrence: {
+          type: 'object',
+          required: ['key', 'date_key', 'type_id', 'moved', 'coalesced', 'origins', 'deep_link'],
+          properties: {
+            key: { type: 'string' },
+            date_key: { type: 'string', format: 'date' },
+            type_id: { type: 'integer' },
+            type_name: { type: ['string', 'null'] },
+            type_icon: { type: ['string', 'null'] },
+            type_color: { type: ['string', 'null'] },
+            type_sort_order: { type: 'integer' },
+            moved: { type: 'boolean' },
+            coalesced: { type: 'boolean', description: 'true when more than one origin (e.g. a schedule and a one-off) supplies this same date.' },
+            origins: { type: 'array', items: { $ref: '#/components/schemas/WasteOccurrenceOrigin' } },
+            deep_link: { type: 'string', description: 'Stable "?type=<id>&date=<YYYY-MM-DD>" deep-link target.' },
+          },
+        },
+        WasteNextPerTypeEntry: {
+          type: 'object',
+          required: ['type', 'next'],
+          properties: {
+            type: { $ref: '#/components/schemas/WasteType' },
+            next: {
+              oneOf: [{ $ref: '#/components/schemas/WasteOccurrence' }, { type: 'null' }],
+            },
+          },
+        },
+        WasteTypeListResponse: {
+          type: 'object',
+          required: ['data'],
+          properties: { data: { type: 'array', items: { $ref: '#/components/schemas/WasteType' } } },
+        },
+        WasteTypeResponse: {
+          type: 'object',
+          required: ['data'],
+          properties: { data: { $ref: '#/components/schemas/WasteType' } },
+        },
+        WasteScheduleListResponse: {
+          type: 'object',
+          required: ['data'],
+          properties: { data: { type: 'array', items: { $ref: '#/components/schemas/WasteSchedule' } } },
+        },
+        WasteScheduleResponse: {
+          type: 'object',
+          required: ['data'],
+          properties: { data: { $ref: '#/components/schemas/WasteSchedule' } },
+        },
+        WasteScheduleOverrideResponse: {
+          type: 'object',
+          required: ['data'],
+          properties: { data: { $ref: '#/components/schemas/WasteScheduleOverride' } },
+        },
+        WasteOneOffPickupListResponse: {
+          type: 'object',
+          required: ['data'],
+          properties: { data: { type: 'array', items: { $ref: '#/components/schemas/WasteOneOffPickup' } } },
+        },
+        WasteOneOffPickupResponse: {
+          type: 'object',
+          required: ['data'],
+          properties: { data: { $ref: '#/components/schemas/WasteOneOffPickup' } },
+        },
+        WasteOccurrenceListResponse: {
+          type: 'object',
+          required: ['data'],
+          properties: { data: { type: 'array', items: { $ref: '#/components/schemas/WasteOccurrence' } } },
+        },
+        WasteNextPerTypeResponse: {
+          type: 'object',
+          required: ['data'],
+          properties: { data: { type: 'array', items: { $ref: '#/components/schemas/WasteNextPerTypeEntry' } } },
+        },
+        WasteSource: {
+          type: 'object',
+          required: ['id', 'kind', 'name', 'version', 'created_at', 'updated_at'],
+          properties: {
+            id: { type: 'integer' },
+            kind: { type: 'string', enum: ['file', 'url'] },
+            name: { type: 'string' },
+            content_hash: { type: 'string', description: 'sha256 of the ICS text behind the currently committed snapshot.' },
+            version: { type: 'integer', description: 'Bumped on every committed (re)import; the concurrency guard for reimport/commit.' },
+            coverage_start: { type: ['string', 'null'], format: 'date' },
+            coverage_end: { type: ['string', 'null'], format: 'date' },
+            last_import_at: { type: ['string', 'null'], format: 'date-time' },
+            last_success_at: { type: ['string', 'null'], format: 'date-time', description: 'Only updated on a successful commit; a failed attempt never clears it.' },
+            last_error: { type: ['string', 'null'] },
+            needs_refresh: { type: 'boolean', description: 'true when this source has no mapped pickup on or after today (invariant #6) - derived, not stored.' },
+            url: { type: 'string', description: 'kind=url only. A credential: omitted entirely for a caller without module write access, never merely masked.' },
+            refresh_interval_minutes: { type: 'integer', description: 'kind=url only. Bounded 60-43200 (hourly to monthly).' },
+            next_attempt_at: { type: ['string', 'null'], format: 'date-time', description: 'kind=url only. null while needs_mapping is set - the scheduler skips the source until a reviewed refresh.' },
+            consecutive_failures: { type: 'integer', description: 'kind=url only. Drives exponential backoff; reset to 0 on any successful fetch.' },
+            needs_mapping: { type: 'boolean', description: 'kind=url only. Content changed but could not auto-commit (an unmapped label or unresolved blocking diagnostic); resolved only by a reviewed refresh.' },
+            created_at: { type: 'string', format: 'date-time' },
+            updated_at: { type: 'string', format: 'date-time' },
+          },
+        },
+        WasteSourceDetail: {
+          allOf: [
+            { $ref: '#/components/schemas/WasteSource' },
+            { type: 'object', properties: { mappings: { type: 'array', items: { $ref: '#/components/schemas/WasteSourceMapping' } } } },
+          ],
+        },
+        WasteSourceRenameInput: {
+          type: 'object', required: ['name'], properties: { name: { type: 'string', maxLength: 150 } },
+        },
+        WasteSourceMapping: {
+          type: 'object',
+          required: ['id', 'source_id', 'original_label', 'normalized_label', 'ignored'],
+          properties: {
+            id: { type: 'integer' },
+            source_id: { type: 'integer' },
+            original_label: { type: 'string' },
+            normalized_label: { type: 'string' },
+            type_id: { type: ['integer', 'null'] },
+            ignored: { type: 'boolean' },
+          },
+        },
+        WasteSourceMappingUpdateInput: {
+          type: 'object',
+          properties: {
+            type_id: { type: 'integer', description: 'Required unless ignored is true.' },
+            ignored: { type: 'boolean', default: false },
+          },
+        },
+        WasteImportDiagnostic: {
+          type: 'object',
+          required: ['severity', 'code', 'message'],
+          properties: {
+            severity: { type: 'string', enum: ['info', 'blocking'] },
+            code: { type: 'string', enum: ['skipped_unparsable', 'cancelled_excluded', 'missing_uid_fallback', 'duplicate_instance', 'unsupported_rdate', 'unbounded_recurrence'] },
+            message: { type: 'string' },
+            count: { type: 'integer' },
+            event_key: { type: 'string', description: 'Present on a "blocking" diagnostic; pass it back in skip_event_keys on commit to exclude the affected event and unblock the rest of the file.' },
+          },
+        },
+        WasteImportLabel: {
+          type: 'object',
+          required: ['normalized_label', 'original_label', 'count'],
+          properties: {
+            normalized_label: { type: 'string' },
+            original_label: { type: 'string' },
+            count: { type: 'integer' },
+            sample_summary: { type: ['string', 'null'] },
+            suggested_type_id: { type: ['integer', 'null'], description: 'A same-name (case-insensitive) match against an existing type; a convenience default only, never applied on its own.' },
+            remembered_type_id: { type: ['integer', 'null'], description: 'The type this label was mapped to on the source\'s last commit, on a re-import preview.' },
+            remembered_ignored: { type: 'boolean' },
+          },
+        },
+        WasteImportPreview: {
+          type: 'object',
+          required: ['digest', 'coverage', 'counts', 'diagnostics', 'labels'],
+          properties: {
+            digest: { type: 'string', description: 'sha256 of what this preview shows (candidates/labels/diagnostics), not of the raw ICS bytes; pass it back as preview_digest on commit. A URL source may be re-fetched between preview and commit - this digest still matches as long as the parsed result is unchanged.' },
+            source_id: { type: ['integer', 'null'], description: 'null for a fresh import preview.' },
+            expected_version: { type: ['integer', 'null'], description: 'The source\'s current version, for a re-import preview; pass it back as expected_version on commit.' },
+            coverage: {
+              type: 'object',
+              properties: { start: { type: ['string', 'null'], format: 'date' }, end: { type: ['string', 'null'], format: 'date' } },
+            },
+            counts: {
+              type: 'object',
+              properties: { events: { type: 'integer' }, candidates: { type: 'integer' }, distinct_labels: { type: 'integer' } },
+            },
+            diagnostics: { type: 'array', items: { $ref: '#/components/schemas/WasteImportDiagnostic' } },
+            labels: { type: 'array', items: { $ref: '#/components/schemas/WasteImportLabel' } },
+          },
+        },
+        WasteImportPreviewInput: {
+          type: 'object', required: ['ics'],
+          properties: { ics: { type: 'string', description: 'The raw ICS file text.' } },
+        },
+        WasteImportPreviewResponse: {
+          type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteImportPreview' } },
+        },
+        WasteImportMappingDecision: {
+          type: 'object',
+          required: ['normalized_label'],
+          description: 'Exactly one of type_id / new_type / ignored must be set. One decision is required per distinct label reported by the preview.',
+          properties: {
+            normalized_label: { type: 'string' },
+            type_id: { type: 'integer' },
+            new_type: { $ref: '#/components/schemas/WasteTypeInput' },
+            ignored: { type: 'boolean' },
+          },
+        },
+        WasteImportCommitInput: {
+          type: 'object',
+          required: ['ics', 'mappings'],
+          properties: {
+            ics: { type: 'string', description: 'The raw ICS file text (re-parsed on commit; never trusts a client-supplied candidate list).' },
+            name: { type: 'string', maxLength: 150, description: 'Required for a fresh import (POST /import/commit); defaults to the existing name on a re-import.' },
+            mappings: { type: 'array', items: { $ref: '#/components/schemas/WasteImportMappingDecision' } },
+            skip_event_keys: { type: 'array', items: { type: 'string' }, description: 'Blocking-diagnostic event_key values explicitly acknowledged and excluded.' },
+            preview_digest: { type: 'string', description: 'The digest returned by the matching preview; a mismatch (the parsed content actually changed since that preview) is refused with 409.' },
+            expected_version: { type: 'integer', description: 'Required on a re-import commit; the source\'s version as last seen in a preview (409 on mismatch).' },
+          },
+        },
+        WasteImportDiff: {
+          type: 'object',
+          required: ['added', 'changed', 'removed', 'coalesced'],
+          properties: {
+            added: { type: 'integer' }, changed: { type: 'integer' }, removed: { type: 'integer' },
+            coalesced: { type: 'integer', description: 'Informational: how many accepted pickups land on a date a manual schedule/one-off (or another source) already provides for the same type.' },
+          },
+        },
+        WasteImportCommitResult: {
+          type: 'object',
+          required: ['source', 'diff'],
+          properties: { source: { $ref: '#/components/schemas/WasteSource' }, diff: { $ref: '#/components/schemas/WasteImportDiff' } },
+        },
+        WasteImportCommitResponse: {
+          type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteImportCommitResult' } },
+        },
+        WasteSourceListResponse: {
+          type: 'object', required: ['data'], properties: { data: { type: 'array', items: { $ref: '#/components/schemas/WasteSource' } } },
+        },
+        WasteSourceDetailResponse: {
+          type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteSourceDetail' } },
+        },
+        WasteSourceMappingResponse: {
+          type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteSourceMapping' } },
+        },
+        WasteUrlSourceCreateInput: {
+          type: 'object',
+          required: ['name', 'url'],
+          properties: {
+            name: { type: 'string', maxLength: 150 },
+            url: { type: 'string', description: 'https:// only by default; http:// is accepted only under the operator opt-in WASTE_SOURCE_ALLOW_PRIVATE_NETWORK.' },
+            refresh_interval_minutes: { type: 'integer', default: 1440, description: 'Bounded 60-43200 (hourly to monthly).' },
+          },
+        },
+        WasteUrlSourceRefreshResult: {
+          type: 'object',
+          required: ['source', 'outcome'],
+          properties: {
+            source: { $ref: '#/components/schemas/WasteSource' },
+            outcome: {
+              type: 'string',
+              enum: ['committed', 'unchanged', 'needs_mapping', 'error'],
+              description: 'committed: every label had a remembered decision, applied via the same atomic path as a file re-import. unchanged: a conditional GET reported no change (304). needs_mapping: content changed but at least one label (or blocking diagnostic) has no remembered decision - see source.needs_mapping and the preview field. error: the fetch failed - see source.last_error.',
+            },
+            diff: { $ref: '#/components/schemas/WasteImportDiff' },
+            preview: { $ref: '#/components/schemas/WasteImportPreview' },
+          },
+        },
+        WasteUrlSourceCreateResponse: {
+          type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteUrlSourceRefreshResult' } },
+        },
+        WasteUrlSourceRefreshResponse: {
+          type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteUrlSourceRefreshResult' } },
+        },
+        WasteReminderSetting: {
+          type: 'object',
+          required: ['type_id', 'enabled', 'offset_days', 'delivery_time'],
+          properties: {
+            type_id: { type: 'integer' },
+            type_name: { type: 'string', description: 'Only present on GET (list); PUT\'s response is scoped to the one type_id already in the URL.' },
+            enabled: { type: 'boolean' },
+            offset_days: { type: 'integer', description: 'Lead time before the pickup, in days. Bounded 0-14.' },
+            delivery_time: { type: 'string', description: 'Household-local HH:MM the reminder is delivered at.' },
+          },
+        },
+        WasteReminderSettingsListResponse: {
+          type: 'object', required: ['data'], properties: { data: { type: 'array', items: { $ref: '#/components/schemas/WasteReminderSetting' } } },
+        },
+        WasteReminderSettingUpdateInput: {
+          type: 'object',
+          properties: {
+            enabled: { type: 'boolean', default: false },
+            offset_days: { type: 'integer', default: 1 },
+            delivery_time: { type: 'string', default: '08:00' },
+          },
+        },
+        WasteReminderSettingResponse: {
+          type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteReminderSetting' } },
+        },
+        WasteFeedStatus: {
+          type: 'object',
+          nullable: true,
+          properties: {
+            token: { type: 'string' },
+            url: { type: 'string', description: 'Public, unauthenticated .ics URL. Rotates when regenerated.' },
+            type_ids: {
+              type: 'array', items: { type: 'integer' }, nullable: true,
+              description: 'Optional type selection. null (default) means every active type.',
+            },
+          },
+        },
+        WasteFeedStatusResponse: {
+          type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteFeedStatus' } },
+        },
+        WasteFeedTypeSelectionInput: {
+          type: 'object',
+          required: ['type_ids'],
+          properties: {
+            type_ids: {
+              type: 'array', items: { type: 'integer' }, nullable: true,
+              description: 'Waste type ids to include, or null to include every active type again.',
+            },
+          },
+        },
+        WasteMappingProfileEntry: {
+          type: 'object',
+          required: ['pattern', 'type_name'],
+          properties: {
+            pattern: { type: 'string', description: 'Normalized source label this pattern matches.' },
+            type_name: { type: 'string' },
+          },
+        },
+        WasteMappingProfile: {
+          type: 'object',
+          required: ['version', 'mappings'],
+          properties: {
+            version: { type: 'integer', enum: [1] },
+            source_name: { type: 'string', description: 'Only present on export, informational only.' },
+            mappings: { type: 'array', items: { $ref: '#/components/schemas/WasteMappingProfileEntry' } },
+          },
+        },
+        WasteMappingProfileExportResponse: {
+          type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteMappingProfile' } },
+        },
+        WasteMappingProfileImportPreviewInput: {
+          type: 'object', required: ['profile'], properties: { profile: { $ref: '#/components/schemas/WasteMappingProfile' } },
+        },
+        WasteMappingProfilePreviewEntry: {
+          type: 'object',
+          required: ['pattern', 'type_name', 'status'],
+          properties: {
+            pattern: { type: 'string' },
+            type_name: { type: 'string' },
+            mapping_id: { type: 'integer', nullable: true },
+            original_label: { type: 'string', nullable: true },
+            resolved_type_id: { type: 'integer', nullable: true },
+            status: {
+              type: 'string',
+              enum: ['applicable', 'unchanged', 'unmatched_pattern', 'unmatched_type', 'ambiguous_type'],
+              description: 'applicable: will be applied on commit. unchanged: source mapping already matches. unmatched_pattern: no mapping in this source has this pattern. unmatched_type: no waste type in this household has this name. ambiguous_type: more than one waste type shares this name and none of them is the mapping\'s own current type - never guessed at, resolve the name collision (rename one of the types) before this entry can apply.',
+            },
+          },
+        },
+        WasteMappingProfilePreview: {
+          type: 'object',
+          required: ['source_id', 'entries', 'applicable_count', 'profile_digest'],
+          properties: {
+            source_id: { type: 'integer' },
+            entries: { type: 'array', items: { $ref: '#/components/schemas/WasteMappingProfilePreviewEntry' } },
+            applicable_count: { type: 'integer' },
+            profile_digest: { type: 'string', description: 'Pass back unchanged on commit; a mismatch means the profile changed since this preview.' },
+          },
+        },
+        WasteMappingProfileImportPreviewResponse: {
+          type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteMappingProfilePreview' } },
+        },
+        WasteMappingProfileImportCommitInput: {
+          type: 'object',
+          required: ['profile', 'profile_digest'],
+          properties: {
+            profile: { $ref: '#/components/schemas/WasteMappingProfile' },
+            profile_digest: { type: 'string' },
+          },
+        },
+        WasteMappingProfileImportCommitResult: {
+          type: 'object',
+          required: ['applied_count', 'entries'],
+          properties: {
+            applied_count: { type: 'integer' },
+            entries: { type: 'array', items: { $ref: '#/components/schemas/WasteMappingProfilePreviewEntry' } },
+          },
+        },
+        WasteMappingProfileImportCommitResponse: {
+          type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteMappingProfileImportCommitResult' } },
+        },
 };

@@ -541,6 +541,7 @@
   --module-split-expenses: var(--_family-money);
   --module-documents: var(--_family-records);
   --module-housekeeping: var(--_family-work);
+  --module-waste:     var(--_family-work);
   --module-health:    var(--_family-health);
   /* War der "money"-Familie zugeteilt (Budget, Kostenteilung), solange
    * router.js Inventar unter NAV_SECTION.finance fuehrte. Mit dem Umzug nach

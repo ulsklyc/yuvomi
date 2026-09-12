@@ -68,6 +68,21 @@ function makeDb() {
       created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
     );
+    -- Gleiche Bauart wie schedule_reminder_entries darueber: die
+    -- CASE-Zweige fuer 'waste_pickup' in processDueNotifications() lesen beide
+    -- Tabellen, also muessen beide hier stehen. Fehlten sie, brach der ganze
+    -- Push-Test mit "no such table: waste_reminder_entries" ab - und weil
+    -- "npm test" eine &&-Kette ist, kam danach KEINE Suite mehr dran (#1063).
+    CREATE TABLE waste_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+      icon TEXT NOT NULL DEFAULT 'trash-2', color TEXT NOT NULL DEFAULT '#22C55E',
+      archived INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE waste_reminder_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type_id INTEGER NOT NULL REFERENCES waste_types(id) ON DELETE CASCADE,
+      date_key TEXT NOT NULL,
+      UNIQUE (user_id, type_id, date_key)
+    );
     CREATE TABLE cycle_reminder_anchors (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

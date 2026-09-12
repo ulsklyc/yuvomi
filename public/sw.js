@@ -232,7 +232,13 @@ const APP_LOCALES = [
   '/locales/zh.json',
 ];
 
-// Seiten-Module: lazy geladen, aber vorab gecacht für Offline
+// Seiten-Module: lazy geladen, aber vorab gecacht für Offline.
+// waste.js fehlt hier BEWUSST (Round-3-Review, #1063): wie housekeeping.js
+// und schedule.js ist es ein Opt-in-Modul, das die meisten Installationen
+// nie laden - vorab gecacht würde es jede Installation Bytes kosten, und
+// die Seite selbst ist ohne Netz ohnehin nur eingeschränkt nützlich (die
+// Termine kommen aus /occurrences). Wer die drei offline will, hebt sie
+// zusammen hierher, nicht einzeln.
 const PAGE_MODULES = [
   '/pages/dashboard.js',
   '/pages/tasks.js',

@@ -24,6 +24,7 @@ import { remindersPaths } from './reminders.js';
 import { searchPaths } from './search.js';
 import { splitexpensesPaths } from './splitexpenses.js';
 import { housekeepingPaths } from './housekeeping.js';
+import { wastePaths } from './waste.js';
 import { modulesPaths } from './modules.js';
 import { pushPaths } from './push.js';
 import { notificationsPaths } from './notifications.js';
@@ -62,6 +63,7 @@ export function buildPaths() {
     ...searchPaths(),
     ...splitexpensesPaths(),
     ...housekeepingPaths(),
+    ...wastePaths(),
     ...modulesPaths(),
     ...pushPaths(),
     ...notificationsPaths(),

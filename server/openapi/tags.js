@@ -20,6 +20,7 @@ export const apiTags = [
       { name: 'SplitExpenses' },
       { name: 'Documents' },
       { name: 'Housekeeping' },
+      { name: 'Waste' },
       { name: 'Modules' },
       { name: 'Backup' },
       { name: 'Weather' },

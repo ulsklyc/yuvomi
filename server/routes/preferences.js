@@ -227,10 +227,10 @@ const SCHEDULE_TEMPLATE_KEYS = ['work', 'school', 'university'];
 const TOGGLEABLE_MODULES = [
   'tasks', 'calendar', 'meals', 'recipes', 'shopping', 'pantry', 'inventory',
   'birthdays', 'notes', 'contacts', 'budget', 'documents',
-  'housekeeping', 'rewards', 'health', 'schedule',
+  'housekeeping', 'waste', 'rewards', 'health', 'schedule',
 ];
-const MODULE_ORDER_RE = /^(dashboard|tasks|calendar|meals|recipes|shopping|pantry|inventory|birthdays|notes|contacts|budget|documents|housekeeping|rewards|health|schedule|third-party-[a-z0-9][a-z0-9-]{1,62}[a-z0-9])$/;
-const MOBILE_NAV_ORDER_RE = /^(tasks|calendar|kitchen|meals|recipes|shopping|pantry|inventory|birthdays|notes|contacts|budget|documents|housekeeping|rewards|health|schedule|third-party-[a-z0-9][a-z0-9-]{1,62}[a-z0-9])$/;
+const MODULE_ORDER_RE = /^(dashboard|tasks|calendar|meals|recipes|shopping|pantry|inventory|birthdays|notes|contacts|budget|documents|housekeeping|waste|rewards|health|schedule|third-party-[a-z0-9][a-z0-9-]{1,62}[a-z0-9])$/;
+const MOBILE_NAV_ORDER_RE = /^(tasks|calendar|kitchen|meals|recipes|shopping|pantry|inventory|birthdays|notes|contacts|budget|documents|housekeeping|waste|rewards|health|schedule|third-party-[a-z0-9][a-z0-9-]{1,62}[a-z0-9])$/;
 const KITCHEN_NAV_IDS = new Set(['kitchen', 'meals', 'recipes', 'shopping', 'pantry']);
 
 // --------------------------------------------------------
@@ -455,8 +455,12 @@ function parseMobileNavOrder(raw) {
  * nur, dass hier unbegrenzt viel Fremdinhalt in `sync_config` landet.
  *
  * Erlaubt sind Boolean, endliche Zahlen, kurze Strings und Listen kurzer
- * Strings. Verschachtelte Objekte nicht: sie hätten keine Tiefengrenze, und
- * kein Widget braucht sie.
+ * Strings ODER ganzer Zahlen (#1063 Phase 10: die Waste-Kachel filtert
+ * nach Typ-Ids, keine Kategorie-Schlüsseln - eine Liste darf deshalb nicht
+ * mehr nur Strings tragen; Ids sind Integer, also lässt die Liste auch nur
+ * Integer durch statt beliebiger endlicher Zahlen wie 1e308 oder Brüche).
+ * Verschachtelte Objekte nicht: sie hätten keine Tiefengrenze, und kein
+ * Widget braucht sie.
  *
  * @returns {object|null} normalisierte Optionen, oder null wenn die Form nicht stimmt
  */
@@ -481,7 +485,8 @@ function normalizeWidgetOptions(input) {
     }
     if (Array.isArray(value)) {
       if (value.length > MAX_WIDGET_OPTION_VALUES) return null;
-      if (!value.every((v) => typeof v === 'string' && v.length <= MAX_WIDGET_OPTION_LENGTH)) return null;
+      if (!value.every((v) => (typeof v === 'string' && v.length <= MAX_WIDGET_OPTION_LENGTH)
+        || (typeof v === 'number' && Number.isInteger(v)))) return null;
       out[key] = [...value];
       continue;
     }

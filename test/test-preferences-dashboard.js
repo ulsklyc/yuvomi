@@ -427,11 +427,21 @@ test('die Form der Optionen wird geprüft, ihre Bedeutung nicht', async () => {
     // nachziehen müsste.
     assert.equal((await withOptions({ was_auch_immer: true })).status, 200);
 
+    // Eine Liste darf auch Zahlen tragen (#1063 Phase 10: die Waste-Kachel
+    // filtert nach Typ-Ids, keine Kategorie-Schlüsseln) - gemischt mit Strings,
+    // solange jedes Element für sich gültig ist. Vor den restlichen Checks,
+    // damit der Endstand unten weiter der ERSTE erfolgreiche Schreibvorgang ist.
+    assert.equal((await withOptions({ list: [1, 2, 3] })).status, 200, 'eine Zahlenliste ist eine gültige Optionsform');
+    assert.equal((await withOptions({ list: ['a', 2, 'c'] })).status, 200, 'Strings und Zahlen dürfen sich mischen');
+    assert.equal((await withOptions({ was_auch_immer: true })).status, 200);
+
     assert.equal((await withOptions('mine')).status, 400, 'ein String ist kein Optionsobjekt');
     assert.equal((await withOptions([1, 2])).status, 400, 'ein Array ist kein Optionsobjekt');
     assert.equal((await withOptions({ 'Groß': true })).status, 400, 'Schlüssel sind klein und schlicht');
     assert.equal((await withOptions({ nested: { a: 1 } })).status, 400, 'verschachtelt hätte keine Tiefengrenze');
     assert.equal((await withOptions({ list: [{ a: 1 }] })).status, 400);
+    assert.equal((await withOptions({ list: [Infinity] })).status, 400, 'eine nicht-endliche Zahl bleibt ungültig, wie beim Einzelwert');
+    assert.equal((await withOptions({ list: [NaN] })).status, 400);
     assert.equal((await withOptions({ text: 'x'.repeat(65) })).status, 400);
     assert.equal((await withOptions({ list: Array.from({ length: 51 }, (_, i) => `c${i}`) })).status, 400);
     assert.equal((await withOptions(Object.fromEntries(

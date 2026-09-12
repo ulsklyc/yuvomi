@@ -34,6 +34,7 @@ const NAV_TO_MODULE = Object.freeze({
   inventory: 'inventory',
   documents: 'documents',
   housekeeping: 'housekeeping',
+  waste: 'waste',
   rewards: 'rewards',
   health: 'health',
 });

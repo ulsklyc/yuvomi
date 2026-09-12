@@ -278,6 +278,7 @@
 .widget--health   { --widget-accent: var(--module-health); }
 .widget--housekeeping { --widget-accent: var(--module-housekeeping); }
 .widget--schedule { --widget-accent: var(--module-schedule); }
+.widget--waste    { --widget-accent: var(--module-waste); }
 /* Wie das Wetter: eine Kachel, die keinem Modul gehoert, traegt den Ton der
  * Seite. Der Countdown (#647) sammelt aus Kalender UND Aufgaben ein - jeder
  * der beiden Toene waere fuer die andere Haelfte der Liste falsch. Ohne diese
@@ -3749,6 +3750,115 @@ svg.weather-forecast__icon {
 
 .schedule-widget-empty {
   padding: var(--space-2);
+}
+
+/* --------------------------------------------------------
+ * Waste-Widget (naechste Abholung je Typ)
+ * Dieselbe Zeilen-Grammatik wie Schedule (Marke - Name - rechtsbuendiger
+ * Zustand), nur ohne Avatar: die Identitaet der Zeile ist der Typ, nicht eine
+ * Person, daher ein Farbpunkt statt eines Avatars.
+ * -------------------------------------------------------- */
+.waste-widget {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.waste-widget-row {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1h) var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  touch-action: pan-y;
+  transition: background-color var(--transition-fast);
+}
+
+.waste-widget-row:hover {
+  background-color: var(--color-surface-2);
+}
+
+.waste-widget-row__dot {
+  display: inline-block;
+  width: .7rem;
+  height: .7rem;
+  border-radius: 50%;
+  background: var(--waste-color);
+  flex: 0 0 auto;
+}
+
+.waste-widget-row__name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.waste-widget-row__icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+}
+
+.waste-widget-row__flag {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+}
+
+.waste-widget-row__date {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.waste-widget-row__date--none {
+  color: var(--color-text-tertiary);
+}
+
+/* Der eine global naechste Termin (Phase 4 - "one global-next emphasis") -
+ * dieselbe Rolle wie countdown-item__days--now, nur ohne eigene Rang-Skala:
+ * hier gibt es nur "der naechste" und "der Rest". */
+.waste-widget-row__date--next {
+  color: var(--widget-accent);
+  font-weight: var(--font-weight-semibold);
+}
+
+.waste-widget-more {
+  margin: var(--space-1) 0 0;
+  padding: 0 var(--space-2);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+}
+
+/* Eine Meldung nennt ihren Ton EINMAL, in der Schrift (Skalen-Regel, DESIGN.md
+ * Colors) - die Flaeche bleibt neutral, wie housekeeping-widget__unpaid es
+ * fuer seinen eigenen Fuss-Chip schon vormacht. */
+.waste-widget__refresh-warning {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1h);
+  margin: var(--space-2) var(--space-2) 0;
+  padding: var(--space-1h) var(--space-2h);
+  border-radius: var(--radius-sm);
+  background: var(--color-fill-well);
+  color: var(--color-warning-ink);
+  font-size: var(--type-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.waste-widget__refresh-warning svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
 }
 
 /* --------------------------------------------------------
