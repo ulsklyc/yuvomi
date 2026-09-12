@@ -1439,3 +1439,62 @@ test('Serien-Speichern reicht ein leeres Konto einer kontolosen Instanz nicht we
   assert.match(zweig, /api\.put\(`\/budget\/\$\{entry\.id\}\/series`, seriesBody\)/,
     'gesendet wird der bereinigte Body, nicht der ursprüngliche');
 });
+
+// --------------------------------------------------------
+// Split-Ausgaben: eine Primäraktion statt vier (Cross-Modul-Review)
+// --------------------------------------------------------
+
+/**
+ * Split-Ausgaben bringt seinen eigenen Kopfknopf UND seinen eigenen FAB mit
+ * (split-expenses.js). Solange TAB_CAPS['split-expenses'].add einen Aktionsnamen
+ * trug, zeigte Budgets EIGENER Toolbar-Knopf (#budget-add) und Budgets EIGENER
+ * FAB (#fab-new-budget) auf diesem Tab ZUSAETZLICH auf, beide per Klick an
+ * #split-add-expense delegiert - macht mit dem Unterseiten-eigenen Kopfknopf
+ * und dessen eigenem FAB vier Ausloeser fuer dieselbe Handlung, gemessen als
+ * "drei violette Add-Knoepfe zugleich" im UX-Review. `add: null` (wie Berichte)
+ * haelt Budgets generische Knoepfe auf diesem Tab unsichtbar.
+ */
+test('Split-Ausgaben bietet keine zweite, generische Neu-Aktion aus dem Budget-Kopf', () => {
+  const table = budget.match(/const TAB_CAPS = \{[\s\S]*?\n\};/);
+  assert.ok(table, 'TAB_CAPS-Tabelle fehlt');
+  assert.match(table[0], /'split-expenses':\s*\{[^}]*add:\s*null/,
+    'Split-Ausgaben bringt seinen eigenen Kopfknopf/FAB mit - Budgets generischer ' +
+    '#budget-add/#fab-new-budget-Knopf darf hier keine zweite Aktion anbieten');
+  // Der Kontext-Schalter darf die Unterseite nicht mehr direkt anklicken -
+  // sonst bliebe der alte Vierfach-Ausloeser ueber einen zweiten Codepfad stehen.
+  assert.doesNotMatch(withoutComments(budget), /case 'split-expenses':/,
+    'addHandler darf für Split-Ausgaben keinen eigenen Zweig mehr brauchen - ' +
+    'der Tab hat keine generische Neu-Aktion mehr');
+});
+
+/**
+ * Eingebettet (der einzige heute erreichte Fall - budget.js ruft immer mit
+ * embedded:true) darf Split-Ausgaben keine zweite Seiten-Ueberschrift unter
+ * Budgets eigenem <h1> führen, und sein Kopfknopf darf nicht als zweiter
+ * Primärknopf neben dem FAB (#split-fab) auftreten.
+ */
+test('eingebettete Split-Ausgaben tragen keine zweite <h1> und keinen zweiten Primärknopf', () => {
+  assert.match(splitExpenses, /const TitleTag = embedded \? 'h2' : 'h1'/,
+    'die Überschrift muss im eingebetteten Fall eine Bereichs-Überschrift sein, kein zweites <h1>');
+  assert.match(splitExpenses, /const addExpenseBtnVariant = embedded \? 'btn--secondary' : 'btn--primary'/,
+    'der Kopfknopf muss im eingebetteten Fall zurücktreten - die Primäraktion ist der FAB');
+  assert.match(splitExpenses, /<\$\{TitleTag\} class="split-title">/,
+    'die Überschrift muss über TitleTag gerendert werden, nicht fest als <h1>');
+  assert.match(splitExpenses, /<button class="btn \$\{addExpenseBtnVariant\}" id="split-add-expense">/,
+    'der Kopfknopf muss über addExpenseBtnVariant gerendert werden, nicht fest als --primary');
+});
+
+/**
+ * Löschen einer Gruppe ist unumkehrbar (die Gruppe fällt mitsamt ihrer
+ * Ausgaben), Bearbeiten/Archivieren nicht - dieselbe Kapsel für alle drei
+ * verwischte den Unterschied (UX-Review).
+ */
+test('Gruppe löschen trägt eine andere Gewichtung als bearbeiten/archivieren', () => {
+  assert.match(splitExpenses, /id="split-edit-group"[^>]*>/);
+  assert.match(splitExpenses, /class="btn btn--secondary btn--icon" id="split-edit-group"/,
+    'Bearbeiten bleibt eine gewöhnliche Sekundäraktion');
+  assert.match(splitExpenses, /class="btn btn--secondary btn--icon" id="split-archive-group"/,
+    'Archivieren bleibt eine gewöhnliche Sekundäraktion');
+  assert.match(splitExpenses, /class="btn btn--icon btn--danger-outline" id="split-delete-group"/,
+    'Löschen muss sich sichtbar von Bearbeiten/Archivieren abheben, ohne die Zeile zu dominieren');
+});

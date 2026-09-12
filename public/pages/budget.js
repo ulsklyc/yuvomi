@@ -249,7 +249,16 @@ const TAB_CAPS = {
   'subscriptions':  { month: false, note: 'budget.periodNoteSubscriptions', add: 'subscriptions.add' },
   'loans':          { month: false, note: 'budget.periodNoteLoans',         add: 'budget.newLoan' },
   'reports':        { month: true,  range: true, add: null },
-  'split-expenses': { month: false, note: 'budget.periodNoteSplit',         add: 'splitExpenses.addExpense' },
+  // `add: null` wie Berichte: Split-Ausgaben bringt seine eigene Primaeraktion
+  // mit (Kopfknopf + FAB in split-expenses.js). Vorher stand hier derselbe
+  // Aktionsname wie im eingebetteten Kopf, und der generische Kopfknopf UND
+  // der generische FAB dieser Seite delegierten beide per Klick an
+  // #split-add-expense - macht mit dem eigenen Kopfknopf und dem eigenen FAB
+  // der Unterseite VIER Ausloeser fuer dieselbe Handlung (Cross-Modul-Review:
+  // "drei violette Add-Knoepfe zugleich"). Split-Ausgaben ist das einzige
+  // Sub-Tab mit eigenem Primaerknopf/-FAB; die anderen sechs teilen sich
+  // Budgets generische Knoepfe, weil sie keinen eigenen mitbringen.
+  'split-expenses': { month: false, note: 'budget.periodNoteSplit',         add: null },
 };
 
 // Sentinel für „keine eigene Farbe" im Kontofarb-Wähler: der echte Wert ist der
@@ -453,6 +462,13 @@ export async function render(container, { user }) {
              ein ruhiger Kontexttext. Eine Lücke machte jeden Tabwechsel zur
              Neuorientierung (Critique 2026-07-30, P1). -->
         <div class="page-toolbar__center budget-nav__month">
+          <!-- „Aktuell" bleibt ein Reset, kein Navigationsschritt - aber jetzt VOR
+               dem Stepper statt dahinter: Kalender fuehrt „Heute" links vom
+               Pfeilpaar, Mahlzeiten zieht mit (meals.js). Eine Position/ein Bauteil
+               app-weit statt drei Varianten fuer denselben Sprung-zu-jetzt-Reset
+               (Cross-Modul-Review). Das Label bleibt bewusst „Aktuell": der Sprung
+               gilt dem laufenden Monat, nicht dem heutigen Tag. -->
+          <button class="btn btn--secondary budget-nav__today" id="budget-today">${t('budget.currentMonth')}</button>
           <button class="btn btn--icon" id="budget-prev" aria-label="${t('budget.prevMonth')}">
             <i data-lucide="chevron-left" aria-hidden="true"></i>
           </button>
@@ -460,9 +476,6 @@ export async function render(container, { user }) {
           <button class="btn btn--icon" id="budget-next" aria-label="${t('budget.nextMonth')}">
             <i data-lucide="chevron-right" aria-hidden="true"></i>
           </button>
-          <!-- „Aktuell" ist ein Reset, kein Navigationsschritt: hinter dem
-               Stepper statt zwischen Pfeil und Wert. -->
-          <button class="btn btn--secondary budget-nav__today" id="budget-today">${t('budget.currentMonth')}</button>
           <span class="budget-nav__note" id="budget-period-note" hidden></span>
         </div>
         ${state.budgetMode === 'personal' ? `
@@ -567,11 +580,11 @@ function wireNav() {
       renderBody();
     },
   });
-  // Neu-Aktion je Tab — spiegelt TAB_CAPS.add. Tabs ohne Neu-Aktion (Berichte)
+  // Neu-Aktion je Tab — spiegelt TAB_CAPS.add. Tabs ohne Neu-Aktion (Berichte,
+  // Split-Ausgaben - die Unterseite bringt ihren eigenen Kopfknopf/FAB mit)
   // blenden beide Auslöser aus, der Handler bleibt dort folgenlos.
   const addHandler = () => {
     switch (state.activeTab) {
-      case 'split-expenses': _container.querySelector('#split-add-expense')?.click(); return;
       case 'subscriptions':  openSubscriptionModal(); return;
       case 'plan':           _container.querySelector('#budget-plan-add')?.click(); return;
       case 'accounts':       openAccountModal(); return;
