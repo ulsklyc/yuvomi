@@ -222,6 +222,11 @@ export async function render(container, { user }) {
            also nie beide erreichbar. -->
       <div class="page-toolbar page-toolbar--in-group page-toolbar--wrap">
         <div class="page-toolbar__center week-nav">
+          <!-- „Heute" steht VOR dem Stepper, nicht dahinter oder in den Aktionen:
+               Kalender fuehrt dieselbe Rolle links vom Pfeilpaar, Budget zieht mit
+               (budget.js) - eine Position/ein Bauteil app-weit statt drei Varianten
+               fuer denselben Sprung-zu-jetzt-Reset (Cross-Modul-Review). -->
+          <button class="btn btn--secondary week-nav__today" id="week-today">${t('meals.today')}</button>
           <button class="btn btn--icon" id="week-prev" aria-label="${t('meals.prevWeek')}">
             <i data-lucide="chevron-left" aria-hidden="true"></i>
           </button>
@@ -231,7 +236,6 @@ export async function render(container, { user }) {
           </button>
         </div>
         <div class="page-toolbar__actions">
-          <button class="btn btn--secondary week-nav__today" id="week-today">${t('meals.today')}</button>
           <!-- Nur Desktop: klappt die Rezept-Spalte weg, damit alle sieben
                Tagesspalten in voller Breite ins Board passen. -->
           <button class="btn btn--icon week-nav__rail-toggle" id="rail-toggle"
