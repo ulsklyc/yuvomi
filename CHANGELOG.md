@@ -161,6 +161,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Opening Housekeeping with a broken visit deep link now says so** (#1139). A reminder or
+  calendar notification's `?editVisit=<id>` link that points at a deleted, invalid, or
+  no-longer-accessible visit used to fail silently and land on the ordinary dashboard, with nothing
+  to tell a stale link apart from a working one. It now shows a localized message - a missing visit
+  says so without a retry, a visit you no longer have access to says so without revealing anything
+  about it, and any other failure offers to try again. The broken link is cleared from the address
+  bar right away, so a reload or going back does not repeat the failed request.
+
 - **An event moved to another CalDAV calendar can be deleted or edited right away** (#593). A move
   creates the event in the new calendar and removes it from the old one, but until the next sync
   Yuvomi kept pointing at the old copy. Deleting the event in that window went to an address that
