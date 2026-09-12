@@ -37,6 +37,10 @@ export const ENV_SCHEMA = [
   // Rezept-Provider-Spiegel (Mealie/Tandoor): derselbe SSRF-Guard, derselbe
   // häufigste Self-Hoster-Fall wie bei den ICS-Abos oben.
   { key: 'RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK', type: 'default', label: 'Allow Private Network Recipe Provider Target', default: 'false', required: false, group: 'sync', writeToEnv: true },
+  // Waste-URL-Quellen (#1063 Phase 7): derselbe SSRF-Guard, derselbe häufigste
+  // Self-Hoster-Fall wie bei den ICS-Abos/Rezept-Providern oben - ein
+  // kommunales Abfuhrkalender-Feed im eigenen LAN scheitert sonst stumm.
+  { key: 'WASTE_SOURCE_ALLOW_PRIVATE_NETWORK', type: 'default', label: 'Allow Waste Source Feeds from Private Network', default: 'false', required: false, group: 'sync', writeToEnv: true },
   // Zeitzone des Containers: Logzeitstempel und Backup-Cron, und der DEFAULT für
   // die Haushaltszone. Seit v2.34.0 (#829) ist die Haushaltszone eine eigene
   // Einstellung in der App (sync_config `household_timezone`) und gewinnt, wo es

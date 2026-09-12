@@ -49,8 +49,14 @@ function normalizeUrl(raw) {
   return url.href;
 }
 
-async function checkSSRF(urlStr) {
-  if (isPrivateNetworkAllowed()) return;
+/**
+ * `allowPrivateNetwork` defaults to this module's own opt-in
+ * (ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK) but can be swapped for another
+ * module's - waste-url-source.js passes its own WASTE_SOURCE_ALLOW_PRIVATE_NETWORK
+ * check here instead of keeping a second copy of this whole function.
+ */
+async function checkSSRF(urlStr, allowPrivateNetwork = isPrivateNetworkAllowed) {
+  if (allowPrivateNetwork()) return;
   const hostname = new URL(urlStr).hostname;
   // URL.hostname liefert IPv6 in Klammern ([::1]) – für isIP/Filter entfernen.
   const host = hostname.replace(/^\[|\]$/g, '');

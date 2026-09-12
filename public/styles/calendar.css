@@ -2016,6 +2016,35 @@
 }
 
 /* --------------------------------------------------------
+ * Waste-Ebene (#1063 Phase 5)
+ *
+ * Der Chip erbt die Balkenform seiner Basisklasse (.month-day__holiday /
+ * .allday-holiday / .agenda-holiday), MUSS aber anders als Feiertag und
+ * Schichtplan tatsaechlich klickbar sein - er fuehrt direkt in die
+ * Waste-Seite. Die Basisklassen setzen `pointer-events: none` (sie sind
+ * dekorative Baender, deren Klick zur Zelle/Spalte durchfallen soll), diese
+ * Regel nimmt das fuer die Waste-Bar gezielt zurueck.
+ * -------------------------------------------------------- */
+.waste-occurrence-chip {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.waste-occurrence-chip:hover,
+.waste-occurrence-chip:focus-visible {
+  filter: brightness(0.92);
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.waste-occurrence-chip__flag {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  opacity: .82;
+}
+
+/* --------------------------------------------------------
  * Filter-Knopf und Filter-Blatt
  *
  * HIER STANDEN BIS ZU FUENF EBENEN-CHIPS, und sie sind aus drei gemessenen
@@ -2088,6 +2117,17 @@
 .cal-filters__reset {
   margin-top: var(--space-5);
   width: 100%;
+}
+
+/* Per-Typ-Unterliste unter der Waste-Ebene (#1063 Phase 10) - die einzige
+   echte Verschachtelung in diesem Blatt, siehe buildLayerRowsHtml. Einrueckung
+   traegt die Beziehung, keine eigene Umrandung - sonst saehe es aus wie eine
+   zweite eigene Gruppe statt einer Unterliste EINER Zeile. */
+.cal-filters__nested {
+  margin-left: var(--space-5);
+  margin-top: var(--space-1);
+  display: flex;
+  flex-direction: column;
 }
 
 /* Die Feiertags- und Schul-Layer tragen eine NUTZERFARBE und bekommen sie

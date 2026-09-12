@@ -326,6 +326,7 @@ export const MODULE_ICON = {
   pantry:           'archive',
   kitchen:          'utensils',
   housekeeping:     'paintbrush',
+  waste:            'trash-2',
   documents:        'folder-lock',
   inventory:        'package',
   rewards:          'award',

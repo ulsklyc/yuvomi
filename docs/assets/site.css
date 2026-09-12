@@ -94,6 +94,11 @@
      --_family-time). Wie --m-pantry als Referenz notiert: so folgt es den
      beiden Dark-Bloecken von selbst. */
   --m-schedule: var(--m-calendar);
+  /* Waste collection zieht in der App aus derselben Familie wie Aufgaben/
+     Haushaltshilfe/Belohnungen (tokens.css: --module-waste ist
+     --_family-work, wie die drei anderen). Als Referenz notiert wie
+     --m-pantry/--m-schedule oben. */
+  --m-waste: var(--m-tasks);
   --m-recipes: #0C7C5B;
   --m-shopping: #CF236F;
   --m-notes: #9D6007;

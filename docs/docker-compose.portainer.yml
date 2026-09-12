@@ -166,6 +166,8 @@ services:
       - ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK=${ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK:-false}
       # Set true only for recipe provider (Mealie/Tandoor) mirrors on a private/local network.
       - RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=${RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK:-false}
+      # Set true only for a waste collection URL source on a private/local network.
+      - WASTE_SOURCE_ALLOW_PRIVATE_NETWORK=${WASTE_SOURCE_ALLOW_PRIVATE_NETWORK:-false}
       # Set true only for notification channels (Webhook/Gotify/ntfy) on a private/local network.
       - NOTIFICATION_ALLOW_PRIVATE_NETWORK=${NOTIFICATION_ALLOW_PRIVATE_NETWORK:-false}
       # Default true, anders als die vier darueber: ein DMS ist selbst gehostet und

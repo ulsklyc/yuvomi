@@ -99,6 +99,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   follows both without extra work. Inventory's own search matches on it too, since "where is the
   device that runs on this address" is the question the field exists for.
 
+- **New optional module: Waste collection** (#1063). Define your household's waste types
+  (recycling, organic, general, or your own, each with an icon and color) and a weekly or
+  fixed-day-of-month pickup schedule for each. A single calculated pickup can be moved to a
+  different date or skipped without touching the rest of the schedule, and moving one origin never
+  hides another - a manual one-off pickup recorded on the same day a schedule occurrence moved away
+  from still shows. One-off pickups cover irregular or special collections that are not part of any
+  recurring schedule. A type with schedules or pickups cannot be deleted (archive it instead), so a
+  season's history is never lost by accident. Off by default; a household turns it on in
+  Settings → Modules. A municipality's ICS calendar file can also be imported: preview its pickups,
+  map each label to a waste type (or create one on the spot, or ignore it), and commit - the file is
+  re-parsed on commit so nothing is trusted from the preview alone, and re-importing next year's file
+  diffs cleanly into additions/changes/removals without duplicating or losing manual data. A source
+  with no future mapped pickup is flagged for a refresh. An optional Dashboard widget shows the next
+  pickup per active type, soonest first, and carries the same "needs a refresh" flag as the module
+  page; hidden by default, like the module itself. A device-local Calendar layer, off by default,
+  shows every type's pickups in month, week, day, and agenda view; a pickup carries its type's icon
+  and color and opens the module directly, never the ordinary event editor. Beyond a one-time file
+  import, a source can also subscribe to an ICS URL: it refreshes itself automatically on a
+  configurable schedule (hourly to monthly), applying an update only once every label already has a
+  confirmed mapping - unrecognized content is flagged for review instead of guessed at, and a manual
+  "check now" is always available alongside the automatic schedule. Each household member can also opt
+  into their own pickup reminders per waste type, choosing how many days ahead and what time of day
+  (household-local) to be notified - personal, so a reminder never goes to someone who didn't ask for
+  it. A monthly schedule can now also follow an ordinal weekday - "the second Monday" or "the last
+  Friday" of every month - alongside the existing weekly and fixed-day-of-month rhythms; the
+  underlying shared recurrence engine gained this once and every existing recurring feature (Tasks,
+  Calendar, CalDAV/ICS import) benefits from it, not just Waste. A revocable, personal read-only ICS
+  feed of upcoming pickups is now available too (Settings → Feeds), with an optional per-type
+  selection; a source's label-to-type mapping decisions can be exported as a portable profile and
+  re-applied to another source or household, without the app ever shipping a municipal/provider
+  catalog. Waste types are now searchable from the global search bar, and the Calendar layer's filter
+  sheet gained a per-type visibility list nested under the one Waste toggle, so a rare collection is
+  never silently hidden while a noisy one can be tucked away. The page now leads with a labelled
+  "Add waste type" button rather than hiding all four actions behind one unlabelled menu, both empty
+  states offer the step their own text describes, and the pickup button no longer dead-ends on a
+  fresh install - without a type it now opens the type dialog instead of only saying that one is
+  missing. Waste type, schedule, and source rows carry the same single overflow menu with named
+  entries that the pickup rows already used, so a destructive action is no longer one stray tap away
+  and an action whose meaning changes with the source finally says which one it is; every one of those
+  menus now sits at the trailing edge of its row, and every row puts its icon beside the name instead
+  of above it, so all four row types read the same way. A paused schedule
+  is now visually distinct from an archived type instead of wearing the same badge. A type's colour
+  comes from a curated palette instead of a free colour picker, which had happily accepted a white or
+  black icon that then disappeared against the light or dark background - an existing colour outside
+  the palette is kept, not silently overwritten.
+
 - **Planned meals show their recipe's picture, for recipes mirrored from Mealie or Tandoor**
   (#1059, step one). The thumbnail proxy has existed since the provider sync landed, but only the
   recipe list used it; the meal planner and the "today's meals" tile rendered text. Both now show

@@ -1200,6 +1200,40 @@ const MIGRATIONS_SQL = {
                 THEN COALESCE(location, '') ELSE '' END)
     FROM calendar_events;
   `,
+  // Migration 197: only the one table test-search.js needs (waste_types) -
+  // the full migration also creates schedules/overrides/one-offs, irrelevant
+  // to search. Same "extract, not exact copy" rule as key 1.
+  197: `
+    CREATE TABLE waste_types (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      name        TEXT    NOT NULL,
+      icon        TEXT    NOT NULL DEFAULT 'trash-2',
+      color       TEXT    NOT NULL,
+      archived    INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1)),
+      sort_order  INTEGER NOT NULL DEFAULT 0,
+      created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    );
+  `,
+  // Migration 206: FTS triggers + backfill for waste_types, same shape as key 66.
+  206: `
+    CREATE TRIGGER trg_search_waste_types_ai AFTER INSERT ON waste_types BEGIN
+      INSERT INTO search_index (entity, entity_id, title, body)
+      VALUES ('waste_type', NEW.id, COALESCE(NEW.name, ''), '');
+    END;
+    CREATE TRIGGER trg_search_waste_types_ad AFTER DELETE ON waste_types BEGIN
+      DELETE FROM search_index WHERE entity = 'waste_type' AND entity_id = OLD.id;
+    END;
+    CREATE TRIGGER trg_search_waste_types_au AFTER UPDATE ON waste_types BEGIN
+      DELETE FROM search_index WHERE entity = 'waste_type' AND entity_id = OLD.id;
+      INSERT INTO search_index (entity, entity_id, title, body)
+      VALUES ('waste_type', NEW.id, COALESCE(NEW.name, ''), '');
+    END;
+
+    INSERT INTO search_index (entity, entity_id, title, body)
+      SELECT 'waste_type', id, COALESCE(name, ''), '' FROM waste_types;
+  `,
 };
 
 export { MIGRATIONS_SQL };

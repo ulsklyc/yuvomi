@@ -34,6 +34,26 @@ let _initialFormSnapshot = null;
 let _initialFormTimeout = null;
 let _modalFormSeq = 0;
 
+/**
+ * Ob dieses Modal beim Schliessen ueberhaupt nach ungespeicherten Eingaben
+ * fragen darf.
+ *
+ * NICHT JEDES MODAL IST EIN FORMULAR. Der Dirty-Guard vergleicht stumpf alle
+ * `input/select/textarea` im Kasten gegen ihren Stand beim Oeffnen - fuer ein
+ * Formular mit „Speichern" genau richtig, fuer ein ANSICHTSBLATT falsch: die
+ * Filter des Kalenders (pages/calendar.js, openCalendarFilters) sind eine Reihe
+ * Schalter, die SOFORT wirken und sofort gespeichert sind. Es gibt dort weder
+ * einen Speichern-Knopf noch etwas zu verwerfen - trotzdem fragte jedes
+ * Schliessen nach dem Umlegen einer Ebene „Aenderungen verwerfen?", und ein
+ * „Verwerfen" nahm die Aenderung nicht etwa zurueck, sondern liess sie stehen.
+ * Der Dialog log also zweimal: er behauptete einen Verlust, den es nicht gab,
+ * und versprach ein Zuruecknehmen, das er nicht leistete.
+ *
+ * Der Schalter steht hier und nicht als Abfrage auf eine Klasse, weil nur die
+ * aufrufende Seite weiss, ob ihre Felder auf ein Speichern warten.
+ */
+let _dirtyGuardEnabled = true;
+
 // Modal-Lebenszyklus als explizite Zustandsmaschine (Audit 1.5). Ersetzt die
 // frühere ad-hoc-Jonglage aus einem Boolean-Schließ-Flag plus temporär
 // genullten Globals. Gültige Zustände:
@@ -296,6 +316,8 @@ function serializeForm(container) {
 }
 
 function isFormDirty(container) {
+  // Ein Ansichtsblatt hat nichts Ungespeichertes - siehe _dirtyGuardEnabled.
+  if (!_dirtyGuardEnabled) return false;
   if (_initialFormSnapshot === null) return false;
   return serializeForm(container) !== _initialFormSnapshot;
 }
@@ -471,6 +493,11 @@ function _suspendActiveModal() {
     // null-Snapshot schaltet isFormDirty() für die restliche Lebensdauer des
     // Formulars ab - der Dirty-Guard wäre danach still tot.
     snapshot: _initialFormSnapshot ?? (panel ? serializeForm(panel) : null),
+    // Mit demselben Grund wie der Snapshot daneben: der Dialog, der sich gleich
+    // darüberlegt, läuft selbst durch openModal() und setzt den Wächter dabei
+    // auf seinen Standardwert. Ohne dieses Merken käme ein geparktes
+    // Ansichtsblatt (dirtyGuard:false) mit eingeschaltetem Wächter zurück.
+    dirtyGuard: _dirtyGuardEnabled,
     restoreFocus: previouslyFocused,
     // Zwei verschiedene Fokusziele: `restoreFocus` zeigt nach draußen (die Zeile,
     // aus der das Modal kam) und gilt für dessen späteres Schließen; `trigger`
@@ -492,7 +519,7 @@ function _suspendActiveModal() {
 }
 
 // Dialog beendet, Modal darunter lebt weiter → exakt wiederherstellen.
-function _resumeSuspendedModal({ overlay, id, title, titleId, snapshot, restoreFocus, trigger }) {
+function _resumeSuspendedModal({ overlay, id, title, titleId, snapshot, dirtyGuard = true, restoreFocus, trigger }) {
   /* ES GIBT NICHTS ZURUECKZUHOLEN, WENN DER KNOTEN WEG IST (#871).
    *
    * Sitzungsende und echte Navigation raeumen alle Kaesten aus dem Dokument,
@@ -512,6 +539,7 @@ function _resumeSuspendedModal({ overlay, id, title, titleId, snapshot, restoreF
   overlay.inert = false;
   activeOverlay = overlay;
   _initialFormSnapshot = snapshot;
+  _dirtyGuardEnabled = dirtyGuard;
   previouslyFocused = restoreFocus;
   document.body.style.overflow = 'hidden';
   modalState = 'open';
@@ -1056,10 +1084,13 @@ export function updateHeaderAction(panel, { label, onClick, hidden = false } = {
  * @param {string}   [opts.size='md'] - 'sm' (400px) | 'md' (520px) | 'lg' (680px) | 'xl' (min(960px, 95vw)); Breiten siehe layout.css .modal-panel--*
  * @param {'first-field'|'none'|HTMLElement} [opts.initialFocus='first-field'] - siehe applyInitialFocus
  * @param {{label: string, id?: string, onClick?: Function}} [opts.headerAction] - Textbutton rechts im Kopf, links vom Schließen-X
+ * @param {boolean} [opts.dirtyGuard=true] - `false` für Ansichtsblätter, deren
+ *   Felder sofort wirken und nichts zu speichern haben (siehe _dirtyGuardEnabled).
+ *   Für alles mit einem Speichern-Knopf bleibt es an.
  */
 export function openModal({
   title, content, onSave, onDelete, onClose, size = 'md',
-  initialFocus = 'first-field', headerAction = null,
+  initialFocus = 'first-field', headerAction = null, dirtyGuard = true,
 } = {}) {
   // Vorheriges Modal schließen (kein Stacking).
   if (activeOverlay) {
@@ -1127,9 +1158,19 @@ export function openModal({
 
   trapFocus(panel, initialFocus);
 
-  // Snapshot für Dirty-Check (kurzer Delay: Felder könnten noch per JS befüllt werden)
+  // Snapshot für Dirty-Check: sofort den Ist-Zustand aufnehmen (meist die
+  // leeren Vorgabewerte), sonst wertet der Dirty-Guard ein schnelles
+  // Tippen+Escape/Overlay-Klick innerhalb des folgenden Delays fälschlich als
+  // unverändert - `isFormDirty` hält `null` für "nichts zu vergleichen", nicht
+  // für "noch nichts eingegeben". Der verzögerte zweite Snapshot bleibt für
+  // Felder, die erst nach dem Öffnen per JS befüllt werden (Selects, Datepicker).
+  //
+  // NACH dem `closeModal({force:true})` oben: dessen Aufräumen stellt den
+  // Wächter auf den Standardwert zurück, ein früheres Setzen wäre wieder
+  // eingesammelt worden.
+  _dirtyGuardEnabled = dirtyGuard;
   if (_initialFormTimeout) clearTimeout(_initialFormTimeout);
-  _initialFormSnapshot = null;
+  _snapshotNow();
   _initialFormTimeout = setTimeout(_snapshotNow, 150);
 
   // Swipe-to-Close auf Mobile
@@ -1244,6 +1285,9 @@ export async function closeModal({ force = false } = {}) {
     _initialFormTimeout = null;
   }
   _initialFormSnapshot = null;
+  // Der Wächter gilt je Modal, nicht je Sitzung: das nächste openModal() soll
+  // ihn wieder anhaben, wenn es nichts anderes sagt.
+  _dirtyGuardEnabled = true;
 
   document.removeEventListener('keydown', onEscape);
 

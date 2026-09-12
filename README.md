@@ -7,7 +7,7 @@
 
   <p>
     Tasks, calendar, budget, groceries, meals, health and more - for a family, a couple,
-    or just you. Nineteen modules for one household of up to six people, on a server you
+    or just you. Twenty modules for one household of up to six people, on a server you
     own, and the only thing that leaves it is a version check.
   </p>
 
@@ -34,7 +34,7 @@
     <img src="docs/screenshots/dashboard-light-web.webp" alt="The Yuvomi dashboard: today's tasks, calendar events, meals and the shopping list on one screen" width="820">
   </picture>
 
-  <sub><b>19</b> modules &nbsp;·&nbsp; <b>24</b> languages &nbsp;·&nbsp; <b>0</b> trackers &nbsp;·&nbsp; optional <b>AES-256</b> database encryption &nbsp;·&nbsp; <b>MIT</b></sub>
+  <sub><b>20</b> modules &nbsp;·&nbsp; <b>24</b> languages &nbsp;·&nbsp; <b>0</b> trackers &nbsp;·&nbsp; optional <b>AES-256</b> database encryption &nbsp;·&nbsp; <b>MIT</b></sub>
 </div>
 
 Most households glue their life together from a dozen paid apps, each with its own account, its
@@ -68,7 +68,7 @@ This is the part a folder full of separate apps cannot do:
 - **A ticked-off chore pays out.** Points on a task land on the assigned member's account, and the reward catalog spends them.
 - **A filed receipt hangs on the booking.** Upload it once and it belongs to the transaction, the shared expense and the inventory item at the same time.
 
-## The nineteen modules
+## The twenty modules
 
 Turn on what your household needs; the rest stays out of the way.
 
@@ -84,6 +84,7 @@ Turn on what your household needs; the rest stays out of the way.
 | **Inventory** | What you own: purchase price, warranty, condition and storage location, with linked receipts and deadline reminders. Off by default; households turn it on. |
 | **Budget** | Income, expenses, accounts, loans, subscriptions and per-category planning, with a personal mode. An entry can share its amount while keeping its title and category private, so a shared account's balance stays right. |
 | **Housekeeping** | Household staff: schedules, check-in/out, daily or hourly billing, chores and supply requests. |
+| **Waste collection** | Weekly or fixed-day-of-month pickup schedules per waste type, with one-off dates and per-occurrence moves or skips. Off by default. |
 | **Rewards** | Points on tasks credit the assigned member, with a parent-approved catalog and an auditable ledger. |
 | **Health** | Per-member vitals, medications, labs, activity and cycle tracking, with trend charts. |
 | **Schedule** | Rotating shift patterns and fixed weekly timetables from one cycle model, with per-day overrides and an explicit free day. The calendar shows them as a read-only overlay computed on read, so changing a pattern leaves no stale appointments behind. Off by default. |

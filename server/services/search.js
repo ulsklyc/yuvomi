@@ -75,6 +75,7 @@ const BUCKET_MODULE = Object.freeze({
   items: 'shopping',
   meds: 'health',
   activities: 'health',
+  waste: 'waste',
 });
 
 /** Die Module, aus denen die Suche liest - die Menge, gegen die Token-Scopes geprüft werden. */
@@ -250,6 +251,20 @@ export function runSearch(database, q, userId, { hiddenModules = null } = {}) {
     ORDER BY a.performed_at DESC
     LIMIT @limit
   `).all({ match, userId, limit });
+
+  // Waste: nur der Typ-Katalog ist indiziert (Migration 206) - nie die von
+  // waste-domain.js berechneten, potenziell unbegrenzten Termine (siehe dortige
+  // Migrationsnotiz). Kein Besitzer-Filter (Haushaltseigentum, wie Kontakte),
+  // archivierte Typen bleiben ausgeblendet wie überall sonst in Waste.
+  if (allows('waste')) results.waste = database.prepare(`
+    SELECT wt.id, wt.name AS title, wt.icon, wt.color
+    FROM search_index s
+    JOIN waste_types wt ON wt.id = s.entity_id
+    WHERE s.entity = 'waste_type' AND s.search_index MATCH @match
+      AND wt.archived = 0
+    ORDER BY wt.sort_order ASC, wt.name ASC
+    LIMIT @limit
+  `).all({ match, limit });
 
   return results;
 }

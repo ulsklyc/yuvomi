@@ -71,6 +71,14 @@ function renderPage(container) {
       </div>
     </section>
 
+    <section class="settings-section">
+      <h2 class="settings-section__title">${t('settings.wasteFeedTitle')}</h2>
+      <div class="settings-card">
+        <p class="settings-card-description">${t('settings.wasteFeedDescription')}</p>
+        <div id="waste-feed-body"></div>
+      </div>
+    </section>
+
   `);
 }
 
@@ -473,6 +481,143 @@ async function loadScheduleFeed(container) {
 }
 
 // --------------------------------------------------------------------------
+// Read-only ICS export feed - waste pickups, with an optional per-type
+// selection (#1063 Phase 10). Content is household-wide like the inventory
+// feed above (no owner/visibility column on waste data) - only the token and
+// the type selection are personal, see server/services/waste-ics.js.
+// --------------------------------------------------------------------------
+
+function renderWasteFeedInactive(body) {
+  body.replaceChildren();
+  body.insertAdjacentHTML('beforeend', `
+    <p class="settings-card-description">${t('settings.wasteFeedInactive')}</p>
+    <div class="settings-form-actions">
+      <button type="button" class="btn btn--primary" id="waste-feed-activate">${t('settings.wasteFeedActivate')}</button>
+    </div>
+  `);
+}
+
+function wasteFeedTypeRowsHtml(types, selectedIds) {
+  return types.map((type) => toggleRowHtml({
+    label: type.name,
+    checked: selectedIds === null || selectedIds.includes(type.id),
+    swatchColor: type.color,
+    attrs: { 'data-waste-feed-type': String(type.id) },
+  })).join('');
+}
+
+function renderWasteFeedActive(body, data, types) {
+  const webcal = data.url.replace(/^https?:\/\//i, 'webcal://');
+  body.replaceChildren();
+  body.insertAdjacentHTML('beforeend', `
+    <div class="form-group">
+      <label class="form-label" for="waste-feed-url">${t('settings.wasteFeedUrlLabel')}</label>
+      <input id="waste-feed-url" class="form-input" type="text" readonly value="${esc(data.url)}">
+      <p class="form-hint">${t('settings.wasteFeedHint')}</p>
+    </div>
+    ${types.length ? `
+      <div class="form-group">
+        <span class="form-label">${t('settings.wasteFeedTypesLabel')}</span>
+        <p class="form-hint">${t('settings.wasteFeedTypesHint')}</p>
+        <div id="waste-feed-types">${wasteFeedTypeRowsHtml(types, data.type_ids)}</div>
+      </div>
+    ` : ''}
+    <div class="settings-form-actions">
+      <button type="button" class="btn btn--secondary" id="waste-feed-copy">${t('settings.wasteFeedCopy')}</button>
+      <a class="btn btn--secondary" href="${esc(webcal)}">${t('settings.wasteFeedSubscribe')}</a>
+      <button type="button" class="btn btn--secondary" id="waste-feed-regen">${t('settings.wasteFeedRegenerate')}</button>
+      <button type="button" class="btn btn--danger-outline" id="waste-feed-disable">${t('settings.wasteFeedDisable')}</button>
+    </div>
+  `);
+}
+
+async function loadWasteFeed(container) {
+  const body = container.querySelector('#waste-feed-body');
+  if (!body) return;
+
+  const reload = () => loadWasteFeed(container);
+
+  let res;
+  let typesRes;
+  try {
+    [res, typesRes] = await Promise.all([api.get('/waste/feed'), api.get('/waste/types')]);
+  } catch (err) {
+    body.replaceChildren();
+    body.appendChild(createInlineError(err.message || t('common.errorGeneric')));
+    return;
+  }
+
+  const data = res?.data;
+  const types = typesRes?.data ?? [];
+  if (!data) {
+    renderWasteFeedInactive(body);
+    body.querySelector('#waste-feed-activate')?.addEventListener('click', async () => {
+      try {
+        await api.post('/waste/feed/regenerate');
+        showToast(t('settings.wasteFeedTitle'), 'success');
+        await reload();
+      } catch (err) {
+        showToast(err.message || t('common.errorGeneric'), 'danger');
+      }
+    });
+    return;
+  }
+
+  renderWasteFeedActive(body, data, types);
+
+  body.querySelector('#waste-feed-copy')?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard?.writeText(data.url);
+      showToast(t('settings.wasteFeedCopied'), 'success');
+    } catch (err) {
+      showToast(err.message || t('common.errorGeneric'), 'danger');
+    }
+  });
+  body.querySelector('#waste-feed-regen')?.addEventListener('click', async () => {
+    if (!await confirmModal(t('settings.wasteFeedRegenerateConfirm'),
+      { danger: true, detail: t('settings.wasteFeedRegenerateConfirmDetail') })) return;
+    try {
+      await api.post('/waste/feed/regenerate');
+      await reload();
+    } catch (err) {
+      showToast(err.message || t('common.errorGeneric'), 'danger');
+    }
+  });
+  body.querySelector('#waste-feed-disable')?.addEventListener('click', async () => {
+    if (!await confirmModal(t('settings.wasteFeedDisableConfirm'),
+      { danger: true, detail: t('settings.wasteFeedDisableConfirmDetail') })) return;
+    try {
+      await api.delete('/waste/feed');
+      await reload();
+    } catch (err) {
+      showToast(err.message || t('common.errorGeneric'), 'danger');
+    }
+  });
+  // Leeres Ergebnis (alle abgewaehlt) oder alle angehakt heisst wieder "kein
+  // Filter" - derselbe "leeres Set = alle"-Vertrag wie ueberall sonst in
+  // dieser Codebase (state.people in calendar.js), server-seitig als null
+  // statt eines leeren Arrays gespeichert (siehe waste-ics.js).
+  body.querySelector('#waste-feed-types')?.addEventListener('change', async (e) => {
+    const input = e.target;
+    if (!(input instanceof HTMLInputElement) || !input.dataset.wasteFeedType) return;
+    const checked = [...body.querySelectorAll('[data-waste-feed-type]')]
+      .filter((el) => el.checked)
+      .map((el) => Number(el.dataset.wasteFeedType));
+    const typeIds = (checked.length === 0 || checked.length === types.length) ? null : checked;
+    input.disabled = true;
+    try {
+      await api.put('/waste/feed/types', { type_ids: typeIds });
+      showToast(t('settings.wasteFeedSaved'), 'success');
+    } catch (err) {
+      input.checked = !input.checked;
+      showToast(err.message || t('common.errorGeneric'), 'danger');
+    } finally {
+      input.disabled = false;
+    }
+  });
+}
+
+// --------------------------------------------------------------------------
 // Entry point
 // --------------------------------------------------------------------------
 
@@ -482,5 +627,6 @@ export async function render(container) {
   await loadInventoryFeed(container);
   await loadCycleFeed(container);
   await loadScheduleFeed(container);
+  await loadWasteFeed(container);
   window.lucide?.createIcons({ el: container });
 }

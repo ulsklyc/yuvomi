@@ -1279,6 +1279,10 @@
           <div class="hint" data-i18n="advanced.recipeProviderPrivateNetworkHint">Needed for a Mealie or Tandoor instance on your own network. Lifts the SSRF protection for recipe provider mirrors.</div>
         </div>
         <div class="field">
+          <label><input type="checkbox" id="adv-waste-source-private"> <span data-i18n="advanced.wasteSourcePrivateNetwork">Allow waste collection feeds on your home network</span></label>
+          <div class="hint" data-i18n="advanced.wasteSourcePrivateNetworkHint">Needed for a municipal waste calendar mirrored on your own network. Lifts the SSRF protection for waste collection URL sources.</div>
+        </div>
+        <div class="field">
           <label><input type="checkbox" id="adv-document-webdav-private"> <span data-i18n="advanced.documentWebdavPrivateNetwork">Allow a WebDAV target on your home network</span></label>
           <div class="hint" data-i18n="advanced.documentWebdavPrivateNetworkHint">Needed for a Nextcloud on your own network. Lifts the SSRF protection for this target.</div>
         </div>
@@ -1735,6 +1739,7 @@ const S = {
   SYNC_INTERVAL_MINUTES: '',
   ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK: '',
   RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK: '',
+  WASTE_SOURCE_ALLOW_PRIVATE_NETWORK: '',
   MAX_UPLOAD_MB: '',
   DOCUMENT_STORAGE_LOCAL_ENABLED: '',
   DOCUMENT_STORAGE_LOCAL_PATH: '',
@@ -1869,6 +1874,7 @@ function buildEnv() {
     DATA_DIR: S.DATA_DIR,
     ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK: S.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK,
     RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK: S.RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK,
+    WASTE_SOURCE_ALLOW_PRIVATE_NETWORK: S.WASTE_SOURCE_ALLOW_PRIVATE_NETWORK,
     MAX_UPLOAD_MB: S.MAX_UPLOAD_MB,
     DOCUMENT_STORAGE_LOCAL_ENABLED: S.DOCUMENT_STORAGE_LOCAL_ENABLED,
     DOCUMENT_STORAGE_LOCAL_PATH: S.DOCUMENT_STORAGE_LOCAL_PATH,
@@ -2699,6 +2705,7 @@ $('adv-next').addEventListener('click', () => {
   // Die drei Heimnetz-Freigaben stehen seit der Zusammenfuehrung beisammen.
   S.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK = $('adv-ics-private').checked ? 'true' : '';
   S.RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK = $('adv-recipe-provider-private').checked ? 'true' : '';
+  S.WASTE_SOURCE_ALLOW_PRIVATE_NETWORK = $('adv-waste-source-private').checked ? 'true' : '';
   S.DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK =
     $('adv-document-webdav-private').checked ? 'true' : '';
 
@@ -2765,6 +2772,7 @@ function renderReview() {
   const privateNet = [
     S.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK === 'true' && t('review.privateNetworkIcs'),
     S.RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK === 'true' && t('review.privateNetworkRecipes'),
+    S.WASTE_SOURCE_ALLOW_PRIVATE_NETWORK === 'true' && t('review.privateNetworkWaste'),
     S.DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK === 'true' && t('review.privateNetworkWebdav'),
   ].filter(Boolean);
   // "nicht freigegeben" statt "deaktiviert": der unberuehrte Default ist keine

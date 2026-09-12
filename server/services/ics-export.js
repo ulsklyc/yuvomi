@@ -5,7 +5,7 @@
  * Abhängigkeiten: keine externen.
  */
 
-import { randomBytes } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import {
   householdTimeZone, isValidTimeZone, localToUTC, shiftDateKey, utcToWall,
 } from '../utils/timezone.js';
@@ -23,7 +23,12 @@ function escapeICSText(s) {
     .replace(/\\/g, '\\\\')
     .replace(/;/g, '\\;')
     .replace(/,/g, '\\,')
-    .replace(/\r?\n/g, '\\n');
+    // Jeder Zeilenumbruch wird zu '\n' - nicht nur '\r\n'/'\n'. Ein einzelnes
+    // '\r' (kein Editor tippt das, aber ein praeparierter Titel kann es tragen)
+    // ging vorher unveraendert durch: eine rohe CR-Steuerzeichenfolge in einer
+    // gefalteten ICS-Zeile ist eine Zeilenumbruch-Injektion in den generierten
+    // Feed (ein Abonnent koennte sie als Beginn einer neuen Property lesen).
+    .replace(/\r\n|\r|\n/g, '\\n');
 }
 
 function foldLine(line) {
@@ -403,10 +408,24 @@ function clearFeedToken(conn, userId) {
   conn.prepare(`UPDATE users SET calendar_feed_token = NULL WHERE id = ?`).run(userId);
 }
 
+/**
+ * Findet den Besitzer eines Feed-Tokens ueber timingSafeEqual statt eine
+ * SQL-Gleichheit `WHERE token = ?` (die als String-Vergleich je Zeile frueh
+ * abbrechen kann, sobald das erste Byte abweicht - dieselbe Klasse Fehler,
+ * gegen die CSRF/TOTP timingSafeEqual schon einsetzen). Ein Token ist immer
+ * fest lang (randomBytes(32).toString('base64url')), ein `?token=`-Query-Wert
+ * vom Client dagegen beliebig lang - die Laengenpruefung selbst verraet
+ * nichts Geheimes, sie steht nur davor, weil timingSafeEqual bei
+ * ungleicher Laenge wirft.
+ */
 function findUserIdByFeedToken(conn, token) {
   if (!token) return null;
-  const row = conn.prepare(`SELECT id FROM users WHERE calendar_feed_token = ?`).get(token);
-  return row?.id ?? null;
+  const candidate = Buffer.from(token, 'utf8');
+  for (const row of conn.prepare(`SELECT id, calendar_feed_token AS t FROM users WHERE calendar_feed_token IS NOT NULL`).all()) {
+    const stored = Buffer.from(row.t, 'utf8');
+    if (stored.length === candidate.length && timingSafeEqual(stored, candidate)) return row.id;
+  }
+  return null;
 }
 
 function getFeedShowAssignees(conn, userId) {
