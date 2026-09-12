@@ -48,29 +48,31 @@ import { SETTINGS_LEAVES } from '../public/settings/registry.js';
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * Nimmt dem Seed jede Erinnerung, bevor der Ausgangsstand entsteht (#1160).
+ * Verwirft jede Erinnerung des Ausgangsstands (#1160).
  *
- * Der Seed traegt Geburtstage mit festem Datum und Vorlauf (Lena Braun am 12.09.,
- * einen Tag vorher), und der Harness seedet am Lauftag. An solchen Tagen ist eine
- * Erinnerung faellig, ihr Toast liegt ueber dem Fuss eines offenen Dialogs und
- * nimmt den Klick auf "Speichern": am 12.09.2026 wurden dadurch drei
- * Kalender-Sonden rot, einen Tag spaeter waeren sie zufaellig wieder gruen
- * gewesen. Keine Sonde prueft Erinnerungen, also soll auch keine davon abhaengen,
- * an welchem Tag der Handlauf faehrt. Der Fehler in der Oberflaeche selbst ist
- * #1160 und gehoert in eine eigene Sonde, nicht in ein Ausblenden hier.
+ * Der Seed traegt Geburtstage mit festem Datum und Vorlauf, und der Harness
+ * seedet am Lauftag. An solchen Tagen ist eine Erinnerung faellig, ihr Toast
+ * liegt ueber dem Fuss eines offenen Dialogs und nimmt den Klick auf
+ * "Speichern": am 12.09.2026 wurden dadurch drei Kalender-Sonden rot, einen Tag
+ * spaeter waeren sie zufaellig wieder gruen gewesen. Keine Sonde prueft
+ * Erinnerungen, also soll auch keine davon abhaengen, an welchem Tag der
+ * Handlauf faehrt. Der Fehler in der Oberflaeche selbst ist #1160 und gehoert in
+ * eine eigene Sonde, nicht in ein Ausblenden hier.
  *
- * `dismissed = 1` reicht NICHT: `GET /reminders/pending` ruft
- * `syncAllBirthdayReminders`, und `syncBirthdayReminder` legt die Erinnerung neu
- * und unverworfen an, sobald keine aktive Zeile mehr passt. Erst ein leerer
- * `reminder_offset` laesst die Synchronisation die Zeile loeschen.
+ * VERWORFEN, NICHT GELOESCHT, und die Geburtstage bleiben unangetastet. Ihre
+ * Kalendertermine und Erinnerungen entstehen erst beim ersten Abgleich
+ * (`syncAllBirthdayReminders`, ausgeloest von `GET /reminders/pending`); deshalb
+ * gleicht `startHarness` einmal als die angemeldete Person ab, BEVOR diese
+ * Funktion laeuft. Der erste Versuch leerte stattdessen `reminder_offset` - der
+ * Wert bedeutet in `syncBirthdayCalendarEvent` aber auch "kein Termin", und der
+ * Kalender haette fuer den ganzen Lauf keinen einzigen Geburtstag mehr gezeigt
+ * (Review an #1161). Dass eine Verwerfung den naechsten Abgleich ueberlebt, gilt
+ * erst, seit `syncBirthdayReminder` die Zeile desselben Termins behaelt.
  */
-function neutralizeSeedReminders(dbPath) {
+function dismissAllReminders(dbPath) {
   const db = new Database(dbPath);
   try {
-    db.transaction(() => {
-      db.prepare("UPDATE birthdays SET reminder_offset = ''").run();
-      db.prepare('DELETE FROM reminders').run();
-    })();
+    return db.prepare('UPDATE reminders SET dismissed = 1 WHERE dismissed = 0').run().changes;
   } finally {
     db.close();
   }
@@ -317,7 +319,6 @@ export async function startHarness() {
     await stopServer(migrator);
 
     await run(process.execPath, ['scripts/seed-demo.js', '--db', dbPath, '--locale', 'de']);
-    neutralizeSeedReminders(dbPath);
 
     server = startServer(dbPath, port);
     await waitForHttp(baseUrl);
@@ -342,7 +343,14 @@ export async function startHarness() {
   // und der Login-Limiter sieht keinen zweiten Versuch.
   let snapshotPath = null;
   if (!external) {
+    // Ein Abgleich als die angemeldete Person legt die Geburtstagstermine und
+    // ihre Erinnerungen an; danach verwirft `dismissAllReminders` sie (#1160).
+    const pending = await fetch(`${baseUrl}/api/v1/reminders/pending`, {
+      headers: { Cookie: cookies.map((c) => `${c.name}=${c.value}`).join('; ') },
+    });
+    if (!pending.ok) throw new Error(`Abgleich der Erinnerungen fehlgeschlagen (${pending.status})`);
     await stopServer(server);
+    dismissAllReminders(dbPath);
     mkdirSync(join(tmpDir, 'snapshot'));
     snapshotPath = join(tmpDir, 'snapshot', 'guards.db');
     copyDatabase(dbPath, snapshotPath);
