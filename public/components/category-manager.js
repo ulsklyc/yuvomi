@@ -6,6 +6,7 @@
  *
  * Verhalten:
  *   - configure({ basePath, groups, groupField, supportsSubcategories, labelResolver, titleKey, hintKey,
+ *                 addMaxLength,
  *                 deleteConfirmKey, deleteDetailKey, subDeleteDetailKey })
  *   - Lädt via api.get(basePath); mutiert über post/put/patch/delete relativ zu basePath
  *   - Dispatcht nach jeder Mutation `category-manager-changed`
@@ -110,6 +111,7 @@ class CategoryManagerElement extends HTMLElement {
     this._rowIconResolver = null;
     this._addScopeLabelKey = 'noteCategories.scopeLabel';
     this._addScopeHelpKey = '';
+    this._addMaxLength = 60;
     this._cats = [];
     this._sortables = [];
     this._onClick = this._onClick.bind(this);
@@ -130,6 +132,9 @@ class CategoryManagerElement extends HTMLElement {
     this._rowIconResolver = typeof opts.rowIconResolver === 'function' ? opts.rowIconResolver : null;
     if (opts.addScopeLabelKey) this._addScopeLabelKey = opts.addScopeLabelKey;
     if (opts.addScopeHelpKey) this._addScopeHelpKey = opts.addScopeHelpKey;
+    if (Number.isInteger(opts.addMaxLength) && opts.addMaxLength > 0) {
+      this._addMaxLength = opts.addMaxLength;
+    }
     if (opts.deleteConfirmKey) this._deleteConfirmKey = opts.deleteConfirmKey;
     if (opts.deleteDetailKey) this._deleteDetailKey = opts.deleteDetailKey;
     if (opts.subDeleteDetailKey) this._subDeleteDetailKey = opts.subDeleteDetailKey;
@@ -208,7 +213,7 @@ class CategoryManagerElement extends HTMLElement {
           ${items.map((c, i) => this._rowHtml(c, g, i === 0, i === items.length - 1)).join('')}
         </ul>
         ${this._unifiedAdd ? '' : `<form class="cat-add-form" data-group="${esc(g.key)}" novalidate autocomplete="off">
-          <input class="form-input" type="text" maxlength="60"
+          <input class="form-input" type="text" maxlength="${this._addMaxLength}"
                  placeholder="${esc(t(this._addPlaceholderKey))}"
                  aria-label="${esc(t(this._addPlaceholderKey))}" />
           <button type="submit" class="btn btn--primary">${esc(t(g.addLabelKey || 'common.add'))}</button>
@@ -227,7 +232,7 @@ class CategoryManagerElement extends HTMLElement {
       : '';
     return `<form class="cat-add-form cat-add-form--unified" data-group="${esc(this._groups[0]?.key ?? '')}"
                   novalidate autocomplete="off">
-      <input class="form-input" type="text" maxlength="60"
+      <input class="form-input" type="text" maxlength="${this._addMaxLength}"
              placeholder="${esc(t(this._addPlaceholderKey))}"
              aria-label="${esc(t(this._addPlaceholderKey))}" />
       ${hasScopeChoice ? `<div class="cat-add-form__scope">

@@ -108,6 +108,14 @@ test('configured scope label key labels the unified scope selector', () => {
   assert.match(manager._unifiedAddFormHtml(), /aria-label="custom\.scope\.label"/);
 });
 
+test('configured add-name limit reaches the unified category input', () => {
+  const legacy = managerWithCategory({ unifiedAdd: true });
+  const notes = managerWithCategory({ unifiedAdd: true, addMaxLength: 80 });
+
+  assert.match(legacy._unifiedAddFormHtml(), /maxlength="60"/);
+  assert.match(notes._unifiedAddFormHtml(), /maxlength="80"/);
+});
+
 test('configured group field renders categories returned with a scope', () => {
   const manager = managerWithCategory({
     groupField: 'scope',

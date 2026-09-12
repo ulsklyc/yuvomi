@@ -1169,6 +1169,7 @@ function openNoteCategoryManager() {
           : 'noteCategories.personalManagementHint',
         deleteDetailKey: 'noteCategories.deleteDetail',
         unifiedAdd: true,
+        addMaxLength: 80,
         rowIconResolver: (item) => item.scope === 'personal' ? 'user' : 'home',
         addScopeLabelKey: 'noteCategories.scopeLabel',
         addScopeHelpKey: 'noteCategories.scopeHelp',
