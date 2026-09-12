@@ -41,10 +41,40 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import Database from 'better-sqlite3-multiple-ciphers';
 import puppeteer from 'puppeteer';
 import { SETTINGS_LEAVES } from '../public/settings/registry.js';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+/**
+ * Nimmt dem Seed jede Erinnerung, bevor der Ausgangsstand entsteht (#1160).
+ *
+ * Der Seed traegt Geburtstage mit festem Datum und Vorlauf (Lena Braun am 12.09.,
+ * einen Tag vorher), und der Harness seedet am Lauftag. An solchen Tagen ist eine
+ * Erinnerung faellig, ihr Toast liegt ueber dem Fuss eines offenen Dialogs und
+ * nimmt den Klick auf "Speichern": am 12.09.2026 wurden dadurch drei
+ * Kalender-Sonden rot, einen Tag spaeter waeren sie zufaellig wieder gruen
+ * gewesen. Keine Sonde prueft Erinnerungen, also soll auch keine davon abhaengen,
+ * an welchem Tag der Handlauf faehrt. Der Fehler in der Oberflaeche selbst ist
+ * #1160 und gehoert in eine eigene Sonde, nicht in ein Ausblenden hier.
+ *
+ * `dismissed = 1` reicht NICHT: `GET /reminders/pending` ruft
+ * `syncAllBirthdayReminders`, und `syncBirthdayReminder` legt die Erinnerung neu
+ * und unverworfen an, sobald keine aktive Zeile mehr passt. Erst ein leerer
+ * `reminder_offset` laesst die Synchronisation die Zeile loeschen.
+ */
+function neutralizeSeedReminders(dbPath) {
+  const db = new Database(dbPath);
+  try {
+    db.transaction(() => {
+      db.prepare("UPDATE birthdays SET reminder_offset = ''").run();
+      db.prepare('DELETE FROM reminders').run();
+    })();
+  } finally {
+    db.close();
+  }
+}
 
 /** Die 16 Hauptrouten - dieselbe Liste, die capture.mjs und head-audit belegen. */
 export const ROUTES = {
@@ -287,6 +317,7 @@ export async function startHarness() {
     await stopServer(migrator);
 
     await run(process.execPath, ['scripts/seed-demo.js', '--db', dbPath, '--locale', 'de']);
+    neutralizeSeedReminders(dbPath);
 
     server = startServer(dbPath, port);
     await waitForHttp(baseUrl);
