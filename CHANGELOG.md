@@ -36,6 +36,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and used only when tapped - no geocoding, nothing looked up in advance. An address imported over
   CalDAV with escaped line breaks is searched as one line.
 
+- **A shopping list follows what the rest of the household does, while it is open.** Two people
+  in the same shop used to see two different lists: what one ticked off stayed unticked on the
+  other's phone until that page was reloaded. The open list now hears about changes within about ten
+  seconds and redraws the affected rows in place - the same gesture as your own tap, no jump, no
+  animation - and rebuilds only when an item was added, removed or renamed.
+
+  The server keeps a change counter per list, maintained by database triggers rather than by the
+  routes: shopping items are written from six modules (the list itself, meal-plan and recipe
+  imports, the housekeeping module, MCP, the CalDAV to-do sync), and a counter that every writer
+  has to remember is a counter one of them forgets. The counter also moves when a list is renamed,
+  and its row goes with the list, so a list someone else deletes disappears from your screen too.
+  The open page asks `GET /api/v1/shopping/versions` every ten seconds while the tab is visible,
+  and at once when it becomes visible or gets focus - the moment somebody looks at the phone. It
+  reloads only a list whose number moved, through the same request it used to open it, so there
+  is still one read path. Deliberately a poll and not an open stream: it works through any
+  reverse proxy, holds no connection, and can grow into a stream on the same counter later. Your
+  own taps do not cost a reload: the write routes answer with the counter before and after, and
+  the page skips the reload when nothing else moved in between.
+
 - **A shopping item can carry a price and the shop it was bought at** (#1003, first cut). Both sit
   in the item dialog, where the item is already open - the checkbox stays the fastest gesture in the
   app and gains no second step. The price is stored in whole minor units (cents, yen, fils) rather

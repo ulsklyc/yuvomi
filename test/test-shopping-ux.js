@@ -75,9 +75,14 @@ function resetShoppingState() {
   // Wasserstandsmarke aus einem frueheren Fall verwirft sonst die Auffrischung
   // des naechsten - der Fall ist dann isoliert gruen und in der Suite rot.
   __test.intents.clear();
+  __test.pendingRemovals.clear();
   __test.resetLoadOrderForTest();
   __test.state.items = [];
   __test.state.categories = [];
+  // Ein Fehlerbild aus einem frueheren Fall (loadLists faengt selbst und
+  // vermerkt es) liesse die Live-Aktualisierung des naechsten stumm bleiben.
+  __test.state.listsError = null;
+  __test.state.itemsError = null;
   __test.state.activeListId = 1;
   __test.state.currentUserId = 7;
   __test.state.collapsedCategories = new Set();
@@ -1158,4 +1163,686 @@ test('nach einem Fehlschlag derselben Liste wird die gecachte Antwort angenommen
   assert.equal(__test.state.items.length, 1,
     'ist der Bestand verworfen, ist die gecachte Antwort das Beste, was es gibt');
   delete globalThis.__apiStub;
+});
+
+// --------------------------------------------------------
+// Live-Aktualisierung: fremde Aenderungen erreichen den Zettel
+// --------------------------------------------------------
+
+const bread = (isChecked = 0) => ({ id: 11, name: 'Brot', is_checked: isChecked, category: 'Backwaren', sort_order: 0 });
+const listRow = (checked) => ({ id: 1, name: 'Einkauf', item_total: 2, item_checked: checked });
+
+test('liveRefreshPlan: bewegt sich nur der Haken, bleiben die Zeilen stehen - auch in anderer Reihenfolge', () => {
+  const previous = [milk(0), bread(0)];
+  // Der Server sortiert Abgehaktes ans Ende: die Antwort kommt in anderer Reihenfolge.
+  const fresh = [bread(0), milk(1)];
+  const plan = __test.liveRefreshPlan(previous, fresh);
+  assert.equal(plan.rebuild, false, 'dieselben Artikel, dieselben Namen: kein Neuaufbau, keine Animation, kein Sprung');
+  assert.deepEqual(plan.changed.map((i) => i.id), [10], 'nur die Zeile mit dem neuen Haken wird umgefaerbt');
+});
+
+test('liveRefreshPlan: ein neuer, fehlender, umbenannter oder umsortierter Artikel baut die Liste neu', () => {
+  const previous = [milk(0), bread(0)];
+  const rebuilds = {
+    'dazugekommen':      [milk(0), bread(0), { id: 12, name: 'Eier', is_checked: 0, category: 'Sonstiges' }],
+    'verschwunden':      [milk(0)],
+    'umbenannt':         [{ ...milk(0), name: 'Hafermilch' }, bread(0)],
+    'andere Kategorie':  [{ ...milk(0), category: 'Kuehlregal' }, bread(0)],
+    'andere Menge':      [{ ...milk(0), quantity: '2 l' }, bread(0)],
+  };
+  for (const [why, fresh] of Object.entries(rebuilds)) {
+    assert.equal(__test.liveRefreshPlan(previous, fresh).rebuild, true, why);
+  }
+  assert.equal(__test.liveRefreshPlan([], []).rebuild, false, 'leer zu leer ist keine Bewegung');
+});
+
+test('refreshFromFeed: die aktive Liste laedt Listen UND Artikel, eine andere nur die Listenzeile', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0), { id: 2, name: 'Baumarkt', item_total: 0, item_checked: 0 }];
+  __test.state.items = [milk(0), bread(0)];
+
+  const calls = [];
+  globalThis.__apiStub = {
+    get: async (path) => { calls.push(path); return { data: [listRow(1), { id: 2, name: 'Baumarkt', item_total: 3, item_checked: 0 }] }; },
+    getWithSource: async (path) => { calls.push(path); return { data: { data: [bread(0), milk(1)] }, fromCache: false }; },
+  };
+  const signal = new AbortController().signal;
+
+  await __test.refreshFromFeed(makeNullContainer(), 1, signal);
+  assert.deepEqual([...calls].sort(), ['/shopping', '/shopping/1/items']);
+  assert.equal(__test.state.items.find((i) => i.id === 10).is_checked, 1, 'der fremde Haken steht im Serverstand');
+  assert.equal(__test.state.lists[0].item_checked, 1, 'der Zaehler im Reiter folgt');
+
+  calls.length = 0;
+  await __test.refreshFromFeed(makeNullContainer(), 2, signal);
+  assert.deepEqual(calls, ['/shopping'], 'fuer eine andere Liste reicht der Zaehler - switchList laedt ohnehin frisch');
+  assert.equal(__test.state.lists[1].item_total, 3);
+  delete globalThis.__apiStub;
+});
+
+test('refreshFromFeed: ein Fehler beim Nachladen bleibt still und laesst den letzten Stand stehen', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0)];
+  globalThis.__apiStub = {
+    get: async () => { throw Object.assign(new Error('500'), { data: { error: 'kaputt' } }); },
+    getWithSource: async () => { throw Object.assign(new Error('500'), { data: { error: 'kaputt' } }); },
+  };
+  const warnings = [];
+  const origWarn = console.warn;
+  console.warn = (...args) => warnings.push(args);
+  await assert.doesNotReject(() => __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal));
+  console.warn = origWarn;
+  assert.equal(__test.state.items.length, 1, 'der Bestand bleibt');
+  assert.equal(__test.state.itemsError, null, 'kein Fehlerbild fuer eine stille Auffrischung');
+  // loadLists() faengt selbst und leert die Listen - eine stille Auffrischung
+  // darf daraus weder leere Reiter noch einen Merker machen, der jede weitere
+  // Meldung abweist.
+  assert.equal(__test.state.lists.length, 1, 'die Reiter bleiben stehen');
+  assert.equal(__test.state.listsError, null, 'kein Merker, der die naechste Meldung stumm schaltet');
+  delete globalThis.__apiStub;
+});
+
+test('refreshFromFeed: die eigene, noch unbestaetigte Bearbeitung ueberlebt die Meldung des Feeds', async () => {
+  resetShoppingState();
+  __test.intents.clear();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0)];
+
+  const gate = deferred();
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    // Die Antwort kennt den Haken noch nicht: der eigene PATCH ist unterwegs.
+    getWithSource: async () => ({ data: { data: [milk(0)] }, fromCache: false }),
+    patch: () => gate.promise,
+  };
+
+  const toggling = __test.toggleShoppingItem(10, 0, makeNullContainer());
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  assert.equal(__test.checkedOf(__test.state.items[0]), 1,
+    'die Absicht ueberlagert den alten Serverstand - die Zeile springt nicht zurueck');
+  assert.equal(__test.intents.size, 1, 'die Absicht steht, bis eine Antwort sie traegt');
+
+  gate.resolve({ data: null });
+  await toggling;
+  delete globalThis.__apiStub;
+});
+
+test('refreshFromFeed: die Meldung der EIGENEN Aenderung erfuellt die Absicht, statt sie zurueckzudrehen', async () => {
+  resetShoppingState();
+  __test.intents.clear();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0)];
+
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(1)] }),
+    getWithSource: async () => ({ data: { data: [milk(1)] }, fromCache: false }),
+    patch: async () => ({ data: null }),
+  };
+  await __test.toggleShoppingItem(10, 0, makeNullContainer());
+  assert.equal(__test.intents.size, 1);
+
+  // Der Trigger meldet auch den eigenen Haken; die Antwort darauf traegt ihn.
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  assert.equal(__test.intents.size, 0, 'die Antwort traegt den gewollten Wert - die Absicht ist erfuellt');
+  assert.equal(__test.checkedOf(__test.state.items[0]), 1);
+  delete globalThis.__apiStub;
+});
+
+test('refreshFromFeed: ein abgebrochener Aufbau zeichnet nichts mehr', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0)];
+  const gate = deferred();
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(1)] }),
+    getWithSource: () => gate.promise,
+  };
+  const ac = new AbortController();
+  const refreshing = __test.refreshFromFeed(makeNullContainer(), 1, ac.signal);
+  ac.abort(); // die Seite wird verlassen, waehrend die Antwort unterwegs ist
+  gate.resolve({ data: { data: [milk(1)] }, fromCache: false });
+  await refreshing;
+  assert.equal(__test.state.lists[0].item_checked, 1,
+    'der Serverstand kommt an - er ist die Wahrheit, gleich wer sie noch anschaut');
+  delete globalThis.__apiStub;
+});
+
+test('refreshFromFeed: ist die aktive Liste weg, wechselt der Zettel auf die erste verbliebene', async () => {
+  resetShoppingState();
+  __test.state.activeListId = 1;
+  __test.state.lists = [listRow(0), { id: 2, name: 'Baumarkt', item_total: 0, item_checked: 0 }];
+  __test.state.items = [milk(0)];
+  const calls = [];
+  globalThis.__apiStub = {
+    // Liste 1 hat jemand anderes geloescht: die Antwort kennt nur noch Liste 2.
+    get: async (path) => { calls.push(path); return { data: [{ id: 2, name: 'Baumarkt', item_total: 1, item_checked: 0 }] }; },
+    getWithSource: async (path) => { calls.push(path); return { data: { data: [bread(0)], list: { id: 2, name: 'Baumarkt' } }, fromCache: false }; },
+  };
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  assert.equal(__test.state.activeListId, 2, 'die erste verbliebene Liste wird aktiv');
+  assert.ok(calls.includes('/shopping/2/items'), 'und geladen');
+  assert.deepEqual(__test.state.items.map((i) => i.id), [11]);
+  delete globalThis.__apiStub;
+});
+
+// --------------------------------------------------------
+// Undo-Fenster gegen eine Live-Auffrischung (Review zu PR #1109, Punkt 1 und 2)
+//
+// Der DELETE geht erst, wenn das Fenster zu ist. Landet in den fuenf Sekunden
+// eine Auffrischung, hat der Server den Artikel noch - und `loadItems` brachte
+// ihn zurueck, unter dem Toast, der ihn als geloescht meldet. Die Quittung des
+// DELETE rueckte die Marke danach vor, und keine Abfrage holte das nach.
+// --------------------------------------------------------
+
+/** Faengt das Undo-Fenster ab: der Test schliesst es selbst oder nimmt zurueck. */
+function captureUndo() {
+  const box = { last: null };
+  globalThis.__undoStub = (opts) => { box.last = opts; };
+  return box;
+}
+
+test('eine Auffrischung im Undo-Fenster bringt den geloeschten Artikel NICHT zurueck', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  const deletes = [];
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    // Der Server hat die Milch noch - der DELETE ist ja noch nicht raus.
+    getWithSource: async () => ({ data: { data: [milk(0), bread(1)] }, fromCache: false }),
+    delete: async (path) => { deletes.push(path); return { data: null, list_change: { list_id: 1, before: 5, after: 6 } }; },
+  };
+
+  __test.deleteItemUndoable(10, makeNullContainer());
+  assert.deepEqual(__test.state.items.map((i) => i.id), [11], 'die Zeile ist sofort weg');
+  assert.ok(__test.pendingRemovals.has(10), 'und als schwebend vermerkt');
+
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  assert.deepEqual(__test.state.items.map((i) => i.id), [11], 'die Auffrischung laesst die Milch draussen');
+  assert.equal(__test.state.items[0].is_checked, 1, 'traegt aber den fremden Haken am Brot ein');
+  assert.equal(__test.state.lists[0].item_total, 1, 'der Zaehler zaehlt die Milch nicht wieder mit');
+
+  await undo.last.commit({ keepalive: false });
+  assert.deepEqual(deletes, ['/shopping/items/10']);
+  assert.equal(__test.pendingRemovals.size, 0, 'mit dem DELETE ist nichts mehr schwebend');
+  assert.deepEqual(__test.state.items.map((i) => i.id), [11], 'und der Bestand ist der Serverstand nach dem DELETE');
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+test('Zuruecknehmen nach einer Auffrischung im Fenster bringt den Artikel genau EINMAL zurueck', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    getWithSource: async () => ({ data: { data: [milk(0), bread(0)] }, fromCache: false }),
+  };
+
+  __test.deleteItemUndoable(10, makeNullContainer());
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  undo.last.restore();
+
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 11], 'einmal Milch, nicht zweimal');
+  assert.equal(__test.pendingRemovals.size, 0, 'nichts mehr schwebend');
+  assert.equal(__test.state.lists[0].item_total, 2, 'der Zaehler steht wieder auf dem Serverstand');
+
+  // Die naechste Auffrischung traegt die Milch wieder - sie ist nicht mehr schwebend.
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 11]);
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+test('ein fehlgeschlagener DELETE raeumt die Schwebe und bringt die Zeile zurueck', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  globalThis.__apiStub = {
+    delete: async () => { throw Object.assign(new Error('500'), { data: { error: 'kaputt' } }); },
+  };
+
+  __test.deleteItemUndoable(10, makeNullContainer());
+  await assert.rejects(() => undo.last.commit({ keepalive: false }));
+  assert.equal(__test.pendingRemovals.size, 0, 'der Fehlschlag laesst nichts schwebend zurueck');
+  // scheduleUndoableDelete ruft bei einem Fehlschlag restore - hier von Hand.
+  undo.last.restore(new Error('500'));
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 11]);
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+test('Abgehakte loeschen: die Auffrischung im Fenster bringt sie nicht zurueck, das Zuruecknehmen nicht doppelt', async () => {
+  resetShoppingState();
+  const eier = () => ({ id: 12, name: 'Eier', is_checked: 0, category: 'Sonstiges', sort_order: 0 });
+  __test.state.lists = [{ ...listRow(2), item_total: 3 }];
+  __test.state.items = [milk(1), bread(1), eier()];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  const deletes = [];
+  globalThis.__apiStub = {
+    get: async () => ({ data: [{ ...listRow(2), item_total: 3 }] }),
+    getWithSource: async () => ({ data: { data: [milk(1), bread(1), eier()] }, fromCache: false }),
+    delete: async (path) => { deletes.push(path); return { data: null, list_change: { list_id: 1, before: 5, after: 6 } }; },
+  };
+
+  __test.clearCheckedUndoable(makeNullContainer());
+  assert.deepEqual(__test.state.items.map((i) => i.id), [12]);
+  assert.equal(__test.pendingRemovals.size, 2);
+
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  assert.deepEqual(__test.state.items.map((i) => i.id), [12], 'die Abgehakten bleiben draussen');
+  assert.equal(__test.state.lists[0].item_total, 1, 'der Zaehler ohne die Abgehakten');
+  assert.equal(__test.state.lists[0].item_checked, 0);
+
+  undo.last.restore();
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 11, 12], 'jede genau einmal zurueck');
+  assert.equal(__test.pendingRemovals.size, 0);
+  assert.equal(__test.state.lists[0].item_total, 3);
+  assert.equal(__test.state.lists[0].item_checked, 2);
+  assert.deepEqual(deletes, [], 'zurueckgenommen - kein DELETE');
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+test('Abgehakte loeschen: das Schliessen des Fensters raeumt die Schwebe', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(1)];
+  __test.state.items = [milk(1), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  globalThis.__apiStub = {
+    delete: async () => ({ data: null, list_change: { list_id: 1, before: 5, after: 6 } }),
+  };
+  __test.clearCheckedUndoable(makeNullContainer());
+  await undo.last.commit({ keepalive: false });
+  assert.equal(__test.pendingRemovals.size, 0);
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+// --------------------------------------------------------
+// Eine Antwort, die VOR dem DELETE begann und NACH ihm eintrifft (Review zu
+// PR #1109, Runde 3)
+//
+// Das Fenster oeffnet die Live-Auffrischung selbst: eine Abfrage stoesst
+// `loadItems` an, und das Undo-Fenster schliesst, waehrend der GET noch
+// unterwegs ist. Raeumte der Erfolg des DELETE die Schwebe sofort, traege die
+// Antwort den Artikel zurueck - und er bliebe, weil die Quittung die Marke
+// vorgerueckt hat und keine Abfrage mehr nachlaedt. Die Reihenfolge der
+// Antworten steht in jedem Fall unten von Hand fest.
+// --------------------------------------------------------
+
+test('ein GET, der VOR dem DELETE begann und NACH ihm antwortet, bringt die Zeile nicht zurueck', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  let releaseGet;
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    // Der GET hat den Server gelesen, bevor der DELETE ankam: die Milch ist noch da.
+    getWithSource: () => new Promise((resolve) => {
+      releaseGet = () => resolve({ data: { data: [milk(0), bread(0)] }, fromCache: false });
+    }),
+    delete: async () => ({ data: null, list_change: { list_id: 1, before: 5, after: 6 } }),
+  };
+
+  __test.deleteItemUndoable(10, makeNullContainer());
+  const refresh = __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await new Promise((r) => setImmediate(r));
+  await undo.last.commit({ keepalive: false });
+  assert.ok(__test.pendingRemovals.has(10), 'bestaetigt, aber noch nicht geraeumt: ein aelterer GET ist unterwegs');
+  releaseGet();
+  await refresh;
+  assert.deepEqual(__test.state.items.map((i) => i.id), [11], 'die aeltere Antwort bringt die Milch nicht zurueck');
+  assert.equal(__test.pendingRemovals.size, 0, 'mit der letzten aelteren Antwort ist die Schwebe geraeumt');
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+test('ein Listen-Laden, das VOR dem DELETE begann und NACH ihm antwortet, zaehlt den Artikel nicht mehr mit', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(1)];
+  __test.state.items = [milk(1), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  let releaseLists;
+  globalThis.__apiStub = {
+    // Die Listenzeile vom Server VOR dem DELETE: zwei Artikel, einer abgehakt.
+    get: () => new Promise((resolve) => { releaseLists = () => resolve({ data: [listRow(1)] }); }),
+    getWithSource: async () => ({ data: { data: [milk(1), bread(0)] }, fromCache: false }),
+    delete: async () => ({ data: null, list_change: { list_id: 1, before: 5, after: 6 } }),
+  };
+
+  __test.deleteItemUndoable(10, makeNullContainer());
+  assert.equal(__test.state.lists[0].item_total, 1);
+  const refresh = __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await new Promise((r) => setImmediate(r));
+  await undo.last.commit({ keepalive: false });
+  releaseLists();
+  await refresh;
+  assert.equal(__test.state.lists[0].item_total, 1, 'der Zaehler traegt den Serverstand ohne die Milch');
+  assert.equal(__test.state.lists[0].item_checked, 0);
+  assert.deepEqual(__test.state.items.map((i) => i.id), [11]);
+  assert.equal(__test.pendingRemovals.size, 0);
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+test('Abgehakte loeschen: ein GET, der VOR dem DELETE begann und NACH ihm antwortet, bringt sie nicht zurueck', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(2)];
+  __test.state.items = [milk(1), bread(1)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  let releaseGet;
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(2)] }),
+    getWithSource: () => new Promise((resolve) => {
+      releaseGet = () => resolve({ data: { data: [milk(1), bread(1)] }, fromCache: false });
+    }),
+    delete: async () => ({ data: null, deleted: 2, list_change: { list_id: 1, before: 5, after: 6 } }),
+  };
+
+  __test.clearCheckedUndoable(makeNullContainer());
+  const refresh = __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await new Promise((r) => setImmediate(r));
+  await undo.last.commit({ keepalive: false });
+  releaseGet();
+  await refresh;
+  assert.deepEqual(__test.state.items, [], 'die aeltere Antwort bringt keine der Abgehakten zurueck');
+  assert.equal(__test.state.lists[0].item_total, 0);
+  assert.equal(__test.pendingRemovals.size, 0);
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+test('eine NACH dem DELETE begonnene Antwort ist die Wahrheit des Servers - auch wenn eine aeltere noch unterwegs ist', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  const gates = [];
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    getWithSource: () => new Promise((resolve) => { gates.push(resolve); }),
+    delete: async () => ({ data: null, list_change: { list_id: 1, before: 5, after: 6 } }),
+  };
+
+  __test.deleteItemUndoable(10, makeNullContainer());
+  const older = __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await new Promise((r) => setImmediate(r));
+  await undo.last.commit({ keepalive: false });
+  const newer = __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await new Promise((r) => setImmediate(r));
+  assert.equal(gates.length, 2);
+
+  // Die juengere Antwort zuerst. Sie traegt die Milch - was der Server nach dem
+  // DELETE sagt, gilt, die Schwebe filtert sie NICHT mehr (jemand koennte sie
+  // neu angelegt haben; im Test steht dafuer dieselbe Id).
+  gates[1]({ data: { data: [milk(0), bread(0)] }, fromCache: false });
+  await newer;
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 11], 'die juengere Antwort wird ungefiltert angewandt');
+
+  // Die aeltere danach: sie fasst den Stand nicht mehr an (Ladeordnung).
+  gates[0]({ data: { data: [bread(0)] }, fromCache: false });
+  await older;
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 11], 'die aeltere Antwort ueberschreibt die juengere nicht');
+  assert.equal(__test.pendingRemovals.size, 0, 'nichts mehr unterwegs, nichts mehr schwebend');
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+test('ein fehlgeschlagener DELETE raeumt sofort, auch wenn ein aelterer GET noch unterwegs ist', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  let releaseGet;
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    getWithSource: () => new Promise((resolve) => {
+      releaseGet = () => resolve({ data: { data: [milk(0), bread(0)] }, fromCache: false });
+    }),
+    delete: async () => { throw Object.assign(new Error('500'), { data: { error: 'kaputt' } }); },
+  };
+
+  __test.deleteItemUndoable(10, makeNullContainer());
+  const refresh = __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await new Promise((r) => setImmediate(r));
+  await assert.rejects(() => undo.last.commit({ keepalive: false }));
+  assert.equal(__test.pendingRemovals.size, 0, 'der Server hat die Milch noch - nichts ist schwebend');
+  undo.last.restore(new Error('500'));
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 11], 'restore bringt die Zeile zurueck');
+  releaseGet();
+  await refresh;
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 11], 'und die Antwort traegt sie genau einmal');
+  assert.equal(__test.state.lists[0].item_total, 2);
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+// --------------------------------------------------------
+// Abgehakte loeschen: die Route loescht, was BEIM EINTREFFEN abgehakt ist
+// (Review zu PR #1109, Runde 3). Hat jemand anderes im Undo-Fenster einen
+// weiteren Artikel abgehakt, nimmt der Server ihn mit - und die Quittung darf
+// die Marke dann nicht vorruecken, sonst laedt keine Abfrage die Zeile weg.
+// --------------------------------------------------------
+
+/** Feed samt Stubs: liefert, ob die naechste Abfrage bei `version` nachlaedt. */
+async function reloadsOnNextPoll({ deleted, version }) {
+  resetShoppingState();
+  __test.state.lists = [listRow(1)];
+  __test.state.items = [milk(1), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  let versions = [{ list_id: 1, version: 4 }];
+  const calls = [];
+  globalThis.__apiStub = {
+    get: async (path) => {
+      calls.push(path);
+      if (path === '/shopping/versions') return { data: versions };
+      return { data: [listRow(0)] };
+    },
+    getWithSource: async (path) => { calls.push(path); return { data: { data: [bread(0)] }, fromCache: false }; },
+    delete: async () => ({ deleted, list_change: { list_id: 1, before: 4, after: 5 } }),
+  };
+  const route = new AbortController();
+  try {
+    __test.wireLiveUpdates(makeNullContainer(), route.signal);
+    await settle(); // die erste Abfrage setzt die Marke auf 4
+
+    __test.clearCheckedUndoable(makeNullContainer()); // entfernt EINEN Artikel
+    await undo.last.commit({ keepalive: false });
+
+    versions = [{ list_id: 1, version }];
+    calls.length = 0;
+    await __test.getLiveFeedForTest().poll();
+    await settle();
+    return calls.includes('/shopping/1/items');
+  } finally {
+    route.abort();
+    __test.abortLiveUpdatesForTest();
+    delete globalThis.__apiStub;
+    delete globalThis.__undoStub;
+    delete global.window.yuvomi.showToast;
+  }
+}
+
+test('Abgehakte loeschen: hat der Server genau so viele entfernt wie die Seite, erspart die Quittung das Nachladen', async () => {
+  assert.equal(await reloadsOnNextPoll({ deleted: 1, version: 5 }), false);
+});
+
+test('Abgehakte loeschen: hat der Server MEHR entfernt als die Seite, laedt die naechste Abfrage nach', async () => {
+  assert.equal(await reloadsOnNextPoll({ deleted: 2, version: 5 }), true,
+    'der fremde Haken, den der Server mitgeloescht hat, verschwindet nur durch das Nachladen');
+});
+
+/** Kleinstes Panel fuer den Artikeldialog: Felder mit Wert, ein Formular mit submit-Handler. */
+function makeDialogPanel(values) {
+  const fields = {};
+  for (const [id, value] of Object.entries(values)) fields[`#${id}`] = { value, addEventListener() {} };
+  const handlers = {};
+  const form = { addEventListener(type, fn) { handlers[type] = fn; } };
+  return {
+    querySelector(sel) {
+      if (sel === '#item-details-form') return form;
+      return fields[sel] ?? null;
+    },
+    submit: () => handlers.submit({ preventDefault() {} }),
+  };
+}
+
+const dialogFields = (name, qty = '') => ({
+  'item-details-name': name, 'item-details-qty': qty, 'item-details-cat': 'Sonstiges',
+  'item-details-url': '', 'item-details-notes': '', 'item-details-price': '', 'item-details-store': '',
+  'item-details-link': '', 'item-details-cancel': '',
+});
+
+test('Speichern im Artikeldialog nach einer Auffrischung trifft die Zeile im BESTAND, nicht das alte Objekt', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0), bread(0)];
+  __test.state.categories = [{ id: 1, name: 'Sonstiges' }, { id: 2, name: 'Backwaren' }];
+  let onSave = null;
+  globalThis.__modalStub = (opts) => { onSave = opts.onSave; };
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    // Die Auffrischung ersetzt den Bestand durch NEUE Objekte (fremder Haken am Brot).
+    getWithSource: async () => ({ data: { data: [milk(0), bread(1)] }, fromCache: false }),
+    patch: async (path, payload) => ({
+      data: { ...milk(0), ...payload },
+      list_change: { list_id: 1, before: 6, after: 7 },
+    }),
+  };
+
+  __test.openItemDetails(10, makeNullContainer());
+  assert.equal(typeof onSave, 'function', 'der Dialog ist offen');
+  const panel = makeDialogPanel(dialogFields('Hafermilch', '2'));
+  onSave(panel);
+
+  // Waehrend der Dialog offen ist, meldet der Feed die Liste.
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await panel.submit();
+
+  const zeile = __test.state.items.find((i) => i.id === 10);
+  assert.equal(zeile.name, 'Hafermilch', 'die Bearbeitung steht im Bestand, aus dem die Liste zeichnet');
+  assert.equal(zeile.quantity, '2');
+  assert.equal(__test.state.items.find((i) => i.id === 11).is_checked, 1, 'der fremde Haken bleibt');
+
+  delete globalThis.__apiStub;
+  delete globalThis.__modalStub;
+});
+
+test('Speichern im Artikeldialog: ist der Artikel inzwischen weg, wirft das Speichern nicht', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0)];
+  __test.state.categories = [{ id: 1, name: 'Sonstiges' }];
+  let onSave = null;
+  globalThis.__modalStub = (opts) => { onSave = opts.onSave; };
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    getWithSource: async () => ({ data: { data: [] }, fromCache: false }),
+    patch: async (path, payload) => ({ data: { ...milk(0), ...payload }, list_change: { list_id: 1, before: 6, after: 7 } }),
+  };
+  __test.openItemDetails(10, makeNullContainer());
+  const panel = makeDialogPanel(dialogFields('Hafermilch'));
+  onSave(panel);
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await assert.doesNotReject(() => panel.submit());
+  assert.deepEqual(__test.state.items, [], 'kein Geisterobjekt im Bestand');
+  delete globalThis.__apiStub;
+  delete globalThis.__modalStub;
+});
+
+/** Zwei Makrotasks reichen, damit die Warteschlange Stub-Antworten verarbeitet hat. */
+const settle = async () => { for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0)); };
+
+test('wireLiveUpdates: die Abfrage haengt am Router-Signal, eine bewegte Nummer laedt nach, die eigene Quittung erspart das Nachladen', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0)];
+
+  let versions = [{ list_id: 1, version: 4 }];
+  const calls = [];
+  globalThis.__apiStub = {
+    get: async (path) => {
+      calls.push(path);
+      if (path === '/shopping/versions') return { data: versions };
+      return { data: [listRow(1)] };
+    },
+    getWithSource: async (path) => { calls.push(path); return { data: { data: [milk(1)] }, fromCache: false }; },
+    patch: async () => ({ data: null, list_change: { list_id: 1, before: 4, after: 6 } }),
+  };
+
+  const route = new AbortController();
+  try {
+    __test.wireLiveUpdates(makeNullContainer(), route.signal);
+    await settle();
+    assert.deepEqual(calls, ['/shopping/versions'], 'die erste Abfrage setzt nur die Marken');
+
+    // Der eigene Haken: die Quittung rueckt die Marke auf 6 - die naechste
+    // Abfrage sieht 6 und laedt NICHT nach.
+    await __test.toggleShoppingItem(10, 0, makeNullContainer());
+    versions = [{ list_id: 1, version: 6 }];
+    calls.length = 0;
+    await __test.getLiveFeedForTest().poll();
+    await settle();
+    assert.deepEqual(calls, ['/shopping/versions'], 'das eigene Werk loest kein Nachladen aus');
+
+    // Jemand anderes: die Nummer steigt ueber die Quittung hinaus.
+    versions = [{ list_id: 1, version: 7 }];
+    calls.length = 0;
+    await __test.getLiveFeedForTest().poll();
+    await settle();
+    assert.ok(calls.includes('/shopping/1/items'), 'eine fremde Bewegung laedt die aktive Liste nach');
+
+    const first = __test.getLiveFeedForTest();
+    __test.wireLiveUpdates(makeNullContainer(), route.signal);
+    assert.notEqual(__test.getLiveFeedForTest(), first, 'der naechste Aufbau derselben Seite hat seinen eigenen Feed');
+    await settle(); // die erste Abfrage des NEUEN Feeds ist durch
+    calls.length = 0;
+    await first.poll();
+    assert.deepEqual(calls, [], 'der Feed des vorigen Aufbaus fragt nicht mehr');
+
+    route.abort();
+    assert.equal(__test.getLiveFeedForTest(), null, 'die Seite verlassen beendet den Feed');
+  } finally {
+    // Der Takt hinge sonst am Prozess, wenn eine Zusicherung oben scheitert -
+    // die Suite endete dann nie.
+    route.abort();
+    __test.abortLiveUpdatesForTest();
+    delete globalThis.__apiStub;
+  }
 });

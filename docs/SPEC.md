@@ -440,6 +440,26 @@ rejects a grouped "1.000" instead of silently reading it as one.
 `store_id` is `ON DELETE SET NULL`, not `RESTRICT`: deleting a shop keeps every price and only
 clears the assignment. What was once paid stays true.
 
+### Shopping List Changes (migration v194)
+One row per list, a counter that says *that* the list or its items changed, never what. Every
+list has a row from the start (backfilled with 0 for existing lists, an insert trigger on
+`shopping_lists` for new ones), because a client takes the first version it sees as its baseline
+and a list without a row would lose its first change to that baseline. Triggers on
+`shopping_items` (after insert, update, delete, plus one for an item whose `list_id` changed,
+which bumps the list it left), on `shopping_item_tags` (after insert and delete, resolved to the
+list through the item) and on a `shopping_lists` update bump it, so every writer - the
+shopping routes, the meal-plan and recipe imports, housekeeping, MCP, the CalDAV to-do sync -
+counts without knowing about it; `GET /api/v1/shopping/versions` reads this table and nothing
+else. Deliberately no foreign key to Shopping Lists: the item triggers fire during the cascade of a
+list deletion and a foreign key would make exactly that insert fail; a trigger on `shopping_lists`
+removes the row after the list instead, and the missing row is how a client learns the list is
+gone. Deviates from the entity-table rule (no `id`, no timestamps) as a key/value table.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| list_id | INTEGER | PRIMARY KEY |
+| version | INTEGER | NOT NULL, DEFAULT 0 |
+
 ### Meals
 | Column | Type | Constraint |
 |--------|------|-----------|
@@ -3439,6 +3459,30 @@ The surface carries four things, in this order: **the time**, large (this is whe
 - Integration with meal plan: "Add ingredients to shopping list" transfers with source reference
 - **Bulk import from meal plan (v1.3.0):** a "From meal plan" action (in the list header until v2.2.3, since then in the chip row's overflow menu) opens a date-range dialog (defaults to the next 7 days) and imports the ingredients of every planned meal in that range into the active list. Repeated ingredients are aggregated before insertion — numeric quantities with a matching unit are summed, purely textual quantities collapse to a `N × …` note. Already-transferred ingredients are skipped via the existing `on_shopping_list` flag (`POST /api/v1/shopping/:listId/import-meal-plan`).
 - Checked items shown with strikethrough + moved to bottom
+- **Live updates while the list is open (migration v194):** an open list hears within a few
+  seconds that another member (or a meal-plan import, or the CalDAV sync) changed its items, and
+  redraws the affected rows in place - a check from another phone looks exactly like a check on
+  this one, no rebuild, no scroll jump. The list is rebuilt only when an item was added, removed
+  or renamed; a list someone else renamed or deleted updates the tab row, and a deleted active
+  list hands over to the first remaining one. The mechanism is two-layered: a per-list change
+  counter (`shopping_list_changes`) that database triggers bump on every insert/update/delete of
+  `shopping_items` (both lists when an item moves) and on a list rename, so no writer has to
+  announce itself; and `GET /api/v1/shopping/versions`, which the page polls every 10 s while
+  the tab is visible and immediately on `visibilitychange`/`focus`, reloading only a list whose
+  number moved - through the same items request it used to open the list, so there is still one
+  read path. Deliberately a poll, not a stream: `/api/v1` is the contract, a versions list works
+  through any proxy, holds none of the browser's per-origin connections, and can grow into a
+  stream on the same counter later without withdrawing anything. The poll is bound to the
+  router's abort signal (#976). Own edits cost no reload: the item write routes answer with
+  `list_change: { list_id, before, after }`, and the page advances its mark when `before` is the
+  version it last saw - if someone else wrote in between, `before` differs and the next poll
+  reloads. Own edits also survive a reload: the intent overlay (see the check-intent rules in
+  `public/pages/shopping.js`) keeps a pending tap on top of an older server answer, and a row
+  removed locally stays out of every answer that started before its DELETE was confirmed - during
+  the undo window and for a load still in flight when the window closes - because the receipt
+  has already moved the mark and no poll would reload it otherwise. "Clear checked" deletes
+  whatever is checked when the request arrives, so the page acknowledges its receipt only when
+  the server deleted exactly as many rows as the page removed; otherwise the next poll reloads.
 - **Manual item order within an aisle (v1.87.0, #678):** every row carries a drag handle next to its edit and delete actions. Dragging reorders within the category group only — a drag across groups would be a category change, which the item dialog already does, and ranks are per category anyway. The handle is a real button and takes ArrowUp/ArrowDown once focused, sharing one persistence path with the drag; that keyboard route is required of every `makeSortable` caller (see the header of `public/utils/sortable.js`) and is guarded in `test:frontend-audit`. Its `aria-label` carries the position, and a `role="status"` live region announces each move, reusing `category.reorderAnnounce`. Checked rows are filtered out of the drag and their handle is disabled — they sort last in their group regardless of rank. A category holding a single row hides its handle via `:only-child`. `PATCH /api/v1/shopping/:listId/items/reorder` takes `{ category, order }` and requires the **complete** group: a partial list would leave the omitted ranks colliding with the newly assigned ones. Requests are serialised per category with at most one follow-up queued, so rapid moves settle in the order they were made instead of letting the arrival order at the server decide; the follow-up reads the DOM when it starts, so any number of moves costs two requests. The list id is captured when a move is queued, so switching lists mid-flight neither misroutes the write nor overwrites the new list's state.
 - **Send the list to a member by email (#944):** an entry in the overflow menu mails the list's open
   items to one household member, grouped by category in the same shop order the screen shows.

@@ -20,6 +20,8 @@ import { findPageFab } from '/utils/fab.js';
 import { setBulkPill, clearBulkPill, bulkPillLayer } from '/utils/bulk-pill.js';
 import { makeSortable } from '/utils/sortable.js';
 import { amountPlaceholder, centsToAmountInput, amountInputToCents, toDecimalString, breaksOffAtSeparator } from '/utils/money.js';
+import { startLiveFeed } from '/utils/live-feed.js';
+import { createPageController } from '/utils/page-lifecycle.js';
 
 
 // --------------------------------------------------------
@@ -311,6 +313,46 @@ const intents = new Map();
 /** Monotone Folgenummer, damit ein zweites Antippen das erste ueberstimmt. */
 let _checkSeq = 0;
 /**
+ * Artikel, die lokal schon weg sind, deren Loeschung der Server aber noch nicht
+ * in jeder Antwort widerspiegelt: Id -> { listId, checked, removedAt } fuer das
+ * Undo-Fenster (`deleteItemUndoable`, `clearCheckedUndoable`) und den Moment
+ * danach.
+ *
+ * Dasselbe Muster wie `intents`, nur fuer das Loeschen: `state.items` traegt
+ * den Serverstand, und der Server hat den Artikel im Undo-Fenster noch. Landet
+ * in diesen fuenf Sekunden eine Live-Auffrischung (jemand anderes hat die
+ * Liste bewegt), ersetzt `loadItems` den Bestand mit der Serverantwort - und
+ * die Zeile stuende wieder da, unter dem Toast, der sie als geloescht meldet.
+ * Schlimmer: die Quittung des DELETE traegt danach als `before` genau die
+ * Marke, die die Auffrischung gesetzt hat, der Feed rueckt vor, und die
+ * naechste Abfrage laedt NICHT nach. Die Zeile bliebe stehen, bis sich die
+ * Liste das naechste Mal bewegt. Und ein Zuruecknehmen im Fenster legte den
+ * Schnappschuss neben die schon wieder vorhandene Zeile: zweimal Milch.
+ *
+ * Deshalb filtert `loadItems` diese Ids aus jeder Antwort: der Bestand nach
+ * der Auffrischung ist der Serverstand OHNE die schwebenden Loeschungen, und
+ * genau das ist der Stand, den die Quittung des DELETE dann meint. `loadLists`
+ * zieht die Eintraege vom Zaehler im Reiter ab, aus demselben Grund: der Server
+ * zaehlt den Artikel noch mit, die Anzeige nicht mehr.
+ *
+ * DER ERFOLG DES DELETE RAEUMT NICHT SOFORT - dieselbe Regel wie `settledAt`
+ * beim Abhaken. Eine Antwort, die VOR dem DELETE losgeschickt wurde und danach
+ * eintrifft, traegt den Artikel noch: sie hat den Server gelesen, als er ihn
+ * hatte. Waere die Schwebe da schon geraeumt, kaeme die Zeile zurueck - und
+ * bliebe, weil die Quittung die Marke des Feeds schon vorgerueckt hat und keine
+ * Abfrage mehr nachlaedt. Genau dieses Fenster oeffnet die Live-Auffrischung
+ * selbst: eine Abfrage stoesst `loadItems` an, und das Undo-Fenster schliesst,
+ * waehrend der GET noch unterwegs ist. Deshalb bekommt der Eintrag beim Erfolg
+ * die Ladenummer `removedAt = _loadSeq`: jede Antwort, die bis dahin begonnen
+ * hat (`startedAt <= removedAt`), wird weiter gefiltert; eine spaeter begonnene
+ * ist die Wahrheit des Servers. Der Eintrag faellt, sobald kein Ladevorgang
+ * mehr unterwegs ist, der ihn noch tragen koennte (`pruneSettledRemovals`) -
+ * bei ruhiger Seite also sofort. Ein Zuruecknehmen und ein FEHLGESCHLAGENER
+ * DELETE raeumen dagegen sofort: der Server hat den Artikel, `restore` bringt
+ * ihn zurueck, und jede Antwort darf ihn wieder tragen.
+ */
+const pendingRemovals = new Map();
+/**
  * Wann der Server einen Artikel zuletzt BESTAETIGT hat: id -> Ladenummer.
  *
  * Sie haengt am Artikel, nicht an der Absicht - denn sie ueberlebt diese. Wer
@@ -323,15 +365,69 @@ let _checkSeq = 0;
 const settledAt = new Map();
 
 /**
- * Die Nummer des zuletzt ANGEWANDTEN Ladevorgangs, je Liste.
+ * Die Ladeordnung: eine Nummer je BEGONNENEM Ladevorgang, und je Liste die
+ * Nummer des zuletzt ANGEWANDTEN.
  *
  * Die einzige verbliebene Zeitrechnung, und sie gehoert zum LADEN, nicht zur
  * Absicht: zwei Auffrischungen koennen sich ueberholen, und eine aeltere
  * Antwort darf den Stand nicht ueberschreiben, den eine juengere schon gesetzt
  * hat. Je Liste, weil ein Laden von Liste B ueber Liste A nichts aussagt.
+ *
+ * `_loadSeq` zaehlt Artikel- UND Listen-Ladevorgaenge: die Schwebe der
+ * Loeschungen fragt bei beiden, ob eine Antwort vor oder nach dem DELETE
+ * begonnen hat, und dafuer muss EINE Ordnung gelten. `_loadsInFlight` haelt
+ * die Nummern der noch offenen Ladevorgaenge, damit die Schwebe weiss, ob noch
+ * eine Antwort unterwegs ist, die einen geloeschten Artikel tragen koennte.
  */
 let _loadSeq = 0;
 const _appliedLoad = new Map();
+const _loadsInFlight = new Set();
+
+/** Einen Ladevorgang beginnen: Nummer ziehen und als offen vermerken. */
+function beginLoad() {
+  const startedAt = ++_loadSeq;
+  _loadsInFlight.add(startedAt);
+  return startedAt;
+}
+
+/** Einen Ladevorgang abschliessen - angewandt, verworfen oder gescheitert. */
+function endLoad(startedAt) {
+  _loadsInFlight.delete(startedAt);
+  pruneSettledRemovals();
+}
+
+/**
+ * Ob eine Antwort, die bei `startedAt` begann, den schwebend geloeschten
+ * Artikel noch tragen darf: im Undo-Fenster immer (der Server hat ihn), nach
+ * dem DELETE nur, wenn sie vor der Bestaetigung losgeschickt wurde.
+ */
+function removalHides(entry, startedAt) {
+  return entry.removedAt == null || entry.removedAt >= startedAt;
+}
+
+/**
+ * Den Erfolg eines DELETE vermerken: ab jetzt filtert die Schwebe nur noch
+ * Antworten, die vor diesem Moment begonnen haben.
+ */
+function confirmRemovals(ids) {
+  for (const id of ids) {
+    const entry = pendingRemovals.get(id);
+    if (entry) entry.removedAt = _loadSeq;
+  }
+  pruneSettledRemovals();
+}
+
+/**
+ * Bestaetigte Loeschungen fallen lassen, sobald keine Antwort mehr unterwegs
+ * ist, die vor ihrer Bestaetigung begonnen hat. Ist nichts unterwegs, sofort.
+ */
+function pruneSettledRemovals() {
+  let oldest = Infinity;
+  for (const seq of _loadsInFlight) if (seq < oldest) oldest = seq;
+  for (const [id, entry] of pendingRemovals) {
+    if (entry.removedAt != null && entry.removedAt < oldest) pendingRemovals.delete(id);
+  }
+}
 /**
  * Zu welcher Liste `state.items` gerade gehoert.
  *
@@ -429,7 +525,7 @@ async function toggleShoppingItem(id, checked, container) {
   }
 
   try {
-    await api.patch(`/shopping/items/${id}`, { is_checked: newVal });
+    acknowledgeOwnChange(await api.patch(`/shopping/items/${id}`, { is_checked: newVal }));
     // BEWUSST OHNE AUFRAEUMEN. Die Absicht faellt erst, wenn eine Ladeantwort
     // den Wert traegt (`settleIntents`) - der Erfolg allein beweist der Zeile
     // nichts gegen eine Antwort, die gleich danach mit dem alten Stand kommt.
@@ -522,7 +618,9 @@ function deleteItemUndoable(id, container) {
   // treffen.
   const listId = state.activeListId;
 
-  // Optimistisch entfernen
+  // Optimistisch entfernen - und als schwebend vermerken, damit eine
+  // Live-Auffrischung im Undo-Fenster die Zeile nicht zurueckbringt.
+  pendingRemovals.set(id, { listId, checked: gebucht, removedAt: null });
   state.items = state.items.filter((i) => i.id !== id);
   updateItemsList(container);
   updateListCounter(listId, -1, gebucht ? -1 : 0);
@@ -531,7 +629,19 @@ function deleteItemUndoable(id, container) {
   scheduleUndoableDelete({
     message: t('shopping.itemDeletedToast', { name: snapshot?.name ?? '' }),
     commit: async ({ keepalive }) => {
-      await api.delete(`/shopping/items/${id}`, { keepalive });
+      let response;
+      try {
+        response = await api.delete(`/shopping/items/${id}`, { keepalive });
+      } catch (err) {
+        // Schlaegt das DELETE fehl, bringt `restore` die Zeile zurueck, und
+        // jede Antwort darf sie wieder tragen - sofort, nicht erst spaeter.
+        pendingRemovals.delete(id);
+        throw err;
+      }
+      acknowledgeOwnChange(response);
+      // Bestaetigt, aber noch nicht geraeumt: eine Antwort, die vor dem DELETE
+      // losging, traegt den Artikel noch (siehe `pendingRemovals`).
+      confirmRemovals([id]);
       // Endgueltig weg: die Absicht kann von keiner Antwort mehr erfuellt oder
       // ueberholt werden und laege sonst tot in der Karte. Bis hierher bleibt
       // sie liegen - ein Zuruecknehmen im Undo-Fenster braucht sie, damit die
@@ -539,12 +649,14 @@ function deleteItemUndoable(id, container) {
       intents.delete(id);
     },
     restore: (err) => {
+      pendingRemovals.delete(id);
       if (snapshot) {
         // Der sichtbare Zustand nur, wenn die Liste noch die gezeigte ist -
         // sonst gehoert `state.items` bereits einer anderen. Der Server hat
         // nichts geloescht, also bringt `switchList` den Artikel beim
-        // Zurueckwechseln ohnehin mit.
-        if (state.activeListId === listId) {
+        // Zurueckwechseln ohnehin mit. Und nur, wenn die Zeile nicht schon
+        // wieder da ist - sonst stuende sie zweimal.
+        if (state.activeListId === listId && !state.items.some((i) => i.id === id)) {
           state.items.push(snapshot);
           state.items.sort((a, b) => a.id - b.id);
           updateItemsList(container);
@@ -752,7 +864,9 @@ function renderListContent(container) {
       description: t('common.loadErrorDescription'),
       error: state.listsError,
       retryLabel: t('common.retry'),
-      onRetry: () => render(container, {}),
+      // Das Router-Signal reist mit: ein Aufbau aus dem Retry-Knopf gehoert
+      // zur selben Route und muss mit ihr fallen (#976).
+      onRetry: () => render(container, { user: { id: state.currentUserId }, signal: _routeSignal }),
     });
     return;
   }
@@ -1204,6 +1318,7 @@ function wireQuickAdd(container) {
 
     try {
       const data = await api.post(`/shopping/${state.activeListId}/items`, { name, quantity, category });
+      acknowledgeOwnChange(data);
       state.items.push(data.data);
       // Einfügen in DOM ohne komplettes Re-Render
       updateItemsList(container);
@@ -1318,6 +1433,7 @@ async function sendItemOrder(groupEl, container, listId) {
 
   try {
     const data = await api.patch(`/shopping/${listId}/items/reorder`, { category, order });
+    acknowledgeOwnChange(data);
     // Nur den State nachziehen, nicht neu zeichnen: das DOM steht bereits
     // richtig, und ein Re-Render würde den Fokus vom Griff nehmen - mitten in
     // einer Tastaturbedienung wäre das das Ende der Bedienkette.
@@ -1754,8 +1870,24 @@ function openItemDetails(itemId, container) {
             store_id: storeId,
           };
           const data = await api.patch(`/shopping/items/${item.id}`, payload);
-          const categoryChanged = data.data.category !== item.category;
-          Object.assign(item, data.data);
+          acknowledgeOwnChange(data);
+          // DER ARTIKEL WIRD BEIM SPEICHERN NACHGESCHLAGEN, nicht beim Oeffnen
+          // festgehalten: waehrend der Dialog offen war, kann eine
+          // Live-Auffrischung `state.items` ersetzt haben - dann ist `item` ein
+          // Objekt, das nirgends mehr haengt, und die Bearbeitung landete dort
+          // statt in der Liste. Die Zeile zeigte weiter den alten Namen, und
+          // weil die Quittung die Marke vorrueckt, holte auch keine Abfrage
+          // das nach. Fehlt der Artikel ganz (jemand hat ihn inzwischen
+          // geloescht, oder er ist noch nicht wieder geladen), bleibt der
+          // Neuaufbau aus dem Bestand.
+          const aktuell = state.items.find((i) => i.id === item.id);
+          if (!aktuell) {
+            closeModal({ force: true });
+            updateItemsList(container);
+            return;
+          }
+          const categoryChanged = data.data.category !== aktuell.category;
+          Object.assign(aktuell, data.data);
           // force: der Dirty-Guard vergleicht gegen den Snapshot vom Öffnen und
           // sähe die gerade gespeicherten Felder als ungespeicherte Änderungen.
           // Ohne das fragte Speichern „Änderungen verwerfen?" (Issue #625).
@@ -1767,8 +1899,8 @@ function openItemDetails(itemId, container) {
           if (categoryChanged) {
             updateItemsList(container);
           } else {
-            updateItemRow(container, item);
-            refreshItemName(container, item);
+            updateItemRow(container, aktuell);
+            refreshItemName(container, aktuell);
           }
         } catch (err) {
           window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
@@ -2090,7 +2222,9 @@ function clearCheckedUndoable(container) {
   // Snapshot zur alten gehoerte und sie also nicht zurueckholen konnte.
   const listId = state.activeListId;
 
-  // Optimistisch entfernen
+  // Optimistisch entfernen - und als schwebend vermerken, damit eine
+  // Live-Auffrischung im Undo-Fenster die Zeilen nicht zurueckbringt.
+  for (const item of checked) pendingRemovals.set(item.id, { listId, checked: true, removedAt: null });
   state.items = state.items.filter((i) => !checkedOf(i));
   updateItemsList(container);
   updateListCounter(listId, -count, -count);
@@ -2098,10 +2232,34 @@ function clearCheckedUndoable(container) {
 
   scheduleUndoableDelete({
     message: t('shopping.itemsRemovedToast', { count }),
-    commit: ({ keepalive }) => api.delete(`/shopping/${listId}/items/checked`, { keepalive }),
+    commit: async ({ keepalive }) => {
+      let response;
+      try {
+        response = await api.delete(`/shopping/${listId}/items/checked`, { keepalive });
+      } catch (err) {
+        // Sofort raeumen: `restore` bringt die Zeilen zurueck, und jede Antwort
+        // darf sie wieder tragen.
+        for (const item of checked) pendingRemovals.delete(item.id);
+        throw err;
+      }
+      // DIE ROUTE LOESCHT, WAS BEIM EINTREFFEN ABGEHAKT IST - nicht, was die
+      // Seite entfernt hat. Hat jemand anderes im Undo-Fenster einen weiteren
+      // Artikel abgehakt (und eine Auffrischung ihn hergebracht), nimmt der
+      // Server ihn mit; hat jemand einen der unseren zurueckgeholt, bleibt er.
+      // In beiden Faellen meint die Quittung MEHR oder WENIGER als die eigene
+      // Anzeige, und rueckte sie die Marke vor, lade keine Abfrage nach: die
+      // Zeile stuende falsch, bis die Liste sich das naechste Mal bewegt. Also
+      // gilt sie nur, wenn der Server genau so viele entfernt hat, wie die
+      // Seite entfernt hat - sonst sieht die naechste Abfrage die Bewegung.
+      if (response?.deleted === count) acknowledgeOwnChange(response);
+      confirmRemovals(checked.map((item) => item.id));
+    },
     restore: (err) => {
+      for (const item of checked) pendingRemovals.delete(item.id);
       if (state.activeListId === listId) {
-        snapshot.forEach((item) => state.items.push(item));
+        // Nur, was nicht schon wieder da ist - sonst stuende es zweimal.
+        const vorhanden = new Set(state.items.map((i) => i.id));
+        snapshot.forEach((item) => { if (!vorhanden.has(item.id)) state.items.push(item); });
         state.items.sort((a, b) => a.id - b.id);
         updateItemsList(container);
       }
@@ -2220,9 +2378,20 @@ function openMealPlanImport(container) {
 // --------------------------------------------------------
 
 async function loadLists() {
+  // In der Ladeordnung, weil die Schwebe der Loeschungen wissen muss, ob diese
+  // Antwort vor oder nach einem DELETE begonnen hat (siehe `pendingRemovals`).
+  const startedAt = beginLoad();
   try {
     const data   = await api.get('/shopping');
     state.lists  = data.data ?? [];
+    // Der Zaehler im Reiter zeigt, was die Zeilen zeigen: ein Artikel im
+    // Undo-Fenster ist fuer den Server noch da, fuer die Anzeige nicht mehr
+    // (`pendingRemovals`) - sonst zaehlte die Auffrischung ihn wieder mit, und
+    // das Zuruecknehmen buchte ihn ein zweites Mal dazu. Dasselbe fuer eine
+    // Antwort, die vor dem DELETE losging: der Server zaehlte ihn da noch.
+    for (const entry of pendingRemovals.values()) {
+      if (removalHides(entry, startedAt)) updateListCounter(entry.listId, -1, entry.checked ? -1 : 0);
+    }
     state.listsError = null;
   } catch (err) {
     console.error('[Shopping] loadLists Fehler:', err);
@@ -2231,6 +2400,8 @@ async function loadLists() {
     // [Neue Liste erstellen]" stehen blieb - bei 31 vorhandenen Artikeln
     // (Critique P0, 2026-07-30).
     state.listsError = err;
+  } finally {
+    endLoad(startedAt);
   }
 }
 
@@ -2263,60 +2434,75 @@ async function loadStores() {
 }
 
 async function loadItems(listId) {
-  const startedAt  = ++_loadSeq;
-  // `getWithSource`, weil dieser Pfad in der Offline-Whitelist des Service
-  // Workers steht (`API_CACHE_WHITELIST` in sw.js): faellt das Netz aus, kommt
-  // die zuletzt gecachte Antwort mit Status 200 zurueck, und die ist von einer
-  // frischen sonst nicht zu unterscheiden.
-  const { data, fromCache } = await api.getWithSource(`/shopping/${listId}/items`);
-  // Ein Rundlauf kann von einem Listenwechsel ueberholt werden. Alle sechs
-  // Aufrufer laden die GERADE aktive Liste - `switchList` setzt
-  // `state.activeListId` sogar vor dem Warten -, die Antworten kommen aber in
-  // beliebiger Reihenfolge zurueck. Wer nicht mehr die aktive Liste ist, darf
-  // den globalen Stand nicht mehr anfassen: sonst stuenden die Artikel der
-  // alten Liste unter dem neuen Reiter, und die naechste Bearbeitung traefe
-  // die falschen. Das Fenster ist seit #1066 breiter geworden, weil die
-  // Auffrischung des Kategorie-Managers laeuft, waehrend die Seite wieder
-  // bedienbar ist.
-  if (state.activeListId !== listId) return;
-  // Wer aelter ist als das, was schon steht, fasst den Stand nicht mehr an.
-  // Die Wache darueber deckt das nicht ab: dieselbe Liste, zwei Rundlaeufe.
-  // Nur eine netzfrische Antwort setzt die Marke - bei wackligem Netz scheitert
-  // die spaeter begonnene Anfrage oft zuerst und wird aus dem Cache bedient.
-  if (startedAt < (_appliedLoad.get(listId) ?? 0)) return;
-  // EINE GECACHTE ANTWORT ERSETZT KEINEN FRISCHEREN STAND. Sie ist beliebig
-  // alt; steht fuer diese Liste schon etwas Netzfrisches, waere sie ein
-  // Rueckschritt - offline gehoert der zuletzt bekannte Stand auf den Schirm,
-  // nicht ein aelterer. Nur wenn noch gar nichts geladen wurde, ist sie das
-  // Beste, was es gibt.
-  // ... aber nur, wenn `state.items` diese Liste ueberhaupt zeigt. Gehoert der
-  // Bestand einer anderen, ist die gecachte Antwort das Beste, was es gibt -
-  // und allemal besser als die Artikel der falschen Liste.
-  if (fromCache && _appliedLoad.has(listId) && _itemsListId === listId) return;
-  if (!fromCache) _appliedLoad.set(listId, startedAt);
+  const startedAt = beginLoad();
+  // try/finally um den ganzen Rundlauf: die Ladeordnung schliesst ihn ab, ob
+  // er angewandt, verworfen oder gescheitert ist (siehe `endLoad`).
+  try {
+    // `getWithSource`, weil dieser Pfad in der Offline-Whitelist des Service
+    // Workers steht (`API_CACHE_WHITELIST` in sw.js): faellt das Netz aus, kommt
+    // die zuletzt gecachte Antwort mit Status 200 zurueck, und die ist von einer
+    // frischen sonst nicht zu unterscheiden.
+    const { data, fromCache } = await api.getWithSource(`/shopping/${listId}/items`);
+    // Ein Rundlauf kann von einem Listenwechsel ueberholt werden. Alle sechs
+    // Aufrufer laden die GERADE aktive Liste - `switchList` setzt
+    // `state.activeListId` sogar vor dem Warten -, die Antworten kommen aber in
+    // beliebiger Reihenfolge zurueck. Wer nicht mehr die aktive Liste ist, darf
+    // den globalen Stand nicht mehr anfassen: sonst stuenden die Artikel der
+    // alten Liste unter dem neuen Reiter, und die naechste Bearbeitung traefe
+    // die falschen. Das Fenster ist seit #1066 breiter geworden, weil die
+    // Auffrischung des Kategorie-Managers laeuft, waehrend die Seite wieder
+    // bedienbar ist.
+    if (state.activeListId !== listId) return;
+    // Wer aelter ist als das, was schon steht, fasst den Stand nicht mehr an.
+    // Die Wache darueber deckt das nicht ab: dieselbe Liste, zwei Rundlaeufe.
+    // Nur eine netzfrische Antwort setzt die Marke - bei wackligem Netz scheitert
+    // die spaeter begonnene Anfrage oft zuerst und wird aus dem Cache bedient.
+    if (startedAt < (_appliedLoad.get(listId) ?? 0)) return;
+    // EINE GECACHTE ANTWORT ERSETZT KEINEN FRISCHEREN STAND. Sie ist beliebig
+    // alt; steht fuer diese Liste schon etwas Netzfrisches, waere sie ein
+    // Rueckschritt - offline gehoert der zuletzt bekannte Stand auf den Schirm,
+    // nicht ein aelterer. Nur wenn noch gar nichts geladen wurde, ist sie das
+    // Beste, was es gibt.
+    // ... aber nur, wenn `state.items` diese Liste ueberhaupt zeigt. Gehoert der
+    // Bestand einer anderen, ist die gecachte Antwort das Beste, was es gibt -
+    // und allemal besser als die Artikel der falschen Liste.
+    if (fromCache && _appliedLoad.has(listId) && _itemsListId === listId) return;
+    if (!fromCache) _appliedLoad.set(listId, startedAt);
 
-  // `state.items` traegt NUR den Serverstand - die Absichten liegen daneben und
-  // ueberlagern beim Zeichnen. Deshalb wird hier nichts aufgetragen; es faellt
-  // nur, was die Antwort erfuellt hat.
-  // EIN BESTAETIGTER ARTIKEL WIRD VON EINER AELTEREN ANTWORT NICHT
-  // ZURUECKGEDREHT. Die Antwort selbst bleibt gueltig - ihre uebrigen Artikel,
-  // die Liste und die Kategorien werden gebraucht -, nur der eine Wert, von
-  // dem wir sicher wissen, dass er juenger ist, bleibt stehen.
-  const vorherige = new Map(state.items.map((i) => [i.id, i]));
-  const frisch = data.data ?? [];
-  for (const item of frisch) {
-    const bestaetigt = settledAt.get(item.id);
-    if (bestaetigt != null && bestaetigt >= startedAt) {
-      const alt = vorherige.get(item.id);
-      if (alt) item.is_checked = alt.is_checked;
+    // `state.items` traegt NUR den Serverstand - die Absichten liegen daneben und
+    // ueberlagern beim Zeichnen. Deshalb wird hier nichts aufgetragen; es faellt
+    // nur, was die Antwort erfuellt hat.
+    // EIN BESTAETIGTER ARTIKEL WIRD VON EINER AELTEREN ANTWORT NICHT
+    // ZURUECKGEDREHT. Die Antwort selbst bleibt gueltig - ihre uebrigen Artikel,
+    // die Liste und die Kategorien werden gebraucht -, nur der eine Wert, von
+    // dem wir sicher wissen, dass er juenger ist, bleibt stehen.
+    const vorherige = new Map(state.items.map((i) => [i.id, i]));
+    // EIN LOKAL GELOESCHTER ARTIKEL KOMMT NICHT ZURUECK, solange sein Undo-Fenster
+    // laeuft: der Server hat ihn noch, die Anzeige nicht mehr (`pendingRemovals`).
+    // Nur so ist der Bestand nach einer Auffrischung "Serverstand ohne die
+    // schwebenden Loeschungen" - und die Quittung des spaeteren DELETE stimmt.
+    // Und auch nicht aus einer Antwort, die VOR dem DELETE losging und erst
+    // danach eintrifft: sie hat den Server gelesen, als er den Artikel noch hatte.
+    const frisch = (data.data ?? []).filter((i) => {
+      const entry = pendingRemovals.get(i.id);
+      return !entry || !removalHides(entry, startedAt);
+    });
+    for (const item of frisch) {
+      const bestaetigt = settledAt.get(item.id);
+      if (bestaetigt != null && bestaetigt >= startedAt) {
+        const alt = vorherige.get(item.id);
+        if (alt) item.is_checked = alt.is_checked;
+      }
     }
+    state.items = frisch;
+    _itemsListId = listId;
+    settleIntents(state.items, listId, { fromCache, startedAt });
+    state.activeList = data.list ?? null;
+    // Kategorien aus API-Antwort übernehmen wenn vorhanden (immer aktuell)
+    if (data.categories?.length) state.categories = data.categories;
+  } finally {
+    endLoad(startedAt);
   }
-  state.items = frisch;
-  _itemsListId = listId;
-  settleIntents(state.items, listId, { fromCache, startedAt });
-  state.activeList = data.list ?? null;
-  // Kategorien aus API-Antwort übernehmen wenn vorhanden (immer aktuell)
-  if (data.categories?.length) state.categories = data.categories;
 }
 
 async function switchList(listId, container) {
@@ -2342,6 +2528,198 @@ async function switchList(listId, container) {
   }
   renderListContent(container);
   wireListContentEvents(container);
+}
+
+// --------------------------------------------------------
+// Live-Aktualisierung
+// --------------------------------------------------------
+
+/**
+ * Takt der Laufnummern-Abfrage (GET /shopping/versions), solange der Tab
+ * sichtbar ist. Zehn Sekunden sind der Tausch zwischen "es hat sich
+ * aktualisiert" neben jemandem im Laden und einem Server, der von jedem
+ * offenen Zettel eine kleine Anfrage je Takt bekommt - und einem Haushalt
+ * hinter EINER Adresse, der sich den Limiter (300/min) teilt.
+ */
+const LIVE_POLL_MS = 10_000;
+
+/** Controller der laufenden Live-Verdrahtung: faellt mit dem Router-Signal und beim naechsten render(). */
+let _liveController = null;
+/** Der laufende Feed - fuer die Quittung eigener Schreibvorgaenge. */
+let _liveFeed = null;
+/** Das Router-Signal des letzten Aufbaus - der Retry-Knopf reicht es an sein render() weiter. */
+let _routeSignal = null;
+
+/**
+ * Die Quittung eines eigenen Schreibvorgangs an den Feed reichen.
+ *
+ * Die Artikel-Routen antworten mit `list_change: { list_id, before, after }`.
+ * Ist `before` der Stand, den der Feed zuletzt gesehen hat, ist alles bis
+ * `after` das eigene Werk, und die naechste Abfrage laedt die Liste nicht
+ * umsonst nach - das waeren sonst zwei Anfragen je Tab und Haken, auch fuer
+ * den Tab, der den Haken gesetzt hat.
+ */
+function acknowledgeOwnChange(response) {
+  _liveFeed?.acknowledge(response?.list_change);
+}
+
+/**
+ * Was ein frischer Stand an der Zeilen-Ansicht aendert.
+ *
+ * Zwei Faelle, und sie sind mit Absicht verschieden gross. Hat sich nur der
+ * Abgehakt-Zustand bewegt - der haeufige Fall, zwei Leute im selben Laden -,
+ * wird die Zeile an Ort und Stelle umgefaerbt, wie beim eigenen Antippen: kein
+ * Neuaufbau, keine Einblend-Animation, die Scroll-Position bleibt (#276), und
+ * die Reihenfolge auch - Abgehaktes sortiert sich beim naechsten Aufbau ans
+ * Ende, nicht unter dem Finger weg. Ist ein Artikel dazugekommen, verschwunden
+ * oder umbenannt, wird die Liste neu gebaut; das ist der Fall, den die
+ * Animation meint.
+ *
+ * Verglichen wird der SERVERSTAND vor und nach dem Laden, nicht das DOM: die
+ * Seite haelt beides ohnehin deckungsgleich, und `updateItemRow` zeichnet die
+ * Ueberlagerung mit der eigenen Absicht selbst (`checkedOf`).
+ */
+function liveRefreshPlan(previous, fresh) {
+  const shape = (i) => JSON.stringify([
+    i.id, i.category, i.name, i.quantity ?? '', i.notes ? 1 : 0, i.url ? 1 : 0,
+    i.price_cents ?? '', i.store_id ?? '', i.tags ?? [],
+  ]);
+  const before = previous.map(shape).sort();
+  const after  = fresh.map(shape).sort();
+  if (before.length !== after.length || before.some((s, idx) => s !== after[idx])) {
+    return { rebuild: true, changed: [] };
+  }
+  const checkedBefore = new Map(previous.map((i) => [i.id, i.is_checked]));
+  return {
+    rebuild: false,
+    changed: fresh.filter((i) => checkedBefore.get(i.id) !== i.is_checked),
+  };
+}
+
+/**
+ * Eine Liste nachladen, weil der Feed sie gemeldet hat.
+ *
+ * Still bei Fehlern, wie der stille Refresh des Dashboards: der Zettel zeigt
+ * weiter den letzten bekannten Stand, und die naechste Meldung versucht es
+ * wieder. Nur die AKTIVE Liste laedt ihre Artikel; fuer jede andere reicht die
+ * Listenzeile mit ihrem Zaehler, und `switchList` laedt ohnehin frisch.
+ *
+ * Die eigene Bearbeitung ueberlebt das Nachladen: `loadItems` traegt nur den
+ * Serverstand ein, die Absicht liegt daneben und faellt erst, wenn die Antwort
+ * sie traegt (`settleIntents`). Deshalb darf der Feed auch die eigene
+ * Aenderung melden - die Antwort darauf ist genau die, die die Absicht erfuellt.
+ */
+async function refreshFromFeed(container, listId, signal) {
+  if (state.listsError) return;
+  const active        = listId === state.activeListId;
+  const previous      = state.items;
+  const previousLists = state.lists;
+  let failed = false;
+  try {
+    if (active) await Promise.all([loadLists(), loadItems(listId)]);
+    else await loadLists();
+  } catch (err) {
+    console.warn('[Shopping] Live-Aktualisierung fehlgeschlagen:', err);
+    failed = true;
+  }
+  // loadLists() faengt selbst und vermerkt den Fehler fuer den Seitenaufbau,
+  // wo er ein Fehlerbild mit Wiederholung ergibt. Fuer eine STILLE
+  // Auffrischung ist derselbe Vermerk das Gegenteil von still: leere Reiter
+  // und ein Merker, der jede weitere Meldung abwiese. Also zurueck auf den
+  // letzten Stand, und die naechste Meldung versucht es wieder.
+  if (state.listsError) {
+    state.listsError = null;
+    state.lists = previousLists;
+    return;
+  }
+  if (failed || signal.aborted) return;
+  // Die aktive Liste ist weg - jemand anderes hat sie geloescht. Der Zettel
+  // wechselt auf die erste verbliebene oder zeigt den Leerzustand, statt eine
+  // Liste zu zeigen, die es nicht mehr gibt.
+  if (state.activeListId != null && !state.lists.some((l) => l.id === state.activeListId)) {
+    if (state.lists.length) {
+      await switchList(state.lists[0].id, container);
+      return;
+    }
+    state.activeListId = null;
+    state.activeList = null;
+    clearItems();
+    renderTabs(container);
+    renderListContent(container);
+    return;
+  }
+  renderTabs(container);
+  // Inzwischen umgeschaltet: switchList zeichnet die neue Liste selbst.
+  if (!active || state.activeListId !== listId) return;
+  if (state.itemsError) {
+    // Der Fehlerzustand von vorhin ist ueberholt - die Antwort ist da.
+    state.itemsError = null;
+    updateItemsList(container);
+    return;
+  }
+  const plan = liveRefreshPlan(previous, state.items);
+  if (plan.rebuild) {
+    updateItemsList(container);
+    return;
+  }
+  for (const item of plan.changed) updateItemRow(container, item);
+  if (plan.changed.length) updateCheckedActions(container);
+}
+
+/**
+ * Die Live-Aktualisierung eines Seitenaufbaus verdrahten. Alles haengt am
+ * Signal DIESES Aufbaus (#976-Muster): der naechste Aufbau bricht den vorigen
+ * ab, und das Router-Signal reisst beide beim Verlassen der Seite mit.
+ *
+ * Der Feed fragt die Laufnummern im Takt ab, solange der Tab sichtbar ist,
+ * und sofort, wenn er sichtbar wird oder den Fokus bekommt - das ist der
+ * Moment, in dem jemand aufs Telefon schaut und den aktuellen Stand erwartet.
+ *
+ * Meldungen laufen durch EINE Warteschlange: zwei Listen in einer Antwort
+ * ergeben ein Nachladen nach dem anderen, nicht zwei, die sich ueberholen.
+ */
+function wireLiveUpdates(container, routeSignal) {
+  _liveController?.abort();
+  const controller = createPageController(routeSignal);
+  _liveController = controller;
+  const { signal } = controller;
+  if (signal.aborted) return;
+
+  const queue = new Set();
+  let draining = false;
+  const drain = async () => {
+    if (draining) return;
+    draining = true;
+    try {
+      while (queue.size && !signal.aborted) {
+        const [listId] = queue;
+        queue.delete(listId);
+        await refreshFromFeed(container, listId, signal);
+      }
+    } finally {
+      draining = false;
+    }
+  };
+  const request = (listId) => {
+    if (signal.aborted || listId == null) return;
+    queue.add(listId);
+    drain();
+  };
+
+  const feed = startLiveFeed({
+    fetchVersions: async () => (await api.get('/shopping/versions')).data ?? [],
+    onChange: request,
+    signal,
+    intervalMs: LIVE_POLL_MS,
+  });
+  _liveFeed = feed;
+  signal.addEventListener('abort', () => { if (_liveFeed === feed) _liveFeed = null; });
+
+  // Die erste Abfrage setzt die Marken; sie laeuft neben dem Laden der Seite.
+  feed.poll();
+  const wake = () => { if (!document.hidden) feed.poll(); };
+  document.addEventListener('visibilitychange', wake, { signal });
+  window.addEventListener('focus', wake, { signal });
 }
 
 // --------------------------------------------------------
@@ -2712,11 +3090,19 @@ async function openCategoryManager(container, { fromDeepLink = false } = {}) {
 // Haupt-Render
 // --------------------------------------------------------
 
-export async function render(container, { user }) {
+export async function render(container, { user, signal: routeSignal = null } = {}) {
   state.currentUserId = user?.id ?? null;
+  _routeSignal = routeSignal;
   // Ein Seitenaufbau ist immer ein neuer Batch fuer die Sammelaktions-Pille -
   // eine Frist der vorherigen Seite darf diese hier nicht treffen (#1039).
   resetPillMachine();
+  // VOR dem Laden, nicht danach: der Feed setzt seine Marken mit der ersten
+  // Antwort, und was sich ab da bewegt, wird gemeldet. Verdrahtet erst nach
+  // dem Laden, fiele eine Aenderung zwischen Artikel-Antwort und erster
+  // Feed-Antwort durch - bis zur uebernaechsten. Eine Meldung, die noch in
+  // den Aufbau faellt, laedt hoechstens einmal umsonst; die Ladeordnung
+  // (`_loadSeq`) haelt die Antworten auseinander.
+  wireLiveUpdates(container, routeSignal);
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="shopping-page page-measure--narrow">
@@ -2864,6 +3250,13 @@ export const __test = {
   toggleShoppingItem,
   loadItems,
   deleteItemUndoable,
+  clearCheckedUndoable,
+  // Der Dialog rendert ueber den Modal-Stub des Loaders; die Tests greifen
+  // sein onSave ab und loesen das Speichern nach einer Auffrischung aus.
+  openItemDetails,
+  // Die schwebenden Loeschungen: geprueft wird, dass eine Auffrischung im
+  // Undo-Fenster sie nicht zurueckbringt und das Fenster sie wieder raeumt.
+  pendingRemovals,
   // Die Absichten-Karte und ihre Lesefunktion: die Tests pruefen an ihnen die
   // Trennung selbst - dass `state.items` den Serverstand behaelt und die Zeile
   // die Ueberlagerung zeigt.
@@ -2873,5 +3266,13 @@ export const __test = {
   // global, und eine Wasserstandsmarke aus einem frueheren Fall verwirft die
   // Auffrischung des naechsten. Aufraeumen gehoert an den ANFANG jedes Falls.
   clearItems,
-  resetLoadOrderForTest: () => { _appliedLoad.clear(); settledAt.clear(); _itemsListId = null; },
+  resetLoadOrderForTest: () => { _appliedLoad.clear(); settledAt.clear(); _loadsInFlight.clear(); _itemsListId = null; },
+  // Live-Aktualisierung: der Plan ist reine Logik (Serverstand vorher/nachher),
+  // das Nachladen und die Verdrahtung laufen ueber den api-Stub.
+  liveRefreshPlan,
+  refreshFromFeed,
+  wireLiveUpdates,
+  acknowledgeOwnChange,
+  getLiveFeedForTest: () => _liveFeed,
+  abortLiveUpdatesForTest: () => { _liveController?.abort(); _liveController = null; _liveFeed = null; },
 };

@@ -1112,6 +1112,55 @@ const MIGRATIONS_SQL = {
         WHERE id = NEW.id;
       END;
     `,
+
+  // Migration v194: Aenderungszaehler je Einkaufsliste fuer die
+  // Live-Aktualisierung. Backfill und Trigger sind der ganze Inhalt - eine
+  // Suite, die sie faehrt, prueft genau, dass jeder Schreibweg an
+  // shopping_lists und shopping_items die Nummer bewegt.
+  194: `
+      CREATE TABLE shopping_list_changes (
+        list_id INTEGER PRIMARY KEY,
+        version INTEGER NOT NULL DEFAULT 0
+      );
+      INSERT INTO shopping_list_changes (list_id, version) SELECT id, 0 FROM shopping_lists;
+      CREATE TRIGGER trg_shopping_lists_change_ai AFTER INSERT ON shopping_lists BEGIN
+        INSERT OR IGNORE INTO shopping_list_changes (list_id, version) VALUES (NEW.id, 0);
+      END;
+      CREATE TRIGGER trg_shopping_lists_change_au AFTER UPDATE ON shopping_lists BEGIN
+        INSERT INTO shopping_list_changes (list_id, version) VALUES (NEW.id, 1)
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
+      CREATE TRIGGER trg_shopping_items_change_ai AFTER INSERT ON shopping_items BEGIN
+        INSERT INTO shopping_list_changes (list_id, version) VALUES (NEW.list_id, 1)
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
+      CREATE TRIGGER trg_shopping_items_change_au AFTER UPDATE ON shopping_items BEGIN
+        INSERT INTO shopping_list_changes (list_id, version) VALUES (NEW.list_id, 1)
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
+      CREATE TRIGGER trg_shopping_items_change_au_moved AFTER UPDATE OF list_id ON shopping_items
+        WHEN OLD.list_id <> NEW.list_id BEGIN
+        INSERT INTO shopping_list_changes (list_id, version) VALUES (OLD.list_id, 1)
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
+      CREATE TRIGGER trg_shopping_items_change_ad AFTER DELETE ON shopping_items BEGIN
+        INSERT INTO shopping_list_changes (list_id, version) VALUES (OLD.list_id, 1)
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
+      CREATE TRIGGER trg_shopping_item_tags_change_ai AFTER INSERT ON shopping_item_tags BEGIN
+        INSERT INTO shopping_list_changes (list_id, version)
+          SELECT list_id, 1 FROM shopping_items WHERE id = NEW.item_id
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
+      CREATE TRIGGER trg_shopping_item_tags_change_ad AFTER DELETE ON shopping_item_tags BEGIN
+        INSERT INTO shopping_list_changes (list_id, version)
+          SELECT list_id, 1 FROM shopping_items WHERE id = OLD.item_id
+          ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
+      END;
+      CREATE TRIGGER trg_shopping_lists_change_ad AFTER DELETE ON shopping_lists BEGIN
+        DELETE FROM shopping_list_changes WHERE list_id = OLD.id;
+      END;
+    `,
 };
 
 export { MIGRATIONS_SQL };
