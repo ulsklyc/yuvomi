@@ -4414,6 +4414,14 @@ test('Sonde 21 - Notiz-Kategorien behalten Fokus, Gruppenrolle und Reader-Icons'
       })).data;
     }, fixtureName);
     categoryIds.push(second.id);
+    const third = await page.evaluate(async (name) => {
+      const { api } = await import('/api.js');
+      return (await api.post('/notes/categories', {
+        name: `${name} three`,
+        scope: 'personal',
+      })).data;
+    }, fixtureName);
+    categoryIds.push(third.id);
     const note = await page.evaluate(async ({ name, ids }) => {
       const { api } = await import('/api.js');
       return (await api.post('/notes', {
@@ -4421,7 +4429,7 @@ test('Sonde 21 - Notiz-Kategorien behalten Fokus, Gruppenrolle und Reader-Icons'
         content: 'Reader icons survive repeated pane replacement.',
         category_ids: ids,
       })).data;
-    }, { name: fixtureName, ids: categoryIds });
+    }, { name: fixtureName, ids: categoryIds.slice(0, 2) });
     noteId = note.id;
 
     await gotoRoute(page, '/notes');
@@ -4469,6 +4477,23 @@ test('Sonde 21 - Notiz-Kategorien behalten Fokus, Gruppenrolle und Reader-Icons'
         { icons: 2, placeholders: 0 },
       ],
     });
+
+    // Escape belongs to the open combobox first, then to the containing modal.
+    // With a dirty search field the second press must reach the discard guard.
+    await page.click('.note-mode-switch [data-view="edit"]');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await page.focus('#note-category-search');
+    await page.type('#note-category-search', third.name);
+    await page.waitForSelector('#note-category-suggestions:not([hidden])');
+    await page.keyboard.press('Escape');
+    assert.deepEqual(await page.evaluate(() => ({
+      listHidden: document.querySelector('#note-category-suggestions')?.hidden,
+      editorConnected: document.querySelector('.note-modal')?.isConnected,
+      focus: document.activeElement?.id,
+    })), { listHidden: true, editorConnected: true, focus: 'note-category-search' });
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('#confirm-modal-cancel', { timeout: 1000 });
+    await page.click('#confirm-modal-cancel');
   } catch (err) {
     probeError = err;
   } finally {

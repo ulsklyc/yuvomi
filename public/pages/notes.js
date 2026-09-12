@@ -966,9 +966,14 @@ function openNoteModal({ mode, note = null }) {
         renderCategorySuggestions();
       });
       categorySearch.addEventListener('keydown', (event) => {
-        if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) {
+        const popupOpen = !categoryList.hidden;
+        if (
+          ['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key)
+          || (event.key === 'Escape' && popupOpen)
+        ) {
           // The modal also handles Enter/Escape. A consumed combobox key must
           // select/close only here, never save or close the whole note modal.
+          // Once the popup is closed, Escape belongs to the modal again.
           event.stopPropagation();
         }
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -996,7 +1001,7 @@ function openNoteModal({ mode, note = null }) {
             if (exact) selectCategory(exact);
             else if (!categoryCreateButton.hidden) categoryCreateButton.click();
           }
-        } else if (event.key === 'Escape') {
+        } else if (event.key === 'Escape' && popupOpen) {
           event.preventDefault();
           closeCategorySuggestions();
         }
