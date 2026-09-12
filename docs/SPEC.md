@@ -440,6 +440,38 @@ rejects a grouped "1.000" instead of silently reading it as one.
 `store_id` is `ON DELETE SET NULL`, not `RESTRICT`: deleting a shop keeps every price and only
 clears the assignment. What was once paid stays true.
 
+### Duplicating a list (#1103)
+`POST /shopping/{listId}/duplicate` copies a list's items into a brand-new list in one transaction.
+Body: `{ name, resetChecked?, keepQuantities?, keepNotes? }`, all three flags default to `true`.
+
+Category assignment and the manual per-category `sort_order` are **always** carried over verbatim —
+that is the entire point of duplicating a list, not something to make optional. `sort_order` is
+copied explicitly rather than left to the `AFTER INSERT` trigger (which would append every copied row
+to the end of its category and destroy the order being preserved).
+
+What a copy never carries over, independent of the flags:
+- The CalDAV sync columns (`external_uid`, `external_source`, `external_account_id`,
+  `external_object_url`, `outbound_dirty`, `outbound_attempts`) reset to their local defaults. Each
+  names a fact about a *specific* mirrored remote object; copying them verbatim would make an edit to
+  the copy write onto the same remote VTODO the original mirrors, and deleting the copy would queue
+  deletion of that shared remote object (the same class of hazard raised on #998, "Move an item
+  between shopping lists"). If the destination list is itself a CalDAV sync target, a copied item
+  uploads as a brand-new VTODO on the next sync pass, same as any newly-added item.
+- `added_from_meal` resets to `NULL` — a copy was created by this action, not by the meal that added
+  the original item.
+- `price_cents` and `store_id` reset to `NULL` — both are facts about a purchase actually made
+  (#1003), "paid once, in this shop"; a copy has not been bought yet.
+
+`GET /shopping/suggestions?q=` additionally returns each suggested name's most recently used
+`category` and `quantity`, not the name alone, so picking a suggestion in quick-add restores its usual
+aisle placement instead of defaulting to the fallback category (the gap #1103 opened with). Results
+are ordered by most recently used first (`MAX(created_at)`, tie-broken by row id) rather than
+alphabetically.
+
+The item POST route's own default category (when none is given) is the *last* category, matching
+`import-pantry`'s existing fallback and the original intent of issue #548 ("default manually added
+items to the misc category") — the route had drifted to defaulting to the *first* category instead.
+
 ### Meals
 | Column | Type | Constraint |
 |--------|------|-----------|
@@ -3503,6 +3535,7 @@ The surface carries four things, in this order: **the time**, large (this is whe
 - **Quick-add is a disclosure on touch (v1.59.0):** the two-line quick-add form is collapsed on pointer-less devices and opened by the FAB, which until then was the only FAB in the kitchen that merely focused an already-visible field instead of opening a form. Esc closes it and returns focus to the FAB. On pointer devices the field stays open — it is faster than any button — and the redundant empty-state CTA is dropped there instead, because the input it points at is visible right above it.
 - **Item editor (v1.59.0):** the detail dialog is titled "Edit item" (shared key with the pantry) instead of carrying the data value as its title, offers name, quantity and category besides link and note, and has a Cancel button. Before this it had two fields, no Cancel, and neither name nor quantity could be changed — a typo meant deleting the row and re-creating it. Deleting stays in the row (× on pointer devices, swipe on touch), both with undo.
 - **"Apply" is disabled at zero hits (v1.59.0)** in the meal-plan import dialog, matching its sibling action "Randomize plan"; the preview enables it as soon as the range contains ingredients.
+- **Duplicate a list (#1103):** "Duplicate" sits in the list menu next to rename/delete and opens a dialog for the new list's name plus three on-by-default flags (reset checked state, keep quantities, keep notes & links) — see "Duplicating a list" under Data Model above for what always carries over and what never does. Picking an autocomplete suggestion while adding an item now restores that item's most recently used category and quantity too, not just its name, and suggestions are ordered by most recently used rather than alphabetically. Quick-add's category selector resets to the default after every item added, instead of staying on whatever a previous suggestion or manual pick set it to — otherwise an unrelated item typed right after could quietly land in the wrong aisle.
 
 ### Meal Plan (`/meals`)
 

@@ -604,7 +604,16 @@
         "storesHint": "A boltok, ahol vásároltok. Az ár bolt nélkül csak félig válaszol.",
         "storeDeleteConfirm": "Törli a(z) „{{name}}” üzletet?",
         "storeDeleteConfirmDetail": "Az üzlethez tartozó tételek és az áruk is megmaradnak - csak az üzlet hozzárendelése lesz üres. Helyettesítő üzlet itt nincs.",
-        "addStore": "Új üzlet"
+        "addStore": "Új üzlet",
+        "duplicateListLabel": "Lista duplikálása",
+        "duplicateListTitle": "„{{name}}” duplikálása",
+        "duplicateListNameLabel": "Az új lista neve",
+        "duplicateDefaultName": "{{name}} – másolat",
+        "duplicateResetChecked": "Pipák visszaállítása",
+        "duplicateKeepQuantities": "Mennyiségek megtartása",
+        "duplicateKeepNotes": "Jegyzetek és linkek megtartása",
+        "duplicateSubmit": "Duplikálás",
+        "duplicateError": "A listát nem sikerult duplikálni."
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} étel megtervezve.",

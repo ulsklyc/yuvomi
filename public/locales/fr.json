@@ -604,7 +604,16 @@
         "storesHint": "Les magasins où vous faites vos courses. Un prix sans magasin ne répond qu'à moitié.",
         "storeDeleteConfirm": "Supprimer le magasin « {{name}} » ?",
         "storeDeleteConfirmDetail": "Les articles de ce magasin sont conservés, leur prix aussi - seule l'affectation au magasin devient vide. Il n'y a pas de magasin de remplacement.",
-        "addStore": "Nouveau magasin"
+        "addStore": "Nouveau magasin",
+        "duplicateListLabel": "Dupliquer la liste",
+        "duplicateListTitle": "Dupliquer « {{name}} »",
+        "duplicateListNameLabel": "Nom de la nouvelle liste",
+        "duplicateDefaultName": "{{name}} – Copie",
+        "duplicateResetChecked": "Réinitialiser les cases cochées",
+        "duplicateKeepQuantities": "Conserver les quantités",
+        "duplicateKeepNotes": "Conserver notes et liens",
+        "duplicateSubmit": "Dupliquer",
+        "duplicateError": "La liste n'a pas pu être dupliquée."
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} repas planifiés.",

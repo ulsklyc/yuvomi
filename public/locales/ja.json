@@ -604,7 +604,16 @@
         "storesHint": "買い物をする店です。店のない価格は半分の答えにしかなりません。",
         "storeDeleteConfirm": "店「{{name}}」を削除しますか？",
         "storeDeleteConfirmDetail": "この店の品物とその価格はそのまま残ります。空になるのは店の割り当てだけで、代わりの店は入りません。",
-        "addStore": "新しい店"
+        "addStore": "新しい店",
+        "duplicateListLabel": "リストを複製",
+        "duplicateListTitle": "「{{name}}」を複製",
+        "duplicateListNameLabel": "新しいリストの名前",
+        "duplicateDefaultName": "{{name}} - コピー",
+        "duplicateResetChecked": "チェック状態をリセット",
+        "duplicateKeepQuantities": "数量を引き継ぐ",
+        "duplicateKeepNotes": "メモとリンクを引き継ぐ",
+        "duplicateSubmit": "複製",
+        "duplicateError": "リストを複製できませんでした。"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} 件の食事を計画しました。",

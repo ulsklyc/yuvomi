@@ -604,7 +604,16 @@
         "storesHint": "Obchody, kde nakupujete. Cena bez obchodu odpoví jen napůl.",
         "storeDeleteConfirm": "Smazat obchod „{{name}}“?",
         "storeDeleteConfirmDetail": "Položky tohoto obchodu zůstanou zachovány i s cenou - prázdné bude jen přiřazení obchodu. Náhradní obchod se nedoplňuje.",
-        "addStore": "Nový obchod"
+        "addStore": "Nový obchod",
+        "duplicateListLabel": "Duplikovat seznam",
+        "duplicateListTitle": "Duplikovat „{{name}}“",
+        "duplicateListNameLabel": "Název nového seznamu",
+        "duplicateDefaultName": "{{name}} – kopie",
+        "duplicateResetChecked": "Zrušit zaškrtnutí",
+        "duplicateKeepQuantities": "Zachovat množství",
+        "duplicateKeepNotes": "Zachovat poznámky a odkazy",
+        "duplicateSubmit": "Duplikovat",
+        "duplicateError": "Seznam se nepodařilo duplikovat."
     },
     "meals": {
         "randomizeSuccess_few": "Naplánována {{count}} jídla.",

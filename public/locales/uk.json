@@ -604,7 +604,16 @@
         "storesHint": "Магазини, де ви купуєте. Ціна без магазину відповідає лише наполовину.",
         "storeDeleteConfirm": "Видалити магазин «{{name}}»?",
         "storeDeleteConfirmDetail": "Товари цього магазину залишаться разом із ціною - порожнім стане лише поле магазину. Заміни магазину тут немає.",
-        "addStore": "Новий магазин"
+        "addStore": "Новий магазин",
+        "duplicateListLabel": "Дублювати список",
+        "duplicateListTitle": "Дублювати «{{name}}»",
+        "duplicateListNameLabel": "Назва нового списку",
+        "duplicateDefaultName": "{{name}} — копія",
+        "duplicateResetChecked": "Скинути позначки",
+        "duplicateKeepQuantities": "Зберегти кількість",
+        "duplicateKeepNotes": "Зберегти нотатки й посилання",
+        "duplicateSubmit": "Дублювати",
+        "duplicateError": "Не вдалося дублювати список."
     },
     "meals": {
         "randomizeSuccess_few": "Заплановано {{count}} прийоми їжі.",

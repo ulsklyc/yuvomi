@@ -604,7 +604,16 @@
         "storesHint": "Alışveriş yaptığınız mağazalar. Mağazasız bir fiyat sorunun yarısını yanıtlar.",
         "storeDeleteConfirm": "“{{name}}” mağazası silinsin mi?",
         "storeDeleteConfirmDetail": "Bu mağazanın ürünleri ve fiyatları kalır - yalnızca mağaza ataması boşalır. Yerine geçecek bir mağaza yoktur.",
-        "addStore": "Yeni mağaza"
+        "addStore": "Yeni mağaza",
+        "duplicateListLabel": "Listeyi kopyala",
+        "duplicateListTitle": "„{{name}}” kopyalansın",
+        "duplicateListNameLabel": "Yeni listenin adı",
+        "duplicateDefaultName": "{{name}} – Kopya",
+        "duplicateResetChecked": "İşaretlemeleri sıfırla",
+        "duplicateKeepQuantities": "Miktarları koru",
+        "duplicateKeepNotes": "Notları ve bağlantıları koru",
+        "duplicateSubmit": "Kopyala",
+        "duplicateError": "Liste kopyalanamadı."
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} öğün planlandı.",

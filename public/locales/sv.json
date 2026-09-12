@@ -604,7 +604,16 @@
         "storesHint": "Butikerna ni handlar i. Ett pris utan butik svarar bara till hälften.",
         "storeDeleteConfirm": "Ta bort butiken ”{{name}}”?",
         "storeDeleteConfirmDetail": "Varorna från den här butiken blir kvar, priset också - bara butikskopplingen blir tom. Någon ersättningsbutik finns inte.",
-        "addStore": "Ny butik"
+        "addStore": "Ny butik",
+        "duplicateListLabel": "Duplicera listan",
+        "duplicateListTitle": "Duplicera ”{{name}}”",
+        "duplicateListNameLabel": "Namn på den nya listan",
+        "duplicateDefaultName": "{{name}} – Kopia",
+        "duplicateResetChecked": "Återställ ibockade varor",
+        "duplicateKeepQuantities": "Behåll mängder",
+        "duplicateKeepNotes": "Behåll anteckningar och länkar",
+        "duplicateSubmit": "Duplicera",
+        "duplicateError": "Listan kunde inte dupliceras."
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} måltider planerade.",

@@ -616,7 +616,16 @@
         "storesHint": "Sklepy, w których kupujecie. Cena bez sklepu odpowiada tylko na pół pytania.",
         "storeDeleteConfirm": "Usunąć sklep „{{name}}”?",
         "storeDeleteConfirmDetail": "Pozycje z tego sklepu pozostaną wraz z ceną - puste będzie tylko przypisanie sklepu. Nie ma tu sklepu zastępczego.",
-        "addStore": "Nowy sklep"
+        "addStore": "Nowy sklep",
+        "duplicateListLabel": "Duplikuj listę",
+        "duplicateListTitle": "Duplikuj „{{name}}”",
+        "duplicateListNameLabel": "Nazwa nowej listy",
+        "duplicateDefaultName": "{{name}} – kopia",
+        "duplicateResetChecked": "Zresetuj odhaczenia",
+        "duplicateKeepQuantities": "Zachowaj ilości",
+        "duplicateKeepNotes": "Zachowaj notatki i linki",
+        "duplicateSubmit": "Duplikuj",
+        "duplicateError": "Nie udało się zduplikować listy."
     },
     "meals": {
         "randomizeSuccess_few": "Zaplanowano {{count}} posiłki.",

@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A shopping list can be duplicated** (#1103). "Duplicate" sits in the list menu next to
+  rename/delete and copies every item into a new list, with category assignment and the manual
+  per-category order always carried over - that is the point of duplicating, not a switch. Three
+  flags control the rest: reset checked state, keep quantities, and keep notes & links, all on by
+  default.
+
+  A duplicated item is a new, local item: CalDAV sync fields, the originating meal, and any recorded
+  price or shop are never copied, since each names something true of the *original* item only (a
+  synced remote object, a specific meal, a price actually paid in a specific shop), never of a fresh
+  copy.
+
+- **A shopping suggestion carries its category and quantity** (#1113, from discussion #1103).
+  Picking a suggestion while adding an item now also fills in that item's most recently used
+  category and quantity, instead of only its name - without the category, every picked suggestion
+  landed back in the fallback category and the aisle order had to be re-sorted on the next trip.
+  Suggestions are also now ordered by most recently used first, instead of alphabetically - a
+  household buys the same handful of things again and again, and the ones bought last stood out
+  less behind everything the alphabet puts first.
+
 - **A new event goes to the calendar of the person it is assigned to** (#1060). A Google or CalDAV
   calendar that names a default assignee in the sync settings now works in both directions: events
   imported from it get that person, and a new event assigned to exactly that person gets that
@@ -198,6 +217,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   found none, removed the dismissed one and created the same reminder again - so it was back within
   a minute, and could be pushed a second time. The reminder now stays dismissed until its time
   actually changes: a different lead time, a changed date, or next year's birthday.
+
+- **An item added without a category lands in the misc category again** (#548). The item route had
+  drifted to defaulting to the *first* category ("Fruit & vegetables" in aisle order) instead of the
+  *last*, neutral one - the pantry import already fell back to the last. Both now agree. In the same
+  corner, quick-add's category selector resets to the default after every item added, instead of
+  staying on whatever a previous suggestion or manual pick set it to - an unrelated item typed right
+  after could quietly land in the wrong aisle.
 
 - **A housekeeper can check out again, and work a second session on the same day** (#1133, #1138).
   The one button that carries both directions was disabled while someone was checked in, and it is

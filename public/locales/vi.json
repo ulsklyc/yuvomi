@@ -604,7 +604,16 @@
         "storesHint": "Những cửa hàng bạn mua sắm. Giá mà không có cửa hàng chỉ trả lời một nửa.",
         "storeDeleteConfirm": "Xóa cửa hàng “{{name}}”?",
         "storeDeleteConfirmDetail": "Các món của cửa hàng này vẫn còn, giá cũng vậy - chỉ phần gán cửa hàng trở nên trống. Ở đây không có cửa hàng thay thế.",
-        "addStore": "Cửa hàng mới"
+        "addStore": "Cửa hàng mới",
+        "duplicateListLabel": "Nhân bản danh sách",
+        "duplicateListTitle": "Nhân bản “{{name}}”",
+        "duplicateListNameLabel": "Tên danh sách mới",
+        "duplicateDefaultName": "{{name}} – Bản sao",
+        "duplicateResetChecked": "Đặt lại các mục đã đánh dấu",
+        "duplicateKeepQuantities": "Giữ số lượng",
+        "duplicateKeepNotes": "Giữ ghi chú & liên kết",
+        "duplicateSubmit": "Nhân bản",
+        "duplicateError": "Không thể nhân bản danh sách."
     },
     "meals": {
         "randomizeSuccess_few": "Đã lên kế hoạch {{count}} bữa ăn.",

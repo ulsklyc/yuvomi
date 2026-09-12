@@ -604,7 +604,16 @@
         "storesHint": "Магазины, где вы покупаете. Цена без магазина отвечает лишь наполовину.",
         "storeDeleteConfirm": "Удалить магазин «{{name}}»?",
         "storeDeleteConfirmDetail": "Товары этого магазина останутся вместе с ценой - пустым будет только поле магазина. Замены магазина здесь нет.",
-        "addStore": "Новый магазин"
+        "addStore": "Новый магазин",
+        "duplicateListLabel": "Дублировать список",
+        "duplicateListTitle": "Дублировать «{{name}}»",
+        "duplicateListNameLabel": "Название нового списка",
+        "duplicateDefaultName": "{{name}} — копия",
+        "duplicateResetChecked": "Сбросить отметки",
+        "duplicateKeepQuantities": "Сохранить количество",
+        "duplicateKeepNotes": "Сохранить заметки и ссылки",
+        "duplicateSubmit": "Дублировать",
+        "duplicateError": "Не удалось дублировать список."
     },
     "meals": {
         "randomizeSuccess_few": "Запланировано {{count}} приёма пищи.",

@@ -616,7 +616,16 @@
         "storesHint": "Toko tempat kalian berbelanja. Harga tanpa toko hanya menjawab separuh.",
         "storeDeleteConfirm": "Hapus toko “{{name}}”?",
         "storeDeleteConfirmDetail": "Barang dari toko ini tetap ada, harganya juga - hanya penetapan tokonya yang menjadi kosong. Tidak ada toko pengganti di sini.",
-        "addStore": "Toko baru"
+        "addStore": "Toko baru",
+        "duplicateListLabel": "Duplikat daftar",
+        "duplicateListTitle": "Duplikat \"{{name}}\"",
+        "duplicateListNameLabel": "Nama daftar baru",
+        "duplicateDefaultName": "{{name}} – Salinan",
+        "duplicateResetChecked": "Setel ulang tanda centang",
+        "duplicateKeepQuantities": "Pertahankan jumlah",
+        "duplicateKeepNotes": "Pertahankan catatan & tautan",
+        "duplicateSubmit": "Duplikat",
+        "duplicateError": "Daftar tidak dapat diduplikat."
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} makanan direncanakan.",

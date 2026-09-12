@@ -616,7 +616,16 @@
         "storesHint": "Die Läden, in denen ihr einkauft. Ein Preis ohne Laden beantwortet nur die halbe Frage.",
         "storeDeleteConfirm": "Laden „{{name}}“ löschen?",
         "storeDeleteConfirmDetail": "Artikel dieses Ladens bleiben erhalten, ihr Preis bleibt stehen - nur die Ladenzuordnung ist danach leer. Eine Ersatzzuordnung gibt es hier nicht.",
-        "addStore": "Neuer Laden"
+        "addStore": "Neuer Laden",
+        "duplicateListLabel": "Liste duplizieren",
+        "duplicateListTitle": "„{{name}}“ duplizieren",
+        "duplicateListNameLabel": "Name der neuen Liste",
+        "duplicateDefaultName": "{{name}} – Kopie",
+        "duplicateResetChecked": "Häkchen zurücksetzen",
+        "duplicateKeepQuantities": "Mengen übernehmen",
+        "duplicateKeepNotes": "Notizen & Links übernehmen",
+        "duplicateSubmit": "Duplizieren",
+        "duplicateError": "Die Liste konnte nicht dupliziert werden."
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} Mahlzeiten geplant.",

@@ -611,6 +611,7 @@ function renderTabs(container) {
         label: t('shopping.listActionsLabel', { name: state.activeList.name }),
         items: [
           { action: 'rename-list', label: t('shopping.renameListLabel'), icon: 'pencil', id: state.activeList.id },
+          { action: 'duplicate-list', label: t('shopping.duplicateListLabel'), icon: 'copy' },
           { action: 'import-meals', label: t('shopping.importMeals'), icon: 'utensils' },
           { action: 'send-list', label: t('shopping.sendList'), icon: 'mail' },
           { action: 'manage-categories', label: t('shopping.manageCategories'), icon: 'tags' },
@@ -729,6 +730,85 @@ async function openSendListDialog(container) {
             byReason ? t(byReason) : (err.data?.error ?? t('shopping.sendListError')),
             'danger',
           );
+          btn.disabled = false;
+        }
+      });
+    },
+  });
+}
+
+/**
+ * Liste duplizieren (#1103) - "der Einkauf letzte Woche war gut, das meiste
+ * davon wieder", ohne die alte Liste anzutasten. Kategorie und Handsortierung
+ * werden serverseitig immer übernommen; nur Häkchen/Menge/Notiz sind Flags.
+ *
+ * Artikelzahlen für die neue Liste kommen aus den schon geladenen Artikeln der
+ * QUELL-Liste statt aus einem zweiten `GET /shopping` - genau die Zahlen, die
+ * gleich kopiert werden, sind bereits im Client, ein Neuladen der ganzen
+ * Listen-Übersicht dafür wäre eine Anfrage für eine Antwort, die schon da ist.
+ */
+async function openDuplicateListDialog(container) {
+  const source = state.activeList;
+  if (!source) return;
+
+  openModal({
+    title: t('shopping.duplicateListTitle', { name: source.name }),
+    content: `
+      <div class="form-group">
+        <label class="form-label" for="duplicate-list-name">${esc(t('shopping.duplicateListNameLabel'))}</label>
+        <input class="form-input" type="text" id="duplicate-list-name"
+               value="${esc(t('shopping.duplicateDefaultName', { name: source.name }))}" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="toggle">
+          <input type="checkbox" id="duplicate-reset-checked" checked>
+          <span class="toggle__track"></span>
+          <span>${esc(t('shopping.duplicateResetChecked'))}</span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label class="toggle">
+          <input type="checkbox" id="duplicate-keep-quantities" checked>
+          <span class="toggle__track"></span>
+          <span>${esc(t('shopping.duplicateKeepQuantities'))}</span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label class="toggle">
+          <input type="checkbox" id="duplicate-keep-notes" checked>
+          <span class="toggle__track"></span>
+          <span>${esc(t('shopping.duplicateKeepNotes'))}</span>
+        </label>
+      </div>
+      <div class="modal-panel__footer modal-panel__footer--plain">
+        <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
+        <button type="button" class="btn btn--primary" id="duplicate-list-confirm">${esc(t('shopping.duplicateSubmit'))}</button>
+      </div>`,
+    onSave(panel) {
+      panel.querySelector('#duplicate-list-confirm').addEventListener('click', async (event) => {
+        const btn = event.currentTarget;
+        const name = panel.querySelector('#duplicate-list-name').value.trim();
+        if (!name) {
+          reportFieldError(panel.querySelector('#duplicate-list-name'), t('common.nameRequired'));
+          return;
+        }
+        const resetChecked   = panel.querySelector('#duplicate-reset-checked').checked;
+        const keepQuantities = panel.querySelector('#duplicate-keep-quantities').checked;
+        const keepNotes      = panel.querySelector('#duplicate-keep-notes').checked;
+
+        btn.disabled = true;
+        try {
+          const data = await api.post(`/shopping/${source.id}/duplicate`, {
+            name, resetChecked, keepQuantities, keepNotes,
+          });
+          const itemTotal   = state.items.length;
+          const itemChecked = resetChecked ? 0 : state.items.filter(checkedOf).length;
+          state.lists.push({ ...data.data, item_total: itemTotal, item_checked: itemChecked });
+          closeModal({ force: true });
+          await switchList(data.data.id, container);
+          refocusAfterRender();
+        } catch (err) {
+          window.yuvomi.showToast(err.data?.error ?? t('shopping.duplicateError'), 'danger');
           btn.disabled = false;
         }
       });
@@ -1028,6 +1108,29 @@ function renderItem(item) {
 
 let autocompleteTimeout = null;
 
+/**
+ * Übernimmt eine gewählte Vorschlagszeile ins Formular (#1103): Name immer,
+ * Kategorie/Menge nur, wenn die Zeile sie kennt. Eine Kategorie, die es im
+ * Haushalt nicht mehr gibt (umbenannt/gelöscht seit dem letzten Einkauf),
+ * bleibt beim aktuellen Stand des Feldes stehen, statt eine ungültige Option
+ * zu erzwingen - `<select>` würde sie ohnehin nur stillschweigend ignorieren.
+ */
+function applyAutocompleteSuggestion(container, el) {
+  const nameInput = container.querySelector('#item-name-input');
+  const qtyInput  = container.querySelector('#item-qty-input');
+  const catSelect = container.querySelector('#item-cat-select');
+  if (!nameInput) return;
+
+  nameInput.value = el.dataset.name ?? '';
+  if (catSelect && el.dataset.category
+    && [...catSelect.options].some((o) => o.value === el.dataset.category)) {
+    catSelect.value = el.dataset.category;
+  }
+  if (qtyInput && el.dataset.quantity) {
+    qtyInput.value = el.dataset.quantity;
+  }
+}
+
 function wireAutocomplete(container) {
   const input    = container.querySelector('#item-name-input');
   const dropdown = container.querySelector('#autocomplete-dropdown');
@@ -1047,8 +1150,11 @@ function wireAutocomplete(container) {
         if (!suggestions.length) { dropdown.hidden = true; return; }
 
         dropdown.replaceChildren();
+        // Angezeigt wird nur der Name - Kategorie/Menge reisen unsichtbar als
+        // data-Attribute mit und füllen beim Wählen die übrigen Felder (#1103).
         dropdown.insertAdjacentHTML('beforeend', suggestions.map((s, i) =>
-          `<div class="autocomplete-item" data-idx="${i}" data-value="${esc(s)}">${esc(s)}</div>`
+          `<div class="autocomplete-item" data-idx="${i}" data-name="${esc(s.name)}"
+                data-category="${esc(s.category ?? '')}" data-quantity="${esc(s.quantity ?? '')}">${esc(s.name)}</div>`
         ).join(''));
         dropdown.hidden = false;
         activeIdx = -1;
@@ -1056,7 +1162,7 @@ function wireAutocomplete(container) {
         dropdown.querySelectorAll('.autocomplete-item').forEach((el) => {
           el.addEventListener('mousedown', (e) => {
             e.preventDefault();
-            input.value = el.dataset.value;
+            applyAutocompleteSuggestion(container, el);
             dropdown.hidden = true;
           });
         });
@@ -1081,7 +1187,7 @@ function wireAutocomplete(container) {
       items.forEach((el, i) => el.classList.toggle('autocomplete-item--active', i === activeIdx));
     } else if (e.key === 'Enter' && activeIdx >= 0) {
       e.preventDefault();
-      input.value = items[activeIdx].dataset.value;
+      applyAutocompleteSuggestion(container, items[activeIdx]);
       dropdown.hidden = true;
     } else if (e.key === 'Escape') {
       dropdown.hidden = true;
@@ -1211,6 +1317,16 @@ function wireQuickAdd(container) {
       renderTabs(container);
       nameInput.value = '';
       qtyInput.value  = '';
+      // Die Kategorie faellt auf den Standard zurueck (#548: neu = Sonstiges),
+      // statt fuer den NAECHSTEN, unverwandten Artikel stehen zu bleiben. Ohne
+      // diese Zeile blieb sie an der zuletzt gewaehlten Kategorie haengen -
+      // ob von Hand gewaehlt oder von einem Vorschlag uebernommen
+      // (applyAutocompleteSuggestion) - und ein danach eingetippter Artikel
+      // landete dort, nicht in Sonstiges (gemeldet 2026-09-11: "Toast" landete
+      // in "Milchprodukte", weil zuvor ein Milch-Vorschlag gewaehlt wurde).
+      if ([...catSelect.options].some((o) => o.value === DEFAULT_CATEGORY_NAME)) {
+        catSelect.value = DEFAULT_CATEGORY_NAME;
+      }
       // Erfolgs-Feedback auf dem +-Button (DOM-API, kein innerHTML)
       _flashAddBtn(form.querySelector('.quick-add__btn'));
       nameInput.focus();
@@ -2451,6 +2567,11 @@ function wireListContentEvents(container) {
       await openSendListDialog(container);
     }
 
+    // ---- Liste duplizieren (#1103) ----
+    if (action === 'duplicate-list') {
+      await openDuplicateListDialog(container);
+    }
+
     // ---- Liste umbenennen ----
     if (action === 'rename-list') {
       const newName = await promptModal(t('shopping.renameListPrompt'), state.activeList?.name ?? '');
@@ -2864,6 +2985,11 @@ export const __test = {
   toggleShoppingItem,
   loadItems,
   deleteItemUndoable,
+  // GET /shopping/suggestions liefert seit #1103 Objekte ({name, category,
+  // quantity}), keine blossen Namen - ein Nutzer meldete "[object Object]" im
+  // Namensfeld, weil diese Uebernahme nie eine eigene Pruefung hatte (nur die
+  // Server-Seite der Route war getestet).
+  applyAutocompleteSuggestion,
   // Die Absichten-Karte und ihre Lesefunktion: die Tests pruefen an ihnen die
   // Trennung selbst - dass `state.items` den Serverstand behaelt und die Zeile
   // die Ueberlagerung zeigt.

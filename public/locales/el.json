@@ -604,7 +604,16 @@
         "storesHint": "Τα καταστήματα όπου ψωνίζετε. Μια τιμή χωρίς κατάστημα απαντά μόνο μισή ερώτηση.",
         "storeDeleteConfirm": "Διαγραφή καταστήματος «{{name}}»;",
         "storeDeleteConfirmDetail": "Τα είδη αυτού του καταστήματος παραμένουν μαζί με την τιμή τους - μόνο η αντιστοίχιση καταστήματος αδειάζει. Δεν υπάρχει εναλλακτικό κατάστημα.",
-        "addStore": "Νέο κατάστημα"
+        "addStore": "Νέο κατάστημα",
+        "duplicateListLabel": "Διπλασιασμός λίστας",
+        "duplicateListTitle": "Διπλασιασμός «{{name}}»",
+        "duplicateListNameLabel": "Όνομα νέας λίστας",
+        "duplicateDefaultName": "{{name}} – Αντίγραφο",
+        "duplicateResetChecked": "Επαναφορά τσεκαρισμένων",
+        "duplicateKeepQuantities": "Διατήρηση ποσοτήτων",
+        "duplicateKeepNotes": "Διατήρηση σημειώσεων & συνδέσμων",
+        "duplicateSubmit": "Διπλασιασμός",
+        "duplicateError": "Δεν ήταν δυνατός ο διπλασιασμός της λίστας."
     },
     "meals": {
         "randomizeSuccess_few": "Προγραμματίστηκαν {{count}} γεύματα.",

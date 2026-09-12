@@ -604,7 +604,16 @@
         "storesHint": "वे दुकानें जहाँ आप खरीदते हैं। दुकान के बिना कीमत आधा ही उत्तर देती है।",
         "storeDeleteConfirm": "दुकान “{{name}}” हटाएँ?",
         "storeDeleteConfirmDetail": "इस दुकान की चीज़ें और उनकी कीमत बनी रहती हैं - सिर्फ़ दुकान का चुनाव खाली हो जाता है। यहाँ कोई वैकल्पिक दुकान नहीं मिलती।",
-        "addStore": "नई दुकान"
+        "addStore": "नई दुकान",
+        "duplicateListLabel": "सूची डुप्लीकेट करें",
+        "duplicateListTitle": "“{{name}}” डुप्लीकेट करें",
+        "duplicateListNameLabel": "नई सूची का नाम",
+        "duplicateDefaultName": "{{name}} – प्रतिलिपि",
+        "duplicateResetChecked": "चेक किए गए आइटम रीसेट करें",
+        "duplicateKeepQuantities": "मात्राएं बनाए रखें",
+        "duplicateKeepNotes": "नोट्स और लिंक बनाए रखें",
+        "duplicateSubmit": "डुप्लीकेट करें",
+        "duplicateError": "सूची डुप्लीकेट नहीं की जा सकी।"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} भोजन योजनाबद्ध किए गए।",

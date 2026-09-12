@@ -616,7 +616,16 @@
         "storesHint": "Ang mga tindahang pinamimilihan ninyo. Ang presyo na walang tindahan ay kalahating sagot lamang.",
         "storeDeleteConfirm": "Burahin ang tindahang “{{name}}”?",
         "storeDeleteConfirmDetail": "Mananatili ang mga bagay ng tindahang ito pati ang presyo nila - ang takda ng tindahan lang ang mawawalan ng laman. Walang kapalit na tindahan dito.",
-        "addStore": "Bagong tindahan"
+        "addStore": "Bagong tindahan",
+        "duplicateListLabel": "I-duplicate ang listahan",
+        "duplicateListTitle": "I-duplicate ang \"{{name}}\"",
+        "duplicateListNameLabel": "Pangalan ng bagong listahan",
+        "duplicateDefaultName": "{{name}} – Kopya",
+        "duplicateResetChecked": "I-reset ang mga naka-check",
+        "duplicateKeepQuantities": "Panatilihin ang dami",
+        "duplicateKeepNotes": "Panatilihin ang mga tala at link",
+        "duplicateSubmit": "I-duplicate",
+        "duplicateError": "Hindi ma-duplicate ang listahan."
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} na pagkain ang naplano.",

@@ -604,7 +604,16 @@
         "storesHint": "De winkels waar jullie kopen. Een prijs zonder winkel beantwoordt maar de helft.",
         "storeDeleteConfirm": "Winkel “{{name}}” verwijderen?",
         "storeDeleteConfirmDetail": "Artikelen van deze winkel blijven staan, hun prijs ook - alleen de winkeltoewijzing is daarna leeg. Een vervangende winkel is er niet.",
-        "addStore": "Nieuwe winkel"
+        "addStore": "Nieuwe winkel",
+        "duplicateListLabel": "Lijst dupliceren",
+        "duplicateListTitle": "„{{name}}” dupliceren",
+        "duplicateListNameLabel": "Naam van de nieuwe lijst",
+        "duplicateDefaultName": "{{name}} – Kopie",
+        "duplicateResetChecked": "Aangevinkte items resetten",
+        "duplicateKeepQuantities": "Hoeveelheden behouden",
+        "duplicateKeepNotes": "Notities en links behouden",
+        "duplicateSubmit": "Dupliceren",
+        "duplicateError": "De lijst kon niet worden gedupliceerd."
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} maaltijden gepland.",

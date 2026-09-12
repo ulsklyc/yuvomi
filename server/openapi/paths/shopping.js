@@ -43,6 +43,20 @@ export function shoppingPaths() {
       put: op({ summary: 'Rename shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true }),
     },
+    '/api/v1/shopping/{listId}/duplicate': {
+      post: op({
+        summary: 'Duplicate a shopping list',
+        description: 'Body: { name, resetChecked?, keepQuantities?, keepNotes? } - the three flags default to true. '
+          + 'Category assignment and manual per-category order are always carried over, since preserving them is '
+          + 'the point of duplicating. CalDAV sync fields, the meal-plan origin, the recorded price and the shop '
+          + 'are never copied: each is a fact about the ORIGINAL item (a synced remote object, a specific meal, a '
+          + 'price actually paid in a specific shop) that is not true of a fresh copy.',
+        tag: 'Shopping',
+        params: [idParam('listId', 'List ID')],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
+    },
     '/api/v1/shopping/{listId}/items': {
       get: op({ summary: 'List items in shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')] }),
       post: op({ summary: 'Add item to shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true, requestBody: jsonBody(null) }),

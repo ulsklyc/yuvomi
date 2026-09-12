@@ -604,7 +604,16 @@
         "storesHint": "The shops you buy at. A price without a shop answers only half the question.",
         "storeDeleteConfirm": "Delete shop “{{name}}”?",
         "storeDeleteConfirmDetail": "Items from this shop stay, and so do their prices - only the shop assignment is empty afterwards. There is no replacement shop.",
-        "addStore": "New shop"
+        "addStore": "New shop",
+        "duplicateListLabel": "Duplicate list",
+        "duplicateListTitle": "Duplicate \"{{name}}\"",
+        "duplicateListNameLabel": "New list name",
+        "duplicateDefaultName": "{{name}} – Copy",
+        "duplicateResetChecked": "Reset checked state",
+        "duplicateKeepQuantities": "Keep quantities",
+        "duplicateKeepNotes": "Keep notes & links",
+        "duplicateSubmit": "Duplicate",
+        "duplicateError": "The list could not be duplicated."
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} meals planned.",

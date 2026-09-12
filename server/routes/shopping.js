@@ -306,21 +306,46 @@ router.get('/send-recipients', (req, res) => {
 // --------------------------------------------------------
 // GET /api/v1/shopping/suggestions?q=…
 // Autocomplete-Vorschläge aus bisherigen Artikelnamen.
-// Response: { data: string[] }
+// Response: { data: { name, category, quantity }[] }
+//
+// KATEGORIE UND MENGE REISEN MIT (#1103). Ein Name allein macht aus der Liste
+// bisheriger Einkaeufe keinen Vorschlag, der etwas spart - ohne die Kategorie
+// landet jeder abgetippte Vorschlag wieder in "Sonstiges" und die
+// Gang-Reihenfolge, derentwegen jemand ueberhaupt Kategorien pflegt, ist beim
+// naechsten Einkauf neu zu sortieren. Die juengste Zeile mit diesem Namen
+// entscheidet, welche Kategorie/Menge vorgeschlagen wird - sie ist die
+// aktuellste Aussage darueber, wie der Haushalt den Artikel heute einordnet.
+//
+// REIHENFOLGE NACH ZULETZT VERWENDET, NICHT ALPHABETISCH (#1103). Ein
+// Haushalt kauft dieselbe Handvoll Artikel immer wieder - die zuletzt
+// eingekauften stehen oben, statt hinter allem, was zufaellig frueher im
+// Alphabet liegt.
 // --------------------------------------------------------
 router.get('/suggestions', (req, res) => {
   try {
     const q = (req.query.q ?? '').trim();
     if (q.length < 1) return res.json({ data: [] });
 
-    const rows = db.get().prepare(`
-      SELECT DISTINCT name FROM shopping_items
+    const names = db.get().prepare(`
+      SELECT name, MAX(created_at) AS latest, MAX(id) AS latest_id FROM shopping_items
       WHERE name LIKE ? COLLATE NOCASE
-      ORDER BY name ASC
+      GROUP BY name
+      ORDER BY latest DESC, latest_id DESC
       LIMIT 8
     `).all(`${q}%`);
 
-    res.json({ data: rows.map((r) => r.name) });
+    const mostRecent = db.get().prepare(`
+      SELECT category, quantity FROM shopping_items
+      WHERE name = ?
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
+    `);
+    const data = names.map((r) => {
+      const recent = mostRecent.get(r.name);
+      return { name: r.name, category: recent?.category ?? null, quantity: recent?.quantity ?? null };
+    });
+
+    res.json({ data });
   } catch (err) {
     log.error('suggestions error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -694,6 +719,87 @@ router.put('/:listId', (req, res) => {
 });
 
 // --------------------------------------------------------
+// POST /api/v1/shopping/:listId/duplicate
+// Liste als neue Liste kopieren (#1103) - "der Einkauf letzte Woche war gut,
+// das meiste davon wieder", ohne die alte Liste anzutasten.
+// Body: { name, resetChecked?, keepQuantities?, keepNotes? }  (die drei Flags
+//        sind alle standardmaessig an)
+// Response: { data: ShoppingList }
+//
+// KATEGORIE UND HANDSORTIERUNG WERDEN IMMER UEBERNOMMEN - das ist der Punkt
+// des Duplizierens, kein Schalter. Was NIE mitkopiert wird, unabhaengig von
+// den Flags:
+//
+//   - Die CalDAV-Sync-Spalten (external_uid/external_source/...). Sie sind
+//     eine Aussage ueber EIN Sync-Objekt auf einem fremden Server - eine
+//     unveraenderte Kopie wuerde jede Aenderung der Kopie auf dasselbe
+//     entfernte VTODO schreiben und jedes Loeschen der Kopie dessen Loeschung
+//     dort anstossen (siehe auch die Diskussion in #998). Eine Kopie ist ein
+//     neuer, lokaler Artikel, der beim naechsten Sync-Lauf ganz normal neu
+//     angelegt wird, falls die Zielliste selbst gespiegelt ist.
+//   - added_from_meal: eine Kopie stammt aus dieser Aktion, nicht aus der
+//     Mahlzeit, aus der der ORIGINAL-Artikel kam.
+//   - price_cents UND store_id: beide sind eine Tatsache ueber einen EINKAUF -
+//     "einmal bezahlt, in diesem Laden" (#1003) - eine Kopie wurde noch nicht
+//     bezahlt, ihr fehlen beide Tatsachen, die Preis und Laden festhalten
+//     (Ruecksprache mit dem Maintainer auf #1103: derselbe Grund fuer beide,
+//     nicht nur fuer den Preis).
+// --------------------------------------------------------
+router.post('/:listId/duplicate', (req, res) => {
+  try {
+    const list = db.get()
+      .prepare('SELECT * FROM shopping_lists WHERE id = ?')
+      .get(req.params.listId);
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
+
+    const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
+    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
+
+    const resetChecked   = req.body.resetChecked !== false;
+    const keepQuantities = req.body.keepQuantities !== false;
+    const keepNotes      = req.body.keepNotes !== false;
+
+    const items = db.get()
+      .prepare('SELECT * FROM shopping_items WHERE list_id = ?')
+      .all(req.params.listId);
+
+    const newList = db.get().transaction(() => {
+      const info = db.get()
+        .prepare('INSERT INTO shopping_lists (name, created_by) VALUES (?, ?)')
+        .run(vName.value, req.authUserId || req.session.userId);
+      const newListId = info.lastInsertRowid;
+
+      const insertItem = db.get().prepare(`
+        INSERT INTO shopping_items
+          (list_id, name, quantity, category, is_checked, notes, url, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const item of items) {
+        insertItem.run(
+          newListId,
+          item.name,
+          keepQuantities ? item.quantity : null,
+          item.category,
+          resetChecked ? 0 : item.is_checked,
+          keepNotes ? item.notes : null,
+          keepNotes ? item.url : null,
+          // Rang explizit uebernehmen statt dem Einfuege-Trigger zu ueberlassen
+          // (der neue Zeilen mit sort_order=0 ans Ende ihrer Kategorie stellt) -
+          // die Handsortierung IST das, was diese Route verspricht zu erhalten.
+          item.sort_order,
+        );
+      }
+      return db.get().prepare('SELECT * FROM shopping_lists WHERE id = ?').get(newListId);
+    })();
+
+    res.status(201).json({ data: newList });
+  } catch (err) {
+    log.error('POST /:listId/duplicate error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// --------------------------------------------------------
 // DELETE /api/v1/shopping/:listId
 // Liste und alle Artikel löschen (CASCADE).
 // Response: { ok: true }
@@ -817,8 +923,14 @@ router.post('/:listId/items', (req, res) => {
       .get(req.params.listId);
     if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
 
+    // Ohne Kategorie faellt der Artikel auf die LETZTE (#548, "Sonstiges"),
+    // nicht die erste ("Obst & Gemuese" nach Gang-Reihenfolge) - genau das war
+    // der gemeldete Fehler: unzusammenhaengende Artikel landeten automatisch
+    // in der ersten Kategorie, statt in der neutralen Sammelkategorie. Der
+    // Quick-Add-Client schickt die Kategorie ohnehin immer explizit mit;
+    // dieser Rueckfall greift nur, wenn sie fehlt (z.B. direkter API-Aufruf).
     const validNames = validCategoryNames();
-    const defaultCat = validNames[0] ?? 'Sonstiges';
+    const defaultCat = validNames[validNames.length - 1] ?? 'Sonstiges';
     const requestedCat = req.body.category || defaultCat;
 
     const vName  = str(req.body.name, 'Name', { max: MAX_TITLE });

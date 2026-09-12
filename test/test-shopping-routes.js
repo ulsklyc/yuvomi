@@ -68,7 +68,31 @@ test('GET /suggestions: Präfix liefert distinct Namen', async () => {
   await call('POST', `/${list}/items`, { name: 'Bananen' }); // Duplikat → DISTINCT
   const r = await call('GET', '/suggestions?q=Ban');
   assert.equal(r.status, 200);
-  assert.deepEqual(r.body.data, ['Bananen']);
+  assert.equal(r.body.data.length, 1);
+  assert.equal(r.body.data[0].name, 'Bananen');
+});
+
+test('GET /suggestions: sortiert nach zuletzt verwendet, nicht alphabetisch (#1103)', async () => {
+  const list = await newList('SuggOrder');
+  // "Zwiebeln" zuerst angelegt (alphabetisch nach "Zucchini"), aber "Zucchini"
+  // danach - die Antwort muss trotzdem mit dem zuletzt verwendeten beginnen.
+  await call('POST', `/${list}/items`, { name: 'Zwiebeln' });
+  await call('POST', `/${list}/items`, { name: 'Zucchini' });
+  const r = await call('GET', '/suggestions?q=Z');
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.data.map((s) => s.name), ['Zucchini', 'Zwiebeln']);
+});
+
+test('GET /suggestions: trägt Kategorie + Menge der zuletzt verwendeten Zeile mit (#1103)', async () => {
+  const cats = await call('GET', '/categories');
+  const [firstCat, secondCat] = cats.body.data;
+  const list = await newList('Sugg2');
+  await call('POST', `/${list}/items`, { name: 'Käse', category: firstCat.name, quantity: '200g' });
+  // Die JUENGERE Zeile entscheidet (gleiche Sekunde: die groessere ID).
+  await call('POST', `/${list}/items`, { name: 'Käse', category: secondCat.name, quantity: '1 Stück' });
+  const r = await call('GET', '/suggestions?q=Käse');
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.data, [{ name: 'Käse', category: secondCat.name, quantity: '1 Stück' }]);
 });
 
 // --------------------------------------------------------------------------
@@ -116,6 +140,91 @@ test('PUT /:listId: benennt um', async () => {
   assert.equal(r.body.data.name, 'Neu');
 });
 
+// --------------------------------------------------------------------------
+// Liste duplizieren (#1103)
+// --------------------------------------------------------------------------
+test('POST /:listId/duplicate: unbekannte Liste → 404', async () => {
+  const r = await call('POST', '/999999/duplicate', { name: 'Kopie' });
+  assert.equal(r.status, 404);
+});
+
+test('POST /:listId/duplicate: leerer Name → 400', async () => {
+  const list = await newList('Original');
+  const r = await call('POST', `/${list}/duplicate`, { name: '' });
+  assert.equal(r.status, 400);
+});
+
+test('POST /:listId/duplicate: kopiert Kategorie + Handsortierung immer, unabhängig von den Flags', async () => {
+  const cats = await call('GET', '/categories');
+  const catName = cats.body.data[0].name;
+  const list = await newList('Original');
+  const a = await call('POST', `/${list}/items`, { name: 'A', category: catName });
+  const b = await call('POST', `/${list}/items`, { name: 'B', category: catName });
+  await call('PATCH', `/${list}/items/reorder`, { category: catName, order: [b.body.data.id, a.body.data.id] });
+
+  const dup = await call('POST', `/${list}/duplicate`, { name: 'Kopie' });
+  assert.equal(dup.status, 201);
+  assert.notEqual(dup.body.data.id, list);
+  assert.equal(dup.body.data.name, 'Kopie');
+
+  const items = await call('GET', `/${dup.body.data.id}/items`);
+  assert.equal(items.body.data.length, 2);
+  assert.deepEqual(items.body.data.map((i) => i.name), ['B', 'A']); // Rang übernommen
+  for (const i of items.body.data) assert.equal(i.category, catName);
+});
+
+test('POST /:listId/duplicate: resetChecked/keepQuantities/keepNotes steuern, was mitkommt', async () => {
+  const list = await newList('Original2');
+  const item = await call('POST', `/${list}/items`, {
+    name: 'Milch', quantity: '2 Liter', notes: 'Bio', url: 'https://example.com',
+  });
+  await call('PATCH', `/items/${item.body.data.id}`, { is_checked: true });
+
+  const dup = await call('POST', `/${list}/duplicate`, {
+    name: 'Kopie2', resetChecked: false, keepQuantities: false, keepNotes: false,
+  });
+  const items = await call('GET', `/${dup.body.data.id}/items`);
+  const copy = items.body.data[0];
+  assert.equal(copy.is_checked, 1); // resetChecked:false → Häkchen bleibt
+  assert.equal(copy.quantity, null);
+  assert.equal(copy.notes, null);
+  assert.equal(copy.url, null);
+});
+
+test('POST /:listId/duplicate: Häkchen wird standardmäßig zurückgesetzt', async () => {
+  const list = await newList('Original3');
+  const item = await call('POST', `/${list}/items`, { name: 'Brot' });
+  await call('PATCH', `/items/${item.body.data.id}`, { is_checked: true });
+
+  const dup = await call('POST', `/${list}/duplicate`, { name: 'Kopie3' });
+  const items = await call('GET', `/${dup.body.data.id}/items`);
+  assert.equal(items.body.data[0].is_checked, 0);
+});
+
+test('POST /:listId/duplicate: übernimmt weder CalDAV-Sync-Spalten noch added_from_meal/price_cents/store_id', async () => {
+  const store = await call('POST', '/stores', { name: 'Netto' });
+  const list = await newList('Original4');
+  const item = await call('POST', `/${list}/items`, { name: 'Käse' });
+  db.prepare(`
+    UPDATE shopping_items
+    SET external_uid = 'uid-1', external_source = 'caldav', external_object_url = 'https://caldav.example/x',
+        added_from_meal = NULL, price_cents = 250, store_id = ?
+    WHERE id = ?
+  `).run(store.body.data.id, item.body.data.id);
+
+  const dup = await call('POST', `/${list}/duplicate`, { name: 'Kopie4' });
+  const copyId = (await call('GET', `/${dup.body.data.id}/items`)).body.data[0].id;
+  const row = db.prepare('SELECT * FROM shopping_items WHERE id = ?').get(copyId);
+  assert.equal(row.external_uid, null);
+  assert.equal(row.external_source, 'local');
+  assert.equal(row.external_object_url, null);
+  assert.equal(row.added_from_meal, null);
+  assert.equal(row.price_cents, null);
+  // Ein Laden ist genauso eine Tatsache ueber einen EINKAUF wie der Preis
+  // (Maintainer-Ruecksprache auf #1103) - eine Kopie hat beides noch nicht.
+  assert.equal(row.store_id, null);
+});
+
 test('DELETE /:listId: unbekannt → 404', async () => {
   const r = await call('DELETE', '/999999');
   assert.equal(r.status, 404);
@@ -150,12 +259,12 @@ test('POST /:listId/items: Nicht-http(s)-URL → 400', async () => {
   assert.equal(r.status, 400);
 });
 
-test('POST /:listId/items: legt Artikel an, Default-Kategorie = erste', async () => {
+test('POST /:listId/items: legt Artikel an, Default-Kategorie = letzte (#548)', async () => {
   const list = await newList();
   const r = await call('POST', `/${list}/items`, { name: 'Milch', quantity: '1 l', url: 'https://example.com' });
   assert.equal(r.status, 201);
   assert.equal(r.body.data.name, 'Milch');
-  assert.equal(r.body.data.category, 'Obst & Gemüse'); // sort_order 0
+  assert.equal(r.body.data.category, 'Sonstiges'); // letzte Kategorie, nicht die erste (#548)
   assert.equal(r.body.data.url, 'https://example.com');
 });
 

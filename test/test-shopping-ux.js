@@ -1159,3 +1159,97 @@ test('nach einem Fehlschlag derselben Liste wird die gecachte Antwort angenommen
     'ist der Bestand verworfen, ist die gecachte Antwort das Beste, was es gibt');
   delete globalThis.__apiStub;
 });
+
+// --------------------------------------------------------------------------
+// Autocomplete-Vorschlag uebernehmen (#1103)
+//
+// GET /shopping/suggestions liefert seit #1103 { name, category, quantity }
+// je Vorschlag, nicht mehr nur einen Namen (Companion-Fix zu #1103: "Kategorie
+// reist mit"). Ein Nutzer meldete "[object Object]" im Namensfeld - genau das
+// Ergebnis von `esc(einemObjekt)` -, weil dieser Uebernahme-Pfad nie eine
+// eigene Pruefung hatte: nur die Server-Seite der Route war getestet, die
+// Client-Seite (wireAutocomplete) rief weiterhin `esc(s)`/`.dataset.value`
+// auf einem Objekt auf.
+// --------------------------------------------------------------------------
+
+/** Minimaler Eingabefeld-Doppelgaenger: nur die eine Eigenschaft, die
+ *  applyAutocompleteSuggestion() anfasst. */
+function fakeInput(initial = '') {
+  return { value: initial };
+}
+
+/** Minimaler <select>-Doppelgaenger mit einer festen Options-Liste. */
+function fakeSelect(optionValues, initial = optionValues[0] ?? '') {
+  return { value: initial, options: optionValues.map((v) => ({ value: v })) };
+}
+
+function fakeFormContainer({ name, qty, cat }) {
+  const els = {
+    '#item-name-input': name,
+    '#item-qty-input': qty,
+    '#item-cat-select': cat,
+  };
+  return { querySelector: (sel) => els[sel] ?? null };
+}
+
+test('applyAutocompleteSuggestion: übernimmt Name, Kategorie und Menge aus dem Vorschlagsobjekt', () => {
+  const name = fakeInput('');
+  const qty  = fakeInput('');
+  const cat  = fakeSelect(['Obst & Gemüse', 'Backwaren', 'Sonstiges'], 'Sonstiges');
+  const container = fakeFormContainer({ name, qty, cat });
+
+  const el = { dataset: { name: 'Bananen', category: 'Obst & Gemüse', quantity: '1 Bund' } };
+  __test.applyAutocompleteSuggestion(container, el);
+
+  assert.equal(name.value, 'Bananen', 'der Name darf nie das Objekt selbst als String zeigen ("[object Object]")');
+  assert.equal(cat.value, 'Obst & Gemüse');
+  assert.equal(qty.value, '1 Bund');
+});
+
+test('applyAutocompleteSuggestion: eine nicht mehr vorhandene Kategorie überschreibt das Feld nicht', () => {
+  const name = fakeInput('');
+  const qty  = fakeInput('');
+  const cat  = fakeSelect(['Obst & Gemüse', 'Backwaren'], 'Backwaren');
+  const container = fakeFormContainer({ name, qty, cat });
+
+  // "Getränke" existiert in dieser Auswahl nicht (umbenannt/gelöscht seit dem
+  // letzten Einkauf) - das Feld muss auf seinem bisherigen Wert bleiben.
+  const el = { dataset: { name: 'Wasser', category: 'Getränke', quantity: '' } };
+  __test.applyAutocompleteSuggestion(container, el);
+
+  assert.equal(name.value, 'Wasser');
+  assert.equal(cat.value, 'Backwaren', 'eine unbekannte Kategorie darf das Feld nicht auf einen ungültigen Wert setzen');
+  assert.equal(qty.value, '', 'eine leere Menge überschreibt das Feld nicht mit einem leeren String');
+});
+
+test('shopping.js: der Vorschlags-Renderer zeigt s.name, nicht das ganze Vorschlagsobjekt', () => {
+  // Ergaenzende Textprobe (Verhaltenstest oben deckt die eigentliche Logik ab):
+  // haelt fest, dass der Renderer nie wieder auf ein bares `s` zurueckfaellt.
+  const source = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
+  assert.match(source, /data-name="\$\{esc\(s\.name\)\}"/,
+    'Der Vorschlags-Eintrag muss s.name rendern, nicht das ganze Vorschlagsobjekt.');
+  assert.doesNotMatch(source, /esc\(s\)/,
+    'Ein Vorschlagsobjekt darf nie als Ganzes in esc() laufen - das ergibt "[object Object]".');
+});
+
+// --------------------------------------------------------------------------
+// Quick-Add: die Kategorie faellt nach dem Anlegen auf den Standard zurueck
+//
+// Gemeldet 2026-09-11: nach dem Waehlen eines Autocomplete-Vorschlags
+// ("Milch", Kategorie Milchprodukte) blieb die Kategorie-Auswahl auf
+// "Milchprodukte" stehen - ein danach eingetippter, unverwandter Artikel
+// ("Toast") landete dort statt in Sonstiges (#548). Name/Menge wurden nach
+// dem Anlegen schon zurueckgesetzt, die Kategorie nicht.
+// --------------------------------------------------------------------------
+test('wireQuickAdd: setzt die Kategorie nach dem Anlegen auf den Standard zurueck, nicht nur Name/Menge', () => {
+  const source = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
+  const submitBlock = source.slice(
+    source.indexOf("form.addEventListener('submit'"),
+    source.indexOf("form.addEventListener('submit'") + 2500,
+  );
+  assert.match(submitBlock, /nameInput\.value = '';/);
+  assert.match(submitBlock, /catSelect\.value = DEFAULT_CATEGORY_NAME/,
+    'die Kategorie-Auswahl muss nach dem Anlegen auf DEFAULT_CATEGORY_NAME zurueckfallen, ' +
+    'sonst bleibt eine per Vorschlag oder von Hand gewaehlte Kategorie fuer den naechsten Artikel stehen.');
+});
+

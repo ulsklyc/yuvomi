@@ -616,7 +616,16 @@
         "storesHint": "장을 보는 상점입니다. 상점 없는 가격은 절반만 답합니다.",
         "storeDeleteConfirm": "상점 “{{name}}”을(를) 삭제할까요?",
         "storeDeleteConfirmDetail": "이 상점의 항목과 가격은 그대로 남고, 상점 지정만 비워집니다. 대체 상점은 채워지지 않습니다.",
-        "addStore": "새 상점"
+        "addStore": "새 상점",
+        "duplicateListLabel": "목록 복제",
+        "duplicateListTitle": "“{{name}}” 복제",
+        "duplicateListNameLabel": "새 목록 이름",
+        "duplicateDefaultName": "{{name}} – 사본",
+        "duplicateResetChecked": "체크 상태 초기화",
+        "duplicateKeepQuantities": "수량 유지",
+        "duplicateKeepNotes": "메모 및 링크 유지",
+        "duplicateSubmit": "복제",
+        "duplicateError": "목록을 복제할 수 없습니다."
     },
     "meals": {
         "randomizeSuccess_few": "{{count}}개의 식사가 계획되었습니다.",

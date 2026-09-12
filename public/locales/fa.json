@@ -616,7 +616,16 @@
         "storesHint": "فروشگاه‌هایی که از آن‌ها خرید می‌کنید. قیمت بدون فروشگاه تنها نیمی از پرسش را پاسخ می‌دهد.",
         "storeDeleteConfirm": "فروشگاه «{{name}}» حذف شود؟",
         "storeDeleteConfirmDetail": "کالاهای این فروشگاه و قیمتشان باقی می‌مانند - فقط انتساب فروشگاه خالی می‌شود. جایگزینی برای فروشگاه وجود ندارد.",
-        "addStore": "فروشگاه جدید"
+        "addStore": "فروشگاه جدید",
+        "duplicateListLabel": "کپی از فهرست",
+        "duplicateListTitle": "کپی از «{{name}}»",
+        "duplicateListNameLabel": "نام فهرست جدید",
+        "duplicateDefaultName": "{{name}} – کپی",
+        "duplicateResetChecked": "بازنشانی موارد علامت‌خورده",
+        "duplicateKeepQuantities": "حفظ مقدارها",
+        "duplicateKeepNotes": "حفظ یادداشت‌ها و لینک‌ها",
+        "duplicateSubmit": "کپی",
+        "duplicateError": "کپی کردن فهرست ممکن نشد."
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} وعده برنامه‌ریزی شد.",

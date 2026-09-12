@@ -604,7 +604,16 @@
         "storesHint": "المتاجر التي تتسوقون منها. السعر بدون متجر يجيب نصف السؤال فقط.",
         "storeDeleteConfirm": "حذف المتجر ‏«{{name}}»؟",
         "storeDeleteConfirmDetail": "تبقى عناصر هذا المتجر كما هي ويبقى سعرها أيضاً - يصبح حقل المتجر فارغاً فقط. لا يوجد متجر بديل هنا.",
-        "addStore": "متجر جديد"
+        "addStore": "متجر جديد",
+        "duplicateListLabel": "تكرار القائمة",
+        "duplicateListTitle": "تكرار «{{name}}»",
+        "duplicateListNameLabel": "اسم القائمة الجديدة",
+        "duplicateDefaultName": "{{name}} – نسخة",
+        "duplicateResetChecked": "إعادة تعيين العناصر المحددة",
+        "duplicateKeepQuantities": "الاحتفاظ بالكميات",
+        "duplicateKeepNotes": "الاحتفاظ بالملاحظات والروابط",
+        "duplicateSubmit": "تكرار",
+        "duplicateError": "تعذّر تكرار القائمة."
     },
     "meals": {
         "randomizeSuccess_few": "تم تخطيط {{count}} وجبات.",

@@ -604,7 +604,16 @@
         "storesHint": "I negozi in cui fate la spesa. Un prezzo senza negozio risponde solo a metà.",
         "storeDeleteConfirm": "Eliminare il negozio «{{name}}»?",
         "storeDeleteConfirmDetail": "Gli articoli di questo negozio restano, e anche il loro prezzo: solo l'assegnazione del negozio resta vuota. Qui non c'è un negozio sostitutivo.",
-        "addStore": "Nuovo negozio"
+        "addStore": "Nuovo negozio",
+        "duplicateListLabel": "Duplica lista",
+        "duplicateListTitle": "Duplica «{{name}}»",
+        "duplicateListNameLabel": "Nome della nuova lista",
+        "duplicateDefaultName": "{{name}} – Copia",
+        "duplicateResetChecked": "Reimposta le spunte",
+        "duplicateKeepQuantities": "Mantieni le quantità",
+        "duplicateKeepNotes": "Mantieni note e link",
+        "duplicateSubmit": "Duplica",
+        "duplicateError": "Impossibile duplicare la lista."
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} pasti pianificati.",

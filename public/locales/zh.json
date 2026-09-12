@@ -604,7 +604,16 @@
         "storesHint": "你们购物的商店。没有商店的价格只回答了一半。",
         "storeDeleteConfirm": "删除商店“{{name}}”？",
         "storeDeleteConfirmDetail": "该商店的商品及其价格都会保留，只有商店归属会变为空白，这里不会自动换成别的商店。",
-        "addStore": "新商店"
+        "addStore": "新商店",
+        "duplicateListLabel": "复制清单",
+        "duplicateListTitle": "复制“{{name}}”",
+        "duplicateListNameLabel": "新清单名称",
+        "duplicateDefaultName": "{{name}} – 副本",
+        "duplicateResetChecked": "重置勾选状态",
+        "duplicateKeepQuantities": "保留数量",
+        "duplicateKeepNotes": "保留备注和链接",
+        "duplicateSubmit": "复制",
+        "duplicateError": "无法复制该清单。"
     },
     "meals": {
         "randomizeSuccess_few": "已规划 {{count}} 餐。",
