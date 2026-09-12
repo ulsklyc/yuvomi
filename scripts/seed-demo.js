@@ -814,15 +814,23 @@ const insertBirthday = db.prepare(`
   INSERT INTO birthdays (name, birth_date, notes, family_user_id, reminder_offset, created_by)
   VALUES (?, ?, ?, ?, ?, ?)
 `);
+// reminder_offset ist ein Minutenwert als Text, wie ihn das Formular schreibt
+// (REMINDER_OFFSETS in public/pages/birthdays.js - nur deren Werte, sonst zeigt das Formular
+// eine Auswahl, die es nicht kennt; der Server liest ihn per
+// parseInt). Hier stand '1d'/'3d'/'1w' - daraus wurden 1, 3 und 0 Minuten, und
+// jeder Demo-Geburtstag erinnerte kurz vor Mittag AM Tag selbst statt Tage vorher.
+const DAY_BEFORE  = '1440';
+const TWO_DAYS    = '2880';
+const WEEK_BEFORE = '10080';
 [
-  ['Emma Johnson',                                    '2018-06-14', L('Turning 8 — chocolate cake & bouncy castle', 'Wird 8 — Schokotorte und Hüpfburg'), emmaId, '1w', lindaId],
-  ['Leo Johnson',                                     '2016-03-22', L('Loves football & LEGO',                      'Liebt Fußball und LEGO'),            leoId,  '1w', lindaId],
-  ['Margaret Johnson',                                '1958-06-19', L("Alex's mum — 'Grandma'",                     'Alex’ Mutter — „Oma"'),              null,   '3d', alexId],
-  [L('Uncle Mike Johnson', 'Onkel Mike Johnson'),     '1985-11-02', L("Alex's brother in Hamburg",                  'Alex’ Bruder in Hamburg'),           null,   '1d', alexId],
-  [L('Aunt Claire Becker', 'Tante Claire Becker'),    '1989-08-30', L("Linda's sister",                             'Lindas Schwester'),                  null,   '1d', lindaId],
-  ['Lena Braun',                                      '2018-09-12', L("Emma's best friend",                         'Emmas beste Freundin'),              null,   '1d', lindaId],
-  ['Alex Johnson',                                    '1986-02-08', '',                                                                                   alexId, '3d', lindaId],
-  ['Linda Johnson',                                   '1988-04-25', '',                                                                                   lindaId,'3d', alexId],
+  ['Emma Johnson',                                    '2018-06-14', L('Turning 8 — chocolate cake & bouncy castle', 'Wird 8 — Schokotorte und Hüpfburg'), emmaId, WEEK_BEFORE, lindaId],
+  ['Leo Johnson',                                     '2016-03-22', L('Loves football & LEGO',                      'Liebt Fußball und LEGO'),            leoId,  WEEK_BEFORE, lindaId],
+  ['Margaret Johnson',                                '1958-06-19', L("Alex's mum — 'Grandma'",                     'Alex’ Mutter — „Oma"'),              null,   TWO_DAYS,    alexId],
+  [L('Uncle Mike Johnson', 'Onkel Mike Johnson'),     '1985-11-02', L("Alex's brother in Hamburg",                  'Alex’ Bruder in Hamburg'),           null,   DAY_BEFORE,  alexId],
+  [L('Aunt Claire Becker', 'Tante Claire Becker'),    '1989-08-30', L("Linda's sister",                             'Lindas Schwester'),                  null,   DAY_BEFORE,  lindaId],
+  ['Lena Braun',                                      '2018-09-12', L("Emma's best friend",                         'Emmas beste Freundin'),              null,   DAY_BEFORE,  lindaId],
+  ['Alex Johnson',                                    '1986-02-08', '',                                                                                   alexId, TWO_DAYS,    lindaId],
+  ['Linda Johnson',                                   '1988-04-25', '',                                                                                   lindaId,TWO_DAYS,    alexId],
 ].forEach(row => insertBirthday.run(...row));
 
 // ── Documents ────────────────────────────────────────────────────────────────

@@ -9489,6 +9489,36 @@ test('split activity feed translates every type the backend writes', () => {
   assert.deepEqual(unwritten, [], 'verwaiste activityType-Keys — kein Codepfad schreibt diesen Typ');
 });
 
+// Der Demo-Seed schrieb reminder_offset als '1d'/'3d'/'1w'. Gespeichert wird aber
+// ein Minutenwert als Text, und der Server liest ihn per parseInt: aus '1d' wurde
+// eine Minute, aus '1w' null - jeder Demo-Geburtstag erinnerte kurz vor Mittag am
+// Tag selbst. Aufgefallen ist es erst, als der Toast einer so faelligen Erinnerung
+// im Handlauf drei Sonden rot machte (#1160). Der Seed darf deshalb nur Werte
+// schreiben, die das Geburtstagsformular selbst anbietet; alles andere zeigt das
+// Formular als Auswahl, die es nicht kennt.
+test('demo seed writes only reminder offsets the birthday form offers', () => {
+  const page = read('../public/pages/birthdays.js');
+  const optionsBlock = page.match(/const REMINDER_OFFSETS = \(\) => \[([\s\S]*?)\];/);
+  assert.ok(optionsBlock, 'REMINDER_OFFSETS in public/pages/birthdays.js nicht gefunden');
+  const offered = [...optionsBlock[1].matchAll(/value:\s*'([^']*)'/g)].map((m) => m[1]);
+  assert.ok(offered.includes('1440'), `unerwartete Formularwerte: ${offered.join(', ')}`);
+
+  const seed = read('../scripts/seed-demo.js');
+  const start = seed.indexOf("console.log('Inserting birthdays");
+  const end = seed.indexOf("console.log('Inserting documents");
+  assert.ok(start > 0 && end > start, 'Geburtstagsblock im Seed nicht gefunden');
+  const block = seed.slice(start, end);
+  const constants = Object.fromEntries([...block.matchAll(/const (\w+)\s*=\s*'([^']*)';/g)].map((m) => [m[1], m[2]]));
+  // Jede Zeile endet auf `…, <reminder_offset>, <created_by>],`.
+  const tokens = [...block.matchAll(/,\s*('[^']*'|[A-Z_]+),\s*\w+Id\],/g)].map((m) => m[1]);
+  assert.ok(tokens.length >= 8, `erwartet mindestens 8 Geburtstagszeilen, gefunden: ${tokens.length}`);
+  const invalid = tokens
+    .map((token) => [token, token.startsWith("'") ? token.slice(1, -1) : constants[token]])
+    .filter(([, value]) => value === undefined || value === 'custom' || !offered.includes(value))
+    .map(([token, value]) => `${token} = ${value}`);
+  assert.deepEqual(invalid, [], `Seed-Vorlauf ausserhalb der Formularwerte (${offered.join(', ')})`);
+});
+
 // ============================================================
 // Konsistenz-Audit (UX/UI): Invarianten, die der Audit hergestellt hat.
 // Jeder Guard hier hält genau einen Befund geschlossen — die Befunde
