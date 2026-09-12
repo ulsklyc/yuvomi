@@ -1477,6 +1477,237 @@ test('Abgehakte loeschen: das Schliessen des Fensters raeumt die Schwebe', async
   delete global.window.yuvomi.showToast;
 });
 
+// --------------------------------------------------------
+// Eine Antwort, die VOR dem DELETE begann und NACH ihm eintrifft (Review zu
+// PR #1109, Runde 3)
+//
+// Das Fenster oeffnet die Live-Auffrischung selbst: eine Abfrage stoesst
+// `loadItems` an, und das Undo-Fenster schliesst, waehrend der GET noch
+// unterwegs ist. Raeumte der Erfolg des DELETE die Schwebe sofort, traege die
+// Antwort den Artikel zurueck - und er bliebe, weil die Quittung die Marke
+// vorgerueckt hat und keine Abfrage mehr nachlaedt. Die Reihenfolge der
+// Antworten steht in jedem Fall unten von Hand fest.
+// --------------------------------------------------------
+
+test('ein GET, der VOR dem DELETE begann und NACH ihm antwortet, bringt die Zeile nicht zurueck', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  let releaseGet;
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    // Der GET hat den Server gelesen, bevor der DELETE ankam: die Milch ist noch da.
+    getWithSource: () => new Promise((resolve) => {
+      releaseGet = () => resolve({ data: { data: [milk(0), bread(0)] }, fromCache: false });
+    }),
+    delete: async () => ({ data: null, list_change: { list_id: 1, before: 5, after: 6 } }),
+  };
+
+  __test.deleteItemUndoable(10, makeNullContainer());
+  const refresh = __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await new Promise((r) => setImmediate(r));
+  await undo.last.commit({ keepalive: false });
+  assert.ok(__test.pendingRemovals.has(10), 'bestaetigt, aber noch nicht geraeumt: ein aelterer GET ist unterwegs');
+  releaseGet();
+  await refresh;
+  assert.deepEqual(__test.state.items.map((i) => i.id), [11], 'die aeltere Antwort bringt die Milch nicht zurueck');
+  assert.equal(__test.pendingRemovals.size, 0, 'mit der letzten aelteren Antwort ist die Schwebe geraeumt');
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+test('ein Listen-Laden, das VOR dem DELETE begann und NACH ihm antwortet, zaehlt den Artikel nicht mehr mit', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(1)];
+  __test.state.items = [milk(1), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  let releaseLists;
+  globalThis.__apiStub = {
+    // Die Listenzeile vom Server VOR dem DELETE: zwei Artikel, einer abgehakt.
+    get: () => new Promise((resolve) => { releaseLists = () => resolve({ data: [listRow(1)] }); }),
+    getWithSource: async () => ({ data: { data: [milk(1), bread(0)] }, fromCache: false }),
+    delete: async () => ({ data: null, list_change: { list_id: 1, before: 5, after: 6 } }),
+  };
+
+  __test.deleteItemUndoable(10, makeNullContainer());
+  assert.equal(__test.state.lists[0].item_total, 1);
+  const refresh = __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await new Promise((r) => setImmediate(r));
+  await undo.last.commit({ keepalive: false });
+  releaseLists();
+  await refresh;
+  assert.equal(__test.state.lists[0].item_total, 1, 'der Zaehler traegt den Serverstand ohne die Milch');
+  assert.equal(__test.state.lists[0].item_checked, 0);
+  assert.deepEqual(__test.state.items.map((i) => i.id), [11]);
+  assert.equal(__test.pendingRemovals.size, 0);
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+test('Abgehakte loeschen: ein GET, der VOR dem DELETE begann und NACH ihm antwortet, bringt sie nicht zurueck', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(2)];
+  __test.state.items = [milk(1), bread(1)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  let releaseGet;
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(2)] }),
+    getWithSource: () => new Promise((resolve) => {
+      releaseGet = () => resolve({ data: { data: [milk(1), bread(1)] }, fromCache: false });
+    }),
+    delete: async () => ({ data: null, deleted: 2, list_change: { list_id: 1, before: 5, after: 6 } }),
+  };
+
+  __test.clearCheckedUndoable(makeNullContainer());
+  const refresh = __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await new Promise((r) => setImmediate(r));
+  await undo.last.commit({ keepalive: false });
+  releaseGet();
+  await refresh;
+  assert.deepEqual(__test.state.items, [], 'die aeltere Antwort bringt keine der Abgehakten zurueck');
+  assert.equal(__test.state.lists[0].item_total, 0);
+  assert.equal(__test.pendingRemovals.size, 0);
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+test('eine NACH dem DELETE begonnene Antwort ist die Wahrheit des Servers - auch wenn eine aeltere noch unterwegs ist', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  const gates = [];
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    getWithSource: () => new Promise((resolve) => { gates.push(resolve); }),
+    delete: async () => ({ data: null, list_change: { list_id: 1, before: 5, after: 6 } }),
+  };
+
+  __test.deleteItemUndoable(10, makeNullContainer());
+  const older = __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await new Promise((r) => setImmediate(r));
+  await undo.last.commit({ keepalive: false });
+  const newer = __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await new Promise((r) => setImmediate(r));
+  assert.equal(gates.length, 2);
+
+  // Die juengere Antwort zuerst. Sie traegt die Milch - was der Server nach dem
+  // DELETE sagt, gilt, die Schwebe filtert sie NICHT mehr (jemand koennte sie
+  // neu angelegt haben; im Test steht dafuer dieselbe Id).
+  gates[1]({ data: { data: [milk(0), bread(0)] }, fromCache: false });
+  await newer;
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 11], 'die juengere Antwort wird ungefiltert angewandt');
+
+  // Die aeltere danach: sie fasst den Stand nicht mehr an (Ladeordnung).
+  gates[0]({ data: { data: [bread(0)] }, fromCache: false });
+  await older;
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 11], 'die aeltere Antwort ueberschreibt die juengere nicht');
+  assert.equal(__test.pendingRemovals.size, 0, 'nichts mehr unterwegs, nichts mehr schwebend');
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+test('ein fehlgeschlagener DELETE raeumt sofort, auch wenn ein aelterer GET noch unterwegs ist', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  let releaseGet;
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    getWithSource: () => new Promise((resolve) => {
+      releaseGet = () => resolve({ data: { data: [milk(0), bread(0)] }, fromCache: false });
+    }),
+    delete: async () => { throw Object.assign(new Error('500'), { data: { error: 'kaputt' } }); },
+  };
+
+  __test.deleteItemUndoable(10, makeNullContainer());
+  const refresh = __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await new Promise((r) => setImmediate(r));
+  await assert.rejects(() => undo.last.commit({ keepalive: false }));
+  assert.equal(__test.pendingRemovals.size, 0, 'der Server hat die Milch noch - nichts ist schwebend');
+  undo.last.restore(new Error('500'));
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 11], 'restore bringt die Zeile zurueck');
+  releaseGet();
+  await refresh;
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 11], 'und die Antwort traegt sie genau einmal');
+  assert.equal(__test.state.lists[0].item_total, 2);
+
+  delete globalThis.__apiStub;
+  delete globalThis.__undoStub;
+  delete global.window.yuvomi.showToast;
+});
+
+// --------------------------------------------------------
+// Abgehakte loeschen: die Route loescht, was BEIM EINTREFFEN abgehakt ist
+// (Review zu PR #1109, Runde 3). Hat jemand anderes im Undo-Fenster einen
+// weiteren Artikel abgehakt, nimmt der Server ihn mit - und die Quittung darf
+// die Marke dann nicht vorruecken, sonst laedt keine Abfrage die Zeile weg.
+// --------------------------------------------------------
+
+/** Feed samt Stubs: liefert, ob die naechste Abfrage bei `version` nachlaedt. */
+async function reloadsOnNextPoll({ deleted, version }) {
+  resetShoppingState();
+  __test.state.lists = [listRow(1)];
+  __test.state.items = [milk(1), bread(0)];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  let versions = [{ list_id: 1, version: 4 }];
+  const calls = [];
+  globalThis.__apiStub = {
+    get: async (path) => {
+      calls.push(path);
+      if (path === '/shopping/versions') return { data: versions };
+      return { data: [listRow(0)] };
+    },
+    getWithSource: async (path) => { calls.push(path); return { data: { data: [bread(0)] }, fromCache: false }; },
+    delete: async () => ({ deleted, list_change: { list_id: 1, before: 4, after: 5 } }),
+  };
+  const route = new AbortController();
+  try {
+    __test.wireLiveUpdates(makeNullContainer(), route.signal);
+    await settle(); // die erste Abfrage setzt die Marke auf 4
+
+    __test.clearCheckedUndoable(makeNullContainer()); // entfernt EINEN Artikel
+    await undo.last.commit({ keepalive: false });
+
+    versions = [{ list_id: 1, version }];
+    calls.length = 0;
+    await __test.getLiveFeedForTest().poll();
+    await settle();
+    return calls.includes('/shopping/1/items');
+  } finally {
+    route.abort();
+    __test.abortLiveUpdatesForTest();
+    delete globalThis.__apiStub;
+    delete globalThis.__undoStub;
+    delete global.window.yuvomi.showToast;
+  }
+}
+
+test('Abgehakte loeschen: hat der Server genau so viele entfernt wie die Seite, erspart die Quittung das Nachladen', async () => {
+  assert.equal(await reloadsOnNextPoll({ deleted: 1, version: 5 }), false);
+});
+
+test('Abgehakte loeschen: hat der Server MEHR entfernt als die Seite, laedt die naechste Abfrage nach', async () => {
+  assert.equal(await reloadsOnNextPoll({ deleted: 2, version: 5 }), true,
+    'der fremde Haken, den der Server mitgeloescht hat, verschwindet nur durch das Nachladen');
+});
+
 /** Kleinstes Panel fuer den Artikeldialog: Felder mit Wert, ein Formular mit submit-Handler. */
 function makeDialogPanel(values) {
   const fields = {};

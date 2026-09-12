@@ -3477,7 +3477,12 @@ The surface carries four things, in this order: **the time**, large (this is whe
   `list_change: { list_id, before, after }`, and the page advances its mark when `before` is the
   version it last saw - if someone else wrote in between, `before` differs and the next poll
   reloads. Own edits also survive a reload: the intent overlay (see the check-intent rules in
-  `public/pages/shopping.js`) keeps a pending tap on top of an older server answer.
+  `public/pages/shopping.js`) keeps a pending tap on top of an older server answer, and a row
+  removed locally stays out of every answer that started before its DELETE was confirmed - during
+  the undo window and for a load still in flight when the window closes - because the receipt
+  has already moved the mark and no poll would reload it otherwise. "Clear checked" deletes
+  whatever is checked when the request arrives, so the page acknowledges its receipt only when
+  the server deleted exactly as many rows as the page removed; otherwise the next poll reloads.
 - **Manual item order within an aisle (v1.87.0, #678):** every row carries a drag handle next to its edit and delete actions. Dragging reorders within the category group only — a drag across groups would be a category change, which the item dialog already does, and ranks are per category anyway. The handle is a real button and takes ArrowUp/ArrowDown once focused, sharing one persistence path with the drag; that keyboard route is required of every `makeSortable` caller (see the header of `public/utils/sortable.js`) and is guarded in `test:frontend-audit`. Its `aria-label` carries the position, and a `role="status"` live region announces each move, reusing `category.reorderAnnounce`. Checked rows are filtered out of the drag and their handle is disabled — they sort last in their group regardless of rank. A category holding a single row hides its handle via `:only-child`. `PATCH /api/v1/shopping/:listId/items/reorder` takes `{ category, order }` and requires the **complete** group: a partial list would leave the omitted ranks colliding with the newly assigned ones. Requests are serialised per category with at most one follow-up queued, so rapid moves settle in the order they were made instead of letting the arrival order at the server decide; the follow-up reads the DOM when it starts, so any number of moves costs two requests. The list id is captured when a move is queued, so switching lists mid-flight neither misroutes the write nor overwrites the new list's state.
 - **Send the list to a member by email (#944):** an entry in the overflow menu mails the list's open
   items to one household member, grouped by category in the same shop order the screen shows.
