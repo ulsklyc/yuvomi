@@ -676,6 +676,58 @@ test('ein Zielwechsel auf den Kalender, in dem der Termin liegt, ist kein Umzug'
   assert.equal(reload(before.id).outbound_move_to, null);
 });
 
+// ── Ein widerrufener Umzug ──────────────────────────────────────────────────────
+//
+// Zwischen Vormerkung und Ausführung liegt mindestens ein Sync-Lauf, und der kann
+// scheitern (Google nicht erreichbar, Ziel gerade entzogen). In diesem Fenster darf
+// der Nutzer seine Wahl zurücknehmen: markOutbound schreibt das Ziel über COALESCE,
+// damit eine Feldänderung einen wartenden Umzug nicht verschluckt - ohne
+// ausdrückliches Zurücknehmen kam deshalb keine spätere Wahl mehr dagegen an.
+
+test('nach einem gescheiterten Umzug nimmt die Rückkehr zum aktuellen Kalender ihn zurück', async () => {
+  reset();
+  const { before } = seedMove();
+  const calendars = writableCalendars(['primary', 'fam@g']);
+  await __test.processPendingUpdates(
+    fakeCalendar({ calendars, onMove: () => { throw apiError(503); } }), {},
+  );
+  assert.equal(reload(before.id).outbound_move_to, 'fam@g', 'Vorbedingung: der Umzug steht weiter an');
+
+  const current = reload(before.id);
+  db.prepare("UPDATE calendar_events SET target_google_calendar_id = 'primary' WHERE id = ?").run(before.id);
+  assert.equal(__test.markEventOutbound(current, reload(before.id)), false, 'es bleibt nichts auszuführen');
+  assert.equal(reload(before.id).outbound_move_to, null);
+
+  const calendar = fakeCalendar({ calendars });
+  assert.equal(await __test.processPendingUpdates(calendar, {}), 0);
+  assert.equal(calendar.moves.length, 0, 'der Termin bleibt in dem Kalender, der gewählt ist');
+});
+
+test('ein drittes Ziel ersetzt den wartenden Umzug', () => {
+  reset();
+  const { before } = seedMove();
+  const current = reload(before.id);
+  db.prepare("UPDATE calendar_events SET target_google_calendar_id = 'work@g' WHERE id = ?").run(before.id);
+
+  assert.equal(__test.markEventOutbound(current, reload(before.id)), true);
+  assert.equal(reload(before.id).outbound_move_to, 'work@g', 'der letzte Wunsch gilt');
+});
+
+test('eine Feldänderung ohne Zielwechsel lässt den wartenden Umzug stehen', () => {
+  // Die Gegenprobe zum Zurücknehmen: nur ein Zielwechsel IM REQUEST darf einen
+  // Umzug beenden. Der Zustand allein sagt nichts - sonst verlöre jede andere
+  // Bearbeitung den wartenden Umzug.
+  reset();
+  const { before } = seedMove();
+  const current = reload(before.id);
+  db.prepare("UPDATE calendar_events SET title = 'Anders' WHERE id = ?").run(before.id);
+
+  assert.equal(__test.markEventOutbound(current, reload(before.id)), true);
+  const row = reload(before.id);
+  assert.equal(row.outbound_move_to, 'fam@g');
+  assert.equal(row.outbound_dirty, 1);
+});
+
 // ── Inbound-Schutz ──────────────────────────────────────────────────────────────
 
 function inboundItem(id, summary = 'Termin aus Google') {
@@ -1084,6 +1136,25 @@ test('PUT /:id merkt einen gewechselten Zielkalender als Umzug vor', async () =>
   const row = reload(event.id);
   assert.equal(row.outbound_move_to, 'fam@g');
   assert.equal(row.target_google_calendar_id, 'fam@g');
+});
+
+test('PUT /:id nimmt einen wartenden Umzug zurück, wenn wieder der eigene Kalender kommt', async () => {
+  // Der ganze Weg über die Route: nur wenn sie das gewählte Ziel mitschreibt und
+  // den Stand davor übergibt, kann die Rücknahme überhaupt erkannt werden.
+  reset();
+  const calRefId = __test.upsertExternalCalendar('google', 'primary', 'Primär', '#4285F4');
+  const event = insertGoogleEvent({ calRefId, googleId: 'gev-put-undo', target: 'primary' });
+
+  await callRoute('PUT', `/${event.id}`, { target_google_calendar_id: 'fam@g' });
+  assert.equal(reload(event.id).outbound_move_to, 'fam@g', 'Vorbedingung: der Umzug ist vorgemerkt');
+
+  const res = await callRoute('PUT', `/${event.id}`, { target_google_calendar_id: 'primary' });
+  assert.equal(res.status, 200);
+
+  const row = reload(event.id);
+  assert.equal(row.outbound_move_to, null);
+  assert.equal(row.target_google_calendar_id, 'primary');
+  assert.equal(__test.pendingUpdateCount(), 0, 'der Sync findet keine Arbeit mehr');
 });
 
 test('PUT /:id markiert einen rein lokalen Termin nicht', async () => {

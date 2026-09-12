@@ -1179,6 +1179,59 @@ test('wird der Termin während des Umzugs gelöscht, wird auch die Kopie im Ziel
     'der nächste Lauf räumt die Kopie im Ziel ab');
 });
 
+// ── Ein widerrufener Umzug ──────────────────────────────────────────────────────
+//
+// Zwischen Vormerkung und Ausführung liegt mindestens ein Sync-Lauf, und der kann
+// scheitern (Server offline, Ziel gerade weg). In diesem Fenster darf der Nutzer
+// seine Wahl zurücknehmen: markOutbound schreibt das Ziel über COALESCE, damit eine
+// Feldänderung einen wartenden Umzug nicht verschluckt - ohne ausdrückliches
+// Zurücknehmen kam deshalb keine spätere Wahl mehr gegen die alte Vormerkung an.
+
+test('nach einem gescheiterten Umzug nimmt die Rückkehr zum aktuellen Kalender ihn zurück', async () => {
+  reset();
+  const event = seedMoved('mv18@t');
+  const calendars = new Map([[CAL2_URL, { url: CAL2_URL, displayName: 'Arbeit' }]]);
+  await processPendingUpdates(
+    fakeClient({ onCreate: () => { throw httpError(507); } }), 'caldav', indexFor('mv18@t'), calendars,
+  );
+  assert.equal(reload(event.id).outbound_move_to, CAL2_URL, 'Vorbedingung: der Umzug steht weiter an');
+
+  const before = reload(event.id);
+  db.prepare('UPDATE calendar_events SET target_caldav_calendar_url = ? WHERE id = ?').run(CAL_URL, event.id);
+  assert.equal(outbound.markEventOutbound(before, reload(event.id)), false, 'es bleibt nichts auszuführen');
+  assert.equal(reload(event.id).outbound_move_to, null);
+
+  const client = fakeClient();
+  assert.equal(await processPendingUpdates(client, 'caldav', indexFor('mv18@t'), calendars), 0);
+  assert.equal(client.creates.length, 0, 'der Termin bleibt in dem Kalender, der gewählt ist');
+});
+
+test('ein drittes Ziel ersetzt den wartenden Umzug', () => {
+  reset();
+  const CAL3_URL = 'https://dav.example/cal/school/';
+  const event  = seedMoved('mv19@t');
+  const before = reload(event.id);
+  db.prepare('UPDATE calendar_events SET target_caldav_calendar_url = ? WHERE id = ?').run(CAL3_URL, event.id);
+
+  assert.equal(outbound.markEventOutbound(before, reload(event.id)), true);
+  assert.equal(reload(event.id).outbound_move_to, CAL3_URL, 'der letzte Wunsch gilt');
+});
+
+test('eine Feldänderung ohne Zielwahl lässt den wartenden Umzug stehen', () => {
+  // Die Gegenprobe zum Zurücknehmen: nur eine Zielwahl IM REQUEST darf einen Umzug
+  // beenden. Der Zustand allein sagt nichts - sonst verlöre jede andere Bearbeitung
+  // den wartenden Umzug.
+  reset();
+  const event  = seedMoved('mv20@t');
+  const before = reload(event.id);
+  db.prepare("UPDATE calendar_events SET title = 'Anders' WHERE id = ?").run(event.id);
+
+  assert.equal(outbound.markEventOutbound(before, reload(event.id)), true);
+  const row = reload(event.id);
+  assert.equal(row.outbound_move_to, CAL2_URL);
+  assert.equal(row.outbound_dirty, 1);
+});
+
 // ── Was während des Provider-Aufrufs eintrifft ──────────────────────────────────
 //
 // Der Patch wird vor den awaits aus der Zeile gebaut. Eine Bearbeitung, die in

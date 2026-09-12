@@ -200,6 +200,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   attempt. An edit made while the event is being moved goes to its new calendar in the same run
   instead of waiting for the next sync.
 
+- **Choosing the calendar an event already sits in withdraws a move that has not gone out yet**
+  (#593). A move to another calendar is queued and carried out by the sync, and that attempt can
+  fail - the server may be unreachable right then. Choosing the original calendar again in that
+  window looked like no change at all, so the queued move stayed: the next sync moved the event into
+  a calendar nobody had chosen any more, while the dialog showed the one that was. A target pointing
+  back at the calendar the event sits in now withdraws the queued move, and a target pointing at a
+  third calendar replaces it. Only the choice made in that edit counts: an edit that leaves the
+  target alone keeps a queued move, and a target stored on an older event that differs from its
+  actual calendar is still never read as a wish to move. Google and CalDAV alike.
+
 - **A review run that stopped at its gate is named as such, even when it first denied having
   reviewed** (#1101). The check behind the automated review reads the run's closing text to say
   why a silent run went red. It only looked at the first mention of "already reviewed", so a text

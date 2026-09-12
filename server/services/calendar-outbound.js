@@ -184,19 +184,27 @@ export function handleDeletionError(err, row, provider) {
 
 /**
  * Markiert ein Event für den Push und/oder den Umzug.
+ *
+ * Ein Umzug überlebt bewusst jede Vormerkung, die keinen kennt: COALESCE lässt die
+ * bestehende Absicht stehen, damit eine Feldänderung einen wartenden Umzug nicht
+ * verschluckt. Zurücknehmen lässt er sich deshalb nur ausdrücklich über
+ * `cancelMove` - ein `moveTo: null` kommt gegen das COALESCE nicht an.
+ *
  * @param {number} eventId
- * @param {{dirty?: boolean, moveTo?: string|null}} what
+ * @param {{dirty?: boolean, moveTo?: string|null, cancelMove?: boolean}} what
+ * @returns {boolean} true, wenn dieser Aufruf Arbeit vorgemerkt hat; ein reines
+ *   Zurücknehmen gibt false zurück - danach ist nichts auszuführen.
  */
-export function markOutbound(eventId, { dirty = false, moveTo = null } = {}) {
-  if (!dirty && !moveTo) return false;
+export function markOutbound(eventId, { dirty = false, moveTo = null, cancelMove = false } = {}) {
+  if (!dirty && !moveTo && !cancelMove) return false;
   db.get().prepare(`
     UPDATE calendar_events
     SET outbound_dirty    = CASE WHEN ? THEN 1 ELSE outbound_dirty END,
-        outbound_move_to  = COALESCE(?, outbound_move_to),
+        outbound_move_to  = CASE WHEN ? THEN NULL ELSE COALESCE(?, outbound_move_to) END,
         outbound_attempts = 0
     WHERE id = ?
-  `).run(dirty ? 1 : 0, moveTo, eventId);
-  return true;
+  `).run(dirty ? 1 : 0, cancelMove ? 1 : 0, moveTo, eventId);
+  return !!(dirty || moveTo);
 }
 
 export function pendingUpdates(source) {
@@ -408,7 +416,8 @@ export function queueEventDeletion(event, database = null) {
  * Der Umzug hängt bewusst an der *Änderung im Request*, nicht am Zustand:
  * Bestandsdaten können ein Ziel tragen, das vom tatsächlichen Kalender abweicht
  * (die target_*-Felder waren für gespiegelte Termine folgenlos setzbar), und das
- * darf nicht nachträglich als Umzugswunsch gelesen werden.
+ * darf nicht nachträglich als Umzugswunsch gelesen werden. Aus demselben Grund
+ * nimmt nur eine Zielwahl im Request einen vorgemerkten Umzug zurück.
  * @returns {boolean} true, wenn etwas aussteht
  */
 export function markEventOutbound(before, after) {
@@ -420,17 +429,24 @@ export function markEventOutbound(before, after) {
 
   const targetField = targetFieldFor(after.external_source);
 
-  let moveTo = null;
+  let moveTo     = null;
+  let cancelMove = false;
   if (targetField) {
-    const target  = after[targetField] || null;
-    const current = currentCalendarId(after);
-    if (target && target !== before?.[targetField] && current && target !== current) {
-      moveTo = target;
+    const target   = after[targetField] || null;
+    const previous = before?.[targetField] || null;
+    const current  = currentCalendarId(after);
+    if (target && target !== previous && current) {
+      // Zurück auf den Kalender, in dem der Termin liegt: ein noch nicht
+      // ausgeführter Umzug ist damit widerrufen und muss fallen. Ohne das bliebe
+      // er stehen (COALESCE) und der nächste Sync schöbe den Termin in einen
+      // Kalender, den niemand mehr gewählt hat.
+      if (target === current) cancelMove = true;
+      else moveTo = target;
     }
   }
 
-  if (!dirty && !moveTo) return false;
-  return markOutbound(after.id, { dirty, moveTo });
+  if (!dirty && !moveTo && !cancelMove) return false;
+  return markOutbound(after.id, { dirty, moveTo, cancelMove });
 }
 
 /**
