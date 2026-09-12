@@ -405,12 +405,12 @@ So the limit is on the interface, not on the release count:
 
 | Track | What it carries | When it ships |
 |---|---|---|
-| **Weekly train** | Anything under `public/pages/`, `public/styles/`, `public/utils/`, `public/components/`, `public/settings/` | **Tuesdays only** |
+| **Interface train** | Anything under `public/pages/`, `public/styles/`, `public/utils/`, `public/components/`, `public/settings/` | **Wednesdays and Sundays only** |
 | **Everything else** | Server, database, docs, tests, deploy descriptors, translations | Any day, **at most one release per calendar day** |
 
-Tuesday, because a household planner gets used most at the weekend: an interface change then has four days to settle before the family is standing in front of it on Saturday.
+Two fixed days, since 12 September 2026 (until then the train ran on Tuesdays only). A finished interface change waits at most four days for its train instead of a week, and the interface still moves on two known days rather than whenever something happens to be done.
 
-**Security fixes and data-loss bugs are not held back.** They ship the moment they are ready, on any day. Since v2.64.1 (4 September 2026) a security fix ships as a **patch release cut from the last tag**, carrying the fix, its tests and its documentation and nothing else: the guard judges the whole diff since the last tag, and a branch off that tag is on the second track by construction, so the interface work waiting on `main` for its Tuesday is not pulled forward with it. The steps are in [docs/RELEASING.md](docs/RELEASING.md); the `--hotfix` escape hatch below remains for a fix that cannot be separated from what is already on `main`.
+**Security fixes and data-loss bugs are not held back.** They ship the moment they are ready, on any day. Since v2.64.1 (4 September 2026) a security fix ships as a **patch release cut from the last tag**, carrying the fix, its tests and its documentation and nothing else: the guard judges the whole diff since the last tag, and a branch off that tag is on the second track by construction, so the interface work waiting on `main` for its train is not pulled forward with it. The steps are in [docs/RELEASING.md](docs/RELEASING.md); the `--hotfix` escape hatch below remains for a fix that cannot be separated from what is already on `main`.
 
 `npm run check:release-cadence` decides this, and it runs before the tag rather than after. A release that carries interface changes on a Thursday fails it; so does a second same-day release on the other track. The escape hatch is `--hotfix "<reason>"`, and the reason is mandatory and printed - an exception nobody has to write down is just a rule that quietly stopped applying.
 
@@ -420,7 +420,7 @@ This is a promise the project can keep because it is not a promise: it is a cond
 
 `npm run test:document-guards` is the one suite that is deliberately not in `npm test` and not in CI. It drives a real browser against a seeded server and costs around 80 minutes (82 measured on 2 September 2026), which is not a price worth paying on every push for invariants that only change in bursts. It is a handrail run once before a release instead.
 
-**It is required for any release that carries the weekly train**, that is, any release whose diff touches `public/pages`, `public/styles`, `public/utils`, `public/components` or `public/settings`. A release on the other track does not need it: those probes measure the rendered document, and a change that never reaches the document cannot move them.
+**It is required for any release that carries the interface train**, that is, any release whose diff touches `public/pages`, `public/styles`, `public/utils`, `public/components` or `public/settings`. A release on the other track does not need it: those probes measure the rendered document, and a change that never reaches the document cannot move them.
 
 Treat the path list as a heuristic rather than a boundary. What the probes see also depends on how full the test instance is, and that comes from `scripts/seed-demo.js` and from the shape of server responses: a fuller instance makes header filters wider. If you change the seed or a response shape substantially, run the handrail even when no interface path is in your diff.
 
