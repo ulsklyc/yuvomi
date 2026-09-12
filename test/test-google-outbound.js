@@ -728,6 +728,55 @@ test('eine Feldänderung ohne Zielwechsel lässt den wartenden Umzug stehen', ()
   assert.equal(row.outbound_dirty, 1);
 });
 
+test('ein noch offener Push macht die Rücknahme zum Sofortversuch wert', () => {
+  // Der Rückgabewert steuert den Sofortversuch der Route. Er muss den Zustand
+  // NACH dem Aufruf melden, nicht nur die Arbeit dieses Aufrufs: bleibt aus einem
+  // gescheiterten Versuch ein Push offen, wartete er sonst auf den nächsten Sync.
+  reset();
+  const { before } = seedMove();
+  const renamed = reload(before.id);
+  db.prepare("UPDATE calendar_events SET title = 'Anders' WHERE id = ?").run(before.id);
+  __test.markEventOutbound(renamed, reload(before.id));
+  assert.equal(reload(before.id).outbound_dirty, 1, 'Vorbedingung: ein Push steht an');
+
+  const current = reload(before.id);
+  db.prepare("UPDATE calendar_events SET target_google_calendar_id = 'primary' WHERE id = ?").run(before.id);
+
+  assert.equal(__test.markEventOutbound(current, reload(before.id)), true);
+  const row = reload(before.id);
+  assert.equal(row.outbound_move_to, null);
+  assert.equal(row.outbound_dirty, 1, 'der Push bleibt, nur der Umzug fällt');
+});
+
+test('auch im Nur-Lesen-Modus wird ein wartender Umzug zurückgenommen', () => {
+  // Zurücknehmen ist eine lokale Buchung und braucht keinen Schreibzugriff. Bliebe
+  // der Umzug hier stehen, liefe er nach dem Abschalten des Nur-Lesen-Modus los.
+  reset();
+  const { before } = seedMove();
+  const current = reload(before.id);
+  db.prepare("UPDATE calendar_events SET target_google_calendar_id = 'primary' WHERE id = ?").run(before.id);
+
+  __test.setReadonly(true);
+  assert.equal(__test.markEventOutbound(current, reload(before.id)), false, 'kein Sofortversuch, es geht nichts hinaus');
+  __test.setReadonly(false);
+
+  assert.equal(reload(before.id).outbound_move_to, null);
+});
+
+test('im Nur-Lesen-Modus entsteht dagegen kein neuer Umzug', () => {
+  // Die Gegenprobe: der Guard fällt nur für das Zurücknehmen, nicht fürs Vormerken.
+  reset();
+  const fromRef = __test.upsertExternalCalendar('google', 'primary', 'Primär', '#4285F4');
+  const before  = insertGoogleEvent({ calRefId: fromRef, googleId: 'gev-ro-move', target: 'primary' });
+  db.prepare("UPDATE calendar_events SET target_google_calendar_id = 'fam@g' WHERE id = ?").run(before.id);
+
+  __test.setReadonly(true);
+  assert.equal(__test.markEventOutbound(before, reload(before.id)), false);
+  __test.setReadonly(false);
+
+  assert.equal(reload(before.id).outbound_move_to, null);
+});
+
 // ── Inbound-Schutz ──────────────────────────────────────────────────────────────
 
 function inboundItem(id, summary = 'Termin aus Google') {

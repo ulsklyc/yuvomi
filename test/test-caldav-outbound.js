@@ -1232,6 +1232,53 @@ test('eine Feldänderung ohne Zielwahl lässt den wartenden Umzug stehen', () =>
   assert.equal(row.outbound_dirty, 1);
 });
 
+test('ein noch offener Push macht die Rücknahme zum Sofortversuch wert', () => {
+  // Der Rückgabewert steuert den Sofortversuch der Route. Er muss den Zustand NACH
+  // dem Aufruf melden, nicht nur die Arbeit dieses Aufrufs: bleibt aus einem
+  // gescheiterten Versuch ein Push offen, wartete er sonst auf den nächsten Sync.
+  reset();
+  const event   = seedMoved('mv21@t');
+  const renamed = reload(event.id);
+  db.prepare("UPDATE calendar_events SET title = 'Anders' WHERE id = ?").run(event.id);
+  outbound.markEventOutbound(renamed, reload(event.id));
+  assert.equal(reload(event.id).outbound_dirty, 1, 'Vorbedingung: ein Push steht an');
+
+  const before = reload(event.id);
+  db.prepare('UPDATE calendar_events SET target_caldav_calendar_url = ? WHERE id = ?').run(CAL_URL, event.id);
+
+  assert.equal(outbound.markEventOutbound(before, reload(event.id)), true);
+  const row = reload(event.id);
+  assert.equal(row.outbound_move_to, null);
+  assert.equal(row.outbound_dirty, 1, 'der Push bleibt, nur der Umzug fällt');
+});
+
+test('auch ohne CalDAV-Konto wird ein wartender Umzug zurückgenommen', () => {
+  // Zurücknehmen ist eine lokale Buchung und braucht kein schreibbares Konto. Bliebe
+  // der Umzug stehen, liefe er los, sobald wieder ein Konto eingerichtet ist.
+  reset();
+  const event  = seedMoved('mv22@t');
+  const before = reload(event.id);
+  db.prepare('UPDATE calendar_events SET target_caldav_calendar_url = ? WHERE id = ?').run(CAL_URL, event.id);
+
+  db.prepare('DELETE FROM caldav_accounts').run();
+  assert.equal(outbound.markEventOutbound(before, reload(event.id)), false, 'kein Sofortversuch, es geht nichts hinaus');
+
+  assert.equal(reload(event.id).outbound_move_to, null);
+});
+
+test('ohne CalDAV-Konto entsteht dagegen kein neuer Umzug', () => {
+  // Die Gegenprobe: der Guard fällt nur für das Zurücknehmen, nicht fürs Vormerken.
+  reset();
+  const calRefId = upsertCalendar(CAL_URL);
+  const before = insertSyncedEvent({ uid: 'mv23@t', calRefId, target: CAL_URL });
+  db.prepare('UPDATE calendar_events SET target_caldav_calendar_url = ? WHERE id = ?').run(CAL2_URL, before.id);
+
+  db.prepare('DELETE FROM caldav_accounts').run();
+  assert.equal(outbound.markEventOutbound(before, reload(before.id)), false);
+
+  assert.equal(reload(before.id).outbound_move_to, null);
+});
+
 // ── Was während des Provider-Aufrufs eintrifft ──────────────────────────────────
 //
 // Der Patch wird vor den awaits aus der Zeile gebaut. Eine Bearbeitung, die in

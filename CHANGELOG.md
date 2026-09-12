@@ -218,7 +218,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   back at the calendar the event sits in now withdraws the queued move, and a target pointing at a
   third calendar replaces it. Only the choice made in that edit counts: an edit that leaves the
   target alone keeps a queued move, and a target stored on an older event that differs from its
-  actual calendar is still never read as a wish to move. Google and CalDAV alike.
+  actual calendar is still never read as a wish to move. Withdrawing also works while the sync is
+  set to read-only or its account is gone - it changes nothing at the provider, and a move the user
+  took back must not come back to life once writing is allowed again. Google and CalDAV alike.
 
 - **A review run that stopped at its gate is named as such, even when it first denied having
   reviewed** (#1101). The check behind the automated review reads the run's closing text to say

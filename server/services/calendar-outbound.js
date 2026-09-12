@@ -192,19 +192,22 @@ export function handleDeletionError(err, row, provider) {
  *
  * @param {number} eventId
  * @param {{dirty?: boolean, moveTo?: string|null, cancelMove?: boolean}} what
- * @returns {boolean} true, wenn dieser Aufruf Arbeit vorgemerkt hat; ein reines
- *   Zurücknehmen gibt false zurück - danach ist nichts auszuführen.
+ * @returns {boolean} true, wenn danach ausgehende Arbeit ansteht - nicht nur die
+ *   dieses Aufrufs: nimmt er einen Umzug zurück, kann aus einem früheren,
+ *   gescheiterten Versuch noch ein Push offen sein, und der Aufrufer entscheidet
+ *   daran über seinen Sofortversuch.
  */
 export function markOutbound(eventId, { dirty = false, moveTo = null, cancelMove = false } = {}) {
   if (!dirty && !moveTo && !cancelMove) return false;
-  db.get().prepare(`
+  const row = db.get().prepare(`
     UPDATE calendar_events
     SET outbound_dirty    = CASE WHEN ? THEN 1 ELSE outbound_dirty END,
         outbound_move_to  = CASE WHEN ? THEN NULL ELSE COALESCE(?, outbound_move_to) END,
         outbound_attempts = 0
     WHERE id = ?
-  `).run(dirty ? 1 : 0, cancelMove ? 1 : 0, moveTo, eventId);
-  return !!(dirty || moveTo);
+    RETURNING outbound_dirty, outbound_move_to
+  `).get(dirty ? 1 : 0, cancelMove ? 1 : 0, moveTo, eventId);
+  return !!(row && (row.outbound_dirty || row.outbound_move_to));
 }
 
 export function pendingUpdates(source) {
@@ -423,7 +426,6 @@ export function queueEventDeletion(event, database = null) {
 export function markEventOutbound(before, after) {
   if (!after || !OUTBOUND_SOURCES.includes(after.external_source)) return false;
   if (!after.external_calendar_id) return false;
-  if (!acceptsOutbound(after.external_source)) return false;
 
   const dirty = mirroredFieldsChanged(before, after);
 
@@ -443,6 +445,16 @@ export function markEventOutbound(before, after) {
       if (target === current) cancelMove = true;
       else moveTo = target;
     }
+  }
+
+  // Vormerken kann nur, wer überhaupt hinausschreiben darf. Das Zurücknehmen
+  // nicht: es ist eine rein lokale Buchung, und genau in einer Nur-Lesen-Phase
+  // muss sie durchkommen - sonst steht nach dem Abschalten des Nur-Lesen-Modus
+  // noch ein Umzug an, den der Nutzer längst widerrufen hat. Ein Sofortversuch
+  // lohnt dann trotzdem nicht, deshalb false.
+  if (!acceptsOutbound(after.external_source)) {
+    if (cancelMove) markOutbound(after.id, { cancelMove });
+    return false;
   }
 
   if (!dirty && !moveTo && !cancelMove) return false;
