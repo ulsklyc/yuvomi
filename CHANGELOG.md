@@ -202,6 +202,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   two), and a guard keeps it to those. Only a database filled by `scripts/seed-demo.js` is
   affected.
 
+- **A dismissed birthday reminder stays dismissed.** Dismissing a due birthday reminder only lasted
+  until the next check: the sync that keeps a birthday's reminder in step looked for an active row,
+  found none, removed the dismissed one and created the same reminder again - so it was back within
+  a minute, and could be pushed a second time. The reminder now stays dismissed until its time
+  actually changes: a different lead time, a changed date, or next year's birthday.
+
 - **A housekeeper can check out again, and work a second session on the same day** (#1133, #1138).
   The one button that carries both directions was disabled while someone was checked in, and it is
   the only thing that triggers the check-out path - so that path was unreachable: a household could
