@@ -195,8 +195,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The demo data's birthday reminders now come days ahead, not minutes before noon on the day.**
   The demo seed wrote reminder lead times as `1d`, `3d` and `1w`, while Yuvomi stores them as
-  minutes, so they became one minute, three minutes and none: every demo birthday reminded shortly
-  before noon on the birthday itself, and the birthday form showed a lead time it does not offer.
+  minutes and reads only the leading digits, so they became one minute, three minutes and one
+  minute again: every demo birthday reminded shortly before noon on the birthday itself, and the
+  birthday form showed a lead time it does not offer.
   The seed now uses the form's own values (a day, two days, a week - the former three days became
   two), and a guard keeps it to those. Only a database filled by `scripts/seed-demo.js` is
   affected.

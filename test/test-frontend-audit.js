@@ -9491,7 +9491,7 @@ test('split activity feed translates every type the backend writes', () => {
 
 // Der Demo-Seed schrieb reminder_offset als '1d'/'3d'/'1w'. Gespeichert wird aber
 // ein Minutenwert als Text, und der Server liest ihn per parseInt: aus '1d' wurde
-// eine Minute, aus '1w' null - jeder Demo-Geburtstag erinnerte kurz vor Mittag am
+// eine Minute, aus '3d' drei, aus '1w' wieder eine - jeder Demo-Geburtstag erinnerte kurz vor Mittag am
 // Tag selbst. Aufgefallen ist es erst, als der Toast einer so faelligen Erinnerung
 // im Handlauf drei Sonden rot machte (#1160). Der Seed darf deshalb nur Werte
 // schreiben, die das Geburtstagsformular selbst anbietet; alles andere zeigt das

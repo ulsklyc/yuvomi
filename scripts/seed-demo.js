@@ -817,7 +817,7 @@ const insertBirthday = db.prepare(`
 // reminder_offset ist ein Minutenwert als Text, wie ihn das Formular schreibt
 // (REMINDER_OFFSETS in public/pages/birthdays.js - nur deren Werte, sonst zeigt das Formular
 // eine Auswahl, die es nicht kennt; der Server liest ihn per
-// parseInt). Hier stand '1d'/'3d'/'1w' - daraus wurden 1, 3 und 0 Minuten, und
+// parseInt). Hier stand '1d'/'3d'/'1w' - daraus wurden 1, 3 und wieder 1 Minute (parseInt liest nur die Ziffer), und
 // jeder Demo-Geburtstag erinnerte kurz vor Mittag AM Tag selbst statt Tage vorher.
 const DAY_BEFORE  = '1440';
 const TWO_DAYS    = '2880';
