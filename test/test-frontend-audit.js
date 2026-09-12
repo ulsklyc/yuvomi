@@ -8173,7 +8173,6 @@ test('German housekeeping visit copy contains no English fallback strings', () =
   const expected = {
     reports: 'Berichte',
     visitRecordedAt: 'Einsatz erfasst um',
-    checkedInToday: 'Heute erfasst',
     editVisit: 'Einsatz bearbeiten',
     paymentPaid: 'Bezahlt',
     paymentPending: 'Ausstehend',
