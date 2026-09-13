@@ -16,6 +16,11 @@
  *        Aktion den Monat behaelt, dass eine ueberholte Antwort nichts
  *        ueberschreibt, dass ein Fehler den Monat zuruecksetzt, und dass das
  *        Monatslabel der Sprache folgt.
+ *
+ *        #1174: Ob Schritt oder Neuladen gilt, entscheidet der Start des
+ *        Abrufs - ein gescheiterter Schritt verwirft das Neuladen nach dem
+ *        Bezahlen nicht, und ein vor der Aktion gestarteter Schritt
+ *        ueberschreibt es nicht.
  * Ausführen: node --loader ./test/test-browser-loader.mjs --test test/test-housekeeping-ui.js
  */
 import { test } from 'node:test';
@@ -256,6 +261,53 @@ test('scheitert der zweite von zwei schnellen Schritten, gilt wieder der angezei
   installApi();
   await hk.stepReportMonth(content, -1);
   assert.equal(requests.at(-1), '/housekeeping/visits?month=2026-08', 'der naechste Schritt geht vom angezeigten Monat aus');
+});
+
+test('ein gescheiterter Schritt verwirft das Neuladen einer Aktion nicht (#1174)', async () => {
+  const content = await freshReports();
+  await hk.stepReportMonth(content, -1);                 // August gewaehlt und angezeigt
+  toasts.length = 0;
+  const augustPaid = { ...REPORTS['2026-08'], totals: { total: 100, paid: 100, pending: 0 } };
+  let releaseReload;
+  installApi({
+    onMonth: (month) => (month === '2026-08'
+      ? new Promise((resolve) => { releaseReload = () => resolve({ data: augustPaid }); })
+      : Promise.reject(new Error('offline'))),
+  });
+  const reload = hk.loadData();                          // Bezahlen im August, Antwort haengt
+  await new Promise((resolve) => setImmediate(resolve));
+  await hk.stepReportMonth(content, -1);                 // derweil Juli, scheitert
+  assert.equal(hk.state().reportMonth, '2026-08', 'der Stepper steht wieder auf dem angezeigten August');
+  releaseReload();
+  await reload;
+  assert.equal(hk.state().visitReport.month, '2026-08');
+  assert.equal(hk.state().visitReport.totals.paid, 100, 'der August-Bericht traegt die Zahlung');
+});
+
+test('eine vor der Aktion gestartete Monatsantwort ueberschreibt das spaetere Neuladen nicht (#1174)', async () => {
+  const content = await freshReports();
+  const augustBefore = REPORTS['2026-08'];
+  const augustPaid = { ...augustBefore, totals: { total: 100, paid: 100, pending: 0 } };
+  let releaseStep;
+  let stepStarted = false;
+  installApi({
+    onMonth: (month) => {
+      if (month !== '2026-08') return { data: REPORTS[month] };
+      if (!stepStarted) {
+        stepStarted = true;
+        return new Promise((resolve) => { releaseStep = () => resolve({ data: augustBefore }); });
+      }
+      return { data: augustPaid };
+    },
+  });
+  const step = hk.stepReportMonth(content, -1);          // August angefragt, Antwort haengt
+  await hk.loadData();                                   // eine Aktion laedt danach nach und kommt zuerst an
+  assert.equal(hk.state().visitReport.totals.paid, 100);
+  releaseStep();                                         // jetzt erst die aeltere Antwort
+  await step;
+  assert.equal(hk.state().visitReport.month, '2026-08');
+  assert.equal(hk.state().visitReport.totals.paid, 100, 'der Stand von vor der Aktion bleibt verworfen');
+  assert.match(content.html, /id="housekeeping-report-month">August 2026</, 'der Schritt rendert trotzdem');
 });
 
 test('das Monatslabel folgt der Sprache', async () => {
