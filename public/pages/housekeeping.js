@@ -125,6 +125,7 @@ async function loadData() {
   // nicht mit dem alten Monat ueberschreiben. Scheitert der Schritt dagegen,
   // bleibt dieses Neuladen der neueste Stand und gilt (#1174).
   const reportSeq = ++reportFetchSeq;
+  const reportMonth = state.reportMonth;
   const [dashboard, tasks, current, report, templates, workers, prefs] = await Promise.all([
     api.get('/housekeeping/dashboard'),
     api.get('/housekeeping/decay-tasks'),
@@ -132,7 +133,7 @@ async function loadData() {
     // Der Berichte-Tab behaelt seinen Monat ueber jedes Neuladen (#1137). Jede
     // Aktion der Seite laedt hierueber nach; stuende der Monat nur im
     // Bedienelement, spraenge der Bericht nach dem ersten Bezahlen zurueck.
-    state.reportMonth ? api.get(reportVisitsPath(state.reportMonth)) : null,
+    reportMonth ? api.get(reportVisitsPath(reportMonth)) : null,
     api.get('/housekeeping/task-templates'),
     api.get(`/housekeeping/workers?${dayParams.toString()}`),
     api.get('/preferences'),
@@ -147,6 +148,12 @@ async function loadData() {
   if (reportSeq > appliedReportSeq) {
     applyVisitReport(report ? report.data : currentReport);
     appliedReportSeq = reportSeq;
+    // Der Stepper rechnet vom angezeigten Monat aus. Ist ein Schritt inzwischen
+    // gescheitert, hat er den Monat auf den damals angezeigten zurueckgestellt,
+    // und dieser Bericht zeigt womoeglich einen anderen (#1174). Laeuft dagegen
+    // ein spaeter gestarteter Schritt noch, gehoert der Monat ihm: er wendet
+    // seinen Bericht an oder stellt beim Scheitern auf diesen hier zurueck.
+    if (!(reportStepInFlight > reportSeq)) state.reportMonth = reportMonth;
   }
   state.templates = templates.data || [];
   state.workers = workers.data || [];
@@ -714,6 +721,9 @@ let reportMonthRequest = 0;
  * Schritt das spaetere Neuladen. Beides faengt der Startzeitpunkt. */
 let reportFetchSeq = 0;
 let appliedReportSeq = 0;
+// Nummer des juengsten Schritts, solange er laeuft; ein ueberholter Schritt
+// raeumt sie nicht, und ein veralteter Wert ist kleiner als jedes spaetere Neuladen.
+let reportStepInFlight = 0;
 
 /* Der gewaehlte Monat ist SEITENZUSTAND (#1137): loadData() liest ihn bei
  * jedem Neuladen. Gesetzt wird er vor dem Abruf, damit zwei schnelle Schritte
@@ -723,9 +733,11 @@ async function showReportMonth(content, monthValue, focusId = null) {
   state.reportMonth = monthValue === currentMonthKey() ? null : monthValue;
   const request = ++reportMonthRequest;
   const seq = ++reportFetchSeq;
+  reportStepInFlight = seq;
   try {
     const res = await api.get(reportVisitsPath(monthValue));
     if (request !== reportMonthRequest) return;
+    reportStepInFlight = 0;
     // Ein Neuladen, das NACH diesem Schritt gestartet ist, hat denselben Monat
     // schon frischer angewandt: dann bleibt dessen Stand, gerendert wird trotzdem.
     if (seq > appliedReportSeq) {
@@ -741,6 +753,7 @@ async function showReportMonth(content, monthValue, focusId = null) {
       ?.focus({ preventScroll: true });
   } catch (err) {
     if (request !== reportMonthRequest) return;
+    reportStepInFlight = 0;
     // Zurueck auf den Monat, den der Bericht ZEIGT - nicht auf den Wert vor
     // diesem Aufruf: bei zwei schnellen Schritten war das schon das Ziel des
     // ersten, dessen Antwort verworfen wurde, und Anzeige und Stepper liefen
