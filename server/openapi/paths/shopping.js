@@ -26,6 +26,18 @@ export function shoppingPaths() {
       patch: op({ summary: 'Reorder shopping categories', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/shopping/suggestions': { get: op({ summary: 'Get shopping suggestions', tag: 'Shopping' }) },
+    '/api/v1/shopping/versions': {
+      get: op({
+        summary: 'Change counter of every shopping list',
+        description: 'One `{ list_id, version }` per list. The counter says *that* a list changed, never *what*: '
+          + 'it moves whenever the list was renamed or its items were inserted, updated, moved or deleted by anyone '
+          + '- a household member, a meal-plan import, the CalDAV sync - and the row disappears with the list. '
+          + 'Database triggers keep it, so no writer has to announce itself. A client polls this while a list is '
+          + 'open and reloads a list through the same items request it used to open it; the write routes on items '
+          + 'return `list_change: { list_id, before, after }` so the writer can tell its own change apart.',
+        tag: 'Shopping',
+      }),
+    },
     '/api/v1/shopping/items/undo-transfer': {
       post: op({
         summary: 'Undo a kitchen transfer to a shopping list',

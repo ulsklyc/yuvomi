@@ -229,6 +229,24 @@ test('Nicht-Whitelist- und /auth/*-GETs werden durchgereicht', async () => {
   assert.equal(await apiCacheName(env), undefined);
 });
 
+test('die Laufnummern-Abfrage /shopping/versions wird durchgereicht, /shopping/:id/items daneben gecacht', async () => {
+  const env = loadSw({
+    fetchImpl: async () => new MockResponse(JSON.stringify({ data: [{ list_id: 1, version: 3 }] }), { status: 200 }),
+  });
+  const versions = new MockRequest(apiUrl('/shopping/versions'), { method: 'GET' });
+  const { responded } = dispatchFetch(env, versions);
+  assert.equal(responded, false, 'die Abfrage im Takt darf nicht in den API-Cache');
+  assert.equal(await apiCacheName(env), undefined, 'kein API-Cache durch die Laufnummern-Abfrage');
+
+  const items = new MockRequest(apiUrl('/shopping/1/items'), { method: 'GET' });
+  const itemsFetch = dispatchFetch(env, items);
+  assert.ok(itemsFetch.responded, 'die Artikel einer Liste bleiben offline lesbar');
+  assert.equal((await itemsFetch.result).status, 200);
+  const cache = await env.caches.open(await apiCacheName(env));
+  assert.ok(await cache.match(items), 'die Artikel-Antwort liegt im API-Cache');
+  assert.equal(await cache.match(versions), undefined, 'die Laufnummern liegen nicht daneben');
+});
+
 test('CLEAR_API_CACHE leert den API-Cache (Nutzerwechsel-Leak-Schutz)', async () => {
   const env = loadSw({
     fetchImpl: async () => new MockResponse(JSON.stringify({ data: 'geheim' }), { status: 200 }),
