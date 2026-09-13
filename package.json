@@ -28,7 +28,7 @@
     "test:screensaver": "node --test test/test-screensaver.js",
     "test:multi-assignment": "node --experimental-sqlite test/test-multi-assignment.js",
     "test:visibility": "node --experimental-sqlite test/test-visibility.js",
-    "test:sync-default-assignee": "node --experimental-sqlite test/test-sync-default-assignee.js",
+    "test:sync-default-assignee": "DB_PATH=:memory: node --experimental-sqlite test/test-sync-default-assignee.js",
     "test:tasks": "node --experimental-sqlite test/test-tasks.js",
     "test:tasks-recurrence": "node --test test/test-tasks-recurrence.js",
     "test:tasks-routes": "node --test test/test-tasks-routes.js",
