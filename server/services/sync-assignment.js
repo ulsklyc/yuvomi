@@ -48,9 +48,18 @@ export function assignDefaultToEvent(d, eventId, userId) {
 // event_assignments-Zeile. Eine verwaiste Standard-Person (Nutzer gelöscht)
 // fällt über den JOIN auf users heraus, wie in assignDefaultToEvent.
 //
-// Nur SPIEGEL-Termine: die Quelle des Termins muss die des Kalenders sein. Ein
-// lokal abgekoppeltes Vorkommen (retireLegacyInstances setzt external_source auf
-// 'local') behält seine calendar_ref_id, gehört aber nicht mehr dem Kalender.
+// Nur HEREINGEKOMMENE Termine: die Quelle des Termins muss die des Kalenders
+// sein. Ein lokal abgekoppeltes Vorkommen (retireLegacyInstances setzt
+// external_source auf 'local') behält seine calendar_ref_id, gehört aber nicht
+// mehr dem Kalender.
+//
+// Und kein HINAUSGEPUSHTER Termin: der Outbound-Sync stempelt dieselben Spalten
+// (external_source, calendar_ref_id) auf einen lokal angelegten Termin, sobald er
+// im Kalender liegt. Er hinterlässt aber eine Spur, die kein Import trägt -
+// Google und CalDAV behalten ihr gewähltes Ziel (target_*), Apple und CalDAV
+// laden unter der UID 'oikos-<id>@oikos.local' hoch. Ein importierter Termin,
+// den jemand in Yuvomi in einen anderen Kalender verschoben hat, trägt ebenfalls
+// ein Ziel und bleibt damit aussen vor: an ihm hat schon eine Hand gearbeitet.
 //
 // Geschrieben wird über setEventAssignments(), die eine Schreibstelle der
 // Zuweisung: sie verteilt die Erinnerungen des Anlegers an die neue Person
@@ -63,6 +72,9 @@ const UNASSIGNED_MAPPED_EVENTS = `
   JOIN external_calendars ec ON ec.id = e.calendar_ref_id
   JOIN users u ON u.id = ec.default_assignee_user_id
   WHERE e.external_source = ec.source
+    AND e.target_google_calendar_id IS NULL
+    AND e.target_caldav_calendar_url IS NULL
+    AND COALESCE(e.external_calendar_id, '') <> ('oikos-' || e.id || '@oikos.local')
     AND e.assigned_to IS NULL
     AND NOT EXISTS (SELECT 1 FROM event_assignments ea WHERE ea.event_id = e.id)
 `;

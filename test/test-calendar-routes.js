@@ -465,7 +465,7 @@ test('default-assignee-backfill - füllt nur unzugewiesene Termine aus Kalendern
     INSERT INTO external_calendars (source, external_id, name, default_assignee_user_id)
     VALUES (?, ?, 'Backfill', ?)
   `).run(source, externalId, assignee).lastInsertRowid;
-  const event = (title, { refId = null, subId = null, source = null, assignedTo = null, rows = [], visibility = 'all', documentId = null } = {}) => {
+  const event = (title, { refId = null, subId = null, source = null, assignedTo = null, rows = [], visibility = 'all', documentId = null, targetGoogle = null, targetCaldav = null, ownUid = false } = {}) => {
     const id = db.prepare(`
       INSERT INTO calendar_events
         (title, start_datetime, created_by, external_source, calendar_ref_id, subscription_id, assigned_to,
@@ -473,6 +473,8 @@ test('default-assignee-backfill - füllt nur unzugewiesene Termine aus Kalendern
       VALUES (?, '2035-03-01T10:00', ?, ?, ?, ?, ?, ?, ?)
     `).run(title, ADMIN.id, source ?? (subId ? 'ics' : refId ? 'caldav' : 'local'), refId, subId, assignedTo,
       visibility, documentId).lastInsertRowid;
+    db.prepare('UPDATE calendar_events SET target_google_calendar_id = ?, target_caldav_calendar_url = ?, external_calendar_id = ? WHERE id = ?')
+      .run(targetGoogle, targetCaldav, ownUid ? `oikos-${id}@oikos.local` : null, id);
     for (const uid of rows) {
       db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(id, uid);
     }
@@ -490,6 +492,7 @@ test('default-assignee-backfill - füllt nur unzugewiesene Termine aus Kalendern
   const google  = calendar('google', 'backfill-google', TOM.id);
   const plain   = calendar('caldav', 'https://dav.example/backfill-b/', null);
   const orphan  = calendar('caldav', 'https://dav.example/backfill-c/', 99999);
+  const apple   = calendar('apple', 'https://icloud.example/backfill/', MARIA.id);
   const subId = db.prepare(`
     INSERT INTO ics_subscriptions (name, url, color, created_by, shared, default_assignee_user_id)
     VALUES ('Backfill', 'https://x/backfill.ics', '#123456', 1, 1, ?)
@@ -507,6 +510,11 @@ test('default-assignee-backfill - füllt nur unzugewiesene Termine aus Kalendern
     // Lokal abgekoppelt (retireLegacyInstances): calendar_ref_id bleibt stehen,
     // der Termin gehört aber nicht mehr dem Kalender.
     detached:     event('bf-detached', { refId: google, source: 'local' }),
+    // Lokal angelegt und HINAUSGEPUSHT: der Outbound stempelt dieselben Spalten
+    // wie ein Import, hinterlässt aber sein Ziel oder die eigene UID.
+    pushedGoogle: event('bf-pushed-google', { refId: google, source: 'google', targetGoogle: 'backfill-google' }),
+    pushedCaldav: event('bf-pushed-caldav', { refId: caldav, targetCaldav: 'https://dav.example/backfill-a/', ownUid: true }),
+    pushedApple:  event('bf-pushed-apple', { refId: apple, source: 'apple', ownUid: true }),
     // Von Hand zugewiesen: beide Spalten gesetzt.
     manual:       event('bf-manual', { refId: caldav, assignedTo: ADMIN.id, rows: [ADMIN.id] }),
     // Nur eine der beiden Spalten - jede für sich zählt als Zuweisung.
@@ -535,6 +543,9 @@ test('default-assignee-backfill - füllt nur unzugewiesene Termine aus Kalendern
     assert.deepEqual(assignment(ids.emptyCaldav), { assignedTo: MARIA.id, users: [MARIA.id] });
     assert.deepEqual(assignment(ids.emptyGoogle), { assignedTo: TOM.id, users: [TOM.id] }, 'jeder Kalender füllt mit SEINER Person');
     assert.deepEqual(assignment(ids.detached), { assignedTo: null, users: [] }, 'abgekoppelte Vorkommen gehören nicht mehr dazu');
+    assert.deepEqual(assignment(ids.pushedGoogle), { assignedTo: null, users: [] }, 'nach Google gepusht: Ziel bleibt stehen');
+    assert.deepEqual(assignment(ids.pushedCaldav), { assignedTo: null, users: [] }, 'nach CalDAV gepusht: Ziel und eigene UID');
+    assert.deepEqual(assignment(ids.pushedApple), { assignedTo: null, users: [] }, 'nach iCloud gepusht: eigene UID');
     assert.deepEqual(db.prepare(`
       SELECT created_by FROM reminders WHERE entity_type = 'event' AND entity_id = ? ORDER BY created_by
     `).all(ids.emptyCaldav).map((r) => r.created_by), [ADMIN.id, MARIA.id], 'die Erinnerung ist mitgewandert');
@@ -556,7 +567,7 @@ test('default-assignee-backfill - füllt nur unzugewiesene Termine aus Kalendern
     db.prepare(`DELETE FROM calendar_events WHERE id IN (${Object.values(ids).join(',')})`).run();
     db.prepare('DELETE FROM family_documents WHERE id = ?').run(documentId);
     db.prepare('DELETE FROM ics_subscriptions WHERE id = ?').run(subId);
-    db.prepare('DELETE FROM external_calendars WHERE id IN (?, ?, ?, ?)').run(caldav, google, plain, orphan);
+    db.prepare('DELETE FROM external_calendars WHERE id IN (?, ?, ?, ?, ?)').run(caldav, google, plain, orphan, apple);
   }
 });
 
