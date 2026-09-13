@@ -332,7 +332,9 @@ Run `npm run test:calendar-occurrence-overrides`
 for migration 194, original-slot identity, inheritance and owner resolution,
 atomic edit/delete/split operations, bounded exact-count orphan handling,
 visibility-equivalent mutation rights, provider outbound exclusion, nested
-savepoint fallback, projection caching, and cross-reader degradation contracts. The suite sets a fresh temporary
+savepoint fallback, projection caching, cross-reader degradation contracts, and
+the body-free projection list staying a complete mirror of `calendar_events`
+(#1155: a new column fails the suite until it is listed or excluded by name). The suite sets a fresh temporary
 `DB_PATH` before importing the route serializer, whose dependency graph
 initializes `server/db.js`, and removes that database and its SQLite sidecars at
 process exit. Its dedicated script runs directly in the root `npm test`
