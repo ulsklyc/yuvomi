@@ -202,6 +202,27 @@ test('ein Fehler setzt den Monat zurueck und meldet ihn', async () => {
   assert.deepEqual(toasts.at(-1), ['offline', 'danger']);
 });
 
+test('scheitert der zweite von zwei schnellen Schritten, gilt wieder der angezeigte Monat', async () => {
+  const content = await freshReports();
+  toasts.length = 0;
+  let releaseAugust;
+  installApi({
+    onMonth: (month) => (month === '2026-08'
+      ? new Promise((resolve) => { releaseAugust = () => resolve({ data: REPORTS[month] }); })
+      : Promise.reject(new Error('offline'))),
+  });
+  const first = hk.stepReportMonth(content, -1);   // August, haengt
+  await hk.stepReportMonth(content, -1);           // Juli, scheitert
+  assert.equal(hk.state().visitReport.month, '2026-09', 'angezeigt ist noch September');
+  assert.equal(hk.state().reportMonth, null, 'der Stepper steht wieder auf dem angezeigten Monat, nicht auf August');
+  releaseAugust();
+  await first;
+  assert.equal(hk.state().visitReport.month, '2026-09', 'die ueberholte August-Antwort bleibt verworfen');
+  installApi();
+  await hk.stepReportMonth(content, -1);
+  assert.equal(requests.at(-1), '/housekeeping/visits?month=2026-08', 'der naechste Schritt geht vom angezeigten Monat aus');
+});
+
 test('das Monatslabel folgt der Sprache', async () => {
   try {
     globalThis.__locale = 'fr';

@@ -212,8 +212,12 @@
 
 /* Monats-Stepper des Berichte-Tabs (#1137): Pfeil, Monat, Pfeil, dahinter der
  * Reset - dieselbe Reihenfolge wie Budget (.budget-nav__month). */
+/* Umbruch erlaubt: auf schmalen Karten passen Pfeile, Monat und ein laengeres
+ * lokalisiertes "Aktuell" nicht in eine Zeile. Der Reset rutscht dann als
+ * letztes Glied in die naechste Zeile, der Stepper bleibt beisammen. */
 .housekeeping-month-nav {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1);
 }

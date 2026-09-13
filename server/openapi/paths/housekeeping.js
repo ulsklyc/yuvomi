@@ -1,6 +1,6 @@
 import { op, jsonBody, idParam } from '../helpers.js';
 
-const VISIT_CAPABILITY_NOTE = 'Each visit carries `can_edit` and `can_delete`: true unless the visit is paid and the caller is not an admin '
+const VISIT_CAPABILITY_NOTE = 'Each visit carries `can_edit` and `can_delete`: true when the caller may write to the Housekeeping module and the visit is either unpaid or the caller is an admin '
   + '(a paid visit is settled), and `can_mark_unpaid`: true when the visit is paid and the caller is an admin. '
   + 'They are hints for the interface; `PUT`/`DELETE /api/v1/housekeeping/visits/{id}` and `POST .../unpay` check the role themselves.';
 

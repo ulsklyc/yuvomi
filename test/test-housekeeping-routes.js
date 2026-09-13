@@ -31,6 +31,7 @@ app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
   req.session = { userId: actor.id, role: actor.role };
+  req.sessionModuleAccess = actor.moduleAccess ?? null;
   next();
 });
 // Die Zahlungsaufgabe ist ein zweiter Weg an den bezahlten Besuch, deshalb
@@ -54,6 +55,9 @@ async function call(method, path, { as, body } = {}) {
 
 const ADM = { id: ADMIN, role: 'admin' };
 const MEM = { id: MEMBER, role: 'member' };
+// Mitglied mit Housekeeping nur zum Lesen (#1135): GET kommt durch, Schreiben weist
+// die Modul-Middleware in server/index.js ab - die ist hier nicht montiert.
+const MEM_READ = { id: MEMBER, role: 'member', moduleAccess: { housekeeping: 'read' } };
 
 // --------------------------------------------------------------------------
 // Worker-Anlage: Admin-Gate + Validierung
@@ -489,6 +493,12 @@ test('can_edit/can_delete: Admin immer, Mitglied nur am unbezahlten Besuch - und
 
     const oneMem = await call('GET', `/visits/${PAY_SESSION_ID}`, { as: MEM });
     assert.deepEqual(caps(oneMem.body.data), { can_edit: false, can_delete: false }, 'GET /visits/:id traegt die Felder ebenso');
+
+    // Nur-Lese-Modulrecht: auch am unbezahlten Besuch nichts, was die Middleware abwiese.
+    const readOnly = await call('GET', '/visits?month=2025-04', { as: MEM_READ });
+    assert.deepEqual(caps(pick(readOnly, unpaidId)), { can_edit: false, can_delete: false }, 'Mitglied nur lesend, unbezahlt');
+    const readOnlyOne = await call('GET', `/visits/${unpaidId}`, { as: MEM_READ });
+    assert.deepEqual(caps(readOnlyOne.body.data), { can_edit: false, can_delete: false });
     const oneAdm = await call('GET', `/visits/${PAY_SESSION_ID}`, { as: ADM });
     assert.deepEqual(caps(oneAdm.body.data), { can_edit: true, can_delete: true });
 

@@ -27,6 +27,7 @@ import {
   mirroredFieldsChanged,
   queueEventDeletion,
 } from '../services/calendar-outbound.js';
+import { moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
 
 const log = createLogger('Housekeeping');
 const router = express.Router();
@@ -524,12 +525,17 @@ function assertMayTouchSettled(existing, req, res) {
 // Funktion wie assertMayTouchSettled - aendert sich die Regel, wandern Sperre
 // und Anzeige zusammen. Die Routen pruefen beim Schreiben trotzdem selbst: die
 // Felder sind ein Hinweis fuer die Oberflaeche, keine Berechtigung.
+//
+// Dazu die Modulrechte: ein Mitglied mit Housekeeping nur zum Lesen kommt an
+// GET /visits heran, jedes PUT/DELETE weist die Middleware in server/index.js
+// aber ab. Dieselbe Pruefung (moduleAccessVerdict), kein Nachbau.
 function visitCapabilities(row, req) {
-  const touchable = mayTouchSettled(row, req);
+  const writable = moduleAccessVerdict(req.sessionModuleAccess, 'housekeeping', 'write') === MODULE_ACCESS_ALLOW;
+  const touchable = writable && mayTouchSettled(row, req);
   return {
     can_edit: touchable,
     can_delete: touchable,
-    can_mark_unpaid: Boolean(row.paid_at) && req.authRole === 'admin',
+    can_mark_unpaid: writable && Boolean(row.paid_at) && req.authRole === 'admin',
   };
 }
 

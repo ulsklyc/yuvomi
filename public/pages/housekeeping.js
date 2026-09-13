@@ -403,7 +403,7 @@ function renderDashboard(content) {
   content.querySelectorAll('[data-open-visit]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const visit = (state.recentVisits || []).find((v) => String(v.id) === btn.dataset.openVisit);
-      if (visit) openVisitReportModal(visit);
+      if (visit) openVisitReportModal(visit, null, { onRefresh: () => { if (content.isConnected) renderDashboard(content); } });
     });
   });
 }
@@ -702,7 +702,6 @@ let reportMonthRequest = 0;
  * zwei Monate weit gehen; eine Antwort, die ein spaeterer Klick schon
  * ueberholt hat, wird verworfen, und ein Fehler stellt den Monat zurueck. */
 async function showReportMonth(content, monthValue, focusId = null) {
-  const previous = state.reportMonth;
   state.reportMonth = monthValue === currentMonthKey() ? null : monthValue;
   const request = ++reportMonthRequest;
   try {
@@ -718,7 +717,12 @@ async function showReportMonth(content, monthValue, focusId = null) {
       ?.focus({ preventScroll: true });
   } catch (err) {
     if (request !== reportMonthRequest) return;
-    state.reportMonth = previous;
+    // Zurueck auf den Monat, den der Bericht ZEIGT - nicht auf den Wert vor
+    // diesem Aufruf: bei zwei schnellen Schritten war das schon das Ziel des
+    // ersten, dessen Antwort verworfen wurde, und Anzeige und Stepper liefen
+    // auseinander.
+    const shown = state.visitReport?.month || currentMonthKey();
+    state.reportMonth = shown === currentMonthKey() ? null : shown;
     window.yuvomi?.showToast(err.message, 'danger');
   }
 }
@@ -813,7 +817,9 @@ function renderReports(content) {
   });
 }
 
-function openVisitReportModal(visit, content = null) {
+/* `onRefresh` rendert die Ansicht neu, aus der der Bericht geoeffnet wurde (Uebersicht,
+ * Personal, Deep-Link). Ohne ihn ist es der Berichte-Tab in `content`. */
+function openVisitReportModal(visit, content = null, { onRefresh = null } = {}) {
   const paid = !!visit.paid_at;
   // Die Ruecknahme bietet nur an, wem der Server sie zugesteht
   // (`can_mark_unpaid`, #1136) - die Admin-Regel wird hier nicht nachgebaut.
@@ -863,13 +869,15 @@ function openVisitReportModal(visit, content = null) {
       panel.querySelector('#visit-report-pay')?.addEventListener('click', () => payVisit(visit, async () => {
         closeModal({ force: true });
         await loadData();
-        if (content?.isConnected) renderReports(content);
+        if (onRefresh) await onRefresh();
+        else if (content?.isConnected) renderReports(content);
         refocusAfterRender();
       }));
       panel.querySelector('#visit-report-unpay')?.addEventListener('click', () => unpayVisit(visit, async () => {
         closeModal({ force: true });
         await loadData();
-        if (content?.isConnected) renderReports(content);
+        if (onRefresh) await onRefresh();
+        else if (content?.isConnected) renderReports(content);
         refocusAfterRender();
       }));
     },
@@ -951,7 +959,12 @@ function renderStaff(content) {
   content.querySelectorAll('[data-open-visit]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const visit = state.staffVisits.find((item) => String(item.id) === btn.dataset.openVisit);
-      if (visit) openVisitReportModal(visit);
+      if (visit) openVisitReportModal(visit, null, {
+        onRefresh: async () => {
+          await loadStaffVisits();
+          if (content.isConnected) renderStaff(content);
+        },
+      });
     });
   });
   content.querySelectorAll('[data-pay-visit]').forEach((btn) => {
@@ -1450,7 +1463,7 @@ export async function render(container) {
           // Wer einen abgerechneten Besuch nicht aendern darf, bekommt den
           // Bericht statt eines Formulars, das erst beim Speichern scheitert (#1135).
           if (visit.can_edit) openVisitEditModal(visit, content);
-          else openVisitReportModal(visit);
+          else openVisitReportModal(visit, null, { onRefresh: () => renderCurrentTab(container) });
         }
       } catch {
         // visit not found or unauthorized — silently ignore
