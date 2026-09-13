@@ -10,7 +10,7 @@ import * as googleCalendar from '../../services/google-calendar.js';
 import { requireAdmin } from '../../auth.js';
 import {
   applyDefaultAssigneesToExisting,
-  countUnassignedMappedEvents,
+  backfillCandidatesToken,
   listBackfillCandidates,
 } from '../../services/sync-assignment.js';
 
@@ -217,11 +217,14 @@ router.patch('/external-calendars', requireAdmin, (req, res) => {
  * GET /api/v1/calendar/external-calendars/default-assignee-backfill
  * Admin only. Zählt, wie viele bereits importierte Termine das Nachtragen der
  * Standard-Zuweisung füllen würde (#1154) - die Zahl steht in der Rückfrage.
- * Response: { data: { count } }
+ * Das Token ist der Fingerabdruck genau dieser Menge (#1171) und geht mit der
+ * Bestätigung zurück.
+ * Response: { data: { count, token } }
  */
 router.get('/external-calendars/default-assignee-backfill', requireAdmin, (req, res) => {
   try {
-    res.json({ data: { count: countUnassignedMappedEvents(db.get()) } });
+    const candidates = listBackfillCandidates(db.get());
+    res.json({ data: { count: candidates.length, token: backfillCandidatesToken(candidates) } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
@@ -234,13 +237,16 @@ router.get('/external-calendars/default-assignee-backfill', requireAdmin, (req, 
  * seine schon importierten Termine an, die noch niemandem zugewiesen sind
  * (#1154). Eine vorhandene Zuweisung bleibt unangetastet.
  *
- * Die Rueckfrage hat eine Zahl genannt, und nur diese Menge ist bestaetigt:
- * hat sich die Kandidatenmenge seither geaendert (jemand hat Zuweisungen
- * entfernt, eine Zuordnung umgestellt), antwortet die Route mit 409 statt mehr
- * oder andere Termine zu fuellen. Die Aktion ist nur Termin fuer Termin
- * zuruecknehmbar.
- * Body: { expected_count: number }
- * Response: { data: { assigned } } | 409 { data: { count } }
+ * Die Rueckfrage hat eine Menge genannt, und nur diese Menge ist bestaetigt:
+ * hat sie sich seither geaendert (jemand hat Zuweisungen entfernt, eine
+ * Zuordnung umgestellt), antwortet die Route mit 409 statt mehr oder andere
+ * Termine zu fuellen. Die Zahl allein faengt nur eine Aenderung der GROESSE;
+ * das Token aus der Zaehlung faengt auch den Tausch bei gleicher Groesse
+ * (#1171). Ohne Token bleibt es beim Zahlenvergleich, damit ein API-Client, der
+ * die Route vor dem Token angebunden hat, nicht bricht. Die Aktion ist nur
+ * Termin fuer Termin zuruecknehmbar.
+ * Body: { expected_count: number, expected_token?: string }
+ * Response: { data: { assigned } } | 409 { data: { count, token } }
  */
 router.post('/external-calendars/default-assignee-backfill', requireAdmin, async (req, res) => {
   try {
@@ -248,13 +254,19 @@ router.post('/external-calendars/default-assignee-backfill', requireAdmin, async
     if (!Number.isInteger(expected) || expected < 0) {
       return res.status(400).json({ error: 'expected_count fehlt oder ist ungültig.', code: 400 });
     }
+    const expectedToken = req.body?.expected_token;
+    if (expectedToken !== undefined && expectedToken !== null
+      && (typeof expectedToken !== 'string' || !/^[0-9a-f]{64}$/.test(expectedToken))) {
+      return res.status(400).json({ error: 'expected_token ist ungültig.', code: 400 });
+    }
     // Gezählt und festgehalten im selben synchronen Schritt: genau diese Liste
     // ist bestätigt, und nur sie wird abgearbeitet - auch wenn zwischen den
     // Happen neue Kandidaten dazukommen.
     const candidates = listBackfillCandidates(db.get());
-    if (candidates.length !== expected) {
+    const token = backfillCandidatesToken(candidates);
+    if (candidates.length !== expected || (expectedToken && expectedToken !== token)) {
       return res.status(409).json({
-        error: 'Die Termine haben sich seit der Zählung geändert.', code: 409, data: { count: candidates.length },
+        error: 'Die Termine haben sich seit der Zählung geändert.', code: 409, data: { count: candidates.length, token },
       });
     }
     res.json({ data: { assigned: await applyDefaultAssigneesToExisting(db.get(), candidates) } });

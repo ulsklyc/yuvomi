@@ -130,10 +130,12 @@ function bindDefaultAssigneeBackfill(container) {
     // gar nicht mehr offen ist.
     const context = captureModalContext();
     let count = 0;
+    let token = null;
     try {
       await withBusy(btn, async () => {
         const res = await api.get(endpoint);
         count = res.data?.count ?? 0;
+        token = res.data?.token ?? null;
       });
     } catch (err) {
       if (isModalContextCurrent(context)) showToast(err.message || t('common.errorGeneric'), 'danger');
@@ -154,10 +156,11 @@ function bindDefaultAssigneeBackfill(container) {
 
     await withBusy(btn, async () => {
       try {
-        // Die bestätigte Zahl geht mit: hat sich die Menge seit der Zählung
-        // geändert, weist der Server mit 409 ab, statt mehr oder andere Termine
-        // zu füllen, als die Rückfrage genannt hat.
-        const res = await api.post(endpoint, { expected_count: count });
+        // Zahl und Fingerabdruck der gezählten Menge gehen mit: hat sich die
+        // Menge seit der Zählung geändert - auch bei gleicher Größe (#1171) -,
+        // weist der Server mit 409 ab, statt mehr oder andere Termine zu füllen,
+        // als die Rückfrage genannt hat.
+        const res = await api.post(endpoint, { expected_count: count, expected_token: token });
         const assigned = res.data?.assigned ?? 0;
         showToast(t('settings.sync.backfillDone', { count: assigned }), 'success');
       } catch (err) {

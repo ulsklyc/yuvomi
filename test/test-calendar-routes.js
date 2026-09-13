@@ -599,6 +599,59 @@ test('default-assignee-backfill - füllt nur unzugewiesene Termine aus Kalendern
   }
 });
 
+test('default-assignee-backfill - die Bestätigung bindet die Menge, nicht nur ihre Größe (#1171)', async () => {
+  const route = '/external-calendars/default-assignee-backfill';
+  const refId = db.prepare(`
+    INSERT INTO external_calendars (source, external_id, name, default_assignee_user_id)
+    VALUES ('caldav', 'https://dav.example/backfill-token/', 'Token', ?)
+  `).run(TOM.id).lastInsertRowid;
+  const mk = (title) => db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, created_by, external_source, calendar_ref_id)
+    VALUES (?, '2035-06-01T10:00', ?, 'caldav', ?)
+  `).run(title, ADMIN.id, refId).lastInsertRowid;
+  const who = (id) => db.prepare('SELECT assigned_to AS a FROM calendar_events WHERE id = ?').get(id).a;
+  const first = mk('bf-token-first');
+  const ids = [first];
+  try {
+    const counted = (await call('GET', route)).body.data;
+    assert.match(counted.token, /^[0-9a-f]{64}$/);
+
+    // Gleiche Größe, andere Menge: ein Termin wird von Hand zugewiesen, ein neuer Import nimmt seinen Platz ein.
+    db.prepare('UPDATE calendar_events SET assigned_to = ? WHERE id = ?').run(MARIA.id, first);
+    db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(first, MARIA.id);
+    const arrived = mk('bf-token-arrived');
+    ids.push(arrived);
+    assert.equal((await call('GET', route)).body.data.count, counted.count, 'die Zahl allein sieht den Tausch nicht');
+
+    const swapped = await call('POST', route, { body: { expected_count: counted.count, expected_token: counted.token } });
+    assert.equal(swapped.status, 409, 'ein getauschter Termin ist eine andere Menge');
+    assert.equal(swapped.body.data.count, counted.count);
+    assert.notEqual(swapped.body.data.token, counted.token, 'die 409 nennt das aktuelle Token');
+    assert.equal(who(arrived), null, 'ein nicht bestaetigter Termin bleibt unzugewiesen');
+
+    // Dieselben Termine, andere Person: eine umgestellte Standard-Zuweisung ist ebenfalls eine andere Menge.
+    const recounted = (await call('GET', route)).body.data;
+    db.prepare('UPDATE external_calendars SET default_assignee_user_id = ? WHERE id = ?').run(MARIA.id, refId);
+    const reassigned = await call('POST', route, { body: { expected_count: recounted.count, expected_token: recounted.token } });
+    assert.equal(reassigned.status, 409, 'bestaetigt war Tom, nicht Maria');
+    assert.equal(who(arrived), null);
+
+    // Ein Token, das keins ist, wird abgewiesen statt ignoriert.
+    assert.equal((await call('POST', route, { body: { expected_count: recounted.count, expected_token: 42 } })).status, 400);
+    assert.equal((await call('POST', route, { body: { expected_count: recounted.count, expected_token: '' } })).status, 400);
+    assert.equal(who(arrived), null);
+
+    // Mit der frischen Bestaetigung laeuft es - und fuellt mit der Person, die sie genannt hat.
+    const fresh = (await call('GET', route)).body.data;
+    const applied = await call('POST', route, { body: { expected_count: fresh.count, expected_token: fresh.token } });
+    assert.equal(applied.status, 200);
+    assert.equal(who(arrived), MARIA.id);
+  } finally {
+    db.prepare(`DELETE FROM calendar_events WHERE id IN (${ids.join(',')})`).run();
+    db.prepare('DELETE FROM external_calendars WHERE id = ?').run(refId);
+  }
+});
+
 test('default-assignee-backfill - arbeitet in Happen und kommt trotzdem bis zum Ende (#1154)', async () => {
   const { applyDefaultAssigneesToExisting } = await import('../server/services/sync-assignment.js');
   const refId = db.prepare(`

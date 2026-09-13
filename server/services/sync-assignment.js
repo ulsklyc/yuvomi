@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { setEventAssignments } from '../routes/calendar/helpers.js';
 
 // --------------------------------------------------------
@@ -89,22 +90,12 @@ const UNASSIGNED_MAPPED_EVENTS = `
     AND NOT EXISTS (SELECT 1 FROM event_assignments ea WHERE ea.event_id = e.id)
 `;
 
-/**
- * Zählt die Termine, die applyDefaultAssigneesToExisting() füllen würde.
- *
- * @param {object} d better-sqlite3 Datenbank-Handle
- * @returns {number}
- */
-export function countUnassignedMappedEvents(d) {
-  return d.prepare(`SELECT COUNT(*) AS count ${UNASSIGNED_MAPPED_EVENTS}`).get().count;
-}
-
 const BACKFILL_BATCH_SIZE = 50;
 
 /**
  * Die Kandidaten, wie sie JETZT sind: Termin und die Person seines Kalenders.
- * Die Route vergleicht ihre Anzahl mit der bestätigten Zahl und reicht genau
- * diese Liste an applyDefaultAssigneesToExisting() weiter.
+ * Die Route vergleicht sie mit der bestätigten Menge und reicht genau diese
+ * Liste an applyDefaultAssigneesToExisting() weiter.
  *
  * @param {object} d better-sqlite3 Datenbank-Handle
  * @returns {{ eventId: number, userId: number }[]}
@@ -113,6 +104,26 @@ export function listBackfillCandidates(d) {
   return d.prepare(
     `SELECT e.id AS eventId, ec.default_assignee_user_id AS userId ${UNASSIGNED_MAPPED_EVENTS} ORDER BY e.id`
   ).all();
+}
+
+/**
+ * Fingerabdruck der Kandidatenliste: welche Termine an welche Person gehen.
+ *
+ * Die Anzahl allein bestätigt zu wenig (#1171). Zwischen Zählung und Bestätigung
+ * kann sich die Menge bei gleicher Größe ändern - ein Termin wird von Hand
+ * zugewiesen, während ein neuer Import seinen Platz einnimmt, oder ein anderer
+ * Admin stellt die Standard-Person eines Kalenders um. Die Zahl stimmt dann
+ * noch, der Lauf träfe aber andere Termine oder eine andere Person, als die
+ * Rückfrage gezählt hat. Die Liste kommt nach Termin-ID sortiert, der
+ * Fingerabdruck ist also für dieselbe Menge immer derselbe.
+ *
+ * @param {{ eventId: number, userId: number }[]} candidates
+ * @returns {string} SHA-256, hex
+ */
+export function backfillCandidatesToken(candidates) {
+  const hash = createHash('sha256');
+  for (const { eventId, userId } of candidates) hash.update(`${eventId}:${userId};`);
+  return hash.digest('hex');
 }
 
 /**
@@ -131,9 +142,9 @@ export function listBackfillCandidates(d) {
  * iCloud-Historie hat Tausende Termine; gemessen blockierten 5000 Termine den
  * Event-Loop in einer Transaktion gut zwoelf Sekunden. Jeder Happen ist eine
  * eigene Transaktion (50 Termine, gemessen unter 0,2 s), dazwischen kommen
- * andere Anfragen dran. Ein zugewiesener
- * Termin faellt aus der Kandidatenmenge, also holt jeder Happen einfach die
- * naechsten - bricht der Lauf ab, setzt ein zweiter dort fort.
+ * andere Anfragen dran. Jeder Happen nimmt die naechsten Eintraege der
+ * bestaetigten Liste; bricht der Lauf ab, bleiben die uebrigen Termine
+ * unzugewiesen, und eine neue Zaehlung findet sie wieder.
  *
  * DER TEURE WEG NUR, WO ER ETWAS BEWIRKT. setEventAssignments() verteilt
  * Erinnerungen und gleicht Anhangrechte an; die allermeisten importierten
