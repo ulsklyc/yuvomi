@@ -32,6 +32,7 @@ const FLAT_SCOPES = Object.freeze({
   meds:       { table: 'medications',        column: 'user_id' },
   labs:       { table: 'health_lab_reports', column: 'user_id' },
   activities: { table: 'health_activities',  column: 'user_id' },
+  fasting:    { table: 'health_fasts',       column: 'user_id' },
 });
 
 // Vitalwerte tragen ihre Voreinstellung JE METRIK: wer den Blutdruck teilen
@@ -175,6 +176,11 @@ router.patch('/visibility-defaults/apply', (req, res) => {
       updated = database.prepare(
         'UPDATE health_vitals SET visibility = ? WHERE user_id = ? AND type = ?'
       ).run(visibility, viewer, scope.slice(VITAL_PREFIX.length)).changes;
+    } else if (scope === 'fasting') {
+      // Privacy changes must invalidate an already-open fasting editor too.
+      updated = database.prepare(
+        'UPDATE health_fasts SET visibility = ?, revision = revision + 1, updated_by = ?, updated_at = ? WHERE user_id = ?'
+      ).run(visibility, viewer, new Date().toISOString(), viewer).changes;
     } else {
       const target = FLAT_SCOPES[scope];
       updated = database.prepare(

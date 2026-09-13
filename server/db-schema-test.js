@@ -1266,6 +1266,59 @@ const MIGRATIONS_SQL = {
         DELETE FROM shopping_list_changes WHERE list_id = OLD.id;
       END;
     `,
+  197: `
+    CREATE TABLE health_fasts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      start_at TEXT NOT NULL,
+      end_at TEXT,
+      start_tzid TEXT NOT NULL,
+      goal_minutes INTEGER CHECK(goal_minutes IS NULL OR (goal_minutes BETWEEN 60 AND 20160 AND goal_minutes % 60 = 0)),
+      rating INTEGER CHECK(rating IS NULL OR rating BETWEEN 1 AND 5),
+      note TEXT CHECK(note IS NULL OR length(note) <= 2000),
+      visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('private', 'family')),
+      revision INTEGER NOT NULL DEFAULT 1 CHECK(revision >= 1),
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      CHECK(end_at IS NULL OR end_at > start_at)
+    );
+    CREATE UNIQUE INDEX idx_health_fasts_one_active ON health_fasts(user_id) WHERE end_at IS NULL;
+    CREATE INDEX idx_health_fasts_owner_interval ON health_fasts(user_id, start_at, end_at);
+    CREATE TABLE health_fasting_settings (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      default_goal_minutes INTEGER CHECK(default_goal_minutes IS NULL OR (default_goal_minutes BETWEEN 60 AND 20160 AND default_goal_minutes % 60 = 0)),
+      zone_mode TEXT NOT NULL DEFAULT 'timer' CHECK(zone_mode IN ('timer', 'educational')),
+      safety_acknowledged_at TEXT,
+      safety_acknowledged_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    );
+  `,
+  198: `
+    CREATE TABLE reminders_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity_type TEXT NOT NULL CHECK(entity_type IN ('task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'fasting_goal', 'fasting_next_start')),
+      entity_id INTEGER NOT NULL,
+      remind_at TEXT NOT NULL,
+      dismissed INTEGER NOT NULL DEFAULT 0,
+      created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      pushed_at TEXT,
+      assigned_from INTEGER REFERENCES users(id) ON DELETE SET NULL
+    );
+    INSERT INTO reminders_new (id, entity_type, entity_id, remind_at, dismissed, created_by, created_at, pushed_at, assigned_from)
+      SELECT id, entity_type, entity_id, remind_at, dismissed, created_by, created_at, pushed_at, assigned_from FROM reminders;
+    DROP TABLE reminders;
+    ALTER TABLE reminders_new RENAME TO reminders;
+    CREATE INDEX idx_reminders_entity ON reminders(entity_type, entity_id);
+    CREATE INDEX idx_reminders_remind ON reminders(remind_at);
+    CREATE INDEX idx_reminders_user ON reminders(created_by);
+    CREATE INDEX idx_reminders_assigned_from ON reminders(assigned_from);
+    ALTER TABLE health_fasting_settings ADD COLUMN remind_goal INTEGER NOT NULL DEFAULT 0 CHECK(remind_goal IN (0, 1));
+    ALTER TABLE health_fasting_settings ADD COLUMN remind_next_start INTEGER NOT NULL DEFAULT 0 CHECK(remind_next_start IN (0, 1));
+  `,
 };
 
 export { MIGRATIONS_SQL };

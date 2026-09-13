@@ -48,6 +48,7 @@ import {
   predictSymptomLikelihood,
 } from '/utils/health-cycle.js';
 import { HEALTH_ROUTES, renderHealthTabsBar } from '/utils/health-tabs.js';
+import { canUseFasting } from '/permissions.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
 
 let _container = null;
@@ -86,13 +87,16 @@ function mountAreaLoadError(area, name, onRetry) {
 // damit die Regel an genau einer Stelle steht. Default an, damit Bestandskonten
 // ihr Verhalten behalten; wird in render() aus /preferences aufgefrischt.
 let cycleEnabled = true;
+let fastingEnabled = false;
 
 async function loadHealthPrefs() {
   try {
     const res = await api.get('/preferences');
     cycleEnabled = res?.data?.health_cycle_effective !== false;
+    fastingEnabled = canUseFasting();
   } catch {
     cycleEnabled = true;
+    fastingEnabled = canUseFasting();
   }
 }
 
@@ -234,6 +238,13 @@ const PANELS = () => [
     emptyDescKey: 'health.cycle.emptyDesc',
   },
   {
+    route: '/health/fasting',
+    icon: 'timer',
+    titleKey: 'health.fasting.title',
+    emptyTitleKey: 'health.fasting.emptyTitle',
+    emptyDescKey: 'health.fasting.emptyDesc',
+  },
+  {
     route: '/health/meds',
     icon: 'pill',
     titleKey: 'health.meds.title',
@@ -259,6 +270,7 @@ const PANELS = () => [
 function normalizeHealthPath(path) {
   // Zyklus deaktiviert → Deep-Link auf die Übersicht umleiten (kein leeres Panel).
   if (path === '/health/cycle' && !cycleEnabled) return '/health';
+  if (path === '/health/fasting' && !fastingEnabled) return '/health';
   return HEALTH_ROUTES.includes(path) ? path : '/health';
 }
 
@@ -272,6 +284,8 @@ function panelMarkup(panel, activeRoute) {
     ? '<div class="health-vitals" data-vitals-root></div>'
     : panel.route === '/health/cycle'
     ? '<div class="health-cycle" data-cycle-root></div>'
+    : panel.route === '/health/fasting'
+    ? '<div class="health-fasting" data-fasting-root></div>'
     : panel.route === '/health/meds'
     ? '<div class="health-meds" data-meds-root></div>'
     : panel.route === '/health/labs'
@@ -368,7 +382,7 @@ export async function render(container, ctx = {}) {
   overview.loaded = false;
   await Promise.all([loadHealthPrefs(), loadCareGrants(), loadVisibilityDefaults()]);
   const activeRoute = normalizeHealthPath(window.location.pathname);
-  const panels = PANELS().filter((panel) => cycleEnabled || panel.route !== '/health/cycle');
+  const panels = PANELS().filter((panel) => (cycleEnabled || panel.route !== '/health/cycle') && (fastingEnabled || panel.route !== '/health/fasting'));
 
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
@@ -389,11 +403,12 @@ export async function render(container, ctx = {}) {
   container.querySelector('.health-page').appendChild(_fab);
 
   if (window.lucide) window.lucide.createIcons({ el: container });
-  renderHealthTabsBar(container, activeRoute, { cycleEnabled });
+  renderHealthTabsBar(container, activeRoute, { cycleEnabled, fastingEnabled });
   updateHealthFab(activeRoute);
   maybeMountOverview(activeRoute);
   maybeMountVitals(activeRoute);
   maybeMountCycle(activeRoute);
+  maybeMountFasting(activeRoute);
   maybeMountMeds(activeRoute);
   maybeMountLabs(activeRoute);
   maybeMountActivity(activeRoute);
@@ -408,11 +423,12 @@ export async function update({ path, user } = {}) {
   const activeRoute = normalizeHealthPath(path || window.location.pathname);
 
   _container.querySelector('.sub-tabs-bar')?.remove();
-  renderHealthTabsBar(_container, activeRoute, { cycleEnabled });
+  renderHealthTabsBar(_container, activeRoute, { cycleEnabled, fastingEnabled });
   updateHealthFab(activeRoute);
   maybeMountOverview(activeRoute);
   maybeMountVitals(activeRoute);
   maybeMountCycle(activeRoute);
+  maybeMountFasting(activeRoute);
   maybeMountMeds(activeRoute);
   maybeMountLabs(activeRoute);
   maybeMountActivity(activeRoute);
@@ -4130,6 +4146,17 @@ function maybeMountCycle(activeRoute) {
   if (cycle.root === root && cycle.loaded) return;
   cycle.root = root;
   mountCycle();
+}
+
+function maybeMountFasting(activeRoute) {
+  if (activeRoute !== '/health/fasting' || !fastingEnabled) return;
+  const root = _container?.querySelector('[data-fasting-root]');
+  if (!root) return;
+  root.dataset.fastingMounted = 'true';
+  import('/pages/health-fasting.js').then(({ mountFasting }) => mountFasting(root, { userId: vitals.meId })).catch((error) => {
+    root.replaceChildren();
+    root.insertAdjacentHTML('beforeend', `<div class="fasting-panel__error" role="alert"><h3>${esc(t('health.fasting.loadError'))}</h3><p>${esc(error?.message || '')}</p></div>`);
+  });
 }
 
 function cycleSkeletonMarkup() {

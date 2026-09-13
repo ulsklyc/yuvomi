@@ -12,11 +12,13 @@ import { syncAllBirthdayReminders } from '../services/birthdays.js';
 import { fanOutEventReminders, eventAuthorId } from '../services/event-reminder-fanout.js';
 import { deniedModules } from '../permissions.js';
 import { tokenAllows } from '../scopes.js';
+import { reminderPayload } from '../services/notifications.js';
+import { resolveHouseholdLocale } from '../utils/i18n.js';
 
 const log    = createLogger('Reminders');
 const router = express.Router();
 
-const VALID_ENTITY_TYPES = ['task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry'];
+const VALID_ENTITY_TYPES = ['task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'fasting_goal', 'fasting_next_start'];
 
 /**
  * Nach jedem Schreibvorgang an den Erinnerungen eines Termins: die Zugewiesenen
@@ -83,7 +85,7 @@ function syncEventFanout(entityType, entityId, userId) {
  * Die LESEWEGE (GET) kennen alle Typen weiter: der Erinnerungs-Toast muss eine
  * abgeleitete Meldung anzeigen und wegwischen können.
  */
-const DERIVED_ENTITY_TYPES = ['pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry'];
+const DERIVED_ENTITY_TYPES = ['pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'fasting_goal', 'fasting_next_start'];
 
 /* DIESER ROUTER IST EINE MISCHSTELLE, UND SEIN PFAD SAGT DAS NICHT.
  *
@@ -119,6 +121,8 @@ const ORIGIN_MODULE = Object.freeze({
   cycle_log_nudge:        'health',
   schedule_entry:         'schedule',
   schedule_extra_entry:   'schedule',
+  fasting_goal:           'health',
+  fasting_next_start:     'health',
 });
 
 /**
@@ -200,7 +204,12 @@ router.get('/pending', (req, res) => {
       ORDER BY r.remind_at ASC
     `).all(userId, now, ...origins);
 
-    res.json({ data: rows });
+    const locale = resolveHouseholdLocale(db.get());
+    res.json({ data: rows.map((row) => {
+      if (row.entity_type !== 'fasting_goal' && row.entity_type !== 'fasting_next_start') return row;
+      const payload = reminderPayload(row, locale);
+      return { ...row, notification_title: payload.title, notification_body: payload.body, target_url: payload.url };
+    }) });
   } catch (err) {
     log.error('Error loading due reminders:', err.message);
     res.status(500).json({ error: 'Internal error.', code: 500 });

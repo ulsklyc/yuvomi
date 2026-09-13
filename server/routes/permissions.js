@@ -18,9 +18,17 @@ import {
   replaceSubjectPermissions,
   isValidFamilyRole,
 } from '../permissions.js';
+import { syncFastingRemindersForUser } from '../services/fasting-reminders.js';
 
 const log = createLogger('Permissions');
 const router = express.Router();
+
+function syncFastingForUsers(userIds) {
+  const database = db.get();
+  for (const userId of userIds) {
+    try { syncFastingRemindersForUser(database, userId); } catch (error) { log.warn(`Fasting reminder sync failed for user ${userId}:`, error?.message || error); }
+  }
+}
 
 // requireAuth + csrfMiddleware werden global in server/index.js angewandt.
 router.use(requireAdmin);
@@ -78,6 +86,7 @@ router.put('/role/:familyRole', (req, res) => {
       return res.status(400).json({ error: 'Invalid family role.', code: 400 });
     }
     const data = replaceSubjectPermissions(db.get(), 'role', familyRole, req.body || {});
+    syncFastingForUsers(db.get().prepare('SELECT id FROM users WHERE family_role = ?').all(familyRole).map((row) => row.id));
     res.json({ data });
   } catch (err) {
     if (/Unknown|Invalid/.test(err.message)) {
@@ -122,6 +131,7 @@ router.put('/user/:userId', (req, res) => {
       return res.status(400).json({ error: 'Administrators always have full access; per-member restrictions do not apply.', code: 400 });
     }
     const data = replaceSubjectPermissions(db.get(), 'user', userId, req.body || {});
+    syncFastingForUsers([userId]);
     res.json({ data });
   } catch (err) {
     if (/Unknown|Invalid/.test(err.message)) {

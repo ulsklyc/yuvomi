@@ -2488,6 +2488,98 @@ like `apple_app_password` and Google OAuth tokens; encryption-at-rest is via the
 
 ### Health (migration 65)
 
+#### Fasting journal (migrations 197 and 198)
+
+`/health/fasting` requires `health_use_fasting` and Health module access. The MVP
+provides own-person controls and a family read selector. Other-person views are
+read-only in the UI, including for caregivers. The API retains explicit Health
+caregiver grants: both people need the fasting capability, and mutations require
+the caller's Health write access. Admin status does not replace a caregiver grant.
+Family readers see family-visible records; owners and granted caregivers may read
+private records. Ungranted readers receive null settings and acknowledgement.
+Personal settings are owner-only; caregivers may acknowledge safety via the API.
+
+`health_fasts` (migration 197) stores actual intervals:
+
+| Column | Type | Contract |
+|---|---|---|
+| id | INTEGER | Primary key |
+| user_id | INTEGER | Required owner; user deletion cascades |
+| start_at, end_at | TEXT | Canonical UTC instants; null end means active |
+| start_tzid | TEXT | Captured runtime-supported IANA zone |
+| goal_minutes | INTEGER | Nullable; whole hours from 60 to 20160 minutes |
+| rating | INTEGER | Nullable subjective value 1 through 5 |
+| note | TEXT | Nullable; at most 2000 characters |
+| visibility | TEXT | private or family |
+| revision | INTEGER | Starts at 1; increments on mutation |
+| created_by, updated_by | INTEGER | Required on write; actor deletion sets null |
+| created_at, updated_at | TEXT | UTC audit timestamps |
+
+`idx_health_fasts_one_active` is a partial unique index per owner. Service-owned
+immediate transactions validate overlap/revision and perform writes and reminder
+reconciliation atomically. End must follow start; neither may be in the future.
+Actual duration is unbounded and uses UTC elapsed time across DST. Ordinary edits
+retain the captured zone and unchanged timestamp precision. Repeated local hours
+retain the original offset; missing spring-forward times are rejected.
+
+`health_fasting_settings` (migration 197) is keyed by user_id with cascading owner
+deletion. It holds nullable default_goal_minutes, zone_mode (`timer`/`educational`),
+safety_acknowledged_at, nullable safety_acknowledged_by (actor deletion sets null),
+and timestamps. Migration 198 adds remind_goal and remind_next_start, both off by
+default. clock_mode (`auto`/`elapsed`/`remaining`) lives in sync_config under
+`fasting_clock_mode:user:<id>`. Missing settings mean no goal, timer mode and no
+acknowledgement. Visibility defaults use health_visibility_defaults scope `fasting`,
+default private, with the existing own-record bulk visibility action.
+
+The page supports immediate/earlier start, completed backfill, active-start
+correction, and completed-record edits. First creation requires explicit safety
+acknowledgement on the page: Yuvomi records fasting and is not a
+medical device or medical advice. Finish persists before the optional summary;
+closing it keeps the fast completed. Undo end PATCHes end_at:null with the returned
+revision. Deletion uses the shared undoable-delete window. Offline display keeps
+ticking; writes require connection. Resume and route re-entry refresh authoritative
+state, retaining the same person's clock if that refresh fails.
+
+Presets are 12:12, 14:10, 15:9, 16:8, 18:6, 20:4 and 23:1, plus no goal or whole
+hours up to 336. Page goal changes update the active goal and future default
+together without changing start or completed history. API callers may update only
+the default by omitting active_id. Supplying active_id (null when none) checks active
+identity; an active row also requires expected_revision. The dial separates up to
+fourteen days and collapses further visual days while retaining exact duration.
+Reaching a goal never stops the timer. Optional broad educational phases overlap
+on day one and have a text legend/dialog; they do not assert measured metabolism
+or benefits from longer fasting. Active metadata shows recorded-zone start/target.
+
+History uses keyset pages (default 10, maximum 100), ordered by start_at DESC,
+id DESC. Both before_at and before_id come from next_cursor. GET /fasting aliases
+/fasting/history. user_id/from/to apply to history and CSV; from/to are inclusive
+YYYY-MM-DD completion dates in each record's captured zone. Invalid/reversed dates
+return 400 FASTING_DATE_RANGE_INVALID. CSV columns are start_at,end_at,start_tzid,
+duration_minutes,goal_minutes,goal_reached,rating,note,visibility, with spreadsheet
+formula-safe escaping. Revision conflicts return numeric code 409 and separate
+reason FASTING_REVISION_CONFLICT, FASTING_ACTIVE_EXISTS or FASTING_OVERLAP; current
+contains a conflicting row where available. Missing acknowledgement returns
+FASTING_ACK_REQUIRED. POST retries use Idempotency-Key. API data is not SW-cached.
+
+Fasting insights use completed records only. All-time/calendar-year/rolling-30-day
+summaries contain count, totalMinutes and averageMinutes. Completion dates use each
+record's zone; today/year boundaries use the household display_tzid. A completed
+fast reaching its captured goal credits ceil(actual duration / 24 hours) dates
+ending on completion. Overlapping credits count once; interval merging avoids
+per-day allocation. Current streak ends today/yesterday; longest is historical.
+Weekly buckets contain date,count,totalMinutes,nullable summed goalMinutes,
+goalCount,hasRecord. Missing days differ from completed sub-minute records; the
+chart shows actual/captured-goal values and partial goal coverage.
+
+Notifications are owner-only with independent retained preferences. Goal reached
+targets start_at + goal. Eligible completed fasts with goal below 24 hours schedule
+next start at end_at + (24 hours - goal); actual duration of 24 hours or more is
+excluded. A later fast cancels the prior next-start prompt. Missing reminders are
+created only for future targets; persisted due reminders retain delivery retries.
+Lifecycle/settings/permission changes reconcile immediately; periodic repair
+preserves unchanged delivery state. Polling/push share localized neutral text and
+the /health/fasting deep link.
+
 The Health module stores personal medical data per family member across seven tables (migration
 65) plus three menstrual-cycle tables (migration 71). Every owner-scoped table carries `user_id`
 (the owning member) and a `visibility` of `private` (owner only) or `family` (all members). Nested
