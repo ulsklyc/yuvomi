@@ -515,6 +515,8 @@ test('default-assignee-backfill - füllt nur unzugewiesene Termine aus Kalendern
     pushedGoogle: event('bf-pushed-google', { refId: google, source: 'google', targetGoogle: 'backfill-google' }),
     pushedCaldav: event('bf-pushed-caldav', { refId: caldav, targetCaldav: 'https://dav.example/backfill-a/', ownUid: true }),
     pushedApple:  event('bf-pushed-apple', { refId: apple, source: 'apple', ownUid: true }),
+    // Vor Migration 47 lud der Google-Outbound lokale Termine OHNE Ziel hoch.
+    legacyGoogle: event('bf-legacy-google', { refId: google, source: 'google' }),
     // Von Hand zugewiesen: beide Spalten gesetzt.
     manual:       event('bf-manual', { refId: caldav, assignedTo: ADMIN.id, rows: [ADMIN.id] }),
     // Nur eine der beiden Spalten - jede für sich zählt als Zuweisung.
@@ -525,6 +527,7 @@ test('default-assignee-backfill - füllt nur unzugewiesene Termine aus Kalendern
     local:        event('bf-local'),
     icsFeed:      event('bf-ics', { subId }),
   };
+  db.prepare('UPDATE calendar_events SET created_at = ? WHERE id = ?').run('2000-01-01T00:00:00Z', ids.legacyGoogle);
   // Die Erinnerung des Anlegers wandert mit der Zuweisung zur neuen Person (#921).
   db.prepare(`
     INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
@@ -563,6 +566,7 @@ test('default-assignee-backfill - füllt nur unzugewiesene Termine aus Kalendern
     assert.deepEqual(assignment(ids.pushedGoogle), { assignedTo: null, users: [] }, 'nach Google gepusht: Ziel bleibt stehen');
     assert.deepEqual(assignment(ids.pushedCaldav), { assignedTo: null, users: [] }, 'nach CalDAV gepusht: Ziel und eigene UID');
     assert.deepEqual(assignment(ids.pushedApple), { assignedTo: null, users: [] }, 'nach iCloud gepusht: eigene UID');
+    assert.deepEqual(assignment(ids.legacyGoogle), { assignedTo: null, users: [] }, 'Google-Termin von vor Migration 47 bleibt aussen vor');
     assert.deepEqual(db.prepare(`
       SELECT remind_at, dismissed FROM reminders
       WHERE entity_type = 'event' AND entity_id = ? AND created_by = ? ORDER BY remind_at
@@ -607,11 +611,46 @@ test('default-assignee-backfill - arbeitet in Happen und kommt trotzdem bis zum 
   `).run(`bf-batch-${n}`, ADMIN.id, refId).lastInsertRowid);
   try {
     // Andere Tests der Datei koennen Kandidaten hinterlassen: gemessen wird, dass alle drei gefuellt sind.
-    const assigned = await applyDefaultAssigneesToExisting(db, { batchSize: 1 });
+    const assigned = await applyDefaultAssigneesToExisting(db, undefined, { batchSize: 1 });
     assert.ok(assigned >= 3, `mindestens drei Happen, bekommen ${assigned}`);
     for (const id of ids) {
       assert.equal(db.prepare('SELECT assigned_to AS a FROM calendar_events WHERE id = ?').get(id).a, TOM.id);
     }
+  } finally {
+    db.prepare(`DELETE FROM calendar_events WHERE id IN (${ids.join(',')})`).run();
+    db.prepare('DELETE FROM external_calendars WHERE id = ?').run(refId);
+  }
+});
+
+test('default-assignee-backfill - arbeitet nur die bestätigte Liste ab und prüft jede Zeile erneut (#1154)', async () => {
+  const { applyDefaultAssigneesToExisting, listBackfillCandidates } = await import('../server/services/sync-assignment.js');
+  const refId = db.prepare(`
+    INSERT INTO external_calendars (source, external_id, name, default_assignee_user_id)
+    VALUES ('caldav', 'https://dav.example/backfill-snapshot/', 'Snapshot', ?)
+  `).run(TOM.id).lastInsertRowid;
+  const mk = (title) => db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, created_by, external_source, calendar_ref_id)
+    VALUES (?, '2035-05-01T10:00', ?, 'caldav', ?)
+  `).run(title, ADMIN.id, refId).lastInsertRowid;
+  const kept = mk('bf-snap-kept');
+  const handAssigned = mk('bf-snap-hand');
+  const ids = [kept, handAssigned];
+  try {
+    const snapshot = listBackfillCandidates(db).filter((c) => ids.includes(c.eventId));
+    assert.equal(snapshot.length, 2);
+
+    // Zwischen Bestätigung und Abarbeitung: eine Zuweisung von Hand und ein neuer Kandidat.
+    db.prepare('UPDATE calendar_events SET assigned_to = ? WHERE id = ?').run(MARIA.id, handAssigned);
+    db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(handAssigned, MARIA.id);
+    const arrived = mk('bf-snap-arrived');
+    ids.push(arrived);
+
+    const assigned = await applyDefaultAssigneesToExisting(db, snapshot, { batchSize: 1 });
+    assert.equal(assigned, 1, 'nur der unveraenderte Kandidat zaehlt');
+    const who = (id) => db.prepare('SELECT assigned_to AS a FROM calendar_events WHERE id = ?').get(id).a;
+    assert.equal(who(kept), TOM.id);
+    assert.equal(who(handAssigned), MARIA.id, 'die Hand gewinnt auch mitten im Lauf');
+    assert.equal(who(arrived), null, 'ein nachtraeglich hinzugekommener Kandidat war nicht bestaetigt');
   } finally {
     db.prepare(`DELETE FROM calendar_events WHERE id IN (${ids.join(',')})`).run();
     db.prepare('DELETE FROM external_calendars WHERE id = ?').run(refId);

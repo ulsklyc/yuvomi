@@ -11,6 +11,7 @@ import { requireAdmin } from '../../auth.js';
 import {
   applyDefaultAssigneesToExisting,
   countUnassignedMappedEvents,
+  listBackfillCandidates,
 } from '../../services/sync-assignment.js';
 
 const log = createLogger('Calendar');
@@ -247,13 +248,16 @@ router.post('/external-calendars/default-assignee-backfill', requireAdmin, async
     if (!Number.isInteger(expected) || expected < 0) {
       return res.status(400).json({ error: 'expected_count fehlt oder ist ungültig.', code: 400 });
     }
-    const current = countUnassignedMappedEvents(db.get());
-    if (current !== expected) {
+    // Gezählt und festgehalten im selben synchronen Schritt: genau diese Liste
+    // ist bestätigt, und nur sie wird abgearbeitet - auch wenn zwischen den
+    // Happen neue Kandidaten dazukommen.
+    const candidates = listBackfillCandidates(db.get());
+    if (candidates.length !== expected) {
       return res.status(409).json({
-        error: 'Die Termine haben sich seit der Zählung geändert.', code: 409, data: { count: current },
+        error: 'Die Termine haben sich seit der Zählung geändert.', code: 409, data: { count: candidates.length },
       });
     }
-    res.json({ data: { assigned: await applyDefaultAssigneesToExisting(db.get()) } });
+    res.json({ data: { assigned: await applyDefaultAssigneesToExisting(db.get(), candidates) } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });

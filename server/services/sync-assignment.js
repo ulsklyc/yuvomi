@@ -61,6 +61,14 @@ export function assignDefaultToEvent(d, eventId, userId) {
 // den jemand in Yuvomi in einen anderen Kalender verschoben hat, trägt ebenfalls
 // ein Ziel und bleibt damit aussen vor: an ihm hat schon eine Hand gearbeitet.
 //
+// Die eine Luecke dieser Spur: vor Migration 47 lud der Google-Outbound JEDEN
+// lokalen Termin in den einen Google-Kalender, ohne Ziel, und Migration 47 hat
+// target_google_calendar_id nicht nachgetragen. Solche Termine sehen aus wie
+// Importe. Google-Termine, die vor dem Einspielen von Migration 47 angelegt
+// wurden, bleiben deshalb ganz aussen vor - ein alter Import wird dabei
+// mitgenommen, aber uebersprungen ist die sichere Richtung. Die Tabellen-
+// Umbauten danach tragen created_at unveraendert mit.
+//
 // Geschrieben wird über setEventAssignments(), die eine Schreibstelle der
 // Zuweisung: sie verteilt die Erinnerungen des Anlegers an die neue Person
 // (#921) und gleicht die Dokumentrechte eines Anhangs an. Ein direktes INSERT
@@ -75,6 +83,8 @@ const UNASSIGNED_MAPPED_EVENTS = `
     AND e.target_google_calendar_id IS NULL
     AND e.target_caldav_calendar_url IS NULL
     AND COALESCE(e.external_calendar_id, '') <> ('oikos-' || e.id || '@oikos.local')
+    AND NOT (e.external_source = 'google' AND e.created_at < COALESCE(
+      (SELECT applied_at FROM schema_migrations WHERE version = 47), ''))
     AND e.assigned_to IS NULL
     AND NOT EXISTS (SELECT 1 FROM event_assignments ea WHERE ea.event_id = e.id)
 `;
@@ -92,9 +102,30 @@ export function countUnassignedMappedEvents(d) {
 const BACKFILL_BATCH_SIZE = 50;
 
 /**
+ * Die Kandidaten, wie sie JETZT sind: Termin und die Person seines Kalenders.
+ * Die Route vergleicht ihre Anzahl mit der bestätigten Zahl und reicht genau
+ * diese Liste an applyDefaultAssigneesToExisting() weiter.
+ *
+ * @param {object} d better-sqlite3 Datenbank-Handle
+ * @returns {{ eventId: number, userId: number }[]}
+ */
+export function listBackfillCandidates(d) {
+  return d.prepare(
+    `SELECT e.id AS eventId, ec.default_assignee_user_id AS userId ${UNASSIGNED_MAPPED_EVENTS} ORDER BY e.id`
+  ).all();
+}
+
+/**
  * Weist jedem noch unzugewiesenen Termin aus einem Kalender mit
  * Standard-Zuweisung diese Person zu. Idempotent: ein zweiter Lauf findet
  * nichts mehr.
+ *
+ * NUR DIE BESTÄTIGTE LISTE. Zwischen den Happen laufen andere Anfragen, auch ein
+ * Sync oder eine Zuweisung von Hand. Die Liste ist deshalb die bei der
+ * Bestätigung gezählte, und jede Zeile wird beim Schreiben erneut geprüft: ist
+ * der Termin inzwischen zugewiesen oder zeigt sein Kalender auf eine andere
+ * Person, bleibt er stehen; ein inzwischen neu hinzugekommener Kandidat wird
+ * nicht angefasst. Die Rückgabe zählt nur, was tatsächlich zugewiesen wurde.
  *
  * IN HAPPEN, NICHT IN EINER TRANSAKTION. Ein Haushalt mit Jahren an
  * iCloud-Historie hat Tausende Termine; gemessen blockierten 5000 Termine den
@@ -116,17 +147,21 @@ const BACKFILL_BATCH_SIZE = 50;
  * Erinnerungen hat, nimmt den teuren Weg gar nicht erst.
  *
  * @param {object} d better-sqlite3 Datenbank-Handle
+ * @param {{ eventId: number, userId: number }[]} [candidates] bestätigte Liste; Standard: die aktuelle
  * @param {{ batchSize?: number, now?: Date }} [options]
  * @returns {Promise<number>} Anzahl der zugewiesenen Termine
  */
-export async function applyDefaultAssigneesToExisting(d, { batchSize = BACKFILL_BATCH_SIZE, now = new Date() } = {}) {
+export async function applyDefaultAssigneesToExisting(
+  d,
+  candidates = listBackfillCandidates(d),
+  { batchSize = BACKFILL_BATCH_SIZE, now = new Date() } = {},
+) {
   const nowIso = now.toISOString();
-  const selectBatch = d.prepare(`
-    SELECT e.id AS eventId, ec.default_assignee_user_id AS userId,
+  const stillEligible = d.prepare(`
+    SELECT ec.default_assignee_user_id AS userId,
            e.created_by AS authorId, e.attachment_document_id AS documentId
     ${UNASSIGNED_MAPPED_EVENTS}
-    ORDER BY e.id
-    LIMIT ?
+      AND e.id = ?
   `);
   const setPrimary = d.prepare(
     'UPDATE calendar_events SET assigned_to = ? WHERE id = ? AND assigned_to IS NULL'
@@ -145,22 +180,25 @@ export async function applyDefaultAssigneesToExisting(d, { batchSize = BACKFILL_
   `);
 
   let assigned = 0;
-  for (;;) {
-    const count = d.transaction(() => {
-      const rows = selectBatch.all(batchSize);
-      for (const { eventId, userId, authorId, documentId } of rows) {
+  for (let start = 0; start < candidates.length; start += batchSize) {
+    const batch = candidates.slice(start, start + batchSize);
+    assigned += d.transaction(() => {
+      let written = 0;
+      for (const { eventId, userId } of batch) {
+        const row = stillEligible.get(eventId);
+        if (!row || row.userId !== userId) continue;
         setPrimary.run(userId, eventId);
-        if (documentId || (authorId !== null && hasFutureTemplate.get(eventId, authorId, nowIso))) {
+        if (row.documentId || (row.authorId !== null && hasFutureTemplate.get(eventId, row.authorId, nowIso))) {
           setEventAssignments(d, eventId, [userId]);
           settlePastInherited.run(eventId, userId, nowIso);
         } else {
           addAssignment.run(eventId, userId);
         }
+        written += 1;
       }
-      return rows.length;
+      return written;
     })();
-    assigned += count;
-    if (count < batchSize) return assigned;
-    await new Promise((resolve) => setImmediate(resolve));
+    if (start + batchSize < candidates.length) await new Promise((resolve) => setImmediate(resolve));
   }
+  return assigned;
 }
