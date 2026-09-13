@@ -4235,19 +4235,6 @@ async function openReadyNoteModal(page) {
   await new Promise((resolve) => setTimeout(resolve, 300));
 }
 
-async function activateNoteSave(page) {
-  // These probes exercise save ownership and request ordering, not toast
-  // geometry. A due reminder can legitimately cover the button's screen
-  // coordinates depending on the wall-clock date. HTMLElement.click() still
-  // drives the real control, respects its disabled state, and keeps the probe
-  // independent of unrelated seed reminders.
-  assert.equal(await page.$eval('#note-modal-save', (button) => {
-    if (button.disabled) return false;
-    button.click();
-    return true;
-  }), true, 'the note save button must be enabled before activation');
-}
-
 async function typeExactly(page, selector, value) {
   await page.type(selector, value);
   assert.equal(await page.$eval(selector, (field) => field.value), value);
@@ -4600,7 +4587,7 @@ test('Sonde 22 - Anlegen einer Kategorie blockiert Speichern und beruehrt keinen
     heldRequest = null;
     await page.waitForSelector(`[data-selected-category-id] .note-category-selection__name`);
     await page.waitForFunction(() => !document.querySelector('#note-modal-save')?.disabled);
-    await activateNoteSave(page);
+    await page.click('#note-modal-save');
     await page.waitForSelector('#shared-modal-overlay', { hidden: true });
 
     const persisted = await page.evaluate(async ({ title, categoryName }) => {
@@ -4776,7 +4763,7 @@ test('Sonde 23 - spaete Notizantworten respektieren Ersatz- und Bestaetigungsdia
     await typeExactly(page, '#note-content', successContent);
     await clearMatchingToast(page, { tone: 'success', text: 'Note created' });
     heldRequest = holdNextNoteSave(page);
-    await activateNoteSave(page);
+    await page.click('#note-modal-save');
     await heldRequest.seen;
     await discardOpenNoteEditor(page);
     await openReadyNoteModal(page);
@@ -4823,7 +4810,7 @@ test('Sonde 23 - spaete Notizantworten respektieren Ersatz- und Bestaetigungsdia
     await replaceExactly(page, '#note-content', 'This PUT is expected to fail after its editor closes.');
     await clearMatchingToast(page, { tone: 'danger', text: 'PUT note save delayed failure' });
     heldRequest = holdNextNoteSave(page, { method: 'PUT', noteId: failureFixture.id });
-    await activateNoteSave(page);
+    await page.click('#note-modal-save');
     await heldRequest.seen;
     await discardOpenNoteEditor(page);
     await openReadyNoteModal(page);
@@ -4868,7 +4855,7 @@ test('Sonde 23 - spaete Notizantworten respektieren Ersatz- und Bestaetigungsdia
     await replaceExactly(page, '#note-content', retryContent);
     await clearMatchingToast(page, { tone: 'danger', text: 'PUT note save delayed failure' });
     heldRequest = holdNextNoteSave(page, { method: 'PUT', noteId: failureFixture.id });
-    await activateNoteSave(page);
+    await page.click('#note-modal-save');
     await heldRequest.seen;
     await heldRequest.reject();
     heldRequest = null;
@@ -4882,7 +4869,7 @@ test('Sonde 23 - spaete Notizantworten respektieren Ersatz- und Bestaetigungsdia
 
     await clearMatchingToast(page, { tone: 'success', text: 'Note saved' });
     heldRequest = holdNextNoteSave(page, { method: 'PUT', noteId: failureFixture.id });
-    await activateNoteSave(page);
+    await page.click('#note-modal-save');
     await heldRequest.seen;
     await heldRequest.release();
     heldRequest = null;
@@ -4904,7 +4891,7 @@ test('Sonde 23 - spaete Notizantworten respektieren Ersatz- und Bestaetigungsdia
     await typeExactly(page, '#note-content', confirmationContent);
     await clearMatchingToast(page, { tone: 'success', text: 'Note created' });
     heldRequest = holdNextNoteSave(page);
-    await activateNoteSave(page);
+    await page.click('#note-modal-save');
     await heldRequest.seen;
     await page.keyboard.press('Escape');
     await page.waitForSelector('#confirm-modal-cancel');
