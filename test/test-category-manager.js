@@ -83,12 +83,25 @@ test('Notizen importieren die generische Komponente auch beim direkten Seitenauf
 });
 test('Notiz-Kategorien nutzen eine gemeinsame scope-fähige Eingabe und Scope-Icons', () => {
   assert(/unifiedAdd:\s*true/.test(notesPage), 'Notizen müssen genau eine gemeinsame Add-Eingabe konfigurieren');
-  assert(/addMaxLength:\s*80/.test(notesPage), 'Die Manager-Eingabe muss denselben 80-Zeichen-Vertrag wie die Notes-API nutzen');
   assert(/groupField:\s*'scope'/.test(notesPage), 'Notizen müssen scope als Gruppen- und Request-Feld konfigurieren');
   assert(/rowIconResolver/.test(notesPage), 'Notizen müssen persönliche und Haushaltskategorien per Icon unterscheiden');
   assert(/addScopeHelpKey/.test(notesPage), 'Die Scope-Wahl braucht einen erklärenden Tooltip');
   assert(/this\._unifiedAdd/.test(comp), 'Category Manager muss den gemeinsamen Add-Modus unterstützen');
   assert(/this\._rowIconResolver/.test(comp), 'Category Manager muss opt-in Scope-Icons unterstützen');
+});
+test('Notiz-Kategorie-Picker und Manager verwenden den gemeinsamen Namensvertrag', () => {
+  assert(
+    /import\s*\{\s*NOTE_CATEGORY_NAME_MAX_LENGTH\s*\}\s*from\s*'\/utils\/note-category-name\.js'/.test(notesPage),
+    'notes.js muss den gemeinsamen Namensvertrag importieren',
+  );
+  assert(
+    /id="note-category-search"\s+maxlength="\$\{NOTE_CATEGORY_NAME_MAX_LENGTH\}"/.test(notesPage),
+    'Der Picker muss maxlength aus dem gemeinsamen Vertrag lesen',
+  );
+  assert(
+    /addMaxLength:\s*NOTE_CATEGORY_NAME_MAX_LENGTH/.test(notesPage),
+    'Der Manager muss addMaxLength aus dem gemeinsamen Vertrag lesen',
+  );
 });
 test('Scope-Tooltip und Berechtigungs-Einzüge funktionieren auch in RTL-Sprachen', () => {
   assert(/inset-inline-end:\s*0/.test(compCss), 'Tooltip muss logisch am Inline-Ende verankert sein');

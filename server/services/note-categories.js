@@ -4,7 +4,10 @@
  *        haushaltsweite Kategorien an einer zentralen Stelle erzwingen.
  */
 
-import { categoryNameKey } from '../../public/utils/note-category-name.js';
+import {
+  categoryNameKey,
+  NOTE_CATEGORY_NAME_MAX_LENGTH,
+} from '../../public/utils/note-category-name.js';
 export { categoryNameKey };
 
 export class NoteCategoryInputError extends Error {
@@ -123,8 +126,10 @@ export function replaceEditableAssignments(database, {
 export function validateCategoryName(value) {
   if (typeof value !== 'string') throw new NoteCategoryInputError('Category name is required');
   const name = value.trim();
-  if (!name || name.length > 80) {
-    throw new NoteCategoryInputError('Category name must contain 1 to 80 characters');
+  if (!name || name.length > NOTE_CATEGORY_NAME_MAX_LENGTH) {
+    throw new NoteCategoryInputError(
+      `Category name must contain 1 to ${NOTE_CATEGORY_NAME_MAX_LENGTH} characters`,
+    );
   }
   return name;
 }

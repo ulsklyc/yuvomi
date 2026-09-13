@@ -30,6 +30,7 @@ import {
   findExactCategory,
   moveCategoryPickerOption,
 } from '/utils/note-category-picker.js';
+import { NOTE_CATEGORY_NAME_MAX_LENGTH } from '/utils/note-category-name.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -575,7 +576,7 @@ function renderCategoryEditor(selectedIds = []) {
       </div>
       <div class="note-category-picker">
         <div class="note-category-picker__combobox">
-          <input type="text" class="form-input" id="note-category-search" maxlength="80"
+          <input type="text" class="form-input" id="note-category-search" maxlength="${NOTE_CATEGORY_NAME_MAX_LENGTH}"
                  placeholder="${esc(t('noteCategories.searchPlaceholder'))}" role="combobox"
                  aria-autocomplete="list" aria-expanded="false" aria-controls="note-category-suggestions"
                  autocomplete="off">
@@ -1174,7 +1175,7 @@ function openNoteCategoryManager() {
           : 'noteCategories.personalManagementHint',
         deleteDetailKey: 'noteCategories.deleteDetail',
         unifiedAdd: true,
-        addMaxLength: 80,
+        addMaxLength: NOTE_CATEGORY_NAME_MAX_LENGTH,
         rowIconResolver: (item) => item.scope === 'personal' ? 'user' : 'home',
         addScopeLabelKey: 'noteCategories.scopeLabel',
         addScopeHelpKey: 'noteCategories.scopeHelp',

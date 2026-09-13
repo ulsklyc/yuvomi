@@ -7,6 +7,7 @@ import {
   pruneMissingNoteCategoryIds,
   removeNoteCategoryFromState,
 } from '../public/utils/note-category-filter.js';
+import * as noteCategoryNameContract from '../public/utils/note-category-name.js';
 import { categoryNameKey } from '../server/services/note-categories.js';
 import { schemas as openApiSchemas } from '../server/openapi/schemas.js';
 import { notesPaths as buildNotePaths } from '../server/openapi/paths/notes.js';
@@ -474,6 +475,19 @@ test('OpenAPI documents note category payloads and permission capabilities', () 
 
   assert.deepEqual(openApiSchemas.NoteCreateInput.required, ['content']);
   assert.equal(openApiSchemas.NoteCategoryRenameInput.properties.scope, undefined);
+  for (const schemaName of ['NoteCategory', 'NoteCategoryInput', 'NoteCategoryRenameInput']) {
+    assert.equal(
+      openApiSchemas[schemaName].properties.name.maxLength,
+      noteCategoryNameContract.NOTE_CATEGORY_NAME_MAX_LENGTH,
+      `${schemaName} must use the shared note category name limit`,
+    );
+  }
+  assert.match(schemas, /import\s*\{\s*NOTE_CATEGORY_NAME_MAX_LENGTH\s*\}\s*from\s*'\.\.\/\.\.\/public\/utils\/note-category-name\.js'/);
+  assert.equal(
+    (schemas.match(/maxLength:\s*NOTE_CATEGORY_NAME_MAX_LENGTH/g) || []).length,
+    3,
+    'all three note category name schemas must reference the shared limit',
+  );
   const paths = buildNotePaths();
   assert.equal(paths['/api/v1/notes'].post.requestBody.content['application/json'].schema.$ref, '#/components/schemas/NoteCreateInput');
   assert.equal(paths['/api/v1/notes/{id}'].put.requestBody.content['application/json'].schema.$ref, '#/components/schemas/NoteUpdateInput');
