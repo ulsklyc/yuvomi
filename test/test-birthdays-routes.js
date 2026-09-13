@@ -512,3 +512,46 @@ test('Stichtag und Erinnerung folgen der Haushaltszone, nicht der des Servers', 
     db.prepare('DELETE FROM birthdays WHERE id = ?').run(rowId);
   }
 });
+
+// Eine verworfene Geburtstagserinnerung kam zurueck: `syncBirthdayReminder`
+// suchte nur UNverworfene Zeilen, fand nach dem Verwerfen keine, loeschte alles
+// und legte dieselbe Erinnerung unverworfen neu an. `GET /reminders/pending`
+// gleicht bei jedem Poll ab, also stand sie nach einer Minute wieder da, und der
+// Push-Scheduler sah ein leeres `pushed_at`. Gefunden am 13.09.2026 beim
+// Handlauf-Fix zu #1160. Verglichen wird relativ zur ersten Zeile, damit die
+// Maschinenzone der Suite hier keine Rolle spielt.
+test('eine verworfene Geburtstagserinnerung bleibt verworfen, bis sich ihr Termin aendert', () => {
+  const rowId = db.prepare(`
+    INSERT INTO birthdays (name, birth_date, reminder_offset, created_by) VALUES (?, ?, '1440', ?)
+  `).run('Verwerfprobe', '1990-03-10', USER).lastInsertRowid;
+  const ON_BIRTHDAY = new Date('2026-03-10T12:00:00Z');
+  const sync = () => syncBirthdayArtifacts(db, db.prepare('SELECT * FROM birthdays WHERE id = ?').get(rowId), ON_BIRTHDAY);
+  const rows = (eventId) => db.prepare(`
+    SELECT id, remind_at, dismissed, pushed_at FROM reminders
+    WHERE entity_type = 'event' AND entity_id = ? AND created_by = ? ORDER BY id
+  `).all(eventId, USER);
+
+  try {
+    const { calendar_event_id: eventId } = sync();
+    assert.ok(eventId, 'Fixture: der Geburtstag hat einen Kalendertermin');
+    const [first, ...rest] = rows(eventId);
+    assert.equal(rest.length, 0, 'Fixture: genau eine Erinnerung');
+
+    const PUSHED = '2026-03-09T12:00:00.000Z';
+    db.prepare('UPDATE reminders SET dismissed = 1, pushed_at = ? WHERE id = ?').run(PUSHED, first.id);
+    sync();
+    assert.deepEqual(rows(eventId), [{ ...first, dismissed: 1, pushed_at: PUSHED }],
+      'derselbe Termin: die verworfene Zeile bleibt, und keine unverworfene kommt daneben');
+
+    // Aendert sich der Termin der Erinnerung, ist es eine neue Erinnerung.
+    db.prepare("UPDATE birthdays SET reminder_offset = '2880' WHERE id = ?").run(rowId);
+    sync();
+    const [moved, ...others] = rows(eventId);
+    assert.equal(others.length, 0, 'der alte Termin wird ersetzt, nicht ergaenzt');
+    assert.notEqual(moved.remind_at, first.remind_at);
+    assert.equal(moved.dismissed, 0, 'ein anderer Vorlauf erinnert neu');
+  } finally {
+    deleteBirthdayArtifacts(db, db.prepare('SELECT * FROM birthdays WHERE id = ?').get(rowId));
+    db.prepare('DELETE FROM birthdays WHERE id = ?').run(rowId);
+  }
+});

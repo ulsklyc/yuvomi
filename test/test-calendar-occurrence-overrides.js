@@ -35,7 +35,9 @@ import {
 import {
   expandRecurringEvents, MAX_EXPANSION_ITERATIONS,
 } from '../server/services/calendar-events.js';
-import { expandAndResolveEventRows, eventProjectionSql } from '../server/services/calendar-event-reader.js';
+import {
+  BODY_FREE_EVENT_COLUMNS, expandAndResolveEventRows, eventProjectionSql,
+} from '../server/services/calendar-event-reader.js';
 
 const { serializeEvent, serializeEvents } = await import('../server/routes/calendar/helpers.js');
 const { __test: appleCalendarTest } = await import('../server/services/apple-calendar.js');
@@ -71,6 +73,29 @@ test('event projection reads calendar columns once per database connection', () 
   assert.equal(eventProjectionSql(database, 'a'), 'a.id,\n           a.title');
   assert.equal(eventProjectionSql(database, 'b'), 'b.id,\n           b.title');
   assert.equal(pragmaReads, 1);
+});
+
+// #1155: BODY_FREE_EVENT_COLUMNS is a hand-maintained mirror of calendar_events.
+// eventProjectionSql() silently drops listed columns the schema lacks, but it
+// cannot add a column the list lacks: a migration that adds one would vanish
+// from /calendar/upcoming, the dashboard tile and the ICS feed with no test red.
+test('body-free event projection mirrors every calendar_events column but the inline attachment body', async () => {
+  const { get } = await import('../server/db.js');
+  // Deliberate exclusion, not an oversight: legacy inline attachment bodies can
+  // be megabytes and never belong in a compact read path.
+  const EXCLUDED = ['attachment_data'];
+  const schema = get().prepare('PRAGMA table_info(calendar_events)').all()
+    .map((column) => column.name);
+  assert.ok(EXCLUDED.every((name) => schema.includes(name)),
+    'an excluded column that no longer exists should leave the exclusion list');
+  assert.equal(new Set(BODY_FREE_EVENT_COLUMNS).size, BODY_FREE_EVENT_COLUMNS.length,
+    'a column listed twice would be selected twice');
+  assert.deepEqual(
+    [...BODY_FREE_EVENT_COLUMNS].sort(),
+    schema.filter((name) => !EXCLUDED.includes(name)).sort(),
+    'a new calendar_events column must be added to BODY_FREE_EVENT_COLUMNS on purpose '
+      + '(server/services/calendar-event-reader.js), or named in EXCLUDED with a reason',
+  );
 });
 
 function createDatabase() {

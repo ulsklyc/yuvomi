@@ -249,7 +249,16 @@ const TAB_CAPS = {
   'subscriptions':  { month: false, note: 'budget.periodNoteSubscriptions', add: 'subscriptions.add' },
   'loans':          { month: false, note: 'budget.periodNoteLoans',         add: 'budget.newLoan' },
   'reports':        { month: true,  range: true, add: null },
-  'split-expenses': { month: false, note: 'budget.periodNoteSplit',         add: 'splitExpenses.addExpense' },
+  // `add: null` wie Berichte: Split-Ausgaben bringt seine eigene Primaeraktion
+  // mit (Kopfknopf + FAB in split-expenses.js). Vorher stand hier derselbe
+  // Aktionsname wie im eingebetteten Kopf, und der generische Kopfknopf UND
+  // der generische FAB dieser Seite delegierten beide per Klick an
+  // #split-add-expense - macht mit dem eigenen Kopfknopf und dem eigenen FAB
+  // der Unterseite VIER Ausloeser fuer dieselbe Handlung (Cross-Modul-Review:
+  // "drei violette Add-Knoepfe zugleich"). Split-Ausgaben ist das einzige
+  // Sub-Tab mit eigenem Primaerknopf/-FAB; die anderen sechs teilen sich
+  // Budgets generische Knoepfe, weil sie keinen eigenen mitbringen.
+  'split-expenses': { month: false, note: 'budget.periodNoteSplit',         add: null },
 };
 
 // Sentinel für „keine eigene Farbe" im Kontofarb-Wähler: der echte Wert ist der
@@ -567,11 +576,11 @@ function wireNav() {
       renderBody();
     },
   });
-  // Neu-Aktion je Tab — spiegelt TAB_CAPS.add. Tabs ohne Neu-Aktion (Berichte)
+  // Neu-Aktion je Tab — spiegelt TAB_CAPS.add. Tabs ohne Neu-Aktion (Berichte,
+  // Split-Ausgaben - die Unterseite bringt ihren eigenen Kopfknopf/FAB mit)
   // blenden beide Auslöser aus, der Handler bleibt dort folgenlos.
   const addHandler = () => {
     switch (state.activeTab) {
-      case 'split-expenses': _container.querySelector('#split-add-expense')?.click(); return;
       case 'subscriptions':  openSubscriptionModal(); return;
       case 'plan':           _container.querySelector('#budget-plan-add')?.click(); return;
       case 'accounts':       openAccountModal(); return;

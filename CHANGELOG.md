@@ -16,6 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   badges stay on one line; a +N control reveals and correctly announces the remaining categories on
   hover, focus or tap, and category icons remain intact after switching between reading and editing.
 
+- **The holiday country list now includes the United States, Canada, the United Kingdom, Australia
+  and New Zealand** (#965). OpenHolidays, the free API behind Settings → Calendar's holiday sync,
+  doesn't cover these five - their public holidays are computed locally instead (fixed dates,
+  n-th-weekday rules, Easter offsets, and each country's own documented weekend-observance rule),
+  the same approach already used for Brazil. The United Kingdom is offered as three regions -
+  England & Wales, Scotland, and Northern Ireland - since their holidays genuinely differ, not just
+  their names. None of the five has school-holiday data available, so the school-holiday toggle is
+  disabled with an explanation when one of them is selected, rather than silently syncing nothing.
+  For any other country not covered by OpenHolidays or this local list, an ordinary ICS calendar
+  subscription (Settings → Personal → Calendar subscriptions) can still bring in its public
+  holidays - now mentioned there directly.
+
 - **A new event goes to the calendar of the person it is assigned to** (#1060). A Google or CalDAV
   calendar that names a default assignee in the sync settings now works in both directions: events
   imported from it get that person, and a new event assigned to exactly that person gets that
@@ -199,6 +211,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The delete dialog is unchanged: "Delete entire series" already says it.
 
 ### Fixed
+
+- **Split Expenses no longer shows three ways to add an expense at once, or a second page title
+  under Budget's own heading.** Viewed as Budget's Split Expenses tab, the tab used to offer its own
+  header button and its own floating button for adding an expense, on top of Budget's own generic
+  toolbar button and FAB - both of the latter only ever repeated the tab's own button under the
+  hood. Budget's generic add action is now switched off for this tab, the same way it already is for
+  Reports; the tab's own floating button is the one primary action, and its header button steps back
+  to a secondary one. The tab's own `<h1>` - a second page title stacked under Budget's - is now a
+  section heading instead, matching how it already looked in a lighter type size. Deleting a group
+  now gets the same restrained red treatment used for a destructive action elsewhere in the app,
+  instead of looking identical to editing or archiving it.
+
+- **The demo data's birthday reminders now come days ahead, not minutes before noon on the day.**
+  The demo seed wrote reminder lead times as `1d`, `3d` and `1w`, while Yuvomi stores them as
+  minutes and reads only the leading digits, so they became one minute, three minutes and one
+  minute again: every demo birthday reminded shortly before noon on the birthday itself, and the
+  birthday form showed a lead time it does not offer.
+  The seed now uses the form's own values (a day, two days, a week - the former three days became
+  two), and a guard keeps it to those. Only a database filled by `scripts/seed-demo.js` is
+  affected.
+
+- **A dismissed birthday reminder stays dismissed.** Dismissing a due birthday reminder only lasted
+  until the next check: the sync that keeps a birthday's reminder in step looked for an active row,
+  found none, removed the dismissed one and created the same reminder again - so it was back within
+  a minute, and could be pushed a second time. The reminder now stays dismissed until its time
+  actually changes: a different lead time, a changed date, or next year's birthday.
 
 - **A housekeeper can check out again, and work a second session on the same day** (#1133, #1138).
   The one button that carries both directions was disabled while someone was checked in, and it is

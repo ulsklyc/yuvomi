@@ -50,22 +50,57 @@ async function apiFetch(path) {
 
 /**
  * Alle verfügbaren Länder abrufen.
- * @returns {Promise<Array<{isoCode: string, name: string}>>}
+ *
+ * ZUSAETZLICH ZU OPENHOLIDAYS: ein paar Laender fuehrt OpenHolidays selbst
+ * nicht (#965 - u. a. die USA fehlten ganz), obwohl ihre Feiertage sich ohne
+ * Fremd-API aus reiner Datumsarithmetik herleiten lassen (LOCAL_COUNTRIES
+ * weiter unten). Die liefert die API selbst nachtraeglich, gewinnt der
+ * API-Eintrag - unsere Liste ist ein Zusatz, keine Kopie. Jeder lokale
+ * Eintrag traegt `schoolHolidays: false`: es gibt fuer keinen von ihnen eine
+ * Datenquelle fuer Schulferien (die sind in den betroffenen Laendern
+ * regional/bezirksweise geregelt, nicht national einheitlich), und das
+ * Frontend nutzt das Feld, um den Schulferien-Schalter dafuer ehrlich
+ * auszugrauen statt eine leere Ebene stillschweigend nichts synchronisieren
+ * zu lassen.
+ * @returns {Promise<Array<{isoCode: string, name: string, schoolHolidays?: boolean}>>}
  */
 async function getCountries() {
-  const raw = await apiFetch('/Countries');
-  return (raw ?? []).map((c) => ({
+  // FAELLT DIE API AUS, BLEIBEN DIE LOKALEN LAENDER WAEHLBAR (Review-Fund zu
+  // #965): ohne diesen Fang wurde aus dem Fetch-Fehler ein 502 der Route, das
+  // Frontend fiel auf eine leere Liste zurueck - und ausgerechnet die Laender,
+  // die gar kein Netz brauchen, waren nicht mehr auswaehlbar. Ein Ausfall der
+  // Fremd-API kostet dann nur deren eigene 36 Eintraege, nicht die lokalen.
+  let raw = [];
+  try {
+    raw = await apiFetch('/Countries');
+  } catch (err) {
+    log.warn(`Fetch /Countries failed (${err.message}) - serving the locally computed countries only`);
+    raw = [];
+  }
+  const apiCountries = (raw ?? []).map((c) => ({
     isoCode: c.isoCode,
     name: resolveName(c.name),
-  })).sort((a, b) => a.name.localeCompare(b.name));
+  }));
+  const apiCodes = new Set(apiCountries.map((c) => c.isoCode));
+  const local = Object.keys(LOCAL_COUNTRIES)
+    .filter((isoCode) => !apiCodes.has(isoCode))
+    .map((isoCode) => ({ isoCode, name: LOCAL_COUNTRIES[isoCode].name, schoolHolidays: false }));
+  return [...apiCountries, ...local].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
  * Unterteilungen (Bundesländer etc.) für ein Land abrufen.
+ *
+ * GB fuehrt OpenHolidays selbst nicht (siehe getCountries) - die vier
+ * britischen Nationen unterscheiden sich in ihren Feiertagen zu stark fuer
+ * eine gemeinsame Landesliste (Schottland kennt z. B. keinen Ostermontag,
+ * Nordirland zwei zusaetzliche Feiertage), daher werden sie hier synthetisch
+ * als Subdivisionen gefuehrt statt die API zu befragen.
  * @param {string} countryIsoCode z.B. 'DE'
  * @returns {Promise<Array<{isoCode: string, name: string}>>}
  */
 async function getSubdivisions(countryIsoCode) {
+  if (countryIsoCode === 'GB') return GB_SUBDIVISIONS.slice();
   const raw = await apiFetch(`/Subdivisions?countryIsoCode=${encodeURIComponent(countryIsoCode)}`);
   return (raw ?? []).map((s) => ({
     isoCode: s.isoCode ?? s.code,
@@ -86,6 +121,10 @@ async function getSubdivisions(countryIsoCode) {
  * @returns {Promise<Array<{code: string, name: string}>>}
  */
 async function getGroups(countryIsoCode, subdivisionCode) {
+  // GB hat keine Schulferien-Gruppen (kein Datenanbieter, siehe getCountries)
+  // - ein Abruf gegen die echte API mit einem erfundenen Laendercode waere
+  // sinnlos und koennte nur einen Fehlschlag ernten.
+  if (countryIsoCode === 'GB') return [];
   const raw = await apiFetch(`/Subdivisions?countryIsoCode=${encodeURIComponent(countryIsoCode)}`);
   const match = (raw ?? []).find((s) => (s.code ?? s.isoCode) === subdivisionCode);
   const groups = Array.isArray(match?.groups) ? match.groups : [];
@@ -151,56 +190,370 @@ function easterSunday(year) {
   return utcDate(year, month, day);
 }
 
-function localizedBrazilHolidayName(key, langCode) {
-  const names = {
-    universalBrotherhood: { PT: 'Confraternização Universal', EN: 'Universal Brotherhood Day' },
-    goodFriday:           { PT: 'Sexta-feira Santa', EN: 'Good Friday' },
-    tiradentes:           { PT: 'Tiradentes', EN: 'Tiradentes Day' },
-    labourDay:            { PT: 'Dia do Trabalho', EN: 'Labour Day' },
-    independence:         { PT: 'Independência do Brasil', EN: 'Independence Day' },
-    aparecida:            { PT: 'Nossa Senhora Aparecida', EN: 'Our Lady of Aparecida' },
-    allSouls:             { PT: 'Finados', EN: "All Souls' Day" },
-    republic:             { PT: 'Proclamação da República', EN: 'Republic Proclamation Day' },
-    blackConsciousness:   { PT: 'Dia Nacional de Zumbi e da Consciência Negra', EN: 'National Zumbi and Black Consciousness Day' },
-    christmas:            { PT: 'Natal', EN: 'Christmas Day' },
-  };
-  // DIESELBE KASKADE WIE resolveName: Wunschsprache, sonst Englisch, sonst was
-  // da ist. Der Rueckfall stand auf PT - was fuer einen brasilianischen
-  // Haushalt richtig aussah, aber der Zusage aus #946 widerspricht: ein
-  // deutscher Haushalt bekam Portugiesisch, obwohl eine englische Fassung
-  // danebenlag. Die Ersatzliste kennt nur PT und EN; welche der beiden gilt,
-  // entscheidet damit dieselbe Regel wie bei den Namen aus der API.
+// --------------------------------------------------------
+// Lokal berechnete Feiertage (#965)
+//
+// OpenHolidays deckt 36 Laender ab, ueberwiegend Europa plus BR/MX/ZA - kein
+// Fremddienst dazwischen bedeutet aber, dass ein fehlendes Land (die USA
+// waren der gemeldete Fall) sich nur ueber eine LOKALE Liste nachruesten
+// laesst, nicht ueber einen zweiten Anbieter (bewusste Entscheidung: ein
+// zweiter Live-Dienst waere ein zweiter Ausfallpunkt fuer ein einzelnes Land).
+// Diese Liste ist reine Datumsarithmetik - kein Netzwerk, kein Cache-Sonderfall
+// - und laeuft ueber denselben Weg wie die Brasilien-Ersatzliste, die es schon
+// vor #965 gab; Brasilien ist unten selbst auf dieses Schema umgestellt, damit
+// seine bestehenden Tests als Gleichheitsbeweis fuer die Umstellung dienen.
+//
+// AUFGENOMMEN WURDE NUR, WAS SICH OHNE JAHR-FUER-JAHR-DEKRET HERLEITEN LAESST:
+// feste Daten, "n-ter Wochentag", Osterversatz, plus - fuer Matariki - eine von
+// der neuseeländischen Regierung bereits bis 2052 veroeffentlichte Tabelle
+// (kein Mondkalender-Algorithmus, eine echte amtliche Liste). Bewusst NICHT
+// aufgenommen: monderechnete Feiertage (z. B. islamische Feste - Mondsichtung,
+// keine Formel), jahresweise dekretierte Bruecktage (Argentinien u. a.) und
+// Feiertage, die sich je Bundesstaat/Provinz unterscheiden (US-Bundesstaaten,
+// australische Bundesstaaten). Diese Laender bleiben bewusst aussen vor, statt
+// eine falsche Zuversicht vorzutaeuschen - siehe die ICS-Abo-Empfehlung in den
+// Einstellungen fuer genau diesen Fall.
+// --------------------------------------------------------
+
+const SUN = 0, MON = 1, TUE = 2, WED = 3, THU = 4, FRI = 5, SAT = 6;
+
+/** n-tes Vorkommen eines Wochentags in einem Monat; n=-1 -> letztes Vorkommen. */
+function nthWeekdayOfMonth(year, month, weekday, n) {
+  if (n === -1) {
+    const last = utcDate(year, month + 1, 0); // Tag 0 des Folgemonats = letzter Tag dieses Monats
+    const diff = (last.getUTCDay() - weekday + 7) % 7;
+    return addDays(last, -diff);
+  }
+  const first = utcDate(year, month, 1);
+  const diff = (weekday - first.getUTCDay() + 7) % 7;
+  return addDays(first, diff + (n - 1) * 7);
+}
+
+/**
+ * Letzter Montag an oder vor `maxDay` des Monats. Fuer Kanadas Victoria Day
+ * ("Monday preceding May 25", gesetzlich der Montag zwischen dem 18. und 24.
+ * Mai inklusive - NICHT einfach "letzter Montag im Mai": faellt der 25. Mai
+ * selbst auf einen Montag, bleibt Victoria Day trotzdem der 18., weil das
+ * Gesetz "preceding May 25" sagt, nicht "on or before").
+ */
+function lastMondayOnOrBefore(year, month, maxDay) {
+  const d = utcDate(year, month, maxDay);
+  const diff = (d.getUTCDay() - MON + 7) % 7;
+  return addDays(d, -diff);
+}
+
+/** US-Beobachtungsregel: Samstag -> Freitag davor, Sonntag -> Montag danach. */
+function usObserved(date) {
+  const dow = date.getUTCDay();
+  if (dow === SAT) return addDays(date, -1);
+  if (dow === SUN) return addDays(date, 1);
+  return date;
+}
+
+/**
+ * Kanadas Regel (Holidays Act / Bills of Exchange Act, belegt fuer Canada Day
+ * woertlich im Gesetzestext, fuer die uebrigen vier per Arbeitsrecht-Praxis):
+ * nur Sonntag verschiebt auf den folgenden Montag. Samstag bleibt bewusst
+ * unveraendert - dafuer gibt es keine einheitliche landesweite Regel, sondern
+ * abweichende Provinz-Praxis (siehe Recherche zu #965), und eine erfundene
+ * Verschiebung waere schlimmer als gar keine.
+ */
+function sundayToMonday(date) {
+  return date.getUTCDay() === SUN ? addDays(date, 1) : date;
+}
+
+/**
+ * "Mondayisation" (UK/Neuseeland): faellt der Tag auf Samstag oder Sonntag,
+ * gilt der naechste Montag als Feiertag.
+ */
+function mondayised(date) {
+  const dow = date.getUTCDay();
+  if (dow !== SAT && dow !== SUN) return date;
+  return addDays(date, (MON - dow + 7) % 7);
+}
+
+/**
+ * Verschiebungstabelle fuer ein Feiertags-PAAR an aufeinanderfolgenden Tagen
+ * (Weihnachten/Boxing Day in UK und Neuseeland; Neujahr/2. Januar in
+ * Schottland und Neuseeland) - amtlich bestaetigt (siehe #965-Recherche,
+ * u. a. GOV.UK, mygov.scot): faellt Tag 1 auf einen Werktag, bleibt beides
+ * unveraendert. Faellt Tag 1 auf Freitag, ist nur Tag 2 (Samstag) betroffen
+ * und ruesckt auf den folgenden Montag. Faellt Tag 1 auf Samstag, ruecken
+ * BEIDE vor - Tag 1 auf Montag, Tag 2 (Sonntag) auf Dienstag, damit sie sich
+ * nicht denselben Tag teilen. Faellt Tag 1 auf Sonntag, bleibt Tag 2 (der
+ * bereits Montag ist) unveraendert, und nur Tag 1 ruesckt auf Dienstag vor.
+ * Kein Algorithmus rekonstruiert das zuverlaessiger als die Tabelle selbst -
+ * sie deckt alle sieben moeglichen Wochentage ab.
+ */
+const PAIR_SHIFT_DAYS = {
+  [MON]: [0, 0], [TUE]: [0, 0], [WED]: [0, 0], [THU]: [0, 0],
+  [FRI]: [0, 2], [SAT]: [2, 2], [SUN]: [2, 0],
+};
+
+function mondayisedPair(day1Date) {
+  const [off1, off2] = PAIR_SHIFT_DAYS[day1Date.getUTCDay()];
+  return [addDays(day1Date, off1), addDays(day1Date, 1 + off2)];
+}
+
+/**
+ * Namen-Kaskade fuer lokal berechnete Feiertage: dieselbe Regel wie
+ * resolveName fuer API-Namen (Wunschsprache, sonst Englisch, sonst was da
+ * ist) - Konsistenz ist der Punkt, nicht nur Bequemlichkeit (#946 galt genauso
+ * fuer den alten Brasilien-Ersatz).
+ * @param {string|Record<string,string>} names einzelner String oder Sprachcode-Map
+ */
+function resolveLocalName(names, langCode) {
+  if (typeof names === 'string') return names;
   const lang = String(langCode || '').toUpperCase();
-  return names[key]?.[lang] ?? names[key]?.EN ?? names[key]?.PT ?? key;
+  return names[lang] ?? names.EN ?? Object.values(names)[0];
 }
 
-function brazilPublicHolidays(year, langCode) {
-  const fixed = [
-    ['universalBrotherhood', 1, 1],
-    ['tiradentes', 4, 21],
-    ['labourDay', 5, 1],
-    ['independence', 9, 7],
-    ['aparecida', 10, 12],
-    ['allSouls', 11, 2],
-    ['republic', 11, 15],
-    ['blackConsciousness', 11, 20],
-    ['christmas', 12, 25],
-  ].map(([key, month, day]) => {
-    const date = formatIsoDate(utcDate(year, month, day));
-    return { startDate: date, endDate: date, name: localizedBrazilHolidayName(key, langCode) };
-  });
-
-  const goodFriday = formatIsoDate(addDays(easterSunday(year), -2));
-  return [
-    fixed[0],
-    { startDate: goodFriday, endDate: goodFriday, name: localizedBrazilHolidayName('goodFriday', langCode) },
-    ...fixed.slice(1),
-  ];
+/**
+ * Ein einzelnes Regel-Datum fuer ein Jahr aufloesen. `table`-Regeln ohne
+ * Eintrag fuer das gefragte Jahr liefern `null` - lieber eine Luecke als ein
+ * geratenes Datum (gilt fuer Matariki ausserhalb der von der neuseelaendischen
+ * Regierung veroeffentlichten Jahre 2022-2052).
+ */
+function resolveRuleDate(rule, year) {
+  switch (rule.type) {
+    case 'fixed': return utcDate(year, rule.month, rule.day);
+    case 'nth': return nthWeekdayOfMonth(year, rule.month, rule.weekday, rule.n);
+    case 'lastMondayOnOrBefore': return lastMondayOnOrBefore(year, rule.month, rule.maxDay);
+    case 'easter': return addDays(easterSunday(year), rule.offset);
+    case 'table': {
+      const raw = rule.dates[year];
+      if (!raw) return null;
+      const [m, d] = raw.split('-').map(Number);
+      return utcDate(year, m, d);
+    }
+    default: throw new Error(`Unbekannter Regeltyp: ${rule.type}`);
+  }
 }
 
-function localHolidayFallback(country, type, year, langCode) {
-  if (country === 'BR' && type === 'public') return brazilPublicHolidays(year, langCode);
-  return [];
+function applyObservance(date, observance) {
+  switch (observance) {
+    case 'us': return usObserved(date);
+    case 'sundayToMonday': return sundayToMonday(date);
+    case 'mondayised': return mondayised(date);
+    default: return date;
+  }
+}
+
+/** Ein Eintrag-Array (siehe LOCAL_COUNTRIES) fuer ein Jahr in Cache-Zeilen expandieren. */
+function expandCountryEntries(entries, year, langCode) {
+  const out = [];
+  for (const entry of entries) {
+    if (entry.rule.type === 'pair') {
+      const day1 = utcDate(year, entry.rule.month, entry.rule.day1);
+      const [d1, d2] = mondayisedPair(day1);
+      out.push([d1, entry.names[0]], [d2, entry.names[1]]);
+      continue;
+    }
+    const base = resolveRuleDate(entry.rule, year);
+    if (!base) continue;
+    out.push([applyObservance(base, entry.observance), entry.names]);
+  }
+  return out
+    .map(([date, names]) => {
+      const iso = formatIsoDate(date);
+      return { startDate: iso, endDate: iso, name: resolveLocalName(names, langCode) };
+    })
+    .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0));
+}
+
+// ---- Brasilien ---------------------------------------------------------
+// Selbst auf das Regel-Schema umgestellt (vorher eigene brazilPublicHolidays/
+// localizedBrazilHolidayName-Funktionen) - die bestehende Testsuite dieser
+// Liste liefert damit den Gleichheitsbeweis, dass die Umstellung nichts
+// veraendert hat.
+const BR_PUBLIC_HOLIDAYS = [
+  { names: { PT: 'Confraternização Universal', EN: 'Universal Brotherhood Day' }, rule: { type: 'fixed', month: 1, day: 1 } },
+  { names: { PT: 'Sexta-feira Santa', EN: 'Good Friday' }, rule: { type: 'easter', offset: -2 } },
+  { names: { PT: 'Tiradentes', EN: 'Tiradentes Day' }, rule: { type: 'fixed', month: 4, day: 21 } },
+  { names: { PT: 'Dia do Trabalho', EN: 'Labour Day' }, rule: { type: 'fixed', month: 5, day: 1 } },
+  { names: { PT: 'Independência do Brasil', EN: 'Independence Day' }, rule: { type: 'fixed', month: 9, day: 7 } },
+  { names: { PT: 'Nossa Senhora Aparecida', EN: 'Our Lady of Aparecida' }, rule: { type: 'fixed', month: 10, day: 12 } },
+  { names: { PT: 'Finados', EN: "All Souls' Day" }, rule: { type: 'fixed', month: 11, day: 2 } },
+  { names: { PT: 'Proclamação da República', EN: 'Republic Proclamation Day' }, rule: { type: 'fixed', month: 11, day: 15 } },
+  { names: { PT: 'Dia Nacional de Zumbi e da Consciência Negra', EN: 'National Zumbi and Black Consciousness Day' }, rule: { type: 'fixed', month: 11, day: 20 } },
+  { names: { PT: 'Natal', EN: 'Christmas Day' }, rule: { type: 'fixed', month: 12, day: 25 } },
+];
+
+// ---- USA ------------------------------------------------------------
+// 11 Bundesfeiertage. Beobachtungsregel per Executive-Order-Praxis (OPM):
+// Samstag -> Freitag davor, Sonntag -> Montag danach; die "n-ter Wochentag"-
+// Feiertage fallen konstruktionsbedingt nie aufs Wochenende. Nur EN-Namen -
+// bewusst dokumentierte Einschraenkung, siehe PR-Beschreibung.
+const US_PUBLIC_HOLIDAYS = [
+  { names: "New Year's Day", rule: { type: 'fixed', month: 1, day: 1 }, observance: 'us' },
+  { names: 'Martin Luther King, Jr. Day', rule: { type: 'nth', month: 1, weekday: MON, n: 3 } },
+  { names: "Washington's Birthday", rule: { type: 'nth', month: 2, weekday: MON, n: 3 } },
+  { names: 'Memorial Day', rule: { type: 'nth', month: 5, weekday: MON, n: -1 } },
+  { names: 'Juneteenth National Independence Day', rule: { type: 'fixed', month: 6, day: 19 }, observance: 'us' },
+  { names: 'Independence Day', rule: { type: 'fixed', month: 7, day: 4 }, observance: 'us' },
+  { names: 'Labor Day', rule: { type: 'nth', month: 9, weekday: MON, n: 1 } },
+  { names: 'Columbus Day', rule: { type: 'nth', month: 10, weekday: MON, n: 2 } },
+  { names: 'Veterans Day', rule: { type: 'fixed', month: 11, day: 11 }, observance: 'us' },
+  { names: 'Thanksgiving Day', rule: { type: 'nth', month: 11, weekday: THU, n: 4 } },
+  { names: 'Christmas Day', rule: { type: 'fixed', month: 12, day: 25 }, observance: 'us' },
+];
+
+// ---- Kanada -----------------------------------------------------------
+// 10 landesweite gesetzliche Feiertage (fuer bundesrechtlich geregelte
+// Arbeitsverhaeltnisse - der ueblich zitierte Referenzsatz). EN+FR-Namen,
+// wie bei Brasilien PT+EN - durchlaeuft dieselbe Sprachkaskade. Kanada fuehrt
+// nur Karfreitag, keinen Ostermontag als Bundesfeiertag.
+//
+// BEOBACHTUNG NUR SONNTAG->MONTAG (sundayToMonday oben), UNABHAENGIG PRO TAG -
+// anders als UK/Neuseeland gibt es hier KEIN Paar-Schema, das eine Kollision
+// zwischen Weihnachten und Boxing Day vermeidet. Faellt Weihnachten auf einen
+// Sonntag (z. B. 2022), ruecken beide - der verschobene Weihnachtstag UND der
+// unveraenderte Boxing Day - auf denselben Montag (26.12.2022): zwei Zeilen,
+// ein Datum. Fuer einen Familienkalender ist das unschaedlich (zwei Balken am
+// selben Tag statt einer), aber bewusst dokumentiert, damit es nicht als
+// uebersehener Fehler gilt - fuer Kanada ist keine Quelle gefunden worden, die
+// eine UK-Stil-Kollisionsvermeidung belegt, und eine erfundene waere schlimmer
+// als die dokumentierte Ueberschneidung.
+// Victoria Day per Sonderregel (lastMondayOnOrBefore).
+const CA_PUBLIC_HOLIDAYS = [
+  { names: { EN: "New Year's Day", FR: "Jour de l'An" }, rule: { type: 'fixed', month: 1, day: 1 }, observance: 'sundayToMonday' },
+  { names: { EN: 'Good Friday', FR: 'Vendredi saint' }, rule: { type: 'easter', offset: -2 } },
+  { names: { EN: 'Victoria Day', FR: 'Fête de la Reine' }, rule: { type: 'lastMondayOnOrBefore', month: 5, maxDay: 24 } },
+  { names: { EN: 'Canada Day', FR: 'Fête du Canada' }, rule: { type: 'fixed', month: 7, day: 1 }, observance: 'sundayToMonday' },
+  { names: { EN: 'Labour Day', FR: 'Fête du Travail' }, rule: { type: 'nth', month: 9, weekday: MON, n: 1 } },
+  { names: { EN: 'National Day for Truth and Reconciliation', FR: 'Journée nationale de la vérité et de la réconciliation' }, rule: { type: 'fixed', month: 9, day: 30 } },
+  { names: { EN: 'Thanksgiving', FR: 'Action de grâce' }, rule: { type: 'nth', month: 10, weekday: MON, n: 2 } },
+  { names: { EN: 'Remembrance Day', FR: 'Jour du Souvenir' }, rule: { type: 'fixed', month: 11, day: 11 }, observance: 'sundayToMonday' },
+  { names: { EN: 'Christmas Day', FR: 'Noël' }, rule: { type: 'fixed', month: 12, day: 25 }, observance: 'sundayToMonday' },
+  { names: { EN: 'Boxing Day', FR: 'Lendemain de Noël' }, rule: { type: 'fixed', month: 12, day: 26 }, observance: 'sundayToMonday' },
+];
+
+// ---- Vereinigtes Koenigreich --------------------------------------------
+// Keine gemeinsame Landesliste: die vier Nationen unterscheiden sich zu
+// stark (Schottland ohne Ostermontag, mit eigenem Sommertermin und 2.
+// Januar; Nordirland mit zwei Zusatzfeiertagen) - je Subdivision eine
+// vollstaendige eigene Liste statt eines "Basis + Zuschlag"-Schemas, das an
+// der Realitaet vorbeigegangen waere. GB_SUBDIVISIONS (unten) ist die
+// Auswahl dafuer; ohne gewaehlte Subdivision gilt England & Wales.
+const GB_ENGLAND_WALES_HOLIDAYS = [
+  { names: "New Year's Day", rule: { type: 'fixed', month: 1, day: 1 }, observance: 'mondayised' },
+  { names: 'Good Friday', rule: { type: 'easter', offset: -2 } },
+  { names: 'Easter Monday', rule: { type: 'easter', offset: 1 } },
+  { names: 'Early May Bank Holiday', rule: { type: 'nth', month: 5, weekday: MON, n: 1 } },
+  { names: 'Spring Bank Holiday', rule: { type: 'nth', month: 5, weekday: MON, n: -1 } },
+  { names: 'Summer Bank Holiday', rule: { type: 'nth', month: 8, weekday: MON, n: -1 } },
+  { names: ['Christmas Day', 'Boxing Day'], rule: { type: 'pair', month: 12, day1: 25 } },
+];
+
+const GB_SCOTLAND_HOLIDAYS = [
+  // '2nd January' in GOV.UK-Schreibweise (bank-holidays.json), nicht '2 January'.
+  { names: ["New Year's Day", '2nd January'], rule: { type: 'pair', month: 1, day1: 1 } },
+  { names: 'Good Friday', rule: { type: 'easter', offset: -2 } },
+  { names: 'Early May Bank Holiday', rule: { type: 'nth', month: 5, weekday: MON, n: 1 } },
+  { names: 'Spring Bank Holiday', rule: { type: 'nth', month: 5, weekday: MON, n: -1 } },
+  // Schottlands Sommertermin ist der ERSTE Montag im August, nicht der letzte
+  // wie in England/Wales - keine Tippfehler-Variante derselben Regel.
+  { names: 'Summer Bank Holiday', rule: { type: 'nth', month: 8, weekday: MON, n: 1 } },
+  // St Andrew's Day IST mondayised: der St Andrew's Day Bank Holiday
+  // (Scotland) Act 2007 s.1(2) verlegt ihn auf den folgenden Montag, wenn der
+  // 30.11. auf ein Wochenende faellt - GOV.UK (bank-holidays.json) fuehrt
+  // entsprechend 2019-12-02, 2024-12-02 und 2025-12-01 als Ersatztage. Ein
+  // frueherer Kommentar hier behauptete das Gegenteil, und genau daran hing
+  // der Review-Fund zu #965: 2025 (Sonntag) lag im Sync-Fenster und stand
+  // einen Tag zu frueh im Kalender.
+  { names: "St Andrew's Day", rule: { type: 'fixed', month: 11, day: 30 }, observance: 'mondayised' },
+  { names: ['Christmas Day', 'Boxing Day'], rule: { type: 'pair', month: 12, day1: 25 } },
+];
+
+const GB_NORTHERN_IRELAND_HOLIDAYS = [
+  ...GB_ENGLAND_WALES_HOLIDAYS.slice(0, -1),
+  { names: "St Patrick's Day", rule: { type: 'fixed', month: 3, day: 17 }, observance: 'mondayised' },
+  { names: 'Battle of the Boyne (Orangemen’s Day)', rule: { type: 'fixed', month: 7, day: 12 }, observance: 'mondayised' },
+  ...GB_ENGLAND_WALES_HOLIDAYS.slice(-1),
+];
+
+const GB_SUBDIVISIONS = [
+  { isoCode: 'GB-ENG', name: 'England and Wales' },
+  { isoCode: 'GB-NIR', name: 'Northern Ireland' },
+  { isoCode: 'GB-SCT', name: 'Scotland' },
+];
+
+function gbHolidaysFor(subdivision) {
+  if (subdivision === 'GB-SCT') return GB_SCOTLAND_HOLIDAYS;
+  if (subdivision === 'GB-NIR') return GB_NORTHERN_IRELAND_HOLIDAYS;
+  return GB_ENGLAND_WALES_HOLIDAYS;
+}
+
+// ---- Australien ---------------------------------------------------------
+// Nur landesweite Feiertage. KEINE Wochenend-Verschiebung: es gibt kein
+// Bundesgesetz dafuer, jeder Bundesstaat erlaesst seine eigene Ersatztag-
+// Regel (siehe #965-Recherche) - ein erfundenes bundesweites Ausweichdatum
+// waere in mindestens einem Bundesstaat schlicht falsch. Feiertage, die je
+// Bundesstaat variieren (Queen's/King's Birthday, Labour Day), bleiben aussen
+// vor wie bei jedem anderen Land dieser Liste.
+const AU_PUBLIC_HOLIDAYS = [
+  { names: "New Year's Day", rule: { type: 'fixed', month: 1, day: 1 } },
+  { names: 'Australia Day', rule: { type: 'fixed', month: 1, day: 26 } },
+  { names: 'Good Friday', rule: { type: 'easter', offset: -2 } },
+  { names: 'Easter Monday', rule: { type: 'easter', offset: 1 } },
+  { names: 'Anzac Day', rule: { type: 'fixed', month: 4, day: 25 } },
+  { names: 'Christmas Day', rule: { type: 'fixed', month: 12, day: 25 } },
+  { names: 'Boxing Day', rule: { type: 'fixed', month: 12, day: 26 } },
+];
+
+// ---- Neuseeland -----------------------------------------------------------
+// "Mondayisation" seit Holidays (Full Recognition of Waitangi Day and ANZAC
+// Day) Amendment Act 2013 fuer sechs feste Termine (Neujahr/2. Januar als
+// Paar, Waitangi, Anzac, Weihnachten/Boxing Day als Paar) - King's Birthday,
+// Matariki und Labour Day liegen konstruktionsbedingt bereits auf einem
+// Montag/Freitag und werden nie verschoben.
+//
+// MATARIKI IST EINE TABELLE, KEINE FORMEL: die Termine werden vom
+// Matariki-Beirat anhand des Maori-Mondkalenders bestimmt und von der
+// Regierung (MBIE) im Voraus bis 2052 veroeffentlicht - nicht algorithmisch
+// herleitbar, aber eine echte amtliche Liste, kein Schaetzwert. Jenseits von
+// 2052 liefert resolveRuleDate() bewusst `null` statt zu raten.
+const NZ_MATARIKI_DATES = {
+  2022: '06-24', 2023: '07-14', 2024: '06-28', 2025: '06-20', 2026: '07-10',
+  2027: '06-25', 2028: '07-14', 2029: '07-06', 2030: '06-21', 2031: '07-11',
+  2032: '07-02', 2033: '06-24', 2034: '07-07', 2035: '06-29', 2036: '07-18',
+  2037: '07-10', 2038: '06-25', 2039: '07-15', 2040: '07-06', 2041: '07-19',
+  2042: '07-11', 2043: '07-03', 2044: '06-24', 2045: '07-07', 2046: '06-29',
+  2047: '07-19', 2048: '07-03', 2049: '06-25', 2050: '07-15', 2051: '06-30',
+  2052: '06-21',
+};
+
+const NZ_PUBLIC_HOLIDAYS = [
+  { names: ["New Year's Day", 'Day after New Year’s Day'], rule: { type: 'pair', month: 1, day1: 1 } },
+  { names: 'Waitangi Day', rule: { type: 'fixed', month: 2, day: 6 }, observance: 'mondayised' },
+  { names: 'Good Friday', rule: { type: 'easter', offset: -2 } },
+  { names: 'Easter Monday', rule: { type: 'easter', offset: 1 } },
+  { names: 'Anzac Day', rule: { type: 'fixed', month: 4, day: 25 }, observance: 'mondayised' },
+  { names: "King's Birthday", rule: { type: 'nth', month: 6, weekday: MON, n: 1 } },
+  { names: 'Matariki', rule: { type: 'table', dates: NZ_MATARIKI_DATES } },
+  { names: 'Labour Day', rule: { type: 'nth', month: 10, weekday: MON, n: 4 } },
+  { names: ['Christmas Day', 'Boxing Day'], rule: { type: 'pair', month: 12, day1: 25 } },
+];
+
+/**
+ * Registry der lokal berechneten Laender. `schoolHolidays: false` in
+ * getCountries() wird aus den hier gefuehrten Schluesseln abgeleitet - fuer
+ * keins von ihnen existiert eine Schulferien-Quelle.
+ */
+const LOCAL_COUNTRIES = {
+  BR: { name: 'Brazil', holidays: () => BR_PUBLIC_HOLIDAYS },
+  US: { name: 'United States', holidays: () => US_PUBLIC_HOLIDAYS },
+  CA: { name: 'Canada', holidays: () => CA_PUBLIC_HOLIDAYS },
+  GB: { name: 'United Kingdom', holidays: (subdivision) => gbHolidaysFor(subdivision) },
+  AU: { name: 'Australia', holidays: () => AU_PUBLIC_HOLIDAYS },
+  NZ: { name: 'New Zealand', holidays: () => NZ_PUBLIC_HOLIDAYS },
+};
+
+function localHolidayFallback(country, type, year, langCode, subdivision) {
+  if (type !== 'public') return [];
+  const local = LOCAL_COUNTRIES[country];
+  if (!local) return [];
+  return expandCountryEntries(local.holidays(subdivision), year, langCode);
 }
 
 // --------------------------------------------------------
@@ -261,27 +614,40 @@ async function syncYearAndType(country, subdivision, year, type, langCode) {
 
   let holidays;
   let fetchFailed = false;
-  try {
-    holidays = await apiFetch(`/${endpoint}?${params}`);
-    // NUR EIN ECHTES LEERES ARRAY IST EINE AUSKUNFT. Ein HTTP 200 mit einem
-    // anderen Rumpf - ein Fehlerobjekt eines vorgeschalteten Proxys, eine
-    // geaenderte Antwortform - sagt gar nichts, und seit `finishEmpty` einen
-    // leeren Bereich RAEUMT, waere daraus Datenverlust geworden: der Cache
-    // gelöscht, der Scope als vollstaendig verbucht, und die Feiertage 30 Tage
-    // lang weg. Ein Nicht-Array zaehlt deshalb wie ein gescheiterter Abruf
-    // (gefunden in der PR-Durchsicht, als Folgefehler genau dieser Aenderung).
-    if (!Array.isArray(holidays)) {
-      log.warn(`Fetch ${endpoint} ${country}/${subdivision ?? '-'}/${year}: unexpected response shape (${typeof holidays})`);
+  // KEIN LIVE-ABRUF FUER DIE LOKAL BERECHNETEN LAENDER (Review-Fund zu #965):
+  // /PublicHolidays antwortet fuer sie belegt mit 200 [] (fuer BR und US
+  // gemessen, GB fuehrt die API gar nicht) - der Request loeste also nur den
+  // Fallback aus, der hier ohnehin die Daten liefert. Der Kurzschluss spart
+  // nicht bloss vier Requests pro Lauf: er macht den Offline-Fall fuer diese
+  // Laender per Konstruktion funktionsfaehig, statt ihn vom Scheitern eines im
+  // Voraus bekannten sinnlosen Abrufs abhaengig zu machen. Schulferien nehmen
+  // weiter den API-Weg - fuer sie gibt es keinen lokalen Ersatz, und die leere
+  // Antwort bleibt dort die ehrliche Auskunft.
+  if (type === 'public' && LOCAL_COUNTRIES[country]) {
+    holidays = localHolidayFallback(country, type, year, langCode, subdivision);
+  } else {
+    try {
+      holidays = await apiFetch(`/${endpoint}?${params}`);
+      // NUR EIN ECHTES LEERES ARRAY IST EINE AUSKUNFT. Ein HTTP 200 mit einem
+      // anderen Rumpf - ein Fehlerobjekt eines vorgeschalteten Proxys, eine
+      // geaenderte Antwortform - sagt gar nichts, und seit `finishEmpty` einen
+      // leeren Bereich RAEUMT, waere daraus Datenverlust geworden: der Cache
+      // gelöscht, der Scope als vollstaendig verbucht, und die Feiertage 30 Tage
+      // lang weg. Ein Nicht-Array zaehlt deshalb wie ein gescheiterter Abruf
+      // (gefunden in der PR-Durchsicht, als Folgefehler genau dieser Aenderung).
+      if (!Array.isArray(holidays)) {
+        log.warn(`Fetch ${endpoint} ${country}/${subdivision ?? '-'}/${year}: unexpected response shape (${typeof holidays})`);
+        fetchFailed = true;
+      }
+    } catch (err) {
+      log.warn(`Fetch ${endpoint} ${country}/${subdivision ?? '-'}/${year}: ${err.message}`);
       fetchFailed = true;
+      holidays = localHolidayFallback(country, type, year, langCode, subdivision);
     }
-  } catch (err) {
-    log.warn(`Fetch ${endpoint} ${country}/${subdivision ?? '-'}/${year}: ${err.message}`);
-    fetchFailed = true;
-    holidays = localHolidayFallback(country, type, year, langCode);
   }
 
   if (!Array.isArray(holidays) || holidays.length === 0) {
-    holidays = localHolidayFallback(country, type, year, langCode);
+    holidays = localHolidayFallback(country, type, year, langCode, subdivision);
   }
   if (!Array.isArray(holidays) || holidays.length === 0) return finishEmpty(fetchFailed, country, type, year);
 
@@ -614,3 +980,10 @@ function getForRange(from, to) {
 }
 
 export { sync, getCountries, getSubdivisions, getGroups, getForRange, __setFetchImpl };
+
+// Reine Regel-Engine fuer #965: hand-verifizierte Jahres-Fixtures (siehe
+// test-holidays.js) laufen direkt hierueber statt ueber sync()'s begrenztes
+// currentYear-1..+2-Fenster - so laesst sich z. B. der Jahresgrenzfall Neujahr
+// 2028 (Samstag -> Silvester 2027) unabhaengig vom aktuellen Kalenderjahr
+// pruefen, in dem die Tests laufen.
+export const __test = { localHolidayFallback, expandCountryEntries, LOCAL_COUNTRIES };

@@ -30,6 +30,8 @@ import {
 } from '../public/settings/module-order.js';
 import {
   applyHolidaySubdivisionSelection,
+  countrySchoolHolidaysAvailable,
+  createSchoolAvailabilityUpdater,
   ensureHolidayLayerSelection,
   isHolidayCountryResolved,
   resolveHolidayLocation,
@@ -888,6 +890,101 @@ test('holiday sync enables public holidays when every layer is disabled', () => 
     showPublic: false,
     showSchool: true,
   });
+});
+
+test('#965: school holidays are available unless the country entry says otherwise', () => {
+  const countries = [
+    { isoCode: 'DE', name: 'Germany' },
+    { isoCode: 'US', name: 'United States', schoolHolidays: false },
+  ];
+  assert.equal(countrySchoolHolidaysAvailable(countries, ''), true, 'kein gewaehltes Land - kein Grund zu sperren');
+  assert.equal(countrySchoolHolidaysAvailable(countries, 'DE'), true, 'ein gewoehnliches OpenHolidays-Land traegt kein Flag');
+  assert.equal(countrySchoolHolidaysAvailable(countries, 'US'), false, 'das Flag ist eine Ausnahmemarkierung, keine Positivliste');
+  assert.equal(countrySchoolHolidaysAvailable(countries, 'FR'), true, 'ein Land ausserhalb der Liste gilt nicht als gesperrt');
+  assert.equal(countrySchoolHolidaysAvailable([], 'US'), true, 'ohne geladene Laenderliste noch keine Sperre - kein Fehlzustand vortaeuschen');
+});
+
+// #965 Review-Fund: die reine Verfuegbarkeitsfrage oben war getestet, ihr
+// Aufrufer nicht - und der loeschte den Haken beim Sperren, ohne ihn je
+// zurueckzugeben. Ein DE-Haushalt mit Schulferien-Ebene, der im Dropdown kurz
+// zu den USA und wieder zu DE blaettert und speichert, verlor die Ebene still.
+// Diese Tests fahren den echten Aufrufer-Pfad (Land-Wechsel-Handler) ueber
+// dieselben drei Bedienelemente, die das Blatt haelt.
+const HOLIDAY_TEST_COUNTRIES = [
+  { isoCode: 'DE', name: 'Germany' },
+  { isoCode: 'US', name: 'United States', schoolHolidays: false },
+];
+
+function schoolControls({ checked }) {
+  return {
+    showSchool: { checked, disabled: false },
+    schoolColorGroup: { hidden: !checked },
+    schoolUnavailableHint: { hidden: true },
+  };
+}
+
+test('#965 Review: DE -> US -> DE gibt den Schulferien-Haken zurueck', () => {
+  const c = schoolControls({ checked: true });
+  const apply = createSchoolAvailabilityUpdater(c);
+
+  apply(HOLIDAY_TEST_COUNTRIES, 'DE'); // initialer Zustand: verfuegbar, Haken an
+  assert.equal(c.showSchool.checked, true);
+  assert.equal(c.showSchool.disabled, false);
+
+  apply(HOLIDAY_TEST_COUNTRIES, 'US'); // Land ohne Quelle: gesperrt UND Haken raus,
+  // denn der Speichern-Pfad liest checked woertlich - stuende der Haken noch,
+  // wuerde holiday_show_school=1 fuer ein Land ohne Datenquelle gespeichert.
+  assert.equal(c.showSchool.disabled, true);
+  assert.equal(c.showSchool.checked, false);
+  assert.equal(c.schoolColorGroup.hidden, true);
+  assert.equal(c.schoolUnavailableHint.hidden, false);
+
+  apply(HOLIDAY_TEST_COUNTRIES, 'DE'); // zurueck: der gemerkte Haken kommt wieder
+  assert.equal(c.showSchool.disabled, false);
+  assert.equal(c.showSchool.checked, true, 'der Umweg ueber die USA darf die Ebene nicht kosten');
+  assert.equal(c.schoolColorGroup.hidden, false);
+  assert.equal(c.schoolUnavailableHint.hidden, true);
+});
+
+test('#965 Review: ein nie gesetzter Haken kommt nach dem Umweg auch nicht zurueck', () => {
+  const c = schoolControls({ checked: false });
+  const apply = createSchoolAvailabilityUpdater(c);
+
+  apply(HOLIDAY_TEST_COUNTRIES, 'US');
+  assert.equal(c.showSchool.checked, false);
+
+  apply(HOLIDAY_TEST_COUNTRIES, 'DE');
+  assert.equal(c.showSchool.checked, false, 'wiederhergestellt wird nur, was vorher da war');
+  assert.equal(c.schoolColorGroup.hidden, true);
+});
+
+test('#965 Review: US -> DE -> US merkt sich den Stand nur einmal, nicht den gesperrten', () => {
+  // Zwei Sperr-Aufrufe hintereinander (US -> GB) duerfen nicht den bereits
+  // geloeschten Haken als "gemerkten Stand" ueberschreiben.
+  const countries = [...HOLIDAY_TEST_COUNTRIES, { isoCode: 'GB', name: 'United Kingdom', schoolHolidays: false }];
+  const c = schoolControls({ checked: true });
+  const apply = createSchoolAvailabilityUpdater(c);
+
+  apply(countries, 'US');
+  apply(countries, 'GB'); // zweites gesperrtes Land direkt hinterher
+  assert.equal(c.showSchool.checked, false);
+
+  apply(countries, 'DE');
+  assert.equal(c.showSchool.checked, true, 'auch ueber zwei gesperrte Laender hinweg bleibt der Stand erhalten');
+});
+
+test('#965 Review: ein bewusster Klick im entsperrten Zustand ueberlebt den naechsten Umweg', () => {
+  const c = schoolControls({ checked: true });
+  const apply = createSchoolAvailabilityUpdater(c);
+
+  apply(HOLIDAY_TEST_COUNTRIES, 'US');
+  apply(HOLIDAY_TEST_COUNTRIES, 'DE'); // Haken wiederhergestellt
+  c.showSchool.checked = false;        // Nutzer schaltet die Ebene jetzt bewusst ab
+
+  apply(HOLIDAY_TEST_COUNTRIES, 'US');
+  apply(HOLIDAY_TEST_COUNTRIES, 'DE');
+  assert.equal(c.showSchool.checked, false,
+    'gemerkt wird der Stand VOR dem Sperren - nicht ein aelterer, laengst verworfener');
 });
 
 test('holiday country remains unresolved until discovery contains the persisted value', () => {

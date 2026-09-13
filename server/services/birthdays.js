@@ -334,8 +334,16 @@ function syncBirthdayReminder(database, birthday, from = new Date(), kind = 'bir
     ORDER BY created_at DESC
   `).all(eventId, birthday.created_by);
 
-  const active = existing.find((row) => row.dismissed === 0);
-  if (active && active.remind_at === desired) return active.id;
+  // EINE ZEILE JE TERMIN, verworfen oder nicht. Hier stand
+  // `existing.find((row) => row.dismissed === 0)`: nach dem Verwerfen fand die
+  // Suche nichts, loeschte alles und legte dieselbe Erinnerung unverworfen neu
+  // an. `GET /reminders/pending` gleicht bei jedem Poll ab, also stand sie eine
+  // Minute spaeter wieder da, mit leerem `pushed_at` auch fuer den Push-Scheduler.
+  // Ersetzt wird nur, wenn sich der Termin selbst aendert: anderer Vorlauf,
+  // anderes Datum, oder der Geburtstag ist vorbei und das naechste Jahr dran.
+  const current = existing.find((row) => row.remind_at === desired && row.dismissed === 0)
+    ?? existing.find((row) => row.remind_at === desired);
+  if (current) return current.id;
 
   database.prepare(`
     DELETE FROM reminders

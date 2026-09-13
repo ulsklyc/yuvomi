@@ -81,7 +81,7 @@ function groupIcon(type) {
   }[type] || 'users';
 }
 
-export async function render(container, { user } = {}) {
+export async function render(container, { user, embedded = false } = {}) {
   _container = container;
   state.user = user || null;
   // `split`, nicht `reading`: Kopf und Kennzahlenband stehen ueber einem
@@ -89,14 +89,28 @@ export async function render(container, { user } = {}) {
   // Bauart des Modus. Das Raster selbst traegt die Seite noch in eigenem CSS
   // (Container-Queries statt Viewport-Breite, siehe split-expenses.css);
   // das Shell-Raster wirkt nur auf .app-page__body, den es hier nicht gibt.
+  //
+  // EINGEBETTET (budget.js ruft immer mit embedded:true - es gibt heute keine
+  // eigenstaendige Route) TRAEGT DIE UEBERSCHRIFT KEIN ZWEITES <h1>: der
+  // Modulkopf sagt bereits "Budget" (Cross-Modul-Review). Die Budget-Seiten-
+  // CSS behandelte den Split-Titel dort eingebettet schon laenger als
+  // Bereichs-Ueberschrift (typography.css) - das Element selbst blieb bis
+  // hierher ein <h1> und widersprach damit seiner eigenen Rolle. Aus demselben
+  // Grund traegt der Knopf hier --secondary statt --primary: die Primaeraktion ist der FAB
+  // (#split-fab, siehe unten), nicht zwei violette Knoepfe fuer dieselbe
+  // Handlung. Unveraendert bleibt die (heute nicht erreichte) eigenstaendige
+  // Zukunft: <h1> plus Primaerknopf, falls Split-Ausgaben je eine eigene
+  // Navigationsebene bekommt (DESIGN.md, Q-3).
+  const TitleTag = embedded ? 'h2' : 'h1';
+  const addExpenseBtnVariant = embedded ? 'btn--secondary' : 'btn--primary';
   setHtml(container, `
     <div class="split-page app-page app-page--split" data-composition="split">
       <header class="panel-head split-topbar">
         <div>
-          <h1 class="split-title">${t('splitExpenses.title')}</h1>
+          <${TitleTag} class="split-title">${t('splitExpenses.title')}</${TitleTag}>
           <p class="split-subtitle">${t('splitExpenses.subtitle')}</p>
         </div>
-        <button class="btn btn--primary" id="split-add-expense">
+        <button class="btn ${addExpenseBtnVariant}" id="split-add-expense">
           <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
           ${t('splitExpenses.addExpense')}
         </button>
@@ -369,7 +383,12 @@ function renderMain() {
         <button class="btn btn--secondary btn--icon" id="split-archive-group" aria-label="${t('splitExpenses.archiveGroup')}">
           <i data-lucide="archive" aria-hidden="true"></i>
         </button>
-        <button class="btn btn--secondary btn--icon" id="split-delete-group" aria-label="${t('splitExpenses.deleteGroup')}">
+        <!-- Loeschen ist unumkehrbar (die Gruppe faellt mitsamt ihrer Ausgaben),
+             Bearbeiten/Archivieren nicht - dieselbe Kapsel fuer alle drei
+             verwischte den Unterschied. --danger-outline hebt sich ab, ohne die
+             Zeile zu dominieren; confirmModal({danger:true}) haengt schon
+             darunter (deleteGroup()). -->
+        <button class="btn btn--icon btn--danger-outline" id="split-delete-group" aria-label="${t('splitExpenses.deleteGroup')}">
           <i data-lucide="trash-2" aria-hidden="true"></i>
         </button>`}
         <button class="btn btn--secondary" id="split-settle">
