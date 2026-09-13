@@ -86,18 +86,92 @@ test('acknowledge: stimmt `before` nicht, hat jemand anderes dazwischen geschrie
   assert.deepEqual(state.changes, [1], 'die fremde Aenderung darf nicht hinter der eigenen Quittung verschwinden');
 });
 
-test('acknowledge vor der ersten Antwort oder mit unbrauchbarer Quittung tut nichts', async () => {
+test('acknowledge vor der ersten Antwort gilt fuer sie - ein Haken gleich nach dem Oeffnen kostet kein Nachladen', async () => {
+  const { feed, state } = make();
+  // Die erste Abfrage war unterwegs, als der Haken gesetzt wurde: sie hat 1
+  // gelesen, die Quittung sagt 1 -> 2. Wuerde die Quittung verworfen, weil
+  // noch keine Marke steht, saehe die naechste Abfrage 1 -> 2 als fremd.
+  feed.acknowledge({ list_id: 1, before: 1, after: 2 });
+  state.answer = rows([1, 1]);
+  await feed.poll();
+  state.answer = rows([1, 2]);
+  await feed.poll();
+  assert.deepEqual(state.changes, [], 'die 2 ist das eigene Werk');
+  state.answer = rows([1, 3]);
+  await feed.poll();
+  assert.deepEqual(state.changes, [1], 'ab da zaehlt wieder jede Bewegung');
+});
+
+test('acknowledge mit unbrauchbarer Quittung tut nichts - auch vor der ersten Antwort', async () => {
   const { feed, state } = make();
   assert.doesNotThrow(() => {
-    feed.acknowledge({ list_id: 1, before: 0, after: 1 });
     feed.acknowledge(null);
     feed.acknowledge({ list_id: 'eins', before: 0, after: 1 });
+    feed.acknowledge({ list_id: 1, before: 0, after: 'zwei' });
   });
   state.answer = rows([1, 1]);
   await feed.poll();
   state.answer = rows([1, 2]);
   await feed.poll();
   assert.deepEqual(state.changes, [1]);
+});
+
+test('hold: liegt der geladene Stand UNTER der Marke, laedt die naechste Abfrage nach - die Aenderung zwischen den beiden Antworten beim Oeffnen geht nicht verloren', async () => {
+  const { feed, state } = make();
+  state.answer = rows([1, 5]);
+  await feed.poll();
+  // Die Artikel-Antwort war die aeltere: sie trug Stand 4, die Laufnummern
+  // sagten schon 5 - dazwischen hat jemand geschrieben, und die Marke stand
+  // ohne `hold` schon dahinter.
+  feed.hold(1, 4);
+  await feed.poll();
+  assert.deepEqual(state.changes, [1]);
+});
+
+test('hold: liegt der geladene Stand UEBER der Marke, laedt die naechste Abfrage nicht umsonst', async () => {
+  const { feed, state } = make();
+  state.answer = rows([1, 4]);
+  await feed.poll();
+  // Die Laufnummern-Antwort war die aeltere: die Artikel tragen schon 5.
+  feed.hold(1, 5);
+  state.answer = rows([1, 5]);
+  await feed.poll();
+  assert.deepEqual(state.changes, [], 'die Seite hat den Stand 5 schon');
+  state.answer = rows([1, 6]);
+  await feed.poll();
+  assert.deepEqual(state.changes, [1]);
+});
+
+test('hold vor der ersten Antwort: die erste Antwort vergleicht gegen den geladenen Stand', async () => {
+  const older = make();
+  older.feed.hold(1, 4);
+  older.state.answer = rows([1, 5], [2, 0]);
+  await older.feed.poll();
+  assert.deepEqual(older.state.changes, [1], 'Laufnummern nach den Artikeln gelesen, dazwischen eine Aenderung');
+
+  const same = make();
+  same.feed.hold(1, 5);
+  same.state.answer = rows([1, 5], [2, 0]);
+  await same.feed.poll();
+  assert.deepEqual(same.state.changes, [], 'derselbe Stand ist keine Bewegung - und Liste 2 kennt die Seite nur aus dieser Antwort');
+});
+
+test('hold und acknowledge vor der ersten Antwort gelten in ihrer Reihenfolge', async () => {
+  const { feed, state } = make();
+  feed.hold(1, 4);                                        // geladen bei 4
+  feed.acknowledge({ list_id: 1, before: 4, after: 5 });  // eigener Haken 4 -> 5
+  state.answer = rows([1, 5]);
+  await feed.poll();
+  assert.deepEqual(state.changes, [], 'Stand 4 plus der eigene Haken ist die 5');
+});
+
+test('hold mit unbrauchbaren Werten tut nichts', async () => {
+  const { feed, state } = make();
+  state.answer = rows([1, 4]);
+  await feed.poll();
+  assert.doesNotThrow(() => { feed.hold(1, undefined); feed.hold('eins', 4); feed.hold(1, null); });
+  await feed.poll();
+  assert.deepEqual(state.changes, []);
 });
 
 test('eine ueberholte Antwort mit kleinerer Nummer bewegt nichts und senkt die Marke nicht', async () => {

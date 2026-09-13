@@ -789,7 +789,12 @@ router.get('/:listId/items', (req, res) => {
     if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
 
     const categories = loadCategories();
-    res.json({ data: loadListItems(req.params.listId, categories), list, categories });
+    // Die Laufnummer, zu der diese Artikel gehoeren: der Zettel sagt sie dem
+    // Feed als seinen Stand. Sonst haengt es an der Reihenfolge zweier
+    // Antworten beim Oeffnen - Laufnummern zuerst oder Artikel zuerst -, ob
+    // eine Aenderung dazwischen bis zur uebernaechsten verloren geht.
+    // Synchron mit dem Lesen der Artikel, also derselbe Stand.
+    res.json({ data: loadListItems(req.params.listId, categories), list, categories, version: listVersion(list.id) });
   } catch (err) {
     log.error('GET /:listId/items error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1152,18 +1157,35 @@ router.post('/:listId/import-pantry', (req, res) => {
 
 // --------------------------------------------------------
 // DELETE /api/v1/shopping/:listId/items/checked
-// Alle abgehakten Artikel aus einer Liste löschen.
-// Response: { deleted: number }
+// Abgehakte Artikel aus einer Liste löschen.
+// Body (optional): { ids: number[] } - nur diese, sonst alle abgehakten.
+// Response: { deleted: number, list_change }
 // --------------------------------------------------------
 router.delete('/:listId/items/checked', (req, res) => {
   try {
-    const queued = queueTodoDeletions(
-      'shopping', mirroredItems('list_id = ? AND is_checked = 1', req.params.listId)
-    );
+    // Ohne Body: alles, was beim Eintreffen abgehakt ist. Mit `{ ids }`: nur
+    // diese - und auch davon nur, was abgehakt ist und zu dieser Liste
+    // gehoert. Der Zettel schickt die IDs, die er selbst entfernt hat: im
+    // Undo-Fenster kann jemand anderes einen weiteren Artikel abhaken (den
+    // die Auffrischung dann herbringt), und der ginge sonst mit - und das
+    // Zuruecknehmen brachte nur den eigenen Schnappschuss zurueck.
+    let ids = null;
+    if (req.body?.ids !== undefined) {
+      if (!Array.isArray(req.body.ids) || req.body.ids.length === 0)
+        return res.status(400).json({ error: 'ids muss ein nicht-leeres Array von Artikel-IDs sein.', code: 400 });
+      ids = req.body.ids.map(Number);
+      if (ids.some((id) => !Number.isInteger(id) || id <= 0))
+        return res.status(400).json({ error: 'ids darf nur Artikel-IDs enthalten.', code: 400 });
+    }
+    const scope = ids
+      ? { where: `list_id = ? AND is_checked = 1 AND id IN (${ids.map(() => '?').join(',')})`, params: [req.params.listId, ...ids] }
+      : { where: 'list_id = ? AND is_checked = 1', params: [req.params.listId] };
+
+    const queued = queueTodoDeletions('shopping', mirroredItems(scope.where, ...scope.params));
 
     const { result, list_change } = withListChange(req.params.listId, () => db.get().prepare(`
-      DELETE FROM shopping_items WHERE list_id = ? AND is_checked = 1
-    `).run(req.params.listId));
+      DELETE FROM shopping_items WHERE ${scope.where}
+    `).run(...scope.params));
     res.json({ deleted: result.changes, list_change });
 
     if (queued) pushToCalDAV('Löschung');

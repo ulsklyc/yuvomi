@@ -7737,7 +7737,24 @@ const MIGRATIONS = [
         INSERT INTO shopping_list_changes (list_id, version) VALUES (NEW.list_id, 1)
           ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
       END;
-      CREATE TRIGGER trg_shopping_items_change_au AFTER UPDATE ON shopping_items BEGIN
+      -- NUR EINE AENDERUNG, DIE DER ZETTEL ZEIGT, ZAEHLT. Ein UPDATE ohne
+      -- WHEN bewegte die Nummer auch fuer die Buchhaltung: fuer outbound_dirty
+      -- (der CalDAV-Push setzt es nach dem eigenen Haken auf 1 und nach dem
+      -- Versand auf 0 - zwei Schritte, die keine Quittung deckt, und der
+      -- eigene Haken kostete auf einer gespiegelten Liste doch ein Nachladen),
+      -- fuer updated_at (trg_shopping_items_updated_at schreibt es in einem
+      -- zweiten UPDATE - jede Aenderung zaehlte doppelt) und fuer den
+      -- Inbound-Sync, der jede gespiegelte Zeile bei jedem Lauf unveraendert
+      -- neu schreibt. IS NOT statt <>, damit NULL gegen NULL gleich ist.
+      -- Die Liste nennt genau die Spalten, die der Zettel zeigt; eine neue
+      -- Spalte, die er zeigen soll, braucht eine Migration mit dem Trigger.
+      CREATE TRIGGER trg_shopping_items_change_au AFTER UPDATE ON shopping_items
+        WHEN NEW.list_id IS NOT OLD.list_id OR NEW.name IS NOT OLD.name
+          OR NEW.quantity IS NOT OLD.quantity OR NEW.category IS NOT OLD.category
+          OR NEW.is_checked IS NOT OLD.is_checked OR NEW.notes IS NOT OLD.notes
+          OR NEW.url IS NOT OLD.url OR NEW.sort_order IS NOT OLD.sort_order
+          OR NEW.price_cents IS NOT OLD.price_cents OR NEW.store_id IS NOT OLD.store_id
+        BEGIN
         INSERT INTO shopping_list_changes (list_id, version) VALUES (NEW.list_id, 1)
           ON CONFLICT(list_id) DO UPDATE SET version = version + 1;
       END;

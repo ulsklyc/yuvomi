@@ -1170,6 +1170,7 @@ test('nach einem Fehlschlag derselben Liste wird die gecachte Antwort angenommen
 // --------------------------------------------------------
 
 const bread = (isChecked = 0) => ({ id: 11, name: 'Brot', is_checked: isChecked, category: 'Backwaren', sort_order: 0 });
+const eier  = () => ({ id: 12, name: 'Eier', is_checked: 0, category: 'Sonstiges', sort_order: 0 });
 const listRow = (checked) => ({ id: 1, name: 'Einkauf', item_total: 2, item_checked: checked });
 
 test('liveRefreshPlan: bewegt sich nur der Haken, bleiben die Zeilen stehen - auch in anderer Reihenfolge', () => {
@@ -1189,6 +1190,10 @@ test('liveRefreshPlan: ein neuer, fehlender, umbenannter oder umsortierter Artik
     'umbenannt':         [{ ...milk(0), name: 'Hafermilch' }, bread(0)],
     'andere Kategorie':  [{ ...milk(0), category: 'Kuehlregal' }, bread(0)],
     'andere Menge':      [{ ...milk(0), quantity: '2 l' }, bread(0)],
+    // Jemand hat die Milch nach unten gezogen: der Server antwortet in neuer
+    // Reihenfolge, und `sort_order` traegt sie. Die Reihenfolge der Antwort
+    // allein zaehlt nicht (siehe den Fall darueber) - der Rang schon.
+    'umsortiert':        [bread(0), { ...milk(0), sort_order: 2 }],
   };
   for (const [why, fresh] of Object.entries(rebuilds)) {
     assert.equal(__test.liveRefreshPlan(previous, fresh).rebuild, true, why);
@@ -1240,6 +1245,66 @@ test('refreshFromFeed: ein Fehler beim Nachladen bleibt still und laesst den let
   // Meldung abweist.
   assert.equal(__test.state.lists.length, 1, 'die Reiter bleiben stehen');
   assert.equal(__test.state.listsError, null, 'kein Merker, der die naechste Meldung stumm schaltet');
+  delete globalThis.__apiStub;
+});
+
+test('refreshFromFeed: scheitert nur die Listenzeile, kommt der frische Bestand trotzdem auf den Schirm', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0)];
+  // Jemand anderes hat Eier dazugelegt; GET /shopping antwortet 500, die
+  // Artikel kommen durch. `loadLists` faengt selbst, also hat `loadItems`
+  // den Bestand schon eingetragen, wenn der Fehler der Listenzeile auffaellt.
+  globalThis.__apiStub = {
+    get: async () => { throw Object.assign(new Error('500'), { data: { error: 'kaputt' } }); },
+    getWithSource: async () => ({ data: { data: [milk(0), eier()] }, fromCache: false }),
+  };
+  const asked = [];
+  const container = { querySelector: (sel) => { asked.push(sel); return null; }, querySelectorAll: () => [] };
+  const origError = console.error;
+  console.error = () => {};
+  await __test.refreshFromFeed(container, 1, new AbortController().signal);
+  console.error = origError;
+  assert.deepEqual(__test.state.items.map((i) => i.id), [10, 12], 'die Artikel-Antwort ist angewandt');
+  // Ohne das Zeichnen hielte die Seite einen Stand, den keine spaetere Meldung
+  // mehr zeichnet: `liveRefreshPlan` vergleicht Serverstand mit Serverstand,
+  // und der naechste ist mit diesem deckungsgleich - die Eier erschienen nie.
+  assert.ok(asked.includes('#items-list'), 'der frische Bestand wird gezeichnet');
+  assert.equal(__test.state.listsError, null, 'kein Merker, der die naechste Meldung stumm schaltet');
+  assert.equal(__test.state.lists.length, 1, 'die Reiter bleiben stehen');
+  delete globalThis.__apiStub;
+});
+
+test('refreshFromFeed: scheitern die Artikel sofort und die Listenzeile SPAETER, bleibt kein Merker zurueck', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0)];
+  const fail = () => Object.assign(new Error('500'), { data: { error: 'kaputt' } });
+  // Die Ablehnung der Artikel kommt zuerst; die Listenzeile ist da noch
+  // unterwegs und scheitert danach. Wer nur bis zur ersten Ablehnung wartet,
+  // liest den Merker, bevor er gesetzt ist - und er bleibt dann stehen.
+  globalThis.__apiStub = {
+    get: () => new Promise((_, reject) => setTimeout(() => reject(fail()), 5)),
+    getWithSource: async () => { throw fail(); },
+  };
+  const origWarn = console.warn;
+  const origError = console.error;
+  console.warn = () => {};
+  console.error = () => {};
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  await new Promise((r) => setTimeout(r, 25));
+  console.warn = origWarn;
+  console.error = origError;
+  assert.equal(__test.state.listsError, null, 'der spaete Fehler der Listenzeile darf nicht stehen bleiben');
+  assert.deepEqual(__test.state.lists.map((l) => l.id), [1], 'die Reiter bleiben stehen');
+  // Und die naechste Meldung wird noch bedient.
+  const calls = [];
+  globalThis.__apiStub = {
+    get: async (path) => { calls.push(path); return { data: [listRow(0)] }; },
+    getWithSource: async (path) => { calls.push(path); return { data: { data: [milk(0)] }, fromCache: false }; },
+  };
+  await __test.refreshFromFeed(makeNullContainer(), 1, new AbortController().signal);
+  assert.deepEqual([...calls].sort(), ['/shopping', '/shopping/1/items'], 'die naechste Meldung laedt');
   delete globalThis.__apiStub;
 });
 
@@ -1427,7 +1492,6 @@ test('ein fehlgeschlagener DELETE raeumt die Schwebe und bringt die Zeile zuruec
 
 test('Abgehakte loeschen: die Auffrischung im Fenster bringt sie nicht zurueck, das Zuruecknehmen nicht doppelt', async () => {
   resetShoppingState();
-  const eier = () => ({ id: 12, name: 'Eier', is_checked: 0, category: 'Sonstiges', sort_order: 0 });
   __test.state.lists = [{ ...listRow(2), item_total: 3 }];
   __test.state.items = [milk(1), bread(1), eier()];
   global.window.yuvomi.showToast = () => {};
@@ -1653,11 +1717,37 @@ test('ein fehlgeschlagener DELETE raeumt sofort, auch wenn ein aelterer GET noch
 });
 
 // --------------------------------------------------------
-// Abgehakte loeschen: die Route loescht, was BEIM EINTREFFEN abgehakt ist
-// (Review zu PR #1109, Runde 3). Hat jemand anderes im Undo-Fenster einen
-// weiteren Artikel abgehakt, nimmt der Server ihn mit - und die Quittung darf
-// die Marke dann nicht vorruecken, sonst laedt keine Abfrage die Zeile weg.
+// Abgehakte loeschen (Review zu PR #1109, Runden 3 und 4): der DELETE nennt
+// die Artikel, die die Seite entfernt hat - ein Haken, den jemand anderes im
+// Undo-Fenster setzt, geht so nicht mit. Hat jemand einen der unseren im
+// Fenster zurueckgeholt, behaelt der Server ihn, und die Quittung darf die
+// Marke dann nicht vorruecken, sonst laedt keine Abfrage die Zeile her.
 // --------------------------------------------------------
+
+test('Abgehakte loeschen: der DELETE nennt genau die Artikel, die die Seite entfernt hat', async () => {
+  resetShoppingState();
+  __test.state.lists = [listRow(2)];
+  __test.state.items = [milk(1), bread(1), eier()];
+  global.window.yuvomi.showToast = () => {};
+  const undo = captureUndo();
+  const sent = [];
+  globalThis.__apiStub = {
+    delete: async (path, opts) => {
+      sent.push({ path, keepalive: opts.keepalive, body: JSON.parse(opts.body) });
+      return { deleted: 2, list_change: { list_id: 1, before: 4, after: 5 } };
+    },
+  };
+  try {
+    __test.clearCheckedUndoable(makeNullContainer());
+    await undo.last.commit({ keepalive: true });
+    assert.deepEqual(sent, [{ path: '/shopping/1/items/checked', keepalive: true, body: { ids: [10, 11] } }],
+      'nicht "alles, was beim Eintreffen abgehakt ist" - und die Fetch-Option bleibt erhalten');
+  } finally {
+    delete globalThis.__apiStub;
+    delete globalThis.__undoStub;
+    delete global.window.yuvomi.showToast;
+  }
+});
 
 /** Feed samt Stubs: liefert, ob die naechste Abfrage bei `version` nachlaedt. */
 async function reloadsOnNextPoll({ deleted, version }) {
@@ -1703,9 +1793,52 @@ test('Abgehakte loeschen: hat der Server genau so viele entfernt wie die Seite, 
   assert.equal(await reloadsOnNextPoll({ deleted: 1, version: 5 }), false);
 });
 
-test('Abgehakte loeschen: hat der Server MEHR entfernt als die Seite, laedt die naechste Abfrage nach', async () => {
-  assert.equal(await reloadsOnNextPoll({ deleted: 2, version: 5 }), true,
-    'der fremde Haken, den der Server mitgeloescht hat, verschwindet nur durch das Nachladen');
+test('Abgehakte loeschen: hat der Server WENIGER entfernt als die Seite, laedt die naechste Abfrage nach', async () => {
+  assert.equal(await reloadsOnNextPoll({ deleted: 0, version: 5 }), true,
+    'die Zeile, die jemand im Undo-Fenster zurueckgeholt hat, kommt nur durch das Nachladen her');
+});
+
+test('loadItems: die Laufnummer der Artikel-Antwort wird der Stand des Feeds - in beide Richtungen', async () => {
+  const run = async ({ feedSays, itemsCarry, thenFeedSays }) => {
+    resetShoppingState();
+    __test.state.lists = [listRow(0)];
+    __test.state.items = [];
+    let versions = [{ list_id: 1, version: feedSays }];
+    const calls = [];
+    globalThis.__apiStub = {
+      get: async (path) => {
+        calls.push(path);
+        if (path === '/shopping/versions') return { data: versions };
+        return { data: [listRow(0)] };
+      },
+      getWithSource: async (path) => { calls.push(path); return { data: { data: [milk(0)], version: itemsCarry }, fromCache: false }; },
+    };
+    const route = new AbortController();
+    try {
+      __test.wireLiveUpdates(makeNullContainer(), route.signal);
+      await settle(); // die Laufnummern-Antwort setzt die Marke
+      await __test.loadItems(1); // die Artikel-Antwort sagt, welchen Stand die Seite haelt
+      calls.length = 0;
+      versions = [{ list_id: 1, version: thenFeedSays }];
+      await __test.getLiveFeedForTest().poll();
+      await settle();
+      return calls.includes('/shopping/1/items');
+    } finally {
+      route.abort();
+      __test.abortLiveUpdatesForTest();
+      delete globalThis.__apiStub;
+    }
+  };
+  // Beim Oeffnen laufen beide Anfragen nebeneinander, und keine Reihenfolge ist
+  // die sichere: kam die Laufnummern-Antwort zuerst (4) und die Artikel danach
+  // (5), hat die Seite die 5 schon - die naechste Abfrage laedt nicht umsonst.
+  assert.equal(await run({ feedSays: 4, itemsCarry: 5, thenFeedSays: 5 }), false,
+    'die Artikel-Antwort war die juengere: nichts nachzuladen');
+  // Kam die Laufnummern-Antwort danach (6) und die Artikel davor (5), hat
+  // jemand zwischen den beiden geschrieben - ohne `hold` stuende die Marke
+  // schon auf 6, und die Aenderung fiele bis zur uebernaechsten durch.
+  assert.equal(await run({ feedSays: 6, itemsCarry: 5, thenFeedSays: 6 }), true,
+    'die Artikel-Antwort war die aeltere: die Aenderung dazwischen wird nachgeladen');
 });
 
 /** Kleinstes Panel fuer den Artikeldialog: Felder mit Wert, ein Formular mit submit-Handler. */

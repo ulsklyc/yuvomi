@@ -2235,22 +2235,28 @@ function clearCheckedUndoable(container) {
     commit: async ({ keepalive }) => {
       let response;
       try {
-        response = await api.delete(`/shopping/${listId}/items/checked`, { keepalive });
+        // GENAU DIE ARTIKEL, DIE DIE SEITE ENTFERNT HAT - nicht, was beim
+        // Eintreffen abgehakt ist. Hat jemand anderes im Undo-Fenster einen
+        // weiteren Artikel abgehakt (und eine Auffrischung ihn hergebracht),
+        // naehme die Route ohne Liste ihn mit, und das Zuruecknehmen braechte
+        // nur den eigenen Schnappschuss zurueck.
+        response = await api.delete(`/shopping/${listId}/items/checked`, {
+          keepalive,
+          body: JSON.stringify({ ids: checked.map((item) => item.id) }),
+        });
       } catch (err) {
         // Sofort raeumen: `restore` bringt die Zeilen zurueck, und jede Antwort
         // darf sie wieder tragen.
         for (const item of checked) pendingRemovals.delete(item.id);
         throw err;
       }
-      // DIE ROUTE LOESCHT, WAS BEIM EINTREFFEN ABGEHAKT IST - nicht, was die
-      // Seite entfernt hat. Hat jemand anderes im Undo-Fenster einen weiteren
-      // Artikel abgehakt (und eine Auffrischung ihn hergebracht), nimmt der
-      // Server ihn mit; hat jemand einen der unseren zurueckgeholt, bleibt er.
-      // In beiden Faellen meint die Quittung MEHR oder WENIGER als die eigene
-      // Anzeige, und rueckte sie die Marke vor, lade keine Abfrage nach: die
-      // Zeile stuende falsch, bis die Liste sich das naechste Mal bewegt. Also
-      // gilt sie nur, wenn der Server genau so viele entfernt hat, wie die
-      // Seite entfernt hat - sonst sieht die naechste Abfrage die Bewegung.
+      // Weniger als erbeten heisst: jemand hat einen der unseren im Fenster
+      // zurueckgeholt, und der Server hat ihn behalten. Dann meint die Quittung
+      // WENIGER als die eigene Anzeige, und rueckte sie die Marke vor, lade
+      // keine Abfrage nach - die Zeile fehlte, bis die Liste sich das naechste
+      // Mal bewegt. Also gilt sie nur, wenn der Server genau so viele entfernt
+      // hat, wie die Seite entfernt hat - sonst sieht die naechste Abfrage die
+      // Bewegung und holt die Zeile her.
       if (response?.deleted === count) acknowledgeOwnChange(response);
       confirmRemovals(checked.map((item) => item.id));
     },
@@ -2498,6 +2504,11 @@ async function loadItems(listId) {
     _itemsListId = listId;
     settleIntents(state.items, listId, { fromCache, startedAt });
     state.activeList = data.list ?? null;
+    // Dem Feed sagen, welchen Stand die Seite jetzt haelt: die Antwort traegt
+    // die Laufnummer, zu der ihre Artikel gehoeren. Auch eine gecachte - sie
+    // IST der Stand, den die Seite zeigt, und liegt er unter der Laufnummer,
+    // ist das Nachladen bei der naechsten Abfrage genau richtig.
+    _liveFeed?.hold(listId, data.version);
     // Kategorien aus API-Antwort übernehmen wenn vorhanden (immer aktuell)
     if (data.categories?.length) state.categories = data.categories;
   } finally {
@@ -2571,9 +2582,13 @@ function acknowledgeOwnChange(response) {
  * wird die Zeile an Ort und Stelle umgefaerbt, wie beim eigenen Antippen: kein
  * Neuaufbau, keine Einblend-Animation, die Scroll-Position bleibt (#276), und
  * die Reihenfolge auch - Abgehaktes sortiert sich beim naechsten Aufbau ans
- * Ende, nicht unter dem Finger weg. Ist ein Artikel dazugekommen, verschwunden
- * oder umbenannt, wird die Liste neu gebaut; das ist der Fall, den die
- * Animation meint.
+ * Ende, nicht unter dem Finger weg. Ist ein Artikel dazugekommen, verschwunden,
+ * umbenannt oder umsortiert, wird die Liste neu gebaut; das ist der Fall, den
+ * die Animation meint. Umsortiert heisst: sein `sort_order` hat sich bewegt -
+ * die Reihenfolge der ANTWORT allein nicht, denn die aendert sich schon mit
+ * einem Haken (Abgehaktes sortiert der Server ans Ende), und ein Haken darf
+ * keinen Neuaufbau kosten. Das Ziehen eines anderen bewegt `sort_order`; das
+ * Abhaken laesst es stehen.
  *
  * Verglichen wird der SERVERSTAND vor und nach dem Laden, nicht das DOM: die
  * Seite haelt beides ohnehin deckungsgleich, und `updateItemRow` zeichnet die
@@ -2582,7 +2597,7 @@ function acknowledgeOwnChange(response) {
 function liveRefreshPlan(previous, fresh) {
   const shape = (i) => JSON.stringify([
     i.id, i.category, i.name, i.quantity ?? '', i.notes ? 1 : 0, i.url ? 1 : 0,
-    i.price_cents ?? '', i.store_id ?? '', i.tags ?? [],
+    i.price_cents ?? '', i.store_id ?? '', i.tags ?? [], i.sort_order ?? '',
   ]);
   const before = previous.map(shape).sort();
   const after  = fresh.map(shape).sort();
@@ -2614,29 +2629,37 @@ async function refreshFromFeed(container, listId, signal) {
   const active        = listId === state.activeListId;
   const previous      = state.items;
   const previousLists = state.lists;
-  let failed = false;
-  try {
-    if (active) await Promise.all([loadLists(), loadItems(listId)]);
-    else await loadLists();
-  } catch (err) {
-    console.warn('[Shopping] Live-Aktualisierung fehlgeschlagen:', err);
-    failed = true;
-  }
+  // BEIDE Antworten abwarten, nicht nur bis zur ersten Ablehnung. `loadLists`
+  // faengt selbst und vermerkt in `state.listsError`; brach `Promise.all` mit
+  // dem Scheitern von `loadItems` ab, waehrend `loadLists` noch unterwegs war,
+  // stand der Merker beim Lesen unten noch auf null und wurde DANACH gesetzt -
+  // und blieb: die Wache oben wies ab da jede Meldung ab, ohne Fehlerbild,
+  // mit leeren Reitern, bis zum naechsten Seitenaufbau.
+  const [, items] = await Promise.allSettled([loadLists(), active ? loadItems(listId) : null]);
+  const itemsFailed = items.status === 'rejected';
+  if (itemsFailed) console.warn('[Shopping] Live-Aktualisierung fehlgeschlagen:', items.reason);
   // loadLists() faengt selbst und vermerkt den Fehler fuer den Seitenaufbau,
   // wo er ein Fehlerbild mit Wiederholung ergibt. Fuer eine STILLE
   // Auffrischung ist derselbe Vermerk das Gegenteil von still: leere Reiter
   // und ein Merker, der jede weitere Meldung abwiese. Also zurueck auf den
   // letzten Stand, und die naechste Meldung versucht es wieder.
-  if (state.listsError) {
+  const listsFailed = Boolean(state.listsError);
+  if (listsFailed) {
     state.listsError = null;
     state.lists = previousLists;
-    return;
   }
-  if (failed || signal.aborted) return;
+  if (signal.aborted) return;
+  // Was `loadItems` in `state.items` eingetragen hat, kommt auf den Schirm -
+  // auch wenn die Listenzeile daneben gescheitert ist. Kehrte die Auffrischung
+  // hier um, hielte die Seite einen Stand, den sie nie gezeichnet hat; die
+  // naechste Meldung vergleicht Serverstand mit Serverstand (`liveRefreshPlan`),
+  // faende nichts Neues, und die Zeile erschiene nie.
+  //
   // Die aktive Liste ist weg - jemand anderes hat sie geloescht. Der Zettel
   // wechselt auf die erste verbliebene oder zeigt den Leerzustand, statt eine
-  // Liste zu zeigen, die es nicht mehr gibt.
-  if (state.activeListId != null && !state.lists.some((l) => l.id === state.activeListId)) {
+  // Liste zu zeigen, die es nicht mehr gibt. Das kann nur eine frische
+  // Listenantwort sagen, nicht der zurueckgeholte Stand.
+  if (!listsFailed && state.activeListId != null && !state.lists.some((l) => l.id === state.activeListId)) {
     if (state.lists.length) {
       await switchList(state.lists[0].id, container);
       return;
@@ -2651,6 +2674,8 @@ async function refreshFromFeed(container, listId, signal) {
   renderTabs(container);
   // Inzwischen umgeschaltet: switchList zeichnet die neue Liste selbst.
   if (!active || state.activeListId !== listId) return;
+  // Gescheitert heisst: `state.items` ist unangetastet, es gibt nichts zu zeichnen.
+  if (itemsFailed) return;
   if (state.itemsError) {
     // Der Fehlerzustand von vorhin ist ueberholt - die Antwort ist da.
     state.itemsError = null;
@@ -3096,12 +3121,14 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Ein Seitenaufbau ist immer ein neuer Batch fuer die Sammelaktions-Pille -
   // eine Frist der vorherigen Seite darf diese hier nicht treffen (#1039).
   resetPillMachine();
-  // VOR dem Laden, nicht danach: der Feed setzt seine Marken mit der ersten
-  // Antwort, und was sich ab da bewegt, wird gemeldet. Verdrahtet erst nach
-  // dem Laden, fiele eine Aenderung zwischen Artikel-Antwort und erster
-  // Feed-Antwort durch - bis zur uebernaechsten. Eine Meldung, die noch in
-  // den Aufbau faellt, laedt hoechstens einmal umsonst; die Ladeordnung
-  // (`_loadSeq`) haelt die Antworten auseinander.
+  // VOR dem Laden: die erste Laufnummern-Abfrage laeuft neben dem Laden der
+  // Seite. Die Reihenfolge der beiden Antworten ist damit NICHT entschieden -
+  // und muss es nicht sein: die Artikel-Antwort traegt ihre Laufnummer, und
+  // `loadItems` gibt sie dem Feed als den Stand, den die Seite haelt
+  // (`hold`). Eine Aenderung zwischen den beiden Antworten faellt so nicht
+  // durch, egal welche zuerst kam. Eine Meldung, die noch in den Aufbau
+  // faellt, laedt hoechstens einmal umsonst; die Ladeordnung (`_loadSeq`)
+  // haelt die Antworten auseinander.
   wireLiveUpdates(container, routeSignal);
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `

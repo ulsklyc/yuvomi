@@ -450,7 +450,14 @@ which bumps the list it left), on `shopping_item_tags` (after insert and delete,
 list through the item) and on a `shopping_lists` update bump it, so every writer - the
 shopping routes, the meal-plan and recipe imports, housekeeping, MCP, the CalDAV to-do sync -
 counts without knowing about it; `GET /api/v1/shopping/versions` reads this table and nothing
-else. Deliberately no foreign key to Shopping Lists: the item triggers fire during the cascade of a
+else. The update trigger carries a `WHEN` that compares the columns a client shows (`list_id`,
+`name`, `quantity`, `category`, `is_checked`, `notes`, `url`, `sort_order`, `price_cents`,
+`store_id`; `IS NOT`, so NULL equals NULL): bookkeeping does not count - not the `outbound_dirty`
+flag the CalDAV push sets after an own tap and clears after the upload (two steps no receipt could
+cover, so an own tap on a mirrored list would have cost a reload), not the second UPDATE
+`trg_shopping_items_updated_at` runs after every change (which doubled every step), and not the
+inbound sync rewriting an unchanged mirrored row on every pass. A new column a client should show
+needs a migration that extends the trigger. Deliberately no foreign key to Shopping Lists: the item triggers fire during the cascade of a
 list deletion and a foreign key would make exactly that insert fail; a trigger on `shopping_lists`
 removes the row after the list instead, and the missing row is how a client learns the list is
 gone. Deviates from the entity-table rule (no `id`, no timestamps) as a key/value table.
@@ -721,7 +728,7 @@ Excluded single occurrences of a recurring series (EXDATE, migration v85). One r
 | created_at | TEXT | DATETIME, default now |
 | PRIMARY KEY | | (event_id, exception_date) |
 
-**Linked local occurrence overrides (migration v194, #975).** The current only-this edit path stores a concrete replacement row with `recurrence_parent_id`, `recurrence_id`, and `overridden_fields`. The parent plus original slot is the durable identity, so moving the displayed start does not change which occurrence is being edited. This model also subsumes the existing imported `${uid}::${recurrenceId}` identity: an imported override is already a concrete rule-less event row, and a future migration can locate its master and populate the same parent and original-slot columns. It does not need a second override table or a second read model. The current day-based key and unique `(recurrence_parent_id, recurrence_id)` index allow exactly one overridden original slot per series per day; importing multiple occurrences on the same day would require widening the key, index, and date-key validation first. Migration v196 deliberately performs no such import migration and does not heuristically relink historic detached local edits, because their original slot cannot be recovered unambiguously.
+**Linked local occurrence overrides (migration v194, #975).** The current only-this edit path stores a concrete replacement row with `recurrence_parent_id`, `recurrence_id`, and `overridden_fields`. The parent plus original slot is the durable identity, so moving the displayed start does not change which occurrence is being edited. This model also subsumes the existing imported `${uid}::${recurrenceId}` identity: an imported override is already a concrete rule-less event row, and a future migration can locate its master and populate the same parent and original-slot columns. It does not need a second override table or a second read model. The current day-based key and unique `(recurrence_parent_id, recurrence_id)` index allow exactly one overridden original slot per series per day; importing multiple occurrences on the same day would require widening the key, index, and date-key validation first. Migration v194 deliberately performs no such import migration and does not heuristically relink historic detached local edits, because their original slot cannot be recovered unambiguously.
 
 Eligibility for linked overrides is server-owned and local-only. A series must have a recurrence rule, have `external_source = 'local'`, carry no external UID, object URL, calendar reference, subscription, provider link, or Google, CalDAV, or Outlook outbound target, and have no birthday, name-day, housekeeping, or other generated owner. `is_local_recurring_series` describes local origin, independently of `can_override_occurrence`. A locally owned series with an outbound target, Outlook auto-sync exposure, or a birthday, name-day, housekeeping, or other generated owner remains local and exposes `can_detach_occurrence` to visible actors instead: all three scopes retain the legacy standalone-event plus EXDATE / truncate-plus-successor workflow. That fallback intentionally retains its existing multi-request partial-failure window, while linked overrides are atomic. Imported series keep whole-series behavior and never use that fallback. Occurrence mutations use the same row-visibility authorization as the established whole-series PUT/DELETE path; there is no extra creator-only tier. Apple auto-sync excludes linked children and masters with linked children, but a deletion-only EXDATE does not remove a series from its existing outbound behavior. API capability fields are presentation data; the server repeats authoritative visibility and eligibility checks before writing.
 
@@ -3551,12 +3558,13 @@ The surface carries four things, in this order: **the time**, large (this is whe
 - Integration with meal plan: "Add ingredients to shopping list" transfers with source reference
 - **Bulk import from meal plan (v1.3.0):** a "From meal plan" action (in the list header until v2.2.3, since then in the chip row's overflow menu) opens a date-range dialog (defaults to the next 7 days) and imports the ingredients of every planned meal in that range into the active list. Repeated ingredients are aggregated before insertion — numeric quantities with a matching unit are summed, purely textual quantities collapse to a `N × …` note. Already-transferred ingredients are skipped via the existing `on_shopping_list` flag (`POST /api/v1/shopping/:listId/import-meal-plan`).
 - Checked items shown with strikethrough + moved to bottom
-- **Live updates while the list is open (migration v196):** an open list hears within a few
-  seconds that another member (or a meal-plan import, or the CalDAV sync) changed its items, and
-  redraws the affected rows in place - a check from another phone looks exactly like a check on
-  this one, no rebuild, no scroll jump. The list is rebuilt only when an item was added, removed
-  or renamed; a list someone else renamed or deleted updates the tab row, and a deleted active
-  list hands over to the first remaining one. The mechanism is two-layered: a per-list change
+- **Live updates while the list is open (migration v196):** an open list hears within about
+  ten seconds that another member (or a meal-plan import, or the CalDAV sync) changed its items,
+  and redraws the affected rows in place - a check from another phone looks exactly like a check
+  on this one, no rebuild, no scroll jump. The list is rebuilt only when an item was added,
+  removed, renamed or moved (its `sort_order` changed - the answer's order alone changes with
+  every check, since checked rows sort last); a list someone else renamed or deleted updates the
+  tab row, and a deleted active list hands over to the first remaining one. The mechanism is two-layered: a per-list change
   counter (`shopping_list_changes`) that database triggers bump on every insert/update/delete of
   `shopping_items` (both lists when an item moves) and on a list rename, so no writer has to
   announce itself; and `GET /api/v1/shopping/versions`, which the page polls every 10 s while
@@ -3568,13 +3576,20 @@ The surface carries four things, in this order: **the time**, large (this is whe
   router's abort signal (#976). Own edits cost no reload: the item write routes answer with
   `list_change: { list_id, before, after }`, and the page advances its mark when `before` is the
   version it last saw - if someone else wrote in between, `before` differs and the next poll
-  reloads. Own edits also survive a reload: the intent overlay (see the check-intent rules in
+  reloads. The items answer carries `version`, and the page hands it to the feed as the state it
+  holds (`hold`): on open, the versions poll and the items request run side by side and neither
+  order is the safe one, so the mark becomes whatever the page actually loaded - a lower value
+  makes the next poll reload the change that fell between the two answers, a higher one saves a
+  pointless reload. A receipt or a held state that arrives before the first versions answer is
+  kept and applied to it, in order. Own edits also survive a reload: the intent overlay (see the check-intent rules in
   `public/pages/shopping.js`) keeps a pending tap on top of an older server answer, and a row
   removed locally stays out of every answer that started before its DELETE was confirmed - during
   the undo window and for a load still in flight when the window closes - because the receipt
-  has already moved the mark and no poll would reload it otherwise. "Clear checked" deletes
-  whatever is checked when the request arrives, so the page acknowledges its receipt only when
-  the server deleted exactly as many rows as the page removed; otherwise the next poll reloads.
+  has already moved the mark and no poll would reload it otherwise. "Clear checked" names the
+  ids the page removed (`DELETE /:listId/items/checked` with `{ ids }`), so a row someone else
+  ticked during the undo window stays; the page acknowledges the receipt only when the server
+  deleted exactly as many rows as it removed - fewer means someone unticked one of them in the
+  window and the server kept it, and the next poll brings it back.
 - **Manual item order within an aisle (v1.87.0, #678):** every row carries a drag handle next to its edit and delete actions. Dragging reorders within the category group only — a drag across groups would be a category change, which the item dialog already does, and ranks are per category anyway. The handle is a real button and takes ArrowUp/ArrowDown once focused, sharing one persistence path with the drag; that keyboard route is required of every `makeSortable` caller (see the header of `public/utils/sortable.js`) and is guarded in `test:frontend-audit`. Its `aria-label` carries the position, and a `role="status"` live region announces each move, reusing `category.reorderAnnounce`. Checked rows are filtered out of the drag and their handle is disabled — they sort last in their group regardless of rank. A category holding a single row hides its handle via `:only-child`. `PATCH /api/v1/shopping/:listId/items/reorder` takes `{ category, order }` and requires the **complete** group: a partial list would leave the omitted ranks colliding with the newly assigned ones. Requests are serialised per category with at most one follow-up queued, so rapid moves settle in the order they were made instead of letting the arrival order at the server decide; the follow-up reads the DOM when it starts, so any number of moves costs two requests. The list id is captured when a move is queued, so switching lists mid-flight neither misroutes the write nor overwrites the new list's state.
 - **Send the list to a member by email (#944):** an entry in the overflow menu mails the list's open
   items to one household member, grouped by category in the same shop order the screen shows.

@@ -377,6 +377,34 @@ test('DELETE /:listId/items/checked: entfernt nur abgehakte, zählt', async () =
   assert.equal(db.prepare('SELECT COUNT(*) c FROM shopping_items WHERE list_id = ?').get(list).c, 1);
 });
 
+test('DELETE /:listId/items/checked mit { ids }: nur die genannten, davon nur abgehakte, nur aus dieser Liste', async () => {
+  const list  = await newList('Checked-Ids');
+  const other = await newList('Andere');
+  const a = (await call('POST', `/${list}/items`,  { name: 'A' })).body.data;
+  const b = (await call('POST', `/${list}/items`,  { name: 'B' })).body.data;
+  const c = (await call('POST', `/${list}/items`,  { name: 'C' })).body.data;
+  const x = (await call('POST', `/${other}/items`, { name: 'X' })).body.data;
+  for (const item of [a, b, x]) await call('PATCH', `/items/${item.id}`, { is_checked: true });
+  // B ist abgehakt, aber nicht genannt (jemand anderes, im Undo-Fenster).
+  // C ist genannt, aber nicht abgehakt (zurueckgeholt). X gehoert einer anderen Liste.
+  const r = await call('DELETE', `/${list}/items/checked`, { ids: [a.id, c.id, x.id] });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.deleted, 1, 'nur A: genannt, abgehakt, in dieser Liste');
+  const names = (listId) => db.prepare('SELECT name FROM shopping_items WHERE list_id = ? ORDER BY name').all(listId).map((row) => row.name);
+  assert.deepEqual(names(list), ['B', 'C']);
+  assert.deepEqual(names(other), ['X'], 'eine fremde ID loescht nichts in der anderen Liste');
+});
+
+test('DELETE /:listId/items/checked: ein leeres oder unbrauchbares ids ist 400, kein "dann eben alle"', async () => {
+  const list = await newList('Checked-400');
+  const a = (await call('POST', `/${list}/items`, { name: 'A' })).body.data;
+  await call('PATCH', `/items/${a.id}`, { is_checked: true });
+  assert.equal((await call('DELETE', `/${list}/items/checked`, { ids: [] })).status, 400);
+  assert.equal((await call('DELETE', `/${list}/items/checked`, { ids: ['a'] })).status, 400);
+  assert.equal((await call('DELETE', `/${list}/items/checked`, { ids: [0] })).status, 400);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM shopping_items WHERE list_id = ?').get(list).c, 1, 'nichts geloescht');
+});
+
 // --------------------------------------------------------------------------
 // Essensplan-Import
 // --------------------------------------------------------------------------

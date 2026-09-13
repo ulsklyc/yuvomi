@@ -20,6 +20,20 @@
  *        ueberholte - sie war unterwegs, als die Quittung die Marke vorrueckte.
  *        Sie bewegt nichts. Nummern steigen nur.
  *
+ *        `hold()` sagt dem Feed, welchen Stand die Seite fuer eine Liste
+ *        GELADEN hat (die Artikel-Antwort traegt ihre Laufnummer). Die Marke
+ *        wird dieser Stand - in beide Richtungen: liegt er unter der Marke,
+ *        hat die Laufnummern-Antwort schon eine Aenderung gesehen, die die
+ *        Artikel-Antwort noch nicht trug, und die naechste Abfrage laedt sie
+ *        nach; liegt er darueber, war die Laufnummern-Antwort die aeltere,
+ *        und die Abfrage laedt nicht umsonst. Beim Oeffnen laufen beide
+ *        Anfragen nebeneinander, und keine Reihenfolge ist die sichere.
+ *
+ *        Quittung und Stand koennen vor der ersten Laufnummern-Antwort
+ *        kommen - ein Haken gleich nach dem Oeffnen. Sie werden aufgehoben
+ *        und auf die erste Antwort angewandt, in ihrer Reihenfolge; sonst
+ *        kostete der Haken ein Nachladen, und ein Stand ginge verloren.
+ *
  *        Bewusst eine Abfrage im Takt und kein offener Strom: eine Anfrage,
  *        die endet, braucht keinen Proxy, der Stroeme durchlaesst, belegt
  *        keine der wenigen Verbindungen je Origin und laesst sich spaeter
@@ -38,7 +52,7 @@
  * @param {() => boolean} [opts.isHidden]            verborgener Tab: der Takt schweigt
  * @param {(fn: () => void, ms: number) => any} [opts.setInterval]   fuer Tests
  * @param {(id: any) => void} [opts.clearInterval]                    fuer Tests
- * @returns {{ poll: () => Promise<void>, acknowledge: (change: any) => void, stop: () => void }}
+ * @returns {{ poll: () => Promise<void>, acknowledge: (change: any) => void, hold: (listId: number, version: number) => void, stop: () => void }}
  */
 export function startLiveFeed({
   fetchVersions,
@@ -51,6 +65,8 @@ export function startLiveFeed({
 }) {
   /** Zuletzt gesehene Laufnummer je Liste; null bis zur ersten Antwort. */
   let seen = null;
+  /** Quittungen und Staende, die vor der ersten Antwort kamen - in Reihenfolge. */
+  let pending = [];
   let inFlight = null;
   let stopped = signal?.aborted ?? false;
 
@@ -63,8 +79,15 @@ export function startLiveFeed({
       if (Number.isInteger(row?.list_id) && Number.isInteger(row?.version)) fresh.set(row.list_id, row.version);
     }
     if (!seen) {
-      seen = fresh;
-      return;
+      // Die erste Antwort setzt die Marken - und dann kommt dran, was die
+      // Seite in der Zwischenzeit schon wusste. Danach der gewoehnliche
+      // Vergleich: eine aufgehobene Quittung oder ein aufgehobener Stand
+      // kann die Marke unter diese Antwort gesetzt haben, und das ist dann
+      // eine Bewegung, die zu melden ist.
+      seen = new Map(fresh);
+      const replay = pending;
+      pending = [];
+      for (const fn of replay) fn();
     }
     const moved = new Set();
     for (const [listId, version] of fresh) {
@@ -92,10 +115,17 @@ export function startLiveFeed({
   };
 
   const acknowledge = (change) => {
-    if (!seen || !change) return;
+    if (!change) return;
     const { list_id: listId, before, after } = change;
     if (!Number.isInteger(listId) || !Number.isInteger(after)) return;
+    if (!seen) { pending.push(() => acknowledge(change)); return; }
     if (seen.get(listId) === before) seen.set(listId, after);
+  };
+
+  const hold = (listId, version) => {
+    if (!Number.isInteger(listId) || !Number.isInteger(version)) return;
+    if (!seen) { pending.push(() => hold(listId, version)); return; }
+    seen.set(listId, version);
   };
 
   const timer = stopped ? null : schedule(() => { if (!isHidden()) poll(); }, intervalMs);
@@ -105,5 +135,5 @@ export function startLiveFeed({
   };
   signal?.addEventListener('abort', stop, { once: true });
 
-  return { poll, acknowledge, stop };
+  return { poll, acknowledge, hold, stop };
 }

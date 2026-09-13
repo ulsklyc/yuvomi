@@ -150,6 +150,59 @@ test('ein Schreibweg an der Route vorbei zaehlt genauso (der Grund fuer den Trig
   assert.ok(versionOf(list) > before);
 });
 
+test('Buchhaltung bewegt die Nummer nicht: outbound_dirty, updated_at, ein unveraenderter Sync-Schreibvorgang', async () => {
+  const list = await newList('Buchhaltung');
+  const { data: item } = await addItem(list);
+  const before = versionOf(list);
+  // So merkt markTodoOutbound() den Artikel fuer den CalDAV-Push vor, und so
+  // raeumt der Push den Merker nach dem Versand - zwei UPDATEs, die kein
+  // Zettel sieht und keine Quittung deckt.
+  db.prepare('UPDATE shopping_items SET outbound_dirty = 1, outbound_attempts = 0 WHERE id = ?').run(item.id);
+  db.prepare('UPDATE shopping_items SET outbound_dirty = 0, outbound_attempts = 0 WHERE id = ?').run(item.id);
+  assert.equal(versionOf(list), before, 'der Push-Merker ist keine Aenderung, die ein Zettel sieht');
+  // So schreibt upsertShoppingItem() (caldav-reminders-sync.js) jede
+  // gespiegelte Zeile bei jedem Lauf - meist unveraendert.
+  db.prepare('UPDATE shopping_items SET name = name, is_checked = is_checked, list_id = list_id WHERE id = ?').run(item.id);
+  assert.equal(versionOf(list), before, 'ein Schreibvorgang ohne Aenderung bewegt nichts');
+  db.prepare('UPDATE shopping_items SET name = ? WHERE id = ?').run('Hafermilch', item.id);
+  assert.equal(versionOf(list), before + 1,
+    'genau ein Schritt: das zweite UPDATE von trg_shopping_items_updated_at zaehlt nicht mit');
+});
+
+test('der eigene Haken auf einer gespiegelten Liste kostet kein Nachladen: nichts, was der Push schreibt, liegt hinter der Quittung', async () => {
+  // Ein Konto, das es gibt (isMirrored prueft das), auf einer Adresse, die
+  // sofort ablehnt: der Sofortversuch des Push laeuft nach der Antwort und
+  // scheitert hier, wie er soll.
+  const account = db.prepare(`
+    INSERT INTO caldav_accounts (name, caldav_url, username, password)
+    VALUES ('Radicale', 'http://127.0.0.1:9/', 'u', 'p')
+  `).run().lastInsertRowid;
+  const list = await newList('Spiegel');
+  const { data: item } = await addItem(list, 'Milch');
+  db.prepare(`
+    UPDATE shopping_items
+    SET external_uid = 'uid-spiegel', external_source = 'caldav', external_account_id = ?,
+        external_object_url = 'http://127.0.0.1:9/spiegel.ics'
+    WHERE id = ?
+  `).run(account, item.id);
+
+  const patched = await call('PATCH', `/shopping/items/${item.id}`, { is_checked: true });
+  assert.equal(patched.status, 200);
+  assert.equal(db.prepare('SELECT outbound_dirty FROM shopping_items WHERE id = ?').get(item.id).outbound_dirty, 1,
+    'der Push ist vorgemerkt - die Route hat markTodoOutbound() wirklich durchlaufen');
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(versionOf(list), patched.body.list_change.after,
+    'Vormerken und Versuch des Push bewegen die Nummer nicht - die Quittung deckt den Haken ganz');
+});
+
+test('GET /shopping/:listId/items traegt die Laufnummer, zu der die Artikel gehoeren', async () => {
+  const list = await newList('Stand');
+  await addItem(list);
+  const r = await call('GET', `/shopping/${list}/items`);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.version, versionOf(list), 'derselbe Stand wie die Artikel - synchron gelesen');
+});
+
 test('ein Artikel, der die Liste wechselt, bewegt BEIDE Listen - auch die, die er verlaesst', async () => {
   const from = await newList('Von');
   const to = await newList('Nach');
@@ -214,6 +267,20 @@ test('Artikel zweier Listen zaehlen getrennt', async () => {
 // --------------------------------------------------------------------------
 // 3. Die Quittung
 // --------------------------------------------------------------------------
+test('DELETE /shopping/:listId/items/checked mit { ids } loescht nur die genannten - der Zettel nennt, was er entfernt hat', async () => {
+  const list = await newList('Genannt');
+  const a = (await addItem(list, 'A')).data;
+  const b = (await addItem(list, 'B')).data;
+  for (const item of [a, b]) await call('PATCH', `/shopping/items/${item.id}`, { is_checked: true });
+  // B hat jemand anderes im Undo-Fenster abgehakt; der Zettel hat nur A entfernt.
+  const r = await call('DELETE', `/shopping/${list}/items/checked`, { ids: [a.id] });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.deleted, 1);
+  assert.deepEqual(db.prepare('SELECT name FROM shopping_items WHERE list_id = ?').all(list).map((row) => row.name), ['B'],
+    'der fremde Haken bleibt - und kommt beim Zuruecknehmen nicht als Fremdkoerper zurueck');
+  assert.equal(r.body.list_change.after, versionOf(list));
+});
+
 test('die Artikel-Routen antworten mit list_change: { list_id, before, after }', async () => {
   const list = await newList('Quittung');
 
@@ -258,7 +325,11 @@ test('v196: bestehende Listen bekommen beim Update ihre Zeile mit 0', () => {
     CREATE TABLE shopping_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       list_id INTEGER NOT NULL REFERENCES shopping_lists(id) ON DELETE CASCADE,
-      name TEXT NOT NULL
+      name TEXT NOT NULL,
+      -- Die Spalten, die der Update-Trigger vergleicht; ohne sie schluege
+      -- schon CREATE TRIGGER fehl.
+      quantity TEXT, category TEXT NOT NULL DEFAULT 'Sonstiges', is_checked INTEGER NOT NULL DEFAULT 0,
+      notes TEXT, url TEXT, sort_order INTEGER NOT NULL DEFAULT 0, price_cents INTEGER, store_id INTEGER
     );
     CREATE TABLE shopping_item_tags (
       item_id INTEGER NOT NULL REFERENCES shopping_items(id) ON DELETE CASCADE,
@@ -272,6 +343,6 @@ test('v196: bestehende Listen bekommen beim Update ihre Zeile mit 0', () => {
   assert.deepEqual(rows, [{ list_id: 1, version: 0 }, { list_id: 2, version: 0 }],
     'jede Bestandsliste hat eine Zeile - sonst ginge ihre erste Aenderung als Ausgangsstand verloren');
   old.prepare('UPDATE shopping_items SET name = ? WHERE id = 1').run('Hafermilch');
-  assert.ok(old.prepare('SELECT version FROM shopping_list_changes WHERE list_id = 1').get().version >= 1);
+  assert.equal(old.prepare('SELECT version FROM shopping_list_changes WHERE list_id = 1').get().version, 1);
   old.close();
 });

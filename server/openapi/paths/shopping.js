@@ -56,7 +56,13 @@ export function shoppingPaths() {
       delete: op({ summary: 'Delete shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true }),
     },
     '/api/v1/shopping/{listId}/items': {
-      get: op({ summary: 'List items in shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')] }),
+      get: op({
+        summary: 'List items in shopping list',
+        description: 'Returns the items with the list, the categories and `version`, the list\'s change counter read in the same '
+          + 'synchronous step as the items, so a client that polls `/shopping/versions` knows exactly which state it holds.',
+        tag: 'Shopping',
+        params: [idParam('listId', 'List ID')],
+      }),
       post: op({ summary: 'Add item to shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/shopping/{listId}/import-pantry': {
@@ -95,7 +101,17 @@ export function shoppingPaths() {
       }),
     },
     '/api/v1/shopping/{listId}/items/checked': {
-      delete: op({ summary: 'Delete checked shopping items', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true }),
+      delete: op({
+        summary: 'Delete checked shopping items',
+        description: 'Without a body, every item that is checked when the request arrives. With `{ ids }`, only those '
+          + 'ids, and of them only the ones that are checked and belong to this list - a client that removed rows '
+          + 'optimistically names exactly what it removed, so a row someone else ticked in the meantime stays. '
+          + '`deleted` reports what actually went.',
+        tag: 'Shopping',
+        params: [idParam('listId', 'List ID')],
+        stateChanging: true,
+        requestBody: { ...jsonBody(null, 'Optional: `{ ids: number[] }`'), required: false },
+      }),
     },
     '/api/v1/shopping/{listId}/items/reorder': {
       patch: op({ summary: 'Reorder the items of one category', tag: 'Shopping', stateChanging: true, params: [idParam('listId', 'Shopping list ID')], requestBody: jsonBody(null), description: 'Per category rather than across the whole list: the category order is already its own handle and models the route through the shop; a second, list-wide rank beside it would make two statements about the same order. The request must name EVERY item of the category - a subset would let the ranks of the omitted ones collide with the newly assigned ones, and creation time would decide again.' }),
