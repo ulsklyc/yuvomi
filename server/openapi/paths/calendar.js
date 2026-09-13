@@ -295,5 +295,9 @@ export function calendarPaths() {
     '/api/v1/calendar/external-calendars': {
       patch: op({ summary: 'Set the default assignee of an external calendar', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody(null), description: 'Body: { source, external_id, default_assignee_user_id }. Events arriving from that calendar are assigned to this member. Without it the first batch of a newly enabled calendar came in unassigned and had to be filled in by hand (#730). The sync only refreshes name and colour on conflict, so the assignment set here stays.' }),
     },
+    '/api/v1/calendar/external-calendars/default-assignee-backfill': {
+      get: op({ summary: 'Count imported events a default-assignee backfill would fill', tag: 'Calendar', admin: true, description: 'Response: { data: { count } }. Counts already imported events from calendars of every account that carry a default assignee and are not assigned to anyone yet (#1154).' }),
+      post: op({ summary: 'Apply default assignees to already imported events', tag: 'Calendar', admin: true, stateChanging: true, description: 'Response: { data: { assigned } }. A default assignee only reaches events imported after it was set. This one-off action assigns it to the events already imported from that calendar, across all accounts, but only where an event is not assigned to anyone yet: an assignment made by hand is left alone (#1154). It cannot tell a never-assigned event from one whose assignment was removed by hand. ICS subscriptions are not included.' }),
+    },
   };
 }

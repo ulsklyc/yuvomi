@@ -2494,7 +2494,17 @@
             "defaultAssignee": "Assegnazione predefinita",
             "defaultAssigneeNone": "Nessuno",
             "defaultAssigneeHint": "Gli eventi appena sincronizzati vengono assegnati automaticamente a questa persona.",
-            "defaultAssigneeRoutingHint": "Assegnazione predefinita: gli eventi di un calendario ricevono la persona scelta lì, e un nuovo evento assegnato solo a quella persona viene creato in quel calendario. Vale per i calendari Google e CalDAV, non per Apple o Outlook."
+            "defaultAssigneeRoutingHint": "Assegnazione predefinita: gli eventi di un calendario ricevono la persona scelta lì, e un nuovo evento assegnato solo a quella persona viene creato in quel calendario. Vale per i calendari Google e CalDAV, non per Apple o Outlook.",
+            "backfillTitle": "Completa le assegnazioni",
+            "backfillDescription": "L’assegnazione predefinita vale solo per gli appuntamenti importati dopo averla impostata. Qui puoi applicarla una volta agli appuntamenti già importati da tutti gli account. Gli appuntamenti già assegnati a qualcuno restano invariati.",
+            "backfillAction": "Applica agli appuntamenti esistenti",
+            "backfillQuestion": "Assegnare {{count}} appuntamenti senza assegnazione?",
+            "backfillQuestion_one": "Assegnare {{count}} appuntamento senza assegnazione?",
+            "backfillDetail": "Ogni appuntamento riceve l’assegnazione predefinita del suo calendario. Questo include gli appuntamenti la cui assegnazione è stata rimossa a mano. Si può annullare solo un appuntamento alla volta.",
+            "backfillConfirm": "Assegna",
+            "backfillNone": "Non ci sono appuntamenti senza assegnazione nei calendari con assegnazione predefinita.",
+            "backfillDone": "{{count}} appuntamenti assegnati.",
+            "backfillDone_one": "{{count}} appuntamento assegnato."
         },
         "calendarDefaultsTitle": "Valori predefiniti per i nuovi eventi",
         "calendarDefaultsDescription": "Preimpostazioni applicate automaticamente ai nuovi eventi.",

@@ -366,6 +366,8 @@ test('Sync-Routen: Nicht-Admin erhält 403 (requireAdmin-Gate)', async () => {
     ['PATCH', '/caldav/accounts/1/calendars'], ['POST', '/caldav/sync'],
     ['GET', '/caldav/accounts/1/reminder-lists'], ['PATCH', '/caldav/accounts/1/reminder-lists'],
     ['POST', '/caldav/reminders/sync'],
+    ['GET', '/external-calendars/default-assignee-backfill'],
+    ['POST', '/external-calendars/default-assignee-backfill'],
   ];
   for (const [method, route] of guarded) {
     // Kein Body: requireAdmin greift vor dem Body-Parsing, und fetch verbietet
@@ -447,6 +449,91 @@ test('PATCH /external-calendars — ein unbekannter Kalender bleibt 404 (#730)',
     body: { source: 'caldav', external_id: 'https://dav.example/fremd/', default_assignee_user_id: 2 },
   });
   assert.equal(res.status, 404);
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// #1154: Die Standard-Zuweisung wirkt nur auf NEU importierte Termine. Das
+// Nachtragen füllt die schon importierten - aber nur die, die noch niemandem
+// gehören. Jede Zeile unten ist ein Fall, der UNVERÄNDERT bleiben muss, und
+// jeder hängt an genau einer Klausel der Abfrage: fällt die Klausel, wird
+// genau dieser Fall gefüllt und der Test rot.
+// ────────────────────────────────────────────────────────────────────────────
+
+test('default-assignee-backfill - füllt nur unzugewiesene Termine aus Kalendern mit Standard-Zuweisung (#1154)', async () => {
+  const route = '/external-calendars/default-assignee-backfill';
+  const calendar = (source, externalId, assignee) => db.prepare(`
+    INSERT INTO external_calendars (source, external_id, name, default_assignee_user_id)
+    VALUES (?, ?, 'Backfill', ?)
+  `).run(source, externalId, assignee).lastInsertRowid;
+  const event = (title, { refId = null, subId = null, assignedTo = null, rows = [] } = {}) => {
+    const id = db.prepare(`
+      INSERT INTO calendar_events
+        (title, start_datetime, created_by, external_source, calendar_ref_id, subscription_id, assigned_to)
+      VALUES (?, '2035-03-01T10:00', ?, ?, ?, ?, ?)
+    `).run(title, ADMIN.id, refId || subId ? 'caldav' : 'local', refId, subId, assignedTo).lastInsertRowid;
+    for (const uid of rows) {
+      db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(id, uid);
+    }
+    return id;
+  };
+  const assignment = (id) => ({
+    assignedTo: db.prepare('SELECT assigned_to AS a FROM calendar_events WHERE id = ?').get(id).a,
+    users: db.prepare('SELECT user_id FROM event_assignments WHERE event_id = ? ORDER BY user_id').all(id).map((r) => r.user_id),
+  });
+
+  // Die Datenbank teilen sich alle Tests der Datei: gemessen wird der Zuwachs.
+  const before = (await call('GET', route)).body.data.count;
+
+  const caldav  = calendar('caldav', 'https://dav.example/backfill-a/', MARIA.id);
+  const google  = calendar('google', 'backfill-google', TOM.id);
+  const plain   = calendar('caldav', 'https://dav.example/backfill-b/', null);
+  const orphan  = calendar('caldav', 'https://dav.example/backfill-c/', 99999);
+  const subId = db.prepare(`
+    INSERT INTO ics_subscriptions (name, url, color, created_by, shared, default_assignee_user_id)
+    VALUES ('Backfill', 'https://x/backfill.ics', '#123456', 1, 1, ?)
+  `).run(MARIA.id).lastInsertRowid;
+
+  const ids = {
+    emptyCaldav:  event('bf-empty-caldav', { refId: caldav }),
+    emptyGoogle:  event('bf-empty-google', { refId: google }),
+    // Von Hand zugewiesen: beide Spalten gesetzt.
+    manual:       event('bf-manual', { refId: caldav, assignedTo: ADMIN.id, rows: [ADMIN.id] }),
+    // Nur eine der beiden Spalten - jede für sich zählt als Zuweisung.
+    rowsOnly:     event('bf-rows-only', { refId: caldav, rows: [TOM.id] }),
+    primaryOnly:  event('bf-primary-only', { refId: caldav, assignedTo: TOM.id }),
+    noMapping:    event('bf-no-mapping', { refId: plain }),
+    orphanPerson: event('bf-orphan', { refId: orphan }),
+    local:        event('bf-local'),
+    icsFeed:      event('bf-ics', { subId }),
+  };
+
+  try {
+    const counted = await call('GET', route);
+    assert.equal(counted.status, 200);
+    assert.equal(counted.body.data.count, before + 2, 'gezählt werden nur die zwei leeren Termine');
+
+    const applied = await call('POST', route);
+    assert.equal(applied.status, 200);
+    assert.equal(applied.body.data.assigned, before + 2);
+
+    assert.deepEqual(assignment(ids.emptyCaldav), { assignedTo: MARIA.id, users: [MARIA.id] });
+    assert.deepEqual(assignment(ids.emptyGoogle), { assignedTo: TOM.id, users: [TOM.id] }, 'jeder Kalender füllt mit SEINER Person');
+    assert.deepEqual(assignment(ids.manual), { assignedTo: ADMIN.id, users: [ADMIN.id] }, 'die Hand gewinnt');
+    assert.deepEqual(assignment(ids.rowsOnly), { assignedTo: null, users: [TOM.id] });
+    assert.deepEqual(assignment(ids.primaryOnly), { assignedTo: TOM.id, users: [] });
+    assert.deepEqual(assignment(ids.noMapping), { assignedTo: null, users: [] });
+    assert.deepEqual(assignment(ids.orphanPerson), { assignedTo: null, users: [] }, 'verwaiste Person wird nicht eingetragen');
+    assert.deepEqual(assignment(ids.local), { assignedTo: null, users: [] });
+    assert.deepEqual(assignment(ids.icsFeed), { assignedTo: null, users: [] }, 'ICS-Abos gehören nicht dazu');
+
+    // Einmalig heisst auch: ein zweiter Lauf findet nichts mehr.
+    assert.equal((await call('GET', route)).body.data.count, 0);
+    assert.equal((await call('POST', route)).body.data.assigned, 0);
+  } finally {
+    db.prepare(`DELETE FROM calendar_events WHERE id IN (${Object.values(ids).join(',')})`).run();
+    db.prepare('DELETE FROM ics_subscriptions WHERE id = ?').run(subId);
+    db.prepare('DELETE FROM external_calendars WHERE id IN (?, ?, ?, ?)').run(caldav, google, plain, orphan);
+  }
 });
 
 test('PUT /google/readonly — 400 non-boolean + Happy', async () => {

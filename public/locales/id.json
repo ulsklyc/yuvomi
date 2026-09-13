@@ -2506,7 +2506,17 @@
             "defaultAssignee": "Penerima tugas default",
             "defaultAssigneeNone": "Tidak ada",
             "defaultAssigneeHint": "Acara yang baru disinkronkan otomatis ditugaskan ke orang ini.",
-            "defaultAssigneeRoutingHint": "Penerima tugas default: acara dari sebuah kalender mendapat orang yang dipilih di sana, dan acara baru yang hanya ditugaskan ke orang itu dibuat di kalender tersebut. Berlaku untuk kalender Google dan CalDAV, bukan Apple atau Outlook."
+            "defaultAssigneeRoutingHint": "Penerima tugas default: acara dari sebuah kalender mendapat orang yang dipilih di sana, dan acara baru yang hanya ditugaskan ke orang itu dibuat di kalender tersebut. Berlaku untuk kalender Google dan CalDAV, bukan Apple atau Outlook.",
+            "backfillTitle": "Lengkapi penugasan",
+            "backfillDescription": "Penerima tugas default hanya berlaku untuk janji temu yang diimpor setelah diatur. Di sini Anda dapat menerapkannya sekali ke janji temu yang sudah diimpor dari semua akun. Janji temu yang sudah ditugaskan ke seseorang tidak berubah.",
+            "backfillAction": "Terapkan ke janji temu yang ada",
+            "backfillQuestion": "Tugaskan {{count}} janji temu tanpa penerima tugas?",
+            "backfillQuestion_one": "Tugaskan {{count}} janji temu tanpa penerima tugas?",
+            "backfillDetail": "Setiap janji temu mendapat penerima tugas default dari kalendernya. Ini termasuk janji temu yang penugasannya dihapus secara manual oleh seseorang. Hanya bisa dibatalkan satu per satu.",
+            "backfillConfirm": "Tugaskan",
+            "backfillNone": "Tidak ada janji temu tanpa penerima tugas di kalender dengan penerima tugas default.",
+            "backfillDone": "{{count}} janji temu ditugaskan.",
+            "backfillDone_one": "{{count}} janji temu ditugaskan."
         },
         "calendarDefaultsTitle": "Bawaan untuk acara baru",
         "calendarDefaultsDescription": "Prasetel yang otomatis diterapkan ke acara baru.",

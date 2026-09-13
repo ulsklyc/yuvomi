@@ -26,3 +26,68 @@ export function assignDefaultToEvent(d, eventId, userId) {
   d.prepare('INSERT OR IGNORE INTO event_assignments (event_id, user_id) VALUES (?, ?)')
     .run(eventId, userId);
 }
+
+// --------------------------------------------------------
+// Nachtragen auf bereits importierte Termine (#1154).
+//
+// Der Sync bleibt neu-only (Kopfkommentar). Nachgetragen wird nur auf
+// ausdrücklichen Wunsch, einmalig und nur dort, wo ein Termin noch
+// NIEMANDEM zugewiesen ist: eine Zuweisung von Hand gewinnt immer. Was die
+// Aktion nicht unterscheiden kann, ist eine von Hand ENTFERNTE Zuweisung -
+// ein solcher Termin sieht aus wie ein nie zugewiesener und wird gefüllt.
+// Das sagt die Rückfrage in der Oberfläche.
+//
+// Geltungsbereich: jeder Kalender aller Konten (external_calendars, also
+// Google/Apple/CalDAV), der eine Standard-Zuweisung trägt. ICS-Abos nicht:
+// sie gehören ihrem Anleger und werden in dessen Einstellungen gepflegt,
+// nicht auf der Admin-Seite, auf der die Aktion steht.
+//
+// „Keine Zuweisung" heißt beide Spalten leer: `assigned_to` UND keine
+// event_assignments-Zeile. Eine verwaiste Standard-Person (Nutzer gelöscht)
+// fällt über den JOIN auf users heraus, wie in assignDefaultToEvent.
+// --------------------------------------------------------
+
+const UNASSIGNED_MAPPED_EVENTS = `
+  FROM calendar_events e
+  JOIN external_calendars ec ON ec.id = e.calendar_ref_id
+  JOIN users u ON u.id = ec.default_assignee_user_id
+  WHERE e.assigned_to IS NULL
+    AND NOT EXISTS (SELECT 1 FROM event_assignments ea WHERE ea.event_id = e.id)
+`;
+
+/**
+ * Zählt die Termine, die applyDefaultAssigneesToExisting() füllen würde.
+ *
+ * @param {object} d better-sqlite3 Datenbank-Handle
+ * @returns {number}
+ */
+export function countUnassignedMappedEvents(d) {
+  return d.prepare(`SELECT COUNT(*) AS count ${UNASSIGNED_MAPPED_EVENTS}`).get().count;
+}
+
+/**
+ * Weist jedem noch unzugewiesenen Termin aus einem Kalender mit
+ * Standard-Zuweisung diese Person zu. Idempotent: ein zweiter Lauf findet
+ * nichts mehr.
+ *
+ * @param {object} d better-sqlite3 Datenbank-Handle
+ * @returns {number} Anzahl der zugewiesenen Termine
+ */
+export function applyDefaultAssigneesToExisting(d) {
+  return d.transaction(() => {
+    const rows = d.prepare(
+      `SELECT e.id AS eventId, ec.default_assignee_user_id AS userId ${UNASSIGNED_MAPPED_EVENTS}`
+    ).all();
+    const setPrimary = d.prepare(
+      'UPDATE calendar_events SET assigned_to = ? WHERE id = ? AND assigned_to IS NULL'
+    );
+    const addAssignment = d.prepare(
+      'INSERT OR IGNORE INTO event_assignments (event_id, user_id) VALUES (?, ?)'
+    );
+    for (const { eventId, userId } of rows) {
+      setPrimary.run(userId, eventId);
+      addAssignment.run(eventId, userId);
+    }
+    return rows.length;
+  })();
+}

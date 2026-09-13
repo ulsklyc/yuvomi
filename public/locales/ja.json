@@ -2494,7 +2494,17 @@
             "defaultAssignee": "既定の割り当て先",
             "defaultAssigneeNone": "なし",
             "defaultAssigneeHint": "新しく同期された予定は自動的にこの人に割り当てられます。",
-            "defaultAssigneeRoutingHint": "既定の割り当て先: カレンダーの予定にはそこで選んだ人が割り当てられ、その人だけに割り当てた新しい予定はそのカレンダーに作成されます。Google と CalDAV のカレンダーが対象で、Apple と Outlook は対象外です。"
+            "defaultAssigneeRoutingHint": "既定の割り当て先: カレンダーの予定にはそこで選んだ人が割り当てられ、その人だけに割り当てた新しい予定はそのカレンダーに作成されます。Google と CalDAV のカレンダーが対象で、Apple と Outlook は対象外です。",
+            "backfillTitle": "割り当てを補完",
+            "backfillDescription": "既定の割り当て先は、設定後に取り込まれた予定にだけ適用されます。ここでは、すべてのアカウントからすでに取り込まれた予定に一度だけ適用できます。すでに誰かに割り当てられている予定は変更されません。",
+            "backfillAction": "既存の予定に適用",
+            "backfillQuestion": "割り当てのない予定 {{count}} 件を割り当てますか？",
+            "backfillQuestion_one": "割り当てのない予定 {{count}} 件を割り当てますか？",
+            "backfillDetail": "各予定には、そのカレンダーの既定の割り当て先が設定されます。誰かが手動で割り当てを外した予定も対象になります。元に戻すには予定ごとに操作する必要があります。",
+            "backfillConfirm": "割り当てる",
+            "backfillNone": "既定の割り当て先があるカレンダーに、割り当てのない予定はありません。",
+            "backfillDone": "予定 {{count}} 件を割り当てました。",
+            "backfillDone_one": "予定 {{count}} 件を割り当てました。"
         },
         "calendarDefaultsTitle": "新しい予定の既定値",
         "calendarDefaultsDescription": "新しい予定に自動的に適用される既定設定。",

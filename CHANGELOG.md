@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A calendar's default assignee can now be applied to the events it already imported** (#1154).
+  Until now the mapping only reached events that arrived after it was set, so the first thing
+  anyone saw after mapping a calendar was a list of unassigned events. Settings → Sync gains a
+  one-off "Apply to existing appointments" action for admins: it runs over the calendars of all
+  accounts that have a default assignee, names how many events it will touch, and fills only
+  events that are not assigned to anyone yet. An assignment made by hand is left alone. ICS
+  subscriptions are not included.
+
 ## [2.66.0] - 2026-09-13
 
 ### Added

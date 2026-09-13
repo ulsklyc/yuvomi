@@ -2517,7 +2517,17 @@
             "defaultAssignee": "Default assignee",
             "defaultAssigneeNone": "None",
             "defaultAssigneeHint": "Newly synced events are automatically assigned to this person.",
-            "defaultAssigneeRoutingHint": "Default assignee: events from a calendar get the person chosen there, and a new event assigned only to that person is created in that calendar. This applies to Google and CalDAV calendars, not to Apple or Outlook."
+            "defaultAssigneeRoutingHint": "Default assignee: events from a calendar get the person chosen there, and a new event assigned only to that person is created in that calendar. This applies to Google and CalDAV calendars, not to Apple or Outlook.",
+            "backfillTitle": "Fill in assignments",
+            "backfillDescription": "A default assignee only applies to appointments imported after it was set. Here you can apply it once to the appointments already imported from all accounts. Appointments already assigned to someone stay as they are.",
+            "backfillAction": "Apply to existing appointments",
+            "backfillQuestion": "Assign {{count}} unassigned appointments?",
+            "backfillQuestion_one": "Assign {{count}} unassigned appointment?",
+            "backfillDetail": "Each appointment gets the default assignee of its calendar. This includes appointments whose assignment someone removed by hand. It can only be undone one appointment at a time.",
+            "backfillConfirm": "Assign",
+            "backfillNone": "There are no unassigned appointments in calendars with a default assignee.",
+            "backfillDone": "{{count}} appointments assigned.",
+            "backfillDone_one": "{{count}} appointment assigned."
         },
         "calendarDefaultsTitle": "Defaults for new events",
         "calendarDefaultsDescription": "Presets automatically applied to new events.",

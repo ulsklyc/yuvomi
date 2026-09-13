@@ -8,6 +8,10 @@ import express from 'express';
 import * as db from '../../db.js';
 import * as googleCalendar from '../../services/google-calendar.js';
 import { requireAdmin } from '../../auth.js';
+import {
+  applyDefaultAssigneesToExisting,
+  countUnassignedMappedEvents,
+} from '../../services/sync-assignment.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
@@ -202,6 +206,37 @@ router.patch('/external-calendars', requireAdmin, (req, res) => {
       `).run(source, external_id, name, assignee);
     }
     res.json({ data: { source, external_id, default_assignee_user_id: assignee } });
+  } catch (err) {
+    log.error('', err);
+    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+  }
+});
+
+/**
+ * GET /api/v1/calendar/external-calendars/default-assignee-backfill
+ * Admin only. Zählt, wie viele bereits importierte Termine das Nachtragen der
+ * Standard-Zuweisung füllen würde (#1154) - die Zahl steht in der Rückfrage.
+ * Response: { data: { count } }
+ */
+router.get('/external-calendars/default-assignee-backfill', requireAdmin, (req, res) => {
+  try {
+    res.json({ data: { count: countUnassignedMappedEvents(db.get()) } });
+  } catch (err) {
+    log.error('', err);
+    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+  }
+});
+
+/**
+ * POST /api/v1/calendar/external-calendars/default-assignee-backfill
+ * Admin only. Wendet die Standard-Zuweisung jedes Kalenders aller Konten auf
+ * seine schon importierten Termine an, die noch niemandem zugewiesen sind
+ * (#1154). Eine vorhandene Zuweisung bleibt unangetastet.
+ * Response: { data: { assigned } }
+ */
+router.post('/external-calendars/default-assignee-backfill', requireAdmin, (req, res) => {
+  try {
+    res.json({ data: { assigned: applyDefaultAssigneesToExisting(db.get()) } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });

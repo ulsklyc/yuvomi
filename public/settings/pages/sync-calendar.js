@@ -84,7 +84,72 @@ function renderPage(container, user) {
     <section class="settings-section">
       <div id="sync-more-providers-container"></div>
     </section>
+
+    ${user?.role === 'admin' ? `
+      <section class="settings-section">
+        <h2 class="settings-section__title">${t('settings.sync.backfillTitle')}</h2>
+        <div class="settings-card">
+          <p class="settings-card-description">${t('settings.sync.backfillDescription')}</p>
+          <div class="settings-form-actions">
+            <button type="button" class="btn btn--secondary" id="sync-default-assignee-backfill-btn">
+              ${t('settings.sync.backfillAction')}
+            </button>
+          </div>
+        </div>
+      </section>
+    ` : ''}
   `);
+}
+
+// --------------------------------------------------------------------------
+// Standard-Zuweisung auf bereits importierte Termine nachtragen (#1154)
+// --------------------------------------------------------------------------
+
+/**
+ * Eine Aktion für alle Konten, nicht je Kalender: jeder Kalender mit
+ * Standard-Zuweisung füllt seine eigenen, noch unzugewiesenen Termine. Die
+ * Zahl kommt vor der Rückfrage vom Server, weil sich die Aktion nur Termin
+ * für Termin zurücknehmen lässt. Die Rückfrage steht AUSSERHALB von withBusy:
+ * sonst gäbe der Dialog den Fokus an einen deaktivierten Knopf zurück.
+ */
+function bindDefaultAssigneeBackfill(container) {
+  const btn = container.querySelector('#sync-default-assignee-backfill-btn');
+  if (!btn) return;
+  const endpoint = '/calendar/external-calendars/default-assignee-backfill';
+
+  btn.addEventListener('click', async () => {
+    let count = 0;
+    try {
+      await withBusy(btn, async () => {
+        const res = await api.get(endpoint);
+        count = res.data?.count ?? 0;
+      });
+    } catch (err) {
+      showToast(err.message || t('common.errorGeneric'), 'danger');
+      return;
+    }
+
+    if (count === 0) {
+      showToast(t('settings.sync.backfillNone'));
+      return;
+    }
+
+    const confirmed = await confirmModal(t('settings.sync.backfillQuestion', { count }), {
+      confirmLabel: t('settings.sync.backfillConfirm'),
+      detail: t('settings.sync.backfillDetail'),
+    });
+    if (!confirmed) return;
+
+    await withBusy(btn, async () => {
+      try {
+        const res = await api.post(endpoint);
+        const assigned = res.data?.assigned ?? 0;
+        showToast(t('settings.sync.backfillDone', { count: assigned }), 'success');
+      } catch (err) {
+        showToast(err.message || t('common.errorGeneric'), 'danger');
+      }
+    });
+  });
 }
 
 // --------------------------------------------------------------------------
@@ -1417,6 +1482,7 @@ function handleOAuthCallback(container, query) {
 export async function render(container, { user, query } = {}) {
   renderPage(container, user);
   bindCalDAVAddButton(container, user);
+  bindDefaultAssigneeBackfill(container);
 
   await loadCalDAVAccounts(container, user);
   await renderMoreProviders(container, user);

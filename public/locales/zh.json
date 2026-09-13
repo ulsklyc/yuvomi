@@ -2494,7 +2494,17 @@
             "defaultAssignee": "默认分配",
             "defaultAssigneeNone": "无",
             "defaultAssigneeHint": "新同步的日程会自动分配给此人。",
-            "defaultAssigneeRoutingHint": "默认分配: 日历中的事件会分配给在此选择的人，仅分配给此人的新事件会创建在该日历中。适用于 Google 和 CalDAV 日历，不适用于 Apple 或 Outlook。"
+            "defaultAssigneeRoutingHint": "默认分配: 日历中的事件会分配给在此选择的人，仅分配给此人的新事件会创建在该日历中。适用于 Google 和 CalDAV 日历，不适用于 Apple 或 Outlook。",
+            "backfillTitle": "补充分配",
+            "backfillDescription": "默认分配只适用于设置之后导入的日程。你可以在这里将其一次性应用到所有账户中已导入的日程。已经分配给某人的日程保持不变。",
+            "backfillAction": "应用到现有日程",
+            "backfillQuestion": "分配 {{count}} 个未分配的日程？",
+            "backfillQuestion_one": "分配 {{count}} 个未分配的日程？",
+            "backfillDetail": "每个日程都会获得其所属日历的默认分配。这也包括有人手动移除了分配的日程。只能逐个日程撤销。",
+            "backfillConfirm": "分配",
+            "backfillNone": "在设有默认分配的日历中没有未分配的日程。",
+            "backfillDone": "已分配 {{count}} 个日程。",
+            "backfillDone_one": "已分配 {{count}} 个日程。"
         },
         "calendarDefaultsTitle": "新事件的默认值",
         "calendarDefaultsDescription": "自动应用于新事件的预设。",
