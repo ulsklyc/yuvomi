@@ -45,8 +45,10 @@ const count = (html, needle) => html.split(needle).length - 1;
 // ---------------------------------------------------------------------------
 
 // So liefert der Server die Felder (visitCapabilities in server/routes/housekeeping.js).
-const asMember = (visit) => ({ ...visit, can_edit: !visit.paid_at, can_delete: !visit.paid_at });
-const asAdmin = (visit) => ({ ...visit, can_edit: true, can_delete: true });
+const asMember = (visit) => ({ ...visit, can_edit: !visit.paid_at, can_delete: !visit.paid_at, can_mark_paid: !visit.paid_at });
+const asAdmin = (visit) => ({ ...visit, can_edit: true, can_delete: true, can_mark_paid: !visit.paid_at });
+// Housekeeping nur zum Lesen: der Server bietet nichts an.
+const asReader = (visit) => ({ ...visit, can_edit: false, can_delete: false, can_mark_paid: false });
 const paidVisit = { id: 11, check_in: '2026-08-04T09:00:00.000Z', total_amount: 60, paid_at: '2026-08-05T10:00:00Z' };
 const openVisit = { id: 12, check_in: '2026-08-06T09:00:00.000Z', total_amount: 40, paid_at: null };
 
@@ -79,6 +81,15 @@ test('Admin: bezahlter und unbezahlter Besuch behalten Bearbeiten und Loeschen',
   assert.equal(count(html, 'data-delete-visit='), 2);
   assert.equal(count(html, 'data-open-visit='), 0);
   assert.doesNotMatch(html, /housekeeping\.settledAdminOnly/);
+});
+
+test('nur lesend: auch der unbezahlte Besuch hat ein gesperrtes Bezahlen und keinen Bearbeiten-Knopf', () => {
+  const html = staffLogHtml([asReader(openVisit)]);
+  assert.match(html, /data-pay-visit="12" disabled/, 'Bezahlen gesperrt');
+  assert.equal(count(html, 'data-edit-visit='), 0);
+  assert.equal(count(html, 'data-open-visit="12"'), 1);
+  const member = staffLogHtml([asMember(openVisit)]);
+  assert.doesNotMatch(member, /data-pay-visit="12" disabled/, 'mit Schreibrecht bleibt Bezahlen offen');
 });
 
 test('ohne Serverfelder bietet die Zeile nichts an, was scheitern koennte', () => {
@@ -133,6 +144,30 @@ test('Startzustand: laufender Monat, Reset verborgen', async () => {
     && content.html.indexOf('housekeeping-report-next') < content.html.indexOf('id="housekeeping-report-current"'),
   'Reihenfolge: zurueck, Monat, vor, Reset');
   assert.equal(requests.filter((u) => u.includes('?month=')).length, 0, 'ohne Wahl kein Monatsparameter');
+});
+
+test('die Besuchs-Kachel im Berichte-Tab behauptet keinen laufenden Monat', async () => {
+  const content = await freshReports();
+  assert.match(content.html, /housekeeping\.reportVisitsCount/);
+  assert.doesNotMatch(content.html, /housekeeping\.visitsThisMonth/);
+});
+
+test('ein Neuladen nach einer Aktion ueberschreibt einen inzwischen gewaehlten Monat nicht', async () => {
+  const content = await freshReports();
+  await hk.stepReportMonth(content, -1);                 // August gewaehlt
+  let releaseReload;
+  installApi({
+    onMonth: (month) => (month === '2026-08'
+      ? new Promise((resolve) => { releaseReload = () => resolve({ data: REPORTS[month] }); })
+      : { data: REPORTS[month] }),
+  });
+  const reload = hk.loadData();                          // Aktion im August, Antwort haengt
+  await new Promise((resolve) => setImmediate(resolve));
+  await hk.stepReportMonth(content, -1);                 // derweil Juli
+  releaseReload();
+  await reload;
+  assert.equal(hk.state().visitReport.month, '2026-07', 'der alte Neulade-Bericht bleibt verworfen');
+  assert.equal(hk.state().reportMonth, '2026-07');
 });
 
 test('Schritt zurueck laedt den Vormonat mit seinen Summen und zeigt den Reset', async () => {

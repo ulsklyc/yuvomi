@@ -3396,7 +3396,8 @@
         "nextMonth": "Mes siguiente",
         "currentMonth": "Este mes",
         "noVisitReportsInMonth": "No se registró ningún servicio en {{month}}.",
-        "settledAdminOnly": "Solo un administrador puede modificarlo o eliminarlo"
+        "settledAdminOnly": "Solo un administrador puede modificarlo o eliminarlo",
+        "reportVisitsCount": "Visitas"
     },
     "userMultiSelect": {
         "moreUsers": "más",

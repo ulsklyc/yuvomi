@@ -3396,7 +3396,8 @@
         "nextMonth": "Επόμενος μήνας",
         "currentMonth": "Τρέχων",
         "noVisitReportsInMonth": "Δεν καταγράφηκε καμία επίσκεψη για {{month}}.",
-        "settledAdminOnly": "Μόνο ένας διαχειριστής μπορεί να την αλλάξει ή να τη διαγράψει"
+        "settledAdminOnly": "Μόνο ένας διαχειριστής μπορεί να την αλλάξει ή να τη διαγράψει",
+        "reportVisitsCount": "Επισκέψεις"
     },
     "userMultiSelect": {
         "moreUsers": "ακόμη",

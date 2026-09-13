@@ -3396,7 +3396,8 @@
         "nextMonth": "Következő hónap",
         "currentMonth": "Aktuális hónap",
         "noVisitReportsInMonth": "{{month}} időszakban nem volt személyzeti látogatás.",
-        "settledAdminOnly": "Csak egy admin módosíthatja vagy törölheti"
+        "settledAdminOnly": "Csak egy admin módosíthatja vagy törölheti",
+        "reportVisitsCount": "Látogatások"
     },
     "userMultiSelect": {
         "moreUsers": "továbbiak",

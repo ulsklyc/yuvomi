@@ -3396,7 +3396,8 @@
         "nextMonth": "来月",
         "currentMonth": "今月",
         "noVisitReportsInMonth": "{{month}}の訪問記録はありません。",
-        "settledAdminOnly": "変更・削除できるのは管理者だけです"
+        "settledAdminOnly": "変更・削除できるのは管理者だけです",
+        "reportVisitsCount": "訪問"
     },
     "userMultiSelect": {
         "moreUsers": "他",

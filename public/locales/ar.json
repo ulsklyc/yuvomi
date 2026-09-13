@@ -3396,7 +3396,8 @@
         "nextMonth": "الشهر التالي",
         "currentMonth": "الشهر الحالي",
         "noVisitReportsInMonth": "لم تُسجل أي زيارة في {{month}}.",
-        "settledAdminOnly": "لا يمكن تعديله أو حذفه إلا بواسطة مسؤول"
+        "settledAdminOnly": "لا يمكن تعديله أو حذفه إلا بواسطة مسؤول",
+        "reportVisitsCount": "الزيارات"
     },
     "userMultiSelect": {
         "moreUsers": "آخرون",

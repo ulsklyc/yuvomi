@@ -28,6 +28,7 @@ import {
   queueEventDeletion,
 } from '../services/calendar-outbound.js';
 import { moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
+import { tokenAllows } from '../scopes.js';
 
 const log = createLogger('Housekeeping');
 const router = express.Router();
@@ -526,15 +527,28 @@ function assertMayTouchSettled(existing, req, res) {
 // und Anzeige zusammen. Die Routen pruefen beim Schreiben trotzdem selbst: die
 // Felder sind ein Hinweis fuer die Oberflaeche, keine Berechtigung.
 //
-// Dazu die Modulrechte: ein Mitglied mit Housekeeping nur zum Lesen kommt an
-// GET /visits heran, jedes PUT/DELETE weist die Middleware in server/index.js
-// aber ab. Dieselbe Pruefung (moduleAccessVerdict), kein Nachbau.
+// Dazu die beiden Schreibgrenzen VOR den Routen, beide aus server/index.js und
+// mit derselben Pruefung, kein Nachbau: die Modulrechte eines Mitglieds
+// (moduleAccessVerdict; Housekeeping nur zum Lesen) und die Scopes eines
+// API-Tokens (tokenAllows; ein housekeeping:read-Token darf nicht schreiben,
+// auch wenn sein Nutzer es duerfte). Wer an GET /visits herankommt, aber an
+// einer der beiden scheitert, bekommt keine Aktion angeboten - auch nicht das
+// Bezahlen (`can_mark_paid`).
+function mayWriteHousekeeping(req) {
+  if (moduleAccessVerdict(req.sessionModuleAccess, 'housekeeping', 'write') !== MODULE_ACCESS_ALLOW) return false;
+  if (req.authMethod === 'api_token' && req.authScopes != null) {
+    return tokenAllows(req.authScopes, 'housekeeping', 'write');
+  }
+  return true;
+}
+
 function visitCapabilities(row, req) {
-  const writable = moduleAccessVerdict(req.sessionModuleAccess, 'housekeeping', 'write') === MODULE_ACCESS_ALLOW;
+  const writable = mayWriteHousekeeping(req);
   const touchable = writable && mayTouchSettled(row, req);
   return {
     can_edit: touchable,
     can_delete: touchable,
+    can_mark_paid: writable && !row.paid_at,
     can_mark_unpaid: writable && Boolean(row.paid_at) && req.authRole === 'admin',
   };
 }

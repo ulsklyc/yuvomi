@@ -3396,7 +3396,8 @@
         "nextMonth": "Следующий месяц",
         "currentMonth": "Текущий",
         "noVisitReportsInMonth": "За период {{month}} визитов не записано.",
-        "settledAdminOnly": "Изменить или удалить может только администратор"
+        "settledAdminOnly": "Изменить или удалить может только администратор",
+        "reportVisitsCount": "Визиты"
     },
     "userMultiSelect": {
         "moreUsers": "ещё",

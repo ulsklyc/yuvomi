@@ -3396,7 +3396,8 @@
         "nextMonth": "Mois suivant",
         "currentMonth": "Actuel",
         "noVisitReportsInMonth": "Aucune intervention enregistrée en {{month}}.",
-        "settledAdminOnly": "Seul un admin peut la modifier ou la supprimer"
+        "settledAdminOnly": "Seul un admin peut la modifier ou la supprimer",
+        "reportVisitsCount": "Visites"
     },
     "userMultiSelect": {
         "moreUsers": "autres",

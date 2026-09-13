@@ -3400,7 +3400,8 @@
         "nextMonth": "Następny miesiąc",
         "currentMonth": "Bieżący",
         "noVisitReportsInMonth": "Brak zarejestrowanych wizyt personelu w okresie {{month}}.",
-        "settledAdminOnly": "Zmienić lub usunąć może tylko admin"
+        "settledAdminOnly": "Zmienić lub usunąć może tylko admin",
+        "reportVisitsCount": "Wizyty"
     },
     "splitExpenses": {
         "title": "Wspólne wydatki",

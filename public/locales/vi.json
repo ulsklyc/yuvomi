@@ -3396,7 +3396,8 @@
         "nextMonth": "Tháng sau",
         "currentMonth": "Hiện tại",
         "noVisitReportsInMonth": "Không có lượt đến của nhân viên được ghi nhận trong {{month}}.",
-        "settledAdminOnly": "Chỉ quản trị viên mới có thể sửa hoặc xoá"
+        "settledAdminOnly": "Chỉ quản trị viên mới có thể sửa hoặc xoá",
+        "reportVisitsCount": "Số lượt đến"
     },
     "userMultiSelect": {
         "moreUsers": "thêm",

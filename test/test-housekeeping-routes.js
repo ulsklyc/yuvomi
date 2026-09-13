@@ -32,6 +32,8 @@ app.use((req, _res, next) => {
   req.authRole = actor.role;
   req.session = { userId: actor.id, role: actor.role };
   req.sessionModuleAccess = actor.moduleAccess ?? null;
+  req.authMethod = actor.authMethod;
+  req.authScopes = actor.authScopes ?? null;
   next();
 });
 // Die Zahlungsaufgabe ist ein zweiter Weg an den bezahlten Besuch, deshalb
@@ -58,6 +60,8 @@ const MEM = { id: MEMBER, role: 'member' };
 // Mitglied mit Housekeeping nur zum Lesen (#1135): GET kommt durch, Schreiben weist
 // die Modul-Middleware in server/index.js ab - die ist hier nicht montiert.
 const MEM_READ = { id: MEMBER, role: 'member', moduleAccess: { housekeeping: 'read' } };
+// API-Token nur mit housekeeping:read, dessen Nutzer (Admin) sonst schreiben duerfte.
+const TOKEN_READ = { id: ADMIN, role: 'admin', authMethod: 'api_token', authScopes: ['housekeeping:read'] };
 
 // --------------------------------------------------------------------------
 // Worker-Anlage: Admin-Gate + Validierung
@@ -482,6 +486,7 @@ test('can_edit/can_delete: Admin immer, Mitglied nur am unbezahlten Besuch - und
   try {
     const pick = (res, id) => res.body.data.visits.find((v) => v.id === id);
     const caps = (v) => ({ can_edit: v.can_edit, can_delete: v.can_delete });
+    const pays = (v) => ({ can_mark_paid: v.can_mark_paid, can_mark_unpaid: v.can_mark_unpaid });
 
     const adm = await call('GET', '/visits?month=2025-04', { as: ADM });
     assert.deepEqual(caps(pick(adm, PAY_SESSION_ID)), { can_edit: true, can_delete: true }, 'Admin, bezahlt');
@@ -499,6 +504,19 @@ test('can_edit/can_delete: Admin immer, Mitglied nur am unbezahlten Besuch - und
     assert.deepEqual(caps(pick(readOnly, unpaidId)), { can_edit: false, can_delete: false }, 'Mitglied nur lesend, unbezahlt');
     const readOnlyOne = await call('GET', `/visits/${unpaidId}`, { as: MEM_READ });
     assert.deepEqual(caps(readOnlyOne.body.data), { can_edit: false, can_delete: false });
+    assert.deepEqual(pays(pick(readOnly, unpaidId)), { can_mark_paid: false, can_mark_unpaid: false }, 'nur lesend: auch kein Bezahlen');
+
+    // Bezahlen: nur am unbezahlten Besuch, fuer jeden mit Schreibrecht.
+    assert.deepEqual(pays(pick(mem, unpaidId)), { can_mark_paid: true, can_mark_unpaid: false });
+    assert.deepEqual(pays(pick(mem, PAY_SESSION_ID)), { can_mark_paid: false, can_mark_unpaid: false });
+    assert.deepEqual(pays(pick(adm, PAY_SESSION_ID)), { can_mark_paid: false, can_mark_unpaid: true });
+
+    // Ein housekeeping:read-Token: auch als Admin keine Schreib-Aktion.
+    const token = await call('GET', '/visits?month=2025-04', { as: TOKEN_READ });
+    assert.deepEqual({ ...caps(pick(token, PAY_SESSION_ID)), ...pays(pick(token, PAY_SESSION_ID)) },
+      { can_edit: false, can_delete: false, can_mark_paid: false, can_mark_unpaid: false }, 'Lese-Token, bezahlt');
+    assert.deepEqual({ ...caps(pick(token, unpaidId)), ...pays(pick(token, unpaidId)) },
+      { can_edit: false, can_delete: false, can_mark_paid: false, can_mark_unpaid: false }, 'Lese-Token, unbezahlt');
     const oneAdm = await call('GET', `/visits/${PAY_SESSION_ID}`, { as: ADM });
     assert.deepEqual(caps(oneAdm.body.data), { can_edit: true, can_delete: true });
 

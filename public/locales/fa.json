@@ -3400,7 +3400,8 @@
         "nextMonth": "ماه بعد",
         "currentMonth": "جاری",
         "noVisitReportsInMonth": "در {{month}} هیچ بازدیدی ثبت نشده است.",
-        "settledAdminOnly": "فقط یک مدیر می‌تواند آن را تغییر دهد یا حذف کند"
+        "settledAdminOnly": "فقط یک مدیر می‌تواند آن را تغییر دهد یا حذف کند",
+        "reportVisitsCount": "بازدیدها"
     },
     "splitExpenses": {
         "title": "هزینه‌های مشترک",

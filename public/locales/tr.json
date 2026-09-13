@@ -3396,7 +3396,8 @@
         "nextMonth": "Sonraki ay",
         "currentMonth": "Bu Ay",
         "noVisitReportsInMonth": "{{month}} döneminde ziyaret kaydedilmedi.",
-        "settledAdminOnly": "Yalnızca bir yönetici değiştirebilir veya silebilir"
+        "settledAdminOnly": "Yalnızca bir yönetici değiştirebilir veya silebilir",
+        "reportVisitsCount": "Ziyaretler"
     },
     "userMultiSelect": {
         "moreUsers": "daha",

@@ -3400,7 +3400,8 @@
         "nextMonth": "다음 달",
         "currentMonth": "이번 달",
         "noVisitReportsInMonth": "{{month}}에는 기록된 방문이 없습니다.",
-        "settledAdminOnly": "관리자만 변경하거나 삭제할 수 있습니다"
+        "settledAdminOnly": "관리자만 변경하거나 삭제할 수 있습니다",
+        "reportVisitsCount": "방문"
     },
     "splitExpenses": {
         "title": "공동 지출",

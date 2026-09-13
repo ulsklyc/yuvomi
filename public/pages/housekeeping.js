@@ -120,6 +120,10 @@ async function loadStaffVisits(workerId = state.selectedStaffId, monthValue = st
 
 async function loadData() {
   const dayParams = localDayParams();
+  // Waehrend dieses Neuladens kann jemand schon den naechsten Monat gewaehlt
+  // haben (#1137): dann gehoert der Bericht showReportMonth(), und die Antwort
+  // hier darf ihn nicht mit dem alten Monat ueberschreiben.
+  const reportRequest = reportMonthRequest;
   const [dashboard, tasks, current, report, templates, workers, prefs] = await Promise.all([
     api.get('/housekeeping/dashboard'),
     api.get('/housekeeping/decay-tasks'),
@@ -139,7 +143,7 @@ async function loadData() {
   // Die Uebersicht zeigt die juengsten Besuche, egal welchen Monat der
   // Berichte-Tab gerade offen hat.
   state.recentVisits = currentReport.visits || [];
-  applyVisitReport(report ? report.data : currentReport);
+  if (reportRequest === reportMonthRequest) applyVisitReport(report ? report.data : currentReport);
   state.templates = templates.data || [];
   state.workers = workers.data || [];
   state.worker = state.workers[0] || null;
@@ -750,7 +754,7 @@ function renderReports(content) {
         <strong>${esc(visit.worker_name || t('housekeeping.staff'))}</strong>
         <span>${esc(formatDate(visit.check_in))} · ${esc(money(visit.total_amount))} · ${esc(paid ? t('housekeeping.paymentPaid') : t('housekeeping.paymentPending'))}</span>
       </div>
-      ${paid ? '' : `
+      ${!visit.can_mark_paid ? '' : `
       <button class="btn btn--secondary" type="button" data-pay-report="${visit.id}">
         <i data-lucide="check" class="icon-sm" aria-hidden="true"></i>${esc(t('housekeeping.markPaid'))}
       </button>`}
@@ -769,7 +773,7 @@ function renderReports(content) {
       </div>
       <section class="metric-grid">
         <article class="metric-card metric-card--inset">
-          <div class="metric-card__label">${esc(t('housekeeping.visitsThisMonth'))}</div>
+          <div class="metric-card__label">${esc(t('housekeeping.reportVisitsCount'))}</div>
           <div class="metric-card__value">${esc(visits.length)}</div>
         </article>
         <article class="metric-card metric-card--inset">
@@ -824,7 +828,7 @@ function openVisitReportModal(visit, content = null, { onRefresh = null } = {}) 
   // Die Ruecknahme bietet nur an, wem der Server sie zugesteht
   // (`can_mark_unpaid`, #1136) - die Admin-Regel wird hier nicht nachgebaut.
   let footerAction = '';
-  if (!paid) {
+  if (visit.can_mark_paid) {
     footerAction = `
           <button class="btn btn--primary" type="button" id="visit-report-pay">
             <i data-lucide="check" class="icon-sm" aria-hidden="true"></i>${esc(t('housekeeping.markPaid'))}
@@ -1017,7 +1021,7 @@ function renderStaffVisitLog() {
           <div class="list-row__meta">${esc(money(visit.total_amount))} · ${esc(visitPaymentMeta(visit))}</div>
         </div>
         <div class="list-row__actions">
-          <button class="row-action" type="button" data-pay-visit="${visit.id}" ${paid ? 'disabled' : ''}
+          <button class="row-action" type="button" data-pay-visit="${visit.id}" ${visit.can_mark_paid ? '' : 'disabled'}
                   aria-label="${esc(paid ? t('housekeeping.paymentPaid') : t('housekeeping.markPaid'))}: ${esc(visitDate)}">
             <i data-lucide="badge-dollar-sign" class="icon-md" aria-hidden="true"></i>
           </button>

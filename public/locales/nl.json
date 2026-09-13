@@ -3396,7 +3396,8 @@
         "nextMonth": "Volgende maand",
         "currentMonth": "Huidig",
         "noVisitReportsInMonth": "Geen personeelsbezoeken vastgelegd in {{month}}.",
-        "settledAdminOnly": "Alleen een beheerder kan dit wijzigen of verwijderen"
+        "settledAdminOnly": "Alleen een beheerder kan dit wijzigen of verwijderen",
+        "reportVisitsCount": "Bezoeken"
     },
     "userMultiSelect": {
         "moreUsers": "meer",

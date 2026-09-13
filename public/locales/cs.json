@@ -3000,7 +3000,8 @@
         "nextMonth": "Příští měsíc",
         "currentMonth": "Aktuální měsíc",
         "noVisitReportsInMonth": "V období {{month}} nebyly zaznamenány žádné návštěvy.",
-        "settledAdminOnly": "Upravit nebo smazat ji může jen admin"
+        "settledAdminOnly": "Upravit nebo smazat ji může jen admin",
+        "reportVisitsCount": "Návštěvy"
     },
     "splitExpenses": {
         "title": "Společné výdaje",
