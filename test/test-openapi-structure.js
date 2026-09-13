@@ -14,6 +14,28 @@ import { buildPaths } from '../server/openapi/paths/index.js';
 import { buildOpenApiSpec } from '../server/openapi.js';
 
 const pathsDir = new URL('../server/openapi/paths/', import.meta.url);
+test('fasting clients receive concrete lifecycle schemas, revision transports and date filters', () => {
+  const paths = buildOpenApiSpec({}).paths;
+  const schema = (path, method) => paths[`/api/v1/health/${path}`][method].requestBody.content['application/json'].schema;
+  const create = schema('fasting', 'post');
+  assert.deepEqual(create.required, ['start_at', 'start_tzid']);
+  assert.equal(create.properties.goal_minutes.multipleOf, 60);
+  assert.equal(create.properties.goal_minutes.maximum, 20160);
+  assert.equal(create.properties.end_at.nullable, true);
+  assert.equal(create.properties.note.maxLength, 2000);
+  assert.deepEqual(schema('fasting/{id}', 'patch').required, ['expected_revision']);
+  assert.deepEqual(schema('fasting/{id}/finish', 'post').required, ['expected_revision']);
+  assert.ok(paths['/api/v1/health/fasting'].post.responses[201]);
+  assert.ok(paths['/api/v1/health/fasting/{id}'].delete.responses[204]);
+  assert.ok(paths['/api/v1/health/fasting/{id}'].delete.parameters.some((p) => p.name === 'expected_revision' && !p.required));
+  for (const alias of ['fasting', 'fasting/history']) {
+    const names = paths[`/api/v1/health/${alias}`].get.parameters.map((p) => p.name);
+    for (const name of ['user_id', 'from', 'to', 'limit', 'before_at', 'before_id']) assert.ok(names.includes(name));
+    assert.ok(!names.includes('offset'));
+  }
+  assert.ok(!paths['/api/v1/health/fasting/stats'].get.parameters.some((p) => p.name === 'now'));
+  assert.ok(paths['/api/v1/health/export/fasting'].get.responses[200].content['text/csv']);
+});
 const indexSrc = readFileSync(new URL('index.js', pathsDir), 'utf8');
 const moduleFiles = readdirSync(pathsDir)
   .filter((f) => f.endsWith('.js') && f !== 'index.js')

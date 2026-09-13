@@ -4,6 +4,7 @@ import { esc } from '/utils/html.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 import { VITAL_METRICS } from '/utils/health-vitals.js';
+import { canUseFasting } from '/permissions.js';
 
 /**
  * Die Bereiche, deren Standard-Sichtbarkeit hier gewaehlt wird (#958).
@@ -28,6 +29,7 @@ function visibilityScopes() {
         { key: 'meds', label: t('health.tabs.meds') },
         { key: 'labs', label: t('health.tabs.labs') },
         { key: 'activities', label: t('health.tabs.activity') },
+        ...(canUseFasting() ? [{ key: 'fasting', label: t('health.fasting.title') }] : []),
       ],
     },
   ];

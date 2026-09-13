@@ -39,7 +39,7 @@
  * „Bestandslayout ohne genau eine Id liest sich nicht als umsortiert", über
  * JEDE Id dieser Liste. Wer hier umsortiert, prüft ihn - er ist der Ort, an dem
  * ein Fehler auffällt. */
-export const WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'countdown', 'budget', 'rewards', 'health', 'cycle', 'housekeeping', 'schedule', 'family', 'notes', 'weather', 'clock', 'metrics', 'quicklinks'];
+export const WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'countdown', 'budget', 'rewards', 'health', 'cycle', 'fasting', 'housekeeping', 'schedule', 'family', 'notes', 'weather', 'clock', 'metrics', 'quicklinks'];
 
 // Vier kuratierte Formen statt sechs: über vier Auswahlmöglichkeiten pro Widget
 // (× bis zu 12 Widgets) kippt der Anpassen-Modus in Mikro-Entscheidungs-Overhead
@@ -105,7 +105,7 @@ export function defaultWidgetSize(id) {
   // `quicklinks` steht bei der Uhr und nicht bei den Listen: es ist eine ZEILE
   // aus Kacheln (#469), keine Liste aus Zeilen. Auf 1x1 passten zwei davon
   // nebeneinander, und eine Startrampe mit zwei Plaetzen ist keine.
-  if (['weather', 'shopping', 'health', 'cycle', 'meals', 'clock', 'quicklinks'].includes(id)) return '2x1';
+  if (['weather', 'shopping', 'health', 'cycle', 'fasting', 'meals', 'clock', 'quicklinks'].includes(id)) return '2x1';
   // DIE KENNZAHLREIHE IST EINE ZEILE, KEIN BLOCK (Critique 2026-08-13, P1).
   //
   // Hier stand '2x2' mit der Begruendung, das Raster sei der Vergleich, fuer den

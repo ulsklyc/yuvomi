@@ -18,6 +18,7 @@ import { warrantyEndDate } from './inventory-deadlines.js';
 import { syncAllPantryExpiryReminders } from './pantry-reminders.js';
 import { syncAllCycleReminders } from './cycle-reminders.js';
 import { syncAllScheduleReminders } from './schedule-reminders.js';
+import { syncAllFastingReminders } from './fasting-reminders.js';
 
 const log = createLogger('Notifications');
 const APP_NAME = 'Yuvomi';
@@ -112,6 +113,8 @@ const REMINDER_ORIGINS = {
   cycle_log_nudge:        { titleKey: 'health.cycle.title',     url: '/health' },
   schedule_entry:         { titleKey: 'nav.schedule',           url: '/schedule' },
   schedule_extra_entry:   { titleKey: 'nav.schedule',           url: '/schedule' },
+  fasting_goal:            { titleKey: 'health.fasting.title',   url: '/health/fasting' },
+  fasting_next_start:      { titleKey: 'health.fasting.title',   url: '/health/fasting' },
 };
 
 /**
@@ -172,7 +175,13 @@ function scheduleEntryBody(reminder) {
   return `${reminder.entity_title} - ${reminder.schedule_start_time}`;
 }
 
-function reminderPayload(reminder, locale) {
+function fastingBody(reminder, locale) {
+  return translate(locale, reminder.entity_type === 'fasting_goal'
+    ? 'health.fasting.goalReached'
+    : 'health.fasting.ready');
+}
+
+export function reminderPayload(reminder, locale) {
   const title = reminder.entity_title || FALLBACK_BODY;
   const origin = REMINDER_ORIGINS[reminder.entity_type];
   let body = title;
@@ -188,6 +197,8 @@ function reminderPayload(reminder, locale) {
     body = cycleBody(reminder, locale);
   } else if ((reminder.entity_type === 'schedule_entry' || reminder.entity_type === 'schedule_extra_entry') && reminder.entity_title) {
     body = scheduleEntryBody(reminder);
+  } else if (reminder.entity_type === 'fasting_goal' || reminder.entity_type === 'fasting_next_start') {
+    body = fastingBody(reminder, locale);
   }
   return {
     // Ohne bekannte Herkunft bleibt der App-Name: er ist nichtssagend, aber nie
@@ -329,6 +340,12 @@ export async function processDueNotifications({
     }
   }
 
+  try {
+    syncAllFastingReminders(activeDb, now);
+  } catch (err) {
+    log.error('Fasting reminder sync failed:', err?.message || err);
+  }
+
   // DER BESTAND ZIEHT HIER NACH, nicht erst beim naechsten Anfassen. Der
   // Router legt die Erinnerung eines Artikels beim Speichern an - aber ein
   // Vorrat, der schon vor diesem Feature im Regal stand, ist nie gespeichert
@@ -378,6 +395,8 @@ export async function processDueNotifications({
           SELECT t.name FROM schedule_extra_shifts e JOIN schedule_shift_types t ON t.id = e.shift_type_id
           WHERE e.id = r.entity_id
         )
+        WHEN 'fasting_goal' THEN 'Fasting goal'
+        WHEN 'fasting_next_start' THEN 'Next fast'
       END AS entity_title,
       CASE WHEN r.entity_type = 'inventory_item'
         THEN (SELECT purchase_date FROM inventory_items WHERE id = r.entity_id) END AS inv_purchase_date,

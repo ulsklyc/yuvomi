@@ -9,6 +9,7 @@ export const HEALTH_ROUTES = Object.freeze([
   '/health',
   '/health/vitals',
   '/health/cycle',
+  '/health/fasting',
   '/health/meds',
   '/health/labs',
   '/health/activity',
@@ -17,10 +18,11 @@ export const HEALTH_STORAGE_KEY = 'yuvomi-health-tab';
 
 // Der Zyklus-Tab ist ein haushaltweiter Opt-in (Settings → Module → Gesundheit).
 // Ist er deaktiviert, entfällt der Tab; die Route leitet auf die Übersicht um.
-export const HEALTH_TABS = ({ cycleEnabled = true } = {}) => [
+export const HEALTH_TABS = ({ cycleEnabled = true, fastingEnabled = false } = {}) => [
   { route: '/health',          labelKey: 'health.tabs.overview', icon: 'heart-pulse'    },
   { route: '/health/vitals',   labelKey: 'health.tabs.vitals',   icon: 'activity'       },
   ...(cycleEnabled ? [{ route: '/health/cycle', labelKey: 'health.tabs.cycle', icon: 'droplet' }] : []),
+  ...(fastingEnabled ? [{ route: '/health/fasting', labelKey: 'health.tabs.fasting', icon: 'timer' }] : []),
   { route: '/health/meds',     labelKey: 'health.tabs.meds',     icon: 'pill'           },
   { route: '/health/labs',     labelKey: 'health.tabs.labs',     icon: 'flask-conical'  },
   { route: '/health/activity', labelKey: 'health.tabs.activity', icon: 'dumbbell'       },
@@ -57,7 +59,7 @@ export function getLastHealthRoute() {
  * @param {HTMLElement} container - der Seiten-Container; muss die `.page-toolbar`
  *                                  der Gesundheit enthalten.
  */
-export function renderHealthTabsBar(container, activeRoute, { cycleEnabled = true } = {}) {
+export function renderHealthTabsBar(container, activeRoute, { cycleEnabled = true, fastingEnabled = false } = {}) {
   const toolbar = container.querySelector('.page-toolbar');
   if (!toolbar) return;
 
@@ -70,7 +72,7 @@ export function renderHealthTabsBar(container, activeRoute, { cycleEnabled = tru
     // Die Panels kommen vom Aufrufer, nicht aus einer Attributsuche im Baum:
     // ein `aria-controls` entsteht nur dort, wo es wirklich ein Panel gibt.
     panelFor: (route) => container.querySelector(`[data-health-panel="${CSS.escape(route)}"]`),
-    tabs: HEALTH_TABS({ cycleEnabled }).map(({ route, labelKey, icon }) => ({ id: route, label: t(labelKey), icon })),
+    tabs: HEALTH_TABS({ cycleEnabled, fastingEnabled }).map(({ route, labelKey, icon }) => ({ id: route, label: t(labelKey), icon })),
     activeId: activeRoute,
     storageKey: HEALTH_STORAGE_KEY,
     // page-toolbar__bar: die Bar-Zeile des Canonical Page Head (layout.css,

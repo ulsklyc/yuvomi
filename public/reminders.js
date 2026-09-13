@@ -65,12 +65,20 @@ async function requestPermission() {
  *
  * @param {string} title
  * @param {string} body
+ * @param {string|null} targetUrl
  */
-function showBrowserNotification(title, body) {
+function showBrowserNotification(title, body, targetUrl = null) {
   if (isPushSubscribed()) return; // Web Push übernimmt die System-Benachrichtigung
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   try {
     const n = new Notification(title, { body, icon: '/icons/icon-192.png' });
+    if (typeof targetUrl === 'string' && targetUrl.startsWith('/') && !targetUrl.startsWith('//')) {
+      n.onclick = () => {
+        window.focus?.();
+        window.yuvomi?.navigate(targetUrl);
+        n.close();
+      };
+    }
     setTimeout(() => n.close(), 8000);
   } catch {
     // Notification-API kann in bestimmten Kontexten fehlschlagen
@@ -173,6 +181,8 @@ const REMINDER_ORIGINS = {
   cycle_log_nudge:        { accent: 'var(--module-health)',    icon: 'droplet',      labelKey: 'health.cycle.title' },
   schedule_entry:         { accent: 'var(--module-schedule)',  icon: 'calendar-clock', labelKey: 'nav.schedule' },
   schedule_extra_entry:   { accent: 'var(--module-schedule)',  icon: 'calendar-clock', labelKey: 'nav.schedule' },
+  fasting_goal:            { accent: 'var(--module-health)',    icon: 'timer',         labelKey: 'health.fasting.title' },
+  fasting_next_start:      { accent: 'var(--module-health)',    icon: 'timer',         labelKey: 'health.fasting.title' },
 };
 
 function createOriginSeal(entityType) {
@@ -216,8 +226,9 @@ function processReminders(reminders) {
     _shownIds.add(reminder.id);
     const labelKey = REMINDER_ORIGINS[reminder.entity_type]?.labelKey;
     showBrowserNotification(
-      labelKey ? t(labelKey) : t('reminders.toastTitle'),
-      reminder.entity_title || ''
+      reminder.notification_title || (labelKey ? t(labelKey) : t('reminders.toastTitle')),
+      reminderBody(reminder),
+      reminder.target_url || null,
     );
   });
 
@@ -245,6 +256,10 @@ function cycleReminderBody(reminder) {
   if (reminder.entity_type === 'cycle_log_nudge') return t('health.cycle.settings.remindLogDaily');
   if (reminder.entity_type === 'cycle_period') return `${t('health.cycle.status.nextPeriod')} - ${reminder.entity_title}`;
   return null;
+}
+
+function reminderBody(reminder) {
+  return reminder.notification_body ?? cycleReminderBody(reminder) ?? reminder.entity_title ?? '';
 }
 
 /**
@@ -276,7 +291,7 @@ function showReminderToast(reminder) {
   titleEl.textContent = t('reminders.toastTitle');
 
   const bodyEl = document.createElement('span');
-  bodyEl.textContent = cycleReminderBody(reminder) ?? reminder.entity_title ?? '';
+  bodyEl.textContent = reminderBody(reminder);
 
   // KEIN DOPPELPUNKT MEHR ZWISCHEN BEIDEN. Er stammt aus einer einzeiligen
   // Fassung („Erinnerung: Zahnarzttermin"); der Textblock ist längst eine
@@ -311,6 +326,9 @@ function showReminderToast(reminder) {
     clearTimeout(dismissTimer);
     dismissReminder(reminder.id);
     toast.remove();
+    if (typeof reminder.target_url === 'string' && reminder.target_url.startsWith('/') && !reminder.target_url.startsWith('//')) {
+      window.yuvomi?.navigate(reminder.target_url);
+    }
   });
 
   return true;
@@ -382,4 +400,7 @@ function refresh() {
   poll();
 }
 
-export { init, stop, refresh, requestPermission, notificationStatus };
+export {
+  init, stop, refresh, requestPermission, notificationStatus,
+  showBrowserNotification, showReminderToast, processReminders,
+};

@@ -77,6 +77,7 @@ export const PERMISSION_WIDGETS = Object.freeze([
   { id: 'rewards',      module: 'rewards' },
   { id: 'health',       module: 'health' },
   { id: 'cycle',        module: 'health' },
+  { id: 'fasting',      module: 'health' },
   { id: 'housekeeping', module: 'housekeeping' },
   { id: 'schedule',     module: 'schedule' },
   { id: 'notes',        module: 'notes' },
@@ -112,6 +113,11 @@ export const PERMISSION_CAPABILITIES = Object.freeze([
     key: 'notes_manage_household_categories',
     module: 'notes',
     labelKey: 'noteCategories.permissionLabel',
+  },
+  {
+    key: 'health_use_fasting',
+    module: 'health',
+    labelKey: 'health.fasting.permissionLabel',
   },
 ]);
 

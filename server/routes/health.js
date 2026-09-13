@@ -38,6 +38,7 @@ import cycleRouter from './health/cycle.js';
 import cycleFeedRouter from './health/cycle-feed.js';
 import caregiversRouter from './health/caregivers.js';
 import visibilityDefaultsRouter from './health/visibility-defaults.js';
+import fastingRouter from './health/fasting.js';
 
 const router = express.Router();
 
@@ -53,5 +54,6 @@ router.use(cycleRouter);
 router.use(cycleFeedRouter);
 router.use(caregiversRouter);
 router.use(visibilityDefaultsRouter);
+router.use(fastingRouter);
 
 export default router;

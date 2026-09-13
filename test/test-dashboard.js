@@ -2198,7 +2198,7 @@ test('Widget-Merge: eine fehlende Id landet an ihrer Default-Position, nicht hin
   // abgeleitet waere, koennte nie melden, dass die Liste sich geaendert hat.
   // Zuletzt nachgezogen fuer `schedule` (Schedule v2).
   const geprueft = widgets.WIDGET_IDS.length;
-  assert(geprueft === 18, `Reichweite: ${geprueft} Ids geprueft, nicht die erwarteten 18`);
+  assert(geprueft === 19, `Reichweite: ${geprueft} Ids geprueft, nicht die erwarteten 19`);
   const falsch = widgets.WIDGET_IDS.filter((id) => {
     const merged = widgets.normalizeDashboardConfig(layoutOhne(id));
     return merged.map((w) => w.id).join(',') !== widgets.WIDGET_IDS.join(',');
@@ -2249,7 +2249,7 @@ test('Widget-Merge: ein umsortiertes Layout laesst den Neuzugang seinem Vorgaeng
   // `countdown` ist der zweite Neuzugang in diesem Layout (#647) und belegt
   // dieselbe Zusicherung ein zweites Mal: sein Vorgaenger in WIDGET_IDS ist
   // `birthdays`, und dorthin gehoert er - nicht ans Ende.
-  assert(sichtbar.join(',') === 'weather,metrics,family,budget,birthdays,countdown,rewards,notes',
+  assert(sichtbar.join(',') === 'weather,metrics,family,budget,birthdays,countdown,rewards,notes,fasting',
     `Neuzugang an unerwarteter Stelle: ${sichtbar.join(',')}`);
   assert(widgets.isUserOrderedConfig(merged),
     'ein echt umsortiertes Layout muss umsortiert bleiben - sonst packt dense es um');

@@ -2431,3 +2431,49 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   color: var(--color-text-secondary);
   white-space: nowrap;
 }
+
+/* Fasting hero: calm timer treatment shared by desktop and the installed PWA. */
+/* Health owns the page width; fasting only composes its content. */
+.fasting-panel { display: grid; gap: var(--space-6); }
+.fasting-card { padding: var(--space-5); border-radius: var(--radius-md); background: var(--color-surface-work); box-shadow: var(--shadow-sm); }
+.fasting-hero { text-align: center; align-items: center; padding: var(--space-5); }
+.fasting-hero__timer { font-size: var(--text-3xl); line-height: var(--line-height-tight); font-variant-numeric: tabular-nums; font-weight: var(--font-weight-bold); overflow-wrap: anywhere; }
+.fasting-dial__days { display: block; margin-top: var(--space-2); color: var(--color-text-secondary); }
+.fasting-hero__remaining { font-weight: var(--font-weight-semibold); }
+.fasting-hero__meta { margin-block: var(--space-2) var(--space-4); color: var(--color-text-secondary); font-size: var(--text-sm); }
+.fasting-hero__actions { display: flex; justify-content: center; gap: var(--space-2); flex-wrap: wrap; }
+.fasting-history-more { display: grid; justify-items: center; gap: var(--space-2); padding-block-start: var(--space-3); }
+.fasting-history-more [hidden] { display: none; }
+.fasting-card__heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-block-end: var(--space-3); flex-wrap: wrap; }
+.fasting-card__heading .u-section-title { margin: 0; }
+.fasting-history { list-style: none; margin: 0; padding: 0; }
+.fasting-history__row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4); padding-block: var(--space-4); }
+.fasting-history__row + .fasting-history__row { border-top: 1px solid var(--color-border-subtle); }
+.fasting-history__dates { display: grid; gap: var(--space-1); flex: 1; min-width: 12rem; }
+.fasting-history__dates span, .fasting-history__dates p, .empty-hint { color: var(--color-text-secondary); font-size: var(--text-sm); }
+.fasting-history__dates p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fasting-history__summary { display: grid; gap: var(--space-1); font-variant-numeric: tabular-nums; }
+.fasting-history__summary span { color: var(--module-health); }
+.fasting-history__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.fasting-stats__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: var(--space-4); container: metric-grid / inline-size; }
+.fasting-stats__periods { display: grid; gap: var(--space-4); margin-block-end: var(--space-5); }
+.fasting-stats__period + .fasting-stats__period { padding-block-start: var(--space-4); border-top: 1px solid var(--color-border-subtle); }
+.fasting-stats__period h4 { margin: 0 0 var(--space-3); font-size: var(--text-sm); font-weight: var(--font-weight-semibold); }
+.fasting-stat { display: grid; gap: var(--space-1); }
+.fasting-stat span { color: var(--color-text-secondary); font-size: var(--text-sm); }
+.fasting-week__title { margin-block: var(--space-5) var(--space-3); font-size: var(--text-sm); }
+.fasting-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto 5rem auto auto auto; gap: var(--space-2); }
+.fasting-week__day { display: grid; grid-template-rows: subgrid; grid-row: span 5; gap: var(--space-2); text-align: center; font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.fasting-week__day > span { align-self: end; overflow-wrap: anywhere; }
+.fasting-week__day time { color: var(--color-text-secondary); }
+.fasting-week__track { display: flex; direction: ltr; align-items: end; gap: var(--space-1); background: var(--color-fill-well); }
+.fasting-week__bar, .fasting-week__goal { display: block; width: 50%; height: calc(var(--bar-scale) * 100%); border-radius: var(--radius-sm) var(--radius-sm) 0 0; background: var(--chart-series-1); }
+.fasting-week__goal { background: var(--chart-series-2); }
+.fasting-history-filters { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); margin-block-end: var(--space-4); }
+.fasting-history-filters label { display: grid; gap: var(--space-2); min-width: 0; }
+[data-fasting-shell] { margin-block-end: var(--space-4); }
+[data-fasting-load-error]:empty { display: none; }
+@media (max-width: 639px) {
+  .fasting-hero, .fasting-card { padding: var(--space-4); }
+  .fasting-week { gap: var(--space-1); }
+}

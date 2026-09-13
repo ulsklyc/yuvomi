@@ -185,6 +185,28 @@ test('GET /pending ist je Nutzer isoliert (kein Fremdzugriff)', async () => {
   assert.equal(res.body.data.length, 0, 'Bob sieht Annas fällige Erinnerungen nicht');
 });
 
+test('GET /pending returns localized fasting polling payloads and deep link', async () => {
+  const owner = freshUser();
+  currentUid = owner;
+  const fastId = db.prepare(`INSERT INTO health_fasts (user_id, start_at, end_at, start_tzid, goal_minutes)
+    VALUES (?, '2026-01-01T00:00:00.000Z', NULL, 'UTC', 60)`).run(owner).lastInsertRowid;
+  insertReminder(owner, 'fasting_goal', fastId, PAST);
+  insertReminder(owner, 'fasting_next_start', fastId, PAST);
+  for (const [locale, title, goalBody, nextBody] of [
+    ['de', 'Fasten', 'Ziel erreicht', 'Bereit für deinen nächsten Fastenstart'],
+    ['cs', 'Půst', 'Cíl splněn', 'Připraveno na další půst'],
+  ]) {
+    db.prepare(`INSERT INTO sync_config (key, value) VALUES ('language', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(locale);
+    const response = await call('GET', '/pending');
+    const fasting = response.body.data.filter((row) => row.entity_type.startsWith('fasting_'));
+    assert.deepEqual(fasting.map((row) => [row.notification_title, row.notification_body, row.target_url]), [
+      [title, goalBody, '/health/fasting'],
+      [title, nextBody, '/health/fasting'],
+    ]);
+  }
+});
+
 test('GET /pending materialisiert Geburtstags-Artefakte (Seiteneffekt)', async () => {
   const owner = freshUser();
   currentUid = owner;

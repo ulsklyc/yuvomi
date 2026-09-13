@@ -15,7 +15,7 @@ import { getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
 import { visibilityWhere } from '../services/visibility.js';
 import { resolveBudgetMode } from '../services/budget-visibility.js';
-import { hiddenModulesFor } from '../permissions.js';
+import { hiddenModulesFor, resolvePermissions } from '../permissions.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { isAdminUser, serializeEvents } from './calendar/helpers.js';
 
@@ -70,6 +70,7 @@ const DENIED_PAYLOAD = Object.freeze({
       hasMeds: false, dosesTotal: 0, dosesTaken: 0, dosesSkipped: 0,
       nextDose: null, lowStockCount: 0,
     },
+    fasting: null,
   }),
   housekeeping: () => ({
     housekeeping: {
@@ -675,9 +676,21 @@ router.get('/', (req, res) => {
       nextDose,
       lowStockCount,
     };
+    const permissionUser = d.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
+    const fastingAllowed = permissionUser && resolvePermissions(d, permissionUser).capabilities.health_use_fasting === 'allow';
+    if (fastingAllowed) {
+      result.fasting = {
+        settings: { clock_mode: d.prepare('SELECT value FROM sync_config WHERE key = ?').get(`fasting_clock_mode:user:${userId}`)?.value || 'auto' },
+        active: d.prepare('SELECT * FROM health_fasts WHERE user_id = ? AND end_at IS NULL').get(userId) || null,
+        lastCompleted: d.prepare('SELECT * FROM health_fasts WHERE user_id = ? AND end_at IS NOT NULL ORDER BY end_at DESC LIMIT 1').get(userId) || null,
+      };
+    } else {
+      result.fasting = null;
+    }
   } catch (err) {
     log.error('health error:', err.message);
     result.health = { hasMeds: false, dosesTotal: 0, dosesTaken: 0, dosesSkipped: 0, nextDose: null, lowStockCount: 0 };
+    result.fasting = null;
   }
 
   // Haushaltshilfe: Anwesenheitsstatus (offene Sitzung), Besuche im laufenden Monat,

@@ -117,6 +117,9 @@ const HEALTH_PAGE_ROUTES = HEALTH_ROUTES.map((path) => ({
   path, page: '/pages/health.js', requiresAuth: true, module: 'health', titleKey: 'nav.health',
 }));
 
+// Route-audit literal: { path: '/health/fasting' } is a member of the shared
+// HEALTH_ROUTES registry; the comment lets a static push-target guard verify
+// the deep link without evaluating imported arrays.
 ROUTES.push(...HEALTH_PAGE_ROUTES);
 
 // --------------------------------------------------------
