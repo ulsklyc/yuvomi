@@ -27,6 +27,8 @@ import {
   mirroredFieldsChanged,
   queueEventDeletion,
 } from '../services/calendar-outbound.js';
+import { moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
+import { tokenAllows } from '../scopes.js';
 
 const log = createLogger('Housekeeping');
 const router = express.Router();
@@ -509,17 +511,46 @@ function assertAdmin(req, res) {
 // Danach gilt dieselbe Grenze wie beim Anlegen des Arbeitsverhaeltnisses
 // (POST /worker): nur ein Admin aendert, loescht oder bucht einen bezahlten
 // Besuch erneut (GHSA-4p5w-5346-8598).
+function mayTouchSettled(row, req) {
+  return !row.paid_at || req.authRole === 'admin';
+}
+
 function assertMayTouchSettled(existing, req, res) {
-  if (!existing.paid_at) return true;
+  if (mayTouchSettled(existing, req)) return true;
   return assertAdmin(req, res);
 }
 
-// Praesentationsfeld je Besuch (#1136): die Seite zeigt "Zahlung zuruecknehmen"
-// nur, wenn der Server es anbietet, statt die Admin-Regel selbst nachzubauen.
-// POST /visits/:id/unpay prueft beim Schreiben trotzdem selbst - das Feld ist
-// ein Hinweis fuer die Oberflaeche, keine Berechtigung.
-function canMarkUnpaid(row, req) {
-  return Boolean(row.paid_at) && req.authRole === 'admin';
+// Praesentationsfelder je Besuch (#1136, #1135): die Seite zeigt Bearbeiten,
+// Loeschen und "Zahlung zuruecknehmen" nur, wenn der Server es anbietet, statt
+// die Admin-Regel selbst nachzubauen. `can_edit`/`can_delete` lesen DIESELBE
+// Funktion wie assertMayTouchSettled - aendert sich die Regel, wandern Sperre
+// und Anzeige zusammen. Die Routen pruefen beim Schreiben trotzdem selbst: die
+// Felder sind ein Hinweis fuer die Oberflaeche, keine Berechtigung.
+//
+// Dazu die beiden Schreibgrenzen VOR den Routen, beide aus server/index.js und
+// mit derselben Pruefung, kein Nachbau: die Modulrechte eines Mitglieds
+// (moduleAccessVerdict; Housekeeping nur zum Lesen) und die Scopes eines
+// API-Tokens (tokenAllows; ein housekeeping:read-Token darf nicht schreiben,
+// auch wenn sein Nutzer es duerfte). Wer an GET /visits herankommt, aber an
+// einer der beiden scheitert, bekommt keine Aktion angeboten - auch nicht das
+// Bezahlen (`can_mark_paid`).
+function mayWriteHousekeeping(req) {
+  if (moduleAccessVerdict(req.sessionModuleAccess, 'housekeeping', 'write') !== MODULE_ACCESS_ALLOW) return false;
+  if (req.authMethod === 'api_token' && req.authScopes != null) {
+    return tokenAllows(req.authScopes, 'housekeeping', 'write');
+  }
+  return true;
+}
+
+function visitCapabilities(row, req) {
+  const writable = mayWriteHousekeeping(req);
+  const touchable = writable && mayTouchSettled(row, req);
+  return {
+    can_edit: touchable,
+    can_delete: touchable,
+    can_mark_paid: writable && !row.paid_at,
+    can_mark_unpaid: writable && Boolean(row.paid_at) && req.authRole === 'admin',
+  };
 }
 
 async function createWorkerUser({ username, displayName, avatarColor, avatarData, actorUserId }) {
@@ -765,7 +796,7 @@ router.get('/visits', (req, res) => {
       payment_task_title: row.payment_task_title ?? null,
       receipt_document_name: row.receipt_document_name ?? null,
       total_amount: Number(row.daily_rate || 0) + Number(row.extras || 0),
-      can_mark_unpaid: canMarkUnpaid(row, req),
+      ...visitCapabilities(row, req),
     }));
     const totals = visits.reduce((acc, visit) => {
       acc.total += visit.total_amount;
@@ -861,7 +892,7 @@ router.get('/visits/:id', (req, res) => {
       payment_task_title: row.payment_task_title ?? null,
       receipt_document_name: row.receipt_document_name ?? null,
       total_amount: Number(row.daily_rate || 0) + Number(row.extras || 0),
-      can_mark_unpaid: canMarkUnpaid(row, req),
+      ...visitCapabilities(row, req),
     };
     res.json({ data: visit });
   } catch (err) {

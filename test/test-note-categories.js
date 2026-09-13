@@ -7,14 +7,17 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import * as noteCategoryNameContract from '../public/utils/note-category-name.js';
 import {
   categoryNameKey,
   hydrateNotesWithCategories,
   listVisibleCategories,
   pruneCategoryFromDashboardConfigs,
   replaceEditableAssignments,
+  validateCategoryName,
 } from '../server/services/note-categories.js';
 
 function database() {
@@ -47,6 +50,28 @@ test('category name keys normalize canonical composition and ordinary Unicode ca
   assert.equal(categoryNameKey('ẞ'), categoryNameKey('ß'));
   assert.equal(categoryNameKey('ß'), categoryNameKey('SS'));
   assert.equal(categoryNameKey(categoryNameKey('ẞ')), categoryNameKey('ẞ'));
+});
+
+test('note category names have one shared 80-character contract', () => {
+  assert.equal(noteCategoryNameContract.NOTE_CATEGORY_NAME_MAX_LENGTH, 80);
+});
+
+test('server accepts an 80-character category name and rejects 81 characters', () => {
+  assert.equal(validateCategoryName('a'.repeat(80)), 'a'.repeat(80));
+  assert.throws(
+    () => validateCategoryName('a'.repeat(81)),
+    { message: 'Category name must contain 1 to 80 characters' },
+  );
+});
+
+test('server validation and its error message use the shared name limit', () => {
+  const source = readFileSync(new URL('../server/services/note-categories.js', import.meta.url), 'utf8');
+  assert.match(
+    source,
+    /import\s*\{[^}]*NOTE_CATEGORY_NAME_MAX_LENGTH[^}]*\}\s*from\s*'\.\.\/\.\.\/public\/utils\/note-category-name\.js'/,
+  );
+  assert.match(source, /name\.length\s*>\s*NOTE_CATEGORY_NAME_MAX_LENGTH/);
+  assert.match(source, /Category name must contain 1 to \$\{NOTE_CATEGORY_NAME_MAX_LENGTH\} characters/);
 });
 
 test('category names are unique case-insensitively inside their scope', () => {

@@ -2506,7 +2506,18 @@
             "defaultAssignee": "기본 담당자",
             "defaultAssigneeNone": "없음",
             "defaultAssigneeHint": "새로 동기화된 일정은 자동으로 이 사람에게 할당됩니다.",
-            "defaultAssigneeRoutingHint": "기본 담당자: 캘린더의 일정은 그곳에서 선택한 사람에게 할당되고, 그 사람에게만 할당된 새 일정은 해당 캘린더에 만들어집니다. Google 및 CalDAV 캘린더에 적용되며 Apple이나 Outlook에는 적용되지 않습니다."
+            "defaultAssigneeRoutingHint": "기본 담당자: 캘린더의 일정은 그곳에서 선택한 사람에게 할당되고, 그 사람에게만 할당된 새 일정은 해당 캘린더에 만들어집니다. Google 및 CalDAV 캘린더에 적용되며 Apple이나 Outlook에는 적용되지 않습니다.",
+            "backfillTitle": "담당자 채우기",
+            "backfillDescription": "기본 담당자는 설정한 뒤에 가져온 일정에만 적용됩니다. 여기서 모든 계정에서 이미 가져온 일정에 한 번 적용할 수 있습니다. 이미 누군가에게 할당된 일정은 그대로 유지됩니다.",
+            "backfillAction": "기존 일정에 적용",
+            "backfillQuestion": "담당자가 없는 일정 {{count}}개를 할당할까요?",
+            "backfillQuestion_one": "담당자가 없는 일정 {{count}}개를 할당할까요?",
+            "backfillDetail": "각 일정에 해당 캘린더의 기본 담당자가 지정됩니다. 누군가 직접 담당자를 제거한 일정도 포함됩니다. 되돌리려면 일정마다 하나씩 바꿔야 합니다.",
+            "backfillConfirm": "할당",
+            "backfillNone": "기본 담당자가 있는 캘린더에 담당자가 없는 일정이 없습니다.",
+            "backfillDone": "일정 {{count}}개를 할당했습니다.",
+            "backfillDone_one": "일정 {{count}}개를 할당했습니다.",
+            "backfillChanged": "개수를 센 뒤 일정이 바뀌었습니다. 다시 적용해 주세요."
         },
         "calendarDefaultsTitle": "새 일정 기본값",
         "calendarDefaultsDescription": "새 일정에 자동으로 적용되는 기본 설정입니다.",
@@ -3395,7 +3406,13 @@
         "hoursWorked": "근무 시간",
         "computedAmount": "계산된 금액",
         "setupProfileAction": "프로필 만들기",
-        "loadError": "가사 도우미를 불러오지 못했습니다."
+        "loadError": "가사 도우미를 불러오지 못했습니다.",
+        "prevMonth": "지난달",
+        "nextMonth": "다음 달",
+        "currentMonth": "이번 달",
+        "noVisitReportsInMonth": "{{month}}에는 기록된 방문이 없습니다.",
+        "settledAdminOnly": "관리자만 변경하거나 삭제할 수 있습니다",
+        "reportVisitsCount": "방문"
     },
     "splitExpenses": {
         "title": "공동 지출",

@@ -1868,7 +1868,7 @@ test('Speichern im Artikeldialog nach einer Auffrischung trifft die Zeile im BES
   __test.state.items = [milk(0), bread(0)];
   __test.state.categories = [{ id: 1, name: 'Sonstiges' }, { id: 2, name: 'Backwaren' }];
   let onSave = null;
-  globalThis.__modalStub = (opts) => { onSave = opts.onSave; };
+  globalThis.__openModal = (opts) => { onSave = opts.onSave; };
   globalThis.__apiStub = {
     get: async () => ({ data: [listRow(0)] }),
     // Die Auffrischung ersetzt den Bestand durch NEUE Objekte (fremder Haken am Brot).
@@ -1894,7 +1894,7 @@ test('Speichern im Artikeldialog nach einer Auffrischung trifft die Zeile im BES
   assert.equal(__test.state.items.find((i) => i.id === 11).is_checked, 1, 'der fremde Haken bleibt');
 
   delete globalThis.__apiStub;
-  delete globalThis.__modalStub;
+  delete globalThis.__openModal;
 });
 
 test('Speichern im Artikeldialog: ist der Artikel inzwischen weg, wirft das Speichern nicht', async () => {
@@ -1903,7 +1903,7 @@ test('Speichern im Artikeldialog: ist der Artikel inzwischen weg, wirft das Spei
   __test.state.items = [milk(0)];
   __test.state.categories = [{ id: 1, name: 'Sonstiges' }];
   let onSave = null;
-  globalThis.__modalStub = (opts) => { onSave = opts.onSave; };
+  globalThis.__openModal = (opts) => { onSave = opts.onSave; };
   globalThis.__apiStub = {
     get: async () => ({ data: [listRow(0)] }),
     getWithSource: async () => ({ data: { data: [] }, fromCache: false }),
@@ -1916,7 +1916,7 @@ test('Speichern im Artikeldialog: ist der Artikel inzwischen weg, wirft das Spei
   await assert.doesNotReject(() => panel.submit());
   assert.deepEqual(__test.state.items, [], 'kein Geisterobjekt im Bestand');
   delete globalThis.__apiStub;
-  delete globalThis.__modalStub;
+  delete globalThis.__openModal;
 });
 
 /** Zwei Makrotasks reichen, damit die Warteschlange Stub-Antworten verarbeitet hat. */

@@ -2494,7 +2494,18 @@
             "defaultAssignee": "Standaardtoewijzing",
             "defaultAssigneeNone": "Geen",
             "defaultAssigneeHint": "Nieuw gesynchroniseerde afspraken worden automatisch aan deze persoon toegewezen.",
-            "defaultAssigneeRoutingHint": "Standaardtoewijzing: afspraken uit een agenda krijgen de daar gekozen persoon, en een nieuwe afspraak die alleen aan die persoon is toegewezen, wordt in die agenda aangemaakt. Dit geldt voor Google- en CalDAV-agenda's, niet voor Apple of Outlook."
+            "defaultAssigneeRoutingHint": "Standaardtoewijzing: afspraken uit een agenda krijgen de daar gekozen persoon, en een nieuwe afspraak die alleen aan die persoon is toegewezen, wordt in die agenda aangemaakt. Dit geldt voor Google- en CalDAV-agenda's, niet voor Apple of Outlook.",
+            "backfillTitle": "Toewijzingen aanvullen",
+            "backfillDescription": "Een standaardtoewijzing geldt alleen voor afspraken die na het instellen zijn opgehaald. Hier kun je haar eenmalig toepassen op de afspraken die al uit alle accounts zijn opgehaald. Afspraken die al aan iemand zijn toegewezen, blijven ongewijzigd.",
+            "backfillAction": "Toepassen op bestaande afspraken",
+            "backfillQuestion": "{{count}} afspraken zonder toewijzing toewijzen?",
+            "backfillQuestion_one": "{{count}} afspraak zonder toewijzing toewijzen?",
+            "backfillDetail": "Elke afspraak krijgt de standaardtoewijzing van haar agenda. Dat geldt ook voor afspraken waarvan iemand de toewijzing met de hand heeft verwijderd. Terugdraaien kan alleen per afspraak.",
+            "backfillConfirm": "Toewijzen",
+            "backfillNone": "Er zijn geen afspraken zonder toewijzing in agenda’s met een standaardtoewijzing.",
+            "backfillDone": "{{count}} afspraken toegewezen.",
+            "backfillDone_one": "{{count}} afspraak toegewezen.",
+            "backfillChanged": "Afspraken zijn gewijzigd sinds het tellen. Pas het opnieuw toe."
         },
         "calendarDefaultsTitle": "Standaardwaarden voor nieuwe afspraken",
         "calendarDefaultsDescription": "Voorinstellingen die automatisch op nieuwe afspraken worden toegepast.",
@@ -3391,7 +3402,13 @@
         "hoursWorked": "Gewerkte uren",
         "computedAmount": "Berekend bedrag",
         "setupProfileAction": "Profiel aanmaken",
-        "loadError": "Huishouden kon niet worden geladen."
+        "loadError": "Huishouden kon niet worden geladen.",
+        "prevMonth": "Vorige maand",
+        "nextMonth": "Volgende maand",
+        "currentMonth": "Huidig",
+        "noVisitReportsInMonth": "Geen personeelsbezoeken vastgelegd in {{month}}.",
+        "settledAdminOnly": "Alleen een beheerder kan dit wijzigen of verwijderen",
+        "reportVisitsCount": "Bezoeken"
     },
     "userMultiSelect": {
         "moreUsers": "meer",

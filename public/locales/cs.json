@@ -2494,7 +2494,18 @@
             "defaultAssignee": "Výchozí přiřazení",
             "defaultAssigneeNone": "Žádné",
             "defaultAssigneeHint": "Nově synchronizované události se automaticky přiřadí této osobě.",
-            "defaultAssigneeRoutingHint": "Výchozí přiřazení: události z kalendáře dostanou osobu zvolenou u něj a nová událost přiřazená jen této osobě se vytvoří v tomto kalendáři. Platí pro kalendáře Google a CalDAV, ne pro Apple ani Outlook."
+            "defaultAssigneeRoutingHint": "Výchozí přiřazení: události z kalendáře dostanou osobu zvolenou u něj a nová událost přiřazená jen této osobě se vytvoří v tomto kalendáři. Platí pro kalendáře Google a CalDAV, ne pro Apple ani Outlook.",
+            "backfillTitle": "Doplnit přiřazení",
+            "backfillDescription": "Výchozí přiřazení platí jen pro události přenesené po jeho nastavení. Zde ho můžete jednorázově použít na události už přenesené ze všech účtů. Události, které už někomu přiřazené jsou, zůstanou beze změny.",
+            "backfillAction": "Použít na stávající události",
+            "backfillQuestion": "Přiřadit {{count}} nepřiřazených událostí?",
+            "backfillQuestion_one": "Přiřadit {{count}} nepřiřazenou událost?",
+            "backfillDetail": "Každá událost dostane výchozí přiřazení svého kalendáře. Týká se to i událostí, u kterých někdo přiřazení ručně odebral. Vrátit to lze jen událost po události.",
+            "backfillConfirm": "Přiřadit",
+            "backfillNone": "V kalendářích s výchozím přiřazením nejsou žádné nepřiřazené události.",
+            "backfillDone": "Přiřazeno {{count}} událostí.",
+            "backfillDone_one": "Přiřazena {{count}} událost.",
+            "backfillChanged": "Od spočítání se události změnily. Použijte to prosím znovu."
         },
         "calendarDefaultsTitle": "Výchozí hodnoty pro nové události",
         "calendarDefaultsDescription": "Předvolby automaticky použité na nové události.",
@@ -2995,7 +3006,13 @@
         "hoursWorked": "Pracovní hodiny",
         "computedAmount": "Vypočtená částka",
         "setupProfileAction": "Vytvořit profil",
-        "loadError": "Domácí práce se nepodařilo načíst."
+        "loadError": "Domácí práce se nepodařilo načíst.",
+        "prevMonth": "Předchozí měsíc",
+        "nextMonth": "Příští měsíc",
+        "currentMonth": "Aktuální měsíc",
+        "noVisitReportsInMonth": "V období {{month}} nebyly zaznamenány žádné návštěvy.",
+        "settledAdminOnly": "Upravit nebo smazat ji může jen admin",
+        "reportVisitsCount": "Návštěvy"
     },
     "splitExpenses": {
         "title": "Společné výdaje",

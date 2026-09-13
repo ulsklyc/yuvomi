@@ -2529,7 +2529,18 @@
             "defaultAssignee": "Standard-Zuweisung",
             "defaultAssigneeNone": "Keine",
             "defaultAssigneeHint": "Neu synchronisierte Termine werden automatisch dieser Person zugewiesen.",
-            "defaultAssigneeRoutingHint": "Standard-Zuweisung: Termine aus einem Kalender bekommen die dort gewählte Person, und ein neuer Termin, der nur dieser Person zugewiesen ist, wird in diesem Kalender angelegt. Das gilt für Google- und CalDAV-Kalender, nicht für Apple oder Outlook."
+            "defaultAssigneeRoutingHint": "Standard-Zuweisung: Termine aus einem Kalender bekommen die dort gewählte Person, und ein neuer Termin, der nur dieser Person zugewiesen ist, wird in diesem Kalender angelegt. Das gilt für Google- und CalDAV-Kalender, nicht für Apple oder Outlook.",
+            "backfillTitle": "Zuweisung nachtragen",
+            "backfillDescription": "Eine Standard-Zuweisung gilt nur für Termine, die nach dem Setzen übernommen werden. Hier lässt sie sich einmalig auf die schon übernommenen Termine aller Konten anwenden. Termine, die bereits jemandem zugewiesen sind, bleiben unverändert.",
+            "backfillAction": "Auf bestehende Termine anwenden",
+            "backfillQuestion": "{{count}} Termine ohne Zuweisung zuweisen?",
+            "backfillQuestion_one": "{{count}} Termin ohne Zuweisung zuweisen?",
+            "backfillDetail": "Jeder Termin bekommt die Standard-Zuweisung seines Kalenders. Das trifft auch Termine, bei denen jemand die Zuweisung von Hand entfernt hat. Zurücknehmen lässt es sich nur Termin für Termin.",
+            "backfillConfirm": "Zuweisen",
+            "backfillNone": "Es gibt keine Termine ohne Zuweisung in Kalendern mit Standard-Zuweisung.",
+            "backfillDone": "{{count}} Termine zugewiesen.",
+            "backfillDone_one": "{{count}} Termin zugewiesen.",
+            "backfillChanged": "Seit der Zählung haben sich Termine geändert. Bitte noch einmal anwenden."
         },
         "calendarDefaultsTitle": "Standardwerte für neue Termine",
         "calendarDefaultsDescription": "Voreinstellungen, die neue Termine automatisch übernehmen.",
@@ -3395,7 +3406,13 @@
         "hoursWorked": "Arbeitszeit",
         "computedAmount": "Berechneter Betrag",
         "setupProfileAction": "Profil anlegen",
-        "loadError": "Haushaltshilfe konnte nicht geladen werden."
+        "loadError": "Haushaltshilfe konnte nicht geladen werden.",
+        "prevMonth": "Vorheriger Monat",
+        "nextMonth": "Nächster Monat",
+        "currentMonth": "Aktuell",
+        "noVisitReportsInMonth": "Im {{month}} wurden keine Einsätze erfasst.",
+        "settledAdminOnly": "Ändern oder löschen nur durch einen Admin",
+        "reportVisitsCount": "Besuche"
     },
     "splitExpenses": {
         "title": "Gemeinsame Ausgaben",

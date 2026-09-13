@@ -69,6 +69,40 @@ const { default: contactsRouter } = await import('../server/routes/contacts.js')
 db.init();
 const database = db.get();
 
+// --------------------------------------------------------
+// 1b) Heilung der Migration v195 (#1140) - bewusst gegen die ECHTEN
+//     MIGRATIONS aus db.js gefahren, nicht gegen den Spiegel: die
+//     Spiegel-Schreibpfade (server/auth.js, server/routes/split-expenses.js)
+//     schrieben bis v195 das rohe 'Sonstiges' statt des Keys 'misc', und ohne
+//     diese Probe haelt kein Test das UPDATE der Migration selbst fest.
+// --------------------------------------------------------
+{
+  const V195 = db.MIGRATIONS.find((m) => m.version === 195);
+  test('Migration v195 existiert und fasst die Sonstiges-Kategorie an', () => {
+    assert(V195, 'Migration 195 fehlt in db.js MIGRATIONS');
+    assert(/Sonstiges/.test(V195.up), 'v195 muss die Kategorie Sonstiges anfassen');
+  });
+
+  // Vor-v195-Stand: Schema + Kategorien-Seed (v84), dann Zeilen, wie die
+  // fehlerhaften Schreibpfade sie NACH v84 weiter hinterlassen haben.
+  const mig = new DatabaseSync(':memory:');
+  mig.exec(MIGRATIONS_SQL[1]);
+  mig.exec(MIGRATIONS_SQL[84]);
+  mig.prepare("INSERT INTO contacts (name, category) VALUES ('Mitglied', 'Sonstiges')").run();
+  mig.prepare("INSERT INTO contacts (name, category) VALUES ('Gast', 'Sonstiges')").run();
+  mig.prepare("INSERT INTO contacts (name, category) VALUES ('Dr. Meier', 'doctor')").run();
+
+  test('v195 heilt Sonstiges-Kontakte auf misc, andere Kategorien bleiben', () => {
+    mig.exec(V195.up);
+    const byName = Object.fromEntries(
+      mig.prepare('SELECT name, category FROM contacts').all().map((r) => [r.name, r.category]));
+    assert(byName['Mitglied'] === 'misc', `Mitglied: erwartet misc, war ${byName['Mitglied']}`);
+    assert(byName['Gast'] === 'misc', `Gast: erwartet misc, war ${byName['Gast']}`);
+    assert(byName['Dr. Meier'] === 'doctor', `Dr. Meier: doctor muss unberuehrt bleiben, war ${byName['Dr. Meier']}`);
+  });
+  mig.close();
+}
+
 const app = express();
 app.use(express.json());
 app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1 }; next(); });

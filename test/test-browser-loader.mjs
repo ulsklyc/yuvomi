@@ -71,7 +71,9 @@ const STUBS = {
     };
     export const initI18n = async () => {};
     export const setLocale = async () => {};
-    export const getLocale = () => 'de';
+    // Wie __formatLocale: Tests, die lokalisierte Monatsnamen pruefen, setzen
+    // globalThis.__locale; ohne das bleibt es bei 'de'.
+    export const getLocale = () => globalThis.__locale ?? 'de';
     // Die Format-Locale ist im Browser eine Einstellung des Haushalts und
     // entscheidet ueber Ziffernsystem, Dezimaltrenner und Gruppierung. Tests, die
     // genau das pruefen (utils/money.js und alles, was dessen Umschrift nutzt),
@@ -101,9 +103,7 @@ const STUBS = {
     export const recurrenceRow = () => ({ icon: 'repeat', label: '', value: '' });
   `,
   '/components/modal.js': `
-    // Ein Test, der den Dialog selbst bedienen will, setzt
-    // globalThis.__modalStub = (opts) => {} und bekommt onSave in die Hand.
-    export const openModal = (opts) => { globalThis.__modalStub?.(opts); };
+    export const openModal = (...args) => globalThis.__openModal?.(...args);
     export const closeModal = () => {};
     export const confirmModal = async () => true;
     export const confirmOverModal = async (...args) => globalThis.__confirmOverModal?.(...args) ?? true;

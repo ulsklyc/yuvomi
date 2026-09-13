@@ -1,3 +1,5 @@
+import { NOTE_CATEGORY_NAME_MAX_LENGTH } from '../../public/utils/note-category-name.js';
+
 const noteInputProperties = {
   title: { type: ['string', 'null'] },
   content: { type: 'string' },
@@ -111,7 +113,7 @@ export const schemas = {
           required: ['id', 'name', 'scope', 'sort_order'],
           properties: {
             id: { type: 'integer' },
-            name: { type: 'string', minLength: 1, maxLength: 80 },
+            name: { type: 'string', minLength: 1, maxLength: NOTE_CATEGORY_NAME_MAX_LENGTH },
             scope: { type: 'string', enum: ['personal', 'household'] },
             owner_user_id: { type: ['integer', 'null'] },
             sort_order: { type: 'integer' },
@@ -144,7 +146,7 @@ export const schemas = {
           type: 'object',
           required: ['name'],
           properties: {
-            name: { type: 'string', minLength: 1, maxLength: 80 },
+            name: { type: 'string', minLength: 1, maxLength: NOTE_CATEGORY_NAME_MAX_LENGTH },
             scope: { type: 'string', enum: ['personal', 'household'], default: 'personal' },
           },
         },
@@ -152,7 +154,7 @@ export const schemas = {
           type: 'object',
           required: ['name'],
           properties: {
-            name: { type: 'string', minLength: 1, maxLength: 80 },
+            name: { type: 'string', minLength: 1, maxLength: NOTE_CATEGORY_NAME_MAX_LENGTH },
           },
         },
         NoteCategoryReorderInput: {

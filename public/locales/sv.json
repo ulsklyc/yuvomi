@@ -2494,7 +2494,18 @@
             "defaultAssignee": "Standardtilldelning",
             "defaultAssigneeNone": "Ingen",
             "defaultAssigneeHint": "Nyligen synkroniserade händelser tilldelas automatiskt den här personen.",
-            "defaultAssigneeRoutingHint": "Standardtilldelning: händelser från en kalender får personen som valts där, och en ny händelse som bara är tilldelad den personen skapas i den kalendern. Gäller Google- och CalDAV-kalendrar, inte Apple eller Outlook."
+            "defaultAssigneeRoutingHint": "Standardtilldelning: händelser från en kalender får personen som valts där, och en ny händelse som bara är tilldelad den personen skapas i den kalendern. Gäller Google- och CalDAV-kalendrar, inte Apple eller Outlook.",
+            "backfillTitle": "Fyll i tilldelningar",
+            "backfillDescription": "En standardtilldelning gäller bara möten som hämtats efter att den ställts in. Här kan du tillämpa den en gång på möten som redan hämtats från alla konton. Möten som redan är tilldelade någon lämnas orörda.",
+            "backfillAction": "Tillämpa på befintliga möten",
+            "backfillQuestion": "Tilldela {{count}} möten utan tilldelning?",
+            "backfillQuestion_one": "Tilldela {{count}} möte utan tilldelning?",
+            "backfillDetail": "Varje möte får standardtilldelningen för sin kalender. Det gäller även möten där någon tagit bort tilldelningen för hand. Det går bara att ångra ett möte i taget.",
+            "backfillConfirm": "Tilldela",
+            "backfillNone": "Det finns inga möten utan tilldelning i kalendrar med standardtilldelning.",
+            "backfillDone": "{{count}} möten tilldelade.",
+            "backfillDone_one": "{{count}} möte tilldelat.",
+            "backfillChanged": "Mötena har ändrats sedan de räknades. Tillämpa igen."
         },
         "calendarDefaultsTitle": "Standardvärden för nya händelser",
         "calendarDefaultsDescription": "Förinställningar som tillämpas automatiskt på nya händelser.",
@@ -3391,7 +3402,13 @@
         "hoursWorked": "Arbetade timmar",
         "computedAmount": "Beräknat belopp",
         "setupProfileAction": "Skapa profil",
-        "loadError": "Städning kunde inte laddas."
+        "loadError": "Städning kunde inte laddas.",
+        "prevMonth": "Föregående månad",
+        "nextMonth": "Nästa månad",
+        "currentMonth": "Nuvarande",
+        "noVisitReportsInMonth": "Inga personalbesök registrerades under {{month}}.",
+        "settledAdminOnly": "Bara en admin kan ändra eller ta bort",
+        "reportVisitsCount": "Besök"
     },
     "userMultiSelect": {
         "moreUsers": "mer",
