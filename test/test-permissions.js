@@ -337,7 +337,7 @@ test('permissionCatalog liefert Module, Widgets, Rollen, Levels', () => {
   assert.deepEqual(cat.widgetAccessLevels, ['none', 'allow']);
   assert.ok(cat.capabilities.some((item) => item.key === 'notes_manage_household_categories'));
   assert.deepEqual(cat.capabilityAccessLevels, ['none', 'allow']);
-  assert.deepEqual(PERMISSION_CAPABILITIES.map((item) => item.key), ['notes_manage_household_categories']);
+  assert.deepEqual(PERMISSION_CAPABILITIES.map((item) => item.key), ['notes_manage_household_categories', 'health_use_fasting']);
 });
 
 test('clientPermissions: kompakte Payload mit admin-Flag', () => {

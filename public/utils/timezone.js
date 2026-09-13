@@ -123,7 +123,7 @@ function formatterFor(zone) {
   let fmt = _formatterCache.get(zone);
   if (!fmt) {
     fmt = new Intl.DateTimeFormat('en-US', {
-      timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
+      timeZone: zone, era: 'short', year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
     });
     _formatterCache.set(zone, fmt);
@@ -143,14 +143,14 @@ function formatterFor(zone) {
  * @returns {{year:number,month:number,day:number,hour:number,minute:number,second:number}|null}
  *          `null`, wenn der Wert nicht lesbar ist
  */
-export function zonedFields(value) {
+export function zonedFields(value, timeZone = displayTimeZone()) {
   if (value === null || value === undefined || value === '') return null;
 
   // Wanduhrzeit: direkt lesen. Ein Umweg über `new Date()` wäre hier nicht nur
   // unnötig, sondern falsch - er würde die Zeichen in einen Zeitpunkt der
   // Browser-Zone verwandeln und ihn anschließend in eine andere umrechnen.
   if (typeof value === 'string' && !hasExplicitZone(value)) {
-    const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/.exec(value.trim());
+    const m = /^(\d{4}|[+-]\d{6})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/.exec(value.trim());
     if (m) {
       return {
         year: Number(m[1]), month: Number(m[2]), day: Number(m[3]),
@@ -163,7 +163,7 @@ export function zonedFields(value) {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return null;
 
-  const zone = displayTimeZone();
+  const zone = timeZone;
   if (!zone) {
     return {
       year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate(),
@@ -181,12 +181,50 @@ export function zonedFields(value) {
   // Monats auf 0 setzen (dieselbe Falle wie in server/utils/timezone.js).
   const hour = g('hour');
   return {
-    year: g('year'), month: g('month'), day: g('day'),
+    year: parts.find((part) => part.type === 'era')?.value === 'BC' ? 1 - g('year') : g('year'), month: g('month'), day: g('day'),
     hour: hour === 24 ? 0 : hour, minute: g('minute'), second: g('second'),
   };
 }
 
 const pad2 = (n) => String(n).padStart(2, '0');
+const isoYear = (year) => year >= 0 && year <= 9999 ? String(year).padStart(4, '0') : `${year < 0 ? '-' : '+'}${String(Math.abs(year)).padStart(6, '0')}`;
+
+/** Editable wall time in an explicit recorded zone, never the browser zone. */
+export function wallTimeValue(value, zone) {
+  const f = zonedFields(value, zone);
+  return f ? `${isoYear(f.year)}-${pad2(f.month)}-${pad2(f.day)}T${pad2(f.hour)}:${pad2(f.minute)}:${pad2(f.second)}` : '';
+}
+
+function wallEpoch(value) {
+  const date = new Date(`${value}Z`);
+  return date.getTime();
+}
+
+/** Enumerate valid offsets; round-trip rejects DST gaps and malformed dates. */
+export function wallTimeCandidates(value, zone) {
+  if (!isValidTimeZone(zone) || !/^(?:\d{4}|[+-]\d{6})-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(value)) return [];
+  const wall = /T\d{2}:\d{2}$/.test(value) ? `${value}:00` : value;
+  const epoch = wallEpoch(wall);
+  if (!Number.isFinite(epoch)) return [];
+  const offsets = new Set();
+  for (let hours = -36; hours <= 36; hours += 6) {
+    const sample = epoch + hours * 3600000;
+    offsets.add(wallEpoch(wallTimeValue(sample, zone)) - sample);
+  }
+  return [...offsets].map((offset) => ({ instant: new Date(epoch - offset).toISOString(), offsetMinutes: offset / 60000 }))
+    .filter((candidate) => wallTimeValue(candidate.instant, zone) === wall)
+    .sort((a, b) => a.instant.localeCompare(b.instant));
+}
+
+/** Retain an existing fold's offset, including exact unchanged milliseconds. */
+export function wallTimeInstant(value, zone, original = null, offsetMinutes = null) {
+  const wall = /T\d{2}:\d{2}$/.test(value) ? `${value}:00` : value;
+  if (original && wallTimeValue(original, zone) === wall && offsetMinutes === null) return original;
+  const candidates = wallTimeCandidates(wall, zone);
+  if (!candidates.length) throw new Error('Invalid wall time');
+  const preferred = offsetMinutes ?? (original ? (wallEpoch(wallTimeValue(original, zone)) - Math.floor(Date.parse(original) / 1000) * 1000) / 60000 : null);
+  return (candidates.find((candidate) => candidate.offsetMinutes === preferred) || candidates[0]).instant;
+}
 
 /**
  * Der Kalendertag eines Zeitwerts in der Anzeigezone (YYYY-MM-DD).

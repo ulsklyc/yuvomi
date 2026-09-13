@@ -1,0 +1,50 @@
+/* Shared fasting controls used by Health and personal Settings. */
+.fasting-dial { --fasting-progress: 0%; position: relative; display: grid; place-items: center; width: min(100%, 18rem); aspect-ratio: 1; margin: var(--space-4) auto; border-radius: var(--radius-full); background: conic-gradient(var(--module-health) var(--fasting-progress), var(--color-border-subtle) 0); }
+.fasting-dial::after { content: ''; position: absolute; inset: var(--space-2); border-radius: var(--radius-full); background: var(--color-surface-work); }
+.fasting-dial__content { position: relative; z-index: 1; padding: var(--space-3); max-width: 100%; text-align: center; }
+.fasting-clock-switch { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); padding: var(--space-1); border-radius: var(--radius-sm); background: var(--color-surface-3); }
+.fasting-clock-switch .btn { flex: 1; color: var(--color-text-secondary); }
+.fasting-clock-switch .btn[aria-pressed="true"] { background: var(--seg-active-bg); box-shadow: var(--seg-active-shadow); color: color-mix(in srgb, var(--module-health) var(--tint-ink), var(--color-text-primary)); }
+.fasting-preferences { display: grid; gap: var(--space-5); }
+.fasting-presets { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-block: var(--space-3); }
+.fasting-custom { margin-block-start: var(--space-4); }
+.fasting-custom[hidden] { display: none; }
+.fasting-preferences .form-hint, [data-fasting-edit-form] .form-hint { font-size: var(--text-sm); color: var(--color-text-secondary); }
+[data-fasting-edit-error], [data-fasting-error] { font-size: var(--text-sm); color: var(--color-danger-ink); }
+.fasting-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.fasting-editor-grid .form-group { min-width: 0; }
+.fasting-editor-grid .form-input { min-width: 0; width: 100%; }
+.fasting-rating { border: 0; padding: 0; margin-block: var(--space-3); display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); }
+.fasting-rating legend { margin-block-end: var(--space-2); }
+.fasting-rating__choice { position: relative; display: grid; place-items: center; min-width: var(--target-md); min-height: var(--target-md); cursor: pointer; border-radius: var(--radius-full); }
+.fasting-rating__choice input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.fasting-rating__choice span { font-size: var(--text-2xl); color: var(--color-accent); }
+.fasting-rating__choice:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+[data-fasting-edit-form] textarea { resize: vertical; }
+[data-fasting-error]:empty, [data-fasting-preferences-status]:empty, [data-fasting-edit-error]:empty { display: none; }
+.fasting-dial--segmented { background: none; }
+.fasting-dial--segmented::after { display: none; }
+[data-fasting-segments] { position: absolute; inset: 0; }
+.fasting-dial__svg { width: 100%; height: 100%; overflow: visible; }
+.fasting-dial__svg circle { fill: none; stroke-width: 3; }
+.fasting-dial__track { stroke: var(--color-fill-well); }
+.fasting-dial__trace { stroke: var(--module-health); }
+.fasting-dial__svg .fasting-dial__goal { stroke: var(--color-text-primary); stroke-width: 6; }
+.fasting-dial__svg .fasting-dial__zone { stroke-width: 2; }
+.fasting-dial__zone--0 { stroke: var(--chart-series-1); }
+.fasting-dial__zone--1 { stroke: var(--chart-series-2); }
+.fasting-dial__zone--2 { stroke: var(--chart-series-3); }
+.fasting-dial__landmarks { fill: var(--color-text-secondary); text-anchor: middle; font-size: calc(var(--text-xs) * 0.5); }
+.fasting-dial__extra { position: absolute; inset-inline: 0; bottom: var(--space-6); color: var(--color-text-secondary); font-size: var(--text-sm); }
+.fasting-education { text-align: start; font-size: var(--text-sm); color: var(--color-text-secondary); }
+.fasting-help-heading { display: flex; align-items: center; gap: var(--space-2); }
+yuvomi-fasting-help { display: inline-flex; flex-shrink: 0; }
+.fasting-help__button { display: grid; place-items: center; width: var(--target-base); height: var(--target-base); flex-shrink: 0; padding: 0; border: 0; border-radius: var(--radius-full); background: transparent; color: var(--color-text-secondary); cursor: help; }
+.fasting-help__button:hover, .fasting-help__button:focus-visible { color: var(--color-text-primary); background: var(--color-surface-hover); }
+.fasting-help__button:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: var(--focus-ring-offset); }
+.fasting-help__button > svg { width: var(--icon-lg); height: var(--icon-lg); }
+.fasting-help__tooltip { position: fixed; inset: auto; margin: 0; width: min(300px, calc(100vw - var(--space-6))); max-height: calc(100dvh - var(--space-6)); overflow: auto; padding: var(--space-3); border: 0; border-radius: var(--radius-sm); background: var(--color-text-primary); color: var(--color-bg); text-align: start; font-size: var(--text-sm); font-weight: var(--font-weight-regular); line-height: var(--line-height-relaxed); box-shadow: var(--shadow-md); }
+.fasting-help__tooltip > span { display: block; margin-block-start: var(--space-2); }
+@media (max-width: 639px) {
+  .fasting-editor-grid { grid-template-columns: 1fr; }
+}

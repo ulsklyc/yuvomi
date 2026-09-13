@@ -38,6 +38,22 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const tz = await import('../public/utils/timezone.js');
+test('recorded wall time preserves astronomical year zero and BCE identity', () => {
+  for (const year of ['0000', '-000001', '-200000']) {
+    const original = `${year}-06-01T12:00:00.123Z`;
+    assert.equal(tz.wallTimeValue(original, 'UTC'), `${year}-06-01T12:00:00`);
+    assert.equal(tz.wallTimeInstant(`${year}-06-01T12:00:00`, 'UTC', original), original);
+    assert.equal(tz.wallTimeInstant(`${year}-06-01T12:05:00`, 'UTC', original), `${year}-06-01T12:05:00.000Z`);
+  }
+});
+test('explicit recorded zone retains fold offset and rejects a missing local hour', () => {
+  assert.equal(typeof tz.wallTimeInstant, 'function');
+  assert.equal(tz.wallTimeInstant('2025-10-26T02:35:00', 'Europe/Prague', '2025-10-26T01:30:00Z'), '2025-10-26T01:35:00.000Z');
+  assert.equal(tz.wallTimeInstant('2025-10-26T02:35:00', 'Europe/Prague', '2025-10-26T00:30:00Z'), '2025-10-26T00:35:00.000Z');
+  assert.throws(() => tz.wallTimeInstant('2025-03-30T02:30:00', 'Europe/Prague'), /wall time/);
+  assert.equal(tz.wallTimeValue('2025-10-26T01:30:00.123Z', 'Europe/Prague'), '2025-10-26T02:30:00');
+  assert.equal(tz.wallTimeInstant('2025-10-26T02:30:00', 'Europe/Prague', '2025-10-26T01:30:00.123Z'), '2025-10-26T01:30:00.123Z');
+});
 const dateUtils = await import('../public/utils/date.js');
 
 const {

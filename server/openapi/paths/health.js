@@ -1,6 +1,21 @@
 import { op, jsonBody, idParam } from '../helpers.js';
 
 export function healthPaths() {
+  const instant = { type: 'string', format: 'date-time', pattern: '(Z|[+-][0-9]{2}:[0-9]{2})$', description: 'ISO instant with explicit offset; writes cannot be in the future.' };
+  const goal = { type: 'integer', nullable: true, minimum: 60, maximum: 20160, multipleOf: 60 };
+  const revision = { type: 'integer', minimum: 1 };
+  const recordFields = { start_at: instant, end_at: { ...instant, nullable: true }, start_tzid: { type: 'string', description: 'Runtime-supported IANA zone captured on creation and retained by ordinary edits.' }, goal_minutes: goal, rating: { type: 'integer', nullable: true, minimum: 1, maximum: 5 }, note: { type: 'string', nullable: true, maxLength: 2000 }, visibility: { type: 'string', enum: ['private', 'family'] } };
+  const fastingBody = (properties, required = [], mandatory = true) => ({ required: mandatory, content: { 'application/json': { schema: { type: 'object', properties, required } } } });
+  const userParam = { name: 'user_id', in: 'query', required: false, schema: { type: 'integer', minimum: 1 }, description: 'Defaults to the signed-in user. Family visibility and explicit caregiver grants apply.' };
+  const dates = ['from', 'to'].map((name) => ({ name, in: 'query', required: false, schema: { type: 'string', format: 'date', pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' }, description: 'Inclusive completion date in each record\'s captured start_tzid; from must not exceed to.' }));
+  const historyParams = [userParam, ...dates, { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 10 } }, { name: 'before_at', in: 'query', schema: instant, description: 'Pass together with before_id from next_cursor.' }, { name: 'before_id', in: 'query', schema: revision, description: 'Pass together with before_at.' }];
+  const fastingResponses = (status = 200, description = 'Successful response') => ({
+    [status]: { description }, 400: { description: 'Invalid timestamp, zone, goal, date range, cursor, revision or other input.' },
+    401: { $ref: '#/components/responses/Unauthorized' }, 403: { $ref: '#/components/responses/Forbidden' },
+    404: { description: 'FASTING_NOT_FOUND: record does not exist.' },
+    409: { description: 'Numeric code: 409; reason: FASTING_REVISION_CONFLICT, FASTING_ACTIVE_EXISTS, FASTING_OVERLAP, FASTING_ALREADY_FINISHED or FASTING_ACK_REQUIRED. Revision/overlap conflicts may include current record.', content: { 'application/json': { schema: { type: 'object', properties: { error: { type: 'string' }, code: { type: 'integer', enum: [409] }, reason: { type: 'string' }, current: { type: 'object' } } } } } },
+    500: { $ref: '#/components/responses/InternalServerError' },
+  });
   return {
     '/api/v1/health/vitals': {
       get: op({ summary: 'List vital measurements', tag: 'Health', description: 'Scoped to the viewer; `?user_id=` filters to a family member (only their `family`-visible rows). Optional `type`, `from`, `to` filters.' }),
@@ -87,6 +102,36 @@ export function healthPaths() {
     },
     '/api/v1/health/export/meds-logs': {
       get: op({ summary: 'Export medication dose logs as CSV', tag: 'Health', description: 'Scoped to the viewer; `?user_id=`, `from`, `to` filters supported. Returns `text/csv`.' }),
+    },
+    '/api/v1/health/fasting': {
+      get: op({ summary: 'List completed fasts', tag: 'Health', params: historyParams, responses: fastingResponses(), description: 'Alias of /fasting/history. Returns data, has_more and next_cursor, ordered by start_at DESC, id DESC.' }),
+      post: op({ summary: 'Start or backfill a fast', tag: 'Health', stateChanging: true, responses: fastingResponses(201), requestBody: fastingBody({ ...recordFields, user_id: revision, acknowledge_safety: { type: 'boolean', description: 'true explicitly acknowledges the first-use safety information.' } }, ['start_at', 'start_tzid']), description: 'Omitted/null end_at creates an active fast. At most one active row per person; intervals cannot overlap. Owner or explicitly granted caregiver with both fasting capabilities and Health write access.' }),
+    },
+    '/api/v1/health/fasting/state': {
+      get: op({ summary: 'Get fasting timer state', tag: 'Health', params: [userParam], responses: fastingResponses(), description: 'Active fast, settings, acknowledged, canWrite (owner/caregiver relationship), display_tzid and first ten completed records; history_has_more/history_next_cursor continue through /fasting/history. Health module write access is additionally required for mutations. Ungranted family readers receive null settings and acknowledged. Display zone follows household settings.' }),
+    },
+    '/api/v1/health/fasting/history': {
+      get: op({ summary: 'List fasting history', tag: 'Health', params: historyParams, responses: fastingResponses(), description: 'Returns data, has_more and next_cursor (cursor object or null). Ordered by start_at DESC, id DESC. Date filters select recorded-zone completion dates; malformed/reversed ranges return 400 FASTING_DATE_RANGE_INVALID. Visibility applies on every page.' }),
+    },
+    '/api/v1/health/fasting/stats': {
+      get: op({ summary: 'Get fasting statistics', tag: 'Health', params: [userParam], responses: fastingResponses(), description: 'Completed records only: allTime/year/last30Days summaries, currentStreak/longestStreak, display_tzid, today and seven weekly buckets {date,count,totalMinutes,goalMinutes,goalCount,hasRecord}. Captured non-null goals are summed. Missing days have hasRecord=false and goalMinutes=null. Calendar windows use household display-zone today; completion dates use each captured record zone.' }),
+    },
+    '/api/v1/health/fasting/settings': {
+      get: op({ summary: 'Get fasting settings', tag: 'Health', params: [userParam], responses: fastingResponses(), description: 'Settings or null for an ungranted family reader.' }),
+      put: op({ summary: 'Update fasting settings', tag: 'Health', params: [userParam], responses: fastingResponses(), description: 'Sparse personal settings. Caregivers may submit only user_id and acknowledge_safety. clock_mode is stored per user in sync_config. Supplying active_id (null if none) with a default_goal_minutes change also changes that active goal atomically; a matching active row requires expected_revision. Without active_id only the default changes. Completed records remain unchanged.', stateChanging: true, requestBody: fastingBody({ user_id: revision, default_goal_minutes: goal, zone_mode: { type: 'string', enum: ['timer', 'educational'] }, clock_mode: { type: 'string', enum: ['auto', 'elapsed', 'remaining'] }, acknowledge_safety: { type: 'boolean' }, active_id: { ...revision, nullable: true }, expected_revision: revision }) }),
+    },
+    '/api/v1/health/fasting/acknowledge-safety': {
+      post: op({ summary: 'Acknowledge fasting safety information', tag: 'Health', params: [userParam], stateChanging: true, responses: fastingResponses(), requestBody: fastingBody({ user_id: revision }, [], false) }),
+    },
+    '/api/v1/health/fasting/{id}': {
+      patch: op({ summary: 'Edit or reopen a fasting record', tag: 'Health', params: [idParam()], stateChanging: true, responses: fastingResponses(), description: 'end_at:null reopens the same record; interval and active-row constraints apply. Ownership cannot be reassigned.', requestBody: fastingBody({ ...recordFields, expected_revision: revision }, ['expected_revision']) }),
+      delete: op({ summary: 'Delete a fasting record', tag: 'Health', params: [idParam(), { name: 'expected_revision', in: 'query', required: false, schema: revision }], stateChanging: true, responses: fastingResponses(204, 'Deleted; no response body.'), description: 'expected_revision is required in either the query or JSON body. A non-null body value takes precedence.', requestBody: fastingBody({ expected_revision: revision }, [], false) }),
+    },
+    '/api/v1/health/fasting/{id}/finish': {
+      post: op({ summary: 'Finish an active fast', tag: 'Health', params: [idParam()], stateChanging: true, responses: fastingResponses(), description: 'Persists the end immediately; end_at defaults to server now when omitted. Requires an active row.', requestBody: fastingBody({ expected_revision: revision, end_at: instant }, ['expected_revision']) }),
+    },
+    '/api/v1/health/export/fasting': {
+      get: op({ summary: 'Export fasting history as CSV', tag: 'Health', params: [userParam, ...dates], responses: { ...fastingResponses(), 200: { description: 'Visibility-scoped UTF-8 CSV with BOM; spreadsheet formula-safe escaped cells.', content: { 'text/csv': { schema: { type: 'string' } } } } }, description: 'Columns: start_at,end_at,start_tzid,duration_minutes,goal_minutes,goal_reached,rating,note,visibility. Uses the same recorded-zone completion-date filters as history.' }),
     },
     '/api/v1/health/cycle/periods': {
       get: op({ summary: 'List menstrual period episodes', tag: 'Health', description: 'Scoped to the viewer; `?user_id=`, `from`, `to` filters supported.' }),

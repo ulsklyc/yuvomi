@@ -113,6 +113,11 @@ export const PERMISSION_CAPABILITIES = Object.freeze([
     module: 'notes',
     labelKey: 'noteCategories.permissionLabel',
   },
+  {
+    key: 'health_use_fasting',
+    module: 'health',
+    labelKey: 'health.fasting.permissionLabel',
+  },
 ]);
 
 export const MODULE_ACCESS_LEVELS = Object.freeze(['none', 'read', 'write']);

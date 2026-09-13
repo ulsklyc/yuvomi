@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A fasting journal records timers and past fasts in Health** (Refs #1173).
+  Start now or earlier, record completed intervals, and edit or undo changes with
+  conflict protection. Elapsed/remaining clocks, personal goals and an optional
+  educational dial preserve the recorded time zone. History loads ten records at
+  a time; date filters and CSV cover the complete visible history. Family members
+  can read shared records; personal settings stay private. Yuvomi records fasting
+  and does not provide medical advice.
+
+- **Fasting insights summarize completed records and captured goals.**
+  Calendar windows, interval-based streaks and weekly actual/goal values preserve
+  recorded zones and remain bounded even for very long intervals.
+
 - **A calendar's default assignee can now be applied to the events it already imported** (#1154).
   Until now the mapping only reached events that arrived after it was set, so the first thing
   anyone saw after mapping a calendar was a list of unassigned events. Settings → Sync gains a

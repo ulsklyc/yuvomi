@@ -18,6 +18,23 @@ import { readFileSync, readdirSync } from 'node:fs';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const chain = pkg.scripts.test;
+test('fasting slices execute each owned suite exactly once', () => {
+  for (const [script, file] of [
+    ['test:health-fasting', 'test-health-fasting.js'],
+    ['test:health-fasting', 'test-health-fasting-nav.js'],
+    ['test:health-fasting', 'test-health-fasting-migration.js'],
+    ['test:health-fasting', 'test-health-fasting-service.js'],
+    ['test:health-fasting', 'test-health-fasting-api.js'],
+    ['test:health-fasting', 'test-health-fasting-dates.js'],
+    ['test:health-fasting-stats', 'test-health-fasting-stats-api.js'],
+    ['test:health-fasting-stats', 'test-health-fasting-stats.js'],
+  ]) {
+    assert.ok(pkg.scripts[script], `${script} has its own entry point`);
+    assert.ok(pkg.scripts[script].includes(`test/${file}`), `${file} belongs to ${script}`);
+    assert.equal([...chain.matchAll(new RegExp(`npm run ${script}(?![\\w:.-])`, 'g'))].length, 1);
+    assert.equal(Object.entries(pkg.scripts).filter(([name, command]) => name.startsWith('test:') && command.includes(`test/${file}`)).length, 1);
+  }
+});
 const suiteScripts = Object.keys(pkg.scripts).filter((k) => k.startsWith('test:'));
 
 const suiteFile = (name) => pkg.scripts[name].match(/test\/[\w.-]+\.js/)?.[0];
