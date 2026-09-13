@@ -40,6 +40,20 @@ jobs:
         # und der Guard wird rot, statt still zu ueberspringen.
         with:
           fetch-depth: 2
+      # Der Checkout bringt keine Tags mit, test:changelog vergleicht aber die
+      # veroeffentlichten CHANGELOG-Abschnitte mit dem Tag des neuesten Abschnitts
+      # (warum einer reicht, steht am Guard). Der zweitneueste Abschnitt ist der Rueckfall
+      # fuer den Push des Release-Commits, dessen Tag erst danach kommt. depth 2 und nicht 1: zeigt
+      # der Tag auf HEAD selbst, macht --depth=1 HEAD flach, HEAD^1 verschwindet und
+      # test:migrations-append-only wird rot (am 13.9.2026 in einem Klon nachgestellt).
+      - name: Fetch the release tag of the newest CHANGELOG section
+        run: |
+          for version in $(grep -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | head -n 2 | tr -d '#[] '); do
+            if git fetch --no-tags --depth=2 origin "+refs/tags/v${version}:refs/tags/v${version}"; then
+              exit 0
+            fi
+          done
+          echo "No release tag found - the released-section guard in test:changelog will skip."
       - name: Set up Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:

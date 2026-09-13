@@ -6,7 +6,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import changelogRouter, { buildRouter, __test } from '../server/routes/changelog.js';
@@ -436,9 +437,9 @@ test('der Vorspann-Guard erkennt einen Eintrag ohne Vorspann', () => {
 test('jeder getaggte Release hat einen CHANGELOG-Eintrag, keine Version doppelt', (t) => {
   // F-033-Guard: beim Docs-Audit 2026-08-05 fehlten 13 getaggten Releases die
   // Einträge - bei spaeteren Release-Läufen still verloren gegangen. Der Guard
-  // beißt beim lokalen release-prep (voller Clone); in CI ohne Tags
-  // (checkout mit depth 1, ohne fetch-tags) skippt er sichtbar statt leer zu
-  // bestehen. Die Gegenrichtung (Eintrag ohne Tag) bleibt bewusst ungeprüft:
+  // beißt beim lokalen release-prep (voller Clone). In CI holt ci.yml nur den
+  // Tag des neuesten Abschnitts nach, dort prueft er also nur diesen einen; ganz
+  // ohne Tags skippt er sichtbar statt leer zu bestehen. Die Gegenrichtung (Eintrag ohne Tag) bleibt bewusst ungeprüft:
   // [0.71.9]/[0.76.0] sind dokumentierte Altfälle, und beim Release liegt der
   // neue Eintrag naturgemäß vor dem Tag.
   const repoRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -464,4 +465,177 @@ test('jeder getaggte Release hat einen CHANGELOG-Eintrag, keine Version doppelt'
   const dupes = [...new Set(headings.filter((v, i) => headings.indexOf(v) !== i))];
   assert.deepEqual(dupes, [],
     `Versionen mit doppeltem CHANGELOG-Heading: ${dupes.join(', ')}`);
+});
+
+/* EIN VEROEFFENTLICHTER ABSCHNITT AENDERT SICH NICHT MEHR.
+ *
+ * Rebased ein Beitragender seinen Zweig auf ein neues Release, mischt git seinen
+ * Eintrag unter Umstaenden konfliktfrei in den Abschnitt, der gerade veroeffentlicht
+ * wurde: release-prep hat `## [Unreleased]` in `## [2.66.0] - datum` umbenannt, und
+ * der Kontext, an dem der Eintrag haengt, steht jetzt dort. PR #1109 trug so seinen
+ * ganzen Eintrag unter `## [2.66.0]` / `### Added` bei leerem `[Unreleased]`, #1095
+ * vorher genauso. Der Vorspann-Guard oben blieb gruen - er prueft das Format, nicht
+ * den Ort. Die Notizen von 2.66.0 sind aber schon der Text des GitHub-Releases: ein
+ * Eintrag dort landet still im falschen Release.
+ *
+ * DIE REGEL: jeder Abschnitt `## [x.y.z]` steht Zeichen fuer Zeichen so da wie am
+ * Tag. Nur `[Unreleased]` darf sich frei aendern.
+ *
+ * VERGLICHEN WIRD GEGEN EINEN TAG, nicht jeder Abschnitt gegen seinen eigenen: gegen
+ * den neuesten vorhandenen Tag, der nicht neuer ist als der neueste Abschnitt. Er
+ * traegt alle aelteren Abschnitte so, wie sie bei seinem Release aussahen, und weil
+ * release-prep vor jedem Tag `npm test` faehrt, sahen sie dort so aus wie an ihren
+ * eigenen Tags. Jeden Abschnitt gegen seinen eigenen Tag zu lesen hiesse, jede Fassung
+ * der Datei zu lesen - am 13.09.2026 waren das 280 MB, quadratisch wachsend. Diese
+ * Messung lief einmal von Hand, beim Anlegen: 30 der 887 Abschnitte weichen von ihrem
+ * eigenen Tag ab, alle vor 2.66.0 veroeffentlicht. Zehn davon trugen am Tag Eintraege
+ * unter der falschen Ueberschrift, die spaeter zurueckgestellt wurden (etwa 1.37.0,
+ * 1.40.0, 1.75.4) - derselbe Fehler, nur beim Release selbst gemacht. Der Rest sind
+ * die Gedankenstrich-Sweeps, die Uebersetzung der deutschen Eintraege und bewusste
+ * Nachtraege wie #1053 in 2.64.1.
+ *
+ * GRENZEN:
+ * - Ein Abschnitt, der neuer ist als der Referenz-Tag, bleibt ungeprueft. Das ist der
+ *   Release-Commit: release-prep benennt `[Unreleased]` um und faehrt `npm test` VOR
+ *   `git tag`. Der neue Abschnitt hat da noch keinen Tag, die aelteren werden gegen
+ *   den vorigen verglichen.
+ * - CI klont ohne Tags. ci.yml holt den Tag des neuesten Abschnitts nach; ohne jeden
+ *   Tag skippt der Guard sichtbar.
+ * - Eine bewusste Aenderung an einem veroeffentlichten Abschnitt (ein Nachtrag wie
+ *   #1053) steht mit dem Hash ihres Inhalts in RELEASED_SECTION_EDITS. Der Hash haelt
+ *   genau diese Fassung fest: wer den Abschnitt danach noch einmal aendert, ist wieder
+ *   rot. Nach dem naechsten Release deckt der Tag die Fassung ab, der Eintrag ist dann
+ *   ueberfluessig und darf gehen. */
+const RELEASED_SECTION_EDITS = {
+  // 'x.y.z': '<hash aus der Fehlermeldung>', // #Issue: warum der Abschnitt nachtraeglich geaendert wurde
+};
+
+const sectionHash = (section) => createHash('sha256').update(section).digest('hex').slice(0, 12);
+
+// Version -> Abschnitt, von `## [x.y.z]` bis vor die naechste `## [`-Zeile.
+// `[Unreleased]` faellt heraus, Leerraum am Ende zaehlt nicht.
+function releasedSections(text) {
+  const sections = new Map();
+  for (const part of text.split(/^(?=## \[)/m)) {
+    const m = /^## \[(\d+\.\d+\.\d+)\]/.exec(part);
+    if (m) sections.set(m[1], part.trimEnd());
+  }
+  return sections;
+}
+
+function firstDifference(section, published) {
+  if (published === undefined) return 'am Tag gibt es diesen Abschnitt nicht';
+  const now = section.split('\n');
+  const then = published.split('\n');
+  let i = 0;
+  while (i < now.length && now[i] === then[i]) i += 1;
+  const cut = (line) => (line === undefined ? '(nichts)' : `"${line.slice(0, 80)}"`);
+  return `Zeile ${i + 1}: jetzt ${cut(now[i])}, am Tag ${cut(then[i])}`;
+}
+
+function releasedSectionDrift(headText, referenceText, referenceVersion, edits = {}) {
+  const published = releasedSections(referenceText);
+  const offenders = [];
+  let checked = 0;
+  for (const [version, section] of releasedSections(headText)) {
+    if (compareVersions(version, referenceVersion) > 0) continue;
+    checked += 1;
+    if (section === published.get(version)) continue;
+    const hash = sectionHash(section);
+    if (edits[version] === hash) continue;
+    offenders.push({ version, hash, detail: firstDifference(section, published.get(version)) });
+  }
+  return { offenders, checked };
+}
+
+test('veroeffentlichte CHANGELOG-Abschnitte stehen noch so da wie am Tag', (t) => {
+  const repoRoot = fileURLToPath(new URL('..', import.meta.url));
+  const headText = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
+  const newest = [...releasedSections(headText).keys()]
+    .reduce((a, b) => (compareVersions(a, b) >= 0 ? a : b));
+
+  let tags;
+  try {
+    tags = execFileSync('git', ['tag', '--list', 'v*'], { cwd: repoRoot, encoding: 'utf8' })
+      .split('\n')
+      .filter((l) => /^v\d+\.\d+\.\d+$/.test(l))
+      .map((l) => l.slice(1));
+  } catch {
+    return t.skip('git nicht verfügbar');
+  }
+  const referenceVersion = tags
+    .filter((v) => compareVersions(v, newest) <= 0)
+    .sort(compareVersions)
+    .at(-1);
+  if (!referenceVersion) {
+    return t.skip('kein Release-Tag im Checkout (flacher Klon) - ci.yml holt den Tag des neuesten Abschnitts nach');
+  }
+
+  const referenceText = execFileSync('git', ['show', `refs/tags/v${referenceVersion}:CHANGELOG.md`], {
+    cwd: repoRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
+  });
+  const { offenders, checked } = releasedSectionDrift(
+    headText, referenceText, referenceVersion, RELEASED_SECTION_EDITS);
+
+  // Reichweite: bricht die Abschnittstrennung, vergleicht der Guard nichts und ist gruen.
+  assert.ok(checked >= 10, `nur ${checked} Abschnitte gegen v${referenceVersion} verglichen`);
+  assert.equal(offenders.length, 0, [
+    `Veroeffentlichte CHANGELOG-Abschnitte weichen von v${referenceVersion} ab:`,
+    ...offenders.map((o) => `  [${o.version}] ${o.detail}`),
+    'Ein neuer Eintrag gehoert unter [Unreleased]. Nach einem Rebase auf ein neues Release mischt git',
+    'ihn gern in den gerade veroeffentlichten Abschnitt - dann dorthin zurueckschieben. Ist die Aenderung',
+    'Absicht (ein Nachtrag), den Abschnitt in RELEASED_SECTION_EDITS (test/test-changelog.js) eintragen:',
+    ...offenders.map((o) => `  '${o.version}': '${o.hash}',`),
+  ].join('\n'));
+});
+
+test('der Abschnitts-Guard erkennt einen Eintrag im veroeffentlichten Abschnitt', () => {
+  // SAMPLE_CHANGELOG steht hier fuer die Datei am Tag v1.2.1.
+  const unchanged = releasedSectionDrift(SAMPLE_CHANGELOG, SAMPLE_CHANGELOG, '1.2.1');
+  assert.deepEqual(unchanged, { offenders: [], checked: 2 });
+
+  // [Unreleased] darf wachsen.
+  const unreleased = SAMPLE_CHANGELOG.replace(
+    '- Etwas, das noch nicht ausgeliefert ist\n',
+    '- Etwas, das noch nicht ausgeliefert ist\n- Und noch etwas\n');
+  assert.notEqual(unreleased, SAMPLE_CHANGELOG);
+  assert.deepEqual(releasedSectionDrift(unreleased, SAMPLE_CHANGELOG, '1.2.1').offenders, []);
+
+  // Die Form von #1109: der Eintrag ist aus [Unreleased] in den Abschnitt darunter gerutscht.
+  const moved = SAMPLE_CHANGELOG
+    .replace('- Etwas, das noch nicht ausgeliefert ist\n', '')
+    .replace('- Ein Fehler weniger\n', '- Etwas, das noch nicht ausgeliefert ist\n- Ein Fehler weniger\n');
+  const drift = releasedSectionDrift(moved, SAMPLE_CHANGELOG, '1.2.1');
+  assert.deepEqual(drift.offenders.map((o) => o.version), ['1.2.1']);
+  assert.match(drift.offenders[0].detail, /jetzt "- Etwas, das noch nicht ausgeliefert ist", am Tag "- Ein Fehler weniger"/);
+
+  // Ein Abschnitt, den es am Tag nicht gab, ist auch eine Abweichung.
+  const missing = releasedSectionDrift(SAMPLE_CHANGELOG, SAMPLE_CHANGELOG.replace(/## \[1\.2\.0\][^]*$/, ''), '1.2.1');
+  assert.deepEqual(missing.offenders.map((o) => [o.version, o.detail]),
+    [['1.2.0', 'am Tag gibt es diesen Abschnitt nicht']]);
+});
+
+test('der Release-Commit selbst ist fuer den Abschnitts-Guard kein Fund', () => {
+  // So baut release-prep den Commit: [Unreleased] wird zur neuen Version, darueber
+  // ein leeres [Unreleased]. `npm test` laeuft davor, der Tag v1.2.2 kommt danach -
+  // die Referenz ist also noch v1.2.1.
+  const release = SAMPLE_CHANGELOG.replace('## [Unreleased]\n', '## [Unreleased]\n\n## [1.2.2] - 2026-01-03\n');
+  assert.notEqual(release, SAMPLE_CHANGELOG);
+  assert.deepEqual(releasedSectionDrift(release, SAMPLE_CHANGELOG, '1.2.1'), { offenders: [], checked: 2 });
+
+  // Nach dem Tag ist die Datei am Tag dieselbe wie im Baum.
+  assert.deepEqual(releasedSectionDrift(release, release, '1.2.2').offenders, []);
+});
+
+test('eine eingetragene Aenderung haelt genau ihre Fassung fest', () => {
+  const addendum = SAMPLE_CHANGELOG.replace('- Ein Fehler weniger\n', '- Ein Fehler weniger. *Nachtrag: und warum.*\n');
+  const [found] = releasedSectionDrift(addendum, SAMPLE_CHANGELOG, '1.2.1').offenders;
+  assert.equal(found.version, '1.2.1');
+
+  const edits = { '1.2.1': found.hash };
+  assert.deepEqual(releasedSectionDrift(addendum, SAMPLE_CHANGELOG, '1.2.1', edits).offenders, []);
+
+  // Wer den nachgetragenen Abschnitt noch einmal anfasst, ist wieder rot.
+  const again = addendum.replace('- Ein Fehler weniger.', '- Ein Fehler weniger.\n- Noch einer');
+  assert.deepEqual(releasedSectionDrift(again, SAMPLE_CHANGELOG, '1.2.1', edits).offenders.map((o) => o.version), ['1.2.1']);
 });
