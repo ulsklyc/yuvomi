@@ -1,6 +1,13 @@
 import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
-import { closeModal, confirmModal, openModal, refocusAfterRender } from '/components/modal.js';
+import {
+  captureModalContext,
+  closeModal,
+  confirmModal,
+  isModalContextCurrent,
+  openModal,
+  refocusAfterRender,
+} from '/components/modal.js';
 import {
   createDisclosure,
   createInlineError,
@@ -118,6 +125,10 @@ function bindDefaultAssigneeBackfill(container) {
   const endpoint = '/calendar/external-calendars/default-assignee-backfill';
 
   btn.addEventListener('click', async () => {
+    // Wer während der Zählung wegnavigiert, bekommt die Rückfrage nicht über
+    // eine fremde Seite gelegt - bestätigt würde sonst eine Aktion, deren Seite
+    // gar nicht mehr offen ist.
+    const context = captureModalContext();
     let count = 0;
     try {
       await withBusy(btn, async () => {
@@ -125,9 +136,10 @@ function bindDefaultAssigneeBackfill(container) {
         count = res.data?.count ?? 0;
       });
     } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
+      if (isModalContextCurrent(context)) showToast(err.message || t('common.errorGeneric'), 'danger');
       return;
     }
+    if (!isModalContextCurrent(context)) return;
 
     if (count === 0) {
       showToast(t('settings.sync.backfillNone'));

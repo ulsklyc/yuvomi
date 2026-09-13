@@ -1,3 +1,5 @@
+import { setEventAssignments } from '../routes/calendar/helpers.js';
+
 // --------------------------------------------------------
 // Standard-Zuweisung für synchronisierte Termine (#459).
 //
@@ -45,13 +47,23 @@ export function assignDefaultToEvent(d, eventId, userId) {
 // „Keine Zuweisung" heißt beide Spalten leer: `assigned_to` UND keine
 // event_assignments-Zeile. Eine verwaiste Standard-Person (Nutzer gelöscht)
 // fällt über den JOIN auf users heraus, wie in assignDefaultToEvent.
+//
+// Nur SPIEGEL-Termine: die Quelle des Termins muss die des Kalenders sein. Ein
+// lokal abgekoppeltes Vorkommen (retireLegacyInstances setzt external_source auf
+// 'local') behält seine calendar_ref_id, gehört aber nicht mehr dem Kalender.
+//
+// Geschrieben wird über setEventAssignments(), die eine Schreibstelle der
+// Zuweisung: sie verteilt die Erinnerungen des Anlegers an die neue Person
+// (#921) und gleicht die Dokumentrechte eines Anhangs an. Ein direktes INSERT
+// zeigte der Person den Termin, aber weder Erinnerung noch Anhang.
 // --------------------------------------------------------
 
 const UNASSIGNED_MAPPED_EVENTS = `
   FROM calendar_events e
   JOIN external_calendars ec ON ec.id = e.calendar_ref_id
   JOIN users u ON u.id = ec.default_assignee_user_id
-  WHERE e.assigned_to IS NULL
+  WHERE e.external_source = ec.source
+    AND e.assigned_to IS NULL
     AND NOT EXISTS (SELECT 1 FROM event_assignments ea WHERE ea.event_id = e.id)
 `;
 
@@ -81,12 +93,9 @@ export function applyDefaultAssigneesToExisting(d) {
     const setPrimary = d.prepare(
       'UPDATE calendar_events SET assigned_to = ? WHERE id = ? AND assigned_to IS NULL'
     );
-    const addAssignment = d.prepare(
-      'INSERT OR IGNORE INTO event_assignments (event_id, user_id) VALUES (?, ?)'
-    );
     for (const { eventId, userId } of rows) {
       setPrimary.run(userId, eventId);
-      addAssignment.run(eventId, userId);
+      setEventAssignments(d, eventId, [userId]);
     }
     return rows.length;
   })();
