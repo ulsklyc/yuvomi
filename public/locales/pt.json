@@ -3391,7 +3391,12 @@
         "hoursWorked": "Horas trabalhadas",
         "computedAmount": "Valor calculado",
         "setupProfileAction": "Criar perfil",
-        "loadError": "Não foi possível carregar a faxina."
+        "loadError": "Não foi possível carregar a faxina.",
+        "prevMonth": "Mês anterior",
+        "nextMonth": "Próximo mês",
+        "currentMonth": "Atual",
+        "noVisitReportsInMonth": "Nenhuma visita da equipe registrada em {{month}}.",
+        "settledAdminOnly": "Só um admin pode alterar ou excluir"
     },
     "userMultiSelect": {
         "moreUsers": "mais",

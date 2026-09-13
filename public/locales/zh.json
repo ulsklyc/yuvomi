@@ -3391,7 +3391,12 @@
         "hoursWorked": "工作小时数",
         "computedAmount": "计算金额",
         "setupProfileAction": "创建档案",
-        "loadError": "无法加载家务。"
+        "loadError": "无法加载家务。",
+        "prevMonth": "上个月",
+        "nextMonth": "下个月",
+        "currentMonth": "当前",
+        "noVisitReportsInMonth": "{{month}}没有上门服务记录。",
+        "settledAdminOnly": "只有管理员可以修改或删除"
     },
     "userMultiSelect": {
         "moreUsers": "更多",

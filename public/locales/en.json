@@ -3391,7 +3391,12 @@
         "hoursWorked": "Hours worked",
         "computedAmount": "Computed amount",
         "setupProfileAction": "Create profile",
-        "loadError": "Housekeeping could not be loaded."
+        "loadError": "Housekeeping could not be loaded.",
+        "prevMonth": "Previous month",
+        "nextMonth": "Next month",
+        "currentMonth": "Current",
+        "noVisitReportsInMonth": "No staff visits recorded in {{month}}.",
+        "settledAdminOnly": "Only an admin can change or delete it"
     },
     "userMultiSelect": {
         "moreUsers": "more",

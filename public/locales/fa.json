@@ -3395,7 +3395,12 @@
         "hoursWorked": "زمان کار",
         "computedAmount": "مبلغ محاسبه‌شده",
         "setupProfileAction": "ایجاد نمایه",
-        "loadError": "خدمتکار خانه بارگذاری نشد."
+        "loadError": "خدمتکار خانه بارگذاری نشد.",
+        "prevMonth": "ماه قبل",
+        "nextMonth": "ماه بعد",
+        "currentMonth": "جاری",
+        "noVisitReportsInMonth": "در {{month}} هیچ بازدیدی ثبت نشده است.",
+        "settledAdminOnly": "فقط یک مدیر می‌تواند آن را تغییر دهد یا حذف کند"
     },
     "splitExpenses": {
         "title": "هزینه‌های مشترک",

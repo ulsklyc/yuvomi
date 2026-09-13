@@ -3391,7 +3391,12 @@
         "hoursWorked": "Arbetade timmar",
         "computedAmount": "Beräknat belopp",
         "setupProfileAction": "Skapa profil",
-        "loadError": "Städning kunde inte laddas."
+        "loadError": "Städning kunde inte laddas.",
+        "prevMonth": "Föregående månad",
+        "nextMonth": "Nästa månad",
+        "currentMonth": "Nuvarande",
+        "noVisitReportsInMonth": "Inga personalbesök registrerades under {{month}}.",
+        "settledAdminOnly": "Bara en admin kan ändra eller ta bort"
     },
     "userMultiSelect": {
         "moreUsers": "mer",

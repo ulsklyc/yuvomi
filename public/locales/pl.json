@@ -3395,7 +3395,12 @@
         "hoursWorked": "Przepracowane godziny",
         "computedAmount": "Obliczona kwota",
         "setupProfileAction": "Utwórz profil",
-        "loadError": "Nie udało się załadować sprzątania."
+        "loadError": "Nie udało się załadować sprzątania.",
+        "prevMonth": "Poprzedni miesiąc",
+        "nextMonth": "Następny miesiąc",
+        "currentMonth": "Bieżący",
+        "noVisitReportsInMonth": "Brak zarejestrowanych wizyt personelu w okresie {{month}}.",
+        "settledAdminOnly": "Zmienić lub usunąć może tylko admin"
     },
     "splitExpenses": {
         "title": "Wspólne wydatki",

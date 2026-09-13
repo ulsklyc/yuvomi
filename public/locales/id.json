@@ -3395,7 +3395,12 @@
         "hoursWorked": "Waktu kerja",
         "computedAmount": "Jumlah terhitung",
         "setupProfileAction": "Buat profil",
-        "loadError": "Asisten rumah tangga tidak dapat dimuat."
+        "loadError": "Asisten rumah tangga tidak dapat dimuat.",
+        "prevMonth": "Bulan sebelumnya",
+        "nextMonth": "Bulan berikutnya",
+        "currentMonth": "Saat ini",
+        "noVisitReportsInMonth": "Tidak ada kunjungan tercatat pada {{month}}.",
+        "settledAdminOnly": "Hanya admin yang dapat mengubah atau menghapusnya"
     },
     "splitExpenses": {
         "title": "Pengeluaran Bersama",

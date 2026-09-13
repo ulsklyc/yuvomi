@@ -2995,7 +2995,12 @@
         "hoursWorked": "Pracovní hodiny",
         "computedAmount": "Vypočtená částka",
         "setupProfileAction": "Vytvořit profil",
-        "loadError": "Domácí práce se nepodařilo načíst."
+        "loadError": "Domácí práce se nepodařilo načíst.",
+        "prevMonth": "Předchozí měsíc",
+        "nextMonth": "Příští měsíc",
+        "currentMonth": "Aktuální měsíc",
+        "noVisitReportsInMonth": "V období {{month}} nebyly zaznamenány žádné návštěvy.",
+        "settledAdminOnly": "Upravit nebo smazat ji může jen admin"
     },
     "splitExpenses": {
         "title": "Společné výdaje",

@@ -3391,7 +3391,12 @@
         "hoursWorked": "Ore lavorate",
         "computedAmount": "Importo calcolato",
         "setupProfileAction": "Crea profilo",
-        "loadError": "Impossibile caricare le pulizie."
+        "loadError": "Impossibile caricare le pulizie.",
+        "prevMonth": "Mese precedente",
+        "nextMonth": "Mese successivo",
+        "currentMonth": "Corrente",
+        "noVisitReportsInMonth": "Nessuna visita del personale registrata per {{month}}.",
+        "settledAdminOnly": "Solo un admin può modificarla o eliminarla"
     },
     "userMultiSelect": {
         "moreUsers": "altri",

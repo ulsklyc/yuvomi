@@ -3395,7 +3395,12 @@
         "hoursWorked": "Oras na napagtrabahuhan",
         "computedAmount": "Kinalkulang halaga",
         "setupProfileAction": "Gumawa ng profile",
-        "loadError": "Hindi ma-load ang gawaing-bahay."
+        "loadError": "Hindi ma-load ang gawaing-bahay.",
+        "prevMonth": "Nakaraang buwan",
+        "nextMonth": "Susunod na buwan",
+        "currentMonth": "Kasalukuyan",
+        "noVisitReportsInMonth": "Walang naitalang pagbisita ng tauhan sa {{month}}.",
+        "settledAdminOnly": "Tanging admin ang maaaring baguhin o burahin ito"
     },
     "splitExpenses": {
         "title": "Mga hinating gastos",

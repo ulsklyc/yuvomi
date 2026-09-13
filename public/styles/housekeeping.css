@@ -210,6 +210,32 @@
   margin: 0;
 }
 
+/* Monats-Stepper des Berichte-Tabs (#1137): Pfeil, Monat, Pfeil, dahinter der
+ * Reset - dieselbe Reihenfolge wie Budget (.budget-nav__month). */
+.housekeeping-month-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* [hidden] durchsetzen: .btn setzt display mit gleicher Spezifitaet, der Reset
+ * blieb sonst im laufenden Monat sichtbar (dieselbe Falle wie in budget.css). */
+.housekeeping-month-nav [hidden] { display: none !important; }
+
+/* Der Monat ist der Wert des Steppers, kein Nebentext: die Regel fuer den
+ * Abschnittskopf faerbt jedes span sekundaer. Die Mindestbreite haelt den
+ * naechsten Pfeil an seinem Platz, waehrend der Monatsname kuerzer oder laenger wird. */
+.housekeeping-section-heading .housekeeping-month-nav__label {
+  min-width: 9.5rem;
+  text-align: center;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.housekeeping-month-nav__current {
+  padding: var(--space-1) var(--space-3);
+}
+
 .housekeeping-chart {
   min-height: 126px;
   display: flex;

@@ -3391,7 +3391,12 @@
         "hoursWorked": "Heures travaillées",
         "computedAmount": "Montant calculé",
         "setupProfileAction": "Créer le profil",
-        "loadError": "Impossible de charger le ménage."
+        "loadError": "Impossible de charger le ménage.",
+        "prevMonth": "Mois précédent",
+        "nextMonth": "Mois suivant",
+        "currentMonth": "Actuel",
+        "noVisitReportsInMonth": "Aucune intervention enregistrée en {{month}}.",
+        "settledAdminOnly": "Seul un admin peut la modifier ou la supprimer"
     },
     "userMultiSelect": {
         "moreUsers": "autres",

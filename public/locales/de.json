@@ -3395,7 +3395,12 @@
         "hoursWorked": "Arbeitszeit",
         "computedAmount": "Berechneter Betrag",
         "setupProfileAction": "Profil anlegen",
-        "loadError": "Haushaltshilfe konnte nicht geladen werden."
+        "loadError": "Haushaltshilfe konnte nicht geladen werden.",
+        "prevMonth": "Vorheriger Monat",
+        "nextMonth": "Nächster Monat",
+        "currentMonth": "Aktuell",
+        "noVisitReportsInMonth": "Im {{month}} wurden keine Einsätze erfasst.",
+        "settledAdminOnly": "Ändern oder löschen nur durch einen Admin"
     },
     "splitExpenses": {
         "title": "Gemeinsame Ausgaben",

@@ -3391,7 +3391,12 @@
         "hoursWorked": "Số giờ làm việc",
         "computedAmount": "Số tiền được tính",
         "setupProfileAction": "Tạo hồ sơ",
-        "loadError": "Không thể tải dọn dẹp."
+        "loadError": "Không thể tải dọn dẹp.",
+        "prevMonth": "Tháng trước",
+        "nextMonth": "Tháng sau",
+        "currentMonth": "Hiện tại",
+        "noVisitReportsInMonth": "Không có lượt đến của nhân viên được ghi nhận trong {{month}}.",
+        "settledAdminOnly": "Chỉ quản trị viên mới có thể sửa hoặc xoá"
     },
     "userMultiSelect": {
         "moreUsers": "thêm",

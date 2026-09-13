@@ -3391,7 +3391,12 @@
         "hoursWorked": "作業時間",
         "computedAmount": "計算金額",
         "setupProfileAction": "プロフィールを作成",
-        "loadError": "家事の読み込みに失敗しました。"
+        "loadError": "家事の読み込みに失敗しました。",
+        "prevMonth": "先月",
+        "nextMonth": "来月",
+        "currentMonth": "今月",
+        "noVisitReportsInMonth": "{{month}}の訪問記録はありません。",
+        "settledAdminOnly": "変更・削除できるのは管理者だけです"
     },
     "userMultiSelect": {
         "moreUsers": "他",

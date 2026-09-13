@@ -3391,7 +3391,12 @@
         "hoursWorked": "काम के घंटे",
         "computedAmount": "गणना की गई राशि",
         "setupProfileAction": "प्रोफ़ाइल बनाएँ",
-        "loadError": "गृहकार्य लोड नहीं हो सका।"
+        "loadError": "गृहकार्य लोड नहीं हो सका।",
+        "prevMonth": "पिछला माह",
+        "nextMonth": "अगला माह",
+        "currentMonth": "वर्तमान",
+        "noVisitReportsInMonth": "{{month}} में कोई विज़िट दर्ज नहीं हुई।",
+        "settledAdminOnly": "केवल एडमिन ही इसे बदल या हटा सकता है"
     },
     "userMultiSelect": {
         "moreUsers": "और",

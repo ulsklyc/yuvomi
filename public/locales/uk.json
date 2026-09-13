@@ -3391,7 +3391,12 @@
         "hoursWorked": "Відпрацьовані години",
         "computedAmount": "Розрахована сума",
         "setupProfileAction": "Створити профіль",
-        "loadError": "Не вдалося завантажити прибирання."
+        "loadError": "Не вдалося завантажити прибирання.",
+        "prevMonth": "Попередній місяць",
+        "nextMonth": "Наступний місяць",
+        "currentMonth": "Поточний",
+        "noVisitReportsInMonth": "За період {{month}} відвідувань персоналу не зафіксовано.",
+        "settledAdminOnly": "Змінити або видалити може лише адміністратор"
     },
     "userMultiSelect": {
         "moreUsers": "інші",

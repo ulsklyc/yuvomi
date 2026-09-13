@@ -1,7 +1,8 @@
 import { op, jsonBody, idParam } from '../helpers.js';
 
-const VISIT_CAPABILITY_NOTE = 'Each visit carries `can_mark_unpaid`: true when the visit is paid and the caller is an admin. '
-  + 'It is a hint for the interface; `POST /api/v1/housekeeping/visits/{id}/unpay` checks the role itself.';
+const VISIT_CAPABILITY_NOTE = 'Each visit carries `can_edit` and `can_delete`: true unless the visit is paid and the caller is not an admin '
+  + '(a paid visit is settled), and `can_mark_unpaid`: true when the visit is paid and the caller is an admin. '
+  + 'They are hints for the interface; `PUT`/`DELETE /api/v1/housekeeping/visits/{id}` and `POST .../unpay` check the role themselves.';
 
 export function housekeepingPaths() {
   return {

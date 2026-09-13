@@ -3391,7 +3391,12 @@
         "hoursWorked": "Çalışılan saat",
         "computedAmount": "Hesaplanan tutar",
         "setupProfileAction": "Profil oluştur",
-        "loadError": "Ev işleri yüklenemedi."
+        "loadError": "Ev işleri yüklenemedi.",
+        "prevMonth": "Önceki ay",
+        "nextMonth": "Sonraki ay",
+        "currentMonth": "Bu Ay",
+        "noVisitReportsInMonth": "{{month}} döneminde ziyaret kaydedilmedi.",
+        "settledAdminOnly": "Yalnızca bir yönetici değiştirebilir veya silebilir"
     },
     "userMultiSelect": {
         "moreUsers": "daha",

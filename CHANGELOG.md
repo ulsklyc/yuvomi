@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The Housekeeping Reports tab can step through past months** (#1137). Until now it only ever
+  showed the current month, and older reports were reachable only through a single worker in the
+  Staff tab. A previous/next stepper with a jump back to the current month now sits next to the
+  title, in the same order as Budget. The chosen month stays put while you work in it: marking a
+  visit paid or editing one reloads that month instead of jumping back, and an empty month says
+  which month it is.
+
+### Fixed
+
+- **Housekeeping only offers visit actions you are allowed to take** (#1135). A paid visit is
+  settled, and only an admin can change or delete it - but the Staff log and the recent visits on
+  the Overview showed edit and delete on every visit, so a member found out at save. The server now
+  sends per visit whether the current user may edit or delete it. Where that is not allowed, the row
+  offers the visit report instead and says that only an admin can change it. A calendar link to
+  such a visit opens the report rather than a form that cannot be saved.
+
 ## [2.66.0] - 2026-09-13
 
 ### Added

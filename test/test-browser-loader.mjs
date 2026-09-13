@@ -71,7 +71,9 @@ const STUBS = {
     };
     export const initI18n = async () => {};
     export const setLocale = async () => {};
-    export const getLocale = () => 'de';
+    // Wie __formatLocale: Tests, die lokalisierte Monatsnamen pruefen, setzen
+    // globalThis.__locale; ohne das bleibt es bei 'de'.
+    export const getLocale = () => globalThis.__locale ?? 'de';
     // Die Format-Locale ist im Browser eine Einstellung des Haushalts und
     // entscheidet ueber Ziffernsystem, Dezimaltrenner und Gruppierung. Tests, die
     // genau das pruefen (utils/money.js und alles, was dessen Umschrift nutzt),

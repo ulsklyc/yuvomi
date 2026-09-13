@@ -3391,7 +3391,12 @@
         "hoursWorked": "ساعات العمل",
         "computedAmount": "المبلغ المحسوب",
         "setupProfileAction": "إنشاء ملف شخصي",
-        "loadError": "تعذر تحميل التدبير المنزلي."
+        "loadError": "تعذر تحميل التدبير المنزلي.",
+        "prevMonth": "الشهر السابق",
+        "nextMonth": "الشهر التالي",
+        "currentMonth": "الشهر الحالي",
+        "noVisitReportsInMonth": "لم تُسجل أي زيارة في {{month}}.",
+        "settledAdminOnly": "لا يمكن تعديله أو حذفه إلا بواسطة مسؤول"
     },
     "userMultiSelect": {
         "moreUsers": "آخرون",

@@ -3391,7 +3391,12 @@
         "hoursWorked": "Отработанные часы",
         "computedAmount": "Рассчитанная сумма",
         "setupProfileAction": "Создать профиль",
-        "loadError": "Не удалось загрузить уборку."
+        "loadError": "Не удалось загрузить уборку.",
+        "prevMonth": "Предыдущий месяц",
+        "nextMonth": "Следующий месяц",
+        "currentMonth": "Текущий",
+        "noVisitReportsInMonth": "За период {{month}} визитов не записано.",
+        "settledAdminOnly": "Изменить или удалить может только администратор"
     },
     "userMultiSelect": {
         "moreUsers": "ещё",

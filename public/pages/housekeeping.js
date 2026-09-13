@@ -42,6 +42,10 @@ let state = {
   tasks: [],
   reports: [],
   visitReport: null,
+  // Monat des Berichte-Tabs (#1137); null folgt dem laufenden Monat.
+  reportMonth: null,
+  currentMonth: null,
+  recentVisits: [],
   templates: [],
   worker: null,
   workers: [],
@@ -116,18 +120,26 @@ async function loadStaffVisits(workerId = state.selectedStaffId, monthValue = st
 
 async function loadData() {
   const dayParams = localDayParams();
-  const [dashboard, tasks, reports, templates, workers, prefs] = await Promise.all([
+  const [dashboard, tasks, current, report, templates, workers, prefs] = await Promise.all([
     api.get('/housekeeping/dashboard'),
     api.get('/housekeeping/decay-tasks'),
     api.get('/housekeeping/visits'),
+    // Der Berichte-Tab behaelt seinen Monat ueber jedes Neuladen (#1137). Jede
+    // Aktion der Seite laedt hierueber nach; stuende der Monat nur im
+    // Bedienelement, spraenge der Bericht nach dem ersten Bezahlen zurueck.
+    state.reportMonth ? api.get(reportVisitsPath(state.reportMonth)) : null,
     api.get('/housekeeping/task-templates'),
     api.get(`/housekeeping/workers?${dayParams.toString()}`),
     api.get('/preferences'),
   ]);
   state.dashboard = dashboard.data;
   state.tasks = tasks.data || [];
-  state.visitReport = reports.data || { visits: [], totals: {} };
-  state.reports = state.visitReport.visits || [];
+  const currentReport = current.data || { visits: [], totals: {} };
+  state.currentMonth = currentReport.month || localDate().slice(0, 7);
+  // Die Uebersicht zeigt die juengsten Besuche, egal welchen Monat der
+  // Berichte-Tab gerade offen hat.
+  state.recentVisits = currentReport.visits || [];
+  applyVisitReport(report ? report.data : currentReport);
   state.templates = templates.data || [];
   state.workers = workers.data || [];
   state.worker = state.workers[0] || null;
@@ -326,18 +338,15 @@ function renderDashboard(content) {
     `;
   }).join('');
 
-  const recentVisits = (state.reports || []).slice(0, 5);
+  const recentVisits = (state.recentVisits || []).slice(0, 5);
   const recentRows = recentVisits.map((visit) => `
     <article class="list-row housekeeping-staff-log-row">
       <div class="list-row__main">
         <div class="list-row__name">${esc(formatDate(visit.check_in))}</div>
-        <div class="list-row__meta">${esc(visit.worker_name || t('housekeeping.staff'))} · ${esc(money(visit.total_amount))} · ${esc(visit.paid_at ? t('housekeeping.paymentPaid') : t('housekeeping.paymentPending'))}</div>
+        <div class="list-row__meta">${esc(visit.worker_name || t('housekeeping.staff'))} · ${esc(money(visit.total_amount))} · ${esc(visitPaymentMeta(visit))}</div>
       </div>
       <div class="list-row__actions">
-        <button class="row-action" type="button" data-edit-visit="${esc(visit.id)}"
-                aria-label="${esc(t('housekeeping.editVisit'))}: ${esc(formatDate(visit.check_in))}">
-          <i data-lucide="edit-2" class="icon-md" aria-hidden="true"></i>
-        </button>
+        ${visitEditActionHtml(visit, formatDate(visit.check_in))}
       </div>
     </article>
   `).join('');
@@ -387,8 +396,14 @@ function renderDashboard(content) {
   });
   content.querySelectorAll('[data-edit-visit]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const visit = (state.reports || []).find((v) => String(v.id) === btn.dataset.editVisit);
+      const visit = (state.recentVisits || []).find((v) => String(v.id) === btn.dataset.editVisit);
       if (visit) openVisitEditModal(visit, content, { onDone: renderDashboard });
+    });
+  });
+  content.querySelectorAll('[data-open-visit]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const visit = (state.recentVisits || []).find((v) => String(v.id) === btn.dataset.openVisit);
+      if (visit) openVisitReportModal(visit);
     });
   });
 }
@@ -604,10 +619,122 @@ async function unpayVisit(visit, onUnpaid) {
   }
 }
 
+/* Bearbeiten und Loeschen bietet eine Besuchszeile nur an, wenn der Server es
+ * fuer genau diesen Besuch zugesteht (`can_edit`, `can_delete`, #1135). Vorher
+ * standen beide Knoepfe an jeder Zeile, und ein Mitglied lernte erst beim
+ * Speichern, dass ein bezahlter Besuch abgerechnet ist. Die Admin-Regel wird
+ * hier nicht nachgebaut. Wo Bearbeiten fehlt, fuehrt der Knopf zum Bericht:
+ * lesen darf jede Person, die die Zeile sieht. */
+function visitEditActionHtml(visit, visitDate) {
+  if (visit.can_edit) {
+    return `<button class="row-action" type="button" data-edit-visit="${esc(visit.id)}"
+                aria-label="${esc(t('housekeeping.editVisit'))}: ${esc(visitDate)}">
+          <i data-lucide="edit-2" class="icon-md" aria-hidden="true"></i>
+        </button>`;
+  }
+  return `<button class="row-action" type="button" data-open-visit="${esc(visit.id)}"
+                aria-label="${esc(t('housekeeping.openVisitReport'))}: ${esc(visitDate)}">
+          <i data-lucide="file-text" class="icon-md" aria-hidden="true"></i>
+        </button>`;
+}
+
+function visitDeleteActionHtml(visit, visitDate) {
+  if (!visit.can_delete) return '';
+  return `<button class="row-action row-action--danger" type="button" data-delete-visit="${esc(visit.id)}"
+                aria-label="${esc(t('housekeeping.deleteVisit'))}: ${esc(visitDate)}">
+          <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
+        </button>`;
+}
+
+/* Warum die Knoepfe fehlen, steht in der Metazeile, wo der Zahlstatus die
+ * Zeile ohnehin beschreibt - nicht als Tooltip an einem Knopf, den es nicht gibt. */
+function visitPaymentMeta(visit) {
+  if (!visit.paid_at) return t('housekeeping.paymentPending');
+  if (visit.can_edit) return t('housekeeping.paymentPaid');
+  return `${t('housekeeping.paymentPaid')} · ${t('housekeeping.settledAdminOnly')}`;
+}
+
+function currentMonthKey() {
+  return state.currentMonth || localDate().slice(0, 7);
+}
+
+function shiftMonth(ym, dir) {
+  const [year, monthIndex] = ym.split('-').map(Number);
+  const d = new Date(year, monthIndex - 1 + dir, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function reportVisitsPath(monthValue) {
+  return `/housekeeping/visits?month=${encodeURIComponent(monthValue)}`;
+}
+
+function applyVisitReport(data) {
+  state.visitReport = data || { visits: [], totals: {} };
+  state.reports = state.visitReport.visits || [];
+}
+
+/* Monats-Stepper des Berichte-Tabs (#1137) in der Grammatik, die Budget
+ * vorgibt und #1164 fuer Kalender und Mahlzeiten uebernimmt: Pfeil, Monat,
+ * Pfeil, dahinter der Reset, und der Reset ist im laufenden Monat verborgen.
+ * Die Pfeile beschreiben sich ueber den Monat, damit ein Screenreader nach dem
+ * Schritt auch sagt, wo er gelandet ist. */
+function reportMonthNavHtml(shownMonth, isCurrentMonth) {
+  return `
+        <div class="housekeeping-month-nav">
+          <button class="btn btn--icon" type="button" id="housekeeping-report-prev"
+                  aria-label="${esc(t('housekeeping.prevMonth'))}" aria-describedby="housekeeping-report-month">
+            <i data-lucide="chevron-left" aria-hidden="true"></i>
+          </button>
+          <span class="housekeeping-month-nav__label" id="housekeeping-report-month">${esc(formatMonthLabel(shownMonth))}</span>
+          <button class="btn btn--icon" type="button" id="housekeeping-report-next"
+                  aria-label="${esc(t('housekeeping.nextMonth'))}" aria-describedby="housekeeping-report-month">
+            <i data-lucide="chevron-right" aria-hidden="true"></i>
+          </button>
+          <button class="btn btn--secondary housekeeping-month-nav__current" type="button"
+                  id="housekeeping-report-current"${isCurrentMonth ? ' hidden' : ''}>${esc(t('housekeeping.currentMonth'))}</button>
+        </div>`;
+}
+
+let reportMonthRequest = 0;
+
+/* Der gewaehlte Monat ist SEITENZUSTAND (#1137): loadData() liest ihn bei
+ * jedem Neuladen. Gesetzt wird er vor dem Abruf, damit zwei schnelle Schritte
+ * zwei Monate weit gehen; eine Antwort, die ein spaeterer Klick schon
+ * ueberholt hat, wird verworfen, und ein Fehler stellt den Monat zurueck. */
+async function showReportMonth(content, monthValue, focusId = null) {
+  const previous = state.reportMonth;
+  state.reportMonth = monthValue === currentMonthKey() ? null : monthValue;
+  const request = ++reportMonthRequest;
+  try {
+    const res = await api.get(reportVisitsPath(monthValue));
+    if (request !== reportMonthRequest) return;
+    applyVisitReport(res.data || { month: monthValue, visits: [], totals: {} });
+    if (!content?.isConnected || state.tab !== 'reports') return;
+    renderReports(content);
+    // Der Reset verschwindet im laufenden Monat - dann bleibt der Fokus am
+    // vorherigen Pfeil statt auf <body> zu fallen.
+    const target = focusId ? content.querySelector(`#${focusId}`) : null;
+    (target && !target.hidden ? target : content.querySelector('#housekeeping-report-prev'))
+      ?.focus({ preventScroll: true });
+  } catch (err) {
+    if (request !== reportMonthRequest) return;
+    state.reportMonth = previous;
+    window.yuvomi?.showToast(err.message, 'danger');
+  }
+}
+
+function stepReportMonth(content, dir) {
+  const base = state.reportMonth || currentMonthKey();
+  return showReportMonth(content, shiftMonth(base, dir),
+    dir < 0 ? 'housekeeping-report-prev' : 'housekeeping-report-next');
+}
+
 function renderReports(content) {
   content.replaceChildren();
   const totals = state.visitReport?.totals || {};
   const visits = state.reports || [];
+  const shownMonth = state.visitReport?.month || currentMonthKey();
+  const isCurrentMonth = shownMonth === currentMonthKey();
   const rows = visits.map((visit) => {
     const paid = !!visit.paid_at;
     return `
@@ -634,7 +761,7 @@ function renderReports(content) {
     <section class="housekeeping-card">
       <div class="housekeeping-section-heading">
         <h2>${esc(t('housekeeping.visitReports'))}</h2>
-        <span>${esc(formatMonthLabel(state.visitReport?.month || ''))}</span>
+        ${reportMonthNavHtml(shownMonth, isCurrentMonth)}
       </div>
       <section class="metric-grid">
         <article class="metric-card metric-card--inset">
@@ -652,10 +779,18 @@ function renderReports(content) {
       </section>
     </section>
     <section class="housekeeping-reports" aria-label="${esc(t('housekeeping.recentReports'))}">
-      ${rows || `<p class="housekeeping-muted">${esc(t('housekeeping.noVisitReports'))}</p>`}
+      ${rows || `<p class="housekeeping-muted">${esc(isCurrentMonth
+    ? t('housekeeping.noVisitReports')
+    : t('housekeeping.noVisitReportsInMonth', { month: formatMonthLabel(shownMonth) }))}</p>`}
     </section>
   `);
   if (window.lucide) window.lucide.createIcons({ el: content });
+
+  content.querySelector('#housekeeping-report-prev')?.addEventListener('click', () => stepReportMonth(content, -1));
+  content.querySelector('#housekeeping-report-next')?.addEventListener('click', () => stepReportMonth(content, 1));
+  content.querySelector('#housekeeping-report-current')?.addEventListener('click', () => (
+    showReportMonth(content, currentMonthKey(), 'housekeeping-report-current')
+  ));
 
   content.querySelectorAll('[data-visit-report]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -813,6 +948,12 @@ function renderStaff(content) {
       if (visit) openVisitEditModal(visit, content);
     });
   });
+  content.querySelectorAll('[data-open-visit]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const visit = state.staffVisits.find((item) => String(item.id) === btn.dataset.openVisit);
+      if (visit) openVisitReportModal(visit);
+    });
+  });
   content.querySelectorAll('[data-pay-visit]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const visit = state.staffVisits.find((item) => String(item.id) === btn.dataset.payVisit);
@@ -860,21 +1001,15 @@ function renderStaffVisitLog() {
       <article class="list-row housekeeping-staff-log-row">
         <div class="list-row__main">
           <div class="list-row__name">${esc(visitDate)}</div>
-          <div class="list-row__meta">${esc(money(visit.total_amount))} · ${esc(paid ? t('housekeeping.paymentPaid') : t('housekeeping.paymentPending'))}</div>
+          <div class="list-row__meta">${esc(money(visit.total_amount))} · ${esc(visitPaymentMeta(visit))}</div>
         </div>
         <div class="list-row__actions">
           <button class="row-action" type="button" data-pay-visit="${visit.id}" ${paid ? 'disabled' : ''}
                   aria-label="${esc(paid ? t('housekeeping.paymentPaid') : t('housekeeping.markPaid'))}: ${esc(visitDate)}">
             <i data-lucide="badge-dollar-sign" class="icon-md" aria-hidden="true"></i>
           </button>
-          <button class="row-action" type="button" data-edit-visit="${visit.id}"
-                  aria-label="${esc(t('housekeeping.editVisit'))}: ${esc(visitDate)}">
-            <i data-lucide="edit-2" class="icon-md" aria-hidden="true"></i>
-          </button>
-          <button class="row-action row-action--danger" type="button" data-delete-visit="${visit.id}"
-                  aria-label="${esc(t('housekeeping.deleteVisit'))}: ${esc(visitDate)}">
-            <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
-          </button>
+          ${visitEditActionHtml(visit, visitDate)}
+          ${visitDeleteActionHtml(visit, visitDate)}
         </div>
       </article>
     `;
@@ -1312,7 +1447,10 @@ export async function render(container) {
         const visit = res.data;
         if (visit) {
           const content = container.querySelector('#housekeeping-content') || container;
-          openVisitEditModal(visit, content);
+          // Wer einen abgerechneten Besuch nicht aendern darf, bekommt den
+          // Bericht statt eines Formulars, das erst beim Speichern scheitert (#1135).
+          if (visit.can_edit) openVisitEditModal(visit, content);
+          else openVisitReportModal(visit);
         }
       } catch {
         // visit not found or unauthorized — silently ignore
@@ -1336,3 +1474,17 @@ export async function render(container) {
     });
   }
 }
+
+// Nur fuer die Tests (test-housekeeping-ui.js): die Seite laeuft dort ohne DOM.
+export const __test = {
+  loadData,
+  renderReports,
+  renderStaffVisitLog,
+  showReportMonth,
+  stepReportMonth,
+  shiftMonth,
+  visitEditActionHtml,
+  visitDeleteActionHtml,
+  visitPaymentMeta,
+  state: () => state,
+};

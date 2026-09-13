@@ -8371,10 +8371,16 @@ test('audited profile, birthday, navigation, and budget controls meet mobile tou
    * schon vom Knopf der zweiten Liste gruen gemacht, waehrend der erste noch
    * der alte war - also genau in dem Zustand, in dem diese Aenderung eine
    * Stunde lang war. Gezaehlt wird deshalb ueber alle Fundstellen. */
-  const visitButtons = [...housekeepingPage.matchAll(/<button\b([^>]*\bdata-(?:pay|edit|delete)-visit=[^>]*)>/g)]
+  /* Seit #1135 entstehen Bearbeiten, Loeschen und der Bericht-Knopf (`data-open-visit`,
+   * wo der Server Bearbeiten nicht zugesteht) in EINEM Helfer je Aktion. Gezaehlt
+   * werden deshalb die Knopf-Literale samt Bericht-Knopf, und "beide Listen" haelt
+   * die zweite Zusicherung: beide Listen rufen den Helfer. */
+  const visitButtons = [...housekeepingPage.matchAll(/<button\b([^>]*\bdata-(?:pay|edit|delete|open)-visit=[^>]*)>/g)]
     .map((m) => m[1]);
   assert.ok(visitButtons.length >= 4,
-    `erwartet: Besuchs-Knoepfe in beiden Listen, gefunden: ${visitButtons.length}`);
+    `erwartet: Pay-, Edit-, Bericht- und Delete-Knopf, gefunden: ${visitButtons.length}`);
+  assert.ok((housekeepingPage.match(/\$\{visitEditActionHtml\(visit, /g) || []).length >= 2,
+    'beide Besuchslisten (Uebersicht und Personal-Protokoll) nehmen ihre Aktion aus visitEditActionHtml()');
   const eigenbau = visitButtons.filter((attrs) => !/class="row-action(?: row-action--danger)?"/.test(attrs));
   assert.deepEqual(eigenbau, [],
     'jeder Besuchs-Knopf traegt die geteilte .row-action-Grammatik, nicht nur der zuletzt angefasste');

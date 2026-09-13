@@ -3395,7 +3395,12 @@
         "hoursWorked": "근무 시간",
         "computedAmount": "계산된 금액",
         "setupProfileAction": "프로필 만들기",
-        "loadError": "가사 도우미를 불러오지 못했습니다."
+        "loadError": "가사 도우미를 불러오지 못했습니다.",
+        "prevMonth": "지난달",
+        "nextMonth": "다음 달",
+        "currentMonth": "이번 달",
+        "noVisitReportsInMonth": "{{month}}에는 기록된 방문이 없습니다.",
+        "settledAdminOnly": "관리자만 변경하거나 삭제할 수 있습니다"
     },
     "splitExpenses": {
         "title": "공동 지출",

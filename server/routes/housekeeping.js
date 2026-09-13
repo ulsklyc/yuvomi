@@ -509,17 +509,28 @@ function assertAdmin(req, res) {
 // Danach gilt dieselbe Grenze wie beim Anlegen des Arbeitsverhaeltnisses
 // (POST /worker): nur ein Admin aendert, loescht oder bucht einen bezahlten
 // Besuch erneut (GHSA-4p5w-5346-8598).
+function mayTouchSettled(row, req) {
+  return !row.paid_at || req.authRole === 'admin';
+}
+
 function assertMayTouchSettled(existing, req, res) {
-  if (!existing.paid_at) return true;
+  if (mayTouchSettled(existing, req)) return true;
   return assertAdmin(req, res);
 }
 
-// Praesentationsfeld je Besuch (#1136): die Seite zeigt "Zahlung zuruecknehmen"
-// nur, wenn der Server es anbietet, statt die Admin-Regel selbst nachzubauen.
-// POST /visits/:id/unpay prueft beim Schreiben trotzdem selbst - das Feld ist
-// ein Hinweis fuer die Oberflaeche, keine Berechtigung.
-function canMarkUnpaid(row, req) {
-  return Boolean(row.paid_at) && req.authRole === 'admin';
+// Praesentationsfelder je Besuch (#1136, #1135): die Seite zeigt Bearbeiten,
+// Loeschen und "Zahlung zuruecknehmen" nur, wenn der Server es anbietet, statt
+// die Admin-Regel selbst nachzubauen. `can_edit`/`can_delete` lesen DIESELBE
+// Funktion wie assertMayTouchSettled - aendert sich die Regel, wandern Sperre
+// und Anzeige zusammen. Die Routen pruefen beim Schreiben trotzdem selbst: die
+// Felder sind ein Hinweis fuer die Oberflaeche, keine Berechtigung.
+function visitCapabilities(row, req) {
+  const touchable = mayTouchSettled(row, req);
+  return {
+    can_edit: touchable,
+    can_delete: touchable,
+    can_mark_unpaid: Boolean(row.paid_at) && req.authRole === 'admin',
+  };
 }
 
 async function createWorkerUser({ username, displayName, avatarColor, avatarData, actorUserId }) {
@@ -765,7 +776,7 @@ router.get('/visits', (req, res) => {
       payment_task_title: row.payment_task_title ?? null,
       receipt_document_name: row.receipt_document_name ?? null,
       total_amount: Number(row.daily_rate || 0) + Number(row.extras || 0),
-      can_mark_unpaid: canMarkUnpaid(row, req),
+      ...visitCapabilities(row, req),
     }));
     const totals = visits.reduce((acc, visit) => {
       acc.total += visit.total_amount;
@@ -861,7 +872,7 @@ router.get('/visits/:id', (req, res) => {
       payment_task_title: row.payment_task_title ?? null,
       receipt_document_name: row.receipt_document_name ?? null,
       total_amount: Number(row.daily_rate || 0) + Number(row.extras || 0),
-      can_mark_unpaid: canMarkUnpaid(row, req),
+      ...visitCapabilities(row, req),
     };
     res.json({ data: visit });
   } catch (err) {

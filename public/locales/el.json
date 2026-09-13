@@ -3391,7 +3391,12 @@
         "hoursWorked": "Ώρες εργασίας",
         "computedAmount": "Υπολογισμένο ποσό",
         "setupProfileAction": "Δημιουργία προφίλ",
-        "loadError": "Δεν ήταν δυνατή η φόρτωση του νοικοκυριού."
+        "loadError": "Δεν ήταν δυνατή η φόρτωση του νοικοκυριού.",
+        "prevMonth": "Προηγούμενος μήνας",
+        "nextMonth": "Επόμενος μήνας",
+        "currentMonth": "Τρέχων",
+        "noVisitReportsInMonth": "Δεν καταγράφηκε καμία επίσκεψη για {{month}}.",
+        "settledAdminOnly": "Μόνο ένας διαχειριστής μπορεί να την αλλάξει ή να τη διαγράψει"
     },
     "userMultiSelect": {
         "moreUsers": "ακόμη",

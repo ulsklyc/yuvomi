@@ -3391,7 +3391,12 @@
         "hoursWorked": "Horas trabajadas",
         "computedAmount": "Importe calculado",
         "setupProfileAction": "Crear perfil",
-        "loadError": "No se pudo cargar la limpieza."
+        "loadError": "No se pudo cargar la limpieza.",
+        "prevMonth": "Mes anterior",
+        "nextMonth": "Mes siguiente",
+        "currentMonth": "Este mes",
+        "noVisitReportsInMonth": "No se registró ningún servicio en {{month}}.",
+        "settledAdminOnly": "Solo un administrador puede modificarlo o eliminarlo"
     },
     "userMultiSelect": {
         "moreUsers": "más",

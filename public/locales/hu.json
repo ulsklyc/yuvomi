@@ -3391,7 +3391,12 @@
         "hoursWorked": "Ledolgozott órák",
         "computedAmount": "Számított összeg",
         "setupProfileAction": "Profil létrehozása",
-        "loadError": "A háztartás betöltése sikertelen."
+        "loadError": "A háztartás betöltése sikertelen.",
+        "prevMonth": "Előző hónap",
+        "nextMonth": "Következő hónap",
+        "currentMonth": "Aktuális hónap",
+        "noVisitReportsInMonth": "{{month}} időszakban nem volt személyzeti látogatás.",
+        "settledAdminOnly": "Csak egy admin módosíthatja vagy törölheti"
     },
     "userMultiSelect": {
         "moreUsers": "továbbiak",
