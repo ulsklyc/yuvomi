@@ -89,26 +89,78 @@ export function countUnassignedMappedEvents(d) {
   return d.prepare(`SELECT COUNT(*) AS count ${UNASSIGNED_MAPPED_EVENTS}`).get().count;
 }
 
+const BACKFILL_BATCH_SIZE = 50;
+
 /**
  * Weist jedem noch unzugewiesenen Termin aus einem Kalender mit
  * Standard-Zuweisung diese Person zu. Idempotent: ein zweiter Lauf findet
  * nichts mehr.
  *
+ * IN HAPPEN, NICHT IN EINER TRANSAKTION. Ein Haushalt mit Jahren an
+ * iCloud-Historie hat Tausende Termine; gemessen blockierten 5000 Termine den
+ * Event-Loop in einer Transaktion gut zwoelf Sekunden. Jeder Happen ist eine
+ * eigene Transaktion (50 Termine, gemessen unter 0,2 s), dazwischen kommen
+ * andere Anfragen dran. Ein zugewiesener
+ * Termin faellt aus der Kandidatenmenge, also holt jeder Happen einfach die
+ * naechsten - bricht der Lauf ab, setzt ein zweiter dort fort.
+ *
+ * DER TEURE WEG NUR, WO ER ETWAS BEWIRKT. setEventAssignments() verteilt
+ * Erinnerungen und gleicht Anhangrechte an; die allermeisten importierten
+ * Termine haben keins von beidem, fuer sie reichen zwei Schreibzugriffe.
+ *
+ * KEINE VERGANGENEN ERINNERUNGEN. Der Scheduler verschickt jede nicht
+ * verworfene Erinnerung mit remind_at <= jetzt - eine nachgetragene Zuweisung
+ * an einen Termin von 2024 schickte der neuen Person sofort die alte Meldung.
+ * Geerbte Erinnerungen, deren Zeit vorbei ist, gelten deshalb als verworfen;
+ * kuenftige kommen wie gewohnt. Ein Termin, dessen Anleger nur vergangene
+ * Erinnerungen hat, nimmt den teuren Weg gar nicht erst.
+ *
  * @param {object} d better-sqlite3 Datenbank-Handle
- * @returns {number} Anzahl der zugewiesenen Termine
+ * @param {{ batchSize?: number, now?: Date }} [options]
+ * @returns {Promise<number>} Anzahl der zugewiesenen Termine
  */
-export function applyDefaultAssigneesToExisting(d) {
-  return d.transaction(() => {
-    const rows = d.prepare(
-      `SELECT e.id AS eventId, ec.default_assignee_user_id AS userId ${UNASSIGNED_MAPPED_EVENTS}`
-    ).all();
-    const setPrimary = d.prepare(
-      'UPDATE calendar_events SET assigned_to = ? WHERE id = ? AND assigned_to IS NULL'
-    );
-    for (const { eventId, userId } of rows) {
-      setPrimary.run(userId, eventId);
-      setEventAssignments(d, eventId, [userId]);
-    }
-    return rows.length;
-  })();
+export async function applyDefaultAssigneesToExisting(d, { batchSize = BACKFILL_BATCH_SIZE, now = new Date() } = {}) {
+  const nowIso = now.toISOString();
+  const selectBatch = d.prepare(`
+    SELECT e.id AS eventId, ec.default_assignee_user_id AS userId,
+           e.created_by AS authorId, e.attachment_document_id AS documentId
+    ${UNASSIGNED_MAPPED_EVENTS}
+    ORDER BY e.id
+    LIMIT ?
+  `);
+  const setPrimary = d.prepare(
+    'UPDATE calendar_events SET assigned_to = ? WHERE id = ? AND assigned_to IS NULL'
+  );
+  const addAssignment = d.prepare(
+    'INSERT OR IGNORE INTO event_assignments (event_id, user_id) VALUES (?, ?)'
+  );
+  const hasFutureTemplate = d.prepare(`
+    SELECT 1 FROM reminders
+    WHERE entity_type = 'event' AND entity_id = ? AND created_by = ? AND remind_at > ?
+  `);
+  const settlePastInherited = d.prepare(`
+    UPDATE reminders SET dismissed = 1
+    WHERE entity_type = 'event' AND entity_id = ? AND created_by = ?
+      AND assigned_from IS NOT NULL AND remind_at <= ?
+  `);
+
+  let assigned = 0;
+  for (;;) {
+    const count = d.transaction(() => {
+      const rows = selectBatch.all(batchSize);
+      for (const { eventId, userId, authorId, documentId } of rows) {
+        setPrimary.run(userId, eventId);
+        if (documentId || (authorId !== null && hasFutureTemplate.get(eventId, authorId, nowIso))) {
+          setEventAssignments(d, eventId, [userId]);
+          settlePastInherited.run(eventId, userId, nowIso);
+        } else {
+          addAssignment.run(eventId, userId);
+        }
+      }
+      return rows.length;
+    })();
+    assigned += count;
+    if (count < batchSize) return assigned;
+    await new Promise((resolve) => setImmediate(resolve));
+  }
 }

@@ -2504,7 +2504,8 @@
             "backfillConfirm": "Назначить",
             "backfillNone": "В календарях с назначением по умолчанию нет встреч без назначения.",
             "backfillDone": "Назначено встреч: {{count}}.",
-            "backfillDone_one": "Назначена {{count}} встреча."
+            "backfillDone_one": "Назначена {{count}} встреча.",
+            "backfillChanged": "После подсчёта встречи изменились. Примените ещё раз."
         },
         "calendarDefaultsTitle": "Значения по умолчанию для новых событий",
         "calendarDefaultsDescription": "Настройки, автоматически применяемые к новым событиям.",

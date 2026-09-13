@@ -2504,7 +2504,8 @@
             "backfillConfirm": "Tilldela",
             "backfillNone": "Det finns inga möten utan tilldelning i kalendrar med standardtilldelning.",
             "backfillDone": "{{count}} möten tilldelade.",
-            "backfillDone_one": "{{count}} möte tilldelat."
+            "backfillDone_one": "{{count}} möte tilldelat.",
+            "backfillChanged": "Mötena har ändrats sedan de räknades. Tillämpa igen."
         },
         "calendarDefaultsTitle": "Standardvärden för nya händelser",
         "calendarDefaultsDescription": "Förinställningar som tillämpas automatiskt på nya händelser.",

@@ -2504,7 +2504,8 @@
             "backfillConfirm": "Atribuir",
             "backfillNone": "Não há compromissos sem atribuição em calendários com atribuição padrão.",
             "backfillDone": "{{count}} compromissos atribuídos.",
-            "backfillDone_one": "{{count}} compromisso atribuído."
+            "backfillDone_one": "{{count}} compromisso atribuído.",
+            "backfillChanged": "Os compromissos mudaram desde a contagem. Aplique de novo."
         },
         "calendarDefaultsTitle": "Padrões para novos eventos",
         "calendarDefaultsDescription": "Predefinições aplicadas automaticamente a novos eventos.",

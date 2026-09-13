@@ -2516,7 +2516,8 @@
             "backfillConfirm": "واگذاری",
             "backfillNone": "در تقویم‌های دارای واگذاری پیش‌فرض، قرار بدون واگذاری وجود ندارد.",
             "backfillDone": "{{count}} قرار واگذار شد.",
-            "backfillDone_one": "{{count}} قرار واگذار شد."
+            "backfillDone_one": "{{count}} قرار واگذار شد.",
+            "backfillChanged": "قرارها پس از شمارش تغییر کرده‌اند. لطفاً دوباره اعمال کنید."
         },
         "calendarDefaultsTitle": "مقادیر پیش‌فرض برای رویدادهای جدید",
         "calendarDefaultsDescription": "تنظیمات پیش‌فرضی که به‌طور خودکار روی رویدادهای جدید اعمال می‌شوند.",

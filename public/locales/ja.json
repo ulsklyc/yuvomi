@@ -2504,7 +2504,8 @@
             "backfillConfirm": "割り当てる",
             "backfillNone": "既定の割り当て先があるカレンダーに、割り当てのない予定はありません。",
             "backfillDone": "予定 {{count}} 件を割り当てました。",
-            "backfillDone_one": "予定 {{count}} 件を割り当てました。"
+            "backfillDone_one": "予定 {{count}} 件を割り当てました。",
+            "backfillChanged": "件数を数えた後に予定が変わりました。もう一度適用してください。"
         },
         "calendarDefaultsTitle": "新しい予定の既定値",
         "calendarDefaultsDescription": "新しい予定に自動的に適用される既定設定。",

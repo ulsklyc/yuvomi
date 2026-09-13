@@ -2504,7 +2504,8 @@
             "backfillConfirm": "Attribuer",
             "backfillNone": "Aucun rendez-vous sans attribution dans les calendriers ayant une attribution par défaut.",
             "backfillDone": "{{count}} rendez-vous attribués.",
-            "backfillDone_one": "{{count}} rendez-vous attribué."
+            "backfillDone_one": "{{count}} rendez-vous attribué.",
+            "backfillChanged": "Les rendez-vous ont changé depuis le décompte. Veuillez réappliquer."
         },
         "calendarDefaultsTitle": "Valeurs par défaut des nouveaux événements",
         "calendarDefaultsDescription": "Préréglages appliqués automatiquement aux nouveaux événements.",

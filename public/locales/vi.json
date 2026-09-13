@@ -2504,7 +2504,8 @@
             "backfillConfirm": "Giao",
             "backfillNone": "Không có lịch hẹn nào chưa có người được giao trong các lịch có người được giao mặc định.",
             "backfillDone": "Đã giao {{count}} lịch hẹn.",
-            "backfillDone_one": "Đã giao {{count}} lịch hẹn."
+            "backfillDone_one": "Đã giao {{count}} lịch hẹn.",
+            "backfillChanged": "Lịch hẹn đã thay đổi kể từ khi đếm. Vui lòng áp dụng lại."
         },
         "calendarDefaultsTitle": "Mặc định cho sự kiện mới",
         "calendarDefaultsDescription": "Cài đặt sẵn tự động áp dụng cho sự kiện mới.",

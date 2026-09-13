@@ -2516,7 +2516,8 @@
             "backfillConfirm": "Przypisz",
             "backfillNone": "W kalendarzach z domyślnym przypisaniem nie ma terminów bez przypisania.",
             "backfillDone": "Przypisano {{count}} terminów.",
-            "backfillDone_one": "Przypisano {{count}} termin."
+            "backfillDone_one": "Przypisano {{count}} termin.",
+            "backfillChanged": "Terminy zmieniły się od policzenia. Zastosuj ponownie."
         },
         "calendarDefaultsTitle": "Domyślne ustawienia nowych wydarzeń",
         "calendarDefaultsDescription": "Ustawienia stosowane automatycznie do nowych wydarzeń.",

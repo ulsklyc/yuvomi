@@ -2504,7 +2504,8 @@
             "backfillConfirm": "Přiřadit",
             "backfillNone": "V kalendářích s výchozím přiřazením nejsou žádné nepřiřazené události.",
             "backfillDone": "Přiřazeno {{count}} událostí.",
-            "backfillDone_one": "Přiřazena {{count}} událost."
+            "backfillDone_one": "Přiřazena {{count}} událost.",
+            "backfillChanged": "Od spočítání se události změnily. Použijte to prosím znovu."
         },
         "calendarDefaultsTitle": "Výchozí hodnoty pro nové události",
         "calendarDefaultsDescription": "Předvolby automaticky použité na nové události.",

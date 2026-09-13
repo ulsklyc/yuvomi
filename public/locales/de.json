@@ -2539,7 +2539,8 @@
             "backfillConfirm": "Zuweisen",
             "backfillNone": "Es gibt keine Termine ohne Zuweisung in Kalendern mit Standard-Zuweisung.",
             "backfillDone": "{{count}} Termine zugewiesen.",
-            "backfillDone_one": "{{count}} Termin zugewiesen."
+            "backfillDone_one": "{{count}} Termin zugewiesen.",
+            "backfillChanged": "Seit der Zählung haben sich Termine geändert. Bitte noch einmal anwenden."
         },
         "calendarDefaultsTitle": "Standardwerte für neue Termine",
         "calendarDefaultsDescription": "Voreinstellungen, die neue Termine automatisch übernehmen.",

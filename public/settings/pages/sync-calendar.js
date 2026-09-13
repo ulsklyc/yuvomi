@@ -154,11 +154,15 @@ function bindDefaultAssigneeBackfill(container) {
 
     await withBusy(btn, async () => {
       try {
-        const res = await api.post(endpoint);
+        // Die bestätigte Zahl geht mit: hat sich die Menge seit der Zählung
+        // geändert, weist der Server mit 409 ab, statt mehr oder andere Termine
+        // zu füllen, als die Rückfrage genannt hat.
+        const res = await api.post(endpoint, { expected_count: count });
         const assigned = res.data?.assigned ?? 0;
         showToast(t('settings.sync.backfillDone', { count: assigned }), 'success');
       } catch (err) {
-        showToast(err.message || t('common.errorGeneric'), 'danger');
+        if (err.status === 409) showToast(t('settings.sync.backfillChanged'), 'warning');
+        else showToast(err.message || t('common.errorGeneric'), 'danger');
       }
     });
   });

@@ -2504,7 +2504,8 @@
             "backfillConfirm": "सौंपें",
             "backfillNone": "डिफ़ॉल्ट असाइनमेंट वाले कैलेंडरों में कोई बिना असाइनमेंट वाला अपॉइंटमेंट नहीं है।",
             "backfillDone": "{{count}} अपॉइंटमेंट सौंपे गए।",
-            "backfillDone_one": "{{count}} अपॉइंटमेंट सौंपा गया।"
+            "backfillDone_one": "{{count}} अपॉइंटमेंट सौंपा गया।",
+            "backfillChanged": "गिनती के बाद अपॉइंटमेंट बदल गए हैं। कृपया फिर से लागू करें।"
         },
         "calendarDefaultsTitle": "नए इवेंट के लिए डिफ़ॉल्ट",
         "calendarDefaultsDescription": "नए इवेंट पर स्वतः लागू होने वाली प्रीसेट।",

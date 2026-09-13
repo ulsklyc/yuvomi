@@ -2504,7 +2504,8 @@
             "backfillConfirm": "Ata",
             "backfillNone": "Varsayılan ataması olan takvimlerde atanmamış randevu yok.",
             "backfillDone": "{{count}} randevu atandı.",
-            "backfillDone_one": "{{count}} randevu atandı."
+            "backfillDone_one": "{{count}} randevu atandı.",
+            "backfillChanged": "Randevular sayıldıktan sonra değişti. Lütfen yeniden uygulayın."
         },
         "calendarDefaultsTitle": "Yeni etkinlikler için varsayılanlar",
         "calendarDefaultsDescription": "Yeni etkinliklere otomatik uygulanan ön ayarlar.",

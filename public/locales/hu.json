@@ -2504,7 +2504,8 @@
             "backfillConfirm": "Hozzárendelés",
             "backfillNone": "Az alapértelmezett hozzárendeléssel rendelkező naptárakban nincs hozzárendelés nélküli időpont.",
             "backfillDone": "{{count}} időpont hozzárendelve.",
-            "backfillDone_one": "{{count}} időpont hozzárendelve."
+            "backfillDone_one": "{{count}} időpont hozzárendelve.",
+            "backfillChanged": "Az időpontok megváltoztak a számlálás óta. Alkalmazza újra."
         },
         "calendarDefaultsTitle": "Új események alapértékei",
         "calendarDefaultsDescription": "Az új eseményekre automatikusan alkalmazott beállítások.",

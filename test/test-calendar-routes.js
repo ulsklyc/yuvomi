@@ -530,13 +530,30 @@ test('default-assignee-backfill - füllt nur unzugewiesene Termine aus Kalendern
     INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
     VALUES ('event', ?, '2035-03-01T09:00:00', ?)
   `).run(ids.emptyCaldav, ADMIN.id);
+  // Eine VERGANGENE Erinnerung: nachgetragen darf sie nicht sofort zugestellt werden.
+  db.prepare(`
+    INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+    VALUES ('event', ?, '2020-01-01T09:00:00', ?)
+  `).run(ids.emptyCaldav, ADMIN.id);
+  // Nur eine vergangene Erinnerung: gar keine Verteilung.
+  db.prepare(`
+    INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+    VALUES ('event', ?, '2020-01-01T09:00:00', ?)
+  `).run(ids.emptyGoogle, ADMIN.id);
 
   try {
     const counted = await call('GET', route);
     assert.equal(counted.status, 200);
     assert.equal(counted.body.data.count, before + 2, 'gezählt werden nur die zwei leeren Termine');
 
-    const applied = await call('POST', route);
+    // Ohne bestaetigte Zahl nichts, mit veralteter Zahl 409 - und in beiden Faellen bleibt alles, wie es ist.
+    assert.equal((await call('POST', route, { body: {} })).status, 400);
+    const stale = await call('POST', route, { body: { expected_count: before + 1 } });
+    assert.equal(stale.status, 409);
+    assert.equal(stale.body.data.count, before + 2, 'die 409 nennt die aktuelle Zahl');
+    assert.deepEqual(assignment(ids.emptyCaldav), { assignedTo: null, users: [] }, 'eine veraltete Rueckfrage fuellt nichts');
+
+    const applied = await call('POST', route, { body: { expected_count: before + 2 } });
     assert.equal(applied.status, 200);
     assert.equal(applied.body.data.assigned, before + 2);
 
@@ -547,8 +564,15 @@ test('default-assignee-backfill - füllt nur unzugewiesene Termine aus Kalendern
     assert.deepEqual(assignment(ids.pushedCaldav), { assignedTo: null, users: [] }, 'nach CalDAV gepusht: Ziel und eigene UID');
     assert.deepEqual(assignment(ids.pushedApple), { assignedTo: null, users: [] }, 'nach iCloud gepusht: eigene UID');
     assert.deepEqual(db.prepare(`
-      SELECT created_by FROM reminders WHERE entity_type = 'event' AND entity_id = ? ORDER BY created_by
-    `).all(ids.emptyCaldav).map((r) => r.created_by), [ADMIN.id, MARIA.id], 'die Erinnerung ist mitgewandert');
+      SELECT remind_at, dismissed FROM reminders
+      WHERE entity_type = 'event' AND entity_id = ? AND created_by = ? ORDER BY remind_at
+    `).all(ids.emptyCaldav, MARIA.id).map((r) => ({ ...r })), [
+      { remind_at: '2020-01-01T09:00:00', dismissed: 1 },
+      { remind_at: '2035-03-01T09:00:00', dismissed: 0 },
+    ], 'die kuenftige Erinnerung ist mitgewandert, die vergangene gilt als verworfen');
+    assert.equal(db.prepare(`
+      SELECT COUNT(*) AS n FROM reminders WHERE entity_type = 'event' AND entity_id = ? AND created_by = ?
+    `).get(ids.emptyGoogle, TOM.id).n, 0, 'nur vergangene Erinnerungen: nichts verteilt');
     assert.deepEqual(db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ?')
       .all(documentId).map((r) => r.user_id), [MARIA.id], 'der Anhang ist für die neue Person offen');
     assert.deepEqual(assignment(ids.manual), { assignedTo: ADMIN.id, users: [ADMIN.id] }, 'die Hand gewinnt');
@@ -561,13 +585,36 @@ test('default-assignee-backfill - füllt nur unzugewiesene Termine aus Kalendern
 
     // Einmalig heisst auch: ein zweiter Lauf findet nichts mehr.
     assert.equal((await call('GET', route)).body.data.count, 0);
-    assert.equal((await call('POST', route)).body.data.assigned, 0);
+    assert.equal((await call('POST', route, { body: { expected_count: 0 } })).body.data.assigned, 0);
   } finally {
     db.prepare(`DELETE FROM reminders WHERE entity_type = 'event' AND entity_id IN (${Object.values(ids).join(',')})`).run();
     db.prepare(`DELETE FROM calendar_events WHERE id IN (${Object.values(ids).join(',')})`).run();
     db.prepare('DELETE FROM family_documents WHERE id = ?').run(documentId);
     db.prepare('DELETE FROM ics_subscriptions WHERE id = ?').run(subId);
     db.prepare('DELETE FROM external_calendars WHERE id IN (?, ?, ?, ?, ?)').run(caldav, google, plain, orphan, apple);
+  }
+});
+
+test('default-assignee-backfill - arbeitet in Happen und kommt trotzdem bis zum Ende (#1154)', async () => {
+  const { applyDefaultAssigneesToExisting } = await import('../server/services/sync-assignment.js');
+  const refId = db.prepare(`
+    INSERT INTO external_calendars (source, external_id, name, default_assignee_user_id)
+    VALUES ('caldav', 'https://dav.example/backfill-batch/', 'Batch', ?)
+  `).run(TOM.id).lastInsertRowid;
+  const ids = [1, 2, 3].map((n) => db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, created_by, external_source, calendar_ref_id)
+    VALUES (?, '2035-04-01T10:00', ?, 'caldav', ?)
+  `).run(`bf-batch-${n}`, ADMIN.id, refId).lastInsertRowid);
+  try {
+    // Andere Tests der Datei koennen Kandidaten hinterlassen: gemessen wird, dass alle drei gefuellt sind.
+    const assigned = await applyDefaultAssigneesToExisting(db, { batchSize: 1 });
+    assert.ok(assigned >= 3, `mindestens drei Happen, bekommen ${assigned}`);
+    for (const id of ids) {
+      assert.equal(db.prepare('SELECT assigned_to AS a FROM calendar_events WHERE id = ?').get(id).a, TOM.id);
+    }
+  } finally {
+    db.prepare(`DELETE FROM calendar_events WHERE id IN (${ids.join(',')})`).run();
+    db.prepare('DELETE FROM external_calendars WHERE id = ?').run(refId);
   }
 });
 

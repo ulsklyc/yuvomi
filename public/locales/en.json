@@ -2527,7 +2527,8 @@
             "backfillConfirm": "Assign",
             "backfillNone": "There are no unassigned appointments in calendars with a default assignee.",
             "backfillDone": "{{count}} appointments assigned.",
-            "backfillDone_one": "{{count}} appointment assigned."
+            "backfillDone_one": "{{count}} appointment assigned.",
+            "backfillChanged": "Appointments changed since they were counted. Please apply it again."
         },
         "calendarDefaultsTitle": "Defaults for new events",
         "calendarDefaultsDescription": "Presets automatically applied to new events.",

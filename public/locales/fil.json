@@ -2539,7 +2539,8 @@
             "backfillConfirm": "Iatas",
             "backfillNone": "Walang appointment na walang naaatasan sa mga kalendaryong may default na naaatasan.",
             "backfillDone": "{{count}} na appointment ang inatasan.",
-            "backfillDone_one": "{{count}} na appointment ang inatasan."
+            "backfillDone_one": "{{count}} na appointment ang inatasan.",
+            "backfillChanged": "Nabago ang mga appointment mula nang bilangin. Pakilapat itong muli."
         },
         "calendarDefaultsTitle": "Mga default para sa bagong kaganapan",
         "calendarDefaultsDescription": "Mga preset na awtomatikong inilalapat sa mga bagong kaganapan.",

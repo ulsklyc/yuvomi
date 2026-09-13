@@ -232,11 +232,28 @@ router.get('/external-calendars/default-assignee-backfill', requireAdmin, (req, 
  * Admin only. Wendet die Standard-Zuweisung jedes Kalenders aller Konten auf
  * seine schon importierten Termine an, die noch niemandem zugewiesen sind
  * (#1154). Eine vorhandene Zuweisung bleibt unangetastet.
- * Response: { data: { assigned } }
+ *
+ * Die Rueckfrage hat eine Zahl genannt, und nur diese Menge ist bestaetigt:
+ * hat sich die Kandidatenmenge seither geaendert (jemand hat Zuweisungen
+ * entfernt, eine Zuordnung umgestellt), antwortet die Route mit 409 statt mehr
+ * oder andere Termine zu fuellen. Die Aktion ist nur Termin fuer Termin
+ * zuruecknehmbar.
+ * Body: { expected_count: number }
+ * Response: { data: { assigned } } | 409 { data: { count } }
  */
-router.post('/external-calendars/default-assignee-backfill', requireAdmin, (req, res) => {
+router.post('/external-calendars/default-assignee-backfill', requireAdmin, async (req, res) => {
   try {
-    res.json({ data: { assigned: applyDefaultAssigneesToExisting(db.get()) } });
+    const expected = req.body?.expected_count;
+    if (!Number.isInteger(expected) || expected < 0) {
+      return res.status(400).json({ error: 'expected_count fehlt oder ist ungültig.', code: 400 });
+    }
+    const current = countUnassignedMappedEvents(db.get());
+    if (current !== expected) {
+      return res.status(409).json({
+        error: 'Die Termine haben sich seit der Zählung geändert.', code: 409, data: { count: current },
+      });
+    }
+    res.json({ data: { assigned: await applyDefaultAssigneesToExisting(db.get()) } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });

@@ -2504,7 +2504,8 @@
             "backfillConfirm": "Toewijzen",
             "backfillNone": "Er zijn geen afspraken zonder toewijzing in agenda’s met een standaardtoewijzing.",
             "backfillDone": "{{count}} afspraken toegewezen.",
-            "backfillDone_one": "{{count}} afspraak toegewezen."
+            "backfillDone_one": "{{count}} afspraak toegewezen.",
+            "backfillChanged": "Afspraken zijn gewijzigd sinds het tellen. Pas het opnieuw toe."
         },
         "calendarDefaultsTitle": "Standaardwaarden voor nieuwe afspraken",
         "calendarDefaultsDescription": "Voorinstellingen die automatisch op nieuwe afspraken worden toegepast.",

@@ -2504,7 +2504,8 @@
             "backfillConfirm": "Ανάθεση",
             "backfillNone": "Δεν υπάρχουν ραντεβού χωρίς ανάθεση σε ημερολόγια με προεπιλεγμένη ανάθεση.",
             "backfillDone": "Ανατέθηκαν {{count}} ραντεβού.",
-            "backfillDone_one": "Ανατέθηκε {{count}} ραντεβού."
+            "backfillDone_one": "Ανατέθηκε {{count}} ραντεβού.",
+            "backfillChanged": "Τα ραντεβού άλλαξαν από την καταμέτρηση. Εφαρμόστε το ξανά."
         },
         "calendarDefaultsTitle": "Προεπιλογές για νέα συμβάντα",
         "calendarDefaultsDescription": "Προεπιλογές που εφαρμόζονται αυτόματα σε νέα συμβάντα.",

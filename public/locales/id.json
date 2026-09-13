@@ -2516,7 +2516,8 @@
             "backfillConfirm": "Tugaskan",
             "backfillNone": "Tidak ada janji temu tanpa penerima tugas di kalender dengan penerima tugas default.",
             "backfillDone": "{{count}} janji temu ditugaskan.",
-            "backfillDone_one": "{{count}} janji temu ditugaskan."
+            "backfillDone_one": "{{count}} janji temu ditugaskan.",
+            "backfillChanged": "Janji temu berubah sejak dihitung. Terapkan lagi."
         },
         "calendarDefaultsTitle": "Bawaan untuk acara baru",
         "calendarDefaultsDescription": "Prasetel yang otomatis diterapkan ke acara baru.",

@@ -2504,7 +2504,8 @@
             "backfillConfirm": "Asignar",
             "backfillNone": "No hay citas sin asignar en calendarios con asignación predeterminada.",
             "backfillDone": "{{count}} citas asignadas.",
-            "backfillDone_one": "{{count}} cita asignada."
+            "backfillDone_one": "{{count}} cita asignada.",
+            "backfillChanged": "Las citas cambiaron desde que se contaron. Vuelve a aplicarlo."
         },
         "calendarDefaultsTitle": "Valores predeterminados para nuevos eventos",
         "calendarDefaultsDescription": "Ajustes que se aplican automáticamente a los nuevos eventos.",

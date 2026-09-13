@@ -2504,7 +2504,8 @@
             "backfillConfirm": "Assegna",
             "backfillNone": "Non ci sono appuntamenti senza assegnazione nei calendari con assegnazione predefinita.",
             "backfillDone": "{{count}} appuntamenti assegnati.",
-            "backfillDone_one": "{{count}} appuntamento assegnato."
+            "backfillDone_one": "{{count}} appuntamento assegnato.",
+            "backfillChanged": "Gli appuntamenti sono cambiati dopo il conteggio. Applica di nuovo."
         },
         "calendarDefaultsTitle": "Valori predefiniti per i nuovi eventi",
         "calendarDefaultsDescription": "Preimpostazioni applicate automaticamente ai nuovi eventi.",

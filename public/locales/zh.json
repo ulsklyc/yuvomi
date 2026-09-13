@@ -2504,7 +2504,8 @@
             "backfillConfirm": "分配",
             "backfillNone": "在设有默认分配的日历中没有未分配的日程。",
             "backfillDone": "已分配 {{count}} 个日程。",
-            "backfillDone_one": "已分配 {{count}} 个日程。"
+            "backfillDone_one": "已分配 {{count}} 个日程。",
+            "backfillChanged": "计数后日程已有变化。请再次应用。"
         },
         "calendarDefaultsTitle": "新事件的默认值",
         "calendarDefaultsDescription": "自动应用于新事件的预设。",
