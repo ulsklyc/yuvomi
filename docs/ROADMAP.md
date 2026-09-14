@@ -85,8 +85,8 @@ dashboard (#885), calendar names instead of "event" (#988), themes from design-t
   person chosen on the device and only to tick off tasks and request redemptions; it signs in
   as a device an admin pairs, never with a password.
 - **Open.** Configurable widgets on the wall, the expensive half of #915; the display account
-  in three steps after "who did it" on tasks (#1205): one member predicate (#1207), the paired
-  display (#1208), its two actions (#1209).
+  in three steps: one member predicate (#1207), the paired display on top of it (#1208), and its
+  two actions (#1209), which also need "who did it" on tasks (#1205).
 
 ## A different week
 
