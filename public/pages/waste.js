@@ -1,11 +1,14 @@
 /**
  * Page: Waste collection (#1063)
- * Purpose: manage waste types and their weekly/monthly pickup schedules, move
- *          or skip a single calculated occurrence, record one-off pickups,
- *          and show upcoming pickups. Import/URL sources, the Dashboard
- *          widget, and the Calendar layer are later phases - this page only
- *          talks to the manual-domain endpoints (/waste/types, /schedules,
- *          .../overrides, /pickups, /occurrences).
+ * Purpose: manage waste types and their pickup schedules (weekly, monthly on a
+ *          fixed day or on the n-th weekday), move or skip a single calculated
+ *          occurrence, record one-off pickups, show upcoming pickups, import
+ *          an ICS file once or subscribe to an ICS URL, and set the personal
+ *          pickup reminders. Endpoints: /waste/types, /schedules (with
+ *          .../overrides), /pickups, /occurrences, /import/preview and
+ *          /import/commit, /sources, /reminder-settings. The Dashboard widget
+ *          lives in utils/dashboard-widgets.js, the Calendar layer in
+ *          pages/calendar.js.
  */
 
 import { api } from '/api.js';

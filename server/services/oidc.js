@@ -99,8 +99,10 @@ export function isPasswordLoginEnabled({ hasLinkedSsoAccount = true } = {}) {
   // kommt. Eine frische Installation legt ihren ersten Administrator ueber
   // `/setup` mit einem Passwort an - griffe der Schalter schon davor, waere
   // dieses Konto im selben Moment tot, `/setup` danach zu und niemand mehr
-  // administrativ drin. Erst wenn mindestens ein Konto tatsaechlich mit dem
-  // Anbieter verknuepft ist, gibt es einen zweiten Weg, den man zumachen kann.
+  // administrativ drin. Erst wenn mindestens ein ADMINISTRATOR-Konto mit dem
+  // Anbieter verknuepft ist, gibt es einen zweiten Weg, den man zumachen kann
+  // (die Abfrage dazu steht in `auth.js` und `index.js`, beide mit
+  // `role = 'admin'`).
   // Der Aufrufer reicht die Antwort herein; der Default haelt diese Datei frei
   // von der Datenbank und laesst den Schalter im Zweifel GREIFEN.
   return !hasLinkedSsoAccount;
@@ -126,9 +128,10 @@ export function passwordLoginWarning({ hasLinkedSsoAccount = true } = {}) {
   // aus wie der eingeschaltete Riegel - und ohne Hinweis haelt der Betreiber
   // das Anmeldeformular fuer zu, waehrend es offen steht.
   if (!hasLinkedSsoAccount) {
-    return 'AUTH_ALLOW_PASSWORD_LOGIN=false has no effect yet because no account is linked to '
-      + 'the OIDC provider. Password login stays enabled until somebody signs in through SSO '
-      + 'at least once - otherwise nobody could sign in at all.';
+    return 'AUTH_ALLOW_PASSWORD_LOGIN=false has no effect yet because no administrator account is '
+      + 'linked to the OIDC provider. Password login stays enabled until an administrator signs '
+      + 'in through SSO at least once - a member signing in does not count, otherwise an '
+      + 'administrator without a linked account could be locked out of the administration.';
   }
   return null;
 }

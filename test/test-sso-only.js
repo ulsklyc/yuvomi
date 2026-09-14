@@ -351,7 +351,9 @@ test('auch der zweite Fail-open-Zustand meldet sich beim Start', () => {
   withOidc({ AUTH_ALLOW_PASSWORD_LOGIN: 'false' }, () => {
     const warning = passwordLoginWarning({ hasLinkedSsoAccount: false });
     assert.ok(warning, 'ohne Warnung ist der Zustand von aussen nicht erkennbar');
-    assert.match(warning, /no account is linked/);
+    // Der Text muss dieselbe Bedingung nennen wie die Abfrage in auth.js und
+    // index.js: ein verknuepftes Mitglied ohne Adminrolle schliesst nichts.
+    assert.match(warning, /no administrator account is linked/);
     assert.equal(passwordLoginWarning({ hasLinkedSsoAccount: true }), null,
       'greift der Riegel wirklich, gibt es nichts zu melden');
   });
