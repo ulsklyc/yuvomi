@@ -912,8 +912,8 @@ test('holiday group keeps a persisted group only for the place it was saved for 
   }), 'CH-BE-EO');
 });
 
-test('holiday settings pass the group lookup state to resolveHolidayGroup and report a failed lookup (PR #1186)', () => {
-  const source = readFileSync(new URL('../public/settings/pages/modules-calendar.js', import.meta.url), 'utf8');
+test('holiday settings pass the group lookup state to resolveHolidayGroup and report a failed lookup (PR #1186)', async () => {
+  const source = await readFile(new URL('../public/settings/pages/modules-calendar.js', import.meta.url), 'utf8');
   const data = source.slice(source.indexOf('function holidayPreferenceData('), source.indexOf('function bindWeekStart('));
   assert.match(data, /holiday_group: resolveHolidayGroup\(\{\s*groupReady: discoveryState\.groupReady,/,
     'der Speicherweg muss den Bereit-Merker durchreichen, sonst hilft der Helfer nichts');
