@@ -77,7 +77,7 @@ their Google calendar (#573).
 A tablet on the kitchen wall is not a person, it is a device the whole family looks at, and it
 keeps asking for its own treatment: a customisable wall mode (#915), the screensaver inside the
 dashboard (#885), calendar names instead of "event" (#988), themes from design-token overrides
-(#972), and the display account above (#913).
+(#972), and a display account that is not a member (#913).
 
 - **Decided.** No switch whose only job is to hide one button: the entry into wall mode is
   always visible, shipped in v2.60.0 that way on purpose (#915). Colours first for themes,
