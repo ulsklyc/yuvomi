@@ -636,6 +636,18 @@ test('GET /holidays/groups/:cc/:sc: gestubbt -> 200', async () => {
   assert.equal(res.body.data.length, 2);
   holidays.__setFetchImpl(null);
 });
+test('PUT holiday_subdivision=null laesst die Gruppe eines Landes ohne Subdivision stehen (PR #1186)', async () => {
+  await put({ holiday_country: 'BE', holiday_subdivision: null, holiday_group: 'BE-FR' });
+  const partial = await put({ holiday_subdivision: null });
+  assert.equal(partial.status, 200);
+  assert.equal(partial.body.data.holiday_country, 'BE');
+  assert.equal(partial.body.data.holiday_group, 'BE-FR', 'ein Teil-Update ohne Gruppe loescht die Gemeinschaft nicht');
+  // Eine Gruppe, die an einer gespeicherten Region hing, faellt weiter mit ihr.
+  await put({ holiday_country: 'CH', holiday_subdivision: 'CH-BE', holiday_group: 'CH-BE-VS' });
+  const removed = await put({ holiday_subdivision: null });
+  assert.equal(removed.body.data.holiday_subdivision, null);
+  assert.equal(removed.body.data.holiday_group, null);
+});
 test('GET /holidays/groups/:cc: Land ohne Subdivisionen -> Gruppen am Land (D#1182)', async () => {
   holidays.__setFetchImpl(async (url) => ({
     ok: true,

@@ -1216,10 +1216,15 @@ router.put('/', (req, res) => {
         if (holiday_subdivision !== null && !SUBDIVISION_RE.test(holiday_subdivision)) {
           return res.status(400).json({ error: 'Ungültiger Regionscode (z. B. DE-BY).', code: 400 });
         }
-        // Ohne Subdivision gibt es keine Schulferien-Gruppe mehr → mit aufräumen.
+        // Wird eine gespeicherte Subdivision entfernt, faellt ihre Schulferien-
+        // Gruppe mit (CH-BE-VS gehoert zu CH-BE). War gar keine gespeichert, gehoert
+        // eine gespeicherte Gruppe dem Land selbst (BE-FR, D#1182) und bleibt:
+        // sonst loeschte ein Teil-Update nur mit `holiday_subdivision: null` still
+        // die gewaehlte Gemeinschaft (Review zu PR #1186).
         if (holiday_subdivision === null) {
+          const hadSubdivision = cfgGet('holiday_subdivision') != null;
           cfgDelete('holiday_subdivision');
-          cfgDelete('holiday_group');
+          if (hadSubdivision) cfgDelete('holiday_group');
         } else {
           cfgSet('holiday_subdivision', holiday_subdivision);
         }
