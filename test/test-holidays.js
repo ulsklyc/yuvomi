@@ -361,6 +361,14 @@ test('getGroups: a country WITH subdivisions has no groups without a region (DE-
   assert.deepEqual(paths, ['/Subdivisions'], 'no /Groups call for a country that has subdivisions');
 });
 
+test('getGroups: a 200 that is not an array is an error, not "no groups" (PR #1186)', async () => {
+  __setFetchImpl(async (url) => (new URL(String(url)).pathname === '/Subdivisions' ? okJson([]) : okJson({ message: 'maintenance' })));
+  await assert.rejects(getGroups('BE'), /Unexpected \/Groups response shape/);
+  __setFetchImpl(async () => okJson({ message: 'maintenance' }));
+  await assert.rejects(getGroups('CH', 'CH-BE'), /Unexpected \/Subdivisions response shape/);
+  await assert.rejects(getGroups('BE'), /Unexpected \/Subdivisions response shape/);
+});
+
 test('getForRange: Belgium - a country-level group without a subdivision shows only that community (D#1182)', () => {
   setConfig({ holiday_country: 'BE', holiday_group: 'BE-FR', holiday_show_public: '1', holiday_show_school: '1' });
   seedHoliday({ type: 'public', country: 'BE', start: '2026-07-21', end: '2026-07-21', name: 'Fete nationale' });

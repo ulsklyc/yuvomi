@@ -378,6 +378,39 @@ async function loadSubdivisions(
  * @returns {Promise<boolean|null>} true = fuer diesen Ort bestaetigt (auch "keine
  *   Gruppe"), false = gescheitert, null = durch eine neuere Anfrage ueberholt.
  */
+/**
+ * Leert und verbirgt den Gruppen-Picker und ueberholt jede noch laufende
+ * Gruppensuche. Beim Landwechsel SOFORT, nicht erst nach der Regionssuche:
+ * sonst stuende waehrend einer langsamen Anfrage die Gruppe des alten Landes
+ * sichtbar und gueltig neben dem neuen Land (Review zu PR #1186).
+ * @returns {number} die neue Anfrage-Nummer
+ */
+function clearGroupPicker(select, groupContainer, requestState) {
+  const requestId = ++requestState.latestRequestId;
+  const noneOption = document.createElement('option');
+  noneOption.value = '';
+  noneOption.textContent = t('settings.holidayGroupNone');
+  select.replaceChildren(noneOption);
+  select.disabled = true;
+  groupContainer.hidden = true;
+  return requestId;
+}
+
+/**
+ * Soll nach der Regionssuche eines Landwechsels eine Gruppensuche starten?
+ * Nein, wenn inzwischen ein anderes Land gewaehlt ist oder die Antwort ueberholt
+ * wurde - der neuere Wechsel besitzt den Gruppenzustand. Und nein, wenn die
+ * Regionssuche gescheitert ist: dann haelt resolveHolidayLocation() den
+ * gespeicherten Ort, und eine Suche ohne Region wuerde "keine Gruppe"
+ * bestaetigen und die gespeicherte loeschen (Review zu PR #1186).
+ * @returns {{countryLevel: boolean}|null}
+ */
+export function groupLookupAfterSubdivisions({ discovery, requestedCountry, currentCountry, subdivisionCount }) {
+  if (requestedCountry !== currentCountry) return null;
+  if (!discovery.ok || discovery.value === null) return null;
+  return { countryLevel: subdivisionCount === 0 };
+}
+
 async function loadGroups(
   select,
   groupContainer,
@@ -387,13 +420,7 @@ async function loadGroups(
   requestState,
   { countryLevel = false } = {},
 ) {
-  const requestId = ++requestState.latestRequestId;
-  const noneOption = document.createElement('option');
-  noneOption.value = '';
-  noneOption.textContent = t('settings.holidayGroupNone');
-  select.replaceChildren(noneOption);
-  select.disabled = true;
-  groupContainer.hidden = true;
+  const requestId = clearGroupPicker(select, groupContainer, requestState);
 
   if (!countryCode || (!subdivisionCode && !countryLevel)) return true;
 
@@ -598,6 +625,8 @@ async function bindEvents(container, preferences) {
     const countryCode = countrySelect.value;
     discoveryState.countryReady = true;
     discoveryState.subdivisionReady = false;
+    discoveryState.groupReady = false;
+    clearGroupPicker(groupSelect, groupGroup, groupRequests);
     updateSyncState();
     applySchoolAvailability(countryCode);
     const result = await runHolidayDiscovery(
@@ -613,11 +642,17 @@ async function bindEvents(container, preferences) {
     if (result.ok && result.value) {
       discoveryState.subdivisionReady = result.value.selectedResolved;
     }
-    // Land gewechselt → Subdivision zurückgesetzt → Gruppen-Picker leeren. Ein
-    // Land ohne Subdivisionen bringt seine Gruppen selbst mit (D#1182).
-    const countryLevel = Boolean(result.ok && result.value) && subdivisionSelect.options.length <= 1;
-    discoveryState.groupReady = false;
-    applyGroupResult(await loadGroups(groupSelect, groupGroup, countryCode, subdivisionSelect.value, '', groupRequests, { countryLevel }));
+    // Land gewechselt → Subdivision zurückgesetzt. Ein Land ohne Subdivisionen
+    // bringt seine Gruppen selbst mit (D#1182).
+    const lookup = groupLookupAfterSubdivisions({
+      discovery: result,
+      requestedCountry: countryCode,
+      currentCountry: countrySelect.value,
+      subdivisionCount: subdivisionSelect.options.length - 1,
+    });
+    if (lookup) {
+      applyGroupResult(await loadGroups(groupSelect, groupGroup, countryCode, subdivisionSelect.value, '', groupRequests, lookup));
+    }
     updateSyncState();
   });
 

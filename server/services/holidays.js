@@ -128,9 +128,13 @@ async function getGroups(countryIsoCode, subdivisionCode = null) {
   // sinnlos und koennte nur einen Fehlschlag ernten.
   if (countryIsoCode === 'GB') return [];
   const raw = await apiFetch(`/Subdivisions?countryIsoCode=${encodeURIComponent(countryIsoCode)}`);
+  // NUR EIN ECHTES ARRAY IST EINE AUSKUNFT (wie beim Sync unten): eine 200 mit
+  // anderem Rumpf als "keine Gruppen" zu melden, liesse die Einstellungen die
+  // gespeicherte Gruppe beim naechsten Speichern loeschen (Review zu PR #1186).
+  if (!Array.isArray(raw)) throw new Error('Unexpected /Subdivisions response shape');
   let groups;
   if (subdivisionCode) {
-    const match = (raw ?? []).find((s) => (s.code ?? s.isoCode) === subdivisionCode);
+    const match = raw.find((s) => (s.code ?? s.isoCode) === subdivisionCode);
     groups = Array.isArray(match?.groups) ? match.groups : [];
   } else {
     // LAND OHNE SUBDIVISIONEN, ABER MIT GRUPPEN (D#1182): Belgien fuehrt
@@ -140,9 +144,10 @@ async function getGroups(countryIsoCode, subdivisionCode = null) {
     // zeigte alle drei Regime nebeneinander. Fuehrt ein Land Subdivisionen,
     // gehoeren seine Gruppen zu ihnen (DE-MV-ABS, CH-BE-VS) und sind ohne
     // gewaehlte Region keine Antwort.
-    if (Array.isArray(raw) && raw.length > 0) return [];
+    if (raw.length > 0) return [];
     const countryGroups = await apiFetch(`/Groups?countryIsoCode=${encodeURIComponent(countryIsoCode)}`);
-    groups = Array.isArray(countryGroups) ? countryGroups : [];
+    if (!Array.isArray(countryGroups)) throw new Error('Unexpected /Groups response shape');
+    groups = countryGroups;
   }
   return groups
     .map((g) => ({

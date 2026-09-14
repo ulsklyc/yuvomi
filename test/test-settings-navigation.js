@@ -34,6 +34,7 @@ import {
   createSchoolAvailabilityUpdater,
   ensureHolidayLayerSelection,
   isHolidayCountryResolved,
+  groupLookupAfterSubdivisions,
   resolveHolidayGroup,
   resolveHolidayLocation,
   runHolidayDiscovery,
@@ -920,6 +921,30 @@ test('holiday settings pass the group lookup state to resolveHolidayGroup and re
   const loader = source.slice(source.indexOf('async function loadGroups('), source.indexOf('function holidayPreferenceData('));
   assert.match(loader, /catch \{[^}]*return requestId === requestState\.latestRequestId \? false : null;/,
     'eine gescheiterte Gruppensuche meldet false, nicht "keine Gruppe"');
+});
+
+test('a country change starts a group lookup only for a current, successful subdivision answer (PR #1186)', () => {
+  const ok = { ok: true, value: { selectedResolved: true } };
+  assert.deepEqual(groupLookupAfterSubdivisions({ discovery: ok, requestedCountry: 'BE', currentCountry: 'BE', subdivisionCount: 0 }), { countryLevel: true });
+  assert.deepEqual(groupLookupAfterSubdivisions({ discovery: ok, requestedCountry: 'CH', currentCountry: 'CH', subdivisionCount: 26 }), { countryLevel: false });
+  // DE -> BE schnell hintereinander: die aeltere Antwort darf die Suche fuer Belgien nicht ueberholen.
+  assert.equal(groupLookupAfterSubdivisions({ discovery: ok, requestedCountry: 'DE', currentCountry: 'BE', subdivisionCount: 16 }), null);
+  assert.equal(groupLookupAfterSubdivisions({ discovery: { ok: true, value: null }, requestedCountry: 'DE', currentCountry: 'DE', subdivisionCount: 16 }), null);
+  // Regionssuche gescheitert: nichts bestaetigen, die gespeicherte Gruppe bleibt.
+  assert.equal(groupLookupAfterSubdivisions({ discovery: { ok: false, value: null }, requestedCountry: 'CH', currentCountry: 'CH', subdivisionCount: 0 }), null);
+});
+
+test('a country change invalidates the old group picker before it awaits the subdivisions (PR #1186)', async () => {
+  const source = await readFile(new URL('../public/settings/pages/modules-calendar.js', import.meta.url), 'utf8');
+  const start = source.indexOf("countrySelect.addEventListener('change'");
+  const handler = source.slice(start, source.indexOf("subdivisionSelect.addEventListener('change'", start));
+  const cleared = handler.indexOf('clearGroupPicker(groupSelect, groupGroup, groupRequests);');
+  const notReady = handler.indexOf('discoveryState.groupReady = false;');
+  const awaited = handler.indexOf('await runHolidayDiscovery(');
+  assert.ok(cleared > 0 && notReady > 0 && awaited > 0, 'Handler-Bausteine gefunden');
+  assert.ok(cleared < awaited && notReady < awaited, 'der alte Picker muss vor dem Warten auf die Regionen fallen');
+  assert.match(handler, /const lookup = groupLookupAfterSubdivisions\(\{/);
+  assert.match(handler, /if \(lookup\) \{\s*applyGroupResult\(await loadGroups\(/);
 });
 
 test('holiday sync enables public holidays when every layer is disabled', () => {
