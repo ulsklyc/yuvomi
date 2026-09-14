@@ -36,8 +36,8 @@
 }
 
 .split-title,
-.split-group-header h2,
-.split-card h3 {
+.split-group-name,
+.split-card-title {
   margin: 0;
   letter-spacing: var(--tracking-normal);
   color: var(--color-text-primary);

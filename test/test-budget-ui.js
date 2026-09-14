@@ -1485,6 +1485,39 @@ test('eingebettete Split-Ausgaben tragen keine zweite <h1> und keinen zweiten Pr
 });
 
 /**
+ * Mit dem Tab-Titel als <h2> stand der Gruppenname auf derselben Stufe wie der
+ * Titel, die Karten darunter auf <h3>. Eingebettet sinkt die Gliederung deshalb
+ * eine Stufe: Budget > Split-Ausgaben > Gruppe > Abschnitt (Nachtrag aus dem
+ * Review von #1148). Weil der Tag damit wechselt, darf die Optik nicht an ihm
+ * haengen - ein Selektor wie `.split-card h3` griffe nur noch ausserhalb des Budgets.
+ */
+test('eingebettete Split-Ausgaben gliedern Gruppe und Karten eine Stufe tiefer', () => {
+  const src = withoutHtmlComments(withoutComments(splitExpenses));
+  assert.match(src, /_embedded = embedded;/,
+    'render() muss den Einbettungs-Schalter festhalten, renderMain() bekommt ihn nicht übergeben');
+  assert.match(src, /const GroupTag = _embedded \? 'h3' : 'h2'/,
+    'der Gruppenname steht eingebettet unter dem <h2>-Tab-Titel, also <h3>');
+  assert.match(src, /const SectionTag = _embedded \? 'h4' : 'h3'/,
+    'die Karten stehen eingebettet unter dem Gruppennamen, also <h4>');
+  assert.match(src, /<\$\{GroupTag\} class="split-group-name">/,
+    'der Gruppenname muss über GroupTag gerendert werden');
+  assert.equal((src.match(/<\$\{SectionTag\} class="split-card-title">/g) ?? []).length, 3,
+    'Salden, letzte Ausgaben und Verlauf müssen über SectionTag gerendert werden');
+  assert.doesNotMatch(src, /<h[1-6][\s>]/,
+    'eine fest geschriebene Überschrift folgt der Einbettung nicht - über eine Tag-Variable rendern');
+
+  const byTag = [];
+  for (const file of readdirSync(new URL('../public/styles/', import.meta.url))) {
+    if (!file.endsWith('.css')) continue;
+    for (const { selector } of eachRule(read(`../public/styles/${file}`))) {
+      if (/\.split[\w-]*[^,]*\bh[1-6]\b/.test(selector)) byTag.push(`${file}: ${selector}`);
+    }
+  }
+  assert.deepEqual(byTag, [],
+    'Split-Überschriften wechseln mit der Einbettung den Tag - Stile an die Klasse hängen, nicht an h2/h3');
+});
+
+/**
  * Löschen einer Gruppe ist unumkehrbar (die Gruppe fällt mitsamt ihrer
  * Ausgaben), Bearbeiten/Archivieren nicht - dieselbe Kapsel für alle drei
  * verwischte den Unterschied (UX-Review).

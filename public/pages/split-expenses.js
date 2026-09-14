@@ -35,6 +35,11 @@ let state = {
   user: null,
 };
 let _container = null;
+// Eingebettet (siehe render) sinkt die ganze Gliederung um eine Stufe: der Tab-Titel
+// ist <h2>, also Gruppenname <h3> und Karten <h4> - Budget > Split-Ausgaben > Gruppe
+// > Abschnitt (Nachtrag aus dem Review von #1148). Die Optik haengt an Klassen
+// (.split-group-name, .split-card-title), nicht am Tag.
+let _embedded = false;
 
 /* UEBERGABE AUS DEM BUDGET (#1057).
  *
@@ -83,6 +88,7 @@ function groupIcon(type) {
 
 export async function render(container, { user, embedded = false } = {}) {
   _container = container;
+  _embedded = embedded;
   state.user = user || null;
   // `split`, nicht `reading`: Kopf und Kennzahlenband stehen ueber einem
   // zweispaltigen .split-layout (Gruppen links, Detail rechts) - das IST die
@@ -362,10 +368,12 @@ function renderMain() {
   // Archiv-Ansicht: Salden, Ausgaben und Verlauf bleiben lesbar, alle
   // schreibenden Aktionen weichen dem Wiederherstellen (#574).
   const archived = isArchivedView();
+  const GroupTag = _embedded ? 'h3' : 'h2';
+  const SectionTag = _embedded ? 'h4' : 'h3';
   setHtml(main, `
     <section class="split-group-header">
       <div>
-        <h2>${esc(group.name)}</h2>
+        <${GroupTag} class="split-group-name">${esc(group.name)}</${GroupTag}>
         <p class="split-group-type">${t(`splitExpenses.groupType.${group.type}`)}</p>
         ${archived ? `<p class="split-archived-badge"><i data-lucide="archive" class="icon-md" aria-hidden="true"></i>${t('splitExpenses.statusArchived')}</p>` : ''}
         <p>${esc(group.description || t('splitExpenses.groupDefaultDescription'))}</p>
@@ -404,20 +412,20 @@ function renderMain() {
     <div class="split-content-grid">
       <section class="split-card split-card--balances">
         <div class="split-card-head">
-          <h3>${t('splitExpenses.balances')}</h3>
+          <${SectionTag} class="split-card-title">${t('splitExpenses.balances')}</${SectionTag}>
           <span>${t('splitExpenses.simplified')}</span>
         </div>
         <div id="split-balances">${renderBalances()}</div>
       </section>
       <section class="split-card">
         <div class="split-card-head">
-          <h3>${t('splitExpenses.recentExpenses')}</h3>
+          <${SectionTag} class="split-card-title">${t('splitExpenses.recentExpenses')}</${SectionTag}>
         </div>
         <div id="split-expense-list">${renderExpenses(archived)}</div>
       </section>
       <section class="split-card">
         <div class="split-card-head">
-          <h3>${t('splitExpenses.activity')}</h3>
+          <${SectionTag} class="split-card-title">${t('splitExpenses.activity')}</${SectionTag}>
         </div>
         <div class="split-activity">${renderActivity()}</div>
       </section>

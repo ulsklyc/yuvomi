@@ -353,9 +353,10 @@ test('Raster und Liste der Dokumente verwenden dieselbe Titelrolle', () => {
 test('sichtbare Split-Expense-Überschriften besitzen explizite Rollen', () => {
   const typography = readFileSync(new URL('../public/styles/typography.css', import.meta.url), 'utf8');
 
-  assertTypeRole(typography, 'typography.css', '.split-group-header h2', '--type-section-title',
+  // Klassen statt Tags: eingebettet rendert die Seite <h3>/<h4>, sonst <h2>/<h3> (#1148).
+  assertTypeRole(typography, 'typography.css', '.split-group-name', '--type-section-title',
     'Gruppenüberschriften dürfen nicht auf die Browser-Standardgröße zurückfallen');
-  assertTypeRole(typography, 'typography.css', '.split-card h3', '--type-card-title',
+  assertTypeRole(typography, 'typography.css', '.split-card-title', '--type-card-title',
     'Kartenüberschriften dürfen nicht auf die Browser-Standardgröße zurückfallen');
 });
 
