@@ -337,6 +337,17 @@ That request is open and welcome; it is about calendar events, which do carry as
 member. What this entry rules out is not a person-first view, but putting one module's data
 into another module's page to get one.
 
+The rule was reached a third time in September 2026, from household chores. #736 asked for a
+cleaning plan for households without a cleaning helper, and @Kyrodan's daily routines, in the
+same thread and in #913, asked for chores that reset, credit the person who did them and stay
+out of the calendar. Yuvomi already had two answers to "do this again some days after it was
+last done": the Housekeeping decay tasks (`frequency_days` counted from `last_completed`) and
+tasks with `recurrence_from_completion`. It is the same arithmetic, and only the task side
+carries assignees, points, a completion history and reminders. Growing the decay tasks into
+the chores feature would have meant building each of those a second time. Routines therefore
+become a kind of task, with their own tab in the tasks module; the decay tasks move into them,
+and Housekeeping keeps the helper side (#787). The first step is #1205.
+
 ### Where the rule lives
 
 - **The model:** migration 165 in `server/db.js` - `schedule_patterns` with `anchor_date` and
@@ -361,4 +372,6 @@ which trades one pattern row plus its overrides for roughly seven hundred rows p
 two years, and makes every edit a reconciliation. And placing an editor or a comparison view
 for schedule data inside the calendar because that is where people look first: the calendar
 renders schedule entries as a layer, it does not host them. A person-first view of the
-calendar's own events is a different question, asked in #670 and still open.
+calendar's own events is a different question, asked in #670 and still open. A second model
+for recurring household work next to tasks, whether as a module of its own or by giving the
+Housekeeping decay tasks people, points or a history of their own.
