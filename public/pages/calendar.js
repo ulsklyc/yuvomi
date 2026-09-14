@@ -6,7 +6,7 @@
 
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues, recurrenceRow } from '/rrule-ui.js';
-import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, renderKeepingFocus } from '/components/modal.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
@@ -4026,8 +4026,12 @@ function renderAgendaEvent(ev, dayStr) {
 
   const displayBg     = resolveEventBackground(ev);
   const assignedUsers = ev.assigned_users ?? [];
+  // `data-date` macht die Zeile eindeutig: ein Serientermin und ein mehrtaegiger
+  // Termin stehen mit derselben id an mehreren Tagen. Ohne das Datum findet
+  // `renderKeepingFocus()` nach dem Neuaufbau mehrere Kandidaten und weicht auf
+  // die Seitenwurzel aus, statt auf der Zeile zu bleiben (#1083).
   return `
-    <div class="list-row agenda-event" data-id="${ev.id}" role="button" tabindex="0"
+    <div class="list-row agenda-event" data-id="${ev.id}" data-date="${esc(dayStr ?? localDate(ev.start_datetime))}" role="button" tabindex="0"
          aria-label="${esc(agendaEventAriaLabel(ev, timeStr))}">
       <div class="agenda-event__color" style="background:${esc(displayBg)};"></div>
       <div class="agenda-event__body">
@@ -5616,6 +5620,7 @@ async function deleteEvent(event) {
     },
     isViewActive: () => Boolean(_container?.isConnected),
     reloadEvents: reloadCalendarRangeAfterDelete,
+    keepFocus: renderKeepingFocus,
     handleError: (err) => window.yuvomi?.showToast(
       err.data?.error ?? t('calendar.deleteError'),
       'danger',
@@ -5817,6 +5822,7 @@ async function deleteThisAndFollowing(event) {
     }),
     isViewActive: () => Boolean(_container?.isConnected),
     reloadEvents: reloadCalendarRangeAfterDelete,
+    keepFocus: renderKeepingFocus,
     handleError: (err) => window.yuvomi?.showToast(
       err.data?.error ?? t('calendar.deleteError'),
       'danger',
@@ -5845,6 +5851,7 @@ async function deleteSingleOccurrence(event) {
     }),
     isViewActive: () => Boolean(_container?.isConnected),
     reloadEvents: reloadCalendarRangeAfterDelete,
+    keepFocus: renderKeepingFocus,
     handleError: (err) => window.yuvomi?.showToast(
       err.data?.error ?? t('calendar.deleteError'),
       'danger',

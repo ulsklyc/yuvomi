@@ -17,7 +17,7 @@ const {
   focusRestoreTarget,
   rememberFocus,
   __test: modalTest,
-  restoreFocusAfterClose, refocusAfterRender, forgetRestore,
+  restoreFocusAfterClose, refocusAfterRender, forgetRestore, renderKeepingFocus,
 } = await import('../public/components/modal.js');
 
 // matchMedia und document.createElementNS werden von btnSuccess/btnError benötigt
@@ -883,6 +883,63 @@ test('der Merker aus dem Popover traegt auch den Neuaufbau danach (#1083)', () =
     assert.equal(restoreFocusAfterClose(null), null, 'ohne Merker gibt es nichts zurueckzugeben');
   } finally {
     forgetRestore();
+    global.document.activeElement = vorher.active;
+    global.document.body = vorher.body;
+  }
+});
+
+/* DER NEUAUFBAU OHNE SCHLIESSEN (#1083). Das Loeschen im Kalender rendert nach
+ * dem Undo-Fenster erneut, ausserhalb jedes Handlers. Gemessen in der Agenda fiel
+ * der Fokus dabei von der Zeile, auf die der Nutzer inzwischen gewechselt war,
+ * auf BODY - und der Merker des Popovers zeigte auf die geloeschte Zeile. Hier
+ * zaehlt, was DIREKT VOR dem Neuaufbau den Fokus hielt. Gemessen am Ergebnis. */
+test('renderKeepingFocus traegt den Fokus ueber einen Neuaufbau ohne Schliessen (#1083)', () => {
+  const vorher = { active: global.document.activeElement, body: global.document.body };
+  global.document.body = makeNode('body');
+  const fokussierbar = (n) => { n.focus = () => { global.document.activeElement = n; }; return n; };
+  const wurzel = fokussierbar(makeNode('main', { id: 'main-content' }));
+  const zeile = (id) => fokussierbar(makeNode('div', { cls: 'list-row', data: { id } }));
+  // Der Neuaufbau haengt das fokussierte Element ab; der Fokus faellt auf body.
+  const tauscheAus = (el) => () => { el.isConnected = false; global.document.activeElement = global.document.body; };
+  try {
+    const alt = zeile('15');
+    const neu = zeile('15');
+    global.document.activeElement = alt;
+    withDom({ byTag: { DIV: [zeile('16'), neu] }, byId: { 'main-content': wurzel } }, () => {
+      assert.equal(renderKeepingFocus(tauscheAus(alt)), neu,
+        'die neu gebaute Zeile mit denselben data-Werten bekommt den Fokus, nicht die Nachbarzeile');
+      assert.equal(global.document.activeElement, neu);
+    });
+
+    const ohneErsatz = zeile('9');
+    global.document.activeElement = ohneErsatz;
+    withDom({ byId: { 'main-content': wurzel } }, () => {
+      renderKeepingFocus(tauscheAus(ohneErsatz));
+      assert.equal(global.document.activeElement, wurzel, 'ohne Ersatz die Seitenwurzel, nie body');
+    });
+
+    const eigeneWahl = fokussierbar(makeNode('button', { id: 'cal-today' }));
+    const weg = zeile('15');
+    global.document.activeElement = weg;
+    withDom({ byTag: { DIV: [neu] }, byId: { 'main-content': wurzel } }, () => {
+      assert.equal(renderKeepingFocus(() => { weg.isConnected = false; eigeneWahl.focus(); }), null);
+      assert.equal(global.document.activeElement, eigeneWahl,
+        'hat der Neuaufbau selbst etwas fokussiert, ist dessen Wahl die bessere');
+    });
+
+    const bleibt = zeile('15');
+    global.document.activeElement = bleibt;
+    withDom({ byTag: { DIV: [neu] }, byId: { 'main-content': wurzel } }, () => {
+      assert.equal(renderKeepingFocus(() => {}), null, 'haelt das Element den Fokus noch, gibt es nichts zu tun');
+      assert.equal(global.document.activeElement, bleibt);
+    });
+
+    global.document.activeElement = global.document.body;
+    withDom({ byTag: { DIV: [neu] }, byId: { 'main-content': wurzel } }, () => {
+      assert.equal(renderKeepingFocus(() => {}), null, 'war vorher nichts fokussiert, wird nichts erfunden');
+      assert.equal(global.document.activeElement, global.document.body);
+    });
+  } finally {
     global.document.activeElement = vorher.active;
     global.document.body = vorher.body;
   }

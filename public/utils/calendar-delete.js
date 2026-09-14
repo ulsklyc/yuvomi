@@ -225,6 +225,11 @@ export function scheduleCalendarDeleteWithUndo({
   reloadEvents,
   handleError,
   render,
+  // The late re-renders (commit after the Undo window, Undo itself) run outside
+  // any handler, after the user may have moved focus into the rebuilt view. The
+  // page passes `renderKeepingFocus` from components/modal.js here (#1083). The
+  // first render belongs to the delete gesture, which restores its own focus.
+  keepFocus = (renderNow) => renderNow(),
 }) {
   const transition = beginOptimisticCalendarDelete(state, deleteScope);
   const write = reserveSeriesWrite(state, deleteScope.seriesId ?? deleteScope.eventId);
@@ -236,12 +241,12 @@ export function scheduleCalendarDeleteWithUndo({
       transition.commit();
       if (keepalive || !isViewActive()) return;
       await reloadEvents();
-      render();
+      keepFocus(render);
     },
     restore: (err) => {
       write.cancel();
       if (!transition.restore()) return;
-      if (isViewActive()) render();
+      if (isViewActive()) keepFocus(render);
       if (err) void handleError(err);
     },
     restoreOnKeepaliveError: true,

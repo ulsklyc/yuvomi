@@ -961,6 +961,36 @@ export function refocusAfterRender() {
 }
 
 /**
+ * DEN FOKUS UEBER EINEN NEUAUFBAU TRAGEN, DEN KEIN SCHLIESSEN AUSLOEST (#1083).
+ *
+ * `refocusAfterRender()` gehoert zu einem Schliessvorgang: sein Merker ist der
+ * Ausloeser des letzten Dialogs. Das Loeschen im Kalender rendert aber ein
+ * zweites Mal, wenn das Undo-Fenster ablaeuft - Sekunden spaeter und ausserhalb
+ * jedes Handlers (`scheduleCalendarDeleteWithUndo` in utils/calendar-delete.js).
+ * Bis dahin hat der Nutzer weitergearbeitet: gemessen in der Agenda stand der
+ * Fokus auf der naechsten Zeile, `renderView()` tauschte `#cal-body` aus, und er
+ * fiel auf BODY. Der Merker des Dialogs zeigte auf die geloeschte Zeile und
+ * haette die Seitenwurzel geliefert, nicht die Zeile, auf der der Nutzer stand.
+ *
+ * Gemerkt wird deshalb DIREKT VOR dem Neuaufbau, was den Fokus haelt, und
+ * dasselbe Element danach im neuen Baum wiedergefunden. Die Wachen sind die des
+ * Nachfassens: war vorher nichts fokussiert, haelt das Element den Fokus noch,
+ * hat der Neuaufbau selbst etwas fokussiert oder steht ein Dialog offen, tut der
+ * Aufruf nichts. Der Merker des letzten Schliessens bleibt unberuehrt.
+ *
+ * @param {() => void} render  der synchrone Neuaufbau
+ * @returns {HTMLElement|null} das Element, das den Fokus bekam, sonst null
+ */
+export function renderKeepingFocus(render) {
+  const memo = rememberFocus(document.activeElement);
+  render();
+  if (!memo || activeOverlay) return null;
+  if (memo.el.isConnected && document.activeElement === memo.el) return null;
+  if (document.activeElement !== document.body) return null;
+  return _fokussiereMitRueckfall(focusRestoreTarget(memo));
+}
+
+/**
  * Den Merker verwerfen, weil etwas an dieser Schicht vorbei geschlossen wurde.
  *
  * `closeDetailView()` kehrt im Popover-Zweig frueh zurueck, ohne `closeModal()`

@@ -127,6 +127,7 @@ const STUBS = {
     export const btnSuccess = () => {};
     export const btnError = () => {};
     export const refocusAfterRender = () => {};
+    export const renderKeepingFocus = (render) => { render(); return null; };
     export const forgetRestore = () => {};
   `,
   '/components/detail-view.js': `

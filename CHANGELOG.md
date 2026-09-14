@@ -228,6 +228,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pinned to the top of the scroll area while the day's shifts scroll past, so a block halfway down a
   long day is never orphaned from the day it belongs to.
 
+- **The calendar keeps keyboard focus when a deletion is committed** (#1083). A deleted event
+  disappears at once and is removed for good once the Undo notice runs out, and the view then draws
+  itself once more. Whatever you had moved on to in the meantime, for example the next row in the
+  agenda, lost focus at that moment, so the next Tab started again at the top of the page. That
+  element now keeps focus across the redraw, and the same holds when Undo brings the event back.
+
 ## [2.66.1] - 2026-09-14
 
 ### Security
