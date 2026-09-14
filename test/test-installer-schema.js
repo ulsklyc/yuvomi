@@ -962,9 +962,23 @@ test('kein Deploy-Descriptor gibt einem UI-sperrenden Schlüssel einen nicht-lee
 test('die Unraid-Vorlage gibt keinem UI-sperrenden Schlüssel einen Wert vor', () => {
   const keys = uiLockingEnvKeys();
   // Auskommentierte Eintraege gibt es fuer Unraid nicht - sie duerfen weder als
-  // deklariert zaehlen noch in die Paritaetspruefung unten eingehen.
-  const xml = readFileSync(new URL('../templates/yuvomi.xml', import.meta.url), 'utf8')
-    .replace(/<!--[\s\S]*?-->/g, '');
+  // deklariert zaehlen noch in die Paritaetspruefung unten eingehen. Bewusst per
+  // indexOf statt per replace-Regex: CodeQL bewertet ein Kommentar-replace als
+  // unvollstaendige Bereinigung (ein unterminiertes "<!--" bliebe stehen), und hier
+  // gilt ein nicht geschlossener Kommentar ohnehin bis zum Dateiende.
+  const withoutComments = (src) => {
+    let out = '';
+    let pos = 0;
+    for (;;) {
+      const start = src.indexOf('<!--', pos);
+      if (start === -1) return out + src.slice(pos);
+      out += src.slice(pos, start);
+      const end = src.indexOf('-->', start + 4);
+      if (end === -1) return out;
+      pos = end + 3;
+    }
+  };
+  const xml = withoutComments(readFileSync(new URL('../templates/yuvomi.xml', import.meta.url), 'utf8'));
   const configs = [...xml.matchAll(/<Config\b([^>]*?)(?:\/>|>([^<]*)<\/Config>)/g)];
   // Gueltiges XML erlaubt Leerraum um "=" und beide Anfuehrungszeichen. Ein Matcher,
   // der nur Name="..." kennt, liest Default = '587' als "kein Default".
