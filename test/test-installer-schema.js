@@ -939,8 +939,10 @@ test('kein Deploy-Descriptor gibt einem UI-sperrenden Schlüssel einen nicht-lee
     for (const key of keys) {
       // ${KEY:-<default>} - alles ausser sofort schliessender Klammer ist ein Wert.
       for (const m of src.matchAll(new RegExp(`\\$\\{${key}:-([^}]*)\\}`, 'g'))) {
-        if (m[1].trim() === '') continue;
-        offenders.push(`${file.replace(/^\.\.\//, '')}: ${key} defaultet auf "${m[1]}"`);
+        // ROH, nicht getrimmt: ein `${WEBDAV_BACKUP_URL:- }` setzt ein Leerzeichen, und
+        // backup-webdav.js sperrt schon daran (envControlled: Boolean(ENV_URL)).
+        if (m[1] === '') continue;
+        offenders.push(`${file.replace(/^\.\.\//, '')}: ${key} defaultet auf ${JSON.stringify(m[1])}`);
       }
     }
   }
@@ -979,27 +981,78 @@ test('die Unraid-Vorlage gibt keinem UI-sperrenden Schlüssel einen Wert vor', (
     }
   };
   const xml = withoutComments(readFileSync(new URL('../templates/yuvomi.xml', import.meta.url), 'utf8'));
-  const configs = [...xml.matchAll(/<Config\b([^>]*?)(?:\/>|>([^<]*)<\/Config>)/g)];
-  // Gueltiges XML erlaubt Leerraum um "=" und beide Anfuehrungszeichen. Ein Matcher,
-  // der nur Name="..." kennt, liest Default = '587' als "kein Default".
-  const attr = (attrs, name) => attrs.match(new RegExp(`\\b${name}\\s*=\\s*(["'])(.*?)\\1`))?.[2];
 
-  // Liest das Muster nicht jeden Eintrag, fehlt ein Teil der Pruefung still.
-  assert.equal(configs.length, (xml.match(/<Config\b/g) || []).length,
-    'Nicht jeder <Config>-Eintrag der Unraid-Vorlage passt auf das Muster - die Pruefung laese nur einen Teil.');
+  // Tag-Grenzen per Zeichenlauf statt per Regex: ein ">" in einem Attributwert
+  // (Description="Port > 0") ist gueltiges XML und darf den Tag nicht beenden.
+  const configEntries = (src) => {
+    const out = [];
+    let pos = 0;
+    for (;;) {
+      const start = src.indexOf('<Config', pos);
+      if (start === -1) return out;
+      pos = start + '<Config'.length;
+      if (pos < src.length && !/[\s/>]/.test(src[pos])) continue; // anderer Tagname, etwa <Configs
+      let i = pos;
+      let quote = '';
+      while (i < src.length && (quote || src[i] !== '>')) {
+        if (quote) { if (src[i] === quote) quote = ''; }
+        else if (src[i] === '"' || src[i] === "'") quote = src[i];
+        i += 1;
+      }
+      if (i >= src.length) return [...out, { attrs: src.slice(pos), text: '', broken: true }];
+      const selfClosing = src[i - 1] === '/';
+      const attrs = src.slice(pos, selfClosing ? i - 1 : i);
+      if (selfClosing) { out.push({ attrs, text: '' }); pos = i + 1; continue; }
+      const close = src.indexOf('</Config>', i + 1);
+      if (close === -1) return [...out, { attrs, text: '', broken: true }];
+      out.push({ attrs, text: src.slice(i + 1, close) });
+      pos = close + '</Config>'.length;
+    }
+  };
+
+  // Attribute der Reihe nach lesen, damit ein "Target=" IN einem Beschreibungstext nicht
+  // zaehlt. Gueltiges XML erlaubt Leerraum um "=" und beide Anfuehrungszeichen. Was das
+  // Muster nicht lesen kann (etwa ein ungequotetes Default=587), bleibt als Rest stehen
+  // und wird gemeldet, statt als "kein Default" durchzugehen. Ein gescheitertes exec
+  // setzt lastIndex auf 0 zurueck, deshalb zaehlt das Ende des letzten Treffers.
+  const parseAttrs = (s) => {
+    const map = {};
+    const re = /\s*([A-Za-z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/y;
+    let end = 0;
+    let m;
+    while ((m = re.exec(s)) !== null) {
+      map[m[1]] = m[2] ?? m[3];
+      end = re.lastIndex;
+    }
+    return { map, rest: s.slice(end).trim() };
+  };
+
+  const entries = configEntries(xml);
+  // Liest der Scanner nicht jeden Eintrag vollstaendig, fehlt ein Teil der Pruefung still.
+  assert.equal(entries.length, (xml.match(/<Config[\s/>]/g) || []).length,
+    'Nicht jeder <Config>-Eintrag der Unraid-Vorlage wurde gelesen - die Pruefung laese nur einen Teil.');
+  const unreadable = entries
+    .map((e) => ({ e, parsed: parseAttrs(e.attrs) }))
+    .filter(({ e, parsed }) => e.broken || parsed.rest !== '')
+    .map(({ e, parsed }) => `${parsed.map.Target ?? '?'}: ${e.broken ? 'nicht geschlossen' : `unlesbar "${parsed.rest}"`}`);
+  assert.deepEqual(unreadable, [],
+    `Diese <Config>-Eintraege kann die Pruefung nicht sicher lesen:\n${unreadable.join('\n')}`);
 
   const declared = new Set();
   const offenders = [];
-  for (const [, attrs, text = ''] of configs) {
-    const target = attr(attrs, 'Target');
+  for (const { attrs, text } of entries) {
+    const { map } = parseAttrs(attrs);
+    const target = map.Target;
     if (!keys.includes(target)) continue;
     // Nur ein Variable-Eintrag wird zur Umgebungsvariable; derselbe Target als
     // Path oder Port ist fuer Unraid-Nutzer nicht setzbar und gilt als fehlend.
-    if (attr(attrs, 'Type') !== 'Variable') continue;
+    if (map.Type !== 'Variable') continue;
     declared.add(target);
-    const def = attr(attrs, 'Default') ?? '';
-    if (def.trim() !== '') offenders.push(`${target}: Default="${def}"`);
-    if (text.trim() !== '') offenders.push(`${target}: Wert "${text.trim()}"`);
+    // ROH vergleichen, nicht getrimmt: backup-webdav.js sperrt schon bei einem
+    // Leerzeichen (envControlled: Boolean(ENV_URL)), obwohl getConfig() es ignoriert.
+    const def = map.Default ?? '';
+    if (def !== '') offenders.push(`${target}: Default=${JSON.stringify(def)}`);
+    if (text !== '') offenders.push(`${target}: Wert ${JSON.stringify(text)}`);
   }
 
   // Unraid hat keinen Fallback: ein fehlender Eintrag ist fuer Unraid-Nutzer nicht setzbar.
