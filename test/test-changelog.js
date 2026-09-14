@@ -495,10 +495,14 @@ test('jeder getaggte Release hat einen CHANGELOG-Eintrag, keine Version doppelt'
  * Nachtraege wie #1053 in 2.64.1.
  *
  * GRENZEN:
- * - Ein Abschnitt, der neuer ist als der Referenz-Tag, bleibt ungeprueft. Das ist der
- *   Release-Commit: release-prep benennt `[Unreleased]` um und faehrt `npm test` VOR
+ * - Ein Abschnitt, der neuer ist als der Referenz-Tag, bleibt im Text ungeprueft. Das ist
+ *   der Release-Commit: release-prep benennt `[Unreleased]` um und faehrt `npm test` VOR
  *   `git tag`. Der neue Abschnitt hat da noch keinen Tag, die aelteren werden gegen
- *   den vorigen verglichen.
+ *   den vorigen verglichen. ERLAUBT ist er aber nur mit der Version aus package.json
+ *   (#1184): release-prep bumpt sie in Schritt 2, vor dem Umbenennen und vor der Suite.
+ *   Ein gewoehnlicher PR, der seinen Eintrag unter eine erfundene `## [2.67.0]` schreibt
+ *   und `[Unreleased]` leer laesst, laesst package.json auf der veroeffentlichten Version
+ *   - und ist damit rot, statt dass parseChangelogFile die Ueberschrift als Release liest.
  * - CI klont ohne Tags. ci.yml holt den Tag des neuesten Abschnitts nach; ohne jeden
  *   Tag skippt der Guard sichtbar.
  * - Eine bewusste Aenderung an einem veroeffentlichten Abschnitt (ein Nachtrag wie
@@ -538,7 +542,7 @@ function firstDifference(section, published) {
   return `Zeile ${i + 1}: jetzt ${cut(now[i])}, am Tag ${cut(then[i])}`;
 }
 
-function releasedSectionDrift(headText, referenceText, referenceVersion, edits = {}) {
+function releasedSectionDrift(headText, referenceText, referenceVersion, edits = {}, { packageVersion } = {}) {
   const current = releasedSections(headText);
   const published = releasedSections(referenceText);
   const offenders = [];
@@ -546,7 +550,15 @@ function releasedSectionDrift(headText, referenceText, referenceVersion, edits =
   // Beide Seiten ablaufen, nicht nur den Baum: ein geloeschter Abschnitt oder eine
   // Ueberschrift, die das Muster nicht mehr trifft, kaeme sonst gar nicht vor (PR #1183).
   for (const version of new Set([...current.keys(), ...published.keys()])) {
-    if (compareVersions(version, referenceVersion) > 0) continue;
+    if (compareVersions(version, referenceVersion) > 0) {
+      // Neuer als der Referenz-Tag darf nur der Release-Commit sein, und der hat die
+      // Version schon gebumpt (#1184).
+      if (packageVersion !== undefined && current.has(version) && version !== packageVersion) {
+        offenders.push({ version, hash: null,
+          detail: `neuer Abschnitt ohne Tag, package.json steht aber auf ${packageVersion} - eine Versionsueberschrift schreibt nur release-prep, ein Eintrag gehoert unter [Unreleased]` });
+      }
+      continue;
+    }
     checked += 1;
     const section = current.get(version);
     if (section === published.get(version)) continue;
@@ -594,8 +606,10 @@ test('veroeffentlichte CHANGELOG-Abschnitte stehen noch so da wie am Tag', (t) =
   const referenceText = execFileSync('git', ['show', `refs/tags/v${referenceVersion}:CHANGELOG.md`], {
     cwd: repoRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
   });
+  const packageVersion = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+  assert.match(packageVersion, /^\d+\.\d+\.\d+$/, 'package.json traegt keine lesbare Version');
   const { offenders, checked } = releasedSectionDrift(
-    headText, referenceText, referenceVersion, RELEASED_SECTION_EDITS);
+    headText, referenceText, referenceVersion, RELEASED_SECTION_EDITS, { packageVersion });
 
   // Reichweite: bricht die Abschnittstrennung, vergleicht der Guard nichts und ist gruen.
   assert.ok(checked >= 10, `nur ${checked} Abschnitte gegen v${referenceVersion} verglichen`);
@@ -673,10 +687,27 @@ test('der Release-Commit selbst ist fuer den Abschnitts-Guard kein Fund', () => 
   // die Referenz ist also noch v1.2.1.
   const release = SAMPLE_CHANGELOG.replace('## [Unreleased]\n', '## [Unreleased]\n\n## [1.2.2] - 2026-01-03\n');
   assert.notEqual(release, SAMPLE_CHANGELOG);
-  assert.deepEqual(releasedSectionDrift(release, SAMPLE_CHANGELOG, '1.2.1'), { offenders: [], checked: 2 });
+  assert.deepEqual(releasedSectionDrift(release, SAMPLE_CHANGELOG, '1.2.1', {}, { packageVersion: '1.2.2' }),
+    { offenders: [], checked: 2 });
 
   // Nach dem Tag ist die Datei am Tag dieselbe wie im Baum.
   assert.deepEqual(releasedSectionDrift(release, release, '1.2.2').offenders, []);
+});
+
+test('eine erfundene Versionsueberschrift ausserhalb eines Releases ist ein Fund (#1184)', () => {
+  // Derselbe Text wie der Release-Commit oben: [Unreleased] leer, darunter [1.2.2]. Den
+  // Unterschied macht allein package.json - ein gewoehnlicher PR bumpt nicht.
+  const invented = SAMPLE_CHANGELOG.replace('## [Unreleased]\n', '## [Unreleased]\n\n## [1.2.2] - 2026-01-03\n');
+  assert.notEqual(invented, SAMPLE_CHANGELOG);
+  const found = releasedSectionDrift(invented, SAMPLE_CHANGELOG, '1.2.1', {}, { packageVersion: '1.2.1' });
+  assert.deepEqual(found.offenders.map((o) => o.version), ['1.2.2']);
+  assert.match(found.offenders[0].detail, /package\.json steht aber auf 1\.2\.1/);
+  assert.equal(found.offenders[0].hash, null, 'kein Nachtrags-Hash: das laesst sich nicht wegquittieren');
+
+  // Zwei neue Ueberschriften: hoechstens eine kann der Release sein.
+  const two = invented.replace('## [1.2.2] - 2026-01-03\n', '## [1.2.3] - 2026-01-04\n\n## [1.2.2] - 2026-01-03\n');
+  assert.deepEqual(releasedSectionDrift(two, SAMPLE_CHANGELOG, '1.2.1', {}, { packageVersion: '1.2.3' }).offenders.map((o) => o.version),
+    ['1.2.2']);
 });
 
 test('eine eingetragene Aenderung haelt genau ihre Fassung fest', () => {
