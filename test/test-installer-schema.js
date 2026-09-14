@@ -950,6 +950,44 @@ test('kein Deploy-Descriptor gibt einem UI-sperrenden Schlüssel einen nicht-lee
     + `Feld danach in den Einstellungen nicht mehr ändern:\n${offenders.join('\n')}`);
 });
 
+// Dieselbe Regel, eine Bauart weiter: die Unraid-Vorlage interpoliert nichts.
+// `templates/yuvomi.xml` zaehlt jede Variable als `<Config>` auf, und was dort im
+// `Default`-Attribut oder als Elementtext steht, fuellt Unraid beim Anlegen des
+// Containers vor - es landet also genauso in der Umgebung wie ein Compose-Default.
+// Die Suche nach `${KEY:-...}` oben sieht die Datei gar nicht (sie ist weder YAML
+// noch Quadlet), und genau dort standen bis fba63f6a sieben solche Werte, darunter
+// EMAIL_SMTP_PORT=587 und DOCUMENT_STORAGE_WEBDAV_ENABLED=false, das den Schalter in
+// der Oberflaeche sperrte. Gegen die Vorlage von vor fba63f6a meldet dieser Test
+// genau diese sieben Schluessel, je mit Default und mit Wert.
+test('die Unraid-Vorlage gibt keinem UI-sperrenden Schlüssel einen Wert vor', () => {
+  const keys = uiLockingEnvKeys();
+  const xml = readFileSync(new URL('../templates/yuvomi.xml', import.meta.url), 'utf8');
+  const configs = [...xml.matchAll(/<Config\b([^>]*?)(?:\/>|>([^<]*)<\/Config>)/g)];
+
+  // Liest das Muster nicht jeden Eintrag, fehlt ein Teil der Pruefung still.
+  assert.equal(configs.length, (xml.match(/<Config\b/g) || []).length,
+    'Nicht jeder <Config>-Eintrag der Unraid-Vorlage passt auf das Muster - die Pruefung laese nur einen Teil.');
+
+  const declared = new Set();
+  const offenders = [];
+  for (const [, attrs, text = ''] of configs) {
+    const target = attrs.match(/\bTarget="([^"]*)"/)?.[1];
+    if (!keys.includes(target)) continue;
+    declared.add(target);
+    const def = attrs.match(/\bDefault="([^"]*)"/)?.[1] ?? '';
+    if (def.trim() !== '') offenders.push(`${target}: Default="${def}"`);
+    if (text.trim() !== '') offenders.push(`${target}: Wert "${text.trim()}"`);
+  }
+
+  // Unraid hat keinen Fallback: ein fehlender Eintrag ist fuer Unraid-Nutzer nicht setzbar.
+  assert.deepEqual(keys.filter((k) => !declared.has(k)).sort(), [],
+    'Diese UI-sperrenden Schluessel fehlen in der Unraid-Vorlage.');
+
+  assert.deepEqual(offenders.sort(), [],
+    'Die Unraid-Vorlage fuellt diese UI-sperrenden Schluessel vor - jeder neue Container sperrt damit '
+    + `das Feld in den Einstellungen:\n${offenders.join('\n')}`);
+});
+
 test('der Dokument-Mount zielt auf DOCUMENT_STORAGE_LOCAL_PATH, nie auf einen festen Pfad', () => {
   // DOCUMENT_STORAGE_LOCAL_DIR wurde eingeführt, damit Host-Ordner und
   // Container-Pfad nicht auseinanderlaufen. Die Compose-Dateien mounteten aber
