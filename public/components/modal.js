@@ -287,19 +287,32 @@ function trapFocus(container, initialFocus = 'first-field') {
  *                             nichts zu tippen, und ein Feldfokus fährt auf dem
  *                             Smartphone grundlos die Tastatur hoch.
  *   HTMLElement             - genau dieses Element.
+ *
+ * DER ERSTFOKUS KOMMT 50 MS SPAETER - UND DARF DANN NICHTS MEHR UEBERSCHREIBEN
+ * (#1156). Auf einem langsamen Geraet liegt der Timer laenger, und bis dahin hat
+ * schon jemand gewaehlt: gemessen am Speichern-Tor, wo `confirmOverModal` das
+ * Formular parkt, fragt und den Fokus beim Fortsetzen auf den Speichern-Knopf
+ * zurueckgibt. Der liegengebliebene Timer zog ihn danach ins erste Feld, und
+ * nichts holte ihn zurueck. Er fokussiert deshalb nur noch, wenn das Ziel noch
+ * haengt, das Modal nicht geparkt (`inert`) ist und im Modal noch nichts den
+ * Fokus haelt.
  */
 function applyInitialFocus(container, initialFocus) {
   if (initialFocus === 'none') return;
 
-  if (initialFocus && typeof initialFocus.focus === 'function') {
-    setTimeout(() => initialFocus.focus(), 50);
-    return;
+  const target = initialFocus && typeof initialFocus.focus === 'function'
+    ? initialFocus
+    : container.querySelector(FIRST_FIELD) ?? container.querySelector(FOCUSABLE);
+  if (target) {
+    setTimeout(() => _focusInitialUnlessClaimed(container, target), 50);
   }
+}
 
-  const first = container.querySelector(FIRST_FIELD) ?? container.querySelector(FOCUSABLE);
-  if (first) {
-    setTimeout(() => first.focus(), 50);
-  }
+function _focusInitialUnlessClaimed(container, target) {
+  if (!target.isConnected) return;
+  if (container.closest?.('[inert]')) return;
+  if (container.contains(document.activeElement)) return;
+  target.focus();
 }
 
 /**
@@ -1614,6 +1627,7 @@ export const __test = {
   wireSheetSwipe: _wireSheetSwipe,
   createConfirmOverModal,
   finishSuspendedConfirmation,
+  applyInitialFocus,
 };
 
 // --------------------------------------------------------

@@ -1084,3 +1084,111 @@ test('Sheet-Swipe: ein begonnener Zug bleibt verfolgt und setzt das Panel einmal
     delete global.requestAnimationFrame;
   }
 });
+
+/* DER ERSTFOKUS NIMMT KEINEN SPAETER GESETZTEN FOKUS WEG (#1156).
+ *
+ * Gemessen im Browser mit gestrecktem 50-ms-Timer: das Speichern-Tor gab den
+ * Fokus beim Fortsetzen korrekt auf den Speichern-Knopf zurueck, und 1,5 s spaeter
+ * zog der liegengebliebene Erstfokus ihn ins erste Feld. Der Timer wird hier
+ * abgefangen und von Hand ausgeloest; gemessen wird, wo der Fokus danach steht. */
+function erstfokusLage({ inert = false } = {}) {
+  const vorher = { active: global.document.activeElement, setTimeout: global.setTimeout };
+  const geplant = [];
+  global.setTimeout = (fn, ms) => { geplant.push({ fn, ms }); return geplant.length; };
+  const imModal = new Set();
+  const knoten = (id, drinnen) => {
+    const n = { id, isConnected: true, focus() { global.document.activeElement = n; } };
+    if (drinnen) imModal.add(n);
+    return n;
+  };
+  const feld = knoten('first-field', true);
+  const container = {
+    querySelector: () => feld,
+    contains: (el) => imModal.has(el),
+    closest: (sel) => (sel === '[inert]' && inert ? {} : null),
+  };
+  return {
+    geplant, feld, container, knoten,
+    ausloesen: () => geplant.splice(0).forEach(({ fn }) => fn()),
+    aufraeumen: () => {
+      global.setTimeout = vorher.setTimeout;
+      global.document.activeElement = vorher.active;
+    },
+  };
+}
+
+test('Erstfokus: ein Modal, in dem nichts den Fokus haelt, bekommt sein erstes Feld (#1156)', () => {
+  const lage = erstfokusLage();
+  try {
+    global.document.activeElement = lage.knoten('ausloeser-draussen', false);
+    modalTest.applyInitialFocus(lage.container, 'first-field');
+    assert.deepEqual(lage.geplant.map(({ ms }) => ms), [50], 'der Erstfokus bleibt ein 50-ms-Timer');
+    lage.ausloesen();
+    assert.equal(global.document.activeElement, lage.feld, 'der Normalfall bleibt: Fokus ins erste Feld');
+  } finally {
+    lage.aufraeumen();
+  }
+});
+
+test('Erstfokus: ein inzwischen im Modal gewaehlter Fokus bleibt stehen (#1156)', () => {
+  const lage = erstfokusLage();
+  try {
+    global.document.activeElement = lage.knoten('ausloeser-draussen', false);
+    modalTest.applyInitialFocus(lage.container, 'first-field');
+    // Das Speichern-Tor hat fortgesetzt und den Fokus auf den Knopf gelegt.
+    const speichern = lage.knoten('gate-save', true);
+    speichern.focus();
+    lage.ausloesen();
+    assert.equal(global.document.activeElement, speichern,
+      'ein liegengebliebener Timer darf den Fokus nicht ins erste Feld ziehen');
+  } finally {
+    lage.aufraeumen();
+  }
+});
+
+test('Erstfokus: ein geparktes (inert) Modal und ein abgehaengtes Ziel bekommen keinen Fokus (#1156)', () => {
+  const geparkt = erstfokusLage({ inert: true });
+  try {
+    const draussen = geparkt.knoten('dialog-knopf', false);
+    global.document.activeElement = draussen;
+    modalTest.applyInitialFocus(geparkt.container, 'first-field');
+    geparkt.ausloesen();
+    assert.equal(global.document.activeElement, draussen, 'unter einem Dialog geparkt: der Dialog behaelt den Fokus');
+  } finally {
+    geparkt.aufraeumen();
+  }
+
+  const weg = erstfokusLage();
+  try {
+    const draussen = weg.knoten('seite', false);
+    global.document.activeElement = draussen;
+    modalTest.applyInitialFocus(weg.container, 'first-field');
+    weg.feld.isConnected = false;
+    weg.ausloesen();
+    assert.equal(global.document.activeElement, draussen, 'ein geschlossenes Modal fokussiert nichts mehr');
+  } finally {
+    weg.aufraeumen();
+  }
+});
+
+test('Erstfokus: ein ausdrueckliches Ziel traegt dieselbe Wache, "none" plant nichts (#1156)', () => {
+  const lage = erstfokusLage();
+  try {
+    const ziel = lage.knoten('confirm-modal-ok', true);
+    global.document.activeElement = lage.knoten('ausloeser-draussen', false);
+    modalTest.applyInitialFocus(lage.container, ziel);
+    lage.ausloesen();
+    assert.equal(global.document.activeElement, ziel, 'ein ausdrueckliches Ziel bekommt den Fokus wie bisher');
+
+    modalTest.applyInitialFocus(lage.container, ziel);
+    const gewaehlt = lage.knoten('confirm-modal-cancel', true);
+    gewaehlt.focus();
+    lage.ausloesen();
+    assert.equal(global.document.activeElement, gewaehlt, 'und nimmt einen spaeter gewaehlten Fokus ebenso wenig weg');
+
+    modalTest.applyInitialFocus(lage.container, 'none');
+    assert.equal(lage.geplant.length, 0, 'bei "none" setzt der Aufrufer den Fokus selbst');
+  } finally {
+    lage.aufraeumen();
+  }
+});

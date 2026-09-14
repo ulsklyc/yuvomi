@@ -236,6 +236,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   way, because the notice removes its button before the event comes back; focus now lands on the
   restored event.
 
+- **A dialog no longer moves keyboard focus into its first field after you have already moved on**
+  (#1156). Opening a form puts focus into its first field a moment later. On a slow or busy device
+  that moment could arrive after you had already acted, for example after answering a save
+  confirmation, which hands focus back to the Save button: focus then jumped to the first field
+  instead, and nothing brought it back. The first field now only gets focus while nothing inside
+  the dialog has it yet.
+
 ## [2.66.1] - 2026-09-14
 
 ### Security

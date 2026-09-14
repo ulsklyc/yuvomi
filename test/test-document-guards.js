@@ -378,6 +378,55 @@ test('save confirmations preserve the same editor across repeated gates and keep
   }
 });
 
+// #1156: die Save-Gate-Probe oben war unter Last zeitweise rot (`focus:
+// 'gate-title'`). Ursache gemessen: nicht das `inert` beim Fortsetzen, sondern der
+// 50-ms-Erstfokus des Editors - lag er hinter dem Fortsetzen, zog er den Fokus vom
+// Speichern-Knopf ins erste Feld. Unter Last war das Zufall; hier wird der Timer
+// fuer das eine Oeffnen auf 1500 ms gestreckt, damit er SICHER hinter dem
+// Fortsetzen liegt und die Sonde bei jedem Lauf misst, was vorher nur manchmal kam.
+test('der verspaetete Erstfokus nimmt dem fortgesetzten Speichern-Tor den Fokus nicht weg (#1156)', async () => {
+  const page = await openPage(harness, { device: 'desktop', locale: 'de' });
+  try {
+    const openSlow = (title) => page.evaluate(async (modalTitle) => {
+      const modal = await import('/components/modal.js');
+      const origSetTimeout = window.setTimeout;
+      window.setTimeout = (fn, ms, ...rest) => origSetTimeout(fn, ms === 50 ? 1500 : ms, ...rest);
+      try {
+        modal.openModal({
+          title: modalTitle,
+          content: '<form><input id="slow-title" value="Original"><button type="button" id="slow-save">Save</button></form>',
+        });
+      } finally {
+        window.setTimeout = origSetTimeout;
+      }
+      window.slowGate = { modal };
+    }, title);
+
+    await openSlow('Slow editor');
+    await page.evaluate(() => {
+      document.getElementById('slow-save').focus();
+      window.slowGate.pending = window.slowGate.modal.confirmOverModal('Continue saving?', { closeOnConfirm: false });
+    });
+    await page.click('#confirm-modal-cancel');
+    assert.deepEqual(await page.evaluate(async () => {
+      const confirmed = await window.slowGate.pending;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return { confirmed, focus: document.activeElement?.id };
+    }), { confirmed: false, focus: 'slow-save' },
+    'der Erstfokus-Timer feuert nach dem Fortsetzen und darf den Speichern-Knopf nicht verdraengen');
+
+    // Gegenseite: ohne Tor bekommt dasselbe Modal seinen Erstfokus weiterhin.
+    await page.evaluate(() => window.slowGate.modal.closeModal({ force: true }));
+    await openSlow('Slow editor again');
+    assert.equal(await page.evaluate(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return document.activeElement?.id;
+    }), 'slow-title', 'ohne spaeter gewaehlten Fokus landet der Erstfokus wie bisher im ersten Feld');
+  } finally {
+    await page.close();
+  }
+});
+
 async function openCalendarSaveGateEditor(page, { wholeSeriesOnly = false } = {}) {
   const seriesId = await page.evaluate(async (wholeSeriesOnly) => {
     const { api } = await import('/api.js');
