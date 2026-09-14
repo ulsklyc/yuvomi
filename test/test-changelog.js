@@ -524,6 +524,7 @@ function releasedSections(text) {
 }
 
 function firstDifference(section, published) {
+  if (section === undefined) return 'im Baum fehlt dieser Abschnitt (geloescht oder Ueberschrift veraendert)';
   if (published === undefined) return 'am Tag gibt es diesen Abschnitt nicht';
   const now = section.split('\n');
   const then = published.split('\n');
@@ -534,14 +535,18 @@ function firstDifference(section, published) {
 }
 
 function releasedSectionDrift(headText, referenceText, referenceVersion, edits = {}) {
+  const current = releasedSections(headText);
   const published = releasedSections(referenceText);
   const offenders = [];
   let checked = 0;
-  for (const [version, section] of releasedSections(headText)) {
+  // Beide Seiten ablaufen, nicht nur den Baum: ein geloeschter Abschnitt oder eine
+  // Ueberschrift, die das Muster nicht mehr trifft, kaeme sonst gar nicht vor (PR #1183).
+  for (const version of new Set([...current.keys(), ...published.keys()])) {
     if (compareVersions(version, referenceVersion) > 0) continue;
     checked += 1;
+    const section = current.get(version);
     if (section === published.get(version)) continue;
-    const hash = sectionHash(section);
+    const hash = sectionHash(section ?? '');
     if (edits[version] === hash) continue;
     offenders.push({ version, hash, detail: firstDifference(section, published.get(version)) });
   }
@@ -613,6 +618,17 @@ test('der Abschnitts-Guard erkennt einen Eintrag im veroeffentlichten Abschnitt'
   const missing = releasedSectionDrift(SAMPLE_CHANGELOG, SAMPLE_CHANGELOG.replace(/## \[1\.2\.0\][^]*$/, ''), '1.2.1');
   assert.deepEqual(missing.offenders.map((o) => [o.version, o.detail]),
     [['1.2.0', 'am Tag gibt es diesen Abschnitt nicht']]);
+
+  // Und umgekehrt: ein veroeffentlichter Abschnitt, der im Baum fehlt - geloescht oder
+  // mit einer Ueberschrift, die das Muster nicht mehr trifft.
+  const deleted = SAMPLE_CHANGELOG.replace(/## \[1\.2\.0\][^]*$/, '');
+  assert.notEqual(deleted, SAMPLE_CHANGELOG);
+  assert.deepEqual(releasedSectionDrift(deleted, SAMPLE_CHANGELOG, '1.2.1').offenders.map((o) => [o.version, o.detail]),
+    [['1.2.0', 'im Baum fehlt dieser Abschnitt (geloescht oder Ueberschrift veraendert)']]);
+  // Ohne erkennbare Ueberschrift rutscht der Inhalt in den Abschnitt darueber - beide sind Funde.
+  const renamed = SAMPLE_CHANGELOG.replace('## [1.2.0] - 2026-01-01', '## 1.2.0 - 2026-01-01');
+  assert.notEqual(renamed, SAMPLE_CHANGELOG);
+  assert.deepEqual(releasedSectionDrift(renamed, SAMPLE_CHANGELOG, '1.2.1').offenders.map((o) => o.version), ['1.2.1', '1.2.0']);
 });
 
 test('der Release-Commit selbst ist fuer den Abschnitts-Guard kein Fund', () => {
