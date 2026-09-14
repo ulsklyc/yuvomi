@@ -930,6 +930,8 @@ test('a country change starts a group lookup only for a current, successful subd
   // DE -> BE schnell hintereinander: die aeltere Antwort darf die Suche fuer Belgien nicht ueberholen.
   assert.equal(groupLookupAfterSubdivisions({ discovery: ok, requestedCountry: 'DE', currentCountry: 'BE', subdivisionCount: 16 }), null);
   assert.equal(groupLookupAfterSubdivisions({ discovery: { ok: true, value: null }, requestedCountry: 'DE', currentCountry: 'DE', subdivisionCount: 16 }), null);
+  // Lokal berechnetes Land ohne Schulferien-Quelle (US): keine Anfrage am Land, "keine Gruppe" ist die Auskunft.
+  assert.deepEqual(groupLookupAfterSubdivisions({ discovery: ok, requestedCountry: 'US', currentCountry: 'US', subdivisionCount: 0, schoolHolidaysAvailable: false }), { countryLevel: false });
   // Regionssuche gescheitert: nichts bestaetigen, die gespeicherte Gruppe bleibt.
   assert.equal(groupLookupAfterSubdivisions({ discovery: { ok: false, value: null }, requestedCountry: 'CH', currentCountry: 'CH', subdivisionCount: 0 }), null);
 });
@@ -945,6 +947,11 @@ test('a country change invalidates the old group picker before it awaits the sub
   assert.ok(cleared < awaited && notReady < awaited, 'der alte Picker muss vor dem Warten auf die Regionen fallen');
   assert.match(handler, /const lookup = groupLookupAfterSubdivisions\(\{/);
   assert.match(handler, /if \(lookup\) \{\s*applyGroupResult\(await loadGroups\(/);
+  assert.match(handler, /schoolHolidaysAvailable: countrySchoolHolidaysAvailable\(countriesData, countryCode\),/,
+    'der Landwechsel fragt ein Land ohne Schulferien-Quelle nicht nach Gruppen');
+  const initial = source.slice(source.indexOf('const countriesResult = await runHolidayDiscovery('));
+  assert.match(initial, /subdivisionSelect\.options\.length <= 1\s*&& countrySchoolHolidaysAvailable\(countriesData, preferences\.holiday_country\)\) \{/,
+    'auch der erste Aufbau fragt ein Land ohne Schulferien-Quelle nicht am Land');
 });
 
 test('holiday sync enables public holidays when every layer is disabled', () => {

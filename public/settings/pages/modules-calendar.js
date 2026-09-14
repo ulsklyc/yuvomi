@@ -403,12 +403,15 @@ function clearGroupPicker(select, groupContainer, requestState) {
  * Regionssuche gescheitert ist: dann haelt resolveHolidayLocation() den
  * gespeicherten Ort, und eine Suche ohne Region wuerde "keine Gruppe"
  * bestaetigen und die gespeicherte loeschen (Review zu PR #1186).
+ * Am Land gefragt wird nur fuer ein Land mit Schulferien-Quelle: die lokal
+ * berechneten Laender (US, CA, AU, NZ, BR, GB) fuehrt OpenHolidays nicht, eine
+ * Anfrage dort waere ein sicherer Fehlschlag (countrySchoolHolidaysAvailable()).
  * @returns {{countryLevel: boolean}|null}
  */
-export function groupLookupAfterSubdivisions({ discovery, requestedCountry, currentCountry, subdivisionCount }) {
+export function groupLookupAfterSubdivisions({ discovery, requestedCountry, currentCountry, subdivisionCount, schoolHolidaysAvailable = true }) {
   if (requestedCountry !== currentCountry) return null;
   if (!discovery.ok || discovery.value === null) return null;
-  return { countryLevel: subdivisionCount === 0 };
+  return { countryLevel: subdivisionCount === 0 && schoolHolidaysAvailable !== false };
 }
 
 async function loadGroups(
@@ -649,6 +652,7 @@ async function bindEvents(container, preferences) {
       requestedCountry: countryCode,
       currentCountry: countrySelect.value,
       subdivisionCount: subdivisionSelect.options.length - 1,
+      schoolHolidaysAvailable: countrySchoolHolidaysAvailable(countriesData, countryCode),
     });
     if (lookup) {
       applyGroupResult(await loadGroups(groupSelect, groupGroup, countryCode, subdivisionSelect.value, '', groupRequests, lookup));
@@ -791,7 +795,8 @@ async function bindEvents(container, preferences) {
         preferences.holiday_group || '',
         groupRequests,
       ));
-    } else if (subdivisionsResult.ok && subdivisionsResult.value && subdivisionSelect.options.length <= 1) {
+    } else if (subdivisionsResult.ok && subdivisionsResult.value && subdivisionSelect.options.length <= 1
+      && countrySchoolHolidaysAvailable(countriesData, preferences.holiday_country)) {
       // Land ohne Subdivisionen (Belgien, D#1182): gespeicherte Gruppe am Land.
       applyGroupResult(await loadGroups(
         groupSelect,
