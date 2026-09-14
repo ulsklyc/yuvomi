@@ -460,6 +460,29 @@ describe('env-Vorrang', () => {
       }
     }
   });
+
+  it('sperrt die Felder nicht fuer eine URL aus reinem Leerraum', async () => {
+    // envControlled entscheidet, ob die Einstellungen die Backup-Felder sperren. Es
+    // hing am ROHEN Wert (Boolean(ENV_URL)), getConfig() dagegen am getrimmten: ein
+    // Leerzeichen in WEBDAV_BACKUP_URL - etwa aus `${WEBDAV_BACKUP_URL:- }` oder einer
+    // mehrzeilig formatierten Unraid-Vorlage - sperrte die Felder, ohne dass die URL
+    // galt. Der Test oben mit '' sah das nie, weil Boolean('') ohnehin false ist.
+    const saved = process.env.WEBDAV_BACKUP_URL;
+    try {
+      process.env.WEBDAV_BACKUP_URL = ' \n ';
+      const blank = await import(`../server/services/backup-webdav.js?blank=${process.pid}`);
+      assert.equal(blank.getConfig().url, null, 'Leerraum darf nicht als URL gelten');
+      assert.equal(blank.getStatus().envControlled, false, 'Leerraum darf die Backup-Felder nicht sperren');
+
+      // Gegenstueck, damit der Test nicht an einem immer falschen Wert gruen haengt.
+      process.env.WEBDAV_BACKUP_URL = 'https://dav.example/remote.php/dav/';
+      const set = await import(`../server/services/backup-webdav.js?set=${process.pid}`);
+      assert.equal(set.getStatus().envControlled, true, 'eine gesetzte URL muss die Felder sperren');
+    } finally {
+      if (saved === undefined) delete process.env.WEBDAV_BACKUP_URL;
+      else process.env.WEBDAV_BACKUP_URL = saved;
+    }
+  });
 });
 
 describe('Zugangsdaten aus der Umgebung', () => {

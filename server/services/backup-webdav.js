@@ -471,6 +471,9 @@ export function getStatus() {
     keep:          cfg.keep,
     lastUpload:    cfgGet('webdav_backup_last_upload') ?? null,
     lastError:     cfgGet('webdav_backup_last_error')  ?? null,
-    envControlled: Boolean(ENV_URL), // true → URL comes from env, UI fields are read-only
+    // Dasselbe Kriterium wie getConfig(): nur eine nach dem Trimmen nicht-leere URL
+    // kommt aus der Umgebung. Boolean(ENV_URL) sperrte schon bei reinem Leerraum,
+    // obwohl getConfig() genau diesen Wert ignoriert und die DB-URL nimmt.
+    envControlled: envValue(ENV_URL) !== undefined, // true → URL comes from env, UI fields are read-only
   };
 }

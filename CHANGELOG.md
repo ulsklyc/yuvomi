@@ -115,6 +115,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A WebDAV backup URL made of whitespace no longer locks the backup settings.** A space or line
+  break in `WEBDAV_BACKUP_URL`, for example from `${WEBDAV_BACKUP_URL:- }` in a compose file, was
+  ignored as a URL but still marked the backup fields as set by the environment, so they could not be
+  edited in Settings. Both now use the same check: only a value that is not blank comes from the
+  environment.
+
 - **A modules folder set through `MODULES_DIR` in `.env` is found again.** `docker-compose.yml`,
   `podman-compose.yml` and the Podman Quadlet hand the `.env` to the container, and the app reads
   `MODULES_DIR` there as its own folder: an absolute host path in it pointed the app at a folder
