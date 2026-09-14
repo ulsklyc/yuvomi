@@ -295,12 +295,18 @@ function trapFocus(container, initialFocus = 'first-field') {
  * zurueckgibt. Der liegengebliebene Timer zog ihn danach ins erste Feld, und
  * nichts holte ihn zurueck. Er fokussiert deshalb nur noch, wenn das Ziel noch
  * haengt, das Modal nicht geparkt (`inert`) ist und seit dem Planen niemand den
- * Fokus woandershin gesetzt hat.
+ * Fokus im Modal oder in einer Oberflaeche darueber gewaehlt hat.
  *
- * "WOANDERSHIN", NICHT "INS MODAL" (Review zu #1193): der Datepicker oeffnet sein
- * Popover direkt unter `document.body` und fokussiert synchron hinein - ausserhalb
- * des Modals, ohne es inert zu machen. Eine Wache, die nur im Modal nachsieht,
- * haette den Fokus aus dem offenen Kalender zurueck ins erste Feld gerissen.
+ * "ODER DARUEBER" (Review zu #1193): der Datepicker oeffnet sein Popover direkt
+ * unter `document.body` und fokussiert synchron hinein - ausserhalb des Modals,
+ * ohne es inert zu machen. Eine Wache, die nur im Modal nachsieht, haette den
+ * Fokus aus dem offenen Kalender zurueck ins erste Feld gerissen.
+ *
+ * "DARUEBER", NICHT "IRGENDWO" (zweite Runde derselben Review): wer waehrend der
+ * Verzoegerung Tab drueckt, landet auf einem Element der Seite DAHINTER - die ist
+ * nicht inert, der Fokus-Trap haengt nur am Panel. Zaehlte das als Wahl, kaeme der
+ * Fokus nie in den Dialog, und der Trap griffe nie. Ein Seitenelement dahinter ist
+ * also so wenig eine Wahl wie ein auf body gefallener Fokus.
  */
 function applyInitialFocus(container, initialFocus) {
   if (initialFocus === 'none') return;
@@ -317,10 +323,13 @@ function applyInitialFocus(container, initialFocus) {
 function _focusInitialUnlessClaimed(container, target, beimPlanen) {
   if (!target.isConnected) return;
   if (container.closest?.('[inert]')) return;
-  // Ein auf body gefallener Fokus ist keine Wahl: der Ausloeser wurde weggerendert,
-  // und das Modal soll seinen Einstieg trotzdem bekommen.
   const jetzt = document.activeElement;
-  if (jetzt && jetzt !== beimPlanen && jetzt !== document.body) return;
+  // Gewaehlt ist nur ein Fokus im Modal selbst oder in einem Popover darueber.
+  // body (der Ausloeser wurde weggerendert) und die Seite dahinter (Tab waehrend
+  // der Verzoegerung) sind keine Wahl - das Modal bekommt seinen Einstieg trotzdem.
+  const gewaehlt = jetzt && jetzt !== beimPlanen
+    && (container.contains(jetzt) || Boolean(jetzt.closest?.('[popover]')));
+  if (gewaehlt) return;
   target.focus();
 }
 

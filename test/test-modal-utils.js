@@ -1097,8 +1097,13 @@ function erstfokusLage({ inert = false } = {}) {
   const geplant = [];
   global.setTimeout = (fn, ms) => { geplant.push({ fn, ms }); return geplant.length; };
   const imModal = new Set();
-  const knoten = (id, drinnen) => {
-    const n = { id, isConnected: true, focus() { global.document.activeElement = n; } };
+  const knoten = (id, drinnen, { popover = false } = {}) => {
+    const n = {
+      id,
+      isConnected: true,
+      closest: (sel) => (sel === '[popover]' && popover ? {} : null),
+      focus() { global.document.activeElement = n; },
+    };
     if (drinnen) imModal.add(n);
     return n;
   };
@@ -1203,11 +1208,28 @@ test('Erstfokus: ein Fokus in einem Popover ausserhalb des Modals bleibt stehen 
   try {
     global.document.activeElement = lage.knoten('ausloeser-draussen', false);
     modalTest.applyInitialFocus(lage.container, 'first-field');
-    const kalender = lage.knoten('ydp-popover-tag', false);
+    const kalender = lage.knoten('ydp-popover-tag', false, { popover: true });
     kalender.focus();
     lage.ausloesen();
     assert.equal(global.document.activeElement, kalender,
       'das Datepicker-Popover haengt unter body - der Erstfokus darf es trotzdem nicht verdraengen');
+  } finally {
+    lage.aufraeumen();
+  }
+});
+
+/* Zweite Runde der Review zu #1193: wer waehrend der Verzoegerung Tab drueckt,
+ * landet auf der Seite DAHINTER (nicht inert, der Trap haengt nur am Panel). Galt
+ * das als Wahl, kam der Fokus nie in den aria-modal-Dialog. */
+test('Erstfokus: ein Seitenelement hinter dem Modal ist keine Wahl, das erste Feld kommt trotzdem (#1156)', () => {
+  const lage = erstfokusLage();
+  try {
+    global.document.activeElement = lage.knoten('ausloeser-draussen', false);
+    modalTest.applyInitialFocus(lage.container, 'first-field');
+    lage.knoten('naechster-link-der-seite', false).focus();
+    lage.ausloesen();
+    assert.equal(global.document.activeElement, lage.feld,
+      'ein Tab in die Seite dahinter darf den Einstieg in den Dialog nicht verhindern');
   } finally {
     lage.aufraeumen();
   }

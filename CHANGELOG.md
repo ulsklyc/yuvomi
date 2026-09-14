@@ -241,7 +241,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that moment could arrive after you had already acted, for example after answering a save
   confirmation, which hands focus back to the Save button: focus then jumped to the first field
   instead, and nothing brought it back. The same could pull focus out of an open date picker. The
-  first field now only gets focus if focus has not moved anywhere else since the dialog opened.
+  first field now stays out of the way once focus has moved inside the dialog or into something on
+  top of it, such as a date picker; focus that lands on the page behind the dialog still moves in.
 
 ## [2.66.1] - 2026-09-14
 

@@ -456,6 +456,25 @@ test('der verspaetete Erstfokus nimmt dem fortgesetzten Speichern-Tor den Fokus 
       await new Promise((resolve) => setTimeout(resolve, 2000));
       return document.activeElement?.id;
     }), 'slow-title', 'ein auf body gefallener Fokus ist keine Wahl - das erste Feld bekommt ihn trotzdem');
+
+    // Tab waehrend der Verzoegerung landet auf der Seite DAHINTER (nicht inert, der
+    // Trap haengt nur am Panel). Das ist keine Wahl: der Fokus muss in den Dialog
+    // (zweite Runde der Review zu #1193).
+    await page.evaluate(() => {
+      window.slowGate.modal.closeModal({ force: true });
+      document.getElementById('slow-background')?.remove();
+      const background = document.createElement('button');
+      background.id = 'slow-background';
+      document.body.appendChild(background);
+    });
+    await openSlow('Slow editor, tab into the page behind');
+    assert.equal(await page.evaluate(async () => {
+      document.getElementById('slow-background').focus();
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const focus = document.activeElement?.id;
+      document.getElementById('slow-background').remove();
+      return focus;
+    }), 'slow-title', 'ein Seitenelement hinter dem Modal ist keine Wahl - der Fokus muss in den Dialog');
   } finally {
     await page.close();
   }
