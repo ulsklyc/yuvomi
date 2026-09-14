@@ -1487,3 +1487,163 @@ test('ein während des Patches gewählter und wieder verworfener Umzug verfällt
   assert.equal(row.outbound_move_to, null, 'gewählt ist der Kalender, in dem der Termin liegt');
   assert.equal(row.outbound_dirty, 0);
 });
+
+// ── Fehler, die nicht am Termin hängen ──────────────────────────────────────────
+// Vor Push und Umzug fragt der Lauf die Kalender-Metadaten ab (Schreibrecht, Zone).
+// Dieser Aufruf scheitert aus denselben Gründen wie jeder andere: Netz weg,
+// Token-Refresh, Ratenlimit. Ein solcher Fehler ist kein Kalender ohne Schreibrecht.
+// Verworfen, erreichte die Bearbeitung Google nie, und kein Inbound meldete es.
+
+function networkError() {
+  const err = new Error('getaddrinfo ENOTFOUND www.googleapis.com');
+  err.code = 'ENOTFOUND';
+  return err;
+}
+
+/** calendarList.get wirft für die genannten Kalender, die übrigen antworten normal. */
+function failMeta(calendar, ids, makeError) {
+  const originalGet = calendar.calendarList.get;
+  calendar.calendarList.get = async (params) => {
+    if (ids.includes(params.calendarId)) {
+      calendar.metaCalls.push(params.calendarId);
+      throw makeError();
+    }
+    return originalGet(params);
+  };
+  return calendar;
+}
+
+for (const [label, makeError] of [['503', () => apiError(503)], ['ohne HTTP-Status', networkError]]) {
+  test(`ein gescheiterter Metadaten-Abruf (${label}) lässt die Änderung vorgemerkt`, async () => {
+    reset();
+    const event = seedDirty({ title: 'Offline bearbeitet' }, `gev-meta-${label}`);
+
+    const calendar = failMeta(fakeCalendar({ calendars: writableCalendars() }), ['primary'], makeError);
+    assert.equal(await __test.processPendingUpdates(calendar, {}), 0);
+
+    assert.equal(calendar.patches.length, 0);
+    const row = reload(event.id);
+    assert.equal(row.outbound_dirty, 1, 'die Bearbeitung hat Google nicht erreicht');
+    assert.equal(row.outbound_attempts, 1);
+
+    const next = fakeCalendar({ calendars: writableCalendars() });
+    assert.equal(await __test.processPendingUpdates(next, {}), 1);
+    assert.equal(next.patches[0].requestBody.summary, 'Offline bearbeitet');
+    assert.equal(reload(event.id).outbound_dirty, 0);
+  });
+}
+
+test('ein dauerhaft scheiternder Metadaten-Abruf gibt nach MAX_OUTBOUND_ATTEMPTS auf', async () => {
+  reset();
+  const event = seedDirty({ title: 'Nie erreichbar' }, 'gev-meta-dead');
+
+  const calendar = failMeta(fakeCalendar({ calendars: writableCalendars() }), ['primary'], () => apiError(503));
+  for (let i = 0; i < __test.MAX_OUTBOUND_ATTEMPTS - 1; i++) {
+    await __test.processPendingUpdates(calendar, {});
+  }
+  assert.equal(reload(event.id).outbound_dirty, 1, 'Vorbedingung: bis zum letzten Versuch bleibt sie stehen');
+
+  await __test.processPendingUpdates(calendar, {});
+  assert.equal(calendar.patches.length, 0);
+  assert.equal(reload(event.id).outbound_dirty, 0);
+});
+
+test('ein gescheiterter Abruf des Zielkalenders lässt den Umzug vorgemerkt und patcht nicht in der Quelle', async () => {
+  reset();
+  const { before } = seedMove('primary', 'fam@g', 'gev-dest-meta');
+  db.prepare("UPDATE calendar_events SET title = 'Umzug mit Umbenennung' WHERE id = ?").run(before.id);
+  __test.markEventOutbound(before, reload(before.id));
+
+  const calendar = failMeta(
+    fakeCalendar({ calendars: writableCalendars(['primary', 'fam@g']) }), ['fam@g'], () => apiError(503),
+  );
+  assert.equal(await __test.processPendingUpdates(calendar, {}), 0);
+
+  assert.equal(calendar.moves.length, 0);
+  assert.equal(calendar.patches.length, 0, 'sonst stünde die Änderung im falschen Kalender');
+  const row = reload(before.id);
+  assert.equal(row.outbound_move_to, 'fam@g', 'der nächste Lauf versucht den Umzug erneut');
+  assert.equal(row.outbound_dirty, 1);
+  assert.equal(row.outbound_attempts, 1);
+  assert.equal(__test.currentGoogleCalendarId(row), 'primary');
+});
+
+test('ein während des Zielabrufs gewähltes Ziel fällt nicht mit dem unschreibbaren', async () => {
+  // fam@g ist nur lesbar, die Vormerkung dorthin fällt zu Recht. work@g kam während
+  // des Abrufs dazu und ist ein anderer Umzug.
+  reset();
+  const event = seedMirrored('gev-dest-reader-retarget');
+  await put(event.id, { target_google_calendar_id: 'fam@g' });
+
+  const calendar = fakeCalendar({
+    calendars: {
+      ...writableCalendars(['primary', 'work@g']),
+      ...writableCalendars(['fam@g'], { accessRole: 'reader' }),
+    },
+  });
+  const originalGet = calendar.calendarList.get;
+  calendar.calendarList.get = async (params) => {
+    if (params.calendarId === 'fam@g') await put(event.id, { target_google_calendar_id: 'work@g' });
+    return originalGet(params);
+  };
+  await __test.processPendingUpdates(calendar, {});
+
+  assert.equal(calendar.moves.length, 0);
+  const row = reload(event.id);
+  assert.equal(__test.currentGoogleCalendarId(row), 'primary');
+  assert.equal(row.outbound_move_to, 'work@g', 'der zuletzt gewählte Kalender steht weiter an');
+});
+
+test('ein während des scheiternden Umzugs gewähltes Ziel fällt nicht mit ihm', async () => {
+  // Google lehnt den Umzug nach fam@g ab (400, aufgeben). Während des Aufrufs hat der
+  // Nutzer work@g gewählt - das ist ein neuer Umzug, kein Teil des abgelehnten.
+  reset();
+  const event = seedMirrored('gev-move-fail-retarget');
+  await put(event.id, { target_google_calendar_id: 'fam@g' });
+
+  const calendar = fakeCalendar({
+    calendars: writableCalendars(['primary', 'fam@g', 'work@g']),
+    onMove: async () => {
+      await put(event.id, { target_google_calendar_id: 'work@g' });
+      throw apiError(400);
+    },
+  });
+  await __test.processPendingUpdates(calendar, {});
+
+  let row = reload(event.id);
+  assert.equal(__test.currentGoogleCalendarId(row), 'primary');
+  assert.equal(row.outbound_move_to, 'work@g', 'der zuletzt gewählte Kalender steht weiter an');
+
+  const next = fakeCalendar({ calendars: writableCalendars(['primary', 'fam@g', 'work@g']) });
+  assert.equal(await __test.processPendingUpdates(next, {}), 1);
+  assert.deepEqual(next.moves, [{ calendarId: 'primary', eventId: 'gev-move-fail-retarget', destination: 'work@g' }]);
+  row = reload(event.id);
+  assert.equal(__test.currentGoogleCalendarId(row), 'work@g');
+  assert.equal(row.outbound_move_to, null);
+});
+
+test('eine Bearbeitung während des scheiternden Umzugs gibt ihm seine Versuche zurück', async () => {
+  // Das Gegenstück zum scheiternden Patch nach dem Umzug: der Umzug stand auf seinem
+  // letzten Versuch, die Bearbeitung setzt den Zähler zurück. Aufgegeben wird nach
+  // dem Zähler, der jetzt gilt, nicht nach dem aus der Auswahl.
+  reset();
+  const event = seedMirrored('gev-move-fail-budget');
+  await put(event.id, { target_google_calendar_id: 'fam@g' });
+  db.prepare('UPDATE calendar_events SET outbound_attempts = ? WHERE id = ?')
+    .run(__test.MAX_OUTBOUND_ATTEMPTS - 1, event.id);
+
+  const calendar = fakeCalendar({
+    calendars: writableCalendars(['primary', 'fam@g']),
+    onMove: async () => {
+      await put(event.id, { title: 'Unterwegs umbenannt' });
+      throw apiError(503);
+    },
+  });
+  await __test.processPendingUpdates(calendar, {});
+
+  assert.equal(calendar.patches.length, 0);
+  const row = reload(event.id);
+  assert.equal(row.outbound_move_to, 'fam@g', 'der Umzug hat nach der Bearbeitung wieder Versuche');
+  assert.equal(row.outbound_dirty, 1);
+  assert.equal(row.outbound_attempts, 1);
+});

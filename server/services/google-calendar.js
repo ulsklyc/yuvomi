@@ -119,7 +119,7 @@ function isConnected() {
  * Inbound braucht Name/Farbe, Outbound Rolle/Zeitzone - beides steckt in
  * derselben calendarList.get-Antwort.
  * @returns {Promise<{role:string|null,timeZone:string|null,name:string,color:string,refId:number}|null>}
- *          null, wenn der Kalender nicht (mehr) zugänglich ist.
+ *          null, wenn der Abruf gescheitert ist - warum, sagt metaFailure().
  */
 async function loadCalendarMeta(calendar, calendarId, cache) {
   if (cache.has(calendarId)) return cache.get(calendarId);
@@ -137,9 +137,22 @@ async function loadCalendarMeta(calendar, calendarId, cache) {
     };
   } catch (err) {
     log.warn(`Calendar metadata is not accessible (${calendarId}):`, err.message);
+    let failures = metaFailures.get(cache);
+    if (!failures) metaFailures.set(cache, failures = new Map());
+    failures.set(calendarId, err);
   }
   cache.set(calendarId, info);
   return info;
+}
+
+// Ein null im Cache sagt nicht, ob der Kalender weg ist oder nur das Netz. Der Grund
+// hängt deshalb am Cache selbst: er lebt so lange wie der Lauf, der ihn gecacht hat,
+// und jeder spätere Treffer im selben Lauf findet ihn.
+const metaFailures = new WeakMap();
+
+/** Der Fehler, an dem der Metadaten-Abruf für calendarId in diesem Lauf scheiterte. */
+function metaFailure(cache, calendarId) {
+  return metaFailures.get(cache)?.get(calendarId) ?? null;
 }
 
 /**
@@ -232,6 +245,21 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
   const handleError = (err, event, what, giveUp) =>
     outbound.handleUpdateError(err, event, what, 'Google', giveUp);
 
+  // Ein gescheiterter Metadaten-Abruf ist kein Kalender ohne Schreibrecht:
+  // calendarList.get scheitert auch an Netz, Token-Refresh oder Ratenlimit. Eine
+  // deshalb verworfene Vormerkung erreichte Google nie, und kein Inbound brächte den
+  // Unterschied zurück. Es gilt dieselbe Regel wie für einen gescheiterten Aufruf:
+  // verworfen wird nur bei 404/410 (nicht mehr zugänglich), 400 oder verbrauchten
+  // Versuchen. `now` ist der nachgeladene Stand, dessen Zähler gilt.
+  // @returns {boolean} true, wenn der Termin auf den nächsten Lauf wartet
+  const waitsForMeta = (now, calendarId) => {
+    const err = metaFailure(metaCache, calendarId);
+    if (!err || outbound.outboundFailureAction(err, now.outbound_attempts) !== 'retry') return false;
+    outbound.failOutbound(now.id);
+    log.warn(`Calendar metadata for ${calendarId} is unavailable, outbound work for event ${now.id} stays queued (attempt ${now.outbound_attempts + 1}):`, err.message);
+    return true;
+  };
+
   let done = 0;
   for (const event of events) {
     let calendarId = googleCalendarIdForEvent(event);
@@ -244,6 +272,9 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
 
     const meta = await loadCalendarMeta(calendar, calendarId, metaCache);
     if (!isWritableRole(meta?.role ?? null)) {
+      const now = outbound.reloadEvent(event.id);
+      if (!now) continue; // parallel gelöscht - der Tombstone-Pfad übernimmt
+      if (!meta && waitsForMeta(now, calendarId)) continue;
       log.warn(`Calendar ${calendarId} has no writable role (role=${meta?.role ?? null}), skipping outbound work for event ${event.id}.`);
       clear(event.id);
       continue;
@@ -258,10 +289,18 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
     if (moveTo && moveTo !== calendarId) {
       const destMeta = await loadCalendarMeta(calendar, moveTo, metaCache);
       if (!isWritableRole(destMeta?.role ?? null)) {
-        // Der Zielkalender bleibt unangetastet: nur die Vormerkung fällt weg,
-        // der Termin bleibt in Google, wo er ist.
-        log.warn(`Destination calendar ${moveTo} has no writable role (role=${destMeta?.role ?? null}), keeping event ${event.id} in ${calendarId}.`);
-        clearMove(event.id);
+        const now = outbound.reloadEvent(event.id);
+        if (!now) continue; // parallel gelöscht - der Tombstone-Pfad übernimmt
+        // Während des Abrufs anders gewählt: das Urteil über dieses Ziel betrifft
+        // den neuen Umzug nicht, über ihn entscheidet der nächste Lauf.
+        if (now.outbound_move_to === moveTo) {
+          // Wie ein gescheiterter Umzug: nicht im alten Kalender patchen.
+          if (!destMeta && waitsForMeta(now, moveTo)) continue;
+          // Der Zielkalender bleibt unangetastet: nur die Vormerkung fällt weg,
+          // der Termin bleibt in Google, wo er ist.
+          log.warn(`Destination calendar ${moveTo} has no writable role (role=${destMeta?.role ?? null}), keeping event ${event.id} in ${calendarId}.`);
+          clearMove(event.id);
+        }
       } else {
         try {
           const moved = await calendar.events.move({
@@ -279,7 +318,11 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
           // hier abbrechen, statt im alten Kalender zu patchen. Wird der Umzug
           // aufgegeben, bleibt eine vorgemerkte Feldänderung für den nächsten
           // Lauf bestehen.
-          handleError(err, event, 'move', clearMove);
+          // Geurteilt wird am nachgeladenen Stand: eine Bearbeitung während des
+          // Aufrufs hat den Zähler zurückgesetzt, und ein inzwischen anders
+          // gewähltes Ziel ist ein neuer Umzug, der mit diesem nicht fallen darf.
+          const now = outbound.reloadEvent(event.id);
+          if (now?.outbound_move_to === moveTo) handleError(err, now, 'move', clearMove);
           continue;
         }
       }

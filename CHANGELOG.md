@@ -115,6 +115,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A Google Calendar change made while the connection is down now reaches Google once it is
+  back.** Before pushing an edit or moving an event to another calendar, Yuvomi asks Google for that
+  calendar's details. When that request failed for a passing reason, such as no network, a token
+  refresh or a rate limit, the change was handled like one for a read-only calendar and dropped: it
+  never reached Google, and nothing said so. It now waits for the next sync and is only given up
+  after the usual five attempts, or when Google reports the calendar as gone. A different calendar
+  picked while a move is still under way is also no longer discarded when Google rejects that move.
+
 - **A WebDAV backup URL made of whitespace no longer locks the backup settings.** A space or line
   break in `WEBDAV_BACKUP_URL`, for example from `${WEBDAV_BACKUP_URL:- }` in a compose file, was
   ignored as a URL but still marked the backup fields as set by the environment, so they could not be
