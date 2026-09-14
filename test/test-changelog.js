@@ -550,6 +550,18 @@ function releasedSectionDrift(headText, referenceText, referenceVersion, edits =
     if (edits[version] === hash) continue;
     offenders.push({ version, hash, detail: firstDifference(section, published.get(version)) });
   }
+  // Zwei vertauschte Bloecke behalten jeder seinen Text, die Datei liest sich trotzdem
+  // anders: der Rueckfall (parseChangelogFile) nimmt die Releases von oben (PR #1183).
+  // Verglichen wird nur, was auf beiden Seiten steht - eine Loeschung meldet die Schleife.
+  const order = (sections, other) => [...sections.keys()]
+    .filter((v) => other.has(v) && compareVersions(v, referenceVersion) <= 0);
+  const now = order(current, published);
+  const then = order(published, current);
+  const at = now.findIndex((v, i) => v !== then[i]);
+  if (at >= 0) {
+    offenders.push({ version: now[at], hash: null,
+      detail: `Reihenfolge: an Stelle ${at + 1} steht jetzt ${now[at]}, am Tag ${then[at]}` });
+  }
   return { offenders, checked };
 }
 
@@ -590,7 +602,7 @@ test('veroeffentlichte CHANGELOG-Abschnitte stehen noch so da wie am Tag', (t) =
     'Ein neuer Eintrag gehoert unter [Unreleased]. Nach einem Rebase auf ein neues Release mischt git',
     'ihn gern in den gerade veroeffentlichten Abschnitt - dann dorthin zurueckschieben. Ist die Aenderung',
     'Absicht (ein Nachtrag), den Abschnitt in RELEASED_SECTION_EDITS (test/test-changelog.js) eintragen:',
-    ...offenders.map((o) => `  '${o.version}': '${o.hash}',`),
+    ...offenders.filter((o) => o.hash).map((o) => `  '${o.version}': '${o.hash}',`),
   ].join('\n'));
 });
 
@@ -629,6 +641,14 @@ test('der Abschnitts-Guard erkennt einen Eintrag im veroeffentlichten Abschnitt'
   const renamed = SAMPLE_CHANGELOG.replace('## [1.2.0] - 2026-01-01', '## 1.2.0 - 2026-01-01');
   assert.notEqual(renamed, SAMPLE_CHANGELOG);
   assert.deepEqual(releasedSectionDrift(renamed, SAMPLE_CHANGELOG, '1.2.1').offenders.map((o) => o.version), ['1.2.1', '1.2.0']);
+
+  // Zwei Bloecke unveraendert vertauscht: jeder Text stimmt, die Reihenfolge nicht.
+  const b121 = '## [1.2.1] - 2026-01-02\n\n### Fixed\n\n- Ein Fehler weniger\n';
+  const b120 = '## [1.2.0] - 2026-01-01\n\n### Added\n\n- Ein Modul mehr\n';
+  const swapped = SAMPLE_CHANGELOG.replace(`${b121}\n${b120}`, `${b120}\n${b121}`);
+  assert.notEqual(swapped, SAMPLE_CHANGELOG);
+  assert.deepEqual(releasedSectionDrift(swapped, SAMPLE_CHANGELOG, '1.2.1').offenders.map((o) => [o.version, o.detail]),
+    [['1.2.0', 'Reihenfolge: an Stelle 1 steht jetzt 1.2.0, am Tag 1.2.1']]);
 });
 
 test('der Release-Commit selbst ist fuer den Abschnitts-Guard kein Fund', () => {

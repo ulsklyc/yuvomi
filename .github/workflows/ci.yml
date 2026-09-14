@@ -42,17 +42,21 @@ jobs:
           fetch-depth: 2
       # Der Checkout bringt keine Tags mit, test:changelog vergleicht aber die
       # veroeffentlichten CHANGELOG-Abschnitte mit dem Tag des neuesten Abschnitts
-      # (warum einer reicht, steht am Guard). Die Version kommt aus HEAD^1, dem main-Stand,
-      # und nicht aus der Datei, die geprueft wird: benennt ein PR die neueste Ueberschrift
-      # um, holte der Step sonst einen aelteren Tag, und die Umbenennung fiele durch (PR
-      # #1183). So steht der Tag von main ohne Ueberschrift da, und der Paritaets-Test wird
-      # rot. Der zweitneueste Abschnitt ist der Rueckfall fuer den Push des Release-Commits,
-      # dessen Tag erst danach kommt. depth 2 und nicht 1: zeigt der Tag auf HEAD selbst,
-      # macht --depth=1 HEAD flach, HEAD^1 verschwindet und test:migrations-append-only
-      # wird rot (am 13.9.2026 in einem Klon nachgestellt).
+      # (warum einer reicht, steht am Guard). Die Version kommt aus main, nicht aus der
+      # Datei, die geprueft wird: benennt ein PR die neueste Ueberschrift um, holte der
+      # Step sonst einen aelteren Tag, und die Umbenennung fiele durch. So steht der Tag
+      # von main ohne Ueberschrift da, und der Paritaets-Test wird rot. Und nicht HEAD^1:
+      # bei workflow_dispatch ist das der Elternteil im Zweig, nach einem Merge von main
+      # in einen alten Zweig also der alte Stand (beides aus dem Review von PR #1183).
+      # Ein Zweig hinter einem Release wird damit rot wie jeder lokale Lauf mit allen
+      # Tags. Der zweitneueste Abschnitt ist der Rueckfall fuer den Push des
+      # Release-Commits, dessen Tag erst danach kommt. depth 2 und nicht 1, fuer main wie
+      # fuer den Tag: zeigt der Ref auf HEAD selbst, macht --depth=1 HEAD flach, HEAD^1
+      # verschwindet und test:migrations-append-only wird rot (in einem Klon nachgestellt).
       - name: Fetch the release tag of the newest CHANGELOG section
         run: |
-          for version in $(git show HEAD^1:CHANGELOG.md | grep -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' | head -n 2 | tr -d '#[] '); do
+          git fetch --no-tags --depth=2 origin +refs/heads/main:refs/remotes/origin/main
+          for version in $(git show refs/remotes/origin/main:CHANGELOG.md | grep -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' | head -n 2 | tr -d '#[] '); do
             if git fetch --no-tags --depth=2 origin "+refs/tags/v${version}:refs/tags/v${version}"; then
               exit 0
             fi
