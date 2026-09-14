@@ -255,8 +255,10 @@ How long that line holds: before an operation under `/api/v1` changes or goes aw
 
 ## Docker / Podman
 
-The default `docker-compose.yml` mounts `${MODULES_DIR:-./modules}` to `/app/modules`. To keep modules outside the Yuvomi checkout, set `MODULES_DIR=/absolute/path/to/yuvomi-modules` in `.env` and restart the compose service. New or changed module folders are scanned at runtime; rebuilding the image is not required.
+The default `docker-compose.yml` mounts `${MODULES_DIR:-./modules}` to `/app/modules`. To keep modules outside the Yuvomi checkout, set `MODULES_DIR=/absolute/path/to/yuvomi-modules` in `.env` and restart the compose service. The compose file pins `MODULES_DIR` to `/app/modules` inside the container, so the value in `.env` only moves the host folder. New or changed module folders are scanned at runtime; rebuilding the image is not required.
 
 On Podman (RHEL/Fedora/CentOS Stream) use `podman-compose.yml` instead — it mounts the same `/app/modules` path with the SELinux `:Z` relabel so the rootless container can read your modules.
 
 On Portainer the stack mounts a named volume (`oikos_modules`) at `/app/modules`, since a Portainer deployment has no repository checkout to bind-mount from. Copy module folders into that volume (for example via `docker cp` into the running container, or a temporary container mounting the volume); a bind mount to a host path works too if you edit the stack.
+
+Unraid (the template's *Modules* path, `/mnt/user/appdata/yuvomi/modules` by default), TrueNAS (the *Modules Storage* entry) and the Podman Quadlet (`~/.local/share/oikos/modules`) mount `/app/modules` as well. **Umbrel is the exception:** its store package mounts no modules folder, so third-party modules are not available there. A module copied into the running container would sit in the container layer and be gone on the next update.

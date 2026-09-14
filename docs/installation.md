@@ -383,6 +383,8 @@ Launch Yuvomi from your Umbrel home screen. The first visit guides you through c
 
 > **Finish setup right away.** When Umbrel's reverse-proxy authentication is disabled, the unauthenticated first-run setup endpoint is reachable on your LAN until you create the admin account. Complete the first-run setup immediately after installing.
 
+> **No third-party modules on Umbrel.** The store package mounts no modules folder, so the drop-in [modules](../MODULES.md) are not available on this path. Every other install option supports them.
+
 ---
 
 ### Option F — Unraid (Community Apps)
