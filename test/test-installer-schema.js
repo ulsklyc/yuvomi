@@ -939,8 +939,10 @@ test('kein Deploy-Descriptor gibt einem UI-sperrenden Schlüssel einen nicht-lee
     for (const key of keys) {
       // ${KEY:-<default>} - alles ausser sofort schliessender Klammer ist ein Wert.
       for (const m of src.matchAll(new RegExp(`\\$\\{${key}:-([^}]*)\\}`, 'g'))) {
-        // ROH, nicht getrimmt: ein `${WEBDAV_BACKUP_URL:- }` setzt ein Leerzeichen, und
-        // backup-webdav.js sperrt schon daran (envControlled: Boolean(ENV_URL)).
+        // ROH, nicht getrimmt: die Regel ist ein LEERER Default. Die Services trimmen
+        // heute alle, bevor sie sperren - backup-webdav.js erst seit #1199, davor sperrte
+        // dort schon ein Leerzeichen. Ein Guard, der sich auf dieses Trimmen verlaesst,
+        // wird still wirkungslos, sobald ein Service es vergisst; gewollt ist Leerraum hier nie.
         if (m[1] === '') continue;
         offenders.push(`${file.replace(/^\.\.\//, '')}: ${key} defaultet auf ${JSON.stringify(m[1])}`);
       }
@@ -1052,8 +1054,9 @@ test('die Unraid-Vorlage gibt keinem UI-sperrenden Schlüssel einen Wert vor', (
     // Path oder Port ist fuer Unraid-Nutzer nicht setzbar und gilt als fehlend.
     if (map.Type !== 'Variable') continue;
     declared.add(target);
-    // ROH vergleichen, nicht getrimmt: backup-webdav.js sperrt schon bei einem
-    // Leerzeichen (envControlled: Boolean(ENV_URL)), obwohl getConfig() es ignoriert.
+    // ROH vergleichen, nicht getrimmt - dieselbe Regel wie im Compose-Test oben: leer heisst
+    // leer. Dass die Services Leerraum heute beim Sperren ignorieren (backup-webdav.js erst
+    // seit #1199), ist kein Grund, ihn in der Vorlage zu dulden.
     const def = map.Default ?? '';
     if (def !== '') offenders.push(`${target}: Default=${JSON.stringify(def)}`);
     if (text !== '') offenders.push(`${target}: Wert ${JSON.stringify(text)}`);
