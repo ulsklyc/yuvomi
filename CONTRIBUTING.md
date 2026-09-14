@@ -401,7 +401,7 @@ Otherwise: user-oriented language, and `-` rather than `—` or `–`. An entry 
 
 ## Release cadence
 
-Yuvomi releases on two tracks. The rule exists because of [#496](https://github.com/ulsklyc/yuvomi/discussions/496): between 13 August and 2 September 2026 there were 92 releases across 19 active days, and **72 of them changed the interface** - roughly three and a half times a day. The complaint was never "too many tags". It was that somebody learning the app watched it move while they were still learning it.
+Yuvomi releases on two tracks. The rule exists because of [#496](https://github.com/ulsklyc/yuvomi/discussions/496): between 13 August and 2 September 2026 there were 92 releases across 19 active days, and **75 of them changed the interface** - roughly three and a half times a day. The complaint was never "too many tags". It was that somebody learning the app watched it move while they were still learning it.
 
 So the limit is on the interface, not on the release count:
 

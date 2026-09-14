@@ -5,11 +5,11 @@
  * Abhaengigkeiten: git im PATH, vollstaendiges Klon mit Tags
  *
  * Die Regel kommt aus #496 und #850. Gemessen am 02.09.2026 fuer den 13.08. bis
- * 02.09. (21 Kalendertage): 92 Releases an 19 aktiven Tagen, und 72 davon
- * fassten public/pages, styles, utils oder components an - rund 3,4-mal pro
- * Kalendertag, 3,8-mal pro aktivem Tag. Mit public/settings, das dieser Guard
- * ebenfalls zur Oberflaeche zaehlt, sind es 75 (nachgezaehlt am 14.09.2026,
- * Vorgaenger je Tag chronologisch). Der Einwand war nie "zu viele Tags", sondern "sie lernt eine Funktion,
+ * 02.09. (21 Kalendertage): 92 Releases an 19 aktiven Tagen, und 75 davon
+ * fassten die Oberflaeche im Sinne der UI_PREFIXES unten an - rund 3,6-mal pro
+ * Kalendertag, knapp 4-mal pro aktivem Tag. Die erste Zaehlung nannte 72, weil
+ * sie public/settings ausliess (nachgezaehlt am 14.09.2026, Vorgaenger je Tag
+ * chronologisch). Der Einwand war nie "zu viele Tags", sondern "sie lernt eine Funktion,
  * waehrend sie sich aendert". Deshalb zielt die Regel auf die Oberflaeche und
  * nicht auf die Release-Zahl:
  *
