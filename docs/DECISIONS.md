@@ -337,9 +337,9 @@ That request is open and welcome; it is about calendar events, which do carry as
 member. What this entry rules out is not a person-first view, but putting one module's data
 into another module's page to get one.
 
-The rule was reached a third time in September 2026, from household chores. #736 asked for a
+The rule was reached a fourth time in September 2026, from household chores. #736 asked for a
 cleaning plan for households without a cleaning helper, and @Kyrodan's daily routines, in the
-same thread and in #913, asked for chores that reset, credit the person who did them and stay
+same thread and in his wall-display vision in #913, asked for chores that reset, credit the person who did them and stay
 out of the calendar. Yuvomi already had two answers to "do this again some days after it was
 last done": the Housekeeping decay tasks (`frequency_days` counted from `last_completed`) and
 tasks with `recurrence_from_completion`. It is the same arithmetic, and only the task side
