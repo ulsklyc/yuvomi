@@ -28,10 +28,8 @@ evening (#777), and a person's own calendar rather than the household's (#739, #
   #1007, #913 and #787. Being visible as a person is a property, not a relationship.
 - **Open.** The explicit "can sign in" state with its migration; the Family page adding a
   person with a login as an option; the one predicate replacing the three module-local answers
-  (the first step, and the one without behaviour change). For the display account, #913 has
-  two questions still with the maintainer: may it act at all, and does it authenticate like an
-  account or like a provisioned device. For personal calendar connections, the missing piece
-  is an owner on the connection (#739).
+  (the first step, and the one without behaviour change, #1207). For personal calendar
+  connections, the missing piece is an owner on the connection (#739).
 
 ## Private by default, in one vocabulary
 
@@ -83,9 +81,12 @@ dashboard (#885), calendar names instead of "event" (#988), themes from design-t
 
 - **Decided.** No switch whose only job is to hide one button: the entry into wall mode is
   always visible, shipped in v2.60.0 that way on purpose (#915). Colours first for themes,
-  fonts as a separate feature (#972).
-- **Open.** Configurable widgets on the wall, the expensive half of #915; the display
-  account's two questions.
+  fonts as a separate feature (#972). The display account (#913) may act, but only for a
+  person chosen on the device and only to tick off tasks and request redemptions; it signs in
+  as a device an admin pairs, never with a password.
+- **Open.** Configurable widgets on the wall, the expensive half of #915; the display account
+  in three steps after "who did it" on tasks (#1205): one member predicate (#1207), the paired
+  display (#1208), its two actions (#1209).
 
 ## A different week
 
