@@ -961,8 +961,14 @@ test('kein Deploy-Descriptor gibt einem UI-sperrenden Schlüssel einen nicht-lee
 // genau diese sieben Schluessel, je mit Default und mit Wert.
 test('die Unraid-Vorlage gibt keinem UI-sperrenden Schlüssel einen Wert vor', () => {
   const keys = uiLockingEnvKeys();
-  const xml = readFileSync(new URL('../templates/yuvomi.xml', import.meta.url), 'utf8');
+  // Auskommentierte Eintraege gibt es fuer Unraid nicht - sie duerfen weder als
+  // deklariert zaehlen noch in die Paritaetspruefung unten eingehen.
+  const xml = readFileSync(new URL('../templates/yuvomi.xml', import.meta.url), 'utf8')
+    .replace(/<!--[\s\S]*?-->/g, '');
   const configs = [...xml.matchAll(/<Config\b([^>]*?)(?:\/>|>([^<]*)<\/Config>)/g)];
+  // Gueltiges XML erlaubt Leerraum um "=" und beide Anfuehrungszeichen. Ein Matcher,
+  // der nur Name="..." kennt, liest Default = '587' als "kein Default".
+  const attr = (attrs, name) => attrs.match(new RegExp(`\\b${name}\\s*=\\s*(["'])(.*?)\\1`))?.[2];
 
   // Liest das Muster nicht jeden Eintrag, fehlt ein Teil der Pruefung still.
   assert.equal(configs.length, (xml.match(/<Config\b/g) || []).length,
@@ -971,10 +977,13 @@ test('die Unraid-Vorlage gibt keinem UI-sperrenden Schlüssel einen Wert vor', (
   const declared = new Set();
   const offenders = [];
   for (const [, attrs, text = ''] of configs) {
-    const target = attrs.match(/\bTarget="([^"]*)"/)?.[1];
+    const target = attr(attrs, 'Target');
     if (!keys.includes(target)) continue;
+    // Nur ein Variable-Eintrag wird zur Umgebungsvariable; derselbe Target als
+    // Path oder Port ist fuer Unraid-Nutzer nicht setzbar und gilt als fehlend.
+    if (attr(attrs, 'Type') !== 'Variable') continue;
     declared.add(target);
-    const def = attrs.match(/\bDefault="([^"]*)"/)?.[1] ?? '';
+    const def = attr(attrs, 'Default') ?? '';
     if (def.trim() !== '') offenders.push(`${target}: Default="${def}"`);
     if (text.trim() !== '') offenders.push(`${target}: Wert "${text.trim()}"`);
   }
