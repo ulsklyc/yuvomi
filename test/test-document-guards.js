@@ -422,6 +422,40 @@ test('der verspaetete Erstfokus nimmt dem fortgesetzten Speichern-Tor den Fokus 
       await new Promise((resolve) => setTimeout(resolve, 2000));
       return document.activeElement?.id;
     }), 'slow-title', 'ohne spaeter gewaehlten Fokus landet der Erstfokus wie bisher im ersten Feld');
+
+    // Wie das Datepicker-Popover: ein Fokusziel direkt unter body, AUSSERHALB des
+    // Modals, ohne dass das Modal inert wird (Befund aus der claude-review zu #1193).
+    await page.evaluate(() => window.slowGate.modal.closeModal({ force: true }));
+    await openSlow('Slow editor with a popover');
+    assert.equal(await page.evaluate(async () => {
+      const popover = document.createElement('div');
+      popover.id = 'slow-popover';
+      popover.setAttribute('popover', 'manual');
+      popover.tabIndex = -1;
+      document.body.appendChild(popover);
+      popover.showPopover?.();
+      popover.focus();
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const focus = document.activeElement?.id;
+      popover.remove();
+      return focus;
+    }), 'slow-popover', 'der Erstfokus-Timer darf den Fokus nicht aus einem Popover unter body ziehen');
+
+    // Faellt der Fokus nur auf body, weil der Ausloeser weggerendert wurde, ist
+    // das keine Wahl: das Modal bekommt seinen Erstfokus trotzdem.
+    await page.evaluate(() => window.slowGate.modal.closeModal({ force: true }));
+    await page.evaluate(() => {
+      const trigger = document.createElement('button');
+      trigger.id = 'slow-trigger';
+      document.body.appendChild(trigger);
+      trigger.focus();
+    });
+    await openSlow('Slow editor over a re-rendered list');
+    assert.equal(await page.evaluate(async () => {
+      document.getElementById('slow-trigger')?.remove();
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return document.activeElement?.id;
+    }), 'slow-title', 'ein auf body gefallener Fokus ist keine Wahl - das erste Feld bekommt ihn trotzdem');
   } finally {
     await page.close();
   }

@@ -1092,7 +1092,8 @@ test('Sheet-Swipe: ein begonnener Zug bleibt verfolgt und setzt das Panel einmal
  * zog der liegengebliebene Erstfokus ihn ins erste Feld. Der Timer wird hier
  * abgefangen und von Hand ausgeloest; gemessen wird, wo der Fokus danach steht. */
 function erstfokusLage({ inert = false } = {}) {
-  const vorher = { active: global.document.activeElement, setTimeout: global.setTimeout };
+  const vorher = { active: global.document.activeElement, setTimeout: global.setTimeout, body: global.document.body };
+  global.document.body = { id: 'BODY' };
   const geplant = [];
   global.setTimeout = (fn, ms) => { geplant.push({ fn, ms }); return geplant.length; };
   const imModal = new Set();
@@ -1113,6 +1114,7 @@ function erstfokusLage({ inert = false } = {}) {
     aufraeumen: () => {
       global.setTimeout = vorher.setTimeout;
       global.document.activeElement = vorher.active;
+      global.document.body = vorher.body;
     },
   };
 }
@@ -1188,6 +1190,39 @@ test('Erstfokus: ein ausdrueckliches Ziel traegt dieselbe Wache, "none" plant ni
 
     modalTest.applyInitialFocus(lage.container, 'none');
     assert.equal(lage.geplant.length, 0, 'bei "none" setzt der Aufrufer den Fokus selbst');
+  } finally {
+    lage.aufraeumen();
+  }
+});
+
+/* Review zu #1193: der Datepicker oeffnet sein Popover unter document.body und
+ * fokussiert synchron hinein - AUSSERHALB des Modal-Containers. Eine Wache, die
+ * nur im Modal nachsieht, riss den Fokus aus dem offenen Kalender. */
+test('Erstfokus: ein Fokus in einem Popover ausserhalb des Modals bleibt stehen (#1156)', () => {
+  const lage = erstfokusLage();
+  try {
+    global.document.activeElement = lage.knoten('ausloeser-draussen', false);
+    modalTest.applyInitialFocus(lage.container, 'first-field');
+    const kalender = lage.knoten('ydp-popover-tag', false);
+    kalender.focus();
+    lage.ausloesen();
+    assert.equal(global.document.activeElement, kalender,
+      'das Datepicker-Popover haengt unter body - der Erstfokus darf es trotzdem nicht verdraengen');
+  } finally {
+    lage.aufraeumen();
+  }
+});
+
+test('Erstfokus: ein auf body gefallener Fokus ist keine Wahl, das erste Feld kommt trotzdem (#1156)', () => {
+  const lage = erstfokusLage();
+  try {
+    global.document.activeElement = lage.knoten('listenzeile', false);
+    modalTest.applyInitialFocus(lage.container, 'first-field');
+    // Die Seite rendert die Liste neu, die Zeile ist weg, der Fokus faellt auf body.
+    global.document.activeElement = global.document.body;
+    lage.ausloesen();
+    assert.equal(global.document.activeElement, lage.feld,
+      'ohne diese Ausnahme bekaeme ein Modal ueber einer neu gerenderten Liste gar keinen Fokus');
   } finally {
     lage.aufraeumen();
   }

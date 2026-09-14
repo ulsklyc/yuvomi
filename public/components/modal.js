@@ -294,8 +294,13 @@ function trapFocus(container, initialFocus = 'first-field') {
  * Formular parkt, fragt und den Fokus beim Fortsetzen auf den Speichern-Knopf
  * zurueckgibt. Der liegengebliebene Timer zog ihn danach ins erste Feld, und
  * nichts holte ihn zurueck. Er fokussiert deshalb nur noch, wenn das Ziel noch
- * haengt, das Modal nicht geparkt (`inert`) ist und im Modal noch nichts den
- * Fokus haelt.
+ * haengt, das Modal nicht geparkt (`inert`) ist und seit dem Planen niemand den
+ * Fokus woandershin gesetzt hat.
+ *
+ * "WOANDERSHIN", NICHT "INS MODAL" (Review zu #1193): der Datepicker oeffnet sein
+ * Popover direkt unter `document.body` und fokussiert synchron hinein - ausserhalb
+ * des Modals, ohne es inert zu machen. Eine Wache, die nur im Modal nachsieht,
+ * haette den Fokus aus dem offenen Kalender zurueck ins erste Feld gerissen.
  */
 function applyInitialFocus(container, initialFocus) {
   if (initialFocus === 'none') return;
@@ -304,14 +309,18 @@ function applyInitialFocus(container, initialFocus) {
     ? initialFocus
     : container.querySelector(FIRST_FIELD) ?? container.querySelector(FOCUSABLE);
   if (target) {
-    setTimeout(() => _focusInitialUnlessClaimed(container, target), 50);
+    const beimPlanen = document.activeElement;
+    setTimeout(() => _focusInitialUnlessClaimed(container, target, beimPlanen), 50);
   }
 }
 
-function _focusInitialUnlessClaimed(container, target) {
+function _focusInitialUnlessClaimed(container, target, beimPlanen) {
   if (!target.isConnected) return;
   if (container.closest?.('[inert]')) return;
-  if (container.contains(document.activeElement)) return;
+  // Ein auf body gefallener Fokus ist keine Wahl: der Ausloeser wurde weggerendert,
+  // und das Modal soll seinen Einstieg trotzdem bekommen.
+  const jetzt = document.activeElement;
+  if (jetzt && jetzt !== beimPlanen && jetzt !== document.body) return;
   target.focus();
 }
 
