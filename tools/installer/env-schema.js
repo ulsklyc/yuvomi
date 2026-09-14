@@ -66,8 +66,8 @@ export const ENV_SCHEMA = [
   // "environment:" auf /backups pinnen (environment schlaegt env_file), und ein
   // Guard erzwingt das in jedem Ziel. Darauf ruht die Ausnahme aber NICHT: die
   // .env.example warnt ausdruecklich davor, die Datei einem blanken
-  // "docker run --env-file" zu geben, und dort gibt es kein Override. MODULES_DIR
-  // pinnt ohnehin kein Descriptor.
+  // "docker run --env-file" zu geben, und dort gibt es kein Override. Fuer
+  // MODULES_DIR gilt dasselbe: Docker, Podman und Quadlet pinnen es auf /app/modules.
   //
   // Wer die Sicherungen auf ein NAS-Array legen will, aendert deshalb den MOUNT
   // in der Compose-Datei, nicht diese Variable - so steht es in

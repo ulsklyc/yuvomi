@@ -10,10 +10,9 @@ services:
     volumes:
       - ${DATA_DIR:-./data}:/data
       - ${BACKUP_DIR:-./backups}:/backups
-      # Drop Yuvomi modules into ./modules. For another host folder, edit the left
-      # side of this line rather than MODULES_DIR in .env: the app reads that name
-      # inside the container too, and an absolute host path there points it at a
-      # folder that is not mounted.
+      # Drop Yuvomi modules into ./modules, or set MODULES_DIR=/path/to/modules in
+      # .env. The app reads that name inside the container too, so environment:
+      # below pins it to /app/modules; the .env value only moves the mount source.
       - ${MODULES_DIR:-./modules}:/app/modules
       # Optional local documents folder. BOTH ends come from the .env: the app
       # writes to DOCUMENT_STORAGE_LOCAL_PATH, so mounting at a fixed /documents
@@ -35,6 +34,7 @@ services:
       - NODE_ENV=production
       - DB_PATH=${DB_PATH:-/data/yuvomi.db}
       - BACKUP_DIR=/backups
+      - MODULES_DIR=/app/modules
       # Local document storage (optional): set to true to store uploaded documents on the mounted /documents folder.
       - DOCUMENT_STORAGE_LOCAL_ENABLED=${DOCUMENT_STORAGE_LOCAL_ENABLED:-false}
       - DOCUMENT_STORAGE_LOCAL_PATH=${DOCUMENT_STORAGE_LOCAL_PATH:-/documents}

@@ -16,7 +16,6 @@ questions:
   - variable: TZ
     group: Yuvomi Configuration
     label: Timezone
-    description: Log timestamps and the backup schedule, and the default for the household zone. The household zone can also be set inside the app (Settings > Personal > Appearance > Region); that setting wins where both exist.
     schema:
       type: string
       default: Etc/UTC

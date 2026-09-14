@@ -30,16 +30,22 @@ Nach einer Strukturänderung an `questions.yaml` verlangt deren Anleitung
 zusätzlich `app_migrations.yaml` plus Migrationsskript, damit Bestandsinstallationen
 ihre Werte behalten.
 
-## Bekannte Abweichung vom Upstream
+## Abgleich mit Upstream
 
-Gemessen am 2026-09-14 unterscheidet sich der Spiegel in genau einer Zeile von
-`ix-dev/community/yuvomi/`: `questions.yaml` trägt lokal eine `description` zur
-Zeitzonen-Frage (die Haushaltszone in der App gewinnt), die mit dem Release-Commit
-von v2.34.0 hinzukam und Upstream nie erreicht hat. Entweder mit den Maintainern
-klären oder zurücknehmen; bis dahin ist sie beim `diff` die erwartete Abweichung.
-Der `modules`-Speicher (`/app/modules`), den Upstream längst trägt, fehlte hier bis
-zum selben Tag und ist nachgezogen, zusammen mit zwei Tippfehler-Korrekturen aus
-Upstream.
+Seit dem 2026-09-14 ist der Spiegel mit `ix-dev/community/yuvomi/` byte-identisch
+(`questions.yaml`, `templates/docker-compose.yaml`,
+`templates/test_values/basic-values.yaml`, `item.yaml`). Bis dahin fehlte hier der
+`modules`-Speicher (`/app/modules`) samt zwei Tippfehler-Korrekturen, und
+`questions.yaml` trug lokal eine `description` zur Zeitzonen-Frage, die mit dem
+Release-Commit von v2.34.0 hinzukam und Upstream nie erreicht hat. Sie ist
+zurückgenommen: TrueNAS-Nutzer sehen ohnehin nur den Katalog, und was sie sagte,
+steht für alle Ziele in `docs/installation.md` (Variable `TZ`).
+
+Nachprüfen je Datei:
+
+```bash
+gh api repos/truenas/apps/contents/ix-dev/community/yuvomi/questions.yaml --jq .content | base64 -d | diff - deploy/truenas/questions.yaml
+```
 
 ## Namensraum: `yuvomi`, nicht `oikos`
 

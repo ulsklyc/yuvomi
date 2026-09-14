@@ -115,6 +115,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A modules folder set through `MODULES_DIR` in `.env` is found again.** `docker-compose.yml`,
+  `podman-compose.yml` and the Podman Quadlet hand the `.env` to the container, and the app reads
+  `MODULES_DIR` there as its own folder: an absolute host path in it pointed the app at a folder
+  nobody had mounted, so dropped-in modules never appeared. The three descriptors now pin it to
+  `/app/modules` inside the container; with Compose the `.env` value only moves the mount source, and
+  the Quadlet keeps its host folder in the unit file. It reaches an existing install once its compose
+  file or Quadlet unit is updated.
+
+- **The Unraid template no longer takes email, backup and document-storage settings out of the
+  app's hands.** Seven of its variables shipped a value, and a value there wins over the matching
+  setting in Settings, locking the email and document-storage fields. New containers leave them
+  empty. A container created from the older template keeps what it was created with; clearing the
+  variable on its Edit page hands the setting back to the app (see the Unraid section of the
+  installation guide).
+
 - **Belgian school holidays can be narrowed to one language community.** OpenHolidays lists Belgium
   without any regions but splits its school holidays between the Flemish, French and German-speaking
   Communities, so the calendar settings had nothing to choose from and the calendar showed all three

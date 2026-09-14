@@ -120,9 +120,10 @@ const INTENTIONALLY_NOT_IN_INSTALLER = {
     + 'darf. Der Host-Ordner der Sicherungen wird ueber den Mount gesetzt, nicht hierueber.',
   MODULES_DIR:
     'Dieselbe Regel wie bei BACKUP_DIR: die App liest den Namen selbst (services/modules.js) '
-    + 'und meint das Verzeichnis IM Container. Hier ist es sogar schaerfer, weil kein Descriptor '
-    + 'die Variable unter environment pinnt - ein Host-Pfad aus der .env erreicht den Container '
-    + 'also ungebremst. Wer Module ablegt, setzt den Mount in der Compose-Datei.',
+    + 'und meint das Verzeichnis IM Container. Docker, Podman und Quadlet laden die .env in den '
+    + 'Container und pinnen die Variable deshalb unter environment auf /app/modules (Guard '
+    + 'unten). Bei Compose verschiebt der .env-Wert damit nur die Mount-Quelle; das Quadlet '
+    + 'interpoliert nicht und haelt den Host-Ordner in der Unit.',
   OIKOS_HTTP_BIND: 'Bindungsadresse für rootless Podman hinter Proxy. Ein falscher Wert macht die App unerreichbar, und der Default ist für jede vom Wizard erzeugte Installation richtig.',
   DMS_ALLOW_PRIVATE_NETWORK:
     'Der einzige *_ALLOW_PRIVATE_NETWORK-Schalter mit Default true (#809): ein DMS ist per '
@@ -486,6 +487,23 @@ test('Jedes Container-Deployment schreibt Backups nach /backups (issue #579)', (
   assert.ok(backupVar, 'Unraid deklariert BACKUP_DIR nicht');
   assert.match(backupVar[0], /Default="\/backups"/, 'Unraid BACKUP_DIR muss /backups defaulten');
   assert.match(unraid, /Target="\/backups"[^>]+Type="Path"/, 'Unraid mountet kein /backups');
+});
+
+test('Wer die .env in den Container laedt, pinnt MODULES_DIR auf /app/modules', () => {
+  // Dieselbe Klasse wie #579: die App liest MODULES_DIR selbst (services/modules.js)
+  // und meint das Verzeichnis IM Container. Docker, Podman und Quadlet reichen die
+  // .env an den Container weiter; ohne Pin zeigte ein Host-Pfad aus der .env die
+  // App auf einen Ordner, den niemand gemountet hat, und abgelegte Module blieben
+  // unsichtbar. Portainer, Umbrel, TrueNAS und Unraid laden keine .env in den
+  // Container und sind deshalb nicht Teil dieser Pruefung.
+  for (const path of ['../docker-compose.yml', '../podman-compose.yml']) {
+    const src = readFileSync(new URL(path, import.meta.url), 'utf8');
+    assert.match(src, /:\/app\/modules(:Z)?$/m, `${path} mountet kein /app/modules`);
+    assert.match(src, /^\s*- MODULES_DIR=\/app\/modules$/m, `${path} pinnt MODULES_DIR nicht auf /app/modules`);
+  }
+  const quadlet = readFileSync(new URL('../tools/quadlet/oikos.container', import.meta.url), 'utf8');
+  assert.match(quadlet, /:\/app\/modules(:Z)?$/m, 'Quadlet mountet kein /app/modules');
+  assert.match(quadlet, /^Environment=MODULES_DIR=\/app\/modules$/m, 'Quadlet pinnt MODULES_DIR nicht auf /app/modules');
 });
 
 test('TZ und OIKOS_HTTP_PORT haben writeToEnv: true', () => {

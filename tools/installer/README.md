@@ -19,7 +19,7 @@ of inactivity otherwise). Download the generated `.env` before you close the tab
 
 ## Requirements
 
-- Node.js 18+ (the installer itself has zero npm dependencies — Node built-ins only)
+- Node.js 22+, the version the repository targets and CI tests (the installer itself has zero npm dependencies - Node built-ins only)
 - A container engine — either **Docker** with Compose v2, or **Podman** with the
   `podman compose` subcommand (4.1+) or the `podman-compose` package
 - The repository cloned locally

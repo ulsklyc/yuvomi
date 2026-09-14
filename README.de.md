@@ -7,7 +7,7 @@
 
   <p>
     Aufgaben, Kalender, Budget, Einkauf, Mahlzeiten, Gesundheit und mehr - für eine Familie,
-    ein Paar oder nur dich. Zwanzig Module für einen Haushalt von bis zu sechs Personen, auf
+    ein Paar oder nur dich. Zwanzig Module für einen Haushalt, meist zwei bis sechs Personen, auf
     einem Server, der dir gehört, und das Einzige, was ihn verlässt, ist eine Versionsprüfung.
   </p>
 
@@ -147,7 +147,7 @@ git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi
 node tools/installer/install-server.js
 ```
 
-Öffne **http://localhost:8090**. Braucht Node.js 18+ auf dem Host; der Container bringt sein eigenes Node 24 mit.
+Öffne **http://localhost:8090**. Braucht Node.js 22+ auf dem Host; der Container bringt sein eigenes Node 24 mit.
 
 ### Aus dem App-Store deines NAS
 
