@@ -1383,6 +1383,24 @@ router.get('/holidays/subdivisions/:countryCode', async (req, res) => {
   }
 });
 
+// GET /api/v1/preferences/holidays/groups/:countryCode
+// Schulferien-Gruppen eines Landes ohne Subdivisionen (Belgien, D#1182). Leere
+// Liste fuer jedes Land, das Subdivisionen fuehrt - dort gehoeren die Gruppen
+// zur Region und kommen ueber die Route darunter.
+router.get('/holidays/groups/:countryCode', async (req, res) => {
+  const { countryCode } = req.params;
+  if (!COUNTRY_ISO_RE.test(countryCode)) {
+    return res.status(400).json({ error: 'Ungültiger Ländercode.', code: 400 });
+  }
+  try {
+    const groups = await holidays.getGroups(countryCode, null);
+    res.json({ data: groups });
+  } catch (err) {
+    log.error('GET /holidays/groups/:countryCode', err);
+    res.status(502).json({ error: 'Fehler beim Abrufen der Ferien-Gruppen.', code: 502 });
+  }
+});
+
 // GET /api/v1/preferences/holidays/groups/:countryCode/:subdivisionCode
 // Schulferien-Gruppen einer Subdivision (mehrsprachige Kantone). Leere Liste,
 // wenn die Subdivision nur ein Ferien-Regime kennt. (#434)

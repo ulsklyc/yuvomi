@@ -2239,7 +2239,7 @@
         "holidaySubdivisionPlaceholder": "Válasszon egy államot…",
         "holidayGroupLabel": "Iskolai szünet régiója",
         "holidayGroupNone": "Összes megjelenítése",
-        "holidayGroupHint": "Egyes többnyelvű kantonokban az iskolai szünetek időpontjai a nyelvi régiótól függően eltérnek. Válaszd ki a megfelelő régiót a pontos dátumokért.",
+        "holidayGroupHint": "Egyes többnyelvű országokban és kantonokban az iskolai szünetek időpontjai a nyelvi közösségtől függően eltérnek. Válaszd ki a megfelelő régiót a pontos dátumokért.",
         "holidayPublicLabel": "Nyilvános ünnepek megjelenítése",
         "holidaySchoolLabel": "Iskolai szünetek megjelenítése",
         "holidaySchoolUnavailable": "Ehhez az országhoz nem érhetők el iskolai szünet adatok.",

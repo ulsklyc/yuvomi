@@ -2262,7 +2262,7 @@
         "holidaySubdivisionPlaceholder": "Select a state…",
         "holidayGroupLabel": "School-holiday region",
         "holidayGroupNone": "Show all",
-        "holidayGroupHint": "Some multilingual cantons have different school-holiday dates depending on the language region. Choose the matching region for correct dates.",
+        "holidayGroupHint": "In some multilingual countries and cantons, school-holiday dates differ by language community. Choose the matching region for correct dates.",
         "holidayPublicLabel": "Show public holidays",
         "holidaySchoolLabel": "Show school holidays",
         "holidaySchoolUnavailable": "No school-holiday data is available for this country.",

@@ -329,6 +329,47 @@ test('getGroups: [] for a subdivision without groups', async () => {
   assert.deepEqual(await getGroups('CH', 'CH-ZH'), []);
 });
 
+test('getGroups: a country without subdivisions offers its own groups (D#1182, Belgium)', async () => {
+  const paths = [];
+  __setFetchImpl(async (url) => {
+    const u = new URL(String(url));
+    paths.push(u.pathname);
+    if (u.pathname === '/Subdivisions') return okJson([]);
+    assert.equal(u.searchParams.get('countryIsoCode'), 'BE');
+    return okJson([
+      { code: 'BE-NL', shortName: 'NL', name: [{ language: 'EN', text: 'Flemish Community' }] },
+      { code: 'BE-DE', shortName: 'DE', name: [{ language: 'EN', text: 'German-speaking Community' }] },
+      { code: 'BE-FR', shortName: 'FR', name: [{ language: 'EN', text: 'French Community' }] },
+    ]);
+  });
+  const groups = await getGroups('BE');
+  assert.deepEqual(paths, ['/Subdivisions', '/Groups']);
+  assert.deepEqual(groups, [
+    { code: 'BE-NL', name: 'Flemish Community' },
+    { code: 'BE-FR', name: 'French Community' },
+    { code: 'BE-DE', name: 'German-speaking Community' },
+  ]);
+});
+
+test('getGroups: a country WITH subdivisions has no groups without a region (DE-MV stays under DE-MV)', async () => {
+  const paths = [];
+  __setFetchImpl(async (url) => {
+    paths.push(new URL(String(url)).pathname);
+    return okJson([{ code: 'DE-MV', name: [], shortName: 'MV', groups: [{ code: 'DE-MV-ABS' }, { code: 'DE-MV-BBS' }] }]);
+  });
+  assert.deepEqual(await getGroups('DE', null), []);
+  assert.deepEqual(paths, ['/Subdivisions'], 'no /Groups call for a country that has subdivisions');
+});
+
+test('getForRange: Belgium - a country-level group without a subdivision shows only that community (D#1182)', () => {
+  setConfig({ holiday_country: 'BE', holiday_group: 'BE-FR', holiday_show_public: '1', holiday_show_school: '1' });
+  seedHoliday({ type: 'public', country: 'BE', start: '2026-07-21', end: '2026-07-21', name: 'Fete nationale' });
+  seedHoliday({ type: 'school', country: 'BE', group: 'BE-FR', start: '2026-07-04', end: '2026-08-23', name: 'Vacances d ete' });
+  seedHoliday({ type: 'school', country: 'BE', group: 'BE-NL', start: '2026-07-01', end: '2026-08-31', name: 'Zomervakantie' });
+  const names = getForRange('2026-07-01', '2026-08-31').map((r) => r.name).sort();
+  assert.deepEqual(names, ['Fete nationale', 'Vacances d ete']);
+});
+
 test('sync: stores group_code from the OpenHolidays groups field (#434)', async () => {
   __setFetchImpl(async (url) => {
     const path = new URL(String(url)).pathname;

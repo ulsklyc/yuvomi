@@ -2274,7 +2274,7 @@
         "holidaySubdivisionPlaceholder": "Bundesland auswählen…",
         "holidayGroupLabel": "Schulferien-Region",
         "holidayGroupNone": "Alle anzeigen",
-        "holidayGroupHint": "Einige mehrsprachige Kantone haben je nach Sprachregion unterschiedliche Schulferien-Termine. Wähle die passende Region für korrekte Daten.",
+        "holidayGroupHint": "In manchen mehrsprachigen Ländern und Kantonen unterscheiden sich die Schulferien je nach Sprachgemeinschaft. Wähle die passende Region für korrekte Daten.",
         "holidayPublicLabel": "Feiertage anzeigen",
         "holidaySchoolLabel": "Schulferien anzeigen",
         "holidaySchoolUnavailable": "Für dieses Land liegen keine Schulferien-Daten vor.",

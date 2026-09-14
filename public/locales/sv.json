@@ -2239,7 +2239,7 @@
         "holidaySubdivisionPlaceholder": "Välj en region…",
         "holidayGroupLabel": "Skollovsregion",
         "holidayGroupNone": "Visa alla",
-        "holidayGroupHint": "Vissa flerspråkiga kantoner har olika skollovsdatum beroende på språkregion. Välj rätt region för korrekta datum.",
+        "holidayGroupHint": "I vissa flerspråkiga länder och kantoner skiljer sig skollovsdatumen åt beroende på språkgemenskap. Välj rätt region för korrekta datum.",
         "holidayPublicLabel": "Visa helgdagar",
         "holidaySchoolLabel": "Visa skollov",
         "holidaySchoolUnavailable": "Det finns inga skollovsdata tillgängliga för detta land.",

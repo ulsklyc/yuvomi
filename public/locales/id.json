@@ -2251,7 +2251,7 @@
         "holidaySubdivisionPlaceholder": "Pilih provinsi…",
         "holidayGroupLabel": "Wilayah libur sekolah",
         "holidayGroupNone": "Tampilkan semua",
-        "holidayGroupHint": "Beberapa kanton multibahasa memiliki tanggal libur sekolah yang berbeda tergantung wilayah bahasa. Pilih wilayah yang sesuai untuk tanggal yang benar.",
+        "holidayGroupHint": "Di beberapa negara dan kanton multibahasa, tanggal libur sekolah berbeda menurut komunitas bahasa. Pilih wilayah yang sesuai untuk tanggal yang benar.",
         "holidayPublicLabel": "Tampilkan hari libur",
         "holidaySchoolLabel": "Tampilkan libur sekolah",
         "holidaySchoolUnavailable": "Tidak ada data libur sekolah yang tersedia untuk negara ini.",

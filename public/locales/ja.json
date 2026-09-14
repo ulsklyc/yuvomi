@@ -2239,7 +2239,7 @@
         "holidaySubdivisionPlaceholder": "地域を選択…",
         "holidayGroupLabel": "学校休暇の地域",
         "holidayGroupNone": "すべて表示",
-        "holidayGroupHint": "多言語のカントンでは、言語地域によって学校休暇の日程が異なる場合があります。正しい日程を表示するには該当する地域を選択してください。",
+        "holidayGroupHint": "多言語の国やカントンでは、言語共同体によって学校休暇の日程が異なる場合があります。正しい日程を表示するには該当する地域を選択してください。",
         "holidayPublicLabel": "祝日を表示",
         "holidaySchoolLabel": "学校の休暇を表示",
         "holidaySchoolUnavailable": "この国の学校休暇データはありません。",

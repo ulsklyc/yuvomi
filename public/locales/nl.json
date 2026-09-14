@@ -2239,7 +2239,7 @@
         "holidaySubdivisionPlaceholder": "Selecteer een regio…",
         "holidayGroupLabel": "Schoolvakantieregio",
         "holidayGroupNone": "Alles tonen",
-        "holidayGroupHint": "Sommige meertalige kantons hebben verschillende schoolvakantiedata afhankelijk van de taalregio. Kies de juiste regio voor correcte datums.",
+        "holidayGroupHint": "In sommige meertalige landen en kantons verschillen de schoolvakanties per taalgemeenschap. Kies de juiste regio voor correcte datums.",
         "holidayPublicLabel": "Feestdagen weergeven",
         "holidaySchoolLabel": "Schoolvakanties weergeven",
         "holidaySchoolUnavailable": "Voor dit land zijn geen schoolvakantiegegevens beschikbaar.",

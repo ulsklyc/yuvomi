@@ -2251,7 +2251,7 @@
         "holidaySubdivisionPlaceholder": "Wybierz region…",
         "holidayGroupLabel": "Region ferii szkolnych",
         "holidayGroupNone": "Pokaż wszystkie",
-        "holidayGroupHint": "Niektóre wielojęzyczne kantony mają różne terminy ferii szkolnych w zależności od regionu językowego. Wybierz odpowiedni region, aby zobaczyć poprawne daty.",
+        "holidayGroupHint": "W niektórych wielojęzycznych krajach i kantonach terminy ferii szkolnych różnią się w zależności od wspólnoty językowej. Wybierz odpowiedni region, aby zobaczyć poprawne daty.",
         "holidayPublicLabel": "Pokaż święta",
         "holidaySchoolLabel": "Pokaż ferie szkolne",
         "holidaySchoolUnavailable": "Dla tego kraju nie są dostępne dane o feriach szkolnych.",

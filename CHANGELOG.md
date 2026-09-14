@@ -101,6 +101,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Belgian school holidays can be narrowed to one language community.** OpenHolidays lists Belgium
+  without any regions but splits its school holidays between the Flemish, French and German-speaking
+  Communities, so the calendar settings had nothing to choose from and the calendar showed all three
+  side by side. A country without regions now offers its school-holiday groups directly under
+  Settings > Modules > Calendar, and the hint there no longer speaks only of Swiss cantons.
+
 - **Housekeeping only offers visit actions you are allowed to take** (#1135). A paid visit is
   settled, and only an admin can change or delete it - but the Staff log and the recent visits on
   the Overview showed edit and delete on every visit, so a member found out at save. The server now

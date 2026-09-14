@@ -2239,7 +2239,7 @@
         "holidaySubdivisionPlaceholder": "Vyberte region…",
         "holidayGroupLabel": "Region školních prázdnin",
         "holidayGroupNone": "Zobrazit vše",
-        "holidayGroupHint": "Některé vícejazyčné kantony mají různá data školních prázdnin podle jazykové oblasti. Vyberte odpovídající region pro správná data.",
+        "holidayGroupHint": "V některých vícejazyčných zemích a kantonech se data školních prázdnin liší podle jazykového společenství. Vyberte odpovídající region pro správná data.",
         "holidayPublicLabel": "Zobrazit státní svátky",
         "holidaySchoolLabel": "Zobrazit školní prázdniny",
         "holidaySchoolUnavailable": "Pro tuto zemi nejsou k dispozici žádné údaje o školních prázdninách.",

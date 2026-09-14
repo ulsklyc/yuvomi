@@ -2239,7 +2239,7 @@
         "holidaySubdivisionPlaceholder": "Seleccionar una región…",
         "holidayGroupLabel": "Región de vacaciones escolares",
         "holidayGroupNone": "Mostrar todo",
-        "holidayGroupHint": "Algunos cantones plurilingües tienen fechas de vacaciones escolares distintas según la región lingüística. Elige la región correspondiente para ver las fechas correctas.",
+        "holidayGroupHint": "En algunos países y cantones plurilingües, las fechas de vacaciones escolares varían según la comunidad lingüística. Elige la región correspondiente para ver las fechas correctas.",
         "holidayPublicLabel": "Mostrar días festivos",
         "holidaySchoolLabel": "Mostrar vacaciones escolares",
         "holidaySchoolUnavailable": "No hay datos de vacaciones escolares disponibles para este país.",

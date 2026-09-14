@@ -896,7 +896,7 @@ external-calendar connections as two separate concerns).
 | end_date | TEXT | YYYY-MM-DD, NOT NULL |
 | name | TEXT | Localized holiday name, NOT NULL |
 | year | INTEGER | Source year (used for scoped re-sync), NOT NULL |
-| group_code | TEXT | School-holiday group (e.g. `CH-BE-VS`) for multilingual subdivisions; nullable (applies to the whole subdivision, e.g. public holidays) |
+| group_code | TEXT | School-holiday group (e.g. `CH-BE-VS`) for multilingual subdivisions, or of the country itself when it has no subdivisions (Belgium: `BE-FR`); nullable (applies to the whole subdivision or country, e.g. public holidays) |
 
 Indexes: `idx_holiday_cache_dates (start_date, end_date)`, `idx_holiday_cache_lookup (type, country, subdivision, year)`.
 Configuration lives in `sync_config`: `holiday_country`, `holiday_subdivision`, `holiday_group`, `holiday_show_public`,
