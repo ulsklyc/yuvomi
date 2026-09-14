@@ -1313,14 +1313,18 @@ test("GB (Schottland): St Andrew's Day ist mondayised (Act 2007 s.1(2), Review-F
 // beider Jahre, und zwar aus den PRIMAERQUELLEN abgetippt, nicht aus der Engine
 // abgelesen - sonst bewiese der Test nur, dass Code und Fixture denselben
 // (moeglicherweise falschen) Gedankengang teilen:
-//   US: OPM "Federal Holidays" (opm.gov), Tabellen 2026/2027.
+//   US: OPM "Federal Holidays" (opm.gov), Tabellen 2026/2027/2028.
 //   CA: canada.ca (CRA) 2026; 2027 nach Holidays Act/Bills of Exchange Act
 //       (nur So->Mo verschiebt; Sa bleibt - die im Code dokumentierte,
 //       bewusste Abweichung von der UK-Paarlogik).
 //   GB: gov.uk/bank-holidays.json (alle drei Nationen, 2026 + 2027).
 //   AU: landesweite Feiertage auf ihrem echten Kalenderdatum - bewusst ohne
 //       Ersatztage (kein Bundesgesetz; siehe AU-Regelsatz).
-//   NZ: employment.govt.nz (MBIE), Tabellen 2026/2027 inkl. Matariki.
+//   NZ: employment.govt.nz (MBIE), Tabellen 2026/2027 inkl. Matariki. 2028 fuehrt
+//       die Seite noch nicht (Stand 14.09.2026): Mondayisation nach der amtlichen
+//       Tabelle 2022 mit derselben Wochentagslage (1.1. Sa, 2.1. So, 6.2. So ->
+//       Mo 3., Di 4., Mo 7.), Matariki nach dem Matariki Advisory Committee
+//       (Te Papa, tepapa.govt.nz), Ostern und Montage per Datumsarithmetik.
 //   BR: feste gesetzliche Daten + Karfreitag.
 // Jede Wochentagsbehauptung wurde zusaetzlich unabhaengig per Datumsarithmetik
 // gegengeprueft (jeder "Montag"-Feiertag ist wirklich ein Montag usw.).
@@ -1331,7 +1335,7 @@ test("GB (Schottland): St Andrew's Day ist mondayised (Act 2007 s.1(2), Review-F
 // Regeltabelle liefern - dokumentierte Grenze, siehe docs/SPEC.md; der
 // ICS-Weg ist dafuer die Antwort.
 
-test('US: vollstaendige Datumstabelle 2026 + 2027 (OPM)', () => {
+test('US: vollstaendige Datumstabelle 2026 + 2027 + 2028 (OPM)', () => {
   assert.deepEqual(namesAndDates(2026, 'US'), [
     "2026-01-01 New Year's Day",
     '2026-01-19 Martin Luther King, Jr. Day',
@@ -1357,6 +1361,23 @@ test('US: vollstaendige Datumstabelle 2026 + 2027 (OPM)', () => {
     '2027-11-11 Veterans Day',
     '2027-11-25 Thanksgiving Day',
     '2027-12-24 Christmas Day',                        // 25.12. Samstag -> Freitag
+  ]);
+  // 2028 trennt, was 2026 und 2027 nicht koennen: in beiden Jahren ist der 4.
+  // Donnerstag im November zugleich der letzte, und der 11. November faellt auf
+  // keinen Samstag. Die Mutationen Thanksgiving `n: 4 -> -1` und Veterans Day ohne
+  // `observance: 'us'` blieben deshalb gruen (Review zu #1129).
+  assert.deepEqual(namesAndDates(2028, 'US'), [
+    "2027-12-31 New Year's Day",                       // 1.1.2028 Samstag -> Freitag im Vorjahr
+    '2028-01-17 Martin Luther King, Jr. Day',
+    "2028-02-21 Washington's Birthday",
+    '2028-05-29 Memorial Day',                         // letzter Montag, der vierte waere der 22.
+    '2028-06-19 Juneteenth National Independence Day',
+    '2028-07-04 Independence Day',
+    '2028-09-04 Labor Day',
+    '2028-10-09 Columbus Day',
+    '2028-11-10 Veterans Day',                         // 11.11. Samstag -> Freitag
+    '2028-11-23 Thanksgiving Day',                     // 4. Donnerstag, der letzte waere der 30.
+    '2028-12-25 Christmas Day',
   ]);
 });
 
@@ -1485,7 +1506,7 @@ test('AU: vollstaendige Datumstabelle 2026 + 2027 (echte Kalenderdaten, keine Er
   ]);
 });
 
-test('NZ: vollstaendige Datumstabelle 2026 + 2027 (employment.govt.nz)', () => {
+test('NZ: vollstaendige Datumstabelle 2026 + 2027 + 2028 (employment.govt.nz)', () => {
   assert.deepEqual(namesAndDates(2026, 'NZ'), [
     "2026-01-01 New Year's Day",
     '2026-01-02 Day after New Year’s Day',
@@ -1511,6 +1532,23 @@ test('NZ: vollstaendige Datumstabelle 2026 + 2027 (employment.govt.nz)', () => {
     '2027-10-25 Labour Day',
     '2027-12-27 Christmas Day',            // 25.12. Samstag -> Montag
     '2027-12-28 Boxing Day',               // 26.12. Sonntag -> Dienstag
+  ]);
+  // 2028 trennt, was 2026 und 2027 nicht koennen: dort ist der 4. Montag im
+  // Oktober zugleich der letzte, eine Mutation Labour Day `n: 4 -> -1` blieb gruen
+  // (Review zu #1129). Dazu die Lage, die 2027 nicht hat: 1.1. Samstag UND 2.1.
+  // Sonntag, Waitangi an einem Sonntag - dieselbe Wochentagslage wie 2022.
+  assert.deepEqual(namesAndDates(2028, 'NZ'), [
+    "2028-01-03 New Year's Day",           // 1.1. Samstag -> Montag
+    '2028-01-04 Day after New Year’s Day', // 2.1. Sonntag -> Dienstag
+    '2028-02-07 Waitangi Day',             // 6.2. Sonntag -> Montag
+    '2028-04-14 Good Friday',
+    '2028-04-17 Easter Monday',
+    '2028-04-25 Anzac Day',
+    "2028-06-05 King's Birthday",
+    '2028-07-14 Matariki',
+    '2028-10-23 Labour Day',               // 4. Montag, der letzte waere der 30.
+    '2028-12-25 Christmas Day',
+    '2028-12-26 Boxing Day',
   ]);
 });
 
