@@ -786,6 +786,7 @@ test('only the late re-renders go through keepFocus, the gesture render does not
     handleError: () => {},
     render: () => { calls.push('render'); },
     keepFocus: (renderNow) => { calls.push('keepFocus'); renderNow(); },
+    refocusAfterUndo: () => { calls.push('refocusAfterUndo'); },
   };
 
   scheduleCalendarDeleteWithUndo({
@@ -795,7 +796,8 @@ test('only the late re-renders go through keepFocus, the gesture render does not
   });
   assert.deepEqual(calls, ['render'], 'the first render belongs to the delete gesture');
   await scheduled[0].commit({ keepalive: false });
-  assert.deepEqual(calls, ['render', 'reload', 'keepFocus', 'render']);
+  assert.deepEqual(calls, ['render', 'reload', 'keepFocus', 'render'],
+    'a commit brings nothing back, so there is no restored row to refocus');
 
   calls.length = 0;
   scheduleCalendarDeleteWithUndo({
@@ -804,7 +806,10 @@ test('only the late re-renders go through keepFocus, the gesture render does not
     deleteScope: { eventId: 8, scope: 'all' },
   });
   scheduled[1].restore();
-  assert.deepEqual(calls, ['render', 'keepFocus', 'render'], 'Undo re-renders just as late');
+  // Keyboard Undo: the toast removed its focused button before calling restore,
+  // so keepFocus has nothing to carry; the refocus runs after the row is back.
+  assert.deepEqual(calls, ['render', 'keepFocus', 'render', 'refocusAfterUndo'],
+    'Undo re-renders just as late and then puts focus back on the restored row');
 });
 
 test('every calendar delete passes the focus keeper to the scheduler (#1083)', () => {
@@ -815,6 +820,8 @@ test('every calendar delete passes the focus keeper to the scheduler (#1083)', (
   for (const call of calls) {
     assert.match(call, /\n\s*keepFocus: renderKeepingFocus,/,
       'without it the default keeps no focus, and the commit render drops it to body');
+    assert.match(call, /\n\s*refocusAfterUndo: refocusAfterRender,/,
+      'without it a keyboard Undo leaves focus on body - the toast removed its button first');
   }
   assert.match(src, /import \{[^}]*\brenderKeepingFocus\b[^}]*\} from '\/components\/modal\.js'/);
 });

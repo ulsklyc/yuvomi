@@ -5621,6 +5621,7 @@ async function deleteEvent(event) {
     isViewActive: () => Boolean(_container?.isConnected),
     reloadEvents: reloadCalendarRangeAfterDelete,
     keepFocus: renderKeepingFocus,
+    refocusAfterUndo: refocusAfterRender,
     handleError: (err) => window.yuvomi?.showToast(
       err.data?.error ?? t('calendar.deleteError'),
       'danger',
@@ -5823,6 +5824,7 @@ async function deleteThisAndFollowing(event) {
     isViewActive: () => Boolean(_container?.isConnected),
     reloadEvents: reloadCalendarRangeAfterDelete,
     keepFocus: renderKeepingFocus,
+    refocusAfterUndo: refocusAfterRender,
     handleError: (err) => window.yuvomi?.showToast(
       err.data?.error ?? t('calendar.deleteError'),
       'danger',
@@ -5852,6 +5854,7 @@ async function deleteSingleOccurrence(event) {
     isViewActive: () => Boolean(_container?.isConnected),
     reloadEvents: reloadCalendarRangeAfterDelete,
     keepFocus: renderKeepingFocus,
+    refocusAfterUndo: refocusAfterRender,
     handleError: (err) => window.yuvomi?.showToast(
       err.data?.error ?? t('calendar.deleteError'),
       'danger',

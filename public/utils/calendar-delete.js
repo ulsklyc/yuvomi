@@ -230,6 +230,12 @@ export function scheduleCalendarDeleteWithUndo({
   // page passes `renderKeepingFocus` from components/modal.js here (#1083). The
   // first render belongs to the delete gesture, which restores its own focus.
   keepFocus = (renderNow) => renderNow(),
+  // Undo from the keyboard: the toast removes its focused button BEFORE it calls
+  // restore (showToast in router.js), so keepFocus finds nothing to carry and
+  // focus sits on body. The page passes `refocusAfterRender` here: its memo is
+  // the trigger of the closed delete dialog or popover, which is exactly the row
+  // this Undo brings back, and it only acts while focus is still on body.
+  refocusAfterUndo = () => {},
 }) {
   const transition = beginOptimisticCalendarDelete(state, deleteScope);
   const write = reserveSeriesWrite(state, deleteScope.seriesId ?? deleteScope.eventId);
@@ -246,7 +252,10 @@ export function scheduleCalendarDeleteWithUndo({
     restore: (err) => {
       write.cancel();
       if (!transition.restore()) return;
-      if (isViewActive()) keepFocus(render);
+      if (isViewActive()) {
+        keepFocus(render);
+        refocusAfterUndo();
+      }
       if (err) void handleError(err);
     },
     restoreOnKeepaliveError: true,

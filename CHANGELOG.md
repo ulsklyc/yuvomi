@@ -232,7 +232,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   disappears at once and is removed for good once the Undo notice runs out, and the view then draws
   itself once more. Whatever you had moved on to in the meantime, for example the next row in the
   agenda, lost focus at that moment, so the next Tab started again at the top of the page. That
-  element now keeps focus across the redraw, and the same holds when Undo brings the event back.
+  element now keeps focus across the redraw. Pressing Undo from the keyboard lost focus the same
+  way, because the notice removes its button before the event comes back; focus now lands on the
+  restored event.
 
 ## [2.66.1] - 2026-09-14
 
