@@ -512,11 +512,15 @@ const RELEASED_SECTION_EDITS = {
 
 const sectionHash = (section) => createHash('sha256').update(section).digest('hex').slice(0, 12);
 
+// Ein Windows-Checkout mit core.autocrlf liefert CRLF, `git show` den Blob mit LF - ohne
+// Angleich waere jeder Abschnitt ein Fund (PR #1183; test:migrations-append-only ebenso).
+const lf = (text) => text.replace(/\r\n/g, '\n');
+
 // Version -> Abschnitt, von `## [x.y.z]` bis vor die naechste `## [`-Zeile.
 // `[Unreleased]` faellt heraus, Leerraum am Ende zaehlt nicht.
 function releasedSections(text) {
   const sections = new Map();
-  for (const part of text.split(/^(?=## \[)/m)) {
+  for (const part of lf(text).split(/^(?=## \[)/m)) {
     const m = /^## \[(\d+\.\d+\.\d+)\]/.exec(part);
     if (m) sections.set(m[1], part.trimEnd());
   }
@@ -550,17 +554,16 @@ function releasedSectionDrift(headText, referenceText, referenceVersion, edits =
     if (edits[version] === hash) continue;
     offenders.push({ version, hash, detail: firstDifference(section, published.get(version)) });
   }
-  // Zwei vertauschte Bloecke behalten jeder seinen Text, die Datei liest sich trotzdem
-  // anders: der Rueckfall (parseChangelogFile) nimmt die Releases von oben (PR #1183).
-  // Verglichen wird nur, was auf beiden Seiten steht - eine Loeschung meldet die Schleife.
-  const order = (sections, other) => [...sections.keys()]
-    .filter((v) => other.has(v) && compareVersions(v, referenceVersion) <= 0);
-  const now = order(current, published);
-  const then = order(published, current);
-  const at = now.findIndex((v, i) => v !== then[i]);
-  if (at >= 0) {
-    offenders.push({ version: now[at], hash: null,
-      detail: `Reihenfolge: an Stelle ${at + 1} steht jetzt ${now[at]}, am Tag ${then[at]}` });
+  // Die Abschnitte stehen absteigend, der noch ungetaggte eingeschlossen: zwei vertauschte
+  // Bloecke behalten jeder ihren Text, und ein neuer Block unter einem aelteren hat keinen
+  // Tag, gegen den er sich vergleichen liesse - der Rueckfall (parseChangelogFile) nimmt
+  // die Releases aber von oben (beides aus dem Review von PR #1183). Am 14.09.2026 standen
+  // alle 887 Ueberschriften so, es braucht keine Ausnahme.
+  const headings = [...lf(headText).matchAll(/^## \[(\d+\.\d+\.\d+)\]/gm)].map((m) => m[1]);
+  for (let i = 1; i < headings.length; i += 1) {
+    if (compareVersions(headings[i - 1], headings[i]) > 0) continue;
+    offenders.push({ version: headings[i], hash: null,
+      detail: `Reihenfolge: ${headings[i]} steht unter ${headings[i - 1]}, neuere Abschnitte gehoeren nach oben` });
   }
   return { offenders, checked };
 }
@@ -648,7 +651,20 @@ test('der Abschnitts-Guard erkennt einen Eintrag im veroeffentlichten Abschnitt'
   const swapped = SAMPLE_CHANGELOG.replace(`${b121}\n${b120}`, `${b120}\n${b121}`);
   assert.notEqual(swapped, SAMPLE_CHANGELOG);
   assert.deepEqual(releasedSectionDrift(swapped, SAMPLE_CHANGELOG, '1.2.1').offenders.map((o) => [o.version, o.detail]),
-    [['1.2.0', 'Reihenfolge: an Stelle 1 steht jetzt 1.2.0, am Tag 1.2.1']]);
+    [['1.2.1', 'Reihenfolge: 1.2.1 steht unter 1.2.0, neuere Abschnitte gehoeren nach oben']]);
+
+  // Ein neuer, noch ungetaggter Block unter einem aelteren: kein Tag zum Vergleichen, die
+  // Stelle ist trotzdem falsch.
+  const pendingLow = SAMPLE_CHANGELOG.replace(b120, `## [1.2.2] - 2026-01-03\n\n### Fixed\n\n- Neu\n\n${b120}`);
+  assert.notEqual(pendingLow, SAMPLE_CHANGELOG);
+  assert.deepEqual(releasedSectionDrift(pendingLow, SAMPLE_CHANGELOG, '1.2.1').offenders.map((o) => o.version), ['1.2.2']);
+});
+
+test('der Abschnitts-Guard stolpert nicht ueber CRLF im Arbeitsbaum', () => {
+  // Windows mit core.autocrlf checkt CHANGELOG.md mit CRLF aus, `git show` liefert LF.
+  const crlf = SAMPLE_CHANGELOG.replace(/\n/g, '\r\n');
+  assert.notEqual(crlf, SAMPLE_CHANGELOG);
+  assert.deepEqual(releasedSectionDrift(crlf, SAMPLE_CHANGELOG, '1.2.1'), { offenders: [], checked: 2 });
 });
 
 test('der Release-Commit selbst ist fuer den Abschnitts-Guard kein Fund', () => {
