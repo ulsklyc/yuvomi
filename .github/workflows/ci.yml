@@ -42,21 +42,35 @@ jobs:
           fetch-depth: 2
       # Der Checkout bringt keine Tags mit, test:changelog vergleicht aber die
       # veroeffentlichten CHANGELOG-Abschnitte mit dem Tag des neuesten Abschnitts
-      # (warum einer reicht, steht am Guard). Die Version kommt aus main, nicht aus der
-      # Datei, die geprueft wird: benennt ein PR die neueste Ueberschrift um, holte der
-      # Step sonst einen aelteren Tag, und die Umbenennung fiele durch. So steht der Tag
-      # von main ohne Ueberschrift da, und der Paritaets-Test wird rot. Und nicht HEAD^1:
-      # bei workflow_dispatch ist das der Elternteil im Zweig, nach einem Merge von main
-      # in einen alten Zweig also der alte Stand (beides aus dem Review von PR #1183).
-      # Ein Zweig hinter einem Release wird damit rot wie jeder lokale Lauf mit allen
-      # Tags. Der zweitneueste Abschnitt ist der Rueckfall fuer den Push des
-      # Release-Commits, dessen Tag erst danach kommt. depth 2 und nicht 1, fuer main wie
-      # fuer den Tag: zeigt der Ref auf HEAD selbst, macht --depth=1 HEAD flach, HEAD^1
-      # verschwindet und test:migrations-append-only wird rot (in einem Klon nachgestellt).
+      # (warum einer reicht, steht am Guard). Die Version kommt nie aus der Datei, die
+      # geprueft wird: benennt ein PR die neueste Ueberschrift um, holte der Step sonst
+      # einen aelteren Tag, und die Umbenennung fiele durch. So steht der Tag der Basis
+      # ohne Ueberschrift da, und der Paritaets-Test wird rot. Die Quelle haengt am
+      # Anlass (alles aus dem Review von PR #1183):
+      # - pull_request: HEAD^1, die Basis, auf der der Merge-Commit steht. Nicht das
+      #   laufende main: wird waehrend des Laufs ein Release getaggt, holte der Step
+      #   dessen Tag, und der Paritaets-Test waere fuer einen unveraenderten PR rot.
+      # - push: HEAD, denn das ist main.
+      # - workflow_dispatch: main, eigens geholt. HEAD^1 ist dort der Elternteil im
+      #   Zweig, nach einem Merge von main in einen alten Zweig also der alte Stand. Ein
+      #   Zweig hinter einem Release wird damit rot wie jeder lokale Lauf mit allen Tags.
+      # Der zweitneueste Abschnitt ist der Rueckfall fuer den Push des Release-Commits,
+      # dessen Tag erst danach kommt. depth 2 und nicht 1, fuer main wie fuer den Tag:
+      # zeigt der Ref auf HEAD selbst, macht --depth=1 HEAD flach, HEAD^1 verschwindet
+      # und test:migrations-append-only wird rot (in einem Klon nachgestellt).
       - name: Fetch the release tag of the newest CHANGELOG section
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          git fetch --no-tags --depth=2 origin +refs/heads/main:refs/remotes/origin/main
-          for version in $(git show refs/remotes/origin/main:CHANGELOG.md | grep -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' | head -n 2 | tr -d '#[] '); do
+          case "$EVENT_NAME" in
+            pull_request) source=HEAD^1 ;;
+            push) source=HEAD ;;
+            *)
+              git fetch --no-tags --depth=2 origin +refs/heads/main:refs/remotes/origin/main
+              source=refs/remotes/origin/main
+              ;;
+          esac
+          for version in $(git show "${source}:CHANGELOG.md" | grep -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' | head -n 2 | tr -d '#[] '); do
             if git fetch --no-tags --depth=2 origin "+refs/tags/v${version}:refs/tags/v${version}"; then
               exit 0
             fi
