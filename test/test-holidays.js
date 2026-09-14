@@ -361,6 +361,14 @@ test('getGroups: a country WITH subdivisions has no groups without a region (DE-
   assert.deepEqual(paths, ['/Subdivisions'], 'no /Groups call for a country that has subdivisions');
 });
 
+test('getForRange: a group of another country filters nothing (PR #1186)', () => {
+  setConfig({ holiday_country: 'DE', holiday_group: 'BE-FR', holiday_show_school: '1' });
+  seedHoliday({ type: 'school', country: 'DE', group: 'DE-MV-ABS', start: '2026-07-13', end: '2026-08-22', name: 'Sommerferien MV' });
+  seedHoliday({ type: 'school', country: 'DE', start: '2026-07-30', end: '2026-09-12', name: 'Sommerferien BY' });
+  const names = getForRange('2026-07-01', '2026-09-30').map((r) => r.name).sort();
+  assert.deepEqual(names, ['Sommerferien BY', 'Sommerferien MV'], 'die belgische Gruppe filtert deutsche Ferien nicht leer');
+});
+
 test('getGroups: a 200 that is not an array is an error, not "no groups" (PR #1186)', async () => {
   __setFetchImpl(async (url) => (new URL(String(url)).pathname === '/Subdivisions' ? okJson([]) : okJson({ message: 'maintenance' })));
   await assert.rejects(getGroups('BE'), /Unexpected \/Groups response shape/);

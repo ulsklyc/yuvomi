@@ -962,8 +962,13 @@ function getForRange(from, to) {
   // Feiertage) gezeigt. So bleibt genau EIN korrektes Ferien-Regime übrig und der
   // Union-Merge unten wird zum No-op. Ohne Gruppen-Auswahl greift der Merge als
   // Fallback und kollabiert überlappende Varianten wie bisher. (#434)
-  const groupClause = group ? 'AND (group_code IS NULL OR group_code = ?)' : '';
-  const groupArgs   = group ? [group] : [];
+  // Eine Gruppe filtert nur das Land, zu dem sie gehoert (CH-BE-VS -> CH, BE-FR
+  // -> BE). Steht nach einem Landwechsel noch eine fremde Gruppe in der
+  // Konfiguration, wird sie ignoriert, statt die Schulferien des neuen Landes
+  // leer zu filtern (Review zu PR #1186).
+  const groupApplies = group !== null && group.startsWith(`${country}-`);
+  const groupClause = groupApplies ? 'AND (group_code IS NULL OR group_code = ?)' : '';
+  const groupArgs   = groupApplies ? [group] : [];
 
   // GROUP BY kollabiert identische Feiertage, die aus mehreren Scopes im Cache
   // liegen (z. B. länderweite NULL-Zeilen aus der Zeit vor #434 neben dem heutigen

@@ -1209,6 +1209,9 @@ router.put('/', (req, res) => {
           cfgDelete('holiday_subdivision');
           cfgDelete('holiday_group');
         } else {
+          // Anderes Land ohne mitgeschickte Gruppe: die gespeicherte gehoert zum
+          // alten Land (BE-FR) und darf das neue nicht filtern (Review zu PR #1186).
+          if (holiday_group === undefined && cfgGet('holiday_country') !== holiday_country) cfgDelete('holiday_group');
           cfgSet('holiday_country', holiday_country);
         }
       }

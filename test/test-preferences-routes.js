@@ -648,6 +648,19 @@ test('PUT holiday_subdivision=null laesst die Gruppe eines Landes ohne Subdivisi
   assert.equal(removed.body.data.holiday_subdivision, null);
   assert.equal(removed.body.data.holiday_group, null);
 });
+test('PUT holiday_country auf ein anderes Land ohne Gruppe raeumt die alte Gruppe ab (PR #1186)', async () => {
+  await put({ holiday_country: 'BE', holiday_subdivision: null, holiday_group: 'BE-FR' });
+  const moved = await put({ holiday_country: 'DE', holiday_subdivision: null });
+  assert.equal(moved.body.data.holiday_country, 'DE');
+  assert.equal(moved.body.data.holiday_group, null, 'BE-FR gehoert nicht zu DE');
+  // Dasselbe Land erneut: die Gruppe bleibt.
+  await put({ holiday_country: 'BE', holiday_group: 'BE-FR' });
+  const same = await put({ holiday_country: 'BE' });
+  assert.equal(same.body.data.holiday_group, 'BE-FR');
+  // Landwechsel MIT neuer Gruppe: die neue gilt.
+  const withGroup = await put({ holiday_country: 'CH', holiday_subdivision: 'CH-BE', holiday_group: 'CH-BE-VS' });
+  assert.equal(withGroup.body.data.holiday_group, 'CH-BE-VS');
+});
 test('GET /holidays/groups/:cc: Land ohne Subdivisionen -> Gruppen am Land (D#1182)', async () => {
   holidays.__setFetchImpl(async (url) => ({
     ok: true,

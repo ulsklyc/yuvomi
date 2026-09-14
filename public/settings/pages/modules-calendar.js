@@ -786,7 +786,11 @@ async function bindEvents(container, preferences) {
     if (subdivisionsResult.ok && subdivisionsResult.value) {
       discoveryState.subdivisionReady = subdivisionsResult.value.selectedResolved;
     }
-    if (preferences.holiday_subdivision) {
+    // Hat der Nutzer waehrend der Regionssuche schon ein anderes Land gewaehlt,
+    // gehoert der Gruppenzustand dessen Wechsel: keine Suche mehr fuer das
+    // gespeicherte Land starten, sie wuerde die neuere ueberholen (Review zu PR #1186).
+    const stillSavedCountry = countrySelect.value === preferences.holiday_country;
+    if (stillSavedCountry && preferences.holiday_subdivision) {
       applyGroupResult(await loadGroups(
         groupSelect,
         groupGroup,
@@ -795,7 +799,7 @@ async function bindEvents(container, preferences) {
         preferences.holiday_group || '',
         groupRequests,
       ));
-    } else if (subdivisionsResult.ok && subdivisionsResult.value && subdivisionSelect.options.length <= 1
+    } else if (stillSavedCountry && subdivisionsResult.ok && subdivisionsResult.value && subdivisionSelect.options.length <= 1
       && countrySchoolHolidaysAvailable(countriesData, preferences.holiday_country)) {
       // Land ohne Subdivisionen (Belgien, D#1182): gespeicherte Gruppe am Land.
       applyGroupResult(await loadGroups(
@@ -807,7 +811,7 @@ async function bindEvents(container, preferences) {
         groupRequests,
         { countryLevel: true },
       ));
-    } else if (subdivisionsResult.ok && subdivisionsResult.value) {
+    } else if (stillSavedCountry && subdivisionsResult.ok && subdivisionsResult.value) {
       // Land mit Subdivisionen, keine gewaehlt: bestaetigt ohne Gruppe.
       discoveryState.groupReady = true;
     }

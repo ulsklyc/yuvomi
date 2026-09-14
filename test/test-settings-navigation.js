@@ -952,6 +952,9 @@ test('a country change invalidates the old group picker before it awaits the sub
   const initial = source.slice(source.indexOf('const countriesResult = await runHolidayDiscovery('));
   assert.match(initial, /subdivisionSelect\.options\.length <= 1\s*&& countrySchoolHolidaysAvailable\(countriesData, preferences\.holiday_country\)\) \{/,
     'auch der erste Aufbau fragt ein Land ohne Schulferien-Quelle nicht am Land');
+  assert.match(initial, /const stillSavedCountry = countrySelect\.value === preferences\.holiday_country;\s*if \(stillSavedCountry && preferences\.holiday_subdivision\) \{/,
+    'der erste Aufbau startet keine Gruppensuche fuer das gespeicherte Land, wenn schon ein anderes gewaehlt ist');
+  assert.match(initial, /\} else if \(stillSavedCountry && subdivisionsResult\.ok && subdivisionsResult\.value && subdivisionSelect\.options\.length <= 1/);
 });
 
 test('holiday sync enables public holidays when every layer is disabled', () => {
