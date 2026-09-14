@@ -8,7 +8,7 @@
   <Profile>
 **Yuvomi** - the self-hosted family planner PWA.
 
-A private, offline-capable web app that keeps your household organized - tasks, groceries, meals, recipes, pantry stock, calendar, shift schedules, documents, budget, health, rewards, inventory, housekeeping, notes, contacts, birthdays and more - in one place, without cloud accounts or subscriptions.
+A private, offline-capable web app that keeps your household organized - tasks, groceries, meals, recipes, pantry stock, calendar, shift schedules, documents, budget, health, rewards, inventory, housekeeping, waste collection, notes, contacts, birthdays and more - in one place, without cloud accounts or subscriptions.
 
 This repository ships the official Docker template for Yuvomi. The image is published to GitHub Container Registry at `ghcr.io/ulsklyc/yuvomi`.
 
