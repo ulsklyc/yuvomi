@@ -1,7 +1,7 @@
 # Digest des Multi-Arch-Index von node:24.20.0-slim (bookworm), Stand 4.9.2026.
 # Ein Tag allein ist eine Behauptung, der Digest ist das Image, das gebaut wurde;
 # Dependabot (docker) hebt ihn mit dem Tag. Beide FROM-Zeilen tragen denselben.
-FROM node:24-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e AS build
+FROM node:24-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553 AS build
 
 # Toolchain als Notnagel für native Module. Seit v13 ist
 # better-sqlite3-multiple-ciphers auf Node-API gebaut und liefert die Binaries
@@ -23,7 +23,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 # ---- Runtime stage ----
-FROM node:24-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e
+FROM node:24-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
 
 RUN apt-get update && apt-get install -y \
     gosu \
