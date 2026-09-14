@@ -50,21 +50,39 @@ jobs:
       # - pull_request: HEAD^1, die Basis, auf der der Merge-Commit steht. Nicht das
       #   laufende main: wird waehrend des Laufs ein Release getaggt, holte der Step
       #   dessen Tag, und der Paritaets-Test waere fuer einen unveraenderten PR rot.
-      # - push: HEAD, denn das ist main.
+      # - push: der main-Stand VOR dem Push (github.event.before), nicht HEAD (#1185). Mit
+      #   HEAD waehlte ein direkter Push, der die neueste Ueberschrift loescht oder
+      #   umbenennt, seine Referenz selbst und blieb gruen. HEAD^1 allein reicht nur fuer
+      #   einen Push aus EINEM Commit; bei mehreren steht die Umbenennung schon im
+      #   Elternteil. Liegt der Vorstand nicht im flachen Klon, wird er einzeln geholt,
+      #   --depth=1 ist dort unschaedlich: er ist nie HEAD, und HEAD^1 faengt cat-file
+      #   vorher ab. Rueckfall HEAD^1 fuer die Null-SHA eines neuen Zweigs und fuer einen
+      #   Vorstand, den der Server nicht mehr herausgibt (Force-Push).
       # - workflow_dispatch: main, eigens geholt. HEAD^1 ist dort der Elternteil im
       #   Zweig, nach einem Merge von main in einen alten Zweig also der alte Stand. Ein
       #   Zweig hinter einem Release wird damit rot wie jeder lokale Lauf mit allen Tags.
-      # Der zweitneueste Abschnitt ist der Rueckfall fuer den Push des Release-Commits,
-      # dessen Tag erst danach kommt. depth 2 und nicht 1, fuer main wie fuer den Tag:
+      # Der zweitneueste Abschnitt ist der Rueckfall fuer einen Vorstand, dessen neuester
+      # Abschnitt noch keinen Tag hat. depth 2 und nicht 1, fuer main wie fuer den Tag:
       # zeigt der Ref auf HEAD selbst, macht --depth=1 HEAD flach, HEAD^1 verschwindet
       # und test:migrations-append-only wird rot (in einem Klon nachgestellt).
       - name: Fetch the release tag of the newest CHANGELOG section
         env:
           EVENT_NAME: ${{ github.event_name }}
+          PUSH_BEFORE: ${{ github.event.before }}
         run: |
           case "$EVENT_NAME" in
             pull_request) source=HEAD^1 ;;
-            push) source=HEAD ;;
+            push)
+              source=HEAD^1
+              if [ -z "$PUSH_BEFORE" ] || [ "$PUSH_BEFORE" = 0000000000000000000000000000000000000000 ]; then
+                echo "No pre-push revision - reading the CHANGELOG reference from HEAD^1."
+              elif git cat-file -e "${PUSH_BEFORE}^{commit}" 2>/dev/null \
+                || git fetch --no-tags --depth=1 origin "$PUSH_BEFORE"; then
+                source=$PUSH_BEFORE
+              else
+                echo "Pre-push revision $PUSH_BEFORE is not available - reading the CHANGELOG reference from HEAD^1."
+              fi
+              ;;
             *)
               git fetch --no-tags --depth=2 origin +refs/heads/main:refs/remotes/origin/main
               source=refs/remotes/origin/main
