@@ -1003,10 +1003,14 @@ test('die Unraid-Vorlage gibt keinem UI-sperrenden Schlüssel einen Wert vor', (
       const selfClosing = src[i - 1] === '/';
       const attrs = src.slice(pos, selfClosing ? i - 1 : i);
       if (selfClosing) { out.push({ attrs, text: '' }); pos = i + 1; continue; }
-      const close = src.indexOf('</Config>', i + 1);
-      if (close === -1) return [...out, { attrs, text: '', broken: true }];
-      out.push({ attrs, text: src.slice(i + 1, close) });
-      pos = close + '</Config>'.length;
+      // XML erlaubt Leerraum vor dem ">" des End-Tags (`</Config >`, auch ueber einen
+      // Zeilenumbruch); ein literales '</Config>' uebersaehe das und liefe in den naechsten Eintrag.
+      const closeTag = /<\/Config\s*>/g;
+      closeTag.lastIndex = i + 1;
+      const close = closeTag.exec(src);
+      if (close === null) return [...out, { attrs, text: '', broken: true }];
+      out.push({ attrs, text: src.slice(i + 1, close.index) });
+      pos = close.index + close[0].length;
     }
   };
 
