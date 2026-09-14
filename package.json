@@ -342,21 +342,21 @@
   "dependencies": {
     "bcrypt": "^6.0.0",
     "better-sqlite3-multiple-ciphers": "^13.0.3",
-    "compression": "^1.8.1",
+    "compression": "^1.8.2",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
     "express-session": "^1.19.0",
     "helmet": "^8.3.0",
-    "libphonenumber-js": "^1.13.12",
+    "libphonenumber-js": "^1.13.13",
     "node-cron": "^4.6.0",
-    "nodemailer": "^10.0.0",
-    "openid-client": "^6.8.7",
+    "nodemailer": "^10.0.8",
+    "openid-client": "^6.8.8",
     "web-push": "^3.6.7"
   },
   "optionalDependencies": {
-    "googleapis": "^178.0.0",
-    "tsdav": "^2.3.1"
+    "googleapis": "^180.0.0",
+    "tsdav": "^2.3.3"
   },
   "license": "MIT",
   "devDependencies": {
