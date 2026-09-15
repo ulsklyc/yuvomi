@@ -128,7 +128,7 @@ without a terminal.
 - **Image** - `ghcr.io/ulsklyc/`<wbr>`yuvomi:latest`, about 500 MB.
 - **Needs** - 256 MB RAM and one port, 3000 by default.
 - **Writes** - four volumes you own: data, backups, modules, documents.
-- **Outbound** - out of the box, one update check against the GitHub releases API. Block it and nothing breaks, only the hint about a newer version stays away. Weather, public holidays, calendar and contact sync, push and notification channels, cloud storage and backup reach out only once you switch them on.
+- **Outbound** - out of the box, one update check against the GitHub releases API. Block it and nothing breaks, only the hint about a newer version stays away. Opening the calendar settings loads the list of holiday countries from openholidaysapi.org. Weather, public holidays, calendar and contact sync, push and notification channels, cloud storage and backup reach out only once you switch them on.
 - **Your LAN** - calendar subscriptions, WebDAV storage and recipe mirrors on private or internal addresses stay blocked until you opt in ([how](docs/installation.md#environment-variables)).
 - **Encryption key** - optional, but there is no way back: a lost or changed key never opens the database again, not by you and not by us. The guided setup and Umbrel generate one for you; with Compose, TrueNAS or Unraid you set it yourself, so write it down.
 - **Your data** - one SQLite file at `/data/yuvomi.db`, plus the folder, WebDAV or Drive if you moved documents there.
@@ -156,7 +156,8 @@ docker compose up -d
 ```
 
 Open `http://localhost:3000`. The first visit walks you through creating your admin account. If the
-page does not load, `docker compose logs` usually names the reason, and the
+page does not load, `docker compose logs` (on Podman, `podman compose -f podman-compose.yml logs`)
+usually names the reason, and the
 [troubleshooting guide](docs/installation.md#troubleshooting) covers the common ones.
 
 ### Guided setup

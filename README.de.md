@@ -128,7 +128,7 @@ Such dir deinen Weg aus: [Docker oder Podman](#docker-oder-podman) für volle Ko
 - **Image** - `ghcr.io/ulsklyc/`<wbr>`yuvomi:latest`, rund 500 MB.
 - **Braucht** - 256 MB RAM und einen Port, standardmäßig 3000.
 - **Schreibt** - vier Volumes, die dir gehören: Daten, Backups, Module, Dokumente.
-- **Nach außen** - ab Werk eine Update-Abfrage an die GitHub-Releases-API. Blockier sie, und nichts geht kaputt, nur der Hinweis auf eine neuere Version bleibt aus. Wetter, Feiertage, Kalender- und Kontakte-Sync, Push- und Benachrichtigungskanäle, Cloud-Speicher und Backup gehen erst nach außen, wenn du sie einschaltest.
+- **Nach außen** - ab Werk eine Update-Abfrage an die GitHub-Releases-API. Blockier sie, und nichts geht kaputt, nur der Hinweis auf eine neuere Version bleibt aus. Das Öffnen der Kalender-Einstellungen lädt die Liste der Feiertagsländer von openholidaysapi.org. Wetter, Feiertage, Kalender- und Kontakte-Sync, Push- und Benachrichtigungskanäle, Cloud-Speicher und Backup gehen erst nach außen, wenn du sie einschaltest.
 - **Dein LAN** - Kalender-Abos, WebDAV-Speicher und Rezept-Spiegel unter privaten oder internen Adressen bleiben blockiert, bis du sie freigibst ([wie](docs/installation.md#environment-variables)).
 - **Schlüssel** - optional, aber ohne Weg zurück: ein verlorener oder geänderter Schlüssel öffnet die Datenbank nie wieder, weder für dich noch für uns. Die geführte Einrichtung und Umbrel erzeugen ihn für dich; mit Compose, TrueNAS oder Unraid setzt du ihn selbst, also schreib ihn auf.
 - **Deine Daten** - eine SQLite-Datei unter `/data/yuvomi.db`, dazu Ordner, WebDAV oder Drive, falls die Dokumente dort liegen.
@@ -157,7 +157,8 @@ docker compose up -d
 ```
 
 Öffne `http://localhost:3000`. Der erste Besuch führt dich durch das Anlegen des Admin-Kontos. Lädt
-die Seite nicht, nennt `docker compose logs` meist den Grund, und die
+die Seite nicht, nennt `docker compose logs` (unter Podman `podman compose -f podman-compose.yml logs`)
+meist den Grund, und die
 [Fehlersuche](docs/installation.md#troubleshooting) deckt die häufigen Fälle ab.
 
 ### Geführte Einrichtung
