@@ -28,6 +28,7 @@ import {
   deleteOccurrence,
   isEligibleLocalSeries,
   isLocallyOwnedSeries,
+  parseOverrideFields,
   splitSeries,
   truncateSeries,
   upsertOccurrenceOverride,
@@ -151,13 +152,20 @@ function validateOccurrenceAssignments(database, value) {
   return { value: ids, error: null };
 }
 
-/** Der gespeicherte Stand eines Vorkommens: wer an der Serie steht oder am schon abgewandelten Vorkommen. */
+/**
+ * Der gespeicherte Stand eines Vorkommens - nach derselben Regel wie
+ * upsertOccurrenceOverride() und splitSeries(): besitzt ein bestehendes
+ * Vorkommen seine Zuweisungen (`overridden_fields` enthaelt `assignments`),
+ * gelten dessen, sonst die der Serie. Wer das Vorkommen schon entfernt hat,
+ * steht damit nicht mehr auf der Bestandsliste.
+ */
 function storedOccurrenceAssignees(database, seriesId, recurrenceId) {
-  return database.prepare(`
-    SELECT user_id FROM event_assignments
-    WHERE event_id = ?
-       OR event_id IN (SELECT id FROM calendar_events WHERE recurrence_parent_id = ? AND recurrence_id = ?)
-  `).all(seriesId, seriesId, recurrenceId).map((row) => row.user_id);
+  const existing = database.prepare(`
+    SELECT id, overridden_fields FROM calendar_events
+    WHERE recurrence_parent_id = ? AND recurrence_id = ?
+  `).get(seriesId, recurrenceId);
+  const ownsAssignments = existing && parseOverrideFields(existing.overridden_fields).includes('assignments');
+  return storedEventAssignees(database, ownsAssignments ? existing.id : seriesId);
 }
 
 /** Wer am Termin steht, so wie es der Schreibvorgang gerade vorfindet. */

@@ -632,6 +632,30 @@ test('calendar: this-and-following keeps a stored staff attendee and takes no ne
   assert.deepEqual(assignedIds('event_assignments', 'event_id', kept.body.data.id), byId([BEN, CLARA]));
 });
 
+test('calendar: an occurrence that owns its attendees is the stored state, not the series', async () => {
+  // Die Serie nennt Clara, das Vorkommen hat sie mit einer eigenen
+  // Zuweisung entfernt. Fuer dieses Vorkommen ist sie damit NICHT mehr
+  // gespeichert - sie wieder hinzuzufuegen ist eine neue Wahl. Genau so
+  // bestimmt upsertOccurrenceOverride() den geltenden Stand.
+  const seriesId = addSeries('Einkauf', '2030-08-01T09:00:00', [CLARA]);
+  const removed = await call('PUT', `/calendar/${seriesId}/occurrences/2030-08-03`, { body: { assigned_to: [BEN] } });
+  assert.equal(removed.status, 200, JSON.stringify(removed.body));
+  const child = db.prepare('SELECT id, overridden_fields FROM calendar_events WHERE recurrence_parent_id = ? AND recurrence_id = ?').get(seriesId, '2030-08-03');
+  assert.match(String(child?.overridden_fields), /assignments/, 'Vorbedingung: das Vorkommen besitzt seine Zuweisungen');
+  assert.deepEqual(assignedIds('event_assignments', 'event_id', child.id), [BEN]);
+
+  assertRejectsNonMember(
+    await call('PUT', `/calendar/${seriesId}/occurrences/2030-08-03`, { body: { assigned_to: [BEN, CLARA] } }),
+    'staff re-added to an occurrence that had removed them',
+  );
+  assert.deepEqual(assignedIds('event_assignments', 'event_id', child.id), [BEN], 'a rejected PUT writes nothing');
+
+  // Gegenprobe: ein Vorkommen ohne eigene Zuweisung erbt die der Serie, dort
+  // bleibt Clara gespeichert.
+  const inherited = await call('PUT', `/calendar/${seriesId}/occurrences/2030-08-04`, { body: { assigned_to: [BEN, CLARA] } });
+  assert.equal(inherited.status, 200, JSON.stringify(inherited.body));
+});
+
 test('calendar: a rejected attendee leaves no staged attachment behind', async () => {
   // Ordner-gestuetzte Ablage, damit eine liegen gebliebene Datei sichtbar wird -
   // der Standardpfad legt Anhaenge als BLOB in die Datenbank.
