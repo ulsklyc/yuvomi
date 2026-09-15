@@ -333,8 +333,6 @@ function adminPredicates(source) {
   });
 }
 
-const FALLBACK = "return req.authRole==='admin'||req.session?.role==='admin'";
-
 /** Datei -> erlaubte Vorkommen als `<Ausdruck> @ <Anweisung>`, mit Grund. */
 const ADMIN_PREDICATE_EXCEPTIONS = new Map([
   // Die Definition des Helfers selbst.
@@ -349,25 +347,6 @@ const ADMIN_PREDICATE_EXCEPTIONS = new Map([
   // Ausserhalb dieses Schnitts geblieben; zieht beim naechsten Anfassen nach.
   ['server/routes/dashboard.js', [
     "authRole==='admin' @ result.quicklinks=listQuickLinksFor(userId,req.authRole==='admin')",
-  ]],
-  // Fassungen mit Fallback auf die Session-Rolle: das Einsammeln aendert, was
-  // Token plus Admin-Cookie duerfen, und ist ein eigener Schritt.
-  ['server/routes/calendar/helpers.js', [
-    "authRole==='admin' @ return req.authRole==='admin'||req.session?.isAdmin===true||req.session?.role==='admin'",
-    "session?.isAdmin @ return req.authRole==='admin'||req.session?.isAdmin===true||req.session?.role==='admin'",
-    "session?.role==='admin' @ return req.authRole==='admin'||req.session?.isAdmin===true||req.session?.role==='admin'",
-  ]],
-  ...['dms', 'documents', 'recipe-providers', 'split-expenses', 'tasks'].map((name) => [
-    `server/routes/${name}.js`,
-    [`authRole==='admin' @ ${FALLBACK}`, `session?.role==='admin' @ ${FALLBACK}`],
-  ]),
-  ['server/routes/notes.js', [
-    "authRole==='admin' @ if(req.authRole==='admin'||req.session?.role==='admin')return true",
-    "session?.role==='admin' @ if(req.authRole==='admin'||req.session?.role==='admin')return true",
-  ]],
-  ['server/routes/schedule.js', [
-    "authRole==='admin' @ export const isAdmin=(req)=>req.authRole==='admin'||req.session?.role==='admin'",
-    "session?.role==='admin' @ export const isAdmin=(req)=>req.authRole==='admin'||req.session?.role==='admin'",
   ]],
 ]);
 

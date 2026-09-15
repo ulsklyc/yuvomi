@@ -8,6 +8,7 @@ import { StorageError } from '../../services/document-storage.js';
 import { ensureModuleFolder } from '../../services/document-folders.js';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../../utils/upload-limit.js';
 import { contentMatchesMime } from '../../utils/file-signature.js';
+import { isAdminRequest } from '../../middleware/require-admin.js';
 import {
   fanOutEventReminders, dropInheritedEventReminders, eventAuthorId,
 } from '../../services/event-reminder-fanout.js';
@@ -64,8 +65,9 @@ export function getUserId(req) {
   return null;
 }
 
+/** Bleibt als Name fuer die Kalender-Router und das Dashboard; die Regel steht in isAdminRequest(). */
 export function isAdminUser(req) {
-  return req.authRole === 'admin' || req.session?.isAdmin === true || req.session?.role === 'admin';
+  return isAdminRequest(req);
 }
 
 export function eventIcon(value) {

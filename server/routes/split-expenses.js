@@ -9,6 +9,7 @@ import * as db from '../db.js';
 import { hashPassword, normalizePassword } from '../utils/password.js';
 import { createLogger } from '../logger.js';
 import { collectErrors, date as validateDate, id as validateId, str, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
 import { documentLinksFor, loadDocumentLinks, replaceDocumentLinks, visibleDocumentRef } from '../services/document-links.js';
 import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
 import { buildSplits, decorateMoney, minorToDecimal, parseMoneyToMinor, simplifyDebts } from '../services/split-expenses.js';
@@ -57,10 +58,6 @@ function isSplitGuest(req) {
   return Boolean(splitGuestScope(req));
 }
 
-function isSystemAdmin(req) {
-  return req.authRole === 'admin' || req.session?.role === 'admin';
-}
-
 function defaultCurrency() {
   return db.get().prepare('SELECT value FROM sync_config WHERE key = ?').get('currency')?.value || 'EUR';
 }
@@ -72,7 +69,7 @@ function memberRole(groupId, uid) {
 function canManageGroup(groupId, req) {
   if (isSplitGuest(req)) return false;
   const role = memberRole(groupId, userId(req));
-  return isSystemAdmin(req) || role === 'owner' || role === 'admin';
+  return isAdminRequest(req) || role === 'owner' || role === 'admin';
 }
 
 function requireGroupAccess(groupId, req) {
@@ -85,7 +82,7 @@ function requireGroupAccess(groupId, req) {
     LEFT JOIN expense_group_members m ON m.group_id = g.id AND m.user_id = ?
     WHERE g.id = ?
   `).get(userId(req), groupId);
-  if (!group || (!group.member_role && !isSystemAdmin(req))) return null;
+  if (!group || (!group.member_role && !isAdminRequest(req))) return null;
   return group;
 }
 
@@ -229,7 +226,7 @@ function loadExpense(expenseId, req) {
   });
   // Der Admin-Bypass gilt nicht für Gastkonten - sonst hinge das Confinement an
   // der Annahme, dass ein Gast nie die Admin-Rolle trägt.
-  if (!expense && (!isSystemAdmin(req) || guest)) return null;
+  if (!expense && (!isAdminRequest(req) || guest)) return null;
   if (!expense) {
     return db.get().prepare(`
       SELECT e.*, u.display_name AS payer_name, g.name AS group_name

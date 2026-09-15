@@ -12,6 +12,7 @@ import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
 import { str, MAX_TITLE, MAX_URL } from '../middleware/validate.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
 import { getAdapter, SUPPORTED_PROVIDERS } from '../services/recipe-providers/index.js';
 import {
   isBlockedBaseUrl, isPrivateNetworkRefusal, withPrivateNetworkHint, PRIVATE_NETWORK_MESSAGE,
@@ -21,7 +22,6 @@ import { sync, syncOne, getStatus } from '../services/recipe-provider-sync.js';
 const log = createLogger('RecipeProviders');
 const router = express.Router();
 
-function isAdmin(req) { return req.authRole === 'admin' || req.session?.role === 'admin'; }
 function userId(req) { return req.authUserId || req.session?.userId; }
 
 function publicAccount(row) {
@@ -36,7 +36,7 @@ function getAccount(id) {
 
 router.get('/accounts', (req, res) => {
   try {
-    if (!isAdmin(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const rows = db.get().prepare('SELECT * FROM recipe_provider_accounts ORDER BY name COLLATE NOCASE').all();
     res.json({ data: rows.map(publicAccount) });
   } catch (err) {
@@ -47,7 +47,7 @@ router.get('/accounts', (req, res) => {
 
 router.post('/accounts', async (req, res) => {
   try {
-    if (!isAdmin(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const provider = SUPPORTED_PROVIDERS.includes(req.body.provider) ? req.body.provider : 'mealie';
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
     const vUrl = str(req.body.base_url, 'Base URL', { max: MAX_URL });
@@ -104,7 +104,7 @@ router.post('/accounts', async (req, res) => {
 
 router.patch('/accounts/:id', (req, res) => {
   try {
-    if (!isAdmin(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const account = getAccount(Number(req.params.id));
     if (!account) return res.status(404).json({ error: 'Recipe provider account not found.', code: 404 });
 
@@ -141,7 +141,7 @@ router.patch('/accounts/:id', (req, res) => {
 
 router.delete('/accounts/:id', (req, res) => {
   try {
-    if (!isAdmin(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const id = Number(req.params.id);
     const existing = getAccount(id);
     if (!existing) return res.status(404).json({ error: 'Recipe provider account not found.', code: 404 });
@@ -158,7 +158,7 @@ router.delete('/accounts/:id', (req, res) => {
 
 router.post('/accounts/:id/test', async (req, res) => {
   try {
-    if (!isAdmin(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const account = getAccount(Number(req.params.id));
     if (!account) return res.status(404).json({ error: 'Recipe provider account not found.', code: 404 });
     const probe = await getAdapter(account).testConnection();
@@ -175,7 +175,7 @@ router.post('/accounts/:id/test', async (req, res) => {
 
 router.post('/accounts/:id/sync', async (req, res) => {
   try {
-    if (!isAdmin(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const account = getAccount(Number(req.params.id));
     if (!account) return res.status(404).json({ error: 'Recipe provider account not found.', code: 404 });
     const result = await syncOne(account.id);
@@ -188,7 +188,7 @@ router.post('/accounts/:id/sync', async (req, res) => {
 
 router.post('/sync', async (req, res) => {
   try {
-    if (!isAdmin(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const result = await sync();
     res.json({ data: result });
   } catch (err) {

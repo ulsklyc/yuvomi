@@ -158,6 +158,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A request with an API token is judged by the token's own role, even when an admin session comes
+  along.** If the same client also sent the session cookie of a signed-in administrator, a request
+  made with a member's API token could still pass as an administrator in several places: calendar
+  subscriptions and events, locked tasks, household note categories, documents and DMS connections,
+  recipe providers, the shift schedule and split expenses. Each of them had its own admin check that
+  also looked at the session. They now use the same check as every other route, which looks only at
+  the role of the person the token belongs to. Signing in as an administrator without a token keeps
+  full access, and a request with only a session or only a token behaves as before.
 - **Form fields have a clearly visible edge in both themes.** Text inputs, selects and text areas
   drew their resting edge in the same faint shade as card and group outlines, which rendered at 1.2
   to 1.5:1 against the surface around them - well below the 3:1 a control boundary needs for people

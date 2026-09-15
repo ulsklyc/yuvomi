@@ -53,7 +53,9 @@ app.use(express.json());
 app.use((req, _res, next) => {
   req.authUserId = session.userId;
   req.authRole = session.role;
-  req.session = { userId: session.userId, role: session.role };
+  // cookieSession: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
+  // setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung.
+  req.session = session.cookieSession ?? { userId: session.userId, role: session.role };
   next();
 });
 app.use('/api/v1/documents/dms', dmsRouter);
@@ -104,6 +106,14 @@ test('GET /accounts: Member bekommt 403', async () => {
   const res = await call('GET', '/accounts');
   assert.equal(res.status, 403);
   session = { userId: adminId, role: 'admin' };
+});
+
+test('GET /accounts: Mitglieds-Token neben einer Admin-Sitzung bekommt 403, die Admin-Sitzung allein 200', async () => {
+  session = { userId: memberId, role: 'member', cookieSession: { userId: adminId, role: 'admin' } };
+  const withToken = await call('GET', '/accounts');
+  session = { userId: adminId, role: 'admin' };
+  assert.equal(withToken.status, 403, 'das Gate urteilt nach der Rolle des Token-Subjekts');
+  assert.equal((await call('GET', '/accounts')).status, 200);
 });
 
 test('DELETE /accounts/:id: Admin entfernt Account', async () => {

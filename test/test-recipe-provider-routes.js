@@ -30,7 +30,9 @@ app.use(express.json());
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
+  // cookieSession: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
+  // setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung.
+  req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
   next();
 });
 app.use('/', recipeProvidersRouter);
@@ -69,6 +71,14 @@ test('GET /accounts: Nicht-Admin → 403', async () => {
   const r = await call('GET', '/accounts');
   actor = { id: ADMIN, role: 'admin' };
   assert.equal(r.status, 403);
+});
+
+test('GET /accounts: Mitglieds-Token neben einer Admin-Sitzung → 403, die Admin-Sitzung allein → 200', async () => {
+  actor = { id: MEMBER, role: 'member', cookieSession: { userId: ADMIN, role: 'admin' } };
+  const withToken = await call('GET', '/accounts');
+  actor = { id: ADMIN, role: 'admin' };
+  assert.equal(withToken.status, 403, 'das Gate urteilt nach der Rolle des Token-Subjekts');
+  assert.equal((await call('GET', '/accounts')).status, 200);
 });
 
 test('POST /accounts: fehlende Felder → 400', async () => {

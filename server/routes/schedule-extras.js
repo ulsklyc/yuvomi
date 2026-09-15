@@ -18,10 +18,11 @@
 import express from 'express';
 import * as db from '../db.js';
 import { collectErrors, date, id, str } from '../middleware/validate.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
 import { dateKeysInRange } from '../services/schedule.js';
 import { daysBetweenDateKeys } from '../utils/timezone.js';
 import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js';
-import { validateFieldValues, replaceFieldValues, fieldValuesFor, isAdmin, rejectedScheduleOwner } from './schedule.js';
+import { validateFieldValues, replaceFieldValues, fieldValuesFor, rejectedScheduleOwner } from './schedule.js';
 import { nonMemberMessage } from '../services/household-members.js';
 import { createLogger } from '../logger.js';
 
@@ -31,7 +32,7 @@ const actorId = (req) => req.authUserId || req.session?.userId;
 const fail = (res, code, error) => res.status(code).json({ error, code });
 const userExists = (value) => !!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(value);
 const typeExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_shift_types WHERE id = ?').get(value);
-const mineOrAdmin = (req, userId) => isAdmin(req) || actorId(req) === userId;
+const mineOrAdmin = (req, userId) => isAdminRequest(req) || actorId(req) === userId;
 // Ein committeter Schreibvorgang darf nicht an einem werfenden Resync
 // scheitern - der Aufrufer hat sein Extra bereits, ein 500er hier wuerde ihm
 // das Gegenteil vorspiegeln und einen idempotenten Retry zur Dublette machen.

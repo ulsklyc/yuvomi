@@ -41,7 +41,9 @@ const app = express();
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
+  // cookieSession: a session sent along with an API token - requireAuth then
+  // takes authUserId/authRole from the token, req.session stays the session.
+  req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
   next();
 });
 app.use(express.json());
@@ -189,4 +191,16 @@ test('two extras on the same day both appear, even sharing the same shift type -
   await call('POST', '/extras', { as: ALICE, body: { user_id: ALICE.id, date_key: '2027-08-01', shift_type_id: typeId, note: 'Second' } });
   const rows = database.prepare('SELECT note FROM schedule_extra_shifts WHERE user_id = ? AND date_key = ? ORDER BY id').all(ALICE.id, '2027-08-01');
   assert.deepEqual(rows.map((r) => r.note), ['First', 'Second'], 'a second extra of the same type on the same day is a new row, not an upsert over the first');
+});
+
+test('a member API token sent next to an admin session may not add an extra to someone else\'s schedule; the admin session alone may', async () => {
+  const body = { user_id: BOB.id, date_key: '2031-02-03', shift_type_id: typeId, note: 'Token probe' };
+  try {
+    const withToken = await call('POST', '/extras', { as: { ...ALICE, cookieSession: { userId: ADMIN.id, role: 'admin' } }, body });
+    assert.equal(withToken.status, 403, 'the gate judges by the token subject\'s role');
+    const adminOnly = await call('POST', '/extras', { as: ADMIN, body });
+    assert.equal(adminOnly.status, 201);
+  } finally {
+    database.prepare('DELETE FROM schedule_extra_shifts WHERE user_id = ? AND date_key = ?').run(BOB.id, '2031-02-03');
+  }
 });

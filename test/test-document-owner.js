@@ -74,13 +74,15 @@ function documentRow(id) {
   return get().prepare('SELECT name, status, created_by FROM family_documents WHERE id = ?').get(id);
 }
 
-function createHarness(userId, role) {
+/** `cookieSession`: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
+ *  setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung. */
+function createHarness(userId, role, cookieSession) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     req.authUserId = userId;
     req.authRole = role;
-    req.session = { userId, role };
+    req.session = cookieSession ?? { userId, role };
     next();
   });
   app.use('/api/v1/documents', documentsRouter);
@@ -160,3 +162,23 @@ for (const write of WRITES) {
     });
   }
 }
+
+test('PUT /:id: ein Mitglieds-Token neben einer Admin-Sitzung bekommt 403, die Admin-Sitzung allein darf', async () => {
+  const id = seedDocument(OWNER);
+  const before = documentRow(id);
+  const withToken = createHarness(MEMBER, 'member', { userId: ADMIN, role: 'admin' });
+  try {
+    const res = await withToken.call('PUT', `/${id}`, { name: 'Umbenannt' });
+    assert.equal(res.status, 403, 'das Gate urteilt nach der Rolle des Token-Subjekts');
+    assert.deepEqual(documentRow(id), before, 'die Zeile bleibt unberuehrt');
+  } finally {
+    await withToken.close();
+  }
+  const adminOnly = createHarness(ADMIN, 'admin');
+  try {
+    const res = await adminOnly.call('PUT', `/${id}`, { name: 'Umbenannt' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+  } finally {
+    await adminOnly.close();
+  }
+});

@@ -317,9 +317,6 @@ function lockingTask(task) {
   return parent && parent.locked ? parent : null;
 }
 
-/** Admin - hier lokal, weil die Regel in der Route wohnt und nicht in einer Middleware. */
-function isAdmin(req) { return req.authRole === 'admin' || req.session?.role === 'admin'; }
-
 /**
  * Darf diese Person die DEFINITION der Aufgabe aendern oder sie loeschen? (#830)
  *
@@ -334,7 +331,7 @@ function isAdmin(req) { return req.authRole === 'admin' || req.session?.role ===
 function mayEditTaskDefinition(task, req) {
   const lock = lockingTask(task);
   if (!lock) return true;
-  if (isAdmin(req)) return true;
+  if (isAdminRequest(req)) return true;
   return lock.created_by === (req.authUserId || req.session?.userId);
 }
 

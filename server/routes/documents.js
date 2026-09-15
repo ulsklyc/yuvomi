@@ -9,6 +9,7 @@ import { createHmac, randomBytes } from 'node:crypto';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { str, collectErrors, id as validateId, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
 import { canManageDocument, documentVisibleSql } from '../services/document-access.js';
 import { newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import {
@@ -142,14 +143,10 @@ function userId(req) {
   return req.authUserId || req.session.userId;
 }
 
-function isAdmin(req) {
-  return req.authRole === 'admin' || req.session?.role === 'admin';
-}
-
 // Schreiben darf, wer das Dokument angelegt hat, oder ein Admin. Die Regel steht
 // neben der Sichtbarkeit in services/document-access.js (#989).
 function mayManage(req, document) {
-  return canManageDocument(document, { userId: userId(req), isAdmin: isAdmin(req) });
+  return canManageDocument(document, { userId: userId(req), isAdmin: isAdminRequest(req) });
 }
 
 function canSeeSql(alias = 'd') {
@@ -330,7 +327,7 @@ function configProtected(message, options = {}) {
 
 router.get('/storage/config', (req, res) => {
   try {
-    if (!isAdmin(req)) {
+    if (!isAdminRequest(req)) {
       return res.status(403).json({ error: 'Not authorized.', code: 403 });
     }
     res.json({ data: storageConfigStatus() });
@@ -343,7 +340,7 @@ router.get('/storage/config', (req, res) => {
 
 router.put('/storage/config', async (req, res) => {
   try {
-    if (!isAdmin(req)) {
+    if (!isAdminRequest(req)) {
       return res.status(403).json({ error: 'Not authorized.', code: 403 });
     }
     if (
@@ -481,7 +478,7 @@ router.put('/storage/config', async (req, res) => {
 
 router.post('/storage/test', async (req, res) => {
   try {
-    if (!isAdmin(req)) {
+    if (!isAdminRequest(req)) {
       return res.status(403).json({ error: 'Not authorized.', code: 403 });
     }
     await assertWebdavTargetAllowed(resolveConfig(req.body));
@@ -508,8 +505,8 @@ router.get('/meta/options', (req, res) => {
         active_upload_backend: getActiveUploadBackend(),
         // Der Client blendet Deep-Links in die (admin-only) Dokument-Einstellungen
         // nur ein, wenn sie auch erreichbar sind — kein toter Link für Mitglieder.
-        is_admin: isAdmin(req),
-        dms_accounts: isAdmin(req) ? dmsAccounts : [],
+        is_admin: isAdminRequest(req),
+        dms_accounts: isAdminRequest(req) ? dmsAccounts : [],
       },
     });
   } catch (err) {

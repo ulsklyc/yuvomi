@@ -8,6 +8,7 @@ import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
 import { str, color, collectErrors, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
 import { resolvePermissions } from '../permissions.js';
 import {
@@ -29,7 +30,7 @@ function actorId(req) {
 }
 
 function canManageHousehold(req) {
-  if (req.authRole === 'admin' || req.session?.role === 'admin') return true;
+  if (isAdminRequest(req)) return true;
   const user = db.get().prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(actorId(req));
   return resolvePermissions(db.get(), user).capabilities.notes_manage_household_categories === 'allow';
 }

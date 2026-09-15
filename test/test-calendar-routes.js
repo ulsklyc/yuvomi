@@ -69,7 +69,9 @@ const app = express();
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
+  // cookieSession: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
+  // setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung.
+  req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
   next();
 });
 app.use(express.json({ limit: '10mb' }));
@@ -804,6 +806,16 @@ test('DELETE /subscriptions/:id — 400/404/403/204', async () => {
   assert.equal((await call('DELETE', `/subscriptions/${subId}`, { actor: TOM })).status, 403);
   assert.equal((await call('DELETE', `/subscriptions/${subId}`, { actor: MARIA })).status, 204);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM ics_subscriptions WHERE id=?').get(subId).n, 0);
+});
+
+test('DELETE /subscriptions/:id - Mitglieds-Token neben einer Admin-Sitzung 403, die Admin-Sitzung allein 204', async () => {
+  const subId = db.prepare("INSERT INTO ics_subscriptions (name, url, color, created_by, shared) VALUES ('TokenProbe','https://x/t.ics','#0000FF',2,0)").run().lastInsertRowid;
+  const withToken = await call('DELETE', `/subscriptions/${subId}`, {
+    actor: { ...TOM, cookieSession: { userId: ADMIN.id, role: 'admin' } },
+  });
+  assert.equal(withToken.status, 403, 'isAdminUser urteilt nach der Rolle des Token-Subjekts');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM ics_subscriptions WHERE id=?').get(subId).n, 1);
+  assert.equal((await call('DELETE', `/subscriptions/${subId}`, { actor: ADMIN })).status, 204);
 });
 
 // ════════════════════════════════════════════════════════════════════════════════

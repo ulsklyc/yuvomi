@@ -75,7 +75,9 @@ app.use(express.json());
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
+  // cookieSession: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
+  // setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung.
+  req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
   next();
 });
 app.use('/api/v1/tasks', tasksRouter);
@@ -179,6 +181,21 @@ test('PUT: Ersteller:in und Admin kommen durch', async () => {
     as: asAdmin, body: fullUpdate(task, { title: 'Zimmer aufräumen (Admin)' }),
   });
   assert.equal(byAdmin.status, 200);
+});
+
+test('PUT: ein Mitglieds-Token neben einer Admin-Sitzung schreibt nicht um, die Admin-Sitzung allein schon', async () => {
+  const task = await lockedTask('Blumen gießen');
+  const withToken = await call('PUT', `/${task.id}`, {
+    as: { ...asChild, cookieSession: { userId: ADMIN, role: 'admin' } },
+    body: fullUpdate(task, { title: 'Blumen gießen, wenn mir danach ist' }),
+  });
+  assert.equal(withToken.status, 403, 'die Sperre urteilt nach der Rolle des Token-Subjekts');
+  assert.equal(db.prepare('SELECT title FROM tasks WHERE id = ?').get(task.id).title, 'Blumen gießen');
+
+  const adminOnly = await call('PUT', `/${task.id}`, {
+    as: asAdmin, body: fullUpdate(task, { title: 'Blumen gießen (Admin)' }),
+  });
+  assert.equal(adminOnly.status, 200);
 });
 
 test('PUT: die Sperre selbst zu lösen ist der erste Zug - und er ist zu', async () => {

@@ -332,7 +332,7 @@ test('die Speicher-Einstellungen sind von der Seite aus verlinkt — nur für Ad
   // Blatt liegt seit dem IA-Umbau unter `sync` (Critique 2026-07-27).
   assert.match(page, /state\.isAdmin \? `<a class="document-storage-target__link" href="\/settings\/sync\/storage"/);
   const routes = read('../server/routes/documents.js');
-  assert.match(routes, /is_admin: isAdmin\(req\)/);
+  assert.match(routes, /is_admin: isAdminRequest\(req\)/);
 });
 
 test('das Rückgängig-Löschen stellt die Server-Sortierung wieder her', () => {

@@ -2,6 +2,7 @@
 import express from 'express';
 import * as db from '../db.js';
 import { bool, color, collectErrors, date, id, num, str, time } from '../middleware/validate.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
 import { createLogger } from '../logger.js';
 import { dateKeysInRange, scheduleData, fieldsForShiftTypes, fieldValuesFor, typeColumns } from '../services/schedule.js';
 // Re-Export fuer bestehende Importe (routes/schedule-extras.js, Tests): die
@@ -17,7 +18,6 @@ import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js'
 const router = express.Router();
 const log = createLogger('Schedule');
 const actorId = (req) => req.authUserId || req.session?.userId;
-export const isAdmin = (req) => req.authRole === 'admin' || req.session?.role === 'admin';
 const fail = (res, code, error) => res.status(code).json({ error, code });
 const userExists = (value) => !!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(value);
 /**
@@ -36,7 +36,7 @@ export function rejectedScheduleOwner(userId) {
 }
 const typeExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_shift_types WHERE id = ?').get(value);
 const customFieldExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_custom_fields WHERE id = ?').get(value);
-const mineOrAdmin = (req, userId) => isAdmin(req) || actorId(req) === userId;
+const mineOrAdmin = (req, userId) => isAdminRequest(req) || actorId(req) === userId;
 
 // Wer darf als eigene Spalte in der Uebersicht (Overview-Tab) auftauchen? Nur
 // echte Haushaltsmitglieder - Haushaltshilfen (housekeeping_workers) und
@@ -74,7 +74,7 @@ function shiftIcon(value) {
  * `created_by` ist `ON DELETE SET NULL`: ein Typ, dessen Ersteller nicht mehr
  * da ist, wird verwaist und liegt damit bei den Admins - nicht bei allen.
  */
-const ownTypeOrAdmin = (req, type) => isAdmin(req) || (type.created_by != null && type.created_by === actorId(req));
+const ownTypeOrAdmin = (req, type) => isAdminRequest(req) || (type.created_by != null && type.created_by === actorId(req));
 
 /**
  * Hat SQLite das Loeschen wegen einer bestehenden Referenz abgelehnt?

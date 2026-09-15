@@ -28,7 +28,9 @@ app.use(express.json());
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
+  // cookieSession: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
+  // setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung.
+  req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
   next();
 });
 app.use('/', notesRouter);
@@ -317,6 +319,23 @@ test('DELETE /:id: löscht Notiz (204)', async () => {
   const r = await call('DELETE', `/${note.id}`);
   assert.equal(r.status, 204);
   assert.equal(db.prepare('SELECT COUNT(*) c FROM notes WHERE id = ?').get(note.id).c, 0);
+});
+
+test('Kategorien: ein Mitglieds-Token neben einer Admin-Sitzung legt keine Haushaltskategorie an, die Admin-Sitzung allein schon', async () => {
+  // Eigene Nutzer: U hat oben ein individuelles Recht bekommen und taugt nicht als Mitglied ohne Recht.
+  const member = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('token-member','Toni','x','member')`).run().lastInsertRowid;
+  const admin = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('session-admin','Ada','x','admin')`).run().lastInsertRowid;
+  try {
+    actor = { id: member, role: 'member', cookieSession: { userId: admin, role: 'admin' } };
+    const withToken = await call('POST', '/categories', { name: 'Token-Probe', scope: 'household' });
+    assert.equal(withToken.status, 403, 'das Gate urteilt nach der Rolle des Token-Subjekts');
+    actor = { id: admin, role: 'admin' };
+    const adminOnly = await call('POST', '/categories', { name: 'Token-Probe', scope: 'household' });
+    assert.equal(adminOnly.status, 201);
+  } finally {
+    actor = { id: U, role: 'member' };
+    db.prepare("DELETE FROM note_categories WHERE scope = 'household' AND name = 'Token-Probe'").run();
+  }
 });
 
 test.after(() => server.close());
