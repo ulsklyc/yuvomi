@@ -846,7 +846,7 @@ function renderBody() {
           <button class="budget-account-chip" id="budget-clear-responsible-filter" type="button"
                   aria-label="${esc(t('budget.clearResponsibleFilter'))}">
             <i data-lucide="user-round" class="icon-sm" aria-hidden="true"></i>
-            <span>${esc(responsibleFilterName(state.responsibleFilterId, state))}</span>
+            <span>${esc(responsibleFilterLabel(state))}</span>
             <i data-lucide="x" class="icon-sm" aria-hidden="true"></i>
           </button>` : ''}
         </div>
@@ -917,7 +917,7 @@ function renderBody() {
     const respBtn = e.target.closest('[data-responsible]');
     if (respBtn) {
       const id = parseInt(respBtn.dataset.responsible, 10);
-      state.responsibleFilterId = state.responsibleFilterId === id ? null : id;
+      toggleResponsibleFilter(state, id);
       renderBody();
       return;
     }
@@ -2125,7 +2125,26 @@ function responsibleFilterName(id, { members = [], entries = [] } = {}) {
     ?? '';
 }
 
-export const __test = { responsiblePickerHtml, responsibleFilterName };
+/**
+ * Setzt den Zustaendigen-Filter - oder hebt ihn auf, wenn dieselbe Person
+ * erneut gewaehlt wird. Der Name wird beim Setzen gemerkt: der Filter bleibt
+ * ueber einen Monatswechsel aktiv, und nennt im neuen Monat keine Buchung mehr
+ * Hauspersonal oder einen Gast, kennt ihn sonst niemand mehr - der Chip waere
+ * leer, die Liste gefiltert (#1207).
+ */
+function toggleResponsibleFilter(target, id) {
+  target.responsibleFilterId = target.responsibleFilterId === id ? null : id;
+  target.responsibleFilterCachedName = target.responsibleFilterId == null
+    ? ''
+    : responsibleFilterName(target.responsibleFilterId, target);
+}
+
+/** Die Beschriftung des aktiven Zustaendigen-Filterchips. */
+function responsibleFilterLabel(source) {
+  return responsibleFilterName(source.responsibleFilterId, source) || source.responsibleFilterCachedName || '';
+}
+
+export const __test = { responsiblePickerHtml, responsibleFilterName, toggleResponsibleFilter, responsibleFilterLabel };
 
 function openBudgetModal({ mode, entry = null, initialType = '' }) {
   const isEdit = mode === 'edit';

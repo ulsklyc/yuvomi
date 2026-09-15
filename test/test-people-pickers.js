@@ -202,6 +202,41 @@ test('dashboard: the schedule slice brings the names of every plan owner, and th
   }
 });
 
+test('budget: the responsible filter chip keeps its name after a month change', () => {
+  // Der Filter wird am Avatar einer Buchung gesetzt, die Clara nennt. Im
+  // naechsten Monat nennt keine Buchung sie mehr, und die Mitgliederliste kennt
+  // sie nicht - der Filter bleibt aktiv, der Chip darf nicht leer werden.
+  const view = { members: [ANNA], entries: [{ id: 1, responsible_users: [CLARA] }], responsibleFilterId: null };
+  budget.toggleResponsibleFilter(view, CLARA.id);
+  view.entries = [{ id: 2, responsible_users: [ANNA] }];
+  assert.equal(view.responsibleFilterId, CLARA.id, 'the filter stays active');
+  assert.equal(budget.responsibleFilterLabel(view), 'Clara');
+  budget.toggleResponsibleFilter(view, CLARA.id);
+  assert.equal(view.responsibleFilterId, null, 'the same person again clears the filter');
+});
+
+const { __test: health } = await import('../public/pages/health.js');
+const BEN = { id: 2, display_name: 'Ben', avatar_color: '#222222', username: 'ben' };
+
+test('health: a signed-in account that is not a member sees its own name on the person switcher', async () => {
+  // Gelesen und geschrieben wird unter personId = eigenes Konto; die Liste aus
+  // /family/members kennt ein angemeldetes Konto, das kein Mitglied ist, nicht.
+  globalThis.__apiStub = { get: async (path) => (path === '/family/members' ? { data: [ANNA, BEN] } : { data: null }) };
+  try {
+    const view = { members: [], personId: null, meId: CLARA.id };
+    await health.loadHealthMembers(view, CLARA);
+    assert.equal(view.personId, CLARA.id);
+    const html = health.personSwitcherMarkup(view.members, view.personId, view.meId, { menuId: 'm', label: 'Person' });
+    assert.match(html, /class="health-person-switcher__name">Clara · health\.vitals\.you</, 'the switcher names the person whose data is shown');
+
+    const member = { members: [], personId: null, meId: ANNA.id };
+    await health.loadHealthMembers(member, ANNA);
+    assert.deepEqual(member.members.map((person) => person.id), [ANNA.id, BEN.id], 'a member is listed once, as before');
+  } finally {
+    delete globalThis.__apiStub;
+  }
+});
+
 const { __test: icsSettings } = await import('../public/settings/pages/personal-calendar-subscriptions.js');
 
 test('settings: saving a calendar subscription keeps a stored assignee that is not on offer', () => {
