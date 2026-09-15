@@ -106,7 +106,7 @@ function createRouteHarness({ userId = 1, role = 'admin' } = {}) {
     setAuth(nextAuth) {
       auth = { ...auth, ...nextAuth };
     },
-    async listen() {
+    async start() {
       if (!server.listening) {
         await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
       }
@@ -125,7 +125,7 @@ function createRouteHarness({ userId = 1, role = 'admin' } = {}) {
 }
 
 async function routeCall(harness, method, pathname, body) {
-  const baseUrl = await harness.listen();
+  const baseUrl = await harness.start();
   const response = await fetch(`${baseUrl}/api/v1/documents${pathname}`, {
     method,
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
@@ -139,7 +139,7 @@ async function routeCall(harness, method, pathname, body) {
 }
 
 async function calendarRouteCall(harness, method, pathname, body) {
-  const baseUrl = await harness.listen();
+  const baseUrl = await harness.start();
   const response = await fetch(`${baseUrl}/api/v1/calendar${pathname}`, {
     method,
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
@@ -1634,7 +1634,7 @@ test('preview and download read WebDAV documents through the shared storage serv
   });
   webdav.files.set('/documents/archive/remote.txt', Buffer.from('remote bytes'));
   const harness = createRouteHarness({ userId });
-  const baseUrl = await harness.listen();
+  const baseUrl = await harness.start();
   t.after(() => harness.close());
 
   for (const endpoint of ['preview', 'download']) {
@@ -2837,7 +2837,7 @@ test('document routes: local folder upload lands on disk and status reports loca
   assert.deepEqual(readFileSync(onDisk), Buffer.from('folder route bytes'));
 
   // Download round-trips the bytes back from disk.
-  const baseUrl = await harness.listen();
+  const baseUrl = await harness.start();
   const dl = await fetch(`${baseUrl}/api/v1/documents/${created.body.data.id}/download`);
   assert.equal(dl.status, 200);
   assert.deepEqual(Buffer.from(await dl.arrayBuffer()), Buffer.from('folder route bytes'));
@@ -2870,7 +2870,7 @@ test('calendar attachment ACLs protect recorded Drive content and follow event u
   const unrelatedId = createRouteUser();
   const harness = createRouteHarness({ userId: ownerId });
   t.after(() => harness.close());
-  const baseUrl = await harness.listen();
+  const baseUrl = await harness.start();
   const auth = (userId, role = 'member') => harness.setAuth({ userId, role });
   const listIds = async (userId) => {
     auth(userId);

@@ -192,21 +192,152 @@ test('keine Suite baut ihren Temp-DB-Pfad von Hand zusammen', () => {
  * synchron, und vier Aufrufe in test-changelog.js lebten davon - der Umbau
  * braucht deshalb dort ein `await` auf das Ereignis, nicht nur das Argument.
  *
- * Geprueft wird die Schreibweise: `.listen(<port>` gefolgt von `)` oder einem
- * zweiten Argument, das nicht `'127.0.0.1'` ist. Nicht erkannt wird die
- * Objektform `listen({ port })` - die kommt in test/ heute nicht vor. */
+ * DER GUARD SCHLIESST, WAS ER NICHT BEWEISEN KANN. Die erste Fassung suchte
+ * die Portschreibweise per Regex und liess jeden Aufruf durch, auf den das
+ * Muster nicht passte: ein berechneter Port (`PORT + 1`, `getPort()`,
+ * `ports[0]`) war unsichtbar, sogar mit ausdruecklichem `'0.0.0.0'` (Review
+ * auf #1223). Ein Nicht-Treffer darf nicht "in Ordnung" heissen. Deshalb liest
+ * der Guard jeden Aufruf von `listen` im Code, und der besteht nur, wenn er
+ * Loopback BELEGT: `'127.0.0.1'` als zweites Argument oder `host: '127.0.0.1'`
+ * in der Objektform. Alles andere ist rot, auch ein Aufruf ohne Argument.
+ *
+ * Kommentare, Strings, Template- und Regex-Literale ueberspringt der Leser,
+ * damit Prosa und Fixtures nicht zaehlen. Seine Grenze: ein Aufruf INNERHALB
+ * einer `${...}`-Einbettung eines Template-Literals bleibt unsichtbar. */
+const IDENT = /[\w$]/;
+const REGEX_AFTER_WORD = new Set(['return', 'typeof', 'case', 'in', 'of', 'void', 'delete', 'throw', 'yield', 'await']);
+const LOOPBACK_ARG = /^(['"`])127\.0\.0\.1\1$/;
+const LOOPBACK_OBJECT = /^\{[\s\S]*\bhost\s*:\s*(['"`])127\.0\.0\.1\1[\s\S]*\}$/;
+
+/** Index hinter dem schliessenden Anfuehrungszeichen eines String-Literals ab `at`. */
+function endOfString(src, at) {
+  const quote = src[at];
+  let j = at + 1;
+  while (j < src.length && src[j] !== quote) j += src[j] === '\\' ? 2 : 1;
+  return j + 1;
+}
+
+/** Jeder Aufruf von `.listen(` im Code, mit Position und rohem Argumenttext. */
+function listenCalls(src) {
+  const calls = [];
+  let prev = '';
+  let word = '';
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '/' && src[i + 1] === '/') {
+      const eol = src.indexOf('\n', i);
+      i = eol < 0 ? src.length : eol;
+    } else if (c === '/' && src[i + 1] === '*') {
+      const end = src.indexOf('*/', i + 2);
+      i = end < 0 ? src.length : end + 2;
+    } else if (c === '\'' || c === '"' || c === '`') {
+      i = endOfString(src, i);
+      prev = 'x';
+      word = '';
+    } else if (c === '/' && (prev === '' || '(,=:[!&|?{};'.includes(prev) || REGEX_AFTER_WORD.has(word))) {
+      let inClass = false;
+      let j = i + 1;
+      for (; j < src.length; j += 1) {
+        if (src[j] === '\\') j += 1;
+        else if (src[j] === '[') inClass = true;
+        else if (src[j] === ']') inClass = false;
+        else if (src[j] === '/' && !inClass) break;
+      }
+      i = j + 1;
+      prev = 'x';
+      word = '';
+    } else if (src.startsWith('.listen(', i)) {
+      const start = i + '.listen('.length;
+      let depth = 1;
+      let j = start;
+      while (j < src.length && depth > 0) {
+        const d = src[j];
+        if (d === '\'' || d === '"' || d === '`') { j = endOfString(src, j); continue; }
+        if ('([{'.includes(d)) depth += 1;
+        else if (')]}'.includes(d)) depth -= 1;
+        j += 1;
+      }
+      calls.push({ index: i, args: src.slice(start, j - 1) });
+      i = start;
+      prev = '(';
+      word = '';
+    } else {
+      if (IDENT.test(c)) word = (IDENT.test(src[i - 1] ?? '') ? word : '') + c;
+      else if (!/\s/.test(c)) word = '';
+      if (!/\s/.test(c)) prev = IDENT.test(c) ? 'x' : c;
+      i += 1;
+    }
+  }
+  return calls;
+}
+
+/** Die Argumente auf oberster Ebene, an Kommas ausserhalb von Klammern und Strings getrennt. */
+function topLevelArgs(text) {
+  const args = [];
+  let depth = 0;
+  let from = 0;
+  for (let j = 0; j < text.length; j += 1) {
+    const d = text[j];
+    if (d === '\'' || d === '"' || d === '`') { j = endOfString(text, j) - 1; continue; }
+    if ('([{'.includes(d)) depth += 1;
+    else if (')]}'.includes(d)) depth -= 1;
+    else if (d === ',' && depth === 0) { args.push(text.slice(from, j).trim()); from = j + 1; }
+  }
+  const last = text.slice(from).trim();
+  if (last) args.push(last);
+  return args;
+}
+
+function bindsLoopback(argsText) {
+  const [first = '', second = ''] = topLevelArgs(argsText);
+  return LOOPBACK_ARG.test(second) || LOOPBACK_OBJECT.test(first);
+}
+
 test('kein Testserver lauscht auf allen Interfaces', () => {
-  const withoutLoopback = /\.listen\(\s*[\w.]+\s*(?=\)|,)(?!,\s*['"`]127\.0\.0\.1['"`])/g;
   const offenders = readdirSync(new URL('../test', import.meta.url))
     .filter((f) => /\.m?js$/.test(f))
     .flatMap((f) => {
       const src = readFileSync(new URL(`../test/${f}`, import.meta.url), 'utf8');
-      return [...src.matchAll(withoutLoopback)]
-        .map((m) => `${f}:${src.slice(0, m.index).split('\n').length}`);
+      return listenCalls(src)
+        .filter((call) => !bindsLoopback(call.args))
+        .map((call) => `${f}:${src.slice(0, call.index).split('\n').length}`);
     });
   assert.deepEqual(
     offenders,
     [],
-    `listen() ohne Host bindet an alle Interfaces - '127.0.0.1' als zweites Argument: ${offenders.join(', ')}`,
+    `listen() ohne belegten Loopback-Host - '127.0.0.1' als zweites Argument: ${offenders.join(', ')}`,
   );
+});
+
+test('der Loopback-Leser urteilt ueber den Aufruf, nicht ueber eine Schreibweise', () => {
+  const verdicts = (src) => listenCalls(src).map((call) => bindsLoopback(call.args));
+  // Rot: alles, was Loopback nicht belegt - auch berechnete Ports.
+  for (const src of [
+    'server.listen(0);',
+    'server.listen(PORT + 1);',
+    'server.listen(getPort());',
+    'server.listen(ports[0]);',
+    "server.listen(PORT + 1, '0.0.0.0');",
+    'server.listen(0, cb);',
+    'server.listen();',
+    'server.listen({ port: 0 });',
+    "server.listen({ port: 0, host: '0.0.0.0' });",
+  ]) assert.deepEqual(verdicts(src), [false], src);
+  // Gruen: Loopback belegt, auch mehrzeilig und mit Klammern in Callback und String.
+  for (const src of [
+    "server.listen(0, '127.0.0.1');",
+    'app.listen(getPort(), "127.0.0.1", () => resolve({ port: s.address().port }));',
+    "server.listen(\n  0,\n  '127.0.0.1',\n  () => log(')'),\n);",
+    "server.listen({ port: 0, host: '127.0.0.1' }, cb);",
+  ]) assert.deepEqual(verdicts(src), [true], src);
+  // Unsichtbar: Prosa, Strings, Templates und Regex-Literale zaehlen nicht.
+  for (const src of [
+    '// server.listen(0)',
+    '/* server.listen(0) */',
+    "const s = 'server.listen(0)';",
+    'const t = `server.listen(0)`;',
+    'const re = /server.listen(0)/;',
+    'return /server.listen(0)/.test(x);',
+  ]) assert.deepEqual(verdicts(src), [], src);
 });
