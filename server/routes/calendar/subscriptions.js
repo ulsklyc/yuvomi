@@ -8,6 +8,7 @@ import * as db from '../../db.js';
 import * as icsSubscription from '../../services/ics-subscription.js';
 import { color } from '../../middleware/validate.js';
 import { ICS_COLOR_RE, getUserId, isAdminUser } from './helpers.js';
+import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
@@ -53,6 +54,9 @@ router.post('/subscriptions', async (req, res) => {
         return res.status(400).json({ error: 'default_assignee_user_id muss eine Zahl oder null sein.', code: 400 });
       if (!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(defaultAssignee))
         return res.status(400).json({ error: 'Unbekannte Nutzer-ID.', code: 400 });
+      // Zugewiesen werden nur Haushaltsmitglieder (#1207); ein neues Abo hat noch keinen Stand.
+      const strangers = newNonMembers([defaultAssignee]);
+      if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
     }
 
     const { sub, syncError } = await icsSubscription.create(getUserId(req), {
@@ -88,6 +92,12 @@ router.patch('/subscriptions/:id', (req, res) => {
     if (req.body.default_assignee_user_id !== undefined) {
       const raw = req.body.default_assignee_user_id;
       fields.default_assignee_user_id = (raw === null || raw === '') ? null : Number(raw);
+      // Neu nur Haushaltsmitglieder (#1207); die gespeicherte Zuweisung bleibt gueltig.
+      if (fields.default_assignee_user_id !== null) {
+        const stored = db.get().prepare('SELECT default_assignee_user_id AS a FROM ics_subscriptions WHERE id = ?').get(subId)?.a;
+        const strangers = newNonMembers([fields.default_assignee_user_id], { stored: stored == null ? [] : [stored] });
+        if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
+      }
     }
 
     const updated = icsSubscription.update(getUserId(req), subId, fields, isAdmin);

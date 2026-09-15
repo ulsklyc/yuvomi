@@ -14,7 +14,7 @@ import { sendDocumentDeletionConflict } from '../services/document-deletion-lock
 import { buildSplits, decorateMoney, minorToDecimal, parseMoneyToMinor, simplifyDebts } from '../services/split-expenses.js';
 import { CURRENCY_CODES } from '../../public/utils/currency-codes.js';
 import { syncBirthdayArtifacts } from '../services/birthdays.js';
-import { householdMemberSql } from '../services/household-members.js';
+import { householdMemberSql, newNonMembers, staffMessage } from '../services/household-members.js';
 import { todayKey } from '../utils/timezone.js';
 
 const log = createLogger('SplitExpenses');
@@ -641,6 +641,11 @@ router.post('/groups/:id/members', async (req, res) => {
     if (!memberUserId) return res.status(400).json({ error: 'user_id or contact_id is required.', code: 400 });
     const exists = db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(memberUserId);
     if (!exists) return res.status(404).json({ error: 'User not found.', code: 404 });
+    // Mitglieder und Gaeste, aber kein Hauspersonal (#1207). Eine bestehende
+    // Mitgliedschaft bleibt gueltig und laesst sich weiter aendern.
+    const already = db.get().prepare('SELECT 1 FROM expense_group_members WHERE group_id = ? AND user_id = ?').get(groupId, memberUserId);
+    const staff = newNonMembers([memberUserId], { stored: already ? [memberUserId] : [], guestsAllowed: true });
+    if (staff.length) return res.status(400).json({ error: staffMessage(staff), code: 400 });
     db.get().prepare(`
       INSERT INTO expense_group_members (group_id, user_id, role, invited_by)
       VALUES (?, ?, ?, ?)

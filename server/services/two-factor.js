@@ -26,7 +26,6 @@ import {
 } from '../utils/totp.js';
 import { qrToDataUrl } from '../utils/qrcode.js';
 import { createLogger } from '../logger.js';
-import { householdMemberSql } from './household-members.js';
 
 const log = createLogger('2fa');
 
@@ -273,6 +272,12 @@ export function regenerateRecoveryCodes(db, userId) {
  * Familienverwaltung. Ohne diese Sicht ist die Pflicht blind: ein Admin
  * schaltete sie ein, ohne zu wissen, wen er damit vor eine Aufgabe stellt.
  *
+ * JEDES KONTO, NICHT NUR DIE MITGLIEDER (#1207): der zweite Faktor schuetzt
+ * Anmeldungen. Anmelden kann sich heute jedes Konto - es gibt keinen
+ * deaktivierten Zustand, Gaeste melden sich mit Passwort an, und Hauspersonal
+ * ist nur beim Passwort-Login gesperrt, ueber SSO nicht (dort greift der
+ * zweite Faktor ebenso). Die Liste steht deshalb in der Allowlist des Guards.
+ *
  * Bewusst nur der Ja-Nein-Zustand, keine Zeitstempel und keine Zahl der
  * Wiederherstellungscodes - das geht auch einen Admin nichts an.
  *
@@ -286,7 +291,6 @@ export function householdOverview(db) {
            (t.confirmed_at IS NOT NULL)  AS enabled
       FROM users u
       LEFT JOIN user_totp t ON t.user_id = u.id
-     WHERE ${householdMemberSql('u')}
      ORDER BY u.display_name
   `).all().map((row) => ({ ...row, enabled: row.enabled === 1 }));
 }

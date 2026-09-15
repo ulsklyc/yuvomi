@@ -108,20 +108,32 @@ export function isHouseholdMember(userId, { db } = {}) {
  * jede Route schon ihre eigene Antwort (404, still verwerfen, eigene Meldung),
  * und die bleibt, wie sie ist.
  *
+ * `guestsAllowed` gilt fuer die EINE Stelle, an der Gaeste hingehoeren: die
+ * Mitglieder einer Ausgabengruppe. Ein Gast existiert fuer geteilte Ausgaben;
+ * Hauspersonal bleibt auch dort draussen. Eine Liste macht daraus keine
+ * Fassung - das Praedikat selbst kennt keine Optionen.
+ *
  * @param {Iterable<number>} userIds
- * @param {{ stored?: Iterable<number>, db?: object }} [options]
+ * @param {{ stored?: Iterable<number>, guestsAllowed?: boolean, db?: object }} [options]
  * @returns {number[]} die abzulehnenden ids, in der Reihenfolge der Anfrage
  */
-export function newNonMembers(userIds, { stored = [], db } = {}) {
+export function newNonMembers(userIds, { stored = [], guestsAllowed = false, db } = {}) {
   const database = db || dbModule.get();
   const keep = new Set([...stored].map(Number));
   const exists = database.prepare('SELECT 1 FROM users WHERE id = ?');
   const member = database.prepare(`SELECT 1 FROM users u WHERE u.id = ? AND ${householdMemberSql('u')}`);
+  const scope = database.prepare(`SELECT ${accessScopeSql('u')} AS scope FROM users u WHERE u.id = ?`);
   return [...new Set([...userIds].map(Number))]
-    .filter((id) => Number.isInteger(id) && !keep.has(id) && exists.get(id) && !member.get(id));
+    .filter((id) => Number.isInteger(id) && !keep.has(id) && exists.get(id) && !member.get(id))
+    .filter((id) => !(guestsAllowed && scope.get(id)?.scope === 'split_guest'));
 }
 
 /** Die eine Meldung dazu - jede Route sagt dasselbe, damit ein Client einen Grund hat. */
 export function nonMemberMessage(ids) {
   return `Only household members can be chosen here - user ${ids.join(', ')} is not a household member.`;
+}
+
+/** Dieselbe Meldung fuer die Stelle mit `guestsAllowed`: dort ist nur Hauspersonal ausgeschlossen. */
+export function staffMessage(ids) {
+  return `Housekeeping staff cannot be chosen here - user ${ids.join(', ')} is neither a household member nor a guest.`;
 }

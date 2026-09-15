@@ -79,6 +79,10 @@ const ALLOWLIST = [
     reason: 'API token subjects for admins: a token is issued for an account, staff included; guests are left out through access_scope because POST /api-tokens rejects them.',
   },
   {
+    file: 'server/services/two-factor.js', site: 'householdOverview', lists: 1,
+    reason: 'Two-factor overview for admins: the second factor protects sign-ins, and every account can sign in today (no disabled state; staff are barred from password login only, not from SSO).',
+  },
+  {
     file: 'server/auth.js', site: 'findOrCreateOidcUser', lists: 1,
     reason: 'Sign-in: SSO links the one account that carries the verified address, whichever kind it is.',
   },

@@ -8,6 +8,7 @@ import express from 'express';
 import * as db from '../../db.js';
 import * as googleCalendar from '../../services/google-calendar.js';
 import { requireAdmin } from '../../auth.js';
+import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
 import {
   applyDefaultAssigneesToExisting,
   backfillCandidatesToken,
@@ -188,6 +189,12 @@ router.patch('/external-calendars', requireAdmin, (req, res) => {
     }
     if (assignee !== null && !db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(assignee)) {
       return res.status(400).json({ error: 'Unbekannte Nutzer-ID.', code: 400 });
+    }
+    // Neu nur Haushaltsmitglieder (#1207); die gespeicherte Zuweisung bleibt gueltig.
+    if (assignee !== null) {
+      const stored = db.get().prepare('SELECT default_assignee_user_id AS a FROM external_calendars WHERE source = ? AND external_id = ?').get(source, external_id)?.a;
+      const strangers = newNonMembers([assignee], { stored: stored == null ? [] : [stored] });
+      if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
     }
 
     const result = db.get().prepare(
