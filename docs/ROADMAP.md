@@ -27,8 +27,9 @@ evening (#777), and a person's own calendar rather than the household's (#739, #
   row - [DECISIONS.md entry 4](DECISIONS.md#4-a-household-is-people-not-accounts), reached in
   #1007, #913 and #787. Being visible as a person is a property, not a relationship.
 - **Open.** The explicit "can sign in" state with its migration; the Family page adding a
-  person with a login as an option; the one predicate replacing the three module-local answers
-  (the first step, and the one without behaviour change, #1207). For personal calendar
+  person with a login as an option; one form of the member predicate for every list of people
+  (the predicate exists since #1207, but the lists still apply three forms of it and
+  `GET /auth/users` still feeds pickers unfiltered). For personal calendar
   connections, the missing piece is an owner on the connection (#739).
 
 ## Private by default, in one vocabulary
