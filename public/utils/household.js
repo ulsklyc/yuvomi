@@ -53,6 +53,7 @@ export function setHouseholdSize(size) {
 /** Setzt den Zustand beim Abmelden zurueck - der naechste Nutzer zaehlt neu. */
 export function clearHouseholdSize() {
   _size = null;
+  _otherReaders = null;
   document.documentElement.classList.remove('household-solo');
 }
 
@@ -70,4 +71,39 @@ export function isSoloHousehold() {
 /** Die gezaehlte Groesse, oder `null`, solange keine Auth-Antwort da war. */
 export function getHouseholdSize() {
   return _size;
+}
+
+let _otherReaders = null;
+
+/**
+ * Die Module, die ausser dem angemeldeten Konto noch jemand lesen kann
+ * (`othersCanRead` aus einer Auth-Antwort). Ein fehlender Wert setzt NICHT
+ * zurueck - aus demselben Grund wie bei setHouseholdSize().
+ *
+ * @param {string[]|undefined} modules
+ */
+export function setOtherReaders(modules) {
+  if (!Array.isArray(modules)) return;
+  _otherReaders = new Set(modules);
+}
+
+/** Kann ausser dem angemeldeten Konto noch jemand dieses Modul lesen? */
+export function othersCanRead(moduleKey) {
+  return _otherReaders?.has(moduleKey) ?? false;
+}
+
+/**
+ * Verschwinden die Schutzsteuerungen eines Moduls (Sichtbarkeit, Sperre,
+ * Freigabe)?
+ *
+ * SCHUTZ IST KEINE LISTE (#1207). Die Haushaltsgroesse zaehlt nur Mitglieder,
+ * ein Haushalt aus einer Person und Hauspersonal ist also solo - fuer die
+ * Anzeige (Familien-Widget, Avatar-Marken) richtig. Eine Sichtbarkeit aber
+ * schuetzt vor allen, die mitlesen koennen: kann ausser dem Nutzer irgendein
+ * Konto das Modul lesen - Mitglied, Hauspersonal oder Gast mit Zugriff -,
+ * bleiben die Felder stehen. Sonst bliebe jeder neue Eintrag bei "alle" und
+ * waere fuer genau diese Konten lesbar.
+ */
+export function hidesPrivacyControls(moduleKey) {
+  return isSoloHousehold() && !othersCanRead(moduleKey);
 }

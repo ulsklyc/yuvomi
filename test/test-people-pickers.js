@@ -237,6 +237,47 @@ test('health: a signed-in account that is not a member sees its own name on the 
   }
 });
 
+const { setOtherReaders } = await import('../public/utils/household.js');
+
+/** Ist die form-group um das Feld mit diesem Merkmal verborgen? */
+function fieldGroupHidden(html, marker) {
+  const at = html.indexOf(marker);
+  assert.ok(at > 0, `the field ${marker} is rendered`);
+  const groupStart = html.lastIndexOf('<div class="form-group"', at);
+  const tag = html.slice(groupStart, html.indexOf('>', groupStart) + 1);
+  return /\shidden(\s|>)/.test(tag);
+}
+
+test('privacy: with one member, the protective fields stay while another account can read the module', () => {
+  // Ein Haushalt aus einem Mitglied und Personal, das Aufgaben, Dokumente und
+  // den Kalender lesen kann: ein neuer Eintrag ohne Sichtbarkeitsfeld bliebe
+  // bei "alle" und waere fuer das Personal lesbar.
+  setHouseholdSize(1);
+  const event = { id: 8, title: 'Arzt', start_datetime: '2030-05-01T10:00', end_datetime: '2030-05-01T11:00', visibility: 'all', assigned_users: [] };
+  const render = () => ({
+    task: tasks.renderModalContent({ task: null, users: [ANNA] }),
+    document: documents.documentVisibilityFieldHtml(null),
+    event: calendar.buildEventModalContent({ mode: 'edit', event }),
+  });
+  try {
+    setOtherReaders(['calendar', 'documents', 'tasks']);
+    let html = render();
+    assert.equal(fieldGroupHidden(html.task, 'id="task-visibility"'), false, 'task visibility');
+    assert.equal(fieldGroupHidden(html.task, 'id="task-locked"'), false, 'task lock');
+    assert.equal(fieldGroupHidden(html.document, 'id="document-visibility"'), false, 'document visibility');
+    assert.equal(fieldGroupHidden(html.event, 'id="modal-visibility"'), false, 'event visibility');
+
+    setOtherReaders([]);
+    html = render();
+    assert.equal(fieldGroupHidden(html.task, 'id="task-visibility"'), true, 'nobody else reads: task visibility hidden as before');
+    assert.equal(fieldGroupHidden(html.task, 'id="task-locked"'), true, 'task lock hidden as before');
+    assert.equal(fieldGroupHidden(html.document, 'id="document-visibility"'), true, 'document visibility hidden as before');
+    assert.equal(fieldGroupHidden(html.event, 'id="modal-visibility"'), true, 'event visibility hidden as before');
+  } finally {
+    setOtherReaders([]);
+  }
+});
+
 const { __test: icsSettings } = await import('../public/settings/pages/personal-calendar-subscriptions.js');
 
 test('settings: saving a calendar subscription keeps a stored assignee that is not on offer', () => {

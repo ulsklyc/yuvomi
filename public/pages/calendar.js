@@ -35,6 +35,7 @@ import { refresh as refreshReminders } from '/reminders.js';
 import { parseRemindAtAsUtc } from '/utils/reminder-offset.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 import { withChosenPeople } from '/utils/people-picker.js';
+import { othersCanRead } from '/utils/household.js';
 import { wireTablist } from '/utils/tablist.js';
 // EINE Schalterform, auch hier. Das Primitiv liegt unter `/settings/`, weil
 // dort sein Anlass lag (vier Schalterformen nebeneinander, Critique
@@ -5268,8 +5269,11 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
          "#modal-visibility?.value || 'all'". Ohne den Knoten machte jedes
          Speichern einen privaten Termin fuer alle sichtbar, sobald die Liste
          hoechstens ein Mitglied hat - ein Haushalt aus einer Person und einer
-         Haushaltshilfe genauso. Das Aufgabenformular macht es ebenso. -->
-    <div class="form-group"${state.users.length > 1 ? '' : ' hidden'}>
+         Haushaltshilfe genauso. Das Aufgabenformular macht es ebenso.
+         Sichtbar bleibt es, solange ein anderes Konto den Kalender lesen kann -
+         auch Hauspersonal mit Zugriff: sonst bliebe jeder neue Termin bei
+         "alle" und waere fuer genau dieses Konto lesbar. -->
+    <div class="form-group"${state.users.length > 1 || othersCanRead('calendar') ? '' : ' hidden'}>
       <label class="form-label" for="modal-visibility">${t('common.visibility.label')}</label>
       <select class="input" id="modal-visibility" name="visibility">
         <option value="all"       ${visibility === 'all'       ? 'selected' : ''}>${t('common.visibility.all')}</option>

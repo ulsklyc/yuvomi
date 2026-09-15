@@ -6,7 +6,7 @@
 
 import { clearApiCache } from '/sw-register.js';
 import { setPermissions, clearPermissions } from '/permissions.js';
-import { setHouseholdSize, clearHouseholdSize } from '/utils/household.js';
+import { setHouseholdSize, setOtherReaders, clearHouseholdSize } from '/utils/household.js';
 import { forgetLayoutHint } from '/utils/dashboard-layout-hint.js';
 
 const API_BASE = '/api/v1';
@@ -233,6 +233,7 @@ const auth = {
     const res = await api.post('/auth/login', { username, password });
     setPermissions(res?.permissions);
     setHouseholdSize(res?.householdSize);
+    setOtherReaders(res?.othersCanRead);
     return res;
   },
   // Zweiter Schritt der Anmeldung (#672). Der Code darf ein TOTP-Code oder ein
@@ -241,6 +242,7 @@ const auth = {
     const res = await api.post('/auth/2fa/verify', { code });
     setPermissions(res?.permissions);
     setHouseholdSize(res?.householdSize);
+    setOtherReaders(res?.othersCanRead);
     return res;
   },
   // Verwaltung des eigenen zweiten Faktors.
@@ -272,6 +274,7 @@ const auth = {
     // Neben den Rechten die zweite Angabe, die JEDE Seite braucht und die
     // niemand einzeln holen soll: die Haushaltsgroesse (utils/household.js).
     setHouseholdSize(res?.householdSize);
+    setOtherReaders(res?.othersCanRead);
     return res;
   },
   setup: (username, display_name, password) => api.post('/auth/setup', { username, display_name, password }),

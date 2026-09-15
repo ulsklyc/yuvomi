@@ -87,6 +87,28 @@ function householdSize(database) {
 }
 
 /**
+ * Welche Module ausser diesem Konto noch jemand lesen kann - fuer die
+ * Schutzsteuerungen (Sichtbarkeit, Sperre, Freigabe), nicht fuer die Anzeige.
+ *
+ * SCHUTZ IST KEINE MITGLIEDERLISTE (#1207). householdSize zaehlt nur
+ * Mitglieder; ein Haushalt aus einer Person und Hauspersonal ist solo. Eine
+ * Sichtbarkeit schuetzt aber vor jedem Konto, das das Modul lesen kann: ohne
+ * das Feld bliebe ein neuer Eintrag bei "alle" und waere fuer genau dieses
+ * Konto lesbar. Gezaehlt wird deshalb jedes andere Konto mit Lesezugriff, auch
+ * Hauspersonal. Gaeste geteilter Ausgaben erreichen ausserhalb dieses Moduls
+ * keine Route (Gast-Sperre in server/index.js) und zaehlen nicht.
+ */
+const PRIVACY_MODULES = ['calendar', 'documents', 'tasks'];
+function othersCanRead(database, userId) {
+  const others = database.prepare(`
+    SELECT u.id, u.role, u.family_role FROM users u
+    WHERE u.id != ? AND ${accessScopeSql('u')} = 'family'
+  `).all(userId);
+  const resolved = others.map((other) => resolvePermissions(database, other).modules);
+  return PRIVACY_MODULES.filter((key) => resolved.some((modules) => (modules[key] ?? 'write') !== 'none'));
+}
+
+/**
  * Die Einfuehrungs-Version, die ein Konto gesehen haben muss, damit der
  * Onboarding-Rundgang nicht erneut erscheint. Ein Konto mit einer kleineren
  * gespeicherten `users.onboarding_version` bekommt ihn wieder vorgesetzt -
@@ -774,6 +796,7 @@ function loginPayload(req, user) {
     // stuende ein Solo-Haushalt bis zum naechsten Kaltstart wieder voller
     // Familienfelder.
     householdSize: householdSize(db.get()),
+    othersCanRead: othersCanRead(db.get(), user.id),
     csrfToken: req.session.csrfToken,
   };
 }
@@ -1938,6 +1961,7 @@ router.get('/me', requireAuth, (req, res) => {
         user: publicUser(user),
         permissions: clientPermissions(db.get(), user),
         householdSize: householdSize(db.get()),
+        othersCanRead: othersCanRead(db.get(), user.id),
       });
     }
 
@@ -1958,6 +1982,7 @@ router.get('/me', requireAuth, (req, res) => {
       user: publicUser(user),
       permissions: clientPermissions(db.get(), user),
       householdSize: householdSize(db.get()),
+      othersCanRead: othersCanRead(db.get(), user.id),
       csrfToken: req.session.csrfToken,
     });
   } catch (err) {

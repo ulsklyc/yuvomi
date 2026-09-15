@@ -19,7 +19,7 @@ import { findPageFab } from '/utils/fab.js';
 // dann nicht (utils/household.js). Das Feld bleibt im DOM und behaelt seinen
 // Wert, es ist nur `hidden`: der Absende-Pfad liest es unveraendert, und kommt
 // ein zweites Mitglied dazu, steht es wieder da.
-import { isSoloHousehold } from '/utils/household.js';
+import { hidesPrivacyControls } from '/utils/household.js';
 import { withChosenPeople } from '/utils/people-picker.js';
 import { maxUploadBytes } from '/utils/upload-limit.js';
 import { mountEmptyState } from '/utils/empty-state.js';
@@ -1283,7 +1283,7 @@ function renderMeta(doc, { showSize = true } = {}) {
   return `
     <span><i data-lucide="${CATEGORY_ICONS[doc.category] || 'folder'}" aria-hidden="true"></i>${categoryLabel}</span>
     ${doc.folder_name && !folderDuplicatesCategory ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
-    ${isSoloHousehold() ? '' : `<span><i data-lucide="${doc.visibility === 'family' ? 'users' : doc.visibility === 'private' ? 'lock' : 'user-check'}" aria-hidden="true"></i>${t(`documents.visibility.${doc.visibility}`)}</span>`}
+    ${hidesPrivacyControls('documents') ? '' : `<span><i data-lucide="${doc.visibility === 'family' ? 'users' : doc.visibility === 'private' ? 'lock' : 'user-check'}" aria-hidden="true"></i>${t(`documents.visibility.${doc.visibility}`)}</span>`}
     ${showSize ? `<span>${formatFileSize(doc.file_size)}</span>` : ''}
     ${storageBadgeHtml(doc)}
   `;
@@ -1687,7 +1687,19 @@ function memberOptions(selected = []) {
   `).join('');
 }
 
-export const __test = { memberOptions, loadMembers };
+/** Das Sichtbarkeitsfeld des Dokument-Dialogs. */
+function documentVisibilityFieldHtml(doc) {
+  return `<div class="form-group"${hidesPrivacyControls('documents') ? ' hidden' : ''}>
+            <label class="label" for="document-visibility">${t('documents.visibilityLabel')}</label>
+            <select class="input" id="document-visibility">
+              <option value="family" ${(doc?.visibility || 'family') === 'family' ? 'selected' : ''}>${t('documents.visibility.family')}</option>
+              <option value="restricted" ${doc?.visibility === 'restricted' ? 'selected' : ''}>${t('documents.visibility.restricted')}</option>
+              <option value="private" ${doc?.visibility === 'private' ? 'selected' : ''}>${t('documents.visibility.private')}</option>
+            </select>
+          </div>`;
+}
+
+export const __test = { memberOptions, loadMembers, documentVisibilityFieldHtml };
 
 function openDocumentModal(doc = null, { initialUpload = 'files' } = {}) {
   const isEdit = !!doc;
@@ -1783,14 +1795,7 @@ function openDocumentModal(doc = null, { initialUpload = 'files' } = {}) {
               ${state.folders.map((folder) => `<option value="${folder.id}" ${presetFolderId === String(folder.id) ? 'selected' : ''}>${esc(folder.name)}</option>`).join('')}
             </select>
           </div>
-          <div class="form-group"${isSoloHousehold() ? ' hidden' : ''}>
-            <label class="label" for="document-visibility">${t('documents.visibilityLabel')}</label>
-            <select class="input" id="document-visibility">
-              <option value="family" ${(doc?.visibility || 'family') === 'family' ? 'selected' : ''}>${t('documents.visibility.family')}</option>
-              <option value="restricted" ${doc?.visibility === 'restricted' ? 'selected' : ''}>${t('documents.visibility.restricted')}</option>
-              <option value="private" ${doc?.visibility === 'private' ? 'selected' : ''}>${t('documents.visibility.private')}</option>
-            </select>
-          </div>
+          ${documentVisibilityFieldHtml(doc)}
         </div>
         <div class="document-member-picker" id="document-member-picker">
           <div class="label">${t('documents.allowedMembersLabel')}</div>
