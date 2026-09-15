@@ -67,6 +67,38 @@ test('task + recurrence date fields use the shared yuvomi-datepicker', () => {
   assert.doesNotMatch(tasksSource, /js-date-input|js-time-input/);
 });
 
+/*
+ * DAS EINBLENDEN ENDET AUF DEM STYLESHEET, NICHT AUF EINEM INLINE-WERT.
+ *
+ * `stagger()` liess `opacity: 1`, `transform: translateY(0)` und die eigene
+ * `transition` inline stehen. Das Inline-`opacity: 1` schlug jede Zustandsregel
+ * der Zeile selbst: `.shopping-item--checked { opacity: 0.45 }` und
+ * `.kanban-card--done { opacity: 0.6 }` griffen nur unter
+ * prefers-reduced-motion (dort kehrt stagger frueh zurueck), sonst nie - zwei
+ * Aussehen fuer denselben Zustand (Kontrastmessung nach dem HIG-Redesign,
+ * #1230). Dasselbe Inline-Opacity hielt die Drag-Geister
+ * (`.sortable-ghost { opacity: 0.4 }`) deckend.
+ */
+test('stagger: hinterlaesst nach dem Einblenden kein Inline-opacity, -transform oder -transition', async () => {
+  const els = [{ style: {} }, { style: {} }, { style: {} }];
+  stagger(els, { delay: 0, duration: 0 });
+  await new Promise((r) => setTimeout(r, 40));
+  els.forEach((el, i) => {
+    assert.equal(el.style.opacity || '', '', `Element ${i}: Inline-opacity "${el.style.opacity}" ueberdeckt die Zustandsregeln der Zeile`);
+    assert.equal(el.style.transform || '', '', `Element ${i}: Inline-transform "${el.style.transform}" bleibt stehen`);
+    assert.equal(el.style.transition || '', '', `Element ${i}: Inline-transition "${el.style.transition}" ueberdeckt die Transitions des Stylesheets`);
+  });
+});
+
+test('stagger: raeumt nur die eigenen Werte ab, nicht was inzwischen jemand anderes gesetzt hat', async () => {
+  const el = { style: {} };
+  stagger([el], { delay: 5, duration: 0 });
+  // Eine Wischgeste setzt waehrend des Einblendens ihr eigenes transform.
+  el.style.transform = 'translateX(-40px)';
+  await new Promise((r) => setTimeout(r, 40));
+  assert.equal(el.style.transform, 'translateX(-40px)', 'stagger hat ein fremdes Inline-transform ueberschrieben');
+});
+
 test('stagger: tut nichts bei prefers-reduced-motion', () => {
   global.window.matchMedia = () => ({ matches: true });
   const els = [{ style: {} }];

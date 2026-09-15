@@ -5762,28 +5762,34 @@ test('die Touch-Zielgröße folgt DESIGN.md statt einer dritten Zahl', () => {
 });
 
 /**
- * Nicht-Text-Kontrast: gemessen, dokumentiert, bewusst offen.
+ * Nicht-Text-Kontrast: gemessen, entschieden, dokumentiert.
  *
- * Die Kanten der Bedienelemente erreichen die 3:1 aus WCAG 1.4.11 nicht. Der
- * Betreiber hat am 2026-07-30 entschieden, das vorerst nur zu dokumentieren
- * statt --color-border anzuheben - die Änderung ginge durch jedes Modul.
+ * Die Kanten der Bedienelemente erreichten die 3:1 aus WCAG 1.4.11 nicht. Der
+ * Betreiber hatte am 2026-07-30 entschieden, das nur zu dokumentieren; am
+ * 2026-09-15 fiel die Entscheidung fuer ein eigenes --color-border-control
+ * (#1230, Option A). Ob das Token die 3:1 HAELT, prueft
+ * "Feldkanten tragen --color-border-control" - dieser Guard haelt das WISSEN
+ * fest: warum es ein eigenes Token ist und nicht --color-border angehoben
+ * wurde, und auf welchen Gruenden es am knappsten steht. Verschwindet der
+ * Kommentar, verschwindet auch der Grund, und die naechste Aufraeumrunde legt
+ * beide Kanten wieder zusammen.
  *
- * Der Guard hält die MESSUNG fest, nicht den Fix: verschwindet der Kommentar,
- * verschwindet auch das Wissen, warum die Zahl so steht. Messwerte und Zielwert
- * sind mit dem HIG-Rollout (2026-08) neu erhoben worden - die alte Zahlenreihe
- * galt gegen die warme Prä-Redesign-Palette und wäre gegen die kühle
- * iOS-27-Rampe schlicht falsch.
+ * Bis #1230 hielt dieser Guard die OFFENE Messung fest (1,13 / 1,26 / 1,60:1,
+ * Zielwert #949494). Er war damit der erste, der beim Umsetzen rot wurde - zu
+ * Recht: eine Doku, die einen behobenen Befund als offen fuehrt, ist falsch.
  */
-test('der offene Nicht-Text-Kontrast bleibt an den Tokens dokumentiert', () => {
+test('der entschiedene Nicht-Text-Kontrast bleibt an den Tokens dokumentiert', () => {
   const tokens = read('../public/styles/tokens.css');
   const block = tokens.slice(0, tokens.indexOf('--color-border:'));
-  assert.match(block, /WCAG 1\.4\.11/, 'der Befund muss an --color-border dokumentiert bleiben');
-  assert.match(block, /1\.13:1/, 'der gemessene Ist-Wert auf dem Grouped-Grund gehört dazu');
-  assert.match(block, /1\.26:1/, 'der Wert auf --color-surface gehört dazu (Eingabefeld auf Weiß)');
-  assert.match(block, /1\.60:1/, 'der Dark-Wert gehört dazu');
-  assert.match(block, /#949494/, 'der Zielwert für 3:1 gegen die kühle Rampe gehört dazu, sonst muss ihn jeder neu ausrechnen');
-  assert.match(block, /nicht für dekorative Gruppierung/,
-    'die Abgrenzung Bedienelement gegen Kartenkante gehört dazu - der Critique warf beides zusammen');
+  assert.match(block, /WCAG 1\.4\.11/, 'der Befund muss an den Kanten-Tokens dokumentiert bleiben');
+  assert.match(block, /#1230/, 'der Vorgang, in dem entschieden wurde, gehoert dazu');
+  assert.match(block, /--color-border-control ist die\s+\*?\s*vorhandene Rampenstufe --neutral-500/,
+    'welcher Wert das Token ist und woher er kommt, gehoert dazu');
+  assert.match(block, /3,18 auf der Buehne/, 'der knappste helle Grund gehoert dazu');
+  assert.match(block, /3,86\s+\*?\s*auf -raised/, 'der knappste dunkle Grund gehoert dazu');
+  assert.match(block, /NUR FELDKANTEN/,
+    'die Abgrenzung Feldkante gegen Kartenkante gehoert dazu - der Critique warf beides zusammen');
+  assert.match(tokens, /--color-border-control:\s*var\(--neutral-500\)/, 'das Token selbst muss so stehen, wie der Kommentar es beschreibt');
 });
 
 /**
@@ -7422,6 +7428,71 @@ test('jede Regel, die Farbe UND Untergrund setzt, haelt ihr eigenes Paar', () =>
  * `stagger()` sonst ein Inline-`opacity: 1` hinterlaesst - das ist eine offene
  * Designfrage, keine Zusage dieses Guards.
  * ──────────────────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────────────────
+ * Die Kante eines Eingabefelds haelt 3:1 (WCAG 1.4.11) - mit einem eigenen
+ * Token, nicht mit der Kartenkante
+ *
+ * Bis #1230 zogen die Felder ihre Ruhekante aus --color-border, derselben
+ * Stufe wie jede Karten- und Gruppenkante. Gerendert lag sie bei 1,26 bis
+ * 1,47:1 in beiden Themes, auf allen Flaechen (Login, Modals, Settings-Blaetter,
+ * Glas). Die Entscheidung (Ulas, 2026-09-15, Option A): ein eigenes
+ * --color-border-control = --neutral-500, NUR fuer Feldkanten; Trennlinien und
+ * Kartenkanten behalten --color-border.
+ *
+ * Zwei Zusagen, zwei Haelften:
+ *   1. das Token haelt 3:1 gegen jeden Grund, auf dem ein Feld gemessen stand,
+ *      in beiden Themes;
+ *   2. keine Feldregel zieht ihre Kante noch aus der Kartenkante. Welche Regel
+ *      ein Feld ist, entscheidet der SELEKTOR (input/select/textarea, .input,
+ *      .form-input, `__input`, die Such-Huelle), nicht eine Liste - eine Liste
+ *      liesse ausgerechnet das naechste Feld ungeprueft.
+ * ──────────────────────────────────────────────────────────────────────────── */
+test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrund', () => {
+  const { light, dark } = themeTokenMaps();
+  // Die Gruende, auf denen ein Feld in der Messung stand: Karte/Modal/Login
+  // (surface, surface-work), Settings-Blatt (surface-raised), Modal-Feldgrund
+  // (surface-2) und die Buehne (bg).
+  const GROUNDS = ['--color-surface', '--color-surface-work', '--color-surface-raised', '--color-surface-2', '--color-bg'];
+  const tokenFindings = [];
+  for (const [theme, map] of [['light', light], ['dark', dark]]) {
+    const edge = resolveColor('--color-border-control', map);
+    assert.ok(/^#[0-9a-f]{6}$/i.test(edge ?? ''), `${theme}: --color-border-control loest nicht auf eine Hex-Farbe auf (${edge})`);
+    for (const ground of GROUNDS) {
+      const bg = resolveColor(ground, map);
+      assert.ok(/^#[0-9a-f]{6}$/i.test(bg ?? ''), `${theme}: ${ground} loest nicht auf eine Hex-Farbe auf (${bg})`);
+      const ratio = contrastRatio(edge, bg);
+      if (ratio + 0.005 < 3) tokenFindings.push(`${theme}: ${edge} auf ${ground} (${bg}) ${ratio.toFixed(2)}:1`);
+    }
+  }
+  assert.deepEqual(tokenFindings, [], 'Die Feldkante unterschreitet 3:1 (WCAG 1.4.11) auf einem Grund, auf dem Felder stehen.');
+
+  const FIELD = /(?:^|[\s>+~])(?:input|select|textarea)(?![\w-])|\.(?:input|form-input)(?![\w-])|__input(?![\w-])|search__control(?![\w-])|quick-add__(?:qty|cat)(?![\w-])|__select(?![\w-])/;
+  const NOT_A_TEXT_FIELD = /\[type="?(?:checkbox|radio|range|color|file|hidden)"?\]|::|:focus|:hover|:disabled|\[disabled\]|is-invalid|--invalid|--error/;
+  const styles = new URL('../public/styles/', import.meta.url);
+  const offenders = [];
+  let controlEdges = 0;
+  for (const file of readdirSync(styles).filter((entry) => entry.endsWith('.css') && entry !== 'tokens.css')) {
+    for (const rule of eachRule(readFileSync(new URL(file, styles), 'utf8'))) {
+      const parts = rule.selector.split(',').map((s) => s.trim());
+      const fieldParts = parts.filter((s) => {
+        const last = s.split(/\s+|>|\+|~/).filter(Boolean).pop() ?? '';
+        return FIELD.test(` ${last}`) && !NOT_A_TEXT_FIELD.test(last);
+      });
+      if (!fieldParts.length) continue;
+      const edges = [...rule.body.matchAll(/(?:^|;)\s*border(?:-color|-top|-bottom|-left|-right)?\s*:\s*([^;]+)/g)].map((m) => m[1]);
+      if (edges.some((v) => /var\(\s*--color-border-control\s*\)/.test(v))) controlEdges += 1;
+      if (edges.some((v) => /var\(\s*--color-border(?:-subtle|-strong)?\s*[,)]/.test(v))) {
+        offenders.push(`${file}: ${fieldParts.join(', ')}${rule.at.length ? `  [${rule.at.join(' ')}]` : ''}`);
+      }
+    }
+  }
+  assert.ok(controlEdges >= 10,
+    `Nur ${controlEdges} Feldregeln mit --color-border-control gefunden - der Selektor-Scan greift nicht mehr, der Guard misst nichts.`);
+  assert.deepEqual(offenders, [],
+    'Feldregeln, die ihre Ruhekante aus der Kartenkante ziehen (--color-border*). Ein Eingabefeld nimmt '
+    + '--color-border-control (3:1, WCAG 1.4.11); --color-border bleibt Trennlinien und Kartenkanten.');
+});
+
 test('das Etikett einer Listenzeile haelt 4.5:1 in jedem Zustand, der es zuruecknimmt', () => {
   const { light, dark } = themeTokenMaps();
   const resolveHex = (value, map) => {
@@ -7469,6 +7540,55 @@ test('das Etikett einer Listenzeile haelt 4.5:1 in jedem Zustand, der es zurueck
   assert.deepEqual(findings, [],
     'Ein Zustand nimmt das Etikett unter 4.5:1 zurueck. Zuruecknehmen ueber die Farbe '
     + '(--color-text-tertiary), nicht ueber opacity - die Deckung multipliziert den Kontrast mit herunter.');
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Die abgehakte Einkaufszeile nimmt sich ueber Textfarben zurueck, nicht ueber
+ * die Deckung (#1230)
+ *
+ * `.shopping-item--checked { opacity: 0.45 }` griff nur unter
+ * prefers-reduced-motion, weil stagger() sonst ein Inline-`opacity: 1`
+ * hinterliess. Genau diese Menschen sahen Name und Menge bei 1,99:1 (light)
+ * und 2,51:1 (dark). Seit stagger() aufraeumt, gaelte die Deckung fuer alle.
+ * Zwei Zusagen: keine Regel des Zustands dimmt ueber opacity, und jede
+ * Textfarbe, die er setzt, haelt 4.5:1 auf den Gruenden der Zeile.
+ * ──────────────────────────────────────────────────────────────────────────── */
+test('die abgehakte Einkaufszeile nimmt sich ueber Textfarben zurueck, nicht ueber opacity', () => {
+  const { light, dark } = themeTokenMaps();
+  const styles = new URL('../public/styles/', import.meta.url);
+  const stateRules = readdirSync(styles)
+    .filter((entry) => entry.endsWith('.css') && entry !== 'tokens.css')
+    .flatMap((file) => [...eachRule(readFileSync(new URL(file, styles), 'utf8'))].map((rule) => ({ ...rule, file })))
+    .filter((rule) => rule.selector.split(',').some((part) => /\.shopping-item--checked(?![\w-])/.test(part)));
+  assert.ok(stateRules.length >= 2,
+    `Nur ${stateRules.length} Regeln fuer .shopping-item--checked gefunden - umbenannt? Dann prueft dieser Guard nichts mehr.`);
+
+  const dimmed = stateRules.filter((rule) => {
+    let value = null;
+    for (const m of rule.body.matchAll(/(?:^|;)\s*opacity\s*:\s*([0-9.]+)/g)) value = Number(m[1]);
+    return value !== null && value < 1;
+  }).map((rule) => `${rule.file}: ${rule.selector.trim()}`);
+  assert.deepEqual(dimmed, [],
+    'Der abgehakte Posten dimmt ueber opacity. Die Deckung multipliziert den Kontrast jedes Textes der Zeile mit '
+    + 'herunter - zuruecknehmen ueber --color-text-secondary/-tertiary.');
+
+  const findings = [];
+  let colors = 0;
+  for (const rule of stateRules) {
+    const decl = [...rule.body.matchAll(/(?:^|;)\s*color\s*:\s*var\(\s*(--[\w-]+)\s*\)/g)].pop();
+    if (!decl) continue;
+    colors += 1;
+    for (const [theme, map] of [['light', light], ['dark', dark]]) {
+      const fg = resolveColor(decl[1], map);
+      for (const ground of ['--color-surface', '--color-surface-2']) {
+        const bg = resolveColor(ground, map);
+        const ratio = contrastRatio(fg, bg);
+        if (ratio + 0.005 < 4.5) findings.push(`${theme}: ${ratio.toFixed(2)}:1  ${rule.file}  ${rule.selector.trim()}  ${decl[1]} auf ${ground}`);
+      }
+    }
+  }
+  assert.ok(colors >= 2, `Nur ${colors} Textfarben im Zustand gefunden - der Guard misst nichts.`);
+  assert.deepEqual(findings, [], 'Eine Textfarbe des abgehakten Postens unterschreitet 4.5:1.');
 });
 
 test('module accents stay readable as text on the page background in both themes', () => {

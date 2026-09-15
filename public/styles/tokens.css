@@ -93,20 +93,29 @@
   --color-surface-2:      var(--neutral-50);
   --_color-surface-3:     var(--_neutral-150);
   --color-surface-3:      var(--_color-surface-3);
-  /* OFFEN, BEWUSST NICHT GEÄNDERT (Entscheidung des Betreibers, 2026-07-30,
-   * gilt im HIG-Redesign fort): die Kanten der BEDIENELEMENTE erreichen den von
-   * WCAG 1.4.11 geforderten 3:1-Kontrast nicht — auch Apples eigene Grouped-List-
-   * Separatoren tun das nicht. Gemessen gegen die iOS-27-Welt: 1.26:1 hell auf
-   * --color-surface (Eingabefeld auf Weiß), 1.13:1 auf dem Grouped-Grund,
-   * 1.60:1 dunkel auf --color-surface. Der 3:1-Zielwert auf Weiß wäre #949494
-   * (der alte Zielwert #8A8A86 galt gegen die warme Prä-Redesign-Palette).
-   * Der saubere Weg wäre ein eigenes --color-border-control mit 3:1, das NUR
-   * interaktive Kanten benutzen, nicht für dekorative Gruppierung;
-   * --color-border global anzuheben würde jede Kartenkante der App mithärten.
-   * Der TEXT-Kontrast ist ohne Verstoß. */
+  /* DIE KANTE EINES EINGABEFELDS HAT EIN EIGENES TOKEN (Entscheidung Ulas,
+   * 2026-09-15, #1230 - Option A). Bis dahin zogen Felder ihre Ruhekante aus
+   * --color-border, derselben Stufe wie jede Karten- und Gruppenkante, und
+   * lagen gerendert bei 1,19 bis 1,47:1 in beiden Themes - unter den 3:1, die
+   * WCAG 1.4.11 fuer die Grenze eines Bedienelements verlangt (die Entscheidung
+   * vom 2026-07-30 hatte das bewusst offen gelassen).
+   *
+   * --color-border-control ist die vorhandene Rampenstufe --neutral-500 und
+   * haelt 3:1 auf jedem Grund, auf dem ein Feld gemessen stand: light 3,53 auf
+   * Weiss, 3,42 auf -raised, 3,18 auf der Buehne; dark 4,51 auf -surface, 3,86
+   * auf -raised, 5,46 auf der Buehne (die Dark-Bloecke setzen --_neutral-500,
+   * das Token zieht mit). Die knappere Alternative (#938E85 / #7A746B) fiel auf
+   * der hellen Buehne auf 2,93 und auf dem dunklen -raised auf 2,71.
+   *
+   * NUR FELDKANTEN (input, select, textarea, .input, .form-input, Such-Huellen).
+   * Trennlinien, Karten- und Gruppenkanten behalten --color-border - sie global
+   * anzuheben haette jede Kartenkante der App mitgehaertet. Der Fokusrand bleibt
+   * der Akzent. Guard: test-frontend-audit.js, "Feldkanten tragen
+   * --color-border-control". */
   --color-border:         var(--neutral-200);
   --color-border-subtle:  var(--neutral-150);
   --color-border-strong:  var(--neutral-300);  /* kräftigere Trennlinie (Hover, betonte Rahmen) */
+  --color-border-control: var(--neutral-500);  /* Ruhekante von Eingabefeldern, 3:1 (WCAG 1.4.11) */
   --color-text-primary:   var(--neutral-900);
   --color-text-secondary: var(--neutral-600);  /* WCAG AA: 6.19:1 auf weiß, 5.58:1 auf --color-bg - dieselben Werte wie an --_neutral-600 oben; hier standen die der alten kühlen Rampe (5.75 / 5.2) */
   /* WARM STATT KUEHL (Dark-Kur 2026-08-17, gilt fuer BEIDE Themes). #68686F
@@ -1751,7 +1760,7 @@
      * (.md-toolbar__sep:hover, .user-ms__avatar--none), und der Guard
      * verlangt dort zu Recht 4.5 - #47423B traegt 4.52. */
     --color-border-subtle: #3E3933;  /* Trenner, ruhige Kartenkante */
-    --color-border:        #47423B;  /* Standardkante, Formfelder */
+    --color-border:        #47423B;  /* Standardkante (Karten, Gruppen); Feldkanten: --color-border-control */
     --color-border-strong: #6F6A61;  /* Hover, betonte Rahmen (~2.7:1) */
 
     --_sidebar-bg:           #221F1D;

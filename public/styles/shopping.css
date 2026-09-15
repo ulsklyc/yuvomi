@@ -370,12 +370,12 @@
   width: 100%;
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-sm);
-  /* --color-border wie die beiden Nachbarfelder, nicht --glass-border-subtle.
+  /* --color-border-control wie die beiden Nachbarfelder, nicht --glass-border-subtle.
    * Das Glas-Token ist ein weißes Alpha (35 % hell / 12 % dunkel) und erreichte
    * auf der opaken Arbeitsfläche 1.03:1 gegen den Grund - die schwächste
    * Feldkante der ganzen App und als Glas auf einer Arbeitsfläche zusätzlich
    * gegen die Hausregel „Glas bleibt der Shell" (Critique 2026-07-29). */
-  border: 1.5px solid var(--color-border);
+  border: 1.5px solid var(--color-border-control);
   background-color: var(--color-surface);
   color: var(--color-text-primary);
   font-size: var(--text-base);
@@ -395,7 +395,7 @@
   min-width: 0;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
-  border: 1.5px solid var(--color-border);
+  border: 1.5px solid var(--color-border-control);
   background-color: var(--color-surface);
   color: var(--color-text-primary);
   font-size: var(--text-base);
@@ -419,7 +419,7 @@
   max-width: none;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
-  border: 1.5px solid var(--color-border);
+  border: 1.5px solid var(--color-border-control);
   background-color: var(--color-surface);
   color: var(--color-text-secondary);
   font-size: var(--text-base);
@@ -658,13 +658,20 @@
   }
 }
 
-/* Abgehakt: gedämpft über die ganze Zeile. Der Vollton-Grün der Checkbox bleibt
- * BEWUSST - er trägt das weiße Häkchen (--color-ink-on-vivid), eine Tönung würde
- * dessen Kontrast brechen. Die 0.45 multiplizieren die Sättigung ohnehin herunter,
- * der abgehakte Artikel ist also nicht die stärkste Fläche der Seite. */
-.shopping-item--checked {
-  opacity: 0.45;
-}
+/* ABGEHAKT TRITT ÜBER DIE TEXTFARBEN ZURÜCK, NICHT ÜBER DIE DECKUNG DER ZEILE.
+ *
+ * Hier stand `.shopping-item--checked { opacity: 0.45 }`. Gegriffen hat sie nur
+ * unter prefers-reduced-motion: sonst hinterliess stagger() ein Inline-
+ * `opacity: 1`, das die Regel schlug. Wer reduzierte Bewegung eingestellt hat,
+ * sah Name und Menge damit bei 1,99:1 (light) und 2,51:1 (dark), alle anderen
+ * die ungedämpfte Zeile (#1230). Seit stagger() nichts mehr inline stehen
+ * lässt, hätte die 0.45 für ALLE gegolten. Die Zeile trägt den Zustand deshalb
+ * so, wie ihn bisher alle außer diesen Menschen sahen: Name secondary mit
+ * Durchstrich, Metazeile und Etiketten tertiary - 4.5:1 und mehr in beiden
+ * Themes, gleich mit und ohne reduzierte Bewegung. Der Vollton-Grün der
+ * Checkbox bleibt BEWUSST - er trägt das weiße Häkchen (--color-ink-on-vivid),
+ * eine Tönung würde dessen Kontrast brechen. Guard: test-frontend-audit.js,
+ * "die abgehakte Einkaufszeile nimmt sich ueber Textfarben zurueck". */
 
 /* Checkbox */
 .item-check {

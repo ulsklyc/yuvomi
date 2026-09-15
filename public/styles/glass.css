@@ -329,7 +329,7 @@
 .form-input,
 select.form-input,
 textarea.form-input {
-  border-color: var(--color-border);
+  border-color: var(--color-border-control);
 }
 
 @media (prefers-contrast: more) {

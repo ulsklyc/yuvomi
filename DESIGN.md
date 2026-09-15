@@ -1526,7 +1526,8 @@ Zuordnung als Tabelle bei der Signature Component; Guards auf Ebene 3
 nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
 
 ### Inputs / Fields
-- **Style:** 10px Radius (`--radius-sm`), 1.5px Border `--color-border`, Surface-Grund,
+- **Style:** 10px Radius (`--radius-sm`), 1.5px Border `--color-border-control` (3:1 nach
+  WCAG 1.4.11; Karten- und Trennkanten bleiben `--color-border`), Surface-Grund,
   Padding 8px 12px, min-height 48px (Desktop 40px), Schriftgroesse nie unter 16px,
   Placeholder `--color-text-placeholder` (= Tertiaer, gethemt; NIE die Disabled-Farbe, und
   als Elementselektor auf `input`/`textarea`, damit kein Feld auf Chromes UA-Default

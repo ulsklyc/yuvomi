@@ -131,12 +131,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Tags on checked-off shopping items are readable again.** A checked item faded its tags by
-  making them partly transparent, which left the tag text at 2.6:1 in the light theme and 3.7:1 in
-  the dark theme, below the 4.5:1 that normal text needs. A checked item is still something you can
-  tap to reopen, so it is not exempt the way a disabled control would be. The tags now recede
-  through the same quieter text color the item's other details already use when checked, which
-  keeps them visibly softer than the item name at 5.4:1 and 7.7:1.
+- **Form fields have a clearly visible edge in both themes.** Text inputs, selects and text areas
+  drew their resting edge in the same faint shade as card and group outlines, which rendered at 1.2
+  to 1.5:1 against the surface around them - well below the 3:1 a control boundary needs for people
+  to find the field at all. Fields now have an edge color of their own, at 3.2 to 3.5:1 in the light
+  theme and 3.9 to 5.5:1 in the dark theme on every surface they sit on: the sign-in page, dialogs,
+  settings pages, the search overlay, and the search and quick-add fields above the lists. Card
+  edges and separators keep their quieter shade, and a focused field still takes the accent color.
+- **Checked-off shopping items look the same with reduced motion, and stay readable.** A checked
+  item was meant to fade as a whole, but that only happened for people who had reduced motion turned
+  on, and for them its name and quantity dropped to 2.0:1 (light) and 2.5:1 (dark). Everyone else
+  saw the item unfaded, because the fade-in animation of the list left a setting behind that
+  overrode it. The animation now cleans up after itself, and a checked item recedes through quieter
+  text colors instead of transparency: the name struck through in the secondary text color, details
+  and tags in the tertiary one, at 5.4:1 or more in both themes. Its tags no longer fade on their
+  own either (2.6:1 and 3.7:1 before). A checked item can still be tapped to reopen it, so it is not
+  exempt the way a disabled control would be. The same leftover setting had also kept a dragged row
+  or board card fully opaque; it now fades while it is being moved, as intended.
 - **An early click on the simple setup no longer overwrites an existing installation.** The web
   installer locks its simple path when it finds an `.env`, because that path sets host, port and
   cookie security itself. The lock only took effect once the installer had finished checking for

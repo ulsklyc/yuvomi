@@ -35,10 +35,10 @@
   min-height: var(--target-base);
   padding-block: var(--space-2);
   padding-inline: 36px calc(var(--space-2) + 24px);
-  /* Feldkanon aus DESIGN.md: 1.5px --color-border auf Surface-Grund. Die
+  /* Feldkanon aus DESIGN.md: 1.5px --color-border-control auf Surface-Grund. Die
    * frühere surface-2-Fläche lag im Dark unter dem Seitengrund und ließ das
    * Feld mit seiner subtilen Kante fast verschwinden. */
-  border: 1.5px solid var(--color-border);
+  border: 1.5px solid var(--color-border-control);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text-primary);

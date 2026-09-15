@@ -22,9 +22,23 @@ export function stagger(elements, { delay = 30, duration = 180, max = 5 } = {}) 
     el.style.opacity = '0';
     el.style.transform = 'translateY(8px)';
     el.style.transition = `opacity ${duration}ms ease, transform ${duration}ms ease`;
+    // Zurückgelesen statt als Literal verglichen: der Browser serialisiert
+    // Inline-Werte selbst, und nur so erkennt das Aufräumen seine eigenen.
+    const own = { opacity: el.style.opacity, transform: el.style.transform, transition: el.style.transition };
     setTimeout(() => {
-      el.style.opacity = '1';
-      el.style.transform = 'translateY(0)';
+      // DAS EINBLENDEN ENDET AUF DEM STYLESHEET, NICHT AUF EINEM INLINE-WERT
+      // (#1230). Hier stand `opacity = '1'`, und das blieb inline stehen: es
+      // schlug jede Zustandsregel der Zeile selbst - `.shopping-item--checked`
+      // griff nur unter prefers-reduced-motion, die Drag-Geister
+      // (`.sortable-ghost`) blieben deckend. Das Leeren blendet über die noch
+      // stehende Transition auf den Wert des Stylesheets ein. Geräumt wird nur,
+      // was noch der eigene Wert ist - eine Wischgeste kann inzwischen ihr
+      // eigenes transform gesetzt haben.
+      if (el.style.opacity === own.opacity) el.style.opacity = '';
+      if (el.style.transform === own.transform) el.style.transform = '';
+      setTimeout(() => {
+        if (el.style.transition === own.transition) el.style.transition = '';
+      }, duration);
     }, itemDelay);
   });
 }

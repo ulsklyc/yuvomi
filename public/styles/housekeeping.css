@@ -316,7 +316,7 @@
 .housekeeping-field select {
   width: 100%;
   min-height: var(--target-lg);
-  border: 1.5px solid var(--color-border);
+  border: 1.5px solid var(--color-border-control);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text-primary);

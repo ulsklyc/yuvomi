@@ -1246,7 +1246,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   height: var(--target-lg);
   padding: 0 var(--space-3);
   border-radius: var(--radius-lg);
-  border: 1.5px solid var(--color-border);
+  border: 1.5px solid var(--color-border-control);
   background-color: var(--color-surface-elevated);
   color: var(--color-text-primary);
   font-size: var(--text-base);
@@ -5088,7 +5088,7 @@ p.field-hint--warn[hidden] {
   box-sizing: border-box;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
-  border: 1.5px solid var(--color-border);
+  border: 1.5px solid var(--color-border-control);
   background-color: var(--color-surface);
   color: var(--color-text-primary);
   font-size: var(--text-base);

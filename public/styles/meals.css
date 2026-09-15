@@ -849,9 +849,9 @@
   width: 100%;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
-  /* Feldkante nach dem Input-Kanon (DESIGN.md: 1.5px --color-border), nicht
-   * im Modul-Akzent - die Akzentkante gehörte zur abgelösten Welt. */
-  border: 1.5px solid var(--color-border);
+  /* Feldkante nach dem Input-Kanon (DESIGN.md: 1.5px --color-border-control),
+   * nicht im Modul-Akzent - die Akzentkante gehörte zur abgelösten Welt. */
+  border: 1.5px solid var(--color-border-control);
   background-color: var(--color-surface);
   color: var(--color-text-primary);
   font-size: var(--type-body);
