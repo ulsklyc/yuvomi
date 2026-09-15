@@ -846,7 +846,7 @@ function renderBody() {
           <button class="budget-account-chip" id="budget-clear-responsible-filter" type="button"
                   aria-label="${esc(t('budget.clearResponsibleFilter'))}">
             <i data-lucide="user-round" class="icon-sm" aria-hidden="true"></i>
-            <span>${esc(state.members.find((u) => u.id === state.responsibleFilterId)?.display_name ?? '')}</span>
+            <span>${esc(responsibleFilterName(state.responsibleFilterId, state))}</span>
             <i data-lucide="x" class="icon-sm" aria-hidden="true"></i>
           </button>` : ''}
         </div>
@@ -2112,7 +2112,20 @@ function responsiblePickerHtml({ members, entry, isEdit }) {
     </div>` : '';
 }
 
-export const __test = { responsiblePickerHtml };
+/**
+ * Der Name auf dem Zustaendigen-Filterchip. Den Filter setzt ein Klick auf den
+ * Avatar-Stapel einer Buchung - der kann auch Hauspersonal oder einen Gast
+ * nennen, den die Mitgliederliste nicht kennt (#1207). Dann traegt der Chip
+ * den Namen aus der Buchung selbst statt eines leeren Etiketts.
+ */
+function responsibleFilterName(id, { members = [], entries = [] } = {}) {
+  const same = (person) => Number(person?.id) === Number(id);
+  return members.find(same)?.display_name
+    ?? entries.flatMap((entry) => entry.responsible_users ?? []).find(same)?.display_name
+    ?? '';
+}
+
+export const __test = { responsiblePickerHtml, responsibleFilterName };
 
 function openBudgetModal({ mode, entry = null, initialType = '' }) {
   const isEdit = mode === 'edit';

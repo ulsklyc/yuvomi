@@ -3940,6 +3940,7 @@ async function openFoundEvent(ev) {
 }
 
 export const __test = {
+  buildEventModalContent,
   fetchWindow,
   getWeekRange,
   getRangeForView,
@@ -5263,8 +5264,12 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       ${renderUserMultiSelect(withChosenPeople(state.users, isEdit ? event.assigned_users : []), selectedUserIds, 'cal_assigned', 'calendar.assignedLabel')}
     </div>
 
-    ${state.users.length > 1 ? `
-    <div class="form-group">
+    <!-- Verborgen, nicht entfernt: der Speicherpfad liest
+         "#modal-visibility?.value || 'all'". Ohne den Knoten machte jedes
+         Speichern einen privaten Termin fuer alle sichtbar, sobald die Liste
+         hoechstens ein Mitglied hat - ein Haushalt aus einer Person und einer
+         Haushaltshilfe genauso. Das Aufgabenformular macht es ebenso. -->
+    <div class="form-group"${state.users.length > 1 ? '' : ' hidden'}>
       <label class="form-label" for="modal-visibility">${t('common.visibility.label')}</label>
       <select class="input" id="modal-visibility" name="visibility">
         <option value="all"       ${visibility === 'all'       ? 'selected' : ''}>${t('common.visibility.all')}</option>
@@ -5273,7 +5278,7 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       </select>
       <p class="form-hint">${t('common.visibility.hint')}</p>
       <p class="form-hint field-hint--warn" id="modal-visibility-warning" role="status" hidden><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('common.visibility.assigneesNobodyHint')}</span></p>
-    </div>` : ''}
+    </div>
 
     <!-- #647: der Schalter, den @Kyrodan beschrieben hat - „einen Termin als
          Countdown markieren" statt eines zweiten Systems daneben. Er steht im

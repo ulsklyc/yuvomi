@@ -2125,8 +2125,12 @@ function renderScheduleWidget(schedule, users, size) {
   // (Review #930: sechs Mitglieder, die zwei im Dienst mit den hoechsten ids).
   // Im-Dienst-Eintraege zuerst, stabil sortiert, dann erst der Deckel.
   const sorted = [...entries].sort((a, b) => (a.shift_type ? 0 : 1) - (b.shift_type ? 0 : 1));
+  // Namen aus dem Verzeichnis des Ausschnitts (loadScheduleSlice): auch ein
+  // bestehender Plan von Hauspersonal traegt so einen Namen. Ohne Verzeichnis
+  // bleibt es bei data.users.
+  const directory = schedule?.people?.length ? schedule.people : users;
   const rows = sorted.slice(0, listRowCap(size)).map((entry) => {
-    const user = users.find((item) => Number(item.id) === Number(entry.user_id));
+    const user = directory.find((item) => Number(item.id) === Number(entry.user_id));
     const type = entry.shift_type;
     const accent = user?.avatar_color || AVATAR_FALLBACK_COLOR;
     const avatarInner = user?.avatar_data
@@ -4416,12 +4420,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     if (data.schedule !== undefined) return;
     if (window.yuvomi?.isModuleDisabled('schedule')) return;
     try {
-      const day = householdToday();
-      const [entriesRes, typesRes] = await Promise.all([
-        api.get(`/schedule/entries?from=${day}&to=${day}`),
-        api.get('/schedule/shift-types'),
-      ]);
-      data.schedule = { entries: entriesRes.data?.entries ?? [], hasTypes: (typesRes.data ?? []).length > 0 };
+      data.schedule = await loadScheduleSlice(householdToday());
     } catch (err) {
       console.error('[Dashboard] Schedule-Slice Ladefehler:', err?.message);
       data.schedule = null;
@@ -5060,7 +5059,28 @@ export async function render(container, { user, signal: routeSignal = null } = {
   }
 }
 
-export const __test = { buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions };
+/**
+ * Der Schichtplan eines Tages fuer die Kachel: Eintraege, ob es ueberhaupt
+ * Typen gibt, und die Namen der Plan-Besitzer. data.users kommt aus der
+ * Mitgliederliste (#1207); auch Hauspersonal kann einen Plan haben, und seine
+ * Zeile traegt wie auf der Dienstplan- und der Kalenderseite einen Namen.
+ * Faellt nur das Verzeichnis aus, bleibt die Kachel stehen und nennt die
+ * Mitglieder wie zuvor.
+ */
+async function loadScheduleSlice(day) {
+  const [entriesRes, typesRes, peopleRes] = await Promise.all([
+    api.get(`/schedule/entries?from=${day}&to=${day}`),
+    api.get('/schedule/shift-types'),
+    api.get('/auth/users').catch(() => ({ data: [] })),
+  ]);
+  return {
+    entries: entriesRes.data?.entries ?? [],
+    hasTypes: (typesRes.data ?? []).length > 0,
+    people: peopleRes.data ?? [],
+  };
+}
+
+export const __test = { loadScheduleSlice, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

@@ -20,6 +20,7 @@ import { findPageFab } from '/utils/fab.js';
 // Wert, es ist nur `hidden`: der Absende-Pfad liest es unveraendert, und kommt
 // ein zweites Mitglied dazu, steht es wieder da.
 import { isSoloHousehold } from '/utils/household.js';
+import { withChosenPeople } from '/utils/people-picker.js';
 import { maxUploadBytes } from '/utils/upload-limit.js';
 import { mountEmptyState } from '/utils/empty-state.js';
 import { subtreeIds, folderPath, flattenFolderTree } from '/utils/folder-tree.js';
@@ -290,9 +291,16 @@ function renderBreadcrumb() {
   }).join('')}`);
 }
 
+/**
+ * Die Freigabe-Auswahl zeigt Haushaltsmitglieder (#1207); die Namen bestehender
+ * Freigaben kommen aus dem Kontenverzeichnis - auch Hauspersonal oder ein Gast
+ * kann eine haben. Bewusst ohne Fallback auf eine leere Liste: ohne Verzeichnis
+ * fehlte das Kaestchen einer bestehenden Freigabe, und Speichern entzoege sie.
+ */
 async function loadMembers() {
-  const res = await api.get('/family/members');
-  state.members = res.data || [];
+  const [members, directory] = await Promise.all([api.get('/family/members'), api.get('/auth/users')]);
+  state.members = members.data || [];
+  state.directory = directory.data || [];
 }
 
 // Nur der Status wird serverseitig gefiltert: Kategorie und Ordner sind
@@ -1660,15 +1668,26 @@ async function deleteSelected() {
   deleteDocuments(docs);
 }
 
+/**
+ * Die Freigabe-Kaestchen: Haushaltsmitglieder und dazu, wer an diesem Dokument
+ * schon freigegeben ist (#1207). saveDocument() baut allowed_member_ids aus den
+ * angehakten Kaestchen - ein fehlendes Kaestchen entzoege beim Speichern den
+ * Zugriff. Namen bestehender Freigaben kommen aus dem Kontenverzeichnis.
+ */
 function memberOptions(selected = []) {
   const selectedSet = new Set(selected.map(String));
-  return state.members.map((member) => `
+  const granted = selected
+    .map((id) => (state.directory ?? []).find((person) => Number(person.id) === Number(id)))
+    .filter(Boolean);
+  return withChosenPeople(state.members, granted).map((member) => `
     <label class="document-member-option">
       <input type="checkbox" value="${member.id}" ${selectedSet.has(String(member.id)) ? 'checked' : ''}>
       <span>${esc(member.display_name)}</span>
     </label>
   `).join('');
 }
+
+export const __test = { memberOptions, loadMembers };
 
 function openDocumentModal(doc = null, { initialUpload = 'files' } = {}) {
   const isEdit = !!doc;
