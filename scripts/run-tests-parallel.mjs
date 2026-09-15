@@ -30,16 +30,19 @@
  *
  * Aufruf:  node scripts/run-tests-parallel.mjs [--jobs N] [--logs DIR]
  *          [--timeout SEKUNDEN] [--list] [--package DATEI]
+ * Logs ohne `--logs`: `<tmpdir>/yuvomi-test-parallel/<checkout>-<hash>/`, von
+ * jedem Lauf zuerst geleert. `--timeout` gilt je Schritt, Default 900 s.
  * Exit 0 = alle Schritte gruen, 1 = mindestens einer rot, 2 = Aufruf- oder
  * Parserfehler.
  */
 
 import { spawn } from 'node:child_process';
-import { closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { closeSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 const REPO_PACKAGE = fileURLToPath(new URL('../package.json', import.meta.url));
 
@@ -254,8 +257,17 @@ async function main(argv) {
   }
 
   let logDir = opts.logs;
-  if (logDir) mkdirSync(logDir, { recursive: true });
-  else logDir = mkdtempSync(path.join(os.tmpdir(), 'yuvomi-test-parallel-'));
+  if (!logDir) {
+    // Ein fester Ordner je Checkout, vor jedem Lauf geleert. Ein neuer Ordner
+    // je Lauf liess rund 326 Dateien pro Lauf im Temp-Ordner liegen; alte
+    // Ordner nach Praefix wegzuraeumen traefe den laufenden Runner eines
+    // anderen Arbeitsbaums.
+    const checkout = realpathSync(cwd);
+    const key = createHash('sha256').update(checkout).digest('hex').slice(0, 8);
+    logDir = path.join(os.tmpdir(), 'yuvomi-test-parallel', `${path.basename(checkout)}-${key}`);
+    rmSync(logDir, { recursive: true, force: true });
+  }
+  mkdirSync(logDir, { recursive: true });
 
   const stop = (signal) => {
     for (const child of running) {
@@ -312,6 +324,24 @@ async function main(argv) {
   return red.length ? 1 : 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+/**
+ * Als Programm gestartet oder nur importiert (von test:parallel-runner)?
+ *
+ * Beide Seiten ueber `realpathSync`. Der Loader loest `import.meta.url` ueber
+ * Symlinks auf, `process.argv[1]` bleibt, wie getippt. Die erste Fassung
+ * verglich nur `path.resolve(argv[1])`: ueber einen Symlink gestartet - unter
+ * macOS reicht `/tmp` statt `/private/tmp` - endete der Runner mit Exit 0 und
+ * ohne Ausgabe, auch bei roter Kette (Review auf #1229).
+ */
+function startedAsProgram() {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (startedAsProgram()) {
   process.exitCode = await main(process.argv.slice(2));
 }

@@ -14,13 +14,13 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 
-import { SERIAL, loadSteps, parseChain } from '../scripts/run-tests-parallel.mjs';
+import { SERIAL, loadSteps, parseChain, runSteps } from '../scripts/run-tests-parallel.mjs';
 
 const RUNNER = fileURLToPath(new URL('../scripts/run-tests-parallel.mjs', import.meta.url));
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -170,18 +170,63 @@ test('SERIAL nennt nur Schritte der Kette, jeden mit Grund', () => {
   }
 });
 
+/* Die Schleife darueber laeuft ueber eine LEERE Liste und prueft heute nichts.
+ * Was die Liste traegt, steht in `runSteps`: ein veralteter Eintrag bricht ab,
+ * ein gueltiger laeuft allein nach dem parallelen Teil. Beides hier mit einer
+ * eigenen Liste, damit es nicht erst mit dem ersten echten Eintrag auffaellt. */
+test('SERIAL: ein veralteter Eintrag bricht ab, ein gueltiger laeuft allein danach', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yuvomi-runner-serial-'));
+  try {
+    const opts = { cwd: dir, logDir: dir, jobs: 2, timeoutMs: 0 };
+    await assert.rejects(
+      runSteps(['node -e "1"'], { ...opts, serial: new Map([['npm run test:gibt-es-nicht', 'veralteter Eintrag']]) }),
+      /SERIAL nennt Schritte, die nicht in der Kette stehen: npm run test:gibt-es-nicht/,
+    );
+
+    const alone = 'node -e "require(\'node:fs\').appendFileSync(\'order.txt\', \'serial\\n\')"';
+    const results = await runSteps([
+      alone,
+      'node -e "setTimeout(() => require(\'node:fs\').appendFileSync(\'order.txt\', \'parallel\\n\'), 300)"',
+    ], { ...opts, serial: new Map([[alone, 'laeuft allein, weil der Test es so will']]) });
+    assert.deepEqual(results.map((r) => r.ok), [true, true]);
+    // Der serielle Schritt steht in der Kette ZUERST und laeuft trotzdem nach dem parallelen.
+    assert.equal(readFileSync(join(dir, 'order.txt'), 'utf8'), 'parallel\nserial\n');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 /** Faehrt den Runner als Programm gegen eine eigene package.json. */
-function runRunner(chainSteps, args = []) {
+function runRunner(chainSteps, args = [], { runner = RUNNER, logs = true } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'yuvomi-runner-run-'));
   writeFileSync(join(dir, 'package.json'), JSON.stringify({ scripts: { test: chainSteps.join(' && ') } }));
-  const logs = join(dir, 'logs');
-  const run = spawnSync(process.execPath, [RUNNER, '--package', join(dir, 'package.json'), '--logs', logs, ...args], {
-    encoding: 'utf8',
-  });
-  const summaryPath = join(logs, 'summary.json');
+  const logDir = join(dir, 'logs');
+  const run = spawnSync(process.execPath, [
+    runner, '--package', join(dir, 'package.json'), ...(logs ? ['--logs', logDir] : []), ...args,
+  ], { encoding: 'utf8' });
+  const summaryPath = join(logDir, 'summary.json');
   const summary = existsSync(summaryPath) ? JSON.parse(readFileSync(summaryPath, 'utf8')) : null;
   return { dir, run, summary, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
+
+/* Der Einstieg darf nie still nichts tun. Die erste Fassung verglich
+ * `import.meta.url` (vom Loader aufgeloest) mit `path.resolve(argv[1])` (nicht
+ * aufgeloest): ueber einen Symlink gestartet - unter macOS schon `/tmp` statt
+ * `/private/tmp` - endete der Runner mit Exit 0 und ohne ein Byte Ausgabe,
+ * auch bei roter Kette (Review auf #1229). */
+test('ueber einen Symlink gestartet laeuft der Runner trotzdem, rot bleibt rot', () => {
+  const linkDir = mkdtempSync(join(tmpdir(), 'yuvomi-runner-link-'));
+  const link = join(linkDir, 'runner-link.mjs');
+  symlinkSync(RUNNER, link);
+  const r = runRunner(['node -e "process.exit(1)"'], [], { runner: link });
+  try {
+    assert.equal(r.run.status, 1, `Exit ${r.run.status}, Ausgabe: ${JSON.stringify(r.run.stdout + r.run.stderr)}`);
+    assert.match(r.run.stdout, /1 Schritte, 0 gruen, 1 rot/);
+  } finally {
+    r.cleanup();
+    rmSync(linkDir, { recursive: true, force: true });
+  }
+});
 
 test('ein roter Schritt haelt den Lauf nicht an, der Exit-Code kommt aus dem Kind', () => {
   // --jobs 1: der dritte Schritt startet erst NACH dem roten - laeuft er, lief der Runner weiter.
@@ -204,7 +249,7 @@ test('ein roter Schritt haelt den Lauf nicht an, der Exit-Code kommt aus dem Kin
   }
 });
 
-test('alle gruen ergibt Exit 0, ein haengender Schritt faellt ueber den Timeout', () => {
+test('alle gruen ergibt Exit 0', () => {
   const green = runRunner(['node -e "1"', 'node -e "2"', 'node -e "3"'], ['--jobs', '3']);
   try {
     assert.equal(green.run.status, 0, green.run.stdout + green.run.stderr);
@@ -213,12 +258,66 @@ test('alle gruen ergibt Exit 0, ein haengender Schritt faellt ueber den Timeout'
     green.cleanup();
   }
 
-  const hung = runRunner(['node -e "setTimeout(() => {}, 60000)"', 'node -e "1"'], ['--jobs', '2', '--timeout', '1']);
+});
+
+/** Lebt `pid` noch? Wartet bis zu `ms`, weil ein getoeteter Waise erst vom Init-Prozess abgeraeumt wird. */
+function aliveAfter(pid, ms) {
+  const tick = new Int32Array(new SharedArrayBuffer(4));
+  for (const deadline = Date.now() + ms; ; Atomics.wait(tick, 0, 0, 25)) {
+    try { process.kill(pid, 0); } catch { return false; }
+    if (Date.now() > deadline) return true;
+  }
+}
+
+/* DER TIMEOUT MUSS DIE GANZE GRUPPE TREFFEN, NICHT NUR DIE SHELL.
+ *
+ * Ein Schritt ist `sh -c <schritt>`, und `npm run x` darunter ist npm -> sh ->
+ * node. Die erste Fassung dieses Tests hing mit einem direkten `node -e`: `sh`
+ * ersetzt sich dann durch `node`, der Kill auf die Shell traf also zufaellig den
+ * Prozess, der haengt, und `process.kill(child.pid)` statt `-child.pid` blieb
+ * gruen (Review auf #1229). Hier haengt ein ENKEL - das `; :` hinter dem Aufruf
+ * zwingt die innere Shell zu forken statt sich zu ersetzen -, und geprueft wird,
+ * dass er nach dem Lauf nicht mehr lebt. */
+test('ein haengender Schritt faellt ueber den Timeout, samt seiner Enkelprozesse', () => {
+  const grandchild = 'node -e "require(\\"node:fs\\").writeFileSync(\\"hang.pid\\", String(process.pid)); setTimeout(() => {}, 60000)"';
+  const hung = runRunner([`sh -c '${grandchild}; :'`, 'node -e "1"'], ['--jobs', '2', '--timeout', '2']);
+  let pid = null;
   try {
     assert.equal(hung.run.status, 1, hung.run.stdout + hung.run.stderr);
     assert.deepEqual(hung.summary.steps.map((s) => [s.ok, s.timedOut]), [[false, true], [true, false]]);
+    const pidFile = join(hung.dir, 'hang.pid');
+    assert.ok(existsSync(pidFile), 'der Enkelprozess ist nie gestartet - der Test prueft so nichts');
+    pid = Number(readFileSync(pidFile, 'utf8'));
+    assert.equal(aliveAfter(pid, 2000), false, `Enkelprozess ${pid} lebt nach dem Timeout weiter - der Kill traf nur die Shell`);
+    pid = null;
   } finally {
+    // Kein Waise aus einem roten Lauf: der Test raeumt ihn selbst ab.
+    if (pid) try { process.kill(pid, 'SIGKILL'); } catch { /* schon weg */ }
     hung.cleanup();
+  }
+});
+
+/* Ohne `--logs` schreibt jeder Lauf in DENSELBEN Ordner je Checkout und leert
+ * ihn vorher. Die erste Fassung legte je Lauf ein neues Verzeichnis mit rund
+ * 326 Dateien in den Temp-Ordner und raeumte nie auf. Ein fester Ordner je
+ * Checkout statt Aufraeumen nach Praefix: das Praefix trifft auch den
+ * laufenden Runner eines anderen Arbeitsbaums. */
+test('ohne --logs ueberschreibt ein Lauf den Logordner seines Checkouts', () => {
+  const first = runRunner(['node -e "1"'], [], { logs: false });
+  try {
+    const dirOf = (out) => out.match(/^Logs: (.+)$/m)?.[1];
+    const logDir = dirOf(first.run.stdout);
+    assert.ok(logDir && existsSync(join(logDir, '001-node_-e_1.log')), first.run.stdout);
+    writeFileSync(join(logDir, 'alt.log'), 'vom vorigen Lauf');
+
+    const again = spawnSync(process.execPath, [RUNNER, '--package', join(first.dir, 'package.json')], { encoding: 'utf8' });
+    assert.equal(again.status, 0, again.stdout + again.stderr);
+    assert.equal(dirOf(again.stdout), logDir, 'derselbe Checkout bekommt denselben Logordner');
+    assert.equal(existsSync(join(logDir, 'alt.log')), false, 'der Rest des vorigen Laufs liegt noch da');
+    assert.ok(existsSync(join(logDir, 'summary.json')));
+    rmSync(logDir, { recursive: true, force: true });
+  } finally {
+    first.cleanup();
   }
 });
 
