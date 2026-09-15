@@ -743,9 +743,14 @@ test('--timeout und --grace ueber dem Timer-Maximum enden mit Exit 2', () => {
  * (Review auf #1229). Der Runner frischt die mtime deshalb per Herzschlag auf;
  * `--heartbeat 1` ist die Pruefnaht, die das Intervall hier auf eine Sekunde
  * setzt, und die zurueckgedrehte mtime spielt die 24 h. */
+// Wartet auf eine Datei und endet spaetestens nach 60 s von selbst: ein roter
+// Lauf, dessen Runner der Test per SIGKILL beendet, liess den Schritt sonst als
+// Waisen zurueck (abgekoppelte Prozessgruppe, sein Ordner schon geloescht).
 const WAIT_FOR_FILE = [
   'const { existsSync } = require(\'node:fs\');',
   'const timer = setInterval(() => { if (existsSync(process.argv[2])) clearInterval(timer); }, 20);',
+  // unref: der Timer haelt den Schritt nicht am Leben, sobald die Datei da ist.
+  'setTimeout(() => process.exit(3), 60000).unref();',
   '',
 ].join('\n');
 const HEARTBEAT_ARGS = ['--heartbeat', '1'];
@@ -780,8 +785,11 @@ test('ein aktiver Lauf mit alter Ordner-mtime ueberlebt das Aufraeumen eines zwe
     assert.equal(result.code, 0, result.out);
     assert.ok(existsSync(join(runDir, 'summary.json')), 'summary.json fehlt');
   } finally {
-    try { run.child.kill('SIGKILL'); } catch { /* schon weg */ }
+    // Erst den Schritt freigeben und den Runner regulaer enden lassen, dann erst
+    // toeten und loeschen - sonst lebt der Schritt in seiner eigenen Gruppe weiter.
     writeFileSync(join(pkgDir, 'los'), '');
+    await Promise.race([run.done, pause(5000)]);
+    try { run.child.kill('SIGKILL'); } catch { /* schon weg */ }
     rmSync(tmp, { recursive: true, force: true });
     rmSync(pkgDir, { recursive: true, force: true });
   }
