@@ -38,15 +38,31 @@
  *        an einer erlaubten Stelle schluepft so nicht mit durch. Ein Eintrag,
  *        der nichts mehr trifft, ist ebenfalls rot.
  *
+ *        GELESEN WIRD DAS SQL WIE SQL, soweit es das Urteil braucht:
+ *        Zeichenketten und Kommentare in einem Durchgang (ein `'--'` ist Text,
+ *        ein Apostroph in einem `--`-Kommentar auch, und ein fuehrender
+ *        Kommentar versteckt kein SELECT), Klammern nur um das Praedikat zaehlen
+ *        nicht, und jeder Arm einer UNION-, INTERSECT- oder EXCEPT-Abfrage, der
+ *        FROM users liest, muss fuer sich gefiltert sein.
+ *
+ *        VERSCHATTUNG: bindet die Datei den Namen des Praedikats oder einer
+ *        Konstante, die es haelt, noch einmal - Parameter, lokale Variable oder
+ *        Funktion, Destrukturierung, oder reicht sie ihn bloss als Wert weiter -,
+ *        gilt er in dieser Datei nie als Praedikat. Gueltigkeitsbereiche verfolgt
+ *        der Guard nicht; lieber rot als falsch gruen.
+ *
  *        GRENZEN - bewusst kein SQL-Parser, deshalb sieht der Guard nicht:
  *          - SQL, das erst zur Laufzeit entsteht: Funktionsaufruf, `let sql`,
  *            String-Konkatenation;
  *          - `users` hinter einem Schema (`main.users`), in einem CTE, in einer
  *            abgeleiteten Tabelle oder in einem Komma-Join;
+ *          - `users` in Anfuehrungszeichen (`FROM "users"`);
  *          - Gueltigkeitsbereiche von Konstanten: die Tabelle ist dateiweit.
- *            Ein zweimal deklarierter Name zaehlt deshalb nie als Praedikat
- *            (rot); eine zweimal deklarierte SQL-Konstante wird mit ihrer
- *            letzten Fassung gelesen;
+ *            Ein zweimal deklarierter oder verschatteter Name zaehlt deshalb nie
+ *            als Praedikat (rot); eine zweimal deklarierte SQL-Konstante wird mit
+ *            ihrer letzten Fassung gelesen;
+ *          - eine Bindung INNERHALB eines `${...}` im SQL: die Bindungszaehlung
+ *            liest nur den Code ausserhalb der Template-Ausdruecke;
  *          - Logik jenseits von OR und direktem NOT, etwa ein `CASE` oder ein
  *            Vergleich um das Praedikat herum.
  *        Anzahlen (`COUNT(*) ... .get()`) sind keine Liste und nicht Teil
@@ -255,7 +271,50 @@ function bracketPairs(tokens) {
 // Datei-Analyse
 // --------------------------------------------------------------------------
 
-function importedPredicateNames(tokens, file) {
+/** Die Token-Stellen der import-Anweisungen: dort ist ein Name gebunden, aber vertraut. */
+function importRanges(tokens) {
+  const ranges = [];
+  for (let i = 0; i < tokens.length; i += 1) {
+    if (!isIdent(tokens[i], 'import') || isPunct(tokens[i - 1], '.')
+      || isPunct(tokens[i + 1], '(') || isPunct(tokens[i + 1], '.')) continue;
+    let j = i + 1;
+    while (j < tokens.length && tokens[j].type !== 'string') j += 1;
+    ranges.push([i, j]);
+    i = j;
+  }
+  return (idx) => ranges.some(([from, to]) => from <= idx && idx <= to);
+}
+
+/**
+ * Wie oft bindet die Datei `name` ausserhalb eines Imports? Gezaehlt wird
+ * konservativ jedes Vorkommen im Code (nicht in `${...}` eines Templates), das
+ * weder ein Aufruf (`name(`), noch ein Eigenschaftszugriff (`.name`), noch ein
+ * Objektschluessel (`name:`) ist: Deklaration, Parameter, Destrukturierung -
+ * aber auch ein bloss weitergereichter Wert. Keine Verfolgung von
+ * Gueltigkeitsbereichen; lieber rot als falsch gruen.
+ */
+function bindingCount(tokens, name, inImport) {
+  let count = 0;
+  for (let i = 0; i < tokens.length; i += 1) {
+    if (!isIdent(tokens[i], name) || inImport(i)) continue;
+    const prev = tokens[i - 1];
+    const next = tokens[i + 1];
+    if (isPunct(prev, '.')) continue;
+    if (isPunct(next, ':') && !isPunct(prev, '?')) continue;
+    if (isPunct(next, '(') && !isIdent(prev, 'function')) continue;
+    count += 1;
+  }
+  return count;
+}
+
+/**
+ * Die Namen, unter denen das Praedikat in dieser Datei vertraut ist: importiert
+ * aus dem Praedikat-Modul (im Modul selbst: seine eine Deklaration) - und von der
+ * Datei nirgends sonst gebunden. Ein Parameter, eine lokale Funktion oder eine
+ * Destrukturierung gleichen Namens verschattet den Import; der Guard verfolgt
+ * keine Gueltigkeitsbereiche und nimmt den Namen dann in der ganzen Datei nicht.
+ */
+function importedPredicateNames(tokens, file, inImport) {
   const names = new Set();
   if (file === PREDICATE_MODULE) names.add(PREDICATE_EXPORT);
   for (let i = 0; i < tokens.length; i += 1) {
@@ -274,7 +333,8 @@ function importedPredicateNames(tokens, file) {
     const target = relative(ROOT, resolve(ROOT, dirname(file), spec)).split(sep).join('/');
     if (target === PREDICATE_MODULE) local.forEach((name) => names.add(name));
   }
-  return names;
+  const ownDeclarations = (name) => (file === PREDICATE_MODULE && name === PREDICATE_EXPORT ? 1 : 0);
+  return new Set([...names].filter((name) => bindingCount(tokens, name, inImport) <= ownDeclarations(name)));
 }
 
 /**
@@ -356,11 +416,58 @@ function sqlText(exprTokens, ctx, seen = new Set()) {
 }
 
 /** Woerter der SQL mit ihrer Klammertiefe; Kommentare und SQL-Zeichenketten sind vorher weg. */
+/**
+ * SQL ohne Kommentare und mit maskierten Zeichenketten - in EINEM Durchgang.
+ *
+ * Nacheinander geht es in beide Richtungen schief: erst die Kommentare weg,
+ * und `'--'` frisst als "Kommentar" den Rest der Zeile samt Praedikat oder OR;
+ * erst die Zeichenketten weg, und das Apostroph in `-- it's` oeffnet eine, die
+ * nie endet. Der Scanner nimmt, was zuerst kommt.
+ *
+ * Danach fallen Klammern weg, die NUR das Praedikat umschliessen: `(pred)` und
+ * `((pred))` filtern genau wie `pred`. Ein NOT davor bleibt stehen.
+ */
+function cleanSql(sql) {
+  let out = '';
+  let i = 0;
+  while (i < sql.length) {
+    const ch = sql[i];
+    if (ch === "'") {
+      let j = i + 1;
+      while (j < sql.length) {
+        if (sql[j] === "'" && sql[j + 1] === "'") { j += 2; continue; }
+        if (sql[j] === "'") break;
+        j += 1;
+      }
+      out += "''";
+      i = j + 1;
+      continue;
+    }
+    if (ch === '-' && sql[i + 1] === '-') {
+      while (i < sql.length && sql[i] !== '\n') i += 1;
+      out += ' ';
+      continue;
+    }
+    if (ch === '/' && sql[i + 1] === '*') {
+      const end = sql.indexOf('*/', i + 2);
+      i = end === -1 ? sql.length : end + 2;
+      out += ' ';
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  let previous;
+  do {
+    previous = out;
+    out = out.replace(/\(\s*(__member_\w+__)\s*\)/g, ' $1 ');
+  } while (out !== previous);
+  return out;
+}
+
+/** Woerter der SQL mit ihrer Klammertiefe. */
 function sqlWords(sql) {
-  const clean = sql
-    .replace(/--[^\n]*/g, ' ')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/'(?:''|[^'])*'/g, "''");
+  const clean = cleanSql(sql);
   let depth = 0;
   const words = [];
   const re = /[()]|[A-Za-z_][\w]*/g;
@@ -373,29 +480,41 @@ function sqlWords(sql) {
   return words;
 }
 
+const COMPOUND = new Set(['union', 'intersect', 'except']);
+
+/**
+ * Die Arme einer zusammengesetzten Abfrage. Jedes UNION (auch UNION ALL),
+ * INTERSECT oder EXCEPT auf oberster Ebene beginnt einen neuen - und jeder Arm,
+ * der FROM users liest, ist eine Liste fuer sich: ein gefiltertes WHERE vorn
+ * filtert kein `UNION ALL SELECT id FROM users` dahinter.
+ */
+function compoundParts(words) {
+  const parts = [[]];
+  for (const w of words) {
+    if (w.depth === 0 && COMPOUND.has(w.word)) {
+      parts.push([]);
+      continue;
+    }
+    parts[parts.length - 1].push(w);
+  }
+  return parts;
+}
+
 const topLevelFromUsers = (words) => words.findIndex((w, idx) => w.depth === 0 && w.word === 'from'
   && words[idx + 1]?.word === 'users' && words[idx + 1].depth === 0);
 
-/** Liest die SQL `FROM users` auf oberster Klammerebene? */
+/** Liest die SQL `FROM users` auf oberster Klammerebene, in irgendeinem Arm? */
 export function drivesFromUsers(sql) {
-  return topLevelFromUsers(sqlWords(sql)) !== -1;
+  return compoundParts(sqlWords(sql)).some((part) => topLevelFromUsers(part) !== -1);
 }
 
 const NOT_AN_ALIAS = new Set(['where', 'join', 'left', 'right', 'inner', 'outer', 'cross', 'full', 'natural',
-  'on', 'using', 'order', 'group', 'limit', 'having', 'union', 'window', 'except', 'intersect']);
-const END_OF_WHERE = new Set(['group', 'order', 'limit', 'having', 'union', 'window', 'except', 'intersect', 'returning']);
+  'on', 'using', 'order', 'group', 'limit', 'having', 'window', 'all']);
+const END_OF_WHERE = new Set(['group', 'order', 'limit', 'having', 'window', 'returning']);
 
-/**
- * Filtert das Praedikat die Liste wirklich? Es muss in der WHERE-Klausel der
- * obersten Ebene stehen, dort auf oberster Ebene und nicht direkt hinter NOT,
- * die Klausel darf auf oberster Ebene kein OR haben, und der Alias muss der der
- * fuehrenden users-Tabelle sein. Kein SQL-Parser: was darueber hinausgeht,
- * steht im Kopf unter GRENZEN.
- */
-export function filteredByPredicate(sql) {
-  const words = sqlWords(sql);
+/** Filtert das Praedikat diesen einen Arm? */
+function partFiltered(words) {
   const from = topLevelFromUsers(words);
-  if (from === -1) return false;
   let next = words[from + 2];
   if (next?.depth === 0 && next.word === 'as') next = words[from + 3];
   const alias = next && next.depth === 0 && !NOT_AN_ALIAS.has(next.word) && !next.word.startsWith('__')
@@ -409,6 +528,19 @@ export function filteredByPredicate(sql) {
   if (clause.some((w) => w.depth === 0 && w.word === 'or')) return false;
   const marker = '__member_' + alias + '__';
   return clause.some((w, idx) => w.depth === 0 && w.word === marker && clause[idx - 1]?.word !== 'not');
+}
+
+/**
+ * Filtert das Praedikat die Liste wirklich? Fuer JEDEN Arm, der FROM users
+ * liest: das Praedikat steht in dessen WHERE-Klausel der obersten Ebene, dort
+ * auf oberster Ebene (Klammern nur um das Praedikat zaehlen nicht) und nicht
+ * direkt hinter NOT, die Klausel hat auf oberster Ebene kein OR, und der Alias
+ * ist der der fuehrenden users-Tabelle. Kein SQL-Parser: was darueber
+ * hinausgeht, steht im Kopf unter GRENZEN.
+ */
+export function filteredByPredicate(sql) {
+  const reading = compoundParts(sqlWords(sql)).filter((part) => topLevelFromUsers(part) !== -1);
+  return reading.length > 0 && reading.every(partFiltered);
 }
 
 function siteRanges(tokens, pairs) {
@@ -511,7 +643,14 @@ export function unfilteredPeopleLists(src, file) {
   const { tokens } = tokenize(src);
   const pairs = bracketPairs(tokens);
   const { consts, duplicates } = constInitializers(tokens, pairs);
-  const ctx = { predicateNames: importedPredicateNames(tokens, file), consts, duplicates };
+  const inImport = importRanges(tokens);
+  // Eine Konstante, deren Name die Datei noch einmal bindet (Parameter, lokale
+  // Variable, Destrukturierung), ist nicht sicher dieselbe - wie ein doppelt
+  // deklarierter Name zaehlt sie nie als Praedikat.
+  for (const name of consts.keys()) {
+    if (bindingCount(tokens, name, inImport) > 1) duplicates.add(name);
+  }
+  const ctx = { predicateNames: importedPredicateNames(tokens, file, inImport), consts, duplicates };
   const ranges = siteRanges(tokens, pairs);
   const findings = [];
   for (let i = 0; i < tokens.length; i += 1) {
@@ -521,7 +660,8 @@ export function unfilteredPeopleLists(src, file) {
     const arg = tokens.slice(i + 3, close);
     const sql = sqlText(arg, ctx);
     // Nur Lesen: ein `INSERT ... SELECT ... FROM users` schreibt, es zeigt niemanden.
-    if (!/^\s*(select|with)\b/i.test(sql) || !drivesFromUsers(sql)) continue;
+    // Entschieden wird am bereinigten SQL: ein fuehrender Kommentar versteckt kein SELECT.
+    if (!/^\s*(select|with)\b/i.test(cleanSql(sql)) || !drivesFromUsers(sql)) continue;
 
     let kind = fetchKind(tokens, pairs, close + 1);
     if (kind === 'kept') kind = keptStatementKind(tokens, pairs, i);
@@ -672,6 +812,85 @@ test('self-test: a well-placed predicate is green, whatever else the WHERE says'
   }`;
   assert.deepEqual(sites(bareTable), [], 'without an alias the table name is the alias');
 });
+
+const listOf = (sql) => `${IMPORT}function listPeople() {
+  return db.prepare(\`${sql}\`).all();
+}`;
+
+// Jeder Fall ein eigener Test, damit jeder einzeln rot zu sehen ist. Die mit
+// `filtered: true` beurteilte die Pruefung bis 0f0beac5 falsch als ROT (die
+// Meldung behauptete, das Praedikat fehle), die mit `filtered: false` falsch
+// als GRUEN. Die uebrigen stehen als Kontrolle daneben.
+const READING_CASES = [
+  ['parentheses around the predicate change nothing', true,
+    "SELECT u.id FROM users u WHERE (${householdMemberSql('u')})"],
+  ['double parentheses after an AND change nothing either', true,
+    "SELECT u.id FROM users u WHERE u.role = 'member' AND ((${householdMemberSql('u')}))"],
+  ['NOT in front of the parentheses still negates the predicate', false,
+    "SELECT u.id FROM users u WHERE NOT (${householdMemberSql('u')})"],
+  ['an unfiltered UNION ALL arm behind a filtered WHERE still lists everyone', false,
+    "SELECT u.id FROM users u WHERE ${householdMemberSql('u')} UNION ALL SELECT id FROM users"],
+  ['an unfiltered EXCEPT arm is a list of its own too', false,
+    "SELECT u.id FROM users u WHERE ${householdMemberSql('u')} EXCEPT SELECT id FROM users WHERE role = 'admin'"],
+  ['an unfiltered INTERSECT arm is a list of its own too', false,
+    "SELECT u.id FROM users u WHERE ${householdMemberSql('u')} INTERSECT SELECT id FROM users ORDER BY id"],
+  ['a compound query with every users arm filtered is filtered', true,
+    "SELECT u.id FROM users u WHERE ${householdMemberSql('u')} UNION SELECT v.id FROM users v WHERE ${householdMemberSql('v')}"],
+  ['a compound arm that does not read FROM users is not a list of users', true,
+    "SELECT u.id FROM users u WHERE ${householdMemberSql('u')} UNION ALL SELECT u.id FROM split_expense_guest_users g JOIN users u ON u.id = g.user_id"],
+  ['-- inside an SQL string does not swallow the predicate behind it', true,
+    "SELECT u.id FROM users u WHERE u.display_name <> '--' AND ${householdMemberSql('u')}"],
+  ['-- inside an SQL string does not swallow the OR behind it', false,
+    "SELECT u.id FROM users u WHERE ${householdMemberSql('u')} AND u.display_name = '--' OR 1 = 1"],
+  ['a quote inside an SQL comment does not open a string', true,
+    "SELECT u.id FROM users u -- it's the member list\n WHERE ${householdMemberSql('u')}"],
+  ['a leading -- comment does not hide the SELECT', false,
+    '-- every account, for the admin page\nSELECT id FROM users ORDER BY id'],
+  ['a leading block comment does not hide the SELECT', false,
+    '/* every account */ SELECT id FROM users ORDER BY id'],
+];
+for (const [name, filtered, sql] of READING_CASES) {
+  test(`self-test: reading SQL - ${name}`, () => {
+    assert.deepEqual(sites(listOf(sql)), filtered ? [] : ['listPeople'], sql);
+  });
+}
+
+test('self-test: reading SQL - a leading comment before an INSERT still marks a write', () => {
+  const src = `function copy(ids) {
+    const ins = db.prepare(\`-- copy the ids\nINSERT INTO t (user_id) SELECT id FROM users WHERE id = ?\`);
+    for (const id of ids) ins.run(id);
+  }`;
+  assert.deepEqual(sites(src), []);
+});
+
+// Ein vertrauter Name, den die Datei selbst noch einmal bindet, kann etwas
+// anderes sein als der Import - der Guard verfolgt keine Gueltigkeitsbereiche
+// und nimmt ihn deshalb in dieser Datei nie als Praedikat.
+const SHADOW_CASES = [
+  ['a parameter named like the predicate', `${IMPORT}function listPeople(householdMemberSql) {
+    return db.prepare(\`SELECT u.id FROM users u WHERE \${householdMemberSql('u')}\`).all();
+  }`],
+  ['a destructured parameter named like the predicate', `${IMPORT}function listPeople({ householdMemberSql }) {
+    return db.prepare(\`SELECT u.id FROM users u WHERE \${householdMemberSql('u')}\`).all();
+  }`],
+  ['a local arrow function named like the predicate', `${IMPORT}function listPeople() {
+    const householdMemberSql = () => '1 = 1';
+    return db.prepare(\`SELECT u.id FROM users u WHERE \${householdMemberSql('u')}\`).all();
+  }`],
+  ['a function declaration named like the predicate', `${IMPORT}function householdMemberSql() { return '1 = 1'; }
+  function listPeople() {
+    return db.prepare(\`SELECT u.id FROM users u WHERE \${householdMemberSql('u')}\`).all();
+  }`],
+  ['a parameter named like a constant that holds the predicate', `${IMPORT}const MEMBER = householdMemberSql('u');
+  function listPeople(MEMBER) {
+    return db.prepare(\`SELECT u.id FROM users u WHERE \${MEMBER}\`).all();
+  }`],
+];
+for (const [name, src] of SHADOW_CASES) {
+  test(`self-test: shadowing - ${name} is not the predicate`, () => {
+    assert.deepEqual(sites(src), ['listPeople']);
+  });
+}
 
 test('self-test: a flag column added to GET /users keeps the list unfiltered', () => {
   // Der realistische Weg in die Falle: /auth/users rechnet schon `is_worker`
