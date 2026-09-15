@@ -733,6 +733,60 @@ test('--timeout und --grace ueber dem Timer-Maximum enden mit Exit 2', () => {
   }
 });
 
+/* EIN LAUFENDER LAUF IST NICHT ALT.
+ *
+ * Das Aufraeumen liest die mtime des Laufordners. Die aendert sich nur, wenn im
+ * Ordner eine Datei entsteht - ein Schritt, der ueber seinen offenen Deskriptor
+ * ins Log schreibt, laesst sie stehen. Mit `--timeout 0` und einem Schritt, der
+ * lange keine neue Datei anlegt, sah ein aktiver Lauf nach 24 h alt aus, ein
+ * zweiter Lauf loeschte seinen Ordner, und `summary.json` scheiterte mit ENOENT
+ * (Review auf #1229). Der Runner frischt die mtime deshalb per Herzschlag auf;
+ * `--heartbeat 1` ist die Pruefnaht, die das Intervall hier auf eine Sekunde
+ * setzt, und die zurueckgedrehte mtime spielt die 24 h. */
+const WAIT_FOR_FILE = [
+  'const { existsSync } = require(\'node:fs\');',
+  'const timer = setInterval(() => { if (existsSync(process.argv[2])) clearInterval(timer); }, 20);',
+  '',
+].join('\n');
+const HEARTBEAT_ARGS = ['--heartbeat', '1'];
+
+test('ein aktiver Lauf mit alter Ordner-mtime ueberlebt das Aufraeumen eines zweiten Laufs', async () => {
+  const { cleanupOldRuns } = runnerModule;
+  const tmp = mkdtempSync(join(tmpdir(), 'yuvomi-runner-aktiv-'));
+  const pkgDir = mkdtempSync(join(tmpdir(), 'yuvomi-runner-run-'));
+  writeFileSync(join(pkgDir, 'warte.cjs'), WAIT_FOR_FILE);
+  writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({ scripts: { test: 'node warte.cjs los' } }));
+  const run = startRunner(
+    ['--package', join(pkgDir, 'package.json'), '--jobs', '1', '--timeout', '0', ...HEARTBEAT_ARGS],
+    { ...process.env, TMPDIR: tmp, TMP: tmp, TEMP: tmp },
+  );
+  try {
+    let runDir = null;
+    for (const deadline = Date.now() + 10000; !runDir; await pause(25)) {
+      assert.ok(Date.now() < deadline, 'kein Laufordner mit dem Log des Schritts - der Test prueft so nichts');
+      const name = readdirSync(tmp).find((entry) => entry.startsWith('yuvomi-test-parallel-'));
+      if (name && existsSync(join(tmp, name, '001-node_warte.cjs_los.log'))) runDir = join(tmp, name);
+    }
+    // Der Schritt laeuft und legt keine Datei mehr an; der Ordner sieht 25 h alt aus.
+    const stale = (Date.now() - 25 * 3600 * 1000) / 1000;
+    utimesSync(runDir, stale, stale);
+    await pause(2500);
+
+    assert.deepEqual(cleanupOldRuns({ tmpdir: tmp }), [], 'das Aufraeumen hat den aktiven Lauf geloescht');
+    assert.ok(existsSync(runDir), 'der Ordner des aktiven Laufs ist weg');
+
+    writeFileSync(join(pkgDir, 'los'), '');
+    const result = await run.done;
+    assert.equal(result.code, 0, result.out);
+    assert.ok(existsSync(join(runDir, 'summary.json')), 'summary.json fehlt');
+  } finally {
+    try { run.child.kill('SIGKILL'); } catch { /* schon weg */ }
+    writeFileSync(join(pkgDir, 'los'), '');
+    rmSync(tmp, { recursive: true, force: true });
+    rmSync(pkgDir, { recursive: true, force: true });
+  }
+});
+
 test('ein falscher Aufruf endet mit Exit 2, nicht mit einem Lauf', () => {
   const r = runRunner(['node -e "1"'], ['--jobs', '0']);
   try {

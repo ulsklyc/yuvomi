@@ -47,13 +47,15 @@
  * Nur POSIX: `/bin/sh`, Prozessgruppen - wie die `test`-Kette selbst.
  * `--timeout` gilt je Schritt, Default 900 s. `--grace`: so lange wartet ein
  * Abbruch nach SIGTERM, bevor er SIGKILL schickt, Default 5 s.
+ * `--heartbeat SEKUNDEN` ist eine Pruefnaht: so oft frischt der Lauf die mtime
+ * seines Ordners auf (Default 600), damit der Test nicht zehn Minuten wartet.
  * Exit 0 = alle Schritte gruen, 1 = mindestens einer rot, 2 = Aufruf- oder
  * Parserfehler.
  */
 
 import { spawn } from 'node:child_process';
 import {
-  closeSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync,
+  closeSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, utimesSync, writeFileSync,
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -225,6 +227,7 @@ function parseArgs(argv) {
     logs: null,
     timeout: 900,
     grace: 5,
+    heartbeat: HEARTBEAT_SECONDS,
     list: false,
     packagePath: REPO_PACKAGE,
   };
@@ -249,6 +252,7 @@ function parseArgs(argv) {
     else if (arg === '--logs') opts.logs = path.resolve(value());
     else if (arg === '--timeout') opts.timeout = seconds(value()); // 0 = ohne Limit
     else if (arg === '--grace') opts.grace = seconds(value());
+    else if (arg === '--heartbeat') opts.heartbeat = count(value(), 1, MAX_TIMER_SECONDS); // Pruefnaht fuer den Test
     else if (arg === '--package') opts.packagePath = path.resolve(value());
     else if (arg === '--list') opts.list = true;
     else if (arg === '--help' || arg === '-h') opts.help = true;
@@ -296,13 +300,38 @@ const pause = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 const RUN_PREFIX = 'yuvomi-test-parallel-';
 const RUN_DIR_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
+/** So oft frischt ein laufender Runner die mtime seines Laufordners auf - weit unter RUN_DIR_MAX_AGE_MS. */
+const HEARTBEAT_SECONDS = 10 * 60;
+
+/**
+ * Haelt die mtime von `dir` frisch, solange der Lauf lebt: sofort, alle
+ * `intervalMs` und bei jedem Aufruf von `touch()`.
+ *
+ * Ein neues Log allein reicht nicht. Ein Schritt schreibt ueber seinen offenen
+ * Deskriptor, und das aendert die mtime des ORDNERS nicht; mit `--timeout 0`
+ * und einem Schritt, der lange keine neue Datei anlegt, sah ein aktiver Lauf
+ * nach 24 h alt aus, ein zweiter Lauf loeschte ihn, und `summary.json`
+ * scheiterte mit ENOENT (Review auf #1229). Der Timer ist `unref()`t: er haelt
+ * den Prozess nicht am Leben.
+ */
+export function startHeartbeat(dir, intervalMs = HEARTBEAT_SECONDS * 1000) {
+  const touch = () => {
+    const now = new Date();
+    try { utimesSync(dir, now, now); } catch { /* Ordner weg - summary.json meldet das laut */ }
+  };
+  touch();
+  const timer = setInterval(touch, intervalMs);
+  timer.unref();
+  return { touch, stop: () => clearInterval(timer) };
+}
+
 /**
  * Raeumt alte Laufordner weg - nur, wenn es sicher geht. Lieber etwas liegen
  * lassen als Fremdes loeschen: ein Eintrag `yuvomi-test-parallel-*` direkt in
  * tmpdir, per `lstat` gelesen (kein Symlink, ein echtes Verzeichnis), mit der
  * eigenen UID (wo es UIDs gibt; unter Windows zaehlen nur Art und Alter) und
- * aelter als 24 h. Ein laufender Lauf ist frisch: jedes neue Log setzt die
- * mtime seines Ordners.
+ * aelter als 24 h. Ein laufender Lauf ist frisch, weil sein Herzschlag
+ * (`startHeartbeat`) die mtime seines Ordners alle 10 min neu setzt.
  *
  * Wurzel, Uhr und UID lassen sich unterschieben, damit der Test jeden Zweig
  * ohne zweiten Nutzer und ohne Warten sieht.
@@ -425,6 +454,7 @@ async function main(argv) {
 
   const logDir = opts.logs ?? defaultLogDir();
   if (opts.logs) mkdirSync(logDir, { recursive: true });
+  const heartbeat = startHeartbeat(logDir, opts.heartbeat * 1000);
 
   /*
    * EIN ABBRUCH RAEUMT AUF, BEVOR ER ENDET. Die Fassung davor schickte einmal
@@ -492,6 +522,7 @@ async function main(argv) {
       jobs: opts.jobs,
       timeoutMs: opts.timeout * 1000,
       onResult: (r, done) => {
+        heartbeat.touch();
         const mark = r.ok ? 'ok  ' : 'ROT ';
         console.log(`[${String(done).padStart(width)}/${steps.length}] ${mark} ${fmt(r.ms).padStart(7)}  ${r.step}${r.ok ? '' : `  (${verdict(r)})`}`);
       },
@@ -525,6 +556,7 @@ async function main(argv) {
   console.log('');
   console.log(`${results.length} Schritte, ${results.length - red.length} gruen, ${red.length} rot - ${opts.jobs} Jobs, Dauer ${fmt(wall)} (Summe der Schritte ${fmt(sum)})`);
   console.log(`Logs: ${logDir}`);
+  heartbeat.stop();
   return red.length ? 1 : 0;
 }
 
