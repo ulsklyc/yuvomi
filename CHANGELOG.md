@@ -159,7 +159,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and tags in the tertiary one, at 5.4:1 or more in both themes. Its tags no longer fade on their
   own either (2.6:1 and 3.7:1 before). A checked item can still be tapped to reopen it, so it is not
   exempt the way a disabled control would be. The same leftover setting had also kept a dragged row
-  or board card fully opaque; it now fades while it is being moved, as intended.
+  or board card fully opaque, and stopped note and document cards from lifting slightly when the
+  pointer rests on them; a dragged card now fades while it is being moved, and notes and documents
+  lift on hover again, as intended.
 - **An early click on the simple setup no longer overwrites an existing installation.** The web
   installer locks its simple path when it finds an `.env`, because that path sets host, port and
   cookie security itself. The lock only took effect once the installer had finished checking for
