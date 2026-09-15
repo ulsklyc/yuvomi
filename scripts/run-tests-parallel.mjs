@@ -29,20 +29,26 @@
  * von `tee`.
  *
  * Aufruf:  node scripts/run-tests-parallel.mjs [--jobs N] [--logs DIR]
- *          [--timeout SEKUNDEN] [--list] [--package DATEI]
- * Logs ohne `--logs`: `<tmpdir>/yuvomi-test-parallel/<checkout>-<hash>/`, von
- * jedem Lauf zuerst geleert. `--timeout` gilt je Schritt, Default 900 s.
+ *          [--timeout SEKUNDEN] [--grace SEKUNDEN] [--list] [--package DATEI]
+ * Logs ohne `--logs`: `<tmpdir>/yuvomi-test-parallel/<checkout>-<hash>/run-*`,
+ * je Lauf neu, 0700; Laufordner ueber 24 h raeumt der naechste Lauf weg.
+ * `--timeout` gilt je Schritt, Default 900 s. `--grace`: so lange wartet ein
+ * Abbruch nach SIGTERM, bevor er SIGKILL schickt, Default 5 s.
  * Exit 0 = alle Schritte gruen, 1 = mindestens einer rot, 2 = Aufruf- oder
  * Parserfehler.
  */
 
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { closeSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync, closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
+
+import { runningGroupMembers } from './process-state.mjs';
 
 const REPO_PACKAGE = fileURLToPath(new URL('../package.json', import.meta.url));
 
@@ -63,8 +69,18 @@ const UNSUPPORTED = new Map([
   ['\n', 'Zeilenumbruch'],
   ['(', 'Klammer'],
   [')', 'Klammer'],
-  ['`', 'Backtick'],
 ]);
+
+/*
+ * `$(`, Backticks und `${` - UEBERALL in der Kette, auch in Anfuehrungszeichen.
+ * In `"$(printf "%s && %s" a b)"` beginnt das innere `"` in der Shell ein neues
+ * Quote-Paar; der Parser kennt nur eine Ebene und zerlegte die Kette in drei
+ * Teile (Review auf #1229). Nachgebaut wird das nicht - die echte Kette enthaelt
+ * nichts davon, und verschachtelte Ersetzungen richtig zu lesen hiesse, die
+ * Shell nachzubauen. Auch in einfachen Quotes, wo sie harmlos waeren: eine
+ * Regel ohne Ausnahme bleibt pruefbar.
+ */
+const SUBSTITUTION = /\$\(|\$\{|`/;
 
 /**
  * Zerlegt eine `&&`-Kette in ihre Schritte, so wie `sh` sie trennt.
@@ -77,6 +93,11 @@ const UNSUPPORTED = new Map([
  * @returns {string[]}
  */
 export function parseChain(script) {
+  const substitution = script.match(SUBSTITUTION);
+  if (substitution) {
+    throw new Error(`Nicht unterstuetzte Ersetzung '${substitution[0]}' bei Zeichen ${substitution.index}: `
+      + '$(...), Backticks und ${...} lehnt der Runner ueberall in der Kette ab, auch in Anfuehrungszeichen');
+  }
   const steps = [];
   let current = '';
   let quote = null;
@@ -134,6 +155,7 @@ function parseArgs(argv) {
     jobs: Math.max(1, os.availableParallelism() - 1),
     logs: null,
     timeout: 900,
+    grace: 5,
     list: false,
     packagePath: REPO_PACKAGE,
   };
@@ -150,6 +172,7 @@ function parseArgs(argv) {
     if (arg === '--jobs' || arg === '-j') opts.jobs = count(value(), 1);
     else if (arg === '--logs') opts.logs = path.resolve(value());
     else if (arg === '--timeout') opts.timeout = count(value(), 0);
+    else if (arg === '--grace') opts.grace = count(value(), 0);
     else if (arg === '--package') opts.packagePath = path.resolve(value());
     else if (arg === '--list') opts.list = true;
     else if (arg === '--help' || arg === '-h') opts.help = true;
@@ -168,6 +191,53 @@ const slug = (step) => step.replace(/^npm run /, '').replace(/[^\w.-]+/g, '_').r
 
 /** Laufende Prozessgruppen, damit ein Abbruch sie mitnimmt. */
 const running = new Set();
+
+/** Nach einem Abbruch startet kein Schritt mehr. */
+let interrupted = false;
+
+const pause = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+const RUN_DIR_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Legt `dir` mit 0700 an und zieht einen vorhandenen eigenen Ordner auf 0700.
+ * Die Logs tragen Testausgaben, und unter Linux liegt `/tmp` fuer alle Nutzer
+ * offen; mit der umask 022 entstanden Ordner 0755 und Dateien 0644.
+ */
+function privateDir(dir) {
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const stat = statSync(dir);
+  const own = typeof process.getuid !== 'function' || stat.uid === process.getuid();
+  if (own && (stat.mode & 0o777) !== 0o700) chmodSync(dir, 0o700);
+}
+
+/**
+ * Der Logordner eines Laufs ohne `--logs`: `<tmpdir>/yuvomi-test-parallel/
+ * <checkout>-<hash>/run-XXXXXX`, je Lauf neu.
+ *
+ * JE LAUF, NICHT JE CHECKOUT. Die Fassung davor leerte einen festen Ordner je
+ * Checkout: ein zweiter Lauf daneben loeschte die Logs des ersten, und beide
+ * schrieben ihre summary.json an dieselbe Stelle (Review auf #1229).
+ * Aufgeraeumt werden nur Geschwister ueber 24 h - ein laufender Lauf ist
+ * frisch, denn jedes neue Log setzt die mtime seines Ordners.
+ */
+function defaultLogDir(cwd) {
+  const checkout = realpathSync(cwd);
+  const key = createHash('sha256').update(checkout).digest('hex').slice(0, 8);
+  const root = path.join(os.tmpdir(), 'yuvomi-test-parallel');
+  const base = path.join(root, `${path.basename(checkout)}-${key}`);
+  privateDir(root);
+  privateDir(base);
+  const now = Date.now();
+  for (const entry of readdirSync(base, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !entry.name.startsWith('run-')) continue;
+    const dir = path.join(base, entry.name);
+    try {
+      if (now - statSync(dir).mtimeMs > RUN_DIR_MAX_AGE_MS) rmSync(dir, { recursive: true, force: true });
+    } catch { /* raeumt gerade ein anderer Lauf weg */ }
+  }
+  return mkdtempSync(path.join(base, 'run-')); // mkdtemp legt mit 0700 an
+}
 
 function runStep({ step, index }, { cwd, logDir, timeoutMs }) {
   const logPath = path.join(logDir, `${String(index + 1).padStart(3, '0')}-${slug(step)}.log`);
@@ -221,7 +291,7 @@ export async function runSteps(steps, { cwd, logDir, jobs, timeoutMs, serial = S
   const results = [];
   let next = 0;
   const worker = async () => {
-    while (next < parallel.length) {
+    while (!interrupted && next < parallel.length) {
       const result = await runStep(parallel[next++], { cwd, logDir, timeoutMs });
       results.push(result);
       onResult(result, results.length);
@@ -229,6 +299,7 @@ export async function runSteps(steps, { cwd, logDir, jobs, timeoutMs, serial = S
   };
   await Promise.all(Array.from({ length: Math.min(jobs, parallel.length) }, worker));
   for (const item of alone) {
+    if (interrupted) break;
     const result = await runStep(item, { cwd, logDir, timeoutMs });
     results.push(result);
     onResult(result, results.length);
@@ -242,7 +313,7 @@ async function main(argv) {
   try {
     opts = parseArgs(argv);
     if (opts.help) {
-      console.log('node scripts/run-tests-parallel.mjs [--jobs N] [--logs DIR] [--timeout SEKUNDEN] [--list] [--package DATEI]');
+      console.log('node scripts/run-tests-parallel.mjs [--jobs N] [--logs DIR] [--timeout SEKUNDEN] [--grace SEKUNDEN] [--list] [--package DATEI]');
       return 0;
     }
     loaded = loadSteps(opts.packagePath);
@@ -256,28 +327,50 @@ async function main(argv) {
     return 0;
   }
 
-  let logDir = opts.logs;
-  if (!logDir) {
-    // Ein fester Ordner je Checkout, vor jedem Lauf geleert. Ein neuer Ordner
-    // je Lauf liess rund 326 Dateien pro Lauf im Temp-Ordner liegen; alte
-    // Ordner nach Praefix wegzuraeumen traefe den laufenden Runner eines
-    // anderen Arbeitsbaums.
-    const checkout = realpathSync(cwd);
-    const key = createHash('sha256').update(checkout).digest('hex').slice(0, 8);
-    logDir = path.join(os.tmpdir(), 'yuvomi-test-parallel', `${path.basename(checkout)}-${key}`);
-    rmSync(logDir, { recursive: true, force: true });
-  }
-  mkdirSync(logDir, { recursive: true });
+  const logDir = opts.logs ?? defaultLogDir(cwd);
+  if (opts.logs) mkdirSync(logDir, { recursive: true });
 
-  const stop = (signal) => {
-    for (const child of running) {
-      try { process.kill(-child.pid, 'SIGTERM'); } catch { /* schon weg */ }
+  /*
+   * EIN ABBRUCH RAEUMT AUF, BEVOR ER ENDET. Die Fassung davor schickte einmal
+   * SIGTERM und beendete sich sofort: ein Schritt mit eigenem SIGTERM-Handler
+   * lief als Waise weiter (Review auf #1229). Jetzt: kein neuer Schritt,
+   * SIGTERM an die Gruppen, warten, nach `--grace` SIGKILL an alles, was noch
+   * laeuft, erst dann Exit 130 (SIGINT) bzw. 143 (SIGTERM). Ein zweites Signal
+   * wartet nicht mehr. Ob etwas laeuft, entscheidet der Prozesszustand, nicht
+   * `kill(pid, 0)` - ein Zombie laeuft nicht (scripts/process-state.mjs).
+   */
+  const exitCodes = { SIGINT: 130, SIGTERM: 143 };
+  let groups = [];
+  let stopping = null;
+  const signalGroups = (sig) => {
+    for (const pgid of groups) {
+      try { process.kill(-pgid, sig); } catch { /* Gruppe schon leer */ }
     }
-    console.error(`\nAbbruch (${signal}) - Logs in ${logDir}`);
-    process.exit(130);
   };
-  process.once('SIGINT', stop);
-  process.once('SIGTERM', stop);
+  const waitForGroups = async (ms, step) => {
+    for (const deadline = Date.now() + ms; runningGroupMembers(groups).length && Date.now() < deadline;) await pause(step);
+    return runningGroupMembers(groups).length;
+  };
+  const stop = (signal) => {
+    if (stopping) {
+      signalGroups('SIGKILL');
+      process.exit(exitCodes[signal] ?? 130);
+    }
+    interrupted = true;
+    groups = [...running].map((child) => child.pid);
+    stopping = (async () => {
+      console.error(`\nAbbruch (${signal}) - SIGTERM an ${groups.length} Prozessgruppe(n), Logs in ${logDir}`);
+      signalGroups('SIGTERM');
+      if (await waitForGroups(opts.grace * 1000, 100)) {
+        console.error(`Nach ${opts.grace} s laeuft noch etwas - SIGKILL an die Gruppen`);
+        signalGroups('SIGKILL');
+        await waitForGroups(2000, 50);
+      }
+      process.exit(exitCodes[signal] ?? 130);
+    })();
+  };
+  process.on('SIGINT', stop);
+  process.on('SIGTERM', stop);
 
   console.log(`${steps.length} Schritte, ${opts.jobs} Jobs, Logs in ${logDir}`);
   const width = String(steps.length).length;
@@ -298,6 +391,8 @@ async function main(argv) {
     console.error(err.message);
     return 2;
   }
+  // Nach einem Abbruch endet der Prozess in `stop`, nicht mit einer Zusammenfassung ueber halbe Ergebnisse.
+  if (stopping) await stopping;
   const wall = performance.now() - started;
 
   const red = results.filter((r) => !r.ok);

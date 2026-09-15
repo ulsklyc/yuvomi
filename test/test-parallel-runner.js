@@ -13,14 +13,18 @@
 
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { once } from 'node:events';
+import {
+  chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 
 import { SERIAL, loadSteps, parseChain, runSteps } from '../scripts/run-tests-parallel.mjs';
+import { isRunning, parseProcStat, processState, runningGroupMembers } from '../scripts/process-state.mjs';
 
 const RUNNER = fileURLToPath(new URL('../scripts/run-tests-parallel.mjs', import.meta.url));
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -162,6 +166,35 @@ test('andere Operatoren brechen ab, statt still in einen Schritt zu rutschen', (
   ]) assert.throws(() => parseChain(chain), undefined, JSON.stringify(chain));
 });
 
+/* KEINE ERSETZUNG, AUCH NICHT IN ANFUEHRUNGSZEICHEN.
+ *
+ * In `"$(printf "%s && %s" a b)"` oeffnet das innere `"` in der Shell ein
+ * NEUES Quote-Paar innerhalb der Befehlsersetzung. Der Parser kennt nur eine
+ * Quote-Ebene, hielt die inneren Quotes fuer das Ende der aeusseren und
+ * zerlegte die Kette in drei Teile (Review auf #1229). Nachgebaut wird das
+ * nicht: die echte Kette enthaelt weder `$(`, Backticks noch `${`, und ein
+ * Parser fuer verschachtelte Ersetzungen waere ein Shell-Nachbau. Der Runner
+ * lehnt sie IRGENDWO in der Kette laut ab, auch in einfachen Quotes, wo sie
+ * harmlos waeren - eine Regel ohne Ausnahme bleibt pruefbar. */
+test('Befehlsersetzung und ${...} lehnt der Runner ab, auch in Anfuehrungszeichen', () => {
+  for (const chain of [
+    'echo "$(printf "%s && %s" a b)" && echo c',
+    'echo "`printf "%s && %s" a b`" && echo c',
+    'echo \'$(a)\' && echo c',
+    'echo "${HOME}" && echo c',
+    'echo "$((1 + 1))" && echo c',
+  ]) assert.throws(() => parseChain(chain), /Ersetzung/, JSON.stringify(chain));
+
+  const r = runRunner(['echo "$(printf "%s && %s" a b)"', 'echo c']);
+  try {
+    assert.equal(r.run.status, 2, r.run.stdout + r.run.stderr);
+    assert.match(r.run.stderr, /Ersetzung/);
+    assert.equal(r.summary, null, 'bei einer abgelehnten Kette darf nichts laufen');
+  } finally {
+    r.cleanup();
+  }
+});
+
 test('SERIAL nennt nur Schritte der Kette, jeden mit Grund', () => {
   const { steps } = loadSteps();
   for (const [step, reason] of SERIAL) {
@@ -260,14 +293,83 @@ test('alle gruen ergibt Exit 0', () => {
 
 });
 
-/** Lebt `pid` noch? Wartet bis zu `ms`, weil ein getoeteter Waise erst vom Init-Prozess abgeraeumt wird. */
-function aliveAfter(pid, ms) {
+/**
+ * Laeuft `pid` nach bis zu `ms` noch? Ein Zombie laeuft nicht: ein getoeteter
+ * Waise bleibt als `Z` in der Tabelle, bis der Init-Prozess ihn erntet, und in
+ * manchem Container tut der das nie (scripts/process-state.mjs).
+ */
+function runningAfter(pid, ms) {
   const tick = new Int32Array(new SharedArrayBuffer(4));
   for (const deadline = Date.now() + ms; ; Atomics.wait(tick, 0, 0, 25)) {
-    try { process.kill(pid, 0); } catch { return false; }
+    if (!isRunning(pid)) return false;
     if (Date.now() > deadline) return true;
   }
 }
+
+const pause = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+/** Wartet, bis `file` existiert, oder wirft nach `ms`. */
+async function waitForFile(file, ms, what) {
+  for (const deadline = Date.now() + ms; !existsSync(file); await pause(25)) {
+    if (Date.now() > deadline) throw new Error(`${what} ist nach ${ms} ms nicht da - der Test prueft so nichts`);
+  }
+}
+
+/* EIN ECHTER ZOMBIE, auf jeder Plattform: die Shell startet ein Kind im
+ * Hintergrund und ersetzt sich dann durch `sleep`, das nie `wait()` ruft. Das
+ * Kind endet und bleibt als `Z` stehen, bis `sleep` endet. `process.kill(pid,
+ * 0)` gelingt darauf - genau das hielt die erste Fassung fuer "lebt noch". */
+test('ein Zombie zaehlt als beendet', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yuvomi-runner-zombie-'));
+  const parent = spawn('/bin/sh', ['-c', 'sleep 0.3 & echo $! > z.pid; exec sleep 5'], { cwd: dir, stdio: 'ignore' });
+  try {
+    await waitForFile(join(dir, 'z.pid'), 5000, 'z.pid');
+    const pid = Number(readFileSync(join(dir, 'z.pid'), 'utf8'));
+    for (const deadline = Date.now() + 5000; processState(pid) !== 'zombie'; await pause(25)) {
+      assert.ok(Date.now() < deadline, `Prozess ${pid} wurde nie zum Zombie: ${processState(pid)}`);
+    }
+    assert.doesNotThrow(() => process.kill(pid, 0), 'der Zombie steht noch in der Prozesstabelle');
+    assert.equal(isRunning(pid), false);
+    assert.equal(runningAfter(pid, 0), false);
+  } finally {
+    parent.kill('SIGKILL');
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/* Beide Leser auf jeder Plattform: den `/proc`-Zweig unter macOS und den
+ * `ps`-Zweig unter Linux sieht nur, wer das Lesen ersetzt. */
+test('Prozesszustand aus /proc und aus ps, mit Zombie in der Gruppe', () => {
+  const enoent = () => Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+  const files = {
+    '/proc/10/stat': '10 (node) S 1 10 10 0 -1 4194560',
+    '/proc/11/stat': '11 (a (b) c) Z 10 10 10 0 -1 4194572',
+    '/proc/12/stat': '12 (sh) R 1 12 12 0 -1 4194560',
+  };
+  const linux = {
+    platform: 'linux',
+    readFile: (file) => { if (file in files) return files[file]; throw enoent(); },
+    listProc: () => ['self', ...Object.keys(files).map((file) => file.split('/')[2])],
+  };
+  assert.deepEqual(parseProcStat(files['/proc/11/stat']), { state: 'Z', pgid: 10 });
+  assert.deepEqual([10, 11, 99].map((pid) => processState(pid, linux)), ['alive', 'zombie', 'gone']);
+  assert.deepEqual(runningGroupMembers([10], linux), [10]);
+  assert.deepEqual(runningGroupMembers([10, 12], linux), [10, 12]);
+
+  const table = [[10, 10, 'Ss'], [11, 10, 'Z'], [12, 12, 'R+']];
+  const mac = {
+    platform: 'darwin',
+    ps: (args) => {
+      if (args[0] === '-A') return `${table.map((row) => `  ${row.join('  ')}`).join('\n')}\n`;
+      const row = table.find(([pid]) => String(pid) === args.at(-1));
+      if (!row) throw Object.assign(new Error('ps: exit 1'), { status: 1 });
+      return `${row[2]}\n`;
+    },
+  };
+  assert.deepEqual([10, 11, 99].map((pid) => processState(pid, mac)), ['alive', 'zombie', 'gone']);
+  assert.deepEqual(runningGroupMembers([10], mac), [10]);
+  assert.deepEqual(runningGroupMembers([10, 12], mac), [10, 12]);
+});
 
 /* DER TIMEOUT MUSS DIE GANZE GRUPPE TREFFEN, NICHT NUR DIE SHELL.
  *
@@ -288,7 +390,7 @@ test('ein haengender Schritt faellt ueber den Timeout, samt seiner Enkelprozesse
     const pidFile = join(hung.dir, 'hang.pid');
     assert.ok(existsSync(pidFile), 'der Enkelprozess ist nie gestartet - der Test prueft so nichts');
     pid = Number(readFileSync(pidFile, 'utf8'));
-    assert.equal(aliveAfter(pid, 2000), false, `Enkelprozess ${pid} lebt nach dem Timeout weiter - der Kill traf nur die Shell`);
+    assert.equal(runningAfter(pid, 2000), false, `Enkelprozess ${pid} lebt nach dem Timeout weiter - der Kill traf nur die Shell`);
     pid = null;
   } finally {
     // Kein Waise aus einem roten Lauf: der Test raeumt ihn selbst ab.
@@ -297,27 +399,133 @@ test('ein haengender Schritt faellt ueber den Timeout, samt seiner Enkelprozesse
   }
 });
 
-/* Ohne `--logs` schreibt jeder Lauf in DENSELBEN Ordner je Checkout und leert
- * ihn vorher. Die erste Fassung legte je Lauf ein neues Verzeichnis mit rund
- * 326 Dateien in den Temp-Ordner und raeumte nie auf. Ein fester Ordner je
- * Checkout statt Aufraeumen nach Praefix: das Praefix trifft auch den
- * laufenden Runner eines anderen Arbeitsbaums. */
-test('ohne --logs ueberschreibt ein Lauf den Logordner seines Checkouts', () => {
-  const first = runRunner(['node -e "1"'], [], { logs: false });
+/** Startet den Runner als Programm, ohne auf ihn zu warten. */
+function startRunner(args, env = process.env) {
+  const child = spawn(process.execPath, [RUNNER, ...args], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  let out = '';
+  child.stdout.on('data', (chunk) => { out += chunk; });
+  child.stderr.on('data', (chunk) => { out += chunk; });
+  const done = once(child, 'close').then(([code, signal]) => ({ code, signal, out }));
+  return { child, done };
+}
+
+const logsLine = (out) => out.match(/^Logs: (.+)$/m)?.[1];
+
+/** Der Checkout-Ordner eines Laufordners - aber nie der gemeinsame Oberordner aller Checkouts. */
+function checkoutLogDir(runDir) {
+  const base = runDir && dirname(runDir);
+  return base && basename(base) !== 'yuvomi-test-parallel' ? base : null;
+}
+
+/* JEDER LAUF SEIN EIGENER ORDNER, NUR FUER DEN EIGENEN NUTZER.
+ *
+ * Die Fassung davor schrieb ohne `--logs` in EINEN Ordner je Checkout und
+ * leerte ihn beim Start: ein zweiter Lauf im selben Checkout loeschte die Logs
+ * des laufenden ersten, und beide schrieben ihre `summary.json` an dieselbe
+ * Stelle. Angelegt wurde der Ordner mit 0755, die Logs mit 0644 - unter Linux
+ * liegt `/tmp` fuer alle Nutzer offen (Review auf #1229). */
+test('ohne --logs bekommt jeder Lauf einen eigenen Ordner mit 0700, auch gleichzeitig', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yuvomi-runner-logs-'));
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({
+    scripts: { test: 'node -e "setTimeout(() => console.log(process.env.RUN_MARK), 400)"' },
+  }));
+  let base = null;
   try {
-    const dirOf = (out) => out.match(/^Logs: (.+)$/m)?.[1];
-    const logDir = dirOf(first.run.stdout);
-    assert.ok(logDir && existsSync(join(logDir, '001-node_-e_1.log')), first.run.stdout);
-    writeFileSync(join(logDir, 'alt.log'), 'vom vorigen Lauf');
+    const [a, b] = await Promise.all(['a', 'b'].map((mark) => startRunner(
+      ['--package', join(dir, 'package.json')],
+      { ...process.env, RUN_MARK: mark },
+    ).done));
+    assert.equal(a.code, 0, a.out);
+    assert.equal(b.code, 0, b.out);
+    const runs = [[logsLine(a.out), 'a'], [logsLine(b.out), 'b']];
+    base = checkoutLogDir(runs[0][0]);
+    assert.notEqual(runs[0][0], runs[1][0], 'zwei gleichzeitige Laeufe teilen sich einen Logordner');
+    assert.ok(base, `kein Checkout-Ordner ueber ${runs[0][0]}`);
+    assert.equal(dirname(runs[1][0]), base, 'beide Laufordner liegen im Ordner desselben Checkouts');
+    for (const [runDir, mark] of runs) {
+      const summary = JSON.parse(readFileSync(join(runDir, 'summary.json'), 'utf8'));
+      assert.equal(dirname(summary.steps[0].log), runDir, 'die Zusammenfassung zeigt auf fremde Logs');
+      assert.equal(readFileSync(summary.steps[0].log, 'utf8').trim(), mark, 'das Log gehoert zum anderen Lauf');
+    }
+    if (process.platform !== 'win32') {
+      for (const d of [base, runs[0][0], runs[1][0]]) {
+        assert.equal((statSync(d).mode & 0o777).toString(8), '700', `${d} ist fuer andere Nutzer offen`);
+      }
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    if (base) rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('Logordner: ein Lauf raeumt nur Laufordner ueber 24 h weg und setzt den Ordner auf 0700', () => {
+  const first = runRunner(['node -e "1"'], [], { logs: false });
+  let base = null;
+  try {
+    assert.equal(first.run.status, 0, first.run.stdout + first.run.stderr);
+    base = checkoutLogDir(logsLine(first.run.stdout));
+    assert.ok(base, first.run.stdout);
+    const stale = Date.now() / 1000 - 25 * 3600;
+    mkdirSync(join(base, 'run-alt'));
+    utimesSync(join(base, 'run-alt'), stale, stale);
+    mkdirSync(join(base, 'run-frisch'));
+    if (process.platform !== 'win32') chmodSync(base, 0o755);
 
     const again = spawnSync(process.execPath, [RUNNER, '--package', join(first.dir, 'package.json')], { encoding: 'utf8' });
     assert.equal(again.status, 0, again.stdout + again.stderr);
-    assert.equal(dirOf(again.stdout), logDir, 'derselbe Checkout bekommt denselben Logordner');
-    assert.equal(existsSync(join(logDir, 'alt.log')), false, 'der Rest des vorigen Laufs liegt noch da');
-    assert.ok(existsSync(join(logDir, 'summary.json')));
-    rmSync(logDir, { recursive: true, force: true });
+    assert.equal(existsSync(join(base, 'run-alt')), false, 'ein Laufordner ueber 24 h liegt noch da');
+    assert.ok(existsSync(join(base, 'run-frisch')), 'ein frischer Laufordner - womoeglich ein laufender Lauf - wurde geloescht');
+    assert.ok(existsSync(logsLine(first.run.stdout)), 'der Ordner des ersten Laufs wurde geloescht');
+    if (process.platform !== 'win32') {
+      assert.equal((statSync(base).mode & 0o777).toString(8), '700', 'ein vorhandener Ordner mit 0755 bleibt offen');
+    }
   } finally {
     first.cleanup();
+    if (base) rmSync(base, { recursive: true, force: true });
+  }
+});
+
+/* EIN ABBRUCH RAEUMT AUF, BEVOR ER ENDET.
+ *
+ * Die Fassung davor schickte bei SIGINT/SIGTERM einmal SIGTERM an die Gruppen
+ * und beendete sich sofort. Ein Schritt, der SIGTERM ignoriert, lief als Waise
+ * weiter, und ein wartender Schritt konnte noch starten (Review auf #1229).
+ * Hier ignorieren Schritt UND Enkel SIGTERM; nach dem Abbruch darf keiner mehr
+ * laufen, und der zweite Schritt darf nie gestartet sein. */
+const STUBBORN = [
+  'const { spawn } = require(\'node:child_process\');',
+  'const { writeFileSync } = require(\'node:fs\');',
+  'process.on(\'SIGTERM\', () => {});',
+  'if (process.argv[2] === \'enkel\') {',
+  '  writeFileSync(\'grand.pid\', String(process.pid));',
+  '} else {',
+  '  writeFileSync(\'lead.pid\', String(process.pid));',
+  '  spawn(process.execPath, [__filename, \'enkel\'], { stdio: \'ignore\' });',
+  '}',
+  'setInterval(() => {}, 1000);',
+  '',
+].join('\n');
+const GRACE_ARGS = ['--grace', '1'];
+
+test('ein Abbruch wartet auf die Gruppen und toetet, was SIGTERM ignoriert', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yuvomi-runner-stop-'));
+  writeFileSync(join(dir, 'stur.cjs'), STUBBORN);
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({
+    scripts: { test: 'node stur.cjs && node -e "require(\'node:fs\').writeFileSync(\'danach.txt\', \'x\')"' },
+  }));
+  const pids = [];
+  try {
+    const run = startRunner(['--package', join(dir, 'package.json'), '--logs', join(dir, 'logs'), '--jobs', '1', ...GRACE_ARGS]);
+    await waitForFile(join(dir, 'grand.pid'), 10000, 'der Enkelprozess');
+    pids.push(Number(readFileSync(join(dir, 'lead.pid'), 'utf8')), Number(readFileSync(join(dir, 'grand.pid'), 'utf8')));
+    run.child.kill('SIGTERM');
+    const result = await run.done;
+    assert.equal(result.code, 143, `Exit ${result.code}/${result.signal}: ${result.out}`);
+    for (const pid of pids) assert.equal(isRunning(pid), false, `Prozess ${pid} laeuft nach dem Abbruch weiter`);
+    assert.equal(existsSync(join(dir, 'danach.txt')), false, 'nach dem Abbruch ist noch ein Schritt gestartet');
+  } finally {
+    for (const pid of pids) try { process.kill(pid, 'SIGKILL'); } catch { /* schon weg */ }
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

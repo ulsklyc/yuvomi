@@ -101,9 +101,11 @@ HTTP starts its own server on a free local port and stops it again.
 `npm run test-parallel` runs every step of the `test` chain as its own process - by default
 one per CPU core minus one, `--jobs N` to change that. It does not stop at the first failure:
 it ends with the failed steps and their log files, the ten slowest steps and a non-zero exit
-code. The logs land in `yuvomi-test-parallel/<checkout>-<hash>` under the system temp
-directory, which every run empties first (`--logs DIR` for another place), and a step that runs
-longer than 900 seconds is stopped and counted as failed (`--timeout SECONDS`). The steps come
+code. Each run writes its logs to a folder of its own under the system temp directory,
+`yuvomi-test-parallel/<checkout>-<hash>/run-*`, readable only by you; run folders older than 24
+hours are removed (`--logs DIR` for another place). A step that runs longer than 900 seconds is
+stopped and counted as failed (`--timeout SECONDS`). Ctrl+C stops the running steps with SIGTERM
+and kills whatever still runs 5 seconds later (`--grace SECONDS`). The steps come
 from the `test` script itself, so a new suite is still registered there
 and nowhere else. Because suites run side by side, a suite takes a free port
 (`listen(0, '127.0.0.1')`) and a temp path of its own (`freshTestDbPath()`, `mkdtemp`), never a
