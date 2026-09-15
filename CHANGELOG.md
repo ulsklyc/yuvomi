@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The cycle tab grows into a full tracker: visible flow strength, feelings, more fertility
+  signals, hard-private intimacy logging, PMS patterns, and a "today" insight bubble.** The day log
+  gains cervical mucus, LH and pregnancy tests, multi-select feelings (replacing the single mood),
+  and intimacy - cervical mucus, the two test results and intimacy are never shown to anyone but
+  yourself, even on days shared with the family, enforced by the server. On
+  `POST /api/v1/health/cycle/logs`, `mood` (kept for older clients) and `feelings` now both accept
+  only the fixed feelings list - an out-of-list value is a 400 instead of being stored as free text.
+  Saving a day log through the app always sends the current feelings selection, so an older
+  free-text mood value is cleared the next time that day is edited in the app; only a save that
+  omits both fields entirely (outside the app's own form) leaves it as-is. Flow strength finally
+  shows up everywhere it matters: a four-step dot scale on the calendar, a heaviest-flow chip per
+  period in the history, a per-cycle flow intensity chart, and a calm hint when recent periods run
+  repeatedly heavy or over a week. A bubble at the top answers the daily question at a glance -
+  cycle day and phase, plus whichever of these applies: period expected today (start it right
+  there), symptoms likely today, a PMS window approaching, or the fertile window. Predictions got
+  more honest along the way: a temperature-confirmed ovulation now also moves the month calendar
+  (ring and calendar can no longer disagree), implausible gaps from overlapping or future-dated
+  periods no longer poison the averages (the period dialog warns about both), the BBT chart spaces
+  its points by real dates and breaks across logging gaps, and the likelihood overlay projects into
+  the next cycle instead of only backwards. New per-person settings: contraception (hormonal methods
+  pause the fertile-window prediction, with the reason shown instead of an empty tile), a
+  perimenopause mode that predicts a date range rather than a false-precision single day, a
+  PMS-window toggle, and an opt-in partner reminder that shares only the predicted date - never any
+  log content. Period history can be imported from CSV (German date and separator formats included),
+  the Health overview shows the next period at a glance, and the trends section was restructured
+  around one expander per symptom with an added feelings-by-phase view and a pain summary.
+
 - **New optional module: Waste collection** (#1063). Define your household's waste types
   (recycling, organic, general, or your own, each with an icon and color) and a weekly or
   fixed-day-of-month pickup schedule for each. A single calculated pickup can be moved to a

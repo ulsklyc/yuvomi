@@ -4404,7 +4404,11 @@
                 "regular": "规律",
                 "irregular": "不规律",
                 "notEnoughData": "数据不足",
-                "noPrediction": "记录一次月经以获得预测。"
+                "noPrediction": "记录一次月经以获得预测。",
+                "fertilitySuppressedNote": "易孕期已暂停：激素避孕。",
+                "nextPeriodRangeSub": "平均：{{date}}",
+                "partnerNextPeriod": "{{name}}的月经预计将于{{date}}开始。",
+                "partnerNextPeriodNeutral": "伴侣提醒-月经"
             },
             "stats": {
                 "source": {
@@ -4412,11 +4416,14 @@
                     "history_one": "基于你上一个周期",
                     "insufficientHistory": "暂用默认值 - 再记录 {{count}} 个周期以获得个性化预测",
                     "insufficientHistory_one": "暂用默认值 - 再记录 {{count}} 个周期以获得个性化预测",
-                    "default": "默认假设(尚未记录历史数据)"
+                    "default": "默认假设(尚未记录历史数据)",
+                    "historyOther": "基于最近 {{count}} 个周期",
+                    "historyOther_one": "基于上一个周期"
                 }
             },
             "unit": {
-                "days": "{{value}} 天"
+                "days": "{{value}} 天",
+                "days_one": "{{value}} 天"
             },
             "today": {
                 "title": "今天",
@@ -4430,7 +4437,9 @@
             "calendar": {
                 "title": "日历",
                 "prevMonth": "上个月",
-                "nextMonth": "下个月"
+                "nextMonth": "下个月",
+                "likelihoodTitle": "症状模式",
+                "likelihoodCaption": "选择一个症状,查看根据你的历史记录它常出现在哪些天。"
             },
             "weekday": {
                 "mon": "一",
@@ -4447,13 +4456,16 @@
                 "fertile": "易孕",
                 "ovulation": "排卵",
                 "today": "今天",
-                "logged": "记录"
+                "logged": "记录",
+                "pms": "经前期窗口(模式)"
             },
             "history": {
                 "title": "趋势",
                 "ongoing": "进行中",
                 "empty": "尚未记录任何月经。",
-                "cycleLength": "周期 {{value}} 天"
+                "cycleLength": "周期 {{value}} 天",
+                "cycleLength_one": "周期 {{value}} 天",
+                "flowHeaviest": "最强: {{value}}"
             },
             "trends": {
                 "title": "趋势",
@@ -4469,12 +4481,21 @@
                 "typical": "典型",
                 "atypical": "非典型",
                 "typicalRangeLabel": "典型范围:{{min}}-{{max}} 天",
-                "likelihoodTitle": "症状模式",
-                "likelihoodCaption": "选择一个症状,查看根据你的历史记录它常出现在哪些天。",
-                "likelyToday": "{{symptom}}通常在你周期的这一天前后出现。",
                 "symptomTracked": "已记录",
                 "symptomPredicted": "常在此处出现",
-                "phaseOther": "其他"
+                "phaseOther": "其他",
+                "details": "详情",
+                "feelingFrequency": "情绪频率",
+                "flowLoad": "每个周期的经量强度",
+                "flowLoadCaption": "基于你记录的经量 - 记录越完整，这项数据就越有参考价值。",
+                "flowLoadColumn": "经量负荷",
+                "flowLoadValue": "{{load}}（已记录{{days}}）",
+                "heavyBleedingHintHeavy": "你最近的月经多次被记录为「量多」-值得在就医时提一提。",
+                "heavyBleedingHintLong": "你最近至少有一次月经持续超过一周-值得在就医时提一提。",
+                "painTitle": "疼痛",
+                "painCurrentCycleLabel": "本周期的疼痛天数",
+                "painAvgPerCycleLabel": "平均每周期疼痛天数",
+                "painAvgIntensityLabel": "平均强度"
             },
             "flow": {
                 "label": "经量",
@@ -4543,7 +4564,9 @@
             },
             "period": {
                 "add": "记录月经",
-                "edit": "编辑月经"
+                "edit": "编辑月经",
+                "warningFuture": "开始日期在未来 - 预测仅基于过去的周期。",
+                "warningOverlap": "与已记录的周期重叠。"
             },
             "dayLog": {
                 "title": "记录当天",
@@ -4582,8 +4605,91 @@
                 "pregnancyMode": "怀孕模式",
                 "dueDate": "预产期",
                 "pregnancyHint": "在怀孕模式下，月经和排卵预测将暂停。每日记录仍可使用。",
-                "saved": "设置已保存。"
-            }
+                "saved": "设置已保存。",
+                "contraception": "避孕方式",
+                "contraceptionHint": "激素类方式会自动暂停易孕期预测。",
+                "contraceptionUnset": "未设置",
+                "contraceptionOptions": {
+                    "none": "无",
+                    "pill": "口服避孕药",
+                    "hormonal_iud": "激素宫内节育器",
+                    "copper_iud": "含铜宫内节育器",
+                    "implant": "皮下埋植剂",
+                    "injection": "避孕针",
+                    "patch": "避孕贴片",
+                    "ring": "阴道环",
+                    "condom": "避孕套",
+                    "other": "其他"
+                },
+                "perimenopauseMode": "围绝经期模式",
+                "perimenopauseModeHint": "预测将显示为一个区间而非单一日期；规律性判断将关闭。",
+                "showPms": "显示 PMS 窗口",
+                "notifyPartner": "通知伴侣",
+                "notifyPartnerHint": "所选的人只会收到预测日期，绝不会收到症状、备注或其他记录。",
+                "notifyPartnerNoEligible": "没有符合条件的家庭成员-只有拥有健康模块访问权限的成员才能收到通知。",
+                "notifyPartnerDaysBefore": "伴侣提醒"
+            },
+            "mucus": {
+                "label": "宫颈粘液",
+                "hint": "可选。质地变化有助于缩小易孕期范围。",
+                "none": "无",
+                "dry": "干燥",
+                "sticky": "粘稠",
+                "creamy": "乳状",
+                "watery": "水状",
+                "eggwhite": "蛋清状"
+            },
+            "test": {
+                "label": "检测",
+                "lhLabel": "LH 检测",
+                "pregnancyLabel": "验孕检测",
+                "unset": "未检测",
+                "negative": "阴性",
+                "positive": "阳性"
+            },
+            "feelings": {
+                "label": "情绪"
+            },
+            "intimacy": {
+                "label": "亲密关系",
+                "hint": "即使这一天与家人共享,该记录仍保持私密。",
+                "none": "未指定",
+                "protected": "有防护",
+                "unprotected": "无防护",
+                "solo": "独自"
+            },
+            "quickLink": {
+                "painkiller": "记录止痛药",
+                "weight": "记录体重"
+            },
+            "bubble": {
+                "ariaLabel": "今日周期状态",
+                "line1": "周期第{{day}}天 · {{phase}}",
+                "periodToday": "预计今天来月经-现在开始记录？",
+                "periodOverdue": "月经已延迟{{count}}天-现在开始记录？",
+                "periodOverdue_one": "月经已延迟{{count}}天-现在开始记录？",
+                "periodStillOpen": "记录显示你的月经似乎还在进行中-现在结束吗？",
+                "peakPainDay": "根据你的规律,今天常常是疼痛最严重的一天({{symptom}})。",
+                "likelySymptomsToday": "今天可能出现：{{symptoms}}",
+                "pmsWindow": "PMS 窗口可能从{{weekday}}开始",
+                "upcomingSymptom": "从{{weekday}}起可能出现：{{symptom}}",
+                "fertile": "易孕期至{{date}}",
+                "fertileConfirmed": "易孕期（排卵已确认）至{{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "本周期的排卵已通过体温上升得到确认。未来的周期仍基于日历法；这不能替代避孕措施或医生建议。",
+            "import": {
+                "button": "导入",
+                "title": "导入周期历史记录",
+                "explainer": "CSV 文件或粘贴的文本:每行一个周期,格式为「start_date,end_date」(结束日期可选),日期格式为 YYYY-MM-DD 或 DD.MM.YYYY,以逗号或分号分隔。",
+                "fileLabel": "选择 CSV 文件",
+                "pasteLabel": "或粘贴 CSV 文本",
+                "submit": "导入",
+                "resultToast": "已导入 {{imported}} 条,已跳过 {{skipped}} 条。",
+                "errorsTitle": "以下行无法导入:",
+                "emptyError": "请选择 CSV 文件或粘贴文本。",
+                "error": "导入失败。"
+            },
+            "discoveryHint": "提示:可以在<a href=\"/settings/personal/feeds\">设置 → 个人 → 订阅源</a>中以 ICS 订阅源的形式订阅预测周期,也可以通过自定义模式在<a href=\"/\">概览</a>中显示周期小组件。"
         },
         "duration": {
             "hm": "{{hours}} 小时 {{minutes}} 分钟",

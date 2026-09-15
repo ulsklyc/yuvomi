@@ -40,13 +40,14 @@ function insertPeriod(userId, startDate, endDate) {
 }
 
 function setSettings(userId, fields = {}) {
-  const f = { cycle_length_avg: null, period_length_avg: null, luteal_length: 14, track_fertility: 1, ...fields };
+  const f = { cycle_length_avg: null, period_length_avg: null, luteal_length: 14, track_fertility: 1, contraception: null, ...fields };
   db.prepare(`
-    INSERT INTO cycle_settings (user_id, cycle_length_avg, period_length_avg, luteal_length, track_fertility)
-    VALUES (@user_id, @cycle_length_avg, @period_length_avg, @luteal_length, @track_fertility)
+    INSERT INTO cycle_settings (user_id, cycle_length_avg, period_length_avg, luteal_length, track_fertility, contraception)
+    VALUES (@user_id, @cycle_length_avg, @period_length_avg, @luteal_length, @track_fertility, @contraception)
     ON CONFLICT(user_id) DO UPDATE SET
       cycle_length_avg = excluded.cycle_length_avg, period_length_avg = excluded.period_length_avg,
-      luteal_length = excluded.luteal_length, track_fertility = excluded.track_fertility
+      luteal_length = excluded.luteal_length, track_fertility = excluded.track_fertility,
+      contraception = excluded.contraception
   `).run({ user_id: userId, ...f });
 }
 
@@ -105,6 +106,31 @@ test('buildCycleFeed: fruchtbares Fenster + Eisprung nur bei aktivierter Fruchtb
   setSettings(alice, { track_fertility: 0 });
   const withoutFertility = cycleIcs.buildCycleFeed(db, alice, new Date('2026-03-10T00:00:00Z'));
   assert.doesNotMatch(withoutFertility, /Fertile window|Ovulation/);
+});
+
+// Der Feed muss dieselbe Verhuetungs-Unterdrueckung
+// beachten wie predictCycle() (suppressesFertility(), public/utils/health-cycle.js)
+// - vorher pruefte er nur track_fertility und schickte bei hormoneller
+// Verhuetung weiter Eisprung-/Fruchtbares-Fenster-Termine, obwohl der
+// Zyklus-Tab die Vorhersage laengst pausiert.
+test('buildCycleFeed: hormonelle Verhuetung unterdrueckt fruchtbares Fenster + Eisprung wie im Zyklus-Tab', () => {
+  db.exec('DELETE FROM cycle_periods; DELETE FROM cycle_settings;');
+  insertPeriod(alice, '2026-01-01', '2026-01-06');
+  insertPeriod(alice, '2026-01-29', '2026-02-03');
+  insertPeriod(alice, '2026-02-26', '2026-03-03');
+  setHouseholdLanguage('en');
+
+  setSettings(alice, { track_fertility: 1, contraception: 'pill' });
+  const withPill = cycleIcs.buildCycleFeed(db, alice, new Date('2026-03-10T00:00:00Z'));
+  assert.doesNotMatch(withPill, /Fertile window|Ovulation/);
+  // Vorhergesagte Perioden selbst bleiben unveraendert - nur Eisprung/Fenster
+  // sind betroffen (dieselbe Unterscheidung wie track_fertility=0 oben).
+  assert.equal((withPill.match(/SUMMARY:Predicted period/g) || []).length, 3);
+
+  setSettings(alice, { track_fertility: 1, contraception: 'copper_iud' });
+  const withCopperIud = cycleIcs.buildCycleFeed(db, alice, new Date('2026-03-10T00:00:00Z'));
+  assert.equal((withCopperIud.match(/SUMMARY:Fertile window \(predicted\)/g) || []).length, 3);
+  assert.equal((withCopperIud.match(/SUMMARY:Ovulation \(predicted\)/g) || []).length, 3);
 });
 
 test('buildCycleFeed: im Schwangerschafts-Modus keine Prognose, geloggte Perioden bleiben', () => {

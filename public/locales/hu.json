@@ -4404,7 +4404,11 @@
                 "regular": "Szabályos",
                 "irregular": "Szabálytalan",
                 "notEnoughData": "Kevés adat",
-                "noPrediction": "Rögzíts egy menstruációt az előrejelzésekhez."
+                "noPrediction": "Rögzíts egy menstruációt az előrejelzésekhez.",
+                "fertilitySuppressedNote": "Termékeny időszak szüneteltetve: hormonális fogamzásgátlás.",
+                "nextPeriodRangeSub": "Átlag: {{date}}",
+                "partnerNextPeriod": "{{name}} menstruációja várhatóan {{date}}-én kezdődik.",
+                "partnerNextPeriodNeutral": "Partner-emlékeztető: menstruáció"
             },
             "stats": {
                 "source": {
@@ -4412,11 +4416,14 @@
                     "history_one": "Az utolsó ciklusod alapján",
                     "insufficientHistory": "Egyelőre alapértelmezett érték - rögzíts még {{count}} ciklust a személyre szabott előrejelzéshez",
                     "insufficientHistory_one": "Egyelőre alapértelmezett érték - rögzíts még {{count}} ciklust a személyre szabott előrejelzéshez",
-                    "default": "Alapértelmezett feltételezés (még nincs rögzített előzmény)"
+                    "default": "Alapértelmezett feltételezés (még nincs rögzített előzmény)",
+                    "historyOther": "Az utolsó {{count}} ciklus alapján",
+                    "historyOther_one": "Az utolsó ciklus alapján"
                 }
             },
             "unit": {
-                "days": "{{value}} nap"
+                "days": "{{value}} nap",
+                "days_one": "{{value}} nap"
             },
             "today": {
                 "title": "Ma",
@@ -4430,7 +4437,9 @@
             "calendar": {
                 "title": "Naptár",
                 "prevMonth": "Előző hónap",
-                "nextMonth": "Következő hónap"
+                "nextMonth": "Következő hónap",
+                "likelihoodTitle": "Tünetminták",
+                "likelihoodCaption": "Válassz egy tünetet, hogy lásd, mely napokon jelentkezik gyakran, az előzményeid alapján."
             },
             "weekday": {
                 "mon": "H",
@@ -4447,13 +4456,16 @@
                 "fertile": "Termékeny",
                 "ovulation": "Ovuláció",
                 "today": "Ma",
-                "logged": "Bejegyzés"
+                "logged": "Bejegyzés",
+                "pms": "PMS-időszak (minta)"
             },
             "history": {
                 "title": "Tendencia",
                 "ongoing": "folyamatban",
                 "empty": "Még nincs rögzített menstruáció.",
-                "cycleLength": "Ciklus {{value}} nap"
+                "cycleLength": "Ciklus {{value}} nap",
+                "cycleLength_one": "Ciklus {{value}} nap",
+                "flowHeaviest": "Max. {{value}}"
             },
             "trends": {
                 "title": "Trendek",
@@ -4469,12 +4481,21 @@
                 "typical": "Jellemző",
                 "atypical": "Nem jellemző",
                 "typicalRangeLabel": "Jellemző tartomány: {{min}}-{{max}} nap",
-                "likelihoodTitle": "Tünetminták",
-                "likelihoodCaption": "Válassz egy tünetet, hogy lásd, mely napokon jelentkezik gyakran, az előzményeid alapján.",
-                "likelyToday": "{{symptom}} gyakran ez körül a ciklusnap körül jelentkezik.",
                 "symptomTracked": "Rögzítve",
                 "symptomPredicted": "Gyakran itt jelentkezik",
-                "phaseOther": "Egyéb"
+                "phaseOther": "Egyéb",
+                "details": "Részletek",
+                "feelingFrequency": "Hangulat gyakorisága",
+                "flowLoad": "Vérzés intenzitása ciklusonként",
+                "flowLoadCaption": "A rögzített vérzésadatokon alapul - minél teljesebb a naplózás, annál informatívabb.",
+                "flowLoadColumn": "Vérzésterhelés",
+                "flowLoadValue": "{{load}} ({{days}} rögzítve)",
+                "heavyBleedingHintHeavy": "Az utóbbi ciklusaid ismétlődően „erős” vérzésként lettek rögzítve - érdemes ezt megemlíteni egy orvosi konzultáción.",
+                "heavyBleedingHintLong": "Legalább egy utóbbi ciklusod egy hétnél tovább tartott - érdemes ezt megemlíteni egy orvosi konzultáción.",
+                "painTitle": "Fájdalom",
+                "painCurrentCycleLabel": "Fájdalmas napok ebben a ciklusban",
+                "painAvgPerCycleLabel": "Átl. fájdalmas napok ciklusonként",
+                "painAvgIntensityLabel": "Átl. intenzitás"
             },
             "flow": {
                 "label": "Vérzés erőssége",
@@ -4543,7 +4564,9 @@
             },
             "period": {
                 "add": "Menstruáció rögzítése",
-                "edit": "Menstruáció szerkesztése"
+                "edit": "Menstruáció szerkesztése",
+                "warningFuture": "A kezdő dátum a jövőben van - az előrejelzések csak a korábbi ciklusokon alapulnak.",
+                "warningOverlap": "Átfedésben van egy már rögzített ciklussal."
             },
             "dayLog": {
                 "title": "Nap rögzítése",
@@ -4582,8 +4605,91 @@
                 "pregnancyMode": "Terhesség mód",
                 "dueDate": "Várható szülési időpont",
                 "pregnancyHint": "Terhesség módban a menstruáció- és ovulációs előrejelzések szünetelnek. A napi naplózás továbbra is elérhető.",
-                "saved": "Beállítások mentve."
-            }
+                "saved": "Beállítások mentve.",
+                "contraception": "Fogamzásgátlási módszer",
+                "contraceptionHint": "A hormonális módszerek automatikusan szüneteltetik a termékeny időszak előrejelzését.",
+                "contraceptionUnset": "Nincs megadva",
+                "contraceptionOptions": {
+                    "none": "Nincs",
+                    "pill": "Tabletta",
+                    "hormonal_iud": "Hormonspirál",
+                    "copper_iud": "Rézspirál",
+                    "implant": "Implantátum",
+                    "injection": "Injekció",
+                    "patch": "Tapasz",
+                    "ring": "Hüvelygyűrű",
+                    "condom": "Óvszer",
+                    "other": "Egyéb"
+                },
+                "perimenopauseMode": "Perimenopauza mód",
+                "perimenopauseModeHint": "Az előrejelzések tartományként jelennek meg egyetlen dátum helyett; a szabályosság-értékelés kikapcsol.",
+                "showPms": "PMS-időszak megjelenítése",
+                "notifyPartner": "Partner értesítése",
+                "notifyPartnerHint": "A kiválasztott személy csak az előre jelzett dátumot kapja meg, sosem tüneteket, jegyzeteket vagy más bejegyzéseket.",
+                "notifyPartnerNoEligible": "Nincs jogosult háztartástag - csak az Egészség modulhoz hozzáféréssel rendelkező tagok értesíthetők.",
+                "notifyPartnerDaysBefore": "Emlékeztető a partnernek"
+            },
+            "mucus": {
+                "label": "Méhnyaknyák",
+                "hint": "Nem kötelező. Az állag változásai segíthetnek szűkíteni a termékeny időszakot.",
+                "none": "Nincs",
+                "dry": "Száraz",
+                "sticky": "Ragadós",
+                "creamy": "Krémes",
+                "watery": "Vizes",
+                "eggwhite": "Tojásfehérje-szerű"
+            },
+            "test": {
+                "label": "Tesztek",
+                "lhLabel": "LH-teszt",
+                "pregnancyLabel": "Terhességi teszt",
+                "unset": "Nincs tesztelve",
+                "negative": "Negatív",
+                "positive": "Pozitív"
+            },
+            "feelings": {
+                "label": "Érzések"
+            },
+            "intimacy": {
+                "label": "Intimitás",
+                "hint": "Privát marad akkor is, ha ezt a napot megosztod a családdal.",
+                "none": "Nincs megadva",
+                "protected": "Védekezéssel",
+                "unprotected": "Védekezés nélkül",
+                "solo": "Egyedül"
+            },
+            "quickLink": {
+                "painkiller": "Fájdalomcsillapító rögzítése",
+                "weight": "Testsúly rögzítése"
+            },
+            "bubble": {
+                "ariaLabel": "Mai ciklusállapot",
+                "line1": "{{day}}. ciklusnap · {{phase}}",
+                "periodToday": "A menstruáció ma várható - elindítod most?",
+                "periodOverdue": "A menstruáció {{count}} napja késik - elindítod most?",
+                "periodOverdue_one": "A menstruáció {{count}} napja késik - elindítod most?",
+                "periodStillOpen": "A bejegyzés szerint a menstruációd még mindig tart - befejezed most?",
+                "peakPainDay": "A mintázatod szerint ma gyakran a legerősebb fájdalom napja van ({{symptom}}).",
+                "likelySymptomsToday": "Ma valószínű: {{symptoms}}",
+                "pmsWindow": "PMS-időszak valószínűleg {{weekday}}-tól",
+                "upcomingSymptom": "{{weekday}}-tól valószínű: {{symptom}}",
+                "fertile": "Termékeny időszak eddig: {{date}}",
+                "fertileConfirmed": "Termékeny időszak (megerősített ovuláció) eddig: {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "Ennek a ciklusnak az ovulációját hőmérséklet-emelkedés igazolta. A jövőbeli ciklusok továbbra is a naptári módszeren alapulnak; ez nem helyettesíti a fogamzásgátlást vagy az orvosi tanácsot.",
+            "import": {
+                "button": "Importálás",
+                "title": "Ciklustörténet importálása",
+                "explainer": "CSV-fájl vagy beillesztett szöveg: soronként egy időszak „start_date,end_date” formában (a végdátum opcionális), dátumok ÉÉÉÉ-HH-NN vagy NN.HH.ÉÉÉÉ formátumban, vesszővel vagy pontosvesszővel elválasztva.",
+                "fileLabel": "CSV-fájl kiválasztása",
+                "pasteLabel": "Vagy CSV-szöveg beillesztése",
+                "submit": "Importálás",
+                "resultToast": "{{imported}} importálva, {{skipped}} kihagyva.",
+                "errorsTitle": "Ezeket a sorokat nem sikerült importálni:",
+                "emptyError": "Válassz egy CSV-fájlt, vagy illessz be szöveget.",
+                "error": "Az importálás nem sikerült."
+            },
+            "discoveryHint": "Tipp: a becsült ciklusra ICS-hírcsatornaként iratkozhatsz fel a <a href=\"/settings/personal/feeds\">Beállítások → Személyes → Hírcsatornák</a> alatt, vagy megjelenítheted a ciklus-widgetet az <a href=\"/\">Áttekintésen</a> a testreszabás módban."
         },
         "duration": {
             "hm": "{{hours}} ó {{minutes}} p",

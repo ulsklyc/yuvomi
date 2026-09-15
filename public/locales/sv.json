@@ -4404,7 +4404,11 @@
                 "regular": "Regelbunden",
                 "irregular": "Oregelbunden",
                 "notEnoughData": "För lite data",
-                "noPrediction": "Registrera en mens för prognoser."
+                "noPrediction": "Registrera en mens för prognoser.",
+                "fertilitySuppressedNote": "Fertilt fönster pausat: hormonell preventivmetod.",
+                "nextPeriodRangeSub": "Medel: {{date}}",
+                "partnerNextPeriod": "{{name}}s mens beräknas börja {{date}}.",
+                "partnerNextPeriodNeutral": "Partnerpåminnelse: mens"
             },
             "stats": {
                 "source": {
@@ -4412,11 +4416,14 @@
                     "history_one": "Baserat på din senaste cykel",
                     "insufficientHistory": "Standardvärde tills vidare - logga {{count}} cykler till för en personlig prognos",
                     "insufficientHistory_one": "Standardvärde tills vidare - logga {{count}} cykel till för en personlig prognos",
-                    "default": "Standardantagande (ingen historik loggad än)"
+                    "default": "Standardantagande (ingen historik loggad än)",
+                    "historyOther": "Baserat på de senaste {{count}} cyklerna",
+                    "historyOther_one": "Baserat på den senaste cykeln"
                 }
             },
             "unit": {
-                "days": "{{value}} dagar"
+                "days": "{{value}} dagar",
+                "days_one": "{{value}} dag"
             },
             "today": {
                 "title": "I dag",
@@ -4430,7 +4437,9 @@
             "calendar": {
                 "title": "Kalender",
                 "prevMonth": "Föregående månad",
-                "nextMonth": "Nästa månad"
+                "nextMonth": "Nästa månad",
+                "likelihoodTitle": "Symtommönster",
+                "likelihoodCaption": "Välj ett symtom för att se vilka dagar det ofta inträffar, baserat på din historik."
             },
             "weekday": {
                 "mon": "Mån",
@@ -4447,13 +4456,16 @@
                 "fertile": "Fertil",
                 "ovulation": "Ägglossning",
                 "today": "I dag",
-                "logged": "Post"
+                "logged": "Post",
+                "pms": "PMS-fönster (mönster)"
             },
             "history": {
                 "title": "Trend",
                 "ongoing": "pågående",
                 "empty": "Inga menstruationer registrerade ännu.",
-                "cycleLength": "Cykel {{value}} dagar"
+                "cycleLength": "Cykel {{value}} dagar",
+                "cycleLength_one": "Cykel {{value}} dag",
+                "flowHeaviest": "Max. {{value}}"
             },
             "trends": {
                 "title": "Trender",
@@ -4469,12 +4481,21 @@
                 "typical": "Typisk",
                 "atypical": "Atypisk",
                 "typicalRangeLabel": "Typiskt intervall: {{min}}-{{max}} dagar",
-                "likelihoodTitle": "Symtommönster",
-                "likelihoodCaption": "Välj ett symtom för att se vilka dagar det ofta inträffar, baserat på din historik.",
-                "likelyToday": "{{symptom}} inträffar ofta kring denna dag i din cykel.",
                 "symptomTracked": "Loggat",
                 "symptomPredicted": "Inträffar ofta här",
-                "phaseOther": "Annat"
+                "phaseOther": "Annat",
+                "details": "Detaljer",
+                "feelingFrequency": "Känslofrekvens",
+                "flowLoad": "Blödningsintensitet per cykel",
+                "flowLoadCaption": "Baserat på dina blödningsregistreringar - ju mer komplett din loggning är, desto mer meningsfullt är detta.",
+                "flowLoadColumn": "Blödningsbelastning",
+                "flowLoadValue": "{{load}} ({{days}} loggade)",
+                "heavyBleedingHintHeavy": "Dina senaste menscykler har upprepade gånger loggats som \"kraftiga\" - värt att nämna vid nästa läkarbesök.",
+                "heavyBleedingHintLong": "Minst en av dina senaste mensperioder varade längre än en vecka - värt att nämna vid nästa läkarbesök.",
+                "painTitle": "Smärta",
+                "painCurrentCycleLabel": "Smärtdagar denna cykel",
+                "painAvgPerCycleLabel": "Snitt smärtdagar per cykel",
+                "painAvgIntensityLabel": "Snittintensitet"
             },
             "flow": {
                 "label": "Flöde",
@@ -4543,7 +4564,9 @@
             },
             "period": {
                 "add": "Registrera mens",
-                "edit": "Redigera mens"
+                "edit": "Redigera mens",
+                "warningFuture": "Startdatumet ligger i framtiden - prognoser baseras endast på tidigare cykler.",
+                "warningOverlap": "Överlappar en redan loggad cykel."
             },
             "dayLog": {
                 "title": "Logga dag",
@@ -4582,8 +4605,91 @@
                 "pregnancyMode": "Graviditetsläge",
                 "dueDate": "Beräknat förlossningsdatum",
                 "pregnancyHint": "I graviditetsläge pausas prognoser för mens och ägglossning. Daglig loggning är fortfarande tillgänglig.",
-                "saved": "Inställningarna sparades."
-            }
+                "saved": "Inställningarna sparades.",
+                "contraception": "Preventivmetod",
+                "contraceptionHint": "Hormonella metoder pausar automatiskt förutsägelser för det fertila fönstret.",
+                "contraceptionUnset": "Ej angivet",
+                "contraceptionOptions": {
+                    "none": "Ingen",
+                    "pill": "P-piller",
+                    "hormonal_iud": "Hormonspiral",
+                    "copper_iud": "Kopparspiral",
+                    "implant": "Implantat",
+                    "injection": "P-spruta",
+                    "patch": "Plåster",
+                    "ring": "Vaginalring",
+                    "condom": "Kondom",
+                    "other": "Annat"
+                },
+                "perimenopauseMode": "Perimenopaus-läge",
+                "perimenopauseModeHint": "Förutsägelser visas som ett intervall istället för ett enda datum; regelbundenhetsbedömningen stängs av.",
+                "showPms": "Visa PMS-fönster",
+                "notifyPartner": "Meddela en partner",
+                "notifyPartnerHint": "Den valda personen får bara det förutsagda datumet, aldrig symtom, anteckningar eller andra poster.",
+                "notifyPartnerNoEligible": "Ingen berättigad hushållsmedlem tillgänglig - endast medlemmar med åtkomst till modulen Hälsa kan meddelas.",
+                "notifyPartnerDaysBefore": "Påminnelse till partner"
+            },
+            "mucus": {
+                "label": "Cervixslem",
+                "hint": "Valfritt. Förändringar i konsistens kan hjälpa till att avgränsa den fertila perioden.",
+                "none": "Ingen",
+                "dry": "Torr",
+                "sticky": "Klibbig",
+                "creamy": "Krämig",
+                "watery": "Vattnig",
+                "eggwhite": "Äggvita"
+            },
+            "test": {
+                "label": "Tester",
+                "lhLabel": "LH-test",
+                "pregnancyLabel": "Graviditetstest",
+                "unset": "Inte testat",
+                "negative": "Negativt",
+                "positive": "Positivt"
+            },
+            "feelings": {
+                "label": "Känslor"
+            },
+            "intimacy": {
+                "label": "Intimitet",
+                "hint": "Förblir privat även om den här dagen delas med familjen.",
+                "none": "Inte angivet",
+                "protected": "Skyddat",
+                "unprotected": "Oskyddat",
+                "solo": "Solo"
+            },
+            "quickLink": {
+                "painkiller": "Logga smärtstillande",
+                "weight": "Logga vikt"
+            },
+            "bubble": {
+                "ariaLabel": "Dagens cykelstatus",
+                "line1": "Cykeldag {{day}} · {{phase}}",
+                "periodToday": "Mens väntas idag - starta nu?",
+                "periodOverdue": "Mens är {{count}} dagar försenad - starta nu?",
+                "periodOverdue_one": "Mens är {{count}} dag försenad - starta nu?",
+                "periodStillOpen": "Din mens verkar fortfarande pågå enligt loggen - avsluta nu?",
+                "peakPainDay": "Enligt ditt mönster är idag ofta din dag med starkast smärta ({{symptom}}).",
+                "likelySymptomsToday": "Troligt idag: {{symptoms}}",
+                "pmsWindow": "PMS-fönster troligt från {{weekday}}",
+                "upcomingSymptom": "Troligt från {{weekday}}: {{symptom}}",
+                "fertile": "Fertilt fönster till {{date}}",
+                "fertileConfirmed": "Fertilt fönster (ägglossning bekräftad) till {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "Ägglossningen den här cykeln bekräftades av en temperaturhöjning. Kommande cykler bygger fortfarande på kalendermetoden; det ersätter inte preventivmedel eller medicinsk rådgivning.",
+            "import": {
+                "button": "Importera",
+                "title": "Importera menscykelhistorik",
+                "explainer": "CSV-fil eller inklistrad text: en rad per mens som ”start_date,end_date” (slutdatum valfritt), datum i formatet ÅÅÅÅ-MM-DD eller DD.MM.ÅÅÅÅ, separerade med kommatecken eller semikolon.",
+                "fileLabel": "Välj CSV-fil",
+                "pasteLabel": "Eller klistra in CSV-text",
+                "submit": "Importera",
+                "resultToast": "{{imported}} importerade, {{skipped}} överhoppade.",
+                "errorsTitle": "Dessa rader kunde inte importeras:",
+                "emptyError": "Välj en CSV-fil eller klistra in text.",
+                "error": "Importen misslyckades."
+            },
+            "discoveryHint": "Tips: prenumerera på den förutspådda cykeln som ICS-flöde under <a href=\"/settings/personal/feeds\">Inställningar → Personligt → Flöden</a>, eller visa cykel-widgeten på <a href=\"/\">Översikt</a> via dess anpassningsläge."
         },
         "duration": {
             "hm": "{{hours}} tim {{minutes}} min",

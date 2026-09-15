@@ -8349,6 +8349,132 @@ const MIGRATIONS = [
       );
     `,
   },
+  {
+    version: 210,
+    description: 'Health: cervical mucus, LH/pregnancy test results and intimacy as optional day-log scalars',
+    // Vier weitere Skalarwerte je Tag, gleiche Bauart wie Migration 179
+    // (basal_temp): ein ALTER TABLE ADD COLUMN KANN durchaus einen
+    // spalten-eigenen CHECK tragen (siehe Migration 212, perimenopause_mode/
+    // show_pms) - das ist hier nicht der Grund, warum diese vier Werte-Listen
+    // stattdessen in der Route leben. Der eigentliche Grund ist Konsistenz mit
+    // dem bestehenden Vorbild `basal_temp_unit` (Migration 179): dieselbe Zeile
+    // (cycle_day_logs) validiert alle ihre geschlossenen, aber nullbaren
+    // Text-Skalare an derselben Stelle, statt manche per CHECK und manche per
+    // Route zu pruefen.
+    //
+    // `intimacy` ist bewusst KEIN sichtbarkeitsgesteuertes Feld wie die
+    // anderen drei: die Route liefert es nur an den Eigentuemer selbst zurueck,
+    // unabhaengig von `visibility` (siehe cycle.js GET /cycle/logs) - ein
+    // Sexualleben-Eintrag soll nicht ueber "family" fuer andere
+    // Haushaltsmitglieder mitlesbar werden, nur weil der restliche Tag geteilt
+    // ist.
+    up: `
+      ALTER TABLE cycle_day_logs ADD COLUMN cervix_mucus TEXT;
+      ALTER TABLE cycle_day_logs ADD COLUMN lh_test TEXT;
+      ALTER TABLE cycle_day_logs ADD COLUMN pregnancy_test TEXT;
+      ALTER TABLE cycle_day_logs ADD COLUMN intimacy TEXT;
+    `,
+  },
+  {
+    version: 211,
+    description: 'Health: multi-select feelings per day log - normalized cycle_day_log_feelings table, backfilled from the legacy mood column',
+    // Gleiches Muster wie Migration 178 (cycle_day_log_symptoms): die alte
+    // Skalar-Spalte (cycle_day_logs.mood) bleibt UNVERAENDERT stehen - kein
+    // DROP COLUMN, kein Rebuild. Sie ist ab hier nur noch historisch: neue
+    // Schreibvorgaenge (server/routes/health/cycle.js) fuellen sie nicht mehr.
+    // Die API liest sie zur Abwaertskompatibilitaet zwar noch zurueck, aber ihr
+    // Wert wandert nach dieser Migration nie wieder in die Datenbank. Ein
+    // rohes Backup von vor dieser Migration bleibt trotzdem lesbar, ohne einen
+    // zweiten Migrationspfad zu brauchen.
+    //
+    // DER BACKFILL NORMALISIERT UND FILTERT: `mood` war freier Text (keine
+    // Werte-Liste erzwungen), `feelings` ist seit dieser Migration ein
+    // GESCHLOSSENES Set (MOOD_VALUES, sieben Schluessel: great/good/neutral/
+    // sensitive/sad/irritable/anxious - public/utils/health-cycle.js). Nur
+    // Werte, die (nach LOWER(TRIM(...))) in dieser Liste stehen, werden
+    // uebernommen; alles andere bleibt AUSSCHLIESSLICH in der eingefrorenen
+    // `mood`-Spalte lesbar. Zwei Gruende, keine Kompromisse: freier Text war
+    // als Chip nie darstellbar (die UI kennt nur die sieben Presets), und eine
+    // erfundene Zuordnung (z. B. "tired" -> "sensitive") waere ein Datensatz,
+    // den die Person nie eingetragen hat - eine fabrizierte Aussage ist
+    // schlimmer als eine fehlende.
+    up: `
+      CREATE TABLE cycle_day_log_feelings (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        day_log_id  INTEGER NOT NULL REFERENCES cycle_day_logs(id) ON DELETE CASCADE,
+        feeling_key TEXT    NOT NULL,
+        UNIQUE(day_log_id, feeling_key)
+      );
+      CREATE INDEX idx_cycle_day_log_feelings_day_log ON cycle_day_log_feelings(day_log_id);
+
+      -- Rueckwirkend aus der alten Skalar-Spalte befuellen: genau eine Zeile
+      -- je Tages-Log mit gesetztem, GUELTIGEM mood-Wert. Anders als bei
+      -- Migration 178 (Komma-Liste, mehrere Symptome je Zeile) ist hier keine
+      -- Zerlegung noetig - mood trug schon immer genau einen Wert.
+      INSERT INTO cycle_day_log_feelings (day_log_id, feeling_key)
+      SELECT id, LOWER(TRIM(mood)) FROM cycle_day_logs
+      WHERE mood IS NOT NULL AND TRIM(mood) <> ''
+        AND LOWER(TRIM(mood)) IN ('great', 'good', 'neutral', 'sensitive', 'sad', 'irritable', 'anxious');
+    `,
+  },
+  {
+    version: 212,
+    description: 'Health: cycle_settings extensions - contraception, perimenopause mode, PMS toggle, opt-in partner notification',
+    up: `
+      -- Kein CHECK auf der Spalte: die Werte-Liste lebt in der Route (gleiche
+      -- Aufteilung wie basal_temp_unit/flow ueberall sonst in diesem Modul).
+      -- Eine Teilmenge dieser Werte (hormonell) schaltet clientseitig die
+      -- Eisprung-/Fruchtbarkeitsvorhersage ab (siehe public/utils/health-cycle.js,
+      -- suppressesFertility()).
+      ALTER TABLE cycle_settings ADD COLUMN contraception TEXT;
+
+      -- Standard 0 (aus): ein Bestandshaushalt sieht ohne aktives Zutun keine
+      -- geaenderte Vorhersage-Darstellung.
+      ALTER TABLE cycle_settings ADD COLUMN perimenopause_mode INTEGER NOT NULL DEFAULT 0
+        CHECK(perimenopause_mode IN (0, 1));
+
+      -- Standard 1 (an): die PMS-Einblendung ist rein abgeleitet (kein
+      -- gespeicherter Zeitraum) und rendert ohnehin nur bei einem echten
+      -- erkannten Muster - ein Bestandshaushalt sieht also nur dann ueberhaupt
+      -- etwas Neues, wenn die eigenen Daten es hergeben.
+      ALTER TABLE cycle_settings ADD COLUMN show_pms INTEGER NOT NULL DEFAULT 1
+        CHECK(show_pms IN (0, 1));
+
+      -- Opt-in-Benachrichtigung: der Eigentuemer veroeffentlicht, die
+      -- Partnerperson braucht keine eigene Freigabe - deshalb genuegt ein
+      -- einfacher Verweis ohne Gegenzeichnung. SET NULL statt CASCADE:
+      -- verlaesst die verwiesene Person den Haushalt, verliert die
+      -- Einstellung nur ihr Ziel, nicht die eigene Zeile.
+      ALTER TABLE cycle_settings ADD COLUMN notify_partner_user_id INTEGER
+        REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE cycle_settings ADD COLUMN notify_partner_days_before INTEGER;
+    `,
+  },
+  {
+    version: 213,
+    description: 'Health: widen cycle_reminder_anchors.kind to add partner_period',
+    // SQLite kennt kein ALTER auf einen CHECK - derselbe Tabellen-Rebuild wie
+    // v137/v141/v148/v162/v177 fuer reminders.entity_type, nur hier fuer die
+    // Anker-Art. `foreignKeysOff` ist NICHT noetig: anders als reminders (an
+    // dem notification_deliveries.reminder_id mit ON DELETE CASCADE haengt)
+    // referenziert keine andere Tabelle cycle_reminder_anchors per FK - nur
+    // reminders.entity_id, und das ist das ueberall gleiche polymorphe Muster
+    // ohne echten Fremdschluessel.
+    up: `
+      CREATE TABLE cycle_reminder_anchors_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        anchor_date TEXT    NOT NULL,
+        kind        TEXT    NOT NULL CHECK(kind IN ('period_predicted', 'log_nudge', 'partner_period')),
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        UNIQUE(user_id, anchor_date, kind)
+      );
+      INSERT INTO cycle_reminder_anchors_new (id, user_id, anchor_date, kind, created_at)
+        SELECT id, user_id, anchor_date, kind, created_at FROM cycle_reminder_anchors;
+      DROP TABLE cycle_reminder_anchors;
+      ALTER TABLE cycle_reminder_anchors_new RENAME TO cycle_reminder_anchors;
+    `,
+  },
 ];
 
 /**

@@ -4404,7 +4404,11 @@
                 "regular": "Regular",
                 "irregular": "Irregular",
                 "notEnoughData": "Dados insuficientes",
-                "noPrediction": "Registe um período para obter previsões."
+                "noPrediction": "Registe um período para obter previsões.",
+                "fertilitySuppressedNote": "Janela fértil pausada: contraceção hormonal.",
+                "nextPeriodRangeSub": "Média: {{date}}",
+                "partnerNextPeriod": "Previsão: o período de {{name}} deve começar em {{date}}.",
+                "partnerNextPeriodNeutral": "Lembrete para o(a) parceiro(a): período"
             },
             "stats": {
                 "source": {
@@ -4412,11 +4416,14 @@
                     "history_one": "Com base no teu último ciclo",
                     "insufficientHistory": "Valor predefinido por agora - regista mais {{count}} ciclos para uma previsão personalizada",
                     "insufficientHistory_one": "Valor predefinido por agora - regista mais {{count}} ciclo para uma previsão personalizada",
-                    "default": "Suposição predefinida (ainda sem histórico registado)"
+                    "default": "Suposição predefinida (ainda sem histórico registado)",
+                    "historyOther": "Com base nos últimos {{count}} ciclos",
+                    "historyOther_one": "Com base no último ciclo"
                 }
             },
             "unit": {
-                "days": "{{value}} dias"
+                "days": "{{value}} dias",
+                "days_one": "{{value}} dia"
             },
             "today": {
                 "title": "Hoje",
@@ -4430,7 +4437,9 @@
             "calendar": {
                 "title": "Calendário",
                 "prevMonth": "Mês anterior",
-                "nextMonth": "Próximo mês"
+                "nextMonth": "Próximo mês",
+                "likelihoodTitle": "Padrões de sintomas",
+                "likelihoodCaption": "Escolhe um sintoma para ver em que dias costuma ocorrer, com base no teu histórico."
             },
             "weekday": {
                 "mon": "Seg",
@@ -4447,13 +4456,16 @@
                 "fertile": "Fértil",
                 "ovulation": "Ovulação",
                 "today": "Hoje",
-                "logged": "Entrada"
+                "logged": "Entrada",
+                "pms": "Janela de TPM (padrão)"
             },
             "history": {
                 "title": "Evolução",
                 "ongoing": "em curso",
                 "empty": "Ainda não há períodos registados.",
-                "cycleLength": "Ciclo {{value}} dias"
+                "cycleLength": "Ciclo {{value}} dias",
+                "cycleLength_one": "Ciclo {{value}} dia",
+                "flowHeaviest": "Máx. {{value}}"
             },
             "trends": {
                 "title": "Tendências",
@@ -4469,12 +4481,21 @@
                 "typical": "Típico",
                 "atypical": "Atípico",
                 "typicalRangeLabel": "Intervalo típico: {{min}}-{{max}} dias",
-                "likelihoodTitle": "Padrões de sintomas",
-                "likelihoodCaption": "Escolhe um sintoma para ver em que dias costuma ocorrer, com base no teu histórico.",
-                "likelyToday": "{{symptom}} costuma ocorrer perto deste dia do teu ciclo.",
                 "symptomTracked": "Registado",
                 "symptomPredicted": "Costuma ocorrer aqui",
-                "phaseOther": "Outro"
+                "phaseOther": "Outro",
+                "details": "Detalhes",
+                "feelingFrequency": "Frequência de sentimentos",
+                "flowLoad": "Intensidade do fluxo por ciclo",
+                "flowLoadCaption": "Baseado nos teus registos de fluxo - quanto mais completo o registo, mais significativo isto é.",
+                "flowLoadColumn": "Carga de fluxo",
+                "flowLoadValue": "{{load}} ({{days}} registados)",
+                "heavyBleedingHintHeavy": "Os teus últimos períodos foram registados várias vezes como «intensos» - vale a pena falar sobre isso numa consulta médica.",
+                "heavyBleedingHintLong": "Pelo menos um dos teus últimos períodos durou mais de uma semana - vale a pena falar sobre isso numa consulta médica.",
+                "painTitle": "Dor",
+                "painCurrentCycleLabel": "Dias com dor neste ciclo",
+                "painAvgPerCycleLabel": "Méd. dias com dor por ciclo",
+                "painAvgIntensityLabel": "Intensidade média"
             },
             "flow": {
                 "label": "Intensidade do fluxo",
@@ -4543,7 +4564,9 @@
             },
             "period": {
                 "add": "Registar período",
-                "edit": "Editar período"
+                "edit": "Editar período",
+                "warningFuture": "A data de início está no futuro - as previsões baseiam-se apenas em ciclos passados.",
+                "warningOverlap": "Sobrepõe-se a um ciclo já registado."
             },
             "dayLog": {
                 "title": "Registar dia",
@@ -4582,8 +4605,91 @@
                 "pregnancyMode": "Modo gravidez",
                 "dueDate": "Data provável do parto",
                 "pregnancyHint": "No modo gravidez, as previsões de menstruação e ovulação ficam pausadas. O registro diário continua disponível.",
-                "saved": "Configurações salvas."
-            }
+                "saved": "Configurações salvas.",
+                "contraception": "Método contraceptivo",
+                "contraceptionHint": "Métodos hormonais pausam automaticamente as previsões da janela fértil.",
+                "contraceptionUnset": "Não especificado",
+                "contraceptionOptions": {
+                    "none": "Nenhum",
+                    "pill": "Pílula",
+                    "hormonal_iud": "DIU hormonal",
+                    "copper_iud": "DIU de cobre",
+                    "implant": "Implante",
+                    "injection": "Injeção",
+                    "patch": "Adesivo",
+                    "ring": "Anel vaginal",
+                    "condom": "Preservativo",
+                    "other": "Outro"
+                },
+                "perimenopauseMode": "Modo perimenopausa",
+                "perimenopauseModeHint": "As previsões passam a mostrar um intervalo em vez de uma data única; a avaliação de regularidade é desativada.",
+                "showPms": "Mostrar janela de TPM",
+                "notifyPartner": "Avisar um(a) parceiro(a)",
+                "notifyPartnerHint": "A pessoa escolhida recebe apenas a data prevista, nunca sintomas, notas ou outros registos.",
+                "notifyPartnerNoEligible": "Nenhum membro da família elegível - só é possível notificar quem tem acesso ao módulo Saúde.",
+                "notifyPartnerDaysBefore": "Aviso ao(à) parceiro(a)"
+            },
+            "mucus": {
+                "label": "Muco cervical",
+                "hint": "Opcional. As alterações de textura podem ajudar a delimitar a janela fértil.",
+                "none": "Nenhum",
+                "dry": "Seco",
+                "sticky": "Pegajoso",
+                "creamy": "Cremoso",
+                "watery": "Aquoso",
+                "eggwhite": "Clara de ovo"
+            },
+            "test": {
+                "label": "Testes",
+                "lhLabel": "Teste de LH",
+                "pregnancyLabel": "Teste de gravidez",
+                "unset": "Não testado",
+                "negative": "Negativo",
+                "positive": "Positivo"
+            },
+            "feelings": {
+                "label": "Emoções"
+            },
+            "intimacy": {
+                "label": "Intimidade",
+                "hint": "Mantém-se privado mesmo que este dia seja partilhado com a família.",
+                "none": "Não especificado",
+                "protected": "Protegida",
+                "unprotected": "Desprotegida",
+                "solo": "A sós"
+            },
+            "quickLink": {
+                "painkiller": "Registar analgésico",
+                "weight": "Registar peso"
+            },
+            "bubble": {
+                "ariaLabel": "Estado do ciclo de hoje",
+                "line1": "Dia {{day}} do ciclo · {{phase}}",
+                "periodToday": "Período previsto para hoje - começar agora?",
+                "periodOverdue": "Período está atrasado há {{count}} dias - começar agora?",
+                "periodOverdue_one": "Período está atrasado há {{count}} dia - começar agora?",
+                "periodStillOpen": "O período ainda consta como em curso - encerrá-lo agora?",
+                "peakPainDay": "Segundo o teu padrão, hoje costuma ser o teu dia de dor mais intensa ({{symptom}}).",
+                "likelySymptomsToday": "Provável hoje: {{symptoms}}",
+                "pmsWindow": "Janela pré-menstrual provável a partir de {{weekday}}",
+                "upcomingSymptom": "Provável a partir de {{weekday}}: {{symptom}}",
+                "fertile": "Janela fértil até {{date}}",
+                "fertileConfirmed": "Janela fértil (ovulação confirmada) até {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "A ovulação deste ciclo foi confirmada por um aumento de temperatura. Os próximos ciclos continuam a basear-se no método do calendário; isto não substitui a contraceção nem o aconselhamento médico.",
+            "import": {
+                "button": "Importar",
+                "title": "Importar histórico de períodos",
+                "explainer": "Arquivo CSV ou texto colado: uma linha por período no formato «start_date,end_date» (data final opcional), datas em AAAA-MM-DD ou DD.MM.AAAA, separadas por vírgula ou ponto e vírgula.",
+                "fileLabel": "Escolher arquivo CSV",
+                "pasteLabel": "Ou colar texto CSV",
+                "submit": "Importar",
+                "resultToast": "{{imported}} importados, {{skipped}} ignorados.",
+                "errorsTitle": "Estas linhas não puderam ser importadas:",
+                "emptyError": "Escolha um arquivo CSV ou cole um texto.",
+                "error": "Falha na importação."
+            },
+            "discoveryHint": "Dica: assine o ciclo previsto como feed ICS em <a href=\"/settings/personal/feeds\">Configurações → Pessoal → Feeds</a>, ou exiba o widget do ciclo no <a href=\"/\">Painel</a> pelo modo de personalização."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",

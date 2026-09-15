@@ -4404,7 +4404,11 @@
                 "regular": "Teratur",
                 "irregular": "Tidak teratur",
                 "notEnoughData": "Data tidak cukup",
-                "noPrediction": "Catat menstruasi untuk mendapatkan prediksi."
+                "noPrediction": "Catat menstruasi untuk mendapatkan prediksi.",
+                "fertilitySuppressedNote": "Masa subur dijeda: kontrasepsi hormonal.",
+                "nextPeriodRangeSub": "Rata-rata: {{date}}",
+                "partnerNextPeriod": "Menstruasi {{name}} diperkirakan mulai pada {{date}}.",
+                "partnerNextPeriodNeutral": "Pengingat pasangan: menstruasi"
             },
             "stats": {
                 "source": {
@@ -4412,11 +4416,14 @@
                     "history_one": "Berdasarkan siklus terakhirmu",
                     "insufficientHistory": "Nilai bawaan untuk saat ini - catat {{count}} siklus lagi untuk prediksi yang dipersonalisasi",
                     "insufficientHistory_one": "Nilai bawaan untuk saat ini - catat {{count}} siklus lagi untuk prediksi yang dipersonalisasi",
-                    "default": "Asumsi bawaan (belum ada riwayat tercatat)"
+                    "default": "Asumsi bawaan (belum ada riwayat tercatat)",
+                    "historyOther": "Berdasarkan {{count}} siklus terakhir",
+                    "historyOther_one": "Berdasarkan siklus terakhir"
                 }
             },
             "unit": {
-                "days": "{{value}} hari"
+                "days": "{{value}} hari",
+                "days_one": "{{value}} hari"
             },
             "today": {
                 "title": "Hari ini",
@@ -4430,7 +4437,9 @@
             "calendar": {
                 "title": "Kalender",
                 "prevMonth": "Bulan sebelumnya",
-                "nextMonth": "Bulan berikutnya"
+                "nextMonth": "Bulan berikutnya",
+                "likelihoodTitle": "Pola gejala",
+                "likelihoodCaption": "Pilih gejala untuk melihat hari-hari kemunculannya, berdasarkan riwayatmu."
             },
             "weekday": {
                 "mon": "Sen",
@@ -4447,13 +4456,16 @@
                 "fertile": "Subur",
                 "ovulation": "Ovulasi",
                 "today": "Hari ini",
-                "logged": "Entri"
+                "logged": "Entri",
+                "pms": "Jendela PMS (pola)"
             },
             "history": {
                 "title": "Tren",
                 "ongoing": "berlangsung",
                 "empty": "Belum ada menstruasi yang dicatat.",
-                "cycleLength": "Siklus {{value}} hari"
+                "cycleLength": "Siklus {{value}} hari",
+                "cycleLength_one": "Siklus {{value}} hari",
+                "flowHeaviest": "Maks. {{value}}"
             },
             "trends": {
                 "title": "Tren",
@@ -4469,12 +4481,21 @@
                 "typical": "Umum",
                 "atypical": "Tidak umum",
                 "typicalRangeLabel": "Rentang umum: {{min}}-{{max}} hari",
-                "likelihoodTitle": "Pola gejala",
-                "likelihoodCaption": "Pilih gejala untuk melihat hari-hari kemunculannya, berdasarkan riwayatmu.",
-                "likelyToday": "{{symptom}} sering muncul di sekitar hari ini dalam siklusmu.",
                 "symptomTracked": "Tercatat",
                 "symptomPredicted": "Sering muncul di sini",
-                "phaseOther": "Lainnya"
+                "phaseOther": "Lainnya",
+                "details": "Detail",
+                "feelingFrequency": "Frekuensi perasaan",
+                "flowLoad": "Intensitas aliran per siklus",
+                "flowLoadCaption": "Berdasarkan catatan aliranmu - semakin lengkap pencatatanmu, semakin bermakna data ini.",
+                "flowLoadColumn": "Beban aliran",
+                "flowLoadValue": "{{load}} ({{days}} tercatat)",
+                "heavyBleedingHintHeavy": "Menstruasi terakhirmu berulang kali tercatat sebagai \"deras\" - ada baiknya disampaikan saat konsultasi medis.",
+                "heavyBleedingHintLong": "Setidaknya satu menstruasi terakhirmu berlangsung lebih dari seminggu - ada baiknya disampaikan saat konsultasi medis.",
+                "painTitle": "Nyeri",
+                "painCurrentCycleLabel": "Hari nyeri pada siklus ini",
+                "painAvgPerCycleLabel": "Rata-rata hari nyeri per siklus",
+                "painAvgIntensityLabel": "Rata-rata intensitas"
             },
             "flow": {
                 "label": "Volume darah",
@@ -4543,7 +4564,9 @@
             },
             "period": {
                 "add": "Catat menstruasi",
-                "edit": "Edit menstruasi"
+                "edit": "Edit menstruasi",
+                "warningFuture": "Tanggal mulai berada di masa depan - prediksi hanya didasarkan pada siklus sebelumnya.",
+                "warningOverlap": "Tumpang tindih dengan siklus yang sudah tercatat."
             },
             "dayLog": {
                 "title": "Catat hari",
@@ -4582,8 +4605,91 @@
                 "pregnancyMode": "Mode kehamilan",
                 "dueDate": "Perkiraan tanggal lahir",
                 "pregnancyHint": "Dalam mode kehamilan, prediksi menstruasi dan ovulasi dijeda. Pencatatan harian tetap tersedia.",
-                "saved": "Pengaturan disimpan."
-            }
+                "saved": "Pengaturan disimpan.",
+                "contraception": "Metode kontrasepsi",
+                "contraceptionHint": "Metode hormonal secara otomatis menjeda prediksi masa subur.",
+                "contraceptionUnset": "Belum ditentukan",
+                "contraceptionOptions": {
+                    "none": "Tidak ada",
+                    "pill": "Pil",
+                    "hormonal_iud": "IUD hormonal",
+                    "copper_iud": "IUD tembaga",
+                    "implant": "Implan",
+                    "injection": "Suntik",
+                    "patch": "Koyo",
+                    "ring": "Cincin vagina",
+                    "condom": "Kondom",
+                    "other": "Lainnya"
+                },
+                "perimenopauseMode": "Mode perimenopause",
+                "perimenopauseModeHint": "Prediksi kini ditampilkan sebagai rentang, bukan satu tanggal; penilaian keteraturan dimatikan.",
+                "showPms": "Tampilkan jendela PMS",
+                "notifyPartner": "Beri tahu pasangan",
+                "notifyPartnerHint": "Orang yang dipilih hanya menerima tanggal prediksi, tidak pernah gejala, catatan, atau entri lainnya.",
+                "notifyPartnerNoEligible": "Tidak ada anggota rumah tangga yang memenuhi syarat - hanya anggota dengan akses ke modul Kesehatan yang dapat diberi tahu.",
+                "notifyPartnerDaysBefore": "Pengingat untuk pasangan"
+            },
+            "mucus": {
+                "label": "Lendir serviks",
+                "hint": "Opsional. Perubahan tekstur dapat membantu mempersempit masa subur.",
+                "none": "Tidak ada",
+                "dry": "Kering",
+                "sticky": "Lengket",
+                "creamy": "Krim",
+                "watery": "Encer",
+                "eggwhite": "Seperti putih telur"
+            },
+            "test": {
+                "label": "Tes",
+                "lhLabel": "Tes LH",
+                "pregnancyLabel": "Tes kehamilan",
+                "unset": "Belum dites",
+                "negative": "Negatif",
+                "positive": "Positif"
+            },
+            "feelings": {
+                "label": "Perasaan"
+            },
+            "intimacy": {
+                "label": "Keintiman",
+                "hint": "Tetap pribadi meskipun hari ini dibagikan ke keluarga.",
+                "none": "Tidak ditentukan",
+                "protected": "Terlindungi",
+                "unprotected": "Tidak terlindungi",
+                "solo": "Sendiri"
+            },
+            "quickLink": {
+                "painkiller": "Catat pereda nyeri",
+                "weight": "Catat berat badan"
+            },
+            "bubble": {
+                "ariaLabel": "Status siklus hari ini",
+                "line1": "Hari siklus {{day}} · {{phase}}",
+                "periodToday": "Menstruasi diperkirakan hari ini - mulai sekarang?",
+                "periodOverdue": "Menstruasi terlambat {{count}} hari - mulai sekarang?",
+                "periodOverdue_one": "Menstruasi terlambat {{count}} hari - mulai sekarang?",
+                "periodStillOpen": "Menstruasimu masih tercatat sedang berlangsung - akhiri sekarang?",
+                "peakPainDay": "Berdasarkan polamu, hari ini sering menjadi hari nyeri paling parah ({{symptom}}).",
+                "likelySymptomsToday": "Kemungkinan hari ini: {{symptoms}}",
+                "pmsWindow": "Jendela PMS kemungkinan mulai {{weekday}}",
+                "upcomingSymptom": "Kemungkinan mulai {{weekday}}: {{symptom}}",
+                "fertile": "Masa subur hingga {{date}}",
+                "fertileConfirmed": "Masa subur (ovulasi terkonfirmasi) hingga {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "Ovulasi pada siklus ini dikonfirmasi oleh kenaikan suhu. Siklus mendatang tetap menggunakan metode kalender; ini tidak menggantikan kontrasepsi atau saran medis.",
+            "import": {
+                "button": "Impor",
+                "title": "Impor riwayat menstruasi",
+                "explainer": "File CSV atau teks yang ditempel: satu baris per periode dalam format „start_date,end_date” (tanggal akhir opsional), tanggal dalam format YYYY-MM-DD atau DD.MM.YYYY, dipisahkan koma atau titik koma.",
+                "fileLabel": "Pilih file CSV",
+                "pasteLabel": "Atau tempel teks CSV",
+                "submit": "Impor",
+                "resultToast": "{{imported}} diimpor, {{skipped}} dilewati.",
+                "errorsTitle": "Baris berikut tidak dapat diimpor:",
+                "emptyError": "Pilih file CSV atau tempel teks.",
+                "error": "Impor gagal."
+            },
+            "discoveryHint": "Tips: berlangganan siklus yang diprediksi sebagai feed ICS di <a href=\"/settings/personal/feeds\">Pengaturan → Pribadi → Feed</a>, atau tampilkan widget siklus di <a href=\"/\">Ringkasan</a> melalui mode kustomisasi."
         },
         "duration": {
             "hm": "{{hours}} j {{minutes}} mnt",

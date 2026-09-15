@@ -140,6 +140,21 @@ function readableOrigins(req) {
   return Object.keys(ORIGIN_MODULE).filter((type) => mayTouchOrigin(req, type, 'read'));
 }
 
+/**
+ * Anzeigename des Zyklus-Eigentümers zu einer 'partner_period'-Zeile (siehe
+ * server/services/cycle-reminders.js#syncPartnerReminder). Ein eigener
+ * kleiner Nachschlag statt eines JOINs in der Sammelabfrage unten - die gilt
+ * für sechs Herkünfte, und `users.display_name` braucht nur die seltene
+ * Partner-Zeile. Gleiche Begründung und gleiche Form wie
+ * notifications.js#cycleOwnerName - keine zweite Wahrheit.
+ */
+function cycleOwnerName(anchorId) {
+  return db.get().prepare(`
+    SELECT u.display_name AS name FROM cycle_reminder_anchors a
+    JOIN users u ON u.id = a.user_id WHERE a.id = ?
+  `).get(anchorId)?.name || null;
+}
+
 /** Herkünfte, die ein Schreibweg annehmen darf: alle ausser den abgeleiteten. */
 const SETTABLE_ENTITY_TYPES = VALID_ENTITY_TYPES.filter((t) => !DERIVED_ENTITY_TYPES.includes(t));
 
@@ -196,14 +211,44 @@ router.get('/pending', (req, res) => {
             SELECT t.name FROM waste_reminder_entries e JOIN waste_types t ON t.id = e.type_id
             WHERE e.id = r.entity_id
           )
-        END AS entity_title
+        END AS entity_title,
+        -- Unterscheidet die eigene Perioden-Erinnerung von einer an eine
+        -- Partnerperson weitergereichten (gleicher entity_type 'cycle_period',
+        -- siehe cycle-reminders.js#syncPartnerReminder) - ohne das läse der
+        -- Partner-Toast "Nächste Periode - <Datum>" als wäre es die eigene.
+        -- cycle_owner_name wird bewusst NICHT hier mitgeholt (kein JOIN auf
+        -- users in dieser Sammelabfrage für sieben Herkünfte), sondern weiter
+        -- unten verzögert und nur für tatsächliche 'partner_period'-Zeilen
+        -- geholt - gleiche Form wie notifications.js.
+        CASE WHEN r.entity_type = 'cycle_period'
+          THEN (SELECT kind FROM cycle_reminder_anchors WHERE id = r.entity_id) END AS cycle_anchor_kind
       FROM reminders r
       WHERE r.created_by  = ?
         AND r.dismissed   = 0
         AND r.remind_at  <= ?
         AND r.entity_type IN (${origins.map(() => '?').join(', ')})
+        -- Eine 'cycle_period'/'cycle_log_nudge'-Zeile, deren Anker bereits
+        -- geloescht wurde (Eigentuemer geloescht, Einstellung geaendert, o.ae.),
+        -- aber deren periodischer Sync noch nicht wieder gelaufen ist, darf
+        -- hier nicht auftauchen - ohne Anker fehlt cycle_anchor_kind, und die
+        -- Zeile faellt im Client auf die eigene "naechste Periode"-Darstellung
+        -- zurueck (Falschzuordnung an eine Partnerperson, schlimmer als vorher).
+        -- Lieber kurz gar nicht zeigen, bis der Sync sie ohnehin loescht.
+        AND (
+          r.entity_type NOT IN ('cycle_period', 'cycle_log_nudge')
+          OR EXISTS (SELECT 1 FROM cycle_reminder_anchors WHERE id = r.entity_id)
+        )
       ORDER BY r.remind_at ASC
     `).all(userId, now, ...origins);
+
+    // Nur für die tatsächlichen Partner-Zeilen geholt (rar) - siehe Kommentar
+    // an cycle_anchor_kind oben. Bleibt bei jeder anderen Zeile `undefined`
+    // und damit aus der JSON-Antwort draußen, statt als `null` zu erscheinen.
+    for (const row of rows) {
+      if (row.cycle_anchor_kind === 'partner_period') {
+        row.cycle_owner_name = cycleOwnerName(row.entity_id);
+      }
+    }
 
     res.json({ data: rows });
   } catch (err) {

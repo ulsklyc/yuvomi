@@ -4404,7 +4404,11 @@
                 "regular": "Regular",
                 "irregular": "Irregular",
                 "notEnoughData": "Not enough data",
-                "noPrediction": "Log a period to see predictions."
+                "noPrediction": "Log a period to see predictions.",
+                "fertilitySuppressedNote": "Fertile window paused: hormonal contraception.",
+                "nextPeriodRangeSub": "Average: {{date}}",
+                "partnerNextPeriod": "{{name}}'s period is predicted to start on {{date}}.",
+                "partnerNextPeriodNeutral": "Partner reminder: period"
             },
             "stats": {
                 "source": {
@@ -4412,11 +4416,14 @@
                     "history_one": "Based on your last period",
                     "insufficientHistory": "Default for now - log {{count}} more periods for a personalized prediction",
                     "insufficientHistory_one": "Default for now - log {{count}} more period for a personalized prediction",
-                    "default": "Default assumption (no history logged yet)"
+                    "default": "Default assumption (no history logged yet)",
+                    "historyOther": "Based on the last {{count}} periods",
+                    "historyOther_one": "Based on the last period"
                 }
             },
             "unit": {
-                "days": "{{value}} days"
+                "days": "{{value}} days",
+                "days_one": "{{value}} day"
             },
             "today": {
                 "title": "Today",
@@ -4430,7 +4437,9 @@
             "calendar": {
                 "title": "Calendar",
                 "prevMonth": "Previous month",
-                "nextMonth": "Next month"
+                "nextMonth": "Next month",
+                "likelihoodTitle": "Symptom patterns",
+                "likelihoodCaption": "Pick a symptom to see which days it often occurs on, based on your history."
             },
             "weekday": {
                 "mon": "Mon",
@@ -4447,13 +4456,16 @@
                 "fertile": "Fertile",
                 "ovulation": "Ovulation",
                 "today": "Today",
-                "logged": "Entry"
+                "logged": "Entry",
+                "pms": "PMS window (pattern)"
             },
             "history": {
                 "title": "History",
                 "ongoing": "ongoing",
                 "empty": "No periods logged yet.",
-                "cycleLength": "Cycle {{value}} days"
+                "cycleLength": "Cycle {{value}} days",
+                "cycleLength_one": "Cycle {{value}} day",
+                "flowHeaviest": "Max. {{value}}"
             },
             "trends": {
                 "title": "Trends",
@@ -4469,12 +4481,21 @@
                 "typical": "Typical",
                 "atypical": "Atypical",
                 "typicalRangeLabel": "Typical range: {{min}}-{{max}} days",
-                "likelihoodTitle": "Symptom patterns",
-                "likelihoodCaption": "Pick a symptom to see which days it often occurs on, based on your history.",
-                "likelyToday": "{{symptom}} often occurs around this day in your cycle.",
                 "symptomTracked": "Logged",
                 "symptomPredicted": "Often occurs here",
-                "phaseOther": "Other"
+                "phaseOther": "Other",
+                "details": "Details",
+                "feelingFrequency": "Feelings frequency",
+                "flowLoad": "Flow intensity per cycle",
+                "flowLoadCaption": "Based on your flow entries - the more complete your logging, the more meaningful this is.",
+                "flowLoadColumn": "Flow load",
+                "flowLoadValue": "{{load}} ({{days}} logged)",
+                "heavyBleedingHintHeavy": "Your recent periods were repeatedly logged as \"heavy\" - worth mentioning at your next medical check-up.",
+                "heavyBleedingHintLong": "At least one of your recent periods lasted longer than a week - worth mentioning at your next medical check-up.",
+                "painTitle": "Pain",
+                "painCurrentCycleLabel": "Pain days this cycle",
+                "painAvgPerCycleLabel": "Avg. pain days per cycle",
+                "painAvgIntensityLabel": "Avg. intensity"
             },
             "flow": {
                 "label": "Flow",
@@ -4543,7 +4564,9 @@
             },
             "period": {
                 "add": "Log period",
-                "edit": "Edit period"
+                "edit": "Edit period",
+                "warningFuture": "Start date is in the future - predictions are based only on past periods.",
+                "warningOverlap": "Overlaps with an already logged period."
             },
             "dayLog": {
                 "title": "Log day",
@@ -4582,8 +4605,91 @@
                 "pregnancyMode": "Pregnancy mode",
                 "dueDate": "Estimated due date",
                 "pregnancyHint": "In pregnancy mode, period and ovulation predictions are paused. Daily logging stays available.",
-                "saved": "Settings saved."
-            }
+                "saved": "Settings saved.",
+                "contraception": "Contraception method",
+                "contraceptionHint": "Hormonal methods automatically pause fertile-window predictions.",
+                "contraceptionUnset": "Not specified",
+                "contraceptionOptions": {
+                    "none": "None",
+                    "pill": "Pill",
+                    "hormonal_iud": "Hormonal IUD",
+                    "copper_iud": "Copper IUD",
+                    "implant": "Implant",
+                    "injection": "Injection",
+                    "patch": "Patch",
+                    "ring": "Vaginal ring",
+                    "condom": "Condom",
+                    "other": "Other"
+                },
+                "perimenopauseMode": "Perimenopause mode",
+                "perimenopauseModeHint": "Predictions show as a range instead of a single date; the regularity judgment is turned off.",
+                "showPms": "Show PMS window",
+                "notifyPartner": "Notify a partner",
+                "notifyPartnerHint": "The chosen person only receives the predicted date, never symptoms, notes, or any other entries.",
+                "notifyPartnerNoEligible": "No eligible household member available - only members with access to the Health module can be notified.",
+                "notifyPartnerDaysBefore": "Partner reminder timing"
+            },
+            "mucus": {
+                "label": "Cervical mucus",
+                "hint": "Optional. Changes in texture can help narrow down the fertile window.",
+                "none": "None",
+                "dry": "Dry",
+                "sticky": "Sticky",
+                "creamy": "Creamy",
+                "watery": "Watery",
+                "eggwhite": "Egg white"
+            },
+            "test": {
+                "label": "Tests",
+                "lhLabel": "LH test",
+                "pregnancyLabel": "Pregnancy test",
+                "unset": "Not tested",
+                "negative": "Negative",
+                "positive": "Positive"
+            },
+            "feelings": {
+                "label": "Feelings"
+            },
+            "intimacy": {
+                "label": "Intimacy",
+                "hint": "Stays private even when this day is shared with the family.",
+                "none": "Not specified",
+                "protected": "Protected",
+                "unprotected": "Unprotected",
+                "solo": "Solo"
+            },
+            "quickLink": {
+                "painkiller": "Log painkiller",
+                "weight": "Log weight"
+            },
+            "bubble": {
+                "ariaLabel": "Today's cycle status",
+                "line1": "Cycle day {{day}} · {{phase}}",
+                "periodToday": "Period expected today - start it now?",
+                "periodOverdue": "Period is {{count}} days overdue - start it now?",
+                "periodOverdue_one": "Period is {{count}} day overdue - start it now?",
+                "periodStillOpen": "Your period is still logged as ongoing - end it now?",
+                "peakPainDay": "Today is often your strongest pain day ({{symptom}}), based on your pattern.",
+                "likelySymptomsToday": "Likely today: {{symptoms}}",
+                "pmsWindow": "PMS window likely from {{weekday}}",
+                "upcomingSymptom": "Likely from {{weekday}}: {{symptom}}",
+                "fertile": "Fertile window until {{date}}",
+                "fertileConfirmed": "Fertile window (ovulation confirmed) until {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "This cycle's ovulation was confirmed by a temperature rise. Future cycles still rely on the calendar method; this does not replace contraception or medical advice.",
+            "import": {
+                "button": "Import",
+                "title": "Import period history",
+                "explainer": "CSV file or pasted text: one row per period as \"start_date,end_date\" (end date optional), dates as YYYY-MM-DD or DD.MM.YYYY, separated by comma or semicolon.",
+                "fileLabel": "Choose CSV file",
+                "pasteLabel": "Or paste CSV text",
+                "submit": "Import",
+                "resultToast": "{{imported}} imported, {{skipped}} skipped.",
+                "errorsTitle": "These rows could not be imported:",
+                "emptyError": "Please choose a CSV file or paste text.",
+                "error": "Import failed."
+            },
+            "discoveryHint": "Tip: subscribe to the predicted cycle as an ICS feed under <a href=\"/settings/personal/feeds\">Settings → Personal → Feeds</a>, or show the cycle widget on the <a href=\"/\">Overview</a> via its customize mode."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",

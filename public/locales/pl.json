@@ -4404,7 +4404,11 @@
                 "regular": "Regularny",
                 "irregular": "Nieregularny",
                 "notEnoughData": "Za mało danych",
-                "noPrediction": "Zapisz miesiączkę, aby uzyskać prognozy."
+                "noPrediction": "Zapisz miesiączkę, aby uzyskać prognozy.",
+                "fertilitySuppressedNote": "Okno płodności wstrzymane: antykoncepcja hormonalna.",
+                "nextPeriodRangeSub": "Średnio: {{date}}",
+                "partnerNextPeriod": "Okres osoby {{name}} powinien rozpocząć się {{date}}.",
+                "partnerNextPeriodNeutral": "Przypomnienie dla partnera: okres"
             },
             "stats": {
                 "source": {
@@ -4412,11 +4416,14 @@
                     "history_one": "Na podstawie ostatniego cyklu",
                     "insufficientHistory": "Na razie wartość domyślna - zarejestruj jeszcze {{count}} cykli, aby uzyskać spersonalizowaną prognozę",
                     "insufficientHistory_one": "Na razie wartość domyślna - zarejestruj jeszcze {{count}} cykl, aby uzyskać spersonalizowaną prognozę",
-                    "default": "Domyślne założenie (brak jeszcze zarejestrowanej historii)"
+                    "default": "Domyślne założenie (brak jeszcze zarejestrowanej historii)",
+                    "historyOther": "Na podstawie ostatnich {{count}} cykli",
+                    "historyOther_one": "Na podstawie ostatniego cyklu"
                 }
             },
             "unit": {
-                "days": "{{value}} dni"
+                "days": "{{value}} dni",
+                "days_one": "{{value}} dzień"
             },
             "today": {
                 "title": "Dzisiaj",
@@ -4430,7 +4437,9 @@
             "calendar": {
                 "title": "Kalendarz",
                 "prevMonth": "Poprzedni miesiąc",
-                "nextMonth": "Następny miesiąc"
+                "nextMonth": "Następny miesiąc",
+                "likelihoodTitle": "Wzorce objawów",
+                "likelihoodCaption": "Wybierz objaw, aby zobaczyć, w które dni najczęściej występuje, na podstawie Twojej historii."
             },
             "weekday": {
                 "mon": "Pn",
@@ -4447,13 +4456,16 @@
                 "fertile": "Płodne",
                 "ovulation": "Owulacja",
                 "today": "Dzisiaj",
-                "logged": "Wpis"
+                "logged": "Wpis",
+                "pms": "Okno PMS (wzorzec)"
             },
             "history": {
                 "title": "Trend",
                 "ongoing": "w toku",
                 "empty": "Nie zapisano jeszcze miesiączek.",
-                "cycleLength": "Cykl {{value}} dni"
+                "cycleLength": "Cykl {{value}} dni",
+                "cycleLength_one": "Cykl {{value}} dzień",
+                "flowHeaviest": "Maks. {{value}}"
             },
             "trends": {
                 "title": "Trendy",
@@ -4469,12 +4481,21 @@
                 "typical": "Typowy",
                 "atypical": "Nietypowy",
                 "typicalRangeLabel": "Typowy zakres: {{min}}-{{max}} dni",
-                "likelihoodTitle": "Wzorce objawów",
-                "likelihoodCaption": "Wybierz objaw, aby zobaczyć, w które dni najczęściej występuje, na podstawie Twojej historii.",
-                "likelyToday": "{{symptom}} często występuje w okolicach tego dnia Twojego cyklu.",
                 "symptomTracked": "Zarejestrowano",
                 "symptomPredicted": "Często występuje tutaj",
-                "phaseOther": "Inne"
+                "phaseOther": "Inne",
+                "details": "Szczegóły",
+                "feelingFrequency": "Częstość nastrojów",
+                "flowLoad": "Intensywność krwawienia w cyklu",
+                "flowLoadCaption": "Na podstawie Twoich wpisów o krwawieniu - im pełniejsze zapisy, tym bardziej miarodajny wynik.",
+                "flowLoadColumn": "Nasilenie krwawienia",
+                "flowLoadValue": "{{load}} ({{days}} odnotowanych)",
+                "heavyBleedingHintHeavy": "Twoje ostatnie okresy były wielokrotnie oznaczone jako „obfite” - warto o tym wspomnieć podczas wizyty lekarskiej.",
+                "heavyBleedingHintLong": "Co najmniej jeden z Twoich ostatnich okresów trwał dłużej niż tydzień - warto o tym wspomnieć podczas wizyty lekarskiej.",
+                "painTitle": "Ból",
+                "painCurrentCycleLabel": "Dni z bólem w tym cyklu",
+                "painAvgPerCycleLabel": "Śr. dni z bólem na cykl",
+                "painAvgIntensityLabel": "Śr. nasilenie"
             },
             "flow": {
                 "label": "Intensywność krwawienia",
@@ -4543,7 +4564,9 @@
             },
             "period": {
                 "add": "Zapisz miesiączkę",
-                "edit": "Edytuj miesiączkę"
+                "edit": "Edytuj miesiączkę",
+                "warningFuture": "Data rozpoczęcia jest w przyszłości - prognozy opierają się tylko na minionych cyklach.",
+                "warningOverlap": "Nakłada się na już zapisany cykl."
             },
             "dayLog": {
                 "title": "Zapisz dzień",
@@ -4582,8 +4605,91 @@
                 "pregnancyMode": "Tryb ciąży",
                 "dueDate": "Przewidywany termin porodu",
                 "pregnancyHint": "W trybie ciąży prognozy miesiączki i owulacji są wstrzymane. Codzienne zapisy pozostają dostępne.",
-                "saved": "Ustawienia zapisane."
-            }
+                "saved": "Ustawienia zapisane.",
+                "contraception": "Metoda antykoncepcji",
+                "contraceptionHint": "Metody hormonalne automatycznie wstrzymują przewidywanie okna płodności.",
+                "contraceptionUnset": "Nie podano",
+                "contraceptionOptions": {
+                    "none": "Brak",
+                    "pill": "Tabletka",
+                    "hormonal_iud": "Wkładka hormonalna",
+                    "copper_iud": "Wkładka miedziana",
+                    "implant": "Implant",
+                    "injection": "Zastrzyk",
+                    "patch": "Plaster",
+                    "ring": "Krążek dopochwowy",
+                    "condom": "Prezerwatywa",
+                    "other": "Inna"
+                },
+                "perimenopauseMode": "Tryb perimenopauzy",
+                "perimenopauseModeHint": "Przewidywania pokazują zakres zamiast jednej daty; ocena regularności zostaje wyłączona.",
+                "showPms": "Pokaż okno PMS",
+                "notifyPartner": "Powiadom partnera",
+                "notifyPartnerHint": "Wybrana osoba otrzymuje tylko przewidywaną datę, nigdy objawy, notatki ani inne wpisy.",
+                "notifyPartnerNoEligible": "Brak uprawnionego członka gospodarstwa domowego - powiadamiani mogą być tylko członkowie z dostępem do modułu Zdrowie.",
+                "notifyPartnerDaysBefore": "Przypomnienie dla partnera"
+            },
+            "mucus": {
+                "label": "Śluz szyjkowy",
+                "hint": "Opcjonalnie. Zmiany konsystencji mogą pomóc określić okno płodności.",
+                "none": "Brak",
+                "dry": "Suchy",
+                "sticky": "Lepki",
+                "creamy": "Kremowy",
+                "watery": "Wodnisty",
+                "eggwhite": "Jak białko jaja"
+            },
+            "test": {
+                "label": "Testy",
+                "lhLabel": "Test LH",
+                "pregnancyLabel": "Test ciążowy",
+                "unset": "Nie testowano",
+                "negative": "Ujemny",
+                "positive": "Dodatni"
+            },
+            "feelings": {
+                "label": "Emocje"
+            },
+            "intimacy": {
+                "label": "Intymność",
+                "hint": "Pozostaje prywatne, nawet jeśli ten dzień jest udostępniony rodzinie.",
+                "none": "Nie podano",
+                "protected": "Zabezpieczony",
+                "unprotected": "Niezabezpieczony",
+                "solo": "Solo"
+            },
+            "quickLink": {
+                "painkiller": "Zapisz środek przeciwbólowy",
+                "weight": "Zapisz wagę"
+            },
+            "bubble": {
+                "ariaLabel": "Dzisiejszy stan cyklu",
+                "line1": "Dzień cyklu {{day}} · {{phase}}",
+                "periodToday": "Okres oczekiwany dziś - rozpocząć teraz?",
+                "periodOverdue": "Okres jest opóźniony o {{count}} dni - rozpocząć teraz?",
+                "periodOverdue_one": "Okres jest opóźniony o {{count}} dzień - rozpocząć teraz?",
+                "periodStillOpen": "Twój okres nadal widnieje jako trwający - zakończyć teraz?",
+                "peakPainDay": "Według Twojego wzorca dzisiaj często występuje najsilniejszy ból ({{symptom}}).",
+                "likelySymptomsToday": "Dziś prawdopodobnie: {{symptoms}}",
+                "pmsWindow": "Okno PMS prawdopodobnie od {{weekday}}",
+                "upcomingSymptom": "Od {{weekday}} prawdopodobnie: {{symptom}}",
+                "fertile": "Okno płodności do {{date}}",
+                "fertileConfirmed": "Okno płodności (owulacja potwierdzona) do {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "Owulacja w tym cyklu została potwierdzona wzrostem temperatury. Kolejne cykle nadal opierają się na metodzie kalendarzowej; to nie zastępuje antykoncepcji ani porady lekarskiej.",
+            "import": {
+                "button": "Importuj",
+                "title": "Importuj historię cykli",
+                "explainer": "Plik CSV lub wklejony tekst: jeden wiersz na okres w formacie „start_date,end_date” (data końcowa opcjonalna), daty w formacie RRRR-MM-DD lub DD.MM.RRRR, oddzielone przecinkiem lub średnikiem.",
+                "fileLabel": "Wybierz plik CSV",
+                "pasteLabel": "Lub wklej tekst CSV",
+                "submit": "Importuj",
+                "resultToast": "Zaimportowano: {{imported}}, pominięto: {{skipped}}.",
+                "errorsTitle": "Tych wierszy nie udało się zaimportować:",
+                "emptyError": "Wybierz plik CSV lub wklej tekst.",
+                "error": "Import nie powiódł się."
+            },
+            "discoveryHint": "Wskazówka: przewidywany cykl można subskrybować jako kanał ICS w <a href=\"/settings/personal/feeds\">Ustawienia → Osobiste → Kanały</a>, a widżet cyklu można pokazać na <a href=\"/\">Pulpicie</a> w trybie dostosowywania."
         },
         "duration": {
             "hm": "{{hours}} godz. {{minutes}} min",

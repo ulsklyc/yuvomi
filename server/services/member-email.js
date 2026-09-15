@@ -82,6 +82,24 @@ export function memberEmail(userId, { db } = {}) {
 }
 
 /**
+ * Alle Haushaltsmitglieder (kein Hauspersonal, kein Geteilte-Ausgaben-Gast) -
+ * fuer eine Auswahlliste, die dann noch nach ihrer eigenen Frage filtert (z. B.
+ * Health-Zugriff, Familienrolle). Dieselbe Mitgliedschafts-Bedingung wie
+ * `isHouseholdMember()` (household-members.js), damit die Liste niemanden
+ * zeigt, den die Einzelpruefung ablehnt, und niemanden verbirgt, den sie
+ * akzeptiert.
+ */
+export function listHouseholdMembers({ db } = {}) {
+  const database = db || dbModule.get();
+  return database.prepare(`
+    SELECT u.id, u.display_name, u.family_role
+    FROM users u
+    WHERE ${householdMemberSql('u')}
+    ORDER BY u.display_name COLLATE NOCASE ASC
+  `).all();
+}
+
+/**
  * Mitglieder, die per Mail erreichbar sind - fuer eine Empfaengerauswahl.
  * Dieselbe Bedingung wie `memberEmail()`, damit die Auswahl niemanden zeigt,
  * den die Route ablehnt, und niemanden verbirgt, den sie akzeptiert.

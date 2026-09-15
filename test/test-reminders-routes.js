@@ -81,6 +81,14 @@ function insertReminder(owner, entityType, entityId, remindAt, dismissed = 0) {
     `INSERT INTO reminders (entity_type, entity_id, remind_at, created_by, dismissed) VALUES (?, ?, ?, ?, ?)`,
   ).run(entityType, entityId, remindAt, owner, dismissed).lastInsertRowid;
 }
+// Anker direkt einfügen (umgeht server/services/cycle-reminders.js) - `kind`
+// entscheidet, ob GET /pending nachher 'period_predicted' oder
+// 'partner_period' ausliefert (Befund 2).
+function insertCycleAnchor(ownerId, kind, anchorDate = '2026-06-29') {
+  return db.prepare(
+    `INSERT INTO cycle_reminder_anchors (user_id, anchor_date, kind) VALUES (?, ?, ?)`,
+  ).run(ownerId, anchorDate, kind).lastInsertRowid;
+}
 
 const PAST = '2000-01-01T00:00:00';   // immer <= jetzt  -> faellig
 const FUTURE = '2099-12-31T23:59:59';  // immer >  jetzt  -> nicht faellig
@@ -201,6 +209,69 @@ test('GET /pending materialisiert Geburtstags-Artefakte (Seiteneffekt)', async (
   // syncAllBirthdayReminders hat ein calendar_event materialisiert und verknüpft.
   const linked = db.prepare('SELECT calendar_event_id FROM birthdays WHERE id = ?').get(bId).calendar_event_id;
   assert.ok(linked, 'Geburtstag hat nach GET /pending ein verknüpftes Kalender-Event');
+});
+
+// --------------------------------------------------------------------------
+// GET /pending - cycle_anchor_kind / cycle_owner_name (Partner-Erinnerung)
+//
+// Ohne diese Felder sagt der In-App-Toast der Partnerperson "Nächste Periode -
+// <Datum>", als wäre es die eigene - der Push-Weg (notifications.js) trägt
+// `cycle_anchor_kind` schon lange, GET /pending bislang nicht.
+// --------------------------------------------------------------------------
+test('GET /pending traegt cycle_anchor_kind + cycle_owner_name an einer Partner-Erinnerung', async () => {
+  const owner = freshUser('member');
+  const partner = freshUser('member');
+
+  const anchorId = insertCycleAnchor(owner, 'partner_period', '2026-06-29');
+  insertReminder(partner, 'cycle_period', anchorId, PAST);
+
+  currentUid = partner;
+  const res = await call('GET', '/pending');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.length, 1);
+  const row = res.body.data[0];
+  assert.equal(row.cycle_anchor_kind, 'partner_period');
+  const ownerName = db.prepare('SELECT display_name FROM users WHERE id = ?').get(owner).display_name;
+  assert.equal(row.cycle_owner_name, ownerName, 'der Name gehoert dem Anker-Eigentuemer, nicht der Empfaengerin');
+});
+
+test('GET /pending traegt cycle_anchor_kind ohne cycle_owner_name an einer eigenen Perioden-Erinnerung', async () => {
+  const owner = freshUser('member');
+
+  const anchorId = insertCycleAnchor(owner, 'period_predicted', '2026-06-29');
+  insertReminder(owner, 'cycle_period', anchorId, PAST);
+
+  currentUid = owner;
+  const res = await call('GET', '/pending');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.length, 1);
+  const row = res.body.data[0];
+  assert.equal(row.cycle_anchor_kind, 'period_predicted');
+  assert.ok(!('cycle_owner_name' in row), 'die eigene Erinnerung nennt keinen Namen - es ist ja die eigene');
+});
+
+// Luecke zwischen der Loeschung des Ankers (z. B. der Eigentuemer wird
+// geloescht oder aendert die Einstellung) und dem naechsten periodischen
+// Sync, der die verwaiste Zeile eigentlich aufraeumt: bis dahin darf
+// GET /pending eine 'cycle_period'/'cycle_log_nudge'-Zeile ohne Anker nicht
+// ausliefern - ohne cycle_anchor_kind faellt der Client auf die eigene
+// "naechste Periode"-Darstellung zurueck, was bei einer Partner-Erinnerung
+// eine Falschzuordnung waere (schlimmer als gar nichts zu zeigen).
+test('GET /pending zeigt eine verwaiste cycle_period-Erinnerung nicht, solange ihr Anker fehlt', async () => {
+  const owner = freshUser('member');
+  const partner = freshUser('member');
+
+  const anchorId = insertCycleAnchor(owner, 'partner_period', '2026-06-29');
+  insertReminder(partner, 'cycle_period', anchorId, PAST);
+
+  // Die Luecke simulieren: Anker direkt geloescht, ohne dass der Sync schon
+  // gelaufen waere und auch die reminders-Zeile mit entfernt haette.
+  db.prepare('DELETE FROM cycle_reminder_anchors WHERE id = ?').run(anchorId);
+
+  currentUid = partner;
+  const res = await call('GET', '/pending');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.length, 0, 'eine Erinnerung ohne Anker darf nicht auftauchen, egal welchen Inhalt sie noch traegt');
 });
 
 // --------------------------------------------------------

@@ -4404,7 +4404,11 @@
                 "regular": "規則的",
                 "irregular": "不規則",
                 "notEnoughData": "データ不足",
-                "noPrediction": "予測するには生理を記録してください。"
+                "noPrediction": "予測するには生理を記録してください。",
+                "fertilitySuppressedNote": "妊娠可能期間は一時停止中: ホルモン避妊のため。",
+                "nextPeriodRangeSub": "平均: {{date}}",
+                "partnerNextPeriod": "{{name}}さんの生理は{{date}}に始まる見込みです。",
+                "partnerNextPeriodNeutral": "パートナー通知 - 生理"
             },
             "stats": {
                 "source": {
@@ -4412,11 +4416,14 @@
                     "history_one": "直近の周期に基づく",
                     "insufficientHistory": "現時点では既定値です - 個人に合わせた予測には、あと{{count}}周期分の記録が必要です",
                     "insufficientHistory_one": "現時点では既定値です - 個人に合わせた予測には、あと{{count}}周期分の記録が必要です",
-                    "default": "既定の想定値(履歴がまだ記録されていません)"
+                    "default": "既定の想定値(履歴がまだ記録されていません)",
+                    "historyOther": "直近{{count}}周期に基づく",
+                    "historyOther_one": "直近の周期に基づく"
                 }
             },
             "unit": {
-                "days": "{{value}}日"
+                "days": "{{value}}日",
+                "days_one": "{{value}}日"
             },
             "today": {
                 "title": "今日",
@@ -4430,7 +4437,9 @@
             "calendar": {
                 "title": "カレンダー",
                 "prevMonth": "先月",
-                "nextMonth": "来月"
+                "nextMonth": "来月",
+                "likelihoodTitle": "症状パターン",
+                "likelihoodCaption": "症状を選ぶと、あなたの履歴に基づいてよく現れる日がわかります。"
             },
             "weekday": {
                 "mon": "月",
@@ -4447,13 +4456,16 @@
                 "fertile": "妊娠可能",
                 "ovulation": "排卵",
                 "today": "今日",
-                "logged": "記録"
+                "logged": "記録",
+                "pms": "PMS期間(パターン)"
             },
             "history": {
                 "title": "推移",
                 "ongoing": "進行中",
                 "empty": "まだ生理が記録されていません。",
-                "cycleLength": "周期{{value}}日"
+                "cycleLength": "周期{{value}}日",
+                "cycleLength_one": "周期{{value}}日",
+                "flowHeaviest": "最大: {{value}}"
             },
             "trends": {
                 "title": "傾向",
@@ -4469,12 +4481,21 @@
                 "typical": "典型的",
                 "atypical": "非典型的",
                 "typicalRangeLabel": "典型的な範囲:{{min}}~{{max}}日",
-                "likelihoodTitle": "症状パターン",
-                "likelihoodCaption": "症状を選ぶと、あなたの履歴に基づいてよく現れる日がわかります。",
-                "likelyToday": "{{symptom}}は周期のこの日の前後によく現れます。",
                 "symptomTracked": "記録済み",
                 "symptomPredicted": "ここでよく現れる",
-                "phaseOther": "その他"
+                "phaseOther": "その他",
+                "details": "詳細",
+                "feelingFrequency": "気分の頻度",
+                "flowLoad": "周期ごとの経血量の推移",
+                "flowLoadCaption": "経血量の記録に基づきます - 記録が詳しいほど、この情報の意味が増します。",
+                "flowLoadColumn": "経血量の合計",
+                "flowLoadValue": "{{load}}（{{days}}記録）",
+                "heavyBleedingHintHeavy": "直近の月経が繰り返し「多い」と記録されています - 医師への相談時に伝える価値があります。",
+                "heavyBleedingHintLong": "直近の月経のうち少なくとも1回が1週間以上続きました - 医師への相談時に伝える価値があります。",
+                "painTitle": "痛み",
+                "painCurrentCycleLabel": "今周期の痛みのある日数",
+                "painAvgPerCycleLabel": "周期あたりの平均痛み日数",
+                "painAvgIntensityLabel": "平均強度"
             },
             "flow": {
                 "label": "経血量",
@@ -4543,7 +4564,9 @@
             },
             "period": {
                 "add": "生理を記録",
-                "edit": "生理を編集"
+                "edit": "生理を編集",
+                "warningFuture": "開始日が未来の日付です - 予測は過去の周期のみに基づきます。",
+                "warningOverlap": "すでに記録済みの周期と重なっています。"
             },
             "dayLog": {
                 "title": "その日を記録",
@@ -4582,8 +4605,91 @@
                 "pregnancyMode": "妊娠モード",
                 "dueDate": "出産予定日",
                 "pregnancyHint": "妊娠モードでは生理と排卵の予測が一時停止します。毎日の記録は引き続き利用できます。",
-                "saved": "設定を保存しました。"
-            }
+                "saved": "設定を保存しました。",
+                "contraception": "避妊方法",
+                "contraceptionHint": "ホルモン系の方法は妊娠可能期間の予測を自動的に停止します。",
+                "contraceptionUnset": "未設定",
+                "contraceptionOptions": {
+                    "none": "なし",
+                    "pill": "ピル",
+                    "hormonal_iud": "ホルモンIUD",
+                    "copper_iud": "銅IUD",
+                    "implant": "インプラント",
+                    "injection": "注射",
+                    "patch": "パッチ",
+                    "ring": "腟内リング",
+                    "condom": "コンドーム",
+                    "other": "その他"
+                },
+                "perimenopauseMode": "更年期モード",
+                "perimenopauseModeHint": "予測は単一の日付ではなく期間で表示され、規則性の判定はオフになります。",
+                "showPms": "PMS期間を表示",
+                "notifyPartner": "パートナーに通知",
+                "notifyPartnerHint": "選択された相手には予測日のみが伝わり、症状やメモなどの記録は一切共有されません。",
+                "notifyPartnerNoEligible": "通知できる対象者がいません - ヘルスモジュールへのアクセス権を持つメンバーのみ通知できます。",
+                "notifyPartnerDaysBefore": "パートナーへのリマインダー"
+            },
+            "mucus": {
+                "label": "頸管粘液",
+                "hint": "任意項目です。粘液の状態の変化は、妊娠可能期間を絞り込むのに役立ちます。",
+                "none": "なし",
+                "dry": "乾燥",
+                "sticky": "粘り気",
+                "creamy": "クリーム状",
+                "watery": "水っぽい",
+                "eggwhite": "卵白状"
+            },
+            "test": {
+                "label": "検査",
+                "lhLabel": "LH検査",
+                "pregnancyLabel": "妊娠検査",
+                "unset": "未検査",
+                "negative": "陰性",
+                "positive": "陽性"
+            },
+            "feelings": {
+                "label": "気持ち"
+            },
+            "intimacy": {
+                "label": "親密な関係",
+                "hint": "この日を家族と共有していても、非公開のままです。",
+                "none": "未指定",
+                "protected": "避妊あり",
+                "unprotected": "避妊なし",
+                "solo": "ひとり"
+            },
+            "quickLink": {
+                "painkiller": "鎮痛剤を記録",
+                "weight": "体重を記録"
+            },
+            "bubble": {
+                "ariaLabel": "今日のサイクル状況",
+                "line1": "サイクル{{day}}日目 · {{phase}}",
+                "periodToday": "今日生理が予測されています - 今すぐ開始しますか?",
+                "periodOverdue": "生理が{{count}}日遅れています - 今すぐ開始しますか?",
+                "periodOverdue_one": "生理が{{count}}日遅れています - 今すぐ開始しますか?",
+                "periodStillOpen": "記録上、生理がまだ続いているようです - 今すぐ終了しますか?",
+                "peakPainDay": "あなたのパターンによると、今日は痛みが最も強くなりやすい日です({{symptom}})。",
+                "likelySymptomsToday": "今日起こりやすい: {{symptoms}}",
+                "pmsWindow": "PMS期間はおそらく{{weekday}}から",
+                "upcomingSymptom": "{{weekday}}からおそらく: {{symptom}}",
+                "fertile": "妊娠可能期間は{{date}}まで",
+                "fertileConfirmed": "妊娠可能期間(排卵確認済み)は{{date}}まで"
+            },
+            "fertilityDisclaimerConfirmed": "この周期の排卵は体温上昇によって確認されました。今後の周期は引き続きカレンダー法に基づきます。避妊や医師の助言の代わりにはなりません。",
+            "import": {
+                "button": "インポート",
+                "title": "生理履歴をインポート",
+                "explainer": "CSVファイルまたは貼り付けたテキスト:1行につき1つの周期を「start_date,end_date」の形式で(終了日は任意)、日付はYYYY-MM-DDまたはDD.MM.YYYY形式、カンマまたはセミコロンで区切ります。",
+                "fileLabel": "CSVファイルを選択",
+                "pasteLabel": "またはCSVテキストを貼り付け",
+                "submit": "インポート",
+                "resultToast": "{{imported}}件をインポート、{{skipped}}件をスキップしました。",
+                "errorsTitle": "次の行はインポートできませんでした:",
+                "emptyError": "CSVファイルを選択するか、テキストを貼り付けてください。",
+                "error": "インポートに失敗しました。"
+            },
+            "discoveryHint": "ヒント:予測される周期は<a href=\"/settings/personal/feeds\">設定 → 個人 → フィード</a>でICSフィードとして購読できます。また、周期ウィジェットはカスタマイズモードから<a href=\"/\">ダッシュボード</a>に表示できます。"
         },
         "duration": {
             "hm": "{{hours}}時間{{minutes}}分",

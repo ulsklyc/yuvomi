@@ -4404,7 +4404,11 @@
                 "regular": "Regelmatig",
                 "irregular": "Onregelmatig",
                 "notEnoughData": "Te weinig gegevens",
-                "noPrediction": "Registreer een menstruatie voor voorspellingen."
+                "noPrediction": "Registreer een menstruatie voor voorspellingen.",
+                "fertilitySuppressedNote": "Vruchtbaar venster gepauzeerd: hormonale anticonceptie.",
+                "nextPeriodRangeSub": "Gemiddeld: {{date}}",
+                "partnerNextPeriod": "De menstruatie van {{name}} begint naar verwachting op {{date}}.",
+                "partnerNextPeriodNeutral": "Partnerherinnering: menstruatie"
             },
             "stats": {
                 "source": {
@@ -4412,11 +4416,14 @@
                     "history_one": "Gebaseerd op je laatste cyclus",
                     "insufficientHistory": "Voorlopig een standaardwaarde - registreer nog {{count}} cycli voor een persoonlijke voorspelling",
                     "insufficientHistory_one": "Voorlopig een standaardwaarde - registreer nog {{count}} cyclus voor een persoonlijke voorspelling",
-                    "default": "Standaardaanname (nog geen geschiedenis geregistreerd)"
+                    "default": "Standaardaanname (nog geen geschiedenis geregistreerd)",
+                    "historyOther": "Gebaseerd op je laatste {{count}} cycli",
+                    "historyOther_one": "Gebaseerd op je laatste cyclus"
                 }
             },
             "unit": {
-                "days": "{{value}} dagen"
+                "days": "{{value}} dagen",
+                "days_one": "{{value}} dag"
             },
             "today": {
                 "title": "Vandaag",
@@ -4430,7 +4437,9 @@
             "calendar": {
                 "title": "Agenda",
                 "prevMonth": "Vorige maand",
-                "nextMonth": "Volgende maand"
+                "nextMonth": "Volgende maand",
+                "likelihoodTitle": "Symptoompatronen",
+                "likelihoodCaption": "Kies een symptoom om te zien op welke dagen het, op basis van je geschiedenis, vaak voorkomt."
             },
             "weekday": {
                 "mon": "ma",
@@ -4447,13 +4456,16 @@
                 "fertile": "Vruchtbaar",
                 "ovulation": "Eisprong",
                 "today": "Vandaag",
-                "logged": "Item"
+                "logged": "Item",
+                "pms": "PMS-venster (patroon)"
             },
             "history": {
                 "title": "Verloop",
                 "ongoing": "lopend",
                 "empty": "Nog geen menstruaties geregistreerd.",
-                "cycleLength": "Cyclus {{value}} dagen"
+                "cycleLength": "Cyclus {{value}} dagen",
+                "cycleLength_one": "Cyclus {{value}} dag",
+                "flowHeaviest": "Max. {{value}}"
             },
             "trends": {
                 "title": "Trends",
@@ -4469,12 +4481,21 @@
                 "typical": "Typisch",
                 "atypical": "Atypisch",
                 "typicalRangeLabel": "Typisch bereik: {{min}}-{{max}} dagen",
-                "likelihoodTitle": "Symptoompatronen",
-                "likelihoodCaption": "Kies een symptoom om te zien op welke dagen het, op basis van je geschiedenis, vaak voorkomt.",
-                "likelyToday": "{{symptom}} komt vaak rond deze dag van je cyclus voor.",
                 "symptomTracked": "Geregistreerd",
                 "symptomPredicted": "Komt hier vaak voor",
-                "phaseOther": "Overig"
+                "phaseOther": "Overig",
+                "details": "Details",
+                "feelingFrequency": "Gevoelens-frequentie",
+                "flowLoad": "Bloedingsintensiteit per cyclus",
+                "flowLoadCaption": "Gebaseerd op je bloedingsregistraties - hoe vollediger je bijhoudt, hoe zinvoller dit is.",
+                "flowLoadColumn": "Bloedingslast",
+                "flowLoadValue": "{{load}} ({{days}} geregistreerd)",
+                "heavyBleedingHintHeavy": "Je laatste menstruaties zijn herhaaldelijk als \"hevig\" geregistreerd - dit is het bespreken met een arts waard.",
+                "heavyBleedingHintLong": "Minstens één van je laatste menstruaties duurde langer dan een week - dit is het bespreken met een arts waard.",
+                "painTitle": "Pijn",
+                "painCurrentCycleLabel": "Pijndagen deze cyclus",
+                "painAvgPerCycleLabel": "Gem. pijndagen per cyclus",
+                "painAvgIntensityLabel": "Gem. intensiteit"
             },
             "flow": {
                 "label": "Bloedverlies",
@@ -4543,7 +4564,9 @@
             },
             "period": {
                 "add": "Menstruatie registreren",
-                "edit": "Menstruatie bewerken"
+                "edit": "Menstruatie bewerken",
+                "warningFuture": "Startdatum ligt in de toekomst - voorspellingen zijn alleen gebaseerd op eerdere cycli.",
+                "warningOverlap": "Overlapt met een al geregistreerde cyclus."
             },
             "dayLog": {
                 "title": "Dag registreren",
@@ -4582,8 +4605,91 @@
                 "pregnancyMode": "Zwangerschapsmodus",
                 "dueDate": "Uitgerekende datum",
                 "pregnancyHint": "In de zwangerschapsmodus worden voorspellingen voor menstruatie en eisprong gepauzeerd. Dagelijks loggen blijft mogelijk.",
-                "saved": "Instellingen opgeslagen."
-            }
+                "saved": "Instellingen opgeslagen.",
+                "contraception": "Anticonceptiemethode",
+                "contraceptionHint": "Hormonale methoden pauzeren automatisch de voorspelling van het vruchtbare venster.",
+                "contraceptionUnset": "Niet opgegeven",
+                "contraceptionOptions": {
+                    "none": "Geen",
+                    "pill": "Pil",
+                    "hormonal_iud": "Hormoonspiraal",
+                    "copper_iud": "Koperspiraal",
+                    "implant": "Implantaat",
+                    "injection": "Prikpil",
+                    "patch": "Pleister",
+                    "ring": "Vaginale ring",
+                    "condom": "Condoom",
+                    "other": "Anders"
+                },
+                "perimenopauseMode": "Perimenopauze-modus",
+                "perimenopauseModeHint": "Voorspellingen worden getoond als bereik in plaats van één datum; de regelmaat-beoordeling wordt uitgeschakeld.",
+                "showPms": "PMS-venster tonen",
+                "notifyPartner": "Partner op de hoogte stellen",
+                "notifyPartnerHint": "De gekozen persoon ontvangt alleen de voorspelde datum, nooit symptomen, notities of andere gegevens.",
+                "notifyPartnerNoEligible": "Geen geschikt huishoudlid beschikbaar - alleen leden met toegang tot de module Gezondheid kunnen worden geïnformeerd.",
+                "notifyPartnerDaysBefore": "Herinnering voor partner"
+            },
+            "mucus": {
+                "label": "Baarmoederhalsslijm",
+                "hint": "Optioneel. Veranderingen in de substantie kunnen helpen de vruchtbare periode af te bakenen.",
+                "none": "Geen",
+                "dry": "Droog",
+                "sticky": "Plakkerig",
+                "creamy": "Romig",
+                "watery": "Waterig",
+                "eggwhite": "Eiwit-achtig"
+            },
+            "test": {
+                "label": "Tests",
+                "lhLabel": "LH-test",
+                "pregnancyLabel": "Zwangerschapstest",
+                "unset": "Niet getest",
+                "negative": "Negatief",
+                "positive": "Positief"
+            },
+            "feelings": {
+                "label": "Gevoelens"
+            },
+            "intimacy": {
+                "label": "Intimiteit",
+                "hint": "Blijft privé, ook als deze dag met het gezin wordt gedeeld.",
+                "none": "Niet opgegeven",
+                "protected": "Beschermd",
+                "unprotected": "Onbeschermd",
+                "solo": "Solo"
+            },
+            "quickLink": {
+                "painkiller": "Pijnstiller registreren",
+                "weight": "Gewicht registreren"
+            },
+            "bubble": {
+                "ariaLabel": "Cyclusstatus vandaag",
+                "line1": "Cyclusdag {{day}} · {{phase}}",
+                "periodToday": "Menstruatie vandaag verwacht - nu starten?",
+                "periodOverdue": "Menstruatie is {{count}} dagen over tijd - nu starten?",
+                "periodOverdue_one": "Menstruatie is {{count}} dag over tijd - nu starten?",
+                "periodStillOpen": "Je menstruatie staat nog als lopend geregistreerd - nu beëindigen?",
+                "peakPainDay": "Volgens je patroon is vandaag vaak je dag met de sterkste pijn ({{symptom}}).",
+                "likelySymptomsToday": "Vandaag waarschijnlijk: {{symptoms}}",
+                "pmsWindow": "PMS-venster waarschijnlijk vanaf {{weekday}}",
+                "upcomingSymptom": "Vanaf {{weekday}} waarschijnlijk: {{symptom}}",
+                "fertile": "Vruchtbaar venster tot {{date}}",
+                "fertileConfirmed": "Vruchtbaar venster (eisprong bevestigd) tot {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "De eisprong van deze cyclus is bevestigd door een temperatuurstijging. Toekomstige cycli blijven op de kalendermethode gebaseerd; dit vervangt geen anticonceptie of medisch advies.",
+            "import": {
+                "button": "Importeren",
+                "title": "Menstruatiegeschiedenis importeren",
+                "explainer": "CSV-bestand of geplakte tekst: één regel per menstruatie als „start_date,end_date” (einddatum optioneel), datums in JJJJ-MM-DD of DD-MM-JJJJ, gescheiden door komma of puntkomma.",
+                "fileLabel": "CSV-bestand kiezen",
+                "pasteLabel": "Of CSV-tekst plakken",
+                "submit": "Importeren",
+                "resultToast": "{{imported}} geïmporteerd, {{skipped}} overgeslagen.",
+                "errorsTitle": "Deze regels konden niet worden geïmporteerd:",
+                "emptyError": "Kies een CSV-bestand of plak tekst.",
+                "error": "Importeren mislukt."
+            },
+            "discoveryHint": "Tip: abonneer je op de voorspelde cyclus als ICS-feed onder <a href=\"/settings/personal/feeds\">Instellingen → Persoonlijk → Feeds</a>, of toon de cyclus-widget op het <a href=\"/\">Overzicht</a> via de aanpasmodus."
         },
         "duration": {
             "hm": "{{hours}} u {{minutes}} min",

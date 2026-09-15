@@ -4404,7 +4404,11 @@
                 "regular": "Regelmäßig",
                 "irregular": "Unregelmäßig",
                 "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "noPrediction": "Erfasse eine Periode für Vorhersagen.",
+                "fertilitySuppressedNote": "Fruchtbares Fenster pausiert: hormonelle Verhütung.",
+                "nextPeriodRangeSub": "Mittel: {{date}}",
+                "partnerNextPeriod": "Periode von {{name}}: voraussichtlicher Beginn am {{date}}.",
+                "partnerNextPeriodNeutral": "Partner-Erinnerung: Periode"
             },
             "stats": {
                 "source": {
@@ -4412,11 +4416,14 @@
                     "history_one": "Basierend auf deiner letzten Periode",
                     "insufficientHistory": "Vorerst ein Standardwert - noch {{count}} weitere Perioden für eine persönliche Vorhersage",
                     "insufficientHistory_one": "Vorerst ein Standardwert - noch {{count}} weitere Periode für eine persönliche Vorhersage",
-                    "default": "Standardannahme (noch keine Historie erfasst)"
+                    "default": "Standardannahme (noch keine Historie erfasst)",
+                    "historyOther": "Basierend auf den letzten {{count}} Perioden",
+                    "historyOther_one": "Basierend auf der letzten Periode"
                 }
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} Tage",
+                "days_one": "{{value}} Tag"
             },
             "today": {
                 "title": "Heute",
@@ -4430,7 +4437,9 @@
             "calendar": {
                 "title": "Kalender",
                 "prevMonth": "Vorheriger Monat",
-                "nextMonth": "Nächster Monat"
+                "nextMonth": "Nächster Monat",
+                "likelihoodTitle": "Symptom-Muster",
+                "likelihoodCaption": "Wähle ein Symptom, um zu sehen, an welchen Tagen es laut deiner Historie häufig auftritt."
             },
             "weekday": {
                 "mon": "Mo",
@@ -4447,13 +4456,16 @@
                 "fertile": "Fruchtbar",
                 "ovulation": "Eisprung",
                 "today": "Heute",
-                "logged": "Eintrag"
+                "logged": "Eintrag",
+                "pms": "PMS-Fenster (Muster)"
             },
             "history": {
                 "title": "Verlauf",
                 "ongoing": "laufend",
                 "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "cycleLength": "Zyklus {{value}} Tage",
+                "cycleLength_one": "Zyklus {{value}} Tag",
+                "flowHeaviest": "Max. {{value}}"
             },
             "trends": {
                 "title": "Trends",
@@ -4469,12 +4481,21 @@
                 "typical": "Typisch",
                 "atypical": "Untypisch",
                 "typicalRangeLabel": "Allgemein üblicher Bereich: {{min}}-{{max}} Tage",
-                "likelihoodTitle": "Symptom-Muster",
-                "likelihoodCaption": "Wähle ein Symptom, um zu sehen, an welchen Tagen es laut deiner Historie häufig auftritt.",
-                "likelyToday": "{{symptom}} tritt an diesem Zyklustag häufig auf.",
                 "symptomTracked": "Eingetragen",
                 "symptomPredicted": "Tritt hier häufig auf",
-                "phaseOther": "Sonstige"
+                "phaseOther": "Sonstige",
+                "details": "Details",
+                "feelingFrequency": "Gefühls-Häufigkeit",
+                "flowLoad": "Blutungsintensität je Zyklus",
+                "flowLoadCaption": "Beruht auf deinen Blutungs-Einträgen - je vollständiger du protokollierst, desto aussagekräftiger.",
+                "flowLoadColumn": "Blutungslast",
+                "flowLoadValue": "{{load}} ({{days}} protokolliert)",
+                "heavyBleedingHintHeavy": "Deine letzten Perioden wurden mehrfach als „stark“ eingetragen - ärztliche Beratung dazu kann sinnvoll sein.",
+                "heavyBleedingHintLong": "Mindestens eine deiner letzten Perioden dauerte länger als eine Woche - ärztliche Beratung dazu kann sinnvoll sein.",
+                "painTitle": "Schmerzen",
+                "painCurrentCycleLabel": "Schmerztage in diesem Zyklus",
+                "painAvgPerCycleLabel": "Ø Schmerztage je Zyklus",
+                "painAvgIntensityLabel": "Ø Stärke"
             },
             "flow": {
                 "label": "Blutungsstärke",
@@ -4543,7 +4564,9 @@
             },
             "period": {
                 "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "edit": "Periode bearbeiten",
+                "warningFuture": "Startdatum liegt in der Zukunft - Vorhersagen basieren nur auf vergangenen Perioden.",
+                "warningOverlap": "Überschneidet sich mit einer bereits erfassten Periode."
             },
             "dayLog": {
                 "title": "Tag protokollieren",
@@ -4582,8 +4605,91 @@
                 "pregnancyMode": "Schwangerschafts-Modus",
                 "dueDate": "Errechneter Entbindungstermin",
                 "pregnancyHint": "Im Schwangerschafts-Modus werden Perioden- und Eisprung-Vorhersagen angehalten. Tages-Logging bleibt möglich.",
-                "saved": "Einstellungen gespeichert."
-            }
+                "saved": "Einstellungen gespeichert.",
+                "contraception": "Verhütungsmethode",
+                "contraceptionHint": "Hormonelle Methoden pausieren automatisch die Vorhersage des fruchtbaren Fensters.",
+                "contraceptionUnset": "Nicht angegeben",
+                "contraceptionOptions": {
+                    "none": "Keine",
+                    "pill": "Pille",
+                    "hormonal_iud": "Hormonspirale",
+                    "copper_iud": "Kupferspirale",
+                    "implant": "Hormonimplantat",
+                    "injection": "Hormonspritze",
+                    "patch": "Verhütungspflaster",
+                    "ring": "Vaginalring",
+                    "condom": "Kondom",
+                    "other": "Andere"
+                },
+                "perimenopauseMode": "Perimenopause-Modus",
+                "perimenopauseModeHint": "Vorhersagen erscheinen als Spanne statt als einzelnes Datum; die Regelmäßigkeits-Einschätzung entfällt.",
+                "showPms": "PMS-Fenster anzeigen",
+                "notifyPartner": "Partner/-in benachrichtigen",
+                "notifyPartnerHint": "Die gewählte Person erhält nur das vorhergesagte Datum, nie Symptome, Notizen oder andere Einträge.",
+                "notifyPartnerNoEligible": "Kein geeignetes Haushaltsmitglied verfügbar - benachrichtigt werden können nur Mitglieder mit Zugriff auf das Health-Modul.",
+                "notifyPartnerDaysBefore": "Erinnerung an Partner/-in"
+            },
+            "mucus": {
+                "label": "Zervixschleim",
+                "hint": "Optional. Veränderungen der Konsistenz können helfen, das fruchtbare Fenster einzugrenzen.",
+                "none": "Keine",
+                "dry": "Trocken",
+                "sticky": "Zäh",
+                "creamy": "Cremig",
+                "watery": "Wässrig",
+                "eggwhite": "Eiklar"
+            },
+            "test": {
+                "label": "Tests",
+                "lhLabel": "LH-Test",
+                "pregnancyLabel": "Schwangerschaftstest",
+                "unset": "Nicht getestet",
+                "negative": "Negativ",
+                "positive": "Positiv"
+            },
+            "feelings": {
+                "label": "Gefühle"
+            },
+            "intimacy": {
+                "label": "Intimität",
+                "hint": "Bleibt privat, auch wenn dieser Tag mit der Familie geteilt wird.",
+                "none": "Keine Angabe",
+                "protected": "Geschützt",
+                "unprotected": "Ungeschützt",
+                "solo": "Solo"
+            },
+            "quickLink": {
+                "painkiller": "Schmerzmittel erfassen",
+                "weight": "Gewicht erfassen"
+            },
+            "bubble": {
+                "ariaLabel": "Heutiger Zyklusstatus",
+                "line1": "Zyklustag {{day}} · {{phase}}",
+                "periodToday": "Periode heute erwartet - jetzt starten?",
+                "periodOverdue": "Periode ist seit {{count}} Tagen überfällig - jetzt starten?",
+                "periodOverdue_one": "Periode ist seit {{count}} Tag überfällig - jetzt starten?",
+                "periodStillOpen": "Deine Periode läuft laut Eintrag noch - jetzt beenden?",
+                "peakPainDay": "Heute ist laut deinem Muster oft der stärkste Schmerztag ({{symptom}}).",
+                "likelySymptomsToday": "Heute wahrscheinlich: {{symptoms}}",
+                "pmsWindow": "PMS-Fenster wahrscheinlich ab {{weekday}}",
+                "upcomingSymptom": "Ab {{weekday}} wahrscheinlich: {{symptom}}",
+                "fertile": "Fruchtbares Fenster bis {{date}}",
+                "fertileConfirmed": "Fruchtbares Fenster (Eisprung bestätigt) bis {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "Der Eisprung dieses Zyklus wurde durch einen Temperaturanstieg bestätigt. Künftige Zyklen beruhen weiterhin auf der Kalendermethode; das ersetzt keine Verhütung und keine ärztliche Beratung.",
+            "import": {
+                "button": "Importieren",
+                "title": "Perioden-Historie importieren",
+                "explainer": "CSV-Datei oder eingefügter Text: eine Zeile je Periode als „start_date,end_date“ (Enddatum optional), Datum im Format JJJJ-MM-TT oder TT.MM.JJJJ, getrennt durch Komma oder Semikolon.",
+                "fileLabel": "CSV-Datei auswählen",
+                "pasteLabel": "Oder CSV-Text einfügen",
+                "submit": "Importieren",
+                "resultToast": "{{imported}} importiert, {{skipped}} übersprungen.",
+                "errorsTitle": "Diese Zeilen konnten nicht importiert werden:",
+                "emptyError": "Bitte eine CSV-Datei auswählen oder Text einfügen.",
+                "error": "Import fehlgeschlagen."
+            },
+            "discoveryHint": "Tipp: Der vorhergesagte Zyklus lässt sich als ICS-Feed unter <a href=\"/settings/personal/feeds\">Einstellungen → Persönlich → Feeds</a> abonnieren; das Zyklus-Widget lässt sich in der <a href=\"/\">Übersicht</a> über „Anpassen“ einblenden."
         },
         "duration": {
             "hm": "{{hours}} Std. {{minutes}} Min.",

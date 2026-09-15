@@ -24,7 +24,7 @@
 import { randomBytes } from 'node:crypto';
 import { resolveHouseholdFormats, translate } from '../utils/i18n.js';
 import { escapeICSText, foldLine } from './ics-export.js';
-import { projectFutureCycles } from '../../public/utils/health-cycle.js';
+import { projectFutureCycles, suppressesFertility } from '../../public/utils/health-cycle.js';
 import { todayKey } from '../utils/timezone.js';
 
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -117,7 +117,13 @@ function buildCycleFeed(conn, userId, now = new Date()) {
       summary: translate(locale, 'health.cycle.ics.predictedPeriodSummary'),
     }, dtstamp));
 
-    if (settings.track_fertility === undefined ? true : !!settings.track_fertility) {
+    // Dieselbe Bedingung wie predictCycle() (public/utils/health-cycle.js):
+    // eine hormonelle Verhuetungsmethode pausiert Eisprung/fruchtbares Fenster
+    // genauso wie ein manuell abgeschaltetes track_fertility - der abonnierte
+    // Feed darf diese Termine sonst weiter verschicken, waehrend der Zyklus-Tab
+    // selbst die Vorhersage laengst pausiert.
+    const trackFertility = settings.track_fertility === undefined ? true : !!settings.track_fertility;
+    if (trackFertility && !suppressesFertility(settings)) {
       out.push(...buildSpanVEvent({
         uid: `cycle-fertile-predicted-${userId}-${cyc.start}`,
         start: cyc.fertileStart,

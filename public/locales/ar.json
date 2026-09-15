@@ -4404,7 +4404,11 @@
                 "regular": "منتظمة",
                 "irregular": "غير منتظمة",
                 "notEnoughData": "بيانات غير كافية",
-                "noPrediction": "سجّلي دورة للحصول على التوقعات."
+                "noPrediction": "سجّلي دورة للحصول على التوقعات.",
+                "fertilitySuppressedNote": "نافذة الخصوبة متوقفة: بسبب وسيلة منع حمل هرمونية.",
+                "nextPeriodRangeSub": "المتوسط: {{date}}",
+                "partnerNextPeriod": "دورة {{name}} من المتوقع أن تبدأ في {{date}}.",
+                "partnerNextPeriodNeutral": "تذكير الشريك: الدورة"
             },
             "stats": {
                 "source": {
@@ -4412,11 +4416,14 @@
                     "history_one": "استنادًا إلى دورتك الأخيرة",
                     "insufficientHistory": "قيمة افتراضية حاليًا - سجّلي {{count}} دورات إضافية للحصول على توقّع شخصي",
                     "insufficientHistory_one": "قيمة افتراضية حاليًا - سجّلي دورة واحدة إضافية للحصول على توقّع شخصي",
-                    "default": "افتراض مبدئي (لم يُسجَّل سجل بعد)"
+                    "default": "افتراض مبدئي (لم يُسجَّل سجل بعد)",
+                    "historyOther": "استنادًا إلى آخر {{count}} دورات",
+                    "historyOther_one": "استنادًا إلى الدورة الأخيرة"
                 }
             },
             "unit": {
-                "days": "{{value}} يوم"
+                "days": "{{value}} يوم",
+                "days_one": "{{value}} يوم"
             },
             "today": {
                 "title": "اليوم",
@@ -4430,7 +4437,9 @@
             "calendar": {
                 "title": "التقويم",
                 "prevMonth": "الشهر السابق",
-                "nextMonth": "الشهر التالي"
+                "nextMonth": "الشهر التالي",
+                "likelihoodTitle": "أنماط الأعراض",
+                "likelihoodCaption": "اختاري عرضًا لمعرفة الأيام التي يظهر فيها غالبًا، استنادًا إلى سجلّك."
             },
             "weekday": {
                 "mon": "إث",
@@ -4447,13 +4456,16 @@
                 "fertile": "خصبة",
                 "ovulation": "الإباضة",
                 "today": "اليوم",
-                "logged": "إدخال"
+                "logged": "إدخال",
+                "pms": "نافذة المتلازمة السابقة للحيض (نمط)"
             },
             "history": {
                 "title": "الاتجاه",
                 "ongoing": "جارية",
                 "empty": "لم تُسجَّل أي دورات بعد.",
-                "cycleLength": "دورة {{value}} يوم"
+                "cycleLength": "دورة {{value}} يوم",
+                "cycleLength_one": "دورة {{value}} يوم",
+                "flowHeaviest": "الحد الأقصى: {{value}}"
             },
             "trends": {
                 "title": "الاتجاهات",
@@ -4469,12 +4481,21 @@
                 "typical": "معتاد",
                 "atypical": "غير معتاد",
                 "typicalRangeLabel": "النطاق المعتاد: {{min}}-{{max}} أيام",
-                "likelihoodTitle": "أنماط الأعراض",
-                "likelihoodCaption": "اختاري عرضًا لمعرفة الأيام التي يظهر فيها غالبًا، استنادًا إلى سجلّك.",
-                "likelyToday": "غالبًا ما يظهر {{symptom}} حول هذا اليوم من دورتك.",
                 "symptomTracked": "مسجَّل",
                 "symptomPredicted": "يظهر غالبًا هنا",
-                "phaseOther": "أخرى"
+                "phaseOther": "أخرى",
+                "details": "التفاصيل",
+                "feelingFrequency": "تكرار المشاعر",
+                "flowLoad": "شدة النزيف لكل دورة",
+                "flowLoadCaption": "استناداً إلى تسجيلاتك للنزيف - كلما كان تسجيلك أكثر اكتمالاً، كانت هذه البيانات أكثر دلالة.",
+                "flowLoadColumn": "حمل النزيف",
+                "flowLoadValue": "{{load}} (تم تسجيل {{days}})",
+                "heavyBleedingHintHeavy": "تم تسجيل دوراتك الأخيرة عدة مرات بأنها «غزيرة» - يستحق ذلك ذكره خلال استشارة طبية.",
+                "heavyBleedingHintLong": "استمرت واحدة على الأقل من دوراتك الأخيرة أكثر من أسبوع - يستحق ذلك ذكره خلال استشارة طبية.",
+                "painTitle": "الألم",
+                "painCurrentCycleLabel": "أيام الألم في هذه الدورة",
+                "painAvgPerCycleLabel": "متوسط أيام الألم لكل دورة",
+                "painAvgIntensityLabel": "متوسط الشدة"
             },
             "flow": {
                 "label": "شدة النزيف",
@@ -4543,7 +4564,9 @@
             },
             "period": {
                 "add": "تسجيل الدورة",
-                "edit": "تعديل الدورة"
+                "edit": "تعديل الدورة",
+                "warningFuture": "تاريخ البدء في المستقبل - تعتمد التوقعات فقط على الدورات السابقة.",
+                "warningOverlap": "يتداخل مع دورة مسجَّلة مسبقًا."
             },
             "dayLog": {
                 "title": "تسجيل اليوم",
@@ -4582,8 +4605,91 @@
                 "pregnancyMode": "وضع الحمل",
                 "dueDate": "تاريخ الولادة المتوقع",
                 "pregnancyHint": "في وضع الحمل، تتوقف تنبؤات الدورة والإباضة مؤقتًا. يبقى التسجيل اليومي متاحًا.",
-                "saved": "تم حفظ الإعدادات."
-            }
+                "saved": "تم حفظ الإعدادات.",
+                "contraception": "وسيلة منع الحمل",
+                "contraceptionHint": "الوسائل الهرمونية توقف تلقائيًا توقع نافذة الخصوبة.",
+                "contraceptionUnset": "غير محدد",
+                "contraceptionOptions": {
+                    "none": "لا شيء",
+                    "pill": "حبوب منع الحمل",
+                    "hormonal_iud": "لولب هرموني",
+                    "copper_iud": "لولب نحاسي",
+                    "implant": "غرسة هرمونية",
+                    "injection": "حقنة",
+                    "patch": "لصقة",
+                    "ring": "حلقة مهبلية",
+                    "condom": "واقي ذكري",
+                    "other": "أخرى"
+                },
+                "perimenopauseMode": "وضع ما حول سن اليأس",
+                "perimenopauseModeHint": "تظهر التوقعات كنطاق بدلاً من تاريخ واحد، ويُعطَّل تقييم الانتظام.",
+                "showPms": "إظهار نافذة ما قبل الدورة",
+                "notifyPartner": "إشعار الشريك",
+                "notifyPartnerHint": "يتلقى الشخص المختار التاريخ المتوقع فقط، ولا يصله أبدًا أي أعراض أو ملاحظات أو تسجيلات أخرى.",
+                "notifyPartnerNoEligible": "لا يوجد عضو مؤهل في العائلة - يمكن إشعار الأعضاء الذين لديهم صلاحية الوصول إلى وحدة الصحة فقط.",
+                "notifyPartnerDaysBefore": "تذكير للشريك"
+            },
+            "mucus": {
+                "label": "مخاط عنق الرحم",
+                "hint": "اختياري. يمكن أن تساعد التغيرات في القوام على تحديد نافذة الخصوبة.",
+                "none": "لا شيء",
+                "dry": "جاف",
+                "sticky": "لزج",
+                "creamy": "كريمي",
+                "watery": "مائي",
+                "eggwhite": "يشبه بياض البيض"
+            },
+            "test": {
+                "label": "الاختبارات",
+                "lhLabel": "اختبار LH",
+                "pregnancyLabel": "اختبار الحمل",
+                "unset": "لم يُختبر",
+                "negative": "سلبي",
+                "positive": "إيجابي"
+            },
+            "feelings": {
+                "label": "المشاعر"
+            },
+            "intimacy": {
+                "label": "العلاقة الحميمة",
+                "hint": "يبقى خاصًا حتى لو تمت مشاركة هذا اليوم مع العائلة.",
+                "none": "غير محدد",
+                "protected": "محمي",
+                "unprotected": "غير محمي",
+                "solo": "بمفردك"
+            },
+            "quickLink": {
+                "painkiller": "تسجيل مسكّن",
+                "weight": "تسجيل الوزن"
+            },
+            "bubble": {
+                "ariaLabel": "حالة الدورة اليوم",
+                "line1": "اليوم {{day}} من الدورة · {{phase}}",
+                "periodToday": "من المتوقع أن تبدأ الدورة اليوم - هل تبدأ الآن؟",
+                "periodOverdue": "تأخرت الدورة {{count}} يوم - هل تبدأ الآن؟",
+                "periodOverdue_one": "تأخرت الدورة {{count}} يوم - هل تبدأ الآن؟",
+                "periodStillOpen": "دورتك لا تزال مسجَّلة كجارية - إنهاؤها الآن؟",
+                "peakPainDay": "وفق نمطك، غالبًا ما يكون اليوم يوم الألم الأشد ({{symptom}}).",
+                "likelySymptomsToday": "محتمل اليوم: {{symptoms}}",
+                "pmsWindow": "نافذة ما قبل الدورة محتملة ابتداءً من {{weekday}}",
+                "upcomingSymptom": "محتمل ابتداءً من {{weekday}}: {{symptom}}",
+                "fertile": "نافذة الخصوبة حتى {{date}}",
+                "fertileConfirmed": "نافذة الخصوبة (تأكد الإباضة) حتى {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "تم تأكيد إباضة هذه الدورة من خلال ارتفاع في درجة الحرارة. لا تزال الدورات المستقبلية تعتمد على طريقة التقويم؛ وهذا لا يغني عن وسائل منع الحمل أو الاستشارة الطبية.",
+            "import": {
+                "button": "استيراد",
+                "title": "استيراد سجل الدورات",
+                "explainer": "ملف CSV أو نص ملصق: سطر واحد لكل دورة بالصيغة «start_date,end_date» (تاريخ الانتهاء اختياري)، والتواريخ بصيغة YYYY-MM-DD أو DD.MM.YYYY، مفصولة بفاصلة أو فاصلة منقوطة.",
+                "fileLabel": "اختيار ملف CSV",
+                "pasteLabel": "أو لصق نص CSV",
+                "submit": "استيراد",
+                "resultToast": "تم استيراد {{imported}}، وتخطي {{skipped}}.",
+                "errorsTitle": "تعذّر استيراد هذه الصفوف:",
+                "emptyError": "يرجى اختيار ملف CSV أو لصق نص.",
+                "error": "فشل الاستيراد."
+            },
+            "discoveryHint": "نصيحة: يمكنك الاشتراك في الدورة المتوقعة كخلاصة ICS ضمن <a href=\"/settings/personal/feeds\">الإعدادات ← شخصي ← الخلاصات</a>، أو إظهار أداة الدورة في <a href=\"/\">لوحة التحكم</a> عبر وضع التخصيص."
         },
         "duration": {
             "hm": "{{hours}} س {{minutes}} د",

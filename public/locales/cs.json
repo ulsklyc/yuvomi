@@ -4404,7 +4404,11 @@
                 "regular": "Pravidelný",
                 "irregular": "Nepravidelný",
                 "notEnoughData": "Málo dat",
-                "noPrediction": "Zaznamenej menstruaci pro předpovědi."
+                "noPrediction": "Zaznamenej menstruaci pro předpovědi.",
+                "fertilitySuppressedNote": "Plodné okno pozastaveno: hormonální antikoncepce.",
+                "nextPeriodRangeSub": "Průměr: {{date}}",
+                "partnerNextPeriod": "Menstruace osoby {{name}} by měla podle predikce začít {{date}}.",
+                "partnerNextPeriodNeutral": "Připomenutí pro partnera: menstruace"
             },
             "stats": {
                 "source": {
@@ -4412,11 +4416,14 @@
                     "history_one": "Na základě posledního cyklu",
                     "insufficientHistory": "Zatím výchozí hodnota - zaznamenejte ještě {{count}} cyklů pro osobní předpověď",
                     "insufficientHistory_one": "Zatím výchozí hodnota - zaznamenejte ještě {{count}} cyklus pro osobní předpověď",
-                    "default": "Výchozí předpoklad (zatím nezaznamenána žádná historie)"
+                    "default": "Výchozí předpoklad (zatím nezaznamenána žádná historie)",
+                    "historyOther": "Na základě posledních {{count}} cyklů",
+                    "historyOther_one": "Na základě posledního cyklu"
                 }
             },
             "unit": {
-                "days": "{{value}} dní"
+                "days": "{{value}} dní",
+                "days_one": "{{value}} den"
             },
             "today": {
                 "title": "Dnes",
@@ -4430,7 +4437,9 @@
             "calendar": {
                 "title": "Kalendář",
                 "prevMonth": "Předchozí měsíc",
-                "nextMonth": "Příští měsíc"
+                "nextMonth": "Příští měsíc",
+                "likelihoodTitle": "Vzorce symptomů",
+                "likelihoodCaption": "Vyberte symptom a zjistěte, ve které dny se podle vaší historie často objevuje."
             },
             "weekday": {
                 "mon": "Po",
@@ -4447,13 +4456,16 @@
                 "fertile": "Plodné",
                 "ovulation": "Ovulace",
                 "today": "Dnes",
-                "logged": "Záznam"
+                "logged": "Záznam",
+                "pms": "Okno PMS (vzorec)"
             },
             "history": {
                 "title": "Vývoj",
                 "ongoing": "probíhá",
                 "empty": "Zatím nezaznamenána žádná menstruace.",
-                "cycleLength": "Cyklus {{value}} dní"
+                "cycleLength": "Cyklus {{value}} dní",
+                "cycleLength_one": "Cyklus {{value}} den",
+                "flowHeaviest": "Max. {{value}}"
             },
             "trends": {
                 "title": "Trendy",
@@ -4469,12 +4481,21 @@
                 "typical": "Typické",
                 "atypical": "Atypické",
                 "typicalRangeLabel": "Typický rozsah: {{min}}-{{max}} dní",
-                "likelihoodTitle": "Vzorce symptomů",
-                "likelihoodCaption": "Vyberte symptom a zjistěte, ve které dny se podle vaší historie často objevuje.",
-                "likelyToday": "{{symptom}} se často objevuje kolem tohoto dne vašeho cyklu.",
                 "symptomTracked": "Zaznamenáno",
                 "symptomPredicted": "Zde se často objevuje",
-                "phaseOther": "Ostatní"
+                "phaseOther": "Ostatní",
+                "details": "Podrobnosti",
+                "feelingFrequency": "Četnost nálad",
+                "flowLoad": "Intenzita krvácení podle cyklu",
+                "flowLoadCaption": "Vychází z tvých záznamů o krvácení - čím úplnější záznamy, tím vypovídavější údaj.",
+                "flowLoadColumn": "Zátěž krvácení",
+                "flowLoadValue": "{{load}} ({{days}} zaznamenáno)",
+                "heavyBleedingHintHeavy": "Tvé poslední menstruace byly opakovaně označeny jako „silné“ - stojí za to to zmínit při lékařské konzultaci.",
+                "heavyBleedingHintLong": "Alespoň jedna z tvých posledních menstruací trvala déle než týden - stojí za to to zmínit při lékařské konzultaci.",
+                "painTitle": "Bolest",
+                "painCurrentCycleLabel": "Dny s bolestí v tomto cyklu",
+                "painAvgPerCycleLabel": "Prům. dnů s bolestí na cyklus",
+                "painAvgIntensityLabel": "Prům. intenzita"
             },
             "flow": {
                 "label": "Intenzita krvácení",
@@ -4543,7 +4564,9 @@
             },
             "period": {
                 "add": "Zaznamenat menstruaci",
-                "edit": "Upravit menstruaci"
+                "edit": "Upravit menstruaci",
+                "warningFuture": "Datum zahájení je v budoucnosti - předpovědi vycházejí jen z minulých cyklů.",
+                "warningOverlap": "Překrývá se s již zaznamenaným cyklem."
             },
             "dayLog": {
                 "title": "Zaznamenat den",
@@ -4582,8 +4605,91 @@
                 "pregnancyMode": "Režim těhotenství",
                 "dueDate": "Předpokládaný termín porodu",
                 "pregnancyHint": "V režimu těhotenství jsou předpovědi menstruace a ovulace pozastaveny. Denní záznamy zůstávají dostupné.",
-                "saved": "Nastavení uloženo."
-            }
+                "saved": "Nastavení uloženo.",
+                "contraception": "Metoda antikoncepce",
+                "contraceptionHint": "Hormonální metody automaticky pozastaví predikci plodného okna.",
+                "contraceptionUnset": "Neuvedeno",
+                "contraceptionOptions": {
+                    "none": "Žádná",
+                    "pill": "Pilulka",
+                    "hormonal_iud": "Hormonální nitroděložní tělísko",
+                    "copper_iud": "Měděné nitroděložní tělísko",
+                    "implant": "Implantát",
+                    "injection": "Injekce",
+                    "patch": "Náplast",
+                    "ring": "Vaginální kroužek",
+                    "condom": "Kondom",
+                    "other": "Jiná"
+                },
+                "perimenopauseMode": "Režim perimenopauzy",
+                "perimenopauseModeHint": "Predikce se zobrazují jako rozmezí místo jednoho data; hodnocení pravidelnosti se vypíná.",
+                "showPms": "Zobrazit PMS okno",
+                "notifyPartner": "Upozornit partnera",
+                "notifyPartnerHint": "Zvolená osoba dostane pouze předpovězené datum, nikdy příznaky, poznámky ani jiné záznamy.",
+                "notifyPartnerNoEligible": "Není k dispozici žádný způsobilý člen domácnosti - upozornit lze jen členy s přístupem k modulu Zdraví.",
+                "notifyPartnerDaysBefore": "Připomenutí pro partnera"
+            },
+            "mucus": {
+                "label": "Cervikální hlen",
+                "hint": "Volitelné. Změny konzistence mohou pomoci upřesnit plodné okno.",
+                "none": "Žádný",
+                "dry": "Suchý",
+                "sticky": "Lepkavý",
+                "creamy": "Krémový",
+                "watery": "Vodnatý",
+                "eggwhite": "Jako bílek"
+            },
+            "test": {
+                "label": "Testy",
+                "lhLabel": "LH test",
+                "pregnancyLabel": "Těhotenský test",
+                "unset": "Netestováno",
+                "negative": "Negativní",
+                "positive": "Pozitivní"
+            },
+            "feelings": {
+                "label": "Pocity"
+            },
+            "intimacy": {
+                "label": "Intimita",
+                "hint": "Zůstává soukromé, i když je tento den sdílen s rodinou.",
+                "none": "Neuvedeno",
+                "protected": "Chráněný",
+                "unprotected": "Nechráněný",
+                "solo": "Sólo"
+            },
+            "quickLink": {
+                "painkiller": "Zaznamenat lék proti bolesti",
+                "weight": "Zaznamenat váhu"
+            },
+            "bubble": {
+                "ariaLabel": "Dnešní stav cyklu",
+                "line1": "Den cyklu {{day}} · {{phase}}",
+                "periodToday": "Menstruace se dnes očekává - začít teď?",
+                "periodOverdue": "Menstruace mešká {{count}} dní - začít teď?",
+                "periodOverdue_one": "Menstruace mešká {{count}} den - začít teď?",
+                "periodStillOpen": "Podle záznamu tvoje menstruace stále probíhá - ukončit teď?",
+                "peakPainDay": "Podle vašeho vzorce bývá dnešek často dnem s nejsilnější bolestí ({{symptom}}).",
+                "likelySymptomsToday": "Dnes pravděpodobně: {{symptoms}}",
+                "pmsWindow": "PMS okno pravděpodobně od {{weekday}}",
+                "upcomingSymptom": "Od {{weekday}} pravděpodobně: {{symptom}}",
+                "fertile": "Plodné okno do {{date}}",
+                "fertileConfirmed": "Plodné okno (ovulace potvrzena) do {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "Ovulace v tomto cyklu byla potvrzena vzestupem teploty. Budoucí cykly nadále vycházejí z kalendářní metody; to nenahrazuje antikoncepci ani lékařskou radu.",
+            "import": {
+                "button": "Importovat",
+                "title": "Importovat historii menstruace",
+                "explainer": "Soubor CSV nebo vložený text: jeden řádek na periodu ve tvaru „start_date,end_date“ (koncové datum volitelné), data ve formátu RRRR-MM-DD nebo DD.MM.RRRR, oddělená čárkou nebo středníkem.",
+                "fileLabel": "Vybrat soubor CSV",
+                "pasteLabel": "Nebo vložit text CSV",
+                "submit": "Importovat",
+                "resultToast": "Importováno: {{imported}}, přeskočeno: {{skipped}}.",
+                "errorsTitle": "Tyto řádky se nepodařilo importovat:",
+                "emptyError": "Vyberte soubor CSV nebo vložte text.",
+                "error": "Import se nezdařil."
+            },
+            "discoveryHint": "Tip: předpovězený cyklus si můžete odebírat jako ICS kanál v <a href=\"/settings/personal/feeds\">Nastavení → Osobní → Kanály</a>, nebo zobrazit widget cyklu na <a href=\"/\">Přehledu</a> v režimu úprav."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",

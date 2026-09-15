@@ -1308,6 +1308,39 @@ button.health-med-card:hover {
   min-width: 0;
 }
 
+/* Die Zyklus-Kachel ist ein <button>, keine <section> - die ganze
+ * Kachel klickt zum Zyklus-Tab durch, statt nur eine
+ * Detailzeile darin wie bei den Vitalwerte-Karten. Rest der Optik bleibt
+ * identisch zu den Nachbarn (.health-overview__card): nur die Button-
+ * Grundformatierung wird zurückgesetzt, Ausrichtung bleibt linksbündig wie
+ * eine gewöhnliche Karte. */
+.health-overview__card--link {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  transition: box-shadow 0.15s ease;
+}
+
+.health-overview__card--link:hover,
+.health-overview__card--link:focus-visible {
+  box-shadow: var(--shadow-md);
+}
+
+.health-overview__cycle-value {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.health-overview__cycle-sub {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
 /* Adherence + Streak */
 .health-overview__adherence {
   display: grid;
@@ -1616,6 +1649,71 @@ button.health-med-card:hover {
   50%      { transform: scale(1.18); }
 }
 
+/* ---- "Heute"-Einblendung (C-1) ---- */
+
+.cycle-bubble {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  /* Modulton als Inhalts-Aussage ("wo bin ich"), keine Kartenexplosion: Kante
+   * im Vollton + Waschung in DERSELBEN Regel, damit der Struktur-Audit
+   * (test-frontend-audit.js, Vollton-Regel) die Aussage nicht zweimal blass
+   * zaehlt - die Kante traegt den vollen Ton, die Flaeche nur die Waschung. */
+  border-inline-start: 3px solid var(--module-health);
+  background: color-mix(in oklab, var(--module-health) var(--tint-wash), var(--color-surface));
+}
+
+.cycle-bubble__icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--module-health);
+}
+.cycle-bubble__icon svg { width: var(--icon-md); height: var(--icon-md); }
+
+.cycle-bubble__body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+
+.cycle-bubble__line1 { margin: 0; font-weight: 600; font-size: var(--text-sm); color: var(--color-text-primary); }
+
+.cycle-bubble__line2 {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.cycle-bubble__line2--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* Zeile 2 als echter Knopf (Barrierefreiheit: Symptom-Fall oeffnet das
+ * Tages-Log) - optisch bleibt sie eine Textzeile, keine Schaltflaeche. */
+.cycle-bubble__line2--action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--color-text-secondary);
+  text-align: start;
+  cursor: pointer;
+}
+.cycle-bubble__line2--action svg { width: var(--icon-sm); height: var(--icon-sm); flex: 0 0 auto; color: var(--color-text-tertiary); }
+.cycle-bubble__line2--action:hover,
+.cycle-bubble__line2--action:focus-visible { color: var(--color-text-primary); }
+
 /* ---- Schwangerschaft (Vorhersage pausiert) ---- */
 
 .cycle-preg {
@@ -1767,6 +1865,19 @@ button.health-med-card:hover {
   gap: var(--space-1);
 }
 
+/* Hinweiskachel, wenn hormonelle Verhuetung das fruchtbare Fenster
+ * pausiert - reine Meldung (Ton in Schrift/Icon, KEINE getoente Flaeche),
+ * damit die freigewordene Kachel-Luecke nicht wie ein Fehler wirkt. */
+.cycle-stat--note {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.cycle-stat--note i { width: var(--icon-sm); height: var(--icon-sm); flex: 0 0 auto; color: var(--color-text-tertiary); }
+
 .cycle-stat__pair-row {
   display: flex;
   flex-direction: row;
@@ -1809,7 +1920,29 @@ button.health-med-card:hover {
 
 /* ---- Monatskalender ---- */
 
-.cycle-cal { margin-top: var(--space-6); }
+.cycle-cal {
+  margin-top: var(--space-6);
+  /* Container Query statt neuer Viewport-Schwelle (DESIGN.md/tokens.css §11c:
+     komponenteninterne Responsivitaet fragt den eigenen Elternrahmen, keinen
+     neuen Seiten-Breakpoint) - der Kalender reagiert auf SEINE eigene
+     verfuegbare Breite, nicht auf die des Viewports. */
+  container: cycle-cal / inline-size;
+  /* Kompaktes Ziel (gemessen: 1200px Dashboard-Breite -> 160px-Zellen, 977px
+     hohes Gitter, hoeher als ein 900px-Viewport): Zellbreite 64px
+     (--space-16, oberes Ende des Zielkorridors 56-64px) mal 7 Spalten plus 6
+     Gaps a 4px (--space-1 - der Wert, auf den der fluide Gap unten ab knapp
+     380px Breite ohnehin saettigt, damit Mobile und Desktop dieselbe
+     Gap-Mathematik teilen): 7*64 + 6*4 = 472px. */
+  --cycle-cal-grid-max: calc(var(--space-16) * 7 + var(--space-1) * 6);
+  /* Rail-Untergrenze: 4 Zellbreiten + 1 Gap = 4*64 + 4 = 260px - der Punkt, ab
+     dem Legende/Chips zu schmal wuerden und lieber stapeln sollten (siehe
+     @container-Regel unten). */
+  --cycle-cal-rail-min: calc(var(--space-16) * 4 + var(--space-1));
+  /* Rail-Obergrenze: 5 Zellbreiten = 320px, verhindert, dass die schmale
+     Legenden-/Chip-Spalte bei sehr breiten Containern sinnlos in die Breite
+     gezogen wird. */
+  --cycle-cal-rail-max: calc(var(--space-16) * 5);
+}
 .cycle-section__title { margin: 0 0 var(--space-3); }
 
 .cycle-cal__head {
@@ -1839,6 +1972,43 @@ button.health-med-card:hover {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: clamp(var(--space-0h), 0.53vw, var(--space-1));
+}
+
+/* Default: gestapelt, exakt die heutige Reihenfolge (Gitter -> Legende ->
+   Muster-Satz); .cycle-cal__main/-rail existieren hier nur als Block-Wrapper
+   ohne Eigenwirkung - die Zwei-Spalten-Variante steckt allein in der
+   @container-Regel unten. */
+.cycle-cal__body { display: block; }
+.cycle-cal__main {
+  /* Das kompakte Ziel gilt IMMER, nicht erst ab der Zwei-Spalten-Schwelle:
+     ein 768px breiter Container soll das Gitter genauso auf ~472px begrenzen
+     wie ein 1440px breiter, statt es auf die volle Abschnittsbreite zu
+     strecken - das WAR der eigentliche Bug (160px-Zellen, 977px hohes
+     Gitter). Unterhalb von --cycle-cal-grid-max (z. B. Phone-Breite) greift
+     max-width ohnehin nicht, dort bleibt alles wie zuvor. */
+  max-width: var(--cycle-cal-grid-max);
+}
+
+/* Ab hier passt eine Zwei-Spalten-Variante (Gitter links, Legende+Chips
+   rechts) hinein, ohne die Rail unter ~260px zu quetschen: Schwelle =
+   Gitter-Max (472px) + Spaltenabstand (--space-6 = 24px) + Rail-Min (260px)
+   = 756px. Unterhalb dessen bleibt es bei der Stapel-Reihenfolge oben. */
+@container cycle-cal (min-width: 756px) {
+  .cycle-cal__body {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-6);
+  }
+  .cycle-cal__main { flex: 0 1 var(--cycle-cal-grid-max); }
+  .cycle-cal__rail {
+    flex: 1 1 var(--cycle-cal-rail-min);
+    min-width: var(--cycle-cal-rail-min);
+    max-width: var(--cycle-cal-rail-max);
+  }
+  /* Die Legende traegt ihren eigenen margin-top (Abstand zum Gitter im
+     gestapelten Fall) - daneben statt darunter soll sie stattdessen mit der
+     Wochentagszeile fluchten. */
+  .cycle-cal__rail > *:first-child { margin-top: 0; }
 }
 
 .cycle-cal__wd {
@@ -1907,6 +2077,56 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--cycle-period) calc(55% * var(--cycle-marker-alpha, 1)), transparent);
 }
 
+/* T2: bestätigter (BBT-Temperaturanstieg) Eisprung/fruchtbares Fenster vs.
+ * reine Kalendermethode - dieselbe Voll-/Umriss-Grammatik wie oben bei der
+ * Periode, NICHT eine zweite Farbe (der Ring löst dasselbe Problem am selben
+ * Punkt mit einem zusätzlichen Aussenring, siehe cycleRingMarkup()). Die
+ * Basisregel .is-ovulation oben (Füllung + Rand-Ring) bleibt der BESTÄTIGTE
+ * Zustand (Messwert); .is-predicted schwächt sie zum reinen Umriss ab, wenn
+ * es (noch) nur die Kalendermethode ist - `confirmed`/`predicted` schließen
+ * sich laut buildCycleCalendar() gegenseitig aus. */
+.cycle-cal__day.is-ovulation.is-predicted {
+  background: transparent;
+  font-weight: 400;
+}
+.cycle-cal__day.is-ovulation.is-predicted::after {
+  border-width: 1.5px;
+  border-color: color-mix(in oklab, var(--cycle-ovulation) calc(55% * var(--cycle-marker-alpha, 1)), transparent);
+}
+
+/* Dasselbe Prinzip für das fruchtbare Fenster: die Schraffur STEHT für "noch
+ * Vorhersage" (siehe Kommentar bei .is-fertile oben) - ein bestätigtes
+ * Fenster tauscht sie gegen eine ruhige Vollfläche, statt eine zweite Farbe
+ * einzuführen. */
+.cycle-cal__day.is-fertile.is-confirmed {
+  background-image: none;
+  background-color: color-mix(in oklab, var(--cycle-fertile) calc(var(--tint-raised) * var(--cycle-marker-alpha, 1)), transparent);
+}
+
+/* Intimitäts-Marker - eigene Ecke (oben links), damit er weder mit dem
+ * Flow-Punkt (unten mittig) noch mit dem Symptom-Overlay (oben rechts, s.u.)
+ * kollidiert. Bewusst NEUTRAL (--color-text-tertiary), nicht im Periodenton -
+ * dieses Feld ist hart-privat (siehe docs/SPEC.md, "Owner-only axis") und soll
+ * nicht wie ein weiterer Phasen-/Blutungsmarker wirken, nur "still" auf den
+ * Tag hinweisen. */
+.cycle-cal__intimacy-icon {
+  position: absolute;
+  top: var(--space-1);
+  left: var(--space-1);
+  z-index: 1;
+  color: color-mix(in oklab, var(--color-text-tertiary) calc(100% * var(--cycle-marker-alpha, 1)), transparent);
+}
+
+/* PMS-Fenster (aus dem Symptom-Muster abgeleitet, s. pmsWindow()) -
+ * eine schwache Waschung des Modultons, bewusst nur --tint-wash (die
+ * schwächste Stufe der Skala) und NUR auf Zellen ohne eigene Phase
+ * (cycleCalendarMarkup() filtert das) - so bleibt Menstruation/fruchtbar/
+ * Eisprung immer in ihrer eigenen Farbe lesbar, und die Musterfläche bleibt
+ * klar schwächer als jede Phasenfarbe (12/22/20 % oben vs. 8 % hier). */
+.cycle-cal__day.is-pms {
+  background: color-mix(in oklab, var(--module-health) calc(var(--tint-wash) * var(--cycle-marker-alpha, 1)), transparent);
+}
+
 /* HEUTE IST DIE STIMME, KEINE PHASE.
  *
  * Der Ring stand im Modulton - und der ist im Zyklus-Kalender der Ton, der den
@@ -1945,8 +2165,31 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   z-index: 1;
 }
 
-.cycle-cal__day[data-flow="spotting"] .cycle-cal__dot { opacity: 0.55; }
-.cycle-cal__day[data-flow="heavy"] .cycle-cal__dot { width: 6px; height: 6px; }
+/* B-1/A-9: 4-stufige Blutungsstärke-Skala - Größe UND Füllstärke steigen
+ * gemeinsam an, statt (wie zuvor) allein über eine kaum wahrnehmbare
+ * Opazität (Schmierblutung) bzw. 1px Größenunterschied (stark), bei dem
+ * "leicht" und "mittel" identisch aussahen. Die drei helleren Stufen nutzen
+ * je eine benannte Toenungsstufe (tokens.css §6b) auf --cycle-period, "stark"
+ * bleibt der volle Ton der Basisregel oben (keine Toenung nötig - Vollton IST
+ * die stärkste Stufe). `--cycle-marker-alpha` bleibt überall erhalten, damit
+ * ein Log auf einem Nachbarmonatstag genauso gedimmt wird wie jeder andere
+ * Marker der Zelle. */
+.cycle-cal__day[data-flow="spotting"] .cycle-cal__dot {
+  width: 4px;
+  height: 4px;
+  background: color-mix(in oklab, var(--cycle-period) calc(var(--tint-raised) * var(--cycle-marker-alpha, 1)), transparent);
+}
+.cycle-cal__day[data-flow="light"] .cycle-cal__dot {
+  width: 5.5px;
+  height: 5.5px;
+  background: color-mix(in oklab, var(--cycle-period) calc(var(--tint-hint) * var(--cycle-marker-alpha, 1)), transparent);
+}
+.cycle-cal__day[data-flow="medium"] .cycle-cal__dot {
+  width: 7px;
+  height: 7px;
+  background: color-mix(in oklab, var(--cycle-period) calc(var(--tint-ink) * var(--cycle-marker-alpha, 1)), transparent);
+}
+.cycle-cal__day[data-flow="heavy"] .cycle-cal__dot { width: 8.5px; height: 8.5px; }
 
 /* Symptom-Wahrscheinlichkeits-Overlay (Phase 4e): eigene Ecke (oben rechts),
  * damit der Marker nicht mit dem bestehenden hasLog-Punkt (unten mittig)
@@ -2010,8 +2253,35 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   background: color-mix(in oklab, var(--cycle-ovulation) 20%, transparent);
   border: 2px solid var(--cycle-ovulation);
 }
+/* T2: die Standard-Legendenzeile "Eisprung" zeigt jetzt den Umriss der
+ * Kalendermethode (Vorhersage, s. .cycle-cal__day.is-ovulation.is-predicted);
+ * "Eisprung bestätigt" (nur bei Bedarf angehängt) bleibt der Vollton oben. */
+.cycle-legend__swatch.is-ovulation.is-predicted {
+  background: transparent;
+  border-width: 1.5px;
+  border-color: color-mix(in oklab, var(--cycle-ovulation) 55%, transparent);
+}
 /* Die Legende spiegelt den Kalender-Marker 1:1 - also auch seinen Ton. */
 .cycle-legend__swatch.is-today { box-shadow: inset 0 0 0 2px var(--color-accent); }
+
+/* A-9/B-1: einfacher Log-Punkt ohne Flow-Wert - ein kleiner Kreis MITTIG im
+ * quadratischen Swatch-Rahmen, statt (wie die Phasen) die ganze Fläche zu
+ * füllen; genau der "aktuelle Look" aus .cycle-cal__dot. */
+.cycle-legend__swatch--dot { position: relative; }
+.cycle-legend__swatch--dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: var(--cycle-period);
+}
+
+/* PMS-Legendenswatch spiegelt die schwache Modulton-Waschung des
+ * Kalenders 1:1. */
+.cycle-legend__swatch.is-pms { background: color-mix(in oklab, var(--module-health) var(--tint-wash), transparent); }
 
 /* Ring-Legende (Phase Post-Ship) - der Ring selbst zeichnet volle Bogenfarben
    und einen gefuellten Punkt, nicht die 20%-Wash/Schraffur/Hohlring-Optik des
@@ -2040,6 +2310,78 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   border: 1.5px solid var(--module-health);
   border-radius: 50%;
 }
+
+/* Herz-Icon in der Legende - derselbe stille, nicht-phasenfarbene Ton
+ * wie der Kalender-Marker (siehe .cycle-cal__intimacy-icon). */
+.cycle-legend__heart-icon { color: var(--color-text-tertiary); }
+
+/* B-1: kompakte Zeile für die 4-stufige Blutungsstärke-Skala - EINE Zeile
+ * statt vier zusätzlicher .cycle-legend__item-Einträge, damit die Legende bei
+ * fünf/sechs weiteren Zuständen (Eisprung bestätigt, Symptom-Overlay, PMS)
+ * nicht auswuchert. Die Punkte spiegeln .cycle-cal__day[data-flow]
+ * .cycle-cal__dot 1:1, nur ohne --cycle-marker-alpha (die Legende kennt kein
+ * "Nachbarmonat"). */
+.cycle-legend__flow-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: var(--text-2xs);
+  color: var(--color-text-secondary);
+}
+.cycle-legend__flow-label { font-weight: 600; }
+.cycle-legend__flow-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.cycle-legend__flow-dot {
+  display: inline-block;
+  border-radius: var(--radius-full);
+  background: var(--cycle-period);
+}
+.cycle-legend__flow-dot[data-flow="spotting"] {
+  width: 4px;
+  height: 4px;
+  background: color-mix(in oklab, var(--cycle-period) var(--tint-raised), transparent);
+}
+.cycle-legend__flow-dot[data-flow="light"] {
+  width: 5.5px;
+  height: 5.5px;
+  background: color-mix(in oklab, var(--cycle-period) var(--tint-hint), transparent);
+}
+.cycle-legend__flow-dot[data-flow="medium"] {
+  width: 7px;
+  height: 7px;
+  background: color-mix(in oklab, var(--cycle-period) var(--tint-ink), transparent);
+}
+.cycle-legend__flow-dot[data-flow="heavy"] { width: 8.5px; height: 8.5px; }
+
+/* v2 Nutzer-Feedback: die Symptom-Muster-Chips (Phase 4e) sitzen jetzt direkt
+ * unter der Kalender-Legende statt ganz unten im Trends-Bereich - dort war die
+ * einzige sichtbare Wirkung (die Kalender-Marker) weit entfernt und ein Tap
+ * wirkte wie ein No-op. Kein eigenes Kachel-Gehaeuse (kein .health-chart-
+ * section) mehr - es reiht sich flach in den Kalenderabschnitt ein, genau wie
+ * die Legende selbst. */
+.cycle-likelihood { margin-top: var(--space-4); }
+.cycle-likelihood__caption {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+.cycle-likelihood__picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+/* Der Muster-Satz einer Auswahl (symptomCyclePatternSentence()) - dieselbe
+ * .cycle-pattern__sentence-Optik wie im Trends-Aufklapper, hier zusaetzlich
+ * mit etwas Abstand nach oben statt dessen eigenem unteren Rand. */
+.cycle-likelihood__sentence { margin: var(--space-2) 0 0; }
 
 /* ---- Trends (Phase 4) ---- */
 
@@ -2123,25 +2465,43 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   box-shadow: inset 0 0 0 2px var(--color-text-primary);
 }
 
-/* Symptom-Wahrscheinlichkeits-Chips + "heute wahrscheinlich"-Hinweis (Phase 4e). */
-.cycle-likelihood__picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+/* Kleines Gefuehls-Icon vor dem Zeilennamen (MOOD_TYPES-Icon) - Symptome
+ * tragen an derselben Stelle keins, hier eins, weil MOOD_TYPES.icon ohnehin
+ * existiert und ein Gefuehl (anders als ein Textpreset) von einem
+ * wiedererkennbaren Icon profitiert (dieselben Icons wie im Tages-Log). */
+.cycle-symptom-row__icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  margin-right: var(--space-1);
+  vertical-align: -2px;
+  color: var(--color-text-tertiary);
 }
 
-/* Meldung, keine Zuordnung (Struktur-Audit): Ton in Schrift+Icon, keine
- * getoente Flaeche daneben - sonst zaehlt --module-health zweimal blass. */
-.cycle-likelihood__callout {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--module-health);
+/* Schmerz-Kachel am Kopf des Trends-Bereichs - drei Werte NEBENEINANDER
+ * statt als Chart, bewusst eine Kachel, kein Diagramm. Dieselbe
+ * .health-chart-section-Hülle wie jeder andere Trend-Block (ein-System-Optik),
+ * nur mit einer Statistik-Reihe statt eines SVG als Inhalt. */
+.cycle-pain-tile__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  text-align: center;
 }
-.cycle-likelihood__callout svg { width: var(--icon-md); height: var(--icon-md); flex-shrink: 0; }
+.cycle-pain-tile__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cycle-pain-tile__value {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--module-health);
+  font-variant-numeric: tabular-nums;
+}
+.cycle-pain-tile__label {
+  font-size: var(--text-2xs);
+  color: var(--color-text-secondary);
+}
 
 /* ---- Verlauf ---- */
 
@@ -2196,6 +2556,25 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   gap: var(--space-2);
   flex-wrap: wrap;
   margin-top: var(--space-4);
+}
+
+/* Eine ruhige Hinweiszeile unter der Fußleiste - trägt .cycle-hint
+ * (dieselbe leise, tertiäre Textfarbe wie überall im Zyklus-Tab), nur mit
+ * etwas Abstand nach oben, weil sie zwischen zwei Blöcken (Fußleiste,
+ * Disclaimer) ohne eigenes Flex-Gap steht. Ihr Textinhalt kommt roh (nicht
+ * escaped) aus der Übersetzung selbst, dieselbe Konvention wie
+ * settings.applePasswordHint - zwei feste Links gehören zum Satz, nicht zu
+ * variablen Daten. */
+.cycle-discovery-hint {
+  margin-top: var(--space-2);
+}
+
+/* Server-Fehlerliste beim CSV-Import (bis zu zehn Zeilen, siehe
+ * server/routes/health/cycle.js) - schlichte Liste in der bestehenden
+ * .form-error-Box statt einer neuen Fehlerkomponente. */
+.cycle-import-errors ul {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-4);
 }
 
 /* ---- Modal-Auswahlchips (Flow/Symptome/Stimmung) ----
@@ -2288,6 +2667,25 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 
 .cycle-hint { font-size: var(--text-xs); color: var(--color-text-secondary); margin: 0; }
 
+/* A-3: weiche Warnung im Perioden-Modal (Zukunftsdatum/Ueberschneidung) - Ton
+ * wie eine Warn-Kachel, nicht wie `.form-error` (das waere Gefahr/blockierend,
+ * hier bleibt Speichern bewusst erlaubt). Getrennt von `.cycle-hint`, weil sie
+ * per [hidden] ein- und ausgeblendet wird statt immer sichtbar zu stehen. */
+.cycle-hint--warning {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-warning-light);
+  color: var(--color-warning-ink);
+  border-radius: var(--radius-sm);
+}
+
+/* Schloss-Symbol vor dem Intimitaets-Label: `.label` ist block, das Icon
+ * soll aber in derselben Zeile wie der Text stehen. */
+.cycle-intimacy-label { display: inline-flex; align-items: center; gap: var(--space-1); }
+
+/* Schnellzugriffs-Links unter der Symptome-Gruppe im Tages-Log -
+ * bewusst leise (btn--ghost btn--sm), keine zweite Aktionsebene neben Speichern. */
+.cycle-quick-links { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
 /* Bulk-Sichtbarkeit: Sekundär-Button plus ausklappbare Inline-Bestätigung. */
 .cycle-bulk { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
 .cycle-bulk__confirm {
@@ -2302,6 +2700,19 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 }
 /* display erst wenn sichtbar - sonst überschreibt der Flex das UA-[hidden]. */
 .cycle-bulk__confirm:not([hidden]) { display: flex; }
+/* [hidden] durchsetzen: `.form-field` (layout.css) setzt `display: flex` mit
+ * derselben Spezifitaet wie das UA-`[hidden] { display: none }` und gewinnt
+ * als spaeter geladene Regel - betraf schon das Entbindungstermin-Feld
+ * (#cs-due-field, unveraendert sichtbar geblieben, obwohl der Schwanger-
+ * schafts-Modus aus war) und beim Bau der Partner-Erinnerung neu dazu-
+ * gekommene #cs-notify-partner-days-field genauso. Gleiches Muster wie
+ * .inventory-filters[hidden]/.tasks-filters-row[hidden] in ihren jeweiligen
+ * Modulen - hier lokal auf die beiden betroffenen Felder begrenzt, statt
+ * layout.css global anzufassen. */
+#cs-due-field[hidden],
+#cs-notify-partner-days-field[hidden] {
+  display: none;
+}
 .cycle-bulk__question { color: var(--color-text-primary); }
 /* Umbruch statt Quetschen - Begruendung an `.modal-panel__footer`
  * (layout.css, #872). */

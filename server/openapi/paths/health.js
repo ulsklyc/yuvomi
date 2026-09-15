@@ -139,15 +139,35 @@ export function healthPaths() {
       delete: op({ summary: 'Delete a period episode', tag: 'Health', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/health/cycle/logs': {
-      get: op({ summary: 'List cycle day logs (flow, symptoms, mood)', tag: 'Health', description: 'Scoped to the viewer; `?user_id=`, `from`, `to` filters supported.' }),
-      post: op({ summary: 'Upsert a cycle day log (one per person and day)', tag: 'Health', stateChanging: true, requestBody: jsonBody(null) }),
+      get: op({
+        summary: 'List cycle day logs (flow, symptoms, feelings, mucus, tests)',
+        tag: 'Health',
+        description: 'Scoped to the viewer; `?user_id=`, `from`, `to` filters supported. Each row also carries `feelings` (array of mood keys, from the normalized `cycle_day_log_feelings` table); the legacy scalar `mood` is still returned for backward compatibility; it is only written (set to NULL) when a save\'s body includes `feelings` or `mood` as a key, and left untouched otherwise. `cervix_mucus`, `lh_test`, `pregnancy_test` and `intimacy` (all nullable enums, see the POST body) are included ONLY when the caller is the row\'s own owner - stripped from every other read regardless of the row\'s `visibility`, since sharing a day does not imply sharing fertility-test results or a sex-life entry.',
+      }),
+      post: op({
+        summary: 'Upsert a cycle day log (one per person and day)',
+        tag: 'Health',
+        stateChanging: true,
+        requestBody: jsonBody(null),
+        description: 'Body: { log_date, flow?, note?, visibility?, symptoms?, basal_temp?, basal_temp_unit?, cervix_mucus?, lh_test?, pregnancy_test?, intimacy?, feelings? }. `cervix_mucus` ∈ dry/sticky/creamy/watery/eggwhite; `lh_test`/`pregnancy_test` ∈ negative/positive; `intimacy` ∈ protected/unprotected/solo. `feelings` is an array from a fixed 7-key set (great/good/neutral/sensitive/sad/irritable/anxious, same as the frontend\'s MOOD_TYPES) - any other value is a 400, not stored as free text. The legacy single-value `mood` is still accepted and validated against the same fixed set, treated as `feelings: [mood]` when `feelings` is absent. A save whose body includes either `feelings` or `mood` as a key fully replaces the stored feelings rows (delete + re-insert) and sets the `mood` column to NULL; a save that includes neither key leaves both the existing feelings rows and the `mood` column untouched, so an unrelated field change cannot silently clear a frozen legacy mood value. This is NOT the same as `symptoms`: `symptoms` is fully replaced on every save (an omitted `symptoms` array normalizes to empty and clears any existing rows), while `feelings`/`mood` are only replaced when the request actually names one of those two keys.',
+      }),
     },
     '/api/v1/health/cycle/logs/{id}': {
       delete: op({ summary: 'Delete a cycle day log', tag: 'Health', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/health/cycle/settings': {
-      get: op({ summary: 'Get the viewer\'s cycle prediction settings', tag: 'Health' }),
-      put: op({ summary: 'Update the viewer\'s cycle prediction settings', tag: 'Health', stateChanging: true, requestBody: jsonBody(null) }),
+      get: op({
+        summary: 'Get the viewer\'s cycle prediction settings',
+        tag: 'Health',
+        description: 'Includes `contraception`, `perimenopause_mode`, `show_pms`, `notify_partner_user_id` and `notify_partner_days_before` alongside the existing prediction settings, plus `eligible_partners: [{ id, display_name }]` - other household members (excluding the caller and anyone with the family role `child`) who pass the same health-module-access check the partner-reminder sync itself uses. Only these are valid targets for `notify_partner_user_id` below.',
+      }),
+      put: op({
+        summary: 'Update the viewer\'s cycle prediction settings',
+        tag: 'Health',
+        stateChanging: true,
+        requestBody: jsonBody(null),
+        description: 'Full-replace semantics like every other field on this route: an omitted field resets to its default rather than leaving the stored value untouched. `contraception` ∈ none/pill/hormonal_iud/copper_iud/implant/injection/patch/ring/condom/other; hormonal methods auto-disable fertile-window prediction client-side. `perimenopause_mode`/`show_pms` are booleans. `notify_partner_user_id` (opt-in partner notification) must be one of the `eligible_partners` returned by GET (an existing household member with health-module access, not a child) and must not be the caller themselves - 400 otherwise; empty/absent clears it. `notify_partner_days_before` is an integer 0-14. The response is the same shape as GET, including the `eligible_partners` list.',
+      }),
     },
     '/api/v1/health/cycle/feed': {
       get: op({ summary: 'Get own predicted-cycle ICS feed status', tag: 'Health' }),
@@ -159,6 +179,15 @@ export function healthPaths() {
     '/api/v1/health/export/cycle': {
       get: op({ summary: 'Export period history as CSV', tag: 'Health', description: 'Scoped to the viewer; `?user_id=`, `from`, `to` filters supported. Returns `text/csv`.' }),
     },
+    '/api/v1/health/cycle/import': {
+      post: op({
+        summary: 'Import period history from CSV',
+        tag: 'Health',
+        stateChanging: true,
+        requestBody: jsonBody(null),
+        description: 'Body: { csv: string }. Header-tolerant CSV in the export\'s own column order (`start_date`, `end_date` first - see GET /export/cycle); extra columns are ignored. Accepts both comma and semicolon separators (German Excel exports use `;`) and both `YYYY-MM-DD` and `DD.MM.YYYY` dates (again a German-export accommodation). All-or-nothing: any invalid row rejects the whole import with 400 and up to the first 10 row errors, nothing is inserted. A row whose `start_date` matches an existing period of the caller is skipped (counted, not an error); other overlaps are allowed. Rejects with 400 if the payload exceeds 100 KB or 500 data rows. New periods take the caller\'s `default_visibility` from `/cycle/settings` (falls back to `private`). Response: `{ imported, skipped, errors: [] }`. Re-syncs the caller\'s cycle reminders once after commit.',
+      }),
+    },
     '/api/v1/health/caregivers/me': {
       get: op({ summary: 'List who the caller may record health data for', tag: 'Health', description: 'Open to every member: it is the answer about their own rights, not about anyone else\'s data.' }),
     },
@@ -169,7 +198,7 @@ export function healthPaths() {
       put: op({ summary: 'Set who may record health data for one person', tag: 'Health', admin: true, stateChanging: true, params: [idParam('subjectId', 'The person being cared for')], requestBody: jsonBody(null), description: 'Sets the caregivers to exactly the list given. An empty array withdraws care, so removing is the same path as changing and needs no route of its own.' }),
     },
     '/api/v1/health/cycle/visibility': {
-      patch: op({ summary: 'Set the visibility of all own cycle entries at once', tag: 'Health', stateChanging: true, requestBody: jsonBody(null), description: 'Applies one visibility to every period and daily log of the CALLER. Other people\'s entries are untouched, and periods and logs move together in one transaction - either both or neither.' }),
+      patch: op({ summary: 'Set the visibility of all own cycle entries at once', tag: 'Health', stateChanging: true, requestBody: jsonBody(null), description: 'Applies one visibility to every period and daily log of the CALLER. Other people\'s entries are untouched, and periods and logs move together in one transaction - either both or neither. Never exposes `cervix_mucus`, `lh_test`, `pregnancy_test` or `intimacy` to anyone else even when logs move to `family`: those four fields are stripped from every non-owner read regardless of visibility (see GET /cycle/logs).' }),
     },
     '/api/v1/health/visibility-defaults': {
       get: op({ summary: 'Get the caller\'s default visibility per health area', tag: 'Health', description: 'Returns only the deviations as `{ scope_key: visibility }`; a missing key means `private`, the shipped value. Scope keys are `vital:<type>` per metric plus `meds`, `labs` and `activities`. The cycle tab keeps its own setting under `/health/cycle/settings`.' }),

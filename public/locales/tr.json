@@ -4404,7 +4404,11 @@
                 "regular": "Düzenli",
                 "irregular": "Düzensiz",
                 "notEnoughData": "Yetersiz veri",
-                "noPrediction": "Tahminler için bir adet dönemi kaydet."
+                "noPrediction": "Tahminler için bir adet dönemi kaydet.",
+                "fertilitySuppressedNote": "Doğurgan pencere duraklatıldı: hormonal doğum kontrolü.",
+                "nextPeriodRangeSub": "Ortalama: {{date}}",
+                "partnerNextPeriod": "{{name}} adlı kişinin adetinin {{date}} tarihinde başlaması bekleniyor.",
+                "partnerNextPeriodNeutral": "Partner hatırlatması: adet"
             },
             "stats": {
                 "source": {
@@ -4412,11 +4416,14 @@
                     "history_one": "Son döngüne göre",
                     "insufficientHistory": "Şimdilik varsayılan değer - kişiselleştirilmiş tahmin için {{count}} döngü daha kaydet",
                     "insufficientHistory_one": "Şimdilik varsayılan değer - kişiselleştirilmiş tahmin için {{count}} döngü daha kaydet",
-                    "default": "Varsayılan kabul (henüz geçmiş kaydı yok)"
+                    "default": "Varsayılan kabul (henüz geçmiş kaydı yok)",
+                    "historyOther": "Son {{count}} döngüye göre",
+                    "historyOther_one": "Son döngüye göre"
                 }
             },
             "unit": {
-                "days": "{{value}} gün"
+                "days": "{{value}} gün",
+                "days_one": "{{value}} gün"
             },
             "today": {
                 "title": "Bugün",
@@ -4430,7 +4437,9 @@
             "calendar": {
                 "title": "Takvim",
                 "prevMonth": "Önceki ay",
-                "nextMonth": "Sonraki ay"
+                "nextMonth": "Sonraki ay",
+                "likelihoodTitle": "Semptom örüntüleri",
+                "likelihoodCaption": "Geçmişine göre hangi günlerde sık görüldüğünü görmek için bir semptom seç."
             },
             "weekday": {
                 "mon": "Pzt",
@@ -4447,13 +4456,16 @@
                 "fertile": "Doğurgan",
                 "ovulation": "Yumurtlama",
                 "today": "Bugün",
-                "logged": "Kayıt"
+                "logged": "Kayıt",
+                "pms": "PMS penceresi (örüntü)"
             },
             "history": {
                 "title": "Eğilim",
                 "ongoing": "devam ediyor",
                 "empty": "Henüz adet dönemi kaydedilmedi.",
-                "cycleLength": "Döngü {{value}} gün"
+                "cycleLength": "Döngü {{value}} gün",
+                "cycleLength_one": "Döngü {{value}} gün",
+                "flowHeaviest": "Maks. {{value}}"
             },
             "trends": {
                 "title": "Eğilimler",
@@ -4469,12 +4481,21 @@
                 "typical": "Tipik",
                 "atypical": "Atipik",
                 "typicalRangeLabel": "Tipik aralık: {{min}}-{{max}} gün",
-                "likelihoodTitle": "Semptom örüntüleri",
-                "likelihoodCaption": "Geçmişine göre hangi günlerde sık görüldüğünü görmek için bir semptom seç.",
-                "likelyToday": "{{symptom}} döngünde genellikle bu günün civarında görülür.",
                 "symptomTracked": "Kaydedildi",
                 "symptomPredicted": "Genellikle burada görülür",
-                "phaseOther": "Diğer"
+                "phaseOther": "Diğer",
+                "details": "Ayrıntılar",
+                "feelingFrequency": "Duygu sıklığı",
+                "flowLoad": "Döngü başına kanama yoğunluğu",
+                "flowLoadCaption": "Kanama kayıtlarına dayanır - kayıtların ne kadar eksiksiz olursa, bu o kadar anlamlı olur.",
+                "flowLoadColumn": "Kanama yükü",
+                "flowLoadValue": "{{load}} ({{days}} kaydedildi)",
+                "heavyBleedingHintHeavy": "Son adet dönemlerin tekrar tekrar \"yoğun\" olarak kaydedildi - bunu bir doktor görüşmesinde belirtmekte fayda var.",
+                "heavyBleedingHintLong": "Son adet dönemlerinden en az biri bir haftadan uzun sürdü - bunu bir doktor görüşmesinde belirtmekte fayda var.",
+                "painTitle": "Ağrı",
+                "painCurrentCycleLabel": "Bu döngüdeki ağrılı gün sayısı",
+                "painAvgPerCycleLabel": "Döngü başına ort. ağrılı gün",
+                "painAvgIntensityLabel": "Ort. yoğunluk"
             },
             "flow": {
                 "label": "Kanama yoğunluğu",
@@ -4543,7 +4564,9 @@
             },
             "period": {
                 "add": "Adeti kaydet",
-                "edit": "Adeti düzenle"
+                "edit": "Adeti düzenle",
+                "warningFuture": "Başlangıç tarihi gelecekte - tahminler yalnızca geçmiş döngülere dayanır.",
+                "warningOverlap": "Zaten kaydedilmiş bir döngüyle çakışıyor."
             },
             "dayLog": {
                 "title": "Günü kaydet",
@@ -4582,8 +4605,91 @@
                 "pregnancyMode": "Gebelik modu",
                 "dueDate": "Tahmini doğum tarihi",
                 "pregnancyHint": "Gebelik modunda regl ve yumurtlama tahminleri duraklatılır. Günlük kayıt kullanılmaya devam eder.",
-                "saved": "Ayarlar kaydedildi."
-            }
+                "saved": "Ayarlar kaydedildi.",
+                "contraception": "Doğum kontrol yöntemi",
+                "contraceptionHint": "Hormonal yöntemler doğurgan pencere tahminini otomatik olarak duraklatır.",
+                "contraceptionUnset": "Belirtilmedi",
+                "contraceptionOptions": {
+                    "none": "Yok",
+                    "pill": "Doğum kontrol hapı",
+                    "hormonal_iud": "Hormonlu spiral",
+                    "copper_iud": "Bakırlı spiral",
+                    "implant": "İmplant",
+                    "injection": "İğne",
+                    "patch": "Bant",
+                    "ring": "Vajinal halka",
+                    "condom": "Prezervatif",
+                    "other": "Diğer"
+                },
+                "perimenopauseMode": "Perimenopoz modu",
+                "perimenopauseModeHint": "Tahminler tek bir tarih yerine bir aralık olarak gösterilir; düzenlilik değerlendirmesi kapatılır.",
+                "showPms": "PMS penceresini göster",
+                "notifyPartner": "Bir partnere bildir",
+                "notifyPartnerHint": "Seçilen kişi yalnızca tahmini tarihi alır, asla semptomları, notları veya diğer kayıtları almaz.",
+                "notifyPartnerNoEligible": "Uygun bir hane üyesi yok - yalnızca Sağlık modülüne erişimi olan üyelere bildirim gönderilebilir.",
+                "notifyPartnerDaysBefore": "Partner hatırlatması"
+            },
+            "mucus": {
+                "label": "Serviks mukusu",
+                "hint": "İsteğe bağlı. Kıvamdaki değişiklikler doğurgan pencereyi daraltmaya yardımcı olabilir.",
+                "none": "Yok",
+                "dry": "Kuru",
+                "sticky": "Yapışkan",
+                "creamy": "Kremsi",
+                "watery": "Sulu",
+                "eggwhite": "Yumurta akı gibi"
+            },
+            "test": {
+                "label": "Testler",
+                "lhLabel": "LH testi",
+                "pregnancyLabel": "Gebelik testi",
+                "unset": "Test yapılmadı",
+                "negative": "Negatif",
+                "positive": "Pozitif"
+            },
+            "feelings": {
+                "label": "Duygular"
+            },
+            "intimacy": {
+                "label": "Mahremiyet",
+                "hint": "Bu gün aileyle paylaşılsa bile özel kalır.",
+                "none": "Belirtilmedi",
+                "protected": "Korunmalı",
+                "unprotected": "Korunmasız",
+                "solo": "Tek başına"
+            },
+            "quickLink": {
+                "painkiller": "Ağrı kesici kaydet",
+                "weight": "Kilo kaydet"
+            },
+            "bubble": {
+                "ariaLabel": "Bugünkü döngü durumu",
+                "line1": "Döngü günü {{day}} · {{phase}}",
+                "periodToday": "Adet bugün bekleniyor - şimdi başlatılsın mı?",
+                "periodOverdue": "Adet {{count}} gündür gecikti - şimdi başlatılsın mı?",
+                "periodOverdue_one": "Adet {{count}} gündür gecikti - şimdi başlatılsın mı?",
+                "periodStillOpen": "Kayda göre adetin hâlâ devam ediyor - şimdi bitirilsin mi?",
+                "peakPainDay": "Örüntüne göre bugün genellikle en yoğun ağrı günün oluyor ({{symptom}}).",
+                "likelySymptomsToday": "Bugün muhtemel: {{symptoms}}",
+                "pmsWindow": "PMS penceresi muhtemelen {{weekday}} itibarıyla",
+                "upcomingSymptom": "{{weekday}} itibarıyla muhtemel: {{symptom}}",
+                "fertile": "Doğurgan pencere {{date}} tarihine kadar",
+                "fertileConfirmed": "Doğurgan pencere (yumurtlama doğrulandı) {{date}} tarihine kadar"
+            },
+            "fertilityDisclaimerConfirmed": "Bu döngüdeki yumurtlama bir sıcaklık artışıyla doğrulandı. Gelecekteki döngüler yine takvim yöntemine dayanır; bu doğum kontrolünün veya tıbbi tavsiyenin yerini tutmaz.",
+            "import": {
+                "button": "İçe Aktar",
+                "title": "Adet geçmişini içe aktar",
+                "explainer": "CSV dosyası veya yapıştırılan metin: her satır bir döngü için „start_date,end_date” biçiminde (bitiş tarihi isteğe bağlı), tarihler YYYY-AA-GG veya GG.AA.YYYY biçiminde, virgül veya noktalı virgülle ayrılmış.",
+                "fileLabel": "CSV dosyası seç",
+                "pasteLabel": "Veya CSV metnini yapıştır",
+                "submit": "İçe Aktar",
+                "resultToast": "{{imported}} içe aktarıldı, {{skipped}} atlandı.",
+                "errorsTitle": "Bu satırlar içe aktarılamadı:",
+                "emptyError": "Lütfen bir CSV dosyası seçin veya metin yapıştırın.",
+                "error": "İçe aktarma başarısız oldu."
+            },
+            "discoveryHint": "İpucu: tahmini döngüye <a href=\"/settings/personal/feeds\">Ayarlar → Kişisel → Beslemeler</a> altında ICS beslemesi olarak abone olabilirsin, ya da döngü widget'ını <a href=\"/\">Genel Bakış</a>'ta özelleştirme modundan gösterebilirsin."
         },
         "duration": {
             "hm": "{{hours}} sa {{minutes}} dk",

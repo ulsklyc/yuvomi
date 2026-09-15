@@ -4404,7 +4404,11 @@
                 "regular": "규칙적",
                 "irregular": "불규칙",
                 "notEnoughData": "데이터 부족",
-                "noPrediction": "예측을 위해 생리를 기록하세요."
+                "noPrediction": "예측을 위해 생리를 기록하세요.",
+                "fertilitySuppressedNote": "가임기 일시 중지됨: 호르몬 피임.",
+                "nextPeriodRangeSub": "평균: {{date}}",
+                "partnerNextPeriod": "{{name}}님의 생리는 {{date}}에 시작될 것으로 예상됩니다.",
+                "partnerNextPeriodNeutral": "파트너 알림 - 생리"
             },
             "stats": {
                 "source": {
@@ -4412,11 +4416,14 @@
                     "history_one": "가장 최근 주기를 기준으로",
                     "insufficientHistory": "현재는 기본값입니다 - 맞춤 예측을 위해 {{count}}개 주기를 더 기록하세요",
                     "insufficientHistory_one": "현재는 기본값입니다 - 맞춤 예측을 위해 {{count}}개 주기를 더 기록하세요",
-                    "default": "기본 가정값(아직 기록된 이력 없음)"
+                    "default": "기본 가정값(아직 기록된 이력 없음)",
+                    "historyOther": "최근 {{count}}개 주기를 기준으로",
+                    "historyOther_one": "가장 최근 주기를 기준으로"
                 }
             },
             "unit": {
-                "days": "{{value}}일"
+                "days": "{{value}}일",
+                "days_one": "{{value}}일"
             },
             "today": {
                 "title": "오늘",
@@ -4430,7 +4437,9 @@
             "calendar": {
                 "title": "캘린더",
                 "prevMonth": "지난달",
-                "nextMonth": "다음 달"
+                "nextMonth": "다음 달",
+                "likelihoodTitle": "증상 패턴",
+                "likelihoodCaption": "이력에 따라 자주 나타나는 날짜를 확인하려면 증상을 선택하세요."
             },
             "weekday": {
                 "mon": "월",
@@ -4447,13 +4456,16 @@
                 "fertile": "가임",
                 "ovulation": "배란",
                 "today": "오늘",
-                "logged": "기록"
+                "logged": "기록",
+                "pms": "PMS 기간 (패턴)"
             },
             "history": {
                 "title": "추이",
                 "ongoing": "진행 중",
                 "empty": "아직 기록된 생리가 없습니다.",
-                "cycleLength": "주기 {{value}}일"
+                "cycleLength": "주기 {{value}}일",
+                "cycleLength_one": "주기 {{value}}일",
+                "flowHeaviest": "최고: {{value}}"
             },
             "trends": {
                 "title": "추세",
@@ -4469,12 +4481,21 @@
                 "typical": "일반적",
                 "atypical": "비정상적",
                 "typicalRangeLabel": "일반적 범위: {{min}}-{{max}}일",
-                "likelihoodTitle": "증상 패턴",
-                "likelihoodCaption": "이력에 따라 자주 나타나는 날짜를 확인하려면 증상을 선택하세요.",
-                "likelyToday": "{{symptom}}은(는) 주기의 이 날 즈음에 자주 나타납니다.",
                 "symptomTracked": "기록됨",
                 "symptomPredicted": "여기서 자주 나타남",
-                "phaseOther": "기타"
+                "phaseOther": "기타",
+                "details": "세부정보",
+                "feelingFrequency": "기분 빈도",
+                "flowLoad": "주기별 생리량 추이",
+                "flowLoadCaption": "생리량 기록을 기반으로 합니다 - 기록이 자세할수록 더 의미 있는 정보입니다.",
+                "flowLoadColumn": "생리량 합계",
+                "flowLoadValue": "{{load}} ({{days}} 기록됨)",
+                "heavyBleedingHintHeavy": "최근 생리가 반복적으로 \"과다\"로 기록되었습니다 - 진료 상담 시 언급해 볼 만합니다.",
+                "heavyBleedingHintLong": "최근 생리 중 적어도 한 번은 일주일 이상 지속되었습니다 - 진료 상담 시 언급해 볼 만합니다.",
+                "painTitle": "통증",
+                "painCurrentCycleLabel": "이번 주기의 통증 일수",
+                "painAvgPerCycleLabel": "주기당 평균 통증 일수",
+                "painAvgIntensityLabel": "평균 강도"
             },
             "flow": {
                 "label": "생리량",
@@ -4543,7 +4564,9 @@
             },
             "period": {
                 "add": "생리 기록",
-                "edit": "생리 편집"
+                "edit": "생리 편집",
+                "warningFuture": "시작일이 미래입니다 - 예측은 과거 주기만을 기준으로 합니다.",
+                "warningOverlap": "이미 기록된 주기와 겹칩니다."
             },
             "dayLog": {
                 "title": "하루 기록",
@@ -4582,8 +4605,91 @@
                 "pregnancyMode": "임신 모드",
                 "dueDate": "출산 예정일",
                 "pregnancyHint": "임신 모드에서는 생리와 배란 예측이 일시 중지됩니다. 매일 기록은 계속 사용할 수 있습니다.",
-                "saved": "설정이 저장되었습니다."
-            }
+                "saved": "설정이 저장되었습니다.",
+                "contraception": "피임 방법",
+                "contraceptionHint": "호르몬 방식은 가임기 예측을 자동으로 중단합니다.",
+                "contraceptionUnset": "지정 안 함",
+                "contraceptionOptions": {
+                    "none": "없음",
+                    "pill": "경구 피임약",
+                    "hormonal_iud": "호르몬 IUD",
+                    "copper_iud": "구리 IUD",
+                    "implant": "임플란트",
+                    "injection": "주사",
+                    "patch": "패치",
+                    "ring": "질 링",
+                    "condom": "콘돔",
+                    "other": "기타"
+                },
+                "perimenopauseMode": "폐경기 이행 모드",
+                "perimenopauseModeHint": "예측이 단일 날짜 대신 범위로 표시되며 규칙성 평가는 꺼집니다.",
+                "showPms": "PMS 기간 표시",
+                "notifyPartner": "파트너에게 알리기",
+                "notifyPartnerHint": "선택한 사람은 예측 날짜만 받을 뿐, 증상이나 메모 등 다른 기록은 전혀 받지 않습니다.",
+                "notifyPartnerNoEligible": "알림을 받을 수 있는 가족 구성원이 없습니다 - 건강 모듈에 접근 권한이 있는 구성원만 알림을 받을 수 있습니다.",
+                "notifyPartnerDaysBefore": "파트너 알림"
+            },
+            "mucus": {
+                "label": "자궁경부 점액",
+                "hint": "선택 사항입니다. 점액의 상태 변화는 가임기를 좁히는 데 도움이 될 수 있습니다.",
+                "none": "없음",
+                "dry": "건조함",
+                "sticky": "끈적임",
+                "creamy": "크림 같음",
+                "watery": "묽음",
+                "eggwhite": "흰자 같음"
+            },
+            "test": {
+                "label": "검사",
+                "lhLabel": "LH 검사",
+                "pregnancyLabel": "임신 검사",
+                "unset": "검사 안 함",
+                "negative": "음성",
+                "positive": "양성"
+            },
+            "feelings": {
+                "label": "감정"
+            },
+            "intimacy": {
+                "label": "친밀감",
+                "hint": "이 날을 가족과 공유해도 비공개로 유지됩니다.",
+                "none": "지정 안 함",
+                "protected": "피임함",
+                "unprotected": "피임 안 함",
+                "solo": "혼자"
+            },
+            "quickLink": {
+                "painkiller": "진통제 기록",
+                "weight": "체중 기록"
+            },
+            "bubble": {
+                "ariaLabel": "오늘의 주기 상태",
+                "line1": "주기 {{day}}일차 · {{phase}}",
+                "periodToday": "오늘 생리가 예상됩니다 - 지금 시작할까요?",
+                "periodOverdue": "생리가 {{count}}일 지연되었습니다 - 지금 시작할까요?",
+                "periodOverdue_one": "생리가 {{count}}일 지연되었습니다 - 지금 시작할까요?",
+                "periodStillOpen": "기록상 생리가 아직 진행 중인 것 같아요 - 지금 종료할까요?",
+                "peakPainDay": "당신의 패턴에 따르면 오늘은 통증이 가장 심한 날인 경우가 많아요 ({{symptom}}).",
+                "likelySymptomsToday": "오늘 발생 가능성: {{symptoms}}",
+                "pmsWindow": "PMS 기간이 {{weekday}}부터 예상됩니다",
+                "upcomingSymptom": "{{weekday}}부터 가능성 있음: {{symptom}}",
+                "fertile": "가임기는 {{date}}까지",
+                "fertileConfirmed": "가임기(배란 확인됨)는 {{date}}까지"
+            },
+            "fertilityDisclaimerConfirmed": "이번 주기의 배란은 체온 상승으로 확인되었습니다. 앞으로의 주기는 여전히 달력 방식에 기반하며, 이는 피임이나 의학적 조언을 대체하지 않습니다.",
+            "import": {
+                "button": "가져오기",
+                "title": "생리 기록 가져오기",
+                "explainer": "CSV 파일 또는 붙여넣은 텍스트: 주기당 한 줄, 「start_date,end_date」 형식(종료일은 선택 사항), 날짜는 YYYY-MM-DD 또는 DD.MM.YYYY 형식이며 쉼표나 세미콜론으로 구분합니다.",
+                "fileLabel": "CSV 파일 선택",
+                "pasteLabel": "또는 CSV 텍스트 붙여넣기",
+                "submit": "가져오기",
+                "resultToast": "{{imported}}개 가져옴, {{skipped}}개 건너뜀.",
+                "errorsTitle": "다음 행은 가져올 수 없습니다:",
+                "emptyError": "CSV 파일을 선택하거나 텍스트를 붙여넣으세요.",
+                "error": "가져오기에 실패했습니다."
+            },
+            "discoveryHint": "팁: 예측된 주기는 <a href=\"/settings/personal/feeds\">설정 → 개인 → 피드</a>에서 ICS 피드로 구독할 수 있으며, 주기 위젯은 <a href=\"/\">개요</a>에서 사용자 지정 모드를 통해 표시할 수 있습니다."
         },
         "duration": {
             "hm": "{{hours}}시간 {{minutes}}분",
