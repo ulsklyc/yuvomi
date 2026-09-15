@@ -816,21 +816,28 @@ function applyShiftPreset(form) {
 }
 /**
  * Wer als Besitzer:in angeboten wird (#1207): die Haushaltsmitglieder aus
- * GET /schedule/household-members, dazu wer schon einen Plan hat, und die
- * aktuelle Auswahl. `state.users` bleibt das Namensverzeichnis fuer bestehende
- * Zeilen - auch Hauspersonal kann einen Plan haben -, angeboten wird daraus
- * aber niemand, der nichts besitzt und kein Mitglied ist. Einen neuen Plan fuer
- * so jemanden weist der Server ohnehin ab.
+ * GET /schedule/household-members und wer schon einen Plan hat. `state.users`
+ * bleibt das Namensverzeichnis fuer bestehende Zeilen - auch Hauspersonal kann
+ * einen Plan haben -, angeboten wird daraus aber niemand, der nichts besitzt
+ * und kein Mitglied ist. Die Vorauswahl eines NEUEN Formulars (selectedOwner())
+ * macht niemanden waehlbar: POST /schedule/patterns lehnt so jemanden ab.
  */
-function ownerIds(selected) {
+function ownerIds() {
   const ids = new Set((overview.people ?? []).map((person) => Number(person.id)));
   for (const row of [...state.patterns, ...state.overrides, ...state.extras]) ids.add(Number(row.user_id));
-  if (selected !== undefined && selected !== null && selected !== '') ids.add(Number(selected));
   return ids;
 }
 function userOptions(selected) {
-  const eligible = ownerIds(selected);
+  const eligible = ownerIds();
   return state.users.filter((user) => eligible.has(Number(user.id)) && (canManageOthers || Number(user.id) === Number(currentUserId))).map((user) => option(user.id, user.display_name || user.username, Number(selected) === Number(user.id))).join('');
+}
+
+/** Nur fuer Tests: den Zustand setzen, aus dem die Besitzer-Auswahl liest. */
+function setOwnerContext({ users = [], people = [], patterns = [], overrides = [], extras = [], me = null, mayManageOthers = false } = {}) {
+  state = { ...state, users, patterns, overrides, extras };
+  overview = { ...overview, people };
+  currentUserId = me;
+  canManageOthers = mayManageOthers;
 }
 
 function formField(label, control, className = '') {
@@ -2993,4 +3000,4 @@ export async function update({ path } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { overrideGroups, extraGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
+export const __test = { userOptions, setOwnerContext, overrideGroups, extraGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };

@@ -101,6 +101,7 @@ const STUBS = {
     export const getRRuleValues = () => ({});
     export const describeRRule = () => '';
     export const recurrenceRow = () => ({ icon: 'repeat', label: '', value: '' });
+    export const intervalUnitLabel = () => '';
   `,
   '/components/modal.js': `
     export const openModal = (...args) => globalThis.__openModal?.(...args);
@@ -163,7 +164,9 @@ const STUBS = {
     export const refresh = async () => {};
   `,
   '/components/user-multi-select.js': `
-    export const renderUserMultiSelect = () => '';
+    // Tests, die das Markup einer Personen-Auswahl pruefen, setzen
+    // globalThis.__renderUserMultiSelect (etwa auf die echte Komponente).
+    export const renderUserMultiSelect = (...args) => globalThis.__renderUserMultiSelect?.(...args) ?? '';
     export const getSelectedUserIds = () => [];
     export const bindUserMultiSelect = () => {};
     export const renderAvatarStack = () => '';

@@ -755,6 +755,9 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
   const isEdit = !!task;
 
   const selectedIds = task?.assigned_users?.map((u) => u.id) ?? (task?.assigned_to ? [task.assigned_to] : []);
+  // Wen der Zustaendigen-Picker anbietet: die Mitglieder und wer schon an der
+  // Aufgabe steht. Versteckt wird er nur, wenn darin wirklich eine Person steht.
+  const assigneePeople = withChosenPeople(users, task?.assigned_users);
   const visibility  = task?.visibility || 'all';
 
   const selectedCat = task?.category ?? FALLBACK_CATEGORY;
@@ -990,8 +993,8 @@ ${syncTargetFieldHtml(task)}
            und „- Niemand -" (Critique 2026-08-10). Das Feld bleibt im DOM und
            behaelt seinen Wert, es wird nur verborgen - der Absende-Pfad liest
            es unveraendert (utils/household.js). -->
-      <div class="form-group" style="margin-top:var(--space-4)"${isSoloHousehold() ? ' hidden' : ''}>
-        ${renderUserMultiSelect(withChosenPeople(users, task?.assigned_users), selectedIds, 'task_assigned', 'tasks.assignedLabel')}
+      <div class="form-group" style="margin-top:var(--space-4)"${isSoloHousehold() && assigneePeople.length <= 1 ? ' hidden' : ''}>
+        ${renderUserMultiSelect(assigneePeople, selectedIds, 'task_assigned', 'tasks.assignedLabel')}
       </div>
 
       <!-- #647: die Haelfte, die @jamespurnama1 beschrieben hat. Fuehrerschein
@@ -3867,6 +3870,8 @@ export async function render(container, { user }) {
 // Testfläche: nur reine Funktionen, deren Vertrag außerhalb dieser Datei zählt.
 export const __test = {
   groupBy, groupKey, formatDueDate, normalizeFilterSet, taskQuery, state,
+  // Der Aufgaben-Dialog als Markup: welche Felder er zeigt und wen er anbietet.
+  renderModalContent,
   // Gemerkte Filter: der Vertrag ist, dass Lesen und Schreiben AUSEINANDER
   // gehen - sonst schriebe das Bereinigen sich fest (siehe getRecentFilters).
   getRecentFilters, storedRecentFilters, saveRecentFilter,

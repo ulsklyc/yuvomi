@@ -2090,6 +2090,30 @@ function openCategoryManager() {
   });
 }
 
+/**
+ * Der Zustaendigen-Picker einer Buchung (#1057), als eigene Funktion, damit
+ * sich pruefen laesst, wann er erscheint und wen er anbietet.
+ */
+function responsiblePickerHtml({ members, entry, isEdit }) {
+  // Gezaehlt wird die ERGAENZTE Liste: nennt eine Buchung schon Personal oder
+  // einen Gast, gibt es auch mit einem Mitglied etwas zu sehen und zu entfernen.
+  const people = withChosenPeople(members, isEdit ? entry.responsible_users : []);
+  return people.length > 1 ? `<div class="form-group js-entry-field">
+      ${renderUserMultiSelect(people, isEdit ? (entry.responsible_users ?? []).map((u) => u.id) : [], 'bm-responsible', 'budget.responsibleLabel')}
+      <p class="form-hint">${esc(t('budget.responsibleHint'))}</p>
+      ${/* Der Weg von der Zuschreibung zur Forderung (#1057) - und er ist
+          * ausdruecklich ein Weg und keine Verschmelzung: hier entsteht nichts,
+          * dort bestaetigt die Person, was entsteht. Nur beim Bearbeiten, weil
+          * eine noch nicht gespeicherte Buchung nichts zu uebergeben hat. */ ''}
+      ${isEdit && (entry.responsible_users ?? []).length ? `
+      <button type="button" class="btn btn--secondary btn--sm" id="bm-to-split">
+        <i data-lucide="arrow-right-left" class="icon-sm" aria-hidden="true"></i>${esc(t('budget.handoverToSplit'))}
+      </button>` : ''}
+    </div>` : '';
+}
+
+export const __test = { responsiblePickerHtml };
+
 function openBudgetModal({ mode, entry = null, initialType = '' }) {
   const isEdit = mode === 'edit';
   const today  = todayKey();
@@ -2213,18 +2237,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
         * Verschwindet im Solo-Haushalt: eine Zustaendigkeitsfrage mit genau
         * einer moeglichen Antwort ist ein Formularfeld ohne Frage (dieselbe
         * Regel wie in utils/household.js). */ ''}
-    ${state.members.length > 1 ? `<div class="form-group js-entry-field">
-      ${renderUserMultiSelect(withChosenPeople(state.members, isEdit ? entry.responsible_users : []), isEdit ? (entry.responsible_users ?? []).map((u) => u.id) : [], 'bm-responsible', 'budget.responsibleLabel')}
-      <p class="form-hint">${esc(t('budget.responsibleHint'))}</p>
-      ${/* Der Weg von der Zuschreibung zur Forderung (#1057) - und er ist
-          * ausdruecklich ein Weg und keine Verschmelzung: hier entsteht nichts,
-          * dort bestaetigt die Person, was entsteht. Nur beim Bearbeiten, weil
-          * eine noch nicht gespeicherte Buchung nichts zu uebergeben hat. */ ''}
-      ${isEdit && (entry.responsible_users ?? []).length ? `
-      <button type="button" class="btn btn--secondary btn--sm" id="bm-to-split">
-        <i data-lucide="arrow-right-left" class="icon-sm" aria-hidden="true"></i>${esc(t('budget.handoverToSplit'))}
-      </button>` : ''}
-    </div>` : ''}
+    ${responsiblePickerHtml({ members: state.members, entry, isEdit })}
 
     <div class="js-entry-field">
       ${advancedSection(`
