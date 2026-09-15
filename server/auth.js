@@ -754,7 +754,7 @@ function loginPayload(req, user) {
       avatar_data:  user.avatar_data,
       role:         user.role,
       family_role:  user.family_role,
-      access_scope: db.get().prepare(`SELECT ${accessScopeSql('u')} AS access_scope FROM users u WHERE u.id = ?`).get(user.id)?.access_scope ?? 'family',
+      access_scope: db.get().prepare(`SELECT ${accessScopeSql('u')} AS access_scope FROM users u WHERE u.id = ?`).get(user.id).access_scope,
       // Auch hier, aus demselben Grund wie householdSize unten: der Router
       // fragt nach dem Login nicht extra /me, bevor die Uebersicht rendert.
       onboarding_pending: user.onboarding_version < CURRENT_ONBOARDING_VERSION,
