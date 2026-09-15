@@ -135,10 +135,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The website and both READMEs now say what reaches out once you use a feature** (#1212). Out of
   the box the only outbound request is still the update check against the GitHub releases API. The
   pages said that weather, calendar sync and cloud backup stay off until you enter credentials, but
-  weather needs only a location, and public holidays are fetched from openholidaysapi.org once a
-  country is set; opening the calendar settings loads the list of holiday countries from there too.
-  Looking up a logo for a subscription contacts the service's website, and push goes through your
-  browser's push service. The outbound line now names all of them.
+  weather needs only a location, and once a country is set, holidays are fetched from
+  openholidaysapi.org - except the public holidays of Australia, Brazil, Canada, New Zealand, the
+  United Kingdom and the United States, which Yuvomi works out itself without a request. Opening the
+  calendar settings loads the list of holiday countries from openholidaysapi.org as well, whether or
+  not a country is set. Looking up a logo for a subscription contacts the service's website, and
+  push goes through your browser's push service. The outbound line now names all of them.
 
 - **A WebDAV backup URL made of whitespace no longer locks the backup settings.** A space or line
   break in `WEBDAV_BACKUP_URL`, for example from `${WEBDAV_BACKUP_URL:- }` in a compose file, was
