@@ -113,6 +113,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   own taps do not cost a reload: the write routes answer with the counter before and after, and
   the page skips the reload when nothing else moved in between.
 
+### Changed
+
+- **The README is shorter between the introduction and the install steps** (#1212). Each module
+  gets one line in the module table, with the detail left to the spec, and "Before you commit" -
+  what happens if the project stops, how to take your data elsewhere, what it costs - now comes
+  before the first command instead of after it. The install section opens with the three ways in,
+  lists the encryption key and the blocking of addresses on your own network as facts that apply
+  to every path, and names the logs command for both Docker and Podman.
+
 ### Fixed
 
 - **A Google Calendar change made while the connection is down now reaches Google once it is
@@ -122,6 +131,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never reached Google, and nothing said so. It now waits for the next sync and is only given up
   after the usual five attempts, or when Google reports the calendar as gone. A different calendar
   picked while a move is still under way is also no longer discarded when Google rejects that move.
+
+- **The website and both READMEs now say what reaches out once you use a feature** (#1212). Out of
+  the box the only outbound request is still the update check against the GitHub releases API. The
+  pages said that weather, calendar sync and cloud backup stay off until you enter credentials, but
+  weather needs only a location, and public holidays are fetched from openholidaysapi.org once a
+  country is set; opening the calendar settings loads the list of holiday countries from there too.
+  Looking up a logo for a subscription contacts the service's website, and push goes through your
+  browser's push service. The outbound line now names all of them.
 
 - **A WebDAV backup URL made of whitespace no longer locks the backup settings.** A space or line
   break in `WEBDAV_BACKUP_URL`, for example from `${WEBDAV_BACKUP_URL:- }` in a compose file, was
