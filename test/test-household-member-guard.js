@@ -18,12 +18,17 @@
  *            vorsichtshalber mit). `.get()`/`.run()` sind Einzelzeile/Schreiben.
  *
  *        WAS ALS PRAEDIKAT ZAEHLT: ein AUFRUF von `householdMemberSql`, der aus
- *        dem Praedikat-Modul importiert ist, als `${...}` im SQL selbst oder in
- *        einer Konstante, die dort eingesetzt wird. Gelesen wird ein Token-
- *        strom ohne Kommentare, und Zeichenketten sind Zeichenketten: ein
- *        Kommentar, der den Namen nennt, oder der Name als Text im SQL macht
- *        den Guard nicht gruen (siehe die Selbsttests unten - jeder davon ist
- *        eine Weise, auf die ein Textguard sich taeuschen laesst).
+ *        dem Praedikat-Modul importiert ist, als blosses `${...}` im SQL oder
+ *        als Konstante, die genau diesen Aufruf haelt - und nur dort, wo er die
+ *        Liste auch filtert: in der WHERE-Klausel der obersten Ebene, nicht
+ *        direkt hinter NOT, in einer Klausel ohne OR auf oberster Ebene, mit
+ *        dem Alias der fuehrenden `users`-Tabelle als Zeichenkette. In der
+ *        SELECT-Liste, in einer JOIN-Bedingung, neben einem OR oder auf einem
+ *        anderen Alias filtert er niemanden. Gelesen wird ein Tokenstrom ohne
+ *        Kommentare, und Zeichenketten sind Zeichenketten: ein Kommentar, der
+ *        den Namen nennt, oder der Name als Text im SQL macht den Guard nicht
+ *        gruen (siehe die Selbsttests unten - jeder davon ist eine Weise, auf
+ *        die sich eine Textpruefung taeuschen laesst).
  *
  *        DIE ALLOWLIST ist die Liste der Stellen, die bewusst ALLE Zeilen sehen
  *        (Benutzerverwaltung, Anmeldung, Hintergrundjobs je Konto). Sie ist
@@ -33,9 +38,19 @@
  *        an einer erlaubten Stelle schluepft so nicht mit durch. Ein Eintrag,
  *        der nichts mehr trifft, ist ebenfalls rot.
  *
- *        Grenzen: SQL, das erst zur Laufzeit zusammengesetzt wird (Aufruf einer
- *        Funktion statt Literal/Konstante), sieht der Guard nicht. Anzahlen
- *        (`COUNT(*) ... .get()`) sind keine Liste und nicht Teil dieses Guards.
+ *        GRENZEN - bewusst kein SQL-Parser, deshalb sieht der Guard nicht:
+ *          - SQL, das erst zur Laufzeit entsteht: Funktionsaufruf, `let sql`,
+ *            String-Konkatenation;
+ *          - `users` hinter einem Schema (`main.users`), in einem CTE, in einer
+ *            abgeleiteten Tabelle oder in einem Komma-Join;
+ *          - Gueltigkeitsbereiche von Konstanten: die Tabelle ist dateiweit.
+ *            Ein zweimal deklarierter Name zaehlt deshalb nie als Praedikat
+ *            (rot); eine zweimal deklarierte SQL-Konstante wird mit ihrer
+ *            letzten Fassung gelesen;
+ *          - Logik jenseits von OR und direktem NOT, etwa ein `CASE` oder ein
+ *            Vergleich um das Praedikat herum.
+ *        Anzahlen (`COUNT(*) ... .get()`) sind keine Liste und nicht Teil
+ *        dieses Guards.
  * Ausfuehren: npm run test:household-member-guard
  */
 
@@ -57,7 +72,7 @@ const PREDICATE_EXPORT = 'householdMemberSql';
 const ALLOWLIST = [
   {
     file: 'server/auth.js', site: 'GET /users', lists: 2,
-    reason: 'User administration: lists every account and flags staff (is_worker) and guests (access_scope). The calendar, budget and schedule pickers also read it unfiltered - open question in #1207.',
+    reason: 'User administration: lists every account and flags staff (is_worker) and guests (access_scope). The calendar, budget and schedule pickers read the same list today.',
   },
   {
     file: 'server/auth.js', site: 'findOrCreateOidcUser', lists: 1,
@@ -262,8 +277,14 @@ function importedPredicateNames(tokens, file) {
   return names;
 }
 
+/**
+ * Dateiweite Tabelle `const NAME = <Initialisierer>`. Sie kennt keine
+ * Gueltigkeitsbereiche; ein zweimal deklarierter Name steht deshalb zusaetzlich
+ * in `duplicates` und zaehlt nie als Praedikat.
+ */
 function constInitializers(tokens, pairs) {
   const consts = new Map();
+  const duplicates = new Set();
   for (let i = 0; i < tokens.length; i += 1) {
     if (!isIdent(tokens[i], 'const') || !isIdent(tokens[i + 1]) || !isPunct(tokens[i + 2], '=')) continue;
     let j = i + 3;
@@ -279,32 +300,51 @@ function constInitializers(tokens, pairs) {
       init.push(tokens[j]);
       j += 1;
     }
+    if (consts.has(tokens[i + 1].value)) duplicates.add(tokens[i + 1].value);
     consts.set(tokens[i + 1].value, init);
   }
-  return consts;
+  return { consts, duplicates };
 }
 
-function carriesPredicate(exprTokens, ctx, seen = new Set()) {
-  for (let i = 0; i < exprTokens.length; i += 1) {
-    const tok = exprTokens[i];
-    if (tok.type === 'template' && tok.exprs.some((inner) => carriesPredicate(inner, ctx, seen))) return true;
-    if (tok.type !== 'ident') continue;
-    if (ctx.predicateNames.has(tok.value) && isPunct(exprTokens[i + 1], '(') && !isPunct(exprTokens[i - 1], '.')) return true;
-    if (ctx.consts.has(tok.value) && !seen.has(tok.value) && !isPunct(exprTokens[i - 1], '.')) {
-      seen.add(tok.value);
-      if (carriesPredicate(ctx.consts.get(tok.value), ctx, seen)) return true;
-    }
+/**
+ * Ist dieser `${...}`-Ausdruck GENAU der Praedikatsaufruf - direkt, oder als
+ * Konstante, die nichts anderes haelt? Dann der Alias, den er als Zeichenkette
+ * nennt ('?' fuer einen Alias, der keine Zeichenkette ist), sonst null. Ein
+ * Ausdruck, der den Aufruf nur enthaelt (`pred('u') + ' OR 1'`), ist es nicht.
+ */
+function predicateAlias(exprTokens, ctx, seen = new Set()) {
+  const first = exprTokens[0];
+  if (exprTokens.length === 1 && isIdent(first) && ctx.consts.has(first.value)
+    && !ctx.duplicates.has(first.value) && !seen.has(first.value)) {
+    seen.add(first.value);
+    return predicateAlias(ctx.consts.get(first.value), ctx, seen);
   }
-  return false;
+  if (!isIdent(first) || !ctx.predicateNames.has(first.value) || !isPunct(exprTokens[1], '(')) return null;
+  if (bracketPairs(exprTokens).get(1) !== exprTokens.length - 1) return null;
+  const arg = exprTokens[2];
+  return arg?.type === 'string' && /^[A-Za-z_]\w*$/.test(arg.value) ? arg.value.toLowerCase() : '?';
+}
+
+/** Platzhalter fuer ein `${...}` im gelesenen SQL: Praedikat samt Alias, oder irgendein Ausdruck. */
+function exprMarker(exprTokens, ctx) {
+  const alias = predicateAlias(exprTokens, ctx);
+  if (alias === null) return '__expr__';
+  return '__member_' + (alias === '?' ? '0' : alias) + '__';
 }
 
 function sqlText(exprTokens, ctx, seen = new Set()) {
   let text = '';
   for (let i = 0; i < exprTokens.length; i += 1) {
     const tok = exprTokens[i];
-    if (tok.type === 'string') text += ` ${tok.value} `;
-    else if (tok.type === 'template') text += ` ${tok.quasis.join(' __expr__ ')} `;
-    else if (tok.type === 'ident' && ctx.consts.has(tok.value) && !seen.has(tok.value) && !isPunct(exprTokens[i - 1], '.')) {
+    if (tok.type === 'string') text += ' ' + tok.value + ' ';
+    else if (tok.type === 'template') {
+      const parts = [];
+      tok.quasis.forEach((quasi, k) => {
+        parts.push(quasi);
+        if (k < tok.exprs.length) parts.push(exprMarker(tok.exprs[k], ctx));
+      });
+      text += ' ' + parts.join(' ') + ' ';
+    } else if (tok.type === 'ident' && ctx.consts.has(tok.value) && !seen.has(tok.value) && !isPunct(exprTokens[i - 1], '.')) {
       const init = ctx.consts.get(tok.value);
       if (init.length === 1 && (init[0].type === 'string' || init[0].type === 'template')) {
         seen.add(tok.value);
@@ -315,8 +355,8 @@ function sqlText(exprTokens, ctx, seen = new Set()) {
   return text;
 }
 
-/** Liest die SQL `FROM users` auf oberster Klammerebene? */
-export function drivesFromUsers(sql) {
+/** Woerter der SQL mit ihrer Klammertiefe; Kommentare und SQL-Zeichenketten sind vorher weg. */
+function sqlWords(sql) {
   const clean = sql
     .replace(/--[^\n]*/g, ' ')
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
@@ -330,8 +370,45 @@ export function drivesFromUsers(sql) {
     else if (m[0] === ')') depth -= 1;
     else words.push({ word: m[0].toLowerCase(), depth });
   }
-  return words.some((w, idx) => w.depth === 0 && w.word === 'from'
-    && words[idx + 1]?.word === 'users' && words[idx + 1].depth === 0);
+  return words;
+}
+
+const topLevelFromUsers = (words) => words.findIndex((w, idx) => w.depth === 0 && w.word === 'from'
+  && words[idx + 1]?.word === 'users' && words[idx + 1].depth === 0);
+
+/** Liest die SQL `FROM users` auf oberster Klammerebene? */
+export function drivesFromUsers(sql) {
+  return topLevelFromUsers(sqlWords(sql)) !== -1;
+}
+
+const NOT_AN_ALIAS = new Set(['where', 'join', 'left', 'right', 'inner', 'outer', 'cross', 'full', 'natural',
+  'on', 'using', 'order', 'group', 'limit', 'having', 'union', 'window', 'except', 'intersect']);
+const END_OF_WHERE = new Set(['group', 'order', 'limit', 'having', 'union', 'window', 'except', 'intersect', 'returning']);
+
+/**
+ * Filtert das Praedikat die Liste wirklich? Es muss in der WHERE-Klausel der
+ * obersten Ebene stehen, dort auf oberster Ebene und nicht direkt hinter NOT,
+ * die Klausel darf auf oberster Ebene kein OR haben, und der Alias muss der der
+ * fuehrenden users-Tabelle sein. Kein SQL-Parser: was darueber hinausgeht,
+ * steht im Kopf unter GRENZEN.
+ */
+export function filteredByPredicate(sql) {
+  const words = sqlWords(sql);
+  const from = topLevelFromUsers(words);
+  if (from === -1) return false;
+  let next = words[from + 2];
+  if (next?.depth === 0 && next.word === 'as') next = words[from + 3];
+  const alias = next && next.depth === 0 && !NOT_AN_ALIAS.has(next.word) && !next.word.startsWith('__')
+    ? next.word
+    : 'users';
+  const where = words.findIndex((w, idx) => idx > from && w.depth === 0 && w.word === 'where');
+  if (where === -1) return false;
+  let end = words.findIndex((w, idx) => idx > where && w.depth === 0 && END_OF_WHERE.has(w.word));
+  if (end === -1) end = words.length;
+  const clause = words.slice(where + 1, end);
+  if (clause.some((w) => w.depth === 0 && w.word === 'or')) return false;
+  const marker = '__member_' + alias + '__';
+  return clause.some((w, idx) => w.depth === 0 && w.word === marker && clause[idx - 1]?.word !== 'not');
 }
 
 function siteRanges(tokens, pairs) {
@@ -433,10 +510,8 @@ function lineOf(src, offset) {
 export function unfilteredPeopleLists(src, file) {
   const { tokens } = tokenize(src);
   const pairs = bracketPairs(tokens);
-  const ctx = {
-    predicateNames: importedPredicateNames(tokens, file),
-    consts: constInitializers(tokens, pairs),
-  };
+  const { consts, duplicates } = constInitializers(tokens, pairs);
+  const ctx = { predicateNames: importedPredicateNames(tokens, file), consts, duplicates };
   const ranges = siteRanges(tokens, pairs);
   const findings = [];
   for (let i = 0; i < tokens.length; i += 1) {
@@ -451,7 +526,7 @@ export function unfilteredPeopleLists(src, file) {
     let kind = fetchKind(tokens, pairs, close + 1);
     if (kind === 'kept') kind = keptStatementKind(tokens, pairs, i);
     if (kind === 'row') continue;
-    if (carriesPredicate(arg, ctx)) continue;
+    if (filteredByPredicate(sql)) continue;
 
     const enclosing = ranges
       .filter((r) => r.from <= i && i <= r.to)
@@ -543,6 +618,88 @@ test('self-test: single rows, writes, joins and subqueries are not lists of peop
     db.prepare('SELECT * FROM users_archive').all();
   }`;
   assert.deepEqual(sites(src), []);
+});
+
+// Das Praedikat zaehlt nur dort, wo es die Liste auch filtert: in der WHERE-
+// Klausel der obersten Ebene, per AND verbunden, auf dem Alias der users-
+// Tabelle, die die Liste liest. Jeder Fall hier war mit der alten Pruefung
+// ("kommt der Aufruf irgendwo im SQL vor?") gruen.
+const MISPLACED = [
+  ['a flag column in the SELECT list filters no one',
+    "SELECT u.id, ${householdMemberSql('u')} AS is_member FROM users u ORDER BY u.id"],
+  ['an OR beside the predicate lets everyone through',
+    "SELECT u.id FROM users u WHERE ${householdMemberSql('u')} OR 1 = 1"],
+  ['inside a parenthesised OR the predicate binds nothing',
+    "SELECT u.id FROM users u WHERE (${householdMemberSql('u')} OR u.role = 'admin')"],
+  ['a negated predicate lists exactly the others',
+    "SELECT u.id FROM users u WHERE NOT ${householdMemberSql('u')}"],
+  ['the predicate on another users alias filters the wrong table',
+    "SELECT u.id FROM users u JOIN users v ON v.id = u.id WHERE ${householdMemberSql('v')}"],
+  ['the predicate in a JOIN condition does not filter the list',
+    "SELECT u.id FROM users u LEFT JOIN contacts c ON c.family_user_id = u.id AND ${householdMemberSql('u')}"],
+  ['an alias the reader cannot see is not an alias it can check',
+    'SELECT u.id FROM users u WHERE ${householdMemberSql(alias)}'],
+  ['only the bare call counts, not an expression built around it',
+    "SELECT u.id FROM users u WHERE ${householdMemberSql('u') + ' OR 1 = 1'}"],
+];
+for (const [name, sql] of MISPLACED) {
+  test(`self-test: misplaced predicate is red - ${name}`, () => {
+    // `sql` steht in normalen Anfuehrungszeichen, sein `${...}` ist Text - hier
+    // eingesetzt wird es im erzeugten Quelltext zur ECHTEN Interpolation. Die
+    // Gegenprobe steht darunter: dieselbe Stelle mit dem Praedikat am richtigen
+    // Platz ist gruen, der Fall ist also nicht aus dem falschen Grund rot.
+    const src = `${IMPORT}router.get('/users', (req, res) => {
+      const alias = 'u';
+      db.get().prepare(\`${sql}\`).all();
+    });`;
+    assert.deepEqual(sites(src), ['GET /users']);
+    const placed = `${IMPORT}router.get('/users', (req, res) => {
+      db.get().prepare(\`SELECT u.id FROM users u WHERE \${householdMemberSql('u')}\`).all();
+    });`;
+    assert.deepEqual(sites(placed), []);
+  });
+}
+
+test('self-test: a well-placed predicate is green, whatever else the WHERE says', () => {
+  const green = `${IMPORT}function listPeople() {
+    return db.prepare(\`SELECT u.id FROM users AS u LEFT JOIN contacts c ON c.family_user_id = u.id
+      WHERE (u.role = 'admin' OR u.role = 'member') AND \${householdMemberSql('u', { includeGuests: true })}
+      ORDER BY u.display_name\`).all();
+  }`;
+  assert.deepEqual(sites(green), [], 'an OR inside its own parentheses beside the predicate is fine');
+  const bareTable = `${IMPORT}function listPeople() {
+    return db.prepare(\`SELECT id FROM users WHERE \${householdMemberSql('users')} ORDER BY id\`).all();
+  }`;
+  assert.deepEqual(sites(bareTable), [], 'without an alias the table name is the alias');
+});
+
+test('self-test: a flag column added to GET /users keeps the list unfiltered', () => {
+  // Der realistische Weg in die Falle: /auth/users rechnet schon `is_worker`
+  // als Spalte. Kaeme das Praedikat dort als weitere Spalte dazu, traefe der
+  // Allowlist-Eintrag nichts mehr und der Guard verlangte, ihn zu loeschen -
+  // fuer eine Liste, die weiterhin jede Zeile zeigt.
+  const src = `${IMPORT}router.get('/users', requireAuth, (req, res) => {
+    const users = db.get().prepare(\`
+      SELECT id, display_name,
+             EXISTS(SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = users.id) AS is_worker,
+             \${householdMemberSql('users')} AS is_member
+      FROM users
+      ORDER BY display_name
+    \`).all();
+  });`;
+  assert.deepEqual(sites(src), ['GET /users']);
+});
+
+test('self-test: a constant name declared twice in a file does not count as the predicate', () => {
+  const src = `${IMPORT}function listPeople() {
+    const F = '1 = 1';
+    return db.prepare(\`SELECT u.id FROM users u WHERE \${F}\`).all();
+  }
+  function other() {
+    const F = householdMemberSql('u');
+    return F;
+  }`;
+  assert.deepEqual(sites(src), ['listPeople']);
 });
 
 test('self-test: a statement kept for later is judged by how its variable is used', () => {

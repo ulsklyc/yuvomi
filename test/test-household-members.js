@@ -59,10 +59,13 @@ function addUser(username, displayName, role, familyRole) {
   `).run(username, displayName, hash, role, familyRole).lastInsertRowid);
 }
 
-const ANNA = addUser('anna', 'Anna', 'admin', 'parent'); // Mitglied, Admin
-const BEN = addUser('ben', 'Ben', 'member', 'child'); // Mitglied, Kind
-const CLARA = addUser('clara', 'Clara', 'member', 'other'); // Hauspersonal
+// In UMGEKEHRTER Namensfolge angelegt: die ids laufen gegen das Alphabet. Eine
+// Liste ohne ORDER BY (Einfuegefolge) oder mit der falschen Richtung liefert
+// so nie zufaellig die erwartete Reihenfolge.
 const DORA = addUser('dora', 'Dora', 'member', 'other'); // Geteilte-Ausgaben-Gast
+const CLARA = addUser('clara', 'Clara', 'member', 'other'); // Hauspersonal
+const BEN = addUser('ben', 'Ben', 'member', 'child'); // Mitglied, Kind
+const ANNA = addUser('anna', 'Anna', 'admin', 'parent'); // Mitglied, Admin
 
 db.prepare('INSERT INTO housekeeping_workers (user_id) VALUES (?)').run(CLARA);
 
@@ -82,16 +85,20 @@ for (const [id, name] of [[ANNA, 'anna'], [BEN, 'ben'], [CLARA, 'clara'], [DORA,
   db.prepare('INSERT INTO reward_participants (user_id, enabled) VALUES (?, 1)').run(id);
 }
 
-const EVERYONE = [ANNA, BEN, CLARA, DORA].sort((a, b) => a - b);
-const MEMBERS_ONLY = [ANNA, BEN].sort((a, b) => a - b); // ohne Personal, ohne Gaeste
-const WITHOUT_STAFF = [ANNA, BEN, DORA].sort((a, b) => a - b); // Gaeste bleiben drin
-const WITHOUT_GUESTS = [ANNA, BEN, CLARA].sort((a, b) => a - b); // Personal bleibt drin
+// Jede Erwartung in Namensfolge: jede dieser Listen sortiert nach display_name
+// (die Belohnungslisten zuerst nach Saldo, der hier fuer alle 0 ist).
+const EVERYONE = [ANNA, BEN, CLARA, DORA];
+const MEMBERS_ONLY = [ANNA, BEN]; // ohne Personal, ohne Gaeste
+const WITHOUT_STAFF = [ANNA, BEN, DORA]; // Gaeste bleiben drin
+const WITHOUT_GUESTS = [ANNA, BEN, CLARA]; // Personal bleibt drin
+const byId = (ids) => [...ids].sort((a, b) => a - b);
 
 const ROLE = { [ANNA]: 'admin', [BEN]: 'member', [CLARA]: 'member', [DORA]: 'member' };
 
 // Vorbedingung: in dieser DB gibt es genau diese vier Zeilen. Jede Liste wird
 // gegen die GANZE Antwort verglichen, nicht gegen einen Ausschnitt.
-assert.deepEqual(db.prepare('SELECT id FROM users ORDER BY id').all().map((r) => r.id), EVERYONE);
+assert.deepEqual(db.prepare('SELECT id FROM users ORDER BY id').all().map((r) => r.id), byId(EVERYONE));
+assert.deepEqual(byId(EVERYONE), [...EVERYONE].reverse(), 'Vorbedingung: ids laufen gegen die Namensfolge');
 
 // --------------------------------------------------------------------------
 // App: echte Sitzung, echter requireAuth - so sehen die Router dieselben
@@ -133,7 +140,8 @@ async function call(method, path, { as = ANNA, body, headers = {} } = {}) {
   return { status: res.status, body: text ? JSON.parse(text) : null, res };
 }
 
-const idsOf = (rows, key = 'id') => rows.map((row) => row[key]).sort((a, b) => a - b);
+// In der Reihenfolge der Antwort - die Reihenfolge gehoert zum Verhalten der Liste.
+const idsOf = (rows, key = 'id') => rows.map((row) => row[key]);
 
 // --------------------------------------------------------------------------
 // Fassung 1: ohne Personal, ohne Gaeste (das strenge Praedikat)
@@ -201,7 +209,8 @@ test('without staff: a task comment mention notifies guests but never staff', as
   } finally {
     pushService.sendPushToUser = original;
   }
-  assert.deepEqual([...pushed].sort((a, b) => a - b), [BEN, DORA].sort((a, b) => a - b));
+  // Die Reihenfolge der Meldungen ist keine Liste, die jemand sieht.
+  assert.deepEqual(byId(pushed), byId([BEN, DORA]));
 });
 
 test('without staff: the dashboard user list and reward standings keep guests', async () => {
