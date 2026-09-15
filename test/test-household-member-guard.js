@@ -42,7 +42,8 @@
  *        Zeichenketten und Kommentare in einem Durchgang (ein `'--'` ist Text,
  *        ein Apostroph in einem `--`-Kommentar auch, und ein fuehrender
  *        Kommentar versteckt kein SELECT), Klammern nur um das Praedikat zaehlen
- *        nicht, und jeder Arm einer UNION-, INTERSECT- oder EXCEPT-Abfrage, der
+ *        nicht (die eines Funktionsaufrufs wie `likely(pred)` schon: das NOT
+ *        davor muss sichtbar bleiben), und jeder Arm einer UNION-, INTERSECT- oder EXCEPT-Abfrage, der
  *        FROM users liest, muss fuer sich gefiltert sein.
  *
  *        VERSCHATTUNG: bindet die Datei den Namen des Praedikats oder einer
@@ -64,7 +65,15 @@
  *          - eine Bindung INNERHALB eines `${...}` im SQL: die Bindungszaehlung
  *            liest nur den Code ausserhalb der Template-Ausdruecke;
  *          - Logik jenseits von OR und direktem NOT, etwa ein `CASE` oder ein
- *            Vergleich um das Praedikat herum.
+ *            Vergleich um das Praedikat herum;
+ *          - Gueltigkeitsbereiche von Statement-Namen: `const row = db.prepare(...)`
+ *            und ein anderes `row` derselben Datei gelten als dasselbe Statement.
+ *            Doppelte Bindungen konservativ als Liste zu werten ginge nicht:
+ *            am 15.09.2026 waren 242 von 727 Statement-Namen in ihrer Datei mehr
+ *            als einmal gebunden (`row` 13-mal in auth.js);
+ *          - ein Bezeichner oder SQL-Parameter, der wie der interne Marker
+ *            `__member_<alias>__` heisst (am 15.09.2026 kein Vorkommen unter
+ *            server/).
  *        Anzahlen (`COUNT(*) ... .get()`) sind keine Liste und nicht Teil
  *        dieses Guards.
  * Ausfuehren: npm run test:household-member-guard
@@ -151,6 +160,17 @@ const ALLOWLIST = [
 
 const REGEX_AFTER_KEYWORD = new Set(['return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'new', 'delete', 'void', 'throw', 'yield', 'await']);
 
+/**
+ * Das Zeichen hinter einem Backslash, wie JavaScript es an SQLite gibt.
+ *
+ * `'SELECT id FROM\nusers'` kommt als echter Zeilenumbruch an. Wer nur den
+ * Backslash wegwirft, liest `FROMnusers` und findet kein FROM users.
+ */
+const ESCAPED_WHITESPACE = { n: '\n', r: '\r', t: '\t', f: '\f', v: '\v' };
+function unescaped(ch) {
+  return ESCAPED_WHITESPACE[ch] ?? ch;
+}
+
 function tokenize(src, start = 0, untilBrace = false) {
   const tokens = [];
   let i = start;
@@ -173,7 +193,7 @@ function tokenize(src, start = 0, untilBrace = false) {
       let j = i + 1;
       let value = '';
       while (j < src.length && src[j] !== ch) {
-        if (src[j] === '\\') { value += src[j + 1]; j += 2; continue; }
+        if (src[j] === '\\') { value += unescaped(src[j + 1]); j += 2; continue; }
         value += src[j];
         j += 1;
       }
@@ -187,7 +207,7 @@ function tokenize(src, start = 0, untilBrace = false) {
       let cur = '';
       let j = i + 1;
       while (j < src.length && src[j] !== '`') {
-        if (src[j] === '\\') { cur += src[j + 1]; j += 2; continue; }
+        if (src[j] === '\\') { cur += unescaped(src[j + 1]); j += 2; continue; }
         if (src[j] === '$' && src[j + 1] === '{') {
           quasis.push(cur);
           cur = '';
@@ -423,7 +443,6 @@ function sqlText(exprTokens, ctx, seen = new Set()) {
   return text;
 }
 
-/** Woerter der SQL mit ihrer Klammertiefe; Kommentare und SQL-Zeichenketten sind vorher weg. */
 /**
  * SQL ohne Kommentare und mit maskierten Zeichenketten - in EINEM Durchgang.
  *
@@ -433,8 +452,13 @@ function sqlText(exprTokens, ctx, seen = new Set()) {
  * nie endet. Der Scanner nimmt, was zuerst kommt.
  *
  * Danach fallen Klammern weg, die NUR das Praedikat umschliessen: `(pred)` und
- * `((pred))` filtern genau wie `pred`. Ein NOT davor bleibt stehen.
+ * `((pred))` filtern genau wie `pred`. Ein NOT davor bleibt stehen. Die
+ * Klammern eines Funktionsaufrufs bleiben: aus `NOT likely(pred)` wuerde sonst
+ * `NOT likely pred`, und das NOT stuende nicht mehr direkt vor dem Praedikat.
+ * Vor der Klammer darf deshalb nur ein Schluesselwort oder kein Wort stehen.
  */
+const PAREN_KEYWORDS = new Set(['where', 'and', 'or', 'not', 'on']);
+
 function cleanSql(sql) {
   let out = '';
   let i = 0;
@@ -468,7 +492,10 @@ function cleanSql(sql) {
   let previous;
   do {
     previous = out;
-    out = out.replace(/\(\s*(__member_\w+__)\s*\)/g, ' $1 ');
+    out = out.replace(/\(\s*(__member_\w+__)\s*\)/g, (match, name, offset, whole) => {
+      const word = /([A-Za-z_]\w*)\s*$/.exec(whole.slice(0, offset));
+      return word && !PAREN_KEYWORDS.has(word[1].toLowerCase()) ? match : ` ${name} `;
+    });
   } while (out !== previous);
   return out;
 }
@@ -836,6 +863,12 @@ const READING_CASES = [
     "SELECT u.id FROM users u WHERE u.role = 'member' AND ((${householdMemberSql('u')}))"],
   ['NOT in front of the parentheses still negates the predicate', false,
     "SELECT u.id FROM users u WHERE NOT (${householdMemberSql('u')})"],
+  // Diese zwei waren auf 0f0beac5 richtig rot und auf 2880ac2d falsch gruen:
+  // das Aufloesen der Klammern nahm die eines Funktionsaufrufs mit.
+  ['NOT in front of a function call around the predicate still negates it', false,
+    "SELECT u.id FROM users u WHERE NOT likely(${householdMemberSql('u')})"],
+  ['AND NOT in front of a function call around the predicate still negates it', false,
+    "SELECT u.id FROM users u WHERE u.role = 'member' AND NOT unlikely(${householdMemberSql('u')})"],
   ['an unfiltered UNION ALL arm behind a filtered WHERE still lists everyone', false,
     "SELECT u.id FROM users u WHERE ${householdMemberSql('u')} UNION ALL SELECT id FROM users"],
   ['an unfiltered EXCEPT arm is a list of its own too', false,
@@ -854,6 +887,8 @@ const READING_CASES = [
     "SELECT u.id FROM users u -- it's the member list\n WHERE ${householdMemberSql('u')}"],
   ['a leading -- comment does not hide the SELECT', false,
     '-- every account, for the admin page\nSELECT id FROM users ORDER BY id'],
+  ['an escaped newline in the template is whitespace between FROM and users', false,
+    'SELECT id FROM\\nusers ORDER BY id'],
   ['a leading block comment does not hide the SELECT', false,
     '/* every account */ SELECT id FROM users ORDER BY id'],
 ];
@@ -862,6 +897,13 @@ for (const [name, filtered, sql] of READING_CASES) {
     assert.deepEqual(sites(listOf(sql)), filtered ? [] : ['listPeople'], sql);
   });
 }
+
+test('self-test: reading SQL - an escaped newline in a quoted string is whitespace too', () => {
+  const src = `function listPeople() {
+    return db.prepare('SELECT id FROM\\nusers ORDER BY id').all();
+  }`;
+  assert.deepEqual(sites(src), ['listPeople']);
+});
 
 test('self-test: reading SQL - a leading comment before an INSERT still marks a write', () => {
   const src = `function copy(ids) {
