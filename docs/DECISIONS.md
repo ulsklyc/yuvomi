@@ -227,16 +227,18 @@ in this schema points at `users.id`, and a second table would make every new fea
   `users` row minus staff minus guests), and `accessScopeSql()`, which resolves `access_scope`
   per account to `family` or `split_guest`. The predicate has one form, decided in #1207: no
   staff and no guests, in every list of members, and `npm run test:household-member-guard`
-  turns red when a new list reads `users` without it. The places that list accounts rather than
-  members stand in the guard's allowlist with a reason: user administration (`GET /auth/users`,
-  which the pickers no longer read), sign-in, the permission matrix, API token subjects and
-  background jobs per account.
+  turns red when a new list reads `users` without it. Lists of accounts rather than members
+  stand in the guard's allowlist with a reason - among them user administration
+  (`GET /auth/users`, which no picker reads any more), sign-in, the permission matrix, API token
+  subjects and the two-factor overview, which shows every account because the second factor
+  protects sign-ins and every account can sign in.
 - Choosing follows listing (#1007, all or nothing): the routes that take people for these
   lists - task assignees, calendar attendees, budget responsibles, schedule owners, reward
-  enrolment - refuse a newly chosen non-member through `newNonMembers()`, while a reference
-  already stored stays valid, so an old record keeps its staff member or guest and still saves.
-  Split expenses offer the guests of the group being split, because a guest exists for exactly
-  that.
+  enrolment, the default assignee of a synced calendar and the Outlook account owner - refuse a
+  newly chosen non-member through `newNonMembers()`, while a reference already stored stays
+  valid, so an old record keeps its staff member or guest and still saves. Split expenses are
+  the one place guests belong: the candidates are members plus the guests of that group, and
+  adding a group member refuses staff only.
 - `server/routes/housekeeping.js` (`createWorkerUser`) - a worker is a `users` row with a
   random password, role `member`, family role `other`.
 - `server/services/oidc.js` - the `$oidc$` placeholder: "this account has no password" is a
