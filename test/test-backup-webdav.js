@@ -273,7 +273,11 @@ describe('WebDAV Backup — service module', async () => {
       await assert.rejects(
         () => webdav.testConnection({ url: `http://127.0.0.1:${port}`, username: 'x', password: 'y' }),
         (err) => {
+          // `davFetch` reicht den Fehler von `fetch` unveraendert durch. Die
+          // Ursache muss die abgelehnte Verbindung sein - irgendein Error waere
+          // auch ein Tippfehler in der URL oder eine fehlende Zugangsangabe.
           assert.ok(err instanceof Error, 'should throw Error');
+          assert.equal(err.cause?.code, 'ECONNREFUSED', `unexpected cause: ${err.cause?.code ?? err.message}`);
           return true;
         }
       );
