@@ -231,7 +231,7 @@ in this schema points at `users.id`, and a second table would make every new fea
   stand in the guard's allowlist with a reason, among them user administration
   (`GET /auth/users`, which no picker reads any more), sign-in, the permission matrix, API token
   subjects, background jobs per account and the two-factor overview, which shows every account
-  because the second factor protects sign-ins and every account can sign in.
+  because the second factor protects accounts, not membership.
 - Choosing follows listing (#1007, all or nothing): the routes that take people for these
   lists - task assignees, calendar attendees, budget responsibles, schedule owners, reward
   enrolment, the default assignee of a synced calendar and the Outlook account owner - refuse a

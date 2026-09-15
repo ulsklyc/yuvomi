@@ -132,9 +132,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still be added to a group; housekeeping staff cannot. Nothing is taken away: a task, event,
   budget entry, schedule, synced calendar, group membership or reward enrolment that already
   names a staff member or guest keeps them and can still be saved; only choosing one anew is
-  refused. User administration, permissions and API tokens still list every account, and the
-  two-factor overview for admins now shows every account that can sign in, housekeeping staff
-  and guests included.
+  refused. User administration and permissions still list every account, API tokens every
+  account except shared-expense guests as before, and the two-factor overview for admins now
+  shows every account, housekeeping staff and guests included.
 - **The README is shorter between the introduction and the install steps** (#1212). Each module
   gets one line in the module table, with the detail left to the spec, and "Before you commit" -
   what happens if the project stops, how to take your data elsewhere, what it costs - now comes

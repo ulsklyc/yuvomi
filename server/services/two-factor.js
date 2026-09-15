@@ -273,10 +273,8 @@ export function regenerateRecoveryCodes(db, userId) {
  * schaltete sie ein, ohne zu wissen, wen er damit vor eine Aufgabe stellt.
  *
  * JEDES KONTO, NICHT NUR DIE MITGLIEDER (#1207): der zweite Faktor schuetzt
- * Anmeldungen. Anmelden kann sich heute jedes Konto - es gibt keinen
- * deaktivierten Zustand, Gaeste melden sich mit Passwort an, und Hauspersonal
- * ist nur beim Passwort-Login gesperrt, ueber SSO nicht (dort greift der
- * zweite Faktor ebenso). Die Liste steht deshalb in der Allowlist des Guards.
+ * Konten, nicht Mitgliedschaft. Die Admin-Uebersicht listet deshalb jedes
+ * Konto, und die Liste steht in der Allowlist des Guards.
  *
  * Bewusst nur der Ja-Nein-Zustand, keine Zeitstempel und keine Zahl der
  * Wiederherstellungscodes - das geht auch einen Admin nichts an.

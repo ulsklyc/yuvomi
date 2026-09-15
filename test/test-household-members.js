@@ -213,12 +213,9 @@ test('members only: GET /family/members (the source of the pickers)', async () =
   assert.deepEqual(idsOf(r.body.data), MEMBERS);
 });
 
-test('accounts: the 2FA overview lists every account that can sign in', async () => {
-  // Der zweite Faktor schuetzt Anmeldungen, nicht die Mitgliedschaft
-  // (Entscheidung 15.09.2026, #1207). Anmelden kann sich heute JEDES Konto:
-  // es gibt keinen deaktivierten Zustand, ein Gast meldet sich mit Passwort
-  // an, und Hauspersonal ist nur beim Passwort-Login gesperrt - ueber SSO
-  // (`/auth/oidc/callback`) nicht, und dort greift der zweite Faktor ebenso.
+test('accounts: the 2FA overview lists every account', async () => {
+  // Der zweite Faktor schuetzt Konten, nicht Mitgliedschaft (Entscheidung
+  // vom 15.09.2026, #1207): die Admin-Uebersicht listet deshalb jedes Konto.
   assert.deepEqual(idsOf(householdOverview(db), 'user_id'), EVERYONE);
   const r = await call('GET', '/auth/2fa/overview');
   assert.equal(r.status, 200);

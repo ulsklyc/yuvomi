@@ -105,7 +105,7 @@ const ALLOWLIST = [
   },
   {
     file: 'server/services/two-factor.js', site: 'householdOverview', lists: 1,
-    reason: 'Two-factor overview for admins: the second factor protects sign-ins, and every account can sign in today (no disabled state; staff are barred from password login only, not from SSO).',
+    reason: 'Two-factor overview for admins: the second factor protects accounts, not membership, so the overview lists every account.',
   },
   {
     file: 'server/auth.js', site: 'findOrCreateOidcUser', lists: 1,
