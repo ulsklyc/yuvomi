@@ -17412,6 +17412,51 @@ test('withoutCommentsKeepingLines laesst Regex-Literale und URLs heil', () => {
     'ein echter Zeilenkommentar muss weiter fallen');
 });
 
+/* EIN ZEILENKOMMENTAR OEFFNET KEINEN BLOCK (Review zu #1232).
+ *
+ * Der Schnitt nahm erst Blockkommentare heraus, dann Zeilenkommentare, und
+ * kannte keine Strings. `// Accept: *` gefolgt von `/*` las er als Blockanfang
+ * und blendete alles bis zum naechsten Blockende irgendwo spaeter in der Datei
+ * aus, echten Code eingeschlossen (gemessen an server/utils/http.js und
+ * server/index.js). Der Admin-Praedikat-Guard war in solchen Spannen blind.
+ */
+test('withoutCommentsKeepingLines liest Kommentare und Strings in einem Durchgang', () => {
+  const zeilen = (src) => withoutCommentsKeepingLines(src).split('\n');
+
+  const verschluckt = zeilen([
+    '// Accept: */*',
+    "const a = req.authRole === 'admin';",
+    '/* echter Kommentar */',
+    'renderAll();',
+  ].join('\n'));
+  assert.equal(verschluckt.length, 4, 'die Zeilenzahl muss gleich bleiben');
+  assert.equal(verschluckt[0].trim(), '', 'der Zeilenkommentar faellt');
+  assert.equal(verschluckt[1], "const a = req.authRole === 'admin';",
+    'ein Blockanfang in einem Zeilenkommentar darf den Code darunter nicht verschlucken');
+  assert.equal(verschluckt[2].trim(), '', 'der echte Blockkommentar faellt');
+  assert.equal(verschluckt[3], 'renderAll();');
+
+  const inStrings = "const s = '/* kein Kommentar */'; const d = \"// auch keiner\";";
+  assert.equal(withoutCommentsKeepingLines(inStrings), inStrings,
+    'Kommentarzeichen in einem String-Literal sind kein Kommentar');
+
+  const inTemplate = 'const t = `\n<a href="x">// kein</a> /* auch nicht */\n${x /* weg */}`;';
+  assert.equal(withoutCommentsKeepingLines(inTemplate),
+    'const t = `\n<a href="x">// kein</a> /* auch nicht */\n${x          }`;',
+    'im Template-Literal bleibt der Text stehen, in der Ersetzung faellt der Kommentar');
+
+  const mehrzeilig = zeilen('a();\n/* eins\n zwei */\nb(); // weg');
+  assert.equal(mehrzeilig.length, 4, 'ein mehrzeiliger Blockkommentar behaelt seine Zeilen');
+  assert.deepEqual(mehrzeilig.slice(0, 3).map((z) => z.trim()), ['a();', '', '']);
+  assert.equal(mehrzeilig[3].trimEnd(), 'b();', 'nach Code faellt nur der Kommentar');
+
+  const regex = zeilen(String.raw`const r = /[/*]/g; const q = /'/;` + '\nnext();\n/* c */\nconst h = a / b; // weg');
+  assert.equal(regex[0], String.raw`const r = /[/*]/g; const q = /'/;`,
+    'Kommentar- und Anfuehrungszeichen in einem Regex-Literal oeffnen nichts');
+  assert.equal(regex[1], 'next();');
+  assert.equal(regex[3].trimEnd(), 'const h = a / b;', 'eine Division ist kein Regex-Literal');
+});
+
 /* EIN IMPORT OHNE AUFRUF IST TOTER CODE.
  *
  * Beim Entfernen der toten Aufrufe blieb in birthdays.js der Import stehen

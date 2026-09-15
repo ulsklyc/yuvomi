@@ -74,26 +74,128 @@ export function withoutBlockComments(src) {
  * passiert, die Gegenprobe zum Guard blieb still. Toter Code besteht einen
  * Textguard, solange der Guard den Text nicht erst neutralisiert.
  *
- * `http://` bleibt heil: der Schnitt greift nur bei einem `//`, dem weder ein
- * Doppelpunkt noch ein Backslash vorausgeht. Ohne den Doppelpunkt verschluckte
- * die Regel den Rest einer Zeile mit einer URL darin; ohne den Backslash
- * dieselbe Zeile mit einem Regex-Literal wie `/^https?:\/\//i`, dessen
- * escapter Schraegstrich mit dem schliessenden ein `//` bildet (gemessen an
- * `documents.js`, `shopping.js` und `personal-feeds.js`). Ein Guard, der eine
+ * WARUM EIN DURCHGANG MIT ZUSTAENDEN: die fruehere Fassung nahm erst alle
+ * Blockkommentare heraus, dann alle Zeilenkommentare, und kannte keine Strings.
+ * Ein Zeilenkommentar mit `Accept: *` und `/` dahinter enthaelt einen
+ * Blockanfang; der Schnitt blendete von dort alles bis zum naechsten Blockende
+ * irgendwo spaeter in der Datei aus, echten Code eingeschlossen (gemessen an
+ * `server/utils/http.js` und `server/index.js`, gefunden am
+ * Admin-Praedikat-Guard in `test-settings-admin-gate.js`). Ein Guard, der eine
  * vorhandene Zeile nicht mehr sieht, meldet einen Fehler, den es nicht gibt -
- * oder uebersieht einen, den es gibt.
+ * oder uebersieht einen, den es gibt. Der Scanner liest deshalb Zeichen fuer
+ * Zeichen und weiss, ob er in Code, Kommentar, String, Template-Literal (samt
+ * `${}`-Ersetzung) oder Regex-Literal steht. Escapes gelten ueberall, so bleiben
+ * `/^https?:\/\//i` und `'http://x'` heil. Einen Fixpunkt braucht es nicht: ein
+ * Durchgang laesst kein halbes Trennzeichen stehen.
  *
- * Blockkommentare werden durch Leerzeichen ersetzt, nicht entfernt, damit jede
- * Zeile ihre Nummer behaelt. Der Fixpunkt hat denselben Grund wie oben.
+ * Blockkommentare werden durch Leerzeichen ersetzt und behalten ihre
+ * Zeilenumbrueche, Zeilenkommentare fallen bis zum Zeilenende weg - so behaelt
+ * jede Zeile ihre Nummer.
+ *
+ * GRENZE: ob ein `/` ein Regex-Literal oeffnet oder teilt, entscheidet das
+ * Zeichen davor. Nach einem Bezeichner (ausser Schluesselwoertern wie `return`
+ * oder `typeof`), einer Zahl, `)`, `]` oder `}` gilt es als Division, ebenso ein
+ * Kandidat ohne schliessendes `/` in derselben Zeile. Ein Regex-Literal an so
+ * einer Stelle (`if (x) /[/*]/.test(s)`) liest der Scanner als Code: escapte
+ * Zeichen bleiben dort heil, ein unescaptes `/*`, `//` oder Anfuehrungszeichen
+ * in einer Zeichenklasse oeffnet dagegen Kommentar oder String. Ein einfacher
+ * oder doppelter String endet spaetestens am Zeilenende.
  * @param {string} src
  * @returns {string}
  */
 export function withoutCommentsKeepingLines(src) {
-  let out = src;
-  let previous;
-  do {
-    previous = out;
-    out = out.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
-  } while (out !== previous);
-  return out.split('\n').map((z) => z.replace(/(^|[^:\\])\/\/.*$/, '$1')).join('\n');
+  const n = src.length;
+  let out = '';
+  let i = 0;
+  // Je offener `${`-Ersetzung ihre Klammertiefe; die `}` bei Tiefe 0 schliesst sie.
+  const ersetzungen = [];
+  // Letztes bedeutsames Code-Zeichen und der Bezeichner davor: Regex oder Division?
+  let zuletzt = '';
+  let wort = '';
+  let wortZu = false;
+
+  // Template-Text ab `j` bis hinter das schliessende Backtick oder hinter `${`.
+  const templateBis = (j) => {
+    while (j < n) {
+      if (src[j] === '\\') { j += 2; continue; }
+      if (src[j] === '`') return j + 1;
+      if (src[j] === '$' && src[j + 1] === '{') { ersetzungen.push(0); return j + 2; }
+      j++;
+    }
+    return n;
+  };
+  // Ende eines Regex-Literals ab dem oeffnenden `/`, oder -1 ohne Schluss in der Zeile.
+  const regexBis = (j) => {
+    let klasse = false;
+    for (j += 1; j < n; j++) {
+      const z = src[j];
+      if (z === '\n' || z === '\r') return -1;
+      if (z === '\\') { j++; continue; }
+      if (klasse) { if (z === ']') klasse = false; continue; }
+      if (z === '[') klasse = true;
+      else if (z === '/') {
+        j++;
+        while (j < n && /[a-z]/i.test(src[j])) j++;
+        return j;
+      }
+    }
+    return -1;
+  };
+  const alsWert = (bis) => {
+    out += src.slice(i, bis);
+    i = Math.min(bis, n);
+    zuletzt = ')';
+    wort = '';
+  };
+
+  while (i < n) {
+    const c = src[i];
+    const d = src[i + 1];
+    if (c === '/' && d === '/') {
+      while (i < n && src[i] !== '\n' && src[i] !== '\r') i++;
+      wortZu = true;
+    } else if (c === '/' && d === '*') {
+      const ende = src.indexOf('*/', i + 2);
+      const bis = ende === -1 ? n : ende + 2;
+      out += src.slice(i, bis).replace(/[^\n]/g, ' ');
+      i = bis;
+      wortZu = true;
+    } else if (c === "'" || c === '"') {
+      let j = i + 1;
+      while (j < n && src[j] !== c && src[j] !== '\n') j += src[j] === '\\' ? 2 : 1;
+      alsWert(src[j] === c ? j + 1 : j);
+    } else if (c === '`') {
+      alsWert(templateBis(i + 1));
+    } else if (c === '}' && ersetzungen.length && ersetzungen.at(-1) === 0) {
+      ersetzungen.pop();
+      alsWert(templateBis(i + 1));
+    } else if (c === '/' && regexErlaubt(zuletzt, wort) && regexBis(i) !== -1) {
+      alsWert(regexBis(i));
+    } else {
+      if (c === '{' && ersetzungen.length) ersetzungen[ersetzungen.length - 1]++;
+      if (c === '}' && ersetzungen.length) ersetzungen[ersetzungen.length - 1]--;
+      out += c;
+      i++;
+      if (/\s/.test(c)) {
+        wortZu = true;
+      } else {
+        wort = /[\w$]/.test(c) ? (wortZu ? '' : wort) + c : '';
+        wortZu = false;
+        zuletzt = c;
+      }
+    }
+  }
+  return out;
+}
+
+/** Nach diesen Woertern beginnt ein Ausdruck, ein `/` dort oeffnet ein Regex-Literal. */
+const VOR_AUSDRUCK = new Set([
+  'await', 'case', 'delete', 'do', 'else', 'in', 'instanceof', 'new', 'of',
+  'return', 'throw', 'typeof', 'void', 'yield',
+]);
+
+function regexErlaubt(zuletzt, wort) {
+  if (zuletzt === '') return true;
+  if (/[\w$]/.test(zuletzt)) return VOR_AUSDRUCK.has(wort);
+  return !')]}'.includes(zuletzt);
 }
