@@ -820,6 +820,17 @@ test('der Einfach-Pfad liest seine Sperre erst nach dem Preflight - beim Start u
     'startFlow lenkt bei bestehender .env nicht nach dem Warten in den Erweitert-Pfad um');
   assert.ok(defaults > redirect,
     'startFlow setzt die Einfach-Defaults, bevor die Sperre entschieden hat');
+  // Das Warten oeffnet ein zweites Fenster (Review zu #1217): wer waehrenddessen
+  // "Erweitert" waehlt, ist sofort dort - und die haengende Einfach-Wahl rief
+  // danach trotzdem showStep(1) und warf ihn zurueck. Nur die LETZTE Wahl darf
+  // nach dem Warten weiterlaufen.
+  assert.match(html, /let flowRequest = 0;/, 'es gibt keinen Zaehler fuer die letzte Modus-Wahl');
+  const claim = start.indexOf('const request = ++flowRequest');
+  const stale = start.search(/if \(request !== flowRequest\) return;/);
+  assert.ok(claim !== -1 && claim < waitStart,
+    'startFlow vermerkt die Wahl nicht vor dem Warten');
+  assert.ok(stale > waitStart && stale < redirect,
+    'eine ueberholte Einfach-Wahl laeuft nach dem Warten weiter und springt zurueck');
 
   const save = bodyFrom("$('simple-next').addEventListener('click', async () =>");
   const write = save.indexOf("fetch('/api/save-env'");

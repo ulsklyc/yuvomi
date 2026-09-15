@@ -2210,6 +2210,9 @@ $('mode-simple').addEventListener('click', () => startFlow('simple'));
 $('mode-advanced').addEventListener('click', () => startFlow('advanced'));
 $('simple-to-advanced').addEventListener('click', () => startFlow('advanced'));
 
+// Zaehlt die Modus-Wahlen. Nur die letzte darf nach dem Warten weiterlaufen.
+let flowRequest = 0;
+
 async function startFlow(m) {
   // Die Sperre des Einfach-Pfads setzt erst die ANTWORT des Preflights, und
   // bis dahin ist die Karte klickbar. Ein Klick in diesem Fenster landete
@@ -2217,8 +2220,13 @@ async function startFlow(m) {
   // die Cookie-Sicherheit hart darueberschrieb. Deshalb erst warten, dann
   // entscheiden - und bei bestehender .env dorthin, wo jeder dieser Werte
   // sichtbar im Formular steht.
+  // Das Warten oeffnet selbst ein Fenster: wer waehrenddessen "Erweitert"
+  // waehlt, ist sofort dort. Die haengende Einfach-Wahl ist dann ueberholt und
+  // darf ihn nicht per showStep(1) zurueckwerfen.
+  const request = ++flowRequest;
   if (m === 'simple') {
     await preflightDone;
+    if (request !== flowRequest) return;
     if (simpleLockedByEnv) m = 'advanced';
   }
   mode = m;
