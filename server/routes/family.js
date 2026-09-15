@@ -7,6 +7,7 @@
 import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
+import { householdMemberSql } from '../services/household-members.js';
 
 const log = createLogger('Family');
 const router = express.Router();
@@ -26,9 +27,7 @@ router.get('/members', (req, res) => {
       FROM users u
       LEFT JOIN contacts c ON c.family_user_id = u.id
       LEFT JOIN birthdays b ON b.family_user_id = u.id
-      WHERE NOT EXISTS (
-        SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = u.id
-      )
+      WHERE ${householdMemberSql('u', { includeGuests: true })}
       ORDER BY u.display_name COLLATE NOCASE ASC
     `).all();
     res.json({ data: members });

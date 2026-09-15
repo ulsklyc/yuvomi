@@ -14,6 +14,7 @@ import { sendDocumentDeletionConflict } from '../services/document-deletion-lock
 import { buildSplits, decorateMoney, minorToDecimal, parseMoneyToMinor, simplifyDebts } from '../services/split-expenses.js';
 import { CURRENCY_CODES } from '../../public/utils/currency-codes.js';
 import { syncBirthdayArtifacts } from '../services/birthdays.js';
+import { householdMemberSql } from '../services/household-members.js';
 import { todayKey } from '../utils/timezone.js';
 
 const log = createLogger('SplitExpenses');
@@ -594,7 +595,7 @@ router.get('/groups/:id/member-candidates', (req, res) => {
       LEFT JOIN contacts c ON c.family_user_id = u.id
       LEFT JOIN birthdays b ON b.family_user_id = u.id
       LEFT JOIN expense_group_members gm ON gm.group_id = ? AND gm.user_id = u.id
-      WHERE NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = u.id)
+      WHERE ${householdMemberSql('u', { includeGuests: true })}
       ORDER BY u.display_name COLLATE NOCASE ASC
     `).all(groupId);
     const contacts = db.get().prepare(`

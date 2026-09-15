@@ -43,7 +43,7 @@ export function schedulePaths() {
     '/api/v1/schedule/household-members': {
       get: op({
         summary: 'List people selectable for the Overview tab',
-        description: 'Real household members only - filtered through isHouseholdMember(), so housekeeping staff and split-expense guests never appear.',
+        description: 'Real household members only - filtered through the strict household member predicate, so housekeeping staff and split-expense guests never appear.',
         tag: 'Schedule',
       }),
     },

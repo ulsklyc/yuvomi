@@ -11,7 +11,7 @@ import { dateKeysInRange, scheduleData, fieldsForShiftTypes, fieldValuesFor, typ
 // routes/schedule-extras.js' eigener Kopfkommentar seit jeher vermeidet.
 export { scheduleData, fieldValuesFor } from '../services/schedule.js';
 import { daysBetweenDateKeys } from '../utils/timezone.js';
-import { isHouseholdMember } from '../services/member-email.js';
+import { householdMemberSql } from '../services/household-members.js';
 import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js';
 
 const router = express.Router();
@@ -27,14 +27,14 @@ const mineOrAdmin = (req, userId) => isAdmin(req) || actorId(req) === userId;
 // Wer darf als eigene Spalte in der Uebersicht (Overview-Tab) auftauchen? Nur
 // echte Haushaltsmitglieder - Haushaltshilfen (housekeeping_workers) und
 // Split-Expense-Gaeste (split_expense_guest_users) sollen nie eine leere Spur
-// bekommen. isHouseholdMember() ist die einzige Kopie dieser Regel im ganzen
-// Repo (server/services/member-email.js) - hier absichtlich wiederverwendet,
-// nicht neu geschrieben.
+// bekommen. Das strenge Praedikat aus server/services/household-members.js,
+// dieselbe Regel wie isHouseholdMember() - als Bedingung in der Abfrage statt
+// als Einzelpruefung je Zeile, nicht neu geschrieben.
 router.get('/household-members', (_req, res) => {
   const rows = db.get()
-    .prepare('SELECT id, display_name, avatar_color, avatar_data FROM users ORDER BY display_name COLLATE NOCASE')
+    .prepare(`SELECT u.id, u.display_name, u.avatar_color, u.avatar_data FROM users u WHERE ${householdMemberSql('u')} ORDER BY u.display_name COLLATE NOCASE`)
     .all();
-  res.json({ data: rows.filter((row) => isHouseholdMember(row.id)) });
+  res.json({ data: rows });
 });
 
 /** Lucides laengster Name liegt bei 34 Zeichen; 48 laesst Luft nach oben - dieselbe Grenze wie bei den Schnellzugriffen (quick-links.js). */

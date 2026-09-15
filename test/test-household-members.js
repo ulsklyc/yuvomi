@@ -38,7 +38,7 @@ const { default: splitRouter } = await import('../server/routes/split-expenses.j
 const { default: permissionsRouter } = await import('../server/routes/permissions.js');
 const { householdOverview } = await import('../server/services/two-factor.js');
 const { listEmailableMembers } = await import('../server/services/member-email.js');
-const { isHouseholdMember } = await import('../server/services/member-email.js');
+const { householdMemberSql, isHouseholdMember } = await import('../server/services/household-members.js');
 const { pushService } = await import('../server/services/push.js');
 const { hashPassword } = await import('../server/utils/password.js');
 
@@ -145,6 +145,14 @@ test('strict: the shopping list recipient picker offers members only', () => {
 
 test('strict: isHouseholdMember() says yes to members only', () => {
   assert.deepEqual(EVERYONE.filter((id) => isHouseholdMember(id, { db })), MEMBERS_ONLY);
+});
+
+test('the predicate refuses a form that excludes no one, and an alias that is not a name', () => {
+  // Eine Liste, die Personal UND Gaeste zeigt, sieht jede Zeile - die gehoert
+  // mit Grund in die Allowlist des Guards, nicht hinter einen Praedikatsaufruf,
+  // der nichts ausschliesst und trotzdem wie ein Filter aussieht.
+  assert.throws(() => householdMemberSql('u', { includeStaff: true, includeGuests: true }), TypeError);
+  assert.throws(() => householdMemberSql('u.id OR 1'), TypeError);
 });
 
 test('strict: GET /schedule/household-members lists members only', async () => {

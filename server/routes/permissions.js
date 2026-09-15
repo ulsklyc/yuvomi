@@ -12,6 +12,7 @@ import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { requireAdmin } from '../auth.js';
 import { listModules } from '../services/modules.js';
+import { accessScopeSql } from '../services/household-members.js';
 import {
   permissionCatalog,
   getSubjectPermissions,
@@ -35,9 +36,7 @@ router.get('/catalog', async (req, res) => {
     const catalog = permissionCatalog();
     const members = db.get().prepare(`
       SELECT id, display_name, username, avatar_color, avatar_data, role, family_role,
-        CASE WHEN EXISTS (
-          SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = users.id
-        ) THEN 'split_guest' ELSE 'family' END AS access_scope
+        ${accessScopeSql('users')} AS access_scope
       FROM users
       ORDER BY display_name
     `).all();
