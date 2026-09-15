@@ -300,7 +300,7 @@
     "test:preferences-dashboard": "node --experimental-sqlite --test test/test-preferences-dashboard.js",
     "test:preferences-hidden-modules": "node --experimental-sqlite --test test/test-preferences-hidden-modules.js",
     "test:preferences-schedule-templates": "node --experimental-sqlite --test test/test-preferences-schedule-templates.js",
-    "test:preferences-countdown-grace": "node --experimental-sqlite --test test/test-preferences-countdown-grace.js",
+    "test:preferences-countdown-grace": "node --loader ./test/test-browser-loader.mjs --experimental-sqlite --test test/test-preferences-countdown-grace.js",
     "test:sync-target": "node --test test/test-sync-target.js",
     "test:installer-schema": "node --test test/test-installer-schema.js",
     "test:installer-env-write": "node --test test/test-installer-env-write.js",
