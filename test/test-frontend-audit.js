@@ -7422,9 +7422,22 @@ test('jede Regel, die Farbe UND Untergrund setzt, haelt ihr eigenes Paar', () =>
  *   1. das Token haelt 3:1 gegen jeden Grund, auf dem ein Feld gemessen stand,
  *      in beiden Themes;
  *   2. keine Feldregel zieht ihre Kante noch aus der Kartenkante. Welche Regel
- *      ein Feld ist, entscheidet der SELEKTOR (input/select/textarea, .input,
- *      .form-input, `__input`, die Such-Huelle), nicht eine Liste - eine Liste
- *      liesse ausgerechnet das naechste Feld ungeprueft.
+ *      ein Feld ist, entscheidet eine LISTE von Selektor-Fragmenten (`FIELD`:
+ *      input/select/textarea, .input, .form-input, `__input`, `__select`, die
+ *      Such-Huelle, die Quick-Add-Felder). Eine Liste laesst das naechste Feld
+ *      ungeprueft, deshalb steht ein NETZ dahinter: jede Regel, deren letztes
+ *      Glied `search`, `input`, `field`, `select` oder `textarea` im Namen
+ *      traegt und ihre Kante aus --color-border* zieht, muss entweder ein Feld
+ *      nach der Liste sein oder als BENANNTE Ausnahme mit Grund in
+ *      `NOT_A_FIELD` stehen - sonst ist der Guard rot. Eine Ausnahme, die keine
+ *      Regel mehr trifft, ist ebenfalls rot.
+ *
+ * Was das Netz nicht faengt: ein Feld ohne eines dieser Woerter im Namen. Der
+ * bewusst ausgenommene `.event-icon-picker__trigger` (ein Knopf, der einen
+ * Icon-Waehler oeffnet) traegt keins und liegt deshalb ausserhalb - ein
+ * Knopf identifiziert sich ueber Glyphe und Beschriftung, nicht ueber die
+ * Kante (WCAG 1.4.11 verlangt die Grenze nur, wo sie das Bedienelement
+ * erkennbar macht).
  * ──────────────────────────────────────────────────────────────────────────── */
 test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrund', () => {
   const { light, dark } = themeTokenMaps();
@@ -7447,21 +7460,45 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
 
   const FIELD = /(?:^|[\s>+~])(?:input|select|textarea)(?![\w-])|\.(?:input|form-input)(?![\w-])|__input(?![\w-])|search__control(?![\w-])|quick-add__(?:qty|cat)(?![\w-])|__select(?![\w-])/;
   const NOT_A_TEXT_FIELD = /\[type="?(?:checkbox|radio|range|color|file|hidden)"?\]|::|:focus|:hover|:disabled|\[disabled\]|is-invalid|--invalid|--error/;
+  // Das Netz: Feldwoerter im Namen des letzten Glieds. Jede Regel, die es
+  // faengt und die keine Feldregel nach `FIELD` ist, braucht einen Eintrag
+  // hier - mit dem Grund, warum sie kein Eingabefeld ist.
+  const FIELD_WORD = /search|input|field|select|textarea/i;
+  const NOT_A_FIELD = new Map([
+    ['.more-sheet__search', 'Knopf im Feld-Look: oeffnet die Suche, nimmt keine Eingabe an; bewusst unveraendert (#1230)'],
+    ['.more-sheet__search:hover', 'Hover desselben Knopfs'],
+    ['.cal-search', 'Leiste der Kalendersuche; die Kante ist die Trennlinie unter der Leiste, nicht die des Feldes'],
+    ['.search-overlay__header', 'Kopf des Such-Overlays; Trennlinie zur Trefferliste'],
+    ['.search-overlay__panel', 'Flaeche des Such-Overlays ab Tablet-Breite; Kartenkante'],
+    ['.search-result + .search-result', 'Trennlinie zwischen zwei Treffern'],
+    ['.search-scope', 'Bereichs-Chip in der Suche; ein Knopf, kein Feld'],
+    ['.search-scope:hover', 'Hover desselben Chips'],
+    ['.documents-selectbar', 'Aktionsleiste der Mehrfachauswahl ("select" als Auswaehlen); Trennlinie'],
+    ['.rrule-fields', 'Gruppe der Wiederholungsfelder; Gruppenkante, die Felder darin tragen ihre eigene'],
+    ['.schedule-day-row-fields', 'Gruppe der Felder eines Wochentags; linke Gruppenlinie'],
+    ['.note-category-selection', 'Chip der gewaehlten Notiz-Kategorie; Knopf, kein Feld'],
+  ]);
   const styles = new URL('../public/styles/', import.meta.url);
   const offenders = [];
+  const unnamed = [];
+  const usedExceptions = new Set();
   let controlEdges = 0;
   for (const file of readdirSync(styles).filter((entry) => entry.endsWith('.css') && entry !== 'tokens.css')) {
     for (const rule of eachRule(readFileSync(new URL(file, styles), 'utf8'))) {
-      const parts = rule.selector.split(',').map((s) => s.trim());
-      const fieldParts = parts.filter((s) => {
-        const last = s.split(/\s+|>|\+|~/).filter(Boolean).pop() ?? '';
-        return FIELD.test(` ${last}`) && !NOT_A_TEXT_FIELD.test(last);
-      });
-      if (!fieldParts.length) continue;
+      const parts = rule.selector.split(',').map((s) => s.trim().replace(/\s+/g, ' '));
+      const lastOf = (s) => s.split(/\s+|>|\+|~/).filter(Boolean).pop() ?? '';
+      const fieldParts = parts.filter((s) => FIELD.test(` ${lastOf(s)}`) && !NOT_A_TEXT_FIELD.test(lastOf(s)));
       const edges = [...rule.body.matchAll(/(?:^|;)\s*border(?:-color|-top|-bottom|-left|-right)?\s*:\s*([^;]+)/g)].map((m) => m[1]);
-      if (edges.some((v) => /var\(\s*--color-border-control\s*\)/.test(v))) controlEdges += 1;
-      if (edges.some((v) => /var\(\s*--color-border(?:-subtle|-strong)?\s*[,)]/.test(v))) {
-        offenders.push(`${file}: ${fieldParts.join(', ')}${rule.at.length ? `  [${rule.at.join(' ')}]` : ''}`);
+      const cardEdge = edges.some((v) => /var\(\s*--color-border(?:-subtle|-strong)?\s*[,)]/.test(v));
+      if (fieldParts.length) {
+        if (edges.some((v) => /var\(\s*--color-border-control\s*\)/.test(v))) controlEdges += 1;
+        if (cardEdge) offenders.push(`${file}: ${fieldParts.join(', ')}${rule.at.length ? `  [${rule.at.join(' ')}]` : ''}`);
+      }
+      if (!cardEdge) continue;
+      for (const part of parts) {
+        if (fieldParts.includes(part) || !FIELD_WORD.test(lastOf(part))) continue;
+        if (NOT_A_FIELD.has(part)) usedExceptions.add(part);
+        else unnamed.push(`${file}: ${part}${rule.at.length ? `  [${rule.at.join(' ')}]` : ''}`);
       }
     }
   }
@@ -7470,6 +7507,13 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
   assert.deepEqual(offenders, [],
     'Feldregeln, die ihre Ruhekante aus der Kartenkante ziehen (--color-border*). Ein Eingabefeld nimmt '
     + '--color-border-control (3:1, WCAG 1.4.11); --color-border bleibt Trennlinien und Kartenkanten.');
+  assert.deepEqual(unnamed, [],
+    'Eine Regel mit Feldwort im Namen (search/input/field/select/textarea) zieht ihre Kante aus --color-border*, '
+    + 'ist aber weder ein Feld nach FIELD noch eine benannte Ausnahme in NOT_A_FIELD. Ist es ein Eingabefeld: '
+    + '--color-border-control. Ist es keins: in NOT_A_FIELD eintragen, mit Grund.');
+  const staleExceptions = [...NOT_A_FIELD.keys()].filter((key) => !usedExceptions.has(key));
+  assert.deepEqual(staleExceptions, [],
+    'NOT_A_FIELD nennt Selektoren, die keine Regel mit Kartenkante mehr treffen - Eintrag entfernen.');
 });
 
 /* ────────────────────────────────────────────────────────────────────────────
