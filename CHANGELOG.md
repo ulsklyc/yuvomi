@@ -115,6 +115,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **On the project page, the module list on phones folds away again, and the jump menu marks the
+  right section after a language switch.** On a phone, "Show all modules" opened the full list and
+  then disappeared, so the list could not be shortened again; the button now stays and switches
+  between all and fewer modules. The jump menu remembered where each section starts and measured
+  again only when the window changed size, so after switching to the longer German page it
+  highlighted the next section too early. It now measures again whenever the language changes or
+  the module list opens or closes. The calendar screenshot also tells screen readers what it shows,
+  instead of just "Calendar".
+
 - **A Google Calendar change made while the connection is down now reaches Google once it is
   back.** Before pushing an edit or moving an event to another calendar, Yuvomi asks Google for that
   calendar's details. When that request failed for a passing reason, such as no network, a token
