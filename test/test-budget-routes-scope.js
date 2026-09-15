@@ -33,7 +33,7 @@ function startApp() {
   app.use((req, _res, next) => { req.authUserId = actor.id; req.authRole = actor.role; req.session = { userId: actor.id }; next(); });
   app.use('/', budgetRouter);
   return new Promise((resolve) => {
-    const s = app.listen(0, () => resolve({
+    const s = app.listen(0, '127.0.0.1', () => resolve({
       baseUrl: `http://127.0.0.1:${s.address().port}`,
       close: () => new Promise((r) => s.close(r)),
     }));

@@ -58,7 +58,7 @@ function createMockServer({ failAuth = false, failPropfind = false, liveProp = '
       // Stempel). Nur so kann der Test sehen, ob die Sortierung im Modul
       // wirklich arbeitet oder nur die Serverreihenfolge durchreicht.
       const fileEntries = [...files.entries()].filter(([k]) => k.startsWith(url));
-      const hrefOf = (p) => (absoluteHrefs ? `http://localhost:${MOCK_PORT}${p}` : p);
+      const hrefOf = (p) => (absoluteHrefs ? `http://127.0.0.1:${MOCK_PORT}${p}` : p);
       const fileXml = fileEntries.map(([filePath, info]) => `
         <D:response>
           <D:href>${xmlEsc(hrefOf(filePath))}</D:href>
@@ -137,7 +137,7 @@ function createMockServer({ failAuth = false, failPropfind = false, liveProp = '
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
-const WEBDAV_URL = `http://localhost:${MOCK_PORT}`;
+const WEBDAV_URL = `http://127.0.0.1:${MOCK_PORT}`;
 let tmpDir;
 
 async function createTempBackup(name = 'oikos-backup-2099-01-01T00-00-00-000Z.db') {
@@ -207,7 +207,7 @@ describe('WebDAV Backup — service module', async () => {
     let mockCtx;
     before(() => new Promise((resolve) => {
       mockCtx = createMockServer();
-      mockCtx.server.listen(MOCK_PORT, resolve);
+      mockCtx.server.listen(MOCK_PORT, '127.0.0.1', resolve);
     }));
     after(() => new Promise((resolve) => mockCtx.server.close(resolve)));
 
@@ -232,7 +232,7 @@ describe('WebDAV Backup — service module', async () => {
     let mockCtx;
     before(() => new Promise((resolve) => {
       mockCtx = createMockServer();
-      mockCtx.server.listen(MOCK_PORT, resolve);
+      mockCtx.server.listen(MOCK_PORT, '127.0.0.1', resolve);
     }));
     after(() => new Promise((resolve) => mockCtx.server.close(resolve)));
 
@@ -301,7 +301,7 @@ describe('WebDAV Backup — service module', async () => {
     let mockCtx;
     before(() => new Promise((resolve) => {
       mockCtx = createMockServer({ liveProp: 'lp1:' });
-      mockCtx.server.listen(MOCK_PORT, resolve);
+      mockCtx.server.listen(MOCK_PORT, '127.0.0.1', resolve);
     }));
     after(() => new Promise((resolve) => mockCtx.server.close(resolve)));
 
@@ -362,7 +362,7 @@ describe('WebDAV Backup — service module', async () => {
     let mockCtx;
     before(() => new Promise((resolve) => {
       mockCtx = createMockServer({ absoluteHrefs: true });
-      mockCtx.server.listen(MOCK_PORT, resolve);
+      mockCtx.server.listen(MOCK_PORT, '127.0.0.1', resolve);
     }));
     after(() => new Promise((resolve) => mockCtx.server.close(resolve)));
 
@@ -396,7 +396,7 @@ describe('WebDAV Backup — service module', async () => {
     let mockCtx;
     before(() => new Promise((resolve) => {
       mockCtx = createMockServer();
-      mockCtx.server.listen(MOCK_PORT, resolve);
+      mockCtx.server.listen(MOCK_PORT, '127.0.0.1', resolve);
     }));
     after(() => new Promise((resolve) => mockCtx.server.close(resolve)));
 

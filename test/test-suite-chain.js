@@ -177,3 +177,36 @@ test('keine Suite baut ihren Temp-DB-Pfad von Hand zusammen', () => {
     + `sonst erbt ein Lauf die Datei eines abgebrochenen mit derselben PID: ${offenders.join(', ')}`,
   );
 });
+
+/* EIN TESTSERVER LAUSCHT AUF LOOPBACK, NICHT AUF ALLEN INTERFACES.
+ *
+ * `listen(0)` ohne Host bindet an `::` bzw. `0.0.0.0` - der Server ist dann fuer
+ * die Dauer der Suite aus dem lokalen Netz erreichbar. Die Route-Harnesse setzen
+ * `req.authUserId` und `req.authRole` per Stub-Middleware, haeufig als `admin`:
+ * wer im selben WLAN sitzt, haette waehrend des Laufs eine Admin-Sitzung ohne
+ * Anmeldung gegen die Testdatenbank. Gemessen am 2026-09-15: 91 von 153
+ * `listen()`-Aufrufen in 75 Dateien ohne Host.
+ *
+ * Mit Host bindet `listen()` ASYNCHRON: `server.address()` ist direkt danach
+ * `null`, erst nach `'listening'` steht der Port fest. Ohne Host war das
+ * synchron, und vier Aufrufe in test-changelog.js lebten davon - der Umbau
+ * braucht deshalb dort ein `await` auf das Ereignis, nicht nur das Argument.
+ *
+ * Geprueft wird die Schreibweise: `.listen(<port>` gefolgt von `)` oder einem
+ * zweiten Argument, das nicht `'127.0.0.1'` ist. Nicht erkannt wird die
+ * Objektform `listen({ port })` - die kommt in test/ heute nicht vor. */
+test('kein Testserver lauscht auf allen Interfaces', () => {
+  const withoutLoopback = /\.listen\(\s*[\w.]+\s*(?=\)|,)(?!,\s*['"`]127\.0\.0\.1['"`])/g;
+  const offenders = readdirSync(new URL('../test', import.meta.url))
+    .filter((f) => /\.m?js$/.test(f))
+    .flatMap((f) => {
+      const src = readFileSync(new URL(`../test/${f}`, import.meta.url), 'utf8');
+      return [...src.matchAll(withoutLoopback)]
+        .map((m) => `${f}:${src.slice(0, m.index).split('\n').length}`);
+    });
+  assert.deepEqual(
+    offenders,
+    [],
+    `listen() ohne Host bindet an alle Interfaces - '127.0.0.1' als zweites Argument: ${offenders.join(', ')}`,
+  );
+});

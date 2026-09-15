@@ -22,7 +22,7 @@ function startApp() {
   app.use((req, _res, next) => { req.authUserId = 1; req.authRole = currentRole; next(); });
   app.use('/', preferencesRouter);
   return new Promise((resolve) => {
-    const s = app.listen(0, () => resolve({
+    const s = app.listen(0, '127.0.0.1', () => resolve({
       baseUrl: `http://127.0.0.1:${s.address().port}`,
       close: () => new Promise((r) => s.close(r)),
     }));

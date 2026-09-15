@@ -245,7 +245,7 @@ buildInviteRoutes(inviteRouter, {
   limiter: (_req, _res, next) => next(), // Rate-Limit im Test überbrücken
 });
 app.use('/auth', inviteRouter);
-const server = app.listen(0);
+const server = app.listen(0, '127.0.0.1');
 const routeBase = await new Promise((r) =>
   server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 

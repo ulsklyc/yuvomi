@@ -55,7 +55,7 @@ const legacyToken = mintToken('yuvomi_legacy_unscoped_token', null);
 const app = express();
 app.use(express.json());
 app.use('/api/v1/auth', authRouter);
-const server = app.listen(0);
+const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
 

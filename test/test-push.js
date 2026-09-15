@@ -277,7 +277,7 @@ async function startApp(db, webpush, userId = 1) {
   const { createPushService } = await import('../server/services/push.js');
   const pushService = createPushService({ db, webpush });
   app.use('/', buildRouter({ pushService, database: db }));
-  const server = await new Promise((r) => { const s = app.listen(0, () => r(s)); });
+  const server = await new Promise((r) => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
 
   after(async () => {
     // Erst die Keep-Alive-Verbindungen von `fetch`: `close()` wartet sonst auf

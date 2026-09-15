@@ -54,7 +54,7 @@ app.use((req, _res, next) => {
   next();
 });
 app.use('/', dashboardRouter);
-const server = app.listen(0);
+const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));
 
 test('dashboard note category filters are AND and run before the row limit', async () => {

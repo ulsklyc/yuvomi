@@ -173,7 +173,7 @@ function futureIso() {
 async function call(app, method, path, body) {
   const { createServer } = await import('node:http');
   const server = createServer(app);
-  await new Promise((resolve) => server.listen(0, resolve));
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address();
   const res = await fetch(`http://127.0.0.1:${port}${path}`, {
     method,

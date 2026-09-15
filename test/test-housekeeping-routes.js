@@ -40,7 +40,7 @@ app.use((req, _res, next) => {
 // haengt der Aufgaben-Router mit im selben Server (GHSA-4p5w-5346-8598).
 app.use('/tasks-api', tasksRouter);
 app.use('/', housekeepingRouter);
-const server = app.listen(0);
+const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 
 async function call(method, path, { as, body } = {}) {

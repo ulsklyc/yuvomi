@@ -47,7 +47,7 @@ app.use((req, _res, next) => {
 });
 app.use(express.json());
 app.use('/', scheduleRouter);
-const server = app.listen(0);
+const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolveServer) => server.on('listening', () => resolveServer(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
 
@@ -162,7 +162,7 @@ authApp.use((req, _res, next) => {
   next();
 });
 authApp.use('/auth', authRouter);
-const authServer = authApp.listen(0);
+const authServer = authApp.listen(0, '127.0.0.1');
 const authBaseUrl = await new Promise((r) => authServer.on('listening', () => r(`http://127.0.0.1:${authServer.address().port}`)));
 test.after(() => authServer.close());
 

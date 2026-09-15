@@ -34,7 +34,7 @@ app.use((req, _res, next) => {
   next();
 });
 app.use('/', shoppingRouter);
-const server = app.listen(0);
+const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 
 async function call(method, path, body) {

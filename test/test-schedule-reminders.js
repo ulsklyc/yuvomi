@@ -537,7 +537,7 @@ app.use(express.json());
 app.use((req, _res, next) => { req.authUserId = actorId; req.sessionModuleAccess = {}; req.authScopes = null; next(); });
 app.use('/schedule/preferences', schedulePreferencesRouter);
 app.use('/reminders', remindersRouter);
-const server = app.listen(0);
+const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
 

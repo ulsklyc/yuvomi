@@ -47,7 +47,7 @@ app.use((req, _res, next) => {
 app.use(express.json());
 app.use('/', scheduleRouter);
 app.use('/extras', scheduleExtrasRouter);
-const server = app.listen(0);
+const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolveServer) => server.on('listening', () => resolveServer(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
 

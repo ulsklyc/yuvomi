@@ -43,7 +43,7 @@ describe('Outlook-Push-Ziel an Events', () => {
     app.use('/calendar', calendarRouter);
 
     await new Promise((resolve) => {
-      server = app.listen(0, () => {
+      server = app.listen(0, '127.0.0.1', () => {
         baseUrl = `http://127.0.0.1:${server.address().port}`;
         resolve();
       });

@@ -1035,7 +1035,7 @@ test('Dashboard-Geburtstagswidget lädt Geburtstage haushaltsweit (Issue #406)',
   });
   app.use('/', dashboardRouter);
 
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
     const response = await fetch(`http://127.0.0.1:${server.address().port}/`);
@@ -1097,7 +1097,7 @@ test('Dashboard-Endpoint filtert heutige Mahlzeiten nach sichtbaren Typen', asyn
   });
   app.use('/', dashboardRouter);
 
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
     const response = await fetch(`http://127.0.0.1:${server.address().port}/`);
@@ -1153,7 +1153,7 @@ test('Dashboard-Endpoint: Belohnungen liefert Punktestand, Teilnehmerzahl und of
   const app = express();
   app.use((req, _res, next) => { req.authUserId = parent; req.session = { userId: parent }; next(); });
   app.use('/', dashboardRouter);
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
     const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
@@ -1264,7 +1264,7 @@ test('Dashboard-Endpoint: Gesundheit zählt heute fällige eigene Dosen und Nach
   const app = express();
   app.use((req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); });
   app.use('/', dashboardRouter);
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
     const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
@@ -1315,7 +1315,7 @@ test('Dashboard-Endpoint: Haushaltshilfe meldet Anwesenheit, Monatsbesuche und o
   const app = express();
   app.use((req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); });
   app.use('/', dashboardRouter);
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
     const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
@@ -1386,7 +1386,7 @@ test('Dashboard-Endpoint: dringende Aufgaben, anstehende Termine, Einkaufslisten
   const app = express();
   app.use((req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); });
   app.use('/', dashboardRouter);
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
     const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
@@ -1436,7 +1436,7 @@ test('Dashboard-Endpoint: fehlender Auth-Kontext führt zu 500 (kritischer Fehle
   // req.session.userId und der äußere try/catch liefert die 500-Antwort.
   app.use((req, _res, next) => { next(); });
   app.use('/', dashboardRouter);
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
     const response = await fetch(`http://127.0.0.1:${server.address().port}/`);
@@ -2969,7 +2969,7 @@ test('Dashboard serialisiert linked occurrences ohne rohe Persistenzfelder', asy
     next();
   });
   app.use('/', dashboardRouter);
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
     const body = await (await fetch(`http://127.0.0.1:${server.address().port}/?events_scope=mine`)).json();

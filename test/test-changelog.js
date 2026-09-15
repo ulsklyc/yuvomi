@@ -115,7 +115,8 @@ test('changelog router fetches and sanitizes GitHub release JSON', async () => {
     },
   }));
 
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
   try {
     const res = await fetch(`http://127.0.0.1:${server.address().port}/`);
     assert.equal(res.status, 200);
@@ -240,7 +241,8 @@ test('faellt GitHub aus, kommt die mitgelieferte Datei statt 502', async () => {
     readChangelogFile: () => SAMPLE_CHANGELOG,
   }));
 
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
   try {
     const res = await fetch(`http://127.0.0.1:${server.address().port}/`);
     assert.equal(res.status, 200);
@@ -261,7 +263,8 @@ test('ohne mitgelieferte Datei bleibt es beim 502', async () => {
     readChangelogFile: () => { throw new Error('ENOENT'); },
   }));
 
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
   try {
     const res = await fetch(`http://127.0.0.1:${server.address().port}/`);
     assert.equal(res.status, 502);
@@ -281,7 +284,8 @@ test('nach einem Fehlschlag wird GitHub eine Weile nicht erneut gefragt', async 
     readChangelogFile: () => SAMPLE_CHANGELOG,
   }));
 
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
   const hole = async () => {
     const res = await fetch(`http://127.0.0.1:${server.address().port}/`);
     return res.json();

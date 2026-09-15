@@ -80,7 +80,7 @@ app.use((_err, _req, res, _next) => {
   res.status(500).json({ error: 'Internal server error.', code: 500 });
 });
 
-const server = app.listen(0);
+const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 
 test.after(() => {

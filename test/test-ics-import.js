@@ -213,7 +213,7 @@ app.use((req, _res, next) => {
 });
 app.use('/api/v1/calendar', calendarRouter);
 const server = http.createServer(app);
-await new Promise((r) => server.listen(0, r));
+await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const port = server.address().port;
 
 function request(method, path, body) {

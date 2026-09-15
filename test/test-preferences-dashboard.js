@@ -65,7 +65,7 @@ function startApp() {
   app.use('/', preferencesRouter);
 
   return new Promise((resolve) => {
-    const server = app.listen(0, () => resolve({
+    const server = app.listen(0, '127.0.0.1', () => resolve({
       baseUrl: `http://127.0.0.1:${server.address().port}`,
       close: () => new Promise((done) => server.close(done)),
     }));

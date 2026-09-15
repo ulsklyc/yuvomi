@@ -42,7 +42,7 @@ app.get('/auth-context', requireAuth, (req, res) => res.json({
   module_access: req.sessionModuleAccess,
 }));
 app.use('/budget', requireAuth, csrfMiddleware, budgetRouter);
-const server = app.listen(0);
+const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
 
