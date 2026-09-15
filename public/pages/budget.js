@@ -221,6 +221,11 @@ let state = {
   range:        'month',      // 'week' | 'month' | 'year'
   reportAnchor: todayKey(),
   reportPeriod: '',           // vom Server gemeldeter Zeitraum (nur für 'week' im Label)
+  // Rohe Grenzen desselben Zeitraums (YYYY-MM-DD), fuer Containment-Pruefungen
+  // (reportShowsToday()) - reportPeriod ist bereits lokalisiert formatiert und
+  // nicht mehr vergleichbar.
+  reportRangeFrom: null,
+  reportRangeTo:   null,
 };
 let _container = null;
 let _user = null;
@@ -422,6 +427,86 @@ async function loadBudgetMeta() {
 // Entry Point
 // --------------------------------------------------------
 
+/**
+ * Der Zeitraum-Kopf: zurueck, Wert, vor - und dahinter der Reset. „Aktuell"
+ * ist ein Reset, kein Navigationsschritt: hinter dem Stepper statt zwischen
+ * Pfeil und Wert. Seit #1164 ist das die Regel fuer alle drei Zeitraum-Koepfe
+ * (Kalender, Wochenplan, Budget). Als eigener Baustein, damit der
+ * Verhaltenstest die GERENDERTE Reihenfolge prueft (test-budget-ui.js),
+ * statt Quelltext zu lesen.
+ */
+function monthNavHtml() {
+  return `
+          <button class="btn btn--icon" id="budget-prev" aria-label="${t('budget.prevMonth')}">
+            <i data-lucide="chevron-left" aria-hidden="true"></i>
+          </button>
+          <span class="budget-nav__label" id="budget-label" aria-live="polite"></span>
+          <button class="btn btn--icon" id="budget-next" aria-label="${t('budget.nextMonth')}">
+            <i data-lucide="chevron-right" aria-hidden="true"></i>
+          </button>
+          <button class="btn btn--secondary budget-nav__today" id="budget-today">${t('budget.currentMonth')}</button>
+          <span class="budget-nav__note" id="budget-period-note" hidden></span>
+  `;
+}
+
+/**
+ * „Aktuell" erscheint nur, wenn der aktuelle Zeitraum nicht zu sehen ist -
+ * dieselbe Sichtbarkeitsregel wie syncTodayButton() im Kalender (#1164).
+ *
+ * `.is-current` statt `hidden` (PR #1200 Review, Blocking 1): `hidden` nahm
+ * die Box aus dem Fluss, `.budget-nav__label` daneben (`flex: 1`) wuchs in den
+ * frei gewordenen Platz, und "›" ruckte um die Knopfbreite, sobald der Reset
+ * erschien/verschwand - gemessen 11/11 ueber 33 Layouts, am schlimmsten von
+ * allen drei Koepfen. `.is-current` (layout.css) blendet nur per `visibility`
+ * aus, die Box bleibt im Fluss. `inert` nimmt Zeiger, Fokus und A11y-Baum.
+ * War der Knopf fokussiert, holt sich der Fokus vorher einen Stepper daneben -
+ * sonst faellt er auf `<body>` (`inert` blurred wie `display: none`).
+ *
+ * Laeuft NACH dem Tab-Block in updateTabs(): der entscheidet, ob der Tab
+ * ueberhaupt Monatsnavigation traegt, hier wird nur verfeinert.
+ *
+ * „Zu sehen" heisst CONTAINMENT, nicht Ankergleichheit (Befund 4): auf den
+ * Berichten ankert `anchorForMonth()` den laufenden Monat auf dem heutigen
+ * Tag, jeden anderen auf dessen Ersten - `state.reportAnchor === todayKey()`
+ * traf deshalb nur an einem einzigen Tag im Monat zu, obwohl der ganze Monat
+ * "heute" enthaelt. `reportShowsToday()` prueft je Aufloesung den ANGEZEIGTEN
+ * BEREICH (Jahr/Monat/Woche), genau wie `getRangeForView` es im Kalender tut.
+ */
+function reportShowsToday() {
+  const today = todayKey();
+  if (state.range === 'year') {
+    return parseLocalDateKey(state.reportAnchor).getFullYear() === parseLocalDateKey(today).getFullYear();
+  }
+  if (state.range === 'month') {
+    return state.reportAnchor.slice(0, 7) === currentMonth();
+  }
+  // Woche: die Grenzen meldet der Server (onPeriod), erst dann ist Containment
+  // pruefbar. Bis dahin (erster Bildaufbau) faellt es auf Ankergleichheit
+  // zurueck - der Anker ist zu dem Zeitpunkt ohnehin `todayKey()` (state-Default).
+  if (state.reportRangeFrom && state.reportRangeTo) {
+    return today >= state.reportRangeFrom && today <= state.reportRangeTo;
+  }
+  return state.reportAnchor === today;
+}
+
+function syncCurrentButton(root = _container) {
+  const btn = root?.querySelector('#budget-today');
+  if (!btn) return;
+  const caps = tabCaps();
+  const isCurrent = !caps.month || (state.activeTab === 'reports'
+    ? reportShowsToday()
+    : state.month === currentMonth());
+  // `typeof document` statt eines nackten Bezeichners: Testumgebungen ohne DOM
+  // stubben `document` nicht immer, und ein nackter Bezeichner wirft dort
+  // schon beim Werteauswerten.
+  const active = typeof document !== 'undefined' ? document.activeElement : null;
+  if (isCurrent && active === btn) {
+    (root.querySelector('#budget-prev') || root.querySelector('#budget-next'))?.focus();
+  }
+  btn.classList.toggle('is-current', isCurrent);
+  btn.inert = isCurrent;
+}
+
 export async function render(container, { user }) {
   _container = container;
   _user = user;
@@ -461,19 +546,7 @@ export async function render(container, { user }) {
         <!-- Der Kopf-Slot bleibt auf jedem Tab besetzt: entweder Stepper oder
              ein ruhiger Kontexttext. Eine Lücke machte jeden Tabwechsel zur
              Neuorientierung (Critique 2026-07-30, P1). -->
-        <div class="page-toolbar__center budget-nav__month">
-          <button class="btn btn--icon" id="budget-prev" aria-label="${t('budget.prevMonth')}">
-            <i data-lucide="chevron-left" aria-hidden="true"></i>
-          </button>
-          <span class="budget-nav__label" id="budget-label" aria-live="polite"></span>
-          <button class="btn btn--icon" id="budget-next" aria-label="${t('budget.nextMonth')}">
-            <i data-lucide="chevron-right" aria-hidden="true"></i>
-          </button>
-          <!-- „Aktuell" ist ein Reset, kein Navigationsschritt: hinter dem
-               Stepper statt zwischen Pfeil und Wert. -->
-          <button class="btn btn--secondary budget-nav__today" id="budget-today">${t('budget.currentMonth')}</button>
-          <span class="budget-nav__note" id="budget-period-note" hidden></span>
-        </div>
+        <div class="page-toolbar__center budget-nav__month">${monthNavHtml()}</div>
         ${state.budgetMode === 'personal' ? `
         <div class="budget-scope" role="tablist" aria-label="${t('budget.scopeLabel')}">
           ${[['mine', t('budget.scopeMine')], ['household', t('budget.scopeHousehold')]].map(([id, label]) => {
@@ -518,6 +591,14 @@ export async function render(container, { user }) {
 
   if (window.lucide) lucide.createIcons({ el: container });
 
+  // Vor dem ersten Laden synchronisieren, nicht erst danach: `state.month` und
+  // `state.activeTab` stehen schon, also kann „Aktuell" seinen Zielzustand VOR
+  // dem ersten Bildaufbau bekommen. Sonst rendert monthNavHtml() ihn sichtbar,
+  // der Ladevorgang laeuft, und erst renderBody() (nach dem Await) versteckt
+  // ihn wieder - ein sichtbares Aufblitzen bei jedem frischen Laden von
+  // /budget (PR #1200 Review, Befund 5).
+  syncCurrentButton();
+
   if (user?.access_scope !== 'split_guest') {
     // Konten einmalig beim Mount laden (Salden sind monatsunabhängig; kein
     // Nachladen pro Monatswechsel). Namensliste versorgt die Transaktions-Meta.
@@ -553,9 +634,11 @@ function wireNav() {
   _container.querySelector('#budget-next').addEventListener('click', () => stepPeriod(1));
   _container.querySelector('#budget-today').addEventListener('click', async () => {
     if (state.activeTab === 'reports') {
-      const today = todayKey();
-      if (today === state.reportAnchor) return;
-      state.reportAnchor = today;
+      // Containment statt Ankergleichheit (Befund 4, wie in reportShowsToday()):
+      // ein Klick, waehrend der Anker schon im heutigen Bereich liegt, waere
+      // sonst ein sichtbares No-Op, obwohl der Knopf `inert` sein sollte.
+      if (reportShowsToday()) return;
+      state.reportAnchor = todayKey();
       renderBody();
       return;
     }
@@ -678,10 +761,17 @@ function renderBody() {
         refocusSegmented('.budget-stats__ranges');
       },
       // Die Wochengrenzen kennt der Server; das Kopf-Label holt sie sich von dort
-      // nach, statt die Wochenlogik ein zweites Mal im Client zu führen.
+      // nach, statt die Wochenlogik ein zweites Mal im Client zu führen. Die
+      // rohen Grenzen (reportRangeFrom/To) braucht reportShowsToday() für die
+      // Containment-Prüfung von „Aktuell" bei Auflösung „Woche".
       onPeriod: ({ from, to }) => {
         state.reportPeriod = `${formatDate(from)} – ${formatDate(to)}`;
-        if (state.activeTab === 'reports' && state.range === 'week') updateLabel();
+        state.reportRangeFrom = from;
+        state.reportRangeTo   = to;
+        if (state.activeTab === 'reports' && state.range === 'week') {
+          updateLabel();
+          syncCurrentButton();
+        }
       },
     }).catch((err) => console.error('[Budget] stats render error:', err));
     return;
@@ -948,6 +1038,9 @@ function updateTabs() {
     const el = _container.querySelector(selector);
     if (el) el.hidden = !caps.month;
   });
+  // Verfeinerung fuer „Aktuell" (#1164): auf dem aktuellen Zeitraum bleibt der
+  // Reset verborgen, auch wenn der Tab Monatsnavigation traegt.
+  syncCurrentButton();
   // Wo kein Stepper steht, steht der Grund: der Slot bleibt besetzt, statt eine
   // Lücke zu hinterlassen, die der Nutzer als „Monat gilt noch" lesen könnte.
   const note = _container.querySelector('#budget-period-note');
@@ -3445,3 +3538,26 @@ async function deleteEntrySeries(id) {
     },
   });
 }
+
+// Nur fuer Tests (Muster wie calendar.js/meals.js): der Zeitraum-Kopf und die
+// Sichtbarkeitsregel des „Aktuell"-Resets sind verhaltensgetrieben gepinnt
+// (test-budget-ui.js, #1164) - gerendertes Markup und echte Sync-Funktion
+// statt Quelltext-Regex.
+export const __test = {
+  monthNavHtml,
+  syncCurrentButton,
+  tabCaps,
+  currentMonth,
+  state,
+  // PR #1200 Review Runde 3, Nice-to-have 1: der bisherige Verdrahtungstest
+  // las `updateTabs()` als QUELLTEXT (Regex auf den Funktionskoerper) - ein
+  // `if (false) syncCurrentButton();` im echten Render-Pfad blieb gruen,
+  // solange der String noch irgendwo im Funktionskoerper stand. Dieser
+  // Wrapper laesst den TATSAECHLICHEN Render-Pfad laufen (mit einem
+  // uebergebenen Test-Container statt des Modul-internen `_container`),
+  // damit der Test die echte Verdrahtung prueft, nicht ihre Textform.
+  updateTabsForTest(container) {
+    _container = container;
+    updateTabs();
+  },
+};

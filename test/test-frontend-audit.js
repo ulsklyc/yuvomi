@@ -17238,3 +17238,44 @@ test('inVerschachtelterFunktion trennt Rueckruf von Dialogvorbereitung', () => {
   assert.equal(inVerschachtelterFunktion(imTry, 0, 2), false,
     'ein try-Block oeffnet keinen Rueckruf');
 });
+
+// PR #1200 Review Runde 3, Nice-to-have 2: keine Suite pinnte den
+// eigentlichen CSS-MECHANISMUS des reservierten Reset-Slots fest. Der
+// Reviewer hat gegengeprueft: `.btn.is-current { visibility: hidden; }` durch
+// `{ display: none; }` ersetzt, und test:calendar, test:meals, test:budget-ui,
+// test:frontend-audit und test:mobile-scroll-layout blieben ALLE gruen - das
+// waere die Rueckkehr der Runde-1-Regression ("›" ruckt um die Knopfbreite),
+// von keiner Suite bemerkt. `display: none` naehme die Box aus dem Fluss,
+// `visibility: hidden` blendet nur die Malerei aus und haelt den Slot
+// reserviert - genau das ist der Unterschied, den layout.css direkt darueber
+// selbst dokumentiert (siehe Kommentar ueber der Regel).
+test('.btn.is-current blendet per visibility aus, nicht per display (PR #1200 Review Runde 3)', () => {
+  const layout = read('../public/styles/layout.css');
+  const rule = [...eachRule(layout)].find(({ selector }) => selector.trim() === '.btn.is-current');
+  assert.ok(rule, '.btn.is-current-Regel nicht gefunden');
+  assert.match(rule.body, /visibility:\s*hidden/,
+    '.btn.is-current muss visibility:hidden setzen - der reservierte Slot haengt daran, dass die Box im Fluss bleibt');
+  assert.doesNotMatch(rule.body, /display:\s*none/,
+    '.btn.is-current darf nicht display:none setzen - das nimmt die Box aus dem Fluss und laesst "›" wieder wandern (Runde-1-Regression)');
+});
+
+// PR #1200 Review Runde 4, Nice-to-have 3a: keine Suite pinnte den
+// CSS-MECHANISMUS fest, der verhindert, dass ueberlaufender Wochen-Text unter
+// "›" hinweg gemalt wird. Der Reviewer hat gegengeprueft: `overflow: hidden;`
+// und `text-overflow: ellipsis;` aus `.week-nav__label` entfernt, und
+// test:meals, test:frontend-audit und test:mobile-scroll-layout blieben ALLE
+// gruen - das waere die Rueckkehr der Runde-3-Regression (34px Text unter dem
+// Pfeil in fr, 20px in uk, beides gemessen), von keiner Suite bemerkt. Dieser
+// Test pinnt jetzt GENAU DIESEN Mechanismus fest, nach demselben Muster wie
+// `.btn.is-current` direkt darueber: die Regel per `eachRule()` lesen, nicht
+// den Dateitext durchsuchen (eine zufaellige Erwaehnung anderswo waere sonst
+// ein falscher gruener Treffer).
+test('.week-nav__label schneidet ueberlaufenden Text per overflow/text-overflow, statt ihn unter den Pfeil zu malen (PR #1200 Review Runde 4)', () => {
+  const meals = read('../public/styles/meals.css');
+  const rule = [...eachRule(meals)].find(({ selector }) => selector.trim() === '.week-nav__label');
+  assert.ok(rule, '.week-nav__label-Regel nicht gefunden');
+  assert.match(rule.body, /overflow:\s*hidden/,
+    '.week-nav__label muss overflow:hidden setzen - sonst malt ueberlaufender Text unter "›" (Runde-3-Regression)');
+  assert.match(rule.body, /text-overflow:\s*ellipsis/,
+    '.week-nav__label muss text-overflow:ellipsis setzen - sonst wird ueberlaufender Text kommentarlos abgeschnitten statt sichtbar gekuerzt');
+});

@@ -78,6 +78,20 @@
    * dann selbst bei 1440px 26px über die Gruppe (beides gemessen). Ein paar
    * wandernde Pixel sind der geringere Preis. */
   min-width: 0;
+  /* Clip-Sicherheitsnetz (PR #1200 Review Runde 3, Blocking): der reservierte
+   * Slot fuer den Reset-Knopf ("Heute"/"Aujourd'hui"/"Сьогодні") ist so breit
+   * wie sein eigenes uebersetztes Wort - in fr/uk deutlich breiter als in de
+   * (101.5px/87.2px gegen 65.7px, gemessen). Bei 320px blieb dem Label dann zu
+   * wenig Raum, und `white-space: nowrap` OHNE Begrenzung malt den Ueberlauf
+   * einfach ueber „>" hinweg (34px fr, davon 30px unter dem Pfeil; 20px uk,
+   * davon 16px). `overflow: hidden` + `text-overflow: ellipsis` schneidet den
+   * ueberschuessigen Text lockern statt ihn zu zeichnen - die Box selbst
+   * bleibt exakt so breit, wie der Flex-Layout sie ohnehin schon zuteilt, „>"
+   * wandert also NICHT (das war der Fehler der ersten Runde). Locale-neutral:
+   * gilt unabhaengig davon, welche Sprache gerade den breitesten Reset-Knopf
+   * hat. */
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Der Leerzustand ist ein Kind des Wochen-Grids und braucht deshalb zwei
@@ -240,11 +254,52 @@
    * (order: 3 in layout.css), weil „center" in den meisten Modulen ein Suchfeld
    * ist und damit nachrangig gegenüber Titel und Aktionen. Hier ist der
    * __center-Slot die Datums-Navigation und damit das Wichtigste im Kopf: sie
-   * gehört auf die erste Zeile, „Heute"/Zufallsplan darunter. Deshalb genau
+   * gehört auf die erste Zeile. Seit #1164 sitzt „Heute" IM __center-Slot,
+   * hinter den Pfeilen (weekNavHtml(), meals.js) - es steht also mit auf
+   * dieser ersten Zeile, nicht mehr darunter. Nur „Zufallsplan" (und der
+   * Rail-Toggle) bleiben im Actions-Slot der zweiten Zeile. Deshalb genau
    * diese Umkehrung - kein eigenes Kopf-Layout, nur eine andere Reihenfolge
    * innerhalb der geteilten Grammatik. */
   .meals-page .page-toolbar__center {
     order: -1;
+  }
+
+  /* PR #1200 Review Runde 4, Should-fix 1: „Heute" bekommt unter 640px eine
+   * EIGENE Zeile, statt sich die erste mit „<", dem Label und „>" zu teilen.
+   *
+   * Bis hierher (Runde 3) reservierte das Label immer nur den Platz, der nach
+   * Pfeilen UND Reset-Knopf übrig blieb - fest genug, damit „>" beim
+   * Auftauchen/Verschwinden von „Heute" nicht wandert (Runde-3-Fix), aber zu
+   * knapp: der reservierte Reset-Slot skaliert mit dem übersetzten Wort
+   * ("Aujourd'hui" 101.5px, "Сьогодні" 87.2px gegen "Heute" 65.7px, gemessen),
+   * und bei 320px blieb dem Label in fr/uk zu wenig Raum fuer BEIDE
+   * Wochenenden - der Ellipsis-Notnagel aus Runde 3 schnitt dann das
+   * Enddatum lautlos ab, statt nur ueberzulaufenden Text zu verstecken.
+   *
+   * Der Reset-Knopf wandert deshalb hier auf eine zweite Zeile. `order`
+   * reicht nicht, weil `.week-nav` sonst genauso schmal umbrechen wuerde wie
+   * vorher; erst `flex-basis: 100%` erzwingt, dass er NIE neben Pfeilen und
+   * Label passt und darum IMMER umbricht - unabhaengig von Sprache, Wortlaenge
+   * oder Sichtbarkeitszustand. Das Label bekommt dadurch immer die volle
+   * Zeile abzueglich der beiden Pfeile, nie abzueglich des Reset-Knopfs - der
+   * Engpass, der die zwei Enddaten kostete, existiert damit strukturell nicht
+   * mehr, in keiner Sprache und keiner Woche (auch nicht bei einem
+   * Monatswechsel innerhalb der Woche).
+   *
+   * Preis: „Heute" steht bei 320-639px nicht mehr auf derselben Zeile wie die
+   * Pfeile (die #1164-Anordnung oben gilt nur noch fuer breitere Bildschirme).
+   * Der reservierte Slot bleibt trotzdem `.is-current`-gesteuert (visibility,
+   * nicht `hidden`) - die zweite Zeile bleibt also immer gleich hoch, ob der
+   * Knopf sichtbar ist oder nicht, und die Pfeile ruckeln beim Wechsel weiterhin
+   * nicht. */
+  .week-nav {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  .week-nav__today {
+    flex-basis: 100%;
+    order: 1;
   }
 
   .week-grid {

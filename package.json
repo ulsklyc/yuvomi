@@ -83,7 +83,7 @@
     "test:budget-stats": "DB_PATH=:memory: node --experimental-sqlite test/test-budget-stats.js",
     "test:budget-accounts": "node --experimental-sqlite --test test/test-budget-accounts.js",
     "test:budget-plans": "node --experimental-sqlite test/test-budget-plans.js",
-    "test:budget-ui": "node --test test/test-budget-ui.js",
+    "test:budget-ui": "node --loader ./test/test-browser-loader.mjs --test test/test-budget-ui.js",
     "test:budget-visibility": "node --experimental-sqlite test/test-budget-visibility.js",
     "test:budget-routes-scope": "node --experimental-sqlite --test test/test-budget-routes-scope.js",
     "test:budget-entries-routes": "node --experimental-sqlite --test test/test-budget-entries-routes.js",

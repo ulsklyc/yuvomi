@@ -101,6 +101,7 @@ const STUBS = {
     export const getRRuleValues = () => ({});
     export const describeRRule = () => '';
     export const recurrenceRow = () => ({ icon: 'repeat', label: '', value: '' });
+    export const intervalUnitLabel = () => '';
   `,
   '/components/modal.js': `
     export const openModal = (...args) => globalThis.__openModal?.(...args);

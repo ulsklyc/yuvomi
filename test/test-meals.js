@@ -11,7 +11,11 @@ import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { datesForTemplateInRange, mealWeekday } from '../server/services/meal-recurrence.js';
 import { __test as mealsUi } from '../public/pages/meals.js';
 import { toDecimalString } from '../public/utils/money.js';
+import { todayKey } from '../public/utils/date.js';
+import { setDisplayTimeZone, _resetDisplayTimeZoneCache } from '../public/utils/timezone.js';
 import { parseQuantity } from '../server/services/shopping-import.js';
+
+const mealsSource = readFileSync(new URL('../public/pages/meals.js', import.meta.url), 'utf8');
 
 let passed = 0;
 let failed = 0;
@@ -595,6 +599,30 @@ test('Wochenberechnung: Montag der aktuellen Woche', () => {
   assert(getMondayOf('2026-03-30') === '2026-03-30', 'Nächster Montag');
 });
 
+// PR #1200 Review Runde 3, Nice-to-have 2: keine Suite pinnte fest, dass
+// `formatWeekLabel()` den schmalen Wochen-Format-Umschalter ueberhaupt liest -
+// ein hartcodiertes `narrow = true`/`false` anstelle des `matchMedia`-Aufrufs
+// bliebe unbemerkt gruen. Ein rein TEXTLICHER Vergleich zwischen schmal/breit
+// waere hier blind: der Browser-Loader stubbt `formatDate`/`formatDayMonth`
+// beide auf `String(d)`, beide Zweige liefern also dieselbe Zeichenkette. Der
+// Spy prueft deshalb den echten AUFRUF: `formatWeekLabel()` muss
+// `window.matchMedia('(max-width: 639px)')` tatsaechlich befragen - fehlt der
+// Aufruf (weil `narrow` fest verdrahtet wurde), faellt das hier durch.
+test('formatWeekLabel() befragt tatsaechlich matchMedia fuer den schmalen Umschalter', () => {
+  const zuvorWindow = globalThis.window;
+  const calls = [];
+  globalThis.window = {
+    matchMedia: (query) => { calls.push(query); return { matches: false }; },
+  };
+  try {
+    mealsUi.formatWeekLabel('2026-09-14');
+    assert(calls.includes('(max-width: 639px)'),
+      'formatWeekLabel() muss window.matchMedia("(max-width: 639px)") aufrufen - sonst ist der schmale Umschalter fest verdrahtet statt live gelesen');
+  } finally {
+    globalThis.window = zuvorWindow;
+  }
+});
+
 // --------------------------------------------------------
 // Rezept skalieren: Zutatenmengen (Umschrift nach Region)
 // --------------------------------------------------------
@@ -794,6 +822,424 @@ test('Skalieren: eine mitten im Trenner abgeschnittene Zahl bleibt stehen', () =
   scaled('ar-EG', '١ ١/٢ cup', 2, '٣ cup');
   // Ein Leerzeichen trennt dagegen zwei Angaben und schneidet nichts ab.
   scaled('de', '2 x 500 g', 2, '4 x 500 g');
+});
+
+// --------------------------------------------------------
+// Zeitraum-Kopf (#1164)
+// --------------------------------------------------------
+
+// Fake-Knopf mit einer echten (Set-gestuetzten) classList und einem
+// `inert`-Feld - genug DOM-Oberflaeche, um `.is-current` und `inert` wie im
+// echten Browser zu pruefen, ohne eine ganze DOM-Bibliothek zu laden.
+function fakeResetButton() {
+  const classes = new Set();
+  return {
+    inert: false,
+    classList: {
+      toggle(cls, force) { if (force) classes.add(cls); else classes.delete(cls); },
+      contains(cls) { return classes.has(cls); },
+    },
+  };
+}
+
+// #1164: EIN Positions- und EINE Sichtbarkeitsregel fuer den Zeitraum-Reset.
+// Verhaltensgetrieben: geprueft werden der GERENDERTE Kopf und die echte
+// Sync-Funktion, nicht der Quelltext.
+//
+// PR #1200 Review, Blocking 1: `hidden` loeste in `display: none` auf und nahm
+// die Box aus dem Fluss - `.week-nav__label` (`flex: 1`) wuchs dann in den
+// frei gewordenen Platz und "›" ruckte um die Knopfbreite, sobald der Reset
+// erschien/verschwand (gemessen 5/11 ueber 33 Layouts). Ersetzt durch
+// `.is-current` (visibility, Box bleibt im Fluss) + `inert`
+// (Zeiger/Fokus/A11y-Baum). Dieser Test pinnt jetzt GENAU DIESEN Mechanismus
+// fest: eine Rueckkehr zu `hidden` faellt hier durch.
+test('Zeitraum-Kopf: zurueck, Wert, vor - dahinter „Heute", per .is-current+inert verborgen in der aktuellen Woche (#1164, #1200)', () => {
+  // (a) Reihenfolge im gerenderten Markup: der Reset steht HINTER dem Stepper,
+  // im week-nav-Slot - nicht mehr bei den Inhalts-Aktionen.
+  const ids = [...mealsUi.weekNavHtml().matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
+  assert(JSON.stringify(ids) === JSON.stringify(['week-prev', 'week-label', 'week-next', 'week-today']),
+    `erwartet zurueck, Wert, vor, Reset - gerendert: ${ids.join(', ')}`);
+
+  // (b) Sichtbarkeit: in der aktuellen Woche traegt der Reset `.is-current`
+  // und `inert`, behaelt aber sein Element (der Slot bleibt reserviert).
+  const btn = fakeResetButton();
+  const prevBtn = fakeResetButton();
+  const root = {
+    querySelector: (sel) => (sel === '#week-today' ? btn : sel === '#week-prev' ? prevBtn : null),
+  };
+  const zuvor = mealsUi.state.currentWeek;
+  try {
+    mealsUi.state.currentWeek = mealsUi.getMondayOf(todayKey());
+    mealsUi.syncTodayButton(root);
+    assert(btn.classList.contains('is-current') === true, 'in der aktuellen Woche muss der Reset .is-current tragen');
+    assert(btn.inert === true, 'in der aktuellen Woche muss der Reset inert sein');
+    mealsUi.state.currentWeek = '2000-01-03';
+    mealsUi.syncTodayButton(root);
+    assert(btn.classList.contains('is-current') === false, 'in einer anderen Woche darf der Reset nicht .is-current sein');
+    assert(btn.inert === false, 'in einer anderen Woche darf der Reset nicht inert sein');
+  } finally {
+    mealsUi.state.currentWeek = zuvor;
+  }
+});
+
+// PR #1200 Review, Should-fix 3: Enter auf „Heute" laedt die aktuelle Woche
+// und macht den (fokussierten) Knopf damit selbst inert - ohne Gegenmassnahme
+// faellt der Fokus auf `<body>`.
+test('syncTodayButton() rettet den Fokus vor dem eigenen inert-Werden', () => {
+  const btn = fakeResetButton();
+  const prevBtn = fakeResetButton();
+  const root = { querySelector: (sel) => (sel === '#week-today' ? btn : sel === '#week-prev' ? prevBtn : null) };
+  const zuvor = mealsUi.state.currentWeek;
+  const zuvorDocument = globalThis.document;
+  try {
+    globalThis.document = { activeElement: btn };
+    mealsUi.state.currentWeek = '2000-01-03'; // erst NICHT aktuell
+    mealsUi.syncTodayButton(root);
+    assert(btn.inert === false);
+
+    let fokussiert = false;
+    prevBtn.focus = () => { fokussiert = true; globalThis.document.activeElement = prevBtn; };
+    mealsUi.state.currentWeek = mealsUi.getMondayOf(todayKey()); // jetzt wird der fokussierte Knopf aktuell
+    mealsUi.syncTodayButton(root);
+    assert(fokussiert === true, 'der Fokus muss vor dem inert-Werden auf den Zurueck-Pfeil wandern');
+    assert(btn.inert === true);
+  } finally {
+    mealsUi.state.currentWeek = zuvor;
+    globalThis.document = zuvorDocument;
+  }
+});
+
+// Minimales Fake-DOM-Element: genug Oberflaeche fuer `mountEmptyState()`
+// (utils/empty-state.js) - `createElement`/`createTextNode`, `className`,
+// `setAttribute`, `appendChild`/`append`, `classList`, `replaceChildren`,
+// `removeAttribute`. Kein echtes DOM, keine jsdom-Abhaengigkeit - dieselbe
+// Idee wie `fakeResetButton()` oben, nur fuer den Leerzustands-Zweig.
+function fakeDomElement(tag) {
+  const classes = new Set();
+  return {
+    tagName: tag,
+    className: '',
+    attributes: {},
+    style: {},
+    dataset: {},
+    children: [],
+    classList: {
+      add(...cs) { cs.forEach((c) => classes.add(c)); },
+      remove(...cs) { cs.forEach((c) => classes.delete(c)); },
+      toggle(c, force) { if (force) classes.add(c); else classes.delete(c); },
+      contains: (c) => classes.has(c),
+    },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    removeAttribute(name) { delete this.attributes[name]; },
+    appendChild(child) { this.children.push(child); return child; },
+    append(...items) { this.children.push(...items); },
+    insertAdjacentHTML() { /* Markup wird nicht geprueft - nur, dass gebaut wird */ },
+    replaceChildren(...items) { this.children = items; },
+    addEventListener() {},
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+  };
+}
+
+function withMinimalDom(fn) {
+  const zuvorDocument = globalThis.document;
+  const zuvorWindow = globalThis.window;
+  globalThis.document = {
+    createElement: (tag) => fakeDomElement(tag),
+    createTextNode: (text) => ({ nodeType: 3, textContent: text }),
+  };
+  globalThis.window = { lucide: undefined, matchMedia: () => ({ matches: false }) };
+  try { return fn(); }
+  finally {
+    globalThis.document = zuvorDocument;
+    globalThis.window = zuvorWindow;
+  }
+}
+
+// PR #1200 Review Runde 3, Nice-to-have 1: der bisherige Test las
+// `renderWeekGrid()` als QUELLTEXT (Regex auf den Funktionskoerper) - ein
+// auskommentiertes `// syncTodayButton();` im echten Render-Pfad blieb gruen,
+// solange der String noch irgendwo im Funktionskoerper stand (PR #1200
+// Review Runde 3, Nice-to-have 1). Dieser Test laesst den ECHTEN Render-Pfad
+// laufen: `renderWeekGridForTest()` setzt den Modul-internen Container auf
+// einen Test-Container und ruft `renderWeekGrid()` unveraendert auf; geprueft
+// wird das SICHTBARE ERGEBNIS am echten `#week-today`-Knoten, nicht der
+// Quelltext.
+test('renderWeekGrid() verdrahtet syncTodayButton() wirklich in den Render-Pfad', () => {
+  withMinimalDom(() => {
+    const grid = fakeDomElement('div');
+    const label = fakeDomElement('span');
+    const todayBtn = fakeResetButton();
+    const prevBtn = fakeResetButton();
+    const testContainer = {
+      querySelector(sel) {
+        if (sel === '#week-grid') return grid;
+        if (sel === '#week-label') return label;
+        if (sel === '#week-today') return todayBtn;
+        if (sel === '#week-prev') return prevBtn;
+        return null;
+      },
+    };
+    const zuvorWeek = mealsUi.state.currentWeek;
+    const zuvorMeals = mealsUi.state.meals;
+    const zuvorError = mealsUi.state.loadError;
+    try {
+      // Aktuelle Woche + leerer Plan: `renderWeekGrid()` haengt am
+      // Leerzustand-Zweig auf, NACHDEM es `syncTodayButton()` aufgerufen hat -
+      // der guenstigste echte Durchlauf, der die Verdrahtung noch beobachtet.
+      mealsUi.state.currentWeek = mealsUi.getMondayOf(todayKey());
+      mealsUi.state.meals = [];
+      mealsUi.state.loadError = null;
+      mealsUi.renderWeekGridForTest(testContainer);
+      assert(todayBtn.classList.contains('is-current') === true,
+        'renderWeekGrid() muss syncTodayButton() wirklich aufrufen - „Heute" traegt in der aktuellen Woche sonst kein .is-current');
+    } finally {
+      mealsUi.state.currentWeek = zuvorWeek;
+      mealsUi.state.meals = zuvorMeals;
+      mealsUi.state.loadError = zuvorError;
+    }
+  });
+});
+
+// PR #1200 Review Runde 3, Nice-to-have 4: `formatWeekLabel()` las
+// `matchMedia` bisher nur beim Rendern - ein Fenster, das ueber die
+// 640px-Schwelle gezogen wird, behielt bis zum naechsten Wochenwechsel das
+// alte Format. `onNarrowWeekLabelQueryChange()` ist der Change-Handler einer
+// gehaltenen `MediaQueryList` (Modul-Top-Level, siehe meals.js); dieser Test
+// ruft ihn direkt auf und prueft, dass er tatsaechlich neu zeichnet -
+// erkennbar am selben sichtbaren Ergebnis wie beim Verdrahtungstest oben
+// (`syncTodayButton()` laeuft innerhalb von `renderWeekGrid()` erneut).
+test('onNarrowWeekLabelQueryChange() zeichnet die Wochen-Navigation neu, wenn der Container noch sichtbar ist', () => {
+  withMinimalDom(() => {
+    const grid = fakeDomElement('div');
+    const label = fakeDomElement('span');
+    const todayBtn = fakeResetButton();
+    todayBtn.classList.toggle('is-current', false); // Startzustand: absichtlich falsch
+    const prevBtn = fakeResetButton();
+    const testContainer = {
+      isConnected: true,
+      querySelector(sel) {
+        if (sel === '#week-grid') return grid;
+        if (sel === '#week-label') return label;
+        if (sel === '#week-today') return todayBtn;
+        if (sel === '#week-prev') return prevBtn;
+        return null;
+      },
+    };
+    const zuvorWeek = mealsUi.state.currentWeek;
+    const zuvorMeals = mealsUi.state.meals;
+    const zuvorError = mealsUi.state.loadError;
+    try {
+      mealsUi.state.currentWeek = mealsUi.getMondayOf(todayKey());
+      mealsUi.state.meals = [];
+      mealsUi.state.loadError = null;
+      mealsUi.renderWeekGridForTest(testContainer); // Container einmal "montieren"
+      todayBtn.classList.toggle('is-current', false); // und wieder falsch machen
+
+      mealsUi.onNarrowWeekLabelQueryChange();
+      assert(todayBtn.classList.contains('is-current') === true,
+        'onNarrowWeekLabelQueryChange() muss bei sichtbarem Container neu zeichnen (renderWeekGrid()/syncTodayButton())');
+
+      // Nicht mehr sichtbar (Navigation weg von /meals): kein Zeichnen ins Leere.
+      testContainer.isConnected = false;
+      todayBtn.classList.toggle('is-current', false);
+      mealsUi.onNarrowWeekLabelQueryChange();
+      assert(todayBtn.classList.contains('is-current') === false,
+        'onNarrowWeekLabelQueryChange() darf nach dem Verlassen der Seite (isConnected=false) nicht mehr zeichnen');
+    } finally {
+      mealsUi.state.currentWeek = zuvorWeek;
+      mealsUi.state.meals = zuvorMeals;
+      mealsUi.state.loadError = zuvorError;
+    }
+  });
+});
+
+// PR #1200 Review, Befund 5: weekNavHtml() rendert den Reset ohne
+// .is-current/inert, und ohne diese Gegenmassnahme blitzt er bei jedem
+// frischen Laden von /meals sichtbar auf, bevor renderWeekGrid() ihn nach dem
+// ersten Laden wieder korrekt einstellt.
+test('render() synchronisiert „Heute" VOR dem ersten Laden, gegen das Aufblitzen (Befund 5)', () => {
+  const renderStart = mealsSource.indexOf('export async function render(container, { user }) {');
+  const loadIdx = mealsSource.indexOf('await Promise.all([loadWeek(monday)');
+  assert(renderStart > -1 && loadIdx > -1, 'render()/Promise.all-Aufruf nicht gefunden');
+  const syncIdx = mealsSource.indexOf('syncTodayButton();', renderStart);
+  assert(syncIdx > -1 && syncIdx < loadIdx,
+    'syncTodayButton() muss zwischen dem Beginn von render() und dem ersten Laden aufgerufen werden');
+});
+
+// PR #1200 Review, Befund 8: dieser Test berechnete sein Soll bisher mit
+// demselben getMondayOf(todayKey()) wie die Seite selbst - eine Regression in
+// der Zonenumrechnung waere hier unsichtbar geblieben, weil beide Seiten
+// denselben (moeglicherweise kaputten) Weg gegangen waeren. Eine explizit
+// gesetzte Haushaltszone, die von der Prozesszone des Testlaeufers abweicht,
+// und ein UNABHAENGIG (rohes Intl.DateTimeFormat statt todayKey()) berechnetes
+// Soll zwingen die Umrechnung wirklich auf den Pruefstand - dasselbe Muster
+// wie test-calendar-timezone-window.js (dort per `process.env.TZ`, hier per
+// der Haushaltszonen-API, die die Seite selbst befragt).
+test('„Heute" im Essensplan folgt der HAUSHALTSZONE, nicht der Prozesszone des Testlaeufers (Befund 8)', () => {
+  const zuvorWeek = mealsUi.state.currentWeek;
+  const RealDate = globalThis.Date;
+  try {
+    setDisplayTimeZone('America/Los_Angeles');
+
+    // Ein per `new Date()` gelesenes „jetzt" faellt nur dann auf, wenn Prozess-
+    // und Haushaltszone tatsaechlich verschiedene WOCHEN sehen - ein kaputtes
+    // `zonedFields()` (das die Haushaltszone ignoriert und auf die Prozesszone
+    // zurückfaellt) waere sonst UNSICHTBAR geblieben. Ein fest eingefrorener
+    // Zeitpunkt nahe der UTC-Mitternacht an einem Montag erzwingt das
+    // unabhaengig davon, wann die Suite laeuft: 02:30 UTC am Montag ist in Los
+    // Angeles (UTC-8 im Januar) noch Sonntag 18:30 der VORWOCHE.
+    const fixed = new RealDate('2026-01-12T02:30:00Z');
+    class FixedDate extends RealDate {
+      constructor(...args) { super(...(args.length ? args : [fixed])); }
+      static now() { return fixed.getTime(); }
+    }
+    globalThis.Date = FixedDate;
+
+    const erwarteterHeuteKey = '2026-01-11'; // LA-Kalendertag (Sonntag) bei 2026-01-12T02:30Z
+    const prozessHeuteKey = '2026-01-12'; // UTC-Kalendertag (Montag) desselben Zeitpunkts
+    const erwarteterMontag = mealsUi.getMondayOf(erwarteterHeuteKey);
+    const prozessMontag = mealsUi.getMondayOf(prozessHeuteKey);
+    assert(erwarteterMontag !== prozessMontag,
+      'Testaufbau fehlerhaft: LA- und Prozesstag muessen fuer diese Pruefung verschiedene Wochen ergeben');
+
+    // PR #1200 Review Runde 3, Nice-to-have 3: nicht `todayKey()` isoliert
+    // aufrufen, sondern durch die ECHTE Sync-Funktion beobachten - ein
+    // Rueckfall von `todayKey()` auf ein naives `new Date().toISOString()`
+    // (Prozesszone statt Haushaltszone) faellt nur auf, wenn das RESULTAT von
+    // `syncTodayButton()` am DOM-Knoten geprueft wird, nicht der Rueckgabewert
+    // von `todayKey()` selbst.
+    const btnLaWoche = fakeResetButton();
+    const rootLaWoche = { querySelector: (sel) => (sel === '#week-today' ? btnLaWoche : null) };
+    mealsUi.state.currentWeek = erwarteterMontag; // die tatsaechlich laufende (LA-)Woche
+    mealsUi.syncTodayButton(rootLaWoche);
+    assert(btnLaWoche.classList.contains('is-current') === true,
+      `syncTodayButton() muss die LA-Woche (${erwarteterMontag}) als aktuell erkennen - stattdessen .is-current=${btnLaWoche.classList.contains('is-current')}. ` +
+      'Ein auf die Prozesszone zurueckgefallenes todayKey() saehe hier die falsche Woche.');
+
+    const btnProzessWoche = fakeResetButton();
+    const rootProzessWoche = { querySelector: (sel) => (sel === '#week-today' ? btnProzessWoche : null) };
+    mealsUi.state.currentWeek = prozessMontag; // die UTC-Prozesswoche - in LA nicht die aktuelle
+    mealsUi.syncTodayButton(rootProzessWoche);
+    assert(btnProzessWoche.classList.contains('is-current') === false,
+      `syncTodayButton() darf die Prozesszonen-Woche (${prozessMontag}) NICHT als aktuell erkennen - stattdessen .is-current=${btnProzessWoche.classList.contains('is-current')}. ` +
+      'Ein auf die Prozesszone zurueckgefallenes todayKey() saehe genau diese Woche faelschlich als aktuell an.');
+  } finally {
+    globalThis.Date = RealDate;
+    mealsUi.state.currentWeek = zuvorWeek;
+    setDisplayTimeZone(null);
+    _resetDisplayTimeZoneCache();
+  }
+});
+
+// PR #1200 Review Runde 4, Should-fix 2: `onNarrowWeekLabelQueryChange()` rief
+// bisher `renderWeekGrid()` auf - eine Bildschirmdrehung ueber die 640px-
+// Schwelle riss damit das GANZE Wochengitter neu auf (jede Karte, den
+// Stagger, den Scroll zur heutigen Spalte), obwohl nur das Label ein anderes
+// Format braucht. Stand der Fokus auf einer Mahlzeit-Karte, fiel er dabei auf
+// `<body>` - main haelt ihn auf der Karte. Dieser Test pinnt beide Haelften
+// des Fixes fest: der Handler darf das Grid nicht anfassen (Spione auf den
+// Methoden, die ein echter renderWeekGrid()-Durchlauf nachweislich benutzt -
+// siehe Testaufbau oben), und ein zuvor gesetzter Fokus muss unveraendert
+// bleiben.
+test('onNarrowWeekLabelQueryChange() aktualisiert nur Label und Reset, nicht das Wochengitter (Runde 4, Should-fix 2)', () => {
+  withMinimalDom(() => {
+    const grid = fakeDomElement('div');
+    let gridTouched = false;
+    const zuvorRemoveAttribute = grid.removeAttribute.bind(grid);
+    grid.removeAttribute = (name) => { gridTouched = true; zuvorRemoveAttribute(name); };
+    grid.setAttribute = (name, value) => { gridTouched = true; grid.attributes[name] = value; };
+    const zuvorReplaceChildren = grid.replaceChildren.bind(grid);
+    grid.replaceChildren = (...items) => { gridTouched = true; zuvorReplaceChildren(...items); };
+
+    const label = fakeDomElement('span');
+    const todayBtn = fakeResetButton();
+    const prevBtn = fakeResetButton();
+    const strayCard = fakeResetButton(); // Stellvertreter fuer eine fokussierte Mahlzeit-Karte
+    const testContainer = {
+      isConnected: true,
+      querySelector(sel) {
+        if (sel === '#week-grid') return grid;
+        if (sel === '#week-label') return label;
+        if (sel === '#week-today') return todayBtn;
+        if (sel === '#week-prev') return prevBtn;
+        return null;
+      },
+    };
+    const zuvorWeek = mealsUi.state.currentWeek;
+    const zuvorMeals = mealsUi.state.meals;
+    const zuvorError = mealsUi.state.loadError;
+    const zuvorDocument = globalThis.document;
+    try {
+      mealsUi.state.currentWeek = mealsUi.getMondayOf(todayKey());
+      mealsUi.state.meals = [];
+      mealsUi.state.loadError = null;
+
+      // Testaufbau-Beweis: ein ECHTER renderWeekGrid()-Durchlauf beruehrt das
+      // Grid nachweislich (Leerzustand-Zweig ruft grid.removeAttribute auf) -
+      // ohne diesen Beweis waere ein "gridTouched bleibt false" unten wertlos.
+      mealsUi.renderWeekGridForTest(testContainer);
+      assert(gridTouched === true,
+        'Testaufbau fehlerhaft: ein echter renderWeekGrid()-Durchlauf muss das Grid beruehren, sonst beweist der Test unten nichts');
+
+      gridTouched = false;
+      globalThis.document = { activeElement: strayCard };
+      mealsUi.onNarrowWeekLabelQueryChange();
+
+      assert(gridTouched === false,
+        'onNarrowWeekLabelQueryChange() darf das Wochengitter NICHT anfassen - das rebuildet Karten, Stagger und Scroll unnoetig (Runde 4, Should-fix 2)');
+      assert(globalThis.document.activeElement === strayCard,
+        'onNarrowWeekLabelQueryChange() darf den Fokus nicht verschieben - ein Grid-Rebuild waere genau der Weg, ueber den main den Fokus verliert');
+      assert(todayBtn.classList.contains('is-current') === true,
+        'onNarrowWeekLabelQueryChange() muss trotzdem syncTodayButton() ausfuehren - nur das Grid bleibt unberuehrt, nicht Label/Reset');
+    } finally {
+      mealsUi.state.currentWeek = zuvorWeek;
+      mealsUi.state.meals = zuvorMeals;
+      mealsUi.state.loadError = zuvorError;
+      globalThis.document = zuvorDocument;
+    }
+  });
+});
+
+// PR #1200 Review Runde 4, Nice-to-have 3b: der bestehende Test oben ruft
+// `onNarrowWeekLabelQueryChange()` direkt auf - das prueft, dass der Handler
+// TUT, was er soll, aber nicht, dass er ueberhaupt an ein echtes
+// `matchMedia(...)`-Change-Ereignis gebunden ist. Ein geloeschtes
+// `addEventListener('change', ...)` in meals.js liesse `test:meals` komplett
+// gruen, weil kein Test je einen echten Aufruf des Verdrahtungs-Einzeilers
+// beobachtet. Dieser Test importiert das Modul FRISCH (Cache-Buster in der
+// Spezifizierer-Query, dasselbe Muster wie test-nav-badges.js/
+// test-overlay-history.js) gegen ein `window.matchMedia`, dessen
+// `addEventListener` selbst ein Spion ist - nur ein echter Modul-Top-Level-
+// Aufruf von `addEventListener('change', ...)` erzeugt hier einen Treffer.
+const _narrowWeekLabelListenerCalls = await (async () => {
+  const calls = [];
+  const zuvorWindow = globalThis.window;
+  globalThis.window = {
+    matchMedia: (query) => ({
+      matches: false,
+      addEventListener(type, handler) { calls.push({ query, type, handler }); },
+    }),
+  };
+  try {
+    await import(`../public/pages/meals.js?narrow-week-label-listener-probe=${process.pid}-${Date.now()}`);
+  } finally {
+    globalThis.window = zuvorWindow;
+  }
+  return calls;
+})();
+
+test('meals.js registriert onNarrowWeekLabelQueryChange() wirklich per matchMedia(...).addEventListener() (Runde 4, Nice-to-have 3b)', () => {
+  assert(_narrowWeekLabelListenerCalls.length === 1,
+    `erwartet genau eine addEventListener()-Registrierung beim Modul-Import, erhalten: ${_narrowWeekLabelListenerCalls.length}. ` +
+    'Eine geloeschte addEventListener-Zeile in meals.js waere hier 0, nicht 1.');
+  const [call] = _narrowWeekLabelListenerCalls;
+  assert(call.query === '(max-width: 639px)',
+    `erwartet die Anmeldung auf "(max-width: 639px)", erhalten: "${call.query}"`);
+  assert(call.type === 'change',
+    `erwartet ein "change"-Ereignis, erhalten: "${call.type}"`);
+  assert(typeof call.handler === 'function',
+    'der registrierte Handler muss eine Funktion sein (onNarrowWeekLabelQueryChange)');
 });
 
 // --------------------------------------------------------

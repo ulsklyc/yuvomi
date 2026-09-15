@@ -32,6 +32,30 @@ const panelCss = read('../public/styles/panel.css');
 const subscriptionsCss = read('../public/styles/subscriptions.css');
 const splitCss = read('../public/styles/split-expenses.css');
 
+// Fuer den Verhaltenstest des Zeitraum-Kopfs (#1164) wird budget.js WIRKLICH
+// geladen (Browser-Loader, siehe npm-Skript), statt nur als Text gelesen -
+// geprueft werden gerendertes Markup und die echte Sync-Funktion. budget.js
+// zieht am Modulkopf echte Browser-Module (u. a. das Custom Element
+// category-manager.js); der Minimal-Stub deckt genau deren Modul-Ladezeit ab,
+// dasselbe Muster wie test-waste-ui.js/test-shopping-ux.js. Er steht VOR dem
+// ersten Top-Level-await: unter Node 22 beginnen registrierte Tests dort schon
+// zu laufen, und alles, was sie brauchen, muss dann initialisiert sein.
+global.HTMLElement = class HTMLElement {};
+global.customElements = { define() {}, get() { return undefined; } };
+global.window = { matchMedia: () => ({ matches: false }), addEventListener() {}, yuvomi: {} };
+global.document = {
+  getElementById: () => null,
+  createElement: () => Object.assign(new global.HTMLElement(), {
+    style: {}, setAttribute() {}, appendChild() {}, addEventListener() {},
+    classList: { add() {}, remove() {}, toggle() {} },
+  }),
+  addEventListener() {},
+  documentElement: { lang: 'de' },
+};
+global.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+const { __test: budgetUi } = await import('../public/pages/budget.js');
+const { todayKey } = await import('../public/utils/date.js');
+
 // --------------------------------------------------------
 // Monatsnavigation und Neu-Aktion je Untertab
 // --------------------------------------------------------
@@ -78,6 +102,210 @@ test('Monats-Bedienelemente werden als Block geschaltet, nicht einzeln', () => {
   const block = budget.match(/\['#budget-prev', '#budget-next', '#budget-today', '#budget-label'\][\s\S]{0,220}/);
   assert.ok(block, 'Monats-Bedienelemente werden nicht gemeinsam geschaltet');
   assert.match(block[0], /el\.hidden = !caps\.month/);
+});
+
+// Fake-Knopf mit einer echten (Set-gestuetzten) classList und einem
+// `inert`-Feld - genug DOM-Oberflaeche, um `.is-current` und `inert` wie im
+// echten Browser zu pruefen, ohne eine ganze DOM-Bibliothek zu laden.
+function fakeResetButton() {
+  const classes = new Set();
+  return {
+    inert: false,
+    classList: {
+      toggle(cls, force) { if (force) classes.add(cls); else classes.delete(cls); },
+      contains(cls) { return classes.has(cls); },
+    },
+  };
+}
+
+// #1164: EIN Positions- und EINE Sichtbarkeitsregel fuer den Zeitraum-Reset.
+// Verhaltensgetrieben: geprueft werden der GERENDERTE Kopf und die echte
+// Sync-Funktion, nicht der Quelltext.
+//
+// PR #1200 Review, Blocking 1: `hidden` loeste in `display: none` auf und nahm
+// die Box aus dem Fluss - das Nachbar-Label (`flex: 1`) wuchs dann in den frei
+// gewordenen Platz und "›" ruckte um die Knopfbreite, sobald der Reset
+// erschien/verschwand (gemessen 11/11 im Budget ueber 33 Layouts, das
+// schlimmste der drei Module). Ersetzt durch `.is-current` (visibility, Box
+// bleibt im Fluss) + `inert` (Zeiger/Fokus/A11y-Baum). Dieser Test pinnt jetzt
+// GENAU DIESEN Mechanismus fest: eine Rueckkehr zu `hidden` (oder ein
+// Vergessen von `inert`) faellt hier durch.
+test('Zeitraum-Kopf: zurueck, Wert, vor - dahinter „Aktuell", per .is-current+inert verborgen im aktuellen Zeitraum (#1164, #1200)', () => {
+  // (a) Reihenfolge im gerenderten Markup: der Reset steht HINTER dem Stepper.
+  const ids = [...budgetUi.monthNavHtml().matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(
+    ids,
+    ['budget-prev', 'budget-label', 'budget-next', 'budget-today', 'budget-period-note'],
+    'erwartet zurueck, Wert, vor, Reset (und den Kontexttext-Slot)'
+  );
+
+  // (b) Sichtbarkeit: im aktuellen Monat bzw. auf dem heutigen Berichts-Anker
+  // traegt der Reset `.is-current` und `inert`, behaelt aber sein Element (der
+  // Slot bleibt reserviert, "›"/"‹" wandern nicht).
+  const btn = fakeResetButton();
+  const prevBtn = fakeResetButton();
+  const root = {
+    querySelector: (sel) => (sel === '#budget-today' ? btn : sel === '#budget-prev' ? prevBtn : null),
+  };
+  const zuvor = {
+    activeTab: budgetUi.state.activeTab,
+    month: budgetUi.state.month,
+    reportAnchor: budgetUi.state.reportAnchor,
+    range: budgetUi.state.range,
+    reportRangeFrom: budgetUi.state.reportRangeFrom,
+    reportRangeTo: budgetUi.state.reportRangeTo,
+  };
+  try {
+    budgetUi.state.activeTab = 'budget';
+    budgetUi.state.month = budgetUi.currentMonth();
+    budgetUi.syncCurrentButton(root);
+    assert.equal(btn.classList.contains('is-current'), true, 'im aktuellen Monat muss der Reset .is-current tragen');
+    assert.equal(btn.inert, true, 'im aktuellen Monat muss der Reset inert sein');
+    budgetUi.state.month = '2030-06';
+    budgetUi.syncCurrentButton(root);
+    assert.equal(btn.classList.contains('is-current'), false, 'in einem anderen Monat darf der Reset nicht .is-current sein');
+    assert.equal(btn.inert, false, 'in einem anderen Monat darf der Reset nicht inert sein');
+
+    // Berichte rechnen per CONTAINMENT (Befund 4), nicht Ankergleichheit: ein
+    // Anker auf dem Monatsersten zeigt trotzdem "aktuell", solange der
+    // angezeigte Monat den heutigen Tag enthaelt.
+    budgetUi.state.activeTab = 'reports';
+    budgetUi.state.range = 'month';
+    budgetUi.state.reportAnchor = '2030-06-01';
+    budgetUi.syncCurrentButton(root);
+    assert.equal(btn.classList.contains('is-current'), false, 'Berichte/Monat: ein fremder Monat zeigt den Reset');
+    budgetUi.state.reportAnchor = budgetUi.currentMonth() + '-01';
+    budgetUi.syncCurrentButton(root);
+    assert.equal(
+      btn.classList.contains('is-current'), true,
+      'Berichte/Monat: der Anker auf dem Monatsersten des LAUFENDEN Monats muss trotzdem als aktuell gelten (Befund 4 - Ankergleichheit versagte hier)'
+    );
+
+    budgetUi.state.range = 'year';
+    budgetUi.state.reportAnchor = '2030-06-15';
+    budgetUi.syncCurrentButton(root);
+    assert.equal(btn.classList.contains('is-current'), false, 'Berichte/Jahr: ein fremdes Jahr zeigt den Reset');
+    budgetUi.state.reportAnchor = todayKey();
+    budgetUi.syncCurrentButton(root);
+    assert.equal(btn.classList.contains('is-current'), true, 'Berichte/Jahr: das laufende Jahr verbirgt den Reset');
+
+    budgetUi.state.range = 'week';
+    budgetUi.state.reportAnchor = todayKey();
+    budgetUi.state.reportRangeFrom = '2020-01-06';
+    budgetUi.state.reportRangeTo = '2020-01-12';
+    budgetUi.syncCurrentButton(root);
+    assert.equal(
+      btn.classList.contains('is-current'), false,
+      'Berichte/Woche: eine gemeldete Serverwoche, die heute nicht enthaelt, zeigt den Reset'
+    );
+    budgetUi.state.reportRangeFrom = todayKey();
+    budgetUi.state.reportRangeTo = todayKey();
+    budgetUi.syncCurrentButton(root);
+    assert.equal(
+      btn.classList.contains('is-current'), true,
+      'Berichte/Woche: enthaelt die gemeldete Serverwoche heute, ist der Reset verborgen'
+    );
+
+    // Und der Tab-Block behaelt das letzte Wort: ohne Monatsnavigation bleibt
+    // der Reset verborgen, egal welcher Monat eingestellt ist.
+    budgetUi.state.activeTab = 'accounts';
+    budgetUi.state.month = '2030-06';
+    btn.classList.toggle('is-current', false);
+    btn.inert = false;
+    budgetUi.syncCurrentButton(root);
+    assert.equal(btn.classList.contains('is-current'), true, 'ohne Monatsnavigation bleibt der Reset .is-current');
+    assert.equal(btn.inert, true, 'ohne Monatsnavigation bleibt der Reset inert');
+  } finally {
+    Object.assign(budgetUi.state, zuvor);
+  }
+});
+
+// PR #1200 Review, Should-fix 3: Enter auf „Aktuell" laed den heutigen
+// Zeitraum, macht den (fokussierten) Knopf damit selbst inert - ohne
+// Gegenmassnahme faellt der Fokus auf `<body>`. syncCurrentButton() muss den
+// Fokus VORHER auf den Vorherige-Periode-Pfeil legen.
+test('syncCurrentButton() rettet den Fokus vor dem eigenen inert-Werden', () => {
+  const btn = fakeResetButton();
+  const prevBtn = fakeResetButton();
+  const root = {
+    querySelector: (sel) => (sel === '#budget-today' ? btn : sel === '#budget-prev' ? prevBtn : null),
+  };
+  const zuvor = { activeTab: budgetUi.state.activeTab, month: budgetUi.state.month };
+  const zuvorDocument = global.document;
+  try {
+    global.document = { ...zuvorDocument, activeElement: btn };
+    budgetUi.state.activeTab = 'budget';
+    budgetUi.state.month = '2030-06'; // erst NICHT aktuell, Knopf ist sichtbar+fokussierbar
+    budgetUi.syncCurrentButton(root);
+    assert.equal(btn.inert, false);
+
+    let fokussiert = false;
+    prevBtn.focus = () => { fokussiert = true; global.document.activeElement = prevBtn; };
+    budgetUi.state.month = budgetUi.currentMonth(); // jetzt wird der fokussierte Knopf aktuell
+    budgetUi.syncCurrentButton(root);
+    assert.equal(fokussiert, true, 'der Fokus muss vor dem inert-Werden auf den Vorherige-Pfeil wandern');
+    assert.equal(btn.inert, true);
+  } finally {
+    Object.assign(budgetUi.state, zuvor);
+    global.document = zuvorDocument;
+  }
+});
+
+// Minimales Fake-Element fuer Knoten, die `updateTabs()` neben dem Reset
+// noch anfasst (#budget-body, #budget-prev/-next/-label, #budget-period-note,
+// #budget-add): `hidden`, `textContent`, `setAttribute`, eine leere
+// `querySelector()` (fuer `addBtn.querySelector('.toolbar-new-btn__label')`).
+function fakeToolbarElement() {
+  return {
+    hidden: false,
+    textContent: '',
+    setAttribute() {},
+    querySelector() { return null; },
+  };
+}
+
+// PR #1200 Review Runde 3, Nice-to-have 1: der bisherige Test las
+// `updateTabs()` als QUELLTEXT (Regex auf den Funktionskoerper) - ein
+// `if (false) syncCurrentButton();` im echten Render-Pfad blieb gruen,
+// solange der String noch irgendwo im Funktionskoerper stand. Dieser Test
+// laesst den ECHTEN Render-Pfad laufen: `updateTabsForTest()` setzt den
+// Modul-internen Container auf einen Test-Container und ruft `updateTabs()`
+// unveraendert auf; geprueft wird das SICHTBARE ERGEBNIS am echten
+// `#budget-today`-Knoten, nicht der Quelltext.
+test('updateTabs() verdrahtet syncCurrentButton() wirklich in den Render-Pfad', () => {
+  const todayBtn = fakeResetButton();
+  const testContainer = {
+    classList: { toggle() {} },
+    querySelector(sel) {
+      if (sel === '#budget-today') return todayBtn;
+      return fakeToolbarElement();
+    },
+  };
+  const zuvorTab = budgetUi.state.activeTab;
+  const zuvorMonth = budgetUi.state.month;
+  try {
+    budgetUi.state.activeTab = 'budget'; // TAB_CAPS['budget']: month: true
+    budgetUi.state.month = budgetUi.currentMonth(); // aktueller Monat -> is-current
+    budgetUi.updateTabsForTest(testContainer);
+    assert.equal(todayBtn.classList.contains('is-current'), true,
+      'updateTabs() muss syncCurrentButton() wirklich aufrufen - der Reset traegt im aktuellen Monat sonst kein .is-current');
+  } finally {
+    budgetUi.state.activeTab = zuvorTab;
+    budgetUi.state.month = zuvorMonth;
+  }
+});
+
+// PR #1200 Review, Befund 5: monthNavHtml() rendert den Reset ohne
+// .is-current/inert, und ohne diese Gegenmassnahme blitzt er bei jedem
+// frischen Laden von /budget sichtbar auf, bevor renderBody() ihn nach dem
+// ersten Laden wieder korrekt einstellt.
+test('render() synchronisiert „Aktuell" VOR dem ersten Laden, gegen das Aufblitzen (Befund 5)', () => {
+  const renderStart = budget.indexOf('export async function render(container, { user }) {');
+  const loadIdx = budget.indexOf('await Promise.all([loadMonth(state.month), loadAccounts()]);');
+  assert.ok(renderStart > -1 && loadIdx > -1, 'render()/Promise.all-Aufruf nicht gefunden');
+  const syncIdx = budget.indexOf('syncCurrentButton();', renderStart);
+  assert.ok(syncIdx > -1 && syncIdx < loadIdx,
+    'syncCurrentButton() muss zwischen dem Beginn von render() und dem ersten Laden aufgerufen werden');
 });
 
 test('das Modul führt genau eine Zeitachse', () => {

@@ -2255,9 +2255,21 @@ html.fab-anim-done .page-fab {
  *
  * DER PREIS IST GEMESSEN UND BEZAHLT: ohne Gegenmassnahme kappt der engere
  * Slot das Zeitraum-Label auf seine 7ch-Untergrenze („August 2026" auf 75 von
- * 98px). Die Gegenmassnahme ist der kontextabhaengige „Heute"-Knopf in
- * calendar.js - er gibt genau die 66px frei, die dem Label fehlen. Wer diese
- * Regel auf einen weiteren Kopf zieht, braucht dort dieselbe Rechnung. */
+ * 98px).
+ *
+ * BIS #1200 gab es hier eine Gegenmassnahme: der „Heute"-Knopf in calendar.js
+ * gab per `hidden` (= aus dem Fluss entfernt) genau die 66px frei, die dem
+ * Label fehlten, sobald der aktuelle Zeitraum stand. Genau dieses Freigeben
+ * war der Bug hinter #1200: das Nachbar-Label wuchs in den frei gewordenen
+ * Platz, und der naechste/vorherige Pfeil ruckte um die Knopfbreite. Seit
+ * `.is-current` (layout.css, `.btn.is-current`) den Slot per `visibility`
+ * PERMANENT reserviert, gibt es diese 66px nie mehr frei - der Slot ist auf
+ * jedem Zeitraum gleich breit. Das Label hat dadurch dauerhaft 66px weniger
+ * Raum als vor #1200, unabhaengig vom Reset-Zustand; das ist der Preis fuer
+ * den ruhigen Pfeil und wird hier bewusst in Kauf genommen. Die 7ch-Untergrenze
+ * (calendar.css) bleibt ein Sicherheitsnetz fuer eine noch schmalere Kombination
+ * aus Locale und Viewport - in den gemessenen Layouts (PR #1200 Review Runde 3)
+ * greift sie nirgends, das Label bleibt ueberall breiter als 7ch. */
 /* NUR IM AUSGEKLAPPTEN ZUSTAND, und das ist gemessen worden, nicht vermutet.
  *
  * Der eingeklappte Kopf (`is-collapsed`) hat eine ANDERE Zeilenordnung: der
@@ -3420,6 +3432,30 @@ html.fab-anim-done .page-fab {
 .recipe-detail[hidden],
 p.field-hint--warn[hidden] {
   display: none !important;
+}
+
+/* DER RESET DER ZEITRAUM-NAVIGATION (Kalender „Heute", Essensplan „Heute",
+ * Budget „Aktuell") BRAUCHT `hidden` GERADE NICHT - er braucht das Gegenteil.
+ *
+ * `hidden` loest oben in `display: none` auf und entfernt die Box komplett aus
+ * dem Fluss. Der Nachbar in der Zeile ist aber ein flexibles Label
+ * (`flex: 1`/`flex: 1 1 auto`): faellt die Box weg, waechst das Label in genau
+ * den frei gewordenen Platz - und "›" ruckt um exakt die Breite des Knopfes
+ * nach links. Ein Klick auf "›", der den aktuellen Zeitraum verlaesst, laesst
+ * den Reset an GENAU DER STELLE erscheinen, an der eben noch "›" stand: ein
+ * zweiter Klick ohne Mausbewegung trifft den Reset statt des Pfeils (PR #1200
+ * Review, gemessen 11/11 im Budget, 7/11 im Kalender, 5/11 im Essensplan ueber
+ * 33 Layouts).
+ *
+ * `.is-current` reserviert die Box stattdessen dauerhaft: `visibility: hidden`
+ * blendet nur die MALEREI aus, die Breite bleibt im Fluss und "›" bewegt sich
+ * nie. Die Zeiger-, Fokus- und Barrierefreiheits-Seite uebernimmt das
+ * `inert`-Attribut, das dieselben drei Module am Element setzen (siehe
+ * calendar.js/meals.js/budget.js `syncTodayButton`/`syncCurrentButton`) -
+ * dieselbe Kombination, die router.js und modal.js fuer geparkte Elemente
+ * schon nutzen. */
+.btn.is-current {
+  visibility: hidden;
 }
 
 /* ================================================================

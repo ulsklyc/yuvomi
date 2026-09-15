@@ -1685,6 +1685,27 @@ export async function render(container, { user }) {
 // Toolbar
 // --------------------------------------------------------
 
+/**
+ * Der Zeitraum-Kopf: zurueck, Wert, vor - und DAHINTER der Reset. „Heute" ist
+ * ein Reset, kein Navigationsschritt: hinter dem Stepper statt vor den
+ * Pfeilen. Das ist die Regel, die budget.js an „Aktuell" festhaelt, und seit
+ * #1164 gilt sie fuer alle drei Zeitraum-Koepfe (Kalender, Wochenplan,
+ * Budget). Als eigener Baustein, damit der Verhaltenstest die GERENDERTE
+ * Reihenfolge prueft (test-calendar.js), statt Quelltext zu lesen.
+ */
+function periodNavHtml() {
+  return `
+      <button class="btn btn--icon" id="cal-prev" aria-label="${t('calendar.back')}">
+        <i data-lucide="chevron-left" aria-hidden="true"></i>
+      </button>
+      <span class="cal-toolbar__label" id="cal-label"></span>
+      <button class="btn btn--icon" id="cal-next" aria-label="${t('calendar.forward')}">
+        <i data-lucide="chevron-right" aria-hidden="true"></i>
+      </button>
+      <button class="btn btn--secondary cal-toolbar__today" id="cal-today">${t('calendar.today')}</button>
+  `;
+}
+
 function renderToolbar() {
   const bar = _container.querySelector('#cal-toolbar');
   if (!bar) return;
@@ -1724,16 +1745,7 @@ function renderToolbar() {
   bar.replaceChildren();
   bar.insertAdjacentHTML('beforeend', `
     <h1 class="page-toolbar__title">${t('calendar.title')}</h1>
-    <div class="page-toolbar__center cal-toolbar__month">
-      <button class="btn btn--secondary cal-toolbar__today" id="cal-today">${t('calendar.today')}</button>
-      <button class="btn btn--icon" id="cal-prev" aria-label="${t('calendar.back')}">
-        <i data-lucide="chevron-left" aria-hidden="true"></i>
-      </button>
-      <span class="cal-toolbar__label" id="cal-label"></span>
-      <button class="btn btn--icon" id="cal-next" aria-label="${t('calendar.forward')}">
-        <i data-lucide="chevron-right" aria-hidden="true"></i>
-      </button>
-    </div>
+    <div class="page-toolbar__center cal-toolbar__month">${periodNavHtml()}</div>
     <div class="page-toolbar__actions">
       ${filterBtnHtml}
       <!-- KEIN aria-controls im geschlossenen Zustand: die Suchleiste entsteht
@@ -1862,26 +1874,44 @@ function syncViewPanel() {
  *
  * Ein Knopf, der an den aktuellen Zeitraum zurueckfuehrt, ist sinnlos, solange
  * man dort steht - Apple Kalender und Fantastical blenden ihn genau dann aus.
- * Hier ist er ausserdem die Gegenmassnahme zu `flex-basis: 0` am Center-Slot
- * (layout.css): der engere Slot kappt das Zeitraum-Label sonst auf seine
- * 7ch-Untergrenze, und die 66px dieses Knopfes sind genau die, die fehlen.
  *
- * `hidden` STATT ENTFERNEN, und das ist der Punkt: der Slot behaelt seine
- * Basis 0 und bleibt in der Titelzeile, egal ob der Knopf da ist. Die
- * KOPFHOEHE springt beim Navigieren damit nicht - nur die Labelbreite aendert
- * sich. Ein Kopf, der beim Blaettern seine Hoehe wechselt, waere derselbe
- * Fehler, den die kollabierende Leiste mit ihrem negativen `top` vermeidet.
+ * `.is-current` STATT `hidden` (PR #1200 Review): `hidden` loeste in
+ * `display: none` auf und entfernte die Box aus dem Fluss - das Label daneben
+ * traegt `flex: 1 1 auto` und wuchs in den frei gewordenen Platz, wodurch "›"
+ * beim Erscheinen/Verschwinden des Knopfes um dessen Breite ruckte. Ein Klick
+ * auf "›", der den aktuellen Zeitraum verlaesst, liess den Reset dadurch genau
+ * an der Stelle auftauchen, an der eben noch "›" stand - ein zweiter Klick
+ * ohne Mausbewegung traf den Reset statt des Pfeils (gemessen 7/11 ueber 33
+ * Layouts). `.is-current` (layout.css) blendet nur per `visibility` aus, die
+ * Box bleibt im Fluss und der Slot bleibt gleich breit, egal ob der Knopf zu
+ * sehen ist. `inert` nimmt ihm zusaetzlich Zeiger, Fokus und A11y-Baum, ohne
+ * ihn wie `hidden` aus dem Layout zu nehmen.
+ *
+ * War der Knopf fokussiert, als er aktuell wurde (Enter/Space auf "Heute"
+ * fuehrt genau dorthin), holt sich `syncTodayButton()` selbst den Fokus vorher
+ * auf einen Stepper daneben (kein eigener Helfer - die paar Zeilen weiter
+ * unten, direkt vor dem `inert`-Zuweisen) - sonst faellt er auf `<body>`, weil
+ * `inert` ein fokussiertes Element ebenso blurred wie `display: none` es taete.
  *
  * Die Frage „ist heute zu sehen" beantwortet der ANGEZEIGTE BEREICH, nicht
  * eine Fallunterscheidung je Ansicht: `getRangeForView` kennt ihn fuer alle
  * vier, und eine zweite Rechnung daneben waere die naechste Stelle, an der
  * Monat und Agenda auseinanderlaufen.
  */
-function syncTodayButton() {
-  const btn = _container.querySelector('#cal-today');
+function syncTodayButton(root = _container) {
+  const btn = root?.querySelector('#cal-today');
   if (!btn) return;
   const { from, to } = getRangeForView(state.view, state.cursor);
-  btn.hidden = state.today >= from && state.today <= to;
+  const isCurrent = state.today >= from && state.today <= to;
+  // `typeof document` statt eines nackten Bezeichners: Testumgebungen ohne
+  // DOM stubben `document` nicht immer, und ein nackter Bezeichner wirft dort
+  // schon beim Werteauswerten, bevor `isCurrent` ihn kurzschliessen kann.
+  const active = typeof document !== 'undefined' ? document.activeElement : null;
+  if (isCurrent && active === btn) {
+    (root.querySelector('#cal-prev') || root.querySelector('#cal-next'))?.focus();
+  }
+  btn.classList.toggle('is-current', isCurrent);
+  btn.inert = isCurrent;
 }
 
 function getWeekNumber(dateStr) {
@@ -4003,6 +4033,8 @@ export const __test = {
   wasteTypeOptions,
   restoreWasteTypeFilter,
   buildLayerRowsHtml,
+  periodNavHtml,
+  syncTodayButton,
 };
 
 function renderAgendaEvent(ev, dayStr) {

@@ -20,6 +20,102 @@ function test(name, fn) {
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion fehlgeschlagen'); }
 
+// Fake-Knopf mit einer echten (Set-gestuetzten) classList und einem
+// `inert`-Feld - genug DOM-Oberflaeche, um `.is-current` und `inert` wie im
+// echten Browser zu pruefen, ohne eine ganze DOM-Bibliothek zu laden.
+function fakeResetButton() {
+  const classes = new Set();
+  return {
+    inert: false,
+    classList: {
+      toggle(cls, force) { if (force) classes.add(cls); else classes.delete(cls); },
+      contains(cls) { return classes.has(cls); },
+    },
+  };
+}
+
+// #1164: EIN Positions- und EINE Sichtbarkeitsregel fuer den Zeitraum-Reset.
+// Verhaltensgetrieben: geprueft werden der GERENDERTE Kopf und die echte
+// Sync-Funktion, nicht der Quelltext.
+//
+// PR #1200 Review, Blocking 1: `hidden` loeste in `display: none` auf und nahm
+// die Box aus dem Fluss - `.cal-toolbar__label` (`flex: 1 1 auto`) wuchs dann
+// in den frei gewordenen Platz und "›" ruckte um die Knopfbreite, sobald der
+// Reset erschien/verschwand (gemessen 7/11 ueber 33 Layouts). Ersetzt durch
+// `.is-current` (visibility, Box bleibt im Fluss) + `inert`
+// (Zeiger/Fokus/A11y-Baum). Dieser Test pinnt jetzt GENAU DIESEN Mechanismus
+// fest: eine Rueckkehr zu `hidden` faellt hier durch.
+test('Zeitraum-Kopf: zurueck, Wert, vor - dahinter „Heute", per .is-current+inert verborgen im angezeigten Zeitraum (#1164, #1200)', () => {
+  // (a) Reihenfolge im gerenderten Markup: der Reset steht HINTER dem Stepper.
+  const ids = [...calendarHelpers.periodNavHtml().matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
+  assert(JSON.stringify(ids) === JSON.stringify(['cal-prev', 'cal-label', 'cal-next', 'cal-today']),
+    `erwartet zurueck, Wert, vor, Reset - gerendert: ${ids.join(', ')}`);
+
+  // (b) Sichtbarkeit: im angezeigten Zeitraum traegt der Reset `.is-current`
+  // und `inert`, behaelt aber sein Element (der Slot bleibt reserviert).
+  const btn = fakeResetButton();
+  const prevBtn = fakeResetButton();
+  const root = {
+    querySelector: (sel) => (sel === '#cal-today' ? btn : sel === '#cal-prev' ? prevBtn : null),
+    contains: () => false,
+  };
+  const zuvor = {
+    view: calendarHelpers.state.view,
+    cursor: calendarHelpers.state.cursor,
+    today: calendarHelpers.state.today,
+  };
+  try {
+    calendarHelpers.state.view = 'month';
+    calendarHelpers.state.today = '2026-06-15';
+    calendarHelpers.state.cursor = '2026-06-15';
+    calendarHelpers.syncTodayButton(root);
+    assert(btn.classList.contains('is-current') === true, 'im angezeigten Monat muss der Reset .is-current tragen');
+    assert(btn.inert === true, 'im angezeigten Monat muss der Reset inert sein');
+    calendarHelpers.state.cursor = '2026-08-15';
+    calendarHelpers.syncTodayButton(root);
+    assert(btn.classList.contains('is-current') === false, 'ausserhalb des angezeigten Monats darf der Reset nicht .is-current sein');
+    assert(btn.inert === false, 'ausserhalb des angezeigten Monats darf der Reset nicht inert sein');
+  } finally {
+    Object.assign(calendarHelpers.state, zuvor);
+  }
+});
+
+// PR #1200 Review, Should-fix 3 (Calendar "kostenlos mitgenommen"): war der
+// Reset fokussiert, als goToday() ihn selbst inert macht, faellt der Fokus
+// ohne Gegenmassnahme auf `<body>`.
+test('syncTodayButton() rettet den Fokus vor dem eigenen inert-Werden', () => {
+  const btn = fakeResetButton();
+  const prevBtn = fakeResetButton();
+  const root = {
+    querySelector: (sel) => (sel === '#cal-today' ? btn : sel === '#cal-prev' ? prevBtn : null),
+    contains: (el) => el === btn || el === prevBtn,
+  };
+  const zuvor = {
+    view: calendarHelpers.state.view,
+    cursor: calendarHelpers.state.cursor,
+    today: calendarHelpers.state.today,
+  };
+  const zuvorDocument = globalThis.document;
+  try {
+    globalThis.document = { activeElement: btn };
+    calendarHelpers.state.view = 'month';
+    calendarHelpers.state.today = '2026-06-15';
+    calendarHelpers.state.cursor = '2026-08-15'; // erst NICHT aktuell
+    calendarHelpers.syncTodayButton(root);
+    assert(btn.inert === false);
+
+    let fokussiert = false;
+    prevBtn.focus = () => { fokussiert = true; globalThis.document.activeElement = prevBtn; };
+    calendarHelpers.state.cursor = '2026-06-15'; // jetzt wird der fokussierte Knopf aktuell
+    calendarHelpers.syncTodayButton(root);
+    assert(fokussiert === true, 'der Fokus muss vor dem inert-Werden auf den Zurueck-Pfeil wandern');
+    assert(btn.inert === true);
+  } finally {
+    Object.assign(calendarHelpers.state, zuvor);
+    globalThis.document = zuvorDocument;
+  }
+});
+
 test('Kalender-Speicherbestätigungen halten beide Editor-Save-Gates offen', () => {
   const source = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   for (const [name, nextName] of [

@@ -74,10 +74,69 @@ function addDays(dateStr, n) {
   return addLocalDays(dateStr, n);
 }
 
+/**
+ * Schmale Telefone (PR #1200 Review, Blocking 2): das volle Datum an beiden
+ * Enden - "14.09.2026 - 20.09.2026" - lief in de/fr/uk bei 320/375px 21-112px
+ * ueber die Zeile. Seit #1164 lebt `#week-today` in derselben Zeile wie das
+ * Label und macht sie um seine Breite enger; auf main war der schlechteste
+ * Fall 9px bei 320px, hier gemessen bis 112px.
+ *
+ * Unter 640px faellt das Jahr an BEIDEN Enden weg (`formatDayMonth` statt
+ * `formatDate`) - verwandt mit dem Muster, das der Kalender fuer sein eigenes
+ * schmales Wochen-Label nutzt (`updateLabel()`, calendar.js:
+ * `calendar.dayRangeLabel`), dort behaelt nur der Endtag sein Jahr. Hier
+ * fällt es an BEIDEN Tagen weg: eine Kalenderwoche liegt so gut wie nie über
+ * einen Jahreswechsel, und die zusätzliche Breite (nicht nur ein Datum,
+ * sondern zwei) war noetig, um die von Reviewern gemessenen 112px in fr
+ * sicher aufzufangen.
+ */
+const NARROW_WEEK_LABEL_QUERY = '(max-width: 639px)';
+
 function formatWeekLabel(monday) {
   const sunday = addDays(monday, 6);
-  return `${formatDate(monday)} – ${formatDate(sunday)}`;
+  const narrow = window.matchMedia?.(NARROW_WEEK_LABEL_QUERY).matches;
+  // Unter 640px faellt das Jahr an BEIDEN Enden weg (`formatDayMonth`): die
+  // Kalenderwoche liegt so gut wie nie ueber einen Jahreswechsel, und die
+  // gesparte Breite ist hier der knappere Preis - eine Woche wie
+  // "28.12. - 03.01." bleibt trotzdem eindeutig genug fuer den Kopf einer
+  // Seite, die ohnehin "diese Woche" zeigt.
+  const from = narrow ? formatDayMonth(monday) : formatDate(monday);
+  const to = narrow ? formatDayMonth(sunday) : formatDate(sunday);
+  return `${from} – ${to}`;
 }
+
+/**
+ * PR #1200 Review Runde 3, Nice-to-have 4: `formatWeekLabel()` liest
+ * `matchMedia` nur beim Rendern - ein Fenster, das ueber die 640px-Schwelle
+ * gezogen wird, behielt bis zum naechsten Wochenwechsel das alte Format.
+ *
+ * EINE gehaltene `MediaQueryList` statt eines
+ * `window.matchMedia(...).addEventListener(...)` in einem Rutsch: ohne
+ * gehaltene Referenz darf die Engine die Liste einsammeln, und der Listener
+ * verstummt irgendwann still - dasselbe Muster wie router.js' `darkSchemeQuery`.
+ * Modul-Top-Level statt in `render()`: `render()` laeuft bei jeder Navigation
+ * zur Seite neu, ein dort gebundener Listener wuerde sich mit jedem Besuch
+ * verdoppeln.
+ *
+ * `_container?.isConnected` (wie beim Fokus-Rueckstoss weiter unten) haelt den
+ * Listener nach einer Navigation weg von /meals stumm - ohne die Prüfung
+ * rendert er in einen Container, den niemand mehr sieht.
+ *
+ * PR #1200 Review Runde 4, Should-fix 2: hier stand `renderWeekGrid()` statt
+ * `updateWeekLabel()` - eine Bildschirmdrehung ueber die 640px-Schwelle riss
+ * damit das GANZE Wochengitter neu auf (jede Karte, den Stagger, den Scroll
+ * zur heutigen Spalte), obwohl nur das Label ein anderes Format braucht.
+ * Stand der Fokus auf einer Mahlzeit-Karte, landete er nach dem Neuaufbau auf
+ * `<body>` - eine Kartenreferenz, die `renderWeekGrid()` wegwirft, ueberlebt
+ * den Wechsel nicht. `updateWeekLabel()` ruehrt nur `#week-label` und den
+ * Reset-Knopf an, beide unabhaengig vom Karten-DOM - der Fokus bleibt daher
+ * unberuehrt, wo immer er gerade steht.
+ */
+function onNarrowWeekLabelQueryChange() {
+  if (_container?.isConnected) updateWeekLabel();
+}
+const _narrowWeekLabelQuery = typeof window !== 'undefined' ? window.matchMedia?.(NARROW_WEEK_LABEL_QUERY) ?? null : null;
+_narrowWeekLabelQuery?.addEventListener('change', onNarrowWeekLabelQueryChange);
 
 function isToday(dateStr) {
   return dateStr === todayKey();
@@ -205,6 +264,63 @@ async function loadPreferences() {
 // Render
 // --------------------------------------------------------
 
+/**
+ * Der Zeitraum-Kopf: zurueck, Wert, vor - und DAHINTER der Reset. „Heute" ist
+ * ein Reset, kein Navigationsschritt: hinter dem Stepper statt zwischen den
+ * Inhalts-Aktionen. Das ist die Regel, die budget.js an „Aktuell" festhaelt,
+ * und seit #1164 gilt sie fuer alle drei Zeitraum-Koepfe (Kalender,
+ * Wochenplan, Budget). Vorher stand „Heute" im Actions-Slot neben
+ * „Zufallsplan" und „+ Gericht" - Inhalts-Aktionen einer ganz anderen
+ * Gewichtung - und landete unter ~768px auf einer zweiten Zeile, getrennt vom
+ * Stepper, den es zuruecksetzt. Als eigener Baustein, damit der
+ * Verhaltenstest die GERENDERTE Reihenfolge prueft (test-meals.js), statt
+ * Quelltext zu lesen.
+ */
+function weekNavHtml() {
+  return `
+          <button class="btn btn--icon" id="week-prev" aria-label="${t('meals.prevWeek')}">
+            <i data-lucide="chevron-left" aria-hidden="true"></i>
+          </button>
+          <span class="week-nav__label" id="week-label"></span>
+          <button class="btn btn--icon" id="week-next" aria-label="${t('meals.nextWeek')}">
+            <i data-lucide="chevron-right" aria-hidden="true"></i>
+          </button>
+          <button class="btn btn--secondary week-nav__today" id="week-today">${t('meals.today')}</button>
+  `;
+}
+
+/**
+ * „Heute" erscheint nur, wenn die aktuelle Woche nicht zu sehen ist -
+ * dieselbe Sichtbarkeitsregel wie syncTodayButton() im Kalender (#1164).
+ *
+ * `.is-current` statt `hidden` (PR #1200 Review): `hidden` entfernte die Box
+ * aus dem Fluss, und `.week-nav__label` daneben (`flex: 1`) wuchs in den frei
+ * gewordenen Platz - "›" ruckte dadurch um die Knopfbreite, sobald der Reset
+ * erschien oder verschwand. `.is-current` (layout.css, `.btn.is-current`)
+ * blendet nur per `visibility` aus; die Box bleibt im Fluss, der Slot bleibt
+ * gleich breit. `inert` nimmt dem Knopf zusaetzlich Zeiger, Fokus und
+ * A11y-Baum.
+ *
+ * War der Knopf fokussiert (Enter auf „Heute" fuehrt genau in den Zustand, der
+ * ihn gleich verbirgt), holt sich der Fokus vorher einen Stepper daneben -
+ * sonst faellt er auf `<body>`, denn ein `inert`es Element blurred wie
+ * `display: none` es taete.
+ */
+function syncTodayButton(root = _container) {
+  const btn = root?.querySelector('#week-today');
+  if (!btn) return;
+  const isCurrent = state.currentWeek === getMondayOf(todayKey());
+  // `typeof document` statt eines nackten Bezeichners: Testumgebungen ohne DOM
+  // stubben `document` nicht immer, und ein nackter Bezeichner wirft dort
+  // schon beim Werteauswerten.
+  const active = typeof document !== 'undefined' ? document.activeElement : null;
+  if (isCurrent && active === btn) {
+    (root.querySelector('#week-prev') || root.querySelector('#week-next'))?.focus();
+  }
+  btn.classList.toggle('is-current', isCurrent);
+  btn.inert = isCurrent;
+}
+
 export async function render(container, { user }) {
   _container = container;
   container.replaceChildren();
@@ -221,17 +337,8 @@ export async function render(container, { user }) {
            Aktionsblock dazwischen - mobil gemessen 80px und 705px, einhändig
            also nie beide erreichbar. -->
       <div class="page-toolbar page-toolbar--in-group page-toolbar--wrap">
-        <div class="page-toolbar__center week-nav">
-          <button class="btn btn--icon" id="week-prev" aria-label="${t('meals.prevWeek')}">
-            <i data-lucide="chevron-left" aria-hidden="true"></i>
-          </button>
-          <span class="week-nav__label" id="week-label"></span>
-          <button class="btn btn--icon" id="week-next" aria-label="${t('meals.nextWeek')}">
-            <i data-lucide="chevron-right" aria-hidden="true"></i>
-          </button>
-        </div>
+        <div class="page-toolbar__center week-nav">${weekNavHtml()}</div>
         <div class="page-toolbar__actions">
-          <button class="btn btn--secondary week-nav__today" id="week-today">${t('meals.today')}</button>
           <!-- Nur Desktop: klappt die Rezept-Spalte weg, damit alle sieben
                Tagesspalten in voller Breite ins Board passen. -->
           <button class="btn btn--icon week-nav__rail-toggle" id="rail-toggle"
@@ -263,6 +370,15 @@ export async function render(container, { user }) {
 
   const today  = todayKey();
   const monday = getMondayOf(today);
+
+  // Vor dem ersten Laden synchronisieren, nicht erst danach: `state.currentWeek`
+  // steht schon (die Seite oeffnet immer auf der aktuellen Woche), also kann
+  // „Heute" seinen Zielzustand VOR dem ersten Bildaufbau bekommen. Sonst
+  // rendert weekNavHtml() ihn sichtbar, der Ladevorgang laeuft, und erst danach
+  // versteckt syncTodayButton() ihn wieder - ein sichtbares Aufblitzen bei
+  // jedem frischen Laden von /meals (PR #1200 Review, Befund 5).
+  state.currentWeek = monday;
+  syncTodayButton();
 
   await Promise.all([loadWeek(monday), loadLists(), loadPreferences(), loadCategories(), loadRecipes()]);
   renderWeekGrid();
@@ -344,12 +460,24 @@ function wireRailToggle() {
 // Wochengitter
 // --------------------------------------------------------
 
+/**
+ * Aktualisiert NUR Label und Reset-Knopf der Wochen-Navigation - ohne das
+ * Wochengitter anzufassen. Eigene Funktion statt zweier Zeilen inline in
+ * `renderWeekGrid()` (PR #1200 Review Runde 4, Should-fix 2): der
+ * Breakpoint-Handler unten braucht GENAU diese zwei Zeilen, keine der
+ * Karten-Neuaufbauten, die im Rest von `renderWeekGrid()` folgen.
+ */
+function updateWeekLabel() {
+  const label = _container?.querySelector('#week-label');
+  if (label) label.textContent = formatWeekLabel(state.currentWeek);
+  syncTodayButton();
+}
+
 function renderWeekGrid() {
   const grid = _container.querySelector('#week-grid');
   if (!grid) return;
 
-  _container.querySelector('#week-label').textContent =
-    formatWeekLabel(state.currentWeek);
+  updateWeekLabel();
 
   // Fehlgeschlagene Woche: Fehlerzustand statt Leerzustand. Muss VOR der
   // Leer-Prüfung stehen - `state.meals` ist nach einem Fehler ebenfalls leer,
@@ -1805,6 +1933,27 @@ export const __test = {
   // Skalierte Zutatenmenge: haengt an der Format-Locale und ist deshalb nur
   // verhaltensgetrieben pruefbar (siehe test-meals.js).
   scaleQuantityText,
+  // Zeitraum-Kopf (#1164): Reihenfolge und Sichtbarkeitsregel des
+  // „Heute"-Resets sind verhaltensgetrieben gepinnt (test-meals.js).
+  weekNavHtml,
+  syncTodayButton,
+  getMondayOf,
+  formatWeekLabel,
+  state,
+  // PR #1200 Review Runde 3, Nice-to-have 1: der bisherige Verdrahtungstest
+  // las `renderWeekGrid()` als QUELLTEXT (Regex auf den Funktionskoerper) -
+  // ein auskommentiertes `// syncTodayButton();` im echten Render-Pfad blieb
+  // gruen, solange der String noch irgendwo im Funktionskoerper stand. Dieser
+  // Wrapper laesst den TATSAECHLICHEN Render-Pfad laufen (mit einem
+  // uebergebenen Test-Container statt des Modul-internen `_container`), damit
+  // der Test die echte Verdrahtung prueft, nicht ihre Textform.
+  renderWeekGridForTest(container) {
+    _container = container;
+    renderWeekGrid();
+  },
+  // PR #1200 Review Runde 3, Nice-to-have 4: pinnt, dass ein Wechsel ueber die
+  // 640px-Schwelle das Wochen-Label wirklich neu zeichnet (test-meals.js).
+  onNarrowWeekLabelQueryChange,
 };
 
 // --------------------------------------------------------
