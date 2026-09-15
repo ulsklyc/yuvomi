@@ -511,7 +511,7 @@
     .mod-ico svg { width: 23px; height: 23px; }
     .mod-card h3 { font-size: 1.02rem; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 7px; }
     .mod-card p { font-size: 0.875rem; color: var(--text-2); line-height: 1.6; }
-    /* Mobile Progressive Disclosure fuer die 15 Karten: einspaltig liefen sie
+    /* Mobile Progressive Disclosure fuer die Modulkarten: einspaltig liefen sie
        ~7.300px, also 8,7 Bildschirme Inventar ZWISCHEN den Handoffs und dem
        Vertrauens-Peak (Longevity). Desktop hat zwei Stufen (vier ausfuehrlich,
        Rest als Karte), mobil zahlte man den vollen Preis linear. Sechs Karten
@@ -527,8 +527,10 @@
         background: var(--surface); color: var(--text-1); border: 1px solid var(--border);
         border-radius: var(--r-full); box-shadow: var(--shadow-sm);
         font-family: var(--ff); font-size: 0.9rem; font-weight: 600; cursor: pointer; }
-      html.js .mod-toggle svg { width: 16px; height: 16px; color: var(--accent); }
-      html.js .mod-grid.expanded ~ .mod-toggle { display: none; }
+      html.js .mod-toggle svg { width: 16px; height: 16px; color: var(--accent); transition: transform .2s var(--ease-out); }
+      /* Der Knopf bleibt nach dem Aufklappen stehen und klappt wieder zu: vorher
+         verschwand er, und die Karten liessen sich mobil nie mehr einklappen. */
+      html.js .mod-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
     }
 
 
@@ -1054,7 +1056,7 @@
           <p data-t="gal_cal_c"><b>Google, iCloud and Nextcloud, finally in one calendar.</b> Two-way sync, so an appointment added here lands on every phone in the house.</p>
         </figcaption>
         <div class="gal-frame">
-          <img class="sc" data-light="screenshots/calendar-light-web.png" data-light-m="screenshots/calendar-light-mobile.png" data-dark-m="screenshots/calendar-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw" data-dark="screenshots/calendar-dark-web.png" src="screenshots/calendar-light-web.png" alt="Calendar" data-alt-t="alt_c_cal" loading="lazy" decoding="async" width="900" height="675">
+          <img class="sc" data-light="screenshots/calendar-light-web.png" data-light-m="screenshots/calendar-light-mobile.png" data-dark-m="screenshots/calendar-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw" data-dark="screenshots/calendar-dark-web.png" src="screenshots/calendar-light-web.png" alt="Yuvomi calendar showing appointments, tasks and birthdays for the whole household" data-alt-t="alt_c_cal" loading="lazy" decoding="async" width="900" height="675">
         </div>
       </figure>
       <!-- Tasks and Budget used to sit here too, with the same two images the
@@ -1268,7 +1270,7 @@
          ein Kopf, zwei Stufen: vier ausfuehrlich, der Rest als Karte. Die Zahl steht
          bewusst nicht mehr hier - sie driftet, und der Guard misst sie ohnehin. -->
     <p class="mod-lead reveal" data-t="more_desc">The other sixteen, each one independent. Turn on what fits your household; the rest stays out of the way.</p>
-    <div class="mod-grid">
+    <div class="mod-grid" id="modGrid">
       <div class="mod-card reveal" style="--m: var(--m-calendar)">
         <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
         <h3 data-t="m_cal_t">Calendar</h3><p data-t="m_cal_d">Two-way sync with Google and CalDAV, one-way push to Outlook.com via Microsoft Graph, public ICS subscriptions, recurring events, holiday overlays and per-event visibility.</p>
@@ -1334,10 +1336,11 @@
         <h3 data-t="m_waste_t">Waste collection</h3><p data-t="m_waste_d">Weekly, monthly or nth-weekday pickup rhythms, or a municipal ICS calendar imported once or subscribed by URL, with per-occurrence moves and skips, personal reminders, a Dashboard widget and a switchable Calendar layer. Off by default; households turn it on.</p>
       </div>
     </div>
-    <!-- Nur auf dem Telefon sichtbar (CSS oben): klappt die Karten 7-15 auf.
-         Ohne Zahl im Label - "Die uebrigen fuenfzehn" im Vorspann driftet schon
-         als bekanntes Muster, eine zweite Zahl driftet doppelt. -->
-    <button class="mod-toggle" type="button" id="modToggle" aria-expanded="false">
+    <!-- Nur auf dem Telefon sichtbar (CSS oben): klappt die Karten ab der
+         siebten auf und wieder zu. Ohne Zahl im Label - die Kartenzahl steht im
+         Vorspann (more_desc, von test:docs-landing gehalten), eine zweite Zahl
+         driftet doppelt. -->
+    <button class="mod-toggle" type="button" id="modToggle" aria-expanded="false" aria-controls="modGrid">
       <span data-t="mods_more">Show all modules</span>
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
     </button>
@@ -1577,7 +1580,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       long_q2:'What if I want my data somewhere else?', long_a2:'<b>Copying one file is the whole export.</b> Everything lives in a single SQLite file on your own disk, unless you moved documents to a folder, WebDAV or Google Drive; those files need their own backup. Scheduled backups write a restorable archive on top of that, and the documented API plus the MCP endpoint pull anything out in whatever shape you need.',
       long_q3:'What if I lose the encryption key?', long_a3:'<b>Then the database is gone, and we cannot help you.</b> That is the honest answer: SQLCipher has no recovery path and no back door, which is the entire point of it. Store the key the way you store the ones that matter. Encryption is optional; if you would rather not carry that risk, leave it off and the file stays readable.',
       long_title:'The three questions worth asking first',
-      alt_c_cal:'Calendar',
+      alt_c_cal:'Yuvomi calendar showing appointments, tasks and birthdays for the whole household',
       alt_m_inventory:'The inventory module on a phone',
       alt_m_shopping:'A shared shopping list on a phone',
       alt_m_rewards:'The rewards ledger on a phone',
@@ -1653,7 +1656,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       m_sched_t:'Schedule', m_sched_d:'Rotating shift patterns and fixed weekly timetables from a single cycle model, with per-day exceptions and an explicit day off. The calendar shows them as a read-only layer computed on read, so changing a pattern leaves no stale appointments behind.',
       m_waste_t:'Waste collection', m_waste_d:'Weekly, monthly or nth-weekday pickup rhythms, or a municipal ICS calendar imported once or subscribed by URL, with per-occurrence moves and skips, personal reminders, a Dashboard widget and a switchable Calendar layer. Off by default; households turn it on.',
       more_desc:'The other sixteen, each one independent. Turn on what fits your household; the rest stays out of the way.',
-      mods_more:'Show all modules',
+      mods_more:'Show all modules', mods_less:'Show fewer modules',
       m_docs_t:'Documents', m_docs_d:'Family files with previews, folders, visibility controls and bulk actions. Storage on a local folder, WebDAV or Google Drive; Paperless-ngx and Papra optional.',
       m_notes_t:'Notes & Contacts', m_notes_d:'Colored Markdown sticky notes for recipes, memos and quick reminders, sorted into personal or household categories, with checklists you tick off by tapping them. Plus a shared contact directory with CardDAV sync and vCard import/export.',
       m_cal_t:'Calendar', m_cal_d:'Two-way sync with Google and CalDAV, one-way push to Outlook.com via Microsoft Graph, public ICS subscriptions, recurring events, holiday overlays and per-event visibility.',
@@ -1694,7 +1697,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       long_q2:'Was, wenn ich meine Daten woanders hin will?', long_a2:'<b>Eine Datei kopieren ist der ganze Export.</b> Alles liegt in einer einzigen SQLite-Datei auf eurer eigenen Platte, außer ihr habt die Dokumente in einen Ordner, auf WebDAV oder in Google Drive ausgelagert; diese Dateien brauchen eine eigene Sicherung. Geplante Backups schreiben darüber hinaus ein wiederherstellbares Archiv, und die dokumentierte API samt MCP-Endpunkt holt alles in der Form heraus, die ihr braucht.',
       long_q3:'Was, wenn ich den Verschlüsselungsschlüssel verliere?', long_a3:'<b>Dann ist die Datenbank weg, und wir können euch nicht helfen.</b> Das ist die ehrliche Antwort: SQLCipher hat keinen Wiederherstellungsweg und keine Hintertür, und genau das ist der Sinn der Sache. Verwahrt den Schlüssel wie die, auf die es ankommt. Die Verschlüsselung ist optional; wer dieses Risiko nicht tragen will, lässt sie aus, dann bleibt die Datei lesbar.',
       long_title:'Die drei Fragen, die man vorher stellen sollte',
-      alt_c_cal:'Kalender',
+      alt_c_cal:'Yuvomi-Kalender mit Terminen, Aufgaben und Geburtstagen des ganzen Haushalts',
       alt_m_inventory:'Das Inventar-Modul auf dem Handy',
       alt_m_shopping:'Eine geteilte Einkaufsliste auf dem Handy',
       alt_m_rewards:'Das Belohnungs-Konto auf dem Handy',
@@ -1767,7 +1770,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       m_sched_t:'Schichtplan', m_sched_d:'Rotierende Schichtmuster und feste Wochenpläne aus einem Zyklusmodell, mit Ausnahmen je Tag und einem ausdrücklichen freien Tag. Der Kalender zeigt sie als schreibgeschützte Ebene, beim Lesen berechnet - eine Musteränderung lässt keine veralteten Termine zurück.',
       m_waste_t:'Entsorgung', m_waste_d:'Wöchentliche, monatliche oder Wochentag-Abholrhythmen oder ein kommunaler ICS-Kalender, einmal importiert oder per URL abonniert, mit Verschieben/Ausfallenlassen je Termin, persönlichen Erinnerungen, einem Dashboard-Widget und einer schaltbaren Kalender-Ebene. Standardmäßig aus; Haushalte schalten es ein.',
       more_desc:'Die übrigen sechzehn, jedes eigenständig. Schaltet ein, was zu eurem Haushalt passt; der Rest bleibt aus dem Weg.',
-      mods_more:'Alle Module zeigen',
+      mods_more:'Alle Module zeigen', mods_less:'Weniger Module zeigen',
       m_docs_t:'Dokumente', m_docs_d:'Familiendateien mit Vorschau, Ordnern, Sichtbarkeitsregeln und Stapelaktionen. Ablage lokal, per WebDAV oder Google Drive; Paperless-ngx und Papra optional.',
       m_notes_t:'Notizen & Kontakte', m_notes_d:'Farbige Markdown-Haftnotizen für Rezepte, Memos und schnelle Erinnerungen, in persönlichen oder Haushalts-Kategorien, mit Checklisten, die man antippt statt zu bearbeiten. Dazu ein geteiltes Kontaktverzeichnis mit CardDAV-Sync und vCard-Import/-Export.',
       m_cal_t:'Kalender', m_cal_d:'Sync in beide Richtungen mit Google und CalDAV, einseitiger Push nach Outlook.com via Microsoft Graph, öffentliche ICS-Abos, wiederkehrende Termine, Feiertags-Overlays und Sichtbarkeit pro Termin.',
@@ -1966,6 +1969,9 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
     applyThemeLabel();
     applyShots();
     syncCodeScroll();
+    /* Die deutsche Fassung ist laenger: alles, was Positionen cacht (Scroll-Spy),
+       misst auf dieses Signal neu. */
+    document.dispatchEvent(new Event('yuvomi:layout'));
   }
   document.getElementById('themeBtn').onclick = function(){ theme = isDark() ? 'light' : 'dark'; lsSet('theme', theme); applyTheme(); };
   document.getElementById('langBtn').onclick = function(){ lang = lang === 'en' ? 'de' : 'en'; lsSet('lang', lang); applyLang(); };
@@ -2076,22 +2082,39 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
     }
     addEventListener('scroll', sync, { passive: true }); sync();
   })();
-  /* Mobile Modulliste aufklappen. Der Knopf verschwindet danach (CSS), also
-     wandert der Fokus auf die erste neu sichtbare Karte, damit ein
-     Tastatur-Nutzer nicht im Nichts steht. */
+  /* Mobile Modulliste auf- und wieder zuklappen. Beim Aufklappen wandert der
+     Fokus auf die erste neu sichtbare Karte, damit ein Tastatur-Nutzer nicht
+     im Nichts steht. Beim Zuklappen rueckt der Knopf um die verborgenen
+     Karten nach oben und laege sonst ausserhalb des Blicks - scrollIntoView
+     holt ihn zurueck. Das Label wechselt ueber data-t, damit ein spaeterer
+     Sprachwechsel die passende Fassung setzt. */
   (function(){
     var btn = document.getElementById('modToggle'); if (!btn) return;
+    var grid = document.getElementById('modGrid'); if (!grid) return;
+    var label = btn.querySelector('[data-t]');
     btn.addEventListener('click', function(){
-      var grid = document.querySelector('.mod-grid'); if (!grid) return;
-      grid.classList.add('expanded');
-      btn.setAttribute('aria-expanded', 'true');
-      var first = grid.querySelector('.mod-card:nth-child(7)');
-      if (first) { first.setAttribute('tabindex', '-1'); first.focus({ preventScroll: false }); }
+      var open = !grid.classList.contains('expanded');
+      grid.classList.toggle('expanded', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      var key = open ? 'mods_less' : 'mods_more';
+      label.setAttribute('data-t', key);
+      setRich(label, T[lang][key]);
+      if (open) {
+        var first = grid.querySelector('.mod-card:nth-child(7)');
+        if (first) { first.setAttribute('tabindex', '-1'); first.focus({ preventScroll: false }); }
+      } else {
+        btn.scrollIntoView({ block: 'nearest' });
+      }
+      document.dispatchEvent(new Event('yuvomi:layout'));
     });
   })();
   /* Scroll-Spy fuers Sprungmenue: die Linie sagt "wie weit", das hier sagt
-     "wo". Positionen werden gecacht und nur bei resize neu gemessen - ein
-     offsetTop-Read pro Scroll-Event waere ein erzwungener Reflow. */
+     "wo". Positionen werden gecacht - ein offsetTop-Read pro Scroll-Event
+     waere ein erzwungener Reflow - und neu gemessen, wenn sich Hoehen
+     verschieben: bei resize, nach load und auf 'yuvomi:layout', das der
+     Sprachwechsel und die Modul-Disclosure senden. Ohne das Signal lagen die
+     Marken nach dem Wechsel auf die laengere deutsche Fassung bis zum
+     naechsten resize daneben. */
   (function(){
     var links = Array.prototype.slice.call(document.querySelectorAll('.nav-jump a[href^="#"]'));
     if (!links.length) return;
@@ -2113,6 +2136,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       current = hit;
     }
     addEventListener('resize', function(){ measure(); sync(); });
+    document.addEventListener('yuvomi:layout', function(){ measure(); sync(); });
     addEventListener('scroll', sync, { passive: true });
     /* Nach applyShots/Reveals verschieben sich Hoehen; einmal spaet nachmessen. */
     addEventListener('load', function(){ measure(); sync(); });
