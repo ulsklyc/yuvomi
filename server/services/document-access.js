@@ -1,6 +1,7 @@
 /**
- * Modul: Dokument-Sichtbarkeit
- * Zweck: Die eine Regel, wer ein Dokument aus dem Dokumente-Modul sehen darf.
+ * Modul: Dokument-Sichtbarkeit und -Besitz
+ * Zweck: Die eine Regel, wer ein Dokument aus dem Dokumente-Modul sehen darf,
+ *        und die eine, wer ein sichtbares Dokument schreiben darf.
  *
  * Sichtbar ist ein Dokument fuer Ersteller:in, bei visibility='family' oder ueber
  * einen expliziten Freigabe-Eintrag (family_document_access).
@@ -51,4 +52,20 @@ export function filterVisibleDocumentIds(database, ids, userId) {
   `).all(...wanted, { userId }).map((row) => row.id));
 
   return wanted.filter((id) => visible.has(id));
+}
+
+/**
+ * Die Besitzregel fuer Schreibzugriffe: ein sichtbares Dokument aendern,
+ * archivieren oder loeschen darf, wer es angelegt hat, oder ein Admin.
+ * Sichtbarkeit allein reicht nie - ein Familien-Dokument sehen alle.
+ *
+ * Bis #989 stand die Regel fuenfmal in routes/documents.js: dreimal woertlich
+ * an den Einzelrouten, zweimal fuer einen ganzen Ordnerzweig umgestellt. Eine
+ * kuenftige Rolle, die Dokumente pflegen darf, aendert diese eine Stelle.
+ * @param {{created_by: number}} document
+ * @param {{userId: number, isAdmin: boolean}} actor
+ * @returns {boolean}
+ */
+export function canManageDocument(document, { userId, isAdmin }) {
+  return isAdmin || document.created_by === userId;
 }
