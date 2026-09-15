@@ -225,16 +225,18 @@ in this schema points at `users.id`, and a second table would make every new fea
 
 - `server/services/household-members.js` - `householdMemberSql()`, the member predicate (a
   `users` row minus staff minus guests), and `accessScopeSql()`, which resolves `access_scope`
-  per account to `family` or `split_guest`. The lists of members built from `users` go
-  through the predicate, and `npm run test:household-member-guard` turns red when a new list
-  reads `users` without it. The exceptions stand in the guard's allowlist with a reason: user
-  administration, sign-in, the permission matrix, background jobs per account - and
-  `GET /auth/users`, which besides the administration also feeds the calendar, budget and
-  schedule pickers today, so staff and guests are offered there (#1207).
-- Not every list applies the strict form yet: `includeGuests` (family members, 2FA overview,
-  task options and mentions, dashboard, rewards, split expense candidates) and `includeStaff`
-  (household size, API token subjects) keep what each list showed before the predicate
-  existed. Whether they converge is open in #1207.
+  per account to `family` or `split_guest`. The predicate has one form, decided in #1207: no
+  staff and no guests, in every list of members, and `npm run test:household-member-guard`
+  turns red when a new list reads `users` without it. The places that list accounts rather than
+  members stand in the guard's allowlist with a reason: user administration (`GET /auth/users`,
+  which the pickers no longer read), sign-in, the permission matrix, API token subjects and
+  background jobs per account.
+- Choosing follows listing (#1007, all or nothing): the routes that take people for these
+  lists - task assignees, calendar attendees, budget responsibles, schedule owners, reward
+  enrolment - refuse a newly chosen non-member through `newNonMembers()`, while a reference
+  already stored stays valid, so an old record keeps its staff member or guest and still saves.
+  Split expenses offer the guests of the group being split, because a guest exists for exactly
+  that.
 - `server/routes/housekeeping.js` (`createWorkerUser`) - a worker is a `users` row with a
   random password, role `member`, family role `other`.
 - `server/services/oidc.js` - the `$oidc$` placeholder: "this account has no password" is a
@@ -244,8 +246,7 @@ in this schema points at `users.id`, and a second table would make every new fea
 
 "Can sign in" as an explicit state of the row, with a migration that classifies today's staff
 and guests; the Family page adding a person with a login as an option rather than a
-prerequisite; one form of the predicate for every list, where today three are in use (#1207).
-The order and the threads are in [ROADMAP.md](ROADMAP.md). A `persons` table, a second list-of-people query that
+prerequisite. The order and the threads are in [ROADMAP.md](ROADMAP.md). A `persons` table, a second list-of-people query that
 bypasses the predicate, or a per-pair visibility setting would each be this decision undone.
 
 ---
