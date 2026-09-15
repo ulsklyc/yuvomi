@@ -4,7 +4,7 @@ Vollständige, annotierte Liste aller `npm run test:*`-Suiten - welche Suite dec
 
 Testinfrastruktur: echtes SQLite (`--experimental-sqlite`), im Speicher oder als Temp-Datei aus `freshTestDbPath()`, Node >= 22. Vorher muss nichts laufen: Suiten, die Routen über HTTP prüfen, starten ihren eigenen Express-Server auf einem freien lokalen Port und rufen ihn per `fetch()` auf. Netz nur über Loopback.
 
-Neue Suite - drei Schritte, alle drei Pflicht: (1) `test/test-[module].js` anlegen, (2) `test:[module]`-Skript in `package.json` eintragen, (3) das Skript in die `test`-Kette (`package.json`, Script `test`) einhängen - sonst läuft die Suite weder unter `npm test` noch in CI. Genau so sind fünf Suiten monatelang CI-blind geblieben. Imports von App-Code (`server/`, `public/`, `tools/`) und Root-Dateien via `../`.
+Neue Suite - drei Schritte, alle drei Pflicht: (1) `test/test-[module].js` anlegen, (2) `test:[module]`-Skript in `package.json` eintragen, (3) das Skript in die `test`-Kette (`package.json`, Script `test`) einhängen - sonst läuft die Suite weder unter `npm test` noch in CI. Genau so sind fünf Suiten monatelang CI-blind geblieben. Ausnahme: eine Suite, die `puppeteer` oder `test/document-guards-harness.js` importiert, hängt in Schritt 3 statt an `test` am Script `test:document-guards` - `npm run test:suite-chain` weist sie in der `test`-Kette ab. Imports von App-Code (`server/`, `public/`, `tools/`) und Root-Dateien via `../`.
 
 ```bash
 npm test             # Alle Suiten (Node >=22)

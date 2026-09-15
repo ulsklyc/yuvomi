@@ -375,8 +375,10 @@ stops being one.
 
 - A new test file `test/test-[name].js` needs a `test:[name]` script in `package.json`, and that
   script has to be added to the `test` chain as well - otherwise it runs neither under `npm test`
-  nor in CI. `npm run test:suite-chain` fails on a file without a script and on a script outside
-  the chain.
+  nor in CI. The exception is a suite that imports `puppeteer` or `test/document-guards-harness.js`:
+  its script goes into `test:document-guards` instead, never into `test` (see
+  [The pre-release handrail](#the-pre-release-handrail)). `npm run test:suite-chain` fails on a file
+  without a script and on a script that runs in the wrong chain or in none.
 - Real SQLite, never a mock: an in-memory database or a temp file from `freshTestDbPath()` in
   `test/tmp-db.js`, with the real migrations (or their test mirror in `server/db-schema-test.js`)
   applied. Don't stub out migrations.
