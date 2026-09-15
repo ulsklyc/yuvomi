@@ -1,7 +1,8 @@
 /**
  * Modul: Haushaltsmitglied
- * Zweck: Die eine Antwort auf "ist diese users-Zeile ein Haushaltsmitglied?" und
- *        die eine Herleitung von `access_scope` (#1207).
+ * Zweck: Die eine Antwort auf "ist diese users-Zeile ein Haushaltsmitglied?",
+ *        die eine Herleitung von `access_scope` und die eine Pruefung fuer
+ *        Routen, die Personen annehmen (#1207).
  * Abhaengigkeiten: server/db.js
  *
  * EINE users-ZEILE IST NICHT AUTOMATISCH EIN HAUSHALTSMITGLIED (docs/DECISIONS.md,
@@ -14,22 +15,22 @@
  *     `server/index.js` sperrt sie aus jeder `/api/v1/*`-Route ausser
  *     `/split-expenses`.
  *
- * JEDE LISTE VON PERSONEN GEHT UEBER `householdMemberSql()`. Beantwortet eine
- * Liste die Frage selbst, steht ein Konto, das alle anderen verbergen, genau
- * dort - nicht verborgen, sondern uneinheitlich sichtbar (#1007).
- * `npm run test:household-member-guard` wird rot, sobald unter `server/` eine
- * Liste aus `users` ohne dieses Praedikat entsteht; die Stellen, die bewusst
- * jede Zeile sehen (Benutzerverwaltung, Anmeldung, Hintergrundjobs je Konto),
- * stehen dort mit Grund in einer Allowlist.
+ * JEDE LISTE VON MITGLIEDERN GEHT UEBER `householdMemberSql()`, und es gibt
+ * genau EINE Fassung: ohne Personal, ohne Gaeste (entschieden am 15.09.2026,
+ * #1207). Beantwortet eine Liste die Frage selbst, steht ein Konto, das alle
+ * anderen verbergen, genau dort - nicht verborgen, sondern uneinheitlich
+ * sichtbar (#1007). `npm run test:household-member-guard` wird rot, sobald
+ * unter `server/` eine Liste aus `users` ohne dieses Praedikat entsteht; die
+ * Stellen, die bewusst jedes KONTO sehen (Benutzerverwaltung, Anmeldung,
+ * Rechte-Matrix, API-Token-Subjekte, Hintergrundjobs je Konto), stehen dort
+ * mit Grund in einer Allowlist.
  *
- * DREI FASSUNGEN SIND IN GEBRAUCH, UND DAS IST BESTAND, KEINE ENTSCHEIDUNG.
- * Streng (ohne Personal, ohne Gaeste) ist der Default. `includeGuests` und
- * `includeStaff` gibt es, weil Listen, die vor diesem Modul ihre eigene Klausel
- * hatten, bis heute nur Personal bzw. nur Gaeste ausschliessen. Die Option macht
- * die Abweichung an der Aufrufstelle sichtbar, statt sie still anzugleichen: ob
- * diese Listen streng werden sollen, ist die offene Frage aus #1207. Wer eine
- * Option entfernt, aendert, wen die Liste zeigt - `test:household-members`
- * haelt jede Liste auf ihrer heutigen Fassung fest.
+ * UND ALLES ODER NICHTS GILT AUCH BEIM SCHREIBEN. Eine Auswahl, die Personal
+ * nicht anbietet, waehrend die Route es annimmt, verbirgt nichts. Routen, die
+ * Personen fuer eine dieser Listen annehmen, fragen deshalb `newNonMembers()`
+ * - mit dem GESPEICHERTEN Stand daneben: ein Verweis, der schon besteht, bleibt
+ * gueltig, damit ein alter Datensatz mit Personal oder Gast weiter speicherbar
+ * ist und niemand still aus ihm verschwindet.
  */
 import * as dbModule from '../db.js';
 
@@ -45,24 +46,23 @@ function checkedAlias(alias) {
 /**
  * SQL-Bedingung "die users-Zeile unter `alias` ist ein Haushaltsmitglied".
  *
- * Beide Optionen zugleich sind ein Fehler, keine Fassung: eine Liste, die jede
- * Zeile sehen muss, gehoert mit Grund in die Allowlist des Guards - ein
- * Praedikatsaufruf, der nichts ausschliesst, saehe dort aus wie eine gefilterte
- * Liste.
+ * Nimmt bewusst KEINE Optionen mehr. Die frueheren `includeGuests` und
+ * `includeStaff` hielten fest, was Listen vor diesem Modul zeigten; seit alle
+ * Listen streng sind, waere jede Option nur ein Weg zurueck in die
+ * uneinheitliche Sichtbarkeit. Ein Aufruf mit zweitem Argument wirft, statt es
+ * still zu ignorieren. Eine Liste, die jede Zeile sehen muss, gehoert mit Grund
+ * in die Allowlist des Guards.
  *
  * @param {string} alias Tabellenname oder -alias der users-Zeile, z. B. 'u' oder 'users'
- * @param {{ includeStaff?: boolean, includeGuests?: boolean }} [options]
  * @returns {string} Bedingung zum Einsetzen in eine WHERE-Klausel
  */
-export function householdMemberSql(alias, { includeStaff = false, includeGuests = false } = {}) {
-  const a = checkedAlias(alias);
-  if (includeStaff && includeGuests) {
-    throw new TypeError('household-members: a list that includes staff and guests sees every row - allowlist it in the guard instead');
+export function householdMemberSql(alias, ...rest) {
+  if (rest.length) {
+    throw new TypeError('household-members: householdMemberSql() takes no options - every list of members is strict (#1207)');
   }
-  const clauses = [];
-  if (!includeStaff) clauses.push(`NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = ${a}.id)`);
-  if (!includeGuests) clauses.push(`NOT EXISTS (SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = ${a}.id)`);
-  return `(${clauses.join(' AND ')})`;
+  const a = checkedAlias(alias);
+  return `(NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = ${a}.id)`
+    + ` AND NOT EXISTS (SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = ${a}.id))`;
 }
 
 /**
@@ -80,10 +80,9 @@ export function accessScopeSql(alias) {
 }
 
 /**
- * Gehoert diese Zeile zum Haushalt, im strengen Sinn? Die Einzelpruefung zur
- * Liste: eine Route, die eine Auswahl annimmt, fragt hier, damit die Auswahl
- * niemanden zeigt, den die Route ablehnt, und niemanden verbirgt, den sie
- * akzeptiert.
+ * Gehoert diese Zeile zum Haushalt? Die Einzelpruefung zur Liste: eine Route,
+ * die eine Auswahl annimmt, fragt hier, damit die Auswahl niemanden zeigt, den
+ * die Route ablehnt, und niemanden verbirgt, den sie akzeptiert.
  *
  * Getrennt von der Adressfrage (`memberEmail()` in member-email.js), weil die
  * beiden Absagen verschiedene sind: "kenne ich nicht" gegen "hat keine
@@ -95,4 +94,34 @@ export function isHouseholdMember(userId, { db } = {}) {
   return Boolean(database.prepare(`
     SELECT 1 FROM users u WHERE u.id = ? AND ${householdMemberSql('u')}
   `).get(userId));
+}
+
+/**
+ * Welche der genannten Konten kaemen NEU dazu und sind keine Haushaltsmitglieder?
+ *
+ * `stored` ist der gespeicherte Stand des Datensatzes (die Zustaendigen einer
+ * Aufgabe, die Teilnehmer eines Termins ...). Wer dort schon steht, bleibt
+ * gueltig - sonst liesse sich ein alter Datensatz mit Personal oder Gast nicht
+ * mehr speichern, ohne diese Person zu entfernen.
+ *
+ * Ein Konto, das es gar nicht gibt, meldet diese Funktion NICHT: dafuer hat
+ * jede Route schon ihre eigene Antwort (404, still verwerfen, eigene Meldung),
+ * und die bleibt, wie sie ist.
+ *
+ * @param {Iterable<number>} userIds
+ * @param {{ stored?: Iterable<number>, db?: object }} [options]
+ * @returns {number[]} die abzulehnenden ids, in der Reihenfolge der Anfrage
+ */
+export function newNonMembers(userIds, { stored = [], db } = {}) {
+  const database = db || dbModule.get();
+  const keep = new Set([...stored].map(Number));
+  const exists = database.prepare('SELECT 1 FROM users WHERE id = ?');
+  const member = database.prepare(`SELECT 1 FROM users u WHERE u.id = ? AND ${householdMemberSql('u')}`);
+  return [...new Set([...userIds].map(Number))]
+    .filter((id) => Number.isInteger(id) && !keep.has(id) && exists.get(id) && !member.get(id));
+}
+
+/** Die eine Meldung dazu - jede Route sagt dasselbe, damit ein Client einen Grund hat. */
+export function nonMemberMessage(ids) {
+  return `Only household members can be chosen here - user ${ids.join(', ')} is not a household member.`;
 }

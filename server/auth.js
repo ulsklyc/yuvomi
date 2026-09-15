@@ -74,12 +74,12 @@ const MAX_AVATAR_DATA_LENGTH = 768 * 1024;
  * `access_scope` schon zieht. Ein Haushalt von einer Person mit drei
  * Reisebekanntschaften ist ein Solo-Haushalt.
  *
- * Hauspersonal zaehlt dagegen mit (`includeStaff`). Das ist Bestand, keine
- * Entscheidung - die Frage steht offen in #1207.
+ * Hauspersonal zaehlt ebenso wenig mit (#1207): ein Haushalt aus einer Person
+ * und ihrer Putzhilfe ist ein Solo-Haushalt.
  */
 const HOUSEHOLD_SIZE_SQL = `
   SELECT COUNT(*) AS n FROM users
-  WHERE ${householdMemberSql('users', { includeStaff: true })}
+  WHERE ${householdMemberSql('users')}
 `;
 
 function householdSize(database) {
@@ -2310,10 +2310,14 @@ router.get('/api-tokens', requireAuth, requireAdmin, (req, res) => {
       LEFT JOIN users subject ON subject.id = COALESCE(t.subject_user_id, t.created_by)
       ORDER BY t.created_at DESC
     `).all();
+    // KONTEN, keine Mitgliederliste (#1207): ein Admin stellt ein Token fuer
+    // ein Konto aus, auch fuer das einer Haushaltshilfe. Nur Gaeste fehlen,
+    // weil POST /api-tokens sie als Subjekt abweist - dieselbe Grenze ueber
+    // access_scope. Die Liste steht deshalb in der Allowlist des Guards.
     const subjects = db.get().prepare(`
       SELECT u.id, u.username, u.display_name
       FROM users u
-      WHERE ${householdMemberSql('u', { includeStaff: true })}
+      WHERE ${accessScopeSql('u')} = 'family'
       ORDER BY u.display_name
     `).all();
     res.json({ data: rows.map(publicApiToken), subjects });

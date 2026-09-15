@@ -14,6 +14,7 @@ import { esc } from '/utils/html.js';
 import { renderMarkdownToolbar, wireMarkdownToolbar } from '/utils/markdown-toolbar.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
+import { withChosenPeople } from '/utils/people-picker.js';
 import { resolveReminderPreset } from '/utils/reminder-offset.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
@@ -990,7 +991,7 @@ ${syncTargetFieldHtml(task)}
            behaelt seinen Wert, es wird nur verborgen - der Absende-Pfad liest
            es unveraendert (utils/household.js). -->
       <div class="form-group" style="margin-top:var(--space-4)"${isSoloHousehold() ? ' hidden' : ''}>
-        ${renderUserMultiSelect(users, selectedIds, 'task_assigned', 'tasks.assignedLabel')}
+        ${renderUserMultiSelect(withChosenPeople(users, task?.assigned_users), selectedIds, 'task_assigned', 'tasks.assignedLabel')}
       </div>
 
       <!-- #647: die Haelfte, die @jamespurnama1 beschrieben hat. Fuehrerschein

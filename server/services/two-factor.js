@@ -286,7 +286,7 @@ export function householdOverview(db) {
            (t.confirmed_at IS NOT NULL)  AS enabled
       FROM users u
       LEFT JOIN user_totp t ON t.user_id = u.id
-     WHERE ${householdMemberSql('u', { includeGuests: true })}
+     WHERE ${householdMemberSql('u')}
      ORDER BY u.display_name
   `).all().map((row) => ({ ...row, enabled: row.enabled === 1 }));
 }

@@ -34,6 +34,7 @@ import { resolveEventColor } from '/utils/event-color.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { parseRemindAtAsUtc } from '/utils/reminder-offset.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
+import { withChosenPeople } from '/utils/people-picker.js';
 import { wireTablist } from '/utils/tablist.js';
 // EINE Schalterform, auch hier. Das Primitiv liegt unter `/settings/`, weil
 // dort sein Anlass lag (vier Schalterformen nebeneinander, Critique
@@ -1562,13 +1563,18 @@ async function getCachedAt(path) {
   }
 }
 
+/**
+ * Auswahl und Personenfilter zeigen Haushaltsmitglieder (#1207). Die Namen
+ * bestehender Dienstplan-Eintraege kommen aus dem Kontenverzeichnis: auch
+ * Hauspersonal kann einen Plan haben, und sein Eintrag soll einen Namen tragen.
+ */
 async function loadUsers() {
-  try {
-    const res   = await api.get('/auth/users');
-    state.users = res.data;
-  } catch {
-    state.users = [];
-  }
+  const [members, directory] = await Promise.all([
+    api.get('/family/members').then((res) => res.data ?? []).catch(() => []),
+    api.get('/auth/users').then((res) => res.data ?? []).catch(() => []),
+  ]);
+  state.users = members;
+  state.userDirectory = directory;
 }
 
 // --------------------------------------------------------
@@ -2452,7 +2458,7 @@ function persistWasteTypeFilter() {
 function scheduleHasTimes(entry) { return Boolean(entry.shift_type?.start_time && entry.shift_type?.end_time); }
 
 function scheduleOwnerName(entry) {
-  const owner = state.users.find((user) => Number(user.id) === Number(entry.user_id));
+  const owner = (state.userDirectory ?? state.users).find((user) => Number(user.id) === Number(entry.user_id));
   return owner?.display_name || owner?.username || "";
 }
 
@@ -3460,7 +3466,7 @@ function openCalendarFilters() {
     // uebrigen aus; das ist die Lesart, die Apple in derselben Liste hat.
     checked: state.people.size === 0 || state.people.has(u.id),
     // ZWEI NAMEN FUER DIESELBE FARBE, und das ist kein Tippfehler in einer
-    // der beiden Quellen: `/auth/users` liefert die Spalte roh als
+    // der beiden Quellen: `/family/members` liefert die Spalte roh als
     // `avatar_color`, waehrend `assigned_users` sie im JSON auf `color`
     // umbenennt (services/calendar-events.js:17). Wer nur einen der beiden
     // Namen liest, bekommt an einer der beiden Stellen `undefined` - hier
@@ -5254,7 +5260,7 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
     </div>
 
     <div class="form-group">
-      ${renderUserMultiSelect(state.users, selectedUserIds, 'cal_assigned', 'calendar.assignedLabel')}
+      ${renderUserMultiSelect(withChosenPeople(state.users, isEdit ? event.assigned_users : []), selectedUserIds, 'cal_assigned', 'calendar.assignedLabel')}
     </div>
 
     ${state.users.length > 1 ? `

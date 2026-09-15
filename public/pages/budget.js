@@ -30,6 +30,7 @@ import { findPageFab } from '/utils/fab.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
+import { withChosenPeople } from '/utils/people-picker.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -440,10 +441,11 @@ export async function render(container, { user }) {
     try {
       const [prefsRes, usersRes] = await Promise.all([
         api.get('/preferences'),
-        // Fuer den Zustaendigen-Picker (#1057). Faellt der Aufruf aus, bleibt die
-        // Liste leer und das Feld verschwindet - eine Buchung ohne Picker ist
-        // besser als ein Formular, das gar nicht aufgeht.
-        api.get('/auth/users').catch(() => ({ data: [] })),
+        // Fuer den Zustaendigen-Picker (#1057): nur Haushaltsmitglieder (#1207).
+        // Faellt der Aufruf aus, bleibt die Liste leer und das Feld verschwindet -
+        // eine Buchung ohne Picker ist besser als ein Formular, das gar nicht
+        // aufgeht. Ein Gast bekommt hier ein 403 und landet genau dort.
+        api.get('/family/members').catch(() => ({ data: [] })),
         loadBudgetMeta(),
       ]);
       state.currency = prefsRes.data?.currency ?? 'EUR';
@@ -2212,7 +2214,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
         * einer moeglichen Antwort ist ein Formularfeld ohne Frage (dieselbe
         * Regel wie in utils/household.js). */ ''}
     ${state.members.length > 1 ? `<div class="form-group js-entry-field">
-      ${renderUserMultiSelect(state.members, isEdit ? (entry.responsible_users ?? []).map((u) => u.id) : [], 'bm-responsible', 'budget.responsibleLabel')}
+      ${renderUserMultiSelect(withChosenPeople(state.members, isEdit ? entry.responsible_users : []), isEdit ? (entry.responsible_users ?? []).map((u) => u.id) : [], 'bm-responsible', 'budget.responsibleLabel')}
       <p class="form-hint">${esc(t('budget.responsibleHint'))}</p>
       ${/* Der Weg von der Zuschreibung zur Forderung (#1057) - und er ist
           * ausdruecklich ein Weg und keine Verschmelzung: hier entsteht nichts,

@@ -14,6 +14,7 @@ import {
 } from '../../services/budget-visibility.js';
 import { computeLoanSchedule, remainingPrincipalFromPayments, remainingInstallmentsForBalance } from '../../services/loan-amortization.js';
 import { todayKey } from '../../utils/timezone.js';
+import { newNonMembers } from '../../services/household-members.js';
 
 // --------------------------------------------------------
 // Persönlich/geteilt (#476/#505): Haushalts-Modus + Sichtbarkeits-Enforcement.
@@ -832,6 +833,26 @@ export function replaceResponsibles(entryId, rawUserIds) {
     SELECT ?, id FROM users WHERE id = ?
   `);
   for (const id of ids) ins.run(entryId, id);
+}
+
+/**
+ * Wer unter den mitgeschickten Zustaendigen NEU waere und kein Haushaltsmitglied
+ * ist (#1207) - gegen den gespeicherten Stand des Eintrags `entryId`: wer dort
+ * schon steht, bleibt gueltig. `undefined` heisst "nicht mitgeschickt", wie in
+ * replaceResponsibles(). Vor jedem Schreiben zu fragen: replaceResponsibles()
+ * laeuft erst nach dem eigentlichen Update und verwirft Unbekannte still.
+ *
+ * @param {number|null} entryId
+ * @param {Array<number>|undefined} rawUserIds
+ * @returns {number[]}
+ */
+export function responsibleNonMembers(entryId, rawUserIds) {
+  if (!Array.isArray(rawUserIds)) return [];
+  const ids = rawUserIds.map(Number).filter((n) => Number.isInteger(n) && n > 0);
+  const stored = entryId == null
+    ? []
+    : db.get().prepare('SELECT user_id FROM budget_entry_responsibles WHERE entry_id = ?').all(entryId).map((r) => r.user_id);
+  return newNonMembers(ids, { stored });
 }
 
 /** Das JSON aus RESPONSIBLE_USERS_SQL in ein Array wandeln. */

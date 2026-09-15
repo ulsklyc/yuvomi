@@ -10,7 +10,7 @@ import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { getBalance, isEnrolled, postLedger } from '../services/rewards.js';
-import { householdMemberSql } from '../services/household-members.js';
+import { householdMemberSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 
 const log = createLogger('Rewards');
 const router = express.Router();
@@ -29,8 +29,10 @@ function actingUser(req) {
   return req.authUserId || req.session?.userId || null;
 }
 
-// Nur echte Familienmitglieder (keine Haushaltshilfe-Konten).
-const MEMBER_FILTER = householdMemberSql('u', { includeGuests: true });
+// Nur Haushaltsmitglieder - kein Hauspersonal, keine Gaeste (#1207). Eine
+// alte Einschreibung von Personal oder Gast bleibt in reward_participants
+// stehen, erscheint aber in keiner dieser Listen und zaehlt nicht mit.
+const MEMBER_FILTER = householdMemberSql('u');
 
 function toInt(val) {
   const n = Math.trunc(Number(val));
@@ -89,7 +91,7 @@ router.get('/overview', (req, res) => {
     const pending = d.prepare("SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending'").get().n;
     // Zähler für den Eltern-Ersteinrichtungs-Hinweis (aktivierte Mitglieder,
     // angelegte Prämien, Aufgaben mit Punktewert).
-    const participantCount = d.prepare('SELECT COUNT(*) AS n FROM reward_participants WHERE enabled = 1').get().n;
+    const participantCount = d.prepare(`SELECT COUNT(*) AS n FROM reward_participants p JOIN users u ON u.id = p.user_id WHERE p.enabled = 1 AND ${MEMBER_FILTER}`).get().n;
     const catalogCount = d.prepare('SELECT COUNT(*) AS n FROM reward_catalog WHERE is_active = 1').get().n;
     const pointedTaskCount = d.prepare('SELECT COUNT(*) AS n FROM tasks WHERE points > 0').get().n;
     res.json({ data: {
@@ -133,6 +135,14 @@ router.put('/participants/:userId', requireAdmin, (req, res) => {
     const enabled = req.body?.enabled === true || req.body?.enabled === 1 ? 1 : 0;
     const user = db.get().prepare('SELECT id FROM users WHERE id = ?').get(userId);
     if (!user) return res.status(404).json({ error: 'User not found.', code: 404 });
+    // Einschreiben nur Haushaltsmitglieder (#1207). Eine eingeschaltete
+    // Einschreibung von frueher bleibt gueltig und laesst sich abschalten;
+    // abgeschaltet ist sie keine mehr, und neu anlegen geht nicht.
+    if (enabled === 1) {
+      const current = db.get().prepare('SELECT enabled FROM reward_participants WHERE user_id = ?').get(userId);
+      const strangers = newNonMembers([userId], { stored: current?.enabled === 1 ? [userId] : [] });
+      if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
+    }
 
     db.get().prepare(`
       INSERT INTO reward_participants (user_id, enabled) VALUES (?, ?)

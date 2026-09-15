@@ -301,7 +301,7 @@ function openIcsEditModal(container, sub, subs, user) {
       // Assignee-Optionen async nachladen — Modal öffnet sofort (kein Fetch-Block).
       const assigneeSel = panel.querySelector('#ics-edit-assignee');
       if (assigneeSel) {
-        loadFamilyUsers().then((users) => {
+        loadFamilyUsers(sub.default_assignee_user_id).then((users) => {
           assigneeSel.querySelector('option[data-loading]')?.remove();
           for (const u of users) {
             const opt = document.createElement('option');

@@ -19,8 +19,9 @@ import {
   normalizeIntervalCount, effectiveMonthly,
   validCategoryKeys, defaultCategory, validateSubcategory, validateAccountRef,
   entryWithLoanMeta, refreshLoanStatus, fromBudgetAmount, bookingFor,
-  RESPONSIBLE_USERS_SQL, replaceResponsibles, withResponsibles,
+  RESPONSIBLE_USERS_SQL, replaceResponsibles, withResponsibles, responsibleNonMembers,
 } from './helpers.js';
+import { nonMemberMessage } from '../../services/household-members.js';
 
 const log = createLogger('Budget');
 const router = express.Router();
@@ -288,6 +289,9 @@ router.post('/', (req, res) => {
 
     const accountRef = validateAccountRef(req.body.account_id);
     if (accountRef.error) return res.status(400).json({ error: accountRef.error, code: 400 });
+    // Zustaendig nur Haushaltsmitglieder (#1207).
+    const strangers = responsibleNonMembers(null, req.body.responsible_user_ids);
+    if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
 
     // Intervall + virtuelles Budget nur für wiederkehrende Einträge.
     const isRecurring = req.body.is_recurring ? 1 : 0;
@@ -367,6 +371,9 @@ router.put('/:id/series', (req, res) => {
     if (req.body.recurrence_interval_count !== undefined) checks.push(intervalCountCheck(req.body.recurrence_interval_count));
     const errors = collectErrors(checks);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    // Neu nur Haushaltsmitglieder (#1207), gegen den Stand der Serie.
+    const strangers = responsibleNonMembers(parentId, req.body.responsible_user_ids);
+    if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
 
     const { title, amount, category, subcategory: requestedSubcategory, is_recurring, recurrence_rule } = req.body;
     const finalTitle    = title     !== undefined ? title.trim()                        : parent.title;
@@ -602,6 +609,9 @@ router.put('/:id', (req, res) => {
     if (req.body.recurrence_interval_count !== undefined) checks.push(intervalCountCheck(req.body.recurrence_interval_count));
     const errors = collectErrors(checks);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    // Neu nur Haushaltsmitglieder (#1207); wer schon zustaendig ist, bleibt es.
+    const strangers = responsibleNonMembers(id, req.body.responsible_user_ids);
+    if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
     const { title, amount, category, subcategory: requestedSubcategory, date, is_recurring, recurrence_rule } = req.body;
     const linkedPayment = db.get().prepare(`
       SELECT * FROM budget_loan_payments WHERE budget_entry_id = ?

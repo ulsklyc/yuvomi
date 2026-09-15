@@ -19,6 +19,7 @@ import {
 } from '../../services/document-storage.js';
 import { queueEventDeletion, markEventOutbound, flushOutbound } from '../../services/calendar-outbound.js';
 import { SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN } from '../../services/calendar-events.js';
+import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
 import {
   assertSuccessorHasOccurrence,
   baseOccurrenceFor,
@@ -129,7 +130,7 @@ async function cleanupCalendarUploads(uploads) {
   if (firstError) throw firstError;
 }
 
-function validateOccurrenceAssignments(database, value) {
+function validateOccurrenceAssignments(database, value, stored = []) {
   if (value === undefined) return { value: undefined, error: null };
   if (value === null) return { value: [], error: null };
   const ids = Array.isArray(value) ? value : [value];
@@ -146,8 +147,21 @@ function validateOccurrenceAssignments(database, value) {
     if (Number(found) !== ids.length) {
       return { value: null, error: 'Eine zugewiesene Person existiert nicht mehr. Lade die Personenauswahl erneut.' };
     }
+    // Neu nur Haushaltsmitglieder (#1207). Wer schon an der Serie oder an
+    // diesem Vorkommen steht, bleibt gueltig.
+    const strangers = newNonMembers(ids, { stored, db: database });
+    if (strangers.length) return { value: null, error: nonMemberMessage(strangers) };
   }
   return { value: ids, error: null };
+}
+
+/** Der gespeicherte Stand eines Vorkommens: wer an der Serie steht oder am schon abgewandelten Vorkommen. */
+function storedOccurrenceAssignees(database, seriesId, recurrenceId) {
+  return database.prepare(`
+    SELECT user_id FROM event_assignments
+    WHERE event_id = ?
+       OR event_id IN (SELECT id FROM calendar_events WHERE recurrence_parent_id = ? AND recurrence_id = ?)
+  `).all(seriesId, seriesId, recurrenceId).map((row) => row.user_id);
 }
 
 function isPossibleCalendarDateTime(value) {
@@ -170,7 +184,7 @@ function isPossibleCalendarDateTime(value) {
     && (offsetMinute === undefined || Number(offsetMinute) <= 59);
 }
 
-function validateOccurrenceMutationBody(database, body, { following = false } = {}) {
+function validateOccurrenceMutationBody(database, body, { following = false, storedAssignees = [] } = {}) {
   const values = {};
   const errors = [];
   const validateString = (field, label, options = {}) => {
@@ -243,7 +257,7 @@ function validateOccurrenceMutationBody(database, body, { following = false } = 
       errors.push('Sichtbarkeit: Wähle alle Personen, zugewiesene Personen oder privat (all, assignees, private).');
     } else values.visibility = body.visibility;
   }
-  const assignments = validateOccurrenceAssignments(database, body.assigned_to);
+  const assignments = validateOccurrenceAssignments(database, body.assigned_to, storedAssignees);
   if (assignments.error) errors.push(assignments.error);
 
   return { values, assignments: assignments.value, errors };
@@ -343,6 +357,9 @@ router.post('/', async (req, res) => {
     const errors = collectErrors([vTitle, vDesc, vStart, vEnd, vColor, vLoc, vRrule, vCaldav, vGoogle, vOutlook]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     if (!vIcon) return res.status(400).json({ error: 'icon: invalid calendar event icon.', code: 400 });
+    // Teilnehmen lassen nur Haushaltsmitglieder (#1207).
+    const strangers = newNonMembers(parseAssignedTo(req.body.assigned_to));
+    if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
 
     // EINE SERIE OHNE EIN EINZIGES VORKOMMEN WIRD NICHT GESPEICHERT (#960).
     // `FREQ=MONTHLY;BYMONTHDAY=-1;UNTIL=20260120` ab dem 15. Januar nimmt der
@@ -592,6 +609,13 @@ router.put('/:id', async (req, res) => {
     if (vOutlook) checks.push(vOutlook);
     const errors = collectErrors(checks);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    // Neu nur Haushaltsmitglieder (#1207); wer schon teilnimmt, bleibt gueltig.
+    // Vor dem ersten await (Beleg-Upload) und vor jedem Schreiben geprueft.
+    if (req.body.assigned_to !== undefined) {
+      const stored = db.get().prepare('SELECT user_id FROM event_assignments WHERE event_id = ?').all(id).map((r) => r.user_id);
+      const strangers = newNonMembers(parseAssignedTo(req.body.assigned_to), { stored });
+      if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
+    }
     if (event.recurrence_rule && req.body.confirmed_orphan_count !== undefined
         && (!Number.isInteger(req.body.confirmed_orphan_count)
           || req.body.confirmed_orphan_count < 0)) {
@@ -1019,7 +1043,9 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
     }
     baseOccurrenceFor(master, req.params.recurrenceId);
 
-    const mutation = validateOccurrenceMutationBody(db.get(), req.body);
+    const mutation = validateOccurrenceMutationBody(db.get(), req.body, {
+      storedAssignees: storedOccurrenceAssignees(db.get(), seriesId, req.params.recurrenceId),
+    });
     const { values: validated, errors } = mutation;
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -1162,7 +1188,10 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
     }
     const selectedBase = baseOccurrenceFor(master, req.params.recurrenceId);
 
-    const mutation = validateOccurrenceMutationBody(db.get(), req.body, { following: true });
+    const mutation = validateOccurrenceMutationBody(db.get(), req.body, {
+      following: true,
+      storedAssignees: storedOccurrenceAssignees(db.get(), seriesId, req.params.recurrenceId),
+    });
     const { values: validated } = mutation;
     const caldavProvided = req.body.target_caldav_account_id !== undefined
       || req.body.target_caldav_calendar_url !== undefined;

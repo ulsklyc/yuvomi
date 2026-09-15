@@ -814,8 +814,23 @@ function applyShiftPreset(form) {
   const iconButton = form.querySelector('[data-action="pick-shift-icon"]');
   if (iconButton) setShiftIconButtonIcon(iconButton, selected.icon);
 }
+/**
+ * Wer als Besitzer:in angeboten wird (#1207): die Haushaltsmitglieder aus
+ * GET /schedule/household-members, dazu wer schon einen Plan hat, und die
+ * aktuelle Auswahl. `state.users` bleibt das Namensverzeichnis fuer bestehende
+ * Zeilen - auch Hauspersonal kann einen Plan haben -, angeboten wird daraus
+ * aber niemand, der nichts besitzt und kein Mitglied ist. Einen neuen Plan fuer
+ * so jemanden weist der Server ohnehin ab.
+ */
+function ownerIds(selected) {
+  const ids = new Set((overview.people ?? []).map((person) => Number(person.id)));
+  for (const row of [...state.patterns, ...state.overrides, ...state.extras]) ids.add(Number(row.user_id));
+  if (selected !== undefined && selected !== null && selected !== '') ids.add(Number(selected));
+  return ids;
+}
 function userOptions(selected) {
-  return state.users.filter((user) => canManageOthers || Number(user.id) === Number(currentUserId)).map((user) => option(user.id, user.display_name || user.username, Number(selected) === Number(user.id))).join('');
+  const eligible = ownerIds(selected);
+  return state.users.filter((user) => eligible.has(Number(user.id)) && (canManageOthers || Number(user.id) === Number(currentUserId))).map((user) => option(user.id, user.display_name || user.username, Number(selected) === Number(user.id))).join('');
 }
 
 function formField(label, control, className = '') {

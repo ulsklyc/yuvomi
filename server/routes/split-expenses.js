@@ -586,6 +586,10 @@ router.get('/groups/:id/member-candidates', (req, res) => {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
     if (isSplitGuest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    // Haushaltsmitglieder, dazu die Gaeste DIESER Gruppe (#1207). Ein Gast
+    // existiert fuer geteilte Ausgaben: er gehoert zu der Gruppe, fuer die er
+    // angelegt wurde, und zu jeder, in der er schon Mitglied ist. Gaeste
+    // anderer Gruppen bietet die Auswahl nicht an.
     const people = db.get().prepare(`
       SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
              u.avatar_color, u.family_role, c.phone, c.email, b.birth_date,
@@ -594,10 +598,21 @@ router.get('/groups/:id/member-candidates', (req, res) => {
       FROM users u
       LEFT JOIN contacts c ON c.family_user_id = u.id
       LEFT JOIN birthdays b ON b.family_user_id = u.id
-      LEFT JOIN expense_group_members gm ON gm.group_id = ? AND gm.user_id = u.id
-      WHERE ${householdMemberSql('u', { includeGuests: true })}
-      ORDER BY u.display_name COLLATE NOCASE ASC
-    `).all(groupId);
+      LEFT JOIN expense_group_members gm ON gm.group_id = @groupId AND gm.user_id = u.id
+      WHERE ${householdMemberSql('u')}
+      UNION ALL
+      SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
+             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date,
+             CASE WHEN gm.user_id IS NULL THEN 0 ELSE 1 END AS in_group,
+             gm.role AS group_role
+      FROM split_expense_guest_users g
+      JOIN users u ON u.id = g.user_id
+      LEFT JOIN contacts c ON c.family_user_id = u.id
+      LEFT JOIN birthdays b ON b.family_user_id = u.id
+      LEFT JOIN expense_group_members gm ON gm.group_id = @groupId AND gm.user_id = u.id
+      WHERE g.group_id = @groupId OR gm.user_id IS NOT NULL
+      ORDER BY display_name COLLATE NOCASE ASC
+    `).all({ groupId });
     const contacts = db.get().prepare(`
       SELECT 'contact' AS source, NULL AS user_id, c.id AS contact_id, c.name AS display_name,
              NULL AS username, '#2563EB' AS avatar_color, 'other' AS family_role,

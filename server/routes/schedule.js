@@ -11,7 +11,7 @@ import { dateKeysInRange, scheduleData, fieldsForShiftTypes, fieldValuesFor, typ
 // routes/schedule-extras.js' eigener Kopfkommentar seit jeher vermeidet.
 export { scheduleData, fieldValuesFor } from '../services/schedule.js';
 import { daysBetweenDateKeys } from '../utils/timezone.js';
-import { householdMemberSql } from '../services/household-members.js';
+import { householdMemberSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js';
 
 const router = express.Router();
@@ -20,6 +20,20 @@ const actorId = (req) => req.authUserId || req.session?.userId;
 export const isAdmin = (req) => req.authRole === 'admin' || req.session?.role === 'admin';
 const fail = (res, code, error) => res.status(code).json({ error, code });
 const userExists = (value) => !!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(value);
+/**
+ * Ein NEUER Dienstplan-Besitzer muss Haushaltsmitglied sein (#1207). Wer schon
+ * einen Plan hat - Muster, Abweichung oder Zusatzschicht -, bleibt gueltig:
+ * ein bestehender Plan von Hauspersonal darf beim Bearbeiten nicht scheitern.
+ * Auch von routes/schedule-extras.js benutzt.
+ */
+export function rejectedScheduleOwner(userId) {
+  const owns = db.get().prepare(`
+    SELECT 1 FROM schedule_patterns WHERE user_id = @id
+    UNION SELECT 1 FROM schedule_overrides WHERE user_id = @id
+    UNION SELECT 1 FROM schedule_extra_shifts WHERE user_id = @id
+  `).get({ id: userId });
+  return newNonMembers([userId], { stored: owns ? [userId] : [] }).length > 0;
+}
 const typeExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_shift_types WHERE id = ?').get(value);
 const customFieldExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_custom_fields WHERE id = ?').get(value);
 const mineOrAdmin = (req, userId) => isAdmin(req) || actorId(req) === userId;
@@ -269,7 +283,7 @@ router.post('/patterns', (req, res) => {
   const user = id(req.body?.user_id ?? actorId(req), 'user_id'); const name = str(req.body?.name, 'name'); const anchor = date(req.body?.anchor_date, 'anchor_date', true);
   const length = num(req.body?.cycle_length, 'cycle_length', { required: true }); const from = date(req.body?.valid_from, 'valid_from'); const until = date(req.body?.valid_until, 'valid_until');
   const active = req.body?.is_active === undefined ? { value: true, error: null } : bool(req.body.is_active, 'is_active');
-  const errors = collectErrors([user, name, anchor, length, from, until, active]); if (!Number.isInteger(length.value) || length.value < 1 || length.value > 366) errors.push('cycle_length must be between 1 and 366.'); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.');
+  const errors = collectErrors([user, name, anchor, length, from, until, active]); if (!Number.isInteger(length.value) || length.value < 1 || length.value > 366) errors.push('cycle_length must be between 1 and 366.'); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value]));
   if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.'); if (from.value && until.value && from.value > until.value) errors.push('valid_from must be before valid_until.');
   if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });
   const result = db.get().prepare('INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length, valid_from, valid_until, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)').run(user.value, name.value, anchor.value, length.value, from.value, until.value, Number(active.value));
@@ -277,7 +291,7 @@ router.post('/patterns', (req, res) => {
 });
 router.put('/overrides/:dateKey', (req, res) => {
   const key = date(req.params.dateKey, 'date_key', true); const user = id(req.body?.user_id ?? actorId(req), 'user_id'); const typeId = req.body?.shift_type_id == null ? null : id(req.body.shift_type_id, 'shift_type_id'); const note = str(req.body?.note, 'note', { required: false, max: 5000 });
-  const errors = collectErrors([key, user, typeId, note].filter(Boolean)); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); if (typeId && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.'); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.');
+  const errors = collectErrors([key, user, typeId, note].filter(Boolean)); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value])); if (typeId && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.'); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.');
   const fields = validateFieldValues(req.body?.field_values, typeId?.value ?? null); if (fields.error) errors.push(fields.error);
   if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });
   // Upsert und replaceFieldValues() in EINER Transaktion: ohne sie stand der
@@ -461,6 +475,7 @@ router.post('/overrides/fill', (req, res) => {
   if (fields.error) errors.push(fields.error);
   if (from.value && to.value && from.value > to.value) errors.push('from must be before to.');
   if (user.value && !userExists(user.value)) errors.push('user_id does not exist.');
+  else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value]));
   if (typeId && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.');
   if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.');
   if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });

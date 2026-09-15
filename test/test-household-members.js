@@ -467,3 +467,24 @@ test('rewards: only a household member can be enrolled, an old enrolment can sti
   assert.equal(db.prepare('SELECT enabled FROM reward_participants WHERE user_id = ?').get(DORA).enabled, 0, 'switched off, not deleted');
   assertRejectsNonMember(await call('PUT', `/rewards/participants/${DORA}`, { body: { enabled: true } }), 'switching an old guest enrolment back on');
 });
+
+// --------------------------------------------------------------------------
+// Die Auswahl im Browser: Mitglieder, dazu wer am Datensatz schon steht
+// --------------------------------------------------------------------------
+
+test('picker: members, then whoever is already chosen on the record, once', async () => {
+  // Ohne diesen Schritt bekaeme eine gespeicherte Haushaltskraft kein Haekchen,
+  // und das naechste Speichern naehme sie still heraus - obwohl der Server den
+  // gespeicherten Verweis ausdruecklich weiter annimmt.
+  const { withChosenPeople } = await import('../public/utils/people-picker.js');
+  const members = [{ id: ANNA, display_name: 'Anna', avatar_color: '#111111' }, { id: BEN, display_name: 'Ben', avatar_color: '#222222' }];
+  const chosen = [
+    { id: BEN, display_name: 'Ben', color: '#222222' },
+    { id: CLARA, display_name: 'Clara', color: '#333333' },
+    { id: CLARA, display_name: 'Clara', color: '#333333' },
+  ];
+  const list = withChosenPeople(members, chosen);
+  assert.deepEqual(list.map((person) => person.id), [ANNA, BEN, CLARA]);
+  assert.equal(list[2].avatar_color, '#333333', 'the record calls the colour `color`, the picker reads `avatar_color`');
+  assert.deepEqual(withChosenPeople(members, null).map((person) => person.id), [ANNA, BEN], 'a new record offers members only');
+});

@@ -21,7 +21,8 @@ import { collectErrors, date, id, str } from '../middleware/validate.js';
 import { dateKeysInRange } from '../services/schedule.js';
 import { daysBetweenDateKeys } from '../utils/timezone.js';
 import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js';
-import { validateFieldValues, replaceFieldValues, fieldValuesFor, isAdmin } from './schedule.js';
+import { validateFieldValues, replaceFieldValues, fieldValuesFor, isAdmin, rejectedScheduleOwner } from './schedule.js';
+import { nonMemberMessage } from '../services/household-members.js';
 import { createLogger } from '../logger.js';
 
 const router = express.Router();
@@ -69,7 +70,7 @@ router.get('/', (req, res) => {
 router.post('/', (req, res) => {
   const key = date(req.body?.date_key, 'date_key', true); const user = id(req.body?.user_id ?? actorId(req), 'user_id'); const typeId = id(req.body?.shift_type_id, 'shift_type_id'); const note = str(req.body?.note, 'note', { required: false, max: 5000 }); const offset = reminderOffset(req.body?.reminder_offset_minutes);
   const fields = validateFieldValues(req.body?.field_values, typeId.value ?? null);
-  const errors = collectErrors([key, user, typeId, note, offset].filter(Boolean)); if (fields.error) errors.push(fields.error); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); if (typeId.value && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.'); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.'); if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });
+  const errors = collectErrors([key, user, typeId, note, offset].filter(Boolean)); if (fields.error) errors.push(fields.error); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value])); if (typeId.value && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.'); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.'); if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });
   // Anlegen und replaceFieldValues() in EINER Transaktion: sonst stand die
   // Zeile schon committed, bevor ihre Werte geschrieben waren, und ein Wurf
   // dazwischen liess einen 500er auf eine bereits vorhandene Zeile antworten -
@@ -100,6 +101,7 @@ router.post('/fill', (req, res) => {
   if (fields.error) errors.push(fields.error);
   if (from.value && to.value && from.value > to.value) errors.push('from must be before to.');
   if (user.value && !userExists(user.value)) errors.push('user_id does not exist.');
+  else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value]));
   if (typeId.value && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.');
   if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.');
   if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });

@@ -122,6 +122,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Housekeeping staff and shared-expense guests no longer appear where you pick or list
+  household members** (#1207). The pickers for task assignees, calendar attendees, budget
+  responsibles, schedule owners, medication owners and synced-calendar assignees, the family
+  list, the calendar's person filter, mentions, the reward standings and enrolment, the
+  household-wide two-factor overview and the Overview's member cards now show household members
+  only, and the household size counts them the same way - a household of one person and a
+  cleaner is a household of one. Splitting an expense still offers the guests of that group.
+  Nothing is taken away: a task, event, budget entry, schedule or reward enrolment that already
+  names a staff member or guest keeps them and can still be saved; only choosing one anew is
+  refused. User administration, permissions and API tokens still list every account.
 - **The README is shorter between the introduction and the install steps** (#1212). Each module
   gets one line in the module table, with the detail left to the spec, and "Before you commit" -
   what happens if the project stops, how to take your data elsewhere, what it costs - now comes

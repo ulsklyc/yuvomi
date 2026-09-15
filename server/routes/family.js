@@ -27,7 +27,7 @@ router.get('/members', (req, res) => {
       FROM users u
       LEFT JOIN contacts c ON c.family_user_id = u.id
       LEFT JOIN birthdays b ON b.family_user_id = u.id
-      WHERE ${householdMemberSql('u', { includeGuests: true })}
+      WHERE ${householdMemberSql('u')}
       ORDER BY u.display_name COLLATE NOCASE ASC
     `).all();
     res.json({ data: members });

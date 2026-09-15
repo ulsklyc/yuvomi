@@ -6,7 +6,7 @@ export function familyPaths() {
       get: op({
         summary: 'List family members',
         tag: 'Family',
-        description: 'Read-only endpoint for family-member profiles. It does not expose usernames or system access roles and does not support create/update/delete operations.',
+        description: 'Read-only endpoint for family-member profiles: household members only, without housekeeping staff and split-expense guests. It does not expose usernames or system access roles and does not support create/update/delete operations.',
         responses: {
           200: {
             description: 'Family members',

@@ -203,7 +203,7 @@ function buildCalendarAssigneeSelect({ source, externalId, currentId }) {
   ['click', 'mousedown', 'change'].forEach((ev) =>
     select.addEventListener(ev, (e) => e.stopPropagation()));
 
-  loadFamilyUsers().then((users) => {
+  loadFamilyUsers(currentId).then((users) => {
     loadingOpt.remove();
     for (const u of users) {
       const opt = document.createElement('option');
@@ -1077,7 +1077,7 @@ function buildOutlookAutoSyncControls(account, calendars) {
   noneOpt.value = '';
   noneOpt.textContent = t('settings.outlookOwnerNone');
   ownerSelect.appendChild(noneOpt);
-  loadFamilyUsers().then((users) => {
+  loadFamilyUsers(account.ownerUserId).then((users) => {
     for (const u of users) {
       const opt = document.createElement('option');
       opt.value = String(u.id);
