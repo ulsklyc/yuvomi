@@ -675,8 +675,12 @@
         </div>
         <!-- Dieselbe Warnung wie im Erweitert-Pfad (step-config). Sie fehlte hier,
              obwohl gerade dieser Pfad die .env mit einem Klick überschreibt. -->
-        <div class="info-banner" id="simple-existing" style="display:none" data-i18n="config.existing">
-          Existing configuration detected: your current .env file will be backed up before saving.
+        <!-- Warnung, kein Hinweis: der Speichern-Schritt ersetzt die bestehende
+             Konfiguration, auch wenn er sie vorher sichert. Der Text sitzt im
+             inneren span, weil die Übersetzung textContent setzt. -->
+        <div class="warn-banner" id="simple-existing" role="note" style="display:none">
+          <span class="warn-icon" aria-hidden="true">&#x26A0;</span>
+          <span data-i18n="config.existing">Existing configuration detected - your current .env file will be backed up before saving.</span>
         </div>
         <div class="warn-banner" role="note">
           <span class="warn-icon" aria-hidden="true">&#x26A0;</span>
@@ -701,8 +705,9 @@
         <p data-i18n="config.subtitle">How will you access Yuvomi?</p>
       </div>
       <div class="card-body">
-        <div class="info-banner" id="cfg-existing" style="display:none" data-i18n="config.existing">
-          Existing configuration detected - your current .env file will be backed up before saving.
+        <div class="warn-banner" id="cfg-existing" role="note" style="display:none">
+          <span class="warn-icon" aria-hidden="true">&#x26A0;</span>
+          <span data-i18n="config.existing">Existing configuration detected - your current .env file will be backed up before saving.</span>
         </div>
         <!-- Wie #welcome-prereq: Text zur Laufzeit, kein data-i18n. -->
         <div class="error-banner" id="cfg-prereq" role="alert"></div>
@@ -1930,8 +1935,9 @@ const preflightDone = (async () => {
     if (d.containerRunning) $('welcome-running').style.display = 'block';
 
     if (d.envExists) {
-      $('cfg-existing').style.display = 'block';
-      $('simple-existing').style.display = 'block';
+      // flex, nicht block: beide sind .warn-banner, Icon und Text stehen in einer Zeile.
+      $('cfg-existing').style.display = 'flex';
+      $('simple-existing').style.display = 'flex';
       // Und der Einfach-Pfad wird gesperrt. applySimpleDefaults() setzt host,
       // port, SESSION_SECURE='false' und TRUST_PROXY='loopback' hart, buildEnv()
       // schickt sie mit - der Rerun-Schutz des Servers bewahrt aber nur, was der

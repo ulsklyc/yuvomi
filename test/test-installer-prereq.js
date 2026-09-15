@@ -365,13 +365,24 @@ test('jeder Pfad, der die .env schreibt, verlangt vorher eine Bestätigung', () 
 test('beide Einrichtungspfade zeigen die Warnung über eine bestehende .env', () => {
   const src = readFileSync(new URL('../tools/installer/install.html', import.meta.url), 'utf8');
   for (const id of ['cfg-existing', 'simple-existing']) {
-    assert.match(src, new RegExp(`id="${id}"[^>]*data-i18n="config.existing"`),
-      `${id} fehlt im Markup oder trägt den falschen i18n-Schlüssel`);
+    // Als Warnung, nicht als Hinweis: der Speichern-Schritt ersetzt die
+    // bestehende Konfiguration, auch wenn er sie vorher sichert. Der Text sitzt
+    // im inneren span, weil die Übersetzung textContent setzt und ein Icon
+    // direkt im Banner sonst beim ersten Sprachwechsel verschwände.
+    const banner = src.match(new RegExp(`<div class="([^"]*)" id="${id}"[^>]*>([\\s\\S]*?)</div>`));
+    assert.ok(banner, `${id} fehlt im Markup`);
+    assert.match(banner[1], /\bwarn-banner\b/, `${id} ist nicht als Warnung eingefärbt`);
+    assert.match(banner[2], /class="warn-icon"/, `${id} trägt kein Warn-Icon`);
+    assert.match(banner[2], /<span data-i18n="config\.existing">/,
+      `${id} trägt den falschen i18n-Schlüssel, oder er sitzt nicht im inneren span`);
   }
-  // Ein Banner, das der Preflight nie einblendet, ist so gut wie keins.
+  // Ein Banner, das der Preflight nie einblendet, ist so gut wie keins - und
+  // .warn-banner ist ein Flex-Container: mit display 'block' fiele das Icon
+  // aus der Zeile.
   const preflight = src.slice(src.indexOf('d.envExists'), src.indexOf('d.envExists') + 300);
   for (const id of ['cfg-existing', 'simple-existing']) {
-    assert.ok(preflight.includes(id), `${id} wird bei envExists nicht eingeblendet`);
+    assert.ok(preflight.includes(`$('${id}').style.display = 'flex'`),
+      `${id} wird bei envExists nicht als Flex-Banner eingeblendet`);
   }
 });
 

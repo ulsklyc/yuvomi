@@ -124,6 +124,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The web installer shows an existing configuration as a warning, not as a hint.** When the
+  installer finds an `.env`, both setup paths say that the current file will be backed up before
+  saving - a setup that works is about to be replaced. That line was tinted like a plain hint; it
+  now carries the same amber warning style and icon as the backup reminder.
+
 - **On the project page, the module list on phones folds away again, and the jump menu marks the
   right section after a language switch.** On a phone, "Show all modules" opened the full list and
   then disappeared, so the list could not be shortened again; the button now stays and switches
