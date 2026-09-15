@@ -790,6 +790,48 @@ test('ein zweiter Lauf kann den Einfach-Pfad nicht ueber eine bestehende .env le
     'die Sperre braucht eine sichtbare Begruendung auf der Willkommensseite');
 });
 
+test('der Einfach-Pfad liest seine Sperre erst nach dem Preflight - beim Start und beim Speichern', () => {
+  // Die Sperre oben setzt erst die ANTWORT des Preflights. Bis dahin ist die
+  // Karte klickbar, und startFlow() wartete nicht: ein Klick in diesem Fenster
+  // landete trotz bestehender .env im Einfach-Pfad, dessen Speichern Host, Port,
+  // SESSION_SECURE und TRUST_PROXY hart darueberschrieb. Geprueft wird deshalb
+  // die Reihenfolge an beiden Tueren: erst warten, dann die Sperre lesen und
+  // umlenken, dann handeln.
+  const html = readFileSync(new URL('../tools/installer/install.html', import.meta.url), 'utf8');
+
+  const bodyFrom = (marker) => {
+    const at = html.indexOf(marker);
+    assert.notEqual(at, -1, `${marker} nicht gefunden`);
+    const open = html.indexOf('{', at + marker.length - 1);
+    let depth = 0;
+    for (let i = open; i < html.length; i++) {
+      if (html[i] === '{') depth++;
+      else if (html[i] === '}' && --depth === 0) return html.slice(open, i + 1);
+    }
+    return assert.fail(`${marker} ist nicht geschlossen`);
+  };
+
+  const start = bodyFrom('function startFlow(');
+  const waitStart = start.indexOf('await preflightDone');
+  const redirect = start.search(/if \(simpleLockedByEnv\) m = 'advanced'/);
+  const defaults = start.indexOf('applySimpleDefaults');
+  assert.notEqual(waitStart, -1, 'startFlow wartet nicht auf den Preflight');
+  assert.ok(redirect > waitStart,
+    'startFlow lenkt bei bestehender .env nicht nach dem Warten in den Erweitert-Pfad um');
+  assert.ok(defaults > redirect,
+    'startFlow setzt die Einfach-Defaults, bevor die Sperre entschieden hat');
+
+  const save = bodyFrom("$('simple-next').addEventListener('click', async () =>");
+  const write = save.indexOf("fetch('/api/save-env'");
+  const waitSave = save.indexOf('await preflightDone');
+  const refuse = save.search(/if \(simpleLockedByEnv\) \{ startFlow\('advanced'\); return; \}/);
+  assert.notEqual(write, -1, 'der Einfach-Pfad schreibt nicht mehr ueber /api/save-env - Guard veraltet?');
+  assert.ok(waitSave !== -1 && waitSave < write,
+    'das Speichern im Einfach-Pfad wartet nicht auf den Preflight');
+  assert.ok(refuse > waitSave && refuse < write,
+    'das Speichern im Einfach-Pfad bricht bei bestehender .env nicht vor dem Schreiben ab');
+});
+
 test('ein Rerun schreibt gueltige Compose-Syntax unveraendert zurueck', async () => {
   // readEnvFile/decodeEnvValue kennen nur doppelte Anfuehrungszeichen. Werden
   // ALLE Zeilen darueber geparst und neu gerendert, wird aus `PASS='a b'` der

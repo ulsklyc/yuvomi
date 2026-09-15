@@ -124,10 +124,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An early click on the simple setup no longer overwrites an existing installation.** The web
+  installer locks its simple path when it finds an `.env`, because that path sets host, port and
+  cookie security itself. The lock only took effect once the installer had finished checking for
+  the file, so a click in the moment before could still start the simple path and write over, for
+  example, a setup running behind a reverse proxy. The simple path now waits for that check and
+  continues in the advanced setup, where each of these values is visible, and its save step refuses
+  to write over an existing file.
+
 - **The web installer shows an existing configuration as a warning, not as a hint.** When the
-  installer finds an `.env`, both setup paths say that the current file will be backed up before
-  saving - a setup that works is about to be replaced. That line was tinted like a plain hint; it
-  now carries the same amber warning style and icon as the backup reminder.
+  installer finds an `.env`, the setup says that the current file will be backed up before saving -
+  a setup that works is about to be replaced. That line was tinted like a plain hint; it now carries
+  the same amber warning style and icon as the installer's backup reminders.
 
 - **On the project page, the module list on phones folds away again, and the jump menu marks the
   right section after a language switch.** On a phone, "Show all modules" opened the full list and
