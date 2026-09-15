@@ -6,13 +6,33 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
+import { chmodSync, mkdtempSync, rmSync } from 'node:fs';
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 
 // Nested under a root we control, so one test can revoke write access on the
 // parent and exercise the "backup directory is not writable" path (issue #579).
-const TEST_BACKUP_ROOT = './test-backups';
+//
+// EIN EIGENER ORDNER JE PROZESS, NICHT `./test-backups` IM CHECKOUT. Bis
+// 2026-09-15 teilten sich zwei Laeufe im selben Checkout (zwei parallele
+// Runner, ein Runner neben `npm test`) diesen Ordner: der eine loeschte ihn
+// (Anfang, #579-Test, Aufraeumen) oder nahm ihm per chmod die Schreibrechte,
+// waehrend der andere darin rotierte. Zwei Kopien gleichzeitig: in fuenf
+// Runden neun von zehn Laeufen rot (ENOENT, falsche Dateizahl).
+//
+// Der Pfad bleibt trotzdem RELATIV zum Arbeitsverzeichnis. #579 prueft, dass
+// die Fehlermeldung den absoluten Pfad nennt statt des konfigurierten
+// relativen; mit einem absoluten BACKUP_DIR waere diese Zusicherung leer.
+const TEST_BACKUP_ABSOLUTE = mkdtempSync(path.join(os.tmpdir(), 'yuvomi-backup-scheduler-'));
+const TEST_BACKUP_ROOT = path.relative(process.cwd(), TEST_BACKUP_ABSOLUTE);
 const TEST_BACKUP_DIR = path.join(TEST_BACKUP_ROOT, 'store');
+
+// Auch wenn die Suite unterwegs abbricht - dann womoeglich mit entzogenen Schreibrechten.
+process.on('exit', () => {
+  try { chmodSync(TEST_BACKUP_ABSOLUTE, 0o700); } catch { /* schon weg */ }
+  rmSync(TEST_BACKUP_ABSOLUTE, { recursive: true, force: true });
+});
 
 // Mock environment variables
 process.env.BACKUP_ENABLED = 'false'; // Disable scheduler for tests
@@ -121,6 +141,8 @@ describe('Backup Scheduler', () => {
       t.skip('running as root bypasses directory permissions');
       return;
     }
+    assert.equal(path.isAbsolute(TEST_BACKUP_DIR), false,
+      'BACKUP_DIR must stay relative - with an absolute path the absolute-path assertion below checks nothing');
 
     await fs.rm(TEST_BACKUP_DIR, { recursive: true, force: true });
     await fs.chmod(TEST_BACKUP_ROOT, 0o500);
