@@ -767,9 +767,9 @@ async function openSendListDialog(container) {
 
   let members = [];
   try {
-    // Nicht `/family/members`: der zeigt alle Konten ausser Hauspersonal, also
-    // auch Geteilte-Ausgaben-Gaeste, die Externe sind. Dieser Endpunkt fragt
-    // dieselbe Funktion wie die Versandroute, damit die Auswahl niemanden
+    // Nicht `/family/members`: der zeigt dieselben Haushaltsmitglieder, prueft
+    // aber nicht, ob jemand genau EINE gueltige Adresse hat. Dieser Endpunkt
+    // fragt dieselbe Funktion wie die Versandroute, damit die Auswahl niemanden
     // anbietet, den der Server ablehnt - und umgekehrt.
     //
     // Sich selbst einzuschliessen ist Absicht: "schick mir die Liste aufs

@@ -130,7 +130,7 @@ async function cleanupCalendarUploads(uploads) {
   if (firstError) throw firstError;
 }
 
-function validateOccurrenceAssignments(database, value, stored = []) {
+function validateOccurrenceAssignments(database, value) {
   if (value === undefined) return { value: undefined, error: null };
   if (value === null) return { value: [], error: null };
   const ids = Array.isArray(value) ? value : [value];
@@ -147,10 +147,6 @@ function validateOccurrenceAssignments(database, value, stored = []) {
     if (Number(found) !== ids.length) {
       return { value: null, error: 'Eine zugewiesene Person existiert nicht mehr. Lade die Personenauswahl erneut.' };
     }
-    // Neu nur Haushaltsmitglieder (#1207). Wer schon an der Serie oder an
-    // diesem Vorkommen steht, bleibt gueltig.
-    const strangers = newNonMembers(ids, { stored, db: database });
-    if (strangers.length) return { value: null, error: nonMemberMessage(strangers) };
   }
   return { value: ids, error: null };
 }
@@ -162,6 +158,41 @@ function storedOccurrenceAssignees(database, seriesId, recurrenceId) {
     WHERE event_id = ?
        OR event_id IN (SELECT id FROM calendar_events WHERE recurrence_parent_id = ? AND recurrence_id = ?)
   `).all(seriesId, seriesId, recurrenceId).map((row) => row.user_id);
+}
+
+/** Wer am Termin steht, so wie es der Schreibvorgang gerade vorfindet. */
+function storedEventAssignees(database, eventId) {
+  return database.prepare('SELECT user_id FROM event_assignments WHERE event_id = ?')
+    .all(eventId).map((row) => row.user_id);
+}
+
+/**
+ * Eine Personenwahl, die erst unmittelbar vor dem Schreiben abgelehnt wird
+ * (#1207). Eigene Klasse, damit die Catch-Bloecke gestagte Uploads wegraeumen
+ * und dann mit ihrer Meldung 400 antworten.
+ */
+class NonMemberAssignmentError extends Error {}
+
+/**
+ * Neu nur Haushaltsmitglieder, gegen den gespeicherten Stand - gefragt dort,
+ * wo geschrieben wird, synchron nach dem letzten await des Handlers.
+ */
+function assertNoNewNonMembers(database, userIds, stored) {
+  if (userIds === undefined) return;
+  const strangers = newNonMembers(userIds, { stored, db: database });
+  if (strangers.length) throw new NonMemberAssignmentError(nonMemberMessage(strangers));
+}
+
+/** Eine abgelehnte Personenwahl: gestagte Uploads wegraeumen, dann 400 mit ihrer Meldung. */
+async function sendNonMemberAssignment(res, err, staged) {
+  if (staged.length > 0) {
+    try {
+      await cleanupCalendarUploads(staged);
+    } catch (cleanupError) {
+      return sendStorageError(res, cleanupError, 'Calendar attachment storage cleanup failed.');
+    }
+  }
+  return res.status(400).json({ error: err.message, code: 400 });
 }
 
 function isPossibleCalendarDateTime(value) {
@@ -184,7 +215,7 @@ function isPossibleCalendarDateTime(value) {
     && (offsetMinute === undefined || Number(offsetMinute) <= 59);
 }
 
-function validateOccurrenceMutationBody(database, body, { following = false, storedAssignees = [] } = {}) {
+function validateOccurrenceMutationBody(database, body, { following = false } = {}) {
   const values = {};
   const errors = [];
   const validateString = (field, label, options = {}) => {
@@ -257,7 +288,7 @@ function validateOccurrenceMutationBody(database, body, { following = false, sto
       errors.push('Sichtbarkeit: Wähle alle Personen, zugewiesene Personen oder privat (all, assignees, private).');
     } else values.visibility = body.visibility;
   }
-  const assignments = validateOccurrenceAssignments(database, body.assigned_to, storedAssignees);
+  const assignments = validateOccurrenceAssignments(database, body.assigned_to);
   if (assignments.error) errors.push(assignments.error);
 
   return { values, assignments: assignments.value, errors };
@@ -609,13 +640,6 @@ router.put('/:id', async (req, res) => {
     if (vOutlook) checks.push(vOutlook);
     const errors = collectErrors(checks);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-    // Neu nur Haushaltsmitglieder (#1207); wer schon teilnimmt, bleibt gueltig.
-    // Vor dem ersten await (Beleg-Upload) und vor jedem Schreiben geprueft.
-    if (req.body.assigned_to !== undefined) {
-      const stored = db.get().prepare('SELECT user_id FROM event_assignments WHERE event_id = ?').all(id).map((r) => r.user_id);
-      const strangers = newNonMembers(parseAssignedTo(req.body.assigned_to), { stored });
-      if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
-    }
     if (event.recurrence_rule && req.body.confirmed_orphan_count !== undefined
         && (!Number.isInteger(req.body.confirmed_orphan_count)
           || req.body.confirmed_orphan_count < 0)) {
@@ -774,6 +798,8 @@ router.put('/:id', async (req, res) => {
     const outlookCalendarId = vOutlook ? vOutlook.value.calendarId : event.target_outlook_calendar_id;
 
     const applyUpdate = () => {
+      // Neu nur Haushaltsmitglieder (#1207), gegen den Stand, den dieses Schreiben vorfindet.
+      if (assignedTouched) assertNoNewNonMembers(db.get(), userIds, storedEventAssignees(db.get(), id));
       const documentId = replacementRequested
         ? createAttachmentDocument(
             db.get(),
@@ -923,7 +949,9 @@ router.put('/:id', async (req, res) => {
         db.get(),
         event.created_by,
         stagedClones,
-        (cloneOptions) => updateSeriesWithOverrides(db.get(), {
+        (cloneOptions) => {
+          if (assignedTouched) assertNoNewNonMembers(db.get(), userIds, storedEventAssignees(db.get(), id));
+          return updateSeriesWithOverrides(db.get(), {
           seriesId: id,
           actorId: getUserId(req),
           isAdmin: isAdminUser(req),
@@ -933,7 +961,8 @@ router.put('/:id', async (req, res) => {
           applyUpdate,
           authorizeActor: false,
           ...cloneOptions,
-        }),
+        });
+        },
       );
     } else {
       db.get().transaction(applyUpdate)();
@@ -991,6 +1020,7 @@ router.put('/:id', async (req, res) => {
     if (err instanceof CalendarOccurrenceError && staged.length === 0) {
       return sendCalendarOccurrenceError(res, err);
     }
+    if (err instanceof NonMemberAssignmentError) return sendNonMemberAssignment(res, err, staged);
     if (err instanceof StorageError && staged.length === 0) {
       log.error('PUT /:id storage error:', err);
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
@@ -1043,9 +1073,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
     }
     baseOccurrenceFor(master, req.params.recurrenceId);
 
-    const mutation = validateOccurrenceMutationBody(db.get(), req.body, {
-      storedAssignees: storedOccurrenceAssignees(db.get(), seriesId, req.params.recurrenceId),
-    });
+    const mutation = validateOccurrenceMutationBody(db.get(), req.body);
     const { values: validated, errors } = mutation;
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -1102,6 +1130,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
     }
     if (vIcon !== undefined) changes.icon = vIcon;
 
+    assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), seriesId, req.params.recurrenceId));
     const result = upsertOccurrenceOverride(db.get(), {
       seriesId,
       recurrenceId: req.params.recurrenceId,
@@ -1146,6 +1175,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
       log.error('PUT occurrence storage error:', err);
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
     }
+    if (err instanceof NonMemberAssignmentError) return sendNonMemberAssignment(res, err, [stagedUpload].filter(Boolean));
     log.error('PUT occurrence failed:', err);
     if (stagedUpload) {
       try {
@@ -1188,10 +1218,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
     }
     const selectedBase = baseOccurrenceFor(master, req.params.recurrenceId);
 
-    const mutation = validateOccurrenceMutationBody(db.get(), req.body, {
-      following: true,
-      storedAssignees: storedOccurrenceAssignees(db.get(), seriesId, req.params.recurrenceId),
-    });
+    const mutation = validateOccurrenceMutationBody(db.get(), req.body, { following: true });
     const { values: validated } = mutation;
     const caldavProvided = req.body.target_caldav_account_id !== undefined
       || req.body.target_caldav_calendar_url !== undefined;
@@ -1314,7 +1341,10 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
       db.get(),
       master.created_by,
       stagedClones,
-      (cloneOptions) => splitSeries(db.get(), { ...commonOptions, ...cloneOptions }),
+      (cloneOptions) => {
+        assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), seriesId, req.params.recurrenceId));
+        return splitSeries(db.get(), { ...commonOptions, ...cloneOptions });
+      },
     );
     stagedUpload = null;
     res.status(result.wholeSeries ? 200 : 201).json({
@@ -1332,6 +1362,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
     if (err instanceof StorageError && staged.length === 0) {
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
     }
+    if (err instanceof NonMemberAssignmentError) return sendNonMemberAssignment(res, err, staged);
     log.error('PUT occurrence following failed:', err);
     if (staged.length > 0) {
       try {
