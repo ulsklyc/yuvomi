@@ -1,10 +1,10 @@
 /**
  * Test: BIND_ADDRESS - worauf der Server lauscht
- * Zweck: Die Auslegung (leer = alle Interfaces, Wildcards -> passender Loopback
- *        fuer den Selbstaufruf, IPv6 in Klammern, Zonen-ID abgelehnt) UND der
- *        echte Aufruf: server/index.js bindet ueber test/server-ready.js an
- *        127.0.0.1. Ein Unit-Test allein saehe nicht, ob index.js die Funktion
- *        ueberhaupt fragt.
+ * Zweck: Die Auslegung (leer = alle Interfaces, nur IP-Literale, Zonen-ID
+ *        abgelehnt, Wildcards -> passender Loopback fuer den Selbstaufruf, IPv6
+ *        in Klammern) UND der echte Aufruf: server/index.js bindet ueber
+ *        test/server-ready.js an 127.0.0.1. Ein Unit-Test allein saehe nicht, ob
+ *        index.js die Funktion ueberhaupt fragt.
  * Ausfuehren: node --experimental-sqlite --test test/test-bind-address.js
  */
 import { test } from 'node:test';
@@ -18,6 +18,15 @@ test('leer, Leerraum oder nicht gesetzt heisst: alle Interfaces', () => {
   assert.equal(readBindAddress(''), undefined);
   assert.equal(readBindAddress('   '), undefined);
   assert.equal(readBindAddress(' 127.0.0.1 '), '127.0.0.1');
+});
+
+test('nur IP-Literale - ein Hostname wuerde beim Selbstaufruf neu aufgeloest', () => {
+  for (const ip of ['127.0.0.1', '0.0.0.0', '::', '::1', '192.168.1.5', 'fd00::5']) {
+    assert.equal(readBindAddress(ip), ip);
+  }
+  for (const name of ['localhost', 'yuvomi.local', '[::1]']) {
+    assert.throws(() => readBindAddress(name), /not a host name/, name);
+  }
 });
 
 test('eine IPv6-Adresse mit Zonen-ID wird beim Start abgelehnt, nicht erst beim MCP-Aufruf', () => {
