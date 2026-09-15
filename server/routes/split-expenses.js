@@ -461,6 +461,11 @@ router.post('/groups', (req, res) => {
     // ist hier noch nicht sinnvoll (das Frontend bietet den Editor erst im
     // Bearbeiten-Dialog). Nur die Methode wird direkt übernommen.
     const defaultMethod = SPLIT_METHODS.includes(req.body.default_split_method) ? req.body.default_split_method : 'equal';
+    // Wer anlegt, wird Owner der Gruppe - dieselbe Regel wie beim Hinzufuegen
+    // (#1207): ein angemeldetes Konto, das weder Haushaltsmitglied noch Gast
+    // ist, bekommt keine neue Mitgliedschaft.
+    const staff = newNonMembers([userId(req)], { guestsAllowed: true });
+    if (staff.length) return res.status(400).json({ error: staffMessage(staff), code: 400 });
     const result = db.transaction(() => {
       const created = db.get().prepare(`
         INSERT INTO expense_groups (name, description, type, default_currency, default_split_method, created_by)

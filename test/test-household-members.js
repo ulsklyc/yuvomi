@@ -729,3 +729,21 @@ test('documents: a stored grant stays saveable, a removed one cannot come back',
   assertRejectsNonMember(await save([BEN, DORA]), 'guest shared anew');
   assert.deepEqual(access(), [BEN], 'a rejected save changes nothing');
 });
+
+// --------------------------------------------------------------------------
+// Geteilte Ausgaben: wer eine Gruppe anlegt, wird ihr Owner
+// --------------------------------------------------------------------------
+
+test('split expenses: creating a group follows the same rule as adding a member', async () => {
+  // Ein angemeldetes Konto, das weder Mitglied noch Gast ist, wuerde beim
+  // Anlegen als Owner eingetragen - genau die Mitgliedschaft, die
+  // POST /groups/:id/members ablehnt.
+  const groups = () => db.prepare('SELECT COUNT(*) AS n FROM expense_groups').get().n;
+  const before = groups();
+  assertRejectsNonMember(await call('POST', '/split-expenses/groups', { as: CLARA, body: { name: 'Putzkasse' } }), 'staff creating a group');
+  assert.equal(groups(), before, 'a refused request creates no group');
+
+  const ok = await call('POST', '/split-expenses/groups', { as: ANNA, body: { name: 'Haushaltskasse' } });
+  assert.equal(ok.status, 201, JSON.stringify(ok.body));
+  assert.equal(groups(), before + 1);
+});
