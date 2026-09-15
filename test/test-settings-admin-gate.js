@@ -267,34 +267,100 @@ test('kein adminOnly-Blatt schreibt eine per-Nutzer-Preference', () => {
 // halten die Verhaltenstests der Routen, etwa test-email.js,
 // test-rewards-routes.js, test-screensaver.js und test-notifications.js.
 //
-// Die Karte zaehlt exakt, nicht hoechstens: faellt eine Stelle weg, muss ihr
-// Eintrag mitfallen, sonst waechst hier still ein Freibrief.
+// Gelesen wird der ganze Quelltext ohne Kommentare, nicht Zeile fuer Zeile:
+// zeilenweise sah der Guard `req.authRole` und `=== 'admin'` auf zwei Zeilen
+// nicht. Zwischen den Tokens darf deshalb Leerraum samt Umbruch stehen, und
+// `req?.authRole`, `req['authRole']` und `'admin' === req.authRole` meinen
+// dasselbe. Die Zeile fuer die Meldung wird aus dem Offset zurueckgerechnet.
+//
+// Die Karte fuehrt je Datei die erlaubten VORKOMMEN, nicht ihre Anzahl: eine
+// Zahl bleibt gleich, wenn eine gelistete Stelle geht und eine neue kommt, und
+// der Tausch waere gruen. Ein Vorkommen ist `<Ausdruck> @ <Anweisung>` - der
+// Treffer und die Anweisung um ihn herum, begrenzt durch `;`, `{` oder `}`,
+// beide ohne Leerraum ausser zwischen zwei Wortzeichen. Die Anweisung statt der
+// Zeile, weil sie Einruecken, Umbrechen und Kommentare aushaelt; der Ausdruck
+// dazu, weil eine Anweisung mehrere Treffer tragen kann. Zwei Stellen, die das
+// Praedikat in verschiedene Bedingungen setzen, sind so verschiedene Schluessel.
+// Zeilennummern stehen bewusst nicht darin, sie wandern bei jedem Edit.
+// Verglichen wird auf Gleichheit der Multimengen: faellt eine Stelle weg, muss
+// ihr Eintrag mitfallen, sonst waechst hier still ein Freibrief.
+//
+// GRENZE: wer eine gelistete Anweisung woertlich an eine andere Stelle
+// derselben Datei verschiebt, bleibt gruen. Umgekehrt meldet jede Aenderung an
+// einer gelisteten Anweisung sie als neu und den alten Eintrag als verschwunden.
 
-const ADMIN_PREDICATE_PATTERNS = [
-  /authRole\s*[!=]==\s*['"]admin['"]/g,
-  /['"]admin['"]\s*[!=]==\s*(req\.)?authRole/g,
-  /session\??\.role\s*[!=]==\s*['"]admin/g,
-  /session\??\.isAdmin/g,
-];
+/** `.name`, `?.name`, `['name']` und `?.['name']`, mit Leerraum dazwischen. */
+const zugriff = (name) => String.raw`\s*(?:\??\.\s*${name}\b|(?:\?\.)?\s*\[\s*['"\x60]${name}['"\x60]\s*\])`;
+const EQ = String.raw`\s*[!=]==?\s*`;
+const ADMIN = String.raw`['"\x60]admin['"\x60]`;
+const AUTH_ROLE = String.raw`(?:\[\s*['"\x60]authRole['"\x60]\s*\]|\bauthRole\b)`;
+const OBJEKT = String.raw`(?:[\w$]+\s*(?:\?\.)?\s*\.?\s*)?`;
+const SESSION_ROLE = String.raw`\bsession${zugriff('role')}`;
 
-/** Datei -> exakte Trefferzahl, mit Grund. */
+const ADMIN_PREDICATE = new RegExp([
+  AUTH_ROLE + EQ + ADMIN,
+  ADMIN + EQ + OBJEKT + AUTH_ROLE,
+  SESSION_ROLE + EQ + ADMIN,
+  ADMIN + EQ + OBJEKT + SESSION_ROLE,
+  String.raw`\bsession${zugriff('isAdmin')}`,
+].join('|'), 'g');
+
+/** Leerraum weg, ausser zwischen zwei Wortzeichen (`return req` bleibt lesbar). */
+const kompakt = (s) => s.replace(/\s+/g, ' ').trim().replace(/ (?![\w$])|(?<![\w$]) /g, '');
+
+/** Jedes Admin-Praedikat einer Quelle mit Zeile, Ausdruck und Kartenschluessel. */
+function adminPredicates(source) {
+  const src = withoutCommentsKeepingLines(source);
+  return [...src.matchAll(ADMIN_PREDICATE)].map((m) => {
+    let von = m.index;
+    while (von > 0 && !';{}'.includes(src[von - 1])) von--;
+    let bis = m.index + m[0].length;
+    while (bis < src.length && !';{}'.includes(src[bis])) bis++;
+    const expr = kompakt(m[0]);
+    return {
+      line: src.slice(0, m.index).split('\n').length,
+      expr,
+      key: `${expr} @ ${kompakt(src.slice(von, bis))}`,
+    };
+  });
+}
+
+const FALLBACK = "return req.authRole==='admin'||req.session?.role==='admin'";
+
+/** Datei -> erlaubte Vorkommen als `<Ausdruck> @ <Anweisung>`, mit Grund. */
 const ADMIN_PREDICATE_EXCEPTIONS = new Map([
   // Die Definition des Helfers selbst.
-  ['server/middleware/require-admin.js', 1],
+  ['server/middleware/require-admin.js', [
+    "authRole==='admin' @ return req.authRole==='admin'",
+  ]],
   // test-sso-only.js haelt die woertliche Schreibweise per Regex.
-  ['server/auth.js', 2],
+  ['server/auth.js', [
+    "authRole==='admin' @ if(req.authRole==='admin')return",
+    "authRole==='admin' @ const isAdmin=req.authRole==='admin'",
+  ]],
   // Ausserhalb dieses Schnitts geblieben; zieht beim naechsten Anfassen nach.
-  ['server/routes/dashboard.js', 1],
+  ['server/routes/dashboard.js', [
+    "authRole==='admin' @ result.quicklinks=listQuickLinksFor(userId,req.authRole==='admin')",
+  ]],
   // Fassungen mit Fallback auf die Session-Rolle: das Einsammeln aendert, was
   // Token plus Admin-Cookie duerfen, und ist ein eigener Schritt.
-  ['server/routes/calendar/helpers.js', 3],
-  ['server/routes/dms.js', 2],
-  ['server/routes/documents.js', 2],
-  ['server/routes/notes.js', 2],
-  ['server/routes/recipe-providers.js', 2],
-  ['server/routes/schedule.js', 2],
-  ['server/routes/split-expenses.js', 2],
-  ['server/routes/tasks.js', 2],
+  ['server/routes/calendar/helpers.js', [
+    "authRole==='admin' @ return req.authRole==='admin'||req.session?.isAdmin===true||req.session?.role==='admin'",
+    "session?.isAdmin @ return req.authRole==='admin'||req.session?.isAdmin===true||req.session?.role==='admin'",
+    "session?.role==='admin' @ return req.authRole==='admin'||req.session?.isAdmin===true||req.session?.role==='admin'",
+  ]],
+  ...['dms', 'documents', 'recipe-providers', 'split-expenses', 'tasks'].map((name) => [
+    `server/routes/${name}.js`,
+    [`authRole==='admin' @ ${FALLBACK}`, `session?.role==='admin' @ ${FALLBACK}`],
+  ]),
+  ['server/routes/notes.js', [
+    "authRole==='admin' @ if(req.authRole==='admin'||req.session?.role==='admin')return true",
+    "session?.role==='admin' @ if(req.authRole==='admin'||req.session?.role==='admin')return true",
+  ]],
+  ['server/routes/schedule.js', [
+    "authRole==='admin' @ export const isAdmin=(req)=>req.authRole==='admin'||req.session?.role==='admin'",
+    "session?.role==='admin' @ export const isAdmin=(req)=>req.authRole==='admin'||req.session?.role==='admin'",
+  ]],
 ]);
 
 function serverJsFiles(dir = join(ROOT, 'server')) {
@@ -311,32 +377,35 @@ test('das Admin-Praedikat steht nur in isAdminRequest() und den gezaehlten Ausna
   const files = serverJsFiles();
   assert.ok(files.length >= 200, `nur ${files.length} Dateien unter server/ gefunden - der Walk greift nicht mehr`);
 
-  const hits = new Map();
+  // Die Schreibweisen, fuer die der zeilenweise Guard blind war.
+  const gefunden = (src) => adminPredicates(src).map((p) => p.line);
+  assert.deepEqual(gefunden("a();\nconst x = req.authRole\n  === 'admin';"), [2], 'umbrochener Vergleich');
+  assert.deepEqual(gefunden("const x = 'admin' ===\n  req\n  ?.authRole;"), [1], 'umgekehrt und umbrochen');
+  assert.deepEqual(gefunden("const x = req['authRole'] !== 'admin';"), [1], 'Klammerzugriff');
+  assert.deepEqual(gefunden("const x = req.session\n  ?.role == 'admin';"), [1], 'Session-Rolle umbrochen');
+  assert.deepEqual(gefunden("req.authRole = 'admin'; // req.authRole === 'admin'"), [], 'Zuweisung und Kommentar');
+
+  const found = new Map();
   for (const file of files) {
     const rel = relative(ROOT, file).split('\\').join('/');
-    const lines = withoutCommentsKeepingLines(readFileSync(file, 'utf8')).split('\n');
-    lines.forEach((line, i) => {
-      for (const pattern of ADMIN_PREDICATE_PATTERNS) {
-        for (const m of line.matchAll(pattern)) {
-          if (!hits.has(rel)) hits.set(rel, []);
-          hits.get(rel).push(`${rel}:${i + 1}: ${m[0]}`);
-        }
-      }
-    });
+    const predicates = adminPredicates(readFileSync(file, 'utf8'));
+    if (predicates.length) found.set(rel, predicates);
   }
 
   const problems = [];
-  for (const [rel, found] of hits) {
-    const expected = ADMIN_PREDICATE_EXCEPTIONS.get(rel) ?? 0;
-    if (found.length !== expected) {
-      problems.push(`${rel}: ${found.length} Treffer, Karte erwartet ${expected}\n    ${found.join('\n    ')}`);
+  for (const rel of new Set([...found.keys(), ...ADMIN_PREDICATE_EXCEPTIONS.keys()])) {
+    const offen = [...(ADMIN_PREDICATE_EXCEPTIONS.get(rel) ?? [])];
+    for (const p of found.get(rel) ?? []) {
+      const k = offen.indexOf(p.key);
+      if (k !== -1) { offen.splice(k, 1); continue; }
+      problems.push(`neues Vorkommen ${rel}:${p.line} ${p.expr} - isAdminRequest() benutzen\n    Kartenschluessel: ${JSON.stringify(p.key)}`);
     }
-  }
-  for (const [rel, expected] of ADMIN_PREDICATE_EXCEPTIONS) {
-    if (!hits.has(rel)) problems.push(`${rel}: 0 Treffer, Karte erwartet ${expected} - Eintrag streichen`);
+    for (const key of offen) {
+      problems.push(`gelistetes Vorkommen nicht mehr gefunden - Karte streichen\n    ${rel}: ${JSON.stringify(key)}`);
+    }
   }
 
   assert.deepEqual(problems, [],
     'Das Admin-Praedikat gehoert in isAdminRequest(req) aus server/middleware/require-admin.js; '
-    + 'die Ausnahmekarte zaehlt exakt und muss beim Einsammeln mitfallen:\n  ' + problems.join('\n  '));
+    + 'die Ausnahmekarte listet jedes Vorkommen und muss beim Einsammeln mitfallen:\n  ' + problems.join('\n  '));
 });

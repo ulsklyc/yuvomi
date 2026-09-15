@@ -17457,6 +17457,36 @@ test('withoutCommentsKeepingLines liest Kommentare und Strings in einem Durchgan
   assert.equal(regex[3].trimEnd(), 'const h = a / b;', 'eine Division ist kein Regex-Literal');
 });
 
+/* EIN `${` BEGINNT EINEN AUSDRUCK (Review zu #1232, Runde 2).
+ *
+ * Der Scanner merkte sich das Template-Literal als fertigen Wert, auch wenn er
+ * nur bis zum `${` gelesen hatte. Ein `/` direkt dahinter galt deshalb als
+ * Division, das `/*` in `/[/*]/` als Blockanfang, und alles bis zum naechsten
+ * Blockende weiter unten fiel weg - der Code dazwischen eingeschlossen.
+ * Dieselbe Klasse an den Nachbarstellen: `}${` springt direkt in die naechste
+ * Ersetzung, ein Template in einer Ersetzung oeffnet selbst eine. Nach dem
+ * schliessenden Backtick bleibt es dagegen ein Wert, der `/` dort teilt.
+ */
+test('withoutCommentsKeepingLines liest nach `${` einen Ausdruck', () => {
+  const zeilen = (src) => withoutCommentsKeepingLines(src).split('\n');
+  const gate = "const a = req.authRole === 'admin';";
+
+  for (const [name, template] of [
+    ['direkt nach dem Backtick', 'const t = `${/[/*]/.test(value)}`;'],
+    ['nach einer vorigen Ersetzung', 'const t = `x${a}${/[/*]/.test(value)}`;'],
+    ['im Template einer Ersetzung', 'const t = `${`${/[/*]/.source}`}`;'],
+  ]) {
+    const z = zeilen([template, gate, '/* spaeter */', 'renderAll();'].join('\n'));
+    assert.equal(z[0], template, `${name}: das Regex-Literal bleibt heil`);
+    assert.equal(z[1], gate, `${name}: der Code darunter darf nicht verschwinden`);
+    assert.equal(z[2].trim(), '', `${name}: der echte Blockkommentar faellt`);
+    assert.equal(z[3], 'renderAll();');
+  }
+
+  assert.equal(withoutCommentsKeepingLines('const n = `${a}` / 2 + "/" + b; // weg').trimEnd(),
+    'const n = `${a}` / 2 + "/" + b;', 'nach dem schliessenden Backtick teilt der `/`');
+});
+
 /* EIN IMPORT OHNE AUFRUF IST TOTER CODE.
  *
  * Beim Entfernen der toten Aufrufe blieb in birthdays.js der Import stehen

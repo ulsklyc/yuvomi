@@ -94,12 +94,16 @@ export function withoutBlockComments(src) {
  *
  * GRENZE: ob ein `/` ein Regex-Literal oeffnet oder teilt, entscheidet das
  * Zeichen davor. Nach einem Bezeichner (ausser Schluesselwoertern wie `return`
- * oder `typeof`), einer Zahl, `)`, `]` oder `}` gilt es als Division, ebenso ein
- * Kandidat ohne schliessendes `/` in derselben Zeile. Ein Regex-Literal an so
- * einer Stelle (`if (x) /[/*]/.test(s)`) liest der Scanner als Code: escapte
- * Zeichen bleiben dort heil, ein unescaptes `/*`, `//` oder Anfuehrungszeichen
- * in einer Zeichenklasse oeffnet dagegen Kommentar oder String. Ein einfacher
- * oder doppelter String endet spaetestens am Zeilenende.
+ * oder `typeof`), einer Zahl, `)`, `]`, `}` oder einem fertigen String- oder
+ * Template-Literal gilt es als Division, ebenso ein Kandidat ohne schliessendes
+ * `/` in derselben Zeile. Hinter `${` (auch direkt nach `}${` und in einem
+ * Template innerhalb einer Ersetzung) beginnt dagegen ein Ausdruck, dort oeffnet
+ * es ein Regex-Literal. Ein Regex-Literal an einer Divisionsstelle
+ * (`if (x) /[/*]/.test(s)`) liest der Scanner als Code: escapte Zeichen bleiben
+ * dort heil, ein unescaptes `/*`, `//` oder Anfuehrungszeichen in einer
+ * Zeichenklasse oeffnet dagegen Kommentar oder String. Umgekehrt gilt ein `/`
+ * nach `++` oder `--` als Regex-Anfang, wenn die Zeile noch einen `/` hat. Ein
+ * einfacher oder doppelter String endet spaetestens am Zeilenende.
  * @param {string} src
  * @returns {string}
  */
@@ -147,6 +151,13 @@ export function withoutCommentsKeepingLines(src) {
     zuletzt = ')';
     wort = '';
   };
+  // Template-Text lesen. Endet er am Backtick, ist das Literal ein fertiger Wert;
+  // endet er an `${`, beginnt dahinter ein Ausdruck, und ein `/` oeffnet ein Regex.
+  const imTemplate = (j) => {
+    const offen = ersetzungen.length;
+    alsWert(templateBis(j));
+    if (ersetzungen.length > offen) zuletzt = '';
+  };
 
   while (i < n) {
     const c = src[i];
@@ -165,10 +176,10 @@ export function withoutCommentsKeepingLines(src) {
       while (j < n && src[j] !== c && src[j] !== '\n') j += src[j] === '\\' ? 2 : 1;
       alsWert(src[j] === c ? j + 1 : j);
     } else if (c === '`') {
-      alsWert(templateBis(i + 1));
+      imTemplate(i + 1);
     } else if (c === '}' && ersetzungen.length && ersetzungen.at(-1) === 0) {
       ersetzungen.pop();
-      alsWert(templateBis(i + 1));
+      imTemplate(i + 1);
     } else if (c === '/' && regexErlaubt(zuletzt, wort) && regexBis(i) !== -1) {
       alsWert(regexBis(i));
     } else {
