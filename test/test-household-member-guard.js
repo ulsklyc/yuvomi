@@ -42,7 +42,8 @@
  *        Zeichenketten und Kommentare in einem Durchgang (ein `'--'` ist Text,
  *        ein Apostroph in einem `--`-Kommentar auch, und ein fuehrender
  *        Kommentar versteckt kein SELECT), Klammern nur um das Praedikat zaehlen
- *        nicht, und jeder Arm einer UNION-, INTERSECT- oder EXCEPT-Abfrage, der
+ *        nicht (die eines Funktionsaufrufs wie `likely(pred)` schon: das NOT
+ *        davor muss sichtbar bleiben), und jeder Arm einer UNION-, INTERSECT- oder EXCEPT-Abfrage, der
  *        FROM users liest, muss fuer sich gefiltert sein.
  *
  *        VERSCHATTUNG: bindet die Datei den Namen des Praedikats oder einer
@@ -415,7 +416,6 @@ function sqlText(exprTokens, ctx, seen = new Set()) {
   return text;
 }
 
-/** Woerter der SQL mit ihrer Klammertiefe; Kommentare und SQL-Zeichenketten sind vorher weg. */
 /**
  * SQL ohne Kommentare und mit maskierten Zeichenketten - in EINEM Durchgang.
  *
@@ -425,8 +425,13 @@ function sqlText(exprTokens, ctx, seen = new Set()) {
  * nie endet. Der Scanner nimmt, was zuerst kommt.
  *
  * Danach fallen Klammern weg, die NUR das Praedikat umschliessen: `(pred)` und
- * `((pred))` filtern genau wie `pred`. Ein NOT davor bleibt stehen.
+ * `((pred))` filtern genau wie `pred`. Ein NOT davor bleibt stehen. Die
+ * Klammern eines Funktionsaufrufs bleiben: aus `NOT likely(pred)` wuerde sonst
+ * `NOT likely pred`, und das NOT stuende nicht mehr direkt vor dem Praedikat.
+ * Vor der Klammer darf deshalb nur ein Schluesselwort oder kein Wort stehen.
  */
+const PAREN_KEYWORDS = new Set(['where', 'and', 'or', 'not', 'on']);
+
 function cleanSql(sql) {
   let out = '';
   let i = 0;
@@ -460,7 +465,10 @@ function cleanSql(sql) {
   let previous;
   do {
     previous = out;
-    out = out.replace(/\(\s*(__member_\w+__)\s*\)/g, ' $1 ');
+    out = out.replace(/\(\s*(__member_\w+__)\s*\)/g, (match, name, offset, whole) => {
+      const word = /([A-Za-z_]\w*)\s*$/.exec(whole.slice(0, offset));
+      return word && !PAREN_KEYWORDS.has(word[1].toLowerCase()) ? match : ` ${name} `;
+    });
   } while (out !== previous);
   return out;
 }
@@ -828,6 +836,12 @@ const READING_CASES = [
     "SELECT u.id FROM users u WHERE u.role = 'member' AND ((${householdMemberSql('u')}))"],
   ['NOT in front of the parentheses still negates the predicate', false,
     "SELECT u.id FROM users u WHERE NOT (${householdMemberSql('u')})"],
+  // Diese zwei waren auf 0f0beac5 richtig rot und auf 2880ac2d falsch gruen:
+  // das Aufloesen der Klammern nahm die eines Funktionsaufrufs mit.
+  ['NOT in front of a function call around the predicate still negates it', false,
+    "SELECT u.id FROM users u WHERE NOT likely(${householdMemberSql('u')})"],
+  ['AND NOT in front of a function call around the predicate still negates it', false,
+    "SELECT u.id FROM users u WHERE u.role = 'member' AND NOT unlikely(${householdMemberSql('u')})"],
   ['an unfiltered UNION ALL arm behind a filtered WHERE still lists everyone', false,
     "SELECT u.id FROM users u WHERE ${householdMemberSql('u')} UNION ALL SELECT id FROM users"],
   ['an unfiltered EXCEPT arm is a list of its own too', false,
