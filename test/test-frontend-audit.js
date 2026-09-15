@@ -7408,27 +7408,6 @@ test('jede Regel, die Farbe UND Untergrund setzt, haelt ihr eigenes Paar', () =>
 });
 
 /* ────────────────────────────────────────────────────────────────────────────
- * Das Etikett einer Listenzeile haelt 4.5:1 auch in jedem Zustand, der es
- * zuruecknimmt - gerechnet mit der Deckung, nicht nur mit der Farbe
- *
- * Der Guard darueber sieht `opacity` nicht: `.shopping-item--checked
- * .list-row__tag` setzte nur `opacity: 0.6` und keine Farbe, baute also kein
- * Paar und fiel durch jede Regel. Gerendert stand das Etikett eines
- * abgehakten Postens bei 2,58:1 (light) und 3,71:1 (dark) auf seiner eigenen
- * Pille (Kontrastmessung nach dem HIG-Redesign, 2026-09-15). Abgehakt ist ein
- * Zustand, kein deaktiviertes Bedienelement - die Zeile laesst sich wieder
- * aufmachen, die WCAG-Ausnahme fuer Deaktiviertes greift nicht. Dieselbe Zeile
- * hat die Frage fuer `.item-meta` schon beantwortet: zurueckgenommen ueber
- * --color-text-tertiary, nicht ueber Deckung.
- *
- * Gerechnet wird der Untergrund der Basisregel (die Pille), die Farbe der
- * Zustandsregel oder ersatzweise der Basis und die Deckung der Zustandsregel.
- * Die Deckung der ganzen Zeile (`.shopping-item--checked { opacity }`) ist
- * NICHT mitgerechnet: sie greift nur unter prefers-reduced-motion, weil
- * `stagger()` sonst ein Inline-`opacity: 1` hinterlaesst - das ist eine offene
- * Designfrage, keine Zusage dieses Guards.
- * ──────────────────────────────────────────────────────────────────────────── */
-/* ────────────────────────────────────────────────────────────────────────────
  * Die Kante eines Eingabefelds haelt 3:1 (WCAG 1.4.11) - mit einem eigenen
  * Token, nicht mit der Kartenkante
  *
@@ -7493,6 +7472,27 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
     + '--color-border-control (3:1, WCAG 1.4.11); --color-border bleibt Trennlinien und Kartenkanten.');
 });
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * Das Etikett einer Listenzeile haelt 4.5:1 auch in jedem Zustand, der es
+ * zuruecknimmt - gerechnet mit der Deckung, nicht nur mit der Farbe
+ *
+ * Der Farbpaar-Guard sieht `opacity` nicht: `.shopping-item--checked
+ * .list-row__tag` setzte nur `opacity: 0.6` und keine Farbe, baute also kein
+ * Paar und fiel durch jede Regel. Gerendert stand das Etikett eines
+ * abgehakten Postens bei 2,58:1 (light) und 3,71:1 (dark) auf seiner eigenen
+ * Pille (Kontrastmessung nach dem HIG-Redesign, 2026-09-15). Abgehakt ist ein
+ * Zustand, kein deaktiviertes Bedienelement - die Zeile laesst sich wieder
+ * aufmachen, die WCAG-Ausnahme fuer Deaktiviertes greift nicht. Dieselbe Zeile
+ * hat die Frage fuer `.item-meta` schon beantwortet: zurueckgenommen ueber
+ * --color-text-tertiary, nicht ueber Deckung.
+ *
+ * Gerechnet wird der Untergrund der Basisregel (die Pille), die Farbe der
+ * Zustandsregel oder ersatzweise der Basis und die Deckung der Zustandsregel.
+ * Die Deckung der ganzen Zeile gehoert nicht hierher: `.shopping-item--checked`
+ * dimmt seit #1230 gar nicht mehr ueber opacity (entschieden, Ulas
+ * 2026-09-15), und das halten "die abgehakte Einkaufszeile nimmt sich ueber
+ * Textfarben zurueck" und "zurueckgenommene Karten und Zeilen" weiter unten.
+ * ──────────────────────────────────────────────────────────────────────────── */
 test('das Etikett einer Listenzeile haelt 4.5:1 in jedem Zustand, der es zuruecknimmt', () => {
   const { light, dark } = themeTokenMaps();
   const resolveHex = (value, map) => {
@@ -7609,15 +7609,47 @@ test('die abgehakte Einkaufszeile nimmt sich ueber Textfarben zurueck, nicht ueb
  * --color-text-receded (tokens.css), Badges und Initialen voll. Die erwartete
  * Buchung behaelt ihre Einnahme-/Ausgabefarbe; das Badge markiert die Zeile.
  *
- * WELCHE REGEL EIN ZUSTAND IST, SAGT DER SELEKTOR, nicht eine Liste: ein
- * Zustandsmodifikator (`--done`, `--archived`, `--inactive`, `--paused`, ...)
- * oder `.is-inactive` irgendwo im Selektor. Ausgenommen ist nur, was der
- * Standard ausnimmt: echte deaktivierte Bedienelemente (`:disabled`) und die
- * Drag-Geister von SortableJS, die kein Zustand eines Datensatzes sind.
+ * WELCHE REGEL EIN ZUSTAND IST, ENTSCHEIDET EINE WORTLISTE - und das steht
+ * hier so, weil es so ist. Ein Selektor verraet nicht, ob `--out` "leer" oder
+ * "ausgeblendet" heisst; gezaehlt wird jede Regel mit einem dieser
+ * Zustandswoerter als Modifikator (`--done`, `--archived`, ...) oder als
+ * `.is-inactive` IRGENDWO im Selektor, auf jeder Klasse - nicht eine Liste von
+ * Karten. Ein NEUES Zustandswort muss hier eingetragen werden, sonst sieht der
+ * Guard es nicht.
+ *
+ * BEWUSST NICHT IN DER LISTE, gemessen am 2026-09-15 (#1230), jeweils mit
+ * Grund - wer eines davon aufnimmt, macht den Guard rot, ohne dass ein
+ * Verstoss vorliegt:
+ *   `.is-disabled`, `.is-locked`  deaktivierte bzw. gesperrte Bedienelemente,
+ *                                 die WCAG 1.4.3 ausnimmt;
+ *   `.pantry-row--out`            dimmt nur den Namen (0.65), gerendert
+ *                                 5,34:1 light / 5,20:1 dark;
+ *   `.note-md-check.is-checked`   dimmt nur den Text des Punkts (0.65),
+ *                                 gerendert 5,26:1 light / 4,63:1 dark.
+ * Ausgenommen ist ausserdem, was kein Zustand eines Datensatzes ist: echte
+ * deaktivierte Bedienelemente (`:disabled`) und die Drag-Geister von SortableJS.
+ *
+ * DIE DECKUNG WIRD GELESEN, NICHT NUR DIE ZAHL: `opacity: 60%` ist dieselbe
+ * Deckung wie `0.6`, und ein `var(--x)` wird ueber die Tokens aufgeloest. Was
+ * sich nicht aufloesen laesst (ein Modul-Token, `calc()`), zaehlt als Verstoss -
+ * ein Guard, der Unlesbares durchwinkt, prueft nur die Schreibweise.
  * ──────────────────────────────────────────────────────────────────────────── */
 test('zurueckgenommene Karten und Zeilen dimmen nicht ueber opacity, und ihre Textfarben halten 4.5:1', () => {
   const { light, dark } = themeTokenMaps();
-  const STATE = /--(?:done|checked|archived|inactive|completed|disabled|paused|exists|pending)(?![\w-])|\.is-inactive(?![\w-])/;
+  const STATE = /--(?:done|checked|archived|inactive|completed|disabled|paused|exists|pending|settled|ended|expired|cancelled|canceled|dismissed|resolved|redeemed|fulfilled)(?![\w-])|\.is-inactive(?![\w-])/;
+  // Deckung einer Deklaration in beiden Themes: Zahl, Prozent oder var() mit
+  // optionalem Rueckfall. NaN heisst "nicht lesbar" und zaehlt als Verstoss.
+  const opacityIn = (raw, map, depth = 0) => {
+    const v = String(raw).trim().replace(/\s*!important$/i, '');
+    const ref = v.match(/^var\(\s*(--[\w-]+)\s*(?:,\s*(.+))?\)$/);
+    if (ref) {
+      const next = map.get(ref[1]) ?? ref[2];
+      return next === undefined || depth > 12 ? Number.NaN : opacityIn(next, map, depth + 1);
+    }
+    const pct = v.match(/^(\d*\.?\d+)%$/);
+    if (pct) return Number(pct[1]) / 100;
+    return /^\d*\.?\d+$/.test(v) ? Number(v) : Number.NaN;
+  };
   const EXEMPT = /:disabled|\[disabled\]|sortable-/;
   const styles = new URL('../public/styles/', import.meta.url);
   const dimmed = [];
@@ -7632,9 +7664,15 @@ test('zurueckgenommene Karten und Zeilen dimmen nicht ueber opacity, und ihre Te
       stateRules += 1;
       const where = `${file}: ${parts.join(', ')}${rule.at.length ? `  [${rule.at.join(' ')}]` : ''}`;
 
-      let opacity = null;
-      for (const m of rule.body.matchAll(/(?:^|;)\s*opacity\s*:\s*([0-9.]+)\s*(?=;|$)/g)) opacity = Number(m[1]);
-      if (opacity !== null && opacity < 1) dimmed.push(`${where}  opacity ${opacity}`);
+      const opacityDecl = [...rule.body.matchAll(/(?:^|;)\s*opacity\s*:\s*([^;]+)/g)].pop();
+      if (opacityDecl) {
+        const values = [light, dark].map((map) => opacityIn(opacityDecl[1], map));
+        if (values.some((value) => Number.isNaN(value))) {
+          dimmed.push(`${where}  opacity ${opacityDecl[1].trim()} (nicht aufloesbar)`);
+        } else if (Math.min(...values) < 1) {
+          dimmed.push(`${where}  opacity ${opacityDecl[1].trim()} (= ${Math.min(...values)})`);
+        }
+      }
 
       const decl = [...rule.body.matchAll(/(?:^|;)\s*color\s*:\s*var\(\s*(--[\w-]+)\s*\)/g)].pop();
       if (!decl) continue;
