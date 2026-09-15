@@ -48,17 +48,23 @@ function startMockHost() {
   });
 }
 
-/** Ein Port, auf dem gerade niemand lauscht: vom Kernel geholt und wieder freigegeben. */
-function closedPort() {
-  const probe = http.createServer();
-  return new Promise((resolve, reject) => {
-    probe.once('error', reject);
-    probe.listen(0, '127.0.0.1', () => {
-      const { port } = probe.address();
-      probe.close(() => resolve(port));
-    });
-  });
-}
+/**
+ * Ein Port, auf dem niemand lauscht - ohne ihn vorher zu binden und freizugeben.
+ *
+ * Die Fassung davor holte sich einen Port vom Kernel und gab ihn wieder frei.
+ * Zwischen `close()` und der Anfrage konnte unter dem Parallel-Runner eine
+ * Nachbarsuite genau diesen Port binden; dann antwortete ein fremder Listener
+ * statt ECONNREFUSED (Review auf #1229; mit einem Nachbarn im Fenster
+ * nachgestellt: "Missing expected rejection").
+ *
+ * Port 2 bekommt keine Suite: `listen(0)` vergibt nur ephemere Ports (unter
+ * Linux ab 32768, unter macOS ab 49152), und unter Linux darf ein Prozess ohne
+ * Root-Rechte ihn gar nicht binden. Port 1 geht NICHT: fetch sperrt ihn als
+ * "bad port" der Fetch-Spezifikation, bevor es eine Verbindung versucht - der
+ * Fehler hat dort keinen `cause.code` (gemessen 2026-09-15, Port 2 bis 5:
+ * ECONNREFUSED in wenigen Millisekunden).
+ */
+const REFUSED_PORT = 2;
 
 /** Setzt den Mock fuer einen Block ein und nimmt ihn im after()-Hook wieder heraus. */
 function useMock(options) {
@@ -267,11 +273,10 @@ describe('WebDAV Backup — service module', async () => {
     });
 
     it('should throw when server is unreachable', async () => {
-      // Kein fester Port: 39872 lag unter Linux im ephemeren Bereich und
-      // konnte belegt sein. Ein eben freigegebener Port ist es nicht.
-      const port = await closedPort();
+      // Weder 39872 (unter Linux im ephemeren Bereich) noch ein eben
+      // freigegebener Port (Rennen mit Nachbarsuiten) - siehe REFUSED_PORT.
       await assert.rejects(
-        () => webdav.testConnection({ url: `http://127.0.0.1:${port}`, username: 'x', password: 'y' }),
+        () => webdav.testConnection({ url: `http://127.0.0.1:${REFUSED_PORT}`, username: 'x', password: 'y' }),
         (err) => {
           // `davFetch` reicht den Fehler von `fetch` unveraendert durch. Die
           // Ursache muss die abgelehnte Verbindung sein - irgendein Error waere
