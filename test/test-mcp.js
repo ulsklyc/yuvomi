@@ -500,6 +500,37 @@ test('call_api_operation GET: baut URL, leitet Auth-Header weiter, gibt Body zur
   }
 });
 
+test('call_api_operation: ohne BASE_URL folgt der Selbstaufruf BIND_ADDRESS', async () => {
+  // Bindet der Server nur an eine LAN-Adresse, ginge der Loopback-Default ins
+  // Leere. Die Bruecke muss dieselbe Adresse fragen wie server/index.js.
+  const saved = {
+    MCP_INTERNAL_BASE_URL: process.env.MCP_INTERNAL_BASE_URL,
+    BASE_URL: process.env.BASE_URL,
+    BIND_ADDRESS: process.env.BIND_ADDRESS,
+    PORT: process.env.PORT,
+  };
+  delete process.env.MCP_INTERNAL_BASE_URL;
+  delete process.env.BASE_URL;
+  process.env.BIND_ADDRESS = '192.168.1.5';
+  process.env.PORT = '3100';
+  const calls = installFetchMock(() => jsonResponse({ data: {} }));
+  try {
+    const res = await toolCallWithHeaders(
+      'call_api_operation',
+      { operation_key: 'get_dashboard' },
+      { authorization: 'Bearer test-token' },
+    );
+    assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+    assert.equal(calls[0].url, 'http://192.168.1.5:3100/api/v1/dashboard');
+  } finally {
+    global.fetch = realFetch;
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 test('call_api_operation: rendert Path-Params und Query in die URL', async () => {
   const calls = installFetchMock(() => jsonResponse({ data: { id: 42 } }));
   try {

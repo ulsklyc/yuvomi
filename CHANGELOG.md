@@ -112,6 +112,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reverse proxy, holds no connection, and can grow into a stream on the same counter later. Your
   own taps do not cost a reload: the write routes answer with the counter before and after, and
   the page skips the reload when nothing else moved in between.
+- **`BIND_ADDRESS` sets the address the server listens on.** Unset, nothing changes: the app
+  listens on all interfaces, which is exactly what a container needs for its published port to
+  reach it, so Docker, Podman, Unraid, TrueNAS and Umbrel installations leave it alone. When Node
+  runs directly on a machine behind a reverse proxy on that same machine, `127.0.0.1` keeps the
+  app itself off the network. The built-in MCP bridge follows the setting when it calls the API
+  back. It is not the same as `OIKOS_HTTP_BIND`, which decides where the container engine
+  publishes the port.
 
 ### Changed
 

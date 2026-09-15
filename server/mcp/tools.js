@@ -31,6 +31,7 @@ import { taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
 import { visibilityWhere } from '../services/visibility.js';
 import { getUpcomingEvents } from '../services/calendar-event-reader.js';
 import { loadTagsFor, normalizeTags, setTags, tagKey } from '../utils/task-tags.js';
+import { readBindAddress, selfCallHost } from '../utils/bind-address.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
 
@@ -406,7 +407,9 @@ function internalBaseUrl() {
   return (
     process.env.MCP_INTERNAL_BASE_URL
     || process.env.BASE_URL
-    || `http://127.0.0.1:${process.env.PORT || 3000}`
+    // Dieselbe Adresse, auf der server/index.js lauscht: bindet der Server nur
+    // an eine LAN-Adresse, ginge ein Aufruf an 127.0.0.1 ins Leere.
+    || `http://${selfCallHost(readBindAddress(process.env.BIND_ADDRESS))}:${process.env.PORT || 3000}`
   ).replace(/\/+$/, '');
 }
 

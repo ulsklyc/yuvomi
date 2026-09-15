@@ -56,6 +56,9 @@ export async function startTestServer({ name, env = {} } = {}) {
   // 13100) kollidieren, sobald zwei Suiten gleichzeitig laufen - und eine
   // belegte Nummer sah wie ein kaputter Server aus.
   process.env.PORT = '0';
+  // Nur Loopback: ohne Angabe lauscht server/index.js auf allen Interfaces, und
+  // die Suite waere fuer ihre Dauer aus dem lokalen Netz erreichbar.
+  process.env.BIND_ADDRESS = '127.0.0.1';
   // Der Backup-Cron traegt zu keiner dieser Suiten etwas bei, laesst sich aber
   // nicht unref()en; er muesste sonst einzeln gestoppt werden.
   process.env.BACKUP_ENABLED = 'false';

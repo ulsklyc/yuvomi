@@ -208,6 +208,7 @@ function startServer(dbPath, port) {
       NODE_ENV: 'development',
       DB_PATH: dbPath,
       PORT: String(port),
+      BIND_ADDRESS: '127.0.0.1',
       BASE_URL: `http://127.0.0.1:${port}`,
       SESSION_SECRET: 'document-guards-secret-0123456789abcdef',
       // Der Login-Limiter laesst fuenf Versuche pro Minute zu. Das ist fuer die

@@ -168,6 +168,10 @@ const INTENTIONALLY_NOT_IN_INSTALLER = {
   MCP_INTERNAL_BASE_URL: 'Betriebs-Feinjustage.',
   RATE_LIMIT_WINDOW_MS: 'Betriebs-Feinjustage.',
   RATE_LIMIT_MAX_ATTEMPTS: 'Betriebs-Feinjustage.',
+  BIND_ADDRESS:
+    'Nur fuer den Betrieb ohne Container: im Container muss die App auf allen Interfaces '
+    + 'lauschen, sonst erreicht das veroeffentlichte Port-Mapping sie nicht. Der Wizard erzeugt '
+    + 'ausschliesslich Container-Installationen, dort waere jeder gesetzte Wert ein Ausfall.',
   BACKUP_UPLOAD_LIMIT:
     'Betriebs-Feinjustage: Body-Limit fuer den Restore-Upload im Admin-UI, nur beim '
     + 'Zurueckspielen einer ueberdimensionierten Datenbank relevant.',

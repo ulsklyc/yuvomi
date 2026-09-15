@@ -11,6 +11,7 @@ import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { readFileSync } from 'node:fs';
 import { createLogger } from './logger.js';
+import { readBindAddress } from './utils/bind-address.js';
 import * as db from './db.js';
 import { router as authRouter, sessionMiddleware, requireAuth, requireAdmin, isPasswordLoginEnabled } from './auth.js';
 import { csrfMiddleware } from './middleware/csrf.js';
@@ -111,6 +112,9 @@ const DEFAULT_APP_NAME = 'Yuvomi';
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
+// Leer = alle Interfaces, wie vor der Variable. Ein Container braucht genau das,
+// sonst erreicht ihn das veroeffentlichte Port-Mapping nicht.
+const BIND_ADDRESS = readBindAddress(process.env.BIND_ADDRESS);
 
 // --------------------------------------------------------
 // Security-Middleware
@@ -714,11 +718,12 @@ try {
   log.warn('Initial module registry scan failed:', err.message);
 }
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, BIND_ADDRESS, () => {
   // Der gebundene Port statt der Wunschangabe: mit PORT=0 vergibt der Kernel
   // einen freien Port, und genau der gehoert ins Log. Fuer den Regelfall
-  // (PORT=3000) steht dort weiterhin wortgleich dieselbe Zeile.
-  logYuvomi.info(`Server running on port ${server.address()?.port ?? PORT} | Version ${APP_VERSION}`);
+  // (PORT=3000, kein BIND_ADDRESS) steht dort weiterhin wortgleich dieselbe Zeile.
+  const boundTo = BIND_ADDRESS ? ` (bound to ${BIND_ADDRESS})` : '';
+  logYuvomi.info(`Server running on port ${server.address()?.port ?? PORT}${boundTo} | Version ${APP_VERSION}`);
   logYuvomi.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
   // Ein Sicherheitsschalter, der still nicht greift, ist schlimmer als keiner:
