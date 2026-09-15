@@ -127,12 +127,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schedule owners, medication owners, synced-calendar assignees and the Outlook account owner, the
   family list, the calendar's person filter, mentions, the reward standings and enrolment and the
   Overview's member cards now show household members only, and the household size counts them the
-  same way - a household of one person and a cleaner is a household of one. Splitting an expense
+  same way - a household of one person and a cleaner is a household of one for what the app shows.
+  Visibility, locking and document sharing stay available as long as anyone else can read the
+  module, a cleaner with access included, so a new entry can still be kept private. Splitting an expense
   still offers the guests of that group, and guests can still be added to a group; housekeeping
   staff cannot. Nothing is taken away: a task, event, budget entry, schedule, synced calendar or
   document share that already names a staff member or guest keeps them, still shows them in its
   editor and can still be saved, and an event's visibility stays as it was. Existing group
-  memberships and reward enrolments stay as well, but their editors no longer list them. Schedule
+  memberships stay as well and still show in the group editor, so they can be ended. An old reward
+  enrolment of a staff member or guest stays on record, but it no longer earns points, redeems or
+  receives a bonus. Schedule
   rows on the dashboard keep their names; only choosing a staff member or guest anew is refused.
   User administration and permissions still list every account, API tokens every account except
   shared-expense guests as before, and the two-factor overview for admins now shows every account,

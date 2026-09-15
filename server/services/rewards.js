@@ -7,6 +7,8 @@
  * Abhängigkeiten: better-sqlite3-Handle (synchron), wird vom Aufrufer übergeben.
  */
 
+import { householdMemberSql } from './household-members.js';
+
 const REWARD_TX = `
   INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, redemption_id, created_by)
   VALUES (@user_id, @delta, @type, @reason, @task_id, @redemption_id, @created_by)
@@ -18,17 +20,33 @@ export function getBalance(d, userId) {
   return row?.bal ?? 0;
 }
 
+/*
+ * NUR HAUSHALTSMITGLIEDER NEHMEN AKTIV TEIL (#1207). Eine alte Einschreibung
+ * von Hauspersonal oder einem Gast bleibt in reward_participants stehen, samt
+ * ihrem Ledger - aber sie verdient keine Punkte mehr, loest nichts ein und
+ * bekommt keinen Bonus. Sonst sammelte ein Konto, das keine Liste mehr zeigt,
+ * unsichtbar weiter.
+ */
+
 /** IDs aller aktiv teilnehmenden Mitglieder. */
 function enrolledIds(d) {
   return new Set(
-    d.prepare('SELECT user_id FROM reward_participants WHERE enabled = 1').all().map((r) => r.user_id),
+    d.prepare(`
+      SELECT p.user_id FROM reward_participants p
+      JOIN users u ON u.id = p.user_id
+      WHERE p.enabled = 1 AND ${householdMemberSql('u')}
+    `).all().map((r) => r.user_id),
   );
 }
 
 /** Nimmt ein Mitglied aktiv am Punkte-System teil? */
 export function isEnrolled(d, userId) {
   if (!userId) return false;
-  const row = d.prepare('SELECT enabled FROM reward_participants WHERE user_id = ?').get(userId);
+  const row = d.prepare(`
+    SELECT p.enabled FROM reward_participants p
+    JOIN users u ON u.id = p.user_id
+    WHERE p.user_id = ? AND ${householdMemberSql('u')}
+  `).get(userId);
   return !!row && row.enabled === 1;
 }
 

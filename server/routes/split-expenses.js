@@ -616,6 +616,22 @@ router.get('/groups/:id/member-candidates', (req, res) => {
       LEFT JOIN birthdays b ON b.family_user_id = u.id
       LEFT JOIN expense_group_members gm ON gm.group_id = @groupId AND gm.user_id = u.id
       WHERE g.group_id = @groupId OR gm.user_id IS NOT NULL
+      UNION ALL
+      -- Wer schon Mitglied dieser Gruppe ist, ohne Haushaltsmitglied oder Gast
+      -- zu sein (Hauspersonal aus der Zeit vor #1207): neu hinzufuegen laesst
+      -- sich so jemand nicht mehr, aber der Editor muss die Mitgliedschaft
+      -- zeigen, damit sie sich beenden laesst.
+      SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
+             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date,
+             1 AS in_group,
+             gm.role AS group_role
+      FROM expense_group_members gm
+      JOIN users u ON u.id = gm.user_id
+      LEFT JOIN contacts c ON c.family_user_id = u.id
+      LEFT JOIN birthdays b ON b.family_user_id = u.id
+      WHERE gm.group_id = @groupId
+        AND NOT (${householdMemberSql('u')})
+        AND NOT EXISTS (SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = u.id)
       ORDER BY display_name COLLATE NOCASE ASC
     `).all({ groupId });
     const contacts = db.get().prepare(`

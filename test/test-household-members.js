@@ -747,3 +747,74 @@ test('split expenses: creating a group follows the same rule as adding a member'
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
   assert.equal(groups(), before + 1);
 });
+
+test('split member candidates: a stored member who may not join anew stays listed, so it can be removed', async () => {
+  // Clara (Hauspersonal) ist seit dem Test oben Mitglied der zweiten Gruppe.
+  // Der Editor baut seine Kaestchen nur aus den Kandidaten - fehlt sie dort,
+  // kann niemand ihre Mitgliedschaft sehen oder beenden.
+  const other = await call('GET', `/split-expenses/groups/${OTHER}/member-candidates`);
+  assert.equal(other.status, 200);
+  const users = other.body.data.filter((row) => row.source === 'user');
+  assert.deepEqual(idsOf(users, 'user_id'), [ANNA, BEN, CLARA, EMIL]);
+  assert.equal(users.find((row) => row.user_id === CLARA).in_group, 1);
+
+  const here = await call('GET', `/split-expenses/groups/${GROUP}/member-candidates`);
+  assert.ok(!idsOf(here.body.data.filter((row) => row.source === 'user'), 'user_id').includes(CLARA),
+    'not offered for a group she does not belong to');
+});
+
+// --------------------------------------------------------------------------
+// Belohnungen: eine alte Einschreibung bleibt stehen, aber sie wirkt nicht
+// --------------------------------------------------------------------------
+
+test('rewards: an old enrolment of an account that is not a member earns, redeems and receives nothing', async () => {
+  // Clara (Hauspersonal) ist seit der Fixture eingeschrieben (enabled = 1).
+  const taskId = Number(db.prepare("INSERT INTO tasks (title, status, points, created_by) VALUES ('Fenster', 'open', 5, ?)").run(ANNA).lastInsertRowid);
+  for (const id of [BEN, CLARA]) db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(taskId, id);
+  const done = await call('PATCH', `/tasks/${taskId}/status`, { body: { status: 'done' } });
+  assert.equal(done.status, 200, JSON.stringify(done.body));
+  const earned = db.prepare("SELECT user_id FROM reward_ledger WHERE task_id = ? AND type = 'earn' ORDER BY user_id").all(taskId)
+    .map((row) => row.user_id);
+  assert.deepEqual(earned, [BEN], 'the member earns the points, the old staff enrolment does not');
+
+  const itemId = Number(db.prepare("INSERT INTO reward_catalog (name, cost, created_by) VALUES ('Eis', 1, ?)").run(ANNA).lastInsertRowid);
+  db.prepare("INSERT INTO reward_ledger (user_id, delta, type, reason, created_by) VALUES (?, 10, 'bonus', 'Altbestand', ?)").run(CLARA, ANNA);
+  const redeem = await call('POST', '/rewards/redemptions', { body: { catalog_id: itemId, user_id: CLARA } });
+  assert.equal(redeem.status, 400, `redeeming for an old staff enrolment: ${JSON.stringify(redeem.body)}`);
+  const bonus = await call('POST', '/rewards/bonus', { body: { user_id: CLARA, delta: 3 } });
+  assert.equal(bonus.status, 400, `a bonus for an old staff enrolment: ${JSON.stringify(bonus.body)}`);
+
+  const ok = await call('POST', '/rewards/redemptions', { body: { catalog_id: itemId, user_id: BEN } });
+  assert.equal(ok.status, 201, `the member redeems as before: ${JSON.stringify(ok.body)}`);
+});
+
+// --------------------------------------------------------------------------
+// Schutzsteuerungen: wer ausser mir ein Modul lesen kann
+// --------------------------------------------------------------------------
+
+test('auth: othersCanRead names the modules another account can read, staff included, guests not', async () => {
+  const KEYS = ['calendar', 'documents', 'tasks'];
+  const setAccess = (userId, key, access) => db.prepare(`
+    INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+    VALUES ('user', ?, 'module', ?, ?)
+    ON CONFLICT(subject_type, subject_id, resource_type, resource_key) DO UPDATE SET access = excluded.access
+  `).run(String(userId), key, access);
+  const readers = async () => {
+    const me = await call('GET', '/auth/me', { as: ANNA });
+    assert.equal(me.status, 200);
+    return me.body.othersCanRead;
+  };
+  try {
+    // Ein Haushalt aus einem Mitglied und Personal: Ben liest nichts mit, die
+    // Gaeste Dora und Emil lesen ausserhalb geteilter Ausgaben ohnehin nichts.
+    for (const key of KEYS) setAccess(BEN, key, 'none');
+    assert.deepEqual(await readers(), KEYS, 'staff with module access can read along');
+    for (const key of KEYS) setAccess(CLARA, key, 'none');
+    assert.deepEqual(await readers(), [], 'without module access nobody else reads');
+    setAccess(CLARA, 'documents', 'read');
+    assert.deepEqual(await readers(), ['documents'], 'read access is enough');
+  } finally {
+    db.prepare(`DELETE FROM access_permissions WHERE subject_type = 'user' AND resource_type = 'module' AND subject_id IN (?, ?)`)
+      .run(String(BEN), String(CLARA));
+  }
+});
