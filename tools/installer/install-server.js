@@ -427,9 +427,15 @@ export async function probeContainerRunning({
 } = {}) {
   let timer;
   let child = null;
-  const timeout = new Promise(done => { timer = setTimeout(() => done(false), timeoutMs); });
+  let timedOut = false;
+  const timeout = new Promise(done => {
+    timer = setTimeout(() => { timedOut = true; done(false); }, timeoutMs);
+  });
   const probe = (async () => {
     const engine = await resolveEngine();
+    // Kam die Engine erst nach dem Zeitlimit, ist die Funktion schon zurueck und
+    // ihr finally gelaufen: ein jetzt gestarteter inspect wuerde nie beendet.
+    if (timedOut) return false;
     const { cmd, args } = inspectCommand(engine, ['inspect', '--format', '{{.State.Status}}', 'yuvomi']);
     return new Promise(done => {
       child = spawnFn(cmd, args, { stdio: 'pipe' });

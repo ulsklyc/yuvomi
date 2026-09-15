@@ -328,6 +328,19 @@ test('der Preflight wartet nicht unbegrenzt auf die Container-Engine', async () 
   const noEngine = await mod.probeContainerRunning({ timeoutMs: 50, resolveEngine: () => new Promise(() => {}), spawnFn: hanging });
   assert.equal(noEngine, false, 'eine haengende Engine-Erkennung haelt den Preflight auf');
 
+  // Kommt die Engine erst NACH dem Zeitlimit, darf kein inspect mehr starten:
+  // die Funktion ist dann schon zurueck, und niemand beendet einen haengenden
+  // Prozess mehr - jede weitere Preflight-Abfrage liesse einen liegen (Review zu #1217).
+  let lateSpawns = 0;
+  const late = await mod.probeContainerRunning({
+    timeoutMs: 20,
+    resolveEngine: () => new Promise(done => setTimeout(() => done(engine), 60)),
+    spawnFn: (...args) => { lateSpawns++; return hanging(...args); },
+  });
+  assert.equal(late, false, 'eine zu spaete Engine-Erkennung muss als Zeitueberschreitung gelten');
+  await new Promise(done => setTimeout(done, 120));
+  assert.equal(lateSpawns, 0, 'nach dem Zeitlimit startet trotzdem ein inspect, den niemand mehr beendet');
+
   // Der Normalfall bleibt: "running" auf stdout, Exit 0.
   const answering = () => {
     const child = new EventEmitter();
