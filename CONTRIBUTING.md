@@ -46,6 +46,12 @@ The app answers on [http://localhost:3000](http://localhost:3000). On the first 
 guides you through creating the admin account in the browser; headless setups can run
 `npm run setup` instead.
 
+The dev server listens on all interfaces, so other devices on your network can reach it too.
+On a network you do not trust, set `BIND_ADDRESS=127.0.0.1` in `.env` to keep it on your
+machine. The suites that start `server/index.js` as a program already do that, through
+`test/server-ready.js` and the document-guards harness; a new harness that starts the server
+itself has to set it as well.
+
 ### Running tests
 
 ```bash
