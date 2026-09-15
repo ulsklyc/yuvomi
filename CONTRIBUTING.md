@@ -56,6 +56,7 @@ itself has to set it as well.
 
 ```bash
 npm test              # All suites
+npm run test-parallel # The same suites side by side, keeps going after a failure
 ```
 
 Individual suites (faster during development):
@@ -96,6 +97,21 @@ Tests run with plain Node against real SQLite (`--experimental-sqlite`), in memo
 temp file - newer suites use the built-in `node --test` runner, older ones are plain
 assertion scripts. Nothing has to be running beforehand: a suite that exercises routes over
 HTTP starts its own server on a free local port and stops it again.
+
+`npm run test-parallel` runs every step of the `test` chain as its own process - by default
+one per CPU core minus one, `--jobs N` to change that. It does not stop at the first failure:
+it ends with the failed steps and their log files, the ten slowest steps and a non-zero exit
+code. Each run writes its logs to a folder of its own under the system temp directory,
+`yuvomi-test-parallel-*`, created fresh for that run and readable only by you; your own run
+folders older than 24 hours are removed at the next start (`--logs DIR` for another place). A step that runs longer than 900 seconds is
+stopped and counted as failed (`--timeout SECONDS`). Ctrl+C stops the running steps with SIGTERM
+and kills whatever still runs 5 seconds later (`--grace SECONDS`); pressing Ctrl+C again after
+more than a second kills at once (npm passes the first Ctrl+C on twice, so an immediate second
+signal is ignored). The steps come
+from the `test` script itself, so a new suite is still registered there
+and nowhere else. Because suites run side by side, a suite takes a free port
+(`listen(0, '127.0.0.1')`) and a temp path of its own (`freshTestDbPath()`, `mkdtemp`), never a
+fixed one. CI runs `npm test`, one suite after the other.
 
 ---
 

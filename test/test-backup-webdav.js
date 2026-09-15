@@ -17,7 +17,65 @@ const xmlEsc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/
 
 // ─── Mock WebDAV server ───────────────────────────────────────────────────────
 
-const MOCK_PORT = 39871;
+/**
+ * EIN Host fuer alle Mock-Server, auf einem Port, den der Kernel vergibt.
+ *
+ * Bis 2026-09-15 lauschte jeder Block auf dem festen Port 39871. Zwei Laeufe
+ * nebeneinander (parallele Kette, zweiter Arbeitsbaum) trafen denselben Port,
+ * und unter Linux liegt 39871 mitten im ephemeren Bereich (32768-60999) - dort
+ * kann ihn jede ausgehende Verbindung einer Nachbarsuite halten. Ein Port pro
+ * Block geht aber auch nicht: `server/services/backup-webdav.js` liest
+ * `WEBDAV_BACKUP_URL` einmal beim Import. Deshalb lauscht EIN Server ueber die
+ * ganze Suite, und jeder Block tauscht nur die Antwortlogik (`useMock`).
+ */
+const mockHost = { server: null, port: null, active: null };
+
+function startMockHost() {
+  mockHost.server = http.createServer((req, res) => {
+    if (!mockHost.active) {
+      res.writeHead(503);
+      res.end('no mock active');
+      return;
+    }
+    mockHost.active.handle(req, res);
+  });
+  return new Promise((resolve, reject) => {
+    mockHost.server.once('error', reject);
+    mockHost.server.listen(0, '127.0.0.1', () => {
+      mockHost.port = mockHost.server.address().port;
+      resolve();
+    });
+  });
+}
+
+/**
+ * Ein Port, auf dem niemand lauscht - ohne ihn vorher zu binden und freizugeben.
+ *
+ * Die Fassung davor holte sich einen Port vom Kernel und gab ihn wieder frei.
+ * Zwischen `close()` und der Anfrage konnte unter dem Parallel-Runner eine
+ * Nachbarsuite genau diesen Port binden; dann antwortete ein fremder Listener
+ * statt ECONNREFUSED (Review auf #1229; mit einem Nachbarn im Fenster
+ * nachgestellt: "Missing expected rejection").
+ *
+ * Port 2 bekommt keine Suite: `listen(0)` vergibt nur ephemere Ports (unter
+ * Linux ab 32768, unter macOS ab 49152), und unter Linux darf ein Prozess ohne
+ * Root-Rechte ihn gar nicht binden. Port 1 geht NICHT: fetch sperrt ihn als
+ * "bad port" der Fetch-Spezifikation, bevor es eine Verbindung versucht - der
+ * Fehler hat dort keinen `cause.code` (gemessen 2026-09-15, Port 2 bis 5:
+ * ECONNREFUSED in wenigen Millisekunden).
+ */
+const REFUSED_PORT = 2;
+
+/** Setzt den Mock fuer einen Block ein und nimmt ihn im after()-Hook wieder heraus. */
+function useMock(options) {
+  const ctx = {};
+  before(() => {
+    Object.assign(ctx, createMockServer(options));
+    mockHost.active = ctx;
+  });
+  after(() => { mockHost.active = null; });
+  return ctx;
+}
 
 /**
  * Minimal WebDAV mock:
@@ -35,7 +93,7 @@ function createMockServer({ failAuth = false, failPropfind = false, liveProp = '
   // In-memory "filesystem"
   const files = new Map(); // remotePath → { lastmod, size }
 
-  const server = http.createServer((req, res) => {
+  const handle = (req, res) => {
     if (failAuth) {
       res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="test"' });
       res.end('Unauthorized');
@@ -58,7 +116,7 @@ function createMockServer({ failAuth = false, failPropfind = false, liveProp = '
       // Stempel). Nur so kann der Test sehen, ob die Sortierung im Modul
       // wirklich arbeitet oder nur die Serverreihenfolge durchreicht.
       const fileEntries = [...files.entries()].filter(([k]) => k.startsWith(url));
-      const hrefOf = (p) => (absoluteHrefs ? `http://127.0.0.1:${MOCK_PORT}${p}` : p);
+      const hrefOf = (p) => (absoluteHrefs ? `http://127.0.0.1:${mockHost.port}${p}` : p);
       const fileXml = fileEntries.map(([filePath, info]) => `
         <D:response>
           <D:href>${xmlEsc(hrefOf(filePath))}</D:href>
@@ -130,14 +188,13 @@ function createMockServer({ failAuth = false, failPropfind = false, liveProp = '
 
     res.writeHead(405);
     res.end('Method Not Allowed');
-  });
+  };
 
-  return { server, files };
+  return { handle, files };
 }
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
-const WEBDAV_URL = `http://127.0.0.1:${MOCK_PORT}`;
 let tmpDir;
 
 async function createTempBackup(name = 'oikos-backup-2099-01-01T00-00-00-000Z.db') {
@@ -163,12 +220,16 @@ describe('WebDAV Backup — service module', async () => {
 
   before(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'oikos-webdav-test-'));
+    // Der Port muss VOR dem Import feststehen - das Modul liest die URL beim Laden.
+    await startMockHost();
     process.env.BACKUP_DIR            = tmpDir;
-    process.env.WEBDAV_BACKUP_URL     = WEBDAV_URL;
+    process.env.WEBDAV_BACKUP_URL     = `http://127.0.0.1:${mockHost.port}`;
     webdav = await import('../server/services/backup-webdav.js');
   });
 
   after(async () => {
+    mockHost.server.closeAllConnections?.();
+    await new Promise((resolve) => mockHost.server.close(resolve));
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -186,7 +247,7 @@ describe('WebDAV Backup — service module', async () => {
   it('getConfig() should read env vars', () => {
     const cfg = webdav.getConfig();
     assert.strictEqual(cfg.enabled,    true,              'enabled from env');
-    assert.strictEqual(cfg.url,        WEBDAV_URL,        'url from env');
+    assert.strictEqual(cfg.url,        `http://127.0.0.1:${mockHost.port}`, 'url from env');
     assert.strictEqual(cfg.username,   'testuser',        'username from env');
     assert.strictEqual(cfg.password,   'testpass',        'password from env');
     assert.strictEqual(cfg.remotePath, '/oikos/backups/', 'remotePath');
@@ -204,12 +265,7 @@ describe('WebDAV Backup — service module', async () => {
   });
 
   describe('testConnection()', async () => {
-    let mockCtx;
-    before(() => new Promise((resolve) => {
-      mockCtx = createMockServer();
-      mockCtx.server.listen(MOCK_PORT, '127.0.0.1', resolve);
-    }));
-    after(() => new Promise((resolve) => mockCtx.server.close(resolve)));
+    useMock();
 
     it('should return { ok: true } on successful PROPFIND', async () => {
       const result = await webdav.testConnection({});
@@ -217,11 +273,16 @@ describe('WebDAV Backup — service module', async () => {
     });
 
     it('should throw when server is unreachable', async () => {
-      // Port 39872 is not listening — should throw a connection error
+      // Weder 39872 (unter Linux im ephemeren Bereich) noch ein eben
+      // freigegebener Port (Rennen mit Nachbarsuiten) - siehe REFUSED_PORT.
       await assert.rejects(
-        () => webdav.testConnection({ url: 'http://localhost:39872', username: 'x', password: 'y' }),
+        () => webdav.testConnection({ url: `http://127.0.0.1:${REFUSED_PORT}`, username: 'x', password: 'y' }),
         (err) => {
+          // `davFetch` reicht den Fehler von `fetch` unveraendert durch. Die
+          // Ursache muss die abgelehnte Verbindung sein - irgendein Error waere
+          // auch ein Tippfehler in der URL oder eine fehlende Zugangsangabe.
           assert.ok(err instanceof Error, 'should throw Error');
+          assert.equal(err.cause?.code, 'ECONNREFUSED', `unexpected cause: ${err.cause?.code ?? err.message}`);
           return true;
         }
       );
@@ -229,12 +290,7 @@ describe('WebDAV Backup — service module', async () => {
   });
 
   describe('uploadBackup()', async () => {
-    let mockCtx;
-    before(() => new Promise((resolve) => {
-      mockCtx = createMockServer();
-      mockCtx.server.listen(MOCK_PORT, '127.0.0.1', resolve);
-    }));
-    after(() => new Promise((resolve) => mockCtx.server.close(resolve)));
+    const mockCtx = useMock();
 
     it('should PUT the file to the remote server', async () => {
       const fp = await createTempBackup();
@@ -298,12 +354,7 @@ describe('WebDAV Backup — service module', async () => {
   // Namen, und die Rotation loeschte vom falschen Ende: das gerade hochgeladene
   // Backup, jedes Mal.
   describe('rotation on an Apache mod_dav server (#853)', async () => {
-    let mockCtx;
-    before(() => new Promise((resolve) => {
-      mockCtx = createMockServer({ liveProp: 'lp1:' });
-      mockCtx.server.listen(MOCK_PORT, '127.0.0.1', resolve);
-    }));
-    after(() => new Promise((resolve) => mockCtx.server.close(resolve)));
+    const mockCtx = useMock({ liveProp: 'lp1:' });
 
     const remoteDbFiles = () => [...mockCtx.files.keys()]
       .filter((k) => k.startsWith('/oikos/backups/') && k.endsWith('.db'))
@@ -359,12 +410,7 @@ describe('WebDAV Backup — service module', async () => {
   // Basis-URL an - unnormalisiert entstuende daraus `http://host/http://host/…`,
   // und die DELETE-Anfrage ginge ins Leere statt aufs Ziel.
   describe('rotation on a server that answers with absolute hrefs', async () => {
-    let mockCtx;
-    before(() => new Promise((resolve) => {
-      mockCtx = createMockServer({ absoluteHrefs: true });
-      mockCtx.server.listen(MOCK_PORT, '127.0.0.1', resolve);
-    }));
-    after(() => new Promise((resolve) => mockCtx.server.close(resolve)));
+    const mockCtx = useMock({ absoluteHrefs: true });
 
     it('should still delete the oldest file', async () => {
       const names = [
@@ -393,12 +439,7 @@ describe('WebDAV Backup — service module', async () => {
   });
 
   describe('triggerUpload()', async () => {
-    let mockCtx;
-    before(() => new Promise((resolve) => {
-      mockCtx = createMockServer();
-      mockCtx.server.listen(MOCK_PORT, '127.0.0.1', resolve);
-    }));
-    after(() => new Promise((resolve) => mockCtx.server.close(resolve)));
+    const mockCtx = useMock();
 
     it('should throw when no local backup files exist', async () => {
       const emptyDir = await fs.mkdtemp(path.join(os.tmpdir(), 'oikos-empty-'));

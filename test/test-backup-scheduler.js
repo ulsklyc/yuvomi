@@ -6,13 +6,33 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
+import { chmodSync, mkdtempSync, rmSync } from 'node:fs';
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 
 // Nested under a root we control, so one test can revoke write access on the
 // parent and exercise the "backup directory is not writable" path (issue #579).
-const TEST_BACKUP_ROOT = './test-backups';
+//
+// EIN EIGENER ORDNER JE PROZESS, NICHT `./test-backups` IM CHECKOUT. Bis
+// 2026-09-15 teilten sich zwei Laeufe im selben Checkout (zwei parallele
+// Runner, ein Runner neben `npm test`) diesen Ordner: der eine loeschte ihn
+// (Anfang, #579-Test, Aufraeumen) oder nahm ihm per chmod die Schreibrechte,
+// waehrend der andere darin rotierte. Zwei Kopien gleichzeitig: in fuenf
+// Runden neun von zehn Laeufen rot (ENOENT, falsche Dateizahl).
+//
+// Der Pfad bleibt trotzdem RELATIV zum Arbeitsverzeichnis. #579 prueft, dass
+// die Fehlermeldung den absoluten Pfad nennt statt des konfigurierten
+// relativen; mit einem absoluten BACKUP_DIR waere diese Zusicherung leer.
+const TEST_BACKUP_ABSOLUTE = mkdtempSync(path.join(os.tmpdir(), 'yuvomi-backup-scheduler-'));
+const TEST_BACKUP_ROOT = path.relative(process.cwd(), TEST_BACKUP_ABSOLUTE);
 const TEST_BACKUP_DIR = path.join(TEST_BACKUP_ROOT, 'store');
+
+// Auch wenn die Suite unterwegs abbricht - dann womoeglich mit entzogenen Schreibrechten.
+process.on('exit', () => {
+  try { chmodSync(TEST_BACKUP_ABSOLUTE, 0o700); } catch { /* schon weg */ }
+  rmSync(TEST_BACKUP_ABSOLUTE, { recursive: true, force: true });
+});
 
 // Mock environment variables
 process.env.BACKUP_ENABLED = 'false'; // Disable scheduler for tests
@@ -121,6 +141,8 @@ describe('Backup Scheduler', () => {
       t.skip('running as root bypasses directory permissions');
       return;
     }
+    assert.equal(path.isAbsolute(TEST_BACKUP_DIR), false,
+      'BACKUP_DIR must stay relative - with an absolute path the absolute-path assertion below checks nothing');
 
     await fs.rm(TEST_BACKUP_DIR, { recursive: true, force: true });
     await fs.chmod(TEST_BACKUP_ROOT, 0o500);
@@ -129,10 +151,19 @@ describe('Backup Scheduler', () => {
       const result = await backupScheduler.triggerBackup();
 
       assert.strictEqual(result.success, false, 'backup must fail on an unwritable directory');
-      assert.match(
-        result.error,
-        new RegExp(path.resolve(TEST_BACKUP_DIR).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
-        'error must name the absolute path, not the relative one'
+      // VERANKERT AN DEN ANFUEHRUNGSZEICHEN DER MELDUNG. Der relative BACKUP_DIR fuehrt
+      // ueber `../..` bis zur Wurzel und ENDET im absoluten Temp-Pfad. Ein unverankerter
+      // Treffer auf den absoluten Pfad fand ihn deshalb auch in einer Meldung, die den
+      // RELATIVEN Wert nennt: `${BACKUP_DIR}` statt `${path.resolve(BACKUP_DIR)}` im
+      // Server blieb gruen (Review auf #1229).
+      const absolute = path.resolve(TEST_BACKUP_DIR);
+      assert.ok(
+        result.error.includes(`"${absolute}"`),
+        `error must name the absolute path in quotes: ${result.error}`
+      );
+      assert.ok(
+        !result.error.includes(`"${TEST_BACKUP_DIR}"`),
+        `error must not name the relative path: ${result.error}`
       );
       assert.match(result.error, /BACKUP_DIR/, 'error must point at the BACKUP_DIR setting');
       assert.match(result.error, /EACCES|EPERM|EROFS/, 'error must keep the original errno');
