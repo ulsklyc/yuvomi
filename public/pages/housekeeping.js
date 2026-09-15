@@ -4,7 +4,7 @@
  * Abhängigkeiten: /api.js, /i18n.js, /utils/html.js
  */
 
-import { api } from '/api.js';
+import { api, auth } from '/api.js';
 import { t, formatDate, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -1414,6 +1414,8 @@ function openStaffModal(worker, content, options = {}) {
             avatar_data: state.workerAvatar,
             notes: fields.notes.value.trim() || null,
           });
+          // Eine neue Kraft kann ein Modul mitlesen: `othersCanRead` neu holen.
+          await auth.me().catch(() => {});
           window.yuvomi?.showToast(t('housekeeping.workerSavedToast'), 'success');
           await loadData();
           closeModal({ force: true });

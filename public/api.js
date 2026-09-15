@@ -290,7 +290,14 @@ const auth = {
     await auth.me().catch(() => {});
     return res;
   },
-  updateUser: (id, data) => api.patch(`/auth/users/${id}`, data),
+  // Rolle und Rechte entscheiden, wer ein Modul mitlesen kann (`othersCanRead`):
+  // derselbe Rundweg wie beim Anlegen, sonst blieben die Schutzfelder bis zum
+  // naechsten Kaltstart in der alten Lage.
+  updateUser: async (id, data) => {
+    const res = await api.patch(`/auth/users/${id}`, data);
+    await auth.me().catch(() => {});
+    return res;
+  },
   updateProfile: (data) => api.patch('/auth/me/profile', data),
   markOnboardingSeen: () => api.post('/auth/onboarding-seen', {}),
   deleteUser: async (id) => {

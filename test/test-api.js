@@ -312,3 +312,21 @@ test('OpenAPI erlaubt DMS-Push für local, webdav und google_drive, aber nicht d
   assert.deepEqual(linked.properties.storage_backend.enum, ['dms']);
   assert.ok(linked.required.includes('storage_backend'));
 });
+
+// ─── Mitleser eines Moduls nach einer Kontoaenderung neu holen (#1228) ──────
+
+test('auth.updateUser holt danach /auth/me, damit othersCanRead in derselben Sitzung stimmt', async () => {
+  setup();
+  const calls = [];
+  _mockFetch = (url, opts = {}) => {
+    calls.push(`${opts.method || 'GET'} ${url}`);
+    return mockResponse(200, { data: {}, householdSize: 1, othersCanRead: ['tasks'] });
+  };
+
+  await auth.updateUser(7, { role: 'member' });
+
+  const patch = calls.findIndex((c) => /^PATCH .*\/auth\/users\/7$/.test(c));
+  const me = calls.findIndex((c) => /^GET .*\/auth\/me$/.test(c));
+  assert.ok(patch >= 0, `PATCH fehlt: ${calls.join(', ')}`);
+  assert.ok(me > patch, `nach dem PATCH fehlt GET /auth/me: ${calls.join(', ')}`);
+});

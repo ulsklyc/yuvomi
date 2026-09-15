@@ -10,7 +10,7 @@
  * Zugriffsstufe wird über Icon-Segmente mit gleitender Aktiv-Pille gesetzt.
  */
 
-import { api } from '/api.js';
+import { api, auth } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { prefersInkText } from '/utils/contrast.js';
@@ -520,6 +520,9 @@ async function save(container) {
   if (saveBtn) saveBtn.disabled = true;
   try {
     const res = await api.put(url, payload);
+    // Neue Rechte koennen neue Mitleser eines Moduls schaffen: `othersCanRead`
+    // neu holen, damit die Schutzfelder in derselben Sitzung stimmen.
+    await auth.me().catch(() => {});
     state.draft = { modules: { ...res.data.modules }, widgets: { ...res.data.widgets }, capabilities: { ...res.data.capabilities } };
     state.dirty = false;
     renderMatrix(container);
