@@ -55,7 +55,7 @@ let statisticsRequestId = 0;
 let overviewRequestId = 0;
 // "Uebersicht"-Tab: mehrere Haushaltsmitglieder nebeneinander vergleichen
 // (#1018 - Stundenplaene mehrerer Kinder). people kommt vorgefiltert vom
-// Server (GET /schedule/household-members, isHouseholdMember()); selectedIds
+// Server (GET /schedule/household-members, householdMemberSql()); selectedIds
 // ist rein clientseitig und loest nie einen Fetch aus - nur der Wochenwechsel
 // tut das (siehe refreshOverview()).
 const OVERVIEW_SELECTION_KEY = 'yuvomi:schedule:overview:people';
@@ -247,7 +247,7 @@ async function load() {
     // Quickstart-Vorlagen ueberhaupt angeboten werden, nicht zu verwechseln
     // mit den per-Nutzer-Werten oben aus /schedule/preferences.
     api.get('/preferences').catch(() => ({ data: {} })),
-    // Vorgefiltert (isHouseholdMember()) fuer den Uebersicht-Tab - Haushaltshilfen
+    // Vorgefiltert (householdMemberSql()) fuer den Uebersicht-Tab - Haushaltshilfen
     // und Split-Expense-Gaeste sollen dort nie eine eigene Spur bekommen.
     api.get('/schedule/household-members').catch(() => ({ data: [] })),
   ]);

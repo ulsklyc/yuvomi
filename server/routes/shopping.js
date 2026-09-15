@@ -18,7 +18,8 @@ import {
 } from '../services/caldav-todo-outbound.js';
 import rateLimit from 'express-rate-limit';
 import { emailService as defaultEmailService } from '../services/email.js';
-import { memberEmail, isHouseholdMember, listEmailableMembers } from '../services/member-email.js';
+import { memberEmail, listEmailableMembers } from '../services/member-email.js';
+import { isHouseholdMember } from '../services/household-members.js';
 import { buildShoppingListMail } from '../services/shopping-mail.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 

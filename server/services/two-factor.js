@@ -26,6 +26,7 @@ import {
 } from '../utils/totp.js';
 import { qrToDataUrl } from '../utils/qrcode.js';
 import { createLogger } from '../logger.js';
+import { householdMemberSql } from './household-members.js';
 
 const log = createLogger('2fa');
 
@@ -285,7 +286,7 @@ export function householdOverview(db) {
            (t.confirmed_at IS NOT NULL)  AS enabled
       FROM users u
       LEFT JOIN user_totp t ON t.user_id = u.id
-     WHERE NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = u.id)
+     WHERE ${householdMemberSql('u', { includeGuests: true })}
      ORDER BY u.display_name
   `).all().map((row) => ({ ...row, enabled: row.enabled === 1 }));
 }

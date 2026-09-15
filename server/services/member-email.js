@@ -21,11 +21,11 @@
  *     mit Adresse an. Wer nur "gibt es diese users-Zeile" fragt, haelt sie
  *     deshalb faelschlich fuer erreichbar.
  *
- * Die Bedingung steht darum EINMAL, unten als `HOUSEHOLD_MEMBER_SQL`, und wird
- * von der Liste (Empfaengerauswahl) wie von der Einzelpruefung (Route)
- * benutzt. Waeren es zwei Fassungen, koennte die Auswahl jemanden verbergen,
- * den die Route weiterhin akzeptiert - und genau das ist die Luecke, gegen die
- * sie geschrieben ist.
+ * Die Bedingung steht darum EINMAL, in `server/services/household-members.js`
+ * (#1207), und wird von der Liste hier (Empfaengerauswahl) wie von der
+ * Einzelpruefung `isHouseholdMember()` dort (Route) benutzt. Waeren es zwei
+ * Fassungen, koennte die Auswahl jemanden verbergen, den die Route weiterhin
+ * akzeptiert - und genau das ist die Luecke, gegen die sie geschrieben ist.
  *
  * SIE GILT ABER NICHT FUER JEDE FRAGE AN DIESES MODUL. Der Passwort-Reset
  * braucht dieselbe Adresssuche und gilt ausdruecklich auch fuer Gaeste; wer
@@ -33,11 +33,7 @@
  * zurueck in sein eigenes Konto. Die beiden Fragen bleiben deshalb getrennt.
  */
 import * as dbModule from '../db.js';
-
-const HOUSEHOLD_MEMBER_SQL = `
-  NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = u.id)
-  AND NOT EXISTS (SELECT 1 FROM split_expense_guest_users g WHERE g.user_id = u.id)
-`;
+import { householdMemberSql } from './household-members.js';
 
 /**
  * Genau EINE Adresse, oder gar keine.
@@ -86,19 +82,6 @@ export function memberEmail(userId, { db } = {}) {
 }
 
 /**
- * Gehoert diese Zeile zum Haushalt? Getrennt von der Adressfrage, weil die
- * beiden Absagen verschiedene sind: "kenne ich nicht" gegen "hat keine
- * Adresse hinterlegt". Wer sie zusammenwirft, kann dem Nutzer nicht sagen,
- * was zu tun ist.
- */
-export function isHouseholdMember(userId, { db } = {}) {
-  const database = db || dbModule.get();
-  return Boolean(database.prepare(`
-    SELECT 1 FROM users u WHERE u.id = ? AND ${HOUSEHOLD_MEMBER_SQL}
-  `).get(userId));
-}
-
-/**
  * Mitglieder, die per Mail erreichbar sind - fuer eine Empfaengerauswahl.
  * Dieselbe Bedingung wie `memberEmail()`, damit die Auswahl niemanden zeigt,
  * den die Route ablehnt, und niemanden verbirgt, den sie akzeptiert.
@@ -109,7 +92,7 @@ export function listEmailableMembers({ db } = {}) {
     SELECT u.id, u.display_name, c.email
     FROM users u
     JOIN contacts c ON c.family_user_id = u.id
-    WHERE c.email IS NOT NULL AND c.email != '' AND ${HOUSEHOLD_MEMBER_SQL}
+    WHERE c.email IS NOT NULL AND c.email != '' AND ${householdMemberSql('u')}
     ORDER BY u.display_name COLLATE NOCASE ASC
   `).all()
     .map((row) => ({ ...row, email: singleAddress(row.email) }))
