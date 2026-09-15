@@ -585,6 +585,80 @@ test('ein Abbruch wartet auf die Gruppen und toetet, was SIGTERM ignoriert', asy
   }
 });
 
+/** Startet den Runner mit einem Schritt, der samt Enkel SIGTERM ignoriert, und wartet, bis beide stehen. */
+async function startStubborn(args) {
+  const dir = mkdtempSync(join(tmpdir(), 'yuvomi-runner-signal-'));
+  writeFileSync(join(dir, 'stur.cjs'), STUBBORN);
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ scripts: { test: 'node stur.cjs' } }));
+  const run = startRunner(['--package', join(dir, 'package.json'), '--logs', join(dir, 'logs'), ...args]);
+  const pids = [];
+  const cleanup = () => {
+    for (const pid of pids) try { process.kill(pid, 'SIGKILL'); } catch { /* schon weg */ }
+    try { run.child.kill('SIGKILL'); } catch { /* schon weg */ }
+    rmSync(dir, { recursive: true, force: true });
+  };
+  try {
+    await waitForFile(join(dir, 'grand.pid'), 10000, 'der Enkelprozess');
+  } catch (err) {
+    cleanup();
+    throw err;
+  }
+  pids.push(Number(readFileSync(join(dir, 'lead.pid'), 'utf8')), Number(readFileSync(join(dir, 'grand.pid'), 'utf8')));
+  return { run, pids, cleanup };
+}
+
+/* ZWEI SIGNALE AUS EINEM CTRL+C. Unter `npm run test-parallel` kommt SIGINT
+ * zweimal an, vom Terminal und von npm weitergereicht. Die Fassung davor nahm
+ * das zweite als "nicht mehr warten" und toetete sofort: Exit 130 nach 53 ms
+ * (Review auf #1229). Nachgestellt mit zwei SIGINT im Abstand von 5 ms. */
+test('zwei Signale kurz nacheinander behalten die Karenz', async () => {
+  const s = await startStubborn(['--grace', '2']);
+  try {
+    const t0 = Date.now();
+    s.run.child.kill('SIGINT');
+    await pause(5);
+    s.run.child.kill('SIGINT');
+    await pause(700);
+    for (const pid of s.pids) {
+      assert.equal(isRunning(pid), true, `Prozess ${pid} ist ${Date.now() - t0} ms nach Ctrl+C tot - die Karenz fiel weg`);
+    }
+    const result = await s.run.done;
+    const elapsed = Date.now() - t0;
+    assert.equal(result.code, 130, result.out);
+    assert.ok(elapsed >= 1900, `Exit nach ${elapsed} ms, vor Ablauf von --grace 2`);
+    for (const pid of s.pids) assert.equal(runningAfter(pid, 2000), false, `Prozess ${pid} laeuft nach dem Abbruch weiter`);
+  } finally {
+    s.cleanup();
+  }
+});
+
+test('ein zweites Signal mehr als eine Sekunde spaeter toetet sofort', async () => {
+  const s = await startStubborn(['--grace', '30']);
+  try {
+    s.run.child.kill('SIGINT');
+    await pause(1300);
+    for (const pid of s.pids) assert.equal(isRunning(pid), true, `Prozess ${pid} ist vor dem zweiten Signal tot`);
+    const t1 = Date.now();
+    s.run.child.kill('SIGINT');
+    const result = await s.run.done;
+    const elapsed = Date.now() - t1;
+    assert.equal(result.code, 130, result.out);
+    assert.ok(elapsed < 5000, `Exit erst ${elapsed} ms nach dem zweiten Signal - es hat nicht eskaliert`);
+    for (const pid of s.pids) assert.equal(runningAfter(pid, 2000), false, `Prozess ${pid} laeuft nach dem zweiten Signal weiter`);
+  } finally {
+    s.cleanup();
+  }
+});
+
+test('Dauern werden vor der Zerlegung gerundet: kein "1m60s"', () => {
+  const { fmt } = runnerModule;
+  assert.equal(typeof fmt, 'function', 'fmt fehlt im Runner');
+  assert.deepEqual(
+    [0, 59940, 59960, 61000, 119600, 3599500].map(fmt),
+    ['0.0s', '59.9s', '1m00s', '1m01s', '2m00s', '60m00s'],
+  );
+});
+
 test('ein falscher Aufruf endet mit Exit 2, nicht mit einem Lauf', () => {
   const r = runRunner(['node -e "1"'], ['--jobs', '0']);
   try {

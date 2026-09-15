@@ -181,10 +181,16 @@ function parseArgs(argv) {
   return opts;
 }
 
-const fmt = (ms) => {
-  const s = ms / 1000;
-  if (s < 60) return `${s.toFixed(1)}s`;
-  return `${Math.floor(s / 60)}m${String(Math.round(s % 60)).padStart(2, '0')}s`;
+/**
+ * Dauer fuer die Ausgabe. Gerundet wird VOR der Zerlegung in Minuten und
+ * Sekunden - sonst wird aus 119,6 s "1m60s" und aus 59,96 s "60.0s" (Review
+ * auf #1229).
+ */
+export const fmt = (ms) => {
+  const tenths = Math.round(ms / 100);
+  if (tenths < 600) return `${(tenths / 10).toFixed(1)}s`;
+  const seconds = Math.round(ms / 1000);
+  return `${Math.floor(seconds / 60)}m${String(seconds % 60).padStart(2, '0')}s`;
 };
 
 const slug = (step) => step.replace(/^npm run /, '').replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80);
@@ -349,13 +355,23 @@ async function main(argv) {
    * SIGTERM und beendete sich sofort: ein Schritt mit eigenem SIGTERM-Handler
    * lief als Waise weiter (Review auf #1229). Jetzt: kein neuer Schritt,
    * SIGTERM an die Gruppen, warten, nach `--grace` SIGKILL an alles, was noch
-   * laeuft, erst dann Exit 130 (SIGINT) bzw. 143 (SIGTERM). Ein zweites Signal
-   * wartet nicht mehr. Ob etwas laeuft, entscheidet der Prozesszustand, nicht
-   * `kill(pid, 0)` - ein Zombie laeuft nicht (scripts/process-state.mjs).
+   * laeuft, erst dann Exit 130 (SIGINT) bzw. 143 (SIGTERM). Ob etwas laeuft,
+   * entscheidet der Prozesszustand, nicht `kill(pid, 0)` - ein Zombie laeuft
+   * nicht (scripts/process-state.mjs).
+   *
+   * EIN ZWEITES SIGNAL ESKALIERT NUR MIT ABSTAND. Ctrl+C unter `npm run
+   * test-parallel` kommt zweimal an: vom Terminal an die ganze
+   * Vordergrund-Prozessgruppe und noch einmal von npm weitergereicht. Die
+   * Fassung davor nahm schon das zweite als "nicht mehr warten": Exit 130 nach
+   * 53 ms, der Schritt ohne Karenz getoetet (Review auf #1229). Wer wirklich
+   * nicht warten will, drueckt spaeter noch einmal - erst ein Signal mehr als
+   * SECOND_SIGNAL_GAP_MS nach dem ersten schickt sofort SIGKILL.
    */
+  const SECOND_SIGNAL_GAP_MS = 1000;
   const exitCodes = { SIGINT: 130, SIGTERM: 143 };
   let groups = [];
   let stopping = null;
+  let firstSignalAt = 0;
   const signalGroups = (sig) => {
     for (const pgid of groups) {
       try { process.kill(-pgid, sig); } catch { /* Gruppe schon leer */ }
@@ -367,9 +383,12 @@ async function main(argv) {
   };
   const stop = (signal) => {
     if (stopping) {
+      if (Date.now() - firstSignalAt <= SECOND_SIGNAL_GAP_MS) return; // dasselbe Ctrl+C, von npm weitergereicht
+      console.error('Zweites Signal - SIGKILL an die Gruppen, ohne Karenz');
       signalGroups('SIGKILL');
       process.exit(exitCodes[signal] ?? 130);
     }
+    firstSignalAt = Date.now();
     interrupted = true;
     groups = [...running].map((child) => child.pid);
     stopping = (async () => {

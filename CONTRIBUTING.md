@@ -105,7 +105,9 @@ code. Each run writes its logs to a folder of its own under the system temp dire
 `yuvomi-test-parallel-*`, created fresh for that run and readable only by you; your own run
 folders older than 24 hours are removed at the next start (`--logs DIR` for another place). A step that runs longer than 900 seconds is
 stopped and counted as failed (`--timeout SECONDS`). Ctrl+C stops the running steps with SIGTERM
-and kills whatever still runs 5 seconds later (`--grace SECONDS`). The steps come
+and kills whatever still runs 5 seconds later (`--grace SECONDS`); pressing Ctrl+C again after
+more than a second kills at once (npm passes the first Ctrl+C on twice, so an immediate second
+signal is ignored). The steps come
 from the `test` script itself, so a new suite is still registered there
 and nowhere else. Because suites run side by side, a suite takes a free port
 (`listen(0, '127.0.0.1')`) and a temp path of its own (`freshTestDbPath()`, `mkdtemp`), never a
