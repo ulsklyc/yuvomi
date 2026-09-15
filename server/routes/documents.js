@@ -10,6 +10,7 @@ import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { str, collectErrors, id as validateId, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { canManageDocument, documentVisibleSql } from '../services/document-access.js';
+import { newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import {
   DocumentDeletionInProgressError,
   documentDeleteIsActive,
@@ -1056,6 +1057,9 @@ router.post('/', async (req, res) => {
     if (parsed.error) return res.status(400).json({ error: parsed.error, code: 400 });
 
     const allowedIds = visibility === 'restricted' ? parseMemberIds(req.body.allowed_member_ids) : [];
+    // Freigeben laesst sich ein neues Dokument nur Haushaltsmitgliedern (#1207).
+    const strangers = newNonMembers(allowedIds);
+    if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
     stagedUpload = await stageDocumentUpload({
       buffer: parsed.buffer,
       mime: parsed.mime,
@@ -1140,6 +1144,14 @@ router.put('/:id', (req, res) => {
         && activeFolderTreeDeletes.has(vFolderId.value)) {
       return deletionInProgress(res);
     }
+    const allowedIds = (visibility || existing.visibility) === 'restricted' ? parseMemberIds(req.body.allowed_member_ids) : [];
+    // Neu freigeben laesst sich nur Haushaltsmitgliedern (#1207). Wer schon
+    // freigegeben ist - auch Hauspersonal oder ein Gast -, bleibt speicherbar.
+    // Geprueft vor dem UPDATE: eine abgelehnte Anfrage aendert nichts.
+    const storedAccess = db.get().prepare('SELECT user_id FROM family_document_access WHERE document_id = ?')
+      .all(id).map((row) => row.user_id);
+    const strangers = newNonMembers(allowedIds, { stored: storedAccess });
+    if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
     db.get().prepare(`
       UPDATE family_documents
       SET name = COALESCE(?, name),
@@ -1158,8 +1170,7 @@ router.put('/:id', (req, res) => {
       req.body.folder_id !== undefined ? vFolderId.value : existing.folder_id,
       id
     );
-    if ((visibility || existing.visibility) === 'restricted') replaceAccess(id, parseMemberIds(req.body.allowed_member_ids));
-    else replaceAccess(id, []);
+    replaceAccess(id, allowedIds);
 
     const row = db.get().prepare(`${documentSelect()} WHERE d.id = ? GROUP BY d.id`).get(id);
     res.json({ data: normalizeDocument(row) });

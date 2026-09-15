@@ -47,6 +47,7 @@ const { default: dashboardRouter } = await import('../server/routes/dashboard.js
 const { default: rewardsRouter } = await import('../server/routes/rewards.js');
 const { default: splitRouter } = await import('../server/routes/split-expenses.js');
 const { default: permissionsRouter } = await import('../server/routes/permissions.js');
+const { default: documentsRouter } = await import('../server/routes/documents.js');
 const { householdOverview } = await import('../server/services/two-factor.js');
 const { listEmailableMembers } = await import('../server/services/member-email.js');
 const { householdMemberSql, isHouseholdMember } = await import('../server/services/household-members.js');
@@ -151,6 +152,7 @@ app.use('/dashboard', requireAuth, dashboardRouter);
 app.use('/rewards', requireAuth, rewardsRouter);
 app.use('/split-expenses', requireAuth, splitRouter);
 app.use('/permissions', requireAuth, permissionsRouter);
+app.use('/documents', requireAuth, documentsRouter);
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -690,4 +692,40 @@ test('calendar: a rejected attendee leaves no staged attachment behind', async (
     else process.env.DOCUMENT_STORAGE_LOCAL_PATH = before.path;
     await fs.rm(dir, { recursive: true, force: true });
   }
+});
+
+// --------------------------------------------------------------------------
+// Dokumente: Freigaben
+// --------------------------------------------------------------------------
+
+test('documents: a new document can only be shared with household members', async () => {
+  const contentData = `data:text/plain;base64,${Buffer.from('Vertrag').toString('base64')}`;
+  const body = { name: 'Vertrag', original_name: 'vertrag.txt', content_data: contentData, visibility: 'restricted' };
+  assertRejectsNonMember(await call('POST', '/documents', { body: { ...body, allowed_member_ids: [BEN, CLARA] } }), 'staff shared on a new document');
+  assertRejectsNonMember(await call('POST', '/documents', { body: { ...body, allowed_member_ids: [BEN, DORA] } }), 'guest shared on a new document');
+  const ok = await call('POST', '/documents', { body: { ...body, allowed_member_ids: [BEN] } });
+  assert.equal(ok.status, 201, JSON.stringify(ok.body));
+  assert.deepEqual(ok.body.data.allowed_member_ids, [BEN]);
+});
+
+test('documents: a stored grant stays saveable, a removed one cannot come back', async () => {
+  const docId = Number(db.prepare(`
+    INSERT INTO family_documents (name, category, visibility, original_name, mime_type, file_size, content_data, created_by)
+    VALUES ('Mietvertrag', 'other', 'restricted', 'miete.txt', 'text/plain', 5, ?, ?)
+  `).run(Buffer.from('hallo').toString('base64'), ANNA).lastInsertRowid);
+  db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(docId, CLARA);
+  const access = () => db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
+    .all(docId).map((row) => row.user_id);
+  const save = (ids) => call('PUT', `/documents/${docId}`, { body: { name: 'Mietvertrag', visibility: 'restricted', allowed_member_ids: ids } });
+
+  const kept = await save([CLARA, BEN]);
+  assert.equal(kept.status, 200, JSON.stringify(kept.body));
+  assert.deepEqual(access(), byId([BEN, CLARA]), 'the stored staff grant stays next to the new member');
+
+  assert.equal((await save([BEN])).status, 200);
+  assert.deepEqual(access(), [BEN]);
+
+  assertRejectsNonMember(await save([BEN, CLARA]), 'staff shared again after the grant was removed');
+  assertRejectsNonMember(await save([BEN, DORA]), 'guest shared anew');
+  assert.deepEqual(access(), [BEN], 'a rejected save changes nothing');
 });
