@@ -30,8 +30,9 @@
  *
  * Aufruf:  node scripts/run-tests-parallel.mjs [--jobs N] [--logs DIR]
  *          [--timeout SEKUNDEN] [--grace SEKUNDEN] [--list] [--package DATEI]
- * Logs ohne `--logs`: `<tmpdir>/yuvomi-test-parallel/<checkout>-<hash>/run-*`,
- * je Lauf neu, 0700; Laufordner ueber 24 h raeumt der naechste Lauf weg.
+ * Logs ohne `--logs`: `<tmpdir>/yuvomi-test-parallel-*`, je Lauf per `mkdtemp`
+ * neu (0700); eigene Laufordner ueber 24 h raeumt der naechste Lauf weg.
+ * Nur POSIX: `/bin/sh`, Prozessgruppen - wie die `test`-Kette selbst.
  * `--timeout` gilt je Schritt, Default 900 s. `--grace`: so lange wartet ein
  * Abbruch nach SIGTERM, bevor er SIGKILL schickt, Default 5 s.
  * Exit 0 = alle Schritte gruen, 1 = mindestens einer rot, 2 = Aufruf- oder
@@ -39,9 +40,8 @@
  */
 
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import {
-  chmodSync, closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync,
+  closeSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync,
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -197,46 +197,60 @@ let interrupted = false;
 
 const pause = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
+/*
+ * DER LOGORDNER EINES LAUFS OHNE `--logs`: `mkdtemp` DIREKT UNTER TMPDIR.
+ *
+ * Keine feste Wurzel. Die Fassungen davor schrieben unter
+ * `<tmpdir>/yuvomi-test-parallel`, und jeder Befund auf #1229 kam von diesem
+ * einen vorhersagbaren Namen: zwei Laeufe teilten einen Ordner, er entstand mit
+ * 0755, ein zweiter Nutzer bekam EACCES - und unter einem `/tmp`, das alle
+ * beschreiben duerfen, lenkte ein vorab gelegter Symlink den Runner in ein
+ * fremdes Verzeichnis: `mkdirSync(recursive)` wirft dort nicht, `statSync` und
+ * `chmodSync` folgen dem Link, der Runner setzte das Ziel auf 0700, schrieb
+ * hinein und raeumte darin auf. Eine UID im Namen aendert daran nichts, der
+ * Name bliebe vorhersagbar. `mkdtemp` legt atomar an, mit 0700 und einem Namen,
+ * den niemand vorher kennt - kein `chmod` auf einen vorgefundenen Pfad.
+ */
+const RUN_PREFIX = 'yuvomi-test-parallel-';
 const RUN_DIR_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Legt `dir` mit 0700 an und zieht einen vorhandenen eigenen Ordner auf 0700.
- * Die Logs tragen Testausgaben, und unter Linux liegt `/tmp` fuer alle Nutzer
- * offen; mit der umask 022 entstanden Ordner 0755 und Dateien 0644.
+ * Raeumt alte Laufordner weg - nur, wenn es sicher geht. Lieber etwas liegen
+ * lassen als Fremdes loeschen: ein Eintrag `yuvomi-test-parallel-*` direkt in
+ * tmpdir, per `lstat` gelesen (kein Symlink, ein echtes Verzeichnis), mit der
+ * eigenen UID (wo es UIDs gibt; unter Windows zaehlen nur Art und Alter) und
+ * aelter als 24 h. Ein laufender Lauf ist frisch: jedes neue Log setzt die
+ * mtime seines Ordners.
+ *
+ * Wurzel, Uhr und UID lassen sich unterschieben, damit der Test jeden Zweig
+ * ohne zweiten Nutzer und ohne Warten sieht.
+ *
+ * @returns {string[]} die Namen der geloeschten Ordner
  */
-function privateDir(dir) {
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const stat = statSync(dir);
-  const own = typeof process.getuid !== 'function' || stat.uid === process.getuid();
-  if (own && (stat.mode & 0o777) !== 0o700) chmodSync(dir, 0o700);
+export function cleanupOldRuns({
+  tmpdir = os.tmpdir(), now = Date.now(), uid = process.getuid?.(), maxAgeMs = RUN_DIR_MAX_AGE_MS,
+} = {}) {
+  const removed = [];
+  let names;
+  try { names = readdirSync(tmpdir); } catch { return removed; }
+  for (const name of names.sort()) {
+    if (!name.startsWith(RUN_PREFIX)) continue;
+    const dir = path.join(tmpdir, name);
+    try {
+      const stat = lstatSync(dir);
+      if (stat.isSymbolicLink() || !stat.isDirectory()) continue;
+      if (typeof uid === 'number' && stat.uid !== uid) continue;
+      if (now - stat.mtimeMs <= maxAgeMs) continue;
+      rmSync(dir, { recursive: true, force: true });
+      removed.push(name);
+    } catch { /* inzwischen weg oder nicht lesbar - liegen lassen */ }
+  }
+  return removed;
 }
 
-/**
- * Der Logordner eines Laufs ohne `--logs`: `<tmpdir>/yuvomi-test-parallel/
- * <checkout>-<hash>/run-XXXXXX`, je Lauf neu.
- *
- * JE LAUF, NICHT JE CHECKOUT. Die Fassung davor leerte einen festen Ordner je
- * Checkout: ein zweiter Lauf daneben loeschte die Logs des ersten, und beide
- * schrieben ihre summary.json an dieselbe Stelle (Review auf #1229).
- * Aufgeraeumt werden nur Geschwister ueber 24 h - ein laufender Lauf ist
- * frisch, denn jedes neue Log setzt die mtime seines Ordners.
- */
-function defaultLogDir(cwd) {
-  const checkout = realpathSync(cwd);
-  const key = createHash('sha256').update(checkout).digest('hex').slice(0, 8);
-  const root = path.join(os.tmpdir(), 'yuvomi-test-parallel');
-  const base = path.join(root, `${path.basename(checkout)}-${key}`);
-  privateDir(root);
-  privateDir(base);
-  const now = Date.now();
-  for (const entry of readdirSync(base, { withFileTypes: true })) {
-    if (!entry.isDirectory() || !entry.name.startsWith('run-')) continue;
-    const dir = path.join(base, entry.name);
-    try {
-      if (now - statSync(dir).mtimeMs > RUN_DIR_MAX_AGE_MS) rmSync(dir, { recursive: true, force: true });
-    } catch { /* raeumt gerade ein anderer Lauf weg */ }
-  }
-  return mkdtempSync(path.join(base, 'run-')); // mkdtemp legt mit 0700 an
+function defaultLogDir() {
+  cleanupOldRuns();
+  return mkdtempSync(path.join(os.tmpdir(), RUN_PREFIX));
 }
 
 function runStep({ step, index }, { cwd, logDir, timeoutMs }) {
@@ -327,7 +341,7 @@ async function main(argv) {
     return 0;
   }
 
-  const logDir = opts.logs ?? defaultLogDir(cwd);
+  const logDir = opts.logs ?? defaultLogDir();
   if (opts.logs) mkdirSync(logDir, { recursive: true });
 
   /*

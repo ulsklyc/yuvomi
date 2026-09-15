@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import {
-  chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync,
+  chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
@@ -24,6 +24,9 @@ import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 
 import { SERIAL, loadSteps, parseChain, runSteps } from '../scripts/run-tests-parallel.mjs';
+// Namensraum statt benanntem Import fuer Helfer, die spaeter dazukamen: fehlt
+// einer, wird nur sein Test rot und nicht die ganze Datei beim Laden.
+import * as runnerModule from '../scripts/run-tests-parallel.mjs';
 import { isRunning, parseProcStat, processState, runningGroupMembers } from '../scripts/process-state.mjs';
 
 const RUNNER = fileURLToPath(new URL('../scripts/run-tests-parallel.mjs', import.meta.url));
@@ -411,12 +414,6 @@ function startRunner(args, env = process.env) {
 
 const logsLine = (out) => out.match(/^Logs: (.+)$/m)?.[1];
 
-/** Der Checkout-Ordner eines Laufordners - aber nie der gemeinsame Oberordner aller Checkouts. */
-function checkoutLogDir(runDir) {
-  const base = runDir && dirname(runDir);
-  return base && basename(base) !== 'yuvomi-test-parallel' ? base : null;
-}
-
 /* JEDER LAUF SEIN EIGENER ORDNER, NUR FUER DEN EIGENEN NUTZER.
  *
  * Die Fassung davor schrieb ohne `--logs` in EINEN Ordner je Checkout und
@@ -429,7 +426,7 @@ test('ohne --logs bekommt jeder Lauf einen eigenen Ordner mit 0700, auch gleichz
   writeFileSync(join(dir, 'package.json'), JSON.stringify({
     scripts: { test: 'node -e "setTimeout(() => console.log(process.env.RUN_MARK), 400)"' },
   }));
-  let base = null;
+  const created = [];
   try {
     const [a, b] = await Promise.all(['a', 'b'].map((mark) => startRunner(
       ['--package', join(dir, 'package.json')],
@@ -438,50 +435,109 @@ test('ohne --logs bekommt jeder Lauf einen eigenen Ordner mit 0700, auch gleichz
     assert.equal(a.code, 0, a.out);
     assert.equal(b.code, 0, b.out);
     const runs = [[logsLine(a.out), 'a'], [logsLine(b.out), 'b']];
-    base = checkoutLogDir(runs[0][0]);
+    created.push(...runs.map(([runDir]) => runDir).filter(Boolean));
     assert.notEqual(runs[0][0], runs[1][0], 'zwei gleichzeitige Laeufe teilen sich einen Logordner');
-    assert.ok(base, `kein Checkout-Ordner ueber ${runs[0][0]}`);
-    assert.equal(dirname(runs[1][0]), base, 'beide Laufordner liegen im Ordner desselben Checkouts');
+    // Direkt unter tmpdir, per mkdtemp - keine feste Wurzel dazwischen (siehe Symlink-Test unten).
+    for (const [runDir] of runs) {
+      assert.equal(dirname(runDir), tmpdir(), `${runDir} liegt nicht direkt unter tmpdir`);
+      assert.match(basename(runDir), /^yuvomi-test-parallel-.+/);
+    }
     for (const [runDir, mark] of runs) {
       const summary = JSON.parse(readFileSync(join(runDir, 'summary.json'), 'utf8'));
       assert.equal(dirname(summary.steps[0].log), runDir, 'die Zusammenfassung zeigt auf fremde Logs');
       assert.equal(readFileSync(summary.steps[0].log, 'utf8').trim(), mark, 'das Log gehoert zum anderen Lauf');
     }
     if (process.platform !== 'win32') {
-      for (const d of [base, runs[0][0], runs[1][0]]) {
-        assert.equal((statSync(d).mode & 0o777).toString(8), '700', `${d} ist fuer andere Nutzer offen`);
+      for (const [runDir] of runs) {
+        assert.equal((statSync(runDir).mode & 0o777).toString(8), '700', `${runDir} ist fuer andere Nutzer offen`);
       }
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
-    if (base) rmSync(base, { recursive: true, force: true });
+    for (const runDir of created) rmSync(runDir, { recursive: true, force: true });
   }
 });
 
-test('Logordner: ein Lauf raeumt nur Laufordner ueber 24 h weg und setzt den Ordner auf 0700', () => {
-  const first = runRunner(['node -e "1"'], [], { logs: false });
-  let base = null;
+/* KEINE FESTE WURZEL.
+ *
+ * Die Fassung davor schrieb unter `<tmpdir>/yuvomi-test-parallel`, einem
+ * vorhersagbaren Namen. Unter einem `/tmp`, das alle beschreiben duerfen, legt
+ * ein anderer Nutzer dort vorab einen Symlink auf ein Verzeichnis des Opfers
+ * an: `mkdirSync(recursive)` wirft nicht, `statSync`/`chmodSync` folgen dem
+ * Link, der Runner setzt das fremde Ziel auf 0700, schreibt seine Logs hinein
+ * und raeumt darin auf (Review auf #1229). Dieselbe feste Wurzel brachte davor
+ * schon geteilte Ordner, 0755 und EACCES fuer zweite Nutzer. Jetzt legt jeder
+ * Lauf seinen Ordner per `mkdtemp` direkt unter tmpdir an: atomar, 0700,
+ * unvorhersagbarer Name. Ohne zweiten Nutzer nachgestellt: der Symlink liegt
+ * unter dem alten Namen in einem untergeschobenen Temp-Ordner. */
+test('ein Symlink unter dem alten Wurzelnamen lenkt den Runner nicht um', (t) => {
+  if (process.platform === 'win32') {
+    t.skip('Symlinks auf Ordner brauchen unter Windows Sonderrechte');
+    return;
+  }
+  const tmp = mkdtempSync(join(tmpdir(), 'yuvomi-runner-tmp-'));
+  const victim = mkdtempSync(join(tmpdir(), 'yuvomi-runner-opfer-'));
+  const pkgDir = mkdtempSync(join(tmpdir(), 'yuvomi-runner-run-'));
   try {
-    assert.equal(first.run.status, 0, first.run.stdout + first.run.stderr);
-    base = checkoutLogDir(logsLine(first.run.stdout));
-    assert.ok(base, first.run.stdout);
-    const stale = Date.now() / 1000 - 25 * 3600;
-    mkdirSync(join(base, 'run-alt'));
-    utimesSync(join(base, 'run-alt'), stale, stale);
-    mkdirSync(join(base, 'run-frisch'));
-    if (process.platform !== 'win32') chmodSync(base, 0o755);
-
-    const again = spawnSync(process.execPath, [RUNNER, '--package', join(first.dir, 'package.json')], { encoding: 'utf8' });
-    assert.equal(again.status, 0, again.stdout + again.stderr);
-    assert.equal(existsSync(join(base, 'run-alt')), false, 'ein Laufordner ueber 24 h liegt noch da');
-    assert.ok(existsSync(join(base, 'run-frisch')), 'ein frischer Laufordner - womoeglich ein laufender Lauf - wurde geloescht');
-    assert.ok(existsSync(logsLine(first.run.stdout)), 'der Ordner des ersten Laufs wurde geloescht');
-    if (process.platform !== 'win32') {
-      assert.equal((statSync(base).mode & 0o777).toString(8), '700', 'ein vorhandener Ordner mit 0755 bleibt offen');
-    }
+    chmodSync(victim, 0o755);
+    writeFileSync(join(victim, 'wichtig.txt'), 'gehoert dem Opfer');
+    symlinkSync(victim, join(tmp, 'yuvomi-test-parallel'));
+    writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({ scripts: { test: 'node -e "1"' } }));
+    const run = spawnSync(process.execPath, [RUNNER, '--package', join(pkgDir, 'package.json')], {
+      encoding: 'utf8',
+      env: { ...process.env, TMPDIR: tmp, TMP: tmp, TEMP: tmp },
+    });
+    assert.equal(run.status, 0, run.stdout + run.stderr);
+    assert.equal((statSync(victim).mode & 0o777).toString(8), '755', 'der Runner hat das Ziel des Symlinks umgerechtet');
+    assert.deepEqual(readdirSync(victim), ['wichtig.txt'], 'der Runner hat in das Ziel des Symlinks geschrieben');
+    const runDir = logsLine(run.stdout);
+    assert.equal(dirname(runDir), tmp, `der Laufordner ${runDir} liegt nicht direkt unter tmpdir`);
+    assert.match(basename(runDir), /^yuvomi-test-parallel-.+/);
+    assert.equal((statSync(runDir).mode & 0o777).toString(8), '700', 'der Laufordner ist fuer andere offen');
   } finally {
-    first.cleanup();
-    if (base) rmSync(base, { recursive: true, force: true });
+    for (const d of [tmp, victim, pkgDir]) rmSync(d, { recursive: true, force: true });
+  }
+});
+
+/* ALTE LAEUFE WEGRAEUMEN NUR, WENN ES SICHER GEHT. Lieber etwas liegen lassen
+ * als Fremdes loeschen: kein Symlink, ein echtes Verzeichnis, die eigene UID
+ * (wo es UIDs gibt), aelter als 24 h. Wurzel, Uhr und UID sind hier
+ * untergeschoben, damit jeder Zweig ohne zweiten Nutzer und ohne Warten
+ * sichtbar wird. */
+test('das Aufraeumen loescht nur eigene, echte Laufordner ueber 24 h', () => {
+  const { cleanupOldRuns } = runnerModule;
+  assert.equal(typeof cleanupOldRuns, 'function', 'cleanupOldRuns fehlt im Runner');
+  const tmp = mkdtempSync(join(tmpdir(), 'yuvomi-runner-cleanup-'));
+  const victim = mkdtempSync(join(tmpdir(), 'yuvomi-runner-opfer-'));
+  const day = 24 * 3600 * 1000;
+  const old = (Date.now() - 25 * 3600 * 1000) / 1000;
+  const posix = typeof process.getuid === 'function';
+  const own = posix ? process.getuid() : undefined;
+  try {
+    for (const name of ['yuvomi-test-parallel-alt', 'yuvomi-test-parallel-jung', 'anderer-ordner-alt']) mkdirSync(join(tmp, name));
+    writeFileSync(join(tmp, 'yuvomi-test-parallel-datei'), 'keine Logs');
+    writeFileSync(join(victim, 'wichtig.txt'), 'gehoert dem Opfer');
+    for (const name of ['yuvomi-test-parallel-alt', 'anderer-ordner-alt', 'yuvomi-test-parallel-datei']) {
+      utimesSync(join(tmp, name), old, old);
+    }
+    utimesSync(victim, old, old);
+    if (process.platform !== 'win32') symlinkSync(victim, join(tmp, 'yuvomi-test-parallel-link'));
+
+    if (posix) {
+      // Einem anderen Nutzer gehoert nichts davon: selbst mit vorgestellter Uhr bleibt alles.
+      assert.deepEqual(cleanupOldRuns({ tmpdir: tmp, now: Date.now() + 2 * day, uid: own + 1 }), []);
+    }
+    // Echte Uhr: nur der alte eigene Ordner.
+    assert.deepEqual(cleanupOldRuns({ tmpdir: tmp, now: Date.now(), uid: own }), ['yuvomi-test-parallel-alt']);
+    // Uhr zwei Tage vor: jetzt ist auch der junge alt - Symlink, Datei und fremder Name bleiben trotzdem.
+    assert.deepEqual(cleanupOldRuns({ tmpdir: tmp, now: Date.now() + 2 * day, uid: own }), ['yuvomi-test-parallel-jung']);
+    const expected = ['anderer-ordner-alt', 'yuvomi-test-parallel-datei'];
+    if (process.platform !== 'win32') expected.push('yuvomi-test-parallel-link');
+    assert.deepEqual(readdirSync(tmp).sort(), expected.sort());
+    assert.deepEqual(readdirSync(victim), ['wichtig.txt'], 'das Ziel des Symlinks wurde angefasst');
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+    rmSync(victim, { recursive: true, force: true });
   }
 });
 

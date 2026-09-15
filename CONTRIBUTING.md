@@ -102,8 +102,8 @@ HTTP starts its own server on a free local port and stops it again.
 one per CPU core minus one, `--jobs N` to change that. It does not stop at the first failure:
 it ends with the failed steps and their log files, the ten slowest steps and a non-zero exit
 code. Each run writes its logs to a folder of its own under the system temp directory,
-`yuvomi-test-parallel/<checkout>-<hash>/run-*`, readable only by you; run folders older than 24
-hours are removed (`--logs DIR` for another place). A step that runs longer than 900 seconds is
+`yuvomi-test-parallel-*`, created fresh for that run and readable only by you; your own run
+folders older than 24 hours are removed at the next start (`--logs DIR` for another place). A step that runs longer than 900 seconds is
 stopped and counted as failed (`--timeout SECONDS`). Ctrl+C stops the running steps with SIGTERM
 and kills whatever still runs 5 seconds later (`--grace SECONDS`). The steps come
 from the `test` script itself, so a new suite is still registered there
