@@ -227,10 +227,10 @@ in this schema points at `users.id`, and a second table would make every new fea
   `users` row minus staff minus guests), and `accessScopeSql()`, which resolves `access_scope`
   per account to `family` or `split_guest`. The lists of members built from `users` go
   through the predicate, and `npm run test:household-member-guard` turns red when a new list
-  reads `users` without it. The exceptions stand in the guard's allowlist with a reason: user
-  administration, sign-in, the permission matrix, background jobs per account - and
-  `GET /auth/users`, which besides the administration also feeds the calendar, budget and
-  schedule pickers today, so staff and guests are offered there (#1207).
+  reads `users` without it. The places that must see every row stand in the guard's allowlist
+  with a reason, among them user administration (`GET /auth/users`, which today also feeds the
+  calendar, budget and schedule pickers, so staff and guests are offered there), sign-in, the
+  permission matrix and background jobs per account (#1207).
 - Not every list applies the strict form yet: `includeGuests` (family members, 2FA overview,
   task options and mentions, dashboard, rewards, split expense candidates) and `includeStaff`
   (household size, API token subjects) keep what each list showed before the predicate
