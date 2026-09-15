@@ -88,7 +88,7 @@ const PREDICATE_EXPORT = 'householdMemberSql';
 const ALLOWLIST = [
   {
     file: 'server/auth.js', site: 'GET /users', lists: 2,
-    reason: 'User administration: lists every account and flags staff (is_worker) and guests (access_scope). The calendar, budget and schedule pickers read the same list today.',
+    reason: 'User administration: lists every account and flags staff (is_worker) and guests (access_scope). No picker reads it since #1207; the calendar and schedule pages use it only to name people a record already stores.',
   },
   {
     file: 'server/auth.js', site: 'GET /api-tokens', lists: 1,
