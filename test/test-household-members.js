@@ -213,11 +213,16 @@ test('members only: GET /family/members (the source of the pickers)', async () =
   assert.deepEqual(idsOf(r.body.data), MEMBERS);
 });
 
-test('members only: the household 2FA overview', async () => {
-  assert.deepEqual(idsOf(householdOverview(db), 'user_id'), MEMBERS);
+test('accounts: the 2FA overview lists every account that can sign in', async () => {
+  // Der zweite Faktor schuetzt Anmeldungen, nicht die Mitgliedschaft
+  // (Entscheidung 15.09.2026, #1207). Anmelden kann sich heute JEDES Konto:
+  // es gibt keinen deaktivierten Zustand, ein Gast meldet sich mit Passwort
+  // an, und Hauspersonal ist nur beim Passwort-Login gesperrt - ueber SSO
+  // (`/auth/oidc/callback`) nicht, und dort greift der zweite Faktor ebenso.
+  assert.deepEqual(idsOf(householdOverview(db), 'user_id'), EVERYONE);
   const r = await call('GET', '/auth/2fa/overview');
   assert.equal(r.status, 200);
-  assert.deepEqual(idsOf(r.body.data, 'user_id'), MEMBERS);
+  assert.deepEqual(idsOf(r.body.data, 'user_id'), EVERYONE);
 });
 
 test('members only: GET /tasks/meta/options', async () => {
@@ -487,4 +492,88 @@ test('picker: members, then whoever is already chosen on the record, once', asyn
   assert.deepEqual(list.map((person) => person.id), [ANNA, BEN, CLARA]);
   assert.equal(list[2].avatar_color, '#333333', 'the record calls the colour `color`, the picker reads `avatar_color`');
   assert.deepEqual(withChosenPeople(members, null).map((person) => person.id), [ANNA, BEN], 'a new record offers members only');
+});
+
+// --------------------------------------------------------------------------
+// Weitere Personenwahl: Sync-Ziele, Outlook, Ausgabengruppen (Entscheidung
+// vom 15.09.2026 - dasselbe Muster: neu nur Mitglieder, Gespeichertes bleibt)
+// --------------------------------------------------------------------------
+
+test('synced calendars: a new ICS subscription default assignee must be a household member', async () => {
+  const body = { name: 'Schule', url: 'https://127.0.0.1/stundenplan.ics', color: '#123456' };
+  // Kein Netz: 127.0.0.1 weist die SSRF-Pruefung vor jedem Abruf ab. Ein
+  // Mitglied kommt an der Personenpruefung vorbei und scheitert erst dort - die
+  // Positivkontrolle dafuer, dass die Ablehnung darunter die Mitgliedschaft meint.
+  const member = await call('POST', '/calendar/subscriptions', { body: { ...body, default_assignee_user_id: BEN } });
+  assert.equal(member.status, 400, JSON.stringify(member.body));
+  assert.match(String(member.body?.error), /private IP/i);
+  assertRejectsNonMember(
+    await call('POST', '/calendar/subscriptions', { body: { ...body, default_assignee_user_id: CLARA } }),
+    'staff as default assignee of a new subscription',
+  );
+});
+
+test('synced calendars: a stored ICS subscription assignee stays saveable, a new guest does not', async () => {
+  const subId = Number(db.prepare(`
+    INSERT INTO ics_subscriptions (name, url, color, created_by, default_assignee_user_id)
+    VALUES ('Verein', 'https://example.org/verein.ics', '#654321', ?, ?)
+  `).run(ANNA, CLARA).lastInsertRowid);
+  const assignee = () => db.prepare('SELECT default_assignee_user_id AS a FROM ics_subscriptions WHERE id = ?').get(subId).a;
+
+  const kept = await call('PATCH', `/calendar/subscriptions/${subId}`, { body: { name: 'Verein neu', default_assignee_user_id: CLARA } });
+  assert.equal(kept.status, 200, JSON.stringify(kept.body));
+  assertRejectsNonMember(await call('PATCH', `/calendar/subscriptions/${subId}`, { body: { default_assignee_user_id: DORA } }), 'guest as default assignee');
+  assert.equal(assignee(), CLARA, 'a rejected PATCH writes nothing');
+  const member = await call('PATCH', `/calendar/subscriptions/${subId}`, { body: { default_assignee_user_id: BEN } });
+  assert.equal(member.status, 200, JSON.stringify(member.body));
+  assert.equal(assignee(), BEN);
+});
+
+test('synced calendars: an external calendar default assignee (Google, Apple, CalDAV)', async () => {
+  const target = { source: 'google', external_id: 'haus@group.calendar.google.com' };
+  db.prepare('INSERT INTO external_calendars (source, external_id, name, default_assignee_user_id) VALUES (?, ?, ?, ?)')
+    .run(target.source, target.external_id, 'Haus', CLARA);
+  const assignee = () => db.prepare('SELECT default_assignee_user_id AS a FROM external_calendars WHERE external_id = ?').get(target.external_id).a;
+
+  const kept = await call('PATCH', '/calendar/external-calendars', { body: { ...target, default_assignee_user_id: CLARA } });
+  assert.equal(kept.status, 200, JSON.stringify(kept.body));
+  assertRejectsNonMember(await call('PATCH', '/calendar/external-calendars', { body: { ...target, default_assignee_user_id: EMIL } }), 'guest as default assignee');
+  assert.equal(assignee(), CLARA, 'a rejected PATCH writes nothing');
+  const member = await call('PATCH', '/calendar/external-calendars', { body: { ...target, default_assignee_user_id: BEN } });
+  assert.equal(member.status, 200, JSON.stringify(member.body));
+  assertRejectsNonMember(
+    await call('PATCH', '/calendar/external-calendars', { body: { ...target, default_assignee_user_id: CLARA } }),
+    'staff chosen again after being replaced',
+  );
+});
+
+test('synced calendars: a stored Outlook account owner stays saveable, a new non-member does not', async () => {
+  const accountId = Number(db.prepare(`
+    INSERT INTO outlook_accounts (name, access_token, refresh_token, owner_user_id) VALUES ('Arbeit', 'access', 'refresh', ?)
+  `).run(CLARA).lastInsertRowid);
+  const owner = () => db.prepare('SELECT owner_user_id AS o FROM outlook_accounts WHERE id = ?').get(accountId).o;
+
+  const kept = await call('PUT', `/calendar/outlook/accounts/${accountId}`, { body: { name: 'Arbeit neu', ownerUserId: CLARA } });
+  assert.equal(kept.status, 200, JSON.stringify(kept.body));
+  assertRejectsNonMember(await call('PUT', `/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: DORA } }), 'guest as owner');
+  assert.equal(owner(), CLARA, 'a rejected PUT writes nothing');
+  const member = await call('PUT', `/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: BEN } });
+  assert.equal(member.status, 200, JSON.stringify(member.body));
+  assert.equal(owner(), BEN);
+});
+
+test('split expenses: members and guests can join a group, staff cannot, a stored staff membership stays', async () => {
+  const membership = (groupId, userId) => db.prepare('SELECT role FROM expense_group_members WHERE group_id = ? AND user_id = ?').get(groupId, userId);
+
+  const member = await call('POST', `/split-expenses/groups/${GROUP}/members`, { body: { user_id: BEN } });
+  assert.equal(member.status, 201, JSON.stringify(member.body));
+  const guest = await call('POST', `/split-expenses/groups/${GROUP}/members`, { body: { user_id: EMIL } });
+  assert.equal(guest.status, 201, `the guest mechanism stays: a guest of another group can still join ${JSON.stringify(guest.body)}`);
+  assertRejectsNonMember(await call('POST', `/split-expenses/groups/${GROUP}/members`, { body: { user_id: CLARA } }), 'staff joining a group');
+  assert.equal(membership(GROUP, CLARA), undefined, 'a rejected POST writes nothing');
+
+  db.prepare("INSERT INTO expense_group_members (group_id, user_id, role) VALUES (?, ?, 'guest')").run(OTHER, CLARA);
+  const kept = await call('POST', `/split-expenses/groups/${OTHER}/members`, { body: { user_id: CLARA, role: 'admin' } });
+  assert.equal(kept.status, 201, JSON.stringify(kept.body));
+  assert.equal(membership(OTHER, CLARA).role, 'admin', 'a stored staff membership can still be changed');
 });
