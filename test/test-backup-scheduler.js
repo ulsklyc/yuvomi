@@ -151,10 +151,19 @@ describe('Backup Scheduler', () => {
       const result = await backupScheduler.triggerBackup();
 
       assert.strictEqual(result.success, false, 'backup must fail on an unwritable directory');
-      assert.match(
-        result.error,
-        new RegExp(path.resolve(TEST_BACKUP_DIR).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
-        'error must name the absolute path, not the relative one'
+      // VERANKERT AN DEN ANFUEHRUNGSZEICHEN DER MELDUNG. Der relative BACKUP_DIR fuehrt
+      // ueber `../..` bis zur Wurzel und ENDET im absoluten Temp-Pfad. Ein unverankerter
+      // Treffer auf den absoluten Pfad fand ihn deshalb auch in einer Meldung, die den
+      // RELATIVEN Wert nennt: `${BACKUP_DIR}` statt `${path.resolve(BACKUP_DIR)}` im
+      // Server blieb gruen (Review auf #1229).
+      const absolute = path.resolve(TEST_BACKUP_DIR);
+      assert.ok(
+        result.error.includes(`"${absolute}"`),
+        `error must name the absolute path in quotes: ${result.error}`
+      );
+      assert.ok(
+        !result.error.includes(`"${TEST_BACKUP_DIR}"`),
+        `error must not name the relative path: ${result.error}`
       );
       assert.match(result.error, /BACKUP_DIR/, 'error must point at the BACKUP_DIR setting');
       assert.match(result.error, /EACCES|EPERM|EROFS/, 'error must keep the original errno');
