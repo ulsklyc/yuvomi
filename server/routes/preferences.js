@@ -9,6 +9,7 @@ import express from 'express';
 import * as db from '../db.js';
 import * as holidays from '../services/holidays.js';
 import { str, MAX_SHORT } from '../middleware/validate.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
 import { getSupportedLocales, isSupportedLocale, resolveHouseholdLocale } from '../utils/i18n.js';
 import { householdTimeZone, isValidTimeZone } from '../utils/timezone.js';
 import { retitleBirthdayEvents } from '../services/birthdays.js';
@@ -658,7 +659,7 @@ router.put('/', (req, res) => {
     // geschrieben waren - ein gemischtes Payload eines Nicht-Admins wandte sich
     // dann teilweise an, bevor der 403 kam.
     if (schedule_hidden_templates !== undefined) {
-      if (req.authRole !== 'admin') {
+      if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (!Array.isArray(schedule_hidden_templates)) {
@@ -736,7 +737,7 @@ router.put('/', (req, res) => {
 
     // Budget-Modus — haushaltweite Grundsatzentscheidung, nur Admin (#476/#505).
     if (budget_mode !== undefined) {
-      if (req.authRole !== 'admin') {
+      if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (!VALID_BUDGET_MODES.includes(budget_mode)) {
@@ -755,7 +756,7 @@ router.put('/', (req, res) => {
     // - sonst wäre der dortige Schutz über diesen Umweg zu umgehen. Die Oberfläche
     // behandelte die Region ohnehin immer als Admin-Feld, nur die Route nicht.
     if (region !== undefined) {
-      if (req.authRole !== 'admin') {
+      if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (region !== null && (typeof region !== 'string' || !VALID_REGION.test(region))) {
@@ -773,7 +774,7 @@ router.put('/', (req, res) => {
     // abonnieren, und die Wanduhrzeit, mit der Termine zu Google und Outlook
     // hinausgehen. Ein Mitglied darf ihn deshalb nicht fuer alle umstellen.
     if (timezone !== undefined) {
-      if (req.authRole !== 'admin') {
+      if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (timezone !== null && timezone !== '' && !isValidTimeZone(timezone)) {
@@ -788,7 +789,7 @@ router.put('/', (req, res) => {
     // Datensprache — haushaltweite Grundsatzentscheidung wie Region und Währung,
     // deshalb nur Admin. null/'' stellt auf "automatisch" zurück (aus der Region).
     if (language !== undefined) {
-      if (req.authRole !== 'admin') {
+      if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (language !== null && language !== '' && !isSupportedLocale(language)) {
@@ -864,7 +865,7 @@ router.put('/', (req, res) => {
     // ist der Rueckweg oben - ohne ihn waere die Vorgabe fuer jeden unsichtbar,
     // der je eine Kachel verschoben hat.
     if (dashboard_widgets_default !== undefined) {
-      if (req.authRole !== 'admin') {
+      if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (dashboard_widgets_default === null) {
@@ -881,7 +882,7 @@ router.put('/', (req, res) => {
     }
 
     if (dashboard_today_glance_default !== undefined) {
-      if (req.authRole !== 'admin') {
+      if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (dashboard_today_glance_default === null) {
@@ -894,7 +895,7 @@ router.put('/', (req, res) => {
     }
 
     if (disabled_modules !== undefined) {
-      if (req.authRole !== 'admin') {
+      if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (!Array.isArray(disabled_modules)) {
@@ -1024,7 +1025,7 @@ router.put('/', (req, res) => {
 
     // Haushaltweite Modul-Feature-Schalter — nur Admins.
     if (health_cycle_enabled !== undefined) {
-      if (req.authRole !== 'admin') {
+      if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (typeof health_cycle_enabled !== 'boolean') {
@@ -1045,7 +1046,7 @@ router.put('/', (req, res) => {
     }
 
     if (rewards_require_approval !== undefined) {
-      if (req.authRole !== 'admin') {
+      if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (typeof rewards_require_approval !== 'boolean') {
@@ -1055,7 +1056,7 @@ router.put('/', (req, res) => {
     }
 
     if (tasks_subtasks_expanded !== undefined) {
-      if (req.authRole !== 'admin') {
+      if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (typeof tasks_subtasks_expanded !== 'boolean') {
@@ -1066,7 +1067,7 @@ router.put('/', (req, res) => {
 
     // Standard-Punktwert für neue Aufgaben (#578). 0 schaltet den Standard ab.
     if (tasks_default_points !== undefined) {
-      if (req.authRole !== 'admin') {
+      if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       const points = Number(tasks_default_points);
@@ -1078,7 +1079,7 @@ router.put('/', (req, res) => {
 
     // Nachfrist für abgelaufene Countdowns (#969). 0 = keine Nachfrist.
     if (countdown_grace_days !== undefined) {
-      if (req.authRole !== 'admin') {
+      if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       const days = Number(countdown_grace_days);
@@ -1097,7 +1098,7 @@ router.put('/', (req, res) => {
       weather_units    !== undefined ||
       weather_auto_locate !== undefined
     ) {
-      if (req.authRole !== 'admin') {
+      if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (weather_provider !== undefined) {
@@ -1206,7 +1207,7 @@ router.put('/', (req, res) => {
       holiday_public_color !== undefined ||
       holiday_school_color !== undefined
     ) {
-      if (req.authRole !== 'admin') {
+      if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (holiday_country !== undefined) {
@@ -1440,7 +1441,7 @@ router.get('/holidays/groups/:countryCode/:subdivisionCode', async (req, res) =>
 
 // POST /api/v1/preferences/holidays/sync  (admin only)
 router.post('/holidays/sync', async (req, res) => {
-  if (req.authRole !== 'admin') {
+  if (!isAdminRequest(req)) {
     return res.status(403).json({ error: 'Admin access required.', code: 403 });
   }
   try {

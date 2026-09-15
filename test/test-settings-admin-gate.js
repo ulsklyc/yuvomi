@@ -31,9 +31,10 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withoutCommentsKeepingLines } from './source-text.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -255,4 +256,87 @@ test('kein adminOnly-Blatt schreibt eine per-Nutzer-Preference', () => {
   assert.deepEqual(violations, [],
     'Diese Einstellungen wirken pro Nutzer, ihr Blatt ist aber adminOnly - jeder darf sie setzen, '
     + 'nur erreicht sie niemand ausser dem Admin:\n  ' + violations.join('\n  '));
+});
+
+// ── Dritte Sonde: eine Schreibweise fuer das Admin-Praedikat ─────────────────
+//
+// Ob eine Anfrage als Admin gilt, fragt der Server ueber `isAdminRequest()` aus
+// server/middleware/require-admin.js. Dieser Test haelt nur die SCHREIBWEISE:
+// ein neues `req.authRole === 'admin'` oder ein Session-Fallback neben dem
+// Helfer wird rot. Die Regel selbst (Mitglied bekommt 403, Admin kommt durch)
+// halten die Verhaltenstests der Routen, etwa test-email.js,
+// test-rewards-routes.js, test-screensaver.js und test-notifications.js.
+//
+// Die Karte zaehlt exakt, nicht hoechstens: faellt eine Stelle weg, muss ihr
+// Eintrag mitfallen, sonst waechst hier still ein Freibrief.
+
+const ADMIN_PREDICATE_PATTERNS = [
+  /authRole\s*[!=]==\s*['"]admin['"]/g,
+  /['"]admin['"]\s*[!=]==\s*(req\.)?authRole/g,
+  /session\??\.role\s*[!=]==\s*['"]admin/g,
+  /session\??\.isAdmin/g,
+];
+
+/** Datei -> exakte Trefferzahl, mit Grund. */
+const ADMIN_PREDICATE_EXCEPTIONS = new Map([
+  // Die Definition des Helfers selbst.
+  ['server/middleware/require-admin.js', 1],
+  // test-sso-only.js haelt die woertliche Schreibweise per Regex.
+  ['server/auth.js', 2],
+  // Ausserhalb dieses Schnitts geblieben; zieht beim naechsten Anfassen nach.
+  ['server/routes/dashboard.js', 1],
+  // Fassungen mit Fallback auf die Session-Rolle: das Einsammeln aendert, was
+  // Token plus Admin-Cookie duerfen, und ist ein eigener Schritt.
+  ['server/routes/calendar/helpers.js', 3],
+  ['server/routes/dms.js', 2],
+  ['server/routes/documents.js', 2],
+  ['server/routes/notes.js', 2],
+  ['server/routes/recipe-providers.js', 2],
+  ['server/routes/schedule.js', 2],
+  ['server/routes/split-expenses.js', 2],
+  ['server/routes/tasks.js', 2],
+]);
+
+function serverJsFiles(dir = join(ROOT, 'server')) {
+  const files = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) files.push(...serverJsFiles(full));
+    else if (entry.name.endsWith('.js')) files.push(full);
+  }
+  return files;
+}
+
+test('das Admin-Praedikat steht nur in isAdminRequest() und den gezaehlten Ausnahmen', () => {
+  const files = serverJsFiles();
+  assert.ok(files.length >= 200, `nur ${files.length} Dateien unter server/ gefunden - der Walk greift nicht mehr`);
+
+  const hits = new Map();
+  for (const file of files) {
+    const rel = relative(ROOT, file).split('\\').join('/');
+    const lines = withoutCommentsKeepingLines(readFileSync(file, 'utf8')).split('\n');
+    lines.forEach((line, i) => {
+      for (const pattern of ADMIN_PREDICATE_PATTERNS) {
+        for (const m of line.matchAll(pattern)) {
+          if (!hits.has(rel)) hits.set(rel, []);
+          hits.get(rel).push(`${rel}:${i + 1}: ${m[0]}`);
+        }
+      }
+    });
+  }
+
+  const problems = [];
+  for (const [rel, found] of hits) {
+    const expected = ADMIN_PREDICATE_EXCEPTIONS.get(rel) ?? 0;
+    if (found.length !== expected) {
+      problems.push(`${rel}: ${found.length} Treffer, Karte erwartet ${expected}\n    ${found.join('\n    ')}`);
+    }
+  }
+  for (const [rel, expected] of ADMIN_PREDICATE_EXCEPTIONS) {
+    if (!hits.has(rel)) problems.push(`${rel}: 0 Treffer, Karte erwartet ${expected} - Eintrag streichen`);
+  }
+
+  assert.deepEqual(problems, [],
+    'Das Admin-Praedikat gehoert in isAdminRequest(req) aus server/middleware/require-admin.js; '
+    + 'die Ausnahmekarte zaehlt exakt und muss beim Einsammeln mitfallen:\n  ' + problems.join('\n  '));
 });

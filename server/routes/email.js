@@ -6,6 +6,7 @@
 import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
 import { emailService as defaultEmailService } from '../services/email.js';
 
 const log = createLogger('EmailRoutes');
@@ -35,7 +36,7 @@ export function buildRouter({ database, emailService = defaultEmailService, reso
 
   function requireAdmin(req, res, next) {
     // requireAuth (server/auth.js) populates req.authRole for both session and API-token auth.
-    if (req.authRole !== 'admin') {
+    if (!isAdminRequest(req)) {
       return res.status(403).json({ error: 'Admin access required.', code: 403 });
     }
     next();

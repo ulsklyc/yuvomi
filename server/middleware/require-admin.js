@@ -9,9 +9,17 @@
  * diese Funktion unverändert weiter - Bestandsimporte bleiben gültig.
  */
 
+/**
+ * Ob die Anfrage mit Admin-Rolle kommt. `requireAuth` legt die geltende Rolle
+ * für Session und API-Token gleichermaßen in `req.authRole` ab.
+ */
+export function isAdminRequest(req) {
+  return req.authRole === 'admin';
+}
+
 /** Lässt nur Admins durch; alle anderen erhalten 403. */
 export function requireAdmin(req, res, next) {
-  if (req.authRole === 'admin') {
+  if (isAdminRequest(req)) {
     return next();
   }
   res.status(403).json({ error: 'Permission denied.', code: 403 });

@@ -21,6 +21,7 @@ import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
 import { str, color, collectErrors, MAX_SHORT } from '../middleware/validate.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
 import { normalizeQuickLinkUrl } from '../../public/utils/quick-link-url.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 
@@ -179,11 +180,6 @@ function actingUser(req) {
   return req.authUserId || req.session?.userId || null;
 }
 
-/** Ob die anfragende Person Admin ist - eine Schreibweise für alle Aufrufer. */
-function actingIsAdmin(req) {
-  return req.authRole === 'admin';
-}
-
 /**
  * Übersetzt die Absage der Adressprüfung in eine Fehlermeldung.
  * @param {'empty'|'too-long'|'malformed'|'protocol'} reason
@@ -204,7 +200,7 @@ function urlErrorMessage(reason) {
  */
 router.get('/', (req, res) => {
   try {
-    res.json({ data: listQuickLinksFor(actingUser(req), actingIsAdmin(req)) });
+    res.json({ data: listQuickLinksFor(actingUser(req), isAdminRequest(req)) });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
@@ -281,7 +277,7 @@ router.put('/order', (req, res) => {
       ordered.forEach((id, index) => stmt.run(index, id));
     });
 
-    res.json({ data: listQuickLinksFor(me, actingIsAdmin(req)) });
+    res.json({ data: listQuickLinksFor(me, isAdminRequest(req)) });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
@@ -302,7 +298,7 @@ router.put('/:id', (req, res) => {
     if (!row || (row.visibility === 'private' && row.created_by !== actingUser(req))) {
       return res.status(404).json({ error: 'Schnellzugriff nicht gefunden', code: 404 });
     }
-    if (!mayEdit(row, actingUser(req), actingIsAdmin(req))) return res.status(403).json({ error: 'Keine Berechtigung', code: 403 });
+    if (!mayEdit(row, actingUser(req), isAdminRequest(req))) return res.status(403).json({ error: 'Keine Berechtigung', code: 403 });
 
     const vName  = req.body.name !== undefined ? str(req.body.name, 'Name', { max: MAX_SHORT }) : { value: row.name, error: null };
     const vColor = req.body.color !== undefined ? color(req.body.color || null, 'Color') : { value: row.color, error: null };
@@ -347,7 +343,7 @@ router.delete('/:id', (req, res) => {
     if (!row || (row.visibility === 'private' && row.created_by !== actingUser(req))) {
       return res.status(404).json({ error: 'Schnellzugriff nicht gefunden', code: 404 });
     }
-    if (!mayEdit(row, actingUser(req), actingIsAdmin(req))) return res.status(403).json({ error: 'Keine Berechtigung', code: 403 });
+    if (!mayEdit(row, actingUser(req), isAdminRequest(req))) return res.status(403).json({ error: 'Keine Berechtigung', code: 403 });
 
     db.get().prepare('DELETE FROM quick_links WHERE id = ?').run(id);
     res.status(204).end();

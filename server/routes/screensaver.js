@@ -2,6 +2,7 @@
 import express from 'express';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
 
 const router = express.Router();
 const log = createLogger('Screensaver');
@@ -21,7 +22,7 @@ function config() {
 }
 
 function requireAdmin(req, res, next) {
-  if (req.authRole !== 'admin') return res.status(403).json({ error: 'Admin access required.', code: 403 });
+  if (!isAdminRequest(req)) return res.status(403).json({ error: 'Admin access required.', code: 403 });
   next();
 }
 

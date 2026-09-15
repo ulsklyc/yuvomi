@@ -11,6 +11,7 @@ import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { getBalance, isEnrolled, postLedger } from '../services/rewards.js';
 import { householdMemberSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
 
 const log = createLogger('Rewards');
 const router = express.Router();
@@ -19,7 +20,7 @@ const MAX_COST = 1_000_000;
 const MAX_BONUS = 1_000_000;
 
 function requireAdmin(req, res, next) {
-  if (req.authRole !== 'admin') {
+  if (!isAdminRequest(req)) {
     return res.status(403).json({ error: 'Admin access required.', code: 403 });
   }
   next();
@@ -96,7 +97,7 @@ router.get('/overview', (req, res) => {
     const pointedTaskCount = d.prepare('SELECT COUNT(*) AS n FROM tasks WHERE points > 0').get().n;
     res.json({ data: {
       balances, catalog, pendingCount: pending,
-      isAdmin: req.authRole === 'admin', me: actingUser(req),
+      isAdmin: isAdminRequest(req), me: actingUser(req),
       setup: { participantCount, catalogCount, pointedTaskCount },
     } });
   } catch (err) {
@@ -162,7 +163,7 @@ router.put('/participants/:userId', requireAdmin, (req, res) => {
 // --------------------------------------------------------
 router.get('/catalog', (req, res) => {
   try {
-    const all = req.authRole === 'admin' && req.query.all === '1';
+    const all = isAdminRequest(req) && req.query.all === '1';
     const rows = db.get().prepare(`
       SELECT id, name, cost, icon, description, is_active, sort_order
       FROM reward_catalog
@@ -327,7 +328,7 @@ router.post('/redemptions', (req, res) => {
   try {
     const d = db.get();
     const me = actingUser(req);
-    const targetId = req.body?.user_id != null && req.authRole === 'admin' ? toInt(req.body.user_id) : me;
+    const targetId = req.body?.user_id != null && isAdminRequest(req) ? toInt(req.body.user_id) : me;
     if (!targetId) return res.status(400).json({ error: 'user_id is required.', code: 400 });
 
     const item = d.prepare('SELECT * FROM reward_catalog WHERE id = ? AND is_active = 1').get(toInt(req.body?.catalog_id));
@@ -385,7 +386,7 @@ router.patch('/redemptions/:id', (req, res) => {
     if (row.status !== 'pending')
       return res.status(409).json({ error: 'Redemption already decided.', code: 409 });
 
-    const isAdmin = req.authRole === 'admin';
+    const isAdmin = isAdminRequest(req);
     if ((action === 'fulfill' || action === 'reject') && !isAdmin)
       return res.status(403).json({ error: 'Admin access required.', code: 403 });
     if (action === 'cancel' && !isAdmin && row.user_id !== me)

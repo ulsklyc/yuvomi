@@ -6,6 +6,7 @@
 import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
 import { createNotificationChannelStore, NOTIFICATION_PROVIDERS } from '../services/notification-channels.js';
 import { notificationService as defaultNotificationService } from '../services/notifications.js';
 
@@ -26,7 +27,7 @@ export function buildRouter({
   const router = express.Router();
 
   function requireAdmin(req, res, next) {
-    if (req.authRole !== 'admin') {
+    if (!isAdminRequest(req)) {
       return res.status(403).json({ error: 'Admin access required.', code: 403 });
     }
     next();

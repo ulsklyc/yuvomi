@@ -7,6 +7,7 @@
 import express from 'express';
 import path from 'node:path';
 import { requireAdmin } from '../auth.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
 import { createLogger } from '../logger.js';
 import { MODULES_DIR, listModules, resolveAssetPath, setModuleEnabled } from '../services/modules.js';
 
@@ -15,7 +16,7 @@ const log = createLogger('Modules');
 
 router.get('/', async (req, res) => {
   try {
-    const admin = req.authRole === 'admin' && req.query.admin === '1';
+    const admin = isAdminRequest(req) && req.query.admin === '1';
     const modules = await listModules({ admin });
     res.json({ data: modules });
   } catch (err) {

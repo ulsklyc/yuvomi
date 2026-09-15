@@ -11,6 +11,7 @@ import { hashPassword } from '../utils/password.js';
 import * as db from '../db.js';
 import { normalizeAvatarData, syncFamilyMemberArtifacts } from '../auth.js';
 import { collectErrors, color, date, datetime, month, num, oneOf, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
 import { minutesBetween, computeHourlyAmount } from '../services/housekeeping-billing.js';
 import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
 import { assertDocumentLinkTargetsAvailable } from '../services/document-links.js';
@@ -500,7 +501,7 @@ function housekeepingDashboard() {
 }
 
 function assertAdmin(req, res) {
-  if (req.authRole === 'admin') return true;
+  if (isAdminRequest(req)) return true;
   res.status(403).json({ error: 'Permission denied.', code: 403 });
   return false;
 }
@@ -512,7 +513,7 @@ function assertAdmin(req, res) {
 // (POST /worker): nur ein Admin aendert, loescht oder bucht einen bezahlten
 // Besuch erneut (GHSA-4p5w-5346-8598).
 function mayTouchSettled(row, req) {
-  return !row.paid_at || req.authRole === 'admin';
+  return !row.paid_at || isAdminRequest(req);
 }
 
 function assertMayTouchSettled(existing, req, res) {
@@ -549,7 +550,7 @@ function visitCapabilities(row, req) {
     can_edit: touchable,
     can_delete: touchable,
     can_mark_paid: writable && !row.paid_at,
-    can_mark_unpaid: writable && Boolean(row.paid_at) && req.authRole === 'admin',
+    can_mark_unpaid: writable && Boolean(row.paid_at) && isAdminRequest(req),
   };
 }
 
