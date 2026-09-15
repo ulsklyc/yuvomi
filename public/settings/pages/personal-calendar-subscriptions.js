@@ -320,12 +320,11 @@ function openIcsEditModal(container, sub, subs, user) {
         const name = panel.querySelector('#ics-edit-name').value.trim();
         const color = panel.querySelector('#ics-edit-color').value;
         const shared = panel.querySelector('#ics-edit-shared').checked ? 1 : 0;
-        const assigneeVal = panel.querySelector('#ics-edit-assignee').value;
-        const default_assignee_user_id = assigneeVal ? Number(assigneeVal) : null;
+        const assignee = assigneePatch(panel.querySelector('#ics-edit-assignee'), sub.default_assignee_user_id);
         errEl.hidden = true;
         submitBtn.disabled = true;
         try {
-          const res = await api.patch(`/calendar/subscriptions/${sub.id}`, { name, color, shared, default_assignee_user_id });
+          const res = await api.patch(`/calendar/subscriptions/${sub.id}`, { name, color, shared, ...assignee });
           const idx = subs.findIndex((s) => s.id === sub.id);
           if (idx >= 0) subs[idx] = res.data;
           renderIcsList(container, subs, user);
@@ -470,6 +469,22 @@ function bindCalendarImport(container) {
 // --------------------------------------------------------------------------
 // Entry point
 // --------------------------------------------------------------------------
+
+/**
+ * Der Zustaendigen-Wert fuer PATCH /calendar/subscriptions/:id. Die Optionen
+ * laden asynchron nach (loadFamilyUsers). Steht eine gespeicherte Zuweisung
+ * nicht darunter - die Liste laedt noch, oder das Laden ist fehlgeschlagen -,
+ * bleibt das Feld weg, und der Server laesst den gespeicherten Wert stehen.
+ * Sonst truege jedes Speichern von Name oder Farbe still "niemand" ein (#1207).
+ */
+function assigneePatch(select, stored) {
+  const offered = [...(select.options ?? [])].some((option) => option.value === String(stored));
+  if (stored != null && !offered) return {};
+  const value = select.value;
+  return { default_assignee_user_id: value ? Number(value) : null };
+}
+
+export const __test = { assigneePatch };
 
 export async function render(container, { user } = {}) {
   renderPage(container);

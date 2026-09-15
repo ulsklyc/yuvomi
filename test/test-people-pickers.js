@@ -201,3 +201,18 @@ test('dashboard: the schedule slice brings the names of every plan owner, and th
     delete globalThis.__apiStub;
   }
 });
+
+const { __test: icsSettings } = await import('../public/settings/pages/personal-calendar-subscriptions.js');
+
+test('settings: saving a calendar subscription keeps a stored assignee that is not on offer', () => {
+  // Die Optionen laden asynchron nach. Steht die gespeicherte Zuweisung nicht
+  // darunter - die Liste laedt noch, oder das Laden ist fehlgeschlagen -, zeigt
+  // die Auswahl "niemand", und Speichern von Name oder Farbe truege das ein.
+  const select = (value, ...ids) => ({ value, options: [{ value: '' }, ...ids.map((id) => ({ value: String(id) }))] });
+  assert.deepEqual(icsSettings.assigneePatch(select('', ANNA.id), CLARA.id), {},
+    'the field stays out of the request, so the server keeps the stored assignee');
+  assert.deepEqual(icsSettings.assigneePatch(select(String(CLARA.id), ANNA.id, CLARA.id), CLARA.id), { default_assignee_user_id: CLARA.id });
+  assert.deepEqual(icsSettings.assigneePatch(select('', ANNA.id, CLARA.id), CLARA.id), { default_assignee_user_id: null },
+    'removing an assignee who is on offer still works');
+  assert.deepEqual(icsSettings.assigneePatch(select(String(ANNA.id), ANNA.id), null), { default_assignee_user_id: ANNA.id });
+});
