@@ -659,6 +659,80 @@ test('Dauern werden vor der Zerlegung gerundet: kein "1m60s"', () => {
   );
 });
 
+/* GRENZEN STATT NACHBAU (Entscheidung auf #1229): Randfaelle der Shell-Syntax
+ * werden abgelehnt, nicht interpretiert. Jeder Fall hier ist einer, an dem der
+ * Runner vorher still etwas anderes tat als `sh` - und die echte Kette muss
+ * trotzdem durchgehen (der Paritaetstest oben faehrt sie). */
+test('ein Kommentar (#) am Wortanfang wird abgelehnt, # mitten im Wort nicht', () => {
+  for (const chain of [
+    'printf a >> seen # stop && printf b >> seen',
+    '# nur Kommentar && node -e "1"',
+    'node -e "1" &&# b',
+    'node -e "1"\t# tab && node -e "2"',
+  ]) assert.throws(() => parseChain(chain), /Kommentar/, JSON.stringify(chain));
+  // Kein Wortanfang, in Quotes oder escaped: fuer sh ein gewoehnliches Zeichen.
+  assert.deepEqual(parseChain('echo a#b && echo "# c" && echo \'#d\' && echo \\#e'), ['echo a#b', 'echo "# c"', 'echo \'#d\'', 'echo \\#e']);
+
+  const r = runRunner(['printf a >> seen # stop', 'printf b >> seen']);
+  try {
+    assert.equal(r.run.status, 2, r.run.stdout + r.run.stderr);
+    assert.match(r.run.stderr, /Kommentar/);
+    assert.equal(existsSync(join(r.dir, 'seen')), false, 'bei einer abgelehnten Kette darf nichts laufen');
+  } finally {
+    r.cleanup();
+  }
+});
+
+test('ein Schritt, der den Shell-Zustand aendert, wird abgelehnt, Env-Praefixe nicht', () => {
+  for (const word of ['cd', 'export', 'unset', 'source', '.', 'set', 'alias', 'ulimit', 'umask', 'pushd', 'popd']) {
+    assert.throws(() => parseChain(`node -e "1" && ${word} x && node -e "2"`), /Shell-Zustand/, word);
+    assert.throws(() => parseChain(`DB_PATH=:memory: ${word} x`), /Shell-Zustand/, `mit Praefix: ${word}`);
+  }
+  for (const chain of ['MARK=ok && node -e "1"', 'A=1 B="zwei worte" && node -e "1"', 'node -e "1" && TZ=UTC']) {
+    assert.throws(() => parseChain(chain), /Shell-Zustand/, chain);
+  }
+  // Erlaubt: Praefixe vor einem Kommando, das Wort als Argument, aehnliche Namen.
+  assert.deepEqual(parseChain('DB_PATH=:memory: node test/a.js && TZ=Europe/Berlin DB_PATH=:memory: node --test b.js && node cd && cdx a && npm run test:export'), [
+    'DB_PATH=:memory: node test/a.js',
+    'TZ=Europe/Berlin DB_PATH=:memory: node --test b.js',
+    'node cd',
+    'cdx a',
+    'npm run test:export',
+  ]);
+
+  const r = runRunner(['export MARK=ok', 'node -e "process.exit(process.env.MARK ? 0 : 1)"']);
+  try {
+    assert.equal(r.run.status, 2, r.run.stdout + r.run.stderr);
+    assert.match(r.run.stderr, /Shell-Zustand/);
+    assert.equal(r.summary, null);
+  } finally {
+    r.cleanup();
+  }
+});
+
+/* `setTimeout` kennt hoechstens 2^31-1 ms. Darueber setzt Node den Timer mit
+ * einer Warnung auf 1 ms: `--timeout 2147484` hiess "jeder Schritt faellt sofort
+ * ueber den Timeout". `0` ist "ohne Limit". */
+test('--timeout und --grace ueber dem Timer-Maximum enden mit Exit 2', () => {
+  for (const args of [['--timeout', '2147484'], ['--grace', '2147484']]) {
+    const r = runRunner(['node -e "1"'], args);
+    try {
+      assert.equal(r.run.status, 2, `${args.join(' ')}: ${r.run.stdout}${r.run.stderr}`);
+      assert.match(r.run.stderr, /2147483/);
+      assert.equal(r.summary, null);
+    } finally {
+      r.cleanup();
+    }
+  }
+  const max = runRunner(['node -e "1"'], ['--timeout', '2147483']);
+  try {
+    assert.equal(max.run.status, 0, max.run.stdout + max.run.stderr);
+    assert.doesNotMatch(max.run.stderr, /TimeoutOverflowWarning/);
+  } finally {
+    max.cleanup();
+  }
+});
+
 test('ein falscher Aufruf endet mit Exit 2, nicht mit einem Lauf', () => {
   const r = runRunner(['node -e "1"'], ['--jobs', '0']);
   try {

@@ -17,6 +17,18 @@
  * dieselben Schritte findet wie die Shell, belegt `test:parallel-runner` gegen
  * `sh` selbst.
  *
+ * GRENZEN. Der Parser ist kein Shell-Nachbau und wird keiner. Er versteht
+ * einfache Kommandos mit Env-Praefixen und Anfuehrungszeichen, getrennt durch
+ * `&&`. Alles andere lehnt er mit Exit 2 ab, statt es zu interpretieren:
+ *   - andere Operatoren: `||`, `;`, `|`, `&`, Klammern, Zeilenumbruch
+ *   - Ersetzungen irgendwo in der Kette, auch in Quotes: `$(`, Backticks, `${`
+ *   - Kommentare: `#` am Wortanfang ausserhalb von Quotes
+ *   - Schritte, die den Shell-Zustand aendern: `cd`, `export`, `unset`,
+ *     `source`, `.`, `set`, `alias`, `ulimit`, `umask`, `pushd`, `popd` oder
+ *     nur Zuweisungen - jeder Schritt bekommt seine eigene Shell
+ * Die echte Kette braucht nichts davon. Weitere Randfaelle werden abgelehnt oder
+ * mit einer Messung beantwortet, nicht nachgebaut (Entscheidung auf #1229).
+ *
  * KEINE SUITE, DESHALB KEIN `test:`-NAME. `test:suite-chain` verlangt, dass
  * jedes `test:*`-Script in einer Kette haengt; den Einstieg der Browser-Kette
  * nennt es einmal beim Namen, weil eine Kette nicht in sich selbst haengen
@@ -132,6 +144,10 @@ export function parseChain(script) {
       } else {
         throw new Error(`Nicht unterstuetzter Operator '&' bei Zeichen ${i}`);
       }
+    } else if (c === '#' && (current === '' || /\s$/.test(current))) {
+      // Am Wortanfang beginnt `#` fuer sh einen Kommentar bis zum Zeilenende - ein
+      // `&&` dahinter trennt dann nichts mehr. Mitten im Wort ist es ein Zeichen.
+      throw new Error(`Nicht unterstuetzter Kommentar (#) bei Zeichen ${i}: sh ignoriert den Rest, der Runner wuerde daran trennen`);
     } else if (UNSUPPORTED.has(c)) {
       throw new Error(`Nicht unterstuetzter Operator (${UNSUPPORTED.get(c)}) bei Zeichen ${i}`);
     } else {
@@ -140,7 +156,57 @@ export function parseChain(script) {
   }
   if (quote) throw new Error(`Offenes Anfuehrungszeichen ${quote} in der Kette`);
   push(script.length);
+  for (const step of steps) rejectStateChange(step);
   return steps;
+}
+
+/** Die Woerter eines Schritts, an Leerraum ausserhalb von Quotes getrennt; Quotes bleiben stehen. */
+function shellWords(step) {
+  const words = [];
+  let word = '';
+  let quote = null;
+  for (let i = 0; i < step.length; i += 1) {
+    const c = step[i];
+    if (quote) {
+      word += c;
+      if (c === '\\' && quote === '"' && i + 1 < step.length) word += step[++i];
+      else if (c === quote) quote = null;
+    } else if (c === '\\') {
+      word += c;
+      if (i + 1 < step.length) word += step[++i];
+    } else if (c === '\'' || c === '"') {
+      word += c;
+      quote = c;
+    } else if (/\s/.test(c)) {
+      if (word) words.push(word);
+      word = '';
+    } else {
+      word += c;
+    }
+  }
+  if (word) words.push(word);
+  return words;
+}
+
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+const STATE_CHANGING = new Set(['cd', 'export', 'unset', 'source', '.', 'set', 'alias', 'ulimit', 'umask', 'pushd', 'popd']);
+
+/**
+ * Seriell in EINER Shell wirkt `cd x && npm run y` auf den naechsten Schritt,
+ * im Runner bekommt jeder Schritt eine frische Shell - dasselbe gilt fuer
+ * `export`, `MARK=ok` ohne Kommando und die uebrigen Eintraege. Env-Praefixe
+ * vor einem Kommando (`DB_PATH=:memory: node ...`) gelten nur fuer dieses und
+ * bleiben erlaubt.
+ */
+function rejectStateChange(step) {
+  const command = shellWords(step).find((word) => !ASSIGNMENT.test(word));
+  if (command === undefined) {
+    throw new Error(`Schritt '${step}' besteht nur aus Zuweisungen und veraendert den Shell-Zustand, den der Runner je Schritt neu anlegt`);
+  }
+  const name = command.replace(/["'\\]/g, '');
+  if (STATE_CHANGING.has(name)) {
+    throw new Error(`Schritt '${step}' veraendert den Shell-Zustand (${name}), den der Runner je Schritt neu anlegt`);
+  }
 }
 
 /** Die Schritte der `test`-Kette einer package.json, samt Arbeitsverzeichnis. */
@@ -149,6 +215,9 @@ export function loadSteps(packagePath = REPO_PACKAGE) {
   if (typeof pkg.scripts?.test !== 'string') throw new Error(`${packagePath} hat kein scripts.test`);
   return { steps: parseChain(pkg.scripts.test), cwd: path.dirname(path.resolve(packagePath)) };
 }
+
+/** Groesster Sekundenwert, den ein Node-Timer noch haelt: floor((2^31-1) / 1000). */
+const MAX_TIMER_SECONDS = Math.floor(2147483647 / 1000);
 
 function parseArgs(argv) {
   const opts = {
@@ -165,14 +234,21 @@ function parseArgs(argv) {
       if (i + 1 >= argv.length) throw new Error(`${arg} braucht einen Wert`);
       return argv[++i];
     };
-    const count = (raw, min) => {
-      if (!/^\d+$/.test(raw) || Number(raw) < min) throw new Error(`${arg} erwartet eine ganze Zahl >= ${min}, nicht '${raw}'`);
+    const count = (raw, min, max = Infinity) => {
+      if (!/^\d+$/.test(raw) || Number(raw) < min || Number(raw) > max) {
+        const range = max === Infinity ? `>= ${min}` : `von ${min} bis ${max}`;
+        throw new Error(`${arg} erwartet eine ganze Zahl ${range}, nicht '${raw}'`);
+      }
       return Number(raw);
     };
+    // `setTimeout` kennt hoechstens 2^31-1 ms; darueber setzt Node den Timer mit
+    // einer Warnung auf 1 ms, und jeder Schritt fiele sofort ueber den Timeout.
+    // `--grace` bekommt dieselbe Grenze, damit beide Sekundenwerte gleich gelten.
+    const seconds = (raw) => count(raw, 0, MAX_TIMER_SECONDS);
     if (arg === '--jobs' || arg === '-j') opts.jobs = count(value(), 1);
     else if (arg === '--logs') opts.logs = path.resolve(value());
-    else if (arg === '--timeout') opts.timeout = count(value(), 0);
-    else if (arg === '--grace') opts.grace = count(value(), 0);
+    else if (arg === '--timeout') opts.timeout = seconds(value()); // 0 = ohne Limit
+    else if (arg === '--grace') opts.grace = seconds(value());
     else if (arg === '--package') opts.packagePath = path.resolve(value());
     else if (arg === '--list') opts.list = true;
     else if (arg === '--help' || arg === '-h') opts.help = true;
