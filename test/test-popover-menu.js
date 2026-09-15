@@ -16,7 +16,7 @@
  * `keydown` wie der Browser. Das DOM darunter ist der kleinstmoegliche Stub -
  * `closest`, `querySelectorAll`, `focus`, `tabIndex`, mehr fasst der Code nicht
  * an. Ein echtes DOM haette eine Fremd-Dependency gekostet, und die Kette ist
- * netzfrei und serverlos.
+ * netzfrei und kommt ohne Browser aus.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

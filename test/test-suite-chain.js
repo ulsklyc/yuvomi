@@ -25,9 +25,11 @@ const suiteFile = (name) => pkg.scripts[name].match(/test\/[\w.-]+\.js/)?.[0];
 /**
  * Eine Suite braucht einen Browser, wenn ihre Datei ihn importiert.
  *
- * DAS IST DAS KRITERIUM, NICHT DER NAME. `npm test` ist netzfrei und serverlos:
- * die Suiten importieren Route-Handler direkt gegen In-Memory-SQLite. Eine
- * Suite, die einen echten Browser gegen einen echten Serverprozess fährt,
+ * DAS IST DAS KRITERIUM, NICHT DER NAME. `npm test` geht nicht über Loopback
+ * hinaus und braucht weder einen eigenen Serverprozess noch einen Browser: die
+ * Suiten laufen gegen echtes SQLite, und wo sie Routen über HTTP prüfen, lauscht
+ * der Server im Testprozess selbst auf einem lokalen Port. Eine Suite, die
+ * einen echten Browser gegen einen eigenen Serverprozess fährt,
  * gehört dort nicht hinein - und eine Namensausnahme („außer
  * test:document-guards") wäre wieder eine Allowlist, die beim zweiten Fall
  * fehlt. Geprüft wird deshalb die Bauart der Datei.

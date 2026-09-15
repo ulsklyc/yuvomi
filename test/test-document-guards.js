@@ -7,8 +7,9 @@
  *        zweier Regeln entstehen, deren Token-Paare je fuer sich AA halten.
  * Ausfuehren: npm run test:document-guards   (braucht Browser + Serverprozess)
  *
- * NICHT in `npm test`: die uebrige Kette ist netzfrei und serverlos und soll
- * das bleiben. test-suite-chain.js kennt die Zweiteilung als Regel (eine Suite,
+ * NICHT in `npm test`: die uebrige Kette kommt ohne eigenen Serverprozess und
+ * ohne Browser aus (HTTP nur im Testprozess ueber Loopback) und soll das
+ * bleiben. test-suite-chain.js kennt die Zweiteilung als Regel (eine Suite,
  * die `puppeteer` importiert, gehoert in die Browser-Kette), nicht als
  * Namensausnahme.
  *
