@@ -407,6 +407,50 @@ export function safeSpawn(cmd, args, opts = {}) {
   }
 }
 
+/** Obergrenze fuer die Container-Frage im Preflight. */
+export const PREFLIGHT_PROBE_TIMEOUT_MS = 3000;
+
+/**
+ * Laeuft der yuvomi-Container? Mit Zeitlimit.
+ *
+ * Der Wizard wartet auf den Preflight, bevor er den Einfach-Pfad freigibt oder
+ * Schluessel erzeugt. Engine-Erkennung und `inspect` fragen den Daemon, und
+ * eine Engine, die nicht antwortet (Daemon haengt, entfernter Kontext), liess
+ * die Antwort nie kommen - obwohl envExists laengst feststand. Nach dem Limit
+ * gilt der Container als nicht laufend, und ein haengender Prozess wird
+ * beendet. `resolveEngine` und `spawnFn` sind fuer Tests injizierbar.
+ */
+export async function probeContainerRunning({
+  timeoutMs = PREFLIGHT_PROBE_TIMEOUT_MS,
+  resolveEngine = getEngine,
+  spawnFn = safeSpawn,
+} = {}) {
+  let timer;
+  let child = null;
+  const timeout = new Promise(done => { timer = setTimeout(() => done(false), timeoutMs); });
+  const probe = (async () => {
+    const engine = await resolveEngine();
+    const { cmd, args } = inspectCommand(engine, ['inspect', '--format', '{{.State.Status}}', 'yuvomi']);
+    return new Promise(done => {
+      child = spawnFn(cmd, args, { stdio: 'pipe' });
+      let out = '';
+      let settled = false;
+      const finish = running => { if (!settled) { settled = true; done(running); } };
+      child.stdout?.on('data', d => { out += d.toString().trim(); });
+      child.on('error', () => finish(false));
+      child.on('close', code => finish(code === 0 && out === 'running'));
+    });
+  })().catch(() => false);
+  try {
+    return await Promise.race([probe, timeout]);
+  } finally {
+    clearTimeout(timer);
+    if (child && child.exitCode === null) {
+      try { child.kill(); } catch { /* bereits beendet */ }
+    }
+  }
+}
+
 /**
  * Copy an existing .env to .env.bak-<ISO timestamp> before it is overwritten.
  * Returns the backup path, or null when there was nothing to back up.
@@ -558,21 +602,9 @@ async function route(req, res, server) {
       // Nur die NAMEN der vorhandenen Schlüssel - die Werte bleiben auf dem
       // Server. Das Frontend erzeugt für diese keinen neuen Wert mehr.
       const preservedKeys = PRESERVED_KEYS.filter(key => Boolean(existingEnv[key]));
-      const engine = await getEngine();
-      const { cmd, args } = inspectCommand(engine, ['inspect', '--format', '{{.State.Status}}', 'yuvomi']);
-      return await new Promise(resolvePromise => {
-        const inspect = spawn(cmd, args, { stdio: 'pipe' });
-        let out = '';
-        let settled = false;
-        const reply = containerRunning => {
-          if (settled) return;          // error + close can both fire
-          settled = true;
-          resolvePromise(json(res, 200, { envExists, preservedKeys, containerRunning }));
-        };
-        inspect.stdout.on('data', d => { out += d.toString().trim(); });
-        inspect.on('error', () => reply(false));
-        inspect.on('close', code => reply(code === 0 && out === 'running'));
-      });
+      // Mit Zeitlimit: der Wizard wartet auf diese Antwort (siehe probeContainerRunning).
+      const containerRunning = await probeContainerRunning();
+      return json(res, 200, { envExists, preservedKeys, containerRunning });
     } catch (err) {
       return json(res, 500, { error: err.message });
     }

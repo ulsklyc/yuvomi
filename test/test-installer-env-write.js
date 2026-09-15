@@ -298,6 +298,60 @@ test('GET /api/preflight liefert envExists und containerRunning', async () => {
   }
 });
 
+test('der Preflight wartet nicht unbegrenzt auf die Container-Engine', async () => {
+  // Der Wizard wartet vor dem Einfach-Pfad und vor dem Erzeugen der Schluessel
+  // auf den Preflight (Review zu #1217). Der Preflight wartete seinerseits auf
+  // die Engine-Erkennung und `docker/podman inspect`, beides ohne Zeitlimit: eine
+  // haengende Engine liess Einfach-Karte und Speichern stumm stehen, obwohl der
+  // Server envExists laengst kannte.
+  const mod = await import('../tools/installer/install-server.js');
+  assert.equal(typeof mod.probeContainerRunning, 'function',
+    'es gibt keine begrenzte Container-Abfrage fuer den Preflight');
+  const { EventEmitter } = await import('node:events');
+
+  const engine = { engine: 'docker', composeBin: 'docker', compose: ['compose'], missing: [] };
+  let killed = false;
+  const hanging = () => {
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.exitCode = null;
+    child.kill = () => { killed = true; return true; };
+    return child; // meldet nie 'close'
+  };
+
+  const started = Date.now();
+  const stalled = await mod.probeContainerRunning({ timeoutMs: 50, resolveEngine: async () => engine, spawnFn: hanging });
+  assert.equal(stalled, false, 'eine haengende Engine muss als "laeuft nicht" gelten');
+  assert.ok(Date.now() - started < 2000, 'die Abfrage haelt ihr Zeitlimit nicht ein');
+  assert.equal(killed, true, 'der haengende inspect-Prozess wird nicht beendet');
+
+  const noEngine = await mod.probeContainerRunning({ timeoutMs: 50, resolveEngine: () => new Promise(() => {}), spawnFn: hanging });
+  assert.equal(noEngine, false, 'eine haengende Engine-Erkennung haelt den Preflight auf');
+
+  // Der Normalfall bleibt: "running" auf stdout, Exit 0.
+  const answering = () => {
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.exitCode = null;
+    child.kill = () => true;
+    queueMicrotask(() => {
+      child.stdout.emit('data', Buffer.from('running\n'));
+      child.exitCode = 0;
+      child.emit('close', 0);
+    });
+    return child;
+  };
+  assert.equal(await mod.probeContainerRunning({ timeoutMs: 1000, resolveEngine: async () => engine, spawnFn: answering }), true,
+    'ein laufender Container wird nicht mehr erkannt');
+
+  // Exportiert allein reicht nicht: die Route muss sie benutzen.
+  const src = readFileSync(new URL('../tools/installer/install-server.js', import.meta.url), 'utf8');
+  const at = src.indexOf("url.pathname === '/api/preflight'");
+  const route = src.slice(at, src.indexOf('\n  }\n', at));
+  assert.match(route, /await probeContainerRunning\(/, 'die Preflight-Route nutzt die begrenzte Abfrage nicht');
+  assert.doesNotMatch(route, /spawn\(/, 'die Preflight-Route startet inspect weiter selbst und ohne Zeitlimit');
+});
+
 // ── Static parity checks ─────────────────────────────────────────────────────
 
 test('install.html prüft Preflight und zeigt ein Hinweis-Banner', () => {

@@ -130,7 +130,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the file, so a click in the moment before could still start the simple path and write over, for
   example, a setup running behind a reverse proxy. The simple path now waits for that check and
   continues in the advanced setup, where each of these values is visible, and its save step refuses
-  to write over an existing file.
+  to write over an existing file. The check itself no longer waits indefinitely for a container
+  engine that does not answer: after a few seconds the installer carries on and treats the container
+  as not running.
 
 - **The web installer shows an existing configuration as a warning, not as a hint.** When the
   installer finds an `.env`, the setup says that the current file will be backed up before saving -
