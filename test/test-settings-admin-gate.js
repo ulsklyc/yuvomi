@@ -288,6 +288,14 @@ test('kein adminOnly-Blatt schreibt eine per-Nutzer-Preference', () => {
 // GRENZE: wer eine gelistete Anweisung woertlich an eine andere Stelle
 // derselben Datei verschiebt, bleibt gruen. Umgekehrt meldet jede Aenderung an
 // einer gelisteten Anweisung sie als neu und den alten Eintrag als verschwunden.
+// Der Guard liest Text, keinen Syntaxbaum (Entscheidung vom 15.09.2026, kein
+// Parser als Abhaengigkeit): ein geklammerter Operand wie
+// `(req.authRole) === 'admin'` bleibt gruen, ebenso Code hinter einem
+// Regex-Literal an einer Divisionsstelle (Grenze des Scanners, siehe
+// `withoutCommentsKeepingLines`). Umgekehrt wird die Schreibweise in einem
+// String oder im Text eines Template-Literals rot, obwohl dort nichts prueft.
+// Durchrutschen kann also nur absichtlich verschleierter Code; dagegen stehen
+// die Verhaltenstests oben, nicht dieser Guard.
 
 /** `.name`, `?.name`, `['name']` und `?.['name']`, mit Leerraum dazwischen. */
 const zugriff = (name) => String.raw`\s*(?:\??\.\s*${name}\b|(?:\?\.)?\s*\[\s*['"\x60]${name}['"\x60]\s*\])`;

@@ -103,7 +103,14 @@ export function withoutBlockComments(src) {
  * dort heil, ein unescaptes `/*`, `//` oder Anfuehrungszeichen in einer
  * Zeichenklasse oeffnet dagegen Kommentar oder String. Umgekehrt gilt ein `/`
  * nach `++` oder `--` als Regex-Anfang, wenn die Zeile noch einen `/` hat. Ein
- * einfacher oder doppelter String endet spaetestens am Zeilenende.
+ * einfacher oder doppelter String endet spaetestens am Zeilenende. Das gilt auch
+ * fuer ein Regex-Literal als Anweisung direkt hinter einem Block
+ * (`if (ok) {}` und darunter `/[/*]/.test(s)`): dort blendet der Scanner ab dem
+ * `/*` alles bis zum naechsten Blockende aus. Bewusst so gelassen (Entscheidung
+ * vom 15.09.2026): Anweisungsgrenzen sicher zu erkennen braucht einen Parser.
+ * Gemessen am selben Tag: in `server/`, `public/` (ohne vendor) und `tools/`
+ * beginnen sieben Zeilen mit einem Regex-Literal, keines traegt ein unescaptes
+ * `/*`, `//` oder Anfuehrungszeichen.
  * @param {string} src
  * @returns {string}
  */
