@@ -37,7 +37,7 @@ import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const db = dbmod.get();
-const { __test, disconnect } = await import('../server/services/google-calendar.js');
+const { __test, disconnect, sync, flushOutbound } = await import('../server/services/google-calendar.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
 
 db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')").run();
@@ -1646,4 +1646,82 @@ test('eine Bearbeitung während des scheiternden Umzugs gibt ihm seine Versuche 
   assert.equal(row.outbound_move_to, 'fam@g', 'der Umzug hat nach der Bearbeitung wieder Versuche');
   assert.equal(row.outbound_dirty, 1);
   assert.equal(row.outbound_attempts, 1);
+});
+
+// ── Zwei Durchgänge auf einmal ──────────────────────────────────────────────────
+//
+// Das Google-Gegenstück zu den Sperren-Tests in test-caldav-outbound.js. Der
+// Sofortversuch hinter jeder Schreibroute und der Sync-Lauf des Schedulers führen
+// dieselbe Buchhaltung über awaits hinweg; server/utils/sync-lock.js reiht sie
+// unter dem Schlüssel 'google' hintereinander. test-sync-lock.js prüft die Sperre
+// für sich - diese Tests prüfen, dass beide Google-Einstiege auch durch sie gehen.
+
+/** Ein Promise, dessen Ende der Test bestimmt - der Ersatz für den Netzaufruf. */
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+/** Dem Event-Loop mehrfach Luft geben, damit ein zweiter Durchgang wirklich liefe. */
+async function settle(times = 5) {
+  for (let i = 0; i < times; i++) await new Promise((resolve) => setImmediate(resolve));
+}
+
+/** Attrappe für einen ganzen Sync-Lauf: der liest vor dem Outbound die Farbpalette. */
+function syncCalendar(options) {
+  return { ...fakeCalendar(options), colors: { get: async () => ({ data: { event: {} } }) } };
+}
+
+test('ein Google-Sofortversuch wartet auf einen laufenden Sync-Lauf', async () => {
+  reset();
+  db.prepare('DELETE FROM google_calendar_selection').run();
+  __test.queueEventDeletion(insertGoogleEvent({ googleId: 'gev-lock-sync', target: 'primary' }));
+
+  const gate = deferred();
+  const running = syncCalendar({ onDelete: () => gate.promise });
+  const immediate = fakeCalendar();
+
+  const syncing = sync({ createCalendar: () => running });
+  await settle();
+  const flushing = flushOutbound({ createCalendar: () => immediate });
+  await settle();
+
+  try {
+    assert.equal(running.deletes.length, 1, 'der Sync-Lauf hängt in seinem DELETE');
+    assert.equal(immediate.deletes.length, 0, 'solange der Sync läuft, löscht der Sofortversuch nichts');
+  } finally {
+    // Auch wenn die Zusicherung fällt: der hängende Aufruf muss enden, sonst
+    // wartet die Suite auf einen Lauf, der nie zurückkehrt.
+    gate.resolve();
+    await Promise.allSettled([syncing, flushing]);
+  }
+
+  assert.equal(immediate.deletes.length, 0, 'danach ist nichts mehr offen: das DELETE ging genau einmal hinaus');
+  assert.equal(tombstones().length, 0);
+});
+
+test('ein zweiter Google-Sofortversuch arbeitet den Tombstone des ersten nicht mit ab', async () => {
+  reset();
+  __test.queueEventDeletion(insertGoogleEvent({ googleId: 'gev-lock-flush', target: 'primary' }));
+
+  const gate = deferred();
+  const first = fakeCalendar({ onDelete: () => gate.promise });
+  const second = fakeCalendar();
+
+  const running = flushOutbound({ createCalendar: () => first });
+  await settle();
+  const waiting = flushOutbound({ createCalendar: () => second });
+  await settle();
+
+  try {
+    assert.equal(first.deletes.length, 1, 'der erste Durchgang hängt in seinem DELETE');
+    assert.equal(second.deletes.length, 0, 'der zweite wartet, statt dasselbe Event noch einmal zu löschen');
+  } finally {
+    gate.resolve();
+    await Promise.allSettled([running, waiting]);
+  }
+
+  assert.equal(second.deletes.length, 0);
+  assert.equal(tombstones().length, 0);
 });

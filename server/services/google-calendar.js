@@ -371,11 +371,11 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
  * Fehler sind unkritisch - die Vormerkung bleibt stehen und der Sync holt nach.
  * @returns {Promise<{deleted:number,updated:number}>}
  */
-async function flushOutbound() {
-  return runSerialized('google', 'flush', runFlushOutbound);
+async function flushOutbound({ createCalendar = authorizedCalendar } = {}) {
+  return runSerialized('google', 'flush', () => runFlushOutbound(createCalendar));
 }
 
-async function runFlushOutbound() {
+async function runFlushOutbound(createCalendar) {
   const idle = { deleted: 0, updated: 0 };
   if (!isConnected() || isReadonly()) return idle;
 
@@ -383,7 +383,7 @@ async function runFlushOutbound() {
   const hasUpdates   = pendingUpdateCount() > 0;
   if (!hasDeletions && !hasUpdates) return idle;
 
-  const calendar = google.calendar({ version: 'v3', auth: loadAuthorizedClient() });
+  const calendar = createCalendar();
   const deleted = hasDeletions ? await processPendingDeletions(calendar) : 0;
   const updated = hasUpdates
     ? await processPendingUpdates(calendar, await fetchEventColorMap(calendar), new Map())
@@ -528,6 +528,16 @@ function loadAuthorizedClient() {
   return client;
 }
 
+/**
+ * Der Kalender-Client mit den gespeicherten Tokens. Sync-Lauf und Sofortversuch
+ * bauen ihn per Vorgabe selbst; eine Suite reicht stattdessen eine Attrappe
+ * herein, damit sie die Sperre an genau diesen beiden Einstiegen treiben kann
+ * (#593) statt nur an server/utils/sync-lock.js für sich.
+ */
+function authorizedCalendar() {
+  return google.calendar({ version: 'v3', auth: loadAuthorizedClient() });
+}
+
 // --------------------------------------------------------
 // Öffentliche API
 // --------------------------------------------------------
@@ -642,13 +652,13 @@ function disconnect({ deleteEvents = false } = {}) {
  * runSync() statt in ihm, damit JEDER Ausstieg erfasst wird - auch das frühe
  * Werfen bei fehlendem Token, das ohne Verbindung der wahrscheinlichste Fall ist.
  */
-async function sync() {
-  return runSerialized('google', 'sync', () => withSyncOutcome(db.get(), 'google', runSync));
+async function sync({ createCalendar = authorizedCalendar } = {}) {
+  return runSerialized('google', 'sync',
+    () => withSyncOutcome(db.get(), 'google', () => runSync(createCalendar)));
 }
 
-async function runSync() {
-  const client   = loadAuthorizedClient();
-  const calendar = google.calendar({ version: 'v3', auth: client });
+async function runSync(createCalendar) {
+  const calendar = createCalendar();
 
   // Event-Farbpalette (colorId → Hex) einmalig für den ganzen Sync laden.
   const eventColorMap = await fetchEventColorMap(calendar);
