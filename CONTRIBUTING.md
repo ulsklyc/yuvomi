@@ -56,6 +56,7 @@ itself has to set it as well.
 
 ```bash
 npm test              # All suites
+npm run test-parallel # The same suites side by side, keeps going after a failure
 ```
 
 Individual suites (faster during development):
@@ -96,6 +97,14 @@ Tests run with plain Node against real SQLite (`--experimental-sqlite`), in memo
 temp file - newer suites use the built-in `node --test` runner, older ones are plain
 assertion scripts. Nothing has to be running beforehand: a suite that exercises routes over
 HTTP starts its own server on a free local port and stops it again.
+
+`npm run test-parallel` runs every step of the `test` chain as its own process - by default
+one per CPU core minus one, `--jobs N` to change that. It does not stop at the first failure:
+it ends with the failed steps and their log files, the ten slowest steps and a non-zero exit
+code. The steps come from the `test` script itself, so a new suite is still registered there
+and nowhere else. Because suites run side by side, a suite takes a free port
+(`listen(0, '127.0.0.1')`) and a temp path of its own (`freshTestDbPath()`, `mkdtemp`), never a
+fixed one. CI runs `npm test`, one suite after the other.
 
 ---
 
