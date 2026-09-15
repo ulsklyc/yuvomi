@@ -10,6 +10,7 @@ import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { getBalance, isEnrolled, postLedger } from '../services/rewards.js';
+import { householdMemberSql } from '../services/household-members.js';
 
 const log = createLogger('Rewards');
 const router = express.Router();
@@ -29,7 +30,7 @@ function actingUser(req) {
 }
 
 // Nur echte Familienmitglieder (keine Haushaltshilfe-Konten).
-const MEMBER_FILTER = 'NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = u.id)';
+const MEMBER_FILTER = householdMemberSql('u', { includeGuests: true });
 
 function toInt(val) {
   const n = Math.trunc(Number(val));

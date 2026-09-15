@@ -3566,9 +3566,9 @@ Timetables module/feature (#1018) without a second data model, since every resol
 carries a `user_id`.
 
 - **Person picker:** a real multi-select (unlike the Statistics tab's single-select picker), offering
-  only actual household members — filtered through `isHouseholdMember()`
-  (`server/services/member-email.js`), the one shared predicate that already excludes housekeeping
-  workers and split-expense guests everywhere else membership is checked. Selection persists per
+  only actual household members - filtered through the strict form of `householdMemberSql()`
+  (`server/services/household-members.js`), the one shared predicate, which excludes housekeeping
+  workers and split-expense guests. Selection persists per
   browser (`localStorage`); a stale id for someone since removed or demoted is silently dropped on
   load rather than left dangling.
 - **Fixed lane order:** lanes stay in the order the picker returns them, never re-sorted by who has
@@ -3987,8 +3987,8 @@ The surface carries four things, in this order: **the time**, large (this is whe
   shopping) and shared-expense guests, who are external - `server/index.js` blocks them from every
   `/api/v1/*` route except `/split-expenses`, yet the guest sync gives them a contact row. Asking only
   "does this users row exist" treats both as reachable. The predicate therefore lives once in
-  `member-email.js` (`isHouseholdMember`) and serves both the picker
-  (`GET /api/v1/shopping/send-recipients`) and the route's own check, so the picker cannot offer someone
+  `household-members.js` (`householdMemberSql`, and `isHouseholdMember` for one account) and serves
+  both the picker (`GET /api/v1/shopping/send-recipients`) and the route's own check, so the picker cannot offer someone
   the server rejects nor hide someone it accepts - a boundary drawn only in the interface is no boundary.
   It is deliberately *not* folded into `memberEmail()`: the password reset uses that same lookup and
   applies expressly to shared-expense guests too (`auth.js` names `isSplitExpenseGuest` as its own
