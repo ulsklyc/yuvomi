@@ -550,8 +550,21 @@ button.health-med-card:hover {
   border-color: var(--module-accent);
 }
 
+/* Zuruecknehmen-Muster (tokens.css, #1230) statt `opacity: 0.7`, die Badge und
+ * Unterzeilen auf 3,1 bis 4,2:1 zog. Das „Inaktiv"-Badge bleibt voll und nimmt
+ * auf der vertieften Flaeche die naechste Stufe, sonst verschwaende seine Pille. */
 .health-med-card.is-inactive {
-  opacity: 0.7;
+  background: var(--color-surface-receded);
+  border-color: var(--color-border-receded);
+}
+
+.health-med-card.is-inactive .health-med-card__sub,
+.health-med-card.is-inactive .health-med-card__stock {
+  color: var(--color-text-receded);
+}
+
+.health-med-card.is-inactive .health-med-badge--muted {
+  background: var(--color-surface-3);
 }
 
 .health-med-card__head {

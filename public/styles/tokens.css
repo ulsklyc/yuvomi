@@ -116,6 +116,23 @@
   --color-border-subtle:  var(--neutral-150);
   --color-border-strong:  var(--neutral-300);  /* kräftigere Trennlinie (Hover, betonte Rahmen) */
   --color-border-control: var(--neutral-500);  /* Ruhekante von Eingabefeldern, 3:1 (WCAG 1.4.11) */
+  /* ZURUECKGENOMMEN IST EIN MUSTER, KEINE DECKUNG (#1230, Entscheidung Ulas
+   * 2026-09-15). Erledigte und abgelegte Aufgaben, archivierte Konten,
+   * pausierte und abgeschlossene Abos, inaktive Medikamente und Praemien,
+   * archivierte Abfallarten und bereits importierte Zeilen nahmen sich ueber
+   * `opacity: 0.55` bis `0.78` zurueck. Die Deckung multipliziert den Kontrast
+   * JEDES Textes mit herunter, Badges und Avatar-Initialen eingeschlossen:
+   * gerendert 1,65 bis 3,86:1 light, 2,40 bis 4,23:1 dark.
+   *
+   * Die drei Rollen stattdessen: die Flaeche sinkt auf die vertiefte Stufe,
+   * die Kante wird die ruhigste, der Sekundaertext geht eine Stufe leiser.
+   * Titel bleiben secondary, Badges, Prioritaets-Chips und Initialen voll -
+   * sie tragen die Aussage des Zustands. Alle Werte sind Aliase: die
+   * Dark-Bloecke setzen die Stufen darunter, das Muster zieht mit. Guard:
+   * test-frontend-audit.js, "zurueckgenommene Karten und Zeilen". */
+  --color-surface-receded: var(--color-surface-2);
+  --color-border-receded:  var(--color-border-subtle);
+  --color-text-receded:    var(--color-text-tertiary);   /* 5,39 / 7,71:1 auf --color-surface-receded */
   --color-text-primary:   var(--neutral-900);
   --color-text-secondary: var(--neutral-600);  /* WCAG AA: 6.19:1 auf weiß, 5.58:1 auf --color-bg - dieselben Werte wie an --_neutral-600 oben; hier standen die der alten kühlen Rampe (5.75 / 5.2) */
   /* WARM STATT KUEHL (Dark-Kur 2026-08-17, gilt fuer BEIDE Themes). #68686F

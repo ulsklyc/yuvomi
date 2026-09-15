@@ -336,8 +336,23 @@
   min-width: 0;
 }
 
-.subscription-card--disabled {
-  opacity: 0.62;
+/* Pausiert und abgeschlossen nehmen sich über das Zurücknehmen-Muster zurück
+ * (tokens.css, #1230), nicht über `opacity: 0.62` / `0.78` - die zogen
+ * Beschreibung, Metazeile und Status-Badge auf 2,6 bis 3,8:1. Den Zustand
+ * sagt das Badge; es bleibt voll. */
+.subscription-card--disabled,
+.subscription-card--completed {
+  background: var(--color-surface-receded);
+  border-radius: var(--radius-md);
+}
+
+.subscription-card--disabled .subscription-card__desc,
+.subscription-card--disabled .subscription-card__cost span,
+.subscription-card--disabled .subscription-card__meta,
+.subscription-card--completed .subscription-card__desc,
+.subscription-card--completed .subscription-card__cost span,
+.subscription-card--completed .subscription-card__meta {
+  color: var(--color-text-receded);
 }
 
 /* Monogramm: die Marke trägt Fläche und Rahmen, die Schrift kommt aus dem
@@ -403,9 +418,6 @@
 }
 
 /* Abgeschlossen (#594): abgesetzt vom Pausiert-Grau über den Modul-Akzent. */
-.subscription-card--completed {
-  opacity: 0.78;
-}
 
 /* „Abgeschlossen" ist ein ZUSTAND, kein Ort. Der Modul-Akzent des Budgets
  * setzte es zwar vom Pausiert-Grau ab, sagte dabei aber „Budget" - und zwar

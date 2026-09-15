@@ -138,6 +138,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   theme and 3.9 to 5.5:1 in the dark theme on every surface they sit on: the sign-in page, dialogs,
   settings pages, the search overlay, and the search and quick-add fields above the lists. Card
   edges and separators keep their quieter shade, and a focused field still takes the accent color.
+- **Set-aside cards and rows stay readable.** Done and archived tasks (in the list and on the
+  board), archived accounts, paused and completed subscriptions, inactive medications and rewards,
+  archived waste types, paused pickups, and rows that an import has already added all faded out by
+  turning partly transparent. That pulled every text on them below the 4.5:1 normal text needs,
+  status badges and the initials in avatars included: 1.7 to 3.9:1 in the light theme, 2.4 to
+  4.2:1 in the dark theme. They now recede in one consistent way instead: the card sinks to a
+  slightly deeper surface with a quieter edge, secondary details use the quieter text color, and
+  titles, status badges, priority chips and avatars stay at full strength. The amount of an
+  expected budget entry is no longer faded either (3.5:1 and 3.0:1 before); it keeps its income or
+  expense color, and the "expected" badge marks the row. In the birthday import dialog, the
+  "already added" badge had no background at all and its text was practically invisible; it now
+  shows in the module color again.
 - **Checked-off shopping items look the same with reduced motion, and stay readable.** A checked
   item was meant to fade as a whole, but that only happened for people who had reduced motion turned
   on, and for them its name and quantity dropped to 2.0:1 (light) and 2.5:1 (dark). Everyone else

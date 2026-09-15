@@ -7591,6 +7591,82 @@ test('die abgehakte Einkaufszeile nimmt sich ueber Textfarben zurueck, nicht ueb
   assert.deepEqual(findings, [], 'Eine Textfarbe des abgehakten Postens unterschreitet 4.5:1.');
 });
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * Zurueckgenommene Karten und Zeilen dimmen nicht ueber opacity (#1230)
+ *
+ * Erledigte und abgelegte Aufgaben, archivierte Konten, pausierte und
+ * abgeschlossene Abos, inaktive Medikamente und Praemien, archivierte
+ * Abfallarten, pausierte Abfuhrtermine, bereits importierte Zeilen und
+ * erwartete Buchungsbetraege nahmen sich ueber `opacity: 0.55` bis `0.78`
+ * zurueck. Gerendert fiel damit JEDER Text der Karte unter 4.5:1, die
+ * Initialen der Avatare und die Zustands-Badges eingeschlossen: 1,65 bis
+ * 3,86:1 light, 2,40 bis 4,23:1 dark. Die Deckung multipliziert den Kontrast
+ * mit herunter; eine Stufe, bei der sekundaerer Text 4.5:1 haelt, liegt ueber
+ * 0.9 und dimmt nichts mehr.
+ *
+ * Die Entscheidung (Ulas, 2026-09-15): EIN Muster fuer alles Zurueckgenommene -
+ * Flaeche --color-surface-receded, Kante --color-border-receded, Sekundaertext
+ * --color-text-receded (tokens.css), Badges und Initialen voll. Die erwartete
+ * Buchung behaelt ihre Einnahme-/Ausgabefarbe; das Badge markiert die Zeile.
+ *
+ * WELCHE REGEL EIN ZUSTAND IST, SAGT DER SELEKTOR, nicht eine Liste: ein
+ * Zustandsmodifikator (`--done`, `--archived`, `--inactive`, `--paused`, ...)
+ * oder `.is-inactive` irgendwo im Selektor. Ausgenommen ist nur, was der
+ * Standard ausnimmt: echte deaktivierte Bedienelemente (`:disabled`) und die
+ * Drag-Geister von SortableJS, die kein Zustand eines Datensatzes sind.
+ * ──────────────────────────────────────────────────────────────────────────── */
+test('zurueckgenommene Karten und Zeilen dimmen nicht ueber opacity, und ihre Textfarben halten 4.5:1', () => {
+  const { light, dark } = themeTokenMaps();
+  const STATE = /--(?:done|checked|archived|inactive|completed|disabled|paused|exists|pending)(?![\w-])|\.is-inactive(?![\w-])/;
+  const EXEMPT = /:disabled|\[disabled\]|sortable-/;
+  const styles = new URL('../public/styles/', import.meta.url);
+  const dimmed = [];
+  const weakText = [];
+  let stateRules = 0;
+  let colors = 0;
+
+  for (const file of readdirSync(styles).filter((entry) => entry.endsWith('.css') && entry !== 'tokens.css')) {
+    for (const rule of eachRule(readFileSync(new URL(file, styles), 'utf8'))) {
+      const parts = rule.selector.split(',').map((s) => s.trim()).filter((s) => STATE.test(s) && !EXEMPT.test(s));
+      if (!parts.length) continue;
+      stateRules += 1;
+      const where = `${file}: ${parts.join(', ')}${rule.at.length ? `  [${rule.at.join(' ')}]` : ''}`;
+
+      let opacity = null;
+      for (const m of rule.body.matchAll(/(?:^|;)\s*opacity\s*:\s*([0-9.]+)\s*(?=;|$)/g)) opacity = Number(m[1]);
+      if (opacity !== null && opacity < 1) dimmed.push(`${where}  opacity ${opacity}`);
+
+      const decl = [...rule.body.matchAll(/(?:^|;)\s*color\s*:\s*var\(\s*(--[\w-]+)\s*\)/g)].pop();
+      if (!decl) continue;
+      // Deaktiviert ist vom Standard ausgenommen (WCAG 1.4.3) - dieselbe
+      // Kategorie wie oben, nur an der Farbe statt am Selektor erkannt.
+      if (decl[1] === '--color-text-disabled') continue;
+      // Eine Regel, die ihre EIGENE Flaeche setzt (`.swipe-reveal--done`: Tinte
+      // auf Gruen), steht nicht auf surface - ihr Paar prueft "jede Regel, die
+      // Farbe UND Untergrund setzt, haelt ihr eigenes Paar" weiter oben.
+      if (/(?:^|;)\s*background(?:-color)?\s*:/.test(rule.body)) continue;
+      for (const [theme, map] of [['light', light], ['dark', dark]]) {
+        const fg = resolveColor(decl[1], map);
+        if (!/^#[0-9a-f]{6}$/i.test(fg ?? '')) continue;
+        colors += 1;
+        for (const ground of ['--color-surface', '--color-surface-2']) {
+          const ratio = contrastRatio(fg, resolveColor(ground, map));
+          if (ratio + 0.005 < 4.5) weakText.push(`${theme}: ${ratio.toFixed(2)}:1  ${where}  ${decl[1]} auf ${ground}`);
+        }
+      }
+    }
+  }
+
+  assert.ok(stateRules >= 20,
+    `Nur ${stateRules} Zustandsregeln gefunden - der Selektor-Scan greift nicht mehr, der Guard misst nichts.`);
+  assert.ok(colors >= 10, `Nur ${colors} aufloesbare Textfarben in Zustandsregeln - der Guard misst nichts.`);
+  assert.deepEqual(dimmed, [],
+    'Ein Zustand dimmt seine Karte oder Zeile ueber opacity. Das zieht jeden Text darin unter 4.5:1, Badges '
+    + 'und Initialen eingeschlossen. Zuruecknehmen ueber --color-surface-receded, --color-border-receded und '
+    + '--color-text-receded (tokens.css).');
+  assert.deepEqual(weakText, [], 'Eine Textfarbe in einer Zustandsregel unterschreitet 4.5:1 auf surface oder surface-2.');
+});
+
 test('module accents stay readable as text on the page background in both themes', () => {
   // `.btn--secondary` faerbt seine Beschriftung mit --active-module-accent
   // (layout.css). Steht so ein Button auf dem Seitenhintergrund statt in einer

@@ -317,7 +317,17 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xs);
 }
-.rw-reward-card--inactive { opacity: 0.62; }
+/* Zurücknehmen-Muster (tokens.css, #1230) statt `opacity: 0.62`. Das
+ * „Inaktiv"-Etikett trägt den Zustand und bleibt voll. */
+.rw-reward-card--inactive {
+  background: var(--color-surface-receded);
+  border-color: var(--color-border-receded);
+  box-shadow: none;
+}
+
+.rw-reward-card--inactive .rw-reward-card__desc {
+  color: var(--color-text-receded);
+}
 /* NENNT NICHTS: das Zeichen der Prämie steht in ihrer eigenen Karte, in ihrem
  * eigenen Modul. Es trug den Modulton als 16-%-Waschung MIT demselben Ton als
  * Glyph darauf - dieselbe Farbe zweimal blass, sechsmal nebeneinander auf der

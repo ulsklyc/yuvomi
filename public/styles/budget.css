@@ -201,12 +201,11 @@
   white-space: nowrap;
 }
 
-/* Der Betrag einer erwarteten Buchung wird zurückgenommen: er ist eine Ansage,
- * keine Tatsache. Nur der Betrag - Titel und Datum bleiben voll lesbar, sonst
- * wäre die Zeile schwerer zu erfassen als die daneben. */
-.budget-entry--pending .budget-entry__amount {
-  opacity: 0.65;
-}
+/* Der Betrag einer erwarteten Buchung behält seine Einnahme-/Ausgabefarbe
+ * (#1230, Entscheidung Ulas). Hier stand `opacity: 0.65` - er sollte als
+ * Ansage statt Tatsache zurücktreten, lag damit aber bei 3,52:1 (light) und
+ * 2,99:1 (dark). Die Ansage tragen das „erwartet"-Badge und der gestreifte
+ * Indikator der Zeile; eine gedämpfte Zahl hätte sie nur unleserlich gesagt. */
 
 .budget-entry--pending .budget-entry__indicator {
   background: repeating-linear-gradient(
@@ -339,7 +338,19 @@
 
 .budget-account:hover { border-color: var(--account-accent); }
 
-.budget-account--archived { opacity: 0.62; }
+/* Zurücknehmen-Muster (tokens.css, #1230) statt `opacity: 0.62`, die Badge,
+ * Saldo und Metazeile auf 2,5 bis 3,8:1 zog. Das „Archiviert"-Badge und der
+ * Saldo bleiben voll, die Kante wird die ruhigste und ersetzt den Schatten. */
+.budget-account--archived {
+  background: var(--color-surface-receded);
+  border-color: var(--color-border-receded);
+  box-shadow: none;
+}
+
+.budget-account--archived .budget-account__type,
+.budget-account--archived .budget-account__starting {
+  color: var(--color-text-receded);
+}
 
 .budget-account__main {
   flex: 1 1 auto;

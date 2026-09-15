@@ -599,17 +599,28 @@
   background-color: var(--color-surface-hover);
 }
 
-.task-card--done {
-  opacity: 0.6;
-  transition: opacity var(--transition-base);
+/* Erledigt und abgelegt (#688) treten über das Zurücknehmen-Muster zurück
+ * (tokens.css, #1230), nicht über die Deckung: `opacity: 0.6` / `0.55` zog
+ * jeden Text der Karte auf 1,7 bis 3,9:1, die Initialen der Avatare
+ * eingeschlossen. Fläche vertieft, Metazeile eine Stufe leiser, Priorität,
+ * Etiketten und Avatare voll. EINE Regel für beide, weil die Fläche gleich
+ * gemeint ist; der Unterschied liegt im Titel: erledigt trägt den Durchstrich,
+ * abgelegt nicht - die Aufgabe ist aus dem Lauf, nicht zwingend fertig. Der
+ * linke Streifen bleibt die Priorität. */
+.task-card--done,
+.task-card--archived {
+  background-color: var(--color-surface-receded);
 }
 
-/* Abgelegt (#688): zurückgenommen wie „erledigt", aber ohne den Durchstrich -
-   die Aufgabe ist aus dem Lauf, nicht zwingend fertig. Der linke Streifen bleibt
-   die Priorität, deshalb tritt hier nur die Fläche zurück. */
-.task-card--archived {
-  opacity: 0.55;
-  background-color: var(--color-surface-2);
+.task-card--archived .task-card__title {
+  color: var(--color-text-secondary);
+}
+
+.task-card--done .task-card__meta,
+.task-card--done .due-date,
+.task-card--archived .task-card__meta,
+.task-card--archived .due-date {
+  color: var(--color-text-receded);
 }
 
 .task-card__archived {
@@ -1321,8 +1332,18 @@
   transition: none;
 }
 
+/* Dasselbe Zurücknehmen-Muster wie die Listenkarte (#1230). Die Deckung hat hier
+ * nur unter prefers-reduced-motion gegriffen - stagger() liess sonst ein
+ * Inline-`opacity: 1` stehen -, und dort lag jeder Text der Karte bei 1,8 bis
+ * 3,6:1. Die Kante ersetzt den Schatten: eine vertiefte Karte hebt sich nicht. */
 .kanban-card--done {
-  opacity: 0.6;
+  background-color: var(--color-surface-receded);
+  box-shadow: 0 0 0 var(--space-px) var(--color-border-receded);
+}
+
+.kanban-card--done .kanban-card__meta,
+.kanban-card--done .due-date {
+  color: var(--color-text-receded);
 }
 
 .kanban-card__title {

@@ -186,12 +186,11 @@
  * das Wort der Tokens fuer „kaum getoent". Der Chip wird zum Umriss seiner
  * selbst und sagt damit dasselbe wie sein Text.
  * Die Textfarbe bleibt bewusst die geerbte `--color-text-secondary` der
- * Basisregel: die Zeile traegt ohnehin schon `opacity: 0.62`
- * (.waste-schedule-row--paused), und der Chip ist ausgerechnet das Element,
- * das diese Daempfung ERKLAERT - noch eine Stufe leiser wuerde die Erklaerung
- * unter die 4.5:1-Schwelle druecken, die dieser Datei bei den Warn-Chips oben
- * schon einmal auf die Fuesse gefallen ist. Ein hellerer Grund erhoeht den
- * Kontrast der dunklen Schrift sogar, statt ihn zu kosten. */
+ * Basisregel: die Zeile nimmt sich ueber das Zuruecknehmen-Muster zurueck
+ * (.waste-schedule-row--paused, tokens.css, #1230), und der Chip ist
+ * ausgerechnet das Element, das diese Daempfung ERKLAERT - er bleibt voll wie
+ * jedes Zustands-Badge. Ein hellerer Grund erhoeht den Kontrast der dunklen
+ * Schrift sogar, statt ihn zu kosten. */
 .waste-badge--paused {
   background: color-mix(in srgb, var(--color-text-tertiary) var(--tint-wash), transparent);
 }
@@ -243,7 +242,17 @@
   transition: background var(--transition-fast), outline-color var(--transition-fast);
 }
 
-.waste-type-card--archived { opacity: 0.62; }
+/* Zuruecknehmen-Muster (tokens.css, #1230) statt `opacity: 0.62`, die jeden
+ * Text der Karte samt Archiviert-Chip unter 4.5:1 zog. */
+.waste-type-card--archived {
+  background: var(--color-surface-receded);
+  border-color: var(--color-border-receded);
+}
+
+.waste-type-card--archived .list-row__meta,
+.waste-type-card--archived .waste-schedule-list__empty {
+  color: var(--color-text-receded);
+}
 
 .waste-schedule-list {
   padding: 0 var(--space-4) var(--space-3);
@@ -259,7 +268,13 @@
   padding: var(--space-2) 0;
 }
 
-.waste-schedule-row--paused { opacity: 0.62; }
+.waste-schedule-row--paused {
+  background: var(--color-surface-receded);
+}
+
+.waste-schedule-row--paused .list-row__meta {
+  color: var(--color-text-receded);
+}
 
 /* -------------------------------------------------------------------- */
 /* Recurrence form                                                       */

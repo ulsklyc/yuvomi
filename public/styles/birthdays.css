@@ -579,13 +579,19 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Schon hinzugefuegt: Zuruecknehmen-Muster (tokens.css, #1230) statt
+ * `opacity: 0.7`. Das Badge sagt den Zustand und bleibt voll. */
 .bd-import-row--done {
   cursor: default;
-  opacity: 0.7;
+  background: var(--color-surface-receded);
 }
 
 .bd-import-row--done:hover {
-  background: transparent;
+  background: var(--color-surface-receded);
+}
+
+.bd-import-row--done .bd-import-row__date {
+  color: var(--color-text-receded);
 }
 
 .bd-import-row__check {
@@ -595,7 +601,8 @@
   justify-content: center;
   width: 18px;
   height: 18px;
-  color: var(--module-accent);
+  /* Rueckfall wie beim Badge darunter: der Dialog liegt ausserhalb von .birthdays-page. */
+  color: var(--module-accent, var(--module-birthdays));
 }
 
 .bd-import-row__check i {
@@ -603,11 +610,17 @@
   height: 16px;
 }
 
+/* DER IMPORT-DIALOG HAENGT UNTER document.body, NICHT UNTER .birthdays-page
+ * (components/modal.js). --module-accent ist nur an der Seitenwurzel gesetzt,
+ * im Dialog also leer: das Badge hatte keine Flaeche, und seine Tinte stand
+ * gerendert bei 1,04:1 (light) und 1,03:1 (dark) auf dem Dialoggrund (#1230).
+ * Der Rueckfall auf das globale Modul-Token ist dasselbe Muster wie
+ * .vcard-import-row__bday in contacts.css. */
 .bd-import-row__badge {
   flex: none;
   font-size: var(--text-xs);
   color: var(--color-ink-on-vivid);
-  background: var(--module-accent);
+  background: var(--module-accent, var(--module-birthdays));
   padding: var(--space-0h) var(--space-2);
   border-radius: var(--radius-full);
 }

@@ -661,8 +661,19 @@ html:has(.contacts-page.is-selecting) {
   height: 16px;
 }
 
+/* Schon vorhanden: Zuruecknehmen-Muster (tokens.css, #1230) statt
+ * `opacity: 0.72`. Das Badge sagt den Zustand; auf der vertieften Flaeche
+ * nimmt es die naechste Stufe, sonst verschwaende seine Pille im Grund. */
 .vcard-import-row--exists {
-  opacity: 0.72;
+  background: var(--color-surface-receded);
+}
+
+.vcard-import-row--exists .vcard-import-row__detail {
+  color: var(--color-text-receded);
+}
+
+.vcard-import-row--exists .vcard-import-row__badge {
+  background: var(--color-surface-3);
 }
 
 .vcard-import-row__badge {
