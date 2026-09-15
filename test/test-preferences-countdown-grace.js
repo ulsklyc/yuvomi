@@ -10,6 +10,7 @@
  */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
@@ -20,6 +21,7 @@ process.env.SESSION_SECRET = 'preferences-countdown-grace-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: preferencesRouter } = await import('../server/routes/preferences.js');
+const { DEFAULT_OVERDUE_GRACE_DAYS } = await import('../server/services/countdowns.js');
 
 const moduleDatabase = get();
 const db = buildMigratedDatabase(MIGRATIONS);
@@ -131,3 +133,16 @@ for (const invalid of [-1, 91, 7.5, 'sieben']) {
     assert.equal(r.status, 400);
   });
 }
+
+test('das Einstellungsformular fällt auf denselben Standard zurück wie der Server', () => {
+  // Das Formular trägt eine eigene Kopie des Standards für Einstellungen ohne
+  // Wert (public/settings/pages/modules-countdowns.js); ein Browser-Modul kann
+  // server/services/countdowns.js nicht importieren. Driftet die Kopie, zeigt
+  // das Feld eine andere Nachfrist als die, nach der der Server abgelaufene
+  // Countdowns ausblendet (#1027).
+  const form = readFileSync(new URL('../public/settings/pages/modules-countdowns.js', import.meta.url), 'utf8');
+  const copy = form.match(/const DEFAULT_GRACE_DAYS = (\d+);/);
+  assert.ok(copy, 'die Kopie braucht einen benannten Wert, keine Zahl im Markup');
+  assert.equal(Number(copy[1]), DEFAULT_OVERDUE_GRACE_DAYS,
+    'Formular und Server nennen verschiedene Standard-Nachfristen');
+});
