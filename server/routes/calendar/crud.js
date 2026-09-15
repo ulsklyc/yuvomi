@@ -949,9 +949,7 @@ router.put('/:id', async (req, res) => {
         db.get(),
         event.created_by,
         stagedClones,
-        (cloneOptions) => {
-          if (assignedTouched) assertNoNewNonMembers(db.get(), userIds, storedEventAssignees(db.get(), id));
-          return updateSeriesWithOverrides(db.get(), {
+        (cloneOptions) => updateSeriesWithOverrides(db.get(), {
           seriesId: id,
           actorId: getUserId(req),
           isAdmin: isAdminUser(req),
@@ -961,8 +959,7 @@ router.put('/:id', async (req, res) => {
           applyUpdate,
           authorizeActor: false,
           ...cloneOptions,
-        });
-        },
+        }),
       );
     } else {
       db.get().transaction(applyUpdate)();

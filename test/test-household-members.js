@@ -574,3 +574,96 @@ test('split expenses: members and guests can join a group, staff cannot, a store
   assert.equal(kept.status, 201, JSON.stringify(kept.body));
   assert.equal(membership(OTHER, CLARA).role, 'admin', 'a stored staff membership can still be changed');
 });
+
+// --------------------------------------------------------------------------
+// Kalender: die beiden Wege, die erst nach einem await schreiben
+// --------------------------------------------------------------------------
+
+function addSeries(title, start, attendees) {
+  const seriesId = Number(db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, end_datetime, visibility, recurrence_rule, created_by)
+    VALUES (?, ?, NULL, 'all', 'FREQ=DAILY', ?)
+  `).run(title, start, ANNA).lastInsertRowid);
+  for (const userId of attendees) {
+    db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(seriesId, userId);
+  }
+  return seriesId;
+}
+const eventRows = () => db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+
+test('calendar: the series path of PUT keeps a stored staff attendee and takes no new non-member', async () => {
+  const seriesId = addSeries('Wochenplan', '2030-05-01T08:00:00', [CLARA]);
+  // Ein abgewandeltes Vorkommen zwingt PUT /:id in den Serienpfad
+  // (updateSeriesWithOverrides) statt in das einfache Update.
+  const occurrence = await call('PUT', `/calendar/${seriesId}/occurrences/2030-05-03`, { body: { title: 'Anders' } });
+  assert.equal(occurrence.status, 200, JSON.stringify(occurrence.body));
+  assert.ok(db.prepare('SELECT 1 FROM calendar_events WHERE recurrence_parent_id = ?').get(seriesId), 'Vorbedingung: ein verknuepftes Vorkommen existiert');
+
+  const series = () => ({
+    attendees: assignedIds('event_assignments', 'event_id', seriesId),
+    rule: db.prepare('SELECT recurrence_rule AS r FROM calendar_events WHERE id = ?').get(seriesId).r,
+    rows: eventRows(),
+  });
+  const before = series();
+  assertRejectsNonMember(await call('PUT', `/calendar/${seriesId}`, { body: { assigned_to: [CLARA, DORA] } }), 'guest added to a series with an override');
+  assert.deepEqual(series(), before, 'a rejected series PUT writes nothing');
+
+  const kept = await call('PUT', `/calendar/${seriesId}`, { body: { assigned_to: [BEN, CLARA] } });
+  assert.equal(kept.status, 200, JSON.stringify(kept.body));
+  assert.deepEqual(assignedIds('event_assignments', 'event_id', seriesId), byId([BEN, CLARA]));
+});
+
+test('calendar: this-and-following keeps a stored staff attendee and takes no new non-member', async () => {
+  const seriesId = addSeries('Garten', '2030-06-01T07:00:00', [CLARA]);
+  const series = () => ({
+    attendees: assignedIds('event_assignments', 'event_id', seriesId),
+    rule: db.prepare('SELECT recurrence_rule AS r FROM calendar_events WHERE id = ?').get(seriesId).r,
+    rows: eventRows(),
+  });
+  const before = series();
+  assertRejectsNonMember(
+    await call('PUT', `/calendar/${seriesId}/occurrences/2030-06-05/following`, { body: { assigned_to: [CLARA, EMIL] } }),
+    'guest added to this and the following occurrences',
+  );
+  assert.deepEqual(series(), before, 'a rejected split writes nothing: same series, no following series');
+
+  const kept = await call('PUT', `/calendar/${seriesId}/occurrences/2030-06-05/following`, { body: { assigned_to: [BEN, CLARA] } });
+  assert.equal(kept.status, 201, JSON.stringify(kept.body));
+  assert.deepEqual(assignedIds('event_assignments', 'event_id', kept.body.data.id), byId([BEN, CLARA]));
+});
+
+test('calendar: a rejected attendee leaves no staged attachment behind', async () => {
+  // Ordner-gestuetzte Ablage, damit eine liegen gebliebene Datei sichtbar wird -
+  // der Standardpfad legt Anhaenge als BLOB in die Datenbank.
+  const fs = await import('node:fs/promises');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yuvomi-members-attach-'));
+  const before = { enabled: process.env.DOCUMENT_STORAGE_LOCAL_ENABLED, path: process.env.DOCUMENT_STORAGE_LOCAL_PATH };
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  process.env.DOCUMENT_STORAGE_LOCAL_PATH = dir;
+  const files = async () => (await fs.readdir(dir, { withFileTypes: true, recursive: true })).filter((e) => e.isFile()).length;
+  try {
+    const eventId = Number(db.prepare(`
+      INSERT INTO calendar_events (title, start_datetime, visibility, created_by) VALUES ('Zeugnis', '2030-07-01T10:00:00', 'all', ?)
+    `).run(ANNA).lastInsertRowid);
+    const dataUrl = `data:text/plain;base64,${Buffer.from('Anhang').toString('base64')}`;
+
+    // Gegenprobe zuerst: legt dieser Aufbau ueberhaupt eine Datei ab?
+    const ok = await call('PUT', `/calendar/${eventId}`, { body: { assigned_to: [BEN], attachment_data: dataUrl, attachment_name: 'gut.txt' } });
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.equal(await files(), 1, 'Vorbedingung: ein gelungener Anhang liegt im Ordner');
+
+    assertRejectsNonMember(
+      await call('PUT', `/calendar/${eventId}`, { body: { assigned_to: [BEN, DORA], attachment_data: dataUrl, attachment_name: 'waise.txt' } }),
+      'guest added together with an attachment',
+    );
+    assert.equal(await files(), 1, 'the attachment staged for the rejected request was cleaned up');
+  } finally {
+    if (before.enabled === undefined) delete process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+    else process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = before.enabled;
+    if (before.path === undefined) delete process.env.DOCUMENT_STORAGE_LOCAL_PATH;
+    else process.env.DOCUMENT_STORAGE_LOCAL_PATH = before.path;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
