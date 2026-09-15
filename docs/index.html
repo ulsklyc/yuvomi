@@ -1396,7 +1396,7 @@
     <dl class="long-list">
       <div class="long-item reveal">
         <dt data-t="long_q1">What if this project stops?</dt>
-        <dd data-t="long_a1"><b>Nothing changes on your machine.</b> It is MIT-licensed and self-hosted, there is no server of ours anywhere in the path, and the only thing that leaves your machine is a version check against the GitHub releases API. The container you already pulled keeps running exactly as it does today, with or without us.</dd>
+        <dd data-t="long_a1"><b>Nothing changes on your machine.</b> It is MIT-licensed and self-hosted, there is no server of ours anywhere in the path, and out of the box the only thing that leaves your machine is a version check against the GitHub releases API. The container you already pulled keeps running exactly as it does today, with or without us.</dd>
       </div>
       <div class="long-item reveal">
         <dt data-t="long_q2">What if I want my data somewhere else?</dt>
@@ -1473,7 +1473,7 @@
         <li><b data-t="tb_needs_k">Needs</b> <span data-t="tb_needs_v">256 MB RAM and one port, 3000 by default.</span></li>
         <li><b data-t="tb_writes_k">Writes</b> <span data-t="tb_writes_v">Four volumes you own: data, backups, modules, documents.</span></li>
         <li class="tb-wide"><b data-t="tb_data_k">Your data</b> <span><span data-t="tb_data_v">One SQLite file at</span> <code>/data/yuvomi.db</code>. <span data-t="tb_data_v2">Copying it is the whole export, unless documents live outside the database.</span></span></li>
-        <li class="tb-wide"><b data-t="tb_out_k">Outbound</b> <span><span data-t="tb_out_v">One update check against the GitHub releases API, nothing else. Weather, calendar sync and WebDAV backup are all off until you fill in credentials.</span> <a class="tb-proof" href="privacy.html" data-href-en="privacy.html" data-href-de="datenschutz.html" data-t="tb_out_proof">What the site itself stores</a><span class="tb-sep" aria-hidden="true"> · </span><a class="tb-proof" href="https://github.com/ulsklyc/yuvomi/blob/main/server/routes/changelog.js" data-t="tb_out_code">Read the server source</a></span></li>
+        <li class="tb-wide"><b data-t="tb_out_k">Outbound</b> <span><span data-t="tb_out_v">Out of the box, one update check against the GitHub releases API. Weather, public holidays, calendar sync, push and cloud backup reach out only once you switch them on.</span> <a class="tb-proof" href="privacy.html" data-href-en="privacy.html" data-href-de="datenschutz.html" data-t="tb_out_proof">What the site itself stores</a><span class="tb-sep" aria-hidden="true"> · </span><a class="tb-proof" href="https://github.com/ulsklyc/yuvomi/blob/main/server/routes/changelog.js" data-t="tb_out_code">Read the server source</a></span></li>
       </ul>
       <div class="code-wrap"><div class="code-block"><span class="c" data-t="qs_c1"># Pre-built image - Docker</span>
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
@@ -1573,7 +1573,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
     en: {
       ho_4_a:'The last jar goes out of the pantry', ho_4_b:'It is already on the shopping list',
       ho_4_d:'Pantry keeps amounts and best-before dates - and speaks up before one of them is reached. What runs low or runs out moves to the shared list with one tap, and buying it puts it back in stock. Household of five or household of one, the loop is the same.',
-      long_q1:'What if this project stops?', long_a1:'<b>Nothing changes on your machine.</b> It is MIT-licensed and self-hosted, there is no server of ours anywhere in the path, and the only thing that leaves your machine is a version check against the GitHub releases API. The container you already pulled keeps running exactly as it does today, with or without us.',
+      long_q1:'What if this project stops?', long_a1:'<b>Nothing changes on your machine.</b> It is MIT-licensed and self-hosted, there is no server of ours anywhere in the path, and out of the box the only thing that leaves your machine is a version check against the GitHub releases API. The container you already pulled keeps running exactly as it does today, with or without us.',
       long_q2:'What if I want my data somewhere else?', long_a2:'<b>Copying one file is the whole export.</b> Everything lives in a single SQLite file on your own disk, unless you moved documents to a folder, WebDAV or Google Drive; those files need their own backup. Scheduled backups write a restorable archive on top of that, and the documented API plus the MCP endpoint pull anything out in whatever shape you need.',
       long_q3:'What if I lose the encryption key?', long_a3:'<b>Then the database is gone, and we cannot help you.</b> That is the honest answer: SQLCipher has no recovery path and no back door, which is the entire point of it. Store the key the way you store the ones that matter. Encryption is optional; if you would rather not carry that risk, leave it off and the file stays readable.',
       long_title:'The three questions worth asking first',
@@ -1630,7 +1630,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       long_eyebrow:'Before you commit', tb_image_k:'Image', tb_image_v:'about 500 MB',
       tb_needs_k:'Needs', tb_needs_v:'256 MB RAM and one port, 3000 by default.',
       tb_writes_k:'Writes', tb_writes_v:'Four volumes you own: data, backups, modules, documents.',
-      tb_out_k:'Outbound', tb_out_v:'One update check against the GitHub releases API, nothing else. Weather, calendar sync and WebDAV backup are all off until you fill in credentials.',
+      tb_out_k:'Outbound', tb_out_v:'Out of the box, one update check against the GitHub releases API. Weather, public holidays, calendar sync, push and cloud backup reach out only once you switch them on.',
       tb_data_k:'Your data', tb_data_v:'One SQLite file at', tb_data_v2:'Copying it is the whole export, unless documents live outside the database.',
       hero_install:'Install Yuvomi', hero_demo:'See it in action', tag_nocloud:'No cloud required',
       gal_eyebrow:'See it first', gal_title:'This is the whole thing, <em>on one screen.</em>',
@@ -1690,7 +1690,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
     de: {
       ho_4_a:'Das letzte Glas geht aus dem Vorrat', ho_4_b:'Es steht schon auf der Einkaufsliste',
       ho_4_d:'Der Vorrat kennt Mengen und Mindesthaltbarkeit - und meldet sich, bevor eines davon erreicht ist. Was knapp wird oder ausgeht, wandert mit einem Tipp auf die geteilte Liste, und der Einkauf bucht es zurück in den Bestand. Haushalt zu fünft oder Haushalt zu einem, die Schleife ist dieselbe.',
-      long_q1:'Was, wenn dieses Projekt aufhört?', long_a1:'<b>Auf eurer Maschine ändert sich nichts.</b> Es ist MIT-lizenziert und selbstgehostet, es steht nirgends ein Server von uns dazwischen, und das Einzige, was eure Maschine verlässt, ist eine Versionsprüfung gegen die GitHub-Releases-API. Der Container, den ihr längst geladen habt, läuft genau so weiter wie heute, mit uns oder ohne uns.',
+      long_q1:'Was, wenn dieses Projekt aufhört?', long_a1:'<b>Auf eurer Maschine ändert sich nichts.</b> Es ist MIT-lizenziert und selbstgehostet, es steht nirgends ein Server von uns dazwischen, und ab Werk ist das Einzige, was eure Maschine verlässt, eine Versionsprüfung gegen die GitHub-Releases-API. Der Container, den ihr längst geladen habt, läuft genau so weiter wie heute, mit uns oder ohne uns.',
       long_q2:'Was, wenn ich meine Daten woanders hin will?', long_a2:'<b>Eine Datei kopieren ist der ganze Export.</b> Alles liegt in einer einzigen SQLite-Datei auf eurer eigenen Platte, außer ihr habt die Dokumente in einen Ordner, auf WebDAV oder in Google Drive ausgelagert; diese Dateien brauchen eine eigene Sicherung. Geplante Backups schreiben darüber hinaus ein wiederherstellbares Archiv, und die dokumentierte API samt MCP-Endpunkt holt alles in der Form heraus, die ihr braucht.',
       long_q3:'Was, wenn ich den Verschlüsselungsschlüssel verliere?', long_a3:'<b>Dann ist die Datenbank weg, und wir können euch nicht helfen.</b> Das ist die ehrliche Antwort: SQLCipher hat keinen Wiederherstellungsweg und keine Hintertür, und genau das ist der Sinn der Sache. Verwahrt den Schlüssel wie die, auf die es ankommt. Die Verschlüsselung ist optional; wer dieses Risiko nicht tragen will, lässt sie aus, dann bleibt die Datei lesbar.',
       long_title:'Die drei Fragen, die man vorher stellen sollte',
@@ -1747,7 +1747,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       long_eyebrow:'Bevor ihr euch festlegt', tb_image_k:'Image', tb_image_v:'rund 500 MB',
       tb_needs_k:'Braucht', tb_needs_v:'256 MB RAM und einen Port, standardmäßig 3000.',
       tb_writes_k:'Legt an', tb_writes_v:'Vier Volumes, die euch gehören: Daten, Backups, Module, Dokumente.',
-      tb_out_k:'Nach außen', tb_out_v:'Eine Update-Abfrage an die GitHub-Releases-API, sonst nichts. Wetter, Kalender-Sync und WebDAV-Backup bleiben aus, bis ihr Zugangsdaten eintragt.',
+      tb_out_k:'Nach außen', tb_out_v:'Ab Werk eine Update-Abfrage an die GitHub-Releases-API. Wetter, Feiertage, Kalender-Sync, Push und Cloud-Backup gehen erst nach außen, wenn ihr sie einschaltet.',
       tb_data_k:'Eure Daten', tb_data_v:'Eine einzige SQLite-Datei unter', tb_data_v2:'Kopieren ist der ganze Export, solange die Dokumente in der Datenbank liegen.',
       hero_install:'Yuvomi installieren', hero_demo:'App ansehen', tag_nocloud:'Keine Cloud nötig',
       gal_eyebrow:'Erst sehen', gal_title:'Das ist alles, <em>auf einem Bildschirm.</em>',
