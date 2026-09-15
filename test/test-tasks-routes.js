@@ -871,10 +871,14 @@ test('POST: erledigt angelegt bucht Punkte und schreibt den Verlauf', async () =
 test('POST: erledigt angelegte Serie legt die nächste Instanz nach', async () => {
   const admin = { id: ALICE, role: 'admin' };
   const marker = `serie-${randomUUID().slice(0, 8)}`;
+  // Die Fälligkeit liegt bewusst in der Zukunft. Liegt sie zurück, holt die
+  // Serie beim Erledigen übersprungene Vorkommen bis heute auf (#658, gewollt),
+  // und der Nachfolger hinge vom Tag des Testlaufs ab: mit '2026-09-07' war der
+  // Test bis zum 14.09.2026 grün und ab dem 15.09. rot.
   const r = await call('POST', '/', {
     as: admin,
     body: {
-      title: marker, status: 'done', due_date: '2026-09-07',
+      title: marker, status: 'done', due_date: '2099-09-07',
       is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO',
     },
   });
@@ -885,7 +889,7 @@ test('POST: erledigt angelegte Serie legt die nächste Instanz nach', async () =
   assert.equal(rows.length, 2, 'erledigte Instanz plus Nachfolger');
   assert.equal(rows[0].status, 'done');
   assert.equal(rows[1].status, 'open');
-  assert.equal(rows[1].due_date, '2026-09-14', 'der Nachfolger steht eine Woche später');
+  assert.equal(rows[1].due_date, '2099-09-14', 'der Nachfolger steht eine Woche später');
 });
 
 test('POST: status=archived legt nicht ab, sondern fällt auf den ersten Status', async () => {
