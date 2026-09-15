@@ -268,7 +268,10 @@
   padding: var(--space-2) 0;
 }
 
-.waste-schedule-row--paused {
+/* Auch unter dem Zeiger: die Zeile ist zugleich `.list-row`, und `.list-row:hover`
+ * (list-row.css, 0-2-0) toente sie sonst wie eine laufende (#1230). */
+.waste-schedule-row--paused,
+.waste-schedule-row--paused:hover {
   background: var(--color-surface-receded);
 }
 

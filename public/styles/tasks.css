@@ -606,9 +606,22 @@
  * Etiketten und Avatare voll. EINE Regel für beide, weil die Fläche gleich
  * gemeint ist; der Unterschied liegt im Titel: erledigt trägt den Durchstrich,
  * abgelegt nicht - die Aufgabe ist aus dem Lauf, nicht zwingend fertig. Der
- * linke Streifen bleibt die Priorität. */
-.task-card--done,
-.task-card--archived {
+ * linke Streifen bleibt die Priorität.
+ *
+ * `.tasks-page` IST KEIN SCHMUCK. glass.css setzt die Kartenfläche mit
+ * `.tasks-page .task-card` (0-2-0) und schlug damit das unqualifizierte
+ * `.task-card--done` (0-1-0), obwohl dieses Stylesheet später lädt - die
+ * zurückgenommene Fläche kam auf /tasks nie an (Codex an #1230). Gleich
+ * spezifisch gewinnt jetzt die Ladereihenfolge, dieselbe Abmachung, die der
+ * Kommentar in glass.css nennt („glass.css < page CSS"). Die Fläche bleibt auch
+ * unter dem Zeiger: `.tasks-page .task-card:hover` (glass.css, 0-3-0) tönte die
+ * Karte sonst wie eine offene, deshalb steht die Hover-Fassung in derselben
+ * Regel. Guard: test-frontend-audit.js, „keine spezifischere Regel
+ * ueberschreibt eine zurueckgenommene Zustandsregel". */
+.tasks-page .task-card--done,
+.tasks-page .task-card--archived,
+.tasks-page .task-card--done:hover,
+.tasks-page .task-card--archived:hover {
   background-color: var(--color-surface-receded);
 }
 
@@ -1335,8 +1348,13 @@
 /* Dasselbe Zurücknehmen-Muster wie die Listenkarte (#1230). Die Deckung hat hier
  * nur unter prefers-reduced-motion gegriffen - stagger() liess sonst ein
  * Inline-`opacity: 1` stehen -, und dort lag jeder Text der Karte bei 1,8 bis
- * 3,6:1. Die Kante ersetzt den Schatten: eine vertiefte Karte hebt sich nicht. */
-.kanban-card--done {
+ * 3,6:1. Die Kante ersetzt den Schatten: eine vertiefte Karte hebt sich nicht -
+ * auch nicht unter dem Zeiger. `.kanban-card:hover` (0-2-0) gab ihr sonst den
+ * Schatten einer aktiven Karte zurück (Codex an #1230); die Hover-Fassung steht
+ * deshalb in derselben Regel und schlägt ihn bei gleicher Spezifität durch die
+ * spätere Stelle. */
+.kanban-card--done,
+.kanban-card--done:hover {
   background-color: var(--color-surface-receded);
   box-shadow: 0 0 0 var(--space-px) var(--color-border-receded);
 }

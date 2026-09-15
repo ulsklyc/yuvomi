@@ -586,7 +586,8 @@
   background: var(--color-surface-receded);
 }
 
-.bd-import-row--done:hover {
+.bd-import-row--done:hover,
+.bd-import-row--done:focus-within {
   background: var(--color-surface-receded);
 }
 

@@ -7634,9 +7634,12 @@ test('die abgehakte Einkaufszeile nimmt sich ueber Textfarben zurueck, nicht ueb
  * sich nicht aufloesen laesst (ein Modul-Token, `calc()`), zaehlt als Verstoss -
  * ein Guard, der Unlesbares durchwinkt, prueft nur die Schreibweise.
  * ──────────────────────────────────────────────────────────────────────────── */
+const RECEDED_STATE = /--(?:done|checked|archived|inactive|completed|disabled|paused|exists|pending|settled|ended|expired|cancelled|canceled|dismissed|resolved|redeemed|fulfilled)(?![\w-])|\.is-inactive(?![\w-])/;
+const RECEDED_EXEMPT = /:disabled|\[disabled\]|sortable-/;
+
 test('zurueckgenommene Karten und Zeilen dimmen nicht ueber opacity, und ihre Textfarben halten 4.5:1', () => {
   const { light, dark } = themeTokenMaps();
-  const STATE = /--(?:done|checked|archived|inactive|completed|disabled|paused|exists|pending|settled|ended|expired|cancelled|canceled|dismissed|resolved|redeemed|fulfilled)(?![\w-])|\.is-inactive(?![\w-])/;
+  const STATE = RECEDED_STATE;
   // Deckung einer Deklaration in beiden Themes: Zahl, Prozent oder var() mit
   // optionalem Rueckfall. NaN heisst "nicht lesbar" und zaehlt als Verstoss.
   const opacityIn = (raw, map, depth = 0) => {
@@ -7703,6 +7706,175 @@ test('zurueckgenommene Karten und Zeilen dimmen nicht ueber opacity, und ihre Te
     + 'und Initialen eingeschlossen. Zuruecknehmen ueber --color-surface-receded, --color-border-receded und '
     + '--color-text-receded (tokens.css).');
   assert.deepEqual(weakText, [], 'Eine Textfarbe in einer Zustandsregel unterschreitet 4.5:1 auf surface oder surface-2.');
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Keine spezifischere Regel ueberschreibt eine zurueckgenommene Zustandsregel
+ *
+ * Der Guard darueber prueft, was eine Zustandsregel SAGT - nicht, ob sie
+ * GILT. Auf /tasks gewann `.tasks-page .task-card` aus glass.css (0-2-0) gegen
+ * `.task-card--done` (0-1-0), obwohl tasks.css spaeter laedt: erledigte und
+ * abgelegte Listenkarten behielten --color-surface-work statt der
+ * zurueckgenommenen Flaeche, in beiden Themes. Und `.kanban-card:hover` (0-2-0)
+ * gab der erledigten Kanban-Karte beim Zeigen ihren Schatten zurueck - sie hob
+ * sich wie eine aktive (Codex an #1230).
+ *
+ * WIE DIE KASKADE HIER GERECHNET WIRD: eine Regel, deren letztes Glied dieselbe
+ * Karten- bzw. Zeilenklasse traegt, gewinnt, wenn ihre Spezifitaet hoeher ist
+ * oder bei Gleichstand spaeter laedt. Die Ladereihenfolge ist die der
+ * `<link>`-Tags in index.html (global), danach das Seitenstylesheet, das der
+ * Router ans Ende haengt. Zwei Seitenstylesheets sind nie gleichzeitig geladen
+ * und konkurrieren nicht. Modifikatoren derselben Klasse (`.due-date--overdue`)
+ * sind andere Zustaende, nicht dasselbe Element im selben Zustand.
+ *
+ * WELCHE ZUSTANDSREGELN: die des Zuruecknehmen-Musters, also jede Regel mit
+ * Zustandswort im Selektor, die ein `--color-*-receded`-Token setzt. Ein
+ * abgehakter Unteraufgaben-Haken oder eine gruene Wischflaeche ist ein anderer
+ * Zustand mit eigenem Hover und gehoert nicht hierher.
+ *
+ * WELCHE WETTBEWERBER: jede Regel, deren letztes Glied nur Klassen traegt, die
+ * am selben Element sitzen koennen. Welche das sind, sagen die
+ * `class="..."`-Vorlagen in public/ - `.waste-schedule-row` steht dort zusammen
+ * mit `list-row` und `waste-row`, und deren `:hover` uebernahm die Flaeche der
+ * pausierten Zeile, ohne dass eine Regel `.waste-schedule-row` hiess.
+ *
+ * AUCH HOVER, FOKUS UND AKTIV: die zurueckgenommene Flaeche, Kante und Farbe
+ * bleiben unter dem Zeiger stehen (Entscheidung zu #1230). ABGEDECKT ist ein
+ * Wettbewerber nur durch eine Zustandsregel mit denselben Pseudoklassen
+ * (`.kanban-card--done:hover` gegen `.kanban-card:hover`), die dieselbe
+ * Eigenschaft setzt und ihn schlaegt.
+ * ──────────────────────────────────────────────────────────────────────────── */
+test('keine spezifischere Regel ueberschreibt eine zurueckgenommene Zustandsregel', () => {
+  const html = read('../public/index.html');
+  const globals = [...html.matchAll(/href="\/styles\/([\w-]+\.css)"/g)].map((m) => m[1]);
+  assert.ok(globals.includes('glass.css') && globals.includes('layout.css'),
+    'index.html nennt glass.css/layout.css nicht mehr als Stylesheets - die Ladereihenfolge ist nicht mehr lesbar.');
+  const loadRank = (file) => (globals.includes(file) ? globals.indexOf(file) : globals.length);
+
+  const stripNot = (s) => s.replace(/:not\((?:[^()]|\([^()]*\))*\)/g, '');
+  const specificity = (sel) => {
+    let a = 0; let b = 0; let c = 0;
+    let s = sel.replace(/:where\((?:[^()]|\([^()]*\))*\)/g, '');
+    s = s.replace(/:(?:is|not|has)\(((?:[^()]|\([^()]*\))*)\)/g, (_, inner) => {
+      const best = inner.split(',').map(specificity)
+        .sort((x, y) => x[0] - y[0] || x[1] - y[1] || x[2] - y[2]).pop();
+      a += best[0]; b += best[1]; c += best[2];
+      return '';
+    });
+    a += (s.match(/#[\w-]+/g) || []).length;
+    b += (s.match(/\.[\w-]+|\[[^\]]*\]|:(?!:)[\w-]+(?:\([^)]*\))?/g) || []).length;
+    c += (s.match(/(?:^|[\s>+~])[a-z][\w-]*|::[\w-]+/gi) || []).length;
+    return [a, b, c];
+  };
+  const PROPS = { background: 'background', 'background-color': 'background', border: 'border-color', 'border-color': 'border-color', 'box-shadow': 'box-shadow', color: 'color', opacity: 'opacity' };
+  const propsOf = (body) => new Set([...body.matchAll(/(?:^|;)\s*([\w-]+)\s*:/g)].map((m) => PROPS[m[1]]).filter(Boolean));
+  const lastCompound = (s) => s.trim().split(/\s+|>|\+|~/).filter(Boolean).pop() ?? '';
+  const GESTURE = /:(?:hover|focus-within|focus-visible|active)(?![\w-])/g;
+  const gestures = (compound) => new Set(stripNot(compound).match(GESTURE) ?? []);
+
+  const styles = new URL('../public/styles/', import.meta.url);
+  const rules = [];
+  const cssClasses = new Set();
+  for (const file of readdirSync(styles).filter((entry) => entry.endsWith('.css') && entry !== 'tokens.css')) {
+    let index = 0;
+    for (const rule of eachRule(readFileSync(new URL(file, styles), 'utf8'))) {
+      for (const part of rule.selector.split(',').map((s) => s.trim())) {
+        rules.push({ file, index, part, at: rule.at, body: rule.body, props: propsOf(rule.body), spec: specificity(part), last: lastCompound(part) });
+        for (const cls of part.match(/\.[a-z][\w-]*/gi) ?? []) cssClasses.add(cls.slice(1));
+      }
+      index += 1;
+    }
+  }
+
+  // Mitklassen aus den Vorlagen: jede `class="..."`-Stelle in public/, die die
+  // Zustandsklasse nennt, liefert die Klassen, die am selben Element sitzen.
+  const templateSources = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === 'vendor' || entry.name === 'styles') continue;
+      const url = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, dir);
+      if (entry.isDirectory()) walk(url);
+      else if (entry.name.endsWith('.js')) templateSources.push(readFileSync(url, 'utf8'));
+    }
+  };
+  walk(new URL('../public/', import.meta.url));
+  const coClassesOf = (stateClass) => {
+    const name = stateClass.replace(/^\./, '');
+    const found = new Set();
+    for (const src of templateSources) {
+      for (const m of src.matchAll(/class="([^"]*)"/g)) {
+        if (!m[1].includes(name)) continue;
+        for (const token of m[1].match(/[a-z][a-z0-9]*(?:[-_]{1,2}[a-z0-9]+)*/gi) ?? []) {
+          if (cssClasses.has(token) && !RECEDED_STATE.test(`.${token}`)) found.add(`.${token}`);
+        }
+      }
+    }
+    return found;
+  };
+  const beats = (x, y) => {
+    const d = x.spec[0] - y.spec[0] || x.spec[1] - y.spec[1] || x.spec[2] - y.spec[2];
+    if (d !== 0) return d > 0;
+    return loadRank(x.file) - loadRank(y.file) > 0 || (x.file === y.file && x.index > y.index);
+  };
+  const coLoaded = (x, y) => x.file === y.file || globals.includes(x.file) || globals.includes(y.file);
+
+  const allStates = rules.filter((r) => RECEDED_STATE.test(r.part) && !RECEDED_EXEMPT.test(r.part) && r.props.size && !r.last.includes('::'));
+  const states = allStates.filter((r) => /var\(\s*--color-(?:surface|border|text)-receded\s*\)/.test(r.body));
+  const offenders = new Set();
+  let compared = 0;
+  let expanded = 0;
+  for (const state of states) {
+    const classes = stripNot(state.last).match(/\.[\w-]+/g) ?? [];
+    const stateClass = classes.find((cls) => RECEDED_STATE.test(cls));
+    const base = stateClass ? stateClass.replace(/--[\w-]+$/, '') : classes.find((cls) => !/^\.is-/.test(cls));
+    if (!base) continue;
+    // Klassen, die am Element des Zustands sitzen koennen: die Basis, die
+    // uebrigen Klassen des letzten Glieds und - sitzt der Zustand dort - die
+    // Mitklassen aus den Vorlagen.
+    const onElement = new Set([base, ...classes.filter((cls) => !RECEDED_STATE.test(cls))]);
+    if (stateClass) {
+      const fromTemplates = coClassesOf(stateClass);
+      if (fromTemplates.size) expanded += 1;
+      for (const cls of fromTemplates) onElement.add(cls);
+    }
+    // Die Familie: alle Zustandsregeln fuer dasselbe Element im selben Zustand.
+    // Sitzt der Zustand im letzten Glied, ist es genau diese Zustandsklasse
+    // (`.budget-account--archived` enthaelt `.budget-account` nicht als eigene
+    // Klasse); sitzt er an einem Vorfahren, dieselbe Zielklasse unter demselben
+    // Zustandswort.
+    const marker = (state.part.match(RECEDED_STATE) ?? [''])[0];
+    const family = allStates.filter((s) => {
+      const own = stripNot(s.last).match(/\.[\w-]+/g) ?? [];
+      return stateClass ? own.includes(stateClass) : (s.part.includes(marker) && own.includes(base));
+    });
+    for (const other of rules) {
+      if (RECEDED_STATE.test(other.part) || RECEDED_EXEMPT.test(other.part) || other.last.includes('::')) continue;
+      if (!coLoaded(state, other)) continue;
+      const otherClasses = stripNot(other.last).match(/\.[\w-]+/g) ?? [];
+      if (!otherClasses.length || !otherClasses.every((cls) => onElement.has(cls))) continue;
+      const otherGestures = gestures(other.last);
+      for (const prop of [...other.props].filter((p) => state.props.has(p))) {
+        compared += 1;
+        // Eine Zustandsregel schuetzt, wenn sie IMMER gilt, wo der Wettbewerber
+        // gilt: ihre Pseudoklassen sind eine Teilmenge seiner. Das nackte
+        // `.x--done` gilt auch unter dem Zeiger und schlaegt ein gleich
+        // spezifisches, frueher stehendes `.x:hover`; `.x--done:hover` gilt
+        // nicht bei `:focus-within` und schuetzt dort nicht.
+        const guards = family.filter((s) => s.props.has(prop) && [...gestures(s.last)].every((g) => otherGestures.has(g)));
+        if (guards.some((s) => !beats(other, s))) continue;
+        offenders.add(`${state.file}: ${state.part} [${state.spec}]  <-  ${other.file}: ${other.part} [${other.spec}]${other.at.length ? ` @${other.at.join(' ')}` : ''}  ${prop}`);
+      }
+    }
+  }
+  assert.ok(states.length >= 12, `Nur ${states.length} Zustandsregeln des Zuruecknehmen-Musters gefunden - der Scan greift nicht mehr.`);
+  assert.ok(compared >= 10, `Nur ${compared} Wettbewerber verglichen - der Guard misst nichts.`);
+  // Die meisten Vorlagen tragen nur Basis + Zustand; gezaehlt wird deshalb, ob
+  // die Zustandsklasse ueberhaupt in einer Vorlage gefunden wurde.
+  assert.ok(expanded >= 6, `Nur ${expanded} Zustandsregeln fanden ihre Vorlage in public/ - die Vorlagen-Suche greift nicht mehr.`);
+  assert.deepEqual([...offenders].sort(), [],
+    'Eine spezifischere (oder gleich spezifische, spaeter ladende) Regel ueberschreibt eine zurueckgenommene '
+    + 'Zustandsregel bei derselben Eigenschaft. Den Zustandsselektor so qualifizieren, dass er gewinnt '
+    + '(ohne !important), oder eine Zustandsregel mit derselben Pseudoklasse ergaenzen.');
 });
 
 test('module accents stay readable as text on the page background in both themes', () => {

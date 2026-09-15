@@ -340,8 +340,12 @@
 
 /* Zurücknehmen-Muster (tokens.css, #1230) statt `opacity: 0.62`, die Badge,
  * Saldo und Metazeile auf 2,5 bis 3,8:1 zog. Das „Archiviert"-Badge und der
- * Saldo bleiben voll, die Kante wird die ruhigste und ersetzt den Schatten. */
-.budget-account--archived {
+ * Saldo bleiben voll, die Kante wird die ruhigste und ersetzt den Schatten -
+ * auch unter dem Zeiger, wo `.budget-account:hover` sonst die Akzentkante einer
+ * aktiven Karte setzte (#1230). Die Zeile darin (`__main:hover`) antwortet
+ * weiter auf den Zeiger. */
+.budget-account--archived,
+.budget-account--archived:hover {
   background: var(--color-surface-receded);
   border-color: var(--color-border-receded);
   box-shadow: none;

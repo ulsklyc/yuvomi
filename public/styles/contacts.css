@@ -664,7 +664,11 @@ html:has(.contacts-page.is-selecting) {
 /* Schon vorhanden: Zuruecknehmen-Muster (tokens.css, #1230) statt
  * `opacity: 0.72`. Das Badge sagt den Zustand; auf der vertieften Flaeche
  * nimmt es die naechste Stufe, sonst verschwaende seine Pille im Grund. */
-.vcard-import-row--exists {
+/* Auch unter Zeiger und Fokus: `.vcard-import-row:hover`/`:focus-within`
+ * (0-2-0) setzten sonst die Hover-Flaeche einer neuen Zeile (#1230). */
+.vcard-import-row--exists,
+.vcard-import-row--exists:hover,
+.vcard-import-row--exists:focus-within {
   background: var(--color-surface-receded);
 }
 
