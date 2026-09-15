@@ -131,6 +131,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Tags on checked-off shopping items are readable again.** A checked item faded its tags by
+  making them partly transparent, which left the tag text at 2.6:1 in the light theme and 3.7:1 in
+  the dark theme, below the 4.5:1 that normal text needs. A checked item is still something you can
+  tap to reopen, so it is not exempt the way a disabled control would be. The tags now recede
+  through the same quieter text color the item's other details already use when checked, which
+  keeps them visibly softer than the item name at 5.4:1 and 7.7:1.
 - **An early click on the simple setup no longer overwrites an existing installation.** The web
   installer locks its simple path when it finds an `.env`, because that path sets host, port and
   cookie security itself. The lock only took effect once the installer had finished checking for

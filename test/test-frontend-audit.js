@@ -7401,6 +7401,76 @@ test('jede Regel, die Farbe UND Untergrund setzt, haelt ihr eigenes Paar', () =>
     'COPAIR_CATEGORY nennt Selektoren, die in keinem Stylesheet mehr ein Farbpaar bauen.');
 });
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * Das Etikett einer Listenzeile haelt 4.5:1 auch in jedem Zustand, der es
+ * zuruecknimmt - gerechnet mit der Deckung, nicht nur mit der Farbe
+ *
+ * Der Guard darueber sieht `opacity` nicht: `.shopping-item--checked
+ * .list-row__tag` setzte nur `opacity: 0.6` und keine Farbe, baute also kein
+ * Paar und fiel durch jede Regel. Gerendert stand das Etikett eines
+ * abgehakten Postens bei 2,58:1 (light) und 3,71:1 (dark) auf seiner eigenen
+ * Pille (Kontrastmessung nach dem HIG-Redesign, 2026-09-15). Abgehakt ist ein
+ * Zustand, kein deaktiviertes Bedienelement - die Zeile laesst sich wieder
+ * aufmachen, die WCAG-Ausnahme fuer Deaktiviertes greift nicht. Dieselbe Zeile
+ * hat die Frage fuer `.item-meta` schon beantwortet: zurueckgenommen ueber
+ * --color-text-tertiary, nicht ueber Deckung.
+ *
+ * Gerechnet wird der Untergrund der Basisregel (die Pille), die Farbe der
+ * Zustandsregel oder ersatzweise der Basis und die Deckung der Zustandsregel.
+ * Die Deckung der ganzen Zeile (`.shopping-item--checked { opacity }`) ist
+ * NICHT mitgerechnet: sie greift nur unter prefers-reduced-motion, weil
+ * `stagger()` sonst ein Inline-`opacity: 1` hinterlaesst - das ist eine offene
+ * Designfrage, keine Zusage dieses Guards.
+ * ──────────────────────────────────────────────────────────────────────────── */
+test('das Etikett einer Listenzeile haelt 4.5:1 in jedem Zustand, der es zuruecknimmt', () => {
+  const { light, dark } = themeTokenMaps();
+  const resolveHex = (value, map) => {
+    const ref = String(value ?? '').trim().match(/^var\(\s*(--[\w-]+)\s*\)$/);
+    const hex = ref ? resolveColor(ref[1], map) : String(value ?? '').trim();
+    return /^#[0-9a-f]{6}$/i.test(hex ?? '') ? hex : null;
+  };
+  const declOf = (body, prop) => {
+    let found = null;
+    for (const m of body.matchAll(new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`, 'g'))) found = m[1].trim();
+    return found;
+  };
+
+  const styles = new URL('../public/styles/', import.meta.url);
+  const rules = readdirSync(styles)
+    .filter((entry) => entry.endsWith('.css') && entry !== 'tokens.css')
+    .flatMap((file) => [...eachRule(readFileSync(new URL(file, styles), 'utf8'))].map((rule) => ({ ...rule, file })));
+
+  const base = rules.find((rule) => rule.selector.trim() === '.list-row__tag');
+  assert.ok(base, 'Keine Basisregel `.list-row__tag` gefunden - der Guard misst nichts.');
+  const baseColor = declOf(base.body, 'color');
+  const baseBg = declOf(base.body, 'background-color') ?? declOf(base.body, 'background');
+
+  const states = rules.filter((rule) => rule !== base
+    && /\.list-row__tag\s*$/.test(rule.selector.trim())
+    && (declOf(rule.body, 'opacity') !== null || declOf(rule.body, 'color') !== null));
+  assert.ok(states.some((rule) => rule.selector.includes('--checked')),
+    'Die Zustandsregel des abgehakten Postens (`…--checked .list-row__tag`) fehlt - '
+    + 'umbenannt? Dann prueft dieser Guard seit dem Umbenennen nichts mehr.');
+
+  const findings = [];
+  for (const rule of states) {
+    const opacity = Number(declOf(rule.body, 'opacity') ?? 1);
+    for (const [theme, map] of [['light', light], ['dark', dark]]) {
+      const fg = resolveHex(declOf(rule.body, 'color') ?? baseColor, map);
+      const bg = resolveHex(baseBg, map);
+      assert.ok(fg && bg, `${theme}: Farbe oder Pille von ${rule.selector} laesst sich nicht aufloesen`);
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(fg.slice(i, i + 2), 16));
+      const ratio = contrastRatio(compositeColor(`rgba(${r}, ${g}, ${b}, ${opacity})`, bg), bg);
+      if (ratio + 0.005 < 4.5) {
+        findings.push(`${theme}: ${ratio.toFixed(2)}:1  ${fg} x ${opacity} auf ${bg}  ${rule.file}  ${rule.selector.trim()}`);
+      }
+    }
+  }
+  assert.deepEqual(findings, [],
+    'Ein Zustand nimmt das Etikett unter 4.5:1 zurueck. Zuruecknehmen ueber die Farbe '
+    + '(--color-text-tertiary), nicht ueber opacity - die Deckung multipliziert den Kontrast mit herunter.');
+});
+
 test('module accents stay readable as text on the page background in both themes', () => {
   // `.btn--secondary` faerbt seine Beschriftung mit --active-module-accent
   // (layout.css). Steht so ein Button auf dem Seitenhintergrund statt in einer

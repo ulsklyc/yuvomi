@@ -475,9 +475,17 @@
   white-space: nowrap;
 }
 
-/* Abgehakte Posten treten insgesamt zurück - die Etiketten mit. */
+/* Abgehakte Posten treten insgesamt zurück - die Etiketten mit.
+ *
+ * ÜBER DIE FARBE, NICHT ÜBER DIE DECKUNG. Hier stand `opacity: 0.6`, und das
+ * multiplizierte den Kontrast mit herunter: gerendert 2,58:1 (light) und
+ * 3,71:1 (dark) auf der eigenen Pille. Abgehakt ist ein Zustand, kein
+ * deaktiviertes Bedienelement - die Zeile lässt sich wieder aufmachen, also
+ * gilt 4.5:1. Dieselbe Antwort wie `.shopping-item--checked .item-meta`
+ * (shopping.css): tertiary trägt 5,39 (light) und 7,71 (dark) auf
+ * --color-surface-2 und bleibt sichtbar leiser als der Name. */
 .shopping-item--checked .list-row__tag {
-  opacity: 0.6;
+  color: var(--color-text-tertiary);
 }
 
 /* --------------------------------------------------------
