@@ -824,25 +824,7 @@
  * der Farbwechsel trägt das Feedback allein. */
 @media (prefers-reduced-motion: reduce) {
   .task-status-btn--done,
-  /* Am Wandtablett ist die Teilaufgabe ein Zustandszeichen, kein Bedienelement
- * (#1209). Sie traegt dieselbe Grundform, damit die Liste dort nicht anders
- * aussieht als anderswo - aber nichts, was eine Beruehrung verspricht: kein
- * Zeigerwechsel, keine Modulton-Einladung beim Ueberfahren, und vor allem
- * keine 15px-Trefflaeche um ein Element, das nichts tut. Genau das war der
- * erste Anlauf mit `disabled`: die Form eines Knopfes ohne seine Wirkung. */
-.subtask-item__checkbox--static {
-  cursor: default;
-}
-
-.subtask-item__checkbox--static:hover {
-  border-color: var(--color-border);
-}
-
-.subtask-item__checkbox--static::before {
-  content: none;
-}
-
-.subtask-item__checkbox--done {
+  .subtask-item__checkbox--done {
     animation: none;
   }
 }
@@ -1250,6 +1232,32 @@
   background-color: var(--color-success);
   border-color: var(--color-success);
   animation: check-pop var(--duration-sm) var(--ease-out);
+}
+
+/* Am Wandtablett ist die Teilaufgabe ein Zustandszeichen, kein Bedienelement
+ * (#1209). Sie traegt dieselbe Grundform, damit die Liste dort nicht anders
+ * aussieht als anderswo - aber nichts, was eine Beruehrung verspricht: kein
+ * Zeigerwechsel, keine Modulton-Einladung beim Ueberfahren, und vor allem
+ * keine 15px-Trefflaeche um ein Element, das nichts tut. Der erste Anlauf war
+ * ein `disabled`-Knopf: die Form eines Bedienelements ohne seine Wirkung.
+ *
+ * DIE STELLE IST TEIL DER REGEL. Diese drei Regeln muessen NACH den
+ * Basisregeln darueber stehen: sie haetten sonst dieselbe Spezifitaet und
+ * verloeren nach Quellreihenfolge - sichtbar waere nichts, die Kaesten saehen
+ * weiter aus wie Knoepfe. Genau so ist es beim ersten Anlauf passiert, als der
+ * Block versehentlich in der `prefers-reduced-motion`-Abfrage weiter oben
+ * landete: dort wirkte er fuer niemanden, und nebenbei verlor
+ * `.task-status-btn--done` sein `animation: none`. */
+.subtask-item__checkbox--static {
+  cursor: default;
+}
+
+.subtask-item__checkbox--static:hover {
+  border-color: var(--color-border);
+}
+
+.subtask-item__checkbox--static::before {
+  content: none;
 }
 
 .subtask-item__checkbox-icon {

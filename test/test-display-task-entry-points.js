@@ -108,3 +108,64 @@ test('am Display faellt nur die SCHREIB-Seite der Wischgeste weg, die Lese-Seite
   assert.ok(alsMensch.leading, 'beim Menschen bleiben beide Seiten');
   assert.ok(alsMensch.trailing);
 });
+
+// --------------------------------------------------------
+// Die Darstellung dahinter - ein Guard, weil CSS still versagt
+// --------------------------------------------------------
+
+const { eachRule } = await import('./css-rules.js');
+const { readFileSync } = await import('node:fs');
+const TASKS_CSS = readFileSync(new URL('../public/styles/tasks.css', import.meta.url), 'utf8');
+
+/** Die Regeln zu einem Selektor, in Quellreihenfolge, mit ihrer At-Kette. */
+function regelnFuer(muster) {
+  const out = [];
+  let n = 0;
+  for (const regel of eachRule(TASKS_CSS)) {
+    n += 1;
+    if (muster.test(regel.selector)) out.push({ ...regel, nr: n });
+  }
+  return out;
+}
+
+test('das Zustandszeichen steht dort, wo es die Basisregeln ueberhaupt schlagen kann', () => {
+  // WARUM DAS EIN EIGENER FALL IST. Die drei Regeln haben DIESELBE
+  // Spezifitaet wie die Basisregeln der Checkbox. Stehen sie davor, verlieren
+  // sie nach Quellreihenfolge - und zwar lautlos: das Markup stimmt, die Regel
+  // existiert, und der Kasten sieht trotzdem weiter aus wie ein Knopf. Genau
+  // das ist beim ersten Anlauf passiert, als der Block versehentlich in der
+  // `prefers-reduced-motion`-Abfrage landete. Ein Guard auf die POSITION ist
+  // hier die einzige Messung, die das findet.
+  const basis = regelnFuer(/^\.subtask-item__checkbox(:hover|::before)?$/);
+  const statisch = regelnFuer(/\.subtask-item__checkbox--static/);
+
+  assert.equal(basis.length, 3, 'Basis, :hover und ::before');
+  assert.equal(statisch.length, 3, 'cursor, :hover und ::before des Zustandszeichens');
+
+  const letzteBasis = Math.max(...basis.map((r) => r.nr));
+  for (const regel of statisch) {
+    assert.ok(regel.nr > letzteBasis,
+      `${regel.selector} muss nach den Basisregeln stehen (ist ${regel.nr}, Basis endet ${letzteBasis})`);
+    // UND AUF DER BASISEBENE. In einer At-Abfrage gaelte sie nur fuer die
+    // Nutzer, die deren Bedingung erfuellen - am Wandtablett haengt das an
+    // niemandes Systemeinstellung.
+    assert.deepEqual(regel.at, [],
+      `${regel.selector} darf in keinem At-Block stehen, steht aber in ${JSON.stringify(regel.at)}`);
+  }
+});
+
+test('der Bewegungs-Verzicht deckt weiter beide Abhak-Zeichen', () => {
+  // DIE REGRESSION, DIE DER ERSTE ANLAUF NEBENBEI EINBAUTE. Der Block wurde
+  // mitten in die Selektorliste dieser Regel geschoben und trennte
+  // `.task-status-btn--done` von seinem `animation: none` - unter reduzierter
+  // Bewegung lief der check-pop wieder, wogegen die Abfrage gebaut ist
+  // (Audit F-07). Nichts daran war sichtbar, ausser man stellt die
+  // Systemeinstellung um und hakt etwas ab.
+  const treffer = [...eachRule(TASKS_CSS)].filter((r) => /animation:\s*none/.test(r.body)
+    && r.at.some((a) => a.includes('prefers-reduced-motion')));
+  const selektoren = treffer.flatMap((r) => r.selector.split(',').map((x) => x.trim()));
+  assert.ok(selektoren.includes('.task-status-btn--done'),
+    `der grosse Haken muss dabei sein, gefunden: ${JSON.stringify(selektoren)}`);
+  assert.ok(selektoren.includes('.subtask-item__checkbox--done'),
+    `die Teilaufgabe auch, gefunden: ${JSON.stringify(selektoren)}`);
+});
