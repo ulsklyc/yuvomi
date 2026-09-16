@@ -457,6 +457,11 @@ router.use((req, res, next) => {
     if (device && !displayMayRead(req.method, `/auth${req.path}`)) {
       return res.status(403).json({ error: 'A paired display cannot use the account routes.', code: 403 });
     }
+    // Ein Cookie OHNE gueltiges Geraet dahinter kommt hier durch - ein Mensch
+    // soll sich an einem zurueckgebauten Tablett anmelden koennen. Es wird dabei
+    // gleich abgeraeumt, sonst scheitert der erste Request NACH der Anmeldung
+    // wieder an `requireAuth` und die App wirft ihn auf die Anmeldeseite zurueck.
+    if (!device) res.clearCookie(DISPLAY_COOKIE, { httpOnly: true, sameSite: 'lax', path: '/' });
   }
   next();
 });

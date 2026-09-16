@@ -733,11 +733,32 @@ const TOOL_MAP = new Map(ALL_TOOLS.map((t) => [t.name, t]));
  * Guest-Guard vom echten Middleware-Stapel. Ausnahme sind Split-Guests, die
  * gar keinen Haushaltszugriff haben — für sie sind alle Kern-Tools zu.
  *
- * @param {{ scopes?: string[]|null, moduleAccess?: object|null, splitGuest?: boolean }|null} actor
+ * @param {{ scopes?: string[]|null, moduleAccess?: object|null, splitGuest?: boolean, display?: boolean }|null} actor
  * @param {{ scope?: { module: string, access: 'read'|'write' } }} tool
  * @returns {boolean}
  */
 function toolAllowed(actor, tool) {
+  // EIN WANDTABLETT ERREICHT GAR KEIN WERKZEUG, auch keines ohne `scope`
+  // (#1208). `/mcp` liegt bewusst ausserhalb der /api/v1-Gates, und der
+  // Display-Zweig in `requireAuth` setzt Scopes unabhaengig vom Pfad - ohne
+  // diese Zeile laege hier eine Tuer offen, die die REST-Seite verschlossen
+  // hat. Dieselbe Klasse wie GHSA-4jcg-7jvj-p4v9: eine Regel, die je Pfad statt
+  // zentral steht.
+  //
+  // WARUM VOR der Abkuerzung darunter, der Gast-Riegel aber dahinter bleibt:
+  // ohne `scope` sind `list_api_operations`, `get_api_operation` und
+  // `call_api_operation`. Der letzte laeuft ueber `internalApiRequest` in die
+  // REST-Schicht zurueck und traegt damit deren Gates - fuer einen
+  // Ausgaben-Gast IST das sein Weg zu /split-expenses ueber MCP, und ihn
+  // zuzumachen naehme echten Zugang weg (test-mcp.js haelt genau diese drei
+  // Namen fuer ihn fest). Ein Display hat dort nichts zu holen: seine vier
+  // Lesemodule erreicht es ueber REST, und einen Integrationskanal braucht ein
+  // Geraet an der Wand nicht.
+  //
+  // OFFEN UND NICHT HIER ENTSCHIEDEN: dass ein Gast ueber die beiden anderen
+  // den vollstaendigen OpenAPI-Katalog liest, obwohl `/openapi.json` ueber REST
+  // administratorgesperrt ist. Das ist ein eigener Befund, aelter als #1208.
+  if (actor && actor.display) return false;
   if (!tool.scope) return true;
   // Gast-Konten für geteilte Ausgaben erreichen unter /api/v1 nur
   // /split-expenses; kein Kern-Tool liegt dort, also alle gesperrt.
@@ -751,7 +772,7 @@ function toolAllowed(actor, tool) {
 /**
  * Tool-Definitionen für `tools/list`, gefiltert auf das, was der Akteur wirklich
  * aufrufen darf — ein LLM sieht kein Tool, das ihm der nächste Aufruf verweigert.
- * @param {{ scopes?: string[]|null, moduleAccess?: object|null, splitGuest?: boolean }|null} actor
+ * @param {{ scopes?: string[]|null, moduleAccess?: object|null, splitGuest?: boolean, display?: boolean }|null} actor
  * @returns {Array<{ name: string, description: string, inputSchema: object }>}
  */
 function listToolDefinitions(actor = null) {

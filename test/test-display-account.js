@@ -310,6 +310,41 @@ test('ein Display zaehlt als Mitleser, sonst verschwinden die Sichtbarkeitsfelde
   assert.ok(!canRead.includes('health'), 'Gesundheit liest es nicht - dort bleibt es beim Solo-Fall');
 });
 
+test('ein kaputtes Cookie ist kein Credential, sondern ein 401', async () => {
+  // `decodeURIComponent` WIRFT bei einer kaputten Prozentfolge, und der Leser
+  // haengt an zwei unauthentifizierten Stellen. Ein Browser mit
+  // `Cookie: yuvomi.display=%` bekaeme sonst auf JEDEN Request ein 500 - auch
+  // auf die Anmeldung, also ohne jeden Weg zurueck.
+  for (const kaputt of ['%', '%zz', '%E0%A4']) {
+    const res = await fetch(`${BASE}/api/v1/tasks`, { headers: { Cookie: `${DISPLAY_COOKIE}=${kaputt}` } });
+    assert.equal(res.status, 401, `"${kaputt}" muss 401 sein, war ${res.status}`);
+  }
+  // Und die Anmeldung bleibt erreichbar - das ist der Punkt.
+  const login = await fetch(`${BASE}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: `${DISPLAY_COOKIE}=%` },
+    body: JSON.stringify({ username: 'admin', password: 'adminpass123' }),
+  });
+  assert.equal(login.status, 200, 'ein unlesbares Cookie darf keinen Menschen aussperren');
+});
+
+test('das Display erreicht kein MCP-Werkzeug', async () => {
+  // `/mcp` liegt bewusst ausserhalb der /api/v1-Gates, und der Display-Zweig in
+  // `requireAuth` setzt Scopes unabhaengig vom Pfad. Ohne eigenen Riegel
+  // erreichte ein Tablett hier `list_api_operations` und `get_api_operation` -
+  // beide ohne `scope`, also an der Scope-Pruefung vorbei - und bekaeme den
+  // vollstaendigen OpenAPI-Katalog samt Administratorrouten, den `/openapi.json`
+  // ueber REST nur Administratoren zeigt.
+  const res = await fetch(`${BASE}/mcp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: `${DISPLAY_COOKIE}=${displayToken}` },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+  });
+  const body = await res.json().catch(() => null);
+  const namen = (body?.result?.tools ?? []).map((t) => t.name);
+  assert.deepEqual(namen, [], `ein Display darf kein Werkzeug sehen, sah: ${namen.join(', ')}`);
+});
+
 test('das Display steht nicht in der Kontenverwaltung', async () => {
   // `GET /auth/users` ist die Kontenliste, und die Familien-Seite rendert jede
   // Zeile daraus als bearbeitbares Familienmitglied - mit Familienrolle,

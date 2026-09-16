@@ -467,7 +467,7 @@ function renderSubjectSelector(container) {
     `).join('');
     host.insertAdjacentHTML('beforeend', chips);
   } else {
-    const members = state.catalog.members.filter((m) => m.access_scope !== 'split_guest');
+    const members = state.catalog.members.filter((m) => !['split_guest', 'display'].includes(m.access_scope));
     if (!members.length) {
       host.insertAdjacentHTML('beforeend', `<p class="form-hint">${esc(t('settings.permNoMembers'))}</p>`);
       return;

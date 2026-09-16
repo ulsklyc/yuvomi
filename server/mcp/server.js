@@ -17,6 +17,7 @@ import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { handleMcpRequest, PARSE_ERROR } from './protocol.js';
+import { isDisplayAccount } from '../services/display-accounts.js';
 
 const log = createLogger('MCP');
 const router = express.Router();
@@ -31,6 +32,17 @@ function isSplitGuest(userId) {
     return Boolean(db.get().prepare('SELECT 1 FROM split_expense_guest_users WHERE user_id = ?').get(userId));
   } catch (err) {
     log.error('Split-guest lookup failed:', err.message);
+    return true;
+  }
+}
+
+/** Wandtablett? Fehler beim Lesen zaehlen als Display: im Zweifel zumachen. */
+function isDisplay(userId) {
+  if (userId == null) return true;
+  try {
+    return isDisplayAccount(userId);
+  } catch (err) {
+    log.error('Display lookup failed:', err.message);
     return true;
   }
 }
@@ -51,6 +63,13 @@ router.post('/', async (req, res) => {
       // Von requireAuth aufgelöst: null = Admin oder unbeschränkt.
       moduleAccess: req.sessionModuleAccess ?? null,
       splitGuest: isSplitGuest(req.authUserId),
+      // Wandtablett (#1208)? `/mcp` liegt bewusst ausserhalb der /api/v1-Gates,
+      // und der Display-Zweig in `requireAuth` setzt Scopes unabhaengig vom
+      // Pfad - ohne diese Zeile erreichte ein Tablett hier Werkzeuge, die ihm
+      // die REST-Seite verweigert. Dieselbe Klasse wie GHSA-4jcg-7jvj-p4v9:
+      // eine Regel, die je Pfad statt zentral steht. Fehler beim Lesen zaehlen
+      // als Display - im Zweifel zumachen.
+      display: isDisplay(req.authUserId),
     };
     const response = await handleMcpRequest(
       db.get(),

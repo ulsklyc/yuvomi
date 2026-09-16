@@ -134,7 +134,18 @@ export function displayTokenFromRequest(req) {
     if (at < 0) continue;
     if (part.slice(0, at).trim() !== DISPLAY_COOKIE) continue;
     const value = part.slice(at + 1).trim();
-    return value ? decodeURIComponent(value) : null;
+    if (!value) return null;
+    // `decodeURIComponent` WIRFT bei einer kaputten Prozentfolge (`%`, `%zz`,
+    // eine abgeschnittene Mehrbyte-Folge). Dieser Leser haengt an zwei Stellen
+    // OHNE Authentifizierung: in `requireAuth` und am Eingang des Auth-Routers.
+    // Ein Browser mit `Cookie: yuvomi.display=%` bekaeme damit auf JEDEN Request
+    // ein 500 - auch auf `POST /auth/login`, also ohne jeden Weg zurueck.
+    // Ein unlesbares Cookie ist kein Credential: null ist die richtige Antwort.
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return null;
+    }
   }
   return null;
 }
