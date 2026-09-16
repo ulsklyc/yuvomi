@@ -33,7 +33,7 @@ Vulnerabilities that require physical access to the host or root on the server a
 
 ## Security Features
 
-- Session-based auth with `httpOnly`, `SameSite=Lax`, `Secure` cookies
+- Session-based auth with `httpOnly`, `SameSite=Lax` cookies; `Secure` is opt-in through `SESSION_SECURE=true` and off by default, because a self-hosted instance on plain HTTP is a normal case and a `Secure` cookie is silently discarded there
   (Lax instead of Strict because Safari Intelligent Tracking Prevention
   blocks Strict cookies on reverse-proxy navigations and direct URL entry,
   which would cause 401 errors on login. CSRF risk is mitigated by the

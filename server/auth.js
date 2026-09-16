@@ -2147,10 +2147,27 @@ router.get('/me', requireAuth, (req, res) => {
     if (!req.session.csrfToken) {
       req.session.csrfToken = generateToken();
     }
+    // `=== 'true'` UND NICHT `!== 'false'`, wie es hier stand.
+    //
+    // DIE UMGEDREHTE BEDINGUNG HAT GENAU DEN FALL KAPUTT GEMACHT, DEN DER BLOCK
+    // DARUEBER HEILEN SOLL. `SESSION_SECURE` ist standardmaessig NICHT gesetzt
+    // (in `.env.example` auskommentiert), und `undefined !== 'false'` ist wahr:
+    // eine Instanz auf reinem HTTP setzte das CSRF-Cookie als `Secure`, und der
+    // Browser verwirft ein solches Cookie auf einer unverschluesselten
+    // Verbindung stillschweigend. Die Stelle, die nach dem App-Resume das
+    // Cookie wiederherstellen soll, loeschte es also effektiv.
+    //
+    // Sichtbar war es kaum, weil `public/api.js` den Token zusaetzlich im
+    // Speicher haelt und ihn aus dem Antwortkopf nachliest, mit einem
+    // 403-Selbstheilungsversuch daneben - das Symptom war ein sporadisches 403
+    // beim Schreiben, nicht ein fehlendes Cookie. Alle sechs anderen Stellen im
+    // Haus schreiben `=== 'true'` (server/index.js, die drei weiteren hier,
+    // middleware/csrf.js, services/display-accounts.js); diese eine war die
+    // Ausnahme, und sie war keine Absicht.
     res.cookie('csrf-token', req.session.csrfToken, {
       httpOnly: false,
       sameSite: 'lax',
-      secure: process.env.SESSION_SECURE !== 'false',
+      secure: process.env.SESSION_SECURE === 'true',
       maxAge: 1000 * 60 * 60 * 24 * 7,
     });
 

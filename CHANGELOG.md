@@ -53,6 +53,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **On an instance without HTTPS, one cookie was issued in a way the browser throws away.** The
+  setting that decides whether cookies are marked HTTPS-only is off by default, which is right for a
+  self-hosted instance reached over plain HTTP. One place read that setting backwards, so on exactly
+  those instances the security token was handed out marked HTTPS-only and the browser dropped it.
+  It mostly hid behind a retry, surfacing as an occasional refused save rather than as anything
+  legible. Nobody has to change a setting; instances that had already turned HTTPS-only on were never
+  affected.
+
 - **Around the turn of the month, Budget could show the wrong month for a few hours.** When you open
   Budget without picking a month, it picks one for you. That pick followed UTC instead of the
   household's own time zone, so east of UTC the first hours of a new month still showed the old one,
