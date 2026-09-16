@@ -392,11 +392,31 @@ function renderTaskCard(task, opts = {}) {
     ? task.subtasks.map((s) => `
         <div class="subtask-item ${s.status === 'done' ? 'subtask-item--done' : ''}"
              data-subtask-id="${s.id}">
+          ${/* AM TABLETT IST DIE TEILAUFGABE ZU LESEN, NICHT ZU TIPPEN (#1209).
+               Sie fuehrt auf dieselbe Route wie der Haken, aber ohne die
+               Personenauswahl - am Display gaebe es also niemanden, dem die
+               Erledigung gehoerte, und der Server antwortete mit 400.
+
+               DESHALB IST SIE DORT KEIN KNOPF, sondern ein Zustandszeichen.
+               Ein `disabled`-Knopf war der erste Anlauf und die halbe Loesung:
+               er sieht aus wie ein Bedienelement, traegt die Trefflaeche und
+               den Hover-Rahmen weiter, und sein `aria-label` versprach
+               „als erledigt markieren" fuer eine Beruehrung, die nichts tut -
+               genau das Angebot, das der Statusknopf daneben vermeidet, indem
+               er gar nicht erst erscheint. Jetzt nennt die Beschriftung den
+               ZUSTAND statt einer Handlung, und ein `span` verspricht nichts.
+               Dass eine Teilaufgabe am Display spaeter eine eigene
+               Personenauswahl bekommt, ist eine Folgeentscheidung. */''}
+          ${actingAsDisplay() ? `
+          <span class="subtask-item__checkbox subtask-item__checkbox--static ${s.status === 'done' ? 'subtask-item__checkbox--done' : ''}"
+                role="img" aria-label="${esc(`${s.title}: ${t(s.status === 'done' ? 'tasks.statusDone' : 'tasks.statusOpen')}`)}">
+            ${s.status === 'done' ? '<i data-lucide="check" class="subtask-item__checkbox-icon" aria-hidden="true"></i>' : ''}
+          </span>` : `
           <button class="subtask-item__checkbox ${s.status === 'done' ? 'subtask-item__checkbox--done' : ''}"
                   data-action="toggle-subtask" data-id="${s.id}"
                   data-status="${s.status}" aria-label="${t('tasks.subtaskMarkDone', { title: esc(s.title) })}">
             ${s.status === 'done' ? '<i data-lucide="check" class="subtask-item__checkbox-icon" aria-hidden="true"></i>' : ''}
-          </button>
+          </button>`}
           <span class="subtask-item__title">${esc(s.title)}</span>
           ${canEditTaskDefinition(s, task) ? `
           <div class="subtask-item__actions">
@@ -421,11 +441,21 @@ function renderTaskCard(task, opts = {}) {
         <input type="checkbox" class="task-bulk-checkbox" data-task-id="${task.id}"
                ${isChecked ? 'checked' : ''} aria-label="${t('tasks.selectTask')}">
         ` : ''}
+        ${actingAsDisplay() ? '' : `
         <button class="task-status-btn task-status-btn--${task.status}"
                 data-action="toggle-status" data-id="${task.id}" data-status="${task.status}"
                 aria-label="${isDone ? t('tasks.markOpen', { title: esc(task.title) }) : t('tasks.markDone', { title: esc(task.title) })}">
           <i data-lucide="check" class="task-status-btn__check" aria-hidden="true"></i>
         </button>
+        `}
+        ${/* AM TABLETT GAR KEIN STATUSKNOPF, auch nicht bei einer erledigten
+             Aufgabe. Er zeigte dort auf das Zuruecknehmen, und genau das darf
+             ein Display nicht: es storniert Punkte und verwirft die
+             Folgeinstanz einer Serie. Stehen zu lassen hiesse, ein Angebot zu
+             zeichnen, das der Server mit 403 beantwortet - der Befund, der an
+             #1241 als eigener Faden offen steht. Eine erledigte Aufgabe traegt
+             am Display also gar keinen Knopf, und der Picker darunter zeichnet
+             sich fuer sie ohnehin nicht. */''}
         ${renderDoerPicker(task, isDone, archived)}
 
         <div class="task-card__body">
@@ -1091,6 +1121,8 @@ let state = {
   defaultPoints:   0,        // Haushalt-Standard für neue Aufgaben (#578), 0 = aus
   currentUserId:   null,
   isAdmin:         false,    // darf fremde Kommentare entfernen (#734)
+  /** Wer an diesem Wandtablett abhaken darf (#1209) - leer fuer jeden Menschen. */
+  displayPeople:   [],
   // `tags` ist eine Liste, keine Auswahl: mehrere Tags engen UND-verknüpft ein,
   // wie jeder andere Filter in dieser Leiste auch (#586).
   // Status, Priorität und Person halten mehrere Werte (#671); innerhalb einer
@@ -2206,6 +2238,19 @@ function groupHistoryByDay(entries) {
  */
 const DOER_PANEL_PREFIX = 'task-doer-';
 
+/**
+ * Handelt gerade ein Wandtablett (#1209)?
+ *
+ * DIE FRAGE IST NICHT „darf ich schreiben", SONDERN „bin ich jemand". An einem
+ * Display ist „ich" niemand: das Konto ist kein Haushaltsmitglied, verdient
+ * keine Punkte und hat nichts getan. Ein Haken, der ohne Nachfrage abhakt,
+ * schriebe also eine Erledigung auf ein Geraet - deshalb haengt hier eine
+ * andere Bedienung dran und nicht nur ein anderes Recht.
+ */
+function actingAsDisplay() {
+  return state.user?.access_scope === 'display';
+}
+
 function doerPanelTaskId(el) {
   const panel = el.closest?.('.popover-menu');
   if (!panel?.id?.startsWith(DOER_PANEL_PREFIX)) return null;
@@ -2215,13 +2260,32 @@ function doerPanelTaskId(el) {
 
 function renderDoerPicker(task, isDone, archived) {
   if (isDone || archived) return '';
-  const members = state.users ?? [];
-  if (members.length < 2) return '';
+  const tablett = actingAsDisplay();
+  // AM TABLETT IST DIESE AUSWAHL DER EINZIGE WEG, und deshalb gilt die
+  // Zwei-Personen-Schwelle dort nicht. Fuer einen Menschen ist der Picker ein
+  // ZWEITES Ziel neben dem Haken: hakt er selbst ab, braucht er ihn nie, und in
+  // einem Haushalt mit einer Person gaebe es ohnehin nichts zu waehlen. Am
+  // Display gibt es kein „selbst" - auch die einzige Person des Haushalts muss
+  // benannt werden, sonst traegt der Verlauf ein Geraet als Erledigerin.
+  const members = tablett ? (state.displayPeople ?? []) : (state.users ?? []);
+  if (!tablett && members.length < 2) return '';
+  if (tablett && members.length === 0) return '';
   return popoverMenuHtml({
     id: `${DOER_PANEL_PREFIX}${task.id}`,
+    // DERSELBE SCHLUESSEL FUER BEIDE, und das ist kein Sparen am falschen Ende.
+    // „Wer hat X erledigt?" ist am Tablett genau die Frage, die der Knopf
+    // stellt - er hakt ab, indem er sie beantworten laesst. Ein zweiter
+    // Schluessel haette denselben Satz in 24 Sprachen ein zweites Mal gekostet,
+    // und zwei Schluessel mit einem Wortlaut laufen frueher oder spaeter
+    // auseinander.
     label: t('tasks.doneByPick', { title: task.title }),
-    icon: 'user-round-check',
-    triggerClass: 'btn btn--ghost btn--icon btn--icon-sm task-doer-btn',
+    // AM TABLETT TRAEGT DIESER KNOPF DEN HAKEN - er ERSETZT den Statusknopf,
+    // er steht nicht daneben. Zwei Knoepfe waeren zwei Angebote fuer dieselbe
+    // Handlung, und eines davon fuehrte in eine 403.
+    icon: tablett ? 'check' : 'user-round-check',
+    triggerClass: tablett
+      ? 'task-status-btn task-status-btn--open task-status-btn--pick'
+      : 'btn btn--ghost btn--icon btn--icon-sm task-doer-btn',
     items: members.map((u) => ({
       action: 'pick-doer', id: u.id, label: u.display_name, icon: 'user-round',
     })),
@@ -3029,7 +3093,13 @@ function wireSwipeGestures(container) {
   const listEl = container.querySelector('#task-list');
   if (!listEl) return;
 
-  wireSwipeRows(listEl, {
+  // DER RUECKGABEWERT IST FUER DIE MESSUNG DA, und er kostet nichts: kein
+  // Aufrufer liest ihn. Ob eine SEITE der Geste verdrahtet wird, ist sonst
+  // nirgends sichtbar - die Wischgeste hat kein Markup, an dem sich das pruefen
+  // liesse, und ein Zaehler auf dem Aufruf beantwortet nur, DASS verdrahtet
+  // wurde, nicht WELCHE Seite. Genau der Unterschied ist hier die Regel: am
+  // Display faellt die Schreib-Seite weg und die Lese-Seite bleibt.
+  const optionen = {
     card: '.task-card',
     // Vor 2.0.0 öffnete derselbe Wisch hier den Bearbeiten-Dialog: eine der
     // zwei Listen, in denen die Seiten wirklich getauscht haben.
@@ -3038,7 +3108,21 @@ function wireSwipeGestures(container) {
     // (§2: dieselbe Kante trägt sie in jeder Liste). Die Karte fliegt hinaus,
     // weil die Zeile danach in einer anderen Gruppe steht - ohne den Flug
     // spränge sie einfach weg.
-    leading: {
+    // AM WANDTABLETT FEHLT NUR DIE SCHREIB-SEITE (#1209).
+    //
+    // Der Wisch nach vorn ist der dritte Weg zu demselben Statuswechsel - neben
+    // Haken und Popover -, und der einzige, der die Person nicht erfragen kann:
+    // er hat keinen Ort, an dem eine Auswahl aufgehen koennte, und hakt sofort
+    // ab. Am Display liefe er ohne benannte Person in die 400 des Servers, mit
+    // englischem Text auf deutscher Oberflaeche.
+    //
+    // ABER NUR DIESE SEITE. Der erste Anlauf kehrte vor `wireSwipeRows` zurueck
+    // und nahm damit auch den Wisch nach hinten mit - der oeffnet die
+    // Detailansicht und ist reines LESEN, das ein Display ueberall sonst darf
+    // (der Titel derselben Karte oeffnet dieselbe Ansicht ohne jede Pruefung).
+    // `wireSwipeRows` laesst eine Seite ausdruecklich weg, wenn sie `null` ist,
+    // also kostet die Verengung nichts.
+    leading: actingAsDisplay() ? null : {
       reveal: '.swipe-reveal--done',
       flyOut: true,
       run: async (row) => {
@@ -3084,7 +3168,9 @@ function wireSwipeGestures(container) {
         }
       },
     },
-  });
+  };
+  wireSwipeRows(listEl, optionen);
+  return optionen;
 }
 
 // --------------------------------------------------------
@@ -3415,9 +3501,23 @@ function handleBulkDelete(taskIds, container) {
  * ist der Teil, der die Bedienung traegt: Neuladen und dieselbe Quittung mit
  * Rueckweg wie Tipp und Wisch - mit dem Namen darin, weil sonst nichts auf dem
  * Schirm verriete, wem die Erledigung gerade zugeschrieben wurde.
+ *
+ * AM WANDTABLETT OHNE RUECKWEG (#1209), und das ist die Fortsetzung derselben
+ * Regel, die den Statusknopf dort weglaesst: ein Display darf nicht
+ * zuruecknehmen. Der Toast bot den Weg trotzdem an - im Browser gemessen: ein
+ * Tipp auf „Rueckgaengig" lief in 403 und zeigte die rohe englische
+ * Serverantwort auf einer deutschen Oberflaeche. Den Knopf wegzulassen und den
+ * Rueckweg fuenf Sekunden lang daneben zu legen ist dasselbe falsche Angebot,
+ * nur fluechtiger.
  */
 async function completeTaskFor(container, taskId, userId) {
-  const person = (state.users ?? []).find((u) => u.id === userId);
+  // AM DISPLAY AUS `displayPeople`, SONST AUS `state.users`. Beide Listen
+  // tragen den Namen, aber nur die erste ist die, aus der die Wahl kam - und
+  // sie ist die einzige, die das Tablett sicher hat: `/tasks/meta/options`
+  // liegt heute in seinem Scope, und faellt das je weg, hiesse die Quittung
+  // „Erledigt von ." statt zu scheitern.
+  const quelle = actingAsDisplay() ? (state.displayPeople ?? []) : (state.users ?? []);
+  const person = quelle.find((u) => u.id === userId);
   try {
     await toggleTaskStatus(taskId, 'open', userId);
     await loadTasks(container);
@@ -3425,7 +3525,7 @@ async function completeTaskFor(container, taskId, userId) {
       t('tasks.doneByToast', { name: person?.display_name ?? '' }),
       'default',
       5000,
-      async () => {
+      actingAsDisplay() ? null : async () => {
         try {
           await toggleTaskStatus(taskId, 'done');
           await loadTasks(container);
@@ -3521,6 +3621,13 @@ function wireTaskList(container) {
     }
 
     if (action === 'toggle-subtask') {
+      // DER RIEGEL NEBEN DEM WEGGELASSENEN ATTRIBUT. `disabled` im Markup
+      // verhindert den Klick, aber dieser Handler haengt delegiert an der
+      // Liste, und die Liste wird auch von anderen Stellen neu gezeichnet - ein
+      // Zustand, in dem beides auseinanderlaeuft, faellt sonst still in die 400
+      // des Servers. Zwei Zeilen fuer eine Zusicherung, die sonst an einem
+      // Attribut haengt.
+      if (actingAsDisplay()) return;
       try {
         await toggleSubtaskStatus(id, target.dataset.status);
         await loadTasks(container);
@@ -3922,12 +4029,25 @@ export async function render(container, { user }) {
 
   // Daten laden (Filter-State aus vorheriger Session berücksichtigen)
   try {
-    const [tasksData, metaData, preferencesData] = await Promise.all([
+    const [tasksData, metaData, preferencesData, displayPeople] = await Promise.all([
       api.get(`/tasks${taskQuery()}`),
       api.getWithSource('/tasks/meta/options'),
       // Reine Anzeigepräferenz: ein Fehler hier darf die Aufgabenliste nicht
       // mit in den Ladefehler ziehen, deshalb eigener Fallback.
       api.get('/preferences').catch(() => ({ data: {} })),
+      // WER AN DIESEM TABLETT ABHAKEN DARF (#1209) - und warum nicht die Liste
+      // aus `/tasks/meta/options`, die daneben schon geladen wird: die traegt
+      // jedes Haushaltsmitglied, auch eines ohne Schreibrecht auf Aufgaben.
+      // Der Picker bekaeme damit Namen, deren Wahl der Server mit 403
+      // beantwortet, und an einer Kuechenwand sieht das aus wie ein kaputtes
+      // Geraet. `/displays/people` beantwortet dieselbe Frage MIT der
+      // Rechtelage, aus derselben Aufloesung wie die Absage.
+      //
+      // Der Fallback ist eine LEERE Liste und kein Rueckfall auf `meta.users`:
+      // ohne Antwort weiss diese Seite nicht, wer abhaken darf, und eine
+      // geratene Liste waere die zweite Wahrheit. Ohne Liste zeichnet sich kein
+      // Picker - das ist die richtige Richtung fuer einen Irrtum.
+      actingAsDisplay() ? api.get('/displays/people').catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
     ]);
     state.loadError = null;
     // `metaData` traegt jetzt `{ data, fromCache }` - der Rumpf steht in `.data`.
@@ -3937,6 +4057,7 @@ export async function render(container, { user }) {
     state.metaStale = { users: alleStale, categories: alleStale, tags: alleStale };
     state.tasks = tasksData.data ?? [];
     state.users = meta.users ?? [];
+    state.displayPeople = (displayPeople.data ?? []).filter((p) => p.can_tick_off);
     state.categories = meta.categories ?? [];
     state.allTags = meta.tags ?? [];
     state.defaultPoints = Number(meta.default_points) || 0;
@@ -3953,6 +4074,7 @@ export async function render(container, { user }) {
     state.loadError = err;
     state.tasks = [];
     state.users = [];
+    state.displayPeople = [];
     state.categories = [];
     state.allTags = [];
     state.metaStale = { users: false, categories: false, tags: false };
@@ -4003,6 +4125,13 @@ export async function render(container, { user }) {
 // Testfläche: nur reine Funktionen, deren Vertrag außerhalb dieser Datei zählt.
 export const __test = {
   groupBy, groupKey, formatDueDate, normalizeFilterSet, taskQuery, state,
+  // Was ein Wandtablett zu sehen und zu fassen bekommt (#1209). Die Karte
+  // traegt drei Wege zum selben Statuswechsel - Haken, Wisch, Teilaufgabe -,
+  // und am Display darf nur der erste erscheinen, weil nur er nach der Person
+  // fragen kann. Beide Funktionen stehen hier, damit das messbar ist und nicht
+  // nur im Quelltext behauptet: die Karte fuer das Markup, das Einhaengen der
+  // Wischgeste fuer den Weg, der gar kein Markup hat.
+  renderTaskCard, wireSwipeGestures,
   // Der Aufgaben-Dialog als Markup: welche Felder er zeigt und wen er anbietet.
   renderModalContent,
   // Die Personenauswahl beim Abhaken (#1205): WANN sie ueberhaupt erscheint,

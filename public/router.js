@@ -3423,8 +3423,32 @@ function mountExtensionPage(wrapper, thirdPartyModule) {
   return root;
 }
 
+/**
+ * Die Module, in denen ein Wandtablett trotz `read` etwas TUN kann (#1209):
+ * eine Aufgabe abhaken und eine Einloesung beantragen.
+ *
+ * DIE WAHRHEIT STEHT AUF DEM SERVER (`DISPLAY_WRITE_ROUTES` in
+ * server/display-scopes.js), und diese Liste hier ist bewusst KEINE zweite
+ * davon - sie steuert nichts als einen Hinweistext. Liefe sie auseinander,
+ * waere die Folge ein ueberfluessiges oder ein fehlendes Band, nie ein Recht
+ * mehr oder weniger. Deshalb kostet sie auch keinen zusaetzlichen Aufruf: ein
+ * Feld in `/auth/me` waere der genauere Weg und fuer diesen Nutzen zu teuer.
+ */
+const DISPLAY_ACTING_MODULES = ['tasks', 'rewards'];
+
 function applyModuleReadonly(moduleName, pageWrapper) {
   const readOnly = navModuleAccess(moduleName) === 'read';
+  // DAS BAND WIDERSPRAECHE SONST DEM KNOPF DARUNTER. Ein Tablett traegt auf
+  // Aufgaben und Belohnungen `read`, und das stimmt fuer alles ausser den zwei
+  // Handlungen, die es hat - „Aenderungen sind nicht moeglich" liest sich davor
+  // wie ein Fehler des Geraets, waehrend die Zeile darunter sich abhaken laesst
+  // (im Browser gemessen). Ein widerspruechlicher Hinweis ist schlechter als
+  // keiner; das Band bleibt ueberall sonst, auch am Display.
+  if (readOnly && currentUser?.access_scope === 'display'
+    && DISPLAY_ACTING_MODULES.includes(moduleName)) {
+    document.documentElement.toggleAttribute('data-module-readonly', true);
+    return;
+  }
   document.documentElement.toggleAttribute('data-module-readonly', readOnly);
   if (!readOnly || !pageWrapper || pageWrapper.querySelector('.module-readonly-banner')) return;
   const banner = document.createElement('div');

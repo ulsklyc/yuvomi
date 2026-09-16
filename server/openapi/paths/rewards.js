@@ -24,7 +24,7 @@ export function rewardsPaths() {
     },
     '/api/v1/rewards/redemptions': {
       get: op({ summary: 'List redemption requests (filter by status)', tag: 'Rewards' }),
-      post: op({ summary: 'Request a redemption (reserves points)', tag: 'Rewards', stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Request a redemption (reserves points)', tag: 'Rewards', stateChanging: true, requestBody: jsonBody(null), description: 'Body: { catalog_id, user_id?, note? }. Points are reserved immediately; whether anyone has to approve stays with the household setting. `user_id` redeems on behalf of someone else and is otherwise ignored: an administrator may do it for any member, and a paired wall display must do it, naming the person chosen on the device (#1209). For a display the person is required rather than optional, because the display account takes no part in rewards itself, and it has to be a household member who may write this module. The request is booked as the display having asked and the person having received.' }),
     },
     '/api/v1/rewards/redemptions/{id}': {
       patch: op({ summary: 'Decide a redemption (fulfill/reject/cancel)', tag: 'Rewards', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),

@@ -12,6 +12,7 @@ import { createLogger } from '../logger.js';
 import { getBalance, isEnrolled, postLedger } from '../services/rewards.js';
 import { householdMemberSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
+import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
 
 const log = createLogger('Rewards');
 const router = express.Router();
@@ -342,7 +343,31 @@ router.post('/redemptions', (req, res) => {
   try {
     const d = db.get();
     const me = actingUser(req);
-    const targetId = req.body?.user_id != null && isAdminRequest(req) ? toInt(req.body.user_id) : me;
+
+    // EIN WANDTABLETT BEANTRAGT FUER EINE AM GERAET GEWAEHLTE PERSON (#1209).
+    //
+    // Es ist kein Admin, also greift die stellvertretende Einloesung darunter
+    // fuer es nicht - und der Rueckfall auf `me` waere hier besonders
+    // schaedlich: das Display-Konto nimmt an Belohnungen gar nicht teil, der
+    // Aufruf endete also an `isEnrolled` mit einer 400, die von einem Tippfehler
+    // spraeche statt von einer fehlenden Angabe. Die Person MUSS benannt sein,
+    // und `displayActingPerson` prueft dabei dasselbe, was auch das Abhaken
+    // prueft: Haushaltsmitglied, und das Modul selbst schreiben duerfen.
+    //
+    // WAS DAS DISPLAY DABEI NICHT WIRD: `requested_by` und - falls der Haushalt
+    // ohne Freigabe arbeitet - `decided_by` bleiben das Geraet. Das ist die
+    // ehrliche Buchung: beantragt hat es das Tablett, bekommen hat es die
+    // Person. Ob ueberhaupt jemand freigeben muss, bleibt unveraendert die
+    // Einstellung des Haushalts (`rewards_require_approval`) - ein Display
+    // verschiebt diese Grenze nicht, in keine Richtung.
+    let targetId;
+    if (isDisplayRequest(req)) {
+      const actor = displayActingPerson(req, req.body?.user_id, 'rewards', { db: d });
+      if (!actor.ok) return res.status(actor.status).json({ error: actor.error, code: actor.status });
+      targetId = actor.userId;
+    } else {
+      targetId = req.body?.user_id != null && isAdminRequest(req) ? toInt(req.body.user_id) : me;
+    }
     if (!targetId) return res.status(400).json({ error: 'user_id is required.', code: 400 });
 
     const item = d.prepare('SELECT * FROM reward_catalog WHERE id = ? AND is_active = 1').get(toInt(req.body?.catalog_id));

@@ -7,17 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- **On an instance without HTTPS, one cookie was issued in a way the browser throws away.** The
-  setting that decides whether cookies are marked HTTPS-only is off by default, which is right for a
-  self-hosted instance reached over plain HTTP. One place read that setting backwards, so on exactly
-  those instances the security token was handed out marked HTTPS-only and the browser dropped it.
-  It mostly hid behind a retry, surfacing as an occasional refused save rather than as anything
-  legible. Nobody has to change a setting; instances that had already turned HTTPS-only on were never
-  affected.
-
 ### Added
+
+- **A wall tablet can now tick a task off and ask for a reward, for whoever is standing in front of
+  it.** Until now a display only showed things. Tapping a task on a tablet opens the list of people
+  and asks who did it, because on a wall "me" is nobody; picking someone ticks the task off and
+  records that person as having done it, so the points go where the work went. On the rewards page
+  each person keeps their own button for asking to redeem something, and the tablet is recorded as
+  having asked. Those two are everything a display can do: it still creates nothing, edits nothing,
+  deletes nothing, and changes no settings, and it cannot undo a tick either, because taking one back
+  gives points away again and that stays with the household. A person who is not allowed to tick
+  tasks off is not offered on the tablet, and a task that is not visible to the whole household does
+  not appear there and cannot be ticked off through it. Whether a redemption still needs approval is
+  unchanged: the display asks, it never approves.
 
 - **A wall tablet can get an account of its own that only a paired device can use.** Under Settings an
   administrator creates a display, gets a ten-character pairing code, and types it in once on the
@@ -48,6 +50,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   backfilled with a claim nobody ever made. `PATCH /api/v1/tasks/{id}/status` takes an optional
   `done_by_user_id` for this; it has to be a household member, and it only applies to the transition
   into done. (#1205)
+
+### Fixed
+
+- **On an instance without HTTPS, one cookie was issued in a way the browser throws away.** The
+  setting that decides whether cookies are marked HTTPS-only is off by default, which is right for a
+  self-hosted instance reached over plain HTTP. One place read that setting backwards, so on exactly
+  those instances the security token was handed out marked HTTPS-only and the browser dropped it.
+  It mostly hid behind a retry, surfacing as an occasional refused save rather than as anything
+  legible. Nobody has to change a setting; instances that had already turned HTTPS-only on were never
+  affected.
 
 ### Security
 

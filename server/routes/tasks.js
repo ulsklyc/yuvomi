@@ -26,6 +26,7 @@ import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
 import { resolvePermissions } from '../permissions.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { householdMemberSql, isHouseholdMember, newNonMembers, nonMemberMessage } from '../services/household-members.js';
+import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
 import { pushService } from '../services/push.js';
 import { todayKey } from '../utils/timezone.js';
 import {
@@ -1548,6 +1549,61 @@ router.patch('/:id/status', (req, res) => {
     if (!prev)
       return res.status(404).json({ error: 'Task not found.', code: 404 });
 
+    // EIN WANDTABLETT HAKT AB, UND ZWAR NUR DAS (#1209).
+    //
+    // Der Block steht VOR der Ablage-Abkuerzung darunter und vor allem
+    // anderen, weil er die Route fuer ein Display auf einen einzigen Uebergang
+    // verengt: nach 'done', fuer eine benannte Person, auf einer Aufgabe, die
+    // der ganze Haushalt sieht. Stuende er weiter unten, haette ein Tablett
+    // ueber `status: 'archived'` schon abgelegt, bevor irgendjemand fragt - die
+    // Abkuerzung antwortet selbst und kehrt nie zurueck.
+    //
+    // WARUM NUR NACH 'done' UND NICHT ZURUECK: das Zuruecknehmen storniert
+    // Punkte und verwirft die Folgeinstanz einer Serie. Das ist eine
+    // Korrektur, und Korrekturen bleiben beim Haushalt, nicht bei dem, der
+    // gerade an der Kuechenwand vorbeigeht. Das Ticket sagt es als Liste: zwei
+    // Handlungen, sonst nichts.
+    //
+    // WARUM DIE SICHTBARKEIT HIER NOCHMAL GEPRUEFT WIRD, obwohl die Liste sie
+    // schon zieht: die Liste ist eine Antwort, kein Riegel. Ein Display liest
+    // Aufgaben als sein eigenes Konto und sieht damit ohnehin nur
+    // `visibility = 'all'` - aber diese Route nimmt eine ID aus dem Pfad
+    // entgegen, und eine ID kann jeder hinschreiben. Ohne diese Zeile haekte
+    // ein Tablett die private Aufgabe eines Mitglieds ab, ohne sie je gesehen
+    // zu haben, und der Verlauf truege den Beweis.
+    //
+    // DIE ABSAGE IST 404 UND NICHT 403: eine unsichtbare Aufgabe existiert fuer
+    // dieses Geraet nicht, und ein 403 an genau dieser Stelle waere die
+    // Auskunft, dass es sie gibt.
+    //
+    // UND DESHALB STEHT DIE SICHTBARKEIT VOR DEM STATUS. Andersherum stand sie
+    // zuerst, und damit war die Zusicherung im Absatz darueber nur fuer
+    // `status: 'done'` eingeloest: ein Tablett, das `{"status":"open"}` auf eine
+    // geratene Kennung schickte, bekam 403 („darf nur abhaken") fuer eine
+    // Aufgabe, die es gibt, und 404 fuer eine, die es nicht gibt - der
+    // Unterschied zwischen den beiden Antworten IST die Auskunft, die diese
+    // Stelle verweigern soll. Eine private Aufgabe liess sich so ueber ihre
+    // blosse Kennung nachweisen, ohne sie je zu sehen. Jetzt beantwortet die
+    // Route jede Nutzlast auf eine unsichtbare Aufgabe gleich, und zwar mit
+    // derselben 404 wie fuer eine, die es nie gab.
+    let displayDoneBy = null;
+    if (isDisplayRequest(req)) {
+      if (prev.visibility !== 'all') {
+        return res.status(404).json({ error: 'Task not found.', code: 404 });
+      }
+      if (status !== 'done') {
+        return res.status(403).json({
+          error: 'A paired display can only tick a task off.',
+          code: 403,
+        });
+      }
+      const actor = displayActingPerson(req, req.body.done_by_user_id, 'tasks', { db: db.get() });
+      if (!actor.ok) {
+        return res.status(actor.status).json({ error: actor.error, code: actor.status });
+      }
+      displayDoneBy = actor.userId;
+    }
+
     // Ablegen ist kein Statuswechsel: kein Punkte-Storno, keine Serien-Bewegung,
     // kein CalDAV-Push. Genau daran hing #688 - die Ablage überschrieb das 'done'
     // und syncTaskRewards nahm die Gutschrift dafür wieder zurück.
@@ -1579,8 +1635,16 @@ router.patch('/:id/status', (req, res) => {
     const doneByRaw = req.body.done_by_user_id;
     const namesDoer = status === 'done' && prev.status !== 'done'
       && doneByRaw != null && doneByRaw !== '';
-    const doneByUserId = namesDoer ? Number(doneByRaw) : null;
-    if (namesDoer && (!Number.isInteger(doneByUserId) || !isHouseholdMember(doneByUserId, { db: db.get() }))) {
+    // Ein Display hat seine Person oben schon geprueft, und zwar strenger
+    // (benannt sein ist dort Pflicht, das Modulrecht der Person kommt dazu).
+    // `namesDoer` bleibt trotzdem die Bedingung: hakt ein Tablett etwas ab, das
+    // schon 'done' ist, gibt es auch hier keinen Uebergang, an dem eine
+    // Erledigung haengen koennte - dieselbe stille Regel wie fuer Menschen.
+    const doneByUserId = displayDoneBy != null
+      ? (namesDoer ? displayDoneBy : null)
+      : (namesDoer ? Number(doneByRaw) : null);
+    if (displayDoneBy == null
+      && namesDoer && (!Number.isInteger(doneByUserId) || !isHouseholdMember(doneByUserId, { db: db.get() }))) {
       return res.status(400).json({
         error: Number.isInteger(doneByUserId) ? nonMemberMessage([doneByUserId]) : 'Invalid done_by_user_id.',
         code: 400,
