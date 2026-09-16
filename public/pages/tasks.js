@@ -421,11 +421,21 @@ function renderTaskCard(task, opts = {}) {
         <input type="checkbox" class="task-bulk-checkbox" data-task-id="${task.id}"
                ${isChecked ? 'checked' : ''} aria-label="${t('tasks.selectTask')}">
         ` : ''}
+        ${actingAsDisplay() ? '' : `
         <button class="task-status-btn task-status-btn--${task.status}"
                 data-action="toggle-status" data-id="${task.id}" data-status="${task.status}"
                 aria-label="${isDone ? t('tasks.markOpen', { title: esc(task.title) }) : t('tasks.markDone', { title: esc(task.title) })}">
           <i data-lucide="check" class="task-status-btn__check" aria-hidden="true"></i>
         </button>
+        `}
+        ${/* AM TABLETT GAR KEIN STATUSKNOPF, auch nicht bei einer erledigten
+             Aufgabe. Er zeigte dort auf das Zuruecknehmen, und genau das darf
+             ein Display nicht: es storniert Punkte und verwirft die
+             Folgeinstanz einer Serie. Stehen zu lassen hiesse, ein Angebot zu
+             zeichnen, das der Server mit 403 beantwortet - der Befund, der an
+             #1241 als eigener Faden offen steht. Eine erledigte Aufgabe traegt
+             am Display also gar keinen Knopf, und der Picker darunter zeichnet
+             sich fuer sie ohnehin nicht. */''}
         ${renderDoerPicker(task, isDone, archived)}
 
         <div class="task-card__body">
@@ -1091,6 +1101,8 @@ let state = {
   defaultPoints:   0,        // Haushalt-Standard für neue Aufgaben (#578), 0 = aus
   currentUserId:   null,
   isAdmin:         false,    // darf fremde Kommentare entfernen (#734)
+  /** Wer an diesem Wandtablett abhaken darf (#1209) - leer fuer jeden Menschen. */
+  displayPeople:   [],
   // `tags` ist eine Liste, keine Auswahl: mehrere Tags engen UND-verknüpft ein,
   // wie jeder andere Filter in dieser Leiste auch (#586).
   // Status, Priorität und Person halten mehrere Werte (#671); innerhalb einer
@@ -2206,6 +2218,19 @@ function groupHistoryByDay(entries) {
  */
 const DOER_PANEL_PREFIX = 'task-doer-';
 
+/**
+ * Handelt gerade ein Wandtablett (#1209)?
+ *
+ * DIE FRAGE IST NICHT „darf ich schreiben", SONDERN „bin ich jemand". An einem
+ * Display ist „ich" niemand: das Konto ist kein Haushaltsmitglied, verdient
+ * keine Punkte und hat nichts getan. Ein Haken, der ohne Nachfrage abhakt,
+ * schriebe also eine Erledigung auf ein Geraet - deshalb haengt hier eine
+ * andere Bedienung dran und nicht nur ein anderes Recht.
+ */
+function actingAsDisplay() {
+  return state.user?.access_scope === 'display';
+}
+
 function doerPanelTaskId(el) {
   const panel = el.closest?.('.popover-menu');
   if (!panel?.id?.startsWith(DOER_PANEL_PREFIX)) return null;
@@ -2215,13 +2240,32 @@ function doerPanelTaskId(el) {
 
 function renderDoerPicker(task, isDone, archived) {
   if (isDone || archived) return '';
-  const members = state.users ?? [];
-  if (members.length < 2) return '';
+  const tablett = actingAsDisplay();
+  // AM TABLETT IST DIESE AUSWAHL DER EINZIGE WEG, und deshalb gilt die
+  // Zwei-Personen-Schwelle dort nicht. Fuer einen Menschen ist der Picker ein
+  // ZWEITES Ziel neben dem Haken: hakt er selbst ab, braucht er ihn nie, und in
+  // einem Haushalt mit einer Person gaebe es ohnehin nichts zu waehlen. Am
+  // Display gibt es kein „selbst" - auch die einzige Person des Haushalts muss
+  // benannt werden, sonst traegt der Verlauf ein Geraet als Erledigerin.
+  const members = tablett ? (state.displayPeople ?? []) : (state.users ?? []);
+  if (!tablett && members.length < 2) return '';
+  if (tablett && members.length === 0) return '';
   return popoverMenuHtml({
     id: `${DOER_PANEL_PREFIX}${task.id}`,
+    // DERSELBE SCHLUESSEL FUER BEIDE, und das ist kein Sparen am falschen Ende.
+    // „Wer hat X erledigt?" ist am Tablett genau die Frage, die der Knopf
+    // stellt - er hakt ab, indem er sie beantworten laesst. Ein zweiter
+    // Schluessel haette denselben Satz in 24 Sprachen ein zweites Mal gekostet,
+    // und zwei Schluessel mit einem Wortlaut laufen frueher oder spaeter
+    // auseinander.
     label: t('tasks.doneByPick', { title: task.title }),
-    icon: 'user-round-check',
-    triggerClass: 'btn btn--ghost btn--icon btn--icon-sm task-doer-btn',
+    // AM TABLETT TRAEGT DIESER KNOPF DEN HAKEN - er ERSETZT den Statusknopf,
+    // er steht nicht daneben. Zwei Knoepfe waeren zwei Angebote fuer dieselbe
+    // Handlung, und eines davon fuehrte in eine 403.
+    icon: tablett ? 'check' : 'user-round-check',
+    triggerClass: tablett
+      ? 'task-status-btn task-status-btn--open task-status-btn--pick'
+      : 'btn btn--ghost btn--icon btn--icon-sm task-doer-btn',
     items: members.map((u) => ({
       action: 'pick-doer', id: u.id, label: u.display_name, icon: 'user-round',
     })),
@@ -3922,12 +3966,25 @@ export async function render(container, { user }) {
 
   // Daten laden (Filter-State aus vorheriger Session berücksichtigen)
   try {
-    const [tasksData, metaData, preferencesData] = await Promise.all([
+    const [tasksData, metaData, preferencesData, displayPeople] = await Promise.all([
       api.get(`/tasks${taskQuery()}`),
       api.getWithSource('/tasks/meta/options'),
       // Reine Anzeigepräferenz: ein Fehler hier darf die Aufgabenliste nicht
       // mit in den Ladefehler ziehen, deshalb eigener Fallback.
       api.get('/preferences').catch(() => ({ data: {} })),
+      // WER AN DIESEM TABLETT ABHAKEN DARF (#1209) - und warum nicht die Liste
+      // aus `/tasks/meta/options`, die daneben schon geladen wird: die traegt
+      // jedes Haushaltsmitglied, auch eines ohne Schreibrecht auf Aufgaben.
+      // Der Picker bekaeme damit Namen, deren Wahl der Server mit 403
+      // beantwortet, und an einer Kuechenwand sieht das aus wie ein kaputtes
+      // Geraet. `/displays/people` beantwortet dieselbe Frage MIT der
+      // Rechtelage, aus derselben Aufloesung wie die Absage.
+      //
+      // Der Fallback ist eine LEERE Liste und kein Rueckfall auf `meta.users`:
+      // ohne Antwort weiss diese Seite nicht, wer abhaken darf, und eine
+      // geratene Liste waere die zweite Wahrheit. Ohne Liste zeichnet sich kein
+      // Picker - das ist die richtige Richtung fuer einen Irrtum.
+      actingAsDisplay() ? api.get('/displays/people').catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
     ]);
     state.loadError = null;
     // `metaData` traegt jetzt `{ data, fromCache }` - der Rumpf steht in `.data`.
@@ -3937,6 +3994,7 @@ export async function render(container, { user }) {
     state.metaStale = { users: alleStale, categories: alleStale, tags: alleStale };
     state.tasks = tasksData.data ?? [];
     state.users = meta.users ?? [];
+    state.displayPeople = (displayPeople.data ?? []).filter((p) => p.can_tick_off);
     state.categories = meta.categories ?? [];
     state.allTags = meta.tags ?? [];
     state.defaultPoints = Number(meta.default_points) || 0;
@@ -3953,6 +4011,7 @@ export async function render(container, { user }) {
     state.loadError = err;
     state.tasks = [];
     state.users = [];
+    state.displayPeople = [];
     state.categories = [];
     state.allTags = [];
     state.metaStale = { users: false, categories: false, tags: false };

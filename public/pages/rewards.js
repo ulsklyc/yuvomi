@@ -29,6 +29,8 @@ let state = {
   participants: [],    // admin only
   ledgerFilter: null,  // user_id | null
   prevBalances: new Map(), // für Count-up: Salden vor dem letzten Neuladen
+  /** Fuer wen dieses Wandtablett einloesen darf (#1209) - leer fuer jeden Menschen. */
+  displayPeople: [],
 };
 
 function prefersReducedMotion() {
@@ -71,6 +73,32 @@ function runCountUps(scope) {
 
 function isAdmin() {
   return state.user?.role === 'admin';
+}
+
+/**
+ * Handelt gerade ein Wandtablett (#1209)?
+ *
+ * Die Einloese-Knoepfe dieser Seite haengen an einem IDENTITAETS-Gate: „bin ich
+ * das, oder bin ich Elternteil". Am Display trifft weder das eine noch das
+ * andere zu - das Konto ist kein Mitglied, nimmt an Belohnungen nicht teil und
+ * steht in keiner Liste. Ohne eine eigene Antwort verschwaende die Seite dort
+ * jeden Knopf, obwohl der Server die Handlung erlaubt.
+ */
+function actingAsDisplay() {
+  return state.user?.access_scope === 'display';
+}
+
+/**
+ * Darf an diesem Tablett fuer diese Person eingeloest werden?
+ *
+ * DIE ANTWORT KOMMT VOM SERVER, nicht aus einer zweiten Regel hier.
+ * `/displays/people` liefert `can_redeem` aus derselben Rechteaufloesung, die
+ * auch die Absage der Route stellt - eine eigene Bedingung an dieser Stelle
+ * waere die zweite Wahrheit, und sie liefe genau dann auseinander, wenn jemand
+ * die Rechte aendert.
+ */
+function displayMayRedeemFor(memberId) {
+  return (state.displayPeople ?? []).some((p) => p.id === memberId && p.can_redeem);
 }
 
 function fmtPoints(n) {
@@ -124,6 +152,15 @@ async function loadOverview() {
   const res = await api.get('/rewards/overview');
   state.overview = res.data;
   state.catalog = res.data.catalog || [];
+  // WER AN DIESEM TABLETT EINLOESEN DARF (#1209). Die Uebersicht selbst
+  // beantwortet das nicht: sie kennt Punktestaende, nicht Rechte, und `me` ist
+  // hier das Geraet. Der Fallback ist eine LEERE Liste - ohne Antwort weiss
+  // diese Seite nicht, fuer wen sie fragen darf, und kein Knopf ist die
+  // richtige Richtung fuer einen Irrtum.
+  if (actingAsDisplay()) {
+    const people = await api.get('/displays/people').catch(() => ({ data: [] }));
+    state.displayPeople = people.data ?? [];
+  }
   if (isAdmin()) {
     const r = await api.get('/rewards/redemptions?status=pending');
     state.redemptions = r.data || [];
@@ -281,7 +318,9 @@ function canAffordAny(balance) {
 
 function renderStandingRow(member) {
   const hint = nextRewardHint(member.balance);
-  const canRedeem = isAdmin() || member.id === state.overview.me;
+  const canRedeem = actingAsDisplay()
+    ? displayMayRedeemFor(member.id)
+    : (isAdmin() || member.id === state.overview.me);
   /* DIE DECKUNG WAR NIE GEPRUEFT. `canRedeem` oben ist ein IDENTITAETS-Gate
    * (bin ich das, oder bin ich Elternteil), kein Kontostand. Emma sah mit 30
    * Punkten einen aktiven "Einloesen"-Knopf, waehrend die billigste Praemie 40
@@ -455,7 +494,13 @@ function affordabilityFor(cost) {
 function renderRewardCard(item) {
   const inactive = item.is_active === 0;
   const aff = affordabilityFor(item.cost);
-  const canRedeemBtn = !inactive && (isAdmin() || aff.canRedeem !== false) && (isAdmin() || balances().some((b) => b.id === state.overview?.me));
+  // AM TABLETT TRAEGT DER KATALOG KEINEN EINLOESE-KNOPF. Er ruft die Auswahl
+  // ohne Person auf - fuer einen Menschen ist das richtig, weil „ich" die
+  // Antwort ist. Am Display ist es niemand, und ein Knopf, der erst nach einer
+  // Person fragen muesste, waere ein zweiter Weg zu derselben Handlung. Der
+  // eine Weg steht in der Personenliste, wo die Person schon feststeht.
+  const canRedeemBtn = !actingAsDisplay()
+    && !inactive && (isAdmin() || aff.canRedeem !== false) && (isAdmin() || balances().some((b) => b.id === state.overview?.me));
   const shortHint = !isAdmin() && aff.short != null && aff.short > 0
     ? `<span class="rw-reward-card__short">${esc(t('rewards.pointsShort', { points: fmtPoints(aff.short) }))}</span>` : '';
   return `
@@ -896,7 +941,9 @@ async function openMemberDetail(memberId) {
       <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${fmtPoints(Math.abs(row.delta))}</span>
     </li>`;
   }).join('') : `<li class="rw-ledger-row rw-ledger-row--compact"><p class="rw-ledger-row__meta">${esc(t('rewards.emptyLedgerBody'))}</p></li>`;
-  const canRedeem = isAdmin() || member.id === state.overview?.me;
+  const canRedeem = actingAsDisplay()
+    ? displayMayRedeemFor(member.id)
+    : (isAdmin() || member.id === state.overview?.me);
   openModal({
     title: member.display_name,
     content: `

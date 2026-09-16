@@ -853,6 +853,24 @@
 
 .task-status-btn--done .task-status-btn__check { display: block; }
 
+/* Am Wandtablett IST der Haken die Personenauswahl (#1209).
+ *
+ * DER KNOPF SIEHT AUS WIE JEDER ANDERE HAKEN, und das ist Absicht. Am Display
+ * ist „ich" niemand - ein Tipp kann dort nicht abhaken, er muss fragen, fuer
+ * wen. Das ist ein Unterschied im VERHALTEN, nicht im Aussehen: wer an der
+ * Kuechenwand steht, soll denselben Ring sehen wie auf seinem Telefon und nicht
+ * erst ein neues Bauteil lernen. Der Statusknopf wird dort gar nicht gezeichnet,
+ * dieser hier steht an seiner Stelle, und er traegt dieselbe Basisklasse - also
+ * auch die Trefflaeche im ::before und den Ausgleich, der die Zeilenhoehe
+ * unveraendert laesst.
+ *
+ * DAS ICON DES POPOVER-TRIGGERS FAELLT DESHALB WEG. `popoverMenuHtml()` setzt
+ * immer eines, und ein `icon-md`-Haken mitten im leeren Ring waere ein dritter
+ * Zustand neben offen und erledigt - eine Aufgabe saehe aus, als waere sie
+ * schon abgehakt. Der Ring aus `::after` traegt die Darstellung allein, genau
+ * wie bei einer offenen Aufgabe. */
+.task-status-btn--pick > .icon-md { display: none; }
+
 .task-card__body {
   flex: 1;
   min-width: 0;
