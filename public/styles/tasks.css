@@ -824,7 +824,25 @@
  * der Farbwechsel trägt das Feedback allein. */
 @media (prefers-reduced-motion: reduce) {
   .task-status-btn--done,
-  .subtask-item__checkbox--done {
+  /* Am Wandtablett ist die Teilaufgabe ein Zustandszeichen, kein Bedienelement
+ * (#1209). Sie traegt dieselbe Grundform, damit die Liste dort nicht anders
+ * aussieht als anderswo - aber nichts, was eine Beruehrung verspricht: kein
+ * Zeigerwechsel, keine Modulton-Einladung beim Ueberfahren, und vor allem
+ * keine 15px-Trefflaeche um ein Element, das nichts tut. Genau das war der
+ * erste Anlauf mit `disabled`: die Form eines Knopfes ohne seine Wirkung. */
+.subtask-item__checkbox--static {
+  cursor: default;
+}
+
+.subtask-item__checkbox--static:hover {
+  border-color: var(--color-border);
+}
+
+.subtask-item__checkbox--static::before {
+  content: none;
+}
+
+.subtask-item__checkbox--done {
     animation: none;
   }
 }

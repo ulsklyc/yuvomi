@@ -395,16 +395,28 @@ function renderTaskCard(task, opts = {}) {
           ${/* AM TABLETT IST DIE TEILAUFGABE ZU LESEN, NICHT ZU TIPPEN (#1209).
                Sie fuehrt auf dieselbe Route wie der Haken, aber ohne die
                Personenauswahl - am Display gaebe es also niemanden, dem die
-               Erledigung gehoerte, und der Server antwortete mit 400. Die
-               Zeile bleibt sichtbar und behaelt ihren Zustand, sie nimmt nur
-               keine Beruehrung mehr an. Dass eine Teilaufgabe am Display
-               spaeter eine eigene Personenauswahl bekommt, ist eine
-               Folgeentscheidung und keine, die hier nebenbei faellt. */''}
-          <button class="subtask-item__checkbox ${s.status === 'done' ? 'subtask-item__checkbox--done' : ''}"
-                  ${actingAsDisplay() ? 'disabled' : `data-action="toggle-subtask" data-id="${s.id}" data-status="${s.status}"`}
-                  aria-label="${t('tasks.subtaskMarkDone', { title: esc(s.title) })}">
+               Erledigung gehoerte, und der Server antwortete mit 400.
+
+               DESHALB IST SIE DORT KEIN KNOPF, sondern ein Zustandszeichen.
+               Ein `disabled`-Knopf war der erste Anlauf und die halbe Loesung:
+               er sieht aus wie ein Bedienelement, traegt die Trefflaeche und
+               den Hover-Rahmen weiter, und sein `aria-label` versprach
+               „als erledigt markieren" fuer eine Beruehrung, die nichts tut -
+               genau das Angebot, das der Statusknopf daneben vermeidet, indem
+               er gar nicht erst erscheint. Jetzt nennt die Beschriftung den
+               ZUSTAND statt einer Handlung, und ein `span` verspricht nichts.
+               Dass eine Teilaufgabe am Display spaeter eine eigene
+               Personenauswahl bekommt, ist eine Folgeentscheidung. */''}
+          ${actingAsDisplay() ? `
+          <span class="subtask-item__checkbox subtask-item__checkbox--static ${s.status === 'done' ? 'subtask-item__checkbox--done' : ''}"
+                role="img" aria-label="${esc(`${s.title}: ${t(s.status === 'done' ? 'tasks.statusDone' : 'tasks.statusOpen')}`)}">
             ${s.status === 'done' ? '<i data-lucide="check" class="subtask-item__checkbox-icon" aria-hidden="true"></i>' : ''}
-          </button>
+          </span>` : `
+          <button class="subtask-item__checkbox ${s.status === 'done' ? 'subtask-item__checkbox--done' : ''}"
+                  data-action="toggle-subtask" data-id="${s.id}"
+                  data-status="${s.status}" aria-label="${t('tasks.subtaskMarkDone', { title: esc(s.title) })}">
+            ${s.status === 'done' ? '<i data-lucide="check" class="subtask-item__checkbox-icon" aria-hidden="true"></i>' : ''}
+          </button>`}
           <span class="subtask-item__title">${esc(s.title)}</span>
           ${canEditTaskDefinition(s, task) ? `
           <div class="subtask-item__actions">
@@ -3080,21 +3092,14 @@ function saveRecentFilter(filters) {
 function wireSwipeGestures(container) {
   const listEl = container.querySelector('#task-list');
   if (!listEl) return;
-  // AM WANDTABLETT GIBT ES DIE WISCHGESTE NICHT (#1209).
-  //
-  // Sie ist der dritte Weg zu demselben Statuswechsel - neben Haken und
-  // Popover -, und der einzige, der die Person nicht erfragen kann: ein Wisch
-  // hat keinen Ort, an dem eine Auswahl aufgehen koennte, und er hakt sofort
-  // ab. Am Display liefe er deshalb ohne benannte Person in die 400 des
-  // Servers, mit englischem Text auf deutscher Oberflaeche. Dieselbe Regel wie
-  // beim Statusknopf: ein Weg, der ohne Person abhakt, wird dort nicht
-  // angeboten, statt ihn anzubieten und abzuweisen.
-  //
-  // Das trifft auch das WISCHEN ZURUECK auf offen, und das ist richtig so -
-  // zuruecknehmen darf ein Display ohnehin nicht.
-  if (actingAsDisplay()) return;
 
-  wireSwipeRows(listEl, {
+  // DER RUECKGABEWERT IST FUER DIE MESSUNG DA, und er kostet nichts: kein
+  // Aufrufer liest ihn. Ob eine SEITE der Geste verdrahtet wird, ist sonst
+  // nirgends sichtbar - die Wischgeste hat kein Markup, an dem sich das pruefen
+  // liesse, und ein Zaehler auf dem Aufruf beantwortet nur, DASS verdrahtet
+  // wurde, nicht WELCHE Seite. Genau der Unterschied ist hier die Regel: am
+  // Display faellt die Schreib-Seite weg und die Lese-Seite bleibt.
+  const optionen = {
     card: '.task-card',
     // Vor 2.0.0 öffnete derselbe Wisch hier den Bearbeiten-Dialog: eine der
     // zwei Listen, in denen die Seiten wirklich getauscht haben.
@@ -3103,7 +3108,21 @@ function wireSwipeGestures(container) {
     // (§2: dieselbe Kante trägt sie in jeder Liste). Die Karte fliegt hinaus,
     // weil die Zeile danach in einer anderen Gruppe steht - ohne den Flug
     // spränge sie einfach weg.
-    leading: {
+    // AM WANDTABLETT FEHLT NUR DIE SCHREIB-SEITE (#1209).
+    //
+    // Der Wisch nach vorn ist der dritte Weg zu demselben Statuswechsel - neben
+    // Haken und Popover -, und der einzige, der die Person nicht erfragen kann:
+    // er hat keinen Ort, an dem eine Auswahl aufgehen koennte, und hakt sofort
+    // ab. Am Display liefe er ohne benannte Person in die 400 des Servers, mit
+    // englischem Text auf deutscher Oberflaeche.
+    //
+    // ABER NUR DIESE SEITE. Der erste Anlauf kehrte vor `wireSwipeRows` zurueck
+    // und nahm damit auch den Wisch nach hinten mit - der oeffnet die
+    // Detailansicht und ist reines LESEN, das ein Display ueberall sonst darf
+    // (der Titel derselben Karte oeffnet dieselbe Ansicht ohne jede Pruefung).
+    // `wireSwipeRows` laesst eine Seite ausdruecklich weg, wenn sie `null` ist,
+    // also kostet die Verengung nichts.
+    leading: actingAsDisplay() ? null : {
       reveal: '.swipe-reveal--done',
       flyOut: true,
       run: async (row) => {
@@ -3149,7 +3168,9 @@ function wireSwipeGestures(container) {
         }
       },
     },
-  });
+  };
+  wireSwipeRows(listEl, optionen);
+  return optionen;
 }
 
 // --------------------------------------------------------

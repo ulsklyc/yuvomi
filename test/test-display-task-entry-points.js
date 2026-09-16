@@ -49,7 +49,7 @@ function alsRolle(scope, fn) {
   try { return fn(); } finally { tasks.state.user = vorher; }
 }
 
-test('am Display traegt die Teilaufgabe keine Handlung, beim Menschen schon', () => {
+test('am Display ist die Teilaufgabe ein Zustandszeichen, kein Bedienelement', () => {
   const amDisplay = alsRolle('display', () => tasks.renderTaskCard(AUFGABE));
   const alsMensch = alsRolle(null, () => tasks.renderTaskCard(AUFGABE));
 
@@ -60,37 +60,51 @@ test('am Display traegt die Teilaufgabe keine Handlung, beim Menschen schon', ()
 
   assert.ok(!amDisplay.includes('data-action="toggle-subtask"'),
     'am Display darf die Teilaufgabe keine Handlung tragen');
-  assert.match(amDisplay, /subtask-item__checkbox[^>]*disabled/,
-    'sie bleibt sichtbar, nimmt aber keine Beruehrung an');
   assert.match(amDisplay, /Teller/, 'und die Teilaufgabe selbst steht weiter da');
+
+  // KEIN KNOPF, AUCH KEIN DEAKTIVIERTER. Ein `disabled`-Knopf war der erste
+  // Anlauf und die halbe Loesung: er behaelt Form, Trefflaeche und
+  // Hover-Einladung eines Bedienelements. Gemessen wird deshalb die
+  // Abwesenheit des Knopfes selbst, nicht ein Attribut daran.
+  const teilaufgabenBlock = amDisplay.slice(amDisplay.indexOf('subtask-item'));
+  assert.ok(!/<button[^>]*subtask-item__checkbox/.test(teilaufgabenBlock),
+    'am Display steht dort kein button');
+  assert.match(amDisplay, /subtask-item__checkbox--static/,
+    'sondern das Zustandszeichen');
+
+  // UND DIE BESCHRIFTUNG VERSPRICHT NICHTS. „als erledigt markieren" an einem
+  // Element, das nichts tut, ist fuer einen Screenreader eine Handlung, die es
+  // nicht gibt - die Beschriftung nennt am Display den ZUSTAND.
+  // Der Loader liefert fuer `t()` den Schluessel zurueck, nicht die
+  // Uebersetzung - gemessen wird deshalb, WELCHER Schluessel dort steht. Das
+  // ist hier sogar die schaerfere Frage: `subtaskMarkDone` ist eine Handlung,
+  // `statusOpen` ein Zustand, und der Unterschied ist genau der Befund.
+  const label = amDisplay.match(/aria-label="Teller[^"]*"/)?.[0] ?? '';
+  assert.ok(!label.includes('subtaskMarkDone'),
+    `am Display verspricht die Beschriftung keine Handlung, war: ${label}`);
+  assert.match(label, /Teller: tasks\.status/, `sie nennt den Zustand, war: ${label}`);
+  assert.match(alsMensch, /subtaskMarkDone/, 'beim Menschen bleibt die Handlung benannt');
 });
 
-test('am Display wird die Wischgeste gar nicht erst eingehaengt', () => {
-  // GEMESSEN AM VERHALTEN, NICHT AM QUELLTEXT. Die Wischgeste hat kein Markup,
-  // das sich pruefen liesse - sie entsteht erst beim Verdrahten. Gezaehlt wird
-  // deshalb, ob `wireSwipeRows` die Liste ueberhaupt nach ihren Zeilen fragt:
-  // tut es das nicht, ist nichts verdrahtet worden.
+test('am Display faellt nur die SCHREIB-Seite der Wischgeste weg, die Lese-Seite bleibt', () => {
+  // GEMESSEN AN DEN VERDRAHTETEN SEITEN. Die Wischgeste hat kein Markup, das
+  // sich pruefen liesse, und ein Zaehler auf dem Aufruf beantwortet nur, DASS
+  // verdrahtet wurde - nicht WELCHE Seite, und genau das ist hier die Regel.
   //
-  // DER ERSTE ANLAUF ZAEHLTE `addEventListener` AUF DER LISTE und war in
-  // BEIDEN Rollen null - `wireSwipeRows` haengt seine Listener an die einzelnen
-  // `.swipe-row`-Elemente, nicht an die Liste. Ohne den Gegenfall darunter
-  // waere diese Suite gruen gewesen und haette nichts gemessen; er ist der
-  // einzige Grund, dass es auffiel.
-  const liste = () => {
-    let gefragt = 0;
-    return {
-      querySelectorAll(sel) { if (sel === '.swipe-row') gefragt += 1; return []; },
-      querySelector: () => null,
-      addEventListener() {},
-      get gefragt() { return gefragt; },
-    };
-  };
+  // ZWEI ANLAEUFE STANDEN VORHER HIER, und beide waren falsch. Der erste
+  // zaehlte `addEventListener` auf der Liste und war in BEIDEN Rollen null,
+  // weil `wireSwipeRows` an den einzelnen Zeilen haengt. Der zweite zaehlte
+  // den Aufruf und verlangte am Display null - er war gruen, als die Geste
+  // dort KOMPLETT wegfiel, und hat damit uebersehen, dass mit der Schreib-Seite
+  // auch das Oeffnen der Detailansicht verschwand: reines Lesen, das ein
+  // Display ueberall sonst darf.
+  const liste = () => ({ querySelectorAll: () => [], querySelector: () => null, addEventListener() {} });
 
-  const amDisplay = liste();
-  alsRolle('display', () => tasks.wireSwipeGestures({ querySelector: () => amDisplay }));
-  assert.equal(amDisplay.gefragt, 0, 'am Display wird nicht einmal nach den Zeilen gefragt');
+  const amDisplay = alsRolle('display', () => tasks.wireSwipeGestures({ querySelector: liste }));
+  assert.equal(amDisplay.leading, null, 'am Display keine Schreib-Seite');
+  assert.ok(amDisplay.trailing, 'aber die Lese-Seite bleibt - sie oeffnet nur die Detailansicht');
 
-  const alsMensch = liste();
-  alsRolle(null, () => tasks.wireSwipeGestures({ querySelector: () => alsMensch }));
-  assert.ok(alsMensch.gefragt > 0, 'beim Menschen schon - sonst misst der Fall darueber nichts');
+  const alsMensch = alsRolle(null, () => tasks.wireSwipeGestures({ querySelector: liste }));
+  assert.ok(alsMensch.leading, 'beim Menschen bleiben beide Seiten');
+  assert.ok(alsMensch.trailing);
 });
