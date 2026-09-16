@@ -2,6 +2,7 @@ import { corePaths } from './core.js';
 import { authPaths } from './auth.js';
 import { emailPaths } from './email.js';
 import { familyPaths } from './family.js';
+import { displaysPaths } from './displays.js';
 import { backupPaths } from './backup.js';
 import { dashboardPaths } from './dashboard.js';
 import { tasksPaths } from './tasks.js';
@@ -41,6 +42,7 @@ export function buildPaths() {
     ...authPaths(),
     ...emailPaths(),
     ...familyPaths(),
+    ...displaysPaths(),
     ...backupPaths(),
     ...dashboardPaths(),
     ...tasksPaths(),

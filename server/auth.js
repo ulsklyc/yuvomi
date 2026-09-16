@@ -15,6 +15,9 @@ import { collectErrors, date as validateDate, str, MAX_SHORT, MAX_TITLE } from '
 import { createLogger } from './logger.js';
 import { memberEmail } from './services/member-email.js';
 import { accessScopeSql, householdMemberSql } from './services/household-members.js';
+import {
+  DISPLAY_COOKIE, DISPLAY_SCOPES, authenticateDisplayDevice, displayTokenFromRequest, isDisplayAccount,
+} from './services/display-accounts.js';
 import { deleteBirthdayArtifacts, syncBirthdayArtifacts } from './services/birthdays.js';
 import * as oidcClient from 'openid-client';
 import {
@@ -411,6 +414,23 @@ router.use((req, res, next) => {
   if (scopes != null) {
     return res.status(403).json({ error: 'Token scope does not permit this operation.', code: 403 });
   }
+  // DASSELBE FUER EIN GEKOPPELTES DISPLAY (#1208). Es traegt ebenfalls Scopes
+  // und wuerde vom globalen Gate ebenso verworfen - und kommt hier ebenso wenig
+  // vorbei. Gepruefte Gueltigkeit statt blosser Cookie-Anwesenheit: ein altes
+  // oder widerrufenes Display-Cookie im Browser darf einem Menschen nicht die
+  // Anmeldung versperren.
+  //
+  // Die Abweisung ist 403 und nicht 401: das Credential IST gueltig, es darf
+  // hier nur nichts. Ein 401 hiesse "melde dich an", und genau das kann ein
+  // Display nicht.
+  const displayToken = displayTokenFromRequest(req);
+  if (displayToken) {
+    let device = null;
+    try { device = authenticateDisplayDevice(displayToken); } catch { device = null; }
+    if (device) {
+      return res.status(403).json({ error: 'A paired display cannot use the account routes.', code: 403 });
+    }
+  }
   next();
 });
 
@@ -715,6 +735,34 @@ function requireAuth(req, res, next) {
     return next();
   }
 
+  // DER ERSTE BROWSER-PFAD MIT SCOPES (#1208). Er steht VOR dem Sitzungszweig,
+  // damit ein Tablett, auf dem jemand versehentlich auch eine Sitzung
+  // hinterlassen hat, trotzdem als Display laeuft - die engere Berechtigung
+  // gewinnt, nie die weitere.
+  //
+  // Die Scopes sind die feste Liste aus dem Dienst, nicht etwas Gespeichertes:
+  // was ein Display darf, ist eine Produktentscheidung und kein Feld, das ein
+  // Administrator aufbohren kann. Alles Weitere erbt es damit unveraendert von
+  // der Token-Maschinerie - das globale Scope-Gate, das Modul-Gate und die
+  // Sichtbarkeitsregel sehen ein Display wie ein gescoptes Token.
+  const displayToken = displayTokenFromRequest(req);
+  if (displayToken) {
+    const device = authenticateDisplayDevice(displayToken);
+    if (device) {
+      req.authMethod = 'display';
+      req.authUserId = device.userId;
+      req.authRole = 'member';
+      req.authScopes = [...DISPLAY_SCOPES];
+      req.displayDeviceId = device.deviceId;
+      applyRoleModuleAccess(req);
+      return next();
+    }
+    // Ein Credential, das es nicht mehr gibt, faellt NICHT auf die Sitzung
+    // zurueck: ein widerrufenes Tablett soll leer bleiben, nicht heimlich als
+    // die Person weiterlaufen, die es zuletzt eingerichtet hat.
+    return res.status(401).json({ error: 'Not authenticated.', code: 401 });
+  }
+
   if (req.session && req.session.userId) {
     req.authMethod = 'session';
     req.authUserId = req.session.userId;
@@ -782,7 +830,14 @@ function setupAuthSession(req, res, user) {
  * @returns {boolean}
  */
 function canSignIn(database, userId) {
-  return !database.prepare('SELECT 1 FROM housekeeping_workers WHERE user_id = ?').get(userId);
+  if (database.prepare('SELECT 1 FROM housekeeping_workers WHERE user_id = ?').get(userId)) return false;
+  // Ein Wandtablett meldet sich nicht an, es wird gekoppelt (#1208). Die Regel
+  // steht HIER und nicht je Anmeldeweg, weil genau das der Fehler war, den
+  // GHSA-4jcg-7jvj-p4v9 ausgemacht hat: Personal war beim Passwort-Login
+  // gesperrt und beim OIDC-Rueckweg nicht. Diese eine Zeile schliesst beide
+  // Wege und die Konten-Verknuepfung per E-Mail zugleich.
+  if (isDisplayAccount(userId, { db: database })) return false;
+  return true;
 }
 
 /**

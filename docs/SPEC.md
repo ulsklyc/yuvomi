@@ -1938,6 +1938,65 @@ Tokens can optionally be **scoped** to individual modules and access levels — 
 
 The subject can only narrow, never widen: module permissions (#467) are resolved for the subject on every request, a non-admin subject cannot reach admin-only routes, and token scopes remain an additional allow-list on top. A split-expense guest cannot be a subject (the household guard would refuse its requests anyway). Deleting either user removes the token via `ON DELETE CASCADE`, and existing tokens keep behaving as before because the migration backfills `subject_user_id = created_by`.
 
+### Display Accounts (migration v215, #1208, decided in #913)
+
+A wall tablet gets an account only a **paired device** can use. A display is a `users` row of its own
+kind, not a second account model ([DECISIONS entry 4](DECISIONS.md#4-a-household-is-people-not-accounts)):
+`display_accounts` is the third marker table beside `housekeeping_workers` and
+`split_expense_guest_users`, and `householdMemberSql()` gained one more `NOT EXISTS` clause, so a
+display is out of **every** list of people at once. `accessScopeSql()` resolves it to `display`.
+
+**Why not a normal account.** A session ends after seven days, so somebody would regularly type a
+password on a device that hangs on a wall - and that password is the most valuable thing on the
+tablet. In a household that signs in only through SSO such an account could not exist at all. And a
+second factor on a device nobody ever signs out of protects nothing. The row therefore carries the
+placeholder `$display$` in `password_hash` (`NOT NULL`, the same shape SSO-only accounts use with
+`$oidc$`), and `canSignIn()` refuses it - one rule that closes password login, the OIDC callback and
+email linking together, exactly where GHSA-4jcg-7jvj-p4v9 showed what a per-path rule costs.
+
+**The first browser path with scopes.** `requireAuth()` knew scopes only on the token path;
+interactive sessions carry `authScopes = null`. A paired display now carries the fixed list
+`dashboard:read`, `calendar:read`, `tasks:read`, `rewards:read` (`DISPLAY_SCOPES`, not stored and
+not configurable - what a display may do is a product decision, not a field an admin can widen).
+The global gate in `server/index.js` therefore asks about the **scopes**, not the sign-in method:
+that condition read `authMethod !== 'api_token' || authScopes == null`, of which only the second
+half was ever the rule. Sessions are unaffected. The auth router, mounted ahead of the gates, refuses
+a valid display credential at its own entry with 403, the same way it refuses a scoped token
+(GHSA-xcv5-6w6x-x5q2). The display branch runs **before** the session branch: the narrower
+credential wins, so a tablet somebody once signed in on does not quietly stay a full account.
+
+Visibility needs no special case. A display creates nothing and is assigned nothing, so
+`visibilityWhere()` leaves it exactly the rows marked `all`.
+
+| Table | Column | Type | Constraint |
+|-------|--------|------|-----------|
+| display_accounts | user_id | INTEGER | PRIMARY KEY, FK → Users (CASCADE delete) |
+| display_accounts | created_by | INTEGER | FK → Users (SET NULL on delete), nullable |
+| display_pairing_codes | code_hash | TEXT | NOT NULL UNIQUE (SHA-256) |
+| display_pairing_codes | expires_at | TEXT | ISO 8601 NOT NULL (15 minutes) |
+| display_pairing_codes | used_at | TEXT | ISO 8601, nullable - spent rather than deleted, so "valid once" stays a checked fact |
+| display_devices | token_hash | TEXT | NOT NULL UNIQUE (SHA-256) |
+| display_devices | label | TEXT | nullable, set by the tablet at pairing |
+| display_devices | last_seen_at | TEXT | ISO 8601, nullable - written on every request |
+| display_devices | revoked_at | TEXT | ISO 8601, nullable |
+
+**Pairing.** An admin issues a ten-character code from an alphabet without lookalike pairs; the
+tablet types it in at `POST /api/v1/displays/pair`, the only route a display calls and the only one
+that needs no authentication - a freshly mounted tablet has nothing to identify itself with, the same
+reason `/auth/login` is public. A **code**, not a link: a link carries the one-time secret in a URL
+and therefore into history, bookmarks, referrers and logs, and a wall tablet is set up by hand once
+anyway. The credential comes back **only** as an httpOnly cookie, never in the body, so no script on
+the page can read it. Unknown, expired and already-used codes all answer the same 400, and the route
+is rate-limited: ten characters are entropy, not a lock. Issuing a new code spends the previous one,
+and a successful exchange revokes the display's previous device - one display, one tablet.
+
+**No expiry, only revocation.** The credential has no `expires_at`. An expiry nobody notices until
+the tablet is dark on a Sunday morning is not security, it is an outage; the control is the
+revocation, and `last_seen_at` stands next to it so that revoking can be an informed decision.
+Revoking sets `revoked_at` rather than deleting, like an API token, and takes effect on the device's
+next request - the credential is checked against the database every time, so there is no cached state
+to catch up with.
+
 ### ICS Subscriptions
 External calendar feeds subscribed by users (read-only, auto-synced).
 

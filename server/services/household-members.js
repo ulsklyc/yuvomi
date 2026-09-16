@@ -62,22 +62,42 @@ export function householdMemberSql(alias, ...rest) {
   }
   const a = checkedAlias(alias);
   return `(NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = ${a}.id)`
-    + ` AND NOT EXISTS (SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = ${a}.id))`;
+    + ` AND NOT EXISTS (SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = ${a}.id)`
+    // Ein Wandtablett ist kein Familienmitglied (#913, #1208). Es steht hier
+    // neben Personal und Gaesten, weil es dieselbe Art Ausnahme ist: eine
+    // users-Zeile, die kein Mensch im Haushalt ist. Diese eine Klausel nimmt es
+    // aus JEDER Mitgliederliste - Zuweisungen, Teilnehmer, Geburtstage,
+    // Erwaehnungen -, weil alle durch dieses Praedikat gehen (#1207).
+    + ` AND NOT EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = ${a}.id))`;
 }
 
 /**
- * SQL-Ausdruck fuer `access_scope` der users-Zeile unter `alias`: `split_guest`
- * fuer einen Geteilte-Ausgaben-Gast, sonst `family`. Stand vorher zweimal als
- * wortgleiches CASE (Benutzerliste, Rechte-Matrix) und ein drittes Mal als
- * eigene Abfrage im Login.
+ * SQL-Ausdruck fuer `access_scope` der users-Zeile unter `alias`: `display` fuer
+ * ein Wandtablett, `split_guest` fuer einen Geteilte-Ausgaben-Gast, sonst
+ * `family`. Stand vorher zweimal als wortgleiches CASE (Benutzerliste,
+ * Rechte-Matrix) und ein drittes Mal als eigene Abfrage im Login.
+ *
+ * DIE REIHENFOLGE IST WILLKUERLICH UND DARF ES SEIN: eine Zeile kann nicht
+ * beides sein. Ein Display entsteht nur ueber die Display-Route, die eine neue
+ * users-Zeile anlegt, und ein Gast nur ueber eine Ausgabengruppe - keine der
+ * beiden nimmt ein bestehendes Konto der anderen Art an.
  *
  * @param {string} alias Tabellenname oder -alias der users-Zeile
  * @returns {string}
  */
 export function accessScopeSql(alias) {
   const a = checkedAlias(alias);
-  return `CASE WHEN EXISTS (SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = ${a}.id) THEN 'split_guest' ELSE 'family' END`;
+  return `CASE`
+    + ` WHEN EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = ${a}.id) THEN 'display'`
+    + ` WHEN EXISTS (SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = ${a}.id) THEN 'split_guest'`
+    + ` ELSE 'family' END`;
 }
+
+// Die Einzelfrage "ist diese Zeile ein Wandtablett" steht NICHT hier, sondern in
+// services/display-accounts.js neben allem anderen, was ein Display ausmacht.
+// Hier lebt die Klausel, die es aus den Mitgliederlisten nimmt - zwei Antworten
+// auf dieselbe Frage an zwei Orten waeren genau die zweite Wahrheit, gegen die
+// dieses Modul gebaut ist.
 
 /**
  * Gehoert diese Zeile zum Haushalt? Die Einzelpruefung zur Liste: eine Route,

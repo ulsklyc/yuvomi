@@ -66,6 +66,15 @@ import screensaverRouter from './routes/screensaver.js';
 import remindersRouter from './routes/reminders.js';
 import searchRouter from './routes/search.js';
 import familyRouter from './routes/family.js';
+// ZWEI IMPORTZEILEN FUER EINE DATEI, ABSICHTLICH. `test:openapi-coverage`
+// findet die Routen eines Routers, indem es hier Namen auf Dateien abbildet -
+// und seine Muster kennen den reinen Default-Import und den reinen
+// Named-Import, nicht die Mischform `a, { b }`. Als eine Zeile geschrieben fand
+// der Guard fuer /displays keine einzige Route und meldete die Spec als
+// Beschreibung von etwas, das es nicht gibt. Zwei Zeilen kosten nichts und
+// halten den Guard sehend.
+import displaysRouter from './routes/displays.js';
+import { pairingRouter } from './routes/displays.js';
 import backupRouter from './routes/backup.js';
 import housekeepingRouter from './routes/housekeeping.js';
 import wasteRouter from './routes/waste/index.js';
@@ -503,6 +512,12 @@ app.get('/feed/waste/:token.ics', feedLimiter, (req, res) => {
 app.use('/mcp', apiLimiter, requireAuth, mcpRouter);
 
 // Alle weiteren API-Routen erfordern Authentifizierung + CSRF-Schutz
+// Kopplung eines Wandtabletts (#1208): VOR requireAuth, wie /auth/login. Ein
+// frisch aufgehaengtes Geraet hat noch nichts, womit es sich ausweisen koennte -
+// es hat einen Code, den ein Mensch ihm eingetippt hat. Der Router traegt genau
+// eine Route; alles andere unter /displays faellt durch und landet weiter unten
+// im Administrator-Router hinter requireAuth.
+app.use('/api/v1/displays', pairingRouter);
 app.use('/api/v1', requireAuth);
 // System-Metadaten: authentifiziert, aber bewusst vor Guest-/Token-Scope-Gates
 // wie /version behandelt. Keine Haushaltsdaten, nur upstream Release Notes.
@@ -521,13 +536,21 @@ app.use('/api/v1', (req, res, next) => {
     return res.status(403).json({ error: 'This account can only access Shared expenses.', code: 403 });
   }
 });
-// Token-Scopes: Nur für Token-Auth relevant. Ein gescoptes Token (scopes !== null)
-// darf ein Modul nur in der gewährten Zugriffsart (read/write) erreichen; jeder
-// nicht abgedeckte /api/v1-Pfad wird verweigert (Least Privilege). Deckt damit
-// zugleich die MCP-OpenAPI-Brücke ab, da diese per Loopback mit demselben Token
-// hier durchläuft.
+// Scopes: Ein gescoptes Zugangsmittel (scopes !== null) darf ein Modul nur in
+// der gewährten Zugriffsart (read/write) erreichen; jeder nicht abgedeckte
+// /api/v1-Pfad wird verweigert (Least Privilege). Deckt damit zugleich die
+// MCP-OpenAPI-Brücke ab, da diese per Loopback mit demselben Token hier
+// durchläuft.
+//
+// DIE BEDINGUNG FRAGT NACH DEN SCOPES, NICHT NACH DER ANMELDEART (#1208). Sie
+// las bis dahin `req.authMethod !== 'api_token' || req.authScopes == null` -
+// beides zusammen, obwohl nur das zweite die Regel ist. Solange es Scopes nur
+// am Token-Pfad gab, war der Unterschied unsichtbar; mit dem gekoppelten
+// Display gibt es einen zweiten Träger, und die Methode zu prüfen hieße, ihn
+// hier durchzulassen. Für Sessions ändert sich nichts: sie tragen
+// `authScopes === null` und steigen in derselben Zeile aus wie vorher.
 app.use('/api/v1', (req, res, next) => {
-  if (req.authMethod !== 'api_token' || req.authScopes == null) return next();
+  if (req.authScopes == null) return next();
   const moduleKey = moduleForPath(req.path);
   const access = requiredAccess(req.method);
   if (tokenAllows(req.authScopes, moduleKey, access)) return next();
@@ -600,6 +623,7 @@ app.use('/api/v1/screensaver', screensaverRouter);
 app.use('/api/v1/reminders', remindersRouter);
 app.use('/api/v1/search', searchRouter);
 app.use('/api/v1/family', familyRouter);
+app.use('/api/v1/displays', displaysRouter);
 app.use('/api/v1/backup', backupRouter);
 app.use('/api/v1/housekeeping', housekeepingRouter);
 app.use('/api/v1/waste', wasteRouter);

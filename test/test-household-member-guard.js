@@ -108,6 +108,10 @@ const ALLOWLIST = [
     reason: 'API token subjects for admins: a token is issued for an account, staff included; guests are left out through access_scope because POST /api-tokens rejects them.',
   },
   {
+    file: 'server/routes/displays.js', site: 'GET /', lists: 1,
+    reason: 'The exact counterpart of the predicate: this admin list shows the wall displays, which are precisely the accounts the predicate excludes (#1208). Filtering it through the predicate would always return nothing. Admin only, and it shows no household member.',
+  },
+  {
     file: 'server/services/two-factor.js', site: 'householdOverview', lists: 1,
     reason: 'Two-factor overview for admins: the second factor protects accounts, not membership, so the overview lists every account.',
   },
@@ -1041,8 +1045,24 @@ test('every list of people in server/ goes through the household member predicat
   assert.deepEqual(problems, []);
 });
 
+/**
+ * DER DECKEL IST EINE RATSCHE, KEINE OBERGRENZE MIT SPIELRAUM. Er stand auf 15,
+ * seit dieser Guard entstand, und wurde am 16.09.2026 fuer #1208 auf 16 gehoben
+ * - fuer genau einen Eintrag: die Administratorenliste der Wandtabletts.
+ *
+ * Warum der Fall keine Aufweichung ist: diese Liste ist das GEGENSTUECK des
+ * Praedikats, nicht eine Umgehung davon. Sie zeigt ausschliesslich die Konten,
+ * die das Praedikat ausschliesst; durch das Praedikat gefiltert waere sie
+ * dauerhaft leer. Eine Liste, die keinen einzigen Menschen zeigt, kann die
+ * Gefahr nicht ausloesen, gegen die der Deckel gebaut ist (eine Ausnahmekarte,
+ * die still zu einem zweiten Praedikat waechst).
+ *
+ * Wer die naechste Zahl hebt, schreibt hier wieder hin, welcher Eintrag es war
+ * und warum er keine Personenliste ist. Steht das nicht dabei, ist die Antwort
+ * nein - dann gehoert die Liste auf das Praedikat.
+ */
 test('the allowlist stays short and every entry names a reason', () => {
-  assert.ok(ALLOWLIST.length <= 15, 'a long allowlist is a second predicate - move lists onto the predicate instead');
+  assert.ok(ALLOWLIST.length <= 16, 'a long allowlist is a second predicate - move lists onto the predicate instead');
   for (const entry of ALLOWLIST) {
     assert.ok(entry.reason && entry.reason.length > 20, `${entry.file} :: ${entry.site} needs a reason`);
   }

@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A wall tablet can get an account of its own that only a paired device can use.** Under Settings an
+  administrator creates a display, gets a ten-character pairing code, and types it in once on the
+  tablet; from then on the tablet shows the dashboard, calendar, tasks and rewards, and nothing else.
+  A display is not a household member: it appears in no list of people, cannot be assigned anything,
+  and is never offered as a person. It has no usable password and cannot sign in with a username and
+  password or through SSO, so nobody has to type a household password on a device that hangs on a
+  wall and nobody ever signs out of. It reads household-visible entries only, never anybody's private
+  ones, and it can only read - ticking off and requesting a redemption come later (#1209). The
+  pairing code is valid once and for fifteen minutes, the credential lands in an httpOnly cookie that
+  no script on the page can read, and it stays valid until an administrator revokes it - with "last
+  seen" beside it, so revoking is an informed decision rather than a guess. Revoking takes effect on
+  the device's next request. (#1208)
+
 - **Ticking a task off can now name who did it, not just who tapped the checkbox.** A small person
   button sits next to the checkbox and opens the list of household members; picking one marks the
   task done and records that person as having done it. The checkbox itself is untouched - one tap,
