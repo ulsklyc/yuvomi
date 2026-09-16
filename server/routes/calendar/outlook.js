@@ -9,6 +9,7 @@
  */
 
 import { createLogger } from '../../logger.js';
+import { integrationDetailsVisible } from '../../scopes.js';
 import express from 'express';
 import * as outlookCalendar from '../../services/outlook-calendar.js';
 import { requireAdmin } from '../../auth.js';
@@ -193,7 +194,16 @@ router.post('/outlook/sync', requireAdmin, async (req, res) => {
  */
 router.get('/outlook/status', (req, res) => {
   try {
-    res.json({ data: outlookCalendar.getStatus() });
+    const status = outlookCalendar.getStatus();
+    // Kontomailadresse und letzter Fehlertext sind Verwaltungsdaten - dieselbe
+    // Erwaegung wie bei /caldav/status daneben, dieselbe Regel aus scopes.js.
+    const data = integrationDetailsVisible(req)
+      ? status
+      : {
+        ...status,
+        accounts: (status.accounts || []).map(({ email, lastError, ...rest }) => rest),
+      };
+    res.json({ data });
   } catch (err) {
     log.error('Outlook status failed:', err);
     res.status(500).json({ error: 'Failed to get Outlook status.', code: 500 });

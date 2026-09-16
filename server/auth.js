@@ -16,8 +16,8 @@ import { createLogger } from './logger.js';
 import { memberEmail } from './services/member-email.js';
 import { accessScopeSql, householdMemberSql } from './services/household-members.js';
 import {
-  DISPLAY_COOKIE, DISPLAY_SCOPES, authenticateDisplayDevice, displayCookieOptions, displayMayRead,
-  displayTokenFromRequest, isDisplayAccount,
+  DISPLAY_COOKIE, DISPLAY_SCOPES, authenticateDisplayDevice, displayCookieIdentity, displayCookieOptions,
+  displayMayRead, displayTokenFromRequest, isDisplayAccount,
 } from './services/display-accounts.js';
 import { deleteBirthdayArtifacts, syncBirthdayArtifacts } from './services/birthdays.js';
 import * as oidcClient from 'openid-client';
@@ -461,7 +461,7 @@ router.use((req, res, next) => {
     // soll sich an einem zurueckgebauten Tablett anmelden koennen. Es wird dabei
     // gleich abgeraeumt, sonst scheitert der erste Request NACH der Anmeldung
     // wieder an `requireAuth` und die App wirft ihn auf die Anmeldeseite zurueck.
-    if (!device) res.clearCookie(DISPLAY_COOKIE, { httpOnly: true, sameSite: 'lax', path: '/' });
+    if (!device) res.clearCookie(DISPLAY_COOKIE, displayCookieIdentity());
   }
   next();
 });
@@ -788,13 +788,16 @@ function requireAuth(req, res, next) {
       req.authRole = 'member';
       req.authScopes = [...DISPLAY_SCOPES];
       req.displayDeviceId = device.deviceId;
-      // DAS COOKIE WIRD BEI JEDEM ZUGRIFF NEU DATIERT. Browser kappen die
-      // Lebensdauer persistenter Cookies (Chromium: 400 Tage), eine einmal
-      // geschriebene Jahreszahl haelt also nicht, was sie sagt - ein Tablett an
-      // der Wand waere irgendwann von selbst leer, ohne dass jemand etwas
-      // widerrufen haette. Die Begruendung samt Zahlen steht bei
-      // `DISPLAY_COOKIE_MAX_AGE`.
-      res.cookie(DISPLAY_COOKIE, displayToken, displayCookieOptions());
+      // DAS COOKIE WIRD NACHDATIERT, ABER NICHT BEI JEDEM ZUGRIFF. Browser
+      // kappen die Lebensdauer persistenter Cookies (Chromium: 400 Tage), eine
+      // einmal geschriebene Jahreszahl haelt also nicht, was sie sagt - ein
+      // Tablett an der Wand waere irgendwann von selbst leer, ohne dass jemand
+      // etwas widerrufen haette. Warum trotzdem gedrosselt: das Credential
+      // steht im Klartext im Set-Cookie-Kopf, und an jede Antwort geheftet
+      // landet es auch an der einen oeffentlich cachebaren hinter diesem Guard
+      // (`/weather/icon/:code`). Beide Begruendungen samt Zahlen stehen bei
+      // `DISPLAY_COOKIE_MAX_AGE` und `DISPLAY_COOKIE_REFRESH_AFTER_MS`.
+      if (device.refreshCookie) res.cookie(DISPLAY_COOKIE, displayToken, displayCookieOptions());
       applyRoleModuleAccess(req);
       return next();
     }
@@ -809,7 +812,7 @@ function requireAuth(req, res, next) {
     // sonst die Websitedaten von Hand loeschen oder einen neuen Kopplungscode
     // holen. Der Request selbst bleibt abgewiesen; erst der naechste kommt ohne
     // das tote Cookie und wird normal behandelt.
-    res.clearCookie(DISPLAY_COOKIE, { httpOnly: true, sameSite: 'lax', path: '/' });
+    res.clearCookie(DISPLAY_COOKIE, displayCookieIdentity());
     return res.status(401).json({ error: 'Not authenticated.', code: 401 });
   }
 

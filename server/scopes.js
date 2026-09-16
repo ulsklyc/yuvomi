@@ -208,7 +208,27 @@ function tokenAllows(scopes, moduleKey, access) {
   return false;
 }
 
+/**
+ * Darf dieses Credential die VERWALTUNGSDETAILS einer Integration sehen?
+ *
+ * Gemeint sind Server-Adressen, Benutzernamen und Kontomailadressen der
+ * angebundenen Konten - `GET /calendar/caldav/status`, `/calendar/outlook/status`.
+ * Der Pfad-Guard urteilt am ersten Segment, `calendar:read` reicht also bis in
+ * diese Statusrouten hinein. Ein Wandtablett hat genau diesen Scope, haengt
+ * oeffentlich und braucht von alldem nichts (#1241 Runde 3); dasselbe gilt fuer
+ * ein Integrationstoken, das fuer einen fremden Client ausgestellt wurde.
+ *
+ * AN DEN SCOPES GEMESSEN, NICHT AM KONTOTYP - dieselbe Entscheidung wie bei den
+ * Abo-Quell-URLs in Runde 1: die Luecke ist keine Eigenheit des Displays,
+ * sondern die jedes gescopten Credentials. Eine Sitzung (`authScopes === null`)
+ * sieht unveraendert alles; fuer sie aendert sich nichts.
+ */
+function integrationDetailsVisible(req) {
+  return req?.authScopes == null;
+}
+
 export {
+  integrationDetailsVisible,
   SCOPE_MODULES,
   MODULE_KEYS,
   ALL_SCOPES,

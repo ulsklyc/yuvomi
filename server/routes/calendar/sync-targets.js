@@ -17,6 +17,7 @@
  */
 
 import express from 'express';
+import { mayWriteModule } from '../../permissions.js';
 
 import { createLogger } from '../../logger.js';
 import * as googleCalendar from '../../services/google-calendar.js';
@@ -112,6 +113,12 @@ function listOutlookTargets() {
  */
 router.get('/sync-targets', async (req, res) => {
   try {
+    // Dieselbe Erwaegung wie bei /tasks/sync-targets: die Liste fuellt das
+    // Ziel-Feld des Termindialogs und nennt dabei die angebundenen Konten mit
+    // ihren Kalender-URLs. Wer nicht schreiben darf, braucht sie nicht.
+    if (!mayWriteModule(req, 'calendar')) {
+      return res.status(403).json({ error: 'Write access to the calendar is required.', code: 403 });
+    }
     const [google, caldav] = await Promise.all([
       listGoogleTargets().catch((err) => {
         log.warn('Sync targets: Google list failed:', err);

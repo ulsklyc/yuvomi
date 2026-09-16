@@ -148,6 +148,12 @@ async function reload(container) {
   return displays;
 }
 
+/**
+ * Welche Code-Anfrage je Display die juengste ist. Eine Antwort, deren Nummer
+ * nicht mehr stimmt, wurde ueberholt und darf nichts mehr schreiben.
+ */
+const pairTickets = new Map();
+
 function bindEvents(container) {
   const form = container.querySelector('#display-form');
   const list = container.querySelector('#display-list');
@@ -176,17 +182,34 @@ function bindEvents(container) {
   list.addEventListener('click', async (event) => {
     const pair = event.target.closest('[data-display-pair]');
     if (pair) {
+      // ZWEI KLICKS DUERFEN NICHT ZWEI CODES ANFRAGEN. Der Server entwertet
+      // beim Ausstellen jeden aelteren Code - kommen die Antworten in der
+      // anderen Reihenfolge zurueck als die Anfragen hinausgingen, steht am
+      // Ende der ALTE, laengst ungueltige Code auf dem Schirm, und das Tablett
+      // bekommt darauf beharrlich 400. Der Knopf sperrt sich deshalb fuer die
+      // Dauer der Anfrage, und eine ueberholte Antwort schreibt nicht mehr.
+      if (pair.disabled) return;
       clearError(errorEl);
+      const id = pair.dataset.displayPair;
+      const ticket = (pairTickets.get(id) ?? 0) + 1;
+      pairTickets.set(id, ticket);
+      pair.disabled = true;
       try {
-        const res = await api.post(`/displays/${pair.dataset.displayPair}/pairing-code`, {});
-        const box = list.querySelector(`[data-display-code="${pair.dataset.displayPair}"]`);
-        const value = list.querySelector(`[data-display-code-value="${pair.dataset.displayPair}"]`);
+        const res = await api.post(`/displays/${id}/pairing-code`, {});
+        if (pairTickets.get(id) !== ticket) return;
+        const box = list.querySelector(`[data-display-code="${id}"]`);
+        const value = list.querySelector(`[data-display-code-value="${id}"]`);
         if (box && value) {
           value.textContent = groupCode(res.data.code);
           box.hidden = false;
         }
       } catch (err) {
-        showError(errorEl, err.message);
+        if (pairTickets.get(id) === ticket) showError(errorEl, err.message);
+      } finally {
+        // Die Liste wird hier nicht neu gezeichnet, der Knopf von eben ist also
+        // noch derselbe - `isConnected` faengt den Fall trotzdem ab, falls ein
+        // paralleles `reload()` ihn ersetzt hat.
+        if (pair.isConnected) pair.disabled = false;
       }
       return;
     }

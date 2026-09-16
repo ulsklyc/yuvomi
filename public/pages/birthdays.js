@@ -420,7 +420,9 @@ function bindEvents() {
   try {
     if (sessionStorage.getItem('yuvomi:birthdays:autoImport')) {
       sessionStorage.removeItem('yuvomi:birthdays:autoImport');
-      openImportModal();
+      // Dieselbe Bedingung wie am Knopf: ein stehen gebliebenes Flag oeffnete
+      // sonst ein Modal, das nur noch einen 403-Toast zeigen kann.
+      if (moduleAccess('contacts') !== 'none') openImportModal();
     }
   } catch { /* sessionStorage evtl. nicht verfügbar */ }
 

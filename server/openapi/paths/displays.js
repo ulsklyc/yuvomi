@@ -12,7 +12,29 @@ export function displaysPaths() {
         summary: 'Create a wall display',
         tag: 'Displays',
         stateChanging: true,
-        requestBody: null,
+        // AUSGESCHRIEBEN, NICHT `null`. Ohne Schema laesst `op()` den Rumpf ganz
+        // weg: erzeugte Clients haetten kein Argument fuer den Namen, und eine
+        // API-Konsole koennte ihn nicht mitgeben - der Aufruf liefe in das 400
+        // der Route. Die Prosa allein reicht dafuer nicht.
+        requestBody: {
+          required: true,
+          description: 'JSON request body',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['display_name'],
+                properties: {
+                  display_name: {
+                    type: 'string',
+                    maxLength: 128,
+                    description: 'What this tablet is called in the settings list, for example "Kitchen".',
+                  },
+                },
+              },
+            },
+          },
+        },
         description: 'Admin only. Body: { display_name }. Creates a new `users` row marked as a display; an existing account can never be turned into one, because that would silently strip a person out of every list and void their password. The account has no usable password from the start, and no device until one is paired.',
       }),
     },
@@ -27,7 +49,31 @@ export function displaysPaths() {
         // hier erst holt. Dieselbe Angabe wie bei /auth/login.
         auth: false,
         stateChanging: true,
-        requestBody: null,
+        // Wie beim Anlegen: ohne Schema kein Rumpf im Katalog, und der Code
+        // waere genau das Feld, das ein erzeugter Client nicht anbieten kann.
+        requestBody: {
+          required: true,
+          description: 'JSON request body',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['code'],
+                properties: {
+                  code: {
+                    type: 'string',
+                    description: 'The ten-character pairing code. Spaces and dashes are ignored, so a code read off a screen may be typed with or without grouping.',
+                  },
+                  label: {
+                    type: ['string', 'null'],
+                    maxLength: 120,
+                    description: 'Optional name for this device, shown beside "last seen" in the settings list.',
+                  },
+                },
+              },
+            },
+          },
+        },
         description: 'The only route a display itself calls, and the only one that needs no authentication - a freshly mounted tablet has nothing to identify itself with yet, the same reason `/auth/login` is public. Body: { code, label? }. The credential is returned **only** as an httpOnly cookie and never in the response body, so no script on the page can read it. A code is valid once, expires after 15 minutes, and is replaced when a newer one is issued for the same display; all three failures answer the same 400, so guessing learns nothing. Rate-limited like the sign-in routes. A successful exchange revokes the display\'s previous device: one display, one tablet.',
       }),
     },

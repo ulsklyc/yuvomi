@@ -3457,7 +3457,14 @@ function navItems({ catalog = false } = {}) {
       { path: '/calendar', label: t('nav.calendar'),  icon: MODULE_ICON.calendar,  module: 'calendar' },
       { path: '/tasks',    label: t('nav.tasks'),     icon: MODULE_ICON.tasks,     module: 'tasks' },
       { path: '/rewards',  label: t('nav.rewards'),   icon: MODULE_ICON.rewards,   module: 'rewards' },
-    ];
+      // DIE HAUSHALTWEITE ABSCHALTUNG GILT AUCH HIER. Was ein Display DARF,
+      // steht fest - was es GIBT, entscheidet der Haushalt, und `navigate()`
+      // weist ein abgeschaltetes Modul ohnehin ab. Ohne diesen Filter stuende
+      // ein abgeschalteter Kalender in der Leiste des Tabletts und schickte
+      // beim Antippen zurueck auf die Uebersicht. Der gewoehnliche Zweig unten
+      // filtert dieselbe Menge; das Dashboard bleibt immer, es ist die
+      // Startseite und laesst sich nicht abschalten.
+    ].filter((item) => item.module === 'dashboard' || !_disabledModules.has(item.module));
   }
   /* DAS ZEICHEN STEHT NICHT HIER, SONDERN IN MODULE_ICON (nav-icons.js).
    *

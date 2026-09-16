@@ -3,6 +3,7 @@
  */
 
 import { createLogger } from '../../logger.js';
+import { integrationDetailsVisible } from '../../scopes.js';
 import express from 'express';
 import * as caldavSync from '../../services/caldav-sync.js';
 import * as caldavReminders from '../../services/caldav-reminders-sync.js';
@@ -122,7 +123,19 @@ router.post('/caldav/sync', requireAdmin, async (req, res) => {
 router.get('/caldav/status', (req, res) => {
   try {
     const status = caldavSync.getStatus();
-    res.json({ data: status });
+    // SERVER-ADRESSE UND BENUTZERNAME SIND VERWALTUNGSDATEN, keine Kalenderdaten.
+    // `calendar:read` reicht bis hierher, weil der Pfad-Guard am ersten Segment
+    // urteilt - ein Wandtablett an der Kuechenwand haette damit ausgelesen,
+    // gegen welchen Server dieser Haushalt mit welchem Namen synchronisiert.
+    // Die Regel steht in scopes.js, gemessen an den Scopes und nicht am
+    // Kontotyp; eine Sitzung sieht unveraendert alles.
+    const data = integrationDetailsVisible(req)
+      ? status
+      : {
+        ...status,
+        accounts: (status.accounts || []).map(({ caldavUrl, username, ...rest }) => rest),
+      };
+    res.json({ data });
   } catch (err) {
     log.error('CalDAV status failed:', err);
     res.status(500).json({ error: 'Failed to get CalDAV status.', code: 500 });

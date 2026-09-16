@@ -2511,6 +2511,22 @@ test('More button active state keeps visible More identity and accessible active
   assert.doesNotMatch(source, /moreBtn\.toggleAttribute\('aria-current',\s*inMoreSheet\)/);
 });
 
+test('die Display-Leiste filtert haushaltweit abgeschaltete Module', () => {
+  // ROUTER.JS IST BROWSER-GEKOPPELT UND NICHT IMPORTIERBAR, deshalb misst diese
+  // Suite ihn am Quelltext (dieselbe Begruendung wie test-router-guest-guard.js).
+  // Der Display-Zweig gibt eine FESTE Liste zurueck - was ein Wandtablett darf,
+  // steht fest, was es GIBT, entscheidet der Haushalt. Ohne den Filter stuende
+  // ein abgeschalteter Kalender in der Leiste und schickte beim Antippen auf
+  // die Uebersicht zurueck, weil `navigate()` ihn ohnehin abweist.
+  const source = read('../public/router.js');
+  const zweig = source.match(/access_scope === 'display'\)\s*\{[\s\S]*?\n  \}/);
+  assert.ok(zweig, 'der Display-Zweig in navItems() steht noch da');
+  assert.match(zweig[0], /_disabledModules\.has\(/, 'er filtert die abgeschalteten Module');
+  // Das Dashboard ist die Startseite und laesst sich nicht abschalten - es darf
+  // nicht mit herausfallen, sonst haette ein Tablett gar keine Leiste mehr.
+  assert.match(zweig[0], /'dashboard'/);
+});
+
 test('mobile navigation derives five stable destinations from three favorites', () => {
   const source = read('../public/router.js');
 

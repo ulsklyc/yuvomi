@@ -69,52 +69,65 @@ export const pairingRouter = express.Router();
  * antworten gleich. Wer raet, soll nicht erfahren, ob er nah dran war.
  */
 pairingRouter.post('/pair', pairingLimiter, (req, res) => {
-  try {
-    const paired = redeemPairingCode(req.body?.code, {
-      label: typeof req.body?.label === 'string' ? req.body.label.slice(0, 120).trim() || null : null,
-    });
-    if (!paired) {
-      return res.status(400).json({ error: 'This pairing code is not valid.', code: 400 });
-    }
-
-    // DIE SITZUNG DES MENSCHEN MUSS STERBEN, NICHT NUR UEBERDECKT WERDEN.
-    //
-    // Gekoppelt wird fast immer aus einem angemeldeten Browser heraus: jemand
-    // haengt das Tablett auf, meldet sich an, holt sich den Code aus den
-    // Einstellungen. Bliebe `yuvomi.sid` daneben liegen, waere es ein
-    // schlafender Zweitschluessel - `requireAuth` bevorzugt zwar das Display,
-    // aber sobald das Credential faellt (Widerruf, Loeschen des Displays),
-    // loescht derselbe Zweig das tote Cookie, und der naechste Request findet
-    // die alte Sitzung und laeuft mit den VOLLEN Rechten dieser Person weiter.
-    // Ein Widerruf, der das Tablett offener zuruecklaesst als vorher, ist das
-    // Gegenteil dessen, was der Knopf verspricht.
-    //
-    // Serverseitig zerstoeren, nicht nur das Cookie raeumen: der Datensatz im
-    // Store ist der Schluessel, das Cookie nur sein Zettel.
-    const finish = () => {
-      res.clearCookie(SESSION_COOKIE);
-      res.clearCookie(LEGACY_SESSION_COOKIE);
-      // Die Laufzeit steht in `displayCookieOptions()` - dieselbe Quelle, aus
-      // der `requireAuth` bei jedem Request auffrischt.
-      res.cookie(DISPLAY_COOKIE, paired.token, displayCookieOptions());
-      res.status(201).json({ data: { paired: true } });
-    };
-    if (typeof req.session?.destroy === 'function') {
-      return req.session.destroy((err) => {
-        // Ein Store, der nicht loeschen kann, darf hier NICHT durchwinken: der
-        // Zweitschluessel bliebe genau dann liegen, wenn niemand hinsieht.
-        if (err) {
-          log.error('POST /pair session destroy failed:', err);
-          return res.status(500).json({ error: 'Internal server error.', code: 500 });
-        }
-        finish();
+  // DIE SITZUNG STIRBT ZUERST, VOR DEM EINLOESEN - UND DAS IST DIE TEURE
+  // REIHENFOLGE, ABER DIE RICHTIGE.
+  //
+  // Warum sie ueberhaupt sterben muss: gekoppelt wird fast immer aus einem
+  // angemeldeten Browser heraus - jemand haengt das Tablett auf, meldet sich
+  // an, holt sich den Code aus den Einstellungen. Bliebe `yuvomi.sid` daneben
+  // liegen, waere es ein schlafender Zweitschluessel: `requireAuth` bevorzugt
+  // zwar das Display, aber sobald das Credential faellt (Widerruf, Loeschen),
+  // raeumt derselbe Zweig das tote Cookie weg, und der naechste Request findet
+  // die alte Sitzung mit den VOLLEN Rechten dieser Person. Ein Widerruf, der
+  // das Tablett offener zuruecklaesst als vorher, ist das Gegenteil dessen,
+  // was der Knopf verspricht.
+  //
+  // Warum VOR dem Einloesen: `redeemPairingCode()` ist unumkehrbar. Es
+  // verbrennt den Code, legt das Geraet an und widerruft das bisherige Geraet
+  // desselben Displays. Scheiterte danach das Zerstoeren, stuende die Route vor
+  // der Wahl, entweder den Zweitschluessel liegen zu lassen oder mit 500 zu
+  // antworten - und im zweiten Fall waere der Code verbraucht, das Tablett ohne
+  // Cookie und ein vorher gekoppeltes Geraet bereits widerrufen. Ein Fehlschlag
+  // wuerde die Kopplung also nicht nur verhindern, sondern den Zustand
+  // ZERSTOEREN. Zuerst zerstoeren kostet dagegen nichts, was nicht ohnehin weg
+  // soll.
+  //
+  // DER PREIS, offen benannt: auch ein FALSCH eingetippter Code meldet die
+  // Sitzung ab. Auf dem Tablett ist das kein Verlust - wer dort koppelt, will
+  // die Sitzung ohnehin loswerden, und die Seite fuehrt danach zur Anmeldung
+  // zurueck. Fremdauslösung scheidet aus: das Sitzungscookie ist `sameSite:
+  // lax`, ein Formular von aussen schickt es gar nicht erst mit.
+  const redeem = () => {
+    try {
+      const paired = redeemPairingCode(req.body?.code, {
+        label: typeof req.body?.label === 'string' ? req.body.label.slice(0, 120).trim() || null : null,
       });
+      if (!paired) {
+        return res.status(400).json({ error: 'This pairing code is not valid.', code: 400 });
+      }
+      // Die Laufzeit steht in `displayCookieOptions()` - dieselbe Quelle, aus
+      // der `requireAuth` nachdatiert.
+      res.cookie(DISPLAY_COOKIE, paired.token, displayCookieOptions());
+      return res.status(201).json({ data: { paired: true } });
+    } catch (err) {
+      log.error('POST /pair error:', err);
+      return res.status(500).json({ error: 'Internal server error.', code: 500 });
     }
-    return finish();
-  } catch (err) {
-    log.error('POST /pair error:', err);
-    return res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  };
+
+  if (typeof req.session?.destroy !== 'function') return redeem();
+  return req.session.destroy((err) => {
+    // Ein Store, der nicht loeschen kann, darf hier NICHT durchwinken: der
+    // Zweitschluessel bliebe genau dann liegen, wenn niemand hinsieht. Jetzt
+    // kostet die Absage nichts - der Code ist noch unbenutzt und gilt weiter.
+    if (err) {
+      log.error('POST /pair session destroy failed:', err);
+      return res.status(500).json({ error: 'Internal server error.', code: 500 });
+    }
+    res.clearCookie(SESSION_COOKIE);
+    res.clearCookie(LEGACY_SESSION_COOKIE);
+    return redeem();
+  });
 });
 
 // --------------------------------------------------------

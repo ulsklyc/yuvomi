@@ -938,7 +938,7 @@ export const schemas = {
           type: 'object',
           properties: {
             name: { type: 'string' },
-            subject_user_id: { type: 'integer', minimum: 1, description: 'Optional family-member subject. Defaults to the administrator creating the token. Split-expense guests are not eligible.' },
+            subject_user_id: { type: 'integer', minimum: 1, description: 'Optional family-member subject. Defaults to the administrator creating the token. Split-expense guests and wall displays are not eligible - neither can sign in, so neither may carry a credential beside its own.' },
             scopes: {
               type: ['array', 'null'],
               items: { type: 'string' },

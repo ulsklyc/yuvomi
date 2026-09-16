@@ -71,6 +71,36 @@ export const DISPLAY_COOKIE = 'yuvomi.display';
 export const DISPLAY_COOKIE_MAX_AGE = 365 * 24 * 60 * 60 * 1000;
 
 /**
+ * Wie selten das Cookie neu datiert wird - und warum ueberhaupt selten.
+ *
+ * DAS CREDENTIAL STEHT IM KLARTEXT IM `Set-Cookie`-KOPF. Bei jedem Request neu
+ * zu setzen hiess, es an JEDE Antwort zu heften - auch an die eine, die hinter
+ * `requireAuth` bewusst oeffentlich cachebar ist: `GET /weather/icon/:code`
+ * antwortet mit `Cache-Control: public, max-age=86400`, und ein Display hat
+ * `weather:read`. nginx und Cloudflare cachen eine Antwort mit `Set-Cookie`
+ * zwar von Haus aus nicht, aber `proxy_ignore_headers Set-Cookie` steht in
+ * genug Selfhosting-Anleitungen, und dann liegt das Credential im Cache fuer
+ * den naechsten Abholer. Dazu landet es in jedem Proxy-Log, das Antwortkoepfe
+ * mitschreibt.
+ *
+ * Zwoelf Stunden halten beides zusammen: die Ein-Jahres-Zusage bleibt (ein
+ * Tablett an der Wand meldet sich vielfach oefter), und das Cookie steht nur
+ * noch in rund zwei Antworten am Tag statt in jeder.
+ */
+export const DISPLAY_COOKIE_REFRESH_AFTER_MS = 12 * 60 * 60 * 1000;
+
+/** Ist seit dem letzten Zeichen dieses Geraets genug Zeit vergangen? */
+function cookieRefreshDue(lastSeenAt, nowIsoString) {
+  if (!lastSeenAt) return true;
+  const last = Date.parse(lastSeenAt);
+  const now = Date.parse(nowIsoString);
+  // Ein unlesbarer Zeitstempel frischt auf: lieber ein Cookie zu viel als ein
+  // Geraet, das irgendwann still ausfaellt.
+  if (!Number.isFinite(last) || !Number.isFinite(now)) return true;
+  return now - last >= DISPLAY_COOKIE_REFRESH_AFTER_MS;
+}
+
+/**
  * Die Cookie-Optionen - EINE Quelle fuer beide Setzer.
  *
  * Kopplung und Auffrischung muessen bis auf den letzten Schalter gleich
@@ -80,6 +110,19 @@ export const DISPLAY_COOKIE_MAX_AGE = 365 * 24 * 60 * 60 * 1000;
  * `secure` wird bei jedem Aufruf frisch gelesen, weil Tests die Umgebung
  * zwischen zwei Faellen umstellen.
  */
+/**
+ * Nur die IDENTITAET des Cookies, ohne Laufzeit - fuer `clearCookie`.
+ *
+ * Express loescht ein Cookie, indem es dasselbe noch einmal setzt, und "dasselbe"
+ * heisst: gleicher Name, gleicher Pfad, gleiche Domain, gleiche Flags. Weicht
+ * eine davon ab, entsteht ein ZWEITES Cookie statt eines geloeschten. Deshalb
+ * fallen hier nur `maxAge` weg und alles andere bleibt an einer Stelle.
+ */
+export function displayCookieIdentity() {
+  const { maxAge, ...identity } = displayCookieOptions();
+  return identity;
+}
+
 export function displayCookieOptions() {
   return {
     httpOnly: true,
@@ -295,14 +338,20 @@ export function authenticateDisplayDevice(token, { db } = {}) {
   if (!token || typeof token !== 'string') return null;
   const database = db || dbModule.get();
   const row = database.prepare(`
-    SELECT d.id, d.user_id
+    SELECT d.id, d.user_id, d.last_seen_at
       FROM display_devices d
       JOIN display_accounts da ON da.user_id = d.user_id
      WHERE d.token_hash = ? AND d.revoked_at IS NULL
   `).get(hash(token));
   if (!row) return null;
-  database.prepare('UPDATE display_devices SET last_seen_at = ? WHERE id = ?').run(nowIso(), row.id);
-  return { userId: row.user_id, deviceId: row.id };
+  const seen = nowIso();
+  // Die Frage "muss das Cookie neu datiert werden" wird HIER beantwortet, weil
+  // hier schon steht, wann dieses Geraet zuletzt da war - der Aufrufer haette
+  // dafuer eine zweite Abfrage gebraucht. Warum ueberhaupt gedrosselt wird,
+  // steht bei DISPLAY_COOKIE_REFRESH_AFTER_MS.
+  const refreshCookie = cookieRefreshDue(row.last_seen_at, seen);
+  database.prepare('UPDATE display_devices SET last_seen_at = ? WHERE id = ?').run(seen, row.id);
+  return { userId: row.user_id, deviceId: row.id, refreshCookie };
 }
 
 /**

@@ -569,10 +569,43 @@ test('die Kopplung toetet die Sitzung, aus der heraus gekoppelt wurde', async ()
   assert.equal(after.status, 401, 'die Sitzung ist serverseitig zerstoert, nicht nur ueberdeckt');
 });
 
-test('das Geraete-Cookie wird bei jedem Zugriff neu datiert', async () => {
+test('auch ein falscher Code meldet die Sitzung ab - und verbrennt nichts', async () => {
+  // DIE REIHENFOLGE IST DER PUNKT. `redeemPairingCode()` ist unumkehrbar: es
+  // verbrennt den Code, legt das Geraet an und widerruft das bisherige Geraet
+  // desselben Displays. Stuende das Zerstoeren der Sitzung DAHINTER, liesse ein
+  // Fehlschlag dort einen verbrauchten Code, ein Tablett ohne Cookie und ein
+  // bereits widerrufenes Vorgaengergeraet zurueck - der Fehlschlag wuerde den
+  // Zustand also nicht nur verhindern, sondern zerstoeren. Zuerst zerstoeren
+  // kostet nichts, und der Preis dafuer steht hier: ein Tippfehler meldet ab.
+  const session = await login('admin', 'adminpass123');
+  assert.equal((await fetch(`${BASE}/api/v1/documents`, { headers: { Cookie: session.cookie } })).status, 200);
+
+  const created = await admin('POST', '/displays', { display_name: 'Tippfehler' });
+  const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});
+
+  const res = await fetch(`${BASE}/api/v1/displays/pair`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: session.cookie },
+    body: JSON.stringify({ code: 'AAAAAAAAAA' }),
+  });
+  assert.equal(res.status, 400, 'der falsche Code wird abgewiesen');
+  assert.equal(
+    (await fetch(`${BASE}/api/v1/documents`, { headers: { Cookie: session.cookie } })).status,
+    401,
+    'die Sitzung ist trotzdem weg - sie stirbt VOR dem Einloesen',
+  );
+
+  // Und der echte Code lebt noch: der Fehlversuch hat ihn nicht angefasst.
+  assert.equal((await pair(issued.body.data.code)).status, 201);
+});
+
+test('das Geraete-Cookie wird nachdatiert, aber nicht bei jedem Zugriff', async () => {
   // Browser kappen persistente Cookies (Chromium bei 400 Tagen). Eine einmal
   // geschriebene Zehnjahresfrist ist damit keine - ein Tablett an der Wand
-  // waere nach gut einem Jahr von selbst leer gewesen, ohne Widerruf.
+  // waere nach gut einem Jahr von selbst leer gewesen, ohne Widerruf. An JEDE
+  // Antwort gehoert das Credential aber auch nicht: es steht im Klartext im
+  // Set-Cookie-Kopf, und hinter diesem Guard liegt mit /weather/icon eine
+  // oeffentlich cachebare Antwort.
   const created = await admin('POST', '/displays', { display_name: 'Nachdatiert' });
   const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});
   const token = (await pair(issued.body.data.code)).token;
@@ -580,7 +613,17 @@ test('das Geraete-Cookie wird bei jedem Zugriff neu datiert', async () => {
   const res = await fetch(`${BASE}/api/v1/tasks`, { headers: { Cookie: `${DISPLAY_COOKIE}=${token}` } });
   assert.equal(res.status, 200);
   const setCookie = String(res.headers.get('set-cookie') || '');
-  assert.match(setCookie, new RegExp(`${DISPLAY_COOKIE}=`), 'der Zugriff frischt das Cookie auf');
+  assert.match(setCookie, new RegExp(`${DISPLAY_COOKIE}=`), 'der erste Zugriff frischt auf');
+
+  // Der zweite folgt Sekunden spaeter - er darf das Credential NICHT noch
+  // einmal in den Kopf schreiben.
+  const zweiter = await fetch(`${BASE}/api/v1/tasks`, { headers: { Cookie: `${DISPLAY_COOKIE}=${token}` } });
+  assert.equal(zweiter.status, 200);
+  assert.doesNotMatch(
+    String(zweiter.headers.get('set-cookie') || ''),
+    new RegExp(`${DISPLAY_COOKIE}=`),
+    'der naechste Zugriff schweigt, bis die Frist um ist',
+  );
 
   // Die REGEL messen, nicht die Zahl: unter jeder Browser-Kappung und weit
   // genug ueber einem Tag, damit ein Tablett nicht taeglich am Netz haengen
@@ -657,6 +700,72 @@ test('der Katalog nennt die Kopplungsroute als unauthentifiziert', async () => {
   // Route MIT Anmeldung traegt die Anforderung sichtbar.
   assert.ok(Array.isArray(listOp.security) && listOp.security.length > 0,
     'Vorbedingung: authentifizierte Operationen nennen ihre Verfahren');
+});
+
+// --------------------------------------------------------
+// Runde 3: was die Modul-Scopes sonst noch mitbrachten
+// --------------------------------------------------------
+
+test('ein Display sieht die Verwaltungsdaten der Sync-Konten NICHT', async () => {
+  // `calendar:read` reicht bis in die Statusrouten hinein, weil der Pfad-Guard
+  // am ersten Segment urteilt. Dort stehen Server-Adresse und Benutzername der
+  // angebundenen Konten - ein Tablett an der Kuechenwand haette ausgelesen,
+  // wohin dieser Haushalt synchronisiert und unter welchem Namen.
+  db.prepare(`
+    INSERT INTO caldav_accounts(name, caldav_url, username, password)
+    VALUES ('Fastmail', 'https://caldav.example.org/dav/', 'anna@example.org', 'x')
+  `).run();
+
+  const created = await admin('POST', '/displays', { display_name: 'Statusprobe' });
+  const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});
+  const token = (await pair(issued.body.data.code)).token;
+
+  // Vorbedingung: die Sitzung sieht die Felder sehr wohl - sonst waere die
+  // Probe unten auch dann gruen, wenn die Route gar nichts mehr liefert.
+  const alsMensch = await admin('GET', '/calendar/caldav/status');
+  assert.equal(alsMensch.status, 200);
+  const kontoMensch = alsMensch.body.data.accounts.find((a) => a.name === 'Fastmail');
+  assert.equal(kontoMensch.caldavUrl, 'https://caldav.example.org/dav/');
+  assert.equal(kontoMensch.username, 'anna@example.org');
+
+  const alsDisplay = await asDisplay(token)('GET', '/calendar/caldav/status');
+  assert.equal(alsDisplay.status, 200, 'die Route bleibt erreichbar - nur aermer');
+  const konto = alsDisplay.body.data.accounts.find((a) => a.name === 'Fastmail');
+  assert.ok(konto, 'das Konto steht weiterhin in der Liste');
+  assert.equal(konto.caldavUrl, undefined, 'die Server-Adresse fehlt');
+  assert.equal(konto.username, undefined, 'der Benutzername fehlt');
+});
+
+test('die Sync-Ziel-Listen gehoeren dem, der auch speichern darf', async () => {
+  // Sie fuellen ein Feld im Aufgaben- und im Termindialog und nennen dabei die
+  // angebundenen Konten samt Sammlungs-URL. Ein Display darf nur lesen, sieht
+  // den Dialog also nie - die Liste hatte es trotzdem.
+  const created = await admin('POST', '/displays', { display_name: 'Zielprobe' });
+  const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});
+  const display = asDisplay((await pair(issued.body.data.code)).token);
+
+  assert.equal((await display('GET', '/tasks')).status, 200, 'Vorbedingung: Aufgaben sind offen');
+  assert.equal((await display('GET', '/tasks/sync-targets')).status, 403);
+  assert.equal((await display('GET', '/calendar/sync-targets')).status, 403);
+
+  // Und die Gegenrichtung: wer schreiben darf, bekommt seine Auswahl.
+  assert.equal((await admin('GET', '/tasks/sync-targets')).status, 200);
+  assert.equal((await admin('GET', '/calendar/sync-targets')).status, 200);
+});
+
+test('der Katalog beschreibt den Rumpf der Kopplung', async () => {
+  // Ohne Schema laesst `op()` den Rumpf ganz weg - ein erzeugter Client haette
+  // kein Argument fuer den Code, und die Route antwortet dann mit 400.
+  const spec = (await admin('GET', '/openapi.json')).body;
+  const schema = spec?.paths?.['/api/v1/displays/pair']?.post
+    ?.requestBody?.content?.['application/json']?.schema;
+  assert.ok(schema, 'die Kopplungsroute nennt ihren Rumpf');
+  assert.deepEqual(schema.required, ['code']);
+  assert.ok(schema.properties?.label, 'der optionale Name steht auch dabei');
+
+  const create = spec?.paths?.['/api/v1/displays']?.post
+    ?.requestBody?.content?.['application/json']?.schema;
+  assert.deepEqual(create?.required, ['display_name']);
 });
 
 // --------------------------------------------------------

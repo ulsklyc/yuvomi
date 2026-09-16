@@ -39,6 +39,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `done_by_user_id` for this; it has to be a household member, and it only applies to the transition
   into done. (#1205)
 
+### Security
+
+- **Reading the calendar no longer reaches the contact book, the sync accounts, or the sync targets.**
+  Permission for the API is granted per module, and the guard judged a request by the first part of
+  its path - so a credential that had been given the calendar alone also reached `GET
+  /birthdays/import/candidates`, which lists every contact with name and birth date, and the status
+  routes of the connected CalDAV and Outlook accounts, which name the server address, the user name
+  and the account mail address. The birthday-import routes now ask for contact access as well, the
+  status routes leave those management details out for anything but a signed-in person, and the two
+  sync-target lists - they name the connected accounts and their collection URLs - are limited to
+  whoever may actually save to them. If you use an API token scoped to `calendar:read` or
+  `tasks:read` for an integration that reads one of these, give it `contacts:read` or write access to
+  the module in question. The birthday page stops offering its import button where contacts are out
+  of reach. (#1241)
+
 ## [2.67.0] - 2026-09-16
 
 ### Added

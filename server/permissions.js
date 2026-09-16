@@ -377,6 +377,24 @@ export function hiddenModulesFor(req, moduleKeys) {
   return hidden;
 }
 
+/**
+ * Darf dieses Credential in diesem Modul SCHREIBEN? Beide Achsen in einem Aufruf.
+ *
+ * Fuer die Handvoll GET-Routen, die es nur wegen einer Schreibgeste gibt: die
+ * Sync-Ziel-Listen fuellen ein Feld im Aufgaben- und im Termindialog, und wer
+ * dort nichts speichern darf, braucht die Auswahl nicht - wohl aber traegt sie
+ * Kontonamen und Sammlungs-URLs der angebundenen Konten. Der Pfad-Guard in
+ * server/index.js verlangt bei GET nur `read` (`requiredAccess`), diese Stellen
+ * schulden die haertere Frage deshalb selbst.
+ *
+ * Gemessen am RECHT, nicht am Kontotyp: ein Wandtablett faellt heraus, weil es
+ * nur Leserechte hat, und ein Mitglied mit `tasks: read` aus demselben Grund.
+ */
+export function mayWriteModule(req, moduleKey) {
+  return tokenAllows(req?.authScopes, moduleKey, 'write')
+    && moduleAccessVerdict(req?.sessionModuleAccess, moduleKey, 'write') === MODULE_ACCESS_ALLOW;
+}
+
 // Urteil der Modulrechte-Prüfung. 'allow' = durchlassen, 'none' = Modul ganz
 // gesperrt, 'read-only' = nur Lesen erlaubt, Schreibversuch abgewiesen.
 export const MODULE_ACCESS_ALLOW = 'allow';

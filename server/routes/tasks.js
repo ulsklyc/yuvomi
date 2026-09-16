@@ -5,6 +5,7 @@
  */
 
 import { createLogger } from '../logger.js';
+import { mayWriteModule } from '../permissions.js';
 import express from 'express';
 import * as db from '../db.js';
 import { documentVisibleSql } from '../services/document-access.js';
@@ -454,8 +455,16 @@ router.get('/categories', (_req, res) => {
 // Aufgabe dorthin zu schieben hieße, sie als Einkaufsposten zurückzubekommen.
 // Muss wie /categories vor den /:id-Routen stehen, sonst matcht „sync-targets" als :id.
 // --------------------------------------------------------
-router.get('/sync-targets', (_req, res) => {
+router.get('/sync-targets', (req, res) => {
   try {
+    // NUR FUER DEN, DER AUCH SPEICHERN DARF. Die Liste fuellt ein Feld im
+    // Aufgabendialog, und sie traegt Kontonamen samt Sammlungs-URL der
+    // angebundenen CalDAV-Konten. Der Kommentar darueber sagt "keine
+    // Server-URLs" - `listUrl` ist eine. Wer nicht schreiben darf, sieht den
+    // Dialog nie; ein Wandtablett mit `tasks:read` hatte die Liste trotzdem.
+    if (!mayWriteModule(req, 'tasks')) {
+      return res.status(403).json({ error: 'Write access to tasks is required.', code: 403 });
+    }
     const caldav = db.get().prepare(`
       SELECT s.account_id AS accountId, a.name AS accountName,
              s.list_url   AS listUrl,   s.list_name AS listName
