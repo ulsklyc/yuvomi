@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "تم تخطي مهمة {{count}} مقفلة.",
         "listLoadError": "تعذر تحميل المهام.",
         "checklistToggle": "شطب العنصر",
-        "checkConflict": "تم تغيير المهمة في هذه الأثناء. يرجى فتحها من جديد."
+        "checkConflict": "تم تغيير المهمة في هذه الأثناء. يرجى فتحها من جديد.",
+        "doneByPick": "مَن أنجز ”{{title}}“؟",
+        "doneByToast": "أنجزها {{name}}.",
+        "historyTickedBy": "وضع العلامة {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} وجبات",

@@ -54,9 +54,23 @@ export function isEnrolled(d, userId) {
  * Wer verdient die Punkte einer Aufgabe? Zugewiesene, teilnehmende Mitglieder;
  * ist niemand zugewiesen (Kiosk-Tablet mit einem Account), die handelnde Person
  * — sofern selbst teilnehmend. Jedes zuständige Mitglied erhält den vollen Wert.
+ *
+ * EINE BENANNTE ERLEDIGENDE PERSON SCHLÄGT BEIDES (#1205). Wer als "hat es
+ * getan" benannt wurde, ist die Antwort auf genau die Frage, die diese Funktion
+ * stellt - die Zuweisung ist nur die Vermutung darüber, und die handelnde
+ * Person ist nur, wer das Tablett in der Hand hielt. Ohne Benennung ändert sich
+ * nichts: `doneByUserId` ist dann null und die alte Reihenfolge greift
+ * unverändert.
+ *
+ * IST DIE BENANNTE PERSON NICHT DABEI, GIBT ES KEINE PUNKTE - kein Rückfall auf
+ * die Zuweisung. Das ist Absicht und der ganze Sinn der Benennung: die Punkte
+ * für eine Aufgabe, die nachweislich jemand anderes erledigt hat, an die
+ * zugewiesene Person zu buchen, wäre die falscheste der drei möglichen
+ * Antworten. Ein leeres Ergebnis ist hier die richtige.
  */
-export function rewardTargets(d, taskId, actingUserId) {
+export function rewardTargets(d, taskId, actingUserId, doneByUserId = null) {
   const enrolled = enrolledIds(d);
+  if (doneByUserId) return enrolled.has(doneByUserId) ? [doneByUserId] : [];
   const assignees = d.prepare('SELECT user_id FROM task_assignments WHERE task_id = ?')
     .all(taskId).map((r) => r.user_id);
   const targets = assignees.filter((id) => enrolled.has(id));
@@ -70,10 +84,10 @@ export function rewardTargets(d, taskId, actingUserId) {
  * UNIQUE-Index (task_id, user_id) WHERE type='earn' verhindert Doppelvergabe,
  * falls der Statuswechsel mehrfach eintrifft.
  */
-export function awardForCompletion(d, taskId, actingUserId) {
+export function awardForCompletion(d, taskId, actingUserId, doneByUserId = null) {
   const task = d.prepare('SELECT id, points, title FROM tasks WHERE id = ?').get(taskId);
   if (!task || !Number.isInteger(task.points) || task.points <= 0) return;
-  const targets = rewardTargets(d, taskId, actingUserId);
+  const targets = rewardTargets(d, taskId, actingUserId, doneByUserId);
   if (!targets.length) return;
   const ins = d.prepare(`INSERT OR IGNORE INTO ${'reward_ledger'} (user_id, delta, type, reason, task_id, created_by)
     VALUES (?, ?, 'earn', ?, ?, ?)`);
@@ -88,6 +102,12 @@ export function awardForCompletion(d, taskId, actingUserId) {
  * Erledigen sauber neu vergibt und der Ledger nicht mit Toggle-Rauschen wächst.
  */
 export function reverseTaskEarnings(d, taskId) {
+  // OHNE PERSONENFILTER, UND DAS BLEIBT SO (#1205). Seit eine benannte
+  // erledigende Person die Punkte bekommen kann, ist der Empfänger einer
+  // earn-Zeile nicht mehr aus der Zuweisung ableitbar - ein Filter auf
+  // "Zuständige" oder "handelnde Person" ließe genau die Buchung stehen, die
+  // das Zurücknehmen auflösen soll. `task_id` + `type` trifft sie alle,
+  // unabhängig davon, wer sie erhalten hat.
   d.prepare("DELETE FROM reward_ledger WHERE task_id = ? AND type = 'earn'").run(taskId);
 }
 
@@ -95,10 +115,10 @@ export function reverseTaskEarnings(d, taskId) {
  * Zentrale Kopplung an den Aufgaben-Statuswechsel. Vergibt beim Übergang nach
  * 'done' und storniert beim Verlassen von 'done'. Alles andere ist ein No-op.
  */
-export function syncTaskRewards(d, taskId, oldStatus, newStatus, actingUserId) {
+export function syncTaskRewards(d, taskId, oldStatus, newStatus, actingUserId, doneByUserId = null) {
   const wasDone = oldStatus === 'done';
   const isDone = newStatus === 'done';
-  if (isDone && !wasDone) awardForCompletion(d, taskId, actingUserId);
+  if (isDone && !wasDone) awardForCompletion(d, taskId, actingUserId, doneByUserId);
   else if (wasDone && !isDone) reverseTaskEarnings(d, taskId);
 }
 

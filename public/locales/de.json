@@ -399,7 +399,7 @@
         "historyUnknownMember": "Nicht mehr im Haushalt",
         "historyEmptyTitle": "Noch nichts aufgezeichnet",
         "historyEmptyPersonTitle": "Von dieser Person nichts aufgezeichnet",
-        "historyEmptyDescription": "Hier steht, wer wann welche Aufgabe abgehakt hat.",
+        "historyEmptyDescription": "Hier steht, wer wann welche Aufgabe erledigt hat.",
         "historyEmptyHint": "Aufgezeichnet wird ab jetzt - was vorher erledigt wurde, hat niemand mitgeschrieben.",
         "historyLoadError": "Verlauf konnte nicht geladen werden",
         "historyLoadMore": "Mehr anzeigen",
@@ -510,7 +510,10 @@
         "tagsSkippedLocked_one": "{{count}} gesperrte Aufgabe übersprungen.",
         "listLoadError": "Aufgaben konnten nicht geladen werden.",
         "checklistToggle": "Eintrag abhaken",
-        "checkConflict": "Die Aufgabe wurde inzwischen geändert. Bitte erneut öffnen."
+        "checkConflict": "Die Aufgabe wurde inzwischen geändert. Bitte erneut öffnen.",
+        "doneByPick": "Wer hat „{{title}}“ erledigt?",
+        "doneByToast": "Erledigt von {{name}}.",
+        "historyTickedBy": "abgehakt von {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} Mahlzeiten",

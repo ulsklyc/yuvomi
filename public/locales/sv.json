@@ -386,7 +386,7 @@
         "historyUnknownMember": "Inte längre i hushållet",
         "historyEmptyTitle": "Inget registrerat än",
         "historyEmptyPersonTitle": "Inget registrerat för den här personen",
-        "historyEmptyDescription": "Här ser du vem som bockade av vilken uppgift, och när.",
+        "historyEmptyDescription": "Här ser du vem som gjorde vilken uppgift och när.",
         "historyEmptyHint": "Registreringen börjar nu - det som gjordes tidigare skrevs aldrig ned.",
         "historyLoadError": "Historiken kunde inte laddas",
         "historyLoadMore": "Visa fler",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "{{count}} låst uppgift hoppades över.",
         "listLoadError": "Uppgifter kunde inte laddas.",
         "checklistToggle": "Bocka av post",
-        "checkConflict": "Uppgiften har ändrats under tiden. Öppna den igen."
+        "checkConflict": "Uppgiften har ändrats under tiden. Öppna den igen.",
+        "doneByPick": "Vem gjorde ”{{title}}”?",
+        "doneByToast": "Gjord av {{name}}.",
+        "historyTickedBy": "bockad av {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} måltider",

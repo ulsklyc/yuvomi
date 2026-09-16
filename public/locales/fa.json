@@ -399,7 +399,7 @@
         "historyUnknownMember": "دیگر عضو خانواده نیست",
         "historyEmptyTitle": "هنوز چیزی ثبت نشده است",
         "historyEmptyPersonTitle": "برای این شخص چیزی ثبت نشده است",
-        "historyEmptyDescription": "اینجا می‌بینید چه کسی چه کاری را کی انجام داده است.",
+        "historyEmptyDescription": "اینجا می‌بینید چه کسی چه کاری را و چه زمانی انجام داده است.",
         "historyEmptyHint": "ثبت از همین حالا آغاز می‌شود - آنچه پیش‌تر انجام شده، جایی نوشته نشده است.",
         "historyLoadError": "بارگذاری تاریخچه ممکن نشد",
         "historyLoadMore": "نمایش بیشتر",
@@ -510,7 +510,10 @@
         "tagsSkippedLocked_one": "{{count}} وظیفهٔ قفل‌شده رد شد.",
         "listLoadError": "کارها بارگذاری نشدند.",
         "checklistToggle": "علامت‌زدن مورد",
-        "checkConflict": "وظیفه در این میان تغییر کرده است. لطفاً دوباره آن را باز کنید."
+        "checkConflict": "وظیفه در این میان تغییر کرده است. لطفاً دوباره آن را باز کنید.",
+        "doneByPick": "چه کسی «{{title}}» را انجام داد؟",
+        "doneByToast": "انجام‌شده توسط {{name}}.",
+        "historyTickedBy": "علامت‌زده توسط {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} وعده",

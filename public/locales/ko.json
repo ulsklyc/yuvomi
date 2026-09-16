@@ -399,7 +399,7 @@
         "historyUnknownMember": "더 이상 가족 구성원이 아님",
         "historyEmptyTitle": "아직 기록이 없습니다",
         "historyEmptyPersonTitle": "이 사람의 기록이 없습니다",
-        "historyEmptyDescription": "누가 언제 어떤 작업을 완료했는지 여기에 표시됩니다.",
+        "historyEmptyDescription": "누가 어떤 할 일을 언제 했는지 여기에 표시됩니다.",
         "historyEmptyHint": "기록은 지금부터 시작됩니다. 그 전에 완료한 일은 어디에도 남아 있지 않습니다.",
         "historyLoadError": "기록을 불러오지 못했습니다",
         "historyLoadMore": "더 보기",
@@ -510,7 +510,10 @@
         "tagsSkippedLocked_one": "잠긴 작업 {{count}}개를 건너뛰었습니다.",
         "listLoadError": "할 일을 불러오지 못했습니다.",
         "checklistToggle": "항목 체크",
-        "checkConflict": "그 사이에 할 일이 변경되었습니다. 다시 열어 주세요."
+        "checkConflict": "그 사이에 할 일이 변경되었습니다. 다시 열어 주세요.",
+        "doneByPick": "“{{title}}”을(를) 누가 했나요?",
+        "doneByToast": "{{name}} 님이 했습니다.",
+        "historyTickedBy": "체크한 사람: {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}}개 식사",

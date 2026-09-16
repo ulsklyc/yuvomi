@@ -99,6 +99,58 @@ test('Ohne Zuweisung erhält die handelnde Person (Kiosk)', () => {
   assert.equal(getBalance(db, child1), before + 15);
 });
 
+test('Die benannte erledigende Person bekommt die Punkte, nicht die zustaendige (#1205)', () => {
+  // child1 nimmt teil (oben eingeschrieben), child2 nicht.
+  db.prepare('INSERT OR IGNORE INTO reward_participants (user_id, enabled) VALUES (?, 1)').run(child2);
+  const before1 = getBalance(db, child1);
+  const before2 = getBalance(db, child2);
+
+  const taskId = makeTask(20, [child1]);           // zugewiesen an child1 ...
+  awardForCompletion(db, taskId, admin, child2);   // ... erledigt hat es child2
+
+  assert.equal(getBalance(db, child2), before2 + 20, 'wer es getan hat, bekommt sie');
+  assert.equal(getBalance(db, child1), before1, 'die Zuweisung allein bucht nichts mehr');
+});
+
+test('Eine benannte Person, die nicht teilnimmt, bucht nichts - auch nicht auf die Zustaendigen (#1205)', () => {
+  // Der Rueckfall auf die Zuweisung waere hier die falscheste der drei
+  // moeglichen Antworten: die Punkte gingen an jemanden, von dem gerade
+  // festgehalten wurde, dass er es NICHT getan hat.
+  db.prepare('DELETE FROM reward_participants WHERE user_id = ?').run(child2);
+  const before1 = getBalance(db, child1);
+  const before2 = getBalance(db, child2);
+
+  const taskId = makeTask(25, [child1]);
+  awardForCompletion(db, taskId, admin, child2);
+
+  assert.equal(getBalance(db, child1), before1);
+  assert.equal(getBalance(db, child2), before2);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM reward_ledger WHERE task_id = ? AND type='earn'").get(taskId).n, 0);
+});
+
+test('Das Zuruecknehmen holt auch die an die erledigende Person gebuchten Punkte zurueck (#1205)', () => {
+  // reverseTaskEarnings filtert bewusst NICHT nach Person - seit die Punkte an
+  // eine benannte Person gehen koennen, waere jeder Personenfilter genau die
+  // Buchung, die stehen bliebe.
+  db.prepare('INSERT OR IGNORE INTO reward_participants (user_id, enabled) VALUES (?, 1)').run(child2);
+  const before = getBalance(db, child2);
+  const taskId = makeTask(35, [child1]);
+
+  syncTaskRewards(db, taskId, 'open', 'done', admin, child2);
+  assert.equal(getBalance(db, child2), before + 35);
+
+  syncTaskRewards(db, taskId, 'done', 'open', admin);
+  assert.equal(getBalance(db, child2), before, 'Storno kennt die Person nicht und braucht sie nicht');
+  db.prepare('DELETE FROM reward_participants WHERE user_id = ?').run(child2);
+});
+
+test('Ohne Benennung gilt die Zuweisungsregel unveraendert (#1205)', () => {
+  const before = getBalance(db, child1);
+  const taskId = makeTask(10, [child1]);
+  awardForCompletion(db, taskId, admin, null);
+  assert.equal(getBalance(db, child1), before + 10);
+});
+
 test('Aufgabe ohne Punkte bucht nichts', () => {
   const taskId = makeTask(0, [child1]);
   awardForCompletion(db, taskId, admin);

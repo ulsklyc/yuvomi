@@ -386,7 +386,7 @@
         "historyUnknownMember": "Δεν ανήκει πλέον στο νοικοκυριό",
         "historyEmptyTitle": "Δεν έχει καταγραφεί τίποτα ακόμη",
         "historyEmptyPersonTitle": "Καμία καταγραφή για αυτό το άτομο",
-        "historyEmptyDescription": "Εδώ βλέπετε ποιος ολοκλήρωσε ποια εργασία και πότε.",
+        "historyEmptyDescription": "Εδώ βλέπεις ποιος έκανε ποια εργασία και πότε.",
         "historyEmptyHint": "Η καταγραφή ξεκινά τώρα - ό,τι ολοκληρώθηκε πριν δεν το κατέγραψε κανείς.",
         "historyLoadError": "Δεν ήταν δυνατή η φόρτωση του ιστορικού",
         "historyLoadMore": "Εμφάνιση περισσότερων",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "Παραλείφθηκε {{count}} κλειδωμένη εργασία.",
         "listLoadError": "Δεν ήταν δυνατή η φόρτωση των εργασιών.",
         "checklistToggle": "Σημείωση στοιχείου",
-        "checkConflict": "Η εργασία άλλαξε στο μεταξύ. Ανοίξτε την ξανά."
+        "checkConflict": "Η εργασία άλλαξε στο μεταξύ. Ανοίξτε την ξανά.",
+        "doneByPick": "Ποιος έκανε το «{{title}}»;",
+        "doneByToast": "Το έκανε ο/η {{name}}.",
+        "historyTickedBy": "τσεκαρίστηκε από {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} γεύματα",

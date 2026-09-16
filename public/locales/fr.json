@@ -386,7 +386,7 @@
         "historyUnknownMember": "Ne fait plus partie du foyer",
         "historyEmptyTitle": "Rien d’enregistré pour l’instant",
         "historyEmptyPersonTitle": "Rien d’enregistré pour cette personne",
-        "historyEmptyDescription": "Vous verrez ici qui a coché quelle tâche, et quand.",
+        "historyEmptyDescription": "Ici, vous voyez qui a fait quelle tâche, et quand.",
         "historyEmptyHint": "L’enregistrement commence maintenant : ce qui a été fait avant n’a été noté nulle part.",
         "historyLoadError": "Impossible de charger l’historique",
         "historyLoadMore": "Afficher plus",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "{{count}} tâche verrouillée ignorée.",
         "listLoadError": "Impossible de charger les tâches.",
         "checklistToggle": "Cocher l’élément",
-        "checkConflict": "La tâche a été modifiée entre-temps. Veuillez la rouvrir."
+        "checkConflict": "La tâche a été modifiée entre-temps. Veuillez la rouvrir.",
+        "doneByPick": "Qui a fait « {{title}} » ?",
+        "doneByToast": "Fait par {{name}}.",
+        "historyTickedBy": "coché par {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} repas",

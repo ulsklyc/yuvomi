@@ -688,6 +688,34 @@
   position: relative;
 }
 
+/* Die Personenauswahl beim Abhaken (#1205) steht NEBEN dem Haken, nicht darin.
+ *
+ * SIE DARF DIE ZEILE NICHT HOEHER MACHEN. Der Haken traegt seine Trefflaeche
+ * ueber ein ::before und haengt sich per negativem `margin-top` in die Zeile,
+ * damit --target-base die Zeilenhoehe nicht mitbestimmt (siehe die Regel
+ * darueber). Dieser Knopf macht es genauso - ohne den Ausgleich waere eine
+ * Aufgabenzeile mit Auswahl hoeher als eine ohne, und im Solo-Haushalt, wo er
+ * gar nicht rendert, saehe dieselbe Liste anders aus.
+ *
+ * ZURUECKGENOMMEN IM TON, VOLL IN DER FLAECHE. Optisch ist er die zweite
+ * Antwort auf eine Frage, die meistens keine braucht, also traegt er die
+ * tertiaere Textfarbe; angefasst wird er mit demselben Finger wie alles andere,
+ * also behaelt er --target-base als Trefflaeche. Das ist die Aufteilung aus
+ * tokens.css (Zielgroesse in mindestens einer Achse, Optik davon unabhaengig). */
+.task-doer-btn {
+  width: var(--target-base);
+  height: var(--target-base);
+  margin-top: calc((var(--target-base) - var(--space-5)) / -2);
+  margin-inline-start: calc(var(--space-2) * -1);
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.task-doer-btn:hover,
+.task-doer-btn[aria-expanded='true'] {
+  color: var(--color-text-secondary);
+}
+
 .task-status-btn::before {
   content: '';
   position: absolute;
@@ -1874,6 +1902,24 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
+}
+
+/* Wer abgehakt hat, wenn es jemand anderes war als die erledigende Person
+ * (#1205). Eine Nebenauskunft, also leiser als der Name davor - aber Text und
+ * nicht nur Farbe, denn die Unterscheidung steht in den Woertern ("abgehakt
+ * von"), nicht im Ton. */
+.history-row__by {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+}
+
+/* Der Trenner gehoert ins Stylesheet, nicht in 24 Uebersetzungen: „Lea abgehakt
+ * von Mama" liest sich ohne ihn wie ein abgebrochener Satz, und ein Mittelpunkt
+ * am Anfang des Textes waere ein Satzzeichen, das jede Sprache mitschleppen
+ * muesste, obwohl es reine Typografie ist. */
+.history-row__by::before {
+  content: '·';
+  margin-inline-end: var(--space-1);
 }
 
 /* Tabellarisch, damit die Uhrzeiten untereinander fluchten: die Ziffern einer

@@ -54,7 +54,7 @@ function stampCompletion(taskId, iso) {
 test('Schema: task_completions existiert mit dem erwarteten Vertrag', () => {
   const cols = db.prepare('PRAGMA table_info(task_completions)').all();
   const byName = Object.fromEntries(cols.map((c) => [c.name, c]));
-  for (const name of ['id', 'task_id', 'series_id', 'user_id', 'completed_at']) {
+  for (const name of ['id', 'task_id', 'series_id', 'user_id', 'completed_at', 'done_by_user_id']) {
     assert.ok(byName[name], `Spalte ${name} fehlt`);
   }
   assert.equal(byName.task_id.notnull, 1);
@@ -63,6 +63,20 @@ test('Schema: task_completions existiert mit dem erwarteten Vertrag', () => {
   // user_id darf leer werden: das Ausscheiden eines Mitglieds loescht nicht den
   // Verlauf des Haushalts.
   assert.equal(byName.user_id.notnull, 0);
+  // done_by_user_id ebenso - und OHNE Default (#1205): "nicht benannt" ist ein
+  // eigener Zustand, kein stillschweigendes "war die abhakende Person".
+  assert.equal(byName.done_by_user_id.notnull, 0);
+  assert.equal(byName.done_by_user_id.dflt_value, null);
+});
+
+test('Schema: Bestandseintraege bekommen keinen Backfill auf die abhakende Person', () => {
+  // Die Migration darf `user_id` NICHT nach `done_by_user_id` kopieren. Taete
+  // sie es, behauptete jeder alte Eintrag rueckwirkend, die abhakende Person
+  // habe die Aufgabe auch erledigt - eine Aussage, fuer die nie jemand gefragt
+  // wurde. Geprueft an einem Eintrag, der ohne Benennung entsteht.
+  const id = makeTask({ title: 'Ohne Benennung' });
+  recordCompletion(db, id, mom);
+  assert.equal(db.prepare('SELECT done_by_user_id FROM task_completions WHERE task_id = ?').get(id).done_by_user_id, null);
 });
 
 test('Schema: eine Aufgabe kann nur einen Eintrag tragen', () => {
@@ -533,4 +547,99 @@ test('Ablegen ist kein Abhaken und schreibt nichts', async () => {
   });
   assert.equal(res.status, 200);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM task_completions').get().n, 0);
+});
+
+// --------------------------------------------------------
+// Wer hat es getan, nicht nur wer hat abgehakt (#1205)
+// --------------------------------------------------------
+test('Die benannte erledigende Person wird neben der abhakenden festgehalten', () => {
+  const id = makeTask({ title: 'Spuelmaschine ausraeumen' });
+  syncTaskCompletion(db, id, 'open', 'done', mom, kid);
+  const row = db.prepare('SELECT * FROM task_completions WHERE task_id = ?').get(id);
+  assert.equal(row.user_id, mom, 'wer abgehakt hat, behaelt seine Bedeutung');
+  assert.equal(row.done_by_user_id, kid, 'wer es getan hat, steht daneben');
+});
+
+test('Ohne Benennung bleibt alles wie vorher', () => {
+  const id = makeTask({ title: 'Unbenannt' });
+  syncTaskCompletion(db, id, 'open', 'done', mom);
+  const row = db.prepare('SELECT * FROM task_completions WHERE task_id = ?').get(id);
+  assert.equal(row.user_id, mom);
+  assert.equal(row.done_by_user_id, null);
+});
+
+test('Die Benennung ist so idempotent wie der Eintrag selbst', () => {
+  // INSERT OR IGNORE laesst die vorhandene Zeile ganz in Ruhe - auch die
+  // benannte Person. Sonst koennte ein zweiter, unbenannter Statuswechsel die
+  // Angabe still loeschen.
+  const id = makeTask({ title: 'Zweimal abgehakt' });
+  recordCompletion(db, id, mom, kid);
+  recordCompletion(db, id, other, null);
+  const rows = db.prepare('SELECT * FROM task_completions WHERE task_id = ?').all(id);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].done_by_user_id, kid);
+});
+
+test('Zuruecknehmen loescht den Eintrag samt Benennung', () => {
+  const id = makeTask({ title: 'Doch nicht erledigt' });
+  syncTaskCompletion(db, id, 'open', 'done', mom, kid);
+  syncTaskCompletion(db, id, 'done', 'open', mom);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM task_completions WHERE task_id = ?').get(id).n, 0);
+});
+
+test('Der Verlauf zeigt die erledigende Person, und faellt ohne sie auf die abhakende zurueck', () => {
+  const named   = makeTask({ title: 'Benannt' });
+  const plain   = makeTask({ title: 'Unbenannt zwei' });
+  syncTaskCompletion(db, named, 'open', 'done', mom, kid);
+  syncTaskCompletion(db, plain, 'open', 'done', other);
+
+  const { entries } = completionFeed(db, { me: mom, limit: 200 });
+  const a = entries.find((e) => e.task_id === named);
+  const b = entries.find((e) => e.task_id === plain);
+
+  assert.equal(a.person_user_id, kid);
+  assert.equal(a.person_name, 'Lea');
+  assert.equal(a.user_id, mom, 'wer abgehakt hat, bleibt lesbar');
+  assert.equal(a.user_name, 'Mama');
+
+  assert.equal(b.person_user_id, other, 'ohne Benennung ist die abhakende Person die Antwort');
+  assert.equal(b.person_name, 'Tim');
+  assert.equal(b.done_by_user_id, null);
+});
+
+test('Der Personenfilter folgt der angezeigten Person, nicht der abhakenden', () => {
+  // Sonst zeigte der Verlauf nach dem Tippen auf Leas Chip Eintraege, die
+  // Mamas Namen tragen - und Leas eigene Erledigung fehlte darin.
+  const id = makeTask({ title: 'Fuer Lea abgehakt' });
+  syncTaskCompletion(db, id, 'open', 'done', mom, kid);
+
+  const forKid = completionFeed(db, { me: mom, limit: 200, userId: kid }).entries.map((e) => e.task_id);
+  assert.ok(forKid.includes(id), 'die benannte Person findet ihre Erledigung');
+
+  const forMom = completionFeed(db, { me: mom, limit: 200, userId: mom }).entries.map((e) => e.task_id);
+  assert.ok(!forMom.includes(id), 'die abhakende Person bekommt sie nicht zugeschrieben');
+});
+
+test('Die Serienansicht nennt dieselbe Person wie der Verlauf', () => {
+  const first = makeTask({ title: 'Serie mit Benennung', recurring: 1 });
+  syncTaskCompletion(db, first, 'open', 'done', mom, kid);
+  const rows = seriesHistory(db, { me: mom, taskId: first });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].person_user_id, kid);
+  assert.equal(rows[0].person_name, 'Lea');
+});
+
+test('Eine ausgeschiedene erledigende Person loescht den Vorgang nicht', () => {
+  // ON DELETE SET NULL wie bei user_id: der Verweis faellt, der Eintrag bleibt,
+  // und die Anzeige faellt auf die abhakende Person zurueck.
+  const gone = db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('weg', 'Weg', 'x', 'member')").run().lastInsertRowid;
+  const id = makeTask({ title: 'Von jemandem, der geht' });
+  syncTaskCompletion(db, id, 'open', 'done', mom, gone);
+  db.prepare('DELETE FROM users WHERE id = ?').run(gone);
+
+  const row = db.prepare('SELECT * FROM task_completions WHERE task_id = ?').get(id);
+  assert.ok(row, 'der Vorgang hat stattgefunden');
+  assert.equal(row.done_by_user_id, null);
+  const entry = completionFeed(db, { me: mom, limit: 200 }).entries.find((e) => e.task_id === id);
+  assert.equal(entry.person_user_id, mom);
 });

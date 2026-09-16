@@ -404,7 +404,7 @@
         "historyUnknownMember": "No longer in the household",
         "historyEmptyTitle": "Nothing recorded yet",
         "historyEmptyPersonTitle": "Nothing recorded for this person",
-        "historyEmptyDescription": "This is where you see who ticked off which task, and when.",
+        "historyEmptyDescription": "This is where you see who did which task, and when.",
         "historyEmptyHint": "Recording starts now - nothing wrote down what was completed before.",
         "historyLoadError": "History could not be loaded",
         "historyLoadMore": "Show more",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "{{count}} locked task skipped.",
         "listLoadError": "Tasks could not be loaded.",
         "checklistToggle": "Tick item",
-        "checkConflict": "The task has changed in the meantime. Please open it again."
+        "checkConflict": "The task has changed in the meantime. Please open it again.",
+        "doneByPick": "Who did “{{title}}”?",
+        "doneByToast": "Done by {{name}}.",
+        "historyTickedBy": "ticked off by {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} meals",

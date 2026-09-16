@@ -286,7 +286,31 @@ last done, or who did it. This table records the transition.
 | task_id | INTEGER | FK → Tasks (CASCADE delete), NOT NULL, UNIQUE |
 | series_id | INTEGER | NOT NULL — root of the repetition chain, or the task itself. No FK: the root may be deleted without taking later entries with it |
 | user_id | INTEGER | FK → Users (SET NULL) — **who ticked it off** |
+| done_by_user_id | INTEGER | FK → Users (SET NULL), nullable — **who did it**, when somebody was named (migration v214, #1205) |
 | completed_at | TEXT | ISO 8601 UTC, default now |
+
+**Two people, because there are two questions (migration v214, #1205).** `user_id` keeps its meaning
+exactly: whoever ticked the task off. It cannot answer who did the work - on a shared wall tablet
+those are routinely different people, and a child who emptied the dishwasher used to need a parent
+to assign the task first before the points could reach them. `done_by_user_id` answers the second
+question and is **null in the normal case**, which means "nobody was asked", not "nobody did it".
+Existing rows are deliberately **not** backfilled from `user_id`: that would put a claim into the
+record that was never made. Both read paths resolve the pair once, in SQL, into `person_user_id`
+(`COALESCE(done_by_user_id, user_id)`) - the fallback lives in one place rather than in every
+renderer, and the person filter uses the same expression, so the history cannot show one name and
+filter by another. The named person must be a household member (DECISIONS entry 4); a guest or
+housekeeping worker is refused with 400, the same boundary that assignment draws.
+
+The naming is as idempotent as the entry itself: `INSERT OR IGNORE` leaves an existing row alone, so
+a second status change neither moves the timestamp nor rewrites the person. Correcting it means
+reopening the task and ticking it off again - the same path the points take.
+
+**Where the points go.** A named member who takes part in rewards receives them instead of the
+assignees (`rewardTargets`). A named member who does not take part means **no points at all**, with
+no fallback to the assignees: crediting somebody the record just said did not do the work would be
+the worst of the three possible answers. Reversing a completion still deletes every `earn` row for
+the task regardless of who received it - a person filter there would leave standing exactly the
+booking that the undo exists to remove.
 
 **Why a table and not two columns.** A completed recurring task spawns a follow-up instance
 (`recurrence_origin_id`), so the history of one series is spread across a chain of rows whose links

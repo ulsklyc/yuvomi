@@ -1510,15 +1510,39 @@ function spawnRecurrenceFollowup(task) {
 // --------------------------------------------------------
 // PATCH /api/v1/tasks/:id/status
 // Status einer Aufgabe schnell wechseln (z.B. Swipe-Geste / Checkbox).
-// Body: { status: 'open' | 'in_progress' | 'done' | 'archived' }
+// Body: { status: 'open' | 'in_progress' | 'done' | 'archived',
+//         done_by_user_id?: number|null }
 // Response: { data: { id, status, archived_at } }
 // 'archived' legt die Aufgabe ab, ohne ihren Status anzufassen (#688).
+//
+// `done_by_user_id` benennt, WER die Aufgabe erledigt hat (#1205) - wer
+// abgehakt hat, steht ohnehin fest und kommt weiter aus der Sitzung. Ohne
+// Angabe aendert sich nichts: der Verlauf zeigt die abhakende Person und die
+// Punkte folgen der Zuweisungsregel. Die Angabe wirkt nur beim UEBERGANG NACH
+// 'done'; bei jedem anderen Statuswechsel gibt es keine Erledigung, an der sie
+// haengen koennte, und sie wird still verworfen statt abgewiesen - eine
+// Sammelaktion, die alles auf 'open' setzt, soll nicht an einem mitgeschickten
+// Feld scheitern.
 // --------------------------------------------------------
 router.patch('/:id/status', (req, res) => {
   try {
     const { status } = req.body;
     if (!VALID_STATUSES.includes(status))
       return res.status(400).json({ error: `Invalid status. Allowed: ${VALID_STATUSES.join(', ')}`, code: 400 });
+
+    // Benannt werden koennen nur Haushaltsmitglieder (#1207, DECISIONS 4) -
+    // dieselbe Pruefung, die auch das Zuweisen macht, und derselbe Fehlertext.
+    // Ein Gast oder eine Haushaltshilfe ist keine Person, der der Verlauf eine
+    // Erledigung zuschreiben darf, und der Punktestand erst recht nicht.
+    const doneByRaw = req.body.done_by_user_id;
+    const doneByUserId = doneByRaw == null || doneByRaw === '' ? null : Number(doneByRaw);
+    if (doneByUserId != null && !Number.isInteger(doneByUserId))
+      return res.status(400).json({ error: 'Invalid done_by_user_id.', code: 400 });
+    if (doneByUserId != null) {
+      const strangers = newNonMembers([doneByUserId]);
+      if (strangers.length)
+        return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
+    }
 
     // Ganze Zeile, nicht nur der Status: die Rückrichtung (#617) braucht die
     // externen Kennungen, um den Statuswechsel dem CalDAV-Objekt zuzuordnen.
@@ -1552,10 +1576,10 @@ router.patch('/:id/status', (req, res) => {
 
       syncHousekeepingPaymentStatus(db.get(), req.params.id, status);
       // Punkte-Gutschrift/Storno an den Aufgaben-Statuswechsel koppeln.
-      syncTaskRewards(db.get(), Number(req.params.id), prev.status, status, req.authUserId || req.session.userId);
+      syncTaskRewards(db.get(), Number(req.params.id), prev.status, status, req.authUserId || req.session.userId, doneByUserId);
       // Der Verlauf hängt am selben Übergang (#791). Dieser Weg trägt ihn
       // dreifach: Checkbox, Swipe und die Sammelaktion gehen alle hier durch.
-      syncTaskCompletion(db.get(), Number(req.params.id), prev.status, status, req.authUserId || req.session.userId);
+      syncTaskCompletion(db.get(), Number(req.params.id), prev.status, status, req.authUserId || req.session.userId, doneByUserId);
 
       // Zurückgenommenes Abhaken macht auch die Folgeinstanz rückgängig (#650).
       // Sonst stünde die beim Erledigen erzeugte nächste Instanz neben der wieder

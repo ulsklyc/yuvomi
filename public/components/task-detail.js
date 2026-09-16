@@ -1032,7 +1032,10 @@ function seriesHistoryNode(task) {
       when.textContent = `${historyDayLabel(zonedDateKey(entry.completed_at))}, ${formatTime(entry.completed_at)}`;
       const who = document.createElement('span');
       who.className = 'detail-history__who';
-      who.textContent = entry.user_name || t('tasks.historyUnknownMember');
+      // Dieselbe Person wie im Haushaltsverlauf: wer es getan hat, und ohne
+      // Benennung wer abgehakt hat (#1205). Stuende hier weiter `user_name`,
+      // nennten zwei Ansichten desselben Vorgangs zwei verschiedene Namen.
+      who.textContent = entry.person_name || t('tasks.historyUnknownMember');
       row.append(when, who);
       list.appendChild(row);
     }

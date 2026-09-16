@@ -404,7 +404,7 @@
         "historyUnknownMember": "Niet meer in het huishouden",
         "historyEmptyTitle": "Nog niets vastgelegd",
         "historyEmptyPersonTitle": "Niets vastgelegd voor deze persoon",
-        "historyEmptyDescription": "Hier zie je wie welke taak heeft afgevinkt, en wanneer.",
+        "historyEmptyDescription": "Hier zie je wie welke taak heeft gedaan, en wanneer.",
         "historyEmptyHint": "Vastleggen begint nu - wat eerder klaar was, is nergens genoteerd.",
         "historyLoadError": "Geschiedenis kon niet worden geladen",
         "historyLoadMore": "Meer tonen",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "{{count}} vergrendelde taak overgeslagen.",
         "listLoadError": "Taken konden niet worden geladen.",
         "checklistToggle": "Item afvinken",
-        "checkConflict": "De taak is intussen gewijzigd. Open deze opnieuw."
+        "checkConflict": "De taak is intussen gewijzigd. Open deze opnieuw.",
+        "doneByPick": "Wie heeft “{{title}}” gedaan?",
+        "doneByToast": "Gedaan door {{name}}.",
+        "historyTickedBy": "afgevinkt door {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} maaltijden",

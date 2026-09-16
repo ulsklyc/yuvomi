@@ -386,7 +386,7 @@
         "historyUnknownMember": "Більше не в родині",
         "historyEmptyTitle": "Поки нічого не записано",
         "historyEmptyPersonTitle": "Для цього учасника нічого не записано",
-        "historyEmptyDescription": "Тут видно, хто й коли позначив завдання виконаним.",
+        "historyEmptyDescription": "Тут видно, хто і коли виконав яке завдання.",
         "historyEmptyHint": "Запис починається зараз - те, що зробили раніше, ніде не збереглося.",
         "historyLoadError": "Не вдалося завантажити історію",
         "historyLoadMore": "Показати ще",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "Пропущено {{count}} заблоковане завдання.",
         "listLoadError": "Не вдалося завантажити завдання.",
         "checklistToggle": "Позначити пункт",
-        "checkConflict": "Завдання тим часом змінено. Відкрийте його ще раз."
+        "checkConflict": "Завдання тим часом змінено. Відкрийте його ще раз.",
+        "doneByPick": "Хто виконав «{{title}}»?",
+        "doneByToast": "Виконав(ла) {{name}}.",
+        "historyTickedBy": "позначив(ла) {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} прийоми їжі",

@@ -386,7 +386,7 @@
         "historyUnknownMember": "Artık evde değil",
         "historyEmptyTitle": "Henüz bir kayıt yok",
         "historyEmptyPersonTitle": "Bu kişi için kayıt yok",
-        "historyEmptyDescription": "Burada hangi görevi kimin ne zaman tamamladığını görürsünüz.",
+        "historyEmptyDescription": "Hangi görevi kimin ne zaman yaptığını burada görürsün.",
         "historyEmptyHint": "Kayıt şimdi başlıyor - daha önce tamamlananlar hiçbir yere yazılmadı.",
         "historyLoadError": "Geçmiş yüklenemedi",
         "historyLoadMore": "Daha fazla göster",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "{{count}} kilitli görev atlandı.",
         "listLoadError": "Görevler yüklenemedi.",
         "checklistToggle": "Öğeyi işaretle",
-        "checkConflict": "Görev bu arada değişti. Lütfen yeniden açın."
+        "checkConflict": "Görev bu arada değişti. Lütfen yeniden açın.",
+        "doneByPick": "“{{title}}” görevini kim yaptı?",
+        "doneByToast": "{{name}} yaptı.",
+        "historyTickedBy": "işaretleyen: {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} öğünden",

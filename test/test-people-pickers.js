@@ -97,6 +97,44 @@ test('tasks: a solo household keeps hiding the assignee picker when only one per
   assert.equal(assigneeGroup(tasks.renderModalContent({ task: null, users: [ANNA] })).hidden, true);
 });
 
+// Die Auswahl "wer hat es getan" beim Abhaken (#1205). Sie hat keinen eigenen
+// Dialog: sie ist ein zweites Ziel in der Zeile, und die ganze Entscheidung
+// liegt darin, WANN es ueberhaupt dasteht.
+const BEA = { id: 2, display_name: 'Bea', avatar_color: '#222222', username: 'bea' };
+const OPEN_TASK = { id: 7, title: 'Spuelmaschine', status: 'open' };
+
+test('tasks: the doer picker offers every member and carries the task in its panel id', () => {
+  setHouseholdSize(2);
+  tasks.state.users = [ANNA, BEA];
+  const html = tasks.renderDoerPicker(OPEN_TASK, false, false);
+  assert.match(html, /id="task-doer-7"/, 'das Panel traegt die Aufgabe, nicht der Eintrag');
+  assert.deepEqual([...html.matchAll(/data-action="pick-doer" data-id="(\d+)"/g)].map((m) => Number(m[1])),
+    [ANNA.id, BEA.id]);
+});
+
+test('tasks: a solo household never sees the doer picker', () => {
+  setHouseholdSize(1);
+  tasks.state.users = [ANNA];
+  assert.equal(tasks.renderDoerPicker(OPEN_TASK, false, false), '');
+});
+
+test('tasks: a household of two with only one known member still sees no doer picker', () => {
+  // Die Haushaltsgroesse sagt "zwei", die geladene Mitgliederliste kennt eine
+  // Person - ein Menue mit genau einem Eintrag beantwortet keine Frage.
+  setHouseholdSize(2);
+  tasks.state.users = [ANNA];
+  assert.equal(tasks.renderDoerPicker(OPEN_TASK, false, false), '');
+});
+
+test('tasks: a task that is already done or filed away offers no doer picker', () => {
+  // Benannt wird am UEBERGANG nach erledigt, und der ist hier vorbei. Ein
+  // Menue, das nichts mehr aendern kann, waere ein Versprechen ohne Deckung.
+  setHouseholdSize(2);
+  tasks.state.users = [ANNA, BEA];
+  assert.equal(tasks.renderDoerPicker(OPEN_TASK, true, false), '');
+  assert.equal(tasks.renderDoerPicker(OPEN_TASK, false, true), '');
+});
+
 // --------------------------------------------------------------------------
 // Dienstplan
 // --------------------------------------------------------------------------

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Ticking a task off can now name who did it, not just who tapped the checkbox.** A small person
+  button sits next to the checkbox and opens the list of household members; picking one marks the
+  task done and records that person as having done it. The checkbox itself is untouched - one tap,
+  exactly as before - and the button only appears where it answers something, so a household of one
+  never sees it and a task that is already done or filed away does not offer it. The completion now
+  keeps both people: who ticked it off, as always, and who did it. The history shows the person who
+  did the work, notes "ticked off by ..." beside it when the two differ, and its person filter
+  follows the displayed name, so filtering and display can no longer disagree. Points follow the
+  same answer: a named member who takes part in rewards receives them instead of the assignees, and
+  a named member who does not take part means no points at all rather than crediting somebody the
+  record just said did not do the work. Undoing a completion still withdraws exactly what it booked,
+  whoever received it. Nothing changes without the new button: leave it alone and the history shows
+  you, the assignees rule applies, and existing entries are left exactly as they were - they are not
+  backfilled with a claim nobody ever made. `PATCH /api/v1/tasks/{id}/status` takes an optional
+  `done_by_user_id` for this; it has to be a household member, and it only applies to the transition
+  into done. (#1205)
+
 ## [2.67.0] - 2026-09-16
 
 ### Added

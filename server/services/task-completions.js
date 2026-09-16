@@ -62,11 +62,23 @@ export function seriesRootOf(d, taskId) {
  * derselbe Statuswechsel zweimal ein, bleibt es bei einem Eintrag mit dem
  * ersten Zeitpunkt.
  *
+ * ZWEI PERSONEN, WEIL ES ZWEI FRAGEN SIND (#1205). `user_id` ist weiter, wer
+ * abgehakt hat; `done_by_user_id` ist, wer es getan hat, und ist NULL, wenn
+ * niemand danach gefragt wurde. Der Normalfall bleibt damit unberührt: ohne
+ * Angabe verhält sich der Eintrag exakt wie vorher.
+ *
+ * DIE IDEMPOTENZ GILT FÜR BEIDE SPALTEN. `INSERT OR IGNORE` lässt eine schon
+ * vorhandene Zeile in Ruhe, also überschreibt ein zweiter Statuswechsel die
+ * benannte Person nicht - genauso wenig, wie er den Zeitpunkt verschiebt. Wer
+ * die Angabe korrigieren will, nimmt das Abhaken zurück und hakt neu ab; das
+ * ist derselbe Weg, den auch die Punkte gehen (reverseTaskEarnings).
+ *
  * @param {object}      d             better-sqlite3-Connection
  * @param {number}      taskId
  * @param {number|null} actingUserId  wer abgehakt hat
+ * @param {number|null} [doneByUserId] wer es getan hat, falls benannt
  */
-export function recordCompletion(d, taskId, actingUserId) {
+export function recordCompletion(d, taskId, actingUserId, doneByUserId = null) {
   const task = d.prepare('SELECT id, parent_task_id, recurrence_origin_id FROM tasks WHERE id = ?').get(taskId);
   if (!task || task.parent_task_id) return;
 
@@ -82,9 +94,14 @@ export function recordCompletion(d, taskId, actingUserId) {
     : null;
 
   d.prepare(`
-    INSERT OR IGNORE INTO task_completions (task_id, series_id, user_id)
-    VALUES (?, ?, ?)
-  `).run(taskId, inherited?.series_id ?? seriesRootOf(d, taskId), actingUserId || null);
+    INSERT OR IGNORE INTO task_completions (task_id, series_id, user_id, done_by_user_id)
+    VALUES (?, ?, ?, ?)
+  `).run(
+    taskId,
+    inherited?.series_id ?? seriesRootOf(d, taskId),
+    actingUserId || null,
+    doneByUserId || null,
+  );
 }
 
 /**
@@ -119,10 +136,10 @@ export function revokeCompletion(d, taskId) {
  * einen Sync die falsche Auskunft. Das ist eine eigene Entscheidung, keine
  * Nebenwirkung dieser hier.
  */
-export function syncTaskCompletion(d, taskId, oldStatus, newStatus, actingUserId) {
+export function syncTaskCompletion(d, taskId, oldStatus, newStatus, actingUserId, doneByUserId = null) {
   const wasDone = oldStatus === 'done';
   const isDone = newStatus === 'done';
-  if (isDone && !wasDone) recordCompletion(d, taskId, actingUserId);
+  if (isDone && !wasDone) recordCompletion(d, taskId, actingUserId, doneByUserId);
   else if (wasDone && !isDone) revokeCompletion(d, taskId);
 }
 
@@ -137,17 +154,32 @@ export function syncTaskCompletion(d, taskId, oldStatus, newStatus, actingUserId
  */
 const VISIBLE_SQL = visibilityWhere('t', 'task_assignments', 'task_id', '@me');
 
-/** Spalten, die beide Lesepfade teilen. */
+/**
+ * Spalten, die beide Lesepfade teilen.
+ *
+ * `person_user_id` IST DIE EINE AUTORITÄT DAFÜR, WEN DER VERLAUF ZEIGT (#1205).
+ * Sie ist die benannte erledigende Person, und ohne Angabe die abhakende - die
+ * Rückfallregel steht damit genau einmal, im SQL, statt in jedem Renderer
+ * einzeln. `user_id` daneben behält seine alte Bedeutung unverändert: wer
+ * abgehakt hat. Beide Spalten gehen mit, weil die Oberfläche beides
+ * unterscheiden können muss ("A hat für B abgehakt").
+ */
 const SELECT_SQL = `
   SELECT c.id, c.task_id, c.series_id, c.completed_at,
          c.user_id,
          u.display_name  AS user_name,
          u.avatar_color  AS user_color,
          u.avatar_data   AS user_avatar,
+         c.done_by_user_id,
+         COALESCE(c.done_by_user_id, c.user_id) AS person_user_id,
+         p.display_name  AS person_name,
+         p.avatar_color  AS person_color,
+         p.avatar_data   AS person_avatar,
          t.title, t.category, t.points, t.is_recurring, t.visibility
     FROM task_completions c
     JOIN tasks t ON t.id = c.task_id
     LEFT JOIN users u ON u.id = c.user_id
+    LEFT JOIN users p ON p.id = COALESCE(c.done_by_user_id, c.user_id)
 `;
 
 /**
@@ -176,7 +208,16 @@ export function completionFeed(d, { me, limit = 50, userId = null, beforeAt = nu
   const where = [VISIBLE_SQL];
   const params = { me, size };
 
-  if (userId != null) { where.push('c.user_id = @user_id'); params.user_id = userId; }
+  // DER FILTER FOLGT DER ANZEIGE, NICHT DER SPALTE. Gefiltert wird über
+  // dieselbe Rückfallregel, die auch `person_user_id` bildet: wer auf den Chip
+  // einer Person tippt, erwartet die Einträge, die ihren Namen tragen. Würde
+  // hier weiter `c.user_id` stehen, zeigte der Verlauf nach dem Filtern Namen,
+  // die nicht der gefilterten Person gehören - dieselbe Art Widerspruch wie
+  // zwischen einem Diagramm und der Liste darunter.
+  if (userId != null) {
+    where.push('COALESCE(c.done_by_user_id, c.user_id) = @user_id');
+    params.user_id = userId;
+  }
   if (beforeAt) {
     where.push('(c.completed_at < @before_at OR (c.completed_at = @before_at AND c.id < @before_id))');
     params.before_at = beforeAt;

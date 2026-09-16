@@ -404,7 +404,7 @@
         "historyUnknownMember": "Már nem tagja a háztartásnak",
         "historyEmptyTitle": "Még nincs rögzítve semmi",
         "historyEmptyPersonTitle": "Ehhez a személyhez nincs rögzítve semmi",
-        "historyEmptyDescription": "Itt látod, ki mikor melyik feladatot pipálta ki.",
+        "historyEmptyDescription": "Itt látod, ki melyik feladatot végezte el, és mikor.",
         "historyEmptyHint": "A rögzítés mostantól indul - a korábban elvégzetteket senki nem jegyezte fel.",
         "historyLoadError": "Az előzményeket nem sikerült betölteni",
         "historyLoadMore": "Több megjelenítése",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "{{count}} zárolt feladat kihagyva.",
         "listLoadError": "A feladatok betöltése sikertelen.",
         "checklistToggle": "Elem kipipálása",
-        "checkConflict": "A feladat időközben megváltozott. Nyissa meg újra."
+        "checkConflict": "A feladat időközben megváltozott. Nyissa meg újra.",
+        "doneByPick": "Ki végezte el ezt: „{{title}}”?",
+        "doneByToast": "Elvégezte: {{name}}.",
+        "historyTickedBy": "kipipálta: {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} étkezésből",

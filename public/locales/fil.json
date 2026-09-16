@@ -399,7 +399,7 @@
         "historyUnknownMember": "Wala na sa sambahayan",
         "historyEmptyTitle": "Wala pang naitala",
         "historyEmptyPersonTitle": "Walang naitala para sa taong ito",
-        "historyEmptyDescription": "Dito makikita kung sino ang tumapos ng aling gawain, at kailan.",
+        "historyEmptyDescription": "Dito mo makikita kung sino ang gumawa ng bawat gawain, at kailan.",
         "historyEmptyHint": "Nagsisimula ang pagtatala ngayon - walang nagtala ng natapos noon.",
         "historyLoadError": "Hindi ma-load ang kasaysayan",
         "historyLoadMore": "Magpakita pa",
@@ -510,7 +510,10 @@
         "tagsSkippedLocked_one": "{{count}} naka-lock na gawain ang nilaktawan.",
         "listLoadError": "Hindi ma-load ang mga gawain.",
         "checklistToggle": "Markahan ang item",
-        "checkConflict": "Nabago ang gawain samantala. Pakibuksan itong muli."
+        "checkConflict": "Nabago ang gawain samantala. Pakibuksan itong muli.",
+        "doneByPick": "Sino ang gumawa ng “{{title}}”?",
+        "doneByToast": "Ginawa ni {{name}}.",
+        "historyTickedBy": "minarkahan ni {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} na (mga) pagkain",

@@ -386,7 +386,7 @@
         "historyUnknownMember": "Non fa più parte della casa",
         "historyEmptyTitle": "Ancora nulla di registrato",
         "historyEmptyPersonTitle": "Nessuna registrazione per questa persona",
-        "historyEmptyDescription": "Qui vedi chi ha completato quale attività, e quando.",
+        "historyEmptyDescription": "Qui vedi chi ha svolto quale attività e quando.",
         "historyEmptyHint": "La registrazione parte da adesso: ciò che è stato fatto prima non è stato annotato.",
         "historyLoadError": "Impossibile caricare la cronologia",
         "historyLoadMore": "Mostra altri",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "{{count}} attività bloccata ignorata.",
         "listLoadError": "Impossibile caricare i compiti.",
         "checklistToggle": "Spunta elemento",
-        "checkConflict": "L’attività è stata modificata nel frattempo. Riaprila."
+        "checkConflict": "L’attività è stata modificata nel frattempo. Riaprila.",
+        "doneByPick": "Chi ha svolto «{{title}}»?",
+        "doneByToast": "Svolto da {{name}}.",
+        "historyTickedBy": "spuntato da {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} pasti",

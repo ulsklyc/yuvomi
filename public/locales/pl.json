@@ -399,7 +399,7 @@
         "historyUnknownMember": "Już nie w gospodarstwie domowym",
         "historyEmptyTitle": "Jeszcze nic nie zapisano",
         "historyEmptyPersonTitle": "Brak zapisów dla tej osoby",
-        "historyEmptyDescription": "Tutaj widać, kto i kiedy odhaczył które zadanie.",
+        "historyEmptyDescription": "Tutaj zobaczysz, kto wykonał które zadanie i kiedy.",
         "historyEmptyHint": "Zapisywanie zaczyna się teraz - tego, co zrobiono wcześniej, nikt nie notował.",
         "historyLoadError": "Nie udało się wczytać historii",
         "historyLoadMore": "Pokaż więcej",
@@ -510,7 +510,10 @@
         "tagsSkippedLocked_one": "Pominięto {{count}} zablokowane zadanie.",
         "listLoadError": "Nie udało się załadować zadań.",
         "checklistToggle": "Odhacz pozycję",
-        "checkConflict": "Zadanie zostało w międzyczasie zmienione. Otwórz je ponownie."
+        "checkConflict": "Zadanie zostało w międzyczasie zmienione. Otwórz je ponownie.",
+        "doneByPick": "Kto wykonał „{{title}}”?",
+        "doneByToast": "Wykonał(a) {{name}}.",
+        "historyTickedBy": "odhaczone przez {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} posiłki",

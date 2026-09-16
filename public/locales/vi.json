@@ -404,7 +404,7 @@
         "historyUnknownMember": "Không còn trong hộ gia đình",
         "historyEmptyTitle": "Chưa có ghi nhận nào",
         "historyEmptyPersonTitle": "Chưa có ghi nhận cho người này",
-        "historyEmptyDescription": "Ở đây bạn thấy ai đã hoàn thành công việc nào và khi nào.",
+        "historyEmptyDescription": "Ở đây bạn thấy ai đã làm việc nào và khi nào.",
         "historyEmptyHint": "Việc ghi nhận bắt đầu từ bây giờ - những gì hoàn thành trước đó không được lưu lại.",
         "historyLoadError": "Không thể tải lịch sử",
         "historyLoadMore": "Xem thêm",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "Đã bỏ qua {{count}} công việc bị khoá.",
         "listLoadError": "Không thể tải nhiệm vụ.",
         "checklistToggle": "Đánh dấu mục",
-        "checkConflict": "Công việc đã thay đổi trong lúc này. Vui lòng mở lại."
+        "checkConflict": "Công việc đã thay đổi trong lúc này. Vui lòng mở lại.",
+        "doneByPick": "Ai đã làm “{{title}}”?",
+        "doneByToast": "Do {{name}} làm.",
+        "historyTickedBy": "đánh dấu bởi {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} bữa ăn",

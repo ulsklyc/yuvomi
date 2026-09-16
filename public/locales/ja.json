@@ -386,7 +386,7 @@
         "historyUnknownMember": "世帯に在籍していません",
         "historyEmptyTitle": "まだ記録がありません",
         "historyEmptyPersonTitle": "この人の記録はありません",
-        "historyEmptyDescription": "誰がいつどのタスクを完了したかがここに表示されます。",
+        "historyEmptyDescription": "誰がどのタスクをいつやったかがここに表示されます。",
         "historyEmptyHint": "記録はここから始まります。それ以前に完了した分は、どこにも残っていません。",
         "historyLoadError": "履歴を読み込めませんでした",
         "historyLoadMore": "さらに表示",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "ロックされた {{count}} 件のタスクをスキップしました。",
         "listLoadError": "タスクを読み込めませんでした。",
         "checklistToggle": "項目にチェックを入れる",
-        "checkConflict": "タスクはその間に変更されました。もう一度開いてください。"
+        "checkConflict": "タスクはその間に変更されました。もう一度開いてください。",
+        "doneByPick": "「{{title}}」をやったのは誰ですか？",
+        "doneByToast": "{{name}} がやりました。",
+        "historyTickedBy": "チェックしたのは {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}}件の食事",

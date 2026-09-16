@@ -23,6 +23,7 @@ import '/components/category-manager.js';
 import '/components/tag-manager.js';
 import { findPageFab } from '/utils/fab.js';
 import { isSoloHousehold, hidesPrivacyControls } from '/utils/household.js';
+import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { todayKey, parseLocalDateKey } from '/utils/date.js';
 import { makeSortable } from '/utils/sortable.js';
 import { zonedDateKey } from '/utils/timezone.js';
@@ -425,6 +426,7 @@ function renderTaskCard(task, opts = {}) {
                 aria-label="${isDone ? t('tasks.markOpen', { title: esc(task.title) }) : t('tasks.markDone', { title: esc(task.title) })}">
           <i data-lucide="check" class="task-status-btn__check" aria-hidden="true"></i>
         </button>
+        ${renderDoerPicker(task, isDone, archived)}
 
         <div class="task-card__body">
           <button type="button" class="task-card__title u-card-title u-compact" data-action="open-task" data-id="${task.id}">
@@ -1196,9 +1198,19 @@ async function refreshTags() {
   }
 }
 
-async function toggleTaskStatus(id, currentStatus) {
+/**
+ * @param {number|string} id
+ * @param {string} currentStatus
+ * @param {number|null} [doneByUserId] wer es erledigt hat (#1205). Nur beim
+ *        Uebergang nach „erledigt" sinnvoll; der Server verwirft die Angabe an
+ *        jedem anderen Wechsel still, damit eine Sammelaktion nicht an einem
+ *        mitgeschickten Feld scheitert.
+ */
+async function toggleTaskStatus(id, currentStatus, doneByUserId = null) {
   const next = currentStatus === 'done' ? 'open' : 'done';
-  await api.patch(`/tasks/${id}/status`, { status: next });
+  await api.patch(`/tasks/${id}/status`, doneByUserId == null
+    ? { status: next }
+    : { status: next, done_by_user_id: doneByUserId });
 }
 
 async function loadTaskForEdit(id) {
@@ -2158,10 +2170,81 @@ function groupHistoryByDay(entries) {
  * anstellen muessen, und die erste hat sie beim Avatar der Mitglieder bereits
  * einmal falsch gehabt.
  */
+/**
+ * Die Personenauswahl beim Abhaken: „wer hat das getan" (#1205).
+ *
+ * ZWEITES ZIEL STATT ZWEITER BEDEUTUNG FUER DEN HAKEN. Der Haken hakt ab wie
+ * immer, ein Tipp, unveraendert - das ist der haeufige Fall und er darf nicht
+ * teurer werden. Wer jemand anderen nennen will, tippt daneben. Die beiden
+ * verworfenen Alternativen scheiterten je an einer Haelfte davon: ein
+ * Long-Press auf dem Haken gibt es am Schreibtisch nicht und findet niemand
+ * ohne Hinweis, und nur im Aufgaben-Popover zu fragen macht aus dem einen Tipp
+ * am Wandtablett drei - also genau das, wogegen #1205 gebaut ist.
+ *
+ * ER ERSCHEINT NUR, WO ER EINE FRAGE BEANTWORTET. Ein Menue mit einem einzigen
+ * Eintrag fragt nichts, also braucht es zwei Personen - im Solo-Haushalt sind
+ * das nie zwei. Gemessen wird das an der geladenen Mitgliederliste und NICHT an
+ * `isSoloHousehold()` wie beim Personenfilter darunter: beide Zahlen zaehlen
+ * dieselben Menschen, aber nur diese hier ist die Bedingung, an der es wirklich
+ * haengt (und nur sie stimmt auch, solange `/meta/options` noch unterwegs ist).
+ * Die zusaetzliche Abfrage stand hier zuerst und fiel wieder raus, weil keine
+ * Mutation sie rot bekam - ein Zweig, den kein Test halten kann, ist kein
+ * Schutz, sondern nur eine zweite Stelle, die spaeter auseinanderlaufen kann.
+ *
+ * An einer bereits erledigten oder abgelegten Aufgabe gibt es nichts zu
+ * benennen: die Angabe haengt am UEBERGANG nach „erledigt", und der hat hier
+ * schon stattgefunden. Korrigiert wird sie darum auch nicht hier, sondern indem
+ * man das Abhaken zuruecknimmt und neu abhakt - denselben Weg gehen die Punkte.
+ */
+/**
+ * DIE AUFGABE STEHT AM PANEL, DIE PERSON AM EINTRAG. `data-id` ist im
+ * delegierten Handler dieser Seite durchgehend die Aufgaben-ID; ein Eintrag,
+ * der dort die Person hineinschriebe, waere dieselbe Schreibweise mit zwei
+ * Bedeutungen. Das Panel traegt die Aufgabe ohnehin schon in seiner ID - also
+ * liest der Handler sie von dort, und beide Seiten teilen sich dieses eine
+ * Praefix statt zweier Zeichenketten, die auseinanderlaufen koennen.
+ */
+const DOER_PANEL_PREFIX = 'task-doer-';
+
+function doerPanelTaskId(el) {
+  const panel = el.closest?.('.popover-menu');
+  if (!panel?.id?.startsWith(DOER_PANEL_PREFIX)) return null;
+  const id = Number(panel.id.slice(DOER_PANEL_PREFIX.length));
+  return Number.isInteger(id) ? id : null;
+}
+
+function renderDoerPicker(task, isDone, archived) {
+  if (isDone || archived) return '';
+  const members = state.users ?? [];
+  if (members.length < 2) return '';
+  return popoverMenuHtml({
+    id: `${DOER_PANEL_PREFIX}${task.id}`,
+    label: t('tasks.doneByPick', { title: task.title }),
+    icon: 'user-round-check',
+    triggerClass: 'btn btn--ghost btn--icon btn--icon-sm task-doer-btn',
+    items: members.map((u) => ({
+      action: 'pick-doer', id: u.id, label: u.display_name, icon: 'user-round',
+    })),
+  });
+}
+
+/**
+ * DER VERLAUF NENNT, WER ES GETAN HAT (#1205). `person_*` ist die benannte
+ * erledigende Person und ohne Benennung die abhakende - der Server loest das in
+ * EINEM Ausdruck auf, damit die Rueckfallregel nicht in jedem Renderer noch
+ * einmal steht, und filtert nach demselben Ausdruck. Wer abgehakt hat, faellt
+ * damit nicht unter den Tisch: unterscheiden sich die beiden, steht es in der
+ * Metazeile daneben. Es wegzulassen waere die teurere Auskunft - „Lea hat
+ * aufgeraeumt" liest sich sonst wie Leas eigener Eintrag, obwohl Mama ihn
+ * gesetzt hat.
+ */
 function renderHistoryEntry(entry) {
-  const name = entry.user_name || t('tasks.historyUnknownMember');
+  const name = entry.person_name || t('tasks.historyUnknownMember');
+  const tickedBy = entry.done_by_user_id && entry.done_by_user_id !== entry.user_id
+    ? (entry.user_name || t('tasks.historyUnknownMember'))
+    : null;
   const avatar = renderAvatarStack(
-    [{ display_name: name, color: entry.user_color, avatar_data: entry.user_avatar }],
+    [{ display_name: name, color: entry.person_color, avatar_data: entry.person_avatar }],
     { size: 32, maxVisible: 1 },
   );
   // Der Avatar traegt hier NICHTS bei, was nicht daneben stuende: der Name
@@ -2173,7 +2256,7 @@ function renderHistoryEntry(entry) {
       <span class="list-row__main history-row__main">
         <span class="list-row__name">${esc(entry.title)}</span>
         <span class="list-row__meta">
-          ${esc(name)}${entry.is_recurring
+          ${esc(name)}${tickedBy ? ` <span class="history-row__by">${esc(t('tasks.historyTickedBy', { name: tickedBy }))}</span>` : ''}${entry.is_recurring
             ? ` <i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i>` : ''}
         </span>
       </span>
@@ -3323,9 +3406,49 @@ function handleBulkDelete(taskIds, container) {
   });
 }
 
+/**
+ * Abhaken mit benannter Person (#1205) - der zweite Weg zu demselben Uebergang.
+ *
+ * ER NIMMT DIE OPTIMISTISCHE ANIMATION BEWUSST NICHT MIT. Die gehoert zum
+ * gedrueckten Haken („check-pop" quittiert genau diese Beruehrung); hier wurde
+ * ein Menueeintrag gewaehlt, und der Haken hat niemand angefasst. Was bleibt,
+ * ist der Teil, der die Bedienung traegt: Neuladen und dieselbe Quittung mit
+ * Rueckweg wie Tipp und Wisch - mit dem Namen darin, weil sonst nichts auf dem
+ * Schirm verriete, wem die Erledigung gerade zugeschrieben wurde.
+ */
+async function completeTaskFor(container, taskId, userId) {
+  const person = (state.users ?? []).find((u) => u.id === userId);
+  try {
+    await toggleTaskStatus(taskId, 'open', userId);
+    await loadTasks(container);
+    window.yuvomi.showToast(
+      t('tasks.doneByToast', { name: person?.display_name ?? '' }),
+      'default',
+      5000,
+      async () => {
+        try {
+          await toggleTaskStatus(taskId, 'done');
+          await loadTasks(container);
+        } catch (err) {
+          window.yuvomi.showToast(err.message, 'danger');
+        }
+      },
+    );
+  } catch (err) {
+    window.yuvomi.showToast(err.message, 'danger');
+    await loadTasks(container);
+  }
+}
+
 function wireTaskList(container) {
   const listEl = container.querySelector('#task-list');
   if (!listEl) return;
+
+  // Positionierung, Light-Dismiss und Pfeiltasten der Personenauswahl kommen
+  // aus der geteilten Popover-Mechanik. Die Wurzel ist `container` und nicht
+  // `listEl`: `toggle`/`beforetoggle` steigen nicht auf, und die Panels sitzen
+  // im Top-Layer - ein Listener an der Liste selbst sieht sie nie.
+  installPopoverMenus(container);
 
   listEl.addEventListener('click', async (e) => {
     const target = e.target.closest('[data-action]');
@@ -3377,6 +3500,16 @@ function wireTaskList(container) {
         window.yuvomi.showToast(err.message, 'danger');
         await loadTasks(container);
       }
+    }
+
+    if (action === 'pick-doer') {
+      const taskId = doerPanelTaskId(target);
+      const userId = Number(target.dataset.id);
+      if (taskId && Number.isInteger(userId)) {
+        vibrate(15);
+        await completeTaskFor(container, taskId, userId);
+      }
+      return;
     }
 
     if (action === 'toggle-subtasks') {
@@ -3872,6 +4005,9 @@ export const __test = {
   groupBy, groupKey, formatDueDate, normalizeFilterSet, taskQuery, state,
   // Der Aufgaben-Dialog als Markup: welche Felder er zeigt und wen er anbietet.
   renderModalContent,
+  // Die Personenauswahl beim Abhaken (#1205): WANN sie ueberhaupt erscheint,
+  // ist die halbe Entscheidung - ein Solo-Haushalt bekommt sie nie zu sehen.
+  renderDoerPicker,
   // Gemerkte Filter: der Vertrag ist, dass Lesen und Schreiben AUSEINANDER
   // gehen - sonst schriebe das Bereinigen sich fest (siehe getRecentFilters).
   getRecentFilters, storedRecentFilters, saveRecentFilter,

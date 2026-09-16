@@ -386,7 +386,7 @@
         "historyUnknownMember": "अब परिवार में नहीं",
         "historyEmptyTitle": "अभी तक कुछ दर्ज नहीं",
         "historyEmptyPersonTitle": "इस व्यक्ति के लिए कुछ दर्ज नहीं",
-        "historyEmptyDescription": "यहाँ दिखता है कि किसने कौन-सा काम कब पूरा किया।",
+        "historyEmptyDescription": "यहाँ दिखता है कि कौन-सा काम किसने और कब किया।",
         "historyEmptyHint": "रिकॉर्डिंग अब से शुरू होती है - इससे पहले जो पूरा हुआ, वह कहीं दर्ज नहीं है।",
         "historyLoadError": "इतिहास लोड नहीं हो सका",
         "historyLoadMore": "और दिखाएँ",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "{{count}} लॉक किया गया कार्य छोड़ा गया।",
         "listLoadError": "कार्य लोड नहीं हो सके।",
         "checklistToggle": "आइटम पर निशान लगाएं",
-        "checkConflict": "कार्य इस बीच बदल गया है। कृपया इसे फिर से खोलें।"
+        "checkConflict": "कार्य इस बीच बदल गया है। कृपया इसे फिर से खोलें।",
+        "doneByPick": "“{{title}}” किसने किया?",
+        "doneByToast": "{{name}} ने किया।",
+        "historyTickedBy": "{{name}} ने चिह्नित किया"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} भोजन",

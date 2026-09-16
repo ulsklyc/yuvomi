@@ -404,7 +404,7 @@
         "historyUnknownMember": "Již není v domácnosti",
         "historyEmptyTitle": "Zatím nic zaznamenáno",
         "historyEmptyPersonTitle": "Pro tuto osobu nic zaznamenáno",
-        "historyEmptyDescription": "Zde uvidíte, kdo a kdy odškrtl který úkol.",
+        "historyEmptyDescription": "Zde uvidíte, kdo kterou úlohu splnil a kdy.",
         "historyEmptyHint": "Zaznamenává se od teď - co bylo hotové dříve, si nikdo nepsal.",
         "historyLoadError": "Historii se nepodařilo načíst",
         "historyLoadMore": "Zobrazit více",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "Přeskočen {{count}} zamčený úkol.",
         "listLoadError": "Úkoly se nepodařilo načíst.",
         "checklistToggle": "Odškrtnout položku",
-        "checkConflict": "Úkol byl mezitím změněn. Otevřete jej prosím znovu."
+        "checkConflict": "Úkol byl mezitím změněn. Otevřete jej prosím znovu.",
+        "doneByPick": "Kdo splnil „{{title}}“?",
+        "doneByToast": "Splnil(a) {{name}}.",
+        "historyTickedBy": "odškrtl(a) {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} jídla",

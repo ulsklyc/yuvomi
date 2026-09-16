@@ -386,7 +386,7 @@
         "historyUnknownMember": "Больше не в семье",
         "historyEmptyTitle": "Пока ничего не записано",
         "historyEmptyPersonTitle": "Для этого участника ничего не записано",
-        "historyEmptyDescription": "Здесь видно, кто и когда отметил задачу выполненной.",
+        "historyEmptyDescription": "Здесь видно, кто и когда выполнил какую задачу.",
         "historyEmptyHint": "Запись начинается сейчас - то, что сделали раньше, нигде не сохранилось.",
         "historyLoadError": "Не удалось загрузить историю",
         "historyLoadMore": "Показать ещё",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "Пропущена {{count}} заблокированная задача.",
         "listLoadError": "Не удалось загрузить задачи.",
         "checklistToggle": "Отметить пункт",
-        "checkConflict": "Задача была изменена. Откройте её заново."
+        "checkConflict": "Задача была изменена. Откройте её заново.",
+        "doneByPick": "Кто выполнил «{{title}}»?",
+        "doneByToast": "Выполнил(а) {{name}}.",
+        "historyTickedBy": "отметил(а) {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} приёма пищи",

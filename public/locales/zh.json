@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "已跳过 {{count}} 个锁定的任务。",
         "listLoadError": "无法加载任务。",
         "checklistToggle": "勾选条目",
-        "checkConflict": "任务已被修改，请重新打开。"
+        "checkConflict": "任务已被修改，请重新打开。",
+        "doneByPick": "谁完成了“{{title}}”？",
+        "doneByToast": "由 {{name}} 完成。",
+        "historyTickedBy": "由 {{name}} 勾选"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} 餐",

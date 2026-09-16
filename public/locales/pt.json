@@ -393,7 +393,7 @@
         "historyUnknownMember": "Já não pertence ao agregado",
         "historyEmptyTitle": "Ainda nada registado",
         "historyEmptyPersonTitle": "Nada registado para esta pessoa",
-        "historyEmptyDescription": "Aqui vê quem concluiu que tarefa, e quando.",
+        "historyEmptyDescription": "Aqui vês quem fez cada tarefa e quando.",
         "historyEmptyHint": "O registo começa agora - o que foi concluído antes não ficou anotado.",
         "historyLoadError": "Não foi possível carregar o histórico",
         "historyLoadMore": "Mostrar mais",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "{{count}} tarefa bloqueada ignorada.",
         "listLoadError": "Não foi possível carregar as tarefas.",
         "checklistToggle": "Marcar item",
-        "checkConflict": "A tarefa foi alterada entretanto. Abra-a novamente."
+        "checkConflict": "A tarefa foi alterada entretanto. Abra-a novamente.",
+        "doneByPick": "Quem fez “{{title}}”?",
+        "doneByToast": "Feito por {{name}}.",
+        "historyTickedBy": "assinalado por {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} refeições",

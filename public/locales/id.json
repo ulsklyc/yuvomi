@@ -399,7 +399,7 @@
         "historyUnknownMember": "Tidak lagi di rumah tangga",
         "historyEmptyTitle": "Belum ada yang tercatat",
         "historyEmptyPersonTitle": "Tidak ada catatan untuk orang ini",
-        "historyEmptyDescription": "Di sini terlihat siapa yang menyelesaikan tugas mana, dan kapan.",
+        "historyEmptyDescription": "Di sini kamu melihat siapa yang mengerjakan tugas mana, dan kapan.",
         "historyEmptyHint": "Pencatatan dimulai sekarang - yang selesai sebelumnya tidak tercatat di mana pun.",
         "historyLoadError": "Riwayat tidak dapat dimuat",
         "historyLoadMore": "Tampilkan lebih banyak",
@@ -510,7 +510,10 @@
         "tagsSkippedLocked_one": "{{count}} tugas terkunci dilewati.",
         "listLoadError": "Tugas tidak dapat dimuat.",
         "checklistToggle": "Centang item",
-        "checkConflict": "Tugas telah berubah sementara itu. Silakan buka kembali."
+        "checkConflict": "Tugas telah berubah sementara itu. Silakan buka kembali.",
+        "doneByPick": "Siapa yang mengerjakan “{{title}}”?",
+        "doneByToast": "Dikerjakan oleh {{name}}.",
+        "historyTickedBy": "dicentang oleh {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} hidangan",

@@ -386,7 +386,7 @@
         "historyUnknownMember": "Ya no está en el hogar",
         "historyEmptyTitle": "Aún no hay nada registrado",
         "historyEmptyPersonTitle": "Nada registrado para esta persona",
-        "historyEmptyDescription": "Aquí verás quién completó qué tarea y cuándo.",
+        "historyEmptyDescription": "Aquí verás quién hizo cada tarea y cuándo.",
         "historyEmptyHint": "El registro empieza ahora: lo completado antes no lo anotó nadie.",
         "historyLoadError": "No se pudo cargar el historial",
         "historyLoadMore": "Mostrar más",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "{{count}} tarea bloqueada omitida.",
         "listLoadError": "No se pudieron cargar las tareas.",
         "checklistToggle": "Marcar elemento",
-        "checkConflict": "La tarea ha cambiado mientras tanto. Vuelve a abrirla."
+        "checkConflict": "La tarea ha cambiado mientras tanto. Vuelve a abrirla.",
+        "doneByPick": "¿Quién hizo «{{title}}»?",
+        "doneByToast": "Hecho por {{name}}.",
+        "historyTickedBy": "marcado por {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} comidas",

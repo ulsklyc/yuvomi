@@ -41,9 +41,14 @@ import { esc } from '/utils/html.js';
  * @param {string}   opts.label          Zugänglicher Name des Triggers.
  * @param {Array<{action: string, label: string, icon: string, id?: string|number, danger?: boolean}>} opts.items
  * @param {string}   [opts.triggerClass] Zusätzliche Klassen für den Trigger.
+ * @param {string}   [opts.icon]         Lucide-Name für den Trigger. Standard
+ *        `ellipsis` - das Überlaufmenü, für das diese Datei gebaut wurde. Ein
+ *        anderer Name ist für ein Menü gedacht, das nicht „mehr davon" heißt,
+ *        sondern eine bestimmte Frage stellt (die Personenauswahl beim Abhaken,
+ *        #1205); dort wäre das Auslassungszeichen eine Falschauskunft.
  * @returns {string}
  */
-export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn--ghost btn--icon' }) {
+export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn--ghost btn--icon', icon = 'ellipsis' }) {
   const entries = items.map((item) => `
     <button type="button" role="menuitem"
             class="popover-menu__item${item.danger ? ' popover-menu__item--danger' : ''}"
@@ -56,7 +61,7 @@ export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn
     <button type="button" class="${triggerClass} popover-menu__trigger"
             popovertarget="${esc(id)}" aria-haspopup="menu" aria-expanded="false"
             aria-label="${esc(label)}" title="${esc(label)}">
-      <i data-lucide="ellipsis" class="icon-md" aria-hidden="true"></i>
+      <i data-lucide="${esc(icon)}" class="icon-md" aria-hidden="true"></i>
     </button>
     <div class="popover-menu" id="${esc(id)}" popover role="menu">${entries}</div>`;
 }
