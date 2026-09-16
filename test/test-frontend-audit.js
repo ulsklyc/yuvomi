@@ -2519,16 +2519,27 @@ test('wer die Zahl der Mitleser aendert, holt othersCanRead nach', () => {
   // entsteht, ist "fuer alle". Im Ein-Personen-Haushalt ist genau das der
   // Sprung von 0 auf 1: ein angelegtes Wandtablett, ein eingerichtetes
   // Hauspersonal, geaenderte Modulrechte.
+  // AN DIE MUTIERENDE STELLE GEBUNDEN, nicht an die Datei. Die erste Fassung
+  // fragte nur, ob `auth.me()` IRGENDWO in der Datei vorkommt - damit blieb sie
+  // gruen, wenn man die Auffrischung allein aus dem Loesch-Pfad entfernte,
+  // obwohl das der eigene, zweite Fall ist (gegengeprueft: 397 pass).
   const STELLEN = [
-    { datei: '../public/settings/pages/admin-displays.js', was: 'Display anlegen und loeschen' },
-    { datei: '../public/settings/pages/admin-permissions.js', was: 'Rechte speichern' },
-    { datei: '../public/pages/housekeeping.js', was: 'Hauspersonal anlegen' },
+    { datei: '../public/settings/pages/admin-displays.js', was: 'Display anlegen', ruf: /api\.post\('\/displays'/ },
+    { datei: '../public/settings/pages/admin-displays.js', was: 'Display loeschen', ruf: /api\.delete\(`\/displays\// },
+    { datei: '../public/settings/pages/admin-permissions.js', was: 'Rechte speichern', ruf: /api\.put\(url/ },
+    { datei: '../public/pages/housekeeping.js', was: 'Hauspersonal anlegen', ruf: /api\.post\('\/housekeeping\/worker'/ },
   ];
   const fehlend = [];
-  for (const { datei, was } of STELLEN) {
+  for (const { datei, was, ruf } of STELLEN) {
     const src = withoutCommentsKeepingLines(read(datei));
     const importiert = /import\s*\{[^}]*\bauth\b[^}]*\}\s*from\s*'\/api\.js'/.test(src);
-    if (!importiert || !/auth\.me\(\)/.test(src)) fehlend.push(`${datei} (${was})`);
+    const stelle = src.search(ruf);
+    // Die Auffrischung muss NACH der Mutation stehen und nah dabei. 1500 Zeichen,
+    // weil der weiteste der vier Faelle 916 braucht (das Anlegen einer
+    // Haushaltshilfe reicht ein langes Objekt mit) - gemessen, nicht geraten,
+    // und immer noch etwas voellig anderes als "irgendwo in der Datei".
+    const nah = stelle >= 0 && /auth\.me\(\)/.test(src.slice(stelle, stelle + 1500));
+    if (!importiert || stelle < 0 || !nah) fehlend.push(`${datei} (${was})`);
   }
   assert.deepEqual(fehlend, [],
     `Diese Stellen aendern die Zahl der Mitleser, ohne sie nachzuholen:\n  ${fehlend.join('\n  ')}`);

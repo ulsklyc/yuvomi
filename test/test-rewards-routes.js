@@ -387,6 +387,34 @@ test('GET /redemptions — Status-Filter + Namens-Joins', async () => {
   assert.equal((await call('GET', '/redemptions?status=bogus', { actor: ADMIN })).status, 200);
 });
 
+test('GET /redemptions — wer nicht entscheidet, sieht nur seine eigenen', async () => {
+  // DIE POSITIVE HAELFTE DIESER REGEL, und sie ist die wichtigere. Am Display
+  // gemessen kommt immer eine leere Liste heraus - ein Wandtablett kann keine
+  // eigene Anfrage haben -, und die bliebe leer, selbst wenn der Filter das
+  // falsche Subjekt bände. Dann verlöre JEDES Mitglied seine eigene Liste, und
+  // niemand hätte es bemerkt.
+  const { kid: einer, id: seine } = await pendingRedemption(100);
+  const { kid: andere, id: fremde } = await pendingRedemption(100);
+
+  const alsEr = await call('GET', '/redemptions', { actor: einer });
+  assert.equal(alsEr.status, 200);
+  const ids = alsEr.body.data.map((r) => r.id);
+  assert.ok(ids.includes(seine), 'seine eigene Anfrage ist da');
+  assert.ok(!ids.includes(fremde), 'die des anderen nicht');
+  assert.ok(alsEr.body.data.every((r) => r.user_id === einer.id), 'und sonst auch nichts Fremdes');
+
+  // Der Administrator entscheidet und sieht deshalb beide.
+  const alsAdmin = await call('GET', '/redemptions', { actor: ADMIN });
+  const adminIds = alsAdmin.body.data.map((r) => r.id);
+  assert.ok(adminIds.includes(seine) && adminIds.includes(fremde), 'der Admin sieht beide');
+
+  // Der Status-Filter bleibt neben dem Subjektfilter wirksam - zwei Bedingungen
+  // in einer Abfrage sind die Stelle, an der eine still verlorengeht.
+  const nurOffen = await call('GET', '/redemptions?status=pending', { actor: einer });
+  assert.equal(nurOffen.status, 200);
+  assert.ok(nurOffen.body.data.every((r) => r.user_id === einer.id && r.status === 'pending'));
+});
+
 test('GET /overview — Ränge, Katalog und pendingCount nach Aktivität', async () => {
   const res = await call('GET', '/overview', { actor: ADMIN });
   assert.equal(res.status, 200);

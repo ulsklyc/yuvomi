@@ -45,14 +45,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Permission for the API is granted per module, and the guard judged a request by the first part of
   its path - so a credential that had been given the calendar alone also reached `GET
   /birthdays/import/candidates`, which lists every contact with name and birth date, and the status
-  routes of the connected CalDAV and Outlook accounts, which name the server address, the user name
-  and the account mail address. The birthday-import routes now ask for contact access as well, the
-  status routes leave those management details out for anything but a signed-in person, and the two
+  routes of the connected CalDAV, Outlook, Google and Apple accounts, which name the server address,
+  the user name, the account mail address and the last sync error - error text that comes from the
+  other side and regularly carries its address or an account identifier. The birthday-import routes
+  now ask for contact access as well, the status routes leave those management details out for anything but a signed-in person, and the two
   sync-target lists - they name the connected accounts and their collection URLs - are limited to
   whoever may actually save to them. If you use an API token scoped to `calendar:read` or
   `tasks:read` for an integration that reads one of these, give it `contacts:read` or write access to
   the module in question. The birthday page stops offering its import button where contacts are out
   of reach. (#1241)
+
+- **A reward request and its wish text now stay between the person asking and whoever decides.** The
+  list of redemption requests handed every reader of the module up to 300 rows, each with the
+  free-form note and the avatar of the member who wrote it; the page showed you only your own, but it
+  filtered them after downloading everybody's. Approving and rejecting is an administrator's job, so
+  administrators still see all of them and everyone else now gets their own from the query. Nothing
+  changes in what the page shows. If you use an API token scoped to `rewards:read` for an integration
+  that reads the whole household's requests, it will now see only those of the member it acts as.
+  (#1241)
 
 ## [2.67.0] - 2026-09-16
 

@@ -90,6 +90,32 @@ test('buildOpenApiSpec spiegelt buildPaths() vollstaendig', () => {
   assert.ok(Object.keys(spec.components.schemas).length > 0, 'schemas fehlen in der Spec');
 });
 
+test('jede Variable im Pfad hat ihren Parameter', () => {
+  // OPENAPI VERLANGT ES, UND ES IST KEINE FORMSACHE: fehlt zu `{id}` der
+  // Eintrag, weisen Validatoren das ganze Dokument ab, und ein erzeugter Client
+  // bekommt keine Stelle, an der er die Id uebergeben koennte - der Aufruf
+  // laeuft dann in das 400 der Route. Aufgefallen an den Display-Routen aus
+  // #1208, wo alle drei parametrierten Operationen ihre Variablen verschwiegen;
+  // der uebrige Katalog war zu dem Zeitpunkt sauber, dieser Ratchet kostet also
+  // nichts und faengt die naechste vergessene Zeile statt nur einen Rueckfall
+  // in genau diesen dreien.
+  const fehlend = [];
+  for (const [pfad, operationen] of Object.entries(buildPaths())) {
+    const variablen = [...pfad.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]);
+    if (!variablen.length) continue;
+    for (const [methode, operation] of Object.entries(operationen)) {
+      const deklariert = new Set(
+        (operation?.parameters || []).filter((p) => p.in === 'path').map((p) => p.name),
+      );
+      for (const name of variablen) {
+        if (!deklariert.has(name)) fehlend.push(`${methode.toUpperCase()} ${pfad} -> {${name}}`);
+      }
+    }
+  }
+  assert.deepEqual(fehlend, [],
+    `Diese Operationen nennen eine Pfadvariable nicht als Parameter:\n  ${fehlend.join('\n  ')}`);
+});
+
 test('kein Pfad-Parameter mit Namens-Bedeutung ist als Zahl deklariert', () => {
   // idParam() setzt hart `type: integer`; fuer Namen und Schluessel gibt es
   // stringPathParam(). Wird der falsche Helfer genommen, ist die Spec still

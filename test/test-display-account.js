@@ -770,6 +770,14 @@ test('ein Display sieht die Verwaltungsdaten der Sync-Konten NICHT', async () =>
   assert.equal(googleDisplay.body.lastErrorAt, undefined, 'und sein Zeitpunkt auch');
   assert.ok('connected' in googleDisplay.body, 'der Rest der Antwort bleibt stehen');
 
+  // Apple mit eigenem Fehlertext, nicht nur mit fehlendem Schluessel: ohne die
+  // Zeile belegte die Probe bloss, dass das Feld leer ist - nicht, dass ein
+  // vorhandener Text zurueckgehalten wird.
+  db.prepare("INSERT OR REPLACE INTO sync_config(key, value) VALUES ('apple_last_error', ?)")
+    .run('401 from https://caldav.icloud.com/anna%40example.org/calendars/');
+  const alsMenschApple = await admin('GET', '/calendar/apple/status');
+  assert.ok(alsMenschApple.body.lastError, 'Vorbedingung: die Sitzung sieht ihn');
+
   const appleDisplay = await asDisplay(token)('GET', '/calendar/apple/status');
   assert.equal(appleDisplay.status, 200);
   assert.equal(appleDisplay.body.lastError, undefined, 'dasselbe bei Apple');
