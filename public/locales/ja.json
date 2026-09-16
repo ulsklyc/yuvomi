@@ -2700,7 +2700,30 @@
         "healthVisibilityApplied_one": "1 件の記録を変更しました。",
         "mealTypeNamesLabel": "独自の名前",
         "mealTypeNamesHint": "この家庭で四つの食事を何と呼ぶか。空欄にすると既定の名前を使います。名前は入力したまま、すべての言語で表示されます。",
-        "mealTypeNamesSaved": "名前を保存しました。"
+        "mealTypeNamesSaved": "名前を保存しました。",
+        "pageDisplays": "壁掛けタブレット",
+        "pageDisplaysDescription": "壁掛けタブレットを作成し、端末をペアリングし、そのアクセスを失効させます。",
+        "displaysTitle": "壁掛けタブレット",
+        "displaysHint": "壁掛けタブレットには、この端末だけが使える専用のアカウントが割り当てられます。家族メンバーではなく、ログインもせず、世帯に公開されているものだけを表示します。",
+        "displayDeviceNameLabel": "タブレットの名前",
+        "displayDeviceNameHint": "例えば「キッチン」や「廊下」など - この一覧で見分けるためだけに使います。",
+        "displayCreate": "壁掛けタブレットを追加",
+        "displayEmpty": "壁掛けタブレットはまだありません。",
+        "displayPaired": "ペアリング済み",
+        "displayNotPaired": "未ペアリング",
+        "displayIssueCode": "ペアリングコードを発行",
+        "displayDelete": "削除",
+        "displayDeleteConfirm": "「{{name}}」を削除しますか？",
+        "displayPairingCodeLabel": "ペアリングコード",
+        "displayPairingCodeHint": "有効期限は15分で、使えるのは1回だけです。タブレットで /pair を開き、そこに入力してください。表示されるのは今だけです。",
+        "displayDeviceUnnamed": "名前のない端末",
+        "displayDeviceLastSeen": "最終接続: {{when}}",
+        "displayDeviceNeverSeen": "まだ接続されていません",
+        "displayDeviceRevokedAt": "失効: {{when}}",
+        "displayRevokeDevice": "失効させる",
+        "displayRevokeConfirm": "この端末のアクセスを終了しますか？",
+        "displayRevokeDetail": "タブレットにはすぐに何も表示されなくなります。引き続き使うには、あらためてペアリングする必要があります。",
+        "displayDeleteDetail": "アカウントとペアリング済みのすべての端末が削除されます。この操作は取り消せません。"
     },
     "login": {
         "tagline": "家族のプランナーへおかえりなさい。",
@@ -5401,5 +5424,15 @@
         "continuesUntil": "…{{time}}まで継続",
         "overviewEmptyTitle": "比較するメンバーを選択",
         "overviewEmptyDescription": "上で1人以上の家族メンバーを選ぶと、週間予定を並べて表示できます。"
+    },
+    "pairDisplay": {
+        "title": "タブレットをペアリング",
+        "intro": "設定に表示されているペアリングコードを入力してください。",
+        "codeLabel": "ペアリングコード",
+        "codeHint": "10文字で、大文字と小文字の区別はありません。",
+        "labelLabel": "この端末の名前（任意）",
+        "labelHint": "後でどの端末かを見分けるのに役立ちます。",
+        "submit": "ペアリング",
+        "failed": "このペアリングコードは無効です。"
     }
 }

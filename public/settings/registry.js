@@ -322,6 +322,16 @@ export const SETTINGS_LEAVES = freezeEntries([
     loader: () => import('/settings/pages/admin-weather.js'),
   },
   {
+    id: 'admin-displays',
+    domainId: 'admin',
+    path: '/settings/admin/displays',
+    labelKey: 'settings.pageDisplays',
+    descriptionKey: 'settings.pageDisplaysDescription',
+    icon: 'tablet-smartphone',
+    adminOnly: true,
+    loader: () => import('/settings/pages/admin-displays.js'),
+  },
+  {
     id: 'admin-api',
     domainId: 'admin',
     path: '/settings/admin/api',

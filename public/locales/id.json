@@ -2712,7 +2712,30 @@
         "healthVisibilityApplied_one": "Satu entri diubah.",
         "mealTypeNamesLabel": "Nama sendiri",
         "mealTypeNamesHint": "Sebutan rumah tangga Anda untuk keempat waktu makan. Biarkan kosong untuk nama bawaan. Nama tampil sama persis di semua bahasa.",
-        "mealTypeNamesSaved": "Nama disimpan."
+        "mealTypeNamesSaved": "Nama disimpan.",
+        "pageDisplays": "Tablet dinding",
+        "pageDisplaysDescription": "Buat tablet dinding, pasangkan perangkat, dan cabut aksesnya.",
+        "displaysTitle": "Tablet dinding",
+        "displaysHint": "Tablet dinding mendapat akun sendiri yang hanya bisa dipakai perangkat ini. Ia bukan anggota keluarga, tidak masuk log, dan hanya melihat apa yang terlihat oleh rumah tangga.",
+        "displayDeviceNameLabel": "Nama tablet",
+        "displayDeviceNameHint": "Misalnya “Dapur” atau “Lorong” - hanya untuk membedakannya dalam daftar ini.",
+        "displayCreate": "Tambah tablet dinding",
+        "displayEmpty": "Belum ada tablet dinding.",
+        "displayPaired": "Sudah dipasangkan",
+        "displayNotPaired": "Belum dipasangkan",
+        "displayIssueCode": "Buat kode pemasangan",
+        "displayDelete": "Hapus",
+        "displayDeleteConfirm": "Hapus “{{name}}”?",
+        "displayPairingCodeLabel": "Kode pemasangan",
+        "displayPairingCodeHint": "Berlaku 15 menit dan hanya sekali pakai. Buka /pair di tablet lalu ketikkan di sana. Kode ini hanya ditampilkan sekarang.",
+        "displayDeviceUnnamed": "Perangkat tanpa nama",
+        "displayDeviceLastSeen": "Terakhir terlihat: {{when}}",
+        "displayDeviceNeverSeen": "Belum pernah terhubung",
+        "displayDeviceRevokedAt": "Dicabut: {{when}}",
+        "displayRevokeDevice": "Cabut",
+        "displayRevokeConfirm": "Akhiri akses perangkat ini?",
+        "displayRevokeDetail": "Tablet langsung berhenti menampilkan apa pun. Untuk memakainya lagi, tablet harus dipasangkan ulang.",
+        "displayDeleteDetail": "Akun dan semua perangkat yang dipasangkan akan dihapus. Ini tidak bisa dibatalkan."
     },
     "login": {
         "tagline": "Selamat datang kembali di perencana keluarga Anda.",
@@ -5401,5 +5424,15 @@
         "continuesUntil": "…berlanjut hingga {{time}}",
         "overviewEmptyTitle": "Pilih orang untuk dibandingkan",
         "overviewEmptyDescription": "Pilih setidaknya satu anggota keluarga di atas untuk melihat jadwal mingguan berdampingan."
+    },
+    "pairDisplay": {
+        "title": "Pasangkan tablet",
+        "intro": "Masukkan kode pemasangan yang ditampilkan di pengaturan.",
+        "codeLabel": "Kode pemasangan",
+        "codeHint": "Sepuluh karakter, huruf besar atau kecil tidak masalah.",
+        "labelLabel": "Nama perangkat ini (opsional)",
+        "labelHint": "Membantu mengenali nanti perangkat mana yang dimaksud.",
+        "submit": "Pasangkan",
+        "failed": "Kode pemasangan ini tidak berlaku."
     }
 }

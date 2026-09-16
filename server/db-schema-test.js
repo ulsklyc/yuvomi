@@ -1329,6 +1329,17 @@ const MIGRATIONS_SQL = {
       updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     );
   `,
+  // Nur die Markierungstabelle aus v215, nicht der ganze Eintrag: sie ist die,
+  // an der `resolvePermissions()` haengt (ein Display bekommt seine Modulrechte
+  // aus seiner Scope-Liste, #1208). Kopplungscodes und Geraete braucht keine
+  // Suite, die Rechte aufloest.
+  215: `
+    CREATE TABLE IF NOT EXISTS display_accounts (
+      user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    );
+  `,
 };
 
 export { MIGRATIONS_SQL };

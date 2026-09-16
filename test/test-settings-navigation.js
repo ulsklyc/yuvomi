@@ -141,9 +141,14 @@ test('die Blätter verteilen sich wie beschlossen auf die vier Domänen', () => 
   // Zyklus-Opt-out oben - deshalb ein eigenes Blatt statt eines Platzes in
   // `modules-options`, dessen eigener Guard (test:frontend-audit) nur Schalter
   // aus dem geteilten Toggle-Primitiv zulaesst, kein Zahlenfeld.
+  // `admin-displays` (#1208) liegt bei `admin` und nirgends sonst: ein Wandtablett
+  // anzulegen heisst, einem Geraet dauerhaft Zugang zum Haushalt zu geben, und
+  // jede Route des Blatts traegt `requireAdmin`. Es ist kein Modulschalter (es
+  // schaltet nichts an oder aus) und keine Synchronisation (es haengt an keinen
+  // fremden Zugangsdaten) - damit steigt `admin` von 8 auf 9.
   const perDomain = {};
   for (const leaf of SETTINGS_LEAVES) perDomain[leaf.domainId] = (perDomain[leaf.domainId] ?? 0) + 1;
-  assert.deepEqual(perDomain, { personal: 11, modules: 6, sync: 5, admin: 8 });
+  assert.deepEqual(perDomain, { personal: 11, modules: 6, sync: 5, admin: 9 });
   // Jedes Blatt hängt an einer existierenden Domäne.
   const domainIds = new Set(SETTINGS_DOMAINS.map((domain) => domain.id));
   for (const leaf of SETTINGS_LEAVES) {

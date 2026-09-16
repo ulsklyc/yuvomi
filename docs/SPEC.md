@@ -1956,8 +1956,10 @@ email linking together, exactly where GHSA-4jcg-7jvj-p4v9 showed what a per-path
 
 **The first browser path with scopes.** `requireAuth()` knew scopes only on the token path;
 interactive sessions carry `authScopes = null`. A paired display now carries the fixed list
-`dashboard:read`, `calendar:read`, `tasks:read`, `rewards:read` (`DISPLAY_SCOPES`, not stored and
-not configurable - what a display may do is a product decision, not a field an admin can widen).
+`dashboard:read`, `calendar:read`, `tasks:read`, `rewards:read`, `weather:read` (`DISPLAY_SCOPES`,
+not stored and not configurable - what a display may do is a product decision, not a field an admin
+can widen). Weather is on the list for the obvious reason a tablet ends up on a kitchen wall at all,
+and it carries no household data: a forecast for a location the household already set.
 The global gate in `server/index.js` therefore asks about the **scopes**, not the sign-in method:
 that condition read `authMethod !== 'api_token' || authScopes == null`, of which only the second
 half was ever the rule. Sessions are unaffected. The auth router, mounted ahead of the gates, refuses

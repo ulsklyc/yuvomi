@@ -6,7 +6,7 @@
 
 import { api, auth } from '/api.js';
 import { createPageController } from '/utils/page-lifecycle.js';
-import { canSeeWidget, moduleAccess } from '/permissions.js';
+import { canSeeWidget, moduleAccess, navModuleAccess } from '/permissions.js';
 import { t, formatDate, formatTime, timeSuffix, getLocale, getNumberFormat } from '/i18n.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
@@ -3968,15 +3968,35 @@ function wireWallExit(container, rerender, signal) {
 // FAB Speed-Dial
 // --------------------------------------------------------
 
+/**
+ * Der Speed-Dial bietet nur an, was der Betrachter auch ANLEGEN darf.
+ *
+ * Die Liste stand bis #1208 ungefiltert da: wer Notizen auf `none` hatte, bekam
+ * trotzdem „Notiz anlegen" angeboten und lief in ein 403. Aufgefallen ist es am
+ * Wandtablett, wo ALLE vier Eintraege ins Leere fuehren - dessen Module stehen
+ * samt und sonders auf `read`. Der Filter ist deshalb nicht am Display
+ * aufgehaengt, sondern an der Frage, um die es geht: darf diese Route beschrieben
+ * werden? Damit verschwindet derselbe tote Knopf auch fuer ein eingeschraenktes
+ * Mitglied.
+ *
+ * `navModuleAccess` und nicht `moduleAccess`: die Schluessel hier sind
+ * NAVIGATIONS-Routen, und die Zuordnung auf den Rechte-Schluessel steht in
+ * permissions.js (`/shopping` haengt etwa am Kuechen-Modul). Eine eigene
+ * Uebersetzung hier waere die zweite Tabelle dafuer.
+ */
 const FAB_ACTIONS = () => [
   { route: '/tasks',    label: t('dashboard.fabTask'),     icon: 'check-square'   },
   { route: '/calendar', label: t('dashboard.fabCalendar'), icon: 'calendar-plus'  },
   { route: '/shopping', label: t('dashboard.fabShopping'), icon: 'shopping-cart'  },
   { route: '/notes',    label: t('dashboard.fabNote'),     icon: 'sticky-note'    },
-];
+].filter((a) => navModuleAccess(a.route.slice(1)) === 'write');
 
 function renderFab() {
-  const actionsHtml = FAB_ACTIONS().map((a) => `
+  const actions = FAB_ACTIONS();
+  // Kein Eintrag, kein Knopf. Ein Speed-Dial, der sich auf eine leere Liste
+  // oeffnet, waere die schlechtere Haelfte des Fehlers, den der Filter behebt.
+  if (!actions.length) return '';
+  const actionsHtml = actions.map((a) => `
     <button type="button" class="fab-action" data-route="${a.route}" tabindex="-1"
             aria-label="${a.label}">
       <span class="fab-action__label">${a.label}</span>
@@ -5080,7 +5100,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { loadScheduleSlice, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions };
+export const __test = { loadScheduleSlice, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

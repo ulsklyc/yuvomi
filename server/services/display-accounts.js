@@ -32,6 +32,15 @@
 import crypto from 'node:crypto';
 import * as dbModule from '../db.js';
 
+// Die reinen Listen liegen in server/display-scopes.js - OHNE Abhaengigkeiten,
+// damit server/permissions.js sie lesen kann, ohne ueber diese Datei
+// server/db.js mitzuziehen (genau daran hing test:db-isolation: vier Suiten
+// legten eine echte yuvomi.db im Repo an, weil sie nur Rechte aufloesten).
+// Hier durchgereicht, damit die Aufrufer eine Anlaufstelle behalten.
+export {
+  DISPLAY_SCOPES, DISPLAY_SCOPE_MODULES, DISPLAY_READ_PATHS, displayMayRead,
+} from '../display-scopes.js';
+
 /**
  * Cookie-Name des Geraete-Credentials.
  *
@@ -53,26 +62,6 @@ const DEVICE_TOKEN_PREFIX = 'yuvomi_display_';
  * dieser Welt vergleicht sich erfolgreich dagegen.
  */
 export const DISPLAY_PASSWORD_SENTINEL = '$display$';
-
-/**
- * Was ein gekoppeltes Geraet erreichen darf - die feste Liste aus #1208.
- *
- * SIE IST NICHT KONFIGURIERBAR, UND DAS IST DER PUNKT. Ein Display haengt
- * oeffentlich in der Kueche; wer daran vorbeigeht, hat es bedient. Eine
- * Scope-Liste, die ein Administrator aufbohren kann, waere genau die Einladung,
- * die dieses Konto vermeiden soll. Wer mehr braucht, meldet sich als Mensch an.
- *
- * NUR LESEN IN DIESEM SCHRITT. Die beiden Aktionen (abhaken, Einloesung
- * anfragen) sind #1209 und kommen mit ihren eigenen Schreib-Scopes; bis dahin
- * ist ein Display ein Schaufenster. `write` schliesst `read` ein, ein spaeteres
- * `tasks:write` ersetzt hier also einen Eintrag, statt einen hinzuzufuegen.
- */
-export const DISPLAY_SCOPES = Object.freeze([
-  'dashboard:read',
-  'calendar:read',
-  'tasks:read',
-  'rewards:read',
-]);
 
 /**
  * Das Alphabet des Kopplungscodes: Grossbuchstaben und Ziffern OHNE die Paare,

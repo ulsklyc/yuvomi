@@ -2700,7 +2700,30 @@
         "healthVisibilityApplied_one": "تم تغيير إدخال واحد.",
         "mealTypeNamesLabel": "أسماؤك الخاصة",
         "mealTypeNamesHint": "ما تسميه أسرتك للوجبات الأربع. اتركه فارغًا لاستخدام الاسم المدمج. يظهر الاسم كما تكتبه في كل اللغات.",
-        "mealTypeNamesSaved": "تم حفظ الأسماء."
+        "mealTypeNamesSaved": "تم حفظ الأسماء.",
+        "pageDisplays": "الأجهزة اللوحية الجدارية",
+        "pageDisplaysDescription": "إنشاء جهاز لوحي جداري، وإقران جهاز، وإنهاء وصوله.",
+        "displaysTitle": "الأجهزة اللوحية الجدارية",
+        "displaysHint": "يحصل الجهاز اللوحي الجداري على حساب خاص به لا يستخدمه سوى هذا الجهاز. وهو ليس فردًا من العائلة، ولا يسجّل الدخول، ولا يرى إلا ما هو ظاهر للأسرة.",
+        "displayDeviceNameLabel": "اسم الجهاز اللوحي",
+        "displayDeviceNameHint": "مثل «المطبخ» أو «الممر» - للتمييز بينها في هذه القائمة فقط.",
+        "displayCreate": "إضافة جهاز لوحي جداري",
+        "displayEmpty": "لم يُنشأ أي جهاز لوحي جداري بعد.",
+        "displayPaired": "مقترن",
+        "displayNotPaired": "غير مقترن بعد",
+        "displayIssueCode": "إنشاء رمز اقتران",
+        "displayDelete": "حذف",
+        "displayDeleteConfirm": "حذف «{{name}}»؟",
+        "displayPairingCodeLabel": "رمز الاقتران",
+        "displayPairingCodeHint": "صالح لمدة 15 دقيقة ويُستخدم مرة واحدة فقط. افتح /pair على الجهاز اللوحي وأدخله هناك. لا يظهر إلا الآن.",
+        "displayDeviceUnnamed": "جهاز بلا اسم",
+        "displayDeviceLastSeen": "آخر ظهور: {{when}}",
+        "displayDeviceNeverSeen": "لم يتصل قط",
+        "displayDeviceRevokedAt": "أُبطل: {{when}}",
+        "displayRevokeDevice": "إبطال",
+        "displayRevokeConfirm": "هل تريد إنهاء وصول هذا الجهاز؟",
+        "displayRevokeDetail": "يتوقف الجهاز اللوحي فورًا عن عرض أي شيء. ولمتابعة استخدامه يجب إقرانه من جديد.",
+        "displayDeleteDetail": "يُحذف الحساب وجميع الأجهزة المقترنة. ولا يمكن التراجع عن ذلك."
     },
     "login": {
         "tagline": "مرحبًا بعودتك إلى منظّم عائلتك.",
@@ -5401,5 +5424,15 @@
         "continuesUntil": "…يستمر حتى {{time}}",
         "overviewEmptyTitle": "اختر أشخاصًا للمقارنة",
         "overviewEmptyDescription": "اختر أعلاه فردًا واحدًا على الأقل من أفراد الأسرة لرؤية الجداول الأسبوعية جنبًا إلى جنب."
+    },
+    "pairDisplay": {
+        "title": "اقتران الجهاز اللوحي",
+        "intro": "أدخل رمز الاقتران الذي تعرضه الإعدادات.",
+        "codeLabel": "رمز الاقتران",
+        "codeHint": "عشرة رموز، ولا فرق بين الحروف الكبيرة والصغيرة.",
+        "labelLabel": "اسم هذا الجهاز (اختياري)",
+        "labelHint": "يساعد لاحقًا على معرفة الجهاز المقصود.",
+        "submit": "اقتران",
+        "failed": "رمز الاقتران هذا غير صالح."
     }
 }

@@ -15950,8 +15950,25 @@ test('PAGE-000: der Geltungsbereich ist nicht leer und deckt fast alle Seiten', 
     'Login und Setup zeichnen ohne App-Shell und gehoeren nicht in den Geltungsbereich');
   assert.ok(scope.length >= 15,
     `Nur ${scope.length} Seiten im Geltungsbereich - die Regeln pruefen fast nichts`);
-  assert.ok(scope.length >= all - 8,
-    `${all - scope.length} von ${all} Seiten sind ausgenommen - das ist wieder eine Allowlist`);
+  // ZWEI GRUENDE, NICHT EINER. Aussen vor bleibt eine Seite entweder, WEIL SIE
+  // NICHT HINTER DER SHELL ZEICHNET (Login, Setup, Einladung, Reset, Kopplung) -
+  // das ist Bauart und keine Schuld -, oder weil sie noch nicht migriert ist
+  // (COMPOSITION_PENDING). Die Zahl stand bis zum 16.09.2026 als flaches `- 8`
+  // da und warf beides zusammen; das Budget war damit genau aufgebraucht, und
+  // die naechste eigenstaendige Seite (die Display-Kopplung, #1208) liess den
+  // Nachweis rot werden, obwohl an der Ausnahmeliste nichts gewachsen war.
+  //
+  // Jetzt zaehlt jeder Grund fuer sich. Aufweichen laesst sich das nicht: die
+  // eigenstaendigen Seiten kommen aus `requiresAuth: false` im Router (eine
+  // Seite dort einzutragen hiesse, sie faende die App-Shell nicht mehr - das
+  // faellt sofort auf), und die Ausnahmeliste deckelt PAGE-011 bei
+  // COMPOSITION_PENDING_MAX.
+  const standaloneFiles = rows.filter((r) => !r.auth)
+    .filter((r) => existsSync(new URL(`../public/pages/${r.name}`, import.meta.url))).length;
+  const exempt = all - scope.length;
+  assert.ok(exempt <= standaloneFiles + COMPOSITION_PENDING_MAX,
+    `${exempt} von ${all} Seiten sind ausgenommen, erlaubt sind ${standaloneFiles} eigenstaendige `
+    + `plus ${COMPOSITION_PENDING_MAX} noch nicht migrierte - das ist wieder eine Allowlist`);
   assert.ok(compositionScopeCss().length >= 12,
     'Zu wenige Seiten-CSS im Geltungsbereich - die CSS-Regeln laufen ins Leere');
 });

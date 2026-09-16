@@ -2700,7 +2700,30 @@
         "healthVisibilityApplied_one": "Uma entrada alterada.",
         "mealTypeNamesLabel": "Nomes próprios",
         "mealTypeNamesHint": "Como o seu agregado chama as quatro refeições. Deixe vazio para o nome integrado. O nome aparece igual em todos os idiomas.",
-        "mealTypeNamesSaved": "Nomes guardados."
+        "mealTypeNamesSaved": "Nomes guardados.",
+        "pageDisplays": "Tablets de parede",
+        "pageDisplaysDescription": "Criar um tablet de parede, emparelhar um dispositivo e revogar o seu acesso.",
+        "displaysTitle": "Tablets de parede",
+        "displaysHint": "Um tablet de parede recebe uma conta própria que só este dispositivo pode usar. Não é um membro da família, não inicia sessão e vê apenas o que está visível para o agregado.",
+        "displayDeviceNameLabel": "Nome do tablet",
+        "displayDeviceNameHint": "Por exemplo “Cozinha” ou “Corredor” - serve apenas para os distinguir nesta lista.",
+        "displayCreate": "Adicionar tablet de parede",
+        "displayEmpty": "Ainda não há nenhum tablet de parede.",
+        "displayPaired": "Emparelhado",
+        "displayNotPaired": "Ainda não emparelhado",
+        "displayIssueCode": "Gerar código de emparelhamento",
+        "displayDelete": "Eliminar",
+        "displayDeleteConfirm": "Eliminar “{{name}}”?",
+        "displayPairingCodeLabel": "Código de emparelhamento",
+        "displayPairingCodeHint": "Válido durante 15 minutos e funciona exatamente uma vez. Abre /pair no tablet e escreve-o aí. Só é mostrado agora.",
+        "displayDeviceUnnamed": "Dispositivo sem nome",
+        "displayDeviceLastSeen": "Visto pela última vez: {{when}}",
+        "displayDeviceNeverSeen": "Nunca se ligou",
+        "displayDeviceRevokedAt": "Revogado: {{when}}",
+        "displayRevokeDevice": "Revogar",
+        "displayRevokeConfirm": "Terminar o acesso deste dispositivo?",
+        "displayRevokeDetail": "O tablet deixa de mostrar seja o que for de imediato. Para voltar a usá-lo é preciso emparelhá-lo de novo.",
+        "displayDeleteDetail": "A conta e todos os dispositivos emparelhados são removidos. Isto não pode ser anulado."
     },
     "login": {
         "tagline": "Bem-vindo de volta ao teu planeador familiar.",
@@ -5401,5 +5424,15 @@
         "continuesUntil": "…continua até às {{time}}",
         "overviewEmptyTitle": "Escolhe pessoas para comparar",
         "overviewEmptyDescription": "Seleciona acima pelo menos um membro do agregado para ver os horários semanais lado a lado."
+    },
+    "pairDisplay": {
+        "title": "Emparelhar tablet",
+        "intro": "Introduz o código de emparelhamento que as definições mostram.",
+        "codeLabel": "Código de emparelhamento",
+        "codeHint": "Dez caracteres, maiúsculas e minúsculas não importam.",
+        "labelLabel": "Nome deste dispositivo (opcional)",
+        "labelHint": "Ajuda a reconhecer mais tarde de que dispositivo se trata.",
+        "submit": "Emparelhar",
+        "failed": "Este código de emparelhamento não é válido."
     }
 }

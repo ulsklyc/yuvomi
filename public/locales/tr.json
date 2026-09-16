@@ -2700,7 +2700,30 @@
         "healthVisibilityApplied_one": "Bir kayıt değiştirildi.",
         "mealTypeNamesLabel": "Kendi adlarınız",
         "mealTypeNamesHint": "Haneniz dört öğünü nasıl adlandırıyor. Yerleşik ad için boş bırakın. Ad, her dilde yazdığınız gibi görünür.",
-        "mealTypeNamesSaved": "Adlar kaydedildi."
+        "mealTypeNamesSaved": "Adlar kaydedildi.",
+        "pageDisplays": "Duvar tabletleri",
+        "pageDisplaysDescription": "Duvar tableti oluştur, cihaz eşleştir ve erişimini iptal et.",
+        "displaysTitle": "Duvar tabletleri",
+        "displaysHint": "Duvar tableti, yalnızca bu cihazın kullanabileceği kendi hesabını alır. Aile üyesi değildir, oturum açmaz ve yalnızca ev halkına görünen şeyleri görür.",
+        "displayDeviceNameLabel": "Tabletin adı",
+        "displayDeviceNameHint": "Örneğin “Mutfak” veya “Koridor” - yalnızca bu listede ayırt etmek için.",
+        "displayCreate": "Duvar tableti ekle",
+        "displayEmpty": "Henüz duvar tableti oluşturulmadı.",
+        "displayPaired": "Eşleştirildi",
+        "displayNotPaired": "Henüz eşleştirilmedi",
+        "displayIssueCode": "Eşleştirme kodu oluştur",
+        "displayDelete": "Sil",
+        "displayDeleteConfirm": "“{{name}}” silinsin mi?",
+        "displayPairingCodeLabel": "Eşleştirme kodu",
+        "displayPairingCodeHint": "15 dakika geçerlidir ve tam olarak bir kez kullanılır. Tablette /pair adresini aç ve kodu oraya gir. Yalnızca şimdi gösterilir.",
+        "displayDeviceUnnamed": "Adsız cihaz",
+        "displayDeviceLastSeen": "Son görülme: {{when}}",
+        "displayDeviceNeverSeen": "Hiç bağlanmadı",
+        "displayDeviceRevokedAt": "İptal edildi: {{when}}",
+        "displayRevokeDevice": "İptal et",
+        "displayRevokeConfirm": "Bu cihazın erişimi sonlandırılsın mı?",
+        "displayRevokeDetail": "Tablet hemen hiçbir şey göstermez. Yeniden kullanmak için tekrar eşleştirilmesi gerekir.",
+        "displayDeleteDetail": "Hesap ve eşleştirilmiş tüm cihazlar kaldırılır. Bu geri alınamaz."
     },
     "login": {
         "tagline": "Aile planlayıcına tekrar hoş geldin.",
@@ -5401,5 +5424,15 @@
         "continuesUntil": "…{{time}} saatine kadar sürüyor",
         "overviewEmptyTitle": "Karşılaştırılacak kişileri seç",
         "overviewEmptyDescription": "Haftalık programları yan yana görmek için yukarıdan en az bir hane üyesi seç."
+    },
+    "pairDisplay": {
+        "title": "Tableti eşleştir",
+        "intro": "Ayarlarda gösterilen eşleştirme kodunu gir.",
+        "codeLabel": "Eşleştirme kodu",
+        "codeHint": "On karakter, büyük küçük harf fark etmez.",
+        "labelLabel": "Bu cihazın adı (isteğe bağlı)",
+        "labelHint": "Daha sonra hangi cihaz olduğunu anlamana yardımcı olur.",
+        "submit": "Eşleştir",
+        "failed": "Bu eşleştirme kodu geçerli değil."
     }
 }

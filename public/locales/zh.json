@@ -2700,7 +2700,30 @@
         "healthVisibilityApplied_one": "已修改 1 条记录。",
         "mealTypeNamesLabel": "自定义名称",
         "mealTypeNamesHint": "你家对这四餐的称呼。留空则使用内置名称。名称在所有语言中都按你输入的样子显示。",
-        "mealTypeNamesSaved": "名称已保存。"
+        "mealTypeNamesSaved": "名称已保存。",
+        "pageDisplays": "壁挂平板",
+        "pageDisplaysDescription": "创建壁挂平板、配对设备并撤销其访问权限。",
+        "displaysTitle": "壁挂平板",
+        "displaysHint": "壁挂平板会获得一个专属账户，只有这台设备能使用。它不是家庭成员，不会登录，只能看到对家庭公开的内容。",
+        "displayDeviceNameLabel": "平板名称",
+        "displayDeviceNameHint": "例如「厨房」或「走廊」 - 仅用于在此列表中区分。",
+        "displayCreate": "添加壁挂平板",
+        "displayEmpty": "还没有添加壁挂平板。",
+        "displayPaired": "已配对",
+        "displayNotPaired": "尚未配对",
+        "displayIssueCode": "生成配对码",
+        "displayDelete": "删除",
+        "displayDeleteConfirm": "删除「{{name}}」？",
+        "displayPairingCodeLabel": "配对码",
+        "displayPairingCodeHint": "有效期 15 分钟，且仅能使用一次。在平板上打开 /pair 并在那里输入。它只在此刻显示。",
+        "displayDeviceUnnamed": "未命名设备",
+        "displayDeviceLastSeen": "最后连接：{{when}}",
+        "displayDeviceNeverSeen": "从未连接过",
+        "displayDeviceRevokedAt": "已撤销：{{when}}",
+        "displayRevokeDevice": "撤销",
+        "displayRevokeConfirm": "结束这台设备的访问权限？",
+        "displayRevokeDetail": "平板会立即不再显示任何内容。若要继续使用，必须重新配对。",
+        "displayDeleteDetail": "账户和所有已配对的设备都会被移除。此操作无法撤销。"
     },
     "login": {
         "tagline": "欢迎回到您的家庭计划工具。",
@@ -5401,5 +5424,15 @@
         "continuesUntil": "…持续到 {{time}}",
         "overviewEmptyTitle": "选择要比较的成员",
         "overviewEmptyDescription": "在上方至少选择一名家庭成员,即可并排查看每周时间表。"
+    },
+    "pairDisplay": {
+        "title": "配对平板",
+        "intro": "请输入设置中显示的配对码。",
+        "codeLabel": "配对码",
+        "codeHint": "十个字符，不区分大小写。",
+        "labelLabel": "这台设备的名称（可选）",
+        "labelHint": "有助于以后辨认是哪一台设备。",
+        "submit": "配对",
+        "failed": "此配对码无效。"
     }
 }

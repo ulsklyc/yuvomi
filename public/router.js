@@ -77,6 +77,7 @@ const ROUTES = [
   { path: '/forgot-password', page: '/pages/forgot-password.js', requiresAuth: false, module: null, titleKey: 'forgotPassword.title' },
   { path: '/reset-password',  page: '/pages/reset-password.js',  requiresAuth: false, module: null, titleKey: 'resetPassword.title' },
   { path: '/join',     page: '/pages/join.js',     requiresAuth: false, module: null,        titleKey: 'join.title' },
+  { path: '/pair',     page: '/pages/pair-display.js', requiresAuth: false, module: null,  titleKey: 'pairDisplay.title' },
   { path: '/',         page: '/pages/dashboard.js', requiresAuth: true, module: 'dashboard', titleKey: 'dashboard.title' },
   { path: '/tasks',    page: '/pages/tasks.js',     requiresAuth: true, module: 'tasks',     titleKey: 'nav.tasks' },
   { path: '/shopping', page: '/pages/shopping.js',  requiresAuth: true, module: 'shopping',  titleKey: 'nav.shopping' },
@@ -650,7 +651,7 @@ async function navigate(path, userOrPushState = true, pushState = true) {
       startThirdPartyModulePolling();
       // currentUser kann während des await oben auf null gesetzt worden sein
       // (auth:expired bei 401 von /preferences), daher Guard gegen null.
-      if (currentUser && currentUser.access_scope !== 'split_guest') {
+      if (currentUser && !['split_guest', 'display'].includes(currentUser.access_scope)) {
         loadReminderStyles();
         initReminders();
         initPush();
@@ -729,7 +730,7 @@ async function navigate(path, userOrPushState = true, pushState = true) {
         startThirdPartyModulePolling();
         // currentUser kann während des await oben auf null gesetzt worden sein
         // (auth:expired bei 401 von /preferences), daher Guard gegen null.
-        if (currentUser && currentUser.access_scope !== 'split_guest') {
+        if (currentUser && !['split_guest', 'display'].includes(currentUser.access_scope)) {
           loadReminderStyles();
           initReminders();
           initPush();
@@ -965,7 +966,7 @@ function moduleSnapshot() {
 }
 
 function startThirdPartyModulePolling() {
-  if (_moduleRefreshTimer || currentUser?.access_scope === 'split_guest') return;
+  if (_moduleRefreshTimer || ['split_guest', 'display'].includes(currentUser?.access_scope)) return;
   _moduleRefreshTimer = setInterval(async () => {
     const before = moduleSnapshot();
     await syncThirdPartyModules();
@@ -1679,7 +1680,13 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
  * App-Shell mit Navigation einmalig aufbauen (nach erstem Login).
  */
 function renderAppShell(container) {
+  // Gast und Display teilen sich die schmale Navigation: beide sind
+  // Nicht-Mitglieder mit einer festen, kleinen Erlaubnis, und beide haben
+  // nichts von Mehr-Menue, Suchleiste und System-Reihe. Was sie
+  // UNTERSCHEIDET, steht in navItems() - die Liste, nicht das Geruest.
   const isGuest = currentUser?.access_scope === 'split_guest';
+  const isDisplayShell = currentUser?.access_scope === 'display';
+  const isMinimalNav = isGuest || isDisplayShell;
   const skipLink = document.createElement('a');
   skipLink.href = '#main-content';
   skipLink.className = 'sr-only';
@@ -1870,7 +1877,10 @@ function renderAppShell(container) {
   });
   sidebarSearch.setAttribute('aria-keyshortcuts', '/');
   sidebarSearch.setAttribute('title', `${t('nav.search')} (/)`);
-  sidebar.appendChild(sidebarSearch);
+  // Die Suche greift ueber alle Module und ist fuer ein Wandtablett nicht
+  // freigegeben (`search` steht nicht in DISPLAY_SCOPES) - sie antwortete dort
+  // mit 403. Ein Knopf, der nur scheitern kann, gehoert nicht an die Wand.
+  if (!isDisplayShell) sidebar.appendChild(sidebarSearch);
 
   sidebar.appendChild(sidebarItems);
 
@@ -1899,12 +1909,18 @@ function renderAppShell(container) {
     // Abmelden als terminale Aktion: bricht in eine eigene, volle Zeile unter
     // Hilfe/Änderungen (CSS: flex-wrap + border-top). Monochrom wie die
     // Geschwister — Danger-Rot erscheint erst im Confirm.
-    sidebarActionEl({
+    //
+    // FUER EIN DISPLAY GIBT ES SIE NICHT (#1208). Ein Tablett meldet sich nicht
+    // ab, es wird widerrufen - und `POST /auth/logout` beantwortet der Server
+    // ihm mit 403. Der Knopf haette eine Abmeldung versprochen, die nie
+    // stattfindet, und den Bildschirm im Zweifel in einem Fehlerdialog stehen
+    // lassen.
+    ...(isDisplayShell ? [] : [sidebarActionEl({
       labelKey: 'settings.logout',
       icon: 'log-out',
       className: 'nav-item--logout',
       onClick: () => confirmAndLogout(),
-    }),
+    })]),
   );
   sidebar.appendChild(sidebarFooter);
 
@@ -1927,13 +1943,13 @@ function renderAppShell(container) {
   bottomNav.setAttribute('aria-label', t('nav.navigation'));
   const bottomItems = document.createElement('div');
   bottomItems.className = 'nav-bottom__items';
-  if (isGuest) {
+  if (isMinimalNav) {
     navItems().forEach((item) => bottomItems.appendChild(navItemEl(item)));
   }
 
   let backdrop, moreSheet;
 
-  if (!isGuest) {
+  if (!isMinimalNav) {
     bottomItems.replaceChildren(...buildBottomNavItems());
 
     backdrop = document.createElement('div');
@@ -1978,7 +1994,7 @@ function renderAppShell(container) {
   bottomNav.appendChild(bottomItems);
 
   // Gleitender Tab-Indikator — Geschwister von bottomItems, überlebt replaceChildren auf items
-  if (!isGuest) {
+  if (!isMinimalNav) {
     const tabIndicator = document.createElement('div');
     tabIndicator.className = 'nav-bottom__indicator';
     tabIndicator.setAttribute('aria-hidden', 'true');
@@ -3426,6 +3442,21 @@ function navItems({ catalog = false } = {}) {
   if (currentUser?.access_scope === 'split_guest') {
     return [
       { path: '/budget', label: t('splitExpenses.tabLabel'), icon: MODULE_ICON['split-expenses'], module: 'budget' },
+    ];
+  }
+  // EIN WANDTABLETT ZEIGT NUR, WAS ES AUCH OEFFNEN KANN (#1208). Seine
+  // Berechtigung ist eine feste Scope-Liste, und alles ausserhalb davon
+  // beantwortet der Server mit 403 - eine Leiste, die trotzdem Dokumente,
+  // Einstellungen und Abmelden anboete, versprach an der Kuechenwand lauter
+  // Tueren, die nicht aufgehen. Dieselbe Weiche wie beim Ausgaben-Gast darueber,
+  // nur mit vier Eintraegen statt einem; die Liste spiegelt DISPLAY_SCOPES in
+  // server/services/display-accounts.js.
+  if (currentUser?.access_scope === 'display') {
+    return [
+      { path: '/',         label: t('nav.dashboard'), icon: MODULE_ICON.dashboard, module: 'dashboard' },
+      { path: '/calendar', label: t('nav.calendar'),  icon: MODULE_ICON.calendar,  module: 'calendar' },
+      { path: '/tasks',    label: t('nav.tasks'),     icon: MODULE_ICON.tasks,     module: 'tasks' },
+      { path: '/rewards',  label: t('nav.rewards'),   icon: MODULE_ICON.rewards,   module: 'rewards' },
     ];
   }
   /* DAS ZEICHEN STEHT NICHT HIER, SONDERN IN MODULE_ICON (nav-icons.js).

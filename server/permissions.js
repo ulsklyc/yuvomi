@@ -35,6 +35,10 @@
  */
 
 import { MODULE_KEYS, getModuleKeys, tokenAllows } from './scopes.js';
+// NUR die reinen Listen, NICHT den Dienst: der zieht server/db.js mit, und damit
+// legte jede Suite, die bloss Rechte aufloest, eine echte yuvomi.db im Repo an
+// (test:db-isolation nannte vier davon).
+import { DISPLAY_SCOPE_MODULES } from './display-scopes.js';
 
 // Familienrollen (Subjekt-Achse „role"). Spiegelt den CHECK-Constraint der
 // users.family_role-Spalte (Migration, db.js).
@@ -222,7 +226,7 @@ function loadSubjectRows(database, subjectType, subjectId) {
  * @param {{ id: number, role: string, family_role?: string }} user
  * @returns {{ admin: boolean, modules: Record<string,'none'|'read'|'write'>, widgets: Record<string,'none'|'allow'>, capabilities: Record<string,'none'|'allow'> }}
  */
-export function resolvePermissions(database, user) {
+export function resolvePermissions(database, user, { isDisplay = false } = {}) {
   const isAdmin = user?.role === 'admin';
   const modules = {};
   const widgets = {};
@@ -253,6 +257,40 @@ export function resolvePermissions(database, user) {
   }
   if (user?.id != null) {
     apply(loadSubjectRows(database, 'user', user.id));
+  }
+
+  // EIN WANDTABLETT BEKOMMT SEINE RECHTE AUS SEINER SCOPE-LISTE, NICHT AUS DER
+  // RECHTEMATRIX (#1208).
+  //
+  // `isDisplay` KOMMT VOM AUFRUFER, diese Datei fragt die Datenbank nicht danach.
+  // Der erste Anlauf tat genau das - ein `SELECT 1 FROM display_accounts` hier -
+  // und machte damit aus einer Tabelle des Display-Features eine harte
+  // Abhaengigkeit jeder Rechteaufloesung: FUENF Suiten mit handgebautem Schema
+  // fielen nacheinander mit `no such table` um, jede an einer Stelle, die mit
+  // Displays nichts zu tun hat. Wer die Antwort schon hat, reicht sie herein -
+  // `requireAuth()` weiss es aus `req.authMethod`, ohne eine einzige Abfrage.
+  // Der Standard ist `false`, also verhaelt sich jeder andere Aufrufer wie zuvor.
+  //
+  // Der Block steht NACH den beiden apply()-Durchgaengen:
+  // was ein Display darf, ist eine Produktentscheidung, kein Feld, das ein
+  // Administrator aufbohren kann - eine gespeicherte Zeile fuer dieses Konto
+  // wird hier bewusst ueberschrieben.
+  //
+  // UND ES STEHT VOR DER WIDGET-VERERBUNG DARUNTER, weil genau die den Rest
+  // erledigt: die Uebersicht bot dem Tablett Kacheln fuer Geburtstage, Budget
+  // und Notizen an, die der Server dann leer liess (im Browser gesehen). Eine
+  // zweite Liste im Frontend haette das auch behoben - und waere die zweite
+  // Wahrheit darueber gewesen, was ein Display sieht. So folgt alles derselben
+  // Quelle: Navigation, Kacheln und der Anlege-Knopf, der bei `read` verschwindet.
+  //
+  // `read` und nicht `write`: in diesem Schritt schaut ein Display nur zu. Die
+  // beiden Aktionen kommen mit #1209, und dann aendert sich DISPLAY_SCOPES,
+  // nicht diese Stelle.
+  if (isDisplay) {
+    const allowed = new Set(DISPLAY_SCOPE_MODULES);
+    for (const key of Object.keys(modules)) {
+      modules[key] = allowed.has(key) ? 'read' : 'none';
+    }
   }
 
   // Widgets erben die Modulsperre.
@@ -378,8 +416,8 @@ export function moduleAccessVerdict(sessionModuleAccess, moduleKey, access) {
  * Admin-Flag. Der Client blendet damit Nav-Einträge, Settings-Ziele und
  * Dashboard-Widgets aus — die verbindliche Durchsetzung bleibt serverseitig.
  */
-export function clientPermissions(database, user) {
-  const { admin, modules, widgets, capabilities } = resolvePermissions(database, user);
+export function clientPermissions(database, user, { isDisplay = false } = {}) {
+  const { admin, modules, widgets, capabilities } = resolvePermissions(database, user, { isDisplay });
   return { admin, modules, widgets, capabilities };
 }
 

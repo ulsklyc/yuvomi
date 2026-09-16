@@ -2700,7 +2700,30 @@
         "healthVisibilityApplied_one": "En post ändrad.",
         "mealTypeNamesLabel": "Egna namn",
         "mealTypeNamesHint": "Vad ditt hushåll kallar de fyra måltiderna. Lämna tomt för det inbyggda namnet. Namnet visas likadant på alla språk.",
-        "mealTypeNamesSaved": "Namnen har sparats."
+        "mealTypeNamesSaved": "Namnen har sparats.",
+        "pageDisplays": "Väggplattor",
+        "pageDisplaysDescription": "Skapa en väggplatta, parkoppla en enhet och återkalla dess åtkomst.",
+        "displaysTitle": "Väggplattor",
+        "displaysHint": "En väggplatta får ett eget konto som bara den här enheten kan använda. Den är inte en familjemedlem, loggar inte in och ser bara det som är synligt för hushållet.",
+        "displayDeviceNameLabel": "Plattans namn",
+        "displayDeviceNameHint": "Till exempel ”Köket” eller ”Hallen” - bara för att skilja dem åt i den här listan.",
+        "displayCreate": "Lägg till väggplatta",
+        "displayEmpty": "Ingen väggplatta har skapats än.",
+        "displayPaired": "Parkopplad",
+        "displayNotPaired": "Inte parkopplad än",
+        "displayIssueCode": "Skapa parkopplingskod",
+        "displayDelete": "Ta bort",
+        "displayDeleteConfirm": "Ta bort ”{{name}}”?",
+        "displayPairingCodeLabel": "Parkopplingskod",
+        "displayPairingCodeHint": "Giltig i 15 minuter och fungerar exakt en gång. Öppna /pair på plattan och skriv in den där. Den visas bara nu.",
+        "displayDeviceUnnamed": "Namnlös enhet",
+        "displayDeviceLastSeen": "Senast sedd: {{when}}",
+        "displayDeviceNeverSeen": "Har aldrig anslutit",
+        "displayDeviceRevokedAt": "Återkallad: {{when}}",
+        "displayRevokeDevice": "Återkalla",
+        "displayRevokeConfirm": "Avsluta den här enhetens åtkomst?",
+        "displayRevokeDetail": "Plattan slutar genast visa något. För att använda den igen måste den parkopplas på nytt.",
+        "displayDeleteDetail": "Kontot och alla parkopplade enheter tas bort. Det går inte att ångra."
     },
     "login": {
         "tagline": "Välkommen tillbaka till din familjeplanerare.",
@@ -5401,5 +5424,15 @@
         "continuesUntil": "…fortsätter till {{time}}",
         "overviewEmptyTitle": "Välj personer att jämföra",
         "overviewEmptyDescription": "Välj minst en hushållsmedlem ovan för att se veckoscheman sida vid sida."
+    },
+    "pairDisplay": {
+        "title": "Parkoppla platta",
+        "intro": "Ange parkopplingskoden som visas i inställningarna.",
+        "codeLabel": "Parkopplingskod",
+        "codeHint": "Tio tecken, stora eller små bokstäver spelar ingen roll.",
+        "labelLabel": "Den här enhetens namn (valfritt)",
+        "labelHint": "Hjälper dig att senare känna igen vilken enhet som avses.",
+        "submit": "Parkoppla",
+        "failed": "Den här parkopplingskoden gäller inte."
     }
 }

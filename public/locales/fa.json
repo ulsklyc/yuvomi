@@ -2712,7 +2712,30 @@
         "healthVisibilityApplied_one": "یک ورودی تغییر کرد.",
         "mealTypeNamesLabel": "نام‌های دلخواه",
         "mealTypeNamesHint": "خانواده شما چهار وعده را چه می‌نامد. برای نام پیش‌فرض خالی بگذارید. نام در همه زبان‌ها دقیقاً همان‌طور که می‌نویسید نمایش داده می‌شود.",
-        "mealTypeNamesSaved": "نام‌ها ذخیره شد."
+        "mealTypeNamesSaved": "نام‌ها ذخیره شد.",
+        "pageDisplays": "تبلت‌های دیواری",
+        "pageDisplaysDescription": "ساخت تبلت دیواری، جفت کردن دستگاه و باطل کردن دسترسی آن.",
+        "displaysTitle": "تبلت‌های دیواری",
+        "displaysHint": "تبلت دیواری حساب مخصوص خودش را می‌گیرد که فقط همین دستگاه می‌تواند از آن استفاده کند. عضو خانواده نیست، وارد حساب نمی‌شود و فقط چیزی را می‌بیند که برای خانوار قابل مشاهده است.",
+        "displayDeviceNameLabel": "نام تبلت",
+        "displayDeviceNameHint": "برای نمونه «آشپزخانه» یا «راهرو» - فقط برای تشخیص آن‌ها در این فهرست.",
+        "displayCreate": "افزودن تبلت دیواری",
+        "displayEmpty": "هنوز هیچ تبلت دیواری ساخته نشده است.",
+        "displayPaired": "جفت‌شده",
+        "displayNotPaired": "هنوز جفت نشده",
+        "displayIssueCode": "ساخت کد جفت‌سازی",
+        "displayDelete": "حذف",
+        "displayDeleteConfirm": "«{{name}}» حذف شود؟",
+        "displayPairingCodeLabel": "کد جفت‌سازی",
+        "displayPairingCodeHint": "۱۵ دقیقه اعتبار دارد و دقیقاً یک بار کار می‌کند. روی تبلت نشانی /pair را باز کنید و آن را همان‌جا وارد کنید. فقط همین حالا نمایش داده می‌شود.",
+        "displayDeviceUnnamed": "دستگاه بدون نام",
+        "displayDeviceLastSeen": "آخرین بار دیده شده: {{when}}",
+        "displayDeviceNeverSeen": "هرگز متصل نشده",
+        "displayDeviceRevokedAt": "باطل شد: {{when}}",
+        "displayRevokeDevice": "باطل کردن",
+        "displayRevokeConfirm": "دسترسی این دستگاه پایان یابد؟",
+        "displayRevokeDetail": "تبلت بی‌درنگ دیگر چیزی نشان نمی‌دهد. برای استفادهٔ دوباره باید از نو جفت شود.",
+        "displayDeleteDetail": "حساب و همهٔ دستگاه‌های جفت‌شده حذف می‌شوند. این کار برگشت‌پذیر نیست."
     },
     "login": {
         "tagline": "دوباره به برنامه‌ریز خانوادگی‌تان خوش آمدید.",
@@ -5401,5 +5424,15 @@
         "continuesUntil": "…تا {{time}} ادامه دارد",
         "overviewEmptyTitle": "افرادی را برای مقایسه انتخاب کن",
         "overviewEmptyDescription": "بالا دست‌کم یک عضو خانواده را انتخاب کن تا برنامه‌های هفتگی را کنار هم ببینی."
+    },
+    "pairDisplay": {
+        "title": "جفت‌سازی تبلت",
+        "intro": "کد جفت‌سازی را که تنظیمات نشان می‌دهد وارد کنید.",
+        "codeLabel": "کد جفت‌سازی",
+        "codeHint": "ده نویسه، بزرگ یا کوچک بودن حروف مهم نیست.",
+        "labelLabel": "نام این دستگاه (اختیاری)",
+        "labelHint": "کمک می‌کند بعداً بفهمید کدام دستگاه است.",
+        "submit": "جفت کردن",
+        "failed": "این کد جفت‌سازی معتبر نیست."
     }
 }

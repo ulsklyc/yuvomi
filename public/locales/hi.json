@@ -2700,7 +2700,30 @@
         "healthVisibilityApplied_one": "एक प्रविष्टि बदली गई।",
         "mealTypeNamesLabel": "अपने नाम",
         "mealTypeNamesHint": "आपका परिवार चारों भोजन को क्या कहता है। अंतर्निहित नाम के लिए खाली छोड़ें। नाम हर भाषा में वैसा ही दिखता है जैसा आप लिखते हैं।",
-        "mealTypeNamesSaved": "नाम सहेजे गए।"
+        "mealTypeNamesSaved": "नाम सहेजे गए।",
+        "pageDisplays": "दीवार टैबलेट",
+        "pageDisplaysDescription": "दीवार टैबलेट बनाएँ, डिवाइस जोड़ें और उसकी पहुँच रद्द करें।",
+        "displaysTitle": "दीवार टैबलेट",
+        "displaysHint": "दीवार टैबलेट को अपना अलग खाता मिलता है, जिसे केवल यही डिवाइस इस्तेमाल कर सकता है। यह परिवार का सदस्य नहीं है, लॉग इन नहीं करता और केवल वही देखता है जो पूरे घर के लिए दिखता है।",
+        "displayDeviceNameLabel": "टैबलेट का नाम",
+        "displayDeviceNameHint": "उदाहरण के लिए “रसोई” या “गलियारा” - केवल इस सूची में पहचानने के लिए।",
+        "displayCreate": "दीवार टैबलेट जोड़ें",
+        "displayEmpty": "अभी तक कोई दीवार टैबलेट नहीं बनाया गया।",
+        "displayPaired": "जुड़ा हुआ",
+        "displayNotPaired": "अभी तक नहीं जुड़ा",
+        "displayIssueCode": "जोड़ने का कोड बनाएँ",
+        "displayDelete": "हटाएँ",
+        "displayDeleteConfirm": "“{{name}}” हटाएँ?",
+        "displayPairingCodeLabel": "जोड़ने का कोड",
+        "displayPairingCodeHint": "15 मिनट तक वैध और ठीक एक बार ही चलता है। टैबलेट पर /pair खोलें और वहाँ यह कोड डालें। यह केवल अभी दिखाया जाता है।",
+        "displayDeviceUnnamed": "बिना नाम का डिवाइस",
+        "displayDeviceLastSeen": "आखिरी बार देखा गया: {{when}}",
+        "displayDeviceNeverSeen": "कभी कनेक्ट नहीं हुआ",
+        "displayDeviceRevokedAt": "रद्द किया गया: {{when}}",
+        "displayRevokeDevice": "रद्द करें",
+        "displayRevokeConfirm": "इस डिवाइस की पहुँच खत्म करें?",
+        "displayRevokeDetail": "टैबलेट तुरंत कुछ भी दिखाना बंद कर देता है। आगे इस्तेमाल करने के लिए इसे फिर से जोड़ना होगा।",
+        "displayDeleteDetail": "खाता और सभी जुड़े हुए डिवाइस हटा दिए जाएँगे। इसे वापस नहीं लिया जा सकता।"
     },
     "login": {
         "tagline": "अपने पारिवारिक प्लानर में फिर से आपका स्वागत है।",
@@ -5401,5 +5424,15 @@
         "continuesUntil": "…{{time}} तक जारी है",
         "overviewEmptyTitle": "तुलना के लिए लोग चुनें",
         "overviewEmptyDescription": "साप्ताहिक समय-सारिणी साथ-साथ देखने के लिए ऊपर कम से कम एक सदस्य चुनें।"
+    },
+    "pairDisplay": {
+        "title": "टैबलेट जोड़ें",
+        "intro": "वह कोड डालें जो सेटिंग्स में दिख रहा है।",
+        "codeLabel": "जोड़ने का कोड",
+        "codeHint": "दस अक्षर, छोटे या बड़े अक्षर से फर्क नहीं पड़ता।",
+        "labelLabel": "इस डिवाइस का नाम (वैकल्पिक)",
+        "labelHint": "बाद में पहचानने में मदद करता है कि कौन सा डिवाइस है।",
+        "submit": "जोड़ें",
+        "failed": "यह कोड मान्य नहीं है।"
     }
 }

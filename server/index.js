@@ -75,6 +75,7 @@ import familyRouter from './routes/family.js';
 // halten den Guard sehend.
 import displaysRouter from './routes/displays.js';
 import { pairingRouter } from './routes/displays.js';
+import { displayMayRead } from './display-scopes.js';
 import backupRouter from './routes/backup.js';
 import housekeepingRouter from './routes/housekeeping.js';
 import wasteRouter from './routes/waste/index.js';
@@ -551,6 +552,14 @@ app.use('/api/v1', (req, res, next) => {
 // `authScopes === null` und steigen in derselben Zeile aus wie vorher.
 app.use('/api/v1', (req, res, next) => {
   if (req.authScopes == null) return next();
+  // Ein gekoppeltes Display darf zusaetzlich zu seinen Modulen drei Geruestpfade
+  // LESEN (services/display-accounts.js, `DISPLAY_READ_PATHS`): die eigene
+  // Zeile, die Darstellungseinstellungen und die Modulliste. Keiner davon ist
+  // ein scopebares Modul, also verwuerfe dieses Gate sie samt und sonders - und
+  // die App auf dem Tablett kaeme nie ueber ihren Start hinaus. Die Ausnahme
+  // gilt NUR fuer `authMethod === 'display'`; fuer ein gescoptes Token aendert
+  // sich nichts.
+  if (req.authMethod === 'display' && displayMayRead(req.method, req.path)) return next();
   const moduleKey = moduleForPath(req.path);
   const access = requiredAccess(req.method);
   if (tokenAllows(req.authScopes, moduleKey, access)) return next();

@@ -2700,7 +2700,30 @@
         "healthVisibilityApplied_one": "Una voce aggiornata.",
         "mealTypeNamesLabel": "Nomi personalizzati",
         "mealTypeNamesHint": "Come la tua famiglia chiama i quattro pasti. Lascia vuoto per il nome integrato. Il nome appare uguale in tutte le lingue.",
-        "mealTypeNamesSaved": "Nomi salvati."
+        "mealTypeNamesSaved": "Nomi salvati.",
+        "pageDisplays": "Tablet da parete",
+        "pageDisplaysDescription": "Creare un tablet da parete, associare un dispositivo e revocarne l'accesso.",
+        "displaysTitle": "Tablet da parete",
+        "displaysHint": "Un tablet da parete riceve un account proprio, utilizzabile solo da questo dispositivo. Non è un membro della famiglia, non accede e vede solo ciò che è visibile alla famiglia.",
+        "displayDeviceNameLabel": "Nome del tablet",
+        "displayDeviceNameHint": "Ad esempio «Cucina» o «Ingresso» - serve solo a distinguerli in questo elenco.",
+        "displayCreate": "Aggiungi tablet da parete",
+        "displayEmpty": "Nessun tablet da parete creato finora.",
+        "displayPaired": "Associato",
+        "displayNotPaired": "Non ancora associato",
+        "displayIssueCode": "Genera codice di associazione",
+        "displayDelete": "Elimina",
+        "displayDeleteConfirm": "Eliminare «{{name}}»?",
+        "displayPairingCodeLabel": "Codice di associazione",
+        "displayPairingCodeHint": "Valido 15 minuti e utilizzabile una sola volta. Apri /pair sul tablet e digitalo lì. Viene mostrato solo adesso.",
+        "displayDeviceUnnamed": "Dispositivo senza nome",
+        "displayDeviceLastSeen": "Visto l'ultima volta: {{when}}",
+        "displayDeviceNeverSeen": "Mai connesso",
+        "displayDeviceRevokedAt": "Revocato: {{when}}",
+        "displayRevokeDevice": "Revoca",
+        "displayRevokeConfirm": "Terminare l'accesso di questo dispositivo?",
+        "displayRevokeDetail": "Il tablet smette subito di mostrare qualsiasi cosa. Per riutilizzarlo occorre associarlo di nuovo.",
+        "displayDeleteDetail": "L'account e tutti i dispositivi associati vengono rimossi. L'operazione non può essere annullata."
     },
     "login": {
         "tagline": "Bentornato nel tuo pianificatore familiare.",
@@ -5401,5 +5424,15 @@
         "continuesUntil": "…continua fino alle {{time}}",
         "overviewEmptyTitle": "Scegli le persone da confrontare",
         "overviewEmptyDescription": "Seleziona sopra almeno un membro della famiglia per vedere gli orari settimanali affiancati."
+    },
+    "pairDisplay": {
+        "title": "Associa tablet",
+        "intro": "Inserisci il codice di associazione mostrato nelle impostazioni.",
+        "codeLabel": "Codice di associazione",
+        "codeHint": "Dieci caratteri, maiuscole e minuscole non contano.",
+        "labelLabel": "Nome di questo dispositivo (facoltativo)",
+        "labelHint": "Aiuta a riconoscere in seguito di quale dispositivo si tratta.",
+        "submit": "Associa",
+        "failed": "Questo codice di associazione non è valido."
     }
 }

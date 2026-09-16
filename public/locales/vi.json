@@ -2700,7 +2700,30 @@
         "healthVisibilityApplied_one": "Đã đổi một mục.",
         "mealTypeNamesLabel": "Tên riêng của bạn",
         "mealTypeNamesHint": "Gia đình bạn gọi bốn bữa ăn là gì. Để trống để dùng tên mặc định. Tên hiển thị giống nhau trong mọi ngôn ngữ.",
-        "mealTypeNamesSaved": "Đã lưu tên."
+        "mealTypeNamesSaved": "Đã lưu tên.",
+        "pageDisplays": "Máy tính bảng gắn tường",
+        "pageDisplaysDescription": "Tạo máy tính bảng gắn tường, ghép nối thiết bị và thu hồi quyền truy cập của nó.",
+        "displaysTitle": "Máy tính bảng gắn tường",
+        "displaysHint": "Máy tính bảng gắn tường có tài khoản riêng mà chỉ thiết bị này dùng được. Nó không phải là thành viên gia đình, không đăng nhập và chỉ thấy những gì hiển thị cho hộ gia đình.",
+        "displayDeviceNameLabel": "Tên máy tính bảng",
+        "displayDeviceNameHint": "Ví dụ “Nhà bếp” hoặc “Hành lang” - chỉ để phân biệt trong danh sách này.",
+        "displayCreate": "Thêm máy tính bảng gắn tường",
+        "displayEmpty": "Chưa có máy tính bảng gắn tường nào.",
+        "displayPaired": "Đã ghép nối",
+        "displayNotPaired": "Chưa ghép nối",
+        "displayIssueCode": "Tạo mã ghép nối",
+        "displayDelete": "Xóa",
+        "displayDeleteConfirm": "Xóa “{{name}}”?",
+        "displayPairingCodeLabel": "Mã ghép nối",
+        "displayPairingCodeHint": "Có hiệu lực 15 phút và chỉ dùng được đúng một lần. Mở /pair trên máy tính bảng và nhập mã ở đó. Mã chỉ hiển thị lúc này.",
+        "displayDeviceUnnamed": "Thiết bị chưa đặt tên",
+        "displayDeviceLastSeen": "Lần cuối nhìn thấy: {{when}}",
+        "displayDeviceNeverSeen": "Chưa từng kết nối",
+        "displayDeviceRevokedAt": "Đã thu hồi: {{when}}",
+        "displayRevokeDevice": "Thu hồi",
+        "displayRevokeConfirm": "Kết thúc quyền truy cập của thiết bị này?",
+        "displayRevokeDetail": "Máy tính bảng lập tức không hiển thị gì nữa. Để dùng tiếp, phải ghép nối lại.",
+        "displayDeleteDetail": "Tài khoản và mọi thiết bị đã ghép nối sẽ bị xóa. Không thể hoàn tác."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại trình lập kế hoạch gia đình.",
@@ -5401,5 +5424,15 @@
         "continuesUntil": "…tiếp tục đến {{time}}",
         "overviewEmptyTitle": "Chọn người để so sánh",
         "overviewEmptyDescription": "Chọn phía trên ít nhất một thành viên gia đình để xem lịch trình hằng tuần cạnh nhau."
+    },
+    "pairDisplay": {
+        "title": "Ghép nối máy tính bảng",
+        "intro": "Nhập mã ghép nối được hiển thị trong phần cài đặt.",
+        "codeLabel": "Mã ghép nối",
+        "codeHint": "Mười ký tự, không phân biệt chữ hoa chữ thường.",
+        "labelLabel": "Tên thiết bị này (không bắt buộc)",
+        "labelHint": "Giúp nhận ra sau này đây là thiết bị nào.",
+        "submit": "Ghép nối",
+        "failed": "Mã ghép nối này không hợp lệ."
     }
 }

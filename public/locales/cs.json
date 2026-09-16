@@ -2700,7 +2700,30 @@
         "healthVisibilityApplied_one": "Upraven jeden záznam.",
         "mealTypeNamesLabel": "Vlastní názvy",
         "mealTypeNamesHint": "Jak vaše domácnost nazývá čtyři jídla. Ponechte prázdné pro vestavěný název. Název se ve všech jazycích zobrazí přesně tak, jak jej napíšete.",
-        "mealTypeNamesSaved": "Názvy uloženy."
+        "mealTypeNamesSaved": "Názvy uloženy.",
+        "pageDisplays": "Nástěnné tablety",
+        "pageDisplaysDescription": "Vytvořit nástěnný tablet, spárovat zařízení a odvolat jeho přístup.",
+        "displaysTitle": "Nástěnné tablety",
+        "displaysHint": "Nástěnný tablet dostane vlastní účet, který může používat jen toto zařízení. Není členem rodiny, nepřihlašuje se a vidí jen to, co je viditelné pro domácnost.",
+        "displayDeviceNameLabel": "Název tabletu",
+        "displayDeviceNameHint": "Například „Kuchyně“ nebo „Chodba“ - slouží jen k rozlišení v tomto seznamu.",
+        "displayCreate": "Přidat nástěnný tablet",
+        "displayEmpty": "Zatím není vytvořen žádný nástěnný tablet.",
+        "displayPaired": "Spárováno",
+        "displayNotPaired": "Zatím nespárováno",
+        "displayIssueCode": "Vygenerovat párovací kód",
+        "displayDelete": "Odstranit",
+        "displayDeleteConfirm": "Odstranit „{{name}}“?",
+        "displayPairingCodeLabel": "Párovací kód",
+        "displayPairingCodeHint": "Platí 15 minut a lze jej použít právě jednou. Otevřete na tabletu /pair a zadejte jej tam. Zobrazí se pouze teď.",
+        "displayDeviceUnnamed": "Nepojmenované zařízení",
+        "displayDeviceLastSeen": "Naposledy viděno: {{when}}",
+        "displayDeviceNeverSeen": "Nikdy nepřipojeno",
+        "displayDeviceRevokedAt": "Odvoláno: {{when}}",
+        "displayRevokeDevice": "Odvolat",
+        "displayRevokeConfirm": "Ukončit přístup tohoto zařízení?",
+        "displayRevokeDetail": "Tablet okamžitě přestane cokoli zobrazovat. Aby se dal znovu používat, musí se znovu spárovat.",
+        "displayDeleteDetail": "Účet a všechna spárovaná zařízení budou odstraněny. Tuto akci nelze vzít zpět."
     },
     "login": {
         "tagline": "Vítejte zpět ve svém rodinném plánovači.",
@@ -5401,5 +5424,15 @@
         "continuesUntil": "…pokračuje do {{time}}",
         "overviewEmptyTitle": "Vyberte osoby k porovnání",
         "overviewEmptyDescription": "Vyberte výše alespoň jednoho člena domácnosti a zobrazte týdenní rozvrhy vedle sebe."
+    },
+    "pairDisplay": {
+        "title": "Spárovat tablet",
+        "intro": "Zadejte párovací kód, který ukazuje nastavení.",
+        "codeLabel": "Párovací kód",
+        "codeHint": "Deset znaků, na velikosti písmen nezáleží.",
+        "labelLabel": "Název tohoto zařízení (nepovinné)",
+        "labelHint": "Pomůže později poznat, o které zařízení jde.",
+        "submit": "Spárovat",
+        "failed": "Tento párovací kód neplatí."
     }
 }

@@ -2712,7 +2712,30 @@
         "healthVisibilityApplied_one": "Isang entry ang binago.",
         "mealTypeNamesLabel": "Sarili mong mga pangalan",
         "mealTypeNamesHint": "Kung ano ang tawag ng inyong sambahayan sa apat na pagkain. Iwanang blangko para sa nakatakdang pangalan. Lumalabas ang pangalan sa lahat ng wika nang eksakto tulad ng iyong isinulat.",
-        "mealTypeNamesSaved": "Na-save ang mga pangalan."
+        "mealTypeNamesSaved": "Na-save ang mga pangalan.",
+        "pageDisplays": "Mga wall tablet",
+        "pageDisplaysDescription": "Gumawa ng wall tablet, ipares ang device at bawiin ang access nito.",
+        "displaysTitle": "Mga wall tablet",
+        "displaysHint": "Ang wall tablet ay may sariling account na ang device na ito lang ang makakagamit. Hindi ito miyembro ng pamilya, hindi ito nagla-log in, at nakikita lang nito ang nakikita ng sambahayan.",
+        "displayDeviceNameLabel": "Pangalan ng tablet",
+        "displayDeviceNameHint": "Halimbawa “Kusina” o “Pasilyo” - para lang mapagkaiba ang mga ito sa listahang ito.",
+        "displayCreate": "Magdagdag ng wall tablet",
+        "displayEmpty": "Wala pang wall tablet.",
+        "displayPaired": "Naipares na",
+        "displayNotPaired": "Hindi pa naipapares",
+        "displayIssueCode": "Gumawa ng pairing code",
+        "displayDelete": "Burahin",
+        "displayDeleteConfirm": "Burahin ang “{{name}}”?",
+        "displayPairingCodeLabel": "Pairing code",
+        "displayPairingCodeHint": "Balido sa loob ng 15 minuto at isang beses lang gumagana. Buksan ang /pair sa tablet at i-type ito doon. Ipinapakita lang ito ngayon.",
+        "displayDeviceUnnamed": "Device na walang pangalan",
+        "displayDeviceLastSeen": "Huling nakita: {{when}}",
+        "displayDeviceNeverSeen": "Hindi pa kailanman nakakonekta",
+        "displayDeviceRevokedAt": "Binawi: {{when}}",
+        "displayRevokeDevice": "Bawiin",
+        "displayRevokeConfirm": "Tapusin ang access ng device na ito?",
+        "displayRevokeDetail": "Agad nang hihinto ang tablet sa pagpapakita ng kahit ano. Para magamit ulit, kailangan itong ipares muli.",
+        "displayDeleteDetail": "Aalisin ang account at lahat ng naipares na device. Hindi ito maibabalik."
     },
     "login": {
         "tagline": "Maligayang pagbabalik sa iyong family planner.",
@@ -5401,5 +5424,15 @@
         "continuesUntil": "…magpapatuloy hanggang {{time}}",
         "overviewEmptyTitle": "Pumili ng mga tao na ikukumpara",
         "overviewEmptyDescription": "Pumili sa itaas ng kahit isang miyembro ng sambahayan para makita ang lingguhang iskedyul nang magkatabi."
+    },
+    "pairDisplay": {
+        "title": "Ipares ang tablet",
+        "intro": "Ilagay ang pairing code na ipinapakita sa mga setting.",
+        "codeLabel": "Pairing code",
+        "codeHint": "Sampung character, hindi mahalaga kung malaki o maliit ang titik.",
+        "labelLabel": "Pangalan ng device na ito (opsyonal)",
+        "labelHint": "Nakakatulong itong makilala mamaya kung aling device ang tinutukoy.",
+        "submit": "Ipares",
+        "failed": "Hindi balido ang pairing code na ito."
     }
 }

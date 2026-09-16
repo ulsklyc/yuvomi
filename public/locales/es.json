@@ -2700,7 +2700,30 @@
         "healthVisibilityApplied_one": "Una entrada cambiada.",
         "mealTypeNamesLabel": "Nombres propios",
         "mealTypeNamesHint": "Cómo llama tu hogar a las cuatro comidas. Déjalo vacío para el nombre integrado. El nombre se muestra igual en todos los idiomas.",
-        "mealTypeNamesSaved": "Nombres guardados."
+        "mealTypeNamesSaved": "Nombres guardados.",
+        "pageDisplays": "Tabletas de pared",
+        "pageDisplaysDescription": "Crear una tableta de pared, vincular un dispositivo y revocar su acceso.",
+        "displaysTitle": "Tabletas de pared",
+        "displaysHint": "Una tableta de pared recibe su propia cuenta, que solo puede usar este dispositivo. No es un miembro de la familia, no inicia sesión y solo ve lo que es visible para el hogar.",
+        "displayDeviceNameLabel": "Nombre de la tableta",
+        "displayDeviceNameHint": "Por ejemplo «Cocina» o «Pasillo» - solo para distinguirlas en esta lista.",
+        "displayCreate": "Añadir tableta de pared",
+        "displayEmpty": "Todavía no hay ninguna tableta de pared.",
+        "displayPaired": "Vinculada",
+        "displayNotPaired": "Aún no vinculada",
+        "displayIssueCode": "Generar código de vinculación",
+        "displayDelete": "Eliminar",
+        "displayDeleteConfirm": "¿Eliminar «{{name}}»?",
+        "displayPairingCodeLabel": "Código de vinculación",
+        "displayPairingCodeHint": "Válido 15 minutos y se puede usar una sola vez. Abre /pair en la tableta e introdúcelo allí. Solo se muestra ahora.",
+        "displayDeviceUnnamed": "Dispositivo sin nombre",
+        "displayDeviceLastSeen": "Visto por última vez: {{when}}",
+        "displayDeviceNeverSeen": "Nunca se ha conectado",
+        "displayDeviceRevokedAt": "Revocado: {{when}}",
+        "displayRevokeDevice": "Revocar",
+        "displayRevokeConfirm": "¿Finalizar el acceso de este dispositivo?",
+        "displayRevokeDetail": "La tableta deja de mostrar nada de inmediato. Para volver a usarla hay que vincularla de nuevo.",
+        "displayDeleteDetail": "Se eliminan la cuenta y todos los dispositivos vinculados. Esto no se puede deshacer."
     },
     "login": {
         "tagline": "Bienvenido de nuevo a tu planificador familiar.",
@@ -5401,5 +5424,15 @@
         "continuesUntil": "…continúa hasta las {{time}}",
         "overviewEmptyTitle": "Elige personas para comparar",
         "overviewEmptyDescription": "Selecciona arriba al menos un miembro del hogar para ver los horarios semanales uno junto al otro."
+    },
+    "pairDisplay": {
+        "title": "Vincular tableta",
+        "intro": "Introduce el código de vinculación que muestran los ajustes.",
+        "codeLabel": "Código de vinculación",
+        "codeHint": "Diez caracteres, mayúsculas y minúsculas dan igual.",
+        "labelLabel": "Nombre de este dispositivo (opcional)",
+        "labelHint": "Ayuda a reconocer más tarde de qué dispositivo se trata.",
+        "submit": "Vincular",
+        "failed": "Este código de vinculación no es válido."
     }
 }

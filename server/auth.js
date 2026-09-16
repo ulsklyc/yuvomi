@@ -16,7 +16,8 @@ import { createLogger } from './logger.js';
 import { memberEmail } from './services/member-email.js';
 import { accessScopeSql, householdMemberSql } from './services/household-members.js';
 import {
-  DISPLAY_COOKIE, DISPLAY_SCOPES, authenticateDisplayDevice, displayTokenFromRequest, isDisplayAccount,
+  DISPLAY_COOKIE, DISPLAY_SCOPES, authenticateDisplayDevice, displayMayRead, displayTokenFromRequest,
+  isDisplayAccount,
 } from './services/display-accounts.js';
 import { deleteBirthdayArtifacts, syncBirthdayArtifacts } from './services/birthdays.js';
 import * as oidcClient from 'openid-client';
@@ -118,7 +119,10 @@ function othersCanRead(database, userId) {
  * angehoben werden muss diese Zahl nur dort, wo eine kuenftige Aenderung eine
  * erneute Einfuehrung rechtfertigt (siehe Migration 168 in db.js).
  */
-const CURRENT_ONBOARDING_VERSION = 1;
+// Exportiert, seit die Display-Route sie beim Anlegen setzt (#1208): ein
+// Wandtablett ueberspringt die Begruessungstour. Eine zweite `1` dort waere eine
+// Zahl, die beim naechsten Anheben stillschweigend zurueckbliebe.
+export const CURRENT_ONBOARDING_VERSION = 1;
 
 const USER_PUBLIC_COLUMNS = `
   id,
@@ -427,7 +431,16 @@ router.use((req, res, next) => {
   if (displayToken) {
     let device = null;
     try { device = authenticateDisplayDevice(displayToken); } catch { device = null; }
-    if (device) {
+    // `GET /auth/me` ist die eine Ausnahme, und sie ist keine Grosszuegigkeit,
+    // sondern die Voraussetzung dafuer, dass die App auf dem Tablett ueberhaupt
+    // startet: der Auth-Guard in public/router.js fragt sie als erstes und
+    // schickt bei einem Fehler auf die Anmeldeseite (im Browser gemessen).
+    // Sie liefert die EIGENE Zeile und keine Haushaltsdaten - dasselbe
+    // Zugestaendnis, das der Ausgaben-Gast in server/index.js schon hat.
+    // `/auth` davor, weil `req.path` HIER relativ zum Mount ist (`/me`), die
+    // Liste aber `/api/v1`-relativ gefuehrt wird - eine Liste, zwei Verankerungen
+    // waeren zwei Wahrheiten darueber, was ein Display lesen darf.
+    if (device && !displayMayRead(req.method, `/auth${req.path}`)) {
       return res.status(403).json({ error: 'A paired display cannot use the account routes.', code: 403 });
     }
   }
@@ -712,7 +725,9 @@ function applyRoleModuleAccess(req) {
       .prepare('SELECT id, role, family_role FROM users WHERE id = ?')
       .get(req.authUserId);
     if (user) {
-      req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db.get(), user));
+      req.sessionModuleAccess = buildSessionModuleAccess(
+        resolvePermissions(db.get(), user, { isDisplay: req.authMethod === 'display' }),
+      );
     }
   } catch (err) {
     log.error('Permission resolution failed:', err.message);
@@ -2077,7 +2092,10 @@ router.get('/me', requireAuth, (req, res) => {
 
     res.json({
       user: publicUser(user),
-      permissions: clientPermissions(db.get(), user),
+      // Hier und nur hier kann das Subjekt ein Wandtablett sein: die beiden
+      // anderen Aufrufer sind Anmeldewege, und ein Display meldet sich nicht an
+      // (`canSignIn()` weist es ab). Sie bleiben deshalb beim Standard `false`.
+      permissions: clientPermissions(db.get(), user, { isDisplay: req.authMethod === 'display' }),
       householdSize: householdSize(db.get()),
       othersCanRead: othersCanRead(db.get(), user.id),
       csrfToken: req.session.csrfToken,

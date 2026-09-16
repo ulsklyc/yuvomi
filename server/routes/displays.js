@@ -18,6 +18,7 @@ import rateLimit from 'express-rate-limit';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { requireAdmin } from '../middleware/require-admin.js';
+import { CURRENT_ONBOARDING_VERSION } from '../auth.js';
 import {
   DISPLAY_COOKIE,
   DISPLAY_PASSWORD_SENTINEL,
@@ -162,10 +163,14 @@ router.post('/', (req, res) => {
       // meldet sich nie an. Er muss nur eindeutig sein, und die UNIQUE-Spalte
       // haelt das - ein Zaehler waere eine zweite Buchfuehrung darueber.
       const username = `display-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      // `onboarding_version` auf den aktuellen Stand: die Begruessungstour ist
+      // fuer einen Menschen gedacht, der die App kennenlernt. An der Kuechenwand
+      // stuende sie als Dialog vor dem Kalender, und niemand haette den Auftrag,
+      // sie wegzutippen (im Browser gesehen, bevor diese Zeile stand).
       const ins = db.get().prepare(`
-        INSERT INTO users (username, display_name, password_hash, role, family_role)
-        VALUES (?, ?, ?, 'member', 'other')
-      `).run(username, displayName, DISPLAY_PASSWORD_SENTINEL);
+        INSERT INTO users (username, display_name, password_hash, role, family_role, onboarding_version)
+        VALUES (?, ?, ?, 'member', 'other', ?)
+      `).run(username, displayName, DISPLAY_PASSWORD_SENTINEL, CURRENT_ONBOARDING_VERSION);
       userId = Number(ins.lastInsertRowid);
       db.get().prepare('INSERT INTO display_accounts (user_id, created_by) VALUES (?, ?)')
         .run(userId, req.authUserId || null);

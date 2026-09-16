@@ -212,14 +212,96 @@ test('das Display schreibt nichts, auch nicht in seinen eigenen Modulen', async 
   assert.match(String(res.body?.error), /scope/i, 'das Scope-Gate sperrt, nicht die CSRF-Pruefung');
 });
 
-test('das Display erreicht keine Auth-Route', async () => {
+test('das Display erreicht keine Auth-Route ausser der eigenen Zeile', async () => {
   // Der Auth-Router haengt VOR den globalen Gates (GHSA-xcv5-6w6x-x5q2), also
   // reicht das Scope-Gate dort nicht - er hat seinen eigenen Riegel.
   const display = asDisplay(displayToken);
-  for (const [method, path] of [['GET', '/auth/me'], ['GET', '/auth/users'], ['GET', '/auth/api-tokens']]) {
+  for (const [method, path] of [
+    ['GET', '/auth/users'], ['GET', '/auth/api-tokens'], ['GET', '/auth/oidc/config'],
+    ['POST', '/auth/logout'], ['POST', '/auth/api-tokens'],
+  ]) {
     const res = await display(method, path);
     assert.equal(res.status, 403, `${method} ${path} war ${res.status}`);
   }
+});
+
+test('das Display darf genau die drei Geruestpfade LESEN, und nur lesend', async () => {
+  // Ohne sie startet die App auf dem Tablett nicht: der Auth-Guard in
+  // public/router.js fragt `/auth/me` als erstes und wirft bei einem Fehler auf
+  // die Anmeldeseite. Im Browser gemessen - jeder Endpunkt fuer sich verhielt
+  // sich richtig, und die Wand blieb trotzdem leer.
+  //
+  // Keiner der drei liefert Haushaltsdaten: die eigene Zeile, die
+  // Darstellungseinstellungen, die Modulliste. Dasselbe Zugestaendnis hat der
+  // Ausgaben-Gast schon.
+  const display = asDisplay(displayToken);
+  for (const path of ['/auth/me', '/preferences', '/modules']) {
+    assert.equal((await display('GET', path)).status, 200, `${path} muss lesbar sein`);
+  }
+  // Exakt, nicht als Praefix - und nur GET.
+  assert.equal((await display('GET', '/permissions/catalog')).status, 403);
+  assert.equal((await display('PATCH', '/preferences', { week_start: 1 })).status, 403);
+});
+
+test('die Rechte-Nutzlast traegt die Scope-Liste als Modulrechte', async () => {
+  // DIE OBERFLAECHE HAENGT DARAN, NICHT AN EINER ZWEITEN LISTE IM FRONTEND. Die
+  // Uebersicht bot dem Tablett Kacheln fuer Geburtstage, Budget und Notizen an,
+  // die der Server dann leer liess (im Browser gesehen). Statt einer
+  // Display-Sonderabfrage im Dashboard loest `resolvePermissions()` die
+  // Scope-Liste in Modulrechte auf - und Navigation, Kacheln und der
+  // Anlege-Knopf folgen derselben Quelle wie fuer jedes eingeschraenkte
+  // Mitglied auch.
+  const me = await asDisplay(displayToken)('GET', '/auth/me');
+  assert.equal(me.status, 200);
+  const modules = me.body.permissions.modules;
+
+  for (const key of ['calendar', 'tasks', 'rewards']) {
+    assert.equal(modules[key], 'read', `${key} muss lesbar sein`);
+  }
+  for (const key of ['budget', 'documents', 'health', 'notes', 'shopping', 'housekeeping']) {
+    assert.equal(modules[key], 'none', `${key} muss gesperrt sein`);
+  }
+  // `read` und nicht `write`: daran haengt, dass der Anlege-Knopf verschwindet.
+  assert.ok(!Object.values(modules).includes('write'), 'ein Display schreibt in keinem Modul');
+});
+
+test('gesperrte Module nehmen ihre Kacheln mit', async () => {
+  // Die Vererbung stand schon da ("Widgets erben die Modulsperre") - sie greift
+  // nur, weil die Verengung VOR ihr laeuft. Steht sie danach, sind die Module
+  // gesperrt und die Kacheln trotzdem sichtbar.
+  const me = await asDisplay(displayToken)('GET', '/auth/me');
+  const widgets = me.body.permissions.widgets;
+  for (const id of ['budget', 'notes', 'shopping', 'health']) {
+    assert.equal(widgets[id], 'none', `Kachel ${id} muss gesperrt sein`);
+  }
+});
+
+test('eine gespeicherte Rechtezeile kann ein Display nicht aufbohren', async () => {
+  // Die Verengung steht NACH den beiden apply()-Durchgaengen: was ein Display
+  // darf, ist eine Produktentscheidung und kein Feld, das ein Administrator
+  // setzen kann. Hier wird genau das versucht.
+  db.prepare(`
+    INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+    VALUES ('user', ?, 'module', 'documents', 'write')
+  `).run(String(displayId));
+
+  const me = await asDisplay(displayToken)('GET', '/auth/me');
+  assert.equal(me.body.permissions.modules.documents, 'none', 'die gespeicherte Zeile wird ueberschrieben');
+  assert.equal((await asDisplay(displayToken)('GET', '/documents')).status, 403);
+
+  db.prepare("DELETE FROM access_permissions WHERE subject_id = ? AND resource_key = 'documents'")
+    .run(String(displayId));
+});
+
+test('die eigene Zeile nennt das Display als das, was es ist', async () => {
+  // `access_scope` traegt die dritte Auspraegung, und das Frontend haengt daran:
+  // die schmale Navigation in public/router.js entscheidet danach, ob sie vier
+  // Eintraege zeigt oder die volle Mitglieder-Leiste.
+  const me = await asDisplay(displayToken)('GET', '/auth/me');
+  assert.equal(me.status, 200);
+  assert.equal(me.body.user.access_scope, 'display');
+  assert.equal(me.body.user.id, displayId);
+  assert.equal(me.body.user.onboarding_pending, false, 'die Begruessungstour gilt fuer Menschen');
 });
 
 test('das Display legt kein weiteres Display an und widerruft keines', async () => {

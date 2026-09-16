@@ -2712,7 +2712,30 @@
         "healthVisibilityApplied_one": "Ein Eintrag umgestellt.",
         "mealTypeNamesLabel": "Eigene Namen",
         "mealTypeNamesHint": "Wie dein Haushalt die vier Mahlzeiten nennt. Leer lassen für den eingebauten Namen. Der Name gilt in jeder Sprache so, wie du ihn eintippst.",
-        "mealTypeNamesSaved": "Namen gespeichert."
+        "mealTypeNamesSaved": "Namen gespeichert.",
+        "pageDisplays": "Wandtabletts",
+        "pageDisplaysDescription": "Ein Wandtablett anlegen, ein Gerät koppeln und seinen Zugang widerrufen.",
+        "displaysTitle": "Wandtabletts",
+        "displaysHint": "Ein Wandtablett bekommt ein eigenes Konto, das nur dieses Gerät benutzen kann. Es ist kein Familienmitglied, meldet sich nicht an und sieht nur, was für den Haushalt sichtbar ist.",
+        "displayDeviceNameLabel": "Name des Tabletts",
+        "displayDeviceNameHint": "Zum Beispiel „Küche“ oder „Flur“ - nur zur Unterscheidung in dieser Liste.",
+        "displayCreate": "Wandtablett anlegen",
+        "displayEmpty": "Noch kein Wandtablett angelegt.",
+        "displayPaired": "Gekoppelt",
+        "displayNotPaired": "Noch nicht gekoppelt",
+        "displayIssueCode": "Kopplungscode erzeugen",
+        "displayDelete": "Löschen",
+        "displayDeleteConfirm": "„{{name}}“ löschen?",
+        "displayPairingCodeLabel": "Kopplungscode",
+        "displayPairingCodeHint": "15 Minuten gültig, gilt genau einmal. Öffne auf dem Tablett /pair und tippe ihn dort ein. Er wird nur jetzt angezeigt.",
+        "displayDeviceUnnamed": "Unbenanntes Gerät",
+        "displayDeviceLastSeen": "Zuletzt gesehen: {{when}}",
+        "displayDeviceNeverSeen": "Noch nie verbunden",
+        "displayDeviceRevokedAt": "Widerrufen: {{when}}",
+        "displayRevokeDevice": "Widerrufen",
+        "displayRevokeConfirm": "Zugang dieses Geräts beenden?",
+        "displayRevokeDetail": "Das Tablett zeigt sofort nichts mehr. Zum Weiterbenutzen muss es neu gekoppelt werden.",
+        "displayDeleteDetail": "Das Konto und alle gekoppelten Geräte werden entfernt. Das lässt sich nicht rückgängig machen."
     },
     "login": {
         "tagline": "Willkommen zurück bei deinem Familienplaner.",
@@ -5401,5 +5424,15 @@
         "continuesUntil": "…geht bis {{time}}",
         "overviewEmptyTitle": "Personen zum Vergleichen auswählen",
         "overviewEmptyDescription": "Wähle oben mindestens ein Haushaltsmitglied aus, um die Wochenpläne nebeneinander zu sehen."
+    },
+    "pairDisplay": {
+        "title": "Tablett koppeln",
+        "intro": "Gib den Kopplungscode ein, den die Einstellungen anzeigen.",
+        "codeLabel": "Kopplungscode",
+        "codeHint": "Zehn Zeichen, Groß- und Kleinschreibung egal.",
+        "labelLabel": "Name dieses Geräts (optional)",
+        "labelHint": "Hilft später zu erkennen, welches Gerät gemeint ist.",
+        "submit": "Koppeln",
+        "failed": "Dieser Kopplungscode gilt nicht."
     }
 }

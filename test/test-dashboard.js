@@ -145,6 +145,38 @@ db.prepare(`INSERT INTO budget_entries (title, amount, category, subcategory, da
 
 console.log('\n[Dashboard-Test] API-Abfragen\n');
 
+test('Der Speed-Dial bietet nur an, was der Betrachter anlegen darf (#1208)', async () => {
+  // Die Liste stand ungefiltert da: wer Notizen auf `none` hatte, bekam trotzdem
+  // „Notiz anlegen" angeboten und lief in ein 403. Aufgefallen ist es am
+  // Wandtablett, wo ALLE vier Eintraege ins Leere fuehren - dessen Module stehen
+  // samt und sonders auf `read`.
+  const { __test } = await import('../public/pages/dashboard.js');
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+
+  setPermissions({ admin: false, modules: {}, widgets: {}, capabilities: {} });
+  const voll = __test.renderFab();
+  assert(voll.includes('data-route="/tasks"'), 'ohne Einschraenkung stehen alle vier da');
+  assert(voll.includes('data-route="/notes"'));
+
+  // Ein eingeschraenktes Mitglied: Notizen weg, der Rest bleibt.
+  setPermissions({ admin: false, modules: { notes: 'none' }, widgets: {}, capabilities: {} });
+  const teilweise = __test.renderFab();
+  assert(!teilweise.includes('data-route="/notes"'), 'ein gesperrtes Modul wird nicht angeboten');
+  assert(teilweise.includes('data-route="/tasks"'), 'die uebrigen bleiben');
+
+  // Ein Wandtablett: alles nur lesend, also kein Knopf. Ein Speed-Dial, der
+  // sich auf eine leere Liste oeffnet, waere die schlechtere Haelfte des
+  // Fehlers, den der Filter behebt.
+  setPermissions({
+    admin: false,
+    modules: { tasks: 'read', calendar: 'read', shopping: 'none', notes: 'none' },
+    widgets: {}, capabilities: {},
+  });
+  assert(__test.renderFab() === '', 'nur Lesezugriff heisst kein Anlege-Knopf');
+
+  clearPermissions();
+});
+
 test('Notes widget options stay unchanged when the category catalog cannot load', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   const current = { categories: [7, 8] };
