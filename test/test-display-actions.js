@@ -305,16 +305,38 @@ test('das Tablett hakt ab - es nimmt nichts zurueck und legt nichts ab', async (
   assert.equal(row.archived_at, null, 'und liegt nicht in der Ablage');
 });
 
-test('eine Aufgabe, die nicht der ganze Haushalt sieht, gibt es fuer das Tablett nicht', async () => {
+test('eine unsichtbare Aufgabe antwortet auf JEDE Nutzlast gleich - und wie eine, die es nie gab', async () => {
   // Die Liste zieht die Sichtbarkeit schon - aber die Liste ist eine Antwort,
   // kein Riegel: diese Route nimmt eine ID aus dem Pfad, und eine ID kann jeder
   // hinschreiben. 404 und nicht 403, sonst ist die Absage die Auskunft, dass es
   // die Aufgabe gibt.
+  //
+  // ALS MATRIX, UND DAS IST DER PUNKT. Die erste Fassung prueft zwei Faelle
+  // einzeln: Nicht-`done`-Status gegen eine SICHTBARE Aufgabe, und Sichtbarkeit
+  // nur mit `status: 'done'`. Genau die Kombination dazwischen fehlte - und
+  // genau dort lag der Fehler: die Statuspruefung stand vor der
+  // Sichtbarkeitspruefung, also beantwortete `{"status":"open"}` auf eine
+  // private Aufgabe ein 403 („darf nur abhaken") und auf eine erfundene
+  // Kennung ein 404. Der Unterschied zwischen beiden Antworten war die
+  // Auskunft, die diese Route verweigern soll: eine private Aufgabe liess sich
+  // ueber ihre blosse Kennung nachweisen. Zwei gruene Einzelfaelle, deren
+  // Kreuzung niemand einsetzt, messen die Regel nicht.
+  //
+  // Die ERFUNDENE Kennung steht als Vergleichswert daneben, denn die Zusage
+  // lautet nicht „404", sondern „nicht unterscheidbar von einer, die es nicht
+  // gibt". Ohne sie waere auch ein durchgaengiges 403 gruen zu bekommen.
+  const erfunden = 999999;
   for (const sichtbarkeit of ['private', 'assignees']) {
     const id = addTask(`Geheim ${sichtbarkeit}`, sichtbarkeit);
-    const res = await display('PATCH', `/tasks/${id}/status`, { status: 'done', done_by_user_id: LEA });
-    assert.equal(res.status, 404, sichtbarkeit);
+    for (const status of ['done', 'open', 'in_progress', 'archived']) {
+      const unsichtbar = await display('PATCH', `/tasks/${id}/status`, { status, done_by_user_id: LEA });
+      const gibtEsNicht = await display('PATCH', `/tasks/${erfunden}/status`, { status, done_by_user_id: LEA });
+      assert.equal(unsichtbar.status, 404, `${sichtbarkeit} + ${status}`);
+      assert.deepEqual(unsichtbar.body, gibtEsNicht.body,
+        `${sichtbarkeit} + ${status}: die Antwort muss der auf eine erfundene Kennung gleichen`);
+    }
     assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get(id).status, 'open');
+    assert.equal(db.prepare('SELECT archived_at FROM tasks WHERE id = ?').get(id).archived_at, null);
   }
 });
 

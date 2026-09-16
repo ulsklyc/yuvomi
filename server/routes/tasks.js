@@ -1575,16 +1575,27 @@ router.patch('/:id/status', (req, res) => {
     // DIE ABSAGE IST 404 UND NICHT 403: eine unsichtbare Aufgabe existiert fuer
     // dieses Geraet nicht, und ein 403 an genau dieser Stelle waere die
     // Auskunft, dass es sie gibt.
+    //
+    // UND DESHALB STEHT DIE SICHTBARKEIT VOR DEM STATUS. Andersherum stand sie
+    // zuerst, und damit war die Zusicherung im Absatz darueber nur fuer
+    // `status: 'done'` eingeloest: ein Tablett, das `{"status":"open"}` auf eine
+    // geratene Kennung schickte, bekam 403 („darf nur abhaken") fuer eine
+    // Aufgabe, die es gibt, und 404 fuer eine, die es nicht gibt - der
+    // Unterschied zwischen den beiden Antworten IST die Auskunft, die diese
+    // Stelle verweigern soll. Eine private Aufgabe liess sich so ueber ihre
+    // blosse Kennung nachweisen, ohne sie je zu sehen. Jetzt beantwortet die
+    // Route jede Nutzlast auf eine unsichtbare Aufgabe gleich, und zwar mit
+    // derselben 404 wie fuer eine, die es nie gab.
     let displayDoneBy = null;
     if (isDisplayRequest(req)) {
+      if (prev.visibility !== 'all') {
+        return res.status(404).json({ error: 'Task not found.', code: 404 });
+      }
       if (status !== 'done') {
         return res.status(403).json({
           error: 'A paired display can only tick a task off.',
           code: 403,
         });
-      }
-      if (prev.visibility !== 'all') {
-        return res.status(404).json({ error: 'Task not found.', code: 404 });
       }
       const actor = displayActingPerson(req, req.body.done_by_user_id, 'tasks', { db: db.get() });
       if (!actor.ok) {

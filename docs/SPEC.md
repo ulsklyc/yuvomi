@@ -2017,7 +2017,11 @@ silent fallback to the display account, which would record work nobody did), has
 member through the one predicate (#1207, so guests, staff and other displays are out), and has to be
 allowed to write that module herself - without that last check the tablet would be the way around
 module permissions. A task has to be visible to the whole household, and that refusal is **404, not
-403**: an invisible task does not exist for this device, and 403 would confirm that it does. Only the
+403**: an invisible task does not exist for this device, and 403 would confirm that it does. The
+visibility check runs **before** the status check, and that order is the promise rather than a
+detail: the other way round, a payload with any status other than `done` answered 403 for a task
+that exists and 404 for one that does not, and the difference between those two answers is exactly
+the disclosure the 404 is there to prevent. Only the
 transition into `done` is allowed; taking it back reverses points and discards a recurrence
 follow-up, and corrections stay with the household. Deciding a redemption stays wherever the
 household put it (`rewards_require_approval`) - the display asks, it never approves.
