@@ -49,8 +49,15 @@ function intervalCountCheck(value) {
  */
 router.get('/summary', (req, res) => {
   try {
-    const today = new Date().toISOString().slice(0, 7); // YYYY-MM
-    const month = req.query.month || today;
+    // DER VOREINGESTELLTE MONAT IST EINE FRAGE AN DIE UHR, und die folgt der
+    // Haushaltszone. `new Date().toISOString().slice(0, 7)` stand hier und ist
+    // der UTC-Monat: oestlich von UTC zeigt er am Ersten frueh noch den
+    // Vormonat, westlich davon am Letzten abends schon den naechsten. Die
+    // Uebersicht sprang damit fuer ein paar Stunden im Monat auf den falschen
+    // Zeitraum, ohne dass jemand etwas anders gemacht haette
+    // (dieselbe Familie wie die Tagesschluessel-Falle; die Datei importiert
+    // `todayKey` fuer genau diese Frage schon, nur nicht hier).
+    const month = req.query.month || todayKey(db.get()).slice(0, 7);
 
     if (!MONTH_RE.test(month))
       return res.status(400).json({ error: 'month muss YYYY-MM sein', code: 400 });
@@ -197,8 +204,11 @@ router.get('/export', (req, res) => {
  */
 router.get('/', (req, res) => {
   try {
-    const today = new Date().toISOString().slice(0, 7);
-    const month = req.query.month || today;
+    // Haushaltszone, nicht UTC - dieselbe Begruendung wie bei `/summary`
+    // darueber. Beide Vorgaben muessen denselben Monat nennen: die Liste und
+    // die Zusammenfassung darueber stehen auf einer Seite, und zwei Stunden
+    // im Monat zeigten sie verschiedene Zeitraeume.
+    const month = req.query.month || todayKey(db.get()).slice(0, 7);
     const loanId = req.query.loan_id ? parseInt(req.query.loan_id, 10) : null;
 
     if (!loanId && !MONTH_RE.test(month))

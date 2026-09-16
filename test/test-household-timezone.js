@@ -245,6 +245,30 @@ function serverFiles(dir = SERVER_DIR) {
 
 const rel = (file) => path.relative(ROOT, file);
 
+/**
+ * Quelltext ohne Kommentare - das, was der Prozessor sieht.
+ *
+ * WARUM DIE GUARDS DARUNTER IHN BRAUCHEN. Ein Guard, der die ganze Datei
+ * durchsucht, findet sein eigenes Muster auch in dem Satz, der ERKLAERT, warum
+ * die Stelle falsch war. Wer eine dieser Fallen behebt und danebenschreibt,
+ * was dort stand, macht den Guard damit rot - die Suite bestrafte dann das
+ * Richtigstellen. Umgekehrt gilt es genauso: ohne Strippen liesse sich ein
+ * echter Verstoss durch einen Kommentar daneben nicht verdecken, wohl aber
+ * durch Auskommentieren, und ein auskommentierter Verstoss ist keiner.
+ *
+ * Bewusst grob: Zeilenkommentare ab `//` und Blockkommentare. Ein `//` in
+ * einem String (`'https://...'`) wird mit abgeschnitten, was hier folgenlos
+ * ist - die gesuchten Muster stehen in keinem String, und die Richtung des
+ * Irrtums ist die geschlossene: es wird weniger durchsucht, nie mehr.
+ */
+function ohneKommentare(quelle) {
+  return quelle
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map((zeile) => zeile.replace(/\/\/.*$/, ''))
+    .join('\n');
+}
+
 test('Guard: nur timezone.js ruft serverTimeZone() direkt', () => {
   // `serverTimeZone()` ist der Rueckfall, nicht die Antwort - es liest `TZ` und
   // sieht die Einstellung nicht. Ein Aufruf woanders hiesse: diese eine Stelle
@@ -263,13 +287,47 @@ test('Guard: kein Server-Modul leitet "heute" aus toISOString() ab', () => {
   // (`new Date(Date.UTC(...))`); verboten ist der Sprung von JETZT auf einen
   // Kalendertag, denn der ist westlich von UTC abends und oestlich davon
   // morgens der falsche. Die Antwort heisst todayKey(<db>).
-  const NOW_TO_DAY = /new Date\(\s*\)\s*\.toISOString\(\)\s*\.slice\(\s*0\s*,\s*10\s*\)/;
+  //
+  // DER MONAT ZAEHLT MIT, UND DAS WAR EINE LUECKE. Die erste Fassung suchte
+  // `slice(0, 10)` - den Tag - und sah `slice(0, 7)` nicht, obwohl das
+  // derselbe Sprung von JETZT auf einen Kalenderabschnitt ist, nur ein
+  // groeberer. Gefunden wurden dadurch zwei Stellen in
+  // `server/routes/budget/entries.js`: der voreingestellte Monat der
+  // Uebersicht und der der Eintragsliste. Sie sprangen am Monatsrand fuer ein
+  // paar Stunden auf den Nachbarmonat, und beide Seiten derselben Ansicht
+  // konnten dabei verschiedene Zeitraeume zeigen. Die Datei importierte
+  // `todayKey` die ganze Zeit - fuer den Tag, nicht fuer den Monat.
+  //
+  // Der Ausschnitt ist als Alternative geschrieben und nicht als `\d+`: 10 und
+  // 7 sind die beiden Laengen mit einer Bedeutung. Ein `slice(0, 4)` waere das
+  // Jahr und faellt heute durch - es kommt nirgends vor, und ein Guard soll
+  // das melden, was es gibt, statt Faelle zu erfinden.
+  const NOW_TO_PERIOD = /new Date\(\s*\)\s*\.toISOString\(\)\s*\.slice\(\s*0\s*,\s*(?:10|7)\s*\)/;
   const offenders = serverFiles()
     .filter((file) => !file.endsWith(path.join('utils', 'timezone.js')))
-    .filter((file) => NOW_TO_DAY.test(readFileSync(file, 'utf8')))
+    // OHNE KOMMENTARE: sonst meldet dieser Guard den Satz, der erklaert, warum
+    // eine Stelle falsch war, als neuen Verstoss - er bestrafte damit genau
+    // das Richtigstellen.
+    .filter((file) => NOW_TO_PERIOD.test(ohneKommentare(readFileSync(file, 'utf8'))))
     .map(rel);
   assert.deepEqual(offenders, [],
-    `Diese Dateien bilden "heute" aus dem UTC-Tag: ${offenders.join(', ')}`);
+    `Diese Dateien bilden "heute" aus dem UTC-Kalender: ${offenders.join(', ')}`);
+});
+
+test('Guard: das Muster trifft Tag UND Monat, und der Kommentar-Filter haelt', () => {
+  // DER GUARD AUF DEN GUARD. Ein Muster, das niemand gegen einen bekannten
+  // Verstoss haelt, ist eine Behauptung - und die Monats-Erweiterung oben ist
+  // genau der Fall, den die alte Fassung durchliess.
+  const NOW_TO_PERIOD = /new Date\(\s*\)\s*\.toISOString\(\)\s*\.slice\(\s*0\s*,\s*(?:10|7)\s*\)/;
+  assert.ok(NOW_TO_PERIOD.test('const t = new Date().toISOString().slice(0, 10);'), 'Tag');
+  assert.ok(NOW_TO_PERIOD.test('const m = new Date().toISOString().slice(0,7)'), 'Monat ohne Leerzeichen');
+  assert.ok(NOW_TO_PERIOD.test('x = new Date() .toISOString() .slice( 0 , 7 )'), 'Monat mit Leerzeichen');
+  // Arithmetik auf einem gebildeten Key bleibt erlaubt - sie fragt nicht die Uhr.
+  assert.ok(!NOW_TO_PERIOD.test('new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 7)'), 'Date.UTC bleibt frei');
+  // Und der Kommentar-Filter: derselbe Text einmal als Code, einmal erklaert.
+  assert.ok(NOW_TO_PERIOD.test(ohneKommentare('const m = new Date().toISOString().slice(0, 7);')));
+  assert.ok(!NOW_TO_PERIOD.test(ohneKommentare('// hier stand new Date().toISOString().slice(0, 7)')));
+  assert.ok(!NOW_TO_PERIOD.test(ohneKommentare('/* new Date().toISOString().slice(0, 10) */')));
 });
 
 test('Guard: der null-Rueckfall steht nur als Default-Parameter', () => {
