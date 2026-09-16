@@ -2028,6 +2028,17 @@ the picker never offers someone the next call would refuse. It deliberately carr
 contact details `/family/members` returns, for the reason `DISPLAY_PREFERENCE_KEYS` exists: a tablet
 hangs in the open.
 
+**On the tablet the person is chosen per tap, and nothing is remembered.** Tapping a task opens the
+list of people and asks who did it; picking one ticks the task off and records that person. The
+status button is not drawn on a display at all - this picker takes its place and carries the same
+ring, so the control looks like the one on everyone's phone and only behaves differently. A remembered
+person would have been the other option and is deliberately not it: a kitchen wall would keep showing
+the one from the afternoon. A task that is already done gets no button there, because undoing a tick
+is a correction and corrections stay with the household. The two-person threshold the picker uses for
+signed-in people does not apply: on a wall there is no self, so even a household of one has to name
+somebody. On the rewards page each person keeps their own request button, driven by `can_redeem`; the
+catalogue has none, because it opens the dialog without a person.
+
 **One seam worth knowing.** A display has no session, but `csrfMiddleware` keeps its token in
 `req.session`. Reading never hit this, because safe methods pass through. The first writing path a
 tablet takes therefore runs over an **empty session** that the browser carries alongside the device
