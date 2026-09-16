@@ -739,6 +739,33 @@
   border-color: var(--module-accent, var(--color-accent));
 }
 
+/* DAS ZEICHEN STATT DES KNOPFS (#467), dieselbe Bauart wie
+ * `.subtask-item__checkbox--static` aus #1209: der Ring bleibt, weil er die
+ * Auskunft traegt - ob die Aufgabe erledigt ist -, aber nichts an ihm lockt
+ * mehr zum Tippen. Der Zeiger wird neutral, der Hover-Rahmen faellt weg, und
+ * die vergroesserte Trefflaeche (`::before`) verschwindet: sie ist fuer eine
+ * Beruehrung da, die es hier nicht mehr gibt.
+ *
+ * Es steht NACH den Basisregeln: gleiche Spezifitaet entscheidet die
+ * Quellreihenfolge, und davor stehend waere es wirkungslos gewesen. */
+.task-status-btn--static {
+  cursor: default;
+  /* KEIN `check-pop`. Die Animation quittiert eine BERUEHRUNG (`--done` traegt
+   * sie), und hier hat niemand etwas beruehrt - sie liefe bei jedem Neuzeichnen
+   * der Liste los und behauptete ein Abhaken, das gerade nicht stattfand. Es
+   * steht hier und nicht in der reduced-motion-Abfrage: das ist keine Frage der
+   * Bewegungsvorliebe, sondern eine falsche Aussage. */
+  animation: none;
+}
+
+.task-status-btn--static:hover::after {
+  border-color: var(--color-text-tertiary);
+}
+
+.task-status-btn--static::before {
+  content: none;
+}
+
 /* Auf Mobile trägt die Kategorie-Section-Überschrift die Kategorie bereits —
  * das Inline-Label je Zeile ist dort redundant und kostet Platz. */
 @media (max-width: 639px) {

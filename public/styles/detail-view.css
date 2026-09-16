@@ -148,6 +148,20 @@
   cursor: progress;
 }
 
+/* Die Zeile als ZUSTANDSZEICHEN (#467): sie steht noch da und sagt, ob der
+ * Teilschritt erledigt ist, aber nichts an ihr lockt zum Tippen. `:disabled`
+ * daneben heisst in diesem Stylesheet etwas anderes - „gerade unterwegs" -,
+ * und ein <span> traegt es ohnehin nicht. Dieselbe Bauart wie
+ * `.subtask-item__checkbox--static` und `.task-status-btn--static`
+ * (public/styles/tasks.css). */
+.detail-subtask--static {
+  cursor: default;
+}
+
+.detail-subtask--static:hover {
+  background: none;
+}
+
 .detail-subtask i {
   flex-shrink: 0;
   color: var(--color-text-tertiary);

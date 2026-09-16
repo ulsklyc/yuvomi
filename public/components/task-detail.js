@@ -211,11 +211,30 @@ function subtaskListNode(task, ctx) {
   const wrap = document.createElement('div');
   wrap.className = 'detail-subtasks';
 
+  // ZUSTAND ANZEIGEN ODER UMSCHALTEN - dieselbe Zeile, zwei Bauarten (#467).
+  // Wer nur lesen darf, bekommt sie als `span` mit einer Beschriftung, die den
+  // ZUSTAND nennt. Ein `disabled`-Knopf waere hier doppelt falsch: er traegt
+  // Trefflaeche und Hover weiter und verspricht „als erledigt markieren" fuer
+  // eine Beruehrung, die nichts tut - und `.detail-subtask:disabled` bedeutet
+  // in diesem Stylesheet „gerade unterwegs" (cursor: progress), also haette die
+  // Zeile dauerhaft einen Ladecursor getragen. Dieselbe Entscheidung wie an der
+  // Teilaufgabe der Liste (public/pages/tasks.js) und am Tablett (#1209).
+  const nurLesen = isNavModuleReadOnly('tasks');
+
   const paint = (row, status, title) => {
-    row.className = status === 'done' ? 'detail-subtask detail-subtask--done' : 'detail-subtask';
+    row.className = [
+      'detail-subtask',
+      status === 'done' ? 'detail-subtask--done' : '',
+      nurLesen ? 'detail-subtask--static' : '',
+    ].filter(Boolean).join(' ');
     row.dataset.status = status;
-    row.setAttribute('aria-pressed', String(status === 'done'));
-    row.setAttribute('aria-label', t('tasks.subtaskMarkDone', { title }));
+    if (nurLesen) {
+      row.setAttribute('role', 'img');
+      row.setAttribute('aria-label', `${title}: ${t(status === 'done' ? 'tasks.statusDone' : 'tasks.statusOpen')}`);
+    } else {
+      row.setAttribute('aria-pressed', String(status === 'done'));
+      row.setAttribute('aria-label', t('tasks.subtaskMarkDone', { title }));
+    }
     const icon = document.createElement('i');
     icon.dataset.lucide = status === 'done' ? 'check-circle-2' : 'circle';
     icon.className = 'icon-sm';
@@ -227,10 +246,18 @@ function subtaskListNode(task, ctx) {
   };
 
   const appendRow = (s) => {
-    const row = document.createElement('button');
-    row.type = 'button';
+    const row = document.createElement(nurLesen ? 'span' : 'button');
+    if (!nurLesen) row.type = 'button';
     row.dataset.subtaskId = String(s.id);
     paint(row, s.status, s.title);
+    // Die Zeile BLEIBT - sie sagt, ob der Teilschritt erledigt ist, und das ist
+    // auch der Auskunft wert, die niemand umschalten darf. Der Anlegen-Knopf
+    // darunter haengt dagegen an `mayAdd` und faellt ganz weg; er sagt nichts,
+    // er tut nur etwas.
+    if (nurLesen) {
+      wrap.appendChild(row);
+      return row;
+    }
 
     row.addEventListener('click', async () => {
       const previous = row.dataset.status;
@@ -915,7 +942,12 @@ export function openTaskDetail({
 
   // Der häufigste Grund, eine Aufgabe zu öffnen, ist sie abzuhaken. Bisher
   // führte dieser Weg durch ein Formular mit sieben Auswahlfeldern.
-  if (next) {
+  //
+  // Bei `tasks: read` faellt er weg statt gesperrt dazustehen: er traegt keinen
+  // Zustand, den er anzeigen koennte - was die Aufgabe IST, steht zwei Zeilen
+  // darueber als "Status: offen". Ein grauer Knopf "Als erledigt markieren"
+  // waere nur ein Versprechen, das der Server mit 403 einloest.
+  if (next && !isNavModuleReadOnly('tasks')) {
     actions.push({
       id: 'task-detail-advance',
       label: t(next.labelKey),
@@ -1061,3 +1093,10 @@ function seriesHistoryNode(task) {
 
   return list;
 }
+
+/**
+ * Fuer die Tests: der Zeilenbauer der Teilaufgaben. Er ist die eine Stelle, an
+ * der sich die Nur-lesen-Regel (#467) an dieser Ansicht MESSEN laesst - alles
+ * andere hier haengt an `openDetailView` und damit am echten DOM.
+ */
+export const __test = { subtaskListNode };
