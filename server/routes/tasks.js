@@ -24,7 +24,7 @@ import { mentionedUserIds } from '../../public/utils/mentions.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
 import { resolvePermissions } from '../permissions.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
-import { householdMemberSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
+import { householdMemberSql, isHouseholdMember, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { pushService } from '../services/push.js';
 import { todayKey } from '../utils/timezone.js';
 import {
@@ -1522,7 +1522,9 @@ function spawnRecurrenceFollowup(task) {
 // 'done'; bei jedem anderen Statuswechsel gibt es keine Erledigung, an der sie
 // haengen koennte, und sie wird still verworfen statt abgewiesen - eine
 // Sammelaktion, die alles auf 'open' setzt, soll nicht an einem mitgeschickten
-// Feld scheitern.
+// Feld scheitern. GEPRUEFT WIRD DESHALB AUCH ERST DORT: eine Pruefung vor dem
+// Laden von `prev` sah den Uebergang noch gar nicht und wies eine Nutzlast ab,
+// die sie im selben Atemzug als bedeutungslos beschrieb (Review Runde 1).
 // --------------------------------------------------------
 router.patch('/:id/status', (req, res) => {
   try {
@@ -1530,19 +1532,6 @@ router.patch('/:id/status', (req, res) => {
     if (!VALID_STATUSES.includes(status))
       return res.status(400).json({ error: `Invalid status. Allowed: ${VALID_STATUSES.join(', ')}`, code: 400 });
 
-    // Benannt werden koennen nur Haushaltsmitglieder (#1207, DECISIONS 4) -
-    // dieselbe Pruefung, die auch das Zuweisen macht, und derselbe Fehlertext.
-    // Ein Gast oder eine Haushaltshilfe ist keine Person, der der Verlauf eine
-    // Erledigung zuschreiben darf, und der Punktestand erst recht nicht.
-    const doneByRaw = req.body.done_by_user_id;
-    const doneByUserId = doneByRaw == null || doneByRaw === '' ? null : Number(doneByRaw);
-    if (doneByUserId != null && !Number.isInteger(doneByUserId))
-      return res.status(400).json({ error: 'Invalid done_by_user_id.', code: 400 });
-    if (doneByUserId != null) {
-      const strangers = newNonMembers([doneByUserId]);
-      if (strangers.length)
-        return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
-    }
 
     // Ganze Zeile, nicht nur der Status: die Rückrichtung (#617) braucht die
     // externen Kennungen, um den Statuswechsel dem CalDAV-Objekt zuzuordnen.
@@ -1560,6 +1549,33 @@ router.patch('/:id/status', (req, res) => {
 
     if (reopensSettledVisit(db.get(), prev.id, prev.status, status) && !isAdminRequest(req)) {
       return res.status(403).json({ error: 'Permission denied.', code: 403 });
+    }
+
+    // Benannt werden koennen nur Haushaltsmitglieder (#1207, DECISIONS 4) -
+    // dieselbe Grenze, die auch das Zuweisen zieht, und derselbe Fehlertext.
+    // Ein Gast oder eine Haushaltshilfe ist keine Person, der der Verlauf eine
+    // Erledigung zuschreiben darf, und der Punktestand erst recht nicht.
+    //
+    // `isHouseholdMember()` UND NICHT `newNonMembers()`. Die Listenfassung
+    // meldet ausdruecklich nur Konten, die es GIBT und die keine Mitglieder
+    // sind - ein geloeschtes oder erfundenes Konto laesst sie durch, weil jede
+    // Route dafuer ihre eigene Antwort hat (so steht es in ihrem Kommentar).
+    // Diese Route hatte keine: die ID lief weiter in den Fremdschluessel der
+    // neuen Spalte, `INSERT OR IGNORE` unterdrueckt FOREIGN-KEY-Verletzungen
+    // nicht, die ganze Transaktion rollte zurueck - und der Aufrufer bekam 500
+    // statt der zugesagten 400, waehrend sein Statuswechsel still ausblieb
+    // (Review Runde 1). Die Einzelfrage beantwortet beides auf einmal, und die
+    // Absage bleibt eine: wer nicht benannt werden kann, kann nicht benannt
+    // werden - ob er fehlt oder nur nicht dazugehoert, aendert daran nichts.
+    const doneByRaw = req.body.done_by_user_id;
+    const namesDoer = status === 'done' && prev.status !== 'done'
+      && doneByRaw != null && doneByRaw !== '';
+    const doneByUserId = namesDoer ? Number(doneByRaw) : null;
+    if (namesDoer && (!Number.isInteger(doneByUserId) || !isHouseholdMember(doneByUserId, { db: db.get() }))) {
+      return res.status(400).json({
+        error: Number.isInteger(doneByUserId) ? nonMemberMessage([doneByUserId]) : 'Invalid done_by_user_id.',
+        code: 400,
+      });
     }
 
     // Statuswechsel und die Serien-Bewegung, die daraus folgt, sind eine Einheit:

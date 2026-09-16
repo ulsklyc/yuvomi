@@ -1119,3 +1119,54 @@ test('PATCH status: ohne die Angabe verhaelt sich die Route wie vorher', async (
   assert.equal(row.user_id, ALICE);
   assert.equal(row.done_by_user_id, null);
 });
+
+test('PATCH status: eine Person, die es gar nicht gibt, ist 400 und nicht 500', async () => {
+  // `newNonMembers` meldet bewusst NUR existierende Nicht-Mitglieder (es sagt
+  // das selbst in seinem Kommentar) - eine geloeschte oder erfundene ID kommt
+  // durch. Sie landete dann im FK der neuen Spalte, `INSERT OR IGNORE`
+  // unterdrueckt FOREIGN-KEY-Verletzungen nicht, die ganze Transaktion rollte
+  // zurueck und der Aufrufer bekam 500 statt der zugesagten 400 - samt einem
+  // Statuswechsel, der stillschweigend nicht stattgefunden hatte.
+  const admin = { id: ALICE, role: 'admin' };
+  const created = await call('POST', '/', { as: admin, body: { title: `geist-${randomUUID().slice(0, 8)}` } });
+  const id = created.body.data.id;
+
+  const r = await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done', done_by_user_id: 999999 } });
+  assert.equal(r.status, 400);
+  assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get(id).status, 'open');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM task_completions WHERE task_id = ?').get(id).n, 0);
+});
+
+test('PATCH status: ein unbrauchbares done_by_user_id blockiert keinen Wechsel, der gar nicht abhakt', async () => {
+  // Der vorige Test deckt den Weg NACH done ab; hier geht es um jeden anderen.
+  // Eine Sammelaktion schickt dieselbe Nutzlast fuer alle Zeilen - sie darf
+  // nicht daran scheitern, dass ein Feld mitfaehrt, das an diesem Uebergang
+  // ohnehin nichts bewirkt. Der erste Test dazu nahm ein GUELTIGES Mitglied und
+  // haette diesen Fall nie gesehen.
+  const admin = { id: ALICE, role: 'admin' };
+  const created = await call('POST', '/', { as: admin, body: { title: `mitgeschickt-${randomUUID().slice(0, 8)}` } });
+  const id = created.body.data.id;
+
+  const toProgress = await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'in_progress', done_by_user_id: 999999 } });
+  assert.equal(toProgress.status, 200);
+  assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get(id).status, 'in_progress');
+
+  const toWorker = await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'open', done_by_user_id: WORKER } });
+  assert.equal(toWorker.status, 200, 'auch ein Nicht-Mitglied blockiert den Weg zurueck nicht');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM task_completions WHERE task_id = ?').get(id).n, 0);
+});
+
+test('PATCH status: eine bereits erledigte Aufgabe nimmt keine neue Benennung an', async () => {
+  // done -> done ist kein Uebergang. Wuerde die Pruefung hier greifen, waere
+  // das eine Fehlermeldung fuer etwas, das ohnehin nichts schreibt; wuerde die
+  // Benennung greifen, waere es eine zweite, stille Korrekturmoeglichkeit neben
+  // dem dokumentierten Weg (zuruecknehmen und neu abhaken).
+  const admin = { id: ALICE, role: 'admin' };
+  const created = await call('POST', '/', { as: admin, body: { title: `schon-done-${randomUUID().slice(0, 8)}` } });
+  const id = created.body.data.id;
+  await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done', done_by_user_id: BOB } });
+
+  const again = await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done', done_by_user_id: 999999 } });
+  assert.equal(again.status, 200);
+  assert.equal(db.prepare('SELECT done_by_user_id FROM task_completions WHERE task_id = ?').get(id).done_by_user_id, BOB);
+});

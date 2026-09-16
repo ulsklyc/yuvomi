@@ -2007,6 +2007,15 @@
   color: var(--color-text-secondary);
 }
 
+/* Wer abgehakt hat, wenn es jemand anderes war (#1205) - dieselbe Rangfolge wie
+ * im Haushaltsverlauf: der Name der erledigenden Person steht vorn, die
+ * Nebenauskunft leiser dahinter. Die Zeile ist eine Flex-Zeile mit gap, der
+ * Trenner also unnoetig; dort steht er, weil der Zusatz IM Textfluss der
+ * Metazeile haengt. */
+.detail-history__by {
+  color: var(--color-text-tertiary);
+}
+
 .detail-history__empty {
   margin: 0;
   color: var(--color-text-tertiary);

@@ -1035,8 +1035,20 @@ function seriesHistoryNode(task) {
       // Dieselbe Person wie im Haushaltsverlauf: wer es getan hat, und ohne
       // Benennung wer abgehakt hat (#1205). Stuende hier weiter `user_name`,
       // nennten zwei Ansichten desselben Vorgangs zwei verschiedene Namen.
+      //
+      // UND DERSELBE ZUSATZ, wenn abhakende und erledigende Person
+      // auseinanderfallen. Nur `person_name` zu zeigen hiess, dass dieselbe
+      // Zeile im Haushaltsverlauf "Lea - abgehakt von Mama" ist und hier bloss
+      // "Lea": genau die Auskunft, die diese Aenderung neu aufbewahrt, ginge in
+      // der einen der beiden Ansichten wieder verloren (Review Runde 1).
       who.textContent = entry.person_name || t('tasks.historyUnknownMember');
       row.append(when, who);
+      if (entry.done_by_user_id && entry.done_by_user_id !== entry.user_id) {
+        const by = document.createElement('span');
+        by.className = 'detail-history__by';
+        by.textContent = t('tasks.historyTickedBy', { name: entry.user_name || t('tasks.historyUnknownMember') });
+        row.append(by);
+      }
       list.appendChild(row);
     }
   }).catch(() => {
