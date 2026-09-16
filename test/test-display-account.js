@@ -754,6 +754,25 @@ test('ein Display sieht die Verwaltungsdaten der Sync-Konten NICHT', async () =>
   assert.ok(konto, 'das Konto steht weiterhin in der Liste');
   assert.equal(konto.caldavUrl, undefined, 'die Server-Adresse fehlt');
   assert.equal(konto.username, undefined, 'der Benutzername fehlt');
+
+  // UND DIE BEIDEN ANDEREN ANBINDUNGEN AUCH. Google und Apple liefern den
+  // Fehlertext des letzten Laufs mit; der kommt vom Gegenueber und traegt
+  // regelmaessig dessen Adresse oder eine Kontokennung in sich.
+  db.prepare("INSERT OR REPLACE INTO sync_config(key, value) VALUES ('google_last_error', ?)")
+    .run('401 from https://www.googleapis.com/calendar/v3/users/anna@example.org');
+  const alsMenschGoogle = await admin('GET', '/calendar/google/status');
+  assert.equal(alsMenschGoogle.status, 200);
+  assert.ok(alsMenschGoogle.body.lastError, 'Vorbedingung: die Sitzung sieht den Fehlertext');
+
+  const googleDisplay = await asDisplay(token)('GET', '/calendar/google/status');
+  assert.equal(googleDisplay.status, 200);
+  assert.equal(googleDisplay.body.lastError, undefined, 'der Fehlertext fehlt');
+  assert.equal(googleDisplay.body.lastErrorAt, undefined, 'und sein Zeitpunkt auch');
+  assert.ok('connected' in googleDisplay.body, 'der Rest der Antwort bleibt stehen');
+
+  const appleDisplay = await asDisplay(token)('GET', '/calendar/apple/status');
+  assert.equal(appleDisplay.status, 200);
+  assert.equal(appleDisplay.body.lastError, undefined, 'dasselbe bei Apple');
 });
 
 test('die Sync-Ziel-Listen gehoeren dem, der auch speichern darf', async () => {

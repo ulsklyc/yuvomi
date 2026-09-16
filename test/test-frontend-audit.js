@@ -2511,6 +2511,29 @@ test('More button active state keeps visible More identity and accessible active
   assert.doesNotMatch(source, /moreBtn\.toggleAttribute\('aria-current',\s*inMoreSheet\)/);
 });
 
+test('wer die Zahl der Mitleser aendert, holt othersCanRead nach', () => {
+  // `othersCanRead` entscheidet, ob Aufgaben und Kalender ihre
+  // Sichtbarkeitsfelder ueberhaupt zeigen. Der Wert kommt aus /auth/me und
+  // liegt im Speicher - wer ihn nicht nachholt, laesst die Felder bis zum
+  // naechsten vollen Laden verborgen, und alles, was in derselben Sitzung
+  // entsteht, ist "fuer alle". Im Ein-Personen-Haushalt ist genau das der
+  // Sprung von 0 auf 1: ein angelegtes Wandtablett, ein eingerichtetes
+  // Hauspersonal, geaenderte Modulrechte.
+  const STELLEN = [
+    { datei: '../public/settings/pages/admin-displays.js', was: 'Display anlegen und loeschen' },
+    { datei: '../public/settings/pages/admin-permissions.js', was: 'Rechte speichern' },
+    { datei: '../public/pages/housekeeping.js', was: 'Hauspersonal anlegen' },
+  ];
+  const fehlend = [];
+  for (const { datei, was } of STELLEN) {
+    const src = withoutCommentsKeepingLines(read(datei));
+    const importiert = /import\s*\{[^}]*\bauth\b[^}]*\}\s*from\s*'\/api\.js'/.test(src);
+    if (!importiert || !/auth\.me\(\)/.test(src)) fehlend.push(`${datei} (${was})`);
+  }
+  assert.deepEqual(fehlend, [],
+    `Diese Stellen aendern die Zahl der Mitleser, ohne sie nachzuholen:\n  ${fehlend.join('\n  ')}`);
+});
+
 test('die Display-Leiste filtert haushaltweit abgeschaltete Module', () => {
   // ROUTER.JS IST BROWSER-GEKOPPELT UND NICHT IMPORTIERBAR, deshalb misst diese
   // Suite ihn am Quelltext (dieselbe Begruendung wie test-router-guest-guard.js).

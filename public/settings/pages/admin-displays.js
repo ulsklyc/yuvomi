@@ -11,7 +11,7 @@
  * Wer ihn verpasst, stellt einen neuen aus - und der entwertet den alten.
  */
 
-import { api } from '/api.js';
+import { api, auth } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { confirmModal, refocusAfterRender } from '/components/modal.js';
@@ -170,6 +170,15 @@ function bindEvents(container) {
     btn.disabled = true;
     try {
       await api.post('/displays', { display_name: name });
+      // DAS ERSTE DISPLAY MACHT AUS EINEM EIN-PERSONEN-HAUSHALT EINEN MIT
+      // MITLESER. `othersCanRead` entscheidet, ob Aufgaben und Kalender ihre
+      // Sichtbarkeitsfelder ueberhaupt zeigen; der Wert kommt aus /auth/me und
+      // liegt im Speicher. Ohne dieses Nachholen blieben die Felder bis zum
+      // naechsten vollen Laden verborgen, und alles, was in derselben Sitzung
+      // noch entsteht, waere "fuer alle" - also lesbar fuer das Tablett, das
+      // gerade erst angelegt wurde. Rechteaenderungen holen den Wert aus
+      // demselben Grund nach (admin-permissions.js).
+      await auth.me().catch(() => {});
       input.value = '';
       await reload(container);
     } catch (err) {
@@ -248,6 +257,10 @@ function bindEvents(container) {
       clearError(errorEl);
       try {
         await api.delete(`/displays/${del.dataset.displayDelete}`);
+        // Und der Rueckweg: war es das letzte Display, liest in einem
+        // Ein-Personen-Haushalt wieder niemand mit, und die Felder gehoeren
+        // wieder weg. Derselbe Wert, dieselbe Quelle wie beim Anlegen.
+        await auth.me().catch(() => {});
         await reload(container);
         refocusAfterRender();
       } catch (err) {

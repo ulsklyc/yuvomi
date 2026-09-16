@@ -3,6 +3,7 @@
  */
 
 import { createLogger } from '../../logger.js';
+import { integrationDetailsVisible } from '../../scopes.js';
 import express from 'express';
 import * as appleCalendar from '../../services/apple-calendar.js';
 import { requireAdmin } from '../../auth.js';
@@ -20,7 +21,14 @@ const router = express.Router();
  */
 router.get('/apple/status', (req, res) => {
   try {
-    res.json(appleCalendar.getStatus());
+    const status = appleCalendar.getStatus();
+    // DER FEHLERTEXT DES LETZTEN LAUFS IST VERWALTUNGSDATEN. Er kommt vom
+    // Gegenueber und traegt regelmaessig dessen Adresse oder eine Kontokennung
+    // in sich - `calendar:read` reicht bis hierher, weil der Pfad-Guard am
+    // ersten Segment urteilt. Dieselbe Regel wie bei /caldav/status und
+    // /outlook/status, an den Scopes gemessen und nicht am Kontotyp.
+    const { lastError, lastErrorAt, ...rest } = status;
+    res.json(integrationDetailsVisible(req) ? status : rest);
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
