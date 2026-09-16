@@ -773,6 +773,34 @@ test('die Sync-Ziel-Listen gehoeren dem, der auch speichern darf', async () => {
   assert.equal((await admin('GET', '/calendar/sync-targets')).status, 200);
 });
 
+test('auch /auth/me frischt auf - der Riegel davor verbraucht die Frist nicht', async () => {
+  // ZWEI PRUEFUNGEN JE REQUEST. Der Riegel des Auth-Routers ruft
+  // `authenticateDisplayDevice()` und wirft das Ergebnis weg, erst `requireAuth`
+  // danach setzt Cookies. Verbrauchte schon das Feststellen die Frist, bekaeme
+  // ausgerechnet `/auth/me` nie eine Auffrischung - und genau die fragt ein
+  // Tablett beim Start als erstes.
+  const created = await admin('POST', '/displays', { display_name: 'Riegelprobe' });
+  const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});
+  const token = (await pair(issued.body.data.code)).token;
+
+  // Einmal anfragen, damit die erste (faellige) Auffrischung verbraucht ist,
+  // dann die Uhr zurueckstellen.
+  await fetch(`${BASE}/api/v1/tasks`, { headers: { Cookie: `${DISPLAY_COOKIE}=${token}` } });
+  const geraet = db.prepare(
+    'SELECT id FROM display_devices WHERE user_id = ? ORDER BY id DESC LIMIT 1',
+  ).get(created.body.data.id);
+  const vor13h = new Date(Date.now() - 13 * 60 * 60 * 1000).toISOString().replace(/\.\d+Z$/, 'Z');
+  db.prepare('UPDATE display_devices SET cookie_refreshed_at = ? WHERE id = ?').run(vor13h, geraet.id);
+
+  const res = await fetch(`${BASE}/api/v1/auth/me`, { headers: { Cookie: `${DISPLAY_COOKIE}=${token}` } });
+  assert.equal(res.status, 200);
+  assert.match(
+    String(res.headers.get('set-cookie') || ''),
+    new RegExp(`${DISPLAY_COOKIE}=`),
+    'die Auffrischung ueberlebt den doppelten Durchlauf',
+  );
+});
+
 test('ein Display sieht von /preferences nur den Darstellungsteil', async () => {
   // Die Route steht dem Display offen, weil die App ohne sie nicht startet -
   // ihre Antwort ist aber die Sammelstelle des ganzen Haushalts. Die genauen

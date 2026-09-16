@@ -354,15 +354,31 @@ export function authenticateDisplayDevice(token, { db } = {}) {
   // ersten Zugriff nie wieder um - das Cookie wuerde genau EINMAL nachdatiert
   // und liefe danach doch ab. `cookie_refreshed_at` bewegt sich nur, wenn
   // wirklich ein Set-Cookie hinausgeht (Migration 216).
+  //
+  // DIESE FUNKTION STELLT NUR FEST, SIE VERBRAUCHT NICHT. Das Nachdatieren
+  // schreibt `markDisplayCookieRefreshed()`, und das ruft genau die Stelle, die
+  // das Cookie auch setzt. Der Grund steht dort: diese Funktion laeuft je
+  // Request bis zu ZWEIMAL - der Riegel des Auth-Routers prueft mit ihr und
+  // wirft das Ergebnis weg, erst `requireAuth` danach setzt Cookies. Wuerde
+  // schon das Feststellen die Frist verbrauchen, bekaeme ausgerechnet
+  // `/auth/me` - die Route, die ein Tablett beim Start fragt - nie eine
+  // Auffrischung zu sehen.
   const refreshCookie = cookieRefreshDue(row.cookie_refreshed_at, seen);
-  if (refreshCookie) {
-    database.prepare(
-      'UPDATE display_devices SET last_seen_at = ?, cookie_refreshed_at = ? WHERE id = ?',
-    ).run(seen, seen, row.id);
-  } else {
-    database.prepare('UPDATE display_devices SET last_seen_at = ? WHERE id = ?').run(seen, row.id);
-  }
+  database.prepare('UPDATE display_devices SET last_seen_at = ? WHERE id = ?').run(seen, row.id);
   return { userId: row.user_id, deviceId: row.id, refreshCookie };
+}
+
+/**
+ * Festhalten, dass das Cookie dieses Geraets gerade neu gesetzt wurde.
+ *
+ * Getrennt vom Feststellen, damit die Frist nur verbraucht wird, wenn wirklich
+ * ein `Set-Cookie` hinausgeht - siehe die Begruendung in
+ * `authenticateDisplayDevice()`.
+ */
+export function markDisplayCookieRefreshed(deviceId, { db } = {}) {
+  const database = db || dbModule.get();
+  database.prepare('UPDATE display_devices SET cookie_refreshed_at = ? WHERE id = ?')
+    .run(nowIso(), deviceId);
 }
 
 /**

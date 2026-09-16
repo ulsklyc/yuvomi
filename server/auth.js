@@ -17,7 +17,7 @@ import { memberEmail } from './services/member-email.js';
 import { accessScopeSql, householdMemberSql } from './services/household-members.js';
 import {
   DISPLAY_COOKIE, DISPLAY_SCOPES, authenticateDisplayDevice, displayCookieIdentity, displayCookieOptions,
-  displayMayRead, displayTokenFromRequest, isDisplayAccount,
+  displayMayRead, displayTokenFromRequest, isDisplayAccount, markDisplayCookieRefreshed,
 } from './services/display-accounts.js';
 import { deleteBirthdayArtifacts, syncBirthdayArtifacts } from './services/birthdays.js';
 import * as oidcClient from 'openid-client';
@@ -797,7 +797,14 @@ function requireAuth(req, res, next) {
       // landet es auch an der einen oeffentlich cachebaren hinter diesem Guard
       // (`/weather/icon/:code`). Beide Begruendungen samt Zahlen stehen bei
       // `DISPLAY_COOKIE_MAX_AGE` und `DISPLAY_COOKIE_REFRESH_AFTER_MS`.
-      if (device.refreshCookie) res.cookie(DISPLAY_COOKIE, displayToken, displayCookieOptions());
+      if (device.refreshCookie) {
+        res.cookie(DISPLAY_COOKIE, displayToken, displayCookieOptions());
+        // Erst JETZT ist die Frist verbraucht - hier geht das Cookie wirklich
+        // hinaus. Der Riegel des Auth-Routers oben ruft dieselbe Pruefung und
+        // wirft ihr Ergebnis weg; verbrauchte schon sie, bekaeme `/auth/me` nie
+        // eine Auffrischung.
+        markDisplayCookieRefreshed(device.deviceId);
+      }
       applyRoleModuleAccess(req);
       return next();
     }
