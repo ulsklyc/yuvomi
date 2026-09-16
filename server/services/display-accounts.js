@@ -89,10 +89,14 @@ export const DISPLAY_COOKIE_MAX_AGE = 365 * 24 * 60 * 60 * 1000;
  */
 export const DISPLAY_COOKIE_REFRESH_AFTER_MS = 12 * 60 * 60 * 1000;
 
-/** Ist seit dem letzten Zeichen dieses Geraets genug Zeit vergangen? */
-function cookieRefreshDue(lastSeenAt, nowIsoString) {
-  if (!lastSeenAt) return true;
-  const last = Date.parse(lastSeenAt);
+/**
+ * Ist seit der letzten Auffrischung genug Zeit vergangen? `null` heisst "noch
+ * nie" und ist sofort faellig - richtig fuer jedes Geraet, das vor Migration
+ * 216 gekoppelt wurde.
+ */
+function cookieRefreshDue(lastRefreshedAt, nowIsoString) {
+  if (!lastRefreshedAt) return true;
+  const last = Date.parse(lastRefreshedAt);
   const now = Date.parse(nowIsoString);
   // Ein unlesbarer Zeitstempel frischt auf: lieber ein Cookie zu viel als ein
   // Geraet, das irgendwann still ausfaellt.
@@ -338,19 +342,26 @@ export function authenticateDisplayDevice(token, { db } = {}) {
   if (!token || typeof token !== 'string') return null;
   const database = db || dbModule.get();
   const row = database.prepare(`
-    SELECT d.id, d.user_id, d.last_seen_at
+    SELECT d.id, d.user_id, d.cookie_refreshed_at
       FROM display_devices d
       JOIN display_accounts da ON da.user_id = d.user_id
      WHERE d.token_hash = ? AND d.revoked_at IS NULL
   `).get(hash(token));
   if (!row) return null;
   const seen = nowIso();
-  // Die Frage "muss das Cookie neu datiert werden" wird HIER beantwortet, weil
-  // hier schon steht, wann dieses Geraet zuletzt da war - der Aufrufer haette
-  // dafuer eine zweite Abfrage gebraucht. Warum ueberhaupt gedrosselt wird,
-  // steht bei DISPLAY_COOKIE_REFRESH_AFTER_MS.
-  const refreshCookie = cookieRefreshDue(row.last_seen_at, seen);
-  database.prepare('UPDATE display_devices SET last_seen_at = ? WHERE id = ?').run(seen, row.id);
+  // ZWEI UHREN, UND DIE FRISTFRAGE HAENGT AN DER ZWEITEN. `last_seen_at` wird
+  // bei jedem Request neu gesetzt; haengte die Frist daran, waere sie nach dem
+  // ersten Zugriff nie wieder um - das Cookie wuerde genau EINMAL nachdatiert
+  // und liefe danach doch ab. `cookie_refreshed_at` bewegt sich nur, wenn
+  // wirklich ein Set-Cookie hinausgeht (Migration 216).
+  const refreshCookie = cookieRefreshDue(row.cookie_refreshed_at, seen);
+  if (refreshCookie) {
+    database.prepare(
+      'UPDATE display_devices SET last_seen_at = ?, cookie_refreshed_at = ? WHERE id = ?',
+    ).run(seen, seen, row.id);
+  } else {
+    database.prepare('UPDATE display_devices SET last_seen_at = ? WHERE id = ?').run(seen, row.id);
+  }
   return { userId: row.user_id, deviceId: row.id, refreshCookie };
 }
 

@@ -627,7 +627,17 @@ function isCacheableApiGet(pathname) {
 // --------------------------------------------------------
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'CLEAR_API_CACHE') {
-    event.waitUntil(caches.delete(API_CACHE));
+    // QUITTIEREN, WENN DER ABSENDER EINEN PORT MITSCHICKT. Ohne Rueckmeldung
+    // weiss die Seite nie, wann der Cache wirklich weg ist, und ein sofortiges
+    // Neuladen kann noch aus ihm bedient werden - beim Koppeln waeren das die
+    // privaten Antworten der vorherigen Person. Ein Absender ohne Port (die
+    // aelteren Aufrufer) bekommt wie bisher nichts zurueck.
+    const port = event.ports && event.ports[0];
+    event.waitUntil(
+      caches.delete(API_CACHE)
+        .catch(() => false)
+        .then(() => { if (port) port.postMessage({ ok: true }); }),
+    );
   }
 });
 

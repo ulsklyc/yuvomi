@@ -44,12 +44,41 @@ if ('serviceWorker' in navigator) {
  * Aufgerufen bei Logout und Session-Ende, um Daten-Leaks bei Nutzerwechsel am
  * selben Gerät zu verhindern. Defensive Guards: kein SW / kein Controller → No-Op.
  */
-export function clearApiCache() {
-  try {
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_API_CACHE' });
+/**
+ * Den API-Cache leeren - und WARTEN, bis er wirklich leer ist.
+ *
+ * DAS ABSCHICKEN ALLEIN REICHT NICHT. `postMessage` kehrt sofort zurueck, das
+ * Loeschen im Worker laeuft in einem `waitUntil`, und wer danach unmittelbar
+ * neu laedt, kann von seinem eigenen, noch nicht geleerten Cache bedient
+ * werden - beim Koppeln eines Tabletts waeren das die privaten Antworten der
+ * Person, die das Geraet vorher benutzt hat. Der Worker quittiert deshalb ueber
+ * einen MessageChannel, und diese Funktion liefert ein Versprechen darauf.
+ *
+ * DIE FRIST IST KEIN SCHMUCK: gibt es keinen Controller, ist der Worker gerade
+ * am Wechseln oder antwortet er nicht, darf der Aufrufer nicht ewig haengen -
+ * eine Kopplung, die nicht weitergeht, ist schlimmer als ein Cache, der ein
+ * paar Sekunden zu lange lebt. Das Versprechen erfuellt sich dann trotzdem; der
+ * Aufrufer entscheidet nichts anders, er wartet nur nicht laenger.
+ */
+export function clearApiCache({ timeoutMs = 2000 } = {}) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      resolve();
+    };
+    try {
+      const worker = 'serviceWorker' in navigator ? navigator.serviceWorker.controller : null;
+      if (!worker) return finish();
+      const channel = new MessageChannel();
+      channel.port1.onmessage = finish;
+      worker.postMessage({ type: 'CLEAR_API_CACHE' }, [channel.port2]);
+      setTimeout(finish, timeoutMs);
+      return undefined;
+    } catch (err) {
+      console.warn('[SW] clearApiCache fehlgeschlagen:', err);
+      return finish();
     }
-  } catch (err) {
-    console.warn('[SW] clearApiCache fehlgeschlagen:', err);
-  }
+  });
 }

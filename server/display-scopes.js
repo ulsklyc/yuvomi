@@ -78,6 +78,46 @@ export const DISPLAY_READ_PATHS = Object.freeze([
 ]);
 
 /**
+ * Was ein Display aus `/preferences` sehen darf.
+ *
+ * DIE AUSNAHME OBEN TRAEGT IHRE EIGENE VERENGUNG. `/preferences` steht in
+ * DISPLAY_READ_PATHS, weil die App ohne sie nicht startet - die Antwort selbst
+ * ist aber die Sammelstelle des ganzen Haushalts: die genauen Koordinaten des
+ * Wohnorts (`weather_lat`/`weather_lon`), die Budget-Betriebsart, die
+ * Zyklus-Einstellungen des Gesundheitsmoduls, die Haushaltshilfe-Schalter und
+ * die Standard-Sync-Ziele. Ein Tablett haengt oeffentlich; es soll darstellen
+ * koennen, nicht Auskunft geben.
+ *
+ * ALLOWLIST, KEINE DENYLIST: eine Denylist sagt zu jedem kuenftigen Schluessel
+ * erst einmal ja, und genau dieser Antwortrumpf waechst mit jedem neuen Modul.
+ * Was hier fehlt, faellt weg - das ist die richtige Richtung fuer einen Irrtum.
+ *
+ * Aufgenommen ist Darstellung (Sprache, Formate, Zone, Waehrung, Name der App),
+ * Anordnung (welche Module es gibt, Reihenfolge, Uebersichts-Kacheln) und das,
+ * was die vier erreichbaren Seiten zum ZEICHNEN brauchen. Nicht aufgenommen ist
+ * alles, was nur beim Anlegen zaehlt - ein Display legt nichts an.
+ */
+export const DISPLAY_PREFERENCE_KEYS = Object.freeze([
+  'app_name',
+  'language', 'language_effective', 'language_auto',
+  'date_format', 'time_format', 'week_start', 'region', 'currency',
+  'timezone', 'timezone_effective',
+  'disabled_modules', 'hidden_modules', 'module_order', 'mobile_nav_order',
+  'dashboard_widgets', 'dashboard_today_glance',
+  'tasks_subtasks_expanded',
+  'holiday_show_public', 'holiday_show_school', 'holiday_public_color', 'holiday_school_color',
+]);
+
+/** Die Antwort auf das, was ein Display sehen darf - Reihenfolge egal. */
+export function pickDisplayPreferences(data) {
+  const out = {};
+  for (const key of DISPLAY_PREFERENCE_KEYS) {
+    if (data && Object.prototype.hasOwnProperty.call(data, key)) out[key] = data[key];
+  }
+  return out;
+}
+
+/**
  * Darf ein Display diesen Pfad mit dieser Methode lesen? Exakter Vergleich,
  * ausschliesslich GET.
  *

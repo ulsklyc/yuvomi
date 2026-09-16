@@ -17567,6 +17567,20 @@ test('jeder Wechsel des handelnden Kontos leert den API-Cache', () => {
   }
   assert.deepEqual(fehlend, [],
     `Diese Kontowechsel leeren den Offline-Cache nicht:\n  ${fehlend.join('\n  ')}`);
+
+  // DAS ABSCHICKEN ALLEIN REICHT NICHT. `clearApiCache()` schickt eine
+  // Nachricht an den Service Worker; das Loeschen laeuft dort in einem
+  // `waitUntil`. Wer unmittelbar danach neu laedt, kann noch aus dem alten
+  // Cache bedient werden - bei der Kopplung waeren das die privaten Antworten
+  // der Person, die das Tablett vorher benutzt hat. Deshalb quittiert der
+  // Worker, und die Kopplungsseite WARTET darauf, bevor sie neu laedt.
+  const worker = withoutCommentsKeepingLines(read('../public/sw.js'));
+  assert.match(worker, /event\.ports/, 'der Worker nimmt einen Antwortport entgegen');
+  assert.match(worker, /port\.postMessage/, 'und quittiert darueber');
+  const register = withoutCommentsKeepingLines(read('../public/sw-register.js'));
+  assert.match(register, /new MessageChannel\(\)/, 'clearApiCache oeffnet den Kanal');
+  const kopplung = withoutCommentsKeepingLines(read('../public/pages/pair-display.js'));
+  assert.match(kopplung, /await clearApiCache\(/, 'die Kopplung wartet auf die Quittung');
 });
 
 test('wer refocusAfterRender importiert, ruft es auch', () => {

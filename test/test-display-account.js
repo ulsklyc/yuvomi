@@ -625,6 +625,26 @@ test('das Geraete-Cookie wird nachdatiert, aber nicht bei jedem Zugriff', async 
     'der naechste Zugriff schweigt, bis die Frist um ist',
   );
 
+  // UND DIE FRIST MUSS WIEDER UM GEHEN KOENNEN. Haengte sie an `last_seen_at`,
+  // waere sie nach dem ersten Zugriff nie wieder faellig - ein Tablett, das
+  // staendig anfragt, haelt dieses Feld ja dauerhaft frisch, und das Cookie
+  // liefe nach einem Jahr doch ab. Genau dieser Zustand wird hier gestellt:
+  // Geraet war eben noch da (last_seen_at = jetzt), aber zuletzt vor 13 Stunden
+  // nachdatiert.
+  const geraet = db.prepare(
+    'SELECT id FROM display_devices WHERE user_id = ? ORDER BY id DESC LIMIT 1',
+  ).get(created.body.data.id);
+  const vor13h = new Date(Date.now() - 13 * 60 * 60 * 1000).toISOString().replace(/\.\d+Z$/, 'Z');
+  db.prepare('UPDATE display_devices SET cookie_refreshed_at = ? WHERE id = ?').run(vor13h, geraet.id);
+
+  const dritter = await fetch(`${BASE}/api/v1/tasks`, { headers: { Cookie: `${DISPLAY_COOKIE}=${token}` } });
+  assert.equal(dritter.status, 200);
+  assert.match(
+    String(dritter.headers.get('set-cookie') || ''),
+    new RegExp(`${DISPLAY_COOKIE}=`),
+    'nach Ablauf der Frist wird wieder nachdatiert - auch bei staendigem Betrieb',
+  );
+
   // Die REGEL messen, nicht die Zahl: unter jeder Browser-Kappung und weit
   // genug ueber einem Tag, damit ein Tablett nicht taeglich am Netz haengen
   // muss. Ein Literal hier waere beim naechsten Nachjustieren rot geworden,
@@ -751,6 +771,38 @@ test('die Sync-Ziel-Listen gehoeren dem, der auch speichern darf', async () => {
   // Und die Gegenrichtung: wer schreiben darf, bekommt seine Auswahl.
   assert.equal((await admin('GET', '/tasks/sync-targets')).status, 200);
   assert.equal((await admin('GET', '/calendar/sync-targets')).status, 200);
+});
+
+test('ein Display sieht von /preferences nur den Darstellungsteil', async () => {
+  // Die Route steht dem Display offen, weil die App ohne sie nicht startet -
+  // ihre Antwort ist aber die Sammelstelle des ganzen Haushalts. Die genauen
+  // Wohnkoordinaten an einem Geraet, das oeffentlich haengt, sind das
+  // deutlichste Beispiel; Budget-Betriebsart, Zyklus-Einstellungen und die
+  // Standard-Sync-Ziele gehoeren genauso wenig dorthin.
+  const created = await admin('POST', '/displays', { display_name: 'Praeferenzprobe' });
+  const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});
+  const display = asDisplay((await pair(issued.body.data.code)).token);
+
+  const alsMensch = await admin('GET', '/preferences');
+  assert.equal(alsMensch.status, 200);
+  // Vorbedingung: die Sitzung bekommt die Felder tatsaechlich - sonst waere die
+  // Probe unten auch dann gruen, wenn die Route sie gar nicht mehr liefert.
+  assert.ok('weather_lat' in alsMensch.body.data);
+  assert.ok('budget_mode' in alsMensch.body.data);
+
+  const res = await display('GET', '/preferences');
+  assert.equal(res.status, 200);
+  for (const key of ['weather_lat', 'weather_lon', 'budget_mode', 'housekeeping_payment_tasks',
+    'tasks_default_target', 'calendar_default_target', 'visible_meal_types']) {
+    assert.equal(key in res.body.data, false, `${key} gehoert nicht an die Wand`);
+  }
+  // Und was die App zum Starten und Zeichnen braucht, ist da - ein zu enger
+  // Filter waere derselbe Fehler in die andere Richtung (im Browser gemessen:
+  // ohne diese Felder faellt der Auth-Guard in seinen catch).
+  for (const key of ['language_effective', 'date_format', 'time_format', 'week_start',
+    'timezone_effective', 'app_name', 'disabled_modules', 'dashboard_widgets']) {
+    assert.ok(key in res.body.data, `${key} fehlt dem Tablett`);
+  }
 });
 
 test('der Katalog beschreibt den Rumpf der Kopplung', async () => {

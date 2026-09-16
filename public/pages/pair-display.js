@@ -66,7 +66,9 @@ export async function render(container) {
       // im Offline-Fall die privaten Daten der Person, die das Geraet vorher
       // benutzt hat. Abmelden und Sitzungsende tun dasselbe und aus demselben
       // Grund (api.js, router.js).
-      clearApiCache();
+      // GEWARTET, NICHT NUR ABGESCHICKT: das Neuladen unten darf erst
+      // losgehen, wenn der Worker den Cache wirklich geleert hat.
+      await clearApiCache();
       // Ein voller Neuaufbau statt einer Navigation im Router: das Cookie ist
       // gerade erst entstanden, und alles, was die App ueber „wer bin ich"
       // schon im Speicher hat, stammt von davor.
