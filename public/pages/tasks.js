@@ -392,9 +392,17 @@ function renderTaskCard(task, opts = {}) {
     ? task.subtasks.map((s) => `
         <div class="subtask-item ${s.status === 'done' ? 'subtask-item--done' : ''}"
              data-subtask-id="${s.id}">
+          ${/* AM TABLETT IST DIE TEILAUFGABE ZU LESEN, NICHT ZU TIPPEN (#1209).
+               Sie fuehrt auf dieselbe Route wie der Haken, aber ohne die
+               Personenauswahl - am Display gaebe es also niemanden, dem die
+               Erledigung gehoerte, und der Server antwortete mit 400. Die
+               Zeile bleibt sichtbar und behaelt ihren Zustand, sie nimmt nur
+               keine Beruehrung mehr an. Dass eine Teilaufgabe am Display
+               spaeter eine eigene Personenauswahl bekommt, ist eine
+               Folgeentscheidung und keine, die hier nebenbei faellt. */''}
           <button class="subtask-item__checkbox ${s.status === 'done' ? 'subtask-item__checkbox--done' : ''}"
-                  data-action="toggle-subtask" data-id="${s.id}"
-                  data-status="${s.status}" aria-label="${t('tasks.subtaskMarkDone', { title: esc(s.title) })}">
+                  ${actingAsDisplay() ? 'disabled' : `data-action="toggle-subtask" data-id="${s.id}" data-status="${s.status}"`}
+                  aria-label="${t('tasks.subtaskMarkDone', { title: esc(s.title) })}">
             ${s.status === 'done' ? '<i data-lucide="check" class="subtask-item__checkbox-icon" aria-hidden="true"></i>' : ''}
           </button>
           <span class="subtask-item__title">${esc(s.title)}</span>
@@ -3072,6 +3080,19 @@ function saveRecentFilter(filters) {
 function wireSwipeGestures(container) {
   const listEl = container.querySelector('#task-list');
   if (!listEl) return;
+  // AM WANDTABLETT GIBT ES DIE WISCHGESTE NICHT (#1209).
+  //
+  // Sie ist der dritte Weg zu demselben Statuswechsel - neben Haken und
+  // Popover -, und der einzige, der die Person nicht erfragen kann: ein Wisch
+  // hat keinen Ort, an dem eine Auswahl aufgehen koennte, und er hakt sofort
+  // ab. Am Display liefe er deshalb ohne benannte Person in die 400 des
+  // Servers, mit englischem Text auf deutscher Oberflaeche. Dieselbe Regel wie
+  // beim Statusknopf: ein Weg, der ohne Person abhakt, wird dort nicht
+  // angeboten, statt ihn anzubieten und abzuweisen.
+  //
+  // Das trifft auch das WISCHEN ZURUECK auf offen, und das ist richtig so -
+  // zuruecknehmen darf ein Display ohnehin nicht.
+  if (actingAsDisplay()) return;
 
   wireSwipeRows(listEl, {
     card: '.task-card',
@@ -3579,6 +3600,13 @@ function wireTaskList(container) {
     }
 
     if (action === 'toggle-subtask') {
+      // DER RIEGEL NEBEN DEM WEGGELASSENEN ATTRIBUT. `disabled` im Markup
+      // verhindert den Klick, aber dieser Handler haengt delegiert an der
+      // Liste, und die Liste wird auch von anderen Stellen neu gezeichnet - ein
+      // Zustand, in dem beides auseinanderlaeuft, faellt sonst still in die 400
+      // des Servers. Zwei Zeilen fuer eine Zusicherung, die sonst an einem
+      // Attribut haengt.
+      if (actingAsDisplay()) return;
       try {
         await toggleSubtaskStatus(id, target.dataset.status);
         await loadTasks(container);
@@ -4076,6 +4104,13 @@ export async function render(container, { user }) {
 // Testfläche: nur reine Funktionen, deren Vertrag außerhalb dieser Datei zählt.
 export const __test = {
   groupBy, groupKey, formatDueDate, normalizeFilterSet, taskQuery, state,
+  // Was ein Wandtablett zu sehen und zu fassen bekommt (#1209). Die Karte
+  // traegt drei Wege zum selben Statuswechsel - Haken, Wisch, Teilaufgabe -,
+  // und am Display darf nur der erste erscheinen, weil nur er nach der Person
+  // fragen kann. Beide Funktionen stehen hier, damit das messbar ist und nicht
+  // nur im Quelltext behauptet: die Karte fuer das Markup, das Einhaengen der
+  // Wischgeste fuer den Weg, der gar kein Markup hat.
+  renderTaskCard, wireSwipeGestures,
   // Der Aufgaben-Dialog als Markup: welche Felder er zeigt und wen er anbietet.
   renderModalContent,
   // Die Personenauswahl beim Abhaken (#1205): WANN sie ueberhaupt erscheint,
