@@ -57,6 +57,27 @@ function setzeZone(zone) {
   `).run(zone);
 }
 
+/**
+ * Ein Eintrag je Monat - und ohne sie misst die Liste unten NICHTS.
+ *
+ * DER ERSTE ANLAUF SAETE GARNICHTS. `GET /budget/` antwortet bei leerer Tabelle
+ * mit `{ data: [] }` fuer JEDEN Monat, also verglich der Fall darunter zwei
+ * identische leere Antworten - er waere auch mit dem alten UTC-Vorgabemonat
+ * gruen gewesen, den dieser Zweig behebt
+ * ([[reference-green-test-that-measures-nothing]]). Zwei Eintraege beiderseits
+ * der Monatsgrenze machen den Vergleich erst zu einer Aussage: fiele die
+ * Vorgabe auf August zurueck, kaeme der August-Eintrag statt des
+ * September-Eintrags.
+ */
+function saeEintraege() {
+  db.prepare('DELETE FROM budget_entries').run();
+  db.prepare(`
+    INSERT INTO budget_entries (title, amount, category, date, created_by)
+    VALUES ('August-Eintrag', -10, 'Sonstiges', '2026-08-30', 1),
+           ('September-Eintrag', -20, 'Sonstiges', '2026-09-01', 1)
+  `).run();
+}
+
 async function summaryMonat() {
   const res = await fetch(`${BASE}/api/v1/budget/summary`, { headers: { Cookie: COOKIE } });
   assert.equal(res.status, 200);
@@ -100,19 +121,33 @@ test('die Eintragsliste nennt denselben Monat wie die Zusammenfassung darueber',
   // fuer ein paar Stunden im Monat eine Zusammenfassung ueber einem Zeitraum,
   // aus dem die Liste darunter nicht stammt - der unangenehmste Fall, weil
   // beides einzeln plausibel aussieht.
+  saeEintraege();
   setzeZone('Pacific/Kiritimati');
   mock.timers.enable({ apis: ['Date'], now: RANDZEIT });
   try {
     const monat = await summaryMonat();
+    assert.equal(monat, '2026-09', 'die Zusammenfassung steht auf September');
+
     const res = await fetch(`${BASE}/api/v1/budget/`, { headers: { Cookie: COOKIE } });
     assert.equal(res.status, 200);
-    // Die Liste gibt den Monat nicht zurueck, also wird er ueber die Wirkung
-    // gemessen: derselbe Aufruf mit ausdruecklichem `?month=` muss dieselbe
-    // Antwort liefern wie der ohne.
+    const ohne = (await res.json()).data;
+
+    // ERST DER INHALT, DANN DER VERGLEICH. Ein `deepEqual` zweier Antworten
+    // allein war die erste Fassung und sagte nichts: bei leerer Tabelle sind
+    // beide `[]`. Der Titel benennt, welcher Monat wirklich geliefert wurde.
+    assert.deepEqual(ohne.map((e) => e.title), ['September-Eintrag'],
+      `die Liste ohne month muss den September liefern, kam: ${JSON.stringify(ohne.map((e) => e.title))}`);
+
     const explizit = await fetch(`${BASE}/api/v1/budget/?month=${monat}`, { headers: { Cookie: COOKIE } });
     assert.equal(explizit.status, 200);
-    assert.deepEqual(await res.json(), await explizit.json(),
+    assert.deepEqual(ohne, (await explizit.json()).data,
       `die Liste ohne month muss ${monat} meinen`);
+
+    // Und die Gegenprobe, dass die Saat ueberhaupt unterscheidbar ist: der
+    // Nachbarmonat liefert etwas ANDERES. Ohne sie koennte die Zusicherung
+    // darueber auch dann halten, wenn jeder Monat alles zurueckgibt.
+    const august = await fetch(`${BASE}/api/v1/budget/?month=2026-08`, { headers: { Cookie: COOKIE } });
+    assert.deepEqual((await august.json()).data.map((e) => e.title), ['August-Eintrag']);
   } finally {
     mock.timers.reset();
   }
