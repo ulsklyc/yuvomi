@@ -279,28 +279,23 @@ const rel = (file) => path.relative(ROOT, file);
 function stehtImKommentar(quelle, index) {
   const zeilenAnfang = quelle.lastIndexOf('\n', index - 1) + 1;
   const vorDemTreffer = quelle.slice(zeilenAnfang, index);
-  // Zeilenkommentar: irgendwo davor auf derselben Zeile zwei Schraegstriche.
-  if (vorDemTreffer.includes('//')) return true;
-  // Fortsetzungszeile eines Blockkommentars: sie beginnt mit einem Stern.
-  if (/^\s*\*/.test(vorDemTreffer)) return true;
-  // Blockkommentar: die Zeile beginnt mit seinem Anfang. MEHR NICHT - und
-  // genau darin liegt die Fehlerrichtung.
+  // NUR DER ZEILENANFANG ENTSCHEIDET, und zwar fuer alle drei Formen: zwei
+  // Schraegstriche, ein Stern (Fortsetzung) oder ein Blockanfang.
   //
-  // DER ERSTE ANLAUF SUCHTE RUECKWAERTS nach einem Anfang ohne Ende davor und
-  // behauptete im Kommentar, das koenne nur Fehlalarme geben. Das Gegenteil
-  // stimmt: `server/openapi/schemas.js` traegt ein Pfadmuster mit Stern in
-  // einem gewoehnlichen String und danach kein Kommentarende, also galt alles
-  // dahinter als Kommentar - ein angehaengter echter Verstoss wurde NICHT
-  // gemeldet. Der eigene Gegenprobe-Fall darunter hat das aufgedeckt, nicht
-  // das Nachdenken darueber.
+  // DER ERSTE ANLAUF FRAGTE `vorDemTreffer.includes('//')` - und traf damit
+  // jede Zeile mit einer URL darin: `const url = 'https://...'` gefolgt von
+  // echtem Code galt als Kommentar, und der Guard uebersprang die Datei
+  // stillschweigend. Genau der blinde Fleck, gegen den diese Fassung gebaut
+  // ist, nur eine Stelle weiter rechts.
   //
-  // Diese Fassung urteilt nur nach dem Anfang DIESER Zeile. Ein mehrzeiliger
-  // Blockkommentar, dessen Innenzeilen weder mit einem Stern noch mit seinem
-  // Anfang beginnen, gibt damit einen Fehlalarm - im Haus schreibt jeder
-  // Blockkommentar seine Fortsetzungszeilen mit Stern, und ein Fehlalarm
-  // kostet eine Minute, waehrend ein blinder Fleck eine Version kostet.
-  return /^\s*\/\*/.test(vorDemTreffer);
+  // Der Preis ist ein Kommentar HINTER Code auf derselben Zeile: der gilt
+  // jetzt als Code und gaebe einen Fehlalarm. Nachgemessen ueber alle
+  // Serverdateien: **null** solche Stellen - und faende sich je eine, kostete
+  // sie eine Minute, waehrend der umgekehrte Irrtum eine Version kostet.
+  return /^\s*(\/\/|\*|\/\*)/.test(vorDemTreffer);
 }
+
+
 
 /**
  * Der Sprung von JETZT auf einen Kalenderabschnitt - Tag ODER Monat.
@@ -375,8 +370,18 @@ test('Guard: das Urteil ueber den Fundort trifft beide Kommentararten und nichts
   const zeile = '// hier stand new Date().toISOString().slice(0, 7)';
   assert.equal(stehtImKommentar(zeile, zeile.indexOf('new Date')), true, 'Zeilenkommentar');
 
+  // EIN KOMMENTAR HINTER CODE GILT ALS CODE, und das ist Absicht: die
+  // Gegenrichtung fragte, ob irgendwo davor auf der Zeile zwei Schraegstriche
+  // stehen, und traf damit jede Zeile mit einer URL im String. Im Bestand gibt
+  // es null solche Stellen, ein Fehlalarm bliebe also theoretisch - und er ist
+  // die guenstige Haelfte des Irrtums.
   const nachCode = "foo(); // erledigt via new Date().toISOString().slice(0, 7)";
-  assert.equal(stehtImKommentar(nachCode, nachCode.indexOf('new Date')), true, 'Zeilenkommentar hinter Code');
+  assert.equal(stehtImKommentar(nachCode, nachCode.indexOf('new Date')), false,
+    'ein Kommentar hinter Code gilt als Code - Fehlalarm statt blindem Fleck');
+
+  const urlImString = "const u = 'https://x'; const m = new Date().toISOString().slice(0, 7);";
+  assert.equal(stehtImKommentar(urlImString, urlImString.indexOf('new Date')), false,
+    'eine URL im String darf keinen Kommentar vortaeuschen');
 
   const block = '/' + '* new Date().toISOString().slice(0, 10) *' + '/';
   assert.equal(stehtImKommentar(block, block.indexOf('new Date')), true, 'Blockkommentar');
