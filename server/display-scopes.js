@@ -24,10 +24,20 @@
  * Scope-Liste, die ein Administrator aufbohren kann, waere genau die Einladung,
  * die dieses Konto vermeiden soll. Wer mehr braucht, meldet sich als Mensch an.
  *
- * NUR LESEN IN DIESEM SCHRITT. Die beiden Aktionen (abhaken, Einloesung
- * anfragen) sind #1209 und kommen mit ihren eigenen Schreib-Scopes; bis dahin
- * ist ein Display ein Schaufenster. `write` schliesst `read` ein, ein spaeteres
- * `tasks:write` ersetzt hier also einen Eintrag, statt einen hinzuzufuegen.
+ * SIE BLEIBT AUCH MIT #1209 EINE LESELISTE - DIE VORPLANUNG SAGTE ETWAS
+ * ANDERES, UND SIE WAR FALSCH. Hier stand, die beiden Aktionen kaemen „mit
+ * ihren eigenen Schreib-Scopes", `tasks:write` ersetze also spaeter einen
+ * Eintrag. Ein Scope ist aber die Erlaubnis fuer ein GANZES Modul: `tasks:write`
+ * heisst anlegen, aendern, loeschen, Kategorien umbauen - 14 weitere
+ * Schreibrouten neben der einen, die #1209 will. Die Absage im Ticket („no
+ * creating, editing or deleting") waere dann nicht mehr die Regel, sondern
+ * etwas, das jede einzelne Route selbst nachtragen muesste: eine Denylist, bei
+ * der jede kuenftig hinzukommende Route erst einmal JA sagt.
+ *
+ * Deshalb tragen die zwei Handlungen eine exakte Route-Allowlist
+ * (`DISPLAY_WRITE_ROUTES`) statt eines Scopes - dieselbe Bauart wie
+ * `DISPLAY_READ_PATHS` darunter, aus demselben Grund. Was dort fehlt, faellt
+ * weg, und das ist die richtige Richtung fuer einen Irrtum.
  */
 export const DISPLAY_SCOPES = Object.freeze([
   'dashboard:read',
@@ -41,6 +51,33 @@ export const DISPLAY_SCOPES = Object.freeze([
   // die ohnehin haushaltweit gilt. Ohne sie fragte die Uebersicht bei jedem
   // Laden und bekam 403 (im Browser gemessen).
   'weather:read',
+]);
+
+/**
+ * Die beiden Schreibrouten, die ein gekoppeltes Display erreichen darf (#1209).
+ *
+ * WAS DAS DISPLAY DAMIT TUN KANN, und nichts sonst: eine Aufgabe fuer eine am
+ * Geraet gewaehlte Person abhaken, und fuer sie eine Einloesung beantragen. Beide
+ * Routen tragen die eigentliche Regel selbst - dass eine Person benannt sein
+ * muss, dass sie ein Haushaltsmitglied ist, dass sie das Modul ueberhaupt darf
+ * und dass die Aufgabe haushaltssichtbar ist. Diese Liste beantwortet nur die
+ * vorgelagerte Frage, ob der Pfad ueberhaupt zu erreichen ist.
+ *
+ * DIE MUSTER SIND ENG, NICHT BEQUEM. `\d+` und nicht `[^/]+`: eine Kennung ist
+ * eine Zahl, und was keine ist, hat an dieser Stelle nichts verloren. Kein
+ * `startsWith`: `/tasks/1/status` ist gemeint, `/tasks/1/status-irgendwas` nicht
+ * - derselbe Fehler, gegen den DISPLAY_READ_PATHS exakt vergleicht.
+ *
+ * WARUM DIE EINLOESUNG EIN POST AUF DIE SAMMELROUTE IST UND KEIN EIGENER PFAD:
+ * das Beantragen ist genau diese Route, fuer jeden Menschen auch. Ein zweiter
+ * Pfad nur fuer Displays waere eine zweite Stelle, an der dieselbe Buchung
+ * entsteht - und die beiden liefen mit der Zeit auseinander. Das ENTSCHEIDEN
+ * einer Einloesung (`PATCH /rewards/redemptions/:id`) steht bewusst nicht hier:
+ * die Freigabe bleibt, wo der Haushalt sie hingelegt hat.
+ */
+export const DISPLAY_WRITE_ROUTES = Object.freeze([
+  Object.freeze({ method: 'PATCH', pattern: /^\/tasks\/\d+\/status$/ }),
+  Object.freeze({ method: 'POST', pattern: /^\/rewards\/redemptions$/ }),
 ]);
 
 /** Die Module daraus, ohne Zugriffsart - fuer die Rechteaufloesung. */
@@ -75,6 +112,12 @@ export const DISPLAY_READ_PATHS = Object.freeze([
   '/auth/me',
   '/preferences',
   '/modules',
+  // Die Personen, fuer die dieses Tablett handeln darf (#1209). Sie steht hier
+  // und nicht unter einem Modul, weil `/displays` keines ist - dasselbe, was
+  // schon fuer die drei darueber gilt. Die Route selbst laesst nur ein Display
+  // hinein und liefert Name, Farbe, Bild und die zwei Flaggen; die
+  // Kontaktdaten, die `/family/members` mitgibt, bleiben draussen.
+  '/displays/people',
 ]);
 
 /**
@@ -133,4 +176,33 @@ export function pickDisplayPreferences(data) {
 export function displayMayRead(method, path) {
   if (String(method || '').toUpperCase() !== 'GET') return false;
   return DISPLAY_READ_PATHS.includes(String(path || ''));
+}
+
+/**
+ * Darf ein Display diesen Pfad mit dieser Methode SCHREIBEN? (#1209)
+ *
+ * Derselbe Vertrag wie bei `displayMayRead`: der Pfad ist `/api/v1`-relativ,
+ * und der Aufrufer schuldet das. Wer einen anders verankerten Pfad hereingibt,
+ * bekommt `false`.
+ */
+export function displayMayWrite(method, path) {
+  const m = String(method || '').toUpperCase();
+  const p = String(path || '');
+  return DISPLAY_WRITE_ROUTES.some((route) => route.method === m && route.pattern.test(p));
+}
+
+/**
+ * Die EINE Frage, die beide Gates in server/index.js stellen: darf dieses
+ * Display hier durch?
+ *
+ * WARUM SIE ZUSAMMENGEFASST IST. Ein Display passiert zwei Riegel
+ * hintereinander - das Scope-Gate und das Modulrechte-Gate -, und beide muessen
+ * dieselbe Ausnahme kennen. Zweimal dieselbe Bedingung hingeschrieben heisst
+ * zweimal pflegen, und der zweite Ort ist der, den man beim naechsten Mal
+ * vergisst. Der Riegel im Auth-Router (`server/auth.js`) fragt weiterhin nur
+ * `displayMayRead`: dort geht es um die Konto-Routen, an denen ein Display
+ * nichts zu schreiben hat.
+ */
+export function displayMayAct(method, path) {
+  return displayMayRead(method, path) || displayMayWrite(method, path);
 }

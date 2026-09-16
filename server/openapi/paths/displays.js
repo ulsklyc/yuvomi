@@ -99,6 +99,13 @@ export function displaysPaths() {
         description: 'Admin only. Returns a ten-character code in plaintext exactly once, valid for 15 minutes. Issuing a new code spends the previous one immediately: two open codes would be two keys to the same door, and the older one would hang around unnoticed.',
       }),
     },
+    '/api/v1/displays/people': {
+      get: op({
+        summary: 'List the people a paired display may act for',
+        tag: 'Displays',
+        description: 'For paired displays only; a signed-in person gets 403 and uses GET /api/v1/family/members instead. Returns the household members (#1207) with name, colour and picture, plus `can_tick_off` and `can_redeem`, which say whether that person may write the Tasks module and whether they may write Rewards and take part in them. The contact details that /family/members carries are deliberately absent: a tablet hangs in the open, and a picker needs a face and a name, not a phone number. The two flags follow the same permission resolution the write routes apply, so the picker never offers someone the next call would refuse (#1209).',
+      }),
+    },
     '/api/v1/displays/{id}/devices/{deviceId}/revoke': {
       post: op({
         summary: 'Revoke a paired device',

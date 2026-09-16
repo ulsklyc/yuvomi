@@ -5,12 +5,17 @@
  *        genau eine Route: den Tausch des Codes gegen sein Credential.
  * Abhaengigkeiten: express, server/db.js (synchron), services/display-accounts.js
  *
- * ZWEI ROUTER IN EINER DATEI, WEIL SIE VERSCHIEDEN TIEF HAENGEN. Alles, was ein
+ * DREI ROUTER IN EINER DATEI, WEIL SIE VERSCHIEDEN TIEF HAENGEN. Alles, was ein
  * Mensch tut, haengt hinter `requireAuth` und `requireAdmin`. Der Tausch haengt
  * DAVOR, denn ein frisch aufgehaengtes Tablett hat noch nichts, womit es sich
  * ausweisen koennte - genau wie `/auth/login`. Die beiden in einer Datei zu
- * halten und in server/index.js an zwei Stellen zu montieren macht diesen
+ * halten und in server/index.js an drei Stellen zu montieren macht diesen
  * Unterschied sichtbar, statt ihn in zwei Dateien zu verstecken.
+ *
+ * Der dritte kam mit #1209 dazu: die Personenliste, aus der ein gekoppeltes
+ * Tablett waehlt, fuer wen es handelt. Sie haengt hinter `requireAuth`, aber
+ * NICHT hinter `requireAdmin` - ein Display ist ein Mitglied ohne Adminrecht,
+ * und es ist der einzige Aufrufer, den sie hat.
  */
 
 import crypto from 'node:crypto';
@@ -19,6 +24,9 @@ import rateLimit from 'express-rate-limit';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { requireAdmin } from '../middleware/require-admin.js';
+import { householdMemberSql } from '../services/household-members.js';
+import { resolvePermissions } from '../permissions.js';
+import { isEnrolled } from '../services/rewards.js';
 import { CURRENT_ONBOARDING_VERSION, LEGACY_SESSION_COOKIE, SESSION_COOKIE } from '../auth.js';
 import {
   DISPLAY_COOKIE,
@@ -128,6 +136,79 @@ pairingRouter.post('/pair', pairingLimiter, (req, res) => {
     res.clearCookie(LEGACY_SESSION_COOKIE);
     return redeem();
   });
+});
+
+// --------------------------------------------------------
+// Der Personen-Router: hinter requireAuth, aber NICHT hinter requireAdmin.
+// Genau eine Route, und nur ein gekoppeltes Display darf sie (#1209).
+// --------------------------------------------------------
+export const peopleRouter = express.Router();
+
+/**
+ * Die Personen, fuer die dieses Tablett handeln darf - die Fuellung des
+ * Pickers.
+ *
+ * AN DIE NAMEN KAEME DAS TABLETT AUCH OHNE DIESE ROUTE - das ist wichtig,
+ * sonst rechtfertigt sie sich mit etwas, das nicht stimmt. `/tasks/meta/options`
+ * liegt in seinem Scope und liefert Mitglieder samt Namen und Farbe schon
+ * heute. Was dort fehlt, ist die Rechtelage, und ohne sie zeigt der Picker
+ * jedes Mitglied und laesst die Absage an die Wand: ein Kind ohne Schreibrecht
+ * auf Aufgaben bekaeme eine 403, die dort draussen wie ein kaputtes Geraet
+ * aussieht. Fuer die Einloesung sagt `/tasks/meta/options` ohnehin nichts.
+ *
+ * WARUM NICHT `/family/members`, die naheliegende zweite Quelle. Sie zieht
+ * dasselbe Mitglieder-Praedikat, liefert aber Telefonnummer, E-Mail-Adresse und
+ * Geburtsdatum jedes Mitglieds gleich mit. Ein Tablett haengt oeffentlich in
+ * der Kueche; wer daran vorbeigeht, hat die Antwort. Dieselbe Ueberlegung, die
+ * `DISPLAY_PREFERENCE_KEYS` zu einer Allowlist gemacht hat, gilt hier fuer die
+ * Spaltenliste: Name, Farbe, Bild. Mehr braucht ein Knopf mit einem Gesicht
+ * darauf nicht.
+ *
+ * WARUM DIE ANTWORT SAGT, WER WAS DARF. Die
+ * Auswahl soll niemanden zeigen, den die Route hinterher ablehnt, und
+ * niemanden verbergen, den sie akzeptiert - so steht es schon ueber
+ * `isHouseholdMember` in services/household-members.js. Ohne die beiden
+ * Flaggen zeigte der Picker jedes Mitglied, und ein Kind ohne Schreibrecht auf
+ * Aufgaben bekaeme an der Wand eine 403, die aussieht wie ein kaputtes Geraet.
+ * Die Flaggen folgen DERSELBEN Quelle wie die Absage in
+ * services/display-acting.js: `resolvePermissions`, nicht eine zweite Liste.
+ *
+ * `can_redeem` traegt zusaetzlich die Teilnahme am Belohnungssystem
+ * (`isEnrolled`): wer nicht teilnimmt, hat keinen Punktestand, und ein Antrag
+ * fuer ihn endet an derselben Stelle wie fuer das Tablett selbst.
+ */
+peopleRouter.get('/people', (req, res) => {
+  try {
+    // NUR EIN DISPLAY. Ein Mensch hat `/family/members`, und diese Antwort
+    // traegt display-eigene Felder, die anderswo nichts bedeuten. Die Absage
+    // ist 403 und nicht 404: den Pfad gibt es, er ist nur nicht fuer diesen
+    // Aufrufer.
+    if (req.authMethod !== 'display') {
+      return res.status(403).json({ error: 'This route is for paired displays.', code: 403 });
+    }
+    const d = db.get();
+    const rows = d.prepare(`
+      SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.role, u.family_role
+      FROM users u
+      WHERE ${householdMemberSql('u')}
+      ORDER BY u.display_name COLLATE NOCASE ASC
+    `).all();
+    const data = rows.map((row) => {
+      const { admin, modules } = resolvePermissions(d, row);
+      return {
+        id: row.id,
+        display_name: row.display_name,
+        avatar_color: row.avatar_color,
+        avatar_data: row.avatar_data,
+        can_tick_off: admin || modules.tasks === 'write',
+        can_redeem: (admin || modules.rewards === 'write') && isEnrolled(d, row.id),
+      };
+    });
+    res.json({ data });
+  } catch (err) {
+    log.error('GET /people error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
 });
 
 // --------------------------------------------------------

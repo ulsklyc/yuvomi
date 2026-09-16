@@ -75,7 +75,8 @@ import familyRouter from './routes/family.js';
 // halten den Guard sehend.
 import displaysRouter from './routes/displays.js';
 import { pairingRouter } from './routes/displays.js';
-import { displayMayRead } from './display-scopes.js';
+import { peopleRouter } from './routes/displays.js';
+import { displayMayAct } from './display-scopes.js';
 import { DISPLAY_PASSWORD_SENTINEL } from './services/display-accounts.js';
 import backupRouter from './routes/backup.js';
 import housekeepingRouter from './routes/housekeeping.js';
@@ -566,7 +567,7 @@ app.use('/api/v1', (req, res, next) => {
   // die App auf dem Tablett kaeme nie ueber ihren Start hinaus. Die Ausnahme
   // gilt NUR fuer `authMethod === 'display'`; fuer ein gescoptes Token aendert
   // sich nichts.
-  if (req.authMethod === 'display' && displayMayRead(req.method, req.path)) return next();
+  if (req.authMethod === 'display' && displayMayAct(req.method, req.path)) return next();
   const moduleKey = moduleForPath(req.path);
   const access = requiredAccess(req.method);
   if (tokenAllows(req.authScopes, moduleKey, access)) return next();
@@ -591,6 +592,22 @@ app.use('/api/v1', (req, res, next) => {
   // Schlüssel bleibt `schedule`, damit `none` weiterhin verweigert wird; die
   // API-Token-Scope-Prüfung oben bleibt unveraendert an `schedule:write`
   // gebunden.
+  // DIESELBE DISPLAY-AUSNAHME WIE IM GATE DARUEBER (#1209), und sie muss hier
+  // ein zweites Mal stehen. Ein Display traegt `modules.tasks === 'read'` -
+  // absichtlich, denn seine Oberflaeche soll kein Anlegen und kein Bearbeiten
+  // zeigen -, und dieser Riegel liest genau das: ein PATCH auf eine Aufgabe
+  // verlangt `write` und faellt in MODULE_ACCESS_READ_ONLY. Das erste Gate
+  // durchzulassen und hier zu scheitern hiesse, die Ausnahme gaebe es gar nicht;
+  // im Browser sah das aus wie „das Tablett hakt nicht ab", mit 403 und ohne
+  // jeden Hinweis worauf.
+  //
+  // DIE MODULSTUFE AUF `write` ZU HEBEN WAERE DER FALSCHE WEG GEWESEN. Sie
+  // steuert auch, was die App ZEICHNET (permissions.js, „Navigation, Kacheln und
+  // der Anlege-Knopf" folgen derselben Quelle) - ein Display bekaeme dann
+  // Anlegen-, Bearbeiten- und Loeschen-Knoepfe, die der Server hinterher
+  // abweist. Die Erlaubnis ist keine Modulstufe, sondern genau zwei Routen, und
+  // beide Gates fragen dieselbe Liste.
+  if (req.authMethod === 'display' && displayMayAct(req.method, req.path)) return next();
   const { moduleKey: scopedModuleKey, access: scopedAccess } =
     sessionModuleAccessRequirement(req.path, req.method);
   const verdict = moduleAccessVerdict(
@@ -639,6 +656,12 @@ app.use('/api/v1/screensaver', screensaverRouter);
 app.use('/api/v1/reminders', remindersRouter);
 app.use('/api/v1/search', searchRouter);
 app.use('/api/v1/family', familyRouter);
+// Die Personenliste fuer den Picker eines Tabletts (#1209) haengt VOR dem
+// Administrator-Router: der traegt `requireAdmin` auf dem ganzen Router, und ein
+// Display ist ein Mitglied ohne Adminrecht. Express nimmt den ersten Router, der
+// die Route kennt - `/people` gibt es nur hier, alles andere unter `/displays`
+// faellt durch in den Administrator-Router dahinter.
+app.use('/api/v1/displays', peopleRouter);
 app.use('/api/v1/displays', displaysRouter);
 app.use('/api/v1/backup', backupRouter);
 app.use('/api/v1/housekeeping', housekeepingRouter);

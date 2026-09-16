@@ -1999,6 +1999,40 @@ Revoking sets `revoked_at` rather than deleting, like an API token, and takes ef
 next request - the credential is checked against the database every time, so there is no cached state
 to catch up with.
 
+**What a display does, not only what it sees (#1209, decided in #913).** A paired display may act,
+on behalf of a person chosen on the device, for exactly two things: tick a task off, and request a
+redemption. Nothing else - no creating, editing or deleting, and no settings.
+
+The permission is **two routes, not a module scope**. `DISPLAY_SCOPES` stays a read-only list;
+`PATCH /api/v1/tasks/{id}/status` and `POST /api/v1/rewards/redemptions` are named one by one in
+`DISPLAY_WRITE_ROUTES`, with exact method and path patterns. Raising the scopes to `tasks:write`
+would have been the obvious move and the wrong one: a scope covers a whole module, so it would open
+fourteen further writing routes and turn the promise in the ticket into something every route has to
+restate. It would also change what the app **draws** - module access drives navigation, tiles and the
+create button alike - so a tablet would show controls the server then refuses. Both global gates in
+`server/index.js` ask the same list; the module level stays `read`.
+
+**The chosen person carries the rules, not the device.** The person has to be named (there is no
+silent fallback to the display account, which would record work nobody did), has to be a household
+member through the one predicate (#1207, so guests, staff and other displays are out), and has to be
+allowed to write that module herself - without that last check the tablet would be the way around
+module permissions. A task has to be visible to the whole household, and that refusal is **404, not
+403**: an invisible task does not exist for this device, and 403 would confirm that it does. Only the
+transition into `done` is allowed; taking it back reverses points and discards a recurrence
+follow-up, and corrections stay with the household. Deciding a redemption stays wherever the
+household put it (`rewards_require_approval`) - the display asks, it never approves.
+
+`GET /api/v1/displays/people` fills the picker: household members with name, colour and picture,
+plus `can_tick_off` and `can_redeem` from the same permission resolution the write routes apply, so
+the picker never offers someone the next call would refuse. It deliberately carries none of the
+contact details `/family/members` returns, for the reason `DISPLAY_PREFERENCE_KEYS` exists: a tablet
+hangs in the open.
+
+**One seam worth knowing.** A display has no session, but `csrfMiddleware` keeps its token in
+`req.session`. Reading never hit this, because safe methods pass through. The first writing path a
+tablet takes therefore runs over an **empty session** that the browser carries alongside the device
+credential, and without it every write answers 403 - the same 403 a missing permission gives.
+
 ### ICS Subscriptions
 External calendar feeds subscribed by users (read-only, auto-synced).
 
