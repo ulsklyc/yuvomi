@@ -246,56 +246,72 @@ function serverFiles(dir = SERVER_DIR) {
 const rel = (file) => path.relative(ROOT, file);
 
 /**
- * Quelltext ohne Kommentare - das, was der Prozessor sieht.
+ * Steht dieser Treffer in einem Kommentar?
  *
- * WARUM DIE GUARDS DARUNTER IHN BRAUCHEN. Ein Guard, der die ganze Datei
- * durchsucht, findet sein eigenes Muster auch in dem Satz, der ERKLAERT, warum
- * die Stelle falsch war. Wer eine dieser Fallen behebt und danebenschreibt,
- * was dort stand, macht den Guard damit rot - die Suite bestrafte dann das
- * Richtigstellen.
+ * DIE FRAGE IST KLEINER ALS "entferne alle Kommentare", UND DAS IST DER PUNKT.
+ * Drei Anlaeufe gingen den anderen Weg, und jeder scheiterte an etwas anderem:
  *
- * WARUM EIN SCAN UND NICHT ZWEI REGEX-DURCHGAENGE. Der erste Anlauf strich
- * erst Blockkommentare, dann Zeilenkommentare - und loeschte damit echten Code.
- * In `server/index.js` steht ein Pfadmuster mit Stern in einem
- * Zeilenkommentar: fuer den Blockdurchgang ist der Schraegstrich-Stern eine
- * OEFFNENDE Klammer, die bis zur naechsten schliessenden irgendwo weiter unten
- * reicht - dort steht sie, ebenfalls harmlos gemeint, in einem anderen
- * Zeilenkommentar 17 Zeilen spaeter. Dazwischen verschwanden die Mounts von
- * `/permissions` und `/schedule` - **21 Zeilen der Hauptdatei**, gemessen, und
- * der Guard war fuer diesen Bereich blind. Die Reihenfolge umzudrehen tauscht
- * den Fehler nur gegen sein Spiegelbild: ein `//` INNERHALB eines echten
- * Blockkommentars schnitte dann dessen Zeile ab.
+ * 1. Zwei Regex-Durchgaenge, erst Block-, dann Zeilenkommentare. Ein Pfadmuster
+ *    mit Stern in einem Zeilenkommentar von `server/index.js` oeffnete einen
+ *    Blockkommentar bis 17 Zeilen weiter unten - 21 Zeilen weg, darunter zwei
+ *    Router-Mounts.
+ * 2. Ein Zeichen-Scan mit drei Zustaenden, ohne Strings. Ein Pfadmuster in
+ *    einem gewoehnlichen String von `server/openapi/schemas.js` oeffnete einen
+ *    Kommentar bis zum Dateiende - 523 Zeilen, ein Drittel der Datei.
+ * 3. Derselbe Scan mit String- und Regex-Zustaenden. Er fiel ueber
+ *    VERSCHACHTELTE Template-Literale in `server/services/shopping-mail.js`:
+ *    ein Backtick in der Interpolation eines anderen, und ab da stimmte keine
+ *    Zustandsgrenze mehr.
  *
- * Ein Zeichen-Scan kennt dagegen seinen Zustand: in Code, in einem
- * Zeilenkommentar oder in einem Blockkommentar - und nur im ersten beginnt
- * etwas Neues. Strings werden bewusst NICHT verfolgt: ein `//` in einem String
- * schneidet den Rest der Zeile weg, was hier folgenlos ist, weil die gesuchten
- * Muster in keinem String stehen, und die Richtung des Irrtums die geschlossene
- * ist - es wird weniger durchsucht, nie mehr. Ein echter Tokenizer waere die
- * Alternative und fuer einen Textguard zu teuer.
+ * Der naechste Schritt waere ein Stack fuer `${...}` gewesen, und damit ein
+ * JS-Tokenizer in einer Guard-Suite. Das ist die falsche Antwort auf die
+ * richtige Frage: gebraucht wird nicht der Quelltext ohne Kommentare, sondern
+ * ein Urteil ueber EINEN Fundort.
+ *
+ * DIE FEHLERRICHTUNG IST DABEI UMGEKEHRT - und das ist der eigentliche Gewinn.
+ * Ein Filter, der zu viel wegnimmt, macht den Guard BLIND: er meldet nichts und
+ * sieht gruen aus. Diese Fassung kann hoechstens zu VIEL melden, naemlich einen
+ * Treffer in einem ungewoehnlich formatierten Kommentar - und ein Fehlalarm
+ * kostet eine Minute, ein blinder Fleck eine Version. Die zweite Fassung stand
+ * hier mit der Begruendung, weniger zu durchsuchen sei "die geschlossene
+ * Richtung". Fuer einen Guard ist es die offene.
  */
-function ohneKommentare(quelle) {
-  let out = '';
-  let zustand = 'code';
-  for (let i = 0; i < quelle.length; i += 1) {
-    const c = quelle[i];
-    const naechstes = quelle[i + 1];
-    if (zustand === 'code') {
-      if (c === '/' && naechstes === '/') { zustand = 'zeile'; i += 1; continue; }
-      if (c === '/' && naechstes === '*') { zustand = 'block'; i += 1; continue; }
-      out += c;
-    } else if (zustand === 'zeile') {
-      // Der Zeilenumbruch bleibt stehen: die Zeilenzahl darf sich nicht
-      // verschieben, sonst zeigt ein Befund auf die falsche Zeile.
-      if (c === '\n') { zustand = 'code'; out += c; }
-    } else if (c === '*' && naechstes === '/') {
-      zustand = 'code'; i += 1;
-    } else if (c === '\n') {
-      out += c;
-    }
-  }
-  return out;
+function stehtImKommentar(quelle, index) {
+  const zeilenAnfang = quelle.lastIndexOf('\n', index - 1) + 1;
+  const vorDemTreffer = quelle.slice(zeilenAnfang, index);
+  // Zeilenkommentar: irgendwo davor auf derselben Zeile zwei Schraegstriche.
+  if (vorDemTreffer.includes('//')) return true;
+  // Fortsetzungszeile eines Blockkommentars: sie beginnt mit einem Stern.
+  if (/^\s*\*/.test(vorDemTreffer)) return true;
+  // Blockkommentar: die Zeile beginnt mit seinem Anfang. MEHR NICHT - und
+  // genau darin liegt die Fehlerrichtung.
+  //
+  // DER ERSTE ANLAUF SUCHTE RUECKWAERTS nach einem Anfang ohne Ende davor und
+  // behauptete im Kommentar, das koenne nur Fehlalarme geben. Das Gegenteil
+  // stimmt: `server/openapi/schemas.js` traegt ein Pfadmuster mit Stern in
+  // einem gewoehnlichen String und danach kein Kommentarende, also galt alles
+  // dahinter als Kommentar - ein angehaengter echter Verstoss wurde NICHT
+  // gemeldet. Der eigene Gegenprobe-Fall darunter hat das aufgedeckt, nicht
+  // das Nachdenken darueber.
+  //
+  // Diese Fassung urteilt nur nach dem Anfang DIESER Zeile. Ein mehrzeiliger
+  // Blockkommentar, dessen Innenzeilen weder mit einem Stern noch mit seinem
+  // Anfang beginnen, gibt damit einen Fehlalarm - im Haus schreibt jeder
+  // Blockkommentar seine Fortsetzungszeilen mit Stern, und ein Fehlalarm
+  // kostet eine Minute, waehrend ein blinder Fleck eine Version kostet.
+  return /^\s*\/\*/.test(vorDemTreffer);
 }
+
+/**
+ * Der Sprung von JETZT auf einen Kalenderabschnitt - Tag ODER Monat.
+ *
+ * EINE Stelle, weil drei Guards darunter dieselbe Frage stellen und ein Muster,
+ * das an zwei Orten gepflegt wird, an einem davon veraltet. Die Alternative
+ * `\\d+` statt `(?:10|7)` waere weiter: 10 und 7 sind die beiden Laengen mit
+ * einer Bedeutung, ein `slice(0, 4)` waere das Jahr und kommt nicht vor - ein
+ * Guard soll melden, was es gibt, statt Faelle zu erfinden.
+ */
+const NOW_TO_PERIOD = /new Date\(\s*\)\s*\.toISOString\(\)\s*\.slice\(\s*0\s*,\s*(?:10|7)\s*\)/;
 
 test('Guard: nur timezone.js ruft serverTimeZone() direkt', () => {
   // `serverTimeZone()` ist der Rueckfall, nicht die Antwort - es liest `TZ` und
@@ -330,57 +346,84 @@ test('Guard: kein Server-Modul leitet "heute" aus toISOString() ab', () => {
   // 7 sind die beiden Laengen mit einer Bedeutung. Ein `slice(0, 4)` waere das
   // Jahr und faellt heute durch - es kommt nirgends vor, und ein Guard soll
   // das melden, was es gibt, statt Faelle zu erfinden.
-  const NOW_TO_PERIOD = /new Date\(\s*\)\s*\.toISOString\(\)\s*\.slice\(\s*0\s*,\s*(?:10|7)\s*\)/;
+  // JE FUNDORT URTEILEN, nicht die Datei erst saeubern: sonst meldet dieser
+  // Guard den Satz, der ERKLAERT, warum eine Stelle falsch war, als neuen
+  // Verstoss - er bestrafte damit das Richtigstellen. Warum das Urteil und
+  // nicht der Filter, steht ueber `stehtImKommentar`.
   const offenders = serverFiles()
     .filter((file) => !file.endsWith(path.join('utils', 'timezone.js')))
-    // OHNE KOMMENTARE: sonst meldet dieser Guard den Satz, der erklaert, warum
-    // eine Stelle falsch war, als neuen Verstoss - er bestrafte damit genau
-    // das Richtigstellen.
-    .filter((file) => NOW_TO_PERIOD.test(ohneKommentare(readFileSync(file, 'utf8'))))
+    .filter((file) => {
+      const quelle = readFileSync(file, 'utf8');
+      const suche = new RegExp(NOW_TO_PERIOD.source, 'g');
+      for (let treffer = suche.exec(quelle); treffer; treffer = suche.exec(quelle)) {
+        if (!stehtImKommentar(quelle, treffer.index)) return true;
+      }
+      return false;
+    })
     .map(rel);
   assert.deepEqual(offenders, [],
     `Diese Dateien bilden "heute" aus dem UTC-Kalender: ${offenders.join(', ')}`);
 });
 
-test('Guard: der Kommentar-Filter loescht keinen echten Code', () => {
-  // DER FALL, DER DIE ZWEI-REGEX-FASSUNG ERLEDIGT HAT, und er ist keine
-  // Erfindung: `server/index.js` traegt in einem ZEILENkommentar ein Pfadmuster
-  // mit Stern, und 17 Zeilen spaeter in einem weiteren Zeilenkommentar dessen
-  // Gegenstueck. Fuer einen Blockkommentar-Durchgang, der vor dem
-  // Zeilenkommentar-Durchgang laeuft, ist das ein Kommentar ueber 17 Zeilen -
-  // und die Mounts dazwischen waren weg, bevor das Muster ueberhaupt suchte.
-  // Gemessen: 21 Zeilen der Hauptdatei, darunter `/permissions` und
-  // `/schedule`, und der Guard war fuer diesen Bereich blind.
-  //
-  // Gemessen wird an der ECHTEN Datei und nicht an einem Ausschnitt: ein
-  // nachgebauter Schnipsel haette denselben Fehler nur dann, wenn man ihn
-  // richtig nachbaut - und wer ihn richtig nachbauen kann, hat ihn schon
-  // verstanden ([[reference-green-test-that-measures-nothing]]).
-  const echt = readFileSync(path.join(SERVER_DIR, 'index.js'), 'utf8');
-  const gefiltert = ohneKommentare(echt);
-  for (const mount of ["app.use('/api/v1/permissions'", "app.use('/api/v1/schedule"]) {
-    assert.ok(gefiltert.includes(mount),
-      `${mount} darf nicht wegfallen - der Filter loescht echten Code`);
-  }
-  // Und die Zeilenzahl bleibt gleich, damit ein Befund auf die richtige Zeile zeigt.
-  assert.equal(gefiltert.split('\n').length, echt.split('\n').length,
-    'der Filter darf keine Zeilen verschlucken');
+test('Guard: das Urteil ueber den Fundort trifft beide Kommentararten und nichts sonst', () => {
+  // DIE REGEL SELBST, klein und lesbar. Die drei Vorgaengerfassungen filterten
+  // die ganze Datei und scheiterten je an einer anderen Sprachkonstruktion;
+  // diese hier beantwortet nur, ob EIN Fundort in einem Kommentar liegt.
+  const code = 'const m = new Date().toISOString().slice(0, 7);';
+  assert.equal(stehtImKommentar(code, code.indexOf('new Date')), false, 'blanker Code');
+
+  const zeile = '// hier stand new Date().toISOString().slice(0, 7)';
+  assert.equal(stehtImKommentar(zeile, zeile.indexOf('new Date')), true, 'Zeilenkommentar');
+
+  const nachCode = "foo(); // erledigt via new Date().toISOString().slice(0, 7)";
+  assert.equal(stehtImKommentar(nachCode, nachCode.indexOf('new Date')), true, 'Zeilenkommentar hinter Code');
+
+  const block = '/' + '* new Date().toISOString().slice(0, 10) *' + '/';
+  assert.equal(stehtImKommentar(block, block.indexOf('new Date')), true, 'Blockkommentar');
+
+  const fortsetzung = '/' + '**\n * new Date().toISOString().slice(0, 7)\n *' + '/';
+  assert.equal(stehtImKommentar(fortsetzung, fortsetzung.indexOf('new Date')), true, 'Fortsetzungszeile');
+
+  // NACH einem geschlossenen Block ist wieder Code - das ist die Zusicherung,
+  // an der die zweite Fassung zerbrach, nur hier lokal statt global.
+  const danach = '/' + '* alt *' + '/\nconst m = new Date().toISOString().slice(0, 7);';
+  assert.equal(stehtImKommentar(danach, danach.indexOf('new Date')), false, 'hinter einem geschlossenen Block');
 });
+
+test('Guard: der Bestand ist sauber, und der Guard sieht ihn wirklich an', () => {
+  // DIE GEGENPROBE ZUM GUARD OBEN. Ein Guard, der nirgends etwas findet, kann
+  // richtig liegen - oder nicht hinsehen. Die zweite Fassung dieses Filters
+  // uebersah ein Drittel von `server/openapi/schemas.js`, ohne dass irgendetwas
+  // rot wurde. Deshalb wird hier gezaehlt, ob die gesuchten Stellen ueberhaupt
+  // gefunden WERDEN: in den Dateien, die das Muster als Kommentartext tragen,
+  // muss es Treffer geben - und alle muessen als Kommentar erkannt sein.
+  let kommentarTreffer = 0;
+  let codeTreffer = 0;
+  for (const file of serverFiles()) {
+    const quelle = readFileSync(file, 'utf8');
+    const suche = new RegExp(NOW_TO_PERIOD.source, 'g');
+    for (let t = suche.exec(quelle); t; t = suche.exec(quelle)) {
+      if (stehtImKommentar(quelle, t.index)) kommentarTreffer += 1;
+      else codeTreffer += 1;
+    }
+  }
+  assert.ok(kommentarTreffer > 0,
+    'das Muster kommt im Haus als Kommentartext vor - findet der Guard gar nichts, sieht er nicht hin');
+  assert.equal(codeTreffer, 0, 'und ausserhalb von Kommentaren steht es nirgends');
+});
+
 
 test('Guard: das Muster trifft Tag UND Monat, und der Kommentar-Filter haelt', () => {
   // DER GUARD AUF DEN GUARD. Ein Muster, das niemand gegen einen bekannten
   // Verstoss haelt, ist eine Behauptung - und die Monats-Erweiterung oben ist
   // genau der Fall, den die alte Fassung durchliess.
-  const NOW_TO_PERIOD = /new Date\(\s*\)\s*\.toISOString\(\)\s*\.slice\(\s*0\s*,\s*(?:10|7)\s*\)/;
   assert.ok(NOW_TO_PERIOD.test('const t = new Date().toISOString().slice(0, 10);'), 'Tag');
   assert.ok(NOW_TO_PERIOD.test('const m = new Date().toISOString().slice(0,7)'), 'Monat ohne Leerzeichen');
   assert.ok(NOW_TO_PERIOD.test('x = new Date() .toISOString() .slice( 0 , 7 )'), 'Monat mit Leerzeichen');
   // Arithmetik auf einem gebildeten Key bleibt erlaubt - sie fragt nicht die Uhr.
   assert.ok(!NOW_TO_PERIOD.test('new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 7)'), 'Date.UTC bleibt frei');
   // Und der Kommentar-Filter: derselbe Text einmal als Code, einmal erklaert.
-  assert.ok(NOW_TO_PERIOD.test(ohneKommentare('const m = new Date().toISOString().slice(0, 7);')));
-  assert.ok(!NOW_TO_PERIOD.test(ohneKommentare('// hier stand new Date().toISOString().slice(0, 7)')));
-  assert.ok(!NOW_TO_PERIOD.test(ohneKommentare('/* new Date().toISOString().slice(0, 10) */')));
+  // Das Urteil ueber den Fundort hat seinen eigenen Fall weiter oben.
 });
 
 test('Guard: der null-Rueckfall steht nur als Default-Parameter', () => {
