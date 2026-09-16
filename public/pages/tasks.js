@@ -3459,9 +3459,23 @@ function handleBulkDelete(taskIds, container) {
  * ist der Teil, der die Bedienung traegt: Neuladen und dieselbe Quittung mit
  * Rueckweg wie Tipp und Wisch - mit dem Namen darin, weil sonst nichts auf dem
  * Schirm verriete, wem die Erledigung gerade zugeschrieben wurde.
+ *
+ * AM WANDTABLETT OHNE RUECKWEG (#1209), und das ist die Fortsetzung derselben
+ * Regel, die den Statusknopf dort weglaesst: ein Display darf nicht
+ * zuruecknehmen. Der Toast bot den Weg trotzdem an - im Browser gemessen: ein
+ * Tipp auf „Rueckgaengig" lief in 403 und zeigte die rohe englische
+ * Serverantwort auf einer deutschen Oberflaeche. Den Knopf wegzulassen und den
+ * Rueckweg fuenf Sekunden lang daneben zu legen ist dasselbe falsche Angebot,
+ * nur fluechtiger.
  */
 async function completeTaskFor(container, taskId, userId) {
-  const person = (state.users ?? []).find((u) => u.id === userId);
+  // AM DISPLAY AUS `displayPeople`, SONST AUS `state.users`. Beide Listen
+  // tragen den Namen, aber nur die erste ist die, aus der die Wahl kam - und
+  // sie ist die einzige, die das Tablett sicher hat: `/tasks/meta/options`
+  // liegt heute in seinem Scope, und faellt das je weg, hiesse die Quittung
+  // „Erledigt von ." statt zu scheitern.
+  const quelle = actingAsDisplay() ? (state.displayPeople ?? []) : (state.users ?? []);
+  const person = quelle.find((u) => u.id === userId);
   try {
     await toggleTaskStatus(taskId, 'open', userId);
     await loadTasks(container);
@@ -3469,7 +3483,7 @@ async function completeTaskFor(container, taskId, userId) {
       t('tasks.doneByToast', { name: person?.display_name ?? '' }),
       'default',
       5000,
-      async () => {
+      actingAsDisplay() ? null : async () => {
         try {
           await toggleTaskStatus(taskId, 'done');
           await loadTasks(container);

@@ -642,8 +642,16 @@ async function openRedeemModal(memberId, presetItemId = null) {
       </select>
     </div>`;
 
+  // AM TABLETT STEHT DIE PERSON IM TITEL (#1209). Fuer einen Menschen ist „ich"
+  // die Antwort und der Name waere Laerm; am Display sahen der Dialog fuer die
+  // eine und der fuer die andere Person identisch aus, und beide oeffnen sich
+  // aus derselben Liste heraus (im Browser gesehen). Kein neuer Locale-
+  // Schluessel: der Name traegt sich selbst, das Verb steht schon da.
+  const titelPerson = actingAsDisplay()
+    ? (state.displayPeople ?? []).find((p) => p.id === defaultMember)?.display_name
+    : null;
   openModal({
-    title: redeemVerb(),
+    title: titelPerson ? `${redeemVerb()} · ${titelPerson}` : redeemVerb(),
     content: `
       <form id="rw-redeem-form" novalidate>
         ${memberSelect}
