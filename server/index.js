@@ -76,6 +76,7 @@ import familyRouter from './routes/family.js';
 import displaysRouter from './routes/displays.js';
 import { pairingRouter } from './routes/displays.js';
 import { displayMayRead } from './display-scopes.js';
+import { DISPLAY_PASSWORD_SENTINEL } from './services/display-accounts.js';
 import backupRouter from './routes/backup.js';
 import housekeepingRouter from './routes/housekeeping.js';
 import wasteRouter from './routes/waste/index.js';
@@ -312,8 +313,14 @@ function buildVersionPayload(includeVersion = false) {
     // umgestellt, gibt es kein Passwort mehr, das ein Reset zuruecksetzen
     // koennte - der Link waere eine Sackgasse, obwohl SMTP steht. Die Abfrage
     // haelt bei der ersten Zeile an.
+    // BEIDE PLATZHALTER, nicht nur der von SSO (#1208). Ein Wandtablett traegt
+    // `$display$` statt eines Hashes, und das ist ebenso wenig ein Passwort, das
+    // sich zuruecksetzen liesse. In einem Haushalt, in dem alle Menschen per SSO
+    // anmelden, liess ein einziges Display den Reset-Link wieder erscheinen -
+    // eine Sackgasse, genau die, die diese Abfrage verhindern soll.
     const hasResettable = !!db.get()
-      .prepare('SELECT 1 FROM users WHERE password_hash != ? LIMIT 1').get(OIDC_PASSWORD_SENTINEL);
+      .prepare('SELECT 1 FROM users WHERE password_hash NOT IN (?, ?) LIMIT 1')
+      .get(OIDC_PASSWORD_SENTINEL, DISPLAY_PASSWORD_SENTINEL);
     passwordResetEnabled = isPasswordLoginEnabled()
       && hasResettable
       && emailService.isConfigured()

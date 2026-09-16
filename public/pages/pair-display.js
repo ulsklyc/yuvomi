@@ -15,6 +15,7 @@
  * das Tablett ein Display.
  */
 import { api } from '/api.js';
+import { clearApiCache } from '/sw-register.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 
@@ -57,6 +58,15 @@ export async function render(container) {
     btn.disabled = true;
     try {
       await api.post('/displays/pair', { code, label: label || null });
+      // DER OFFLINE-CACHE MUSS WEG, BEVOR NEU GELADEN WIRD. Wer ein Tablett
+      // koppelt, auf dem vorher ein Mitglied angemeldet war, wechselt hier den
+      // Nutzer - und der Service Worker haelt Antworten von `/dashboard`,
+      // `/tasks` und `/calendar` nach Request-URL vor und liefert sie aus, wenn
+      // das Netz fehlt. Ohne dieses Leeren bekaeme das eingeschraenkte Display
+      // im Offline-Fall die privaten Daten der Person, die das Geraet vorher
+      // benutzt hat. Abmelden und Sitzungsende tun dasselbe und aus demselben
+      // Grund (api.js, router.js).
+      clearApiCache();
       // Ein voller Neuaufbau statt einer Navigation im Router: das Cookie ist
       // gerade erst entstanden, und alles, was die App ueber „wer bin ich"
       // schon im Speicher hat, stammt von davor.

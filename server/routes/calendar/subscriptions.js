@@ -21,7 +21,19 @@ const router = express.Router();
 router.get('/subscriptions', (req, res) => {
   try {
     const subs = icsSubscription.getAll(getUserId(req));
-    res.json({ data: subs });
+    // DIE QUELL-URL IST EIN ZUGANGSDATUM, KEIN ANZEIGEFELD. Private
+    // Kalenderfeeds tragen ihr Geheimnis regelmaessig IM Pfad; wer die URL
+    // liest, hat den Kalender dauerhaft - auch nachdem sein eigener Zugang
+    // entzogen wurde. Sie gehoert deshalb dem, der das Abo VERWALTET, und nicht
+    // jedem, der Kalender lesen darf.
+    //
+    // Gemessen an den Scopes, nicht an der Anmeldeart: das trifft das
+    // Wandtablett (#1208) und ebenso ein gescoptes API-Token mit
+    // `calendar:read` - dort lag die Luecke schon vor diesem Ticket. Eine
+    // Sitzung traegt `authScopes === null` und sieht die URL wie bisher, sonst
+    // liesse sich ein Abo nicht mehr bearbeiten.
+    const data = req.authScopes == null ? subs : subs.map(({ url, ...rest }) => rest);
+    res.json({ data });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });

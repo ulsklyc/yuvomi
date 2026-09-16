@@ -13,6 +13,7 @@
  * Unterschied sichtbar, statt ihn in zwei Dateien zu verstecken.
  */
 
+import crypto from 'node:crypto';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import * as db from '../db.js';
@@ -162,7 +163,11 @@ router.post('/', (req, res) => {
       // Der Benutzername ist technisch und taucht nirgends auf: ein Display
       // meldet sich nie an. Er muss nur eindeutig sein, und die UNIQUE-Spalte
       // haelt das - ein Zaehler waere eine zweite Buchfuehrung darueber.
-      const username = `display-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      // `randomUUID` und NICHT `Math.random()`: der Name ist zwar kein
+      // Geheimnis, aber er steht in der `users`-Tabelle neben Konten, deren
+      // Namen es sind, und CodeQL urteilt ueber den Kontext, nicht ueber die
+      // Absicht (Alert 89). Eine kryptographische Quelle kostet hier nichts.
+      const username = `display-${crypto.randomUUID()}`;
       // `onboarding_version` auf den aktuellen Stand: die Begruessungstour ist
       // fuer einen Menschen gedacht, der die App kennenlernt. An der Kuechenwand
       // stuende sie als Dialog vor dem Kalender, und niemand haette den Auftrag,

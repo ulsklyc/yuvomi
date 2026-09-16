@@ -104,11 +104,25 @@ function householdSize(database) {
  */
 const PRIVACY_MODULES = ['calendar', 'documents', 'tasks'];
 function othersCanRead(database, userId) {
+  // DISPLAYS ZAEHLEN MIT (#1208). Der Kommentar ueber dieser Funktion nennt die
+  // Regel schon richtig - "kann ausser dem Nutzer irgendein Konto das Modul
+  // lesen" -, die Abfrage zaehlte aber nur `family`. Ein Wandtablett fiel damit
+  // heraus, und in einem Ein-Personen-Haushalt MIT Tablett verschwanden die
+  // Sichtbarkeitsfelder: jeder neue Eintrag blieb auf „alle" und stand an der
+  // Kuechenwand, ohne dass die Person ihn haette privat stellen koennen. Genau
+  // die Art stiller Preisgabe, gegen die DECISIONS 1 gebaut ist.
+  //
+  // Ein Display wird dabei mit SEINEN Rechten aufgeloest, nicht mit denen eines
+  // Mitglieds: es liest Kalender und Aufgaben, aber nicht Budget oder
+  // Gesundheit - dort bleiben die Felder also weiterhin weg, wenn sonst niemand
+  // da ist.
   const others = database.prepare(`
-    SELECT u.id, u.role, u.family_role FROM users u
-    WHERE u.id != ? AND ${accessScopeSql('u')} = 'family'
+    SELECT u.id, u.role, u.family_role, ${accessScopeSql('u')} AS access_scope FROM users u
+    WHERE u.id != ? AND ${accessScopeSql('u')} IN ('family', 'display')
   `).all(userId);
-  const resolved = others.map((other) => resolvePermissions(database, other).modules);
+  const resolved = others.map((other) => resolvePermissions(database, other, {
+    isDisplay: other.access_scope === 'display',
+  }).modules);
   return PRIVACY_MODULES.filter((key) => resolved.some((modules) => (modules[key] ?? 'write') !== 'none'));
 }
 
@@ -775,6 +789,15 @@ function requireAuth(req, res, next) {
     // Ein Credential, das es nicht mehr gibt, faellt NICHT auf die Sitzung
     // zurueck: ein widerrufenes Tablett soll leer bleiben, nicht heimlich als
     // die Person weiterlaufen, die es zuletzt eingerichtet hat.
+    //
+    // DAS COOKIE WIRD DABEI GELOESCHT, sonst ist das Geraet fuer immer
+    // unbrauchbar: es ist httpOnly, also kommt kein Skript der Seite daran, und
+    // dieser Zweig griffe bei JEDEM weiteren Request - auch nach einer
+    // erfolgreichen Anmeldung als Mensch. Wer ein Tablett zurueckbaut, muesste
+    // sonst die Websitedaten von Hand loeschen oder einen neuen Kopplungscode
+    // holen. Der Request selbst bleibt abgewiesen; erst der naechste kommt ohne
+    // das tote Cookie und wird normal behandelt.
+    res.clearCookie(DISPLAY_COOKIE, { httpOnly: true, sameSite: 'lax', path: '/' });
     return res.status(401).json({ error: 'Not authenticated.', code: 401 });
   }
 
@@ -2418,18 +2441,27 @@ router.get('/users', requireAuth, (req, res) => {
     // Admin-Cookie bekaeme es umgekehrt zu Unrecht. Jede andere Rollenpruefung
     // in dieser Datei fragt aus genau diesem Grund `authRole`.
     const isAdmin = req.authRole === 'admin';
+    // WANDTABLETTS STEHEN HIER NICHT (#1208). Diese Liste ist die
+    // Kontenverwaltung, und die Familien-Seite rendert jede Zeile daraus als
+    // bearbeitbares Familienmitglied - samt Familienrolle, Loeschknopf und,
+    // beim Speichern, `syncFamilyMemberArtifacts`, das dem Geraet einen Kontakt
+    // und einen Geburtstag anlegen wuerde. Ein Display ist kein Konto, das man
+    // hier verwaltet: es hat seine eigene Seite, auf der es angelegt, gekoppelt
+    // und widerrufen wird.
     const users = isAdmin
       ? db.get().prepare(`
           SELECT ${USER_PUBLIC_COLUMNS},
                  EXISTS(SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = users.id) AS is_worker,
                  (password_hash = ?) AS sso_only
           FROM users
+          WHERE NOT EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = users.id)
           ORDER BY display_name
         `).all(OIDC_PASSWORD_SENTINEL)
       : db.get().prepare(`
           SELECT ${USER_PUBLIC_COLUMNS},
                  EXISTS(SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = users.id) AS is_worker
           FROM users
+          WHERE NOT EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = users.id)
           ORDER BY display_name
         `).all();
     res.json({ data: users.map(publicUser) });

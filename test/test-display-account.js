@@ -293,6 +293,60 @@ test('eine gespeicherte Rechtezeile kann ein Display nicht aufbohren', async () 
     .run(String(displayId));
 });
 
+test('ein Display zaehlt als Mitleser, sonst verschwinden die Sichtbarkeitsfelder', async () => {
+  // DER GEFAEHRLICHSTE DER SIEBEN BEFUNDE. `othersCanRead()` zaehlte nur Konten
+  // mit `access_scope = 'family'`. In einem Ein-Personen-Haushalt MIT Tablett
+  // meldete die Antwort damit "niemand sonst liest mit", `hidesPrivacyControls()`
+  // blendete die Sichtbarkeitsauswahl aus, jeder neue Eintrag blieb auf „alle" -
+  // und stand an der Kuechenwand, ohne dass die Person ihn haette privat stellen
+  // koennen. Genau die stille Preisgabe, gegen die DECISIONS 1 gebaut ist.
+  const me = await admin('GET', '/auth/me');
+  assert.equal(me.status, 200);
+  const canRead = me.body.othersCanRead ?? [];
+  assert.ok(canRead.includes('tasks'), 'das Tablett liest Aufgaben mit');
+  assert.ok(canRead.includes('calendar'), 'und den Kalender');
+  // MIT SEINEN Rechten aufgeloest, nicht mit denen eines Mitglieds: was ein
+  // Display nicht lesen darf, darf die Felder auch nicht stehen lassen.
+  assert.ok(!canRead.includes('health'), 'Gesundheit liest es nicht - dort bleibt es beim Solo-Fall');
+});
+
+test('das Display steht nicht in der Kontenverwaltung', async () => {
+  // `GET /auth/users` ist die Kontenliste, und die Familien-Seite rendert jede
+  // Zeile daraus als bearbeitbares Familienmitglied - mit Familienrolle,
+  // Loeschknopf und, beim Speichern, einem Kontakt und einem Geburtstag fuer
+  // das Geraet. Ein Display gehoert dort nicht hin; es hat seine eigene Seite.
+  const users = await admin('GET', '/auth/users');
+  assert.equal(users.status, 200);
+  const ids = (users.body.data ?? []).map((u) => u.id);
+  assert.ok(!ids.includes(displayId), 'kein Wandtablett in der Kontenverwaltung');
+  assert.ok(ids.length > 0, 'die Menschen stehen weiterhin drin');
+});
+
+test('das Display liest keine Abo-URLs, ein Mensch schon', async () => {
+  // EINE QUELL-URL IST EIN ZUGANGSDATUM. Private Kalenderfeeds tragen ihr
+  // Geheimnis regelmaessig IM Pfad - wer sie liest, hat den Kalender dauerhaft,
+  // auch nachdem das Tablett laengst widerrufen wurde. Die Luecke gab es vor
+  // diesem Ticket schon fuer ein gescoptes Token mit `calendar:read`; gemessen
+  // wird deshalb an den Scopes, nicht an der Anmeldeart.
+  const created = await admin('POST', '/calendar/subscriptions', {
+    name: 'Schulferien', url: 'https://example.invalid/feed.ics?token=geheim', color: '#6366f1', shared: 1,
+  });
+  assert.ok([200, 201].includes(created.status), `Abo anlegen: ${created.status}`);
+
+  const alsMensch = await admin('GET', '/calendar/subscriptions');
+  assert.equal(alsMensch.status, 200);
+  assert.ok(alsMensch.body.data.some((sub) => typeof sub.url === 'string'),
+    'wer ein Abo bearbeiten darf, sieht seine URL weiterhin');
+
+  const alsDisplay = await asDisplay(displayToken)('GET', '/calendar/subscriptions');
+  assert.equal(alsDisplay.status, 200, 'die Liste selbst bleibt lesbar - nur das Geheimnis nicht');
+  for (const sub of alsDisplay.body.data ?? []) {
+    assert.ok(!('url' in sub), 'die Quell-URL darf ein Display nicht erreichen');
+  }
+  assert.ok((alsDisplay.body.data ?? []).some((sub) => sub.name === 'Schulferien'),
+    'der Name bleibt, damit der Kalender weiter beschriftet ist');
+});
+
 test('die eigene Zeile nennt das Display als das, was es ist', async () => {
   // `access_scope` traegt die dritte Auspraegung, und das Frontend haengt daran:
   // die schmale Navigation in public/router.js entscheidet danach, ob sie vier
@@ -394,6 +448,21 @@ test('ein Widerruf endet den Zugang beim naechsten Request', async () => {
   // Kein Zwischenspeicher, der den Widerruf noch einholen muesste: die Pruefung
   // sieht bei JEDEM Request in die Datenbank.
   assert.equal((await display('GET', '/tasks')).status, 401, 'danach nicht mehr');
+});
+
+test('ein widerrufenes Credential raeumt sein Cookie ab', async () => {
+  // SONST IST DAS GERAET FUER IMMER UNBRAUCHBAR: das Cookie ist httpOnly, kein
+  // Skript der Seite kommt daran, und der Display-Zweig griffe bei JEDEM
+  // weiteren Request - auch nach einer erfolgreichen Anmeldung als Mensch. Wer
+  // ein Tablett zurueckbaut, muesste die Websitedaten von Hand loeschen.
+  const res = await fetch(`${BASE}/api/v1/tasks`, {
+    headers: { Cookie: `${DISPLAY_COOKIE}=${displayToken}` },
+  });
+  assert.equal(res.status, 401, 'der Request bleibt abgewiesen');
+  const setCookie = String(res.headers.get('set-cookie') || '');
+  assert.match(setCookie, new RegExp(`${DISPLAY_COOKIE}=`), 'die Antwort raeumt das Cookie ab');
+  assert.match(setCookie, /Expires=Thu, 01 Jan 1970|Max-Age=0/,
+    'und zwar so, dass der Browser es wirklich vergisst');
 });
 
 test('ein widerrufenes Credential faellt nicht auf eine Sitzung zurueck', async () => {

@@ -17519,6 +17519,40 @@ test('withoutCommentsKeepingLines liest nach `${` einen Ausdruck', () => {
  * (Review zu #1070). Er schadet nicht, aber er behauptet eine Beteiligung, die
  * es nicht gibt - und beim naechsten Lesen sucht jemand den Aufruf.
  */
+/**
+ * WER DAS HANDELNDE KONTO WECHSELT, LEERT DEN OFFLINE-CACHE.
+ *
+ * Der Service Worker haelt Antworten von `/dashboard`, `/tasks` und `/calendar`
+ * nach Request-URL vor und liefert sie aus, wenn das Netz fehlt. Am selben
+ * Geraet ist das ein Datenleck ueber den Nutzerwechsel hinweg: die naechste
+ * Person bekaeme offline die Daten der vorigen.
+ *
+ * Abmelden und Sitzungsende taten es laengst richtig. Die Kopplung eines
+ * Wandtabletts war der dritte Wechsel und tat es zuerst NICHT (#1208, Review) -
+ * ein Tablett, auf dem vorher jemand angemeldet war, haette die privaten
+ * Nutzlasten dieser Person weiter ausgeliefert, und zwar an ein Konto, das sie
+ * ausdruecklich nicht sehen darf.
+ *
+ * Die Liste ist eine Allowlist der Wechsel, nicht ein Suchmuster: ein vierter
+ * Wechsel faellt hier auf, weil ihn jemand eintragen muss.
+ */
+test('jeder Wechsel des handelnden Kontos leert den API-Cache', () => {
+  const WECHSEL = [
+    { datei: '../public/api.js', was: 'Abmelden und Sitzungsende' },
+    { datei: '../public/router.js', was: 'der Rueckweg auf die Anmeldeseite' },
+    { datei: '../public/pages/pair-display.js', was: 'die Kopplung eines Wandtabletts' },
+  ];
+  const fehlend = [];
+  for (const { datei, was } of WECHSEL) {
+    const src = withoutCommentsKeepingLines(read(datei));
+    const importiert = /import\s*\{[^}]*\bclearApiCache\b[^}]*\}\s*from\s*'\/sw-register\.js'/.test(src);
+    const ruft = /clearApiCache\s*\(/.test(src);
+    if (!importiert || !ruft) fehlend.push(`${datei} (${was})`);
+  }
+  assert.deepEqual(fehlend, [],
+    `Diese Kontowechsel leeren den Offline-Cache nicht:\n  ${fehlend.join('\n  ')}`);
+});
+
 test('wer refocusAfterRender importiert, ruft es auch', () => {
   const tot = [];
   for (const dir of ['../public/pages', '../public/components', '../public/settings/pages']) {

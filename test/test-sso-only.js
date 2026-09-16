@@ -538,8 +538,20 @@ test('der Reset wird nicht beworben, wenn es kein Passwort mehr gibt', () => {
   const expr = index.slice(start, index.indexOf(';', start));
   assert.match(expr, /hasResettable/,
     'die Reset-Faehigkeit haengt nicht davon ab, ob es ueberhaupt ein Passwort gibt');
-  assert.match(index, /password_hash != \?/,
+  // DIE REGEL, NICHT DIE SCHREIBWEISE. Die erste Fassung verlangte woertlich
+  // `password_hash != ?` und wurde damit rot, als die Abfrage VERSCHAERFT wurde:
+  // seit #1208 traegt auch ein Wandtablett einen Platzhalter (`$display$`) statt
+  // eines Hashes, und beide muessen heraus - ein einziges Display liess den
+  // Reset-Link in einem reinen SSO-Haushalt sonst wieder erscheinen.
+  // Geprueft wird deshalb, dass die Abfrage den Hash gegen die
+  // PLATZHALTER-KONSTANTEN haelt, in welcher Form auch immer.
+  const hasResettableQuery = index.slice(index.indexOf('const hasResettable'), start);
+  assert.match(hasResettableQuery, /password_hash\s+(?:!=\s*\?|NOT IN\s*\()/,
     '/version prueft nicht, ob ueberhaupt ein Konto ein Passwort hat');
+  for (const sentinel of ['OIDC_PASSWORD_SENTINEL', 'DISPLAY_PASSWORD_SENTINEL']) {
+    assert.match(hasResettableQuery, new RegExp(sentinel),
+      `die Abfrage nimmt ${sentinel} nicht aus - ein Konto mit diesem Platzhalter gilt sonst als zuruecksetzbar`);
+  }
 });
 
 test('die Anmeldeseite behaelt einen Weg fuer Gastkonten', () => {
