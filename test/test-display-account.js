@@ -539,6 +539,127 @@ test('ein Display loeschen nimmt seine Geraete mit', async () => {
 });
 
 // --------------------------------------------------------
+// Runde 2 des Reviews: was der Uebergang zum Display sonst noch offen liess
+// --------------------------------------------------------
+
+test('die Kopplung toetet die Sitzung, aus der heraus gekoppelt wurde', async () => {
+  // GEKOPPELT WIRD FAST IMMER AUS EINEM ANGEMELDETEN BROWSER. Bliebe
+  // `yuvomi.sid` daneben liegen, waere es ein schlafender Zweitschluessel: das
+  // Display-Credential fuehrt zwar, aber sobald es faellt (Widerruf, Loeschen),
+  // raeumt requireAuth das tote Cookie weg - und der naechste Request faende
+  // die alte Sitzung mit den VOLLEN Rechten dieser Person. Der Widerruf haette
+  // das Tablett damit offener zurueckgelassen als vorher.
+  const created = await admin('POST', '/displays', { display_name: 'Uebergang' });
+  const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});
+  const session = await login('admin', 'adminpass123');
+
+  // Vorbedingung: diese Sitzung traegt gerade noch volle Rechte.
+  assert.equal((await fetch(`${BASE}/api/v1/documents`, { headers: { Cookie: session.cookie } })).status, 200);
+
+  const res = await fetch(`${BASE}/api/v1/displays/pair`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: session.cookie },
+    body: JSON.stringify({ code: issued.body.data.code }),
+  });
+  assert.equal(res.status, 201);
+
+  // Nur die Sitzung, ohne das Geraete-Cookie - so sieht es der Browser nach
+  // einem Widerruf.
+  const after = await fetch(`${BASE}/api/v1/documents`, { headers: { Cookie: session.cookie } });
+  assert.equal(after.status, 401, 'die Sitzung ist serverseitig zerstoert, nicht nur ueberdeckt');
+});
+
+test('das Geraete-Cookie wird bei jedem Zugriff neu datiert', async () => {
+  // Browser kappen persistente Cookies (Chromium bei 400 Tagen). Eine einmal
+  // geschriebene Zehnjahresfrist ist damit keine - ein Tablett an der Wand
+  // waere nach gut einem Jahr von selbst leer gewesen, ohne Widerruf.
+  const created = await admin('POST', '/displays', { display_name: 'Nachdatiert' });
+  const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});
+  const token = (await pair(issued.body.data.code)).token;
+
+  const res = await fetch(`${BASE}/api/v1/tasks`, { headers: { Cookie: `${DISPLAY_COOKIE}=${token}` } });
+  assert.equal(res.status, 200);
+  const setCookie = String(res.headers.get('set-cookie') || '');
+  assert.match(setCookie, new RegExp(`${DISPLAY_COOKIE}=`), 'der Zugriff frischt das Cookie auf');
+
+  // Die REGEL messen, nicht die Zahl: unter jeder Browser-Kappung und weit
+  // genug ueber einem Tag, damit ein Tablett nicht taeglich am Netz haengen
+  // muss. Ein Literal hier waere beim naechsten Nachjustieren rot geworden,
+  // ohne dass etwas kaputt ist.
+  const maxAge = Number(setCookie.match(/Max-Age=(\d+)/i)?.[1] ?? 0);
+  assert.ok(maxAge > 30 * 24 * 60 * 60, `Max-Age ${maxAge} ist zu kurz fuer ein unbeaufsichtigtes Geraet`);
+  assert.ok(maxAge <= 400 * 24 * 60 * 60, `Max-Age ${maxAge} liegt ueber der 400-Tage-Kappung der Browser`);
+});
+
+test('ein Display kann kein Subjekt eines API-Tokens sein', async () => {
+  // Der Weg drumherum: die Display-Id als `subject_user_id` eintragen. Der
+  // Token-Zweig loest Rechte OHNE `isDisplay` auf - die feste Leseliste greift
+  // dort nicht, ein ungescoptes Token haette also die vollen Schreibrechte
+  // eines Mitglieds unter dem Namen des Wandtabletts.
+  const res = await admin('POST', '/auth/api-tokens', { name: 'Tablett-Umweg', subject_user_id: displayId });
+  assert.equal(res.status, 400);
+  assert.match(res.body?.error || '', /display/i);
+});
+
+test('calendar:read reicht NICHT an das Kontaktbuch', async () => {
+  // GET /birthdays/import/candidates zaehlt jeden Kontakt mit Namen und
+  // Geburtsdatum auf. Der Pfad-Guard urteilt am ersten Segment, und
+  // `moduleForPath('/birthdays')` ergibt `calendar` - jedes Credential mit
+  // `calendar:read` kam damit an eine Liste, die `contacts` verlangt.
+  assert.ok(DISPLAY_SCOPES.includes('calendar:read'), 'Vorbedingung: das Display hat calendar:read');
+  assert.ok(!DISPLAY_SCOPES.some((s) => s.startsWith('contacts:')), 'Vorbedingung: contacts ist NICHT dabei');
+
+  // Ein FRISCHES Geraet: das Credential aus dem ersten Test ist weiter oben
+  // schon widerrufen worden, und ein 401 haette hier nach bestandener Pruefung
+  // ausgesehen, ohne die Regel je zu beruehren.
+  const created = await admin('POST', '/displays', { display_name: 'Kontaktprobe' });
+  const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});
+  const token = (await pair(issued.body.data.code)).token;
+  const display = asDisplay(token);
+  // Vorbedingung am SELBEN Praefix: das Display erreicht /birthdays sehr wohl.
+  // Sonst waere das 403 unten auch dann gruen, wenn der ganze Zweig gesperrt
+  // waere - und der Riegel, um den es geht, nie gemessen.
+  assert.equal((await display('GET', '/birthdays')).status, 200, 'Vorbedingung: /birthdays ist offen');
+
+  const denied = await display('GET', '/birthdays/import/candidates');
+  assert.equal(denied.status, 403);
+
+  // Dieselbe Luecke ist aelter als das Display: ein gescoptes API-Token trifft
+  // sie genauso.
+  const tokenRes = await admin('POST', '/auth/api-tokens', { name: 'Nur Kalender', scopes: ['calendar:read'] });
+  assert.equal(tokenRes.status, 201);
+  const scoped = await fetch(`${BASE}/api/v1/birthdays/import/candidates`, {
+    headers: { Authorization: `Bearer ${tokenRes.body.token}` },
+  });
+  assert.equal(scoped.status, 403, 'auch ein Token mit calendar:read bleibt draussen');
+
+  // Und die Gegenrichtung: wer Kontakte darf, kommt weiterhin durch - sonst
+  // haette der Riegel den Geburtstags-Import selbst erschlagen.
+  assert.equal((await admin('GET', '/birthdays/import/candidates')).status, 200);
+});
+
+test('der Katalog nennt die Kopplungsroute als unauthentifiziert', async () => {
+  // Sonst traegt `op()` Bearer, API-Key und Cookie ein und verlangt von einem
+  // frisch aufgehaengten Tablett genau das Credential, das es sich dort erst
+  // holt.
+  const spec = (await admin('GET', '/openapi.json')).body;
+  const pairOp = spec?.paths?.['/api/v1/displays/pair']?.post;
+  const loginOp = spec?.paths?.['/api/v1/auth/login']?.post;
+  const listOp = spec?.paths?.['/api/v1/displays']?.get;
+  assert.ok(pairOp && loginOp && listOp, 'alle drei stehen im Katalog');
+
+  // GEGEN /auth/login GEMESSEN, NICHT GEGEN EIN LITERAL. Wie dieses Projekt
+  // "oeffentlich" schreibt, ist seine Entscheidung (heute: `security` fehlt
+  // ganz) - der Kopplungstausch soll dieselbe Schreibweise tragen wie die
+  // andere Route ohne Anmeldung, nicht eine zufaellig gleich aussehende.
+  assert.deepEqual(pairOp.security, loginOp.security, 'wie /auth/login deklariert');
+  // Und die Gegenprobe, damit der Vergleich nicht leer bestehen kann: eine
+  // Route MIT Anmeldung traegt die Anforderung sichtbar.
+  assert.ok(Array.isArray(listOp.security) && listOp.security.length > 0,
+    'Vorbedingung: authentifizierte Operationen nennen ihre Verfahren');
+});
+
+// --------------------------------------------------------
 // Der Limiter - absichtlich zuletzt, weil er das Budget aufbraucht
 // --------------------------------------------------------
 test('geratene Kopplungscodes laufen in die Versuchsgrenze', async () => {

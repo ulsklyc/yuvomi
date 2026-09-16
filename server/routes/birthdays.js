@@ -3,6 +3,7 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { collectErrors, date as validateDate, str, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
+import { hiddenModulesFor } from '../permissions.js';
 import {
   deleteBirthdayArtifacts,
   hydrateBirthday,
@@ -146,8 +147,34 @@ router.post('/', (req, res) => {
   }
 });
 
+
+/**
+ * Die beiden Import-Routen lesen aus KONTAKTEN, nicht aus Geburtstagen.
+ *
+ * DER PFAD SAGT `birthdays`, DER INHALT KOMMT AUS `contacts` - und der
+ * Scope-Guard in server/index.js urteilt nur nach dem ersten Pfadsegment:
+ * `moduleForPath('/birthdays')` ergibt `calendar`. Jedes Credential mit
+ * `calendar:read` kam damit an die Kandidatenliste, und die zaehlt JEDEN
+ * Kontakt des Haushalts mit Namen und Geburtsdatum auf, ohne
+ * Sichtbarkeitsfilter. Gemeldet fuer das Wandtablett aus #1208 (Scopes:
+ * dashboard, calendar, tasks, rewards, wetter - `contacts` ist NICHT dabei,
+ * seine aufgeloesten Rechte melden `contacts: none`), aber die Luecke ist
+ * aelter und trifft jedes gescopte API-Token genauso.
+ *
+ * `hiddenModulesFor()` prueft beide Achsen in einem Aufruf - Token-Scopes UND
+ * die Modulrechte der Rolle. Dieselbe Klasse Befund wie die Abo-URLs in
+ * #1241 Runde 1 und wie #823: eine Mischstelle braucht ihre eigene Pruefung,
+ * weil die Middleware am Pfad haengt.
+ */
+function contactsHidden(req) {
+  return hiddenModulesFor(req, ['contacts']).has('contacts');
+}
+
 router.get('/import/candidates', (req, res) => {
   try {
+    if (contactsHidden(req)) {
+      return res.status(403).json({ error: 'Contact access is required to import birthdays.', code: 403 });
+    }
     const data = listBirthdayImportCandidates(db.get());
     res.json({ data });
   } catch (err) {
@@ -158,6 +185,12 @@ router.get('/import/candidates', (req, res) => {
 
 router.post('/import', (req, res) => {
   try {
+    // Schreibt Geburtstage, LIEST aber Kontakte: ohne diesen Riegel waere der
+    // Umweg offen, sich die abgewiesene Liste ueber die angelegten
+    // Geburtstagseintraege doch noch zusammenzusetzen.
+    if (contactsHidden(req)) {
+      return res.status(403).json({ error: 'Contact access is required to import birthdays.', code: 403 });
+    }
     const userId = req.authUserId || req.session.userId;
     const ids = Array.isArray(req.body.contact_ids) ? req.body.contact_ids : null;
     if (!ids || ids.length === 0) {

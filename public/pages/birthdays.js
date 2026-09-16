@@ -8,6 +8,7 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { todayKey } from '/utils/date.js';
 import { setNavBadge, BIRTHDAY_BADGE_DAYS } from '/utils/nav-badges.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
+import { moduleAccess } from '/permissions.js';
 import { findPageFab } from '/utils/fab.js';
 // Alias: dieses Modul fuehrt selbst eine `emptyStateHtml()`, die den Renderer
 // mit den Geburtstags-Texten fuellt. Zwei Namen, die sich nur in der
@@ -378,7 +379,12 @@ function renderPage() {
         className: 'birthdays-toolbar__search page-toolbar__center',
       }),
       // Actions slot: Import + desktop-docked primary (dockFabIntoToolbar).
-      actions: renderPageActions(`
+      // DER KNOPF LIEST AUS KONTAKTEN, NICHT AUS GEBURTSTAGEN. Wer `contacts`
+      // nicht sehen darf, bekommt seit #1241 vom Server ein 403 - ohne diese
+      // Zeile bliebe ein Knopf stehen, der nur noch eine Fehlermeldung
+      // aufmacht. Die Durchsetzung bleibt serverseitig, das hier ist die
+      // Anzeige dazu.
+      actions: renderPageActions(moduleAccess('contacts') === 'none' ? '' : `
           <button class="btn btn--secondary birthdays-toolbar__import" id="birthdays-import-btn" type="button" aria-label="${t('birthdays.importButton')}">
             <i data-lucide="download" aria-hidden="true"></i><span>${t('birthdays.importButton')}</span>
           </button>`),

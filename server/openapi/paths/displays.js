@@ -20,6 +20,12 @@ export function displaysPaths() {
       post: op({
         summary: 'Exchange a pairing code for a device credential',
         tag: 'Displays',
+        // Die einzige Route dieses Moduls OHNE Anmeldung - sie haengt in
+        // server/index.js vor `requireAuth`. Ohne `auth: false` traegt der
+        // Katalog hier Bearer, API-Key und Cookie ein und verlangt damit von
+        // einem frisch aufgehaengten Tablett genau das Credential, das es sich
+        // hier erst holt. Dieselbe Angabe wie bei /auth/login.
+        auth: false,
         stateChanging: true,
         requestBody: null,
         description: 'The only route a display itself calls, and the only one that needs no authentication - a freshly mounted tablet has nothing to identify itself with yet, the same reason `/auth/login` is public. Body: { code, label? }. The credential is returned **only** as an httpOnly cookie and never in the response body, so no script on the page can read it. A code is valid once, expires after 15 minutes, and is replaced when a newer one is issued for the same display; all three failures answer the same 400, so guessing learns nothing. Rate-limited like the sign-in routes. A successful exchange revokes the display\'s previous device: one display, one tablet.',

@@ -51,6 +51,45 @@ export {
  */
 export const DISPLAY_COOKIE = 'yuvomi.display';
 
+/**
+ * Wie lange das Cookie gilt - und warum es bei jedem Zugriff neu gesetzt wird.
+ *
+ * DER ERSTE ANLAUF SCHRIEB ZEHN JAHRE UND HIELT DAS FUER "endet nur mit dem
+ * Widerruf". Das stimmt fuer das Credential in der Datenbank, aber nicht fuer
+ * seinen Traeger: Chromium kappt die Lebensdauer eines persistenten Cookies auf
+ * 400 Tage, Safari geht bei per Skript gesetzten sogar auf sieben. Ein Tablett,
+ * das nie jemand anfasst, waere also nach gut einem Jahr von selbst leer
+ * gewesen - genau der unbeaufsichtigte Ausfall, den dieses Konto vermeiden
+ * soll, nur eben mit Ansage im Kalender statt im Code.
+ *
+ * Deshalb steht hier ein Jahr, sicher unter jeder Kappungsgrenze, und
+ * `requireAuth` setzt das Cookie bei JEDEM erfolgreich authentifizierten
+ * Request neu. Ein Geraet, das laeuft, verlaengert sich damit fortwaehrend
+ * selbst; erst eines, das laenger als ein Jahr kein einziges Mal online war,
+ * braucht einen neuen Kopplungscode.
+ */
+export const DISPLAY_COOKIE_MAX_AGE = 365 * 24 * 60 * 60 * 1000;
+
+/**
+ * Die Cookie-Optionen - EINE Quelle fuer beide Setzer.
+ *
+ * Kopplung und Auffrischung muessen bis auf den letzten Schalter gleich
+ * schreiben: weichen sie ab, legt der Browser ein ZWEITES Cookie desselben
+ * Namens an (Pfad und Domain gehoeren zur Identitaet, nicht zum Wert), und
+ * welches davon mitgeschickt wird, entscheidet dann die Reihenfolge im Header.
+ * `secure` wird bei jedem Aufruf frisch gelesen, weil Tests die Umgebung
+ * zwischen zwei Faellen umstellen.
+ */
+export function displayCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.SESSION_SECURE === 'true',
+    sameSite: 'lax',
+    maxAge: DISPLAY_COOKIE_MAX_AGE,
+    path: '/',
+  };
+}
+
 /** Praefix des Klartext-Credentials - macht einen Fund in einem Log erkennbar. */
 const DEVICE_TOKEN_PREFIX = 'yuvomi_display_';
 

@@ -19,10 +19,11 @@ import rateLimit from 'express-rate-limit';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { requireAdmin } from '../middleware/require-admin.js';
-import { CURRENT_ONBOARDING_VERSION } from '../auth.js';
+import { CURRENT_ONBOARDING_VERSION, LEGACY_SESSION_COOKIE, SESSION_COOKIE } from '../auth.js';
 import {
   DISPLAY_COOKIE,
   DISPLAY_PASSWORD_SENTINEL,
+  displayCookieOptions,
   issuePairingCode,
   listDisplayDevices,
   redeemPairingCode,
@@ -76,19 +77,40 @@ pairingRouter.post('/pair', pairingLimiter, (req, res) => {
       return res.status(400).json({ error: 'This pairing code is not valid.', code: 400 });
     }
 
-    // `maxAge` bewusst weit weg, nicht "bis zum Schliessen des Browsers": ein
-    // Wandtablett startet neu, wenn der Strom ausfaellt, und niemand steht
-    // danach mit dem Code bereit. Die Laufzeit des Credentials selbst kennt
-    // ohnehin kein Ende - sie endet mit dem Widerruf, und der steht in der
-    // Datenbank, nicht im Cookie.
-    res.cookie(DISPLAY_COOKIE, paired.token, {
-      httpOnly: true,
-      secure: process.env.SESSION_SECURE === 'true',
-      sameSite: 'lax',
-      maxAge: 10 * 365 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
-    return res.status(201).json({ data: { paired: true } });
+    // DIE SITZUNG DES MENSCHEN MUSS STERBEN, NICHT NUR UEBERDECKT WERDEN.
+    //
+    // Gekoppelt wird fast immer aus einem angemeldeten Browser heraus: jemand
+    // haengt das Tablett auf, meldet sich an, holt sich den Code aus den
+    // Einstellungen. Bliebe `yuvomi.sid` daneben liegen, waere es ein
+    // schlafender Zweitschluessel - `requireAuth` bevorzugt zwar das Display,
+    // aber sobald das Credential faellt (Widerruf, Loeschen des Displays),
+    // loescht derselbe Zweig das tote Cookie, und der naechste Request findet
+    // die alte Sitzung und laeuft mit den VOLLEN Rechten dieser Person weiter.
+    // Ein Widerruf, der das Tablett offener zuruecklaesst als vorher, ist das
+    // Gegenteil dessen, was der Knopf verspricht.
+    //
+    // Serverseitig zerstoeren, nicht nur das Cookie raeumen: der Datensatz im
+    // Store ist der Schluessel, das Cookie nur sein Zettel.
+    const finish = () => {
+      res.clearCookie(SESSION_COOKIE);
+      res.clearCookie(LEGACY_SESSION_COOKIE);
+      // Die Laufzeit steht in `displayCookieOptions()` - dieselbe Quelle, aus
+      // der `requireAuth` bei jedem Request auffrischt.
+      res.cookie(DISPLAY_COOKIE, paired.token, displayCookieOptions());
+      res.status(201).json({ data: { paired: true } });
+    };
+    if (typeof req.session?.destroy === 'function') {
+      return req.session.destroy((err) => {
+        // Ein Store, der nicht loeschen kann, darf hier NICHT durchwinken: der
+        // Zweitschluessel bliebe genau dann liegen, wenn niemand hinsieht.
+        if (err) {
+          log.error('POST /pair session destroy failed:', err);
+          return res.status(500).json({ error: 'Internal server error.', code: 500 });
+        }
+        finish();
+      });
+    }
+    return finish();
   } catch (err) {
     log.error('POST /pair error:', err);
     return res.status(500).json({ error: 'Internal server error.', code: 500 });

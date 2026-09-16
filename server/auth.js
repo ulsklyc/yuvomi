@@ -16,8 +16,8 @@ import { createLogger } from './logger.js';
 import { memberEmail } from './services/member-email.js';
 import { accessScopeSql, householdMemberSql } from './services/household-members.js';
 import {
-  DISPLAY_COOKIE, DISPLAY_SCOPES, authenticateDisplayDevice, displayMayRead, displayTokenFromRequest,
-  isDisplayAccount,
+  DISPLAY_COOKIE, DISPLAY_SCOPES, authenticateDisplayDevice, displayCookieOptions, displayMayRead,
+  displayTokenFromRequest, isDisplayAccount,
 } from './services/display-accounts.js';
 import { deleteBirthdayArtifacts, syncBirthdayArtifacts } from './services/birthdays.js';
 import * as oidcClient from 'openid-client';
@@ -788,6 +788,13 @@ function requireAuth(req, res, next) {
       req.authRole = 'member';
       req.authScopes = [...DISPLAY_SCOPES];
       req.displayDeviceId = device.deviceId;
+      // DAS COOKIE WIRD BEI JEDEM ZUGRIFF NEU DATIERT. Browser kappen die
+      // Lebensdauer persistenter Cookies (Chromium: 400 Tage), eine einmal
+      // geschriebene Jahreszahl haelt also nicht, was sie sagt - ein Tablett an
+      // der Wand waere irgendwann von selbst leer, ohne dass jemand etwas
+      // widerrufen haette. Die Begruendung samt Zahlen steht bei
+      // `DISPLAY_COOKIE_MAX_AGE`.
+      res.cookie(DISPLAY_COOKIE, displayToken, displayCookieOptions());
       applyRoleModuleAccess(req);
       return next();
     }
@@ -2556,6 +2563,19 @@ router.post('/api-tokens', requireAuth, requireAdmin, csrfMiddleware, (req, res)
     if (subject.is_split_guest) {
       return res.status(400).json({ error: 'A split-expense guest cannot be an API token subject.', code: 400 });
     }
+    // EIN DISPLAY IST NUR UEBER SEIN GERAET ERREICHBAR - auch hier (#1208).
+    //
+    // Ohne diese Zeile waere der Weg drumherum offen: ein Administrator traegt
+    // die Display-Id als `subject_user_id` ein und bekommt ein API-Token auf
+    // dieses Konto. Der Token-Zweig in `requireAuth` loest Rechte OHNE
+    // `isDisplay` auf - die feste Leseliste aus display-scopes.js greift also
+    // nicht, und ein ungescoptes Token haette die vollen Schreibrechte eines
+    // gewoehnlichen Mitglieds unter dem Namen des Wandtabletts. Ein Konto, das
+    // sich nicht anmelden kann, darf auch kein Credential neben seinem Geraet
+    // bekommen; dieselbe Erwaegung wie beim Ausgaben-Gast eine Zeile darueber.
+    if (isDisplayAccount(subjectUserId, { db: db.get() })) {
+      return res.status(400).json({ error: 'A display cannot be an API token subject.', code: 400 });
+    }
 
     const result = db.get().prepare(`
       INSERT INTO api_tokens (name, token_hash, token_prefix, created_by, subject_user_id, expires_at, scopes)
@@ -3072,3 +3092,5 @@ setInterval(() => {
 }, 60 * 60_000).unref();
 
 export { router, sessionMiddleware, requireAuth, requireAdmin, syncFamilyMemberArtifacts, normalizeAvatarData };
+// Die Kopplungsroute raeumt beide beim Uebergang zum Display (routes/displays.js).
+export { SESSION_COOKIE, LEGACY_SESSION_COOKIE };
