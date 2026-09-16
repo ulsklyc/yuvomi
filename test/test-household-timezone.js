@@ -252,21 +252,49 @@ const rel = (file) => path.relative(ROOT, file);
  * durchsucht, findet sein eigenes Muster auch in dem Satz, der ERKLAERT, warum
  * die Stelle falsch war. Wer eine dieser Fallen behebt und danebenschreibt,
  * was dort stand, macht den Guard damit rot - die Suite bestrafte dann das
- * Richtigstellen. Umgekehrt gilt es genauso: ohne Strippen liesse sich ein
- * echter Verstoss durch einen Kommentar daneben nicht verdecken, wohl aber
- * durch Auskommentieren, und ein auskommentierter Verstoss ist keiner.
+ * Richtigstellen.
  *
- * Bewusst grob: Zeilenkommentare ab `//` und Blockkommentare. Ein `//` in
- * einem String (`'https://...'`) wird mit abgeschnitten, was hier folgenlos
- * ist - die gesuchten Muster stehen in keinem String, und die Richtung des
- * Irrtums ist die geschlossene: es wird weniger durchsucht, nie mehr.
+ * WARUM EIN SCAN UND NICHT ZWEI REGEX-DURCHGAENGE. Der erste Anlauf strich
+ * erst Blockkommentare, dann Zeilenkommentare - und loeschte damit echten Code.
+ * In `server/index.js` steht ein Pfadmuster mit Stern in einem
+ * Zeilenkommentar: fuer den Blockdurchgang ist der Schraegstrich-Stern eine
+ * OEFFNENDE Klammer, die bis zur naechsten schliessenden irgendwo weiter unten
+ * reicht - dort steht sie, ebenfalls harmlos gemeint, in einem anderen
+ * Zeilenkommentar 17 Zeilen spaeter. Dazwischen verschwanden die Mounts von
+ * `/permissions` und `/schedule` - **21 Zeilen der Hauptdatei**, gemessen, und
+ * der Guard war fuer diesen Bereich blind. Die Reihenfolge umzudrehen tauscht
+ * den Fehler nur gegen sein Spiegelbild: ein `//` INNERHALB eines echten
+ * Blockkommentars schnitte dann dessen Zeile ab.
+ *
+ * Ein Zeichen-Scan kennt dagegen seinen Zustand: in Code, in einem
+ * Zeilenkommentar oder in einem Blockkommentar - und nur im ersten beginnt
+ * etwas Neues. Strings werden bewusst NICHT verfolgt: ein `//` in einem String
+ * schneidet den Rest der Zeile weg, was hier folgenlos ist, weil die gesuchten
+ * Muster in keinem String stehen, und die Richtung des Irrtums die geschlossene
+ * ist - es wird weniger durchsucht, nie mehr. Ein echter Tokenizer waere die
+ * Alternative und fuer einen Textguard zu teuer.
  */
 function ohneKommentare(quelle) {
-  return quelle
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .split('\n')
-    .map((zeile) => zeile.replace(/\/\/.*$/, ''))
-    .join('\n');
+  let out = '';
+  let zustand = 'code';
+  for (let i = 0; i < quelle.length; i += 1) {
+    const c = quelle[i];
+    const naechstes = quelle[i + 1];
+    if (zustand === 'code') {
+      if (c === '/' && naechstes === '/') { zustand = 'zeile'; i += 1; continue; }
+      if (c === '/' && naechstes === '*') { zustand = 'block'; i += 1; continue; }
+      out += c;
+    } else if (zustand === 'zeile') {
+      // Der Zeilenumbruch bleibt stehen: die Zeilenzahl darf sich nicht
+      // verschieben, sonst zeigt ein Befund auf die falsche Zeile.
+      if (c === '\n') { zustand = 'code'; out += c; }
+    } else if (c === '*' && naechstes === '/') {
+      zustand = 'code'; i += 1;
+    } else if (c === '\n') {
+      out += c;
+    }
+  }
+  return out;
 }
 
 test('Guard: nur timezone.js ruft serverTimeZone() direkt', () => {
@@ -312,6 +340,31 @@ test('Guard: kein Server-Modul leitet "heute" aus toISOString() ab', () => {
     .map(rel);
   assert.deepEqual(offenders, [],
     `Diese Dateien bilden "heute" aus dem UTC-Kalender: ${offenders.join(', ')}`);
+});
+
+test('Guard: der Kommentar-Filter loescht keinen echten Code', () => {
+  // DER FALL, DER DIE ZWEI-REGEX-FASSUNG ERLEDIGT HAT, und er ist keine
+  // Erfindung: `server/index.js` traegt in einem ZEILENkommentar ein Pfadmuster
+  // mit Stern, und 17 Zeilen spaeter in einem weiteren Zeilenkommentar dessen
+  // Gegenstueck. Fuer einen Blockkommentar-Durchgang, der vor dem
+  // Zeilenkommentar-Durchgang laeuft, ist das ein Kommentar ueber 17 Zeilen -
+  // und die Mounts dazwischen waren weg, bevor das Muster ueberhaupt suchte.
+  // Gemessen: 21 Zeilen der Hauptdatei, darunter `/permissions` und
+  // `/schedule`, und der Guard war fuer diesen Bereich blind.
+  //
+  // Gemessen wird an der ECHTEN Datei und nicht an einem Ausschnitt: ein
+  // nachgebauter Schnipsel haette denselben Fehler nur dann, wenn man ihn
+  // richtig nachbaut - und wer ihn richtig nachbauen kann, hat ihn schon
+  // verstanden ([[reference-green-test-that-measures-nothing]]).
+  const echt = readFileSync(path.join(SERVER_DIR, 'index.js'), 'utf8');
+  const gefiltert = ohneKommentare(echt);
+  for (const mount of ["app.use('/api/v1/permissions'", "app.use('/api/v1/schedule"]) {
+    assert.ok(gefiltert.includes(mount),
+      `${mount} darf nicht wegfallen - der Filter loescht echten Code`);
+  }
+  // Und die Zeilenzahl bleibt gleich, damit ein Befund auf die richtige Zeile zeigt.
+  assert.equal(gefiltert.split('\n').length, echt.split('\n').length,
+    'der Filter darf keine Zeilen verschlucken');
 });
 
 test('Guard: das Muster trifft Tag UND Monat, und der Kommentar-Filter haelt', () => {
