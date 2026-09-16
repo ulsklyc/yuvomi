@@ -820,6 +820,85 @@ test('auch /auth/me frischt auf - der Riegel davor verbraucht die Frist nicht', 
   );
 });
 
+test('ein Display ist auch ueber die Mitglieder-Routen nicht zu erreichen', async () => {
+  // Die Liste kennt es nicht mehr, diese Route kannte es noch: eine Id aus
+  // GET /displays reichte, um dem Tablett Namen, Familienrolle und - ueber
+  // syncFamilyMemberArtifacts - einen Kontakt zu geben. Mit system_admin
+  // obendrein waere es ein Administrator, der sich nicht anmelden kann.
+  const created = await admin('POST', '/displays', { display_name: 'Unantastbar' });
+  const id = created.body.data.id;
+
+  assert.equal((await admin('PATCH', `/auth/users/${id}`, { system_admin: true })).status, 404);
+  assert.equal((await admin('PATCH', `/auth/users/${id}`, { display_name: 'Papa' })).status, 404);
+  assert.equal((await admin('DELETE', `/auth/users/${id}`)).status, 404);
+
+  // Und die Zeile ist unveraendert geblieben - eine 404 waere wertlos, wenn
+  // vorher schon geschrieben worden waere.
+  const row = db.prepare('SELECT role, display_name FROM users WHERE id = ?').get(id);
+  assert.equal(row.role, 'member');
+  assert.equal(row.display_name, 'Unantastbar');
+
+  // Der Weg ueber /displays bleibt offen.
+  assert.equal((await admin('DELETE', `/displays/${id}`)).status, 200);
+});
+
+test('ein Display zaehlt nicht als verbleibender Administrator', async () => {
+  // Waere es einer, koennte sich der letzte echte Administrator herabstufen -
+  // und niemand kaeme mehr an requireAdmin vorbei, denn ein Display kann sich
+  // nicht anmelden und traegt im Auth-Zweig fest die Rolle `member`.
+  const created = await admin('POST', '/displays', { display_name: 'Scheinadmin' });
+  const id = created.body.data.id;
+  // Die Rolle direkt in der Datenbank setzen: ueber die Route geht es seit
+  // eben nicht mehr, und genau diesen Zustand soll die Zaehlung aushalten.
+  db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(id);
+
+  const me = (await admin('GET', '/auth/me')).body.user;
+  const res = await admin('PATCH', `/auth/users/${me.id}`, { system_admin: false });
+  assert.equal(res.status, 400);
+  assert.match(res.body?.error || '', /admin must remain/i);
+
+  db.prepare('DELETE FROM users WHERE id = ?').run(id);
+});
+
+test('die Anfragenliste der Belohnungen zeigt einem Nicht-Admin nur die eigene', async () => {
+  // Bis zu 300 Zeilen samt freiem Wunschtext jedes Mitglieds gingen an jeden
+  // hinaus, der das Modul lesen darf - die Oberflaeche filterte erst NACH dem
+  // Herunterladen. Aufgefallen am Wandtablett, das gar keine eigenen Zeilen
+  // haben kann; der Fehler ist aelter und traf jedes Mitglied ohne Adminrecht.
+  const created = await admin('POST', '/displays', { display_name: 'Belohnungsprobe' });
+  const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});
+  const display = asDisplay((await pair(issued.body.data.code)).token);
+
+  const adminId = (await admin('GET', '/auth/me')).body.user.id;
+  db.prepare(`
+    INSERT INTO reward_redemptions(user_id, reward_name, cost, status, note, created_at)
+    VALUES (?, 'Kinoabend', 50, 'pending', 'bitte Samstag, nicht vor Mamas Geburtstag', ?)
+  `).run(adminId, new Date().toISOString());
+
+  // Vorbedingung: der Administrator sieht die Zeile samt Notiz.
+  const alsAdmin = await admin('GET', '/rewards/redemptions');
+  assert.equal(alsAdmin.status, 200);
+  assert.ok(alsAdmin.body.data.some((r) => r.note?.includes('Samstag')));
+
+  const alsDisplay = await display('GET', '/rewards/redemptions');
+  assert.equal(alsDisplay.status, 200, 'die Route bleibt erreichbar');
+  assert.deepEqual(alsDisplay.body.data, [], 'ein Display hat keine eigenen Anfragen - also keine');
+});
+
+test('der Katalog nennt die Pfadvariablen der Display-Routen', async () => {
+  // OpenAPI verlangt zu jeder Variablen im Pfad einen Parameter; fehlt er,
+  // weisen Validatoren das Dokument ab und ein erzeugter Client kann die Id
+  // nicht mitgeben.
+  const spec = (await admin('GET', '/openapi.json')).body;
+  const namen = (op) => (op?.parameters || []).filter((p) => p.in === 'path').map((p) => p.name).sort();
+  assert.deepEqual(namen(spec?.paths?.['/api/v1/displays/{id}']?.delete), ['id']);
+  assert.deepEqual(namen(spec?.paths?.['/api/v1/displays/{id}/pairing-code']?.post), ['id']);
+  assert.deepEqual(
+    namen(spec?.paths?.['/api/v1/displays/{id}/devices/{deviceId}/revoke']?.post),
+    ['deviceId', 'id'],
+  );
+});
+
 test('ein Display sieht von /preferences nur den Darstellungsteil', async () => {
   // Die Route steht dem Display offen, weil die App ohne sie nicht startet -
   // ihre Antwort ist aber die Sammelstelle des ganzen Haushalts. Die genauen

@@ -300,6 +300,18 @@ router.get('/redemptions', (req, res) => {
   try {
     const status = ['pending', 'fulfilled', 'rejected', 'cancelled'].includes(req.query.status)
       ? req.query.status : null;
+    // WER NICHT ENTSCHEIDET, SIEHT NUR SEINE EIGENEN ANFRAGEN.
+    //
+    // Das Bestaetigen und Ablehnen ist Administratorensache, und nur dafuer
+    // braucht jemand die Anfragen der anderen. Die Oberflaeche wusste das
+    // laengst - sie filtert die Antwort seit jeher auf die eigene Person
+    // (public/pages/rewards.js) -, aber sie filterte sie NACH dem Herunterladen.
+    // Bis zu 300 Zeilen samt freiem Wunschtext und Bild jedes Mitglieds gingen
+    // also an jeden hinaus, der das Modul lesen darf. Aufgefallen ist es an
+    // einem Wandtablett mit `rewards:read`, das gar keine eigenen Zeilen haben
+    // kann - der Fehler ist aelter und traf jedes Mitglied ohne Adminrecht.
+    const admin = isAdminRequest(req);
+    const me = actingUser(req);
     const rows = db.get().prepare(`
       SELECT r.id, r.user_id, r.catalog_id, r.reward_name, r.reward_icon, r.cost, r.status,
              r.note, r.decided_at, r.created_at,
@@ -308,10 +320,12 @@ router.get('/redemptions', (req, res) => {
       FROM reward_redemptions r
       JOIN users u ON u.id = r.user_id
       LEFT JOIN users dec ON dec.id = r.decided_by
-      ${status ? 'WHERE r.status = @status' : ''}
+      WHERE 1 = 1
+        ${status ? 'AND r.status = @status' : ''}
+        ${admin ? '' : 'AND r.user_id = @me'}
       ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END, r.created_at DESC, r.id DESC
       LIMIT 300
-    `).all({ status });
+    `).all({ status, me });
     res.json({ data: rows });
   } catch (err) {
     log.error('GET /redemptions error:', err);

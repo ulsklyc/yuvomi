@@ -620,7 +620,17 @@ function assertAdminWouldRemain(targetUserId, nextRole) {
   if (nextRole === 'admin') return null;
   const current = db.get().prepare('SELECT role FROM users WHERE id = ?').get(targetUserId);
   if (!current || current.role !== 'admin') return null;
-  const row = db.get().prepare('SELECT COUNT(*) AS count FROM users WHERE role = ? AND id != ?').get('admin', targetUserId);
+  // EIN KONTO, DAS SICH NICHT ANMELDEN KANN, IST KEIN VERBLEIBENDER
+  // ADMINISTRATOR. Ein Wandtablett traegt zwar eine `users`-Zeile, aber
+  // `canSignIn()` weist es ab und seine Rolle steht im Auth-Zweig fest auf
+  // `member` - zaehlte es hier mit, koennte sich der letzte echte
+  // Administrator herabstufen und niemand kaeme mehr an `requireAdmin` vorbei.
+  // Dasselbe gilt fuer einen Ausgaben-Gast; `accessScopeSql()` beantwortet
+  // beides an EINER Stelle.
+  const row = db.get().prepare(`
+    SELECT COUNT(*) AS count FROM users u
+     WHERE u.role = ? AND u.id != ? AND ${accessScopeSql('u')} = 'family'
+  `).get('admin', targetUserId);
   return row.count > 0 ? null : 'At least one system admin must remain.';
 }
 
@@ -2825,6 +2835,18 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
 
     const existing = db.get().prepare(`SELECT ${USER_PUBLIC_COLUMNS} FROM users WHERE id = ?`).get(userId);
     if (!existing) return res.status(404).json({ error: 'User not found.', code: 404 });
+    // EIN DISPLAY IST KEIN MITGLIED, ALSO AUCH HIER NICHT (#1208). Die Liste
+    // darunter kennt es nicht mehr, diese Route kannte es noch: eine Id aus
+    // `GET /displays` reichte, um dem Tablett einen Familiennamen, eine Rolle
+    // und - ueber `syncFamilyMemberArtifacts` - einen Kontakt zu geben, also
+    // genau die Eintraege, aus denen es herausgehalten wird. Mit
+    // `system_admin` obendrein waere es ein Administrator, der sich nicht
+    // anmelden kann; ein echter Administrator koennte sich dann selbst
+    // herabstufen und den Haushalt ohne jeden Zugang zurueck lassen.
+    // Verwaltet wird ein Display unter /displays, sonst nirgends.
+    if (isDisplayAccount(userId, { db: db.get() })) {
+      return res.status(404).json({ error: 'User not found.', code: 404 });
+    }
 
     const username = req.body.username !== undefined ? String(req.body.username || '').trim() : existing.username;
     const displayName = req.body.display_name !== undefined ? String(req.body.display_name || '').trim() : existing.display_name;
@@ -3044,6 +3066,12 @@ router.delete('/users/:id', requireAuth, requireAdmin, csrfMiddleware, (req, res
 
     if (userId === req.authUserId) {
       return res.status(400).json({ error: 'You cannot delete your own account.', code: 400 });
+    }
+    // Wie beim Aendern: ein Display wird unter /displays verwaltet, nicht hier.
+    // Zwei Tueren zu demselben Konto waeren zwei Stellen, an denen die Regeln
+    // dieses Kontotyps gelten muessten.
+    if (isDisplayAccount(userId, { db: db.get() })) {
+      return res.status(404).json({ error: 'User not found.', code: 404 });
     }
 
     // Der dritte Weg, auf dem der letzte SSO-Administrator verschwinden kann

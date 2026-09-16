@@ -1,4 +1,4 @@
-import { op } from '../helpers.js';
+import { idParam, op } from '../helpers.js';
 
 export function displaysPaths() {
   return {
@@ -82,6 +82,10 @@ export function displaysPaths() {
         summary: 'Delete a wall display',
         tag: 'Displays',
         stateChanging: true,
+        // OHNE DIESE ZEILE IST DAS DOKUMENT UNGUELTIG: OpenAPI verlangt zu
+        // jeder Variablen im Pfad einen Parameter, sonst weisen Validatoren es
+        // ab und ein erzeugter Client kann die Id gar nicht mitgeben.
+        params: [idParam('id', 'Display ID')],
         description: 'Admin only. Removes the account and, through `ON DELETE CASCADE`, its pairing codes and devices - any paired tablet stops working on its next request.',
       }),
     },
@@ -90,6 +94,7 @@ export function displaysPaths() {
         summary: 'Issue a one-time pairing code',
         tag: 'Displays',
         stateChanging: true,
+        params: [idParam('id', 'Display ID')],
         requestBody: null,
         description: 'Admin only. Returns a ten-character code in plaintext exactly once, valid for 15 minutes. Issuing a new code spends the previous one immediately: two open codes would be two keys to the same door, and the older one would hang around unnoticed.',
       }),
@@ -99,6 +104,7 @@ export function displaysPaths() {
         summary: 'Revoke a paired device',
         tag: 'Displays',
         stateChanging: true,
+        params: [idParam('id', 'Display ID'), idParam('deviceId', 'Device ID')],
         requestBody: null,
         description: 'Admin only. Sets `revoked_at` rather than deleting the row, so a revocation stays provable. Access ends on the device\'s next request - the credential is checked against the database every time, so there is no cached state a revocation would have to catch up with. The device has to belong to the display named in the path.',
       }),
