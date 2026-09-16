@@ -620,16 +620,25 @@ function assertAdminWouldRemain(targetUserId, nextRole) {
   if (nextRole === 'admin') return null;
   const current = db.get().prepare('SELECT role FROM users WHERE id = ?').get(targetUserId);
   if (!current || current.role !== 'admin') return null;
-  // EIN KONTO, DAS SICH NICHT ANMELDEN KANN, IST KEIN VERBLEIBENDER
-  // ADMINISTRATOR. Ein Wandtablett traegt zwar eine `users`-Zeile, aber
-  // `canSignIn()` weist es ab und seine Rolle steht im Auth-Zweig fest auf
-  // `member` - zaehlte es hier mit, koennte sich der letzte echte
-  // Administrator herabstufen und niemand kaeme mehr an `requireAdmin` vorbei.
-  // Dasselbe gilt fuer einen Ausgaben-Gast; `accessScopeSql()` beantwortet
-  // beides an EINER Stelle.
+  // EIN KONTO, DAS NICHT ADMINISTRATOR SEIN KANN, IST KEIN VERBLEIBENDER.
+  //
+  // Drei Arten `users`-Zeilen sind keine Menschen im Haushalt, und keine davon
+  // kaeme je an `requireAdmin` vorbei: Hauspersonal und ein Wandtablett weist
+  // `canSignIn()` ab (Zeile 903 und 909), ein Ausgaben-Gast kommt zwar herein,
+  // aber das Gast-Gate in server/index.js laesst ihn nur an die geteilten
+  // Ausgaben. Zaehlte eine von ihnen hier mit, koennte ein Administrator sie
+  // zum Administrator machen, sich selbst herabstufen - und der Haushalt haette
+  // niemanden mehr, der an `requireAdmin` vorbeikommt. `/setup` hilft nicht, es
+  // haengt an einer leeren `users`-Tabelle.
+  //
+  // `householdMemberSql()` IST GENAU DIESE MENGE und die einzige Stelle, an der
+  // sie gepflegt wird - ein selbstgebautes `accessScopeSql(...) = 'family'`
+  // stand hier zuerst und liess das Hauspersonal durch, weil es in diesem
+  // Ausdruck als `family` gilt (Review zu #1241). Wer die Frage "ist das ein
+  // Mitglied" zweimal beantwortet, beantwortet sie irgendwann verschieden.
   const row = db.get().prepare(`
     SELECT COUNT(*) AS count FROM users u
-     WHERE u.role = ? AND u.id != ? AND ${accessScopeSql('u')} = 'family'
+     WHERE u.role = ? AND u.id != ? AND ${householdMemberSql('u')}
   `).get('admin', targetUserId);
   return row.count > 0 ? null : 'At least one system admin must remain.';
 }

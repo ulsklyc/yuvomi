@@ -850,6 +850,28 @@ test('ein Display ist auch ueber die Mitglieder-Routen nicht zu erreichen', asyn
   assert.equal((await admin('DELETE', `/displays/${id}`)).status, 200);
 });
 
+test('auch Hauspersonal zaehlt nicht als verbleibender Administrator', async () => {
+  // DIE DRITTE ART, und sie fiel beim ersten Anlauf durch: `accessScopeSql()`
+  // nennt eine Personal-Zeile `family`, `canSignIn()` weist sie aber als erstes
+  // ab (server/auth.js:903). Ein Administrator haette sie zum Administrator
+  // machen, sich selbst herabstufen und den Haushalt ohne jeden Zugang
+  // zuruecklassen koennen - `/setup` hilft nicht, es haengt an einer leeren
+  // users-Tabelle.
+  const helferId = Number(db.prepare(`
+    INSERT INTO users(username, display_name, password_hash, role)
+    VALUES ('putzhilfe', 'Putzhilfe', 'x', 'admin') RETURNING id
+  `).get().id);
+  db.prepare('INSERT INTO housekeeping_workers(user_id) VALUES (?)').run(helferId);
+
+  const me = (await admin('GET', '/auth/me')).body.user;
+  const res = await admin('PATCH', `/auth/users/${me.id}`, { system_admin: false });
+  assert.equal(res.status, 400);
+  assert.match(res.body?.error || '', /admin must remain/i);
+
+  db.prepare('DELETE FROM housekeeping_workers WHERE user_id = ?').run(helferId);
+  db.prepare('DELETE FROM users WHERE id = ?').run(helferId);
+});
+
 test('ein Display zaehlt nicht als verbleibender Administrator', async () => {
   // Waere es einer, koennte sich der letzte echte Administrator herabstufen -
   // und niemand kaeme mehr an requireAdmin vorbei, denn ein Display kann sich
