@@ -292,7 +292,16 @@ function stehtImKommentar(quelle, index) {
   // jetzt als Code und gaebe einen Fehlalarm. Nachgemessen ueber alle
   // Serverdateien: **null** solche Stellen - und faende sich je eine, kostete
   // sie eine Minute, waehrend der umgekehrte Irrtum eine Version kostet.
-  return /^\s*(\/\/|\*|\/\*)/.test(vorDemTreffer);
+  //
+  // EIN ZEILENKOMMENTAR ENDET NIE VOR DER ZEILE - dort genuegt der Anfang.
+  if (/^\s*\/\//.test(vorDemTreffer)) return true;
+  // EIN BLOCK SCHON, UND DAS WAR DER NAECHSTE BLINDE FLECK. Steht ein
+  // geschlossener Kommentar am Zeilenanfang und echter Code dahinter, begann
+  // die Zeile zwar mit seinem Anfang - der Treffer liegt aber ausserhalb. Die
+  // Fassung davor meldete ihn als Kommentar und widersprach damit genau der
+  // Zusage im Absatz oben. Ein Ende vor dem Treffer heisst: wieder Code.
+  if (/^\s*(\*|\/\*)/.test(vorDemTreffer)) return !vorDemTreffer.includes('*' + '/');
+  return false;
 }
 
 
@@ -382,6 +391,19 @@ test('Guard: das Urteil ueber den Fundort trifft beide Kommentararten und nichts
   const urlImString = "const u = 'https://x'; const m = new Date().toISOString().slice(0, 7);";
   assert.equal(stehtImKommentar(urlImString, urlImString.indexOf('new Date')), false,
     'eine URL im String darf keinen Kommentar vortaeuschen');
+
+  // Ein am Zeilenanfang GESCHLOSSENER Block laesst den Rest der Zeile Code
+  // sein - die Fassung davor meldete ihn als Kommentar und war damit an genau
+  // der Stelle blind, an der ihre eigene Zusage das ausschliesst.
+  const geschlossen = '/' + '* alt *' + '/ const m = new Date().toISOString().slice(0, 7);';
+  assert.equal(stehtImKommentar(geschlossen, geschlossen.indexOf('new Date')), false,
+    'hinter einem auf derselben Zeile geschlossenen Block steht Code');
+
+  // Und die Gegenrichtung bleibt: ein OFFENER Block am Zeilenanfang deckt den
+  // Rest der Zeile weiterhin.
+  const offen = '/' + '* new Date().toISOString().slice(0, 7)';
+  assert.equal(stehtImKommentar(offen, offen.indexOf('new Date')), true,
+    'ein offener Block deckt den Treffer');
 
   const block = '/' + '* new Date().toISOString().slice(0, 10) *' + '/';
   assert.equal(stehtImKommentar(block, block.indexOf('new Date')), true, 'Blockkommentar');
