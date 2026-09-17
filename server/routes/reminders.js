@@ -238,6 +238,25 @@ router.get('/pending', (req, res) => {
           r.entity_type NOT IN ('cycle_period', 'cycle_log_nudge')
           OR EXISTS (SELECT 1 FROM cycle_reminder_anchors WHERE id = r.entity_id)
         )
+        -- Dasselbe fuer Aufgaben und Termine, aus einem anderen Grund: seit
+        -- Migration v217 raeumen zwei AFTER-DELETE-Trigger die Erinnerungen
+        -- einer geloeschten Aufgabe/eines geloeschten Termins mit ab, es sollte
+        -- hier also gar keine verwaiste Zeile mehr geben. Der Verweis bleibt
+        -- aber ein WEICHER (kein Fremdschluessel auf tasks/calendar_events),
+        -- und was ohne Fremdschluessel haelt, haelt nur, solange niemand einen
+        -- Weg daran vorbei baut - ein Tabellen-Rebuild, der den Trigger nicht
+        -- wieder anlegt, reicht schon. Was hier durchkaeme, waere eine Zeile
+        -- ohne entity_title: im Toast eine leere Zeile, in der
+        -- Push-Benachrichtigung ein leerer Text (services/notifications.js
+        -- traegt denselben Riegel). Nichts zu zeigen ist besser.
+        AND (
+          r.entity_type != 'task'
+          OR EXISTS (SELECT 1 FROM tasks WHERE id = r.entity_id)
+        )
+        AND (
+          r.entity_type != 'event'
+          OR EXISTS (SELECT 1 FROM calendar_events WHERE id = r.entity_id)
+        )
       ORDER BY r.remind_at ASC
     `).all(userId, now, ...origins);
 

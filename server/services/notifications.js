@@ -487,6 +487,15 @@ export async function processDueNotifications({
         END AS sub_next_payment_date
     FROM reminders r
     WHERE r.dismissed = 0 AND r.pushed_at IS NULL AND r.remind_at <= ?
+      -- Kein Push an eine Aufgabe/einen Termin, den es nicht mehr gibt. Seit
+      -- Migration v217 raeumen zwei AFTER-DELETE-Trigger diese Erinnerungen mit
+      -- ab; der Verweis bleibt aber ein weicher (kein Fremdschluessel auf
+      -- tasks/calendar_events), und ohne diesen Riegel waere das Ergebnis eine
+      -- Meldung mit Titel "Aufgaben" und LEEREM Text - entity_title ist bei
+      -- einer verwaisten Zeile NULL, und reminderPayload() reicht ihn direkt
+      -- als Body durch. routes/reminders.js#/pending traegt denselben Riegel.
+      AND (r.entity_type != 'task'  OR EXISTS (SELECT 1 FROM tasks           WHERE id = r.entity_id))
+      AND (r.entity_type != 'event' OR EXISTS (SELECT 1 FROM calendar_events WHERE id = r.entity_id))
     ORDER BY r.remind_at ASC
   `).all(nowIso);
 

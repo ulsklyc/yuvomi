@@ -3479,8 +3479,9 @@ function handleBulkDelete(taskIds, container) {
   scheduleUndoableDelete({
     message: t('tasks.bulkDeleted'),
     commit: async ({ keepalive }) => {
+      // Erinnerungen gehen mit der Aufgabe - serverseitig, siehe
+      // deleteTaskWithUndo() in components/task-detail.js.
       await Promise.all(taskIds.map(id => api.delete(`/tasks/${id}`, { keepalive })));
-      taskIds.forEach(id => api.delete(`/reminders?entity_type=task&entity_id=${id}`, { keepalive }).catch(() => {}));
       if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       refreshReminders();
       await loadTasks(container);
