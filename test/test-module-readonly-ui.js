@@ -132,10 +132,17 @@ function controls(section) {
  * dem npm-Script, misst diese Suite still die Zone der Maschine und ist auf
  * jeder anderen rot (oder, schlimmer, gruen aus dem falschen Grund). Deshalb
  * steht die Zone hier als eigene Zusicherung und nicht nur als Kommentar.
+ *
+ * Gefragt wird `process.env.TZ`, NICHT `Intl...resolvedOptions().timeZone`:
+ * letzteres faellt ohne `TZ=` auf die SYSTEMZONE zurueck, und die ist auf dem
+ * Entwicklungsrechner gerade Europe/Berlin. Ein verlorenes `TZ=` waere lokal
+ * also gruen geblieben und erst in der CI (UTC) rot - genau der Fehler, den
+ * dieser Test ausschliessen soll. Nachgemessen: ohne `TZ=` meldet Intl
+ * "Europe/Berlin" und `process.env.TZ` ist undefined.
  */
 test('die Suite laeuft in der Zone, auf die ihre Zeitpunkte festgenagelt sind', () => {
   assert.equal(
-    new Intl.DateTimeFormat().resolvedOptions().timeZone,
+    process.env.TZ,
     'Europe/Berlin',
     'npm run test:module-readonly-ui setzt TZ=Europe/Berlin',
   );
@@ -153,7 +160,20 @@ test('calendar: write laesst den Erinnerungsabschnitt unangetastet', () => {
     for (const tag of controls(section)) {
       assert.doesNotMatch(tag, /\sdisabled/, `kein Feld ist gesperrt: ${tag}`);
     }
-    assert.doesNotMatch(section, /reminder-section__notice/, 'kein Hinweis, wo es nichts zu erklaeren gibt');
+    assert.doesNotMatch(section, /reminders\.readOnlyNotice/, 'kein Hinweis, wo es nichts zu erklaeren gibt');
+  });
+});
+
+test('calendar: write zeigt den Abschnitt auch OHNE bestehende Erinnerung - dort wird ja angelegt', () => {
+  withModules({ tasks: 'write', calendar: 'write' }, () => {
+    for (const args of [
+      { task: null, users: [], reminder: null },
+      { task: TASK, users: [], reminder: null },
+    ]) {
+      const section = reminderSection(tasks.renderModalContent(args));
+      assert.ok(section, 'mit Schreibrecht ist der leere Schalter das Angebot, eine anzulegen');
+      assert.equal(controls(section).filter((tag) => /\sdisabled/.test(tag)).length, 0);
+    }
   });
 });
 
@@ -170,6 +190,29 @@ test('calendar: read sperrt JEDES Feld des Abschnitts und laesst die Erinnerung 
       assert.match(tag, /\sdisabled/, `gesperrt gehoert auch: ${tag}`);
     }
     assert.match(section, /reminders\.readOnlyNotice/, 'der Dialog sagt, warum');
+  });
+});
+
+// Die erste Fassung dieses Riegels sperrte den Abschnitt bei `read` immer -
+// auch dort, wo es nichts zu sperren gab. Das widerspricht derselben
+// Faustregel, mit der `none` begruendet ist: gesperrt wird ZUSTAND, und ein
+// leerer Schalter ist keiner. Beide Wege dorthin stehen hier, weil sie
+// verschiedene Ursachen haben: im Anlege-Dialog gibt es die Aufgabe noch
+// nicht, an einer bestehenden Aufgabe hing nie eine Erinnerung.
+test('calendar: read zeigt im ANLEGE-Dialog keinen Abschnitt - eine neue Aufgabe hat keinen Zustand', () => {
+  withModules({ tasks: 'write', calendar: 'read' }, () => {
+    const html = tasks.renderModalContent({ task: null, users: [], reminder: null });
+    assert.equal(reminderSection(html), '', 'kein gesperrter leerer Schalter');
+    assert.doesNotMatch(html, /id="reminder-toggle"/);
+    assert.doesNotMatch(html, /reminders\.readOnlyNotice/, 'auch kein Hinweis auf ein Feld, das es nicht gibt');
+  });
+});
+
+test('calendar: read zeigt an einer Aufgabe OHNE Erinnerung keinen Abschnitt', () => {
+  withModules({ tasks: 'write', calendar: 'read' }, () => {
+    const html = tasks.renderModalContent({ task: TASK, users: [], reminder: null });
+    assert.equal(reminderSection(html), '', 'nichts gespeichert heisst nichts zu zeigen');
+    assert.doesNotMatch(html, /id="reminder-toggle"/);
   });
 });
 

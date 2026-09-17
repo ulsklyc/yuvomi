@@ -71,10 +71,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A reminder switch in the task dialog could only ever fail for some members.** Reminders belong to
   the Calendar, not to Tasks, so somebody allowed to edit tasks but only to read the calendar was
   still offered the switch. Saving then stored the task and refused the reminder, and all they saw
-  was an error next to a task that had in fact been saved. With read access the reminder section now
-  stays visible but locked, so an existing reminder can still be read off, and saving leaves it
-  exactly as it was. Without any calendar access the section is gone, since there is nothing to show
-  there in the first place. With write access nothing changes.
+  was an error next to a task that had in fact been saved. A reminder that is already set now stays
+  visible but locked, so it can still be read off, and saving leaves it exactly as it was. Where
+  there is nothing set - a task being created, or one that never had a reminder - the section is
+  gone rather than shown as an empty switch that cannot be used, and the same goes for members with
+  no calendar access at all. With write access nothing changes.
 
 ### Security
 

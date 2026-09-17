@@ -92,16 +92,14 @@
   color: var(--color-text-primary);
 }
 
-/* Warum der Abschnitt gesperrt ist (Aufgaben-Dialog mit `calendar: read`).
-   Eigene Klasse statt `.form-hint`: die Regel dafuer liegt in der page-scoped
-   settings.css und ist hier nicht geladen - dieselben drei Werte wie
-   `.task-field-hint` in tasks.css. Hier statt in tasks.css, weil der ganze
-   Abschnitt in dieser Datei wohnt und `reminders.css` der Router genau dann
-   nachlaedt, wenn es ihn gibt. */
-.reminder-section__notice {
-  margin: calc(-1 * var(--space-2)) 0 var(--space-3);
-  font-size: var(--text-xs);
-  color: var(--color-text-tertiary);
+/* Die Hinweiszeile im gesperrten Abschnitt gehoert zum SCHALTER UEBER IHR.
+   Groesse und Farbe bringt `.task-field-hint` (tasks.css) mit - dieselbe Rolle
+   soll nicht zweimal verschieden aussehen -, aber der Abstand nach unten
+   gehoert diesem Abschnitt: ohne ihn steht das Label "Erinnern" direkt am Satz
+   und liest sich als dessen Beschriftung (im Browser gemessen). Nur der EINE
+   abweichende Wert steht hier, nicht der ganze Satz noch einmal. */
+.reminder-section .task-field-hint {
+  margin-bottom: var(--space-3);
 }
 
 /* EIN GESPERRTES FELD MUSS AUCH GESPERRT AUSSEHEN. `.input:disabled` ist
@@ -110,12 +108,20 @@
    laesst. `.toggle input:disabled + .toggle__track` (layout.css) traegt den
    Schalter schon, die Felder darunter trug nichts.
 
+   `0.6` ist NICHT frei gewaehlt, sondern der Hauswert fuer genau diese Rolle:
+   `.settings-page .form-input:disabled` (settings.css) dimmt so. Eine eigene
+   Zahl waere eine dritte fuer eine Bedeutung (`.btn:disabled` nutzt 0.4, und
+   das darf abweichen - ein Knopf traegt keinen Wert, den man noch lesen
+   muss). 0.55 stand hier zuerst und drueckte den Text auf 3.84:1 in Hell;
+   0.6 haelt 4.54:1, und Lesbarkeit ist bei einem gesperrten Feld der ganze
+   Zweck der Sperre anstelle des Entfernens.
+
    Absichtlich NUR auf diesen Abschnitt begrenzt: ein `.input:disabled` fuer
    die ganze App aendert das Bild jedes gesperrten Feldes (Dienstplan-
    Fieldsets, Budget, Einstellungen) und ist eine eigene Entscheidung, keine
    Nebenwirkung dieser. */
 .reminder-section .input:disabled {
-  opacity: 0.55;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 

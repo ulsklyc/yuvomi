@@ -1252,6 +1252,13 @@ async function loadTaskForEdit(id) {
 }
 
 async function loadReminderForTask(taskId) {
+  // Ohne JEDEN Kalenderzugriff antwortet `/reminders` mit 403, und das catch
+  // unten macht daraus dasselbe null - nur eine Anfrage spaeter. Der Dialog
+  // zeigt den Abschnitt in diesem Fall ohnehin nicht (siehe
+  // renderReminderSection), also wird hier gar nicht erst gefragt.
+  // `reminderAccess` steht weiter unten und ist als Funktionsdeklaration
+  // gehoistet.
+  if (reminderAccess() === 'none') return null;
   try {
     const data = await api.get(`/reminders?entity_type=task&entity_id=${taskId}`);
     return data.data;
@@ -1291,11 +1298,32 @@ function reminderAccess() {
 
 function renderReminderSection(task = null, reminder = null) {
   const access = reminderAccess();
-  if (access === 'none') return '';
+  // GESPERRT WIRD NUR, WO ES ZUSTAND GIBT. `none` hat keinen (das Lesen
+  // antwortet mit 403), aber `read` ohne Erinnerung genauso wenig: ein
+  // gesperrter leerer Schalter ist keine Auskunft, sondern eine Tuer, die nie
+  // aufgeht - im Anlege-Dialog, wo es die Aufgabe noch gar nicht gibt, und
+  // ebenso an einer Aufgabe, an der nie eine Erinnerung hing. Beide Faelle
+  // messbar in test:module-readonly-ui, beide waren in der ersten Fassung
+  // dieses Riegels da (Review-Runde 1).
+  if (access === 'none' || (access === 'read' && !reminder)) return '';
   // Ein gesperrter Abschnitt zeigt weiter, WAS eingestellt ist, und nimmt
   // nichts an: `disabled` an jedem Bedienelement. Der Riegel im Formular
   // (handleFormSubmit) haengt nicht daran - `checked` liesse sich auch an einem
   // disabled-Kaestchen ablesen -, er fragt reminderAccess() selbst.
+  //
+  // `disabled` nimmt die Felder auch aus der TAB-ORDNUNG - der gespeicherte
+  // Wert ist dann sichtbar, aber per Tastatur nicht erreichbar. Fuer Knoepfe
+  // kennt das Haus dafuer `aria-disabled` (layout.css `.btn[aria-disabled]`);
+  // ein Kontrollkaestchen kann kein `readonly` tragen, ein `aria-disabled`-
+  // Kaestchen bliebe also bedienbar und muesste im Skript zurueckgesetzt
+  // werden. Das ist der Tausch, den diese Stelle bewusst macht.
+  //
+  // Die Hinweiszeile traegt `.task-field-hint` aus tasks.css und KEINE eigene
+  // Klasse: derselbe Satz in derselben Rolle darf nicht dreimal verschieden
+  // aussehen, und die Warnung davor steht schon an `.cal-field-hint` in
+  // calendar.css. Tragfaehig ist das, weil BEIDE Wege in dieses Markup
+  // tasks.css mitbringen - die Route /tasks laedt es als Seiten-Blatt, und
+  // `openTaskById()` (Dashboard, Kalender) awaitet vorher `ensureTaskStyles()`.
   const locked = access === 'read';
   const off = locked ? ' disabled' : '';
   const hasReminder = !!reminder;
@@ -1311,7 +1339,7 @@ function renderReminderSection(task = null, reminder = null) {
           <span class="reminder-section__title">${t('reminders.enableLabel')}</span>
         </label>
       </div>
-      ${locked ? `<p class="reminder-section__notice">${t('reminders.readOnlyNotice')}</p>` : ''}
+      ${locked ? `<p class="task-field-hint">${t('reminders.readOnlyNotice')}</p>` : ''}
       <div id="reminder-fields" class="reminder-fields" ${hasReminder ? '' : 'style="display:none"'}>
         <div class="form-group" style="margin:0">
           <label class="label" for="reminder-offset">${t('reminders.offsetLabel')}</label>
@@ -1506,8 +1534,13 @@ function wireTaskForm(panel, { task = null, container = null, onChanged = () => 
   const fields = panel.querySelector('#reminder-fields');
   const offset = panel.querySelector('#reminder-offset');
   const customFields = panel.querySelector('#reminder-custom-fields');
+  // `fields?.` statt `fields.`: die beiden Suchen sind unabhaengig, und seit
+  // der Abschnitt ganz fehlen kann (renderReminderSection gibt '' zurueck),
+  // haengt die Sicherheit dieser Zeile sonst allein daran, dass `toggle` im
+  // SELBEN Fall null ist und der Listener nie haengt. Das ist wahr, aber keine
+  // Zusicherung, die diese Stelle selbst traegt.
   toggle?.addEventListener('change', () => {
-    fields.style.display = toggle.checked ? '' : 'none';
+    if (fields) fields.style.display = toggle.checked ? '' : 'none';
   });
   offset?.addEventListener('change', () => {
     if (!customFields) return;
