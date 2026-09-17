@@ -501,7 +501,8 @@
         "checkConflict": "タスクはその間に変更されました。もう一度開いてください。",
         "doneByPick": "「{{title}}」をやったのは誰ですか？",
         "doneByToast": "{{name}} がやりました。",
-        "historyTickedBy": "チェックしたのは {{name}}"
+        "historyTickedBy": "チェックしたのは {{name}}",
+        "reminderLockedNeedsDueDate": "このタスクには変更できないリマインダーが設定されています。そのため期限日が必要です。"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}}件の食事",

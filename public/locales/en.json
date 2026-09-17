@@ -501,7 +501,8 @@
         "checkConflict": "The task has changed in the meantime. Please open it again.",
         "doneByPick": "Who did “{{title}}”?",
         "doneByToast": "Done by {{name}}.",
-        "historyTickedBy": "ticked off by {{name}}"
+        "historyTickedBy": "ticked off by {{name}}",
+        "reminderLockedNeedsDueDate": "This task has a reminder you are not allowed to change. It therefore needs a due date."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} meals",

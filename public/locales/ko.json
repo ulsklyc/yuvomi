@@ -513,7 +513,8 @@
         "checkConflict": "그 사이에 할 일이 변경되었습니다. 다시 열어 주세요.",
         "doneByPick": "“{{title}}”을(를) 누가 했나요?",
         "doneByToast": "{{name}} 님이 했습니다.",
-        "historyTickedBy": "체크한 사람: {{name}}"
+        "historyTickedBy": "체크한 사람: {{name}}",
+        "reminderLockedNeedsDueDate": "이 작업에는 변경할 수 없는 알림이 있습니다. 따라서 마감일이 필요합니다."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}}개 식사",

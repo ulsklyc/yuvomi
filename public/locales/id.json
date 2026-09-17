@@ -513,7 +513,8 @@
         "checkConflict": "Tugas telah berubah sementara itu. Silakan buka kembali.",
         "doneByPick": "Siapa yang mengerjakan “{{title}}”?",
         "doneByToast": "Dikerjakan oleh {{name}}.",
-        "historyTickedBy": "dicentang oleh {{name}}"
+        "historyTickedBy": "dicentang oleh {{name}}",
+        "reminderLockedNeedsDueDate": "Tugas ini memiliki pengingat yang tidak boleh Anda ubah. Karena itu tugas ini memerlukan tanggal jatuh tempo."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} hidangan",

@@ -75,7 +75,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   visible but locked, so it can still be read off, and saving leaves it exactly as it was. Where
   there is nothing set - a task being created, or one that never had a reminder - the section is
   gone rather than shown as an empty switch that cannot be used, and the same goes for members with
-  no calendar access at all. With write access nothing changes.
+  no calendar access at all. One rule still holds for everyone: a task with a reminder needs a due
+  date, so clearing the date is refused while a reminder hangs on the task, and the message names
+  the date rather than the switch that cannot be operated. Changing the date to another one is
+  fine. With write access nothing changes.
 
 ### Security
 

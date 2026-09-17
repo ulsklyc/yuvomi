@@ -501,7 +501,8 @@
         "checkConflict": "Công việc đã thay đổi trong lúc này. Vui lòng mở lại.",
         "doneByPick": "Ai đã làm “{{title}}”?",
         "doneByToast": "Do {{name}} làm.",
-        "historyTickedBy": "đánh dấu bởi {{name}}"
+        "historyTickedBy": "đánh dấu bởi {{name}}",
+        "reminderLockedNeedsDueDate": "Công việc này có một nhắc nhở mà bạn không được phép thay đổi. Vì vậy nó cần một ngày đến hạn."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} bữa ăn",

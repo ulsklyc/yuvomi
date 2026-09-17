@@ -501,7 +501,8 @@
         "checkConflict": "De taak is intussen gewijzigd. Open deze opnieuw.",
         "doneByPick": "Wie heeft “{{title}}” gedaan?",
         "doneByToast": "Gedaan door {{name}}.",
-        "historyTickedBy": "afgevinkt door {{name}}"
+        "historyTickedBy": "afgevinkt door {{name}}",
+        "reminderLockedNeedsDueDate": "Deze taak heeft een herinnering die je niet mag wijzigen. Daarom is een einddatum nodig."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} maaltijden",

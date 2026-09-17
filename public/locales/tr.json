@@ -501,7 +501,8 @@
         "checkConflict": "Görev bu arada değişti. Lütfen yeniden açın.",
         "doneByPick": "“{{title}}” görevini kim yaptı?",
         "doneByToast": "{{name}} yaptı.",
-        "historyTickedBy": "işaretleyen: {{name}}"
+        "historyTickedBy": "işaretleyen: {{name}}",
+        "reminderLockedNeedsDueDate": "Bu görevde değiştirmenize izin verilmeyen bir hatırlatıcı var. Bu nedenle bir bitiş tarihi gerekiyor."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} öğünden",

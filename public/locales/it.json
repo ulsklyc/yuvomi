@@ -501,7 +501,8 @@
         "checkConflict": "L’attività è stata modificata nel frattempo. Riaprila.",
         "doneByPick": "Chi ha svolto «{{title}}»?",
         "doneByToast": "Svolto da {{name}}.",
-        "historyTickedBy": "spuntato da {{name}}"
+        "historyTickedBy": "spuntato da {{name}}",
+        "reminderLockedNeedsDueDate": "Questa attività ha un promemoria che non puoi modificare. Serve quindi una data di scadenza."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} pasti",

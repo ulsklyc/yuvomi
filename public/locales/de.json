@@ -513,7 +513,8 @@
         "checkConflict": "Die Aufgabe wurde inzwischen geändert. Bitte erneut öffnen.",
         "doneByPick": "Wer hat „{{title}}“ erledigt?",
         "doneByToast": "Erledigt von {{name}}.",
-        "historyTickedBy": "abgehakt von {{name}}"
+        "historyTickedBy": "abgehakt von {{name}}",
+        "reminderLockedNeedsDueDate": "Diese Aufgabe hat eine Erinnerung, die du nicht ändern darfst. Sie braucht deshalb ein Fälligkeitsdatum."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} Mahlzeiten",

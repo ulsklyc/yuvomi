@@ -62,7 +62,12 @@ function fakeForm({ byId = {}, ...named } = {}) {
   return form;
 }
 
-/** Fehlerzeile, Knopf und die versteckte Task-id - drei getElementById-Ziele. */
+/**
+ * Fehlerzeile, Knopf und die versteckte Task-id - drei getElementById-Ziele.
+ * `errorNode` liegt zusaetzlich offen: ob das Speichern ABGEBROCHEN hat, steht
+ * nur dort, und ein Test, der nur die ausgebliebenen Anfragen zaehlt, koennte
+ * einen stillen Abbruch nicht von einem geglueckten Speichern unterscheiden.
+ */
 function fakeDocument(taskId = '') {
   const nodes = {
     'task-form-error': { hidden: true, textContent: '' },
@@ -73,6 +78,7 @@ function fakeDocument(taskId = '') {
     getElementById: (id) => nodes[id] ?? null,
     documentElement: { lang: 'de', classList: { toggle() {}, add() {}, remove() {}, contains: () => false } },
     addEventListener() {},
+    errorNode: nodes['task-form-error'],
   };
 }
 
@@ -246,7 +252,7 @@ test('ohne geladene Rechte bleibt es beim Vollzugriff (fail-open wie permissions
  * gesperrten) Kaestchens - genau der Wert, den ein blindes Wiederholen
  * erneut schicken wuerde.
  */
-async function submitAndRecordCalls({ modules, reminderChecked, taskId = '7' }) {
+async function submitAndRecordCalls({ modules, reminderChecked, taskId = '7', dueDate = '2026-10-01' }) {
   const calls = [];
   const record = (method) => async (path, body) => {
     calls.push({ method, path, body });
@@ -261,14 +267,15 @@ async function submitAndRecordCalls({ modules, reminderChecked, taskId = '7' }) 
     patch: record('patch'),
     delete: record('delete'),
   };
-  globalThis.document = fakeDocument(taskId);
+  const doc = fakeDocument(taskId);
+  globalThis.document = doc;
   const form = fakeForm({
     title: 'Fenster putzen',
     description: '',
     priority: 'none',
     category: 'household',
     start_date: '',
-    due_date: '2026-10-01',
+    due_date: dueDate,
     due_time: '',
     points: '0',
     byId: {
@@ -285,25 +292,25 @@ async function submitAndRecordCalls({ modules, reminderChecked, taskId = '7' }) 
   } finally {
     delete globalThis.__apiStub;
   }
-  return calls;
+  return { calls, error: doc.errorNode.hidden ? null : doc.errorNode.textContent };
 }
 
 const reminderCalls = (calls) => calls.filter((c) => String(c.path).startsWith('/reminders'));
 
 test('calendar: read speichert die Aufgabe und laesst die Erinnerung unangetastet', async () => {
-  const calls = await submitAndRecordCalls({ modules: { tasks: 'write', calendar: 'read' }, reminderChecked: true });
+  const { calls } = await submitAndRecordCalls({ modules: { tasks: 'write', calendar: 'read' }, reminderChecked: true });
   assert.ok(calls.some((c) => c.method === 'put' && c.path === '/tasks/7'), 'die Aufgabe selbst geht raus');
   assert.deepEqual(reminderCalls(calls), [], 'kein POST /reminders, das nur einen 403 holen wuerde');
 });
 
 test('calendar: read schickt auch kein DELETE, wenn das gesperrte Kaestchen leer ist', async () => {
-  const calls = await submitAndRecordCalls({ modules: { tasks: 'write', calendar: 'read' }, reminderChecked: false });
+  const { calls } = await submitAndRecordCalls({ modules: { tasks: 'write', calendar: 'read' }, reminderChecked: false });
   assert.ok(calls.some((c) => c.method === 'put' && c.path === '/tasks/7'));
   assert.deepEqual(reminderCalls(calls), [], 'nicht abgewaehlt heisst nicht geloescht');
 });
 
 test('calendar: write schreibt die Erinnerung weiter wie bisher', async () => {
-  const calls = await submitAndRecordCalls({ modules: { tasks: 'write', calendar: 'write' }, reminderChecked: true });
+  const { calls } = await submitAndRecordCalls({ modules: { tasks: 'write', calendar: 'write' }, reminderChecked: true });
   const posts = reminderCalls(calls).filter((c) => c.method === 'post');
   assert.equal(posts.length, 1, 'der Weg mit Schreibrecht bleibt offen');
   assert.equal(posts[0].body.entity_type, 'task');
@@ -319,8 +326,43 @@ test('calendar: write schreibt die Erinnerung weiter wie bisher', async () => {
   assert.equal(posts[0].body.remind_at, '2026-09-30T21:59:59');
 });
 
+// Review-Runde 2: der Riegel uebersprang mit dem Schreibvorgang auch die
+// VORBEDINGUNG, und die gilt unabhaengig vom Schreibrecht - eine Erinnerung
+// braucht ein Faelligkeitsdatum. Mit `write` verweigert die App genau diese
+// Kombination seit immer; ohne Schreibrecht ging die Aufgabe mit
+// `due_date: null` durch und liess die Erinnerung an einer Aufgabe ohne
+// Faelligkeit zurueck (`server/routes/tasks.js` fasst die Tabelle nicht an).
+// Die Meldung nennt deshalb das Faelligkeitsdatum, das dieser Nutzer BEDIENEN
+// kann, nicht den Schalter, den er nicht bedienen kann.
+test('calendar: read darf das Faelligkeitsdatum nicht wegraeumen, solange eine Erinnerung haengt', async () => {
+  const { calls, error } = await submitAndRecordCalls({
+    modules: { tasks: 'write', calendar: 'read' }, reminderChecked: true, dueDate: '',
+  });
+  assert.equal(error, 'tasks.reminderLockedNeedsDueDate', 'die Meldung nennt das bedienbare Feld');
+  assert.deepEqual(calls.filter((c) => c.path === '/tasks/7'), [], 'die Aufgabe geht NICHT raus');
+  assert.deepEqual(reminderCalls(calls), [], 'und an der Erinnerung wird auch nichts versucht');
+});
+
+test('calendar: read ohne haengende Erinnerung darf das Faelligkeitsdatum leeren', async () => {
+  const { calls, error } = await submitAndRecordCalls({
+    modules: { tasks: 'write', calendar: 'read' }, reminderChecked: false, dueDate: '',
+  });
+  assert.equal(error, null, 'ohne Erinnerung gibt es keine Regel zu brechen');
+  assert.ok(calls.some((c) => c.method === 'put' && c.path === '/tasks/7'), 'die Aufgabe geht raus');
+});
+
+test('calendar: read darf das Faelligkeitsdatum WECHSELN - das bricht die Regel nicht', async () => {
+  const { calls, error } = await submitAndRecordCalls({
+    modules: { tasks: 'write', calendar: 'read' }, reminderChecked: true, dueDate: '2026-11-15',
+  });
+  assert.equal(error, null);
+  const put = calls.find((c) => c.method === 'put' && c.path === '/tasks/7');
+  assert.equal(put?.body?.due_date, '2026-11-15', 'das neue Datum geht durch');
+  assert.deepEqual(reminderCalls(calls), [], 'die Erinnerung bleibt unangetastet');
+});
+
 test('calendar: write loescht die Erinnerung weiter, wenn der Schalter aus ist', async () => {
-  const calls = await submitAndRecordCalls({ modules: { tasks: 'write', calendar: 'write' }, reminderChecked: false });
+  const { calls } = await submitAndRecordCalls({ modules: { tasks: 'write', calendar: 'write' }, reminderChecked: false });
   const deletes = reminderCalls(calls).filter((c) => c.method === 'delete');
   assert.equal(deletes.length, 1, 'das Abwaehlen loescht weiter');
   assert.match(deletes[0].path, /entity_type=task&entity_id=7/);

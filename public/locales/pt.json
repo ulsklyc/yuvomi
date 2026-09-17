@@ -501,7 +501,8 @@
         "checkConflict": "A tarefa foi alterada entretanto. Abra-a novamente.",
         "doneByPick": "Quem fez “{{title}}”?",
         "doneByToast": "Feito por {{name}}.",
-        "historyTickedBy": "assinalado por {{name}}"
+        "historyTickedBy": "assinalado por {{name}}",
+        "reminderLockedNeedsDueDate": "Esta tarefa tem um lembrete que não pode alterar. Por isso precisa de uma data de vencimento."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} refeições",

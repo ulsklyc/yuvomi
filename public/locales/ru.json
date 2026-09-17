@@ -501,7 +501,8 @@
         "checkConflict": "Задача была изменена. Откройте её заново.",
         "doneByPick": "Кто выполнил «{{title}}»?",
         "doneByToast": "Выполнил(а) {{name}}.",
-        "historyTickedBy": "отметил(а) {{name}}"
+        "historyTickedBy": "отметил(а) {{name}}",
+        "reminderLockedNeedsDueDate": "У этой задачи есть напоминание, которое вы не можете изменить. Поэтому ей нужен срок выполнения."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} приёма пищи",

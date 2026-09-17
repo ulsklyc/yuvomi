@@ -501,7 +501,8 @@
         "checkConflict": "La tarea ha cambiado mientras tanto. Vuelve a abrirla.",
         "doneByPick": "¿Quién hizo «{{title}}»?",
         "doneByToast": "Hecho por {{name}}.",
-        "historyTickedBy": "marcado por {{name}}"
+        "historyTickedBy": "marcado por {{name}}",
+        "reminderLockedNeedsDueDate": "Esta tarea tiene un recordatorio que no puedes cambiar. Por eso necesita una fecha de vencimiento."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} comidas",

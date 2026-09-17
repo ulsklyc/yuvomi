@@ -1804,6 +1804,26 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
   // Feld, das dieser Nutzer gar nicht bedienen kann.
   const canWriteReminder = reminderAccess() === 'write';
   const wantsReminder = canWriteReminder && !!reminderToggle?.checked;
+  // DIE EINE VORBEDINGUNG, DIE AUCH OHNE SCHREIBRECHT GILT: eine Erinnerung
+  // braucht ein Faelligkeitsdatum. Die Regel ist nicht neu - mit Schreibrecht
+  // verweigert die Zeile darunter genau diese Kombination -, aber der Riegel
+  // oben machte sie fuer `calendar: read` brechbar: das Datum gehoert dem
+  // Aufgaben-Modul, ist also bedienbar, und wer es leerraeumt, liess bis
+  // Review-Runde 2 eine Erinnerung an einer Aufgabe OHNE Faelligkeit zurueck
+  // (`server/routes/tasks.js` fasst die Tabelle nicht an). Nachgemessen: die
+  // Aufgabe ging mit `due_date: null` durch, ohne Meldung.
+  //
+  // Der harte Block von vorher kommt damit NICHT zurueck. Er nannte den
+  // Erinnerungs-Schalter, den dieser Nutzer nicht bedienen kann; diese Meldung
+  // nennt das Faelligkeitsdatum, das er bedienen kann, und sagt dazu, warum es
+  // gebraucht wird. Ein Datums-WECHSEL bleibt erlaubt - er bricht die Regel
+  // nicht, sondern verschiebt nur den angezeigten Vorlauf, und das ist ein
+  // eigener Faden (resolveReminderPreset kennt keinen negativen Versatz).
+  const lockedReminderPresent = !canWriteReminder && !!reminderToggle?.checked;
+  if (lockedReminderPresent && !dueDate) {
+    resetSubmit(t('tasks.reminderLockedNeedsDueDate'));
+    return;
+  }
   let remindAt = null;
   if (wantsReminder) {
     if (!dueDate) { resetSubmit(t('tasks.reminderNeedsDueDate')); return; }

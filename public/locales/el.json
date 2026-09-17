@@ -501,7 +501,8 @@
         "checkConflict": "Η εργασία άλλαξε στο μεταξύ. Ανοίξτε την ξανά.",
         "doneByPick": "Ποιος έκανε το «{{title}}»;",
         "doneByToast": "Το έκανε ο/η {{name}}.",
-        "historyTickedBy": "τσεκαρίστηκε από {{name}}"
+        "historyTickedBy": "τσεκαρίστηκε από {{name}}",
+        "reminderLockedNeedsDueDate": "Αυτή η εργασία έχει μια υπενθύμιση που δεν επιτρέπεται να αλλάξετε. Χρειάζεται επομένως ημερομηνία λήξης."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} γεύματα",
