@@ -270,13 +270,25 @@ function spezifitaet(selektor) {
 
 /**
  * Welchen Wert traegt `eigenschaft` am Ende, wenn ein Element GENAU diese
- * Klassen hat? Beruecksichtigt werden nur Regeln auf der Basisebene, deren
- * Selektor ausschliesslich aus Klassen dieser Menge besteht - alles mit
- * Pseudo, Kombinator oder fremder Klasse traegt zu diesem Element nichts bei
- * und wird uebersprungen. Bei Gleichstand gewinnt die spaetere Regel, wie im
- * Browser.
+ * Klassen hat?
+ *
+ * Beruecksichtigt werden Regeln auf der Basisebene, deren Selektor aus Klassen
+ * dieser Menge besteht, optional mit `:not(.fremd)` und optional mit einem
+ * Zustands-Suffix (`:hover`, `::after`, `:hover::after`). Das Suffix muss dem
+ * gefragten GENAU entsprechen: eine `:hover`-Regel sagt nichts ueber den
+ * ruhenden Zustand, und eine `::after`-Regel nichts ueber das Element selbst.
+ * Alles andere - Kombinatoren, fremde Klassen, At-Bloecke - traegt zu diesem
+ * Element nichts bei und wird uebersprungen.
+ *
+ * DAS SUFFIX KAM DAZU, WEIL DIE ERSTE FASSUNG GENAU DARAN VORBEIMASS: sie
+ * verwarf jeden Selektor mit Pseudo und sah damit die Hover-Regeln gar nicht -
+ * also die Stelle, an der dieselbe Kaskadenfalle ein zweites Mal zuschlug
+ * (Review zu PR #1252). Ein Loeser, der die Haelfte der Regeln ueberspringt,
+ * ist ein gruener Test, der nichts misst.
+ *
+ * Bei Gleichstand gewinnt die spaetere Regel, wie im Browser.
  */
-function effektiverWert(css, klassen, eigenschaft) {
+function effektiverWert(css, klassen, eigenschaft, zustand = '') {
   const menge = new Set(klassen);
   let treffer = null;
   let bestes = -1;
@@ -286,8 +298,14 @@ function effektiverWert(css, klassen, eigenschaft) {
     if (at.length) continue;
     for (const teil of selector.split(',')) {
       const sel = teil.trim();
-      if (!/^(?:\.[\w-]+)+$/.test(sel)) continue;
-      const gefordert = sel.split('.').filter(Boolean);
+      // Selektor zerlegen: Klassenkette (mit `:not(.x)`) + Zustands-Suffix.
+      const m = /^((?:\.[\w-]+|:not\(\.[\w-]+\))+)((?:::?[\w-]+)*)$/.exec(sel);
+      if (!m) continue;
+      const [, kette, suffix] = m;
+      if (suffix !== zustand) continue;
+      const verboten = [...kette.matchAll(/:not\(\.([\w-]+)\)/g)].map((x) => x[1]);
+      if (verboten.some((k) => menge.has(k))) continue;
+      const gefordert = kette.replace(/:not\(\.[\w-]+\)/g, '').split('.').filter(Boolean);
       if (!gefordert.every((k) => menge.has(k))) continue;
       const wert = new RegExp(`(?:^|;)\\s*${eigenschaft}\\s*:([^;]*)`).exec(body);
       if (!wert) continue;
@@ -311,6 +329,22 @@ test('der Kaskadenloeser selbst: spaetere Regel gewinnt bei gleicher Spezifitaet
   assert.equal(effektiverWert('.b { animation: pop 1s; }', ['a--done'], 'animation'), null);
 });
 
+test('der Kaskadenloeser selbst: Zustands-Suffix und :not() zaehlen mit', () => {
+  const css = '.a:hover::after { border-color: blau; } .a--done::after { border-color: gruen; }';
+  // Eine :hover-Regel sagt nichts ueber den ruhenden Zustand - und umgekehrt.
+  assert.equal(effektiverWert(css, ['a', 'a--done'], 'border-color', '::after'), 'gruen');
+  assert.equal(effektiverWert(css, ['a', 'a--done'], 'border-color', ':hover::after'), 'blau');
+  // Die Falle: eine Gegenregel mit Pseudo schlaegt den Zustand ueber Spezifitaet.
+  const gegenregel = css + ' .a--static:hover::after { border-color: grau; }';
+  assert.equal(effektiverWert(gegenregel, ['a', 'a--done', 'a--static'], 'border-color', ':hover::after'), 'grau');
+  // `:not()` nimmt das Element aus, statt eine zweite Farbe zu behaupten.
+  const ausgenommen = '.a:not(.a--static):hover::after { border-color: blau; } .a--done::after { border-color: gruen; }';
+  assert.equal(effektiverWert(ausgenommen, ['a', 'a--done', 'a--static'], 'border-color', ':hover::after'), null,
+    'keine Hover-Regel trifft das Zeichen - der ruhende Zustand bleibt stehen');
+  assert.equal(effektiverWert(ausgenommen, ['a', 'a--done'], 'border-color', ':hover::after'), 'blau',
+    'der bedienbare Knopf reagiert weiter');
+});
+
 test('eine erledigte Aufgabe im Zustandszeichen animiert nicht', () => {
   assert.equal(
     effektiverWert(TASKS_CSS, ['task-status-btn', 'task-status-btn--done', 'task-status-btn--static'], 'animation'),
@@ -332,6 +366,44 @@ test('dieselbe Zusicherung fuer die Teilaufgabe (#1209 und #467 teilen sich das 
   assert.match(
     effektiverWert(TASKS_CSS, ['subtask-item__checkbox', 'subtask-item__checkbox--done'], 'animation') ?? '',
     /check-pop/,
+  );
+});
+
+// -------------------------------------------------------------------------
+// Und das Zeichen reagiert auf Ueberfahren gar nicht
+//
+// Die erste Fassung schrieb dem Zeichen eine eigene Hover-FARBE zu. Mit
+// (0,2,1) schlug die den Zustandsring (`--done::after`, (0,1,1)): beim
+// Ueberfahren wurde der gruene Ring einer erledigten Aufgabe grau. Das ist
+// dieselbe Falle wie bei `check-pop`, nur in die andere Richtung - zu viel
+// Spezifitaet statt zu wenig. Jetzt nimmt die Hover-Regel das Zeichen aus,
+// statt gegen es anzuschreiben (Review zu PR #1252).
+// -------------------------------------------------------------------------
+
+test('das Zustandszeichen reagiert nicht auf Ueberfahren, und der Ring behaelt seine Farbe', () => {
+  for (const [name, klassen, ruhend] of [
+    ['erledigt', ['task-status-btn', 'task-status-btn--done', 'task-status-btn--static'], 'var(--color-success)'],
+    ['in Arbeit', ['task-status-btn', 'task-status-btn--in_progress', 'task-status-btn--static'], 'var(--color-warning)'],
+  ]) {
+    assert.equal(effektiverWert(TASKS_CSS, klassen, 'border-color', ':hover::after'), null,
+      `${name}: keine Hover-Regel darf das Zeichen treffen`);
+    assert.equal(effektiverWert(TASKS_CSS, klassen, 'border-color', '::after'), ruhend,
+      `${name}: der Ring behaelt die Farbe, die den Zustand traegt`);
+  }
+  // Der bedienbare Knopf behaelt seine Hover-Reaktion.
+  assert.match(
+    effektiverWert(TASKS_CSS, ['task-status-btn', 'task-status-btn--done'], 'border-color', ':hover::after') ?? '',
+    /module-accent/,
+  );
+});
+
+test('dasselbe an der Teilaufgabe - dort seit #1209', () => {
+  const zeichen = ['subtask-item__checkbox', 'subtask-item__checkbox--done', 'subtask-item__checkbox--static'];
+  assert.equal(effektiverWert(TASKS_CSS, zeichen, 'border-color', ':hover'), null);
+  assert.equal(effektiverWert(TASKS_CSS, zeichen, 'border-color'), 'var(--color-success)');
+  assert.match(
+    effektiverWert(TASKS_CSS, ['subtask-item__checkbox', 'subtask-item__checkbox--done'], 'border-color', ':hover') ?? '',
+    /module-accent/,
   );
 });
 

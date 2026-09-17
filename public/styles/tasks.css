@@ -735,25 +735,34 @@
   transition: border-color var(--transition-fast), background-color var(--transition-fast);
 }
 
-.task-status-btn:hover::after {
+/* DAS ZEICHEN IST AUSGENOMMEN, statt seine Farbe zurueckzuschreiben.
+ *
+ * Hier stand die Ausnahme zuerst als Gegenregel (`--static:hover::after` mit
+ * `border-color: var(--color-text-tertiary)`), und die war eine FARBAUSSAGE mit
+ * Spezifitaet (0,2,1): sie schlug `--done::after` und `--in_progress::after`
+ * (beide (0,1,1)) und faerbte beim Ueberfahren den gruenen Ring einer
+ * erledigten Aufgabe grau. Das Zeichen bekam damit genau die Hover-Reaktion,
+ * die es nicht haben soll - nur in einer anderen Farbe (Review zu PR #1252).
+ *
+ * `:not()` sagt stattdessen, was gemeint ist: der KNOPF reagiert, das ZEICHEN
+ * nicht. Keine zweite Farbaussage, also auch nichts, was den Zustandsring
+ * ueberstimmen koennte. */
+.task-status-btn:not(.task-status-btn--static):hover::after {
   border-color: var(--module-accent, var(--color-accent));
 }
 
 /* DAS ZEICHEN STATT DES KNOPFS (#467), dieselbe Bauart wie
  * `.subtask-item__checkbox--static` aus #1209: der Ring bleibt, weil er die
  * Auskunft traegt - ob die Aufgabe erledigt ist -, aber nichts an ihm lockt
- * mehr zum Tippen. Der Zeiger wird neutral, der Hover-Rahmen faellt weg, und
- * die vergroesserte Trefflaeche (`::before`) verschwindet: sie ist fuer eine
- * Beruehrung da, die es hier nicht mehr gibt.
+ * mehr zum Tippen. Der Zeiger wird neutral, und die vergroesserte Trefflaeche
+ * (`::before`) verschwindet: sie ist fuer eine Beruehrung da, die es hier nicht
+ * mehr gibt. Den Hover-Rahmen nimmt die Regel oben aus, nicht eine Gegenregel
+ * hier - siehe die Begruendung dort.
  *
- * Es steht NACH den Basisregeln: gleiche Spezifitaet entscheidet die
+ * `cursor` steht NACH der Basisregel: gleiche Spezifitaet entscheidet die
  * Quellreihenfolge, und davor stehend waere es wirkungslos gewesen. */
 .task-status-btn--static {
   cursor: default;
-}
-
-.task-status-btn--static:hover::after {
-  border-color: var(--color-text-tertiary);
 }
 
 .task-status-btn--static::before {
@@ -1258,7 +1267,12 @@
 /* Dieselbe Modulton-Einladung wie am grossen Statusknopf (oben) und an
  * .item-check (shopping.css) - die Unteraufgabe war der dritte Abhakmoment
  * und der einzige ohne sie (Signaturelement-Runde 2026-08-31). */
-.subtask-item__checkbox:hover {
+/* Wie am Statusknopf daneben: das Zeichen ist AUSGENOMMEN, statt seine Farbe
+ * zurueckzuschreiben. Die alte Gegenregel (`--static:hover` mit
+ * `border-color: var(--color-border)`) trug (0,2,0) und schlug damit
+ * `--done` (0,1,0) - am Wandtablett wurde der gruene Rahmen einer erledigten
+ * Teilaufgabe beim Ueberfahren grau, seit #1209. */
+.subtask-item__checkbox:not(.subtask-item__checkbox--static):hover {
   border-color: var(--module-accent, var(--color-accent));
 }
 
@@ -1301,10 +1315,6 @@
  * Reihenfolge haengt. */
 .subtask-item__checkbox--done.subtask-item__checkbox--static {
   animation: none;
-}
-
-.subtask-item__checkbox--static:hover {
-  border-color: var(--color-border);
 }
 
 .subtask-item__checkbox--static::before {
