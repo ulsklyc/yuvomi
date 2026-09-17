@@ -4030,7 +4030,6 @@ export const __test = {
   wasteEnabled,
   wasteOccurrencesOnDay,
   renderWasteChip,
-  activeFilterCount,
   availableLayers,
   renderAgendaView,
   renderMonthView,

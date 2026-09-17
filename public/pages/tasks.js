@@ -4282,10 +4282,12 @@ export const __test = {
   // Die Personenauswahl beim Abhaken (#1205): WANN sie ueberhaupt erscheint,
   // ist die halbe Entscheidung - ein Solo-Haushalt bekommt sie nie zu sehen.
   renderDoerPicker,
-  // Welche Bedienelemente eine Zeile, eine Boardkarte und eine leere Liste
-  // ueberhaupt anbieten. Die Nur-lesen-Regel (#467) ist eine Aussage ueber
-  // genau dieses Markup: was verschwindet, was nur `disabled` wird.
-  renderTaskCard, renderKanbanCard, renderTaskGroups, readOnly,
+  // Welche Bedienelemente eine Boardkarte und eine leere Liste ueberhaupt
+  // anbieten. Die Nur-lesen-Regel (#467) ist eine Aussage ueber genau dieses
+  // Markup: was verschwindet, und was als Zeichen stehen bleibt, das den
+  // Zustand nennt. `renderTaskCard` steht schon oben - sie beantwortet beide
+  // Fragen, die des Tabletts und diese.
+  renderKanbanCard, renderTaskGroups, readOnly,
   // Gemerkte Filter: der Vertrag ist, dass Lesen und Schreiben AUSEINANDER
   // gehen - sonst schriebe das Bereinigen sich fest (siehe getRecentFilters).
   getRecentFilters, storedRecentFilters, saveRecentFilter,
