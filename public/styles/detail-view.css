@@ -135,7 +135,14 @@
   cursor: pointer;
 }
 
-.detail-subtask:hover {
+/* Das Zeichen ist AUSGENOMMEN, statt seinen Hintergrund zurueckzuschreiben -
+ * dieselbe Bauart wie an den beiden Abhak-Zeichen in tasks.css. Hier stand eine
+ * Gegenregel (`--static:hover { background: none }`), und die ging nur deshalb
+ * gut, weil `--done` daneben zufaellig keinen Hintergrund setzt: sie traegt
+ * (0,2,0) und haette jede Zustandsfarbe geschlagen, so wie es an den anderen
+ * beiden Stellen tatsaechlich passiert ist (Review zu PR #1252). Eine Bauart,
+ * die nur an einer Stelle haelt, ist eine Bauart zu viel. */
+.detail-subtask:not(.detail-subtask--static):hover {
   background: var(--color-surface-2);
 }
 
@@ -156,10 +163,6 @@
  * (public/styles/tasks.css). */
 .detail-subtask--static {
   cursor: default;
-}
-
-.detail-subtask--static:hover {
-  background: none;
 }
 
 .detail-subtask i {

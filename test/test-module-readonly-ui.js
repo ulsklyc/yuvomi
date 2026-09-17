@@ -397,6 +397,22 @@ test('das Zustandszeichen reagiert nicht auf Ueberfahren, und der Ring behaelt s
   );
 });
 
+test('und an der Zeile der Leseansicht - dort war es nur noch nicht schaedlich', () => {
+  // DIE DRITTE STELLE MIT DEMSELBEN ZEICHEN. Ihre Gegenregel
+  // (`--static:hover { background: none }`) richtete keinen Schaden an, weil
+  // `.detail-subtask--done` zufaellig keinen Hintergrund setzt - sie trug aber
+  // dieselbe (0,2,0) und haette jede Zustandsfarbe geschlagen, die dort morgen
+  // dazukommt. Eine Bauart, die nur an einer Stelle haelt, ist eine zu viel.
+  const css = readFileSync(new URL('../public/styles/detail-view.css', import.meta.url), 'utf8');
+  const zeichen = ['detail-subtask', 'detail-subtask--done', 'detail-subtask--static'];
+  assert.equal(effektiverWert(css, zeichen, 'background', ':hover'), null);
+  assert.match(
+    effektiverWert(css, ['detail-subtask', 'detail-subtask--done'], 'background', ':hover') ?? '',
+    /surface-2/,
+    'die bedienbare Zeile reagiert weiter',
+  );
+});
+
 test('dasselbe an der Teilaufgabe - dort seit #1209', () => {
   const zeichen = ['subtask-item__checkbox', 'subtask-item__checkbox--done', 'subtask-item__checkbox--static'];
   assert.equal(effektiverWert(TASKS_CSS, zeichen, 'border-color', ':hover'), null);
