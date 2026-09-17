@@ -2872,7 +2872,8 @@
         "customDays": "Nap",
         "customWeeks": "Hét",
         "sectionTitlePlural": "Emlékeztetők",
-        "sharedWithAssignees": "Az eseményhez rendelt személyek is megkapják ezt az emlékeztetőt."
+        "sharedWithAssignees": "Az eseményhez rendelt személyek is megkapják ezt az emlékeztetőt.",
+        "readOnlyNotice": "Az emlékeztetők a Naptárhoz tartoznak. Ott írási jog nélkül ez a beállítás változatlan marad."
     },
     "birthdays": {
         "inDays": "{{days}} nap múlva",

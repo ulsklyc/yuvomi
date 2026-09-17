@@ -2872,7 +2872,8 @@
         "customDays": "Ngày",
         "customWeeks": "Tuần",
         "sectionTitlePlural": "Lời nhắc",
-        "sharedWithAssignees": "Những người được giao sự kiện này cũng nhận được lời nhắc này."
+        "sharedWithAssignees": "Những người được giao sự kiện này cũng nhận được lời nhắc này.",
+        "readOnlyNotice": "Nhắc nhở thuộc về Lịch. Nếu không có quyền ghi ở đó, cài đặt này giữ nguyên."
     },
     "birthdays": {
         "inDays": "trong {{days}} ngày",

@@ -2884,7 +2884,8 @@
         "customDays": "Tage",
         "customWeeks": "Wochen",
         "sectionTitlePlural": "Erinnerungen",
-        "sharedWithAssignees": "Wer diesem Termin zugewiesen ist, bekommt diese Erinnerung ebenfalls."
+        "sharedWithAssignees": "Wer diesem Termin zugewiesen ist, bekommt diese Erinnerung ebenfalls.",
+        "readOnlyNotice": "Erinnerungen gehören zum Kalender. Ohne Schreibrecht dort bleibt diese Einstellung unverändert."
     },
     "birthdays": {
         "inDays": "in {{days}} Tagen",

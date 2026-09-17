@@ -2987,7 +2987,8 @@
         "customDays": "Days",
         "customWeeks": "Weeks",
         "sectionTitlePlural": "Rappels",
-        "sharedWithAssignees": "Les personnes affectées à cet événement reçoivent aussi ce rappel."
+        "sharedWithAssignees": "Les personnes affectées à cet événement reçoivent aussi ce rappel.",
+        "readOnlyNotice": "Les rappels appartiennent au Calendrier. Sans droit d’écriture là-bas, ce réglage reste inchangé."
     },
     "onboarding": {
         "step1Title": "Bienvenue dans {{name}}",

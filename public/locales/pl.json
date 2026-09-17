@@ -2884,7 +2884,8 @@
         "customDays": "Dni",
         "customWeeks": "Tygodnie",
         "sectionTitlePlural": "Przypomnienia",
-        "sharedWithAssignees": "Osoby przypisane do tego wydarzenia również otrzymają to przypomnienie."
+        "sharedWithAssignees": "Osoby przypisane do tego wydarzenia również otrzymają to przypomnienie.",
+        "readOnlyNotice": "Przypomnienia należą do Kalendarza. Bez prawa zapisu tam to ustawienie pozostaje bez zmian."
     },
     "birthdays": {
         "inDays": "za {{days}} dni",

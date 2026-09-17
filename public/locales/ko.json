@@ -2884,7 +2884,8 @@
         "customDays": "일",
         "customWeeks": "주",
         "sectionTitlePlural": "알림",
-        "sharedWithAssignees": "이 일정에 배정된 사람도 이 알림을 받습니다."
+        "sharedWithAssignees": "이 일정에 배정된 사람도 이 알림을 받습니다.",
+        "readOnlyNotice": "알림은 캘린더에 속합니다. 캘린더에 쓰기 권한이 없으면 이 설정은 변경되지 않습니다."
     },
     "birthdays": {
         "inDays": "{{days}}일 후",

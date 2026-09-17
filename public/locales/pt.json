@@ -2987,7 +2987,8 @@
         "customDays": "Dias",
         "customWeeks": "Semanas",
         "sectionTitlePlural": "Lembretes",
-        "sharedWithAssignees": "Quem estiver atribuído a este evento também recebe este lembrete."
+        "sharedWithAssignees": "Quem estiver atribuído a este evento também recebe este lembrete.",
+        "readOnlyNotice": "Os lembretes pertencem ao Calendário. Sem permissão de escrita aí, esta definição permanece inalterada."
     },
     "onboarding": {
         "step1Title": "Bem-vindo ao {{name}}",

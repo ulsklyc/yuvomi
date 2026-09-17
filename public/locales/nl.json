@@ -2872,7 +2872,8 @@
         "customDays": "Dagen",
         "customWeeks": "Weken",
         "sectionTitlePlural": "Herinneringen",
-        "sharedWithAssignees": "Wie aan deze afspraak is toegewezen, krijgt deze herinnering ook."
+        "sharedWithAssignees": "Wie aan deze afspraak is toegewezen, krijgt deze herinnering ook.",
+        "readOnlyNotice": "Herinneringen horen bij de Agenda. Zonder schrijfrechten daar blijft deze instelling ongewijzigd."
     },
     "birthdays": {
         "inDays": "over {{days}} dagen",

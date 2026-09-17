@@ -3464,7 +3464,8 @@
         "customDays": "Dny",
         "customWeeks": "Týdny",
         "sectionTitlePlural": "Připomínky",
-        "sharedWithAssignees": "Toto připomenutí dostanou i osoby přiřazené k této události."
+        "sharedWithAssignees": "Toto připomenutí dostanou i osoby přiřazené k této události.",
+        "readOnlyNotice": "Připomínky patří ke Kalendáři. Bez práva k zápisu tam zůstane toto nastavení nezměněné."
     },
     "birthdays": {
         "inDays": "za {{days}} dní",

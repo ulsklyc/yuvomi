@@ -2987,7 +2987,8 @@
         "customDays": "dagar",
         "customWeeks": "Veckor",
         "sectionTitlePlural": "Påminnelser",
-        "sharedWithAssignees": "Den som är tilldelad den här händelsen får också den här påminnelsen."
+        "sharedWithAssignees": "Den som är tilldelad den här händelsen får också den här påminnelsen.",
+        "readOnlyNotice": "Påminnelser hör till Kalendern. Utan skrivrättighet där förblir den här inställningen oförändrad."
     },
     "onboarding": {
         "step1Title": "Välkommen till {{name}}",

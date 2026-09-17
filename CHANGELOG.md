@@ -68,6 +68,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it each made the pick separately, so they could even disagree with each other. Both now follow the
   household time zone, the same one the rest of the app uses for what counts as today.
 
+- **A reminder switch in the task dialog could only ever fail for some members.** Reminders belong to
+  the Calendar, not to Tasks, so somebody allowed to edit tasks but only to read the calendar was
+  still offered the switch. Saving then stored the task and refused the reminder, and all they saw
+  was an error next to a task that had in fact been saved. With read access the reminder section now
+  stays visible but locked, so an existing reminder can still be read off, and saving leaves it
+  exactly as it was. Without any calendar access the section is gone, since there is nothing to show
+  there in the first place. With write access nothing changes.
+
 ### Security
 
 - **Reading the calendar no longer reaches the contact book, the sync accounts, or the sync targets.**

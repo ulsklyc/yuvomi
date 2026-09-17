@@ -2872,7 +2872,8 @@
         "customDays": "Days",
         "customWeeks": "Weeks",
         "sectionTitlePlural": "Reminders",
-        "sharedWithAssignees": "Anyone assigned to this event gets this reminder too."
+        "sharedWithAssignees": "Anyone assigned to this event gets this reminder too.",
+        "readOnlyNotice": "Reminders belong to the Calendar. Without write access there, this setting stays unchanged."
     },
     "birthdays": {
         "inDays": "in {{days}} days",

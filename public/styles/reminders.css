@@ -92,6 +92,33 @@
   color: var(--color-text-primary);
 }
 
+/* Warum der Abschnitt gesperrt ist (Aufgaben-Dialog mit `calendar: read`).
+   Eigene Klasse statt `.form-hint`: die Regel dafuer liegt in der page-scoped
+   settings.css und ist hier nicht geladen - dieselben drei Werte wie
+   `.task-field-hint` in tasks.css. Hier statt in tasks.css, weil der ganze
+   Abschnitt in dieser Datei wohnt und `reminders.css` der Router genau dann
+   nachlaedt, wenn es ihn gibt. */
+.reminder-section__notice {
+  margin: calc(-1 * var(--space-2)) 0 var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+/* EIN GESPERRTES FELD MUSS AUCH GESPERRT AUSSEHEN. `.input:disabled` ist
+   nirgends gestaltet - im Browser gemessen: der gesperrte Vorlauf sah
+   haargenau aus wie die Wiederholungs-Auswahl drueber, die sich bedienen
+   laesst. `.toggle input:disabled + .toggle__track` (layout.css) traegt den
+   Schalter schon, die Felder darunter trug nichts.
+
+   Absichtlich NUR auf diesen Abschnitt begrenzt: ein `.input:disabled` fuer
+   die ganze App aendert das Bild jedes gesperrten Feldes (Dienstplan-
+   Fieldsets, Budget, Einstellungen) und ist eine eigene Entscheidung, keine
+   Nebenwirkung dieser. */
+.reminder-section .input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .reminder-fields {
   display: flex;
   flex-direction: column;

@@ -2987,7 +2987,8 @@
         "customDays": "Giorni",
         "customWeeks": "Settimane",
         "sectionTitlePlural": "Promemoria",
-        "sharedWithAssignees": "Anche chi è assegnato a questo evento riceve questo promemoria."
+        "sharedWithAssignees": "Anche chi è assegnato a questo evento riceve questo promemoria.",
+        "readOnlyNotice": "I promemoria appartengono al Calendario. Senza permesso di scrittura lì, questa impostazione resta invariata."
     },
     "onboarding": {
         "step1Title": "Benvenuto in {{name}}",

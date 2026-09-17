@@ -2987,7 +2987,8 @@
         "customDays": "Days",
         "customWeeks": "Weeks",
         "sectionTitlePlural": "Hatırlatıcılar",
-        "sharedWithAssignees": "Bu etkinliğe atanan kişiler de bu hatırlatmayı alır."
+        "sharedWithAssignees": "Bu etkinliğe atanan kişiler de bu hatırlatmayı alır.",
+        "readOnlyNotice": "Hatırlatıcılar Takvime aittir. Orada yazma yetkiniz yoksa bu ayar değişmeden kalır."
     },
     "onboarding": {
         "step1Title": "{{name}} uygulamasına hoş geldiniz",

@@ -2987,7 +2987,8 @@
         "customDays": "Days",
         "customWeeks": "Weeks",
         "sectionTitlePlural": "अनुस्मारक",
-        "sharedWithAssignees": "इस कार्यक्रम को सौंपे गए लोगों को भी यह अनुस्मारक मिलता है।"
+        "sharedWithAssignees": "इस कार्यक्रम को सौंपे गए लोगों को भी यह अनुस्मारक मिलता है।",
+        "readOnlyNotice": "अनुस्मारक कैलेंडर के अंतर्गत आते हैं। वहाँ लिखने की अनुमति के बिना यह सेटिंग अपरिवर्तित रहती है।"
     },
     "onboarding": {
         "step1Title": "{{name}} में आपका स्वागत है",

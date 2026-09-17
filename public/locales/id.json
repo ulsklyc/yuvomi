@@ -2884,7 +2884,8 @@
         "customDays": "Hari",
         "customWeeks": "Minggu",
         "sectionTitlePlural": "Pengingat",
-        "sharedWithAssignees": "Orang yang ditugaskan ke acara ini juga menerima pengingat ini."
+        "sharedWithAssignees": "Orang yang ditugaskan ke acara ini juga menerima pengingat ini.",
+        "readOnlyNotice": "Pengingat termasuk dalam Kalender. Tanpa akses tulis di sana, pengaturan ini tetap tidak berubah."
     },
     "birthdays": {
         "inDays": "dalam {{days}} hari",
