@@ -1326,12 +1326,19 @@ function renderReminderSection(task = null, reminder = null) {
   // `openTaskById()` (Dashboard, Kalender) awaitet vorher `ensureTaskStyles()`.
   const locked = access === 'read';
   const off = locked ? ' disabled' : '';
+  // Die Faelligkeit, MIT DER dieser Dialog geoeffnet wurde, fuers Speichern -
+  // dort entscheidet sie darueber, ob dieser Nutzer gerade ein Datum WEGRAEUMT
+  // oder ob die Aufgabe schon ohne eines kam (Review-Runde 3). Sie reist am
+  // Abschnitt mit, weil es ihn genau dann gibt, wenn eine gesperrte Erinnerung
+  // haengt - kein zusaetzlicher Modulzustand, der neben dem Dialog altern
+  // koennte.
+  const lockedDue = locked ? ` data-locked-due="${esc(task?.due_date ?? '')}"` : '';
   const hasReminder = !!reminder;
   const resolved = resolveReminderPreset(task, reminder);
   const showCustom = hasReminder && resolved.preset === 'offset_custom';
 
   return `
-    <div class="reminder-section">
+    <div class="reminder-section"${lockedDue}>
       <div class="reminder-section__header">
         <label class="toggle" style="margin:0">
           <input type="checkbox" id="reminder-toggle" ${hasReminder ? 'checked' : ''}${off}>
@@ -1819,8 +1826,20 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
   // gebraucht wird. Ein Datums-WECHSEL bleibt erlaubt - er bricht die Regel
   // nicht, sondern verschiebt nur den angezeigten Vorlauf, und das ist ein
   // eigener Faden (resolveReminderPreset kennt keinen negativen Versatz).
+  //
+  // GEMESSEN WIRD DER UEBERGANG, NICHT DER ZUSTAND (Review-Runde 3). Eine
+  // Aufgabe kann schon OHNE Faelligkeit ankommen, waehrend eine gesperrte
+  // Erinnerung an ihr haengt, und daran ist dieser Nutzer dann unschuldig:
+  // Erinnerungen sind pro `created_by` gefuehrt (`server/routes/reminders.js`
+  // filtert GET, Upsert und DELETE danach), niemand erzwingt die Regel
+  // tabellenuebergreifend, also raeumt ein ZWEITES Mitglied das Datum weg und
+  // loescht dabei nur seine eigene - nicht vorhandene - Zeile. Ein Riegel auf
+  // den Endzustand haette den Erstbesitzer danach aus der Aufgabe ausgesperrt,
+  // bei JEDER Aenderung, auch einer Titelkorrektur, und ohne Ausweg: den
+  // Schalter, der die Meldung verursacht, kann er nicht bedienen.
   const lockedReminderPresent = !canWriteReminder && !!reminderToggle?.checked;
-  if (lockedReminderPresent && !dueDate) {
+  const dueDateWhenOpened = form.querySelector('.reminder-section[data-locked-due]')?.dataset.lockedDue || '';
+  if (lockedReminderPresent && dueDateWhenOpened && !dueDate) {
     resetSubmit(t('tasks.reminderLockedNeedsDueDate'));
     return;
   }

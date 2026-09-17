@@ -78,7 +78,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no calendar access at all. One rule still holds for everyone: a task with a reminder needs a due
   date, so clearing the date is refused while a reminder hangs on the task, and the message names
   the date rather than the switch that cannot be operated. Changing the date to another one is
-  fine. With write access nothing changes.
+  fine, and so is saving a task that already arrived without a date - reminders belong to whoever
+  set them, so another member may have cleared the date earlier, and being locked out of every
+  later edit would be nobody's fault but also nobody's to repair. With write access nothing
+  changes.
 
 ### Security
 

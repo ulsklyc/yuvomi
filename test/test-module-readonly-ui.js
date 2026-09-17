@@ -114,9 +114,17 @@ const TASK = {
 };
 const REMINDER = { id: 3, entity_type: 'task', entity_id: 7, remind_at: '2026-09-30T23:59:59' };
 
-/** Der Erinnerungsabschnitt aus dem echten Dialog-Markup, oder '' . */
+/**
+ * Der Erinnerungsabschnitt aus dem echten Dialog-Markup, oder '' .
+ *
+ * Gesucht wird der Tag-ANFANG, nicht der ganze Tag: der gesperrte Abschnitt
+ * traegt seit Runde 3 zusaetzlich `data-locked-due`, und ein wortwoertliches
+ * `<div class="reminder-section">` fand ihn danach nicht mehr - die Suite
+ * meldete "kein Abschnitt", wo einer stand. Ein Helfer, der am Markup nur eine
+ * Schreibweise kennt, macht jede Zusicherung darueber blind.
+ */
 function reminderSection(html) {
-  const start = html.indexOf('<div class="reminder-section">');
+  const start = html.search(/<div class="reminder-section"[\s>]/);
   if (start < 0) return '';
   const end = html.indexOf('<div id="task-form-error"', start);
   assert.ok(end > start, 'der Abschnitt endet vor der Fehlerzeile des Formulars');
@@ -252,7 +260,15 @@ test('ohne geladene Rechte bleibt es beim Vollzugriff (fail-open wie permissions
  * gesperrten) Kaestchens - genau der Wert, den ein blindes Wiederholen
  * erneut schicken wuerde.
  */
-async function submitAndRecordCalls({ modules, reminderChecked, taskId = '7', dueDate = '2026-10-01' }) {
+async function submitAndRecordCalls({
+  modules, reminderChecked, taskId = '7', dueDate = '2026-10-01',
+  // Die Faelligkeit, mit der der Dialog AUFGING - im Browser traegt sie der
+  // gesperrte Abschnitt als `data-locked-due`. Standard ist derselbe Wert wie
+  // im Feld, also "unveraendert"; ein Test, der das Leerraeumen messen will,
+  // setzt `dueDate: ''` und laesst diesen stehen.
+  dueDateWhenOpened = '2026-10-01',
+  lockedSection = null,
+}) {
   const calls = [];
   const record = (method) => async (path, body) => {
     calls.push({ method, path, body });
@@ -282,6 +298,15 @@ async function submitAndRecordCalls({ modules, reminderChecked, taskId = '7', du
       '#reminder-toggle': { checked: reminderChecked },
       '#reminder-offset': { value: 'offset_1d' },
       '#task-visibility': { value: 'all' },
+      // Den Abschnitt gibt es nur gesperrt und nur mit haengender Erinnerung -
+      // genau dann traegt er im Browser das Attribut (nachgemessen am echten
+      // Markup). `lockedSection: false` stellt den Fall "gar kein Abschnitt"
+      // her, ohne dass ein Test das Attribut von Hand nachbauen muss.
+      '.reminder-section[data-locked-due]': lockedSection ?? (
+        reminderChecked && modules.calendar === 'read'
+          ? { dataset: { lockedDue: dueDateWhenOpened } }
+          : null
+      ),
     },
   });
   try {
@@ -349,6 +374,67 @@ test('calendar: read ohne haengende Erinnerung darf das Faelligkeitsdatum leeren
   });
   assert.equal(error, null, 'ohne Erinnerung gibt es keine Regel zu brechen');
   assert.ok(calls.some((c) => c.method === 'put' && c.path === '/tasks/7'), 'die Aufgabe geht raus');
+});
+
+// Review-Runde 3: der Riegel urteilte ueber den ZUSTAND des Feldes, nicht
+// ueber den Uebergang - und traf damit jemanden, der nichts getan hat.
+// Erinnerungen sind pro `created_by` gefuehrt (server/routes/reminders.js
+// filtert GET, Upsert und DELETE danach) und niemand erzwingt die Regel
+// tabellenuebergreifend: raeumt ein ZWEITES Mitglied das Datum weg, loescht
+// sein Speichern nur die eigene - nicht vorhandene - Zeile, und die Aufgabe
+// kommt danach ohne Faelligkeit, aber mit fremder Erinnerung daher. Ein
+// Endzustands-Riegel haette den Erstbesitzer aus JEDER Aenderung ausgesperrt,
+// auch aus einer Titelkorrektur, und ohne Ausweg.
+test('calendar: read darf eine Aufgabe speichern, die schon OHNE Faelligkeit kam', async () => {
+  const { calls, error } = await submitAndRecordCalls({
+    modules: { tasks: 'write', calendar: 'read' },
+    reminderChecked: true,
+    dueDate: '',
+    dueDateWhenOpened: '', // so ging der Dialog auf: fremde Erinnerung, keine Faelligkeit
+  });
+  assert.equal(error, null, 'wer nichts weggeraeumt hat, wird nicht aufgehalten');
+  assert.ok(calls.some((c) => c.method === 'put' && c.path === '/tasks/7'), 'die Titelaenderung geht durch');
+  assert.deepEqual(reminderCalls(calls), [], 'die fremde Erinnerung bleibt unangetastet');
+});
+
+// DIE NAHT ZWISCHEN DEN ZWEI HAELFTEN. Der Riegel im Speichern liest die
+// Faelligkeit, mit der der Dialog aufging, aus `data-locked-due` am Markup -
+// und alle Tests darueber reichen diesen Wert als Attrappe herein. Damit
+// pruefen beide Haelften einander gegen ihre eigene Annahme: nachgemessen
+// blieben 16 Tests gruen, als das Attribut im echten Markup tot gestellt
+// wurde. Dieser Test holt den Wert deshalb AUS dem erzeugten Markup und
+// schickt ihn durch den Handler. Verschwindet das Attribut oder wird es
+// umbenannt, kommt '' heraus, der Riegel schweigt und diese Zeile wird rot.
+test('das Markup traegt die Faelligkeit, die der Riegel im Speichern liest', async () => {
+  const ausDemMarkup = withModules({ tasks: 'write', calendar: 'read' }, () => {
+    const section = reminderSection(tasks.renderModalContent({ task: TASK, users: [], reminder: REMINDER }));
+    return section.match(/data-locked-due="([^"]*)"/)?.[1] ?? null;
+  });
+  assert.equal(ausDemMarkup, TASK.due_date, 'der gesperrte Abschnitt nennt die Faelligkeit der Aufgabe');
+
+  const { error } = await submitAndRecordCalls({
+    modules: { tasks: 'write', calendar: 'read' },
+    reminderChecked: true,
+    dueDate: '',
+    dueDateWhenOpened: ausDemMarkup,
+  });
+  assert.equal(error, 'tasks.reminderLockedNeedsDueDate', 'und der Handler erkennt daran das Leerraeumen');
+});
+
+test('das Markup nennt eine leere Faelligkeit auch leer - sonst sperrte der Riegel den Unschuldigen aus', () => {
+  withModules({ tasks: 'write', calendar: 'read' }, () => {
+    const section = reminderSection(tasks.renderModalContent({
+      task: { ...TASK, due_date: null }, users: [], reminder: REMINDER,
+    }));
+    assert.match(section, /data-locked-due=""/, 'kein "null" und kein "undefined" im Attribut');
+  });
+});
+
+test('calendar: write haengt gar kein data-locked-due an - dort gibt es nichts zu bewachen', () => {
+  withModules({ tasks: 'write', calendar: 'write' }, () => {
+    const section = reminderSection(tasks.renderModalContent({ task: TASK, users: [], reminder: REMINDER }));
+    assert.doesNotMatch(section, /data-locked-due/);
+  });
 });
 
 test('calendar: read darf das Faelligkeitsdatum WECHSELN - das bricht die Regel nicht', async () => {
