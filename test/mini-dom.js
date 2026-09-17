@@ -70,7 +70,13 @@ class MiniElement {
     else this.childNodes.push(raw);
   }
 
-  addEventListener() {}
+  /**
+   * Merkt sich NUR, DASS einer haengt (`listener`), nicht welcher: Tests fragen
+   * hier, ob ein Renderer einen Weg verdrahtet hat, den er bei fehlenden
+   * Rechten weglassen soll. Ohne diese Spur liefe so eine Zusicherung ins
+   * Leere - `assert.equal(knoten.listener, undefined)` waere immer wahr.
+   */
+  addEventListener(typ) { this.listener = typ; }
   removeEventListener() {}
   querySelector() { return null; }
   querySelectorAll() { return []; }

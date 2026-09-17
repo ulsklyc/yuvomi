@@ -812,9 +812,22 @@ function descriptionNode(task) {
   // verlangt: sie zeigt den VOLLSTÄNDIGEN Text (die Zeilennummern am Kästchen
   // sind also die der Aufgabe) und sie kennt die Aufgaben-Id. Das Dashboard und
   // die Kalender-Chips bekommen diese Optionen deshalb ausdrücklich nicht.
+  //
+  // BEI `tasks: read` IST DAS KÄSTCHEN EIN ZEICHEN (#467). `PATCH
+  // /tasks/:id/check` verlangt Schreibrecht, und der Server kennt dafür keine
+  // Ausnahme - auch keine für ein Wandtablett, dessen zwei erlaubten Routen
+  // diese nicht enthalten. Interaktiv gelassen wäre es genau das Symptom, das
+  // dieser Vorgang beseitigt: der Haken springt optimistisch um, der Aufruf
+  // endet im 403, der Haken springt zurück und ein roter Toast erklärt es auf
+  // Englisch. Die Dekorationsform des Renderers wäre zu wenig - sie ist
+  // `aria-hidden`, und dann verlöre ein Nur-lesen-Nutzer die Auskunft selbst.
+  const nurLesen = isNavModuleReadOnly('tasks');
   box.insertAdjacentHTML('beforeend', renderMarkdownLight(text, {
-    checklist: { interactive: true, toggleLabel: t('tasks.checklistToggle') },
+    checklist: nurLesen
+      ? { stateLabels: { checked: t('tasks.statusDone'), unchecked: t('tasks.statusOpen') } }
+      : { interactive: true, toggleLabel: t('tasks.checklistToggle') },
   }));
+  if (nurLesen) return box;
   box.addEventListener('click', (e) => {
     const hit = e.target.closest('.note-md-box[data-md-line]');
     if (hit) toggleDescriptionCheck(task, hit);
@@ -838,6 +851,9 @@ function descriptionNode(task) {
  * kennt.
  */
 async function toggleDescriptionCheck(task, box) {
+  // Der Riegel neben dem weggelassenen Listener - dieselbe Paarung wie an der
+  // Teilaufgabenzeile: ausgeblendet ist nicht dasselbe wie unerreichbar.
+  if (isNavModuleReadOnly('tasks')) return;
   const line    = parseInt(box.dataset.mdLine, 10);
   const checked = box.dataset.mdChecked !== '1';
   const expect  = splitKeepingLineEndings(task.description)[line * 2];
@@ -1099,4 +1115,4 @@ function seriesHistoryNode(task) {
  * der sich die Nur-lesen-Regel (#467) an dieser Ansicht MESSEN laesst - alles
  * andere hier haengt an `openDetailView` und damit am echten DOM.
  */
-export const __test = { subtaskListNode };
+export const __test = { subtaskListNode, descriptionNode };

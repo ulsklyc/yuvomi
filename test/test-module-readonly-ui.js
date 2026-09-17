@@ -61,6 +61,7 @@ const miniDomAbraeumen = installMiniDom();
 const { setPermissions, clearPermissions } = await import('../public/permissions.js');
 const { canEditTaskDefinition } = await import('../public/utils/task-fields.js');
 const { __test: detail } = await import('../public/components/task-detail.js');
+const { renderMarkdownLight } = await import('../public/utils/html.js');
 const { __test: tasks } = await import('../public/pages/tasks.js');
 const { __test: rewards } = await import('../public/pages/rewards.js');
 const { __test: calendar } = await import('../public/pages/calendar.js');
@@ -426,6 +427,66 @@ test('dasselbe an der Teilaufgabe - dort seit #1209', () => {
 // -------------------------------------------------------------------------
 // Die Leseansicht - der zweite Einstieg in dieselbe Aufgabe
 // -------------------------------------------------------------------------
+
+test('Markdown-Renderer: drei Formen des Kaestchens, und sie schliessen sich aus', () => {
+  const text = '- [x] Muell\n- [ ] Spuelen';
+  const live = renderMarkdownLight(text, { checklist: { interactive: true, toggleLabel: 'um' } });
+  assert.match(live, /<button[^>]*role="checkbox"[^>]*aria-checked="true"/, 'Bedienelement');
+
+  // Dekoration: sichtbar, aber fuer Hilfstechnik gar nicht da.
+  const deko = renderMarkdownLight(text, {});
+  assert.match(deko, /<span class="note-md-box" aria-hidden="true">/);
+
+  // Zeichen: kein Bedienelement, aber der Zustand steht drin.
+  const zeichen = renderMarkdownLight(text, {
+    checklist: { stateLabels: { checked: 'erledigt', unchecked: 'offen' } },
+  });
+  assert.doesNotMatch(zeichen, /<button/, 'nichts, was zum Tippen einlaedt');
+  assert.doesNotMatch(zeichen, /aria-hidden/, 'und nichts, was die Auskunft verschweigt');
+  assert.match(zeichen, /role="img" aria-label="Muell: erledigt"/);
+  assert.match(zeichen, /role="img" aria-label="Spuelen: offen"/);
+
+  // `interactive` schlaegt `stateLabels` - ein Kaestchen ist entweder das eine
+  // oder das andere, nie beides.
+  const beides = renderMarkdownLight(text, {
+    checklist: { interactive: true, toggleLabel: 'um', stateLabels: { checked: 'erledigt', unchecked: 'offen' } },
+  });
+  assert.match(beides, /<button[^>]*role="checkbox"/);
+  assert.doesNotMatch(beides, /role="img"/);
+});
+
+test('Beschreibungs-Checkliste: bedienbar mit Schreibrecht, Zeichen ohne', () => {
+  // GEMESSEN WIRD, WAS DER AUFRUFER DEM RENDERER UEBERGIBT, nicht dessen
+  // Ausgabe: der Test-Loader stubbt `/utils/html.js`, und ein Test gegen die
+  // Ausgabe des Stubs pruefte den Stub. Welches Markup aus welcher Option
+  // entsteht, steht im Test darueber - dort gegen die ECHTE Funktion.
+  const task = aufgabe({ description: '- [x] Muell rausbringen\n- [ ] Spuelmaschine' });
+  const gesehen = [];
+  globalThis.__renderMarkdownLight = (text, optionen) => { gesehen.push(optionen); return String(text); };
+  try {
+    withAccess({ tasks: 'write' }, () => {
+      detail.descriptionNode(task);
+      assert.equal(gesehen.at(-1).checklist.interactive, true,
+        'mit Schreibrecht haengt der Haken am selben Weg wie bisher');
+      assert.equal(gesehen.at(-1).checklist.stateLabels, undefined);
+    });
+
+    withAccess({ tasks: 'read' }, () => {
+      const knoten = detail.descriptionNode(task);
+      const optionen = gesehen.at(-1).checklist;
+      // PATCH /tasks/:id/check verlangt Schreibrecht, und der Server kennt
+      // dafuer keine Ausnahme - auch keine fuer ein Wandtablett.
+      assert.notEqual(optionen.interactive, true, 'kein Bedienelement, das im 403 endet');
+      // Und nicht die Dekorationsform: die ist aria-hidden, dann verloere ein
+      // Nur-lesen-Nutzer die Auskunft selbst.
+      assert.deepEqual(optionen.stateLabels, { checked: 'tasks.statusDone', unchecked: 'tasks.statusOpen' });
+      // Der Klick-Weg wird gar nicht erst verdrahtet.
+      assert.equal(knoten.listener, undefined);
+    });
+  } finally {
+    delete globalThis.__renderMarkdownLight;
+  }
+});
 
 test('Teilaufgabe der Leseansicht: Knopf mit Schreibrecht, Zustandszeichen ohne', () => {
   const task = aufgabe({ subtasks: [{ id: 8, title: 'Tonne', status: 'done' }] });
