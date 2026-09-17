@@ -137,7 +137,13 @@ test('das Zustandszeichen steht dort, wo es die Basisregeln ueberhaupt schlagen 
   // `prefers-reduced-motion`-Abfrage landete. Ein Guard auf die POSITION ist
   // hier die einzige Messung, die das findet.
   const basis = regelnFuer(/^\.subtask-item__checkbox(:hover|::before)?$/);
-  const statisch = regelnFuer(/\.subtask-item__checkbox--static/);
+  // NUR die Regeln mit EINER Klasse. Genau sie haengen an der Position - und
+  // nur um sie geht es hier. Der Ausdruck stand einmal offener
+  // (`/\.subtask-item__checkbox--static/`) und fing damit auch die
+  // Kombinations-Regel darunter, die ihre Wirkung ueber die Spezifitaet holt
+  // und nicht ueber die Reihenfolge: er zaehlte vier statt drei und meldete
+  // eine richtige Ergaenzung als Fehler (PR #1252).
+  const statisch = regelnFuer(/^\.subtask-item__checkbox--static(:hover|::before)?$/);
 
   assert.equal(basis.length, 3, 'Basis, :hover und ::before');
   assert.equal(statisch.length, 3, 'cursor, :hover und ::before des Zustandszeichens');
@@ -152,6 +158,23 @@ test('das Zustandszeichen steht dort, wo es die Basisregeln ueberhaupt schlagen 
     assert.deepEqual(regel.at, [],
       `${regel.selector} darf in keinem At-Block stehen, steht aber in ${JSON.stringify(regel.at)}`);
   }
+});
+
+test('die erledigte Teilaufgabe im Zustandszeichen animiert nicht', () => {
+  // DIE ZWEITE SORTE: eine Regel, die NICHT an ihrer Position haengt.
+  // `.subtask-item__checkbox--done` traegt `check-pop` und steht weiter oben;
+  // eine zweite einfache Klasse daneben haette nach Quellreihenfolge verloren,
+  // so wie es an `.task-status-btn--static` tatsaechlich passiert ist (Review
+  // zu PR #1252). Zwei Klassen im Selektor (0,2,0) schlagen sie unabhaengig
+  // davon, wer wo steht.
+  //
+  // WAS am Ende gilt, rechnet test-module-readonly-ui.js aus; hier steht die
+  // Zusicherung, DASS es die Regel an dieser Stelle gibt - der Guard, der beim
+  // naechsten Umbau der Datei anschlaegt.
+  const kombi = regelnFuer(/^\.subtask-item__checkbox--done\.subtask-item__checkbox--static$/);
+  assert.equal(kombi.length, 1, 'genau eine Regel fuer die Kombination aus erledigt und Zustandszeichen');
+  assert.match(kombi[0].body, /animation:\s*none/);
+  assert.deepEqual(kombi[0].at, [], 'sie gilt fuer alle, nicht nur unter einer At-Bedingung');
 });
 
 test('der Bewegungs-Verzicht deckt weiter beide Abhak-Zeichen', () => {

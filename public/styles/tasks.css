@@ -750,12 +750,6 @@
  * Quellreihenfolge, und davor stehend waere es wirkungslos gewesen. */
 .task-status-btn--static {
   cursor: default;
-  /* KEIN `check-pop`. Die Animation quittiert eine BERUEHRUNG (`--done` traegt
-   * sie), und hier hat niemand etwas beruehrt - sie liefe bei jedem Neuzeichnen
-   * der Liste los und behauptete ein Abhaken, das gerade nicht stattfand. Es
-   * steht hier und nicht in der reduced-motion-Abfrage: das ist keine Frage der
-   * Bewegungsvorliebe, sondern eine falsche Aussage. */
-  animation: none;
 }
 
 .task-status-btn--static:hover::after {
@@ -845,6 +839,25 @@
 
 .task-status-btn--done {
   animation: check-pop var(--duration-md) var(--ease-out);
+}
+
+/* KEIN `check-pop` AM ZUSTANDSZEICHEN (#467). Die Animation quittiert eine
+ * BERUEHRUNG; an einem `span`, den niemand antippen kann, liefe sie bei jedem
+ * Neuzeichnen der Liste los und behauptete ein Abhaken, das gerade nicht
+ * stattfand.
+ *
+ * ZWEI KLASSEN IM SELEKTOR, NICHT EINE. `animation: none` stand zuerst in
+ * `.task-status-btn--static` (Zeile 751) - eine einzelne Klasse wie
+ * `--done` hier, also gleiche Spezifitaet, und weil `--static` WEITER OBEN
+ * steht, gewann `--done` nach Quellreihenfolge. Die Deklaration war damit
+ * wirkungslos, und der Kommentar darueber behauptete das Gegenteil (Review zu
+ * PR #1252). (0,2,0) haengt an keiner Position: wer die Bloecke morgen
+ * umsortiert, kippt die Regel nicht.
+ *
+ * Es steht NICHT in der reduced-motion-Abfrage: das ist keine Frage der
+ * Bewegungsvorliebe, sondern eine falsche Aussage. */
+.task-status-btn--done.task-status-btn--static {
+  animation: none;
 }
 
 /* Skalierungs-Pops unter reduzierter Bewegung abschalten (Audit F-07);
@@ -1277,6 +1290,17 @@
  * `.task-status-btn--done` sein `animation: none`. */
 .subtask-item__checkbox--static {
   cursor: default;
+}
+
+/* Dieselbe Stelle, derselbe Grund wie bei `.task-status-btn--done.--static`
+ * daneben - und derselbe Kaskadenfehler: `.subtask-item__checkbox--done`
+ * (Zeile 1258) traegt `check-pop` und steht davor. Am Wandtablett lief die
+ * Animation deshalb seit #1209 an jeder erledigten Teilaufgabe mit, bei jedem
+ * Neuzeichnen; mit dem Nur-lesen-Zeichen (#467) gilt das nun auch auf dem
+ * Telefon eines Mitglieds. Zwei Klassen, damit es nicht wieder an der
+ * Reihenfolge haengt. */
+.subtask-item__checkbox--done.subtask-item__checkbox--static {
+  animation: none;
 }
 
 .subtask-item__checkbox--static:hover {

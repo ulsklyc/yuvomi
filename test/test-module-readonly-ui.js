@@ -43,6 +43,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { eachRule } from './css-rules.js';
 
 // Die Seiten ziehen Web Components mit, die zur Ladezeit von HTMLElement
 // ableiten. Node kennt das Global nicht; ein leerer Platzhalter reicht, weil
@@ -240,6 +241,98 @@ test('der Riegel in wireTaskList() steht VOR der ersten Aktion', () => {
   // Die Display-Ausnahme hängt am Riegel, nicht an READ_SAFE_ACTIONS: dort
   // stünde sie auch für einen Menschen mit `tasks: read` offen.
   assert.match(fn.slice(0, riegel), /actingAsDisplay\(\) && DISPLAY_WRITE_ACTIONS\.has\(action\)/);
+});
+
+// -------------------------------------------------------------------------
+// Das Zustandszeichen darf nicht animieren
+//
+// `check-pop` quittiert eine BERUEHRUNG. An einem `span`, den niemand antippen
+// kann, liefe sie bei jedem Neuzeichnen der Liste los und behauptete ein
+// Abhaken, das gerade nicht stattfand.
+//
+// GEPRUEFT WIRD DIE KASKADE, NICHT DER TEXT. Der erste Anlauf schrieb
+// `animation: none` in `.task-status-btn--static` und war wirkungslos:
+// `.task-status-btn--done` traegt dieselbe Spezifitaet (0,1,0) und steht
+// WEITER UNTEN, gewinnt also nach Quellreihenfolge (Review zu PR #1252). Ein
+// Textguard haette die Zeile gefunden und gruen gemeldet. Der kleine
+// Kaskadenloeser unten fragt stattdessen, was am Ende wirklich gilt - und
+// faellt damit auch, wenn jemand den Fehler auf einem anderen Weg wieder
+// einbaut.
+// -------------------------------------------------------------------------
+
+/** Spezifitaet eines einfachen Selektors als vergleichbare Zahl. */
+function spezifitaet(selektor) {
+  const ids = (selektor.match(/#[\w-]+/g) ?? []).length;
+  const klassen = (selektor.match(/[.:[][\w-]+/g) ?? []).length;
+  const elemente = (selektor.match(/(?:^|[\s>+~])[a-z][\w-]*/gi) ?? []).length;
+  return ids * 10000 + klassen * 100 + elemente;
+}
+
+/**
+ * Welchen Wert traegt `eigenschaft` am Ende, wenn ein Element GENAU diese
+ * Klassen hat? Beruecksichtigt werden nur Regeln auf der Basisebene, deren
+ * Selektor ausschliesslich aus Klassen dieser Menge besteht - alles mit
+ * Pseudo, Kombinator oder fremder Klasse traegt zu diesem Element nichts bei
+ * und wird uebersprungen. Bei Gleichstand gewinnt die spaetere Regel, wie im
+ * Browser.
+ */
+function effektiverWert(css, klassen, eigenschaft) {
+  const menge = new Set(klassen);
+  let treffer = null;
+  let bestes = -1;
+  let laufnummer = 0;
+  for (const { selector, body, at } of eachRule(css)) {
+    laufnummer += 1;
+    if (at.length) continue;
+    for (const teil of selector.split(',')) {
+      const sel = teil.trim();
+      if (!/^(?:\.[\w-]+)+$/.test(sel)) continue;
+      const gefordert = sel.split('.').filter(Boolean);
+      if (!gefordert.every((k) => menge.has(k))) continue;
+      const wert = new RegExp(`(?:^|;)\\s*${eigenschaft}\\s*:([^;]*)`).exec(body);
+      if (!wert) continue;
+      const rang = spezifitaet(sel) * 100000 + laufnummer;
+      if (rang >= bestes) { bestes = rang; treffer = wert[1].trim(); }
+    }
+  }
+  return treffer;
+}
+
+const TASKS_CSS = readFileSync(new URL('../public/styles/tasks.css', import.meta.url), 'utf8');
+
+test('der Kaskadenloeser selbst: spaetere Regel gewinnt bei gleicher Spezifitaet', () => {
+  // Ohne diese Probe misst der Test unten vielleicht gar nichts. Genau dieser
+  // Fall ist der Fehler, den er fangen soll.
+  const probe = '.a--static { animation: none; } .a--done { animation: pop 1s; }';
+  assert.equal(effektiverWert(probe, ['a--done', 'a--static'], 'animation'), 'pop 1s');
+  const geheilt = probe + ' .a--done.a--static { animation: none; }';
+  assert.equal(effektiverWert(geheilt, ['a--done', 'a--static'], 'animation'), 'none');
+  // Eine Regel, die eine Klasse fordert, die das Element nicht hat, zaehlt nicht.
+  assert.equal(effektiverWert('.b { animation: pop 1s; }', ['a--done'], 'animation'), null);
+});
+
+test('eine erledigte Aufgabe im Zustandszeichen animiert nicht', () => {
+  assert.equal(
+    effektiverWert(TASKS_CSS, ['task-status-btn', 'task-status-btn--done', 'task-status-btn--static'], 'animation'),
+    'none',
+    'check-pop quittiert eine Beruehrung - hier hat niemand etwas beruehrt',
+  );
+  // Der bedienbare Knopf behaelt sie: die Quittung gehoert zum gedrueckten Haken.
+  assert.match(
+    effektiverWert(TASKS_CSS, ['task-status-btn', 'task-status-btn--done'], 'animation') ?? '',
+    /check-pop/,
+  );
+});
+
+test('dieselbe Zusicherung fuer die Teilaufgabe (#1209 und #467 teilen sich das Zeichen)', () => {
+  assert.equal(
+    effektiverWert(TASKS_CSS, ['subtask-item__checkbox', 'subtask-item__checkbox--done', 'subtask-item__checkbox--static'], 'animation'),
+    'none',
+  );
+  assert.match(
+    effektiverWert(TASKS_CSS, ['subtask-item__checkbox', 'subtask-item__checkbox--done'], 'animation') ?? '',
+    /check-pop/,
+  );
 });
 
 // -------------------------------------------------------------------------
