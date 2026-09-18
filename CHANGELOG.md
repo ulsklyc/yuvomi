@@ -53,6 +53,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Restoring a backup from another installation now says that it is the encryption key, instead of
+  claiming the file is not a database.** A backup carries the encryption of the instance that wrote
+  it, so restoring one on an installation with a different key - or with no key at all, which is
+  what happens when the new host generates its own secrets - cannot work until that key is set. All
+  SQLite could say about it was "file is not a database", and that is what the restore dialog
+  showed: the same sentence it shows for a file that really is damaged. The message now names the
+  key, says whether this instance has one set at all, and tells you what to do before trying again -
+  and it still says "not a valid database" where the file genuinely is not one, so it cannot send
+  the next person looking in the wrong place. (#1267)
+
 - **On an instance without HTTPS, one cookie was issued in a way the browser throws away.** The
   setting that decides whether cookies are marked HTTPS-only is off by default, which is right for a
   self-hosted instance reached over plain HTTP. One place read that setting backwards, so on exactly

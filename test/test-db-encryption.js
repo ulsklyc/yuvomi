@@ -21,7 +21,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, existsSync, readFileSync, readdirSync, copyFileSync } from 'node:fs';
+import { mkdtempSync, existsSync, readFileSync, readdirSync, copyFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
@@ -411,4 +411,86 @@ test('ein echter Key, der zufällig mit REPLACE beginnt, wird nicht abgefangen',
 
   assert.ok(existsSync(dbPath), 'Datenbank muss angelegt werden');
   assert.ok(!isPlaintext(dbPath), 'und verschlüsselt sein');
+});
+
+/* EIN BACKUP AUS EINER FREMDEN INSTALLATION SCHEITERT AM SCHLUESSEL, NICHT AN SICH.
+ *
+ * `restoreFromFile()` oeffnet die hochgeladene Datei mit dem Key DIESER Instanz.
+ * Passt er nicht, sagt SQLite denselben Satz wie zu jeder beliebigen fremden
+ * Datei: `file is not a database`. Die Route reicht ihn woertlich an den
+ * Restore-Dialog durch, und dort liest er sich als „dein Backup ist kaputt".
+ *
+ * Gemeldet als #1267: Umzug von einer Instanz mit selbst gesetzten Secrets auf
+ * eine, die sich ihre eigenen erzeugt. Der Melder hat daraufhin die
+ * Datenbankdatei im Container von Hand ersetzt und die Installation zerlegt -
+ * der teure Teil des Fehlers steckt nicht im Abbruch, sondern darin, wozu die
+ * Auskunft einlaedt.
+ *
+ * Gemessen werden beide Richtungen: die Meldung muss den Schluessel nennen, wo
+ * er die Ursache ist, und sie darf es NICHT tun, wo die Datei wirklich keine
+ * Datenbank ist - sonst schickt sie den naechsten in die falsche Richtung.
+ */
+
+/** Ein echtes Backup einer Instanz mit `key` - ueber den Weg, den die App nimmt. */
+async function backupFromInstance(key) {
+  const dir = tmpDir();
+  const mod = await bootDb(join(dir, 'quelle.db'), key);
+  const backupPath = join(dir, 'backup.db');
+  await mod.backupToFile(backupPath);
+  return backupPath;
+}
+
+test('ein Backup mit fremdem Schluessel nennt den Schluessel als Ursache', async () => {
+  const backupPath = await backupFromInstance('schluessel-der-alten-instanz-0123');
+  assert.ok(!isPlaintext(backupPath), 'Vorbedingung: das Backup ist verschluesselt');
+
+  const ziel = await bootDb(join(tmpDir(), 'yuvomi.db'), 'schluessel-der-neuen-instanz-0123');
+
+  await assert.rejects(
+    () => ziel.restoreFromFile(backupPath),
+    /DB_ENCRYPTION_KEY/,
+    'die Meldung muss den Schluessel nennen, nicht nur „is not a database"'
+  );
+});
+
+test('ohne eigenen Schluessel sagt die Meldung, dass gar keiner gesetzt ist', async () => {
+  const backupPath = await backupFromInstance('schluessel-der-alten-instanz-0123');
+  const ziel = await bootDb(join(tmpDir(), 'yuvomi.db'), null);
+
+  // Der Unterschied ist kein Wortspiel: hier gibt es nichts zu vergleichen,
+  // `applyEncryptionKey()` ist ohne Key ein Leerlauf. Wer „falscher Schluessel"
+  // liest, sucht an der falschen Stelle - er hat ueberhaupt keinen.
+  await assert.rejects(
+    () => ziel.restoreFromFile(backupPath),
+    /DB_ENCRYPTION_KEY is not set on this instance/,
+    'ohne gesetzten Key muss die Meldung genau das sagen'
+  );
+});
+
+test('mit dem richtigen Schluessel laeuft derselbe Restore durch', async () => {
+  const KEY_QUELLE = 'schluessel-der-alten-instanz-0123';
+  const backupPath = await backupFromInstance(KEY_QUELLE);
+  const ziel = await bootDb(join(tmpDir(), 'yuvomi.db'), KEY_QUELLE);
+
+  // Ohne diesen Fall waere die Suite auch dann gruen, wenn JEDER Restore mit
+  // der neuen Meldung abbraeche - die Diagnose darf den Weg nicht zumauern.
+  const result = await ziel.restoreFromFile(backupPath);
+  assert.ok(result.schemaVersion > 0, 'der Restore muss durchlaufen und eine Schemaversion melden');
+});
+
+test('eine Datei, die wirklich keine Datenbank ist, bekommt weiter die alte Auskunft', async () => {
+  const dir = tmpDir();
+  const fremd = join(dir, 'kein-backup.db');
+  // Klartext-SQLite-Kopf, dahinter Unsinn: damit ist die Datei nachweislich
+  // nicht verschluesselt, und der Schluessel ist als Ursache ausgeschlossen.
+  writeFileSync(fremd, Buffer.concat([PLAINTEXT_HEADER, Buffer.from('kein gueltiger Inhalt')]));
+
+  const ziel = await bootDb(join(dir, 'yuvomi.db'), KEY);
+
+  await assert.rejects(
+    () => ziel.restoreFromFile(fremd),
+    (err) => /not a valid Yuvomi database|file is not a database/.test(err.message)
+      && !/DB_ENCRYPTION_KEY/.test(err.message),
+    'eine unverschluesselte Datei darf den Schluessel nicht beschuldigen'
+  );
 });

@@ -8833,16 +8833,68 @@ async function backupToFile(destinationPath) {
   return destinationPath;
 }
 
+/**
+ * Warum eine Backup-Datei nicht lesbar ist - so genau, wie es hier zu wissen ist.
+ *
+ * SQLite sagt zu jeder Datei, die es nicht entziffern kann, denselben Satz:
+ * `file is not a database`. Für ein Backup aus einer ANDEREN Installation ist
+ * das die häufigste und zugleich die irreführendste Auskunft - die Datei ist
+ * heil, es fehlt nur der Schlüssel, mit dem sie geschrieben wurde. Gemeldet
+ * als #1267: der Umzug von einer Instanz mit selbst gesetzten Secrets auf eine,
+ * die sich ihre eigenen erzeugt, endete im Restore-Dialog bei „is not a file",
+ * und der Nutzer schloss daraus auf ein kaputtes Backup. Danach hat er die
+ * Datenbankdatei von Hand ersetzt und die Instanz zerlegt - der teure Teil des
+ * Fehlers steckt nicht im Abbruch, sondern in dem, wozu die Auskunft einlädt.
+ *
+ * Unterschieden wird am Dateikopf, nicht geraten: eine unverschlüsselte
+ * SQLite-Datei beginnt mit `SQLite format 3\0`. Fehlt der Kopf, ist die Datei
+ * verschlüsselt ODER überhaupt keine Datenbank - beides kann von hier aus nicht
+ * auseinandergehalten werden, deshalb nennt die Meldung den wahrscheinlichen
+ * Fall zuerst und den anderen im letzten Satz.
+ */
+function unreadableBackupError(encrypted, cause) {
+  if (!encrypted) {
+    return new Error('Backup file is not a valid Yuvomi database.', { cause });
+  }
+  if (!DB_KEY) {
+    return new Error(
+      'Backup file could not be read: it has no plain SQLite header, so it is encrypted - and '
+      + 'DB_ENCRYPTION_KEY is not set on this instance, so there is nothing to decrypt it with. '
+      + 'A backup carries the encryption of the instance that wrote it: set DB_ENCRYPTION_KEY to '
+      + "that instance's key and restart Yuvomi, then restore again.",
+      { cause }
+    );
+  }
+  return new Error(
+    "Backup file could not be decrypted with this instance's DB_ENCRYPTION_KEY. A backup carries "
+    + 'the encryption of the instance that wrote it, so restoring one from another installation '
+    + "needs that installation's key: set DB_ENCRYPTION_KEY to it and restart Yuvomi, then restore "
+    + 'again. If both keys really are the same, the file is not a Yuvomi database.',
+    { cause }
+  );
+}
+
 function validateBackupFile(sourcePath) {
   // Backups, die vor der Verschlüsselungs-Umstellung entstanden sind, liegen im
   // Klartext vor. Sie müssen einspielbar bleiben — würden wir ihnen den Key
   // aufsetzen, läse SQLite sie als verschlüsselt und die Validierung schlüge
   // fehl. Nach dem Restore verschlüsselt init() sie ohnehin.
   const encrypted = !isPlaintextDatabase(sourcePath);
-  const candidate = new Database(sourcePath, { readonly: true, fileMustExist: true });
+  let candidate;
+  try {
+    candidate = new Database(sourcePath, { readonly: true, fileMustExist: true });
+  } catch (err) {
+    // Das Öffnen zählt mit: eine Datei, an der schon der Konstruktor scheitert,
+    // liefe sonst an der Diagnose vorbei und käme als rohe SQLite-Zeile heraus.
+    throw unreadableBackupError(encrypted, err);
+  }
   try {
     if (encrypted) applyEncryptionKey(candidate);
-    assertReadable(candidate);
+    try {
+      assertReadable(candidate);
+    } catch (err) {
+      throw unreadableBackupError(encrypted, err);
+    }
     const row = candidate.prepare(`
       SELECT name
       FROM sqlite_master
