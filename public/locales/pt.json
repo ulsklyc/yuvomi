@@ -2726,7 +2726,8 @@
         "displayRevokeDevice": "Revogar",
         "displayRevokeConfirm": "Terminar o acesso deste dispositivo?",
         "displayRevokeDetail": "O tablet deixa de mostrar seja o que for de imediato. Para voltar a usá-lo é preciso emparelhá-lo de novo.",
-        "displayDeleteDetail": "A conta e todos os dispositivos emparelhados são removidos. Isto não pode ser anulado."
+        "displayDeleteDetail": "A conta e todos os dispositivos emparelhados são removidos. Isto não pode ser anulado.",
+        "backupCliForeignKeyHint": "Um backup de outra instalação carrega a criptografia dessa instalação: defina DB_ENCRYPTION_KEY com o valor dela antes de iniciar, caso contrário o Yuvomi não iniciará mais após a troca do arquivo."
     },
     "login": {
         "tagline": "Bem-vindo de volta ao teu planeador familiar.",

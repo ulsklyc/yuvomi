@@ -2726,7 +2726,8 @@
         "displayRevokeDevice": "Thu hồi",
         "displayRevokeConfirm": "Kết thúc quyền truy cập của thiết bị này?",
         "displayRevokeDetail": "Máy tính bảng lập tức không hiển thị gì nữa. Để dùng tiếp, phải ghép nối lại.",
-        "displayDeleteDetail": "Tài khoản và mọi thiết bị đã ghép nối sẽ bị xóa. Không thể hoàn tác."
+        "displayDeleteDetail": "Tài khoản và mọi thiết bị đã ghép nối sẽ bị xóa. Không thể hoàn tác.",
+        "backupCliForeignKeyHint": "Bản sao lưu từ một cài đặt khác mang theo mã hóa của cài đặt đó: hãy đặt DB_ENCRYPTION_KEY thành giá trị của nó trước khi khởi động, nếu không Yuvomi sẽ không còn khởi động được sau khi thay tệp."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại trình lập kế hoạch gia đình.",

@@ -53,6 +53,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The message about an undecryptable backup no longer sends you into a dead end.** It used to
+  advise setting `DB_ENCRYPTION_KEY` to the other installation's key and restarting. An instance
+  that has a key of its own has its own database encrypted with that key, so after the swap Yuvomi
+  does not start at all - and the dialog that gave the advice is out of reach from then on. The
+  message now says so and points at the command-line route, which replaces the database file and
+  sets the key together, with Yuvomi stopped. An instance with no key of its own still gets the old
+  advice, because there it is correct: its plaintext database is encrypted with that key on the next
+  start. The restore section on the same settings page now says that a backup from another
+  installation needs that installation's key, which it never mentioned. And the error on start-up
+  names two things it kept to itself: the way back, and a write-ahead log left over from a different
+  database lying next to the file - that alone produces the very same "wrong key" error while the
+  key is in fact right, which is what made this take two days to pin down. That last paragraph is
+  deliberately conditional: after any stop that was not a clean shutdown a database keeps its own
+  log, so its mere presence proves nothing, and deleting it would throw away committed transactions
+  without fixing the key. It says so, and where it does apply it asks you to move the file aside
+  rather than delete it. (#1267)
+
 - **The task board shows all four of its columns, and each one can be folded away.** The board
   draws four columns - open, in progress, done and archived - but the layout only ever placed
   three of them per row, so "Archived" dropped into a second row underneath "Open". A grid row

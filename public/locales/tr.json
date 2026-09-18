@@ -2726,7 +2726,8 @@
         "displayRevokeDevice": "İptal et",
         "displayRevokeConfirm": "Bu cihazın erişimi sonlandırılsın mı?",
         "displayRevokeDetail": "Tablet hemen hiçbir şey göstermez. Yeniden kullanmak için tekrar eşleştirilmesi gerekir.",
-        "displayDeleteDetail": "Hesap ve eşleştirilmiş tüm cihazlar kaldırılır. Bu geri alınamaz."
+        "displayDeleteDetail": "Hesap ve eşleştirilmiş tüm cihazlar kaldırılır. Bu geri alınamaz.",
+        "backupCliForeignKeyHint": "Başka bir kurulumdan gelen yedek, o kurulumun şifrelemesini taşır: başlatmadan önce DB_ENCRYPTION_KEY değerini ona ayarlayın, aksi halde dosya değiştirildikten sonra Yuvomi artık başlamaz."
     },
     "login": {
         "tagline": "Aile planlayıcına tekrar hoş geldin.",

@@ -2738,7 +2738,8 @@
         "displayRevokeDevice": "Unieważnij",
         "displayRevokeConfirm": "Zakończyć dostęp tego urządzenia?",
         "displayRevokeDetail": "Tablet natychmiast przestaje cokolwiek pokazywać. Aby znów go używać, trzeba go ponownie sparować.",
-        "displayDeleteDetail": "Konto i wszystkie sparowane urządzenia zostaną usunięte. Tego nie można cofnąć."
+        "displayDeleteDetail": "Konto i wszystkie sparowane urządzenia zostaną usunięte. Tego nie można cofnąć.",
+        "backupCliForeignKeyHint": "Kopia z innej instalacji niesie jej szyfrowanie: przed uruchomieniem ustaw DB_ENCRYPTION_KEY na jej wartość, w przeciwnym razie Yuvomi po podmianie pliku już się nie uruchomi."
     },
     "login": {
         "tagline": "Witaj ponownie w swoim planerze rodzinnym.",

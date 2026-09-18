@@ -2738,7 +2738,8 @@
         "displayRevokeDevice": "해지",
         "displayRevokeConfirm": "이 기기의 접근을 종료할까요?",
         "displayRevokeDetail": "태블릿에는 즉시 아무것도 표시되지 않습니다. 계속 사용하려면 다시 페어링해야 합니다.",
-        "displayDeleteDetail": "계정과 페어링된 모든 기기가 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
+        "displayDeleteDetail": "계정과 페어링된 모든 기기가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
+        "backupCliForeignKeyHint": "다른 설치본의 백업은 해당 설치본의 암호화를 그대로 지닙니다. 시작하기 전에 DB_ENCRYPTION_KEY를 그 값으로 설정하세요. 그렇지 않으면 파일을 교체한 뒤 Yuvomi가 더 이상 시작되지 않습니다."
     },
     "login": {
         "tagline": "가족 플래너에 다시 오신 것을 환영합니다.",

@@ -2738,7 +2738,8 @@
         "displayRevokeDevice": "Bawiin",
         "displayRevokeConfirm": "Tapusin ang access ng device na ito?",
         "displayRevokeDetail": "Agad nang hihinto ang tablet sa pagpapakita ng kahit ano. Para magamit ulit, kailangan itong ipares muli.",
-        "displayDeleteDetail": "Aalisin ang account at lahat ng naipares na device. Hindi ito maibabalik."
+        "displayDeleteDetail": "Aalisin ang account at lahat ng naipares na device. Hindi ito maibabalik.",
+        "backupCliForeignKeyHint": "Ang backup mula sa ibang instalasyon ay may dalang pag-encrypt ng instalasyong iyon: itakda ang DB_ENCRYPTION_KEY sa halaga nito bago magsimula, kung hindi ay hindi na magsisimula ang Yuvomi pagkatapos palitan ang file."
     },
     "login": {
         "tagline": "Maligayang pagbabalik sa iyong family planner.",

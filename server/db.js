@@ -152,6 +152,58 @@ let db;
 // --------------------------------------------------------
 
 /**
+ * Meldung für eine Datenbank, die sich mit dem gesetzten Key nicht öffnen lässt.
+ *
+ * Zwei verschiedene Ursachen erzeugen denselben SQLCipher-Fehler, und die alte
+ * Meldung nannte nur die erste. Die zweite hat einen Melder zwei Tage gekostet
+ * (#1267): er hatte die Datenbankdatei von Hand ersetzt, das Write-Ahead-Log der
+ * VORHERIGEN Datenbank lag daneben, und SQLite liest dessen Frames beim Öffnen
+ * mit - verschlüsselt mit dem alten Key. Die Datei selbst ist dann einwandfrei
+ * und der Key stimmt; nur das Journal gehört nicht dazu.
+ *
+ * Der zweite Absatz ist bewusst BEDINGT formuliert, und das ist der Kern seiner
+ * Fassung: ein `-wal` neben der Datenbank ist KEIN Hinweis auf einen Dateitausch.
+ * `journal_mode = WAL` steht dauerhaft, und es gibt nirgends einen SIGTERM- oder
+ * SIGINT-Handler, der die Verbindung vor dem Stoppen schließt - SQLite räumt das
+ * Journal aber nur beim sauberen Schließen weg. Nach einem gewöhnlichen
+ * Container-Stop liegt es also da, und zwar als EIGENES Journal dieser Datenbank.
+ * Ein unbedingtes „lösch es" würde hier bestätigte, nur noch nicht
+ * gecheckpointete Transaktionen verwerfen und den eigentlichen Schlüsselfehler
+ * nicht einmal berühren - derselbe Fehlertyp, gegen den dieser ganze Vorgang
+ * geht (Review-Befund auf PR #1275). Deshalb: die Bedingung kennt nur der Admin
+ * („hast du die Datei von Hand ersetzt?"), und der Rat lautet beiseitelegen,
+ * nicht löschen.
+ *
+ * Der dritte Satz ist der eigentliche Grund für #1267: die Restore-Meldung
+ * riet dazu, den Key zu tauschen und neu zu starten. Wer das auf einer Instanz
+ * mit eigener verschlüsselter Datenbank tut, landet genau hier und kommt nicht
+ * mehr an die Oberfläche - der Weg zurück gehört deshalb in die Meldung.
+ * @returns {string}
+ */
+function undecryptableDatabaseError() {
+  const lines = [
+    `[DB] Wrong encryption key - ${DB_PATH} could not be decrypted with DB_ENCRYPTION_KEY.`,
+    'The key that opens this file is the one it was created with. If you just changed '
+    + 'DB_ENCRYPTION_KEY to take over a backup from another installation, change it back: '
+    + 'this database belongs to this instance, and a key swap alone does not import anything - '
+    + 'it only locks you out of what is here.',
+  ];
+  if (existsSync(`${DB_PATH}-wal`)) {
+    lines.push(
+      `A write-ahead log is lying next to the database (${DB_PATH}-wal). On its own that means `
+      + 'nothing is wrong with it: after any stop that was not a clean shutdown the log stays, and '
+      + 'it then belongs to THIS database and can hold committed transactions that are not in the '
+      + 'main file yet. Do not delete it in that case - it would throw those away and would not fix '
+      + 'the key. It is only a cause of this error if you replaced the database file by hand, '
+      + 'because then the log belongs to the database you replaced and is still read on open. If '
+      + `that is what happened, stop Yuvomi and move ${DB_PATH}-wal and ${DB_PATH}-shm aside `
+      + 'before starting again.'
+    );
+  }
+  return lines.join(' ');
+}
+
+/**
  * Datenbankverbindung öffnen, SQLCipher-Key setzen, Migrations ausführen.
  * Einmalig beim Serverstart aufrufen.
  * @param {{ plaintextBackup?: boolean }} [options] `plaintextBackup: false`
@@ -189,10 +241,7 @@ function init({ plaintextBackup = true } = {}) {
     try {
       assertReadable(db);
     } catch {
-      throw new Error(
-        `[DB] Wrong encryption key — ${DB_PATH} could not be decrypted. ` +
-        'Check DB_ENCRYPTION_KEY against the value used when the database was created.'
-      );
+      throw new Error(undecryptableDatabaseError());
     }
   }
 
@@ -8851,6 +8900,17 @@ async function backupToFile(destinationPath) {
  * verschlüsselt ODER überhaupt keine Datenbank - beides kann von hier aus nicht
  * auseinandergehalten werden, deshalb nennt die Meldung den wahrscheinlichen
  * Fall zuerst und den anderen im letzten Satz.
+ *
+ * Die Auskunft hat es beim zweiten Anlauf erneut getan, und das ist der Grund
+ * fuer die Fassung von jetzt: sie riet, DB_ENCRYPTION_KEY auf den Key der
+ * Quellinstanz zu setzen und neu zu starten. Auf einer Instanz OHNE eigenen Key
+ * stimmt das - ihre Klartextdatenbank wird beim Start mitverschluesselt, und
+ * danach passt der Key zu beidem. Auf einer Instanz MIT eigenem Key ist es eine
+ * Sackgasse: die eigene Datenbank ist mit dem alten Key verschluesselt, `init()`
+ * bricht beim naechsten Start ab, und der Dialog, der den Rat gegeben hat, ist
+ * nicht mehr erreichbar. Deshalb steht der Rat nur noch im `!DB_KEY`-Zweig; der
+ * andere verweist auf den Weg ueber die Kommandozeile, der Datei und Key
+ * zusammen umstellt (#1267).
  */
 function unreadableBackupError(encrypted, cause) {
   if (!encrypted) {
@@ -8868,9 +8928,13 @@ function unreadableBackupError(encrypted, cause) {
   }
   return new Error(
     "Backup file could not be decrypted with this instance's DB_ENCRYPTION_KEY. A backup carries "
-    + 'the encryption of the instance that wrote it, so restoring one from another installation '
-    + "needs that installation's key: set DB_ENCRYPTION_KEY to it and restart Yuvomi, then restore "
-    + 'again. If both keys really are the same, the file is not a Yuvomi database.',
+    + 'the encryption of the instance that wrote it, so a backup from another installation cannot '
+    + 'be read here. Do NOT just set DB_ENCRYPTION_KEY to that installation\'s key and restart: '
+    + "this instance's own database is encrypted with the key it has now, so after the swap Yuvomi "
+    + 'would not start at all and this dialog would be out of reach. Taking over a backup from '
+    + 'another installation replaces the database file and sets the key together, with Yuvomi '
+    + 'stopped - see "CLI / Docker Compose restore" on this page. If both installations really do '
+    + 'have the same key, the file is not a Yuvomi database.',
     { cause }
   );
 }

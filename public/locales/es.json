@@ -2726,7 +2726,8 @@
         "displayRevokeDevice": "Revocar",
         "displayRevokeConfirm": "¿Finalizar el acceso de este dispositivo?",
         "displayRevokeDetail": "La tableta deja de mostrar nada de inmediato. Para volver a usarla hay que vincularla de nuevo.",
-        "displayDeleteDetail": "Se eliminan la cuenta y todos los dispositivos vinculados. Esto no se puede deshacer."
+        "displayDeleteDetail": "Se eliminan la cuenta y todos los dispositivos vinculados. Esto no se puede deshacer.",
+        "backupCliForeignKeyHint": "Una copia de otra instalación lleva el cifrado de esa instalación: establece DB_ENCRYPTION_KEY con su valor antes de arrancar, de lo contrario Yuvomi ya no se iniciará tras reemplazar el archivo."
     },
     "login": {
         "tagline": "Bienvenido de nuevo a tu planificador familiar.",

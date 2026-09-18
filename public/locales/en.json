@@ -2726,7 +2726,8 @@
         "displayRevokeDevice": "Revoke",
         "displayRevokeConfirm": "End this device's access?",
         "displayRevokeDetail": "The tablet stops showing anything immediately. To use it again it has to be paired anew.",
-        "displayDeleteDetail": "The account and all paired devices are removed. This cannot be undone."
+        "displayDeleteDetail": "The account and all paired devices are removed. This cannot be undone.",
+        "backupCliForeignKeyHint": "A backup from another installation carries that installation's encryption: set DB_ENCRYPTION_KEY to its value before starting, otherwise Yuvomi will no longer start after the file swap."
     },
     "login": {
         "tagline": "Welcome back to your family planner.",

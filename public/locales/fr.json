@@ -2726,7 +2726,8 @@
         "displayRevokeDevice": "Révoquer",
         "displayRevokeConfirm": "Mettre fin à l'accès de cet appareil ?",
         "displayRevokeDetail": "La tablette n'affiche plus rien immédiatement. Pour la réutiliser, il faut l'appairer de nouveau.",
-        "displayDeleteDetail": "Le compte et tous les appareils appairés sont supprimés. Cette action est irréversible."
+        "displayDeleteDetail": "Le compte et tous les appareils appairés sont supprimés. Cette action est irréversible.",
+        "backupCliForeignKeyHint": "Une sauvegarde provenant d'une autre installation porte le chiffrement de celle-ci : définis DB_ENCRYPTION_KEY sur sa valeur avant le démarrage, sinon Yuvomi ne démarrera plus après le remplacement du fichier."
     },
     "login": {
         "tagline": "Bon retour sur votre planificateur familial.",

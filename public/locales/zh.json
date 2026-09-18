@@ -2726,7 +2726,8 @@
         "displayRevokeDevice": "撤销",
         "displayRevokeConfirm": "结束这台设备的访问权限？",
         "displayRevokeDetail": "平板会立即不再显示任何内容。若要继续使用，必须重新配对。",
-        "displayDeleteDetail": "账户和所有已配对的设备都会被移除。此操作无法撤销。"
+        "displayDeleteDetail": "账户和所有已配对的设备都会被移除。此操作无法撤销。",
+        "backupCliForeignKeyHint": "来自其他安装的备份带有该安装的加密：请在启动前将 DB_ENCRYPTION_KEY 设为该安装的值，否则替换文件后 Yuvomi 将无法启动。"
     },
     "login": {
         "tagline": "欢迎回到您的家庭计划工具。",

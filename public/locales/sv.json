@@ -2726,7 +2726,8 @@
         "displayRevokeDevice": "Återkalla",
         "displayRevokeConfirm": "Avsluta den här enhetens åtkomst?",
         "displayRevokeDetail": "Plattan slutar genast visa något. För att använda den igen måste den parkopplas på nytt.",
-        "displayDeleteDetail": "Kontot och alla parkopplade enheter tas bort. Det går inte att ångra."
+        "displayDeleteDetail": "Kontot och alla parkopplade enheter tas bort. Det går inte att ångra.",
+        "backupCliForeignKeyHint": "En säkerhetskopia från en annan installation bär den installationens kryptering: ange DB_ENCRYPTION_KEY till dess värde innan du startar, annars startar Yuvomi inte längre efter filbytet."
     },
     "login": {
         "tagline": "Välkommen tillbaka till din familjeplanerare.",

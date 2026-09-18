@@ -2726,7 +2726,8 @@
         "displayRevokeDevice": "Intrekken",
         "displayRevokeConfirm": "Toegang van dit apparaat beëindigen?",
         "displayRevokeDetail": "Het tablet toont onmiddellijk niets meer. Om het weer te gebruiken moet het opnieuw worden gekoppeld.",
-        "displayDeleteDetail": "Het account en alle gekoppelde apparaten worden verwijderd. Dit kan niet ongedaan worden gemaakt."
+        "displayDeleteDetail": "Het account en alle gekoppelde apparaten worden verwijderd. Dit kan niet ongedaan worden gemaakt.",
+        "backupCliForeignKeyHint": "Een back-up van een andere installatie draagt de versleuteling van die installatie: stel DB_ENCRYPTION_KEY vóór het starten in op die waarde, anders start Yuvomi na het vervangen van het bestand niet meer."
     },
     "login": {
         "tagline": "Welkom terug bij je gezinsplanner.",

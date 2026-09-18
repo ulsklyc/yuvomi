@@ -2738,7 +2738,8 @@
         "displayRevokeDevice": "Cabut",
         "displayRevokeConfirm": "Akhiri akses perangkat ini?",
         "displayRevokeDetail": "Tablet langsung berhenti menampilkan apa pun. Untuk memakainya lagi, tablet harus dipasangkan ulang.",
-        "displayDeleteDetail": "Akun dan semua perangkat yang dipasangkan akan dihapus. Ini tidak bisa dibatalkan."
+        "displayDeleteDetail": "Akun dan semua perangkat yang dipasangkan akan dihapus. Ini tidak bisa dibatalkan.",
+        "backupCliForeignKeyHint": "Cadangan dari instalasi lain membawa enkripsi instalasi tersebut: setel DB_ENCRYPTION_KEY ke nilainya sebelum memulai, jika tidak Yuvomi tidak akan berjalan lagi setelah file diganti."
     },
     "login": {
         "tagline": "Selamat datang kembali di perencana keluarga Anda.",

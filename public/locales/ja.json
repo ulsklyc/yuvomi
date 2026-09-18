@@ -2726,7 +2726,8 @@
         "displayRevokeDevice": "失効させる",
         "displayRevokeConfirm": "この端末のアクセスを終了しますか？",
         "displayRevokeDetail": "タブレットにはすぐに何も表示されなくなります。引き続き使うには、あらためてペアリングする必要があります。",
-        "displayDeleteDetail": "アカウントとペアリング済みのすべての端末が削除されます。この操作は取り消せません。"
+        "displayDeleteDetail": "アカウントとペアリング済みのすべての端末が削除されます。この操作は取り消せません。",
+        "backupCliForeignKeyHint": "他のインストールのバックアップにはそのインストールの暗号化が含まれています。起動前に DB_ENCRYPTION_KEY をその値に設定してください。設定しないと、ファイルを置き換えた後 Yuvomi は起動しなくなります。"
     },
     "login": {
         "tagline": "家族のプランナーへおかえりなさい。",

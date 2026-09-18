@@ -2738,7 +2738,8 @@
         "displayRevokeDevice": "Widerrufen",
         "displayRevokeConfirm": "Zugang dieses Geräts beenden?",
         "displayRevokeDetail": "Das Tablett zeigt sofort nichts mehr. Zum Weiterbenutzen muss es neu gekoppelt werden.",
-        "displayDeleteDetail": "Das Konto und alle gekoppelten Geräte werden entfernt. Das lässt sich nicht rückgängig machen."
+        "displayDeleteDetail": "Das Konto und alle gekoppelten Geräte werden entfernt. Das lässt sich nicht rückgängig machen.",
+        "backupCliForeignKeyHint": "Stammt das Backup aus einer anderen Installation, trägt es deren Verschlüsselung: Setze DB_ENCRYPTION_KEY vor dem Start auf den Wert jener Installation, sonst startet Yuvomi nach dem Dateitausch nicht mehr."
     },
     "login": {
         "tagline": "Willkommen zurück bei deinem Familienplaner.",

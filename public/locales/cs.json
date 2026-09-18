@@ -2726,7 +2726,8 @@
         "displayRevokeDevice": "Odvolat",
         "displayRevokeConfirm": "Ukončit přístup tohoto zařízení?",
         "displayRevokeDetail": "Tablet okamžitě přestane cokoli zobrazovat. Aby se dal znovu používat, musí se znovu spárovat.",
-        "displayDeleteDetail": "Účet a všechna spárovaná zařízení budou odstraněny. Tuto akci nelze vzít zpět."
+        "displayDeleteDetail": "Účet a všechna spárovaná zařízení budou odstraněny. Tuto akci nelze vzít zpět.",
+        "backupCliForeignKeyHint": "Záloha z jiné instalace nese její šifrování: před spuštěním nastavte DB_ENCRYPTION_KEY na její hodnotu, jinak se Yuvomi po výměně souboru již nespustí."
     },
     "login": {
         "tagline": "Vítejte zpět ve svém rodinném plánovači.",
