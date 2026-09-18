@@ -23,6 +23,7 @@ import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import '/components/category-manager.js';
 import '/components/tag-manager.js';
 import { findPageFab } from '/utils/fab.js';
+import { isNavModuleReadOnly } from '/permissions.js';
 import { isSoloHousehold, hidesPrivacyControls } from '/utils/household.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { todayKey, parseLocalDateKey } from '/utils/date.js';
@@ -54,6 +55,49 @@ import {
 function viewer() {
   return { isAdmin: state.isAdmin, currentUserId: state.currentUserId };
 }
+
+/**
+ * Darf dieser Nutzer in Aufgaben ueberhaupt schreiben? (#467)
+ *
+ * Nicht dasselbe wie `canEditTaskDefinition()`: das fragt nach EINER Aufgabe
+ * (wem gehoert sie, ist sie gesperrt), dies nach dem Modul. Der Unterschied ist
+ * der Grund fuer beide Funktionen - die Sammelauswahl, die Kategorien- und
+ * Etikettenverwaltung und der Anlegeweg haengen an keiner einzelnen Aufgabe und
+ * kaemen sonst an der Rechtepruefung vorbei.
+ *
+ * Selbes Muster wie readOnly() in public/pages/waste.js und schedule.js.
+ */
+function readOnly() {
+  return isNavModuleReadOnly('tasks');
+}
+
+/**
+ * Jede `data-action` der Liste, die NICHT schreibt. Positivliste, damit eine
+ * spaeter ergaenzte Schreib-Aktion standardmaessig gesperrt ist statt
+ * standardmaessig offen (siehe READ_SAFE_ACTIONS in waste.js/schedule.js). Die
+ * Markup-Unterdrueckung in renderTaskCard() ist die erste Verteidigungslinie,
+ * der Wachposten in wireTaskList() die zweite.
+ *
+ * `toggle-status` und `toggle-subtask` stehen NICHT darin: bei `tasks: read`
+ * steht an ihrer Stelle ein `span`, der nur den Zustand nennt - taucht der
+ * Knopf trotzdem auf (Devtools, oder eine Liste, die von anderer Stelle neu
+ * gezeichnet wurde), findet er hier denselben Riegel.
+ *
+ * `pick-doer` steht ebenfalls nicht darin, OBWOHL ein Wandtablett genau ueber
+ * diese Aktion abhakt: sie SCHREIBT, und die Liste sagt, was nicht schreibt.
+ * Die Display-Ausnahme steht deshalb im Riegel selbst und nicht hier - sonst
+ * waere sie fuer einen Menschen mit `tasks: read` gleich mit geoeffnet.
+ */
+const READ_SAFE_ACTIONS = new Set(['open-task', 'toggle-subtasks']);
+
+/**
+ * Die eine Schreib-Aktion, die ein gekoppeltes Display erreichen darf (#1209):
+ * abhaken fuer eine am Geraet benannte Person. Der Server fuehrt sie als
+ * benannte Route (`DISPLAY_WRITE_ROUTES`, server/display-scopes.js), nicht als
+ * Modulrecht - das Tablett hat `tasks:read` wie jeder Nur-lesen-Nutzer, und
+ * ohne diese Ausnahme naehme der Riegel unten ihm seinen einzigen Zweck.
+ */
+const DISPLAY_WRITE_ACTIONS = new Set(['pick-doer']);
 
 function canEditTaskDefinition(task, parent = null) {
   return canEditTaskDefinitionFor(task, parent, viewer());
@@ -389,6 +433,23 @@ function renderTaskCard(task, opts = {}) {
     ? Math.round((task.subtask_done / task.subtask_total) * 100)
     : null;
 
+  // WER DARF HIER PER TIPP ABHAKEN? Zwei Gruende sagen nein, und beide fuehren
+  // zu DEMSELBEN Zeichen statt zu zwei Bauarten nebeneinander: ein Tablett hat
+  // keine Person, der die Erledigung gehoerte (#1209), ein Mensch mit
+  // `tasks: read` darf die Route gar nicht (#467).
+  //
+  // ZUSTAND BLEIBT, HANDLUNG FAELLT WEG - aber als `span`, nicht als
+  // `disabled`-Knopf. Die Begruendung steht seit #1209 an der Teilaufgabe und
+  // gilt hier Wort fuer Wort: ein gesperrter Knopf sieht aus wie ein
+  // Bedienelement, traegt Trefflaeche und Hover-Rahmen weiter, und sein
+  // `aria-label` verspricht „als erledigt markieren" fuer eine Beruehrung, die
+  // nichts tut. Die Beschriftung nennt deshalb den ZUSTAND.
+  //
+  // Die Knoepfe daneben (bearbeiten, ablegen, Unteraufgabe) sagen gar nichts -
+  // sie verschwinden ueber canEditTaskDefinition(), das bei `tasks: read` fuer
+  // jede Aufgabe `false` liefert.
+  const darfAbhaken = !actingAsDisplay() && !readOnly();
+
   const subtasksHtml = task.subtasks?.length
     ? task.subtasks.map((s) => `
         <div class="subtask-item ${s.status === 'done' ? 'subtask-item--done' : ''}"
@@ -408,16 +469,16 @@ function renderTaskCard(task, opts = {}) {
                ZUSTAND statt einer Handlung, und ein `span` verspricht nichts.
                Dass eine Teilaufgabe am Display spaeter eine eigene
                Personenauswahl bekommt, ist eine Folgeentscheidung. */''}
-          ${actingAsDisplay() ? `
-          <span class="subtask-item__checkbox subtask-item__checkbox--static ${s.status === 'done' ? 'subtask-item__checkbox--done' : ''}"
-                role="img" aria-label="${esc(`${s.title}: ${t(s.status === 'done' ? 'tasks.statusDone' : 'tasks.statusOpen')}`)}">
-            ${s.status === 'done' ? '<i data-lucide="check" class="subtask-item__checkbox-icon" aria-hidden="true"></i>' : ''}
-          </span>` : `
+          ${darfAbhaken ? `
           <button class="subtask-item__checkbox ${s.status === 'done' ? 'subtask-item__checkbox--done' : ''}"
                   data-action="toggle-subtask" data-id="${s.id}"
                   data-status="${s.status}" aria-label="${t('tasks.subtaskMarkDone', { title: esc(s.title) })}">
             ${s.status === 'done' ? '<i data-lucide="check" class="subtask-item__checkbox-icon" aria-hidden="true"></i>' : ''}
-          </button>`}
+          </button>` : `
+          <span class="subtask-item__checkbox subtask-item__checkbox--static ${s.status === 'done' ? 'subtask-item__checkbox--done' : ''}"
+                role="img" aria-label="${esc(`${s.title}: ${t(s.status === 'done' ? 'tasks.statusDone' : 'tasks.statusOpen')}`)}">
+            ${s.status === 'done' ? '<i data-lucide="check" class="subtask-item__checkbox-icon" aria-hidden="true"></i>' : ''}
+          </span>`}
           <span class="subtask-item__title">${esc(s.title)}</span>
           ${canEditTaskDefinition(s, task) ? `
           <div class="subtask-item__actions">
@@ -442,12 +503,23 @@ function renderTaskCard(task, opts = {}) {
         <input type="checkbox" class="task-bulk-checkbox" data-task-id="${task.id}"
                ${isChecked ? 'checked' : ''} aria-label="${t('tasks.selectTask')}">
         ` : ''}
-        ${actingAsDisplay() ? '' : `
+        ${darfAbhaken ? `
         <button class="task-status-btn task-status-btn--${task.status}"
                 data-action="toggle-status" data-id="${task.id}" data-status="${task.status}"
                 aria-label="${isDone ? t('tasks.markOpen', { title: esc(task.title) }) : t('tasks.markDone', { title: esc(task.title) })}">
           <i data-lucide="check" class="task-status-btn__check" aria-hidden="true"></i>
         </button>
+        ` : actingAsDisplay() ? '' : `
+        ${/* NUR BEI `tasks: read`, NICHT AM DISPLAY. Dort tritt die
+             Personenauswahl an diese Stelle und traegt denselben Ring - ein
+             Zeichen davor waere ein zweiter Kreis in derselben Zeile. Ein
+             Mensch mit Leserecht bekommt keinen Picker, und ohne dieses
+             Zeichen verschwaende die Zeile die Auskunft, die der Haken traegt:
+             ob die Aufgabe erledigt ist. */''}
+        <span class="task-status-btn task-status-btn--${task.status} task-status-btn--static"
+              role="img" aria-label="${esc(`${task.title}: ${t(isDone ? 'tasks.statusDone' : 'tasks.statusOpen')}`)}">
+          <i data-lucide="check" class="task-status-btn__check" aria-hidden="true"></i>
+        </span>
         `}
         ${/* AM TABLETT GAR KEIN STATUSKNOPF, auch nicht bei einer erledigten
              Aufgabe. Er zeigte dort auf das Zuruecknehmen, und genau das darf
@@ -520,9 +592,10 @@ function renderTaskCard(task, opts = {}) {
         <div class="subtask-list ${expandedSubtasks ? 'subtask-list--visible' : ''}"
              id="subtasks-${task.id}">
           ${subtasksHtml}
+          ${canEdit ? `
           <button class="subtask-item__add" data-action="add-subtask" data-parent="${task.id}">
             ${t('tasks.subtaskAdd')}
-          </button>
+          </button>` : ''}
         </div>` : ''}
     </div>`;
 }
@@ -569,7 +642,10 @@ function renderTaskGroups(tasks, groupMode) {
         title: t('tasks.emptyTitle'),
         description: t('tasks.emptyDescription'),
         hint: t('emptyHint.tasks'),
-        action: { label: t('tasks.emptyAction'), icon: 'plus', attrs: { id: 'empty-cta-tasks' } },
+        // Der CTA klickt den FAB, und den gibt es bei `tasks: read` nicht mehr.
+        // Ohne diese Zeile blieb er als einziger Knopf einer leeren Seite
+        // stehen und tat beim Antippen nichts.
+        action: readOnly() ? undefined : { label: t('tasks.emptyAction'), icon: 'plus', attrs: { id: 'empty-cta-tasks' } },
       });
   }
 
@@ -1436,6 +1512,9 @@ function wireCountdownGate(panel) {
 }
 
 function openTaskModal({ task = null, users = [], reminder = null } = {}, container) {
+  // Der letzte Riegel vor dem Formular - hinter FAB, Kopfknopf und
+  // Leerzustands-CTA, die alle hierher fuehren.
+  if (readOnly()) return;
   const isEdit = !!task;
   // Working-Set VOR dem Rendern setzen: renderTagChips liest ihn direkt danach.
   modalTags = normalizeTagList(task?.tags);
@@ -1573,6 +1652,7 @@ function wireTaskForm(panel, { task = null, container = null, onChanged = () => 
  * Server liefert sie in derselben Antwort mit, ein Nachladen entfällt.
  */
 function openTagManager(container) {
+  if (readOnly()) return;
   let manager = null;
   const onChanged = async (e) => {
     state.allTags = e.detail?.tags ?? state.allTags;
@@ -1604,6 +1684,7 @@ function openTagManager(container) {
  * Aufgaben trägt, wäre eine Aktion, die garantiert nichts tut.
  */
 function openBulkTagDialog(taskIds, mode, container) {
+  if (readOnly()) return;
   const selected = state.tasks.filter((task) => taskIds.includes(task.id));
   const pool = mode === 'remove'
     ? [...new Map(selected.flatMap((task) => task.tags ?? [])
@@ -1669,6 +1750,7 @@ function openBulkTagDialog(taskIds, mode, container) {
 // --------------------------------------------------------
 
 function openTaskCategoryManager(container) {
+  if (readOnly()) return;
   // Die Auffrischung haengt am Ereignis, nicht am Schliessen: beim Loeschen
   // raeumt `confirmOverModal` das Modal darunter ab, bevor `api.delete` laeuft
   // (siehe `_notifyChanged` in components/category-manager.js).
@@ -1732,6 +1814,10 @@ function openTaskCategoryManager(container) {
 
 async function handleFormSubmit(e, { container = null, onChanged = () => loadTasks(container) } = {}) {
   e.preventDefault();
+  // Das Formular steht bei `tasks: read` gar nicht erst offen (openTaskModal
+  // riegelt ab, die Leseansicht bekommt keinen Mounter). Der Riegel hier faengt
+  // den Rest: ein Dialog, der noch offen war, als die Rechte sich aenderten.
+  if (readOnly()) return;
   const form      = e.target;
   const errorEl   = document.getElementById('task-form-error');
   const submitBtn = document.getElementById('task-submit-btn');
@@ -2041,6 +2127,10 @@ function applyColumnLocally(task, column) {
 
 /** Board-Bewegung mit optimistischem Vorgriff - der eine Weg für alle drei Gesten. */
 async function runColumnMove(task, column, container) {
+  // Der Schreibweg des Boards - Knopf UND Zug muenden hier. Vor dem
+  // OPTIMISTISCHEN `applyColumnLocally`: sonst spraenge die Karte erst in die
+  // neue Spalte und nach dem 403 zurueck, genau das Symptom aus dem Review.
+  if (readOnly()) return;
   const before = { id: task.id, status: task.status, archived_at: task.archived_at };
   applyColumnLocally(task, column);
   renderKanban(container);
@@ -2087,10 +2177,14 @@ function renderKanbanCard(task) {
       </div>
       <div class="kanban-card__footer">
         ${renderAvatarStack(task.assigned_users ?? [], { size: 22 }) || '<span></span>'}
+        ${/* Der Weiterschalt-Knopf ist reine Handlung: WO die Aufgabe steht,
+              sagt ihre Spalte, nicht dieser Knopf. Bei `tasks: read` faellt er
+              weg - zusammen mit dem Ziehen, das dieselbe Bewegung macht. */ ''}
+        ${readOnly() ? '' : `
         <button class="kanban-card__status-btn" type="button"
                 data-next-status="${next}" title="${nextLabel}" aria-label="${nextLabel}">
           <i data-lucide="${icon}" aria-hidden="true"></i>
-        </button>
+        </button>`}
       </div>
     </div>`;
 }
@@ -2208,6 +2302,10 @@ function destroyKanbanSortables() {
 function wireKanbanSortable(container) {
   const board = container.querySelector('.kanban-board');
   if (!board) return;
+  // Das Ziehen IST der Spaltenwechsel (runColumnMove -> PATCH /tasks/:id/status).
+  // Ohne diesen Riegel blieb die Geste als einziger Schreibweg der Seite offen,
+  // nachdem der Knopf daneben verschwunden war.
+  if (readOnly()) { destroyKanbanSortables(); return; }
   // renderKanban() baut die Spalten bei jedem Zug neu. Ohne das Abraeumen
   // haengen die alten Instanzen an Knoten, die es nicht mehr gibt.
   destroyKanbanSortables();
@@ -2256,7 +2354,10 @@ function wireKanbanClicks(container) {
 
   board.addEventListener('click', async (e) => {
     const statusBtn = e.target.closest('[data-next-status]');
-    if (statusBtn) {
+    // Bei `tasks: read` gibt es den Knopf nicht mehr; taucht er doch auf (per
+    // Devtools), faellt der Klick bewusst DURCH auf die Karte und oeffnet die
+    // Leseansicht - der Weg, den die Karte an dieser Stelle ohnehin anbietet.
+    if (statusBtn && !readOnly()) {
       e.stopPropagation();
       const card = statusBtn.closest('.kanban-card[data-task-id]');
       if (!card) return;
@@ -2386,6 +2487,12 @@ function doerPanelTaskId(el) {
 
 function renderDoerPicker(task, isDone, archived) {
   if (isDone || archived) return '';
+  // AM TABLETT IST DIESE AUSWAHL DER EINE ERLAUBTE SCHREIBWEG (#1209), fuer
+  // einen MENSCHEN mit `tasks: read` ist sie eine reine Handlung und faellt weg
+  // - sie zeigt keinen Zustand, den der Haken daneben nicht schon traegt. Die
+  // Reihenfolge ist deshalb nicht beliebig: `actingAsDisplay()` zuerst, sonst
+  // naehme die Modulregel dem Geraet genau die Funktion, fuer die es haengt.
+  if (!actingAsDisplay() && readOnly()) return '';
   const tablett = actingAsDisplay();
   // AM TABLETT IST DIESE AUSWAHL DER EINZIGE WEG, und deshalb gilt die
   // Zwei-Personen-Schwelle dort nicht. Fuer einen Menschen ist der Picker ein
@@ -3234,7 +3341,7 @@ function wireSwipeGestures(container) {
     // (§2: dieselbe Kante trägt sie in jeder Liste). Die Karte fliegt hinaus,
     // weil die Zeile danach in einer anderen Gruppe steht - ohne den Flug
     // spränge sie einfach weg.
-    // AM WANDTABLETT FEHLT NUR DIE SCHREIB-SEITE (#1209).
+    // AM WANDTABLETT UND BEI `tasks: read` FEHLT NUR DIE SCHREIB-SEITE.
     //
     // Der Wisch nach vorn ist der dritte Weg zu demselben Statuswechsel - neben
     // Haken und Popover -, und der einzige, der die Person nicht erfragen kann:
@@ -3248,7 +3355,12 @@ function wireSwipeGestures(container) {
     // (der Titel derselben Karte oeffnet dieselbe Ansicht ohne jede Pruefung).
     // `wireSwipeRows` laesst eine Seite ausdruecklich weg, wenn sie `null` ist,
     // also kostet die Verengung nichts.
-    leading: actingAsDisplay() ? null : {
+    //
+    // DER ZWEITE GRUND IST DERSELBE SCHNITT (#467): ein Mensch mit
+    // `tasks: read` darf ueberhaupt nicht abhaken, und anders als am Tablett
+    // hilft ihm auch keine Personenauswahl darueber hinweg. Beide Gruende
+    // nehmen genau diese eine Kante.
+    leading: (actingAsDisplay() || readOnly()) ? null : {
       reveal: '.swipe-reveal--done',
       flyOut: true,
       run: async (row) => {
@@ -3485,6 +3597,11 @@ function wireGroupToggle(container) {
 
 function wireNewTaskBtn(container) {
   const handler = () => {
+    // Der FAB liegt in der Shell-Layer und wird ueber html[data-module-readonly]
+    // per CSS ausgeblendet (layout.css), der Kopfknopf traegt `.toolbar-new-btn`
+    // und faellt derselben Regel zu. Der Riegel bleibt trotzdem: eine
+    // CSS-Regel ist keine Sperre.
+    if (readOnly()) return;
     openTaskModal({ users: state.users }, container);
   };
   container.querySelector('#btn-new-task')?.addEventListener('click', handler);
@@ -3513,6 +3630,10 @@ function updateBulkActionsBar(container) {
 function wireBulkSelect(container) {
   const toggleBtn = container.querySelector('#btn-bulk-select');
   if (!toggleBtn) return;
+  // Die Mehrfachauswahl existiert nur fuer die Sammelaktionsleiste, und die
+  // schreibt in jeder ihrer sechs Spalten. Ohne sie waere sie eine Auswahl
+  // ohne Verb.
+  if (readOnly()) return;
 
   toggleBtn.addEventListener('click', () => {
     state.bulkSelectMode = !state.bulkSelectMode;
@@ -3546,6 +3667,7 @@ function wireBulkCheckboxes(container) {
 function wireBulkActions(container) {
   const bar = container.querySelector('#bulk-actions-bar');
   if (!bar) return;
+  if (readOnly()) return;
 
   bar.addEventListener('click', async (e) => {
     const btn = e.target.closest('button[id^="bulk-"]');
@@ -3681,6 +3803,14 @@ function wireTaskList(container) {
     if (!target) return;
     const action = target.dataset.action;
     const id     = target.dataset.id;
+
+    // Der eine Riegel fuer alle Zeilen-Aktionen (siehe READ_SAFE_ACTIONS).
+    // Ausgeblendet ist nicht dasselbe wie unerreichbar: ein Knopf, den es im
+    // Markup nicht mehr gibt, kann trotzdem noch am Bildschirm stehen, wenn die
+    // Liste ihn vor einem Rechtewechsel gezeichnet hat.
+    const erlaubt = READ_SAFE_ACTIONS.has(action)
+      || (actingAsDisplay() && DISPLAY_WRITE_ACTIONS.has(action));
+    if (readOnly() && !erlaubt) return;
 
     if (action === 'toggle-status') {
       const status = target.dataset.status;
@@ -3821,7 +3951,12 @@ function openTaskView(task, reminder, container) {
     categories: state.categories,
     container,
     onChanged: () => loadTasks(container),
-    edit: {
+    // Ohne Mounter baut die geteilte Ansicht keinen Bearbeiten-Knopf (#918) -
+    // besser als einer, der ins Leere fuehrt. openTaskDetail zieht denselben
+    // Schluss ohnehin noch einmal ueber canEditTaskDefinition(); der Verzicht
+    // hier spart den Umweg und sagt es an der Stelle, an der das Formular
+    // eingehaengt wuerde.
+    edit: readOnly() ? null : {
       mount: (panel, pane) => {
         // Working-Set VOR dem Rendern setzen: renderTagChips in wireTaskForm
         // liest ihn direkt danach.
@@ -4054,6 +4189,13 @@ export async function render(container, { user }) {
               <span class="group-toggle__label">${t('tasks.historyView')}</span>
             </button>
           </div>
+          ${/* DREI WERKZEUGE, DIE ALLE SCHREIBEN (#467). Sammelauswahl fuehrt
+                zur Sammelaktionsleiste, die beiden Verwalter legen Kategorien
+                und Etiketten an, benennen um und loeschen. Keins davon zeigt
+                einen Zustand an, den ein Nur-lesen-Nutzer vermissen wuerde -
+                Kategorien und Etiketten stehen als Filter im Blatt und an den
+                Karten. */ ''}
+          ${readOnly() ? '' : `
           <button class="btn btn--ghost btn--icon" id="btn-bulk-select"
                   title="${t('tasks.bulkSelect')}" aria-label="${t('tasks.bulkSelect')}" aria-pressed="false">
             <i data-lucide="list-checks" class="icon-lg" aria-hidden="true"></i>
@@ -4061,10 +4203,11 @@ export async function render(container, { user }) {
           <button class="btn btn--icon btn--ghost" id="btn-manage-categories"
                   aria-label="${t('tasks.manageCategories')}" title="${t('tasks.manageCategories')}">
             <i data-lucide="folder-tree" class="icon-lg" aria-hidden="true"></i>
-          </button>
+          </button>`}
           <!-- Der Tag-Verwalter bekommt das Etiketten-Icon, die Kategorien den
                Ordnerbaum: die beiden Achsen sind bewusst getrennt, und dieselbe
                Bildsprache für beide hätte genau das wieder eingeebnet. -->
+          ${readOnly() ? '' : `
           <button class="btn btn--icon btn--ghost" id="btn-manage-tags"
                   aria-label="${t('tasks.manageTags')}" title="${t('tasks.manageTags')}">
             <i data-lucide="tags" class="icon-lg" aria-hidden="true"></i>
@@ -4072,7 +4215,7 @@ export async function render(container, { user }) {
           <button class="btn btn--primary toolbar-new-btn" id="btn-new-task" style="gap:var(--space-1)"
                   aria-label="${t('tasks.newTask')}">
             <i data-lucide="plus" class="icon-lg" aria-hidden="true"></i> <span class="toolbar-new-btn__label">${t('newLabel.tasks')}</span>
-          </button>
+          </button>`}
         </div>
       </div>
 
@@ -4102,6 +4245,7 @@ export async function render(container, { user }) {
           </div>
         </div>
         <div class="filter-panel" id="filter-panel" hidden></div>
+        ${readOnly() ? '' : `
         <div class="bulk-actions-bar" id="bulk-actions-bar" hidden>
           <span class="bulk-actions-bar__count" id="bulk-count"></span>
           <div class="bulk-actions-bar__actions">
@@ -4134,7 +4278,7 @@ export async function render(container, { user }) {
               ${t('tasks.bulkDelete')}
             </button>
           </div>
-        </div>
+        </div>`}
 
         <div id="task-list">
           ${[1,2,3].map(() => `
@@ -4144,9 +4288,10 @@ export async function render(container, { user }) {
               <div class="skeleton skeleton-line skeleton-line--short" style="height:12px"></div>
             </div>`).join('')}
         </div>
+        ${readOnly() ? '' : `
         <button class="page-fab" id="fab-new-task" aria-label="${t('tasks.newTask')}" data-dock-label="${t('newLabel.tasks')}">
           <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
-        </button>
+        </button>`}
       </div>
     </div>
   `);
@@ -4263,6 +4408,12 @@ export const __test = {
   // Die Personenauswahl beim Abhaken (#1205): WANN sie ueberhaupt erscheint,
   // ist die halbe Entscheidung - ein Solo-Haushalt bekommt sie nie zu sehen.
   renderDoerPicker,
+  // Welche Bedienelemente eine Boardkarte und eine leere Liste ueberhaupt
+  // anbieten. Die Nur-lesen-Regel (#467) ist eine Aussage ueber genau dieses
+  // Markup: was verschwindet, und was als Zeichen stehen bleibt, das den
+  // Zustand nennt. `renderTaskCard` steht schon oben - sie beantwortet beide
+  // Fragen, die des Tabletts und diese.
+  renderKanbanCard, renderTaskGroups, readOnly,
   // Gemerkte Filter: der Vertrag ist, dass Lesen und Schreiben AUSEINANDER
   // gehen - sonst schriebe das Bereinigen sich fest (siehe getRecentFilters).
   getRecentFilters, storedRecentFilters, saveRecentFilter,

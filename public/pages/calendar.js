@@ -37,6 +37,7 @@ import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderA
 import { withChosenPeople } from '/utils/people-picker.js';
 import { othersCanRead } from '/utils/household.js';
 import { wireTablist } from '/utils/tablist.js';
+import { isNavModuleReadOnly } from '/permissions.js';
 // EINE Schalterform, auch hier. Das Primitiv liegt unter `/settings/`, weil
 // dort sein Anlass lag (vier Schalterformen nebeneinander, Critique
 // 2026-07-27) - die Funktion selbst ist geteiltes UI-Vokabular und kein
@@ -431,6 +432,25 @@ const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
  * Stundenlinien, Termine, Now-Linie) folgt automatisch. JS kennt die Dichte
  * gar nicht, es kennt nur den Bezug. */
 const HOUR_VAR = '--cal-hour-height';
+
+/**
+ * Darf dieser Nutzer in den Kalender schreiben? (#467)
+ *
+ * Der Kalender kennt keinen Bedienpunkt, der ZUSTAND anzeigt und dabei
+ * schreibt - anders als der Erledigt-Haken einer Aufgabe. Jeder Schreibweg hier
+ * ist eine reine Handlung (anlegen, bearbeiten, loeschen, zuruecksetzen), und
+ * alle verschwinden deshalb, statt gesperrt dazustehen. Was bleibt, ist die
+ * ganze Leseseite: blaettern, filtern, suchen, Termin oeffnen.
+ *
+ * `reminders` und `birthdays` laufen serverseitig auf dasselbe Modul
+ * (server/scopes.js) - ein Erinnerungs-Schreibvorgang aus dem Terminformular
+ * faellt damit unter dieselbe Sperre.
+ *
+ * Selbes Muster wie readOnly() in public/pages/waste.js und schedule.js.
+ */
+function readOnly() {
+  return isNavModuleReadOnly('calendar');
+}
 
 /** Vertikaler Versatz einer Minutenzahl als calc() gegen die Stundenhoehe. */
 function hourOffset(minutes) {
@@ -1596,9 +1616,13 @@ export async function render(container, { user }) {
     <div class="calendar-page app-page app-page--full" id="calendar-page" data-composition="full">
       <div class="page-toolbar page-toolbar--wrap cal-toolbar" id="cal-toolbar"></div>
       <div id="cal-body" style="flex:1;display:flex;flex-direction:column;overflow:hidden;"></div>
+      ${/* Die CSS-Regel html[data-module-readonly] .page-fab (layout.css) blendet
+            ihn ohnehin aus; hier faellt er ganz weg, damit `findPageFab` unten
+            nicht doch noch einen Anlegeweg verdrahtet. */ ''}
+      ${readOnly() ? '' : `
       <button class="page-fab" id="fab-new-event" aria-label="${t('calendar.newEvent')}" data-dock-label="${t('newLabel.calendar')}">
         <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
-      </button>
+      </button>`}
     </div>
   `);
 
@@ -1754,10 +1778,11 @@ function renderToolbar() {
               aria-expanded="false">
         <i data-lucide="search" aria-hidden="true"></i>
       </button>
+      ${readOnly() ? '' : `
       <button class="btn btn--primary toolbar-new-btn" id="cal-add" aria-label="${t('calendar.addEvent')}">
         <i data-lucide="plus" aria-hidden="true"></i>
         <span class="toolbar-new-btn__label">${t('newLabel.calendar')}</span>
-      </button>
+      </button>`}
     </div>
     <!-- Bar-Zeile des Kopfs (Werkzeugzeilen-Regel, layout.css): das Ansichts-
          Segment hatte im Actions-Slot bei 1280px 212px fuer 245px Inhalt -
@@ -1784,7 +1809,7 @@ function renderToolbar() {
   bar.querySelector('#cal-prev').addEventListener('click', () => navigate(-1));
   bar.querySelector('#cal-next').addEventListener('click', () => navigate(1));
   bar.querySelector('#cal-today').addEventListener('click', goToday);
-  bar.querySelector('#cal-add').addEventListener('click', () => openEventModal({ mode: 'create', date: newEventDate() }));
+  bar.querySelector('#cal-add')?.addEventListener('click', () => openEventModal({ mode: 'create', date: newEventDate() }));
   bar.querySelector('#cal-search').addEventListener('click', openCalendarSearch);
   bar.querySelector('#cal-filters').addEventListener('click', openCalendarFilters);
 
@@ -3224,7 +3249,7 @@ function renderAgendaView(container) {
         ? emptyStateHTML({
           icon: 'calendar-plus',
           title: t('calendar.agendaEmpty'),
-          action: { label: t('calendar.newEvent'), attrs: { id: 'agenda-empty-cta' } },
+          action: readOnly() ? undefined : { label: t('calendar.newEvent'), attrs: { id: 'agenda-empty-cta' } },
         })
         : groups.map(({ date, events, tasks, holidays, schedule, waste }) => `
           <div class="agenda-day">
@@ -3843,7 +3868,7 @@ function renderCalendarSearchState(kind) {
       <div class="cal-search-status">
         <i data-lucide="calendar-search" class="cal-search-status__icon" aria-hidden="true"></i>
         <p class="cal-search-status__text">${esc(t('calendar.searchEmpty', { query: searchQuery }))}</p>
-        <button class="btn btn--secondary" id="cal-search-empty-cta">${esc(t('calendar.newEvent'))}</button>
+        ${readOnly() ? '' : `<button class="btn btn--secondary" id="cal-search-empty-cta">${esc(t('calendar.newEvent'))}</button>`}
       </div>`);
     // Bewusst ohne newEventDate(): die Trefferliste ersetzt die Ansicht, es steht
     // gerade kein Zeitraum auf dem Schirm, auf den ein Vorschlag sich beziehen könnte.
@@ -3941,6 +3966,8 @@ async function openFoundEvent(ev) {
 }
 
 export const __test = {
+  // Die Nur-lesen-Weiche (#467) und der Anlegeweg, den sie als erstes schliesst.
+  readOnly, openEventModal,
   buildEventModalContent,
   fetchWindow,
   getWeekRange,
@@ -4003,7 +4030,6 @@ export const __test = {
   wasteEnabled,
   wasteOccurrencesOnDay,
   renderWasteChip,
-  activeFilterCount,
   availableLayers,
   renderAgendaView,
   renderMonthView,
@@ -4244,7 +4270,11 @@ async function openEventDetail(ev, anchor = null) {
   let reminders = [];
   const remindersReady = loadReminderForEvent(reminderOwnerId(ev)).then((r) => { reminders = r; });
 
-  const actions = [{
+  // LOESCHEN, ZURUECKSETZEN UND BEARBEITEN FALLEN WEG, DIE KARTE BLEIBT (#467).
+  // "In Karte oeffnen" ist der einzige Eintrag dieser Fusszeile, der nichts
+  // schreibt - er gehoert deshalb auch einem Nur-lesen-Nutzer. Die Liste faengt
+  // bei `calendar: read` leer an und nimmt unten nur noch ihn auf.
+  const actions = readOnly() ? [] : [{
     id: 'detail-delete',
     label: t('common.delete'),
     variant: 'danger-ghost',
@@ -4282,7 +4312,7 @@ async function openEventDetail(ev, anchor = null) {
 
   // ICS-Abos: Ein lokal geänderter Termin lässt sich auf das Original
   // zurücksetzen. Die Aktion gehört zum Objekt, also in die Fußzeile.
-  if (ev.external_source === 'ics' && ev.user_modified === 1) {
+  if (ev.external_source === 'ics' && ev.user_modified === 1 && !readOnly()) {
     actions.push({
       id: 'detail-ics-reset',
       label: t('calendar.ics.reset'),
@@ -4312,7 +4342,9 @@ async function openEventDetail(ev, anchor = null) {
     anchor,
     sections: renderEventDetail(ev, reminders),
     actions,
-    edit: {
+    // Ohne `edit` baut die geteilte Ansicht keinen Bearbeiten-Knopf
+    // (components/detail-view.js) - dasselbe Muster wie in der Aufgabenansicht.
+    edit: readOnly() ? undefined : {
       label: t('common.edit'),
       title: t('calendar.editEvent'),
       // Das Formular wartet auf die Erinnerungen, die Leseansicht nicht. Ohne
@@ -4720,6 +4752,12 @@ function wireVisibilityWarning(panel, selectSel, msName, warnSel) {
 }
 
 function openEventModal({ mode, event = null, date = null, reminder = null, time = null }) {
+  // DER LETZTE RIEGEL VOR DEM FORMULAR. Es gibt sieben Wege hierher - Kopfknopf,
+  // FAB, Klick in eine leere Stunde der Wochen- und der Tagesansicht, zwei
+  // Leerzustands-CTAs und der Bearbeiten-Weg der Detailansicht. Sie alle
+  // einzeln zu sperren waere sechs Chancen, eine zu vergessen; der siebte Weg,
+  // der morgen dazukommt, findet den Riegel hier ohnehin.
+  if (readOnly()) return;
   if (mode === 'edit' && event?.housekeeping_visit_id) {
     window.yuvomi.navigate(`/housekeeping?editVisit=${event.housekeeping_visit_id}`);
     return;
@@ -5365,6 +5403,10 @@ function confirmLocalWholeSeriesDelete(event) {
 }
 
 async function saveEvent(overlay, mode, event, existingReminder = null, attachmentState = null) {
+  // Dasselbe wie in handleFormSubmit der Aufgabenseite: das Formular steht bei
+  // `calendar: read` nicht offen, aber ein Dialog kann es gewesen sein, als die
+  // Rechte wechselten.
+  if (readOnly()) return;
   const eventId = event?.id;
   const saveBtn = overlay.querySelector('#modal-save');
   const title   = overlay.querySelector('#modal-title').value.trim();
@@ -5764,6 +5806,10 @@ function confirmExternalSeriesDelete(event) {
 }
 
 async function requestDeleteEvent(event) {
+  // Der Riegel vor jedem Loeschweg: die Fusszeile der Detailansicht ist der
+  // sichtbare, die drei Serien-Varianten darunter (ganze Reihe, dieser und
+  // folgende, einzelner Termin) haengen alle an dieser einen Weiche.
+  if (readOnly()) return;
   if (isExternalRecurringSeries(event)) {
     if (await confirmExternalSeriesDelete(event)) await deleteEvent(event);
     return;

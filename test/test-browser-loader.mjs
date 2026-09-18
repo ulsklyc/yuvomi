@@ -163,7 +163,16 @@ const STUBS = {
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#039;');
     export const fmtLocation = (value) => String(value ?? '');
-    export const renderMarkdownLight = (value) => String(value ?? '');
+    // Wie __renderUserMultiSelect weiter unten: Suiten, die pruefen wollen, WAS
+    // ein Aufrufer dem Markdown-Renderer uebergibt (die Checklisten-Optionen
+    // etwa), setzen globalThis.__renderMarkdownLight. Ohne das bleibt es beim
+    // durchgereichten Text wie bisher - der Stub soll nicht die halbe
+    // Markdown-Umschrift nachbauen.
+    export const renderMarkdownLight = (value, options) => (
+      typeof globalThis.__renderMarkdownLight === 'function'
+        ? globalThis.__renderMarkdownLight(value, options)
+        : String(value ?? '')
+    );
   `,
   '/reminders.js': `
     export const refresh = async () => {};

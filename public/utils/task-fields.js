@@ -18,6 +18,7 @@ import { t, formatDate, formatDayMonth, formatTime } from '/i18n.js';
 import { parseLocalDateKey } from '/utils/date.js';
 import { nowFields } from '/utils/timezone.js';
 import { isPreviewable } from '/utils/document-preview.js';
+import { isNavModuleReadOnly } from '/permissions.js';
 
 // --------------------------------------------------------
 // Prioritaet und Status
@@ -80,6 +81,14 @@ export function isArchived(task) {
  * @param {{isAdmin?: boolean, currentUserId?: number|string|null}} viewer
  */
 export function canEditTaskDefinition(task, parent = null, viewer = {}) {
+  // NUR-LESEN SCHLAEGT DIE EIGENE URHEBERSCHAFT. Die Sperre aus #830 fragt, wem
+  // eine einzelne Aufgabe gehoert; das Modulrecht fragt, ob dieser Nutzer
+  // ueberhaupt in Aufgaben schreiben darf - und die zweite Frage kommt zuerst.
+  // Sie steht hier und nicht in den Renderern, weil sonst dieselbe Antwort in
+  // der Zeile, in der Leseansicht und im Unteraufgaben-Knopf je einmal
+  // geschrieben stuende. Der Server entscheidet verbindlich (#467); dies ist
+  // die ehrliche Oberflaeche dazu.
+  if (isNavModuleReadOnly('tasks')) return false;
   const lock = task?.locked ? task : (parent?.locked ? parent : null);
   if (!lock) return true;
   if (viewer.isAdmin) return true;

@@ -68,7 +68,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it each made the pick separately, so they could even disagree with each other. Both now follow the
   household time zone, the same one the rest of the app uses for what counts as today.
 
-- **A reminder switch in the task dialog could only ever fail for some members.** Reminders belong to
+- **Tasks, Calendar and Rewards no longer offer buttons that a read-only member is not allowed to
+  press.** Someone whose access to a module is "read" still saw every control: edit, archive, delete,
+  add a subtask, the bulk action bar, dragging a card across the board, swiping a row. The server
+  refused each of them correctly, so nothing wrong was ever saved - but the refusal arrived as an
+  error message, and ticking a task off looked like it had worked for a moment before the checkbox
+  sprang back. What stays is everything that tells you something: the tick mark of a task and of a
+  subtask are still there, now as a plain mark that names the state instead of a greyed-out button
+  that promises a tap it cannot honour. What goes is everything that only acts, because it says
+  nothing the row next to it does not already say - where a task sits on the board is what its column
+  is for. Two consequences worth knowing about: a member with read-only access to Rewards can no
+  longer ask to redeem their own points, which they could before, because the server declines that
+  request too; and a wall tablet is unaffected - the two things it may do, ticking a task off for
+  a named person and asking for a reward, are granted to it as named routes rather than as module
+  access, and they stay exactly where they were.
+
+- **A reminder switch in the task dialog could only ever fail for some members.** This is the one
+  case that crosses a module boundary, so the entry above does not cover it: Reminders belong to
   the Calendar, not to Tasks, so somebody allowed to edit tasks but only to read the calendar was
   still offered the switch. Saving then stored the task and refused the reminder, and all they saw
   was an error next to a task that had in fact been saved. A reminder that is already set now stays
