@@ -6,7 +6,7 @@
 
 import { api, auth } from '/api.js';
 import { createPageController } from '/utils/page-lifecycle.js';
-import { canSeeWidget, moduleAccess, navModuleAccess } from '/permissions.js';
+import { canSeeWidget, moduleAccess, navModuleAccess, canUseFasting } from '/permissions.js';
 import { t, formatDate, formatTime, timeSuffix, getLocale, getNumberFormat } from '/i18n.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
@@ -16,10 +16,11 @@ import { esc, fmtLocation, renderMarkdownLight } from '/utils/html.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays, todayKey as householdToday } from '/utils/date.js';
 import { nowFields, zonedUTCProxy, zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { predictCycle, PHASE } from '/utils/health-cycle.js';
+import { startFasting, finishFasting, startFastingClock, fastingClockSwitchHtml, fastingError } from '/components/fasting-controls.js';
 import { localizeBirthdayEvent } from '/utils/birthday-event.js';
 import { countdownPhrase, countdownRank } from '/utils/countdown.js';
 import { findPageFab } from '/utils/fab.js';
-import { openModal, closeModal, confirmModal } from '/components/modal.js';
+import { openModal, closeModal, confirmModal, refocusAfterRender } from '/components/modal.js';
 import { renderAvatarStack } from '/components/user-multi-select.js';
 import { isSoloHousehold } from '/utils/household.js';
 import {
@@ -286,7 +287,7 @@ function maybeHintCustomize(container) {
 // Widget → Modul-Slug für die „Modul deaktiviert?"-Prüfung. Widgets ohne Eintrag
 // (family, weather) sind immer verfügbar. Modulweit, damit Grid-Filter und
 // Wieder-Einblenden-Leiste dieselbe Sichtbarkeitsregel teilen.
-const MODULE_FOR_WIDGET = { tasks: 'tasks', calendar: 'calendar', shopping: 'shopping', meals: 'meals', notes: 'notes', birthdays: 'birthdays', budget: 'budget', rewards: 'rewards', health: 'health', cycle: 'health', housekeeping: 'housekeeping', schedule: 'schedule', waste: 'waste' };
+const MODULE_FOR_WIDGET = { tasks: 'tasks', calendar: 'calendar', shopping: 'shopping', meals: 'meals', notes: 'notes', birthdays: 'birthdays', budget: 'budget', rewards: 'rewards', health: 'health', cycle: 'health', fasting: 'health', housekeeping: 'housekeeping', schedule: 'schedule', waste: 'waste' };
 
 const WIDGETS_WITH_OPTIONS = new Set(['calendar', 'tasks', 'notes', 'waste']);
 
@@ -396,6 +397,7 @@ function isWidgetModuleEnabled(id) {
   // waere aus der Oberflaeche heraus nicht mehr erreichbar. Hier faellt es aus
   // beiden Listen, so wie ein abgeschaltetes Modul auch.
   if (id === 'family' && isSoloHousehold()) return false;
+  if (id === 'fasting' && !canUseFasting()) return false;
   if (id === 'countdown' && !countdownAvailable) return false;
   return true;
 }
@@ -420,6 +422,7 @@ function widgetLabel(id) {
     rewards:  () => t('nav.rewards'),
     health:   () => t('nav.health'),
     cycle:    () => t('health.cycle.title'),
+    fasting:  () => t('health.fasting.title'),
     housekeeping: () => t('nav.housekeeping'),
     schedule: () => t('nav.schedule'),
     waste:    () => t('nav.waste'),
@@ -1978,7 +1981,7 @@ function renderHealthWidget(health) {
 // Zyklus-Widget (owner-only, opt-in)
 // --------------------------------------------------------
 // Strikt privat: Die Vorhersage wird client-seitig aus den nutzer-eigenen
-// /health/cycle/*-Endpunkten berechnet (siehe render()) und fließt NIE in den
+// /health/cycle/(sub)-Endpunkten berechnet (siehe render()) und fließt NIE in den
 // familienweiten /dashboard-Payload. Zeigt Phase + Zyklustag (Mini-Ring) und die
 // nächste Periode als Countdown — die eine glanceable Zahl für den Alltag.
 
@@ -2058,6 +2061,40 @@ function renderCycleWidget(cycle) {
       </div>
     </div>
   </div>`;
+}
+
+function renderFastingWidget(fasting) {
+  if (!fasting) throw new Error('fasting widget slice failed to load');
+  const active = fasting.active;
+  return `<div class="widget widget--fasting">${widgetHeader('fasting', t('health.fasting.title'), null, '/health/fasting')}
+    <div class="fasting-widget">
+      <div class="fasting-dial fasting-dial--segmented" data-fasting-progress><div data-fasting-segments></div><div class="fasting-dial__content">
+        <span class="fasting-widget__meta" data-fasting-clock-label></span>
+        <strong class="fasting-widget__timer" data-fasting-timer>00:00:00</strong>
+        <span class="fasting-widget__meta" data-fasting-days></span>
+      </div></div>
+      <div class="fasting-widget__controls">${fastingClockSwitchHtml()}
+        ${active ? '<span class="fasting-widget__remaining" data-fasting-remaining></span>' : ''}
+        <div class="fasting-widget__actions">${moduleAccess('health') === 'write' ? `<button type="button" class="btn btn--primary btn--sm" data-fasting-widget-action>${esc(t(active ? 'health.fasting.finish' : 'health.fasting.start'))}</button>` : ''}<a href="/health/fasting#history" class="btn btn--secondary btn--sm">${esc(t('health.fasting.history'))}</a></div>
+      </div>
+      <p class="form-hint" role="alert" data-fasting-widget-error></p>
+    </div></div>`;
+}
+
+function wireFastingWidget(container, rerender, fasting, signal) {
+  const root = container.querySelector('.fasting-widget');
+  if (!root || !fasting) return () => {};
+  root.querySelector('[data-fasting-widget-action]')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      if (fasting.active) await finishFasting(fasting.active, rerender, () => !signal.aborted);
+      else if (await startFasting()) { await rerender(); refocusAfterRender(); }
+    } catch (error) {
+      if (root.isConnected) root.querySelector('[data-fasting-widget-error]').textContent = fastingError(error);
+    } finally { button.disabled = false; }
+  }, { signal });
+  return startFastingClock(root, fasting.active, fasting.lastCompleted, fasting.settings);
 }
 
 // --------------------------------------------------------
@@ -3050,6 +3087,7 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     rewards: () => renderRewardsWidget(data.rewards ?? {}),
     health: () => renderHealthWidget(data.health ?? {}),
     cycle: () => renderCycleWidget(data.cycle),
+    fasting: () => renderFastingWidget(data.fasting),
     housekeeping: () => renderHousekeepingWidget(data.housekeeping ?? {}, currency),
     schedule: (size) => renderScheduleWidget(data.schedule, data.users ?? [], size),
     waste: (size) => renderWasteWidget(data.waste, size),
@@ -4847,6 +4885,8 @@ export async function render(container, { user, signal: routeSignal = null } = {
   }
 
   let disposeNoteCategories = () => {};
+  let disposeFastingClock = () => {};
+  signal.addEventListener('abort', () => disposeFastingClock(), { once: true });
   signal.addEventListener('abort', () => disposeNoteCategories(), { once: true });
   function rebuildDashboard(cfg) {
     // Der eine Engpass fuer jeden verspaeteten Neuaufbau (#977): eine Antwort,
@@ -4855,6 +4895,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // aeltere Stand den neueren.
     if (signal.aborted) return;
     disposeNoteCategories();
+    disposeFastingClock();
     const shell = container.querySelector('#dashboard-shell');
     if (!shell) return;
     if (wallMode) {
@@ -4891,6 +4932,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible })}
     `);
     wireLinks(container, rerender, { editing: isCustomizing, user });
+    disposeFastingClock = wireFastingWidget(container, rerender, data.fasting, signal);
     // Retry einer isolierten Widget-Fehlerkachel: da /dashboard aggregiert lädt,
     // ist „erneut versuchen" ein voller Neuaufbau (wie der Page-Level-Retry).
     container.querySelectorAll('[data-widget-retry]').forEach((btn) =>
@@ -5005,6 +5047,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     if (!document.hidden) refreshDashboardData();
   }, 15 * 60 * 1000);
   signal.addEventListener('abort', () => clearInterval(refreshTimerId));
+  window.addEventListener('pageshow', () => { if (!document.hidden) void refreshDashboardData(); }, { signal });
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;

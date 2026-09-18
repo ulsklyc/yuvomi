@@ -17,6 +17,7 @@ import { visibilityWhere } from '../services/visibility.js';
 import { resolveBudgetMode } from '../services/budget-visibility.js';
 import { hiddenModulesFor } from '../permissions.js';
 import { householdMemberSql } from '../services/household-members.js';
+import { FastingError, getFastingState } from '../services/fasting.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { isAdminUser, serializeEvents } from './calendar/helpers.js';
 
@@ -71,6 +72,7 @@ const DENIED_PAYLOAD = Object.freeze({
       hasMeds: false, dosesTotal: 0, dosesTaken: 0, dosesSkipped: 0,
       nextDose: null, lowStockCount: 0,
     },
+    fasting: null,
   }),
   housekeeping: () => ({
     housekeeping: {
@@ -625,62 +627,77 @@ router.get('/', (req, res) => {
   // bleiben der Health-Seite vorbehalten. Fälligkeit inline berechnet (days_mask, Zeitraum,
   // Log-Status), da public/utils/health-meds.js browser-Pfade importiert und serverseitig
   // nicht ladbar ist.
-  if (allows('health')) try {
-    const meds = d.prepare(`
+  if (allows('health')) {
+    try {
+      const meds = d.prepare(`
       SELECT id, name, stock_qty, refill_threshold
       FROM medications
       WHERE active = 1 AND user_id = ?
-    `).all(userId);
-    const scheduleStmt = d.prepare(`
+      `).all(userId);
+      const scheduleStmt = d.prepare(`
       SELECT time_of_day, days_mask, start_date, end_date
       FROM medication_schedules
       WHERE medication_id = ? AND active = 1
-    `);
-    const logStmt = d.prepare(`
+      `);
+      const logStmt = d.prepare(`
       SELECT status FROM medication_logs
       WHERE medication_id = ? AND substr(scheduled_at, 1, 10) = ? AND substr(scheduled_at, 12, 5) = ?
       ORDER BY id DESC LIMIT 1
-    `);
-    let dosesTotal = 0;
-    let dosesTaken = 0;
-    let dosesSkipped = 0;
-    let lowStockCount = 0;
-    let nextDose = null;
-    for (const med of meds) {
-      if (med.stock_qty != null && Number.isFinite(Number(med.stock_qty))) {
-        const stock = Number(med.stock_qty);
-        const thr = med.refill_threshold != null && Number.isFinite(Number(med.refill_threshold))
-          ? Number(med.refill_threshold)
-          : null;
-        if (stock <= 0 || (thr != null && stock <= thr)) lowStockCount += 1;
+      `);
+      let dosesTotal = 0;
+      let dosesTaken = 0;
+      let dosesSkipped = 0;
+      let lowStockCount = 0;
+      let nextDose = null;
+      for (const med of meds) {
+        if (med.stock_qty != null && Number.isFinite(Number(med.stock_qty))) {
+          const stock = Number(med.stock_qty);
+          const thr = med.refill_threshold != null && Number.isFinite(Number(med.refill_threshold))
+            ? Number(med.refill_threshold)
+            : null;
+          if (stock <= 0 || (thr != null && stock <= thr)) lowStockCount += 1;
+        }
+        for (const s of scheduleStmt.all(med.id)) {
+          if (s.start_date && todayLocalKey < s.start_date) continue;
+          if (s.end_date && todayLocalKey > s.end_date) continue;
+          const mask = s.days_mask;
+          const matches = mask === null || mask === undefined
+            ? true
+            : (Number(mask) & (1 << localWeekdayIdx)) !== 0;
+          if (!matches) continue;
+          dosesTotal += 1;
+          const time = s.time_of_day || '00:00';
+          const logRow = logStmt.get(med.id, todayLocalKey, time);
+          if (logRow?.status === 'taken') dosesTaken += 1;
+          else if (logRow?.status === 'skipped') dosesSkipped += 1;
+          else if (!nextDose || time < nextDose.time) nextDose = { name: med.name, time };
+        }
       }
-      for (const s of scheduleStmt.all(med.id)) {
-        if (s.start_date && todayLocalKey < s.start_date) continue;
-        if (s.end_date && todayLocalKey > s.end_date) continue;
-        const mask = s.days_mask;
-        const matches = mask === null || mask === undefined
-          ? true
-          : (Number(mask) & (1 << localWeekdayIdx)) !== 0;
-        if (!matches) continue;
-        dosesTotal += 1;
-        const time = s.time_of_day || '00:00';
-        const logRow = logStmt.get(med.id, todayLocalKey, time);
-        if (logRow?.status === 'taken') dosesTaken += 1;
-        else if (logRow?.status === 'skipped') dosesSkipped += 1;
-        else if (!nextDose || time < nextDose.time) nextDose = { name: med.name, time };
-      }
+      result.health = {
+        hasMeds: meds.length > 0,
+        dosesTotal,
+        dosesTaken,
+        dosesSkipped,
+        nextDose,
+        lowStockCount,
+      };
+    } catch (err) {
+      log.error('health error:', err.message);
+      result.health = { hasMeds: false, dosesTotal: 0, dosesTaken: 0, dosesSkipped: 0, nextDose: null, lowStockCount: 0 };
     }
-    result.health = {
-      hasMeds: meds.length > 0,
-      dosesTotal,
-      dosesTaken,
-      dosesSkipped,
-      nextDose,
-      lowStockCount,
-    };
-  } catch (err) {
-    log.error('health error:', err.message);
-    result.health = { hasMeds: false, dosesTotal: 0, dosesTaken: 0, dosesSkipped: 0, nextDose: null, lowStockCount: 0 };
+
+    try {
+      const permissionUser = d.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
+      const fastingState = getFastingState(d, permissionUser);
+      result.fasting = {
+        settings: { clock_mode: fastingState.settings?.clock_mode || 'auto' },
+        active: fastingState.active,
+        lastCompleted: fastingState.history[0] || null,
+      };
+    } catch (err) {
+      if (!(err instanceof FastingError && err.status === 403)) log.error('fasting error:', err.message);
+      result.fasting = null;
+    }
   }
 
   // Haushaltshilfe: Anwesenheitsstatus (offene Sitzung), Besuche im laufenden Monat,

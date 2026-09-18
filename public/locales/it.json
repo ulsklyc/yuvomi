@@ -3981,6 +3981,7 @@
                 "ketosis": "Fase finale"
             },
             "custom": "Personalizzato",
+            "notifications": "Notifiche",
             "startDate": "Data inizio",
             "endDate": "Data fine",
             "note": "Nota",
@@ -3993,6 +3994,10 @@
             "clockRemaining": "Rimanente",
             "loadMore": "Carica altri 10",
             "goalNextHint": "Modificare l’obiettivo aggiorna il digiuno in corso e l’obiettivo predefinito per i digiuni futuri.",
+            "remindNext": "È ora del tuo prossimo digiuno",
+            "remindGoalToggle": "Avvisami quando raggiungo il mio obiettivo",
+            "remindNextToggle": "Ricordami quando è ora del prossimo digiuno",
+            "reminderHint": "Dopo la fine, il promemoria segue il resto del ciclo di 24 ore. Nessun promemoria senza obiettivo o per obiettivi da 24 ore in su.",
             "safetyTitle": "Prima di iniziare",
             "conflict": "Il dato è cambiato. Ricarica la pagina e riprova.",
             "finishedTitle": "Digiuno terminato",

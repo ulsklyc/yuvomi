@@ -39,6 +39,19 @@ function makeDb({ withNotificationTables = true } = {}) {
       access        TEXT NOT NULL,
       PRIMARY KEY (subject_type, subject_id, resource_type, resource_key)
     );
+    CREATE TABLE health_fasting_settings (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      default_goal_minutes INTEGER,
+      remind_goal INTEGER NOT NULL DEFAULT 0,
+      remind_next_start INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE health_fasts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      start_at TEXT NOT NULL,
+      end_at TEXT,
+      goal_minutes INTEGER
+    );
     CREATE TABLE tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
@@ -111,7 +124,7 @@ function makeDb({ withNotificationTables = true } = {}) {
     );
     CREATE TABLE reminders (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      entity_type TEXT NOT NULL CHECK(entity_type IN ('task','event','subscription','inventory_item','inventory_tracked_date','pantry_item','cycle_period','cycle_log_nudge','schedule_entry','schedule_extra_entry','waste_pickup','document_expiry')),
+      entity_type TEXT NOT NULL CHECK(entity_type IN ('task','event','subscription','inventory_item','inventory_tracked_date','pantry_item','cycle_period','cycle_log_nudge','schedule_entry','schedule_extra_entry','waste_pickup','document_expiry','fasting_goal','fasting_next_start')),
       entity_id INTEGER NOT NULL,
       remind_at TEXT NOT NULL,
       dismissed INTEGER NOT NULL DEFAULT 0,
@@ -710,6 +723,96 @@ test('a notification names its origin in the title, in the household language', 
     'Jede Meldung nennt ihr Herkunftsmodul im Titel, uebersetzt in die Datensprache des Haushalts.');
   // Und der Body bleibt die Sache selbst - der Titel ersetzt ihn nicht.
   assert.deepEqual(payloads.map((p) => p.body), ['Müll rausbringen', 'Zahnarzt', 'Netflix']);
+});
+
+test('next-fast channel notification uses household-localized actionable copy', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { processDueNotifications } = await import('../server/services/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  store.createChannel({ provider: 'ntfy', name: 'ntfy', enabled: true, config: { baseUrl: 'https://ntfy.test', topic: 'family' }, secrets: {} });
+  db.prepare("INSERT INTO sync_config (key, value) VALUES ('language', 'en')").run();
+  db.prepare(`INSERT INTO health_fasting_settings
+    (user_id, default_goal_minutes, remind_goal, remind_next_start) VALUES (1, 960, 0, 1)`).run();
+  db.prepare(`INSERT INTO health_fasts (id, user_id, start_at, end_at, goal_minutes)
+    VALUES (77, 1, '2026-06-18T09:59:00.000Z', '2026-06-19T01:59:00.000Z', 960)`).run();
+  db.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by) VALUES (1, 'fasting_next_start', 77, ?, 1)")
+    .run('2026-06-19T09:59:00.000Z');
+  const payloads = [];
+  const providers = {
+    ntfy: { id: 'ntfy', send: async ({ payload }) => { payloads.push(payload); return { ok: true, status: 200 }; } },
+  };
+
+  await processDueNotifications({
+    database: db,
+    channelStore: store,
+    pushService: { sendPushToUser: async () => 0 },
+    providers,
+    now: new Date('2026-06-19T10:00:00.000Z'),
+  });
+
+  assert.equal(payloads.length, 1);
+  assert.equal(payloads[0].title, 'Fasting');
+  assert.equal(payloads[0].body, 'Ready for your next fast');
+  assert.equal(payloads[0].url, '/health/fasting');
+});
+
+test('household-disabled Health removes fasting rows before periodic delivery', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { processDueNotifications } = await import('../server/services/notifications.js');
+  const database = makeDb();
+  const store = createNotificationChannelStore({ db: database });
+  store.createChannel({ provider: 'ntfy', name: 'ntfy', enabled: true, config: { baseUrl: 'https://ntfy.test', topic: 'family' }, secrets: {} });
+  database.prepare("INSERT INTO sync_config (key, value) VALUES ('disabled_modules', '[\"health\"]')").run();
+  database.prepare(`INSERT INTO health_fasting_settings
+    (user_id, default_goal_minutes, remind_goal, remind_next_start) VALUES (1, 960, 0, 1)`).run();
+  database.prepare(`INSERT INTO health_fasts (id, user_id, start_at, end_at, goal_minutes)
+    VALUES (77, 1, '2026-06-18T09:59:00.000Z', '2026-06-19T01:59:00.000Z', 960)`).run();
+  database.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by) VALUES (1, 'fasting_next_start', 77, ?, 1)")
+    .run('2026-06-19T09:59:00.000Z');
+  let sent = 0;
+
+  await processDueNotifications({
+    database,
+    channelStore: store,
+    pushService: { sendPushToUser: async () => 0 },
+    providers: { ntfy: { id: 'ntfy', send: async () => { sent += 1; return { ok: true, status: 200 }; } } },
+    now: new Date('2026-06-19T10:00:00.000Z'),
+  });
+
+  assert.equal(sent, 0);
+  assert.equal(database.prepare("SELECT count(*) AS count FROM reminders WHERE entity_type = 'fasting_next_start'").get().count, 0);
+});
+
+test('notification delivery fails closed when fasting reconciliation fails', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { processDueNotifications } = await import('../server/services/notifications.js');
+  const database = makeDb();
+  const store = createNotificationChannelStore({ db: database });
+  store.createChannel({ provider: 'ntfy', name: 'ntfy', enabled: true, config: { baseUrl: 'https://ntfy.test', topic: 'family' }, secrets: {} });
+  database.prepare("INSERT INTO tasks (id, title, created_by) VALUES (1, 'Do not deliver', 1)").run();
+  database.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by) VALUES (1, 'task', 1, ?, 1)")
+    .run('2026-06-19T09:59:00.000Z');
+  let sent = 0;
+  const failingDatabase = new Proxy(database, {
+    get(target, property) {
+      if (property === 'prepare') return (sql) => {
+        if (/SELECT user_id FROM health_fasting_settings/.test(sql)) throw new Error('forced fasting sync failure');
+        return target.prepare(sql);
+      };
+      const value = target[property];
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+
+  await assert.rejects(processDueNotifications({
+    database: failingDatabase,
+    channelStore: store,
+    pushService: { sendPushToUser: async () => 0 },
+    providers: { ntfy: { id: 'ntfy', send: async () => { sent += 1; return { ok: true, status: 200 }; } } },
+    now: new Date('2026-06-19T10:00:00.000Z'),
+  }), /forced fasting sync failure/);
+  assert.equal(sent, 0);
 });
 
 test('subscription reminders degrade to the bare name when amount or date are missing (#581)', async () => {

@@ -3981,6 +3981,7 @@
                 "ketosis": "Geç aşama"
             },
             "custom": "Özel",
+            "notifications": "Bildirimler",
             "startDate": "Başlangıç tarihi",
             "endDate": "Bitiş tarihi",
             "note": "Not",
@@ -3993,6 +3994,10 @@
             "clockRemaining": "Kalan",
             "loadMore": "10 tane daha yükle",
             "goalNextHint": "Hedefi değiştirmek mevcut orucu ve sonraki oruçlar için varsayılan hedefi günceller.",
+            "remindNext": "Sıradaki oruca başlama zamanı",
+            "remindGoalToggle": "Hedefime ulaştığımda bildir",
+            "remindNextToggle": "Sıradaki oruç zamanı geldiğinde hatırlat",
+            "reminderHint": "Bitişten sonra 24 saatlik döngünün kalanı kadar beklenir. Hedef yoksa veya en az 24 saatse hatırlatıcı oluşturulmaz.",
             "safetyTitle": "Başlamadan önce",
             "conflict": "Kayıt değişti. Sayfayı yenileyip tekrar deneyin.",
             "finishedTitle": "Oruç tamamlandı",

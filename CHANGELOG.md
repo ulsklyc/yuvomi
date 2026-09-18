@@ -62,6 +62,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   category chips. Archiving a document (or deleting it) clears its reminder, so an archived scan
   never keeps nagging.
 
+- **Fasting can now remind you when you reach your goal and when it is time to start again.**
+  Each reminder can be enabled independently. Changing a fast, its goal or its permissions removes
+  notifications that no longer apply without erasing the saved preference. (#1179)
+
+- **A fasting timer can now be added to the dashboard.** It shows only your own fast and lets you
+  start or finish it there, using the same safety confirmation and timer controls as the journal.
+  Existing dashboards keep it hidden until you add it from the dashboard editor. (#1180)
+
 ### Changed
 
 - **The jump-to-now reset sits behind the period stepper in all three period-navigation headers,

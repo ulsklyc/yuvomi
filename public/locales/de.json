@@ -3981,6 +3981,7 @@
                 "ketosis": "Weitere Phase"
             },
             "custom": "Benutzerdefiniert",
+            "notifications": "Benachrichtigungen",
             "startDate": "Startdatum",
             "endDate": "Enddatum",
             "note": "Notiz",
@@ -3993,6 +3994,10 @@
             "clockRemaining": "Verbleibend",
             "loadMore": "10 weitere laden",
             "goalNextHint": "Eine Zieländerung aktualisiert das aktuelle Fasten und das Standardziel für künftige Fastenzeiten.",
+            "remindNext": "Zeit für dein nächstes Fasten",
+            "remindGoalToggle": "Benachrichtige mich, wenn ich mein Ziel erreiche",
+            "remindNextToggle": "Erinnere mich, wenn es Zeit für das nächste Fasten ist",
+            "reminderHint": "Nach dem Ende folgt die Erinnerung nach dem Rest des 24-Stunden-Zyklus. Keine Erinnerung ohne Ziel oder bei Zielen ab 24 Stunden.",
             "safetyTitle": "Bevor du beginnst",
             "conflict": "Der Eintrag wurde geändert. Lade die Seite neu und versuche es erneut.",
             "finishedTitle": "Fasten beendet",

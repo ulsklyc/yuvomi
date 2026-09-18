@@ -30,7 +30,14 @@ test('fasting slices execute each owned suite exactly once', () => {
     ['test:health-fasting', 'test-health-fasting-api.js'],
     ['test:health-fasting', 'test-health-fasting-dates.js'],
     ['test:health-fasting-stats', 'test-health-fasting-stats-api.js'],
+    ['test:fasting-reminders', 'test-fasting-reminders-migration.js'],
+    ['test:fasting-reminders', 'test-fasting-reminders-transactions.js'],
+    ['test:fasting-reminders', 'test-fasting-reminders-api.js'],
+    ['test:fasting-reminders', 'test-fasting-notification-availability.js'],
     ['test:health-fasting-stats', 'test-health-fasting-stats.js'],
+    ['test:fasting-reminders', 'test-fasting-reminders.js'],
+    ['test:fasting-reminders', 'test-reminders-browser-notification.js'],
+    ['test:dashboard-fasting', 'test-dashboard-fasting.js'],
   ]) {
     assert.ok(pkg.scripts[script], `${script} has its own entry point`);
     assert.ok(pkg.scripts[script].includes(`test/${file}`), `${file} belongs to ${script}`);

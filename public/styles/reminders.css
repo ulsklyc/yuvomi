@@ -32,7 +32,6 @@
 /* Reminder-Toast: Bell-Icon + Textblock */
 .toast--reminder {
   gap: var(--space-2, 8px);
-  cursor: pointer;
   padding-right: var(--space-2, 8px);
 }
 
@@ -57,6 +56,22 @@
   flex: 1;
   gap: var(--space-0h);
   min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+}
+
+button.toast__reminder-text {
+  cursor: pointer;
+}
+
+button.toast__reminder-text:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-xs);
 }
 
 .toast__reminder-text strong {

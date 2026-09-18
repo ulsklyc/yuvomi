@@ -20,6 +20,7 @@ import { syncAllCycleReminders } from './cycle-reminders.js';
 import { syncAllScheduleReminders } from './schedule-reminders.js';
 import { syncAllWasteReminders } from './waste-reminders.js';
 import { withoutSwitchedOffModules } from './reminder-origins.js';
+import { syncAllFastingReminders } from './fasting-reminders.js';
 
 const log = createLogger('Notifications');
 const APP_NAME = 'Yuvomi';
@@ -125,6 +126,8 @@ const REMINDER_ORIGINS = {
   // contract every other Waste projection already uses.
   waste_pickup:           { titleKey: 'nav.waste',              url: '/waste' },
   document_expiry:        { titleKey: 'nav.documents',          url: '/documents' },
+  fasting_goal:           { titleKey: 'health.fasting.title',   url: '/health/fasting' },
+  fasting_next_start:     { titleKey: 'health.fasting.title',   url: '/health/fasting' },
 };
 
 /**
@@ -227,6 +230,12 @@ function documentExpiryBody(reminder) {
   return `${reminder.entity_title} - ${reminder.doc_expires_at}`;
 }
 
+function fastingBody(reminder, locale) {
+  return translate(locale, reminder.entity_type === 'fasting_goal'
+    ? 'health.fasting.goalReached'
+    : 'health.fasting.remindNext');
+}
+
 function reminderPayload(reminder, locale, dateFormat) {
   const title = reminder.entity_title || FALLBACK_BODY;
   const origin = REMINDER_ORIGINS[reminder.entity_type];
@@ -247,6 +256,8 @@ function reminderPayload(reminder, locale, dateFormat) {
     body = wastePickupBody(reminder);
   } else if (reminder.entity_type === 'document_expiry' && reminder.entity_title) {
     body = documentExpiryBody(reminder);
+  } else if (reminder.entity_type === 'fasting_goal' || reminder.entity_type === 'fasting_next_start') {
+    body = fastingBody(reminder, locale);
   }
   // Waste is the one entity_type with a real per-occurrence deep link
   // (?type=<id>&date=<date_key>, the same contract every other Waste
@@ -395,6 +406,10 @@ export async function processDueNotifications({
       log.error(`Birthday sync failed for user ${user.id}:`, err?.message || err);
     }
   }
+
+  // Fasting permission revocation is a delivery boundary. If reconciliation
+  // fails, abort this run instead of sending a stale fasting reminder.
+  syncAllFastingReminders(activeDb, now);
 
   // DER BESTAND ZIEHT HIER NACH, nicht erst beim naechsten Anfassen. Der
   // Router legt die Erinnerung eines Artikels beim Speichern an - aber ein

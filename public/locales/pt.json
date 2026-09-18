@@ -3981,6 +3981,7 @@
                 "ketosis": "Fase final"
             },
             "custom": "Personalizado",
+            "notifications": "Notificações",
             "startDate": "Data de início",
             "endDate": "Data de término",
             "note": "Nota",
@@ -3993,6 +3994,10 @@
             "clockRemaining": "Restante",
             "loadMore": "Carregar mais 10",
             "goalNextHint": "Alterar a meta atualiza o jejum atual e a meta padrão para os próximos jejuns.",
+            "remindNext": "Está na hora do seu próximo jejum",
+            "remindGoalToggle": "Avisar quando eu atingir a meta",
+            "remindNextToggle": "Lembrar quando chegar a hora do próximo jejum",
+            "reminderHint": "Após o fim, o lembrete ocorre após o restante do ciclo de 24 horas. Sem lembrete para metas de 24 horas ou mais, ou sem meta.",
             "safetyTitle": "Antes de começar",
             "conflict": "O registro mudou. Recarregue a página e tente novamente.",
             "finishedTitle": "Jejum concluído",

@@ -33,6 +33,8 @@ export const ORIGIN_MODULE = Object.freeze({
   schedule_extra_entry:   'schedule',
   waste_pickup:           'waste',
   document_expiry:        'documents',
+  fasting_goal:           'health',
+  fasting_next_start:     'health',
 });
 
 /**

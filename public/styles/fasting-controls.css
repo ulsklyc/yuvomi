@@ -1,16 +1,19 @@
-/* Shared fasting controls used by Health and personal Settings. */
+/* Shared controls also appear in a dashboard modal, without health.css. */
 .fasting-dial { --fasting-progress: 0%; position: relative; display: grid; place-items: center; width: min(100%, 18rem); aspect-ratio: 1; margin: var(--space-4) auto; border-radius: var(--radius-full); background: conic-gradient(var(--module-health) var(--fasting-progress), var(--color-border-subtle) 0); }
 .fasting-dial::after { content: ''; position: absolute; inset: var(--space-2); border-radius: var(--radius-full); background: var(--color-surface-work); }
 .fasting-dial__content { position: relative; z-index: 1; padding: var(--space-3); max-width: 100%; text-align: center; }
 .fasting-clock-switch { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); padding: var(--space-1); border-radius: var(--radius-sm); background: var(--color-surface-3); }
 .fasting-clock-switch .btn { flex: 1; color: var(--color-text-secondary); }
 .fasting-clock-switch .btn[aria-pressed="true"] { background: var(--seg-active-bg); box-shadow: var(--seg-active-shadow); color: color-mix(in srgb, var(--module-health) var(--tint-ink), var(--color-text-primary)); }
+.fasting-notifications .form-check:has(input:disabled) { color: var(--color-text-secondary); cursor: not-allowed; }
 .fasting-preferences { display: grid; gap: var(--space-5); }
 .fasting-presets { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-block: var(--space-3); }
 .fasting-custom { margin-block-start: var(--space-4); }
 .fasting-custom[hidden] { display: none; }
+.fasting-notifications { border-top: 1px solid var(--color-border-subtle); padding-block-start: var(--space-4); }
+.fasting-notifications .form-check { display: flex; margin-block: var(--space-3); }
 .fasting-preferences .form-hint, [data-fasting-edit-form] .form-hint { font-size: var(--text-sm); color: var(--color-text-secondary); }
-[data-fasting-edit-error], [data-fasting-error] { font-size: var(--text-sm); color: var(--color-danger-ink); }
+[data-fasting-edit-error], [data-fasting-widget-error], [data-fasting-error] { font-size: var(--text-sm); color: var(--color-danger-ink); }
 .fasting-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
 .fasting-editor-grid .form-group { min-width: 0; }
 .fasting-editor-grid .form-input { min-width: 0; width: 100%; }
@@ -21,7 +24,7 @@
 .fasting-rating__choice span { font-size: var(--text-2xl); color: var(--color-accent); }
 .fasting-rating__choice:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 [data-fasting-edit-form] textarea { resize: vertical; }
-[data-fasting-error]:empty, [data-fasting-preferences-status]:empty, [data-fasting-edit-error]:empty { display: none; }
+[data-fasting-error]:empty, [data-fasting-widget-error]:empty, [data-fasting-preferences-status]:empty, [data-fasting-edit-error]:empty { display: none; }
 .fasting-dial--segmented { background: none; }
 .fasting-dial--segmented::after { display: none; }
 [data-fasting-segments] { position: absolute; inset: 0; }
