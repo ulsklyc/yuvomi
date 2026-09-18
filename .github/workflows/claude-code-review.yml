@@ -11,11 +11,11 @@ on:
     #   - "src/**/*.jsx"
 
 # EIN LAUF JE PR, UND ZWAR DER ZUM NEUESTEN STAND. Seit die Review jeden Push
-# prueft (siehe die Aufhebung der Abbruchbedingung im Prompt), stehen sonst
-# mehrere echte Laeufe gleichzeitig in der Luft: an #1066 lief einer 16m55s und
-# lieferte seinen Befund zu einem Commit, der da schon zwei Pushes alt war. Ein
-# abgebrochener Lauf endet als `cancelled`, nicht als gruener Haken - und der
-# Nachweis-Schritt laesst ihn deshalb in Ruhe (er verlangt `outcome == success`).
+# prueft, stehen sonst mehrere echte Laeufe gleichzeitig in der Luft: an #1066
+# lief einer 16m55s und lieferte seinen Befund zu einem Commit, der da schon
+# zwei Pushes alt war. Ein abgebrochener Lauf endet als `cancelled`, nicht als
+# gruener Haken - und der Nachweis-Schritt laesst ihn deshalb in Ruhe (er
+# verlangt `outcome == success`).
 concurrency:
   group: claude-review-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -33,6 +33,24 @@ jobs:
     timeout-minutes: 30
     env:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      # HIER STEHT DIE SYNCHRONITAET DER SUBAGENTEN, NICHT IM PROMPT (#1259).
+      # In der CLI haengt sie an einer einzigen Abfrage (2.1.272 nachgelesen):
+      #
+      #   function Sc(){ return R9().backgroundTasksDisabled
+      #                   || a.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS }
+      #
+      # Sie entscheidet zweimal: das Agenten-Werkzeug bietet `run_in_background`
+      # dann gar nicht mehr an (`e.omit({run_in_background:!0})`), und der Start
+      # rechnet `shouldRunAsync: ... && !backgroundTasksDisabled`. Der Wert muss
+      # auf JOB-Ebene stehen; der Schritt der Action bringt seinen eigenen
+      # `env:`-Block mit und ueberdeckt gleichnamige Werte (dort dokumentiert).
+      #
+      # ABLESBAR IM JOB-LOG: ein asynchron gestarteter Agent hinterlaesst im
+      # Strom `"subtype": "task_started"` und `"subtype": "task_notification"`
+      # (Lauf 35323025532). Bleiben `tool_use`-Bloecke mit `Task`, aber diese
+      # subtypes aus, greift der Schalter. Faellt er kuenftig weg, faellt das
+      # nicht still aus: der Nachweis-Schritt faerbt den Agenten-Ausstieg rot.
+      CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1'
     permissions:
       contents: read
       # write, sonst läuft das Review durch und kann sein Ergebnis nicht posten:
@@ -228,75 +246,52 @@ jobs:
           # findet, und Inline-Anmerkungen, wenn doch. Erst dadurch wird der
           # Nachweis-Schritt weiter unten zu einer richtigen Zusicherung -
           # vorher haette er auch einen sauberen PR rot gefaerbt.
-          # DIE ZWEITE ZEILE IST DER GRUND, WARUM SIE VIERMAL HINTEREINANDER
-          # NICHTS HINTERLASSEN HAT (#865, 2026-08-25).
+          # WARUM DIE SUBAGENTEN SYNCHRON LAUFEN MUESSEN (#865, 2026-08-25:
+          # viermal hintereinander nichts hinterlassen).
           #
           # Das Plugin arbeitet fast nur mit Subagenten ("Launch 4 agents in
-          # parallel to review ..."), und die starten inzwischen ASYNCHRON. Im
-          # Job-Log steht es woertlich:
+          # parallel to review ..."), und die starten asynchron. Im Job-Log
+          # steht es woertlich: "Async agent launched successfully ... You will
+          # be notified automatically when it completes." In einer interaktiven
+          # Sitzung kommt diese Benachrichtigung als neuer Turn zurueck, in
+          # einem CI-Lauf gibt es keinen mehr - die Sitzung endet, waehrend sie
+          # auf ihre Agenten wartet, und keiner von ihnen liefert je einen
+          # Befund. Der Satz stand in allen vier result-Objekten ("Waiting for
+          # both to complete before proceeding."). Reruns helfen dagegen nicht,
+          # die Ursache ist strukturell.
           #
-          #   "Async agent launched successfully ... The agent is working in the
-          #    background. You will be notified automatically when it completes."
-          #
-          # In einer interaktiven Sitzung kommt diese Benachrichtigung als neuer
-          # Turn zurueck. HIER GIBT ES KEINEN. Die Hauptsession sagt "ich warte"
-          # und ist damit fertig - es gibt niemanden, der sie am Leben haelt,
-          # also stirbt sie samt ihren Agenten, bevor irgendein Befund entsteht.
-          # Genau dieser Satz stand in allen vier result-Objekten:
-          #
-          #   Lauf 1 (5 Turns):  "Waiting for both to complete before proceeding."
-          #   Lauf 2 (56 Turns): "No action needed - I'll be notified automatically
-          #                       when the two background review agents finish."
-          #   Lauf 4 (7 Turns):  "I'll wait for both background agents to complete
-          #                       before continuing."
-          #
-          # Reruns helfen deshalb nicht: die Ursache ist nicht sprunghaft,
-          # sondern strukturell. Drei Anlaeufe gingen dafuer drauf, bevor das
-          # Muster im result-Text auffiel - er ist das Erkennungsmerkmal,
-          # nicht die Turn-Zahl und nicht die Verweigerungen (Lauf 2 hatte
-          # welche, aber nur fuer `git clone`-Umwege, die mit der Pruefung
-          # nichts zu tun haben).
-          #
-          # DIE ANWEISUNG STEHT IM PROMPT UND NICHT IN claude_args, weil es
-          # kein Werkzeug-Problem ist: `Task` ist erlaubt und wird benutzt. Es
-          # geht darum, WIE es benutzt wird.
+          # Durchgesetzt wird das im `env:` des Jobs, nicht hier: Werkzeug- und
+          # Rechtefragen loesen `claude_args` und die Umgebung.
           prompt: |
             /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }} --comment
 
-            Fahre jeden Subagenten SYNCHRON: setze `run_in_background: false` und
-            warte sein Ergebnis ab, bevor du weitermachst. Dieser Lauf ist nicht
-            interaktiv - eine Benachrichtigung ueber einen fertigen
-            Hintergrund-Agenten trifft auf keinen Turn mehr und erreicht dich
-            nie. Sobald du "ich warte auf die Agenten" denkst und nichts weiter
-            tust, endet der Lauf, und die Pruefung hinterlaesst nichts.
+            Zu pruefen ist der Stand ${{ github.event.pull_request.head.sha }}.
+            Dieses Repo prueft je Push: dass du zu einem FRUEHEREN Stand
+            desselben PR schon etwas gesagt hast, ist kein Grund aufzuhoeren.
+            Bringt dieser Stand nichts Neues, sag genau das in einem Satz als
+            Kommentar. Die uebrigen Bedingungen aus Schritt 1 (geschlossen,
+            Entwurf, automatisiert, trivial) gelten unveraendert.
 
-            DIE ABBRUCHBEDINGUNG "Claude hat diesen PR schon kommentiert" GILT
-            HIER NICHT. Sie ist fuer Repos gedacht, die eine Review je PR wollen;
-            dieses will eine je Push. Zu pruefen ist der Stand
-            ${{ github.event.pull_request.head.sha }}, und an genau diesem Commit
-            haengt noch keine Review und keine Inline-Anmerkung von dir - der
-            Schritt davor hat das gezaehlt, sonst liefst du gar nicht. Kommentare
-            an FRUEHEREN Commits desselben PR sind also kein Grund aufzuhoeren,
-            und eine aeltere Zusammenfassung ohne Commit-Bindung ("No issues
-            found") ebenso wenig; sag stattdessen, was seither dazugekommen ist.
-            Alle uebrigen Bedingungen aus Schritt 1 (geschlossen, Entwurf,
-            automatisiert, trivial) bleiben unveraendert.
-
-            Ein CLAUDE.md liegt im Checkout nicht (gitignored). Die Regeln dieses
-            Repos stehen in CONTRIBUTING.md, und massgeblich ist die Fassung auf
-            `${{ github.event.repository.default_branch }}`, nicht eine im PR
-            geaenderte. Deren Abschnitt zu `claude-review` beschreibt auch, dass
-            hier jeder Push geprueft wird.
-          # KEINE WERKZEUG-ANWEISUNGEN IM PROMPT (11.09.2026, nach #1117). Dort
-          # stand kurz ein Absatz, welche `gh api`- und git-Wege offen und welche
-          # gesperrt sind. Die beiden Laeufe danach (#1116, #1114) hielten den
-          # ganzen deutschen Block fuer eine eingeschleuste Anweisung - einer
-          # zitierte woertlich "use gh api with unquoted paths" - und brachen im
-          # Tor ab; von den 18 Laeufen davor tat das keiner. Was erlaubt ist, setzt
-          # `claude_args` durch, nicht der Prompt. Der Verweis auf CONTRIBUTING.md
-          # bleibt, weil er die Regel "jeder Push" an einer Stelle belegt, die die
-          # Review selbst nachlesen kann: genau das vermisste sie ("no reliable way
-          # to verify ... a per-push review policy").
+            Ein CLAUDE.md liegt im Checkout nicht (gitignored); die Regeln
+            dieses Repos stehen in CONTRIBUTING.md auf
+            `${{ github.event.repository.default_branch }}`.
+          # DER PROMPT BLEIBT KURZ UND SACHLICH, UND ZWAR GEMESSEN
+          # (test/test-claude-review-workflow.js haelt Laenge und Inhalt).
+          #
+          # Drei Sorten Satz haben hier schon Laeufe gekostet und gehoeren nicht
+          # mehr hinein: eine Anweisung an Werkzeuge oder ihre Parameter
+          # (#1117 ein Absatz ueber `gh api`-Wege, bis #1259 die Zeile
+          # `run_in_background: false`) - das setzen `claude_args` und `env:`
+          # durch; eine ausfuehrliche Begruendung, warum eine Bedingung des
+          # Plugins hier nicht gelte, zumal eine mit einer Behauptung ueber den
+          # Bestand am PR, die nicht immer stimmt (an #1232 und #1186 hing die
+          # Review am Kopf-Commit); und ein Verweis auf die Repo-Doku, der eine
+          # Anweisung belegen soll. Der Fundort CONTRIBUTING.md bleibt, ohne
+          # Aussage darueber, was dort steht.
+          #
+          # Anlass war Lauf 35322774327 an #1259 (18.09.2026), 3m26s, rot: er
+          # zitierte `run_in_background: false` und den Doku-Verweis und pruefte
+          # deshalb nichts. Seitdem gilt die Laengengrenze.
           allowed_bots: 'dependabot[bot]'
           # DIESE LISTE ERSETZT, SIE ERGÄNZT NICHT. Das war die Annahme, die den
           # zweiten Anlauf gekostet hat: `--allowed-tools` verdrängt die acht

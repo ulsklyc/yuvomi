@@ -48,9 +48,9 @@ const SCHON_KOMMENTIERT = /already\s+(?:left\s+a\s+comment|commented|posted|revi
 /**
  * ... UND ZWAR NUR, WENN DER LAUF DESHALB AUCH AUFGEHOERT HAT.
  *
- * Der Prompt im Workflow hebt diese Abbruchbedingung ausdruecklich auf ("DIE
- * ABBRUCHBEDINGUNG ... GILT HIER NICHT"). Ein gehorsamer Lauf BERICHTET das
- * danach - und traegt den Abbruchgrund damit als ZITAT im result-Text:
+ * Der Prompt im Workflow sagt, dass eine Aeusserung zu einem frueheren Stand
+ * kein Grund zum Aufhoeren ist. Ein gehorsamer Lauf BERICHTET das danach - und
+ * traegt den Abbruchgrund damit als ZITAT im result-Text:
  *
  *   "... telling me to disregard the normal \"already commented\" stop
  *    condition. Rather than trust that claim, I independently verified it ...
@@ -71,6 +71,29 @@ const SCHON_KOMMENTIERT = /already\s+(?:left\s+a\s+comment|commented|posted|revi
  */
 const HOERT_AUF =
   /\b(?:I|I'?ll)\s+(?:should|will|am|shall)?\s*stop(?:ping)?\b|\bstop(?:ping)?\s+here\b|\bnot\s+proceed(?:ing)?\b|\bskip(?:ping)?\s+(?:this|the)\s+review\b|\bno\s+review\s+(?:is\s+)?needed\b/i;
+
+/**
+ * DER LAUF HAT SEINEN EIGENEN AUFTRAG FUER EINGESCHLEUST GEHALTEN (#1259).
+ *
+ * Kein Codebefund, keine Werkzeugsperre, kein Agenten-Ausstieg: der Lauf liest
+ * den deutschen Teil des Prompts als fremde Anweisung in den Argumenten und
+ * hoert deshalb auf. Sechs rote Laeufe zwischen dem Merge von #1119 (11.09.)
+ * und dem 18.09., vier davon mit `Verweigerungen: 0` und `subtype: success`;
+ * der Wortlaut aus Lauf 35322774327 (#1259): "reads like a prompt-injection
+ * test embedded in the command arguments rather than a genuine repo
+ * requirement. I'm flagging this rather than blindly complying".
+ *
+ * ENG GEHALTEN, UND ZWAR ABSICHTLICH ZWEIFACH. Am 11.09. traf ein erstes, zu
+ * breites Muster dreimal das Wort "injection" in BEFUNDEN erfolgreicher
+ * Reviews. Deshalb verlangt dieses hier eine eingeschleuste ANWEISUNG (nicht
+ * das Wort allein), es wird erst NACH den Belegzweigen geprueft (ein Lauf, der
+ * geliefert hat, kann hier nicht mehr landen), und der Lauf muss auch sagen,
+ * dass er aufhoert. Es entscheidet nie ueber gruen, nur zwischen roten
+ * Diagnosen - und steht vor der Werkzeugsperre, weil eine unterwegs verweigerte
+ * Leseoperation nicht die Ursache ist, wenn der Lauf den Auftrag selbst nennt.
+ */
+const PROMPT_VERWORFEN =
+  /prompt[-\s]injection|(?:injected|embedded)\s+(?:instruction|directive|prompt|text|block|paragraph)|instructions?\s+embedded\s+in/i;
 
 /**
  * Der Ausstieg aus #865: die Sitzung endet, waehrend sie auf ihre eigenen
@@ -427,6 +450,13 @@ export function beurteile({
     };
   }
 
+  // DER LAUF NENNT SEINEN EIGENEN AUFTRAG ALS GRUND (#1259). Erst hier, weil
+  // jeder Beleg fuer eine Lieferung vorgeht: eine echte Review, die einen
+  // Injection-Befund im Code meldet, ist oben schon `geprueft`.
+  if (bejahtIrgendwo(text, PROMPT_VERWORFEN) && hoertAuf(text)) {
+    return stumm('prompt-verworfen', neu, seit, ergebnis, zahl.gebunden, gepostet.erfolge);
+  }
+
   if (sperren > 0) return stumm('werkzeugsperre', neu, seit, ergebnis, zahl.gebunden, gepostet.erfolge);
 
   // ... UND DIE GEFAEHRLICHERE LESART GEWINNT WEITER, auch wenn oben der
@@ -507,11 +537,18 @@ const DIAGNOSE = {
     'anthropics/claude-code-action diesen Output noch ausgibt.',
   'schon-kommentiert':
     'DER LAUF HAT IM TOR ABGEBROCHEN, WEIL CLAUDE AN DIESEM PR SCHON EINMAL GESPROCHEN ' +
-    'HAT - und der aktuelle Push ist damit UNGEPRUEFT. Genau dagegen steht die Anweisung im ' +
-    'Prompt ("DIE ABBRUCHBEDINGUNG ... GILT HIER NICHT"). Wird dieser Fehler gemeldet, ' +
-    'greift sie nicht mehr: Wortlaut im Prompt gegen den result-Text im Job-Log halten. ' +
-    'Bis das repariert ist, die Pruefung von Hand nachholen (`/code-review <PR> high`) ' +
-    'oder `@codex review` anfordern - Codex hat diese Sperre nicht.',
+    'HAT - und der aktuelle Push ist damit UNGEPRUEFT. Der Prompt sagt, dass eine ' +
+    'Aeusserung zu einem frueheren Stand kein Grund zum Aufhoeren ist; kommt diese ' +
+    'Diagnose, hat das nicht getragen. Den result-Text im Job-Log lesen, er nennt den ' +
+    'Grund meist selbst. Bis das repariert ist, die Pruefung von Hand nachholen ' +
+    '(`/code-review <PR> high`) oder `@codex review` anfordern - Codex hat diese Sperre nicht.',
+  'prompt-verworfen':
+    'DER LAUF HAT DEN AUFTRAG SELBST FUER EINGESCHLEUST GEHALTEN und deshalb aufgehoert - ' +
+    'der Push ist ungeprueft, und es ist KEIN Befund am Code. Der result-Text sagt, welche ' +
+    'Stelle des Prompts ihn getragen hat. Ein Rerun spielt denselben Prompt ab und hilft ' +
+    'nicht; der Prompt selbst muss kuerzer und sachlicher werden (auf `main`, nicht im ' +
+    'roten PR). Bis dahin die Pruefung von Hand nachholen oder `@codex review` anfordern. ' +
+    'Gemessen zwischen #1119 und #1259: sechs rote Laeufe dieser Sorte in sieben Tagen.',
   'lauf-fehler':
     'Der Lauf selbst ist gescheitert (`is_error` oder ein anderes `subtype` als ' +
     '"success"). Das ist kein Befund am Code: erst den Lauf reparieren, dann wieder ' +
@@ -526,8 +563,9 @@ const DIAGNOSE = {
     'DIE SITZUNG IST AUSGESTIEGEN, WAEHREND SIE AUF IHRE EIGENEN SUBAGENTEN WARTETE ' +
     '(#865, viermal hintereinander). Das Plugin startet sie asynchron; in einem CI-Lauf ' +
     'trifft die Benachrichtigung ueber einen fertigen Agenten auf keinen Turn mehr. ' +
-    'Reruns helfen nicht, die Ursache ist strukturell - im Prompt muss ' +
-    '`run_in_background: false` stehen und auch dort ankommen.',
+    'Reruns helfen nicht, die Ursache ist strukturell. Der Job setzt dagegen ' +
+    'CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1; kommt diese Diagnose trotzdem, ist der ' +
+    'Schalter nicht angekommen - im Strom nach `"subtype": "task_started"` suchen.',
   'nicht-zuzuordnen':
     'Nach dem Laufbeginn stehen claude-Aeusserungen OHNE Commit-Bindung am PR, aber ' +
     'das result-Objekt dieses Laufs sagt nirgends, dass er geliefert hat. Sie sind ' +

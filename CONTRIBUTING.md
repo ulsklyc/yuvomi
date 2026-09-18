@@ -309,9 +309,9 @@ branch: push to it, or merge `main` into the branch, or close and reopen it. A r
 when the refusal came from the path the review happened to take - reading earlier comments one
 way rather than another - because the next run may take a different one.
 
-**A later push is reviewed again.** The review does not stop because it already commented on
-an earlier push of the same PR: the workflow's prompt lifts that condition on purpose, since a
-green check over an unreviewed push is worse than a second review. A run that stops with
+**A later push is reviewed again.** This repository reviews per push, not per PR: a comment on
+an earlier push of the same PR does not cover a later one, and a green check over an unreviewed
+push is worse than a second review. A run that stops with
 "already reviewed this PR" has not reviewed the push it was started for, and the check turns red
 unless it finds that the push was reviewed some other way - also when that push only merged
 `main` into the branch.

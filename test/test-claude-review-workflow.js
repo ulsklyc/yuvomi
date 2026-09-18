@@ -16,6 +16,9 @@ const workflow = readFileSync(
   new URL('../.github/workflows/claude-code-review.yml', import.meta.url),
   'utf8'
 );
+const beitragen = readFileSync(new URL('../CONTRIBUTING.md', import.meta.url), 'utf8');
+/** Nur der Prompt-Block, ohne die Kommentare drumherum. */
+const prompt = workflow.match(/prompt: \|\n((?:[ ]{12}.*\n|\n)+)/)?.[1] ?? '';
 
 test('der Prompt traegt --comment, sonst prueft die Review und schweigt', () => {
   // Die Plugin-Anleitung: "If `--comment` argument was NOT provided, stop here.
@@ -24,31 +27,75 @@ test('der Prompt traegt --comment, sonst prueft die Review und schweigt', () => 
   assert.match(workflow, /\/code-review:code-review[^\n]*--comment/);
 });
 
-test('die Subagenten laufen synchron', () => {
+test('die Subagenten laufen synchron, und zwar erzwungen', () => {
   // #865, 2026-08-25: viermal hintereinander nichts hinterlassen. Das Plugin
   // startet seine Agenten asynchron, und die Benachrichtigung ueber einen
   // fertigen Agenten trifft in einem CI-Lauf auf keinen Turn mehr - die
   // Hauptsession sagt "ich warte" und ist damit fertig. Reruns halfen nicht,
   // weil die Ursache strukturell ist und nicht sprunghaft.
-  assert.match(workflow, /run_in_background:\s*false/,
-    'die Anweisung, Subagenten synchron zu fahren, fehlt im Prompt');
+  //
+  // Bis #1259 stand die Anweisung dazu im Prompt ("setze `run_in_background:
+  // false`"), und genau diese Zeile zitierte die Review am 18.09. als
+  // "attempts to dictate my internal tool parameters", bevor sie den ganzen
+  // Block verwarf. Jetzt entscheidet die Umgebung: der Schalter nimmt dem
+  // Agenten-Werkzeug den Parameter und laesst `shouldRunAsync` falsch werden.
+  assert.match(workflow, /^\s+CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1'$/m,
+    'der Schalter fuer synchrone Subagenten fehlt');
+  // Auf JOB-Ebene, nicht im Schritt: der Schritt der Action bringt seinen
+  // eigenen env-Block mit.
+  const jobEnv = workflow.match(/^ {4}env:\n((?: {6}.*\n|\n)+)/m)?.[1] ?? '';
+  assert.match(jobEnv, /CLAUDE_CODE_DISABLE_BACKGROUND_TASKS/,
+    'der Schalter muss im env des Jobs stehen, sonst sieht ihn die CLI nicht');
+  assert.doesNotMatch(prompt, /run_in_background/,
+    'Werkzeugparameter gehoeren in die Umgebung, nicht in den Prompt');
 });
 
-test('der Prompt traegt keine Werkzeug-Anweisungen, nur den Verweis auf CONTRIBUTING.md', () => {
+test('der Prompt traegt keine Werkzeug-Anweisungen, nur den Fundort CONTRIBUTING.md', () => {
   // 11.09.2026: ein Absatz ueber offene und gesperrte `gh api`- und git-Wege liess
   // die Review den ganzen Prompt als eingeschleust verwerfen (#1116, #1114; von
   // den 18 Laeufen davor keiner). Was erlaubt ist, setzt `claude_args` durch. Der
-  // Verweis auf CONTRIBUTING.md bleibt - dort kann die Review die Regel "jeder
-  // Push" selbst nachlesen, und genau das vermisste sie.
-  const prompt = workflow.match(/prompt: \|\n((?:[ ]{12}.*\n|\n)+)/)?.[1] ?? '';
+  // Fundort CONTRIBUTING.md bleibt - dort stehen die Regeln dieses Repos.
   assert.ok(prompt.includes('/code-review:code-review'), 'der Prompt liess sich nicht lesen');
   assert.doesNotMatch(prompt, /gh api|--allowed-tools|gesperrt|WERKZEUGE/i,
     'Werkzeug-Anweisungen gehoeren in claude_args, nicht in den Prompt');
-  assert.match(prompt, /CONTRIBUTING\.md/, 'der Verweis auf die nachlesbare Regel fehlt');
+  assert.match(prompt, /CONTRIBUTING\.md/, 'der Fundort der Regeln fehlt');
   // Der Checkout traegt die Fassung des PR - ein PR koennte den Widerspruch sonst
   // selbst wieder einbauen (Review auf #1119). Massgeblich ist der Default-Branch.
   assert.match(prompt, /github\.event\.repository\.default_branch/,
     'der Prompt muss die Fassung auf dem Default-Branch fuer massgeblich erklaeren');
+});
+
+test('der Prompt bleibt kurz, und die Laenge ist die Regel', () => {
+  // DIE LAENGE IST DAS MESSBARE AN "NICHT ARGUMENTATIV" (#1259, 18.09.2026).
+  // Der alte Prompt war auf 1783 Zeichen und 26 Zeilen gewachsen, und die
+  // Zuwaechse waren genau die Saetze, die ihn verdaechtig machten: eine
+  // Begruendung, warum eine Abbruchbedingung nicht gelte, ein Werkzeugparameter
+  // und ein Beleg aus der Repo-Doku. Sechs rote Laeufe in sieben Tagen nach
+  // #1119 haben ihn deshalb verworfen. Eine Grenze faengt den naechsten Absatz,
+  // bevor er wieder Laeufe kostet; sie steht mit Luft ueber dem heutigen Stand
+  // (761 Zeichen, 12 Zeilen), aber deutlich unter dem alten.
+  assert.ok(prompt.length <= 1000,
+    `der Prompt ist auf ${prompt.length} Zeichen gewachsen - was erklaert werden muss, gehoert in CONTRIBUTING.md`);
+  assert.ok(prompt.trimEnd().split('\n').length <= 16,
+    'der Prompt hat mehr als 16 Zeilen - ein neuer Absatz gehoert nicht hinein');
+  // Und keine Behauptung darueber, was in der Doku steht: der Lauf zu #1259 las
+  // genau das als "suspiciously on-the-nose".
+  assert.doesNotMatch(prompt, /beschreibt|bestaetigt|belegt/i,
+    'der Prompt soll den Fundort nennen, nicht behaupten, was dort steht');
+});
+
+test('weder Workflow noch CONTRIBUTING.md erklaeren den Prompt zum Mittel', () => {
+  // Zweimal (#1198 am 14.09., #1241 am 16.09.) war der Satz "siehe die
+  // Aufhebung der Abbruchbedingung im Prompt" aus dem Kopf dieser Datei der
+  // Hauptbeleg dafuer, die Review hielt Workflow und CONTRIBUTING.md fuer
+  // gepflanzt: "real CI config doesn't reference the prompt's abort condition".
+  // Die Review liest beide Dateien auf dem Default-Branch mit. Die Regel "jeder
+  // Push wird geprueft" ist eine Projektregel und steht als solche da, nicht
+  // als Eigenschaft eines Prompts.
+  assert.doesNotMatch(workflow, /Aufhebung der Abbruchbedingung im Prompt/);
+  assert.doesNotMatch(beitragen, /prompt lifts|lifts that condition/i);
+  assert.match(beitragen, /reviews per push, not per PR/,
+    'die Regel selbst muss in CONTRIBUTING.md nachlesbar bleiben');
 });
 
 test('Skill und Task stehen in den erlaubten Werkzeugen', () => {
@@ -178,13 +225,25 @@ test('gemessen wird gegen den Laufbeginn, nicht gegen die Commit-Zeit', () => {
   assert.match(workflow, /SEIT: \$\{\{ steps\.stand\.outputs\.seit \}\}/);
 });
 
-test('der Prompt hebt die Abbruchbedingung auf, sonst prueft nur der erste Push', () => {
-  // Ohne diesen Absatz bricht das Plugin ab dem zweiten Push zugesichert ab,
-  // dann waere ein Nachweis, der pro Push zaehlt, dauerhaft rot. Die Aufhebung
-  // und die engere Zaehlung gehoeren zusammen; eine allein ist ein anderer
-  // blinder Fleck.
-  assert.match(workflow, /ABBRUCHBEDINGUNG[^\n]*GILT\s*\n\s*HIER NICHT/);
-  assert.match(workflow, /github\.event\.pull_request\.head\.sha/);
+test('der Prompt haelt die Abbruchbedingung auf, sonst prueft nur der erste Push', () => {
+  // Ohne diesen Satz bricht das Plugin ab dem zweiten Push zugesichert ab, dann
+  // waere ein Nachweis, der pro Push zaehlt, dauerhaft rot. Die Aufhebung und
+  // die engere Zaehlung gehoeren zusammen; eine allein ist ein anderer blinder
+  // Fleck. Seit #1259 steht sie als EIN Satz da und begruendet sich nicht mehr:
+  // die Begruendung war es, die den ganzen Block verdaechtig machte.
+  assert.match(prompt, /kein Grund aufzuhoeren/);
+  assert.match(prompt, /github\.event\.pull_request\.head\.sha/);
+});
+
+test('bringt ein Push nichts Neues, sagt die Review das statt zu schweigen', () => {
+  // DIE DREI FAELLE, IN DENEN DIE REVIEW RECHT HATTE (#1232, #1186, #1253).
+  // Dort hing am Kopf-Commit wirklich schon eine Review, oder der Push war ein
+  // reiner Merge - der Lauf hoerte korrekt auf, hinterliess nichts, und der
+  // Nachweis faerbte rot, weil er "nichts hinterlassen" nicht von "nichts zu
+  // sagen" unterscheiden kann. Ein Satz als Kommentar kostet nichts und macht
+  // aus dem stummen Abbruch eine Aussage, die der Nachweis lesen kann.
+  assert.match(prompt, /nichts Neues/);
+  assert.match(prompt, /Kommentar/);
 });
 
 test('ein Lauf je PR, und zwar der zum neuesten Stand', () => {
