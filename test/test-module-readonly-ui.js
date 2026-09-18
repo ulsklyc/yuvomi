@@ -905,9 +905,17 @@ test('calendar: read zeigt an einer Aufgabe OHNE Erinnerung keinen Abschnitt', (
 
 test('calendar: none entfernt den Abschnitt ganz - es gibt keinen Zustand zu zeigen', () => {
   withAccess({ tasks: 'write', calendar: 'none' }, () => {
-    const html = tasks.renderModalContent({ task: faelligeAufgabe(), users: [], reminder: null });
-    assert.equal(reminderSection(html), '', 'kein Schalter, der nur einen 403 verspricht');
-    assert.doesNotMatch(html, /id="reminder-toggle"/);
+    // BEIDE Lagen, und die zweite ist der eigentliche Test. Mit `reminder: null`
+    // allein faellt diese Zeile auch dann noch richtig aus, wenn die Bedingung
+    // zu `(none || read) && !reminder` verengt wird - nachgemessen: 51 von 51
+    // blieben gruen. Dass eine Erinnerung hier nie ankommt, liegt allein daran,
+    // dass `loadReminderForTask()` fuer `none` vorher abbiegt; das ist eine
+    // Kopplung zwischen zwei Funktionen, keine Eigenschaft dieser hier.
+    for (const reminder of [null, erinnerung()]) {
+      const html = tasks.renderModalContent({ task: faelligeAufgabe(), users: [], reminder });
+      assert.equal(reminderSection(html), '', 'kein Schalter, der nur einen 403 verspricht');
+      assert.doesNotMatch(html, /id="reminder-toggle"/);
+    }
   });
 });
 
