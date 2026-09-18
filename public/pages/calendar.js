@@ -6,7 +6,7 @@
 
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues, recurrenceRow } from '/rrule-ui.js';
-import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, renderKeepingFocus } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, renderKeepingFocus } from '/components/modal.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
@@ -4053,6 +4053,9 @@ export const __test = {
   // `saveEvent` wirklich sendet -, nicht an den Helfern dazwischen.
   renderCalendarReminderSection, afterStartResolution, reminderSummary,
   wireEventForm, saveEvent,
+  // Die Frage nach der Reichweite eines Serientermins (#1284) - dieselbe fuer
+  // Speichern und Loeschen, gemessen an beiden Aufrufern.
+  requestDeleteEvent,
   EVENT_COLORS,
   renderScheduleChip,
   scheduleEntryTitle,
@@ -5134,7 +5137,6 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
       panel.querySelector('#modal-allday')?.checked ? '#modal-allday-start' : '#modal-start-date',
     ),
   });
-  bindRecurringScopeChooser(panel, 'modal-edit');
   bindUserMultiSelect(panel, 'cal_assigned');
   wireVisibilityWarning(panel, '#modal-visibility', 'cal_assigned', '#modal-visibility-warning');
 
@@ -5363,6 +5365,10 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
       ziele = geladen ?? null;
       zielNachZuweisung();
       syncOutlookHint();
+      // Das Laden stellt das bestehende Ziel erst jetzt ein (auch ueber eine
+      // Wahl hinweg, die schneller war). Das ist der Ausgangsstand, keine
+      // Aenderung (#1284).
+      rememberEventFormField(panel, syncTargetSelect);
     });
   }
 
@@ -5408,6 +5414,62 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
   // Speichern als ortloser Toast (Critique P1).
   wireBlurValidation(panel);
   if (window.lucide) lucide.createIcons({ el: panel });
+  // Der Ausgangsstand, gegen den das Speichern eines Serientermins prueft, ob
+  // es ueberhaupt etwas zu fragen gibt (#1284). Als Letztes: alles darueber
+  // darf noch Werte setzen, die zum Ausgangsstand gehoeren.
+  eventFormBaselines.set(panel, readEventFormState(panel));
+}
+
+/**
+ * WAS DAS FORMULAR GERADE SAGT - als Vergleichswert fuer „nichts geaendert"
+ * (#1284).
+ *
+ * Bearbeitet jemand einen Termin einer lokalen Serie, fragt das Speichern, ob
+ * die Aenderung fuer diesen Termin, diesen und die folgenden oder die ganze
+ * Serie gilt. Wer nichts geaendert hat, bekommt die Frage nicht: das Speichern
+ * schliesst dann nur. Das ist eine Entscheidung ueber Daten - ein „nichts
+ * geaendert", das sich irrt, schliesst das Formular und verwirft die Eingabe.
+ *
+ * Deshalb liest der Vergleich keine Feldliste, sondern JEDES Bedienelement im
+ * Formular: Wert oder Haken jedes input/select/textarea, dazu der Zustand jedes
+ * Knopfes, der ihn per aria-pressed/aria-checked traegt (Farbfelder, Wochentage
+ * der Wiederholung). Ein Feld, das spaeter dazukommt, zaehlt damit von selbst
+ * mit; eine Liste haette es vergessen koennen. Irrt der Vergleich, dann in die
+ * harmlose Richtung: er meldet eine Aenderung, und die Frage kommt einmal zu
+ * oft. Eine neue Erinnerungszeile oder eine entfernte aendert die Menge der
+ * Elemente und zaehlt ebenso. Ein entfernter Anhang hinterlaesst kein Feld mit
+ * anderem Wert, er meldet sich ueber seinen eigenen Zustand
+ * (`attachmentState.changed`).
+ */
+const eventFormBaselines = new WeakMap();
+
+function readEventFormState(panel) {
+  const fields = new Map();
+  for (const el of panel.querySelectorAll('input, select, textarea')) {
+    fields.set(el, el.type === 'checkbox' || el.type === 'radio' ? el.checked : el.value);
+  }
+  for (const el of panel.querySelectorAll('[aria-pressed], [aria-checked]')) {
+    fields.set(el, el.getAttribute('aria-pressed') ?? el.getAttribute('aria-checked'));
+  }
+  return fields;
+}
+
+/** Nimmt den jetzigen Wert eines Feldes in den Ausgangsstand auf. */
+function rememberEventFormField(panel, el) {
+  eventFormBaselines.get(panel)?.set(el, readEventFormState(panel).get(el));
+}
+
+function eventFormChanged(panel, attachmentState) {
+  const baseline = eventFormBaselines.get(panel);
+  // Ohne Ausgangsstand laesst sich nichts ausschliessen - also fragen.
+  if (!baseline || attachmentState?.changed) return true;
+  const now = readEventFormState(panel);
+  // Eine entfernte Erinnerungszeile faellt nur an der Zahl auf.
+  if (now.size !== baseline.size) return true;
+  for (const [el, value] of now) {
+    if (baseline.get(el) !== value) return true;
+  }
+  return false;
 }
 
 /**
@@ -5697,10 +5759,6 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       startDate,
     })}
 
-    ${isEdit && isLocalRecurringSeries(event) && canEditCalendarOccurrence(event)
-      ? renderRecurringScopeChooser('modal-edit', event.start_datetime.slice(0, 10))
-      : ''}
-
     ${isEdit && requiresWholeSeriesConfirmation(event) ? `
       <p class="cal-field-hint field-hint--warn" id="modal-whole-series-only" role="status">
         <i data-lucide="alert-triangle" aria-hidden="true"></i>
@@ -5821,6 +5879,26 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       && requiresWholeSeriesConfirmation(event)
       && !await confirmLocalWholeSeriesEdit(event)) return;
 
+  // WOFUER DIE AENDERUNG GILT, FRAGT ERST DAS SPEICHERN (#1284). Bis dahin
+  // stand „Gilt für" als Auswahl unter den Wiederholungsfeldern, vorbelegt mit
+  // „Nur diesen Termin". Wer oben eine Person anhakte und speicherte, sah sie
+  // nicht - und die Person hing an genau einem Termin, alle anderen blieben
+  // ohne. Jetzt kommt die Frage im Moment des Speicherns, als drei Knoepfe ohne
+  // Vorauswahl; Abbrechen fuehrt zurueck ins Formular, ohne etwas zu senden.
+  // Keine Frage, wo es keine gibt: ohne Aenderung schliesst das Speichern nur.
+  // Einzeltermine und Serien aus anderen Kalendern kommen hier nie an - sie
+  // speichern wie bisher die ganze Reihe.
+  let occurrenceScope = 'series';
+  if (mode === 'edit' && isLocalRecurringSeries(event) && canEditCalendarOccurrence(event)) {
+    if (!eventFormChanged(overlay, attachmentState)) {
+      closeModal({ force: true });
+      return;
+    }
+    const choice = await askOverModal(() => recurringScopeChoice({ action: 'save' }));
+    if (!choice) return;
+    occurrenceScope = choice;
+  }
+
   saveBtn.disabled    = true;
   saveBtn.textContent = '…';
 
@@ -5915,9 +5993,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     } else {
       const localRecurring = isLocalRecurringSeries(event);
       const canOverrideOccurrence = canOverrideCalendarOccurrence(event);
-      let scope = localRecurring && canEditCalendarOccurrence(event)
-        ? getRecurringScope(overlay, 'modal-edit')
-        : 'series';
+      let scope = occurrenceScope;
       if (!canOverrideOccurrence && scope === 'following' && followingMeansWholeSeries(event)) scope = 'series';
       if (localRecurring && canEditCalendarOccurrence(event) && (scope === 'this' || scope === 'following')) {
         const target = calendarOccurrenceMutationTarget(event, scope);
@@ -5929,7 +6005,10 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
         // mit dem Vorkommen mit wie seit #975. Hat jemand daneben etwas
         // geaendert, liesse sich das nur speichern, indem die Zeile nach dem
         // Beginn verschoben oder verworfen wird; das entscheidet niemand fuer
-        // ihn. Er bekommt die Meldung an der Zeile.
+        // ihn. Er bekommt die Meldung an der Zeile. Die Frage nach der
+        // Reichweite ist dann schon beantwortet und zu (#1284), das Formular
+        // steht wieder offen - die Meldung trifft also die Zeile, nicht den
+        // Dialog darueber.
         const reminderOffsets = occurrenceReminderOffsets(reminderForm.rows, reminderForm.enabled);
         if (reminderOffsets === null && canOverrideOccurrence && target.carriesReminderOffsets
             && !reminderRowsUnchanged(reminderForm, reminderList(existingReminder)
@@ -6055,47 +6134,68 @@ async function deleteEvent(event) {
   });
 }
 
-/**
- * Gemeinsame Scope-Auswahl für Serientermine (#532): identisches Control für
- * „Bearbeiten" und „Löschen". Select (App-weites Formular-Vokabular) mit Default
- * „Nur diesen Termin" (least-destructive) plus dynamischem Reichweiten-Hinweis,
- * der das konkrete Vorkommensdatum nennt. `prefix` → Element-ID `${prefix}-scope`.
- */
-function renderRecurringScopeChooser(prefix, occDateKey) {
+// Die drei Antworten, in der Reihenfolge, in der sie im Dialog stehen.
+const RECURRING_SCOPES = [
+  ['this', 'calendar.recurringScopeThis'],
+  ['following', 'calendar.recurringScopeFollowing'],
+  ['series', 'calendar.recurringScopeSeries'],
+];
+
+function renderRecurringScopeChoices(action) {
+  const tone = action === 'delete' ? 'btn--danger-outline' : 'btn--secondary';
+  const choices = RECURRING_SCOPES.map(([scope, key]) => `
+        <button type="button" class="btn ${tone}" data-scope="${scope}">${esc(t(key))}</button>`).join('');
   return `
-    <div class="form-group">
-      <label class="form-label" for="${prefix}-scope">${t('calendar.recurringScopeLabel')}</label>
-      <select class="input" id="${prefix}-scope" name="${prefix}-scope" data-occ-date="${esc(occDateKey)}">
-        <option value="this" selected>${t('calendar.recurringScopeThis')}</option>
-        <option value="following">${t('calendar.recurringScopeFollowing')}</option>
-        <option value="series">${t('calendar.recurringScopeSeries')}</option>
-      </select>
-      <p class="form-hint" id="${prefix}-scope-hint" role="status"></p>
+    <p class="modal-confirm__detail" id="recurring-scope-label">${esc(t('calendar.recurringScopeLabel'))}</p>
+    <div class="modal-actions modal-actions--stack">
+      <div class="modal-actions modal-actions--stack" role="group" aria-labelledby="recurring-scope-label">${choices}
+      </div>
+      <button type="button" class="btn btn--ghost" id="recurring-scope-cancel">${esc(t('common.cancel'))}</button>
     </div>`;
 }
 
-/** Reichweiten-Hinweistext für den gewählten Scope (mit formatiertem Datum). */
-function recurringScopeHint(value, occDateKey) {
-  if (value === 'series') return t('calendar.recurringScopeHintSeries');
-  const date = formatPreferredDate(occDateKey);
-  return value === 'following'
-    ? t('calendar.recurringScopeHintFollowing', { date })
-    : t('calendar.recurringScopeHintThis', { date });
-}
-
-/** Verdrahtet den dynamischen Hinweis der Scope-Auswahl. No-op ohne Chooser. */
-function bindRecurringScopeChooser(root, prefix) {
-  const sel  = root.querySelector(`#${prefix}-scope`);
-  const hint = root.querySelector(`#${prefix}-scope-hint`);
-  if (!sel || !hint) return;
-  const update = () => { hint.textContent = recurringScopeHint(sel.value, sel.dataset.occDate); };
-  sel.addEventListener('change', update);
-  update();
-}
-
-/** Liest den gewählten Scope; Default „this" (least-destructive). */
-function getRecurringScope(root, prefix) {
-  return root.querySelector(`#${prefix}-scope`)?.value || 'this';
+/**
+ * DIE FRAGE NACH DER REICHWEITE - EINE, fuer Speichern und Loeschen (#532, #1284).
+ *
+ * Seit #532 teilen Bearbeiten und Loeschen dieselbe Auswahl. Bis #1284 war das
+ * ein Select mit der Vorgabe „Nur diesen Termin": im Loeschdialog die ganze
+ * Frage, im Bearbeiten-Formular aber ein Feld unter den Wiederholungsfeldern,
+ * das man beim Speichern nicht sah - wer eine Person anhakte, gab sie genau
+ * einem Termin. Jetzt kommt die Frage in beiden Faellen erst im Moment der
+ * Handlung, als eigener Dialog mit drei Knoepfen und ohne Vorauswahl: eine
+ * Vorgabe, die man ueberlesen kann, ist hier eine Antwort, die niemand gegeben
+ * hat. Der Fokus geht beim Oeffnen in den Dialog (auf das Schliessen-X, wie bei
+ * jeder Rueckfrage ohne Eingabefeld), Escape, X, Overlay und „Abbrechen"
+ * liefern null.
+ *
+ * `action` ist 'save' oder 'delete'; es waehlt nur Titel und Ton der Knoepfe.
+ * Optionen, Texte und Bedienung sind dieselben - zwei Dialogarten fuer dieselbe
+ * Frage wuerden auseinanderlaufen.
+ *
+ * Loest zu 'this' | 'following' | 'series' | null.
+ */
+function recurringScopeChoice({ action }) {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (value) => {
+      if (resolved) return;
+      resolved = true;
+      closeModal({ force: true });
+      resolve(value);
+    };
+    openSharedModal({
+      title: action === 'delete' ? t('calendar.deleteRecurringTitle') : t('calendar.saveRecurringTitle'),
+      size: 'sm',
+      content: renderRecurringScopeChoices(action),
+      onClose: () => finish(null),
+      onSave(panel) {
+        for (const button of panel.querySelectorAll('[data-scope]')) {
+          button.addEventListener('click', () => finish(button.dataset.scope));
+        }
+        panel.querySelector('#recurring-scope-cancel')?.addEventListener('click', () => finish(null));
+      },
+    });
+  });
 }
 
 /**
@@ -6190,45 +6290,11 @@ async function requestDeleteEvent(event) {
     if (await confirmLocalWholeSeriesDelete(event)) await deleteEvent(event);
     return;
   }
-  const choice = await recurringDeleteChoice(event);
+  const choice = await recurringScopeChoice({ action: 'delete' });
   if (choice === 'series') await deleteEvent(event);
   else if (choice === 'following') await deleteThisAndFollowing(event);
   else if (choice === 'this') await deleteSingleOccurrence(event);
   // null → abgebrochen, nichts tun
-}
-
-/**
- * Auswahl-Dialog für das Löschen wiederkehrender Termine (#532). Nutzt dieselbe
- * Scope-Komponente wie das Bearbeiten-Modal (Konsistenz) plus einen destruktiven
- * „Löschen"-Bestätiger. Löst zu 'this' | 'following' | 'series' | null.
- */
-function recurringDeleteChoice(event) {
-  const occDateKey = event.start_datetime.slice(0, 10);
-  return new Promise((resolve) => {
-    let resolved = false;
-    const finish = (value) => {
-      if (resolved) return;
-      resolved = true;
-      closeModal({ force: true });
-      resolve(value);
-    };
-    openSharedModal({
-      title: t('calendar.deleteRecurringTitle'),
-      size: 'sm',
-      content: `
-        ${renderRecurringScopeChooser('rds', occDateKey)}
-        <div class="modal-actions modal-actions--stack">
-          <button type="button" class="btn btn--danger" id="rds-confirm">${t('common.delete')}</button>
-          <button type="button" class="btn btn--ghost" id="rds-cancel">${t('common.cancel')}</button>
-        </div>`,
-      onClose: () => finish(null),
-      onSave(panel) {
-        bindRecurringScopeChooser(panel, 'rds');
-        panel.querySelector('#rds-confirm')?.addEventListener('click', () => finish(getRecurringScope(panel, 'rds')));
-        panel.querySelector('#rds-cancel')?.addEventListener('click', () => finish(null));
-      },
-    });
-  });
 }
 
 /**

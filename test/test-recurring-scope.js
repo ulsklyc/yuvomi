@@ -587,10 +587,13 @@ test('a local series without occurrence authority confirms edit and delete as wh
   const renderBody = calendarSrc.slice(renderStart, renderEnd);
   assert.match(renderBody, /requiresWholeSeriesConfirmation\(event\)/);
   assert.match(renderBody, /calendar\.wholeSeriesOnlyNotice/);
+  // Seit #1284 fragt das Speichern nach der Reichweite, nicht mehr ein Feld im
+  // Formular. Die Frage haengt an derselben Berechtigung wie zuvor das Feld;
+  // wie sie sich verhaelt, misst test:calendar-occurrence-scope am Aufrufer.
   assert.match(
-    renderBody,
-    /isLocalRecurringSeries\(event\)\s*&&\s*canEditCalendarOccurrence\(event\)[\s\S]*renderRecurringScopeChooser/,
-    'occurrence scope chooser is not guarded by occurrence authority',
+    saveBody,
+    /isLocalRecurringSeries\(event\)\s*&&\s*canEditCalendarOccurrence\(event\)\)\s*\{[\s\S]*?recurringScopeChoice\(/,
+    'occurrence scope question is not guarded by occurrence authority',
   );
 });
 

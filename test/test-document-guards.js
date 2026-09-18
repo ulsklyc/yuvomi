@@ -569,9 +569,11 @@ test('calendar save gates retain unsaved fields after orphan confirmation, serve
       }
       void request.continue();
     });
-    await page.select('#modal-edit-scope', 'series');
     await page.evaluate(() => { document.getElementById('event-rrule-count').value = '1'; });
+    // Seit #1284 fragt das Speichern, wofuer die Aenderung gilt.
     await page.click('#modal-save');
+    await page.waitForSelector('[data-scope="series"]');
+    await page.click('[data-scope="series"]');
     await page.waitForSelector('#confirm-modal-ok');
     assert.equal(attempts.length, 1, 'the real server must reject the rule that orphans its linked child');
     await page.click('#confirm-modal-ok');
@@ -585,6 +587,8 @@ test('calendar save gates retain unsaved fields after orphan confirmation, serve
     await page.waitForFunction(() => ![...document.querySelectorAll('.toast')]
       .some((element) => element.textContent.includes('Save gate test server failure')));
     await page.click('#modal-save');
+    await page.waitForSelector('[data-scope="series"]');
+    await page.click('[data-scope="series"]');
     await page.waitForSelector('#confirm-modal-cancel');
     await page.click('#confirm-modal-cancel');
     await page.waitForFunction(() => !document.getElementById('confirm-modal-cancel')
@@ -606,7 +610,7 @@ test('calendar whole-series save confirmation leaves invalid UNTIL editable', as
   const page = await openPage(harness, { device: 'desktop', locale: 'de' });
   try {
     await openCalendarSaveGateEditor(page, { wholeSeriesOnly: true });
-    assert.equal(await page.$('#modal-edit-scope'), null, 'the fixture must use the whole-series-only capability');
+    assert.ok(await page.$('#modal-whole-series-only'), 'the fixture must use the whole-series-only capability');
     await page.select('#event-rrule-end', 'until');
     await page.evaluate(() => {
       const picker = document.getElementById('event-rrule-until');
@@ -619,6 +623,7 @@ test('calendar whole-series save confirmation leaves invalid UNTIL editable', as
     });
     await page.click('#modal-save');
     await page.waitForSelector('#confirm-modal-ok');
+    assert.equal(await page.$('[data-scope]'), null, 'no scope question where only the whole series can be edited');
     await page.click('#confirm-modal-ok');
     await page.waitForFunction(() => document.getElementById('event-rrule-until')?.getAttribute('aria-invalid') === 'true');
     await assertCalendarSaveGateEditor(page);
