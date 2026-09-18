@@ -63,7 +63,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the overview opens this view rather than offering a button of its own. An open task now offers
   Complete and Start side by side, with Complete first. Starting a task is unchanged and still
   there - "in progress" says something about the task, it was just never meant to be a turnstile.
-  (#1251)
+  While one of them is waiting for the server, the other is disabled: with two buttons side by
+  side a double tap on a slow connection could otherwise complete a task and then immediately
+  undo it, taking the awarded points, the recorded completion and - on a repeating task - the
+  next occurrence with it. (#1251)
 
 - **Restoring a backup from another installation now says that it is the encryption key, instead of
   claiming the file is not a database.** A backup carries the encryption of the instance that wrote

@@ -1031,9 +1031,40 @@ export function openTaskDetail({
  * den neuen Stand sofort, weil das Abhaken sonst wie ein verschluckter Klick
  * wirkt. Scheitert der Aufruf, kommt die alte Beschriftung zurück.
  */
+/**
+ * Die Statusknoepfe, die gerade in der Ansicht stehen.
+ *
+ * Gebraucht, seit eine offene Aufgabe ZWEI davon traegt (#1251). Vorher war je
+ * Status genau einer da, und `btnLoading()` - das nur den angeklickten sperrt -
+ * war damit ein vollstaendiger Riegel. Jetzt stehen Erledigen und Starten
+ * nebeneinander, jeder mit eigenem Listener, und die Ansicht bleibt offen, bis
+ * die Antwort da ist.
+ *
+ * WAS OHNE DEN RIEGEL PASSIERT, und es ist kein kosmetischer Schaden: wer auf
+ * einer langsamen Leitung Erledigen tippt und dann Starten, schickt zwei
+ * Schreibvorgaenge los. Der erste bucht Punkte, schreibt die Erledigung fort
+ * und legt bei einer Serie die naechste Instanz an. Der zweite liest `prev`
+ * frisch, findet `done` vor, und weil `prev.status === 'done' && status !==
+ * 'done'` gilt, storniert er die Gutschrift, verwirft die Erledigung und
+ * LOESCHT die eben angelegte Folgeinstanz (`discardRecurrenceFollowup` in
+ * server/routes/tasks.js). Uebrig bleibt eine laufende Aufgabe, deren
+ * Erledigung verschwunden ist - und bei einer Serie ihr naechster Termin dazu.
+ */
+const STATUS_ACTION_IDS = Object.values(STATUS_ACTIONS).flat().map((step) => step.id);
+
+function statusActionButtons() {
+  return [...new Set(STATUS_ACTION_IDS)]
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+}
+
 async function advanceTaskStatus(task, status, button, ctx) {
   const previous = task.status;
   const stop = btnLoading(button);
+  // Die Geschwister werden nur gesperrt, nicht in den Ladezustand versetzt: der
+  // Spinner gehoert an den Knopf, den jemand gedrueckt hat.
+  const siblings = statusActionButtons().filter((el) => el !== button);
+  siblings.forEach((el) => { el.disabled = true; });
   try {
     await api.patch(`/tasks/${task.id}/status`, { status });
     task.status = status;
@@ -1045,6 +1076,7 @@ async function advanceTaskStatus(task, status, button, ctx) {
   } catch (err) {
     task.status = previous;
     stop();
+    siblings.forEach((el) => { el.disabled = false; });
     // Gescheitert ist ein Schreibvorgang, kein Laden - tasks.loadError („Aufgabe
     // konnte nicht geladen werden") beschriebe den falschen Vorgang.
     window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');

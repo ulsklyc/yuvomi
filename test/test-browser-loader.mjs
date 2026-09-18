@@ -129,7 +129,12 @@ const STUBS = {
     export const updateHeaderAction = () => null;
     export const validateAll = () => true;
     export const promptModal = async (...args) => globalThis.__promptModal?.(...args) ?? null;
-    export const btnLoading = () => {};
+    // Gibt eine FUNKTION zurueck wie das Original - der Aufrufer haelt sie als
+    // stop() fest und ruft sie im Fehlerpfad. Ein leeres Objekt hier liess jeden
+    // Test sterben, der genau diesen Pfad faehrt, und zwar an einem TypeError
+    // statt an der Sache, die er messen wollte. Den Knopfzustand baut der Stub
+    // bewusst NICHT nach: wer ihn pruefen will, wuerde sonst den Stub messen.
+    export const btnLoading = () => () => {};
     export const btnSuccess = () => {};
     export const btnError = () => {};
     export const refocusAfterRender = () => {};
