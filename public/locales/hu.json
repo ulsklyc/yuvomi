@@ -501,7 +501,8 @@
         "checkConflict": "A feladat időközben megváltozott. Nyissa meg újra.",
         "doneByPick": "Ki végezte el ezt: „{{title}}”?",
         "doneByToast": "Elvégezte: {{name}}.",
-        "historyTickedBy": "kipipálta: {{name}}"
+        "historyTickedBy": "kipipálta: {{name}}",
+        "reminderLockedNeedsDueDate": "Ehhez a feladathoz emlékeztető tartozik, amelyet nem módosíthatsz. Ezért határidőre van szüksége."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} étkezésből",
@@ -2874,7 +2875,8 @@
         "sectionTitlePlural": "Emlékeztetők",
         "sharedWithAssignees": "Az eseményhez rendelt személyek is megkapják ezt az emlékeztetőt.",
         "offsetAfterDue": "A határidő után",
-        "afterDueHint": "Ez az emlékeztető a határidő után van ({{when}}), és mentéskor változatlan marad. Válasszon előzetes időt az áthelyezéséhez."
+        "afterDueHint": "Ez az emlékeztető a határidő után van ({{when}}), és mentéskor változatlan marad. Válasszon előzetes időt az áthelyezéséhez.",
+        "readOnlyNotice": "Az emlékeztetők a Naptárhoz tartoznak. Ott írási jog nélkül ez a beállítás változatlan marad."
     },
     "birthdays": {
         "inDays": "{{days}} nap múlva",

@@ -513,7 +513,8 @@
         "checkConflict": "Nabago ang gawain samantala. Pakibuksan itong muli.",
         "doneByPick": "Sino ang gumawa ng “{{title}}”?",
         "doneByToast": "Ginawa ni {{name}}.",
-        "historyTickedBy": "minarkahan ni {{name}}"
+        "historyTickedBy": "minarkahan ni {{name}}",
+        "reminderLockedNeedsDueDate": "May paalala ang gawaing ito na hindi mo maaaring baguhin. Kailangan nito ng petsa ng deadline."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} na (mga) pagkain",
@@ -2886,7 +2887,8 @@
         "sectionTitlePlural": "Mga Paalala",
         "sharedWithAssignees": "Nakukuha rin ng mga nakatalaga sa kaganapang ito ang paalalang ito.",
         "offsetAfterDue": "Pagkatapos ng takdang petsa",
-        "afterDueHint": "Ang paalalang ito ay pagkatapos ng takdang petsa ({{when}}) at mananatiling hindi nagbabago kapag nag-save ka. Pumili ng lead time para ilipat ito."
+        "afterDueHint": "Ang paalalang ito ay pagkatapos ng takdang petsa ({{when}}) at mananatiling hindi nagbabago kapag nag-save ka. Pumili ng lead time para ilipat ito.",
+        "readOnlyNotice": "Ang mga paalala ay nasa Kalendaryo. Kung wala kang access na magsulat doon, hindi mababago ang setting na ito."
     },
     "birthdays": {
         "inDays": "sa loob ng {{days}} araw",

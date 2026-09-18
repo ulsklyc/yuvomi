@@ -501,7 +501,8 @@
         "checkConflict": "The task has changed in the meantime. Please open it again.",
         "doneByPick": "Who did “{{title}}”?",
         "doneByToast": "Done by {{name}}.",
-        "historyTickedBy": "ticked off by {{name}}"
+        "historyTickedBy": "ticked off by {{name}}",
+        "reminderLockedNeedsDueDate": "This task has a reminder you are not allowed to change. It therefore needs a due date."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} meals",
@@ -2874,7 +2875,8 @@
         "sectionTitlePlural": "Reminders",
         "sharedWithAssignees": "Anyone assigned to this event gets this reminder too.",
         "offsetAfterDue": "After the due date",
-        "afterDueHint": "This reminder is after the due date ({{when}}) and stays unchanged when you save. Pick a lead time to move it."
+        "afterDueHint": "This reminder is after the due date ({{when}}) and stays unchanged when you save. Pick a lead time to move it.",
+        "readOnlyNotice": "Reminders belong to the Calendar. Without write access there, this setting stays unchanged."
     },
     "birthdays": {
         "inDays": "in {{days}} days",

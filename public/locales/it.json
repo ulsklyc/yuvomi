@@ -501,7 +501,8 @@
         "checkConflict": "L’attività è stata modificata nel frattempo. Riaprila.",
         "doneByPick": "Chi ha svolto «{{title}}»?",
         "doneByToast": "Svolto da {{name}}.",
-        "historyTickedBy": "spuntato da {{name}}"
+        "historyTickedBy": "spuntato da {{name}}",
+        "reminderLockedNeedsDueDate": "Questa attività ha un promemoria che non puoi modificare. Serve quindi una data di scadenza."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} pasti",
@@ -2989,7 +2990,8 @@
         "sectionTitlePlural": "Promemoria",
         "sharedWithAssignees": "Anche chi è assegnato a questo evento riceve questo promemoria.",
         "offsetAfterDue": "Dopo la scadenza",
-        "afterDueHint": "Questo promemoria è successivo alla data di scadenza ({{when}}) e resta invariato al salvataggio. Scegli un anticipo per spostarlo."
+        "afterDueHint": "Questo promemoria è successivo alla data di scadenza ({{when}}) e resta invariato al salvataggio. Scegli un anticipo per spostarlo.",
+        "readOnlyNotice": "I promemoria appartengono al Calendario. Senza permesso di scrittura lì, questa impostazione resta invariata."
     },
     "onboarding": {
         "step1Title": "Benvenuto in {{name}}",

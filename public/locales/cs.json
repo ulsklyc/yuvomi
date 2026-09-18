@@ -501,7 +501,8 @@
         "checkConflict": "Úkol byl mezitím změněn. Otevřete jej prosím znovu.",
         "doneByPick": "Kdo splnil „{{title}}“?",
         "doneByToast": "Splnil(a) {{name}}.",
-        "historyTickedBy": "odškrtl(a) {{name}}"
+        "historyTickedBy": "odškrtl(a) {{name}}",
+        "reminderLockedNeedsDueDate": "Tento úkol má připomínku, kterou nemůžeš změnit. Proto potřebuje datum splnění."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} jídla",
@@ -3466,7 +3467,8 @@
         "sectionTitlePlural": "Připomínky",
         "sharedWithAssignees": "Toto připomenutí dostanou i osoby přiřazené k této události.",
         "offsetAfterDue": "Po termínu splnění",
-        "afterDueHint": "Tato připomínka je po termínu splnění ({{when}}) a při uložení zůstane beze změny. Vyberte předstih, kterým ji posunete."
+        "afterDueHint": "Tato připomínka je po termínu splnění ({{when}}) a při uložení zůstane beze změny. Vyberte předstih, kterým ji posunete.",
+        "readOnlyNotice": "Připomínky patří ke Kalendáři. Bez práva k zápisu tam zůstane toto nastavení nezměněné."
     },
     "birthdays": {
         "inDays": "za {{days}} dní",

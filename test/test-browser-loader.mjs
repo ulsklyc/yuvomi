@@ -98,7 +98,12 @@ const STUBS = {
   '/rrule-ui.js': `
     export const renderRRuleFields = () => '';
     export const bindRRuleEvents = () => {};
-    export const getRRuleValues = () => ({});
+    // Das leere Objekt ist fuer jede Suite richtig, die nur das MARKUP prueft -
+    // aber es hat kein 'valid_until', und jeder Formular-Handler, der die
+    // Wiederholung mitliest, bricht damit sofort mit "invalidDate" ab. Suiten,
+    // die einen Handler wirklich FAHREN, setzen globalThis.__rruleValues -
+    // dasselbe Muster wie __apiStub in /api.js.
+    export const getRRuleValues = () => globalThis.__rruleValues ?? ({});
     export const describeRRule = () => '';
     export const recurrenceRow = () => ({ icon: 'repeat', label: '', value: '' });
     export const intervalUnitLabel = () => '';

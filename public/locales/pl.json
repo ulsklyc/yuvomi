@@ -513,7 +513,8 @@
         "checkConflict": "Zadanie zostało w międzyczasie zmienione. Otwórz je ponownie.",
         "doneByPick": "Kto wykonał „{{title}}”?",
         "doneByToast": "Wykonał(a) {{name}}.",
-        "historyTickedBy": "odhaczone przez {{name}}"
+        "historyTickedBy": "odhaczone przez {{name}}",
+        "reminderLockedNeedsDueDate": "To zadanie ma przypomnienie, którego nie możesz zmienić. Dlatego wymaga terminu."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} posiłki",
@@ -2886,7 +2887,8 @@
         "sectionTitlePlural": "Przypomnienia",
         "sharedWithAssignees": "Osoby przypisane do tego wydarzenia również otrzymają to przypomnienie.",
         "offsetAfterDue": "Po terminie",
-        "afterDueHint": "To przypomnienie wypada po terminie ({{when}}) i przy zapisie pozostaje bez zmian. Wybierz wyprzedzenie, aby je przesunąć."
+        "afterDueHint": "To przypomnienie wypada po terminie ({{when}}) i przy zapisie pozostaje bez zmian. Wybierz wyprzedzenie, aby je przesunąć.",
+        "readOnlyNotice": "Przypomnienia należą do Kalendarza. Bez prawa zapisu tam to ustawienie pozostaje bez zmian."
     },
     "birthdays": {
         "inDays": "za {{days}} dni",

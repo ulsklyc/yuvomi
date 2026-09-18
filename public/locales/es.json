@@ -501,7 +501,8 @@
         "checkConflict": "La tarea ha cambiado mientras tanto. Vuelve a abrirla.",
         "doneByPick": "¿Quién hizo «{{title}}»?",
         "doneByToast": "Hecho por {{name}}.",
-        "historyTickedBy": "marcado por {{name}}"
+        "historyTickedBy": "marcado por {{name}}",
+        "reminderLockedNeedsDueDate": "Esta tarea tiene un recordatorio que no puedes cambiar. Por eso necesita una fecha de vencimiento."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} comidas",
@@ -2989,7 +2990,8 @@
         "sectionTitlePlural": "Recordatorios",
         "sharedWithAssignees": "Quien esté asignado a este evento también recibe este recordatorio.",
         "offsetAfterDue": "Después del vencimiento",
-        "afterDueHint": "Este recordatorio es posterior a la fecha de vencimiento ({{when}}) y no cambia al guardar. Elige una antelación para moverlo."
+        "afterDueHint": "Este recordatorio es posterior a la fecha de vencimiento ({{when}}) y no cambia al guardar. Elige una antelación para moverlo.",
+        "readOnlyNotice": "Los recordatorios pertenecen al Calendario. Sin permiso de escritura allí, este ajuste se mantiene sin cambios."
     },
     "onboarding": {
         "step1Title": "Bienvenido a {{name}}",

@@ -230,7 +230,7 @@ test('ohne Faelligkeit oder ohne gespeicherten Zeitpunkt bleibt alles stehen', (
 // an den Datumsfeldern stammen also aus genau einer Quelle.
 // --------------------------------------------------------------------------
 
-function fakePanel({ offsetValue = 'offset_after_due', dueDate = '2026-09-18', storedRemindAt = AFTER_DUE.remind_at } = {}) {
+function fakePanel({ offsetValue = 'offset_after_due', dueDate = '2026-09-18', storedRemindAt = AFTER_DUE.remind_at, locked = false } = {}) {
   const el = (value, extra = {}) => ({
     value,
     listeners: {},
@@ -240,6 +240,7 @@ function fakePanel({ offsetValue = 'offset_after_due', dueDate = '2026-09-18', s
   });
   const nodes = {
     '#reminder-offset': el(offsetValue, {
+      disabled: locked,
       options: ['offset_none', 'offset_after_due', 'offset_at_time', 'offset_15m', 'offset_1h',
         'offset_1d', 'offset_2d', 'offset_1w', 'offset_2w', 'offset_custom'].map((value) => ({ value })),
     }),
@@ -349,4 +350,19 @@ test('das Umstellen schreibt nur, was die Auswahl auch fuehrt', () => {
   panel.nodes['#task-due-date'].fire('change');
   assert.equal(panel.nodes['#reminder-offset'].value, 'offset_after_due', 'unveraendert statt falsch');
   assert.equal(panel.nodes['#reminder-custom-amount'].value, '1', 'und die Felder bleiben unberuehrt');
+});
+
+test('ein gesperrter Abschnitt wird auch vom Datumswechsel nicht angefasst', () => {
+  // Mit `calendar: read` ist die Erinnerung gesperrt, das Faelligkeitsdatum
+  // aber bedienbar - es gehoert dem Aufgaben-Modul (#1253). Ein gesperrtes
+  // Feld, das sich unter der Hand aendert, behauptete einen gespeicherten
+  // Zustand, den es nicht gibt: das Speichern fasst die Erinnerung ohne
+  // Schreibrecht gar nicht an.
+  const panel = wireLikeTheDialog(fakePanel({ locked: true }));
+  panel.nodes['#task-due-date'].value = '2026-09-26';
+  panel.nodes['#task-due-date'].fire('change');
+
+  assert.equal(panel.nodes['#reminder-offset'].value, 'offset_after_due', 'die Auswahl bleibt stehen');
+  assert.equal(panel.nodes['#reminder-custom-amount'].value, '1', 'und die Felder darunter auch');
+  assert.equal(panel.nodes['#reminder-after-due-warning'].hidden, false, 'der Warnton bleibt, wie er gespeichert ist');
 });

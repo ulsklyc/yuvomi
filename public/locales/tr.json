@@ -501,7 +501,8 @@
         "checkConflict": "Görev bu arada değişti. Lütfen yeniden açın.",
         "doneByPick": "“{{title}}” görevini kim yaptı?",
         "doneByToast": "{{name}} yaptı.",
-        "historyTickedBy": "işaretleyen: {{name}}"
+        "historyTickedBy": "işaretleyen: {{name}}",
+        "reminderLockedNeedsDueDate": "Bu görevde değiştirmenize izin verilmeyen bir hatırlatıcı var. Bu nedenle bir bitiş tarihi gerekiyor."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} öğünden",
@@ -2989,7 +2990,8 @@
         "sectionTitlePlural": "Hatırlatıcılar",
         "sharedWithAssignees": "Bu etkinliğe atanan kişiler de bu hatırlatmayı alır.",
         "offsetAfterDue": "Son tarihten sonra",
-        "afterDueHint": "Bu hatırlatıcı son tarihten sonra ({{when}}) ve kaydettiğinizde değişmeden kalır. Taşımak için bir hatırlatma süresi seçin."
+        "afterDueHint": "Bu hatırlatıcı son tarihten sonra ({{when}}) ve kaydettiğinizde değişmeden kalır. Taşımak için bir hatırlatma süresi seçin.",
+        "readOnlyNotice": "Hatırlatıcılar Takvime aittir. Orada yazma yetkiniz yoksa bu ayar değişmeden kalır."
     },
     "onboarding": {
         "step1Title": "{{name}} uygulamasına hoş geldiniz",
