@@ -269,8 +269,9 @@ jobs:
             Dieses Repo prueft je Push: dass du zu einem FRUEHEREN Stand
             desselben PR schon etwas gesagt hast, ist kein Grund aufzuhoeren.
             Bringt dieser Stand nichts Neues, sag genau das in einem Satz als
-            Kommentar. Die uebrigen Bedingungen aus Schritt 1 (geschlossen,
-            Entwurf, automatisiert, trivial) gelten unveraendert.
+            Kommentar und nenne darin, WOMIT du verglichen hast. Die uebrigen
+            Bedingungen aus Schritt 1 (geschlossen, Entwurf, automatisiert,
+            trivial) gelten unveraendert.
 
             Ein CLAUDE.md liegt im Checkout nicht (gitignored); die Regeln
             dieses Repos stehen in CONTRIBUTING.md auf

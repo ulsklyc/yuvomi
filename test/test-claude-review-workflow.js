@@ -65,6 +65,33 @@ test('der Prompt traegt keine Werkzeug-Anweisungen, nur den Fundort CONTRIBUTING
     'der Prompt muss die Fassung auf dem Default-Branch fuer massgeblich erklaeren');
 });
 
+test('ein "nichts Neues" muss nennen, WOMIT verglichen wurde', () => {
+  // #1266: gruen entscheidet sich in review-verdict.mjs an EINER Zahl -
+  // `if (gepostet.erfolge > 0) return { ausgang: 'geprueft' }`. Der INHALT der
+  // Aeusserung geht nicht ein, und das ist fuer die Frage, die das Urteil
+  // beantwortet ("hat dieser Lauf ueberhaupt geliefert"), auch richtig.
+  //
+  // Seit die Zeile darueber im Prompt steht, liefert der Fall "nichts Neues"
+  // aber einen Satz - und ein FALSCHES "nichts Neues" ist damit von einem
+  // richtigen nicht mehr zu unterscheiden, beide gruen. Falsch kommt vor:
+  // Lauf 35323025532 (PR #1253) hielt zwei Commits fuer reine Merges "with
+  // zero new lines authored by this PR"; einer davon loeste einen
+  // add/add-Konflikt auf und faltete ~430 Testzeilen ein, was in seiner
+  // Betreffzeile steht. Damals wurde der Lauf rot und die Pruefung von Hand
+  // nachgeholt - sie fand zwei echte Defekte.
+  //
+  // Der Bezugspunkt im Satz macht die Behauptung nachpruefbar, ohne dass der
+  // Waechter den Text deuten muss: er steht auf dem PR, wo ein Mensch ihn
+  // gegen die Commit-Liste halten kann. Ein Matcher auf den Kommentartext
+  // waere der andere Weg und der schlechtere - `VERNEINT` in
+  // review-verdict.mjs zeigt, wie so etwas driftet.
+  //
+  // Dass der Fall selbst im Prompt steht, haelt der Test darueber; hier steht
+  // nur, was seit #1266 dazugehoert.
+  assert.match(prompt, /WOMIT du verglichen hast/,
+    'ein "nichts Neues" ohne Bezugspunkt laesst sich nicht nachpruefen (#1266)');
+});
+
 test('der Prompt bleibt kurz, und die Laenge ist die Regel', () => {
   // DIE LAENGE IST DAS MESSBARE AN "NICHT ARGUMENTATIV" (#1259, 18.09.2026).
   // Der alte Prompt war auf 1783 Zeichen und 26 Zeilen gewachsen, und die
@@ -236,12 +263,20 @@ test('der Prompt haelt die Abbruchbedingung auf, sonst prueft nur der erste Push
 });
 
 test('bringt ein Push nichts Neues, sagt die Review das statt zu schweigen', () => {
-  // DIE DREI FAELLE, IN DENEN DIE REVIEW RECHT HATTE (#1232, #1186, #1253).
-  // Dort hing am Kopf-Commit wirklich schon eine Review, oder der Push war ein
-  // reiner Merge - der Lauf hoerte korrekt auf, hinterliess nichts, und der
-  // Nachweis faerbte rot, weil er "nichts hinterlassen" nicht von "nichts zu
-  // sagen" unterscheiden kann. Ein Satz als Kommentar kostet nichts und macht
-  // aus dem stummen Abbruch eine Aussage, die der Nachweis lesen kann.
+  // DIE FAELLE, IN DENEN DIE REVIEW RECHT HATTE (#1232, #1186). Dort hing am
+  // Kopf-Commit wirklich schon eine Review - der Lauf hoerte korrekt auf,
+  // hinterliess nichts, und der Nachweis faerbte rot, weil er "nichts
+  // hinterlassen" nicht von "nichts zu sagen" unterscheiden kann. Ein Satz als
+  // Kommentar kostet nichts und macht aus dem stummen Abbruch eine Aussage,
+  // die der Nachweis lesen kann.
+  //
+  // #1253 STAND HIER MIT IN DER REIHE UND GEHOERT NICHT HINEIN (#1266,
+  // nachgemessen). Dessen Lauf nannte zwei Commits "Merge origin/main commits,
+  // not new authored work" mit "zero new lines authored by this PR" - einer
+  // davon loeste einen add/add-Konflikt auf und faltete ~430 Testzeilen ein,
+  // was in seiner Betreffzeile steht. Die Review hatte dort nicht recht,
+  // sondern klang nur so. Daran haengt der Test unten: ein "nichts Neues" ohne
+  // Bezugspunkt ist von einem falschen nicht zu unterscheiden.
   assert.match(prompt, /nichts Neues/);
   assert.match(prompt, /Kommentar/);
 });
