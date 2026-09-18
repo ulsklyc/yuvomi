@@ -934,7 +934,19 @@ test('reminders for deleted entities never send the app name as body (#581)', as
   const db = makeDb();
   const store = createNotificationChannelStore({ db });
   store.createChannel({ provider: 'ntfy', name: 'ntfy', enabled: true, config: { baseUrl: 'https://ntfy.test', topic: 'family' }, secrets: {} });
-  db.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by) VALUES (1, 'task', 999, ?, 1)")
+  // DIESE PROBE STAND AUF 'task', UND DORT KOMMT SIE SEIT v217 NICHT MEHR AN.
+  // Eine Erinnerung an eine geloeschte Aufgabe (oder einen geloeschten Termin)
+  // gibt es seitdem nicht mehr: zwei AFTER-DELETE-Trigger raeumen sie mit ab,
+  // und die Sammelabfrage laesst eine trotzdem entstandene Zeile gar nicht
+  // heraus - ein Push mit leerem Inhalt zu einer Aufgabe, die es nicht mehr
+  // gibt, ist keine Meldung, sondern Laerm (test/test-reminder-orphans.js).
+  //
+  // Die Zusage aus #581 gilt unveraendert weiter, nur eben dort, wo eine Waise
+  // weiterhin moeglich ist: `reminderPayload()` bildet den Fallback fuer JEDEN
+  // entity_type gleich, ein Abo ist hier also derselbe Codepfad - und ein Abo,
+  // dessen Zeile verschwunden ist, hat keinen Trigger, der die Erinnerung
+  // mitnimmt.
+  db.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by) VALUES (1, 'subscription', 999, ?, 1)")
     .run('2026-06-19T09:59:00.000Z');
   const payloads = [];
   const providers = {

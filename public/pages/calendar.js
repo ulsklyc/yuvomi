@@ -5660,7 +5660,6 @@ async function deleteEvent(event) {
   const target = event?.series_id
     ? calendarOccurrenceDeleteTarget(event, 'series')
     : { method: 'delete', path: `/calendar/${event.id}` };
-  const reminderEntityId = event?.series_id ?? event.id;
   scheduleCalendarDeleteWithUndo({
     state,
     deleteScope: {
@@ -5671,8 +5670,13 @@ async function deleteEvent(event) {
     message: t('calendar.deletedToast'),
     schedule: scheduleUndoableDelete,
     requestDelete: async ({ keepalive }) => {
+      // Die Erinnerungen des Termins raeumt der Server mit ab (Migration v217,
+      // AFTER-DELETE-Trigger auf `calendar_events`). Der zweite Aufruf, der hier
+      // stand, konnte das nicht leisten: beim Zuklappen des Tabs ging er
+      // verloren, sein stummes `catch` verschluckte ein 403, und er loeschte nur
+      // die EIGENEN Zeilen - die per #921 an Zugewiesene verteilten blieben
+      // stehen.
       await api.delete(target.path, { keepalive });
-      api.delete(`/reminders?entity_type=event&entity_id=${reminderEntityId}`, { keepalive }).catch(() => {});
       if (!keepalive) refreshReminders();
     },
     isViewActive: () => Boolean(_container?.isConnected),

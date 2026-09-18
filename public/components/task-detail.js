@@ -103,9 +103,13 @@ export async function deleteTaskWithUndo(id, { container = null, onChanged = () 
   scheduleUndoableDelete({
     message: t('tasks.deletedToast'),
     commit: async ({ keepalive }) => {
+      // Die Erinnerungen der Aufgabe raeumt der Server mit ab (Migration v217,
+      // AFTER-DELETE-Trigger auf `tasks`). Hier stand dafuer ein zweiter Aufruf
+      // mit stummem `catch` - er ging beim Zuklappen des Tabs verloren, lief bei
+      // `tasks: write` + `calendar: read` in ein verschlucktes 403, und selbst
+      // wenn er ankam, loeschte er nur die EIGENEN Zeilen: die Erinnerung, die
+      // sich jemand anderes auf dieselbe Aufgabe gesetzt hatte, blieb stehen.
       await api.delete(`/tasks/${id}`, { keepalive });
-      // Erinnerungen für diese Aufgabe ebenfalls entfernen
-      api.delete(`/reminders?entity_type=task&entity_id=${id}`, { keepalive }).catch(() => {});
       if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       refreshReminders();
       await onChanged();
