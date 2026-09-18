@@ -103,7 +103,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that description and moved the reminder to match it, without being asked. The dialog now names the
   situation instead: the list gets an entry that says the reminder is after the due date, a warning
   beside it spells out when it actually goes off, and saving leaves it exactly where it is. Picking a
-  lead time moves it as it always did.
+  lead time moves it as it always did. Move the due date back past the reminder - the obvious way to
+  fix it - and the dialog notices while you are still in it: the entry and the warning give way to the
+  lead time that now applies, rather than going on claiming a situation that has passed.
 
 ### Security
 

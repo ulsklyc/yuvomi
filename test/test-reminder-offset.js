@@ -125,6 +125,19 @@ test('Die Presets rechnen wie bisher - Roundtrip ueber beide Richtungen', () => 
   }
 });
 
+test('Eine unbekannte Einheit wird nicht geraten, sondern abgelehnt', () => {
+  const opts = { dueDate: '2026-06-12', dueTime: '12:00', amount: '90' };
+  // Die abgeloeste if-else-Kette liess jede unbekannte Einheit in ihren letzten
+  // Zweig fallen und rechnete sie als WOCHEN - der Zufall einer Schreibweise.
+  // Aus dem Auswahlfeld kommen nur die vier bekannten Werte; kaeme je ein
+  // fuenfter, ist eine Fehlermeldung ehrlicher als ein stiller Zeitpunkt.
+  assert.equal(remindAtFromPreset('offset_custom', { ...opts, unit: 'fortnights' }), null);
+  assert.equal(remindAtFromPreset('offset_custom', { ...opts, unit: '' }), null);
+  for (const unit of ['minutes', 'hours', 'days', 'weeks']) {
+    assert.ok(remindAtFromPreset('offset_custom', { ...opts, unit }), unit);
+  }
+});
+
 test('Custom rechnet die Einheit um, ohne Faelligkeit ergibt nichts', () => {
   const opts = { dueDate: '2026-06-12', dueTime: '12:00' };
   assert.equal(remindAtFromPreset('offset_custom', { ...opts, amount: '90', unit: 'minutes' }),

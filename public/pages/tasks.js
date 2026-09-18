@@ -1424,6 +1424,43 @@ function renderReminderSection(task = null, reminder = null) {
 }
 
 /**
+ * Das Preset, das die Auswahl nach einer Aenderung der Faelligkeit zeigen muss.
+ *
+ * DER ZUSTAND KANN SICH IM DIALOG HEILEN, und dann darf die Beschriftung nicht
+ * stehenbleiben. „Nach der Faelligkeit" ist keine Eigenschaft der Erinnerung,
+ * sondern das VERHAELTNIS zweier Zeitpunkte - schiebt jemand die Faelligkeit
+ * nach hinten (der naheliegende Weg, das Problem zu beheben), liegt die
+ * Erinnerung wieder davor, und der Dialog behauptete sonst weiter einen
+ * Nachlauf. Das waere derselbe Fehler, den dieser Abschnitt beseitigen soll,
+ * nur in die andere Richtung.
+ *
+ * Neu aufgeloest wird NUR, solange die Auswahl noch auf `offset_after_due`
+ * steht. Wer selbst einen Vorlauf gewaehlt hat, hat entschieden; ihm die Wahl
+ * beim naechsten Tastendruck im Datumsfeld umzustellen, waere Bevormundung.
+ *
+ * ES IST DIE GANZE AUFLOESUNG, NICHT NUR DAS PRESET. Ein geheilter Zustand
+ * landet fast immer auf `offset_custom` - ein Datum ohne Uhrzeit faellt auf
+ * 23:59:59, und der Abstand dorthin trifft selten einen runden Vorlauf. Nur die
+ * Auswahl umzustellen, hiesse die Felder darunter auf ihrem Render-Stand stehen
+ * zu lassen: die Auswahl saegte „Benutzerdefiniert", darunter staenden 1 Tag,
+ * und das Speichern verschoebe die Erinnerung doch - derselbe Schaden, in einem
+ * neuen Gewand. Das Heilen macht deshalb genau das, was das Oeffnen tut.
+ *
+ * @param {string} currentValue aktueller Wert der Auswahl
+ * @returns {{preset: string, amount: string, unit: string}|null} die neue
+ *          Auffuellung, oder null wenn nichts umzustellen ist
+ */
+function afterDueResolution(currentValue, { dueDate = '', dueTime = null, storedRemindAt = null } = {}) {
+  if (currentValue !== 'offset_after_due') return null;
+  if (!dueDate || !storedRemindAt) return null;
+  const resolved = resolveReminderPreset(
+    { due_date: dueDate, due_time: dueTime },
+    { remind_at: storedRemindAt },
+  );
+  return resolved.preset === 'offset_after_due' ? null : resolved;
+}
+
+/**
  * Der Zeitpunkt, den der ausgefuellte Erinnerungs-Abschnitt ergibt.
  *
  * DIE NAHT ZWISCHEN MARKUP UND SPEICHERN, und sie steht bewusst als eigene
@@ -1504,6 +1541,57 @@ function wireCountdownGate(panel) {
   due.addEventListener('change', update);
   due.addEventListener('input', update);
   update();
+}
+
+/**
+ * Haelt Auswahl und Warnton am ZUSTAND, nicht am Ladezeitpunkt.
+ *
+ * Zwei Wege fuehren hierher: wer die Auswahl verlaesst, hat das Problem
+ * entschieden und soll den Warnton nicht mehr sehen (wer zurueckgeht, wieder);
+ * und wer die Faelligkeit verschiebt, aendert das Verhaeltnis, aus dem der
+ * Zustand ueberhaupt entsteht. Beide enden in derselben Regel, damit sie nicht
+ * auseinanderlaufen koennen.
+ */
+function syncReminderAfterDue(panel) {
+  const offset = panel.querySelector('#reminder-offset');
+  const warn   = panel.querySelector('#reminder-after-due-warning');
+  if (!offset) return;
+  const next = afterDueResolution(offset.value, {
+    dueDate: parseDateInput(panel.querySelector('#task-due-date')?.value || ''),
+    dueTime: parseTimeInput(panel.querySelector('#task-due-time')?.value || '') || null,
+    storedRemindAt: panel.querySelector('#reminder-stored-at')?.value || null,
+  });
+  // Nur schreiben, wenn die Auswahl den Eintrag auch fuehrt - sonst faende der
+  // Browser ihn nicht und setzte die Auswahl stillschweigend auf den ersten:
+  // aus „1 Tag vorher" wuerde „Keine", und das Speichern loeschte die
+  // Erinnerung.
+  if (next && [...offset.options].some((o) => o.value === next.preset)) {
+    offset.value = next.preset;
+    const amount = panel.querySelector('#reminder-custom-amount');
+    const unit   = panel.querySelector('#reminder-custom-unit');
+    const custom = panel.querySelector('#reminder-custom-fields');
+    if (amount) amount.value = next.amount;
+    if (unit) unit.value = next.unit;
+    // Ein programmatisch gesetzter Wert loest KEIN `change` aus, der Listener
+    // daneben blendet die Felder also nicht ein. Hier steht es deshalb selbst.
+    if (custom) custom.style.display = next.preset === 'offset_custom' ? '' : 'none';
+  }
+  if (warn) warn.hidden = offset.value !== 'offset_after_due';
+}
+
+/**
+ * Die Faelligkeit aendert das Verhaeltnis, aus dem „nach der Faelligkeit"
+ * entsteht - beide Felder werden gehoert, `change` wie `input`, aus demselben
+ * Grund wie bei `wireCountdownGate`: sonst haengt die Anzeige je nach
+ * Bedienweg (Kalenderblatt vs. Tastatur) hinterher.
+ */
+function wireReminderAfterDue(panel) {
+  for (const sel of ['#task-due-date', '#task-due-time']) {
+    const field = panel.querySelector(sel);
+    if (!field) continue;
+    field.addEventListener('change', () => syncReminderAfterDue(panel));
+    field.addEventListener('input', () => syncReminderAfterDue(panel));
+  }
 }
 
 function openTaskModal({ task = null, users = [], reminder = null } = {}, container) {
@@ -1618,14 +1706,11 @@ function wireTaskForm(panel, { task = null, container = null, onChanged = () => 
   toggle?.addEventListener('change', () => {
     fields.style.display = toggle.checked ? '' : 'none';
   });
-  const afterDueWarning = panel.querySelector('#reminder-after-due-warning');
   offset?.addEventListener('change', () => {
     if (customFields) customFields.style.display = offset.value === 'offset_custom' ? '' : 'none';
-    // Der Warnton gehoert an den Zustand, nicht an den Ladezeitpunkt: wer den
-    // Eintrag verlaesst, hat das Problem entschieden und soll ihn nicht mehr
-    // sehen - wer zurueckgeht, wieder.
-    if (afterDueWarning) afterDueWarning.hidden = offset.value !== 'offset_after_due';
+    syncReminderAfterDue(panel);
   });
+  wireReminderAfterDue(panel);
   // Form-Events
   panel.querySelector('#task-form')
     ?.addEventListener('submit', (e) => handleFormSubmit(e, { container, onChanged }));
@@ -4343,7 +4428,13 @@ export const __test = {
   // den seine Auswahlliste nicht abbildet: eine Erinnerung nach der
   // Faelligkeit. Was der Abschnitt dabei sagt, ist der halbe Fix - die andere
   // Haelfte ist, dass das Speichern daraus nicht rechnet.
-  renderReminderSection, reminderRemindAtFromForm,
+  renderReminderSection, reminderRemindAtFromForm, afterDueResolution,
+  // Die Verdrahtung steht mit hier: die Regel allein zu messen hiesse, den
+  // haeufigsten Ausfall auszulassen - einen Listener, den niemand anhaengt.
+  syncReminderAfterDue, wireReminderAfterDue,
+  // Und der AUFRUFER dazu: eine Regel, die richtig ist und die niemand ruft,
+  // ist derselbe Ausfall wie eine falsche Regel.
+  wireTaskForm,
   // Die Personenauswahl beim Abhaken (#1205): WANN sie ueberhaupt erscheint,
   // ist die halbe Entscheidung - ein Solo-Haushalt bekommt sie nie zu sehen.
   renderDoerPicker,

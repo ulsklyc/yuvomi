@@ -124,7 +124,14 @@ export function remindAtFromPreset(preset, {
   if (preset === 'offset_custom') {
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) return null;
-    offsetMs = value * (UNIT_FACTOR_MS.get(unit) ?? UNIT_FACTOR_MS.get('days'));
+    // Eine unbekannte Einheit wird NICHT geraten. Die abgeloeste Kette liess
+    // sie in den letzten else-Zweig fallen und rechnete sie als Wochen - das
+    // war der Zufall einer Schreibweise, keine Entscheidung. Aus dem Auswahlfeld
+    // kommen nur die vier bekannten Werte; kaeme je ein fuenfter, ist eine
+    // Fehlermeldung ehrlicher als ein stillschweigend falscher Zeitpunkt.
+    const factor = UNIT_FACTOR_MS.get(unit);
+    if (factor === undefined) return null;
+    offsetMs = value * factor;
   } else {
     offsetMs = PRESET_OFFSET_MS.get(preset);
     if (offsetMs === undefined) return null;
