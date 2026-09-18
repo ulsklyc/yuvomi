@@ -178,15 +178,34 @@ let db;
  * riet dazu, den Key zu tauschen und neu zu starten. Wer das auf einer Instanz
  * mit eigener verschlüsselter Datenbank tut, landet genau hier und kommt nicht
  * mehr an die Oberfläche - der Weg zurück gehört deshalb in die Meldung.
+ *
+ * Dieser Rückweg gilt aber NUR, wenn allein der Key getauscht wurde, und so
+ * steht er auch da. Wer Datei UND Key zusammen ersetzt hat - der richtige Weg
+ * für eine Übernahme -, würde mit „change it back" in denselben Abbruch
+ * zurückgeschickt: die eingesetzte Datei öffnet sich mit dem alten Key genauso
+ * wenig (#1267, zweite Runde). Für ihn ist einer der beiden Eingänge nicht das,
+ * wofür er ihn hält, und der Rat trennt beides mit einer Probe, die nichts
+ * verändert: Größe und Prüfsumme der Datei gegen das Original. Stimmen sie, ist
+ * es der Key, und dann meist nicht der Wert selbst, sondern sein Weg in den
+ * Prozess - eine Env-Datei wird geparst, nicht kopiert.
  * @returns {string}
  */
 function undecryptableDatabaseError() {
   const lines = [
     `[DB] Wrong encryption key - ${DB_PATH} could not be decrypted with DB_ENCRYPTION_KEY.`,
-    'The key that opens this file is the one it was created with. If you just changed '
-    + 'DB_ENCRYPTION_KEY to take over a backup from another installation, change it back: '
-    + 'this database belongs to this instance, and a key swap alone does not import anything - '
-    + 'it only locks you out of what is here.',
+    'The key that opens this file is the one it was created with.',
+    'If you changed only DB_ENCRYPTION_KEY and left the database file as it was - for example to '
+    + 'take over a backup from another installation - change it back: this database belongs to '
+    + 'this instance, and a key swap alone does not import anything - it only locks you out of '
+    + 'what is here.',
+    'If you replaced the database file and the key together, changing the key back will not help: '
+    + 'the file you put in place does not open with the old key either. Then one of the two is not '
+    + `what you think it is. Compare the size and sha256sum of ${DB_PATH} with the original file; `
+    + 'if they differ, copy the file again. If they match, the key Yuvomi was started with is not, '
+    + 'byte for byte, the one the file was written with. Compare it character by character with the '
+    + 'source, and check how it reaches Yuvomi: an environment file is parsed, not copied - '
+    + 'systemd\'s EnvironmentFile, for one, drops a backslash in an unquoted value, reads a quote '
+    + 'right after "=" as quoting and trims spaces at both ends.',
   ];
   if (existsSync(`${DB_PATH}-wal`)) {
     lines.push(
@@ -198,6 +217,56 @@ function undecryptableDatabaseError() {
       + 'because then the log belongs to the database you replaced and is still read on open. If '
       + `that is what happened, stop Yuvomi and move ${DB_PATH}-wal and ${DB_PATH}-shm aside `
       + 'before starting again.'
+    );
+  }
+  return lines.join(' ');
+}
+
+/**
+ * Meldung für den ersten Lesezugriff nach dem Öffnen, getrennt nach dem, was
+ * SQLite tatsächlich sagt.
+ *
+ * Der `catch` in `init()` hat jeden Fehler an dieser Stelle als falschen Key
+ * gemeldet (#1267). Gemessen sind drei Fälle, die sich nicht vertragen:
+ *   - `SQLITE_NOTADB`: Seite 1 lässt sich nicht entschlüsseln. Das ist der
+ *     falsche Key, aber ebenso eine Datei, die gar keine Datenbank ist (HTML,
+ *     gzip, verstümmelte Übertragung) - deshalb nennt die Key-Meldung auch die
+ *     Probe gegen das Original.
+ *   - `SQLITE_CORRUPT`: gibt es NUR mit dem richtigen Key. Dieselbe
+ *     abgeschnittene Datei liefert mit falschem Key `SQLITE_NOTADB`, denn
+ *     Seite 1 muss erst entschlüsselt werden und ihre HMAC-Prüfung bestehen.
+ *     Hier ist der Key also belegt richtig, und ein Rat zum Key wäre falsch.
+ *   - alles andere: die Meldung behauptet nichts über den Key und reicht Code
+ *     und Text weiter. Gemessen sind hier zwei Rechteprobleme, beide mit
+ *     richtigem Key: `SQLITE_READONLY_DIRECTORY` (WAL-Datenbank in einem
+ *     Verzeichnis ohne Schreibrecht) und `SQLITE_CANTOPEN` (ein `-wal`, auf das
+ *     der Dienst nicht zugreifen darf). Nur für diese beiden Familien kommt der
+ *     Hinweis auf die Dateirechte dazu.
+ * @param {unknown} err
+ * @returns {string}
+ */
+function unreadableAtStartError(err) {
+  const code = typeof err?.code === 'string' ? err.code : '';
+  const detail = `${code || 'no SQLite error code'}: ${err?.message ?? String(err)}`;
+
+  if (code === 'SQLITE_NOTADB') return undecryptableDatabaseError();
+
+  if (code.startsWith('SQLITE_CORRUPT')) {
+    return `[DB] ${DB_PATH} is damaged or incomplete (${detail}). DB_ENCRYPTION_KEY is not the `
+      + 'problem: it does open this file - its first page decrypted and passed the integrity '
+      + 'check, which a wrong key never does - so changing the key will not help. If the file was '
+      + 'copied or downloaded from another machine, the copy most likely stopped short: copy it '
+      + 'again from the original and compare its size and sha256sum with the original before '
+      + 'starting Yuvomi.';
+  }
+
+  const lines = [`[DB] ${DB_PATH} could not be read (${detail}).`];
+  if (code.startsWith('SQLITE_READONLY') || code.startsWith('SQLITE_CANTOPEN')) {
+    lines.push(
+      `Yuvomi needs read and write access to the database file, to ${DB_PATH}-wal and `
+      + `${DB_PATH}-shm next to it and to the directory they are in - even just to read, because `
+      + 'SQLite keeps its write-ahead log there. Check the owner and permissions of '
+      + `${path.dirname(DB_PATH)} and of the files in it for the user Yuvomi runs as.`
     );
   }
   return lines.join(' ');
@@ -240,8 +309,8 @@ function init({ plaintextBackup = true } = {}) {
     // Sicherstellen dass die Datenbank tatsächlich entschlüsselbar ist
     try {
       assertReadable(db);
-    } catch {
-      throw new Error(undecryptableDatabaseError());
+    } catch (err) {
+      throw new Error(unreadableAtStartError(err), { cause: err });
     }
   }
 

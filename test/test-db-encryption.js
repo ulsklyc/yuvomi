@@ -21,7 +21,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, existsSync, readFileSync, readdirSync, copyFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, existsSync, readFileSync, readdirSync, copyFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
@@ -745,3 +746,301 @@ test('ohne liegengebliebenes Log schweigt die Meldung davon', async () => {
     'die WAL-Diagnose darf nicht unbedingt erscheinen'
   );
 });
+
+/*
+ * ---------------------------------------------------------------------------
+ * #1267, dritte Runde: der Startabbruch unterscheidet nach dem SQLite-Code.
+ *
+ * `init()` hat jeden Fehler beim ersten Lesen als falschen Schluessel gemeldet,
+ * ohne `err.code` anzusehen. Gemessen sind aber Faelle, in denen der Schluessel
+ * nachweislich STIMMT: eine abgeschnittene Kopie liefert mit dem richtigen Key
+ * `SQLITE_CORRUPT` (mit falschem Key dieselbe Datei `SQLITE_NOTADB`), eine
+ * WAL-Datenbank in einem Verzeichnis ohne Schreibrecht
+ * `SQLITE_READONLY_DIRECTORY`, ein `-wal` ohne Zugriffsrecht `SQLITE_CANTOPEN`.
+ * Wer dort „Wrong encryption key" liest, sucht am Schluessel, der in Ordnung ist.
+ *
+ * Und der Rueckweg der Key-Meldung („change it back") galt nur fuer den, der
+ * ALLEIN den Schluessel getauscht hat. Wer Datei und Schluessel zusammen
+ * ersetzt hat - der richtige Weg, und genau der des Melders -, wurde damit in
+ * denselben Abbruch zurueckgeschickt.
+ *
+ * Jeder Fall prueft deshalb zuerst den SQLite-Code direkt (sonst misst er am
+ * Ende einen anderen Zweig als behauptet) und BEFOLGT danach den Rat der
+ * Meldung auf demselben Stand: eine Meldung, die einen Handgriff empfiehlt, ist
+ * ausfuehrbarer Rat, und erst der Start danach zeigt, ob er traegt.
+ * ---------------------------------------------------------------------------
+ */
+
+/** SQLite-Code beim ersten Lesen mit diesem Key - `null`, wenn es gelingt. */
+function sqliteCodeOnFirstRead(filePath, key) {
+  const handle = new Database(filePath);
+  try {
+    handle.pragma("cipher = 'sqlcipher'");
+    handle.pragma(`key="x'${Buffer.from(key, 'utf8').toString('hex')}'"`);
+    handle.prepare('SELECT count(*) FROM sqlite_master').get();
+    return null;
+  } catch (err) {
+    return err.code;
+  } finally {
+    handle.close();
+  }
+}
+
+function sha256(filePath) {
+  return createHash('sha256').update(readFileSync(filePath)).digest('hex');
+}
+
+/** Saetze einer Meldung - ein Punkt im Dateinamen (`yuvomi.db`) trennt keinen. */
+function saetze(message) {
+  return message.split(/(?<=\.)\s+(?=[A-Z])/);
+}
+
+test('nur den Schluessel getauscht: „change it back" gilt fuer genau diesen Fall und fuehrt zurueck', async () => {
+  const dir = tmpDir();
+  const eigene = join(dir, 'yuvomi.db');
+  const KEY_EIGEN = 'schluessel-dieser-instanz-0123456';
+  const KEY_GETAUSCHT = 'schluessel-einer-anderen-instanz-01';
+
+  const laufend = await bootDb(eigene, KEY_EIGEN);
+  laufend.get().exec('CREATE TABLE eigener_marker (note TEXT)');
+  laufend.get().prepare('INSERT INTO eigener_marker VALUES (?)').run('vor-dem-tausch');
+  laufend.get().close(); // sauberer Stopp: kein -wal, der WAL-Absatz spricht hier nicht mit
+  assert.equal(
+    sqliteCodeOnFirstRead(eigene, KEY_GETAUSCHT),
+    'SQLITE_NOTADB',
+    'Vorbedingung: ein falscher Key scheitert an Seite 1'
+  );
+
+  await assert.rejects(
+    () => bootDb(eigene, KEY_GETAUSCHT),
+    (err) => {
+      assert.match(err.message, /Wrong encryption key/, 'NOTADB bleibt die Key-Meldung');
+      const rueckweg = saetze(err.message).find((satz) => /change it back/.test(satz));
+      assert.ok(rueckweg, 'der Rueckweg muss genannt sein');
+      assert.match(
+        rueckweg,
+        /changed only DB_ENCRYPTION_KEY and left the database file as it was/,
+        'der Rat „change it back" traegt nur, wenn allein der Key getauscht wurde - und muss das selbst sagen'
+      );
+      return true;
+    },
+    'die Key-Meldung muss ihren Rueckweg auf den reinen Schluesseltausch beschraenken'
+  );
+
+  // Den Rat befolgen: Key zurueck, und die Instanz ist wieder da, mit ihren Daten.
+  const zurueck = await bootDb(eigene, KEY_EIGEN);
+  assert.equal(
+    zurueck.get().prepare('SELECT note FROM eigener_marker').get()?.note,
+    'vor-dem-tausch',
+    'nach dem Zuruecktauschen muss die eigene Datenbank wieder starten'
+  );
+});
+
+test('Datei und Schluessel zusammen ersetzt: der Rat schickt nicht zurueck, sondern trennt Datei und Schluessel', async () => {
+  // Die Lage des Melders: die Zielinstanz hatte ihre eigene Datenbank mit ihrem
+  // eigenen Key. Er hat das Backup an ihre Stelle gelegt und den Key der Quelle
+  // gesetzt - nur kam der nicht Byte fuer Byte an. Hier ist es ein Backslash,
+  // den systemds EnvironmentFile in einer unquotierten Zeile verschluckt.
+  const KEY_QUELLE = 'quell\\schluessel-mit-backslash-0123';
+  const KEY_ANGEKOMMEN = 'quellschluessel-mit-backslash-0123';
+  const KEY_ZIEL = 'eigener-schluessel-der-zielinstanz-01';
+  const backupPath = await backupFromInstance(KEY_QUELLE);
+
+  const dir = tmpDir();
+  const ziel = join(dir, 'yuvomi.db');
+  const vorher = await bootDb(ziel, KEY_ZIEL);
+  vorher.get().close();
+  copyFileSync(backupPath, ziel);
+  assert.ok(!existsSync(`${ziel}-wal`), 'Vorbedingung: kein Journal, die Meldung spricht nur ueber Datei und Key');
+  assert.equal(
+    sqliteCodeOnFirstRead(ziel, KEY_ANGEKOMMEN),
+    'SQLITE_NOTADB',
+    'Vorbedingung: der verschluckte Backslash macht einen anderen Key'
+  );
+
+  await assert.rejects(
+    () => bootDb(ziel, KEY_ANGEKOMMEN),
+    (err) => {
+      assert.match(
+        err.message,
+        /replaced the database file and the key together, changing the key back will not help/,
+        'die Meldung muss den Fall kennen, in dem „change it back" in denselben Abbruch fuehrt'
+      );
+      assert.match(
+        err.message,
+        /Compare the size and sha256sum of .*yuvomi\.db with the original file; if they differ, copy the file again/,
+        'erste Probe: die Datei gegen das Original, ohne etwas zu veraendern'
+      );
+      assert.match(
+        err.message,
+        /If they match, the key Yuvomi was started with is not, byte for byte, the one the file was written with/,
+        'zweite Probe: stimmt die Datei, ist es der Key - nicht „der richtige Key", sondern seine Bytes'
+      );
+      assert.match(
+        err.message,
+        /drops a backslash in an unquoted value/,
+        'die Regel, die hier den Key veraendert hat, muss genannt sein'
+      );
+      assert.ok(!/\bdelete\b/i.test(err.message), 'kein Rat zum Loeschen');
+      return true;
+    },
+    'wer Datei und Key zusammen ersetzt hat, braucht eine andere Auskunft als „change it back"'
+  );
+
+  // Den Rat befolgen, erste Probe: Groesse und Pruefsumme stimmen, also ist es der Key.
+  assert.equal(sha256(ziel), sha256(backupPath), 'die Datei ist unversehrt - die Probe zeigt auf den Key');
+
+  // Warum der Rueckweg hier nicht reicht: mit dem alten Key der Zielinstanz
+  // oeffnet die eingesetzte Datei genauso wenig.
+  await assert.rejects(
+    () => bootDb(ziel, KEY_ZIEL),
+    /Wrong encryption key/,
+    '„change it back" fuehrt nach einem Dateitausch in denselben Abbruch'
+  );
+
+  // Zweite Probe: der Key Byte fuer Byte wie in der Quelle, und die Instanz startet.
+  const mod = await bootDb(ziel, KEY_QUELLE);
+  assert.doesNotThrow(
+    () => mod.get().prepare('SELECT count(*) FROM sqlite_master').get(),
+    'mit dem Key der Quelle muss die ersetzte Datei starten'
+  );
+});
+
+test('eine abgeschnittene Kopie mit richtigem Schluessel heisst beschaedigt, nicht Wrong encryption key', async () => {
+  const KEY_QUELLE = 'schluessel-der-alten-instanz-0123';
+  const backupPath = await backupFromInstance(KEY_QUELLE);
+  const dir = tmpDir();
+  const eigene = join(dir, 'yuvomi.db');
+  // Eine Uebertragung, die nach der ersten Seite abgerissen ist.
+  writeFileSync(eigene, readFileSync(backupPath).subarray(0, 4096));
+  assert.equal(
+    sqliteCodeOnFirstRead(eigene, KEY_QUELLE),
+    'SQLITE_CORRUPT',
+    'Vorbedingung: mit dem richtigen Key meldet SQLite CORRUPT'
+  );
+  assert.equal(
+    sqliteCodeOnFirstRead(eigene, 'ein-ganz-anderer-schluessel-0123'),
+    'SQLITE_NOTADB',
+    'Vorbedingung: mit falschem Key meldet dieselbe Datei NOTADB - erst das belegt, dass CORRUPT den Key bestaetigt'
+  );
+
+  await assert.rejects(
+    () => bootDb(eigene, KEY_QUELLE),
+    (err) => {
+      assert.match(err.message, /is damaged or incomplete \(SQLITE_CORRUPT/, 'Befund und Code gehoeren in die Meldung');
+      assert.ok(!/Wrong encryption key/.test(err.message), 'der Key stimmt - die Meldung darf ihn nicht beschuldigen');
+      assert.ok(!/change it back/.test(err.message), 'und keinen Schluesseltausch raten');
+      assert.match(err.message, /changing the key will not help/, 'sie muss vom Weg am Key wegfuehren');
+      assert.match(
+        err.message,
+        /copy it again from the original and compare its size and sha256sum with the original/,
+        'und den Weg nennen, der traegt'
+      );
+      return true;
+    },
+    'eine unvollstaendige Kopie darf nicht als falscher Schluessel durchgehen'
+  );
+
+  // Den Rat befolgen: vollstaendig neu kopieren, Pruefsumme vergleichen, starten.
+  copyFileSync(backupPath, eigene);
+  assert.equal(sha256(eigene), sha256(backupPath), 'die neue Kopie stimmt mit dem Original ueberein');
+  const mod = await bootDb(eigene, KEY_QUELLE);
+  assert.doesNotThrow(
+    () => mod.get().prepare('SELECT count(*) FROM sqlite_master').get(),
+    'mit vollstaendiger Kopie und demselben Key muss die Instanz starten'
+  );
+});
+
+const ALS_ROOT = typeof process.getuid === 'function' && process.getuid() === 0;
+
+test(
+  'ein Datenverzeichnis ohne Schreibrecht nennt den Code und behauptet nichts ueber den Schluessel',
+  { skip: ALS_ROOT && 'root ignoriert Dateirechte - der Fall ist so nicht herstellbar' },
+  async () => {
+    const dir = tmpDir();
+    const eigene = join(dir, 'yuvomi.db');
+    const laufend = await bootDb(eigene, KEY);
+    laufend.get().close(); // -wal und -shm sind weg, journal_mode = WAL steht in der Datei
+    chmodSync(dir, 0o555);
+    try {
+      assert.equal(
+        sqliteCodeOnFirstRead(eigene, KEY),
+        'SQLITE_READONLY_DIRECTORY',
+        'Vorbedingung: richtiger Key, aber SQLite kann sein Journal nicht anlegen'
+      );
+
+      await assert.rejects(
+        () => bootDb(eigene, KEY),
+        (err) => {
+          assert.match(err.message, /could not be read \(SQLITE_READONLY_DIRECTORY: /, 'Code und SQLite-Text gehoeren in die Meldung');
+          assert.ok(
+            !/encryption key|DB_ENCRYPTION_KEY|decrypt/i.test(err.message),
+            'kein Wort ueber den Key - er ist hier nicht beteiligt'
+          );
+          assert.match(err.message, /needs read and write access to the database file/, 'der Rat muss die Rechte nennen');
+          assert.ok(
+            err.message.includes(`permissions of ${dir} `),
+            'und das Verzeichnis, dessen Rechte zu pruefen sind'
+          );
+          return true;
+        },
+        'ein Rechteproblem darf nicht als falscher Schluessel durchgehen'
+      );
+
+      // Den Rat befolgen: Schreibrecht zurueck, dieselbe Datei startet mit demselben Key.
+      chmodSync(dir, 0o755);
+      const wieder = await bootDb(eigene, KEY);
+      assert.doesNotThrow(
+        () => wieder.get().prepare('SELECT count(*) FROM sqlite_master').get(),
+        'mit Schreibrecht auf das Verzeichnis muss die Instanz starten'
+      );
+    } finally {
+      chmodSync(dir, 0o755);
+    }
+  }
+);
+
+test(
+  'ein Journal ohne Zugriffsrecht nennt den Code und behauptet nichts ueber den Schluessel',
+  { skip: ALS_ROOT && 'root ignoriert Dateirechte - der Fall ist so nicht herstellbar' },
+  async () => {
+    const dir = tmpDir();
+    const eigene = join(dir, 'yuvomi.db');
+    const laufend = await bootDb(eigene, KEY);
+    laufend.get().close();
+    // Ein -wal, das dem Dienst nicht gehoert - etwa von einem Lauf unter einem
+    // anderen Benutzer liegengeblieben.
+    const wal = `${eigene}-wal`;
+    writeFileSync(wal, '');
+    chmodSync(wal, 0o000);
+    try {
+      assert.equal(sqliteCodeOnFirstRead(eigene, KEY), 'SQLITE_CANTOPEN', 'Vorbedingung: richtiger Key, Journal unzugaenglich');
+
+      await assert.rejects(
+        () => bootDb(eigene, KEY),
+        (err) => {
+          assert.match(err.message, /could not be read \(SQLITE_CANTOPEN: /, 'Code und SQLite-Text gehoeren in die Meldung');
+          assert.ok(
+            !/encryption key|DB_ENCRYPTION_KEY|decrypt/i.test(err.message),
+            'kein Wort ueber den Key - er ist hier nicht beteiligt'
+          );
+          assert.ok(err.message.includes(wal), 'der Rat muss das Journal nennen, an dem es haengt');
+          assert.match(err.message, /Check the owner and permissions of/, 'und sagen, was zu pruefen ist');
+          assert.ok(!/\bdelete\b/i.test(err.message), 'kein Rat zum Loeschen - das Journal kann Daten tragen');
+          return true;
+        },
+        'ein unzugaengliches Journal darf nicht als falscher Schluessel durchgehen'
+      );
+
+      // Den Rat befolgen: Rechte am Journal geradeziehen, und die Instanz startet.
+      chmodSync(wal, 0o644);
+      const wieder = await bootDb(eigene, KEY);
+      assert.doesNotThrow(
+        () => wieder.get().prepare('SELECT count(*) FROM sqlite_master').get(),
+        'mit Zugriff auf das Journal muss die Instanz starten'
+      );
+    } finally {
+      chmodSync(wal, 0o644);
+    }
+  }
+);

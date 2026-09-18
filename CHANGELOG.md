@@ -111,6 +111,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without fixing the key. It says so, and where it does apply it asks you to move the file aside
   rather than delete it. (#1267)
 
+- **When Yuvomi cannot read its database at start-up, the message names the actual cause instead of
+  always blaming the encryption key.** Every error on the first read was reported as "Wrong
+  encryption key", whatever SQLite had said. Two of them happen with the right key: a copy of the
+  database that stopped short, and a data directory Yuvomi is not allowed to write to. An incomplete
+  copy is now reported as damaged, with the note that the key does open it and the advice to copy
+  the file again and compare its checksum with the original. Any other error names SQLite's own
+  error code and says nothing about the key; a permissions problem also says which directory to
+  check. The key message itself stops sending the wrong people back: its advice to change the key
+  back now applies only to someone who changed the key alone. Someone who replaced the database file
+  and the key together - the right way to take over a backup - is told that going back will not
+  help, and how to find out which of the two is off: the file's size and checksum against the
+  original, and if those match, the exact characters of the key, because an environment file is
+  parsed rather than copied - systemd, for one, drops backslashes from an unquoted value, reads a
+  quote right after "=" as quoting and trims spaces at both ends. (#1267)
+
 - **The task board shows all four of its columns, and each one can be folded away.** The board
   draws four columns - open, in progress, done and archived - but the layout only ever placed
   three of them per row, so "Archived" dropped into a second row underneath "Open". A grid row
