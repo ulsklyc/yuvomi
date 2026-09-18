@@ -502,7 +502,9 @@
         "doneByPick": "Quem fez “{{title}}”?",
         "doneByToast": "Feito por {{name}}.",
         "historyTickedBy": "assinalado por {{name}}",
-        "reminderLockedNeedsDueDate": "Esta tarefa tem um lembrete que não pode alterar. Por isso precisa de uma data de vencimento."
+        "reminderLockedNeedsDueDate": "Esta tarefa tem um lembrete que não pode alterar. Por isso precisa de uma data de vencimento.",
+        "kanbanColCollapse": "Recolher coluna",
+        "kanbanColExpand": "Expandir coluna"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} refeições",

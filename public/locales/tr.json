@@ -502,7 +502,9 @@
         "doneByPick": "“{{title}}” görevini kim yaptı?",
         "doneByToast": "{{name}} yaptı.",
         "historyTickedBy": "işaretleyen: {{name}}",
-        "reminderLockedNeedsDueDate": "Bu görevde değiştirmenize izin verilmeyen bir hatırlatıcı var. Bu nedenle bir bitiş tarihi gerekiyor."
+        "reminderLockedNeedsDueDate": "Bu görevde değiştirmenize izin verilmeyen bir hatırlatıcı var. Bu nedenle bir bitiş tarihi gerekiyor.",
+        "kanbanColCollapse": "Sütunu daralt",
+        "kanbanColExpand": "Sütunu genişlet"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} öğünden",

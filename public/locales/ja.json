@@ -502,7 +502,9 @@
         "doneByPick": "「{{title}}」をやったのは誰ですか？",
         "doneByToast": "{{name}} がやりました。",
         "historyTickedBy": "チェックしたのは {{name}}",
-        "reminderLockedNeedsDueDate": "このタスクには変更できないリマインダーが設定されています。そのため期限日が必要です。"
+        "reminderLockedNeedsDueDate": "このタスクには変更できないリマインダーが設定されています。そのため期限日が必要です。",
+        "kanbanColCollapse": "列を閉じる",
+        "kanbanColExpand": "列を開く"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}}件の食事",

@@ -502,7 +502,9 @@
         "doneByPick": "Who did “{{title}}”?",
         "doneByToast": "Done by {{name}}.",
         "historyTickedBy": "ticked off by {{name}}",
-        "reminderLockedNeedsDueDate": "This task has a reminder you are not allowed to change. It therefore needs a due date."
+        "reminderLockedNeedsDueDate": "This task has a reminder you are not allowed to change. It therefore needs a due date.",
+        "kanbanColCollapse": "Collapse column",
+        "kanbanColExpand": "Expand column"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} meals",

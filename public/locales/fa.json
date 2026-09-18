@@ -514,7 +514,9 @@
         "doneByPick": "چه کسی «{{title}}» را انجام داد؟",
         "doneByToast": "انجام‌شده توسط {{name}}.",
         "historyTickedBy": "علامت‌زده توسط {{name}}",
-        "reminderLockedNeedsDueDate": "این کار یادآوری دارد که اجازه تغییر آن را ندارید. بنابراین به تاریخ سرسید نیاز دارد."
+        "reminderLockedNeedsDueDate": "این کار یادآوری دارد که اجازه تغییر آن را ندارید. بنابراین به تاریخ سرسید نیاز دارد.",
+        "kanbanColCollapse": "جمع کردن ستون",
+        "kanbanColExpand": "باز کردن ستون"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} وعده",

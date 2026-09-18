@@ -502,7 +502,9 @@
         "doneByPick": "مَن أنجز ”{{title}}“؟",
         "doneByToast": "أنجزها {{name}}.",
         "historyTickedBy": "وضع العلامة {{name}}",
-        "reminderLockedNeedsDueDate": "هذه المهمة لديها تذكير لا يمكنك تغييره. لذلك تحتاج إلى تاريخ استحقاق."
+        "reminderLockedNeedsDueDate": "هذه المهمة لديها تذكير لا يمكنك تغييره. لذلك تحتاج إلى تاريخ استحقاق.",
+        "kanbanColCollapse": "طيّ العمود",
+        "kanbanColExpand": "توسيع العمود"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} وجبات",

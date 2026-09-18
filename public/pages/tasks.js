@@ -190,6 +190,40 @@ function loadCollapsedGroups() {
   }
 }
 
+/**
+ * Dasselbe fuer die Spalten des Bretts (#1250).
+ *
+ * WARUM DAS BRETT DAS BRAUCHT, und zwar mehr als die Liste: "Erledigt" und
+ * "Abgelegt" wachsen monoton. Die Liste laedt nur Offenes, das Brett haengt
+ * seinen Statusfilter bewusst NICHT an die Abfrage (siehe `taskQuery`) und
+ * holt zusaetzlich das ganze Archiv - es zeigt also jede Aufgabe, die der
+ * Haushalt je hatte, und nichts altert aus. Ein Fenster auf der Serverseite
+ * scheidet aus (docs/SCOPE.md: "lists are not paginated"), also klappt man zu.
+ *
+ * Gespeichert wird wie bei den Gruppen nur das EINGEKLAPPTE - eine Spalte, die
+ * jemand nie zugeklappt hat, steht offen da.
+ */
+function isKanbanColCollapsed(status) {
+  return state.collapsedKanbanCols.has(status);
+}
+
+function toggleKanbanCol(status) {
+  if (state.collapsedKanbanCols.has(status)) state.collapsedKanbanCols.delete(status);
+  else state.collapsedKanbanCols.add(status);
+  try {
+    localStorage.setItem(COLLAPSED_KANBAN_KEY, JSON.stringify([...state.collapsedKanbanCols]));
+  } catch { /* Privatmodus/Quota: der Zustand gilt dann nur fuer diese Sitzung */ }
+}
+
+function loadCollapsedKanbanCols() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(COLLAPSED_KANBAN_KEY) ?? '[]');
+    state.collapsedKanbanCols = new Set(Array.isArray(raw) ? raw.filter((k) => typeof k === 'string') : []);
+  } catch {
+    state.collapsedKanbanCols = new Set();
+  }
+}
+
 function groupBy(tasks, mode, categories = state.categories) {
   const groups = {};
 
@@ -1220,6 +1254,11 @@ let state = {
   // Eingeklappte Gruppen (#812), als "<modus>:<gruppen-id>" - derselbe Name
   // kann in beiden Gruppierungen vorkommen und meint dort Verschiedenes.
   collapsedGroups: new Set(),
+  // Eingeklappte Brett-Spalten (#1250), als Status. Eine EIGENE Ablage neben
+  // den Gruppen: die Liste gruppiert nach Kategorie oder Faelligkeit, das Brett
+  // nach Status, und ein gemeinsamer Speicher haette den Status "done" der
+  // einen Ansicht in der anderen verschwinden lassen.
+  collapsedKanbanCols: new Set(),
   filterPanelOpen: false,
   bulkSelectMode:  false,
   selectedTaskIds: new Set(),
@@ -2398,27 +2437,7 @@ function renderKanban(container) {
     return;
   }
 
-  const kanbanHtml = `
-    <div class="kanban-board">
-      ${cols.map((col) => `
-        <div class="kanban-col" data-status="${col.status}">
-          <div class="kanban-col__header">
-            <span class="kanban-col__title" style="color:${col.colorVar.startsWith('--') ? `var(${col.colorVar})` : col.colorVar}">
-              ${col.label}
-            </span>
-            <span class="kanban-col__count">${grouped[col.status].length}</span>
-          </div>
-          <div class="kanban-col__body" data-drop-zone="${col.status}">
-            ${grouped[col.status].length
-              ? grouped[col.status].map((task) => renderKanbanCard(task)).join('')
-              : `<div class="kanban-col__empty">
-                   <span class="kanban-col__empty-idle">${t('tasks.kanbanColEmpty')}</span>
-                   <span class="kanban-col__empty-drop">${t('tasks.kanbanDropHint')}</span>
-                 </div>`}
-          </div>
-        </div>
-      `).join('')}
-    </div>`;
+  const kanbanHtml = kanbanBoardHtml(cols, grouped);
   listEl.replaceChildren();
   listEl.insertAdjacentHTML('beforeend', kanbanHtml);
 
@@ -2461,6 +2480,57 @@ function destroyKanbanSortables() {
   kanbanSortables = [];
 }
 
+/**
+ * Das Brett als Markup - eine reine Funktion, damit messbar ist, WAS bei einem
+ * gegebenen Zustand herauskommt (#1250).
+ *
+ * DER SPALTENKOPF IST EIN KNOPF, keine anklickbare Ueberschrift - dieselbe
+ * Begruendung wie bei den Listengruppen (#812): nur so kennt ihn die Tastatur,
+ * und nur so kann `aria-expanded` den Zustand ueberhaupt melden. Der Zaehler
+ * steht wie dort NEBEN dem Knopf und nicht darin: eine zugeklappte Spalte muss
+ * sagen koennen, wie viel sie verbirgt, sonst klappt man sie zum Nachsehen
+ * wieder auf.
+ *
+ * DER KOERPER WIRD VERSTECKT, NICHT WEGGELASSEN, und das ist der Unterschied
+ * zur Liste: `aria-controls` braucht ein Ziel, das es gibt. Die Ablegezone
+ * verschwindet damit trotzdem aus der Bedienung - `hidden` nimmt sie aus dem
+ * Baum, und `wireKanbanSortable` ueberspringt sie zusaetzlich, weil ein
+ * unsichtbares Ziel fuer SortableJS sonst ein gueltiges bleibt.
+ */
+function kanbanBoardHtml(cols, grouped) {
+  return `
+    <div class="kanban-board">
+      ${cols.map((col) => {
+        const collapsed = isKanbanColCollapsed(col.status);
+        const bodyId = `kanban-col-${col.status}`;
+        return `
+        <div class="kanban-col${collapsed ? ' kanban-col--collapsed' : ''}" data-status="${col.status}">
+          <div class="kanban-col__header">
+            <button type="button" class="kanban-col__toggle" data-kanban-toggle="${col.status}"
+                    aria-expanded="${collapsed ? 'false' : 'true'}" aria-controls="${bodyId}"
+                    title="${collapsed ? t('tasks.kanbanColExpand') : t('tasks.kanbanColCollapse')}">
+              <i data-lucide="chevron-down" aria-hidden="true"
+                 class="list-group__chevron${collapsed ? ' list-group__chevron--collapsed' : ''}"></i>
+              <span class="kanban-col__title" style="color:${col.colorVar.startsWith('--') ? `var(${col.colorVar})` : col.colorVar}">
+                ${col.label}
+              </span>
+            </button>
+            <span class="kanban-col__count">${grouped[col.status].length}</span>
+          </div>
+          <div class="kanban-col__body" id="${bodyId}" data-drop-zone="${col.status}"${collapsed ? ' hidden' : ''}>
+            ${grouped[col.status].length
+              ? grouped[col.status].map((task) => renderKanbanCard(task)).join('')
+              : `<div class="kanban-col__empty">
+                   <span class="kanban-col__empty-idle">${t('tasks.kanbanColEmpty')}</span>
+                   <span class="kanban-col__empty-drop">${t('tasks.kanbanDropHint')}</span>
+                 </div>`}
+          </div>
+        </div>
+      `;
+      }).join('')}
+    </div>`;
+}
+
 function wireKanbanSortable(container) {
   const board = container.querySelector('.kanban-board');
   if (!board) return;
@@ -2473,6 +2543,11 @@ function wireKanbanSortable(container) {
   destroyKanbanSortables();
 
   board.querySelectorAll('[data-drop-zone]').forEach((zone) => {
+    // Eine zugeklappte Spalte ist kein Ziel (#1250). `hidden` nimmt sie aus der
+    // Anzeige, aber SortableJS urteilt nicht darueber: eine Instanz auf einem
+    // versteckten Knoten nimmt eine Karte weiterhin entgegen, und sie
+    // verschwindet dann in einer Spalte, die niemand sieht.
+    if (isKanbanColCollapsed(zone.dataset.dropZone)) return;
     makeSortable(zone, {
       // Ohne `draggable` waeren auch der Leerzustands-Hinweis und alles andere
       // im Spaltenkoerper ziehbar.
@@ -2515,6 +2590,18 @@ function wireKanbanClicks(container) {
   if (!board) return;
 
   board.addEventListener('click', async (e) => {
+    // Der Spaltenkopf zuerst (#1250). Er liegt ausserhalb der Karten, faellt
+    // also ohnehin nicht auf sie durch - er steht hier vorn, weil er die
+    // billigste Antwort ist und das Brett neu zeichnet, bevor irgendein
+    // Nachladen anlaeuft. Und er gilt AUCH bei `tasks: read`: Zuklappen aendert
+    // nichts an den Daten, es ist eine Ansichtssache.
+    const colToggle = e.target.closest('[data-kanban-toggle]');
+    if (colToggle) {
+      toggleKanbanCol(colToggle.dataset.kanbanToggle);
+      renderKanban(container);
+      return;
+    }
+
     const statusBtn = e.target.closest('[data-next-status]');
     // Bei `tasks: read` gibt es den Knopf nicht mehr; taucht er doch auf (per
     // Devtools), faellt der Klick bewusst DURCH auf die Karte und oeffnet die
@@ -3276,6 +3363,7 @@ function renderFilters(container) {
 const RECENT_FILTERS_KEY = 'yuvomi:recentTaskFilters';
 const RECENT_FILTERS_MAX = 3;
 const COLLAPSED_GROUPS_KEY = 'yuvomi:taskCollapsedGroups';
+const COLLAPSED_KANBAN_KEY = 'yuvomi:taskCollapsedKanbanCols';
 const SHOW_FUTURE_KEY = 'yuvomi:taskShowFuture';
 const ASSIGNED_TO_ME_KEY = 'yuvomi:taskAssignedToMe';
 
@@ -4275,6 +4363,7 @@ export async function render(container, { user }) {
   state.user = user ?? null;
   state.currentUserId = user?.id ?? null;
   loadCollapsedGroups();
+  loadCollapsedKanbanCols();
   // Die Rolle entscheidet nur darüber, ob ein fremder Kommentar entfernt werden
   // darf (#734) - der Server prüft dieselbe Bedingung noch einmal.
   state.isAdmin = user?.role === 'admin';
@@ -4559,6 +4648,18 @@ export async function render(container, { user }) {
 // Testfläche: nur reine Funktionen, deren Vertrag außerhalb dieser Datei zählt.
 export const __test = {
   groupBy, groupKey, formatDueDate, normalizeFilterSet, taskQuery, state,
+  // Das Brett als Markup plus seine Spaltenliste (#1250). Beides steht hier,
+  // weil die Spaltenzahl eine Zusicherung GEGEN das Stylesheet ist: das Raster
+  // muss so viele Spalten legen, wie diese Liste fuehrt, und genau dort ist es
+  // einmal auseinandergelaufen. `toggleKanbanCol` kommt mit, damit der
+  // eingeklappte Zustand gesetzt werden kann, ohne in den Speicher zu greifen.
+  kanbanBoardHtml, KANBAN_COLS, toggleKanbanCol,
+  // Das Einhaengen des Ziehens einzeln, weil sein Riegel KEIN Markup hat: eine
+  // Ablegezone, die gar nicht erst verdrahtet wird, sieht im HTML aus wie jede
+  // andere. SortableJS liest keine Sichtbarkeit - eine Instanz auf einem
+  // versteckten Knoten nimmt weiter Karten an, und die verschwinden dann in
+  // einer Spalte, die niemand sieht.
+  wireKanbanSortable,
   // Was ein Wandtablett zu sehen und zu fassen bekommt (#1209). Die Karte
   // traegt drei Wege zum selben Statuswechsel - Haken, Wisch, Teilaufgabe -,
   // und am Display darf nur der erste erscheinen, weil nur er nach der Person

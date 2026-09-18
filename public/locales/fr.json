@@ -502,7 +502,9 @@
         "doneByPick": "Qui a fait « {{title}} » ?",
         "doneByToast": "Fait par {{name}}.",
         "historyTickedBy": "coché par {{name}}",
-        "reminderLockedNeedsDueDate": "Cette tâche a un rappel que vous n’êtes pas autorisé à modifier. Elle a donc besoin d’une date d’échéance."
+        "reminderLockedNeedsDueDate": "Cette tâche a un rappel que vous n’êtes pas autorisé à modifier. Elle a donc besoin d’une date d’échéance.",
+        "kanbanColCollapse": "Réduire la colonne",
+        "kanbanColExpand": "Agrandir la colonne"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} repas",

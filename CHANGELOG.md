@@ -53,6 +53,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The task board shows all four of its columns, and each one can be folded away.** The board
+  draws four columns - open, in progress, done and archived - but the layout only ever placed
+  three of them per row, so "Archived" dropped into a second row underneath "Open". A grid row
+  takes its height from its tallest cell, which meant the archive was pushed further down the
+  page every time a task was completed. It now gets a column of its own on wide screens, and two
+  columns per row on narrow ones so the cards stay readable.
+
+  "Done" and "Archived" also grow without limit, because the board deliberately asks for every
+  task in every state plus the whole archive, and nothing ages out of it. Each column header is
+  now a button that folds its column down to just the header, and it remembers what you folded,
+  on this device. The count stays visible on a folded column, so it can still say how much it is
+  hiding, and a folded column no longer accepts a dragged card - it is not a place to drop
+  something into and then lose sight of. (#1250)
+
 - **A task opened from the overview can now be completed in one step, instead of having to be
   started first.** The reading view offered a single status button, and it moved the task one stage
   along: an open task could only go to "in progress", and only from there to done. Completing

@@ -189,6 +189,21 @@ const STUBS = {
         : String(value ?? '')
     );
   `,
+  '/utils/sortable.js': `
+    // Suiten, die pruefen wollen, WORAUF eine Seite das Ziehen ueberhaupt
+    // einhaengt, setzen globalThis.__sortableCalls auf ein Array und bekommen
+    // je Aufruf das Element und die Optionen - dasselbe Muster wie __apiStub in
+    // /api.js. Der Riegel, den das misst, ist nicht im Markup zu sehen: eine
+    // Ablegezone, die gar nicht erst verdrahtet wird, sieht im HTML aus wie
+    // jede andere.
+    export const isDragActive = () => false;
+    export const makeSortable = async (listEl, opts) => {
+      if (Array.isArray(globalThis.__sortableCalls)) {
+        globalThis.__sortableCalls.push({ el: listEl, opts });
+      }
+      return { destroy() {} };
+    };
+  `,
   '/reminders.js': `
     export const refresh = async () => {};
   `,

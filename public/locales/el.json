@@ -502,7 +502,9 @@
         "doneByPick": "Ποιος έκανε το «{{title}}»;",
         "doneByToast": "Το έκανε ο/η {{name}}.",
         "historyTickedBy": "τσεκαρίστηκε από {{name}}",
-        "reminderLockedNeedsDueDate": "Αυτή η εργασία έχει μια υπενθύμιση που δεν επιτρέπεται να αλλάξετε. Χρειάζεται επομένως ημερομηνία λήξης."
+        "reminderLockedNeedsDueDate": "Αυτή η εργασία έχει μια υπενθύμιση που δεν επιτρέπεται να αλλάξετε. Χρειάζεται επομένως ημερομηνία λήξης.",
+        "kanbanColCollapse": "Σύμπτυξη στήλης",
+        "kanbanColExpand": "Επέκταση στήλης"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} γεύματα",

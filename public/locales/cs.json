@@ -502,7 +502,9 @@
         "doneByPick": "Kdo splnil „{{title}}“?",
         "doneByToast": "Splnil(a) {{name}}.",
         "historyTickedBy": "odškrtl(a) {{name}}",
-        "reminderLockedNeedsDueDate": "Tento úkol má připomínku, kterou nemůžeš změnit. Proto potřebuje datum splnění."
+        "reminderLockedNeedsDueDate": "Tento úkol má připomínku, kterou nemůžeš změnit. Proto potřebuje datum splnění.",
+        "kanbanColCollapse": "Sbalit sloupec",
+        "kanbanColExpand": "Rozbalit sloupec"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} jídla",

@@ -502,7 +502,9 @@
         "doneByPick": "谁完成了“{{title}}”？",
         "doneByToast": "由 {{name}} 完成。",
         "historyTickedBy": "由 {{name}} 勾选",
-        "reminderLockedNeedsDueDate": "此任务有一个你无法更改的提醒。因此它需要一个截止日期。"
+        "reminderLockedNeedsDueDate": "此任务有一个你无法更改的提醒。因此它需要一个截止日期。",
+        "kanbanColCollapse": "收起该列",
+        "kanbanColExpand": "展开该列"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} 餐",

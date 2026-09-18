@@ -502,7 +502,9 @@
         "doneByPick": "Chi ha svolto «{{title}}»?",
         "doneByToast": "Svolto da {{name}}.",
         "historyTickedBy": "spuntato da {{name}}",
-        "reminderLockedNeedsDueDate": "Questa attività ha un promemoria che non puoi modificare. Serve quindi una data di scadenza."
+        "reminderLockedNeedsDueDate": "Questa attività ha un promemoria che non puoi modificare. Serve quindi una data di scadenza.",
+        "kanbanColCollapse": "Comprimi colonna",
+        "kanbanColExpand": "Espandi colonna"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} pasti",

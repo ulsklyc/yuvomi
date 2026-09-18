@@ -502,7 +502,9 @@
         "doneByPick": "Wie heeft “{{title}}” gedaan?",
         "doneByToast": "Gedaan door {{name}}.",
         "historyTickedBy": "afgevinkt door {{name}}",
-        "reminderLockedNeedsDueDate": "Deze taak heeft een herinnering die je niet mag wijzigen. Daarom is een einddatum nodig."
+        "reminderLockedNeedsDueDate": "Deze taak heeft een herinnering die je niet mag wijzigen. Daarom is een einddatum nodig.",
+        "kanbanColCollapse": "Kolom inklappen",
+        "kanbanColExpand": "Kolom uitklappen"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} maaltijden",

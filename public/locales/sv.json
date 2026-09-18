@@ -502,7 +502,9 @@
         "doneByPick": "Vem gjorde ”{{title}}”?",
         "doneByToast": "Gjord av {{name}}.",
         "historyTickedBy": "bockad av {{name}}",
-        "reminderLockedNeedsDueDate": "Den här uppgiften har en påminnelse som du inte får ändra. Därför behövs ett slutdatum."
+        "reminderLockedNeedsDueDate": "Den här uppgiften har en påminnelse som du inte får ändra. Därför behövs ett slutdatum.",
+        "kanbanColCollapse": "Fäll ihop kolumnen",
+        "kanbanColExpand": "Fäll ut kolumnen"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} måltider",

@@ -514,7 +514,9 @@
         "doneByPick": "Wer hat „{{title}}“ erledigt?",
         "doneByToast": "Erledigt von {{name}}.",
         "historyTickedBy": "abgehakt von {{name}}",
-        "reminderLockedNeedsDueDate": "Diese Aufgabe hat eine Erinnerung, die du nicht ändern darfst. Sie braucht deshalb ein Fälligkeitsdatum."
+        "reminderLockedNeedsDueDate": "Diese Aufgabe hat eine Erinnerung, die du nicht ändern darfst. Sie braucht deshalb ein Fälligkeitsdatum.",
+        "kanbanColCollapse": "Spalte einklappen",
+        "kanbanColExpand": "Spalte ausklappen"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} Mahlzeiten",

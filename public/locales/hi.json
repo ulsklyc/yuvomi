@@ -502,7 +502,9 @@
         "doneByPick": "“{{title}}” किसने किया?",
         "doneByToast": "{{name}} ने किया।",
         "historyTickedBy": "{{name}} ने चिह्नित किया",
-        "reminderLockedNeedsDueDate": "इस कार्य में एक अनुस्मारक है जिसे आप बदल नहीं सकते। इसलिए इसे नियत तारीख की आवश्यकता है।"
+        "reminderLockedNeedsDueDate": "इस कार्य में एक अनुस्मारक है जिसे आप बदल नहीं सकते। इसलिए इसे नियत तारीख की आवश्यकता है।",
+        "kanbanColCollapse": "कॉलम समेटें",
+        "kanbanColExpand": "कॉलम फैलाएं"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} भोजन",

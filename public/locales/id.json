@@ -514,7 +514,9 @@
         "doneByPick": "Siapa yang mengerjakan “{{title}}”?",
         "doneByToast": "Dikerjakan oleh {{name}}.",
         "historyTickedBy": "dicentang oleh {{name}}",
-        "reminderLockedNeedsDueDate": "Tugas ini memiliki pengingat yang tidak boleh Anda ubah. Karena itu tugas ini memerlukan tanggal jatuh tempo."
+        "reminderLockedNeedsDueDate": "Tugas ini memiliki pengingat yang tidak boleh Anda ubah. Karena itu tugas ini memerlukan tanggal jatuh tempo.",
+        "kanbanColCollapse": "Ciutkan kolom",
+        "kanbanColExpand": "Bentangkan kolom"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} hidangan",

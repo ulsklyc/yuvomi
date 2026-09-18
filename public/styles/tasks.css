@@ -1394,9 +1394,27 @@
   min-height: 60vh;
 }
 
+/* VIER Spalten, nicht drei. KANBAN_COLS() in pages/tasks.js fuehrt offen,
+ * laufend, erledigt und abgelegt; hier stand `repeat(3, 1fr)`, also fiel die
+ * vierte in eine zweite Rasterzeile unter die erste Spalte. Weil eine
+ * Rasterzeile ihre Hoehe von ihrer hoechsten Zelle nimmt, wanderte "Abgelegt"
+ * mit jeder erledigten Aufgabe weiter nach unten - das Desktop-Symptom aus
+ * #1250. Die Drei-Spalten-Regel stammt aus dem Redesign vom Maerz, die vierte
+ * Spalte kam Ende April dazu: die Spalte wurde ergaenzt, das Layout nicht.
+ *
+ * Zwei Stufen statt einer: vier Spalten waeren ab 640px je rund 160px breit,
+ * und eine Aufgabenkarte traegt dort Titel, Faelligkeit und Personen.
+ * `minmax(0, 1fr)` statt `1fr`, weil ein langer Titel ohne Leerzeichen die
+ * Spalte sonst ueber ihren Anteil hinaus aufzieht. */
 @media (min-width: 640px) {
   .kanban-board {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .kanban-board {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -1406,6 +1424,32 @@
   display: flex;
   flex-direction: column;
   min-height: 200px;
+}
+
+/* Eine zugeklappte Spalte ist nur noch ihr Kopf (#1250) - ohne das behielte sie
+ * ihre 200px und waere fast so hoch wie mit ein paar Karten darin, das
+ * Zuklappen also folgenlos. `min-height: auto` statt `0`: der Kopf traegt seine
+ * eigene Hoehe, und die soll er behalten. */
+.kanban-col--collapsed {
+  min-height: auto;
+}
+
+/* Der Kopf traegt die Gruppen-Grammatik aus list-row.css (.list-group__toggle,
+ * .list-group__chevron) - hier steht nur, was das Brett davon abweichend
+ * braucht: der Knopf fuellt die Zeile bis zum Zaehler. */
+.kanban-col__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: start;
 }
 
 .kanban-col__header {
@@ -1435,6 +1479,15 @@
   gap: var(--space-2);
   min-height: 80px;
   transition: background-color var(--transition-fast);
+}
+
+/* `hidden` ALLEIN REICHT HIER NICHT, und das ist keine Vorsichtsmassnahme: die
+ * Regel darueber setzt `display: flex`, und eine Klassenregel sticht das
+ * `[hidden] { display: none }` des Browsers. Ohne diese Zeile traegt eine
+ * zugeklappte Spalte ihr Attribut und bleibt trotzdem stehen - sichtbar, voll,
+ * und fuer Screenreader zugleich als versteckt ausgewiesen. */
+.kanban-col__body[hidden] {
+  display: none;
 }
 
 .kanban-card {
