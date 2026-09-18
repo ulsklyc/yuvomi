@@ -659,6 +659,38 @@ test('nur dieser, die Zeile nach dem Beginn selbst umgestellt: normale Vorlaeufe
   assert.deepEqual(put?.body.reminder_offsets, [15, 1440]);
 });
 
+// Verschoben wird hier das VORKOMMEN: die Neubewertung stellt die Zeile auf den
+// Vorlauf, der nun gilt, und laesst sie dabei durchreichen. Fuer den Vorkommens-
+// Weg zaehlt, dass sie durchreicht, nicht was sie anzeigt - sonst ginge der
+// angezeigte Vorlauf als Zahl raus und der Server rechnete ihn gegen den NEUEN
+// Beginn des Vorkommens.
+test('nur dieser, Beginn hinter die Erinnerung geschoben: die Erinnerungen bleiben unangefasst', async () => {
+  const reminders = [AFTER];
+  const panel = openDialog({ event: SERIES_OCCURRENCE, reminders, scope: 'this' });
+  userSets(panel.querySelector('#modal-start-date'), '2026-10-16');
+  const [row] = rowsOf(panel);
+  assert.equal(offsetOf(row).value, 'custom', 'Vorbedingung: die Zeile zeigt jetzt einen Vorlauf');
+  const { calls, fieldErrors } = await save(panel, { event: SERIES_OCCURRENCE, reminders });
+  assert.deepEqual(fieldErrors, []);
+  const put = calls.find((c) => c.method === 'put' && c.path === '/calendar/41/occurrences/2026-10-02');
+  assert.equal(put?.body.start_datetime, '2026-10-16T09:00', 'das Vorkommen wurde verschoben');
+  assert.equal('reminder_offsets' in put.body, false,
+    'kein Vorlauf aus der Anzeige - der gespeicherte Zeitpunkt bleibt beim Server, wie er ist');
+});
+
+test('nur dieser, Beginn verschoben und daneben eine Erinnerung geaendert: Meldung an der Zeile', async () => {
+  const reminders = [AFTER, DAY_BEFORE];
+  const panel = openDialog({ event: SERIES_OCCURRENCE, reminders, scope: 'this' });
+  userSets(panel.querySelector('#modal-start-date'), '2026-10-16');
+  const [after, dayBefore] = rowsOf(panel);
+  userSets(offsetOf(dayBefore), '60');
+  const { calls, fieldErrors } = await save(panel, { event: SERIES_OCCURRENCE, reminders });
+  assert.deepEqual(calls.filter((c) => c.method !== 'get'), [], 'nichts gespeichert');
+  assert.equal(fieldErrors.length, 1);
+  assert.equal(fieldErrors[0].input, offsetOf(after), 'die Meldung steht an der Zeile, die noch durchreicht');
+  assert.equal(fieldErrors[0].message, 'reminders.afterStartNeedsLeadTime');
+});
+
 test('nur dieser ohne Zeile nach dem Beginn: Vorlaeufe wie bisher (Regression)', async () => {
   const reminders = [DAY_BEFORE];
   const panel = openDialog({ event: SERIES_OCCURRENCE, reminders, scope: 'this' });

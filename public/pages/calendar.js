@@ -4650,10 +4650,15 @@ function reminderTimesFromRows(rows, anchorStart, enabled = true) {
  * gegen den Beginn des Vorkommens. Eine Zeile nach dem Beginn hat keinen, und
  * ihn als „1 Minute vorher" zu schicken, waere derselbe Fehler auf einem
  * anderen Weg. Das null entscheidet der Aufrufer (saveEvent).
+ *
+ * Es zaehlt dieselbe Frage wie in reminderTimesFromRows: reicht die Zeile noch
+ * durch? Nicht, was sie anzeigt - nach einer Verschiebung des Beginns zeigt
+ * sie den Vorlauf, der nun gilt, und der gegen den NEUEN Beginn des Vorkommens
+ * gerechnet verschoebe den gespeicherten Zeitpunkt.
  */
 function occurrenceReminderOffsets(rows, enabled = true) {
   if (!enabled) return [];
-  if (rows.some((row) => keepsStoredInstant(row) && row.offset === REMINDER_AFTER_START)) return null;
+  if (rows.some(keepsStoredInstant)) return null;
   return canonicalReminderOffsets(rows, true);
 }
 
@@ -5929,8 +5934,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
         if (reminderOffsets === null && canOverrideOccurrence && target.carriesReminderOffsets
             && !reminderRowsUnchanged(reminderForm, reminderList(existingReminder)
               .map((rem) => reminderRowFromReminder(event, rem)))) {
-          const blocked = reminderForm.rows.find((row) =>
-            keepsStoredInstant(row) && row.offset === REMINDER_AFTER_START);
+          const blocked = reminderForm.rows.find(keepsStoredInstant);
           reportFieldError(blocked?.select, t('reminders.afterStartNeedsLeadTime'));
           saveBtn.disabled = false;
           saveBtn.textContent = t('common.save');
