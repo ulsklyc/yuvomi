@@ -5,11 +5,12 @@
  * zuvor pro Seite handgeschriebene `<button class="page-fab">`-Markup und gibt
  * Tab-Modulen einen Kontext-FAB, dessen Aktion dem aktiven Tab folgt.
  *
- * Vier Wege:
+ * Fuenf Wege:
  *   - pageFabHtml()      → HTML-String für Template-Literal-Seiten (eigene Klick-Verdrahtung).
  *   - createPageFab()    → DOM-Element mit onClick, für DOM-basierte / dynamische Seiten.
  *   - findPageFab()      → den FAB der aktuellen Seite finden (dokumentweit, siehe dort).
  *   - setPageFabAction() → Aktion/Label/Sichtbarkeit eines Kontext-FAB je Tab aktualisieren.
+ *   - triggerPageFab()   → der `n`-Kurzbefehl: den FAB auslösen, wenn die Seite ihn anbietet.
  *
  * WO DER FAB LEBT: Eine Seite legt ihn in ihrem Page-Root an, aber dort bleibt er
  * nicht - der Router hebt ihn nach dem Rendern in die Shell-Layer neben dem
@@ -91,4 +92,32 @@ export function setPageFabAction(fab, { label = '', onClick = null, hidden = fal
   const dockedLabel = fab.querySelector('.toolbar-new-btn__label');
   if (dockedLabel && dockLabel) dockedLabel.textContent = dockLabel;
   fab.onclick = hidden ? null : onClick;
+}
+
+/**
+ * Der `n`-Kurzbefehl (SHORTCUTS in router.js): die Primäraktion der Seite
+ * auslösen - aber nur, wenn die Seite sie auch ANBIETET.
+ *
+ * Bei Nur-lesen blendet layout.css den FAB über `html[data-module-readonly]`
+ * mit `display: none` aus. Das nimmt die Affordanz, nicht den Weg:
+ * `querySelector('.page-fab')` findet auch ein so verstecktes Element, und
+ * `.click()` feuert trotzdem. Der Kurzbefehl öffnete damit auf jeder Seite
+ * ohne eigenen Riegel im FAB-Handler den Anlegedialog, dessen Speichern im
+ * 403 endete (#1265) - nur `waste.js` und `tasks.js` fingen es selbst ab.
+ *
+ * Gefragt wird DASSELBE Attribut, an dem die CSS-Regel hängt, und nicht ein
+ * zweites Mal das Recht: `applyModuleReadonly()` im Router ist die eine Stelle,
+ * die es setzt, samt ihrer Wandtablett-Weiche. Der Kurzbefehl tut damit genau
+ * das, was ein Klick auf den sichtbaren Knopf täte - und nichts, wo keiner zu
+ * sehen ist.
+ *
+ * @param {Document} [doc]
+ * @returns {boolean} ob ein FAB ausgelöst wurde
+ */
+export function triggerPageFab(doc = document) {
+  if (doc.documentElement?.hasAttribute('data-module-readonly')) return false;
+  const fab = doc.querySelector('.page-fab');
+  if (!fab) return false;
+  fab.click();
+  return true;
 }

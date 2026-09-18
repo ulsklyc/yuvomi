@@ -84,6 +84,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The "n" shortcut no longer opens a create dialog on a page you may only read.** Where your
+  access to a module is "read", the create button is hidden, but the keyboard shortcut still pressed
+  it: the dialog for a new entry opened anyway, and saving it ended in an error. The shortcut now
+  does exactly what the visible button would do, so where there is no button, nothing happens.
+  (#1265)
+
+- **The attachment field no longer offers an upload you are not allowed to make.** Tasks, budget
+  entries, shared expenses and inventory items share one field for attaching documents, and an
+  uploaded file is stored in Documents - so whether it works depends on your access to Documents,
+  not on the page you are on. Somebody allowed to edit tasks but only to read documents saw the
+  upload button, and saving the task ended in an error. With read access to Documents the upload
+  button, dropping a file onto the field and the size hint are gone; attachments that are already
+  there stay visible and open as before, and linking an existing document still works, because the
+  link is saved with the task or entry itself. Without any access to Documents the field is not
+  shown, and saving leaves existing attachments untouched. (#1265)
+
+- **Undo after moving ingredients to the shopping list is only offered where it can work.** Moving
+  the ingredients of a meal or a recipe to the shopping list also works for a member who may only
+  read the shopping list, but the undo button next to the message then ended in an error, and the
+  "create new list" button that appears when there is no list yet led to a list that could not be
+  created. Both change the shopping list, so they now appear only for members who may edit it; the
+  message itself still says what happened. (#1265)
+
 - **A module switched off for the whole household no longer sends its reminders.** Switching a
   module off under Settings means the household does not have it: it leaves the navigation, and its
   pages send you back to the overview. Only pantry, shift and waste reminders respected that. Task,

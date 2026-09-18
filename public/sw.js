@@ -162,6 +162,7 @@ const APP_SHELL = [
   '/utils/meal-types.js',
   '/utils/mentions.js',
   '/utils/module-accent.js',
+  '/utils/module-access.js',
   '/utils/metric-card.js',
   '/utils/money.js',
   '/utils/nav-badges.js',

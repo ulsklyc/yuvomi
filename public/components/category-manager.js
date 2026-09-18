@@ -16,6 +16,18 @@
  * VERTRAG FUER AUFRUFER: die Auffrischung gehoert in den Ereignis-Handler, nicht
  * in ein onClose des Modals, und niemand meldet sich beim Schliessen ab. Grund
  * steht bei `_notifyChanged()`.
+ *
+ * ZWEITER VERTRAG: WER DEN VERWALTER OEFFNET, DARF SCHREIBEN (#1265). Die
+ * Komponente fragt das Recht nicht selbst. Jeder `basePath` gehoert dem Modul
+ * der Seite, die ihn oeffnet (`/tasks/categories` in tasks.js, `/pantry/locations`
+ * in pantry.js ...) - die Frage ist also dieselbe, die die Seite fuer ihre
+ * anderen Knoepfe ohnehin mit ihrem `readOnly()` stellt, und der Aufrufer
+ * versteckt bei Nur-lesen den AUSLOESER (Vorbild: `#btn-manage-categories` in
+ * tasks.js). Fragte die Komponente selbst, stuende die Frage zweimal da, und
+ * der Ausloeser bliebe trotzdem stehen - er oeffnete dann einen Dialog, in dem
+ * es nichts zu tun gibt. `npm run test:module-write-access` haelt die
+ * Voraussetzung: ein `basePath` in ein FREMDES Modul macht die Suite rot, denn
+ * dort muesste der Aufrufer `mayWritePath()` aus /utils/module-access.js fragen.
  */
 import { api } from '/api.js';
 import { t } from '/i18n.js';
