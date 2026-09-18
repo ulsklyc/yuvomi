@@ -168,6 +168,27 @@ const unescape = (value) => String(value)
   .replaceAll('&quot;', '"').replaceAll('&#039;', "'")
   .replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&');
 
+/**
+ * Text eines Markup-Stuecks ohne Tags, fuer die Zusicherung am sichtbaren Wortlaut.
+ * Bewusst eine Index-Schleife statt `replace(/<[^>]+>/g, '')`: CodeQL bewertet
+ * jedes solche `replace` isoliert als unvollstaendige Bereinigung
+ * (js/incomplete-multi-character-sanitization), auch in Testdateien, und ein
+ * unterminiertes `<` liefe an der Regex vorbei. Hier endet es den Text.
+ */
+function withoutTags(markup) {
+  let out = '';
+  let i = 0;
+  while (i < markup.length) {
+    const open = markup.indexOf('<', i);
+    if (open === -1) { out += markup.slice(i); break; }
+    out += markup.slice(i, open);
+    const close = markup.indexOf('>', open + 1);
+    if (close === -1) break;
+    i = close + 1;
+  }
+  return out;
+}
+
 function selectFromMarkup(markup, classes) {
   const select = new FakeEl('select', { classes });
   select.options = [...markup.matchAll(/<option value="([^"]*)"([^>]*)>([\s\S]*?)<\/option>/g)]
@@ -202,7 +223,7 @@ function rowsFromMarkup(html) {
     if (hintMarkup) {
       const hint = row.append(new FakeEl('p', { classes: hintMarkup[1].split(/\s+/) }));
       hint.hidden = /\shidden\b/.test(` ${hintMarkup[2]}`);
-      hint.textContent = unescape(hintMarkup[3].replace(/<[^>]+>/g, '').trim());
+      hint.textContent = unescape(withoutTags(hintMarkup[3]).trim());
     }
 
     const customMarkup = /<div class="[^"]*js-reminder-custom"\s*([^>]*)>/.exec(chunk);
