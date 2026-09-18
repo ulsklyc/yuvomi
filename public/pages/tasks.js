@@ -9,13 +9,13 @@ import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js
 import { openModal as openSharedModal, closeModal, wireBlurValidation, validateAll, btnSuccess, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender } from '/components/modal.js';
 import { stagger, vibrate, scheduleUndoableDelete, animationSettled } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
-import { t, getLocale, formatDate, formatTime, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
+import { t, getLocale, formatDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { renderMarkdownToolbar, wireMarkdownToolbar } from '/utils/markdown-toolbar.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 import { withChosenPeople } from '/utils/people-picker.js';
-import { resolveReminderPreset } from '/utils/reminder-offset.js';
+import { resolveReminderPreset, remindAtFromPreset, parseRemindAtAsUtc } from '/utils/reminder-offset.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
@@ -1335,10 +1335,47 @@ async function loadReminderForTask(taskId) {
   }
 }
 
+/**
+ * Der Zeitpunkt einer Erinnerung als lesbarer Text in der Anzeigezone.
+ *
+ * `remind_at` ist naiv-UTC ohne Zonen-Suffix und darf deshalb NICHT als String
+ * weitergereicht werden - `zonedFields` laese ihn dann als Wanduhrzeit und
+ * zeigte in einer gesetzten Haushaltszone die falsche Stunde an. Der Umweg
+ * ueber `parseRemindAtAsUtc` macht daraus erst einen Zeitpunkt.
+ */
+function reminderWhenText(reminder) {
+  if (!reminder?.remind_at) return '';
+  const at = parseRemindAtAsUtc(reminder.remind_at);
+  if (Number.isNaN(at.getTime())) return '';
+  return `${formatDate(at)} ${formatTime(at)} ${timeSuffix()}`.trimEnd();
+}
+
+/**
+ * DER DIALOG NENNT AUCH DEN ZUSTAND, DEN SEINE PRESETS NICHT ABBILDEN.
+ *
+ * Die Auswahl kennt nur Vorlaeufe, `remind_at` ist aber ein absoluter
+ * Zeitpunkt. Wer die Faelligkeit VOR eine bestehende Erinnerung zieht, hat
+ * keinen Vorlauf mehr, sondern einen Nachlauf - und den gab es in der Liste
+ * nicht. Der Rueckfall lautete `offset_at_time`: der Dialog sagte „Zum
+ * Startzeitpunkt", waehrend die Erinnerung Tage spaeter feuerte, und das
+ * naechste Speichern rechnete aus dieser falschen Anzeige einen neuen
+ * Zeitpunkt - die Erinnerung wanderte, ohne dass jemand sie angefasst hatte.
+ *
+ * Der Zustand bekommt deshalb einen eigenen Eintrag mit Warnton statt einer
+ * Notluege. Er steht NUR in der Liste, wenn er gerade zutrifft (man waehlt ihn
+ * nicht aus, man ist darin), bleibt danach aber im DOM, damit die Wahl
+ * innerhalb des Dialogs umkehrbar ist: wer versehentlich einen Vorlauf
+ * anklickt, findet den alten Zustand noch vor.
+ *
+ * Der gespeicherte Zeitpunkt reist im versteckten Feld mit, weil das Speichern
+ * ihn braucht - es rechnet fuer diesen Eintrag NICHT, sondern reicht ihn durch.
+ */
 function renderReminderSection(task = null, reminder = null) {
   const hasReminder = !!reminder;
   const resolved = resolveReminderPreset(task, reminder);
   const showCustom = hasReminder && resolved.preset === 'offset_custom';
+  const afterDue = hasReminder && resolved.preset === 'offset_after_due';
+  const whenText = afterDue ? reminderWhenText(reminder) : '';
 
   return `
     <div class="reminder-section">
@@ -1354,6 +1391,7 @@ function renderReminderSection(task = null, reminder = null) {
           <label class="label" for="reminder-offset">${t('reminders.offsetLabel')}</label>
           <select class="input" id="reminder-offset">
             <option value="offset_none">${t('reminders.offsetNone')}</option>
+            ${afterDue ? `<option value="offset_after_due" selected>${t('reminders.offsetAfterDue')}</option>` : ''}
             <option value="offset_at_time" ${resolved.preset === 'offset_at_time' ? 'selected' : ''}>${t('reminders.offsetAtTime')}</option>
             <option value="offset_15m" ${resolved.preset === 'offset_15m' ? 'selected' : ''}>${t('reminders.offset15min')}</option>
             <option value="offset_1h" ${resolved.preset === 'offset_1h' ? 'selected' : ''}>${t('reminders.offset1hour')}</option>
@@ -1363,6 +1401,8 @@ function renderReminderSection(task = null, reminder = null) {
             <option value="offset_2w" ${resolved.preset === 'offset_2w' ? 'selected' : ''}>${t('reminders.offset2weeks')}</option>
             <option value="offset_custom" ${resolved.preset === 'offset_custom' ? 'selected' : ''}>${t('reminders.offsetCustom')}</option>
           </select>
+          <p class="task-field-hint field-hint--warn" id="reminder-after-due-warning" role="status" ${afterDue ? '' : 'hidden'}><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('reminders.afterDueHint', { when: esc(whenText) })}</span></p>
+          <input type="hidden" id="reminder-stored-at" value="${esc(reminder?.remind_at ?? '')}">
         </div>
         <div class="modal-grid modal-grid--2" id="reminder-custom-fields" style="${showCustom ? '' : 'display:none'};margin-top:var(--space-3)">
           <div class="form-group" style="margin:0">
@@ -1381,6 +1421,35 @@ function renderReminderSection(task = null, reminder = null) {
         </div>
       </div>
     </div>`;
+}
+
+/**
+ * Der Zeitpunkt, den der ausgefuellte Erinnerungs-Abschnitt ergibt.
+ *
+ * DIE NAHT ZWISCHEN MARKUP UND SPEICHERN, und sie steht bewusst als eigene
+ * Funktion da: welche Felder `renderReminderSection` schreibt und welche das
+ * Speichern liest, war vorher nur im Quelltext behauptet und an keiner Stelle
+ * messbar. Ein Test kann hier das ECHTE Markup vorne hineingeben und den
+ * Zeitpunkt hinten herausnehmen.
+ *
+ * Gerechnet wird in `remindAtFromPreset` - hier steht nur, was hineingeht. Der
+ * Zustand „liegt nach der Faelligkeit" hat keinen Vorlauf, aus dem sich etwas
+ * rechnen liesse; er reicht den gespeicherten Zeitpunkt durch und laesst die
+ * Erinnerung damit stehen, wo sie steht.
+ *
+ * @returns {string|null} naiv-UTC `remind_at`, oder null bei „keine" bzw. einer
+ *          unbrauchbaren Eingabe
+ */
+function reminderRemindAtFromForm(form, { dueDate, dueTime = null } = {}) {
+  const preset = form.querySelector('#reminder-offset')?.value || 'offset_none';
+  if (preset === 'offset_none') return null;
+  return remindAtFromPreset(preset, {
+    dueDate,
+    dueTime,
+    amount: form.querySelector('#reminder-custom-amount')?.value,
+    unit: form.querySelector('#reminder-custom-unit')?.value || 'days',
+    storedRemindAt: form.querySelector('#reminder-stored-at')?.value || null,
+  });
 }
 
 // --------------------------------------------------------
@@ -1549,9 +1618,13 @@ function wireTaskForm(panel, { task = null, container = null, onChanged = () => 
   toggle?.addEventListener('change', () => {
     fields.style.display = toggle.checked ? '' : 'none';
   });
+  const afterDueWarning = panel.querySelector('#reminder-after-due-warning');
   offset?.addEventListener('change', () => {
-    if (!customFields) return;
-    customFields.style.display = offset.value === 'offset_custom' ? '' : 'none';
+    if (customFields) customFields.style.display = offset.value === 'offset_custom' ? '' : 'none';
+    // Der Warnton gehoert an den Zustand, nicht an den Ladezeitpunkt: wer den
+    // Eintrag verlaesst, hat das Problem entschieden und soll ihn nicht mehr
+    // sehen - wer zurueckgeht, wieder.
+    if (afterDueWarning) afterDueWarning.hidden = offset.value !== 'offset_after_due';
   });
   // Form-Events
   panel.querySelector('#task-form')
@@ -1814,22 +1887,8 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
     if (!dueDate) { resetSubmit(t('tasks.reminderNeedsDueDate')); return; }
     const offsetPreset = form.querySelector('#reminder-offset')?.value || 'offset_none';
     if (offsetPreset === 'offset_none') { resetSubmit(t('tasks.reminderNeedsDueDate')); return; }
-    let offsetMs = 0;
-    if (offsetPreset === 'offset_15m') offsetMs = 15 * 60 * 1000;
-    else if (offsetPreset === 'offset_1h') offsetMs = 60 * 60 * 1000;
-    else if (offsetPreset === 'offset_1d') offsetMs = 24 * 60 * 60 * 1000;
-    else if (offsetPreset === 'offset_2d') offsetMs = 2 * 24 * 60 * 60 * 1000;
-    else if (offsetPreset === 'offset_1w') offsetMs = 7 * 24 * 60 * 60 * 1000;
-    else if (offsetPreset === 'offset_2w') offsetMs = 14 * 24 * 60 * 60 * 1000;
-    else if (offsetPreset === 'offset_custom') {
-      const customAmount = Number(form.querySelector('#reminder-custom-amount')?.value || 0);
-      const customUnit = form.querySelector('#reminder-custom-unit')?.value || 'days';
-      if (!Number.isFinite(customAmount) || customAmount <= 0) { resetSubmit(t('common.invalidInput')); return; }
-      const unitFactor = customUnit === 'minutes' ? 60000 : customUnit === 'hours' ? 3600000 : customUnit === 'days' ? 86400000 : 604800000;
-      offsetMs = customAmount * unitFactor;
-    }
-    const dueDateTime = body.due_time ? new Date(`${dueDate}T${body.due_time}`) : new Date(`${dueDate}T23:59:59`);
-    remindAt = new Date(dueDateTime.getTime() - offsetMs).toISOString().slice(0, 19);
+    remindAt = reminderRemindAtFromForm(form, { dueDate, dueTime: body.due_time });
+    if (!remindAt) { resetSubmit(t('common.invalidInput')); return; }
   }
 
   // Wartende Uploads VOR dem Speichern der Aufgabe (#733): scheitert der
@@ -4280,6 +4339,11 @@ export const __test = {
   renderTaskCard, wireSwipeGestures,
   // Der Aufgaben-Dialog als Markup: welche Felder er zeigt und wen er anbietet.
   renderModalContent,
+  // Der Erinnerungs-Abschnitt einzeln, weil er einen Zustand zu BENENNEN hat,
+  // den seine Auswahlliste nicht abbildet: eine Erinnerung nach der
+  // Faelligkeit. Was der Abschnitt dabei sagt, ist der halbe Fix - die andere
+  // Haelfte ist, dass das Speichern daraus nicht rechnet.
+  renderReminderSection, reminderRemindAtFromForm,
   // Die Personenauswahl beim Abhaken (#1205): WANN sie ueberhaupt erscheint,
   // ist die halbe Entscheidung - ein Solo-Haushalt bekommt sie nie zu sehen.
   renderDoerPicker,

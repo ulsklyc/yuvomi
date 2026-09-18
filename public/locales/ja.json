@@ -2987,7 +2987,9 @@
         "customDays": "Days",
         "customWeeks": "Weeks",
         "sectionTitlePlural": "リマインダー",
-        "sharedWithAssignees": "この予定に割り当てられた人にも、このリマインダーが届きます。"
+        "sharedWithAssignees": "この予定に割り当てられた人にも、このリマインダーが届きます。",
+        "offsetAfterDue": "期日より後",
+        "afterDueHint": "このリマインダーは期日より後（{{when}}）に設定されており、保存しても変更されません。移動するには事前通知のタイミングを選んでください。"
     },
     "onboarding": {
         "step1Title": "{{name}}へようこそ",

@@ -2987,7 +2987,9 @@
         "customDays": "Dias",
         "customWeeks": "Semanas",
         "sectionTitlePlural": "Lembretes",
-        "sharedWithAssignees": "Quem estiver atribuído a este evento também recebe este lembrete."
+        "sharedWithAssignees": "Quem estiver atribuído a este evento também recebe este lembrete.",
+        "offsetAfterDue": "Depois do vencimento",
+        "afterDueHint": "Este lembrete é posterior à data de vencimento ({{when}}) e permanece inalterado ao salvar. Escolha uma antecedência para movê-lo."
     },
     "onboarding": {
         "step1Title": "Bem-vindo ao {{name}}",

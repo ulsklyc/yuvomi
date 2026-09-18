@@ -3464,7 +3464,9 @@
         "customDays": "Dny",
         "customWeeks": "Týdny",
         "sectionTitlePlural": "Připomínky",
-        "sharedWithAssignees": "Toto připomenutí dostanou i osoby přiřazené k této události."
+        "sharedWithAssignees": "Toto připomenutí dostanou i osoby přiřazené k této události.",
+        "offsetAfterDue": "Po termínu splnění",
+        "afterDueHint": "Tato připomínka je po termínu splnění ({{when}}) a při uložení zůstane beze změny. Vyberte předstih, kterým ji posunete."
     },
     "birthdays": {
         "inDays": "za {{days}} dní",

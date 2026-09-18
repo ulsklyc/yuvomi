@@ -2884,7 +2884,9 @@
         "customDays": "일",
         "customWeeks": "주",
         "sectionTitlePlural": "알림",
-        "sharedWithAssignees": "이 일정에 배정된 사람도 이 알림을 받습니다."
+        "sharedWithAssignees": "이 일정에 배정된 사람도 이 알림을 받습니다.",
+        "offsetAfterDue": "마감일 이후",
+        "afterDueHint": "이 알림은 마감일 이후({{when}})이며 저장해도 변경되지 않습니다. 옮기려면 미리 알림 시점을 선택하세요."
     },
     "birthdays": {
         "inDays": "{{days}}일 후",

@@ -2987,7 +2987,9 @@
         "customDays": "Days",
         "customWeeks": "Weeks",
         "sectionTitlePlural": "अनुस्मारक",
-        "sharedWithAssignees": "इस कार्यक्रम को सौंपे गए लोगों को भी यह अनुस्मारक मिलता है।"
+        "sharedWithAssignees": "इस कार्यक्रम को सौंपे गए लोगों को भी यह अनुस्मारक मिलता है।",
+        "offsetAfterDue": "नियत तिथि के बाद",
+        "afterDueHint": "यह अनुस्मारक नियत तिथि ({{when}}) के बाद है और सहेजने पर अपरिवर्तित रहता है। इसे खिसकाने के लिए कोई पूर्व-सूचना अवधि चुनें।"
     },
     "onboarding": {
         "step1Title": "{{name}} में आपका स्वागत है",

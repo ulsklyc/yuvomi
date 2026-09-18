@@ -2987,7 +2987,9 @@
         "customDays": "Days",
         "customWeeks": "Weeks",
         "sectionTitlePlural": "Hatırlatıcılar",
-        "sharedWithAssignees": "Bu etkinliğe atanan kişiler de bu hatırlatmayı alır."
+        "sharedWithAssignees": "Bu etkinliğe atanan kişiler de bu hatırlatmayı alır.",
+        "offsetAfterDue": "Son tarihten sonra",
+        "afterDueHint": "Bu hatırlatıcı son tarihten sonra ({{when}}) ve kaydettiğinizde değişmeden kalır. Taşımak için bir hatırlatma süresi seçin."
     },
     "onboarding": {
         "step1Title": "{{name}} uygulamasına hoş geldiniz",

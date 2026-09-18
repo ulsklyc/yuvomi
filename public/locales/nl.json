@@ -2872,7 +2872,9 @@
         "customDays": "Dagen",
         "customWeeks": "Weken",
         "sectionTitlePlural": "Herinneringen",
-        "sharedWithAssignees": "Wie aan deze afspraak is toegewezen, krijgt deze herinnering ook."
+        "sharedWithAssignees": "Wie aan deze afspraak is toegewezen, krijgt deze herinnering ook.",
+        "offsetAfterDue": "Na de vervaldatum",
+        "afterDueHint": "Deze herinnering valt na de vervaldatum ({{when}}) en blijft ongewijzigd bij het opslaan. Kies een voorlooptijd om hem te verplaatsen."
     },
     "birthdays": {
         "inDays": "over {{days}} dagen",

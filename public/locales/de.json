@@ -2884,7 +2884,9 @@
         "customDays": "Tage",
         "customWeeks": "Wochen",
         "sectionTitlePlural": "Erinnerungen",
-        "sharedWithAssignees": "Wer diesem Termin zugewiesen ist, bekommt diese Erinnerung ebenfalls."
+        "sharedWithAssignees": "Wer diesem Termin zugewiesen ist, bekommt diese Erinnerung ebenfalls.",
+        "offsetAfterDue": "Nach der Fälligkeit",
+        "afterDueHint": "Die Erinnerung liegt nach der Fälligkeit ({{when}}) und bleibt beim Speichern unverändert. Wähle einen Vorlauf, um sie zu verschieben."
     },
     "birthdays": {
         "inDays": "in {{days}} Tagen",

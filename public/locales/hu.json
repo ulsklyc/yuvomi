@@ -2872,7 +2872,9 @@
         "customDays": "Nap",
         "customWeeks": "Hét",
         "sectionTitlePlural": "Emlékeztetők",
-        "sharedWithAssignees": "Az eseményhez rendelt személyek is megkapják ezt az emlékeztetőt."
+        "sharedWithAssignees": "Az eseményhez rendelt személyek is megkapják ezt az emlékeztetőt.",
+        "offsetAfterDue": "A határidő után",
+        "afterDueHint": "Ez az emlékeztető a határidő után van ({{when}}), és mentéskor változatlan marad. Válasszon előzetes időt az áthelyezéséhez."
     },
     "birthdays": {
         "inDays": "{{days}} nap múlva",

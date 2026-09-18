@@ -2987,7 +2987,9 @@
         "customDays": "Days",
         "customWeeks": "Weeks",
         "sectionTitlePlural": "提醒",
-        "sharedWithAssignees": "被指派到此日程的人也会收到此提醒。"
+        "sharedWithAssignees": "被指派到此日程的人也会收到此提醒。",
+        "offsetAfterDue": "截止日期之后",
+        "afterDueHint": "此提醒在截止日期之后（{{when}}），保存时不会改变。选择一个提前量即可移动它。"
     },
     "onboarding": {
         "step1Title": "欢迎使用{{name}}",

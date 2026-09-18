@@ -2987,7 +2987,9 @@
         "customDays": "Days",
         "customWeeks": "Weeks",
         "sectionTitlePlural": "Rappels",
-        "sharedWithAssignees": "Les personnes affectées à cet événement reçoivent aussi ce rappel."
+        "sharedWithAssignees": "Les personnes affectées à cet événement reçoivent aussi ce rappel.",
+        "offsetAfterDue": "Après l'échéance",
+        "afterDueHint": "Ce rappel se situe après la date d'échéance ({{when}}) et reste inchangé à l'enregistrement. Choisissez un délai pour le déplacer."
     },
     "onboarding": {
         "step1Title": "Bienvenue dans {{name}}",

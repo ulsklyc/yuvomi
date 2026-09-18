@@ -2987,7 +2987,9 @@
         "customDays": "Days",
         "customWeeks": "Weeks",
         "sectionTitlePlural": "Recordatorios",
-        "sharedWithAssignees": "Quien esté asignado a este evento también recibe este recordatorio."
+        "sharedWithAssignees": "Quien esté asignado a este evento también recibe este recordatorio.",
+        "offsetAfterDue": "Después del vencimiento",
+        "afterDueHint": "Este recordatorio es posterior a la fecha de vencimiento ({{when}}) y no cambia al guardar. Elige una antelación para moverlo."
     },
     "onboarding": {
         "step1Title": "Bienvenido a {{name}}",

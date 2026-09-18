@@ -2872,7 +2872,9 @@
         "customDays": "Days",
         "customWeeks": "Weeks",
         "sectionTitlePlural": "Reminders",
-        "sharedWithAssignees": "Anyone assigned to this event gets this reminder too."
+        "sharedWithAssignees": "Anyone assigned to this event gets this reminder too.",
+        "offsetAfterDue": "After the due date",
+        "afterDueHint": "This reminder is after the due date ({{when}}) and stays unchanged when you save. Pick a lead time to move it."
     },
     "birthdays": {
         "inDays": "in {{days}} days",

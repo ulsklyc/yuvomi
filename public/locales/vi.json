@@ -2872,7 +2872,9 @@
         "customDays": "Ngày",
         "customWeeks": "Tuần",
         "sectionTitlePlural": "Lời nhắc",
-        "sharedWithAssignees": "Những người được giao sự kiện này cũng nhận được lời nhắc này."
+        "sharedWithAssignees": "Những người được giao sự kiện này cũng nhận được lời nhắc này.",
+        "offsetAfterDue": "Sau ngày đến hạn",
+        "afterDueHint": "Lời nhắc này nằm sau ngày đến hạn ({{when}}) và giữ nguyên khi bạn lưu. Chọn thời gian nhắc trước để dời nó."
     },
     "birthdays": {
         "inDays": "trong {{days}} ngày",

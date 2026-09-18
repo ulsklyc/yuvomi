@@ -2884,7 +2884,9 @@
         "customDays": "Dni",
         "customWeeks": "Tygodnie",
         "sectionTitlePlural": "Przypomnienia",
-        "sharedWithAssignees": "Osoby przypisane do tego wydarzenia również otrzymają to przypomnienie."
+        "sharedWithAssignees": "Osoby przypisane do tego wydarzenia również otrzymają to przypomnienie.",
+        "offsetAfterDue": "Po terminie",
+        "afterDueHint": "To przypomnienie wypada po terminie ({{when}}) i przy zapisie pozostaje bez zmian. Wybierz wyprzedzenie, aby je przesunąć."
     },
     "birthdays": {
         "inDays": "za {{days}} dni",
