@@ -470,3 +470,46 @@ test('der Loopback-Leser urteilt ueber den Aufruf, nicht ueber eine Schreibweise
   // Leser kein Aufruf. Wird er klueger, wird dieser Fall rot und gehoert umgehaengt.
   assert.deepEqual(verdicts('const l = server.listen.bind(server); l(0);'), []);
 });
+
+/* EINE SUITE, DIE NIRGENDS BESCHRIEBEN IST, HAELT EINE INVARIANTE, DIE NIEMAND KENNT.
+ *
+ * `docs/test-suites.md` ist die eine Stelle, an der steht, welche Suite welche
+ * Invariante deckt - CLAUDE.md verweist dafuer auf sie. Der Guard darueber haelt
+ * fest, dass jede Suite LAEUFT; dass sie auch ERKLAERT ist, hielt bisher nichts.
+ * Gemessen am 2026-09-18: zwei Suiten aus den zwei Tagen davor
+ * (`test:reminder-orphans`, `test:task-reminder-after-due`) standen in der Kette,
+ * aber in keiner Zeile der Doku. Der Ausfall ist still und einseitig: die Suite
+ * ist gruen, nur ihr Grund fehlt, und der naechste, der ihren Fall aufraeumt,
+ * findet keinen Satz, der ihm widerspricht.
+ *
+ * Geprueft wird der Aufruf, wie die Doku ihn schreibt (`npm run test:x`), an
+ * DERSELBEN Wortgrenze wie in der Kette - ein Teilstring haelt `test:tasks`
+ * fuer beschrieben, sobald `npm run test:tasks-routes` irgendwo steht. Die
+ * Browser-Kette zaehlt mit: sie ist zwar keine Suite, hat aber ihren eigenen
+ * Abschnitt und wird von Hand gefahren, also braucht gerade sie die Erklaerung. */
+const SUITE_DOC = new URL('../docs/test-suites.md', import.meta.url);
+
+test('jede Suite steht in docs/test-suites.md', () => {
+  const doc = readFileSync(SUITE_DOC, 'utf8');
+  const undocumented = suiteScripts.filter(
+    (name) => !new RegExp(`npm run ${escapeRe(name)}${nameEnd}`).test(doc),
+  );
+  assert.deepEqual(
+    undocumented,
+    [],
+    'Suiten ohne Zeile in docs/test-suites.md - eintragen, was sie deckt: '
+    + `${undocumented.join(', ')}`,
+  );
+});
+
+test('der Doku-Guard liest an der Wortgrenze, nicht als Teilstring', () => {
+  // REICHWEITE VOR DEM URTEIL, wie beim Browser-Nachweis darueber: die Liste
+  // oben ist LEER, sobald die Doku vollstaendig ist, und sagt dann fuer sich
+  // genommen nichts. Was sie traegt, ist der Nachweis, dass das Kriterium
+  // ueberhaupt unterscheidet - eine Schwestersuite mit laengerem Namen darf
+  // eine kuerzere nicht mitdecken.
+  const documented = (doc, name) => new RegExp(`npm run ${escapeRe(name)}${nameEnd}`).test(doc);
+  assert.equal(documented('npm run test:tasks-routes  # ...', 'test:tasks'), false);
+  assert.equal(documented('npm run test:tasks  # ...', 'test:tasks'), true);
+  assert.equal(documented('npm run test:tasks\n', 'test:tasks'), true);
+});
