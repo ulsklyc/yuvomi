@@ -23,6 +23,7 @@
 import { localToUTC, householdTimeZone, todayKey, shiftDateKey } from '../utils/timezone.js';
 import { resolvePermissions } from '../permissions.js';
 import { createLogger } from '../logger.js';
+import { householdDisabledModules } from './household-modules.js';
 import { listTypes, getOccurrences } from './waste-store.js';
 
 const log = createLogger('Waste');
@@ -57,16 +58,10 @@ function isoNow(now) {
 
 /** Is the Waste module switched off for the whole household? Shared with
  * waste-source-scheduler.js, so a disabled module also pauses URL-source
- * background refreshes, not just reminder sync. */
+ * background refreshes, not just reminder sync. The reading of
+ * `disabled_modules` itself lives in household-modules.js (#1279). */
 export function wasteDisabled(database) {
-  const row = database.prepare("SELECT value FROM sync_config WHERE key = 'disabled_modules'").get();
-  if (!row?.value) return false;
-  try {
-    const parsed = JSON.parse(row.value);
-    return Array.isArray(parsed) && parsed.includes('waste');
-  } catch {
-    return false;
-  }
+  return householdDisabledModules(database).has('waste');
 }
 
 function lacksWaste(database, userId) {

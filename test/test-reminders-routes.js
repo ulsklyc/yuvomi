@@ -42,6 +42,13 @@ function buildTestDb() {
 
 const db = buildTestDb();
 _setTestDatabase(db);
+// Die volle Migrationskette schaltet Inventar, Schichtplan und Muell ab
+// (Migrationen 145, 166, 198). Seit #1279 filtert /pending auch nach diesem
+// Haushaltsschalter - die Suite misst aber die ANDEREN beiden Achsen (Token-Scopes
+// und `access_permissions`). Mit abgeschaltetem Muell waere der waste_pickup-Fall
+// unten auch dann gruen, wenn die Rechte-Achse nichts mehr filterte. Der
+// Haushaltsschalter hat seine eigene Suite: test/test-disabled-module-reminders.js.
+db.prepare("INSERT INTO sync_config (key, value) VALUES ('disabled_modules', '[]') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run();
 
 // --------------------------------------------------------
 // Fixtures + Helfer

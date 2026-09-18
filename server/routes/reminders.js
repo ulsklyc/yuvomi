@@ -12,11 +12,14 @@ import { syncAllBirthdayReminders } from '../services/birthdays.js';
 import { fanOutEventReminders, eventAuthorId } from '../services/event-reminder-fanout.js';
 import { deniedModules } from '../permissions.js';
 import { tokenAllows } from '../scopes.js';
+import { ORIGIN_MODULE, withoutSwitchedOffModules } from '../services/reminder-origins.js';
 
 const log    = createLogger('Reminders');
 const router = express.Router();
 
-const VALID_ENTITY_TYPES = ['task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry'];
+// Exportiert fuer den Guard in test/test-disabled-module-reminders.js: jeder
+// Wert muss in ORIGIN_MODULE stehen, sonst faellt er still aus `/pending`.
+export const VALID_ENTITY_TYPES = ['task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry'];
 
 /**
  * Nach jedem Schreibvorgang an den Erinnerungen eines Termins: die Zugewiesenen
@@ -116,23 +119,10 @@ const DERIVED_ENTITY_TYPES = ['pantry_item', 'cycle_period', 'cycle_log_nudge', 
  * Middleware wohnen.
  *
  * Der Befund kam aus der PR-Review zu #811 und ist älter als dieses Feature -
- * er betraf fünf Herkünfte, bevor die sechste dazukam. Deshalb steht hier eine
- * Karte über alle und keine Ausnahme für die neue.
+ * er betraf fünf Herkünfte, bevor die sechste dazukam. Deshalb gibt es eine
+ * Karte über alle und keine Ausnahme für die neue. Sie steht seit #1279 in
+ * server/services/reminder-origins.js, weil auch die Zustellung sie braucht.
  */
-const ORIGIN_MODULE = Object.freeze({
-  task:                   'tasks',
-  event:                  'calendar',
-  subscription:           'budget',
-  inventory_item:         'inventory',
-  inventory_tracked_date: 'inventory',
-  pantry_item:            'pantry',
-  cycle_period:           'health',
-  cycle_log_nudge:        'health',
-  schedule_entry:         'schedule',
-  schedule_extra_entry:   'schedule',
-  waste_pickup:           'waste',
-  document_expiry:        'documents',
-});
 
 /**
  * Darf dieser Aufrufer eine Erinnerung dieser Herkunft sehen bzw. anfassen?
@@ -195,7 +185,7 @@ router.get('/pending', (req, res) => {
     const origins = readableOrigins(req);
     if (!origins.length) return res.json({ data: [] });
 
-    const rows = db.get().prepare(`
+    const dueRows = db.get().prepare(`
       SELECT
         r.*,
         CASE r.entity_type
@@ -272,6 +262,12 @@ router.get('/pending', (req, res) => {
         )
       ORDER BY r.remind_at ASC
     `).all(userId, now, ...origins);
+
+    // Die dritte Achse neben Token-Scopes und Mitgliedsrechten: ein Modul, das
+    // der Haushalt abgeschaltet hat, gibt es hier nicht - auch nicht als
+    // Toast (#1279). Übersprungen, nicht gelöscht: siehe
+    // withoutSwitchedOffModules() für den Grund.
+    const rows = withoutSwitchedOffModules(db.get(), dueRows);
 
     // Nur für die tatsächlichen Partner-Zeilen geholt (rar) - siehe Kommentar
     // an cycle_anchor_kind oben. Bleibt bei jeder anderen Zeile `undefined`

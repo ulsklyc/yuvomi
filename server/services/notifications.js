@@ -19,6 +19,7 @@ import { syncAllPantryExpiryReminders } from './pantry-reminders.js';
 import { syncAllCycleReminders } from './cycle-reminders.js';
 import { syncAllScheduleReminders } from './schedule-reminders.js';
 import { syncAllWasteReminders } from './waste-reminders.js';
+import { withoutSwitchedOffModules } from './reminder-origins.js';
 
 const log = createLogger('Notifications');
 const APP_NAME = 'Yuvomi';
@@ -429,8 +430,8 @@ export async function processDueNotifications({
     log.error('Waste reminder sync failed:', err?.message || err);
   }
 
-  const due = activeDb.prepare(`
-    SELECT r.id, r.created_by, r.entity_type,
+  const dueRows = activeDb.prepare(`
+    SELECT r.id, r.created_by, r.entity_type, r.entity_id,
       CASE r.entity_type
         WHEN 'task'  THEN (SELECT title FROM tasks           WHERE id = r.entity_id)
         WHEN 'event' THEN (SELECT title FROM calendar_events WHERE id = r.entity_id)
@@ -513,6 +514,15 @@ export async function processDueNotifications({
       AND (r.entity_type != 'event' OR EXISTS (SELECT 1 FROM calendar_events WHERE id = r.entity_id))
     ORDER BY r.remind_at ASC
   `).all(nowIso);
+
+  // EIN ABGESCHALTETES MODUL MELDET SICH NICHT (#1279). Die Syncs oben raeumen
+  // nur die Quellen ab, die sie selbst herstellen; eine Aufgabe, ein Termin, ein
+  // Abo, ein Inventar-Datum oder ein Dokument kam bis hierher durch, und der Tipp
+  // auf die Meldung oeffnete eine Seite, die der Routen-Guard abweist. Die Zeile
+  // bleibt ausstehend (pushed_at bleibt leer) und geht nach dem Wiedereinschalten
+  // raus - siehe withoutSwitchedOffModules() fuer den Grund. Synchron direkt
+  // nach dem Lesen, vor dem ersten `await` der Schleife.
+  const due = withoutSwitchedOffModules(activeDb, dueRows);
 
   const counters = { due: due.length, attempted: 0, sent: 0, failed: 0, skipped: 0 };
   const markPushed = activeDb.prepare('UPDATE reminders SET pushed_at = ? WHERE id = ?');

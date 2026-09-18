@@ -84,6 +84,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A module switched off for the whole household no longer sends its reminders.** Switching a
+  module off under Settings means the household does not have it: it leaves the navigation, and its
+  pages send you back to the overview. Only pantry, shift and waste reminders respected that. Task,
+  calendar, subscription, inventory, document, cycle and birthday reminders kept arriving - as a
+  push notification, on a notification channel and in the in-app list - and tapping one opened a
+  page that turned you away. They now stay silent while their module is off. Reminders someone set
+  by hand, and the ones a subscription, an inventory item or a document creates when it is saved,
+  are held back rather than deleted, because nothing would ever bring them back: once the module is
+  switched on again, the ones that fell due in the meantime arrive, as they would after the server
+  had been down for a while. Cycle and birthday reminders are worked out from their data, so like
+  pantry, shift and waste reminders they are cleared while the module is off and come back by
+  themselves once it is on. Birthday reminders follow the Birthdays switch, not the Calendar one,
+  although they hang on a calendar entry: switching the calendar off leaves them alone. (#1279)
+
+- **The cycle notification a partner receives names whose period is expected.** A member can have a
+  partner told ahead of their predicted period. On the in-app list that message named the person,
+  but as a push notification or on a notification channel it always fell back to the neutral
+  wording, because the delivery looked the person up with a reference it never read. (#1279)
+
 - **A two-finger swipe scrolls the main content on a touchscreen, and pinch-to-zoom works there.**
   The main area told the browser it may only be panned vertically, and that setting quietly rules
   out pinch-zoom as well. Chromium treats any scroll that starts with two fingers as a pinch and

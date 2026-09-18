@@ -28,6 +28,7 @@
 import { localToUTC, householdTimeZone, todayKey, shiftDateKey, utcToWall } from '../utils/timezone.js';
 import { resolvePermissions } from '../permissions.js';
 import { createLogger } from '../logger.js';
+import { householdDisabledModules } from './household-modules.js';
 import { scheduleData } from './schedule.js';
 
 const log = createLogger('ScheduleReminders');
@@ -134,15 +135,9 @@ function shiftReminderAt(dateKey, startTime, offsetMinutes, tz) {
   return subtractMinutes(utc, offsetMinutes);
 }
 
+/** Haushaltweit abgeschaltet? Lesart in server/services/household-modules.js. */
 function scheduleDisabled(database) {
-  const row = database.prepare("SELECT value FROM sync_config WHERE key = 'disabled_modules'").get();
-  if (!row?.value) return false;
-  try {
-    const parsed = JSON.parse(row.value);
-    return Array.isArray(parsed) && parsed.includes('schedule');
-  } catch {
-    return false;
-  }
+  return householdDisabledModules(database).has('schedule');
 }
 
 function lacksSchedule(database, userId) {

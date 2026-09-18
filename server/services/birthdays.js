@@ -1,6 +1,7 @@
 import { formatDateKey, resolveHouseholdFormats, translate } from '../utils/i18n.js';
 import { householdTimeZone, localToUTC, todayKey } from '../utils/timezone.js';
 import { OUTBOUND_SOURCES, markEventOutbound, queueEventDeletion } from './calendar-outbound.js';
+import { householdDisabledModules } from './household-modules.js';
 
 const BIRTHDAY_COLOR = '#E11D48';
 const BIRTHDAY_RRULE = 'FREQ=YEARLY;INTERVAL=1';
@@ -483,7 +484,40 @@ function hydrateBirthdayOccurrences(database, row, from = new Date()) {
   return occurrences;
 }
 
+/**
+ * Die AUSSTEHENDEN Erinnerungen an die Geburtstags-Termine dieses Nutzers
+ * abraeumen (#1279). Nur ausstehende: eine zugestellte oder weggewischte Zeile
+ * bleibt stehen, damit der naechste Lauf nach dem Wiedereinschalten sie als
+ * "schon erledigt" wiederfindet (syncBirthdayReminder sucht nach demselben
+ * remind_at) statt dieselbe Meldung ein zweites Mal anzulegen.
+ */
+function clearPendingBirthdayReminders(database, userId) {
+  database.prepare(`
+    DELETE FROM reminders
+    WHERE entity_type = 'event' AND created_by = ? AND dismissed = 0 AND pushed_at IS NULL
+      AND entity_id IN (
+        SELECT calendar_event_id FROM birthdays
+        WHERE created_by = ? AND calendar_event_id IS NOT NULL
+        UNION
+        SELECT name_day_calendar_event_id FROM birthdays
+        WHERE created_by = ? AND name_day_calendar_event_id IS NOT NULL
+      )
+  `).run(userId, userId, userId);
+}
+
 function syncAllBirthdayReminders(database, userId, from = new Date()) {
+  // HAUSHALTSWEIT ABGESCHALTET HEISST: DIESES MODUL GIBT ES HIER NICHT (#1279).
+  // Gleiche Bauart wie Vorrat, Schichtplan und Muell: der Lauf ueberspringt und
+  // raeumt seine ausstehenden Zeilen ab, der erste Lauf nach dem
+  // Wiedereinschalten legt sie neu an. Geburtstags-Erinnerungen laufen als
+  // `event`, die Karte in reminder-origins.js saehe darin den Kalender - der
+  // Schalter `birthdays` erreicht sie nur hier und in der Ausnahme dort.
+  // Die Kalendertermine selbst bleiben unangetastet: jaehrlich wiederkehrend,
+  // zieht an ihnen nichts nach, solange niemand den Geburtstag bearbeitet.
+  if (householdDisabledModules(database).has('birthdays')) {
+    clearPendingBirthdayReminders(database, userId);
+    return;
+  }
   const birthdays = database.prepare(`
     SELECT * FROM birthdays WHERE created_by = ? ORDER BY birth_date ASC
   `).all(userId);

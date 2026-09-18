@@ -22,6 +22,7 @@ import { reminderDateBefore, reminderIsInThePast, REMINDER_TIME_SUFFIX } from '.
 import { todayKey } from '../utils/timezone.js';
 import { resolvePermissions } from '../permissions.js';
 import { createLogger } from '../logger.js';
+import { householdDisabledModules } from './household-modules.js';
 
 const log = createLogger('PantryReminders');
 
@@ -268,20 +269,12 @@ function earliestUsefulReminder(today, expiresOn, now) {
 }
 
 /**
- * Ist der Vorrat haushaltweit abgeschaltet? Gleiche Lesart wie
- * server/services/countdowns.js#disabledModules - defensiv gegen fehlenden,
- * kaputten oder nicht-Array-Wert: "nichts abgeschaltet" ist die einzige sichere
- * Auslegung, die andere Richtung liesse ein Modul stumm verstummen.
+ * Ist der Vorrat haushaltweit abgeschaltet? Die Lesart - defensiv gegen
+ * fehlenden, kaputten oder nicht-Array-Wert - steht seit #1279 an EINER Stelle,
+ * server/services/household-modules.js.
  */
 function pantryDisabled(database) {
-  const row = database.prepare("SELECT value FROM sync_config WHERE key = 'disabled_modules'").get();
-  if (!row?.value) return false;
-  try {
-    const parsed = JSON.parse(row.value);
-    return Array.isArray(parsed) && parsed.includes('pantry');
-  } catch {
-    return false;
-  }
+  return householdDisabledModules(database).has('pantry');
 }
 
 /**

@@ -23,6 +23,10 @@ const dbmod = await import('../server/db.js');
 const { default: itemsRouter } = await import('../server/routes/inventory/items.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
 const db = dbmod.get();
+// Das Inventar ist standardmaessig abgeschaltet (Migration 145), und seit #1279
+// liefert GET /reminders/pending keine Zeile eines abgeschalteten Moduls mehr aus.
+// Diese Suite prueft ein Inventar, das der Haushalt benutzt - also ist es an.
+db.prepare("INSERT INTO sync_config (key, value) VALUES ('disabled_modules', '[]') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run();
 
 const A = db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('a','A','x','member')").run().lastInsertRowid;
 

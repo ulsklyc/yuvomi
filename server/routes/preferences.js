@@ -227,7 +227,10 @@ const SCHEDULE_TEMPLATE_KEYS = ['work', 'school', 'university'];
 
 // Modul-Slugs, die per Settings deaktiviert werden können.
 // Dashboard und Settings sind absichtlich nicht enthalten — sie sind essentiell.
-const TOGGLEABLE_MODULES = [
+// Exportiert fuer test/test-disabled-module-reminders.js: jede Erinnerungs-
+// Herkunft muss auf einen dieser Schluessel zeigen, sonst erreicht der
+// Haushaltsschalter sie nie (#1279).
+export const TOGGLEABLE_MODULES = [
   'tasks', 'calendar', 'meals', 'recipes', 'shopping', 'pantry', 'inventory',
   'birthdays', 'notes', 'contacts', 'budget', 'documents',
   'housekeeping', 'waste', 'rewards', 'health', 'schedule',

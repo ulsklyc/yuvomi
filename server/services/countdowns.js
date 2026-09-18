@@ -38,6 +38,7 @@
 
 import { hasAnyOccurrence, nextOccurrenceAfter, seriesStartFor } from './recurrence.js';
 import { loadEventExceptions } from './calendar-events.js';
+import { householdDisabledModules } from './household-modules.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { visibilityWhere } from './visibility.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
@@ -193,25 +194,6 @@ export function nextEventDate(event, todayKey, exceptions = null, { graceDays = 
 }
 
 /**
- * Ist dieses Modul haushaltweit abgeschaltet?
- *
- * Gelesen wie der Budget-Modus nebenan (`resolveBudgetMode`) - direkt aus
- * `sync_config`, defensiv gegen fehlenden, kaputten oder nicht-Array-Wert:
- * „nichts abgeschaltet" ist die einzige sichere Auslegung eines unlesbaren
- * Werts, denn die andere Richtung würde ein Modul stumm ausblenden.
- */
-function disabledModules(d) {
-  const row = d.prepare("SELECT value FROM sync_config WHERE key = 'disabled_modules'").get();
-  if (!row?.value) return new Set();
-  try {
-    const parsed = JSON.parse(row.value);
-    return new Set(Array.isArray(parsed) ? parsed.filter((m) => typeof m === 'string') : []);
-  } catch {
-    return new Set();
-  }
-}
-
-/**
  * Die haushaltweite Nachfrist in Tagen (#969) - `Number.isInteger`, nicht `||`,
  * damit ein bewusst gesetztes `0` ("keine Nachfrist") nicht auf den Standard
  * zurückfällt.
@@ -266,7 +248,7 @@ export function getCountdowns(d, {
    * darf dieser Betrachter diese Zeile sehen? -, und deshalb landen sie in
    * einem Set und nicht in zwei nacheinander angewandten Filtern. Der
    * Unterschied wäre sonst wieder `total`: zwei Schnitte, zwei Wahrheiten. */
-  const hidden = new Set([...disabledModules(d), ...(hiddenModules ?? [])]);
+  const hidden = new Set([...householdDisabledModules(d), ...(hiddenModules ?? [])]);
   const graceDays = overdueGraceDays(d);
   const items = [
     ...(hidden.has('calendar') ? [] : eventCountdowns(d, userId, todayKey, graceDays)),
