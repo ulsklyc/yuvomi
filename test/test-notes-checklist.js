@@ -197,10 +197,26 @@ test('die Aufgaben rendern ihre Notiz interaktiv - sie zeigen den ganzen Text', 
   // bleibt dieselbe - sie zeigt den vollstaendigen Text und kennt die Id -,
   // und sie gilt jetzt auch dort, wo die Uebersicht die Aufgabe oeffnet.
   const src = await readFile(new URL('../public/components/task-detail.js', import.meta.url), 'utf8');
-  const calls = src.match(/renderMarkdownLight\([^)]*\)/g) ?? [];
-  assert.ok(calls.length > 0, 'die Aufgaben rendern ihre Beschreibung');
-  assert.ok(calls.some((c) => /interactive:\s*true/.test(c)),
+  // DER GANZE RUMPF, NICHT DER AUFRUF-AUSSCHNITT. Hier stand
+  // `/renderMarkdownLight\([^)]*\)/`, und `[^)]*` bricht an der ersten
+  // schliessenden Klammer ab: seit die Optionen ein `t('...')` enthalten
+  // (#467), endete der Ausschnitt vor `interactive` und der Guard meldete eine
+  // richtige Aenderung als Fehler (PR #1252). Ein Ausdruck, der an der
+  // Formatierung seines Prueflings haengt, misst frueher oder spaeter etwas
+  // anderes als gemeint.
+  const fn = src.slice(src.indexOf('function descriptionNode('));
+  const body = fn.slice(0, fn.indexOf('\n}\n'));
+  assert.match(body, /renderMarkdownLight\(/, 'die Aufgaben rendern ihre Beschreibung');
+  assert.match(body, /interactive:\s*true/,
     'die Detailansicht kennt die Aufgaben-Id und zeigt den vollen Text - sie darf');
+  // SIE DARF, WENN SIE AUCH ZURUECKSCHREIBEN DARF. Bei `tasks: read` wird aus
+  // dem Kaestchen ein Zustandszeichen: `PATCH /tasks/:id/check` verlangt
+  // Schreibrecht, und ein Haken, der optimistisch umspringt und nach dem 403
+  // zurueckfaellt, ist die schlechtere Auskunft als gar kein Bedienelement.
+  assert.match(body, /isNavModuleReadOnly\('tasks'\)/,
+    'die Freischaltung haengt am Modulrecht');
+  assert.match(body, /stateLabels/,
+    'und ohne das Recht traegt das Kaestchen den Zustand, statt zu verschwinden');
 });
 
 test('die Notizenseite schaltet die Kaestchen frei und faengt den Klick ab', async () => {

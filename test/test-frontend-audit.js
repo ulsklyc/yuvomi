@@ -291,6 +291,34 @@ test('kein HTML-Kommentar im Markup enthält ein Backtick', () => {
   );
 });
 
+test('kein __test-Export listet denselben Namen zweimal', () => {
+  // ZWEIMAL DERSELBE SCHLUESSEL IST STILL. JavaScript behaelt den spaeteren
+  // Wert, also aendert sich nichts am Verhalten, und kein Guard schlug an -
+  // gefunden hat es erst ein Review (PR #1252). Beide Faelle entstanden gleich:
+  // jemand ergaenzte den Block, ohne die Liste darueber ganz zu lesen, und beim
+  // zweiten kam die Doppelung durch einen Rebase, den git nicht als Konflikt
+  // sah. Der Preis ist Lesezeit: wer sucht, was ein Modul den Tests anbietet,
+  // findet denselben Namen zweimal und muss pruefen, ob die Eintraege
+  // auseinandergelaufen sind.
+  //
+  // Kommentare fallen VOR dem Zaehlen weg - in diesen Bloecken steht die
+  // Begruendung je Gruppe, und sie nennt die Funktionen beim Namen.
+  const doppelte = [];
+  for (const file of walkJsFiles('../public/')) {
+    const block = read(file).match(/export const __test = \{([\s\S]*?)\n\};/);
+    if (!block) continue;
+    const ohneKommentar = withoutCommentsKeepingLines(block[1]);
+    const namen = [...ohneKommentar.matchAll(/(?:^|,)\s*([A-Za-z_$][\w$]*)\s*(?=[,:}\n])/g)].map((m) => m[1]);
+    const zaehler = new Map();
+    for (const name of namen) zaehler.set(name, (zaehler.get(name) ?? 0) + 1);
+    for (const [name, anzahl] of zaehler) {
+      if (anzahl > 1) doppelte.push(`${file}: ${name} (${anzahl}x)`);
+    }
+  }
+  assert.deepEqual(doppelte, [],
+    'derselbe Name zweimal im selben __test-Objekt - der spaetere gewinnt lautlos');
+});
+
 test('static frontend translation keys exist in every locale', () => {
   const keys = new Set();
 

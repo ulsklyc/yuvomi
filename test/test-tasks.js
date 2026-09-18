@@ -220,8 +220,14 @@ test('Teilaufgaben der Detailansicht sind abhakbar, nicht nur lesbar', () => {
   const fn = source.match(/function subtaskListNode\([\s\S]*?\n\}/);
   assert(fn, 'subtaskListNode muss existieren');
   const body = fn[0];
-  assert(/createElement\('button'\)/.test(body),
-    'die Zeile muss ein <button> sein, damit Tastatur und Screenreader denselben Weg haben');
+  // DIE ZEILE, NICHT DER ANLEGEN-KNOPF DARUNTER. Ein blosses
+  // `createElement('button')` stand hier, bis die Zeile bei `tasks: read` zum
+  // Zustandszeichen wurde (#467): der Ausdruck traf danach den zweiten
+  // `createElement('button')` dieser Funktion - den Hinzufuegen-Knopf - und
+  // blieb gruen, ohne noch etwas ueber die Zeile zu sagen. Jetzt steht die
+  // Weiche selbst da, und mit ihr beide Haelften.
+  assert(/createElement\(nurLesen \? 'span' : 'button'\)/.test(body),
+    'mit Schreibrecht muss die Zeile ein <button> sein, damit Tastatur und Screenreader denselben Weg haben');
   assert(/addEventListener\('click'/.test(body),
     'ohne eigenen Listener bleibt die Zeile tot: der Container-Handler erreicht den Top-Layer nicht');
   assert(/toggleSubtaskStatus\(/.test(body),

@@ -87,8 +87,17 @@ function stripInlineMarkdown(segment) {
  * ausdrücklich nicht: es zeigt einen gekürzten Auszug, dessen Zeilennummern
  * nicht die der Notiz sind.
  *
+ * DIE DRITTE FORM IST FÜR DEN, DER DEN GANZEN TEXT SIEHT UND TROTZDEM NICHT
+ * SCHREIBEN DARF (#467): `checklist.stateLabels` macht aus dem Kästchen ein
+ * Zustandszeichen statt eines Bedienelements. Die Dekorationsform wäre dort zu
+ * wenig - sie ist `aria-hidden`, und damit verlöre ein Nur-lesen-Nutzer genau
+ * die Auskunft, die diese Zeile trägt: ob der Punkt erledigt ist. Dieselbe
+ * Bauart wie die `--static`-Zeichen in den Aufgaben (public/styles/tasks.css):
+ * was Zustand ANZEIGT, bleibt lesbar; was nur handelt, verschwindet.
+ *
  * @param {string|null|undefined} text
- * @param {{ checklist?: { interactive?: boolean, toggleLabel?: string } }} [options]
+ * @param {{ checklist?: { interactive?: boolean, toggleLabel?: string,
+ *           stateLabels?: { checked: string, unchecked: string } } }} [options]
  * @returns {string} HTML string
  */
 export function renderMarkdownLight(text, options = {}) {
@@ -96,6 +105,9 @@ export function renderMarkdownLight(text, options = {}) {
 
   const liveChecklist = options.checklist?.interactive === true;
   const toggleLabel   = options.checklist?.toggleLabel ?? '';
+  // Nur ohne `interactive` - ein Kästchen ist entweder Bedienelement oder
+  // Zeichen, nie beides.
+  const stateLabels   = liveChecklist ? null : options.checklist?.stateLabels ?? null;
 
   const lines = String(text).replace(/\r\n?/g, '\n').split('\n');
   const html = [];
@@ -140,11 +152,16 @@ export function renderMarkdownLight(text, options = {}) {
       // umschließen: der darf einen Link enthalten, und ein <a> in einem
       // <button> ist kein gültiges HTML. Die Trefferfläche wächst deshalb per
       // CSS über die 1em der Box hinaus, nicht über das Markup.
+      const zustandsLabel = stateLabels
+        ? `${stripInlineMarkdown(item.text)}: ${item.checked ? stateLabels.checked : stateLabels.unchecked}`
+        : '';
       const box = liveChecklist
         ? `<button type="button" class="note-md-box" role="checkbox" aria-checked="${item.checked}"`
           + ` data-md-line="${index}" data-md-checked="${item.checked ? '1' : '0'}"`
           + ` aria-label="${esc(stripInlineMarkdown(item.text) || toggleLabel)}"></button>`
-        : '<span class="note-md-box" aria-hidden="true"></span>';
+        : stateLabels
+          ? `<span class="note-md-box" role="img" aria-label="${esc(zustandsLabel)}"></span>`
+          : '<span class="note-md-box" aria-hidden="true"></span>';
       html.push(`<li class="note-md-check${item.checked ? ' is-checked' : ''}">${box}<span>${inlineMarkdown(item.text)}</span></li>`);
       continue;
     }
