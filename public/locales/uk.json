@@ -501,7 +501,8 @@
         "checkConflict": "Завдання тим часом змінено. Відкрийте його ще раз.",
         "doneByPick": "Хто виконав «{{title}}»?",
         "doneByToast": "Виконав(ла) {{name}}.",
-        "historyTickedBy": "позначив(ла) {{name}}"
+        "historyTickedBy": "позначив(ла) {{name}}",
+        "reminderLockedNeedsDueDate": "Це завдання має нагадування, яке ви не можете змінити. Тому йому потрібен термін виконання."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} прийоми їжі",
@@ -2872,7 +2873,8 @@
         "customDays": "Днів",
         "customWeeks": "Тижнів",
         "sectionTitlePlural": "Нагадування",
-        "sharedWithAssignees": "Ті, кому призначено цю подію, також отримають це нагадування."
+        "sharedWithAssignees": "Ті, кому призначено цю подію, також отримають це нагадування.",
+        "readOnlyNotice": "Нагадування належать до Календаря. Без права запису там це налаштування залишається без змін."
     },
     "recipes": {
         "mealTypeNone": "Без прийому їжі",

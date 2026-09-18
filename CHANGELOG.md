@@ -83,6 +83,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a named person and asking for a reward, are granted to it as named routes rather than as module
   access, and they stay exactly where they were.
 
+- **A reminder switch in the task dialog could only ever fail for some members.** This one crosses a module
+  boundary, so the read-only entry about buttons does not cover it: Reminders belong to
+  the Calendar, not to Tasks, so somebody allowed to edit tasks but only to read the calendar was
+  still offered the switch. Saving then stored the task and refused the reminder, and all they saw
+  was an error next to a task that had in fact been saved. A reminder that is already set now stays
+  visible but locked, so it can still be read off, and saving leaves it exactly as it was. Where
+  there is nothing set - a task being created, or one that never had a reminder - the section is
+  gone rather than shown as an empty switch that cannot be used, and the same goes for members with
+  no calendar access at all. One rule still holds for everyone: a task with a reminder needs a due
+  date, so clearing the date is refused while a reminder hangs on the task, and the message names
+  the date rather than the switch that cannot be operated. Changing the date to another one is
+  fine, and so is saving a task that already arrived without a date - reminders belong to whoever
+  set them, so another member may have cleared the date earlier, and being locked out of every
+  later edit would be nobody's fault but also nobody's to repair. With write access nothing
+  changes.
+
+- **A reminder for a task or an event you deleted no longer goes off afterwards.** Deleting an item
+  was meant to take its reminders with it, but the clean-up happened in the browser, as a second
+  request sent right behind the deletion - and that request was easy to lose. Closing the tab
+  straight after deleting dropped it. Deleting through the API or a connected assistant never sent
+  it at all. And a member who may change tasks but may only read the calendar had it refused,
+  without being told. What stayed behind was a reminder pointing at something that no longer exists:
+  it arrived later as a notification with a heading and no text, or sat in the app as an empty line
+  waiting to be dismissed. A reminder that somebody else in the household had set on the same task
+  outlived it every time, because the browser only ever cleaned up the reminders of whoever did the
+  deleting. Deleting now takes the reminders with it on the server, whichever way the item is
+  deleted, and reminders left over from before are cleared once when you update.
+
 ### Security
 
 - **Reading the calendar no longer reaches the contact book, the sync accounts, or the sync targets.**

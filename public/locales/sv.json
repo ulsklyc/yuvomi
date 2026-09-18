@@ -501,7 +501,8 @@
         "checkConflict": "Uppgiften har ändrats under tiden. Öppna den igen.",
         "doneByPick": "Vem gjorde ”{{title}}”?",
         "doneByToast": "Gjord av {{name}}.",
-        "historyTickedBy": "bockad av {{name}}"
+        "historyTickedBy": "bockad av {{name}}",
+        "reminderLockedNeedsDueDate": "Den här uppgiften har en påminnelse som du inte får ändra. Därför behövs ett slutdatum."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} måltider",
@@ -2987,7 +2988,8 @@
         "customDays": "dagar",
         "customWeeks": "Veckor",
         "sectionTitlePlural": "Påminnelser",
-        "sharedWithAssignees": "Den som är tilldelad den här händelsen får också den här påminnelsen."
+        "sharedWithAssignees": "Den som är tilldelad den här händelsen får också den här påminnelsen.",
+        "readOnlyNotice": "Påminnelser hör till Kalendern. Utan skrivrättighet där förblir den här inställningen oförändrad."
     },
     "onboarding": {
         "step1Title": "Välkommen till {{name}}",

@@ -38,6 +38,20 @@
  *        dabei der KOMMENTARFREIE Quelltext: sonst hielte ausgerechnet die
  *        Begründung den Test grün (siehe WASTE_CODE in test-waste-ui.js).
  *
+ *        DAZU DIE KREUZABHAENGIGKEIT (#1253, Abschnitt am Ende). Alles
+ *        oben prueft das EIGENE Modul. Der Aufgaben-Dialog stellt aber auch
+ *        die Erinnerung ein, und Erinnerungen gehoeren dem KALENDER -
+ *        `server/scopes.js` fuehrt `calendar`, `reminders` und `birthdays`
+ *        unter einem Schluessel. `tasks: write` plus `calendar: read` zeigte
+ *        deshalb einen Schalter, dessen Speichern mit 403 endete.
+ *        `applyModuleReadonly()` im Router sieht das nicht: es urteilt ueber
+ *        das gerade offene Nav-Modul. Dieser Teil fuehrt als einziger einen
+ *        Handler WIRKLICH aus (`handleFormSubmit`), weil die Zusage dort das
+ *        AUSBLEIBEN einer Anfrage ist - das sieht kein Textguard.
+ *
+ *        Die Suite braucht deshalb TZ=Europe/Berlin (siehe die Zone-Zeile in
+ *        jenem Abschnitt); das npm-Script setzt sie.
+ *
  * Ausführen: npm run test:module-readonly-ui
  */
 import test from 'node:test';
@@ -69,11 +83,29 @@ const { __test: calendar } = await import('../public/pages/calendar.js');
 /** Ein Modul auf 'read' stellen und danach wieder aufräumen. */
 function withAccess(modules, fn) {
   setPermissions({ admin: false, modules, widgets: {}, capabilities: {} });
+  // EIN `finally` UM EIN PROMISE HERUM FEUERT AM ERSTEN `await`, NICHT AM ENDE.
+  // Die rund vierzig Tests oben sind synchron, fuer sie aendert der Zweig
+  // nichts. Der Erinnerungs-Abschnitt unten faehrt aber einen async Handler:
+  // dort raeumte `clearPermissions()` die Rechte weg, sobald der Handler das
+  // erste Mal wartete, und alles danach las wieder den fail-open-Standard
+  // `write`. Nachgemessen am echten Helfer: vor dem await `calendar = read`,
+  // danach `calendar = write`.
+  //
+  // Heute faellt darauf keine Zusicherung herein, weil jede rechte-abhaengige
+  // Entscheidung vor dem ersten await getroffen und gemerkt wird. Das ist
+  // Glueck, keine Zusage - und weil der Standard fail-OPEN ist, waere ein
+  // spaeteres Nachlesen still zu `write` geworden statt rot. Der naechste
+  // async Test erbte die Falle ohne das Glueck.
+  let ergebnis;
   try {
-    return fn();
-  } finally {
+    ergebnis = fn();
+  } catch (err) {
     clearPermissions();
+    throw err;
   }
+  if (typeof ergebnis?.then === 'function') return ergebnis.finally(() => clearPermissions());
+  clearPermissions();
+  return ergebnis;
 }
 
 const mitglied = (over = {}) => ({ id: 3, display_name: 'Emma', balance: 120, ...over });
@@ -753,5 +785,493 @@ test('die Ausnahmen vom Modulrecht stehen am Server, und es sind genau zwei Sort
   assert.match(display, /DISPLAY_WRITE_ROUTES/,
     'und schreibt genau die Routen, die diese Liste benennt');
 });
+
+// -------------------------------------------------------------------------
+// Die KREUZABHAENGIGKEIT: ein Dialog gehoert EINEM Modul, schreibt aber in ein
+// zweites (#1253)
+// -------------------------------------------------------------------------
+//
+// Alles oberhalb prueft das EIGENE Modul: `tasks: read` verbirgt die Knoepfe
+// der Aufgabenseite. Hier geht es um den Fall, den das nicht abdeckt - der
+// Aufgaben-Dialog stellt die Erinnerung ein, und Erinnerungen gehoeren dem
+// KALENDER: `server/scopes.js` fuehrt die Praefixe `calendar`, `reminders` und
+// `birthdays` unter EINEM Schluessel. Wer `tasks: write` und `calendar: read`
+// traegt, stand deshalb vor einem Schalter, dessen Speichern serverseitig mit
+// 403 endete: die Aufgabe war gespeichert, die Erinnerung nicht, und zu sehen
+// bekam er nur eine Fehlermeldung. `applyModuleReadonly()` im Router kann das
+// nicht sehen - es urteilt ueber das gerade offene Nav-Modul.
+//
+// Geprueft wird an BEIDEN Enden, weil der Riegel an beiden Enden sitzt: am
+// Markup, das `renderModalContent()` wirklich erzeugt, und am GEFAHRENEN
+// `handleFormSubmit()`, das die Erinnerungs-Anfrage dann unterlassen muss. Das
+// zweite ist die Haelfte, die kein Textguard sehen kann - er liest einen
+// Aufruf, nicht dessen Ausbleiben.
+
+/**
+ * Eine Zusicherung weiter unten nennt einen UTC-Zeitpunkt, der aus einer
+ * Wanduhrzeit entsteht - der Wert haengt also an der Zone.
+ *
+ * Gefragt wird `process.env.TZ`, NICHT `Intl...resolvedOptions().timeZone`:
+ * letzteres faellt ohne `TZ=` auf die SYSTEMZONE zurueck, und die ist auf dem
+ * Entwicklungsrechner gerade Europe/Berlin. Ein verlorenes `TZ=` waere lokal
+ * also gruen geblieben und erst in der CI (UTC) rot - genau der Fehler, den
+ * diese Zeile ausschliessen soll. Nachgemessen: ohne `TZ=` meldet Intl
+ * "Europe/Berlin" und `process.env.TZ` ist undefined.
+ */
+// Der Abschnitt hier ist der EINZIGE, der einen async Handler faehrt - alles
+// oben ist synchron. Damit haengt er als einziger daran, dass `withAccess()`
+// die Rechte auch ueber ein `await` haelt. Diese Zeile misst genau das, statt
+// es dem Helfer zu glauben: ohne den Promise-Zweig dort steht nach dem ersten
+// await wieder der fail-open-Standard `write`, und jede rechte-abhaengige
+// Entscheidung NACH einem await waere still falsch statt rot.
+test('withAccess haelt die Rechte auch ueber ein await', async () => {
+  const gemessen = [];
+  await withAccess({ tasks: 'write', calendar: 'read' }, async () => {
+    gemessen.push(tasks.reminderAccess());
+    await Promise.resolve();
+    gemessen.push(tasks.reminderAccess());
+  });
+  assert.deepEqual(gemessen, ['read', 'read'], 'vor UND nach dem await');
+  assert.equal(tasks.reminderAccess(), 'write', 'und danach ist wieder aufgeraeumt (fail-open)');
+});
+
+test('die Erinnerungs-Tests laufen in der Zone, auf die ihre Zeitpunkte festgenagelt sind', () => {
+  assert.equal(
+    process.env.TZ,
+    'Europe/Berlin',
+    'npm run test:module-readonly-ui setzt TZ=Europe/Berlin',
+  );
+});
+
+const erinnerung = (over = {}) => ({
+  id: 3, entity_type: 'task', entity_id: 7, remind_at: '2026-09-30T23:59:59', ...over,
+});
+const faelligeAufgabe = (over = {}) => aufgabe({
+  due_date: '2026-10-01', priority: 'none', visibility: 'all',
+  assigned_to: null, assigned_users: [], ...over,
+});
+
+/**
+ * Der Erinnerungsabschnitt aus dem echten Dialog-Markup, oder '' .
+ *
+ * Gesucht wird der Tag-ANFANG, nicht der ganze Tag: der gesperrte Abschnitt
+ * traegt `data-locked-due`, und ein wortwoertliches
+ * `<div class="reminder-section">` fand ihn danach nicht mehr - die Suite
+ * meldete "kein Abschnitt", wo einer stand. Ein Helfer, der am Markup nur eine
+ * Schreibweise kennt, macht jede Zusicherung darueber blind.
+ */
+function reminderSection(html) {
+  const start = html.search(/<div class="reminder-section"[\s>]/);
+  if (start < 0) return '';
+  const end = html.indexOf('<div id="task-form-error"', start);
+  assert.ok(end > start, 'der Abschnitt endet vor der Fehlerzeile des Formulars');
+  return html.slice(start, end);
+}
+
+/** Jedes Bedienelement des Abschnitts, mit seinem oeffnenden Tag. */
+function reminderControls(section) {
+  return [...section.matchAll(/<(input|select|textarea)\b[^>]*>/g)].map((m) => m[0]);
+}
+
+test('calendar: write laesst den Erinnerungsabschnitt unangetastet', () => {
+  withAccess({ tasks: 'write', calendar: 'write' }, () => {
+    const section = reminderSection(tasks.renderModalContent({
+      task: faelligeAufgabe(), users: [], reminder: erinnerung(),
+    }));
+    assert.ok(section, 'der Abschnitt steht im Dialog');
+    assert.ok(reminderControls(section).length >= 4, 'Schalter, Vorlauf und die zwei eigenen Felder');
+    for (const tag of reminderControls(section)) {
+      assert.doesNotMatch(tag, /\sdisabled/, `kein Feld ist gesperrt: ${tag}`);
+    }
+    assert.doesNotMatch(section, /reminders\.readOnlyNotice/, 'kein Hinweis, wo es nichts zu erklaeren gibt');
+  });
+});
+
+test('calendar: write zeigt den Abschnitt auch OHNE bestehende Erinnerung - dort wird ja angelegt', () => {
+  withAccess({ tasks: 'write', calendar: 'write' }, () => {
+    for (const task of [null, faelligeAufgabe()]) {
+      const section = reminderSection(tasks.renderModalContent({ task, users: [], reminder: null }));
+      assert.ok(section, 'mit Schreibrecht ist der leere Schalter das Angebot, eine anzulegen');
+      assert.equal(reminderControls(section).filter((tag) => /\sdisabled/.test(tag)).length, 0);
+    }
+  });
+});
+
+test('calendar: read sperrt JEDES Feld des Abschnitts und laesst die Erinnerung stehen', () => {
+  withAccess({ tasks: 'write', calendar: 'read' }, () => {
+    const section = reminderSection(tasks.renderModalContent({
+      task: faelligeAufgabe(), users: [], reminder: erinnerung(),
+    }));
+    assert.ok(section, 'eine bestehende Erinnerung IST Zustand und bleibt sichtbar');
+    assert.match(section, /id="reminder-toggle"[^>]*\schecked/, 'der gespeicherte Stand steht weiter da');
+    const tags = reminderControls(section);
+    assert.ok(tags.length >= 4, 'der Abschnitt bringt seine Felder mit');
+    // Die Regel, nicht die Aufzaehlung: ein spaeter dazugekommenes Feld ohne
+    // `disabled` faellt hier auf, ohne dass diese Liste gepflegt werden muss.
+    for (const tag of tags) {
+      assert.match(tag, /\sdisabled/, `gesperrt gehoert auch: ${tag}`);
+    }
+    assert.match(section, /reminders\.readOnlyNotice/, 'der Dialog sagt, warum');
+  });
+});
+
+// Die erste Fassung dieses Riegels sperrte den Abschnitt bei `read` immer -
+// auch dort, wo es nichts zu sperren gab. Das widerspricht derselben
+// Faustregel, mit der `none` begruendet ist: gesperrt wird ZUSTAND, und ein
+// leerer Schalter ist keiner. Beide Wege dorthin stehen hier, weil sie
+// verschiedene Ursachen haben: im Anlege-Dialog gibt es die Aufgabe noch
+// nicht, an einer bestehenden Aufgabe hing nie eine Erinnerung.
+test('calendar: read zeigt im ANLEGE-Dialog keinen Abschnitt - eine neue Aufgabe hat keinen Zustand', () => {
+  withAccess({ tasks: 'write', calendar: 'read' }, () => {
+    const html = tasks.renderModalContent({ task: null, users: [], reminder: null });
+    assert.equal(reminderSection(html), '', 'kein gesperrter leerer Schalter');
+    assert.doesNotMatch(html, /id="reminder-toggle"/);
+    assert.doesNotMatch(html, /reminders\.readOnlyNotice/, 'auch kein Hinweis auf ein Feld, das es nicht gibt');
+  });
+});
+
+test('calendar: read zeigt an einer Aufgabe OHNE Erinnerung keinen Abschnitt', () => {
+  withAccess({ tasks: 'write', calendar: 'read' }, () => {
+    const html = tasks.renderModalContent({ task: faelligeAufgabe(), users: [], reminder: null });
+    assert.equal(reminderSection(html), '', 'nichts gespeichert heisst nichts zu zeigen');
+    assert.doesNotMatch(html, /id="reminder-toggle"/);
+  });
+});
+
+test('calendar: none entfernt den Abschnitt ganz - es gibt keinen Zustand zu zeigen', () => {
+  withAccess({ tasks: 'write', calendar: 'none' }, () => {
+    // BEIDE Lagen, und die zweite ist der eigentliche Test. Mit `reminder: null`
+    // allein faellt diese Zeile auch dann noch richtig aus, wenn die Bedingung
+    // zu `(none || read) && !reminder` verengt wird - nachgemessen: 51 von 51
+    // blieben gruen. Dass eine Erinnerung hier nie ankommt, liegt allein daran,
+    // dass `loadReminderForTask()` fuer `none` vorher abbiegt; das ist eine
+    // Kopplung zwischen zwei Funktionen, keine Eigenschaft dieser hier.
+    for (const reminder of [null, erinnerung()]) {
+      const html = tasks.renderModalContent({ task: faelligeAufgabe(), users: [], reminder });
+      assert.equal(reminderSection(html), '', 'kein Schalter, der nur einen 403 verspricht');
+      assert.doesNotMatch(html, /id="reminder-toggle"/);
+    }
+  });
+});
+
+test('ohne geladene Rechte bleibt die Erinnerung bei Vollzugriff (fail-open wie permissions.js)', () => {
+  clearPermissions();
+  assert.equal(tasks.reminderAccess(), 'write');
+  const section = reminderSection(tasks.renderModalContent({
+    task: faelligeAufgabe(), users: [], reminder: erinnerung(),
+  }));
+  for (const tag of reminderControls(section)) assert.doesNotMatch(tag, /\sdisabled/);
+});
+
+test('calendar: write haengt gar kein data-locked-due an - dort gibt es nichts zu bewachen', () => {
+  withAccess({ tasks: 'write', calendar: 'write' }, () => {
+    const section = reminderSection(tasks.renderModalContent({
+      task: faelligeAufgabe(), users: [], reminder: erinnerung(),
+    }));
+    assert.doesNotMatch(section, /data-locked-due/);
+  });
+});
+
+test('das Markup nennt eine leere Faelligkeit auch leer - sonst sperrte der Riegel den Unschuldigen aus', () => {
+  withAccess({ tasks: 'write', calendar: 'read' }, () => {
+    const section = reminderSection(tasks.renderModalContent({
+      task: faelligeAufgabe({ due_date: null }), users: [], reminder: erinnerung(),
+    }));
+    assert.match(section, /data-locked-due=""/, 'kein "null" und kein "undefined" im Attribut');
+  });
+});
+
+// -------------------------------------------------------------------------
+// Und das zweite Ende: der gefahrene Formular-Handler
+// -------------------------------------------------------------------------
+
+/** Ein Feld, wie der Handler es liest: `.value`, sonst nichts. */
+const feld = (value = '') => ({ value: String(value) });
+
+/**
+ * Das Formular. Benannte Felder liegen direkt darauf (`form.title.value` -
+ * genau wie im Browser), alles mit einem Selektor kommt ueber querySelector.
+ */
+function attrappenFormular({ byId = {}, ...named } = {}) {
+  const form = { querySelector: (sel) => byId[sel] ?? null };
+  for (const [name, value] of Object.entries(named)) form[name] = feld(value);
+  return form;
+}
+
+/**
+ * Fehlerzeile, Knopf und die versteckte Task-id - drei getElementById-Ziele.
+ * `errorNode` liegt zusaetzlich offen: ob das Speichern ABGEBROCHEN hat, steht
+ * nur dort, und ein Test, der nur die ausgebliebenen Anfragen zaehlt, koennte
+ * einen stillen Abbruch nicht von einem geglueckten Speichern unterscheiden.
+ */
+function attrappenDokument(taskId = '') {
+  const nodes = {
+    'task-form-error': { hidden: true, textContent: '' },
+    'task-submit-btn': { disabled: false, textContent: '', classList: { add() {}, remove() {} } },
+    'task-id': feld(taskId),
+  };
+  return {
+    getElementById: (id) => nodes[id] ?? null,
+    documentElement: { lang: 'de', classList: { toggle() {}, add() {}, remove() {}, contains: () => false } },
+    addEventListener() {},
+    errorNode: nodes['task-form-error'],
+  };
+}
+
+/**
+ * Faehrt handleFormSubmit gegen einen Attrappen-Dialog und gibt zurueck, was an
+ * den Server ging. `reminderChecked` ist der Stand des (bei `read` gesperrten)
+ * Kaestchens - genau der Wert, den ein blindes Wiederholen erneut schicken
+ * wuerde.
+ *
+ * Das globale `document` gehoert hier dem Mini-DOM aus installMiniDom(); es
+ * wird nur fuer die Dauer des Aufrufs getauscht und danach zurueckgegeben,
+ * sonst stehen die Markup-Tests darueber und das Aufraeumen unten ohne da.
+ */
+async function speichernUndAufrufeSammeln({
+  modules, reminderChecked, taskId = '7', dueDate = '2026-10-01',
+  // Die Faelligkeit, mit der der Dialog AUFGING - im Browser traegt sie der
+  // gesperrte Abschnitt als `data-locked-due`. Standard ist derselbe Wert wie
+  // im Feld, also "unveraendert"; ein Test, der das Leerraeumen messen will,
+  // setzt `dueDate: ''` und laesst diesen stehen.
+  dueDateWhenOpened = '2026-10-01',
+}) {
+  const calls = [];
+  const record = (method) => async (path, body) => {
+    calls.push({ method, path, body });
+    if (method === 'post' && path === '/tasks') return { data: { id: 7 } };
+    return { data: null };
+  };
+  globalThis.__apiStub = {
+    get: record('get'),
+    getWithSource: async (path) => { calls.push({ method: 'get', path }); return { data: { data: [] }, fromCache: false }; },
+    post: record('post'),
+    put: record('put'),
+    patch: record('patch'),
+    delete: record('delete'),
+  };
+  // Der Loader-Stub liefert ohne diesen Haken ein leeres Objekt, und der
+  // Handler bricht dann an `!rrule.valid_until` mit "invalidDate" ab, bevor er
+  // ueberhaupt bis zur Erinnerung kommt.
+  globalThis.__rruleValues = {
+    is_recurring: 0, recurrence_rule: null, recurrence_from_completion: 0, valid_until: true,
+  };
+  const echtesDocument = globalThis.document;
+  const doc = attrappenDokument(taskId);
+  globalThis.document = doc;
+  // `installMiniDom()` setzt `window.yuvomi = {}` - ohne `showToast` wirft der
+  // Handler NACH dem erfolgreichen PUT, das aeussere catch macht daraus eine
+  // Fehlermeldung, und die Erinnerungs-Anfrage bleibt aus. Das saehe wie der
+  // Riegel aus und waere keiner: gemessen an
+  // "window.yuvomi.showToast is not a function" in der Fehlerzeile. Der Toast
+  // gehoert also zur Attrappe, nicht zum Befund.
+  const echterToast = globalThis.window.yuvomi.showToast;
+  globalThis.window.yuvomi.showToast = () => {};
+  const form = attrappenFormular({
+    title: 'Fenster putzen',
+    description: '',
+    priority: 'none',
+    category: 'household',
+    start_date: '',
+    due_date: dueDate,
+    due_time: '',
+    points: '0',
+    byId: {
+      '#reminder-toggle': { checked: reminderChecked },
+      '#reminder-offset': { value: 'offset_1d' },
+      '#task-visibility': { value: 'all' },
+      // Den Abschnitt gibt es nur gesperrt und nur mit haengender Erinnerung -
+      // genau dann traegt er im Browser das Attribut (eigens gemessen, siehe
+      // die Naht-Zusicherung weiter unten).
+      '.reminder-section[data-locked-due]': reminderChecked && modules.calendar === 'read'
+        ? { dataset: { lockedDue: dueDateWhenOpened } }
+        : null,
+    },
+  });
+  try {
+    await withAccess(modules, () => tasks.handleFormSubmit(
+      { preventDefault() {}, target: form },
+      { container: null, onChanged: async () => {} },
+    ));
+  } finally {
+    delete globalThis.__apiStub;
+    delete globalThis.__rruleValues;
+    globalThis.document = echtesDocument;
+    if (echterToast === undefined) delete globalThis.window.yuvomi.showToast;
+    else globalThis.window.yuvomi.showToast = echterToast;
+  }
+  return { calls, error: doc.errorNode.hidden ? null : doc.errorNode.textContent };
+}
+
+const erinnerungsAufrufe = (calls) => calls.filter((c) => String(c.path).startsWith('/reminders'));
+
+test('calendar: read speichert die Aufgabe und laesst die Erinnerung unangetastet', async () => {
+  const { calls } = await speichernUndAufrufeSammeln({
+    modules: { tasks: 'write', calendar: 'read' }, reminderChecked: true,
+  });
+  assert.ok(calls.some((c) => c.method === 'put' && c.path === '/tasks/7'), 'die Aufgabe selbst geht raus');
+  assert.deepEqual(erinnerungsAufrufe(calls), [], 'kein POST /reminders, das nur einen 403 holen wuerde');
+});
+
+test('calendar: read schickt auch kein DELETE, wenn das gesperrte Kaestchen leer ist', async () => {
+  const { calls } = await speichernUndAufrufeSammeln({
+    modules: { tasks: 'write', calendar: 'read' }, reminderChecked: false,
+  });
+  assert.ok(calls.some((c) => c.method === 'put' && c.path === '/tasks/7'));
+  assert.deepEqual(erinnerungsAufrufe(calls), [], 'nicht abgewaehlt heisst nicht geloescht');
+});
+
+test('calendar: write schreibt die Erinnerung weiter wie bisher', async () => {
+  const { calls } = await speichernUndAufrufeSammeln({
+    modules: { tasks: 'write', calendar: 'write' }, reminderChecked: true,
+  });
+  const posts = erinnerungsAufrufe(calls).filter((c) => c.method === 'post');
+  assert.equal(posts.length, 1, 'der Weg mit Schreibrecht bleibt offen');
+  assert.equal(posts[0].body.entity_type, 'task');
+  // Die id kommt aus dem versteckten Feld und ist ein String - so geht sie
+  // auch im Browser raus; der Server nimmt sie so.
+  assert.equal(posts[0].body.entity_id, '7');
+  // Der Zeitpunkt entsteht als WANDUHRZEIT (`new Date('...T23:59:59')`) und
+  // geht als UTC raus - in Europe/Berlin am 1.10. also zwei Stunden davor. Die
+  // Zone nagelt das npm-Script fest; geprueft wird hier nur, DASS der Wert
+  // unveraendert durchgeht (der Vorlauf selbst haengt an test:reminder-offset).
+  assert.equal(posts[0].body.remind_at, '2026-09-30T21:59:59');
+});
+
+test('calendar: write loescht die Erinnerung weiter, wenn der Schalter aus ist', async () => {
+  const { calls } = await speichernUndAufrufeSammeln({
+    modules: { tasks: 'write', calendar: 'write' }, reminderChecked: false,
+  });
+  const deletes = erinnerungsAufrufe(calls).filter((c) => c.method === 'delete');
+  assert.equal(deletes.length, 1, 'das Abwaehlen loescht weiter');
+  assert.match(deletes[0].path, /entity_type=task&entity_id=7/);
+});
+
+// Der Riegel uebersprang mit dem Schreibvorgang auch die VORBEDINGUNG, und die
+// gilt unabhaengig vom Schreibrecht - eine Erinnerung braucht ein
+// Faelligkeitsdatum. Mit `write` verweigert die App genau diese Kombination
+// seit immer; ohne Schreibrecht ging die Aufgabe mit `due_date: null` durch und
+// liess die Erinnerung an einer Aufgabe ohne Faelligkeit zurueck
+// (`server/routes/tasks.js` fasst die Tabelle nicht an). Die Meldung nennt
+// deshalb das Faelligkeitsdatum, das dieser Nutzer BEDIENEN kann, nicht den
+// Schalter, den er nicht bedienen kann.
+test('calendar: read darf das Faelligkeitsdatum nicht wegraeumen, solange eine Erinnerung haengt', async () => {
+  const { calls, error } = await speichernUndAufrufeSammeln({
+    modules: { tasks: 'write', calendar: 'read' }, reminderChecked: true, dueDate: '',
+  });
+  assert.equal(error, 'tasks.reminderLockedNeedsDueDate', 'die Meldung nennt das bedienbare Feld');
+  assert.deepEqual(calls.filter((c) => c.path === '/tasks/7'), [], 'die Aufgabe geht NICHT raus');
+  assert.deepEqual(erinnerungsAufrufe(calls), [], 'und an der Erinnerung wird auch nichts versucht');
+});
+
+test('calendar: read ohne haengende Erinnerung darf das Faelligkeitsdatum leeren', async () => {
+  const { calls, error } = await speichernUndAufrufeSammeln({
+    modules: { tasks: 'write', calendar: 'read' }, reminderChecked: false, dueDate: '',
+  });
+  assert.equal(error, null, 'ohne Erinnerung gibt es keine Regel zu brechen');
+  assert.ok(calls.some((c) => c.method === 'put' && c.path === '/tasks/7'), 'die Aufgabe geht raus');
+});
+
+// Eine Aufgabe kann schon OHNE Faelligkeit ankommen, waehrend eine gesperrte
+// Erinnerung an ihr haengt, und daran ist dieser Nutzer dann unschuldig:
+// Erinnerungen sind pro `created_by` gefuehrt (server/routes/reminders.js
+// filtert GET, Upsert und DELETE danach) und niemand erzwingt die Regel
+// tabellenuebergreifend - ein ZWEITES Mitglied raeumt das Datum weg und loescht
+// dabei nur seine eigene, nicht vorhandene Zeile. Ein Riegel auf den
+// Endzustand haette den Erstbesitzer danach aus JEDER Aenderung ausgesperrt,
+// auch aus einer Titelkorrektur, und ohne Ausweg.
+test('calendar: read darf eine Aufgabe speichern, die schon OHNE Faelligkeit kam', async () => {
+  const { calls, error } = await speichernUndAufrufeSammeln({
+    modules: { tasks: 'write', calendar: 'read' },
+    reminderChecked: true,
+    dueDate: '',
+    dueDateWhenOpened: '', // so ging der Dialog auf: fremde Erinnerung, keine Faelligkeit
+  });
+  assert.equal(error, null, 'wer nichts weggeraeumt hat, wird nicht aufgehalten');
+  assert.ok(calls.some((c) => c.method === 'put' && c.path === '/tasks/7'), 'die Titelaenderung geht durch');
+  assert.deepEqual(erinnerungsAufrufe(calls), [], 'die fremde Erinnerung bleibt unangetastet');
+});
+
+test('calendar: read darf das Faelligkeitsdatum WECHSELN - das bricht die Regel nicht', async () => {
+  const { calls, error } = await speichernUndAufrufeSammeln({
+    modules: { tasks: 'write', calendar: 'read' }, reminderChecked: true, dueDate: '2026-11-15',
+  });
+  assert.equal(error, null);
+  const put = calls.find((c) => c.method === 'put' && c.path === '/tasks/7');
+  assert.equal(put?.body?.due_date, '2026-11-15', 'das neue Datum geht durch');
+  assert.deepEqual(erinnerungsAufrufe(calls), [], 'die Erinnerung bleibt unangetastet');
+});
+
+// DIE PRAEMISSE, AUF DER DER GANZE `read`-ZWEIG STEHT: dass `GET /reminders`
+// fuer `calendar: read` durchgeht und der angezeigte Wert deshalb WIRKLICH da
+// ist und nicht geraten. Der Satz stand dreimal in Prosa und nirgends als
+// Zusicherung. Was das kostet, ist gemessen: aendert man in
+// `loadReminderForTask()` das `=== 'none'` zu `!== 'write'`, bekommt ein
+// `read`-Mitglied nie eine Erinnerung, `renderReminderSection` nimmt dann immer
+// den `(read && !reminder) -> ''`-Ausgang, und der gesamte gesperrte Abschnitt
+// ist produktiv toter Code - bei 51 von 51 gruenen Tests. Dasselbe beim
+// ersatzlosen Loeschen der Zeile (dann nur ein 403 je Dialog).
+async function ladenUndAufrufeSammeln(access) {
+  const calls = [];
+  globalThis.__apiStub = {
+    get: async (path) => {
+      calls.push(path);
+      if (access === 'none') throw new Error('403');
+      return { data: { id: 3, entity_type: 'task', entity_id: 7, remind_at: '2026-09-30T23:59:59' } };
+    },
+  };
+  try {
+    const reminder = await withAccess({ tasks: 'write', calendar: access }, () => tasks.loadReminderForTask(7));
+    return { calls, reminder };
+  } finally {
+    delete globalThis.__apiStub;
+  }
+}
+
+test('calendar: read holt die Erinnerung wirklich - darauf steht der ganze gesperrte Zweig', async () => {
+  const { calls, reminder } = await ladenUndAufrufeSammeln('read');
+  assert.deepEqual(calls, ['/reminders?entity_type=task&entity_id=7'], 'genau eine Anfrage, und zwar diese');
+  assert.equal(reminder?.remind_at, '2026-09-30T23:59:59', 'der Wert kommt an und wird nicht verworfen');
+});
+
+test('calendar: write holt sie genauso', async () => {
+  const { calls, reminder } = await ladenUndAufrufeSammeln('write');
+  assert.equal(calls.length, 1);
+  assert.ok(reminder, 'mit Schreibrecht erst recht');
+});
+
+test('calendar: none fragt gar nicht erst - der 403 waere die einzige Antwort', async () => {
+  const { calls, reminder } = await ladenUndAufrufeSammeln('none');
+  assert.deepEqual(calls, [], 'keine Anfrage, die nur ein 403 holen kann');
+  assert.equal(reminder, null);
+});
+
+// DIE NAHT ZWISCHEN DEN ZWEI HAELFTEN. Der Riegel im Speichern liest die
+// Faelligkeit, mit der der Dialog aufging, aus `data-locked-due` am Markup -
+// und alle Tests darueber reichen diesen Wert als Attrappe herein. Damit
+// pruefen beide Haelften einander gegen ihre eigene Annahme: nachgemessen
+// blieben alle Tests gruen, als das Attribut im echten Markup tot gestellt
+// wurde. Dieser Test holt den Wert deshalb AUS dem erzeugten Markup und
+// schickt ihn durch den Handler. Verschwindet das Attribut oder wird es
+// umbenannt, kommt '' heraus, der Riegel schweigt und diese Zeile wird rot.
+test('das Markup traegt die Faelligkeit, die der Riegel im Speichern liest', async () => {
+  const task = faelligeAufgabe();
+  const ausDemMarkup = withAccess({ tasks: 'write', calendar: 'read' }, () => {
+    const section = reminderSection(tasks.renderModalContent({
+      task, users: [], reminder: erinnerung(),
+    }));
+    return section.match(/data-locked-due="([^"]*)"/)?.[1] ?? null;
+  });
+  assert.equal(ausDemMarkup, task.due_date, 'der gesperrte Abschnitt nennt die Faelligkeit der Aufgabe');
+
+  const { error } = await speichernUndAufrufeSammeln({
+    modules: { tasks: 'write', calendar: 'read' },
+    reminderChecked: true,
+    dueDate: '',
+    dueDateWhenOpened: ausDemMarkup,
+  });
+  assert.equal(error, 'tasks.reminderLockedNeedsDueDate', 'und der Handler erkennt daran das Leerraeumen');
+});
+
 
 test.after(() => miniDomAbraeumen());

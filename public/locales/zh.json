@@ -501,7 +501,8 @@
         "checkConflict": "任务已被修改，请重新打开。",
         "doneByPick": "谁完成了“{{title}}”？",
         "doneByToast": "由 {{name}} 完成。",
-        "historyTickedBy": "由 {{name}} 勾选"
+        "historyTickedBy": "由 {{name}} 勾选",
+        "reminderLockedNeedsDueDate": "此任务有一个你无法更改的提醒。因此它需要一个截止日期。"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} 餐",
@@ -2987,7 +2988,8 @@
         "customDays": "Days",
         "customWeeks": "Weeks",
         "sectionTitlePlural": "提醒",
-        "sharedWithAssignees": "被指派到此日程的人也会收到此提醒。"
+        "sharedWithAssignees": "被指派到此日程的人也会收到此提醒。",
+        "readOnlyNotice": "提醒归日历所有。没有日历的写入权限时，此设置保持不变。"
     },
     "onboarding": {
         "step1Title": "欢迎使用{{name}}",

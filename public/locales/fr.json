@@ -501,7 +501,8 @@
         "checkConflict": "La tâche a été modifiée entre-temps. Veuillez la rouvrir.",
         "doneByPick": "Qui a fait « {{title}} » ?",
         "doneByToast": "Fait par {{name}}.",
-        "historyTickedBy": "coché par {{name}}"
+        "historyTickedBy": "coché par {{name}}",
+        "reminderLockedNeedsDueDate": "Cette tâche a un rappel que vous n’êtes pas autorisé à modifier. Elle a donc besoin d’une date d’échéance."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} repas",
@@ -2987,7 +2988,8 @@
         "customDays": "Days",
         "customWeeks": "Weeks",
         "sectionTitlePlural": "Rappels",
-        "sharedWithAssignees": "Les personnes affectées à cet événement reçoivent aussi ce rappel."
+        "sharedWithAssignees": "Les personnes affectées à cet événement reçoivent aussi ce rappel.",
+        "readOnlyNotice": "Les rappels appartiennent au Calendrier. Sans droit d’écriture là-bas, ce réglage reste inchangé."
     },
     "onboarding": {
         "step1Title": "Bienvenue dans {{name}}",

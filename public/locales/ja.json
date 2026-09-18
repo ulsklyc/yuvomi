@@ -501,7 +501,8 @@
         "checkConflict": "タスクはその間に変更されました。もう一度開いてください。",
         "doneByPick": "「{{title}}」をやったのは誰ですか？",
         "doneByToast": "{{name}} がやりました。",
-        "historyTickedBy": "チェックしたのは {{name}}"
+        "historyTickedBy": "チェックしたのは {{name}}",
+        "reminderLockedNeedsDueDate": "このタスクには変更できないリマインダーが設定されています。そのため期限日が必要です。"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}}件の食事",
@@ -2987,7 +2988,8 @@
         "customDays": "Days",
         "customWeeks": "Weeks",
         "sectionTitlePlural": "リマインダー",
-        "sharedWithAssignees": "この予定に割り当てられた人にも、このリマインダーが届きます。"
+        "sharedWithAssignees": "この予定に割り当てられた人にも、このリマインダーが届きます。",
+        "readOnlyNotice": "リマインダーはカレンダーに属します。カレンダーへの書き込み権限がない場合、この設定は変更されません。"
     },
     "onboarding": {
         "step1Title": "{{name}}へようこそ",

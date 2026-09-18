@@ -16,6 +16,7 @@ import { refresh as refreshReminders } from '/reminders.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 import { withChosenPeople } from '/utils/people-picker.js';
 import { resolveReminderPreset } from '/utils/reminder-offset.js';
+import { navModuleAccess } from '/permissions.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
@@ -1327,6 +1328,13 @@ async function loadTaskForEdit(id) {
 }
 
 async function loadReminderForTask(taskId) {
+  // Ohne JEDEN Kalenderzugriff antwortet `/reminders` mit 403, und das catch
+  // unten macht daraus dasselbe null - nur eine Anfrage spaeter. Der Dialog
+  // zeigt den Abschnitt in diesem Fall ohnehin nicht (siehe
+  // renderReminderSection), also wird hier gar nicht erst gefragt.
+  // `reminderAccess` steht weiter unten und ist als Funktionsdeklaration
+  // gehoistet.
+  if (reminderAccess() === 'none') return null;
   try {
     const data = await api.get(`/reminders?entity_type=task&entity_id=${taskId}`);
     return data.data;
@@ -1335,24 +1343,90 @@ async function loadReminderForTask(taskId) {
   }
 }
 
+/**
+ * Wie weit darf dieser Dialog an der Erinnerung ruehren: 'write'|'read'|'none'.
+ *
+ * ERINNERUNGEN GEHOEREN DEM KALENDER, NICHT DEN AUFGABEN. `server/scopes.js`
+ * fuehrt die Praefixe `calendar`, `reminders` und `birthdays` unter EINEM
+ * Schluessel (`calendar`); der Aufgaben-Dialog schreibt aber ueber
+ * `/reminders`. Wer `tasks: write` und `calendar: read` traegt, sah hier
+ * deshalb einen Schalter, dessen Speichern serverseitig mit 403 endete - die
+ * Aufgabe war gespeichert, die Erinnerung nicht, und zu sehen bekam er nur
+ * eine Fehlermeldung.
+ *
+ * Drei Zustaende, nach der Faustregel „Zustand wird gesperrt, eine reine
+ * Handlung verschwindet":
+ *   write → unveraendert,
+ *   read  → gesperrt. Eine bestehende Erinnerung IST Zustand und bleibt
+ *           sichtbar; `GET /reminders` laesst `calendar: read` durch, der
+ *           Wert steht also wirklich da und ist nicht geraten.
+ *   none  → weg. Es gibt keinen Zustand zu zeigen: `GET /reminders` antwortet
+ *           mit 403, `loadReminderForTask()` liefert ohnehin null, und ein
+ *           leerer Schalter waere nur ein Versprechen auf einen 403.
+ *
+ * Gemessen wird am Nav-Modul `calendar` (dieselbe Karte wie im Router), nicht
+ * am Pfad - `navModuleAccess()` faellt ohne geladene Rechte auf 'write'
+ * zurueck, wie alles in permissions.js. Der Server bleibt das Gate.
+ */
+function reminderAccess() {
+  return navModuleAccess('calendar');
+}
+
 function renderReminderSection(task = null, reminder = null) {
+  const access = reminderAccess();
+  // GESPERRT WIRD NUR, WO ES ZUSTAND GIBT. `none` hat keinen (das Lesen
+  // antwortet mit 403), aber `read` ohne Erinnerung genauso wenig: ein
+  // gesperrter leerer Schalter ist keine Auskunft, sondern eine Tuer, die nie
+  // aufgeht - im Anlege-Dialog, wo es die Aufgabe noch gar nicht gibt, und
+  // ebenso an einer Aufgabe, an der nie eine Erinnerung hing. Beide Faelle
+  // messbar in test:module-readonly-ui, beide waren in der ersten Fassung
+  // dieses Riegels da (Review-Runde 1).
+  if (access === 'none' || (access === 'read' && !reminder)) return '';
+  // Ein gesperrter Abschnitt zeigt weiter, WAS eingestellt ist, und nimmt
+  // nichts an: `disabled` an jedem Bedienelement. Der Riegel im Formular
+  // (handleFormSubmit) haengt nicht daran - `checked` liesse sich auch an einem
+  // disabled-Kaestchen ablesen -, er fragt reminderAccess() selbst.
+  //
+  // `disabled` nimmt die Felder auch aus der TAB-ORDNUNG - der gespeicherte
+  // Wert ist dann sichtbar, aber per Tastatur nicht erreichbar. Fuer Knoepfe
+  // kennt das Haus dafuer `aria-disabled` (layout.css `.btn[aria-disabled]`);
+  // ein Kontrollkaestchen kann kein `readonly` tragen, ein `aria-disabled`-
+  // Kaestchen bliebe also bedienbar und muesste im Skript zurueckgesetzt
+  // werden. Das ist der Tausch, den diese Stelle bewusst macht.
+  //
+  // Die Hinweiszeile traegt `.task-field-hint` aus tasks.css und KEINE eigene
+  // Klasse: derselbe Satz in derselben Rolle darf nicht dreimal verschieden
+  // aussehen, und die Warnung davor steht schon an `.cal-field-hint` in
+  // calendar.css. Tragfaehig ist das, weil BEIDE Wege in dieses Markup
+  // tasks.css mitbringen - die Route /tasks laedt es als Seiten-Blatt, und
+  // `openTaskById()` (Dashboard, Kalender) awaitet vorher `ensureTaskStyles()`.
+  const locked = access === 'read';
+  const off = locked ? ' disabled' : '';
+  // Die Faelligkeit, MIT DER dieser Dialog geoeffnet wurde, fuers Speichern -
+  // dort entscheidet sie darueber, ob dieser Nutzer gerade ein Datum WEGRAEUMT
+  // oder ob die Aufgabe schon ohne eines kam (Review-Runde 3). Sie reist am
+  // Abschnitt mit, weil es ihn genau dann gibt, wenn eine gesperrte Erinnerung
+  // haengt - kein zusaetzlicher Modulzustand, der neben dem Dialog altern
+  // koennte.
+  const lockedDue = locked ? ` data-locked-due="${esc(task?.due_date ?? '')}"` : '';
   const hasReminder = !!reminder;
   const resolved = resolveReminderPreset(task, reminder);
   const showCustom = hasReminder && resolved.preset === 'offset_custom';
 
   return `
-    <div class="reminder-section">
+    <div class="reminder-section"${lockedDue}>
       <div class="reminder-section__header">
         <label class="toggle" style="margin:0">
-          <input type="checkbox" id="reminder-toggle" ${hasReminder ? 'checked' : ''}>
+          <input type="checkbox" id="reminder-toggle" ${hasReminder ? 'checked' : ''}${off}>
           <span class="toggle__track"></span>
           <span class="reminder-section__title">${t('reminders.enableLabel')}</span>
         </label>
       </div>
+      ${locked ? `<p class="task-field-hint">${t('reminders.readOnlyNotice')}</p>` : ''}
       <div id="reminder-fields" class="reminder-fields" ${hasReminder ? '' : 'style="display:none"'}>
         <div class="form-group" style="margin:0">
           <label class="label" for="reminder-offset">${t('reminders.offsetLabel')}</label>
-          <select class="input" id="reminder-offset">
+          <select class="input" id="reminder-offset"${off}>
             <option value="offset_none">${t('reminders.offsetNone')}</option>
             <option value="offset_at_time" ${resolved.preset === 'offset_at_time' ? 'selected' : ''}>${t('reminders.offsetAtTime')}</option>
             <option value="offset_15m" ${resolved.preset === 'offset_15m' ? 'selected' : ''}>${t('reminders.offset15min')}</option>
@@ -1367,11 +1441,11 @@ function renderReminderSection(task = null, reminder = null) {
         <div class="modal-grid modal-grid--2" id="reminder-custom-fields" style="${showCustom ? '' : 'display:none'};margin-top:var(--space-3)">
           <div class="form-group" style="margin:0">
             <label class="label" for="reminder-custom-amount">${t('reminders.customAmountLabel')}</label>
-            <input class="input" type="number" min="1" step="1" id="reminder-custom-amount" value="${resolved.amount}">
+            <input class="input" type="number" min="1" step="1" id="reminder-custom-amount" value="${resolved.amount}"${off}>
           </div>
           <div class="form-group" style="margin:0">
             <label class="label" for="reminder-custom-unit">${t('reminders.customUnitLabel')}</label>
-            <select class="input" id="reminder-custom-unit">
+            <select class="input" id="reminder-custom-unit"${off}>
               <option value="minutes" ${resolved.unit === 'minutes' ? 'selected' : ''}>${t('reminders.customMinutes')}</option>
               <option value="hours" ${resolved.unit === 'hours' ? 'selected' : ''}>${t('reminders.customHours')}</option>
               <option value="days" ${resolved.unit === 'days' ? 'selected' : ''}>${t('reminders.customDays')}</option>
@@ -1546,8 +1620,13 @@ function wireTaskForm(panel, { task = null, container = null, onChanged = () => 
   const fields = panel.querySelector('#reminder-fields');
   const offset = panel.querySelector('#reminder-offset');
   const customFields = panel.querySelector('#reminder-custom-fields');
+  // `fields?.` statt `fields.`: die beiden Suchen sind unabhaengig, und seit
+  // der Abschnitt ganz fehlen kann (renderReminderSection gibt '' zurueck),
+  // haengt die Sicherheit dieser Zeile sonst allein daran, dass `toggle` im
+  // SELBEN Fall null ist und der Listener nie haengt. Das ist wahr, aber keine
+  // Zusicherung, die diese Stelle selbst traegt.
   toggle?.addEventListener('change', () => {
-    fields.style.display = toggle.checked ? '' : 'none';
+    if (fields) fields.style.display = toggle.checked ? '' : 'none';
   });
   offset?.addEventListener('change', () => {
     if (!customFields) return;
@@ -1808,7 +1887,48 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
   // Erinnerungs-Vorbedingungen VOR dem Speichern prüfen — verhindert den
   // widersprüchlichen Zustand "Aufgabe gespeichert (Erfolgs-Toast) + roter
   // Fehler", wenn Reminder ohne Fälligkeit/Offset gesetzt wird (Critique P2).
-  const wantsReminder = !!reminderToggle?.checked;
+  //
+  // OHNE SCHREIBRECHT AUF DEN KALENDER FAELLT DIESER TEIL GANZ WEG (siehe
+  // reminderAccess). Der Abschnitt steht dann gesperrt im Dialog, und was
+  // darin steht, ist der GESPEICHERTE Stand - ihn erneut zu schicken hiesse,
+  // einen unveraenderten Wert gegen einen 403 zu senden. Der Riegel sitzt VOR
+  // der Vorbedingungspruefung, nicht erst vor dem Schreiben: sonst blockierte
+  // ein geleertes Faelligkeitsdatum das Speichern mit einer Meldung ueber ein
+  // Feld, das dieser Nutzer gar nicht bedienen kann.
+  const canWriteReminder = reminderAccess() === 'write';
+  const wantsReminder = canWriteReminder && !!reminderToggle?.checked;
+  // DIE EINE VORBEDINGUNG, DIE AUCH OHNE SCHREIBRECHT GILT: eine Erinnerung
+  // braucht ein Faelligkeitsdatum. Die Regel ist nicht neu - mit Schreibrecht
+  // verweigert die Zeile darunter genau diese Kombination -, aber der Riegel
+  // oben machte sie fuer `calendar: read` brechbar: das Datum gehoert dem
+  // Aufgaben-Modul, ist also bedienbar, und wer es leerraeumt, liess bis
+  // Review-Runde 2 eine Erinnerung an einer Aufgabe OHNE Faelligkeit zurueck
+  // (`server/routes/tasks.js` fasst die Tabelle nicht an). Nachgemessen: die
+  // Aufgabe ging mit `due_date: null` durch, ohne Meldung.
+  //
+  // Der harte Block von vorher kommt damit NICHT zurueck. Er nannte den
+  // Erinnerungs-Schalter, den dieser Nutzer nicht bedienen kann; diese Meldung
+  // nennt das Faelligkeitsdatum, das er bedienen kann, und sagt dazu, warum es
+  // gebraucht wird. Ein Datums-WECHSEL bleibt erlaubt - er bricht die Regel
+  // nicht, sondern verschiebt nur den angezeigten Vorlauf, und das ist ein
+  // eigener Faden (resolveReminderPreset kennt keinen negativen Versatz).
+  //
+  // GEMESSEN WIRD DER UEBERGANG, NICHT DER ZUSTAND (Review-Runde 3). Eine
+  // Aufgabe kann schon OHNE Faelligkeit ankommen, waehrend eine gesperrte
+  // Erinnerung an ihr haengt, und daran ist dieser Nutzer dann unschuldig:
+  // Erinnerungen sind pro `created_by` gefuehrt (`server/routes/reminders.js`
+  // filtert GET, Upsert und DELETE danach), niemand erzwingt die Regel
+  // tabellenuebergreifend, also raeumt ein ZWEITES Mitglied das Datum weg und
+  // loescht dabei nur seine eigene - nicht vorhandene - Zeile. Ein Riegel auf
+  // den Endzustand haette den Erstbesitzer danach aus der Aufgabe ausgesperrt,
+  // bei JEDER Aenderung, auch einer Titelkorrektur, und ohne Ausweg: den
+  // Schalter, der die Meldung verursacht, kann er nicht bedienen.
+  const lockedReminderPresent = !canWriteReminder && !!reminderToggle?.checked;
+  const dueDateWhenOpened = form.querySelector('.reminder-section[data-locked-due]')?.dataset.lockedDue || '';
+  if (lockedReminderPresent && dueDateWhenOpened && !dueDate) {
+    resetSubmit(t('tasks.reminderLockedNeedsDueDate'));
+    return;
+  }
   let remindAt = null;
   if (wantsReminder) {
     if (!dueDate) { resetSubmit(t('tasks.reminderNeedsDueDate')); return; }
@@ -1858,16 +1978,22 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
       window.yuvomi.showToast(t('tasks.createdToast'), 'success');
     }
 
-    // Erinnerung speichern oder löschen (Vorbedingungen bereits oben geprüft)
+    // Erinnerung speichern oder löschen (Vorbedingungen bereits oben geprüft).
+    // `canWriteReminder` gilt auch für den Löschzweig: das stumme catch dort
+    // fängt einen 403 zwar weg, aber der Aufruf wäre eine Löschanfrage für eine
+    // Erinnerung, die dieser Nutzer nicht anfassen darf - und an einer
+    // unveränderten Aufgabe hat er sie auch nicht abgewählt.
     if (savedTaskId) {
-      if (wantsReminder) {
-        await api.post('/reminders', { entity_type: 'task', entity_id: savedTaskId, remind_at: remindAt });
-        refreshReminders();
-      } else {
-        try {
-          await api.delete(`/reminders?entity_type=task&entity_id=${savedTaskId}`);
+      if (canWriteReminder) {
+        if (wantsReminder) {
+          await api.post('/reminders', { entity_type: 'task', entity_id: savedTaskId, remind_at: remindAt });
           refreshReminders();
-        } catch { /* kein Reminder vorhanden - ignorieren */ }
+        } else {
+          try {
+            await api.delete(`/reminders?entity_type=task&entity_id=${savedTaskId}`);
+            refreshReminders();
+          } catch { /* kein Reminder vorhanden - ignorieren */ }
+        }
       }
 
       // Dokument-Verknüpfungen als Replace-Set übernehmen (#503).
@@ -4295,4 +4421,14 @@ export const __test = {
   // Die Frische der Referenzlisten ist nur verhaltensgetrieben pruefbar: sie
   // haengt daran, WIE die Antwort kam, nicht daran, dass eine kam.
   refreshTags,
+  // Erinnerungen liegen im Kalender-Modul (siehe reminderAccess). Der Riegel
+  // steht an ZWEI Stellen - im Markup und im Speichern -, und nur der zweite
+  // entscheidet, ob eine Anfrage rausgeht. Ein Textguard kann das nicht sehen:
+  // er liest den Aufruf, nicht das Ausbleiben. Deshalb steht der Handler hier.
+  handleFormSubmit, reminderAccess,
+  // Der Lader steht hier, weil die PRAEMISSE des gesperrten Zweigs an ihm
+  // haengt: dass `calendar: read` die Erinnerung wirklich bekommt. War das nur
+  // Prosa, liess sich das `none` still zu `!== write` verengen und der ganze
+  // Abschnitt war toter Code, ohne dass ein Test rot wurde.
+  loadReminderForTask,
 };

@@ -501,7 +501,8 @@
         "checkConflict": "De taak is intussen gewijzigd. Open deze opnieuw.",
         "doneByPick": "Wie heeft “{{title}}” gedaan?",
         "doneByToast": "Gedaan door {{name}}.",
-        "historyTickedBy": "afgevinkt door {{name}}"
+        "historyTickedBy": "afgevinkt door {{name}}",
+        "reminderLockedNeedsDueDate": "Deze taak heeft een herinnering die je niet mag wijzigen. Daarom is een einddatum nodig."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} maaltijden",
@@ -2872,7 +2873,8 @@
         "customDays": "Dagen",
         "customWeeks": "Weken",
         "sectionTitlePlural": "Herinneringen",
-        "sharedWithAssignees": "Wie aan deze afspraak is toegewezen, krijgt deze herinnering ook."
+        "sharedWithAssignees": "Wie aan deze afspraak is toegewezen, krijgt deze herinnering ook.",
+        "readOnlyNotice": "Herinneringen horen bij de Agenda. Zonder schrijfrechten daar blijft deze instelling ongewijzigd."
     },
     "birthdays": {
         "inDays": "over {{days}} dagen",

@@ -513,7 +513,8 @@
         "checkConflict": "Tugas telah berubah sementara itu. Silakan buka kembali.",
         "doneByPick": "Siapa yang mengerjakan “{{title}}”?",
         "doneByToast": "Dikerjakan oleh {{name}}.",
-        "historyTickedBy": "dicentang oleh {{name}}"
+        "historyTickedBy": "dicentang oleh {{name}}",
+        "reminderLockedNeedsDueDate": "Tugas ini memiliki pengingat yang tidak boleh Anda ubah. Karena itu tugas ini memerlukan tanggal jatuh tempo."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} hidangan",
@@ -2884,7 +2885,8 @@
         "customDays": "Hari",
         "customWeeks": "Minggu",
         "sectionTitlePlural": "Pengingat",
-        "sharedWithAssignees": "Orang yang ditugaskan ke acara ini juga menerima pengingat ini."
+        "sharedWithAssignees": "Orang yang ditugaskan ke acara ini juga menerima pengingat ini.",
+        "readOnlyNotice": "Pengingat termasuk dalam Kalender. Tanpa akses tulis di sana, pengaturan ini tetap tidak berubah."
     },
     "birthdays": {
         "inDays": "dalam {{days}} hari",

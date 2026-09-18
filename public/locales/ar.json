@@ -501,7 +501,8 @@
         "checkConflict": "تم تغيير المهمة في هذه الأثناء. يرجى فتحها من جديد.",
         "doneByPick": "مَن أنجز ”{{title}}“؟",
         "doneByToast": "أنجزها {{name}}.",
-        "historyTickedBy": "وضع العلامة {{name}}"
+        "historyTickedBy": "وضع العلامة {{name}}",
+        "reminderLockedNeedsDueDate": "هذه المهمة لديها تذكير لا يمكنك تغييره. لذلك تحتاج إلى تاريخ استحقاق."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} وجبات",
@@ -2987,7 +2988,8 @@
         "customDays": "Days",
         "customWeeks": "Weeks",
         "sectionTitlePlural": "التذكيرات",
-        "sharedWithAssignees": "يحصل المُكلَّفون بهذا الموعد على هذا التذكير أيضًا."
+        "sharedWithAssignees": "يحصل المُكلَّفون بهذا الموعد على هذا التذكير أيضًا.",
+        "readOnlyNotice": "التذكيرات تنتمي إلى التقويم. بدون صلاحية الكتابة هناك، يبقى هذا الإعداد كما هو."
     },
     "onboarding": {
         "step1Title": "مرحبًا بك في {{name}}",
