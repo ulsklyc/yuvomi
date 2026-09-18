@@ -8858,10 +8858,11 @@ function unreadableBackupError(encrypted, cause) {
   }
   if (!DB_KEY) {
     return new Error(
-      'Backup file could not be read: it has no plain SQLite header, so it is encrypted - and '
-      + 'DB_ENCRYPTION_KEY is not set on this instance, so there is nothing to decrypt it with. '
+      'Backup file could not be read: it has no plain SQLite header, so it is likely encrypted - '
+      + 'and DB_ENCRYPTION_KEY is not set on this instance, so there is nothing to decrypt it with. '
       + 'A backup carries the encryption of the instance that wrote it: set DB_ENCRYPTION_KEY to '
-      + "that instance's key and restart Yuvomi, then restore again.",
+      + "that instance's key and restart Yuvomi, then restore again. If the file was never "
+      + 'encrypted, it is not a valid Yuvomi database.',
       { cause }
     );
   }

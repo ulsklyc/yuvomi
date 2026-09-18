@@ -431,6 +431,32 @@ test('ein echter Key, der zufällig mit REPLACE beginnt, wird nicht abgefangen',
  * Datenbank ist - sonst schickt sie den naechsten in die falsche Richtung.
  */
 
+/**
+ * BEIDE verschluesselten Zweige muessen die ZWEITE Moeglichkeit nennen.
+ *
+ * Ohne Klartext-Kopf ist eine Datei verschluesselt ODER ueberhaupt keine
+ * Datenbank - ein hochgeladenes Zip, ein abgebrochener Download. Welches von
+ * beidem, kann `validateBackupFile()` nicht wissen, und eine Meldung, die sich
+ * auf den Schluessel festlegt, schickt einen Admin ohne gesetzten Key genau so
+ * in die Irre wie die rohe SQLite-Zeile es in #1267 getan hat: er sucht nach
+ * einem Schluessel, den es nie gab.
+ *
+ * Der erste Anlauf dieses PRs hatte genau diese Asymmetrie - der Zweig MIT Key
+ * nannte die Alternative, der ohne behauptete flach „it is encrypted" (Befund
+ * der Review-Runde auf #1272). Deshalb steht die Regel hier als eigene Probe
+ * und nicht als Nebensatz in einem der beiden Faelle: die naechste Umformulierung
+ * soll sie nicht wieder verlieren koennen.
+ */
+function nenntSchluesselUndAlternative(err, fall) {
+  assert.match(err.message, /DB_ENCRYPTION_KEY/, `${fall}: die Meldung muss den Schluessel nennen`);
+  assert.match(
+    err.message,
+    /is not a (valid )?Yuvomi database/,
+    `${fall}: die Meldung darf die zweite Moeglichkeit nicht verschweigen`
+  );
+  return true;
+}
+
 /** Ein echtes Backup einer Instanz mit `key` - ueber den Weg, den die App nimmt. */
 async function backupFromInstance(key) {
   const dir = tmpDir();
@@ -448,7 +474,7 @@ test('ein Backup mit fremdem Schluessel nennt den Schluessel als Ursache', async
 
   await assert.rejects(
     () => ziel.restoreFromFile(backupPath),
-    /DB_ENCRYPTION_KEY/,
+    (err) => nenntSchluesselUndAlternative(err, 'fremder Schluessel'),
     'die Meldung muss den Schluessel nennen, nicht nur „is not a database"'
   );
 });
@@ -462,7 +488,8 @@ test('ohne eigenen Schluessel sagt die Meldung, dass gar keiner gesetzt ist', as
   // liest, sucht an der falschen Stelle - er hat ueberhaupt keinen.
   await assert.rejects(
     () => ziel.restoreFromFile(backupPath),
-    /DB_ENCRYPTION_KEY is not set on this instance/,
+    (err) => /DB_ENCRYPTION_KEY is not set on this instance/.test(err.message)
+      && nenntSchluesselUndAlternative(err, 'kein Key gesetzt'),
     'ohne gesetzten Key muss die Meldung genau das sagen'
   );
 });
