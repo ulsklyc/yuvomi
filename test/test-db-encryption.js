@@ -19,12 +19,14 @@
  *   (bzw. npm run test:db-encryption)
  */
 
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, existsSync, readFileSync, readdirSync, copyFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 const KEY = 'test-encryption-key-0123456789';
@@ -1044,3 +1046,225 @@ test(
     }
   }
 );
+
+/*
+ * ---------------------------------------------------------------------------
+ * #1283: der Restore-Dialog nennt die Ursache, nicht immer den Schluessel.
+ *
+ * `validateBackupFile()` hat jeden Fehler beim Oeffnen oder ersten Lesen einer
+ * hochgeladenen Datei zur Schluessel-Meldung gemacht - dieselbe Luecke, die
+ * #1281 am Startpfad geschlossen hat. Wer sein EIGENES Backup einspielt, das
+ * unterwegs abgeschnitten wurde, las „a backup from another installation
+ * cannot be read here" und wurde zur Uebernahme ueber die Kommandozeile
+ * geschickt, die ihm nichts nuetzt.
+ *
+ * Diese Faelle laufen durch die ECHTE Route (`server/routes/backup.js`): das
+ * Backup kommt aus `GET /database`, der Restore geht ueber `POST /restore`,
+ * und die Meldung ist der Text, den der Dialog wortgleich anzeigt
+ * (`admin-backup.js` setzt `err.message` als textContent). Die Route bindet an
+ * die ungebuste `server/db.js`, also gibt es in diesem Prozess GENAU EINE
+ * Instanz dahinter, mit `ROUTE_KEY`. Die Rechte-Faelle koennen ueber die Route
+ * nicht entstehen - sie schreibt die Datei selbst -, sie laufen deshalb ueber
+ * das CLI-Skript `scripts/restore-backup.js`, den zweiten Aufrufer.
+ * ---------------------------------------------------------------------------
+ */
+
+const ROUTE_KEY = 'schluessel-dieser-instanz-0123456789';
+let routeInstance = null;
+
+/** Die echte Backup-Route auf einer Instanz mit `ROUTE_KEY`, einmal pro Prozess. */
+async function restoreRoute() {
+  if (routeInstance) return routeInstance;
+  process.env.DB_PATH = join(tmpDir(), 'yuvomi.db');
+  process.env.DB_ENCRYPTION_KEY = ROUTE_KEY;
+  if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.startsWith('REPLACE_WITH_')) {
+    process.env.SESSION_SECRET = 'test-secret-restore-route';
+  }
+  const db = await import('../server/db.js');
+  const { default: router } = await import('../server/routes/backup.js');
+  const { default: express } = await import('express');
+  const app = express();
+  app.use((req, _res, next) => {
+    req.authUserId = 1;
+    req.authRole = 'admin';
+    req.session = { userId: 1, role: 'admin' };
+    next();
+  });
+  app.use('/', router);
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.on('listening', resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  routeInstance = {
+    db,
+    server,
+    async download() {
+      const res = await fetch(`${base}/database`);
+      assert.equal(res.status, 200, 'Vorbedingung: der Backup-Download laeuft');
+      return Buffer.from(await res.arrayBuffer());
+    },
+    async restore(buf) {
+      const res = await fetch(`${base}/restore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: buf,
+      });
+      return { status: res.status, body: await res.json() };
+    },
+  };
+  return routeInstance;
+}
+
+after(() => routeInstance?.server.close());
+
+/**
+ * SQLite-Code so, wie `validateBackupFile()` die Datei oeffnet und zuerst
+ * liest (readonly, Key nur, wenn einer gegeben ist) - `null`, wenn es gelingt.
+ * Anders als `sqliteCodeOnFirstRead()` zaehlt der Konstruktor mit: eine Datei
+ * ohne Leserecht scheitert schon dort.
+ */
+function sqliteCodeBeimPruefen(filePath, key) {
+  let handle;
+  try {
+    handle = new Database(filePath, { readonly: true, fileMustExist: true });
+    if (key) {
+      handle.pragma("cipher = 'sqlcipher'");
+      handle.pragma(`key="x'${Buffer.from(key, 'utf8').toString('hex')}'"`);
+    }
+    handle.prepare('SELECT count(*) FROM sqlite_master').get();
+    return null;
+  } catch (err) {
+    return err.code;
+  } finally {
+    handle?.close();
+  }
+}
+
+/** Was nur die Schluessel-Meldung sagt - nichts davon passt, wenn der Key stimmt. */
+const SCHLUESSEL_SAETZE = /another installation|could not be decrypted|Do NOT just set|CLI \/ Docker Compose restore|restart Yuvomi/;
+
+test('Restore-Dialog: ein Backup mit fremdem Schluessel behaelt die Schluessel-Meldung', async () => {
+  const backupPath = await backupFromInstance('schluessel-der-alten-instanz-0123');
+  const route = await restoreRoute();
+  assert.equal(
+    sqliteCodeBeimPruefen(backupPath, ROUTE_KEY),
+    'SQLITE_NOTADB',
+    'Vorbedingung: mit dem Key dieser Instanz meldet SQLite NOTADB'
+  );
+
+  const res = await route.restore(readFileSync(backupPath));
+  assert.equal(res.status, 400);
+  nenntSchluesselUndAlternative({ message: res.body.error }, 'fremder Schluessel ueber die Route');
+  assert.match(res.body.error, /could not be decrypted with this instance's DB_ENCRYPTION_KEY/);
+  assert.match(res.body.error, /Do NOT just set DB_ENCRYPTION_KEY/, 'die Warnung vor dem Schluesseltausch bleibt');
+  assert.match(res.body.error, /CLI \/ Docker Compose restore/, 'und der Weg, der fuer ein fremdes Backup traegt');
+});
+
+test('Restore-Dialog: ein abgeschnittenes eigenes Backup heisst beschaedigt, nicht fremde Installation', async () => {
+  const route = await restoreRoute();
+  const live = () => route.db.get();
+  live().exec('CREATE TABLE IF NOT EXISTS restore_probe (note TEXT)');
+  live().exec('DELETE FROM restore_probe');
+  live().prepare('INSERT INTO restore_probe (note) VALUES (?)').run('aus dem Backup');
+  const original = await route.download();
+  live().prepare('UPDATE restore_probe SET note = ?').run('nach dem Backup');
+
+  // Der Download bzw. die Kopie hat nach der Haelfte aufgehoert.
+  const dir = tmpDir();
+  const abgeschnitten = join(dir, 'yuvomi-backup.db');
+  writeFileSync(abgeschnitten, original.subarray(0, Math.floor(original.length / 2)));
+  assert.equal(
+    sqliteCodeBeimPruefen(abgeschnitten, ROUTE_KEY),
+    'SQLITE_CORRUPT',
+    'Vorbedingung: mit dem Key dieser Instanz meldet SQLite CORRUPT'
+  );
+  assert.equal(
+    sqliteCodeBeimPruefen(abgeschnitten, 'ein-ganz-anderer-schluessel-0123'),
+    'SQLITE_NOTADB',
+    'Vorbedingung: mit falschem Key meldet dieselbe Datei NOTADB - erst das belegt, dass CORRUPT den Key bestaetigt'
+  );
+
+  const res = await route.restore(readFileSync(abgeschnitten));
+  assert.equal(res.status, 400);
+  const message = res.body.error;
+  assert.match(message, /^Backup file is damaged or incomplete \(SQLITE_CORRUPT: /, 'Befund und Code gehoeren in die Meldung');
+  assert.ok(!SCHLUESSEL_SAETZE.test(message), `der Key stimmt - kein Satz aus der Schluessel-Meldung: ${message}`);
+  assert.match(message, /DB_ENCRYPTION_KEY is not the problem: it does open this file/, 'sie muss sagen, dass der Key traegt');
+  assert.match(message, /Nothing on this instance was changed/, 'und dass nichts kaputt gegangen ist');
+  assert.equal(
+    live().prepare('SELECT note FROM restore_probe').get().note,
+    'nach dem Backup',
+    'die Zusage haelt: der abgelehnte Restore hat die laufende Datenbank nicht angefasst'
+  );
+  assert.match(
+    message,
+    /Get the backup again from where it is stored - download or copy it once more - and check that its size and sha256sum match the stored original, then restore that copy\./,
+    'und den Weg nennen, der traegt'
+  );
+
+  // Den Rat befolgen: die Datei vollstaendig neu holen, Groesse und Pruefsumme
+  // gegen das Original, dann einspielen.
+  writeFileSync(abgeschnitten, original);
+  assert.equal(readFileSync(abgeschnitten).length, original.length, 'die neue Kopie hat die Groesse des Originals');
+  assert.equal(
+    sha256(abgeschnitten),
+    createHash('sha256').update(original).digest('hex'),
+    'und seine Pruefsumme'
+  );
+  const wieder = await route.restore(readFileSync(abgeschnitten));
+  assert.equal(wieder.status, 200, `mit der vollstaendigen Datei muss der Restore gelingen: ${JSON.stringify(wieder.body)}`);
+  assert.equal(
+    live().prepare('SELECT note FROM restore_probe').get().note,
+    'aus dem Backup',
+    'und die Daten des Backups sind wieder da'
+  );
+});
+
+const RESTORE_CLI = fileURLToPath(new URL('../scripts/restore-backup.js', import.meta.url));
+
+/**
+ * Das CLI-Skript als eigener Prozess - so, wie ein Admin es startet. `cwd` ist
+ * ein leeres Verzeichnis, damit `dotenv/config` keine `.env` des Arbeitsbaums
+ * einliest.
+ */
+function cliRestore(backupPath, { dbPath, key }) {
+  const env = { ...process.env, DB_PATH: dbPath, LOG_LEVEL: 'error' };
+  if (key) env.DB_ENCRYPTION_KEY = key;
+  else delete env.DB_ENCRYPTION_KEY;
+  const run = spawnSync(process.execPath, [RESTORE_CLI, backupPath], { cwd: tmpDir(), env, encoding: 'utf8' });
+  const failure = (run.stderr ?? '').split('\n').find((line) => line.startsWith('Restore failed: '));
+  return { status: run.status, failure: failure?.slice('Restore failed: '.length) ?? null, stdout: run.stdout };
+}
+
+for (const [fall, key] of [['mit Schluessel', KEY], ['ohne Schluessel', null]]) {
+  test(
+    `CLI-Restore ${fall}: eine Backup-Datei ohne Leserecht nennt den Code und behauptet nichts ueber den Schluessel`,
+    { skip: ALS_ROOT && 'root ignoriert Dateirechte - der Fall ist so nicht herstellbar' },
+    async () => {
+      const backupPath = await backupFromInstance(key);
+      assert.equal(isPlaintext(backupPath), key === null, 'Vorbedingung: das Backup ist so verschluesselt wie seine Instanz');
+      // Etwa als root kopiert, mit 0600 - fuer den Dienstbenutzer unlesbar.
+      chmodSync(backupPath, 0o000);
+      try {
+        assert.equal(sqliteCodeBeimPruefen(backupPath, key), 'SQLITE_CANTOPEN', 'Vorbedingung: SQLite kann die Datei nicht oeffnen');
+        const dbPath = join(tmpDir(), 'yuvomi.db');
+
+        const run = cliRestore(backupPath, { dbPath, key });
+        assert.equal(run.status, 1, 'der Restore muss scheitern');
+        assert.match(run.failure ?? '', /^Backup file could not be read \(SQLITE_CANTOPEN: /, 'Code und SQLite-Text gehoeren in die Meldung');
+        assert.ok(
+          !/DB_ENCRYPTION_KEY|encrypt|decrypt|key/i.test(run.failure),
+          `kein Wort ueber den Key - die Datei war nur nicht lesbar: ${run.failure}`
+        );
+        assert.match(run.failure, /may read it/, 'der Rat muss das Leserecht nennen');
+
+        // Den Rat befolgen: Leserecht geben, derselbe Aufruf spielt das Backup ein.
+        chmodSync(backupPath, 0o644);
+        const wieder = cliRestore(backupPath, { dbPath, key });
+        assert.equal(wieder.status, 0, `mit Leserecht muss der Restore gelingen: ${wieder.failure}`);
+        assert.match(wieder.stdout, /^Restored /m);
+      } finally {
+        chmodSync(backupPath, 0o644);
+      }
+    }
+  );
+}

@@ -9050,11 +9050,11 @@ async function backupToFile(destinationPath) {
  * nicht mehr erreichbar. Deshalb steht der Rat nur noch im `!DB_KEY`-Zweig; der
  * andere verweist auf den Weg ueber die Kommandozeile, der Datei und Key
  * zusammen umstellt (#1267).
+ *
+ * Beide Texte gelten nur fuer `SQLITE_NOTADB` - die Weiche davor steht in
+ * `unreadableBackupError()` (#1283).
  */
-function unreadableBackupError(encrypted, cause) {
-  if (!encrypted) {
-    return new Error('Backup file is not a valid Yuvomi database.', { cause });
-  }
+function undecryptableBackupError(cause) {
   if (!DB_KEY) {
     return new Error(
       'Backup file could not be read: it has no plain SQLite header, so it is likely encrypted - '
@@ -9076,6 +9076,72 @@ function unreadableBackupError(encrypted, cause) {
     + 'have the same key, the file is not a Yuvomi database.',
     { cause }
   );
+}
+
+/**
+ * Meldung für eine Backup-Datei, an der das Öffnen oder das erste Lesen
+ * scheitert - getrennt nach dem, was SQLite tatsächlich sagt (#1283).
+ *
+ * Vor #1283 wurde jeder Fehler an dieser Stelle zur Schlüssel-Meldung, ohne
+ * auf `err.code` zu sehen - dieselbe Lücke, die #1281 am Startpfad geschlossen
+ * hat. Gemessen über die echte Restore-Route und das CLI-Skript:
+ *   - `SQLITE_NOTADB`: fremder Key, eine Instanz ohne Key vor einem
+ *     verschlüsselten Backup, und ebenso eine Datei, die schon innerhalb der
+ *     ersten Seite abreißt (100 B, 2 KiB) - von einem falschen Key ist das von
+ *     hier aus nicht zu unterscheiden, deshalb nennen beide Key-Texte die
+ *     zweite Möglichkeit mit.
+ *   - `SQLITE_CORRUPT`: das EIGENE Backup, abgeschnitten nach 4 KiB, 8 KiB,
+ *     der Hälfte, allen Seiten bis auf eine, einem Byte zu wenig. Das gibt es
+ *     nur mit dem richtigen Key: dieselbe Datei liefert mit falschem Key
+ *     `SQLITE_NOTADB`, weil Seite 1 erst entschlüsselt werden und ihre
+ *     HMAC-Prüfung bestehen muss. Die Schlüssel-Meldung schickte diesen Admin
+ *     zur Übernahme eines fremden Backups über die Kommandozeile, die ihm
+ *     nichts nützt. Ohne Key kann ein Backup ohne Klartext-Kopf gar nicht
+ *     `SQLITE_CORRUPT` liefern (SQLite scheitert schon am Kopf, gemessen:
+ *     `SQLITE_NOTADB`), und der Satz „der Key öffnet sie" wäre dort falsch -
+ *     deshalb hängt der Zweig an `DB_KEY`.
+ *   - alles andere: Code und SQLite-Text, kein Wort über den Key. Gemessen ist
+ *     `SQLITE_CANTOPEN` für eine Datei ohne Leserecht (CLI-Restore einer als
+ *     root kopierten Datei). Der Kopf ist dann gar nicht lesbar, `encrypted`
+ *     steht deshalb auf true, und ohne diese Weiche sagte die Meldung mit Key
+ *     „falscher Schlüssel" und ohne Key „wahrscheinlich verschlüsselt, setz
+ *     DB_ENCRYPTION_KEY" - beides über eine Klartextdatei, die nur nicht
+ *     lesbar war.
+ * Eine Upload-Übertragung, die abreißt, kommt hier nie an: `express.raw()`
+ * verwirft den Request mit `request.aborted`, bevor die Route läuft. Eine
+ * unvollständige Datei ist also schon unvollständig hochgeladen worden -
+ * meist ein Download oder eine Kopie, die zu früh aufgehört hat.
+ *
+ * Die Klartext-Auskunft bleibt ohne Weiche: sie sagt nichts über den Key.
+ * @param {boolean} encrypted  Datei hat keinen Klartext-SQLite-Kopf
+ * @param {unknown} cause      Fehler beim Öffnen oder ersten Lesen
+ * @returns {Error}
+ */
+function unreadableBackupError(encrypted, cause) {
+  if (!encrypted) {
+    return new Error('Backup file is not a valid Yuvomi database.', { cause });
+  }
+  const code = typeof cause?.code === 'string' ? cause.code : '';
+  if (code === 'SQLITE_NOTADB') return undecryptableBackupError(cause);
+
+  const detail = `${code || 'no SQLite error code'}: ${cause?.message ?? String(cause)}`;
+  if (DB_KEY && code.startsWith('SQLITE_CORRUPT')) {
+    return new Error(
+      `Backup file is damaged or incomplete (${detail}). DB_ENCRYPTION_KEY is not the problem: it `
+      + 'does open this file - its first page decrypted and passed the integrity check, which a '
+      + 'wrong key never does. Most likely the file was cut short before it got here, by a download '
+      + 'or copy that stopped early. Nothing on this instance was changed. Get the backup again from '
+      + 'where it is stored - download or copy it once more - and check that its size and sha256sum '
+      + 'match the stored original, then restore that copy.',
+      { cause }
+    );
+  }
+
+  const lines = [`Backup file could not be read (${detail}).`];
+  if (code.startsWith('SQLITE_CANTOPEN')) {
+    lines.push('Check that the file is there and that the user this restore runs as may read it.');
+  }
+  return new Error(lines.join(' '), { cause });
 }
 
 function validateBackupFile(sourcePath) {

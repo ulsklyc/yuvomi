@@ -145,6 +145,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parsed rather than copied - systemd, for one, drops backslashes from an unquoted value, reads a
   quote right after "=" as quoting and trims spaces at both ends. (#1267)
 
+- **Restoring a backup that is damaged or incomplete no longer blames the encryption key.** On an
+  instance with `DB_ENCRYPTION_KEY`, every backup the restore dialog could not read was reported as
+  one from another installation that this instance's key cannot decrypt, followed by advice about
+  taking over such a backup on the command line. A backup of this very instance that was cut short -
+  by a download or a copy that stopped early - got the same message, although its key is right. It
+  is now reported as damaged or incomplete, with the note that the key does open it, that nothing on
+  the instance was changed, and the advice to fetch the backup again and compare its size and
+  checksum with the stored original. Any other error names SQLite's own error code and says nothing
+  about the key; a file the restore is not allowed to read - for example a backup copied by another
+  user and restored with the command-line script - is no longer called encrypted, and the message
+  says to check its read permission. A backup written with a different key gets the same message as
+  before. (#1283)
+
 - **The task board shows all four of its columns, and each one can be folded away.** The board
   draws four columns - open, in progress, done and archived - but the layout only ever placed
   three of them per row, so "Archived" dropped into a second row underneath "Open". A grid row
