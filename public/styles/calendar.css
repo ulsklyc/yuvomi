@@ -2130,6 +2130,63 @@
   flex-direction: column;
 }
 
+.cal-calendar-manager {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cal-calendar-create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3rem auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.cal-calendar-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cal-calendar-row {
+  display: grid;
+  grid-template-columns: 1rem minmax(8rem, 1fr) 3rem auto repeat(3, 2.5rem);
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.cal-calendar-row__swatch {
+  width: 1rem;
+  height: 1rem;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 1px var(--color-border) inset;
+}
+
+.cal-calendar-row__count {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .cal-calendar-create,
+  .cal-calendar-row {
+    grid-template-columns: 1rem minmax(0, 1fr) 3rem;
+  }
+
+  .cal-calendar-create .btn,
+  .cal-calendar-row__count,
+  .cal-calendar-row .btn {
+    grid-column: 2 / -1;
+  }
+
+  .cal-calendar-create .btn,
+  .cal-calendar-row .btn {
+    width: 100%;
+  }
+}
+
 /* Die Feiertags- und Schul-Layer tragen eine NUTZERFARBE und bekommen sie
    deshalb als Inline-Style aus den Einstellungen. Der Schichtplan hat keine -
    seine Farbe ist eine Designentscheidung und gehoert damit hierher und nicht

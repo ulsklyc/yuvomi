@@ -571,6 +571,18 @@ export const schemas = {
               type: ['string', 'null'],
               description: 'Inherited colour of the source calendar or ICS subscription, read-only. Applies to every event of that source and therefore says nothing about this one; it is the fallback below color and the assignee.',
             },
+            local_calendar_id: {
+              type: ['integer', 'null'],
+              description: 'The local Yuvomi calendar this event belongs to. Omit on create to use the default calendar.',
+            },
+            local_calendar_name: {
+              type: ['string', 'null'],
+              description: 'Display name of the local Yuvomi calendar, read-only.',
+            },
+            local_calendar_color: {
+              type: ['string', 'null'],
+              description: 'Colour of the local Yuvomi calendar, read-only. Used after event, assignee, and external source colours.',
+            },
             attachment_name: { type: ['string', 'null'] },
             attachment_mime: { type: ['string', 'null'] },
             attachment_size: { type: ['integer', 'null'] },

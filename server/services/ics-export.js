@@ -259,10 +259,15 @@ function buildVEvent(
   return lines.map(foldLine);
 }
 
-function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn)) {
+function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn), options = {}) {
   const windowStart = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
     .toISOString().slice(0, 10);
   const feedZone = resolveFeedZone(tz);
+  const calendarFilterSql = options.localCalendarId
+    ? 'AND e.external_source = \'local\' AND e.local_calendar_id = ?'
+    : '';
+  const calendarFilterParams = options.localCalendarId ? [options.localCalendarId] : [];
+  const calendarName = options.calendarName || 'Yuvomi';
 
   // Identische Sichtbarkeitslogik wie GET /api/v1/calendar:
   // alle Events außer fremden, nicht-geteilten ICS-Abos.
@@ -293,8 +298,9 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn))
       e.recurrence_rule IS NOT NULL
       OR DATE(e.start_datetime) >= ?
     )
+    ${calendarFilterSql}
     ORDER BY e.start_datetime ASC
-  `).all(userId, windowStart);
+  `).all(userId, windowStart, ...calendarFilterParams);
   const referencedMasterIds = new Set(queriedRows
     .filter(isLinkedOccurrence)
     .map((event) => Number(event.recurrence_parent_id)));
@@ -370,7 +376,7 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn))
     'PRODID:-//Yuvomi//Calendar Feed//DE',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    'X-WR-CALNAME:Yuvomi',
+    `X-WR-CALNAME:${escapeICSText(calendarName)}`,
   ];
   // Kalenderzone für die Clients, die den Header auswerten (Google, Thunderbird).
   // Sie ersetzt die TZID-Parameter nicht, sondern deckt den Rest: Termine ohne
@@ -391,6 +397,22 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn))
   }
   out.push('END:VCALENDAR');
   return out.join('\r\n') + '\r\n';
+}
+
+function buildCalendarFeed(conn, calendarId, now = new Date(), tz = householdTimeZone(conn)) {
+  const calendar = conn.prepare('SELECT * FROM local_calendars WHERE id = ?').get(calendarId);
+  if (!calendar) return null;
+  const userId = calendar.created_by
+    ?? conn.prepare(`
+      SELECT id FROM users
+      ORDER BY CASE WHEN role = 'admin' THEN 0 ELSE 1 END, id
+      LIMIT 1
+    `).get()?.id
+    ?? 0;
+  return buildFeed(conn, userId, now, tz, {
+    localCalendarId: calendar.id,
+    calendarName: calendar.name,
+  });
 }
 
 function getFeedToken(conn, userId) {
@@ -442,7 +464,7 @@ function setFeedShowAssignees(conn, userId, value) {
 }
 
 export {
-  escapeICSText, foldLine, buildFeed,
+  escapeICSText, foldLine, buildFeed, buildCalendarFeed,
   getFeedToken, regenerateFeedToken, clearFeedToken, findUserIdByFeedToken,
   getFeedShowAssignees, setFeedShowAssignees,
   resolveFeedZone, stampProp,

@@ -2,7 +2,7 @@
  * Calendar structure guard.
  *
  * Sichert die modulare Aufteilung von server/routes/calendar.js: der Orchestrator
- * muss die festgelegte {Methode, Pfad}-Routentabelle ergeben (63
+ * muss die festgelegte {Methode, Pfad}-Routentabelle ergeben (69
  * Routen), und die Cluster-Router müssen zusammen exakt diese Routen ergeben
  * (keine verlorene/doppelte Route). Zusätzlich wird die extern konsumierte
  * Re-Export-Fläche (__test.googleTarget, genutzt von test:google-multi) gepinnt.
@@ -34,6 +34,7 @@ const { default: googleRouter } = await import('../server/routes/calendar/google
 const { default: appleRouter } = await import('../server/routes/calendar/apple.js');
 const { default: subscriptionsRouter } = await import('../server/routes/calendar/subscriptions.js');
 const { default: feedRouter } = await import('../server/routes/calendar/feed.js');
+const { default: localCalendarsRouter } = await import('../server/routes/calendar/local-calendars.js');
 const { default: crudRouter } = await import('../server/routes/calendar/crud.js');
 const { default: caldavRouter } = await import('../server/routes/calendar/caldav.js');
 const { default: syncTargetsRouter } = await import('../server/routes/calendar/sync-targets.js');
@@ -97,6 +98,13 @@ const EXPECTED = [
   'POST /feed/regenerate',
   'DELETE /feed',
   'GET /holidays',
+  // local calendars
+  'GET /calendars',
+  'POST /calendars',
+  'PUT /calendars/:id',
+  'DELETE /calendars/:id',
+  'POST /calendars/:id/feed/regenerate',
+  'DELETE /calendars/:id/feed',
   // sync-targets (Auswahlliste des Event-Modals, #618)
   'GET /sync-targets',
   // crud (/:id-Familie)
@@ -135,16 +143,16 @@ const EXPECTED = [
   'GET /outlook/status',
 ];
 
-test('Orchestrator ergibt exakt die erwartete Routentabelle (63 Routen)', () => {
+test('Orchestrator ergibt exakt die erwartete Routentabelle (69 Routen)', () => {
   const actual = collectRoutes(calendarRouter).sort();
   assert.deepEqual(actual, [...EXPECTED].sort());
-  assert.equal(actual.length, 63);
+  assert.equal(actual.length, 69);
 });
 
 test('die Cluster-Router zusammen ergeben genau die Orchestrator-Routen (keine verlorene/doppelte Route)', () => {
   const perModule = [
     readRouter, googleRouter, appleRouter, subscriptionsRouter, feedRouter, crudRouter, caldavRouter,
-    syncTargetsRouter, outlookRouter,
+    localCalendarsRouter, syncTargetsRouter, outlookRouter,
   ].flatMap(collectRoutes);
   // keine Route kommt in mehr als einem Cluster-Router vor
   const seen = new Set();

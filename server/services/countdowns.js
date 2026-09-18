@@ -316,11 +316,13 @@ function eventCountdowns(d, userId, todayKey, graceDays) {
              ORDER BY ea.user_id
              LIMIT 1
            )) AS assigned_color,
-           COALESCE(ec.color, isub.color) AS cal_color
+           COALESCE(ec.color, isub.color) AS cal_color,
+           lc.color AS local_calendar_color
     FROM calendar_events e
     LEFT JOIN users u ON u.id = e.assigned_to
     LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
     LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
+    LEFT JOIN local_calendars lc ON lc.id = e.local_calendar_id
     WHERE e.countdown = 1
       AND ${visibilityWhere('e', 'event_assignments', 'event_id')}
   `).all(userId, userId);
@@ -364,6 +366,7 @@ function eventCountdowns(d, userId, todayKey, graceDays) {
         assigned_to: row.assigned_to,
         assigned_users: row.assigned_color ? [{ id: row.assigned_to, color: row.assigned_color }] : [],
         cal_color: row.cal_color,
+        local_calendar_color: row.local_calendar_color,
       }),
       recurring: Boolean(row.recurrence_rule),
       ...(row.is_occurrence_override ? {

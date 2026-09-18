@@ -69,7 +69,20 @@ export function calendarPaths() {
       post: op({ summary: 'Sync ICS subscription', tag: 'Calendar', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/calendar/import': {
-      post: op({ summary: 'Import events from an ICS file or shared calendar feed as editable local events', tag: 'Calendar', stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({
+        summary: 'Import events from an ICS file or shared calendar feed as editable local events',
+        tag: 'Calendar',
+        stateChanging: true,
+        requestBody: jsonBody({
+          type: 'object',
+          properties: {
+            ics: { type: 'string', description: 'Raw ICS file text. Required when url is omitted.' },
+            url: { type: 'string', format: 'uri', description: 'Shared calendar URL. Required when ics is omitted.' },
+            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$', description: 'Fallback event color for imported events without their own color.' },
+            local_calendar_id: { type: 'integer', minimum: 1, description: 'Target local calendar. Defaults to the default calendar.' },
+          },
+        }),
+      }),
     },
     '/api/v1/calendar/feed': {
       get: op({ summary: 'Get personal ICS export feed status', tag: 'Calendar' }),
@@ -78,6 +91,20 @@ export function calendarPaths() {
     },
     '/api/v1/calendar/feed/regenerate': {
       post: op({ summary: 'Regenerate personal ICS export feed token', tag: 'Calendar', stateChanging: true }),
+    },
+    '/api/v1/calendar/calendars': {
+      get: op({ summary: 'List local calendars', tag: 'Calendar' }),
+      post: op({ summary: 'Create local calendar', tag: 'Calendar', stateChanging: true, requestBody: jsonBody(null) }),
+    },
+    '/api/v1/calendar/calendars/{id}': {
+      put: op({ summary: 'Update local calendar', tag: 'Calendar', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      delete: op({ summary: 'Delete local calendar and reassign events to the default calendar', tag: 'Calendar', params: [idParam()], stateChanging: true }),
+    },
+    '/api/v1/calendar/calendars/{id}/feed/regenerate': {
+      post: op({ summary: 'Regenerate local-calendar ICS export token', tag: 'Calendar', params: [idParam()], stateChanging: true }),
+    },
+    '/api/v1/calendar/calendars/{id}/feed': {
+      delete: op({ summary: 'Disable local-calendar ICS export', tag: 'Calendar', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/calendar/sync-targets': {
       get: op({

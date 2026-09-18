@@ -21,6 +21,7 @@ import * as googleCalendar from './services/google-calendar.js';
 import * as appleCalendar from './services/apple-calendar.js';
 import * as icsSubscription from './services/ics-subscription.js';
 import * as icsExport from './services/ics-export.js';
+import { findCalendarByFeedToken } from './services/local-calendars.js';
 import * as inventoryDeadlinesIcs from './services/inventory-deadlines-ics.js';
 import * as cycleIcs from './services/cycle-ics.js';
 import * as scheduleIcs from './services/schedule-ics.js';
@@ -423,10 +424,13 @@ const feedLimiter = rateLimit({
 app.get('/feed/calendar/:token.ics', feedLimiter, (req, res) => {
   try {
     const userId = icsExport.findUserIdByFeedToken(db.get(), req.params.token);
-    if (!userId) return res.status(404).type('text/plain').send('Not found');
-    const ics = icsExport.buildFeed(db.get(), userId);
+    const localCalendar = userId ? null : findCalendarByFeedToken(db.get(), req.params.token);
+    if (!userId && !localCalendar) return res.status(404).type('text/plain').send('Not found');
+    const ics = userId
+      ? icsExport.buildFeed(db.get(), userId)
+      : icsExport.buildCalendarFeed(db.get(), localCalendar.id);
     res.set('Cache-Control', 'private, no-store');
-    res.set('Content-Disposition', 'inline; filename="yuvomi.ics"');
+    res.set('Content-Disposition', `inline; filename="${localCalendar ? `yuvomi-${localCalendar.id}.ics` : 'yuvomi.ics'}"`);
     res.type('text/calendar; charset=utf-8').send(ics);
   } catch (err) {
     log.error('', err);

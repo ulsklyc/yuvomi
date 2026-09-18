@@ -8695,6 +8695,74 @@ const MIGRATIONS = [
       END;
     `,
   },
+  {
+    version: 218,
+    description: 'Calendar: first-class local calendars with per-calendar feeds',
+    up(db) {
+      const tableExists = db.prepare(`
+        SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'local_calendars'
+      `).get();
+      if (!tableExists) {
+        db.exec(`
+          CREATE TABLE local_calendars (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT    NOT NULL,
+            color       TEXT    NOT NULL DEFAULT '#007AFF',
+            is_default  INTEGER NOT NULL DEFAULT 0 CHECK(is_default IN (0,1)),
+            sort_order  INTEGER NOT NULL DEFAULT 0,
+            feed_token  TEXT UNIQUE,
+            created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+            updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+          );
+          CREATE UNIQUE INDEX idx_local_calendars_default
+            ON local_calendars(is_default) WHERE is_default = 1;
+          CREATE UNIQUE INDEX idx_local_calendars_feed_token
+            ON local_calendars(feed_token) WHERE feed_token IS NOT NULL;
+          CREATE INDEX idx_local_calendars_sort ON local_calendars(sort_order, name);
+          CREATE TRIGGER trg_local_calendars_updated_at
+            AFTER UPDATE ON local_calendars FOR EACH ROW
+            BEGIN UPDATE local_calendars SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+        `);
+      }
+
+      const columns = new Set(db.prepare('PRAGMA table_info(calendar_events)').all().map((c) => c.name));
+      if (!columns.has('local_calendar_id')) {
+        db.exec(`
+          ALTER TABLE calendar_events ADD COLUMN local_calendar_id INTEGER
+            REFERENCES local_calendars(id) ON DELETE SET NULL;
+          CREATE INDEX IF NOT EXISTS idx_calendar_local_calendar ON calendar_events(local_calendar_id);
+        `);
+      }
+
+      const defaultRow = db.prepare(`
+        SELECT id FROM local_calendars WHERE is_default = 1 ORDER BY id LIMIT 1
+      `).get();
+      let defaultId = defaultRow?.id ?? null;
+      if (!defaultId) {
+        const owner = db.prepare(`
+          SELECT id FROM users
+          ORDER BY CASE WHEN role = 'admin' THEN 0 ELSE 1 END, id
+          LIMIT 1
+        `).get();
+        defaultId = db.prepare(`
+          INSERT INTO local_calendars (name, color, is_default, sort_order, created_by)
+          VALUES ('Calendar', '#007AFF', 1, 0, ?)
+        `).run(owner?.id ?? null).lastInsertRowid;
+      }
+
+      db.prepare(`
+        UPDATE calendar_events
+        SET local_calendar_id = NULL
+        WHERE external_source <> 'local'
+      `).run();
+      db.prepare(`
+        UPDATE calendar_events
+        SET local_calendar_id = ?
+        WHERE external_source = 'local' AND local_calendar_id IS NULL
+      `).run(defaultId);
+    },
+  },
 ];
 
 /**

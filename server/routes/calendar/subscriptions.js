@@ -9,6 +9,7 @@ import * as icsSubscription from '../../services/ics-subscription.js';
 import { color } from '../../middleware/validate.js';
 import { ICS_COLOR_RE, getUserId, isAdminUser } from './helpers.js';
 import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
+import { validateCalendarId } from '../../services/local-calendars.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
@@ -178,9 +179,11 @@ router.post('/import', async (req, res) => {
       if (vColor.error) return res.status(400).json({ error: vColor.error, code: 400 });
       vColorValue = vColor.value;
     }
+    const vLocalCalendar = validateCalendarId(db.get(), req.body.local_calendar_id, { fallbackDefault: true });
+    if (vLocalCalendar.error) return res.status(400).json({ error: vLocalCalendar.error, code: 400 });
 
     const result = await icsSubscription.importToLocal(userId, {
-      ics, url, color: vColorValue,
+      ics, url, color: vColorValue, localCalendarId: vLocalCalendar.value,
     });
     res.status(201).json({ data: result });
   } catch (err) {

@@ -251,6 +251,7 @@
     "test:rrule-ui": "node --loader ./test/test-browser-loader.mjs --test test/test-rrule-ui.js",
     "test:calendar-defaults": "node --experimental-sqlite --test test/test-calendar-defaults.js",
     "test:calendar-routes": "node --experimental-sqlite --test test/test-calendar-routes.js",
+    "test:calendar-local-calendars": "node --experimental-sqlite --test test/test-calendar-local-calendars.js",
     "test:calendar-inherited-color": "node --experimental-sqlite --test test/test-calendar-inherited-color.js",
     "test:calendar-structure": "node --experimental-sqlite --test test/test-calendar-structure.js",
     "test:calendar-timezone-window": "node --loader ./test/test-browser-loader.mjs --experimental-sqlite --test test/test-calendar-timezone-window.js",

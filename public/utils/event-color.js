@@ -80,5 +80,5 @@ export function resolveEventColorOrNull(ev) {
     // nicht zugewiesener.
     return null;
   }
-  return ev.cal_color || null;
+  return ev.cal_color || ev.local_calendar_color || null;
 }
