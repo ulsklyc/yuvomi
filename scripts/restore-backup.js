@@ -42,7 +42,9 @@ try {
     console.log(
       `A write-ahead log with data lay next to the empty database file. It belongs to the database `
       + `that was there before and can hold changes that exist nowhere else, so it was not deleted: `
-      + `it is kept at ${result.keptJournalPath} (with its -shm, if there was one).`
+      + `it is kept at ${result.keptJournalPath} (with its -shm next to it, if there was one). `
+      + `The name is deliberate: under the usual -wal name next to the empty copy, SQLite would `
+      + `discard the log the first time the copy is opened.`
     );
   }
   process.exit(0);

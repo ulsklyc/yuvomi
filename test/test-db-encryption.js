@@ -1578,6 +1578,13 @@ function rollbackAusAusgabe(stdout) {
   return treffer[1];
 }
 
+/** Der Ort, an dem das CLI das aufbewahrte Journal nennt. */
+function journalAusAusgabe(stdout) {
+  const treffer = /it is kept at (\S+) \(/.exec(stdout);
+  assert.ok(treffer, `das CLI muss den Ort des Journals nennen: ${stdout}`);
+  return treffer[1];
+}
+
 /**
  * Ein Backup, das `validateBackupFile()` besteht (Tabelle `schema_migrations`,
  * nur bekannte Versionen) und erst nach dem Kopieren scheitert: die Migrationen
@@ -1638,7 +1645,8 @@ for (const [fall, key] of SCHLUESSEL_FAELLE) {
 
   test(`#1282 CLI-Restore auf die leere Datei MIT Journal (${fall}): das Journal liegt Byte fuer Byte neben der Rollback-Kopie`, async () => {
     const backup = await originalMitMarker(key, 'aus-dem-backup');
-    const ziel = join(tmpDir(), 'yuvomi.db');
+    const dir = tmpDir();
+    const ziel = join(dir, 'yuvomi.db');
     await journalDerVorherigen(ziel, key);
     writeFileSync(ziel, '');
     const walVorher = sha256(`${ziel}-wal`);
@@ -1647,13 +1655,29 @@ for (const [fall, key] of SCHLUESSEL_FAELLE) {
     const run = cliRestore(backup, { dbPath: ziel, key });
     assert.equal(run.status, 0, `der Restore muss gelingen: ${run.stderr}`);
     const rollback = rollbackAusAusgabe(run.stdout);
+    const journal = journalAusAusgabe(run.stdout);
     assert.equal(
-      existsSync(`${rollback}-wal`) && sha256(`${rollback}-wal`),
+      existsSync(journal) && sha256(journal),
       walVorher,
-      'das Journal der vorherigen Datenbank darf nicht geloescht werden - es liegt neben der Rollback-Kopie'
+      'das Journal der vorherigen Datenbank darf nicht geloescht werden - es liegt dort, wo das CLI es nennt'
     );
-    assert.equal(existsSync(`${rollback}-shm`) && sha256(`${rollback}-shm`), shmVorher, 'samt -shm');
-    assert.ok(run.stdout.includes(`it is kept at ${rollback}-wal`), `das CLI nennt den Ort: ${run.stdout}`);
+    assert.equal(groesse(rollback), 0, 'Vorbedingung: die Rollback-Kopie daneben ist die leere Datei');
+
+    // Der naheliegende naechste Schritt: die Rollback-Kopie ansehen, wie ein
+    // Betreiber es mit `sqlite3 <kopie>` taete. SQLite verwirft ein `-wal`
+    // neben einer leeren Hauptdatei beim ersten Lesen (siehe oben) - unter
+    // seinem ueblichen Namen daneben waere das aufbewahrte Journal damit weg.
+    const ansehen = new Database(rollback);
+    ansehen.prepare('SELECT count(*) AS n FROM sqlite_master').get();
+    ansehen.close();
+    assert.equal(
+      existsSync(journal) && sha256(journal),
+      walVorher,
+      'die Rollback-Kopie zu oeffnen darf das aufbewahrte Journal nicht verwerfen'
+    );
+    const shm = readdirSync(dir).filter((name) => name.includes('pre-restore') && name.includes('shm'));
+    assert.equal(shm.length, 1, `samt -shm daneben: ${shm}`);
+    assert.equal(sha256(join(dir, shm[0])), shmVorher, 'das -shm Byte fuer Byte');
 
     const mod = await bootDb(ziel, key);
     assert.equal(
@@ -1688,7 +1712,11 @@ for (const [fall, key] of SCHLUESSEL_FAELLE) {
       'das Journal liegt wieder dort, wo die Meldung es nennt'
     );
     assert.equal(existsSync(`${ziel}-shm`) && sha256(`${ziel}-shm`), shmVorher, 'samt -shm');
-    assert.ok(!existsSync(join(dir, `${rollbacks[0]}-wal`)), 'und nicht mehr neben der Rollback-Kopie');
+    assert.deepEqual(
+      readdirSync(dir).filter((name) => name.startsWith(rollbacks[0]) && name !== rollbacks[0]),
+      [],
+      'und nichts mehr neben der Rollback-Kopie, unter keinem Namen'
+    );
     await assert.rejects(
       () => bootDb(ziel, key),
       /A write-ahead log with data lies next to it/,
@@ -1717,7 +1745,7 @@ for (const [fall, key] of SCHLUESSEL_FAELLE) {
     assert.equal(run.status, 0, `der Restore muss gelingen: ${run.stderr}`);
     const rollback = rollbackAusAusgabe(run.stdout);
     assert.ok(!/write-ahead log/.test(run.stdout), 'eine offene Datenbank ist gecheckpointet, ihr Journal nicht aufbewahrt');
-    assert.ok(!existsSync(`${rollback}-wal`), 'die Rollback-Kopie steht ohne Journal da');
+    assert.ok(!existsSync(`${rollback}-wal`) && !existsSync(`${rollback}.wal-kept`), 'die Rollback-Kopie steht ohne Journal da');
     assert.equal(
       marker(await bootDb(rollback, key)),
       'vor-dem-restore',

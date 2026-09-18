@@ -9336,6 +9336,15 @@ async function renameIfExists(from, to) {
   }
 }
 
+/**
+ * Wohin `restoreFromFile()` das Journal einer leeren Datei legt: neben die
+ * Rollback-Kopie, aber unter einem Namen, den SQLite nicht von selbst aufgreift
+ * (`<kopie>.wal-kept`, nicht `<kopie>-wal`).
+ */
+function keptJournalName(rollbackPath, kind) {
+  return `${rollbackPath}.${kind}-kept`;
+}
+
 async function restoreFromFile(sourcePath) {
   const backupVersion = validateBackupFile(sourcePath);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -9368,10 +9377,15 @@ async function restoreFromFile(sourcePath) {
     // lag, und kann Änderungen tragen, die nirgends sonst stehen - die Meldung
     // aus `emptyDatabaseFileError()` sagt „keep them". Also nicht löschen,
     // sondern neben die Rollback-Kopie legen, wohin es als Vorgänger gehört.
+    //
+    // NICHT unter `-wal`: die Rollback-Kopie ist hier selbst die leere Datei,
+    // und SQLite verwirft ein `-wal` neben einer leeren Hauptdatei beim ersten
+    // Lesen. Wer die Kopie ansieht (`sqlite3 <kopie>`, der naheliegende
+    // nächste Schritt), vernichtete sonst genau das, was hier bewahrt wird.
     if (!wasOpen && regularFileSize(`${DB_PATH}-wal`) > 0) {
-      await fs.rename(`${DB_PATH}-wal`, `${rollbackPath}-wal`);
-      keptJournalPath = `${rollbackPath}-wal`;
-      await renameIfExists(`${DB_PATH}-shm`, `${rollbackPath}-shm`);
+      await fs.rename(`${DB_PATH}-wal`, keptJournalName(rollbackPath, 'wal'));
+      keptJournalPath = keptJournalName(rollbackPath, 'wal');
+      await renameIfExists(`${DB_PATH}-shm`, keptJournalName(rollbackPath, 'shm'));
     }
     await unlinkIfExists(`${DB_PATH}-wal`);
     await unlinkIfExists(`${DB_PATH}-shm`);
@@ -9404,8 +9418,8 @@ async function restoreFromFile(sourcePath) {
         if (keptJournalPath) {
           // Der Rollback stellt den Stand vor dem Restore her: das Journal
           // gehört wieder neben die (leere) Datei, an der die Meldung es nennt.
-          await renameIfExists(`${rollbackPath}-wal`, `${DB_PATH}-wal`);
-          await renameIfExists(`${rollbackPath}-shm`, `${DB_PATH}-shm`);
+          await renameIfExists(keptJournalName(rollbackPath, 'wal'), `${DB_PATH}-wal`);
+          await renameIfExists(keptJournalName(rollbackPath, 'shm'), `${DB_PATH}-shm`);
         }
         try {
           init({ plaintextBackup: false });
