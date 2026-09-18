@@ -84,6 +84,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An empty database file no longer starts Yuvomi as an empty instance.** If the database file
+  existed but had a size of zero, Yuvomi took it for a new database, set it up from scratch and came
+  up empty, without a word - usually in the very moment somebody was moving data, where that looks
+  as if everything is gone. A new installation has no database file at all, so an empty one is left
+  behind by a copy or restore that failed or stopped short, or by a very first start that was
+  stopped before it had written anything. Yuvomi now refuses to start, leaves the file as it is and
+  says what to do in either case: copy the database again and compare its size and checksum with
+  the original, or delete the empty file for a fresh start. A write-ahead log (`-wal`) lying next to
+  an empty file used to be deleted by that start as well; it is now left alone, and the message asks
+  you to move it aside before either step, because it belongs to the database that was there before
+  and would otherwise be read together with the file you copy back in. The same check covers the
+  old file name `oikos.db`. A missing database file still means a fresh installation, as before.
+  (#1282)
+
 - **The "n" shortcut no longer opens a create dialog on a page you may only read.** Where your
   access to a module is "read", the create button is hidden, but the keyboard shortcut still pressed
   it: the dialog for a new entry opened anyway, and saving it ended in an error. The shortcut now

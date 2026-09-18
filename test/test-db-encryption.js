@@ -21,7 +21,7 @@
 
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, existsSync, readFileSync, readdirSync, copyFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdtempSync, existsSync, readFileSync, readdirSync, copyFileSync, writeFileSync, chmodSync, rmSync, renameSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -1267,4 +1267,278 @@ for (const [fall, key] of [['mit Schluessel', KEY], ['ohne Schluessel', null]]) 
       }
     }
   );
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * #1282: eine vorhandene, LEERE Datenbankdatei ist ein Startabbruch.
+ *
+ * SQLite nimmt eine 0-Byte-Datei als neue Datenbank; `init()` hat daraus still
+ * eine frische Instanz gemacht - gemessen mit und ohne Key. Eine frische
+ * Installation hat aber gar keine Datei, und `journal_mode = WAL` schreibt
+ * Seite 1 in die Hauptdatei, bevor es ein `-wal` gibt. Leer ist die Datei nach
+ * einer abgebrochenen Kopie oder nach einem Erststart, der vor Seite 1 getoetet
+ * wurde (mit Key ~150 ms Schluesselableitung; gemessen bleibt dann genau eine
+ * 0-Byte-Datei ohne Nebendatei zurueck - derselbe Zustand wie hier gebaut).
+ *
+ * Das `-wal` neben einer leeren Datei ist KEINE Ausnahme: gemessen loescht
+ * SQLite es beim ersten Lesen und startet leer. Die Verweigerung schuetzt es
+ * also mit, und der Rat muss es beiseitelegen lassen - neu kopiert und mit dem
+ * alten Journal daneben startete die Instanz ohne Key still mit den ALTEN
+ * Daten, mit Key mit „Wrong encryption key" (#1267).
+ *
+ * Jeder Rat der Meldung wird auf demselben Stand befolgt; erst der Start danach
+ * zeigt, ob er traegt. Beide Richtungen laufen mit und ohne Key.
+ * ---------------------------------------------------------------------------
+ */
+
+const SCHLUESSEL_FAELLE = [['ohne Schluessel', null], ['mit Schluessel', KEY]];
+
+/** Groesse in Byte, `null` wenn die Datei fehlt. */
+function groesse(filePath) {
+  return existsSync(filePath) ? statSync(filePath).size : null;
+}
+
+/** Das „Original", das kopiert wird: ein echtes Backup einer Instanz, mit Marker. */
+async function originalMitMarker(key, note) {
+  const dir = tmpDir();
+  const mod = await bootDb(join(dir, 'quelle.db'), key);
+  mod.get().exec('CREATE TABLE marker_1282 (note TEXT)');
+  mod.get().prepare('INSERT INTO marker_1282 VALUES (?)').run(note);
+  const original = join(dir, 'original.db');
+  await mod.backupToFile(original);
+  mod.get().close();
+  return original;
+}
+
+/** Marker der Datenbank, `null` wenn es die Tabelle nicht gibt (frische Instanz). */
+function marker(mod) {
+  const hatTabelle = mod.get()
+    .prepare("SELECT count(*) AS c FROM sqlite_master WHERE name = 'marker_1282'").get().c;
+  return hatTabelle ? mod.get().prepare('SELECT note FROM marker_1282').get()?.note : null;
+}
+
+function istFrischeInstanz(mod, dbPath, key, fall) {
+  const neueste = Math.max(...mod.MIGRATIONS.map((m) => m.version));
+  assert.equal(mod.currentVersion(), neueste, `${fall}: alle Migrationen muessen gelaufen sein`);
+  assert.equal(marker(mod), null, `${fall}: eine frische Instanz hat keine Bestandsdaten`);
+  assert.ok(groesse(dbPath) > 0, `${fall}: die Datei muss jetzt beschrieben sein`);
+  assert.equal(isPlaintext(dbPath), key === null, `${fall}: verschluesselt genau dann, wenn ein Key gesetzt ist`);
+}
+
+/**
+ * Journal einer Datenbank, die vorher an `zielPfad` lief und nicht sauber
+ * gestoppt wurde - `-wal` und `-shm`, Byte fuer Byte wie sie liegen bleiben.
+ */
+async function journalDerVorherigen(zielPfad, key) {
+  const dir = tmpDir();
+  const vorher = await bootDb(join(dir, 'vorher.db'), key);
+  vorher.get().exec('CREATE TABLE marker_1282 (note TEXT)');
+  vorher.get().prepare('INSERT INTO marker_1282 VALUES (?)').run('vorherige-datenbank');
+  // Bewusst waehrend die Verbindung offen ist: close() checkpointet und raeumt das Journal weg.
+  copyFileSync(join(dir, 'vorher.db-wal'), `${zielPfad}-wal`);
+  copyFileSync(join(dir, 'vorher.db-shm'), `${zielPfad}-shm`);
+  vorher.get().close();
+  assert.ok(groesse(`${zielPfad}-wal`) > 0, 'Vorbedingung: das Journal traegt Daten');
+}
+
+/** Rat befolgen: `-wal` und `-shm` beiseitelegen, nicht loeschen. */
+function journalBeiseite(dbPath) {
+  const ablage = tmpDir();
+  for (const suffix of ['-wal', '-shm']) {
+    if (existsSync(`${dbPath}${suffix}`)) renameSync(`${dbPath}${suffix}`, join(ablage, `beiseite${suffix}`));
+  }
+  return join(ablage, 'beiseite-wal');
+}
+
+for (const [fall, key] of SCHLUESSEL_FAELLE) {
+  test(`#1282 leere Datei ohne Journal (${fall}): der Start bricht ab und schreibt nichts hinein`, async () => {
+    const dir = tmpDir();
+    const leer = join(dir, 'yuvomi.db');
+    writeFileSync(leer, '');
+
+    await assert.rejects(
+      () => bootDb(leer, key),
+      (err) => {
+        assert.ok(
+          err.message.startsWith(`[DB] ${leer} exists but is empty (0 bytes).`),
+          'die Meldung muss die Datei und den Befund nennen'
+        );
+        assert.ok(
+          err.message.includes(`copy it again from the original and compare the size and sha256sum of ${leer} with the original`),
+          'Fall a: Kopie oder Restore abgebrochen - neu kopieren und gegen das Original pruefen'
+        );
+        assert.ok(err.message.includes(`delete ${leer} and start again`), 'Fall b: bewusst frisch - die leere Datei loeschen');
+        assert.match(
+          err.message,
+          /the first start of a new installation was interrupted/,
+          'der abgebrochene Erststart hinterlaesst dieselbe Datei und gehoert in Fall b'
+        );
+        assert.ok(!/write-ahead log/.test(err.message), 'ohne Journal darf die Meldung keines erfinden');
+        assert.ok(!/before the rename/.test(err.message), 'ohne Legacy-Datei kein Absatz dazu');
+        assert.ok(!/[\u2013\u2014]/.test(err.message), 'kein Em- oder En-Dash');
+        return true;
+      },
+      'eine leere Datei darf nicht still zur frischen Instanz werden'
+    );
+
+    assert.equal(groesse(leer), 0, 'die Datei muss danach unveraendert 0 Byte haben');
+    assert.deepEqual(readdirSync(dir), ['yuvomi.db'], 'und es darf keine Nebendatei entstanden sein');
+  });
+
+  test(`#1282 Rat „neu kopieren" befolgt (${fall}): der Start gelingt mit den Daten des Originals`, async () => {
+    const original = await originalMitMarker(key, 'original');
+    const ziel = join(tmpDir(), 'yuvomi.db');
+    writeFileSync(ziel, ''); // `cp` auf eine volle Platte
+    await assert.rejects(() => bootDb(ziel, key), /exists but is empty/, 'Vorbedingung: die leere Kopie wird abgewiesen');
+
+    copyFileSync(original, ziel);
+    assert.equal(sha256(ziel), sha256(original), 'die Probe aus der Meldung: Pruefsumme wie das Original');
+    const mod = await bootDb(ziel, key);
+    assert.equal(marker(mod), 'original', 'nach dem erneuten Kopieren muss die Instanz mit den Daten starten');
+  });
+
+  test(`#1282 Rat „leere Datei loeschen" befolgt (${fall}): der Start gelingt als frische Instanz`, async () => {
+    const leer = join(tmpDir(), 'yuvomi.db');
+    writeFileSync(leer, '');
+    await assert.rejects(() => bootDb(leer, key), /exists but is empty/, 'Vorbedingung: die leere Datei wird abgewiesen');
+
+    rmSync(leer);
+    const mod = await bootDb(leer, key);
+    istFrischeInstanz(mod, leer, key, 'nach dem Loeschen');
+  });
+
+  test(`#1282 leere Datei MIT Journal (${fall}): der Start bricht ab, das Journal bleibt Byte fuer Byte liegen`, async () => {
+    const original = await originalMitMarker(key, 'original');
+    const ziel = join(tmpDir(), 'yuvomi.db');
+    await journalDerVorherigen(ziel, key);
+    writeFileSync(ziel, '');
+    const journalVorher = sha256(`${ziel}-wal`);
+
+    await assert.rejects(
+      () => bootDb(ziel, key),
+      (err) => {
+        assert.match(err.message, /exists but is empty \(0 bytes\)/, 'derselbe Abbruch wie ohne Journal');
+        assert.ok(
+          err.message.includes(`A write-ahead log with data lies next to it (${ziel}-wal)`),
+          'das Journal muss genannt werden - es ist nur hier zu sehen'
+        );
+        assert.ok(
+          err.message.includes(`move ${ziel}-wal and ${ziel}-shm aside and keep them - do not delete them`),
+          'der Rat muss es beiseitelegen lassen, nicht loeschen'
+        );
+        assert.match(err.message, /Before either step above/, 'und zwar vor BEIDEN Schritten');
+        return true;
+      },
+      'ein Journal neben einer leeren Datei ist keine Ausnahme von der Verweigerung'
+    );
+
+    assert.equal(groesse(ziel), 0, 'die Hauptdatei bleibt 0 Byte');
+    assert.equal(
+      sha256(`${ziel}-wal`),
+      journalVorher,
+      'das Journal muss unveraendert liegen bleiben - SQLite loescht es beim Oeffnen einer leeren Datei'
+    );
+
+    // Den Rat befolgen: Journal beiseite, Original neu kopieren, pruefen, starten.
+    const beiseite = journalBeiseite(ziel);
+    copyFileSync(original, ziel);
+    assert.equal(sha256(ziel), sha256(original), 'die neue Kopie stimmt mit dem Original ueberein');
+    const mod = await bootDb(ziel, key);
+    assert.equal(
+      marker(mod),
+      'original',
+      'die Instanz muss mit den Daten des Originals starten, nicht mit denen aus dem fremden Journal'
+    );
+    assert.equal(sha256(beiseite), journalVorher, 'das beiseitegelegte Journal bleibt unversehrt');
+  });
+
+  test(`#1282 leere Datei MIT Journal, Rat „frisch starten" befolgt (${fall}): frische Instanz, Journal aufgehoben`, async () => {
+    const leer = join(tmpDir(), 'yuvomi.db');
+    await journalDerVorherigen(leer, key);
+    writeFileSync(leer, '');
+    const journalVorher = sha256(`${leer}-wal`);
+    await assert.rejects(() => bootDb(leer, key), /A write-ahead log with data lies next to it/, 'Vorbedingung');
+
+    const beiseite = journalBeiseite(leer);
+    rmSync(leer);
+    const mod = await bootDb(leer, key);
+    istFrischeInstanz(mod, leer, key, 'nach Beiseitelegen und Loeschen');
+    assert.equal(sha256(beiseite), journalVorher, 'das Journal ist aufgehoben, nicht verloren');
+  });
+
+  test(`#1282 fehlende Datei (${fall}): die frische Installation startet wie bisher`, async () => {
+    const dbPath = join(tmpDir(), 'yuvomi.db');
+    assert.ok(!existsSync(dbPath), 'Vorbedingung: keine Datei');
+    const mod = await bootDb(dbPath, key);
+    istFrischeInstanz(mod, dbPath, key, 'Neuinstallation');
+  });
+
+  test(`#1282 leere Legacy-oikos.db (${fall}): Abbruch, bevor die Umbenennung sie oder ihr Journal anfasst`, async () => {
+    const dir = tmpDir();
+    const legacy = join(dir, 'oikos.db');
+    const neu = join(dir, 'yuvomi.db');
+    await journalDerVorherigen(legacy, key);
+    writeFileSync(legacy, '');
+    const journalVorher = sha256(`${legacy}-wal`);
+
+    await assert.rejects(
+      () => bootDb(legacy, key),
+      (err) => {
+        assert.ok(
+          err.message.startsWith(`[DB] ${legacy} exists but is empty (0 bytes).`),
+          'die Meldung muss die Datei nennen, die wirklich leer ist - nicht den neuen Namen'
+        );
+        assert.ok(err.message.includes(`delete ${legacy} and start again`), 'der Rat gilt fuer diese Datei');
+        assert.ok(err.message.includes(`(${legacy}-wal)`), 'und ihr Journal');
+        return true;
+      },
+      'die Legacy-Migration darf eine leere oikos.db nicht still uebernehmen'
+    );
+
+    assert.equal(groesse(legacy), 0, 'oikos.db bleibt, wie sie war');
+    assert.ok(!existsSync(neu), 'und wird nicht umbenannt');
+    assert.equal(sha256(`${legacy}-wal`), journalVorher, 'ihr Journal ist unberuehrt');
+
+    // Den Rat befolgen: Journal beiseite, leere Datei loeschen - eine frische Instanz entsteht.
+    journalBeiseite(legacy);
+    rmSync(legacy);
+    const mod = await bootDb(legacy, key);
+    istFrischeInstanz(mod, neu, key, 'nach dem Loeschen der leeren oikos.db');
+  });
+
+  test(`#1282 leere yuvomi.db neben voller oikos.db (${fall}): die Meldung sagt, wohin „loeschen" fuehrt`, async () => {
+    const dir = tmpDir();
+    const legacy = join(dir, 'oikos.db');
+    const neu = join(dir, 'yuvomi.db');
+    copyFileSync(await originalMitMarker(key, 'aus-oikos'), legacy);
+    writeFileSync(neu, '');
+    const legacyVorher = sha256(legacy);
+
+    await assert.rejects(
+      () => bootDb(legacy, key),
+      (err) => {
+        assert.ok(err.message.startsWith(`[DB] ${neu} exists but is empty (0 bytes).`), 'die leere Datei ist yuvomi.db');
+        assert.ok(
+          err.message.includes(`An older database file from before the rename lies next to it (${legacy})`),
+          'die Legacy-Datei muss genannt werden, wenn sie Daten hat'
+        );
+        assert.match(
+          err.message,
+          /Deleting the empty yuvomi\.db does not give you a new instance then/,
+          'sonst verspraeche „loeschen" eine frische Instanz und lieferte die alten Daten'
+        );
+        return true;
+      },
+      'bisher startete Yuvomi hier leer auf yuvomi.db und liess oikos.db liegen'
+    );
+    assert.equal(groesse(neu), 0, 'yuvomi.db bleibt 0 Byte');
+    assert.equal(sha256(legacy), legacyVorher, 'oikos.db ist unberuehrt');
+
+    // Den Rat befolgen: die leere yuvomi.db loeschen - der naechste Start zieht oikos.db um.
+    rmSync(neu);
+    const mod = await bootDb(legacy, key);
+    assert.equal(marker(mod), 'aus-oikos', 'wie angekuendigt: die Daten aus oikos.db');
+    assert.ok(!existsSync(legacy), 'oikos.db ist nach yuvomi.db umgezogen');
+  });
 }
