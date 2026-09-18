@@ -83,11 +83,29 @@ const { __test: calendar } = await import('../public/pages/calendar.js');
 /** Ein Modul auf 'read' stellen und danach wieder aufräumen. */
 function withAccess(modules, fn) {
   setPermissions({ admin: false, modules, widgets: {}, capabilities: {} });
+  // EIN `finally` UM EIN PROMISE HERUM FEUERT AM ERSTEN `await`, NICHT AM ENDE.
+  // Die rund vierzig Tests oben sind synchron, fuer sie aendert der Zweig
+  // nichts. Der Erinnerungs-Abschnitt unten faehrt aber einen async Handler:
+  // dort raeumte `clearPermissions()` die Rechte weg, sobald der Handler das
+  // erste Mal wartete, und alles danach las wieder den fail-open-Standard
+  // `write`. Nachgemessen am echten Helfer: vor dem await `calendar = read`,
+  // danach `calendar = write`.
+  //
+  // Heute faellt darauf keine Zusicherung herein, weil jede rechte-abhaengige
+  // Entscheidung vor dem ersten await getroffen und gemerkt wird. Das ist
+  // Glueck, keine Zusage - und weil der Standard fail-OPEN ist, waere ein
+  // spaeteres Nachlesen still zu `write` geworden statt rot. Der naechste
+  // async Test erbte die Falle ohne das Glueck.
+  let ergebnis;
   try {
-    return fn();
-  } finally {
+    ergebnis = fn();
+  } catch (err) {
     clearPermissions();
+    throw err;
   }
+  if (typeof ergebnis?.then === 'function') return ergebnis.finally(() => clearPermissions());
+  clearPermissions();
+  return ergebnis;
 }
 
 const mitglied = (over = {}) => ({ id: 3, display_name: 'Emma', balance: 120, ...over });
@@ -800,6 +818,23 @@ test('die Ausnahmen vom Modulrecht stehen am Server, und es sind genau zwei Sort
  * diese Zeile ausschliessen soll. Nachgemessen: ohne `TZ=` meldet Intl
  * "Europe/Berlin" und `process.env.TZ` ist undefined.
  */
+// Der Abschnitt hier ist der EINZIGE, der einen async Handler faehrt - alles
+// oben ist synchron. Damit haengt er als einziger daran, dass `withAccess()`
+// die Rechte auch ueber ein `await` haelt. Diese Zeile misst genau das, statt
+// es dem Helfer zu glauben: ohne den Promise-Zweig dort steht nach dem ersten
+// await wieder der fail-open-Standard `write`, und jede rechte-abhaengige
+// Entscheidung NACH einem await waere still falsch statt rot.
+test('withAccess haelt die Rechte auch ueber ein await', async () => {
+  const gemessen = [];
+  await withAccess({ tasks: 'write', calendar: 'read' }, async () => {
+    gemessen.push(tasks.reminderAccess());
+    await Promise.resolve();
+    gemessen.push(tasks.reminderAccess());
+  });
+  assert.deepEqual(gemessen, ['read', 'read'], 'vor UND nach dem await');
+  assert.equal(tasks.reminderAccess(), 'write', 'und danach ist wieder aufgeraeumt (fail-open)');
+});
+
 test('die Erinnerungs-Tests laufen in der Zone, auf die ihre Zeitpunkte festgenagelt sind', () => {
   assert.equal(
     process.env.TZ,
@@ -1165,6 +1200,50 @@ test('calendar: read darf das Faelligkeitsdatum WECHSELN - das bricht die Regel 
   const put = calls.find((c) => c.method === 'put' && c.path === '/tasks/7');
   assert.equal(put?.body?.due_date, '2026-11-15', 'das neue Datum geht durch');
   assert.deepEqual(erinnerungsAufrufe(calls), [], 'die Erinnerung bleibt unangetastet');
+});
+
+// DIE PRAEMISSE, AUF DER DER GANZE `read`-ZWEIG STEHT: dass `GET /reminders`
+// fuer `calendar: read` durchgeht und der angezeigte Wert deshalb WIRKLICH da
+// ist und nicht geraten. Der Satz stand dreimal in Prosa und nirgends als
+// Zusicherung. Was das kostet, ist gemessen: aendert man in
+// `loadReminderForTask()` das `=== 'none'` zu `!== 'write'`, bekommt ein
+// `read`-Mitglied nie eine Erinnerung, `renderReminderSection` nimmt dann immer
+// den `(read && !reminder) -> ''`-Ausgang, und der gesamte gesperrte Abschnitt
+// ist produktiv toter Code - bei 51 von 51 gruenen Tests. Dasselbe beim
+// ersatzlosen Loeschen der Zeile (dann nur ein 403 je Dialog).
+async function ladenUndAufrufeSammeln(access) {
+  const calls = [];
+  globalThis.__apiStub = {
+    get: async (path) => {
+      calls.push(path);
+      if (access === 'none') throw new Error('403');
+      return { data: { id: 3, entity_type: 'task', entity_id: 7, remind_at: '2026-09-30T23:59:59' } };
+    },
+  };
+  try {
+    const reminder = await withAccess({ tasks: 'write', calendar: access }, () => tasks.loadReminderForTask(7));
+    return { calls, reminder };
+  } finally {
+    delete globalThis.__apiStub;
+  }
+}
+
+test('calendar: read holt die Erinnerung wirklich - darauf steht der ganze gesperrte Zweig', async () => {
+  const { calls, reminder } = await ladenUndAufrufeSammeln('read');
+  assert.deepEqual(calls, ['/reminders?entity_type=task&entity_id=7'], 'genau eine Anfrage, und zwar diese');
+  assert.equal(reminder?.remind_at, '2026-09-30T23:59:59', 'der Wert kommt an und wird nicht verworfen');
+});
+
+test('calendar: write holt sie genauso', async () => {
+  const { calls, reminder } = await ladenUndAufrufeSammeln('write');
+  assert.equal(calls.length, 1);
+  assert.ok(reminder, 'mit Schreibrecht erst recht');
+});
+
+test('calendar: none fragt gar nicht erst - der 403 waere die einzige Antwort', async () => {
+  const { calls, reminder } = await ladenUndAufrufeSammeln('none');
+  assert.deepEqual(calls, [], 'keine Anfrage, die nur ein 403 holen kann');
+  assert.equal(reminder, null);
 });
 
 // DIE NAHT ZWISCHEN DEN ZWEI HAELFTEN. Der Riegel im Speichern liest die

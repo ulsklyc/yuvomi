@@ -4426,4 +4426,9 @@ export const __test = {
   // entscheidet, ob eine Anfrage rausgeht. Ein Textguard kann das nicht sehen:
   // er liest den Aufruf, nicht das Ausbleiben. Deshalb steht der Handler hier.
   handleFormSubmit, reminderAccess,
+  // Der Lader steht hier, weil die PRAEMISSE des gesperrten Zweigs an ihm
+  // haengt: dass `calendar: read` die Erinnerung wirklich bekommt. War das nur
+  // Prosa, liess sich das `none` still zu `!== write` verengen und der ganze
+  // Abschnitt war toter Code, ohne dass ein Test rot wurde.
+  loadReminderForTask,
 };
