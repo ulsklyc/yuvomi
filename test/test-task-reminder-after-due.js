@@ -366,3 +366,25 @@ test('ein gesperrter Abschnitt wird auch vom Datumswechsel nicht angefasst', () 
   assert.equal(panel.nodes['#reminder-custom-amount'].value, '1', 'und die Felder darunter auch');
   assert.equal(panel.nodes['#reminder-after-due-warning'].hidden, false, 'der Warnton bleibt, wie er gespeichert ist');
 });
+
+test('ein halb getipptes Datum ist kein Datum - der Verlass, auf dem der input-Listener ruht', async () => {
+  // Der Listener feuert bei JEDEM Tastendruck, und die Umstellung ist eine
+  // Einbahnstrasse: was einmal geheilt ist, bleibt beim gezeigten Vorlauf.
+  // Ginge ein Zwischenstand wie „2026-09-1" als gueltiges Datum durch,
+  // schriebe schon das Tippen einen Vorlauf fest, den niemand gemeint hat -
+  // und der naechste Tastendruck koennte ihn nicht zuruecknehmen.
+  //
+  // GEPRUEFT WIRD DIE ECHTE FUNKTION, NICHT DER WEG DURCH DEN LISTENER. Der
+  // Browser-Loader ersetzt `/i18n.js` durch einen Stub, dessen
+  // `parseDateInput` jede Eingabe unveraendert durchreicht - ein Test ueber
+  // den Listener pruefte also den Stub und waere gruen, egal was die echte
+  // Funktion tut. Der relative Import unten umgeht den Stub.
+  const { parseDateInput } = await import('../public/i18n.js');
+  for (const typed of ['2', '20', '202', '2026', '2026-', '2026-0', '2026-09', '2026-09-', '2026-09-1']) {
+    assert.equal(parseDateInput(typed), '', `„${typed}" ist noch kein Datum`);
+  }
+  assert.equal(parseDateInput('2026-09-26'), '2026-09-26', 'erst das vollstaendige Datum zaehlt');
+  // Und ein leeres Datum stellt nichts um - das ist die Seite, die der
+  // Listener davon sieht.
+  assert.equal(tasks.afterDueResolution('offset_after_due', { dueDate: '', storedRemindAt: AFTER_DUE.remind_at }), null);
+});
