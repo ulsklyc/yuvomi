@@ -137,7 +137,17 @@ const STUBS = {
     export const forgetRestore = () => {};
   `,
   '/components/detail-view.js': `
-    export const openDetailView = () => ({ update: () => true, isOpen: () => true });
+    // Tests, die pruefen wollen, WELCHE Bedienelemente ein Aufrufer anbietet -
+    // die Statusknoepfe der Aufgaben-Leseansicht etwa -, setzen
+    // globalThis.__openDetailView und bekommen die Optionen in die Hand,
+    // dasselbe Muster wie __apiStub in /api.js. Ohne das bleibt es beim stummen
+    // Rueckgabewert wie bisher. Ein Guard ueber den QUELLTEXT der Ansicht
+    // taete es hier nicht: er sieht eine Aktionsliste, die gebaut wird, nicht
+    // eine, die auch bei diesem Status herauskommt.
+    export const openDetailView = (options) => {
+      globalThis.__openDetailView?.(options);
+      return { update: () => true, isOpen: () => true };
+    };
     export const closeDetailView = () => {};
     export const detailRowEl = () => null;
     export const visibilityRow = () => ({ icon: 'users', label: '', value: '' });

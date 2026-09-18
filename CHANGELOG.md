@@ -53,6 +53,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A task opened from the overview can now be completed in one step, instead of having to be
+  started first.** The reading view offered a single status button, and it moved the task one stage
+  along: an open task could only go to "in progress", and only from there to done. Completing
+  something therefore took two rounds - start it, open it again, complete it - and nothing in
+  between was visible, because the overview does not show a task's status: the row looked exactly
+  the same after the first tap, so the tap seemed to have been swallowed. On a phone this was the
+  only route to either action, since the list card hides its inline controls on narrow screens and
+  the overview opens this view rather than offering a button of its own. An open task now offers
+  Complete and Start side by side, with Complete first. Starting a task is unchanged and still
+  there - "in progress" says something about the task, it was just never meant to be a turnstile.
+  (#1251)
+
 - **Restoring a backup from another installation now says that it is the encryption key, instead of
   claiming the file is not a database.** A backup carries the encryption of the instance that wrote
   it, so restoring one on an installation with a different key - or with no key at all, which is

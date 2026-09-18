@@ -564,11 +564,16 @@ test('ohne Auswahl wird kein Bearbeiten angeboten (#918)', async () => {
 });
 test('der Status lässt sich aus der Detailansicht weiterschalten', async () => {
   const src = await taskDetailJs();
-  assert.match(src, /const NEXT_STATUS = \{/, 'die Kette open → in_progress → done ist benannt');
-  assert.match(src, /open:\s*\{ status: 'in_progress'/);
-  assert.match(src, /in_progress:\s*\{ status: 'done'/);
-  assert.match(src, /done:\s*\{ status: 'open'/);
-  assert.doesNotMatch(src, /archived:\s*\{ status:/, 'archivierte Aufgaben werden nicht weitergeschaltet');
+  // WELCHE Knoepfe bei welchem Status herauskommen, misst test:task-detail-finish
+  // am laufenden Aufruf - ein Guard ueber den Quelltext sieht eine Zuordnung,
+  // die dasteht, nicht eine, die auch greift. Hier bleibt, was daneben steht:
+  // dass es die Zuordnung ueberhaupt gibt, dass Abgelegtes nicht darin vorkommt,
+  // und dass der Schreibweg dahinter seinen Fehler zurueckrollt und meldet.
+  assert.match(src, /const STATUS_ACTIONS = \{/, 'die Statusziele sind an einer Stelle benannt');
+  assert.match(src, /status: 'in_progress'/, 'das Starten ist eines davon');
+  assert.match(src, /status: 'done'/, 'das Erledigen ebenso');
+  assert.match(src, /status: 'open'/, 'und das Zuruecknehmen');
+  assert.doesNotMatch(src, /archived:\s*\[/, 'archivierte Aufgaben werden nicht weitergeschaltet');
 
   const fn = src.slice(src.indexOf('async function advanceTaskStatus'));
   assert.match(fn, /api\.patch\(`\/tasks\/\$\{task\.id\}\/status`/, 'nutzt die bestehende Route');
