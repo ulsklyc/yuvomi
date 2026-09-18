@@ -95,6 +95,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deleting. Deleting now takes the reminders with it on the server, whichever way the item is
   deleted, and reminders left over from before are cleared once when you update.
 
+- **A task reminder that had ended up after the due date was described as being on it.** A reminder
+  is stored as a point in time, while the dialog offers lead times - "1 day before" and the like. Pull
+  a due date forward past a reminder that was already set and there is no lead time left to name, and
+  the dialog fell back on "at the due time" for it. So a reminder that would not go off until six days
+  after the task was due looked as though it went off with it. Worse, saving the task again believed
+  that description and moved the reminder to match it, without being asked. The dialog now names the
+  situation instead: the list gets an entry that says the reminder is after the due date, a warning
+  beside it spells out when it actually goes off, and saving leaves it exactly where it is. Picking a
+  lead time moves it as it always did.
+
 ### Security
 
 - **Reading the calendar no longer reaches the contact book, the sync accounts, or the sync targets.**
