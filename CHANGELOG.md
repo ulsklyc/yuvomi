@@ -84,6 +84,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Saving a change to one event of a repeating series now asks which events it is for.** Editing an
+  event of a series - adding a person, for example - used to change that one event only, unless you
+  had spotted the "Applies to" field below the repeat settings, which started on "Only this event".
+  The person then showed on that single event, and every other event of the series stayed without
+  them: a grey dot, no avatar. The field is gone. Saving now asks "Only this event", "This and
+  following" or "Whole series", with none of them picked in advance, and cancelling takes you back to
+  the form without saving anything. If nothing was changed, saving simply closes the form. A single
+  event, and a series that belongs to a synced or subscribed calendar, save as before, without the
+  question. Deleting an event of a series asks the same question with the same three buttons,
+  instead of a drop-down. A series that already has a person on one event only can be put right by
+  opening one of the events without them, picking the person and choosing "Whole series". (#1284)
+
 - **An empty database file no longer starts Yuvomi as an empty instance.** If the database file
   existed but had a size of zero, Yuvomi took it for a new database, set it up from scratch and came
   up empty, without a word - usually in the very moment somebody was moving data, where that looks

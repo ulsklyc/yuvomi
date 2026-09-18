@@ -202,6 +202,42 @@ test('confirmOverModal orchestration passes closeOnConfirm through the real susp
   assert.deepEqual(closed, [{ force: true }]);
 });
 
+test('askOverModal parkt das Formular und gibt es nach JEDER Antwort zurueck (#1284)', async () => {
+  // Die Frage nach der Reichweite eines Serientermins hat vier Ausgaenge. Das
+  // Formular darunter kommt bei allen zurueck: bei einer Wahl, weil danach noch
+  // eine Meldung an einer Zeile stehen kann, beim Abbrechen, weil es der
+  // einzige Grund ist, ueberhaupt zu fragen.
+  const suspended = { id: 'editor' };
+  const asked = [];
+  const resumed = [];
+  let answer = 'series';
+  const askOverModal = modalTest.createAskOverModal({
+    getActiveOverlay: () => ({ id: 'active-overlay' }),
+    getModalState: () => 'open',
+    suspend: () => suspended,
+    askSuspended: async (ask, token) => { asked.push(token); return ask(); },
+    resume: (token) => resumed.push(token),
+  });
+  assert.equal(await askOverModal(async () => answer), 'series');
+  answer = null;
+  assert.equal(await askOverModal(async () => answer), null);
+  assert.deepEqual(asked, [suspended, suspended]);
+  assert.deepEqual(resumed, [suspended, suspended]);
+});
+
+test('askOverModal ohne offenes Modal fragt direkt und parkt nichts', async () => {
+  for (const [overlay, state] of [[null, 'idle'], [{ id: 'closing' }, 'closing']]) {
+    const askOverModal = modalTest.createAskOverModal({
+      getActiveOverlay: () => overlay,
+      getModalState: () => state,
+      suspend: () => assert.fail('nothing to suspend'),
+      askSuspended: async () => assert.fail('no suspended path'),
+      resume: () => assert.fail('nothing to resume'),
+    });
+    assert.equal(await askOverModal(async () => 'this'), 'this');
+  }
+});
+
 test('wireBlurValidation: registriert blur-Listener auf required inputs', () => {
   const input = makeInput();
   wireBlurValidation(makeContainer([input]));

@@ -12,6 +12,7 @@
  *   closeModal({ force }) → Promise<void>
  *   confirmModal(message, opts) → Promise<boolean>       (ersetzt ein offenes Modal)
  *   confirmOverModal(message, opts) → Promise<boolean>   (parkt es und gibt es zurück)
+ *   askOverModal(ask) → Promise<Antwort>                 (dasselbe für einen eigenen Dialog)
  *
  * Nachträglich gemountete Panes (Detailansicht → Formular, detail-view.js)
  *   mountFooter(panel)             → hebt eine neu gerenderte Fußzeile ans Panel
@@ -640,12 +641,21 @@ function _resumeSuspendedModal({ overlay, id, title, titleId, snapshot, dirtyGua
  * lässt sich sein Overlay direkt nach dem Aufruf greifen.
  */
 async function _confirmOverSuspended(message, opts, suspended) {
-  const pending = confirmModal(message, opts);
+  return _askOverSuspended(() => confirmModal(message, opts), suspended);
+}
+
+/**
+ * Derselbe Ablauf für einen Dialog, den der Aufrufer selbst baut (#1284): `ask`
+ * öffnet ihn über openModal und liefert ein Promise auf die Antwort. Auch hier
+ * entsteht der Dialog synchron, also greift der Overlay-Zugriff direkt danach.
+ */
+async function _askOverSuspended(ask, suspended) {
+  const pending = ask();
   const dialogOverlay = document.getElementById('shared-modal-overlay');
   try {
-    const confirmed = await pending;
+    const answer = await pending;
     await _awaitOverlayRemoval(dialogOverlay);
-    return confirmed;
+    return answer;
   } catch (err) {
     // Ein geparktes Modal ist inert und damit unbedienbar. Scheitert der Dialog,
     // muss es zurückkommen - sonst steht die App bis zum Reload.
@@ -1640,10 +1650,49 @@ function createConfirmOverModal({
 
 export const confirmOverModal = createConfirmOverModal();
 
+/**
+ * Eine Rückfrage ÜBER einem offenen Modal, deren Dialog der Aufrufer selbst
+ * baut - für Fragen, die mehr als zwei Ausgänge haben (#1284: „Nur diesen
+ * Termin" / „Diesen und folgende" / „Ganze Serie" / Abbrechen beim Speichern
+ * eines Serientermins).
+ *
+ * Dieselbe Mechanik wie `confirmOverModal` mit `closeOnConfirm: false`: das
+ * Formular wird geparkt, `ask()` öffnet den Dialog über `openModal` und liefert
+ * ein Promise auf die Antwort, danach kommt das Formular in JEDEM Fall zurück -
+ * samt Dirty-Snapshot, Escape-Handler und Fokus auf dem auslösenden Knopf. Was
+ * mit der Antwort geschieht (speichern, eine Meldung an einem Feld zeigen,
+ * abbrechen), entscheidet der Aufrufer am wiederhergestellten Formular.
+ *
+ * Ohne offenes Modal ruft es `ask()` einfach auf.
+ *
+ * @param {() => Promise<*>} ask - öffnet den Dialog, löst zur Antwort auf
+ * @returns {Promise<*>} die Antwort von `ask`
+ */
+function createAskOverModal({
+  getActiveOverlay = () => activeOverlay,
+  getModalState = () => modalState,
+  suspend = _suspendActiveModal,
+  askSuspended = _askOverSuspended,
+  resume = _resumeSuspendedModal,
+} = {}) {
+  return async function askOverModal(ask) {
+    // Dieselbe Bedingung wie bei confirmOverModal: nur ein regulär offenes
+    // Modal lässt sich parken.
+    if (!getActiveOverlay() || getModalState() !== 'open') return ask();
+    const suspended = suspend();
+    const answer = await askSuspended(ask, suspended);
+    resume(suspended);
+    return answer;
+  };
+}
+
+export const askOverModal = createAskOverModal();
+
 /** Nur fuer Tests: Gesten und Bestaetigungen ohne echtes Panel treiben. */
 export const __test = {
   wireSheetSwipe: _wireSheetSwipe,
   createConfirmOverModal,
+  createAskOverModal,
   finishSuspendedConfirmation,
   applyInitialFocus,
 };

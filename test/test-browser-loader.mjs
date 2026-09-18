@@ -113,9 +113,18 @@ const STUBS = {
   `,
   '/components/modal.js': `
     export const openModal = (...args) => globalThis.__openModal?.(...args);
-    export const closeModal = () => {};
+    // Suiten, die pruefen wollen, OB und WANN ein Handler schliesst (das
+    // Formular bleibt nach einem Abbrechen offen), setzen globalThis.__closeModal.
+    export const closeModal = (...args) => { globalThis.__closeModal?.(...args); };
     export const confirmModal = async () => true;
     export const confirmOverModal = async (...args) => globalThis.__confirmOverModal?.(...args) ?? true;
+    // Wie das Original ohne offenes Modal: ask() oeffnet den Dialog (ueber
+    // openModal, also __openModal) und liefert die Antwort. Wer sehen will,
+    // DASS eine Frage ueber dem Formular gestellt wird statt es zu ersetzen,
+    // setzt globalThis.__askOverModal und bekommt ask in die Hand.
+    export const askOverModal = async (ask) => (
+      typeof globalThis.__askOverModal === 'function' ? globalThis.__askOverModal(ask) : ask()
+    );
     export const selectModal = async () => null;
     export const advancedSection = (inner = '') => String(inner);
     export const wireBlurValidation = () => {};
@@ -220,7 +229,9 @@ const STUBS = {
     // Tests, die das Markup einer Personen-Auswahl pruefen, setzen
     // globalThis.__renderUserMultiSelect (etwa auf die echte Komponente).
     export const renderUserMultiSelect = (...args) => globalThis.__renderUserMultiSelect?.(...args) ?? '';
-    export const getSelectedUserIds = () => [];
+    // Suiten, die einen Formular-Handler mit gewaehlten Personen FAHREN, setzen
+    // globalThis.__getSelectedUserIds; ohne das bleibt es bei niemandem.
+    export const getSelectedUserIds = (...args) => globalThis.__getSelectedUserIds?.(...args) ?? [];
     export const bindUserMultiSelect = () => {};
     export const renderAvatarStack = () => '';
   `,
