@@ -605,6 +605,31 @@ test('ohne jede Aeusserung bleibt der stille Lauf schlicht unbekannt', () => {
 });
 
 
+test('jeder stumme Grund hat einen eigenen Diagnosetext', () => {
+  // `DIAGNOSE[grund] ?? DIAGNOSE.unbekannt` faellt STILL zurueck. Eine neue
+  // Kategorie ohne eigenen Text traegt deshalb die Meldung von `unbekannt` -
+  // "ohne eines der bekannten Muster zu zeigen" - und das ist dann schlicht
+  // falsch: das Muster ist bekannt, nur der Text fehlt. Der Leser sucht danach
+  // an der Stelle, die die falsche Meldung ihm nennt. Genau so ist
+  // `prompt-verworfen` am 18.09. entstanden, und niemand haette gemerkt, wenn
+  // sein Text vergessen worden waere.
+  const quelle = readFileSync(new URL(SKRIPT, 'file:'), 'utf8');
+  const gruende = [...quelle.matchAll(/stumm\('([a-z-]+)'/g)].map((t) => t[1]);
+  assert.ok(gruende.length >= 8, `nur ${gruende.length} Gruende gefunden - die Suche greift nicht mehr`);
+  for (const grund of new Set(gruende)) {
+    const urteil = beurteile({
+      seit: seit(ABBRUCH_LAUF),
+      ergebnis: { num_turns: 1, subtype: 'success', is_error: false, permission_denials: [], result: '' },
+      aeusserungen: []
+    });
+    // Nicht ueber das Urteil, sondern ueber den Text: die Meldung von `grund`
+    // darf nicht die von `unbekannt` sein.
+    const text = quelle.match(new RegExp(`'?${grund}'?:\\n?\\s*'`));
+    assert.ok(text, `der Diagnosetext zu '${grund}' fehlt - die Meldung faellt still auf die von unbekannt zurueck`);
+    assert.ok(urteil.meldung.length > 0);
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Der Abbruch, bei dem der Lauf seinen eigenen Auftrag verwirft (#1259, 18.09.).
 // ---------------------------------------------------------------------------

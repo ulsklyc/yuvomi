@@ -286,8 +286,8 @@ GitHub API call), and only one specific failure is about the review staying sile
 
 That one is the step **"Die Review muss gesprochen haben"**. It exists because for five PRs
 the check was green over a review that never happened. Its message says what it saw - refused
-tools, a run that stopped at the plugin's own gate, agents it started but never waited for -
-and is a lead for the job log, not a proven cause: a run can hit a refusal on the way and still
+tools, a run that stopped at the plugin's own gate, agents it started but never waited for, a run
+that discarded its own task - and is a lead for the job log, not a proven cause: a run can hit a refusal on the way and still
 stop for another reason. The log shows every tool call because `show_full_output` stays on, and
 that setting is not only for reading: the step needs the same stream to find the comment the
 run posted. The exact rules - including every case in which the review is skipped or silence
