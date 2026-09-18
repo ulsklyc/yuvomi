@@ -3483,6 +3483,9 @@
         "sharedWithAssignees": "Toto připomenutí dostanou i osoby přiřazené k této události.",
         "offsetAfterDue": "Po termínu splnění",
         "afterDueHint": "Tato připomínka je po termínu splnění ({{when}}) a při uložení zůstane beze změny. Vyberte předstih, kterým ji posunete.",
+        "offsetAfterStart": "Po zahájení události",
+        "afterStartHint": "Tato připomínka je po zahájení události ({{when}}) a při uložení zůstane beze změny. Vyberte předstih, kterým ji posunete.",
+        "afterStartNeedsLeadTime": "U jednotlivých událostí série lze připomínky uložit jen jako předstih. Vyberte pro tuto připomínku předstih, nebo ji odeberte.",
         "readOnlyNotice": "Připomínky patří ke Kalendáři. Bez práva k zápisu tam zůstane toto nastavení nezměněné."
     },
     "birthdays": {

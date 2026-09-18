@@ -2891,6 +2891,9 @@
         "sharedWithAssignees": "Osoby przypisane do tego wydarzenia również otrzymają to przypomnienie.",
         "offsetAfterDue": "Po terminie",
         "afterDueHint": "To przypomnienie wypada po terminie ({{when}}) i przy zapisie pozostaje bez zmian. Wybierz wyprzedzenie, aby je przesunąć.",
+        "offsetAfterStart": "Po rozpoczęciu wydarzenia",
+        "afterStartHint": "To przypomnienie wypada po rozpoczęciu wydarzenia ({{when}}) i przy zapisie pozostaje bez zmian. Wybierz wyprzedzenie, aby je przesunąć.",
+        "afterStartNeedsLeadTime": "W pojedynczych wydarzeniach serii przypomnienia można zapisać tylko jako wyprzedzenie. Wybierz wyprzedzenie dla tego przypomnienia albo je usuń.",
         "readOnlyNotice": "Przypomnienia należą do Kalendarza. Bez prawa zapisu tam to ustawienie pozostaje bez zmian."
     },
     "birthdays": {

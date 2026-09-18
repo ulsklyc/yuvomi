@@ -2891,6 +2891,9 @@
         "sharedWithAssignees": "Nakukuha rin ng mga nakatalaga sa kaganapang ito ang paalalang ito.",
         "offsetAfterDue": "Pagkatapos ng takdang petsa",
         "afterDueHint": "Ang paalalang ito ay pagkatapos ng takdang petsa ({{when}}) at mananatiling hindi nagbabago kapag nag-save ka. Pumili ng lead time para ilipat ito.",
+        "offsetAfterStart": "Pagkatapos magsimula ng kaganapan",
+        "afterStartHint": "Ang paalalang ito ay pagkatapos magsimula ng kaganapan ({{when}}) at mananatiling hindi nagbabago kapag nag-save ka. Pumili ng lead time para ilipat ito.",
+        "afterStartNeedsLeadTime": "Sa mga iisang kaganapan ng isang serye, maaari lang i-save ang mga paalala bilang lead time. Pumili ng lead time para sa paalalang ito o alisin ito.",
         "readOnlyNotice": "Ang mga paalala ay nasa Kalendaryo. Kung wala kang access na magsulat doon, hindi mababago ang setting na ito."
     },
     "birthdays": {

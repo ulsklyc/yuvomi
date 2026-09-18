@@ -2879,6 +2879,9 @@
         "sharedWithAssignees": "Az eseményhez rendelt személyek is megkapják ezt az emlékeztetőt.",
         "offsetAfterDue": "A határidő után",
         "afterDueHint": "Ez az emlékeztető a határidő után van ({{when}}), és mentéskor változatlan marad. Válasszon előzetes időt az áthelyezéséhez.",
+        "offsetAfterStart": "Az esemény kezdete után",
+        "afterStartHint": "Ez az emlékeztető az esemény kezdete után van ({{when}}), és mentéskor változatlan marad. Válasszon előzetes időt az áthelyezéséhez.",
+        "afterStartNeedsLeadTime": "Egy sorozat egyes eseményeinél az emlékeztetők csak előzetes időként menthetők. Válasszon előzetes időt ehhez az emlékeztetőhöz, vagy távolítsa el.",
         "readOnlyNotice": "Az emlékeztetők a Naptárhoz tartoznak. Ott írási jog nélkül ez a beállítás változatlan marad."
     },
     "birthdays": {

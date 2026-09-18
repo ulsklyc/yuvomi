@@ -2994,6 +2994,9 @@
         "sharedWithAssignees": "Bu etkinliğe atanan kişiler de bu hatırlatmayı alır.",
         "offsetAfterDue": "Son tarihten sonra",
         "afterDueHint": "Bu hatırlatıcı son tarihten sonra ({{when}}) ve kaydettiğinizde değişmeden kalır. Taşımak için bir hatırlatma süresi seçin.",
+        "offsetAfterStart": "Etkinlik başladıktan sonra",
+        "afterStartHint": "Bu hatırlatıcı etkinlik başladıktan sonra ({{when}}) ve kaydettiğinizde değişmeden kalır. Taşımak için bir hatırlatma süresi seçin.",
+        "afterStartNeedsLeadTime": "Bir serinin tek tek etkinliklerinde hatırlatıcılar yalnızca hatırlatma süresi olarak kaydedilebilir. Bu hatırlatıcı için bir hatırlatma süresi seçin veya kaldırın.",
         "readOnlyNotice": "Hatırlatıcılar Takvime aittir. Orada yazma yetkiniz yoksa bu ayar değişmeden kalır."
     },
     "onboarding": {

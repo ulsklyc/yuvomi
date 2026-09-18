@@ -2891,6 +2891,9 @@
         "sharedWithAssignees": "이 일정에 배정된 사람도 이 알림을 받습니다.",
         "offsetAfterDue": "마감일 이후",
         "afterDueHint": "이 알림은 마감일 이후({{when}})이며 저장해도 변경되지 않습니다. 옮기려면 미리 알림 시점을 선택하세요.",
+        "offsetAfterStart": "일정 시작 이후",
+        "afterStartHint": "이 알림은 일정 시작 이후({{when}})이며 저장해도 변경되지 않습니다. 옮기려면 미리 알림 시점을 선택하세요.",
+        "afterStartNeedsLeadTime": "시리즈의 개별 일정에서는 알림을 미리 알림 시점으로만 저장할 수 있습니다. 이 알림의 미리 알림 시점을 선택하거나 알림을 제거하세요.",
         "readOnlyNotice": "알림은 캘린더에 속합니다. 캘린더에 쓰기 권한이 없으면 이 설정은 변경되지 않습니다."
     },
     "birthdays": {

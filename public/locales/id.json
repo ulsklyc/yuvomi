@@ -2891,6 +2891,9 @@
         "sharedWithAssignees": "Orang yang ditugaskan ke acara ini juga menerima pengingat ini.",
         "offsetAfterDue": "Setelah tanggal jatuh tempo",
         "afterDueHint": "Pengingat ini berada setelah tanggal jatuh tempo ({{when}}) dan tetap tidak berubah saat disimpan. Pilih tenggang waktu untuk memindahkannya.",
+        "offsetAfterStart": "Setelah acara dimulai",
+        "afterStartHint": "Pengingat ini berada setelah acara dimulai ({{when}}) dan tetap tidak berubah saat disimpan. Pilih tenggang waktu untuk memindahkannya.",
+        "afterStartNeedsLeadTime": "Untuk acara tunggal dalam rangkaian, pengingat hanya dapat disimpan sebagai tenggang waktu. Pilih tenggang waktu untuk pengingat ini atau hapus pengingatnya.",
         "readOnlyNotice": "Pengingat termasuk dalam Kalender. Tanpa akses tulis di sana, pengaturan ini tetap tidak berubah."
     },
     "birthdays": {

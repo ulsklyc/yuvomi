@@ -85,11 +85,12 @@ const PRESET_OFFSET_MS = new Map(
 
 /**
  * Schreibt einen `remind_at`-Wert so, wie ihn der Server ablegt: naiv-UTC ohne
- * Zonen-Suffix (siehe `parseRemindAtAsUtc`).
+ * Zonen-Suffix (siehe `parseRemindAtAsUtc`). Auch der Kalender-Dialog reicht
+ * damit einen gespeicherten Zeitpunkt durch, statt ihn neu zu rechnen (#1260).
  * @param {string} value
  * @returns {string|null}
  */
-function naiveUtc(value) {
+export function naiveUtc(value) {
   const text = String(value ?? '').trim();
   if (!text) return null;
   const date = TZ_SUFFIX.test(text) ? new Date(text) : new Date(`${text}Z`);

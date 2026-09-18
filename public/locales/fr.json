@@ -2994,6 +2994,9 @@
         "sharedWithAssignees": "Les personnes affectées à cet événement reçoivent aussi ce rappel.",
         "offsetAfterDue": "Après l'échéance",
         "afterDueHint": "Ce rappel se situe après la date d'échéance ({{when}}) et reste inchangé à l'enregistrement. Choisissez un délai pour le déplacer.",
+        "offsetAfterStart": "Après le début de l'événement",
+        "afterStartHint": "Ce rappel se situe après le début de l'événement ({{when}}) et reste inchangé à l'enregistrement. Choisissez un délai pour le déplacer.",
+        "afterStartNeedsLeadTime": "Pour les événements isolés d'une série, les rappels ne peuvent être enregistrés que sous forme de délai. Choisissez un délai pour ce rappel ou supprimez-le.",
         "readOnlyNotice": "Les rappels appartiennent au Calendrier. Sans droit d’écriture là-bas, ce réglage reste inchangé."
     },
     "onboarding": {

@@ -2879,6 +2879,9 @@
         "sharedWithAssignees": "Những người được giao sự kiện này cũng nhận được lời nhắc này.",
         "offsetAfterDue": "Sau ngày đến hạn",
         "afterDueHint": "Lời nhắc này nằm sau ngày đến hạn ({{when}}) và giữ nguyên khi bạn lưu. Chọn thời gian nhắc trước để dời nó.",
+        "offsetAfterStart": "Sau khi sự kiện bắt đầu",
+        "afterStartHint": "Lời nhắc này nằm sau khi sự kiện bắt đầu ({{when}}) và giữ nguyên khi bạn lưu. Chọn thời gian nhắc trước để dời nó.",
+        "afterStartNeedsLeadTime": "Với từng sự kiện riêng trong một chuỗi, lời nhắc chỉ lưu được dưới dạng thời gian nhắc trước. Chọn thời gian nhắc trước cho lời nhắc này hoặc xóa nó.",
         "readOnlyNotice": "Nhắc nhở thuộc về Lịch. Nếu không có quyền ghi ở đó, cài đặt này giữ nguyên."
     },
     "birthdays": {

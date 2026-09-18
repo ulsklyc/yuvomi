@@ -2879,6 +2879,9 @@
         "sharedWithAssignees": "Anyone assigned to this event gets this reminder too.",
         "offsetAfterDue": "After the due date",
         "afterDueHint": "This reminder is after the due date ({{when}}) and stays unchanged when you save. Pick a lead time to move it.",
+        "offsetAfterStart": "After the event starts",
+        "afterStartHint": "This reminder is after the event starts ({{when}}) and stays unchanged when you save. Pick a lead time to move it.",
+        "afterStartNeedsLeadTime": "Reminders on single events of a series can only be saved as a lead time. Pick a lead time for this reminder or remove it.",
         "readOnlyNotice": "Reminders belong to the Calendar. Without write access there, this setting stays unchanged."
     },
     "birthdays": {

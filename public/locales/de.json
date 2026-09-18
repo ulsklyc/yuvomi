@@ -2891,6 +2891,9 @@
         "sharedWithAssignees": "Wer diesem Termin zugewiesen ist, bekommt diese Erinnerung ebenfalls.",
         "offsetAfterDue": "Nach der Fälligkeit",
         "afterDueHint": "Die Erinnerung liegt nach der Fälligkeit ({{when}}) und bleibt beim Speichern unverändert. Wähle einen Vorlauf, um sie zu verschieben.",
+        "offsetAfterStart": "Nach dem Terminbeginn",
+        "afterStartHint": "Die Erinnerung liegt nach dem Terminbeginn ({{when}}) und bleibt beim Speichern unverändert. Wähle einen Vorlauf, um sie zu verschieben.",
+        "afterStartNeedsLeadTime": "Für einzelne Termine einer Serie lassen sich Erinnerungen nur als Vorlauf speichern. Wähle für diese Erinnerung einen Vorlauf oder entferne sie.",
         "readOnlyNotice": "Erinnerungen gehören zum Kalender. Ohne Schreibrecht dort bleibt diese Einstellung unverändert."
     },
     "birthdays": {

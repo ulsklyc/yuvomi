@@ -2994,6 +2994,9 @@
         "sharedWithAssignees": "Quem estiver atribuído a este evento também recebe este lembrete.",
         "offsetAfterDue": "Depois do vencimento",
         "afterDueHint": "Este lembrete é posterior à data de vencimento ({{when}}) e permanece inalterado ao salvar. Escolha uma antecedência para movê-lo.",
+        "offsetAfterStart": "Depois do início do evento",
+        "afterStartHint": "Este lembrete é posterior ao início do evento ({{when}}) e permanece inalterado ao salvar. Escolha uma antecedência para movê-lo.",
+        "afterStartNeedsLeadTime": "Em eventos individuais de uma série, os lembretes só podem ser salvos como antecedência. Escolha uma antecedência para este lembrete ou remova-o.",
         "readOnlyNotice": "Os lembretes pertencem ao Calendário. Sem permissão de escrita aí, esta definição permanece inalterada."
     },
     "onboarding": {

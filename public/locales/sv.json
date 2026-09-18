@@ -2994,6 +2994,9 @@
         "sharedWithAssignees": "Den som är tilldelad den här händelsen får också den här påminnelsen.",
         "offsetAfterDue": "Efter förfallodatumet",
         "afterDueHint": "Den här påminnelsen ligger efter förfallodatumet ({{when}}) och ändras inte när du sparar. Välj en framförhållning för att flytta den.",
+        "offsetAfterStart": "Efter att händelsen börjat",
+        "afterStartHint": "Den här påminnelsen ligger efter att händelsen börjat ({{when}}) och ändras inte när du sparar. Välj en framförhållning för att flytta den.",
+        "afterStartNeedsLeadTime": "För enskilda händelser i en serie kan påminnelser bara sparas som framförhållning. Välj en framförhållning för den här påminnelsen eller ta bort den.",
         "readOnlyNotice": "Påminnelser hör till Kalendern. Utan skrivrättighet där förblir den här inställningen oförändrad."
     },
     "onboarding": {

@@ -267,6 +267,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fix it - and the dialog notices while you are still in it: the entry and the warning give way to the
   lead time that now applies, rather than going on claiming a situation that has passed.
 
+- **A calendar reminder that had ended up after the event's start no longer moves when you save.**
+  The calendar has the same problem as the task dialog, in its own code. Move an event - by dragging
+  it, through a sync, or from another app - past a reminder that was already set, and the edit dialog
+  showed that reminder as "Custom, 1 minute" before the start. Saving believed it and moved the
+  reminder there, even if you had only changed the title: a reminder set for a week after the event
+  jumped to a minute before it. The row now says the reminder is after the event starts, a warning
+  beside it spells out when it actually goes off, and saving leaves it exactly where it is, row by
+  row, next to any other reminders on the event. Picking a lead time moves it as it always did. Move
+  the start in the dialog and the row follows along: once the reminder is before the new start again,
+  it shows the lead time that applies, and the reminder itself still stays where it was. For a single
+  occurrence of a repeating event, where reminders can only be saved as a lead time, the reminder is
+  left untouched as long as you do not change the reminders; if you do, the dialog asks you to pick a
+  lead time for it or remove it instead of moving it for you. The event details now also give the
+  time of a reminder that has no preset lead time, not just the day. (#1260)
+
 ### Security
 
 - **Reading the calendar no longer reaches the contact book, the sync accounts, or the sync targets.**

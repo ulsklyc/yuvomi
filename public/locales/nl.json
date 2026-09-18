@@ -2879,6 +2879,9 @@
         "sharedWithAssignees": "Wie aan deze afspraak is toegewezen, krijgt deze herinnering ook.",
         "offsetAfterDue": "Na de vervaldatum",
         "afterDueHint": "Deze herinnering valt na de vervaldatum ({{when}}) en blijft ongewijzigd bij het opslaan. Kies een voorlooptijd om hem te verplaatsen.",
+        "offsetAfterStart": "Na het begin van de afspraak",
+        "afterStartHint": "Deze herinnering valt na het begin van de afspraak ({{when}}) en blijft ongewijzigd bij het opslaan. Kies een voorlooptijd om hem te verplaatsen.",
+        "afterStartNeedsLeadTime": "Bij losse afspraken uit een reeks kunnen herinneringen alleen als voorlooptijd worden opgeslagen. Kies een voorlooptijd voor deze herinnering of verwijder hem.",
         "readOnlyNotice": "Herinneringen horen bij de Agenda. Zonder schrijfrechten daar blijft deze instelling ongewijzigd."
     },
     "birthdays": {

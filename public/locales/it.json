@@ -2994,6 +2994,9 @@
         "sharedWithAssignees": "Anche chi è assegnato a questo evento riceve questo promemoria.",
         "offsetAfterDue": "Dopo la scadenza",
         "afterDueHint": "Questo promemoria è successivo alla data di scadenza ({{when}}) e resta invariato al salvataggio. Scegli un anticipo per spostarlo.",
+        "offsetAfterStart": "Dopo l'inizio dell'evento",
+        "afterStartHint": "Questo promemoria è successivo all'inizio dell'evento ({{when}}) e resta invariato al salvataggio. Scegli un anticipo per spostarlo.",
+        "afterStartNeedsLeadTime": "Per i singoli eventi di una serie, i promemoria si possono salvare solo come anticipo. Scegli un anticipo per questo promemoria o rimuovilo.",
         "readOnlyNotice": "I promemoria appartengono al Calendario. Senza permesso di scrittura lì, questa impostazione resta invariata."
     },
     "onboarding": {
