@@ -96,7 +96,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   you to move it aside before either step, because it belongs to the database that was there before
   and would otherwise be read together with the file you copy back in. The same check covers the
   old file name `oikos.db`. A missing database file still means a fresh installation, as before.
-  (#1282)
+  Restoring a backup onto an empty file with the command-line helper (`scripts/restore-backup.js`)
+  keeps working, and a write-ahead log next to that file is no longer deleted but kept next to the
+  pre-restore copy, where the helper tells you. (#1282)
 
 - **The "n" shortcut no longer opens a create dialog on a page you may only read.** Where your
   access to a module is "read", the create button is hidden, but the keyboard shortcut still pressed

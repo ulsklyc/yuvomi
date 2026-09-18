@@ -10,7 +10,6 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import 'dotenv/config';
-import { getPath, restoreFromFile } from '../server/db.js';
 
 const backupPath = process.argv[2];
 
@@ -21,12 +20,30 @@ if (!backupPath) {
 
 const resolved = path.resolve(backupPath);
 
+// Handschlag mit server/db.js, VOR dessen Import: dieses Skript ersetzt die
+// Datei unter DB_PATH, also ist eine leere Datei dort (#1282) kein Grund, beim
+// Import abzubrechen - sie ist genau das, was ein Restore reparieren soll. Nur
+// dieser eine Fall wird dadurch zurückgestellt, siehe Auto-Init am Ende von
+// db.js; eine gesunde Datenbank öffnet der Import weiter wie bisher.
+globalThis[Symbol.for('yuvomi.db.restoreTarget')] = true;
+
 try {
+  // Dynamisch und innerhalb des try: jeder Abbruch beim Öffnen der Datenbank
+  // (falscher Key, unlesbare Datei, ...) endet als `Restore failed: ...`
+  // statt als ungefangene Ausnahme mit Stacktrace.
+  const { getPath, restoreFromFile } = await import('../server/db.js');
   await fs.access(resolved);
   const result = await restoreFromFile(resolved);
   console.log(`Restored ${resolved} into ${getPath()}. Schema v${result.schemaVersion}.`);
   if (result.rollbackPath) {
     console.log(`Previous database copy saved at ${result.rollbackPath}.`);
+  }
+  if (result.keptJournalPath) {
+    console.log(
+      `A write-ahead log with data lay next to the empty database file. It belongs to the database `
+      + `that was there before and can hold changes that exist nowhere else, so it was not deleted: `
+      + `it is kept at ${result.keptJournalPath} (with its -shm, if there was one).`
+    );
   }
   process.exit(0);
 } catch (err) {

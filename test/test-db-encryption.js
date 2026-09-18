@@ -1232,7 +1232,12 @@ function cliRestore(backupPath, { dbPath, key }) {
   else delete env.DB_ENCRYPTION_KEY;
   const run = spawnSync(process.execPath, [RESTORE_CLI, backupPath], { cwd: tmpDir(), env, encoding: 'utf8' });
   const failure = (run.stderr ?? '').split('\n').find((line) => line.startsWith('Restore failed: '));
-  return { status: run.status, failure: failure?.slice('Restore failed: '.length) ?? null, stdout: run.stdout };
+  return {
+    status: run.status,
+    failure: failure?.slice('Restore failed: '.length) ?? null,
+    stdout: run.stdout,
+    stderr: run.stderr ?? '',
+  };
 }
 
 for (const [fall, key] of [['mit Schluessel', KEY], ['ohne Schluessel', null]]) {
@@ -1542,3 +1547,201 @@ for (const [fall, key] of SCHLUESSEL_FAELLE) {
     assert.ok(!existsSync(legacy), 'oikos.db ist nach yuvomi.db umgezogen');
   });
 }
+
+/*
+ * ---------------------------------------------------------------------------
+ * #1282, Review-Runde auf #1288: das Restore-CLI auf eine LEERE `DB_PATH`.
+ *
+ * `init()` laeuft beim Import von db.js, und `scripts/restore-backup.js`
+ * importierte es statisch vor seinem `try`. Seit der Leer-Fall abbricht, endete
+ * genau der Rat der Meldung - neu kopieren, auch per Restore - in einer
+ * ungefangenen Ausnahme mit Stacktrace, und `restoreFromFile()` kam nie zum Zug.
+ *
+ * Das CLI setzt jetzt vor dem Import einen Handschlag
+ * (`Symbol.for('yuvomi.db.restoreTarget')`) und importiert dynamisch im `try`.
+ * Zurueckgestellt wird NUR der Leer-Fall (Fehlercode, nicht Meldungstext), und
+ * nur mit Handschlag: der Server und jeder andere Import brechen weiter ab. Eine
+ * gesunde Datenbank oeffnet das CLI wie bisher, damit der TRUNCATE-Checkpoint
+ * vor der Rollback-Kopie laeuft. Ein Journal mit Daten neben der leeren Datei
+ * wird nicht geloescht, sondern neben die Rollback-Kopie gelegt, und ein
+ * gescheiterter Restore legt es zurueck.
+ * ---------------------------------------------------------------------------
+ */
+
+const LEER_CODE = 'YUVOMI_EMPTY_DATABASE_FILE';
+const RESTORE_HANDSCHLAG = Symbol.for('yuvomi.db.restoreTarget');
+
+/** Die Rollback-Kopie, die das CLI nennt. */
+function rollbackAusAusgabe(stdout) {
+  const treffer = /^Previous database copy saved at (.+)\.$/m.exec(stdout);
+  assert.ok(treffer, `das CLI muss die Rollback-Kopie nennen: ${stdout}`);
+  return treffer[1];
+}
+
+/**
+ * Ein Backup, das `validateBackupFile()` besteht (Tabelle `schema_migrations`,
+ * nur bekannte Versionen) und erst nach dem Kopieren scheitert: die Migrationen
+ * ab v2 finden die Tabellen von v1 nicht.
+ */
+function backupDasNachDemKopierenScheitert() {
+  const pfad = join(tmpDir(), 'scheitert.db');
+  const handle = new Database(pfad);
+  handle.exec(`CREATE TABLE schema_migrations (
+    version INTEGER PRIMARY KEY, description TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT ''
+  )`);
+  handle.prepare('INSERT INTO schema_migrations (version, description) VALUES (1, ?)').run('nur die Tabelle');
+  handle.close();
+  return pfad;
+}
+
+for (const [fall, key] of SCHLUESSEL_FAELLE) {
+  test(`#1282 ohne Handschlag (${fall}): schon der Import von db.js bricht auf der leeren Datei ab`, async () => {
+    // Der Server ruft init() nicht selbst auf, er verlaesst sich auf den
+    // Auto-Init beim Import. `bootDb()` ruft init() danach noch einmal und
+    // saehe es deshalb nicht, wenn der Import den Leer-Fall schluckte.
+    const leer = join(tmpDir(), 'yuvomi.db');
+    writeFileSync(leer, '');
+    process.env.DB_PATH = leer;
+    if (key === null) delete process.env.DB_ENCRYPTION_KEY;
+    else process.env.DB_ENCRYPTION_KEY = key;
+    assert.equal(globalThis[RESTORE_HANDSCHLAG], undefined, 'Vorbedingung: der Testprozess ist nicht das CLI');
+
+    await assert.rejects(
+      () => import(`../server/db.js?ohne-handschlag=${++scenarioCounter}`),
+      (err) => {
+        assert.equal(err.code, LEER_CODE, 'der Leer-Fall traegt seinen eigenen Code');
+        assert.match(err.message, /exists but is empty \(0 bytes\)/, 'und dieselbe Meldung wie bisher');
+        return true;
+      },
+      'ohne Handschlag darf der Import den Leer-Fall nicht zurueckstellen'
+    );
+    assert.equal(groesse(leer), 0, 'die Datei bleibt 0 Byte');
+  });
+
+  test(`#1282 CLI-Restore auf die leere Datei (${fall}): gelingt, die Instanz startet mit den Daten des Backups`, async () => {
+    const backup = await originalMitMarker(key, 'aus-dem-backup');
+    const ziel = join(tmpDir(), 'yuvomi.db');
+    writeFileSync(ziel, ''); // Kopie oder Restore abgebrochen
+    await assert.rejects(() => bootDb(ziel, key), /exists but is empty/, 'Vorbedingung: der Server verweigert die Datei');
+
+    const run = cliRestore(backup, { dbPath: ziel, key });
+    assert.equal(run.status, 0, `der Restore muss gelingen: ${run.stderr}`);
+    assert.match(run.stdout, /^Restored .+ into .+yuvomi\.db\. Schema v\d+\.$/m);
+    assert.ok(!/write-ahead log/.test(run.stdout), 'ohne Journal nennt das CLI keines');
+    assert.equal(groesse(rollbackAusAusgabe(run.stdout)), 0, 'die Rollback-Kopie ist die leere Datei von vorher');
+
+    const mod = await bootDb(ziel, key);
+    assert.equal(marker(mod), 'aus-dem-backup', 'die Instanz startet mit den Daten des Backups');
+    assert.equal(mod.currentVersion(), Math.max(...mod.MIGRATIONS.map((m) => m.version)), 'mit vollem Schema');
+    assert.equal(isPlaintext(ziel), key === null, 'verschluesselt genau dann, wenn ein Key gesetzt ist');
+  });
+
+  test(`#1282 CLI-Restore auf die leere Datei MIT Journal (${fall}): das Journal liegt Byte fuer Byte neben der Rollback-Kopie`, async () => {
+    const backup = await originalMitMarker(key, 'aus-dem-backup');
+    const ziel = join(tmpDir(), 'yuvomi.db');
+    await journalDerVorherigen(ziel, key);
+    writeFileSync(ziel, '');
+    const walVorher = sha256(`${ziel}-wal`);
+    const shmVorher = sha256(`${ziel}-shm`);
+
+    const run = cliRestore(backup, { dbPath: ziel, key });
+    assert.equal(run.status, 0, `der Restore muss gelingen: ${run.stderr}`);
+    const rollback = rollbackAusAusgabe(run.stdout);
+    assert.equal(
+      existsSync(`${rollback}-wal`) && sha256(`${rollback}-wal`),
+      walVorher,
+      'das Journal der vorherigen Datenbank darf nicht geloescht werden - es liegt neben der Rollback-Kopie'
+    );
+    assert.equal(existsSync(`${rollback}-shm`) && sha256(`${rollback}-shm`), shmVorher, 'samt -shm');
+    assert.ok(run.stdout.includes(`it is kept at ${rollback}-wal`), `das CLI nennt den Ort: ${run.stdout}`);
+
+    const mod = await bootDb(ziel, key);
+    assert.equal(
+      marker(mod),
+      'aus-dem-backup',
+      'die Instanz startet mit dem Backup, nicht mit dem Journal der vorherigen Datenbank'
+    );
+  });
+
+  test(`#1282 gescheiterter CLI-Restore auf die leere Datei MIT Journal (${fall}): der Rollback stellt Datei und Journal zurueck`, async () => {
+    const dir = tmpDir();
+    const ziel = join(dir, 'yuvomi.db');
+    await journalDerVorherigen(ziel, key);
+    writeFileSync(ziel, '');
+    const walVorher = sha256(`${ziel}-wal`);
+    const shmVorher = sha256(`${ziel}-shm`);
+
+    const run = cliRestore(backupDasNachDemKopierenScheitert(), { dbPath: ziel, key });
+    assert.equal(run.status, 1, 'der Restore muss scheitern');
+    assert.ok(run.failure, `als „Restore failed: ...": ${run.stderr}`);
+    const rollbacks = readdirSync(dir).filter((name) => /\.pre-restore-[^.]+$/.test(name) && !/-(wal|shm)$/.test(name));
+    assert.equal(rollbacks.length, 1, 'Vorbedingung: gescheitert ist er erst nach dem Kopieren, die Rollback-Kopie steht');
+    assert.ok(
+      !/Rollback after failed restore also failed/.test(run.stderr),
+      `die leere Datei wieder zu verweigern ist der alte Stand, kein gescheiterter Rollback: ${run.stderr}`
+    );
+
+    assert.equal(groesse(ziel), 0, 'die Datei ist wieder die leere von vorher');
+    assert.equal(
+      existsSync(`${ziel}-wal`) && sha256(`${ziel}-wal`),
+      walVorher,
+      'das Journal liegt wieder dort, wo die Meldung es nennt'
+    );
+    assert.equal(existsSync(`${ziel}-shm`) && sha256(`${ziel}-shm`), shmVorher, 'samt -shm');
+    assert.ok(!existsSync(join(dir, `${rollbacks[0]}-wal`)), 'und nicht mehr neben der Rollback-Kopie');
+    await assert.rejects(
+      () => bootDb(ziel, key),
+      /A write-ahead log with data lies next to it/,
+      'der Start bricht ab wie vor dem Restore, mit dem Journal in der Meldung'
+    );
+  });
+
+  test(`CLI-Restore auf eine gesunde Datenbank (${fall}): die Rollback-Kopie traegt allein auch, was nur im Journal stand`, async () => {
+    // Stand nach einem unsauberen Stopp: die letzte Aenderung steht nur im -wal.
+    const laufend = join(tmpDir(), 'laufend.db');
+    const ziel = join(tmpDir(), 'yuvomi.db');
+    const mod = await bootDb(laufend, key);
+    mod.get().exec('CREATE TABLE marker_1282 (note TEXT)');
+    mod.get().prepare('INSERT INTO marker_1282 VALUES (?)').run('vor-dem-restore');
+    for (const suffix of ['', '-wal', '-shm']) copyFileSync(`${laufend}${suffix}`, `${ziel}${suffix}`);
+    mod.get().close();
+    const nurHauptdatei = join(tmpDir(), 'nur-hauptdatei.db');
+    copyFileSync(ziel, nurHauptdatei);
+    assert.equal(
+      marker(await bootDb(nurHauptdatei, key)),
+      null,
+      'Vorbedingung: ohne das Journal fehlt die Aenderung - die Probe misst also den Checkpoint'
+    );
+
+    const run = cliRestore(await originalMitMarker(key, 'aus-dem-backup'), { dbPath: ziel, key });
+    assert.equal(run.status, 0, `der Restore muss gelingen: ${run.stderr}`);
+    const rollback = rollbackAusAusgabe(run.stdout);
+    assert.ok(!/write-ahead log/.test(run.stdout), 'eine offene Datenbank ist gecheckpointet, ihr Journal nicht aufbewahrt');
+    assert.ok(!existsSync(`${rollback}-wal`), 'die Rollback-Kopie steht ohne Journal da');
+    assert.equal(
+      marker(await bootDb(rollback, key)),
+      'vor-dem-restore',
+      'und traegt trotzdem die Aenderung, die vorher nur im Journal stand'
+    );
+    assert.equal(marker(await bootDb(ziel, key)), 'aus-dem-backup', 'die Instanz traegt das Backup');
+  });
+}
+
+test('CLI-Restore mit falschem Schluessel: „Restore failed" statt Stacktrace, die Datenbank bleibt unberuehrt', async () => {
+  const dir = tmpDir();
+  const ziel = join(dir, 'yuvomi.db');
+  (await bootDb(ziel, KEY)).get().close();
+  const vorher = sha256(ziel);
+  // Das Backup passt zum Schluessel des Aufrufs - nur die Datenbank unter
+  // DB_PATH nicht. Scheitern darf der Aufruf also nur am Oeffnen von DB_PATH.
+  const ANDERER = 'ein-anderer-schluessel-0123456789';
+  const backup = await backupFromInstance(ANDERER);
+
+  const run = cliRestore(backup, { dbPath: ziel, key: ANDERER });
+  assert.equal(run.status, 1, 'der Restore muss scheitern');
+  assert.ok(run.failure, `der Abbruch muss als „Restore failed: ..." kommen: ${run.stderr}`);
+  assert.ok(run.failure.includes(ziel), `die Meldung nennt die Datenbank unter DB_PATH, nicht das Backup: ${run.failure}`);
+  assert.ok(!/^\s+at /m.test(run.stderr), `kein Stacktrace: ${run.stderr}`);
+  assert.equal(sha256(ziel), vorher, 'die Datenbank bleibt unberuehrt');
+  assert.deepEqual(readdirSync(dir).filter((name) => name.includes('pre-restore')), [], 'kein Restore hat begonnen');
+});

@@ -365,6 +365,24 @@ function emptyDatabaseFileError(filePath) {
 }
 
 /**
+ * `code` des Fehlers aus `assertDatabaseFileNotEmpty()`: daran erkennen der
+ * Auto-Init am Dateiende und der Rollback in `restoreFromFile()` den Leer-Fall,
+ * ohne die Meldung zu lesen.
+ */
+const EMPTY_DATABASE_FILE = 'YUVOMI_EMPTY_DATABASE_FILE';
+
+/**
+ * Handschlag des Restore-CLI (`scripts/restore-backup.js`), gesetzt VOR dem
+ * Import dieses Moduls. Das CLI ist der eine Aufrufer, für den eine leere
+ * `DB_PATH` kein Grund zum Abbruch ist: es ersetzt genau diese Datei - der Rat
+ * der Meldung („copy it again") führt dorthin. Ein Symbol auf `globalThis`
+ * statt einer Env-Variable, weil es kein Schalter für Betreiber ist: der Server
+ * darf den Leer-Fall nie überspringen, und eine Variable in der Umgebung würde
+ * er erben.
+ */
+const RESTORE_TARGET_HANDSHAKE = Symbol.for('yuvomi.db.restoreTarget');
+
+/**
  * Bricht den Start ab, wenn die Datei, die gleich geöffnet wird, existiert und
  * leer ist. Läuft VOR allem, was die Datei anfasst - auch vor
  * `migrateLegacyDbFile()`, die eine leere `oikos.db` samt Journal sonst schon
@@ -374,7 +392,9 @@ function emptyDatabaseFileError(filePath) {
 function assertDatabaseFileNotEmpty() {
   const filePath = databaseFileAboutToOpen();
   if (!filePath || regularFileSize(filePath) !== 0) return;
-  throw new Error(emptyDatabaseFileError(filePath));
+  const err = new Error(emptyDatabaseFileError(filePath));
+  err.code = EMPTY_DATABASE_FILE;
+  throw err;
 }
 
 /**
@@ -9305,11 +9325,28 @@ async function unlinkIfExists(filePath) {
   }
 }
 
+/** Datei umbenennen; `false`, wenn es sie nicht gibt. */
+async function renameIfExists(from, to) {
+  try {
+    await fs.rename(from, to);
+    return true;
+  } catch (err) {
+    if (err?.code !== 'ENOENT') throw err;
+    return false;
+  }
+}
+
 async function restoreFromFile(sourcePath) {
   const backupVersion = validateBackupFile(sourcePath);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const rollbackPath = `${DB_PATH}.pre-restore-${timestamp}`;
   let rollbackCreated = false;
+  // Offen ist die Verbindung, außer im Leer-Fall des Restore-CLI (#1282, siehe
+  // Auto-Init am Dateiende). Nur eine offene Verbindung wird unten per
+  // TRUNCATE gecheckpointet; danach trägt die Rollback-Kopie alles, und ein
+  // Rest-Journal zu löschen verliert nichts.
+  const wasOpen = Boolean(db);
+  let keptJournalPath = null;
 
   try {
     if (db) {
@@ -9326,6 +9363,16 @@ async function restoreFromFile(sourcePath) {
       if (err?.code !== 'ENOENT') throw err;
     }
 
+    // Ohne offene Verbindung hat niemand das Journal gecheckpointet. Ein `-wal`
+    // mit Daten neben der leeren Datei gehört zur Datenbank, die vorher hier
+    // lag, und kann Änderungen tragen, die nirgends sonst stehen - die Meldung
+    // aus `emptyDatabaseFileError()` sagt „keep them". Also nicht löschen,
+    // sondern neben die Rollback-Kopie legen, wohin es als Vorgänger gehört.
+    if (!wasOpen && regularFileSize(`${DB_PATH}-wal`) > 0) {
+      await fs.rename(`${DB_PATH}-wal`, `${rollbackPath}-wal`);
+      keptJournalPath = `${rollbackPath}-wal`;
+      await renameIfExists(`${DB_PATH}-shm`, `${rollbackPath}-shm`);
+    }
     await unlinkIfExists(`${DB_PATH}-wal`);
     await unlinkIfExists(`${DB_PATH}-shm`);
     await fs.copyFile(sourcePath, DB_PATH);
@@ -9342,6 +9389,7 @@ async function restoreFromFile(sourcePath) {
     return {
       schemaVersion: currentVersion(),
       rollbackPath: rollbackCreated ? rollbackPath : null,
+      keptJournalPath,
     };
   } catch (err) {
     if (rollbackCreated) {
@@ -9353,7 +9401,19 @@ async function restoreFromFile(sourcePath) {
         await unlinkIfExists(`${DB_PATH}-wal`);
         await unlinkIfExists(`${DB_PATH}-shm`);
         await fs.copyFile(rollbackPath, DB_PATH);
-        init({ plaintextBackup: false });
+        if (keptJournalPath) {
+          // Der Rollback stellt den Stand vor dem Restore her: das Journal
+          // gehört wieder neben die (leere) Datei, an der die Meldung es nennt.
+          await renameIfExists(`${rollbackPath}-wal`, `${DB_PATH}-wal`);
+          await renameIfExists(`${rollbackPath}-shm`, `${DB_PATH}-shm`);
+        }
+        try {
+          init({ plaintextBackup: false });
+        } catch (reopenErr) {
+          // Die leere Datei verweigert init() wie vor dem Restore - das ist der
+          // alte Stand, kein gescheiterter Rollback.
+          if (reopenErr?.code !== EMPTY_DATABASE_FILE) throw reopenErr;
+        }
       } catch (rollbackErr) {
         log.error('Rollback after failed restore also failed:', rollbackErr);
       }
@@ -9408,6 +9468,20 @@ function _resetTestDatabase() {
   }
 }
 
-init();   // auto-initialise when module is first imported
+// Auto-Init beim ersten Import. Eine Ausnahme: das Restore-CLI setzt vorher den
+// Handschlag (RESTORE_TARGET_HANDSHAKE), und nur für GENAU den Leer-Fall bleibt
+// `db` dann `null` - `restoreFromFile()` ersetzt die leere Datei ohnehin, und
+// ohne diese Ausnahme endete der Rat der Meldung („copy it again") per CLI in
+// einer ungefangenen Ausnahme (#1282). Alles andere wirft weiter, auch im CLI.
+// Eine gesunde Datenbank öffnet das CLI bewusst wie bisher: nur eine offene
+// Verbindung checkpointet `restoreFromFile()` vor der Rollback-Kopie, ein
+// pauschal aufgeschobenes init() kürzte die Kopie um nicht gecheckpointete
+// Transaktionen und löschte danach das `-wal`. Ohne Handschlag (Server, Tests,
+// andere Skripte) bricht der Leer-Fall ab wie zuvor.
+try {
+  init();
+} catch (err) {
+  if (!(err?.code === EMPTY_DATABASE_FILE && globalThis[RESTORE_TARGET_HANDSHAKE] === true)) throw err;
+}
 
 export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, unknownMigrationVersions, MIGRATIONS, reconcileCriticalSchema, _setTestDatabase, _resetTestDatabase };
