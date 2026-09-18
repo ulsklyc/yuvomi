@@ -124,7 +124,13 @@
   overflow-x: hidden;
   scrollbar-gutter: stable;
   overscroll-behavior-y: contain;
-  touch-action: pan-y;
+  /* `pinch-zoom` gehoert dazu (#1276): ein blosses `pan-y` verbietet ihn, und
+   * Chromium verwirft dann jeden Bildlauf, der mit zwei Fingern beginnt. Das
+   * passt auf die Meldung vom Chromebook-Touchscreen (Hauptinhalt starr,
+   * Seitenleiste ohne touch-action daneben nicht). Aufziehen zum Zoomen ging
+   * hier ebenfalls nicht, obwohl der Viewport es zusagt.
+   * Guard: test:mobile-scroll-layout. */
+  touch-action: pan-y pinch-zoom;
   -webkit-overflow-scrolling: touch;
   padding-top: var(--offline-banner-height, 0px);
   /* Bewusste Layout-Transition (Detector layout-transition, geprüft): das Offline-
@@ -5905,8 +5911,9 @@ textarea::placeholder {
    * sich die Deutung offen, uebernahm die Geste als Bildlauf und beendete den
    * Zeiger mit `pointercancel`, noch bevor die Schwelle erreicht war. Gemessen
    * an #821: auf dem Telefon war der Wisch damit nie ausloesbar. Senkrecht
-   * bleibt beim Browser, damit die Seite unter dem Toast scrollbar bleibt. */
-  touch-action: pan-y;
+   * bleibt beim Browser, damit die Seite unter dem Toast scrollbar bleibt;
+   * `pinch-zoom` dazu, sonst verwirft er dort jeden Zwei-Finger-Bildlauf (#1276). */
+  touch-action: pan-y pinch-zoom;
 }
 
 .toast__icon {

@@ -510,7 +510,7 @@
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--color-border-subtle);
   cursor: pointer;
-  touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
   transition: background-color var(--transition-fast);
 }
 
@@ -616,7 +616,7 @@
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--color-border-subtle);
   cursor: pointer;
-  touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
   transition: background-color var(--transition-fast);
 }
 
@@ -709,7 +709,7 @@
   border: 1px solid var(--color-border);
   background: var(--color-surface-2);
   cursor: pointer;
-  touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
   transition: border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
   text-align: left;
 }
@@ -802,7 +802,7 @@
  * doppelt. Der Hover läuft dafür über die volle Zeilenbreite. */
 .shopping-widget-list {
   cursor: pointer;
-  touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
   transition: background-color var(--transition-fast);
   padding: var(--space-2) var(--space-4);
   margin-inline: calc(var(--space-4) * -1);
@@ -932,7 +932,7 @@
   border-radius: var(--radius-sm);
   padding: var(--space-3);
   cursor: pointer;
-  touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
   transition: background-color var(--transition-fast);
   /* HIER STEHT KEINE FLAECHE MEHR, UND ZWAR ABSICHTLICH.
    *
@@ -2254,7 +2254,7 @@ svg.weather-forecast__icon {
   text-decoration: none;
   text-align: left;
   cursor: pointer;
-  touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
   transition: background-color var(--transition-fast);
 }
 
@@ -3051,7 +3051,7 @@ svg.weather-forecast__icon {
   /* Inset-Rows statt Karte-in-Karte (Apple: Zeilen trennen sich per Hairline,
    * nie per Rahmen): kein eigener Rahmen, keine eigene Flaeche. */
   cursor: pointer;
-  touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
 }
 
 .birthday-widget-item + .birthday-widget-item {
@@ -3143,7 +3143,7 @@ svg.weather-forecast__icon {
   gap: var(--space-3);
   padding: var(--space-2) var(--space-2);
   cursor: pointer;
-  touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
   /* Der Radius dient dem Fokusring: ohne ihn saesse ein hartes Rechteck genau
    * auf den Haarlinien der Nachbarzeilen. Er zieht der Zeile keine Karte an -
    * es gibt weder Flaeche noch Schatten im Ruhezustand. */
@@ -3623,7 +3623,7 @@ svg.weather-forecast__icon {
   padding: var(--space-1h) var(--space-2);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
   transition: background-color var(--transition-fast);
 }
 
@@ -3754,7 +3754,7 @@ svg.weather-forecast__icon {
   padding: var(--space-1h) var(--space-2);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
   transition: background-color var(--transition-fast);
 }
 
@@ -3843,7 +3843,7 @@ svg.weather-forecast__icon {
   padding: var(--space-1h) var(--space-2);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
   transition: background-color var(--transition-fast);
 }
 

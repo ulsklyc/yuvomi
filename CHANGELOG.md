@@ -84,6 +84,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A two-finger swipe scrolls the main content on a touchscreen, and pinch-to-zoom works there.**
+  The main area told the browser it may only be panned vertically, and that setting quietly rules
+  out pinch-zoom as well. Chromium treats any scroll that starts with two fingers as a pinch and
+  drops it entirely where pinch-zoom is not allowed, so on a touchscreen laptop such as a Chromebook
+  a two-finger swipe over the main content did nothing, while the sidebar next to it and the
+  touchpad scrolled normally. On phones the same setting stopped pinch-to-zoom in the main area,
+  although the app allows zooming everywhere else. The main area, the rows in the overview widgets
+  and the toast now allow pinch-zoom alongside vertical panning; one-finger scrolling and swiping a
+  toast away work as before. (#1276)
+
 - **The message about an undecryptable backup no longer sends you into a dead end.** It used to
   advise setting `DB_ENCRYPTION_KEY` to the other installation's key and restarting. An instance
   that has a key of its own has its own database encrypted with that key, so after the swap Yuvomi
