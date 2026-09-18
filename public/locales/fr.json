@@ -3981,6 +3981,7 @@
                 "ketosis": "Phase tardive"
             },
             "custom": "Personnalisé",
+            "notifications": "Notifications de jeûne",
             "startDate": "Date de début",
             "endDate": "Date de fin",
             "note": "Note",
@@ -3993,6 +3994,10 @@
             "clockRemaining": "Restant",
             "loadMore": "Charger 10 de plus",
             "goalNextHint": "Modifier l’objectif met à jour le jeûne en cours et l’objectif par défaut des prochains jeûnes.",
+            "remindNext": "Il est temps de commencer votre prochain jeûne",
+            "remindGoalToggle": "M’avertir lorsque j’atteins mon objectif",
+            "remindNextToggle": "Me rappeler quand commencer le prochain jeûne",
+            "reminderHint": "Après la fin, le rappel suit le reste du cycle de 24 heures. Aucun rappel sans objectif ou pour un objectif de 24 heures ou plus.",
             "safetyTitle": "Avant de commencer",
             "conflict": "Cette entrée a changé. Rechargez la page et réessayez.",
             "finishedTitle": "Jeûne terminé",

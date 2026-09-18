@@ -3981,6 +3981,7 @@
                 "ketosis": "Giai đoạn sau"
             },
             "custom": "Tùy chỉnh",
+            "notifications": "Thông báo",
             "startDate": "Ngày bắt đầu",
             "endDate": "Ngày kết thúc",
             "note": "Ghi chú",
@@ -3993,6 +3994,10 @@
             "clockRemaining": "Còn lại",
             "loadMore": "Tải thêm 10",
             "goalNextHint": "Thay đổi mục tiêu sẽ cập nhật lần nhịn ăn hiện tại và mục tiêu mặc định cho những lần nhịn ăn sau.",
+            "remindNext": "Đã đến lúc bắt đầu lần nhịn ăn tiếp theo",
+            "remindGoalToggle": "Thông báo khi tôi đạt mục tiêu",
+            "remindNextToggle": "Nhắc khi đến lúc nhịn ăn tiếp theo",
+            "reminderHint": "Sau khi kết thúc, nhắc sau phần còn lại của chu kỳ 24 giờ. Không nhắc nếu không có mục tiêu hoặc mục tiêu từ 24 giờ.",
             "safetyTitle": "Trước khi bắt đầu",
             "conflict": "Bản ghi đã thay đổi. Tải lại trang và thử lại.",
             "finishedTitle": "Đã kết thúc nhịn ăn",

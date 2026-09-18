@@ -3981,6 +3981,7 @@
                 "ketosis": "Late fase"
             },
             "custom": "Aangepast",
+            "notifications": "Meldingen",
             "startDate": "Begindatum",
             "endDate": "Einddatum",
             "note": "Notitie",
@@ -3993,6 +3994,10 @@
             "clockRemaining": "Resterend",
             "loadMore": "Nog 10 laden",
             "goalNextHint": "Een doelwijziging past de huidige vastenperiode en het standaarddoel voor toekomstige vastenperiodes aan.",
+            "remindNext": "Tijd voor je volgende vastenperiode",
+            "remindGoalToggle": "Meld het wanneer ik mijn doel bereik",
+            "remindNextToggle": "Herinner mij wanneer het tijd is voor de volgende vastenperiode",
+            "reminderHint": "Na afloop volgt de herinnering na de rest van de cyclus van 24 uur. Geen herinnering zonder doel of bij doelen vanaf 24 uur.",
             "safetyTitle": "Voordat je begint",
             "conflict": "Dit item is gewijzigd. Herlaad de pagina en probeer opnieuw.",
             "finishedTitle": "Vasten beëindigd",

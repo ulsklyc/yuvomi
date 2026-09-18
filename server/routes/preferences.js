@@ -17,6 +17,7 @@ import { retitleBirthdayEvents } from '../services/birthdays.js';
 import { DEFAULT_OVERDUE_GRACE_DAYS } from '../services/countdowns.js';
 import { isWidgetId } from '../services/module-capabilities.js';
 import { listVisibleCategories } from '../services/note-categories.js';
+import { syncAllFastingReminders } from '../services/fasting-reminders.js';
 // Geteilte isomorphe Util (#620, Allowlist in test/test-layer-boundary.js):
 // dasselbe Kennungsformat, das Event-Modal und Einstellungen verwenden.
 import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
@@ -912,7 +913,10 @@ router.put('/', (req, res) => {
       const filtered = disabled_modules
         .filter((m) => typeof m === 'string' && TOGGLEABLE_MODULES.includes(m));
       const unique = [...new Set(filtered)];
-      cfgSet('disabled_modules', JSON.stringify(unique));
+      db.transaction(() => {
+        cfgSet('disabled_modules', JSON.stringify(unique));
+        syncAllFastingReminders(db.get());
+      });
     }
 
     // Persoenlich ausgeblendete Module (#673) - bewusst OHNE Admin-Check, das ist
