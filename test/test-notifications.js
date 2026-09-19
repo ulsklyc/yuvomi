@@ -24,7 +24,10 @@ function makeDb({ withNotificationTables = true } = {}) {
       role TEXT NOT NULL DEFAULT 'member',
       -- resolvePermissions() liest das Rollen-Profil ueber family_role.
       family_role TEXT,
-      schedule_reminder_offset_minutes INTEGER
+      schedule_reminder_offset_minutes INTEGER,
+      -- D6-Betreuungs-Fan-out: der Subjekt-Name auf der geerbten
+      -- Vorsorge-Erinnerung kommt aus users.display_name.
+      display_name TEXT NOT NULL DEFAULT ''
     );
     -- Der Vorrats-Voll-Sync fragt beide Rechte-Achsen (#467): sync_config fuer
     -- die haushaltweite Abschaltung, access_permissions je Empfaenger. Fehlt
@@ -81,6 +84,20 @@ function makeDb({ withNotificationTables = true } = {}) {
       name TEXT NOT NULL,
       expires_at TEXT
     );
+    -- Minimal, nur genug fuer den 'health_prevention_due'-Zweig in
+    -- processDueNotifications() UND fuer syncAllPreventionReminders() -
+    -- ohne diese zwei Tabellen scheitert schon die Sync-Abfrage, bevor die
+    -- due-Abfrage ueberhaupt drankommt.
+    CREATE TABLE health_prevention_types (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL
+    );
+    CREATE TABLE health_prevention_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type_id INTEGER REFERENCES health_prevention_types(id) ON DELETE SET NULL,
+      name TEXT
+    );
     -- Minimal, wie inventory_items/pantry_items daneben: nur genug Spalten,
     -- damit die CASE-Zweige in processDueNotifications() und der
     -- Schichtplan-Sync (server/services/schedule-reminders.js) sich preparen
@@ -111,13 +128,16 @@ function makeDb({ withNotificationTables = true } = {}) {
     );
     CREATE TABLE reminders (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      entity_type TEXT NOT NULL CHECK(entity_type IN ('task','event','subscription','inventory_item','inventory_tracked_date','pantry_item','cycle_period','cycle_log_nudge','schedule_entry','schedule_extra_entry','waste_pickup','document_expiry')),
+      entity_type TEXT NOT NULL CHECK(entity_type IN ('task','event','subscription','inventory_item','inventory_tracked_date','pantry_item','cycle_period','cycle_log_nudge','schedule_entry','schedule_extra_entry','waste_pickup','document_expiry','health_prevention_due')),
       entity_id INTEGER NOT NULL,
       remind_at TEXT NOT NULL,
       dismissed INTEGER NOT NULL DEFAULT 0,
       pushed_at TEXT,
       created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      -- D6-Betreuungs-Fan-out: processDueNotifications() selektiert
+      -- r.assigned_from ungeachtet des entity_type, also muss die Spalte hier stehen.
+      assigned_from INTEGER REFERENCES users(id) ON DELETE SET NULL
     );
     -- Minimal, wie inventory_items/pantry_items daneben: nur genug Spalten,
     -- damit die CASE-Zweige fuer cycle_period/cycle_log_nudge sich preparen
