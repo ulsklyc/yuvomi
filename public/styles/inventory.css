@@ -523,3 +523,108 @@
   font-size: var(--text-sm);
   white-space: nowrap;
 }
+
+/* Wiederholung/Distanz-Intervall - eigene Zeile unter der
+ * Haupt-Zeile statt eine sechste Grid-Spalte: bei 390px ist die Haupt-Zeile
+ * schon voll, und beide Felder sind optional (leer = heutiges Verhalten). */
+.inventory-tracked-date-row__intervals {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.inventory-tracked-date-row__intervals .form-input {
+  width: 8rem;
+}
+
+/* --------------------------------------------------------
+ * Verlaufs-Ansicht (Service-Log + verknuepfte Buchungen/Dokumente)
+ * -------------------------------------------------------- */
+
+/* Kilometerstand-Trend, gleiche Geometrie wie die Health-Charts
+ * (utils/chart.js; .chart__grid/.chart__axis(--y) leben schon geteilt in
+ * panel.css). Was hierbleibt, ist modul-eigen: Kartenrahmen und Flaechenfuellung -
+ * dieselbe Aufteilung wie health.css bei .health-chart(-section)/__area. */
+.inventory-chart-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  margin-bottom: var(--space-3);
+}
+
+.inventory-chart-section__title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-primary);
+}
+
+.inventory-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.inventory-chart__area {
+  fill: color-mix(in oklab, var(--module-inventory) 14%, transparent);
+}
+
+.inventory-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.inventory-history-entry {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.inventory-history-entry__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0h);
+  min-width: 0;
+}
+
+.inventory-history-entry__label {
+  overflow-wrap: anywhere;
+}
+
+.inventory-history-entry__sub {
+  font-size: var(--type-caption);
+  color: var(--color-text-tertiary);
+}
+
+.inventory-history-entry__amount {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.inventory-history-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.inventory-tracked-date-detail-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.inventory-tracked-date-detail-row__done {
+  margin-left: auto;
+}

@@ -17,6 +17,7 @@ import { retitleBirthdayEvents } from '../services/birthdays.js';
 import { DEFAULT_OVERDUE_GRACE_DAYS } from '../services/countdowns.js';
 import { isWidgetId } from '../services/module-capabilities.js';
 import { listVisibleCategories } from '../services/note-categories.js';
+import { syncPreventionRemindersForSubject } from '../services/prevention-reminders.js';
 // Geteilte isomorphe Util (#620, Allowlist in test/test-layer-boundary.js):
 // dasselbe Kennungsformat, das Event-Modal und Einstellungen verwenden.
 import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
@@ -611,6 +612,10 @@ router.get('/', (req, res) => {
         // Modul-Feature-Schalter (haushaltweit). Default an: fehlender Wert =>
         // Feature aktiv, damit Bestandshaushalte ihr Verhalten behalten.
         ...healthCycleViews(req.authUserId),
+        // Betreuungs-Fan-out fuer Vorsorge-Erinnerungen (D6/Review #1256) -
+        // Opt-in wie cycle_settings.notify_partner_user_id: der Eigentuemer
+        // veroeffentlicht bewusst, es teilt nichts von selbst.
+        health_prevention_notify_caregivers: cfgUserGet('health_prevention_notify_caregivers', req.authUserId) === '1',
         rewards_require_approval: cfgGet('rewards_require_approval') !== '0',
         tasks_subtasks_expanded: cfgGet('tasks_subtasks_expanded') === '1',
         tasks_default_points: parseTaskDefaultPoints(cfgGet('tasks_default_points')),
@@ -657,7 +662,7 @@ router.get('/', (req, res) => {
 
 router.put('/', (req, res) => {
   try {
-    const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
+    const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, health_prevention_notify_caregivers, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
 
     // Welche Quickstart-Vorlagen der Schichtplan-Schnellstart zeigt - wie
     // disabled_modules haushaltweit und admin-only, nicht wie hidden_modules
@@ -1053,6 +1058,19 @@ router.put('/', (req, res) => {
       cfgUserSet('health_cycle_enabled', req.authUserId, health_cycle_enabled_user ? '1' : '0');
     }
 
+    // Betreuungs-Fan-out fuer Vorsorge-Erinnerungen (D6/Review #1256) - Opt-in,
+    // Standard aus. Wirkt sofort: derselbe Sync, den caregivers.js nach einer
+    // Betreuungs-Aenderung anstoesst, nicht erst der naechste periodische Lauf.
+    if (health_prevention_notify_caregivers !== undefined) {
+      if (typeof health_prevention_notify_caregivers !== 'boolean') {
+        return res.status(400).json({ error: 'health_prevention_notify_caregivers must be a boolean', code: 400 });
+      }
+      cfgUserSet('health_prevention_notify_caregivers', req.authUserId, health_prevention_notify_caregivers ? '1' : '0');
+      try { syncPreventionRemindersForSubject(db.get(), req.authUserId); } catch (err) {
+        log.error('Error syncing prevention reminders after notify_caregivers change:', err.message);
+      }
+    }
+
     if (rewards_require_approval !== undefined) {
       if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
@@ -1329,6 +1347,10 @@ router.put('/', (req, res) => {
         calendar_default_assign_me: cfgUserGet('calendar_default_assign_me', req.authUserId) === '1',
         calendar_default_target: cfgUserGet('calendar_default_target', req.authUserId) || '',
         ...healthCycleViews(req.authUserId),
+        // Betreuungs-Fan-out fuer Vorsorge-Erinnerungen (D6/Review #1256) -
+        // Opt-in wie cycle_settings.notify_partner_user_id: der Eigentuemer
+        // veroeffentlicht bewusst, es teilt nichts von selbst.
+        health_prevention_notify_caregivers: cfgUserGet('health_prevention_notify_caregivers', req.authUserId) === '1',
         rewards_require_approval: cfgGet('rewards_require_approval') !== '0',
         tasks_subtasks_expanded: cfgGet('tasks_subtasks_expanded') === '1',
         tasks_default_points: parseTaskDefaultPoints(cfgGet('tasks_default_points')),

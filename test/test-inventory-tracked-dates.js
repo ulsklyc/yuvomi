@@ -153,6 +153,25 @@ test('DELETE /items/:id räumt Fristen und ihre Erinnerungen ab', async () => {
   assert.equal(db.prepare('SELECT COUNT(*) AS c FROM inventory_item_dates WHERE item_id = ?').get(created.body.data.id).c, 0);
 });
 
+test('POST mit interval_months/interval_distance legt beide Felder mit an, weggelassen bleiben sie NULL', async () => {
+  const r = await call('POST', '/items', {
+    body: {
+      name: 'Auto', category: 'vehicles',
+      tracked_dates: [
+        { label: 'HU/TÜV', date: FUTURE_DATE, interval_months: 24, interval_distance: 15000 },
+        { label: 'Einmalig', date: FUTURE_DATE },
+      ],
+    },
+  });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const tuv = r.body.data.tracked_dates.find((d) => d.label === 'HU/TÜV');
+  const once = r.body.data.tracked_dates.find((d) => d.label === 'Einmalig');
+  assert.equal(tuv.interval_months, 24);
+  assert.equal(tuv.interval_distance, 15000);
+  assert.equal(once.interval_months, null, 'ohne Angabe bleibt es das heutige Einmal-Verhalten');
+  assert.equal(once.interval_distance, null);
+});
+
 test('GET /reminders/pending löst den Titel für inventory_tracked_date über den Join auf', async () => {
   const created = await call('POST', '/items', {
     body: { name: 'Heizung', tracked_dates: [{ label: 'Wartung', date: '2000-01-05', reminder_offset_days: 1 }] },

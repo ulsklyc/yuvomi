@@ -12,6 +12,7 @@ import express from 'express';
 import * as db from '../../db.js';
 import { requireAdmin } from '../../middleware/require-admin.js';
 import { log, viewerId, caredForIds } from './helpers.js';
+import { syncPreventionRemindersForSubject } from '../../services/prevention-reminders.js';
 
 const router = express.Router();
 
@@ -92,6 +93,14 @@ router.put('/caregivers/:subjectId', requireAdmin, (req, res) => {
       for (const id of ids) insert.run(subjectId, id);
     });
     tx();
+
+    // Wirkt sofort: eine entzogene Betreuung darf nicht bis zum naechsten
+    // periodischen Lauf weiter eine Vorsorge-Erinnerung an die betroffene
+    // Person schicken (D6) - dieselbe Erwartung wie beim Zyklus-
+    // Einstellungs-Schreiben.
+    try { syncPreventionRemindersForSubject(db.get(), subjectId); } catch (err) {
+      log.error('Error re-syncing prevention reminders after care grant change:', err.message);
+    }
 
     res.json({ data: { subject_id: subjectId, caregiver_ids: ids } });
   } catch (err) {

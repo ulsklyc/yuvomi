@@ -24,13 +24,14 @@ import { emptyStateEl } from '/utils/empty-state.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { formatMoney } from '/utils/money.js';
 import { todayKey } from '/utils/date.js';
-import { formatDate, getLocale } from '/i18n.js';
+import { formatDate, getLocale, getNumberFormat } from '/i18n.js';
 import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
 import { warrantyStatus, hasUpcomingDeadline, dateStatus, countUpcomingDeadlines } from '/utils/inventory-warranty.js';
-import { openDetailView } from '/components/detail-view.js';
+import { openDetailView, closeDetailView } from '/components/detail-view.js';
 import { wireScrollFade } from '/utils/ux.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { setNavBadge } from '/utils/nav-badges.js';
+import { CHART, chartScales, chartX, chartY, chartGridMarkup, chartXLabelsMarkup } from '/utils/chart.js';
 
 let _container = null;
 let _search = null;
@@ -54,6 +55,12 @@ async function loadLocations() {
 async function loadCategories() {
   const res = await api.get('/inventory/categories');
   state.categories = res.data;
+}
+
+/** Client-Spiegel von items.js#categoryTracksOdometer - dieselbe Flagge (state.categories),
+ *  kein hartcodierter 'vehicles'-Vergleich mehr (Review #1257). */
+function categoryTracksOdometer(categoryKey) {
+  return state.categories.find((c) => c.key === categoryKey)?.tracks_odometer === 1;
 }
 
 // --------------------------------------------------------
@@ -718,8 +725,212 @@ function trackedDateDetailEntries(item) {
       ? t('inventory.trackedDateOverdueDays', { count: Math.abs(status.days) })
       : status.days === 0 ? t('inventory.trackedDateDueToday')
       : t('inventory.trackedDateInDays', { count: status.days });
-    return { text: d.label, sub: countdown ? `${formatDate(d.date)} · ${countdown}` : formatDate(d.date) };
+    const distanceHint = d.interval_distance
+      ? t('inventory.trackedDateDistanceHint', { value: formatOdometer(d.interval_distance), count: d.interval_distance, unit: odometerUnitLabel(item.odometer_unit) })
+      : '';
+    const sub = [countdown ? `${formatDate(d.date)} · ${countdown}` : formatDate(d.date), distanceHint]
+      .filter(Boolean).join(' · ');
+    return { text: d.label, sub };
   });
+}
+
+/**
+ * Fristen-Zeilen der Detailansicht MIT "Erledigt"-Aktion auf einer faelligen
+ * Zeile - eigener Knoten statt inventoryDetailListNode, weil dort keine
+ * Aktion je Zeile vorgesehen ist. `onDone` bekommt die einzelne getrackte
+ * Frist und loest die Abschluss-Karte aus (siehe openCompletionSheet).
+ */
+function trackedDatesDetailNode(item, onDone) {
+  const rows = item.tracked_dates || [];
+  if (!rows.length) return null;
+  const entries = trackedDateDetailEntries(item);
+  const wrap = document.createElement('div');
+  wrap.className = 'inventory-detail-list';
+  rows.forEach((d, i) => {
+    const { text, sub } = entries[i];
+    const status = dateStatus(d.date);
+    const due = !!status && status.state !== 'valid';
+
+    const line = document.createElement('div');
+    line.className = 'inventory-tracked-date-detail-row';
+    const main = document.createElement('div');
+    main.className = 'inventory-detail-list__item';
+    const span = document.createElement('span');
+    span.className = 'inventory-detail-list__text';
+    span.textContent = text;
+    main.appendChild(span);
+    if (sub) {
+      const subEl = document.createElement('span');
+      subEl.className = 'inventory-detail-list__sub';
+      subEl.textContent = sub;
+      main.appendChild(subEl);
+    }
+    line.appendChild(main);
+
+    if (due) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn--secondary btn--sm inventory-tracked-date-detail-row__done';
+      btn.textContent = t('inventory.markDoneAction');
+      btn.addEventListener('click', () => onDone(d));
+      line.appendChild(btn);
+    }
+    wrap.appendChild(line);
+  });
+  return wrap;
+}
+
+/** Eine Zeile der Verlaufs-Ansicht (Service-Log-Eintrag, verknuepfte Buchung
+ *  oder verknuepftes Dokument) - eine Zeitleiste aus drei Quellen, die es
+ *  schon gibt (server/routes/inventory/service-log.js#loadHistory). */
+function historyEntryLine(entry, odometerUnit) {
+  const line = document.createElement('div');
+  line.className = 'inventory-history-entry';
+  const main = document.createElement('div');
+  main.className = 'inventory-history-entry__main';
+
+  const label = document.createElement('span');
+  label.className = 'inventory-history-entry__label';
+  label.textContent = entry.label;
+  main.appendChild(label);
+
+  const subParts = [formatDate(entry.date)];
+  if (entry.type === 'service_log') {
+    if (entry.vendor) subParts.push(entry.vendor);
+    if (entry.odometer != null) {
+      subParts.push(t('inventory.historyOdometerValue', { value: formatOdometer(entry.odometer), count: entry.odometer, unit: odometerUnit }));
+    }
+    if (entry.note) subParts.push(entry.note);
+  } else if (entry.type === 'budget_entry') {
+    subParts.push(roleLabel(entry.role));
+  }
+  const sub = document.createElement('span');
+  sub.className = 'inventory-history-entry__sub';
+  sub.textContent = subParts.join(' · ');
+  main.appendChild(sub);
+  line.appendChild(main);
+
+  if (entry.type === 'budget_entry') {
+    const amount = document.createElement('span');
+    amount.className = 'inventory-history-entry__amount';
+    amount.textContent = formatMoney(entry.amount, _householdCurrency);
+    line.appendChild(amount);
+  }
+  return line;
+}
+
+/** Barrierefreie Tabelle unter dem Chart - lokales Gegenstueck zu
+ *  health.js#chartTableMarkup (dort ebenfalls nicht geteilt: die Geometrie in
+ *  utils/chart.js ist gemeinsam, das Vokabular je Modul eigen). */
+function chartTableMarkup(caption, headers, rows) {
+  const head = headers.map((h) => `<th scope="col">${esc(h)}</th>`).join('');
+  const body = rows.map((cells) =>
+    `<tr>${cells.map((c, i) => (i === 0
+      ? `<th scope="row">${esc(c)}</th>`
+      : `<td>${esc(c)}</td>`)).join('')}</tr>`).join('');
+  return `
+    <table class="sr-only">
+      <caption>${esc(caption)}</caption>
+      <thead><tr>${head}</tr></thead>
+      <tbody>${body}</tbody>
+    </table>`;
+}
+
+/** Kilometerstand-Trend ueber die Zeit - dieselbe Geometrie wie die
+ *  Health-Charts (utils/chart.js#simpleLineChartMarkup-Muster), hier fuer die
+ *  eine Zeitreihe, die ein Gegenstand hat. Mindestens zwei Punkte, sonst ist
+ *  "ueber die Zeit" gar keine Aussage. */
+function odometerChartMarkup(points, unit) {
+  if (points.length < 2) return '';
+  const { W, H } = CHART;
+  const { top, bottom } = chartScales();
+
+  const values = points.map((p) => p.value);
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+  if (min === max) { min -= 1; max += 1; }
+  const pad = (max - min) * 0.1;
+  min -= pad; max += pad;
+
+  const x = (i) => chartX(i, points.length);
+  const y = (v) => chartY(v, min, max);
+
+  const spine = points.map((p, i) => `${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+  const area = `<polygon class="inventory-chart__area" points="${x(0).toFixed(1)},${bottom.toFixed(1)} ${spine} ${x(points.length - 1).toFixed(1)},${bottom.toFixed(1)}" />`;
+  const dots = points.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" fill="var(--module-inventory)"><title>${esc(`${formatDate(p.date)}: ${formatOdometer(p.value)} ${unit}`)}</title></circle>`).join('');
+
+  const grid = chartGridMarkup(min, max, (val) => formatOdometer(Math.round(val)));
+  const xLabels = chartXLabelsMarkup(points.map((p) => formatDate(p.date)));
+  const titleText = t('inventory.odometerChartTitle');
+  const table = chartTableMarkup(titleText, [t('inventory.completePerformedOnLabel'), t('inventory.odometerLabel')],
+    points.map((p) => [formatDate(p.date), `${formatOdometer(p.value)} ${unit}`]));
+
+  return `
+    <div class="inventory-chart-section">
+      <div class="inventory-chart-section__title">${esc(titleText)}</div>
+      <svg class="inventory-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
+        ${grid}
+        ${area}
+        <polyline fill="none" stroke="var(--module-inventory)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${spine}" />
+        ${dots}
+        ${xLabels}
+      </svg>
+      ${table}
+    </div>`;
+}
+
+/** Kilometerstand-Messpunkte: jede Service-Log-Zeile mit eigenem Wert, plus
+ *  die aktuelle Ablesung des Items selbst, falls sie zu keiner Log-Zeile
+ *  gehoert (z. B. direkt im Formular eingetragen, nie ueber "Erledigt"). */
+function odometerChartPoints(history, item) {
+  const points = (history?.timeline || [])
+    .filter((e) => e.type === 'service_log' && e.odometer != null)
+    .map((e) => ({ date: e.date, value: e.odometer }));
+  if (item.odometer != null && item.odometer_on && !points.some((p) => p.date === item.odometer_on)) {
+    points.push({ date: item.odometer_on, value: item.odometer });
+  }
+  return points.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+}
+
+/** Verlaufs-Knoten: Kilometerstand-Trend (falls genug Messpunkte) + Zeitleiste
+ *  + Gesamtkosten - reine Anzeige, keine eigene Datenhaltung (server-seitig
+ *  eine Zusammenfuehrung, kein neuer Speicher). */
+function historyDetailNode(history, item, historyLoadFailed) {
+  // Ein Ladefehler sieht sonst genauso aus wie "nichts protokolliert" - beides
+  // liefert history === null (Review #1257).
+  if (historyLoadFailed) {
+    const error = document.createElement('p');
+    error.className = 'form-error';
+    error.setAttribute('role', 'alert');
+    error.textContent = t('inventory.historyLoadError');
+    return error;
+  }
+
+  const odometerUnit = odometerUnitLabel(item.odometer_unit);
+  const chartHtml = odometerChartMarkup(odometerChartPoints(history, item), odometerUnit);
+  const hasTimeline = !!(history && history.timeline.length);
+  if (!chartHtml && !hasTimeline) return null;
+
+  const wrap = document.createElement('div');
+  if (chartHtml) wrap.insertAdjacentHTML('beforeend', chartHtml);
+
+  if (hasTimeline) {
+    const list = document.createElement('div');
+    list.className = 'inventory-history-list';
+    history.timeline.forEach((entry) => list.appendChild(historyEntryLine(entry, odometerUnit)));
+    wrap.appendChild(list);
+    if (history.total) {
+      const total = document.createElement('div');
+      total.className = 'inventory-history-total';
+      const label = document.createElement('span');
+      label.textContent = t('inventory.historyTotalLabel');
+      const value = document.createElement('span');
+      value.textContent = formatMoney(history.total, _householdCurrency);
+      total.append(label, value);
+      wrap.appendChild(total);
+    }
+  }
+  return wrap;
 }
 
 /** Detail-Vorschau: eigenes DOM-Element statt Text/Link, gleiche Rolle wie
@@ -742,7 +953,7 @@ function photoDetailNode(photoData) {
  * (detailRowEl), also keine Fallunterscheidung hier noetig.
  * @returns {Array} Sections fuer openDetailView
  */
-function renderItemDetail(item) {
+function renderItemDetail(item, history, onDoneTrackedDate, historyLoadFailed) {
   const bookingEntries = (item.linked_entries || []).map((link) => ({
     text: `${link.title} · ${formatMoney(link.amount, _householdCurrency)}`,
     sub: `${roleLabel(link.role)} · ${formatDate(link.date)}`,
@@ -768,13 +979,35 @@ function renderItemDetail(item) {
     // wessen Namen laeuft es.
     { icon: 'at-sign', label: t('inventory.accountUsernameLabel'), value: item.account_username || '' },
     { icon: 'shield', label: t('inventory.warrantyMonthsLabel'), value: warrantyDetailValue(item) },
-    { icon: 'gauge', label: t('inventory.conditionLabel'), value: t(`inventory.condition${item.condition.charAt(0).toUpperCase()}${item.condition.slice(1)}`) },
+    { icon: 'gauge', label: t('inventory.odometerLabel'), value: odometerDetailValue(item) },
+    { icon: 'sparkles', label: t('inventory.conditionLabel'), value: t(`inventory.condition${item.condition.charAt(0).toUpperCase()}${item.condition.slice(1)}`) },
     { icon: 'info', label: t('inventory.statusLabel'), value: statusLabel(item.status) },
     { icon: 'align-left', label: t('inventory.notesLabel'), value: item.notes || '', multiline: true },
-    { icon: 'calendar-clock', label: t('inventory.trackedDatesLabel'), node: inventoryDetailListNode(trackedDateDetailEntries(item)) },
+    { icon: 'calendar-clock', label: t('inventory.trackedDatesLabel'), node: trackedDatesDetailNode(item, onDoneTrackedDate) },
     { icon: 'receipt', label: t('inventory.linkedBookingsLabel'), node: inventoryDetailListNode(bookingEntries) },
     { icon: 'paperclip', label: t('inventory.attachmentsLabel'), node: inventoryDetailListNode(attachmentEntries) },
+    { icon: 'history', label: t('inventory.historyLabel'), node: historyDetailNode(history, item, historyLoadFailed) },
   ];
+}
+
+/** Uebersetzte Einheit statt des rohen DB-Codes ('km'/'mi') - jede Stelle, die
+ *  eine Kilometerstand-Zahl anzeigt, muss hierueber gehen (Review #1257: eine
+ *  Stelle blieb roh und zeigte "1400 km" auf Russisch statt "1400 км"). */
+function odometerUnitLabel(unit) {
+  return t(`inventory.odometerUnit${unit === 'mi' ? 'Mi' : 'Km'}`);
+}
+
+/** Tausendertrennzeichen der Locale statt einer rohen Ziffernfolge - dasselbe
+ *  Muster wie budget.js/dashboard.js/housekeeping.js (Review #1257). */
+function formatOdometer(value) {
+  return getNumberFormat().format(value);
+}
+
+/** Kilometerstand-Zeile: Wert + Einheit + Ablesedatum, oder leer ohne Wert. */
+function odometerDetailValue(item) {
+  if (item.odometer == null) return '';
+  const value = `${formatOdometer(item.odometer)} ${odometerUnitLabel(item.odometer_unit)}`;
+  return item.odometer_on ? `${value} · ${formatDate(item.odometer_on)}` : value;
 }
 
 /**
@@ -785,14 +1018,51 @@ function renderItemDetail(item) {
  * anstatt einen zweiten Weg fuer den Popover-Fall zu brauchen.
  *
  * Die Liste liefert bereits das volle Item (Anhaenge, Buchungen, Fristen) -
- * kein Einzelabruf noetig, anders als bei Kontakten.
+ * kein Einzelabruf noetig, anders als bei Kontakten. Die Verlaufs-Ansicht ist
+ * ein eigener Endpunkt (server/routes/inventory/service-log.js#loadHistory,
+ * reine Aggregation, kein Teil des Item-Datensatzes) und wird deshalb separat
+ * nachgeladen, bevor die Ansicht aufgeht.
  */
-function openItemDetail(item) {
+async function openItemDetail(item) {
+  let history = null;
+  let historyLoadFailed = false;
+  try {
+    const res = await api.get(`/inventory/items/${item.id}/history`);
+    history = res.data;
+  } catch (err) {
+    console.error('[Inventory] Verlauf konnte nicht geladen werden:', err);
+    historyLoadFailed = true;
+  }
+
+  const onDoneTrackedDate = async (trackedDate) => {
+    // Die Detailansicht MUSS zu sein, BEVOR die Abschluss-Karte aufgeht: beide
+    // sind openModal()-Overlays, und ein zweiter Overlay ueber einem noch
+    // offenen zwingt dessen erzwungenes Schliessen (modal.js#openModal) - das
+    // reisst die Verlaufs-/Zurueck-Verwaltung der Detailansicht
+    // (overlay-history.js) mit, und die gerade erst geoeffnete Karte faellt
+    // im selben Zug wieder zu.
+    await closeDetailView({ force: true });
+    const completed = await openCompletionSheet(item, trackedDate);
+    if (completed) {
+      await loadItems();
+      renderList();
+      updateAttentionBadge();
+    }
+    // Ein voller Neu-Öffnen ist einfacher und robuster als ein In-Place-Update
+    // der Detailansicht - openDetailView bietet dafür keine Aktualisierungs-API,
+    // und das Item hat sich bei einem Abschluss an mehreren Stellen zugleich
+    // geändert (Frist, Erinnerung, ggf. Kilometerstand, Verlauf). Ohne
+    // Abschluss (abgebrochen) geht dieselbe, unveränderte Ansicht wieder auf.
+    const refreshed = (completed && state.items.find((i) => i.id === item.id)) || item;
+    await openItemDetail(refreshed);
+    refocusAfterRender();
+  };
+
   openDetailView({
     title: item.name,
     accentColor: 'var(--module-inventory)',
     size: 'md',
-    sections: renderItemDetail(item),
+    sections: renderItemDetail(item, history, onDoneTrackedDate, historyLoadFailed),
     actions: [{
       id: 'inventory-detail-delete',
       label: t('common.delete'),
@@ -813,6 +1083,87 @@ function openItemDetail(item) {
         form.wire(panel);
       },
     },
+  });
+}
+
+/**
+ * Abschluss-Karte fuer eine faellige getrackte Frist ("Erledigt"): Datum
+ * (Vorgabe heute), Kilometerstand, Haendler, Notiz - alle bis auf das Datum
+ * optional. Eigenes kleines Formular statt buildItemForm-Musters, weil es
+ * nichts mit dem Item-Formular teilt.
+ * @returns {Promise<boolean>} true, wenn die Frist erledigt wurde
+ */
+function openCompletionSheet(item, trackedDate) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (result) => { if (!settled) { settled = true; resolve(result); } };
+
+    // Kilometerstand nur bei odometer-tragenden Kategorien abfragen - dieselbe
+    // Einschraenkung wie im Item-Formular.
+    const isVehicle = categoryTracksOdometer(item.category);
+    const content = `
+      <div class="form-group">
+        <label class="form-label" for="inv-complete-date">${esc(t('inventory.completePerformedOnLabel'))}</label>
+        <yuvomi-datepicker id="inv-complete-date" type="date" value="${esc(todayKey())}"></yuvomi-datepicker>
+      </div>
+      ${isVehicle ? `
+      <div class="form-group">
+        <label class="form-label" for="inv-complete-odometer">${esc(t('inventory.odometerLabel'))}</label>
+        <input id="inv-complete-odometer" class="form-input" type="number" min="0" step="1" inputmode="numeric">
+      </div>` : ''}
+      <div class="form-group">
+        <label class="form-label" for="inv-complete-vendor">${esc(t('inventory.vendorLabel'))}</label>
+        <input id="inv-complete-vendor" class="form-input" type="text">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="inv-complete-note">${esc(t('inventory.notesLabel'))}</label>
+        <textarea id="inv-complete-note" class="form-input" rows="3"></textarea>
+      </div>
+      <div class="modal-panel__footer modal-panel__footer--plain">
+        <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
+        <button type="button" class="btn btn--primary" id="inv-complete-save">${esc(t('inventory.markDoneAction'))}</button>
+      </div>`;
+
+    openSharedModal({
+      title: t('inventory.completeSheetTitle', { label: trackedDate.label }),
+      size: 'sm',
+      content,
+      onSave: (panel) => {
+        panel.querySelector('.modal-panel__footer [data-action="close-modal"]')
+          ?.addEventListener('click', () => { closeSharedModal(); });
+        panel.querySelector('#inv-complete-save').addEventListener('click', async () => {
+          const saveBtn = panel.querySelector('#inv-complete-save');
+          const performedOn = panel.querySelector('#inv-complete-date').value;
+          if (!performedOn) return;
+          const odometerRaw = isVehicle ? panel.querySelector('#inv-complete-odometer').value.trim() : '';
+          const payload = {
+            performed_on: performedOn,
+            odometer: odometerRaw === '' ? null : Number(odometerRaw),
+            vendor: panel.querySelector('#inv-complete-vendor').value.trim() || null,
+            note: panel.querySelector('#inv-complete-note').value.trim() || null,
+          };
+          saveBtn.disabled = true;
+          try {
+            await api.post(`/inventory/items/${item.id}/dates/${trackedDate.id}/complete`, payload);
+            // ERST settle(true), DANN das Modal schliessen: das Schliessen
+            // loest selbst den registrierten onClose-Callback aus (modal.js),
+            // auch bei einem erfolgreichen, selbst ausgeloesten Schliessen -
+            // ohne diese Reihenfolge wuerde dessen settle(false) zuerst
+            // greifen (settle() ist idempotent, "wer zuerst kommt" gewinnt)
+            // und der Abschluss saehe fuer den Aufrufer wie ein Abbruch aus,
+            // obwohl die Frist bereits serverseitig erledigt ist.
+            settle(true);
+            await closeSharedModal({ force: true });
+            window.yuvomi?.showToast(t('inventory.completed'), 'success');
+          } catch (err) {
+            saveBtn.disabled = false;
+            window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+          }
+        });
+        if (window.lucide) window.lucide.createIcons({ el: panel });
+      },
+      onClose: () => settle(false),
+    });
   });
 }
 
@@ -1077,7 +1428,9 @@ function updateWarrantyStatus(panel) {
   }
 }
 
-function trackedDateRowHtml({ label = '', date = '', reminder_offset_days = 30 } = {}) {
+function trackedDateRowHtml({
+  label = '', date = '', reminder_offset_days = 30, interval_months = '', interval_distance = '',
+} = {}) {
   return `
     <div class="inventory-tracked-date-row" data-tracked-date-row>
       <input class="form-input js-tracked-date-label" type="text" maxlength="100"
@@ -1090,6 +1443,16 @@ function trackedDateRowHtml({ label = '', date = '', reminder_offset_days = 30 }
               aria-label="${esc(t('inventory.removeTrackedDateAction'))}">
         <i data-lucide="x" class="icon-md" aria-hidden="true"></i>
       </button>
+      <div class="inventory-tracked-date-row__intervals">
+        <input class="form-input js-tracked-date-interval-months" type="number" min="1" max="600" step="1"
+               placeholder="${esc(t('inventory.trackedDateIntervalMonthsPlaceholder'))}"
+               aria-label="${esc(t('inventory.trackedDateIntervalMonthsLabel'))}"
+               value="${interval_months === null ? '' : esc(String(interval_months))}">
+        <input class="form-input js-tracked-date-interval-distance" type="number" min="1" step="1"
+               placeholder="${esc(t('inventory.trackedDateIntervalDistancePlaceholder'))}"
+               aria-label="${esc(t('inventory.trackedDateIntervalDistanceLabel'))}"
+               value="${interval_distance === null ? '' : esc(String(interval_distance))}">
+      </div>
     </div>`;
 }
 
@@ -1150,10 +1513,16 @@ function collectTrackedDates(panel) {
     // (input min="0", Server-Validator >= 0, DB-CHECK BETWEEN 0 AND 365).
     const rawOffset = row.querySelector('.js-tracked-date-offset').value.trim();
     const offset = Number(rawOffset);
+    const rawIntervalMonths = row.querySelector('.js-tracked-date-interval-months').value.trim();
+    const rawIntervalDistance = row.querySelector('.js-tracked-date-interval-distance').value.trim();
     return {
       label: row.querySelector('.js-tracked-date-label').value.trim(),
       date: row.querySelector('.js-tracked-date-date').value || null,
       reminder_offset_days: rawOffset === '' || !Number.isFinite(offset) ? 30 : offset,
+      // Leer bleibt NULL (heutiges Einmal-Verhalten) - kein Default wie beim
+      // Vorlauf oben, siehe server/routes/inventory/item-dates.js.
+      interval_months: rawIntervalMonths === '' ? null : Number(rawIntervalMonths),
+      interval_distance: rawIntervalDistance === '' ? null : Number(rawIntervalDistance),
     };
   }).filter((d) => d.label && d.date);
 }
@@ -1295,6 +1664,24 @@ function buildItemForm({ mode, item = null }) {
             <select id="inv-condition" class="form-input">${conditionOptions}</select>
           </div>
         </div>
+        <div class="inventory-form-row" id="inv-odometer-group" ${categoryTracksOdometer(isEdit ? item.category : 'other') ? '' : 'hidden'}>
+          <div class="form-group">
+            <label class="form-label" for="inv-odometer">${esc(t('inventory.odometerLabel'))}</label>
+            <input id="inv-odometer" class="form-input" type="number" min="0" step="1" inputmode="numeric">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="inv-odometer-unit">${esc(t('inventory.odometerUnitLabel'))}</label>
+            <select id="inv-odometer-unit" class="form-input">
+              <option value="km">${esc(t('inventory.odometerUnitKm'))}</option>
+              <option value="mi">${esc(t('inventory.odometerUnitMi'))}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="inv-odometer-on">${esc(t('inventory.odometerOnLabel'))}</label>
+            <yuvomi-datepicker id="inv-odometer-on" type="date"
+                               value="${esc(isEdit && item.odometer_on ? item.odometer_on : '')}"></yuvomi-datepicker>
+          </div>
+        </div>
         <div class="form-group">
           <span class="form-label">${esc(t('inventory.trackedDatesLabel'))}</span>
           <p class="inventory-tracked-dates-hint">${esc(t('inventory.trackedDatesHint'))}</p>
@@ -1318,7 +1705,13 @@ function buildItemForm({ mode, item = null }) {
           label: t('inventory.attachmentsLabel'),
           hint: t('inventory.attachmentsHint'),
         })}`,
-      { open: isEdit && (!!item.brand || !!item.model || !!item.serial_number || !!item.notes || !!item.photo_data || (item.attachments?.length ?? 0) > 0) })}
+      {
+        open: isEdit && (!!item.brand || !!item.model || !!item.serial_number || !!item.notes
+          || !!item.photo_data || (item.attachments?.length ?? 0) > 0
+          // Kilometerstand auf einen Blick zeigen: entweder schon gesetzt,
+          // oder die Kategorie, fuer die er am haeufigsten gebraucht wird.
+          || item.odometer != null || categoryTracksOdometer(item.category)),
+      })}
       <div class="modal-panel__footer modal-panel__footer--plain">
         ${isEdit ? `<button type="button" class="btn btn--danger-ghost" id="inv-delete">${esc(t('common.delete'))}</button>` : ''}
         <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
@@ -1339,6 +1732,18 @@ function buildItemForm({ mode, item = null }) {
     panel.querySelector('#inv-warranty').value = isEdit && item.warranty_months != null ? String(item.warranty_months) : '';
     panel.querySelector('#inv-condition').value = isEdit ? item.condition : 'good';
     panel.querySelector('#inv-notes').value = isEdit && item.notes ? item.notes : '';
+    panel.querySelector('#inv-odometer').value = isEdit && item.odometer != null ? String(item.odometer) : '';
+    panel.querySelector('#inv-odometer-unit').value = isEdit && item.odometer_unit ? item.odometer_unit : 'km';
+
+    // Kilometerstand ist auf odometer-tragende Kategorien begrenzt (per
+    // Voreinstellung nur "Fahrzeuge", Nutzer-Entscheidung 2026-09-17) - andere
+    // Gegenstandsarten brauchen keinen Kilometerstand, und ein Kategoriewechsel
+    // weg davon blendet die Gruppe wieder aus (saveItem() sendet dann ohnehin
+    // null, siehe dort).
+    const odometerGroup = panel.querySelector('#inv-odometer-group');
+    panel.querySelector('#inv-category').addEventListener('change', (e) => {
+      odometerGroup.hidden = !categoryTracksOdometer(e.target.value);
+    });
 
     updateWarrantyStatus(panel);
     panel.querySelector('#inv-purchase-date').addEventListener('input', () => updateWarrantyStatus(panel));
@@ -1483,10 +1888,16 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
 
   const priceRaw = panel.querySelector('#inv-purchase-price').value.trim();
   const warrantyRaw = panel.querySelector('#inv-warranty').value.trim();
+  const category = panel.querySelector('#inv-category').value;
+  // Kilometerstand ist auf odometer-tragende Kategorien begrenzt - unabhaengig
+  // vom (bei anderen Kategorien versteckten) Feldinhalt zaehlt hier nur die
+  // aktuelle Kategorie, sonst ueberlebte ein vor dem Kategoriewechsel
+  // eingetragener Wert unsichtbar.
+  const odometerRaw = categoryTracksOdometer(category) ? panel.querySelector('#inv-odometer').value.trim() : '';
 
   const payload = {
     name,
-    category: panel.querySelector('#inv-category').value,
+    category,
     location_id: panel.querySelector('#inv-location').value || null,
     purchase_date: panel.querySelector('#inv-purchase-date').value || null,
     purchase_price: priceRaw === '' ? null : Number(priceRaw),
@@ -1501,6 +1912,9 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
     notes: panel.querySelector('#inv-notes').value.trim() || null,
     tracked_dates: collectTrackedDates(panel),
     photo_data: photoData,
+    odometer: odometerRaw === '' ? null : Number(odometerRaw),
+    odometer_unit: odometerRaw === '' ? null : panel.querySelector('#inv-odometer-unit').value,
+    odometer_on: categoryTracksOdometer(category) ? (panel.querySelector('#inv-odometer-on').value || null) : null,
   };
 
   saveBtn.disabled = true;

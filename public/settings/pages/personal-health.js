@@ -29,6 +29,7 @@ function visibilityScopes() {
         { key: 'meds', label: t('health.tabs.meds') },
         { key: 'labs', label: t('health.tabs.labs') },
         { key: 'activities', label: t('health.tabs.activity') },
+        { key: 'prevention', label: t('health.tabs.prevention') },
         ...(canUseFasting() ? [{ key: 'fasting', label: t('health.fasting.title') }] : []),
       ],
     },
@@ -87,6 +88,17 @@ function renderPage(container, preferences, defaults) {
       </div>
     </section>
     <section class="settings-section">
+      <h2 class="settings-section__title">${t('health.tabs.prevention')}</h2>
+      <div class="settings-card">
+        <p class="settings-card-description">${t('settings.healthPreventionNotifyCaregiversHint')}</p>
+        ${toggleRowHtml({
+          label: t('settings.healthPreventionNotifyCaregiversLabel'),
+          checked: preferences.health_prevention_notify_caregivers === true,
+          attrs: { id: 'health-prevention-notify-caregivers' },
+        })}
+      </div>
+    </section>
+    <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.healthVisibilityTitle')}</h2>
       <div class="settings-card">
         <p class="settings-card-description">${t('settings.healthVisibilityHint')}</p>
@@ -115,6 +127,23 @@ function bindEvents(container) {
       window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
     } finally {
       if (input.isConnected) input.disabled = false;
+    }
+  });
+
+  // Opt-in fuer den Betreuungs-Fan-out der Vorsorge-Erinnerungen (Review
+  // #1256) - Standard aus, wirkt sofort (der Server stoesst den Sync bei
+  // dieser Aenderung selbst an).
+  const notifyInput = container.querySelector('#health-prevention-notify-caregivers');
+  notifyInput?.addEventListener('change', async () => {
+    notifyInput.disabled = true;
+    try {
+      await savePreferences({ health_prevention_notify_caregivers: notifyInput.checked });
+      window.yuvomi?.showToast(t('settings.healthPreventionNotifyCaregiversSaved'), 'success');
+    } catch (error) {
+      notifyInput.checked = !notifyInput.checked;
+      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+    } finally {
+      if (notifyInput.isConnected) notifyInput.disabled = false;
     }
   });
 }

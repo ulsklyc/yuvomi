@@ -18,7 +18,10 @@ function makeDb() {
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec(`
     CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
-      role TEXT NOT NULL DEFAULT 'member', family_role TEXT, schedule_reminder_offset_minutes INTEGER);
+      role TEXT NOT NULL DEFAULT 'member', family_role TEXT, schedule_reminder_offset_minutes INTEGER,
+      -- D6: der Subjekt-Name auf der geerbten Vorsorge-Erinnerung
+      -- kommt aus users.display_name.
+      display_name TEXT NOT NULL DEFAULT '');
     CREATE TABLE sync_config (key TEXT PRIMARY KEY, value TEXT);
     -- Zweite Rechte-Achse des Vorrats-Voll-Syncs (#467).
     CREATE TABLE access_permissions (
@@ -39,6 +42,15 @@ function makeDb() {
     -- Minimal, nur genug fuer den 'document_expiry'-Zweig in processDueNotifications().
     CREATE TABLE family_documents (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
       expires_at TEXT);
+    -- Minimal, nur genug fuer den 'health_prevention_due'-Zweig in
+    -- processDueNotifications() UND fuer syncAllPreventionReminders() -
+    -- ohne diese zwei Tabellen scheitert schon die Sync-Abfrage mit "no such
+    -- table", bevor die due-Abfrage ueberhaupt drankommt.
+    CREATE TABLE health_prevention_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);
+    CREATE TABLE health_prevention_records (id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type_id INTEGER REFERENCES health_prevention_types(id) ON DELETE SET NULL,
+      name TEXT);
     -- Minimal, wie inventory_items/pantry_items daneben - nur genug fuer die
     -- CASE-Zweige in processDueNotifications() und den Schichtplan-Sync.
     CREATE TABLE schedule_shift_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
@@ -69,7 +81,10 @@ function makeDb() {
       dismissed INTEGER NOT NULL DEFAULT 0,
       pushed_at TEXT,
       created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      -- D6-Betreuungs-Fan-out: processDueNotifications() selektiert
+      -- r.assigned_from ungeachtet des entity_type, also muss die Spalte hier stehen.
+      assigned_from INTEGER REFERENCES users(id) ON DELETE SET NULL
     );
     -- Gleiche Bauart wie schedule_reminder_entries darueber: die
     -- CASE-Zweige fuer 'waste_pickup' in processDueNotifications() lesen beide
