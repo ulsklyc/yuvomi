@@ -277,6 +277,12 @@ const expressSession = session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
+  // rolling: refresh the cookie's expiry on every response, so the 7-day
+  // window is measured from last activity instead of from the original
+  // login. Without this, a session that's actively used every day still
+  // expires exactly 7 days after login, because nothing else re-issues
+  // Set-Cookie for a session whose data hasn't changed.
+  rolling: true,
   name: SESSION_COOKIE,
   cookie: {
     httpOnly: true,
