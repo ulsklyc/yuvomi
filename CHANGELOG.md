@@ -427,6 +427,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   follow the assignment as they always have, except that one whose time has already passed is not
   delivered again to the new person. An appointment that carries a colour of its own still shows that
   colour. (#1270)
+- **An appointment you wrote yourself and assigned by hand keeps that assignment when it moves
+  between calendars.** The entry above moves an untouched default assignment along with an
+  appointment, and it read "untouched" off the assignment naming exactly the default person of the
+  calendar the appointment came from. An appointment you wrote in Yuvomi and sent out to a calendar
+  looks the same from the inside, because sending it out records which calendar it now lies in: an
+  appointment assigned to Anna by hand and sent into Anna's own calendar was in exactly that state,
+  and the next move replaced your assignment with the other calendar's person. An appointment Yuvomi
+  sent out is now left alone, by the same rule the one-off filling in of default assignees already
+  followed - it carries a trace no import has, either the target calendar you picked or the
+  identifier Yuvomi uploads it under. Appointments that really did arrive from a calendar are
+  unaffected and still take their assignment with them. (#1270)
 
 ### Security
 

@@ -54,7 +54,17 @@ export function assignDefaultToEvent(d, eventId, userId) {
 // external_source auf 'local') behält seine calendar_ref_id, gehört aber nicht
 // mehr dem Kalender.
 //
-// Und kein HINAUSGEPUSHTER Termin: der Outbound-Sync stempelt dieselben Spalten
+// Und kein HINAUSGEPUSHTER Termin - die Bedingung steht als NOT_PUSHED_OUTBOUND
+// unter diesem Block, weil der Umzug (#1270) dieselbe Frage stellt.
+//
+// Geschrieben wird über setEventAssignments(), die eine Schreibstelle der
+// Zuweisung: sie verteilt die Erinnerungen des Anlegers an die neue Person
+// (#921) und gleicht die Dokumentrechte eines Anhangs an. Ein direktes INSERT
+// zeigte der Person den Termin, aber weder Erinnerung noch Anhang.
+// --------------------------------------------------------
+
+// --------------------------------------------------------
+// Kein HINAUSGEPUSHTER Termin: der Outbound-Sync stempelt dieselben Spalten
 // (external_source, calendar_ref_id) auf einen lokal angelegten Termin, sobald er
 // im Kalender liegt. Er hinterlässt aber eine Spur, die kein Import trägt -
 // Google und CalDAV behalten ihr gewähltes Ziel (target_*), Apple und CalDAV
@@ -70,22 +80,37 @@ export function assignDefaultToEvent(d, eventId, userId) {
 // mitgenommen, aber uebersprungen ist die sichere Richtung. Die Tabellen-
 // Umbauten danach tragen created_at unveraendert mit.
 //
-// Geschrieben wird über setEventAssignments(), die eine Schreibstelle der
-// Zuweisung: sie verteilt die Erinnerungen des Anlegers an die neue Person
-// (#921) und gleicht die Dokumentrechte eines Anhangs an. Ein direktes INSERT
-// zeigte der Person den Termin, aber weder Erinnerung noch Anhang.
+// EINE Bedingung, ZWEI Fragesteller: das Nachtragen (#1154) und der Umzug
+// (#1270) wollen beide wissen, ob an dieser Zeile schon eine Hand war, und
+// kennen dieselben Spuren. Als zweite Schreibweise driftete die Regel - der
+// Umzug hatte sie erst gar nicht und stellte damit eine von Hand gesetzte
+// Zuweisung um, sobald sie zufaellig die Standard-Person des Quellkalenders
+// nannte (der eigene Kalender der zugewiesenen Person ist genau dieser Fall).
+//
+// Der Alias `e` steht im Fragment: jede einsetzende Abfrage muss
+// calendar_events als `e` fuehren.
+//
+// Nicht dabei: Outlook. Der Push dorthin ist einseitig, es gibt keinen Inbound,
+// und die Zeile bleibt dauerhaft external_source='local' ohne calendar_ref_id
+// (outlook-calendar.js, Kopfkommentar) - sie kommt an keiner der beiden Stellen
+// vorbei. Geht derselbe Termin ausserdem zu Google, CalDAV oder Apple, traegt
+// er deren Spur und ist damit schon draussen.
 // --------------------------------------------------------
+
+const NOT_PUSHED_OUTBOUND = `
+  e.target_google_calendar_id IS NULL
+    AND e.target_caldav_calendar_url IS NULL
+    AND COALESCE(e.external_calendar_id, '') <> ('oikos-' || e.id || '@oikos.local')
+    AND NOT (e.external_source = 'google' AND e.created_at < COALESCE(
+      (SELECT applied_at FROM schema_migrations WHERE version = 47), ''))
+`;
 
 const UNASSIGNED_MAPPED_EVENTS = `
   FROM calendar_events e
   JOIN external_calendars ec ON ec.id = e.calendar_ref_id
   JOIN users u ON u.id = ec.default_assignee_user_id
   WHERE e.external_source = ec.source
-    AND e.target_google_calendar_id IS NULL
-    AND e.target_caldav_calendar_url IS NULL
-    AND COALESCE(e.external_calendar_id, '') <> ('oikos-' || e.id || '@oikos.local')
-    AND NOT (e.external_source = 'google' AND e.created_at < COALESCE(
-      (SELECT applied_at FROM schema_migrations WHERE version = 47), ''))
+    AND ${NOT_PUSHED_OUTBOUND}
     AND e.assigned_to IS NULL
     AND NOT EXISTS (SELECT 1 FROM event_assignments ea WHERE ea.event_id = e.id)
 `;
@@ -245,6 +270,16 @@ export async function applyDefaultAssigneesToExisting(
 // eine Loeschung der Zuweisung - eine Handlung, die niemand angeordnet hat, und
 // mit ihr fielen die geerbten Erinnerungen der Person weg.
 //
+// UND KEIN HINAUSGEPUSHTER TERMIN. Die Bedingung oben - "GENAU die
+// Standard-Person von A" - kann eine vom Sync gesetzte Zuweisung nicht von einer
+// HANDGESETZTEN unterscheiden, wenn beide dieselbe Person nennen. Genau das ist
+// der eigene Termin, den jemand Anna zuweist und in Annas eigenen Kalender
+// pusht: der Push stempelt `calendar_ref_id` darauf (caldav-outbound.js,
+// caldav-sync.js, apple-calendar.js, google-calendar.js), und beim naechsten
+// Umzug sah der Helfer "Zuweisung == Standard-Person von A" und stellte die
+// Handarbeit auf die Person von B um. Gefragt wird deshalb dasselbe wie beim
+// Nachtragen (#1154), aus DERSELBEN Quelle: NOT_PUSHED_OUTBOUND.
+//
 // Eine Altzeile ohne `calendar_ref_id` bleibt aussen vor: woher sie kam, ist
 // nicht bekannt, und ohne das Vorher gibt es kein "unangetastet".
 //
@@ -265,7 +300,8 @@ export async function applyDefaultAssigneesToExisting(
 /**
  * Stellt die Standard-Zuweisung eines umgezogenen Sync-Termins auf die
  * Standard-Person des neuen Kalenders um. No-op, wenn die Zuweisung nicht
- * genau die unangetastete Standard-Person des alten Kalenders ist.
+ * genau die unangetastete Standard-Person des alten Kalenders ist oder der
+ * Termin hinausgepusht wurde (NOT_PUSHED_OUTBOUND).
  *
  * @param {object} d better-sqlite3 Datenbank-Handle
  * @param {number} eventId ID des umgezogenen Termins
@@ -284,6 +320,14 @@ export function reassignDefaultOnCalendarMove(
   if (!eventId || fromCalRefId == null || toCalRefId == null) return false;
   if (Number(fromCalRefId) === Number(toCalRefId)) return false;
   if (!toDefaultUserId) return false;
+
+  // An einem hinausgepushten Termin war schon eine Hand: seine Zuweisung ist
+  // eine Aussage eines Menschen, auch wenn sie dieselbe Person nennt wie der
+  // Kalender, in dem er liegt.
+  const notPushedOut = d.prepare(
+    `SELECT 1 FROM calendar_events e WHERE e.id = ? AND ${NOT_PUSHED_OUTBOUND}`
+  ).get(eventId);
+  if (!notPushedOut) return false;
 
   const fromDefault = d.prepare(
     'SELECT default_assignee_user_id FROM external_calendars WHERE id = ?'

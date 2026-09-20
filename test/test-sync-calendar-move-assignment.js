@@ -92,24 +92,28 @@ const VEVENT = (uid) => [
   'END:VEVENT', 'END:VCALENDAR',
 ].join('\r\n');
 
-/** CalDAV-Client, der GENAU EINEN Kalender mit dem Termin liefert. */
-const caldavClient = (calendarUrl) => async () => ({
+/**
+ * CalDAV-Client, der GENAU EINEN Kalender mit dem Termin liefert. `null` als
+ * Kalender heisst: kein Kalender liefert etwas - so laeuft der Outbound-Push
+ * ohne einen Inbound-Fund davor.
+ */
+const caldavClient = (calendarUrl, uid = UID) => async () => ({
   fetchCalendars: async () => [
     { url: CAL_A, displayName: 'Kalender A', components: ['VEVENT'] },
     { url: CAL_B, displayName: 'Kalender B', components: ['VEVENT'] },
   ],
   fetchCalendarObjects: async ({ calendar }) =>
-    (calendar.url === calendarUrl ? [{ data: VEVENT(UID), url: `${calendarUrl}${UID}.ics` }] : []),
+    (calendar.url === calendarUrl ? [{ data: VEVENT(uid), url: `${calendarUrl}${uid}.ics` }] : []),
   createCalendarObject: async () => ({}),
 });
 
-const appleClient = (calendarUrl) => async () => ({
+const appleClient = (calendarUrl, uid = UID) => async () => ({
   fetchCalendars: async () => [
     { url: CAL_A, displayName: 'Kalender A', calendarColor: '#FF0000' },
     { url: CAL_B, displayName: 'Kalender B', calendarColor: '#00FF00' },
   ],
   fetchCalendarObjects: async ({ calendar }) =>
-    (calendar.url === calendarUrl ? [{ data: VEVENT(UID), url: `${calendarUrl}${UID}.ics` }] : []),
+    (calendar.url === calendarUrl ? [{ data: VEVENT(uid), url: `${calendarUrl}${uid}.ics` }] : []),
   createCalendarObject: async () => ({}),
 });
 
@@ -425,5 +429,153 @@ describe('#1270 - der Helfer selbst', () => {
     );
     assert.deepEqual(assignmentsOf(id), [BEN]);
     assert.equal(Number(db.prepare('SELECT assigned_to FROM calendar_events WHERE id = ?').get(id).assigned_to), BEN);
+  });
+});
+
+// --------------------------------------------------------
+// Der hinausgepushte Termin (Folgebefund zu #1270).
+//
+// Ein eigener Termin, den jemand von Hand der Person zuweist, die AUCH der
+// Zielkalender vergibt, sieht nach dem Push wie ein unangetasteter Import aus:
+// `calendar_ref_id` zeigt auf A, die Zuweisung nennt As Standard-Person. Die
+// Schwester-Abfrage des Nachtragens (#1154) kennt diesen Fall und nimmt einen
+// hinausgepushten Termin ausdruecklich aus; der Umzug tat es nicht und stellte
+// die Handarbeit auf die Person von B um.
+//
+// Gefahren wird der ECHTE Weg: der Outbound-Push uebergibt die Zeile an den
+// Sync (oikos-UID, `calendar_ref_id`), der Inbound haengt sie danach um.
+// --------------------------------------------------------
+
+describe('#1270 - ein hinausgepushter Termin behaelt seine Zuweisung', () => {
+  beforeEach(resetTables);
+
+  const rowOf = (id) => db.prepare(
+    `SELECT assigned_to, calendar_ref_id, external_source, external_calendar_id
+     FROM calendar_events WHERE id = ?`
+  ).get(id);
+  const refOf = (externalId) => Number(
+    db.prepare('SELECT id FROM external_calendars WHERE external_id = ?').get(externalId).id
+  );
+
+  it('CalDAV: der eigene Termin, von Hand zugewiesen und hinausgepusht, behaelt sie', async () => {
+    externalCalendar('caldav', CAL_A, 'Kalender A', ANNA);
+    externalCalendar('caldav', CAL_B, 'Kalender B', BEN);
+    seedCaldavAccount();
+    const accountId = Number(db.prepare('SELECT id FROM caldav_accounts').get().id);
+
+    // Eigener Termin, von Hand an Anna - die Person, die auch Kalender A vergibt.
+    const id = Number(db.prepare(`
+      INSERT INTO calendar_events
+        (title, start_datetime, end_datetime, created_by, assigned_to,
+         target_caldav_account_id, target_caldav_calendar_url)
+      VALUES ('Zahnarzt', '2026-04-01T09:00', '2026-04-01T10:00', ?, ?, ?, ?)
+      RETURNING id
+    `).get(OWNER, ANNA, accountId, CAL_A).id);
+    db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(id, ANNA);
+
+    // ECHTER Outbound: kein Kalender liefert etwas, der Push laeuft.
+    await caldavSync({ createClient: caldavClient(null) });
+    const uid = `oikos-${id}@oikos.local`;
+    const pushed = rowOf(id);
+    assert.equal(pushed.external_source, 'caldav', 'der Push hat die Zeile uebergeben');
+    assert.equal(pushed.external_calendar_id, uid, 'und ihr die oikos-UID gegeben');
+    assert.equal(Number(pushed.calendar_ref_id), refOf(CAL_A), 'sie liegt in Kalender A');
+
+    // ECHTER Inbound: derselbe Termin liegt jetzt in Kalender B.
+    await caldavSync({ createClient: caldavClient(CAL_B, uid) });
+    const moved = rowOf(id);
+    assert.equal(Number(moved.calendar_ref_id), refOf(CAL_B), 'der Umzug kam an');
+    assert.equal(Number(moved.assigned_to), ANNA, 'die Handarbeit bleibt');
+    assert.deepEqual(assignmentsOf(id), [ANNA], 'und sie ist die einzige');
+  });
+
+  it('Apple: die oikos-UID allein haelt die Zuweisung, ohne jedes Ziel', async () => {
+    externalCalendar('apple', CAL_A, 'Kalender A', ANNA);
+    externalCalendar('apple', CAL_B, 'Kalender B', BEN);
+
+    // Der Apple-Legacy-Outbound laedt JEDEN lokalen Termin in den ersten
+    // Kalender - ohne Zielspalte. Die UID ist die einzige Spur des Pushs.
+    const id = Number(db.prepare(`
+      INSERT INTO calendar_events
+        (title, start_datetime, end_datetime, created_by, assigned_to)
+      VALUES ('Zahnarzt', '2026-04-01T09:00', '2026-04-01T10:00', ?, ?)
+      RETURNING id
+    `).get(OWNER, ANNA).id);
+    db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(id, ANNA);
+
+    // ECHTER Outbound: kein Kalender liefert etwas, der Push laeuft.
+    await appleSync({ makeClient: appleClient(null) });
+    const uid = `oikos-${id}@oikos.local`;
+    const pushed = rowOf(id);
+    assert.equal(pushed.external_source, 'apple', 'der Push hat die Zeile uebergeben');
+    assert.equal(pushed.external_calendar_id, uid, 'und ihr die oikos-UID gegeben');
+    assert.equal(Number(pushed.calendar_ref_id), refOf(CAL_A), 'sie liegt in Kalender A');
+    const targets = db.prepare(`SELECT target_caldav_calendar_url AS c,
+      target_google_calendar_id AS g FROM calendar_events WHERE id = ?`).get(id);
+    assert.equal(targets.c, null, 'Apple setzt keine CalDAV-Zielspalte');
+    assert.equal(targets.g, null, 'und keine Google-Zielspalte');
+
+    // ECHTER Inbound: derselbe Termin liegt jetzt in Kalender B.
+    await appleSync({ makeClient: appleClient(CAL_B, uid) });
+    const moved = rowOf(id);
+    assert.equal(Number(moved.calendar_ref_id), refOf(CAL_B), 'der Umzug kam an');
+    assert.equal(Number(moved.assigned_to), ANNA, 'die Handarbeit bleibt');
+    assert.deepEqual(assignmentsOf(id), [ANNA], 'und sie ist die einzige');
+  });
+
+  it('Google: der gewaehlte Zielkalender haelt die Zuweisung', () => {
+    const refA = externalCalendar('google', GCAL_A, 'Kalender A', ANNA);
+    const refB = externalCalendar('google', GCAL_B, 'Kalender B', BEN);
+
+    // Der Stand, den der Google-Outbound nach dem Push schreibt
+    // (google-calendar.js: external_source='google' + calendar_ref_id, das
+    // gewaehlte Ziel bleibt stehen). Von Hand an Anna, die auch A vergibt.
+    const id = Number(db.prepare(`
+      INSERT INTO calendar_events
+        (title, start_datetime, end_datetime, created_by, assigned_to,
+         external_source, external_calendar_id, calendar_ref_id,
+         target_google_calendar_id)
+      VALUES ('Zahnarzt', '2026-04-01T09:00', '2026-04-01T10:00', ?, ?,
+              'google', 'gev-push', ?, ?)
+      RETURNING id
+    `).get(OWNER, ANNA, refA, GCAL_A).id);
+    db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(id, ANNA);
+
+    // ECHTER Inbound: dieselbe Event-ID, jetzt aus Kalender B.
+    google.upsertGoogleEvents([gItem('gev-push')], refB, '#4A90E2', {});
+    const moved = rowOf(id);
+    assert.equal(Number(moved.calendar_ref_id), refB, 'der Umzug kam an');
+    assert.equal(Number(moved.assigned_to), ANNA, 'die Handarbeit bleibt');
+    assert.deepEqual(assignmentsOf(id), [ANNA], 'und sie ist die einzige');
+  });
+
+  it('Google: ein Termin von vor Migration 47 bleibt aussen vor', () => {
+    const refA = externalCalendar('google', GCAL_A, 'Kalender A', ANNA);
+    const refB = externalCalendar('google', GCAL_B, 'Kalender B', BEN);
+
+    // Vor Migration 47 lud der Google-Outbound JEDEN lokalen Termin in den einen
+    // Google-Kalender, ohne Ziel, und die Migration hat target_google_calendar_id
+    // nicht nachgetragen: ein solcher Push ist von einem Import nicht zu
+    // unterscheiden. Dass hier nur Handarbeit stehen kann, sagt das Datum - die
+    // Standard-Person je Kalender kam erst mit Migration 79, der Import konnte
+    // die Zuweisung damals also nicht gesetzt haben.
+    const id = Number(db.prepare(`
+      INSERT INTO calendar_events
+        (title, start_datetime, end_datetime, created_by, assigned_to,
+         external_source, external_calendar_id, calendar_ref_id)
+      VALUES ('Zahnarzt', '2026-04-01T09:00', '2026-04-01T10:00', ?, ?,
+              'google', 'gev-legacy', ?)
+      RETURNING id
+    `).get(OWNER, ANNA, refA).id);
+    db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(id, ANNA);
+    db.prepare(`UPDATE calendar_events SET created_at = '2020-01-01T00:00:00Z' WHERE id = ?`).run(id);
+    const applied = db.prepare('SELECT applied_at FROM schema_migrations WHERE version = 47').get();
+    assert.ok(applied, 'Migration 47 steht in schema_migrations');
+
+    google.upsertGoogleEvents([gItem('gev-legacy')], refB, '#4A90E2', {});
+    const moved = rowOf(id);
+    assert.equal(Number(moved.calendar_ref_id), refB, 'der Umzug kam an');
+    assert.equal(Number(moved.assigned_to), ANNA, 'die Handarbeit bleibt');
+    assert.deepEqual(assignmentsOf(id), [ANNA], 'und sie ist die einzige');
   });
 });
