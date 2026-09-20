@@ -35,14 +35,34 @@ const REFERENCE_LOCALE = 'de';
 // ("Birthday: <Name>") - ein Bestandshaushalt erlebt so keinen stillen Wechsel.
 const DEFAULT_LOCALE = 'en';
 
-// `{2,3}`, nicht `{2}`: Filipino traegt den ISO-639-2-Code `fil`, und die
-// Datei heisst danach. Mit `{2}` fiel `fil.json` aus der Liste, ohne dass
-// irgendwo ein Fehler entstand - das Auswahlmenue baut seine Optionen aus
-// SUPPORTED_LOCALES im Frontend und bot Filipino weiter an, waehrend
-// `isSupportedLocale('fil')` false war und das Speichern mit 400 antwortete.
-// Dieselbe Erweiterung steht seit laengerem am Sprachteil des Regionscodes
-// (`/^([a-z]{2,3})-[A-Z]{2}$/` weiter unten); hier war sie vergessen worden.
-const LOCALE_FILE_RE = /^([a-z]{2,3})\.json$/;
+// Die Form, die BCP-47 fuer einen Locale-Dateinamen zulaesst: Sprache, optional
+// Schrift, optional Region - `de`, `fil`, `pt-BR`, `zh-Hant`, `sr-Latn-RS`.
+//
+// Dieselbe Naht ist hier zweimal gerissen, beide Male an einer Laengenangabe,
+// die genau den Bestand beschrieb statt die Regel. Erst forderte der
+// Regionscode in preferences.js `{2}` und wies `fil-PH` ab; dann forderte
+// dieses Muster `{2}` und verlor `fil.json` (#1322), waehrend das Auswahlmenue
+// Filipino weiter anbot, weil es seine Optionen aus SUPPORTED_LOCALES im
+// Frontend baut - `isSupportedLocale('fil')` war false und das Speichern
+// antwortete mit 400. Nach `{2,3}` waere `zh-Hant.json` das dritte Mal gewesen.
+//
+// Die Erweiterung kostet nichts, solange sie eine Form beschreibt und keine
+// beliebige Datei durchlaesst: `README.json` oder ein `de-de.json` mit
+// kleingeschriebener Region bleiben draussen, sonst gaebe die Liste einem
+// Nicht-Locale den Rang einer Sprache. Der Test dazu nagelt beide Richtungen
+// fest, weil der Bestand selbst keine einzige dieser Formen traegt.
+const LOCALE_FILE_RE = /^([a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-[A-Z]{2})?)\.json$/;
+
+/**
+ * Der Locale-Code eines Dateinamens, oder null. Exportiert, weil der Bestand
+ * die Erweiterung nicht misst: alle 24 Dateien heissen `xx.json` oder
+ * `xxx.json`, ein Test ueber getSupportedLocales() liefe an jeder Subtag-Form
+ * vorbei. getSupportedLocales() ruft genau diese Funktion, es gibt also keinen
+ * zweiten Pfad, der auseinanderlaufen koennte.
+ */
+export function localeFromFileName(file) {
+  return file.match(LOCALE_FILE_RE)?.[1] ?? null;
+}
 
 let supportedLocales = null;
 const localeCache = new Map();
@@ -57,7 +77,7 @@ export function getSupportedLocales() {
   if (supportedLocales) return supportedLocales;
   try {
     supportedLocales = readdirSync(LOCALES_DIR)
-      .map((file) => file.match(LOCALE_FILE_RE)?.[1])
+      .map(localeFromFileName)
       .filter(Boolean)
       .sort();
   } catch {

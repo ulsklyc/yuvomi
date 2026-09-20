@@ -378,3 +378,72 @@ test('der Leser von SUPPORTED_LOCALES verschluckt keinen Code', () => {
   assert.equal(LOCALES.length, new Set(LOCALES).size, 'doppelter Code in SUPPORTED_LOCALES');
   assert.ok(LOCALES.includes('fil'), 'fil fehlt - der Code aus #1322');
 });
+
+// Die Serverliste entsteht aus DATEINAMEN, und das Muster dahinter hat dieselbe
+// Naht schon zweimal aufgerissen - beide Male, weil es den Bestand beschrieb
+// statt die Regel. `{2}` wies erst `fil-PH` als Region ab, dann verlor es
+// `fil.json` (#1322). Seit 20.09.2026 beschreibt es die BCP-47-Form: Sprache,
+// optional Schrift, optional Region.
+//
+// Geprueft wird hier `localeFromFileName`, nicht `getSupportedLocales()`: der
+// Bestand traegt 24 Dateien der Form `xx.json`/`xxx.json` und keine einzige mit
+// Subtag, ein Test ueber die fertige Liste liefe also an der Erweiterung vorbei
+// und waere gruen, egal was das Muster erlaubt. Der Test darunter haengt die
+// Funktion an ihren Aufrufer, damit dieser Zugriff keine zweite Wahrheit wird.
+test('ein Locale-Dateiname darf Schrift- und Regions-Subtags tragen', async () => {
+  const { localeFromFileName } = await import('../server/utils/i18n.js');
+
+  for (const [datei, code] of [
+    ['de.json', 'de'],
+    ['fil.json', 'fil'],
+    ['pt-BR.json', 'pt-BR'],
+    ['zh-Hant.json', 'zh-Hant'],
+    ['sr-Latn-RS.json', 'sr-Latn-RS'],
+  ]) {
+    assert.equal(localeFromFileName(datei), code,
+      `${datei} faellt aus der Serverliste. Die Oberflaeche wuerde die Sprache `
+      + 'anbieten und das Speichern mit 400 antworten - der Ausgang von #1322.');
+  }
+
+  // Die Gegenrichtung gehoert dazu: ein Muster, das alles durchlaesst, gaebe
+  // einer beliebigen Datei im Ordner den Rang einer Sprache. `de-de` steht
+  // hier fuer die Schreibweise - BCP-47 schreibt die Region gross, und zwei
+  // Schreibweisen derselben Sprache waeren zwei Eintraege in der Liste.
+  for (const datei of ['README.json', 'de.txt', 'de-de.json', 'zh-HANT.json',
+    'a.json', 'abcd.json', 'de-.json', '.json']) {
+    assert.equal(localeFromFileName(datei), null,
+      `${datei} wird als Sprache gezaehlt, obwohl es keine ist.`);
+  }
+});
+
+// Der Test darueber misst eine Funktion; dieser haelt sie an ihren Aufrufer.
+//
+// Gemessen wird der QUELLTEXT, und das ist hier nicht die bequeme, sondern die
+// einzige ehrliche Wahl. Die erste Fassung verglich getSupportedLocales() mit
+// dem, was localeFromFileName ueber denselben Ordner ergibt - und war gruen,
+// als getSupportedLocales() zur Gegenprobe ein eigenes, enges Muster bekam:
+// solange keine einzige Datei im Bestand einen Subtag traegt, liefern ein
+// weites und ein enges Muster dieselben 24 Codes. Der Vergleich konnte die
+// Frage gar nicht beantworten, die er stellte.
+//
+// Die Frage ist selbst eine Quelltextfrage: gibt es ZWEI Muster fuer einen
+// Locale-Dateinamen. Geprueft wird deshalb die Regel, nicht die Schreibweise
+// eines Aufrufs - ein escaptes `\.json` steht ausschliesslich in einem Regex,
+// der Dateinamen liest, waehrend die gewoehnliche Pfadbildung
+// (`${locale}.json`) ohne Backslash auskommt.
+test('es gibt nur EIN Muster fuer Locale-Dateinamen', () => {
+  const quelle = readFileSync(new URL('../server/utils/i18n.js', import.meta.url), 'utf8');
+  const muster = quelle.match(/\\\.json/g) ?? [];
+  assert.equal(muster.length, 1,
+    `server/utils/i18n.js traegt ${muster.length} Dateinamen-Muster statt einem. `
+    + 'Ein zweites laeuft an localeFromFileName vorbei und damit an dessen Test.');
+});
+
+// Der Realitaetsanker dazu: die Liste, die der Server wirklich ausliefert.
+test('die Serverliste traegt jede Locale-Datei des Ordners', async () => {
+  const { getSupportedLocales } = await import('../server/utils/i18n.js');
+  const dateien = readdirSync(LOCALES_DIR).filter(f => f.endsWith('.json')).length;
+  assert.equal(getSupportedLocales().length, dateien,
+    'Die Serverliste ist kuerzer als der Ordner - eine Datei faellt aus dem Muster.');
+  assert.ok(getSupportedLocales().includes('fil'), 'fil fehlt - der Code aus #1322');
+});
