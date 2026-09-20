@@ -84,6 +84,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A recurring appointment moved "from this date on" in another calendar no longer appears twice on
+  that day.** When a series is split that way, the other calendar ends the old series and starts the
+  new one at the split - and Open-Xchange (mailbox.org), for one, ends the old series one second
+  before the appointment on the split day itself, not on the day before. Yuvomi read only the date
+  from that end marker and threw the time away, so the old series still produced its appointment on
+  the split day while the new one already began there: that single day showed both times, every
+  other day was correct. The end of a series is now read as the moment it is. A series that ends on
+  a whole day keeps it, so all-day series are unchanged - and so is every split Yuvomi itself
+  makes, which has always ended the old series on the day before. Subscribed ICS calendars are read
+  the same way. (#1269)
+
 - **An empty database file no longer starts Yuvomi as an empty instance.** If the database file
   existed but had a size of zero, Yuvomi took it for a new database, set it up from scratch and came
   up empty, without a word - usually in the very moment somebody was moving data, where that looks
