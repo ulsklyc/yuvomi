@@ -1,4 +1,4 @@
-/** Fasting preferences and record dialog, on Health and Settings. */
+/** Shared fasting preferences and record dialog, on Health, Settings and Dashboard. */
 import { api } from '/api.js';
 import { t, formatDate, formatTime } from '/i18n.js';
 import { esc } from '/utils/html.js';
@@ -361,7 +361,10 @@ export function startFastingClock(root, active, last, initial = {}, options = {}
   }, { signal: controller.signal }));
   tick();
   if (options.refresh) {
-    const resume = () => { if (!document.hidden && root.isConnected) void options.refresh(); };
+    const resume = (event) => {
+      if (event?.type === 'pageshow' && !event.persisted) return;
+      if (!document.hidden && root.isConnected) void options.refresh();
+    };
     document.addEventListener('visibilitychange', resume, { signal: controller.signal });
     window.addEventListener('pageshow', resume, { signal: controller.signal });
   }
